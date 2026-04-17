@@ -1,0 +1,633 @@
+<!doctype html>
+<html lang="nl">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>VTK — Aanbod · Openingsuren</title>
+<link rel="stylesheet" href="styles.css" />
+<style>
+  body { background: var(--paper); }
+
+  .page-head {
+    max-width: var(--max); margin: 0 auto;
+    padding: 64px 32px 48px;
+    border-bottom: 1px solid var(--rule);
+    display: grid; grid-template-columns: 1fr auto; gap: 40px; align-items: end;
+  }
+  .crumbs {
+    font-family: var(--mono); font-size: 11px;
+    letter-spacing: 0.08em; text-transform: uppercase;
+    color: var(--muted); margin-bottom: 16px;
+  }
+  .page-head h1 {
+    font-size: clamp(56px, 7vw, 112px);
+    line-height: 0.9; letter-spacing: -0.035em; font-weight: 500;
+  }
+  .page-head h1 em { color: oklch(0.62 0.01 260); font-style: normal; font-weight: 400; }
+  .page-head-meta {
+    font-family: var(--mono); font-size: 11px;
+    letter-spacing: 0.06em; text-transform: uppercase;
+    text-align: right; color: var(--muted); line-height: 1.9;
+  }
+  .page-head-meta b { color: var(--ink); font-weight: 500; }
+
+  .aanbod-wrap { max-width: var(--max); margin: 0 auto; padding: 48px 32px 96px; }
+
+  /* Live status ribbon */
+  .live-ribbon {
+    background: var(--ink);
+    color: var(--paper);
+    padding: 24px 32px;
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    gap: 32px;
+    align-items: center;
+    margin-bottom: 48px;
+  }
+  .live-ribbon .now-label {
+    font-family: var(--mono); font-size: 11px;
+    letter-spacing: 0.08em; text-transform: uppercase;
+    color: oklch(0.6 0.02 260);
+  }
+  .live-ribbon .now-label b { color: var(--accent); display: block; font-family: var(--sans); font-size: 32px; letter-spacing: -0.02em; margin-top: 4px; font-weight: 500; }
+  .live-ribbon .summary {
+    font-size: 17px;
+    color: oklch(0.85 0.02 260);
+    line-height: 1.5;
+  }
+  .live-ribbon .summary b { color: var(--paper); font-weight: 500; }
+  .live-ribbon .summary .op { color: oklch(0.85 0.17 145); }
+  .live-ribbon .summary .cl { color: oklch(0.75 0.12 30); }
+
+  /* Services grid */
+  .services {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0;
+    border-left: 1px solid var(--rule);
+    border-top: 1px solid var(--rule);
+  }
+  .svc {
+    padding: 40px;
+    border-right: 1px solid var(--rule);
+    border-bottom: 1px solid var(--rule);
+    background: var(--paper);
+    position: relative;
+  }
+  .svc-head {
+    display: flex; justify-content: space-between; align-items: baseline;
+    border-bottom: 1px solid var(--rule); padding-bottom: 20px; margin-bottom: 24px;
+  }
+  .svc-num {
+    font-family: var(--mono); font-size: 11px;
+    letter-spacing: 0.08em; color: var(--muted); text-transform: uppercase;
+  }
+  .svc h2 { font-size: 48px; letter-spacing: -0.03em; font-weight: 500; line-height: 1; margin: 4px 0; }
+  .svc .tagline { font-family: var(--mono); font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
+
+  .svc-status {
+    display: flex; justify-content: space-between; align-items: baseline;
+    padding: 14px 0; border-bottom: 1px solid var(--rule);
+  }
+  .svc-status .state {
+    font-family: var(--mono); font-size: 14px;
+    letter-spacing: 0.06em; text-transform: uppercase;
+  }
+  .svc-status .state.open { color: oklch(0.55 0.18 145); }
+  .svc-status .state.open::before { content: "●"; margin-right: 10px; animation: pulse 2s ease-in-out infinite; }
+  .svc-status .state.closed { color: oklch(0.55 0.12 30); }
+  .svc-status .state.closed::before { content: "●"; margin-right: 10px; }
+  .svc-status .change { font-family: var(--mono); font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
+
+  /* Visual hours timeline */
+  .hours-viz {
+    margin: 24px 0;
+    display: grid;
+    grid-template-columns: 80px 1fr;
+    gap: 12px;
+  }
+  .hours-viz .day-lbl {
+    font-family: var(--mono); font-size: 11px;
+    letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted);
+    padding: 6px 0;
+    align-self: center;
+  }
+  .hours-viz .day-lbl.today { color: var(--accent-2); font-weight: 600; }
+  .hours-viz .bar-track {
+    height: 20px;
+    background: var(--paper-2);
+    border: 1px solid var(--rule);
+    position: relative;
+    align-self: center;
+  }
+  .hours-viz .bar-track::before,
+  .hours-viz .bar-track::after {
+    content: "00";
+    position: absolute;
+    top: 22px;
+    font-family: var(--mono); font-size: 9px;
+    color: var(--muted); letter-spacing: 0.04em;
+  }
+  .hours-viz .bar-track::before { left: 0; content: "06:00"; }
+  .hours-viz .bar-track::after { right: 0; content: "22:00"; }
+  .hours-viz .bar {
+    position: absolute;
+    top: 0; bottom: 0;
+    background: var(--ink);
+    display: flex; align-items: center;
+    padding: 0 8px;
+    color: var(--accent);
+    font-family: var(--mono); font-size: 10px;
+    letter-spacing: 0.04em;
+    overflow: hidden; white-space: nowrap;
+  }
+  .hours-viz .today-row .bar { background: var(--accent); color: var(--ink); }
+  .hours-viz .closed .bar { display: none; }
+  .hours-viz .closed .bar-track {
+    background: repeating-linear-gradient(-45deg, var(--paper) 0 6px, var(--paper-2) 6px 12px);
+  }
+
+  .svc-meta {
+    margin-top: 28px; padding-top: 20px;
+    border-top: 1px solid var(--rule);
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    font-family: var(--mono); font-size: 11px;
+  }
+  .svc-meta dt { color: var(--muted); letter-spacing: 0.06em; text-transform: uppercase; }
+  .svc-meta dd { color: var(--ink); letter-spacing: 0.02em; margin-top: 2px; }
+
+  .svc-actions { margin-top: 28px; display: flex; gap: 10px; flex-wrap: wrap; }
+
+  /* Special banner for theokot */
+  .svc.feat { background: var(--accent); }
+  .svc.feat .svc-head { border-bottom-color: oklch(0.5 0.18 80); }
+  .svc.feat .svc-num { color: oklch(0.4 0.15 80); }
+  .svc.feat .tagline { color: oklch(0.4 0.15 80); }
+  .svc.feat .svc-status { border-bottom-color: oklch(0.5 0.18 80); }
+  .svc.feat .svc-status .state.open { color: var(--ink); }
+  .svc.feat .svc-status .state.open::before { color: var(--ink); }
+  .svc.feat .hours-viz .bar-track { background: oklch(0.7 0.15 90); border-color: oklch(0.5 0.18 80); }
+  .svc.feat .hours-viz .bar { background: var(--ink); color: var(--accent); }
+  .svc.feat .hours-viz .today-row .bar { background: var(--paper); color: var(--ink); }
+  .svc.feat .hours-viz .bar-track::before, .svc.feat .hours-viz .bar-track::after { color: oklch(0.3 0.15 80); }
+  .svc.feat .svc-meta { border-top-color: oklch(0.5 0.18 80); }
+  .svc.feat .svc-meta dt { color: oklch(0.4 0.15 80); }
+  .svc.feat .btn-ghost { border-color: var(--ink); color: var(--ink); }
+  .svc.feat .btn-ghost:hover { background: var(--ink); color: var(--accent); }
+  .svc.feat .btn-primary { background: var(--ink); color: var(--accent); }
+
+  /* Menu strip for theokot */
+  .menu-strip {
+    margin-top: 64px; padding: 48px 0;
+    border-top: 1px solid var(--rule);
+    border-bottom: 1px solid var(--rule);
+  }
+  .menu-strip-head {
+    display: flex; justify-content: space-between; align-items: baseline;
+    margin-bottom: 32px;
+  }
+  .menu-strip-head h3 { font-size: 32px; letter-spacing: -0.02em; font-weight: 500; }
+  .menu-strip-head .sub { font-family: var(--mono); font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
+  .menu-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 0;
+    border-left: 1px solid var(--rule);
+    border-top: 1px solid var(--ink);
+  }
+  .menu-item {
+    padding: 24px 20px;
+    border-right: 1px solid var(--rule);
+    border-bottom: 1px solid var(--rule);
+    display: flex; flex-direction: column; gap: 8px;
+  }
+  .menu-item .nr { font-family: var(--mono); font-size: 11px; letter-spacing: 0.06em; color: var(--muted); }
+  .menu-item h4 { font-size: 18px; letter-spacing: -0.01em; font-weight: 500; }
+  .menu-item .ingr { font-size: 13px; color: var(--muted); line-height: 1.4; flex: 1; }
+  .menu-item .price {
+    font-family: var(--mono); font-size: 14px;
+    margin-top: 12px; padding-top: 12px;
+    border-top: 1px solid var(--rule);
+    display: flex; justify-content: space-between;
+    letter-spacing: 0.04em;
+  }
+  .menu-item .price b { font-weight: 500; }
+  .menu-item.sold-out { opacity: 0.5; }
+  .menu-item.sold-out::after {
+    content: "UITVERKOCHT";
+    font-family: var(--mono); font-size: 10px;
+    letter-spacing: 0.08em; color: oklch(0.55 0.12 30);
+    margin-top: 8px;
+  }
+
+  /* Location block */
+  .locations {
+    margin-top: 64px;
+    display: grid;
+    grid-template-columns: 1fr 2fr;
+    gap: 32px;
+  }
+  .locations-side h3 { font-size: 32px; letter-spacing: -0.02em; font-weight: 500; margin-bottom: 12px; line-height: 1; }
+  .locations-side .sub { font-family: var(--mono); font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); margin-bottom: 24px; }
+  .locations-side p { font-size: 15px; color: var(--ink-2); line-height: 1.6; margin-bottom: 20px; }
+
+  .map-ph {
+    background: var(--ink); color: oklch(0.7 0.02 260);
+    aspect-ratio: 16/9;
+    position: relative;
+    overflow: hidden;
+    background-image:
+      linear-gradient(oklch(0.24 0.04 260) 1px, transparent 1px),
+      linear-gradient(90deg, oklch(0.24 0.04 260) 1px, transparent 1px);
+    background-size: 40px 40px;
+    background-color: oklch(0.18 0.04 260);
+  }
+  .map-ph::before {
+    content: "";
+    position: absolute;
+    top: 50%; left: 42%;
+    width: 16px; height: 16px;
+    background: var(--accent);
+    transform: translate(-50%, -50%);
+    box-shadow: 0 0 0 8px oklch(0.85 0.17 90 / 0.3);
+    animation: pulse 2s ease-in-out infinite;
+  }
+  .map-ph .pin-lbl {
+    position: absolute;
+    top: calc(50% + 18px); left: 42%;
+    transform: translateX(-50%);
+    font-family: var(--mono); font-size: 11px;
+    letter-spacing: 0.06em; text-transform: uppercase;
+    color: var(--accent);
+    background: oklch(0.18 0.04 260); padding: 4px 8px;
+    border: 1px solid oklch(0.26 0.04 260);
+    white-space: nowrap;
+  }
+  .map-ph .coords {
+    position: absolute; bottom: 16px; left: 16px;
+    font-family: var(--mono); font-size: 11px;
+    letter-spacing: 0.06em; text-transform: uppercase;
+    color: oklch(0.6 0.02 260);
+  }
+
+  .back-link {
+    position: fixed;
+    top: 16px; left: 16px;
+    z-index: 100;
+    font-family: var(--mono); font-size: 11px;
+    padding: 8px 12px;
+    background: var(--paper);
+    border: 1px solid var(--rule);
+    letter-spacing: 0.06em; text-transform: uppercase;
+  }
+  .back-link:hover { background: var(--ink); color: var(--accent); border-color: var(--ink); }
+</style>
+</head>
+<body>
+  <a href="index.html" class="back-link">← opties</a>
+
+  <div class="utility">
+    <div class="utility-inner">
+      <div><span class="dot"></span>Theokot open · Cursusdienst open</div>
+      <div class="utility-links">
+        <a href="home-editorial.html">Home</a>
+        <a href="kalender.html">Kalender</a>
+        <a>Tweedehands</a>
+        <a>Shiften</a>
+        <a>Tijdsloten</a>
+      </div>
+    </div>
+  </div>
+
+  <nav class="nav">
+    <div class="nav-inner">
+      <a href="home-editorial.html" class="brand">
+        <div class="brand-mark">v·</div>
+        <div>
+          <div class="brand-name">VTK</div>
+          <div class="brand-sub">EST. 1920</div>
+        </div>
+      </a>
+      <div class="nav-links">
+        <a class="active">Aanbod</a><a>Eerstejaars</a><a>Career</a><a>Cursusdienst</a><a>Internationaal</a><a>Studies</a><a>Media</a><a>Over</a><a href="kalender.html">Kalender</a>
+      </div>
+      <div class="nav-right">
+        <button class="lang">NL <span style="color: var(--muted);">/ EN</span></button>
+        <div class="avatar"></div>
+      </div>
+    </div>
+  </nav>
+
+  <header class="page-head">
+    <div>
+      <div class="crumbs">Home · <span style="color: var(--ink);">Aanbod · Openingsuren</span></div>
+      <h1>Aanbod.<br/><em>Wanneer wat open is.</em></h1>
+    </div>
+    <div class="page-head-meta">
+      Diensten<br/><b>Theokot · Cursusdienst · Shiften</b><br/><br/>
+      Locatie<br/><b>Campus Arenberg · Heverlee</b><br/><br/>
+      Live update<br/><b>elke 60 seconden</b>
+    </div>
+  </header>
+
+  <main class="aanbod-wrap">
+    <!-- Live ribbon -->
+    <section class="live-ribbon">
+      <div class="now-label">Vandaag<br/><b>DO · 03 dec · 11:42</b></div>
+      <div class="summary">
+        <b>Theokot</b> is <span class="op">nu open</span> tot 14:00 ·
+        <b>Cursusdienst</b> is <span class="op">nu open</span> tot 16:00 ·
+        <b>Shiften</b> volgende slot-drop <span class="cl">maandag 14:00</span>.
+      </div>
+      <a class="btn btn-accent arrow" style="border-color: var(--accent);">Alle diensten</a>
+    </section>
+
+    <!-- Services -->
+    <section class="services">
+      <!-- Theokot -->
+      <article class="svc feat">
+        <div class="svc-head">
+          <div>
+            <div class="svc-num">// 001 · Theokot</div>
+            <h2>Theokot</h2>
+            <div class="tagline">broodjes · koffie · warme snacks</div>
+          </div>
+          <div style="font-family: var(--mono); font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; text-align: right; color: oklch(0.4 0.15 80);">
+            Sinds<br/><b style="color: var(--ink); font-family: var(--sans); font-size: 24px; letter-spacing: -0.02em; font-weight: 500;">1995</b>
+          </div>
+        </div>
+        <div class="svc-status">
+          <span class="state open">Nu open · sluit om 14:00</span>
+          <span style="color: var(--ink); font-family: var(--mono); font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase;">247 broodjes vandaag</span>
+        </div>
+
+        <div class="hours-viz">
+          <div class="day-lbl">MA</div>
+          <div class="bar-track"><div class="bar" style="left: 34%; width: 16%;">11:30 → 14:00</div></div>
+          <div class="day-lbl">DI</div>
+          <div class="bar-track"><div class="bar" style="left: 34%; width: 16%;">11:30 → 14:00</div></div>
+          <div class="day-lbl">WO</div>
+          <div class="bar-track"><div class="bar" style="left: 34%; width: 16%;">11:30 → 14:00</div></div>
+          <div class="day-lbl today">DO</div>
+          <div class="bar-track today-row"><div class="bar" style="left: 34%; width: 16%;">11:30 → 14:00</div></div>
+          <div class="day-lbl">VR</div>
+          <div class="bar-track"><div class="bar" style="left: 34%; width: 13%;">11:30 → 13:30</div></div>
+          <div class="day-lbl">ZA</div>
+          <div class="bar-track closed"></div>
+          <div class="day-lbl">ZO</div>
+          <div class="bar-track closed"></div>
+        </div>
+
+        <dl class="svc-meta">
+          <dt>LOCATIE</dt><dd>Dozaal · niveau 0</dd>
+          <dt>CAPACITEIT</dt><dd>±300 broodjes/dag</dd>
+          <dt>BETAALMIDDEL</dt><dd>Bancontact · cash</dd>
+          <dt>CONTACT</dt><dd>theokot@vtk.be</dd>
+        </dl>
+
+        <div class="svc-actions">
+          <a class="btn btn-primary arrow">Menu vandaag</a>
+          <a class="btn btn-ghost arrow">Broodje bestellen</a>
+        </div>
+      </article>
+
+      <!-- Cursusdienst -->
+      <article class="svc">
+        <div class="svc-head">
+          <div>
+            <div class="svc-num">// 002 · Cursusdienst</div>
+            <h2>Cursusdienst</h2>
+            <div class="tagline">syllabi · boeken · tweedehands</div>
+          </div>
+          <div style="font-family: var(--mono); font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; text-align: right; color: var(--muted);">
+            Sinds<br/><b style="color: var(--ink); font-family: var(--sans); font-size: 24px; letter-spacing: -0.02em; font-weight: 500;">1968</b>
+          </div>
+        </div>
+        <div class="svc-status">
+          <span class="state open">Nu open · sluit om 16:00</span>
+          <span style="color: var(--muted); font-family: var(--mono); font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase;">186 cursussen in stock</span>
+        </div>
+        <div class="hours-viz">
+          <div class="day-lbl">MA</div>
+          <div class="bar-track"><div class="bar" style="left: 41%; width: 22%;">12:30 → 16:00</div></div>
+          <div class="day-lbl">DI</div>
+          <div class="bar-track"><div class="bar" style="left: 41%; width: 22%;">12:30 → 16:00</div></div>
+          <div class="day-lbl">WO</div>
+          <div class="bar-track"><div class="bar" style="left: 41%; width: 22%;">12:30 → 16:00</div></div>
+          <div class="day-lbl today">DO</div>
+          <div class="bar-track today-row"><div class="bar" style="left: 41%; width: 22%;">12:30 → 16:00</div></div>
+          <div class="day-lbl">VR</div>
+          <div class="bar-track"><div class="bar" style="left: 41%; width: 16%;">12:30 → 15:00</div></div>
+          <div class="day-lbl">ZA</div>
+          <div class="bar-track closed"></div>
+          <div class="day-lbl">ZO</div>
+          <div class="bar-track closed"></div>
+        </div>
+        <dl class="svc-meta">
+          <dt>LOCATIE</dt><dd>Dozaal · niveau −1</dd>
+          <dt>AANBOD</dt><dd>BA + MA burgie · alle richtingen</dd>
+          <dt>BETAALMIDDEL</dt><dd>Bancontact · online</dd>
+          <dt>TWEEDEHANDS</dt><dd>deze week geopend</dd>
+        </dl>
+        <div class="svc-actions">
+          <a class="btn btn-primary arrow">Bestel online</a>
+          <a class="btn btn-ghost arrow">Tweedehands</a>
+        </div>
+      </article>
+
+      <!-- Shiften -->
+      <article class="svc">
+        <div class="svc-head">
+          <div>
+            <div class="svc-num">// 003 · Shiften</div>
+            <h2>Shiftenbureau</h2>
+            <div class="tagline">inschrijven · tijdsloten · events</div>
+          </div>
+          <div style="font-family: var(--mono); font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; text-align: right; color: var(--muted);">
+            Sinds<br/><b style="color: var(--ink); font-family: var(--sans); font-size: 24px; letter-spacing: -0.02em; font-weight: 500;">2018</b>
+          </div>
+        </div>
+        <div class="svc-status">
+          <span class="state closed">Volgende slot-drop · ma 14:00</span>
+          <span style="color: var(--muted); font-family: var(--mono); font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase;">42 / 120 slots vrij</span>
+        </div>
+
+        <div style="margin: 24px 0; display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px;">
+          <div style="padding: 20px; background: var(--paper-2); border: 1px solid var(--rule);">
+            <div style="font-size: 36px; letter-spacing: -0.03em; font-weight: 500;">42</div>
+            <div style="font-family: var(--mono); font-size: 10px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); margin-top: 4px;">open slots</div>
+          </div>
+          <div style="padding: 20px; background: var(--paper-2); border: 1px solid var(--rule);">
+            <div style="font-size: 36px; letter-spacing: -0.03em; font-weight: 500;">00</div>
+            <div style="font-family: var(--mono); font-size: 10px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); margin-top: 4px;">wachtlijst</div>
+          </div>
+          <div style="padding: 20px; background: var(--ink); color: var(--accent); border: 1px solid var(--ink);">
+            <div style="font-size: 36px; letter-spacing: -0.03em; font-weight: 500;">120</div>
+            <div style="font-family: var(--mono); font-size: 10px; letter-spacing: 0.06em; text-transform: uppercase; color: oklch(0.7 0.02 260); margin-top: 4px;">totaal · jg. 105</div>
+          </div>
+        </div>
+
+        <dl class="svc-meta">
+          <dt>PLATFORM</dt><dd>shiften.vtk.be</dd>
+          <dt>RELEASE</dt><dd>maandag 14:00</dd>
+          <dt>SUPPORT</dt><dd>shiften@vtk.be</dd>
+          <dt>HOUDBAARHEID</dt><dd>72 uur</dd>
+        </dl>
+        <div class="svc-actions">
+          <a class="btn btn-primary arrow">Plan een slot</a>
+          <a class="btn btn-ghost arrow">Mijn shiften</a>
+        </div>
+      </article>
+
+      <!-- Tweedehands -->
+      <article class="svc">
+        <div class="svc-head">
+          <div>
+            <div class="svc-num">// 004 · Tweedehands</div>
+            <h2>Tweedehands</h2>
+            <div class="tagline">boeken · markt · ruilbeurs</div>
+          </div>
+          <div style="font-family: var(--mono); font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; text-align: right; color: var(--muted);">
+            Seizoen<br/><b style="color: var(--ink); font-family: var(--sans); font-size: 24px; letter-spacing: -0.02em; font-weight: 500;">Sem 2</b>
+          </div>
+        </div>
+        <div class="svc-status">
+          <span class="state open">Open · tweede semester</span>
+          <span style="color: var(--muted); font-family: var(--mono); font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase;">342 boeken live</span>
+        </div>
+        <div class="hours-viz">
+          <div class="day-lbl">MA</div>
+          <div class="bar-track"><div class="bar" style="left: 41%; width: 22%;">12:30 → 16:00</div></div>
+          <div class="day-lbl">DI</div>
+          <div class="bar-track closed"></div>
+          <div class="day-lbl">WO</div>
+          <div class="bar-track"><div class="bar" style="left: 41%; width: 22%;">12:30 → 16:00</div></div>
+          <div class="day-lbl today">DO</div>
+          <div class="bar-track closed"></div>
+          <div class="day-lbl">VR</div>
+          <div class="bar-track"><div class="bar" style="left: 41%; width: 16%;">12:30 → 15:00</div></div>
+          <div class="day-lbl">ZA</div>
+          <div class="bar-track closed"></div>
+          <div class="day-lbl">ZO</div>
+          <div class="bar-track closed"></div>
+        </div>
+        <dl class="svc-meta">
+          <dt>LOCATIE</dt><dd>Dozaal · niveau −1</dd>
+          <dt>COMMISSIE</dt><dd>10% aan VTK</dd>
+          <dt>PLATFORM</dt><dd>tweedehands.vtk.be</dd>
+          <dt>BOEK INBRENGEN</dt><dd>via formulier</dd>
+        </dl>
+        <div class="svc-actions">
+          <a class="btn btn-primary arrow">Bekijk catalogus</a>
+          <a class="btn btn-ghost arrow">Boek inbrengen</a>
+        </div>
+      </article>
+    </section>
+
+    <!-- Menu strip -->
+    <section class="menu-strip">
+      <div class="menu-strip-head">
+        <div>
+          <div class="label" style="margin-bottom: 8px;">// 005 — menu vandaag · theokot</div>
+          <h3>Broodjes · DO 03 DEC</h3>
+        </div>
+        <div class="sub">Update · 11:42 · verser kan niet</div>
+      </div>
+      <div class="menu-grid">
+        <div class="menu-item">
+          <div class="nr">01</div>
+          <h4>Martino</h4>
+          <div class="ingr">Filet américain · rauwkost · ui · ei · cornichons</div>
+          <div class="price"><span>€4,20</span><b>28 over</b></div>
+        </div>
+        <div class="menu-item">
+          <div class="nr">02</div>
+          <h4>Kip curry</h4>
+          <div class="ingr">Kipfilet · curry-yoghurtsaus · sla · tomaat</div>
+          <div class="price"><span>€4,50</span><b>12 over</b></div>
+        </div>
+        <div class="menu-item sold-out">
+          <div class="nr">03</div>
+          <h4>Gerookte zalm</h4>
+          <div class="ingr">Zalm · roomkaas · rode ui · kappertjes</div>
+          <div class="price"><span>€5,20</span><b>0 over</b></div>
+        </div>
+        <div class="menu-item">
+          <div class="nr">04</div>
+          <h4>Mozza · pesto</h4>
+          <div class="ingr">Buffelmozzarella · pesto · tomaat · rucola (veggie)</div>
+          <div class="price"><span>€4,50</span><b>18 over</b></div>
+        </div>
+        <div class="menu-item">
+          <div class="nr">05</div>
+          <h4>Hummus · groenten</h4>
+          <div class="ingr">Hummus · wortel · komkommer · rode biet (vegan)</div>
+          <div class="price"><span>€4,00</span><b>22 over</b></div>
+        </div>
+        <div class="menu-item">
+          <div class="nr">06</div>
+          <h4>Kaas klassiek</h4>
+          <div class="ingr">Brugge kaas · boter · sla · tomaat</div>
+          <div class="price"><span>€3,50</span><b>34 over</b></div>
+        </div>
+        <div class="menu-item">
+          <div class="nr">07</div>
+          <h4>Tonijn</h4>
+          <div class="ingr">Tonijnsalade · ei · sla · komkommer</div>
+          <div class="price"><span>€4,20</span><b>14 over</b></div>
+        </div>
+        <div class="menu-item">
+          <div class="nr">08</div>
+          <h4>Soep vd dag</h4>
+          <div class="ingr">Pompoen · kokos · gember · korianderolie</div>
+          <div class="price"><span>€3,00</span><b>ruim</b></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Location -->
+    <section class="locations">
+      <div class="locations-side">
+        <div class="label" style="margin-bottom: 12px;">// 006 — locatie</div>
+        <h3>Campus<br/>Arenberg.</h3>
+        <div class="sub">Dozaal · Kasteelpark 1 · 3001 Heverlee</div>
+        <p>Alle fysieke diensten van VTK zitten in de Dozaal op campus Arenberg, vlakbij de faculteit Ingenieurswetenschappen.</p>
+        <p>Het gebouw is open van 08:00 tot 22:00 op weekdagen. Buiten die uren verloopt alles online.</p>
+        <dl class="spec" style="margin-top: 24px;">
+          <dt>TRAM</dt><dd>Lijn 2 · halte Kasteelpark</dd>
+          <dt>FIETS</dt><dd>Overdekte stalling</dd>
+          <dt>AUTO</dt><dd>Parking P-Arenberg</dd>
+        </dl>
+      </div>
+      <div class="map-ph">
+        <span class="pin-lbl">VTK · Dozaal</span>
+        <span class="coords">51.1° N · 4.7° E · Heverlee</span>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <div class="footer-inner">
+      <div class="footer-top">
+        <div>
+          <div class="footer-mega">Partner in crime<br/><span class="acc">since 1920.</span></div>
+          <div style="margin-top: 32px; font-family: var(--mono); font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; color: oklch(0.55 0.02 260);">
+            Kasteelpark Arenberg 1<br/>3001 Heverlee · België
+          </div>
+        </div>
+        <div><h4>Studie</h4><ul><li><a>Aanbod</a></li><li><a>Eerstejaars</a></li><li><a>Cursusdienst</a></li><li><a>Internationaal</a></li></ul></div>
+        <div><h4>Service</h4><ul><li><a>Theokot broodjes</a></li><li><a>Shiften</a></li><li><a>Tijdsloten</a></li><li><a>Tweedehands</a></li></ul></div>
+        <div><h4>Community</h4><ul><li><a>Kalender</a></li><li><a>Career</a></li><li><a>Media</a></li><li><a>Over VTK</a></li></ul></div>
+        <div><h4>Contact</h4><ul><li><a>info@vtk.be</a></li><li><a>Instagram</a></li><li><a>Facebook</a></li><li><a>LinkedIn</a></li></ul></div>
+      </div>
+      <div class="footer-bottom">
+        <span>© 2026 — Vlaamse Technische Kring VZW</span>
+        <span>v05.0 · studie 001</span>
+        <span>Privacy · Cookies · Colofon</span>
+      </div>
+    </div>
+  </footer>
+</body>
+</html>

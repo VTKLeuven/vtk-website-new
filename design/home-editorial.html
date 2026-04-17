@@ -1,0 +1,788 @@
+<!doctype html>
+<html lang="nl">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>VTK — Home (Editorial)</title>
+<link rel="stylesheet" href="styles.css" />
+<style>
+  /* hero */
+  .hero {
+    padding: 48px 0 0;
+    border-bottom: 1px solid var(--rule);
+  }
+  .hero-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr 1fr;
+    gap: 0;
+    align-items: stretch;
+  }
+  .hero-main { grid-column: 1 / 4; padding: 32px 40px 48px 0; border-right: 1px solid var(--rule); position: relative; }
+  .hero-side { padding: 32px 0 48px 40px; display: flex; flex-direction: column; justify-content: space-between; gap: 32px; }
+
+  .hero h1 {
+    font-size: clamp(64px, 10vw, 160px);
+    line-height: 0.88;
+    letter-spacing: -0.04em;
+    font-weight: 500;
+    margin-top: 16px;
+  }
+  .hero h1 em {
+    font-style: normal;
+    color: oklch(0.62 0.01 260);
+    font-weight: 400;
+  }
+  .hero h1 mark {
+    background: var(--accent);
+    color: var(--ink);
+    padding: 0 0.08em;
+    box-decoration-break: clone;
+  }
+  .hero-lede {
+    max-width: 520px;
+    font-size: 18px;
+    line-height: 1.5;
+    color: var(--ink-2);
+    margin-top: 32px;
+  }
+  .hero-actions { display: flex; gap: 12px; margin-top: 32px; }
+  .hero-meta { margin-top: 48px; }
+
+  .hero-side h3 {
+    font-family: var(--mono);
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--muted);
+    margin-bottom: 16px;
+    font-weight: 500;
+  }
+  .hero-photo {
+    flex: 1;
+    min-height: 280px;
+    position: relative;
+  }
+  .hero-photo img {
+    width: 100%; height: 100%;
+    object-fit: cover;
+    display: block;
+  }
+
+  /* next-event card */
+  .next-event h2 {
+    font-size: 32px;
+    line-height: 0.95;
+    letter-spacing: -0.02em;
+    font-weight: 500;
+    margin-bottom: 12px;
+  }
+  .next-event-date {
+    display: flex; gap: 8px; align-items: baseline;
+    font-family: var(--mono);
+    font-size: 13px;
+    color: var(--muted);
+    margin-bottom: 16px;
+    letter-spacing: 0.04em;
+  }
+  .next-event-date b { font-size: 48px; color: var(--ink); font-weight: 500; letter-spacing: -0.02em; }
+
+  /* sections */
+  section.block {
+    padding: 96px 32px;
+    max-width: var(--max);
+    margin: 0 auto;
+    border-bottom: 1px solid var(--rule);
+  }
+  .block-head {
+    display: grid;
+    grid-template-columns: 1fr 3fr;
+    gap: 40px;
+    margin-bottom: 56px;
+    align-items: baseline;
+  }
+  .block-head h2 {
+    font-size: clamp(40px, 5vw, 72px);
+    line-height: 0.95;
+    letter-spacing: -0.03em;
+    font-weight: 500;
+  }
+  .block-num {
+    font-family: var(--mono);
+    font-size: 12px;
+    letter-spacing: 0.08em;
+    color: var(--muted);
+    text-transform: uppercase;
+  }
+
+  /* Events list */
+  .events-list { display: flex; flex-direction: column; border-top: 1px solid var(--ink); }
+  .event-row {
+    display: grid;
+    grid-template-columns: 120px 1fr 2fr 1fr auto;
+    gap: 24px;
+    align-items: center;
+    padding: 28px 0;
+    border-bottom: 1px solid var(--rule);
+    transition: 150ms;
+    cursor: pointer;
+  }
+  .event-row:hover { background: var(--paper-2); padding-left: 16px; padding-right: 16px; }
+  .event-row:hover .event-go { background: var(--accent); }
+  .event-date {
+    font-family: var(--mono);
+    font-size: 13px;
+    color: var(--muted);
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+  .event-date b { color: var(--ink); font-size: 32px; display: block; letter-spacing: -0.02em; font-family: var(--sans); font-weight: 500; }
+  .event-title { font-size: 24px; letter-spacing: -0.01em; font-weight: 500; }
+  .event-desc { color: var(--muted); font-size: 14px; line-height: 1.5; }
+  .event-tag {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--ink);
+    background: var(--paper-2);
+    padding: 4px 10px;
+    border: 1px solid var(--rule);
+    justify-self: start;
+  }
+  .event-go {
+    width: 40px; height: 40px;
+    border: 1px solid var(--ink);
+    display: grid; place-items: center;
+    transition: 150ms;
+    font-size: 18px;
+  }
+
+  /* Opening hours strip */
+  .hours-strip { background: var(--ink); color: var(--paper); margin: 0 -32px; padding: 0; border-bottom: 0; }
+  .hours-grid {
+    max-width: var(--max);
+    margin: 0 auto;
+    padding: 64px 32px;
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 0;
+  }
+  .hours-col { padding: 32px; border-right: 1px solid oklch(0.28 0.04 260); position: relative; }
+  .hours-col:last-child { border-right: 0; }
+  .hours-col h3 {
+    font-size: 32px;
+    letter-spacing: -0.02em;
+    margin-bottom: 8px;
+    font-weight: 500;
+  }
+  .hours-col .sub { font-family: var(--mono); font-size: 11px; color: oklch(0.65 0.02 260); letter-spacing: 0.06em; text-transform: uppercase; margin-bottom: 24px; }
+  .hours-col .status {
+    display: inline-flex; align-items: center;
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: oklch(0.9 0.15 145);
+    margin-bottom: 24px;
+  }
+  .hours-col .status.closed { color: oklch(0.75 0.12 30); }
+  .hours-col .status::before {
+    content: "";
+    display: inline-block;
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: currentColor;
+    margin-right: 10px;
+    animation: pulse 2s ease-in-out infinite;
+  }
+  .hours-list {
+    list-style: none;
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 6px 16px;
+    font-family: var(--mono);
+    font-size: 12px;
+    letter-spacing: 0.02em;
+  }
+  .hours-list dt { color: oklch(0.65 0.02 260); text-transform: uppercase; }
+  .hours-list dd { color: var(--paper); text-align: right; }
+  .hours-list .today { color: var(--accent); }
+  .hours-col.section-hours-bg { background: oklch(0.22 0.04 260); }
+
+  /* Quick nav / tiles */
+  .tiles {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 0;
+    border-top: 1px solid var(--rule);
+  }
+  .tile {
+    padding: 40px 28px 28px;
+    border-right: 1px solid var(--rule);
+    position: relative;
+    min-height: 260px;
+    display: flex; flex-direction: column;
+    transition: 200ms;
+  }
+  .tile:last-child { border-right: 0; }
+  .tile:hover { background: var(--paper-2); }
+  .tile-num {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--muted);
+    letter-spacing: 0.08em;
+    margin-bottom: auto;
+  }
+  .tile h3 { font-size: 28px; letter-spacing: -0.02em; margin: 48px 0 12px; font-weight: 500; line-height: 1; }
+  .tile p { color: var(--muted); font-size: 13px; line-height: 1.5; }
+  .tile-arrow {
+    position: absolute; bottom: 24px; right: 24px;
+    font-size: 18px;
+    width: 36px; height: 36px;
+    border-radius: 50%;
+    border: 1px solid var(--rule);
+    display: grid; place-items: center;
+    transition: 150ms;
+  }
+  .tile:hover .tile-arrow { background: var(--ink); color: var(--accent); border-color: var(--ink); }
+
+  /* Manifesto */
+  .manifesto {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 80px;
+    align-items: start;
+  }
+  .manifesto-text p {
+    font-size: 22px;
+    line-height: 1.5;
+    color: var(--ink-2);
+    margin-bottom: 20px;
+    max-width: 54ch;
+  }
+  .manifesto-text p em {
+    color: var(--ink);
+    font-style: normal;
+    font-weight: 500;
+  }
+  .manifesto-stats {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0;
+    border-top: 1px solid var(--ink);
+    border-left: 1px solid var(--rule);
+  }
+  .stat {
+    padding: 24px 24px 32px;
+    border-right: 1px solid var(--rule);
+    border-bottom: 1px solid var(--rule);
+  }
+  .stat-val {
+    font-size: 56px;
+    line-height: 1;
+    letter-spacing: -0.03em;
+    font-weight: 500;
+  }
+  .stat-val .acc { color: var(--accent-2); }
+  .stat-lbl {
+    font-family: var(--mono);
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--muted);
+    margin-top: 10px;
+  }
+
+  /* Partners strip */
+  .partners {
+    padding: 80px 32px;
+    max-width: var(--max);
+    margin: 0 auto;
+    border-bottom: 1px solid var(--rule);
+  }
+  .partners-head {
+    display: flex; justify-content: space-between; align-items: baseline;
+    margin-bottom: 48px;
+  }
+  .partners-head h3 { font-size: 20px; letter-spacing: -0.01em; font-weight: 500; }
+  .partners-grid {
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    gap: 1px;
+    background: var(--rule);
+    border: 1px solid var(--rule);
+  }
+  .partner {
+    aspect-ratio: 16/9;
+    background: var(--paper);
+    display: grid; place-items: center;
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--muted);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    transition: 150ms;
+  }
+  .partner:hover { background: var(--paper-2); color: var(--ink); }
+
+  .back-link {
+    position: fixed;
+    top: 16px; left: 16px;
+    z-index: 100;
+    font-family: var(--mono);
+    font-size: 11px;
+    padding: 8px 12px;
+    background: var(--paper);
+    border: 1px solid var(--rule);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+  .back-link:hover { background: var(--ink); color: var(--accent); border-color: var(--ink); }
+
+  /* Tweaks panel */
+  .tweaks {
+    position: fixed; right: 20px; bottom: 20px;
+    width: 280px;
+    background: var(--paper);
+    border: 1px solid var(--ink);
+    padding: 16px;
+    font-family: var(--mono);
+    font-size: 11px;
+    z-index: 100;
+    display: none;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.15);
+  }
+  .tweaks.on { display: block; }
+  .tweaks h4 {
+    font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase;
+    margin-bottom: 12px; padding-bottom: 10px; border-bottom: 1px solid var(--rule);
+    display: flex; justify-content: space-between;
+  }
+  .tweaks label {
+    display: block;
+    font-size: 10px;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    margin-bottom: 6px;
+  }
+  .tweaks-row { margin-bottom: 14px; }
+  .tweaks-opts { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 4px; }
+  .tweaks-opts button {
+    padding: 8px 6px;
+    border: 1px solid var(--rule);
+    font-family: var(--mono);
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    background: var(--paper);
+    cursor: pointer;
+  }
+  .tweaks-opts button.on { background: var(--ink); color: var(--accent); border-color: var(--ink); }
+
+  /* Hero variant: split */
+  body[data-hero="split"] .hero-main { grid-column: 1 / 3; }
+  body[data-hero="split"] .hero-side { grid-column: 3 / 5; padding-left: 40px; }
+  body[data-hero="split"] .hero h1 { font-size: clamp(48px, 7vw, 100px); }
+  body[data-hero="split"] .hero-photo { min-height: 480px; }
+
+  /* Hero variant: full-bleed photo */
+  body[data-hero="photo"] .hero-main { grid-column: 1 / 5; border-right: 0; padding-right: 0; }
+  body[data-hero="photo"] .hero-side { display: none; }
+  body[data-hero="photo"] .hero-photo-bleed {
+    display: block !important;
+    margin-top: 32px;
+    height: 520px;
+    position: relative;
+  }
+  body[data-hero="photo"] .hero-photo-bleed img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  body[data-hero="photo"] .hero-photo-bleed::after {
+    content: "// ARENBERG · HEVERLEE · KUL";
+    position: absolute; bottom: 16px; left: 16px;
+    font-family: var(--mono); font-size: 11px;
+    background: var(--paper); padding: 6px 10px;
+    letter-spacing: 0.06em; text-transform: uppercase;
+  }
+  .hero-photo-bleed { display: none; }
+</style>
+</head>
+<body data-hero="classic">
+  <a href="index.html" class="back-link">← opties</a>
+
+  <!-- utility -->
+  <div class="utility">
+    <div class="utility-inner">
+      <div><span class="dot"></span>Theokot open · 11:30 — 14:00</div>
+      <div class="utility-links">
+        <a href="kalender.html">Kalender</a>
+        <a>Tweedehands</a>
+        <a>Boeken bestellen</a>
+        <a>Theokot broodjes</a>
+        <a>Shiften</a>
+        <a>Tijdsloten</a>
+      </div>
+    </div>
+  </div>
+
+  <!-- nav -->
+  <nav class="nav">
+    <div class="nav-inner">
+      <a href="index.html" class="brand">
+        <div class="brand-mark">v·</div>
+        <div>
+          <div class="brand-name">VTK</div>
+          <div class="brand-sub">EST. 1920</div>
+        </div>
+      </a>
+      <div class="nav-links">
+        <a>Aanbod</a>
+        <a>Eerstejaars</a>
+        <a>Career</a>
+        <a>Cursusdienst</a>
+        <a>Internationaal</a>
+        <a>Studies</a>
+        <a>Media</a>
+        <a>Over</a>
+        <a>Contact</a>
+      </div>
+      <div class="nav-right">
+        <button class="lang">NL <span style="color: var(--muted);">/ EN</span></button>
+        <div class="avatar"></div>
+      </div>
+    </div>
+  </nav>
+
+  <!-- hero -->
+  <header class="hero">
+    <div class="wrap">
+      <div class="hero-grid">
+        <div class="hero-main">
+          <div class="label">// 001 — welkom · editie 2025–26</div>
+          <h1>Partner<br/>in crime<br/><em>sinds</em> <mark>1920.</mark></h1>
+          <p class="hero-lede">
+            De Vlaamse Technische Kring is de studentenkring van burgerlijke ingenieurs aan de KU Leuven. Kalender, cursussen, broodjes, shiften — alles wat je dag op de groep draait, op één plek.
+          </p>
+          <div class="hero-actions">
+            <a class="btn btn-primary arrow">Wat is VTK</a>
+            <a class="btn btn-ghost">Bekijk kalender</a>
+          </div>
+          <div class="hero-meta">
+            <dl class="spec">
+              <dt>FACULTEIT</dt><dd>Ingenieurswetenschappen</dd>
+              <dt>CAMPUS</dt><dd>Arenberg · Heverlee</dd>
+              <dt>LEDEN</dt><dd>±3 200 actieve studenten</dd>
+              <dt>PRAESIDIUM</dt><dd>32 — jaargang 105</dd>
+            </dl>
+          </div>
+          <div class="hero-photo-bleed ph">
+            <div class="ph-label">PHOTO · arenberg kasteel</div>
+          </div>
+        </div>
+
+        <aside class="hero-side">
+          <div class="next-event">
+            <h3>// 002 — eerstvolgend</h3>
+            <div class="next-event-date">
+              <b>03</b>
+              <span>DEC · 20:00</span>
+            </div>
+            <h2>Galabal der<br/>Ingenieurs</h2>
+            <p style="color: var(--muted); font-size: 14px; margin-top: 12px; line-height: 1.5;">Brabanthal · Leuven · dresscode black tie</p>
+            <a class="btn btn-accent arrow" style="margin-top: 20px;">Tickets</a>
+          </div>
+          <div class="hero-photo ph">
+            <div class="ph-label">PHOTO · gala 2024</div>
+          </div>
+        </aside>
+      </div>
+    </div>
+  </header>
+
+  <!-- running marquee -->
+  <div class="marquee">
+    <div class="marquee-track">
+      <span>Vlaamse Technische Kring</span><span class="star">✦</span>
+      <span>Partner in crime since 1920</span><span class="star">✦</span>
+      <span>Ingenieurswetenschappen · KU Leuven</span><span class="star">✦</span>
+      <span>105 jaargangen</span><span class="star">✦</span>
+      <span>Vlaamse Technische Kring</span><span class="star">✦</span>
+      <span>Partner in crime since 1920</span><span class="star">✦</span>
+      <span>Ingenieurswetenschappen · KU Leuven</span><span class="star">✦</span>
+      <span>105 jaargangen</span><span class="star">✦</span>
+    </div>
+  </div>
+
+  <!-- events -->
+  <section class="block">
+    <div class="block-head">
+      <div class="block-num">003 — kalender</div>
+      <h2>Binnenkort<br/>op het programma.</h2>
+    </div>
+
+    <div class="events-list">
+      <article class="event-row">
+        <div class="event-date"><b>03</b>DEC · wo</div>
+        <div class="event-title">Galabal der Ingenieurs</div>
+        <div class="event-desc">Brabanthal · 20:00 — 04:00 · dresscode black tie · DJ line-up online</div>
+        <div class="event-tag">Gala</div>
+        <div class="event-go">→</div>
+      </article>
+      <article class="event-row">
+        <div class="event-date"><b>07</b>DEC · zo</div>
+        <div class="event-title">Sinterklaas Cantus</div>
+        <div class="event-desc">Alma 2 · 19:00 · klassieke cantus met speciale intrede van de Sint</div>
+        <div class="event-tag">Cantus</div>
+        <div class="event-go">→</div>
+      </article>
+      <article class="event-row">
+        <div class="event-date"><b>11</b>DEC · do</div>
+        <div class="event-title">VTK Career Fair</div>
+        <div class="event-desc">Aula Pieter de Somer · 60+ bedrijven · gratis voor studenten</div>
+        <div class="event-tag">Career</div>
+        <div class="event-go">→</div>
+      </article>
+      <article class="event-row">
+        <div class="event-date"><b>14</b>DEC · zo</div>
+        <div class="event-title">Examen-survival pack</div>
+        <div class="event-desc">Theokot · ontbijtpakketten ophalen vanaf 08:00</div>
+        <div class="event-tag">Service</div>
+        <div class="event-go">→</div>
+      </article>
+      <article class="event-row">
+        <div class="event-date"><b>18</b>JAN · zo</div>
+        <div class="event-title">Blok & go · shiften</div>
+        <div class="event-desc">Gratis ontbijt in de Theokot · inschrijven via shiftenplatform</div>
+        <div class="event-tag">Blok</div>
+        <div class="event-go">→</div>
+      </article>
+    </div>
+    <div style="display: flex; justify-content: flex-end; margin-top: 32px;">
+      <a class="btn btn-ghost arrow" href="kalender.html">Volledige kalender</a>
+    </div>
+  </section>
+
+  <!-- hours -->
+  <section class="hours-strip">
+    <div style="max-width: var(--max); margin: 0 auto; padding: 32px 32px 0;">
+      <div style="display: flex; justify-content: space-between; align-items: baseline; border-bottom: 1px solid oklch(0.28 0.04 260); padding-bottom: 24px;">
+        <div>
+          <div style="font-family: var(--mono); font-size: 11px; color: oklch(0.6 0.02 260); letter-spacing: 0.08em; text-transform: uppercase;">004 — openingsuren</div>
+          <h2 style="color: var(--paper); font-size: 56px; letter-spacing: -0.03em; margin-top: 8px; font-weight: 500; line-height: 1;">Live aanbod.</h2>
+        </div>
+        <div style="font-family: var(--mono); font-size: 11px; color: oklch(0.6 0.02 260); letter-spacing: 0.08em; text-transform: uppercase; text-align: right;">
+          VANDAAG<br/><span style="color: var(--accent); font-size: 14px;" id="today-label">DO · 03 DEC · 11:42</span>
+        </div>
+      </div>
+    </div>
+    <div class="hours-grid" style="padding-top: 32px;">
+      <div class="hours-col">
+        <h3>Theokot</h3>
+        <div class="sub">Broodjes & warme snacks</div>
+        <div class="status">Nu open · tot 14:00</div>
+        <dl class="hours-list">
+          <dt>MA</dt><dd>11:30 — 14:00</dd>
+          <dt>DI</dt><dd>11:30 — 14:00</dd>
+          <dt>WO</dt><dd>11:30 — 14:00</dd>
+          <dt class="today">DO</dt><dd class="today">11:30 — 14:00</dd>
+          <dt>VR</dt><dd>11:30 — 13:30</dd>
+          <dt>ZA/ZO</dt><dd>Gesloten</dd>
+        </dl>
+      </div>
+      <div class="hours-col section-hours-bg">
+        <h3>Cursusdienst</h3>
+        <div class="sub">Cursussen & tweedehands</div>
+        <div class="status">Nu open · tot 16:00</div>
+        <dl class="hours-list">
+          <dt>MA</dt><dd>12:30 — 16:00</dd>
+          <dt>DI</dt><dd>12:30 — 16:00</dd>
+          <dt>WO</dt><dd>12:30 — 16:00</dd>
+          <dt class="today">DO</dt><dd class="today">12:30 — 16:00</dd>
+          <dt>VR</dt><dd>12:30 — 15:00</dd>
+          <dt>ZA/ZO</dt><dd>Gesloten</dd>
+        </dl>
+      </div>
+      <div class="hours-col">
+        <h3>Shiftenbureau</h3>
+        <div class="sub">Inschrijven & tijdsloten</div>
+        <div class="status closed">Afspraak online · 24/7</div>
+        <dl class="hours-list">
+          <dt>PLATFORM</dt><dd>shiften.vtk.be</dd>
+          <dt>NEXT DROP</dt><dd>MA 14:00</dd>
+          <dt>OPEN SLOTS</dt><dd>42 / 120</dd>
+          <dt>WACHTLIJST</dt><dd>nihil</dd>
+        </dl>
+        <a class="btn btn-accent arrow" style="margin-top: 24px;">Plan een slot</a>
+      </div>
+    </div>
+  </section>
+
+  <!-- quick tiles -->
+  <section style="max-width: var(--max); margin: 0 auto; padding: 0; border-bottom: 1px solid var(--rule);">
+    <div class="tiles">
+      <a class="tile">
+        <div class="tile-num">→ 005</div>
+        <h3>Eerstejaars</h3>
+        <p>Alles wat je moet weten om van start te gaan: onthaal, peter/meter, FAQ.</p>
+        <div class="tile-arrow">↗</div>
+      </a>
+      <a class="tile">
+        <div class="tile-num">→ 006</div>
+        <h3>Career</h3>
+        <p>Career fair, stages, first-job. Partners uit bouw, consulting & tech.</p>
+        <div class="tile-arrow">↗</div>
+      </a>
+      <a class="tile">
+        <div class="tile-num">→ 007</div>
+        <h3>Internationaal</h3>
+        <p>Erasmus, IAESTE, exchanges. Van Tokio tot Toronto.</p>
+        <div class="tile-arrow">↗</div>
+      </a>
+      <a class="tile">
+        <div class="tile-num">→ 008</div>
+        <h3>Media</h3>
+        <p>Foto's, aftermovies, podcasts, studentenblad Ultra.</p>
+        <div class="tile-arrow">↗</div>
+      </a>
+    </div>
+  </section>
+
+  <!-- manifesto / stats -->
+  <section class="block">
+    <div class="block-head">
+      <div class="block-num">009 — over</div>
+      <h2>Geen gewone<br/>studentenkring.</h2>
+    </div>
+    <div class="manifesto">
+      <div class="manifesto-text">
+        <p><em>105 jaargangen, één doel:</em> het leven van de burgerlijke ingenieur wat draaglijker maken.</p>
+        <p>We draaien een broodjesbar, een cursusdienst, een gala, een skireis, een careerfair, een zangfeest en een onthaalweek. Grotendeels vrijwillig. Altijd voor de studenten.</p>
+        <p>Geen fancy missie-statements. Gewoon: als er iets geregeld moet worden voor ingenieurs in Leuven, dan doen wij dat.</p>
+      </div>
+      <div class="manifesto-stats">
+        <div class="stat">
+          <div class="stat-val">105<span class="acc">.</span></div>
+          <div class="stat-lbl">jaargangen sinds oprichting</div>
+        </div>
+        <div class="stat">
+          <div class="stat-val">3 200<span class="acc">+</span></div>
+          <div class="stat-lbl">actieve ingenieursstudenten</div>
+        </div>
+        <div class="stat">
+          <div class="stat-val">42<span class="acc">k</span></div>
+          <div class="stat-lbl">broodjes verkocht in 2024–25</div>
+        </div>
+        <div class="stat">
+          <div class="stat-val">18<span class="acc">°</span></div>
+          <div class="stat-lbl">werkgroepen actief</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- partners -->
+  <section class="partners">
+    <div class="partners-head">
+      <div>
+        <div class="label" style="margin-bottom: 8px;">// 010 — mede mogelijk gemaakt door</div>
+        <h3>Hoofdpartners · jaargang 105</h3>
+      </div>
+      <a class="btn btn-ghost arrow">Word partner</a>
+    </div>
+    <div class="partners-grid">
+      <div class="partner">Besix</div>
+      <div class="partner">Engie</div>
+      <div class="partner">McKinsey</div>
+      <div class="partner">Jan De Nul</div>
+      <div class="partner">Deloitte</div>
+      <div class="partner">ArcelorMittal</div>
+      <div class="partner">KBC</div>
+      <div class="partner">Colruyt</div>
+      <div class="partner">BNP Paribas</div>
+      <div class="partner">Tractebel</div>
+      <div class="partner">Imec</div>
+      <div class="partner">Materialise</div>
+    </div>
+  </section>
+
+  <!-- footer -->
+  <footer class="footer">
+    <div class="footer-inner">
+      <div class="footer-top">
+        <div>
+          <div class="footer-mega">Partner in crime<br/><span class="acc">since 1920.</span></div>
+          <div style="margin-top: 32px; font-family: var(--mono); font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; color: oklch(0.55 0.02 260);">
+            VTK · Vlaamse Technische Kring<br/>
+            Kasteelpark Arenberg 1<br/>
+            3001 Heverlee · België
+          </div>
+        </div>
+        <div>
+          <h4>Studie</h4>
+          <ul><li><a>Aanbod</a></li><li><a>Eerstejaars</a></li><li><a>Cursusdienst</a></li><li><a>Internationaal</a></li></ul>
+        </div>
+        <div>
+          <h4>Service</h4>
+          <ul><li><a>Theokot broodjes</a></li><li><a>Shiften</a></li><li><a>Tijdsloten</a></li><li><a>Tweedehands</a></li></ul>
+        </div>
+        <div>
+          <h4>Community</h4>
+          <ul><li><a>Kalender</a></li><li><a>Career</a></li><li><a>Media</a></li><li><a>Over VTK</a></li></ul>
+        </div>
+        <div>
+          <h4>Contact</h4>
+          <ul><li><a>info@vtk.be</a></li><li><a>Instagram</a></li><li><a>Facebook</a></li><li><a>LinkedIn</a></li></ul>
+        </div>
+      </div>
+      <div class="footer-bottom">
+        <span>© 2026 — Vlaamse Technische Kring VZW</span>
+        <span>v05.0 · studie 001 · apr 2026</span>
+        <span>Privacy · Cookies · Colofon</span>
+      </div>
+    </div>
+  </footer>
+
+  <!-- tweaks -->
+  <div class="tweaks" id="tweaks">
+    <h4>Tweaks <span style="color: var(--muted);">/ hero</span></h4>
+    <div class="tweaks-row">
+      <label>Hero layout</label>
+      <div class="tweaks-opts" id="hero-opts">
+        <button data-val="classic" class="on">Classic</button>
+        <button data-val="split">Split</button>
+        <button data-val="photo">Photo</button>
+      </div>
+    </div>
+    <div style="font-family: var(--mono); font-size: 10px; color: var(--muted); letter-spacing: 0.04em; text-transform: uppercase; margin-top: 8px;">
+      // toggle Tweaks in toolbar
+    </div>
+  </div>
+
+<script>
+(function () {
+  const TWEAKS = /*EDITMODE-BEGIN*/{"hero":"classic"}/*EDITMODE-END*/;
+  const body = document.body;
+  const panel = document.getElementById('tweaks');
+  const opts = document.getElementById('hero-opts');
+
+  const apply = (v) => {
+    body.dataset.hero = v;
+    opts.querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.val === v));
+  };
+  apply(TWEAKS.hero);
+
+  opts.addEventListener('click', (e) => {
+    const b = e.target.closest('button'); if (!b) return;
+    apply(b.dataset.val);
+    try { window.parent.postMessage({ type: '__edit_mode_set_keys', edits: { hero: b.dataset.val }}, '*'); } catch {}
+  });
+
+  window.addEventListener('message', (e) => {
+    if (!e.data || typeof e.data !== 'object') return;
+    if (e.data.type === '__activate_edit_mode') panel.classList.add('on');
+    if (e.data.type === '__deactivate_edit_mode') panel.classList.remove('on');
+  });
+  try { window.parent.postMessage({ type: '__edit_mode_available' }, '*'); } catch {}
+})();
+</script>
+</body>
+</html>

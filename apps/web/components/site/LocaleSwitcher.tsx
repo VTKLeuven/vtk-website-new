@@ -3,7 +3,13 @@
 import { usePathname, useRouter } from "next/navigation";
 import type { Locale } from "@/lib/locale";
 
-export function LocaleSwitcher({ locale }: { locale: Locale }) {
+export function LocaleSwitcher({
+  locale,
+  variant = "default",
+}: {
+  locale: Locale;
+  variant?: "default" | "editorial";
+}) {
   const pathname = usePathname();
   const router = useRouter();
 
@@ -18,6 +24,22 @@ export function LocaleSwitcher({ locale }: { locale: Locale }) {
       nextPath = `/en${currentPath === "/" ? "" : currentPath}`;
     }
     router.push(nextPath);
+  }
+
+  if (variant === "editorial") {
+    return (
+      <div className="lang-toggle" role="group" aria-label="Taal / Language">
+        <button type="button" onClick={() => switchTo("nl")} aria-pressed={locale === "nl"}>
+          NL
+        </button>
+        <span className="lang-sep" aria-hidden>
+          /
+        </span>
+        <button type="button" onClick={() => switchTo("en")} aria-pressed={locale === "en"}>
+          EN
+        </button>
+      </div>
+    );
   }
 
   return (

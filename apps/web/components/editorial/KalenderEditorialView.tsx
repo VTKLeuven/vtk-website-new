@@ -1,0 +1,482 @@
+"use client";
+
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { monthGridCells, isSameCalendarDay } from "./calendarGrid";
+
+type ApiEvent = {
+  id: string;
+  title: string;
+  titleEn: string;
+  start: string;
+  end: string;
+  allDay: boolean;
+  url: string | null;
+  location: string | null;
+  extendedProps: {
+    groupCode: string;
+    groupNameNl: string;
+    groupNameEn: string;
+    descriptionNl: string | null;
+    descriptionEn: string | null;
+  };
+};
+
+const FILTER_CHIPS: Array<{ id: string; codes: string[] | null }> = [
+  { id: "all", codes: null },
+  { id: "gala", codes: ["CULTUUR"] },
+  { id: "career", codes: ["BEDRIJVENRELATIES"] },
+  { id: "cantus", codes: ["FAKBAR"] },
+  { id: "service", codes: ["THEOKOT", "CURSUSDIENST", "ONTHAAL", "LOGISTIEK"] },
+];
+
+function pillClass(code: string): "" | "gala" | "career" | "service" {
+  if (code === "CULTUUR") return "gala";
+  if (code === "BEDRIJVENRELATIES") return "career";
+  if (code === "THEOKOT" || code === "CURSUSDIENST" || code === "ONTHAAL" || code === "LOGISTIEK")
+    return "service";
+  return "";
+}
+
+function legendKey(code: string): "gala" | "cantus" | "career" | "service" | "blok" {
+  const p = pillClass(code);
+  if (p === "gala") return "gala";
+  if (p === "career") return "career";
+  if (p === "service") return "service";
+  if (code === "FAKBAR") return "cantus";
+  return "blok";
+}
+
+export function KalenderEditorialView({
+  locale,
+  labels,
+}: {
+  locale: "nl" | "en";
+  labels: {
+    crumbsHome: string;
+    crumbsHere: string;
+    metaEvents: string;
+    metaCategories: string;
+    metaExport: string;
+    weekLine: string;
+    legendTitle: string;
+    legendSub: string;
+    agendaNext: string;
+    agendaSub: string;
+    subscribeTitle: string;
+    subscribeSub: string;
+    ical: string;
+    google: string;
+    outlook: string;
+    prevEvents: string;
+    nextMonth: string;
+    chips: Record<string, string>;
+    views: { agenda: string; month: string; list: string };
+  };
+}) {
+  const now = new Date();
+  const [cursor, setCursor] = useState(() => new Date(now.getFullYear(), now.getMonth(), 1));
+  const [filter, setFilter] = useState("all");
+  const [view, setView] = useState<"month" | "agenda" | "list">("month");
+  const [monthEvents, setMonthEvents] = useState<ApiEvent[]>([]);
+  const [agendaEvents, setAgendaEvents] = useState<ApiEvent[]>([]);
+
+  const year = cursor.getFullYear();
+  const month = cursor.getMonth();
+  const cells = useMemo(() => monthGridCells(year, month), [year, month]);
+
+  const fetchForRange = useCallback(
+    async (start: Date, end: Date) => {
+      const url = new URL("/api/calendar/events", window.location.origin);
+      url.searchParams.set("start", start.toISOString());
+      url.searchParams.set("end", end.toISOString());
+      const chip = FILTER_CHIPS.find((c) => c.id === filter);
+      const codes = chip?.codes;
+      if (codes && codes.length > 0) {
+        for (const c of codes) url.searchParams.append("group", c);
+      }
+      const res = await fetch(url.toString());
+      if (!res.ok) return [];
+      return (await res.json()) as ApiEvent[];
+    },
+    [filter]
+  );
+
+  useEffect(() => {
+    const start = new Date(cells[0]!.date);
+    start.setHours(0, 0, 0, 0);
+    const end = new Date(cells[41]!.date);
+    end.setHours(23, 59, 59, 999);
+    let cancelled = false;
+    void (async () => {
+      const data = await fetchForRange(start, end);
+      if (!cancelled) setMonthEvents(data);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [cells, fetchForRange]);
+
+  useEffect(() => {
+    const start = new Date();
+    start.setHours(0, 0, 0, 0);
+    const end = new Date();
+    end.setDate(end.getDate() + 14);
+    end.setHours(23, 59, 59, 999);
+    let cancelled = false;
+    void (async () => {
+      const data = await fetchForRange(start, end);
+      if (!cancelled) setAgendaEvents(data.sort((a, b) => +new Date(a.start) - +new Date(b.start)));
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [fetchForRange, filter]);
+
+  const eventsByDay = useMemo(() => {
+    const m = new Map<string, ApiEvent[]>();
+    for (const e of monthEvents) {
+      const d = new Date(e.start);
+      const key = `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+      const arr = m.get(key) ?? [];
+      arr.push(e);
+      m.set(key, arr);
+    }
+    for (const arr of m.values()) {
+      arr.sort((a, b) => +new Date(a.start) - +new Date(b.start));
+    }
+    return m;
+  }, [monthEvents]);
+
+  const legendCounts = useMemo(() => {
+    const acc = { gala: 0, cantus: 0, career: 0, service: 0, blok: 0 };
+    for (const e of monthEvents) {
+      acc[legendKey(e.extendedProps.groupCode)] += 1;
+    }
+    return acc;
+  }, [monthEvents]);
+
+  const monthLabel = cursor.toLocaleDateString(locale === "nl" ? "nl-BE" : "en-GB", {
+    month: "long",
+    year: "numeric",
+  });
+  const gridFrom = cells[0]!.date;
+  const gridTo = cells[41]!.date;
+  const gridRange =
+    gridFrom.toLocaleDateString(locale === "nl" ? "nl-BE" : "en-GB", {
+      day: "2-digit",
+      month: "short",
+    }) +
+    " — " +
+    gridTo.toLocaleDateString(locale === "nl" ? "nl-BE" : "en-GB", {
+      day: "2-digit",
+      month: "short",
+    });
+
+  function pickTitle(e: ApiEvent) {
+    return locale === "nl" ? e.title : e.titleEn || e.title;
+  }
+
+  function pickDesc(e: ApiEvent) {
+    const d = locale === "nl" ? e.extendedProps.descriptionNl : e.extendedProps.descriptionEn;
+    return d ?? "";
+  }
+
+  function pickGroup(e: ApiEvent) {
+    return locale === "nl" ? e.extendedProps.groupNameNl : e.extendedProps.groupNameEn;
+  }
+
+  function eventTime(e: ApiEvent) {
+    if (e.allDay) return locale === "nl" ? "Hele dag" : "All day";
+    return new Date(e.start).toLocaleTimeString(locale === "nl" ? "nl-BE" : "en-GB", {
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  }
+
+  function shiftMonth(delta: number) {
+    setCursor(new Date(year, month + delta, 1));
+  }
+
+  const showGrid = view === "month";
+
+  return (
+    <>
+      <header className="page-head">
+        <div>
+          <div className="crumbs">
+            {labels.crumbsHome} · <span style={{ color: "var(--ink)" }}>{labels.crumbsHere}</span>
+          </div>
+          <h1>
+            {locale === "nl" ? "Kalender " : "Calendar "}
+            <em>{year}.</em>
+          </h1>
+        </div>
+        <div className="page-head-meta">
+          {labels.metaEvents}
+          <br />
+          <b>{monthEvents.length}</b>
+          <br />
+          <br />
+          {labels.metaCategories}
+          <br />
+          <b>Gala · Career · Cantus · Service · Blok</b>
+          <br />
+          <br />
+          {labels.metaExport}
+          <br />
+          <b>iCal · Google · Outlook</b>
+        </div>
+      </header>
+
+      <div className="kal-wrap">
+        <div className="toolbar">
+          <div className="nav-mo">
+            <button type="button" onClick={() => shiftMonth(-1)} aria-label="Previous month">
+              ←
+            </button>
+            <button type="button" onClick={() => shiftMonth(1)} aria-label="Next month">
+              →
+            </button>
+          </div>
+          <div className="mo-label">
+            {monthLabel.charAt(0).toUpperCase() + monthLabel.slice(1)}
+            <small>
+              {labels.weekLine} {gridRange} · {monthEvents.length}{" "}
+              {locale === "nl" ? "evenementen" : "events"}
+            </small>
+          </div>
+          <div className="filters">
+            {FILTER_CHIPS.map((c) => (
+              <button
+                key={c.id}
+                type="button"
+                className={`filter${filter === c.id ? " on" : ""}`}
+                onClick={() => setFilter(c.id)}
+              >
+                {labels.chips[c.id] ?? c.id}
+              </button>
+            ))}
+          </div>
+          <div className="view-switch">
+            <button type="button" className={view === "agenda" ? "on" : ""} onClick={() => setView("agenda")}>
+              {labels.views.agenda}
+            </button>
+            <button type="button" className={view === "month" ? "on" : ""} onClick={() => setView("month")}>
+              {labels.views.month}
+            </button>
+            <button type="button" className={view === "list" ? "on" : ""} onClick={() => setView("list")}>
+              {labels.views.list}
+            </button>
+          </div>
+        </div>
+
+        {showGrid && (
+          <div className="cal">
+            <div className="cal-header">
+              {(locale === "nl"
+                ? ["Ma", "Di", "Wo", "Do", "Vr", "Za", "Zo"]
+                : ["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"]
+              ).map((d) => (
+                <div key={d}>{d}</div>
+              ))}
+            </div>
+            {cells.map(({ date, inMonth }) => {
+              const key = `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`;
+              const list = eventsByDay.get(key) ?? [];
+              const isToday = isSameCalendarDay(date, new Date());
+              const more = list.length > 2 ? list.length - 2 : 0;
+              const show = list.slice(0, 2);
+              return (
+                <div key={key} className={`cal-cell${!inMonth ? " out" : ""}${isToday ? " today" : ""}`}>
+                  <div className="num">{String(date.getDate()).padStart(2, "0")}</div>
+                  {show.map((e) => {
+                    const pc = pillClass(e.extendedProps.groupCode);
+                    return (
+                      <a
+                        key={e.id}
+                        href={e.url ?? undefined}
+                        className={`ev-pill${pc ? ` ${pc}` : ""}`}
+                        onClick={(ev) => {
+                          if (!e.url) ev.preventDefault();
+                        }}
+                      >
+                        <b>{pickTitle(e)}</b>
+                        {eventTime(e)}
+                        {e.location ? ` · ${e.location}` : ""}
+                      </a>
+                    );
+                  })}
+                  {more > 0 ? (
+                    <div className="ev-pill more" title={list.map((e) => pickTitle(e)).join(", ")}>
+                      +{more}
+                    </div>
+                  ) : null}
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {(view === "month" || view === "agenda" || view === "list") && (
+          <section
+            className="agenda"
+            style={{
+              marginTop: view === "list" && !showGrid ? 0 : 48,
+              gridTemplateColumns: view === "list" ? "1fr" : undefined,
+            }}
+          >
+            {view !== "list" && (
+              <aside className="agenda-side">
+                <h3>{labels.legendTitle}</h3>
+                <div className="sub">{labels.legendSub}</div>
+                <ul className="agenda-side-list">
+                  <li className="gala">
+                    <span>
+                      <span className="sw" />
+                      Gala · TD
+                    </span>
+                    <span className="count">{String(legendCounts.gala).padStart(2, "0")}</span>
+                  </li>
+                  <li className="cantus">
+                    <span>
+                      <span className="sw" />
+                      Cantus
+                    </span>
+                    <span className="count">{String(legendCounts.cantus).padStart(2, "0")}</span>
+                  </li>
+                  <li className="career">
+                    <span>
+                      <span className="sw" />
+                      Career
+                    </span>
+                    <span className="count">{String(legendCounts.career).padStart(2, "0")}</span>
+                  </li>
+                  <li className="service">
+                    <span>
+                      <span className="sw" />
+                      Service
+                    </span>
+                    <span className="count">{String(legendCounts.service).padStart(2, "0")}</span>
+                  </li>
+                  <li className="blok">
+                    <span>
+                      <span className="sw" />
+                      Blok · studie
+                    </span>
+                    <span className="count">{String(legendCounts.blok).padStart(2, "0")}</span>
+                  </li>
+                </ul>
+
+                <div style={{ marginTop: 32, paddingTop: 24, borderTop: "1px solid var(--rule)" }}>
+                  <h3 style={{ fontSize: 18 }}>{labels.subscribeTitle}</h3>
+                  <div className="sub">{labels.subscribeSub}</div>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                    <span className="btn btn-ghost arrow" style={{ justifyContent: "space-between" }}>
+                      {labels.ical}
+                    </span>
+                    <span className="btn btn-ghost arrow" style={{ justifyContent: "space-between" }}>
+                      {labels.google}
+                    </span>
+                    <span className="btn btn-ghost arrow" style={{ justifyContent: "space-between" }}>
+                      {labels.outlook}
+                    </span>
+                  </div>
+                </div>
+              </aside>
+            )}
+
+            <div>
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "baseline",
+                  marginBottom: 20,
+                }}
+              >
+                <h2 style={{ fontSize: 32, letterSpacing: "-0.02em", fontWeight: 500 }}>{labels.agendaNext}</h2>
+                <div
+                  style={{
+                    fontFamily: "var(--mono)",
+                    fontSize: "11px",
+                    letterSpacing: "0.06em",
+                    textTransform: "uppercase",
+                    color: "var(--muted)",
+                  }}
+                >
+                  {labels.agendaSub}
+                </div>
+              </div>
+              <div className="agenda-list">
+                {(view === "list" ? agendaEvents : agendaEvents.slice(0, 8)).map((e) => {
+                  const d = new Date(e.start);
+                  const tag =
+                    legendKey(e.extendedProps.groupCode) === "gala"
+                      ? "Gala"
+                      : legendKey(e.extendedProps.groupCode) === "career"
+                        ? "Career"
+                        : legendKey(e.extendedProps.groupCode) === "service"
+                          ? "Service"
+                          : legendKey(e.extendedProps.groupCode) === "cantus"
+                            ? "Cantus"
+                            : "Blok";
+                  const row = (
+                    <>
+                      <div className="ag-date">
+                        <b>{String(d.getDate()).padStart(2, "0")}</b>
+                        {d.toLocaleDateString(locale === "nl" ? "nl-BE" : "en-GB", {
+                          month: "short",
+                        })}{" "}
+                        ·{" "}
+                        {d.toLocaleDateString(locale === "nl" ? "nl-BE" : "en-GB", {
+                          weekday: "short",
+                        })}
+                      </div>
+                      <div className="ag-title">
+                        {pickTitle(e)}
+                        <small>
+                          {eventTime(e)}
+                          {e.location ? ` · ${e.location}` : ""}
+                        </small>
+                      </div>
+                      <div className="ag-desc">{pickDesc(e) || pickGroup(e)}</div>
+                      <div
+                        className="ag-tag"
+                        style={
+                          tag === "Gala"
+                            ? { background: "var(--accent)", borderColor: "var(--accent)" }
+                            : undefined
+                        }
+                      >
+                        {tag}
+                      </div>
+                      <div className="ag-go">→</div>
+                    </>
+                  );
+                  return e.url ? (
+                    <a key={e.id} href={e.url} className="ag-row">
+                      {row}
+                    </a>
+                  ) : (
+                    <article key={e.id} className="ag-row">
+                      {row}
+                    </article>
+                  );
+                })}
+              </div>
+
+              <div style={{ display: "flex", justifyContent: "space-between", marginTop: 32, flexWrap: "wrap", gap: 12 }}>
+                <button type="button" className="btn btn-ghost arrow" onClick={() => shiftMonth(-1)}>
+                  {labels.prevEvents}
+                </button>
+                <button type="button" className="btn btn-primary arrow" onClick={() => shiftMonth(1)}>
+                  {labels.nextMonth}
+                </button>
+              </div>
+            </div>
+          </section>
+        )}
+      </div>
+    </>
+  );
+}

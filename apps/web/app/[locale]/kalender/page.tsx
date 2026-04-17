@@ -1,8 +1,45 @@
-import { prisma } from "@vtk/db";
-import { notFound } from "next/navigation";
-import { getDictionary, type Locale } from "@vtk/i18n";
+import { KalenderEditorialView } from "@/components/editorial/KalenderEditorialView";
 import { hasLocale } from "@/lib/locale";
-import { CalendarView } from "./CalendarView";
+import type { Locale } from "@vtk/i18n";
+import { notFound } from "next/navigation";
+
+import "@/app/design/vtk-base.css";
+import "@/app/design/vtk-kalender.css";
+
+function editorialLabels(locale: Locale) {
+  const nl = locale === "nl";
+  return {
+    crumbsHome: nl ? "Home" : "Home",
+    crumbsHere: nl ? "Kalender" : "Calendar",
+    metaEvents: nl ? "Evenementen (deze maand)" : "Events (this month)",
+    metaCategories: nl ? "Categorieën" : "Categories",
+    metaExport: nl ? "Export" : "Export",
+    weekLine: nl ? "// raster" : "// grid",
+    legendTitle: nl ? "Legenda" : "Legend",
+    legendSub: nl ? "// op basis van groep" : "// by group",
+    agendaNext: nl ? "Eerstvolgend" : "Up next",
+    agendaSub: nl ? "// komende 14 dagen" : "// next 14 days",
+    subscribeTitle: nl ? "Abonneren" : "Subscribe",
+    subscribeSub: nl ? "// voeg toe aan agenda" : "// add to your calendar",
+    ical: "iCal",
+    google: "Google Calendar",
+    outlook: "Outlook",
+    prevEvents: nl ? "Vorige maand" : "Previous month",
+    nextMonth: nl ? "Volgende maand" : "Next month",
+    chips: {
+      all: nl ? "Alle" : "All",
+      gala: "Gala",
+      career: "Career",
+      cantus: "Cantus",
+      service: nl ? "Service" : "Service",
+    },
+    views: {
+      agenda: nl ? "Agenda" : "Agenda",
+      month: nl ? "Maand" : "Month",
+      list: nl ? "Lijst" : "List",
+    },
+  };
+}
 
 export default async function KalenderPage({
   params,
@@ -12,27 +49,10 @@ export default async function KalenderPage({
   const { locale: localeParam } = await params;
   if (!hasLocale(localeParam)) notFound();
   const locale: Locale = localeParam;
-  const dict = getDictionary(locale);
-  const groups = await prisma.group.findMany({
-    orderBy: { orderInPraesidium: "asc" },
-  });
 
   return (
-    <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-10">
-      <h1 className="text-3xl font-bold mb-6">{dict.calendar.title}</h1>
-      <CalendarView
-        locale={locale}
-        groups={groups.map((g) => ({
-          code: g.code,
-          nameNl: g.nameNl,
-          nameEn: g.nameEn,
-        }))}
-        labels={{
-          filters: dict.calendar.filters,
-          selectAll: dict.calendar.selectAll,
-          deselectAll: dict.calendar.deselectAll,
-        }}
-      />
+    <div className="vtk-design">
+      <KalenderEditorialView locale={locale} labels={editorialLabels(locale)} />
     </div>
   );
 }

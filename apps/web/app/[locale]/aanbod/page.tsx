@@ -1,9 +1,9 @@
-import { HomeEditorial } from "@/components/editorial/HomeEditorial";
+import { AanbodEditorial } from "@/components/editorial/AanbodEditorial";
 import { hasLocale } from "@/lib/locale";
 import type { Locale } from "@vtk/i18n";
 import { notFound } from "next/navigation";
 
-export default async function HomePage({
+export default async function AanbodPage({
   params,
 }: {
   params: Promise<{ locale: string }>;
@@ -12,5 +12,5 @@ export default async function HomePage({
   if (!hasLocale(localeParam)) notFound();
   const locale: Locale = localeParam;
 
-  return <HomeEditorial locale={locale} />;
+  return <AanbodEditorial locale={locale} />;
 }

@@ -3,6 +3,8 @@ import { Header } from "@/components/site/Header";
 import { Footer } from "@/components/site/Footer";
 import { hasLocale } from "@/lib/locale";
 
+import "@/app/design/vtk-site-header.css";
+
 export default async function LocaleLayout({
   children,
   params,

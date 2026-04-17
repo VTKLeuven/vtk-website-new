@@ -1,12 +1,18 @@
 import Image from "next/image";
 import Link from "next/link";
 import { prisma } from "@vtk/db";
-import { pick } from "@vtk/i18n";
-import type { Locale } from "@/lib/locale";
-import { getDictionary } from "@vtk/i18n";
+import { getDictionary, pick, type Locale } from "@vtk/i18n";
+import { entryForDate, isClosedHours } from "@/components/editorial/hoursUtils";
 import { getSession } from "@/lib/session";
-import { ProfileMenu } from "./ProfileMenu";
+import { EditorialNavLinks } from "./EditorialNavLinks";
 import { LocaleSwitcher } from "./LocaleSwitcher";
+import { ProfileMenu } from "./ProfileMenu";
+
+type OpeningHoursSetting = {
+  titleNl: string;
+  titleEn: string;
+  entries: Array<{ dayNl: string; dayEn: string; hours: string }>;
+};
 
 function AnonymousUserIcon({ className }: { className?: string }) {
   return (
@@ -27,90 +33,121 @@ function AnonymousUserIcon({ className }: { className?: string }) {
 }
 
 export async function Header({ locale }: { locale: Locale }) {
-  const [tabs, session] = await Promise.all([
+  const now = new Date();
+  const [tabs, session, theokotRow] = await Promise.all([
     prisma.headerTab.findMany({
       where: { visible: true },
       orderBy: { order: "asc" },
     }),
     getSession(),
+    prisma.setting.findUnique({ where: { key: "home.openingHours.theokot" } }),
   ]);
   const dict = getDictionary(locale);
   const base = locale === "nl" ? "" : "/en";
   const loginLabel = dict.header.login;
 
+  const theokot = theokotRow?.value as OpeningHoursSetting | undefined;
+  const theoToday = theokot ? entryForDate(theokot.entries, now, locale) : undefined;
+  const utilLeft =
+    theoToday && !isClosedHours(theoToday.hours)
+      ? `${pick(theokot!.titleNl, theokot!.titleEn, locale).replace(/^Openingsuren\s+/i, "")} · ${theoToday.hours}`
+      : locale === "nl"
+        ? "Theokot · zie openingsuren"
+        : "Theokot · see opening hours";
+
+  const nl = locale === "nl";
+  const quick = nl
+    ? [
+        { href: `${base}/kalender`, label: "Kalender", as: "link" as const },
+        { href: `${base}/cursusdienst`, label: "Tweedehands", as: "link" as const },
+        { href: `${base}/cursusdienst`, label: "Boeken bestellen", as: "link" as const },
+        { href: `${base}/aanbod`, label: "Theokot broodjes", as: "link" as const },
+        { label: "Shiften", as: "muted" as const },
+        { label: "Tijdsloten", as: "muted" as const },
+      ]
+    : [
+        { href: `${base}/kalender`, label: "Calendar", as: "link" as const },
+        { href: `${base}/cursusdienst`, label: "Second-hand", as: "link" as const },
+        { href: `${base}/cursusdienst`, label: "Order books", as: "link" as const },
+        { href: `${base}/aanbod`, label: "Theokot sandwiches", as: "link" as const },
+        { label: "Shifts", as: "muted" as const },
+        { label: "Time slots", as: "muted" as const },
+      ];
+
   return (
-    <header className="sticky top-0 z-40 border-b border-vtk-blue/10 bg-white/90 shadow-[0_4px_30px_-8px_rgba(26,31,74,0.12)] backdrop-blur-md">
-      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-        <div className="flex h-14 items-center justify-between gap-3 sm:h-[4.25rem]">
-          <Link
-            href={`${base}/`}
-            className="relative block h-9 w-[7.5rem] shrink-0 sm:h-10 sm:w-40"
-            aria-label="VTK — home"
-          >
+    <header className="vtk-site-header">
+      <div className="utility">
+        <div className="utility-inner">
+          <div>
+            <span className="dot" />
+            {utilLeft}
+          </div>
+          <div className="utility-links">
+            {quick.map((item, i) =>
+              item.as === "link" ? (
+                <Link key={i} href={item.href}>
+                  {item.label}
+                </Link>
+              ) : (
+                <span key={i} className="utility-muted">
+                  {item.label}
+                </span>
+              )
+            )}
+          </div>
+        </div>
+      </div>
+
+      <div className="nav-inner">
+        <Link href={`${base}/`} className="brand" aria-label="VTK — home">
+          <span className="brand-logo-wrap">
             <Image
               src="/VTK.png"
               alt=""
               fill
               className="object-contain object-left"
-              sizes="(max-width: 640px) 120px, 160px"
+              sizes="120px"
               priority
             />
-          </Link>
-
-          <nav className="hidden min-w-0 flex-1 items-center justify-center gap-0.5 px-3 lg:flex">
-            {tabs.map((tab) => (
-              <Link
-                key={tab.id}
-                href={`${base}/${tab.slug}`}
-                className="rounded-full px-3 py-2 text-sm font-medium text-vtk-blue/85 transition-colors hover:bg-vtk-blue-soft hover:text-vtk-blue"
-              >
-                {pick(tab.labelNl, tab.labelEn, locale)}
-              </Link>
-            ))}
-          </nav>
-
-          <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
-            <LocaleSwitcher locale={locale} />
-            {session ? (
-              <ProfileMenu
-                name={session.user.name}
-                isAdmin={
-                  session.user.isSuperAdmin || session.permissions.length > 0
-                }
-                labels={{
-                  myAccount: dict.header.myAccount,
-                  admin: dict.header.admin,
-                  logout: dict.header.logout,
-                }}
-                base={base}
-              />
-            ) : (
-              <Link
-                href={`${base}/inloggen`}
-                aria-label={loginLabel}
-                title={loginLabel}
-                className="grid h-9 w-9 shrink-0 place-items-center rounded-full border border-vtk-blue/20 text-vtk-blue/75 transition hover:border-vtk-blue/35 hover:bg-vtk-blue-soft hover:text-vtk-blue sm:h-10 sm:w-10"
-              >
-                <AnonymousUserIcon className="h-[1.125rem] w-[1.125rem] sm:h-5 sm:w-5" />
-              </Link>
-            )}
+          </span>
+          <div className="brand-text">
+            <div className="brand-name">VTK</div>
+            <div className="brand-sub">EST. 1920</div>
           </div>
-        </div>
+        </Link>
 
-        <nav className="-mx-4 overflow-x-auto border-t border-vtk-blue/5 pb-3 pt-2 lg:hidden">
-          <ul className="flex min-w-max gap-1 px-4">
-            {tabs.map((tab) => (
-              <li key={tab.id} className="shrink-0">
-                <Link
-                  href={`${base}/${tab.slug}`}
-                  className="inline-block rounded-full border border-transparent px-3 py-1.5 text-sm font-medium text-vtk-blue/90 hover:border-vtk-blue/15 hover:bg-vtk-blue-soft"
-                >
-                  {pick(tab.labelNl, tab.labelEn, locale)}
-                </Link>
-              </li>
-            ))}
-          </ul>
-        </nav>
+        <EditorialNavLinks
+          tabs={tabs}
+          base={base}
+          locale={locale}
+          ariaLabel={locale === "nl" ? "Hoofdnavigatie" : "Main navigation"}
+        />
+
+        <div className="nav-right">
+          <LocaleSwitcher locale={locale} variant="editorial" />
+          {session ? (
+            <ProfileMenu
+              name={session.user.name}
+              isAdmin={session.user.isSuperAdmin || session.permissions.length > 0}
+              labels={{
+                myAccount: dict.header.myAccount,
+                admin: dict.header.admin,
+                logout: dict.header.logout,
+              }}
+              base={base}
+              variant="editorial"
+            />
+          ) : (
+            <Link
+              href={`${base}/inloggen`}
+              aria-label={loginLabel}
+              title={loginLabel}
+              className="nav-login"
+            >
+              <AnonymousUserIcon className="h-[1.125rem] w-[1.125rem]" />
+            </Link>
+          )}
+        </div>
       </div>
     </header>
   );
