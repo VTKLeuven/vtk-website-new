@@ -1,0 +1,239 @@
+"use server";
+
+import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
+import { z } from "zod";
+import { prisma } from "@vtk/db";
+import { hashPassword } from "@vtk/auth/server";
+import { requirePermission } from "@/lib/session";
+
+// ---- Users ------------------------------------------------------------------
+
+const userSchema = z.object({
+  id: z.string().optional(),
+  email: z.string().email(),
+  name: z.string().min(1),
+  password: z.string().optional(),
+  locale: z.enum(["NL", "EN"]).default("NL"),
+  active: z.coerce.boolean().default(true),
+  isSuperAdmin: z.coerce.boolean().default(false),
+});
+
+export async function saveUserAction(formData: FormData): Promise<void> {
+  await requirePermission("users.edit");
+  const parsed = userSchema.parse({
+    id: (formData.get("id") as string) || undefined,
+    email: String(formData.get("email")).toLowerCase().trim(),
+    name: formData.get("name"),
+    password: formData.get("password") || undefined,
+    locale: formData.get("locale") || "NL",
+    active: formData.get("active") === "on",
+    isSuperAdmin: formData.get("isSuperAdmin") === "on",
+  });
+
+  const data: Record<string, unknown> = {
+    email: parsed.email,
+    name: parsed.name,
+    locale: parsed.locale,
+    active: parsed.active,
+    isSuperAdmin: parsed.isSuperAdmin,
+  };
+  if (parsed.password && parsed.password.length > 0) {
+    data.passwordHash = await hashPassword(parsed.password);
+  }
+
+  if (parsed.id) {
+    await prisma.user.update({ where: { id: parsed.id }, data });
+  } else {
+    if (!parsed.password) {
+      throw new Error("Password is required for new users");
+    }
+    await prisma.user.create({
+      data: {
+        email: parsed.email,
+        name: parsed.name,
+        locale: parsed.locale,
+        active: parsed.active,
+        isSuperAdmin: parsed.isSuperAdmin,
+        passwordHash: await hashPassword(parsed.password),
+      },
+    });
+  }
+  revalidatePath("/admin/gebruikers");
+  redirect("/admin/gebruikers");
+}
+
+export async function deleteUserAction(formData: FormData): Promise<void> {
+  await requirePermission("users.edit");
+  const id = formData.get("id") as string;
+  if (id) await prisma.user.delete({ where: { id } });
+  revalidatePath("/admin/gebruikers");
+  redirect("/admin/gebruikers");
+}
+
+const membershipSchema = z.object({
+  userId: z.string(),
+  groupId: z.string(),
+  role: z.enum(["MEMBER", "LEAD"]).default("MEMBER"),
+  titleNl: z.string().optional().nullable(),
+  titleEn: z.string().optional().nullable(),
+  year: z.coerce.number().int().optional().nullable(),
+});
+
+export async function addMembershipAction(formData: FormData): Promise<void> {
+  await requirePermission("users.edit");
+  const parsed = membershipSchema.parse({
+    userId: formData.get("userId"),
+    groupId: formData.get("groupId"),
+    role: formData.get("role") || "MEMBER",
+    titleNl: formData.get("titleNl") || null,
+    titleEn: formData.get("titleEn") || null,
+    year: formData.get("year") || null,
+  });
+  await prisma.groupMembership.upsert({
+    where: { userId_groupId: { userId: parsed.userId, groupId: parsed.groupId } },
+    update: { role: parsed.role, titleNl: parsed.titleNl, titleEn: parsed.titleEn, year: parsed.year },
+    create: parsed,
+  });
+  revalidatePath(`/admin/gebruikers/${parsed.userId}`);
+  revalidatePath("/praesidium");
+}
+
+export async function removeMembershipAction(formData: FormData): Promise<void> {
+  await requirePermission("users.edit");
+  const id = formData.get("id") as string;
+  const userId = formData.get("userId") as string;
+  if (id) await prisma.groupMembership.delete({ where: { id } });
+  revalidatePath(`/admin/gebruikers/${userId}`);
+  revalidatePath("/praesidium");
+}
+
+// Bulk CSV import. Columns: email,name,password,groupCode,role,year
+export async function bulkImportUsersAction(formData: FormData): Promise<{ ok: boolean; added: number; errors: string[] }> {
+  await requirePermission("users.bulkImport");
+  const csv = (formData.get("csv") as string) || "";
+  const lines = csv.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+  const errors: string[] = [];
+  let added = 0;
+
+  const groups = await prisma.group.findMany();
+  const groupByCode = new Map(groups.map((g) => [g.code, g]));
+
+  // Skip header row if present
+  const start = lines[0]?.toLowerCase().includes("email") ? 1 : 0;
+
+  for (let i = start; i < lines.length; i += 1) {
+    const cols = splitCsv(lines[i]);
+    const [email, name, password, groupCode, role, yearStr] = cols;
+    if (!email || !name) {
+      errors.push(`Line ${i + 1}: missing email/name`);
+      continue;
+    }
+    try {
+      const user = await prisma.user.upsert({
+        where: { email: email.toLowerCase() },
+        update: { name },
+        create: {
+          email: email.toLowerCase(),
+          name,
+          passwordHash: await hashPassword(password || cryptoRandomPassword()),
+        },
+      });
+      if (groupCode) {
+        const group = groupByCode.get(groupCode.trim() as never);
+        if (!group) {
+          errors.push(`Line ${i + 1}: unknown group ${groupCode}`);
+        } else {
+          await prisma.groupMembership.upsert({
+            where: { userId_groupId: { userId: user.id, groupId: group.id } },
+            update: {
+              role: (role?.toUpperCase() === "LEAD" ? "LEAD" : "MEMBER") as "LEAD" | "MEMBER",
+              year: yearStr ? Number(yearStr) : null,
+            },
+            create: {
+              userId: user.id,
+              groupId: group.id,
+              role: (role?.toUpperCase() === "LEAD" ? "LEAD" : "MEMBER") as "LEAD" | "MEMBER",
+              year: yearStr ? Number(yearStr) : null,
+            },
+          });
+        }
+      }
+      added += 1;
+    } catch (err) {
+      errors.push(`Line ${i + 1}: ${(err as Error).message}`);
+    }
+  }
+
+  revalidatePath("/admin/gebruikers");
+  return { ok: errors.length === 0, added, errors };
+}
+
+function splitCsv(line: string): string[] {
+  const out: string[] = [];
+  let cur = "";
+  let inQuotes = false;
+  for (let i = 0; i < line.length; i += 1) {
+    const c = line[i];
+    if (inQuotes) {
+      if (c === '"' && line[i + 1] === '"') {
+        cur += '"';
+        i += 1;
+      } else if (c === '"') {
+        inQuotes = false;
+      } else {
+        cur += c;
+      }
+    } else if (c === '"') {
+      inQuotes = true;
+    } else if (c === ",") {
+      out.push(cur);
+      cur = "";
+    } else {
+      cur += c;
+    }
+  }
+  out.push(cur);
+  return out.map((s) => s.trim());
+}
+
+function cryptoRandomPassword() {
+  return Math.random().toString(36).slice(2) + Math.random().toString(36).slice(2);
+}
+
+// ---- Groups -----------------------------------------------------------------
+
+export async function setGroupPermissionAction(formData: FormData): Promise<void> {
+  await requirePermission("groups.manage");
+  const groupId = formData.get("groupId") as string;
+  const permissionId = formData.get("permissionId") as string;
+  const enabled = formData.get("enabled") === "1";
+  if (!groupId || !permissionId) return;
+  if (enabled) {
+    await prisma.groupPermission.upsert({
+      where: { groupId_permissionId: { groupId, permissionId } },
+      update: {},
+      create: { groupId, permissionId },
+    });
+  } else {
+    await prisma.groupPermission
+      .delete({ where: { groupId_permissionId: { groupId, permissionId } } })
+      .catch(() => null);
+  }
+  revalidatePath("/admin/groepen");
+}
+
+export async function saveGroupAction(formData: FormData): Promise<void> {
+  await requirePermission("groups.manage");
+  const id = formData.get("id") as string;
+  const nameNl = formData.get("nameNl") as string;
+  const nameEn = formData.get("nameEn") as string;
+  const descriptionNl = formData.get("descriptionNl") as string;
+  const descriptionEn = formData.get("descriptionEn") as string;
+  const orderInPraesidium = Number(formData.get("orderInPraesidium")) || 0;
+  await prisma.group.update({
+    where: { id },
+    data: { nameNl, nameEn, descriptionNl, descriptionEn, orderInPraesidium },
+  });
+  revalidatePath("/praesidium");
+}

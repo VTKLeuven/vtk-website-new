@@ -1,0 +1,78 @@
+/*
+ * IMPORTANT: we disable Tailwind v4's automatic source detection because in
+ * this monorepo it was walking all the way up to the user's home directory
+ * (there is a stray package-lock.json at ~ and OrbStack mounts under
+ * ~/OrbStack that contain symlink cycles like `.../alpine:latest/bin` → `bin`).
+ * The native oxide scanner follows symlinks, which caused runaway memory
+ * usage (tens of GB swap) as soon as `next dev` booted.
+ *
+ * We explicitly register only the paths that contain class-name tokens.
+ */
+@import "tailwindcss" source(none);
+@source "../app";
+@source "../components";
+@source "../lib";
+@source "../../../packages/ui/src";
+
+/* Brand: primary #1a1f4a, secondary #ffd400, surfaces white / soft cool gray */
+@theme {
+  --color-vtk-blue: #1a1f4a;
+  --color-vtk-blue-dark: #121635;
+  --color-vtk-blue-light: #2a3366;
+  --color-vtk-blue-soft: #eceef8;
+  --color-vtk-blue-muted: #f4f5fc;
+
+  --color-vtk-yellow: #ffd400;
+  --color-vtk-yellow-dark: #e6bf00;
+
+  --color-vtk-surface: #f6f7fb;
+  --color-vtk-surface-elevated: #ffffff;
+
+  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, monospace;
+}
+
+:root {
+  --background: #f6f7fb;
+  --foreground: #1a1f4a;
+  --vtk-ring: rgba(26, 31, 74, 0.12);
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+}
+
+/* Prose content produced by Tiptap */
+.prose-vtk h1 {
+  @apply text-3xl font-bold mt-6 mb-3 text-vtk-blue;
+}
+.prose-vtk h2 {
+  @apply text-2xl font-semibold mt-5 mb-2 text-vtk-blue;
+}
+.prose-vtk h3 {
+  @apply text-xl font-semibold mt-4 mb-2 text-vtk-blue;
+}
+.prose-vtk p {
+  @apply my-3 leading-7 text-zinc-700;
+}
+.prose-vtk a {
+  @apply text-vtk-blue font-medium underline underline-offset-2 decoration-vtk-yellow/80 hover:text-vtk-blue-light;
+}
+.prose-vtk ul {
+  @apply list-disc pl-6 my-3;
+}
+.prose-vtk ol {
+  @apply list-decimal pl-6 my-3;
+}
+.prose-vtk blockquote {
+  @apply border-l-4 border-vtk-yellow pl-4 italic text-zinc-600 bg-vtk-blue-soft/50 rounded-r-lg py-1;
+}
+.prose-vtk img {
+  @apply rounded-lg my-4 max-w-full h-auto shadow-sm border border-zinc-100;
+}

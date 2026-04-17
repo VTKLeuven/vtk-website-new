@@ -1,0 +1,22 @@
+{
+  "name": "vtk-website",
+  "version": "0.1.0",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "npm run dev --workspace=@vtk/web",
+    "build": "npm run build --workspace=@vtk/db && npm run build --workspace=@vtk/web",
+    "start": "npm run start --workspace=@vtk/web",
+    "lint": "npm run lint --workspace=@vtk/web",
+    "db:generate": "npm run generate --workspace=@vtk/db",
+    "db:push": "npm run push --workspace=@vtk/db",
+    "db:migrate": "npm run migrate --workspace=@vtk/db",
+    "db:seed": "npm run seed --workspace=@vtk/db"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}

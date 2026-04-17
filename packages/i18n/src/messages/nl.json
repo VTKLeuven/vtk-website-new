@@ -1,0 +1,92 @@
+{
+  "header": {
+    "skipToContent": "Ga naar inhoud",
+    "login": "Inloggen",
+    "profile": "Profiel",
+    "myAccount": "Mijn account",
+    "admin": "Admin",
+    "logout": "Uitloggen",
+    "language": "Taal"
+  },
+  "footer": {
+    "partners": "Partners",
+    "noPartners": "Nog geen partners.",
+    "copyright": "Vlaamse Technische Kring"
+  },
+  "home": {
+    "welcome": "Welkom bij VTK",
+    "upcomingEvents": "Aankomende evenementen",
+    "noUpcomingEvents": "Geen geplande evenementen.",
+    "viewCalendar": "Bekijk kalender",
+    "readMore": "Lees meer"
+  },
+  "calendar": {
+    "title": "Kalender",
+    "filters": "Filter per groep",
+    "selectAll": "Alles",
+    "deselectAll": "Niets",
+    "noEvents": "Geen evenementen",
+    "addEvent": "Evenement toevoegen"
+  },
+  "praesidium": {
+    "title": "Praesidium",
+    "lead": "Voorzitter",
+    "member": "Lid"
+  },
+  "pocs": {
+    "title": "POC's",
+    "empty": "Nog geen POC's toegevoegd."
+  },
+  "photos": {
+    "title": "Fotogalerij",
+    "album": "Album",
+    "download": "Download",
+    "downloadSelected": "Selectie downloaden",
+    "downloadAll": "Volledig album downloaden",
+    "selected": "geselecteerd",
+    "empty": "Nog geen albums."
+  },
+  "pages": {
+    "empty": "Nog geen pagina's",
+    "overview": "Overzicht",
+    "downloads": "Downloads"
+  },
+  "auth": {
+    "email": "E-mailadres",
+    "password": "Wachtwoord",
+    "signIn": "Inloggen",
+    "signOut": "Uitloggen",
+    "invalidCredentials": "Ongeldige inloggegevens",
+    "account": "Mijn account",
+    "updateProfile": "Profiel bijwerken",
+    "changePassword": "Wachtwoord wijzigen",
+    "currentPassword": "Huidig wachtwoord",
+    "newPassword": "Nieuw wachtwoord",
+    "saved": "Opgeslagen"
+  },
+  "admin": {
+    "title": "Admin",
+    "dashboard": "Dashboard",
+    "pages": "Pagina's",
+    "header": "Header",
+    "calendar": "Kalender",
+    "users": "Gebruikers",
+    "groups": "Groepen",
+    "albums": "Albums",
+    "pocs": "POC's",
+    "partners": "Partners",
+    "home": "Homepagina",
+    "create": "Nieuw",
+    "save": "Opslaan",
+    "delete": "Verwijderen",
+    "cancel": "Annuleren",
+    "edit": "Bewerken",
+    "back": "Terug",
+    "noAccess": "Geen toegang"
+  },
+  "common": {
+    "loading": "Laden...",
+    "yes": "Ja",
+    "no": "Nee"
+  }
+}

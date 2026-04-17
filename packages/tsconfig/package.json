@@ -1,0 +1,7 @@
+{
+  "name": "@vtk/tsconfig",
+  "version": "0.1.0",
+  "private": true,
+  "main": "base.json",
+  "files": ["base.json"]
+}

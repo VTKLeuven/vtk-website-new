@@ -1,0 +1,121 @@
+services:
+  postgres:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-vtk}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-vtk}
+      POSTGRES_DB: ${POSTGRES_DB:-vtk}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    ports:
+      - "127.0.0.1:5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER:-vtk}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  minio:
+    image: minio/minio:latest
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${S3_ACCESS_KEY:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${S3_SECRET_KEY:-minioadmin}
+    volumes:
+      - minio-data:/data
+    ports:
+      - "127.0.0.1:9000:9000"
+      - "127.0.0.1:9001:9001"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/ready"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+
+  minio-setup:
+    image: minio/mc:latest
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: >
+      /bin/sh -c "
+      mc alias set local http://minio:9000 $${S3_ACCESS_KEY:-minioadmin} $${S3_SECRET_KEY:-minioadmin} &&
+      mc mb --ignore-existing local/$${S3_BUCKET:-vtk} &&
+      mc anonymous set download local/$${S3_BUCKET:-vtk};
+      "
+    environment:
+      S3_ACCESS_KEY: ${S3_ACCESS_KEY:-minioadmin}
+      S3_SECRET_KEY: ${S3_SECRET_KEY:-minioadmin}
+      S3_BUCKET: ${S3_BUCKET:-vtk}
+    restart: "no"
+
+  web:
+    build:
+      context: ..
+      dockerfile: infra/docker/web.Dockerfile
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://${POSTGRES_USER:-vtk}:${POSTGRES_PASSWORD:-vtk}@postgres:5432/${POSTGRES_DB:-vtk}?schema=public
+      SESSION_COOKIE_DOMAIN: ${SESSION_COOKIE_DOMAIN:-.vtk.be}
+      VTK_MAIN_URL: ${VTK_MAIN_URL:-https://vtk.be}
+      S3_ENDPOINT: http://minio:9000
+      S3_ACCESS_KEY: ${S3_ACCESS_KEY:-minioadmin}
+      S3_SECRET_KEY: ${S3_SECRET_KEY:-minioadmin}
+      S3_BUCKET: ${S3_BUCKET:-vtk}
+      S3_REGION: ${S3_REGION:-us-east-1}
+      S3_PUBLIC_URL: ${S3_PUBLIC_URL:-https://cdn.vtk.be}
+    ports:
+      - "127.0.0.1:3000:3000"
+
+  logistiek:
+    build:
+      context: ..
+      dockerfile: infra/docker/logistiek.Dockerfile
+    restart: unless-stopped
+    depends_on:
+      web:
+        condition: service_started
+    environment:
+      NODE_ENV: production
+      SESSION_COOKIE_DOMAIN: ${SESSION_COOKIE_DOMAIN:-.vtk.be}
+      VTK_MAIN_URL: ${VTK_MAIN_URL:-https://vtk.be}
+    ports:
+      - "127.0.0.1:3100:3000"
+
+  nginx:
+    image: nginx:alpine
+    restart: unless-stopped
+    depends_on:
+      - web
+      - logistiek
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/conf.d:/etc/nginx/conf.d:ro
+      - ./nginx/letsencrypt:/etc/letsencrypt:ro
+      - ./nginx/www:/var/www/certbot:ro
+
+  certbot:
+    image: certbot/certbot:latest
+    restart: "no"
+    volumes:
+      - ./nginx/letsencrypt:/etc/letsencrypt
+      - ./nginx/www:/var/www/certbot
+    entrypoint: >
+      /bin/sh -c "
+      trap exit TERM;
+      while :; do certbot renew --webroot -w /var/www/certbot --quiet; sleep 12h & wait $${!}; done
+      "
+
+volumes:
+  postgres-data:
+  minio-data:

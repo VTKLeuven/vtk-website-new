@@ -1,0 +1,20 @@
+{
+  "name": "@vtk/auth",
+  "version": "0.1.0",
+  "private": true,
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./server": "./src/server.ts",
+    "./remote": "./src/remote.ts"
+  },
+  "dependencies": {
+    "@node-rs/argon2": "^2.0.2",
+    "@vtk/db": "*"
+  },
+  "devDependencies": {
+    "@vtk/tsconfig": "*",
+    "typescript": "^5"
+  }
+}

@@ -1,0 +1,21 @@
+/* See apps/web/app/globals.css for Tailwind source locking rationale. */
+@import "tailwindcss" source(none);
+@source "../app";
+@source "../lib";
+@source "../../../packages/ui/src";
+
+@theme {
+  --color-vtk-blue: #1a1f4a;
+  --color-vtk-blue-dark: #121635;
+  --color-vtk-blue-light: #2a3366;
+  --color-vtk-blue-soft: #eceef8;
+  --color-vtk-blue-muted: #f4f5fc;
+  --color-vtk-yellow: #ffd400;
+  --color-vtk-yellow-dark: #e6bf00;
+  --color-vtk-surface: #f6f7fb;
+}
+
+html,
+body {
+  height: 100%;
+}

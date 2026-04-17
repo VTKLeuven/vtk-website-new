@@ -1,0 +1,8 @@
+{
+  "extends": "@vtk/tsconfig/base.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "outDir": "./dist"
+  },
+  "include": ["src/**/*.ts", "prisma/**/*.ts"]
+}

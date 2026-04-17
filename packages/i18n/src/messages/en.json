@@ -1,0 +1,92 @@
+{
+  "header": {
+    "skipToContent": "Skip to content",
+    "login": "Sign in",
+    "profile": "Profile",
+    "myAccount": "My account",
+    "admin": "Admin",
+    "logout": "Sign out",
+    "language": "Language"
+  },
+  "footer": {
+    "partners": "Partners",
+    "noPartners": "No partners yet.",
+    "copyright": "Vlaamse Technische Kring"
+  },
+  "home": {
+    "welcome": "Welcome to VTK",
+    "upcomingEvents": "Upcoming events",
+    "noUpcomingEvents": "No scheduled events.",
+    "viewCalendar": "View calendar",
+    "readMore": "Read more"
+  },
+  "calendar": {
+    "title": "Calendar",
+    "filters": "Filter by group",
+    "selectAll": "All",
+    "deselectAll": "None",
+    "noEvents": "No events",
+    "addEvent": "Add event"
+  },
+  "praesidium": {
+    "title": "Praesidium",
+    "lead": "Lead",
+    "member": "Member"
+  },
+  "pocs": {
+    "title": "POCs",
+    "empty": "No POCs yet."
+  },
+  "photos": {
+    "title": "Photo gallery",
+    "album": "Album",
+    "download": "Download",
+    "downloadSelected": "Download selection",
+    "downloadAll": "Download whole album",
+    "selected": "selected",
+    "empty": "No albums yet."
+  },
+  "pages": {
+    "empty": "No pages yet",
+    "overview": "Overview",
+    "downloads": "Downloads"
+  },
+  "auth": {
+    "email": "Email",
+    "password": "Password",
+    "signIn": "Sign in",
+    "signOut": "Sign out",
+    "invalidCredentials": "Invalid credentials",
+    "account": "My account",
+    "updateProfile": "Update profile",
+    "changePassword": "Change password",
+    "currentPassword": "Current password",
+    "newPassword": "New password",
+    "saved": "Saved"
+  },
+  "admin": {
+    "title": "Admin",
+    "dashboard": "Dashboard",
+    "pages": "Pages",
+    "header": "Header",
+    "calendar": "Calendar",
+    "users": "Users",
+    "groups": "Groups",
+    "albums": "Albums",
+    "pocs": "POCs",
+    "partners": "Partners",
+    "home": "Homepage",
+    "create": "New",
+    "save": "Save",
+    "delete": "Delete",
+    "cancel": "Cancel",
+    "edit": "Edit",
+    "back": "Back",
+    "noAccess": "No access"
+  },
+  "common": {
+    "loading": "Loading...",
+    "yes": "Yes",
+    "no": "No"
+  }
+}

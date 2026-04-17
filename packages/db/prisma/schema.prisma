@@ -1,0 +1,324 @@
+// VTK website Prisma schema.
+// Generated client lands in @vtk/db/node_modules/.prisma/client for each package.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// -----------------------------------------------------------------------------
+// Enums
+// -----------------------------------------------------------------------------
+
+enum Locale {
+  NL
+  EN
+}
+
+enum GroupCode {
+  ACTIVITEITEN
+  BEDRIJVENRELATIES
+  COMMUNICATIE
+  CULTUUR
+  CURSUSDIENST
+  DEVELOPMENT
+  FAKBAR
+  GROEP5
+  INTERNATIONAAL
+  IT
+  LOGISTIEK
+  ONDERWIJS
+  ONTHAAL
+  SPORT
+  THEOKOT
+  ALGEMEEN
+}
+
+enum MembershipRole {
+  MEMBER
+  LEAD
+}
+
+enum PageAssetKind {
+  EMBEDDED_PDF
+  DOWNLOAD
+}
+
+enum EventVisibility {
+  PUBLIC
+  MEMBERS
+}
+
+// -----------------------------------------------------------------------------
+// Users, groups, permissions
+// -----------------------------------------------------------------------------
+
+model User {
+  id               String              @id @default(cuid())
+  email            String              @unique
+  name             String
+  passwordHash     String
+  avatarKey        String?
+  locale           Locale              @default(NL)
+  active           Boolean             @default(true)
+  isSuperAdmin     Boolean             @default(false)
+  createdAt        DateTime            @default(now())
+  updatedAt        DateTime            @updatedAt
+
+  memberships      GroupMembership[]
+  sessions         Session[]
+  pocRepresentative PocRepresentative[]
+  createdPages     Page[]              @relation("PageCreatedBy")
+  createdEvents    CalendarEvent[]     @relation("EventCreatedBy")
+}
+
+model Group {
+  id                 String             @id @default(cuid())
+  code               GroupCode          @unique
+  slug               String             @unique
+  nameNl             String
+  nameEn             String
+  descriptionNl      String?
+  descriptionEn      String?
+  orderInPraesidium  Int                @default(0)
+  photoKey           String?
+
+  memberships        GroupMembership[]
+  permissions        GroupPermission[]
+  events             CalendarEvent[]
+}
+
+model GroupMembership {
+  id            String          @id @default(cuid())
+  userId        String
+  groupId       String
+  role          MembershipRole  @default(MEMBER)
+  year          Int?
+  titleNl       String?
+  titleEn       String?
+  displayOrder  Int             @default(0)
+
+  user          User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  group         Group           @relation(fields: [groupId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, groupId])
+  @@index([groupId])
+}
+
+model Permission {
+  id        String             @id @default(cuid())
+  code      String             @unique
+  labelNl   String
+  labelEn   String
+  category  String             @default("general")
+
+  groups    GroupPermission[]
+}
+
+model GroupPermission {
+  groupId       String
+  permissionId  String
+
+  group         Group       @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  permission    Permission  @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@id([groupId, permissionId])
+}
+
+model Session {
+  token     String   @id
+  userId    String
+  expiresAt DateTime
+  userAgent String?
+  ip        String?
+  createdAt DateTime @default(now())
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+// -----------------------------------------------------------------------------
+// Header tabs & pages CMS
+// -----------------------------------------------------------------------------
+
+model HeaderTab {
+  id         String  @id @default(cuid())
+  code       String  @unique
+  slug       String  @unique
+  labelNl    String
+  labelEn    String
+  order      Int     @default(0)
+  visible    Boolean @default(true)
+
+  pages      Page[]
+}
+
+model Page {
+  id               String      @id @default(cuid())
+  slug             String      @unique
+  headerTabId      String?
+  visibleInHeader  Boolean     @default(true)
+  titleNl          String
+  titleEn          String?
+  contentJsonNl    Json
+  contentJsonEn    Json?
+  excerptNl        String?
+  excerptEn        String?
+  publishedAt      DateTime?
+  order            Int         @default(0)
+  createdById      String?
+  createdAt        DateTime    @default(now())
+  updatedAt        DateTime    @updatedAt
+
+  headerTab        HeaderTab?  @relation(fields: [headerTabId], references: [id], onDelete: SetNull)
+  createdBy        User?       @relation("PageCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  assets           PageAsset[]
+
+  @@index([headerTabId])
+}
+
+model PageAsset {
+  id          String         @id @default(cuid())
+  pageId      String
+  storageKey  String
+  kind        PageAssetKind
+  labelNl     String
+  labelEn     String?
+  sizeBytes   Int?
+  mimeType    String?
+  order       Int            @default(0)
+  createdAt   DateTime       @default(now())
+
+  page        Page           @relation(fields: [pageId], references: [id], onDelete: Cascade)
+
+  @@index([pageId])
+}
+
+// -----------------------------------------------------------------------------
+// Calendar
+// -----------------------------------------------------------------------------
+
+model CalendarEvent {
+  id             String           @id @default(cuid())
+  titleNl        String
+  titleEn        String?
+  descriptionNl  String?
+  descriptionEn  String?
+  location       String?
+  start          DateTime
+  end            DateTime
+  allDay         Boolean          @default(false)
+  visibility     EventVisibility  @default(PUBLIC)
+  url            String?
+  groupId        String
+  createdById    String?
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+
+  group          Group            @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  createdBy      User?            @relation("EventCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@index([start])
+  @@index([groupId])
+}
+
+// -----------------------------------------------------------------------------
+// Photo albums
+// -----------------------------------------------------------------------------
+
+model PhotoAlbum {
+  id             String   @id @default(cuid())
+  slug           String   @unique
+  titleNl        String
+  titleEn        String?
+  descriptionNl  String?
+  descriptionEn  String?
+  coverPhotoId   String?  @unique
+  eventDate      DateTime?
+  publishedAt    DateTime?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  coverPhoto     Photo?   @relation("AlbumCover", fields: [coverPhotoId], references: [id], onDelete: SetNull)
+  photos         Photo[]  @relation("AlbumPhotos")
+}
+
+model Photo {
+  id              String     @id @default(cuid())
+  albumId         String
+  storageKey      String
+  thumbnailKey    String?
+  width           Int?
+  height          Int?
+  sizeBytes       Int?
+  originalName    String?
+  takenAt         DateTime?
+  order           Int        @default(0)
+  createdAt       DateTime   @default(now())
+
+  album           PhotoAlbum @relation("AlbumPhotos", fields: [albumId], references: [id], onDelete: Cascade)
+  coverOfAlbum    PhotoAlbum? @relation("AlbumCover")
+
+  @@index([albumId])
+}
+
+// -----------------------------------------------------------------------------
+// POCs (student representatives per study track)
+// -----------------------------------------------------------------------------
+
+model Poc {
+  id             String              @id @default(cuid())
+  slug           String              @unique
+  nameNl         String
+  nameEn         String?
+  studyTrack     String
+  descriptionNl  String?
+  descriptionEn  String?
+  order          Int                 @default(0)
+
+  representatives PocRepresentative[]
+}
+
+model PocRepresentative {
+  id         String  @id @default(cuid())
+  pocId      String
+  userId     String
+  roleNl     String?
+  roleEn     String?
+  order      Int     @default(0)
+
+  poc        Poc     @relation(fields: [pocId], references: [id], onDelete: Cascade)
+  user       User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([pocId, userId])
+}
+
+// -----------------------------------------------------------------------------
+// Partners
+// -----------------------------------------------------------------------------
+
+model Partner {
+  id         String   @id @default(cuid())
+  name       String
+  logoKey    String
+  url        String?
+  order      Int      @default(0)
+  active     Boolean  @default(true)
+  createdAt  DateTime @default(now())
+}
+
+// -----------------------------------------------------------------------------
+// Settings (key/value JSON, drives the editable homepage and opening hours)
+// -----------------------------------------------------------------------------
+
+model Setting {
+  key        String   @id
+  value      Json
+  updatedAt  DateTime @updatedAt
+}

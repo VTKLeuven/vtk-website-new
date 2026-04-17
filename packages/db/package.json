@@ -1,0 +1,27 @@
+{
+  "name": "@vtk/db",
+  "version": "0.1.0",
+  "private": true,
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "scripts": {
+    "generate": "dotenv -e ../../.env -- prisma generate",
+    "push": "dotenv -e ../../.env -- prisma db push",
+    "migrate": "dotenv -e ../../.env -- prisma migrate dev",
+    "seed": "dotenv -e ../../.env -- tsx prisma/seed.ts",
+    "build": "dotenv -e ../../.env -- prisma generate"
+  },
+  "dependencies": {
+    "@prisma/client": "^6.3.0"
+  },
+  "devDependencies": {
+    "@vtk/tsconfig": "*",
+    "dotenv-cli": "^7.4.2",
+    "prisma": "^6.3.0",
+    "tsx": "^4.19.2",
+    "typescript": "^5"
+  },
+  "prisma": {
+    "seed": "tsx prisma/seed.ts"
+  }
+}
