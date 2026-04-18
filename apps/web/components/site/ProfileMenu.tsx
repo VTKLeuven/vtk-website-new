@@ -31,36 +31,21 @@ export function ProfileMenu({
 
   const triggerClass =
     variant === "editorial"
-      ? "avatar-btn"
+      ? "profile-menu-trigger"
       : "flex items-center gap-2 rounded-full border border-vtk-blue/15 bg-white px-2 py-1.5 text-sm text-vtk-blue shadow-sm transition hover:border-vtk-blue/25 hover:bg-vtk-blue-soft/60";
 
   const menuClass =
     variant === "editorial"
-      ? "absolute right-0 z-50 mt-2 w-52 border py-1 text-[11px] uppercase tracking-wider shadow-[0_12px_32px_rgba(0,0,0,0.12)]"
-      : "absolute right-0 mt-2 w-52 rounded-xl border border-vtk-blue/10 bg-white py-1 text-zinc-800 shadow-[0_12px_40px_-8px_rgba(26,31,74,0.18)] ring-1 ring-black/[0.03]";
-
-  const menuStyle =
-    variant === "editorial"
-      ? {
-          borderColor: "var(--rule)",
-          background: "var(--paper)",
-          color: "var(--ink)",
-          fontFamily: "var(--mono)",
-        }
-      : undefined;
+      ? "profile-menu"
+      : "absolute right-0 z-50 mt-2 w-52 rounded-xl border border-vtk-blue/10 bg-white py-1 text-zinc-800 shadow-[0_12px_40px_-8px_rgba(26,31,74,0.18)] ring-1 ring-black/[0.03]";
 
   const itemClass =
     variant === "editorial"
-      ? "block px-4 py-2.5 tracking-wide hover:bg-[var(--paper-2)]"
+      ? "profile-menu-item"
       : "block px-4 py-2.5 text-sm hover:bg-vtk-blue-soft";
 
   return (
-    <div
-      className="relative"
-      ref={ref}
-      onMouseEnter={() => setOpen(true)}
-      onMouseLeave={() => setOpen(false)}
-    >
+    <div className="relative" ref={ref}>
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
@@ -80,7 +65,7 @@ export function ProfileMenu({
         )}
       </button>
       {open && (
-        <div role="menu" className={menuClass} style={menuStyle}>
+        <div role="menu" className={menuClass}>
           <Link href={`${base}/account`} className={itemClass} role="menuitem">
             {labels.myAccount}
           </Link>
@@ -90,7 +75,7 @@ export function ProfileMenu({
             </Link>
           )}
           <form action={logoutAction}>
-            <button type="submit" className={`${itemClass} w-full text-left`} role="menuitem">
+            <button type="submit" className={`${itemClass} text-left`} role="menuitem">
               {labels.logout}
             </button>
           </form>

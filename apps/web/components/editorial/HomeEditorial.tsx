@@ -327,7 +327,7 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
                   lineHeight: 1,
                 }}
               >
-                {locale === "nl" ? "Live aanbod." : "Live services."}
+                {locale === "nl" ? "Openingsuren." : "Opening hours."}
               </h2>
             </div>
             <div
@@ -401,22 +401,6 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
               </dl>
             </div>
           ) : null}
-          <div className="hours-col">
-            <h3>{locale === "nl" ? "Shiftenbureau" : "Shift desk"}</h3>
-            <div className="sub">{locale === "nl" ? "Inschrijven & tijdsloten" : "Sign-ups & time slots"}</div>
-            <div className="status closed">
-              {locale === "nl" ? "Online · 24/7" : "Online · 24/7"}
-            </div>
-            <dl className="hours-list">
-              <dt>WWW</dt>
-              <dd>shiften.vtk.be</dd>
-              <dt>{locale === "nl" ? "INFO" : "INFO"}</dt>
-              <dd>{locale === "nl" ? "via VTK-site" : "via VTK site"}</dd>
-            </dl>
-            <span className="btn btn-accent arrow" style={{ marginTop: 24, opacity: 0.5, pointerEvents: "none" }}>
-              {locale === "nl" ? "Plan een slot" : "Book a slot"}
-            </span>
-          </div>
         </div>
       </section>
 

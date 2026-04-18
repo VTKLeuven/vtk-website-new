@@ -56,20 +56,12 @@ export async function Header({ locale }: { locale: Locale }) {
   const nl = locale === "nl";
   const quick = nl
     ? [
-        { href: `${base}/kalender`, label: "Kalender", as: "link" as const },
-        { href: `${base}/cursusdienst`, label: "Tweedehands", as: "link" as const },
-        { href: `${base}/cursusdienst`, label: "Boeken bestellen", as: "link" as const },
-        { href: `${base}/aanbod`, label: "Theokot broodjes", as: "link" as const },
-        { label: "Shiften", as: "muted" as const },
-        { label: "Tijdsloten", as: "muted" as const },
+        { href: `${base}/aanbod`, label: "Theokot", as: "link" as const },
+        { href: `${base}/cursusdienst`, label: "Cursusdienst", as: "link" as const },
       ]
     : [
-        { href: `${base}/kalender`, label: "Calendar", as: "link" as const },
-        { href: `${base}/cursusdienst`, label: "Second-hand", as: "link" as const },
-        { href: `${base}/cursusdienst`, label: "Order books", as: "link" as const },
-        { href: `${base}/aanbod`, label: "Theokot sandwiches", as: "link" as const },
-        { label: "Shifts", as: "muted" as const },
-        { label: "Time slots", as: "muted" as const },
+        { href: `${base}/aanbod`, label: "Theokot", as: "link" as const },
+        { href: `${base}/cursusdienst`, label: "Course shop", as: "link" as const },
       ];
 
   return (
@@ -98,16 +90,14 @@ export async function Header({ locale }: { locale: Locale }) {
 
       <div className="nav-inner">
         <Link href={`${base}/`} className="brand" aria-label="VTK — home">
-          <span className="brand-logo-wrap">
-            <Image
-              src="/VTK.png"
-              alt=""
-              fill
-              className="object-contain object-left"
-              sizes="120px"
-              priority
-            />
-          </span>
+          <Image
+            src="/VTK.png"
+            alt=""
+            width={320}
+            height={96}
+            className="brand-logo-img"
+            priority
+          />
           <div className="brand-text">
             <div className="brand-name">VTK</div>
             <div className="brand-sub">EST. 1920</div>

@@ -214,7 +214,7 @@
   margin: 0 auto;
   padding: 64px 32px;
   display: grid;
-  grid-template-columns: 1fr 1fr 1fr;
+  grid-template-columns: 1fr 1fr;
   gap: 0;
 }
 .vtk-design .hours-col {
@@ -416,14 +416,19 @@
 }
 .vtk-design .partners-grid {
   display: grid;
-  grid-template-columns: repeat(6, 1fr);
-  gap: 1px;
-  background: var(--rule);
-  border: 1px solid var(--rule);
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  justify-content: center;
+  width: 100%;
+  max-width: 920px;
+  margin: 0 auto;
+  gap: 10px;
+  border: 0;
+  background: transparent;
 }
 .vtk-design .partner {
   aspect-ratio: 16/9;
   background: var(--paper);
+  border: 1px solid var(--rule);
   display: grid;
   place-items: center;
   font-family: var(--mono);
@@ -431,13 +436,19 @@
   color: var(--muted);
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  transition: 150ms;
+  transition:
+    transform 180ms ease,
+    border-color 150ms ease,
+    box-shadow 180ms ease;
   padding: 8px;
   text-align: center;
 }
 .vtk-design .partner:hover {
   background: var(--paper-2);
   color: var(--ink);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.06);
+  border-color: oklch(0.82 0.02 260);
 }
 .vtk-design .partner img {
   max-height: 48px;
@@ -481,7 +492,8 @@
     gap: 48px;
   }
   .vtk-design .partners-grid {
-    grid-template-columns: repeat(3, 1fr);
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    max-width: 100%;
   }
   .vtk-design .event-row {
     grid-template-columns: 80px 1fr;
@@ -501,7 +513,7 @@
     grid-template-columns: 1fr;
   }
   .vtk-design .partners-grid {
-    grid-template-columns: repeat(2, 1fr);
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
   }
   .vtk-design section.block {
     padding: 64px 20px;

@@ -94,7 +94,7 @@
 .vtk-site-header .brand {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 12px; /* ~Tailwind gap-3: tight wordmark next to intrinsic logo width */
   font-family: var(--mono);
   font-weight: 600;
   letter-spacing: 0.02em;
@@ -102,11 +102,13 @@
   text-decoration: none;
 }
 
-.vtk-site-header .brand-logo-wrap {
-  position: relative;
-  width: 76px;
+.vtk-site-header .brand-logo-img {
   height: 34px;
+  width: auto;
+  max-width: min(200px, 38vw);
   flex-shrink: 0;
+  object-fit: contain;
+  object-position: left center;
 }
 
 .vtk-site-header .brand-name {
@@ -185,12 +187,78 @@
   text-transform: uppercase;
 }
 .vtk-site-header .lang-toggle button[aria-pressed="true"] {
-  background: var(--ink);
-  color: var(--accent);
+  background: transparent;
+  color: var(--ink);
+  font-weight: 600;
+  box-shadow: inset 0 -2px 0 0 var(--ink);
+}
+.vtk-site-header .lang-toggle button[aria-pressed="false"] {
+  opacity: 0.5;
+}
+.vtk-site-header .lang-toggle button[aria-pressed="false"]:hover {
+  opacity: 0.85;
+  color: var(--ink);
 }
 .vtk-site-header .lang-toggle .lang-sep {
   color: var(--muted);
   user-select: none;
+}
+
+/* Account control — square, same language as .lang-toggle (no round avatar). */
+.vtk-site-header .profile-menu-trigger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 36px;
+  padding: 6px 12px;
+  border: 1px solid var(--rule);
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: border-color 120ms ease, background 120ms ease;
+}
+.vtk-site-header .profile-menu-trigger:hover {
+  border-color: var(--ink);
+  background: var(--paper-2);
+}
+
+.vtk-site-header .profile-menu {
+  position: absolute;
+  right: 0;
+  top: 100%;
+  z-index: 60;
+  margin-top: 4px;
+  min-width: 11rem;
+  padding: 4px 0;
+  border: 1px solid var(--rule);
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.1);
+}
+
+.vtk-site-header .profile-menu-item {
+  display: block;
+  width: 100%;
+  padding: 10px 14px;
+  color: inherit;
+  text-decoration: none;
+  background: none;
+  border: 0;
+  font: inherit;
+  cursor: pointer;
+  transition: background 120ms ease;
+}
+.vtk-site-header .profile-menu-item:hover {
+  background: var(--paper-2);
 }
 
 .vtk-site-header .avatar-btn {
@@ -233,8 +301,7 @@
   .vtk-site-header .brand-text {
     display: none;
   }
-  .vtk-site-header .brand-logo-wrap {
-    width: 68px;
+  .vtk-site-header .brand-logo-img {
     height: 30px;
   }
 }
