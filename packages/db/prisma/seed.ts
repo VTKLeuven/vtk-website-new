@@ -5,6 +5,20 @@ import { PERMISSIONS } from "../src/permissions";
 
 const prisma = new PrismaClient();
 
+/** Strip whitespace and optional surrounding quotes from env (Docker / shell quirks). */
+function readSeedEnv(raw: string | undefined): string | undefined {
+  if (raw == null) return undefined;
+  let s = raw.trim();
+  if (s === "") return undefined;
+  if (
+    (s.startsWith('"') && s.endsWith('"') && s.length >= 2) ||
+    (s.startsWith("'") && s.endsWith("'") && s.length >= 2)
+  ) {
+    s = s.slice(1, -1).trim();
+  }
+  return s === "" ? undefined : s;
+}
+
 async function main() {
   console.log("Seeding groups...");
   for (const g of GROUP_SEEDS) {
@@ -246,11 +260,14 @@ async function main() {
     }
   }
 
-  if (process.env.SEED_ADMIN_EMAIL && process.env.SEED_ADMIN_PASSWORD) {
+  const seedEmail = readSeedEnv(process.env.SEED_ADMIN_EMAIL);
+  const seedPassword = readSeedEnv(process.env.SEED_ADMIN_PASSWORD);
+
+  if (seedEmail && seedPassword) {
     console.log("Seeding initial admin...");
     // Match apps/web loginAction: email is trimmed + lowercased on sign-in.
-    const adminEmail = process.env.SEED_ADMIN_EMAIL.trim().toLowerCase();
-    const adminPassword = process.env.SEED_ADMIN_PASSWORD.trim();
+    const adminEmail = seedEmail.toLowerCase();
+    const adminPassword = seedPassword;
     const passwordHash = await hash(adminPassword);
     const admin = await prisma.user.upsert({
       where: { email: adminEmail },
@@ -275,6 +292,13 @@ async function main() {
         create: { userId: admin.id, groupId: itGroup.id, role: "LEAD" },
       });
     }
+  } else {
+    console.log(
+      "Skipping initial admin: SEED_ADMIN_EMAIL and SEED_ADMIN_PASSWORD must both be set in the process environment.\n" +
+        "  Docker: ensure repo-root .env defines them, then recreate web so it loads that file:\n" +
+        "    docker compose -f infra/docker-compose.yml up -d --force-recreate web\n" +
+        "  Then: docker compose -f infra/docker-compose.yml exec web sh -c \"cd /app && npx tsx packages/db/prisma/seed.ts\""
+    );
   }
 
   console.log("Seed complete.");

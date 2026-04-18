@@ -58,6 +58,11 @@ services:
       context: ..
       dockerfile: infra/docker/web.Dockerfile
     restart: unless-stopped
+    # Repo-root `.env` (relative to this compose file). Brings SEED_ADMIN_* etc. into
+    # the container. Do NOT also set SEED_* under `environment:` with ${VAR:-} —
+    # an empty compose substitution overrides env_file and skips admin seeding.
+    env_file:
+      - ../.env
     depends_on:
       postgres:
         condition: service_healthy
@@ -66,11 +71,6 @@ services:
     environment:
       NODE_ENV: production
       DATABASE_URL: postgresql://${POSTGRES_USER:-vtk}:${POSTGRES_PASSWORD:-vtk}@postgres:5432/${POSTGRES_DB:-vtk}?schema=public
-      # Required for `docker compose exec web … prisma/seed.ts`: seed reads these from
-      # the container env (it does not load the host’s .env file). Set in the same
-      # `.env` you use for `docker compose` (repo root when you `compose -f infra/…`).
-      SEED_ADMIN_EMAIL: ${SEED_ADMIN_EMAIL:-}
-      SEED_ADMIN_PASSWORD: ${SEED_ADMIN_PASSWORD:-}
       SESSION_COOKIE_DOMAIN: ${SESSION_COOKIE_DOMAIN:-.vtk.be}
       VTK_MAIN_URL: ${VTK_MAIN_URL:-https://vtk.be}
       S3_ENDPOINT: http://minio:9000
