@@ -274,7 +274,11 @@ docker compose -f infra/docker-compose.yml exec web \
 
 The seed is idempotent — groups, header tabs, permissions, and homepage
 defaults will be upserted. With `SEED_ADMIN_EMAIL` / `SEED_ADMIN_PASSWORD`
-set, it also creates a superadmin user.
+set, it also creates a superadmin user. Those values must be in the same
+`.env` Compose uses and are injected into the `web` container; after changing
+them, recreate `web` (`docker compose … up -d web`) before running the seed
+command so the process sees the variables (the seed does not read the host
+`.env` file on its own).
 
 ### 6. Updates / redeploys
 

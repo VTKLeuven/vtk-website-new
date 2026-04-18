@@ -94,7 +94,7 @@
 .vtk-site-header .brand {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 6px;
   font-family: var(--mono);
   font-weight: 600;
   letter-spacing: 0.02em;
@@ -104,8 +104,8 @@
 
 .vtk-site-header .brand-logo-wrap {
   position: relative;
-  width: 112px;
-  height: 40px;
+  width: 76px;
+  height: 34px;
   flex-shrink: 0;
 }
 
@@ -234,7 +234,7 @@
     display: none;
   }
   .vtk-site-header .brand-logo-wrap {
-    width: 96px;
-    height: 36px;
+    width: 68px;
+    height: 30px;
   }
 }

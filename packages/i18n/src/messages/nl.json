@@ -11,7 +11,31 @@
   "footer": {
     "partners": "Partners",
     "noPartners": "Nog geen partners.",
-    "copyright": "Vlaamse Technische Kring"
+    "copyright": "Vlaamse Technische Kring",
+    "tagline": "Partner in crime",
+    "taglineAccent": "sinds 1920.",
+    "address": "VTK · Vlaamse Technische Kring\nKasteelpark Arenberg 1\n3001 Heverlee · België",
+    "colStudy": "Studie",
+    "colService": "Service",
+    "colCommunity": "Community",
+    "colContact": "Contact",
+    "linkOffer": "Aanbod",
+    "linkFirstYear": "Eerstejaars",
+    "linkCourse": "Cursusdienst",
+    "linkIntl": "Internationaal",
+    "linkSandwiches": "Theokot broodjes",
+    "linkSecondHand": "Tweedehands",
+    "linkBooks": "Boeken bestellen",
+    "linkCalendar": "Kalender",
+    "linkCareer": "Career",
+    "linkMedia": "Media",
+    "linkAbout": "Over VTK",
+    "linkInstagram": "Instagram",
+    "linkFacebook": "Facebook",
+    "linkLinkedIn": "LinkedIn",
+    "linkShifts": "Shiften",
+    "linkSlots": "Tijdsloten",
+    "mutedSoon": "(binnenkort)"
   },
   "home": {
     "welcome": "Welkom bij VTK",
@@ -52,6 +76,7 @@
     "downloads": "Downloads"
   },
   "auth": {
+    "signInLead": "Ledenportaal",
     "email": "E-mailadres",
     "password": "Wachtwoord",
     "signIn": "Inloggen",

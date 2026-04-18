@@ -250,7 +250,8 @@ async function main() {
     console.log("Seeding initial admin...");
     // Match apps/web loginAction: email is trimmed + lowercased on sign-in.
     const adminEmail = process.env.SEED_ADMIN_EMAIL.trim().toLowerCase();
-    const passwordHash = await hash(process.env.SEED_ADMIN_PASSWORD);
+    const adminPassword = process.env.SEED_ADMIN_PASSWORD.trim();
+    const passwordHash = await hash(adminPassword);
     const admin = await prisma.user.upsert({
       where: { email: adminEmail },
       update: {

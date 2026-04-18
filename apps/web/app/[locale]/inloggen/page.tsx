@@ -1,6 +1,5 @@
 import { redirect } from "next/navigation";
 import { notFound } from "next/navigation";
-import { Card, Button, Input, Label } from "@vtk/ui";
 import { hasLocale } from "@/lib/locale";
 import { getDictionary } from "@vtk/i18n";
 import { getSession } from "@/lib/session";
@@ -22,14 +21,10 @@ export default async function LoginPage({
   const dict = getDictionary(locale);
 
   return (
-    <div className="relative mx-auto max-w-md px-4 py-16">
-      <div
-        className="pointer-events-none absolute inset-x-0 top-0 mx-auto h-64 max-w-lg rounded-full bg-vtk-yellow/15 blur-3xl"
-        aria-hidden
-      />
-      <Card className="relative p-8 sm:p-10">
-        <div className="mb-2 h-1 w-12 rounded-full bg-vtk-yellow" aria-hidden />
-        <h1 className="mb-6 text-2xl font-bold tracking-tight text-vtk-blue">{dict.auth.signIn}</h1>
+    <div className="vtk-auth">
+      <div className="vtk-auth-panel">
+        <p className="vtk-auth-kicker">{dict.auth.signInLead}</p>
+        <h1 className="vtk-auth-title">{dict.auth.signIn}</h1>
         <LoginForm
           nextParam={next ?? ""}
           labels={{
@@ -39,7 +34,7 @@ export default async function LoginPage({
             invalid: dict.auth.invalidCredentials,
           }}
         />
-      </Card>
+      </div>
     </div>
   );
 }
