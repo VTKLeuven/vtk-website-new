@@ -6,12 +6,12 @@
 }
 .vtk-design .hero-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr 1fr 1fr;
+  grid-template-columns: 1fr 1fr;
   gap: 0;
   align-items: stretch;
 }
 .vtk-design .hero-main {
-  grid-column: 1 / 4;
+  grid-column: 1 / 2;
   padding: 32px 40px 48px 0;
   border-right: 1px solid var(--rule);
   position: relative;

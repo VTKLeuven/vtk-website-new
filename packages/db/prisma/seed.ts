@@ -141,6 +141,110 @@ async function main() {
     });
   }
 
+  console.log("Seeding partners...");
+  // Mirrors the hoofdpartners strip on vtk.be. logoKey points at placeholder
+  // paths — the UI falls back to the partner name as text when the object
+  // isn't present in the S3 bucket, so the seed stays bucket-agnostic.
+  const partnerSeeds: Array<{ name: string; url: string; logoKey: string; order: number }> = [
+    { name: "Deloitte",                    url: "https://mycareer.deloitte.com",                           logoKey: "partners/seed/deloitte.svg",     order: 0 },
+    { name: "Sweco Belgium",               url: "https://swecobelgium.be",                                 logoKey: "partners/seed/sweco.svg",        order: 1 },
+    { name: "Renotec",                     url: "https://renotec.be",                                      logoKey: "partners/seed/renotec.svg",      order: 2 },
+    { name: "DEME Group",                  url: "https://deme-group.com",                                  logoKey: "partners/seed/deme.svg",         order: 3 },
+    { name: "ExxonMobil",                  url: "https://corporate.exxonmobil.com/locations/belgium",      logoKey: "partners/seed/exxonmobil.svg",   order: 4 },
+    { name: "Eiffage Construction Belux",  url: "https://eiffageconstructionbelux.be",                     logoKey: "partners/seed/eiffage.svg",      order: 5 },
+    { name: "Devoteam",                    url: "https://devoteam.com/nl",                                 logoKey: "partners/seed/devoteam.svg",     order: 6 },
+    { name: "Revolut",                     url: "https://revolut.com/en-BE/metal",                         logoKey: "partners/seed/revolut.svg",      order: 7 },
+    { name: "McKinsey",                    url: "https://mckinsey.com/be/careers",                         logoKey: "partners/seed/mckinsey.svg",     order: 8 },
+  ];
+  for (const p of partnerSeeds) {
+    const existing = await prisma.partner.findFirst({ where: { name: p.name } });
+    if (existing) {
+      await prisma.partner.update({
+        where: { id: existing.id },
+        data: { url: p.url, logoKey: p.logoKey, order: p.order, active: true },
+      });
+    } else {
+      await prisma.partner.create({
+        data: { name: p.name, url: p.url, logoKey: p.logoKey, order: p.order, active: true },
+      });
+    }
+  }
+
+  console.log("Seeding calendar events...");
+  // Pulled from the vtk.be /nl/calendar iCal feed. Times are Europe/Brussels
+  // (CEST, +02:00 in April). GroupCode assignments are best-effort based on
+  // the event name — adjust in the admin when the real owners are known.
+  const eventSeeds: Array<{
+    titleNl: string;
+    titleEn: string;
+    location: string;
+    start: string;
+    end: string;
+    url: string;
+    groupCode: "ACTIVITEITEN" | "CULTUUR" | "INTERNATIONAAL" | "FAKBAR" | "THEOKOT";
+  }> = [
+    {
+      titleNl: "AflsuitBBQ",
+      titleEn: "Closing BBQ",
+      location: "Grasveld voor Alma III",
+      start: "2026-04-20T18:00:00+02:00",
+      end:   "2026-04-20T22:00:00+02:00",
+      url: "https://vtk.be/nl/calendar/view/20_04_2026_18_00_00_aflsuitbbq/",
+      groupCode: "ACTIVITEITEN",
+    },
+    {
+      titleNl: "Croquantus",
+      titleEn: "Croquantus",
+      location: "Waaiberg",
+      start: "2026-04-22T20:30:00+02:00",
+      end:   "2026-04-23T01:00:00+02:00",
+      url: "https://vtk.be/nl/calendar/view/22_04_2026_20_30_00_croquantus/",
+      groupCode: "CULTUUR",
+    },
+    {
+      titleNl: "Cantus V",
+      titleEn: "Cantus V",
+      location: "Waaiberg",
+      start: "2026-04-23T20:00:00+02:00",
+      end:   "2026-04-24T01:00:00+02:00",
+      url: "https://vtk.be/nl/calendar/view/23_04_2026_20_00_00_cantus-v/",
+      groupCode: "INTERNATIONAAL",
+    },
+    {
+      titleNl: "Rewind Cantus",
+      titleEn: "Rewind Cantus",
+      location: "Waaiberg",
+      start: "2026-04-28T20:30:00+02:00",
+      end:   "2026-04-29T01:00:00+02:00",
+      url: "https://vtk.be/nl/calendar/view/28_04_2026_20_30_00_rewind-cantus/",
+      groupCode: "CULTUUR",
+    },
+  ];
+  for (const e of eventSeeds) {
+    const group = await prisma.group.findUnique({ where: { code: e.groupCode } });
+    if (!group) continue;
+    const start = new Date(e.start);
+    const end = new Date(e.end);
+    const existing = await prisma.calendarEvent.findFirst({
+      where: { titleNl: e.titleNl, start },
+    });
+    const data = {
+      titleNl: e.titleNl,
+      titleEn: e.titleEn,
+      location: e.location,
+      start,
+      end,
+      url: e.url,
+      visibility: "PUBLIC" as const,
+      groupId: group.id,
+    };
+    if (existing) {
+      await prisma.calendarEvent.update({ where: { id: existing.id }, data });
+    } else {
+      await prisma.calendarEvent.create({ data });
+    }
+  }
+
   if (process.env.SEED_ADMIN_EMAIL && process.env.SEED_ADMIN_PASSWORD) {
     console.log("Seeding initial admin...");
     const passwordHash = await hash(process.env.SEED_ADMIN_PASSWORD);
