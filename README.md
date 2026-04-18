@@ -1,8 +1,10 @@
 # VTK Website
 
-Modular website for Vlaamse Technische Kring, built as an npm workspaces
-monorepo with Next.js 16, Prisma + PostgreSQL, MinIO, and a shared-session SSO
-across subdomains (`*.vtk.be`).
+Modular site for **Vlaamse Technische Kring (VTK)**: an npm **workspaces** monorepo
+with **Next.js 16** (React 19), **Prisma** + PostgreSQL, **MinIO** (S3), and
+shared-session checks for subdomains (`*.vtk.be`). The public homepage follows
+the editorial system under `design/` and `apps/web/app/design/`; admin uses the
+same tokens via scoped CSS.
 
 ## Layout
 
@@ -53,12 +55,21 @@ ln -sf ../../.env apps/logistiek/.env
 
 # Start local infrastructure (Postgres, MinIO, and the bucket-creation one-shot)
 docker compose -f infra/docker-compose.yml up -d postgres minio minio-setup
+```
 
-# Generate the Prisma client, push the schema, and seed baseline data
-# (16 groups, header tabs, permissions, default homepage settings).
+**Postgres reachable from your host:** the default Compose file does **not**
+publish Postgres on `localhost` (to avoid clashing with an existing install).
+Either add a `ports` mapping under `postgres` (see the comment in
+`infra/docker-compose.yml`) or use a `DATABASE_URL` that points at a Postgres you
+already run locally. Prisma CLI and `npm run dev` run **on the host**, so
+`@postgres:5432` only works from **inside** Docker, not from your shell.
+
+```bash
+# Generate the Prisma client, apply the schema, seed baseline data
+# (groups, header tabs, permissions, partners strip, homepage defaults, …).
 npm run db:generate
-npm run db:push
-npm run db:seed
+npm run db:push          # quick local iteration; use db:migrate for migration files
+npm run db:seed          # optional SEED_ADMIN_* in root .env → first superadmin
 ```
 
 ### 2. Running the dev server
@@ -67,9 +78,10 @@ npm run db:seed
 npm run dev
 ```
 
-- Main site: `http://localhost:3000`
-- MinIO console: `http://localhost:9001` (login: `minioadmin` / `minioadmin`)
-- Postgres: `localhost:5432` (user/db: `vtk` / password: `vtk`)
+- Main site (dev): `http://localhost:3000`
+- Full Docker stack (`web` in Compose): `http://127.0.0.1:3011` (see `infra/docker-compose.yml`)
+- MinIO console: `http://localhost:9001` (default login `minioadmin` / `minioadmin` from `.env.example`)
+- Postgres: only on `localhost:5432` if you publish that port or use a local instance; defaults in `.env.example` assume `vtk` / `vtk`
 
 To run the `logistiek` submodule against the same main app:
 
@@ -106,14 +118,14 @@ Both commands also regenerate the Prisma client.
 | Command                                  | What it does                                |
 |------------------------------------------|---------------------------------------------|
 | `npm run dev`                            | Main site dev server (webpack)              |
-| `npm run dev --workspace=@vtk/logistiek` | Submodule dev server on :3100               |
+| `npm run dev --workspace=@vtk/logistiek` | Submodule dev server on :3100             |
 | `npm run build`                          | Build `@vtk/db` + `@vtk/web` for production |
 | `npm run start`                          | Start the built main site                   |
 | `npm run lint`                           | Lint the main site                          |
 | `npm run db:generate`                    | Regenerate Prisma client                    |
 | `npm run db:push`                        | Apply schema without a migration file       |
 | `npm run db:migrate`                     | Create + apply a migration                  |
-| `npm run db:seed`                        | Seed baseline rows (idempotent)             |
+| `npm run db:seed`                        | Seed baseline rows (idempotent; reads root `.env` via `@vtk/db` script) |
 
 ### 6. Stopping / resetting local infra
 
@@ -197,7 +209,7 @@ On the server:
 cp .env.example .env
 ```
 
-Fill in at minimum:
+Fill in at minimum (same **repo-root** `.env` Compose uses for variable substitution **and** for the `web` service via `env_file`):
 
 ```dotenv
 POSTGRES_USER=vtk
@@ -213,10 +225,16 @@ S3_SECRET_KEY=<minio secret key>
 S3_BUCKET=vtk
 S3_PUBLIC_URL=https://cdn.vtk.be
 
-# Creates a first superadmin on `npm run db:seed`
+# Loaded into the web container for `npx tsx packages/db/prisma/seed.ts`
 SEED_ADMIN_EMAIL=admin@vtk.be
 SEED_ADMIN_PASSWORD=<strong password>
 ```
+
+The `web` service sets `env_file: ../.env` so seeding inside the container sees
+`SEED_ADMIN_*`. **`DATABASE_URL` and S3-related keys in the Compose `environment`
+block override** values from `.env` so the app always targets the in-stack
+Postgres and MinIO. After changing `.env`, recreate `web` so the container picks
+up edits: `docker compose -f infra/docker-compose.yml up -d --force-recreate web`.
 
 ### 3. TLS certificates (first time)
 
@@ -252,34 +270,41 @@ This brings up:
 | `postgres`     | PostgreSQL 16, data in the `postgres-data` volume      |
 | `minio`        | S3-compatible object storage, data in `minio-data`     |
 | `minio-setup`  | One-shot: creates the public `vtk` bucket              |
-| `web`          | Main Next.js app on :3000 (loopback)                   |
-| `logistiek`    | Submodule app on :3100 (loopback)                      |
+| `web`          | Main Next.js app on **127.0.0.1:3011** → container :3000 |
+| `logistiek`    | Submodule app on **127.0.0.1:3100** → container :3000  |
 | `nginx`        | TLS termination + subdomain routing on :80/:443        |
 | `certbot`      | Background renew loop (every 12h)                      |
 
-The `web` container runs `prisma generate` and `next build` during image
-build; it does **not** run `db:push` or `db:seed` automatically.
+During image **build**, the `web` Dockerfile runs `prisma generate` and
+`next build`. At **container start**, the default command runs
+`prisma migrate deploy` (applies migrations under `packages/db/prisma/migrations`)
+and then starts Next.js. It does **not** run `db:push` or `db:seed` automatically.
 
 ### 5. First-time database init (once, on the server)
 
-With `postgres` running:
+With `postgres` healthy and `web` built (migrations apply on first `web` start,
+or run deploy explicitly):
 
 ```bash
 docker compose -f infra/docker-compose.yml exec web \
-  sh -c "cd /app && npx prisma db push --schema packages/db/prisma/schema.prisma"
+  sh -c "cd /app && npx prisma migrate deploy --schema packages/db/prisma/schema.prisma"
 
 docker compose -f infra/docker-compose.yml exec web \
   sh -c "cd /app && npx tsx packages/db/prisma/seed.ts"
 ```
 
-The seed is idempotent — groups, header tabs, permissions, and homepage
-defaults will be upserted. With `SEED_ADMIN_EMAIL` / `SEED_ADMIN_PASSWORD` in
-**repo-root** `.env`, the `web` service loads that file and the seed creates a
-superadmin. You must **recreate** the container after editing `.env` or
-compose (`docker compose … up -d --force-recreate web`); a plain `up` that
-leaves the container “Running” does not refresh env. The seed logs
-`Seeding initial admin...` when those variables are present; if you see
-“Skipping initial admin” instead, env is still missing inside `web`.
+Use **`migrate deploy`** in production (not `db push`) so the database matches
+versioned migrations. For a **greenfield** DB, starting `web` once may already
+run `migrate deploy` via the container CMD; the explicit `exec` above is safe
+and idempotent.
+
+The seed is idempotent — groups, header tabs, permissions, partners, calendar
+placeholder rows, homepage defaults, etc. With **`SEED_ADMIN_EMAIL`** and
+**`SEED_ADMIN_PASSWORD`** in repo-root `.env`, the seed upserts a superadmin and
+refreshes their password hash on repeat runs. **Recreate `web`** after changing
+those variables (`docker compose … up -d --force-recreate web`). The seed logs
+`Seeding initial admin...` when both are set; **“Skipping initial admin”**
+means they are missing inside the container (see env_file / recreate above).
 
 ### 6. Updates / redeploys
 
@@ -330,6 +355,13 @@ calling `GET ${VTK_MAIN_URL}/api/auth/session` and receives the full
 
 ---
 
+## Locales
+
+- Default locale is **NL** at `/…`.
+- English lives under **`/en/…`** (same routes, `LocaleSwitcher` toggles prefix).
+
+---
+
 ## Authentication flow (SSO)
 
 - `apps/web` issues an opaque session cookie on `.vtk.be`.
@@ -350,7 +382,13 @@ ln -sf ../../.env apps/logistiek/.env
 ```
 
 **`Can't reach database server at localhost:5432`**
-Postgres isn't running. `docker compose -f infra/docker-compose.yml up -d postgres`.
+Postgres is not reachable at the host URL in `DATABASE_URL`. Start Compose
+Postgres **and** publish port `5432` if you use `localhost`, or point
+`DATABASE_URL` at a running instance.
+
+**`npm run db:seed` → `missing script: seed`**
+Dependencies are not installed (`node_modules` missing). Run **`npm install`**
+from the **monorepo root** (not only inside `apps/web`).
 
 **Runaway memory / fan spinning when running `npm run dev`**
 You probably switched the dev script back to plain `next dev` (Turbopack). See
@@ -361,6 +399,7 @@ more than a handful, Turbopack is leaking. Kill it and use `next dev --webpack`.
 Browsers cache the old cookie on the old domain scope. Clear cookies for
 `.vtk.be` and `vtk.be` in your browser.
 
-**Seed says `duplicate key` on a user**
-The superadmin already exists. Leave `SEED_ADMIN_EMAIL` empty on subsequent
-runs, or just let the error pass — it won't corrupt anything.
+**Seed / admin user**
+The seed **upserts** the admin by email and updates `passwordHash` when
+`SEED_ADMIN_*` are set. If you intentionally remove those env vars, the seed
+skips the admin block and logs “Skipping initial admin”.

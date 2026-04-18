@@ -103,4 +103,217 @@
 
 .vtk-admin-main {
   min-width: 0;
+  color: var(--ink);
+  font-size: 15px;
+  line-height: 1.5;
+}
+
+/* -------------------------------------------------------------------------- */
+/* @vtk/ui Card — boxy panel (only under .vtk-admin-main; public stays round) */
+/* -------------------------------------------------------------------------- */
+
+.vtk-admin-main [data-vtk-ui="card"] {
+  border-radius: 0 !important;
+  border: 1px solid var(--rule) !important;
+  background: var(--paper) !important;
+  box-shadow: none !important;
+}
+
+.vtk-admin-main [data-vtk-ui="card"] + [data-vtk-ui="card"] {
+  margin-top: 24px;
+}
+
+.vtk-admin-main [data-vtk-ui="card"].hover\:shadow-md:hover {
+  box-shadow: none !important;
+}
+
+/* -------------------------------------------------------------------------- */
+/* Tables */
+/* -------------------------------------------------------------------------- */
+
+.vtk-admin-main table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+.vtk-admin-main thead {
+  background: var(--paper-2) !important;
+  color: var(--ink);
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.vtk-admin-main thead th {
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--rule);
+  font-weight: 500;
+  text-align: left;
+}
+
+.vtk-admin-main tbody tr {
+  border-bottom: 1px solid var(--rule);
+  background: var(--paper);
+}
+
+.vtk-admin-main tbody tr:hover {
+  background: var(--paper-2);
+}
+
+.vtk-admin-main tbody td {
+  padding: 12px 14px;
+  vertical-align: top;
+}
+
+/* -------------------------------------------------------------------------- */
+/* Forms: Input, Select, Textarea (@vtk/ui form base) */
+/* -------------------------------------------------------------------------- */
+
+.vtk-admin-main :is(input:not([type="checkbox"]):not([type="radio"]), select, textarea) {
+  border-radius: 0 !important;
+  border-color: var(--rule) !important;
+  background: var(--paper) !important;
+  color: var(--ink) !important;
+  font-family: var(--sans);
+  box-shadow: none !important;
+}
+
+.vtk-admin-main :is(input, select, textarea):focus {
+  outline: none !important;
+  border-color: var(--ink) !important;
+  box-shadow: 0 0 0 1px var(--ink) !important;
+  --tw-ring-width: 0 !important;
+}
+
+.vtk-admin-main label.block {
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted) !important;
+  font-weight: 500;
+}
+
+/* -------------------------------------------------------------------------- */
+/* Buttons (@vtk/ui) */
+/* -------------------------------------------------------------------------- */
+
+.vtk-admin-main button.inline-flex.rounded-lg,
+.vtk-admin-main button.inline-flex.rounded-xl {
+  border-radius: 0 !important;
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.vtk-admin-main button.bg-vtk-blue {
+  background: var(--ink) !important;
+  color: var(--paper) !important;
+  border-color: var(--ink) !important;
+}
+
+.vtk-admin-main button.bg-vtk-blue:hover:not(:disabled) {
+  background: var(--accent) !important;
+  color: var(--ink) !important;
+  border-color: var(--accent) !important;
+}
+
+.vtk-admin-main button.bg-vtk-yellow {
+  background: var(--accent) !important;
+  color: var(--ink) !important;
+  border-color: var(--rule) !important;
+}
+
+.vtk-admin-main button.bg-vtk-yellow:hover:not(:disabled) {
+  background: var(--ink) !important;
+  color: var(--accent) !important;
+}
+
+.vtk-admin-main button.text-vtk-blue {
+  color: var(--ink) !important;
+  border-color: var(--rule) !important;
+  background: transparent !important;
+}
+
+.vtk-admin-main button.text-vtk-blue:hover:not(:disabled) {
+  background: var(--paper-2) !important;
+  border-color: var(--ink) !important;
+}
+
+.vtk-admin-main button.bg-red-600 {
+  border-radius: 0 !important;
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.vtk-admin-main button.bg-red-600:hover:not(:disabled) {
+  background: oklch(0.42 0.14 25) !important;
+}
+
+/* -------------------------------------------------------------------------- */
+/* Links & misc */
+/* -------------------------------------------------------------------------- */
+
+.vtk-admin-main a.text-vtk-blue {
+  color: var(--ink-2) !important;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  text-decoration-color: oklch(0.75 0.12 90);
+}
+
+.vtk-admin-main a.text-vtk-blue:hover {
+  color: var(--ink) !important;
+}
+
+/* Inner bordered panels (permissions, etc.) */
+.vtk-admin-main .rounded-xl {
+  border-radius: 0 !important;
+}
+
+.vtk-admin-main .border-zinc-200 {
+  border-color: var(--rule) !important;
+}
+
+.vtk-admin-main .rounded,
+.vtk-admin-main .rounded-md {
+  border-radius: 0 !important;
+}
+
+/* Chips / badges */
+.vtk-admin-main span[class*="rounded"][class*="bg-vtk-blue-soft"],
+.vtk-admin-main span[class*="rounded"][class*="bg-vtk-blue/10"],
+.vtk-admin-main span[class*="rounded"][class*="bg-vtk-yellow"] {
+  border-radius: 0 !important;
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.vtk-admin-main span[class*="bg-vtk-yellow"] {
+  background: var(--accent) !important;
+  color: var(--ink) !important;
+}
+
+/* Page titles (match admin pages; avoid Wysiwyg h1 inside editor) */
+.vtk-admin-main h1.text-2xl.font-semibold {
+  font-family: var(--sans);
+  font-weight: 500 !important;
+  font-size: clamp(1.35rem, 2.5vw, 1.75rem) !important;
+  letter-spacing: -0.02em;
+  color: var(--ink) !important;
+}
+
+.vtk-admin-main h2.font-semibold {
+  font-family: var(--sans);
+  font-size: 1.05rem;
+  font-weight: 600 !important;
+  letter-spacing: -0.01em;
+  color: var(--ink) !important;
 }
