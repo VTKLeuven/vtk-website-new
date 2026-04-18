@@ -18,7 +18,7 @@ const vtkMono = JetBrains_Mono({
 export const metadata: Metadata = {
   title: "VTK – Vlaamse Technische Kring",
   description:
-    "De officiële website van VTK, de studentenvereniging voor industrieel ingenieurs en ingenieurswetenschappers.",
+    "De officiële website van VTK, de studentenvereniging van de faculteit ingenieurswetenschappers.",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
