@@ -92,7 +92,11 @@ services:
     ports:
       - "127.0.0.1:3100:3000"
 
+  # Optional: TLS + reverse proxy in Docker. Skip if you use Caddy/Traefik/etc. on
+  # the host and only proxy to web (3011) / logistiek (3100). Start with:
+  #   docker compose --profile edge-tls -f infra/docker-compose.yml up -d
   nginx:
+    profiles: ["edge-tls"]
     image: nginx:alpine
     restart: unless-stopped
     depends_on:
@@ -107,6 +111,7 @@ services:
       - ./nginx/www:/var/www/certbot:ro
 
   certbot:
+    profiles: ["edge-tls"]
     image: certbot/certbot:latest
     restart: "no"
     volumes:
