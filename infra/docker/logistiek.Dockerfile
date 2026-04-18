@@ -5,7 +5,16 @@ WORKDIR /repo
 COPY package.json package-lock.json* ./
 COPY apps/logistiek/package.json apps/logistiek/package.json
 COPY packages ./packages
-RUN npm install --no-audit --no-fund
+RUN npm install --no-audit --no-fund \
+  && LIGHTNINGCSS_VERSION="$(node -e "const fs=require('fs'); console.log(JSON.parse(fs.readFileSync('node_modules/lightningcss/package.json','utf8')).version)")" \
+  && ARCH="$(uname -m)" \
+  && if [ "$ARCH" = "x86_64" ]; then \
+       npm install --no-save "lightningcss-linux-x64-musl@${LIGHTNINGCSS_VERSION}"; \
+     elif [ "$ARCH" = "aarch64" ]; then \
+       npm install --no-save "lightningcss-linux-arm64-musl@${LIGHTNINGCSS_VERSION}"; \
+     else \
+       echo "Unsupported arch for Alpine lightningcss: $ARCH" >&2; exit 1; \
+     fi
 
 FROM node:${NODE_VERSION}-alpine AS builder
 WORKDIR /repo
