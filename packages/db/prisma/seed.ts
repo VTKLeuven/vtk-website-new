@@ -248,12 +248,19 @@ async function main() {
 
   if (process.env.SEED_ADMIN_EMAIL && process.env.SEED_ADMIN_PASSWORD) {
     console.log("Seeding initial admin...");
+    // Match apps/web loginAction: email is trimmed + lowercased on sign-in.
+    const adminEmail = process.env.SEED_ADMIN_EMAIL.trim().toLowerCase();
     const passwordHash = await hash(process.env.SEED_ADMIN_PASSWORD);
     const admin = await prisma.user.upsert({
-      where: { email: process.env.SEED_ADMIN_EMAIL },
-      update: { isSuperAdmin: true, active: true },
+      where: { email: adminEmail },
+      update: {
+        email: adminEmail,
+        isSuperAdmin: true,
+        active: true,
+        passwordHash,
+      },
       create: {
-        email: process.env.SEED_ADMIN_EMAIL,
+        email: adminEmail,
         name: "VTK Admin",
         passwordHash,
         isSuperAdmin: true,
