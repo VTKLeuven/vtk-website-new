@@ -38,4 +38,5 @@ COPY --from=builder /repo/node_modules ./node_modules
 WORKDIR /app/apps/web
 EXPOSE 3000
 ENTRYPOINT ["/sbin/tini", "--"]
-CMD ["node", "node_modules/next/dist/bin/next", "start", "-p", "3000"]
+# next is hoisted to /app/node_modules; cwd must stay the app dir for .next
+CMD ["node", "/app/node_modules/next/dist/bin/next", "start", "-p", "3000"]
