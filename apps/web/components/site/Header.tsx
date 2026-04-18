@@ -3,6 +3,7 @@ import Link from "next/link";
 import { prisma } from "@vtk/db";
 import { getDictionary, pick, type Locale } from "@vtk/i18n";
 import { entryForDate, isClosedHours } from "@/components/editorial/hoursUtils";
+import { getVisibleHeaderTabsForNav } from "@/lib/headerTabs";
 import { getSession } from "@/lib/session";
 import { EditorialNavLinks } from "./EditorialNavLinks";
 import { LocaleSwitcher } from "./LocaleSwitcher";
@@ -35,10 +36,7 @@ function AnonymousUserIcon({ className }: { className?: string }) {
 export async function Header({ locale }: { locale: Locale }) {
   const now = new Date();
   const [tabs, session, theokotRow] = await Promise.all([
-    prisma.headerTab.findMany({
-      where: { visible: true },
-      orderBy: { order: "asc" },
-    }),
+    getVisibleHeaderTabsForNav(),
     getSession(),
     prisma.setting.findUnique({ where: { key: "home.openingHours.theokot" } }),
   ]);

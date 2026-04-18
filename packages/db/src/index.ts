@@ -23,3 +23,5 @@ if (process.env.NODE_ENV !== "production") {
 // blows up Turbopack/webpack memory in a monorepo. If you need Prisma
 // model types, import them directly from "@prisma/client" where you use
 // them.
+
+export { HEADER_TABS } from "./groups";

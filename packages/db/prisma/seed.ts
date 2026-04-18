@@ -29,6 +29,7 @@ async function main() {
         labelNl: tab.labelNl,
         labelEn: tab.labelEn,
         order: tab.order,
+        visible: true,
       },
       create: tab,
     });

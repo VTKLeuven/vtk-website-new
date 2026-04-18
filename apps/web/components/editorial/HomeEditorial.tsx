@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { prisma } from "@vtk/db";
 import { pick, type Locale } from "@vtk/i18n";
+import { getVisibleHeaderTabsForNav } from "@/lib/headerTabs";
 import { publicUrl } from "@/lib/storage";
 import {
   dutchDayNameForDate,
@@ -45,10 +46,7 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
       take: 5,
       include: { group: true },
     }),
-    prisma.headerTab.findMany({
-      where: { visible: true },
-      orderBy: { order: "asc" },
-    }),
+    getVisibleHeaderTabsForNav(),
     prisma.partner.findMany({
       where: { active: true },
       orderBy: [{ order: "asc" }, { name: "asc" }],
