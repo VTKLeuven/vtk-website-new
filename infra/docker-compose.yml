@@ -73,7 +73,7 @@ services:
       S3_REGION: ${S3_REGION:-us-east-1}
       S3_PUBLIC_URL: ${S3_PUBLIC_URL:-https://cdn.vtk.be}
     ports:
-      - "127.0.0.1:3000:3000"
+      - "127.0.0.1:3011:3000"
 
   logistiek:
     build:
