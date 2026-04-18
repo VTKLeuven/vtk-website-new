@@ -1,0 +1,29 @@
+name: Deploy to Server
+
+on:
+  push:
+    branches: ["main"]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Install SSH key
+        uses: webfactory/ssh-agent@v0.8.0
+        with:
+          ssh-private-key: ${{ secrets.SSH_KEY }}
+
+      - name: Deploy through SSH
+        run: |
+          ssh -o StrictHostKeyChecking=no ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} "
+            cd /home/it/vtk-website-new &&
+            git fetch --all &&
+            git reset --hard origin/main &&
+
+            # Build and restart Docker stack (compose file lives under infra/)
+            docker compose -f infra/docker-compose.yml up -d --build
+          "
