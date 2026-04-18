@@ -3,6 +3,7 @@ import { Header } from "@/components/site/Header";
 import { Footer } from "@/components/site/Footer";
 import { hasLocale } from "@/lib/locale";
 
+import "@/app/design/vtk-base.css";
 import "@/app/design/vtk-site-header.css";
 import "@/app/design/vtk-site-chrome.css";
 
@@ -19,7 +20,9 @@ export default async function LocaleLayout({
   return (
     <>
       <Header locale={locale} />
-      <main className="flex-1">{children}</main>
+      <main className="flex-1 min-h-0" style={{ background: "var(--paper)" }}>
+        {children}
+      </main>
       <Footer locale={locale} />
     </>
   );

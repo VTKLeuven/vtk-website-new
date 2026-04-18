@@ -6,7 +6,7 @@
 }
 .vtk-design .hero-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: minmax(0, 1.22fr) minmax(0, 1fr); /* ~55 / 45 */
   gap: 0;
   align-items: stretch;
 }
@@ -41,6 +41,15 @@
   color: var(--ink);
   padding: 0 0.08em;
   box-decoration-break: clone;
+}
+/* Keep “sinds 1920.” on one line when there is room (wider main column). */
+.vtk-design .hero-since {
+  white-space: nowrap;
+}
+@media (max-width: 520px) {
+  .vtk-design .hero-since {
+    white-space: normal;
+  }
 }
 .vtk-design .hero-lede {
   max-width: 520px;

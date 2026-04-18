@@ -8,7 +8,8 @@
   --max: 1440px;
   background: var(--ink);
   color: oklch(0.8 0.02 260);
-  margin-top: 80px;
+  /* Use padding, not margin — margin would show body grey between partners and footer */
+  padding-top: 80px;
   font-family: var(--sans);
   -webkit-font-smoothing: antialiased;
 }

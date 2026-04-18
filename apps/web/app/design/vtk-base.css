@@ -36,6 +36,16 @@
   color: inherit;
   text-decoration: none;
 }
+/* Links styled as buttons must not inherit body text colour (would hide text on .btn-primary). */
+.vtk-design a.btn-primary {
+  color: var(--paper);
+}
+.vtk-design a.btn-ghost {
+  color: var(--ink);
+}
+.vtk-design a.btn-accent {
+  color: var(--ink);
+}
 .vtk-design button {
   font: inherit;
   color: inherit;

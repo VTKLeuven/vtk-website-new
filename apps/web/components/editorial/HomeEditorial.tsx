@@ -12,7 +12,6 @@ import {
   shortWeekdayNl,
 } from "./hoursUtils";
 
-import "@/app/design/vtk-base.css";
 import "@/app/design/vtk-home.css";
 
 type OpeningHoursSetting = {
@@ -103,7 +102,9 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
                     <br />
                     in crime
                     <br />
-                    <em>sinds</em> <mark>1920.</mark>
+                    <span className="hero-since">
+                      <em>sinds</em> <mark>1920.</mark>
+                    </span>
                   </>
                 ) : (
                   <>
@@ -111,7 +112,9 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
                     <br />
                     in crime
                     <br />
-                    <em>since</em> <mark>1920.</mark>
+                    <span className="hero-since">
+                      <em>since</em> <mark>1920.</mark>
+                    </span>
                   </>
                 )}
               </h1>

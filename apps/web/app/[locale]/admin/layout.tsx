@@ -4,6 +4,8 @@ import { hasLocale } from "@/lib/locale";
 import { requireSession } from "@/lib/session";
 import { getDictionary, type Locale } from "@vtk/i18n";
 
+import "@/app/design/vtk-admin.css";
+
 const sections = [
   { key: "dashboard", href: "" },
   { key: "pages", href: "/paginas", perm: "pages.edit" },
@@ -44,25 +46,19 @@ export default async function AdminLayout({
   );
 
   return (
-    <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8">
-      <div className="grid grid-cols-1 md:grid-cols-[220px_1fr] gap-6">
-        <aside className="md:sticky md:top-20 self-start">
-          <h2 className="mb-3 text-xs font-bold uppercase tracking-wider text-vtk-blue/50">
-            {dict.admin.title}
-          </h2>
-          <nav className="flex gap-1 overflow-x-auto md:flex-col">
+    <div className="vtk-admin-surface">
+      <div className="vtk-admin-surface-inner">
+        <aside className="md:sticky md:top-24 self-start">
+          <h2 className="vtk-admin-nav-title">{dict.admin.title}</h2>
+          <nav className="vtk-admin-nav">
             {visibleSections.map((s) => (
-              <Link
-                key={s.key}
-                href={`${base}/admin${s.href}`}
-                className="whitespace-nowrap rounded-lg px-3 py-2 text-sm font-medium text-vtk-blue/85 transition hover:bg-vtk-blue-soft hover:text-vtk-blue"
-              >
+              <Link key={s.key} href={`${base}/admin${s.href}`}>
                 {adminDict[s.key]}
               </Link>
             ))}
           </nav>
         </aside>
-        <section className="min-w-0">{children}</section>
+        <section className="vtk-admin-main">{children}</section>
       </div>
     </div>
   );
