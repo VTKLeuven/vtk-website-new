@@ -165,6 +165,44 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
         }))
       : fallbackAanbod;
 
+  const vacancies = [
+    {
+      roleNl: "Junior Embedded Engineer",
+      roleEn: "Junior Embedded Engineer",
+      company: "Materialise · Leuven",
+      typeNl: "Stage",
+      typeEn: "Internship",
+    },
+    {
+      roleNl: "Quant Analyst - zomer 2026",
+      roleEn: "Quant Analyst - Summer 2026",
+      company: "IMC Trading · Amsterdam",
+      typeNl: "Full-time",
+      typeEn: "Full-time",
+    },
+    {
+      roleNl: "ML Research Intern",
+      roleEn: "ML Research Intern",
+      company: "ASML · Veldhoven",
+      typeNl: "Stage",
+      typeEn: "Internship",
+    },
+    {
+      roleNl: "Process Engineer",
+      roleEn: "Process Engineer",
+      company: "argenx · Gent",
+      typeNl: "Graduate",
+      typeEn: "Graduate",
+    },
+    {
+      roleNl: "Strategy Consultant",
+      roleEn: "Strategy Consultant",
+      company: "Bain & Company · Brussel",
+      typeNl: "Graduate",
+      typeEn: "Graduate",
+    },
+  ];
+
   return (
     <div className="vtk-design">
       <section className="home-hero">
@@ -301,94 +339,6 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
         </div>
       </section>
 
-      <section className="section">
-        <div className="sec-head">
-          <h2>
-            {nl ? "Wat we " : "What we "}
-            <span className="serif">{nl ? "doen" : "do"}</span>.
-          </h2>
-          <div className="meta">
-            {nl ? "Werkgroepen en diensten" : "Work groups and services"} ·{" "}
-            <Link href={`${base}/aanbod`}>{nl ? "bekijk alles" : "see all"}</Link>
-          </div>
-        </div>
-        <div className="aanbod">
-          {aanbodCards.slice(0, 6).map((card, index) => (
-            <Link key={card.href} href={card.href} className={`acard${index === 0 ? " feat" : ""}`}>
-              <div>
-                <div className="tag">→ {pick(card.labelNl, card.labelEn, locale)}</div>
-                <h3>{pick(card.titleNl, card.titleEn, locale)}</h3>
-                <p>{pick(card.bodyNl, card.bodyEn, locale)}</p>
-              </div>
-              <div className="cta">{nl ? "Ontdek" : "Explore"}</div>
-            </Link>
-          ))}
-        </div>
-      </section>
-
-      <section className="section">
-        <div className="sec-head">
-          <h2>
-            Career, <span className="serif">{nl ? "eerlijk" : "honestly"}</span>.
-          </h2>
-          <div className="meta">
-            {partners.length} {nl ? "partnerbedrijven" : "partner companies"}
-          </div>
-        </div>
-        <div className="career">
-          <div>
-            <div className="eyebrow">
-              <span className="dot" />
-              VTK Career
-            </div>
-            <h3>
-              {career
-                ? pick(career.titleNl, career.titleEn, locale)
-                : nl
-                  ? "Ontmoet bedrijven voordat je moet solliciteren."
-                  : "Meet companies before you have to apply."}
-            </h3>
-            <p>
-              {career
-                ? pick(career.bodyNl, career.bodyEn, locale)
-                : nl
-                  ? "Doorheen het jaar brengen we studenten en bedrijven samen via career events, bedrijfsrelaties en praktische kansen."
-                  : "Throughout the year we bring students and companies together through career events, company relations and practical opportunities."}
-            </p>
-            <div className="pcount">
-              <div className="meta">
-                <div className="k">{nl ? "Partners" : "Partners"}</div>
-                <div className="v">{partners.length || "—"}</div>
-              </div>
-              <div className="meta">
-                <div className="k">{nl ? "Campus" : "Campus"}</div>
-                <div className="v">Arenberg</div>
-              </div>
-              <div className="meta">
-                <div className="k">VTK</div>
-                <div className="v">1920</div>
-              </div>
-            </div>
-            {career?.ctaUrl ? (
-              <a href={career.ctaUrl} className="btn btn-primary arrow" style={{ marginTop: 24 }}>
-                {pick(career.ctaLabelNl ?? "Meer info", career.ctaLabelEn ?? "More info", locale)}
-              </a>
-            ) : null}
-          </div>
-          <div className="jobs">
-            {(partners.length > 0 ? partners.slice(0, 5) : [{ id: "empty", name: nl ? "Partners verschijnen hier" : "Partners appear here", url: null }]).map((partner) => (
-              <div className="job" key={partner.id}>
-                <div>
-                  <div className="r">{partner.name}</div>
-                  <div className="c">{partner.url ? partner.url.replace(/^https?:\/\//, "") : "VTK Career"}</div>
-                </div>
-                <div className="t">{nl ? "Partner" : "Partner"}</div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
       {(theokot || cursus) && (
         <section className="hours-strip">
           <div className="sec-head">
@@ -449,6 +399,90 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
           </div>
         </section>
       )}
+
+      <section className="section">
+        <div className="sec-head">
+          <h2>
+            {nl ? "Wat we " : "What we "}
+            <span className="serif">{nl ? "doen" : "do"}</span>.
+          </h2>
+          <div className="meta">
+            {nl ? "Werkgroepen en diensten" : "Work groups and services"} ·{" "}
+            <Link href={`${base}/aanbod`}>{nl ? "bekijk alles" : "see all"}</Link>
+          </div>
+        </div>
+        <div className="aanbod">
+          {aanbodCards.slice(0, 6).map((card, index) => (
+            <Link key={card.href} href={card.href} className={`acard${index === 0 ? " feat" : ""}`}>
+              <div>
+                <div className="tag">→ {pick(card.labelNl, card.labelEn, locale)}</div>
+                <h3>{pick(card.titleNl, card.titleEn, locale)}</h3>
+                <p>{pick(card.bodyNl, card.bodyEn, locale)}</p>
+              </div>
+              <div className="cta">{nl ? "Ontdek" : "Explore"}</div>
+            </Link>
+          ))}
+        </div>
+      </section>
+
+      <section className="section">
+        <div className="sec-head">
+          <h2>
+            Career, <span className="serif">{nl ? "eerlijk" : "honestly"}</span>.
+          </h2>
+          <div className="meta">career.vtk.be · {nl ? "vacatures & events" : "vacancies & events"}</div>
+        </div>
+        <div className="career">
+          <div>
+            <div className="eyebrow">
+              <span className="dot" />
+              VTK Career
+            </div>
+            <h3>
+              {career
+                ? pick(career.titleNl, career.titleEn, locale)
+                : nl
+                  ? "Ontmoet bedrijven voordat je moet solliciteren."
+                  : "Meet companies before you have to apply."}
+            </h3>
+            <p>
+              {career
+                ? pick(career.bodyNl, career.bodyEn, locale)
+                : nl
+                  ? "Doorheen het jaar brengen we studenten en bedrijven samen via career events, bedrijfsrelaties en praktische kansen."
+                  : "Throughout the year we bring students and companies together through career events, company relations and practical opportunities."}
+            </p>
+            <div className="pcount">
+              <div className="meta">
+                <div className="k">{nl ? "Bedrijven" : "Companies"}</div>
+                <div className="v">300+</div>
+              </div>
+              <div className="meta">
+                <div className="k">{nl ? "Studenten" : "Students"}</div>
+                <div className="v">3000+</div>
+              </div>
+              <div className="meta">
+                <div className="k">{nl ? "Platform" : "Platform"}</div>
+                <div className="v">career</div>
+              </div>
+            </div>
+            <a href="https://career.vtk.be" className="btn btn-primary arrow" style={{ marginTop: 24 }}>
+              {nl ? "Naar VTK Career" : "Open VTK Career"}
+            </a>
+          </div>
+          <div className="jobs">
+            {vacancies.map((vacancy) => (
+              <div className="job" key={`${vacancy.roleEn}-${vacancy.company}`}>
+                <div>
+                  <div className="r">{pick(vacancy.roleNl, vacancy.roleEn, locale)}</div>
+                  <div className="c">{vacancy.company}</div>
+                </div>
+                <div className="t">{pick(vacancy.typeNl, vacancy.typeEn, locale)}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
 
       <section className="partners">
         <div className="partners-head">

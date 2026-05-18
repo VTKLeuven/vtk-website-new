@@ -160,7 +160,7 @@ async function main() {
           "Discover internships, jobs and corporate events through VTK Career, the bridge between students and industry.",
         ctaLabelNl: "Bekijk VTK Career",
         ctaLabelEn: "Visit VTK Career",
-        ctaUrl: "/career",
+        ctaUrl: "https://career.vtk.be",
       },
     },
     {
@@ -168,7 +168,20 @@ async function main() {
       value: {
         titleNl: "Aftermovies & sfeerbeelden",
         titleEn: "Aftermovies & photos",
-        items: [] as Array<{ type: "video" | "image"; url: string; titleNl?: string; titleEn?: string }>,
+        items: [
+          {
+            type: "video",
+            url: "https://www.youtube.com/watch?v=WdGqhrVUJog",
+            titleNl: "Galabal aftermovie",
+            titleEn: "Gala aftermovie",
+          },
+          {
+            type: "video",
+            url: "https://www.youtube.com/watch?v=9CyqfzXWYME",
+            titleNl: "Jobfair aftermovie",
+            titleEn: "Job fair aftermovie",
+          },
+        ] as Array<{ type: "video" | "image"; url: string; titleNl?: string; titleEn?: string }>,
       },
     },
     {
