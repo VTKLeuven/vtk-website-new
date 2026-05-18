@@ -1,5 +1,6 @@
 import { hash } from "@node-rs/argon2";
 import { PrismaClient } from "@prisma/client";
+import type { GroupCode } from "@prisma/client";
 import { GROUP_SEEDS, HEADER_TABS } from "../src/groups";
 import { PERMISSIONS } from "../src/permissions";
 
@@ -17,6 +18,33 @@ function readSeedEnv(raw: string | undefined): string | undefined {
     s = s.slice(1, -1).trim();
   }
   return s === "" ? undefined : s;
+}
+
+function richText(paragraphs: string[]): object {
+  return {
+    type: "doc",
+    content: paragraphs.map((text) => ({
+      type: "paragraph",
+      content: [{ type: "text", text }],
+    })),
+  };
+}
+
+function headingDoc(title: string, paragraphs: string[]): object {
+  return {
+    type: "doc",
+    content: [
+      {
+        type: "heading",
+        attrs: { level: 2 },
+        content: [{ type: "text", text: title }],
+      },
+      ...paragraphs.map((text) => ({
+        type: "paragraph",
+        content: [{ type: "text", text }],
+      })),
+    ],
+  };
 }
 
 async function main() {
@@ -185,6 +213,427 @@ async function main() {
     }
   }
 
+  console.log("Seeding prototype users and memberships...");
+  const prototypePasswordHash = await hash(readSeedEnv(process.env.SEED_PROTOTYPE_PASSWORD) ?? "prototype");
+  const prototypeUsers = [
+    {
+      email: "praeses@vtk.prototype",
+      name: "Lotte Peeters",
+      locale: "NL" as const,
+      groups: [
+        { code: "GROEP5" as const, role: "LEAD" as const, titleNl: "Praeses", titleEn: "President", year: 2026, displayOrder: 0 },
+        { code: "LOGISTIEK" as const, role: "MEMBER" as const, titleNl: "Ritten", titleEn: "Trips", year: 2026, displayOrder: 2 },
+      ],
+    },
+    {
+      email: "vice@vtk.prototype",
+      name: "Noah Janssens",
+      locale: "NL" as const,
+      groups: [
+        { code: "GROEP5" as const, role: "LEAD" as const, titleNl: "Vice-praeses", titleEn: "Vice president", year: 2026, displayOrder: 1 },
+      ],
+    },
+    {
+      email: "career@vtk.prototype",
+      name: "Mila Verbruggen",
+      locale: "NL" as const,
+      groups: [
+        { code: "BEDRIJVENRELATIES" as const, role: "LEAD" as const, titleNl: "Bedrijvenrelaties", titleEn: "Corporate relations", year: 2026, displayOrder: 0 },
+      ],
+    },
+    {
+      email: "onderwijs@vtk.prototype",
+      name: "Sam De Smet",
+      locale: "NL" as const,
+      groups: [
+        { code: "ONDERWIJS" as const, role: "LEAD" as const, titleNl: "Onderwijs", titleEn: "Education", year: 2026, displayOrder: 0 },
+      ],
+    },
+    {
+      email: "theokot@vtk.prototype",
+      name: "Emma Maes",
+      locale: "NL" as const,
+      groups: [
+        { code: "THEOKOT" as const, role: "LEAD" as const, titleNl: "Theokot", titleEn: "Theokot", year: 2026, displayOrder: 0 },
+      ],
+    },
+    {
+      email: "logistiek@vtk.prototype",
+      name: "Arthur Claes",
+      locale: "NL" as const,
+      groups: [
+        { code: "LOGISTIEK" as const, role: "LEAD" as const, titleNl: "Logistiek", titleEn: "Logistics", year: 2026, displayOrder: 0 },
+      ],
+    },
+    {
+      email: "international@vtk.prototype",
+      name: "Aisha Rahman",
+      locale: "EN" as const,
+      groups: [
+        { code: "INTERNATIONAAL" as const, role: "LEAD" as const, titleNl: "Internationaal", titleEn: "International", year: 2026, displayOrder: 0 },
+      ],
+    },
+    {
+      email: "sport@vtk.prototype",
+      name: "Lucas Goossens",
+      locale: "NL" as const,
+      groups: [
+        { code: "SPORT" as const, role: "LEAD" as const, titleNl: "Sport", titleEn: "Sports", year: 2026, displayOrder: 0 },
+      ],
+    },
+    {
+      email: "cultuur@vtk.prototype",
+      name: "Sofia Martens",
+      locale: "NL" as const,
+      groups: [
+        { code: "CULTUUR" as const, role: "LEAD" as const, titleNl: "Cultuur", titleEn: "Culture", year: 2026, displayOrder: 0 },
+      ],
+    },
+    {
+      email: "it@vtk.prototype",
+      name: "Jonas Willems",
+      locale: "NL" as const,
+      groups: [
+        { code: "IT" as const, role: "LEAD" as const, titleNl: "Webteam", titleEn: "Web team", year: 2026, displayOrder: 0 },
+      ],
+    },
+  ];
+
+  const prototypeUserByEmail = new Map<string, { id: string; email: string; name: string }>();
+  for (const u of prototypeUsers) {
+    const user = await prisma.user.upsert({
+      where: { email: u.email },
+      update: {
+        name: u.name,
+        locale: u.locale,
+        active: true,
+      },
+      create: {
+        email: u.email,
+        name: u.name,
+        locale: u.locale,
+        active: true,
+        passwordHash: prototypePasswordHash,
+      },
+    });
+    prototypeUserByEmail.set(u.email, user);
+    for (const membership of u.groups) {
+      const group = await prisma.group.findUnique({ where: { code: membership.code } });
+      if (!group) continue;
+      await prisma.groupMembership.upsert({
+        where: { userId_groupId: { userId: user.id, groupId: group.id } },
+        update: {
+          role: membership.role,
+          titleNl: membership.titleNl,
+          titleEn: membership.titleEn,
+          year: membership.year,
+          displayOrder: membership.displayOrder,
+        },
+        create: {
+          userId: user.id,
+          groupId: group.id,
+          role: membership.role,
+          titleNl: membership.titleNl,
+          titleEn: membership.titleEn,
+          year: membership.year,
+          displayOrder: membership.displayOrder,
+        },
+      });
+    }
+  }
+
+  console.log("Seeding prototype POCs...");
+  const pocSeeds = [
+    {
+      slug: "computerwetenschappen",
+      nameNl: "Computerwetenschappen",
+      nameEn: "Computer Science",
+      studyTrack: "Master Computer Science",
+      descriptionNl: "Aanspreekpunt voor major-keuzes, ISP-vragen en feedback over softwarevakken.",
+      descriptionEn: "Point of contact for major choices, ISP questions and feedback on software courses.",
+      order: 0,
+      representatives: [
+        { email: "onderwijs@vtk.prototype", roleNl: "POC Computerwetenschappen", roleEn: "POC Computer Science", order: 0 },
+        { email: "it@vtk.prototype", roleNl: "Studentenvertegenwoordiger", roleEn: "Student representative", order: 1 },
+      ],
+    },
+    {
+      slug: "werktuigkunde",
+      nameNl: "Werktuigkunde",
+      nameEn: "Mechanical Engineering",
+      studyTrack: "Master Mechanical Engineering",
+      descriptionNl: "Voor labo's, projectwerk, uurroosters en opleidingsfeedback.",
+      descriptionEn: "For labs, project work, schedules and programme feedback.",
+      order: 1,
+      representatives: [
+        { email: "sport@vtk.prototype", roleNl: "POC Werktuigkunde", roleEn: "POC Mechanical Engineering", order: 0 },
+      ],
+    },
+    {
+      slug: "elektrotechniek",
+      nameNl: "Elektrotechniek",
+      nameEn: "Electrical Engineering",
+      studyTrack: "Master Electrical Engineering",
+      descriptionNl: "Bundelt opmerkingen rond practica, examens en communicatie met professoren.",
+      descriptionEn: "Collects remarks about practicals, exams and communication with professors.",
+      order: 2,
+      representatives: [
+        { email: "vice@vtk.prototype", roleNl: "POC Elektrotechniek", roleEn: "POC Electrical Engineering", order: 0 },
+      ],
+    },
+    {
+      slug: "chemische-technologie",
+      nameNl: "Chemische technologie",
+      nameEn: "Chemical Engineering",
+      studyTrack: "Master Chemical Engineering",
+      descriptionNl: "Contactpunt voor practica, stages en facultaire overlegmomenten.",
+      descriptionEn: "Contact point for labs, internships and faculty consultations.",
+      order: 3,
+      representatives: [
+        { email: "theokot@vtk.prototype", roleNl: "POC Chemische technologie", roleEn: "POC Chemical Engineering", order: 0 },
+      ],
+    },
+  ];
+
+  for (const poc of pocSeeds) {
+    const row = await prisma.poc.upsert({
+      where: { slug: poc.slug },
+      update: {
+        nameNl: poc.nameNl,
+        nameEn: poc.nameEn,
+        studyTrack: poc.studyTrack,
+        descriptionNl: poc.descriptionNl,
+        descriptionEn: poc.descriptionEn,
+        order: poc.order,
+      },
+      create: {
+        slug: poc.slug,
+        nameNl: poc.nameNl,
+        nameEn: poc.nameEn,
+        studyTrack: poc.studyTrack,
+        descriptionNl: poc.descriptionNl,
+        descriptionEn: poc.descriptionEn,
+        order: poc.order,
+      },
+    });
+    for (const rep of poc.representatives) {
+      const user = prototypeUserByEmail.get(rep.email);
+      if (!user) continue;
+      await prisma.pocRepresentative.upsert({
+        where: { pocId_userId: { pocId: row.id, userId: user.id } },
+        update: { roleNl: rep.roleNl, roleEn: rep.roleEn, order: rep.order },
+        create: { pocId: row.id, userId: user.id, roleNl: rep.roleNl, roleEn: rep.roleEn, order: rep.order },
+      });
+    }
+  }
+
+  console.log("Seeding prototype CMS pages...");
+  const pageSeeds = [
+    {
+      headerCode: "EERSTEJAARS",
+      slug: "startweek",
+      titleNl: "Startweek voor eerstejaars",
+      titleEn: "Freshers start week",
+      excerptNl: "Alles wat je nodig hebt in je eerste week op de campus.",
+      excerptEn: "Everything you need in your first week on campus.",
+      order: 0,
+      contentNl: headingDoc("Welkom in Heverlee", [
+        "Tijdens de startweek helpt VTK je met aula's vinden, cursussen bestellen en mensen leren kennen.",
+        "Kom langs aan de infostand voor je welkomstpakket, praktische vragen en een snelle rondleiding door de belangrijkste plekken op Arenberg.",
+      ]),
+      contentEn: headingDoc("Welcome to Heverlee", [
+        "During start week, VTK helps you find lecture halls, order courses and meet other students.",
+        "Drop by the info desk for your welcome kit, practical questions and a short tour of the most important places on Arenberg.",
+      ]),
+    },
+    {
+      headerCode: "CAREER",
+      slug: "career-fair",
+      titleNl: "VTK Career Fair",
+      titleEn: "VTK Career Fair",
+      excerptNl: "Onze grootste ontmoetingsplek voor studenten en bedrijven.",
+      excerptEn: "Our largest meeting point for students and companies.",
+      order: 0,
+      contentNl: richText([
+        "De VTK Career Fair brengt ingenieursstudenten en partnerbedrijven samen voor stages, thesisvoorstellen en eerste jobs.",
+        "In deze prototypeversie tonen we hoe partnerinformatie, praktische details en calls-to-action in het nieuwe ontwerp aanvoelen.",
+      ]),
+      contentEn: richText([
+        "The VTK Career Fair brings engineering students and partner companies together for internships, thesis topics and first jobs.",
+        "In this prototype version, partner information, practical details and calls-to-action show how the new design feels.",
+      ]),
+    },
+    {
+      headerCode: "CURSUSDIENST",
+      slug: "boeken-en-tweedehands",
+      titleNl: "Boeken en tweedehands",
+      titleEn: "Books and second-hand",
+      excerptNl: "Cursussen, syllabi en tweedehandsboeken aan studententarief.",
+      excerptEn: "Courses, syllabi and second-hand books at student prices.",
+      order: 0,
+      contentNl: richText([
+        "De Cursusdienst verzamelt cursusmateriaal voor ingenieursstudenten en houdt de verkoop praktisch en betaalbaar.",
+        "Tweedehandsboeken kunnen in de drukke weken via dezelfde balie opgevolgd worden.",
+      ]),
+      contentEn: richText([
+        "The Course Shop collects course material for engineering students and keeps sales practical and affordable.",
+        "Second-hand books can be handled through the same desk during peak weeks.",
+      ]),
+    },
+    {
+      headerCode: "INTERNATIONAAL",
+      slug: "exchange-buddies",
+      titleNl: "Exchange & buddies",
+      titleEn: "Exchange & buddies",
+      excerptNl: "Voor internationale studenten en Leuvense studenten op uitwisseling.",
+      excerptEn: "For incoming exchange students and Leuven students going abroad.",
+      order: 0,
+      contentNl: richText([
+        "Internationaal helpt exchange-studenten landen in Leuven en wijst lokale studenten de weg naar buitenlandse mogelijkheden.",
+        "Buddy-avonden, praktische sessies en laagdrempelige activiteiten zorgen voor een zachte landing.",
+      ]),
+      contentEn: richText([
+        "International helps exchange students settle in Leuven and points local students toward opportunities abroad.",
+        "Buddy evenings, practical sessions and accessible activities make the landing easier.",
+      ]),
+    },
+    {
+      headerCode: "OVER_VTK",
+      slug: "praesidium-en-werking",
+      titleNl: "Praesidium en werking",
+      titleEn: "Praesidium and organisation",
+      excerptNl: "Hoe VTK draait, van werkgroepen tot dagelijkse werking.",
+      excerptEn: "How VTK works, from work groups to day-to-day operations.",
+      order: 0,
+      contentNl: richText([
+        "VTK wordt gedragen door studenten uit verschillende werkgroepen. Elke groep neemt een deel van het dagelijkse studentenleven op.",
+        "Deze pagina is prototype-inhoud en helpt de nieuwe typografie, downloads en CMS-pagina's beoordelen.",
+      ]),
+      contentEn: richText([
+        "VTK is run by students across different work groups. Each group takes care of part of daily student life.",
+        "This page contains prototype content and helps evaluate the new typography, downloads and CMS pages.",
+      ]),
+    },
+    {
+      headerCode: "CONTACT",
+      slug: "contact",
+      titleNl: "Contact",
+      titleEn: "Contact",
+      excerptNl: "Wie je waarvoor kan bereiken.",
+      excerptEn: "Who to reach for what.",
+      order: 0,
+      contentNl: richText([
+        "Algemene vragen kan je sturen naar info@vtk.be. Voor cursusvragen, events of partnerwerking gebruik je best het specifieke contactadres.",
+        "In het prototype houden we deze pagina bewust kort zodat de layout voor eenvoudige CMS-content zichtbaar is.",
+      ]),
+      contentEn: richText([
+        "General questions can be sent to info@vtk.be. For course questions, events or partnerships, use the specific contact address.",
+        "In the prototype we keep this page intentionally short so the layout for simple CMS content is visible.",
+      ]),
+    },
+  ];
+
+  for (const page of pageSeeds) {
+    const tab = await prisma.headerTab.findUnique({ where: { code: page.headerCode } });
+    if (!tab) continue;
+    await prisma.page.upsert({
+      where: { slug: page.slug },
+      update: {
+        headerTabId: tab.id,
+        visibleInHeader: true,
+        titleNl: page.titleNl,
+        titleEn: page.titleEn,
+        excerptNl: page.excerptNl,
+        excerptEn: page.excerptEn,
+        contentJsonNl: page.contentNl,
+        contentJsonEn: page.contentEn,
+        publishedAt: new Date("2026-05-18T00:00:00+02:00"),
+        order: page.order,
+      },
+      create: {
+        slug: page.slug,
+        headerTabId: tab.id,
+        visibleInHeader: true,
+        titleNl: page.titleNl,
+        titleEn: page.titleEn,
+        excerptNl: page.excerptNl,
+        excerptEn: page.excerptEn,
+        contentJsonNl: page.contentNl,
+        contentJsonEn: page.contentEn,
+        publishedAt: new Date("2026-05-18T00:00:00+02:00"),
+        order: page.order,
+      },
+    });
+  }
+
+  console.log("Seeding prototype photo albums...");
+  const albumSeeds = [
+    {
+      slug: "galabal-2026",
+      titleNl: "Galabal 2026",
+      titleEn: "Gala 2026",
+      descriptionNl: "Prototype-album voor de fotopagina. Upload echte beelden via het adminpaneel.",
+      descriptionEn: "Prototype album for the photo page. Upload real images through the admin panel.",
+      eventDate: "2026-03-14T20:00:00+01:00",
+      publishedAt: "2026-05-18T00:00:00+02:00",
+    },
+    {
+      slug: "vtk-ski-2026",
+      titleNl: "Skireis 2026",
+      titleEn: "Ski trip 2026",
+      descriptionNl: "Sfeerbeelden van de jaarlijkse VTK-skireis.",
+      descriptionEn: "Atmosphere shots from the yearly VTK ski trip.",
+      eventDate: "2026-02-08T08:00:00+01:00",
+      publishedAt: "2026-05-18T00:00:00+02:00",
+    },
+    {
+      slug: "cantus-lente-2026",
+      titleNl: "Lentecantus 2026",
+      titleEn: "Spring cantus 2026",
+      descriptionNl: "Een lege prototypecollectie zodat albumlijsten gevuld zijn voor review.",
+      descriptionEn: "An empty prototype collection so album lists are populated for review.",
+      eventDate: "2026-04-24T20:00:00+02:00",
+      publishedAt: "2026-05-18T00:00:00+02:00",
+    },
+    {
+      slug: "career-fair-2026",
+      titleNl: "Career Fair 2026",
+      titleEn: "Career Fair 2026",
+      descriptionNl: "Prototype-album voor partner- en careercontent.",
+      descriptionEn: "Prototype album for partner and career content.",
+      eventDate: "2026-03-04T10:00:00+01:00",
+      publishedAt: "2026-05-18T00:00:00+02:00",
+    },
+  ];
+  for (const album of albumSeeds) {
+    await prisma.photoAlbum.upsert({
+      where: { slug: album.slug },
+      update: {
+        titleNl: album.titleNl,
+        titleEn: album.titleEn,
+        descriptionNl: album.descriptionNl,
+        descriptionEn: album.descriptionEn,
+        eventDate: new Date(album.eventDate),
+        publishedAt: new Date(album.publishedAt),
+      },
+      create: {
+        slug: album.slug,
+        titleNl: album.titleNl,
+        titleEn: album.titleEn,
+        descriptionNl: album.descriptionNl,
+        descriptionEn: album.descriptionEn,
+        eventDate: new Date(album.eventDate),
+        publishedAt: new Date(album.publishedAt),
+      },
+    });
+  }
+
+  await prisma.setting.upsert({
+    where: { key: "home.featuredAlbums" },
+    update: { value: { albumSlugs: albumSeeds.map((a) => a.slug) } },
+    create: { key: "home.featuredAlbums", value: { albumSlugs: albumSeeds.map((a) => a.slug) } },
+  });
+
   console.log("Seeding calendar events...");
   // Pulled from the vtk.be /nl/calendar iCal feed. Times are Europe/Brussels
   // (CEST, +02:00 in April). GroupCode assignments are best-effort based on
@@ -196,8 +645,98 @@ async function main() {
     start: string;
     end: string;
     url: string;
-    groupCode: "ACTIVITEITEN" | "CULTUUR" | "INTERNATIONAAL" | "FAKBAR" | "THEOKOT";
+    groupCode: GroupCode;
   }> = [
+    {
+      titleNl: "Theokot lunch deluxe",
+      titleEn: "Theokot lunch deluxe",
+      location: "Theokot · Arenberg",
+      start: "2026-05-19T11:30:00+02:00",
+      end: "2026-05-19T14:00:00+02:00",
+      url: "https://vtk.be/nl/aanbod",
+      groupCode: "THEOKOT",
+    },
+    {
+      titleNl: "VTK × Industria TD Quantum",
+      titleEn: "VTK × Industria TD Quantum",
+      location: "Albatros",
+      start: "2026-05-19T20:00:00+02:00",
+      end: "2026-05-20T03:00:00+02:00",
+      url: "https://vtk.be/nl/kalender",
+      groupCode: "ACTIVITEITEN",
+    },
+    {
+      titleNl: "Burgie-info sessie jaar 2",
+      titleEn: "Engineering info session year 2",
+      location: "Aula De Molen",
+      start: "2026-05-20T12:30:00+02:00",
+      end: "2026-05-20T14:00:00+02:00",
+      url: "https://vtk.be/nl/studies",
+      groupCode: "ONDERWIJS",
+    },
+    {
+      titleNl: "Doopcantus Wina × VTK",
+      titleEn: "Initiation cantus Wina × VTK",
+      location: "Alma 2",
+      start: "2026-05-21T19:30:00+02:00",
+      end: "2026-05-22T01:00:00+02:00",
+      url: "https://vtk.be/nl/kalender",
+      groupCode: "CULTUUR",
+    },
+    {
+      titleNl: "Galabal ticket drop + apero",
+      titleEn: "Gala ticket drop + apero",
+      location: "'t Elixir",
+      start: "2026-05-22T18:00:00+02:00",
+      end: "2026-05-22T21:00:00+02:00",
+      url: "https://vtk.be/nl/kalender",
+      groupCode: "GROEP5",
+    },
+    {
+      titleNl: "International buddy night",
+      titleEn: "International buddy night",
+      location: "Pangaea",
+      start: "2026-05-26T19:00:00+02:00",
+      end: "2026-05-26T22:00:00+02:00",
+      url: "https://vtk.be/en/internationaal",
+      groupCode: "INTERNATIONAAL",
+    },
+    {
+      titleNl: "CV review evening",
+      titleEn: "CV review evening",
+      location: "Thermotechnisch Instituut",
+      start: "2026-05-28T18:30:00+02:00",
+      end: "2026-05-28T21:30:00+02:00",
+      url: "https://vtk.be/nl/career",
+      groupCode: "BEDRIJVENRELATIES",
+    },
+    {
+      titleNl: "Sportdag Arenberg",
+      titleEn: "Arenberg sports day",
+      location: "Sportkot",
+      start: "2026-06-03T13:00:00+02:00",
+      end: "2026-06-03T18:00:00+02:00",
+      url: "https://vtk.be/nl/kalender",
+      groupCode: "SPORT",
+    },
+    {
+      titleNl: "Logistiek: busje onboarding",
+      titleEn: "Logistics: van onboarding",
+      location: "VTK kelder",
+      start: "2026-06-05T17:00:00+02:00",
+      end: "2026-06-05T18:30:00+02:00",
+      url: "https://logistiek.vtk.be",
+      groupCode: "LOGISTIEK",
+    },
+    {
+      titleNl: "Blokbar kickoff",
+      titleEn: "Study bar kickoff",
+      location: "Fakbar",
+      start: "2026-06-08T20:00:00+02:00",
+      end: "2026-06-09T01:00:00+02:00",
+      url: "https://vtk.be/nl/kalender",
+      groupCode: "FAKBAR",
+    },
     {
       titleNl: "AflsuitBBQ",
       titleEn: "Closing BBQ",

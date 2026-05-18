@@ -28,22 +28,34 @@ export default async function AlbumPage({
   }));
 
   return (
-    <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-10">
-      <h1 className="text-3xl font-bold">{pick(album.titleNl, album.titleEn, locale)}</h1>
-      {(album.descriptionNl || album.descriptionEn) && (
-        <p className="mt-2 text-zinc-600">
-          {pick(album.descriptionNl ?? "", album.descriptionEn ?? "", locale)}
-        </p>
-      )}
-      <AlbumViewer
-        albumSlug={album.slug}
-        photos={photos}
-        labels={{
-          downloadSelected: dict.photos.downloadSelected,
-          downloadAll: dict.photos.downloadAll,
-          selected: dict.photos.selected,
-        }}
-      />
+    <div className="vtk-page">
+      <header className="vtk-page-head">
+        <div>
+          <div className="vtk-page-kicker">VTK · {dict.photos.title}</div>
+          <h1 className="vtk-page-title">{pick(album.titleNl, album.titleEn, locale)}</h1>
+          {(album.descriptionNl || album.descriptionEn) && (
+            <p className="vtk-page-subtitle">
+              {pick(album.descriptionNl ?? "", album.descriptionEn ?? "", locale)}
+            </p>
+          )}
+        </div>
+        <div className="page-head-meta">
+          <b>{photos.length}</b>
+          <br />
+          {locale === "nl" ? "foto's" : "photos"}
+        </div>
+      </header>
+      <div className="vtk-page-shell">
+        <AlbumViewer
+          albumSlug={album.slug}
+          photos={photos}
+          labels={{
+            downloadSelected: dict.photos.downloadSelected,
+            downloadAll: dict.photos.downloadAll,
+            selected: dict.photos.selected,
+          }}
+        />
+      </div>
     </div>
   );
 }

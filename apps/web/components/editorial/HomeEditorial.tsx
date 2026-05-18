@@ -8,8 +8,6 @@ import {
   entryForDate,
   isClosedHours,
   isOpenAt,
-  parseHoursRange,
-  shortWeekdayNl,
 } from "./hoursUtils";
 
 import "@/app/design/vtk-home.css";
@@ -20,29 +18,58 @@ type OpeningHoursSetting = {
   entries: Array<{ dayNl: string; dayEn: string; hours: string }>;
 };
 
-type FeaturedAlbumsSetting = { albumSlugs: string[] };
+type CareerSetting = {
+  titleNl: string;
+  titleEn: string;
+  bodyNl: string;
+  bodyEn: string;
+  ctaLabelNl?: string;
+  ctaLabelEn?: string;
+  ctaUrl?: string;
+};
 
-function academicYearLabel(d: Date, locale: Locale): string {
+function academicYearLabel(d: Date): string {
   const y = d.getMonth() >= 8 ? d.getFullYear() : d.getFullYear() - 1;
-  return `${y}–${String(y + 1).slice(-2)}`;
+  return `${y}-${String(y + 1).slice(-2)}`;
+}
+
+function dayKey(d: Date, locale: Locale): string {
+  return d.toLocaleDateString(locale === "nl" ? "nl-BE" : "en-GB", {
+    weekday: "long",
+    day: "2-digit",
+    month: "short",
+  });
+}
+
+function formatTime(d: Date, locale: Locale): string {
+  return d.toLocaleTimeString(locale === "nl" ? "nl-BE" : "en-GB", {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
 }
 
 export async function HomeEditorial({ locale }: { locale: Locale }) {
   const base = locale === "nl" ? "" : "/en";
   const now = new Date();
+  const nl = locale === "nl";
 
-  const [settings, upcomingEvents, tabs, partners, featuredAlbums] = await Promise.all([
+  const [settings, upcomingEvents, tabs, partners] = await Promise.all([
     prisma.setting.findMany({
       where: {
         key: {
-          in: ["home.openingHours.cursusdienst", "home.openingHours.theokot", "home.featuredAlbums"],
+          in: [
+            "home.openingHours.cursusdienst",
+            "home.openingHours.theokot",
+            "home.featuredAlbums",
+            "home.career",
+          ],
         },
       },
     }),
     prisma.calendarEvent.findMany({
       where: { start: { gte: now }, visibility: "PUBLIC" },
       orderBy: { start: "asc" },
-      take: 5,
+      take: 8,
       include: { group: true },
     }),
     getVisibleHeaderTabsForNav(),
@@ -51,469 +78,404 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
       orderBy: [{ order: "asc" }, { name: "asc" }],
       take: 12,
     }),
-    (async () => {
-      const raw = await prisma.setting.findUnique({ where: { key: "home.featuredAlbums" } });
-      const value = (raw?.value as FeaturedAlbumsSetting | null) ?? { albumSlugs: [] };
-      if (value.albumSlugs.length === 0) return [];
-      return prisma.photoAlbum.findMany({
-        where: { slug: { in: value.albumSlugs }, publishedAt: { not: null } },
-        include: { coverPhoto: true },
-      });
-    })(),
   ]);
 
   const map = new Map(settings.map((s) => [s.key, s.value as unknown]));
   const cursus = map.get("home.openingHours.cursusdienst") as OpeningHoursSetting | undefined;
   const theokot = map.get("home.openingHours.theokot") as OpeningHoursSetting | undefined;
-
-  const tileTabs = tabs.filter((t) => t.slug !== "").slice(0, 4);
-  const next = upcomingEvents[0];
-  const cover = featuredAlbums[0]?.coverPhoto;
-  const coverUrl = cover ? publicUrl(cover.thumbnailKey || cover.storageKey) : null;
+  const career = map.get("home.career") as CareerSetting | undefined;
 
   const theoToday = theokot ? entryForDate(theokot.entries, now, locale) : undefined;
-
   const theoOpen = theoToday && isOpenAt(theoToday.hours, now);
   const curToday = cursus ? entryForDate(cursus.entries, now, locale) : undefined;
   const curOpen = curToday && !isClosedHours(curToday.hours) && isOpenAt(curToday.hours, now);
 
-  const todayLine = now.toLocaleString(locale === "nl" ? "nl-BE" : "en-GB", {
-    weekday: "short",
-    day: "2-digit",
-    month: "short",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
+  const eventGroups = upcomingEvents.slice(0, 5).reduce<Array<{ key: string; date: Date; events: typeof upcomingEvents }>>(
+    (acc, event) => {
+      const date = new Date(event.start);
+      const key = dayKey(date, locale);
+      const found = acc.find((g) => g.key === key);
+      if (found) found.events.push(event);
+      else acc.push({ key, date, events: [event] });
+      return acc;
+    },
+    []
+  );
+
+  const aanbodTabs = tabs.filter((t) => t.slug !== "").slice(0, 6);
+  const quickLinks = [
+    {
+      k: nl ? "Eten" : "Eat",
+      v: "Theokot",
+      m: theoToday && !isClosedHours(theoToday.hours) ? theoToday.hours : nl ? "Bekijk openingsuren" : "See hours",
+      href: `${base}/aanbod`,
+    },
+    {
+      k: nl ? "Boeken" : "Books",
+      v: nl ? "Cursusdienst" : "Course shop",
+      m: curToday && !isClosedHours(curToday.hours) ? curToday.hours : nl ? "Cursussen & tweedehands" : "Courses & second-hand",
+      href: `${base}/cursusdienst`,
+    },
+    { k: nl ? "Tweedehands" : "Second-hand", v: "Tweedehands", m: nl ? "Koop & verkoop" : "Buy & sell", href: `${base}/cursusdienst` },
+    { k: nl ? "Werk" : "Work", v: "Shiften", m: nl ? "Help mee" : "Join a shift", href: `${base}/aanbod` },
+    { k: nl ? "Reserveer" : "Reserve", v: "Tijdsloten", m: nl ? "Praktische tools" : "Practical tools", href: `${base}/aanbod` },
+    { k: nl ? "Kalender" : "Calendar", v: nl ? "Kalender" : "Calendar", m: nl ? "Alle events" : "All events", href: `${base}/kalender` },
+  ];
+
+  const fallbackAanbod = [
+    {
+      labelNl: "Sociaal",
+      labelEn: "Social",
+      titleNl: "Cantussen, TDs en galabals.",
+      titleEn: "Cantuses, TDs and galas.",
+      bodyNl: "Alles wat de ingenieursstudent buiten de aula samenbrengt.",
+      bodyEn: "Everything that brings engineering students together outside the lecture hall.",
+      href: `${base}/kalender`,
+    },
+    {
+      labelNl: "Career",
+      labelEn: "Career",
+      titleNl: "Van campus naar job.",
+      titleEn: "From campus to career.",
+      bodyNl: "Bedrijvenrelaties, events en kansen om je toekomst scherp te krijgen.",
+      bodyEn: "Company relations, events and opportunities to shape what comes next.",
+      href: `${base}/career`,
+    },
+    {
+      labelNl: "Studies",
+      labelEn: "Studies",
+      titleNl: "Cursusdienst en studiehulp.",
+      titleEn: "Course shop and study help.",
+      bodyNl: "Praktische ondersteuning voor je semester.",
+      bodyEn: "Practical support for your semester.",
+      href: `${base}/cursusdienst`,
+    },
+  ];
+
+  const aanbodCards =
+    aanbodTabs.length > 0
+      ? aanbodTabs.map((tab) => ({
+          labelNl: tab.labelNl,
+          labelEn: tab.labelEn,
+          titleNl: tab.labelNl,
+          titleEn: tab.labelEn,
+          bodyNl: "Ontdek pagina's, activiteiten en praktische info van deze werking.",
+          bodyEn: "Discover pages, activities and practical information from this work group.",
+          href: `${base}/${tab.slug}`,
+        }))
+      : fallbackAanbod;
 
   return (
     <div className="vtk-design">
-      <header className="hero">
-        <div className="wrap">
-          <div className="hero-grid">
-            <div className="hero-main">
-              <div className="label">
-                // 001 — {locale === "nl" ? "welkom · editie" : "welcome · edition"}{" "}
-                {academicYearLabel(now, locale)}
-              </div>
-              <h1>
-                {locale === "nl" ? (
-                  <>
-                    Partner
-                    <br />
-                    in crime
-                    <br />
-                    <span className="hero-since">
-                      <em>sinds</em> <mark>1920.</mark>
-                    </span>
-                  </>
-                ) : (
-                  <>
-                    Partner
-                    <br />
-                    in crime
-                    <br />
-                    <span className="hero-since">
-                      <em>since</em> <mark>1920.</mark>
-                    </span>
-                  </>
-                )}
-              </h1>
-              <p className="hero-lede">
-                {locale === "nl"
-                  ? "De Vlaamse Technische Kring is de studentenkring van burgerlijke ingenieurs aan de KU Leuven. Kalender, cursussen, broodjes, shiften — alles wat je dag op de groep draait, op één plek."
-                  : "The Flemish Technical Circle is the student association for civil engineering students at KU Leuven. Calendar, courses, sandwiches, shifts — everything that shapes your day on campus, in one place."}
-              </p>
-              <div className="hero-actions">
-                <Link href={`${base}/over-vtk`} className="btn btn-primary arrow">
-                  {locale === "nl" ? "Wat is VTK" : "What is VTK"}
-                </Link>
-                <Link href={`${base}/kalender`} className="btn btn-ghost">
-                  {locale === "nl" ? "Bekijk kalender" : "View calendar"}
-                </Link>
-              </div>
-              <div className="hero-meta">
-                <dl className="spec">
-                  <dt>{locale === "nl" ? "FACULTEIT" : "FACULTY"}</dt>
-                  <dd>{locale === "nl" ? "Ingenieurswetenschappen" : "Engineering Science"}</dd>
-                  <dt>{locale === "nl" ? "CAMPUS" : "CAMPUS"}</dt>
-                  <dd>Arenberg · Heverlee</dd>
-                  <dt>VTK</dt>
-                  <dd>vtk.be</dd>
-                  <dt>{locale === "nl" ? "KALENDER" : "CALENDAR"}</dt>
-                  <dd>
-                    <Link href={`${base}/kalender`}>{locale === "nl" ? "live" : "live"}</Link>
-                  </dd>
-                </dl>
-              </div>
-              <div className="hero-photo-bleed ph">
-                <div className="ph-label">PHOTO · arenberg</div>
-              </div>
-            </div>
-
-            <aside className="hero-side">
-              <div className="next-event">
-                <h3>// 002 — {locale === "nl" ? "eerstvolgend" : "next up"}</h3>
-                {next ? (
-                  <>
-                    <div className="next-event-date">
-                      <b>{String(new Date(next.start).getDate()).padStart(2, "0")}</b>
-                      <span>
-                        {new Date(next.start)
-                          .toLocaleDateString(locale === "nl" ? "nl-BE" : "en-GB", {
-                            month: "short",
-                          })
-                          .toUpperCase()}{" "}
-                        ·{" "}
-                        {new Date(next.start).toLocaleTimeString(locale === "nl" ? "nl-BE" : "en-GB", {
-                          hour: "2-digit",
-                          minute: "2-digit",
-                        })}
-                      </span>
-                    </div>
-                    <h2>{pick(next.titleNl, next.titleEn, locale)}</h2>
-                    <p style={{ color: "var(--muted)", fontSize: 14, marginTop: 12, lineHeight: 1.5 }}>
-                      {[next.location, pick(next.group.nameNl, next.group.nameEn, locale)]
-                        .filter(Boolean)
-                        .join(" · ")}
-                    </p>
-                    {next.url ? (
-                      <a href={next.url} className="btn btn-accent arrow" style={{ marginTop: 20 }}>
-                        {locale === "nl" ? "Meer info" : "Details"}
-                      </a>
-                    ) : (
-                      <Link href={`${base}/kalender`} className="btn btn-accent arrow" style={{ marginTop: 20 }}>
-                        {locale === "nl" ? "Kalender" : "Calendar"}
-                      </Link>
-                    )}
-                  </>
-                ) : (
-                  <>
-                    <div className="next-event-date">
-                      <b>—</b>
-                      <span>{locale === "nl" ? "GEEN DATA" : "NO DATA"}</span>
-                    </div>
-                    <h2>{locale === "nl" ? "Nog geen events" : "No upcoming events"}</h2>
-                    <Link href={`${base}/kalender`} className="btn btn-accent arrow" style={{ marginTop: 20 }}>
-                      {locale === "nl" ? "Kalender" : "Calendar"}
-                    </Link>
-                  </>
-                )}
-              </div>
-              <div className="hero-photo ph" style={{ minHeight: 280 }}>
-                {coverUrl ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={coverUrl} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                ) : (
-                  <div className="ph-label">PHOTO · VTK</div>
-                )}
-              </div>
-            </aside>
+      <section className="home-hero">
+        <div>
+          <div className="eyebrow">
+            <span className="dot" />
+            Vlaamse Technische Kring · KU Leuven
           </div>
-        </div>
-      </header>
-
-      <div className="marquee">
-        <div className="marquee-track">
-          <span>Vlaamse Technische Kring</span>
-          <span className="star">✦</span>
-          <span>Partner in crime since 1920</span>
-          <span className="star">✦</span>
-          <span>Ingenieurswetenschappen · KU Leuven</span>
-          <span className="star">✦</span>
-          <span>Vlaamse Technische Kring</span>
-          <span className="star">✦</span>
-          <span>Partner in crime since 1920</span>
-          <span className="star">✦</span>
-          <span>Ingenieurswetenschappen · KU Leuven</span>
-          <span className="star">✦</span>
-        </div>
-      </div>
-
-      <section className="block">
-        <div className="block-head">
-          <div className="block-num">003 — {locale === "nl" ? "kalender" : "calendar"}</div>
-          <h2>
-            {locale === "nl" ? (
+          <h1>
+            {nl ? (
               <>
-                Binnenkort
+                De thuis voor <span className="serif">ingenieurs</span>
                 <br />
-                op het programma.
+                in Leuven.
               </>
             ) : (
               <>
-                Coming up
+                The home for <span className="serif">engineers</span>
                 <br />
-                on the programme.
+                in Leuven.
               </>
             )}
-          </h2>
-        </div>
-
-        <div className="events-list">
-          {upcomingEvents.length === 0 ? (
-            <p style={{ padding: "32px 0", color: "var(--muted)" }}>
-              {locale === "nl" ? "Geen geplande evenementen." : "No upcoming events."}
-            </p>
-          ) : (
-            upcomingEvents.map((e) => {
-              const d = new Date(e.start);
-              const inner = (
-                <>
-                  <div className="event-date">
-                    <b>{String(d.getDate()).padStart(2, "0")}</b>
-                    {d
-                      .toLocaleDateString(locale === "nl" ? "nl-BE" : "en-GB", {
-                        month: "short",
-                      })
-                      .toUpperCase()}{" "}
-                    · {shortWeekdayNl(d).toLowerCase()}
-                  </div>
-                  <div className="event-title">{pick(e.titleNl, e.titleEn, locale)}</div>
-                  <div className="event-desc">
-                    {[e.location, pick(e.group.nameNl, e.group.nameEn, locale)].filter(Boolean).join(" · ")}
-                  </div>
-                  <div className="event-tag">{e.group.code}</div>
-                  <div className="event-go">→</div>
-                </>
-              );
-              return e.url ? (
-                <a key={e.id} href={e.url} className="event-row">
-                  {inner}
-                </a>
-              ) : (
-                <Link key={e.id} href={`${base}/kalender`} className="event-row">
-                  {inner}
-                </Link>
-              );
-            })
-          )}
-        </div>
-        <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 32 }}>
-          <Link href={`${base}/kalender`} className="btn btn-ghost arrow">
-            {locale === "nl" ? "Volledige kalender" : "Full calendar"}
-          </Link>
-        </div>
-      </section>
-
-      <section className="hours-strip">
-        <div style={{ maxWidth: "var(--max)", margin: "0 auto", padding: "32px 32px 0" }}>
-          <div
-            style={{
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "baseline",
-              borderBottom: "1px solid oklch(0.28 0.04 260)",
-              paddingBottom: 24,
-              flexWrap: "wrap",
-              gap: 16,
-            }}
-          >
-            <div>
-              <div
-                style={{
-                  fontFamily: "var(--mono)",
-                  fontSize: 11,
-                  color: "oklch(0.6 0.02 260)",
-                  letterSpacing: "0.08em",
-                  textTransform: "uppercase",
-                }}
-              >
-                004 — {locale === "nl" ? "openingsuren" : "opening hours"}
-              </div>
-              <h2
-                style={{
-                  color: "var(--paper)",
-                  fontSize: "clamp(36px, 6vw, 56px)",
-                  letterSpacing: "-0.03em",
-                  marginTop: 8,
-                  fontWeight: 500,
-                  lineHeight: 1,
-                }}
-              >
-                {locale === "nl" ? "Openingsuren." : "Opening hours."}
-              </h2>
+          </h1>
+          <p className="hero-sub">
+            {nl
+              ? "Events, cursussen, career, broodjes en alles wat je dag op de campus praktischer maakt. Gerund door studenten, sinds 1920."
+              : "Events, courses, careers, sandwiches and everything that makes your day on campus more practical. Run by students, since 1920."}
+          </p>
+          <div className="hero-cta">
+            <Link href={`${base}/over-vtk`} className="btn btn-primary arrow">
+              {nl ? "Word lid" : "Become a member"}
+            </Link>
+            <Link href={`${base}/eerstejaars`} className="btn btn-ghost">
+              {nl ? "Eerstejaars? Start hier" : "First-year? Start here"}
+            </Link>
+          </div>
+          <div className="hero-meta">
+            <div className="meta">
+              <div className="k">{nl ? "Editie" : "Edition"}</div>
+              <div className="v">{academicYearLabel(now)}</div>
             </div>
-            <div
-              style={{
-                fontFamily: "var(--mono)",
-                fontSize: 11,
-                color: "oklch(0.6 0.02 260)",
-                letterSpacing: "0.08em",
-                textTransform: "uppercase",
-                textAlign: "right",
-              }}
-            >
-              {locale === "nl" ? "NU" : "NOW"}
-              <br />
-              <span style={{ color: "var(--accent)", fontSize: 14 }}>{todayLine}</span>
+            <div className="meta">
+              <div className="k">{nl ? "Binnenkort" : "This week"}</div>
+              <div className="v">
+                {upcomingEvents.length} {nl ? "events" : "events"}
+              </div>
+            </div>
+            <div className="meta">
+              <div className="k">{nl ? "Sinds" : "Since"}</div>
+              <div className="v">1920</div>
             </div>
           </div>
         </div>
-        <div className="hours-grid" style={{ paddingTop: 32 }}>
-          {theokot ? (
-            <div className="hours-col">
-              <h3>{pick(theokot.titleNl, theokot.titleEn, locale).replace(/^Openingsuren\s+/i, "")}</h3>
-              <div className="sub">{locale === "nl" ? "Broodjes & warme snacks" : "Sandwiches & snacks"}</div>
-              <div className={`status${theoOpen ? "" : " closed"}`}>
-                {theoOpen
-                  ? locale === "nl"
-                    ? "Nu open"
-                    : "Open now"
-                  : locale === "nl"
-                    ? "Gesloten / buiten uren"
-                    : "Closed / outside hours"}
+
+        <aside className="cal">
+          <div className="cal-head">
+            <div>
+              <h3>{nl ? "Aankomende events" : "Upcoming events"}</h3>
+              <div className="sub">
+                {upcomingEvents[0]
+                  ? `${dayKey(new Date(upcomingEvents[0].start), locale)} → ${dayKey(new Date(upcomingEvents[Math.min(upcomingEvents.length - 1, 4)].start), locale)}`
+                  : nl
+                    ? "Geen geplande events"
+                    : "No planned events"}
               </div>
-              <dl className="hours-list">
-                {theokot.entries.map((row, i) => {
-                  const isToday = row.dayNl === dutchDayNameForDate(now);
-                  const todayCls = isToday ? " today" : "";
-                  return (
-                    <div key={i} style={{ display: "contents" }}>
-                      <dt className={todayCls}>{row.dayNl.slice(0, 2).toUpperCase()}</dt>
-                      <dd className={todayCls}>{row.hours}</dd>
-                    </div>
-                  );
-                })}
-              </dl>
             </div>
-          ) : null}
-          {cursus ? (
-            <div className="hours-col section-hours-bg">
-              <h3>{pick(cursus.titleNl, cursus.titleEn, locale).replace(/^Openingsuren\s+/i, "")}</h3>
-              <div className="sub">{locale === "nl" ? "Cursussen & tweedehands" : "Courses & second-hand"}</div>
-              <div className={`status${curOpen ? "" : " closed"}`}>
-                {curOpen
-                  ? locale === "nl"
-                    ? "Nu open"
-                    : "Open now"
-                  : locale === "nl"
-                    ? "Gesloten / buiten uren"
-                    : "Closed / outside hours"}
+            <Link href={`${base}/kalender`} className="all">
+              {nl ? "Volledige kalender" : "Full calendar"}
+            </Link>
+          </div>
+          <div className="agenda">
+            {eventGroups.length === 0 ? (
+              <div className="day-group">
+                <div className="day-label">
+                  <span className="num">—</span>
+                  <span className="dow">{nl ? "Geen data" : "No data"}</span>
+                </div>
               </div>
-              <dl className="hours-list">
-                {cursus.entries.map((row, i) => {
-                  const isToday = row.dayNl === dutchDayNameForDate(now);
-                  const todayCls = isToday ? " today" : "";
-                  return (
-                    <div key={i} style={{ display: "contents" }}>
-                      <dt className={todayCls}>{row.dayNl.slice(0, 2).toUpperCase()}</dt>
-                      <dd className={todayCls}>{row.hours}</dd>
-                    </div>
-                  );
-                })}
-              </dl>
-            </div>
-          ) : null}
-        </div>
+            ) : (
+              eventGroups.map((group, groupIndex) => (
+                <div className="day-group" key={group.key}>
+                  <div className="day-label">
+                    <span className="num">{String(group.date.getDate()).padStart(2, "0")}</span>
+                    <span className="dow">
+                      {group.date.toLocaleDateString(locale === "nl" ? "nl-BE" : "en-GB", { weekday: "long" })}
+                    </span>
+                    {group.date.toDateString() === now.toDateString() ? (
+                      <span className="today">{nl ? "vandaag" : "today"}</span>
+                    ) : null}
+                  </div>
+                  {group.events.map((event, eventIndex) => {
+                    const eventDate = new Date(event.start);
+                    const content = (
+                      <>
+                        <div className="t">{formatTime(eventDate, locale)}</div>
+                        <div className="n">
+                          {groupIndex === 0 && eventIndex === 0 ? <span className="pin" /> : null}
+                          {pick(event.titleNl, event.titleEn, locale)}
+                          <small>
+                            {[event.location, pick(event.group.nameNl, event.group.nameEn, locale)]
+                              .filter(Boolean)
+                              .join(" · ")}
+                          </small>
+                        </div>
+                        <span className="arrow">→</span>
+                      </>
+                    );
+                    return event.url ? (
+                      <a key={event.id} href={event.url} className={`ev${groupIndex === 0 && eventIndex === 0 ? " featured" : ""}`}>
+                        {content}
+                      </a>
+                    ) : (
+                      <Link key={event.id} href={`${base}/kalender`} className={`ev${groupIndex === 0 && eventIndex === 0 ? " featured" : ""}`}>
+                        {content}
+                      </Link>
+                    );
+                  })}
+                </div>
+              ))
+            )}
+          </div>
+        </aside>
       </section>
 
-      <section style={{ maxWidth: "var(--max)", margin: "0 auto", padding: 0, borderBottom: "1px solid var(--rule)" }}>
-        <div className="tiles">
-          {tileTabs.map((tab, i) => (
-            <Link key={tab.id} href={`${base}/${tab.slug}`} className="tile">
-              <div className="tile-num">→ {String(5 + i).padStart(3, "0")}</div>
-              <h3>{pick(tab.labelNl, tab.labelEn, locale)}</h3>
-              <p>{locale === "nl" ? "Ontdek pagina's en activiteiten." : "Discover pages and activities."}</p>
-              <div className="tile-arrow">↗</div>
+      <section className="quick">
+        <div className="quick-row">
+          {quickLinks.map((item) => (
+            <Link key={item.k} className="ql" href={item.href}>
+              <span className="k">{item.k}</span>
+              <span className="v">{item.v}</span>
+              <span className="m">{item.m}</span>
             </Link>
           ))}
         </div>
       </section>
 
-      <section className="block">
-        <div className="block-head">
-          <div className="block-num">009 — {locale === "nl" ? "over" : "about"}</div>
+      <section className="section">
+        <div className="sec-head">
           <h2>
-            {locale === "nl" ? (
-              <>
-                Geen gewone
-                <br />
-                studentenkring.
-              </>
-            ) : (
-              <>
-                Not your average
-                <br />
-                student society.
-              </>
-            )}
+            {nl ? "Wat we " : "What we "}
+            <span className="serif">{nl ? "doen" : "do"}</span>.
           </h2>
-        </div>
-        <div className="manifesto">
-          <div className="manifesto-text">
-            <p>
-              <em>{locale === "nl" ? "Sinds 1920, één doel:" : "Since 1920, one goal:"}</em>{" "}
-              {locale === "nl"
-                ? "het leven van de ingenieursstudent in Leuven wat draaglijker maken."
-                : "making life for engineering students in Leuven a little easier."}
-            </p>
-            <p>
-              {locale === "nl"
-                ? "We draaien een broodjesbar, een cursusdienst, activiteiten en career-events. Grotendeels vrijwillig. Altijd voor de studenten."
-                : "We run a sandwich bar, a course shop, activities and career events — mostly volunteer-run, always for students."}
-            </p>
-            <p>
-              {locale === "nl"
-                ? "Geen fancy missie-statements. Gewoon: als er iets geregeld moet worden, dan doen wij dat mee."
-                : "No fancy mission statements — if something needs organising, we help make it happen."}
-            </p>
+          <div className="meta">
+            {nl ? "Werkgroepen en diensten" : "Work groups and services"} ·{" "}
+            <Link href={`${base}/aanbod`}>{nl ? "bekijk alles" : "see all"}</Link>
           </div>
-          <div className="manifesto-stats">
-            <div className="stat">
-              <div className="stat-val">
-                105<span className="acc">.</span>
+        </div>
+        <div className="aanbod">
+          {aanbodCards.slice(0, 6).map((card, index) => (
+            <Link key={card.href} href={card.href} className={`acard${index === 0 ? " feat" : ""}`}>
+              <div>
+                <div className="tag">→ {pick(card.labelNl, card.labelEn, locale)}</div>
+                <h3>{pick(card.titleNl, card.titleEn, locale)}</h3>
+                <p>{pick(card.bodyNl, card.bodyEn, locale)}</p>
               </div>
-              <div className="stat-lbl">{locale === "nl" ? "jaargangen sinds oprichting" : "years since founding"}</div>
+              <div className="cta">{nl ? "Ontdek" : "Explore"}</div>
+            </Link>
+          ))}
+        </div>
+      </section>
+
+      <section className="section">
+        <div className="sec-head">
+          <h2>
+            Career, <span className="serif">{nl ? "eerlijk" : "honestly"}</span>.
+          </h2>
+          <div className="meta">
+            {partners.length} {nl ? "partnerbedrijven" : "partner companies"}
+          </div>
+        </div>
+        <div className="career">
+          <div>
+            <div className="eyebrow">
+              <span className="dot" />
+              VTK Career
             </div>
-            <div className="stat">
-              <div className="stat-val">
-                3 200<span className="acc">+</span>
+            <h3>
+              {career
+                ? pick(career.titleNl, career.titleEn, locale)
+                : nl
+                  ? "Ontmoet bedrijven voordat je moet solliciteren."
+                  : "Meet companies before you have to apply."}
+            </h3>
+            <p>
+              {career
+                ? pick(career.bodyNl, career.bodyEn, locale)
+                : nl
+                  ? "Doorheen het jaar brengen we studenten en bedrijven samen via career events, bedrijfsrelaties en praktische kansen."
+                  : "Throughout the year we bring students and companies together through career events, company relations and practical opportunities."}
+            </p>
+            <div className="pcount">
+              <div className="meta">
+                <div className="k">{nl ? "Partners" : "Partners"}</div>
+                <div className="v">{partners.length || "—"}</div>
               </div>
-              <div className="stat-lbl">{locale === "nl" ? "studenten op de campus" : "students on campus"}</div>
-            </div>
-            <div className="stat">
-              <div className="stat-val">
-                16<span className="acc"></span>
+              <div className="meta">
+                <div className="k">{nl ? "Campus" : "Campus"}</div>
+                <div className="v">Arenberg</div>
               </div>
-              <div className="stat-lbl">{locale === "nl" ? "werkgroepen" : "work groups"}</div>
-            </div>
-            <div className="stat">
-              <div className="stat-val">
-                1<span className="acc">×</span>
+              <div className="meta">
+                <div className="k">VTK</div>
+                <div className="v">1920</div>
               </div>
-              <div className="stat-lbl">vtk.be</div>
             </div>
+            {career?.ctaUrl ? (
+              <a href={career.ctaUrl} className="btn btn-primary arrow" style={{ marginTop: 24 }}>
+                {pick(career.ctaLabelNl ?? "Meer info", career.ctaLabelEn ?? "More info", locale)}
+              </a>
+            ) : null}
+          </div>
+          <div className="jobs">
+            {(partners.length > 0 ? partners.slice(0, 5) : [{ id: "empty", name: nl ? "Partners verschijnen hier" : "Partners appear here", url: null }]).map((partner) => (
+              <div className="job" key={partner.id}>
+                <div>
+                  <div className="r">{partner.name}</div>
+                  <div className="c">{partner.url ? partner.url.replace(/^https?:\/\//, "") : "VTK Career"}</div>
+                </div>
+                <div className="t">{nl ? "Partner" : "Partner"}</div>
+              </div>
+            ))}
           </div>
         </div>
       </section>
 
+      {(theokot || cursus) && (
+        <section className="hours-strip">
+          <div className="sec-head">
+            <h2>
+              {nl ? "Openings" : "Opening"} <span className="serif">{nl ? "uren" : "hours"}</span>.
+            </h2>
+            <div className="meta">
+              {now.toLocaleString(locale === "nl" ? "nl-BE" : "en-GB", {
+                weekday: "short",
+                day: "2-digit",
+                month: "short",
+                hour: "2-digit",
+                minute: "2-digit",
+              })}
+            </div>
+          </div>
+          <div className="hours-grid">
+            {theokot ? (
+              <div className="hours-col">
+                <h3>{pick(theokot.titleNl, theokot.titleEn, locale).replace(/^Openingsuren\s+/i, "")}</h3>
+                <div className="sub">{nl ? "Broodjes & warme snacks" : "Sandwiches & snacks"}</div>
+                <div className={`status${theoOpen ? "" : " closed"}`}>
+                  {theoOpen ? (nl ? "Nu open" : "Open now") : nl ? "Gesloten / buiten uren" : "Closed / outside hours"}
+                </div>
+                <dl className="hours-list">
+                  {theokot.entries.map((row, i) => {
+                    const todayCls = row.dayNl === dutchDayNameForDate(now) ? "today" : "";
+                    return (
+                      <div key={i} style={{ display: "contents" }}>
+                        <dt className={todayCls}>{row.dayNl.slice(0, 2).toUpperCase()}</dt>
+                        <dd className={todayCls}>{row.hours}</dd>
+                      </div>
+                    );
+                  })}
+                </dl>
+              </div>
+            ) : null}
+            {cursus ? (
+              <div className="hours-col section-hours-bg">
+                <h3>{pick(cursus.titleNl, cursus.titleEn, locale).replace(/^Openingsuren\s+/i, "")}</h3>
+                <div className="sub">{nl ? "Cursussen & tweedehands" : "Courses & second-hand"}</div>
+                <div className={`status${curOpen ? "" : " closed"}`}>
+                  {curOpen ? (nl ? "Nu open" : "Open now") : nl ? "Gesloten / buiten uren" : "Closed / outside hours"}
+                </div>
+                <dl className="hours-list">
+                  {cursus.entries.map((row, i) => {
+                    const todayCls = row.dayNl === dutchDayNameForDate(now) ? "today" : "";
+                    return (
+                      <div key={i} style={{ display: "contents" }}>
+                        <dt className={todayCls}>{row.dayNl.slice(0, 2).toUpperCase()}</dt>
+                        <dd className={todayCls}>{row.hours}</dd>
+                      </div>
+                    );
+                  })}
+                </dl>
+              </div>
+            ) : null}
+          </div>
+        </section>
+      )}
+
       <section className="partners">
         <div className="partners-head">
           <div>
-            <div className="label" style={{ marginBottom: 8 }}>
-              // 010 — {locale === "nl" ? "mede mogelijk gemaakt door" : "with support from"}
+            <div className="eyebrow">
+              <span className="dot" />
+              {nl ? "Mede mogelijk gemaakt door" : "With support from"}
             </div>
-            <h3>{locale === "nl" ? "Hoofdpartners" : "Main partners"}</h3>
+            <h3>{nl ? "Hoofdpartners" : "Main partners"}</h3>
           </div>
           <Link href={`${base}/contact`} className="btn btn-ghost arrow">
-            {locale === "nl" ? "Contact" : "Contact"}
+            Contact
           </Link>
         </div>
         <div className="partners-grid">
           {partners.length === 0 ? (
-            <div className="partner" style={{ gridColumn: "1 / -1" }}>
-              {locale === "nl" ? "Nog geen partners" : "No partners yet"}
-            </div>
+            <div className="partner">{nl ? "Nog geen partners" : "No partners yet"}</div>
           ) : (
-            partners.map((p) => {
-              const url = publicUrl(p.logoKey);
+            partners.map((partner) => {
+              const logo = publicUrl(partner.logoKey);
               return (
-                <div key={p.id} className="partner">
-                  {url ? (
+                <div className="partner" key={partner.id}>
+                  {logo ? (
                     // eslint-disable-next-line @next/next/no-img-element
-                    <img src={url} alt={p.name} />
+                    <img src={logo} alt={partner.name} />
                   ) : (
-                    p.name
+                    partner.name
                   )}
                 </div>
               );

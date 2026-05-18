@@ -29,37 +29,41 @@ export default async function HeaderOverviewPage({
   if (!tab || !tab.visible) notFound();
 
   return (
-    <div className="mx-auto max-w-5xl px-4 sm:px-6 lg:px-8 py-10 md:py-14">
-      <h1 className="mb-2 text-3xl font-bold tracking-tight text-vtk-blue md:text-4xl">
-        {pick(tab.labelNl, tab.labelEn, locale)}
-      </h1>
-      <p className="mb-8 text-zinc-500">{dict.pages.overview}</p>
+    <div className="vtk-page">
+      <header className="vtk-page-head">
+        <div>
+          <div className="vtk-page-kicker">VTK · {dict.pages.overview}</div>
+          <h1 className="vtk-page-title">{pick(tab.labelNl, tab.labelEn, locale)}</h1>
+        </div>
+      </header>
 
-      {tab.pages.length === 0 ? (
-        <p className="text-sm text-zinc-500">{dict.pages.empty}</p>
-      ) : (
-        <ul className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          {tab.pages.map((page) => (
-            <li key={page.id}>
-              <Link href={`${base}/${tab.slug}/${page.slug}`}>
-                <Card className="p-5 transition hover:border-vtk-blue/20 hover:shadow-md">
-                  <h2 className="text-lg font-semibold text-vtk-blue">
-                    {pick(page.titleNl, page.titleEn, locale)}
-                  </h2>
-                  {(page.excerptNl || page.excerptEn) && (
-                    <p className="mt-2 line-clamp-3 text-sm text-zinc-600">
-                      {pick(page.excerptNl ?? "", page.excerptEn ?? "", locale)}
-                    </p>
-                  )}
-                  <span className="mt-3 inline-block text-sm text-vtk-blue">
-                    {dict.home.readMore} →
-                  </span>
-                </Card>
-              </Link>
-            </li>
-          ))}
-        </ul>
-      )}
+      <div className="vtk-page-shell">
+        {tab.pages.length === 0 ? (
+          <p className="text-sm text-[#5c667f]">{dict.pages.empty}</p>
+        ) : (
+          <ul className="vtk-card-grid">
+            {tab.pages.map((page) => (
+              <li key={page.id}>
+                <Link href={`${base}/${tab.slug}/${page.slug}`}>
+                  <Card className="vtk-card h-full">
+                    <h2 className="text-xl font-semibold tracking-tight text-vtk-ink">
+                      {pick(page.titleNl, page.titleEn, locale)}
+                    </h2>
+                    {(page.excerptNl || page.excerptEn) && (
+                      <p className="mt-2 line-clamp-3 text-sm leading-6 text-[#34405e]">
+                        {pick(page.excerptNl ?? "", page.excerptEn ?? "", locale)}
+                      </p>
+                    )}
+                    <span className="mt-4 inline-block text-sm font-medium text-vtk-ink">
+                      {dict.home.readMore} →
+                    </span>
+                  </Card>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
     </div>
   );
 }

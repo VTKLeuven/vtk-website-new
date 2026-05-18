@@ -39,4 +39,4 @@ WORKDIR /app/apps/web
 EXPOSE 3000
 ENTRYPOINT ["/sbin/tini", "--"]
 # next is hoisted to /app/node_modules; cwd must stay the app dir for .next
-CMD ["/bin/sh", "-c", "npx prisma migrate deploy --schema=/app/packages/db/prisma/schema.prisma && exec node /app/node_modules/next/dist/bin/next start -p 3000"]
+CMD ["/bin/sh", "-c", "npx prisma migrate deploy --schema=/app/packages/db/prisma/schema.prisma && cd /app && npx tsx packages/db/prisma/seed.ts && exec node /app/node_modules/next/dist/bin/next start -p 3000"]

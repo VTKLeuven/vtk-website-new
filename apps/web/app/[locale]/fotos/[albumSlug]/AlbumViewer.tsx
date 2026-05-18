@@ -39,9 +39,9 @@ export function AlbumViewer({
   }
 
   return (
-    <div className="mt-6">
-      <div className="flex flex-wrap items-center gap-3 mb-4">
-        <span className="text-sm text-zinc-500">
+    <div>
+      <div className="mb-5 flex flex-wrap items-center gap-3">
+        <span className="text-sm text-[#5c667f]">
           {selected.size} {labels.selected}
         </span>
         <Button onClick={downloadSelected} disabled={selected.size === 0} size="sm">
@@ -52,17 +52,17 @@ export function AlbumViewer({
         </Button>
       </div>
 
-      <ul className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2">
+      <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
         {photos.map((p, i) => (
           <li key={p.id} className="relative group">
             <button
               type="button"
               onClick={() => setLightbox(i)}
-              className="block aspect-square w-full overflow-hidden rounded bg-zinc-200 focus:outline-vtk-blue"
+              className="block aspect-square w-full overflow-hidden rounded-[16px] border border-vtk-blue/10 bg-[#f2f0e9] focus:outline-vtk-ink"
             >
               <img src={p.thumb} alt="" className="h-full w-full object-cover group-hover:scale-105 transition" />
             </button>
-            <label className="absolute top-2 left-2 rounded bg-white/95 p-1 shadow">
+            <label className="absolute top-2 left-2 rounded-full bg-white/95 p-1 shadow">
               <input
                 type="checkbox"
                 checked={selected.has(p.id)}

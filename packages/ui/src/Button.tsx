@@ -6,18 +6,18 @@ type Size = "sm" | "md" | "lg";
 
 const variants: Record<Variant, string> = {
   primary:
-    "bg-vtk-blue text-white shadow-sm hover:bg-vtk-blue-dark focus-visible:outline-vtk-blue",
+    "border border-vtk-ink bg-vtk-ink text-vtk-surface shadow-sm hover:bg-vtk-navy focus-visible:outline-vtk-ink",
   secondary:
-    "bg-vtk-yellow text-vtk-blue font-semibold shadow-sm hover:bg-vtk-yellow-dark border border-vtk-yellow-dark/20",
+    "border border-vtk-yellow-dark/30 bg-vtk-yellow text-vtk-ink font-semibold shadow-sm hover:bg-vtk-yellow-dark",
   ghost:
-    "text-vtk-blue hover:bg-vtk-blue-soft",
+    "border border-vtk-blue/15 text-vtk-ink hover:border-vtk-blue/30 hover:bg-vtk-blue-soft/70",
   danger: "bg-red-600 text-white hover:bg-red-700",
 };
 
 const sizes: Record<Size, string> = {
-  sm: "h-8 px-3 text-sm rounded-lg",
-  md: "h-10 px-4 text-sm rounded-lg",
-  lg: "h-12 px-6 text-base rounded-xl",
+  sm: "h-8 px-3 text-sm rounded-full",
+  md: "h-10 px-4 text-sm rounded-full",
+  lg: "h-12 px-6 text-base rounded-full",
 };
 
 type Props = ButtonHTMLAttributes<HTMLButtonElement> & {

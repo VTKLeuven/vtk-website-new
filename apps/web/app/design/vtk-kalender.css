@@ -418,3 +418,66 @@
     justify-content: flex-start;
   }
 }
+
+/* Refined design pass */
+.vtk-design .kal-wrap {
+  max-width: var(--max);
+  padding-left: clamp(20px, 3vw, 36px);
+  padding-right: clamp(20px, 3vw, 36px);
+}
+
+.vtk-design .toolbar,
+.vtk-design .cal,
+.vtk-design .agenda-side,
+.vtk-design .agenda-side-list,
+.vtk-design .ag-row {
+  border-radius: 18px;
+}
+
+.vtk-design .toolbar,
+.vtk-design .cal,
+.vtk-design .agenda-side,
+.vtk-design .ag-row {
+  border-color: var(--line);
+  background: #fff;
+}
+
+.vtk-design .filter,
+.vtk-design .view-switch,
+.vtk-design .view-switch button,
+.vtk-design .toolbar .nav-mo button,
+.vtk-design .ev-pill,
+.vtk-design .ag-tag,
+.vtk-design .ag-go {
+  border-radius: 999px;
+}
+
+.vtk-design .filter.on,
+.vtk-design .view-switch button.on,
+.vtk-design .toolbar .nav-mo button:hover {
+  background: var(--ink);
+  color: var(--paper);
+  border-color: var(--ink);
+}
+
+.vtk-design .cal-header > div {
+  background: var(--paper-2);
+  border-color: var(--line);
+}
+
+.vtk-design .cal-cell {
+  border-color: var(--line);
+}
+
+.vtk-design .cal-cell.today .num,
+.vtk-design .ev-pill.gala,
+.vtk-design .ag-row:hover .ag-go {
+  background: var(--yellow);
+  color: var(--ink);
+}
+
+.vtk-design .ag-row {
+  margin-bottom: 10px;
+  padding-left: 18px;
+  padding-right: 18px;
+}

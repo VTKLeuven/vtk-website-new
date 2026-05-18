@@ -23,16 +23,27 @@ export default async function FotosPage({
   });
 
   return (
-    <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-10">
-      <h1 className="text-3xl font-bold mb-6">{dict.photos.title}</h1>
+    <div className="vtk-page">
+      <header className="vtk-page-head">
+        <div>
+          <div className="vtk-page-kicker">VTK · Media</div>
+          <h1 className="vtk-page-title">{dict.photos.title}</h1>
+        </div>
+        <div className="page-head-meta">
+          <b>{albums.length}</b>
+          <br />
+          albums
+        </div>
+      </header>
+      <div className="vtk-page-shell">
       {albums.length === 0 ? (
-        <p className="text-zinc-500">{dict.photos.empty}</p>
+        <p className="text-[#5c667f]">{dict.photos.empty}</p>
       ) : (
-        <ul className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+        <ul className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
           {albums.map((a) => (
             <li key={a.id}>
               <Link href={`${base}/fotos/${a.slug}`} className="group block">
-                <div className="aspect-square overflow-hidden rounded-lg bg-zinc-200">
+                <div className="aspect-square overflow-hidden rounded-[18px] border border-vtk-blue/10 bg-[#f2f0e9]">
                   {a.coverPhoto ? (
                     <img
                       src={publicUrl(a.coverPhoto.thumbnailKey || a.coverPhoto.storageKey) ?? ""}
@@ -41,8 +52,8 @@ export default async function FotosPage({
                     />
                   ) : null}
                 </div>
-                <h2 className="mt-2 font-medium">{pick(a.titleNl, a.titleEn, locale)}</h2>
-                <p className="text-xs text-zinc-500">
+                <h2 className="mt-3 font-semibold tracking-tight text-vtk-ink">{pick(a.titleNl, a.titleEn, locale)}</h2>
+                <p className="text-xs text-[#5c667f]">
                   {a._count.photos} {locale === "nl" ? "foto's" : "photos"}
                   {a.eventDate && ` · ${a.eventDate.toLocaleDateString(locale === "nl" ? "nl-BE" : "en-GB")}`}
                 </p>
@@ -51,6 +62,7 @@ export default async function FotosPage({
           ))}
         </ul>
       )}
+      </div>
     </div>
   );
 }

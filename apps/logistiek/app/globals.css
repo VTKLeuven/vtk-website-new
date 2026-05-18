@@ -5,17 +5,31 @@
 @source "../../../packages/ui/src";
 
 @theme {
-  --color-vtk-blue: #1a1f4a;
-  --color-vtk-blue-dark: #121635;
-  --color-vtk-blue-light: #2a3366;
-  --color-vtk-blue-soft: #eceef8;
-  --color-vtk-blue-muted: #f4f5fc;
-  --color-vtk-yellow: #ffd400;
-  --color-vtk-yellow-dark: #e6bf00;
-  --color-vtk-surface: #f6f7fb;
+  --color-vtk-ink: #0a0f1f;
+  --color-vtk-navy: #0e1a36;
+  --color-vtk-blue: #0e1a36;
+  --color-vtk-blue-dark: #0a0f1f;
+  --color-vtk-blue-light: #34405e;
+  --color-vtk-blue-soft: #f2f0e9;
+  --color-vtk-blue-muted: #fafaf7;
+  --color-vtk-yellow: #ffd23f;
+  --color-vtk-yellow-dark: #edbd22;
+  --color-vtk-surface: #fafaf7;
+  --font-sans: var(--font-vtk-sans), ui-sans-serif, system-ui, sans-serif;
 }
 
 html,
 body {
   height: 100%;
+  font-family: var(--font-vtk-sans), ui-sans-serif, system-ui, sans-serif;
+}
+
+:root {
+  --ink: #0a0f1f;
+  --navy: #0e1a36;
+  --paper: #fafaf7;
+  --paper-2: #f2f0e9;
+  --line: rgba(14, 26, 54, 0.1);
+  --yellow: #ffd23f;
+  --muted: #5c667f;
 }

@@ -514,3 +514,62 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* Refined design pass */
+.vtk-design .aanbod-wrap {
+  max-width: var(--max);
+  padding-left: clamp(20px, 3vw, 36px);
+  padding-right: clamp(20px, 3vw, 36px);
+}
+
+.vtk-design .live-ribbon,
+.vtk-design .svc,
+.vtk-design .menu-strip,
+.vtk-design .menu-item,
+.vtk-design .map-ph {
+  border-radius: 18px;
+}
+
+.vtk-design .live-ribbon,
+.vtk-design .map-ph {
+  background-color: var(--navy);
+}
+
+.vtk-design .services {
+  gap: 18px;
+  border: 0;
+}
+
+.vtk-design .svc {
+  border: 1px solid var(--line);
+  background: #fff;
+}
+
+.vtk-design .svc.feat {
+  background: var(--navy);
+  color: var(--paper);
+}
+
+.vtk-design .svc h2,
+.vtk-design .menu-strip-head h3,
+.vtk-design .locations-side h3 {
+  font-weight: 600;
+}
+
+.vtk-design .hours-viz .bar-track,
+.vtk-design .menu-item {
+  border-color: var(--line);
+  background: var(--paper);
+}
+
+.vtk-design .hours-viz .bar,
+.vtk-design .svc.feat .hours-viz .bar {
+  background: var(--navy);
+  color: var(--yellow);
+}
+
+.vtk-design .hours-viz .today-row .bar,
+.vtk-design .svc.feat .hours-viz .today-row .bar {
+  background: var(--yellow);
+  color: var(--ink);
+}

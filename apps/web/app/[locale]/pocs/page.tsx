@@ -26,18 +26,24 @@ export default async function PocsPage({
   });
 
   return (
-    <div className="mx-auto max-w-5xl px-4 sm:px-6 lg:px-8 py-10 space-y-8">
-      <h1 className="text-4xl font-bold">{dict.pocs.title}</h1>
+    <div className="vtk-page">
+      <header className="vtk-page-head">
+        <div>
+          <div className="vtk-page-kicker">VTK · Onderwijs</div>
+          <h1 className="vtk-page-title">{dict.pocs.title}</h1>
+        </div>
+      </header>
+      <div className="vtk-page-shell">
       {pocs.length === 0 ? (
-        <p className="text-zinc-500">{dict.pocs.empty}</p>
+        <p className="text-[#5c667f]">{dict.pocs.empty}</p>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
           {pocs.map((poc) => (
             <Card key={poc.id} className="p-6">
-              <h2 className="text-xl font-semibold">{pick(poc.nameNl, poc.nameEn, locale)}</h2>
-              <p className="text-xs uppercase tracking-wide text-zinc-500 mb-4">{poc.studyTrack}</p>
+              <h2 className="text-xl font-semibold tracking-tight text-vtk-ink">{pick(poc.nameNl, poc.nameEn, locale)}</h2>
+              <p className="mb-4 text-xs uppercase tracking-[0.08em] text-[#5c667f]">{poc.studyTrack}</p>
               {(poc.descriptionNl || poc.descriptionEn) && (
-                <p className="mb-4 text-sm text-zinc-600">
+                <p className="mb-4 text-sm leading-6 text-[#34405e]">
                   {pick(poc.descriptionNl ?? "", poc.descriptionEn ?? "", locale)}
                 </p>
               )}
@@ -46,22 +52,22 @@ export default async function PocsPage({
                   const src = publicUrl(r.user.avatarKey);
                   return (
                     <li key={r.id} className="text-center">
-                      <div className="mx-auto h-20 w-20 overflow-hidden rounded-full bg-zinc-200">
+                      <div className="mx-auto h-20 w-20 overflow-hidden rounded-[16px] border border-vtk-blue/10 bg-[#f2f0e9]">
                         {src ? (
                           <img src={src} alt={r.user.name} className="h-full w-full object-cover" />
                         ) : (
-                          <div className="grid h-full w-full place-items-center text-lg font-semibold text-zinc-400">
+                          <div className="grid h-full w-full place-items-center text-lg font-semibold text-[#5c667f]">
                             {r.user.name.slice(0, 1).toUpperCase()}
                           </div>
                         )}
                       </div>
                       <div className="mt-1 text-sm font-medium">{r.user.name}</div>
                       {(r.roleNl || r.roleEn) && (
-                        <div className="text-xs text-zinc-500">
+                        <div className="text-xs text-[#5c667f]">
                           {pick(r.roleNl ?? "", r.roleEn ?? "", locale)}
                         </div>
                       )}
-                      <a href={`mailto:${r.user.email}`} className="text-xs text-vtk-blue hover:underline">
+                      <a href={`mailto:${r.user.email}`} className="text-xs text-vtk-ink hover:underline">
                         {r.user.email}
                       </a>
                     </li>
@@ -72,6 +78,7 @@ export default async function PocsPage({
           ))}
         </div>
       )}
+      </div>
     </div>
   );
 }

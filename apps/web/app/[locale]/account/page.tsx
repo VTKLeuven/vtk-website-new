@@ -17,8 +17,11 @@ export default async function AccountPage({ params }: { params: Promise<{ locale
   }
 
   return (
-    <div className="mx-auto max-w-2xl px-4 py-12 space-y-6">
-      <h1 className="text-3xl font-bold">{dict.auth.account}</h1>
+    <div className="vtk-page vtk-page-shell vtk-page-narrow space-y-6">
+      <div>
+        <div className="vtk-page-kicker">VTK</div>
+        <h1 className="text-4xl font-semibold tracking-tight text-vtk-ink">{dict.auth.account}</h1>
+      </div>
       <Card className="p-6">
         <form action={onSave} className="space-y-4">
           <div>
@@ -40,7 +43,9 @@ export default async function AccountPage({ params }: { params: Promise<{ locale
         </form>
       </Card>
       <form action={logoutAction}>
-        <Button variant="ghost" type="submit">{dict.auth.signOut}</Button>
+        <Button variant="ghost" type="submit">
+          {dict.auth.signOut}
+        </Button>
       </form>
     </div>
   );

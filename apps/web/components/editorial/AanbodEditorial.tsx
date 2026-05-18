@@ -173,7 +173,7 @@ export async function AanbodEditorial({ locale }: { locale: Locale }) {
             <article className="svc feat">
               <div className="svc-head">
                 <div>
-                  <div className="svc-num">// 001 · Theokot</div>
+                  <div className="svc-num">{"// 001 · Theokot"}</div>
                   <h2>Theokot</h2>
                   <div className="tagline">{locale === "nl" ? "broodjes · koffie · warme snacks" : "sandwiches · coffee · snacks"}</div>
                 </div>
@@ -228,7 +228,7 @@ export async function AanbodEditorial({ locale }: { locale: Locale }) {
             <article className="svc">
               <div className="svc-head">
                 <div>
-                  <div className="svc-num">// 002 · Cursusdienst</div>
+                  <div className="svc-num">{"// 002 · Cursusdienst"}</div>
                   <h2>Cursusdienst</h2>
                   <div className="tagline">{locale === "nl" ? "syllabi · boeken · tweedehands" : "syllabi · books · second-hand"}</div>
                 </div>
@@ -282,7 +282,7 @@ export async function AanbodEditorial({ locale }: { locale: Locale }) {
           <article className="svc">
             <div className="svc-head">
               <div>
-                <div className="svc-num">// 003 · Shiften</div>
+                <div className="svc-num">{"// 003 · Shiften"}</div>
                 <h2>{locale === "nl" ? "Shiftenbureau" : "Shift desk"}</h2>
                 <div className="tagline">{locale === "nl" ? "inschrijven · tijdsloten · events" : "sign-ups · slots · events"}</div>
               </div>
@@ -354,7 +354,7 @@ export async function AanbodEditorial({ locale }: { locale: Locale }) {
           <article className="svc">
             <div className="svc-head">
               <div>
-                <div className="svc-num">// 004 · Tweedehands</div>
+                <div className="svc-num">{"// 004 · Tweedehands"}</div>
                 <h2>Tweedehands</h2>
                 <div className="tagline">{locale === "nl" ? "boeken · markt · ruilbeurs" : "books · market · exchange"}</div>
               </div>
@@ -382,7 +382,8 @@ export async function AanbodEditorial({ locale }: { locale: Locale }) {
           <div className="menu-strip-head">
             <div>
               <div className="label" style={{ marginBottom: 8 }}>
-                // 005 — {locale === "nl" ? "menu · theokot (voorbeeld)" : "menu · theokot (sample)"}
+                {"// 005 — "}
+                {locale === "nl" ? "menu · theokot (voorbeeld)" : "menu · theokot (sample)"}
               </div>
               <h3>{locale === "nl" ? "Broodjes" : "Sandwiches"}</h3>
             </div>
@@ -422,7 +423,8 @@ export async function AanbodEditorial({ locale }: { locale: Locale }) {
         <section className="locations">
           <div className="locations-side">
             <div className="label" style={{ marginBottom: 12 }}>
-              // 006 — {locale === "nl" ? "locatie" : "location"}
+              {"// 006 — "}
+              {locale === "nl" ? "locatie" : "location"}
             </div>
             <h3>
               {locale === "nl" ? (

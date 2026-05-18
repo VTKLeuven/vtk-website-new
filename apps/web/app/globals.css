@@ -14,28 +14,30 @@
 @source "../lib";
 @source "../../../packages/ui/src";
 
-/* Brand: primary #1a1f4a, secondary #ffd400, surfaces white / soft cool gray */
+/* Brand tokens follow design/new-design.html. */
 @theme {
-  --color-vtk-blue: #1a1f4a;
-  --color-vtk-blue-dark: #121635;
-  --color-vtk-blue-light: #2a3366;
-  --color-vtk-blue-soft: #eceef8;
-  --color-vtk-blue-muted: #f4f5fc;
+  --color-vtk-ink: #0a0f1f;
+  --color-vtk-navy: #0e1a36;
+  --color-vtk-blue: #0e1a36;
+  --color-vtk-blue-dark: #0a0f1f;
+  --color-vtk-blue-light: #34405e;
+  --color-vtk-blue-soft: #f2f0e9;
+  --color-vtk-blue-muted: #fafaf7;
 
-  --color-vtk-yellow: #ffd400;
-  --color-vtk-yellow-dark: #e6bf00;
+  --color-vtk-yellow: #ffd23f;
+  --color-vtk-yellow-dark: #edbd22;
 
-  --color-vtk-surface: #f6f7fb;
+  --color-vtk-surface: #fafaf7;
   --color-vtk-surface-elevated: #ffffff;
 
-  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-sans: var(--font-vtk-sans), var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
   --font-mono: var(--font-geist-mono), ui-monospace, monospace;
 }
 
 :root {
-  --background: #f6f7fb;
-  --foreground: #1a1f4a;
-  --vtk-ring: rgba(26, 31, 74, 0.12);
+  --background: #fafaf7;
+  --foreground: #0a0f1f;
+  --vtk-ring: rgba(14, 26, 54, 0.12);
 }
 
 html,
@@ -46,23 +48,24 @@ body {
 body {
   background: var(--background);
   color: var(--foreground);
+  font-family: var(--font-vtk-sans), var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
 }
 
 /* Prose content produced by Tiptap */
 .prose-vtk h1 {
-  @apply text-3xl font-bold mt-6 mb-3 text-vtk-blue;
+  @apply text-3xl font-semibold mt-6 mb-3 text-vtk-ink tracking-tight;
 }
 .prose-vtk h2 {
-  @apply text-2xl font-semibold mt-5 mb-2 text-vtk-blue;
+  @apply text-2xl font-semibold mt-5 mb-2 text-vtk-ink tracking-tight;
 }
 .prose-vtk h3 {
-  @apply text-xl font-semibold mt-4 mb-2 text-vtk-blue;
+  @apply text-xl font-semibold mt-4 mb-2 text-vtk-ink tracking-tight;
 }
 .prose-vtk p {
-  @apply my-3 leading-7 text-zinc-700;
+  @apply my-3 leading-7 text-[#34405e];
 }
 .prose-vtk a {
-  @apply text-vtk-blue font-medium underline underline-offset-2 decoration-vtk-yellow/80 hover:text-vtk-blue-light;
+  @apply text-vtk-navy font-medium underline underline-offset-4 decoration-vtk-yellow/90 hover:text-vtk-ink;
 }
 .prose-vtk ul {
   @apply list-disc pl-6 my-3;
@@ -71,8 +74,8 @@ body {
   @apply list-decimal pl-6 my-3;
 }
 .prose-vtk blockquote {
-  @apply border-l-4 border-vtk-yellow pl-4 italic text-zinc-600 bg-vtk-blue-soft/50 rounded-r-lg py-1;
+  @apply border-l-4 border-vtk-yellow pl-4 italic text-[#34405e] bg-vtk-blue-soft/70 rounded-r-xl py-1;
 }
 .prose-vtk img {
-  @apply rounded-lg my-4 max-w-full h-auto shadow-sm border border-zinc-100;
+  @apply rounded-2xl my-4 max-w-full h-auto shadow-sm border border-vtk-blue/10;
 }

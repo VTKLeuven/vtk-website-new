@@ -24,8 +24,14 @@ export default async function PraesidiumPage({
   });
 
   return (
-    <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8 py-10 space-y-12">
-      <h1 className="text-4xl font-bold">{dict.praesidium.title}</h1>
+    <div className="vtk-page">
+      <header className="vtk-page-head">
+        <div>
+          <div className="vtk-page-kicker">VTK · KU Leuven</div>
+          <h1 className="vtk-page-title">{dict.praesidium.title}</h1>
+        </div>
+      </header>
+      <div className="vtk-page-shell space-y-14">
       {groups
         .filter((g) => g.memberships.length > 0)
         .map((group) => {
@@ -35,25 +41,25 @@ export default async function PraesidiumPage({
           });
           return (
             <section key={group.id}>
-              <h2 className="text-2xl font-semibold mb-4">
+              <h2 className="mb-5 text-2xl font-semibold tracking-tight text-vtk-ink">
                 {pick(group.nameNl, group.nameEn, locale)}
               </h2>
-              <ul className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-5">
+              <ul className="grid grid-cols-2 gap-5 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
                 {sorted.map((m) => {
                   const src = publicUrl(m.user.avatarKey);
                   return (
                     <li key={m.id} className="text-center">
-                      <div className="mx-auto h-28 w-28 overflow-hidden rounded-full bg-zinc-200 ring-2 ring-vtk-yellow/60">
+                      <div className="mx-auto h-28 w-28 overflow-hidden rounded-[20px] border border-vtk-blue/10 bg-[#f2f0e9]">
                         {src ? (
                           <img src={src} alt={m.user.name} className="h-full w-full object-cover" />
                         ) : (
-                          <div className="grid h-full w-full place-items-center text-3xl font-semibold text-zinc-400">
+                          <div className="grid h-full w-full place-items-center text-3xl font-semibold text-[#5c667f]">
                             {m.user.name.slice(0, 1).toUpperCase()}
                           </div>
                         )}
                       </div>
                       <div className="mt-2 text-sm font-medium">{m.user.name}</div>
-                      <div className="text-xs text-zinc-500">
+                      <div className="text-xs text-[#5c667f]">
                         {m.role === "LEAD"
                           ? dict.praesidium.lead
                           : pick(m.titleNl ?? "", m.titleEn ?? "", locale) || dict.praesidium.member}
@@ -65,6 +71,7 @@ export default async function PraesidiumPage({
             </section>
           );
         })}
+      </div>
     </div>
   );
 }

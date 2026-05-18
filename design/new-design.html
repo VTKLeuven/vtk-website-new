@@ -1,0 +1,407 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>VTK — Option A · Refined</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --navy:#0E1A36;
+    --ink:#0A0F1F;
+    --paper:#FAFAF7;
+    --paper-2:#F2F0E9;
+    --line:rgba(14,26,54,.10);
+    --line-2:rgba(14,26,54,.18);
+    --yellow:#FFD23F;
+    --muted:#5C667F;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;background:var(--paper);color:var(--ink);font-family:'Inter',sans-serif;-webkit-font-smoothing:antialiased}
+  a{color:inherit;text-decoration:none}
+  button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
+  .serif{font-family:'Instrument Serif',serif; font-style:italic; font-weight:400;}
+
+  /* ============ NAV ============ */
+  header.nav{
+    position:sticky; top:0; z-index:30;
+    background:rgba(250,250,247,.88); backdrop-filter:blur(12px);
+    border-bottom:1px solid var(--line);
+  }
+  .nav-inner{max-width:1320px; margin:0 auto; padding:18px 36px; display:flex; align-items:center; gap:48px;}
+  .logo{display:flex; align-items:center; gap:10px; font-weight:700; letter-spacing:-.02em; font-size:18px;}
+  .logo-mark{width:34px;height:34px;background:var(--navy); border-radius:8px; display:grid; place-items:center; color:var(--yellow); font-weight:700; font-size:14px;}
+  .nav-links{display:flex; gap:30px; margin-left:8px;}
+  .nav-links a{font-size:14px; color:var(--ink); opacity:.78; transition:opacity .2s}
+  .nav-links a:hover{opacity:1}
+  .nav-actions{margin-left:auto; display:flex; align-items:center; gap:14px; font-size:14px;}
+  .lang{color:var(--muted);}
+  .btn{
+    display:inline-flex; align-items:center; gap:8px; padding:10px 18px;
+    background:var(--ink); color:var(--paper); border-radius:999px; font-size:14px;
+  }
+  .btn .a{transition:transform .2s} .btn:hover .a{transform:translate(2px,-2px)}
+  .btn-ghost{background:transparent; color:var(--ink); border:1px solid var(--line-2);}
+
+  /* ============ HERO ============ */
+  .hero{
+    max-width:1320px; margin:0 auto; padding:88px 36px 72px;
+    display:grid; grid-template-columns: 1.2fr 1fr; gap:64px; align-items:start;
+  }
+  .eyebrow{font-size:13px; color:var(--muted); display:flex; align-items:center; gap:10px;}
+  .eyebrow .dot{width:6px;height:6px;border-radius:50%; background:var(--yellow);}
+  h1{
+    font-family:'Inter',sans-serif; font-weight:600;
+    font-size: clamp(48px, 6.5vw, 92px); letter-spacing:-.035em; line-height:.98;
+    margin:18px 0 0; color:var(--ink);
+  }
+  h1 .serif{ color:var(--navy); }
+  .hero-sub{
+    max-width:46ch; margin:28px 0 0; font-size:17px; line-height:1.55; color:#34405E;
+  }
+  .hero-cta{display:flex; gap:10px; margin-top:32px;}
+  .hero-meta{
+    margin-top:56px; display:flex; gap:48px; padding-top:24px; border-top:1px solid var(--line);
+  }
+  .meta .k{font-size:11px; text-transform:uppercase; letter-spacing:.1em; color:var(--muted);}
+  .meta .v{font-weight:600; font-size:22px; letter-spacing:-.02em; margin-top:6px;}
+
+  /* ============ CALENDAR ============ */
+  .cal{
+    background:#fff; border:1px solid var(--line); border-radius:18px; padding:24px;
+  }
+  .cal-head{display:flex; align-items:center; justify-content:space-between; margin-bottom:8px;}
+  .cal-head h3{margin:0; font-size:16px; font-weight:600; letter-spacing:-.01em;}
+  .cal-head .sub{font-size:12px; color:var(--muted); margin-top:2px;}
+  .cal-head .all{font-size:13px; color:var(--navy); border-bottom:1px solid var(--navy); padding-bottom:1px;}
+
+  .agenda{margin-top:22px; display:flex; flex-direction:column;}
+  .day-group{padding:14px 0; border-top:1px solid var(--line);}
+  .day-group:first-of-type{border-top:0; padding-top:0;}
+  .day-label{
+    display:flex; align-items:baseline; gap:10px; margin-bottom:8px;
+  }
+  .day-label .num{font-weight:600; font-size:20px; letter-spacing:-.02em;}
+  .day-label .dow{font-size:12px; text-transform:uppercase; letter-spacing:.1em; color:var(--muted);}
+  .day-label .today{font-size:11px; padding:2px 8px; background:var(--yellow); color:var(--ink); border-radius:999px; font-weight:600; letter-spacing:.04em;}
+  .ev{
+    display:grid; grid-template-columns: 56px 1fr auto; gap:14px; align-items:center;
+    padding:10px 0; cursor:pointer; transition:transform .15s;
+  }
+  .ev:hover{transform:translateX(2px)}
+  .ev .t{font-size:13px; color:var(--muted); font-variant-numeric:tabular-nums;}
+  .ev .n{font-weight:500; font-size:15px; letter-spacing:-.005em;}
+  .ev .n small{display:block; font-weight:400; color:var(--muted); font-size:12.5px; margin-top:2px;}
+  .ev .arrow{color:var(--muted); transition:color .2s, transform .2s;}
+  .ev:hover .arrow{color:var(--ink); transform:translateX(2px)}
+  .ev.featured .n{font-weight:600;}
+  .ev.featured .t{color:var(--ink);}
+  .pin{display:inline-block; width:6px;height:6px;border-radius:50%;background:var(--yellow); margin-right:6px;vertical-align:middle;}
+
+  /* ============ QUICK LINKS ROW ============ */
+  .quick{
+    max-width:1320px; margin:0 auto 0; padding:0 36px;
+  }
+  .quick-row{
+    border-top:1px solid var(--line); border-bottom:1px solid var(--line);
+    display:grid; grid-template-columns:repeat(6,1fr);
+  }
+  .ql{
+    padding:22px 18px; border-right:1px solid var(--line);
+    display:flex; flex-direction:column; gap:6px; transition:background .2s;
+  }
+  .ql:last-child{border-right:0;}
+  .ql:hover{background:rgba(255,210,63,.12)}
+  .ql .k{font-size:11px; text-transform:uppercase; letter-spacing:.1em; color:var(--muted);}
+  .ql .v{font-weight:600; font-size:16px; letter-spacing:-.01em;}
+  .ql .m{font-size:12px; color:var(--muted);}
+
+  /* ============ SECTION ============ */
+  .section{max-width:1320px; margin:0 auto; padding:120px 36px 0;}
+  .sec-head{
+    display:flex; align-items:end; justify-content:space-between; gap:24px; margin-bottom:36px;
+  }
+  .sec-head h2{
+    font-family:'Inter',sans-serif; font-weight:600; font-size:46px; letter-spacing:-.03em; line-height:1; margin:0;
+  }
+  .sec-head h2 .serif{color:var(--navy)}
+  .sec-head .meta{font-size:13px; color:var(--muted);}
+  .sec-head .meta a{color:var(--ink); border-bottom:1px solid var(--ink);}
+
+  /* aanbod */
+  .aanbod{display:grid; grid-template-columns:repeat(3,1fr); gap:18px;}
+  .acard{
+    background:#fff; border:1px solid var(--line); border-radius:18px; padding:28px;
+    min-height:240px; display:flex; flex-direction:column; justify-content:space-between;
+    transition:transform .2s, border-color .2s;
+  }
+  .acard:hover{transform:translateY(-3px); border-color:var(--line-2);}
+  .acard .tag{font-size:12px; color:var(--muted); display:flex; align-items:center; gap:8px;}
+  .acard h3{font-family:'Inter',sans-serif; font-weight:600; font-size:24px; letter-spacing:-.02em; margin:14px 0 0; line-height:1.1;}
+  .acard p{font-size:14px; color:#34405E; line-height:1.55; margin:10px 0 0;}
+  .acard .cta{font-size:13px; font-weight:500; margin-top:18px; color:var(--ink); display:inline-flex; gap:6px; align-items:center;}
+  .acard .cta::after{content:"→"; transition:transform .2s} .acard:hover .cta::after{transform:translateX(3px)}
+  .acard.feat{background:var(--navy); color:var(--paper); border-color:var(--navy);}
+  .acard.feat p{color:#B7C0DC}
+  .acard.feat .tag{color:var(--yellow)}
+  .acard.feat .cta{color:var(--yellow)}
+
+  /* career */
+  .career{
+    background:var(--paper-2); border-radius:22px; padding:48px;
+    display:grid; grid-template-columns: 1fr 1fr; gap:48px; align-items:start;
+  }
+  .career h3{font-family:'Inter',sans-serif; font-weight:600; font-size:38px; letter-spacing:-.025em; margin:14px 0 0; line-height:1;}
+  .career h3 .serif{color:var(--navy);}
+  .career p{font-size:15px; line-height:1.6; color:#34405E; margin-top:18px; max-width:38ch;}
+  .career .pcount{display:flex; gap:24px; margin-top:24px;}
+  .career .pcount .meta .v{font-size:32px;}
+  .jobs{display:flex; flex-direction:column;}
+  .job{
+    display:grid; grid-template-columns: 1fr auto; gap:14px; align-items:center;
+    padding:16px 0; border-top:1px solid var(--line-2);
+  }
+  .job:first-child{border-top:1px solid var(--line-2);}
+  .job .r{font-weight:500; font-size:15px;}
+  .job .c{font-size:12.5px; color:var(--muted); margin-top:2px;}
+  .job .t{font-size:11px; padding:4px 9px; background:#fff; border:1px solid var(--line-2); border-radius:999px; color:var(--ink);}
+
+  /* footer */
+  footer{
+    margin-top:140px; border-top:1px solid var(--line);
+  }
+  .foot-inner{
+    max-width:1320px; margin:0 auto; padding:48px 36px 32px;
+    display:grid; grid-template-columns: 1.6fr 1fr 1fr 1fr; gap:48px;
+  }
+  .foot-inner h5{font-size:12px; text-transform:uppercase; letter-spacing:.1em; color:var(--muted); margin:0 0 14px;}
+  .foot-inner ul{list-style:none; padding:0; margin:0; display:flex; flex-direction:column; gap:8px;}
+  .foot-inner a{font-size:14px; color:var(--ink); opacity:.82}
+  .foot-inner a:hover{opacity:1}
+  .foot-brand .vt{font-weight:700; font-size:22px; letter-spacing:-.02em;}
+  .foot-brand p{font-size:13px; color:var(--muted); line-height:1.55; margin-top:10px; max-width:32ch;}
+  .foot-bottom{
+    border-top:1px solid var(--line); padding:18px 36px; max-width:1320px; margin:0 auto;
+    display:flex; justify-content:space-between; font-size:12px; color:var(--muted);
+  }
+  .foot-bottom .soc{display:flex; gap:18px;}
+  .foot-bottom a:hover{color:var(--ink)}
+</style>
+</head>
+<body>
+
+<header class="nav">
+  <div class="nav-inner">
+    <a href="#" class="logo"><div class="logo-mark">vtk</div></a>
+    <nav class="nav-links">
+      <a href="#">Aanbod</a>
+      <a href="#">Eerstejaars</a>
+      <a href="#">Career</a>
+      <a href="#">Cursusdienst</a>
+      <a href="#">Internationaal</a>
+      <a href="#">Studies</a>
+      <a href="#">Media</a>
+      <a href="#">Over VTK</a>
+    </nav>
+    <div class="nav-actions">
+      <span class="lang">NL · EN</span>
+      <a href="#" class="btn">Become a member <span class="a">↗</span></a>
+    </div>
+  </div>
+</header>
+
+<!-- HERO -->
+<section class="hero">
+  <div>
+    <div class="eyebrow"><span class="dot"></span> Vlaamse Technische Kring · KU Leuven</div>
+    <h1>The home for <span class="serif">engineers</span><br/>in Leuven.</h1>
+    <p class="hero-sub">Events, courses, careers and a daily broodje. Run by students, since 1920 — for everyone studying engineering &amp; engineering technology.</p>
+    <div class="hero-cta">
+      <a href="#" class="btn">Become a member <span class="a">↗</span></a>
+      <a href="#" class="btn btn-ghost">First-year? Start here</a>
+    </div>
+    <div class="hero-meta">
+      <div class="meta"><div class="k">Members</div><div class="v">2,840+</div></div>
+      <div class="meta"><div class="k">This week</div><div class="v">14 events</div></div>
+      <div class="meta"><div class="k">Since</div><div class="v">1920</div></div>
+    </div>
+  </div>
+
+  <!-- CALENDAR — quiet agenda list -->
+  <aside class="cal">
+    <div class="cal-head">
+      <div>
+        <h3>Upcoming events</h3>
+        <div class="sub">Week 21 · Tuesday 19 → Sunday 24 May</div>
+      </div>
+      <a href="#" class="all">Full calendar</a>
+    </div>
+
+    <div class="agenda">
+      <div class="day-group">
+        <div class="day-label">
+          <span class="num">19</span><span class="dow">Tuesday</span><span class="today">today</span>
+        </div>
+        <div class="ev featured">
+          <div class="t">20:00</div>
+          <div class="n"><span class="pin"></span>TD Quantum — VTK × Industria<small>Albatros · €5 presale · 1,200 going</small></div>
+          <span class="arrow">→</span>
+        </div>
+      </div>
+
+      <div class="day-group">
+        <div class="day-label"><span class="num">20</span><span class="dow">Wednesday</span></div>
+        <div class="ev">
+          <div class="t">12:30</div>
+          <div class="n">Burgie-info session, Year 2<small>Aula De Molen · broodjes included</small></div>
+          <span class="arrow">→</span>
+        </div>
+      </div>
+
+      <div class="day-group">
+        <div class="day-label"><span class="num">21</span><span class="dow">Thursday</span></div>
+        <div class="ev">
+          <div class="t">19:30</div>
+          <div class="n">Doopcantus — Wina &amp; VTK<small>Alma 2 · 4 spots left</small></div>
+          <span class="arrow">→</span>
+        </div>
+      </div>
+
+      <div class="day-group">
+        <div class="day-label"><span class="num">22</span><span class="dow">Friday</span></div>
+        <div class="ev">
+          <div class="t">18:00</div>
+          <div class="n">Galabal ticket drop + apéro<small>'t Elixir</small></div>
+          <span class="arrow">→</span>
+        </div>
+      </div>
+    </div>
+  </aside>
+</section>
+
+<!-- QUICK LINKS — single row, no bento -->
+<section class="quick">
+  <div class="quick-row">
+    <a class="ql" href="#"><span class="k">Eat</span><span class="v">Theokot</span><span class="m">Open · 11:30–14:00</span></a>
+    <a class="ql" href="#"><span class="k">Books</span><span class="v">Cursusdienst</span><span class="m">14 new this week</span></a>
+    <a class="ql" href="#"><span class="k">Second-hand</span><span class="v">Tweedehands</span><span class="m">Buy &amp; sell</span></a>
+    <a class="ql" href="#"><span class="k">Work</span><span class="v">Shiften</span><span class="m">3 shifts open</span></a>
+    <a class="ql" href="#"><span class="k">Reserve</span><span class="v">Tijdsloten</span><span class="m">Study rooms</span></a>
+    <a class="ql" href="#"><span class="k">Calendar</span><span class="v">Kalender</span><span class="m">All events</span></a>
+  </div>
+</section>
+
+<!-- AANBOD -->
+<section class="section">
+  <div class="sec-head">
+    <h2>What we <span class="serif">do</span>.</h2>
+    <div class="meta">Six verticals — <a href="#">see all</a></div>
+  </div>
+  <div class="aanbod">
+    <a class="acard feat" href="#">
+      <div>
+        <div class="tag">→ Social</div>
+        <h3>Cantussen, TDs &amp; the Galabal.</h3>
+        <p>Two galabals a year, fifteen cantussen, and one very loud TD per month.</p>
+      </div>
+      <div class="cta">Browse social</div>
+    </a>
+    <a class="acard" href="#">
+      <div>
+        <div class="tag">→ Career</div>
+        <h3>From desk to job.</h3>
+        <p>Career fair, mock interviews, CV reviews and a live jobs board.</p>
+      </div>
+      <div class="cta">Career hub</div>
+    </a>
+    <a class="acard" href="#">
+      <div>
+        <div class="tag">→ Studies</div>
+        <h3>Cursusdienst &amp; study help.</h3>
+        <p>Course books at student prices and peer-to-peer study sessions.</p>
+      </div>
+      <div class="cta">Browse books</div>
+    </a>
+    <a class="acard" href="#">
+      <div>
+        <div class="tag">→ Sport &amp; travel</div>
+        <h3>Sportdag, skireis, kayak.</h3>
+        <p>One ski trip, one summer trip, and a sport day where someone always pulls a muscle.</p>
+      </div>
+      <div class="cta">Schedule</div>
+    </a>
+    <a class="acard" href="#">
+      <div>
+        <div class="tag">→ International</div>
+        <h3>Exchange &amp; buddies.</h3>
+        <p>For incoming exchange students and engineers looking to leave.</p>
+      </div>
+      <div class="cta">For internationals</div>
+    </a>
+    <a class="acard" href="#">
+      <div>
+        <div class="tag">→ Eerstejaars</div>
+        <h3>Doop, peters, first-week kit.</h3>
+        <p>Everything you need to survive your first semester. Most of it, anyway.</p>
+      </div>
+      <div class="cta">Start here</div>
+    </a>
+  </div>
+</section>
+
+<!-- CAREER -->
+<section class="section">
+  <div class="sec-head">
+    <h2>Career, <span class="serif">honestly</span>.</h2>
+    <div class="meta">84 partner companies</div>
+  </div>
+  <div class="career">
+    <div>
+      <div class="eyebrow"><span class="dot"></span> VTK Career</div>
+      <h3>Meet the companies before the recruiters do.</h3>
+      <p>Every spring, 84 employers in tech, energy and consulting move into Aula Pieter De Somer for the VTK Career Fair. The rest of the year we run mock interviews, CV reviews and a job board used by 2,000+ students.</p>
+      <div class="pcount">
+        <div class="meta"><div class="k">Partners</div><div class="v">84</div></div>
+        <div class="meta"><div class="k">Open roles</div><div class="v">126</div></div>
+        <div class="meta"><div class="k">Fair attendees</div><div class="v">3.4k</div></div>
+      </div>
+    </div>
+    <div class="jobs">
+      <div class="job"><div><div class="r">Junior Embedded Engineer</div><div class="c">Materialise · Leuven</div></div><div class="t">Internship</div></div>
+      <div class="job"><div><div class="r">Quant Analyst — Summer 2026</div><div class="c">IMC Trading · Amsterdam</div></div><div class="t">Full-time</div></div>
+      <div class="job"><div><div class="r">ML Research Intern</div><div class="c">ASML · Veldhoven</div></div><div class="t">Internship</div></div>
+      <div class="job"><div><div class="r">Process Engineer</div><div class="c">Argenx · Gent</div></div><div class="t">Graduate</div></div>
+      <div class="job"><div><div class="r">Strategy Consultant</div><div class="c">Bain &amp; Co. · Brussels</div></div><div class="t">Graduate</div></div>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="foot-inner">
+    <div class="foot-brand">
+      <div class="logo"><div class="logo-mark">vtk</div><span class="vt">VTK</span></div>
+      <p>Vlaamse Technische Kring · the engineering student association of KU Leuven. Since 1920.</p>
+    </div>
+    <div>
+      <h5>Aanbod</h5>
+      <ul><li><a href="#">Cantussen</a></li><li><a href="#">Galabal</a></li><li><a href="#">Sport &amp; reis</a></li><li><a href="#">Cultuur</a></li></ul>
+    </div>
+    <div>
+      <h5>Praktisch</h5>
+      <ul><li><a href="#">Cursusdienst</a></li><li><a href="#">Theokot</a></li><li><a href="#">Tweedehands</a></li><li><a href="#">Shiften</a></li></ul>
+    </div>
+    <div>
+      <h5>Over</h5>
+      <ul><li><a href="#">Praesidium</a></li><li><a href="#">Contact</a></li><li><a href="#">Pers</a></li></ul>
+    </div>
+  </div>
+  <div class="foot-bottom">
+    <div>© 1920–2026 · VTK vzw · Heverlee</div>
+    <div class="soc"><a href="#">Instagram</a><a href="#">LinkedIn</a><a href="#">YouTube</a><a href="#">Spotify</a></div>
+  </div>
+</footer>
+
+</body>
+</html>

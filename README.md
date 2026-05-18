@@ -278,7 +278,8 @@ This brings up:
 During image **build**, the `web` Dockerfile runs `prisma generate` and
 `next build`. At **container start**, the default command runs
 `prisma migrate deploy` (applies migrations under `packages/db/prisma/migrations`)
-and then starts Next.js. It does **not** run `db:push` or `db:seed` automatically.
+then `packages/db/prisma/seed.ts`, and then starts Next.js. The seed is
+idempotent, so redeploys refresh prototype content safely.
 
 ### 5. First-time database init (once, on the server)
 
@@ -294,12 +295,13 @@ docker compose -f infra/docker-compose.yml exec web \
 ```
 
 Use **`migrate deploy`** in production (not `db push`) so the database matches
-versioned migrations. For a **greenfield** DB, starting `web` once may already
-run `migrate deploy` via the container CMD; the explicit `exec` above is safe
-and idempotent.
+versioned migrations. For a **greenfield** DB, starting `web` once now already
+runs both `migrate deploy` and the seed via the container CMD; the explicit
+`exec` commands above are safe and idempotent if you want to rerun them.
 
 The seed is idempotent — groups, header tabs, permissions, partners, calendar
-placeholder rows, homepage defaults, etc. With **`SEED_ADMIN_EMAIL`** and
+placeholder rows, prototype users, POCs, CMS pages, albums, homepage defaults,
+etc. With **`SEED_ADMIN_EMAIL`** and
 **`SEED_ADMIN_PASSWORD`** in repo-root `.env`, the seed upserts a superadmin and
 refreshes their password hash on repeat runs. **Recreate `web`** after changing
 those variables (`docker compose … up -d --force-recreate web`). The seed logs
@@ -311,11 +313,9 @@ means they are missing inside the container (see env_file / recreate above).
 ```bash
 git pull
 docker compose -f infra/docker-compose.yml up -d --build web logistiek
-
-# If the schema changed:
-docker compose -f infra/docker-compose.yml exec web \
-  sh -c "cd /app && npx prisma migrate deploy --schema packages/db/prisma/schema.prisma"
 ```
+
+The rebuilt `web` container runs migrations and the idempotent seed on startup.
 
 ### 7. Backups
 

@@ -1,18 +1,18 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono, JetBrains_Mono, Space_Grotesk } from "next/font/google";
+import { Geist, Geist_Mono, Instrument_Serif, Inter } from "next/font/google";
 import "./globals.css";
 
 const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
 const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"] });
-const vtkSans = Space_Grotesk({
+const vtkSans = Inter({
   variable: "--font-vtk-sans",
   subsets: ["latin"],
-  weight: ["400", "500", "600"],
 });
-const vtkMono = JetBrains_Mono({
-  variable: "--font-vtk-mono",
+const vtkSerif = Instrument_Serif({
+  variable: "--font-vtk-serif",
   subsets: ["latin"],
-  weight: ["400", "500"],
+  weight: ["400"],
+  style: ["normal", "italic"],
 });
 
 export const metadata: Metadata = {
@@ -25,9 +25,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html
       lang="nl"
-      className={`${geistSans.variable} ${geistMono.variable} ${vtkSans.variable} ${vtkMono.variable} h-full antialiased`}
+      className={`${geistSans.variable} ${geistMono.variable} ${vtkSans.variable} ${vtkSerif.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col bg-vtk-surface text-vtk-blue antialiased selection:bg-vtk-yellow/40 selection:text-vtk-blue">
+      <body className="min-h-full flex flex-col bg-vtk-surface text-vtk-ink antialiased selection:bg-vtk-yellow/40 selection:text-vtk-ink">
         {children}
       </body>
     </html>
