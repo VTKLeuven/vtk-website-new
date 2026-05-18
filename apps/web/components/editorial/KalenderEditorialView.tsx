@@ -73,6 +73,7 @@ export function KalenderEditorialView({
     views: { agenda: string; month: string; list: string };
   };
 }) {
+  const base = locale === "nl" ? "" : "/en";
   const now = new Date();
   const [cursor, setCursor] = useState(() => new Date(now.getFullYear(), now.getMonth(), 1));
   const [filter, setFilter] = useState("all");
@@ -197,6 +198,10 @@ export function KalenderEditorialView({
     setCursor(new Date(year, month + delta, 1));
   }
 
+  function eventHref(e: ApiEvent) {
+    return `${base}/kalender/${e.id}`;
+  }
+
   const showGrid = view === "month";
 
   return (
@@ -292,17 +297,12 @@ export function KalenderEditorialView({
                   {show.map((e) => {
                     const pc = pillClass(e.extendedProps.groupCode);
                     return (
-                      <a
-                        key={e.id}
-                        href={e.url ?? undefined}
-                        className={`ev-pill${pc ? ` ${pc}` : ""}`}
-                        onClick={(ev) => {
-                          if (!e.url) ev.preventDefault();
-                        }}
-                      >
+                      <a key={e.id} href={eventHref(e)} className={`ev-pill${pc ? ` ${pc}` : ""}`}>
                         <b>{pickTitle(e)}</b>
-                        {eventTime(e)}
-                        {e.location ? ` · ${e.location}` : ""}
+                        <span>
+                          {eventTime(e)}
+                          {e.location ? ` · ${e.location}` : ""}
+                        </span>
                       </a>
                     );
                   })}
@@ -367,17 +367,17 @@ export function KalenderEditorialView({
                   </li>
                 </ul>
 
-                <div style={{ marginTop: 32, paddingTop: 24, borderTop: "1px solid var(--rule)" }}>
-                  <h3 style={{ fontSize: 18 }}>{labels.subscribeTitle}</h3>
+                <div className="subscribe-box">
+                  <h3>{labels.subscribeTitle}</h3>
                   <div className="sub">{labels.subscribeSub}</div>
-                  <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                    <span className="btn btn-ghost arrow" style={{ justifyContent: "space-between" }}>
+                  <div className="subscribe-actions">
+                    <span className="btn btn-ghost arrow">
                       {labels.ical}
                     </span>
-                    <span className="btn btn-ghost arrow" style={{ justifyContent: "space-between" }}>
+                    <span className="btn btn-ghost arrow">
                       {labels.google}
                     </span>
-                    <span className="btn btn-ghost arrow" style={{ justifyContent: "space-between" }}>
+                    <span className="btn btn-ghost arrow">
                       {labels.outlook}
                     </span>
                   </div>
@@ -386,26 +386,9 @@ export function KalenderEditorialView({
             )}
 
             <div>
-              <div
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "baseline",
-                  marginBottom: 20,
-                }}
-              >
-                <h2 style={{ fontSize: 32, letterSpacing: "-0.02em", fontWeight: 500 }}>{labels.agendaNext}</h2>
-                <div
-                  style={{
-                    fontFamily: "var(--mono)",
-                    fontSize: "11px",
-                    letterSpacing: "0.06em",
-                    textTransform: "uppercase",
-                    color: "var(--muted)",
-                  }}
-                >
-                  {labels.agendaSub}
-                </div>
+              <div className="agenda-head">
+                <h2>{labels.agendaNext}</h2>
+                <div>{labels.agendaSub}</div>
               </div>
               <div className="agenda-list">
                 {(view === "list" ? agendaEvents : agendaEvents.slice(0, 8)).map((e) => {
@@ -453,14 +436,10 @@ export function KalenderEditorialView({
                       <div className="ag-go">→</div>
                     </>
                   );
-                  return e.url ? (
-                    <a key={e.id} href={e.url} className="ag-row">
+                  return (
+                    <a key={e.id} href={eventHref(e)} className="ag-row">
                       {row}
                     </a>
-                  ) : (
-                    <article key={e.id} className="ag-row">
-                      {row}
-                    </article>
                   );
                 })}
               </div>

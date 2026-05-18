@@ -481,3 +481,335 @@
   padding-left: 18px;
   padding-right: 18px;
 }
+
+/* Calendar new-design cleanup */
+.vtk-design .kal-wrap {
+  padding-top: 36px;
+}
+
+.vtk-design .toolbar {
+  grid-template-columns: auto minmax(220px, 1fr) auto auto;
+  gap: 14px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  box-shadow: none;
+}
+
+.vtk-design .toolbar .nav-mo {
+  font-family: var(--sans);
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.vtk-design .toolbar .nav-mo button {
+  border-color: var(--line-2);
+  border-radius: 999px;
+  background: #fff;
+}
+
+.vtk-design .toolbar .mo-label {
+  font-size: clamp(20px, 2.4vw, 30px);
+  font-weight: 600;
+}
+
+.vtk-design .toolbar .mo-label small {
+  font-family: var(--sans);
+  font-size: 13px;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.vtk-design .filters,
+.vtk-design .view-switch {
+  gap: 6px;
+}
+
+.vtk-design .filter,
+.vtk-design .view-switch button {
+  border: 1px solid var(--line-2);
+  border-radius: 999px;
+  background: #fff;
+  color: var(--ink);
+  font-family: var(--sans);
+  font-size: 13px;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.vtk-design .view-switch {
+  border: 0;
+}
+
+.vtk-design .view-switch button {
+  border-right: 1px solid var(--line-2);
+}
+
+.vtk-design .cal {
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 22px;
+  background: #fff;
+}
+
+.vtk-design .cal-header > div {
+  padding: 12px 14px;
+  background: var(--paper-2);
+  font-family: var(--sans);
+  font-size: 13px;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.vtk-design .cal-cell {
+  min-width: 0;
+  min-height: 132px;
+  padding: 12px;
+  border-color: var(--line);
+  gap: 7px;
+}
+
+.vtk-design .cal-cell .num {
+  font-family: var(--sans);
+  font-size: 13px;
+  letter-spacing: 0;
+}
+
+.vtk-design .cal-cell.today .num {
+  border-radius: 999px;
+  background: var(--yellow);
+}
+
+.vtk-design .ev-pill {
+  display: block;
+  min-width: 0;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-left: 4px solid var(--navy);
+  border-radius: 12px;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--sans);
+  font-size: 12px;
+  letter-spacing: 0;
+  line-height: 1.25;
+  text-transform: none;
+}
+
+.vtk-design .ev-pill b,
+.vtk-design .ev-pill span {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.vtk-design .ev-pill b {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.vtk-design .ev-pill span {
+  margin-top: 2px;
+  color: var(--muted);
+}
+
+.vtk-design .ev-pill:hover {
+  border-color: var(--line-2);
+  background: #fff;
+  color: var(--ink);
+}
+
+.vtk-design .ev-pill.gala {
+  border-left-color: var(--yellow);
+  background: #fff7cf;
+}
+
+.vtk-design .ev-pill.career {
+  border-left-color: #4b6fd6;
+  background: #eef2ff;
+}
+
+.vtk-design .ev-pill.service {
+  border-left-color: #5d9c59;
+  background: #eef8ea;
+}
+
+.vtk-design .ev-pill.more {
+  border: 1px dashed var(--line-2);
+  background: #fff;
+  color: var(--muted);
+}
+
+.vtk-design .agenda {
+  grid-template-columns: minmax(260px, 0.9fr) minmax(0, 2.4fr);
+  gap: 28px;
+}
+
+.vtk-design .agenda-side {
+  padding: 24px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: #fff;
+}
+
+.vtk-design .agenda-side h3 {
+  font-size: 26px;
+  font-weight: 600;
+}
+
+.vtk-design .agenda-side .sub {
+  margin-bottom: 18px;
+  font-family: var(--sans);
+  font-size: 13px;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.vtk-design .agenda-side-list {
+  gap: 0;
+  border-radius: 0;
+  font-family: var(--sans);
+  font-size: 14px;
+}
+
+.vtk-design .agenda-side-list li {
+  align-items: center;
+  padding: 12px 0;
+  letter-spacing: 0;
+}
+
+.vtk-design .agenda-side-list li .sw {
+  border-radius: 999px;
+}
+
+.vtk-design .subscribe-box {
+  margin-top: 32px;
+  padding-top: 24px;
+  border-top: 1px solid var(--line);
+}
+
+.vtk-design .subscribe-box h3 {
+  font-size: 20px;
+}
+
+.vtk-design .subscribe-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.vtk-design .subscribe-actions .btn {
+  justify-content: space-between;
+  background: #fff;
+}
+
+.vtk-design .agenda-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 18px;
+  margin-bottom: 20px;
+}
+
+.vtk-design .agenda-head h2 {
+  font-size: clamp(30px, 4vw, 46px);
+  font-weight: 600;
+  letter-spacing: -0.025em;
+}
+
+.vtk-design .agenda-head div {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.vtk-design .agenda-list {
+  border-top: 0;
+}
+
+.vtk-design .ag-row {
+  grid-template-columns: 96px minmax(180px, 1.1fr) minmax(160px, 1fr) auto auto;
+  gap: 22px;
+  align-items: center;
+  margin-bottom: 14px;
+  padding: 22px 24px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: #fff;
+}
+
+.vtk-design .ag-row:hover {
+  padding: 22px 24px;
+  border-color: var(--line-2);
+  background: #fff;
+  transform: translateY(-1px);
+}
+
+.vtk-design .ag-date,
+.vtk-design .ag-title small,
+.vtk-design .ag-tag,
+.vtk-design .ag-go {
+  font-family: var(--sans);
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.vtk-design .ag-date b {
+  font-size: 34px;
+  font-weight: 600;
+}
+
+.vtk-design .ag-title {
+  font-size: clamp(20px, 2.4vw, 30px);
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+.vtk-design .ag-tag {
+  padding: 6px 12px;
+  border-color: var(--line-2);
+  border-radius: 999px;
+  font-size: 12px;
+}
+
+.vtk-design .ag-go {
+  display: grid;
+  width: 34px;
+  height: 34px;
+  place-items: center;
+  border: 1px solid var(--line-2);
+  border-radius: 999px;
+}
+
+@media (max-width: 960px) {
+  .vtk-design .toolbar,
+  .vtk-design .agenda,
+  .vtk-design .ag-row {
+    grid-template-columns: 1fr;
+  }
+
+  .vtk-design .agenda-head {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}
+
+@media (max-width: 720px) {
+  .vtk-design .cal {
+    display: block;
+    border-radius: 18px;
+  }
+
+  .vtk-design .cal-header {
+    display: none;
+  }
+
+  .vtk-design .cal-cell {
+    min-height: auto;
+    border-right: 0;
+  }
+
+  .vtk-design .cal-cell.out:empty {
+    display: none;
+  }
+}

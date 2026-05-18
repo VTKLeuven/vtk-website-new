@@ -310,12 +310,12 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
                         <span className="arrow">→</span>
                       </>
                     );
-                    return event.url ? (
-                      <a key={event.id} href={event.url} className={`ev${groupIndex === 0 && eventIndex === 0 ? " featured" : ""}`}>
-                        {content}
-                      </a>
-                    ) : (
-                      <Link key={event.id} href={`${base}/kalender`} className={`ev${groupIndex === 0 && eventIndex === 0 ? " featured" : ""}`}>
+                    return (
+                      <Link
+                        key={event.id}
+                        href={`${base}/kalender/${event.id}`}
+                        className={`ev${groupIndex === 0 && eventIndex === 0 ? " featured" : ""}`}
+                      >
                         {content}
                       </Link>
                     );

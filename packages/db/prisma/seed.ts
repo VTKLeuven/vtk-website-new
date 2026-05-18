@@ -443,6 +443,57 @@ async function main() {
   console.log("Seeding prototype CMS pages...");
   const pageSeeds = [
     {
+      headerCode: "AANBOD",
+      slug: "theokot",
+      titleNl: "Theokot",
+      titleEn: "Theokot",
+      excerptNl: "Broodjes, koffie en snelle campuslunch in de VTK-kelder.",
+      excerptEn: "Sandwiches, coffee and quick campus lunch in the VTK basement.",
+      order: 0,
+      contentNl: richText([
+        "Theokot is de dagelijkse stop voor broodjes, koffie en snelle snacks op Arenberg.",
+        "In deze prototypeversie staan de openingsuren centraal op de homepage. Het definitieve menu en praktische details kunnen later via het CMS aangevuld worden.",
+      ]),
+      contentEn: richText([
+        "Theokot is the daily stop for sandwiches, coffee and quick snacks on Arenberg.",
+        "In this prototype, opening hours are highlighted on the homepage. The final menu and practical details can be filled in through the CMS later.",
+      ]),
+    },
+    {
+      headerCode: "AANBOD",
+      slug: "shiften",
+      titleNl: "Shiften",
+      titleEn: "Shifts",
+      excerptNl: "Help mee achter de schermen bij VTK-diensten en events.",
+      excerptEn: "Help behind the scenes at VTK services and events.",
+      order: 1,
+      contentNl: richText([
+        "Vrijwilligers houden Theokot, events en praktische werkingen draaiende.",
+        "Voor het prototype verwijzen we naar het aparte shiftenplatform. Later kan deze pagina de belangrijkste uitleg, voorwaarden en contactinfo tonen.",
+      ]),
+      contentEn: richText([
+        "Volunteers keep Theokot, events and practical services running.",
+        "For the prototype, this page points towards the separate shifts platform. Later, it can contain the main explanation, conditions and contact details.",
+      ]),
+    },
+    {
+      headerCode: "AANBOD",
+      slug: "reservaties-en-logistiek",
+      titleNl: "Reservaties en logistiek",
+      titleEn: "Reservations and logistics",
+      excerptNl: "Praktische ondersteuning, materiaal en logistieke aanvragen.",
+      excerptEn: "Practical support, materials and logistics requests.",
+      order: 2,
+      contentNl: richText([
+        "VTK ondersteunt werkgroepen met materiaal, lokalen, transport en praktische voorbereiding.",
+        "Deze prototypepagina toont hoe het aanbod als gewone CMS-categorie kan groeien zonder aparte layout.",
+      ]),
+      contentEn: richText([
+        "VTK supports work groups with materials, rooms, transport and practical preparation.",
+        "This prototype page shows how the offer section can grow as a normal CMS category without a separate layout.",
+      ]),
+    },
+    {
       headerCode: "EERSTEJAARS",
       slug: "startweek",
       titleNl: "Startweek voor eerstejaars",
@@ -659,6 +710,8 @@ async function main() {
     end: string;
     url: string;
     groupCode: GroupCode;
+    descriptionNl?: string;
+    descriptionEn?: string;
   }> = [
     {
       titleNl: "Theokot lunch deluxe",
@@ -668,6 +721,8 @@ async function main() {
       end: "2026-05-19T14:00:00+02:00",
       url: "https://vtk.be/nl/aanbod",
       groupCode: "THEOKOT",
+      descriptionNl: "Een extra uitgebreide lunchshift met broodjes, koffie en warme snacks in de VTK-kelder.",
+      descriptionEn: "An extended lunch shift with sandwiches, coffee and warm snacks in the VTK basement.",
     },
     {
       titleNl: "VTK × Industria TD Quantum",
@@ -677,6 +732,8 @@ async function main() {
       end: "2026-05-20T03:00:00+02:00",
       url: "https://vtk.be/nl/kalender",
       groupCode: "ACTIVITEITEN",
+      descriptionNl: "Een gezamenlijke TD van VTK en Industria. Verwacht stevige muziek, een late avond en praktische updates via de organiserende kring.",
+      descriptionEn: "A joint TD by VTK and Industria. Expect a loud night, a late finish and practical updates through the organising association.",
     },
     {
       titleNl: "Burgie-info sessie jaar 2",
@@ -686,6 +743,8 @@ async function main() {
       end: "2026-05-20T14:00:00+02:00",
       url: "https://vtk.be/nl/studies",
       groupCode: "ONDERWIJS",
+      descriptionNl: "Infosessie voor tweedejaars burgies over keuzes, trajecten en praktische vragen rond het vervolg van je opleiding.",
+      descriptionEn: "Information session for second-year engineering students about choices, tracks and practical study questions.",
     },
     {
       titleNl: "Doopcantus Wina × VTK",
@@ -695,6 +754,8 @@ async function main() {
       end: "2026-05-22T01:00:00+02:00",
       url: "https://vtk.be/nl/kalender",
       groupCode: "CULTUUR",
+      descriptionNl: "Een cantus samen met Wina. De definitieve praktische info, inschrijvingen en prijzen worden later aangevuld.",
+      descriptionEn: "A cantus together with Wina. Final practical information, registration and pricing will be added later.",
     },
     {
       titleNl: "Galabal ticket drop + apero",
@@ -704,6 +765,8 @@ async function main() {
       end: "2026-05-22T21:00:00+02:00",
       url: "https://vtk.be/nl/kalender",
       groupCode: "GROEP5",
+      descriptionNl: "Ticketmoment voor het galabal met een apero in 't Elixir. Ideaal om praktisch af te spreken met je tafelgenoten.",
+      descriptionEn: "Ticket moment for the gala with an apero at 't Elixir. A good moment to coordinate with your table group.",
     },
     {
       titleNl: "International buddy night",
@@ -713,6 +776,8 @@ async function main() {
       end: "2026-05-26T22:00:00+02:00",
       url: "https://vtk.be/en/internationaal",
       groupCode: "INTERNATIONAAL",
+      descriptionNl: "Een laagdrempelige buddy night voor internationale studenten en Leuvense studenten die nieuwe mensen willen leren kennen.",
+      descriptionEn: "An accessible buddy night for international students and Leuven students who want to meet new people.",
     },
     {
       titleNl: "CV review evening",
@@ -722,6 +787,8 @@ async function main() {
       end: "2026-05-28T21:30:00+02:00",
       url: "https://vtk.be/nl/career",
       groupCode: "BEDRIJVENRELATIES",
+      descriptionNl: "Laat je CV nalezen en krijg concrete feedback voor stages, thesisgesprekken en eerste sollicitaties.",
+      descriptionEn: "Get your CV reviewed and receive concrete feedback for internships, thesis interviews and first applications.",
     },
     {
       titleNl: "Sportdag Arenberg",
@@ -731,6 +798,8 @@ async function main() {
       end: "2026-06-03T18:00:00+02:00",
       url: "https://vtk.be/nl/kalender",
       groupCode: "SPORT",
+      descriptionNl: "Een sportieve namiddag op Arenberg met teams, losse deelnemers en activiteiten voor verschillende niveaus.",
+      descriptionEn: "A sporty afternoon on Arenberg with teams, individual participants and activities for different levels.",
     },
     {
       titleNl: "Logistiek: busje onboarding",
@@ -740,6 +809,8 @@ async function main() {
       end: "2026-06-05T18:30:00+02:00",
       url: "https://logistiek.vtk.be",
       groupCode: "LOGISTIEK",
+      descriptionNl: "Onboarding voor logistieke vrijwilligers rond materiaal, busjes en praktische afspraken.",
+      descriptionEn: "Onboarding for logistics volunteers about materials, vans and practical agreements.",
     },
     {
       titleNl: "Blokbar kickoff",
@@ -749,6 +820,8 @@ async function main() {
       end: "2026-06-09T01:00:00+02:00",
       url: "https://vtk.be/nl/kalender",
       groupCode: "FAKBAR",
+      descriptionNl: "Startmoment voor de blokbar met praktische info over openingsuren, shiften en sfeer tijdens de examenperiode.",
+      descriptionEn: "Kickoff for the study bar with practical information about hours, shifts and atmosphere during exams.",
     },
     {
       titleNl: "AflsuitBBQ",
@@ -758,6 +831,8 @@ async function main() {
       end:   "2026-04-20T22:00:00+02:00",
       url: "https://vtk.be/nl/calendar/view/20_04_2026_18_00_00_aflsuitbbq/",
       groupCode: "ACTIVITEITEN",
+      descriptionNl: "Een afsluitende barbecue om het semester samen buiten af te ronden.",
+      descriptionEn: "A closing barbecue to wrap up the semester outside together.",
     },
     {
       titleNl: "Croquantus",
@@ -767,6 +842,8 @@ async function main() {
       end:   "2026-04-23T01:00:00+02:00",
       url: "https://vtk.be/nl/calendar/view/22_04_2026_20_30_00_croquantus/",
       groupCode: "CULTUUR",
+      descriptionNl: "Een cantusavond op de Waaiberg. Praktische info wordt door de organiserende ploeg bevestigd.",
+      descriptionEn: "A cantus evening at Waaiberg. Practical details are confirmed by the organising team.",
     },
     {
       titleNl: "Cantus V",
@@ -776,6 +853,8 @@ async function main() {
       end:   "2026-04-24T01:00:00+02:00",
       url: "https://vtk.be/nl/calendar/view/23_04_2026_20_00_00_cantus-v/",
       groupCode: "INTERNATIONAAL",
+      descriptionNl: "Cantus V op de Waaiberg met prototype-inhoud voor de eventdetailpagina.",
+      descriptionEn: "Cantus V at Waaiberg with prototype content for the event detail page.",
     },
     {
       titleNl: "Rewind Cantus",
@@ -785,6 +864,8 @@ async function main() {
       end:   "2026-04-29T01:00:00+02:00",
       url: "https://vtk.be/nl/calendar/view/28_04_2026_20_30_00_rewind-cantus/",
       groupCode: "CULTUUR",
+      descriptionNl: "Een rewind-cantus met prototypebeschrijving voor het nieuwe calendardesign.",
+      descriptionEn: "A rewind cantus with prototype copy for the new calendar design.",
     },
   ];
   for (const e of eventSeeds) {
@@ -802,6 +883,8 @@ async function main() {
       start,
       end,
       url: e.url,
+      descriptionNl: e.descriptionNl,
+      descriptionEn: e.descriptionEn,
       visibility: "PUBLIC" as const,
       groupId: group.id,
     };
