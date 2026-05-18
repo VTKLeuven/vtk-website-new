@@ -1,0 +1,127 @@
+.vtk-event-head {
+  padding-top: clamp(32px, 5vw, 56px);
+  padding-bottom: clamp(24px, 4vw, 36px);
+  grid-template-columns: minmax(0, 1fr) minmax(260px, 360px);
+  align-items: end;
+}
+
+.vtk-event-head .vtk-page-kicker {
+  margin-bottom: 12px;
+}
+
+.vtk-event-head .vtk-page-title {
+  max-width: 860px;
+  font-size: clamp(38px, 5.5vw, 72px);
+}
+
+.vtk-event-head .vtk-page-subtitle {
+  margin-top: 12px;
+  font-size: 16px;
+}
+
+.vtk-event-meta {
+  display: grid;
+  gap: 12px;
+}
+
+.vtk-event-meta div {
+  padding: 14px 16px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: #fff;
+}
+
+.vtk-event-meta span {
+  display: block;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.vtk-event-meta b {
+  display: block;
+  margin-top: 3px;
+  color: var(--ink);
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.vtk-event-layout {
+  max-width: var(--max);
+  margin: 0 auto;
+  padding: clamp(32px, 4.5vw, 56px) clamp(20px, 3vw, 36px) clamp(72px, 8vw, 112px);
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(340px, 0.85fr);
+  gap: clamp(20px, 3vw, 34px);
+  align-items: start;
+}
+
+.vtk-event-photo {
+  position: relative;
+  min-height: 360px;
+  aspect-ratio: 16 / 10;
+  margin: 0;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 22px;
+  background: var(--paper-2);
+}
+
+.vtk-event-photo-img {
+  object-fit: cover;
+}
+
+.vtk-event-info {
+  padding: clamp(24px, 3vw, 32px);
+}
+
+.vtk-event-info h2 {
+  margin: 0 0 12px;
+  color: var(--ink);
+  font-size: clamp(24px, 3vw, 34px);
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+.vtk-event-info p {
+  margin: 0;
+  color: var(--body);
+  font-size: 15px;
+  line-height: 1.7;
+}
+
+.vtk-event-info .spec {
+  margin-top: 26px;
+}
+
+.vtk-event-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 30px;
+}
+
+@media (max-width: 960px) {
+  .vtk-event-head,
+  .vtk-event-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .vtk-event-meta {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .vtk-event-photo {
+    min-height: 260px;
+  }
+}
+
+@media (max-width: 640px) {
+  .vtk-event-meta {
+    grid-template-columns: 1fr;
+  }
+
+  .vtk-event-photo {
+    min-height: 220px;
+    aspect-ratio: 4 / 3;
+  }
+}

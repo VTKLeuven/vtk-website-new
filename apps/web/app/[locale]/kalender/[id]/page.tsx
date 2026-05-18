@@ -1,8 +1,11 @@
 import Link from "next/link";
+import Image from "next/image";
 import { notFound } from "next/navigation";
 import { prisma } from "@vtk/db";
 import { pick, type Locale } from "@vtk/i18n";
 import { hasLocale } from "@/lib/locale";
+
+import "@/app/design/vtk-event.css";
 
 function formatDateRange(start: Date, end: Date, locale: Locale, allDay: boolean) {
   const dateLocale = locale === "nl" ? "nl-BE" : "en-GB";
@@ -39,10 +42,11 @@ export default async function EventPage({
   const title = pick(event.titleNl, event.titleEn, locale);
   const description = pick(event.descriptionNl ?? "", event.descriptionEn ?? "", locale);
   const groupName = pick(event.group.nameNl, event.group.nameEn, locale);
+  const imageSrc = "/default-event.jpg";
 
   return (
     <article className="vtk-page">
-      <header className="vtk-page-head">
+      <header className="vtk-page-head vtk-event-head">
         <div>
           <div className="vtk-page-kicker">
             <Link href={`${base}/kalender`} className="vtk-link">
@@ -53,30 +57,41 @@ export default async function EventPage({
           <h1 className="vtk-page-title">{title}</h1>
           <p className="vtk-page-subtitle">{formatDateRange(event.start, event.end, locale, event.allDay)}</p>
         </div>
-        <div className="page-head-meta">
-          {locale === "nl" ? "Groep" : "Group"}
-          <br />
-          <b>{groupName}</b>
-          <br />
-          <br />
-          {locale === "nl" ? "Locatie" : "Location"}
-          <br />
-          <b>{event.location ?? (locale === "nl" ? "Nog te bevestigen" : "To be confirmed")}</b>
+        <div className="vtk-event-meta">
+          <div>
+            <span>{locale === "nl" ? "Groep" : "Group"}</span>
+            <b>{groupName}</b>
+          </div>
+          <div>
+            <span>{locale === "nl" ? "Locatie" : "Location"}</span>
+            <b>{event.location ?? (locale === "nl" ? "Nog te bevestigen" : "To be confirmed")}</b>
+          </div>
         </div>
       </header>
 
-      <div className="vtk-page-shell vtk-page-narrow">
-        <section className="vtk-panel p-6">
-          <h2 className="mb-3 text-xl font-semibold tracking-tight text-vtk-ink">
+      <div className="vtk-event-layout">
+        <figure className="vtk-event-photo">
+          <Image
+            src={imageSrc}
+            alt=""
+            fill
+            sizes="(max-width: 960px) 100vw, 58vw"
+            className="vtk-event-photo-img"
+            priority
+          />
+        </figure>
+
+        <section className="vtk-panel vtk-event-info">
+          <h2>
             {locale === "nl" ? "Over dit event" : "About this event"}
           </h2>
-          <p className="leading-7 text-[#34405e]">
+          <p>
             {description ||
               (locale === "nl"
                 ? "Meer details worden later aangevuld door de organiserende werkgroep."
                 : "More details will be added later by the organising work group.")}
           </p>
-          <dl className="spec mt-6">
+          <dl className="spec">
             <dt>{locale === "nl" ? "Start" : "Start"}</dt>
             <dd>{event.start.toLocaleString(locale === "nl" ? "nl-BE" : "en-GB")}</dd>
             <dt>{locale === "nl" ? "Einde" : "End"}</dt>
@@ -84,7 +99,7 @@ export default async function EventPage({
             <dt>{locale === "nl" ? "Zichtbaarheid" : "Visibility"}</dt>
             <dd>{locale === "nl" ? "Publiek" : "Public"}</dd>
           </dl>
-          <div className="mt-8 flex flex-wrap gap-3">
+          <div className="vtk-event-actions">
             <Link href={`${base}/kalender`} className="btn btn-ghost">
               ← {locale === "nl" ? "Terug naar kalender" : "Back to calendar"}
             </Link>
