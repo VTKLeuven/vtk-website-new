@@ -936,6 +936,21 @@ async function main() {
     );
   }
 
+  console.log("Seeding global dashboard tiles...");
+  const dashboardTiles = [
+    { id: "seed-tile-wiki", label: "Praesidium Wiki", url: "https://praesidium.wiki.vtk.be", icon: "book", color: "navy", order: 0 },
+    { id: "seed-tile-burgieclan", label: "Burgieclan", url: "https://burgieclan.vtk.be", icon: "users", color: "blue", order: 1 },
+    { id: "seed-tile-drive", label: "Google Drive", url: "https://drive.google.com", icon: "cloud", color: "green", order: 2 },
+    { id: "seed-tile-tickets", label: "Tickets", url: "https://tickets.vtk.be", icon: "ticket", color: "yellow", order: 3 },
+  ] as const;
+  for (const t of dashboardTiles) {
+    await prisma.dashboardTile.upsert({
+      where: { id: t.id },
+      update: { label: t.label, url: t.url, icon: t.icon, color: t.color, order: t.order, scope: "GLOBAL" },
+      create: { id: t.id, label: t.label, url: t.url, icon: t.icon, color: t.color, order: t.order, scope: "GLOBAL" },
+    });
+  }
+
   console.log("Seed complete.");
 }
 

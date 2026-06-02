@@ -53,6 +53,12 @@ enum EventVisibility {
   MEMBERS
 }
 
+enum DashboardTileScope {
+  GLOBAL
+  GROUP
+  USER
+}
+
 // -----------------------------------------------------------------------------
 // Users, groups, permissions
 // -----------------------------------------------------------------------------
@@ -74,6 +80,8 @@ model User {
   pocRepresentative PocRepresentative[]
   createdPages     Page[]              @relation("PageCreatedBy")
   createdEvents    CalendarEvent[]     @relation("EventCreatedBy")
+  dashboardTiles   DashboardTile[]
+  dashboardTilePrefs UserDashboardTilePref[]
 }
 
 model Group {
@@ -90,6 +98,7 @@ model Group {
   memberships        GroupMembership[]
   permissions        GroupPermission[]
   events             CalendarEvent[]
+  dashboardTiles     DashboardTile[]
 }
 
 model GroupMembership {
@@ -321,4 +330,49 @@ model Setting {
   key        String   @id
   value      Json
   updatedAt  DateTime @updatedAt
+}
+
+// -----------------------------------------------------------------------------
+// Admin dashboard tiles (configurable launchpad links)
+// -----------------------------------------------------------------------------
+
+model DashboardTile {
+  id        String             @id @default(cuid())
+  label     String
+  url       String
+  icon      String             @default("link") // key into curated icon set
+  color     String             @default("navy") // key into color palette
+  scope     DashboardTileScope
+  groupId   String?            // set when scope = GROUP
+  userId    String?            // set when scope = USER (personal tile)
+  order     Int                @default(0)
+  createdAt DateTime           @default(now())
+  updatedAt DateTime           @updatedAt
+
+  group     Group?                  @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  user      User?                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  prefs     UserDashboardTilePref[]
+
+  @@index([scope])
+  @@index([groupId])
+  @@index([userId])
+}
+
+// Per-user override of a shared (GLOBAL/GROUP) tile: hide it, reorder it, or
+// override its display fields. Personal (USER) tiles are edited directly.
+model UserDashboardTilePref {
+  userId String
+  tileId String
+  hidden Boolean @default(false)
+  order  Int?
+  label  String? // null = inherit from the default tile
+  url    String?
+  icon   String?
+  color  String?
+
+  user   User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tile   DashboardTile @relation(fields: [tileId], references: [id], onDelete: Cascade)
+
+  @@id([userId, tileId])
+  @@index([userId])
 }

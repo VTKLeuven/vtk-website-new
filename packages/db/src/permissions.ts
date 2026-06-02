@@ -31,6 +31,9 @@ export const PERMISSIONS = [
   // Homepage
   { code: "home.edit", labelNl: "Homepagina bewerken", labelEn: "Edit homepage", category: "general" },
 
+  // Dashboard tiles
+  { code: "dashboard.manage", labelNl: "Dashboardtegels beheren", labelEn: "Manage dashboard tiles", category: "general" },
+
   // Module access flags (gate submodules via group permissions)
   { code: "modules.logistiek.access", labelNl: "Toegang tot Logistiek module", labelEn: "Access to Logistics module", category: "modules" },
   { code: "modules.cursusdienst.access", labelNl: "Toegang tot Cursusdienst module", labelEn: "Access to Course Shop module", category: "modules" },

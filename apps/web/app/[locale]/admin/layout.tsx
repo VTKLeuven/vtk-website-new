@@ -17,6 +17,7 @@ const sections = [
   { key: "users", href: "/gebruikers", perm: "users.view" },
   { key: "groups", href: "/groepen", perm: "groups.manage" },
   { key: "home", href: "/home", perm: "home.edit" },
+  { key: "dashboardTiles", href: "/dashboard-tiles", perm: "dashboard.manage" },
 ] as const;
 
 type DictAdmin = ReturnType<typeof getDictionary>["admin"];
