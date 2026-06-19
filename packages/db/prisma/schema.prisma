@@ -65,18 +65,21 @@ enum DashboardTileScope {
 
 model User {
   id               String              @id @default(cuid())
-  email            String              @unique
   name             String
-  passwordHash     String
+  email            String              @unique
+  emailVerified Boolean                @default(false)
   avatarKey        String?
+  image         String?
+
   locale           Locale              @default(NL)
   active           Boolean             @default(true)
   isSuperAdmin     Boolean             @default(false)
+  sessions         Session[]
+  accounts      Account[]
   createdAt        DateTime            @default(now())
   updatedAt        DateTime            @updatedAt
 
   memberships      GroupMembership[]
-  sessions         Session[]
   pocRepresentative PocRepresentative[]
   createdPages     Page[]              @relation("PageCreatedBy")
   createdEvents    CalendarEvent[]     @relation("EventCreatedBy")
@@ -136,20 +139,6 @@ model GroupPermission {
   permission    Permission  @relation(fields: [permissionId], references: [id], onDelete: Cascade)
 
   @@id([groupId, permissionId])
-}
-
-model Session {
-  token     String   @id
-  userId    String
-  expiresAt DateTime
-  userAgent String?
-  ip        String?
-  createdAt DateTime @default(now())
-
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([userId])
-  @@index([expiresAt])
 }
 
 // -----------------------------------------------------------------------------
@@ -375,4 +364,56 @@ model UserDashboardTilePref {
 
   @@id([userId, tileId])
   @@index([userId])
+}
+
+// -----------------------------------------------------------------------------
+// better-auth specific tables
+// -----------------------------------------------------------------------------
+
+model Session {
+  id        String   @id
+  token     String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  ipAddress String?
+  userAgent String?
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([token])
+  @@index([userId])
+  @@map("session")
+}
+
+model Account {
+  id                    String    @id
+  accountId             String
+  providerId            String
+  userId                String
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  accessToken           String?
+  refreshToken          String?
+  idToken               String?
+  accessTokenExpiresAt  DateTime?
+  refreshTokenExpiresAt DateTime?
+  scope                 String?
+  password              String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  @@index([userId])
+  @@map("account")
+}
+
+model Verification {
+  id         String   @id
+  identifier String
+  value      String
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([identifier])
+  @@map("verification")
 }
