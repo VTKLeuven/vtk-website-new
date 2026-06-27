@@ -1,12 +1,22 @@
-export const SESSION_COOKIE_NAME = "vtk_session";
-export const SESSION_DURATION_MS = 1000 * 60 * 60 * 24 * 30; // 30 days
+/**
+ * @author Witse Panneels
+ * @date 2026-06-25
+ *
+ * auth types and basic helper functions
+ * Safe to use in browser and server components :))
+ */
+import type { NextRequest } from "next/server";
+
+/** */
+export type Locale = "NL" | "EN";
+export type AuthGroupRole = "MEMBER" | "LEAD";
 
 export type AuthUser = {
   id: string;
   email: string;
   name: string;
   avatarKey: string | null;
-  locale: "NL" | "EN";
+  locale: Locale;
   isSuperAdmin: boolean;
 };
 
@@ -16,9 +26,16 @@ export type AuthGroup = {
   slug: string;
   nameNl: string;
   nameEn: string;
-  role: "MEMBER" | "LEAD";
+  role: AuthGroupRole;
 };
 
+// ==============================
+// Sessions
+// ==============================
+
+/** Legacy compatibility, prefer not to use anymore
+ * @deprecated
+ */
 export type SessionPayload = {
   token: string;
   expiresAt: string;
@@ -27,10 +44,13 @@ export type SessionPayload = {
   permissions: string[];
 };
 
+/** Legacy compatibility, prefer not to use anymore
+ * @deprecated
+ */
 export function hasPermission(
   session: SessionPayload | null | undefined,
   code: string,
-  options?: { groupId?: string }
+  options?: { groupId?: string },
 ): boolean {
   if (!session) return false;
   if (session.user.isSuperAdmin) return true;
@@ -41,14 +61,76 @@ export function hasPermission(
   return true;
 }
 
+/** Legacy compatibility, prefer not to use anymore
+ * @deprecated
+ */
+export function hasAnyPermission(
+  session: SessionPayload | null | undefined,
+  permissions: string[],
+): boolean {
+  return permissions.some((permission) => hasPermission(session, permission));
+}
+
+/** Legacy compatibility, prefer not to use anymore
+ * @deprecated
+ */
+export function hasAllPermissions(
+  session: SessionPayload | null | undefined,
+  permissions: string[],
+): boolean {
+  return permissions.every((permission) => hasPermission(session, permission));
+}
+
+/** Legacy compatibility, prefer not to use anymore
+ * @deprecated
+ */
 export function isMemberOfGroup(
   session: SessionPayload | null | undefined,
-  groupCode: string
+  groupCode: string,
 ): boolean {
   if (!session) return false;
   return session.groups.some((g) => g.code === groupCode);
 }
 
-export function cookieDomain(): string | undefined {
-  return process.env.SESSION_COOKIE_DOMAIN || undefined;
+// ==============================
+// Error types
+// ==============================
+
+export type AuthErrorCode =
+  | "UNAUTHENTICATED"
+  | "FORBIDDEN"
+  | "INACTIVE_USER"
+  | "INVALID_INPUT"
+  | "REMOTE_AUTH_UNAVAILABLE";
+
+export class AuthError extends Error {
+  constructor(
+    public readonly code: AuthErrorCode,
+    message = code,
+  ) {
+    super(message);
+    this.name = "AuthError";
+  }
 }
+
+// ==============================
+// Api endpoints
+// ==============================
+export type RouteContext = {
+  params: Promise<{
+    all?: string[];
+  }>;
+};
+
+export type RouteHandler = (
+  request: NextRequest,
+  context: RouteContext,
+) => Promise<Response> | Response;
+
+export type ApiHandlers = {
+  GET: RouteHandler;
+  POST: RouteHandler;
+  PATCH: RouteHandler;
+  PUT: RouteHandler;
+  DELETE: RouteHandler;
+};
