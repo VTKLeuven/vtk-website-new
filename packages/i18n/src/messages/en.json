@@ -35,7 +35,8 @@
     "linkLinkedIn": "LinkedIn",
     "linkShifts": "Shifts",
     "linkSlots": "Time slots",
-    "mutedSoon": "(soon)"
+    "mutedSoon": "(soon)",
+    "linkPrivacy": "Privacy"
   },
   "home": {
     "welcome": "Welcome to VTK",
@@ -87,7 +88,8 @@
     "changePassword": "Change password",
     "currentPassword": "Current password",
     "newPassword": "New password",
-    "saved": "Saved"
+    "saved": "Saved",
+    "signInWithKul": "Sign in with KU Leuven"
   },
   "admin": {
     "title": "Admin",
@@ -114,5 +116,68 @@
     "loading": "Loading...",
     "yes": "Yes",
     "no": "No"
+  },
+  "info": {
+    "kicker": "VTK · KU Leuven",
+    "title": "About the member portal",
+    "lead": "The member portal is the part of the VTK website where members and board members sign in to manage the website and internal tools.",
+    "sections": [
+      {
+        "heading": "What is VTK?",
+        "body": "VTK, in full Vlaamse Technische Kring, is the student association of the Faculty of Engineering Science at KU Leuven. We have existed since 1920 and organise study, cultural, sports and social activities for the students of civil engineering and civil engineering-architecture."
+      },
+      {
+        "heading": "What does the member portal do?",
+        "body": "Through the member portal, authorised members manage parts of the website such as the calendar, photo albums, pages, partners and users. Regular visitors do not need this portal: the public website stays freely accessible without signing in."
+      },
+      {
+        "heading": "Signing in with your KU Leuven account",
+        "body": "You can sign in with your KU Leuven account through the central login service of the Associatie KU Leuven. VTK only receives your name and your verified email address to link you to your existing VTK account. Your password is never shared with VTK."
+      },
+      {
+        "heading": "Contact",
+        "body": "Do you have questions about the member portal or your account? Contact us at ict@vtk.be."
+      }
+    ]
+  },
+  "privacy": {
+    "kicker": "VTK · KU Leuven",
+    "title": "Member portal privacy statement",
+    "lead": "This statement explains which personal data VTK processes when you sign in to the member portal, and why.",
+    "updated": "Last updated on 27 June 2026.",
+    "sections": [
+      {
+        "heading": "Who is responsible?",
+        "body": "VTK, Vlaamse Technische Kring, Kasteelpark Arenberg 1, 3001 Heverlee, Belgium. For questions about your data, contact ict@vtk.be."
+      },
+      {
+        "heading": "Which data do we process?",
+        "body": "When you use the member portal, we process:\n• your name and email address\n• your language preference and optionally your profile picture\n• your memberships and the permissions attached to them\n• technical sign-in data such as the time of sign-in, your IP address and your browser type, to secure your session"
+      },
+      {
+        "heading": "Why do we process this data?",
+        "body": "We use this data to authenticate you, to give you access to the right parts of the portal and to protect the security of your account. We do not process your data for advertising and we do not sell it."
+      },
+      {
+        "heading": "Signing in with your KU Leuven account",
+        "body": "When you sign in with your KU Leuven account, the login service of the Associatie KU Leuven shares your name and your verified email address with VTK. We use that email address to link you to your existing VTK account. VTK does not receive your password."
+      },
+      {
+        "heading": "How long do we keep your data?",
+        "body": "Sign-in sessions expire automatically after at most 30 days. We keep your account data for as long as you are a member or contributor of VTK. After that it is deleted or anonymised, unless we are legally required to keep it longer."
+      },
+      {
+        "heading": "Who do we share your data with?",
+        "body": "We only share your data with parties needed to run the service, such as the KU Leuven login service and our hosting provider, who act as processors. We do not share your data with third parties for commercial purposes."
+      },
+      {
+        "heading": "Your rights",
+        "body": "You have the right to access, correct or delete your data, and to object to its processing. To exercise these rights, send a message to ict@vtk.be. You can also file a complaint with the Belgian Data Protection Authority."
+      },
+      {
+        "heading": "Changes to this statement",
+        "body": "We may update this privacy statement when the service changes. The date at the top shows when we last updated the text."
+      }
+    ]
   }
 }

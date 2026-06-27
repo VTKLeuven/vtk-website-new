@@ -6,12 +6,17 @@
  */
 import { betterAuth } from "better-auth";
 import { prismaAdapter } from "better-auth/adapters/prisma";
+import { genericOAuth } from "better-auth/plugins";
+import { APIError } from "better-auth/api";
 import { prisma } from "@vtk/db";
 import { nextCookies } from "better-auth/next-js";
 
 import { hashPassword, verifyPassword } from "./logins/password";
+import { kulOAuthConfig, KUL_PROVIDER_ID } from "./logins/kul";
 
 const isProduction = process.env.NODE_ENV === "production";
+
+const kulConfig = kulOAuthConfig();
 
 export const auth = betterAuth({
   appName: "VTK",
@@ -26,7 +31,12 @@ export const auth = betterAuth({
     provider: "postgresql",
   }),
 
-  plugins: [nextCookies()], // nextCookies must be last import
+  // nextCookies must stay last. The KU Leuven OIDC provider is only registered
+  // when its env vars are present (see logins/kul.ts).
+  plugins: [
+    ...(kulConfig ? [genericOAuth({ config: [kulConfig] })] : []),
+    nextCookies(),
+  ],
 
   emailAndPassword: {
     enabled: true,
@@ -34,6 +44,50 @@ export const auth = betterAuth({
     password: {
       hash: hashPassword,
       verify: verifyPassword,
+    },
+  },
+
+  // KU Leuven OIDC returns verified emails, so link a KUL login to the
+  // pre-provisioned User that already owns that email instead of erroring on a
+  // duplicate. Creation of brand-new users is blocked below — membership is
+  // provisioned out-of-band, not self-served via SSO.
+  account: {
+    accountLinking: {
+      enabled: true,
+      trustedProviders: [KUL_PROVIDER_ID],
+    },
+  },
+
+  databaseHooks: {
+    user: {
+      // better-auth only creates users for SSO sign-ups (email/password signup
+      // is disabled). Admin-created users go through prisma.user.create
+      // directly and never hit this hook. So a create here means an unknown KUL
+      // identity tried to self-provision — reject it.
+      create: {
+        before: async () => {
+          throw new APIError("FORBIDDEN", {
+            message:
+              "No VTK account is linked to this KU Leuven identity. Contact the board to be added.",
+          });
+        },
+      },
+    },
+    session: {
+      // Mirror the `active` gate the password flow enforces in loginAction, so
+      // deactivated members cannot obtain a session via SSO either.
+      create: {
+        before: async (session) => {
+          const user = await prisma.user.findUnique({
+            where: { id: session.userId },
+            select: { active: true },
+          });
+          if (!user?.active) {
+            throw new APIError("FORBIDDEN", { message: "INACTIVE_USER" });
+          }
+          return { data: session };
+        },
+      },
     },
   },
 

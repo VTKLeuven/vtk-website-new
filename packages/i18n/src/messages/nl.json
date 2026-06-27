@@ -35,7 +35,8 @@
     "linkLinkedIn": "LinkedIn",
     "linkShifts": "Shiften",
     "linkSlots": "Tijdsloten",
-    "mutedSoon": "(binnenkort)"
+    "mutedSoon": "(binnenkort)",
+    "linkPrivacy": "Privacy"
   },
   "home": {
     "welcome": "Welkom bij VTK",
@@ -87,7 +88,8 @@
     "changePassword": "Wachtwoord wijzigen",
     "currentPassword": "Huidig wachtwoord",
     "newPassword": "Nieuw wachtwoord",
-    "saved": "Opgeslagen"
+    "saved": "Opgeslagen",
+    "signInWithKul": "Inloggen met KU Leuven"
   },
   "admin": {
     "title": "Admin",
@@ -114,5 +116,68 @@
     "loading": "Laden...",
     "yes": "Ja",
     "no": "Nee"
+  },
+  "info": {
+    "kicker": "VTK · KU Leuven",
+    "title": "Over het ledenportaal",
+    "lead": "Het ledenportaal is het deel van de VTK-website waar leden en praesidiumleden zich aanmelden om de website en interne tools te beheren.",
+    "sections": [
+      {
+        "heading": "Wat is VTK?",
+        "body": "VTK, voluit Vlaamse Technische Kring, is de studentenvereniging van de faculteit Ingenieurswetenschappen aan de KU Leuven. We bestaan sinds 1920 en organiseren activiteiten op vlak van studie, cultuur, sport en ontspanning voor de studenten burgerlijk ingenieur en burgerlijk ingenieur-architect."
+      },
+      {
+        "heading": "Wat doet het ledenportaal?",
+        "body": "Via het ledenportaal beheren bevoegde leden onderdelen van de website, zoals de kalender, foto-albums, pagina's, partners en gebruikers. Gewone bezoekers hebben dit portaal niet nodig: de publieke website blijft vrij toegankelijk zonder aanmelden."
+      },
+      {
+        "heading": "Aanmelden met je KU Leuven account",
+        "body": "Je kan je aanmelden met je KU Leuven account via de centrale aanmelddienst van de Associatie KU Leuven. VTK ontvangt daarbij enkel je naam en je geverifieerde e-mailadres om je te koppelen aan je bestaande VTK-account. Je wachtwoord wordt nooit met VTK gedeeld."
+      },
+      {
+        "heading": "Contact",
+        "body": "Heb je vragen over het ledenportaal of over je account? Neem contact op via ict@vtk.be."
+      }
+    ]
+  },
+  "privacy": {
+    "kicker": "VTK · KU Leuven",
+    "title": "Privacyverklaring ledenportaal",
+    "lead": "Deze verklaring legt uit welke persoonsgegevens VTK verwerkt wanneer je je aanmeldt op het ledenportaal, en waarom.",
+    "updated": "Laatst bijgewerkt op 27 juni 2026.",
+    "sections": [
+      {
+        "heading": "Wie is verantwoordelijk?",
+        "body": "VTK, Vlaamse Technische Kring, Kasteelpark Arenberg 1, 3001 Heverlee, België. Voor vragen over je gegevens kan je terecht bij ict@vtk.be."
+      },
+      {
+        "heading": "Welke gegevens verwerken we?",
+        "body": "Wanneer je het ledenportaal gebruikt, verwerken we:\n• je naam en e-mailadres\n• je taalvoorkeur en eventueel je profielfoto\n• je lidmaatschappen en de rechten die daaraan verbonden zijn\n• technische aanmeldgegevens zoals het tijdstip van aanmelden, je IP-adres en je browsertype, om je sessie te beveiligen"
+      },
+      {
+        "heading": "Waarom verwerken we deze gegevens?",
+        "body": "We gebruiken deze gegevens om je te authenticeren, om je toegang te geven tot de juiste onderdelen van het portaal en om de beveiliging van je account te bewaken. We verwerken je gegevens niet voor reclame en we verkopen ze niet."
+      },
+      {
+        "heading": "Aanmelden met je KU Leuven account",
+        "body": "Als je je aanmeldt met je KU Leuven account, deelt de aanmelddienst van de Associatie KU Leuven je naam en je geverifieerde e-mailadres met VTK. We gebruiken dat e-mailadres om je te koppelen aan je bestaande VTK-account. VTK ontvangt je wachtwoord niet."
+      },
+      {
+        "heading": "Hoelang bewaren we je gegevens?",
+        "body": "Aanmeldsessies verlopen automatisch na uiterlijk 30 dagen. Je accountgegevens bewaren we zolang je lid of medewerker van VTK bent. Daarna worden ze verwijderd of geanonimiseerd, tenzij we ze wettelijk langer moeten bijhouden."
+      },
+      {
+        "heading": "Met wie delen we je gegevens?",
+        "body": "We delen je gegevens enkel met partijen die nodig zijn om de dienst te laten werken, zoals de aanmelddienst van de KU Leuven en onze hostingleverancier, die optreden als verwerker. We delen je gegevens niet met derden voor commerciële doeleinden."
+      },
+      {
+        "heading": "Je rechten",
+        "body": "Je hebt het recht om je gegevens in te kijken, te laten verbeteren of te laten verwijderen, en om bezwaar te maken tegen de verwerking. Stuur hiervoor een bericht naar ict@vtk.be. Je kan ook klacht indienen bij de Gegevensbeschermingsautoriteit."
+      },
+      {
+        "heading": "Wijzigingen aan deze verklaring",
+        "body": "We kunnen deze privacyverklaring aanpassen wanneer de dienst verandert. De datum bovenaan geeft aan wanneer we de tekst laatst hebben bijgewerkt."
+      }
+    ]
   }
 }

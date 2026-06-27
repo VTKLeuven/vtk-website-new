@@ -104,6 +104,7 @@ export async function Footer({ locale }: { locale: Locale }) {
           <span>
             © {new Date().getFullYear()} — {f.copyright}
           </span>
+          <Link href={`${base}/privacy`}>{f.linkPrivacy}</Link>
         </div>
       </div>
     </footer>
