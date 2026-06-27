@@ -10,12 +10,28 @@
  * !do not import these into a client component!
  */
 import 'server-only';
-import { prisma } from '@vtk/db';
-import type { SessionPayload } from './index';
 import { auth } from './auth';
 
-export { auth } from './auth'; // kind of would like not to have to do this...
 export { hashPassword } from './logins/password';
 export { ApiHandler } from './apiHandlers/apiHandler';
 export { getSession } from './server/session';
 export { createUser, updateUser, setUserPassword, deleteUser } from './server/users';
+
+export async function signInEmail(
+  headers: Headers,
+  body: {
+    email: string;
+    password: string;
+  }
+) {
+  return auth.api.signInEmail({
+    headers,
+    body,
+  });
+}
+
+export async function signOut(headers: Headers) {
+  return auth.api.signOut({
+    headers,
+  });
+}

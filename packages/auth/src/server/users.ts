@@ -9,7 +9,6 @@ import { prisma } from '@vtk/db';
 import type { Locale, SessionPayload } from '..';
 import { hasPermission, AuthError } from '..';
 import { hashPassword } from '../logins/password';
-import { auth, Auth } from '../auth';
 
 type CreateUserInput = {
   email: string;
@@ -40,7 +39,7 @@ function normalizeEmail(email: string): string {
 }
 
 export async function createUser(actor: SessionPayload, input: CreateUserInput): Promise<User> {
-  assertCan(actor, 'users.create');
+  assertCan(actor, 'users.edit');
 
   const passwordHash = await hashPassword(input.password);
 
@@ -110,7 +109,7 @@ export async function setUserPassword(
   });
 }
 export async function deleteUser(actor: SessionPayload, userId: string): Promise<void> {
-  assertCan(actor, 'users.delete');
+  assertCan(actor, 'users.edit');
   await prisma.$transaction(async (tx) => {
     await tx.account.deleteMany({ where: { userId } });
     await tx.session.deleteMany({ where: { userId } });
