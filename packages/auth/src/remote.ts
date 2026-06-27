@@ -15,9 +15,8 @@ import { type SessionPayload } from './index';
  * Used by submodule apps to verify a session against the main site.
  * It forwards the cookie and expects a JSON SessionPayload back.
  * */
-export async function fetchRemoteSession(
-  cookieHeader: string | null | undefined
-): Promise<SessionPayload | null> {
+export async function fetchSession(headers: Headers): Promise<SessionPayload | null> {
+  const cookieHeader = headers.get('cookie');
   const mainUrl = process.env.VTK_MAIN_URL || 'https://vtk.be';
 
   if (!cookieHeader) return null;

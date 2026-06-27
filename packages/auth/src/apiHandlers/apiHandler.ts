@@ -11,7 +11,7 @@
 import 'server-only';
 import { auth } from '../auth';
 import { toNextJsHandler } from 'better-auth/next-js';
-import { getSession } from '../server';
+import { getSession } from '../server/session';
 import { NextResponse, type NextRequest } from 'next/server';
 import { RouteContext, RouteHandler, ApiHandlers } from '../index';
 import { notFound, notFoundHandlers, methodNotAllowed } from './basicHandlers';

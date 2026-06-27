@@ -1,11 +1,12 @@
-import Link from "next/link";
-import { getSession } from "@/lib/session";
-import { isMemberOfGroup } from "@vtk/auth";
+import Link from 'next/link';
+import { fetchSession } from '@vtk/auth/remote';
+import { headers } from 'next/headers';
+import { isMemberOfGroup } from '@vtk/auth';
 
-const MAIN_URL = process.env.VTK_MAIN_URL || "https://vtk.be";
+const MAIN_URL = process.env.VTK_MAIN_URL || 'https://vtk.be';
 
 export default async function LogistiekHome() {
-  const session = await getSession();
+  const session = await fetchSession(await headers());
 
   if (!session) {
     return (
@@ -29,7 +30,7 @@ export default async function LogistiekHome() {
     );
   }
 
-  const allowed = session.user.isSuperAdmin || isMemberOfGroup(session, "Logistiek");
+  const allowed = session.user.isSuperAdmin || isMemberOfGroup(session, 'Logistiek');
   if (!allowed) {
     return (
       <main className="mx-auto grid min-h-screen w-full max-w-5xl place-items-center px-5 py-12">
@@ -39,8 +40,8 @@ export default async function LogistiekHome() {
           </div>
           <h1 className="text-4xl font-semibold tracking-[-0.03em] text-vtk-ink">VTK Logistiek</h1>
           <p className="mt-4 leading-7 text-[#34405e]">
-            Je account heeft geen toegang tot deze module. Neem contact op met
-            Logistiek als je denkt dat dit een vergissing is.
+            Je account heeft geen toegang tot deze module. Neem contact op met Logistiek als je
+            denkt dat dit een vergissing is.
           </p>
         </section>
       </main>
@@ -65,11 +66,13 @@ export default async function LogistiekHome() {
         <div className="mb-3 h-2 w-2 rounded-full bg-vtk-yellow" aria-hidden />
         <h2 className="text-2xl font-semibold tracking-tight text-vtk-ink">Planning van ritten</h2>
         <p className="mt-2 max-w-2xl leading-7 text-[#34405e]">
-          Deze submodule is een startpunt. Implementeer hier het reserveren van
-          het busje, het plannen van ritten en het opvolgen van materiaal.
+          Deze submodule is een startpunt. Implementeer hier het reserveren van het busje, het
+          plannen van ritten en het opvolgen van materiaal.
         </p>
         <ul className="mt-5 grid gap-3 text-sm text-[#34405e]">
-          <li>Sessie wordt gedeeld via <code>.vtk.be</code> cookie</li>
+          <li>
+            Sessie wordt gedeeld via <code>.vtk.be</code> cookie
+          </li>
           <li>Toegang beperkt tot groep &quot;Logistiek&quot; of superadmins</li>
           <li>Geschreven met hetzelfde techstack als het hoofdportaal</li>
         </ul>

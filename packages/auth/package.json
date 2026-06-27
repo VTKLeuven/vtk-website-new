@@ -8,8 +8,7 @@
     ".": "./src/index.ts",
     "./server": "./src/server.ts",
     "./remote": "./src/remote.ts",
-    "./client": "./src/client.ts",
-    "./remoteClient": "./src/remoteClient.ts"
+    "./client": "./src/client.ts"
   },
   "dependencies": {
     "@node-rs/argon2": "^2.0.2",

@@ -2,14 +2,14 @@
  * @author Witse Panneels
  * @date 2026-06-25
  */
-import "server-only";
+import 'server-only';
 
-import type { Prisma, User } from "@prisma/client";
-import { prisma } from "@vtk/db";
-import type { Locale, SessionPayload } from ".";
-import { hasPermission, AuthError } from ".";
-import { hashPassword } from "./logins/password";
-import { auth, Auth } from "./auth";
+import type { Prisma, User } from '@prisma/client';
+import { prisma } from '@vtk/db';
+import type { Locale, SessionPayload } from '..';
+import { hasPermission, AuthError } from '..';
+import { hashPassword } from '../logins/password';
+import { auth, Auth } from '../auth';
 
 type CreateUserInput = {
   email: string;
@@ -31,7 +31,7 @@ type UpdateUserInput = {
 
 function assertCan(actor: SessionPayload, permission: string): void {
   if (!hasPermission(actor, permission)) {
-    throw new AuthError("FORBIDDEN");
+    throw new AuthError('FORBIDDEN');
   }
 }
 
@@ -39,11 +39,8 @@ function normalizeEmail(email: string): string {
   return email.trim().toLowerCase();
 }
 
-export async function createUser(
-  actor: SessionPayload,
-  input: CreateUserInput,
-): Promise<User> {
-  assertCan(actor, "users.create");
+export async function createUser(actor: SessionPayload, input: CreateUserInput): Promise<User> {
+  assertCan(actor, 'users.create');
 
   const passwordHash = await hashPassword(input.password);
 
@@ -63,7 +60,7 @@ export async function createUser(
       data: {
         id: `credential:${user.id}`,
         accountId: user.id,
-        providerId: "credential",
+        providerId: 'credential',
         userId: user.id,
         password: passwordHash,
       },
@@ -76,18 +73,16 @@ export async function createUser(
 export async function updateUser(
   actor: SessionPayload,
   userId: string,
-  input: UpdateUserInput,
+  input: UpdateUserInput
 ): Promise<User> {
-  assertCan(actor, "users.edit");
+  assertCan(actor, 'users.edit');
   const data: Prisma.UserUpdateInput = {
     ...(input.email ? { email: normalizeEmail(input.email) } : {}),
     ...(input.name !== undefined ? { name: input.name.trim() } : {}),
     ...(input.locale !== undefined ? { locale: input.locale } : {}),
     ...(input.avatarKey !== undefined ? { avatarKey: input.avatarKey } : {}),
     ...(input.active !== undefined ? { active: input.active } : {}),
-    ...(input.isSuperAdmin !== undefined
-      ? { isSuperAdmin: input.isSuperAdmin }
-      : {}),
+    ...(input.isSuperAdmin !== undefined ? { isSuperAdmin: input.isSuperAdmin } : {}),
   };
   return prisma.user.update({
     where: { id: userId },
@@ -98,9 +93,9 @@ export async function updateUser(
 export async function setUserPassword(
   actor: SessionPayload,
   userId: string,
-  password: string,
+  password: string
 ): Promise<void> {
-  assertCan(actor, "users.edit");
+  assertCan(actor, 'users.edit');
   const passwordHash = await hashPassword(password);
   await prisma.account.upsert({
     where: { id: `credential:${userId}` },
@@ -108,17 +103,14 @@ export async function setUserPassword(
     create: {
       id: `credential:${userId}`,
       accountId: userId,
-      providerId: "credential",
+      providerId: 'credential',
       userId,
       password: passwordHash,
     },
   });
 }
-export async function deleteUser(
-  actor: SessionPayload,
-  userId: string,
-): Promise<void> {
-  assertCan(actor, "users.delete");
+export async function deleteUser(actor: SessionPayload, userId: string): Promise<void> {
+  assertCan(actor, 'users.delete');
   await prisma.$transaction(async (tx) => {
     await tx.account.deleteMany({ where: { userId } });
     await tx.session.deleteMany({ where: { userId } });

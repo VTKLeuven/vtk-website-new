@@ -1,9 +1,10 @@
-import { redirect } from "next/navigation";
-import { notFound } from "next/navigation";
-import { hasLocale } from "@/lib/locale";
-import { getDictionary } from "@vtk/i18n";
-import { getSession } from "@/lib/session";
-import { LoginForm } from "./LoginForm";
+import { headers } from 'next/headers';
+import { redirect } from 'next/navigation';
+import { notFound } from 'next/navigation';
+import { hasLocale } from '@/lib/locale';
+import { getDictionary } from '@vtk/i18n';
+import { getSession } from '@vtk/auth/server';
+import { LoginForm } from './LoginForm';
 
 export default async function LoginPage({
   params,
@@ -16,8 +17,8 @@ export default async function LoginPage({
   const { next } = await searchParams;
   if (!hasLocale(locale)) notFound();
 
-  const session = await getSession();
-  if (session) redirect(next && next.startsWith("/") ? next : "/");
+  const session = await getSession(await headers());
+  if (session) redirect(next && next.startsWith('/') ? next : '/');
   const dict = getDictionary(locale);
 
   return (
@@ -26,7 +27,7 @@ export default async function LoginPage({
         <p className="vtk-auth-kicker">{dict.auth.signInLead}</p>
         <h1 className="vtk-auth-title">{dict.auth.signIn}</h1>
         <LoginForm
-          nextParam={next ?? ""}
+          nextParam={next ?? ''}
           labels={{
             email: dict.auth.email,
             password: dict.auth.password,

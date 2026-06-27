@@ -1,13 +1,14 @@
-import Image from "next/image";
-import Link from "next/link";
-import { prisma } from "@vtk/db";
-import { getDictionary, pick, type Locale } from "@vtk/i18n";
-import { entryForDate, isClosedHours } from "@/components/editorial/hoursUtils";
-import { getVisibleHeaderTabsForNav } from "@/lib/headerTabs";
-import { getSession } from "@/lib/session";
-import { EditorialNavLinks } from "./EditorialNavLinks";
-import { LocaleSwitcher } from "./LocaleSwitcher";
-import { ProfileMenu } from "./ProfileMenu";
+import Image from 'next/image';
+import Link from 'next/link';
+import { prisma } from '@vtk/db';
+import { getDictionary, pick, type Locale } from '@vtk/i18n';
+import { entryForDate, isClosedHours } from '@/components/editorial/hoursUtils';
+import { getVisibleHeaderTabsForNav } from '@/lib/headerTabs';
+import { getSession } from '@vtk/auth/server';
+import { headers } from 'next/headers';
+import { EditorialNavLinks } from './EditorialNavLinks';
+import { LocaleSwitcher } from './LocaleSwitcher';
+import { ProfileMenu } from './ProfileMenu';
 
 type OpeningHoursSetting = {
   titleNl: string;
@@ -37,31 +38,31 @@ export async function Header({ locale }: { locale: Locale }) {
   const now = new Date();
   const [tabs, session, theokotRow] = await Promise.all([
     getVisibleHeaderTabsForNav(),
-    getSession(),
-    prisma.setting.findUnique({ where: { key: "home.openingHours.theokot" } }),
+    getSession(await headers()),
+    prisma.setting.findUnique({ where: { key: 'home.openingHours.theokot' } }),
   ]);
   const dict = getDictionary(locale);
-  const base = locale === "nl" ? "" : "/en";
+  const base = locale === 'nl' ? '' : '/en';
   const loginLabel = dict.header.login;
 
   const theokot = theokotRow?.value as OpeningHoursSetting | undefined;
   const theoToday = theokot ? entryForDate(theokot.entries, now, locale) : undefined;
   const utilLeft =
     theoToday && !isClosedHours(theoToday.hours)
-      ? `${pick(theokot!.titleNl, theokot!.titleEn, locale).replace(/^Openingsuren\s+/i, "")} · ${theoToday.hours}`
-      : locale === "nl"
-        ? "Theokot · zie openingsuren"
-        : "Theokot · see opening hours";
+      ? `${pick(theokot!.titleNl, theokot!.titleEn, locale).replace(/^Openingsuren\s+/i, '')} · ${theoToday.hours}`
+      : locale === 'nl'
+        ? 'Theokot · zie openingsuren'
+        : 'Theokot · see opening hours';
 
-  const nl = locale === "nl";
+  const nl = locale === 'nl';
   const quick = nl
     ? [
-        { href: `${base}/aanbod`, label: "Theokot", as: "link" as const },
-        { href: `${base}/cursusdienst`, label: "Cursusdienst", as: "link" as const },
+        { href: `${base}/aanbod`, label: 'Theokot', as: 'link' as const },
+        { href: `${base}/cursusdienst`, label: 'Cursusdienst', as: 'link' as const },
       ]
     : [
-        { href: `${base}/aanbod`, label: "Theokot", as: "link" as const },
-        { href: `${base}/cursusdienst`, label: "Course shop", as: "link" as const },
+        { href: `${base}/aanbod`, label: 'Theokot', as: 'link' as const },
+        { href: `${base}/cursusdienst`, label: 'Course shop', as: 'link' as const },
       ];
 
   return (
@@ -74,7 +75,7 @@ export async function Header({ locale }: { locale: Locale }) {
           </div>
           <div className="utility-links">
             {quick.map((item, i) =>
-              item.as === "link" ? (
+              item.as === 'link' ? (
                 <Link key={i} href={item.href}>
                   {item.label}
                 </Link>
@@ -108,7 +109,7 @@ export async function Header({ locale }: { locale: Locale }) {
           tabs={tabs}
           base={base}
           locale={locale}
-          ariaLabel={locale === "nl" ? "Hoofdnavigatie" : "Main navigation"}
+          ariaLabel={locale === 'nl' ? 'Hoofdnavigatie' : 'Main navigation'}
         />
 
         <div className="nav-right">
