@@ -4,8 +4,13 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { prisma } from "@vtk/db";
-import { hashPassword } from "@vtk/auth/server";
-import { requirePermission } from "@/lib/session";
+import {
+  createUser,
+  deleteUser,
+  setUserPassword,
+  updateUser,
+} from "@vtk/auth/server";
+import { requirePermission, requireSession } from "@/lib/session";
 
 // ---- Users ------------------------------------------------------------------
 
@@ -20,7 +25,7 @@ const userSchema = z.object({
 });
 
 export async function saveUserAction(formData: FormData): Promise<void> {
-  await requirePermission("users.edit");
+  const session = await requirePermission("users.edit");
   const parsed = userSchema.parse({
     id: (formData.get("id") as string) || undefined,
     email: String(formData.get("email")).toLowerCase().trim(),
@@ -31,32 +36,28 @@ export async function saveUserAction(formData: FormData): Promise<void> {
     isSuperAdmin: formData.get("isSuperAdmin") === "on",
   });
 
-  const data: Record<string, unknown> = {
-    email: parsed.email,
-    name: parsed.name,
-    locale: parsed.locale,
-    active: parsed.active,
-    isSuperAdmin: parsed.isSuperAdmin,
-  };
-  if (parsed.password && parsed.password.length > 0) {
-    data.passwordHash = await hashPassword(parsed.password);
-  }
-
   if (parsed.id) {
-    await prisma.user.update({ where: { id: parsed.id }, data });
+    await updateUser(session, parsed.id, {
+      email: parsed.email,
+      name: parsed.name,
+      locale: parsed.locale,
+      active: parsed.active,
+      isSuperAdmin: parsed.isSuperAdmin,
+    });
+    if (parsed.password && parsed.password.length > 0) {
+      await setUserPassword(session, parsed.id, parsed.password);
+    }
   } else {
     if (!parsed.password) {
       throw new Error("Password is required for new users");
     }
-    await prisma.user.create({
-      data: {
-        email: parsed.email,
-        name: parsed.name,
-        locale: parsed.locale,
-        active: parsed.active,
-        isSuperAdmin: parsed.isSuperAdmin,
-        passwordHash: await hashPassword(parsed.password),
-      },
+    await createUser(session, {
+      email: parsed.email,
+      name: parsed.name,
+      password: parsed.password,
+      locale: parsed.locale,
+      active: parsed.active,
+      isSuperAdmin: parsed.isSuperAdmin,
     });
   }
   revalidatePath("/admin/gebruikers");
@@ -64,9 +65,9 @@ export async function saveUserAction(formData: FormData): Promise<void> {
 }
 
 export async function deleteUserAction(formData: FormData): Promise<void> {
-  await requirePermission("users.edit");
+  const session = await requirePermission("users.edit");
   const id = formData.get("id") as string;
-  if (id) await prisma.user.delete({ where: { id } });
+  if (id) await deleteUser(session, id);
   revalidatePath("/admin/gebruikers");
   redirect("/admin/gebruikers");
 }
@@ -111,6 +112,7 @@ export async function removeMembershipAction(formData: FormData): Promise<void> 
 // Bulk CSV import. Columns: email,name,password,groupCode,role,year
 export async function bulkImportUsersAction(formData: FormData): Promise<{ ok: boolean; added: number; errors: string[] }> {
   await requirePermission("users.bulkImport");
+  const session = await requireSession();
   const csv = (formData.get("csv") as string) || "";
   const lines = csv.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
   const errors: string[] = [];
@@ -136,9 +138,9 @@ export async function bulkImportUsersAction(formData: FormData): Promise<{ ok: b
         create: {
           email: email.toLowerCase(),
           name,
-          passwordHash: await hashPassword(password || cryptoRandomPassword()),
         },
       });
+      await setUserPassword(session, user.id, password || cryptoRandomPassword());
       if (groupCode) {
         const group = groupByCode.get(groupCode.trim() as never);
         if (!group) {

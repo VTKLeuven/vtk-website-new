@@ -7,14 +7,19 @@
   "exports": {
     ".": "./src/index.ts",
     "./server": "./src/server.ts",
-    "./remote": "./src/remote.ts"
+    "./remote": "./src/remote.ts",
+    "./client": "./src/client.ts"
   },
   "dependencies": {
     "@node-rs/argon2": "^2.0.2",
-    "@vtk/db": "*"
+    "@vtk/db": "*",
+    "better-auth": "^1.6.19",
+    "server-only": "^0.0.1"
   },
   "devDependencies": {
+    "@types/node": "^20.19.43",
     "@vtk/tsconfig": "*",
+    "auth": "^1.6.19",
     "typescript": "^5"
   }
 }

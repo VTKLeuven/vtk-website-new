@@ -27,6 +27,7 @@
     "@vtk/storage": "*",
     "@vtk/ui": "*",
     "archiver": "^7.0.1",
+    "better-auth": "^1.6.19",
     "next": "16.2.4",
     "react": "19.2.4",
     "react-dom": "19.2.4",

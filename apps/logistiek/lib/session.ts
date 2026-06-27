@@ -1,19 +1,14 @@
-import { headers } from "next/headers";
-import { fetchRemoteSession } from "@vtk/auth/remote";
-import { isMemberOfGroup, type SessionPayload } from "@vtk/auth";
-
-export async function getSession(): Promise<SessionPayload | null> {
-  const h = await headers();
-  return fetchRemoteSession(h.get("cookie"));
-}
+import { headers } from 'next/headers';
+import { isMemberOfGroup, type SessionPayload } from '@vtk/auth';
+import { fetchSession } from '@vtk/auth/remote';
 
 export async function requireLogistiek(): Promise<SessionPayload> {
-  const session = await getSession();
+  const session = await fetchSession(await headers());
   if (!session) {
-    throw new Error("UNAUTHENTICATED");
+    throw new Error('UNAUTHENTICATED');
   }
-  if (!session.user.isSuperAdmin && !isMemberOfGroup(session, "Logistiek")) {
-    throw new Error("FORBIDDEN");
+  if (!session.user.isSuperAdmin && !isMemberOfGroup(session, 'Logistiek')) {
+    throw new Error('FORBIDDEN');
   }
   return session;
 }

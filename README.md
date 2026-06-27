@@ -50,6 +50,7 @@ cp .env.example .env
 # Link the root .env into each Next.js app so the dev-server workers pick it up.
 # Next.js auto-loads .env from each app's own directory; it does NOT read from
 # the monorepo root. These symlinks are gitignored via the .env* pattern.
+# these don't work on windows :(( you have to manually copy every time something changes
 ln -sf ../../.env apps/web/.env
 ln -sf ../../.env apps/logistiek/.env
 

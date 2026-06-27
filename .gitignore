@@ -47,3 +47,5 @@ packages/db/node_modules/.prisma
 
 # minio data (when running infra locally)
 infra/data
+
+.vscode

@@ -1,97 +1,37 @@
-import { hash, verify } from "@node-rs/argon2";
-import { prisma } from "@vtk/db";
-import { randomBytes } from "node:crypto";
-import { SESSION_DURATION_MS, type SessionPayload } from "./index";
+/**
+ * @author Witse Panneels
+ * @date 2026-06-19
+ *
+ * better-auth server components, to be used on central platform / app (@vtk/web)
+ * Also includes functions for sso and session validation for remote apps (@vtk/logistiek, ...)
+ *
+ * If you are working on a remote app, please do not use this file/these components, use ./remote.ts instead!
+ *
+ * !do not import these into a client component!
+ */
+import 'server-only';
+import { auth } from './auth';
 
-export async function hashPassword(plain: string): Promise<string> {
-  return hash(plain);
-}
+export { hashPassword } from './logins/password';
+export { ApiHandler } from './apiHandlers/apiHandler';
+export { getSession } from './server/session';
+export { createUser, updateUser, setUserPassword, deleteUser } from './server/users';
 
-export async function verifyPassword(plain: string, stored: string): Promise<boolean> {
-  try {
-    return await verify(stored, plain);
-  } catch {
-    return false;
+export async function signInEmail(
+  headers: Headers,
+  body: {
+    email: string;
+    password: string;
   }
-}
-
-export function generateSessionToken(): string {
-  return randomBytes(32).toString("base64url");
-}
-
-export async function createSession(params: {
-  userId: string;
-  userAgent?: string | null;
-  ip?: string | null;
-}): Promise<{ token: string; expiresAt: Date }> {
-  const token = generateSessionToken();
-  const expiresAt = new Date(Date.now() + SESSION_DURATION_MS);
-  await prisma.session.create({
-    data: {
-      token,
-      userId: params.userId,
-      expiresAt,
-      userAgent: params.userAgent ?? null,
-      ip: params.ip ?? null,
-    },
+) {
+  return auth.api.signInEmail({
+    headers,
+    body,
   });
-  return { token, expiresAt };
 }
 
-export async function destroySession(token: string): Promise<void> {
-  await prisma.session.deleteMany({ where: { token } });
-}
-
-export async function getSessionByToken(token: string | undefined | null): Promise<SessionPayload | null> {
-  if (!token) return null;
-  const row = await prisma.session.findUnique({
-    where: { token },
-    include: {
-      user: {
-        include: {
-          memberships: {
-            include: {
-              group: {
-                include: {
-                  permissions: { include: { permission: true } },
-                },
-              },
-            },
-          },
-        },
-      },
-    },
+export async function signOut(headers: Headers) {
+  return auth.api.signOut({
+    headers,
   });
-  if (!row || row.expiresAt <= new Date() || !row.user.active) return null;
-
-  const permissions = new Set<string>();
-  const groups: SessionPayload["groups"] = [];
-  for (const m of row.user.memberships) {
-    groups.push({
-      id: m.group.id,
-      code: m.group.code,
-      slug: m.group.slug,
-      nameNl: m.group.nameNl,
-      nameEn: m.group.nameEn,
-      role: m.role,
-    });
-    for (const gp of m.group.permissions) {
-      permissions.add(gp.permission.code);
-    }
-  }
-
-  return {
-    token: row.token,
-    expiresAt: row.expiresAt.toISOString(),
-    user: {
-      id: row.user.id,
-      email: row.user.email,
-      name: row.user.name,
-      avatarKey: row.user.avatarKey,
-      locale: row.user.locale,
-      isSuperAdmin: row.user.isSuperAdmin,
-    },
-    groups,
-    permissions: Array.from(permissions),
-  };
 }

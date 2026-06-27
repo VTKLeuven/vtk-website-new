@@ -326,9 +326,22 @@ async function main() {
         name: u.name,
         locale: u.locale,
         active: true,
-        passwordHash: prototypePasswordHash,
       },
     });
+    await prisma.account.upsert({
+      where: {id: `credentials:${user.id}`},
+      update: {
+        password: prototypePasswordHash
+      },
+      create: {
+        id: `credentials:${user.id}`,
+        accountId: user.id,
+        providerId: "credential",
+        userId: user.id,
+        password: prototypePasswordHash,
+      }
+    });
+
     prototypeUserByEmail.set(u.email, user);
     for (const membership of u.groups) {
       const group = await prisma.group.findUnique({ where: { code: membership.code } });
@@ -910,15 +923,26 @@ async function main() {
         email: adminEmail,
         isSuperAdmin: true,
         active: true,
-        passwordHash,
       },
       create: {
         email: adminEmail,
         name: "VTK Admin",
-        passwordHash,
         isSuperAdmin: true,
       },
     });
+    await prisma.account.upsert({
+      where: {id: `credential:${admin.id}`},
+      create: {
+        id: `credential:${admin.id}`,
+        accountId: admin.id,
+        providerId: "credential",
+        userId: admin.id,
+        password: passwordHash
+      },
+      update: {
+        password: passwordHash
+      }
+    })
     const itGroup = await prisma.group.findUnique({ where: { code: "IT" } });
     if (itGroup) {
       await prisma.groupMembership.upsert({
