@@ -4,12 +4,13 @@
  *
  * client safe auth components
  */
-"use client";
+'use client';
 
-import { createAuthClient } from "better-auth/react";
+import { createAuthClient } from 'better-auth/react';
 
 export const authClient = createAuthClient({
   baseURL: process.env.BETTER_AUTH_URL,
+  basePath: 'api/auth/better',
 });
 
 export const { signIn, signOut, useSession } = authClient;

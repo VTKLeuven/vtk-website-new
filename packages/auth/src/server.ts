@@ -13,14 +13,12 @@ import 'server-only';
 import { prisma } from '@vtk/db';
 import type { SessionPayload } from './index';
 import { auth } from './auth';
-import { ApiHandler } from './apiHandlers/apiHandler';
 
 export { auth } from './auth'; // kind of would like not to have to do this...
-export { getSession, requireSession, requirePermission } from './sessions';
 export { hashPassword } from './logins/password';
 export { ApiHandler } from './apiHandlers/apiHandler';
 
-export async function getSessionFromHeaders(headers: Headers): Promise<SessionPayload | null> {
+export async function getSession(headers: Headers): Promise<SessionPayload | null> {
   const betterSession = await auth.api.getSession({ headers });
   if (!betterSession) return null;
 
@@ -44,18 +42,8 @@ export async function getSessionFromHeaders(headers: Headers): Promise<SessionPa
   if (!user || !user.active) return null;
 
   const permissions = new Set<string>();
-  const groups: SessionPayload['groups'] = [];
 
   for (const membership of user.memberships) {
-    groups.push({
-      id: membership.group.id,
-      code: membership.group.code,
-      slug: membership.group.slug,
-      nameNl: membership.group.nameNl,
-      nameEn: membership.group.nameEn,
-      role: membership.role,
-    });
-
     for (const entry of membership.group.permissions) {
       permissions.add(entry.permission.code);
     }
@@ -72,7 +60,14 @@ export async function getSessionFromHeaders(headers: Headers): Promise<SessionPa
       locale: user.locale,
       isSuperAdmin: user.isSuperAdmin,
     },
-    groups,
+    groups: user.memberships.map((membership) => ({
+      id: membership.group.id,
+      code: membership.group.code,
+      slug: membership.group.slug,
+      nameNl: membership.group.nameNl,
+      nameEn: membership.group.nameEn,
+      role: membership.role,
+    })),
     permissions: [...permissions],
   };
 }

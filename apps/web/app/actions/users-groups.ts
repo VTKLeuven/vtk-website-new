@@ -38,26 +38,26 @@ export async function saveUserAction(formData: FormData): Promise<void> {
     active: parsed.active,
     isSuperAdmin: parsed.isSuperAdmin,
   };
-  if (parsed.password && parsed.password.length > 0) {
-    data.passwordHash = await hashPassword(parsed.password);
-  }
 
   if (parsed.id) {
     await prisma.user.update({ where: { id: parsed.id }, data });
+    if (parsed.password && parsed.password.length > 0) {
+      await setCredentialPassword(parsed.id, parsed.password);
+    }
   } else {
     if (!parsed.password) {
       throw new Error("Password is required for new users");
     }
-    await prisma.user.create({
+    const user = await prisma.user.create({
       data: {
         email: parsed.email,
         name: parsed.name,
         locale: parsed.locale,
         active: parsed.active,
         isSuperAdmin: parsed.isSuperAdmin,
-        passwordHash: await hashPassword(parsed.password),
       },
     });
+    await setCredentialPassword(user.id, parsed.password);
   }
   revalidatePath("/admin/gebruikers");
   redirect("/admin/gebruikers");
@@ -130,15 +130,16 @@ export async function bulkImportUsersAction(formData: FormData): Promise<{ ok: b
       continue;
     }
     try {
+      const passwordHash = await hashPassword(password || cryptoRandomPassword());
       const user = await prisma.user.upsert({
         where: { email: email.toLowerCase() },
         update: { name },
         create: {
           email: email.toLowerCase(),
           name,
-          passwordHash: await hashPassword(password || cryptoRandomPassword()),
         },
       });
+      await upsertCredentialAccount(user.id, passwordHash);
       if (groupCode) {
         const group = groupByCode.get(groupCode.trim() as never);
         if (!group) {
@@ -199,6 +200,24 @@ function splitCsv(line: string): string[] {
 
 function cryptoRandomPassword() {
   return Math.random().toString(36).slice(2) + Math.random().toString(36).slice(2);
+}
+
+async function setCredentialPassword(userId: string, password: string): Promise<void> {
+  await upsertCredentialAccount(userId, await hashPassword(password));
+}
+
+async function upsertCredentialAccount(userId: string, passwordHash: string): Promise<void> {
+  await prisma.account.upsert({
+    where: { id: `credential:${userId}` },
+    update: { password: passwordHash },
+    create: {
+      id: `credential:${userId}`,
+      accountId: userId,
+      providerId: "credential",
+      userId,
+      password: passwordHash,
+    },
+  });
 }
 
 // ---- Groups -----------------------------------------------------------------

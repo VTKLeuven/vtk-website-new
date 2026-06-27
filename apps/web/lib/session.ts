@@ -1,16 +1,19 @@
 import { headers } from 'next/headers';
-import {
-  getSession as getSessionFromHeaders,
-  requireSession as requireSessionFromHeaders,
-  requirePermission as requirePermissionFromHeaders,
-} from '@vtk/auth/server';
+import { redirect } from 'next/navigation';
+import { getSession } from '@vtk/auth/server';
 
-export async function getSession() {
-  return getSessionFromHeaders(await headers());
-}
-export async function requireSession() {
-  return requireSessionFromHeaders(await headers());
+export async function requireSession(redirectTo?: string) {
+  const session = await getSession(await headers());
+  if (!session) {
+    if (redirectTo) redirect(redirectTo);
+    throw new Error('UNAUTHENTICATED');
+  }
+  return session;
 }
 export async function requirePermission(permission: string) {
-  return requirePermissionFromHeaders(await headers(), permission);
+  const session = await requireSession();
+  if (!session.user.isSuperAdmin && !session.permissions.includes(permission)) {
+    throw new Error('FORBIDDEN');
+  }
+  return session;
 }

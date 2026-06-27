@@ -5,11 +5,11 @@
  * auth types and basic helper functions
  * Safe to use in browser and server components :))
  */
-import type { NextRequest } from "next/server";
+import type { NextRequest } from 'next/server';
 
 /** */
-export type Locale = "NL" | "EN";
-export type AuthGroupRole = "MEMBER" | "LEAD";
+export type Locale = 'NL' | 'EN';
+export type AuthGroupRole = 'MEMBER' | 'LEAD';
 
 export type AuthUser = {
   id: string;
@@ -33,9 +33,6 @@ export type AuthGroup = {
 // Sessions
 // ==============================
 
-/** Legacy compatibility, prefer not to use anymore
- * @deprecated
- */
 export type SessionPayload = {
   token: string;
   expiresAt: string;
@@ -44,13 +41,10 @@ export type SessionPayload = {
   permissions: string[];
 };
 
-/** Legacy compatibility, prefer not to use anymore
- * @deprecated
- */
 export function hasPermission(
   session: SessionPayload | null | undefined,
   code: string,
-  options?: { groupId?: string },
+  options?: { groupId?: string }
 ): boolean {
   if (!session) return false;
   if (session.user.isSuperAdmin) return true;
@@ -61,32 +55,23 @@ export function hasPermission(
   return true;
 }
 
-/** Legacy compatibility, prefer not to use anymore
- * @deprecated
- */
 export function hasAnyPermission(
   session: SessionPayload | null | undefined,
-  permissions: string[],
+  permissions: string[]
 ): boolean {
   return permissions.some((permission) => hasPermission(session, permission));
 }
 
-/** Legacy compatibility, prefer not to use anymore
- * @deprecated
- */
 export function hasAllPermissions(
   session: SessionPayload | null | undefined,
-  permissions: string[],
+  permissions: string[]
 ): boolean {
   return permissions.every((permission) => hasPermission(session, permission));
 }
 
-/** Legacy compatibility, prefer not to use anymore
- * @deprecated
- */
 export function isMemberOfGroup(
   session: SessionPayload | null | undefined,
-  groupCode: string,
+  groupCode: string
 ): boolean {
   if (!session) return false;
   return session.groups.some((g) => g.code === groupCode);
@@ -97,19 +82,19 @@ export function isMemberOfGroup(
 // ==============================
 
 export type AuthErrorCode =
-  | "UNAUTHENTICATED"
-  | "FORBIDDEN"
-  | "INACTIVE_USER"
-  | "INVALID_INPUT"
-  | "REMOTE_AUTH_UNAVAILABLE";
+  | 'UNAUTHENTICATED'
+  | 'FORBIDDEN'
+  | 'INACTIVE_USER'
+  | 'INVALID_INPUT'
+  | 'REMOTE_AUTH_UNAVAILABLE';
 
 export class AuthError extends Error {
   constructor(
     public readonly code: AuthErrorCode,
-    message = code,
+    message = code
   ) {
     super(message);
-    this.name = "AuthError";
+    this.name = 'AuthError';
   }
 }
 
@@ -124,7 +109,7 @@ export type RouteContext = {
 
 export type RouteHandler = (
   request: NextRequest,
-  context: RouteContext,
+  context: RouteContext
 ) => Promise<Response> | Response;
 
 export type ApiHandlers = {

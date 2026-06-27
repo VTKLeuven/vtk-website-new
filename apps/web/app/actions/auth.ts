@@ -1,12 +1,10 @@
 "use server";
 
 import { redirect } from "next/navigation";
-import { cookies } from "next/headers";
+import { headers } from "next/headers";
 import { z } from "zod";
 import { prisma } from "@vtk/db";
-import { SESSION_COOKIE_NAME } from "@vtk/auth";
-import { createSession, destroySession, verifyPassword } from "@vtk/auth/server";
-import { clearSessionCookie, setSessionCookie } from "@/lib/session";
+import { auth } from "@vtk/auth/server";
 
 const loginSchema = z.object({
   email: z.string().email(),
@@ -26,29 +24,39 @@ export async function loginAction(_prev: LoginState, formData: FormData): Promis
     return { error: "Invalid input" };
   }
 
-  const user = await prisma.user.findUnique({ where: { email: parsed.data.email } });
-  if (!user || !user.active) {
-    return { error: "INVALID" };
-  }
-  const ok = await verifyPassword(parsed.data.password, user.passwordHash);
-  if (!ok) {
+  const user = await prisma.user.findUnique({
+    where: { email: parsed.data.email },
+    select: { active: true },
+  });
+  if (!user?.active) {
     return { error: "INVALID" };
   }
 
-  const { token, expiresAt } = await createSession({ userId: user.id });
-  await setSessionCookie(token, expiresAt);
+  try {
+    await auth.api.signInEmail({
+      headers: await headers(),
+      body: {
+        email: parsed.data.email,
+        password: parsed.data.password,
+      },
+    });
+  } catch {
+    return { error: "INVALID" };
+  }
 
-  const next = parsed.data.next && parsed.data.next.startsWith("/") ? parsed.data.next : "/";
+  const next =
+    parsed.data.next &&
+    parsed.data.next.startsWith("/") &&
+    !parsed.data.next.startsWith("//")
+      ? parsed.data.next
+      : "/";
   redirect(next);
 }
 
 export async function logoutAction(): Promise<void> {
-  const cookieStore = await cookies();
-  const token = cookieStore.get(SESSION_COOKIE_NAME)?.value;
-  if (token) {
-    await destroySession(token);
-  }
-  await clearSessionCookie();
+  await auth.api.signOut({
+    headers: await headers(),
+  });
   redirect("/");
 }
 

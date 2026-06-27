@@ -8,22 +8,24 @@
  *
  * !do not import these into a client component!
  */
-import "server-only";
-import { type SessionPayload } from "./index";
+import 'server-only';
+import { type SessionPayload } from './index';
 
 /**
  * Used by submodule apps to verify a session against the main site.
  * It forwards the cookie and expects a JSON SessionPayload back.
  * */
 export async function fetchRemoteSession(
-  cookieHeader: string | null | undefined,
+  cookieHeader: string | null | undefined
 ): Promise<SessionPayload | null> {
-  const mainUrl = process.env.VTK_MAIN_URL || "https://vtk.be";
+  const mainUrl = process.env.VTK_MAIN_URL || 'https://vtk.be';
+
+  if (!cookieHeader) return null;
 
   try {
-    const res = await fetch(`${mainUrl}/api/auth/session`, {
+    const res = await fetch(`${mainUrl}/api/auth/remote/session`, {
       headers: { cookie: cookieHeader },
-      cache: "no-store",
+      cache: 'no-store',
     });
     if (!res.ok) return null;
     return (await res.json()) as SessionPayload;

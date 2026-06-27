@@ -11,7 +11,7 @@
 import 'server-only';
 import { auth } from '../auth';
 import { toNextJsHandler } from 'better-auth/next-js';
-import { getSession } from '../sessions';
+import { getSession } from '../server';
 import { NextResponse, type NextRequest } from 'next/server';
 import { RouteContext, RouteHandler, ApiHandlers } from '../index';
 import { notFound, notFoundHandlers, methodNotAllowed } from './basicHandlers';
@@ -20,6 +20,13 @@ const betterAuthHandlers: ApiHandlers = toNextJsHandler(auth);
 
 const remoteHandlers: ApiHandlers = {
   GET: async function (request: NextRequest, context: RouteContext): Promise<Response> {
+    const temp = await context.params;
+    const params: string[] = temp.all ?? [];
+
+    if (!params[1] || params.length > 2) return notFound();
+    if (params[1] != 'session') return notFound();
+
+    // /api/auth/remote/session
     const session = await getSession(request.headers);
 
     if (!session) {
