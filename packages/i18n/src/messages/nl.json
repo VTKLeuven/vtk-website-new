@@ -89,7 +89,11 @@
     "currentPassword": "Huidig wachtwoord",
     "newPassword": "Nieuw wachtwoord",
     "saved": "Opgeslagen",
-    "signInWithKul": "Inloggen met KU Leuven"
+    "signInWithKul": "Inloggen met KU Leuven",
+    "loginRequiredKicker": "Inloggen vereist",
+    "loginRequiredTitle": "Log in om deze pagina te bekijken",
+    "loginRequiredBody": "Je moet ingelogd zijn voordat je de inhoud van deze pagina kan bekijken.",
+    "goHome": "Naar home"
   },
   "admin": {
     "title": "Admin",
@@ -179,5 +183,8 @@
         "body": "We kunnen deze privacyverklaring aanpassen wanneer de dienst verandert. De datum bovenaan geeft aan wanneer we de tekst laatst hebben bijgewerkt."
       }
     ]
+  },
+  "shift": {
+    "shifts": "Shiften"
   }
 }
