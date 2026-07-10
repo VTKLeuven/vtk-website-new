@@ -22,7 +22,10 @@ packages/
 infra/
   docker-compose.yml  Postgres, MinIO, web, logistiek, Nginx, Certbot
   docker/             Dockerfiles for apps
+  immich/             Optional local Immich stack for the public media gallery
   nginx/conf.d/       Subdomain routing + TLS termination
+docs/
+  immich-gallery.md   Immich-backed public media gallery setup
 ```
 
 ## Requirements
@@ -128,7 +131,17 @@ Both commands also regenerate the Prisma client.
 | `npm run db:migrate`                     | Create + apply a migration                  |
 | `npm run db:seed`                        | Seed baseline rows (idempotent; reads root `.env` via `@vtk/db` script) |
 
-### 6. Stopping / resetting local infra
+### 6. Immich media gallery
+
+The public Media page can read albums directly from Immich. Only albums whose
+Immich description contains `[gallery]` are shown. Photos are not committed to
+this repo; they stay in Immich and are served through Immich Public Proxy.
+
+See [docs/immich-gallery.md](docs/immich-gallery.md) for the required Immich API
+key, public proxy URL, face-search database settings, local setup script, and
+troubleshooting.
+
+### 7. Stopping / resetting local infra
 
 ```bash
 # Stop but keep data

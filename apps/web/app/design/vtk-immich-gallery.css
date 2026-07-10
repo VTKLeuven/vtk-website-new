@@ -1,0 +1,547 @@
+.vtk-immich-album-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(280px, 100%), 1fr));
+  gap: clamp(18px, 2vw, 28px);
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.vtk-immich-album-card {
+  display: block;
+  color: inherit;
+  text-decoration: none;
+}
+
+.vtk-immich-album-cover {
+  position: relative;
+  display: block;
+  aspect-ratio: 4 / 3;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: var(--paper-2);
+}
+
+.vtk-immich-album-cover img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 220ms ease;
+}
+
+.vtk-immich-album-card:hover .vtk-immich-album-cover img {
+  transform: scale(1.035);
+}
+
+.vtk-immich-album-body {
+  display: block;
+  padding-top: 14px;
+}
+
+.vtk-immich-album-title {
+  display: block;
+  color: var(--ink);
+  font-size: 18px;
+  font-weight: 600;
+  letter-spacing: 0;
+  line-height: 1.25;
+}
+
+.vtk-immich-album-meta,
+.vtk-immich-album-description {
+  display: block;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.vtk-immich-album-meta {
+  margin-top: 4px;
+}
+
+.vtk-immich-album-description {
+  display: -webkit-box;
+  margin-top: 8px;
+  max-width: 48ch;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.vtk-immich-state {
+  max-width: 720px;
+}
+
+.vtk-immich-state h2 {
+  margin: 0;
+  color: var(--ink);
+  font-size: 22px;
+  line-height: 1.25;
+}
+
+.vtk-immich-state p {
+  margin: 10px 0 0;
+  color: var(--body);
+}
+
+.vtk-immich-visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.vtk-immich-detail-shell {
+  padding-top: clamp(28px, 5vw, 56px);
+}
+
+.vtk-immich-face-panel {
+  margin-bottom: clamp(24px, 4vw, 42px);
+  padding: clamp(18px, 3vw, 28px);
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: var(--surface);
+}
+
+.vtk-immich-face-header,
+.vtk-immich-match-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+}
+
+.vtk-immich-face-header h2,
+.vtk-immich-match-heading h2 {
+  margin: 0;
+  color: var(--ink);
+  font-size: clamp(22px, 3vw, 30px);
+  line-height: 1.1;
+  letter-spacing: 0;
+}
+
+.vtk-immich-face-header p {
+  max-width: 62ch;
+  margin: 8px 0 0;
+  color: var(--body);
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.vtk-immich-face-panel .vtk-button svg,
+.vtk-immich-preview-clear svg {
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.9;
+}
+
+.vtk-immich-face-form {
+  display: grid;
+  gap: 16px;
+  margin-top: 22px;
+}
+
+.vtk-immich-selfie-picker {
+  display: grid;
+  grid-template-columns: 116px minmax(0, 1fr);
+  gap: 18px;
+  align-items: stretch;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--paper);
+}
+
+.vtk-immich-selfie-preview {
+  position: relative;
+  display: flex;
+  min-height: 112px;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--paper-2);
+  color: var(--muted);
+}
+
+.vtk-immich-selfie-preview > svg {
+  width: 34px;
+  height: 34px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.6;
+}
+
+.vtk-immich-selfie-preview img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.vtk-immich-preview-clear {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  display: inline-flex;
+  width: 30px;
+  height: 30px;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(250, 250, 247, 0.45);
+  border-radius: 999px;
+  background: rgba(10, 15, 31, 0.72);
+  color: #fff;
+}
+
+.vtk-immich-selfie-body {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+}
+
+.vtk-immich-selfie-body h3 {
+  margin: 0;
+  color: var(--ink);
+  font-size: 17px;
+  font-weight: 600;
+  letter-spacing: 0;
+}
+
+.vtk-immich-selfie-body p {
+  margin: 6px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+
+.vtk-immich-selfie-actions,
+.vtk-immich-camera-actions,
+.vtk-immich-face-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.vtk-immich-camera-panel {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--paper);
+}
+
+.vtk-immich-camera-panel p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.vtk-immich-camera-frame {
+  overflow: hidden;
+  max-width: 560px;
+  border-radius: 14px;
+  background: var(--ink);
+}
+
+.vtk-immich-camera-frame video {
+  display: block;
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+  transform: scaleX(-1);
+}
+
+.vtk-immich-consent {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  color: var(--body);
+  font-size: 14px;
+  line-height: 1.55;
+}
+
+.vtk-immich-consent input {
+  margin-top: 4px;
+  accent-color: var(--ink);
+}
+
+.vtk-immich-face-message {
+  margin: 16px 0 0;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--paper);
+  color: var(--body);
+  font-size: 14px;
+  line-height: 1.55;
+}
+
+.vtk-immich-face-message.failed,
+.vtk-immich-face-message.timeout,
+.vtk-immich-face-message.multiple_faces,
+.vtk-immich-face-message.no_indexed_faces {
+  border-color: rgba(180, 54, 54, 0.22);
+  background: rgba(180, 54, 54, 0.06);
+  color: #7a2d2d;
+}
+
+.vtk-immich-match-results {
+  margin-top: clamp(22px, 4vw, 34px);
+  padding-top: clamp(18px, 3vw, 28px);
+  border-top: 1px solid var(--line);
+}
+
+.vtk-immich-match-heading {
+  margin-bottom: 18px;
+}
+
+.vtk-immich-match-heading span {
+  color: var(--muted);
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.vtk-immich-photo-masonry {
+  column-count: 4;
+  column-gap: 14px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.vtk-immich-photo-tile {
+  position: relative;
+  display: inline-block;
+  width: 100%;
+  margin: 0 0 14px;
+  break-inside: avoid;
+}
+
+.vtk-immich-photo-button {
+  display: block;
+  width: 100%;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--paper-2);
+  cursor: zoom-in;
+}
+
+.vtk-immich-photo-button:focus-visible,
+.vtk-immich-icon-button:focus-visible,
+.vtk-immich-lightbox-nav:focus-visible {
+  outline: 2px solid var(--yellow);
+  outline-offset: 3px;
+}
+
+.vtk-immich-photo-button img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 180ms ease;
+}
+
+.vtk-immich-photo-tile:hover .vtk-immich-photo-button img {
+  transform: scale(1.025);
+}
+
+.vtk-immich-icon-button {
+  display: inline-flex;
+  width: 38px;
+  height: 38px;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(250, 250, 247, 0.28);
+  border-radius: 999px;
+  background: rgba(10, 15, 31, 0.72);
+  color: #fff;
+  text-decoration: none;
+  backdrop-filter: blur(8px);
+  transition:
+    transform 160ms ease,
+    background 160ms ease,
+    border-color 160ms ease;
+}
+
+.vtk-immich-icon-button:hover {
+  transform: translateY(-1px);
+  border-color: rgba(250, 250, 247, 0.56);
+  background: rgba(10, 15, 31, 0.9);
+}
+
+.vtk-immich-icon-button svg {
+  width: 19px;
+  height: 19px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.9;
+}
+
+.vtk-immich-photo-download {
+  position: absolute;
+  right: 10px;
+  top: 10px;
+  opacity: 0;
+}
+
+.vtk-immich-photo-tile:hover .vtk-immich-photo-download,
+.vtk-immich-photo-download:focus-visible {
+  opacity: 1;
+}
+
+.vtk-immich-match-badge {
+  position: absolute;
+  left: 10px;
+  top: 10px;
+  padding: 6px 9px;
+  border-radius: 999px;
+  background: var(--yellow);
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.vtk-immich-lightbox {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 76px clamp(16px, 5vw, 84px) 36px;
+  background: rgba(6, 8, 16, 0.94);
+}
+
+.vtk-immich-lightbox-bar {
+  position: absolute;
+  top: 18px;
+  left: clamp(16px, 4vw, 40px);
+  right: clamp(16px, 4vw, 40px);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  color: rgba(250, 250, 247, 0.82);
+  font-size: 13px;
+}
+
+.vtk-immich-lightbox-actions {
+  display: inline-flex;
+  gap: 10px;
+}
+
+.vtk-immich-lightbox-image {
+  display: block;
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  border-radius: 10px;
+  box-shadow: 0 22px 70px rgba(0, 0, 0, 0.44);
+}
+
+.vtk-immich-lightbox-nav {
+  position: absolute;
+  top: 50%;
+  width: 48px;
+  height: 64px;
+  border-radius: 999px;
+  background: rgba(250, 250, 247, 0.08);
+  color: #fff;
+  font-size: 42px;
+  line-height: 1;
+  transform: translateY(-50%);
+}
+
+.vtk-immich-lightbox-nav:hover {
+  background: rgba(250, 250, 247, 0.16);
+}
+
+.vtk-immich-lightbox-prev {
+  left: clamp(10px, 2vw, 28px);
+}
+
+.vtk-immich-lightbox-next {
+  right: clamp(10px, 2vw, 28px);
+}
+
+@media (max-width: 1100px) {
+  .vtk-immich-photo-masonry {
+    column-count: 3;
+  }
+}
+
+@media (max-width: 760px) {
+  .page-head-meta {
+    text-align: left;
+  }
+
+  .vtk-immich-face-header,
+  .vtk-immich-match-heading,
+  .vtk-immich-selfie-body {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .vtk-immich-selfie-picker {
+    grid-template-columns: 92px minmax(0, 1fr);
+  }
+
+  .vtk-immich-photo-masonry {
+    column-count: 2;
+    column-gap: 10px;
+  }
+
+  .vtk-immich-photo-tile {
+    margin-bottom: 10px;
+  }
+
+  .vtk-immich-photo-download {
+    opacity: 1;
+  }
+
+  .vtk-immich-lightbox {
+    padding: 72px 12px 30px;
+  }
+
+  .vtk-immich-lightbox-nav {
+    width: 42px;
+    height: 54px;
+    font-size: 34px;
+  }
+}
+
+@media (max-width: 480px) {
+  .vtk-immich-album-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .vtk-immich-selfie-picker {
+    grid-template-columns: 1fr;
+  }
+
+  .vtk-immich-selfie-preview {
+    min-height: 190px;
+  }
+
+  .vtk-immich-photo-masonry {
+    column-count: 1;
+  }
+}
