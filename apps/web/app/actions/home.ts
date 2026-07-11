@@ -48,23 +48,43 @@ export async function saveAftermoviesAction(formData: FormData): Promise<void> {
   await requirePermission("home.edit");
   const titleNl = formData.get("titleNl") as string;
   const titleEn = formData.get("titleEn") as string;
-  const items: Array<{ type: "video" | "image"; url: string; titleNl?: string; titleEn?: string }> = [];
+  const items: Array<{
+    id: string;
+    type: "video" | "image";
+    url: string;
+    titleNl?: string;
+    titleEn?: string;
+    posterUrl?: string;
+    publishedAt?: string;
+  }> = [];
   for (let i = 0; i < 10; i += 1) {
-    const url = formData.get(`url-${i}`) as string | null;
+    const url = (formData.get(`url-${i}`) as string | null)?.trim();
     if (!url) continue;
+    const savedId = (formData.get(`id-${i}`) as string | null)?.trim();
+    const id = savedId && /^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/.test(savedId)
+      ? savedId
+      : `video-${i + 1}`;
+    const type = formData.get(`type-${i}`) === "image" ? "image" : "video";
+    const posterUrl = (formData.get(`posterUrl-${i}`) as string | null)?.trim();
+    const publishedAt = (formData.get(`publishedAt-${i}`) as string | null)?.trim();
     items.push({
-      type: (formData.get(`type-${i}`) as "video" | "image") || "video",
+      id,
+      type,
       url,
-      titleNl: (formData.get(`titleNl-${i}`) as string) || undefined,
-      titleEn: (formData.get(`titleEn-${i}`) as string) || undefined,
+      titleNl: (formData.get(`titleNl-${i}`) as string)?.trim() || undefined,
+      titleEn: (formData.get(`titleEn-${i}`) as string)?.trim() || undefined,
+      ...(posterUrl ? { posterUrl } : {}),
+      ...(publishedAt ? { publishedAt } : {}),
     });
   }
   await prisma.setting.upsert({
-    where: { key: "home.aftermovies" },
+    where: { key: "media.aftermovies" },
     update: { value: { titleNl, titleEn, items } },
-    create: { key: "home.aftermovies", value: { titleNl, titleEn, items } },
+    create: { key: "media.aftermovies", value: { titleNl, titleEn, items } },
   });
   revalidatePath("/");
+  revalidatePath("/media");
+  revalidatePath("/en/media");
 }
 
 export async function saveFeaturedAlbumsAction(formData: FormData): Promise<void> {

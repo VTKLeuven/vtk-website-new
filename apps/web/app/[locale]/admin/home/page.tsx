@@ -13,8 +13,47 @@ import {
 
 type OpeningHours = { titleNl: string; titleEn: string; entries: Array<{ dayNl: string; dayEn: string; hours: string }> };
 type Career = { titleNl: string; titleEn: string; bodyNl: string; bodyEn: string; ctaLabelNl?: string; ctaLabelEn?: string; ctaUrl?: string };
-type Aftermovies = { titleNl: string; titleEn: string; items: Array<{ type: "video" | "image"; url: string; titleNl?: string; titleEn?: string }> };
+type Aftermovies = {
+  titleNl: string;
+  titleEn: string;
+  items: Array<{
+    id?: string;
+    type: "video" | "image";
+    url: string;
+    titleNl?: string;
+    titleEn?: string;
+    posterUrl?: string;
+    publishedAt?: string;
+  }>;
+};
 type Featured = { albumSlugs: string[] };
+
+function readAftermoviesSetting(value: unknown): Aftermovies | null {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) return null;
+  const record = value as Record<string, unknown>;
+  if (!Array.isArray(record.items)) return null;
+
+  const items = record.items.flatMap((item): Aftermovies["items"] => {
+    if (typeof item !== "object" || item === null || Array.isArray(item)) return [];
+    const entry = item as Record<string, unknown>;
+    if (typeof entry.url !== "string") return [];
+    return [{
+      id: typeof entry.id === "string" ? entry.id : undefined,
+      type: entry.type === "image" ? "image" : "video",
+      url: entry.url,
+      titleNl: typeof entry.titleNl === "string" ? entry.titleNl : undefined,
+      titleEn: typeof entry.titleEn === "string" ? entry.titleEn : undefined,
+      posterUrl: typeof entry.posterUrl === "string" ? entry.posterUrl : undefined,
+      publishedAt: typeof entry.publishedAt === "string" ? entry.publishedAt : undefined,
+    }];
+  });
+
+  return {
+    titleNl: typeof record.titleNl === "string" ? record.titleNl : "Aftermovies",
+    titleEn: typeof record.titleEn === "string" ? record.titleEn : "Aftermovies",
+    items,
+  };
+}
 
 export default async function AdminHome({
   params,
@@ -33,17 +72,20 @@ export default async function AdminHome({
           "home.openingHours.cursusdienst",
           "home.openingHours.theokot",
           "home.career",
+          "media.aftermovies",
           "home.aftermovies",
           "home.featuredAlbums",
         ],
       },
     },
   });
-  const map = new Map(rows.map((r) => [r.key, r.value]));
+  const map = new Map(rows.map((row: { key: string; value: unknown }) => [row.key, row.value]));
   const cursus = (map.get("home.openingHours.cursusdienst") as OpeningHours | undefined) ?? { titleNl: "", titleEn: "", entries: [] };
   const theokot = (map.get("home.openingHours.theokot") as OpeningHours | undefined) ?? { titleNl: "", titleEn: "", entries: [] };
   const career = (map.get("home.career") as Career | undefined) ?? { titleNl: "", titleEn: "", bodyNl: "", bodyEn: "" };
-  const after = (map.get("home.aftermovies") as Aftermovies | undefined) ?? { titleNl: "", titleEn: "", items: [] };
+  const after = readAftermoviesSetting(map.get("media.aftermovies"))
+    ?? readAftermoviesSetting(map.get("home.aftermovies"))
+    ?? { titleNl: "", titleEn: "", items: [] };
   const featured = (map.get("home.featuredAlbums") as Featured | undefined) ?? { albumSlugs: [] };
 
   return (
@@ -113,10 +155,14 @@ export default async function AdminHome({
             <thead className="text-left"><tr><th>Type</th><th>URL (YouTube embed / image URL)</th><th>Title (NL)</th><th>Title (EN)</th></tr></thead>
             <tbody>
               {Array.from({ length: 6 }).map((_, i) => {
-                const item = after.items[i] || { type: "video", url: "", titleNl: "", titleEn: "" };
+                const item: Aftermovies["items"][number] = after.items[i]
+                  ?? { type: "video", url: "", titleNl: "", titleEn: "" };
                 return (
                   <tr key={i}>
                     <td className="pr-2 py-1">
+                      <input type="hidden" name={`id-${i}`} value={item.id ?? ""} />
+                      <input type="hidden" name={`posterUrl-${i}`} value={item.posterUrl ?? ""} />
+                      <input type="hidden" name={`publishedAt-${i}`} value={item.publishedAt ?? ""} />
                       <Select name={`type-${i}`} defaultValue={item.type}>
                         <option value="video">video</option>
                         <option value="image">image</option>
