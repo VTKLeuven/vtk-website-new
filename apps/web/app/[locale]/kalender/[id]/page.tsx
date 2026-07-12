@@ -34,7 +34,7 @@ export default async function EventPage({
 
   const event = await prisma.calendarEvent.findUnique({
     where: { id },
-    include: { group: true },
+    include: { group: true, ticketEvent: { select: { slug: true, status: true } } },
   });
 
   if (!event || event.visibility !== "PUBLIC") notFound();
@@ -103,7 +103,11 @@ export default async function EventPage({
             <Link href={`${base}/kalender`} className="btn btn-ghost">
               ← {locale === "nl" ? "Terug naar kalender" : "Back to calendar"}
             </Link>
-            {event.url ? (
+            {event.ticketEvent?.status === "PUBLISHED" ? (
+              <Link href={`${base}/tickets/${event.ticketEvent.slug}`} className="btn btn-primary">
+                {locale === "nl" ? "Tickets kopen" : "Buy tickets"}
+              </Link>
+            ) : event.url ? (
               <a href={event.url} className="btn btn-primary arrow">
                 {locale === "nl" ? "Externe eventlink" : "External event link"}
               </a>

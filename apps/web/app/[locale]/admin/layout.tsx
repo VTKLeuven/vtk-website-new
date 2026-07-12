@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { hasLocale } from "@/lib/locale";
 import { requireSession } from "@/lib/session";
 import { getDictionary, type Locale } from "@vtk/i18n";
+import { canAccessAnyTicketEvent } from "@/lib/ticketing/authorization";
 
 import "@/app/design/vtk-admin.css";
 
@@ -11,6 +12,7 @@ const sections = [
   { key: "pages", href: "/paginas", perm: "pages.edit" },
   { key: "header", href: "/header", perm: "header.manage" },
   { key: "calendar", href: "/kalender", perm: "calendar.create" },
+  { key: "tickets", href: "/tickets", ticketing: true },
   { key: "albums", href: "/albums", perm: "photos.manageAlbums" },
   { key: "pocs", href: "/pocs", perm: "pocs.manage" },
   { key: "partners", href: "/partners", perm: "partners.manage" },
@@ -37,13 +39,19 @@ export default async function AdminLayout({
   const base = locale === "nl" ? "" : "/en";
 
   const adminDict = dict.admin as DictAdmin & { [key: string]: string };
+  const canAccessTickets =
+    session.user.isSuperAdmin ||
+    session.permissions.includes("tickets.create") ||
+    session.permissions.includes("tickets.manageAll") ||
+    (await canAccessAnyTicketEvent());
 
   const visibleSections = sections.filter(
     (s) =>
-      !("perm" in s) ||
-      !s.perm ||
-      session.user.isSuperAdmin ||
-      session.permissions.includes(s.perm)
+      (!("ticketing" in s) || !s.ticketing || canAccessTickets) &&
+      (!("perm" in s) ||
+        !s.perm ||
+        session.user.isSuperAdmin ||
+        session.permissions.includes(s.perm))
   );
 
   return (

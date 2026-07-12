@@ -46,6 +46,29 @@ const nextConfig: NextConfig = {
       bodySizeLimit: "50mb",
     },
   },
+  async headers() {
+    return [
+      {
+        source: "/scan/:path*",
+        headers: [
+          { key: "Permissions-Policy", value: "camera=(self), microphone=(), geolocation=()" },
+          { key: "Referrer-Policy", value: "same-origin" },
+          { key: "Cache-Control", value: "private, no-store, max-age=0" },
+        ],
+      },
+      ...[
+        "/tickets/bestelling/:path*",
+        "/nl/tickets/bestelling/:path*",
+        "/en/tickets/bestelling/:path*",
+      ].map((source) => ({
+        source,
+        headers: [
+          { key: "Referrer-Policy", value: "no-referrer" },
+          { key: "Cache-Control", value: "private, no-store, max-age=0" },
+        ],
+      })),
+    ];
+  },
 };
 
 export default nextConfig;
