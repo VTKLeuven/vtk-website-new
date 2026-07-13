@@ -14,9 +14,10 @@ export default async function ShiftPage({ params }: { params: Promise<{ locale: 
   const base = locale === 'nl' ? '' : '/en';
   const dict = getDictionary(locale);
 
+  let session;
   // TODO doe dit op een andere (betere manier?)
   try {
-    await requireSession();
+    session = await requireSession();
   } catch {
     return <PleaseLogin locale={locale} nextPath={`${base}/shift`} className="vtk-page-shell" />;
   }
@@ -31,8 +32,8 @@ export default async function ShiftPage({ params }: { params: Promise<{ locale: 
       </header>
 
       <div className="vtk-page-shell">
-        <RegisteredShiftsTable locale={locale} userId={''} />
-        <AvailableShiftsTable locale={locale} userId={''} />
+        <RegisteredShiftsTable locale={locale} userId={session.user.id} />
+        <AvailableShiftsTable locale={locale} userId={session.user.id} />
       </div>
     </div>
   );

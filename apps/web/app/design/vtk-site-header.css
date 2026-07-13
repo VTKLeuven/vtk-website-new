@@ -1,3 +1,9 @@
+:root {
+  /* Hoogte van de sticky header (nav-inner min-height + 1px border). Overlays
+     zoals toasts kunnen hier tegen uitlijnen om onder de header te vallen. */
+  --vtk-header-height: 73px;
+}
+
 .vtk-site-header {
   color: var(--ink);
   position: sticky;

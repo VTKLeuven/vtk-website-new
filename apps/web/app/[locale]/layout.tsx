@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { Header } from "@/components/site/Header";
 import { Footer } from "@/components/site/Footer";
+import { ToastProvider } from "@/components/ui/toast";
 import { hasLocale } from "@/lib/locale";
 
 import "@/app/design/vtk-base.css";
@@ -18,7 +19,7 @@ export default async function LocaleLayout({
   if (!hasLocale(locale)) notFound();
 
   return (
-    <>
+    <ToastProvider>
       <Header locale={locale} />
       {/* `flex-1` + `min-h-0` pins main to viewport height and lets children overflow;
           that overflow painted over the footer looked like “footer in the hero”. */}
@@ -26,6 +27,6 @@ export default async function LocaleLayout({
         {children}
       </main>
       <Footer locale={locale} />
-    </>
+    </ToastProvider>
   );
 }

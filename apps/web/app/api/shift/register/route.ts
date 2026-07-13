@@ -70,11 +70,29 @@ export async function POST(request: Request) {
   if (!shift) {
     return NextResponse.json({ error: 'Shift not found' }, { status: 404 });
   }
-  if (shift.startTime <= new Date()) {
-    return NextResponse.json({ error: 'Shift has already started' }, { status: 409 });
-  }
   if (shift._count.participants >= shift.maxParticipants) {
     return NextResponse.json({ error: 'Shift is full' }, { status: 409 });
+  }
+
+  // Weiger als de user al ingeschreven is voor een (zelfs deels) overlappende
+  // shift. Half-open interval: aansluitende shiften (einde == start) botsen niet.
+  const overlap = await prisma.shift.findFirst({
+    where: {
+      id: { not: id },
+      participants: { some: { userId: session.user.id } },
+      startTime: { lt: shift.endTime },
+      endTime: { gt: shift.startTime },
+    },
+    select: { id: true, name: true },
+  });
+  if (overlap) {
+    return NextResponse.json(
+      {
+        error: 'You are already registered for an overlapping shift',
+        conflictShift: { id: overlap.id, name: overlap.name },
+      },
+      { status: 409 },
+    );
   }
 
   try {
