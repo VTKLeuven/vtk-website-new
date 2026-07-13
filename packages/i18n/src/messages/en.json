@@ -234,7 +234,18 @@
       "notFound": "This shift no longer exists.",
       "registerFailed": "Registration failed. Please try again later.",
       "notRegistered": "You were not registered for this shift.",
-      "unregisterFailed": "Unregistration failed. Please try again later."
+      "unregisterFailed": "Unregistration failed. Please try again later.",
+      "tooLateToUnregister": "You can no longer unregister: less than 24 hours before the start. Ask an admin to remove you."
+    },
+    "history": {
+      "title": "My shift history",
+      "link": "My history",
+      "back": "Back to shifts",
+      "total": "Total shifts",
+      "post": "Group",
+      "count": "Count",
+      "noPost": "No group",
+      "empty": "You have not done any shifts yet."
     }
   }
 }

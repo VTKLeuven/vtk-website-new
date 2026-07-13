@@ -112,13 +112,13 @@ export async function unregisterShift(
     emitShiftsChanged();
   } else {
     const data = (await safeJson(resp)) as ErrorBody;
-    showToast({
-      variant: 'error',
-      message:
-        data?.error === 'You are not registered for this shift'
-          ? t.error.notRegistered
-          : t.error.unregisterFailed,
-    });
+    const message =
+      data?.error === 'You are not registered for this shift'
+        ? t.error.notRegistered
+        : data?.error === 'Cannot unregister within 24 hours of the shift start'
+          ? t.error.tooLateToUnregister
+          : t.error.unregisterFailed;
+    showToast({ variant: 'error', message });
   }
 }
 
@@ -336,32 +336,41 @@ export function RegisteredShiftsTable({ locale }: { locale: Locale; userId: stri
                 </td>
               </tr>
             ) : (
-              shifts.map((shift) => (
-                <Fragment key={shift.id}>
-                  <tr className="vtk-basic-row-click" onClick={() => toggle(shift.id)}>
-                    <td data-label={t.columns.shift}>{shift.name}</td>
-                    <td data-label={t.columns.date}>{fmtDate(shift.startTime)}</td>
-                    <td data-label={t.columns.time}>
-                      {fmtTime(shift.startTime)}-{fmtTime(shift.endTime)}
-                    </td>
-                    <td data-label={t.columns.where}>{shift.location}</td>
-                    <td>
-                      <button
-                        type="button"
-                        className="vtk-basic-badge vtk-basic-badge-danger"
-                        onClick={(e) => {
-                          e.stopPropagation(); // niet de rij uitklappen bij uitschrijven
-                          unregisterShift(shift.id, showToast, t);
-                        }}
-                        style={{ cursor: 'pointer', fontFamily: 'inherit' }}
-                      >
-                        {t.unregister}
-                      </button>
-                    </td>
-                  </tr>
-                  {expandedId === shift.id ? <ShiftDetailRow shift={shift} t={t} /> : null}
-                </Fragment>
-              ))
+              shifts.map((shift) => {
+                // Binnen 24u voor de start kan je jezelf niet meer uitschrijven.
+                const locked = shift.startTime.getTime() - Date.now() < 24 * 60 * 60 * 1000;
+                return (
+                  <Fragment key={shift.id}>
+                    <tr className="vtk-basic-row-click" onClick={() => toggle(shift.id)}>
+                      <td data-label={t.columns.shift}>{shift.name}</td>
+                      <td data-label={t.columns.date}>{fmtDate(shift.startTime)}</td>
+                      <td data-label={t.columns.time}>
+                        {fmtTime(shift.startTime)}-{fmtTime(shift.endTime)}
+                      </td>
+                      <td data-label={t.columns.where}>{shift.location}</td>
+                      <td>
+                        <button
+                          type="button"
+                          className="vtk-basic-badge vtk-basic-badge-danger"
+                          disabled={locked}
+                          title={locked ? t.error.tooLateToUnregister : undefined}
+                          onClick={(e) => {
+                            e.stopPropagation(); // niet de rij uitklappen bij uitschrijven
+                            unregisterShift(shift.id, showToast, t);
+                          }}
+                          style={{
+                            cursor: locked ? 'not-allowed' : 'pointer',
+                            fontFamily: 'inherit',
+                          }}
+                        >
+                          {t.unregister}
+                        </button>
+                      </td>
+                    </tr>
+                    {expandedId === shift.id ? <ShiftDetailRow shift={shift} t={t} /> : null}
+                  </Fragment>
+                );
+              })
             )}
           </tbody>
         </table>

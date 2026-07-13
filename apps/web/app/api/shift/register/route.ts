@@ -129,6 +129,21 @@ export async function DELETE(request: Request) {
     return NextResponse.json({ error: 'id query parameter is required' }, { status: 400 });
   }
 
+  const shift = await prisma.shift.findUnique({ where: { id }, select: { startTime: true } });
+  if (!shift) {
+    return NextResponse.json({ error: 'Shift not found' }, { status: 404 });
+  }
+
+  // Binnen 24u voor de start kan een user zichzelf niet meer uitschrijven. Enkel
+  // een admin kan dan nog verwijderen via het bewerk-endpoint (/api/shift PATCH).
+  const UNREGISTER_LOCK_MS = 24 * 60 * 60 * 1000;
+  if (shift.startTime.getTime() - Date.now() < UNREGISTER_LOCK_MS) {
+    return NextResponse.json(
+      { error: 'Cannot unregister within 24 hours of the shift start' },
+      { status: 409 },
+    );
+  }
+
   try {
     await prisma.shiftParticipant.delete({
       where: { shiftId_userId: { shiftId: id, userId: session.user.id } },

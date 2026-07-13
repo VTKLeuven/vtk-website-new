@@ -234,7 +234,18 @@
       "notFound": "Deze shift bestaat niet meer.",
       "registerFailed": "Inschrijven mislukt. Probeer later opnieuw.",
       "notRegistered": "Je was niet ingeschreven voor deze shift.",
-      "unregisterFailed": "Uitschrijven mislukt. Probeer later opnieuw."
+      "unregisterFailed": "Uitschrijven mislukt. Probeer later opnieuw.",
+      "tooLateToUnregister": "Uitschrijven kan niet meer: minder dan 24u voor de start. Vraag een admin om je te verwijderen."
+    },
+    "history": {
+      "title": "Mijn shiftgeschiedenis",
+      "link": "Mijn geschiedenis",
+      "back": "Terug naar shiften",
+      "total": "Totaal aantal shiften",
+      "post": "Post",
+      "count": "Aantal",
+      "noPost": "Geen post",
+      "empty": "Je hebt nog geen shiften gedaan."
     }
   }
 }
