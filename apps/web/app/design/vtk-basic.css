@@ -254,6 +254,11 @@
   gap: 12px;
 }
 
+/* Ruimte tussen opeenvolgende shift-tabellen (bvb "Mijn shiften" + "Beschikbare shiften"). */
+.vtk-basic-table-section + .vtk-basic-table-section {
+  margin-top: clamp(28px, 5vw, 44px);
+}
+
 .vtk-basic-table-title {
   margin: 0;
   color: var(--ink);
@@ -316,6 +321,98 @@
 .vtk-basic-shift-v {
   color: var(--body);
   font-size: 14px;
+}
+
+/* --- Mobiel: shift-toolbar stapelen + shift-tabellen als kaarten --- */
+@media (max-width: 640px) {
+  .vtk-basic-toolbar {
+    align-items: stretch;
+  }
+
+  .vtk-basic-toolbar .vtk-basic-field {
+    /* velden mogen groeien/krimpen i.p.v. een vaste 160px af te dwingen */
+    min-width: 0;
+    flex: 1 1 140px;
+  }
+
+  .vtk-basic-toolbar .vtk-basic-select {
+    width: 100%;
+  }
+
+  /* Geen horizontale scroll: elke rij wordt een kaart met eigen labels.
+     Alles op block zetten zodat border-collapse niet meer geldt en de
+     scheidingslijnen op de rijen betrouwbaar renderen. */
+  .vtk-shift-table,
+  .vtk-shift-table tbody {
+    display: block;
+    min-width: 0;
+  }
+
+  .vtk-shift-table thead {
+    /* kolomkoppen visueel verbergen (blijven leesbaar voor screenreaders) */
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+    border: 0;
+  }
+
+  .vtk-shift-table tbody tr {
+    display: block;
+    padding: 6px 4px;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .vtk-shift-table tbody tr:last-child {
+    border-bottom: 0;
+  }
+
+  .vtk-shift-table td {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 6px 16px;
+    border-bottom: 0;
+    text-align: right;
+  }
+
+  .vtk-shift-table td[data-label]::before {
+    content: attr(data-label);
+    color: var(--muted);
+    font-size: 12px;
+    font-weight: 700;
+    text-align: left;
+    white-space: nowrap;
+  }
+
+  /* Actiecel (knop) over de volledige breedte als duidelijke tap-target. */
+  .vtk-shift-table td:last-child {
+    padding-top: 10px;
+    padding-bottom: 10px;
+  }
+
+  .vtk-shift-table td:last-child button {
+    width: 100%;
+    justify-content: center;
+    min-height: 40px;
+  }
+
+  /* Uitklap-detailrij: volledige breedte, geen label. */
+  .vtk-shift-table .vtk-basic-row-detail td {
+    display: block;
+    padding: 10px 16px;
+    text-align: left;
+  }
+
+  /* De empty-state-rij blijft één gecentreerde regel. */
+  .vtk-shift-table .vtk-basic-table-empty {
+    display: block;
+    text-align: center;
+  }
 }
 
 .vtk-basic-stat {

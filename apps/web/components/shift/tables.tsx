@@ -231,7 +231,7 @@ export function AvailableShiftsTable({ locale }: { locale: Locale; userId: strin
       </div>
 
       <div className="vtk-basic-table-wrap">
-        <table className="vtk-basic-table">
+        <table className="vtk-basic-table vtk-shift-table">
           <thead>
             <tr>
               <th>Shift</th>
@@ -263,12 +263,12 @@ export function AvailableShiftsTable({ locale }: { locale: Locale; userId: strin
                 return (
                   <Fragment key={shift.id}>
                     <tr className="vtk-basic-row-click" onClick={() => toggle(shift.id)}>
-                      <td>{shift.name}</td>
-                      <td>{fmtDate(shift.startTime)}</td>
-                      <td>
+                      <td data-label="Shift">{shift.name}</td>
+                      <td data-label="Datum">{fmtDate(shift.startTime)}</td>
+                      <td data-label="Tijd">
                         {fmtTime(shift.startTime)}-{fmtTime(shift.endTime)}
                       </td>
-                      <td>{shift.location}</td>
+                      <td data-label="Locatie">{shift.location}</td>
                       <td>
                         <button
                           type="button"
@@ -312,7 +312,7 @@ export function RegisteredShiftsTable({ locale }: { locale: Locale; userId: stri
     <div className="vtk-basic-table-section">
       <h2 className="vtk-basic-table-title">Mijn shiften</h2>
       <div className="vtk-basic-table-wrap">
-        <table className="vtk-basic-table">
+        <table className="vtk-basic-table vtk-shift-table">
           <thead>
             <tr>
               <th>Shift</th>
@@ -333,12 +333,12 @@ export function RegisteredShiftsTable({ locale }: { locale: Locale; userId: stri
               shifts.map((shift) => (
                 <Fragment key={shift.id}>
                   <tr className="vtk-basic-row-click" onClick={() => toggle(shift.id)}>
-                    <td>{shift.name}</td>
-                    <td>{fmtDate(shift.startTime)}</td>
-                    <td>
+                    <td data-label="Shift">{shift.name}</td>
+                    <td data-label="Datum">{fmtDate(shift.startTime)}</td>
+                    <td data-label="Tijd">
                       {fmtTime(shift.startTime)}-{fmtTime(shift.endTime)}
                     </td>
-                    <td>{shift.location}</td>
+                    <td data-label="Locatie">{shift.location}</td>
                     <td>
                       <button
                         type="button"
