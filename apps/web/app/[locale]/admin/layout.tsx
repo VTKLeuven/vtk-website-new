@@ -18,6 +18,7 @@ const sections = [
   { key: "groups", href: "/groepen", perm: "groups.manage" },
   { key: "home", href: "/home", perm: "home.edit" },
   { key: "dashboardTiles", href: "/dashboard-tiles", perm: "dashboard.manage" },
+  { key: "shift", href: "/shiften", anyPerm: ["shift.edit", "shift.reward", "shift.ranking"] },
 ] as const;
 
 type DictAdmin = ReturnType<typeof getDictionary>["admin"];
@@ -38,13 +39,12 @@ export default async function AdminLayout({
 
   const adminDict = dict.admin as DictAdmin & { [key: string]: string };
 
-  const visibleSections = sections.filter(
-    (s) =>
-      !("perm" in s) ||
-      !s.perm ||
-      session.user.isSuperAdmin ||
-      session.permissions.includes(s.perm)
-  );
+  const visibleSections = sections.filter((s) => {
+    if (session.user.isSuperAdmin) return true;
+    if ("anyPerm" in s) return s.anyPerm.some((p) => session.permissions.includes(p));
+    if (!("perm" in s) || !s.perm) return true;
+    return session.permissions.includes(s.perm);
+  });
 
   return (
     <div className="vtk-admin-surface">

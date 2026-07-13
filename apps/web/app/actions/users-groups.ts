@@ -60,6 +60,14 @@ export async function saveUserAction(formData: FormData): Promise<void> {
       isSuperAdmin: parsed.isSuperAdmin,
     });
   }
+
+  // rNumber zit niet in createUser/updateUser; enkel bijwerken wanneer het veld
+  // effectief in het formulier zat (lege waarde = wissen).
+  if (formData.has("rNumber")) {
+    const rNumber = String(formData.get("rNumber") ?? "").trim() || null;
+    await prisma.user.update({ where: { email: parsed.email }, data: { rNumber } });
+  }
+
   revalidatePath("/admin/gebruikers");
   redirect("/admin/gebruikers");
 }
@@ -109,7 +117,7 @@ export async function removeMembershipAction(formData: FormData): Promise<void> 
   revalidatePath("/praesidium");
 }
 
-// Bulk CSV import. Columns: email,name,password,groupCode,role,year
+// Bulk CSV import. Columns: email,name,password,groupCode,role,year,rNumber
 export async function bulkImportUsersAction(formData: FormData): Promise<{ ok: boolean; added: number; errors: string[] }> {
   await requirePermission("users.bulkImport");
   const session = await requireSession();
@@ -126,18 +134,21 @@ export async function bulkImportUsersAction(formData: FormData): Promise<{ ok: b
 
   for (let i = start; i < lines.length; i += 1) {
     const cols = splitCsv(lines[i]);
-    const [email, name, password, groupCode, role, yearStr] = cols;
+    const [email, name, password, groupCode, role, yearStr, rNumberRaw] = cols;
     if (!email || !name) {
       errors.push(`Line ${i + 1}: missing email/name`);
       continue;
     }
+    const rNumber = rNumberRaw?.trim() || undefined;
     try {
       const user = await prisma.user.upsert({
         where: { email: email.toLowerCase() },
-        update: { name },
+        // rNumber enkel meenemen wanneer de kolom een waarde heeft (niet wissen).
+        update: { name, ...(rNumber ? { rNumber } : {}) },
         create: {
           email: email.toLowerCase(),
           name,
+          ...(rNumber ? { rNumber } : {}),
         },
       });
       await setUserPassword(session, user.id, password || cryptoRandomPassword());

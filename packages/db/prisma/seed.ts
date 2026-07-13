@@ -1023,6 +1023,64 @@ async function main() {
     });
   }
 
+  console.log("Seeding completed shifts + participants...");
+  // Voltooide (verleden) shiften met deelnemers, gemengd betaald/onbetaald, zodat
+  // de admin-ranglijst en -vergoedingen data hebben. Negatieve dayOffsets houden ze
+  // relatief in het verleden; de laatste twee vallen in het vorige academiejaar.
+  const pastShiftSeeds: Array<{
+    id: string;
+    name: string;
+    dayOffset: number;
+    startHour: number;
+    endHour: number;
+    location: string;
+    description: string;
+    maxParticipants: number;
+    reward: number;
+    post: GroupCode | null;
+    participants: Array<{ email: string; payedOut: boolean }>;
+  }> = [
+    { id: "seed-shift-past-1", name: "Openingscantus tap", dayOffset: -4, startHour: 21, endHour: 24, location: "Fakbar", description: "Tappen op de openingscantus", maxParticipants: 5, reward: 3, post: "FAKBAR",
+      participants: [ { email: "logistiek@vtk.prototype", payedOut: true }, { email: "sport@vtk.prototype", payedOut: false }, { email: "it@vtk.prototype", payedOut: false } ] },
+    { id: "seed-shift-past-2", name: "Cursusverkoop ochtend", dayOffset: -11, startHour: 9, endHour: 12, location: "Cursusdienst", description: "Ochtendverkoop cursussen", maxParticipants: 3, reward: 1, post: "CURSUSDIENST",
+      participants: [ { email: "onderwijs@vtk.prototype", payedOut: true }, { email: "career@vtk.prototype", payedOut: true } ] },
+    { id: "seed-shift-past-3", name: "Bedrijvendag opbouw", dayOffset: -20, startHour: 8, endHour: 12, location: "Aula 200", description: "Standen opbouwen bedrijvendag", maxParticipants: 6, reward: 2, post: "BEDRIJVENRELATIES",
+      participants: [ { email: "career@vtk.prototype", payedOut: false }, { email: "vice@vtk.prototype", payedOut: false }, { email: "logistiek@vtk.prototype", payedOut: true } ] },
+    { id: "seed-shift-past-4", name: "Interfacultair sporttoernooi", dayOffset: -35, startHour: 13, endHour: 18, location: "Sporthal", description: "Begeleiding sporttoernooi", maxParticipants: 5, reward: 2, post: "SPORT",
+      participants: [ { email: "sport@vtk.prototype", payedOut: true }, { email: "praeses@vtk.prototype", payedOut: false } ] },
+    { id: "seed-shift-past-5", name: "Galabal kaartcontrole", dayOffset: -60, startHour: 19, endHour: 24, location: "Onthaal", description: "Onthaal en kaartcontrole galabal", maxParticipants: 8, reward: 3, post: null,
+      participants: [ { email: "cultuur@vtk.prototype", payedOut: true }, { email: "international@vtk.prototype", payedOut: true }, { email: "theokot@vtk.prototype", payedOut: false } ] },
+    // Vorig academiejaar (~13 maanden geleden).
+    { id: "seed-shift-past-6", name: "Cantus tap (vorig jaar)", dayOffset: -400, startHour: 21, endHour: 24, location: "Fakbar", description: "Tappen vorig academiejaar", maxParticipants: 5, reward: 3, post: "FAKBAR",
+      participants: [ { email: "logistiek@vtk.prototype", payedOut: true }, { email: "sport@vtk.prototype", payedOut: true } ] },
+    { id: "seed-shift-past-7", name: "Doopcafé (vorig jaar)", dayOffset: -430, startHour: 20, endHour: 23, location: "Fakbar", description: "Doopcafé vorig academiejaar", maxParticipants: 4, reward: 2, post: "ACTIVITEITEN",
+      participants: [ { email: "praeses@vtk.prototype", payedOut: true }, { email: "it@vtk.prototype", payedOut: false } ] },
+  ];
+
+  for (const s of pastShiftSeeds) {
+    const data = {
+      name: s.name,
+      startTime: shiftAt(s.dayOffset, s.startHour),
+      endTime: shiftAt(s.dayOffset, s.endHour),
+      location: s.location,
+      description: s.description,
+      maxParticipants: s.maxParticipants,
+      reward: s.reward,
+      post: s.post,
+    };
+    await prisma.shift.upsert({ where: { id: s.id }, update: data, create: { id: s.id, ...data } });
+
+    for (const p of s.participants) {
+      const user = prototypeUserByEmail.get(p.email);
+      if (!user) continue;
+      await prisma.shiftParticipant.upsert({
+        where: { shiftId_userId: { shiftId: s.id, userId: user.id } },
+        update: { payedOut: p.payedOut },
+        create: { shiftId: s.id, userId: user.id, payedOut: p.payedOut },
+      });
+    }
+  }
+
   console.log("Seed complete.");
 }
 

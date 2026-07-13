@@ -67,6 +67,7 @@ model User {
   id               String              @id @default(cuid())
   name             String
   email            String              @unique
+  rNumber          String?             @unique // KU Leuven studentennummer (bvb r0123456), voor zoeken
   emailVerified Boolean                @default(false)
   avatarKey        String?
   image         String?

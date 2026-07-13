@@ -8,7 +8,10 @@
     "generate": "dotenv -e ../../.env -- prisma generate",
     "push": "dotenv -e ../../.env -- prisma db push",
     "migrate": "dotenv -e ../../.env -- prisma migrate dev",
+    "migrate:deploy": "dotenv -e ../../.env -- prisma migrate deploy",
     "seed": "dotenv -e ../../.env -- tsx prisma/seed.ts",
+    "db:setup": "npm run migrate:deploy && npm run generate && npm run seed",
+    "db:reset": "dotenv -e ../../.env -- prisma migrate reset --force",
     "build": "dotenv -e ../../.env -- prisma generate"
   },
   "dependencies": {

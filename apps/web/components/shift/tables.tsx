@@ -104,7 +104,7 @@ export async function registerShift(id: string, showToast: ShowToast, t: ShiftDi
 export async function unregisterShift(
   id: string,
   showToast: ShowToast,
-  t: ShiftDict,
+  t: ShiftDict
 ): Promise<void> {
   const resp = await fetch('/api/shift/register?id=' + id, { method: 'DELETE' });
   if (resp.ok) {

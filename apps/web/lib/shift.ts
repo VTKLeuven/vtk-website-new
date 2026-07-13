@@ -339,13 +339,23 @@ export function parsePartialShift(value: unknown): Partial<ShiftInput> {
  * academiejaar loopt van 1 september tot 1 september. Standaard het academiejaar
  * waarin `reference` valt.
  */
-export function academicYearRange(reference: Date = new Date()): { start: Date; end: Date } {
+/**
+ * Startjaar van het academiejaar waarin `reference` valt. Een academiejaar loopt
+ * van 1 september tot 1 september, dus bvb 15 mei 2026 hoort bij startjaar 2025.
+ */
+export function currentAcademicYear(reference: Date = new Date()): number {
   // getMonth() is 0-based: september = 8.
-  const year = reference.getMonth() >= 8 ? reference.getFullYear() : reference.getFullYear() - 1;
-  return {
-    start: new Date(year, 8, 1),
-    end: new Date(year + 1, 8, 1),
-  };
+  return reference.getMonth() >= 8 ? reference.getFullYear() : reference.getFullYear() - 1;
+}
+
+/** Geeft [1 sep `startYear`, 1 sep `startYear + 1`) terug (einde exclusief). */
+export function academicYearRangeFor(startYear: number): { start: Date; end: Date } {
+  return { start: new Date(startYear, 8, 1), end: new Date(startYear + 1, 8, 1) };
+}
+
+/** Het academiejaar waarin `reference` valt (standaard nu). */
+export function academicYearRange(reference: Date = new Date()): { start: Date; end: Date } {
+  return academicYearRangeFor(currentAcademicYear(reference));
 }
 
 /**
@@ -401,3 +411,6 @@ export const isRecordNotFound = (err: unknown): boolean => prismaErrorCode(err) 
 
 /** True wanneer een Prisma-insert een unique/PK-constraint schond (P2002). */
 export const isUniqueViolation = (err: unknown): boolean => prismaErrorCode(err) === 'P2002';
+
+/** True wanneer een Prisma-operatie een foreign-key-constraint schond (P2003). */
+export const isForeignKeyViolation = (err: unknown): boolean => prismaErrorCode(err) === 'P2003';
