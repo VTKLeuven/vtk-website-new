@@ -9,6 +9,7 @@ import {
   ShiftValidationError,
 } from '@/lib/shift';
 import { authErrorResponse } from '@/lib/session';
+import { withCors, corsPreflight } from '@/lib/cors';
 
 /**
  * Get de huidige shiften (waar een user zich voor kan registreren)
@@ -51,7 +52,7 @@ export async function GET() {
  *
  * Requests zijn van de vorm /api/shift
  */
-export async function POST(request: Request) {
+async function postHandler(request: Request) {
   try {
     await requirePermission('shift.edit');
   } catch (err) {
@@ -88,7 +89,7 @@ export async function POST(request: Request) {
  *
  * Requests zijn van de vorm /api/shift?id=*****
  */
-export async function DELETE(request: Request) {
+async function deleteHandler(request: Request) {
   try {
     await requirePermission('shift.edit');
   } catch (err) {
@@ -136,7 +137,7 @@ const isStringArray = (value: unknown): value is string[] =>
  *    en `removeParticipants` (arrays van userId's). Dit is de admin-override: er
  *    worden bewust géén overlap-/vol-/verleden-regels gecontroleerd.
  */
-export async function PATCH(request: Request) {
+async function patchHandler(request: Request) {
   try {
     await requirePermission('shift.edit');
   } catch (err) {
@@ -264,4 +265,15 @@ export async function PATCH(request: Request) {
   });
 
   return NextResponse.json(shift);
+}
+
+// CORS voor de mutatie-endpoints, zodat andere *.vtk.be-apps ze vanuit de browser
+// kunnen aanroepen (met de gedeelde sessiecookie). GET blijft same-origin.
+export const POST = withCors(postHandler);
+export const PATCH = withCors(patchHandler);
+export const DELETE = withCors(deleteHandler);
+
+/** Preflight (OPTIONS) voor de cross-origin mutatie-requests. */
+export function OPTIONS(request: Request) {
+  return corsPreflight(request);
 }
