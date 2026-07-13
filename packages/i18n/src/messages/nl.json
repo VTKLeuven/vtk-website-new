@@ -89,7 +89,11 @@
     "currentPassword": "Huidig wachtwoord",
     "newPassword": "Nieuw wachtwoord",
     "saved": "Opgeslagen",
-    "signInWithKul": "Inloggen met KU Leuven"
+    "signInWithKul": "Inloggen met KU Leuven",
+    "loginRequiredKicker": "Inloggen vereist",
+    "loginRequiredTitle": "Log in om deze pagina te bekijken",
+    "loginRequiredBody": "Je moet ingelogd zijn voordat je de inhoud van deze pagina kan bekijken.",
+    "goHome": "Naar home"
   },
   "admin": {
     "title": "Admin",
@@ -104,6 +108,7 @@
     "partners": "Partners",
     "home": "Homepagina",
     "dashboardTiles": "Dashboardtegels",
+    "shift": "Shiften",
     "create": "Nieuw",
     "save": "Opslaan",
     "delete": "Verwijderen",
@@ -179,5 +184,68 @@
         "body": "We kunnen deze privacyverklaring aanpassen wanneer de dienst verandert. De datum bovenaan geeft aan wanneer we de tekst laatst hebben bijgewerkt."
       }
     ]
+  },
+  "shift": {
+    "shifts": "Shiften",
+    "available": "Beschikbare shiften",
+    "registered": "Mijn shiften",
+    "columns": {
+      "shift": "Shift",
+      "date": "Datum",
+      "time": "Tijd",
+      "where": "Locatie",
+      "action": "Actie"
+    },
+    "filter": {
+      "post": "Post",
+      "allPosts": "Alle posten",
+      "from": "Vanaf",
+      "sortAsc": "↑ Oplopend",
+      "sortDesc": "↓ Aflopend"
+    },
+    "register": "Registreer",
+    "unregister": "Uitschrijven",
+    "week": {
+      "prev": "← Vorige",
+      "today": "Vandaag",
+      "next": "Volgende →",
+      "startDate": "Startdatum"
+    },
+    "emptyAvailable": "Er zijn geen beschikbare shiften in deze periode.",
+    "emptyRegistered": "Je bent nog niet ingeschreven voor een shift.",
+    "detail": {
+      "start": "Start",
+      "end": "Einde",
+      "location": "Locatie",
+      "post": "Post",
+      "reward": "Beloning",
+      "spots": "Plaatsen",
+      "description": "Beschrijving"
+    },
+    "toast": {
+      "registered": "Je bent ingeschreven voor deze shift.",
+      "unregistered": "Je bent uitgeschreven voor deze shift."
+    },
+    "error": {
+      "full": "Deze shift zit vol.",
+      "alreadyRegistered": "Je bent al ingeschreven voor deze shift.",
+      "overlap": "Je bent al ingeschreven voor een overlappende shift.",
+      "overlapNamed": "Je bent al ingeschreven voor een overlappende shift: {name}.",
+      "notFound": "Deze shift bestaat niet meer.",
+      "registerFailed": "Inschrijven mislukt. Probeer later opnieuw.",
+      "notRegistered": "Je was niet ingeschreven voor deze shift.",
+      "unregisterFailed": "Uitschrijven mislukt. Probeer later opnieuw.",
+      "tooLateToUnregister": "Uitschrijven kan niet meer: minder dan 24u voor de start. Vraag een admin om je te verwijderen."
+    },
+    "history": {
+      "title": "Mijn shiftgeschiedenis",
+      "link": "Mijn geschiedenis",
+      "back": "Terug naar shiften",
+      "total": "Totaal aantal shiften",
+      "post": "Post",
+      "count": "Aantal",
+      "noPost": "Geen post",
+      "empty": "Je hebt nog geen shiften gedaan."
+    }
   }
 }

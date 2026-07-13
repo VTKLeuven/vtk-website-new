@@ -67,6 +67,7 @@ model User {
   id               String              @id @default(cuid())
   name             String
   email            String              @unique
+  rNumber          String?             @unique // KU Leuven studentennummer (bvb r0123456), voor zoeken
   emailVerified Boolean                @default(false)
   avatarKey        String?
   image         String?
@@ -85,6 +86,7 @@ model User {
   createdEvents    CalendarEvent[]     @relation("EventCreatedBy")
   dashboardTiles   DashboardTile[]
   dashboardTilePrefs UserDashboardTilePref[]
+  participatingShifts ShiftParticipant[]
 }
 
 model Group {
@@ -364,6 +366,40 @@ model UserDashboardTilePref {
 
   @@id([userId, tileId])
   @@index([userId])
+}
+
+// -----------------------------------------------------------------------------
+// Shifts
+// -----------------------------------------------------------------------------
+
+model Shift {
+  id  String @id @default(cuid())
+
+  participantIds Int[]
+  participants ShiftParticipant[]
+
+  name String
+  startTime DateTime
+  endTime DateTime
+  location String
+  description String
+  maxParticipants Int
+  reward Int
+
+  post GroupCode?
+  // Ook een field bijhouden voor het evenement waarbij de shift hoort?
+}
+
+model ShiftParticipant {
+  shiftId String
+  shift Shift @relation(fields: [shiftId], references: [id], onDelete: Cascade)
+
+  userId  String
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  payedOut Boolean
+
+  @@id([shiftId, userId])
 }
 
 // -----------------------------------------------------------------------------

@@ -38,6 +38,7 @@ export default async function EditUserPage({
           <input type="hidden" name="id" value={user.id} />
           <div><Label>{locale === "nl" ? "Naam" : "Name"}</Label><Input name="name" defaultValue={user.name} required /></div>
           <div><Label>Email</Label><Input name="email" type="email" defaultValue={user.email} required /></div>
+          <div><Label>{locale === "nl" ? "R-nummer" : "R-number"}</Label><Input name="rNumber" defaultValue={user.rNumber ?? ""} placeholder="r0123456" /></div>
           <div>
             <Label>{locale === "nl" ? "Nieuw wachtwoord" : "New password"}</Label>
             <Input name="password" type="text" placeholder={locale === "nl" ? "Leeg laten om niet te wijzigen" : "Leave blank to keep"} />

@@ -89,7 +89,11 @@
     "currentPassword": "Current password",
     "newPassword": "New password",
     "saved": "Saved",
-    "signInWithKul": "Sign in with KU Leuven"
+    "signInWithKul": "Sign in with KU Leuven",
+    "loginRequiredKicker": "Login required",
+    "loginRequiredTitle": "Please log in to view this page",
+    "loginRequiredBody": "You must be logged in before you can view the content on this page.",
+    "goHome": "Go home"
   },
   "admin": {
     "title": "Admin",
@@ -104,6 +108,7 @@
     "partners": "Partners",
     "home": "Homepage",
     "dashboardTiles": "Dashboard tiles",
+    "shift": "Shifts",
     "create": "New",
     "save": "Save",
     "delete": "Delete",
@@ -179,5 +184,68 @@
         "body": "We may update this privacy statement when the service changes. The date at the top shows when we last updated the text."
       }
     ]
+  },
+  "shift": {
+    "shifts": "Shifts",
+    "available": "Available shifts",
+    "registered": "My shifts",
+    "columns": {
+      "shift": "Shift",
+      "date": "Date",
+      "time": "Time",
+      "where": "Location",
+      "action": "Action"
+    },
+    "filter": {
+      "post": "Group",
+      "allPosts": "All groups",
+      "from": "From",
+      "sortAsc": "↑ Ascending",
+      "sortDesc": "↓ Descending"
+    },
+    "register": "Register",
+    "unregister": "Unregister",
+    "week": {
+      "prev": "← Previous",
+      "today": "Today",
+      "next": "Next →",
+      "startDate": "Start date"
+    },
+    "emptyAvailable": "There are no available shifts in this period.",
+    "emptyRegistered": "You are not registered for any shift yet.",
+    "detail": {
+      "start": "Start",
+      "end": "End",
+      "location": "Location",
+      "post": "Group",
+      "reward": "Reward",
+      "spots": "Spots",
+      "description": "Description"
+    },
+    "toast": {
+      "registered": "You are registered for this shift.",
+      "unregistered": "You are unregistered from this shift."
+    },
+    "error": {
+      "full": "This shift is full.",
+      "alreadyRegistered": "You are already registered for this shift.",
+      "overlap": "You are already registered for an overlapping shift.",
+      "overlapNamed": "You are already registered for an overlapping shift: {name}.",
+      "notFound": "This shift no longer exists.",
+      "registerFailed": "Registration failed. Please try again later.",
+      "notRegistered": "You were not registered for this shift.",
+      "unregisterFailed": "Unregistration failed. Please try again later.",
+      "tooLateToUnregister": "You can no longer unregister: less than 24 hours before the start. Ask an admin to remove you."
+    },
+    "history": {
+      "title": "My shift history",
+      "link": "My history",
+      "back": "Back to shifts",
+      "total": "Total shifts",
+      "post": "Group",
+      "count": "Count",
+      "noPost": "No group",
+      "empty": "You have not done any shifts yet."
+    }
   }
 }

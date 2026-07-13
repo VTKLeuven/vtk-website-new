@@ -1,0 +1,122 @@
+.vtk-week {
+  display: grid;
+  gap: 12px;
+}
+
+.vtk-week-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 10px;
+}
+
+.vtk-week-scroll {
+  overflow-x: auto;
+}
+
+.vtk-week-grid {
+  display: grid;
+  grid-template-columns: 56px repeat(7, minmax(96px, 1fr));
+  min-width: 760px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: #fff;
+  overflow: hidden;
+}
+
+.vtk-week-corner {
+  border-bottom: 1px solid var(--line);
+  background: var(--paper);
+}
+
+.vtk-week-head {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 8px 4px;
+  border-bottom: 1px solid var(--line);
+  border-left: 1px solid var(--line);
+  background: var(--paper);
+}
+
+.vtk-week-dow {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.vtk-week-date {
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.vtk-week-gutter {
+  position: relative;
+}
+
+.vtk-week-hour {
+  position: absolute;
+  right: 6px;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1;
+}
+
+.vtk-week-daycol {
+  position: relative;
+  border-left: 1px solid var(--line);
+}
+
+.vtk-week-block {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 3px 6px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  overflow: hidden;
+  text-align: left;
+  font: inherit;
+  font-size: 11px;
+  line-height: 1.2;
+  cursor: pointer;
+}
+
+.vtk-week-block:disabled {
+  cursor: default;
+}
+
+.vtk-week-block-time {
+  font-weight: 700;
+  opacity: 0.75;
+}
+
+.vtk-week-block-name {
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.vtk-week-block-available {
+  background: #fff;
+  border-color: var(--navy);
+  color: var(--ink);
+}
+
+.vtk-week-block-registered {
+  background: var(--navy);
+  border-color: var(--navy);
+  color: var(--paper);
+}
+
+.vtk-week-block-full {
+  background: var(--paper-2);
+  border-color: var(--line);
+  color: var(--muted);
+}

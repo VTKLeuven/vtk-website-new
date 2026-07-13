@@ -34,6 +34,11 @@ export const PERMISSIONS = [
   // Dashboard tiles
   { code: "dashboard.manage", labelNl: "Dashboardtegels beheren", labelEn: "Manage dashboard tiles", category: "general" },
 
+  // Shifts
+  { code: "shift.edit", labelNl: "Shiften beheren", labelEn: "Manage shifts", category: "shift" },
+  { code: "shift.reward", labelNl: "Shiftvergoedingen beheren", labelEn: "Manage shift rewards", category: "shift" },
+  { code: "shift.ranking", labelNl: "Shiftranglijst bekijken", labelEn: "View shift rankings", category: "shift" },
+
   // Module access flags (gate submodules via group permissions)
   { code: "modules.logistiek.access", labelNl: "Toegang tot Logistiek module", labelEn: "Access to Logistics module", category: "modules" },
   { code: "modules.cursusdienst.access", labelNl: "Toegang tot Cursusdienst module", labelEn: "Access to Course Shop module", category: "modules" },

@@ -53,6 +53,7 @@ export default async function AdminUsers({
           <form action={saveUserAction} className="grid grid-cols-1 md:grid-cols-4 gap-3 items-end">
             <div><Label>{locale === "nl" ? "Naam" : "Name"}</Label><Input name="name" required /></div>
             <div><Label>Email</Label><Input name="email" type="email" required /></div>
+            <div><Label>{locale === "nl" ? "R-nummer" : "R-number"}</Label><Input name="rNumber" placeholder="r0123456" /></div>
             <div><Label>{locale === "nl" ? "Wachtwoord" : "Password"}</Label><Input name="password" type="text" required /></div>
             <div>
               <Label>Locale</Label>
@@ -80,8 +81,8 @@ export default async function AdminUsers({
           </h2>
           <p className="text-sm text-zinc-500 mb-3">
             {locale === "nl"
-              ? "Kolommen: email, name, password, groupCode, role (MEMBER|LEAD), year. Eerste rij mag een header zijn."
-              : "Columns: email, name, password, groupCode, role (MEMBER|LEAD), year. First row may be a header."}
+              ? "Kolommen: email, name, password, groupCode, role (MEMBER|LEAD), year, rNumber. Eerste rij mag een header zijn."
+              : "Columns: email, name, password, groupCode, role (MEMBER|LEAD), year, rNumber. First row may be a header."}
           </p>
           <BulkImport locale={locale} />
         </Card>
