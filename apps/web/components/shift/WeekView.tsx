@@ -1,6 +1,7 @@
 'use client';
 import { useMemo, useState } from 'react';
 import { addDays, format } from 'date-fns';
+import { getDictionary, type Locale } from '@vtk/i18n';
 import { type ShiftResponse } from '@/lib/shift';
 import { useToast } from '@/components/ui/toast';
 import { fmtTime, useShiftList, registerShift, unregisterShift } from './tables';
@@ -8,7 +9,11 @@ import './week-view.css';
 
 const HOUR_PX = 44;
 const MS_PER_HOUR = 3_600_000;
-const DOW_NL = ['zo', 'ma', 'di', 'wo', 'do', 'vr', 'za'];
+// Weekdag-afkortingen per locale, geïndexeerd via Date.getDay() (0 = zondag).
+const DOW = {
+  nl: ['zo', 'ma', 'di', 'wo', 'do', 'vr', 'za'],
+  en: ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'],
+} as const;
 
 type MergedShift = { shift: ShiftResponse; registered: boolean };
 
@@ -33,7 +38,8 @@ function localMidnight(dateStr: string): Date {
  * startdatum (dus startdag + 6 dagen), met shiften als blokken op hun uren.
  * Klikken schrijft in/uit; blijft via de event-bus in sync met de lijstweergave.
  */
-export function ShiftWeekView() {
+export function ShiftWeekView({ locale }: { locale: Locale }) {
+  const t = getDictionary(locale).shift;
   const showToast = useToast();
   const available = useShiftList('/api/shift');
   const registered = useShiftList('/api/shift/register');
@@ -137,7 +143,7 @@ export function ShiftWeekView() {
           onClick={() => shiftWeek(-7)}
           style={{ cursor: 'pointer', fontFamily: 'inherit' }}
         >
-          ← Vorige
+          {t.week.prev}
         </button>
         <button
           type="button"
@@ -145,7 +151,7 @@ export function ShiftWeekView() {
           onClick={() => setStartStr(format(new Date(), 'yyyy-MM-dd'))}
           style={{ cursor: 'pointer', fontFamily: 'inherit' }}
         >
-          Vandaag
+          {t.week.today}
         </button>
         <button
           type="button"
@@ -153,10 +159,10 @@ export function ShiftWeekView() {
           onClick={() => shiftWeek(7)}
           style={{ cursor: 'pointer', fontFamily: 'inherit' }}
         >
-          Volgende →
+          {t.week.next}
         </button>
         <label className="vtk-basic-field">
-          <span className="vtk-basic-label">Startdatum</span>
+          <span className="vtk-basic-label">{t.week.startDate}</span>
           <input
             type="date"
             className="vtk-basic-input"
@@ -171,7 +177,7 @@ export function ShiftWeekView() {
           <div className="vtk-week-corner" />
           {days.map((day) => (
             <div key={day.toISOString()} className="vtk-week-head">
-              <span className="vtk-week-dow">{DOW_NL[day.getDay()]}</span>
+              <span className="vtk-week-dow">{DOW[locale][day.getDay()]}</span>
               <span className="vtk-week-date">{format(day, 'dd/MM')}</span>
             </div>
           ))}
@@ -214,8 +220,8 @@ export function ShiftWeekView() {
                       disabled={isFull}
                       onClick={() =>
                         registered
-                          ? unregisterShift(shift.id, showToast)
-                          : registerShift(shift.id, showToast)
+                          ? unregisterShift(shift.id, showToast, t)
+                          : registerShift(shift.id, showToast, t)
                       }
                       style={{
                         top: (s.startFrac - minHour) * HOUR_PX,

@@ -185,6 +185,55 @@
     ]
   },
   "shift": {
-    "shifts": "Shiften"
+    "shifts": "Shiften",
+    "available": "Beschikbare shiften",
+    "registered": "Mijn shiften",
+    "columns": {
+      "shift": "Shift",
+      "date": "Datum",
+      "time": "Tijd",
+      "where": "Locatie",
+      "action": "Actie"
+    },
+    "filter": {
+      "post": "Post",
+      "allPosts": "Alle posten",
+      "from": "Vanaf",
+      "sortAsc": "↑ Oplopend",
+      "sortDesc": "↓ Aflopend"
+    },
+    "register": "Registreer",
+    "unregister": "Uitschrijven",
+    "week": {
+      "prev": "← Vorige",
+      "today": "Vandaag",
+      "next": "Volgende →",
+      "startDate": "Startdatum"
+    },
+    "emptyAvailable": "Er zijn geen beschikbare shiften in deze periode.",
+    "emptyRegistered": "Je bent nog niet ingeschreven voor een shift.",
+    "detail": {
+      "start": "Start",
+      "end": "Einde",
+      "location": "Locatie",
+      "post": "Post",
+      "reward": "Beloning",
+      "spots": "Plaatsen",
+      "description": "Beschrijving"
+    },
+    "toast": {
+      "registered": "Je bent ingeschreven voor deze shift.",
+      "unregistered": "Je bent uitgeschreven voor deze shift."
+    },
+    "error": {
+      "full": "Deze shift zit vol.",
+      "alreadyRegistered": "Je bent al ingeschreven voor deze shift.",
+      "overlap": "Je bent al ingeschreven voor een overlappende shift.",
+      "overlapNamed": "Je bent al ingeschreven voor een overlappende shift: {name}.",
+      "notFound": "Deze shift bestaat niet meer.",
+      "registerFailed": "Inschrijven mislukt. Probeer later opnieuw.",
+      "notRegistered": "Je was niet ingeschreven voor deze shift.",
+      "unregisterFailed": "Uitschrijven mislukt. Probeer later opnieuw."
+    }
   }
 }

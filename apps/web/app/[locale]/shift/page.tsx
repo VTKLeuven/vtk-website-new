@@ -27,7 +27,7 @@ export default async function ShiftPage({ params }: { params: Promise<{ locale: 
       <header className="vtk-page-head">
         <div>
           <div className="vtk-page-kicker">VTK · {dict.shift.shifts}</div>
-          <h1 className="vtk-page-title">Shiften</h1>
+          <h1 className="vtk-page-title">{dict.shift.shifts}</h1>
         </div>
       </header>
 

@@ -1,12 +1,14 @@
 'use client';
 import { Fragment, useEffect, useMemo, useState } from 'react';
-import { getDictionary, type Locale } from '@vtk/i18n';
+import { getDictionary, type Dictionary, type Locale } from '@vtk/i18n';
 import { parseShiftArray, type ShiftResponse } from '@/lib/shift';
 import { useToast, type ToastInput } from '@/components/ui/toast';
 import { format } from 'date-fns';
 import '@/app/design/vtk-basic.css';
 
 export type ShowToast = (input: ToastInput) => void;
+/** De shift-sectie van het woordenboek; doorgegeven aan helpers buiten de componenten. */
+export type ShiftDict = Dictionary['shift'];
 
 /**
  * Kleine event-bus zodat een (uit)schrijving in de ene view (tabel of week) de
@@ -40,22 +42,22 @@ async function safeJson(resp: Response): Promise<unknown> {
   }
 }
 
-/** Zet de server-foutcode om in een leesbare (NL) reden voor de statusmelding. */
-function registerErrorMessage(body: unknown): string {
+/** Zet de server-foutcode om in een vertaalde reden voor de statusmelding. */
+function registerErrorMessage(body: unknown, t: ShiftDict): string {
   const data = (body ?? {}) as ErrorBody;
   switch (data.error) {
     case 'Shift is full':
-      return 'Deze shift zit vol.';
+      return t.error.full;
     case 'Already registered for this shift':
-      return 'Je bent al ingeschreven voor deze shift.';
+      return t.error.alreadyRegistered;
     case 'You are already registered for an overlapping shift':
       return data.conflictShift?.name
-        ? `Je bent al ingeschreven voor een overlappende shift: ${data.conflictShift.name}.`
-        : 'Je bent al ingeschreven voor een overlappende shift.';
+        ? t.error.overlapNamed.replace('{name}', data.conflictShift.name)
+        : t.error.overlap;
     case 'Shift not found':
-      return 'Deze shift bestaat niet meer.';
+      return t.error.notFound;
     default:
-      return 'Inschrijven mislukt. Probeer later opnieuw.';
+      return t.error.registerFailed;
   }
 }
 
@@ -88,21 +90,25 @@ export function useShiftList(url: string): ShiftResponse[] {
 }
 
 /** Schrijft de huidige user in voor een shift en toont het resultaat als toast. */
-export async function registerShift(id: string, showToast: ShowToast): Promise<void> {
+export async function registerShift(id: string, showToast: ShowToast, t: ShiftDict): Promise<void> {
   const resp = await fetch('/api/shift/register?id=' + id, { method: 'POST' });
   if (resp.ok) {
-    showToast({ variant: 'success', message: 'Je bent ingeschreven voor deze shift.' });
+    showToast({ variant: 'success', message: t.toast.registered });
     emitShiftsChanged();
   } else {
-    showToast({ variant: 'error', message: registerErrorMessage(await safeJson(resp)) });
+    showToast({ variant: 'error', message: registerErrorMessage(await safeJson(resp), t) });
   }
 }
 
 /** Schrijft de huidige user uit voor een shift en toont het resultaat als toast. */
-export async function unregisterShift(id: string, showToast: ShowToast): Promise<void> {
+export async function unregisterShift(
+  id: string,
+  showToast: ShowToast,
+  t: ShiftDict,
+): Promise<void> {
   const resp = await fetch('/api/shift/register?id=' + id, { method: 'DELETE' });
   if (resp.ok) {
-    showToast({ variant: 'success', message: 'Je bent uitgeschreven voor deze shift.' });
+    showToast({ variant: 'success', message: t.toast.unregistered });
     emitShiftsChanged();
   } else {
     const data = (await safeJson(resp)) as ErrorBody;
@@ -110,8 +116,8 @@ export async function unregisterShift(id: string, showToast: ShowToast): Promise
       variant: 'error',
       message:
         data?.error === 'You are not registered for this shift'
-          ? 'Je was niet ingeschreven voor deze shift.'
-          : 'Uitschrijven mislukt. Probeer later opnieuw.',
+          ? t.error.notRegistered
+          : t.error.unregisterFailed,
     });
   }
 }
@@ -126,19 +132,19 @@ function Detail({ k, v, full }: { k: string; v: string; full?: boolean }) {
 }
 
 /** De uitklap-rij met de exacte start/einde (incl. datum) en overige info. */
-function ShiftDetailRow({ shift }: { shift: ShiftResponse }) {
+function ShiftDetailRow({ shift, t }: { shift: ShiftResponse; t: ShiftDict }) {
   const taken = shift.takenSpots ?? shift.participants?.length;
   return (
     <tr className="vtk-basic-row-detail">
       <td colSpan={5}>
         <div className="vtk-basic-shift-details">
-          <Detail k="Start" v={fmtDateTime(shift.startTime)} />
-          <Detail k="Einde" v={fmtDateTime(shift.endTime)} />
-          <Detail k="Locatie" v={shift.location} />
-          {shift.post ? <Detail k="Post" v={shift.post} /> : null}
-          <Detail k="Beloning" v={String(shift.reward)} />
-          <Detail k="Plaatsen" v={`${taken ?? '?'}/${shift.maxParticipants}`} />
-          <Detail k="Beschrijving" v={shift.description} full />
+          <Detail k={t.detail.start} v={fmtDateTime(shift.startTime)} />
+          <Detail k={t.detail.end} v={fmtDateTime(shift.endTime)} />
+          <Detail k={t.detail.location} v={shift.location} />
+          {shift.post ? <Detail k={t.detail.post} v={shift.post} /> : null}
+          <Detail k={t.detail.reward} v={String(shift.reward)} />
+          <Detail k={t.detail.spots} v={`${taken ?? '?'}/${shift.maxParticipants}`} />
+          <Detail k={t.detail.description} v={shift.description} full />
         </div>
       </td>
     </tr>
@@ -153,7 +159,7 @@ function dateWindow(startDate: string): { start: Date; end: Date } | null {
 }
 
 export function AvailableShiftsTable({ locale }: { locale: Locale; userId: string }) {
-  const dict = getDictionary(locale);
+  const t = getDictionary(locale).shift;
 
   const showToast = useToast();
   const shifts = useShiftList('/api/shift');
@@ -191,17 +197,17 @@ export function AvailableShiftsTable({ locale }: { locale: Locale; userId: strin
 
   return (
     <div className="vtk-basic-table-section">
-      <h2 className="vtk-basic-table-title">Beschikbare shiften</h2>
+      <h2 className="vtk-basic-table-title">{t.available}</h2>
 
       <div className="vtk-basic-toolbar">
         <label className="vtk-basic-field">
-          <span className="vtk-basic-label">Post</span>
+          <span className="vtk-basic-label">{t.filter.post}</span>
           <select
             className="vtk-basic-select"
             value={postFilter}
             onChange={(e) => setPostFilter(e.target.value)}
           >
-            <option value="ALL">Alle posten</option>
+            <option value="ALL">{t.filter.allPosts}</option>
             {availablePosts.map((post) => (
               <option key={post} value={post}>
                 {post}
@@ -211,7 +217,7 @@ export function AvailableShiftsTable({ locale }: { locale: Locale; userId: strin
         </label>
 
         <label className="vtk-basic-field">
-          <span className="vtk-basic-label">Vanaf</span>
+          <span className="vtk-basic-label">{t.filter.from}</span>
           <input
             type="date"
             className="vtk-basic-input"
@@ -226,7 +232,7 @@ export function AvailableShiftsTable({ locale }: { locale: Locale; userId: strin
           onClick={() => setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'))}
           style={{ cursor: 'pointer', fontFamily: 'inherit' }}
         >
-          {sortDir === 'asc' ? '↑ Oplopend' : '↓ Aflopend'}
+          {sortDir === 'asc' ? t.filter.sortAsc : t.filter.sortDesc}
         </button>
       </div>
 
@@ -234,18 +240,18 @@ export function AvailableShiftsTable({ locale }: { locale: Locale; userId: strin
         <table className="vtk-basic-table vtk-shift-table">
           <thead>
             <tr>
-              <th>Shift</th>
-              <th>Date</th>
-              <th>Time</th>
-              <th>Where</th>
-              <th>Register</th>
+              <th>{t.columns.shift}</th>
+              <th>{t.columns.date}</th>
+              <th>{t.columns.time}</th>
+              <th>{t.columns.where}</th>
+              <th>{t.columns.action}</th>
             </tr>
           </thead>
           <tbody>
             {visibleShifts.length === 0 ? (
               <tr>
                 <td colSpan={5} className="vtk-basic-table-empty">
-                  Er zijn geen beschikbare shiften in deze periode.
+                  {t.emptyAvailable}
                 </td>
               </tr>
             ) : (
@@ -263,19 +269,19 @@ export function AvailableShiftsTable({ locale }: { locale: Locale; userId: strin
                 return (
                   <Fragment key={shift.id}>
                     <tr className="vtk-basic-row-click" onClick={() => toggle(shift.id)}>
-                      <td data-label="Shift">{shift.name}</td>
-                      <td data-label="Datum">{fmtDate(shift.startTime)}</td>
-                      <td data-label="Tijd">
+                      <td data-label={t.columns.shift}>{shift.name}</td>
+                      <td data-label={t.columns.date}>{fmtDate(shift.startTime)}</td>
+                      <td data-label={t.columns.time}>
                         {fmtTime(shift.startTime)}-{fmtTime(shift.endTime)}
                       </td>
-                      <td data-label="Locatie">{shift.location}</td>
+                      <td data-label={t.columns.where}>{shift.location}</td>
                       <td>
                         <button
                           type="button"
                           className={`vtk-basic-badge ${badgeVariant}`}
                           onClick={(e) => {
                             e.stopPropagation(); // niet de rij uitklappen bij registreren
-                            registerShift(shift.id, showToast);
+                            registerShift(shift.id, showToast, t);
                           }}
                           disabled={isFull}
                           style={{
@@ -283,11 +289,11 @@ export function AvailableShiftsTable({ locale }: { locale: Locale; userId: strin
                             fontFamily: 'inherit',
                           }}
                         >
-                          Registreer ({shift.takenSpots}/{shift.maxParticipants})
+                          {t.register} ({shift.takenSpots}/{shift.maxParticipants})
                         </button>
                       </td>
                     </tr>
-                    {expandedId === shift.id ? <ShiftDetailRow shift={shift} /> : null}
+                    {expandedId === shift.id ? <ShiftDetailRow shift={shift} t={t} /> : null}
                   </Fragment>
                 );
               })
@@ -300,7 +306,7 @@ export function AvailableShiftsTable({ locale }: { locale: Locale; userId: strin
 }
 
 export function RegisteredShiftsTable({ locale }: { locale: Locale; userId: string }) {
-  const dict = getDictionary(locale);
+  const t = getDictionary(locale).shift;
 
   const showToast = useToast();
   const shifts = useShiftList('/api/shift/register');
@@ -310,50 +316,50 @@ export function RegisteredShiftsTable({ locale }: { locale: Locale; userId: stri
 
   return (
     <div className="vtk-basic-table-section">
-      <h2 className="vtk-basic-table-title">Mijn shiften</h2>
+      <h2 className="vtk-basic-table-title">{t.registered}</h2>
       <div className="vtk-basic-table-wrap">
         <table className="vtk-basic-table vtk-shift-table">
           <thead>
             <tr>
-              <th>Shift</th>
-              <th>Date</th>
-              <th>Time</th>
-              <th>Where</th>
-              <th>Register</th>
+              <th>{t.columns.shift}</th>
+              <th>{t.columns.date}</th>
+              <th>{t.columns.time}</th>
+              <th>{t.columns.where}</th>
+              <th>{t.columns.action}</th>
             </tr>
           </thead>
           <tbody>
             {shifts.length === 0 ? (
               <tr>
                 <td colSpan={5} className="vtk-basic-table-empty">
-                  Je bent nog niet ingeschreven voor een shift.
+                  {t.emptyRegistered}
                 </td>
               </tr>
             ) : (
               shifts.map((shift) => (
                 <Fragment key={shift.id}>
                   <tr className="vtk-basic-row-click" onClick={() => toggle(shift.id)}>
-                    <td data-label="Shift">{shift.name}</td>
-                    <td data-label="Datum">{fmtDate(shift.startTime)}</td>
-                    <td data-label="Tijd">
+                    <td data-label={t.columns.shift}>{shift.name}</td>
+                    <td data-label={t.columns.date}>{fmtDate(shift.startTime)}</td>
+                    <td data-label={t.columns.time}>
                       {fmtTime(shift.startTime)}-{fmtTime(shift.endTime)}
                     </td>
-                    <td data-label="Locatie">{shift.location}</td>
+                    <td data-label={t.columns.where}>{shift.location}</td>
                     <td>
                       <button
                         type="button"
                         className="vtk-basic-badge vtk-basic-badge-danger"
                         onClick={(e) => {
                           e.stopPropagation(); // niet de rij uitklappen bij uitschrijven
-                          unregisterShift(shift.id, showToast);
+                          unregisterShift(shift.id, showToast, t);
                         }}
                         style={{ cursor: 'pointer', fontFamily: 'inherit' }}
                       >
-                        Uitschrijven
+                        {t.unregister}
                       </button>
                     </td>
                   </tr>
-                  {expandedId === shift.id ? <ShiftDetailRow shift={shift} /> : null}
+                  {expandedId === shift.id ? <ShiftDetailRow shift={shift} t={t} /> : null}
                 </Fragment>
               ))
             )}
