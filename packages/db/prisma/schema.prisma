@@ -377,6 +377,7 @@ model Shift {
   participantIds Int[]
   participants ShiftParticipant[]
 
+  name String
   startTime DateTime
   endTime DateTime
   location String

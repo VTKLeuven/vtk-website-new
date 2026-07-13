@@ -975,6 +975,54 @@ async function main() {
     });
   }
 
+  console.log("Seeding shifts...");
+  // All shifts are scheduled relative to *now* so a fresh seed always drops them
+  // in the coming 7 days. Fixed ids keep the seed idempotent: re-running just
+  // slides the same shifts forward to the next 7-day window.
+  const shiftNow = new Date();
+  const shiftAt = (dayOffset: number, hour: number, minute = 0): Date => {
+    const d = new Date(shiftNow);
+    d.setDate(d.getDate() + dayOffset);
+    d.setHours(hour, minute, 0, 0);
+    return d;
+  };
+  const shiftSeeds: Array<{
+    id: string;
+    name: string;
+    dayOffset: number;
+    startHour: number;
+    endHour: number;
+    location: string;
+    description: string;
+    maxParticipants: number;
+    reward: number;
+    post: GroupCode | null;
+  }> = [
+    { id: "seed-shift-1", name: "Tapshift", dayOffset: 1, startHour: 20, endHour: 23, location: "Fakbar", description: "Tapshift donderdagavond", maxParticipants: 4, reward: 2, post: "FAKBAR" },
+    { id: "seed-shift-2", name: "Cursusverkoop", dayOffset: 2, startHour: 9, endHour: 12, location: "Cursusdienst", description: "Cursussen verkopen tijdens de ochtend", maxParticipants: 3, reward: 1, post: "CURSUSDIENST" },
+    { id: "seed-shift-3", name: "Quiz opbouw", dayOffset: 3, startHour: 18, endHour: 22, location: "Aula Q", description: "Opbouw quiz-avond", maxParticipants: 6, reward: 3, post: "ACTIVITEITEN" },
+    { id: "seed-shift-4", name: "Sporttoernooi", dayOffset: 4, startHour: 13, endHour: 17, location: "Sporthal", description: "Begeleiding sporttoernooi", maxParticipants: 5, reward: 2, post: "SPORT" },
+    { id: "seed-shift-5", name: "Cantus laden", dayOffset: 5, startHour: 8, endHour: 11, location: "Loods", description: "Materiaal laden voor cantus", maxParticipants: 4, reward: 3, post: "LOGISTIEK" },
+    { id: "seed-shift-6", name: "Galabal onthaal", dayOffset: 6, startHour: 19, endHour: 23, location: "Onthaal", description: "Onthaal en kaartcontrole galabal", maxParticipants: 8, reward: 2, post: null },
+  ];
+  for (const s of shiftSeeds) {
+    const data = {
+      name: s.name,
+      startTime: shiftAt(s.dayOffset, s.startHour),
+      endTime: shiftAt(s.dayOffset, s.endHour),
+      location: s.location,
+      description: s.description,
+      maxParticipants: s.maxParticipants,
+      reward: s.reward,
+      post: s.post,
+    };
+    await prisma.shift.upsert({
+      where: { id: s.id },
+      update: data,
+      create: { id: s.id, ...data },
+    });
+  }
+
   console.log("Seed complete.");
 }
 

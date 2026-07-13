@@ -19,8 +19,8 @@ export async function GET(request: Request) {
     return authErrorResponse(err);
   }
 
-  const requestedUserId = new URL(request.url).searchParams.get('userId');
   let targetUserId = session.user.id;
+  const requestedUserId = new URL(request.url).searchParams.get('userId');
 
   // Andermans shiften bekijken vereist de juiste rechten; de eigen shiften niet.
   if (requestedUserId && requestedUserId !== session.user.id) {
