@@ -81,8 +81,9 @@ export default async function TicketEventDashboard({
   const shopHref = `${ticketBase(locale)}/tickets/${event.slug}`;
   const setupChecks = [
     {
-      label: locale === "nl" ? "Actief tickettype" : "Active ticket type",
+      label: locale === "nl" ? "Tickettype en prijs" : "Ticket type and price",
       complete: activeTypeCount > 0,
+      href: `${base}/instellingen#tickettype-aanmaken`,
     },
     {
       label: locale === "nl" ? "Beschikbare capaciteit" : "Available capacity",
@@ -169,7 +170,11 @@ export default async function TicketEventDashboard({
             {setupChecks.map((check) => (
               <div key={check.label} data-complete={check.complete}>
                 <span className="ticket-admin-checkmark"><Check aria-hidden="true" size={13} /></span>
-                <span>{check.label}</span>
+                {!check.complete && check.href && canManageSetup ? (
+                  <Link className="ticket-admin-setup-link" href={check.href}>{check.label}</Link>
+                ) : (
+                  <span>{check.label}</span>
+                )}
               </div>
             ))}
           </div>

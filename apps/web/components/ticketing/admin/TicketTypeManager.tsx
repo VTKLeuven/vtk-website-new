@@ -46,6 +46,7 @@ export function TicketTypeManager({
   locale: AdminLocale;
 }) {
   const activePools = pools.filter((pool) => pool.active);
+  const hasActiveTicketType = ticketTypes.some((ticketType) => ticketType.active);
 
   return (
     <>
@@ -140,7 +141,7 @@ export function TicketTypeManager({
         )}
       </section>
 
-      <section className="ticket-admin-section">
+      <section id="tickettype-aanmaken" className="ticket-admin-section ticket-admin-anchor-section">
         <div className="ticket-admin-section-head">
           <div className="ticket-admin-section-heading">
             <span className="ticket-admin-section-icon"><Ticket aria-hidden="true" size={17} /></span>
@@ -154,11 +155,16 @@ export function TicketTypeManager({
             </div>
           </div>
         </div>
-        {ticketTypes.length === 0 ? (
-          <p className="ticket-admin-empty">
-            {locale === "nl" ? "Nog geen tickettypes." : "No ticket types yet."}
-          </p>
-        ) : (
+        {!hasActiveTicketType ? (
+          <div className="ticket-admin-alert" role="status">
+            <span>
+              {locale === "nl"
+                ? "Stel hieronder een actief tickettype en de prijs per ticket in. Daarna kan je het event publiceren."
+                : "Set up an active ticket type and price per ticket below. You can then publish the event."}
+            </span>
+          </div>
+        ) : null}
+        {ticketTypes.length > 0 ? (
           <ul className="ticket-admin-list">
             {ticketTypes.map((ticketType) => (
               <li key={ticketType.id}>
@@ -195,10 +201,10 @@ export function TicketTypeManager({
               </li>
             ))}
           </ul>
-        )}
+        ) : null}
 
         <hr className="ticket-admin-divider" />
-        <details className="ticket-admin-details">
+        <details className="ticket-admin-details" open={!hasActiveTicketType}>
           <summary>{locale === "nl" ? "Tickettype toevoegen" : "Add ticket type"}</summary>
           <div className="ticket-admin-details-body">
             {activePools.length === 0 ? (
@@ -235,8 +241,13 @@ export function TicketTypeManager({
                     </select>
                   </div>
                   <div className="ticket-admin-field">
-                    <label htmlFor="ticket-type-price">{locale === "nl" ? `Prijs in ${currency}` : `Price in ${currency}`}</label>
+                    <label htmlFor="ticket-type-price">
+                      {locale === "nl" ? `Prijs per ticket (${currency})` : `Price per ticket (${currency})`}
+                    </label>
                     <input id="ticket-type-price" name="unitPrice" type="number" min="0" step="0.01" required />
+                    <span className="ticket-admin-help">
+                      {locale === "nl" ? "Gebruik 0 voor een gratis ticket." : "Use 0 for a free ticket."}
+                    </span>
                   </div>
                   <div className="ticket-admin-field">
                     <label htmlFor="ticket-type-audience">{locale === "nl" ? "Doelgroep" : "Audience"}</label>

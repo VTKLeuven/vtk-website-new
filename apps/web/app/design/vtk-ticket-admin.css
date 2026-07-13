@@ -366,6 +366,16 @@
   gap: 10px;
 }
 
+.ticket-admin-section-heading > div,
+.ticket-admin-alert > span {
+  min-width: 0;
+}
+
+.ticket-admin-section-head p,
+.ticket-admin-alert > span {
+  overflow-wrap: anywhere;
+}
+
 .ticket-admin-section-icon {
   display: inline-flex;
   width: 30px;
@@ -430,6 +440,21 @@
   margin: 4px 0 0;
   color: var(--muted);
   font-size: 12px;
+}
+
+.ticket-admin-help a,
+.ticket-admin-alert-link,
+.ticket-admin-setup-link {
+  color: inherit;
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.ticket-admin-alert-link {
+  display: block;
+  width: fit-content;
+  margin-top: 5px;
 }
 
 .ticket-admin-inline-meta,

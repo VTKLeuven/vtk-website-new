@@ -73,11 +73,13 @@ export function TicketEventForm({
   event = {},
   groups,
   calendarEvents,
+  hasActiveTicketType = false,
   locale,
 }: {
   event?: TicketEventFormValue;
   groups: GroupOption[];
   calendarEvents: CalendarOption[];
+  hasActiveTicketType?: boolean;
   locale: AdminLocale;
 }) {
   const isEdit = Boolean(event.id);
@@ -249,16 +251,31 @@ export function TicketEventForm({
               <label htmlFor="ticket-status">Status</label>
               <select id="ticket-status" name="status" defaultValue={event.status ?? "DRAFT"}>
                 <option value="DRAFT">{locale === "nl" ? "Concept" : "Draft"}</option>
-                <option value="PUBLISHED">{locale === "nl" ? "Gepubliceerd" : "Published"}</option>
+                <option value="PUBLISHED" disabled={!hasActiveTicketType}>
+                  {locale === "nl" ? "Gepubliceerd" : "Published"}
+                </option>
                 <option value="SALES_PAUSED">{locale === "nl" ? "Verkoop gepauzeerd" : "Sales paused"}</option>
                 <option value="SALES_CLOSED">{locale === "nl" ? "Verkoop gesloten" : "Sales closed"}</option>
                 <option value="CANCELLED">{locale === "nl" ? "Geannuleerd" : "Cancelled"}</option>
                 <option value="ARCHIVED">{locale === "nl" ? "Gearchiveerd" : "Archived"}</option>
               </select>
               <span className="ticket-admin-help">
-                {locale === "nl"
-                  ? "Publiceren kan zodra minstens één actief tickettype bestaat."
-                  : "Publishing requires at least one active ticket type."}
+                {hasActiveTicketType ? (
+                  locale === "nl" ? (
+                    "Er is een actief tickettype; dit event kan gepubliceerd worden."
+                  ) : (
+                    "An active ticket type exists; this event can be published."
+                  )
+                ) : (
+                  <>
+                    {locale === "nl"
+                      ? "Voeg eerst een tickettype met prijs toe. "
+                      : "First add a ticket type with a price. "}
+                    <a href="#tickettype-aanmaken">
+                      {locale === "nl" ? "Tickettype en prijs instellen" : "Set ticket type and price"}
+                    </a>
+                  </>
+                )}
               </span>
             </div>
           ) : (
@@ -365,7 +382,14 @@ export function TicketEventForm({
       {state.status === "error" ? (
         <div className="ticket-admin-alert" data-tone="danger" role="alert">
           <AlertTriangle aria-hidden="true" size={17} />
-          <span>{formErrorMessage(state.code, locale)}</span>
+          <span>
+            {formErrorMessage(state.code, locale)}
+            {state.code === "TICKET_TYPE_REQUIRED_TO_PUBLISH" && isEdit ? (
+              <a className="ticket-admin-alert-link" href="#tickettype-aanmaken">
+                {locale === "nl" ? "Tickettype en prijs instellen" : "Set ticket type and price"}
+              </a>
+            ) : null}
+          </span>
         </div>
       ) : state.status === "success" ? (
         <div className="ticket-admin-alert" data-tone="success" role="status">

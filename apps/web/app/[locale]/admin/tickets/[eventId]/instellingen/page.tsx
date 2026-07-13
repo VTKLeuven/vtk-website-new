@@ -75,7 +75,13 @@ export default async function TicketEventSettingsPage({
       </nav>
       {canManageEvent ? (
         <div id="event-instellingen" className="ticket-admin-anchor-section">
-          <TicketEventForm event={event} groups={groups} calendarEvents={calendarEvents} locale={locale} />
+          <TicketEventForm
+            event={event}
+            groups={groups}
+            calendarEvents={calendarEvents}
+            hasActiveTicketType={event.ticketTypes.some((ticketType) => ticketType.active)}
+            locale={locale}
+          />
         </div>
       ) : null}
       {canManageInventory ? (

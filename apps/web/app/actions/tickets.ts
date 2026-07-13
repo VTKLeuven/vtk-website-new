@@ -257,7 +257,7 @@ export async function createTicketEventAction(formData: FormData): Promise<void>
   });
 
   refreshTicketEvent(locale, event.id);
-  redirect(localePath(locale, `/admin/tickets/${event.id}`));
+  redirect(localePath(locale, `/admin/tickets/${event.id}/instellingen#tickettype-aanmaken`));
 }
 
 export async function updateTicketEventAction(formData: FormData): Promise<void> {
