@@ -248,10 +248,39 @@
   border-color: #f0c6bd;
 }
 
-/* Shift-tabel: statusmelding + tabel als één blok, uitklapbare rijen. */
+/* Shift-tabel: sectiekop + tabel als één blok, uitklapbare rijen. */
 .vtk-basic-table-section {
   display: grid;
   gap: 12px;
+}
+
+.vtk-basic-table-title {
+  margin: 0;
+  color: var(--ink);
+  font-size: 20px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.vtk-basic-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 12px;
+}
+
+.vtk-basic-toolbar .vtk-basic-field {
+  min-width: 160px;
+}
+
+.vtk-basic-toolbar .vtk-basic-select {
+  width: auto;
+}
+
+.vtk-basic-table-empty {
+  padding: 20px 12px;
+  color: var(--muted);
+  text-align: center;
 }
 
 .vtk-basic-row-click {
