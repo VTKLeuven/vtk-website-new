@@ -18,7 +18,7 @@ export async function triggerSentryServerError(): Promise<string | undefined> {
   if (!session.user.isSuperAdmin) throw new Error("FORBIDDEN");
 
   const eventId = Sentry.captureException(
-    new Error("Sentry server-test-fout (bewust getriggerd via admin/IT)"),
+    new Error("Sentry server test error (triggered from admin/IT)"),
   );
 
   // In een langlopende container is dit niet strikt nodig, maar het maakt de

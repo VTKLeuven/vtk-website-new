@@ -1,5 +1,5 @@
 /**
- * Sentry — Edge runtime (middleware, edge route handlers). Loaded from
+ * Sentry: Edge runtime (middleware, edge route handlers). Loaded from
  * `instrumentation.ts` via `register()` when `NEXT_RUNTIME === "edge"`. Inert
  * when `SENTRY_DSN` is unset.
  */

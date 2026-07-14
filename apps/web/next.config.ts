@@ -56,7 +56,7 @@ const nextConfig: NextConfig = {
 // SENTRY_PROJECT/SENTRY_AUTH_TOKEN wordt de source-map-upload stil overgeslagen,
 // dus builds blijven ook zonder Sentry-config werken.
 //
-// NB: we zetten bewust géén `tunnelRoute` — dat zou botsen met de app/[locale]
+// NB: we zetten bewust géén `tunnelRoute`; dat zou botsen met de app/[locale]
 // catch-all routing. Voeg het pas toe als je een niet-gelokaliseerd top-level
 // pad reserveert.
 export default withSentryConfig(nextConfig, {

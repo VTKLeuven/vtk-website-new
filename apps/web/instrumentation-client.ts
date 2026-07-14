@@ -1,5 +1,5 @@
 /**
- * Sentry — browser/client runtime. Next.js loads this file before hydration
+ * Sentry: browser/client runtime. Next.js loads this file before hydration
  * (see node_modules/next/dist/docs/.../instrumentation-client.md). The DSN is
  * read from the (public) `NEXT_PUBLIC_SENTRY_DSN` env var; when it is unset the
  * SDK stays inert, so this is safe to ship without a DSN configured locally.

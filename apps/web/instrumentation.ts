@@ -8,7 +8,7 @@
  *     `setInterval` roept `processDueNoShows` aan. Een globale flag voorkomt
  *     dubbele intervallen bij hot-reloads in dev. In deze single-container deploy
  *     draait er precies één instance; bij horizontaal schalen zou dit meervoudig
- *     draaien — de verwerking is echter idempotent via `session.processedAt`, dus
+ *     draaien; de verwerking is echter idempotent via `session.processedAt`, dus
  *     dat levert hooguit dubbele mail-pogingen op (zie docs/design-decisions.md).
  */
 import * as Sentry from '@sentry/nextjs';

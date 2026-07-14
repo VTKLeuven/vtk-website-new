@@ -1,5 +1,5 @@
 /**
- * Sentry — Node.js server runtime. Loaded from `instrumentation.ts` via
+ * Sentry: Node.js server runtime. Loaded from `instrumentation.ts` via
  * `register()` when `NEXT_RUNTIME === "nodejs"`. Reads the server-side DSN from
  * `SENTRY_DSN`; inert when unset.
  */

@@ -1,9 +1,18 @@
 @AGENTS.md
 
+# Schrijfconventies
+
+- **Gebruik geen em-dashes (—)** in code, comments, UI-copy, commits of andere
+  output. Gebruik in plaats daarvan een puntkomma, dubbele punt, komma, of een
+  losse zin.
+- Vertaal technische / IT-termen niet krampachtig naar het Nederlands. Interne,
+  technische surfaces (bv. de admin/IT-tab) mogen gewoon Engelse vakterminologie
+  gebruiken (bv. "Throw uncaught error" i.p.v. "Onafgevangen fout gooien").
+
 # Kringwerking & design decisions
 
 `docs/design-decisions.md` legt niet-vanzelfsprekende **product-/werkingskeuzes** van
-VTK vast (hoe de kring concreet werkt) — dingen die je niet uit de code of git-historiek
+VTK vast (hoe de kring concreet werkt): dingen die je niet uit de code of git-historiek
 kan afleiden. Lees dit voor context bij features met kringspecifiek gedrag (bv. Theokot).
 
 **Wanneer je een feature bouwt waarvan de gewenste werking een kringkeuze is (niet puur
