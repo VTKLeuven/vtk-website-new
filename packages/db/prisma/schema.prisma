@@ -59,6 +59,13 @@ enum DashboardTileScope {
   USER
 }
 
+enum TheokotOrderStatus {
+  RESERVED   // gereserveerd, nog niet opgehaald
+  PICKED_UP  // afgehaald aan de balie
+  NO_SHOW    // niet opgehaald na sluitingstijd + grace
+  CANCELLED  // door de student geannuleerd voor de deadline
+}
+
 // -----------------------------------------------------------------------------
 // Users, groups, permissions
 // -----------------------------------------------------------------------------
@@ -88,6 +95,10 @@ model User {
   dashboardTilePrefs UserDashboardTilePref[]
   participatingShifts ShiftParticipant[]
   createdShortLinks ShortLink[]           @relation("ShortLinkCreatedBy")
+
+  theokotOrders      TheokotOrder[]      @relation("TheokotOrderUser")
+  theokotPickedUp    TheokotOrder[]      @relation("TheokotPickedUpBy")
+  theokotBans        TheokotBan[]
 }
 
 model Group {
@@ -419,6 +430,129 @@ model ShortLink {
   createdBy   User?     @relation("ShortLinkCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
+}
+
+// -----------------------------------------------------------------------------
+// Theokot (cafetaria / broodjesbar) reservatiesysteem
+//
+// Zie docs/design-decisions.md voor de niet-vanzelfsprekende keuzes achter dit
+// systeem (bestelvenster, annulatie-deadline, no-show/ban-logica, turf-lijst,
+// snapshots i.p.v. live catalogus).
+// -----------------------------------------------------------------------------
+
+/// Catalogus met het standaardaanbod. Prijs in eurocent (Int, geen floats).
+/// Bij het aanmaken van een week worden deze rijen naar `TheokotSessionItem`
+/// gekopieerd (snapshot), zodat latere catalogus-edits oude sessies niet wijzigen.
+model TheokotProduct {
+  id                  String   @id @default(cuid())
+  nameNl              String
+  nameEn              String?
+  priceCents          Int
+  defaultQuantity     Int      @default(0)
+  isWeeklySpecialSlot Boolean  @default(false) // "broodje van de week"-slot
+  order               Int      @default(0)
+  active              Boolean  @default(true)
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+}
+
+/// Eén verkoopsessie = één open dag. Uren en aanbod zijn per dag aanpasbaar;
+/// `isOpen=false` betekent dat Theokot die dag dicht is. De venster-momenten
+/// (order/pickup) worden bij aanmaak berekend uit config + Brussel-tijd en
+/// opgeslagen zodat ze daarna manueel bijgesteld kunnen worden.
+model TheokotSession {
+  id                    String              @id @default(cuid())
+  date                  DateTime            @unique // lokale middernacht van de verkoopdag
+  isOpen                Boolean             @default(true)
+  orderOpenAt           DateTime // vanaf wanneer studenten kunnen bestellen
+  orderCloseAt          DateTime // annulatie-/besteldeadline (turf-lijst wordt geprint)
+  pickupStart           DateTime
+  pickupEnd             DateTime
+  weeklySpecialLabelNl  String? // welk broodje deze week "van de week" is
+  weeklySpecialLabelEn  String?
+  processedAt           DateTime? // wanneer no-shows verwerkt zijn (idempotentie)
+  createdById           String?
+  createdAt             DateTime            @default(now())
+  updatedAt             DateTime            @updatedAt
+
+  items                 TheokotSessionItem[]
+  orders                TheokotOrder[]
+
+  @@index([date])
+}
+
+/// Aanbod van één sessie (snapshot van een product op het moment van aanmaken).
+model TheokotSessionItem {
+  id             String            @id @default(cuid())
+  sessionId      String
+  productId      String? // herkomst-catalogusitem, puur informatief
+  nameNl         String
+  nameEn         String?
+  priceCents     Int
+  quantity       Int // beschikbare voorraad voor deze sessie
+  isWeeklySpecial Boolean          @default(false)
+  order          Int               @default(0)
+
+  session        TheokotSession    @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  lines          TheokotOrderLine[]
+
+  @@index([sessionId])
+}
+
+/// Eén bestelling per persoon per sessie.
+model TheokotOrder {
+  id           String             @id @default(cuid())
+  sessionId    String
+  userId       String
+  status       TheokotOrderStatus @default(RESERVED)
+  totalCents   Int
+  statusNote   String? // vrije notitie bij correcties
+  createdAt    DateTime           @default(now())
+  updatedAt    DateTime           @updatedAt
+  pickedUpAt   DateTime?
+  pickedUpById String? // wie aan de balie op "opgehaald" drukte
+
+  session      TheokotSession     @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  user         User               @relation("TheokotOrderUser", fields: [userId], references: [id], onDelete: Cascade)
+  pickedUpBy   User?              @relation("TheokotPickedUpBy", fields: [pickedUpById], references: [id], onDelete: SetNull)
+  lines        TheokotOrderLine[]
+
+  @@unique([sessionId, userId])
+  @@index([userId])
+  @@index([status])
+}
+
+model TheokotOrderLine {
+  id             String             @id @default(cuid())
+  orderId        String
+  sessionItemId  String
+  quantity       Int
+  unitPriceCents Int // snapshot van de prijs op besteldatum
+
+  order          TheokotOrder       @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  sessionItem    TheokotSessionItem @relation(fields: [sessionItemId], references: [id], onDelete: Cascade)
+
+  @@index([orderId])
+  @@index([sessionItemId])
+}
+
+/// Tijdelijke ban na te veel no-shows. Historiek blijft bewaard; een ban
+/// opheffen zet `active=false` (i.p.v. verwijderen) zodat correcties zichtbaar blijven.
+model TheokotBan {
+  id          String   @id @default(cuid())
+  userId      String
+  reason      String
+  startsAt    DateTime @default(now())
+  endsAt      DateTime
+  active      Boolean  @default(true)
+  note        String?
+  createdById String?
+  createdAt   DateTime @default(now())
+
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([active])
 }
 
 // -----------------------------------------------------------------------------

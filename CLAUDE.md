@@ -1,5 +1,14 @@
 @AGENTS.md
 
+# Kringwerking & design decisions
+
+`docs/design-decisions.md` legt niet-vanzelfsprekende **product-/werkingskeuzes** van
+VTK vast (hoe de kring concreet werkt) — dingen die je niet uit de code of git-historiek
+kan afleiden. Lees dit voor context bij features met kringspecifiek gedrag (bv. Theokot).
+
+**Wanneer je een feature bouwt waarvan de gewenste werking een kringkeuze is (niet puur
+technisch, niet vanzelfsprekend), voeg een sectie toe aan `docs/design-decisions.md`.**
+
 # Styling Guidelines
 
 Use `design/new-design.html` as the visual source of truth for VTK surfaces.

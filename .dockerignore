@@ -1,0 +1,30 @@
+# Docker build context = repo root (see infra/docker-compose.yml `context: ..`).
+# The images install dependencies and build INSIDE the container (deps + builder
+# stages). Host build artifacts must never enter the context: they bloat it and,
+# worse, `COPY . .` would overlay host node_modules (native binaries built for the
+# host OS) on top of the Alpine node_modules from the deps stage, breaking the build.
+
+# Dependencies (root + every workspace)
+**/node_modules
+
+# Next.js build output / caches (built fresh in the image)
+**/.next
+**/.turbo
+
+# Version control & CI
+.git
+.gitignore
+.github
+
+# Logs & OS cruft
+**/*.log
+**/.DS_Store
+**/Thumbs.db
+
+# Editor/local
+.vscode
+.idea
+
+# Docker/infra artifacts not needed for the app build
+infra/nginx/letsencrypt
+infra/nginx/www

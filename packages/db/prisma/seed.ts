@@ -119,6 +119,21 @@ async function main() {
     }
   }
 
+  // De post Theokot beheert het broodjes-reservatiesysteem en bedient de afhaalbalie.
+  const theokotPerms = await prisma.permission.findMany({
+    where: { code: { in: ["theokot.manage", "theokot.pickup"] } },
+  });
+  const theokotGroup = await prisma.group.findUnique({ where: { code: "THEOKOT" } });
+  if (theokotGroup) {
+    for (const perm of theokotPerms) {
+      await prisma.groupPermission.upsert({
+        where: { groupId_permissionId: { groupId: theokotGroup.id, permissionId: perm.id } },
+        update: {},
+        create: { groupId: theokotGroup.id, permissionId: perm.id },
+      });
+    }
+  }
+
   console.log("Seeding default homepage settings...");
   const defaultSettings: Array<{ key: string; value: unknown }> = [
     {
@@ -141,11 +156,11 @@ async function main() {
         titleNl: "Openingsuren Theokot",
         titleEn: "Theokot opening hours",
         entries: [
-          { dayNl: "Maandag", dayEn: "Monday", hours: "11:30 – 14:00" },
-          { dayNl: "Dinsdag", dayEn: "Tuesday", hours: "11:30 – 14:00" },
-          { dayNl: "Woensdag", dayEn: "Wednesday", hours: "11:30 – 14:00" },
-          { dayNl: "Donderdag", dayEn: "Thursday", hours: "11:30 – 14:00" },
-          { dayNl: "Vrijdag", dayEn: "Friday", hours: "11:30 – 14:00" },
+          { dayNl: "Maandag", dayEn: "Monday", hours: "10:30 – 18:00" },
+          { dayNl: "Dinsdag", dayEn: "Tuesday", hours: "10:30 – 18:00" },
+          { dayNl: "Woensdag", dayEn: "Wednesday", hours: "10:30 – 18:00" },
+          { dayNl: "Donderdag", dayEn: "Thursday", hours: "10:30 – 18:00" },
+          { dayNl: "Vrijdag", dayEn: "Friday", hours: "10:30 – 18:00" },
         ],
       },
     },
@@ -187,6 +202,30 @@ async function main() {
     {
       key: "home.featuredAlbums",
       value: { albumSlugs: [] as string[] },
+    },
+    // Theokot-configuratie: waarden die niet elke week wijzigen. maxItemsPerOrder = X,
+    // maxWeeklySpecialPerOrder = Y (X > Y). Tijden zijn "HH:mm" in Brussel-tijd.
+    {
+      key: "theokot.config",
+      value: {
+        maxItemsPerOrder: 5,
+        maxWeeklySpecialPerOrder: 1,
+        orderLeadDays: 2,
+        orderOpenTime: "12:00",
+        cancelDeadline: "10:30",
+        pickupDefaultStart: "12:00",
+        pickupDefaultEnd: "16:00",
+        noShowGraceMinutes: 15,
+        noShowThreshold: 3,
+        banDurationDays: 14,
+      },
+    },
+    {
+      key: "theokot.orderMessage",
+      value: {
+        bodyNl: "",
+        bodyEn: "",
+      },
     },
   ];
   for (const s of defaultSettings) {
@@ -1079,6 +1118,46 @@ async function main() {
         create: { shiftId: s.id, userId: user.id, payedOut: p.payedOut },
       });
     }
+  }
+
+  console.log("Seeding Theokot standard offering...");
+  // Standaardaanbod voor de broodjesbar. Prijzen in eurocent. Deze catalogus wordt
+  // bij het aanmaken van een verkoopweek naar sessie-items gekopieerd (snapshot).
+  // De laatste rij is het "broodje van de week"-slot; welk broodje dat concreet is
+  // wordt per week ingesteld op de sessie zelf.
+  const theokotProducts: Array<{
+    key: string;
+    nameNl: string;
+    nameEn: string;
+    priceCents: number;
+    defaultQuantity: number;
+    isWeeklySpecialSlot?: boolean;
+  }> = [
+    { key: "brie", nameNl: "Broodje Brie", nameEn: "Brie sandwich", priceCents: 260, defaultQuantity: 10 },
+    { key: "boulet", nameNl: "Broodje Boulet", nameEn: "Meatball sandwich", priceCents: 280, defaultQuantity: 12 },
+    { key: "hesp", nameNl: "Broodje Hesp", nameEn: "Ham sandwich", priceCents: 230, defaultQuantity: 10 },
+    { key: "kaas-hesp", nameNl: "Broodje Kaas & Hesp", nameEn: "Cheese & ham sandwich", priceCents: 260, defaultQuantity: 15 },
+    { key: "italiaans", nameNl: "Broodje Italiaans", nameEn: "Italian sandwich", priceCents: 280, defaultQuantity: 10 },
+    { key: "kaas", nameNl: "Broodje Kaas", nameEn: "Cheese sandwich", priceCents: 230, defaultQuantity: 10 },
+    { key: "kip-curry", nameNl: "Broodje Kip Curry", nameEn: "Chicken curry sandwich", priceCents: 260, defaultQuantity: 5 },
+    { key: "mpt", nameNl: "Broodje Mozarella-Pesto-Tomaat", nameEn: "Mozzarella-pesto-tomato sandwich", priceCents: 260, defaultQuantity: 13 },
+    { key: "humus", nameNl: "Bruin broodje humus", nameEn: "Brown roll with hummus", priceCents: 230, defaultQuantity: 5 },
+    { key: "pasta-pesto", nameNl: "Pasta Pesto", nameEn: "Pasta pesto", priceCents: 260, defaultQuantity: 8 },
+    { key: "van-de-week", nameNl: "Broodje van de week", nameEn: "Sandwich of the week", priceCents: 280, defaultQuantity: 20, isWeeklySpecialSlot: true },
+  ];
+  for (let i = 0; i < theokotProducts.length; i += 1) {
+    const p = theokotProducts[i];
+    const id = `seed-theokot-product-${p.key}`;
+    const data = {
+      nameNl: p.nameNl,
+      nameEn: p.nameEn,
+      priceCents: p.priceCents,
+      defaultQuantity: p.defaultQuantity,
+      isWeeklySpecialSlot: p.isWeeklySpecialSlot ?? false,
+      order: i,
+      active: true,
+    };
+    await prisma.theokotProduct.upsert({ where: { id }, update: data, create: { id, ...data } });
   }
 
   console.log("Seed complete.");

@@ -31,6 +31,7 @@ const nextConfig: NextConfig = {
     "@node-rs/argon2",
     "sharp",
     "archiver",
+    "nodemailer",
   ],
   // Pin the workspace root explicitly so Next.js / webpack / Turbopack do
   // not walk upwards and try to index the user's home directory (there's

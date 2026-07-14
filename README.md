@@ -373,6 +373,78 @@ calling `GET ${VTK_MAIN_URL}/api/auth/session` and receives the full
 
 ---
 
+## Theokot broodjes-reservatiesysteem
+
+Post Theokot beheert de broodjesbar-reservaties onder `/admin/theokot` (rechten
+`theokot.manage` / `theokot.pickup`); studenten reserveren op `/theokot`. De
+niet-vanzelfsprekende werkingskeuzes staan in [`docs/design-decisions.md`](docs/design-decisions.md).
+
+### No-show-mails (SMTP)
+
+Niet-opgehaalde bestellingen worden 15 min na sluitingstijd automatisch verwerkt
+(scheduler in `apps/web/instrumentation.ts`) en de student krijgt een
+waarschuwingsmail via **nodemailer** (`apps/web/lib/mail.ts`).
+
+**Zonder `SMTP_HOST` worden mails niet verstuurd maar enkel gelogd** naar de
+serverconsole (`[mail] SMTP niet geconfigureerd …`). Zo werkt lokale ontwikkeling
+zonder mailserver; voor productie zet je de SMTP-variabelen in de repo-root `.env`:
+
+```dotenv
+SMTP_HOST="smtp.example.com"   # verplicht om écht te versturen; leeg = enkel loggen
+SMTP_PORT="587"                # 587 = STARTTLS (aanrader), 465 = impliciete TLS
+SMTP_SECURE="false"            # "true" bij poort 465, "false" bij 587/25 (STARTTLS)
+SMTP_USER="theokot@vtk.be"     # SMTP-login; laat leeg voor een server zonder auth
+SMTP_PASS="<app- of mailboxwachtwoord>"
+MAIL_FROM="Theokot VTK <theokot@vtk.be>"   # afzender in de mails
+```
+
+Uitleg per veld:
+
+| Variabele     | Betekenis                                                                 |
+|---------------|---------------------------------------------------------------------------|
+| `SMTP_HOST`   | Hostname van de SMTP-server. **Leeg laten = mails worden enkel gelogd.**   |
+| `SMTP_PORT`   | `587` (STARTTLS, standaard) of `465` (SSL/TLS). Default `587`.             |
+| `SMTP_SECURE` | `"true"` ⇒ meteen TLS (poort 465). `"false"` ⇒ STARTTLS/plain (587/25).    |
+| `SMTP_USER` / `SMTP_PASS` | Login. Bij Gmail/Microsoft 365: gebruik een **app-wachtwoord**, geen accountwachtwoord. Zonder `SMTP_USER` verbindt nodemailer zonder authenticatie. |
+| `MAIL_FROM`   | Afzender, formaat `Naam <adres>`. Default `Theokot VTK <theokot@vtk.be>`.  |
+
+In de Docker-stack lezen de containers dezelfde repo-root `.env` (zie de
+productie-sectie hierboven); herstart `web` na een wijziging
+(`docker compose … up -d --force-recreate web`).
+
+**Testen zonder te wachten op de scheduler:** de no-show-verwerking is idempotent en
+kan handmatig getriggerd worden. Plaats een testbestelling, zet de `pickupEnd` van die
+sessie in het verleden en roep `processDueNoShows()` aan (bv. via een tijdelijke
+route/script), of wacht op de interval van 5 min. Is SMTP niet gezet, dan verschijnt de
+mailinhoud in de serverlog i.p.v. in een mailbox.
+
+### Studentenkaart-scanner (KU Leuven idverification)
+
+De afhaalbalie (`/admin/theokot/afhalen`) accepteert zowel een handmatig r-nummer als
+een **kaartscan**. De scanner gedraagt zich als een toetsenbord: hij tikt
+`serial;cardAppId` gevolgd door Enter in het invoerveld. De server
+(`lib/kul-card.ts`, aangeroepen door `lookupPickupByCardAction`) wisselt dan
+client-credentials in voor een token en roept de KU Leuven `idverification`-endpoint
+aan; het teruggekregen r-nummer (`userName`) wordt gebruikt om de reservatie op te zoeken.
+
+Configureer in `.env` (zie `.env.example`) — dit zijn **aparte** credentials van de
+OIDC-login:
+
+```dotenv
+KUL_CARD_CLIENT_ID="<client id voor de idverification-API>"
+KUL_CARD_CLIENT_SECRET="<client secret>"
+# Optioneel, defaults zijn de KU Leuven-productie-endpoints:
+KUL_CARD_AUTH_ENDPOINT="https://idp.kuleuven.be/auth/realms/kuleuven/protocol/openid-connect/token"
+KUL_CARD_ID_ENDPOINT="https://account.kuleuven.be/api/v1/idverification"
+```
+
+Zonder `KUL_CARD_CLIENT_ID`/`KUL_CARD_CLIENT_SECRET` blijft het handmatige
+r-nummerveld werken; de scan geeft dan een nette "niet geconfigureerd"-melding. Voor
+een match moet het `User.rNumber` in de databank het r-nummer bevatten dat KU Leuven
+teruggeeft (bv. `r0123456`).
+
+---
+
 ## Troubleshooting
 
 **`Environment variable not found: DATABASE_URL` on first request**

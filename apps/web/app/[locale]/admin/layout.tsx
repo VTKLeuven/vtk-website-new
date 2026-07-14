@@ -20,6 +20,7 @@ const sections = [
   { key: "dashboardTiles", href: "/dashboard-tiles", perm: "dashboard.manage" },
   { key: "shortlinks", href: "/links", perm: "shortlinks.manage" },
   { key: "shift", href: "/shiften", anyPerm: ["shift.edit", "shift.reward", "shift.ranking"] },
+  { key: "theokot", href: "/theokot", anyPerm: ["theokot.manage", "theokot.pickup"] },
 ] as const;
 
 type DictAdmin = ReturnType<typeof getDictionary>["admin"];
