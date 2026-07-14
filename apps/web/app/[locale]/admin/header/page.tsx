@@ -1,9 +1,9 @@
-import { prisma } from "@vtk/db";
+import { prisma, HEADER_TABS } from "@vtk/db";
 import { hasLocale } from "@/lib/locale";
 import { notFound } from "next/navigation";
 import { requirePermission } from "@/lib/session";
 import { Button, Card, Input, Label } from "@vtk/ui";
-import { saveHeaderTabAction, deleteHeaderTabAction } from "@/app/actions/pages";
+import { saveHeaderTabAction, deleteHeaderTabAction, importDefaultHeaderTabsAction } from "@/app/actions/pages";
 import type { Locale } from "@vtk/i18n";
 
 export default async function AdminHeader({
@@ -14,14 +14,40 @@ export default async function AdminHeader({
   const { locale: localeParam } = await params;
   if (!hasLocale(localeParam)) notFound();
   const locale: Locale = localeParam;
+  const nl = locale === "nl";
   await requirePermission("header.manage");
   const tabs = await prisma.headerTab.findMany({ orderBy: { order: "asc" } });
 
   return (
     <div className="space-y-6">
       <h1 className="text-2xl font-semibold">
-        {locale === "nl" ? "Header beheren" : "Manage header"}
+        {nl ? "Header beheren" : "Manage header"}
       </h1>
+
+      {tabs.length === 0 && (
+        <Card className="border border-vtk-yellow-dark/30 bg-vtk-yellow/10 p-5">
+          <h2 className="font-semibold text-vtk-ink">
+            {nl ? "Header gebruikt momenteel standaardtabs" : "Header is currently using default tabs"}
+          </h2>
+          <p className="mt-2 text-sm text-[#34405e]">
+            {nl
+              ? "De navigatie valt terug op de ingebouwde standaardtabs omdat er nog geen tabs in de database staan. Importeer ze om ze hier te beheren (herordenen, hernoemen, verbergen of verwijderen)."
+              : "The navigation falls back to the built-in default tabs because none are stored in the database yet. Import them to manage them here (reorder, rename, hide or delete)."}
+          </p>
+          <ul className="mt-3 flex flex-wrap gap-2">
+            {HEADER_TABS.map((t) => (
+              <li key={t.code} className="rounded-full border border-vtk-blue/15 bg-white px-3 py-1 text-sm text-vtk-ink">
+                {nl ? t.labelNl : t.labelEn}
+              </li>
+            ))}
+          </ul>
+          <form action={importDefaultHeaderTabsAction} className="mt-4">
+            <Button type="submit">
+              {nl ? "Standaardtabs importeren" : "Import default tabs"}
+            </Button>
+          </form>
+        </Card>
+      )}
 
       <Card className="overflow-hidden">
         <table className="w-full text-sm">
@@ -37,6 +63,15 @@ export default async function AdminHeader({
             </tr>
           </thead>
           <tbody>
+            {tabs.length === 0 && (
+              <tr className="border-t border-zinc-200">
+                <td className="px-3 py-6 text-center text-sm text-[#5c667f]" colSpan={7}>
+                  {nl
+                    ? "Nog geen tabs in de database. Importeer hierboven de standaardtabs of voeg er hieronder een toe."
+                    : "No tabs in the database yet. Import the default tabs above or add one below."}
+                </td>
+              </tr>
+            )}
             {tabs.map((t) => (
               <tr key={t.id} className="border-t border-zinc-200">
                 <form

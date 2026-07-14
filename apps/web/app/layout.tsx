@@ -16,7 +16,7 @@ const vtkSerif = Instrument_Serif({
 });
 
 export const metadata: Metadata = {
-  title: "VTK – Vlaamse Technische Kring",
+  title: "Vlaamse Technische Kring",
   description:
     "De officiële website van VTK, de studentenvereniging van de faculteit ingenieurswetenschappers.",
 };

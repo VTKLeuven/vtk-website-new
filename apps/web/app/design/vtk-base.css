@@ -215,9 +215,9 @@
 .vtk-design .page-head h1 {
   margin: 0;
   max-width: 900px;
-  font-size: clamp(46px, 7vw, 92px);
-  line-height: 0.98;
-  letter-spacing: -0.035em;
+  font-size: clamp(30px, 4vw, 52px);
+  line-height: 1.05;
+  letter-spacing: -0.025em;
   font-weight: 600;
   color: var(--ink);
 }

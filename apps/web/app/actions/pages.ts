@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
-import { prisma } from "@vtk/db";
+import { prisma, HEADER_TABS } from "@vtk/db";
 import { requirePermission } from "@/lib/session";
 
 const saveSchema = z.object({
@@ -149,6 +149,29 @@ export async function deleteHeaderTabAction(formData: FormData): Promise<void> {
   await requirePermission("header.manage");
   const id = formData.get("id") as string;
   if (id) await prisma.headerTab.delete({ where: { id } });
+  revalidatePath("/", "layout");
+  redirect("/admin/header");
+}
+
+/**
+ * Persisteert de statische standaardtabs (`HEADER_TABS`) in de database. De nav
+ * valt terug op die defaults zolang de tabel leeg is; door ze te importeren
+ * worden ze bewerkbaar en lezen nav én beheerpagina dezelfde rijen. Idempotent:
+ * bestaande codes/slugs worden overgeslagen.
+ */
+export async function importDefaultHeaderTabsAction(): Promise<void> {
+  await requirePermission("header.manage");
+  await prisma.headerTab.createMany({
+    data: HEADER_TABS.map((t) => ({
+      code: t.code,
+      slug: t.slug,
+      labelNl: t.labelNl,
+      labelEn: t.labelEn,
+      order: t.order,
+      visible: true,
+    })),
+    skipDuplicates: true,
+  });
   revalidatePath("/", "layout");
   redirect("/admin/header");
 }

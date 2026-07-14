@@ -35,6 +35,13 @@ export default async function HeaderOverviewPage({
           <div className="vtk-page-kicker">VTK · {dict.pages.overview}</div>
           <h1 className="vtk-page-title">{pick(tab.labelNl, tab.labelEn, locale)}</h1>
         </div>
+        {tab.code === "CURSUSDIENST" && (
+          <div>
+            <a href="https://cudi.vtk.be" className="vtk-button vtk-button-primary arrow">
+              {locale === "nl" ? "Bestel cursussen op cudi.vtk.be" : "Order courses on cudi.vtk.be"}
+            </a>
+          </div>
+        )}
       </header>
 
       <div className="vtk-page-shell">
