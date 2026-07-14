@@ -88,7 +88,6 @@ const partnerSchema = z.object({
   name: z.string().min(1),
   url: z.string().optional().nullable(),
   logoKey: z.string().min(1),
-  order: z.coerce.number().int().default(0),
   active: z.coerce.boolean().default(true),
 });
 
@@ -99,16 +98,38 @@ export async function savePartnerAction(formData: FormData): Promise<void> {
     name: formData.get("name"),
     url: formData.get("url") || null,
     logoKey: formData.get("logoKey"),
-    order: formData.get("order") || 0,
     active: formData.get("active") === "on",
   });
   if (parsed.id) {
-    await prisma.partner.update({ where: { id: parsed.id }, data: parsed });
+    const existing = await prisma.partner.findUnique({ where: { id: parsed.id } });
+    // order is managed via drag-and-drop (reorderPartnersAction), never touched here.
+    await prisma.partner.update({
+      where: { id: parsed.id },
+      data: { name: parsed.name, url: parsed.url, logoKey: parsed.logoKey, active: parsed.active },
+    });
+    if (existing && existing.logoKey !== parsed.logoKey) {
+      try {
+        await deleteObject(existing.logoKey);
+      } catch {
+        /* ignore */
+      }
+    }
   } else {
-    await prisma.partner.create({ data: parsed });
+    // New partners are appended to the end of the current order.
+    const last = await prisma.partner.findFirst({ orderBy: { order: "desc" }, select: { order: true } });
+    await prisma.partner.create({ data: { ...parsed, order: (last?.order ?? -1) + 1 } });
   }
   revalidatePath("/", "layout");
   redirect("/admin/partners");
+}
+
+export async function reorderPartnersAction(ids: string[]): Promise<void> {
+  await requirePermission("partners.manage");
+  await prisma.$transaction(
+    ids.map((id, index) => prisma.partner.update({ where: { id }, data: { order: index } })),
+  );
+  revalidatePath("/", "layout");
+  revalidatePath("/admin/partners");
 }
 
 export async function deletePartnerAction(formData: FormData): Promise<void> {

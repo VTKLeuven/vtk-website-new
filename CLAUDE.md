@@ -9,6 +9,14 @@
   technische surfaces (bv. de admin/IT-tab) mogen gewoon Engelse vakterminologie
   gebruiken (bv. "Throw uncaught error" i.p.v. "Onafgevangen fout gooien").
 
+# UX-conventies
+
+- **Destructieve acties krijgen altijd een bevestigingsdialoog.** Wanneer een
+  actie iets verwijdert (of anderszins onomkeerbaar data weggooit), toon eerst
+  een bevestigings-modal voor je doorgaat; gebruik geen kale knop die meteen
+  verwijdert, en ook niet de native `confirm()`. De modal moet duidelijk maken
+  wat verwijderd wordt en een expliciete bevestig- en annuleer-knop hebben.
+
 # Kringwerking & design decisions
 
 `docs/design-decisions.md` legt niet-vanzelfsprekende **product-/werkingskeuzes** van

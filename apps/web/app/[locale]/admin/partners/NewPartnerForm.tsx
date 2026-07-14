@@ -43,10 +43,6 @@ export function NewPartnerForm({ locale }: { locale: "nl" | "en" }) {
       <div><Label>Name</Label><Input name="name" required /></div>
       <div><Label>URL</Label><Input name="url" placeholder="https://..." /></div>
       <div className="flex items-end gap-2">
-        <div>
-          <Label>Order</Label>
-          <Input name="order" type="number" defaultValue={0} />
-        </div>
         <label className="inline-flex items-center gap-1 text-sm">
           <input type="checkbox" name="active" defaultChecked />
           {locale === "nl" ? "Actief" : "Active"}
