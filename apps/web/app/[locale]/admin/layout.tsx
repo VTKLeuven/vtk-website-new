@@ -21,6 +21,7 @@ const sections = [
   { key: "shortlinks", href: "/links", perm: "shortlinks.manage" },
   { key: "shift", href: "/shiften", anyPerm: ["shift.edit", "shift.reward", "shift.ranking"] },
   { key: "theokot", href: "/theokot", anyPerm: ["theokot.manage", "theokot.pickup"] },
+  { key: "it", href: "/it", superAdminOnly: true },
 ] as const;
 
 type DictAdmin = ReturnType<typeof getDictionary>["admin"];
@@ -43,6 +44,7 @@ export default async function AdminLayout({
 
   const visibleSections = sections.filter((s) => {
     if (session.user.isSuperAdmin) return true;
+    if ("superAdminOnly" in s && s.superAdminOnly) return false;
     if ("anyPerm" in s) return s.anyPerm.some((p) => session.permissions.includes(p));
     if (!("perm" in s) || !s.perm) return true;
     return session.permissions.includes(s.perm);

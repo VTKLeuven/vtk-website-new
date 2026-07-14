@@ -1,5 +1,6 @@
 import path from "node:path";
 import { loadEnvConfig } from "@next/env";
+import { withSentryConfig } from "@sentry/nextjs";
 import type { NextConfig } from "next";
 
 const monorepoRoot = path.resolve(process.cwd(), "../..");
@@ -49,4 +50,23 @@ const nextConfig: NextConfig = {
   },
 };
 
-export default nextConfig;
+// Wrap met Sentry: injecteert de client/server/edge-instrumentatie en uploadt
+// source maps bij `next build`. org/project/authToken komen uit de omgeving
+// (root-.env is hierboven al geladen via loadEnvConfig). Zonder SENTRY_ORG/
+// SENTRY_PROJECT/SENTRY_AUTH_TOKEN wordt de source-map-upload stil overgeslagen,
+// dus builds blijven ook zonder Sentry-config werken.
+//
+// NB: we zetten bewust géén `tunnelRoute` — dat zou botsen met de app/[locale]
+// catch-all routing. Voeg het pas toe als je een niet-gelokaliseerd top-level
+// pad reserveert.
+export default withSentryConfig(nextConfig, {
+  org: process.env.SENTRY_ORG,
+  project: process.env.SENTRY_PROJECT,
+  authToken: process.env.SENTRY_AUTH_TOKEN,
+
+  // Upload een bredere set client-bestanden voor betere stack traces.
+  widenClientFileUpload: true,
+
+  // Onderdruk plugin-output buiten CI.
+  silent: !process.env.CI,
+});
