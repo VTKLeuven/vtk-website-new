@@ -6,6 +6,7 @@ import { requireSession } from "@/lib/session";
 import { getDictionary, pick } from "@vtk/i18n";
 import { formatEuro } from "@/lib/theokot";
 import { updateProfileAction, logoutAction } from "@/app/actions/auth";
+import { ProfileForm } from "@/components/profile/ProfileForm";
 
 export default async function AccountPage({ params }: { params: Promise<{ locale: string }> }) {
   const { locale } = await params;
@@ -13,6 +14,26 @@ export default async function AccountPage({ params }: { params: Promise<{ locale
   const nl = locale === "nl";
   const session = await requireSession(`/inloggen?next=${nl ? "" : "/en"}/account`);
   const dict = getDictionary(locale);
+
+  // Volledig profiel voor het bewerkbare gegevensformulier (kotadres, mails, ...).
+  const profile = await prisma.user.findUniqueOrThrow({
+    where: { id: session.user.id },
+    select: {
+      email: true,
+      avatarKey: true,
+      street: true,
+      houseNumber: true,
+      bus: true,
+      postalCode: true,
+      city: true,
+      birthDate: true,
+      personalEmail: true,
+      emailPreference: true,
+      mailCategories: true,
+      studyYear: true,
+      studyProgrammes: true,
+    },
+  });
 
   // Aankomende reservaties (nog niet opgehaald, afhaalvenster nog niet voorbij).
   const now = new Date();
@@ -70,6 +91,14 @@ export default async function AccountPage({ params }: { params: Promise<{ locale
           </div>
           <Button type="submit">{dict.auth.updateProfile}</Button>
         </form>
+      </Card>
+
+      <Card className="p-6">
+        <ProfileForm
+          locale={locale}
+          user={profile}
+          submitLabel={nl ? "Gegevens opslaan" : "Save details"}
+        />
       </Card>
 
       <Card className="p-6">

@@ -44,6 +44,7 @@ export async function getSession(headers: Headers): Promise<SessionPayload | nul
       avatarKey: user.avatarKey,
       locale: user.locale,
       isSuperAdmin: user.isSuperAdmin,
+      onboarded: user.onboardedAt !== null,
     },
     groups: user.memberships.map((membership) => ({
       id: membership.group.id,

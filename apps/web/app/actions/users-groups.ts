@@ -10,7 +10,9 @@ import {
   setUserPassword,
   updateUser,
 } from "@vtk/auth/server";
+import { hasPermission } from "@vtk/auth";
 import { requirePermission, requireSession } from "@/lib/session";
+import { currentWorkingYear } from "@/lib/workingYear";
 
 // ---- Users ------------------------------------------------------------------
 
@@ -81,39 +83,59 @@ export async function deleteUserAction(formData: FormData): Promise<void> {
 }
 
 const membershipSchema = z.object({
-  userId: z.string(),
-  groupId: z.string(),
+  userId: z.string().min(1),
+  groupId: z.string().min(1),
   role: z.enum(["MEMBER", "LEAD"]).default("MEMBER"),
   titleNl: z.string().optional().nullable(),
   titleEn: z.string().optional().nullable(),
-  year: z.coerce.number().int().optional().nullable(),
+  year: z.coerce.number().int(),
 });
 
+// Lidmaatschappen beheren mag met users.edit (gebruikersbeheer) of met
+// groups.manage (postenbeheer). Superadmin altijd.
+async function requireMembershipManager() {
+  const session = await requireSession();
+  if (!hasPermission(session, "users.edit") && !hasPermission(session, "groups.manage")) {
+    throw new Error("FORBIDDEN");
+  }
+  return session;
+}
+
 export async function addMembershipAction(formData: FormData): Promise<void> {
-  await requirePermission("users.edit");
+  await requireMembershipManager();
+  const rawYear = String(formData.get("year") ?? "").trim();
   const parsed = membershipSchema.parse({
     userId: formData.get("userId"),
     groupId: formData.get("groupId"),
     role: formData.get("role") || "MEMBER",
     titleNl: formData.get("titleNl") || null,
     titleEn: formData.get("titleEn") || null,
-    year: formData.get("year") || null,
+    // Leeg jaar valt terug op het huidige werkingsjaar.
+    year: rawYear || currentWorkingYear(),
   });
   await prisma.groupMembership.upsert({
-    where: { userId_groupId: { userId: parsed.userId, groupId: parsed.groupId } },
-    update: { role: parsed.role, titleNl: parsed.titleNl, titleEn: parsed.titleEn, year: parsed.year },
+    where: {
+      userId_groupId_year: {
+        userId: parsed.userId,
+        groupId: parsed.groupId,
+        year: parsed.year,
+      },
+    },
+    update: { role: parsed.role, titleNl: parsed.titleNl, titleEn: parsed.titleEn },
     create: parsed,
   });
   revalidatePath(`/admin/gebruikers/${parsed.userId}`);
+  revalidatePath("/admin/groepen");
   revalidatePath("/praesidium");
 }
 
 export async function removeMembershipAction(formData: FormData): Promise<void> {
-  await requirePermission("users.edit");
+  await requireMembershipManager();
   const id = formData.get("id") as string;
   const userId = formData.get("userId") as string;
   if (id) await prisma.groupMembership.delete({ where: { id } });
-  revalidatePath(`/admin/gebruikers/${userId}`);
+  if (userId) revalidatePath(`/admin/gebruikers/${userId}`);
+  revalidatePath("/admin/groepen");
   revalidatePath("/praesidium");
 }
 
@@ -157,17 +179,25 @@ export async function bulkImportUsersAction(formData: FormData): Promise<{ ok: b
         if (!group) {
           errors.push(`Line ${i + 1}: unknown group ${groupCode}`);
         } else {
+          // Leeg jaar in de CSV valt terug op het huidige werkingsjaar.
+          const membershipYear = yearStr ? Number(yearStr) : currentWorkingYear();
+          const membershipRole = (role?.toUpperCase() === "LEAD" ? "LEAD" : "MEMBER") as
+            | "LEAD"
+            | "MEMBER";
           await prisma.groupMembership.upsert({
-            where: { userId_groupId: { userId: user.id, groupId: group.id } },
-            update: {
-              role: (role?.toUpperCase() === "LEAD" ? "LEAD" : "MEMBER") as "LEAD" | "MEMBER",
-              year: yearStr ? Number(yearStr) : null,
+            where: {
+              userId_groupId_year: {
+                userId: user.id,
+                groupId: group.id,
+                year: membershipYear,
+              },
             },
+            update: { role: membershipRole },
             create: {
               userId: user.id,
               groupId: group.id,
-              role: (role?.toUpperCase() === "LEAD" ? "LEAD" : "MEMBER") as "LEAD" | "MEMBER",
-              year: yearStr ? Number(yearStr) : null,
+              role: membershipRole,
+              year: membershipYear,
             },
           });
         }
@@ -248,5 +278,6 @@ export async function saveGroupAction(formData: FormData): Promise<void> {
     where: { id },
     data: { nameNl, nameEn, descriptionNl, descriptionEn, orderInPraesidium },
   });
+  revalidatePath("/admin/groepen");
   revalidatePath("/praesidium");
 }

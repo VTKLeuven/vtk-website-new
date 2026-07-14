@@ -22,7 +22,8 @@ export async function GET(request: Request) {
   const allowed =
     session.user.isSuperAdmin ||
     session.permissions.includes('users.view') ||
-    session.permissions.includes('shift.edit');
+    session.permissions.includes('shift.edit') ||
+    session.permissions.includes('groups.manage');
   if (!allowed) {
     return NextResponse.json({ error: 'FORBIDDEN' }, { status: 403 });
   }

@@ -66,6 +66,54 @@ enum TheokotOrderStatus {
   CANCELLED  // door de student geannuleerd voor de deadline
 }
 
+// Welk e-mailadres de kring gebruikt om een lid te contacteren.
+enum EmailPreference {
+  UNIVERSITY // universiteitsmail (= login-mail via KUL SSO)
+  PERSONAL   // persoonlijke mail
+}
+
+// Mailinglijst-categorieën waarvoor een lid zich (opt-in) kan inschrijven.
+enum MailCategory {
+  FEEST
+  CAREER
+  SPORT
+  EVENEMENTEN
+  ONDERWIJS
+  INTERNATIONAAL
+  EERSTEJAARS
+  BAKSKE
+}
+
+// In welk studiejaar een lid zit.
+enum StudyYear {
+  BACHELOR_1
+  BACHELOR_2
+  BACHELOR_3
+  MASTER_1
+  MASTER_2
+}
+
+// Studierichtingen (een lid kan er meerdere aanduiden). Labels (NL/EN) leven in
+// de i18n-dictionaries, niet in de enum.
+enum StudyProgramme {
+  ARCHITECTURE
+  BIOMEDICAL
+  COMMON_BACHELOR
+  CIVIL
+  CHEMICAL
+  COMPUTER_SCIENCE
+  CYBERSECURITY
+  DIGITAL_HUMANITIES
+  ELECTRICAL
+  ENERGY
+  ARTIFICIAL_INTELLIGENCE
+  MATERIALS
+  NANO
+  URBANISM
+  MATHEMATICAL
+  MECHANICAL
+}
+
 // -----------------------------------------------------------------------------
 // Users, groups, permissions
 // -----------------------------------------------------------------------------
@@ -82,6 +130,27 @@ model User {
   locale           Locale              @default(NL)
   active           Boolean             @default(true)
   isSuperAdmin     Boolean             @default(false)
+
+  // Onboarding-profiel (ingevuld bij de eerste KUL SSO-login). Zolang
+  // onboardedAt null is, wordt het lid naar de onboarding-flow gestuurd.
+  onboardedAt      DateTime?
+  // Kotadres
+  street           String?
+  houseNumber      String?
+  bus              String?             // busnummer, optioneel
+  postalCode       String?
+  city             String?
+  birthDate        DateTime?
+  // Contact: `email` is de login-/universiteitsmail (via SSO). Persoonlijke
+  // mail en de voorkeur voor communicatie komen erbij.
+  personalEmail    String?
+  emailPreference  EmailPreference     @default(UNIVERSITY)
+  // Opt-in mailinglijsten: enkel de aangeduide categorieën zitten in de array.
+  mailCategories   MailCategory[]      @default([])
+  // Studie: één studiejaar, meerdere richtingen mogelijk.
+  studyYear        StudyYear?
+  studyProgrammes  StudyProgramme[]    @default([])
+
   sessions         Session[]
   accounts      Account[]
   createdAt        DateTime            @default(now())
@@ -123,7 +192,10 @@ model GroupMembership {
   userId        String
   groupId       String
   role          MembershipRole  @default(MEMBER)
-  year          Int?
+  // Werkingsjaar (startjaar van het academiejaar): 2026 = "26-27". Elk jaar is
+  // een aparte rij, zodat de historiek per post per jaar bewaard blijft en een
+  // nieuw werkingsjaar automatisch met een lege post begint.
+  year          Int
   titleNl       String?
   titleEn       String?
   displayOrder  Int             @default(0)
@@ -131,8 +203,9 @@ model GroupMembership {
   user          User            @relation(fields: [userId], references: [id], onDelete: Cascade)
   group         Group           @relation(fields: [groupId], references: [id], onDelete: Cascade)
 
-  @@unique([userId, groupId])
+  @@unique([userId, groupId, year])
   @@index([groupId])
+  @@index([year])
 }
 
 model Permission {

@@ -386,12 +386,17 @@ async function main() {
       const group = await prisma.group.findUnique({ where: { code: membership.code } });
       if (!group) continue;
       await prisma.groupMembership.upsert({
-        where: { userId_groupId: { userId: user.id, groupId: group.id } },
+        where: {
+          userId_groupId_year: {
+            userId: user.id,
+            groupId: group.id,
+            year: membership.year,
+          },
+        },
         update: {
           role: membership.role,
           titleNl: membership.titleNl,
           titleEn: membership.titleEn,
-          year: membership.year,
           displayOrder: membership.displayOrder,
         },
         create: {
@@ -985,9 +990,11 @@ async function main() {
     const itGroup = await prisma.group.findUnique({ where: { code: "IT" } });
     if (itGroup) {
       await prisma.groupMembership.upsert({
-        where: { userId_groupId: { userId: admin.id, groupId: itGroup.id } },
+        where: {
+          userId_groupId_year: { userId: admin.id, groupId: itGroup.id, year: 2026 },
+        },
         update: { role: "LEAD" },
-        create: { userId: admin.id, groupId: itGroup.id, role: "LEAD" },
+        create: { userId: admin.id, groupId: itGroup.id, role: "LEAD", year: 2026 },
       });
     }
   } else {

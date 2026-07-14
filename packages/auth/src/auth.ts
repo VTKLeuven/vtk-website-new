@@ -49,8 +49,12 @@ export const auth = betterAuth({
 
   // KU Leuven OIDC returns verified emails, so link a KUL login to the
   // pre-provisioned User that already owns that email instead of erroring on a
-  // duplicate. Creation of brand-new users is blocked below — membership is
-  // provisioned out-of-band, not self-served via SSO.
+  // duplicate. Brand-new KUL identities are allowed to self-provision: with no
+  // `user.create` hook to block them, better-auth creates a fresh user (email/
+  // password signup stays disabled, and admin-created users bypass better-auth
+  // via prisma.user.create, so this only ever fires for SSO). New users land
+  // with no memberships/permissions and `onboardedAt = null`, so the onboarding
+  // gate forces them to complete their profile before using the site.
   account: {
     accountLinking: {
       enabled: true,
@@ -59,20 +63,6 @@ export const auth = betterAuth({
   },
 
   databaseHooks: {
-    user: {
-      // better-auth only creates users for SSO sign-ups (email/password signup
-      // is disabled). Admin-created users go through prisma.user.create
-      // directly and never hit this hook. So a create here means an unknown KUL
-      // identity tried to self-provision — reject it.
-      create: {
-        before: async () => {
-          throw new APIError("FORBIDDEN", {
-            message:
-              "No VTK account is linked to this KU Leuven identity. Contact the board to be added.",
-          });
-        },
-      },
-    },
     session: {
       // Mirror the `active` gate the password flow enforces in loginAction, so
       // deactivated members cannot obtain a session via SSO either.

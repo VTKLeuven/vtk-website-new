@@ -18,6 +18,8 @@ export type AuthUser = {
   avatarKey: string | null;
   locale: Locale;
   isSuperAdmin: boolean;
+  /** `false` until the member completes the onboarding profile. */
+  onboarded: boolean;
 };
 
 export type AuthGroup = {

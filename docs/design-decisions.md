@@ -108,3 +108,86 @@ halen ze af aan de balie en betalen daar. Post **Theokot** beheert het systeem.
 - `theokot.manage` — sessies/aanbod, config, bericht, openingsuren, bans, historiek.
 - `theokot.pickup` — afhaalbalie + turf-lijst.
 - Beide worden in de seed toegekend aan groep **THEOKOT**.
+
+---
+
+## Ledenregistratie & onboarding (KUL SSO)
+
+Studenten **registreren zichzelf** door voor het eerst in te loggen met KU Leuven
+SSO. Concrete implementatie: hook in `packages/auth/src/auth.ts`, gate in
+`apps/web/app/[locale]/layout.tsx` + `apps/web/proxy.ts`, formulier in
+`apps/web/components/profile/ProfileForm.tsx`, actie in
+`apps/web/app/actions/onboarding.ts`, velden in het `User`-model.
+
+### Wie mag registreren
+- **Elke KU Leuven-account** mag zichzelf aanmaken via SSO. Dit is een **bewuste
+  omkering** van de vroegere policy (self-provisioning was geblokkeerd; enkel
+  vooraf door admins toegevoegde leden konden inloggen). Reden: VTK is een
+  studentenkring en wil dat studenten zich zelf kunnen inschrijven.
+- Praktisch: er is geen `user.create`-hook meer die nieuwe SSO-identiteiten
+  weigert. E-mail/wachtwoord-signup blijft uit; admin-aangemaakte gebruikers
+  gaan rechtstreeks via `prisma.user.create` en raken deze flow niet.
+- Een nieuw lid start **zonder groepen/permissies** en met `onboardedAt = null`.
+
+### Verplichte onboarding
+- Zolang `onboardedAt` null is, stuurt de **onboarding-gate** het lid bij elke
+  pagina naar `/onboarding`. Pas na het invullen (dan wordt `onboardedAt`
+  gestempeld) valt die gate weg. De gate leest het huidige pad uit de door de
+  proxy gezette `x-pathname`-header om geen redirect-loop op `/onboarding` te maken.
+- Gevraagde gegevens: **kotadres** (straat, huisnummer, bus *optioneel*, postcode,
+  stad), **geboortedatum**, **persoonlijke mail**, en welk adres (universiteits-
+  of persoonlijke mail) de **voorkeur** krijgt voor communicatie. De
+  universiteitsmail is de SSO-/login-mail (`User.email`) en wordt niet apart
+  gevraagd, enkel getoond.
+- **Profielfoto is optioneel.** Ze wordt opgeslagen als `avatarKey` en verschijnt
+  op `/praesidium` en `/pocs` **enkel** als het lid daar effectief in staat.
+- Alles blijft achteraf bewerkbaar op `/account` (zelfde formulier, zonder dat
+  `onboardedAt` opnieuw gezet wordt).
+
+### Studie (richtingen & studiejaar)
+- Een lid kan **meerdere richtingen** aanduiden (`StudyProgramme`-enum,
+  `User.studyProgrammes` array) en **één studiejaar** (`StudyYear`-enum,
+  `User.studyYear`): 1ste/2de/3de bachelor of 1ste/2de master.
+- De lijst richtingen is **KU Leuven-ingenieurswetenschappen-specifiek** en staat
+  vast in de enum; NL/EN-labels leven in de i18n-dictionaries (`onboarding.programmes`
+  / `onboarding.years`). Nieuwe richting = enum-waarde + label toevoegen +
+  `STUDY_PROGRAMMES` in `apps/web/lib/profile.ts` bijwerken.
+- Beide zijn **optioneel** (geen harde vereiste in de onboarding), zodat de
+  registratie niet blokkeert; te wijzigen op `/account`.
+
+### Posten (groepen) & werkingsjaren
+- Een **post** = een `Group`. In de admin heet dit voortaan **"Posten"** (niet
+  "Groepen"); intern blijven het `Group`/`GroupMembership`-modellen.
+- **De praesidiumsamenstelling wisselt per jaar.** Elk lidmaatschap
+  (`GroupMembership`) hoort bij een **werkingsjaar** (`year`, verplicht):
+  het startjaar van het academiejaar, dus `2026` = "26-27". Uniek is
+  `(userId, groupId, year)`, zodat iemand in meerdere jaren in dezelfde post kan
+  zitten en de **historiek per jaar** bewaard blijft.
+- Het **nieuwe werkingsjaar begint op 15 juli** (Brussel-tijd; zie
+  `apps/web/lib/workingYear.ts`). Er is **geen cron of wisactie** nodig: omdat
+  memberships per jaar staan, is de post in een nieuw werkingsjaar automatisch
+  leeg tot ze ingevuld wordt, en blijven vorige jaren zichtbaar.
+- **Tabjes per jaar** (zoals Theokot), startend bij **"26-27"**
+  (`FIRST_WORKING_YEAR = 2026`; er is geen historiek van daarvoor). Zowel de
+  admin-postenpagina als de publieke `/praesidium` tonen deze tabjes; standaard
+  staat het huidige werkingsjaar open. De gekozen jaar zit in de URL (`?jaar=`).
+- **Migratie-keuze:** bestaande memberships zonder jaar zijn bij de migratie op
+  `2026` gezet, zodat de huidige samenstelling onder "26-27" verschijnt.
+- **Admin-postenpagina** toont per post standaard enkel de **leden van het
+  gekozen jaar + een "lid toevoegen"-balk**; beschrijving/instellingen en rechten
+  staan **ingeklapt** (`<details>`). Een lid verwijderen gaat via een
+  bevestigings-modal (verwijdert enkel dat jaar; andere jaren blijven).
+- **Publieke `/praesidium`** toont per post de leden van het gekozen jaar met hun
+  profielfoto (uit "Mijn account"), verantwoordelijke(n) eerst en daarna
+  alfabetisch.
+- **De post "Algemeen" is verwijderd** (hoorde niet in de praesidiumstructuur en
+  was niet wisbaar in de admin). Verwijderd uit de seed en via de migratie uit de
+  DB; de enum-waarde `GroupCode.ALGEMEEN` blijft ongebruikt bestaan.
+
+### Mailinglijsten (opt-in)
+- Acht categorieën: **Feest, Career, Sport, Evenementen, Onderwijs, VTK
+  International, Eerstejaars, Bakske** (`MailCategory`-enum, opgeslagen als
+  opt-in array op `User.mailCategories`).
+- **Default staat alles uit (opt-in):** een lid vinkt bij registratie expliciet
+  aan waarvoor het mails wil. Bewuste keuze i.p.v. opt-out, om te stroken met de
+  verwachting dat je zelf kiest waarvoor je ingeschreven wordt.

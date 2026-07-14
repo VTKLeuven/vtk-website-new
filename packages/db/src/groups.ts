@@ -9,7 +9,6 @@ export type GroupSeed = {
 };
 
 export const GROUP_SEEDS: GroupSeed[] = [
-  { code: "ALGEMEEN", slug: "algemeen", nameNl: "Algemeen", nameEn: "General", orderInPraesidium: 0 },
   { code: "GROEP5", slug: "groep-5", nameNl: "Groep 5", nameEn: "Group 5", orderInPraesidium: 1 },
   { code: "ACTIVITEITEN", slug: "activiteiten", nameNl: "Activiteiten", nameEn: "Activities", orderInPraesidium: 2 },
   { code: "BEDRIJVENRELATIES", slug: "bedrijvenrelaties", nameNl: "Bedrijvenrelaties", nameEn: "Corporate Relations", orderInPraesidium: 3 },

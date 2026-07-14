@@ -1,10 +1,18 @@
+import { cache } from 'react';
 import { headers } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { getSession } from '@vtk/auth/server';
 import { NextResponse } from 'next/server';
 
+/**
+ * Request-deduped session read. Wrapped in React `cache` so the several server
+ * components that need the session within one render (layout onboarding gate,
+ * Header, the page itself) share a single DB round-trip.
+ */
+export const getCurrentSession = cache(async () => getSession(await headers()));
+
 export async function requireSession(redirectTo?: string) {
-  const session = await getSession(await headers());
+  const session = await getCurrentSession();
   if (!session) {
     if (redirectTo) redirect(redirectTo);
     throw new Error('UNAUTHENTICATED');

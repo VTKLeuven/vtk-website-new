@@ -87,7 +87,7 @@ export default async function AdminDashboard({
       />
 
       <details className="vtk-tiles-meta">
-        <summary>{locale === "nl" ? "Jouw rechten & groepen" : "Your permissions & groups"}</summary>
+        <summary>{locale === "nl" ? "Jouw rechten & posten" : "Your permissions & posts"}</summary>
         <Card className="p-5 mt-3">
           <h2 className="font-semibold mb-2">{locale === "nl" ? "Jouw rechten" : "Your permissions"}</h2>
           {session.user.isSuperAdmin ? (
@@ -107,7 +107,7 @@ export default async function AdminDashboard({
               )}
             </ul>
           )}
-          <h2 className="font-semibold mb-2 mt-4">{locale === "nl" ? "Groepen" : "Groups"}</h2>
+          <h2 className="font-semibold mb-2 mt-4">{locale === "nl" ? "Posten" : "Posts"}</h2>
           <ul className="flex flex-wrap gap-2 text-xs">
             {session.groups.length === 0 ? (
               <li className="text-zinc-500">—</li>

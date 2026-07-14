@@ -49,14 +49,26 @@ export function proxy(request: NextRequest) {
   const segments = pathname.split("/");
   const first = segments[1];
 
+  // Expose the resolved, locale-prefixed path to server components (the
+  // onboarding gate in the [locale] layout needs to know the current path to
+  // avoid redirect loops on the onboarding page itself). Request headers are
+  // the supported channel for passing proxy -> app data (see proxy.md).
+  const internalPath =
+    first && (LOCALES as readonly string[]).includes(first)
+      ? pathname
+      : `/${DEFAULT_LOCALE}${pathname === "/" ? "" : pathname}`;
+
+  const requestHeaders = new Headers(request.headers);
+  requestHeaders.set("x-pathname", internalPath);
+
   if (first && (LOCALES as readonly string[]).includes(first)) {
-    return NextResponse.next();
+    return NextResponse.next({ request: { headers: requestHeaders } });
   }
 
   const url = request.nextUrl.clone();
-  url.pathname = `/${DEFAULT_LOCALE}${pathname === "/" ? "" : pathname}`;
+  url.pathname = internalPath;
   url.search = search;
-  return NextResponse.rewrite(url);
+  return NextResponse.rewrite(url, { request: { headers: requestHeaders } });
 }
 
 export const config = {

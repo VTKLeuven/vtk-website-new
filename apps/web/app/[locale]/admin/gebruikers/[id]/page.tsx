@@ -10,6 +10,7 @@ import {
   removeMembershipAction,
   saveUserAction,
 } from "@/app/actions/users-groups";
+import { currentWorkingYear } from "@/lib/workingYear";
 
 export default async function EditUserPage({
   params,
@@ -91,7 +92,7 @@ export default async function EditUserPage({
             </Select>
           </div>
           <div><Label>Title (NL)</Label><Input name="titleNl" /></div>
-          <div><Label>Year</Label><Input name="year" type="number" /></div>
+          <div><Label>{locale === "nl" ? "Werkingsjaar" : "Working year"}</Label><Input name="year" type="number" defaultValue={currentWorkingYear()} /></div>
           <div><Button type="submit">{locale === "nl" ? "Toevoegen" : "Add"}</Button></div>
         </form>
       </Card>

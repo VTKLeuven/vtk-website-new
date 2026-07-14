@@ -4,7 +4,7 @@ import { notFound } from "next/navigation";
 import { hasLocale } from "@/lib/locale";
 import { requirePermission } from "@/lib/session";
 import type { Locale } from "@vtk/i18n";
-import { Button, Card, Input, Label, Select, Textarea } from "@vtk/ui";
+import { Button, Card, Input, Label, Select } from "@vtk/ui";
 import { saveUserAction } from "@/app/actions/users-groups";
 import { BulkImport } from "./BulkImport";
 
@@ -94,7 +94,7 @@ export default async function AdminUsers({
             <tr>
               <th className="px-4 py-2">{locale === "nl" ? "Naam" : "Name"}</th>
               <th className="px-4 py-2">Email</th>
-              <th className="px-4 py-2">{locale === "nl" ? "Groepen" : "Groups"}</th>
+              <th className="px-4 py-2">{locale === "nl" ? "Posten" : "Posts"}</th>
               <th className="px-4 py-2"></th>
             </tr>
           </thead>
