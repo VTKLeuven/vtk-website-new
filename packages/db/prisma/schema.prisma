@@ -87,6 +87,7 @@ model User {
   dashboardTiles   DashboardTile[]
   dashboardTilePrefs UserDashboardTilePref[]
   participatingShifts ShiftParticipant[]
+  createdShortLinks ShortLink[]           @relation("ShortLinkCreatedBy")
 }
 
 model Group {
@@ -400,6 +401,24 @@ model ShiftParticipant {
   payedOut Boolean
 
   @@id([shiftId, userId])
+}
+
+// -----------------------------------------------------------------------------
+// Short links (on.vtk.be/<slug> -> target URL)
+// -----------------------------------------------------------------------------
+
+model ShortLink {
+  id          String    @id @default(cuid())
+  slug        String    @unique
+  url         String
+  enabled     Boolean   @default(true)
+  clicks      Int       @default(0)
+  note        String?
+  expiresAt   DateTime? // when set, the link stops resolving after this instant
+  createdById String?
+  createdBy   User?     @relation("ShortLinkCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
 }
 
 // -----------------------------------------------------------------------------

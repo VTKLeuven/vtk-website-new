@@ -34,6 +34,9 @@ export const PERMISSIONS = [
   // Dashboard tiles
   { code: "dashboard.manage", labelNl: "Dashboardtegels beheren", labelEn: "Manage dashboard tiles", category: "general" },
 
+  // Short links
+  { code: "shortlinks.manage", labelNl: "Verkorte links beheren", labelEn: "Manage short links", category: "general" },
+
   // Shifts
   { code: "shift.edit", labelNl: "Shiften beheren", labelEn: "Manage shifts", category: "shift" },
   { code: "shift.reward", labelNl: "Shiftvergoedingen beheren", labelEn: "Manage shift rewards", category: "shift" },

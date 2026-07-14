@@ -18,6 +18,7 @@ const sections = [
   { key: "groups", href: "/groepen", perm: "groups.manage" },
   { key: "home", href: "/home", perm: "home.edit" },
   { key: "dashboardTiles", href: "/dashboard-tiles", perm: "dashboard.manage" },
+  { key: "shortlinks", href: "/links", perm: "shortlinks.manage" },
   { key: "shift", href: "/shiften", anyPerm: ["shift.edit", "shift.reward", "shift.ranking"] },
 ] as const;
 
