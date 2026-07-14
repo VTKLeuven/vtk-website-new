@@ -272,6 +272,46 @@ export async function saveConfigAction(formData: FormData): Promise<void> {
   revalidateTheokot();
 }
 
+/**
+ * Vervangt de standaardcatalogus (`TheokotProduct`) — de default namen, prijzen en
+ * aantallen die "Verkoopweek aanmaken" als startpunt gebruikt. Items komen als
+ * geïndexeerde velden `product-<i>-{id,nameNl,nameEn,price,quantity,weekly}`. Actieve
+ * producten die niet meer voorkomen worden verwijderd (de catalogus is losstaand:
+ * sessie-items zijn kopieën, dus bestaande weken blijven ongemoeid).
+ */
+export async function saveProductCatalogAction(formData: FormData): Promise<void> {
+  await requirePermission("theokot.manage");
+  const count = Number(formData.get("productCount")) || 0;
+  const keepIds = new Set<string>();
+
+  for (let i = 0; i < count; i += 1) {
+    const nameNl = ((formData.get(`product-${i}-nameNl`) as string) || "").trim();
+    if (!nameNl) continue;
+    const id = (formData.get(`product-${i}-id`) as string) || "";
+    const nameEn = ((formData.get(`product-${i}-nameEn`) as string) || "").trim() || null;
+    const priceCents = euroToCents(formData.get(`product-${i}-price`)) ?? 0;
+    const defaultQuantity = Math.max(0, Number(formData.get(`product-${i}-quantity`)) || 0);
+    const isWeeklySpecialSlot = formData.get(`product-${i}-weekly`) === "on";
+    const data = { nameNl, nameEn, priceCents, defaultQuantity, isWeeklySpecialSlot, order: i, active: true };
+
+    if (id) {
+      keepIds.add(id);
+      await prisma.theokotProduct.update({ where: { id }, data });
+    } else {
+      const created = await prisma.theokotProduct.create({ data });
+      keepIds.add(created.id);
+    }
+  }
+
+  // Verwijder actieve producten die uit de lijst gehaald zijn.
+  const active = await prisma.theokotProduct.findMany({ where: { active: true }, select: { id: true } });
+  for (const p of active) {
+    if (!keepIds.has(p.id)) await prisma.theokotProduct.delete({ where: { id: p.id } });
+  }
+
+  revalidateTheokot();
+}
+
 export async function saveOrderMessageAction(formData: FormData): Promise<void> {
   await requirePermission("theokot.manage");
   const value = {

@@ -7,6 +7,7 @@ import { Button, Card, Input, Label, Textarea } from "@vtk/ui";
 import { parseTheokotConfig } from "@/lib/theokot";
 import { saveConfigAction, saveOrderMessageAction } from "@/app/actions/theokot";
 import { TheokotAdminNav } from "../TheokotAdminNav";
+import { ProductCatalogManager, type CatalogItem } from "../ProductCatalogManager";
 
 export default async function TheokotSettingsPage({ params }: { params: Promise<{ locale: string }> }) {
   const { locale: localeParam } = await params;
@@ -19,12 +20,21 @@ export default async function TheokotSettingsPage({ params }: { params: Promise<
   const caps = { manage: has("theokot.manage"), pickup: has("theokot.pickup") };
   if (!caps.manage) return <p className="text-sm text-zinc-500">{nl ? "Geen toegang." : "No access."}</p>;
 
-  const [configRow, messageRow] = await Promise.all([
+  const [configRow, messageRow, products] = await Promise.all([
     prisma.setting.findUnique({ where: { key: "theokot.config" } }),
     prisma.setting.findUnique({ where: { key: "theokot.orderMessage" } }),
+    prisma.theokotProduct.findMany({ where: { active: true }, orderBy: { order: "asc" } }),
   ]);
   const config = parseTheokotConfig(configRow?.value);
   const message = (messageRow?.value as { bodyNl?: string; bodyEn?: string }) ?? {};
+  const catalog: CatalogItem[] = products.map((p) => ({
+    id: p.id,
+    nameNl: p.nameNl,
+    nameEn: p.nameEn ?? "",
+    priceEuro: (p.priceCents / 100).toFixed(2),
+    quantity: p.defaultQuantity,
+    isWeeklySpecial: p.isWeeklySpecialSlot,
+  }));
 
   const numField = (name: string, labelNl: string, labelEn: string, value: number, min = 0) => (
     <div>
@@ -67,6 +77,17 @@ export default async function TheokotSettingsPage({ params }: { params: Promise<
             <Button type="submit">{nl ? "Configuratie opslaan" : "Save configuration"}</Button>
           </div>
         </form>
+      </Card>
+
+      {/* Standaardaanbod (catalogus) */}
+      <Card className="p-5">
+        <h2 className="mb-1 text-lg font-semibold">{nl ? "Standaardaanbod" : "Default offering"}</h2>
+        <p className="mb-4 text-sm text-[#5c667f]">
+          {nl
+            ? "De default namen, prijzen en aantallen die als startpunt getoond worden bij “Verkoopweek aanmaken”. Per week kan je nadien nog afwijken; wijzigingen hier raken bestaande weken niet."
+            : "The default names, prices and quantities shown as a starting point when creating a sale week. You can still deviate per week afterwards; changes here don't affect existing weeks."}
+        </p>
+        <ProductCatalogManager nl={nl} initial={catalog} />
       </Card>
 
       {/* Custom bericht */}
