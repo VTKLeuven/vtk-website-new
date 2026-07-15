@@ -279,8 +279,11 @@ This brings up:
 During image **build**, the `web` Dockerfile runs `prisma generate` and
 `next build`. At **container start**, the default command runs
 `prisma migrate deploy` (applies migrations under `packages/db/prisma/migrations`)
-then `packages/db/prisma/seed.ts`, and then starts Next.js. The seed is
-idempotent, so redeploys refresh prototype content safely.
+and then starts Next.js. The seed runs on start **only when `RUN_SEED=true`**;
+otherwise it is skipped. This keeps redeploys from re-asserting seeded and
+admin-managed content (header tabs, CMS pages, partners, ...) over changes made
+in `/admin`. Seed a fresh DB explicitly (next section) or set `RUN_SEED=true`
+for a single start.
 
 ### 5. First-time database init (once, on the server)
 
@@ -296,16 +299,20 @@ docker compose -f infra/docker-compose.yml exec web \
 ```
 
 Use **`migrate deploy`** in production (not `db push`) so the database matches
-versioned migrations. For a **greenfield** DB, starting `web` once now already
-runs both `migrate deploy` and the seed via the container CMD; the explicit
-`exec` commands above are safe and idempotent if you want to rerun them.
+versioned migrations. For a **greenfield** DB, starting `web` runs
+`migrate deploy` but **not** the seed (unless `RUN_SEED=true`), so run the
+`exec ... seed.ts` command above once to populate it. The seed is idempotent, so
+rerunning it is safe.
 
-The seed is idempotent — groups, header tabs, permissions, partners, calendar
-placeholder rows, prototype users, POCs, CMS pages, albums, homepage defaults,
-etc. With **`SEED_ADMIN_EMAIL`** and
-**`SEED_ADMIN_PASSWORD`** in repo-root `.env`, the seed upserts a superadmin and
-refreshes their password hash on repeat runs. **Recreate `web`** after changing
-those variables (`docker compose … up -d --force-recreate web`). The seed logs
+The seed is **create-only**: it fills in missing rows (groups, header tabs,
+permissions, partners, calendar placeholder rows, prototype users, POCs, CMS
+pages, albums, homepage defaults, etc.) but never overwrites existing ones. So
+rerunning it against a populated DB is a no-op for anything already there, and
+edits made in `/admin` always survive. With **`SEED_ADMIN_EMAIL`** and
+**`SEED_ADMIN_PASSWORD`** in repo-root `.env`, the seed creates a superadmin **if
+that email does not exist yet**. It no longer resets the password of an existing
+admin on repeat runs (that was a destructive update); to change an existing
+admin's password, use the admin UI, or delete the row and reseed. The seed logs
 `Seeding initial admin...` when both are set; **“Skipping initial admin”**
 means they are missing inside the container (see env_file / recreate above).
 
@@ -316,7 +323,9 @@ git pull
 docker compose -f infra/docker-compose.yml up -d --build web logistiek
 ```
 
-The rebuilt `web` container runs migrations and the idempotent seed on startup.
+The rebuilt `web` container runs migrations on startup. It does **not** reseed
+(the seed only runs when `RUN_SEED=true`), so admin-managed content survives the
+redeploy.
 
 ### 7. Backups
 
