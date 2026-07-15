@@ -8,6 +8,13 @@
 import type { NextRequest } from 'next/server';
 
 export { splitFullName, fullName, nameParts, type NameParts } from './names';
+export {
+  PERMISSIONS,
+  isPermission,
+  permissionCodes,
+  type Permission,
+} from './permissions';
+export { currentWorkingYear, FIRST_WORKING_YEAR } from './workingYear';
 
 /** */
 export type Locale = 'NL' | 'EN';

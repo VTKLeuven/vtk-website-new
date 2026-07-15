@@ -43,6 +43,15 @@ enum MembershipRole {
   LEAD
 }
 
+// Hoe een post (Group) een rol toekent aan haar leden.
+// DEFAULT: elk lid van de post krijgt de rol. LEADER: enkel de
+// verantwoordelijke (membership.role == LEAD) krijgt de rol, bovenop de
+// DEFAULT-rollen van de post.
+enum RoleGrantKind {
+  DEFAULT
+  LEADER
+}
+
 enum PageAssetKind {
   EMBEDDED_PDF
   DOWNLOAD
@@ -260,6 +269,7 @@ model User {
   updatedAt DateTime  @updatedAt
 
   memberships         GroupMembership[]
+  roles               UserRole[]
   pocRepresentative   PocRepresentative[]
   createdPages        Page[]                  @relation("PageCreatedBy")
   createdEvents       CalendarEvent[]         @relation("EventCreatedBy")
@@ -296,7 +306,11 @@ model Group {
   photoKey          String?
 
   memberships       GroupMembership[]
+  // Legacy: directe rechten op de post. Wordt uitgefaseerd ten voordele van
+  // rollen (zie GroupRole); de sessie-resolver leest voorlopig nog beide.
   permissions       GroupPermission[]
+  // Rollen die deze post toekent aan haar leden (DEFAULT) en verantwoordelijke (LEADER).
+  roleGrants        GroupRole[]
   events            CalendarEvent[]
   dashboardTiles    DashboardTile[]
   ownedTicketEvents TicketEvent[]           @relation("TicketEventOwnerGroup")
@@ -332,6 +346,7 @@ model Permission {
   category String @default("general")
 
   groups GroupPermission[]
+  roles  RolePermission[]
 }
 
 model GroupPermission {
@@ -342,6 +357,74 @@ model GroupPermission {
   permission Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
 
   @@id([groupId, permissionId])
+}
+
+// Een rol bundelt rechten. Leden krijgen rollen direct (UserRole) of via een
+// post (GroupRole). Roldefinities blijven over de jaren heen bestaan; enkel de
+// toewijzingen zijn werkingsjaar-gebonden (zie UserRole) en resetten op 15 juli.
+// `system` markeert rollen die de GUI niet mag verwijderen (bv. admin).
+model Role {
+  id            String   @id @default(cuid())
+  code          String   @unique
+  nameNl        String
+  nameEn        String
+  descriptionNl String?
+  descriptionEn String?
+  // Optionele accentkleur voor de rol-pill in de UI (key in het paletsysteem).
+  color         String?
+  order         Int      @default(0)
+  system        Boolean  @default(false)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  permissions RolePermission[]
+  users       UserRole[]
+  groupGrants GroupRole[]
+}
+
+model RolePermission {
+  roleId       String
+  permissionId String
+
+  role       Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@id([roleId, permissionId])
+  @@index([permissionId])
+}
+
+// Directe roltoewijzing aan een gebruiker, per werkingsjaar (2026 = "26-27").
+// Net als GroupMembership per jaar: een nieuw werkingsjaar begint met een lege
+// toewijzing (de 15-juli-reset) en de historiek blijft bewaard. De uitzondering
+// die niet reset is `User.isSuperAdmin` (een boolean, geen toewijzing).
+model UserRole {
+  userId String
+  roleId String
+  year   Int
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role Role @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@id([userId, roleId, year])
+  @@index([userId])
+  @@index([roleId])
+  @@index([year])
+}
+
+// Rollen die een post automatisch toekent. DEFAULT geldt voor elk lid, LEADER
+// enkel voor de verantwoordelijke (bovenop DEFAULT). Deze grants worden niet per
+// persoon opgeslagen: de sessie-resolver leidt ze af uit de lidmaatschappen.
+model GroupRole {
+  groupId String
+  roleId  String
+  kind    RoleGrantKind @default(DEFAULT)
+
+  group Group @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  role  Role  @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@id([groupId, roleId, kind])
+  @@index([groupId])
+  @@index([roleId])
 }
 
 // -----------------------------------------------------------------------------

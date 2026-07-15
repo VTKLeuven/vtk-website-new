@@ -1,39 +1,14 @@
 // Werkingsjaar-logica voor posten (groepen).
 //
-// Een werkingsjaar is het startjaar van het academiejaar: 2026 = "26-27". Het
-// nieuwe werkingsjaar begint op 15 juli (Brussel-tijd). Omdat memberships per
-// jaar worden bijgehouden, begint een nieuw werkingsjaar automatisch met lege
-// posten en blijft de historiek van vorige jaren bewaard.
+// De cutover zelf (15 juli, Brussel) en `currentWorkingYear` leven in @vtk/auth,
+// zodat de apps én de sessie-resolver exact dezelfde 15-juli-reset gebruiken.
+// Dit bestand voegt enkel app-specifieke helpers toe (tabs, parsing, formatting).
+// Omdat memberships en roltoewijzingen per jaar worden bijgehouden, begint een
+// nieuw werkingsjaar automatisch met lege posten en blijft de historiek bewaard.
 
-/** Eerste getrackte werkingsjaar. Er is geen historiek van vóór "26-27". */
-export const FIRST_WORKING_YEAR = 2026;
+import { currentWorkingYear, FIRST_WORKING_YEAR } from "@vtk/auth";
 
-/** Dag/maand waarop het nieuwe werkingsjaar begint (15 juli). */
-const CUTOVER_MONTH = 7; // juli
-const CUTOVER_DAY = 15;
-
-/** Huidige datum uitgedrukt in Brussel-tijd (jaar/maand/dag). */
-function brusselsYmd(date: Date): { year: number; month: number; day: number } {
-  const parts = new Intl.DateTimeFormat("en-CA", {
-    timeZone: "Europe/Brussels",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).formatToParts(date);
-  const get = (t: string) => Number(parts.find((p) => p.type === t)?.value);
-  return { year: get("year"), month: get("month"), day: get("day") };
-}
-
-/**
- * Het huidige werkingsjaar voor een datum (default nu). Geklemd op
- * {@link FIRST_WORKING_YEAR}, zodat we nooit vóór "26-27" belanden.
- */
-export function currentWorkingYear(date: Date = new Date()): number {
-  const { year, month, day } = brusselsYmd(date);
-  const afterCutover = month > CUTOVER_MONTH || (month === CUTOVER_MONTH && day >= CUTOVER_DAY);
-  const wy = afterCutover ? year : year - 1;
-  return Math.max(wy, FIRST_WORKING_YEAR);
-}
+export { currentWorkingYear, FIRST_WORKING_YEAR };
 
 /** Formatteer een werkingsjaar als "26-27". */
 export function formatWorkingYear(year: number): string {
