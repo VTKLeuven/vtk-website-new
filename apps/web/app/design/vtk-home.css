@@ -1,4 +1,6 @@
 .vtk-design .home-hero {
+  position: relative;
+  z-index: 0;
   max-width: var(--max);
   margin: 0 auto;
   padding: clamp(64px, 8vw, 88px) clamp(20px, 3vw, 36px) clamp(56px, 7vw, 72px);
@@ -6,6 +8,30 @@
   grid-template-columns: minmax(0, 1.2fr) minmax(340px, 1fr);
   gap: clamp(36px, 5vw, 64px);
   align-items: start;
+}
+
+/* Subtle full-bleed background photo (Arenberg). A paper-tinted wash keeps the
+   copy readable, heaviest on the left behind the dark headline, and a bottom
+   fade blends the band into the section below so the photo never distracts. */
+.vtk-design .home-hero::before {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  top: 0;
+  bottom: 0;
+  left: calc(50% - 50vw);
+  right: calc(50% - 50vw);
+  background:
+    linear-gradient(to bottom, rgba(250, 250, 247, 0) 58%, var(--paper) 100%),
+    linear-gradient(
+      100deg,
+      rgba(250, 250, 247, 0.8) 0%,
+      rgba(250, 250, 247, 0.73) 40%,
+      rgba(250, 250, 247, 0.51) 72%,
+      rgba(250, 250, 247, 0.37) 100%
+    ),
+    url("/hero-arenberg.jpg") center 25% / cover no-repeat;
+  pointer-events: none;
 }
 
 .vtk-design .eyebrow {
