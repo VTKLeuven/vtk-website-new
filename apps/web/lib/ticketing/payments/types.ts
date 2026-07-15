@@ -57,6 +57,6 @@ export interface PaymentGateway {
   getCheckoutStatus(checkoutId: string): Promise<CheckoutStatusResult>;
   expireCheckout(checkoutId: string): Promise<void>;
   refund(input: RefundInput): Promise<RefundResult>;
-  getRefundStatus(refundId: string): Promise<RefundStatusResult>;
+  getRefundStatus(input: { refundId: string; paymentId: string }): Promise<RefundStatusResult>;
   isDefinitiveCheckoutError(error: unknown): boolean;
 }

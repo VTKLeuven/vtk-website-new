@@ -39,8 +39,8 @@ export class MockPaymentGateway implements PaymentGateway {
     return { providerRefundId: `mock_refund_${input.refundId}`, status: "SUCCEEDED" };
   }
 
-  async getRefundStatus(refundId: string): Promise<RefundStatusResult> {
-    return { providerRefundId: refundId, status: "SUCCEEDED" };
+  async getRefundStatus(input: { refundId: string; paymentId: string }): Promise<RefundStatusResult> {
+    return { providerRefundId: input.refundId, status: "SUCCEEDED" };
   }
 
   isDefinitiveCheckoutError(): boolean {

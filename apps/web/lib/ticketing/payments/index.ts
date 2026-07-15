@@ -2,7 +2,7 @@ import "server-only";
 
 import { configuredPaymentProvider } from "../config";
 import { MockPaymentGateway } from "./mock";
-import { StripePaymentGateway } from "./stripe";
+import { MolliePaymentGateway } from "./mollie";
 import type { PaymentGateway } from "./types";
 
 let gateway: PaymentGateway | null = null;
@@ -10,14 +10,14 @@ let gateway: PaymentGateway | null = null;
 export function paymentGateway(): PaymentGateway {
   if (gateway) return gateway;
   gateway =
-    configuredPaymentProvider() === "stripe"
-      ? new StripePaymentGateway()
+    configuredPaymentProvider() === "mollie"
+      ? new MolliePaymentGateway()
       : new MockPaymentGateway();
   return gateway;
 }
 
 export function paymentGatewayFor(provider: string): PaymentGateway {
-  if (provider === "stripe") return new StripePaymentGateway();
+  if (provider === "mollie") return new MolliePaymentGateway();
   if (provider === "mock" && process.env.NODE_ENV !== "production") {
     return new MockPaymentGateway();
   }

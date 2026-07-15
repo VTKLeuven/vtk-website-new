@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { getSession } from "@vtk/auth/server";
 import { prisma } from "@vtk/db";
-import { POST as processStripeWebhook } from "@/app/api/tickets/stripe/webhook/route";
+import { POST as processMollieWebhook } from "@/app/api/tickets/mollie/webhook/route";
 import { createOrderAccessToken, secureTokenHash } from "@/lib/ticketing/crypto";
 import { reserveInventory } from "@/lib/ticketing/inventory";
 import {
@@ -11,7 +11,6 @@ import {
   fulfillPaidOrder,
 } from "@/lib/ticketing/orders";
 import { processTicketOutbox } from "@/lib/ticketing/outbox";
-import { stripe } from "@/lib/ticketing/payments/stripe";
 import {
   completeTicketRefund,
   failTicketRefund,
@@ -35,18 +34,17 @@ describe.sequential("ticketing database invariants", () => {
     rateFreeType: randomUUID(),
     issuedOrder: randomUUID(),
     issuedItem: randomUUID(),
-    stripeOrder: randomUUID(),
-    stripeItem: randomUUID(),
-    stripePayment: randomUUID(),
-    stripeCheckout: `cs_test_${randomUUID()}`,
-    stripePaymentIntent: `pi_${randomUUID()}`,
+    mollieOrder: randomUUID(),
+    mollieItem: randomUUID(),
+    molliePayment: randomUUID(),
+    // In Mollie a payment's id is both its checkout handle and payment reference.
+    molliePaymentRef: `tr_${randomUUID().replace(/-/g, "").slice(0, 10)}`,
   };
 
   beforeAll(async () => {
     vi.stubEnv("TICKETING_PAYMENT_PROVIDER", "mock");
     vi.stubEnv("TICKETING_PUBLIC_URL", "http://localhost:3000");
-    vi.stubEnv("STRIPE_SECRET_KEY", "sk_test_integration_only");
-    vi.stubEnv("STRIPE_WEBHOOK_SECRET", "whsec_integration_only");
+    vi.stubEnv("MOLLIE_API_KEY", "test_integration_only");
     await prisma.user.create({
       data: { id: ids.user, name: "Integration Admin", email: `${ids.user}@example.test`, active: true },
     });
@@ -253,42 +251,42 @@ describe.sequential("ticketing database invariants", () => {
     }
   });
 
-  it("fulfills a signed Stripe webhook once and deduplicates its retry", async () => {
+  it("fulfills a Mollie webhook once and deduplicates its retry", async () => {
     const accessExpiresAt = new Date("2027-06-20T00:00:00.000Z");
-    const access = createOrderAccessToken(ids.stripeOrder, accessExpiresAt);
+    const access = createOrderAccessToken(ids.mollieOrder, accessExpiresAt);
     await prisma.$transaction(async (tx) => {
       await reserveInventory(tx, ids.rateEvent, new Map([[ids.ratePool, 1]]));
       await tx.ticketOrder.create({
         data: {
-          id: ids.stripeOrder,
+          id: ids.mollieOrder,
           eventId: ids.rateEvent,
-          reference: `VTK-STRIPE-${ids.stripeOrder}`,
+          reference: `VTK-MOLLIE-${ids.mollieOrder}`,
           accessTokenHash: secureTokenHash(access),
           accessExpiresAt,
-          buyerName: "Stripe Buyer",
-          buyerEmail: "stripe@example.test",
+          buyerName: "Mollie Buyer",
+          buyerEmail: "mollie@example.test",
           subtotalCents: 100,
           totalCents: 100,
           reservationExpiresAt: new Date("2027-05-01T00:00:00.000Z"),
           termsAcceptedAt: new Date(),
           items: {
             create: {
-              id: ids.stripeItem,
+              id: ids.mollieItem,
               ticketTypeId: ids.rateType,
               inventoryPoolId: ids.ratePool,
               ticketTypeCode: "RATE",
               ticketTypeName: "Limiettest",
               unitPriceCents: 100,
               totalCents: 100,
-              attendeeName: "Stripe Attendee",
+              attendeeName: "Mollie Attendee",
             },
           },
           payments: {
             create: {
-              id: ids.stripePayment,
-              provider: "stripe",
-              providerCheckoutId: ids.stripeCheckout,
-              idempotencyKey: `${ids.stripeOrder}:1`,
+              id: ids.molliePayment,
+              provider: "mollie",
+              providerCheckoutId: ids.molliePaymentRef,
+              idempotencyKey: `${ids.mollieOrder}:1`,
               status: "PENDING",
               amountCents: 100,
               currency: "EUR",
@@ -298,61 +296,55 @@ describe.sequential("ticketing database invariants", () => {
       });
     });
 
-    const payload = JSON.stringify({
-      id: `evt_${randomUUID()}`,
-      object: "event",
-      api_version: "2026-06-30.basil",
-      created: Math.floor(Date.now() / 1000),
-      data: {
-        object: {
-          id: ids.stripeCheckout,
-          object: "checkout.session",
-          amount_total: 100,
-          client_reference_id: ids.stripeOrder,
-          currency: "eur",
-          metadata: { vtk_order_id: ids.stripeOrder },
-          payment_intent: ids.stripePaymentIntent,
-          payment_status: "paid",
-        },
-      },
-      livemode: false,
-      pending_webhooks: 1,
-      request: null,
-      type: "checkout.session.completed",
-    });
-    const signature = stripe().webhooks.generateTestHeaderString({
-      payload,
-      secret: "whsec_integration_only",
-    });
+    // The webhook re-fetches the authoritative payment from Mollie; stub that
+    // network call to return a paid payment for our order.
+    const molliePaymentPayload = {
+      id: ids.molliePaymentRef,
+      status: "paid",
+      amount: { currency: "EUR", value: "1.00" },
+      amountRefunded: { currency: "EUR", value: "0.00" },
+      metadata: { vtk_order_id: ids.mollieOrder, vtk_order_number: ids.mollieOrder },
+    };
+    const fetchMock = vi
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValue(
+        new Response(JSON.stringify(molliePaymentPayload), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        })
+      );
+
+    // Mollie posts application/x-www-form-urlencoded with only the payment id.
     const webhookRequest = () =>
-      new Request("http://localhost/api/tickets/stripe/webhook", {
+      new Request("http://localhost/api/tickets/mollie/webhook", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "stripe-signature": signature,
-        },
-        body: payload,
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: new URLSearchParams({ id: ids.molliePaymentRef }).toString(),
       });
 
-    expect((await processStripeWebhook(webhookRequest())).status).toBe(200);
-    expect(await prisma.ticketOrder.findUnique({ where: { id: ids.stripeOrder } })).toMatchObject({
-      status: "PAID",
-    });
-    expect(await prisma.ticketPayment.findUnique({ where: { id: ids.stripePayment } })).toMatchObject({
-      status: "SUCCEEDED",
-      providerPaymentId: ids.stripePaymentIntent,
-    });
-    expect(await prisma.ticket.count({ where: { orderItemId: ids.stripeItem, status: "VALID" } })).toBe(1);
+    try {
+      expect((await processMollieWebhook(webhookRequest())).status).toBe(200);
+      expect(await prisma.ticketOrder.findUnique({ where: { id: ids.mollieOrder } })).toMatchObject({
+        status: "PAID",
+      });
+      expect(await prisma.ticketPayment.findUnique({ where: { id: ids.molliePayment } })).toMatchObject({
+        status: "SUCCEEDED",
+        providerPaymentId: ids.molliePaymentRef,
+      });
+      expect(await prisma.ticket.count({ where: { orderItemId: ids.mollieItem, status: "VALID" } })).toBe(1);
 
-    const duplicate = await processStripeWebhook(webhookRequest());
-    expect(duplicate.status).toBe(200);
-    expect(await duplicate.json()).toMatchObject({ received: true, duplicate: true });
+      const duplicate = await processMollieWebhook(webhookRequest());
+      expect(duplicate.status).toBe(200);
+      expect(await duplicate.json()).toMatchObject({ received: true, duplicate: true });
+    } finally {
+      fetchMock.mockRestore();
+    }
   });
 
   it("keeps payment and refund races internally consistent", async () => {
     const refundId = randomUUID();
     const ticket = await prisma.ticket.findUniqueOrThrow({
-      where: { orderItemId: ids.stripeItem },
+      where: { orderItemId: ids.mollieItem },
     });
     await prisma.$transaction([
       prisma.ticket.update({
@@ -362,14 +354,14 @@ describe.sequential("ticketing database invariants", () => {
       prisma.ticketRefund.create({
         data: {
           id: refundId,
-          orderId: ids.stripeOrder,
-          paymentId: ids.stripePayment,
-          provider: "stripe",
+          orderId: ids.mollieOrder,
+          paymentId: ids.molliePayment,
+          provider: "mollie",
           idempotencyKey: refundId,
           amountCents: 100,
           currency: "EUR",
           requestedById: ids.user,
-          items: { create: { orderItemId: ids.stripeItem, amountCents: 100 } },
+          items: { create: { orderItemId: ids.mollieItem, amountCents: 100 } },
         },
       }),
     ]);
@@ -420,8 +412,8 @@ describe.sequential("ticketing database invariants", () => {
           payments: {
             create: {
               id: racePaymentId,
-              provider: "stripe",
-              providerCheckoutId: `cs_race_${raceOrderId}`,
+              provider: "mollie",
+              providerCheckoutId: `tr_race_${raceOrderId.replace(/-/g, "").slice(0, 10)}`,
               idempotencyKey: `${raceOrderId}:1`,
               status: "PENDING",
               amountCents: 100,
@@ -433,9 +425,9 @@ describe.sequential("ticketing database invariants", () => {
     await Promise.allSettled([
       fulfillPaidOrder({
         orderId: raceOrderId,
-        provider: "stripe",
-        providerPaymentId: `pi_race_${raceOrderId}`,
-        providerCheckoutId: `cs_race_${raceOrderId}`,
+        provider: "mollie",
+        providerPaymentId: `tr_race_${raceOrderId.replace(/-/g, "").slice(0, 10)}`,
+        providerCheckoutId: `tr_race_${raceOrderId.replace(/-/g, "").slice(0, 10)}`,
         amountCents: 100,
         currency: "EUR",
       }),

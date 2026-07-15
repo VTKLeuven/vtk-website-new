@@ -8,7 +8,7 @@ import { completeTicketRefund, failTicketRefund } from "./refunds";
 export async function reconcileTicketPayments(limit = 50) {
   const payments = await prisma.ticketPayment.findMany({
     where: {
-      provider: "stripe",
+      provider: "mollie",
       status: { in: ["CREATED", "PENDING"] },
       providerCheckoutId: { not: null },
     },
@@ -53,7 +53,7 @@ export async function reconcileTicketPayments(limit = 50) {
   }
 
   const refunds = await prisma.ticketRefund.findMany({
-    where: { provider: "stripe", status: "PENDING" },
+    where: { provider: "mollie", status: "PENDING" },
     include: { payment: { select: { providerPaymentId: true } } },
     orderBy: { updatedAt: "asc" },
     take: Math.min(Math.max(limit, 1), 100),
@@ -62,12 +62,15 @@ export async function reconcileTicketPayments(limit = 50) {
     try {
       const gateway = paymentGatewayFor(refund.provider);
       let status: RefundStatusResult;
+      if (!refund.payment.providerPaymentId) {
+        throw new Error("REFUND_PAYMENT_REFERENCE_MISSING");
+      }
       if (refund.providerRefundId) {
-        status = await gateway.getRefundStatus(refund.providerRefundId);
+        status = await gateway.getRefundStatus({
+          refundId: refund.providerRefundId,
+          paymentId: refund.payment.providerPaymentId,
+        });
       } else {
-        if (!refund.payment.providerPaymentId) {
-          throw new Error("REFUND_PAYMENT_REFERENCE_MISSING");
-        }
         status = await gateway.refund({
           paymentId: refund.payment.providerPaymentId,
           amountCents: refund.amountCents,

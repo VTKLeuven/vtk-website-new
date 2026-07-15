@@ -37,14 +37,14 @@ export function ticketTokenSecret(): string {
   return secret || process.env.BETTER_AUTH_SECRET?.trim() || "vtk-local-ticketing-secret-change-me";
 }
 
-export type PaymentProviderName = "stripe" | "mock";
+export type PaymentProviderName = "mollie" | "mock";
 
 export function configuredPaymentProvider(): PaymentProviderName {
   const configured = process.env.TICKETING_PAYMENT_PROVIDER?.trim().toLowerCase();
-  if (configured === "stripe") return "stripe";
+  if (configured === "mollie") return "mollie";
   if (configured === "mock" && process.env.NODE_ENV !== "production") return "mock";
   if (!configured && process.env.NODE_ENV !== "production") return "mock";
-  throw new Error("TICKETING_PAYMENT_PROVIDER must be set to stripe in production");
+  throw new Error("TICKETING_PAYMENT_PROVIDER must be set to mollie in production");
 }
 
 export function maintenanceSecret(): string | null {

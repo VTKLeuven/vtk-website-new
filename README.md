@@ -142,10 +142,11 @@ docker compose -f infra/docker-compose.yml down -v
 
 ## Integrated ticketing
 
-The main app includes event-scoped ticket sales, Stripe Checkout with Bancontact
-and card payments, PDF/QR tickets, refunds, and an authenticated entrance
-scanner. Public sales live at `/tickets`, event administration at
-`/admin/tickets`, and a scanner session at `/scan/<ticket-event-id>`.
+The main app includes event-scoped ticket sales, Mollie hosted checkout
+(Bancontact, card, and the other methods enabled on the Mollie profile),
+PDF/QR tickets, refunds, and an authenticated entrance scanner. Public sales
+live at `/tickets`, event administration at `/admin/tickets`, and a scanner
+session at `/scan/<ticket-event-id>`.
 
 ### Local mock-payment flow
 
@@ -191,56 +192,65 @@ Run the focused ticketing unit tests with:
 npm run test --workspace=@vtk/web
 ```
 
-### Stripe Checkout and Bancontact
+### Mollie hosted checkout
 
-Create a Stripe account for the organisation, complete account verification,
-and enable **Bancontact** in the Stripe payment-method settings. Ticket events
-using Bancontact must charge in EUR. The Checkout integration explicitly offers
-Bancontact and card; payment details remain on Stripe-hosted pages and are never
-handled by this application.
+Create a Mollie account for the organisation, complete the onboarding, and
+enable the desired payment methods (at minimum **Bancontact** and **card**) on
+the Mollie profile. The integration uses the Mollie **Payments API**: it creates
+a single payment for the order total in EUR and redirects the buyer to Mollie's
+hosted checkout, where they pick a method. Payment details stay on Mollie-hosted
+pages and are never handled by this application.
 
-Configure production with separate live-mode secrets:
+Configure production with a live-mode API key:
 
 ```dotenv
-TICKETING_PAYMENT_PROVIDER="stripe"
+TICKETING_PAYMENT_PROVIDER="mollie"
 TICKETING_PUBLIC_URL="https://vtk.be"
 TICKETING_RESERVATION_MINUTES="31"
 TICKETING_TOKEN_SECRET="<openssl rand -base64 48>"
 TICKETING_MAINTENANCE_SECRET="<openssl rand -base64 48>"
-STRIPE_SECRET_KEY="sk_live_..."
-STRIPE_WEBHOOK_SECRET="whsec_..."
+MOLLIE_API_KEY="live_..."
 ```
 
-In Stripe Workbench, register this HTTPS webhook endpoint:
+Mollie calls back at this endpoint whenever a payment or one of its refunds
+changes state:
 
 ```text
-https://vtk.be/api/tickets/stripe/webhook
+https://vtk.be/api/tickets/mollie/webhook
 ```
 
-Subscribe it to exactly these events:
+There is **no webhook to register in a dashboard** and **no signing secret**:
+Mollie posts only the payment id (`id=tr_...`, form-encoded), and the route
+re-fetches the authoritative payment from Mollie's API to decide what to do —
+so trust comes from the API key, not from the request body. The webhook URL is
+derived automatically from `TICKETING_PUBLIC_URL` and sent on every payment.
+Mollie rejects non-public webhook URLs, so the app omits the webhook URL when
+`TICKETING_PUBLIC_URL` points at `localhost`; in that case fulfillment relies on
+the return-page check plus reconciliation in the maintenance worker.
 
-- `checkout.session.completed`
-- `checkout.session.async_payment_succeeded`
-- `checkout.session.expired`
-- `checkout.session.async_payment_failed`
-- `refund.created`
-- `refund.updated`
-- `refund.failed`
+Refunds are settled from refund data embedded in the same webhook, with
+reconciliation in the maintenance worker as a second path when a webhook is
+delayed. Payment status maps as: `paid` → succeeded; `expired` → expired;
+`canceled`/`failed` → failed; everything else stays pending.
 
-The route verifies Stripe's signature against the unmodified request body and
-deduplicates events by Stripe event ID. Reconciliation in the maintenance worker
-provides a second path when a webhook is delayed. For a local Stripe test, use
-the test-mode keys and forward only the subscribed events:
+For a **local Mollie test**, use a `test_...` API key and expose the app over a
+public HTTPS tunnel so Mollie can redirect the buyer back and reach the webhook:
 
 ```bash
-stripe listen \
-  --events checkout.session.completed,checkout.session.async_payment_succeeded,checkout.session.expired,checkout.session.async_payment_failed,refund.created,refund.updated,refund.failed \
-  --forward-to localhost:3000/api/tickets/stripe/webhook
+# 1. tunnel localhost:3000 (any HTTPS tunnel works)
+cloudflared tunnel --url http://localhost:3000     # prints https://<random>.trycloudflare.com
+
+# 2. point ticketing + auth at that origin in the root .env, then restart `npm run dev`
+TICKETING_PAYMENT_PROVIDER="mollie"
+TICKETING_PUBLIC_URL="https://<random>.trycloudflare.com"
+MOLLIE_API_KEY="test_..."
+BETTER_AUTH_TRUSTED_ORIGINS="http://localhost:3000,https://<random>.trycloudflare.com"
 ```
 
-Put the `whsec_...` printed by the Stripe CLI in `STRIPE_WEBHOOK_SECRET`, then
-restart the web server. Never mix test-mode keys, live-mode keys, or their
-webhook signing secrets.
+In test mode Mollie's hosted checkout lets you choose the outcome
+(**paid / failed / expired**) with no real money. The webpack dev server already
+allows `*.trycloudflare.com` via `allowedDevOrigins` in `apps/web/next.config.ts`.
+Never mix test-mode and live-mode API keys.
 
 ### SMTP and the durable outbox
 

@@ -380,7 +380,7 @@ export async function createTicketCheckout(
         };
       }),
       expiresAt,
-      successUrl: `${returnUrl}?payment=return&session_id={CHECKOUT_SESSION_ID}`,
+      successUrl: `${returnUrl}?payment=return`,
       cancelUrl: `${returnUrl}?payment=cancelled`,
       attempt: 1,
     };

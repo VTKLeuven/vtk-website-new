@@ -26,7 +26,7 @@ describe("ticket production secrets", () => {
 });
 
 describe("ticket reservation duration", () => {
-  it("stays within the Stripe Checkout expiry window", () => {
+  it("stays within the payment provider checkout expiry window", () => {
     vi.stubEnv("TICKETING_RESERVATION_MINUTES", "10");
     expect(reservationMinutes()).toBe(31);
 
