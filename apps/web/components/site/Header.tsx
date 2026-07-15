@@ -8,6 +8,7 @@ import { getCurrentSession } from '@/lib/session';
 import { EditorialNavLinks } from './EditorialNavLinks';
 import { LocaleSwitcher } from './LocaleSwitcher';
 import { ProfileMenu } from './ProfileMenu';
+import { SiteHeaderShell } from './SiteHeaderShell';
 
 type OpeningHoursSetting = {
   titleNl: string;
@@ -65,7 +66,7 @@ export async function Header({ locale }: { locale: Locale }) {
       ];
 
   return (
-    <header className="vtk-site-header">
+    <SiteHeaderShell>
       <div className="utility">
         <div className="utility-inner">
           <div>
@@ -137,6 +138,6 @@ export async function Header({ locale }: { locale: Locale }) {
           )}
         </div>
       </div>
-    </header>
+    </SiteHeaderShell>
   );
 }

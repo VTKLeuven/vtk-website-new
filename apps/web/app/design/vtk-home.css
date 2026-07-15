@@ -10,9 +10,11 @@
   align-items: start;
 }
 
-/* Subtle full-bleed background photo (Arenberg). A paper-tinted wash keeps the
-   copy readable, heaviest on the left behind the dark headline, and a bottom
-   fade blends the band into the section below so the photo never distracts. */
+/* Full-bleed Arenberg photo under a navy scrim (heaviest top-left, behind the
+   headline) with light copy on top. A top band keeps the overlapping header
+   legible; a soft bottom vignette settles the band into the section below. Light
+   text and the white events card sit on a reliably dark ground, so contrast
+   never depends on which part of the photo happens to show through. */
 .vtk-design .home-hero::before {
   content: "";
   position: absolute;
@@ -22,13 +24,14 @@
   left: calc(50% - 50vw);
   right: calc(50% - 50vw);
   background:
-    linear-gradient(to bottom, rgba(250, 250, 247, 0) 58%, var(--paper) 100%),
+    linear-gradient(to bottom, rgba(10, 15, 31, 0.55) 0, rgba(10, 15, 31, 0) 160px),
+    linear-gradient(to bottom, rgba(10, 15, 31, 0) 74%, rgba(10, 15, 31, 0.28) 100%),
     linear-gradient(
-      100deg,
-      rgba(250, 250, 247, 0.8) 0%,
-      rgba(250, 250, 247, 0.73) 40%,
-      rgba(250, 250, 247, 0.51) 72%,
-      rgba(250, 250, 247, 0.37) 100%
+      103deg,
+      rgba(9, 12, 24, 0.92) 0%,
+      rgba(10, 15, 31, 0.8) 38%,
+      rgba(12, 20, 42, 0.6) 66%,
+      rgba(14, 26, 54, 0.46) 100%
     ),
     url("/hero-arenberg.jpg") center 25% / cover no-repeat;
   pointer-events: none;
@@ -49,23 +52,79 @@
 
 .vtk-design .home-hero h1 {
   margin: 18px 0 0;
-  color: var(--ink);
+  color: var(--paper);
   font-size: clamp(48px, 6.5vw, 92px);
   line-height: 0.98;
   letter-spacing: -0.035em;
   font-weight: 600;
+  text-shadow: 0 1px 30px rgba(10, 15, 31, 0.45);
 }
 
 .vtk-design .home-hero h1 .serif {
-  color: var(--navy);
+  color: var(--yellow);
 }
 
 .vtk-design .hero-sub {
   max-width: 48ch;
   margin: 28px 0 0;
-  color: var(--body);
+  color: rgba(250, 250, 247, 0.86);
   font-size: 17px;
   line-height: 1.55;
+  text-shadow: 0 1px 24px rgba(10, 15, 31, 0.4);
+}
+
+/* Optie B: light copy + light controls over the navy scrim. Scoped to the hero
+   so the shared eyebrow/meta/button styles keep their normal look elsewhere. */
+.vtk-design .home-hero .eyebrow {
+  color: rgba(250, 250, 247, 0.74);
+}
+
+.vtk-design .home-hero .hero-meta {
+  border-top-color: rgba(250, 250, 247, 0.2);
+}
+
+.vtk-design .home-hero .hero-meta .k {
+  color: rgba(250, 250, 247, 0.62);
+}
+
+.vtk-design .home-hero .hero-meta .v {
+  color: var(--paper);
+}
+
+.vtk-design .home-hero .cal {
+  box-shadow: 0 24px 60px -32px rgba(10, 15, 31, 0.6);
+}
+
+.vtk-design .home-hero .btn-primary {
+  background: var(--paper);
+  border-color: var(--paper);
+  color: var(--ink) !important;
+}
+
+.vtk-design .home-hero .btn-primary:hover {
+  background: #fff;
+  border-color: #fff;
+}
+
+.vtk-design .home-hero .btn-ghost {
+  color: var(--paper) !important;
+  border-color: rgba(250, 250, 247, 0.42);
+}
+
+.vtk-design .home-hero .btn-ghost:hover {
+  border-color: var(--paper);
+  background: rgba(250, 250, 247, 0.12);
+}
+
+/* Desktop: let the hero slide up under the sticky header so the scrim runs
+   edge to edge and the header sits on the photo (see SiteHeaderShell). The top
+   padding gains the header height back so the copy still clears the nav. Below
+   this width the header stays a solid strip above the hero (no overlap). */
+@media (min-width: 981px) {
+  .vtk-design .home-hero {
+    margin-top: calc(-1 * var(--vtk-header-height));
+    padding-top: calc(var(--vtk-header-height) + clamp(56px, 7vw, 84px));
+  }
 }
 
 .vtk-design .hero-actions,
