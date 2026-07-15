@@ -182,11 +182,16 @@ export function ContentManager({
           setDropTarget(null);
         }}
         onDragOver={(e) => {
+          // Sleep je een categorie, dan is de hele groep het doelwit: laat het
+          // event doorbubbelen naar de <li> zodat de categorie oplicht in
+          // plaats van één losse pagina.
+          if (drag.current?.kind === "tab") return;
           e.preventDefault();
           e.stopPropagation();
           if (dropTarget !== page.id) setDropTarget(page.id);
         }}
         onDrop={(e) => {
+          if (drag.current?.kind === "tab") return;
           e.preventDefault();
           e.stopPropagation();
           onDropOnPage(page);
@@ -316,6 +321,9 @@ export function ContentManager({
               dropTarget === "__unlinked__" ? "rounded-xl ring-2 ring-vtk-yellow" : "",
             ].join(" ")}
             onDragOver={(e) => {
+              // Een categorie hoort niet in de losse-pagina's sectie thuis; enkel
+              // pagina's kun je hier droppen.
+              if (drag.current?.kind !== "page") return;
               e.preventDefault();
               if (dropTarget !== "__unlinked__") setDropTarget("__unlinked__");
             }}
