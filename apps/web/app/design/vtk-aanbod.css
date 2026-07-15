@@ -542,12 +542,13 @@
 
 .vtk-design .svc {
   border: 1px solid var(--line);
-  background: #fff;
+  background: var(--surface);
 }
 
 .vtk-design .svc.feat {
-  background: var(--navy);
-  color: var(--paper);
+  background: var(--surface);
+  color: var(--ink);
+  box-shadow: inset 3px 0 0 0 var(--yellow);
 }
 
 .vtk-design .svc h2,
@@ -606,7 +607,7 @@
   padding: 24px;
   border: 1px solid var(--line);
   border-radius: 18px;
-  background: #fff;
+  background: var(--surface);
   color: var(--ink);
   box-shadow: none;
 }
@@ -641,16 +642,17 @@
   padding: 28px;
   border: 1px solid var(--line);
   border-radius: 18px;
-  background: #fff;
+  background: var(--surface);
 }
 
 .vtk-design .svc.feat {
-  background: var(--navy);
-  color: var(--paper);
+  background: var(--surface);
+  color: var(--ink);
+  box-shadow: inset 3px 0 0 0 var(--yellow);
 }
 
 .vtk-design .svc.feat h2 {
-  color: var(--paper);
+  color: var(--ink);
 }
 
 .vtk-design .svc-head {
@@ -660,7 +662,7 @@
 .vtk-design .svc.feat .svc-head,
 .vtk-design .svc.feat .svc-status,
 .vtk-design .svc.feat .svc-meta {
-  border-color: rgb(255 255 255 / 16%);
+  border-color: var(--line);
 }
 
 .vtk-design .svc-num,
@@ -684,7 +686,7 @@
 .vtk-design .svc.feat .svc-status .change,
 .vtk-design .svc.feat .svc-meta dt,
 .vtk-design .svc.feat .svc-meta dd {
-  color: #b7c0dc;
+  color: var(--muted);
 }
 
 .vtk-design .svc h2 {
@@ -745,7 +747,7 @@
 .vtk-design .menu-item {
   border: 1px solid var(--line);
   border-radius: 16px;
-  background: #fff;
+  background: var(--surface);
 }
 
 .vtk-design .menu-item .nr,

@@ -28,7 +28,7 @@
   padding: 14px 16px;
   border: 1px solid var(--line);
   border-radius: 16px;
-  background: #fff;
+  background: var(--surface);
 }
 
 .vtk-event-meta span {

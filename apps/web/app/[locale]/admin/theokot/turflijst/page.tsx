@@ -77,7 +77,7 @@ export default async function TurflijstPage({
         }
         #turf-print table { width: 100%; border-collapse: collapse; }
         #turf-print th, #turf-print td { border: 1px solid #0A0F1F; padding: 8px 12px; text-align: left; }
-        #turf-print th { background: #F2F0E9; font-size: 13px; text-transform: uppercase; letter-spacing: 0.04em; }
+        #turf-print th { background: #E6ECF5; font-size: 13px; text-transform: uppercase; letter-spacing: 0.04em; }
         #turf-print td.num { text-align: center; font-variant-numeric: tabular-nums; width: 4rem; }
         #turf-print td.tally { width: 40%; }
         #turf-print td.check { width: 3rem; text-align: center; }

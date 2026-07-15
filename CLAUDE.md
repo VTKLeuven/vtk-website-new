@@ -90,24 +90,47 @@ the design language into the application instead of copying mockup content.
 
 - Fonts: use Inter for UI and body text. Use Instrument Serif only as an italic
   accent inside large headlines, never for dense interface copy.
-- Palette: default to `--paper #FAFAF7`, `--paper-2 #F2F0E9`,
-  `--ink #0A0F1F`, `--navy #0E1A36`, `--yellow #FFD23F`,
-  and muted blue-gray text. Avoid old cool-gray/mono-heavy styling.
-- Layout: use generous max-width containers around 1320px, off-white page
-  backgrounds, thin navy-tinted borders, and clear horizontal rhythm.
+- Palette: cool paper, light mode. Every colour is a CSS custom property defined
+  **once** in `apps/web/app/design/vtk-base.css`; components reference the tokens,
+  never raw hexes. Retune the palette there and the whole site follows. Key
+  tokens: `--paper #EFF2F8` (page ground), `--paper-2 #E6ECF5` (band/inset tint),
+  `--surface #FFFFFF` (cards & panels), `--ink #0A0F1F` + `--navy #0E1A36`
+  (text/ink and dark accents), `--yellow #FFD23F` (the single accent),
+  `--muted #5C667F` / `--body #34405E` (text tones), `--on-dark-muted #B7C0DC`
+  (muted text on a dark band). Do not reintroduce the old warm off-white
+  (`#FAFAF7`/`#F2F0E9`). The Tailwind `@theme` neutrals in
+  `apps/web/app/globals.css` (`--color-vtk-surface`, `--color-vtk-blue-soft`,
+  `--color-vtk-blue-muted`) mirror these neutrals for `bg-vtk-*` utilities; keep
+  them in sync when you retune.
+- Layout: use generous max-width containers around 1320px, the cool `--paper`
+  page ground, thin navy-tinted `--line` borders, and clear horizontal rhythm.
 - Shape: cards and panels should be softly rounded, usually 16-22px. Small
   controls can be pill-shaped when they are CTAs or filters.
 - Tone: prefer dense editorial utility over marketing decoration. Do not add
   gradients, decorative blobs, nested cards, or oversized explanatory text.
+- Hero (homepage): a full-bleed photo under a navy scrim (heaviest top-left,
+  behind the headline) carries light copy, a yellow italic-serif accent, and the
+  white events card. Keep the bottom edge a subtle dark vignette; do not wash it
+  to `--paper` (a fade to the light ground read as a harsh transition). The sticky
+  header sits transparently over this hero and turns solid once scrolled past it
+  (desktop; `components/site/SiteHeaderShell`).
+- Dark surfaces: `--navy`/`--ink` are for text, buttons, small accents, and
+  intentional full-width bands only, never as a card fill in a light grid. Mark a
+  featured card with a yellow accent rail (`box-shadow: inset 3px 0 0 var(--yellow)`)
+  on a `--surface` card, not a navy block.
 
 ## Components
 
-- Header: sticky translucent paper background with blur, compact brand mark,
-  plain nav links, subtle language/account controls, and one strong dark CTA.
+- Header: sticky, translucent paper background (tracks `--paper`) with blur,
+  compact brand mark, plain nav links, subtle language/account controls, and one
+  strong dark CTA. On the homepage it sits transparently over the dark hero with
+  light nav and turns solid on scroll; solid everywhere else.
 - Buttons: primary is dark ink/navy with paper text; secondary/ghost is bordered
-  on paper; yellow is reserved for accents and active states.
-- Cards: white or paper panels with thin borders, small elevation at most, and
-  restrained hover movement.
+  on paper; yellow is reserved for accents and active states. Over the dark hero,
+  the primary button inverts to a `--surface` fill with ink text.
+- Cards: `--surface` (white) panels with thin `--line` borders on the cool
+  `--paper` ground, small elevation at most, and restrained hover movement. No
+  navy/dark card fills; a featured card is marked with a yellow accent rail.
 - Lists and calendars: favor agenda/list layouts, tabular times, compact day
   labels, and small yellow status pins.
 - Admin: keep pages operationally dense. Forms, tables, and upload/editor

@@ -43,7 +43,7 @@ export default async function FotosPage({
           {albums.map((a) => (
             <li key={a.id}>
               <Link href={`${base}/fotos/${a.slug}`} className="group block">
-                <div className="aspect-square overflow-hidden rounded-[18px] border border-vtk-blue/10 bg-[#f2f0e9]">
+                <div className="aspect-square overflow-hidden rounded-[18px] border border-vtk-blue/10 bg-vtk-blue-soft">
                   {a.coverPhoto ? (
                     <img
                       src={publicUrl(a.coverPhoto.thumbnailKey || a.coverPhoto.storageKey) ?? ""}

@@ -12,9 +12,10 @@
 
 /* Full-bleed Arenberg photo under a navy scrim (heaviest top-left, behind the
    headline) with light copy on top. A top band keeps the overlapping header
-   legible; a soft bottom vignette settles the band into the section below. Light
-   text and the white events card sit on a reliably dark ground, so contrast
-   never depends on which part of the photo happens to show through. */
+   legible; a subtle dark vignette settles the very bottom edge (no wash to
+   --paper, which read as a harsh transition). Light text and the white events
+   card sit on a reliably dark ground, so contrast never depends on which part of
+   the photo happens to show through. */
 .vtk-design .home-hero::before {
   content: "";
   position: absolute;
@@ -25,7 +26,7 @@
   right: calc(50% - 50vw);
   background:
     linear-gradient(to bottom, rgba(10, 15, 31, 0.55) 0, rgba(10, 15, 31, 0) 160px),
-    linear-gradient(to bottom, rgba(10, 15, 31, 0) 74%, rgba(10, 15, 31, 0.28) 100%),
+    linear-gradient(to bottom, rgba(10, 15, 31, 0) 82%, rgba(10, 15, 31, 0.24) 100%),
     linear-gradient(
       103deg,
       rgba(9, 12, 24, 0.92) 0%,
@@ -102,7 +103,7 @@
 }
 
 .vtk-design .home-hero .btn-primary:hover {
-  background: #fff;
+  background: var(--surface);
   border-color: #fff;
 }
 
@@ -163,7 +164,7 @@
 .vtk-design .cal {
   border: 1px solid var(--line);
   border-radius: 18px;
-  background: #fff;
+  background: var(--surface);
   padding: 24px;
 }
 
@@ -382,7 +383,7 @@
   justify-content: space-between;
   border: 1px solid var(--line);
   border-radius: 18px;
-  background: #fff;
+  background: var(--surface);
   padding: 28px;
   color: var(--ink);
   transition: transform 180ms ease, border-color 180ms ease;
@@ -432,23 +433,33 @@
   transform: translateX(3px);
 }
 
+/* Featured card: a light surface marked by a yellow accent rail, not a navy
+   fill. Keeps the card in the light grid while still reading as primary. */
 .vtk-design .acard.feat {
-  background: var(--navy);
-  border-color: var(--navy);
-  color: var(--paper);
+  background: var(--surface);
+  border-color: var(--line-2);
+  box-shadow: inset 3px 0 0 0 var(--yellow);
 }
 
 .vtk-design .acard.feat h3 {
-  color: var(--paper);
+  color: var(--ink);
 }
 
 .vtk-design .acard.feat p {
-  color: #b7c0dc;
+  color: var(--body);
 }
 
-.vtk-design .acard.feat .tag,
+.vtk-design .acard.feat .tag {
+  display: inline-flex;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: var(--yellow);
+  color: var(--ink);
+  font-weight: 700;
+}
+
 .vtk-design .acard.feat .cta {
-  color: var(--yellow);
+  color: var(--navy);
 }
 
 .vtk-design .career {
@@ -456,8 +467,9 @@
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   gap: clamp(28px, 4vw, 48px);
   align-items: start;
+  border: 1px solid var(--line);
   border-radius: 22px;
-  background: var(--paper-2);
+  background: var(--surface);
   padding: clamp(28px, 4vw, 48px);
 }
 
@@ -523,13 +535,13 @@
 .vtk-design .hours-col {
   border: 1px solid var(--line);
   border-radius: 18px;
-  background: #fff;
+  background: var(--surface);
   padding: 28px;
 }
 
 .vtk-design .hours-col.section-hours-bg {
-  background: var(--navy);
-  color: var(--paper);
+  background: var(--surface);
+  color: var(--ink);
 }
 
 .vtk-design .hours-col h3 {
@@ -546,7 +558,7 @@
 }
 
 .vtk-design .hours-col.section-hours-bg .sub {
-  color: #b7c0dc;
+  color: var(--muted);
 }
 
 .vtk-design .hours-col .status {
@@ -585,7 +597,7 @@
 }
 
 .vtk-design .hours-col.section-hours-bg .hours-list dt {
-  color: #b7c0dc;
+  color: var(--muted);
 }
 
 .vtk-design .hours-list .today {
@@ -626,7 +638,7 @@
   place-items: center;
   border: 1px solid var(--line);
   border-radius: 14px;
-  background: #fff;
+  background: var(--surface);
   color: var(--muted);
   padding: 12px;
   text-align: center;

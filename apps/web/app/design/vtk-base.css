@@ -2,16 +2,22 @@
    page helpers are intentionally available to public and admin routes. */
 
 :root {
+  /* Palette = single source of truth. Retune these to reskin the whole site;
+     components reference the tokens, never raw hexes. "paper" is the (cool) page
+     ground, "paper-2" its slightly deeper tint for bands/insets, "surface" the
+     white of cards and panels. See the Styling Guidelines in CLAUDE.md. */
   --ink: #0a0f1f;
   --navy: #0e1a36;
-  --paper: #fafaf7;
-  --paper-2: #f2f0e9;
+  --paper: #eff2f8;
+  --paper-2: #e6ecf5;
   --surface: #ffffff;
   --line: rgba(14, 26, 54, 0.1);
   --line-2: rgba(14, 26, 54, 0.18);
   --yellow: #ffd23f;
   --muted: #5c667f;
   --body: #34405e;
+  /* Muted text on a navy/ink ground (intentional dark bands only). */
+  --on-dark-muted: #b7c0dc;
   --ink-2: var(--body);
   --rule: var(--line);
   --rule-soft: rgba(14, 26, 54, 0.07);

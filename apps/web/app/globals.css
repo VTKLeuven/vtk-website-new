@@ -14,20 +14,24 @@
 @source "../lib";
 @source "../../../packages/ui/src";
 
-/* Brand tokens follow design/new-design.html. */
+/* Brand tokens for Tailwind utilities (bg-vtk-*, text-vtk-*). These mirror the
+   canonical palette in app/design/vtk-base.css (`--paper`, `--paper-2`,
+   `--surface`, ...). Tailwind's @theme needs concrete values to generate the
+   utilities, so when you retune the palette, change it in vtk-base.css and keep
+   these three neutrals in sync: soft = --paper-2, muted/surface = --paper. */
 @theme {
   --color-vtk-ink: #0a0f1f;
   --color-vtk-navy: #0e1a36;
   --color-vtk-blue: #0e1a36;
   --color-vtk-blue-dark: #0a0f1f;
   --color-vtk-blue-light: #34405e;
-  --color-vtk-blue-soft: #f2f0e9;
-  --color-vtk-blue-muted: #fafaf7;
+  --color-vtk-blue-soft: #e6ecf5;
+  --color-vtk-blue-muted: #eff2f8;
 
   --color-vtk-yellow: #ffd23f;
   --color-vtk-yellow-dark: #edbd22;
 
-  --color-vtk-surface: #fafaf7;
+  --color-vtk-surface: #eff2f8;
   --color-vtk-surface-elevated: #ffffff;
 
   --font-sans: var(--font-vtk-sans), var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
@@ -35,8 +39,10 @@
 }
 
 :root {
-  --background: #fafaf7;
-  --foreground: #0a0f1f;
+  /* Body ground tracks the canonical --paper (vtk-base.css); the fallback keeps
+     non-locale routes, where that file is not loaded, on the same colour. */
+  --background: var(--paper, #eff2f8);
+  --foreground: var(--ink, #0a0f1f);
   --vtk-ring: rgba(14, 26, 54, 0.12);
 }
 

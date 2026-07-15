@@ -101,7 +101,7 @@ export default async function AdminGroups({
                   const src = publicUrl(m.user.avatarKey);
                   return (
                     <li key={m.id} className="flex items-center gap-3 py-2">
-                      <div className="h-9 w-9 shrink-0 overflow-hidden rounded-full border border-vtk-blue/10 bg-[#f2f0e9]">
+                      <div className="h-9 w-9 shrink-0 overflow-hidden rounded-full border border-vtk-blue/10 bg-vtk-blue-soft">
                         {src ? (
                           // eslint-disable-next-line @next/next/no-img-element
                           <img src={src} alt="" className="h-full w-full object-cover" />

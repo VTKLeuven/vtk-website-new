@@ -92,7 +92,7 @@ export default async function PraesidiumPage({
                       const src = publicUrl(m.user.avatarKey);
                       return (
                         <li key={m.id} className="text-center">
-                          <div className="mx-auto h-28 w-28 overflow-hidden rounded-[20px] border border-vtk-blue/10 bg-[#f2f0e9]">
+                          <div className="mx-auto h-28 w-28 overflow-hidden rounded-[20px] border border-vtk-blue/10 bg-vtk-blue-soft">
                             {src ? (
                               // eslint-disable-next-line @next/next/no-img-element
                               <img src={src} alt={m.user.name} className="h-full w-full object-cover" />

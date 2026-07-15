@@ -223,7 +223,7 @@ export function ProfileForm({
         <legend className="text-lg font-semibold text-vtk-ink">{t.photoHeading}</legend>
         <p className="text-sm text-[#5c667f]">{t.photoHint}</p>
         <div className="flex items-center gap-4">
-          <div className="h-20 w-20 shrink-0 overflow-hidden rounded-[16px] border border-vtk-blue/10 bg-[#f2f0e9]">
+          <div className="h-20 w-20 shrink-0 overflow-hidden rounded-[16px] border border-vtk-blue/10 bg-vtk-blue-soft">
             {currentAvatar ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img src={currentAvatar} alt="" className="h-full w-full object-cover" />

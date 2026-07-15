@@ -63,25 +63,17 @@ async function main() {
   }
 
   console.log("Seeding header tabs...");
-  // HEADER_TABS is de bron van waarheid voor de standaardtabs: een reseed zet ook
-  // intro en CTA terug, zodat bv. de cudi-knop op /cursusdienst uit data komt en
-  // niet uit een hardcoded branch. Eigen aanpassingen in /admin/inhoud aan deze
-  // velden worden daarmee wel overschreven bij een reseed.
+  // Header tabs zijn na hun eerste aanmaak volledig admin-beheerd: labels, volgorde
+  // (dragbaar, zie /admin/inhoud), zichtbaarheid, slug, intro en CTA worden daar
+  // bewerkt. De seed draait bij ELKE containerstart (zie web.Dockerfile CMD), dus
+  // een `update` met de HEADER_TABS-defaults zou die aanpassingen bij elke deploy
+  // terugdraaien. Daarom enkel ontbrekende tabs aanmaken en bestaande rijen NIET
+  // overschrijven. Een verse of gereset DB krijgt nog steeds alle defaults via
+  // `create`; nieuwe standaardtabs (nieuw `code`) worden nog wel toegevoegd.
   for (const tab of HEADER_TABS) {
     await prisma.headerTab.upsert({
       where: { code: tab.code },
-      update: {
-        slug: tab.slug,
-        labelNl: tab.labelNl,
-        labelEn: tab.labelEn,
-        order: tab.order,
-        visible: true,
-        introNl: tab.introNl ?? null,
-        introEn: tab.introEn ?? null,
-        ctaLabelNl: tab.ctaLabelNl ?? null,
-        ctaLabelEn: tab.ctaLabelEn ?? null,
-        ctaUrl: tab.ctaUrl ?? null,
-      },
+      update: {},
       create: tab,
     });
   }
@@ -237,10 +229,15 @@ async function main() {
       },
     },
   ];
+  // Net als de header tabs zijn deze settings admin-beheerd (openingsuren, career,
+  // aftermovies, theokot-config ...) en worden ze in /admin bewerkt. De seed draait
+  // bij elke containerstart, dus enkel ontbrekende keys aanmaken en bestaande niet
+  // overschrijven; anders draait elke deploy die aanpassingen terug naar de defaults.
+  // Een verse of gereset DB krijgt nog steeds alle defaults via `create`.
   for (const s of defaultSettings) {
     await prisma.setting.upsert({
       where: { key: s.key },
-      update: { value: s.value as object },
+      update: {},
       create: { key: s.key, value: s.value as object },
     });
   }

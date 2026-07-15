@@ -124,7 +124,7 @@
   padding: clamp(28px, 4vw, 40px);
   border: 1px solid var(--line);
   border-radius: 18px;
-  background: #fff;
+  background: var(--surface);
   box-shadow: 0 18px 50px rgba(10, 15, 31, 0.06);
 }
 
