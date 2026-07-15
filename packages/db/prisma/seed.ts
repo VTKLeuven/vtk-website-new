@@ -144,6 +144,17 @@ async function main() {
     }
   }
 
+  // Marketing (Communicatie) maintains the public media page.
+  const communicatie = await prisma.group.findUnique({ where: { code: "COMMUNICATIE" } });
+  const mediaManage = await prisma.permission.findUnique({ where: { code: "media.manage" } });
+  if (communicatie && mediaManage) {
+    await prisma.groupPermission.upsert({
+      where: { groupId_permissionId: { groupId: communicatie.id, permissionId: mediaManage.id } },
+      update: {},
+      create: { groupId: communicatie.id, permissionId: mediaManage.id },
+    });
+  }
+
   console.log("Seeding default homepage settings...");
   const defaultSettings: Array<{
     key: string;

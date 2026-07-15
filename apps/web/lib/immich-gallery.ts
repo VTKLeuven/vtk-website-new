@@ -681,3 +681,62 @@ export function immichGalleryStatus(error: unknown) {
 export function downloadFilenameFromImmichResponse(response: Response, fallback: string) {
   return filenameFromHeader(response.headers.get("content-disposition"), fallback);
 }
+
+// --- Admin album management (used by /admin/media) ---
+
+/** Base URL of the Immich web UI, for "open in Immich" links. */
+export function immichWebUrl(): string | null {
+  const explicit = process.env.GALLERY_IMMICH_WEB_URL?.trim();
+  if (explicit) return explicit.replace(/\/+$/, "");
+  const apiUrl = getConfig().apiUrl;
+  if (!apiUrl) return null;
+  return apiUrl.replace(/\/api\/?$/, "");
+}
+
+/**
+ * Create an Immich album carrying the gallery marker so it shows up on the
+ * public media page. Returns the new album id.
+ */
+export async function createImmichGalleryAlbum({
+  title,
+  description,
+}: {
+  title: string;
+  description?: string;
+}): Promise<{ id: string }> {
+  const config = getConfig();
+  const publicDescription = (description || "").trim();
+  const fullDescription = publicDescription
+    ? `${publicDescription}\n\n${config.albumMarker}`
+    : config.albumMarker;
+
+  const album = await immichJson<{ id: string }>("/albums", {
+    method: "POST",
+    body: {
+      albumName: title,
+      description: fullDescription,
+    },
+  });
+  if (!album?.id) {
+    throw new ImmichGalleryError(502, "Immich did not return an album id.", "immich_album_create_failed");
+  }
+  return { id: album.id };
+}
+
+/** Add previously uploaded assets to an album. */
+export async function addImmichAssetsToAlbum(albumId: string, assetIds: string[]) {
+  if (assetIds.length === 0) return null;
+  return immichJson<unknown>(`/albums/${encodeURIComponent(albumId)}/assets`, {
+    method: "PUT",
+    body: { ids: assetIds },
+  });
+}
+
+/** Force the public gallery snapshot to rebuild on the next request. */
+export async function refreshImmichGallerySnapshot() {
+  try {
+    await getSnapshot({ force: true });
+  } catch {
+    // Cache refresh is best-effort; the TTL will pick up changes anyway.
+  }
+}
