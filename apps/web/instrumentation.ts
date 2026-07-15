@@ -39,26 +39,27 @@ export async function register(): Promise<void> {
   }
 
   // Theokot-timer enkel in de Node.js-runtime (niet edge/browser) en niet dubbel starten.
-  if (process.env.NEXT_RUNTIME !== 'nodejs') return;
-  if (globalThis.__theokotNoShowTimer) return;
+  if (process.env.NEXT_RUNTIME == 'nodejs' && !globalThis.__theokotNoShowTimer) {
+    // niet gebruik maken van early return, want met npm run dev worden branches niet altijd correct gepruned en anders komen deze functies in de browser bundle terecht
 
-  const run = async () => {
-    try {
-      const { processDueNoShows } = await import('./lib/theokot-server');
-      const result = await processDueNoShows(new Date());
-      if (result.noShows > 0) {
-        console.info(
-          `[theokot] no-show-verwerking: ${result.noShows} bestelling(en) over ${result.sessions} sessie(s) gemarkeerd.`,
-        );
+    const run = async () => {
+      try {
+        const { processDueNoShows } = await import('./lib/theokot-server');
+        const result = await processDueNoShows(new Date());
+        if (result.noShows > 0) {
+          console.info(
+            `[theokot] no-show-verwerking: ${result.noShows} bestelling(en) over ${result.sessions} sessie(s) gemarkeerd.`
+          );
+        }
+      } catch (err) {
+        console.error('[theokot] no-show-verwerking mislukt:', err);
       }
-    } catch (err) {
-      console.error('[theokot] no-show-verwerking mislukt:', err);
-    }
-  };
+    };
 
-  // Kort na boot één keer draaien, daarna op interval.
-  globalThis.__theokotNoShowTimer = setInterval(run, INTERVAL_MS);
-  setTimeout(run, 15_000);
+    // Kort na boot één keer draaien, daarna op interval.
+    globalThis.__theokotNoShowTimer = setInterval(run, INTERVAL_MS);
+    setTimeout(run, 15_000);
+  }
 }
 
 // Vangt automatisch alle onverwerkte server-side request-errors op (App Router
