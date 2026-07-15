@@ -20,6 +20,7 @@ const sections = [
   { key: "users", href: "/gebruikers", perm: "users.view" },
   { key: "mailinglists", href: "/mailinglijsten", perm: "mailinglists.export" },
   { key: "groups", href: "/groepen", perm: "groups.manage" },
+  { key: "roles", href: "/roles", perm: "roles.manage" },
   { key: "home", href: "/home", perm: "home.edit" },
   { key: "dashboardTiles", href: "/dashboard-tiles", perm: "dashboard.manage" },
   { key: "shortlinks", href: "/links", perm: "shortlinks.manage" },
@@ -120,6 +121,13 @@ const icons: Record<string, ReactNode> = {
       <circle cx="9" cy="7" r="4" />
       <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
       <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+    </Svg>
+  ),
+  // roles: rechtenbundel -> schild met vinkje
+  roles: (
+    <Svg>
+      <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z" />
+      <path d="m9 12 2 2 4-4" />
     </Svg>
   ),
   // home: huis

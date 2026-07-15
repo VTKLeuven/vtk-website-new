@@ -6,7 +6,7 @@ import 'server-only';
 
 import type { Prisma, User } from '@prisma/client';
 import { prisma } from '@vtk/db';
-import type { Locale, SessionPayload } from '..';
+import type { Locale, Permission, SessionPayload } from '..';
 import { hasPermission, AuthError } from '..';
 import { hashPassword } from '../logins/password';
 
@@ -32,7 +32,7 @@ type UpdateUserInput = {
   isSuperAdmin?: boolean;
 };
 
-function assertCan(actor: SessionPayload, permission: string): void {
+function assertCan(actor: SessionPayload, permission: Permission): void {
   if (!hasPermission(actor, permission)) {
     throw new AuthError('FORBIDDEN');
   }

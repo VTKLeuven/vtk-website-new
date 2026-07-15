@@ -111,6 +111,34 @@ async function main() {
     });
   }
 
+  console.log("Seeding roles...");
+  // De admin-rol is een systeemrol: ze bundelt alle rechten en kan niet via de
+  // GUI verwijderd worden. Ze reset niet apart; roltoewijzingen gaan per
+  // werkingsjaar, dus admin wordt elk jaar opnieuw toegekend (isSuperAdmin op de
+  // user blijft de harde, niet-resettende uitzondering). Andere rollen maak je
+  // aan via /admin/roles.
+  const adminRole = await prisma.role.upsert({
+    where: { code: "admin" },
+    update: { nameNl: "Admin", nameEn: "Admin", system: true },
+    create: {
+      code: "admin",
+      nameNl: "Admin",
+      nameEn: "Admin",
+      system: true,
+      order: 0,
+      descriptionNl: "Volledige toegang tot het beheer.",
+      descriptionEn: "Full access to administration.",
+    },
+  });
+  const allPermsForAdmin = await prisma.permission.findMany();
+  for (const perm of allPermsForAdmin) {
+    await prisma.rolePermission.upsert({
+      where: { roleId_permissionId: { roleId: adminRole.id, permissionId: perm.id } },
+      update: {},
+      create: { roleId: adminRole.id, permissionId: perm.id },
+    });
+  }
+
   // IT and Groep 5 get elevated permissions by default. Global ticket access
   // remains an explicit assignment because it exposes attendee and financial data.
   const elevatedGroupCodes = ["IT", "GROEP5"] as const;

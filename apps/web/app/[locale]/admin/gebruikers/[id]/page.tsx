@@ -14,7 +14,8 @@ import {
   removeMembershipAction,
   saveUserAction,
 } from "@/app/actions/users-groups";
-import { currentWorkingYear } from "@/lib/workingYear";
+import { assignUserRoleAction, removeUserRoleAction } from "@/app/actions/roles";
+import { currentWorkingYear, formatWorkingYear } from "@/lib/workingYear";
 
 export default async function EditUserPage({
   params,
@@ -24,17 +25,30 @@ export default async function EditUserPage({
   const { locale: localeParam, id } = await params;
   if (!hasLocale(localeParam)) notFound();
   const locale: Locale = localeParam;
-  await requirePermission("users.edit");
+  const session = await requirePermission("users.edit");
   const dict = getDictionary(locale);
+  const year = currentWorkingYear();
+  // Rollen toewijzen is een aparte, gevoeligere bevoegdheid dan gebruikersbeheer.
+  const canManageRoles = session.user.isSuperAdmin || session.permissions.includes("roles.manage");
 
-  const [user, groups] = await Promise.all([
+  const [user, groups, allRoles] = await Promise.all([
     prisma.user.findUnique({
       where: { id },
-      include: { memberships: { include: { group: true } } },
+      include: {
+        memberships: { include: { group: true } },
+        roles: { where: { year }, include: { role: true } },
+      },
     }),
     prisma.group.findMany({ orderBy: { orderInPraesidium: "asc" } }),
+    canManageRoles
+      ? prisma.role.findMany({ orderBy: [{ order: "asc" }, { nameNl: "asc" }] })
+      : Promise.resolve([]),
   ]);
   if (!user) notFound();
+
+  // Rollen die dit lid dit jaar nog niet heeft, om in de dropdown aan te bieden.
+  const assignedRoleIds = new Set(user.roles.map((ur) => ur.roleId));
+  const assignableRoles = allRoles.filter((r) => !assignedRoleIds.has(r.id));
 
   // Leden van voor de eerste onboarding hebben nog geen aparte voor-/achternaam;
   // dan tonen we een split van de weergavenaam als startwaarde.
@@ -123,6 +137,62 @@ export default async function EditUserPage({
           <div><Button type="submit">{locale === "nl" ? "Toevoegen" : "Add"}</Button></div>
         </form>
       </Card>
+
+      {canManageRoles && (
+        <Card className="p-5 space-y-4">
+          <div className="flex items-baseline justify-between gap-3">
+            <h2 className="font-semibold">{locale === "nl" ? "Rollen" : "Roles"}</h2>
+            <span className="text-xs text-[#5c667f]">{formatWorkingYear(year)}</span>
+          </div>
+          <p className="text-sm text-[#5c667f]">
+            {locale === "nl"
+              ? "Direct toegewezen rollen voor dit werkingsjaar. Rollen die via een post komen, staan hierboven bij de lidmaatschappen."
+              : "Roles assigned directly for this working year. Roles that come through a post are shown above under memberships."}
+          </p>
+          <ul className="divide-y divide-zinc-200">
+            {user.roles.map((ur) => (
+              <li key={ur.roleId} className="py-2 flex items-center justify-between gap-3">
+                <span className="text-sm">
+                  <span className="font-medium">{locale === "nl" ? ur.role.nameNl : ur.role.nameEn}</span>
+                  {" · "}
+                  <code className="text-xs text-[#5c667f]">{ur.role.code}</code>
+                </span>
+                <DeleteIconButton
+                  action={removeUserRoleAction}
+                  fields={{ userId: user.id, roleId: ur.roleId, year: String(year) }}
+                  label={locale === "nl" ? "Rol intrekken" : "Remove role"}
+                  srLabel={`${locale === "nl" ? "Rol intrekken" : "Remove role"}: ${locale === "nl" ? ur.role.nameNl : ur.role.nameEn}`}
+                  title={locale === "nl" ? "Rol intrekken?" : "Remove role?"}
+                  description={
+                    locale === "nl"
+                      ? `${user.name} verliest de rol "${ur.role.nameNl}" voor ${formatWorkingYear(year)} en de rechten die enkel via deze rol kwamen.`
+                      : `${user.name} loses the role "${ur.role.nameEn}" for ${formatWorkingYear(year)} and the permissions that came only through this role.`
+                  }
+                  confirmLabel={locale === "nl" ? "Intrekken" : "Remove"}
+                  cancelLabel={locale === "nl" ? "Annuleren" : "Cancel"}
+                  successMessage={locale === "nl" ? "Rol ingetrokken" : "Role removed"}
+                />
+              </li>
+            ))}
+            {user.roles.length === 0 && <li className="py-2 text-sm text-zinc-500">—</li>}
+          </ul>
+          {assignableRoles.length > 0 && (
+            <form action={assignUserRoleAction} className="flex flex-wrap items-end gap-3">
+              <input type="hidden" name="userId" value={user.id} />
+              <div className="min-w-[220px] flex-1">
+                <Label>{locale === "nl" ? "Rol toevoegen" : "Add role"}</Label>
+                <Select name="roleId" required defaultValue="">
+                  <option value="" disabled>—</option>
+                  {assignableRoles.map((r) => (
+                    <option key={r.id} value={r.id}>{locale === "nl" ? r.nameNl : r.nameEn}</option>
+                  ))}
+                </Select>
+              </div>
+              <Button type="submit">{locale === "nl" ? "Toevoegen" : "Add"}</Button>
+            </form>
+          )}
+        </Card>
+      )}
 
       <DeleteButton
         action={deleteUserAction}
