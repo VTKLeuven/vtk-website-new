@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { hasLocale } from "@/lib/locale";
 import { requirePermission } from "@/lib/session";
 import type { Locale } from "@vtk/i18n";
+import { nameParts } from "@vtk/auth";
 import { Button, Card, Input, Label, Select } from "@vtk/ui";
 import {
   addMembershipAction,
@@ -31,13 +32,18 @@ export default async function EditUserPage({
   ]);
   if (!user) notFound();
 
+  // Leden van voor de eerste onboarding hebben nog geen aparte voor-/achternaam;
+  // dan tonen we een split van de weergavenaam als startwaarde.
+  const parts = nameParts(user);
+
   return (
     <div className="space-y-6">
       <h1 className="text-2xl font-semibold">{user.name}</h1>
       <Card className="p-5">
         <form action={saveUserAction} className="grid grid-cols-1 md:grid-cols-2 gap-3">
           <input type="hidden" name="id" value={user.id} />
-          <div><Label>{locale === "nl" ? "Naam" : "Name"}</Label><Input name="name" defaultValue={user.name} required /></div>
+          <div><Label>{locale === "nl" ? "Voornaam" : "First name"}</Label><Input name="firstName" defaultValue={parts.firstName} required /></div>
+          <div><Label>{locale === "nl" ? "Achternaam" : "Last name"}</Label><Input name="lastName" defaultValue={parts.lastName} required /></div>
           <div><Label>Email</Label><Input name="email" type="email" defaultValue={user.email} required /></div>
           <div><Label>{locale === "nl" ? "R-nummer" : "R-number"}</Label><Input name="rNumber" defaultValue={user.rNumber ?? ""} placeholder="r0123456" /></div>
           <div>

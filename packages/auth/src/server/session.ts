@@ -45,6 +45,7 @@ export async function getSession(headers: Headers): Promise<SessionPayload | nul
       locale: user.locale,
       isSuperAdmin: user.isSuperAdmin,
       onboarded: user.onboardedAt !== null,
+      studyConfirmedYear: user.studyConfirmedYear,
     },
     groups: user.memberships.map((membership) => ({
       id: membership.group.id,

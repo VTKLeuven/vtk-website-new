@@ -10,7 +10,7 @@ import {
   setUserPassword,
   updateUser,
 } from "@vtk/auth/server";
-import { hasPermission } from "@vtk/auth";
+import { hasPermission, fullName, splitFullName } from "@vtk/auth";
 import { requirePermission, requireSession } from "@/lib/session";
 import { currentWorkingYear } from "@/lib/workingYear";
 
@@ -19,7 +19,8 @@ import { currentWorkingYear } from "@/lib/workingYear";
 const userSchema = z.object({
   id: z.string().optional(),
   email: z.string().email(),
-  name: z.string().min(1),
+  firstName: z.string().trim().min(1),
+  lastName: z.string().trim().min(1),
   password: z.string().optional(),
   locale: z.enum(["NL", "EN"]).default("NL"),
   active: z.coerce.boolean().default(true),
@@ -31,17 +32,22 @@ export async function saveUserAction(formData: FormData): Promise<void> {
   const parsed = userSchema.parse({
     id: (formData.get("id") as string) || undefined,
     email: String(formData.get("email")).toLowerCase().trim(),
-    name: formData.get("name"),
+    firstName: formData.get("firstName"),
+    lastName: formData.get("lastName"),
     password: formData.get("password") || undefined,
     locale: formData.get("locale") || "NL",
     active: formData.get("active") === "on",
     isSuperAdmin: formData.get("isSuperAdmin") === "on",
   });
+  // De weergavenaam blijft afgeleid van voor- + achternaam.
+  const name = fullName(parsed.firstName, parsed.lastName);
 
   if (parsed.id) {
     await updateUser(session, parsed.id, {
       email: parsed.email,
-      name: parsed.name,
+      name,
+      firstName: parsed.firstName,
+      lastName: parsed.lastName,
       locale: parsed.locale,
       active: parsed.active,
       isSuperAdmin: parsed.isSuperAdmin,
@@ -55,7 +61,9 @@ export async function saveUserAction(formData: FormData): Promise<void> {
     }
     await createUser(session, {
       email: parsed.email,
-      name: parsed.name,
+      name,
+      firstName: parsed.firstName,
+      lastName: parsed.lastName,
       password: parsed.password,
       locale: parsed.locale,
       active: parsed.active,
@@ -162,14 +170,24 @@ export async function bulkImportUsersAction(formData: FormData): Promise<{ ok: b
       continue;
     }
     const rNumber = rNumberRaw?.trim() || undefined;
+    // De CSV heeft één naamkolom; voor- en achternaam worden eruit afgeleid en
+    // zijn achteraf te corrigeren door het lid zelf of in het gebruikersbeheer.
+    const parts = splitFullName(name);
     try {
       const user = await prisma.user.upsert({
         where: { email: email.toLowerCase() },
         // rNumber enkel meenemen wanneer de kolom een waarde heeft (niet wissen).
-        update: { name, ...(rNumber ? { rNumber } : {}) },
+        update: {
+          name,
+          firstName: parts.firstName || null,
+          lastName: parts.lastName || null,
+          ...(rNumber ? { rNumber } : {}),
+        },
         create: {
           email: email.toLowerCase(),
           name,
+          firstName: parts.firstName || null,
+          lastName: parts.lastName || null,
           ...(rNumber ? { rNumber } : {}),
         },
       });

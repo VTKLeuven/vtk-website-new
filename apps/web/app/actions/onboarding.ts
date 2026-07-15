@@ -4,17 +4,64 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import sharp from "sharp";
+import { Prisma } from "@prisma/client";
 import { prisma } from "@vtk/db";
 import { newStorageKey, putObject, deleteObject } from "@vtk/storage";
 import { requireSession } from "@/lib/session";
+import { currentWorkingYear } from "@/lib/workingYear";
+import { fullName } from "@vtk/auth";
 import {
   MAIL_CATEGORIES,
   EMAIL_PREFERENCES,
   STUDY_YEARS,
   STUDY_PROGRAMMES,
+  R_NUMBER_REGEX,
 } from "@/lib/profile";
 
+/**
+ * De studievelden, gedeeld door het volledige profielformulier en de jaarlijkse
+ * bevestigingspagina (zie {@link confirmStudyAction}). Alles is optioneel: de
+ * registratie mag er niet op blokkeren.
+ *
+ * Meerdere jaren mogen, want een lid kan bv. deels in 2de en deels in 3de
+ * bachelor zitten.
+ */
+const studySchema = {
+  studyYears: z.array(z.enum(STUDY_YEARS)).default([]),
+  studyProgrammes: z.array(z.enum(STUDY_PROGRAMMES)).default([]),
+  notAtFaculty: z.boolean().default(false),
+};
+
+/**
+ * De `next`-waarde uit een formulier, of `null`. Enkel paden op deze site:
+ * `//evil.com` is voor een browser een protocol-relatieve URL, dus die moet er
+ * expliciet uit.
+ */
+function safeNext(formData: FormData): string | null {
+  const next = String(formData.get("next") ?? "");
+  return next.startsWith("/") && !next.startsWith("//") ? next : null;
+}
+
+/** De studievelden uit een FormData halen, in de vorm die {@link studySchema} verwacht. */
+function studyFields(formData: FormData) {
+  return {
+    studyYears: formData.getAll("studyYears"),
+    studyProgrammes: formData.getAll("studyProgrammes"),
+    // Niet-aangevinkte checkbox zit niet in de FormData.
+    notAtFaculty: formData.get("notAtFaculty") === "on",
+  };
+}
+
 const profileSchema = z.object({
+  firstName: z.string().trim().min(1),
+  lastName: z.string().trim().min(1),
+  // Optioneel, maar wanneer ingevuld moet het een geldig r-nummer zijn.
+  rNumber: z
+    .string()
+    .trim()
+    .toLowerCase()
+    .refine((v) => v === "" || R_NUMBER_REGEX.test(v), { message: "INVALID_RNUMBER" })
+    .default(""),
   street: z.string().trim().min(1),
   houseNumber: z.string().trim().min(1),
   bus: z.string().trim().max(20).optional().default(""),
@@ -24,9 +71,7 @@ const profileSchema = z.object({
   personalEmail: z.string().trim().toLowerCase().email(),
   emailPreference: z.enum(EMAIL_PREFERENCES),
   mailCategories: z.array(z.enum(MAIL_CATEGORIES)).default([]),
-  // Optioneel: leeg = geen keuze (niet verplicht in de onboarding).
-  studyYear: z.enum(STUDY_YEARS).nullable().default(null),
-  studyProgrammes: z.array(z.enum(STUDY_PROGRAMMES)).default([]),
+  ...studySchema,
 });
 
 const MAX_AVATAR_BYTES = 8 * 1024 * 1024; // 8 MiB before re-encode
@@ -60,6 +105,9 @@ export async function saveProfileAction(formData: FormData): Promise<void> {
   const session = await requireSession();
 
   const parsed = profileSchema.safeParse({
+    firstName: formData.get("firstName") ?? "",
+    lastName: formData.get("lastName") ?? "",
+    rNumber: formData.get("rNumber") ?? "",
     street: formData.get("street") ?? "",
     houseNumber: formData.get("houseNumber") ?? "",
     bus: formData.get("bus") ?? "",
@@ -69,9 +117,7 @@ export async function saveProfileAction(formData: FormData): Promise<void> {
     personalEmail: formData.get("personalEmail") ?? "",
     emailPreference: formData.get("emailPreference") ?? "UNIVERSITY",
     mailCategories: formData.getAll("mailCategories"),
-    // Leeg select-veld ("") telt als "geen keuze".
-    studyYear: formData.get("studyYear") || null,
-    studyProgrammes: formData.getAll("studyProgrammes"),
+    ...studyFields(formData),
   });
 
   if (!parsed.success) {
@@ -86,25 +132,47 @@ export async function saveProfileAction(formData: FormData): Promise<void> {
   const wasOnboarded = session.user.onboarded;
   const previousAvatarKey = session.user.avatarKey;
 
-  await prisma.user.update({
-    where: { id: session.user.id },
-    data: {
-      street: data.street,
-      houseNumber: data.houseNumber,
-      bus: data.bus ? data.bus : null,
-      postalCode: data.postalCode,
-      city: data.city,
-      birthDate: data.birthDate,
-      personalEmail: data.personalEmail,
-      emailPreference: data.emailPreference,
-      mailCategories: { set: data.mailCategories },
-      studyYear: data.studyYear,
-      studyProgrammes: { set: data.studyProgrammes },
-      ...(newAvatarKey ? { avatarKey: newAvatarKey } : {}),
-      // Stamp completion only once; account edits keep the original timestamp.
-      ...(wasOnboarded ? {} : { onboardedAt: new Date() }),
-    },
-  });
+  try {
+    await prisma.user.update({
+      where: { id: session.user.id },
+      data: {
+        firstName: data.firstName,
+        lastName: data.lastName,
+        // De weergavenaam blijft afgeleid van voor- + achternaam.
+        name: fullName(data.firstName, data.lastName),
+        rNumber: data.rNumber ? data.rNumber : null,
+        street: data.street,
+        houseNumber: data.houseNumber,
+        bus: data.bus ? data.bus : null,
+        postalCode: data.postalCode,
+        city: data.city,
+        birthDate: data.birthDate,
+        personalEmail: data.personalEmail,
+        emailPreference: data.emailPreference,
+        mailCategories: { set: data.mailCategories },
+        studyYears: { set: data.studyYears },
+        studyProgrammes: { set: data.studyProgrammes },
+        notAtFaculty: data.notAtFaculty,
+        // Wie dit formulier invult, declareert daarmee zijn studie voor dit
+        // werkingsjaar; de bevestigingsgate hoeft er dan niet meer op te vallen.
+        studyConfirmedYear: currentWorkingYear(),
+        ...(newAvatarKey ? { avatarKey: newAvatarKey } : {}),
+        // Stamp completion only once; account edits keep the original timestamp.
+        ...(wasOnboarded ? {} : { onboardedAt: new Date() }),
+      },
+    });
+  } catch (err) {
+    // `rNumber` is uniek: een r-nummer dat al bij een ander lid hangt, is geen
+    // serverfout maar een invoerfout.
+    if (
+      err instanceof Prisma.PrismaClientKnownRequestError &&
+      err.code === "P2002" &&
+      String(err.meta?.target ?? "").includes("rNumber")
+    ) {
+      throw new Error("RNUMBER_TAKEN");
+    }
+    throw err;
+  }
 
   // Clean up the replaced avatar object (best-effort) to avoid orphans.
   if (newAvatarKey && previousAvatarKey && previousAvatarKey !== newAvatarKey) {
@@ -116,8 +184,36 @@ export async function saveProfileAction(formData: FormData): Promise<void> {
   revalidatePath("/pocs");
   revalidatePath("/account");
 
-  const next = String(formData.get("next") ?? "");
-  if (next.startsWith("/") && !next.startsWith("//")) {
-    redirect(next);
-  }
+  const next = safeNext(formData);
+  if (next) redirect(next);
+}
+
+const confirmStudySchema = z.object(studySchema);
+
+/**
+ * Jaarlijkse bevestiging van het studieprofiel (zie de gate in
+ * `app/[locale]/layout.tsx`). Zet `studyConfirmedYear` op het huidige
+ * werkingsjaar, waardoor het lid weer als actief student telt en dus opnieuw in
+ * de mailinglijsten komt.
+ *
+ * Bewust géén aparte "bevestigd zonder wijziging"-flow: het formulier post altijd
+ * de volledige studiekeuze, of ze nu gewijzigd is of niet.
+ */
+export async function confirmStudyAction(formData: FormData): Promise<void> {
+  const session = await requireSession();
+  const parsed = confirmStudySchema.safeParse(studyFields(formData));
+  if (!parsed.success) throw new Error("INVALID_PROFILE");
+
+  await prisma.user.update({
+    where: { id: session.user.id },
+    data: {
+      studyYears: { set: parsed.data.studyYears },
+      studyProgrammes: { set: parsed.data.studyProgrammes },
+      notAtFaculty: parsed.data.notAtFaculty,
+      studyConfirmedYear: currentWorkingYear(),
+    },
+  });
+
+  revalidatePath("/account");
+  redirect(safeNext(formData) ?? "/");
 }

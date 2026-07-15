@@ -5,6 +5,7 @@ import { Footer } from "@/components/site/Footer";
 import { ToastProvider } from "@/components/ui/toast";
 import { hasLocale } from "@/lib/locale";
 import { getCurrentSession } from "@/lib/session";
+import { currentWorkingYear } from "@/lib/workingYear";
 
 import "@/app/design/vtk-base.css";
 import "@/app/design/vtk-site-header.css";
@@ -20,16 +21,27 @@ export default async function LocaleLayout({
   const { locale } = await params;
   if (!hasLocale(locale)) notFound();
 
-  // Onboarding gate: a logged-in member whose profile is not yet completed is
-  // pushed to the onboarding flow before they can use the rest of the site.
-  // The resolved (locale-prefixed) path comes from the proxy via `x-pathname`;
-  // we skip the redirect on the onboarding page itself to avoid a loop.
+  // Twee gates voor een ingelogd lid, in deze volgorde. De resolved
+  // (locale-prefixed) path komt van de proxy via `x-pathname`; we slaan de
+  // redirect over op de doelpagina zelf om geen loop te maken.
   const session = await getCurrentSession();
-  if (session && !session.user.onboarded) {
+  if (session) {
     const currentPath = (await headers()).get("x-pathname") ?? "";
-    const onOnboarding = currentPath.split("/")[2] === "onboarding";
-    if (!onOnboarding) {
-      redirect(locale === "en" ? "/en/onboarding" : "/onboarding");
+    const segment = currentPath.split("/")[2];
+
+    // 1. Onboarding: profiel nog niet ingevuld -> eerst dat afwerken.
+    if (!session.user.onboarded) {
+      if (segment !== "onboarding") {
+        redirect(locale === "en" ? "/en/onboarding" : "/onboarding");
+      }
+    } else if (session.user.studyConfirmedYear !== currentWorkingYear()) {
+      // 2. Studiebevestiging: bij elk nieuw werkingsjaar declareert het lid
+      //    opnieuw wat het studeert. Dat vervangt het jaarlijkse signaal dat
+      //    vroeger via de cursusdienst binnenkwam en houdt de mailinglijsten
+      //    beperkt tot wie effectief nog studeert.
+      if (segment !== "studie-bevestigen") {
+        redirect(locale === "en" ? "/en/studie-bevestigen" : "/studie-bevestigen");
+      }
     }
   }
 

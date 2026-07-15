@@ -7,6 +7,8 @@
  */
 import type { NextRequest } from 'next/server';
 
+export { splitFullName, fullName, nameParts, type NameParts } from './names';
+
 /** */
 export type Locale = 'NL' | 'EN';
 export type AuthGroupRole = 'MEMBER' | 'LEAD';
@@ -20,6 +22,13 @@ export type AuthUser = {
   isSuperAdmin: boolean;
   /** `false` until the member completes the onboarding profile. */
   onboarded: boolean;
+  /**
+   * Werkingsjaar waarin het studieprofiel laatst bevestigd werd, of `null`.
+   * Bewust de ruwe waarde en geen `studyConfirmed`-boolean: welk werkingsjaar
+   * "nu" is, hangt af van de cutover-logica in de app (`lib/workingYear.ts`),
+   * die hier niet thuishoort.
+   */
+  studyConfirmedYear: number | null;
 };
 
 export type AuthGroup = {

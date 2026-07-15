@@ -19,6 +19,12 @@ export type MailCategoryValue = (typeof MAIL_CATEGORIES)[number];
 export const EMAIL_PREFERENCES = ["UNIVERSITY", "PERSONAL"] as const;
 export type EmailPreferenceValue = (typeof EMAIL_PREFERENCES)[number];
 
+// KU Leuven studentennummer: een `r` gevolgd door exact 7 cijfers. Als string
+// gehouden zodat hij zowel als HTML `pattern`-attribuut (client-side hint) als
+// in een `RegExp` (server-side validatie) gebruikt kan worden.
+export const R_NUMBER_PATTERN = "r[0-9]{7}";
+export const R_NUMBER_REGEX = new RegExp(`^${R_NUMBER_PATTERN}$`);
+
 export const STUDY_YEARS = [
   "BACHELOR_1",
   "BACHELOR_2",

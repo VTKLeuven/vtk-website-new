@@ -55,8 +55,9 @@ export async function logoutAction(): Promise<void> {
   redirect('/');
 }
 
+// De naam zit niet in dit formulier: voor- en achternaam worden bewerkt in het
+// gegevensformulier eronder (zie ProfileForm / saveProfileAction).
 const updateProfileSchema = z.object({
-  name: z.string().min(1).max(200),
   locale: z.enum(['NL', 'EN']),
 });
 
@@ -65,7 +66,6 @@ export async function updateProfileAction(
   formData: FormData
 ): Promise<{ ok: boolean; error?: string }> {
   const parsed = updateProfileSchema.safeParse({
-    name: String(formData.get('name') || ''),
     locale: String(formData.get('locale') || 'NL'),
   });
   if (!parsed.success) return { ok: false, error: 'Invalid input' };

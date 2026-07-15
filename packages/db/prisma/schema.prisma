@@ -120,7 +120,13 @@ enum StudyProgramme {
 
 model User {
   id               String              @id @default(cuid())
+  // `name` blijft de weergavenaam (en het veld dat better-auth zelf zet bij een
+  // SSO-login). `firstName`/`lastName` zijn de gestructureerde variant die de
+  // mailinglijst-exports nodig hebben; ze worden ingevuld tijdens de onboarding
+  // en in het gebruikersbeheer, en `name` wordt daaruit samengesteld.
   name             String
+  firstName        String?
+  lastName         String?
   email            String              @unique
   rNumber          String?             @unique // KU Leuven studentennummer (bvb r0123456), voor zoeken
   emailVerified Boolean                @default(false)
@@ -147,9 +153,20 @@ model User {
   emailPreference  EmailPreference     @default(UNIVERSITY)
   // Opt-in mailinglijsten: enkel de aangeduide categorieën zitten in de array.
   mailCategories   MailCategory[]      @default([])
-  // Studie: één studiejaar, meerdere richtingen mogelijk.
-  studyYear        StudyYear?
+  // Studie: meerdere studiejaren en richtingen mogelijk (iemand kan bv. deels in
+  // 2de en deels in 3de bachelor zitten).
+  studyYears       StudyYear[]         @default([])
   studyProgrammes  StudyProgramme[]    @default([])
+  // Lid dat niet aan de faculteit Ingenieurswetenschappen studeert. Bewust geen
+  // `StudyProgramme`-waarde: het is geen richting, en als enum-waarde zou het
+  // overal opduiken waar richtingen opgelijst worden (o.a. de career-export).
+  notAtFaculty     Boolean             @default(false)
+  // Werkingsjaar waarin het lid zijn studieprofiel laatst bevestigde (2026 =
+  // "26-27"). Loopt dat achter op het huidige werkingsjaar, dan is het profiel
+  // verlopen: de bevestigingsgate vraagt het opnieuw en het lid valt zolang uit
+  // de mailinglijsten. Zo blijft "actief student" een jaarlijks vers signaal
+  // zonder koppeling met de cursusdienst.
+  studyConfirmedYear Int?
 
   sessions         Session[]
   accounts      Account[]

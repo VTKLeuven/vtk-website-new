@@ -51,7 +51,8 @@ export default async function AdminUsers({
         <Card className="p-5">
           <h2 className="font-semibold mb-3">{locale === "nl" ? "Nieuwe gebruiker" : "New user"}</h2>
           <form action={saveUserAction} className="grid grid-cols-1 md:grid-cols-4 gap-3 items-end">
-            <div><Label>{locale === "nl" ? "Naam" : "Name"}</Label><Input name="name" required /></div>
+            <div><Label>{locale === "nl" ? "Voornaam" : "First name"}</Label><Input name="firstName" required /></div>
+            <div><Label>{locale === "nl" ? "Achternaam" : "Last name"}</Label><Input name="lastName" required /></div>
             <div><Label>Email</Label><Input name="email" type="email" required /></div>
             <div><Label>{locale === "nl" ? "R-nummer" : "R-number"}</Label><Input name="rNumber" placeholder="r0123456" /></div>
             <div><Label>{locale === "nl" ? "Wachtwoord" : "Password"}</Label><Input name="password" type="text" required /></div>

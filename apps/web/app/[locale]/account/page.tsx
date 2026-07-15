@@ -20,6 +20,10 @@ export default async function AccountPage({ params }: { params: Promise<{ locale
     where: { id: session.user.id },
     select: {
       email: true,
+      name: true,
+      firstName: true,
+      lastName: true,
+      rNumber: true,
       avatarKey: true,
       street: true,
       houseNumber: true,
@@ -30,8 +34,9 @@ export default async function AccountPage({ params }: { params: Promise<{ locale
       personalEmail: true,
       emailPreference: true,
       mailCategories: true,
-      studyYear: true,
+      studyYears: true,
       studyProgrammes: true,
+      notAtFaculty: true,
     },
   });
 
@@ -77,10 +82,6 @@ export default async function AccountPage({ params }: { params: Promise<{ locale
           <div>
             <Label>{dict.auth.email}</Label>
             <Input defaultValue={session.user.email} disabled />
-          </div>
-          <div>
-            <Label htmlFor="name">{locale === "nl" ? "Naam" : "Name"}</Label>
-            <Input id="name" name="name" defaultValue={session.user.name} required />
           </div>
           <div>
             <Label htmlFor="locale">{dict.header.language}</Label>

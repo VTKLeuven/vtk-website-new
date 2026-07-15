@@ -16,6 +16,7 @@ const sections = [
   { key: "pocs", href: "/pocs", perm: "pocs.manage" },
   { key: "partners", href: "/partners", perm: "partners.manage" },
   { key: "users", href: "/gebruikers", perm: "users.view" },
+  { key: "mailinglists", href: "/mailinglijsten", perm: "mailinglists.export" },
   { key: "groups", href: "/groepen", perm: "groups.manage" },
   { key: "home", href: "/home", perm: "home.edit" },
   { key: "dashboardTiles", href: "/dashboard-tiles", perm: "dashboard.manage" },
@@ -109,6 +110,13 @@ const icons: Record<string, ReactNode> = {
     <Svg>
       <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" />
       <circle cx="12" cy="7" r="4" />
+    </Svg>
+  ),
+  // mailinglists: envelop
+  mailinglists: (
+    <Svg>
+      <rect x="2" y="4" width="20" height="16" rx="2" />
+      <path d="m2 7 10 6 10-6" />
     </Svg>
   ),
   // groups: meerdere gebruikers

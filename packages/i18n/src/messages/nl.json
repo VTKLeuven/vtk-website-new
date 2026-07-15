@@ -99,6 +99,11 @@
     "kicker": "Welkom bij VTK",
     "title": "Vervolledig je profiel",
     "intro": "Nog even dit invullen en je bent helemaal geregistreerd. Je kan deze gegevens later altijd aanpassen bij je account.",
+    "identityHeading": "Naam & studentennummer",
+    "firstName": "Voornaam",
+    "lastName": "Achternaam",
+    "rNumber": "R-nummer",
+    "rNumberHint": "Formaat: r gevolgd door 7 cijfers, bv. r0123456.",
     "addressHeading": "Kotadres",
     "street": "Straatnaam",
     "houseNumber": "Huisnummer",
@@ -122,9 +127,11 @@
     "photoChoose": "Kies een foto",
     "studyHeading": "Studie",
     "studyYearLabel": "Studiejaar",
-    "studyYearPlaceholder": "Kies je studiejaar",
+    "studyYearHint": "Duid alle jaren aan waarin je vakken opneemt.",
     "programmesLabel": "Richtingen",
     "programmesHint": "Duid alle richtingen aan die op jou van toepassing zijn.",
+    "notAtFaculty": "Ik studeer niet aan de faculteit",
+    "notAtFacultyHint": "Duid dit aan als je geen ingenieursopleiding aan de faculteit volgt. Je krijgt dan geen Career-mails, want die zijn op faculteitsstudenten gericht.",
     "submit": "Registratie voltooien",
     "required": "Verplicht veld",
     "categories": {
@@ -179,6 +186,7 @@
     "shortlinks": "Verkorte links",
     "shift": "Shiften",
     "theokot": "Theokot",
+    "mailinglists": "Mailinglijsten",
     "it": "IT",
     "create": "Nieuw",
     "save": "Opslaan",
@@ -187,6 +195,23 @@
     "edit": "Bewerken",
     "back": "Terug",
     "noAccess": "Geen toegang"
+  },
+  "confirmStudy": {
+    "title": "Klopt je studie nog?",
+    "intro": "Bij de start van een nieuw academiejaar vragen we je even te bevestigen wat je studeert. Zo blijven onze mailinglijsten kloppen en krijg je enkel mails die voor jou relevant zijn.",
+    "unchangedHint": "Niets veranderd? Klik gewoon op bevestigen.",
+    "submit": "Bevestigen"
+  },
+  "mailinglists": {
+    "title": "Mailinglijsten",
+    "intro": "Download per categorie de leden die ze aangevinkt hebben bij hun account. De kolommen zijn firstname, lastname en email; dat is telkens het voorkeursadres van het lid.",
+    "allStudents": "Alle studenten",
+    "allStudentsHint": "iedereen, geen opt-in",
+    "careerHint": "ZIP met de opsplitsing per studiejaar en per richting",
+    "member": "lid",
+    "members": "leden",
+    "downloadCsv": "Download CSV",
+    "downloadZip": "Download ZIP"
   },
   "common": {
     "loading": "Laden...",

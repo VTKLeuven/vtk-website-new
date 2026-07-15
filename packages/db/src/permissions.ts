@@ -22,6 +22,9 @@ export const PERMISSIONS = [
   { code: "users.bulkImport", labelNl: "Bulk gebruikers importeren", labelEn: "Bulk import users", category: "users" },
   { code: "groups.manage", labelNl: "Groepen en rechten beheren", labelEn: "Manage groups and permissions", category: "users" },
 
+  // Mailing lists
+  { code: "mailinglists.export", labelNl: "Mailinglijsten exporteren", labelEn: "Export mailing lists", category: "users" },
+
   // POCs
   { code: "pocs.manage", labelNl: "POC's beheren", labelEn: "Manage POCs", category: "general" },
 

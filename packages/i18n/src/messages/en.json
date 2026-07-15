@@ -99,6 +99,11 @@
     "kicker": "Welcome to VTK",
     "title": "Complete your profile",
     "intro": "Just a few things to fill in and your registration is done. You can always change these later in your account.",
+    "identityHeading": "Name & student number",
+    "firstName": "First name",
+    "lastName": "Last name",
+    "rNumber": "R-number",
+    "rNumberHint": "Format: r followed by 7 digits, e.g. r0123456.",
     "addressHeading": "Room address",
     "street": "Street",
     "houseNumber": "House number",
@@ -122,9 +127,11 @@
     "photoChoose": "Choose a picture",
     "studyHeading": "Studies",
     "studyYearLabel": "Year of study",
-    "studyYearPlaceholder": "Choose your year of study",
+    "studyYearHint": "Select every year you are taking courses in.",
     "programmesLabel": "Programmes",
     "programmesHint": "Select every programme that applies to you.",
+    "notAtFaculty": "I am not studying at the faculty",
+    "notAtFacultyHint": "Tick this if you are not enrolled in an engineering programme at the faculty. You will not receive Career emails, as those target faculty students.",
     "submit": "Complete registration",
     "required": "Required field",
     "categories": {
@@ -179,6 +186,7 @@
     "shortlinks": "Short links",
     "shift": "Shifts",
     "theokot": "Theokot",
+    "mailinglists": "Mailing lists",
     "it": "IT",
     "create": "New",
     "save": "Save",
@@ -187,6 +195,23 @@
     "edit": "Edit",
     "back": "Back",
     "noAccess": "No access"
+  },
+  "confirmStudy": {
+    "title": "Are your studies still up to date?",
+    "intro": "At the start of every academic year we ask you to confirm what you are studying. That keeps our mailing lists accurate, so you only get emails that are relevant to you.",
+    "unchangedHint": "Nothing changed? Just click confirm.",
+    "submit": "Confirm"
+  },
+  "mailinglists": {
+    "title": "Mailing lists",
+    "intro": "Download the members who opted in to each category in their account. The columns are firstname, lastname and email; that address is always the member's preferred one.",
+    "allStudents": "All students",
+    "allStudentsHint": "everyone, no opt-in",
+    "careerHint": "ZIP with the breakdown per year of study and per programme",
+    "member": "member",
+    "members": "members",
+    "downloadCsv": "Download CSV",
+    "downloadZip": "Download ZIP"
   },
   "common": {
     "loading": "Loading...",

@@ -1,9 +1,11 @@
 import type { User } from "@prisma/client";
-import { Button, Input, Label, Select } from "@vtk/ui";
+import { Button, Input, Label } from "@vtk/ui";
 import { getDictionary, type Locale } from "@vtk/i18n";
+import { nameParts } from "@vtk/auth";
 import { publicUrl } from "@/lib/storage";
-import { MAIL_CATEGORIES, STUDY_YEARS, STUDY_PROGRAMMES } from "@/lib/profile";
+import { MAIL_CATEGORIES, R_NUMBER_PATTERN } from "@/lib/profile";
 import { saveProfileAction } from "@/app/actions/onboarding";
+import { CheckboxChip, StudyFieldset } from "./StudyFieldset";
 
 function dateInputValue(date: Date | null): string {
   if (!date) return "";
@@ -12,9 +14,10 @@ function dateInputValue(date: Date | null): string {
 
 /**
  * Onboarding / account profile form. Renders the kot address, birth date,
- * contact emails + communication preference, opt-in mailing lists and an
- * optional profile picture. Posts to {@link saveProfileAction}. Pass `next` to
- * redirect after saving (onboarding); omit it to stay on the page (account).
+ * contact emails + communication preference + opt-in mailing lists, the study
+ * years and programmes, and an optional profile picture. Posts to
+ * {@link saveProfileAction}. Pass `next` to redirect after saving (onboarding);
+ * omit it to stay on the page (account).
  */
 export function ProfileForm({
   locale,
@@ -26,6 +29,10 @@ export function ProfileForm({
   user: Pick<
     User,
     | "email"
+    | "name"
+    | "firstName"
+    | "lastName"
+    | "rNumber"
     | "avatarKey"
     | "street"
     | "houseNumber"
@@ -36,26 +43,56 @@ export function ProfileForm({
     | "personalEmail"
     | "emailPreference"
     | "mailCategories"
-    | "studyYear"
+    | "studyYears"
     | "studyProgrammes"
+    | "notAtFaculty"
   >;
   next?: string;
   submitLabel: string;
 }) {
   const t = getDictionary(locale).onboarding;
   const currentAvatar = publicUrl(user.avatarKey);
-  const selected = new Set(user.mailCategories);
-  const selectedProgrammes = new Set(user.studyProgrammes);
+  // Leden die de onboarding nog niet doorliepen hebben enkel een weergavenaam;
+  // die splitsen we als startwaarde zodat ze ze meteen kunnen corrigeren.
+  const { firstName, lastName } = nameParts(user);
+  const selectedCategories = new Set(user.mailCategories);
 
   return (
     <form action={saveProfileAction} className="space-y-8">
       {next ? <input type="hidden" name="next" value={next} /> : null}
 
+      {/* Naam & studentennummer */}
+      <fieldset className="space-y-4">
+        <legend className="text-lg font-semibold text-vtk-ink">{t.identityHeading}</legend>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+          <div>
+            <Label htmlFor="firstName">{t.firstName}</Label>
+            <Input id="firstName" name="firstName" defaultValue={firstName} required />
+          </div>
+          <div>
+            <Label htmlFor="lastName">{t.lastName}</Label>
+            <Input id="lastName" name="lastName" defaultValue={lastName} required />
+          </div>
+          <div>
+            <Label htmlFor="rNumber">{t.rNumber}</Label>
+            <Input
+              id="rNumber"
+              name="rNumber"
+              defaultValue={user.rNumber ?? ""}
+              placeholder="r0123456"
+              pattern={R_NUMBER_PATTERN}
+              title={t.rNumberHint}
+            />
+            <p className="mt-1 text-xs text-[#5c667f]">{t.rNumberHint}</p>
+          </div>
+        </div>
+      </fieldset>
+
       {/* Kotadres */}
       <fieldset className="space-y-4">
         <legend className="text-lg font-semibold text-vtk-ink">{t.addressHeading}</legend>
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-6">
-          <div className="sm:col-span-4">
+        <div className="grid grid-cols-1 items-end gap-4 sm:grid-cols-6">
+          <div className="sm:col-span-3">
             <Label htmlFor="street">{t.street}</Label>
             <Input id="street" name="street" defaultValue={user.street ?? ""} required />
           </div>
@@ -63,8 +100,8 @@ export function ProfileForm({
             <Label htmlFor="houseNumber">{t.houseNumber}</Label>
             <Input id="houseNumber" name="houseNumber" defaultValue={user.houseNumber ?? ""} required />
           </div>
-          <div className="sm:col-span-1">
-            <Label htmlFor="bus">
+          <div className="sm:col-span-2">
+            <Label htmlFor="bus" className="whitespace-nowrap">
               {t.bus} <span className="text-xs text-[#5c667f]">({t.busHint})</span>
             </Label>
             <Input id="bus" name="bus" defaultValue={user.bus ?? ""} />
@@ -134,64 +171,33 @@ export function ProfileForm({
             </label>
           </div>
         </div>
-      </fieldset>
-
-      {/* Studie: studiejaar + richtingen */}
-      <fieldset className="space-y-4">
-        <legend className="text-lg font-semibold text-vtk-ink">{t.studyHeading}</legend>
-        <div className="sm:max-w-xs">
-          <Label htmlFor="studyYear">{t.studyYearLabel}</Label>
-          <Select id="studyYear" name="studyYear" defaultValue={user.studyYear ?? ""}>
-            <option value="">{t.studyYearPlaceholder}</option>
-            {STUDY_YEARS.map((year) => (
-              <option key={year} value={year}>
-                {t.years[year]}
-              </option>
-            ))}
-          </Select>
-        </div>
+        {/* Mailinglijsten (opt-in) horen bij de contactgegevens. */}
         <div>
-          <span className="text-sm font-medium text-vtk-ink">{t.programmesLabel}</span>
-          <p className="text-xs text-[#5c667f]">{t.programmesHint}</p>
-          <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2">
-            {STUDY_PROGRAMMES.map((programme) => (
-              <label
-                key={programme}
-                className="inline-flex items-center gap-2 rounded-xl border border-vtk-blue/12 bg-vtk-blue-soft/30 px-3 py-2 text-sm"
-              >
-                <input
-                  type="checkbox"
-                  name="studyProgrammes"
-                  value={programme}
-                  defaultChecked={selectedProgrammes.has(programme)}
-                />
-                {t.programmes[programme]}
-              </label>
+          <span className="text-sm font-medium text-vtk-ink">{t.mailHeading}</span>
+          <p className="text-xs text-[#5c667f]">{t.mailIntro}</p>
+          <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4">
+            {MAIL_CATEGORIES.map((cat) => (
+              <CheckboxChip
+                key={cat}
+                name="mailCategories"
+                value={cat}
+                defaultChecked={selectedCategories.has(cat)}
+                label={t.categories[cat]}
+              />
             ))}
           </div>
         </div>
       </fieldset>
 
-      {/* Mailinglijsten (opt-in) */}
-      <fieldset className="space-y-3">
-        <legend className="text-lg font-semibold text-vtk-ink">{t.mailHeading}</legend>
-        <p className="text-sm text-[#5c667f]">{t.mailIntro}</p>
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-          {MAIL_CATEGORIES.map((cat) => (
-            <label
-              key={cat}
-              className="inline-flex items-center gap-2 rounded-xl border border-vtk-blue/12 bg-vtk-blue-soft/30 px-3 py-2 text-sm"
-            >
-              <input
-                type="checkbox"
-                name="mailCategories"
-                value={cat}
-                defaultChecked={selected.has(cat)}
-              />
-              {t.categories[cat]}
-            </label>
-          ))}
-        </div>
+      {/* Studie: studiejaren + richtingen */}
+      <fieldset className="space-y-4">
+        <legend className="text-lg font-semibold text-vtk-ink">{t.studyHeading}</legend>
+        <StudyFieldset
+          locale={locale}
+          studyYears={user.studyYears}
+          studyProgrammes={user.studyProgrammes}
+          notAtFaculty={user.notAtFaculty}
+        />
       </fieldset>
 
       {/* Profielfoto */}

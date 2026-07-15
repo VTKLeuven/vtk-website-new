@@ -134,26 +134,93 @@ SSO. Concrete implementatie: hook in `packages/auth/src/auth.ts`, gate in
   pagina naar `/onboarding`. Pas na het invullen (dan wordt `onboardedAt`
   gestempeld) valt die gate weg. De gate leest het huidige pad uit de door de
   proxy gezette `x-pathname`-header om geen redirect-loop op `/onboarding` te maken.
-- Gevraagde gegevens: **kotadres** (straat, huisnummer, bus *optioneel*, postcode,
+- Gevraagde gegevens: **naam** (voor- en achternaam apart), **r-nummer**
+  (*optioneel*), **kotadres** (straat, huisnummer, bus *optioneel*, postcode,
   stad), **geboortedatum**, **persoonlijke mail**, en welk adres (universiteits-
   of persoonlijke mail) de **voorkeur** krijgt voor communicatie. De
   universiteitsmail is de SSO-/login-mail (`User.email`) en wordt niet apart
   gevraagd, enkel getoond.
+- **Voor- en achternaam staan apart** (`User.firstName`/`lastName`) omdat de
+  mailinglijst-exports die als aparte kolommen nodig hebben. `User.name` blijft
+  de weergavenaam en wordt eruit samengesteld; enkel bij leden die de onboarding
+  nog niet deden (of die via een bulk-import binnenkwamen) wordt `name` gesplitst
+  als startwaarde. Zie `splitFullName`/`nameParts` in `@vtk/auth`.
+- Het **r-nummer** moet `rXXXXXXX` zijn (7 cijfers) en is uniek over alle leden;
+  het is optioneel zodat de registratie niet blokkeert voor wie het niet bij de
+  hand heeft, maar de Theokot-kaartscanner zoekt er wel op.
 - **Profielfoto is optioneel.** Ze wordt opgeslagen als `avatarKey` en verschijnt
   op `/praesidium` en `/pocs` **enkel** als het lid daar effectief in staat.
 - Alles blijft achteraf bewerkbaar op `/account` (zelfde formulier, zonder dat
   `onboardedAt` opnieuw gezet wordt).
 
-### Studie (richtingen & studiejaar)
+### Studie (richtingen & studiejaren)
 - Een lid kan **meerdere richtingen** aanduiden (`StudyProgramme`-enum,
-  `User.studyProgrammes` array) en **één studiejaar** (`StudyYear`-enum,
-  `User.studyYear`): 1ste/2de/3de bachelor of 1ste/2de master.
+  `User.studyProgrammes` array) en ook **meerdere studiejaren** (`StudyYear`-enum,
+  `User.studyYears` array): 1ste/2de/3de bachelor of 1ste/2de master. Meerdere
+  jaren zijn nodig omdat een lid met een gespreid programma bv. tegelijk vakken
+  van 2de en 3de bachelor opneemt; daarom checkboxes en geen dropdown.
 - De lijst richtingen is **KU Leuven-ingenieurswetenschappen-specifiek** en staat
   vast in de enum; NL/EN-labels leven in de i18n-dictionaries (`onboarding.programmes`
   / `onboarding.years`). Nieuwe richting = enum-waarde + label toevoegen +
   `STUDY_PROGRAMMES` in `apps/web/lib/profile.ts` bijwerken.
 - Beide zijn **optioneel** (geen harde vereiste in de onboarding), zodat de
   registratie niet blokkeert; te wijzigen op `/account`.
+- **"Ik studeer niet aan de faculteit"** (`User.notAtFaculty`) is er voor leden
+  zonder ingenieursopleiding aan de faculteit. Het is bewust **geen
+  `StudyProgramme`-waarde** maar een apart veld: het is geen richting, en als
+  enum-waarde zou het opduiken als fantoom-richting overal waar richtingen
+  opgelijst worden (o.a. de mappen in de career-ZIP). Wie dit aanduidt valt uit
+  **alle** career-lijsten, ook de algemene; de andere categorieën blijven gewoon
+  werken.
+
+### Jaarlijkse studiebevestiging ("wie is nog actief student?")
+- **Het probleem:** vroeger zat de cursusdienst in dezelfde applicatie. Wie boeken
+  wou bestellen moest een richting aanduiden, en die werd elk jaar gereset. Dat
+  gaf ongewild een jaarlijks signaal over wie nog actief studeerde. Nu cudi een
+  aparte site is (en we die bewust **niet** koppelen), viel dat signaal weg.
+- **De oplossing:** niet de koppeling herbouwen, maar de *jaarlijkse herdeclaratie*.
+  `User.studyConfirmedYear` houdt bij in welk werkingsjaar het lid zijn studie
+  laatst bevestigde. Loopt dat achter op `currentWorkingYear()` (rollover op
+  15 juli, zie `lib/workingYear.ts`), dan is het profiel verlopen.
+- Een verlopen profiel wordt **blokkerend** afgedwongen door een tweede gate in
+  `app/[locale]/layout.tsx`, na de onboarding-gate: het lid gaat naar
+  `/studie-bevestigen` voor het de site verder kan gebruiken.
+- **Bewust geen reset van de data** (in tegenstelling tot het oude systeem): de
+  vorige keuze blijft staan en wordt voorgevuld, zodat bevestigen één klik is.
+  Dat verschil bepaalt of leden bevestigen of afhaken.
+- **Waarom dit sterker is dan de oude cudi-truc:** inloggen gaat via KU Leuven
+  SSO. Een afgestudeerde wiens KUL-account uit staat, geraakt niet meer binnen en
+  kan dus nooit bevestigen. "Bevestigd dit werkingsjaar" betekent daardoor in de
+  praktijk: heeft een werkend KUL-account **én** verklaart zelf nog te studeren.
+- `saveProfileAction` (onboarding + `/account`) stempelt `studyConfirmedYear` ook,
+  want wie dat formulier invult declareert daarmee net zijn studie.
+
+### Mailinglijsten (admin-export)
+- De admin-tab **Mailinglijsten** (`mailinglists.export`) exporteert per categorie
+  de leden die ze aangevinkt hebben. Kolommen zijn altijd `firstname`, `lastname`,
+  `email`, waarbij `email` het **voorkeursadres** is (`emailPreference`), niet per
+  se de login-mail. Zonder ingevulde persoonlijke mail valt dat terug op de
+  universiteitsmail.
+- Enkel **actieve** leden komen in een export: een gedeactiveerd account hoort
+  geen mails meer te krijgen.
+- Enkel leden die hun studie **dit werkingsjaar bevestigd** hebben (zie de
+  jaarlijkse studiebevestiging hierboven) zitten in een lijst; dat geldt voor
+  **alle** lijsten, ook "Alle studenten". Afgestudeerden vallen er zo vanzelf
+  uit, zonder manuele opkuis.
+- **"Alle studenten"** is een synthetische lijst: iedereen, zonder opt-in. Ze is
+  bewust **geen `MailCategory`** en heeft dus geen checkbox bij "Mijn account",
+  want dit is de lijst om sowieso iedereen te kunnen bereiken.
+- **Career werkt per richting** en exporteert daarom een ZIP i.p.v. één CSV:
+  een algemene lijst, een opsplitsing per studiejaar (2de bachelor, 3de bachelor,
+  alle bachelors, 1ste master, 2de master, alle masters) en per richting nog eens
+  2de bachelor / 3de bachelor / masters. Alle lijsten zijn deelverzamelingen van
+  de **Career-opt-ins**; wie Career niet aanvinkte zit in geen enkele.
+- Eerste bachelors krijgen **geen eigen career-lijst** (enkel via "alle
+  bachelors"), en per richting bestaan enkel 2de/3de bachelor en masters, want
+  daar zijn de career-activiteiten op gericht.
+- Omdat een lid meerdere studiejaren en richtingen kan aanduiden, **komt het in
+  elke lijst waar het bij hoort**. Lege lijsten blijven in de ZIP zitten zodat de
+  mappenstructuur voorspelbaar is.
 
 ### Posten (groepen) & werkingsjaren
 - Een **post** = een `Group`. In de admin heet dit voortaan **"Posten"** (niet
