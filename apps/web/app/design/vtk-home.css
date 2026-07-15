@@ -92,8 +92,40 @@
   color: var(--paper);
 }
 
+/* The events card sits on the dark hero scrim as "donker glas": a translucent
+   navy panel with blur and light text, so it reads as part of the hero instead
+   of a bright white cut-out that wins every contrast battle. Light-on-dark tones
+   use --paper and --on-dark-muted. Scoped to .home-hero so the same .cal classes
+   stay light on other surfaces (e.g. the sample page). */
 .vtk-design .home-hero .cal {
-  box-shadow: 0 24px 60px -32px rgba(10, 15, 31, 0.6);
+  background: rgba(9, 15, 32, 0.46);
+  border-color: rgba(255, 255, 255, 0.11);
+  box-shadow: none;
+  -webkit-backdrop-filter: blur(16px) saturate(1.05);
+  backdrop-filter: blur(16px) saturate(1.05);
+  color: rgba(255, 255, 255, 0.92);
+}
+
+.vtk-design .home-hero .cal-head h3,
+.vtk-design .home-hero .day-label .num,
+.vtk-design .home-hero .ev .n {
+  color: var(--paper);
+}
+
+.vtk-design .home-hero .cal-head .sub,
+.vtk-design .home-hero .day-label .dow,
+.vtk-design .home-hero .ev .t,
+.vtk-design .home-hero .ev .n small {
+  color: var(--on-dark-muted);
+}
+
+.vtk-design .home-hero .cal-head .all {
+  color: #fff;
+  border-bottom-color: rgba(255, 255, 255, 0.45);
+}
+
+.vtk-design .home-hero .day-group {
+  border-top-color: rgba(255, 255, 255, 0.14);
 }
 
 .vtk-design .home-hero .btn-primary {
