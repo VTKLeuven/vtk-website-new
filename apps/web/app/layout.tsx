@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono, Instrument_Serif, Inter } from "next/font/google";
+import { getSentryDsn } from "@/lib/runtimeConfig";
 import "./globals.css";
 
 const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
@@ -21,13 +22,25 @@ export const metadata: Metadata = {
     "De officiële website van VTK, de studentenvereniging van de faculteit ingenieurswetenschappers.",
 };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  // De Sentry-client-DSN komt uit de DB-config (Admin -> IT). We spuiten ze in
+  // het document zodat instrumentation-client.ts ze kan lezen; dat script draait
+  // na het laden van het document. De client-DSN is publiek per ontwerp.
+  const sentryDsn = await getSentryDsn();
+
   return (
     <html
       lang="nl"
       className={`${geistSans.variable} ${geistMono.variable} ${vtkSans.variable} ${vtkSerif.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col bg-vtk-surface text-vtk-ink antialiased selection:bg-vtk-yellow/40 selection:text-vtk-ink">
+        {sentryDsn && (
+          <script
+            dangerouslySetInnerHTML={{
+              __html: `window.__SENTRY_DSN__=${JSON.stringify(sentryDsn)}`,
+            }}
+          />
+        )}
         {children}
       </body>
     </html>

@@ -43,8 +43,8 @@ export function SentryTest({ dsnConfigured }: { dsnConfigured: boolean }) {
     <div className="space-y-4">
       {!dsnConfigured && (
         <p className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-800">
-          No Sentry DSN configured, so the SDK is inert and sends nothing. Set
-          NEXT_PUBLIC_SENTRY_DSN / SENTRY_DSN in the root .env to test for real.
+          No Sentry DSN configured, so the SDK is inert and sends nothing. Set a DSN above
+          (and reload the page) to test for real.
         </p>
       )}
 

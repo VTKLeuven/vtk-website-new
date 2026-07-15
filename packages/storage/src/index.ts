@@ -1,6 +1,7 @@
 import {
   DeleteObjectCommand,
   GetObjectCommand,
+  HeadBucketCommand,
   PutObjectCommand,
   S3Client,
 } from "@aws-sdk/client-s3";
@@ -9,20 +10,89 @@ import { extname } from "node:path";
 import { Readable } from "node:stream";
 import archiver from "archiver";
 
-const endpoint = process.env.S3_ENDPOINT || "http://localhost:9000";
-const accessKeyId = process.env.S3_ACCESS_KEY || "minioadmin";
-const secretAccessKey = process.env.S3_SECRET_KEY || "minioadmin";
-const bucket = process.env.S3_BUCKET || "vtk";
-const region = process.env.S3_REGION || "us-east-1";
+export type S3Config = {
+  endpoint: string;
+  accessKeyId: string;
+  secretAccessKey: string;
+  bucket: string;
+  region: string;
+  forcePathStyle: boolean;
+};
 
-export const s3Bucket = bucket;
+/**
+ * De S3-configuratie kan tijdens runtime veranderen (ze wordt beheerd via
+ * Admin -> IT en in de database bewaard). Daarom bouwen we de `S3Client` niet
+ * meer één keer bij het laden van de module, maar via een resolver die de app
+ * registreert. De resolver + de gebouwde client leven op `globalThis` zodat er
+ * één instantie gedeeld wordt over Next's aparte route/instrumentation-bundels
+ * binnen hetzelfde proces (een module-lokale `let` zou per bundel verschillen).
+ */
+type StorageGlobal = {
+  resolver?: () => Promise<S3Config>;
+  cache?: { client: S3Client; bucket: string };
+};
 
-export const s3 = new S3Client({
-  endpoint,
-  region,
-  credentials: { accessKeyId, secretAccessKey },
-  forcePathStyle: true,
-});
+const g = globalThis as typeof globalThis & { __vtkStorage?: StorageGlobal };
+
+function store(): StorageGlobal {
+  return (g.__vtkStorage ??= {});
+}
+
+/** Config uit de omgeving; fallback zolang er geen resolver of DB-config is. */
+function envConfig(): S3Config {
+  return {
+    endpoint: process.env.S3_ENDPOINT || "http://localhost:9000",
+    accessKeyId: process.env.S3_ACCESS_KEY || "minioadmin",
+    secretAccessKey: process.env.S3_SECRET_KEY || "minioadmin",
+    bucket: process.env.S3_BUCKET || "vtk",
+    region: process.env.S3_REGION || "us-east-1",
+    // MinIO vereist path-style; Hetzner e.a. werken ook met path-style. Zet op
+    // "false" voor virtual-hosted-style (bucket als subdomein).
+    forcePathStyle: process.env.S3_FORCE_PATH_STYLE !== "false",
+  };
+}
+
+/**
+ * Registreer een async resolver voor de live S3-config (bv. uit de database).
+ * Roep dit één keer op bij het opstarten. Wist de client-cache.
+ */
+export function setS3ConfigResolver(fn: () => Promise<S3Config>): void {
+  const s = store();
+  s.resolver = fn;
+  s.cache = undefined;
+}
+
+/** Gooi de gecachte client weg, zodat de volgende oproep verse config gebruikt. */
+export function resetS3Client(): void {
+  store().cache = undefined;
+}
+
+async function resolveConfig(): Promise<S3Config> {
+  const s = store();
+  if (s.resolver) {
+    try {
+      return await s.resolver();
+    } catch {
+      // Faalt de DB-lezing, val dan terug op env zodat storage blijft werken.
+      return envConfig();
+    }
+  }
+  return envConfig();
+}
+
+async function getClient(): Promise<{ client: S3Client; bucket: string }> {
+  const s = store();
+  if (s.cache) return s.cache;
+  const cfg = await resolveConfig();
+  const client = new S3Client({
+    endpoint: cfg.endpoint,
+    region: cfg.region,
+    credentials: { accessKeyId: cfg.accessKeyId, secretAccessKey: cfg.secretAccessKey },
+    forcePathStyle: cfg.forcePathStyle,
+  });
+  s.cache = { client, bucket: cfg.bucket };
+  return s.cache;
+}
 
 export function newStorageKey(prefix: string, originalName?: string | null): string {
   const id = randomBytes(12).toString("hex");
@@ -35,7 +105,8 @@ export async function putObject(
   body: Buffer | Uint8Array,
   contentType: string
 ): Promise<void> {
-  await s3.send(
+  const { client, bucket } = await getClient();
+  await client.send(
     new PutObjectCommand({
       Bucket: bucket,
       Key: key,
@@ -46,7 +117,8 @@ export async function putObject(
 }
 
 export async function deleteObject(key: string): Promise<void> {
-  await s3.send(new DeleteObjectCommand({ Bucket: bucket, Key: key }));
+  const { client, bucket } = await getClient();
+  await client.send(new DeleteObjectCommand({ Bucket: bucket, Key: key }));
 }
 
 export async function getObjectStream(key: string): Promise<{
@@ -54,7 +126,8 @@ export async function getObjectStream(key: string): Promise<{
   contentType: string | undefined;
   contentLength: number | undefined;
 }> {
-  const res = await s3.send(new GetObjectCommand({ Bucket: bucket, Key: key }));
+  const { client, bucket } = await getClient();
+  const res = await client.send(new GetObjectCommand({ Bucket: bucket, Key: key }));
   const body = res.Body;
   if (!body) throw new Error(`Object not found: ${key}`);
   const stream = body as unknown as NodeJS.ReadableStream;
@@ -74,6 +147,22 @@ export async function getObjectBuffer(key: string): Promise<Buffer> {
     );
   }
   return Buffer.concat(chunks);
+}
+
+/**
+ * Test of de opgegeven config effectief een bereikbare, toegankelijke bucket
+ * oplevert. Gebruikt door de "Test connection"-knop op Admin -> IT. Bouwt een
+ * losse client (raakt de cache niet) zodat je nog niet-opgeslagen config kunt
+ * toetsen.
+ */
+export async function checkS3Connection(cfg: S3Config): Promise<void> {
+  const client = new S3Client({
+    endpoint: cfg.endpoint,
+    region: cfg.region,
+    credentials: { accessKeyId: cfg.accessKeyId, secretAccessKey: cfg.secretAccessKey },
+    forcePathStyle: cfg.forcePathStyle,
+  });
+  await client.send(new HeadBucketCommand({ Bucket: cfg.bucket }));
 }
 
 export type ZipEntry = { key: string; name: string };

@@ -6,8 +6,16 @@
  */
 import * as Sentry from "@sentry/nextjs";
 
+declare global {
+  interface Window {
+    // Door de root-layout ingespoten vanuit de DB-config (Admin -> IT). De
+    // client-DSN is publiek per ontwerp; env blijft de fallback.
+    __SENTRY_DSN__?: string;
+  }
+}
+
 Sentry.init({
-  dsn: process.env.NEXT_PUBLIC_SENTRY_DSN,
+  dsn: window.__SENTRY_DSN__ ?? process.env.NEXT_PUBLIC_SENTRY_DSN,
 
   // 100% tracing in dev, 10% in production.
   tracesSampleRate: process.env.NODE_ENV === "development" ? 1.0 : 0.1,

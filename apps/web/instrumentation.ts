@@ -22,9 +22,19 @@ declare global {
 export async function register(): Promise<void> {
   // Sentry per server-runtime laden (browser gebruikt instrumentation-client.ts).
   if (process.env.NEXT_RUNTIME === 'nodejs') {
-    await import('./sentry.server.config');
+    const { getS3Config, getSentryDsn } = await import('./lib/runtimeConfig');
+    const { setS3ConfigResolver } = await import('@vtk/storage');
+
+    // Objectopslag laten resolven vanuit de live DB-config (zie @vtk/storage).
+    setS3ConfigResolver(getS3Config);
+
+    // Sentry server-side initialiseren met de DSN uit de DB (fallback: env).
+    const dsn = await getSentryDsn().catch(() => process.env.SENTRY_DSN);
+    const { initServerSentry } = await import('./sentry.server.config');
+    initServerSentry(dsn);
   }
   if (process.env.NEXT_RUNTIME === 'edge') {
+    // Edge (middleware) kan de DB niet lezen; blijft op de env-DSN.
     await import('./sentry.edge.config');
   }
 
