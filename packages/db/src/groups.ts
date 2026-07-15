@@ -33,13 +33,17 @@ export const HEADER_TABS: Array<{
   labelEn: string;
   order: number;
 }> = [
-  { code: "AANBOD", slug: "aanbod", labelNl: "Aanbod", labelEn: "Offer", order: 0 },
-  { code: "EERSTEJAARS", slug: "eerstejaars", labelNl: "Eerstejaars", labelEn: "Freshmen", order: 1 },
-  { code: "CAREER", slug: "career", labelNl: "Career", labelEn: "Career", order: 2 },
-  { code: "CURSUSDIENST", slug: "cursusdienst", labelNl: "Cursusdienst", labelEn: "Course Shop", order: 3 },
-  { code: "INTERNATIONAAL", slug: "internationaal", labelNl: "Internationaal", labelEn: "International", order: 4 },
-  { code: "STUDIES", slug: "studies", labelNl: "Studies", labelEn: "Studies", order: 5 },
-  { code: "MEDIA", slug: "media", labelNl: "Media", labelEn: "Media", order: 6 },
-  { code: "OVER_VTK", slug: "over-vtk", labelNl: "Over-VTK", labelEn: "About VTK", order: 7 },
-  { code: "CONTACT", slug: "contact", labelNl: "Contact", labelEn: "Contact", order: 8 },
+  // Code blijft AANBOD: de seed upsert op code, en HeaderTab.code hangt vast aan
+  // bestaande Page-rijen. Enkel slug en label verhuizen naar "Info".
+  { code: "AANBOD", slug: "info", labelNl: "Info", labelEn: "Info", order: 0 },
+  { code: "THEOKOT", slug: "theokot", labelNl: "Theokot", labelEn: "Theokot", order: 1 },
+  { code: "SHIFTEN", slug: "shift", labelNl: "Shiften", labelEn: "Shifts", order: 2 },
+  { code: "EERSTEJAARS", slug: "eerstejaars", labelNl: "Eerstejaars", labelEn: "Freshmen", order: 3 },
+  { code: "CAREER", slug: "career", labelNl: "Career", labelEn: "Career", order: 4 },
+  { code: "CURSUSDIENST", slug: "cursusdienst", labelNl: "Cursusdienst", labelEn: "Course Shop", order: 5 },
+  { code: "INTERNATIONAAL", slug: "internationaal", labelNl: "Internationaal", labelEn: "International", order: 6 },
+  { code: "STUDIES", slug: "studies", labelNl: "Studies", labelEn: "Studies", order: 7 },
+  { code: "MEDIA", slug: "media", labelNl: "Media", labelEn: "Media", order: 8 },
+  { code: "OVER_VTK", slug: "over-vtk", labelNl: "Over-VTK", labelEn: "About VTK", order: 9 },
+  { code: "CONTACT", slug: "contact", labelNl: "Contact", labelEn: "Contact", order: 10 },
 ];

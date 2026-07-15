@@ -56,11 +56,11 @@ export async function Header({ locale }: { locale: Locale }) {
   const nl = locale === 'nl';
   const quick = nl
     ? [
-        { href: `${base}/aanbod`, label: 'Theokot', as: 'link' as const },
+        { href: `${base}/theokot`, label: 'Theokot', as: 'link' as const },
         { href: `${base}/cursusdienst`, label: 'Cursusdienst', as: 'link' as const },
       ]
     : [
-        { href: `${base}/aanbod`, label: 'Theokot', as: 'link' as const },
+        { href: `${base}/theokot`, label: 'Theokot', as: 'link' as const },
         { href: `${base}/cursusdienst`, label: 'Course shop', as: 'link' as const },
       ];
 

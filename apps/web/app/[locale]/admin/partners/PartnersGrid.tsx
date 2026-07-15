@@ -2,6 +2,7 @@
 
 import { useRef, useState, useTransition } from "react";
 import { Button, ConfirmDialog, Input, Label } from "@vtk/ui";
+import { PartnerLogo } from "@/components/site/PartnerLogo";
 import {
   deletePartnerAction,
   reorderPartnersAction,
@@ -94,12 +95,12 @@ export function PartnersGrid({
               ].join(" ")}
               title={nl ? "Sleep om te herschikken; klik om te bewerken" : "Drag to reorder; click to edit"}
             >
-              {p.logoUrl ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={p.logoUrl} alt={p.name} className="max-h-[52px] max-w-full object-contain" />
-              ) : (
-                <span>{p.name}</span>
-              )}
+              <PartnerLogo
+                src={p.logoUrl}
+                name={p.name}
+                className="max-h-[52px] max-w-full object-contain"
+                fallback={<span>{p.name}</span>}
+              />
               {!p.active && (
                 <span className="absolute left-2 top-2 rounded-full bg-zinc-900/80 px-2 py-0.5 text-[10px] font-medium text-white">
                   {nl ? "Inactief" : "Inactive"}
@@ -143,7 +144,7 @@ function EditPartnerModal({
     try {
       const form = new FormData();
       form.append("file", file);
-      form.append("kind", "image");
+      form.append("kind", "logo");
       const res = await fetch("/api/admin/upload", { method: "POST", body: form });
       if (!res.ok) {
         setErr(nl ? "Upload mislukt" : "Upload failed");
@@ -184,12 +185,14 @@ function EditPartnerModal({
 
           <div className="flex items-center gap-4">
             <div className="grid aspect-[16/9] w-32 shrink-0 place-items-center rounded-xl border border-vtk-blue/15 bg-white p-2">
-              {previewUrl ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={previewUrl} alt={partner.name} className="max-h-[52px] max-w-full object-contain" />
-              ) : (
-                <span className="text-xs text-zinc-400">{nl ? "Geen logo" : "No logo"}</span>
-              )}
+              <PartnerLogo
+                src={previewUrl}
+                name={partner.name}
+                className="max-h-[52px] max-w-full object-contain"
+                fallback={
+                  <span className="text-xs text-zinc-400">{nl ? "Geen logo" : "No logo"}</span>
+                }
+              />
             </div>
             <div>
               <Label>{nl ? "Logo vervangen" : "Replace logo"}</Label>

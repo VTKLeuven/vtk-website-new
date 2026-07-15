@@ -3,6 +3,7 @@ import { prisma } from "@vtk/db";
 import { pick, type Locale } from "@vtk/i18n";
 import { getVisibleHeaderTabsForNav } from "@/lib/headerTabs";
 import { publicUrl } from "@/lib/storage";
+import { PartnerLogo } from "@/components/site/PartnerLogo";
 import {
   dutchDayNameForDate,
   entryForDate,
@@ -108,7 +109,7 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
       k: nl ? "Eten" : "Eat",
       v: "Theokot",
       m: theoToday && !isClosedHours(theoToday.hours) ? theoToday.hours : nl ? "Bekijk openingsuren" : "See hours",
-      href: `${base}/aanbod`,
+      href: `${base}/theokot`,
     },
     {
       k: nl ? "Boeken" : "Books",
@@ -116,9 +117,19 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
       m: curToday && !isClosedHours(curToday.hours) ? curToday.hours : nl ? "Cursussen & tweedehands" : "Courses & second-hand",
       href: `${base}/cursusdienst`,
     },
-    { k: nl ? "Tweedehands" : "Second-hand", v: "Tweedehands", m: nl ? "Koop & verkoop" : "Buy & sell", href: `${base}/cursusdienst` },
-    { k: nl ? "Werk" : "Work", v: "Shiften", m: nl ? "Help mee" : "Join a shift", href: `${base}/aanbod` },
-    { k: nl ? "Reserveer" : "Reserve", v: "Tijdsloten", m: nl ? "Praktische tools" : "Practical tools", href: `${base}/aanbod` },
+    {
+      k: nl ? "Tweedehands" : "Second-hand",
+      v: nl ? "Tweedehands Boeken" : "Second-hand Books",
+      m: nl ? "Koop & verkoop" : "Buy & sell",
+      href: "https://cudi.vtk.be/vtk/secondhand",
+    },
+    {
+      k: nl ? "Reserveer" : "Reserve",
+      v: nl ? "Tijdsloten Cudi" : "Cudi Time Slots",
+      m: nl ? "Praktische tools" : "Practical tools",
+      href: "https://cudi.vtk.be/vtk/account/slots",
+    },
+    { k: nl ? "Werk" : "Work", v: "Shiften", m: nl ? "Help mee" : "Join a shift", href: `${base}/shift` },
     { k: nl ? "Kalender" : "Calendar", v: nl ? "Kalender" : "Calendar", m: nl ? "Alle events" : "All events", href: `${base}/kalender` },
   ];
 
@@ -329,13 +340,24 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
 
       <section className="quick">
         <div className="quick-row">
-          {quickLinks.map((item) => (
-            <Link key={item.k} className="ql" href={item.href}>
-              <span className="k">{item.k}</span>
-              <span className="v">{item.v}</span>
-              <span className="m">{item.m}</span>
-            </Link>
-          ))}
+          {quickLinks.map((item) => {
+            const body = (
+              <>
+                <span className="k">{item.k}</span>
+                <span className="v">{item.v}</span>
+                <span className="m">{item.m}</span>
+              </>
+            );
+            return item.href.startsWith("http") ? (
+              <a key={item.k} className="ql" href={item.href}>
+                {body}
+              </a>
+            ) : (
+              <Link key={item.k} className="ql" href={item.href}>
+                {body}
+              </Link>
+            );
+          })}
         </div>
       </section>
 
@@ -408,7 +430,7 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
           </h2>
           <div className="meta">
             {nl ? "Werkgroepen en diensten" : "Work groups and services"} ·{" "}
-            <Link href={`${base}/aanbod`}>{nl ? "bekijk alles" : "see all"}</Link>
+            <Link href={`${base}/info`}>{nl ? "bekijk alles" : "see all"}</Link>
           </div>
         </div>
         <div className="aanbod">
@@ -505,12 +527,7 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
               const logo = publicUrl(partner.logoKey);
               return (
                 <div className="partner" key={partner.id}>
-                  {logo ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={logo} alt={partner.name} />
-                  ) : (
-                    partner.name
-                  )}
+                  <PartnerLogo src={logo} name={partner.name} />
                 </div>
               );
             })

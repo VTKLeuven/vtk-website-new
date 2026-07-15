@@ -15,6 +15,30 @@ acties in `apps/web/app/actions/theokot.ts`).
 
 ---
 
+## Hoofdnavigatie — Info, Theokot en Shiften
+
+De tabs in de header komen uit de `HeaderTab`-tabel; `HEADER_TABS` in
+`packages/db/src/groups.ts` is de seed én de fallback wanneer die tabel leeg is.
+De volgorde en labels zijn dus een kringkeuze, geen technische:
+
+- De vroegere **"Aanbod"**-tab heet nu **"Info"** en leeft op `/info`. Het is nog
+  steeds dezelfde hub-pagina die naar de diensten doorverwijst; enkel de naam dekt
+  de lading beter.
+- **Theokot** en **Shiften** kregen een eigen tab (`/theokot`, `/shift`) meteen na
+  Info, omdat het de twee diensten zijn die studenten het vaakst nodig hebben. Ze
+  staan nog steeds ook als kaart op de Info-pagina.
+- De tab-**code blijft `AANBOD`** ondanks de hernoeming. Codes zijn de sleutel
+  waarop de seed upsert en waar bestaande `Page`-rijen aan hangen; een code
+  wijzigen zou een tweede tab aanmaken in plaats van de bestaande te hernoemen.
+- **"Over het ledenportaal"** verhuisde van `/info` naar `/ledenportaal` om die
+  slug vrij te maken. Let op: die pagina is de bij KU Leuven geregistreerde SSO
+  info-URL (`apps/web/lib/sso.ts`), dus de registratie bij KU Leuven moet mee
+  aangepast worden.
+- **Tweedehands en tijdsloten draaien op Cudi**, niet op deze site. De footer en de
+  homepage-quicklinks linken daarom extern naar `cudi.vtk.be`.
+
+---
+
 ## Theokot — broodjes-reservatiesysteem
 
 Theokot is de cafetaria/broodjesbar van VTK. Studenten reserveren vooraf broodjes,
@@ -65,7 +89,7 @@ halen ze af aan de balie en betalen daar. Post **Theokot** beheert het systeem.
   (`/theokot/balie`) voor shifters die enkel de balie mogen bedienen (geen andere
   admin-toegang).
 - De **studenten-reservatiepagina** leeft op `/theokot` (aliassen `/shop` en
-  `/aanbod/theokot` sturen ernaartoe) en is bereikbaar via de Aanbod-sectie.
+  `/info/theokot` sturen ernaartoe) en heeft een eigen tab in de hoofdnavigatie.
 - **Openingsuren** (startpagina) hebben een eigen tab onder Admin → Theokot, los van de
   overige instellingen.
 - **Kaartscanner**: de scanner werkt als toetsenbord en tikt `serial;cardAppId` + Enter.

@@ -776,7 +776,7 @@ async function main() {
       location: "Theokot · Arenberg",
       start: "2026-05-19T11:30:00+02:00",
       end: "2026-05-19T14:00:00+02:00",
-      url: "https://vtk.be/nl/aanbod",
+      url: "https://vtk.be/nl/theokot",
       groupCode: "THEOKOT",
       descriptionNl: "Een extra uitgebreide lunchshift met broodjes, koffie en warme snacks in de VTK-kelder.",
       descriptionEn: "An extended lunch shift with sandwiches, coffee and warm snacks in the VTK basement.",

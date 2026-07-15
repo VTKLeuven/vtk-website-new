@@ -36,7 +36,7 @@ export function ssoMetadata(): SsoMetadata {
     redirectUri:
       process.env.KUL_OIDC_REDIRECT_URI ||
       `${base}/api/auth/better/oauth2/callback/kuleuven`,
-    infoUrl: `${base}/nl/info`,
+    infoUrl: `${base}/nl/ledenportaal`,
     privacyUrl: `${base}/nl/privacy`,
     logoUrl: `${base}${SSO_LOGO.path}`,
     logoWidth: SSO_LOGO.width,

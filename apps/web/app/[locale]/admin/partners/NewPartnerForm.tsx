@@ -13,7 +13,7 @@ export function NewPartnerForm({ locale }: { locale: "nl" | "en" }) {
     setErr(null);
     const form = new FormData();
     form.append("file", file);
-    form.append("kind", "image");
+    form.append("kind", "logo");
     const res = await fetch("/api/admin/upload", { method: "POST", body: form });
     if (!res.ok) {
       setErr("Upload failed");
