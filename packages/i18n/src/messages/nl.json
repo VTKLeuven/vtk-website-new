@@ -133,6 +133,11 @@
     "notAtFacultyHint": "Duid dit aan als je geen ingenieursopleiding aan de faculteit volgt. Je krijgt dan geen Career-mails, want die zijn op faculteitsstudenten gericht.",
     "submit": "Registratie voltooien",
     "required": "Verplicht veld",
+    "saved": "Gegevens opgeslagen",
+    "errorInvalid": "Niet opgeslagen: kijk de ingevulde gegevens na.",
+    "errorRnumberTaken": "Niet opgeslagen: dit r-nummer hoort al bij een ander lid.",
+    "errorAvatarTooLarge": "Niet opgeslagen: je profielfoto is groter dan 8 MB.",
+    "errorAvatarFailed": "Niet opgeslagen: je profielfoto kon niet verwerkt worden.",
     "categories": {
       "FEEST": "Feest",
       "CAREER": "Career",
@@ -172,8 +177,7 @@
   "admin": {
     "title": "Admin",
     "dashboard": "Dashboard",
-    "pages": "Pagina's",
-    "header": "Header",
+    "content": "Inhoud",
     "calendar": "Kalender",
     "users": "Gebruikers",
     "groups": "Posten",
@@ -215,7 +219,10 @@
   "common": {
     "loading": "Laden...",
     "yes": "Ja",
-    "no": "Nee"
+    "no": "Nee",
+    "saving": "Bezig met opslaan...",
+    "saved": "Opgeslagen",
+    "saveError": "Er ging iets mis bij het opslaan."
   },
   "info": {
     "kicker": "VTK · KU Leuven",

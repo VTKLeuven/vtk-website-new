@@ -133,6 +133,11 @@
     "notAtFacultyHint": "Tick this if you are not enrolled in an engineering programme at the faculty. You will not receive Career emails, as those target faculty students.",
     "submit": "Complete registration",
     "required": "Required field",
+    "saved": "Details saved",
+    "errorInvalid": "Not saved: please check the details you entered.",
+    "errorRnumberTaken": "Not saved: this r-number already belongs to another member.",
+    "errorAvatarTooLarge": "Not saved: your profile picture is larger than 8 MB.",
+    "errorAvatarFailed": "Not saved: your profile picture could not be processed.",
     "categories": {
       "FEEST": "Party",
       "CAREER": "Career",
@@ -172,8 +177,7 @@
   "admin": {
     "title": "Admin",
     "dashboard": "Dashboard",
-    "pages": "Pages",
-    "header": "Header",
+    "content": "Content",
     "calendar": "Calendar",
     "users": "Users",
     "groups": "Posts",
@@ -215,7 +219,10 @@
   "common": {
     "loading": "Loading...",
     "yes": "Yes",
-    "no": "No"
+    "no": "No",
+    "saving": "Saving...",
+    "saved": "Saved",
+    "saveError": "Something went wrong while saving."
   },
   "info": {
     "kicker": "VTK · KU Leuven",

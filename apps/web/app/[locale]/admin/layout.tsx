@@ -9,8 +9,7 @@ import "@/app/design/vtk-admin.css";
 
 const sections = [
   { key: "dashboard", href: "" },
-  { key: "pages", href: "/paginas", perm: "pages.edit" },
-  { key: "header", href: "/header", perm: "header.manage" },
+  { key: "content", href: "/inhoud", anyPerm: ["pages.edit", "header.manage"] },
   { key: "calendar", href: "/kalender", perm: "calendar.create" },
   { key: "albums", href: "/albums", perm: "photos.manageAlbums" },
   { key: "pocs", href: "/pocs", perm: "pocs.manage" },
@@ -57,21 +56,13 @@ const icons: Record<string, ReactNode> = {
       <rect x="3" y="16" width="7" height="5" rx="1" />
     </Svg>
   ),
-  // pages: document met tekstregels
-  pages: (
-    <Svg>
-      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-      <path d="M14 2v6h6" />
-      <path d="M16 13H8" />
-      <path d="M16 17H8" />
-      <path d="M10 9H8" />
-    </Svg>
-  ),
-  // header: bovenste navigatiebalk
-  header: (
+  // content: navigatiebalk bovenaan met de pagina's eronder
+  content: (
     <Svg>
       <rect x="3" y="3" width="18" height="18" rx="2" />
       <path d="M3 9h18" />
+      <path d="M7 13h10" />
+      <path d="M7 17h6" />
     </Svg>
   ),
   // calendar: kalender

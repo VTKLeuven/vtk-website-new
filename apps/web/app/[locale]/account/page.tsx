@@ -5,8 +5,10 @@ import { hasLocale } from "@/lib/locale";
 import { requireSession } from "@/lib/session";
 import { getDictionary, pick } from "@vtk/i18n";
 import { formatEuro } from "@/lib/theokot";
+import type { SaveState } from "@/lib/saveState";
 import { updateProfileAction, logoutAction } from "@/app/actions/auth";
 import { ProfileForm } from "@/components/profile/ProfileForm";
+import { SaveForm } from "@/components/ui/SaveForm";
 
 export default async function AccountPage({ params }: { params: Promise<{ locale: string }> }) {
   const { locale } = await params;
@@ -66,9 +68,9 @@ export default async function AccountPage({ params }: { params: Promise<{ locale
     minute: "2-digit",
   });
 
-  async function onSave(formData: FormData) {
+  async function onSaveLocale(_prev: SaveState, formData: FormData): Promise<SaveState> {
     "use server";
-    await updateProfileAction(session.user.id, formData);
+    return updateProfileAction(session.user.id, formData);
   }
 
   return (
@@ -78,7 +80,14 @@ export default async function AccountPage({ params }: { params: Promise<{ locale
         <h1 className="text-4xl font-semibold tracking-tight text-vtk-ink">{dict.auth.account}</h1>
       </div>
       <Card className="p-6">
-        <form action={onSave} className="space-y-4">
+        <SaveForm
+          action={onSaveLocale}
+          className="space-y-4"
+          submitLabel={dict.auth.updateProfile}
+          savingLabel={dict.common.saving}
+          savedMessage={dict.auth.saved}
+          fallbackErrorMessage={dict.common.saveError}
+        >
           <div>
             <Label>{dict.auth.email}</Label>
             <Input defaultValue={session.user.email} disabled />
@@ -90,8 +99,7 @@ export default async function AccountPage({ params }: { params: Promise<{ locale
               <option value="EN">English</option>
             </Select>
           </div>
-          <Button type="submit">{dict.auth.updateProfile}</Button>
-        </form>
+        </SaveForm>
       </Card>
 
       <Card className="p-6">

@@ -1,3 +1,4 @@
+import Image from "next/image";
 import Link from "next/link";
 import { prisma } from "@vtk/db";
 import { pick, type Locale } from "@vtk/i18n";
@@ -175,44 +176,6 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
           href: `${base}/${tab.slug}`,
         }))
       : fallbackAanbod;
-
-  const vacancies = [
-    {
-      roleNl: "Junior Embedded Engineer",
-      roleEn: "Junior Embedded Engineer",
-      company: "Materialise · Leuven",
-      typeNl: "Stage",
-      typeEn: "Internship",
-    },
-    {
-      roleNl: "Quant Analyst - zomer 2026",
-      roleEn: "Quant Analyst - Summer 2026",
-      company: "IMC Trading · Amsterdam",
-      typeNl: "Full-time",
-      typeEn: "Full-time",
-    },
-    {
-      roleNl: "ML Research Intern",
-      roleEn: "ML Research Intern",
-      company: "ASML · Veldhoven",
-      typeNl: "Stage",
-      typeEn: "Internship",
-    },
-    {
-      roleNl: "Process Engineer",
-      roleEn: "Process Engineer",
-      company: "argenx · Gent",
-      typeNl: "Graduate",
-      typeEn: "Graduate",
-    },
-    {
-      roleNl: "Strategy Consultant",
-      roleEn: "Strategy Consultant",
-      company: "Bain & Company · Brussel",
-      typeNl: "Graduate",
-      typeEn: "Graduate",
-    },
-  ];
 
   return (
     <div className="vtk-design">
@@ -492,17 +455,19 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
               {nl ? "Naar VTK Career" : "Open VTK Career"}
             </a>
           </div>
-          <div className="jobs">
-            {vacancies.map((vacancy) => (
-              <div className="job" key={`${vacancy.roleEn}-${vacancy.company}`}>
-                <div>
-                  <div className="r">{pick(vacancy.roleNl, vacancy.roleEn, locale)}</div>
-                  <div className="c">{vacancy.company}</div>
-                </div>
-                <div className="t">{pick(vacancy.typeNl, vacancy.typeEn, locale)}</div>
-              </div>
-            ))}
-          </div>
+          <figure className="career-photo">
+            <Image
+              src="/career-fair.jpg"
+              alt={
+                nl
+                  ? "Studenten en bedrijven op de VTK Career Fair"
+                  : "Students and companies at the VTK Career Fair"
+              }
+              width={1600}
+              height={1067}
+              sizes="(max-width: 1000px) 100vw, 50vw"
+            />
+          </figure>
         </div>
       </section>
 

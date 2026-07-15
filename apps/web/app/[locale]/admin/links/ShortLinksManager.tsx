@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { Button, Card, Input, Label } from "@vtk/ui";
+import { IconButton, RowActions } from "@/components/ui/IconButton";
+import { CheckIcon, CopyIcon, PencilIcon, TrashIcon } from "@/components/ui/icons";
 import { deleteShortLinkAction, saveShortLinkAction } from "@/app/actions/shortlinks";
 
 export type LinkRow = {
@@ -109,17 +111,38 @@ export function ShortLinksManager({
                 <StatusPill link={l} nl={nl} />
               </div>
 
-              <div className="flex shrink-0 items-center gap-1">
-                <Button size="sm" variant="ghost" onClick={() => copy(l.slug)}>
-                  {copied === l.slug ? (nl ? "Gekopieerd" : "Copied") : nl ? "Kopieer" : "Copy"}
-                </Button>
-                <Button size="sm" variant="ghost" onClick={() => setEditing(l)}>
-                  {nl ? "Bewerk" : "Edit"}
-                </Button>
-                <Button size="sm" variant="ghost" onClick={() => setDeleting(l)}>
-                  {nl ? "Verwijder" : "Delete"}
-                </Button>
-              </div>
+              <RowActions>
+                <IconButton
+                  label={
+                    copied === l.slug
+                      ? nl
+                        ? "Gekopieerd"
+                        : "Copied"
+                      : nl
+                        ? "Link kopiëren"
+                        : "Copy link"
+                  }
+                  srLabel={`${nl ? "Link kopiëren" : "Copy link"}: /${l.slug}`}
+                  onClick={() => copy(l.slug)}
+                >
+                  {copied === l.slug ? <CheckIcon /> : <CopyIcon />}
+                </IconButton>
+                <IconButton
+                  label={nl ? "Bewerken" : "Edit"}
+                  srLabel={`${nl ? "Bewerken" : "Edit"}: /${l.slug}`}
+                  onClick={() => setEditing(l)}
+                >
+                  <PencilIcon />
+                </IconButton>
+                <IconButton
+                  label={nl ? "Verwijderen" : "Delete"}
+                  srLabel={`${nl ? "Verwijderen" : "Delete"}: /${l.slug}`}
+                  tone="danger"
+                  onClick={() => setDeleting(l)}
+                >
+                  <TrashIcon />
+                </IconButton>
+              </RowActions>
             </li>
           ))}
           {visible.length === 0 && (

@@ -28,17 +28,23 @@ export default async function HeaderOverviewPage({
 
   if (!tab || !tab.visible) notFound();
 
+  const intro = pick(tab.introNl ?? "", tab.introEn ?? "", locale);
+  const ctaLabel = pick(tab.ctaLabelNl ?? "", tab.ctaLabelEn ?? "", locale);
+  // Intro en knop komen uit de categorie zelf, beheerd via /admin/inhoud.
+  const showCta = Boolean(ctaLabel && tab.ctaUrl);
+
   return (
     <div className="vtk-page">
       <header className="vtk-page-head">
         <div>
           <div className="vtk-page-kicker">VTK · {dict.pages.overview}</div>
           <h1 className="vtk-page-title">{pick(tab.labelNl, tab.labelEn, locale)}</h1>
+          {intro && <p className="vtk-page-subtitle">{intro}</p>}
         </div>
-        {tab.code === "CURSUSDIENST" && (
+        {showCta && (
           <div>
-            <a href="https://cudi.vtk.be" className="vtk-button vtk-button-primary arrow">
-              {locale === "nl" ? "Bestel cursussen op cudi.vtk.be" : "Order courses on cudi.vtk.be"}
+            <a href={tab.ctaUrl!} className="vtk-button vtk-button-primary arrow">
+              {ctaLabel}
             </a>
           </div>
         )}

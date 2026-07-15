@@ -1,14 +1,19 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useId, useRef, useState, useTransition } from "react";
 import { Button, Input, Label, Select } from "@vtk/ui";
+import type { Locale } from "@vtk/i18n";
 import { addPageAssetAction } from "@/app/actions/pages";
 
-export function FileUploader({ pageId, locale }: { pageId: string; locale: "nl" | "en" }) {
+export function FileUploader({ pageId, locale }: { pageId: string; locale: Locale }) {
+  const nl = locale === "nl";
   const [label, setLabel] = useState("");
   const [kind, setKind] = useState<"EMBEDDED_PDF" | "DOWNLOAD">("DOWNLOAD");
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  // Ref i.p.v. een vaste element-id: er kunnen meerdere uploaders op één scherm staan.
+  const fileInput = useRef<HTMLInputElement>(null);
+  const uid = useId();
 
   async function handleUpload(file: File) {
     setError(null);
@@ -17,7 +22,7 @@ export function FileUploader({ pageId, locale }: { pageId: string; locale: "nl" 
     form.append("kind", kind === "EMBEDDED_PDF" ? "pdf" : "file");
     const res = await fetch("/api/admin/upload", { method: "POST", body: form });
     if (!res.ok) {
-      setError("Upload failed");
+      setError(nl ? "Upload mislukt" : "Upload failed");
       return;
     }
     const data = (await res.json()) as { key: string; size: number; mime: string; name: string };
@@ -33,25 +38,35 @@ export function FileUploader({ pageId, locale }: { pageId: string; locale: "nl" 
     startTransition(async () => {
       await addPageAssetAction(submit);
       setLabel("");
+      if (fileInput.current) fileInput.current.value = "";
     });
   }
 
   return (
-    <div className="mt-4 grid grid-cols-1 sm:grid-cols-[1fr_auto_auto] gap-2 items-end">
+    <div className="mt-4 grid grid-cols-1 items-end gap-2 sm:grid-cols-[1fr_auto_auto]">
       <div>
-        <Label>{locale === "nl" ? "Label" : "Label"}</Label>
-        <Input value={label} onChange={(e) => setLabel(e.target.value)} placeholder={locale === "nl" ? "bv. Reglement" : "e.g. Rules"} />
+        <Label htmlFor={`${uid}-label`}>Label</Label>
+        <Input
+          id={`${uid}-label`}
+          value={label}
+          onChange={(e) => setLabel(e.target.value)}
+          placeholder={nl ? "bv. Reglement" : "e.g. Rules"}
+        />
       </div>
       <div>
-        <Label>Type</Label>
-        <Select value={kind} onChange={(e) => setKind(e.target.value as typeof kind)}>
+        <Label htmlFor={`${uid}-kind`}>Type</Label>
+        <Select
+          id={`${uid}-kind`}
+          value={kind}
+          onChange={(e) => setKind(e.target.value as typeof kind)}
+        >
           <option value="DOWNLOAD">Download</option>
           <option value="EMBEDDED_PDF">PDF embed</option>
         </Select>
       </div>
       <div>
         <input
-          id="file-upload"
+          ref={fileInput}
           type="file"
           hidden
           onChange={(e) => {
@@ -59,8 +74,14 @@ export function FileUploader({ pageId, locale }: { pageId: string; locale: "nl" 
             if (f) handleUpload(f);
           }}
         />
-        <Button type="button" onClick={() => document.getElementById("file-upload")?.click()} disabled={pending}>
-          {pending ? (locale === "nl" ? "Bezig..." : "Uploading...") : (locale === "nl" ? "Bestand uploaden" : "Upload file")}
+        <Button type="button" onClick={() => fileInput.current?.click()} disabled={pending}>
+          {pending
+            ? nl
+              ? "Bezig..."
+              : "Uploading..."
+            : nl
+              ? "Bestand uploaden"
+              : "Upload file"}
         </Button>
       </div>
       {error && <p className="col-span-full text-sm text-red-600">{error}</p>}

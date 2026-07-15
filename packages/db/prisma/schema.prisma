@@ -258,6 +258,14 @@ model HeaderTab {
   order      Int     @default(0)
   visible    Boolean @default(true)
 
+  // Inhoud van de categoriepagina zelf, bewerkbaar via /admin/inhoud.
+  introNl    String?
+  introEn    String?
+  // Optionele knop naast de titel (bv. cudi.vtk.be bij Cursusdienst).
+  ctaLabelNl String?
+  ctaLabelEn String?
+  ctaUrl     String?
+
   pages      Page[]
 }
 

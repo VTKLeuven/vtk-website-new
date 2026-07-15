@@ -1,10 +1,12 @@
 'use server';
 
 import { redirect } from 'next/navigation';
+import { revalidatePath } from 'next/cache';
 import { headers } from 'next/headers';
 import { z } from 'zod';
 import { prisma } from '@vtk/db';
 import { signInEmail, signOut } from '@vtk/auth/server';
+import { saveError, saveOk, type SaveState } from '@/lib/saveState';
 
 const loginSchema = z.object({
   email: z.string().email(),
@@ -61,14 +63,13 @@ const updateProfileSchema = z.object({
   locale: z.enum(['NL', 'EN']),
 });
 
-export async function updateProfileAction(
-  userId: string,
-  formData: FormData
-): Promise<{ ok: boolean; error?: string }> {
+export async function updateProfileAction(userId: string, formData: FormData): Promise<SaveState> {
   const parsed = updateProfileSchema.safeParse({
     locale: String(formData.get('locale') || 'NL'),
   });
-  if (!parsed.success) return { ok: false, error: 'Invalid input' };
+  if (!parsed.success) return saveError('INVALID_LOCALE');
   await prisma.user.update({ where: { id: userId }, data: parsed.data });
-  return { ok: true };
+  // De taalkeuze stuurt de weergave van het ledenportaal aan.
+  revalidatePath('/account');
+  return saveOk();
 }

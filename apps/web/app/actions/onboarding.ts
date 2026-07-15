@@ -8,6 +8,7 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "@vtk/db";
 import { newStorageKey, putObject, deleteObject } from "@vtk/storage";
 import { requireSession } from "@/lib/session";
+import { saveError, saveOk, type SaveState } from "@/lib/saveState";
 import { currentWorkingYear } from "@/lib/workingYear";
 import { fullName } from "@vtk/auth";
 import {
@@ -96,12 +97,27 @@ async function storeAvatar(file: File | null): Promise<string | null> {
   return key;
 }
 
+/** Fouten die het lid zelf kan oplossen; `ProfileForm` vertaalt ze naar een toast. */
+export type ProfileErrorCode =
+  | "INVALID_PROFILE"
+  | "RNUMBER_TAKEN"
+  | "AVATAR_TOO_LARGE"
+  | "AVATAR_FAILED";
+
 /**
  * Save the onboarding / profile fields for the current member. On first
  * completion this stamps `onboardedAt`, which lifts the onboarding gate.
- * Redirects to `next` (onboarding) or returns silently (account edit).
+ * Redirects to `next` (onboarding) or returns a result the form can surface as
+ * a toast (account edit).
+ *
+ * Verwachte invoerfouten komen als `status: "error"` terug in plaats van als
+ * throw: een lid dat een r-nummer hergebruikt hoort een melding te zien, geen
+ * error boundary. Onverwachte serverfouten blijven wel gooien.
  */
-export async function saveProfileAction(formData: FormData): Promise<void> {
+export async function saveProfileAction(
+  _prevState: SaveState,
+  formData: FormData,
+): Promise<SaveState> {
   const session = await requireSession();
 
   const parsed = profileSchema.safeParse({
@@ -121,13 +137,22 @@ export async function saveProfileAction(formData: FormData): Promise<void> {
   });
 
   if (!parsed.success) {
-    // Bubble a compact error the client boundary can surface.
-    throw new Error("INVALID_PROFILE");
+    return saveError("INVALID_PROFILE" satisfies ProfileErrorCode);
   }
   const data = parsed.data;
 
   const file = formData.get("photo");
-  const newAvatarKey = await storeAvatar(file instanceof File ? file : null);
+  let newAvatarKey: string | null = null;
+  try {
+    newAvatarKey = await storeAvatar(file instanceof File ? file : null);
+  } catch (err) {
+    // Te groot is een invoerfout; een kapotte upload of onbereikbare S3 valt
+    // hier ook binnen en mag het lid niet op een crashpagina zetten.
+    const tooLarge = err instanceof Error && err.message === "AVATAR_TOO_LARGE";
+    return saveError(
+      (tooLarge ? "AVATAR_TOO_LARGE" : "AVATAR_FAILED") satisfies ProfileErrorCode,
+    );
+  }
 
   const wasOnboarded = session.user.onboarded;
   const previousAvatarKey = session.user.avatarKey;
@@ -169,8 +194,10 @@ export async function saveProfileAction(formData: FormData): Promise<void> {
       err.code === "P2002" &&
       String(err.meta?.target ?? "").includes("rNumber")
     ) {
-      throw new Error("RNUMBER_TAKEN");
+      return saveError("RNUMBER_TAKEN" satisfies ProfileErrorCode);
     }
+    // Onverwachte serverfouten blijven gooien: die horen in de error boundary
+    // en in de monitoring, niet in een toast die "probeer opnieuw" suggereert.
     throw err;
   }
 
@@ -184,8 +211,12 @@ export async function saveProfileAction(formData: FormData): Promise<void> {
   revalidatePath("/pocs");
   revalidatePath("/account");
 
+  // Buiten elke try/catch: redirect() werkt via een throw en mag niet als
+  // "onverwachte fout" opgevangen worden.
   const next = safeNext(formData);
   if (next) redirect(next);
+
+  return saveOk();
 }
 
 const confirmStudySchema = z.object(studySchema);

@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
+import { Prisma } from "@prisma/client";
 import { prisma } from "@vtk/db";
 import {
   createUser,
@@ -12,7 +13,17 @@ import {
 } from "@vtk/auth/server";
 import { hasPermission, fullName, splitFullName } from "@vtk/auth";
 import { requirePermission, requireSession } from "@/lib/session";
+import { saveError, saveOk, type SaveState } from "@/lib/saveState";
 import { currentWorkingYear } from "@/lib/workingYear";
+
+/** `P2002` op een bepaald veld: de unieke constraint die Prisma noemt. */
+function isUniqueViolation(err: unknown, field: string): boolean {
+  return (
+    err instanceof Prisma.PrismaClientKnownRequestError &&
+    err.code === "P2002" &&
+    String(err.meta?.target ?? "").includes(field)
+  );
+}
 
 // ---- Users ------------------------------------------------------------------
 
@@ -27,9 +38,9 @@ const userSchema = z.object({
   isSuperAdmin: z.coerce.boolean().default(false),
 });
 
-export async function saveUserAction(formData: FormData): Promise<void> {
+export async function saveUserAction(_prev: SaveState, formData: FormData): Promise<SaveState> {
   const session = await requirePermission("users.edit");
-  const parsed = userSchema.parse({
+  const result = userSchema.safeParse({
     id: (formData.get("id") as string) || undefined,
     email: String(formData.get("email")).toLowerCase().trim(),
     firstName: formData.get("firstName"),
@@ -39,47 +50,56 @@ export async function saveUserAction(formData: FormData): Promise<void> {
     active: formData.get("active") === "on",
     isSuperAdmin: formData.get("isSuperAdmin") === "on",
   });
+  if (!result.success) return saveError("INVALID_INPUT");
+  const parsed = result.data;
   // De weergavenaam blijft afgeleid van voor- + achternaam.
   const name = fullName(parsed.firstName, parsed.lastName);
 
-  if (parsed.id) {
-    await updateUser(session, parsed.id, {
-      email: parsed.email,
-      name,
-      firstName: parsed.firstName,
-      lastName: parsed.lastName,
-      locale: parsed.locale,
-      active: parsed.active,
-      isSuperAdmin: parsed.isSuperAdmin,
-    });
-    if (parsed.password && parsed.password.length > 0) {
-      await setUserPassword(session, parsed.id, parsed.password);
+  try {
+    if (parsed.id) {
+      await updateUser(session, parsed.id, {
+        email: parsed.email,
+        name,
+        firstName: parsed.firstName,
+        lastName: parsed.lastName,
+        locale: parsed.locale,
+        active: parsed.active,
+        isSuperAdmin: parsed.isSuperAdmin,
+      });
+      if (parsed.password && parsed.password.length > 0) {
+        await setUserPassword(session, parsed.id, parsed.password);
+      }
+    } else {
+      if (!parsed.password) return saveError("PASSWORD_REQUIRED");
+      await createUser(session, {
+        email: parsed.email,
+        name,
+        firstName: parsed.firstName,
+        lastName: parsed.lastName,
+        password: parsed.password,
+        locale: parsed.locale,
+        active: parsed.active,
+        isSuperAdmin: parsed.isSuperAdmin,
+      });
     }
-  } else {
-    if (!parsed.password) {
-      throw new Error("Password is required for new users");
-    }
-    await createUser(session, {
-      email: parsed.email,
-      name,
-      firstName: parsed.firstName,
-      lastName: parsed.lastName,
-      password: parsed.password,
-      locale: parsed.locale,
-      active: parsed.active,
-      isSuperAdmin: parsed.isSuperAdmin,
-    });
-  }
 
-  // rNumber zit niet in createUser/updateUser; enkel bijwerken wanneer het veld
-  // effectief in het formulier zat (lege waarde = wissen).
-  if (formData.has("rNumber")) {
-    const rNumber = String(formData.get("rNumber") ?? "").trim() || null;
-    await prisma.user.update({ where: { email: parsed.email }, data: { rNumber } });
+    // rNumber zit niet in createUser/updateUser; enkel bijwerken wanneer het veld
+    // effectief in het formulier zat (lege waarde = wissen).
+    if (formData.has("rNumber")) {
+      const rNumber = String(formData.get("rNumber") ?? "").trim() || null;
+      await prisma.user.update({ where: { email: parsed.email }, data: { rNumber } });
+    }
+  } catch (err) {
+    if (isUniqueViolation(err, "email")) return saveError("EMAIL_TAKEN");
+    if (isUniqueViolation(err, "rNumber")) return saveError("RNUMBER_TAKEN");
+    throw err;
   }
 
   revalidatePath("/admin/gebruikers");
-  redirect("/admin/gebruikers");
+  if (parsed.id) revalidatePath(`/admin/gebruikers/${parsed.id}`);
+  // Geen redirect: het formulier staat op de lijstpagina (nieuw) of op de
+  // detailpagina (bewerken); in beide gevallen blijf je waar je bent.
+  return saveOk();
 }
 
 export async function deleteUserAction(formData: FormData): Promise<void> {

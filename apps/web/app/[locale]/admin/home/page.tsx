@@ -3,8 +3,9 @@ import { prisma } from "@vtk/db";
 import { notFound } from "next/navigation";
 import { hasLocale } from "@/lib/locale";
 import { requirePermission } from "@/lib/session";
-import type { Locale } from "@vtk/i18n";
-import { Button, Card, Input, Label, Select, Textarea } from "@vtk/ui";
+import { getDictionary, type Locale } from "@vtk/i18n";
+import { Card, Input, Label, Select, Textarea } from "@vtk/ui";
+import { SaveForm } from "@/components/ui/SaveForm";
 import {
   saveOpeningHoursAction,
   saveCareerAction,
@@ -26,6 +27,7 @@ export default async function AdminHome({
   if (!hasLocale(localeParam)) notFound();
   const locale: Locale = localeParam;
   await requirePermission("home.edit");
+  const dict = getDictionary(locale);
 
   const base = locale === "nl" ? "" : "/en";
   const rows = await prisma.setting.findMany({
@@ -54,7 +56,14 @@ export default async function AdminHome({
         <h2 className="font-semibold mb-3">
           {locale === "nl" ? "Openingsuren" : "Opening hours"} – Cursusdienst
         </h2>
-        <form action={saveOpeningHoursAction} className="space-y-2">
+        <SaveForm
+          action={saveOpeningHoursAction}
+          className="space-y-2"
+          submitLabel={dict.admin.save}
+          savingLabel={dict.common.saving}
+          savedMessage={dict.common.saved}
+          fallbackErrorMessage={dict.common.saveError}
+        >
           <input type="hidden" name="key" value="home.openingHours.cursusdienst" />
           <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
             <div><Label>Title (NL)</Label><Input name="titleNl" defaultValue={cursus.titleNl} /></div>
@@ -75,8 +84,7 @@ export default async function AdminHome({
               })}
             </tbody>
           </table>
-          <Button type="submit">{locale === "nl" ? "Opslaan" : "Save"}</Button>
-        </form>
+        </SaveForm>
       </Card>
 
       <Card className="p-5">
@@ -106,7 +114,14 @@ export default async function AdminHome({
 
       <Card className="p-5">
         <h2 className="font-semibold mb-3">VTK Career</h2>
-        <form action={saveCareerAction} className="space-y-2">
+        <SaveForm
+          action={saveCareerAction}
+          className="space-y-2"
+          submitLabel={dict.admin.save}
+          savingLabel={dict.common.saving}
+          savedMessage={dict.common.saved}
+          fallbackErrorMessage={dict.common.saveError}
+        >
           <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
             <div><Label>Title (NL)</Label><Input name="titleNl" defaultValue={career.titleNl} /></div>
             <div><Label>Title (EN)</Label><Input name="titleEn" defaultValue={career.titleEn} /></div>
@@ -116,15 +131,21 @@ export default async function AdminHome({
             <div><Label>CTA label (EN)</Label><Input name="ctaLabelEn" defaultValue={career.ctaLabelEn ?? ""} /></div>
             <div className="md:col-span-2"><Label>CTA URL</Label><Input name="ctaUrl" defaultValue={career.ctaUrl ?? ""} /></div>
           </div>
-          <Button type="submit">{locale === "nl" ? "Opslaan" : "Save"}</Button>
-        </form>
+        </SaveForm>
       </Card>
 
       <Card className="p-5">
         <h2 className="font-semibold mb-3">
           {locale === "nl" ? "Aftermovies & sfeerbeelden" : "Aftermovies & photos"}
         </h2>
-        <form action={saveAftermoviesAction} className="space-y-2">
+        <SaveForm
+          action={saveAftermoviesAction}
+          className="space-y-2"
+          submitLabel={dict.admin.save}
+          savingLabel={dict.common.saving}
+          savedMessage={dict.common.saved}
+          fallbackErrorMessage={dict.common.saveError}
+        >
           <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
             <div><Label>Title (NL)</Label><Input name="titleNl" defaultValue={after.titleNl} /></div>
             <div><Label>Title (EN)</Label><Input name="titleEn" defaultValue={after.titleEn} /></div>
@@ -150,19 +171,24 @@ export default async function AdminHome({
               })}
             </tbody>
           </table>
-          <Button type="submit">{locale === "nl" ? "Opslaan" : "Save"}</Button>
-        </form>
+        </SaveForm>
       </Card>
 
       <Card className="p-5">
         <h2 className="font-semibold mb-3">
           {locale === "nl" ? "Uitgelichte albums" : "Featured albums"}
         </h2>
-        <form action={saveFeaturedAlbumsAction} className="space-y-2">
+        <SaveForm
+          action={saveFeaturedAlbumsAction}
+          className="space-y-2"
+          submitLabel={dict.admin.save}
+          savingLabel={dict.common.saving}
+          savedMessage={dict.common.saved}
+          fallbackErrorMessage={dict.common.saveError}
+        >
           <Label>{locale === "nl" ? "Slugs (komma-gescheiden)" : "Slugs (comma-separated)"}</Label>
           <Input name="albumSlugs" defaultValue={featured.albumSlugs.join(", ")} placeholder="galabal-2026, cantus-2026" />
-          <Button type="submit">{locale === "nl" ? "Opslaan" : "Save"}</Button>
-        </form>
+        </SaveForm>
       </Card>
     </div>
   );

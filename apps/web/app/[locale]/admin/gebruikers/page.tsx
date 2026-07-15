@@ -1,12 +1,15 @@
-import Link from "next/link";
 import { prisma } from "@vtk/db";
 import { notFound } from "next/navigation";
 import { hasLocale } from "@/lib/locale";
 import { requirePermission } from "@/lib/session";
-import type { Locale } from "@vtk/i18n";
+import { getDictionary, type Locale } from "@vtk/i18n";
 import { Button, Card, Input, Label, Select } from "@vtk/ui";
+import { IconLink, RowActions } from "@/components/ui/IconButton";
+import { PencilIcon } from "@/components/ui/icons";
+import { SaveForm } from "@/components/ui/SaveForm";
 import { saveUserAction } from "@/app/actions/users-groups";
 import { BulkImport } from "./BulkImport";
+import { userErrorMessages } from "./messages";
 
 export default async function AdminUsers({
   params,
@@ -20,6 +23,7 @@ export default async function AdminUsers({
   if (!hasLocale(localeParam)) notFound();
   const locale: Locale = localeParam;
   const session = await requirePermission("users.view");
+  const dict = getDictionary(locale);
   const canEdit = session.user.isSuperAdmin || session.permissions.includes("users.edit");
   const base = locale === "nl" ? "" : "/en";
 
@@ -50,7 +54,15 @@ export default async function AdminUsers({
       {canEdit && (
         <Card className="p-5">
           <h2 className="font-semibold mb-3">{locale === "nl" ? "Nieuwe gebruiker" : "New user"}</h2>
-          <form action={saveUserAction} className="grid grid-cols-1 md:grid-cols-4 gap-3 items-end">
+          <SaveForm
+            action={saveUserAction}
+            className="grid grid-cols-1 md:grid-cols-4 gap-3 items-end [&>button]:justify-self-start"
+            submitLabel={locale === "nl" ? "Aanmaken" : "Create"}
+            savingLabel={dict.common.saving}
+            savedMessage={locale === "nl" ? "Gebruiker aangemaakt" : "User created"}
+            errorMessages={userErrorMessages(locale)}
+            fallbackErrorMessage={dict.common.saveError}
+          >
             <div><Label>{locale === "nl" ? "Voornaam" : "First name"}</Label><Input name="firstName" required /></div>
             <div><Label>{locale === "nl" ? "Achternaam" : "Last name"}</Label><Input name="lastName" required /></div>
             <div><Label>Email</Label><Input name="email" type="email" required /></div>
@@ -69,9 +81,8 @@ export default async function AdminUsers({
                 <input type="checkbox" name="isSuperAdmin" />
                 Superadmin
               </label>
-              <Button type="submit">{locale === "nl" ? "Aanmaken" : "Create"}</Button>
             </div>
-          </form>
+          </SaveForm>
         </Card>
       )}
 
@@ -112,9 +123,15 @@ export default async function AdminUsers({
                   {u.memberships.map((m) => m.group.code).join(", ") || "—"}
                 </td>
                 <td className="px-4 py-2 text-right">
-                  <Link href={`${base}/admin/gebruikers/${u.id}`} className="text-vtk-blue hover:underline">
-                    {locale === "nl" ? "Bewerken" : "Edit"}
-                  </Link>
+                  <RowActions>
+                    <IconLink
+                      href={`${base}/admin/gebruikers/${u.id}`}
+                      label={locale === "nl" ? "Bewerken" : "Edit"}
+                      srLabel={`${locale === "nl" ? "Bewerken" : "Edit"}: ${u.name}`}
+                    >
+                      <PencilIcon />
+                    </IconLink>
+                  </RowActions>
                 </td>
               </tr>
             ))}

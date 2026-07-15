@@ -2,9 +2,12 @@ import { prisma } from "@vtk/db";
 import { notFound } from "next/navigation";
 import { hasLocale } from "@/lib/locale";
 import { requirePermission } from "@/lib/session";
-import type { Locale } from "@vtk/i18n";
+import { getDictionary, type Locale } from "@vtk/i18n";
 import { nameParts } from "@vtk/auth";
 import { Button, Card, Input, Label, Select } from "@vtk/ui";
+import { DeleteButton, DeleteIconButton } from "@/components/ui/DeleteIconButton";
+import { SaveForm } from "@/components/ui/SaveForm";
+import { userErrorMessages } from "../messages";
 import {
   addMembershipAction,
   deleteUserAction,
@@ -22,6 +25,7 @@ export default async function EditUserPage({
   if (!hasLocale(localeParam)) notFound();
   const locale: Locale = localeParam;
   await requirePermission("users.edit");
+  const dict = getDictionary(locale);
 
   const [user, groups] = await Promise.all([
     prisma.user.findUnique({
@@ -40,7 +44,15 @@ export default async function EditUserPage({
     <div className="space-y-6">
       <h1 className="text-2xl font-semibold">{user.name}</h1>
       <Card className="p-5">
-        <form action={saveUserAction} className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <SaveForm
+          action={saveUserAction}
+          className="grid grid-cols-1 md:grid-cols-2 gap-3 [&>button]:justify-self-start"
+          submitLabel={dict.admin.save}
+          savingLabel={dict.common.saving}
+          savedMessage={dict.common.saved}
+          errorMessages={userErrorMessages(locale)}
+          fallbackErrorMessage={dict.common.saveError}
+        >
           <input type="hidden" name="id" value={user.id} />
           <div><Label>{locale === "nl" ? "Voornaam" : "First name"}</Label><Input name="firstName" defaultValue={parts.firstName} required /></div>
           <div><Label>{locale === "nl" ? "Achternaam" : "Last name"}</Label><Input name="lastName" defaultValue={parts.lastName} required /></div>
@@ -57,9 +69,8 @@ export default async function EditUserPage({
           <div className="md:col-span-2 flex items-center gap-4">
             <label className="inline-flex items-center gap-2 text-sm"><input type="checkbox" name="active" defaultChecked={user.active} />Active</label>
             <label className="inline-flex items-center gap-2 text-sm"><input type="checkbox" name="isSuperAdmin" defaultChecked={user.isSuperAdmin} />Superadmin</label>
-            <Button type="submit">{locale === "nl" ? "Opslaan" : "Save"}</Button>
           </div>
-        </form>
+        </SaveForm>
       </Card>
 
       <Card className="p-5 space-y-4">
@@ -72,11 +83,21 @@ export default async function EditUserPage({
                 {m.titleNl ? ` · ${m.titleNl}` : ""}
                 {m.year ? ` · ${m.year}` : ""}
               </span>
-              <form action={removeMembershipAction}>
-                <input type="hidden" name="id" value={m.id} />
-                <input type="hidden" name="userId" value={user.id} />
-                <Button variant="ghost" size="sm" type="submit">{locale === "nl" ? "Verwijder" : "Remove"}</Button>
-              </form>
+              <DeleteIconButton
+                action={removeMembershipAction}
+                fields={{ id: m.id, userId: user.id }}
+                label={locale === "nl" ? "Verwijderen" : "Remove"}
+                srLabel={`${locale === "nl" ? "Verwijderen" : "Remove"}: ${m.group.nameNl}`}
+                title={locale === "nl" ? "Lidmaatschap verwijderen?" : "Remove membership?"}
+                description={
+                  locale === "nl"
+                    ? `${user.name} wordt verwijderd uit ${m.group.nameNl}${m.year ? ` (${m.year})` : ""}. Rechten die via deze post kwamen, vervallen daarmee.`
+                    : `${user.name} will be removed from ${m.group.nameNl}${m.year ? ` (${m.year})` : ""}. Permissions granted through this group will be lost.`
+                }
+                confirmLabel={locale === "nl" ? "Verwijderen" : "Remove"}
+                cancelLabel={locale === "nl" ? "Annuleren" : "Cancel"}
+                successMessage={locale === "nl" ? "Lidmaatschap verwijderd" : "Membership removed"}
+              />
             </li>
           ))}
           {user.memberships.length === 0 && <li className="py-2 text-sm text-zinc-500">—</li>}
@@ -103,10 +124,22 @@ export default async function EditUserPage({
         </form>
       </Card>
 
-      <form action={deleteUserAction}>
-        <input type="hidden" name="id" value={user.id} />
-        <Button variant="danger" type="submit">{locale === "nl" ? "Gebruiker verwijderen" : "Delete user"}</Button>
-      </form>
+      <DeleteButton
+        action={deleteUserAction}
+        fields={{ id: user.id }}
+        title={locale === "nl" ? "Gebruiker verwijderen?" : "Delete user?"}
+        description={
+          locale === "nl"
+            ? `Het account van ${user.name} (${user.email}) wordt permanent verwijderd, samen met ${user.memberships.length} lidmaatschap(pen). Dit kan niet ongedaan gemaakt worden. Overweeg het account op inactief te zetten als je de historiek wil bewaren.`
+            : `The account of ${user.name} (${user.email}) will be permanently deleted, along with ${user.memberships.length} membership(s). This cannot be undone. Consider deactivating the account instead if you want to keep the history.`
+        }
+        confirmLabel={locale === "nl" ? "Verwijderen" : "Delete"}
+        cancelLabel={locale === "nl" ? "Annuleren" : "Cancel"}
+        // Geen toast: deze action redirect naar de gebruikerslijst, want deze
+        // pagina bestaat nadien niet meer. Die navigatie is de bevestiging.
+      >
+        {locale === "nl" ? "Gebruiker verwijderen" : "Delete user"}
+      </DeleteButton>
     </div>
   );
 }

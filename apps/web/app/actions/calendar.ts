@@ -93,5 +93,7 @@ export async function deleteEventAction(formData: FormData): Promise<void> {
   await assertCanManageEvent(userGroupIds, evt.groupId, superOrAll);
   await prisma.calendarEvent.delete({ where: { id } });
   revalidatePath("/kalender");
-  redirect("/admin/kalender");
+  // Geen redirect: de lijst ververst ter plaatse, zodat de gekozen filter
+  // (aankomend/verleden) blijft staan.
+  revalidatePath("/admin/kalender");
 }

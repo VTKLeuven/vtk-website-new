@@ -63,6 +63,10 @@ async function main() {
   }
 
   console.log("Seeding header tabs...");
+  // HEADER_TABS is de bron van waarheid voor de standaardtabs: een reseed zet ook
+  // intro en CTA terug, zodat bv. de cudi-knop op /cursusdienst uit data komt en
+  // niet uit een hardcoded branch. Eigen aanpassingen in /admin/inhoud aan deze
+  // velden worden daarmee wel overschreven bij een reseed.
   for (const tab of HEADER_TABS) {
     await prisma.headerTab.upsert({
       where: { code: tab.code },
@@ -72,6 +76,11 @@ async function main() {
         labelEn: tab.labelEn,
         order: tab.order,
         visible: true,
+        introNl: tab.introNl ?? null,
+        introEn: tab.introEn ?? null,
+        ctaLabelNl: tab.ctaLabelNl ?? null,
+        ctaLabelEn: tab.ctaLabelEn ?? null,
+        ctaUrl: tab.ctaUrl ?? null,
       },
       create: tab,
     });

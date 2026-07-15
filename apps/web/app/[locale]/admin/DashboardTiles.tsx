@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useRef, useState, useTransition } from "react";
+import { ConfirmDialog } from "@vtk/ui";
 import {
   TILE_COLORS,
   TILE_ICONS,
@@ -98,6 +99,7 @@ export function DashboardTiles({
 }) {
   const t = T[locale];
   const [editing, setEditing] = useState(false);
+  const [resetting, setResetting] = useState(false);
   const [list, setList] = useState<EffectiveTile[]>(tiles);
   const [editor, setEditor] = useState<EditorState>(null);
   const [pending, startTransition] = useTransition();
@@ -157,8 +159,10 @@ export function DashboardTiles({
   }
 
   function resetLayout() {
-    if (!confirm(t.resetConfirm)) return;
-    startTransition(() => resetLayoutAction());
+    startTransition(async () => {
+      await resetLayoutAction();
+      setResetting(false);
+    });
   }
 
   const visible = editing ? list : list.filter((x) => !x.hidden);
@@ -172,7 +176,7 @@ export function DashboardTiles({
               <button type="button" className="vtk-tile-btn" onClick={() => setEditor({ mode: "add" })}>
                 + {t.addTile}
               </button>
-              <button type="button" className="vtk-tile-btn" onClick={resetLayout}>
+              <button type="button" className="vtk-tile-btn" onClick={() => setResetting(true)}>
                 {t.resetLayout}
               </button>
               {manageHref && (
@@ -287,6 +291,17 @@ export function DashboardTiles({
           }}
         />
       )}
+
+      <ConfirmDialog
+        open={resetting}
+        title={t.resetLayout}
+        description={t.resetConfirm}
+        confirmLabel={t.resetLayout}
+        cancelLabel={t.cancel}
+        pending={pending}
+        onConfirm={resetLayout}
+        onCancel={() => setResetting(false)}
+      />
     </div>
   );
 }

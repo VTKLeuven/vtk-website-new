@@ -2,7 +2,10 @@
 
 import { useRef, useState, useTransition } from "react";
 import { Button, ConfirmDialog, Input, Label } from "@vtk/ui";
+import { getDictionary } from "@vtk/i18n";
 import { PartnerLogo } from "@/components/site/PartnerLogo";
+import { SaveForm } from "@/components/ui/SaveForm";
+import { saveErrorMessages } from "@/lib/saveMessages";
 import {
   deletePartnerAction,
   reorderPartnersAction,
@@ -133,6 +136,7 @@ function EditPartnerModal({
   onClose: () => void;
 }) {
   const nl = locale === "nl";
+  const dict = getDictionary(locale);
   const [logoKey, setLogoKey] = useState(partner.logoKey);
   const [previewUrl, setPreviewUrl] = useState<string | null>(partner.logoUrl);
   const [uploading, setUploading] = useState(false);
@@ -179,7 +183,19 @@ function EditPartnerModal({
           </button>
         </div>
 
-        <form action={savePartnerAction} className="space-y-4">
+        <SaveForm
+          action={savePartnerAction}
+          className="space-y-4"
+          submitLabel={dict.admin.save}
+          savingLabel={dict.common.saving}
+          savedMessage={dict.common.saved}
+          errorMessages={saveErrorMessages(locale)}
+          fallbackErrorMessage={dict.common.saveError}
+          submitDisabled={uploading}
+          // De actie redirectte vroeger, wat de modal sloot; nu ververst ze ter
+          // plaatse, dus sluiten we hem zelf.
+          onSuccess={onClose}
+        >
           <input type="hidden" name="id" value={partner.id} />
           <input type="hidden" name="logoKey" value={logoKey} />
 
@@ -223,13 +239,11 @@ function EditPartnerModal({
             {nl ? "Actief" : "Active"}
           </label>
 
-          <div className="flex items-center justify-between pt-2">
-            <Button type="submit" disabled={uploading}>
-              {nl ? "Opslaan" : "Save"}
-            </Button>
-            <DeletePartnerButton locale={locale} id={partner.id} name={partner.name} />
-          </div>
-        </form>
+        </SaveForm>
+
+        <div className="mt-4 flex justify-end border-t border-vtk-blue/10 pt-4">
+          <DeletePartnerButton locale={locale} id={partner.id} name={partner.name} />
+        </div>
       </div>
     </div>
   );

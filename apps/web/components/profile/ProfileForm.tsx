@@ -1,11 +1,12 @@
 import type { User } from "@prisma/client";
-import { Button, Input, Label } from "@vtk/ui";
+import { Input, Label } from "@vtk/ui";
 import { getDictionary, type Locale } from "@vtk/i18n";
 import { nameParts } from "@vtk/auth";
 import { publicUrl } from "@/lib/storage";
 import { MAIL_CATEGORIES, R_NUMBER_PATTERN } from "@/lib/profile";
-import { saveProfileAction } from "@/app/actions/onboarding";
 import { CheckboxChip, StudyFieldset } from "./StudyFieldset";
+import { SaveForm } from "@/components/ui/SaveForm";
+import { saveProfileAction, type ProfileErrorCode } from "@/app/actions/onboarding";
 
 function dateInputValue(date: Date | null): string {
   if (!date) return "";
@@ -16,8 +17,9 @@ function dateInputValue(date: Date | null): string {
  * Onboarding / account profile form. Renders the kot address, birth date,
  * contact emails + communication preference + opt-in mailing lists, the study
  * years and programmes, and an optional profile picture. Posts to
- * {@link saveProfileAction}. Pass `next` to redirect after saving (onboarding);
- * omit it to stay on the page (account).
+ * {@link saveProfileAction} via {@link SaveForm}, dat de uitkomst als toast
+ * toont. Pass `next` to redirect after saving (onboarding); omit it to stay on
+ * the page (account), waar de toast de enige bevestiging is.
  */
 export function ProfileForm({
   locale,
@@ -57,8 +59,24 @@ export function ProfileForm({
   const { firstName, lastName } = nameParts(user);
   const selectedCategories = new Set(user.mailCategories);
 
+  const common = getDictionary(locale).common;
+  const errorMessages: Record<ProfileErrorCode, string> = {
+    INVALID_PROFILE: t.errorInvalid,
+    RNUMBER_TAKEN: t.errorRnumberTaken,
+    AVATAR_TOO_LARGE: t.errorAvatarTooLarge,
+    AVATAR_FAILED: t.errorAvatarFailed,
+  };
+
   return (
-    <form action={saveProfileAction} className="space-y-8">
+    <SaveForm
+      action={saveProfileAction}
+      className="space-y-8"
+      submitLabel={submitLabel}
+      savingLabel={common.saving}
+      savedMessage={t.saved}
+      errorMessages={errorMessages}
+      fallbackErrorMessage={common.saveError}
+    >
       {next ? <input type="hidden" name="next" value={next} /> : null}
 
       {/* Naam & studentennummer */}
@@ -219,8 +237,6 @@ export function ProfileForm({
           />
         </div>
       </fieldset>
-
-      <Button type="submit">{submitLabel}</Button>
-    </form>
+    </SaveForm>
   );
 }

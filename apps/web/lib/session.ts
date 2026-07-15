@@ -29,6 +29,22 @@ export async function requirePermission(permission: string) {
 }
 
 /**
+ * Toegang zodra de gebruiker één van de rechten heeft. Voor schermen die meerdere
+ * rechten bundelen (bv. /admin/inhoud met `pages.edit` én `header.manage`); gate
+ * de onderdelen daar zelf nog per recht.
+ */
+export async function requireAnyPermission(permissions: string[]) {
+  const session = await requireSession();
+  if (
+    !session.user.isSuperAdmin &&
+    !permissions.some((p) => session.permissions.includes(p))
+  ) {
+    throw new Error('FORBIDDEN');
+  }
+  return session;
+}
+
+/**
  * Zet een gegooide auth-fout uit {@link requirePermission}/`requireSession` om in
  * een JSON-response. `FORBIDDEN` wordt 403, al de rest (o.a. `UNAUTHENTICATED`) 401.
  */

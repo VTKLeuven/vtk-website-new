@@ -1,6 +1,9 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { ConfirmDialog } from "@vtk/ui";
+import { IconButton } from "@/components/ui/IconButton";
+import { PencilIcon, TrashIcon } from "@/components/ui/icons";
 import {
   TILE_COLORS,
   TILE_ICONS,
@@ -34,7 +37,9 @@ const T = {
     addTile: "Tegel toevoegen",
     edit: "Bewerken",
     remove: "Verwijderen",
-    removeConfirm: "Deze tegel voor iedereen verwijderen?",
+    removeTile: "Tegel verwijderen?",
+    removeConfirm: (label: string) =>
+      `"${label}" verdwijnt van het dashboard van iedereen die de tegel ziet. Dit kan niet ongedaan gemaakt worden.`,
     label: "Naam",
     url: "URL",
     icon: "Pictogram",
@@ -54,7 +59,9 @@ const T = {
     addTile: "Add tile",
     edit: "Edit",
     remove: "Remove",
-    removeConfirm: "Remove this tile for everyone?",
+    removeTile: "Remove tile?",
+    removeConfirm: (label: string) =>
+      `"${label}" will disappear from the dashboard of everyone who sees it. This cannot be undone.`,
     label: "Name",
     url: "URL",
     icon: "Icon",
@@ -84,11 +91,14 @@ export function DefaultTilesManager({
 }) {
   const t = T[locale];
   const [editor, setEditor] = useState<EditorState>(null);
+  const [removing, setRemoving] = useState<SimpleTile | null>(null);
   const [pending, startTransition] = useTransition();
 
   function remove(tile: SimpleTile) {
-    if (!confirm(t.removeConfirm)) return;
-    startTransition(() => deleteDefaultTileAction(tile.id));
+    startTransition(async () => {
+      await deleteDefaultTileAction(tile.id);
+      setRemoving(null);
+    });
   }
 
   return (
@@ -107,7 +117,7 @@ export function DefaultTilesManager({
             + {t.addTile}
           </button>
         </div>
-        <TileList tiles={globalTiles} t={t} onEdit={(tile) => setEditor({ scope: "GLOBAL", groupId: null, tile })} onRemove={remove} />
+        <TileList tiles={globalTiles} t={t} onEdit={(tile) => setEditor({ scope: "GLOBAL", groupId: null, tile })} onRemove={setRemoving} />
       </section>
 
       <section className="vtk-tiles-section">
@@ -126,7 +136,7 @@ export function DefaultTilesManager({
                   + {t.addTile}
                 </button>
               </div>
-              <TileList tiles={g.tiles} t={t} onEdit={(tile) => setEditor({ scope: "GROUP", groupId: g.id, tile })} onRemove={remove} />
+              <TileList tiles={g.tiles} t={t} onEdit={(tile) => setEditor({ scope: "GROUP", groupId: g.id, tile })} onRemove={setRemoving} />
             </div>
           ))}
         </div>
@@ -151,6 +161,17 @@ export function DefaultTilesManager({
           }}
         />
       )}
+
+      <ConfirmDialog
+        open={removing !== null}
+        title={t.removeTile}
+        description={t.removeConfirm(removing?.label ?? "")}
+        confirmLabel={t.remove}
+        cancelLabel={t.cancel}
+        pending={pending}
+        onConfirm={() => removing && remove(removing)}
+        onCancel={() => setRemoving(null)}
+      />
     </div>
   );
 }
@@ -181,12 +202,17 @@ function TileList({
               <span className="text-zinc-500 text-xs">{tile.url}</span>
             </span>
             <span className="vtk-tiles-row-actions">
-              <button type="button" className="vtk-tile-btn" onClick={() => onEdit(tile)}>
-                {t.edit}
-              </button>
-              <button type="button" className="vtk-tile-btn" onClick={() => onRemove(tile)}>
-                {t.remove}
-              </button>
+              <IconButton label={t.edit} srLabel={`${t.edit}: ${tile.label}`} onClick={() => onEdit(tile)}>
+                <PencilIcon />
+              </IconButton>
+              <IconButton
+                label={t.remove}
+                srLabel={`${t.remove}: ${tile.label}`}
+                tone="danger"
+                onClick={() => onRemove(tile)}
+              >
+                <TrashIcon />
+              </IconButton>
             </span>
           </li>
         );

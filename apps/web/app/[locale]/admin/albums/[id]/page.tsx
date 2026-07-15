@@ -4,6 +4,9 @@ import { hasLocale } from "@/lib/locale";
 import { requirePermission } from "@/lib/session";
 import type { Locale } from "@vtk/i18n";
 import { Button, Card, Input, Label, Textarea } from "@vtk/ui";
+import { IconButton } from "@/components/ui/IconButton";
+import { StarIcon } from "@/components/ui/icons";
+import { DeleteButton, DeleteIconButton } from "@/components/ui/DeleteIconButton";
 import { deleteAlbumAction, deletePhotoAction, saveAlbumAction, setAlbumCoverAction } from "@/app/actions/albums";
 import { publicUrl } from "@/lib/storage";
 import { PhotoUploader } from "./PhotoUploader";
@@ -67,21 +70,44 @@ export default async function AdminAlbumDetail({
                   alt=""
                   className="aspect-square w-full object-cover rounded"
                 />
-                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition rounded flex flex-col justify-end opacity-0 group-hover:opacity-100 p-1 gap-1 text-xs">
+                <div className="absolute inset-0 flex items-start justify-end gap-1 rounded bg-black/0 p-1 opacity-0 transition group-hover:bg-black/40 group-hover:opacity-100 focus-within:opacity-100">
                   <form action={setAlbumCoverAction}>
                     <input type="hidden" name="albumId" value={album.id} />
                     <input type="hidden" name="photoId" value={p.id} />
-                    <button className="w-full rounded bg-white/90 px-2 py-1 text-zinc-900" type="submit">
-                      {album.coverPhotoId === p.id ? "★ cover" : (locale === "nl" ? "Maak cover" : "Set cover")}
-                    </button>
+                    <IconButton
+                      type="submit"
+                      label={
+                        album.coverPhotoId === p.id
+                          ? locale === "nl"
+                            ? "Dit is de cover"
+                            : "This is the cover"
+                          : locale === "nl"
+                            ? "Maak cover"
+                            : "Set cover"
+                      }
+                      className={
+                        album.coverPhotoId === p.id
+                          ? "bg-vtk-yellow text-vtk-ink"
+                          : "bg-white/90 text-vtk-ink"
+                      }
+                    >
+                      <StarIcon />
+                    </IconButton>
                   </form>
-                  <form action={deletePhotoAction}>
-                    <input type="hidden" name="id" value={p.id} />
-                    <input type="hidden" name="albumId" value={album.id} />
-                    <button className="w-full rounded bg-red-600 px-2 py-1 text-white" type="submit">
-                      {locale === "nl" ? "Verwijder" : "Delete"}
-                    </button>
-                  </form>
+                  <DeleteIconButton
+                    action={deletePhotoAction}
+                    fields={{ id: p.id, albumId: album.id }}
+                    label={locale === "nl" ? "Foto verwijderen" : "Delete photo"}
+                    title={locale === "nl" ? "Foto verwijderen?" : "Delete photo?"}
+                    description={
+                      locale === "nl"
+                        ? "Deze foto wordt permanent uit het album en uit de opslag verwijderd. Dit kan niet ongedaan gemaakt worden."
+                        : "This photo will be permanently removed from the album and from storage. This cannot be undone."
+                    }
+                    confirmLabel={locale === "nl" ? "Verwijderen" : "Delete"}
+                    cancelLabel={locale === "nl" ? "Annuleren" : "Cancel"}
+                    successMessage={locale === "nl" ? "Foto verwijderd" : "Photo deleted"}
+                  />
                 </div>
               </li>
             ))}
@@ -89,12 +115,22 @@ export default async function AdminAlbumDetail({
         )}
       </Card>
 
-      <form action={deleteAlbumAction}>
-        <input type="hidden" name="id" value={album.id} />
-        <Button variant="danger" type="submit">
-          {locale === "nl" ? "Album verwijderen" : "Delete album"}
-        </Button>
-      </form>
+      <DeleteButton
+        action={deleteAlbumAction}
+        fields={{ id: album.id }}
+        title={locale === "nl" ? "Album verwijderen?" : "Delete album?"}
+        description={
+          locale === "nl"
+            ? `"${album.titleNl}" wordt permanent verwijderd, samen met alle ${album.photos.length} foto's erin. Dit kan niet ongedaan gemaakt worden.`
+            : `"${album.titleNl}" will be permanently deleted, along with all ${album.photos.length} photos in it. This cannot be undone.`
+        }
+        confirmLabel={locale === "nl" ? "Verwijderen" : "Delete"}
+        cancelLabel={locale === "nl" ? "Annuleren" : "Cancel"}
+        // Geen toast: deze action redirect naar de albumlijst, want deze pagina
+        // bestaat nadien niet meer.
+      >
+        {locale === "nl" ? "Album verwijderen" : "Delete album"}
+      </DeleteButton>
     </div>
   );
 }

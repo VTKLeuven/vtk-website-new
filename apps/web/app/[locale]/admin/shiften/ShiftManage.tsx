@@ -3,8 +3,10 @@ import { useMemo, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { format } from "date-fns";
 import type { Locale } from "@vtk/i18n";
-import { Button, Card, Input, Label, Select } from "@vtk/ui";
+import { Button, Card, ConfirmDialog, Input, Label, Select } from "@vtk/ui";
 import { useToast } from "@/components/ui/toast";
+import { IconButton, RowActions } from "@/components/ui/IconButton";
+import { PencilIcon, TrashIcon } from "@/components/ui/icons";
 import { ShiftEditModal } from "./ShiftEditModal";
 import type { AdminShift } from "./ShiftAdmin";
 
@@ -43,6 +45,7 @@ export function ShiftManage({
   const [editing, setEditing] = useState<AdminShift | null>(null);
   const [creating, setCreating] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState<AdminShift | null>(null);
 
   const rows = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -81,15 +84,15 @@ export function ShiftManage({
   const arrow = (key: SortKey) => (sort.key === key ? (sort.dir === "asc" ? " ↑" : " ↓") : "");
 
   async function deleteShift(id: string) {
-    if (!window.confirm(nl ? "Deze shift verwijderen?" : "Delete this shift?")) return;
     setBusyId(id);
     const resp = await fetch("/api/shift?id=" + id, { method: "DELETE" });
     setBusyId(null);
+    setDeleting(null);
     if (resp.ok) {
       showToast({ variant: "success", message: nl ? "Shift verwijderd." : "Shift deleted." });
       router.refresh();
     } else {
-      showToast({ variant: "error", message: nl ? "Verwijderen mislukt." : "Delete failed." });
+      showToast({ variant: "error", message: nl ? "Verwijderen mislukt." : "Delete failed.", duration: 0 });
     }
   }
 
@@ -168,18 +171,24 @@ export function ShiftManage({
                 </td>
                 <td className="px-4 py-2 text-zinc-500">{s.reward}</td>
                 <td className="px-4 py-2 text-right">
-                  <div className="flex justify-end gap-3">
-                    <button className="text-vtk-blue hover:underline" onClick={() => setEditing(s)}>
-                      {nl ? "Bewerken" : "Edit"}
-                    </button>
-                    <button
-                      className="text-red-600 hover:underline disabled:opacity-50"
-                      disabled={busyId === s.id}
-                      onClick={() => deleteShift(s.id)}
+                  <RowActions>
+                    <IconButton
+                      label={nl ? "Bewerken" : "Edit"}
+                      srLabel={`${nl ? "Bewerken" : "Edit"}: ${s.name}`}
+                      onClick={() => setEditing(s)}
                     >
-                      {nl ? "Verwijderen" : "Delete"}
-                    </button>
-                  </div>
+                      <PencilIcon />
+                    </IconButton>
+                    <IconButton
+                      label={nl ? "Verwijderen" : "Delete"}
+                      srLabel={`${nl ? "Verwijderen" : "Delete"}: ${s.name}`}
+                      tone="danger"
+                      disabled={busyId === s.id}
+                      onClick={() => setDeleting(s)}
+                    >
+                      <TrashIcon />
+                    </IconButton>
+                  </RowActions>
                 </td>
               </tr>
             ))}
@@ -210,6 +219,21 @@ export function ShiftManage({
           }}
         />
       )}
+
+      <ConfirmDialog
+        open={deleting !== null}
+        title={nl ? "Shift verwijderen?" : "Delete shift?"}
+        description={
+          nl
+            ? `"${deleting?.name}" wordt permanent verwijderd. ${deleting?.participants.length ?? 0} ingeschreven lid/leden verliezen hun inschrijving. Dit kan niet ongedaan gemaakt worden.`
+            : `"${deleting?.name}" will be permanently deleted. ${deleting?.participants.length ?? 0} registered member(s) will lose their registration. This cannot be undone.`
+        }
+        confirmLabel={nl ? "Verwijderen" : "Delete"}
+        cancelLabel={nl ? "Annuleren" : "Cancel"}
+        pending={busyId !== null}
+        onConfirm={() => deleting && deleteShift(deleting.id)}
+        onCancel={() => setDeleting(null)}
+      />
     </div>
   );
 }

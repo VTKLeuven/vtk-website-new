@@ -1,13 +1,16 @@
 "use client";
 
-import { useState, useTransition } from "react";
-import { Button, Input, Label } from "@vtk/ui";
+import { useState } from "react";
+import { Input, Label } from "@vtk/ui";
+import { getDictionary } from "@vtk/i18n";
+import { SaveForm } from "@/components/ui/SaveForm";
+import { saveErrorMessages } from "@/lib/saveMessages";
 import { savePartnerAction } from "@/app/actions/pocs-partners";
 
 export function NewPartnerForm({ locale }: { locale: "nl" | "en" }) {
   const [logoKey, setLogoKey] = useState("");
-  const [pending, startTransition] = useTransition();
   const [err, setErr] = useState<string | null>(null);
+  const dict = getDictionary(locale);
 
   async function onFile(file: File) {
     setErr(null);
@@ -24,7 +27,17 @@ export function NewPartnerForm({ locale }: { locale: "nl" | "en" }) {
   }
 
   return (
-    <form action={savePartnerAction} className="grid grid-cols-1 md:grid-cols-4 gap-3 items-end">
+    <SaveForm
+      action={savePartnerAction}
+      className="grid grid-cols-1 md:grid-cols-4 gap-3 items-end [&>button]:justify-self-start"
+      submitLabel={locale === "nl" ? "Toevoegen" : "Add"}
+      savingLabel={dict.common.saving}
+      savedMessage={locale === "nl" ? "Partner toegevoegd" : "Partner added"}
+      errorMessages={saveErrorMessages(locale)}
+      fallbackErrorMessage={dict.common.saveError}
+      submitDisabled={!logoKey}
+      onSuccess={() => setLogoKey("")}
+    >
       <input type="hidden" name="logoKey" value={logoKey} />
       <div>
         <Label>{locale === "nl" ? "Logo" : "Logo"}</Label>
@@ -42,15 +55,10 @@ export function NewPartnerForm({ locale }: { locale: "nl" | "en" }) {
       </div>
       <div><Label>Name</Label><Input name="name" required /></div>
       <div><Label>URL</Label><Input name="url" placeholder="https://..." /></div>
-      <div className="flex items-end gap-2">
-        <label className="inline-flex items-center gap-1 text-sm">
-          <input type="checkbox" name="active" defaultChecked />
-          {locale === "nl" ? "Actief" : "Active"}
-        </label>
-        <Button type="submit" disabled={!logoKey || pending}>
-          {locale === "nl" ? "Toevoegen" : "Add"}
-        </Button>
-      </div>
-    </form>
+      <label className="inline-flex items-center gap-1 self-end text-sm">
+        <input type="checkbox" name="active" defaultChecked />
+        {locale === "nl" ? "Actief" : "Active"}
+      </label>
+    </SaveForm>
   );
 }

@@ -1,13 +1,15 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { Button, ConfirmDialog } from "@vtk/ui";
+import { ConfirmDialog } from "@vtk/ui";
+import { IconButton } from "@/components/ui/IconButton";
+import { TrashIcon } from "@/components/ui/icons";
+import { useToast } from "@/components/ui/toast";
 import { removeMembershipAction } from "@/app/actions/users-groups";
 
 /**
- * Verwijdert een lid uit een post (voor het geselecteerde werkingsjaar). Toont
- * eerst een bevestigings-modal (zie CLAUDE.md > UX-conventies): geen kale
- * delete-knop of native confirm().
+ * Verwijdert een lid uit een post (voor het geselecteerde werkingsjaar). Icoon met
+ * tooltip, bevestigings-modal en toast (zie CLAUDE.md > UX-conventies).
  */
 export function RemoveMemberButton({
   membershipId,
@@ -25,21 +27,32 @@ export function RemoveMemberButton({
   locale: "nl" | "en";
 }) {
   const nl = locale === "nl";
+  const showToast = useToast();
   const [confirming, setConfirming] = useState(false);
   const [pending, startTransition] = useTransition();
+  const label = nl ? "Verwijderen" : "Remove";
 
   function onConfirm() {
     const form = new FormData();
     form.append("id", membershipId);
     form.append("userId", userId);
-    startTransition(() => void removeMembershipAction(form));
+    startTransition(async () => {
+      await removeMembershipAction(form);
+      setConfirming(false);
+      showToast({ message: nl ? "Lid verwijderd" : "Member removed", variant: "success" });
+    });
   }
 
   return (
     <>
-      <Button type="button" variant="ghost" size="sm" onClick={() => setConfirming(true)}>
-        {nl ? "Verwijderen" : "Remove"}
-      </Button>
+      <IconButton
+        label={label}
+        srLabel={`${label}: ${memberName}`}
+        tone="danger"
+        onClick={() => setConfirming(true)}
+      >
+        <TrashIcon />
+      </IconButton>
       <ConfirmDialog
         open={confirming}
         title={nl ? "Lid verwijderen?" : "Remove member?"}

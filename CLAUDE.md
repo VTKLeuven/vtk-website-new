@@ -11,11 +11,65 @@
 
 # UX-conventies
 
+Deze drie regels horen bij elkaar: elke actie zegt vooraf wat ze gaat doen
+(bevestiging), is compact waar ze in een lijst staat (icoon), en zegt achteraf of
+het gelukt is (toast).
+
 - **Destructieve acties krijgen altijd een bevestigingsdialoog.** Wanneer een
   actie iets verwijdert (of anderszins onomkeerbaar data weggooit), toon eerst
   een bevestigings-modal voor je doorgaat; gebruik geen kale knop die meteen
   verwijdert, en ook niet de native `confirm()`. De modal moet duidelijk maken
   wat verwijderd wordt en een expliciete bevestig- en annuleer-knop hebben.
+  - Zeg in de beschrijving **wat er precies weg is en wat blijft**, niet enkel
+    "weet je het zeker?". Bijvoorbeeld: hoeveel pagina's losgekoppeld worden, of
+    dat de historiek van andere jaren behouden blijft.
+  - `DeleteIconButton` / `DeleteButton` (`apps/web/components/ui/DeleteIconButton.tsx`)
+    bundelen bevestiging, icoon en toast; gebruik die in plaats van het patroon
+    opnieuw te bouwen. Ze werken ook vanuit server components: je geeft de server
+    action-referentie en de `fields` mee.
+
+- **Rij-acties in tabellen en lijsten zijn icoonknoppen, geen tekst.** Gebruik
+  `IconButton` / `IconLink` uit `apps/web/components/ui/IconButton.tsx` met een
+  icoon uit `apps/web/components/ui/icons.tsx`.
+  - **Een icoon zonder uitleg is geen knop maar een raadsel.** `label` is
+    verplicht en wordt de `title` (tooltip bij hoveren) én de `aria-label`. Geef
+    `srLabel` mee met context ("Verwijderen: Career Fair"), anders hoort een
+    screenreader twintig keer hetzelfde "Verwijderen" zonder te weten waarvan.
+  - **Dit geldt niet voor primaire en formulierknoppen.** "Opslaan", "Nieuw
+    evenement", "Toevoegen", en de knoppen in een bevestigingsdialoog blijven
+    tekst. Een icoon is voor de compacte, herhaalde actie per rij; niet voor de
+    ene belangrijke actie op een scherm.
+  - Behoud betekenisvolle toestand in het icoon zelf (bv. een vinkje na
+    kopiëren), niet enkel in de tooltip.
+- **Opslaan meldt altijd zijn uitkomst, overal (ook in admin).** Een opslaan-knop
+  die niets zichtbaars doet, is een bug: de gebruiker weet dan niet of het gelukt
+  is. Gebruik `SaveForm` (`apps/web/components/ui/SaveForm.tsx`), dat het `<form>`
+  en de submitknop bezit en de uitkomst als toast toont; bouw geen kaal
+  `<form action={...}>` zonder feedback.
+  - De server action geeft `SaveState` terug (`apps/web/lib/saveState.ts`) via de
+    helpers `saveOk()` / `saveError(code)`, in plaats van `void`.
+  - **Verwachte invoerfouten geef je terug, je gooit ze niet.** Een dubbel
+    r-nummer of een te groot bestand is geen serverfout en hoort een rode toast te
+    geven, geen error boundary. Onverwachte fouten mogen wel gewoon gooien: die
+    horen in de error boundary en in de monitoring.
+  - Foutcodes uit de action map je clientside op vertaalde meldingen
+    (`errorMessages`), met `common.saveError` als fallback. Zeg in de melding wat
+    er misging, niet enkel dat er iets misging.
+  - Succes-toasts verdwijnen vanzelf; fout-toasts blijven staan tot de gebruiker
+    ze wegklikt (`duration: 0`).
+  - Redirect de action na het opslaan (zoals de onboarding doet), dan is die
+    navigatie zelf de bevestiging en is een toast niet nodig. Let op dat
+    `redirect()` via een throw werkt: hou ze buiten elke try/catch.
+  - **Een `redirect()` naar de pagina waar je al staat is geen feedback.** Dat
+    patroon (`saveXAction` → `redirect("/admin/x")` terwijl het formulier op
+    `/admin/x` staat) ziet eruit als feedback maar doet niets zichtbaars; gebruik
+    daar `revalidatePath` plus een toast. Redirect enkel wanneer je echt naar een
+    ander scherm gaat, bv. omdat het huidige na de actie niet meer bestaat.
+  - `revalidatePath` moet ook de **beheerpagina** raken, niet enkel de publieke
+    route: anders blijft de lijst waar je net iets wijzigde ongewijzigd staan.
+  - Sluit een modal of inspector zelf via `onSuccess` wanneer de action niet meer
+    redirect, en zet een net aangemaakt item niet in "nieuw"-modus terug: een
+    tweede klik op opslaan maakt anders een duplicaat of botst op een unieke slug.
 
 # Kringwerking & design decisions
 
