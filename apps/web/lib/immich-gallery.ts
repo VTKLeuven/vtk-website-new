@@ -740,3 +740,14 @@ export async function refreshImmichGallerySnapshot() {
     // Cache refresh is best-effort; the TTL will pick up changes anyway.
   }
 }
+
+/**
+ * Set the album cover in Immich itself (albumThumbnailAssetId), so the choice
+ * is visible in the Immich UI and reused by the public gallery.
+ */
+export async function setImmichAlbumCover(albumId: string, assetId: string) {
+  return immichJson<unknown>(`/albums/${encodeURIComponent(albumId)}`, {
+    method: "PATCH",
+    body: { albumThumbnailAssetId: assetId },
+  });
+}

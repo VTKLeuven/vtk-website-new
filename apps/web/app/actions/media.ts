@@ -14,6 +14,7 @@ import {
   addImmichAssetsToAlbum,
   createImmichGalleryAlbum,
   refreshImmichGallerySnapshot,
+  setImmichAlbumCover,
   uploadImmichAsset,
 } from "@/lib/immich-gallery";
 
@@ -182,7 +183,7 @@ export async function createImmichAlbumAction(
 
 export async function uploadImmichAlbumAssetAction(
   formData: FormData
-): Promise<{ ok: boolean; error?: string }> {
+): Promise<{ ok: boolean; assetId?: string; error?: string }> {
   await requirePermission("media.manage");
   const albumId = readField(formData, "albumId", 100);
   const file = formData.get("file");
@@ -205,10 +206,26 @@ export async function uploadImmichAlbumAssetAction(
     });
     if (!uploaded?.id) return { ok: false, error: "upload_failed" };
     await addImmichAssetsToAlbum(albumId, [uploaded.id]);
-    return { ok: true };
+    return { ok: true, assetId: uploaded.id };
   } catch (error) {
     console.error("Immich asset upload failed", error);
     return { ok: false, error: "upload_failed" };
+  }
+}
+
+export async function setImmichAlbumCoverAction(
+  formData: FormData
+): Promise<{ ok: boolean; error?: string }> {
+  await requirePermission("media.manage");
+  const albumId = readField(formData, "albumId", 100);
+  const assetId = readField(formData, "assetId", 100);
+  if (!albumId || !assetId) return { ok: false, error: "missing" };
+  try {
+    await setImmichAlbumCover(albumId, assetId);
+    return { ok: true };
+  } catch (error) {
+    console.error("Immich album cover update failed", error);
+    return { ok: false, error: "cover_failed" };
   }
 }
 
