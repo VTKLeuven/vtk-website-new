@@ -32,37 +32,33 @@ export async function register(): Promise<void> {
     const dsn = await getSentryDsn().catch(() => process.env.SENTRY_DSN);
     const { initServerSentry } = await import('./sentry.server.config');
     initServerSentry(dsn);
-
-    // Theokot no-show-timer. Staat bewust binnen deze NEXT_RUNTIME === 'nodejs'
-    // tak, niet achter een `!== 'nodejs' return`. De bundler houdt enkel code die
-    // lexicaal in deze tak zit uit de edge-build (proxy.ts draait op edge). Zo
-    // blijft de keten ./lib/theokot-server -> ./lib/mail -> nodemailer buiten de
-    // edge-bundle, waar Node-builtins zoals `stream` niet bestaan. Een globale
-    // flag voorkomt dubbele intervallen bij hot-reloads in dev.
-    if (!globalThis.__theokotNoShowTimer) {
-      const run = async () => {
-        try {
-          const { processDueNoShows } = await import('./lib/theokot-server');
-          const result = await processDueNoShows(new Date());
-          if (result.noShows > 0) {
-            console.info(
-              `[theokot] no-show-verwerking: ${result.noShows} bestelling(en) over ${result.sessions} sessie(s) gemarkeerd.`,
-            );
-          }
-        } catch (err) {
-          console.error('[theokot] no-show-verwerking mislukt:', err);
-        }
-      };
-
-      // Kort na boot één keer draaien, daarna op interval.
-      globalThis.__theokotNoShowTimer = setInterval(run, INTERVAL_MS);
-      setTimeout(run, 15_000);
-    }
+  }
+  if (process.env.NEXT_RUNTIME === 'edge') {
+    // Edge (middleware) kan de DB niet lezen; blijft op de env-DSN.
+    await import('./sentry.edge.config');
   }
 
-  if (process.env.NEXT_RUNTIME === 'edge') {
-    // Edge (proxy) kan de DB niet lezen; blijft op de env-DSN.
-    await import('./sentry.edge.config');
+  // Theokot-timer enkel in de Node.js-runtime (niet edge/browser) en niet dubbel starten.
+  if (process.env.NEXT_RUNTIME == 'nodejs' && !globalThis.__theokotNoShowTimer) {
+    // niet gebruik maken van early return, want met npm run dev worden branches niet altijd correct gepruned en anders komen deze functies in de browser bundle terecht
+
+    const run = async () => {
+      try {
+        const { processDueNoShows } = await import('./lib/theokot-server');
+        const result = await processDueNoShows(new Date());
+        if (result.noShows > 0) {
+          console.info(
+            `[theokot] no-show-verwerking: ${result.noShows} bestelling(en) over ${result.sessions} sessie(s) gemarkeerd.`
+          );
+        }
+      } catch (err) {
+        console.error('[theokot] no-show-verwerking mislukt:', err);
+      }
+    };
+
+    // Kort na boot één keer draaien, daarna op interval.
+    globalThis.__theokotNoShowTimer = setInterval(run, INTERVAL_MS);
+    setTimeout(run, 15_000);
   }
 }
 
