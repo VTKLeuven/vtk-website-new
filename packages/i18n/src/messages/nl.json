@@ -293,7 +293,8 @@
     "cancel": "Annuleren",
     "edit": "Bewerken",
     "back": "Terug",
-    "noAccess": "Geen toegang"
+    "noAccess": "Geen toegang",
+    "ledenbeheer": "Ledenbeheer"
   },
   "confirmStudy": {
     "title": "Klopt je studie nog?",

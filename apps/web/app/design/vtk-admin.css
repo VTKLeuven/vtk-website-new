@@ -72,6 +72,88 @@
   color: var(--ink);
 }
 
+/* Actieve link: rustige highlight (geel is voor accenten, niet voor de hele pil). */
+.vtk-admin-nav a.is-active {
+  background: var(--paper-2);
+  color: var(--ink);
+  font-weight: 600;
+}
+
+/* Ledenbeheer-groep.
+   Smal scherm: de sub-items vallen terug op losse pillen in de horizontale
+   scroller (`.vtk-admin-nav-flat` = display:contents), het groepsblok is
+   verborgen. Breed scherm: omgekeerd (inklapbare groep in de kolom-nav). */
+.vtk-admin-nav-flat {
+  display: contents;
+}
+
+.vtk-admin-nav-group {
+  display: none;
+}
+
+.vtk-admin-nav-group-toggle {
+  appearance: none;
+  width: 100%;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 11px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: rgba(10, 15, 31, 0.72);
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.vtk-admin-nav-group-toggle:hover {
+  background: var(--paper-2);
+  color: var(--ink);
+}
+
+.vtk-admin-nav-group-toggle.has-active {
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.vtk-admin-nav-chevron {
+  color: var(--muted);
+  transition: transform 0.15s ease;
+}
+
+.vtk-admin-nav-chevron.is-open {
+  transform: rotate(180deg);
+}
+
+.vtk-admin-nav-sub {
+  display: none;
+  flex-direction: column;
+  gap: 4px;
+  margin: 2px 0 2px 13px;
+  padding-left: 8px;
+  border-left: 1px solid var(--line);
+}
+
+.vtk-admin-nav-sub.is-open {
+  display: flex;
+}
+
+.vtk-admin-nav a.vtk-admin-nav-sublink {
+  font-size: 12.5px;
+}
+
+@media (min-width: 860px) {
+  .vtk-admin-nav-flat {
+    display: none;
+  }
+
+  .vtk-admin-nav-group {
+    display: block;
+  }
+}
+
 .vtk-admin-main {
   min-width: 0;
   color: var(--ink);

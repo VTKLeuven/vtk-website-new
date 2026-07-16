@@ -9,7 +9,8 @@ import { requireSession, authErrorResponse } from '@/lib/session';
  * deelnemer-selectie in shiftbeheer. Schaalt naar duizenden users: er wordt
  * altijd maar een klein aantal matches teruggegeven i.p.v. de hele tabel.
  *
- * Toegang: ingelogd én `users.view` of `shift.edit` (of superadmin).
+ * Toegang: ingelogd én een recht dat een user-picker nodig heeft
+ * (`users.view`, `shift.edit`, `groups.manage` of `pocs.manage`), of superadmin.
  */
 export async function GET(request: Request) {
   let session;
@@ -23,7 +24,8 @@ export async function GET(request: Request) {
     session.user.isSuperAdmin ||
     session.permissions.includes('users.view') ||
     session.permissions.includes('shift.edit') ||
-    session.permissions.includes('groups.manage');
+    session.permissions.includes('groups.manage') ||
+    session.permissions.includes('pocs.manage');
   if (!allowed) {
     return NextResponse.json({ error: 'FORBIDDEN' }, { status: 403 });
   }
