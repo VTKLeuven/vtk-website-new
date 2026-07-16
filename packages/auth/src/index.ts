@@ -6,8 +6,16 @@
  * Safe to use in browser and server components :))
  */
 import type { NextRequest } from 'next/server';
+import type { Permission } from './permissions';
 
 export { splitFullName, fullName, nameParts, type NameParts } from './names';
+export {
+  PERMISSIONS,
+  isPermission,
+  permissionCodes,
+  type Permission,
+} from './permissions';
+export { currentWorkingYear, FIRST_WORKING_YEAR } from './workingYear';
 
 /** */
 export type Locale = 'NL' | 'EN';
@@ -54,7 +62,7 @@ export type SessionPayload = {
 
 export function hasPermission(
   session: SessionPayload | null | undefined,
-  code: string,
+  code: Permission,
   options?: { groupId?: string }
 ): boolean {
   if (!session) return false;
@@ -68,14 +76,14 @@ export function hasPermission(
 
 export function hasAnyPermission(
   session: SessionPayload | null | undefined,
-  permissions: string[]
+  permissions: Permission[]
 ): boolean {
   return permissions.some((permission) => hasPermission(session, permission));
 }
 
 export function hasAllPermissions(
   session: SessionPayload | null | undefined,
-  permissions: string[]
+  permissions: Permission[]
 ): boolean {
   return permissions.every((permission) => hasPermission(session, permission));
 }

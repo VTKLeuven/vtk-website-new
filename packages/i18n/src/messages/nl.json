@@ -274,6 +274,7 @@
     "calendar": "Kalender",
     "users": "Gebruikers",
     "groups": "Posten",
+    "roles": "Rollen",
     "albums": "Albums",
     "media": "Media",
     "pocs": "POC's",
@@ -292,7 +293,8 @@
     "cancel": "Annuleren",
     "edit": "Bewerken",
     "back": "Terug",
-    "noAccess": "Geen toegang"
+    "noAccess": "Geen toegang",
+    "ledenbeheer": "Ledenbeheer"
   },
   "confirmStudy": {
     "title": "Klopt je studie nog?",

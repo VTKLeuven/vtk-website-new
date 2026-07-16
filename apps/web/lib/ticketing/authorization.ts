@@ -1,6 +1,7 @@
 import "server-only";
 
 import { prisma } from "@vtk/db";
+import { currentWorkingYear } from "@vtk/auth";
 import { requireSession } from "@/lib/session";
 
 export const TICKET_CAPABILITIES = [
@@ -53,24 +54,57 @@ export function capabilitiesForTicketRoles(roles: readonly TicketRole[]): Ticket
   return [...capabilities];
 }
 
-async function hasLiveGlobalPermission(userId: string, code: string): Promise<boolean> {
-  const membership = await prisma.groupMembership.findFirst({
+// Live (uit de DB, niet uit de sessie-snapshot) checken of een gebruiker een
+// permissie heeft voor het huidige werkingsjaar. Spiegelt de resolver in
+// packages/auth/src/server/session.ts: rechten komen uit rollen, direct
+// toegewezen (UserRole) of via een post (GroupRole; DEFAULT voor elk lid,
+// LEADER enkel voor de lead).
+async function hasLivePermission(userId: string, code: string): Promise<boolean> {
+  const year = currentWorkingYear();
+
+  const directRole = await prisma.userRole.findFirst({
     where: {
       userId,
+      year,
+      role: { permissions: { some: { permission: { code } } } },
+    },
+    select: { roleId: true },
+  });
+  if (directRole) return true;
+
+  // Post-granted: DEFAULT telt voor elk lid, LEADER enkel wanneer je de lead bent.
+  const memberships = await prisma.groupMembership.findMany({
+    where: {
+      userId,
+      year,
       group: {
-        permissions: { some: { permission: { code } } },
+        roleGrants: {
+          some: { role: { permissions: { some: { permission: { code } } } } },
+        },
       },
     },
-    select: { id: true },
+    select: {
+      role: true,
+      group: {
+        select: {
+          roleGrants: {
+            where: { role: { permissions: { some: { permission: { code } } } } },
+            select: { kind: true },
+          },
+        },
+      },
+    },
   });
-  return Boolean(membership);
+  return memberships.some((m) =>
+    m.group.roleGrants.some((grant) => grant.kind === "DEFAULT" || m.role === "LEAD")
+  );
 }
 
 export async function hasLiveTicketManageAll(
   userId: string,
   isSuperAdmin = false
 ): Promise<boolean> {
-  return isSuperAdmin || hasLiveGlobalPermission(userId, "tickets.manageAll");
+  return isSuperAdmin || hasLivePermission(userId, "tickets.manageAll");
 }
 
 export async function canCreateTicketEventForGroup(
@@ -79,13 +113,18 @@ export async function canCreateTicketEventForGroup(
   isSuperAdmin = false
 ): Promise<boolean> {
   if (isSuperAdmin) return true;
+  // De lead van de post mag ticketevents aanmaken voor die post, mits de post een
+  // rol toekent die `tickets.create` bevat (praesidium in de seed).
   const membership = await prisma.groupMembership.findFirst({
     where: {
       userId,
       groupId,
       role: "LEAD",
+      year: currentWorkingYear(),
       group: {
-        permissions: { some: { permission: { code: "tickets.create" } } },
+        roleGrants: {
+          some: { role: { permissions: { some: { permission: { code: "tickets.create" } } } } },
+        },
       },
     },
     select: { id: true },
@@ -153,10 +192,10 @@ export async function requireTicketEventCapability(
 export async function canAccessAnyTicketEvent(): Promise<boolean> {
   const session = await requireSession();
   if (session.user.isSuperAdmin) return true;
-  if (await hasLiveGlobalPermission(session.user.id, "tickets.manageAll")) return true;
+  if (await hasLivePermission(session.user.id, "tickets.manageAll")) return true;
 
   const memberships = await prisma.groupMembership.findMany({
-    where: { userId: session.user.id },
+    where: { userId: session.user.id, year: currentWorkingYear() },
     select: { groupId: true, role: true },
   });
   const allGroupIds = memberships.map((row) => row.groupId);

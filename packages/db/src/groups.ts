@@ -1,7 +1,7 @@
-import type { GroupCode } from "@prisma/client";
-
 export type GroupSeed = {
-  code: GroupCode;
+  // Vrije, unieke postcode (was de `GroupCode`-enum). Nu een gewone string zodat
+  // posten via de GUI toegevoegd/gewijzigd kunnen worden.
+  code: string;
   slug: string;
   nameNl: string;
   nameEn: string;

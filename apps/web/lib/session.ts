@@ -2,6 +2,7 @@ import { cache } from 'react';
 import { headers } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { getSession } from '@vtk/auth/server';
+import type { Permission } from '@vtk/auth';
 import { NextResponse } from 'next/server';
 
 /**
@@ -20,7 +21,7 @@ export async function requireSession(redirectTo?: string) {
   return session;
 }
 
-export async function requirePermission(permission: string) {
+export async function requirePermission(permission: Permission) {
   const session = await requireSession();
   if (!session.user.isSuperAdmin && !session.permissions.includes(permission)) {
     throw new Error('FORBIDDEN');
@@ -33,7 +34,7 @@ export async function requirePermission(permission: string) {
  * rechten bundelen (bv. /admin/inhoud met `pages.edit` én `header.manage`); gate
  * de onderdelen daar zelf nog per recht.
  */
-export async function requireAnyPermission(permissions: string[]) {
+export async function requireAnyPermission(permissions: Permission[]) {
   const session = await requireSession();
   if (
     !session.user.isSuperAdmin &&

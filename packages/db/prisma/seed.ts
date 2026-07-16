@@ -1,6 +1,5 @@
 import { hash } from "@node-rs/argon2";
 import { PrismaClient } from "@prisma/client";
-import type { GroupCode } from "@prisma/client";
 import { GROUP_SEEDS, HEADER_TABS } from "../src/groups";
 import { PERMISSIONS } from "../src/permissions";
 
@@ -111,66 +110,159 @@ async function main() {
     });
   }
 
-  // IT and Groep 5 get elevated permissions by default. Global ticket access
-  // remains an explicit assignment because it exposes attendee and financial data.
-  const elevatedGroupCodes = ["IT", "GROEP5"] as const;
-  const elevatedPermissions = await prisma.permission.findMany({
-    where: { code: { not: "tickets.manageAll" } },
+  console.log("Seeding roles...");
+  // De admin-rol is een systeemrol: ze bundelt alle rechten en kan niet via de
+  // GUI verwijderd worden. Ze reset niet apart; roltoewijzingen gaan per
+  // werkingsjaar, dus admin wordt elk jaar opnieuw toegekend (isSuperAdmin op de
+  // user blijft de harde, niet-resettende uitzondering). Andere rollen maak je
+  // aan via /admin/roles.
+  const adminRole = await prisma.role.upsert({
+    where: { code: "admin" },
+    update: { nameNl: "Admin", nameEn: "Admin", system: true },
+    create: {
+      code: "admin",
+      nameNl: "Admin",
+      nameEn: "Admin",
+      system: true,
+      order: 0,
+      descriptionNl: "Volledige toegang tot het beheer.",
+      descriptionEn: "Full access to administration.",
+    },
   });
-  for (const code of elevatedGroupCodes) {
-    const group = await prisma.group.findUnique({ where: { code } });
-    if (!group) continue;
-    for (const perm of elevatedPermissions) {
-      await prisma.groupPermission.upsert({
-        where: { groupId_permissionId: { groupId: group.id, permissionId: perm.id } },
-        update: {},
-        create: { groupId: group.id, permissionId: perm.id },
-      });
-    }
-  }
-
-  // Baseline permissions for all other groups are always scoped to their own group.
-  const baselinePermCodes = ["calendar.create", "photos.upload", "tickets.create"];
-  const baselinePerms = await prisma.permission.findMany({
-    where: { code: { in: baselinePermCodes } },
-  });
-  const otherGroups = await prisma.group.findMany({
-    where: { code: { notIn: [...elevatedGroupCodes] } },
-  });
-  for (const group of otherGroups) {
-    for (const perm of baselinePerms) {
-      await prisma.groupPermission.upsert({
-        where: { groupId_permissionId: { groupId: group.id, permissionId: perm.id } },
-        update: {},
-        create: { groupId: group.id, permissionId: perm.id },
-      });
-    }
-  }
-
-  // Marketing (Communicatie) maintains the public media page.
-  const communicatie = await prisma.group.findUnique({ where: { code: "COMMUNICATIE" } });
-  const mediaManage = await prisma.permission.findUnique({ where: { code: "media.manage" } });
-  if (communicatie && mediaManage) {
-    await prisma.groupPermission.upsert({
-      where: { groupId_permissionId: { groupId: communicatie.id, permissionId: mediaManage.id } },
+  const allPermsForAdmin = await prisma.permission.findMany();
+  for (const perm of allPermsForAdmin) {
+    await prisma.rolePermission.upsert({
+      where: { roleId_permissionId: { roleId: adminRole.id, permissionId: perm.id } },
       update: {},
-      create: { groupId: communicatie.id, permissionId: mediaManage.id },
+      create: { roleId: adminRole.id, permissionId: perm.id },
     });
   }
 
-  // De post Theokot beheert het broodjes-reservatiesysteem en bedient de afhaalbalie.
-  const theokotPerms = await prisma.permission.findMany({
-    where: { code: { in: ["theokot.manage", "theokot.pickup"] } },
-  });
-  const theokotGroup = await prisma.group.findUnique({ where: { code: "THEOKOT" } });
-  if (theokotGroup) {
-    for (const perm of theokotPerms) {
-      await prisma.groupPermission.upsert({
-        where: { groupId_permissionId: { groupId: theokotGroup.id, permissionId: perm.id } },
+  console.log("Seeding roles and post role grants...");
+  // Posten kennen rechten niet meer direct toe: ze verlenen ROLLEN aan hun leden
+  // (GroupRole, kind DEFAULT = elk lid). De geseede rolset:
+  //   - admin (alle rechten, systeemrol)                 -> IT + Groep 5
+  //   - praesidium (calendar.create + photos.upload +    -> elke post
+  //       tickets.create)
+  //   - werkgroep, medewerker                            -> beschikbaar, nog niet toegekend
+  //   - theokot (theokot.manage + theokot.pickup)        -> Theokot
+  //   - één rol per post, met de postnaam                -> die post zelf
+  //       (Communicatie krijgt meteen media.manage)
+  // Alles als DEFAULT, zodat elk lid van de post de rol krijgt. Rechten voor de
+  // lege rollen (werkgroep, medewerker, per-post) stel je in via /admin/roles.
+
+  /** Zet (idempotent) de rechten van een rol op exact `permCodes`. */
+  async function setRolePermissions(roleId: string, permCodes: string[]) {
+    const perms = await prisma.permission.findMany({ where: { code: { in: permCodes } } });
+    for (const perm of perms) {
+      await prisma.rolePermission.upsert({
+        where: { roleId_permissionId: { roleId, permissionId: perm.id } },
         update: {},
-        create: { groupId: theokotGroup.id, permissionId: perm.id },
+        create: { roleId, permissionId: perm.id },
       });
     }
+  }
+
+  /** Kent (idempotent) een rol toe aan een post via GroupRole. */
+  async function grantRoleToGroup(groupCode: string, roleId: string, kind: "DEFAULT" | "LEADER" = "DEFAULT") {
+    const group = await prisma.group.findUnique({ where: { code: groupCode } });
+    if (!group) return;
+    await prisma.groupRole.upsert({
+      where: { groupId_roleId_kind: { groupId: group.id, roleId, kind } },
+      update: {},
+      create: { groupId: group.id, roleId, kind },
+    });
+  }
+
+  /** Maakt/behoudt een rol. `update` raakt enkel de labels aan, zodat GUI-edits
+   *  aan volgorde/beschrijving/kleur bij een herseed niet teruggedraaid worden. */
+  async function upsertRole(
+    code: string,
+    nameNl: string,
+    nameEn: string,
+    order: number,
+    descriptionNl: string,
+    descriptionEn: string,
+  ) {
+    return prisma.role.upsert({
+      where: { code },
+      update: { nameNl, nameEn },
+      create: { code, nameNl, nameEn, order, descriptionNl, descriptionEn },
+    });
+  }
+
+  // basis-werkgroep is vervangen door praesidium; verwijder de oude rol (en zo via
+  // cascade haar grants) op bestaande DB's. Idempotent: no-op als ze al weg is.
+  await prisma.role.deleteMany({ where: { code: "basis-werkgroep" } });
+
+  // admin (systeemrol, alle rechten) -> IT en Groep 5, elk lid.
+  for (const code of ["IT", "GROEP5"]) {
+    await grantRoleToGroup(code, adminRole.id, "DEFAULT");
+  }
+
+  // praesidium: de basisrol voor elk praesidiumlid, op elke post.
+  const praesidiumRole = await upsertRole(
+    "praesidium",
+    "Praesidium",
+    "Praesidium",
+    1,
+    "Basisrol voor elk praesidiumlid: evenementen (incl. ticketevents) voor de eigen groep aanmaken en foto's uploaden.",
+    "Base role for every praesidium member: create events (incl. ticket events) for the own group and upload photos.",
+  );
+  await setRolePermissions(praesidiumRole.id, ["calendar.create", "photos.upload", "tickets.create"]);
+  for (const g of GROUP_SEEDS) {
+    await grantRoleToGroup(g.code, praesidiumRole.id, "DEFAULT");
+  }
+
+  // werkgroep en medewerker: beschikbare rollen, nog zonder rechten of grants.
+  await upsertRole(
+    "werkgroep",
+    "Werkgroep",
+    "Work group",
+    2,
+    "Rol voor werkgroepleden. Rechten stel je in via het rollenbeheer.",
+    "Role for work group members. Set permissions in the roles admin.",
+  );
+  await upsertRole(
+    "medewerker",
+    "Medewerker",
+    "Collaborator",
+    3,
+    "Rol voor medewerkers die een werkgroep helpen. Rechten stel je in via het rollenbeheer.",
+    "Role for collaborators helping a work group. Set permissions in the roles admin.",
+  );
+
+  // theokot: het broodjes-reservatiesysteem beheren en de afhaalbalie bedienen.
+  const theokotRole = await upsertRole(
+    "theokot",
+    "Theokot",
+    "Theokot",
+    4,
+    "Theokot beheren (sessies, aanbod, bans, instellingen) en de afhaalbalie bedienen.",
+    "Manage Theokot (sessions, offering, bans, settings) and operate the pickup counter.",
+  );
+  await setRolePermissions(theokotRole.id, ["theokot.manage", "theokot.pickup"]);
+  await grantRoleToGroup("THEOKOT", theokotRole.id, "DEFAULT");
+
+  // Eén rol per post, met de postnaam, toegekend aan die post zelf (elk lid).
+  // Meestal een lege container om er later rechten aan te hangen; enkele posten
+  // krijgen meteen hun vaste, postspecifieke recht(en) mee (zie postRolePerms).
+  const postRolePerms: Record<string, string[]> = {
+    // Communicatie beheert de publieke mediapagina (magazines, promovideo's, albums).
+    COMMUNICATIE: ["media.manage"],
+  };
+  for (const g of GROUP_SEEDS) {
+    const postRole = await upsertRole(
+      `post-${g.code.toLowerCase()}`,
+      g.nameNl,
+      g.nameEn,
+      10 + g.orderInPraesidium,
+      `Rol voor de post ${g.nameNl}.`,
+      `Role for the ${g.nameEn} post.`,
+    );
+    const perms = postRolePerms[g.code];
+    if (perms) await setRolePermissions(postRole.id, perms);
+    await grantRoleToGroup(g.code, postRole.id, "DEFAULT");
   }
 
   console.log("Seeding default homepage settings...");
@@ -910,7 +1002,7 @@ async function main() {
     start: string;
     end: string;
     url: string;
-    groupCode: GroupCode;
+    groupCode: string;
     descriptionNl?: string;
     descriptionEn?: string;
   }> = [
@@ -1186,7 +1278,7 @@ async function main() {
     description: string;
     maxParticipants: number;
     reward: number;
-    post: GroupCode | null;
+    post: string | null;
   }> = [
     { id: "seed-shift-1", name: "Tapshift", dayOffset: 1, startHour: 20, endHour: 23, location: "Fakbar", description: "Tapshift donderdagavond", maxParticipants: 4, reward: 2, post: "FAKBAR" },
     { id: "seed-shift-2", name: "Cursusverkoop", dayOffset: 2, startHour: 9, endHour: 12, location: "Cursusdienst", description: "Cursussen verkopen tijdens de ochtend", maxParticipants: 3, reward: 1, post: "CURSUSDIENST" },
@@ -1227,7 +1319,7 @@ async function main() {
     description: string;
     maxParticipants: number;
     reward: number;
-    post: GroupCode | null;
+    post: string | null;
     participants: Array<{ email: string; payedOut: boolean }>;
   }> = [
     { id: "seed-shift-past-1", name: "Openingscantus tap", dayOffset: -4, startHour: 21, endHour: 24, location: "Fakbar", description: "Tappen op de openingscantus", maxParticipants: 5, reward: 3, post: "FAKBAR",

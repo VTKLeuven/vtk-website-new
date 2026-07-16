@@ -274,6 +274,7 @@
     "calendar": "Calendar",
     "users": "Users",
     "groups": "Posts",
+    "roles": "Roles",
     "albums": "Albums",
     "media": "Media",
     "pocs": "POCs",
@@ -292,7 +293,8 @@
     "cancel": "Cancel",
     "edit": "Edit",
     "back": "Back",
-    "noAccess": "No access"
+    "noAccess": "No access",
+    "ledenbeheer": "Members"
   },
   "confirmStudy": {
     "title": "Are your studies still up to date?",

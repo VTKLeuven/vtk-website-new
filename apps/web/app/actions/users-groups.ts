@@ -282,40 +282,112 @@ function cryptoRandomPassword() {
   return Math.random().toString(36).slice(2) + Math.random().toString(36).slice(2);
 }
 
-// ---- Groups -----------------------------------------------------------------
+// ---- Groups (posten) --------------------------------------------------------
 
-export async function setGroupPermissionAction(formData: FormData): Promise<void> {
-  await requirePermission("groups.manage");
-  const groupId = formData.get("groupId") as string;
-  const permissionId = formData.get("permissionId") as string;
-  const enabled = formData.get("enabled") === "1";
-  if (!groupId || !permissionId) return;
-  if (enabled) {
-    await prisma.groupPermission.upsert({
-      where: { groupId_permissionId: { groupId, permissionId } },
-      update: {},
-      create: { groupId, permissionId },
-    });
-  } else {
-    await prisma.groupPermission
-      .delete({ where: { groupId_permissionId: { groupId, permissionId } } })
-      .catch(() => null);
-  }
-  revalidatePath("/admin/groepen");
+/** Slug uit een naam: kleine letters, koppeltekens, enkel [a-z0-9-]. */
+function slugify(input: string): string {
+  return input
+    .normalize("NFKD")
+    .replace(/[̀-ͯ]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
 }
 
-export async function saveGroupAction(formData: FormData): Promise<void> {
+/** Postcode uit een naam: hoofdletters, underscores, enkel [A-Z0-9_] (zoals IT, GROEP5). */
+function codeify(input: string): string {
+  return input
+    .normalize("NFKD")
+    .replace(/[̀-ͯ]/g, "")
+    .toUpperCase()
+    .replace(/[^A-Z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "");
+}
+
+const groupSchema = z.object({
+  id: z.string().optional(),
+  code: z.string().trim().optional(),
+  nameNl: z.string().trim().min(1),
+  nameEn: z.string().trim().min(1),
+  descriptionNl: z.string().trim().optional().nullable(),
+  descriptionEn: z.string().trim().optional().nullable(),
+  orderInPraesidium: z.coerce.number().int().default(0),
+  active: z.coerce.boolean().default(true),
+});
+
+/**
+ * Post aanmaken of bewerken. De `code` en `slug` staan enkel bij het aanmaken
+ * vast (shiften en de sessie verwijzen naar `code`); bij bewerken wijzigen enkel
+ * naam, beschrijving, volgorde en actief-status. Een post uitzetten (active=false)
+ * haalt ze uit de nieuwe-shift-keuzes maar behoudt de historiek.
+ */
+export async function saveGroupAction(_prev: SaveState, formData: FormData): Promise<SaveState> {
   await requirePermission("groups.manage");
-  const id = formData.get("id") as string;
-  const nameNl = formData.get("nameNl") as string;
-  const nameEn = formData.get("nameEn") as string;
-  const descriptionNl = formData.get("descriptionNl") as string;
-  const descriptionEn = formData.get("descriptionEn") as string;
-  const orderInPraesidium = Number(formData.get("orderInPraesidium")) || 0;
-  await prisma.group.update({
-    where: { id },
-    data: { nameNl, nameEn, descriptionNl, descriptionEn, orderInPraesidium },
+  const result = groupSchema.safeParse({
+    id: (formData.get("id") as string) || undefined,
+    code: (formData.get("code") as string) || undefined,
+    nameNl: formData.get("nameNl"),
+    nameEn: formData.get("nameEn"),
+    descriptionNl: (formData.get("descriptionNl") as string) || null,
+    descriptionEn: (formData.get("descriptionEn") as string) || null,
+    orderInPraesidium: formData.get("orderInPraesidium") || 0,
+    active: formData.get("active") === "on",
   });
+  if (!result.success) return saveError("INVALID_INPUT");
+  const parsed = result.data;
+
+  const data = {
+    nameNl: parsed.nameNl,
+    nameEn: parsed.nameEn,
+    descriptionNl: parsed.descriptionNl,
+    descriptionEn: parsed.descriptionEn,
+    orderInPraesidium: parsed.orderInPraesidium,
+    active: parsed.active,
+  };
+
+  try {
+    if (parsed.id) {
+      await prisma.group.update({ where: { id: parsed.id }, data });
+    } else {
+      const code = codeify(parsed.code || parsed.nameNl);
+      const slug = slugify(parsed.nameNl);
+      if (!code || !slug) return saveError("INVALID_INPUT");
+      await prisma.group.create({ data: { ...data, code, slug } });
+    }
+  } catch (err) {
+    if (isUniqueViolation(err, "code")) return saveError("GROUP_CODE_TAKEN");
+    if (isUniqueViolation(err, "slug")) return saveError("SLUG_TAKEN");
+    throw err;
+  }
+
+  revalidatePath("/admin/groepen");
+  revalidatePath("/praesidium");
+  return saveOk();
+}
+
+/**
+ * Zet (of haalt weg) een rol-grant van een post: een post kent haar rollen toe
+ * aan elk lid (DEFAULT) of enkel aan de verantwoordelijke (LEADER). Vervangt het
+ * oude "recht per post"-raster: posten verlenen nu rollen, geen losse rechten.
+ */
+export async function setGroupRoleAction(formData: FormData): Promise<void> {
+  await requirePermission("groups.manage");
+  const groupId = formData.get("groupId") as string;
+  const roleId = formData.get("roleId") as string;
+  const kind = formData.get("kind") === "LEADER" ? "LEADER" : "DEFAULT";
+  const enabled = formData.get("enabled") === "1";
+  if (!groupId || !roleId) return;
+  if (enabled) {
+    await prisma.groupRole.upsert({
+      where: { groupId_roleId_kind: { groupId, roleId, kind } },
+      update: {},
+      create: { groupId, roleId, kind },
+    });
+  } else {
+    await prisma.groupRole
+      .delete({ where: { groupId_roleId_kind: { groupId, roleId, kind } } })
+      .catch(() => null);
+  }
   revalidatePath("/admin/groepen");
   revalidatePath("/praesidium");
 }

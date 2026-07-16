@@ -1,4 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { currentWorkingYear } from "@vtk/auth";
+import { getSession } from "@vtk/auth/server";
 
 const LOCALES = ["nl", "en"] as const;
 const DEFAULT_LOCALE = "nl";
@@ -43,10 +45,65 @@ function mainSiteUrl(host: string): string {
   return `https://${host.replace(/^on\./, "")}`;
 }
 
+/**
+ * Onboarding/studiebevestiging-gate.
+ *
+ * Deze redirect leeft BEWUST in de proxy en niet in `[locale]/layout.tsx`. Een
+ * `redirect()` vanuit een gedeelde layout tijdens een client-side (RSC) navigatie
+ * zet de App Router-cache in een oneindige refetch-lus: na login redirect de
+ * server-action naar `/`, de layout van `/` redirect naar `/studie-bevestigen`,
+ * en de router blijft dat pagina-segment herophalen (~1/s) zonder ooit te
+ * settelen. Next waarschuwt hier expliciet voor (auth-checks horen niet in
+ * layouts, want die her-renderen niet op navigatie). Een redirect op de
+ * netwerkgrens is daarentegen een gewone 307 die de router netjes volgt.
+ *
+ * Draait op de Node.js-runtime (de default voor proxy in Next 16), dus
+ * `getSession` (Prisma) werkt hier.
+ *
+ * @returns een redirect-response wanneer de gate moet ingrijpen, anders `null`.
+ */
+async function gateRedirect(
+  request: NextRequest,
+  internalPath: string,
+): Promise<NextResponse | null> {
+  // Prefetch-requests niet gaten: Next prefetcht elke <Link>, en een prefetch
+  // omleiden naar de gate-pagina laat de router die redirect volgen in een lus.
+  // De echte navigatie (zonder deze header) wordt wel gegated.
+  if (request.headers.get("next-router-prefetch") === "1") return null;
+
+  const [, locale, segment] = internalPath.split("/");
+
+  // Goedkope short-circuit: geen sessie -> anoniem -> geen gate. `getSession`
+  // geeft zonder geldige sessiecookie snel `null` terug (geen zware queries).
+  const session = await getSession(request.headers);
+  if (!session) return null;
+
+  const enPrefix = locale === "en" ? "/en" : "";
+
+  // 1. Onboarding: profiel nog niet ingevuld -> eerst dat afwerken.
+  if (!session.user.onboarded) {
+    if (segment !== "onboarding") {
+      return NextResponse.redirect(new URL(`${enPrefix}/onboarding`, request.url));
+    }
+    return null;
+  }
+
+  // 2. Studiebevestiging: bij elk nieuw werkingsjaar declareert het lid opnieuw
+  //    wat het studeert (vervangt het jaarlijkse cursusdienst-signaal en houdt
+  //    de mailinglijsten beperkt tot wie effectief nog studeert).
+  if (session.user.studyConfirmedYear !== currentWorkingYear()) {
+    if (segment !== "studie-bevestigen") {
+      return NextResponse.redirect(new URL(`${enPrefix}/studie-bevestigen`, request.url));
+    }
+  }
+
+  return null;
+}
+
 // Rewrite (not redirect) paths without a locale prefix to /nl internally so
 // Dutch URLs stay clean (no /nl prefix in the address bar) while English URLs
 // live under /en/*.
-export function proxy(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   const { pathname, search } = request.nextUrl;
 
   const host = (request.headers.get("host") ?? "").split(":")[0].toLowerCase();
@@ -71,14 +128,17 @@ export function proxy(request: NextRequest) {
   const segments = pathname.split("/");
   const first = segments[1];
 
-  // Expose the resolved, locale-prefixed path to server components (the
-  // onboarding gate in the [locale] layout needs to know the current path to
-  // avoid redirect loops on the onboarding page itself). Request headers are
-  // the supported channel for passing proxy -> app data (see proxy.md).
+  // Expose the resolved, locale-prefixed path to server components. Request
+  // headers are the supported channel for passing proxy -> app data (see
+  // proxy.md).
   const internalPath =
     first && (LOCALES as readonly string[]).includes(first)
       ? pathname
       : `/${DEFAULT_LOCALE}${pathname === "/" ? "" : pathname}`;
+
+  // Onboarding/studiebevestiging-gate op de netwerkgrens (zie gateRedirect).
+  const gate = await gateRedirect(request, internalPath);
+  if (gate) return gate;
 
   const requestHeaders = new Headers(request.headers);
   requestHeaders.set("x-pathname", internalPath);
