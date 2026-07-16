@@ -37,6 +37,7 @@ Prisma schema: `packages/db/prisma/schema.prisma`.
 | `Group` (post) | `code` (unique **String**), `slug`, names, `orderInPraesidium`, `active`. Grants roles via `roleGrants`. |
 | `GroupMembership` | Membership of a post, **per working year**. `role` is `MEMBER` or `LEAD`. `@@unique([userId, groupId, year])`. |
 | `User` | Holds `isSuperAdmin` (a boolean, never resets) plus direct `roles` and `memberships`. |
+| `PageEditorRole` | page ↔ role: which roles may edit a page's **content**. `@@id([pageId, roleId])`. See "Page editing" below. |
 
 Notes:
 - `Group.code` is a plain `String` (not an enum), so posts are fully GUI-managed
@@ -57,7 +58,9 @@ currentWorkingYear()`:
 3. **Super admin** — `user.isSuperAdmin` short-circuits every check to "allowed".
 
 `SessionPayload.permissions` is a `string[]`; the *type safety* is on the check functions' inputs
-(below), not on this array.
+(below), not on this array. The session also carries `roleIds: string[]` — the ids of every role
+the user holds this working year (direct + post-granted, same resolution as the permissions) — for
+checks that hang on a *specific* role, such as page editing.
 
 Because `UserRole` and `GroupMembership` are keyed by working year and the resolver only counts the
 current year, **assignments reset by themselves at the 15 July cutover** — there is no cron job. The
@@ -97,6 +100,25 @@ see `apps/web/app/api/users/search/route.ts` for the pattern (it allows any of `
 **Server actions** must re-check (`await requirePermission(...)`) — never trust the client. Expected
 input errors are *returned* as `saveError(code)`, not thrown (see `CLAUDE.md`).
 
+### Page editing (permission + page role)
+
+Info pages are the one place where a plain permission is not enough: the **content** of a page may
+only be edited by users holding one of the page's **editor roles** (`PageEditorRole`, assigned in
+`/admin/inhoud`). The check lives in `apps/web/lib/pageAccess.ts`:
+
+```ts
+canEditPageContent(session, page /* with editorRoles */)
+// superadmin or pages.editAll  -> always
+// pages.edit                   -> only if page.editorRoles ∩ session.roleIds ≠ ∅
+// page without editor roles    -> locked for plain pages.edit holders
+```
+
+The pages permission family: `pages.edit` (edit assigned pages), `pages.editAll` (bypass the role
+match), `pages.manage` (structure/metadata: `/admin/inhoud`), `pages.delete`. `header.manage` still
+exists and is accepted alongside `pages.manage` by the header-tab actions, but `/admin/inhoud`
+itself is gated on `pages.manage` only. Product rationale in
+`docs/design-decisions.md` ("Infopagina's").
+
 ## Adding a permission (code) vs. a role (GUI)
 
 **A new permission is a code change** — permissions are the fixed vocabulary of the app:
@@ -134,6 +156,8 @@ table whose rows expand into per-category editors, with create/import in modals.
 | `/admin/groepen` (`PostsTable`) | `groups.manage` | Per working-year tabs. Row = post + member count. Expands to: members, roles this post grants (DEFAULT/LEADER), post settings (incl. `active`). Posts are deactivated, never hard-deleted. |
 | `/admin/gebruikers` | `users.view` (edit needs `users.edit`) | **Server-driven** table (URL `?q&sort&dir&page`, `count` + `findMany` with `take`/`skip`, no memberships join) — built to scale to tens of thousands of users. Editing opens `/admin/gebruikers/[id]`. |
 | `/admin/pocs` (`PocsTable`) | `pocs.manage` | Row = POC + representative count. Expands to representatives (added via the `/api/users/search` typeahead) and POC settings. |
+| `/admin/paginas` (`PagesTable`) | `pages.edit` or `pages.editAll` | Lists only the pages the user may edit (role match; editAll/superadmin sees all). Yearly-review pages not yet edited this working year float to the top with a yellow cue. Row → full-page markdown editor (`/admin/paginas/[id]`). |
+| `/admin/inhoud` (`ContentManager`) | `pages.manage` | Header categories + page structure/metadata (slug, category, publish, editor roles, yearly flag, attachments). Content editing moved to `/admin/paginas`; every page has a quick link. Delete needs `pages.delete`. |
 
 User pickers everywhere use the server-side typeahead `GET /api/users/search` (capped results), not
 a full user load, so they scale.

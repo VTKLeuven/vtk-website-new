@@ -4,8 +4,9 @@ import type { SessionPayload } from '../index';
 import { currentWorkingYear } from '../workingYear';
 import { auth } from '../auth';
 
-// Rollen bundelen permissies; hieruit halen we de codes.
-type RoleWithPerms = { permissions: { permission: { code: string } }[] };
+// Rollen bundelen permissies; hieruit halen we de codes (en het rol-id zelf,
+// voor checks die aan een specifieke rol hangen zoals paginabewerking).
+type RoleWithPerms = { id: string; permissions: { permission: { code: string } }[] };
 
 export async function getSession(headers: Headers): Promise<SessionPayload | null> {
   const betterSession = await auth.api.getSession({ headers });
@@ -43,7 +44,9 @@ export async function getSession(headers: Headers): Promise<SessionPayload | nul
   if (!user || !user.active) return null;
 
   const permissions = new Set<string>();
+  const roleIds = new Set<string>();
   const addRolePermissions = (role: RoleWithPerms) => {
+    roleIds.add(role.id);
     for (const rp of role.permissions) permissions.add(rp.permission.code);
   };
 
@@ -80,5 +83,6 @@ export async function getSession(headers: Headers): Promise<SessionPayload | nul
       role: membership.role,
     })),
     permissions: [...permissions],
+    roleIds: [...roleIds],
   };
 }

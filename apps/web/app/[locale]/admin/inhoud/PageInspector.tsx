@@ -1,9 +1,9 @@
 "use client";
 
 import { useId, useState, useTransition } from "react";
+import Link from "next/link";
 import { Button, Card, ConfirmDialog, Input, Label, Select, Textarea } from "@vtk/ui";
 import { getDictionary, type Locale } from "@vtk/i18n";
-import { WysiwygEditor } from "@/components/editor/WysiwygEditor";
 import { SaveForm } from "@/components/ui/SaveForm";
 import { deletePageAction, savePageAction } from "@/app/actions/pages";
 import { SAVE_IDLE } from "@/lib/saveState";
@@ -11,18 +11,18 @@ import { contentErrorMessages } from "./messages";
 import { InspectorHead } from "./TabInspector";
 import { FileUploader } from "./FileUploader";
 import { AssetList } from "./AssetList";
-import type { PageNode, TabNode } from "./ContentManager";
-
-const EMPTY_DOC = { type: "doc", content: [{ type: "paragraph" }] };
+import type { PageNode, RoleOption, TabNode } from "./ContentManager";
 
 /**
- * Volledige pagina-editor in de rechterkolom: velden, tiptap-inhoud (NL en
- * optioneel EN) en de bijlagen. `page: null` is een nieuwe pagina.
+ * Instellingen van een pagina in de rechterkolom: slug, categorie, publicatie,
+ * bewerkrollen en bijlagen. `page: null` is een nieuwe pagina. De inhoud zelf
+ * bewerk je in /admin/paginas (knop bovenaan).
  */
 export function PageInspector({
   locale,
   page,
   tabs,
+  roles,
   defaultTabId = null,
   canDelete,
   onClose,
@@ -30,6 +30,7 @@ export function PageInspector({
   locale: Locale;
   page: PageNode | null;
   tabs: TabNode[];
+  roles: RoleOption[];
   defaultTabId?: string | null;
   canDelete: boolean;
   onClose: () => void;
@@ -37,10 +38,7 @@ export function PageInspector({
   const nl = locale === "nl";
   const dict = getDictionary(locale);
   const uid = useId();
-
-  const [contentNl, setContentNl] = useState<unknown>(page?.contentJsonNl ?? EMPTY_DOC);
-  const [contentEn, setContentEn] = useState<unknown>(page?.contentJsonEn ?? EMPTY_DOC);
-  const [showEn, setShowEn] = useState(Boolean(page?.contentJsonEn || page?.titleEn));
+  const base = nl ? "" : "/en";
 
   return (
     <Card className="p-5">
@@ -49,6 +47,17 @@ export function PageInspector({
         subtitle={page ? `/${page.slug}` : undefined}
         onClose={onClose}
       />
+
+      {page && (
+        <div className="mb-5">
+          <Link
+            href={`${base}/admin/paginas/${page.id}`}
+            className="inline-flex items-center gap-2 rounded-full bg-vtk-ink px-4 py-1.5 text-sm font-medium text-white hover:opacity-90"
+          >
+            {nl ? "Inhoud bewerken" : "Edit content"}
+          </Link>
+        </div>
+      )}
 
       <SaveForm
         action={savePageAction}
@@ -63,8 +72,6 @@ export function PageInspector({
         onSuccess={page ? undefined : onClose}
       >
         {page && <input type="hidden" name="id" value={page.id} />}
-        <input type="hidden" name="contentJsonNl" value={JSON.stringify(contentNl)} />
-        <input type="hidden" name="contentJsonEn" value={showEn ? JSON.stringify(contentEn) : ""} />
         <input type="hidden" name="order" value={page?.order ?? 0} />
 
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -78,6 +85,13 @@ export function PageInspector({
             />
           </div>
           <div>
+            <Label htmlFor={`${uid}-titleEn`}>{nl ? "Titel (EN)" : "Title (EN)"}</Label>
+            <Input id={`${uid}-titleEn`} name="titleEn" defaultValue={page?.titleEn ?? ""} />
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div>
             <Label htmlFor={`${uid}-slug`}>Slug</Label>
             <Input
               id={`${uid}-slug`}
@@ -87,9 +101,6 @@ export function PageInspector({
               required
             />
           </div>
-        </div>
-
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div>
             <Label htmlFor={`${uid}-headerTabId`}>{nl ? "Categorie" : "Category"}</Label>
             <Select
@@ -105,71 +116,89 @@ export function PageInspector({
               ))}
             </Select>
           </div>
-          <div className="flex items-end gap-4">
-            <label className="inline-flex items-center gap-2 text-sm">
-              <input
-                type="checkbox"
-                name="visibleInHeader"
-                defaultChecked={page?.visibleInHeader ?? true}
-              />
-              {nl ? "Tonen in overzicht" : "Show in overview"}
-            </label>
-            <label className="inline-flex items-center gap-2 text-sm">
-              <input type="checkbox" name="published" defaultChecked={page?.published ?? false} />
-              {nl ? "Gepubliceerd" : "Published"}
-            </label>
-          </div>
         </div>
 
-        <div>
-          <Label htmlFor={`${uid}-excerptNl`}>
-            {nl ? "Korte beschrijving (NL)" : "Excerpt (NL)"}
-          </Label>
-          <Textarea
-            id={`${uid}-excerptNl`}
-            name="excerptNl"
-            rows={2}
-            defaultValue={page?.excerptNl ?? ""}
-          />
-          <p className="mt-1 text-xs text-[#5c667f]">
+        <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
+          <label className="inline-flex items-center gap-2 text-sm">
+            <input
+              type="checkbox"
+              name="visibleInHeader"
+              defaultChecked={page?.visibleInHeader ?? true}
+            />
+            {nl ? "Tonen in overzicht" : "Show in overview"}
+          </label>
+          <label className="inline-flex items-center gap-2 text-sm">
+            <input type="checkbox" name="published" defaultChecked={page?.published ?? false} />
+            {nl ? "Gepubliceerd" : "Published"}
+          </label>
+          <label className="inline-flex items-center gap-2 text-sm">
+            <input
+              type="checkbox"
+              name="needsYearlyEdit"
+              defaultChecked={page?.needsYearlyEdit ?? false}
+            />
+            {nl ? "Jaarlijks nakijken" : "Yearly review"}
+          </label>
+        </div>
+        <p className="-mt-3 text-xs text-[#5c667f]">
+          {nl
+            ? "Jaarlijks nakijken: de pagina bevat info die elk werkingsjaar verandert (namen, nummers, ...) en komt bovenaan het paginabeheer tot ze dat jaar bewerkt is."
+            : "Yearly review: the page holds info that changes every working year (names, numbers, ...) and stays on top of the pages admin until it has been edited that year."}
+        </p>
+
+        <fieldset className="space-y-2 border-t border-vtk-blue/10 pt-5">
+          <legend className="text-sm font-semibold text-vtk-ink">
+            {nl ? "Wie mag de inhoud bewerken?" : "Who can edit the content?"}
+          </legend>
+          <p className="text-xs text-[#5c667f]">
             {nl
-              ? "Verschijnt op de kaart op de categoriepagina."
-              : "Shows on the card on the category page."}
+              ? "Leden met een aangevinkte rol (en het recht \"Toegewezen pagina's bewerken\") kunnen deze pagina bewerken. Zonder rollen kan enkel \"Alle pagina's bewerken\" of een superadmin erbij."
+              : "Members holding a checked role (plus the \"Edit assigned pages\" permission) can edit this page. With no roles, only \"Edit all pages\" or a super admin can."}
           </p>
-        </div>
-
-        <div>
-          <Label>{nl ? "Inhoud (NL)" : "Content (NL)"}</Label>
-          <WysiwygEditor value={contentNl} onChange={setContentNl} />
-        </div>
-
-        <label className="inline-flex items-center gap-2 text-sm">
-          <input type="checkbox" checked={showEn} onChange={(e) => setShowEn(e.target.checked)} />
-          {nl ? "Engelstalige versie toevoegen" : "Add English version"}
-        </label>
-
-        {showEn && (
-          <div className="space-y-4 border-t border-vtk-blue/10 pt-5">
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <div>
-                <Label htmlFor={`${uid}-titleEn`}>Title (EN)</Label>
-                <Input id={`${uid}-titleEn`} name="titleEn" defaultValue={page?.titleEn ?? ""} />
-              </div>
-              <div>
-                <Label htmlFor={`${uid}-excerptEn`}>Excerpt (EN)</Label>
-                <Input
-                  id={`${uid}-excerptEn`}
-                  name="excerptEn"
-                  defaultValue={page?.excerptEn ?? ""}
+          <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-2">
+            {roles.map((role) => (
+              <label key={role.id} className="inline-flex items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  name="editorRoleIds"
+                  value={role.id}
+                  defaultChecked={page?.editorRoleIds.includes(role.id) ?? false}
                 />
-              </div>
-            </div>
-            <div>
-              <Label>Content (EN)</Label>
-              <WysiwygEditor value={contentEn} onChange={setContentEn} />
-            </div>
+                {role.name}
+              </label>
+            ))}
           </div>
-        )}
+        </fieldset>
+
+        <div className="grid grid-cols-1 gap-4 border-t border-vtk-blue/10 pt-5 sm:grid-cols-2">
+          <div>
+            <Label htmlFor={`${uid}-excerptNl`}>
+              {nl ? "Korte beschrijving (NL)" : "Excerpt (NL)"}
+            </Label>
+            <Textarea
+              id={`${uid}-excerptNl`}
+              name="excerptNl"
+              rows={2}
+              defaultValue={page?.excerptNl ?? ""}
+            />
+            <p className="mt-1 text-xs text-[#5c667f]">
+              {nl
+                ? "Verschijnt op de kaart op de categoriepagina."
+                : "Shows on the card on the category page."}
+            </p>
+          </div>
+          <div>
+            <Label htmlFor={`${uid}-excerptEn`}>
+              {nl ? "Korte beschrijving (EN)" : "Excerpt (EN)"}
+            </Label>
+            <Textarea
+              id={`${uid}-excerptEn`}
+              name="excerptEn"
+              rows={2}
+              defaultValue={page?.excerptEn ?? ""}
+            />
+          </div>
+        </div>
       </SaveForm>
 
       <div className="mt-6 border-t border-vtk-blue/10 pt-5">

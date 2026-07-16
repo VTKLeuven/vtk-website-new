@@ -30,12 +30,16 @@ export type PageNode = {
   titleEn: string | null;
   excerptNl: string | null;
   excerptEn: string | null;
-  contentJsonNl: unknown;
-  contentJsonEn: unknown;
   published: boolean;
+  needsYearlyEdit: boolean;
+  /** Rollen die de inhoud mogen bewerken (PageEditorRole). */
+  editorRoleIds: string[];
   order: number;
   assets: AssetNode[];
 };
+
+/** Rol-optie voor de bewerkrollen-checkboxes, naam al in de juiste taal. */
+export type RoleOption = { id: string; name: string };
 
 export type TabNode = {
   id: string;
@@ -69,17 +73,15 @@ export function ContentManager({
   locale,
   tabs,
   unlinked,
-  canEditPages,
+  roles,
   canDeletePages,
-  canManageHeader,
   usingDefaults,
 }: {
   locale: Locale;
   tabs: TabNode[];
   unlinked: PageNode[];
-  canEditPages: boolean;
+  roles: RoleOption[];
   canDeletePages: boolean;
-  canManageHeader: boolean;
   usingDefaults: boolean;
 }) {
   const nl = locale === "nl";
@@ -125,7 +127,7 @@ export function ContentManager({
     setDropTarget(null);
     if (!d) return;
 
-    if (d.kind === "tab" && canManageHeader) {
+    if (d.kind === "tab") {
       const ids = tabs.map((t) => t.id);
       const from = ids.indexOf(d.id);
       const to = ids.indexOf(tabId);
@@ -136,7 +138,7 @@ export function ContentManager({
       return;
     }
 
-    if (d.kind === "page" && canEditPages && d.fromTabId !== tabId) {
+    if (d.kind === "page" && d.fromTabId !== tabId) {
       startTransition(() => void movePageToTabAction(d.id, tabId));
     }
   }
@@ -145,7 +147,7 @@ export function ContentManager({
     const d = drag.current;
     drag.current = null;
     setDropTarget(null);
-    if (!d || d.kind !== "page" || !canEditPages) return;
+    if (!d || d.kind !== "page") return;
     if (d.id === target.id) return;
 
     if (d.fromTabId !== target.headerTabId) {
@@ -173,7 +175,7 @@ export function ContentManager({
     return (
       <button
         type="button"
-        draggable={canEditPages}
+        draggable
         onDragStart={() => {
           drag.current = { kind: "page", id: page.id, fromTabId: page.headerTabId };
         }}
@@ -237,7 +239,7 @@ export function ContentManager({
       >
         <button
           type="button"
-          draggable={canManageHeader}
+          draggable
           onDragStart={() => {
             drag.current = { kind: "tab", id: tab.id };
           }}
@@ -268,15 +270,13 @@ export function ContentManager({
           ))}
         </ul>
 
-        {canEditPages && (
-          <button
-            type="button"
-            onClick={() => select({ kind: "new-page", headerTabId: tab.id })}
-            className="mb-1 ml-8 mt-0.5 text-xs font-medium text-[#5c667f] hover:text-vtk-ink"
-          >
-            + {nl ? "Pagina toevoegen" : "Add page"}
-          </button>
-        )}
+        <button
+          type="button"
+          onClick={() => select({ kind: "new-page", headerTabId: tab.id })}
+          className="mb-1 ml-8 mt-0.5 text-xs font-medium text-[#5c667f] hover:text-vtk-ink"
+        >
+          + {nl ? "Pagina toevoegen" : "Add page"}
+        </button>
       </li>
     );
   }
@@ -288,18 +288,18 @@ export function ContentManager({
           <h1 className="text-2xl font-semibold">{nl ? "Inhoud" : "Content"}</h1>
           <p className="mt-1 text-sm text-[#5c667f]">
             {nl
-              ? "Sleep om de navigatie te herschikken of een pagina naar een andere categorie te verplaatsen. Klik om te bewerken."
-              : "Drag to reorder the navigation or move a page to another category. Click to edit."}
+              ? "Sleep om de navigatie te herschikken of een pagina naar een andere categorie te verplaatsen. Klik om instellingen te bewerken; de inhoud zelf bewerk je onder Pagina's."
+              : "Drag to reorder the navigation or move a page to another category. Click to edit settings; the content itself is edited under Pages."}
           </p>
         </div>
-        {canManageHeader && !usingDefaults && (
+        {!usingDefaults && (
           <Button onClick={() => select({ kind: "new-tab" })}>
             {nl ? "Nieuwe categorie" : "New category"}
           </Button>
         )}
       </div>
 
-      {usingDefaults && canManageHeader && <DefaultsNotice locale={locale} />}
+      {usingDefaults && <DefaultsNotice locale={locale} />}
 
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,360px)_minmax(0,1fr)]">
         <Card className="p-3">
@@ -332,7 +332,7 @@ export function ContentManager({
               const d = drag.current;
               drag.current = null;
               setDropTarget(null);
-              if (d?.kind === "page" && canEditPages && d.fromTabId !== null) {
+              if (d?.kind === "page" && d.fromTabId !== null) {
                 startTransition(() => void movePageToTabAction(d.id, null));
               }
             }}
@@ -354,15 +354,13 @@ export function ContentManager({
                   : "Drag a page here to take it out of the navigation."}
               </p>
             )}
-            {canEditPages && (
-              <button
-                type="button"
-                onClick={() => select({ kind: "new-page", headerTabId: null })}
-                className="ml-8 mt-1 text-xs font-medium text-[#5c667f] hover:text-vtk-ink"
-              >
-                + {nl ? "Losse pagina" : "Unlinked page"}
-              </button>
-            )}
+            <button
+              type="button"
+              onClick={() => select({ kind: "new-page", headerTabId: null })}
+              className="ml-8 mt-1 text-xs font-medium text-[#5c667f] hover:text-vtk-ink"
+            >
+              + {nl ? "Losse pagina" : "Unlinked page"}
+            </button>
           </div>
         </Card>
 
@@ -375,43 +373,35 @@ export function ContentManager({
             </Card>
           )}
 
-          {selectedTab && canManageHeader && (
+          {selectedTab && (
             <TabInspector key={selectedTab.id} locale={locale} tab={selectedTab} onClose={close} />
           )}
-          {selection.kind === "new-tab" && canManageHeader && (
+          {selection.kind === "new-tab" && (
             <TabInspector key="new-tab" locale={locale} tab={null} onClose={close} />
           )}
 
-          {selectedPage && canEditPages && (
+          {selectedPage && (
             <PageInspector
               key={selectedPage.id}
               locale={locale}
               page={selectedPage}
               tabs={tabs}
+              roles={roles}
               canDelete={canDeletePages}
               onClose={close}
             />
           )}
-          {selection.kind === "new-page" && canEditPages && (
+          {selection.kind === "new-page" && (
             <PageInspector
               key={`new-${selection.headerTabId ?? "none"}`}
               locale={locale}
               page={null}
               defaultTabId={selection.headerTabId}
               tabs={tabs}
+              roles={roles}
               canDelete={false}
               onClose={close}
             />
-          )}
-
-          {/* Wel geselecteerd, maar geen recht om het te bewerken. */}
-          {((selection.kind === "tab" && !canManageHeader) ||
-            (selection.kind === "page" && !canEditPages)) && (
-            <Card className="grid min-h-[320px] place-items-center p-8 text-center text-sm text-[#5c667f]">
-              {nl
-                ? "Je hebt geen rechten om dit te bewerken."
-                : "You do not have permission to edit this."}
-            </Card>
           )}
         </div>
       </div>

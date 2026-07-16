@@ -270,6 +270,7 @@
   "admin": {
     "title": "Admin",
     "dashboard": "Dashboard",
+    "pages": "Pagina's",
     "content": "Inhoud",
     "calendar": "Kalender",
     "users": "Gebruikers",

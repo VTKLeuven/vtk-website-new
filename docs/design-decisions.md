@@ -39,6 +39,43 @@ De volgorde en labels zijn dus een kringkeuze, geen technische:
 
 ---
 
+## Infopagina's — wie schrijft wat, en het jaarlijkse nakijken
+
+Infopagina's (`Page`) worden door de werkgroepen/posten zelf onderhouden, niet door
+één centrale beheerder. De keuzes:
+
+- **Bewerken is per rol.** Een pagina krijgt in `/admin/inhoud` één of meer
+  **bewerkrollen** (`PageEditorRole`, meerdere rollen per pagina kan). Wie het recht
+  `pages.edit` heeft én zo'n rol draagt (dit werkingsjaar), mag de **inhoud** van die
+  pagina bewerken in `/admin/paginas`. `pages.editAll` en superadmins mogen alles.
+  - **Een pagina zonder bewerkrollen is vergrendeld**: enkel `pages.editAll` of een
+    superadmin kan erbij. Een rol toekennen is dus de bewuste handeling die een
+    pagina openzet, geen beperking achteraf.
+- **Structuur en metadata zijn een aparte bevoegdheid** (`pages.manage`, het scherm
+  `/admin/inhoud`): welke categorieën in de header staan, welke pagina daaronder
+  hangt, slug, publicatie, bewerkrollen en het jaarlijks-nakijken-vinkje.
+  Verwijderen vergt `pages.delete`.
+- **Jaarlijks nakijken** (`needsYearlyEdit`): sommige pagina's bevatten info die elk
+  werkingsjaar verandert (namen, telefoonnummers, verantwoordelijken). Die pagina's
+  staan bovenaan `/admin/paginas` met een gele markering zolang hun inhoud sinds de
+  start van het werkingsjaar (15 juli, dezelfde cutover als de rollen) niet meer is
+  opgeslagen (`contentEditedAt`). Opslaan in de editor is meteen het afvinken; er is
+  bewust geen aparte "gezien"-knop.
+- **Inhoud is markdown.** De editor is platte tekst (markdown) met een
+  voorbeeld-tab en een werkbalk voor de basis (koppen, vet, links, afbeeldingen,
+  lijsten); geavanceerdere markdown werkt maar krijgt geen knop. De oude
+  WYSIWYG-inhoud (tiptap-JSON) blijft renderen tot een pagina één keer in de nieuwe
+  editor is opgeslagen: de editor toont dan een automatische omzetting die de
+  bewerker zelf nakijkt vóór het opslaan.
+- **Geen PDF's in de inhoud.** PDF's en andere bestanden horen bij de **bijlagen**
+  van de pagina (sectie onder de editor); downloads verschijnen onderaan de
+  publieke pagina.
+- **Twee geldige URL's.** Elke gepubliceerde pagina is bereikbaar op
+  `/p/<slug>`; hangt ze onder een headercategorie, dan ook op
+  `/<categorie-slug>/<slug>`. Beide blijven werken.
+
+---
+
 ## Theokot — broodjes-reservatiesysteem
 
 Theokot is de cafetaria/broodjesbar van VTK. Studenten reserveren vooraf broodjes,

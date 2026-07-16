@@ -270,6 +270,7 @@
   "admin": {
     "title": "Admin",
     "dashboard": "Dashboard",
+    "pages": "Pages",
     "content": "Content",
     "calendar": "Calendar",
     "users": "Users",

@@ -10,6 +10,8 @@ export async function POST(request: Request) {
   if (
     !session.user.isSuperAdmin &&
     !hasPermission(session, "pages.edit") &&
+    !hasPermission(session, "pages.editAll") &&
+    !hasPermission(session, "pages.manage") &&
     !hasPermission(session, "photos.upload") &&
     !hasPermission(session, "home.edit") &&
     !hasPermission(session, "partners.manage") &&

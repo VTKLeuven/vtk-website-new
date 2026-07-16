@@ -1,17 +1,17 @@
 import { notFound } from "next/navigation";
 import { prisma } from "@vtk/db";
 import { hasLocale } from "@/lib/locale";
-import { requireAnyPermission } from "@/lib/session";
+import { requirePermission } from "@/lib/session";
 import { hasPermission } from "@vtk/auth";
 import { publicUrl } from "@/lib/storage";
 import type { Locale } from "@vtk/i18n";
-import { ContentManager, type TabNode, type PageNode } from "./ContentManager";
+import { ContentManager, type TabNode, type PageNode, type RoleOption } from "./ContentManager";
 
 /**
- * Beheer van de navigatiestructuur en alle CMS-pagina's op één scherm: welke
- * categorieën in de header staan, wat er op die categoriepagina's komt, en de
- * inhoud van de pagina's eronder. Vervangt de losse /admin/header en
- * /admin/paginas.
+ * Beheer van de navigatiestructuur: welke categorieën in de header staan, welke
+ * pagina's daaronder hangen, en de metadata van die pagina's (slug, rollen,
+ * publicatie, bijlagen). De INHOUD van een pagina bewerk je niet hier maar in
+ * /admin/paginas; elke pagina heeft daarvoor een snelkoppeling.
  */
 export default async function AdminContent({
   params,
@@ -22,18 +22,25 @@ export default async function AdminContent({
   if (!hasLocale(localeParam)) notFound();
   const locale: Locale = localeParam;
 
-  const session = await requireAnyPermission(["pages.edit", "header.manage"]);
-  const canEditPages = hasPermission(session, "pages.edit");
+  const session = await requirePermission("pages.manage");
   const canDeletePages = hasPermission(session, "pages.delete");
-  const canManageHeader = hasPermission(session, "header.manage");
 
-  const [tabs, pages] = await Promise.all([
+  const [tabs, pages, roles] = await Promise.all([
     prisma.headerTab.findMany({ orderBy: { order: "asc" } }),
     prisma.page.findMany({
-      include: { assets: { orderBy: { order: "asc" } } },
+      include: {
+        assets: { orderBy: { order: "asc" } },
+        editorRoles: { select: { roleId: true } },
+      },
       orderBy: [{ order: "asc" }, { titleNl: "asc" }],
     }),
+    prisma.role.findMany({ orderBy: [{ order: "asc" }, { nameNl: "asc" }] }),
   ]);
+
+  const roleOptions: RoleOption[] = roles.map((r) => ({
+    id: r.id,
+    name: locale === "nl" ? r.nameNl : r.nameEn,
+  }));
 
   const toPageNode = (p: (typeof pages)[number]): PageNode => ({
     id: p.id,
@@ -44,9 +51,9 @@ export default async function AdminContent({
     titleEn: p.titleEn,
     excerptNl: p.excerptNl,
     excerptEn: p.excerptEn,
-    contentJsonNl: p.contentJsonNl,
-    contentJsonEn: p.contentJsonEn,
     published: Boolean(p.publishedAt),
+    needsYearlyEdit: p.needsYearlyEdit,
+    editorRoleIds: p.editorRoles.map((r) => r.roleId),
     order: p.order,
     assets: p.assets.map((a) => ({
       id: a.id,
@@ -79,9 +86,8 @@ export default async function AdminContent({
       locale={locale}
       tabs={tabNodes}
       unlinked={unlinked}
-      canEditPages={canEditPages}
+      roles={roleOptions}
       canDeletePages={canDeletePages}
-      canManageHeader={canManageHeader}
       usingDefaults={tabs.length === 0}
     />
   );

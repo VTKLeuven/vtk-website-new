@@ -58,6 +58,12 @@ export type SessionPayload = {
   user: AuthUser;
   groups: AuthGroup[];
   permissions: string[];
+  /**
+   * Rol-id's van de gebruiker voor het huidige werkingsjaar (direct toegewezen
+   * plus via posten, zelfde resolutie als `permissions`). Gebruikt voor checks
+   * die aan een specifieke rol hangen, zoals paginabewerking (PageEditorRole).
+   */
+  roleIds: string[];
 };
 
 export function hasPermission(

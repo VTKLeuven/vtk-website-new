@@ -1,0 +1,19 @@
+We need information pages that can be edited by users of a role.
+
+Make a new item in the admin screen, this should be a list of pages (use the same table components as Ledenbeheer), pages are already defined in the database and have some functions associated with them.
+Clicking on a page should open a full size screen where people can edit their page in plain tekst (markdown formatting) and can also choose to switch to a render preview
+=> This should be possible to do in both dutch and english
+Pages should be able to hold tekst, different sizes of heading, but also links (markdown style) and images
+
+Pages should also have a "needs to change" attribute (name is a work in progress), But these are pages that need to be edited every academic year because the information on those pages (like names and or phone numbers), need to be edited every year
+In that case they should be put at the top of the "pages" list together with a visual cue that the page in question has not been edited yet in the current year (keep track of a last edited value or something)
+
+Permissions for pages work a bit different. You still need the pages.edit and pages.remove roles to edit and manage pages.
+But pages are also now assign a "role" and unless you have superadmin or pages.editAll permissions you can only edit pages that have one of your assigned roles.
+
+Lastly the admin/inhoud page should only be visibile to users who hold the pages.manage permission, this page should also only be used to edit what pages fall under what header items/[headerSlug].
+Do include a button to quickly go to a pages edit page.
+pages are by default accessible under [locale]/page/[pageSlug] (I think this is what the [locale]/p/[pageSlug] directory is for, if so you can keep it at /p/ otherwise make a new route /page/).
+And if a page is set as part of a header Item it should also be accessible under [locale]/[headerSlug]/[pageSlug]. (both links should be valid).
+
+Once everything is implemented, we will tackle the UI of all of these new (and existing pages).
