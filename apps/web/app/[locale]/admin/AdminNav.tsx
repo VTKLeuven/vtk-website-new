@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useState, type ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 
 export type NavItem = {
   key: string;
@@ -68,10 +68,15 @@ function NavGroup({ group, pathname }: { group: Extract<NavNode, { type: "group"
   const [open, setOpen] = useState(containsActive);
 
   // Navigeert de gebruiker naar een item in deze groep terwijl ze ingeklapt is
-  // (de layout blijft gemount tussen admin-routes), klap ze dan open.
-  useEffect(() => {
+  // (de layout blijft gemount tussen admin-routes), klap ze dan open. We passen
+  // de state tijdens het renderen aan i.p.v. in een effect: dat vermijdt
+  // cascading renders. `open` blijft daarna toggelbaar via de knop, en we klappen
+  // nooit automatisch weer dicht.
+  const [prevContainsActive, setPrevContainsActive] = useState(containsActive);
+  if (containsActive !== prevContainsActive) {
+    setPrevContainsActive(containsActive);
     if (containsActive) setOpen(true);
-  }, [containsActive]);
+  }
 
   return (
     <>

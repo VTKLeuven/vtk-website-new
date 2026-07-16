@@ -111,12 +111,11 @@ export function SortHeader({
   align?: "left" | "right";
 }) {
   return (
-    <th>
+    <th aria-sort={active ? (active === "asc" ? "ascending" : "descending") : "none"}>
       <button
         type="button"
         onClick={onClick}
         className={"inline-flex items-center gap-1 " + (align === "right" ? "flex-row-reverse" : "")}
-        aria-sort={active ? (active === "asc" ? "ascending" : "descending") : "none"}
       >
         <span>{label}</span>
         <SortCaret dir={active} />
