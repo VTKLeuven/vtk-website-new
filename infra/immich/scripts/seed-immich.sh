@@ -17,7 +17,7 @@ source "$ROOT_DIR/.env"
 set +a
 
 IMMICH_URL="${IMMICH_URL:-http://localhost:2283}"
-PUBLIC_PROXY_URL="${PUBLIC_PROXY_URL:-http://localhost:3000}"
+PUBLIC_PROXY_URL="${PUBLIC_PROXY_URL:-http://localhost:3014}"
 GALLERY_ALBUM_MARKER="${GALLERY_ALBUM_MARKER:-[gallery]}"
 IMMICH_ADMIN_EMAIL="${IMMICH_ADMIN_EMAIL:-portfolio@example.test}"
 IMMICH_ADMIN_PASSWORD="${IMMICH_ADMIN_PASSWORD:-ImmichPortfolio123}"

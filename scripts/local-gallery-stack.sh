@@ -141,4 +141,4 @@ esac
 
 log "Ready"
 [[ "$WEB_MODE" == "docker" ]] && printf '  Website: http://127.0.0.1:3011/media\n'
-[[ "$START_IMMICH" == "true" ]] && printf '  Immich:  http://127.0.0.1:2283\n  Proxy:   http://127.0.0.1:3001/share/healthcheck\n'
+[[ "$START_IMMICH" == "true" ]] && printf '  Immich:  http://127.0.0.1:2283\n  Proxy:   http://127.0.0.1:3014/share/healthcheck\n'

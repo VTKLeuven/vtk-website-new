@@ -33,7 +33,7 @@ Copy `.env.example` to `.env` and fill in the gallery values:
 ```dotenv
 GALLERY_IMMICH_API_URL="http://localhost:2283/api"
 GALLERY_IMMICH_API_KEY="<immich-api-key>"
-GALLERY_PUBLIC_PROXY_URL="http://localhost:3001"
+GALLERY_PUBLIC_PROXY_URL="http://localhost:3014"
 GALLERY_ALBUM_MARKER="[gallery]"
 GALLERY_CACHE_TTL_SECONDS="60"
 ```
@@ -149,7 +149,7 @@ docker compose -f infra/docker-compose.yml up -d --build web
 Open `http://127.0.0.1:3011/media`.
 
 On the server, Caddy should proxy the Immich management hostname to
-`127.0.0.1:2283` and the public gallery hostname to `127.0.0.1:3001`. Set both
+`127.0.0.1:2283` and the public gallery hostname to `127.0.0.1:3014`. Set both
 `PUBLIC_BASE_URL` in `infra/immich/.env` and `GALLERY_PUBLIC_PROXY_URL` in the
 root `.env` to that public gallery URL.
 

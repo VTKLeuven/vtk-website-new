@@ -493,7 +493,7 @@ immich.vtk.be {
 }
 
 photos.vtk.be {
-    reverse_proxy 127.0.0.1:3001
+    reverse_proxy 127.0.0.1:3014
 }
 ```
 
@@ -522,7 +522,7 @@ This brings up:
 | `immich-machine-learning` | Immich face recognition and search          |
 | `immich-redis` | Private Immich queue/cache                             |
 | `immich-database` | Private Immich PostgreSQL with face embeddings      |
-| `immich-public-proxy` | Public gallery proxy on **127.0.0.1:3001**      |
+| `immich-public-proxy` | Public gallery proxy on **127.0.0.1:3014**      |
 
 During image **build**, the `web` Dockerfile runs `prisma generate` and
 `next build`. At **container start**, the default command runs
