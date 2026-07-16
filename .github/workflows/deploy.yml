@@ -91,6 +91,11 @@ jobs:
             git fetch --all &&
             git reset --hard origin/main &&
 
+            # Trigger the automount and refuse to deploy against a local fallback
+            # directory when the 12 TB NFS filesystem is unavailable.
+            timeout 30 stat /mnt/immich/.immich-storage-ready >/dev/null 2>&1 &&
+            findmnt -rn -M /mnt/immich -t nfs4 >/dev/null &&
+
             # Validate, build, restart, and remove services deleted from Compose.
             docker compose -f infra/docker-compose.yml config --quiet &&
             docker compose -f infra/docker-compose.yml up -d --build --remove-orphans

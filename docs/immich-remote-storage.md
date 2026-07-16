@@ -285,24 +285,9 @@ The `hard` mount option is intentional. If the storage server temporarily
 disappears, filesystem operations wait instead of silently losing or partially
 writing media.
 
-## 6. Make the Compose media path configurable
+## 6. Configure the Compose media path
 
-Make this change in the repository and commit it. Do not edit only the server
-checkout because the deployment workflow resets it to `origin/main`.
-
-In `infra/docker-compose.yml`, find the `immich-server` volume:
-
-```yaml
-- ./immich/data/library:/data
-```
-
-Replace it with:
-
-```yaml
-- ${IMMICH_MEDIA_LOCATION:-./immich/data/library}:/data
-```
-
-The complete volume section should be:
+The repository already makes the `immich-server` media path configurable:
 
 ```yaml
 immich-server:
@@ -320,32 +305,28 @@ On the cloud server, add this to the repository-root `.env`:
 IMMICH_MEDIA_LOCATION=/mnt/immich
 ```
 
-The root `.env` is ignored by Git and survives deployments.
+The root `.env` is ignored by Git and survives deployments. This is the only
+server-side setting needed to select the NFS media path; do not edit the
+Compose file on the server.
 
-## 7. Add a mount guard to deployment
+## 7. Deployment mount guard
 
-In `.github/workflows/deploy.yml`, add the following checks immediately before
-the Compose validation/build commands in the remote SSH script:
-
-```bash
-timeout 30 test -f /mnt/immich/.immich-storage-ready &&
-test "$(findmnt -rn -M /mnt/immich -o FSTYPE)" = "nfs4" &&
-```
-
-The end of the SSH deployment script should look like this:
+The repository's `.github/workflows/deploy.yml` already triggers the automount
+and refuses to deploy unless `/mnt/immich` is an NFSv4 mount containing the
+remote marker. Its deployment guard is:
 
 ```bash
 # Refuse deployment if the 12 TB NFS storage is unavailable.
-timeout 30 test -f /mnt/immich/.immich-storage-ready &&
-test "$(findmnt -rn -M /mnt/immich -o FSTYPE)" = "nfs4" &&
+timeout 30 stat /mnt/immich/.immich-storage-ready >/dev/null 2>&1 &&
+findmnt -rn -M /mnt/immich -t nfs4 >/dev/null &&
 
 docker compose -f infra/docker-compose.yml config --quiet &&
 docker compose -f infra/docker-compose.yml up -d --build --remove-orphans
 ```
 
-This is essential: without the marker and filesystem-type checks, Docker could
-start Immich against an empty local `/mnt/immich` directory after an NFS mount
-failure, splitting media between the two servers.
+Do not remove this guard. Without the marker and filesystem-type checks, Docker
+could start Immich against an empty local `/mnt/immich` directory after an NFS
+mount failure, splitting media between the two servers.
 
 ## 8. Migrate existing Immich media
 
