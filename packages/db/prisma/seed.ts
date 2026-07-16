@@ -47,6 +47,31 @@ function headingDoc(title: string, paragraphs: string[]): object {
   };
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function mergeSettingItemsById(existingValue: unknown, defaultValue: unknown): object {
+  const defaults = isRecord(defaultValue) ? defaultValue : {};
+  const existing = isRecord(existingValue) ? existingValue : {};
+  const defaultItems = Array.isArray(defaults.items) ? defaults.items : [];
+  const existingItems = Array.isArray(existing.items) ? existing.items : [];
+  const existingIds = new Set(
+    existingItems.flatMap((item) =>
+      isRecord(item) && typeof item.id === "string" ? [item.id] : [],
+    ),
+  );
+  const missingItems = defaultItems.filter(
+    (item) => !isRecord(item) || typeof item.id !== "string" || !existingIds.has(item.id),
+  );
+
+  return {
+    ...defaults,
+    ...existing,
+    items: [...existingItems, ...missingItems],
+  };
+}
+
 async function main() {
   console.log("Seeding groups...");
   // Create-only: een reseed op een DB met data mag bestaande groepen (naam,
@@ -122,6 +147,17 @@ async function main() {
     }
   }
 
+  // Marketing (Communicatie) maintains the public media page.
+  const communicatie = await prisma.group.findUnique({ where: { code: "COMMUNICATIE" } });
+  const mediaManage = await prisma.permission.findUnique({ where: { code: "media.manage" } });
+  if (communicatie && mediaManage) {
+    await prisma.groupPermission.upsert({
+      where: { groupId_permissionId: { groupId: communicatie.id, permissionId: mediaManage.id } },
+      update: {},
+      create: { groupId: communicatie.id, permissionId: mediaManage.id },
+    });
+  }
+
   // De post Theokot beheert het broodjes-reservatiesysteem en bedient de afhaalbalie.
   const theokotPerms = await prisma.permission.findMany({
     where: { code: { in: ["theokot.manage", "theokot.pickup"] } },
@@ -138,7 +174,12 @@ async function main() {
   }
 
   console.log("Seeding default homepage settings...");
-  const defaultSettings: Array<{ key: string; value: unknown }> = [
+  const defaultSettings: Array<{
+    key: string;
+    value: unknown;
+    preserveExisting?: boolean;
+    mergeItemsById?: boolean;
+  }> = [
     {
       key: "home.openingHours.cursusdienst",
       value: {
@@ -208,6 +249,115 @@ async function main() {
     // Theokot-configuratie: waarden die niet elke week wijzigen. maxItemsPerOrder = X,
     // maxWeeklySpecialPerOrder = Y (X > Y). Tijden zijn "HH:mm" in Brussel-tijd.
     {
+      key: "media.aftermovies",
+      preserveExisting: true,
+      value: {
+        titleNl: "Aftermovies",
+        titleEn: "Aftermovies",
+        items: [
+          {
+            id: "galabal-aftermovie",
+            type: "video",
+            url: "https://www.youtube.com/watch?v=WdGqhrVUJog",
+            titleNl: "Galabal aftermovie",
+            titleEn: "Gala aftermovie",
+          },
+          {
+            id: "jobfair-aftermovie",
+            type: "video",
+            url: "https://www.youtube.com/watch?v=9CyqfzXWYME",
+            titleNl: "Jobfair aftermovie",
+            titleEn: "Job fair aftermovie",
+          },
+        ],
+      },
+    },
+    {
+      key: "media.magazines",
+      mergeItemsById: true,
+      value: {
+        items: [
+          {
+            id: "bakske-2025-2026-s2w6",
+            kind: "bakske",
+            titleNl: "Het Bakske",
+            titleEn: "Het Bakske",
+            issueNl: "Week 6 / Semester 2, 2025-2026",
+            issueEn: "Week 6 / Semester 2, 2025-2026",
+            publishedAt: "2026-03-15",
+            pdfUrl:
+              "https://vtk.be/_publications/pdf/a88e502ea825c3395a47cbb28d3a3ee96f9b81ee.pdf",
+          },
+          {
+            id: "bakske-2025-2026-s2w4",
+            kind: "bakske",
+            titleNl: "Het Bakske",
+            titleEn: "Het Bakske",
+            issueNl: "Week 4 / Semester 2, 2025-2026",
+            issueEn: "Week 4 / Semester 2, 2025-2026",
+            publishedAt: "2026-03-01",
+            pdfUrl:
+              "https://vtk.be/_publications/pdf/9a4677aa5dea8e0f3a7bf2a0c1812a6eae49142c.pdf",
+          },
+          {
+            id: "bakske-2025-2026-s2w3",
+            kind: "bakske",
+            titleNl: "Het Bakske",
+            titleEn: "Het Bakske",
+            issueNl: "Week 3 / Semester 2, 2025-2026",
+            issueEn: "Week 3 / Semester 2, 2025-2026",
+            publishedAt: "2026-02-22",
+            pdfUrl:
+              "https://vtk.be/_publications/pdf/a7f09c8575986b9b010d7ce5348b6d76fd13b3de.pdf",
+          },
+          {
+            id: "bakske-2025-2026-s1w2",
+            kind: "bakske",
+            titleNl: "Het Bakske",
+            titleEn: "Het Bakske",
+            issueNl: "Week 2 / Semester 1, 2025-2026",
+            issueEn: "Week 2 / Semester 1, 2025-2026",
+            publishedAt: "2025-09-29",
+            pdfUrl:
+              "https://vtk.be/_publications/pdf/a5251f173ff84324bef666dabc03484b91b35f15.pdf",
+          },
+          {
+            id: "ir-reeel-2025-september",
+            kind: "ir-reeel",
+            titleNl: "Ir.Reëel",
+            titleEn: "Ir.Reëel",
+            issueNl: "September 2025, 2025-2026",
+            issueEn: "September 2025, 2025-2026",
+            publishedAt: "2025-09-01",
+            pdfUrl:
+              "https://vtk.be/_publications/pdf/bea5a73905a541b43900d7529c0793a5e24a957a.pdf",
+          },
+          {
+            id: "ir-reeel-2024-2025-2",
+            kind: "ir-reeel",
+            titleNl: "Ir.Reëel",
+            titleEn: "Ir.Reëel",
+            issueNl: "Editie 2, 2024-2025",
+            issueEn: "Issue 2, 2024-2025",
+            publishedAt: "2024-12-03",
+            pdfUrl:
+              "https://vtk.be/_publications/pdf/fc365177942f2411e10340faf2613ba70d1221b8.pdf",
+          },
+          {
+            id: "ir-reeel-2023-2024-4",
+            kind: "ir-reeel",
+            titleNl: "Ir.Reëel",
+            titleEn: "Ir.Reëel",
+            issueNl: "Editie 4, 2023-2024",
+            issueEn: "Issue 4, 2023-2024",
+            publishedAt: "2024-04-25",
+            pdfUrl:
+              "https://vtk.be/_publications/pdf/81d2550a98e49f4bd35962a62e3d2c992e415b6d.pdf",
+          },
+        ],
+      },
+    },
+    {
       key: "theokot.config",
       value: {
         maxItemsPerOrder: 5,
@@ -236,6 +386,17 @@ async function main() {
   // handmatige reseed die aanpassingen niet terugdraait naar de defaults.
   // Een verse of gereset DB krijgt nog steeds alle defaults via `create`.
   for (const s of defaultSettings) {
+    if (s.mergeItemsById) {
+      const existing = await prisma.setting.findUnique({ where: { key: s.key } });
+      const value = existing ? mergeSettingItemsById(existing.value, s.value) : (s.value as object);
+      await prisma.setting.upsert({
+        where: { key: s.key },
+        update: { value },
+        create: { key: s.key, value },
+      });
+      continue;
+    }
+
     await prisma.setting.upsert({
       where: { key: s.key },
       update: {},

@@ -1,0 +1,155 @@
+{
+  "seedVersion": "vtk-gallery-v2",
+  "albums": [
+    {
+      "slug": "24-urenloop-2025",
+      "title": "24 Urenloop 2025",
+      "event": "Sport",
+      "place": "Leuven",
+      "date": "2025-10-22",
+      "description": "Een album vol rondes, supporters, nachtshifts en VTK-sfeer tijdens de 24 Urenloop.",
+      "photos": [
+        { "title": "Startschot", "description": "De eerste meters op de piste met het VTK-team klaar voor 24 uur lopen." },
+        { "title": "Supportersvak", "description": "Geel-blauwe sfeer langs het parcours, met spandoeken en luide aanmoedigingen." },
+        { "title": "Nachtshift", "description": "Lopers en shifters houden het ritme hoog wanneer Leuven al donker is." },
+        { "title": "Laatste Ronde", "description": "De laatste inspanning voor de finish, gedragen door de hele kring." },
+        { "title": "Podiumsfeer", "description": "Een afsluitend beeld van ploeggevoel, vlaggen en vermoeide glimlachen." }
+      ]
+    },
+    {
+      "slug": "galabal-vtk-2025",
+      "title": "Galabal VTK Leuven 2025",
+      "event": "Galabal",
+      "place": "Leuven",
+      "date": "2025-03-14",
+      "description": "Formele portretten, receptiemomenten, speeches en dansvloerbeelden van het VTK Galabal.",
+      "photos": [
+        { "title": "Aankomst", "description": "Gasten in avondkledij bij de inkom, net voor de zaal opengaat." },
+        { "title": "Receptie", "description": "Glazen, gesprekken en de eerste groepsfoto's van de avond." },
+        { "title": "Tafelrede", "description": "Een rustig beeld van de zaal tijdens het diner en de speeches." },
+        { "title": "Openingsdans", "description": "Het eerste dansmoment onder warm licht." },
+        { "title": "Late Uren", "description": "De dansvloer vol energie wanneer het feest op kruissnelheid zit." }
+      ]
+    },
+    {
+      "slug": "openingscantus",
+      "title": "Openingscantus",
+      "event": "Cantus",
+      "place": "Leuven",
+      "date": "2025-09-26",
+      "description": "De cantus waarmee het academiejaar luid wordt ingezet, met kringliederen en tafels vol studenten.",
+      "photos": [
+        { "title": "Io Vivat", "description": "De zaal zingt mee bij het begin van de cantus." },
+        { "title": "Praesidiumtafel", "description": "Het praesidium leidt de avond met codex, linten en VTK-kleuren." },
+        { "title": "Tafelritme", "description": "Studenten zingen en klinken mee aan lange tafels." },
+        { "title": "Kringlied", "description": "Een luid moment wanneer de kringliederen door de zaal gaan." },
+        { "title": "Einde Cantus", "description": "De laatste liederen en groepsfoto's na een lange avond." }
+      ]
+    },
+    {
+      "slug": "onthaaldagen-2025",
+      "title": "Onthaaldagen 2025",
+      "event": "Eerstejaars",
+      "place": "Arenberg",
+      "date": "2025-09-13",
+      "description": "Nieuwe studenten leren VTK, de campus en elkaar kennen tijdens de onthaaldagen.",
+      "photos": [
+        { "title": "Welkom Op Arenberg", "description": "Eerstejaars komen aan op campus Arenberg voor hun eerste VTK-activiteit." },
+        { "title": "Groepsspel", "description": "Kennismakingsspelletjes met nieuwe vrienden en begeleiders." },
+        { "title": "Campusroute", "description": "Een rondleiding langs aula's, fakbar en vaste plekken op de campus." },
+        { "title": "Peter Meter Moment", "description": "Studenten vinden hun groep en maken plannen voor het jaar." },
+        { "title": "Avondactiviteit", "description": "De dag sluit af met muziek, gesprekken en veel nieuwe gezichten." }
+      ]
+    },
+    {
+      "slug": "skireis-2026",
+      "title": "Skireis 2026",
+      "event": "Reis",
+      "place": "Alpen",
+      "date": "2026-02-07",
+      "description": "Sneeuw, busritten, pistes en apres-ski: een winteralbum van de VTK Skireis.",
+      "photos": [
+        { "title": "Bus Vertrek", "description": "De reis begint vroeg met bagage, ski's en een volle bus." },
+        { "title": "Eerste Piste", "description": "Studenten trekken de berg op voor de eerste afdaling." },
+        { "title": "Bergpauze", "description": "Een rustmoment met zicht op sneeuw, zon en helmen op tafel." },
+        { "title": "Apres-Ski", "description": "De groep verzamelt na het skien voor muziek en warme lichten." },
+        { "title": "Laatste Dag", "description": "Een groepsbeeld op de piste voor de terugrit naar Leuven." }
+      ]
+    },
+    {
+      "slug": "jobfair-2024",
+      "title": "VTK Jobfair 2024",
+      "event": "Career",
+      "place": "Leuven",
+      "date": "2024-11-20",
+      "description": "Bedrijven, studenten, stands en gesprekken tijdens de VTK Jobfair.",
+      "photos": [
+        { "title": "Standenhal", "description": "De eerste blik op de beursvloer met bedrijven en bezoekers." },
+        { "title": "CV Gesprek", "description": "Een student bespreekt stage- en jobkansen aan een stand." },
+        { "title": "Bedrijfspitch", "description": "Een korte pitchmoment voor studenten met technische interesse." },
+        { "title": "Netwerkmoment", "description": "Informele gesprekken tussen studenten, recruiters en alumni." },
+        { "title": "Career Team", "description": "Het VTK Career-team sluit een drukke beursdag af." }
+      ]
+    },
+    {
+      "slug": "interfacultaire-rockrally",
+      "title": "Interfacultaire Rockrally",
+      "event": "Cultuur",
+      "place": "Leuven",
+      "date": "2025-04-25",
+      "description": "Bands, publiek, podiumlicht en juryspanning tijdens de Interfacultaire Rockrally.",
+      "photos": [
+        { "title": "Soundcheck", "description": "Kabels, gitaren en lichttests net voor de deuren opengaan." },
+        { "title": "Eerste Band", "description": "De opener zet meteen energie in de zaal." },
+        { "title": "Publiek Voorin", "description": "Studenten dicht bij het podium tijdens een luide refrein." },
+        { "title": "Jury Moment", "description": "De jury overlegt terwijl de volgende act klaarstaat." },
+        { "title": "Finale", "description": "Een laatste podiumbeeld met lichten, rook en applaus." }
+      ]
+    },
+    {
+      "slug": "fakbar-avond",
+      "title": "Fakbar Avond",
+      "event": "Fakbar",
+      "place": "Fakbar",
+      "date": "2025-05-09",
+      "description": "Een losse avond in de Fakbar met vrienden, pintjes, shifters en VTK-muziek.",
+      "photos": [
+        { "title": "Barshift", "description": "Shifters achter de toog houden de avond draaiende." },
+        { "title": "Vriendentafel", "description": "Een groep studenten verzamelt rond een hoge tafel." },
+        { "title": "Geel Blauwe Hoek", "description": "VTK-kleuren en affiches als decor voor een drukke avond." },
+        { "title": "Laatste Bestelling", "description": "Een barbeeld vlak voor sluitingstijd." },
+        { "title": "Na De Shift", "description": "Het team ruimt op en lacht na over de avond." }
+      ]
+    },
+    {
+      "slug": "vtkuisine",
+      "title": "VTKuisine",
+      "event": "Aanbod",
+      "place": "Leuven",
+      "date": "2025-12-03",
+      "description": "Koken, proeven en samen eten tijdens een VTKuisine-avond.",
+      "photos": [
+        { "title": "Prep Team", "description": "Studenten snijden, roeren en zetten de keuken klaar." },
+        { "title": "Pannen Op Het Vuur", "description": "Een close-up van de kookactie tijdens de drukste minuten." },
+        { "title": "Proeftafel", "description": "Borden worden klaargezet voor de eerste ronde." },
+        { "title": "Samen Eten", "description": "Deelnemers schuiven aan voor een warme maaltijd." },
+        { "title": "Keukenploeg", "description": "De ploeg achter VTKuisine poseert na de service." }
+      ]
+    },
+    {
+      "slug": "sportweek",
+      "title": "Sportweek",
+      "event": "Sport",
+      "place": "Arenberg",
+      "date": "2025-05-21",
+      "description": "Een week vol tornooien, trainingen en ploegmomenten op en rond Arenberg.",
+      "photos": [
+        { "title": "Ochtendtraining", "description": "De eerste teams warmen op in de ochtendzon." },
+        { "title": "Volleybalpunt", "description": "Een spannend punt tijdens een interfacultair volleybalduel." },
+        { "title": "Loopgroep", "description": "Studenten verzamelen voor een gezamenlijke run." },
+        { "title": "Teamoverleg", "description": "Een korte bespreking voor de volgende match." },
+        { "title": "Finale Fluit", "description": "De sportweek eindigt met applaus, scoreborden en groepsfoto's." }
+      ]
+    }
+  ]
+}

@@ -311,6 +311,9 @@ export function RegisteredShiftsTable({ locale }: { locale: Locale; userId: stri
   const showToast = useToast();
   const shifts = useShiftList('/api/shift/register');
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  // Snapshot the clock once at mount: reading it during render is impure, and a
+  // stale "within 24h" flag across a long-open tab is harmless (a refresh fixes it).
+  const [now] = useState(() => Date.now());
 
   const toggle = (id: string) => setExpandedId((cur) => (cur === id ? null : id));
 
@@ -338,7 +341,7 @@ export function RegisteredShiftsTable({ locale }: { locale: Locale; userId: stri
             ) : (
               shifts.map((shift) => {
                 // Binnen 24u voor de start kan je jezelf niet meer uitschrijven.
-                const locked = shift.startTime.getTime() - Date.now() < 24 * 60 * 60 * 1000;
+                const locked = shift.startTime.getTime() - now < 24 * 60 * 60 * 1000;
                 return (
                   <Fragment key={shift.id}>
                     <tr className="vtk-basic-row-click" onClick={() => toggle(shift.id)}>

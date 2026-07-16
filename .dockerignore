@@ -10,11 +10,21 @@
 # Next.js build output / caches (built fresh in the image)
 **/.next
 **/.turbo
+*.tsbuildinfo
 
 # Version control & CI
 .git
 .gitignore
 .github
+
+# Secrets & local config (never ship into the build context)
+.env
+.env.*
+**/.env
+**/.env.*
+!.env.example
+!**/.env.example
+.claude
 
 # Logs & OS cruft
 **/*.log
@@ -26,5 +36,9 @@
 .idea
 
 # Docker/infra artifacts not needed for the app build
+infra/immich/.env
+infra/immich/data
+infra/immich/seed/photos
+infra/immich/seed/state.json
 infra/nginx/letsencrypt
 infra/nginx/www

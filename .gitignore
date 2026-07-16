@@ -49,5 +49,9 @@ packages/db/node_modules/.prisma
 
 # minio data (when running infra locally)
 infra/data
+infra/immich/.env
+infra/immich/data
+infra/immich/seed/photos
+infra/immich/seed/state.json
 
 .vscode

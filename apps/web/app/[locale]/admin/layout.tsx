@@ -14,6 +14,7 @@ const sections = [
   { key: "calendar", href: "/kalender", perm: "calendar.create" },
   { key: "tickets", href: "/tickets", ticketing: true },
   { key: "albums", href: "/albums", perm: "photos.manageAlbums" },
+  { key: "media", href: "/media", perm: "media.manage" },
   { key: "pocs", href: "/pocs", perm: "pocs.manage" },
   { key: "partners", href: "/partners", perm: "partners.manage" },
   { key: "users", href: "/gebruikers", perm: "users.view" },
