@@ -41,13 +41,11 @@ function store(): StorageGlobal {
 /** Config uit de omgeving; fallback zolang er geen resolver of DB-config is. */
 function envConfig(): S3Config {
   return {
-    endpoint: process.env.S3_ENDPOINT || "http://localhost:9000",
-    accessKeyId: process.env.S3_ACCESS_KEY || "minioadmin",
-    secretAccessKey: process.env.S3_SECRET_KEY || "minioadmin",
-    bucket: process.env.S3_BUCKET || "vtk",
-    region: process.env.S3_REGION || "us-east-1",
-    // MinIO vereist path-style; Hetzner e.a. werken ook met path-style. Zet op
-    // "false" voor virtual-hosted-style (bucket als subdomein).
+    endpoint: process.env.S3_ENDPOINT || "",
+    accessKeyId: process.env.S3_ACCESS_KEY || "",
+    secretAccessKey: process.env.S3_SECRET_KEY || "",
+    bucket: process.env.S3_BUCKET || "",
+    region: process.env.S3_REGION || "fsn1",
     forcePathStyle: process.env.S3_FORCE_PATH_STYLE !== "false",
   };
 }
@@ -84,6 +82,9 @@ async function getClient(): Promise<{ client: S3Client; bucket: string }> {
   const s = store();
   if (s.cache) return s.cache;
   const cfg = await resolveConfig();
+  if (!cfg.endpoint || !cfg.accessKeyId || !cfg.secretAccessKey || !cfg.bucket) {
+    throw new Error("S3 object storage is not configured; configure Hetzner in Admin -> IT");
+  }
   const client = new S3Client({
     endpoint: cfg.endpoint,
     region: cfg.region,

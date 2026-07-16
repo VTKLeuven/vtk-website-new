@@ -60,7 +60,9 @@ When the website runs in Docker on macOS and Immich runs on the host, use
 
 When both the website and Immich run in Docker, put the website container on a
 network that can reach the Immich API and Immich PostgreSQL container. Then use
-container hostnames such as `immich-server` and `immich_postgres`.
+container hostnames `immich-server` and `immich-database`. The repository's
+single Compose project configures this network and overrides those hostnames
+automatically.
 
 ## Local Development
 
@@ -71,14 +73,14 @@ scripts/local-gallery-stack.sh
 ```
 
 By default this starts a production-like local web container on
-`http://127.0.0.1:3011/media`, starts the website's Postgres and MinIO services,
-and starts the local Immich stack in `infra/immich`.
+`http://127.0.0.1:3011/media`, starts PostgreSQL, and starts the Immich services
+from the main `infra/docker-compose.yml` project.
 
 The local Immich stack contains:
 
-- `infra/immich/docker-compose.yml`: Immich, Immich PostgreSQL, Redis, machine
-  learning, and Immich Public Proxy.
-- `infra/immich/.env.example`: local Immich defaults.
+- `infra/docker-compose.yml`: website services plus Immich, Immich PostgreSQL,
+  Valkey, machine learning, and Immich Public Proxy.
+- `infra/immich/.env.example`: Immich-only environment template.
 - `infra/immich/seed/manifest.json`: versioned demo album definitions.
 - `infra/immich/scripts/`: seed and sample-photo helper scripts.
 
@@ -95,12 +97,6 @@ Run a dry check without starting services:
 scripts/local-gallery-stack.sh --check
 ```
 
-Use a specific Immich compose file:
-
-```bash
-IMMICH_COMPOSE_FILE=/path/to/immich/docker-compose.yml scripts/local-gallery-stack.sh
-```
-
 Use the Next.js development server instead of the web container:
 
 ```bash
@@ -114,20 +110,23 @@ git clone https://github.com/VTKLeuven/vtk-website-new.git
 cd vtk-website-new
 npm install
 cp .env.example .env
+cp infra/immich/.env.example infra/immich/.env
 ```
 
-Edit `.env` with local credentials. Then link the root env file into the Next
-apps:
+Edit both files with local credentials. Keep the three database credential
+forms in `infra/immich/.env` synchronized as its comments explain. Then link
+the root env file into the Next apps:
 
 ```bash
 ln -sf ../../.env apps/web/.env
 ln -sf ../../.env apps/logistiek/.env
 ```
 
-Start the local website database and object storage:
+Start the local databases and Immich:
 
 ```bash
-docker compose -f infra/docker-compose.yml up -d postgres minio minio-setup
+docker compose -f infra/docker-compose.yml up -d \
+  postgres immich-server immich-machine-learning immich-public-proxy
 npm run db:generate
 npm run db:push
 npm run db:seed
@@ -148,6 +147,11 @@ docker compose -f infra/docker-compose.yml up -d --build web
 ```
 
 Open `http://127.0.0.1:3011/media`.
+
+On the server, Caddy should proxy the Immich management hostname to
+`127.0.0.1:2283` and the public gallery hostname to `127.0.0.1:3001`. Set both
+`PUBLIC_BASE_URL` in `infra/immich/.env` and `GALLERY_PUBLIC_PROXY_URL` in the
+root `.env` to that public gallery URL.
 
 ## Git Hygiene
 
