@@ -326,6 +326,7 @@ model CalendarEvent {
   allDay         Boolean          @default(false)
   visibility     EventVisibility  @default(PUBLIC)
   url            String?
+  imageKey       String?
   groupId        String
   createdById    String?
   createdAt      DateTime         @default(now())

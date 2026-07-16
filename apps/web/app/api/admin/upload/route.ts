@@ -12,7 +12,9 @@ export async function POST(request: Request) {
     !hasPermission(session, "pages.edit") &&
     !hasPermission(session, "photos.upload") &&
     !hasPermission(session, "home.edit") &&
-    !hasPermission(session, "partners.manage")
+    !hasPermission(session, "partners.manage") &&
+    !hasPermission(session, "calendar.create") &&
+    !hasPermission(session, "calendar.manageAll")
   ) {
     return NextResponse.json({ error: "forbidden" }, { status: 403 });
   }
