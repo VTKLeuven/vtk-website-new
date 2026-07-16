@@ -11,9 +11,13 @@
   margin: 0 auto;
   padding: 40px clamp(20px, 3vw, 36px) 80px;
   display: grid;
-  grid-template-columns: 1fr;
+  grid-template-columns: minmax(0, 1fr);
   gap: 32px;
   align-items: start;
+}
+
+.vtk-admin-surface-inner > aside {
+  min-width: 0;
 }
 
 @media (min-width: 860px) {

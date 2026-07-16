@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import { prisma } from "@vtk/db";
 import { Card, Label, Input, Select, Button } from "@vtk/ui";
@@ -119,17 +120,17 @@ export default async function AccountPage({ params }: { params: Promise<{ locale
             {nl ? (
               <>
                 Je hebt geen openstaande reservaties.{" "}
-                <a href="/theokot" className="font-medium text-vtk-ink underline">
+                <Link href="/theokot" className="font-medium text-vtk-ink underline">
                   Reserveer broodjes
-                </a>
+                </Link>
                 .
               </>
             ) : (
               <>
                 You have no open reservations.{" "}
-                <a href="/en/theokot" className="font-medium text-vtk-ink underline">
+                <Link href="/en/theokot" className="font-medium text-vtk-ink underline">
                   Reserve sandwiches
-                </a>
+                </Link>
                 .
               </>
             )}
@@ -173,17 +174,17 @@ export default async function AccountPage({ params }: { params: Promise<{ locale
             {nl ? (
               <>
                 Reservaties beheren of annuleren doe je op de{" "}
-                <a href="/theokot" className="font-medium text-vtk-ink underline">
+                <Link href="/theokot" className="font-medium text-vtk-ink underline">
                   Theokot-pagina
-                </a>
+                </Link>
                 .
               </>
             ) : (
               <>
                 Manage or cancel reservations on the{" "}
-                <a href="/en/theokot" className="font-medium text-vtk-ink underline">
+                <Link href="/en/theokot" className="font-medium text-vtk-ink underline">
                   Theokot page
-                </a>
+                </Link>
                 .
               </>
             )}

@@ -17,14 +17,22 @@ export function SiteHeaderShell({ children }: { children: React.ReactNode }) {
   // over the hero before the observer attaches.
   const [overHero, setOverHero] = useState(isHome);
 
+  // This shell lives in the layout and does not remount on client-side
+  // navigation, so reset the flag when the path changes. Adjusting state during
+  // render (storing the previous path) is React's recommended pattern and keeps
+  // the effect free of a synchronous setState; the observer below then refines
+  // it from the hero's real position.
+  const [prevPath, setPrevPath] = useState(pathname);
+  if (pathname !== prevPath) {
+    setPrevPath(pathname);
+    setOverHero(isHome);
+  }
+
   useEffect(() => {
     // Key off the hero actually being in the DOM rather than trusting the path
     // string, and re-run on every navigation. Only the homepage renders it.
     const hero = document.querySelector('.home-hero');
-    if (!hero) {
-      setOverHero(false);
-      return;
-    }
+    if (!hero) return;
 
     const headerHeight =
       parseInt(

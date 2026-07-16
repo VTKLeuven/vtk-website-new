@@ -57,6 +57,42 @@ services:
     ports:
       - "127.0.0.1:3100:3000"
 
+  ticket-worker:
+    image: curlimages/curl:8.10.1
+    restart: unless-stopped
+    depends_on:
+      web:
+        condition: service_started
+    env_file:
+      - ../.env
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        if [ -z "$${TICKETING_MAINTENANCE_SECRET:-}" ]; then
+          echo "Ticket worker disabled: TICKETING_MAINTENANCE_SECRET is empty"
+          while true; do sleep 3600; done
+        fi
+        while true; do
+          if curl --fail --silent --show-error \
+            -X POST \
+            -H "Authorization: Bearer $${TICKETING_MAINTENANCE_SECRET}" \
+            http://web:3000/api/tickets/maintenance; then
+            date +%s > /tmp/ticket-worker-heartbeat
+          fi
+          sleep 15
+        done
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - >-
+          test -n "$${TICKETING_MAINTENANCE_SECRET:-}" &&
+          test -f /tmp/ticket-worker-heartbeat &&
+          [ "$$(($$(date +%s) - $$(cat /tmp/ticket-worker-heartbeat)))" -lt 90 ]
+      interval: 30s
+      timeout: 5s
+      retries: 1
+      start_period: 45s
+
   # Optional: TLS + reverse proxy in Docker. Skip if you use Caddy/Traefik/etc. on
   # the host and only proxy to web (3011) / logistiek (3100). Start with:
   #   docker compose --profile edge-tls -f infra/docker-compose.yml up -d

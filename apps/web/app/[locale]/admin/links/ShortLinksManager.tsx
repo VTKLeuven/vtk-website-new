@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Button, Card, Input, Label } from "@vtk/ui";
 import { IconButton, RowActions } from "@/components/ui/IconButton";
 import { CheckIcon, CopyIcon, PencilIcon, TrashIcon } from "@/components/ui/icons";
@@ -38,10 +38,15 @@ export function ShortLinksManager({
 
   // A save/delete revalidates the route, so `links` arrives as a new array only
   // when the server data actually changed — close any open modal at that point.
-  useEffect(() => {
+  // Adjusting state during render (storing the previous value) is React's
+  // recommended pattern for resetting on a prop change; it avoids the extra
+  // render an effect would cause.
+  const [prevLinks, setPrevLinks] = useState(links);
+  if (links !== prevLinks) {
+    setPrevLinks(links);
     setEditing(null);
     setDeleting(null);
-  }, [links]);
+  }
 
   const inactiveCount = links.filter((l) => !l.enabled || l.expired).length;
   const visible = showInactive ? links : links.filter((l) => l.enabled && !l.expired);

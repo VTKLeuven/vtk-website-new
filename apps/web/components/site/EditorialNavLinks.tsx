@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useSyncExternalStore } from "react";
+import { ChevronRight } from "lucide-react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { pick, type Locale } from "@vtk/i18n";
 
 const subscribeToClient = () => () => undefined;
@@ -19,7 +20,21 @@ export function EditorialNavLinks({
   ariaLabel: string;
 }) {
   const pathname = usePathname() ?? "/";
+  const navRef = useRef<HTMLElement>(null);
+  const [canScrollForward, setCanScrollForward] = useState(false);
   const isClient = useSyncExternalStore(subscribeToClient, () => true, () => false);
+
+  useEffect(() => {
+    const nav = navRef.current;
+    if (!nav) return;
+    const update = () => {
+      setCanScrollForward(nav.scrollLeft + nav.clientWidth < nav.scrollWidth - 2);
+    };
+    update();
+    const observer = new ResizeObserver(update);
+    observer.observe(nav);
+    return () => observer.disconnect();
+  }, [tabs]);
 
   function tabHref(slug: string): string {
     if (base === "") return `/${slug}`;
@@ -33,16 +48,37 @@ export function EditorialNavLinks({
   }
 
   return (
-    <nav className="nav-links" aria-label={ariaLabel}>
-      {tabs.map((tab) => (
-        <Link
-          key={tab.id}
-          href={tabHref(tab.slug)}
-          className={isClient && isActive(tab.slug) ? "active" : undefined}
+    <div className="nav-links-shell">
+      <nav
+        ref={navRef}
+        className="nav-links"
+        aria-label={ariaLabel}
+        onScroll={() => {
+          const nav = navRef.current;
+          if (nav) setCanScrollForward(nav.scrollLeft + nav.clientWidth < nav.scrollWidth - 2);
+        }}
+      >
+        {tabs.map((tab) => (
+          <Link
+            key={tab.id}
+            href={tabHref(tab.slug)}
+            className={isClient && isActive(tab.slug) ? "active" : undefined}
+          >
+            {pick(tab.labelNl, tab.labelEn, locale)}
+          </Link>
+        ))}
+      </nav>
+      {canScrollForward ? (
+        <button
+          className="nav-scroll-next"
+          type="button"
+          aria-label={locale === "nl" ? "Meer navigatie" : "More navigation"}
+          title={locale === "nl" ? "Meer navigatie" : "More navigation"}
+          onClick={() => navRef.current?.scrollBy({ left: 220, behavior: "smooth" })}
         >
-          {pick(tab.labelNl, tab.labelEn, locale)}
-        </Link>
-      ))}
-    </nav>
+          <ChevronRight aria-hidden="true" size={17} />
+        </button>
+      ) : null}
+    </div>
   );
 }

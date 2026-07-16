@@ -3,6 +3,22 @@ import { NextResponse, type NextRequest } from "next/server";
 const LOCALES = ["nl", "en"] as const;
 const DEFAULT_LOCALE = "nl";
 
+function protectTicketResponse(response: NextResponse, pathname: string): NextResponse {
+  const localizedPath = pathname.replace(/^\/(?:nl|en)(?=\/|$)/, "");
+  const isOrderPage = localizedPath.startsWith("/tickets/bestelling/");
+  const isAccountPage =
+    localizedPath === "/mijn-tickets" || localizedPath.startsWith("/mijn-tickets/");
+
+  if (isOrderPage || isAccountPage) {
+    response.headers.set("Cache-Control", "private, no-store, max-age=0");
+    response.headers.set("Pragma", "no-cache");
+    response.headers.set("Expires", "0");
+    response.headers.set("Referrer-Policy", "no-referrer");
+  }
+
+  return response;
+}
+
 // A request is a short-link request when its host is a short-link host. By
 // convention that is any host whose first label is "on" — so it works in every
 // environment without configuration: on.vtk.be (prod), on.main-dev.vtk.be
@@ -46,6 +62,12 @@ export function proxy(request: NextRequest) {
     return NextResponse.rewrite(url);
   }
 
+  // The scanner has its own full-screen route group and must not receive a
+  // locale rewrite to /nl/scan.
+  if (pathname === "/scan" || pathname.startsWith("/scan/")) {
+    return NextResponse.next();
+  }
+
   const segments = pathname.split("/");
   const first = segments[1];
 
@@ -62,13 +84,19 @@ export function proxy(request: NextRequest) {
   requestHeaders.set("x-pathname", internalPath);
 
   if (first && (LOCALES as readonly string[]).includes(first)) {
-    return NextResponse.next({ request: { headers: requestHeaders } });
+    return protectTicketResponse(
+      NextResponse.next({ request: { headers: requestHeaders } }),
+      pathname,
+    );
   }
 
   const url = request.nextUrl.clone();
   url.pathname = internalPath;
   url.search = search;
-  return NextResponse.rewrite(url, { request: { headers: requestHeaders } });
+  return protectTicketResponse(
+    NextResponse.rewrite(url, { request: { headers: requestHeaders } }),
+    pathname,
+  );
 }
 
 export const config = {

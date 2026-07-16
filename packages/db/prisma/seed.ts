@@ -111,13 +111,16 @@ async function main() {
     });
   }
 
-  // IT and Groep 5 get elevated permissions by default.
+  // IT and Groep 5 get elevated permissions by default. Global ticket access
+  // remains an explicit assignment because it exposes attendee and financial data.
   const elevatedGroupCodes = ["IT", "GROEP5"] as const;
-  const everyPermission = await prisma.permission.findMany();
+  const elevatedPermissions = await prisma.permission.findMany({
+    where: { code: { not: "tickets.manageAll" } },
+  });
   for (const code of elevatedGroupCodes) {
     const group = await prisma.group.findUnique({ where: { code } });
     if (!group) continue;
-    for (const perm of everyPermission) {
+    for (const perm of elevatedPermissions) {
       await prisma.groupPermission.upsert({
         where: { groupId_permissionId: { groupId: group.id, permissionId: perm.id } },
         update: {},
@@ -126,8 +129,8 @@ async function main() {
     }
   }
 
-  // Baseline permissions for all other groups: create events for own group + upload photos.
-  const baselinePermCodes = ["calendar.create", "photos.upload"];
+  // Baseline permissions for all other groups are always scoped to their own group.
+  const baselinePermCodes = ["calendar.create", "photos.upload", "tickets.create"];
   const baselinePerms = await prisma.permission.findMany({
     where: { code: { in: baselinePermCodes } },
   });

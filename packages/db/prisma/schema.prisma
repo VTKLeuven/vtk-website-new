@@ -59,17 +59,103 @@ enum DashboardTileScope {
   USER
 }
 
+enum TicketEventStatus {
+  DRAFT
+  PUBLISHED
+  SALES_PAUSED
+  SALES_CLOSED
+  CANCELLED
+  ARCHIVED
+}
+
+enum TicketAudience {
+  PUBLIC
+  MEMBERS
+}
+
+enum TicketQuestionType {
+  SHORT_TEXT
+  LONG_TEXT
+  SINGLE_CHOICE
+  MULTIPLE_CHOICE
+  BOOLEAN
+}
+
+enum TicketGrantRole {
+  OWNER
+  MANAGER
+  FINANCE
+  SCANNER
+  REPORTER
+}
+
+enum TicketGroupGrantScope {
+  ALL_MEMBERS
+  LEADS_ONLY
+}
+
+enum TicketOrderStatus {
+  PENDING_PAYMENT
+  PAID
+  PAYMENT_FAILED
+  EXPIRED
+  CANCELLED
+  PARTIALLY_REFUNDED
+  REFUNDED
+}
+
+enum TicketPaymentStatus {
+  CREATED
+  PENDING
+  SUCCEEDED
+  FAILED
+  CANCELLED
+  EXPIRED
+}
+
+enum TicketRefundStatus {
+  PENDING
+  SUCCEEDED
+  FAILED
+  CANCELLED
+}
+
+enum TicketStatus {
+  VALID
+  VOID
+  REFUNDED
+}
+
+enum TicketScanResult {
+  ACCEPTED
+  ALREADY_USED
+  WRONG_EVENT
+  INVALID
+  VOID
+  REFUNDED
+  EXPIRED
+  REVERSED
+}
+
+enum TicketOutboxStatus {
+  PENDING
+  PROCESSING
+  SENT
+  FAILED
+  DEAD
+}
+
 enum TheokotOrderStatus {
-  RESERVED   // gereserveerd, nog niet opgehaald
-  PICKED_UP  // afgehaald aan de balie
-  NO_SHOW    // niet opgehaald na sluitingstijd + grace
-  CANCELLED  // door de student geannuleerd voor de deadline
+  RESERVED // gereserveerd, nog niet opgehaald
+  PICKED_UP // afgehaald aan de balie
+  NO_SHOW // niet opgehaald na sluitingstijd + grace
+  CANCELLED // door de student geannuleerd voor de deadline
 }
 
 // Welk e-mailadres de kring gebruikt om een lid te contacteren.
 enum EmailPreference {
   UNIVERSITY // universiteitsmail (= login-mail via KUL SSO)
-  PERSONAL   // persoonlijke mail
+  PERSONAL // persoonlijke mail
 }
 
 // Mailinglijst-categorieën waarvoor een lid zich (opt-in) kan inschrijven.
@@ -119,48 +205,48 @@ enum StudyProgramme {
 // -----------------------------------------------------------------------------
 
 model User {
-  id               String              @id @default(cuid())
+  id            String  @id @default(cuid())
   // `name` blijft de weergavenaam (en het veld dat better-auth zelf zet bij een
   // SSO-login). `firstName`/`lastName` zijn de gestructureerde variant die de
   // mailinglijst-exports nodig hebben; ze worden ingevuld tijdens de onboarding
   // en in het gebruikersbeheer, en `name` wordt daaruit samengesteld.
-  name             String
-  firstName        String?
-  lastName         String?
-  email            String              @unique
-  rNumber          String?             @unique // KU Leuven studentennummer (bvb r0123456), voor zoeken
-  emailVerified Boolean                @default(false)
-  avatarKey        String?
+  name          String
+  firstName     String?
+  lastName      String?
+  email         String  @unique
+  rNumber       String? @unique // KU Leuven studentennummer (bvb r0123456), voor zoeken
+  emailVerified Boolean @default(false)
+  avatarKey     String?
   image         String?
 
-  locale           Locale              @default(NL)
-  active           Boolean             @default(true)
-  isSuperAdmin     Boolean             @default(false)
+  locale       Locale  @default(NL)
+  active       Boolean @default(true)
+  isSuperAdmin Boolean @default(false)
 
   // Onboarding-profiel (ingevuld bij de eerste KUL SSO-login). Zolang
   // onboardedAt null is, wordt het lid naar de onboarding-flow gestuurd.
-  onboardedAt      DateTime?
+  onboardedAt        DateTime?
   // Kotadres
-  street           String?
-  houseNumber      String?
-  bus              String?             // busnummer, optioneel
-  postalCode       String?
-  city             String?
-  birthDate        DateTime?
+  street             String?
+  houseNumber        String?
+  bus                String? // busnummer, optioneel
+  postalCode         String?
+  city               String?
+  birthDate          DateTime?
   // Contact: `email` is de login-/universiteitsmail (via SSO). Persoonlijke
   // mail en de voorkeur voor communicatie komen erbij.
-  personalEmail    String?
-  emailPreference  EmailPreference     @default(UNIVERSITY)
+  personalEmail      String?
+  emailPreference    EmailPreference  @default(UNIVERSITY)
   // Opt-in mailinglijsten: enkel de aangeduide categorieën zitten in de array.
-  mailCategories   MailCategory[]      @default([])
+  mailCategories     MailCategory[]   @default([])
   // Studie: meerdere studiejaren en richtingen mogelijk (iemand kan bv. deels in
   // 2de en deels in 3de bachelor zitten).
-  studyYears       StudyYear[]         @default([])
-  studyProgrammes  StudyProgramme[]    @default([])
+  studyYears         StudyYear[]      @default([])
+  studyProgrammes    StudyProgramme[] @default([])
   // Lid dat niet aan de faculteit Ingenieurswetenschappen studeert. Bewust geen
   // `StudyProgramme`-waarde: het is geen richting, en als enum-waarde zou het
   // overal opduiken waar richtingen opgelijst worden (o.a. de career-export).
-  notAtFaculty     Boolean             @default(false)
+  notAtFaculty       Boolean          @default(false)
   // Werkingsjaar waarin het lid zijn studieprofiel laatst bevestigde (2026 =
   // "26-27"). Loopt dat achter op het huidige werkingsjaar, dan is het profiel
   // verlopen: de bevestigingsgate vraagt het opnieuw en het lid valt zolang uit
@@ -168,57 +254,70 @@ model User {
   // zonder koppeling met de cursusdienst.
   studyConfirmedYear Int?
 
-  sessions         Session[]
-  accounts      Account[]
-  createdAt        DateTime            @default(now())
-  updatedAt        DateTime            @updatedAt
+  sessions  Session[]
+  accounts  Account[]
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
 
-  memberships      GroupMembership[]
-  pocRepresentative PocRepresentative[]
-  createdPages     Page[]              @relation("PageCreatedBy")
-  createdEvents    CalendarEvent[]     @relation("EventCreatedBy")
-  dashboardTiles   DashboardTile[]
-  dashboardTilePrefs UserDashboardTilePref[]
+  memberships         GroupMembership[]
+  pocRepresentative   PocRepresentative[]
+  createdPages        Page[]                  @relation("PageCreatedBy")
+  createdEvents       CalendarEvent[]         @relation("EventCreatedBy")
+  dashboardTiles      DashboardTile[]
+  dashboardTilePrefs  UserDashboardTilePref[]
   participatingShifts ShiftParticipant[]
-  createdShortLinks ShortLink[]           @relation("ShortLinkCreatedBy")
+  createdShortLinks   ShortLink[]             @relation("ShortLinkCreatedBy")
 
-  theokotOrders      TheokotOrder[]      @relation("TheokotOrderUser")
-  theokotPickedUp    TheokotOrder[]      @relation("TheokotPickedUpBy")
-  theokotBans        TheokotBan[]
+  theokotOrders   TheokotOrder[] @relation("TheokotOrderUser")
+  theokotPickedUp TheokotOrder[] @relation("TheokotPickedUpBy")
+  theokotBans     TheokotBan[]
+
+  createdTicketEvents      TicketEvent[]           @relation("TicketEventCreatedBy")
+  ticketEventGrants        TicketEventUserGrant[]  @relation("TicketEventGrantUser")
+  ticketEventGrantsGiven   TicketEventUserGrant[]  @relation("TicketEventGrantGrantedBy")
+  ticketGroupGrantsGiven   TicketEventGroupGrant[] @relation("TicketEventGroupGrantGrantedBy")
+  ticketOrders             TicketOrder[]           @relation("TicketOrderBuyer")
+  requestedTicketRefunds   TicketRefund[]          @relation("TicketRefundRequestedBy")
+  createdTicketScanDevices TicketScanDevice[]      @relation("TicketScanDeviceCreatedBy")
+  ticketScans              TicketScanLog[]         @relation("TicketScanActor")
+  ticketAuditLogs          TicketAuditLog[]        @relation("TicketAuditActor")
+  checkedInTickets         Ticket[]                @relation("TicketCheckedInBy")
 }
 
 model Group {
-  id                 String             @id @default(cuid())
-  code               GroupCode          @unique
-  slug               String             @unique
-  nameNl             String
-  nameEn             String
-  descriptionNl      String?
-  descriptionEn      String?
-  orderInPraesidium  Int                @default(0)
-  photoKey           String?
+  id                String    @id @default(cuid())
+  code              GroupCode @unique
+  slug              String    @unique
+  nameNl            String
+  nameEn            String
+  descriptionNl     String?
+  descriptionEn     String?
+  orderInPraesidium Int       @default(0)
+  photoKey          String?
 
-  memberships        GroupMembership[]
-  permissions        GroupPermission[]
-  events             CalendarEvent[]
-  dashboardTiles     DashboardTile[]
+  memberships       GroupMembership[]
+  permissions       GroupPermission[]
+  events            CalendarEvent[]
+  dashboardTiles    DashboardTile[]
+  ownedTicketEvents TicketEvent[]           @relation("TicketEventOwnerGroup")
+  ticketEventGrants TicketEventGroupGrant[]
 }
 
 model GroupMembership {
-  id            String          @id @default(cuid())
-  userId        String
-  groupId       String
-  role          MembershipRole  @default(MEMBER)
+  id           String         @id @default(cuid())
+  userId       String
+  groupId      String
+  role         MembershipRole @default(MEMBER)
   // Werkingsjaar (startjaar van het academiejaar): 2026 = "26-27". Elk jaar is
   // een aparte rij, zodat de historiek per post per jaar bewaard blijft en een
   // nieuw werkingsjaar automatisch met een lege post begint.
-  year          Int
-  titleNl       String?
-  titleEn       String?
-  displayOrder  Int             @default(0)
+  year         Int
+  titleNl      String?
+  titleEn      String?
+  displayOrder Int            @default(0)
 
-  user          User            @relation(fields: [userId], references: [id], onDelete: Cascade)
-  group         Group           @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  group Group @relation(fields: [groupId], references: [id], onDelete: Cascade)
 
   @@unique([userId, groupId, year])
   @@index([groupId])
@@ -226,21 +325,21 @@ model GroupMembership {
 }
 
 model Permission {
-  id        String             @id @default(cuid())
-  code      String             @unique
-  labelNl   String
-  labelEn   String
-  category  String             @default("general")
+  id       String @id @default(cuid())
+  code     String @unique
+  labelNl  String
+  labelEn  String
+  category String @default("general")
 
-  groups    GroupPermission[]
+  groups GroupPermission[]
 }
 
 model GroupPermission {
-  groupId       String
-  permissionId  String
+  groupId      String
+  permissionId String
 
-  group         Group       @relation(fields: [groupId], references: [id], onDelete: Cascade)
-  permission    Permission  @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+  group      Group      @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  permission Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
 
   @@id([groupId, permissionId])
 }
@@ -250,13 +349,13 @@ model GroupPermission {
 // -----------------------------------------------------------------------------
 
 model HeaderTab {
-  id         String  @id @default(cuid())
-  code       String  @unique
-  slug       String  @unique
-  labelNl    String
-  labelEn    String
-  order      Int     @default(0)
-  visible    Boolean @default(true)
+  id      String  @id @default(cuid())
+  code    String  @unique
+  slug    String  @unique
+  labelNl String
+  labelEn String
+  order   Int     @default(0)
+  visible Boolean @default(true)
 
   // Inhoud van de categoriepagina zelf, bewerkbaar via /admin/inhoud.
   introNl    String?
@@ -266,46 +365,46 @@ model HeaderTab {
   ctaLabelEn String?
   ctaUrl     String?
 
-  pages      Page[]
+  pages Page[]
 }
 
 model Page {
-  id               String      @id @default(cuid())
-  slug             String      @unique
-  headerTabId      String?
-  visibleInHeader  Boolean     @default(true)
-  titleNl          String
-  titleEn          String?
-  contentJsonNl    Json
-  contentJsonEn    Json?
-  excerptNl        String?
-  excerptEn        String?
-  publishedAt      DateTime?
-  order            Int         @default(0)
-  createdById      String?
-  createdAt        DateTime    @default(now())
-  updatedAt        DateTime    @updatedAt
+  id              String    @id @default(cuid())
+  slug            String    @unique
+  headerTabId     String?
+  visibleInHeader Boolean   @default(true)
+  titleNl         String
+  titleEn         String?
+  contentJsonNl   Json
+  contentJsonEn   Json?
+  excerptNl       String?
+  excerptEn       String?
+  publishedAt     DateTime?
+  order           Int       @default(0)
+  createdById     String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
 
-  headerTab        HeaderTab?  @relation(fields: [headerTabId], references: [id], onDelete: SetNull)
-  createdBy        User?       @relation("PageCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
-  assets           PageAsset[]
+  headerTab HeaderTab?  @relation(fields: [headerTabId], references: [id], onDelete: SetNull)
+  createdBy User?       @relation("PageCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  assets    PageAsset[]
 
   @@index([headerTabId])
 }
 
 model PageAsset {
-  id          String         @id @default(cuid())
-  pageId      String
-  storageKey  String
-  kind        PageAssetKind
-  labelNl     String
-  labelEn     String?
-  sizeBytes   Int?
-  mimeType    String?
-  order       Int            @default(0)
-  createdAt   DateTime       @default(now())
+  id         String        @id @default(cuid())
+  pageId     String
+  storageKey String
+  kind       PageAssetKind
+  labelNl    String
+  labelEn    String?
+  sizeBytes  Int?
+  mimeType   String?
+  order      Int           @default(0)
+  createdAt  DateTime      @default(now())
 
-  page        Page           @relation(fields: [pageId], references: [id], onDelete: Cascade)
+  page Page @relation(fields: [pageId], references: [id], onDelete: Cascade)
 
   @@index([pageId])
 }
@@ -315,28 +414,521 @@ model PageAsset {
 // -----------------------------------------------------------------------------
 
 model CalendarEvent {
-  id             String           @id @default(cuid())
-  titleNl        String
-  titleEn        String?
-  descriptionNl  String?
-  descriptionEn  String?
-  location       String?
-  start          DateTime
-  end            DateTime
-  allDay         Boolean          @default(false)
-  visibility     EventVisibility  @default(PUBLIC)
-  url            String?
-  imageKey       String?
-  groupId        String
-  createdById    String?
-  createdAt      DateTime         @default(now())
-  updatedAt      DateTime         @updatedAt
+  id            String          @id @default(cuid())
+  titleNl       String
+  titleEn       String?
+  descriptionNl String?
+  descriptionEn String?
+  location      String?
+  start         DateTime
+  end           DateTime
+  allDay        Boolean         @default(false)
+  visibility    EventVisibility @default(PUBLIC)
+  url           String?
+  imageKey      String?
+  groupId       String
+  createdById   String?
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
 
-  group          Group            @relation(fields: [groupId], references: [id], onDelete: Cascade)
-  createdBy      User?            @relation("EventCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  group       Group        @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  createdBy   User?        @relation("EventCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  ticketEvent TicketEvent?
 
   @@index([start])
   @@index([groupId])
+}
+
+// -----------------------------------------------------------------------------
+// Integrated ticketing
+// -----------------------------------------------------------------------------
+
+model TicketEvent {
+  id                    String            @id @default(cuid())
+  calendarEventId       String?           @unique
+  ownerGroupId          String
+  slug                  String            @unique
+  titleNl               String
+  titleEn               String?
+  descriptionNl         String?
+  descriptionEn         String?
+  location              String?
+  startsAt              DateTime          @db.Timestamptz(3)
+  endsAt                DateTime          @db.Timestamptz(3)
+  timeZone              String            @default("Europe/Brussels")
+  salesStartAt          DateTime?         @db.Timestamptz(3)
+  salesEndAt            DateTime?         @db.Timestamptz(3)
+  status                TicketEventStatus @default(DRAFT)
+  currency              String            @default("EUR")
+  maxTicketsPerOrder    Int               @default(8)
+  contactEmail          String?
+  termsUrl              String?
+  termsVersion          String?
+  confirmationMessageNl String?
+  confirmationMessageEn String?
+  settings              Json              @default("{}")
+  createdById           String?
+  publishedAt           DateTime?         @db.Timestamptz(3)
+  archivedAt            DateTime?         @db.Timestamptz(3)
+  createdAt             DateTime          @default(now()) @db.Timestamptz(3)
+  updatedAt             DateTime          @updatedAt @db.Timestamptz(3)
+
+  calendarEvent CalendarEvent? @relation(fields: [calendarEventId], references: [id], onDelete: SetNull)
+  ownerGroup    Group          @relation("TicketEventOwnerGroup", fields: [ownerGroupId], references: [id], onDelete: Restrict)
+  createdBy     User?          @relation("TicketEventCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+
+  inventoryPools TicketInventoryPool[]
+  ticketTypes    TicketType[]
+  questions      TicketQuestion[]
+  userGrants     TicketEventUserGrant[]
+  groupGrants    TicketEventGroupGrant[]
+  orders         TicketOrder[]
+  orderItems     TicketOrderItem[]
+  tickets        Ticket[]
+  gates          TicketGate[]
+  scanDevices    TicketScanDevice[]
+  scanLogs       TicketScanLog[]
+  auditLogs      TicketAuditLog[]
+  outboxMessages TicketOutboxMessage[]
+
+  @@index([ownerGroupId])
+  @@index([status, salesStartAt, salesEndAt])
+  @@index([startsAt])
+}
+
+model TicketInventoryPool {
+  id            String   @id @default(cuid())
+  eventId       String
+  code          String
+  nameNl        String
+  nameEn        String?
+  capacity      Int
+  reservedCount Int      @default(0)
+  soldCount     Int      @default(0)
+  version       Int      @default(0)
+  active        Boolean  @default(true)
+  createdAt     DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt     DateTime @updatedAt @db.Timestamptz(3)
+
+  event       TicketEvent       @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  ticketTypes TicketType[]
+  orderItems  TicketOrderItem[]
+
+  @@unique([eventId, code])
+  @@unique([id, eventId])
+  @@index([eventId, active])
+}
+
+model TicketType {
+  id              String         @id @default(cuid())
+  eventId         String
+  inventoryPoolId String
+  code            String
+  nameNl          String
+  nameEn          String?
+  descriptionNl   String?
+  descriptionEn   String?
+  unitPriceCents  Int
+  currency        String         @default("EUR")
+  audience        TicketAudience @default(PUBLIC)
+  salesStartAt    DateTime?      @db.Timestamptz(3)
+  salesEndAt      DateTime?      @db.Timestamptz(3)
+  minPerOrder     Int            @default(1)
+  maxPerOrder     Int            @default(8)
+  active          Boolean        @default(true)
+  sortOrder       Int            @default(0)
+  createdAt       DateTime       @default(now()) @db.Timestamptz(3)
+  updatedAt       DateTime       @updatedAt @db.Timestamptz(3)
+
+  event         TicketEvent         @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  inventoryPool TicketInventoryPool @relation(fields: [inventoryPoolId, eventId], references: [id, eventId], onDelete: Restrict)
+  questions     TicketQuestion[]
+  orderItems    TicketOrderItem[]
+
+  @@unique([eventId, code])
+  @@unique([id, eventId])
+  @@index([eventId, active, sortOrder])
+  @@index([inventoryPoolId])
+}
+
+model TicketQuestion {
+  id            String             @id @default(cuid())
+  eventId       String
+  ticketTypeId  String?
+  code          String
+  labelNl       String
+  labelEn       String?
+  descriptionNl String?
+  descriptionEn String?
+  type          TicketQuestionType
+  required      Boolean            @default(false)
+  options       Json?
+  active        Boolean            @default(true)
+  sortOrder     Int                @default(0)
+  createdAt     DateTime           @default(now()) @db.Timestamptz(3)
+  updatedAt     DateTime           @updatedAt @db.Timestamptz(3)
+
+  event      TicketEvent             @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  ticketType TicketType?             @relation(fields: [ticketTypeId, eventId], references: [id, eventId], onDelete: Restrict)
+  answers    TicketOrderItemAnswer[]
+
+  @@unique([eventId, code])
+  @@unique([id, eventId])
+  @@index([eventId, active, sortOrder])
+  @@index([ticketTypeId])
+}
+
+model TicketEventUserGrant {
+  id          String          @id @default(cuid())
+  eventId     String
+  userId      String
+  role        TicketGrantRole
+  grantedById String?
+  createdAt   DateTime        @default(now()) @db.Timestamptz(3)
+
+  event     TicketEvent @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  user      User        @relation("TicketEventGrantUser", fields: [userId], references: [id], onDelete: Cascade)
+  grantedBy User?       @relation("TicketEventGrantGrantedBy", fields: [grantedById], references: [id], onDelete: SetNull)
+
+  @@unique([eventId, userId])
+  @@index([userId])
+}
+
+model TicketEventGroupGrant {
+  id          String                @id @default(cuid())
+  eventId     String
+  groupId     String
+  role        TicketGrantRole
+  scope       TicketGroupGrantScope @default(ALL_MEMBERS)
+  grantedById String?
+  createdAt   DateTime              @default(now()) @db.Timestamptz(3)
+
+  event     TicketEvent @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  group     Group       @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  grantedBy User?       @relation("TicketEventGroupGrantGrantedBy", fields: [grantedById], references: [id], onDelete: SetNull)
+
+  @@unique([eventId, groupId])
+  @@index([groupId])
+}
+
+model TicketOrder {
+  id                   String            @id @default(cuid())
+  eventId              String
+  reference            String            @unique
+  accessTokenHash      String            @unique
+  accessExpiresAt      DateTime          @db.Timestamptz(3)
+  requestFingerprint   String?
+  buyerUserId          String?
+  buyerName            String
+  buyerEmail           String
+  locale               Locale            @default(NL)
+  status               TicketOrderStatus @default(PENDING_PAYMENT)
+  currency             String            @default("EUR")
+  subtotalCents        Int
+  discountCents        Int               @default(0)
+  totalCents           Int
+  refundedCents        Int               @default(0)
+  reservationExpiresAt DateTime?         @db.Timestamptz(3)
+  termsAcceptedAt      DateTime?         @db.Timestamptz(3)
+  termsVersion         String?
+  paidAt               DateTime?         @db.Timestamptz(3)
+  failedAt             DateTime?         @db.Timestamptz(3)
+  expiredAt            DateTime?         @db.Timestamptz(3)
+  cancelledAt          DateTime?         @db.Timestamptz(3)
+  createdAt            DateTime          @default(now()) @db.Timestamptz(3)
+  updatedAt            DateTime          @updatedAt @db.Timestamptz(3)
+
+  event          TicketEvent           @relation(fields: [eventId], references: [id], onDelete: Restrict)
+  buyer          User?                 @relation("TicketOrderBuyer", fields: [buyerUserId], references: [id], onDelete: SetNull)
+  items          TicketOrderItem[]
+  payments       TicketPayment[]
+  refunds        TicketRefund[]
+  outboxMessages TicketOutboxMessage[]
+
+  @@unique([id, eventId])
+  @@index([eventId, status, createdAt])
+  @@index([eventId, requestFingerprint, createdAt])
+  @@index([buyerUserId])
+  @@index([buyerEmail])
+  @@index([status, reservationExpiresAt])
+}
+
+// Each order item represents exactly one attendee and can issue at most one ticket.
+model TicketOrderItem {
+  id              String   @id @default(cuid())
+  eventId         String
+  orderId         String
+  ticketTypeId    String
+  inventoryPoolId String
+  ticketTypeCode  String
+  ticketTypeName  String
+  unitPriceCents  Int
+  discountCents   Int      @default(0)
+  totalCents      Int
+  attendeeName    String
+  attendeeEmail   String?
+  createdAt       DateTime @default(now()) @db.Timestamptz(3)
+
+  event         TicketEvent             @relation(fields: [eventId], references: [id], onDelete: Restrict)
+  order         TicketOrder             @relation(fields: [orderId, eventId], references: [id, eventId], onDelete: Restrict)
+  ticketType    TicketType              @relation(fields: [ticketTypeId, eventId], references: [id, eventId], onDelete: Restrict)
+  inventoryPool TicketInventoryPool     @relation(fields: [inventoryPoolId, eventId], references: [id, eventId], onDelete: Restrict)
+  answers       TicketOrderItemAnswer[]
+  ticket        Ticket?
+  refundItems   TicketRefundItem[]
+
+  @@unique([id, eventId])
+  @@unique([id, orderId])
+  @@index([orderId])
+  @@index([eventId, ticketTypeId])
+  @@index([inventoryPoolId])
+}
+
+model TicketOrderItemAnswer {
+  id            String   @id @default(cuid())
+  eventId       String
+  orderItemId   String
+  questionId    String
+  questionCode  String
+  questionLabel String
+  value         Json
+  createdAt     DateTime @default(now()) @db.Timestamptz(3)
+
+  orderItem TicketOrderItem @relation(fields: [orderItemId, eventId], references: [id, eventId], onDelete: Restrict)
+  question  TicketQuestion  @relation(fields: [questionId, eventId], references: [id, eventId], onDelete: Restrict)
+
+  @@unique([orderItemId, questionId])
+  @@index([questionId])
+}
+
+model TicketPayment {
+  id                 String              @id @default(cuid())
+  orderId            String
+  provider           String
+  providerCheckoutId String?
+  providerPaymentId  String?
+  idempotencyKey     String
+  status             TicketPaymentStatus @default(CREATED)
+  amountCents        Int
+  currency           String              @default("EUR")
+  checkoutUrl        String?
+  providerStatus     String?
+  expiresAt          DateTime?           @db.Timestamptz(3)
+  succeededAt        DateTime?           @db.Timestamptz(3)
+  failedAt           DateTime?           @db.Timestamptz(3)
+  createdAt          DateTime            @default(now()) @db.Timestamptz(3)
+  updatedAt          DateTime            @updatedAt @db.Timestamptz(3)
+
+  order    TicketOrder            @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  webhooks TicketPaymentWebhook[]
+  refunds  TicketRefund[]
+
+  @@unique([provider, providerCheckoutId])
+  @@unique([provider, providerPaymentId])
+  @@unique([provider, idempotencyKey])
+  @@unique([id, orderId])
+  @@index([orderId, status])
+  @@index([status, expiresAt])
+}
+
+model TicketPaymentWebhook {
+  id                 String    @id @default(cuid())
+  provider           String
+  externalEventId    String
+  paymentId          String?
+  signatureValid     Boolean
+  payload            Json
+  processingAttempts Int       @default(0)
+  receivedAt         DateTime  @default(now()) @db.Timestamptz(3)
+  processedAt        DateTime? @db.Timestamptz(3)
+  lastError          String?
+
+  payment TicketPayment? @relation(fields: [paymentId], references: [id], onDelete: Restrict)
+
+  @@unique([provider, externalEventId])
+  @@index([paymentId])
+  @@index([processedAt, receivedAt])
+}
+
+model Ticket {
+  id                String       @id @default(cuid())
+  eventId           String
+  orderItemId       String       @unique
+  publicCode        String       @unique
+  credentialHash    String       @unique
+  credentialVersion Int          @default(1)
+  status            TicketStatus @default(VALID)
+  issuedAt          DateTime     @default(now()) @db.Timestamptz(3)
+  checkedInAt       DateTime?    @db.Timestamptz(3)
+  checkedInById     String?
+  voidedAt          DateTime?    @db.Timestamptz(3)
+  refundedAt        DateTime?    @db.Timestamptz(3)
+
+  event       TicketEvent     @relation(fields: [eventId], references: [id], onDelete: Restrict)
+  orderItem   TicketOrderItem @relation(fields: [orderItemId, eventId], references: [id, eventId], onDelete: Restrict)
+  checkedInBy User?           @relation("TicketCheckedInBy", fields: [checkedInById], references: [id], onDelete: SetNull)
+  scanLogs    TicketScanLog[]
+
+  @@unique([id, eventId])
+  @@unique([orderItemId, eventId])
+  @@index([eventId, status])
+  @@index([eventId, checkedInAt])
+  @@index([checkedInById])
+}
+
+model TicketRefund {
+  id               String             @id @default(cuid())
+  orderId          String
+  paymentId        String
+  provider         String
+  providerRefundId String?
+  idempotencyKey   String
+  status           TicketRefundStatus @default(PENDING)
+  amountCents      Int
+  currency         String             @default("EUR")
+  reason           String?
+  requestedById    String?
+  createdAt        DateTime           @default(now()) @db.Timestamptz(3)
+  updatedAt        DateTime           @updatedAt @db.Timestamptz(3)
+  completedAt      DateTime?          @db.Timestamptz(3)
+
+  order       TicketOrder        @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  payment     TicketPayment      @relation(fields: [paymentId, orderId], references: [id, orderId], onDelete: Restrict)
+  requestedBy User?              @relation("TicketRefundRequestedBy", fields: [requestedById], references: [id], onDelete: SetNull)
+  items       TicketRefundItem[]
+
+  @@unique([provider, providerRefundId])
+  @@unique([provider, idempotencyKey])
+  @@unique([id, orderId])
+  @@index([orderId, status])
+  @@index([paymentId])
+  @@index([requestedById])
+}
+
+model TicketRefundItem {
+  id          String @id @default(cuid())
+  orderId     String
+  refundId    String
+  orderItemId String
+  amountCents Int
+
+  refund    TicketRefund    @relation(fields: [refundId, orderId], references: [id, orderId], onDelete: Restrict)
+  orderItem TicketOrderItem @relation(fields: [orderItemId, orderId], references: [id, orderId], onDelete: Restrict)
+
+  @@unique([refundId, orderItemId])
+  @@index([orderItemId])
+}
+
+model TicketGate {
+  id        String   @id @default(cuid())
+  eventId   String
+  code      String
+  name      String
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+
+  event    TicketEvent     @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  scanLogs TicketScanLog[]
+
+  @@unique([eventId, code])
+  @@unique([id, eventId])
+  @@index([eventId, active])
+}
+
+model TicketScanDevice {
+  id          String    @id @default(cuid())
+  eventId     String
+  label       String
+  tokenHash   String    @unique
+  createdById String?
+  lastSeenAt  DateTime? @db.Timestamptz(3)
+  revokedAt   DateTime? @db.Timestamptz(3)
+  createdAt   DateTime  @default(now()) @db.Timestamptz(3)
+  updatedAt   DateTime  @updatedAt @db.Timestamptz(3)
+
+  event     TicketEvent     @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  createdBy User?           @relation("TicketScanDeviceCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  scanLogs  TicketScanLog[]
+
+  @@unique([id, eventId])
+  @@index([eventId, revokedAt])
+  @@index([createdById])
+}
+
+model TicketScanLog {
+  id                    String           @id @default(cuid())
+  eventId               String
+  ticketId              String?
+  scannerUserId         String?
+  deviceId              String?
+  gateId                String?
+  clientScanId          String           @unique
+  result                TicketScanResult
+  credentialFingerprint String?
+  scannedAt             DateTime         @default(now()) @db.Timestamptz(3)
+  clientScannedAt       DateTime?        @db.Timestamptz(3)
+  reversesScanId        String?          @unique
+  metadata              Json?
+
+  event        TicketEvent       @relation(fields: [eventId], references: [id], onDelete: Restrict)
+  ticket       Ticket?           @relation(fields: [ticketId, eventId], references: [id, eventId], onDelete: Restrict)
+  scannerUser  User?             @relation("TicketScanActor", fields: [scannerUserId], references: [id], onDelete: SetNull)
+  device       TicketScanDevice? @relation(fields: [deviceId, eventId], references: [id, eventId], onDelete: Restrict)
+  gate         TicketGate?       @relation(fields: [gateId, eventId], references: [id, eventId], onDelete: Restrict)
+  reversesScan TicketScanLog?    @relation("TicketScanReversal", fields: [reversesScanId], references: [id], onDelete: Restrict)
+  reversedBy   TicketScanLog?    @relation("TicketScanReversal")
+
+  @@index([eventId, scannedAt])
+  @@index([ticketId, scannedAt])
+  @@index([scannerUserId])
+  @@index([deviceId])
+  @@index([gateId])
+}
+
+model TicketAuditLog {
+  id          String   @id @default(cuid())
+  eventId     String
+  actorUserId String?
+  action      String
+  entityType  String
+  entityId    String?
+  ipAddress   String?
+  metadata    Json?
+  createdAt   DateTime @default(now()) @db.Timestamptz(3)
+
+  event     TicketEvent @relation(fields: [eventId], references: [id], onDelete: Restrict)
+  actorUser User?       @relation("TicketAuditActor", fields: [actorUserId], references: [id], onDelete: SetNull)
+
+  @@index([eventId, createdAt])
+  @@index([eventId, entityType, entityId])
+  @@index([actorUserId])
+}
+
+model TicketOutboxMessage {
+  id          String             @id @default(cuid())
+  eventId     String?
+  orderId     String?
+  type        String
+  dedupeKey   String             @unique
+  recipient   String?
+  payload     Json
+  status      TicketOutboxStatus @default(PENDING)
+  attempts    Int                @default(0)
+  availableAt DateTime           @default(now()) @db.Timestamptz(3)
+  lockedAt    DateTime?          @db.Timestamptz(3)
+  lockedBy    String?
+  lastError   String?
+  sentAt      DateTime?          @db.Timestamptz(3)
+  createdAt   DateTime           @default(now()) @db.Timestamptz(3)
+  updatedAt   DateTime           @updatedAt @db.Timestamptz(3)
+
+  event TicketEvent? @relation(fields: [eventId], references: [id], onDelete: Restrict)
+  order TicketOrder? @relation(fields: [orderId], references: [id], onDelete: Restrict)
+
+  @@index([status, availableAt])
+  @@index([eventId])
+  @@index([orderId])
 }
 
 // -----------------------------------------------------------------------------
@@ -344,37 +936,37 @@ model CalendarEvent {
 // -----------------------------------------------------------------------------
 
 model PhotoAlbum {
-  id             String   @id @default(cuid())
-  slug           String   @unique
-  titleNl        String
-  titleEn        String?
-  descriptionNl  String?
-  descriptionEn  String?
-  coverPhotoId   String?  @unique
-  eventDate      DateTime?
-  publishedAt    DateTime?
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  id            String    @id @default(cuid())
+  slug          String    @unique
+  titleNl       String
+  titleEn       String?
+  descriptionNl String?
+  descriptionEn String?
+  coverPhotoId  String?   @unique
+  eventDate     DateTime?
+  publishedAt   DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
 
-  coverPhoto     Photo?   @relation("AlbumCover", fields: [coverPhotoId], references: [id], onDelete: SetNull)
-  photos         Photo[]  @relation("AlbumPhotos")
+  coverPhoto Photo?  @relation("AlbumCover", fields: [coverPhotoId], references: [id], onDelete: SetNull)
+  photos     Photo[] @relation("AlbumPhotos")
 }
 
 model Photo {
-  id              String     @id @default(cuid())
-  albumId         String
-  storageKey      String
-  thumbnailKey    String?
-  width           Int?
-  height          Int?
-  sizeBytes       Int?
-  originalName    String?
-  takenAt         DateTime?
-  order           Int        @default(0)
-  createdAt       DateTime   @default(now())
+  id           String    @id @default(cuid())
+  albumId      String
+  storageKey   String
+  thumbnailKey String?
+  width        Int?
+  height       Int?
+  sizeBytes    Int?
+  originalName String?
+  takenAt      DateTime?
+  order        Int       @default(0)
+  createdAt    DateTime  @default(now())
 
-  album           PhotoAlbum @relation("AlbumPhotos", fields: [albumId], references: [id], onDelete: Cascade)
-  coverOfAlbum    PhotoAlbum? @relation("AlbumCover")
+  album        PhotoAlbum  @relation("AlbumPhotos", fields: [albumId], references: [id], onDelete: Cascade)
+  coverOfAlbum PhotoAlbum? @relation("AlbumCover")
 
   @@index([albumId])
 }
@@ -384,28 +976,28 @@ model Photo {
 // -----------------------------------------------------------------------------
 
 model Poc {
-  id             String              @id @default(cuid())
-  slug           String              @unique
-  nameNl         String
-  nameEn         String?
-  studyTrack     String
-  descriptionNl  String?
-  descriptionEn  String?
-  order          Int                 @default(0)
+  id            String  @id @default(cuid())
+  slug          String  @unique
+  nameNl        String
+  nameEn        String?
+  studyTrack    String
+  descriptionNl String?
+  descriptionEn String?
+  order         Int     @default(0)
 
   representatives PocRepresentative[]
 }
 
 model PocRepresentative {
-  id         String  @id @default(cuid())
-  pocId      String
-  userId     String
-  roleNl     String?
-  roleEn     String?
-  order      Int     @default(0)
+  id     String  @id @default(cuid())
+  pocId  String
+  userId String
+  roleNl String?
+  roleEn String?
+  order  Int     @default(0)
 
-  poc        Poc     @relation(fields: [pocId], references: [id], onDelete: Cascade)
-  user       User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  poc  Poc  @relation(fields: [pocId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([pocId, userId])
 }
@@ -415,13 +1007,13 @@ model PocRepresentative {
 // -----------------------------------------------------------------------------
 
 model Partner {
-  id         String   @id @default(cuid())
-  name       String
-  logoKey    String
-  url        String?
-  order      Int      @default(0)
-  active     Boolean  @default(true)
-  createdAt  DateTime @default(now())
+  id        String   @id @default(cuid())
+  name      String
+  logoKey   String
+  url       String?
+  order     Int      @default(0)
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
 }
 
 // -----------------------------------------------------------------------------
@@ -429,9 +1021,9 @@ model Partner {
 // -----------------------------------------------------------------------------
 
 model Setting {
-  key        String   @id
-  value      Json
-  updatedAt  DateTime @updatedAt
+  key       String   @id
+  value     Json
+  updatedAt DateTime @updatedAt
 }
 
 // -----------------------------------------------------------------------------
@@ -445,15 +1037,15 @@ model DashboardTile {
   icon      String             @default("link") // key into curated icon set
   color     String             @default("navy") // key into color palette
   scope     DashboardTileScope
-  groupId   String?            // set when scope = GROUP
-  userId    String?            // set when scope = USER (personal tile)
+  groupId   String? // set when scope = GROUP
+  userId    String? // set when scope = USER (personal tile)
   order     Int                @default(0)
   createdAt DateTime           @default(now())
   updatedAt DateTime           @updatedAt
 
-  group     Group?                  @relation(fields: [groupId], references: [id], onDelete: Cascade)
-  user      User?                   @relation(fields: [userId], references: [id], onDelete: Cascade)
-  prefs     UserDashboardTilePref[]
+  group Group?                  @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  user  User?                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  prefs UserDashboardTilePref[]
 
   @@index([scope])
   @@index([groupId])
@@ -472,8 +1064,8 @@ model UserDashboardTilePref {
   icon   String?
   color  String?
 
-  user   User          @relation(fields: [userId], references: [id], onDelete: Cascade)
-  tile   DashboardTile @relation(fields: [tileId], references: [id], onDelete: Cascade)
+  user User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tile DashboardTile @relation(fields: [tileId], references: [id], onDelete: Cascade)
 
   @@id([userId, tileId])
   @@index([userId])
@@ -484,18 +1076,18 @@ model UserDashboardTilePref {
 // -----------------------------------------------------------------------------
 
 model Shift {
-  id  String @id @default(cuid())
+  id String @id @default(cuid())
 
   participantIds Int[]
-  participants ShiftParticipant[]
+  participants   ShiftParticipant[]
 
-  name String
-  startTime DateTime
-  endTime DateTime
-  location String
-  description String
+  name            String
+  startTime       DateTime
+  endTime         DateTime
+  location        String
+  description     String
   maxParticipants Int
-  reward Int
+  reward          Int
 
   post GroupCode?
   // Ook een field bijhouden voor het evenement waarbij de shift hoort?
@@ -503,10 +1095,10 @@ model Shift {
 
 model ShiftParticipant {
   shiftId String
-  shift Shift @relation(fields: [shiftId], references: [id], onDelete: Cascade)
+  shift   Shift  @relation(fields: [shiftId], references: [id], onDelete: Cascade)
 
-  userId  String
-  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   payedOut Boolean
 
@@ -560,40 +1152,40 @@ model TheokotProduct {
 /// (order/pickup) worden bij aanmaak berekend uit config + Brussel-tijd en
 /// opgeslagen zodat ze daarna manueel bijgesteld kunnen worden.
 model TheokotSession {
-  id                    String              @id @default(cuid())
-  date                  DateTime            @unique // lokale middernacht van de verkoopdag
-  isOpen                Boolean             @default(true)
-  orderOpenAt           DateTime // vanaf wanneer studenten kunnen bestellen
-  orderCloseAt          DateTime // annulatie-/besteldeadline (turf-lijst wordt geprint)
-  pickupStart           DateTime
-  pickupEnd             DateTime
-  weeklySpecialLabelNl  String? // welk broodje deze week "van de week" is
-  weeklySpecialLabelEn  String?
-  processedAt           DateTime? // wanneer no-shows verwerkt zijn (idempotentie)
-  createdById           String?
-  createdAt             DateTime            @default(now())
-  updatedAt             DateTime            @updatedAt
+  id                   String    @id @default(cuid())
+  date                 DateTime  @unique // lokale middernacht van de verkoopdag
+  isOpen               Boolean   @default(true)
+  orderOpenAt          DateTime // vanaf wanneer studenten kunnen bestellen
+  orderCloseAt         DateTime // annulatie-/besteldeadline (turf-lijst wordt geprint)
+  pickupStart          DateTime
+  pickupEnd            DateTime
+  weeklySpecialLabelNl String? // welk broodje deze week "van de week" is
+  weeklySpecialLabelEn String?
+  processedAt          DateTime? // wanneer no-shows verwerkt zijn (idempotentie)
+  createdById          String?
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
 
-  items                 TheokotSessionItem[]
-  orders                TheokotOrder[]
+  items  TheokotSessionItem[]
+  orders TheokotOrder[]
 
   @@index([date])
 }
 
 /// Aanbod van één sessie (snapshot van een product op het moment van aanmaken).
 model TheokotSessionItem {
-  id             String            @id @default(cuid())
-  sessionId      String
-  productId      String? // herkomst-catalogusitem, puur informatief
-  nameNl         String
-  nameEn         String?
-  priceCents     Int
-  quantity       Int // beschikbare voorraad voor deze sessie
-  isWeeklySpecial Boolean          @default(false)
-  order          Int               @default(0)
+  id              String  @id @default(cuid())
+  sessionId       String
+  productId       String? // herkomst-catalogusitem, puur informatief
+  nameNl          String
+  nameEn          String?
+  priceCents      Int
+  quantity        Int // beschikbare voorraad voor deze sessie
+  isWeeklySpecial Boolean @default(false)
+  order           Int     @default(0)
 
-  session        TheokotSession    @relation(fields: [sessionId], references: [id], onDelete: Cascade)
-  lines          TheokotOrderLine[]
+  session TheokotSession     @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  lines   TheokotOrderLine[]
 
   @@index([sessionId])
 }
@@ -611,10 +1203,10 @@ model TheokotOrder {
   pickedUpAt   DateTime?
   pickedUpById String? // wie aan de balie op "opgehaald" drukte
 
-  session      TheokotSession     @relation(fields: [sessionId], references: [id], onDelete: Cascade)
-  user         User               @relation("TheokotOrderUser", fields: [userId], references: [id], onDelete: Cascade)
-  pickedUpBy   User?              @relation("TheokotPickedUpBy", fields: [pickedUpById], references: [id], onDelete: SetNull)
-  lines        TheokotOrderLine[]
+  session    TheokotSession     @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  user       User               @relation("TheokotOrderUser", fields: [userId], references: [id], onDelete: Cascade)
+  pickedUpBy User?              @relation("TheokotPickedUpBy", fields: [pickedUpById], references: [id], onDelete: SetNull)
+  lines      TheokotOrderLine[]
 
   @@unique([sessionId, userId])
   @@index([userId])
@@ -622,14 +1214,14 @@ model TheokotOrder {
 }
 
 model TheokotOrderLine {
-  id             String             @id @default(cuid())
+  id             String @id @default(cuid())
   orderId        String
   sessionItemId  String
   quantity       Int
   unitPriceCents Int // snapshot van de prijs op besteldatum
 
-  order          TheokotOrder       @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  sessionItem    TheokotSessionItem @relation(fields: [sessionItemId], references: [id], onDelete: Cascade)
+  order       TheokotOrder       @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  sessionItem TheokotSessionItem @relation(fields: [sessionItemId], references: [id], onDelete: Cascade)
 
   @@index([orderId])
   @@index([sessionItemId])
@@ -648,7 +1240,7 @@ model TheokotBan {
   createdById String?
   createdAt   DateTime @default(now())
 
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@index([active])

@@ -153,6 +153,225 @@ docker compose -f infra/docker-compose.yml down -v
 
 ---
 
+## Integrated ticketing
+
+The main app includes event-scoped ticket sales, Mollie hosted checkout
+(Bancontact, card, and the other methods enabled on the Mollie profile),
+PDF/QR tickets, refunds, and an authenticated entrance scanner. Public sales
+live at `/tickets`, event administration at `/admin/tickets`, and a scanner
+session at `/scan/<ticket-event-id>`.
+
+### Local mock-payment flow
+
+The mock gateway is intended for local development only and is rejected when
+`NODE_ENV=production`.
+
+1. Configure the root `.env` and link it into `apps/web` as described above.
+   Keep `TICKETING_PAYMENT_PROVIDER=mock`, and replace both ticketing secrets
+   with local random values.
+2. Apply the migrations and seed an administrator:
+
+   ```bash
+   npm run db:generate
+   npm run db:migrate
+   npm run db:seed
+   npm run dev
+   ```
+
+3. Sign in as the seeded superadmin (or as a group lead with
+   `tickets.create`), create an event under `/admin/tickets`, add a ticket type,
+   set its sales window, and publish it.
+4. Open `/tickets`, complete an order, and accept the mock payment redirect.
+   The order is marked paid and its signed QR tickets are issued immediately.
+5. Run the maintenance endpoint once to process the confirmation-mail outbox:
+
+   ```bash
+   set -a
+   . ./.env
+   set +a
+   curl --fail --silent --show-error \
+     -X POST \
+     -H "Authorization: Bearer $TICKETING_MAINTENANCE_SECRET" \
+     http://localhost:3000/api/tickets/maintenance
+   ```
+
+   Without `SMTP_HOST`, development logs the message to the web-server console.
+   Use the event administration's scanner link to test a first scan, a duplicate
+   scan, and a reversal.
+
+Run the focused ticketing unit tests with:
+
+```bash
+npm run test --workspace=@vtk/web
+```
+
+### Mollie hosted checkout
+
+Create a Mollie account for the organisation, complete the onboarding, and
+enable the desired payment methods (at minimum **Bancontact** and **card**) on
+the Mollie profile. The integration uses the Mollie **Payments API**: it creates
+a single payment for the order total in EUR and redirects the buyer to Mollie's
+hosted checkout, where they pick a method. Payment details stay on Mollie-hosted
+pages and are never handled by this application.
+
+Configure production with a live-mode API key:
+
+```dotenv
+TICKETING_PAYMENT_PROVIDER="mollie"
+TICKETING_PUBLIC_URL="https://vtk.be"
+TICKETING_RESERVATION_MINUTES="31"
+TICKETING_TOKEN_SECRET="<openssl rand -base64 48>"
+TICKETING_MAINTENANCE_SECRET="<openssl rand -base64 48>"
+MOLLIE_API_KEY="live_..."
+```
+
+Mollie calls back at this endpoint whenever a payment or one of its refunds
+changes state:
+
+```text
+https://vtk.be/api/tickets/mollie/webhook
+```
+
+There is **no webhook to register in a dashboard** and **no signing secret**:
+Mollie posts only the payment id (`id=tr_...`, form-encoded), and the route
+re-fetches the authoritative payment from Mollie's API to decide what to do —
+so trust comes from the API key, not from the request body. The webhook URL is
+derived automatically from `TICKETING_PUBLIC_URL` and sent on every payment.
+Mollie rejects non-public webhook URLs, so the app omits the webhook URL when
+`TICKETING_PUBLIC_URL` points at `localhost`; in that case fulfillment relies on
+the return-page check plus reconciliation in the maintenance worker.
+
+Refunds are settled from refund data embedded in the same webhook, with
+reconciliation in the maintenance worker as a second path when a webhook is
+delayed. Payment status maps as: `paid` → succeeded; `expired` → expired;
+`canceled`/`failed` → failed; everything else stays pending.
+
+For a **local Mollie test**, use a `test_...` API key and expose the app over a
+public HTTPS tunnel so Mollie can redirect the buyer back and reach the webhook:
+
+```bash
+# 1. tunnel localhost:3000 (any HTTPS tunnel works)
+cloudflared tunnel --url http://localhost:3000     # prints https://<random>.trycloudflare.com
+
+# 2. point ticketing + auth at that origin in the root .env, then restart `npm run dev`
+TICKETING_PAYMENT_PROVIDER="mollie"
+TICKETING_PUBLIC_URL="https://<random>.trycloudflare.com"
+MOLLIE_API_KEY="test_..."
+BETTER_AUTH_TRUSTED_ORIGINS="http://localhost:3000,https://<random>.trycloudflare.com"
+```
+
+In test mode Mollie's hosted checkout lets you choose the outcome
+(**paid / failed / expired**) with no real money. The webpack dev server already
+allows `*.trycloudflare.com` via `allowedDevOrigins` in `apps/web/next.config.ts`.
+Never mix test-mode and live-mode API keys.
+
+### SMTP and the durable outbox
+
+Paid orders enqueue their confirmation message in the same database transaction
+that issues the tickets. Configure an authenticated SMTP relay in production:
+
+```dotenv
+SMTP_HOST="smtp.example.org"
+SMTP_PORT="587"
+SMTP_SECURE="false"
+SMTP_USER="tickets@vtk.be"
+SMTP_PASSWORD="..."
+MAIL_FROM="VTK Tickets <tickets@vtk.be>"
+MAIL_REPLY_TO="info@vtk.be"
+```
+
+`ticket-worker` in `infra/docker-compose.yml` calls
+`POST /api/tickets/maintenance` every 15 seconds with the maintenance bearer
+secret. Each call reconciles pending Stripe payments/refunds, releases expired
+inventory reservations, and claims outbox rows using `FOR UPDATE SKIP LOCKED`.
+Failed mail is retried with exponential backoff; after eight attempts the row is
+marked `DEAD` and requires operational investigation. Keep the maintenance route
+private, monitor worker/web logs and dead outbox rows, and never put its secret
+in client-side environment variables.
+
+Guest order links keep the capability token in the URL fragment, exchange it
+for an expiring `HttpOnly`, `SameSite=Lax` cookie, and immediately navigate
+to a clean order URL. Fragments are not sent in HTTP requests, so the token is
+not included in Nginx access logs or Stripe return URLs. The cookie and signed
+link expire shortly after the event; resending a confirmation reuses that same
+bounded capability.
+
+Zero-cost tickets require an authenticated site account. This prevents an
+anonymous client from draining event capacity by rotating unverified email
+addresses; paid public tickets remain available to guests. Use member-only
+ticket types when the audience must also be restricted to signed-in users.
+
+### Event-scoped access
+
+Access is evaluated against current database grants on every protected request;
+granting access to one event does not reveal another event. A user or group grant
+has one of these roles:
+
+| Role | Intended access |
+|------|-----------------|
+| `OWNER` | Full event control, attendee and financial data, refunds, scanning, audit, and access grants |
+| `MANAGER` | Event setup, inventory, attendees/orders, scanning, reports, and audit; no finance, refunds, or access grants |
+| `FINANCE` | Attendees/orders, financial totals, refunds, reports, and audit; no event setup, scanning, or access grants |
+| `SCANNER` | Scanner and the minimum event context needed at the entrance |
+| `REPORTER` | Aggregate event reports only; no attendee or financial detail |
+
+Group grants can target all members or leads only. A lead with the group-level
+`tickets.create` permission may create ticket events for that group; the creator
+becomes `OWNER` and the group's leads receive `MANAGER`. `tickets.manageAll` and
+superadmin bypass event grants and therefore expose every event: assign that
+permission only to the small operational team that genuinely needs it.
+
+### Production checklist
+
+- Back up PostgreSQL, run `prisma migrate deploy`, and verify the new migration
+  before enabling ticket sales.
+- Use unique high-entropy values for `BETTER_AUTH_SECRET`,
+  `TICKETING_TOKEN_SECRET`, and `TICKETING_MAINTENANCE_SECRET`; keep them in the
+  deployment secret store and document a rotation procedure.
+- Set `TICKETING_PAYMENT_PROVIDER=stripe`, use Stripe live-mode keys, enable
+  Bancontact, register the seven webhook events, and verify successful webhook
+  deliveries in Stripe Workbench.
+- Configure SPF, DKIM, and DMARC for `MAIL_FROM`; complete a confirmation-mail
+  delivery test outside the organisation before opening sales.
+- Confirm `web` and `ticket-worker` are healthy, monitor webhook errors and
+  `FAILED`/`DEAD` outbox rows, and alert on sustained failures.
+- Configure capacity, sales windows, terms version/URL, contact address, gates,
+  and least-privilege event grants. Remove temporary scanner grants after the
+  event and block unused device identifiers to keep the audit trail clean.
+  Device identifiers are audit metadata, not authentication factors: for a
+  lost device, removing the user's event grant is the security control.
+- Rehearse one live purchase, webhook delivery, PDF/QR download, first and
+  duplicate scan, reversal, full refund, expired reservation, and sold-out edge
+  case. Entrance devices require HTTPS and camera permission.
+- Include ticket tables in encrypted database backups and test restoration.
+  Do not launch until the incident, refund, reconciliation, and support owners
+  are named.
+
+### Privacy and retention
+
+Orders store buyer/attendee names and email addresses, accepted terms/version,
+custom-question answers, payment references, and ticket status. Scan and audit
+logs additionally record operational actors and timestamps. Stripe webhook
+storage is deliberately reduced to identifiers and status metadata; QR secrets
+and order access tokens are stored as hashes.
+
+- Ask only event questions that are necessary, avoid free-text collection of
+  sensitive data, state the purpose and retention period at collection time,
+  and restrict attendee exports to authorised event roles.
+- Treat order links and QR credentials as secrets. Do not include them in logs,
+  analytics, chat, or support tickets; revoke/void affected tickets when leaked.
+- Document the lawful basis, data-subject request process, processor agreements
+  for Stripe/SMTP/hosting, and the separation between statutory financial
+  retention and shorter operational attendee-data retention with the privacy
+  owner and accountant.
+- Archiving an event does **not** currently erase or anonymise its records, and
+  scan/audit rows are append-only. Define an approved post-event
+  anonymisation/purge procedure before production, including backups, while
+  preserving only records that must remain for accounting, fraud handling, or
+  audit obligations.
+
+---
+
 ## Gotchas and local-dev constraints
 
 A few non-obvious choices in this repo exist to keep local development usable.
@@ -274,8 +493,17 @@ Certificates land in `infra/nginx/letsencrypt/live/<domain>/`. The paths in
 ### 4. Launch the stack
 
 ```bash
+# Core services when TLS is handled by a host proxy:
 docker compose -f infra/docker-compose.yml up -d --build
+
+# Or include the bundled Nginx TLS edge:
+docker compose --profile edge-tls -f infra/docker-compose.yml up -d --build
 ```
+
+The bundled checkout rate/body limits and trusted `X-Real-IP` handling live in
+the `edge-tls` Nginx profile. When a host proxy is used, configure equivalent
+limits for `POST /api/tickets/checkout`, cap the Stripe webhook body, and
+overwrite (do not pass through) `X-Real-IP` before exposing ticket sales.
 
 This brings up:
 
@@ -286,8 +514,9 @@ This brings up:
 | `minio-setup`  | One-shot: creates the public `vtk` bucket              |
 | `web`          | Main Next.js app on **127.0.0.1:3011** → container :3000 |
 | `logistiek`    | Submodule app on **127.0.0.1:3100** → container :3000  |
-| `nginx`        | TLS termination + subdomain routing on :80/:443        |
+| `nginx`        | Optional `edge-tls` profile: TLS, rate limits, and subdomain routing on :80/:443 |
 | `certbot`      | Background renew loop (every 12h)                      |
+| `ticket-worker` | Reconciliation, reservation expiry, and mail outbox (every 15s) |
 
 During image **build**, the `web` Dockerfile runs `prisma generate` and
 `next build`. At **container start**, the default command runs

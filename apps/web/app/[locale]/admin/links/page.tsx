@@ -40,6 +40,9 @@ export default async function AdminShortLinks({
     include: { createdBy: { select: { name: true } } },
   });
   const nl = locale === "nl";
+  // Server component: rendered once per request, so reading the clock here is
+  // correct (react-hooks/purity targets client components that re-render).
+  // eslint-disable-next-line react-hooks/purity
   const now = Date.now();
   const dateFmt = new Intl.DateTimeFormat(nl ? "nl-BE" : "en-GB", {
     day: "2-digit",

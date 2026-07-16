@@ -4,6 +4,7 @@
     "login": "Inloggen",
     "profile": "Profiel",
     "myAccount": "Mijn account",
+    "myTickets": "Mijn tickets",
     "admin": "Admin",
     "logout": "Uitloggen",
     "language": "Taal"
@@ -279,6 +280,7 @@
     "partners": "Partners",
     "home": "Homepagina",
     "dashboardTiles": "Dashboardtegels",
+    "tickets": "Tickets",
     "shortlinks": "Verkorte links",
     "shift": "Shiften",
     "theokot": "Theokot",

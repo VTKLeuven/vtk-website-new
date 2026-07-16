@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { hasLocale } from "@/lib/locale";
 import { requireSession } from "@/lib/session";
 import { getDictionary, type Locale } from "@vtk/i18n";
+import { canAccessAnyTicketEvent } from "@/lib/ticketing/authorization";
 
 import "@/app/design/vtk-admin.css";
 
@@ -11,6 +12,7 @@ const sections = [
   { key: "dashboard", href: "" },
   { key: "content", href: "/inhoud", anyPerm: ["pages.edit", "header.manage"] },
   { key: "calendar", href: "/kalender", perm: "calendar.create" },
+  { key: "tickets", href: "/tickets", ticketing: true },
   { key: "albums", href: "/albums", perm: "photos.manageAlbums" },
   { key: "media", href: "/media", perm: "media.manage" },
   { key: "pocs", href: "/pocs", perm: "pocs.manage" },
@@ -185,8 +187,16 @@ export default async function AdminLayout({
   const base = locale === "nl" ? "" : "/en";
 
   const adminDict = dict.admin as DictAdmin & { [key: string]: string };
+  const canAccessTickets =
+    session.user.isSuperAdmin ||
+    session.permissions.includes("tickets.create") ||
+    session.permissions.includes("tickets.manageAll") ||
+    (await canAccessAnyTicketEvent());
 
   const visibleSections = sections.filter((s) => {
+    // Ticketing-tab hangt af van ticket-toegang (eigen grant of globale perm),
+    // niet van de gewone admin-permissies. canAccessTickets dekt superadmins al.
+    if ("ticketing" in s && s.ticketing) return canAccessTickets;
     if (session.user.isSuperAdmin) return true;
     if ("superAdminOnly" in s && s.superAdminOnly) return false;
     if ("anyPerm" in s) return s.anyPerm.some((p) => session.permissions.includes(p));
