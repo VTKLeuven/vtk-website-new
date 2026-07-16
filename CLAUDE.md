@@ -80,6 +80,14 @@ kan afleiden. Lees dit voor context bij features met kringspecifiek gedrag (bv. 
 **Wanneer je een feature bouwt waarvan de gewenste werking een kringkeuze is (niet puur
 technisch, niet vanzelfsprekend), voeg een sectie toe aan `docs/design-decisions.md`.**
 
+# Rollen, posten & rechten
+
+`docs/permissions.md` is de referentie voor de toegangscontrole: het rollen + posten +
+permissies-model, hoe rechten resolven (werkingsjaar-gescoped, 15-juli-reset), hoe je een
+permissie toevoegt (registry in `packages/db/src/permissions.ts` + seed) en hoe je in code
+checkt (`requirePermission` / `hasPermission`, getypeerd op de `Permission`-union). Lees dit
+voor je iets aan auth, admin-schermen of permissie-checks wijzigt.
+
 # Styling Guidelines
 
 Use `design/new-design.html` as the visual source of truth for VTK surfaces.
