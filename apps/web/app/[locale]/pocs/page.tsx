@@ -52,7 +52,7 @@ export default async function PocsPage({
                   const src = publicUrl(r.user.avatarKey);
                   return (
                     <li key={r.id} className="text-center">
-                      <div className="mx-auto h-20 w-20 overflow-hidden rounded-[16px] border border-vtk-blue/10 bg-[#f2f0e9]">
+                      <div className="mx-auto h-20 w-20 overflow-hidden rounded-[16px] border border-vtk-blue/10 bg-vtk-blue-soft">
                         {src ? (
                           <img src={src} alt={r.user.name} className="h-full w-full object-cover" />
                         ) : (

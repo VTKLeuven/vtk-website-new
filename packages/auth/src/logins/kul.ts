@@ -23,24 +23,34 @@
 
 export const KUL_PROVIDER_ID = "kuleuven";
 
+// KU Leuven releases claims under SAML-style names (displayName, givenName,
+// surname). We also accept the standard OIDC spellings (name, given_name,
+// family_name) so the mapping keeps working if KU Leuven ever changes them.
 type ProfileLike = {
   email?: string;
   preferred_username?: string;
   upn?: string;
   name?: string;
+  displayName?: string;
+  commonName?: string;
   given_name?: string;
+  givenName?: string;
   family_name?: string;
+  surname?: string;
 };
 
-/** Best-effort email extraction from an Entra/OIDC profile, normalized lower-case. */
+/** Best-effort email extraction from an OIDC profile, normalized lower-case. */
 function profileEmail(profile: ProfileLike): string | undefined {
   const raw = profile.email ?? profile.preferred_username ?? profile.upn;
   return raw ? raw.trim().toLowerCase() : undefined;
 }
 
 function profileName(profile: ProfileLike): string {
-  if (profile.name) return profile.name;
-  const parts = [profile.given_name, profile.family_name].filter(Boolean);
+  const full = profile.name ?? profile.displayName ?? profile.commonName;
+  if (full) return full;
+  const first = profile.given_name ?? profile.givenName;
+  const last = profile.family_name ?? profile.surname;
+  const parts = [first, last].filter(Boolean);
   return parts.length ? parts.join(" ") : (profileEmail(profile) ?? "KU Leuven user");
 }
 

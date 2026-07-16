@@ -26,6 +26,9 @@ export const PERMISSIONS = [
   { code: "users.bulkImport", labelNl: "Bulk gebruikers importeren", labelEn: "Bulk import users", category: "users" },
   { code: "groups.manage", labelNl: "Groepen en rechten beheren", labelEn: "Manage groups and permissions", category: "users" },
 
+  // Mailing lists
+  { code: "mailinglists.export", labelNl: "Mailinglijsten exporteren", labelEn: "Export mailing lists", category: "users" },
+
   // POCs
   { code: "pocs.manage", labelNl: "POC's beheren", labelEn: "Manage POCs", category: "general" },
 
@@ -37,6 +40,18 @@ export const PERMISSIONS = [
 
   // Dashboard tiles
   { code: "dashboard.manage", labelNl: "Dashboardtegels beheren", labelEn: "Manage dashboard tiles", category: "general" },
+
+  // Short links
+  { code: "shortlinks.manage", labelNl: "Verkorte links beheren", labelEn: "Manage short links", category: "general" },
+
+  // Shifts
+  { code: "shift.edit", labelNl: "Shiften beheren", labelEn: "Manage shifts", category: "shift" },
+  { code: "shift.reward", labelNl: "Shiftvergoedingen beheren", labelEn: "Manage shift rewards", category: "shift" },
+  { code: "shift.ranking", labelNl: "Shiftranglijst bekijken", labelEn: "View shift rankings", category: "shift" },
+
+  // Theokot (cafetaria / broodjesbar)
+  { code: "theokot.manage", labelNl: "Theokot beheren (sessies, aanbod, bans, instellingen)", labelEn: "Manage Theokot (sessions, offering, bans, settings)", category: "theokot" },
+  { code: "theokot.pickup", labelNl: "Theokot afhaalbalie bedienen", labelEn: "Operate Theokot pickup counter", category: "theokot" },
 
   // Module access flags (gate submodules via group permissions)
   { code: "modules.logistiek.access", labelNl: "Toegang tot Logistiek module", labelEn: "Access to Logistics module", category: "modules" },

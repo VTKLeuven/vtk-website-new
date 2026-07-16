@@ -4,11 +4,11 @@ import { prisma } from '@vtk/db';
 import { getDictionary, pick, type Locale } from '@vtk/i18n';
 import { entryForDate, isClosedHours } from '@/components/editorial/hoursUtils';
 import { getVisibleHeaderTabsForNav } from '@/lib/headerTabs';
-import { getSession } from '@vtk/auth/server';
-import { headers } from 'next/headers';
+import { getCurrentSession } from '@/lib/session';
 import { EditorialNavLinks } from './EditorialNavLinks';
 import { LocaleSwitcher } from './LocaleSwitcher';
 import { ProfileMenu } from './ProfileMenu';
+import { SiteHeaderShell } from './SiteHeaderShell';
 
 type OpeningHoursSetting = {
   titleNl: string;
@@ -38,7 +38,7 @@ export async function Header({ locale }: { locale: Locale }) {
   const now = new Date();
   const [tabs, session, theokotRow] = await Promise.all([
     getVisibleHeaderTabsForNav(),
-    getSession(await headers()),
+    getCurrentSession(),
     prisma.setting.findUnique({ where: { key: 'home.openingHours.theokot' } }),
   ]);
   const dict = getDictionary(locale);
@@ -57,18 +57,18 @@ export async function Header({ locale }: { locale: Locale }) {
   const nl = locale === 'nl';
   const quick = nl
     ? [
-        { href: `${base}/aanbod`, label: 'Theokot', as: 'link' as const },
+        { href: `${base}/theokot`, label: 'Theokot', as: 'link' as const },
         { href: `${base}/cursusdienst`, label: 'Cursusdienst', as: 'link' as const },
         { href: `${base}/tickets`, label: 'Tickets', as: 'link' as const },
       ]
     : [
-        { href: `${base}/aanbod`, label: 'Theokot', as: 'link' as const },
+        { href: `${base}/theokot`, label: 'Theokot', as: 'link' as const },
         { href: `${base}/cursusdienst`, label: 'Course shop', as: 'link' as const },
         { href: `${base}/tickets`, label: 'Tickets', as: 'link' as const },
       ];
 
   return (
-    <header className="vtk-site-header">
+    <SiteHeaderShell>
       <div className="utility">
         <div className="utility-inner">
           <div>
@@ -141,6 +141,6 @@ export async function Header({ locale }: { locale: Locale }) {
           )}
         </div>
       </div>
-    </header>
+    </SiteHeaderShell>
   );
 }

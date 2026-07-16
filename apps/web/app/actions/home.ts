@@ -3,8 +3,9 @@
 import { revalidatePath } from "next/cache";
 import { prisma } from "@vtk/db";
 import { requirePermission } from "@/lib/session";
+import { saveOk, type SaveState } from "@/lib/saveState";
 
-export async function saveOpeningHoursAction(formData: FormData): Promise<void> {
+export async function saveOpeningHoursAction(_prev: SaveState, formData: FormData): Promise<SaveState> {
   await requirePermission("home.edit");
   const key = formData.get("key") as string;
   const titleNl = formData.get("titleNl") as string;
@@ -23,9 +24,11 @@ export async function saveOpeningHoursAction(formData: FormData): Promise<void> 
     create: { key, value: { titleNl, titleEn, entries } },
   });
   revalidatePath("/");
+  revalidatePath("/admin/home");
+  return saveOk();
 }
 
-export async function saveCareerAction(formData: FormData): Promise<void> {
+export async function saveCareerAction(_prev: SaveState, formData: FormData): Promise<SaveState> {
   await requirePermission("home.edit");
   const value = {
     titleNl: formData.get("titleNl") as string,
@@ -42,9 +45,11 @@ export async function saveCareerAction(formData: FormData): Promise<void> {
     create: { key: "home.career", value },
   });
   revalidatePath("/");
+  revalidatePath("/admin/home");
+  return saveOk();
 }
 
-export async function saveAftermoviesAction(formData: FormData): Promise<void> {
+export async function saveAftermoviesAction(_prev: SaveState, formData: FormData): Promise<SaveState> {
   await requirePermission("home.edit");
   const titleNl = formData.get("titleNl") as string;
   const titleEn = formData.get("titleEn") as string;
@@ -65,9 +70,11 @@ export async function saveAftermoviesAction(formData: FormData): Promise<void> {
     create: { key: "home.aftermovies", value: { titleNl, titleEn, items } },
   });
   revalidatePath("/");
+  revalidatePath("/admin/home");
+  return saveOk();
 }
 
-export async function saveFeaturedAlbumsAction(formData: FormData): Promise<void> {
+export async function saveFeaturedAlbumsAction(_prev: SaveState, formData: FormData): Promise<SaveState> {
   await requirePermission("home.edit");
   const slugs = (formData.get("albumSlugs") as string)
     .split(",")
@@ -79,4 +86,6 @@ export async function saveFeaturedAlbumsAction(formData: FormData): Promise<void
     create: { key: "home.featuredAlbums", value: { albumSlugs: slugs } },
   });
   revalidatePath("/");
+  revalidatePath("/admin/home");
+  return saveOk();
 }

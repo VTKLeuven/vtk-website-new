@@ -1,9 +1,11 @@
+import Link from "next/link";
 import { prisma } from "@vtk/db";
 import { notFound } from "next/navigation";
 import { hasLocale } from "@/lib/locale";
 import { requirePermission } from "@/lib/session";
-import type { Locale } from "@vtk/i18n";
-import { Button, Card, Input, Label, Select, Textarea } from "@vtk/ui";
+import { getDictionary, type Locale } from "@vtk/i18n";
+import { Card, Input, Label, Select, Textarea } from "@vtk/ui";
+import { SaveForm } from "@/components/ui/SaveForm";
 import {
   saveOpeningHoursAction,
   saveCareerAction,
@@ -25,13 +27,14 @@ export default async function AdminHome({
   if (!hasLocale(localeParam)) notFound();
   const locale: Locale = localeParam;
   await requirePermission("home.edit");
+  const dict = getDictionary(locale);
 
+  const base = locale === "nl" ? "" : "/en";
   const rows = await prisma.setting.findMany({
     where: {
       key: {
         in: [
           "home.openingHours.cursusdienst",
-          "home.openingHours.theokot",
           "home.career",
           "home.aftermovies",
           "home.featuredAlbums",
@@ -41,7 +44,6 @@ export default async function AdminHome({
   });
   const map = new Map(rows.map((r) => [r.key, r.value]));
   const cursus = (map.get("home.openingHours.cursusdienst") as OpeningHours | undefined) ?? { titleNl: "", titleEn: "", entries: [] };
-  const theokot = (map.get("home.openingHours.theokot") as OpeningHours | undefined) ?? { titleNl: "", titleEn: "", entries: [] };
   const career = (map.get("home.career") as Career | undefined) ?? { titleNl: "", titleEn: "", bodyNl: "", bodyEn: "" };
   const after = (map.get("home.aftermovies") as Aftermovies | undefined) ?? { titleNl: "", titleEn: "", items: [] };
   const featured = (map.get("home.featuredAlbums") as Featured | undefined) ?? { albumSlugs: [] };
@@ -50,43 +52,76 @@ export default async function AdminHome({
     <div className="space-y-6">
       <h1 className="text-2xl font-semibold">{locale === "nl" ? "Homepagina" : "Homepage"}</h1>
 
-      {([
-        { title: "Cursusdienst", value: cursus, key: "home.openingHours.cursusdienst" },
-        { title: "Theokot", value: theokot, key: "home.openingHours.theokot" },
-      ] as const).map((block) => (
-        <Card key={block.key} className="p-5">
-          <h2 className="font-semibold mb-3">
-            {locale === "nl" ? "Openingsuren" : "Opening hours"} – {block.title}
-          </h2>
-          <form action={saveOpeningHoursAction} className="space-y-2">
-            <input type="hidden" name="key" value={block.key} />
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-              <div><Label>Title (NL)</Label><Input name="titleNl" defaultValue={block.value.titleNl} /></div>
-              <div><Label>Title (EN)</Label><Input name="titleEn" defaultValue={block.value.titleEn} /></div>
-            </div>
-            <table className="w-full text-sm">
-              <thead className="text-left"><tr><th>Day (NL)</th><th>Day (EN)</th><th>Hours</th></tr></thead>
-              <tbody>
-                {Array.from({ length: 7 }).map((_, i) => {
-                  const e = block.value.entries[i] || { dayNl: "", dayEn: "", hours: "" };
-                  return (
-                    <tr key={i}>
-                      <td className="pr-2 py-1"><Input name={`dayNl-${i}`} defaultValue={e.dayNl} /></td>
-                      <td className="pr-2 py-1"><Input name={`dayEn-${i}`} defaultValue={e.dayEn} /></td>
-                      <td className="py-1"><Input name={`hours-${i}`} defaultValue={e.hours} /></td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-            <Button type="submit">{locale === "nl" ? "Opslaan" : "Save"}</Button>
-          </form>
-        </Card>
-      ))}
+      <Card className="p-5">
+        <h2 className="font-semibold mb-3">
+          {locale === "nl" ? "Openingsuren" : "Opening hours"} – Cursusdienst
+        </h2>
+        <SaveForm
+          action={saveOpeningHoursAction}
+          className="space-y-2"
+          submitLabel={dict.admin.save}
+          savingLabel={dict.common.saving}
+          savedMessage={dict.common.saved}
+          fallbackErrorMessage={dict.common.saveError}
+        >
+          <input type="hidden" name="key" value="home.openingHours.cursusdienst" />
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+            <div><Label>Title (NL)</Label><Input name="titleNl" defaultValue={cursus.titleNl} /></div>
+            <div><Label>Title (EN)</Label><Input name="titleEn" defaultValue={cursus.titleEn} /></div>
+          </div>
+          <table className="w-full text-sm">
+            <thead className="text-left"><tr><th>Day (NL)</th><th>Day (EN)</th><th>Hours</th></tr></thead>
+            <tbody>
+              {Array.from({ length: 7 }).map((_, i) => {
+                const e = cursus.entries[i] || { dayNl: "", dayEn: "", hours: "" };
+                return (
+                  <tr key={i}>
+                    <td className="pr-2 py-1"><Input name={`dayNl-${i}`} defaultValue={e.dayNl} /></td>
+                    <td className="pr-2 py-1"><Input name={`dayEn-${i}`} defaultValue={e.dayEn} /></td>
+                    <td className="py-1"><Input name={`hours-${i}`} defaultValue={e.hours} /></td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </SaveForm>
+      </Card>
+
+      <Card className="p-5">
+        <h2 className="font-semibold mb-1">
+          {locale === "nl" ? "Openingsuren" : "Opening hours"} – Theokot
+        </h2>
+        <p className="text-sm text-[#5c667f]">
+          {locale === "nl" ? (
+            <>
+              De Theokot-openingsuren beheer je onder{" "}
+              <Link href={`${base}/admin/theokot/openingsuren`} className="underline">
+                Theokot · Openingsuren
+              </Link>
+              . Ze verschijnen automatisch op de startpagina.
+            </>
+          ) : (
+            <>
+              Manage the Theokot opening hours under{" "}
+              <Link href={`${base}/admin/theokot/openingsuren`} className="underline">
+                Theokot · Opening hours
+              </Link>
+              . They appear on the homepage automatically.
+            </>
+          )}
+        </p>
+      </Card>
 
       <Card className="p-5">
         <h2 className="font-semibold mb-3">VTK Career</h2>
-        <form action={saveCareerAction} className="space-y-2">
+        <SaveForm
+          action={saveCareerAction}
+          className="space-y-2"
+          submitLabel={dict.admin.save}
+          savingLabel={dict.common.saving}
+          savedMessage={dict.common.saved}
+          fallbackErrorMessage={dict.common.saveError}
+        >
           <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
             <div><Label>Title (NL)</Label><Input name="titleNl" defaultValue={career.titleNl} /></div>
             <div><Label>Title (EN)</Label><Input name="titleEn" defaultValue={career.titleEn} /></div>
@@ -96,15 +131,21 @@ export default async function AdminHome({
             <div><Label>CTA label (EN)</Label><Input name="ctaLabelEn" defaultValue={career.ctaLabelEn ?? ""} /></div>
             <div className="md:col-span-2"><Label>CTA URL</Label><Input name="ctaUrl" defaultValue={career.ctaUrl ?? ""} /></div>
           </div>
-          <Button type="submit">{locale === "nl" ? "Opslaan" : "Save"}</Button>
-        </form>
+        </SaveForm>
       </Card>
 
       <Card className="p-5">
         <h2 className="font-semibold mb-3">
           {locale === "nl" ? "Aftermovies & sfeerbeelden" : "Aftermovies & photos"}
         </h2>
-        <form action={saveAftermoviesAction} className="space-y-2">
+        <SaveForm
+          action={saveAftermoviesAction}
+          className="space-y-2"
+          submitLabel={dict.admin.save}
+          savingLabel={dict.common.saving}
+          savedMessage={dict.common.saved}
+          fallbackErrorMessage={dict.common.saveError}
+        >
           <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
             <div><Label>Title (NL)</Label><Input name="titleNl" defaultValue={after.titleNl} /></div>
             <div><Label>Title (EN)</Label><Input name="titleEn" defaultValue={after.titleEn} /></div>
@@ -130,19 +171,24 @@ export default async function AdminHome({
               })}
             </tbody>
           </table>
-          <Button type="submit">{locale === "nl" ? "Opslaan" : "Save"}</Button>
-        </form>
+        </SaveForm>
       </Card>
 
       <Card className="p-5">
         <h2 className="font-semibold mb-3">
           {locale === "nl" ? "Uitgelichte albums" : "Featured albums"}
         </h2>
-        <form action={saveFeaturedAlbumsAction} className="space-y-2">
+        <SaveForm
+          action={saveFeaturedAlbumsAction}
+          className="space-y-2"
+          submitLabel={dict.admin.save}
+          savingLabel={dict.common.saving}
+          savedMessage={dict.common.saved}
+          fallbackErrorMessage={dict.common.saveError}
+        >
           <Label>{locale === "nl" ? "Slugs (komma-gescheiden)" : "Slugs (comma-separated)"}</Label>
           <Input name="albumSlugs" defaultValue={featured.albumSlugs.join(", ")} placeholder="galabal-2026, cantus-2026" />
-          <Button type="submit">{locale === "nl" ? "Opslaan" : "Save"}</Button>
-        </form>
+        </SaveForm>
       </Card>
     </div>
   );

@@ -5,7 +5,9 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 import { prisma } from "@vtk/db";
 import { hasPermission } from "@vtk/auth";
+import { deleteObject } from "@vtk/storage";
 import { requireSession } from "@/lib/session";
+import { saveError, type SaveState } from "@/lib/saveState";
 
 const eventSchema = z.object({
   id: z.string().optional(),
@@ -20,6 +22,7 @@ const eventSchema = z.object({
   allDay: z.coerce.boolean().default(false),
   visibility: z.enum(["PUBLIC", "MEMBERS"]).default("PUBLIC"),
   url: z.string().optional().nullable(),
+  imageKey: z.string().optional().nullable(),
 });
 
 async function assertCanManageEvent(userGroups: string[], groupId: string, superOrAll: boolean) {
@@ -29,9 +32,9 @@ async function assertCanManageEvent(userGroups: string[], groupId: string, super
   }
 }
 
-export async function saveEventAction(formData: FormData): Promise<void> {
+export async function saveEventAction(_prev: SaveState, formData: FormData): Promise<SaveState> {
   const session = await requireSession();
-  const parsed = eventSchema.parse({
+  const parsed = eventSchema.safeParse({
     id: (formData.get("id") as string) || undefined,
     titleNl: formData.get("titleNl"),
     titleEn: formData.get("titleEn") || null,
@@ -44,7 +47,17 @@ export async function saveEventAction(formData: FormData): Promise<void> {
     allDay: formData.get("allDay") === "on",
     visibility: formData.get("visibility") || "PUBLIC",
     url: formData.get("url") || null,
+    imageKey: (formData.get("imageKey") as string) || null,
   });
+  if (!parsed.success) return saveError("INVALID_INPUT");
+  const input = parsed.data;
+
+  const start = new Date(input.start);
+  const end = new Date(input.end);
+  // Het einde mag niet voor de start liggen. Anders is het evenement tegelijk
+  // "aankomend" op de homepage (die op `start` filtert) en "verleden" in de
+  // admin (die op `end` filtert): dezelfde datum, twee tegengestelde statussen.
+  if (end < start) return saveError("END_BEFORE_START");
 
   const superOrAll =
     session.user.isSuperAdmin || hasPermission(session, "calendar.manageAll");
@@ -52,32 +65,45 @@ export async function saveEventAction(formData: FormData): Promise<void> {
     throw new Error("forbidden");
   }
   const userGroupIds = session.groups.map((g) => g.id);
-  await assertCanManageEvent(userGroupIds, parsed.groupId, superOrAll);
+  await assertCanManageEvent(userGroupIds, input.groupId, superOrAll);
 
   const data = {
-    titleNl: parsed.titleNl,
-    titleEn: parsed.titleEn,
-    descriptionNl: parsed.descriptionNl,
-    descriptionEn: parsed.descriptionEn,
-    location: parsed.location,
-    groupId: parsed.groupId,
-    start: new Date(parsed.start),
-    end: new Date(parsed.end),
-    allDay: parsed.allDay,
-    visibility: parsed.visibility,
-    url: parsed.url,
+    titleNl: input.titleNl,
+    titleEn: input.titleEn,
+    descriptionNl: input.descriptionNl,
+    descriptionEn: input.descriptionEn,
+    location: input.location,
+    groupId: input.groupId,
+    start,
+    end,
+    allDay: input.allDay,
+    visibility: input.visibility,
+    url: input.url,
+    imageKey: input.imageKey,
     createdById: session.user.id,
   };
 
-  if (parsed.id) {
-    const existing = await prisma.calendarEvent.findUnique({ where: { id: parsed.id } });
-    if (!existing) return;
+  if (input.id) {
+    const existing = await prisma.calendarEvent.findUnique({ where: { id: input.id } });
+    if (!existing) return saveError("INVALID_INPUT");
     await assertCanManageEvent(userGroupIds, existing.groupId, superOrAll);
-    await prisma.calendarEvent.update({ where: { id: parsed.id }, data });
+    await prisma.calendarEvent.update({ where: { id: input.id }, data });
+    // De vervangen (of gewiste) afbeelding opruimen, zodat losse objecten niet
+    // in de bucket blijven staan. Mislukt dat, dan is dat geen opslaanfout.
+    if (existing.imageKey && existing.imageKey !== input.imageKey) {
+      try {
+        await deleteObject(existing.imageKey);
+      } catch {
+        /* ignore */
+      }
+    }
   } else {
     await prisma.calendarEvent.create({ data });
   }
   revalidatePath("/kalender");
+  revalidatePath("/admin/kalender");
+  // De redirect naar de lijst is zelf de bevestiging; loopt via een throw en
+  // hoort dus buiten elke try/catch te blijven.
   redirect("/admin/kalender");
 }
 
@@ -92,6 +118,15 @@ export async function deleteEventAction(formData: FormData): Promise<void> {
   const userGroupIds = session.groups.map((g) => g.id);
   await assertCanManageEvent(userGroupIds, evt.groupId, superOrAll);
   await prisma.calendarEvent.delete({ where: { id } });
+  if (evt.imageKey) {
+    try {
+      await deleteObject(evt.imageKey);
+    } catch {
+      /* ignore */
+    }
+  }
   revalidatePath("/kalender");
-  redirect("/admin/kalender");
+  // Geen redirect: de lijst ververst ter plaatse, zodat de gekozen filter
+  // (aankomend/verleden) blijft staan.
+  revalidatePath("/admin/kalender");
 }

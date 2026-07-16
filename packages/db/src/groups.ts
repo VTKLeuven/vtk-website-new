@@ -9,7 +9,6 @@ export type GroupSeed = {
 };
 
 export const GROUP_SEEDS: GroupSeed[] = [
-  { code: "ALGEMEEN", slug: "algemeen", nameNl: "Algemeen", nameEn: "General", orderInPraesidium: 0 },
   { code: "GROEP5", slug: "groep-5", nameNl: "Groep 5", nameEn: "Group 5", orderInPraesidium: 1 },
   { code: "ACTIVITEITEN", slug: "activiteiten", nameNl: "Activiteiten", nameEn: "Activities", orderInPraesidium: 2 },
   { code: "BEDRIJVENRELATIES", slug: "bedrijvenrelaties", nameNl: "Bedrijvenrelaties", nameEn: "Corporate Relations", orderInPraesidium: 3 },
@@ -27,20 +26,53 @@ export const GROUP_SEEDS: GroupSeed[] = [
   { code: "THEOKOT", slug: "theokot", nameNl: "Theokot", nameEn: "Theokot", orderInPraesidium: 15 },
 ];
 
+/**
+ * Standaardtabs voor de hoofdnavigatie. Dit is zowel de seed als de fallback
+ * zolang de `HeaderTab`-tabel leeg is. `intro*` en `cta*` vullen de
+ * categoriepagina (`/[headerSlug]`); ze zijn nadien bewerkbaar via /admin/inhoud.
+ */
 export const HEADER_TABS: Array<{
   code: string;
   slug: string;
   labelNl: string;
   labelEn: string;
   order: number;
+  introNl?: string;
+  introEn?: string;
+  ctaLabelNl?: string;
+  ctaLabelEn?: string;
+  ctaUrl?: string;
 }> = [
-  { code: "AANBOD", slug: "aanbod", labelNl: "Aanbod", labelEn: "Offer", order: 0 },
-  { code: "EERSTEJAARS", slug: "eerstejaars", labelNl: "Eerstejaars", labelEn: "Freshmen", order: 1 },
-  { code: "CAREER", slug: "career", labelNl: "Career", labelEn: "Career", order: 2 },
-  { code: "CURSUSDIENST", slug: "cursusdienst", labelNl: "Cursusdienst", labelEn: "Course Shop", order: 3 },
-  { code: "INTERNATIONAAL", slug: "internationaal", labelNl: "Internationaal", labelEn: "International", order: 4 },
-  { code: "STUDIES", slug: "studies", labelNl: "Studies", labelEn: "Studies", order: 5 },
-  { code: "MEDIA", slug: "media", labelNl: "Media", labelEn: "Media", order: 6 },
-  { code: "OVER_VTK", slug: "over-vtk", labelNl: "Over-VTK", labelEn: "About VTK", order: 7 },
-  { code: "CONTACT", slug: "contact", labelNl: "Contact", labelEn: "Contact", order: 8 },
+  // Code blijft AANBOD: de seed upsert op code, en HeaderTab.code hangt vast aan
+  // bestaande Page-rijen. Enkel slug en label verhuizen naar "Info".
+  {
+    code: "AANBOD",
+    slug: "info",
+    labelNl: "Info",
+    labelEn: "Info",
+    order: 0,
+    introNl:
+      "Praktische diensten, campusvoorzieningen en tools die je semester vlotter maken.",
+    introEn:
+      "Practical services, campus facilities and tools that make your semester smoother.",
+  },
+  { code: "THEOKOT", slug: "theokot", labelNl: "Theokot", labelEn: "Theokot", order: 1 },
+  { code: "SHIFTEN", slug: "shift", labelNl: "Shiften", labelEn: "Shifts", order: 2 },
+  { code: "EERSTEJAARS", slug: "eerstejaars", labelNl: "Eerstejaars", labelEn: "Freshmen", order: 3 },
+  { code: "CAREER", slug: "career", labelNl: "Career", labelEn: "Career", order: 4 },
+  {
+    code: "CURSUSDIENST",
+    slug: "cursusdienst",
+    labelNl: "Cursusdienst",
+    labelEn: "Course Shop",
+    order: 5,
+    ctaLabelNl: "Bestel cursussen op cudi.vtk.be",
+    ctaLabelEn: "Order courses on cudi.vtk.be",
+    ctaUrl: "https://cudi.vtk.be",
+  },
+  { code: "INTERNATIONAAL", slug: "internationaal", labelNl: "Internationaal", labelEn: "International", order: 6 },
+  { code: "STUDIES", slug: "studies", labelNl: "Studies", labelEn: "Studies", order: 7 },
+  { code: "MEDIA", slug: "media", labelNl: "Media", labelEn: "Media", order: 8 },
+  { code: "OVER_VTK", slug: "over-vtk", labelNl: "Over-VTK", labelEn: "About VTK", order: 9 },
+  { code: "CONTACT", slug: "contact", labelNl: "Contact", labelEn: "Contact", order: 10 },
 ];

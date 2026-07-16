@@ -58,7 +58,7 @@ export function AlbumViewer({
             <button
               type="button"
               onClick={() => setLightbox(i)}
-              className="block aspect-square w-full overflow-hidden rounded-[16px] border border-vtk-blue/10 bg-[#f2f0e9] focus:outline-vtk-ink"
+              className="block aspect-square w-full overflow-hidden rounded-[16px] border border-vtk-blue/10 bg-vtk-blue-soft focus:outline-vtk-ink"
             >
               <img src={p.thumb} alt="" className="h-full w-full object-cover group-hover:scale-105 transition" />
             </button>

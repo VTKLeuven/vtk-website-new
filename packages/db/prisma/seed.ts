@@ -49,39 +49,39 @@ function headingDoc(title: string, paragraphs: string[]): object {
 
 async function main() {
   console.log("Seeding groups...");
+  // Create-only: een reseed op een DB met data mag bestaande groepen (naam,
+  // slug, volgorde) niet overschrijven. Nieuwe codes worden nog wel aangemaakt.
   for (const g of GROUP_SEEDS) {
     await prisma.group.upsert({
       where: { code: g.code },
-      update: {
-        slug: g.slug,
-        nameNl: g.nameNl,
-        nameEn: g.nameEn,
-        orderInPraesidium: g.orderInPraesidium,
-      },
+      update: {},
       create: g,
     });
   }
 
   console.log("Seeding header tabs...");
+  // Header tabs zijn na hun eerste aanmaak volledig admin-beheerd: labels, volgorde
+  // (dragbaar, zie /admin/inhoud), zichtbaarheid, slug, intro en CTA worden daar
+  // bewerkt. De seed draait niet automatisch bij een deploy (enkel met RUN_SEED=true,
+  // zie web.Dockerfile CMD), maar ook een handmatige reseed mag die aanpassingen niet
+  // terugdraaien. Daarom enkel ontbrekende tabs aanmaken en bestaande rijen NIET
+  // overschrijven. Een verse of gereset DB krijgt nog steeds alle defaults via
+  // `create`; nieuwe standaardtabs (nieuw `code`) worden nog wel toegevoegd.
   for (const tab of HEADER_TABS) {
     await prisma.headerTab.upsert({
       where: { code: tab.code },
-      update: {
-        slug: tab.slug,
-        labelNl: tab.labelNl,
-        labelEn: tab.labelEn,
-        order: tab.order,
-        visible: true,
-      },
+      update: {},
       create: tab,
     });
   }
 
   console.log("Seeding permissions...");
+  // Create-only: bestaande permission-rijen niet overschrijven bij een reseed.
+  // Nieuwe permission-codes worden nog toegevoegd via `create`.
   for (const p of PERMISSIONS) {
     await prisma.permission.upsert({
       where: { code: p.code },
-      update: { labelNl: p.labelNl, labelEn: p.labelEn, category: p.category },
+      update: {},
       create: { code: p.code, labelNl: p.labelNl, labelEn: p.labelEn, category: p.category },
     });
   }
@@ -122,6 +122,21 @@ async function main() {
     }
   }
 
+  // De post Theokot beheert het broodjes-reservatiesysteem en bedient de afhaalbalie.
+  const theokotPerms = await prisma.permission.findMany({
+    where: { code: { in: ["theokot.manage", "theokot.pickup"] } },
+  });
+  const theokotGroup = await prisma.group.findUnique({ where: { code: "THEOKOT" } });
+  if (theokotGroup) {
+    for (const perm of theokotPerms) {
+      await prisma.groupPermission.upsert({
+        where: { groupId_permissionId: { groupId: theokotGroup.id, permissionId: perm.id } },
+        update: {},
+        create: { groupId: theokotGroup.id, permissionId: perm.id },
+      });
+    }
+  }
+
   console.log("Seeding default homepage settings...");
   const defaultSettings: Array<{ key: string; value: unknown }> = [
     {
@@ -144,11 +159,11 @@ async function main() {
         titleNl: "Openingsuren Theokot",
         titleEn: "Theokot opening hours",
         entries: [
-          { dayNl: "Maandag", dayEn: "Monday", hours: "11:30 – 14:00" },
-          { dayNl: "Dinsdag", dayEn: "Tuesday", hours: "11:30 – 14:00" },
-          { dayNl: "Woensdag", dayEn: "Wednesday", hours: "11:30 – 14:00" },
-          { dayNl: "Donderdag", dayEn: "Thursday", hours: "11:30 – 14:00" },
-          { dayNl: "Vrijdag", dayEn: "Friday", hours: "11:30 – 14:00" },
+          { dayNl: "Maandag", dayEn: "Monday", hours: "10:30 – 18:00" },
+          { dayNl: "Dinsdag", dayEn: "Tuesday", hours: "10:30 – 18:00" },
+          { dayNl: "Woensdag", dayEn: "Wednesday", hours: "10:30 – 18:00" },
+          { dayNl: "Donderdag", dayEn: "Thursday", hours: "10:30 – 18:00" },
+          { dayNl: "Vrijdag", dayEn: "Friday", hours: "10:30 – 18:00" },
         ],
       },
     },
@@ -187,15 +202,43 @@ async function main() {
         ] as Array<{ type: "video" | "image"; url: string; titleNl?: string; titleEn?: string }>,
       },
     },
+    // `home.featuredAlbums` staat hier bewust niet: die wordt na het seeden van de
+    // albums create-only gezet (zie verderop), zodat een verse DB de seed-albums
+    // krijgt maar een admin-selectie niet overschreven wordt.
+    // Theokot-configuratie: waarden die niet elke week wijzigen. maxItemsPerOrder = X,
+    // maxWeeklySpecialPerOrder = Y (X > Y). Tijden zijn "HH:mm" in Brussel-tijd.
     {
-      key: "home.featuredAlbums",
-      value: { albumSlugs: [] as string[] },
+      key: "theokot.config",
+      value: {
+        maxItemsPerOrder: 5,
+        maxWeeklySpecialPerOrder: 1,
+        orderLeadDays: 2,
+        orderOpenTime: "12:00",
+        cancelDeadline: "10:30",
+        pickupDefaultStart: "12:00",
+        pickupDefaultEnd: "16:00",
+        noShowGraceMinutes: 15,
+        noShowThreshold: 3,
+        banDurationDays: 14,
+      },
+    },
+    {
+      key: "theokot.orderMessage",
+      value: {
+        bodyNl: "",
+        bodyEn: "",
+      },
     },
   ];
+  // Net als de header tabs zijn deze settings admin-beheerd (openingsuren, career,
+  // aftermovies, theokot-config ...) en worden ze in /admin bewerkt. Enkel
+  // ontbrekende keys aanmaken en bestaande niet overschrijven, zodat ook een
+  // handmatige reseed die aanpassingen niet terugdraait naar de defaults.
+  // Een verse of gereset DB krijgt nog steeds alle defaults via `create`.
   for (const s of defaultSettings) {
     await prisma.setting.upsert({
       where: { key: s.key },
-      update: { value: s.value as object },
+      update: {},
       create: { key: s.key, value: s.value as object },
     });
   }
@@ -204,6 +247,9 @@ async function main() {
   // Mirrors the hoofdpartners strip on vtk.be. logoKey points at placeholder
   // paths — the UI falls back to the partner name as text when the object
   // isn't present in the S3 bucket, so the seed stays bucket-agnostic.
+  // Partners zijn admin-beheerd (naam, url, logo, volgorde, actief): enkel
+  // ontbrekende aanmaken en bestaande NIET overschrijven, zodat een handmatige
+  // reseed die aanpassingen niet terugdraait.
   const partnerSeeds: Array<{ name: string; url: string; logoKey: string; order: number }> = [
     { name: "Deloitte",                    url: "https://mycareer.deloitte.com",                           logoKey: "partners/seed/deloitte.svg",     order: 0 },
     { name: "Sweco Belgium",               url: "https://swecobelgium.be",                                 logoKey: "partners/seed/sweco.svg",        order: 1 },
@@ -217,16 +263,10 @@ async function main() {
   ];
   for (const p of partnerSeeds) {
     const existing = await prisma.partner.findFirst({ where: { name: p.name } });
-    if (existing) {
-      await prisma.partner.update({
-        where: { id: existing.id },
-        data: { url: p.url, logoKey: p.logoKey, order: p.order, active: true },
-      });
-    } else {
-      await prisma.partner.create({
-        data: { name: p.name, url: p.url, logoKey: p.logoKey, order: p.order, active: true },
-      });
-    }
+    if (existing) continue;
+    await prisma.partner.create({
+      data: { name: p.name, url: p.url, logoKey: p.logoKey, order: p.order, active: true },
+    });
   }
 
   console.log("Seeding prototype users and memberships...");
@@ -315,15 +355,13 @@ async function main() {
     },
   ];
 
+  // Create-only: bestaande prototype-gebruikers, hun wachtwoord en lidmaatschappen
+  // niet overschrijven bij een reseed op een DB met data.
   const prototypeUserByEmail = new Map<string, { id: string; email: string; name: string }>();
   for (const u of prototypeUsers) {
     const user = await prisma.user.upsert({
       where: { email: u.email },
-      update: {
-        name: u.name,
-        locale: u.locale,
-        active: true,
-      },
+      update: {},
       create: {
         email: u.email,
         name: u.name,
@@ -333,9 +371,7 @@ async function main() {
     });
     await prisma.account.upsert({
       where: {id: `credentials:${user.id}`},
-      update: {
-        password: prototypePasswordHash
-      },
+      update: {},
       create: {
         id: `credentials:${user.id}`,
         accountId: user.id,
@@ -350,14 +386,14 @@ async function main() {
       const group = await prisma.group.findUnique({ where: { code: membership.code } });
       if (!group) continue;
       await prisma.groupMembership.upsert({
-        where: { userId_groupId: { userId: user.id, groupId: group.id } },
-        update: {
-          role: membership.role,
-          titleNl: membership.titleNl,
-          titleEn: membership.titleEn,
-          year: membership.year,
-          displayOrder: membership.displayOrder,
+        where: {
+          userId_groupId_year: {
+            userId: user.id,
+            groupId: group.id,
+            year: membership.year,
+          },
         },
+        update: {},
         create: {
           userId: user.id,
           groupId: group.id,
@@ -424,17 +460,13 @@ async function main() {
     },
   ];
 
+  // POC's en hun vertegenwoordigers zijn admin-beheerd (namen, beschrijvingen,
+  // volgorde, wie welke rol heeft): enkel ontbrekende aanmaken en bestaande NIET
+  // overschrijven, zodat een handmatige reseed die aanpassingen niet terugdraait.
   for (const poc of pocSeeds) {
     const row = await prisma.poc.upsert({
       where: { slug: poc.slug },
-      update: {
-        nameNl: poc.nameNl,
-        nameEn: poc.nameEn,
-        studyTrack: poc.studyTrack,
-        descriptionNl: poc.descriptionNl,
-        descriptionEn: poc.descriptionEn,
-        order: poc.order,
-      },
+      update: {},
       create: {
         slug: poc.slug,
         nameNl: poc.nameNl,
@@ -450,7 +482,7 @@ async function main() {
       if (!user) continue;
       await prisma.pocRepresentative.upsert({
         where: { pocId_userId: { pocId: row.id, userId: user.id } },
-        update: { roleNl: rep.roleNl, roleEn: rep.roleEn, order: rep.order },
+        update: {},
         create: { pocId: row.id, userId: user.id, roleNl: rep.roleNl, roleEn: rep.roleEn, order: rep.order },
       });
     }
@@ -613,23 +645,17 @@ async function main() {
     },
   ];
 
+  // CMS-pagina's zijn admin-beheerd: titel, inhoud, categorie (headerTabId),
+  // zichtbaarheid in de header en volgorde worden in /admin/inhoud bewerkt. Enkel
+  // ontbrekende pagina's aanmaken en bestaande NIET overschrijven, zodat een
+  // handmatige reseed die aanpassingen (bv. verplaatst, verborgen of herschikt)
+  // niet terugdraait naar de defaults.
   for (const page of pageSeeds) {
     const tab = await prisma.headerTab.findUnique({ where: { code: page.headerCode } });
     if (!tab) continue;
     await prisma.page.upsert({
       where: { slug: page.slug },
-      update: {
-        headerTabId: tab.id,
-        visibleInHeader: true,
-        titleNl: page.titleNl,
-        titleEn: page.titleEn,
-        excerptNl: page.excerptNl,
-        excerptEn: page.excerptEn,
-        contentJsonNl: page.contentNl,
-        contentJsonEn: page.contentEn,
-        publishedAt: new Date("2026-05-18T00:00:00+02:00"),
-        order: page.order,
-      },
+      update: {},
       create: {
         slug: page.slug,
         headerTabId: tab.id,
@@ -685,17 +711,11 @@ async function main() {
       publishedAt: "2026-05-18T00:00:00+02:00",
     },
   ];
+  // Create-only: bestaande albums (titel, beschrijving, datums) niet overschrijven.
   for (const album of albumSeeds) {
     await prisma.photoAlbum.upsert({
       where: { slug: album.slug },
-      update: {
-        titleNl: album.titleNl,
-        titleEn: album.titleEn,
-        descriptionNl: album.descriptionNl,
-        descriptionEn: album.descriptionEn,
-        eventDate: new Date(album.eventDate),
-        publishedAt: new Date(album.publishedAt),
-      },
+      update: {},
       create: {
         slug: album.slug,
         titleNl: album.titleNl,
@@ -708,9 +728,13 @@ async function main() {
     });
   }
 
+  // Create-only: op een verse DB de featured-albums vullen met de seed-albums;
+  // een bestaande (admin-gekozen) selectie niet overschrijven. Deze key staat
+  // daarom bewust NIET in `defaultSettings` hierboven (die zou hem eerst leeg
+  // aanmaken en deze create-branch nooit laten vuren).
   await prisma.setting.upsert({
     where: { key: "home.featuredAlbums" },
-    update: { value: { albumSlugs: albumSeeds.map((a) => a.slug) } },
+    update: {},
     create: { key: "home.featuredAlbums", value: { albumSlugs: albumSeeds.map((a) => a.slug) } },
   });
 
@@ -735,7 +759,7 @@ async function main() {
       location: "Theokot · Arenberg",
       start: "2026-05-19T11:30:00+02:00",
       end: "2026-05-19T14:00:00+02:00",
-      url: "https://vtk.be/nl/aanbod",
+      url: "https://vtk.be/nl/theokot",
       groupCode: "THEOKOT",
       descriptionNl: "Een extra uitgebreide lunchshift met broodjes, koffie en warme snacks in de VTK-kelder.",
       descriptionEn: "An extended lunch shift with sandwiches, coffee and warm snacks in the VTK basement.",
@@ -884,6 +908,8 @@ async function main() {
       descriptionEn: "A rewind cantus with prototype copy for the new calendar design.",
     },
   ];
+  // Create-only: een bestaand event (zelfde titel + start) niet overschrijven,
+  // zodat admin-bewerkingen aan locatie, tijden of beschrijving blijven staan.
   for (const e of eventSeeds) {
     const group = await prisma.group.findUnique({ where: { code: e.groupCode } });
     if (!group) continue;
@@ -892,23 +918,21 @@ async function main() {
     const existing = await prisma.calendarEvent.findFirst({
       where: { titleNl: e.titleNl, start },
     });
-    const data = {
-      titleNl: e.titleNl,
-      titleEn: e.titleEn,
-      location: e.location,
-      start,
-      end,
-      url: e.url,
-      descriptionNl: e.descriptionNl,
-      descriptionEn: e.descriptionEn,
-      visibility: "PUBLIC" as const,
-      groupId: group.id,
-    };
-    if (existing) {
-      await prisma.calendarEvent.update({ where: { id: existing.id }, data });
-    } else {
-      await prisma.calendarEvent.create({ data });
-    }
+    if (existing) continue;
+    await prisma.calendarEvent.create({
+      data: {
+        titleNl: e.titleNl,
+        titleEn: e.titleEn,
+        location: e.location,
+        start,
+        end,
+        url: e.url,
+        descriptionNl: e.descriptionNl,
+        descriptionEn: e.descriptionEn,
+        visibility: "PUBLIC" as const,
+        groupId: group.id,
+      },
+    });
   }
 
   const seedEmail = readSeedEnv(process.env.SEED_ADMIN_EMAIL);
@@ -920,13 +944,13 @@ async function main() {
     const adminEmail = seedEmail.toLowerCase();
     const adminPassword = seedPassword;
     const passwordHash = await hash(adminPassword);
+    // Create-only: enkel een nieuwe admin aanmaken. Een reseed reset het
+    // wachtwoord of de superadmin-vlag van een BESTAANDE admin NIET meer (dat was
+    // een destructieve update op bestaande data). Wachtwoord kwijt? Reset het in
+    // de admin-UI of verwijder de rij eerst en herseed.
     const admin = await prisma.user.upsert({
       where: { email: adminEmail },
-      update: {
-        email: adminEmail,
-        isSuperAdmin: true,
-        active: true,
-      },
+      update: {},
       create: {
         email: adminEmail,
         name: "VTK Admin",
@@ -935,6 +959,7 @@ async function main() {
     });
     await prisma.account.upsert({
       where: {id: `credential:${admin.id}`},
+      update: {},
       create: {
         id: `credential:${admin.id}`,
         accountId: admin.id,
@@ -942,16 +967,15 @@ async function main() {
         userId: admin.id,
         password: passwordHash
       },
-      update: {
-        password: passwordHash
-      }
     })
     const itGroup = await prisma.group.findUnique({ where: { code: "IT" } });
     if (itGroup) {
       await prisma.groupMembership.upsert({
-        where: { userId_groupId: { userId: admin.id, groupId: itGroup.id } },
-        update: { role: "LEAD" },
-        create: { userId: admin.id, groupId: itGroup.id, role: "LEAD" },
+        where: {
+          userId_groupId_year: { userId: admin.id, groupId: itGroup.id, year: 2026 },
+        },
+        update: {},
+        create: { userId: admin.id, groupId: itGroup.id, role: "LEAD", year: 2026 },
       });
     }
   } else {
@@ -970,12 +994,164 @@ async function main() {
     { id: "seed-tile-drive", label: "Google Drive", url: "https://drive.google.com", icon: "cloud", color: "green", order: 2 },
     { id: "seed-tile-tickets", label: "Tickets", url: "https://tickets.vtk.be", icon: "ticket", color: "yellow", order: 3 },
   ] as const;
+  // Create-only: bestaande tiles (label, url, icoon, kleur, volgorde) niet
+  // overschrijven bij een reseed.
   for (const t of dashboardTiles) {
     await prisma.dashboardTile.upsert({
       where: { id: t.id },
-      update: { label: t.label, url: t.url, icon: t.icon, color: t.color, order: t.order, scope: "GLOBAL" },
+      update: {},
       create: { id: t.id, label: t.label, url: t.url, icon: t.icon, color: t.color, order: t.order, scope: "GLOBAL" },
     });
+  }
+
+  console.log("Seeding shifts...");
+  // On a fresh DB these shifts are dropped in the coming 7 days (scheduled
+  // relative to *now*). Create-only: a reseed on a DB that already has them does
+  // NOT reschedule or overwrite them, so admin edits and sign-ups are preserved.
+  const shiftNow = new Date();
+  const shiftAt = (dayOffset: number, hour: number, minute = 0): Date => {
+    const d = new Date(shiftNow);
+    d.setDate(d.getDate() + dayOffset);
+    d.setHours(hour, minute, 0, 0);
+    return d;
+  };
+  const shiftSeeds: Array<{
+    id: string;
+    name: string;
+    dayOffset: number;
+    startHour: number;
+    endHour: number;
+    location: string;
+    description: string;
+    maxParticipants: number;
+    reward: number;
+    post: GroupCode | null;
+  }> = [
+    { id: "seed-shift-1", name: "Tapshift", dayOffset: 1, startHour: 20, endHour: 23, location: "Fakbar", description: "Tapshift donderdagavond", maxParticipants: 4, reward: 2, post: "FAKBAR" },
+    { id: "seed-shift-2", name: "Cursusverkoop", dayOffset: 2, startHour: 9, endHour: 12, location: "Cursusdienst", description: "Cursussen verkopen tijdens de ochtend", maxParticipants: 3, reward: 1, post: "CURSUSDIENST" },
+    { id: "seed-shift-3", name: "Quiz opbouw", dayOffset: 3, startHour: 18, endHour: 22, location: "Aula Q", description: "Opbouw quiz-avond", maxParticipants: 6, reward: 3, post: "ACTIVITEITEN" },
+    { id: "seed-shift-4", name: "Sporttoernooi", dayOffset: 4, startHour: 13, endHour: 17, location: "Sporthal", description: "Begeleiding sporttoernooi", maxParticipants: 5, reward: 2, post: "SPORT" },
+    { id: "seed-shift-5", name: "Cantus laden", dayOffset: 5, startHour: 8, endHour: 11, location: "Loods", description: "Materiaal laden voor cantus", maxParticipants: 4, reward: 3, post: "LOGISTIEK" },
+    { id: "seed-shift-6", name: "Galabal onthaal", dayOffset: 6, startHour: 19, endHour: 23, location: "Onthaal", description: "Onthaal en kaartcontrole galabal", maxParticipants: 8, reward: 2, post: null },
+  ];
+  for (const s of shiftSeeds) {
+    const data = {
+      name: s.name,
+      startTime: shiftAt(s.dayOffset, s.startHour),
+      endTime: shiftAt(s.dayOffset, s.endHour),
+      location: s.location,
+      description: s.description,
+      maxParticipants: s.maxParticipants,
+      reward: s.reward,
+      post: s.post,
+    };
+    await prisma.shift.upsert({
+      where: { id: s.id },
+      update: {},
+      create: { id: s.id, ...data },
+    });
+  }
+
+  console.log("Seeding completed shifts + participants...");
+  // Voltooide (verleden) shiften met deelnemers, gemengd betaald/onbetaald, zodat
+  // de admin-ranglijst en -vergoedingen data hebben. Negatieve dayOffsets houden ze
+  // relatief in het verleden; de laatste twee vallen in het vorige academiejaar.
+  const pastShiftSeeds: Array<{
+    id: string;
+    name: string;
+    dayOffset: number;
+    startHour: number;
+    endHour: number;
+    location: string;
+    description: string;
+    maxParticipants: number;
+    reward: number;
+    post: GroupCode | null;
+    participants: Array<{ email: string; payedOut: boolean }>;
+  }> = [
+    { id: "seed-shift-past-1", name: "Openingscantus tap", dayOffset: -4, startHour: 21, endHour: 24, location: "Fakbar", description: "Tappen op de openingscantus", maxParticipants: 5, reward: 3, post: "FAKBAR",
+      participants: [ { email: "logistiek@vtk.prototype", payedOut: true }, { email: "sport@vtk.prototype", payedOut: false }, { email: "it@vtk.prototype", payedOut: false } ] },
+    { id: "seed-shift-past-2", name: "Cursusverkoop ochtend", dayOffset: -11, startHour: 9, endHour: 12, location: "Cursusdienst", description: "Ochtendverkoop cursussen", maxParticipants: 3, reward: 1, post: "CURSUSDIENST",
+      participants: [ { email: "onderwijs@vtk.prototype", payedOut: true }, { email: "career@vtk.prototype", payedOut: true } ] },
+    { id: "seed-shift-past-3", name: "Bedrijvendag opbouw", dayOffset: -20, startHour: 8, endHour: 12, location: "Aula 200", description: "Standen opbouwen bedrijvendag", maxParticipants: 6, reward: 2, post: "BEDRIJVENRELATIES",
+      participants: [ { email: "career@vtk.prototype", payedOut: false }, { email: "vice@vtk.prototype", payedOut: false }, { email: "logistiek@vtk.prototype", payedOut: true } ] },
+    { id: "seed-shift-past-4", name: "Interfacultair sporttoernooi", dayOffset: -35, startHour: 13, endHour: 18, location: "Sporthal", description: "Begeleiding sporttoernooi", maxParticipants: 5, reward: 2, post: "SPORT",
+      participants: [ { email: "sport@vtk.prototype", payedOut: true }, { email: "praeses@vtk.prototype", payedOut: false } ] },
+    { id: "seed-shift-past-5", name: "Galabal kaartcontrole", dayOffset: -60, startHour: 19, endHour: 24, location: "Onthaal", description: "Onthaal en kaartcontrole galabal", maxParticipants: 8, reward: 3, post: null,
+      participants: [ { email: "cultuur@vtk.prototype", payedOut: true }, { email: "international@vtk.prototype", payedOut: true }, { email: "theokot@vtk.prototype", payedOut: false } ] },
+    // Vorig academiejaar (~13 maanden geleden).
+    { id: "seed-shift-past-6", name: "Cantus tap (vorig jaar)", dayOffset: -400, startHour: 21, endHour: 24, location: "Fakbar", description: "Tappen vorig academiejaar", maxParticipants: 5, reward: 3, post: "FAKBAR",
+      participants: [ { email: "logistiek@vtk.prototype", payedOut: true }, { email: "sport@vtk.prototype", payedOut: true } ] },
+    { id: "seed-shift-past-7", name: "Doopcafé (vorig jaar)", dayOffset: -430, startHour: 20, endHour: 23, location: "Fakbar", description: "Doopcafé vorig academiejaar", maxParticipants: 4, reward: 2, post: "ACTIVITEITEN",
+      participants: [ { email: "praeses@vtk.prototype", payedOut: true }, { email: "it@vtk.prototype", payedOut: false } ] },
+  ];
+
+  for (const s of pastShiftSeeds) {
+    const data = {
+      name: s.name,
+      startTime: shiftAt(s.dayOffset, s.startHour),
+      endTime: shiftAt(s.dayOffset, s.endHour),
+      location: s.location,
+      description: s.description,
+      maxParticipants: s.maxParticipants,
+      reward: s.reward,
+      post: s.post,
+    };
+    // Create-only, net als de andere shiften: bestaande rijen en hun deelnemers
+    // (incl. payedOut-status) blijven staan bij een reseed.
+    await prisma.shift.upsert({ where: { id: s.id }, update: {}, create: { id: s.id, ...data } });
+
+    for (const p of s.participants) {
+      const user = prototypeUserByEmail.get(p.email);
+      if (!user) continue;
+      await prisma.shiftParticipant.upsert({
+        where: { shiftId_userId: { shiftId: s.id, userId: user.id } },
+        update: {},
+        create: { shiftId: s.id, userId: user.id, payedOut: p.payedOut },
+      });
+    }
+  }
+
+  console.log("Seeding Theokot standard offering...");
+  // Standaardaanbod voor de broodjesbar. Prijzen in eurocent. Deze catalogus wordt
+  // bij het aanmaken van een verkoopweek naar sessie-items gekopieerd (snapshot).
+  // De laatste rij is het "broodje van de week"-slot; welk broodje dat concreet is
+  // wordt per week ingesteld op de sessie zelf.
+  const theokotProducts: Array<{
+    key: string;
+    nameNl: string;
+    nameEn: string;
+    priceCents: number;
+    defaultQuantity: number;
+    isWeeklySpecialSlot?: boolean;
+  }> = [
+    { key: "brie", nameNl: "Broodje Brie", nameEn: "Brie sandwich", priceCents: 260, defaultQuantity: 10 },
+    { key: "boulet", nameNl: "Broodje Boulet", nameEn: "Meatball sandwich", priceCents: 280, defaultQuantity: 12 },
+    { key: "hesp", nameNl: "Broodje Hesp", nameEn: "Ham sandwich", priceCents: 230, defaultQuantity: 10 },
+    { key: "kaas-hesp", nameNl: "Broodje Kaas & Hesp", nameEn: "Cheese & ham sandwich", priceCents: 260, defaultQuantity: 15 },
+    { key: "italiaans", nameNl: "Broodje Italiaans", nameEn: "Italian sandwich", priceCents: 280, defaultQuantity: 10 },
+    { key: "kaas", nameNl: "Broodje Kaas", nameEn: "Cheese sandwich", priceCents: 230, defaultQuantity: 10 },
+    { key: "kip-curry", nameNl: "Broodje Kip Curry", nameEn: "Chicken curry sandwich", priceCents: 260, defaultQuantity: 5 },
+    { key: "mpt", nameNl: "Broodje Mozarella-Pesto-Tomaat", nameEn: "Mozzarella-pesto-tomato sandwich", priceCents: 260, defaultQuantity: 13 },
+    { key: "humus", nameNl: "Bruin broodje humus", nameEn: "Brown roll with hummus", priceCents: 230, defaultQuantity: 5 },
+    { key: "pasta-pesto", nameNl: "Pasta Pesto", nameEn: "Pasta pesto", priceCents: 260, defaultQuantity: 8 },
+    { key: "van-de-week", nameNl: "Broodje van de week", nameEn: "Sandwich of the week", priceCents: 280, defaultQuantity: 20, isWeeklySpecialSlot: true },
+  ];
+  for (let i = 0; i < theokotProducts.length; i += 1) {
+    const p = theokotProducts[i];
+    const id = `seed-theokot-product-${p.key}`;
+    const data = {
+      nameNl: p.nameNl,
+      nameEn: p.nameEn,
+      priceCents: p.priceCents,
+      defaultQuantity: p.defaultQuantity,
+      isWeeklySpecialSlot: p.isWeeklySpecialSlot ?? false,
+      order: i,
+      active: true,
+    };
+    // Create-only: een bestaand product (prijs, naam, hoeveelheid, volgorde) niet
+    // overschrijven bij een reseed.
+    await prisma.theokotProduct.upsert({ where: { id }, update: {}, create: { id, ...data } });
   }
 
   console.log("Seed complete.");

@@ -1,5 +1,8 @@
-import { Button, Card, Input, Label, Select, Textarea } from "@vtk/ui";
+import { Card, Input, Label, Select, Textarea } from "@vtk/ui";
 import { saveEventAction } from "@/app/actions/calendar";
+import { SaveForm } from "@/components/ui/SaveForm";
+import { saveErrorMessages } from "@/lib/saveMessages";
+import { EventImageField } from "./EventImageField";
 
 type Event = {
   id?: string;
@@ -14,6 +17,7 @@ type Event = {
   allDay?: boolean;
   visibility?: "PUBLIC" | "MEMBERS";
   url?: string | null;
+  imageKey?: string | null;
 };
 
 type Group = { id: string; nameNl: string; nameEn: string };
@@ -34,8 +38,22 @@ export function EventForm({
   groups: Group[];
   locale: "nl" | "en";
 }) {
+  const nl = locale === "nl";
   return (
-    <form action={saveEventAction} className="space-y-4">
+    <SaveForm
+      action={saveEventAction}
+      className="space-y-4"
+      submitLabel={nl ? "Opslaan" : "Save"}
+      savingLabel={nl ? "Bezig met opslaan..." : "Saving..."}
+      savedMessage={nl ? "Evenement opgeslagen" : "Event saved"}
+      errorMessages={{
+        ...saveErrorMessages(locale),
+        END_BEFORE_START: nl
+          ? "Niet opgeslagen: het einde ligt voor de start. Kies een einde na de startdatum."
+          : "Not saved: the end is before the start. Pick an end after the start date.",
+      }}
+      fallbackErrorMessage={nl ? "Er ging iets mis bij het opslaan." : "Something went wrong while saving."}
+    >
       {event.id && <input type="hidden" name="id" value={event.id} />}
       <Card className="p-5 space-y-4">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -87,6 +105,9 @@ export function EventForm({
             <Label>URL</Label>
             <Input name="url" defaultValue={event.url ?? ""} placeholder="https://..." />
           </div>
+          <div className="md:col-span-2">
+            <EventImageField defaultKey={event.imageKey} locale={locale} />
+          </div>
         </div>
         <div>
           <Label>Description (NL)</Label>
@@ -97,7 +118,6 @@ export function EventForm({
           <Textarea name="descriptionEn" defaultValue={event.descriptionEn ?? ""} rows={3} />
         </div>
       </Card>
-      <Button type="submit">{locale === "nl" ? "Opslaan" : "Save"}</Button>
-    </form>
+    </SaveForm>
   );
 }

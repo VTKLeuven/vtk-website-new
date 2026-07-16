@@ -20,6 +20,7 @@
     "@fullcalendar/react": "^6.1.19",
     "@fullcalendar/timegrid": "^6.1.19",
     "@node-rs/argon2": "^2.0.2",
+    "@sentry/nextjs": "^10.65.0",
     "@tiptap/extension-image": "^2.11.5",
     "@tiptap/extension-link": "^2.11.5",
     "@tiptap/pm": "^2.11.5",

@@ -135,7 +135,7 @@ export const TILE_COLORS: Array<{
   { key: "purple", labelNl: "Paars", labelEn: "Purple", chipBg: "#EDE6FB", chipFg: "#5B2EA3" },
   { key: "teal", labelNl: "Turquoise", labelEn: "Teal", chipBg: "#DEF1F0", chipFg: "#13726B" },
   { key: "slate", labelNl: "Grijsblauw", labelEn: "Slate", chipBg: "#E7E9EE", chipFg: "#3A4358" },
-  { key: "paper", labelNl: "Papier", labelEn: "Paper", chipBg: "#F2F0E9", chipFg: "#0A0F1F" },
+  { key: "paper", labelNl: "Papier", labelEn: "Paper", chipBg: "#E6ECF5", chipFg: "#0A0F1F" },
 ];
 
 const COLOR_MAP = new Map(TILE_COLORS.map((c) => [c.key, c]));
