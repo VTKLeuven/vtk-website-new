@@ -45,7 +45,7 @@ export const checkoutRequestSchema = z.object({
           .union([z.string().trim().email().max(320), z.literal("")])
           .optional()
           .transform((value) => value || null),
-        answers: z.record(answerValueSchema).default({}),
+        answers: z.record(z.string(), answerValueSchema).default({}),
       })
     )
     .min(1)
