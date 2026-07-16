@@ -156,8 +156,11 @@ SSO. Concrete implementatie: hook in `packages/auth/src/auth.ts`, gate in
 ### Verplichte onboarding
 - Zolang `onboardedAt` null is, stuurt de **onboarding-gate** het lid bij elke
   pagina naar `/onboarding`. Pas na het invullen (dan wordt `onboardedAt`
-  gestempeld) valt die gate weg. De gate leest het huidige pad uit de door de
-  proxy gezette `x-pathname`-header om geen redirect-loop op `/onboarding` te maken.
+  gestempeld) valt die gate weg. De gate (samen met de studiebevestiging-gate)
+  zit in `proxy.ts`, niet in de `[locale]`-layout: een `redirect()` vanuit een
+  gedeelde layout tijdens een client-side (RSC) navigatie zet de App
+  Router-cache in een oneindige refetch-lus. Op de netwerkgrens is het een
+  gewone 307 die de router netjes volgt. Zie `gateRedirect` in `proxy.ts`.
 - Gevraagde gegevens: **naam** (voor- en achternaam apart), **r-nummer**
   (*optioneel*), **kotadres** (straat, huisnummer, bus *optioneel*, postcode,
   stad), **geboortedatum**, **persoonlijke mail**, en welk adres (universiteits-
