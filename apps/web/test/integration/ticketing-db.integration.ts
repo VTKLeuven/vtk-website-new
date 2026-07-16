@@ -305,13 +305,16 @@ describe.sequential("ticketing database invariants", () => {
       amountRefunded: { currency: "EUR", value: "0.00" },
       metadata: { vtk_order_id: ids.mollieOrder, vtk_order_number: ids.mollieOrder },
     };
+    // Return a fresh Response per call: the webhook is invoked twice (original +
+    // dedup retry), and a single shared Response can only have its body read once.
     const fetchMock = vi
       .spyOn(globalThis, "fetch")
-      .mockResolvedValue(
-        new Response(JSON.stringify(molliePaymentPayload), {
-          status: 200,
-          headers: { "Content-Type": "application/json" },
-        })
+      .mockImplementation(
+        async () =>
+          new Response(JSON.stringify(molliePaymentPayload), {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          })
       );
 
     // Mollie posts application/x-www-form-urlencoded with only the payment id.
