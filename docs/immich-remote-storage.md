@@ -21,7 +21,7 @@ Cloud server (100.90.8.74)
 └── /mnt/immich -> NFSv4 over Tailscale
 
 Storage server (100.90.192.112)
-└── /srv/storage/immich on the 12 TB filesystem
+└── /vtk/immich on the 12 TB `vtk` filesystem
     ├── library
     ├── upload
     ├── thumbs
@@ -34,9 +34,9 @@ Storage server (100.90.192.112)
 > requires its database to use a local filesystem. Only Immich `/data` belongs
 > on the remote share.
 
-This guide assumes Ubuntu or Debian on both servers. It also assumes that the
-12 TB filesystem is mounted at `/srv/storage` on the storage server. Verify that
-assumption before creating anything.
+This guide assumes Ubuntu or Debian on both servers. The 12 TB `vtk` filesystem
+is mounted at `/vtk` on the storage server; Immich receives its own directory at
+`/vtk/immich`.
 
 ## 1. Verify Tailscale on both servers
 
@@ -99,15 +99,15 @@ df -hT
 findmnt
 ```
 
-Confirm that `/srv/storage` is actually located on the 12 TB filesystem:
+Confirm that `/vtk` is the 12 TB filesystem:
 
 ```bash
-df -hT /srv/storage
-findmnt -T /srv/storage
+df -hT /vtk
+findmnt -T /vtk
 ```
 
-Stop here if these commands do not show the 12 TB filesystem. Substitute the
-real 12 TB mountpoint everywhere below before continuing.
+The output must identify the `vtk` filesystem mounted at `/vtk` with
+approximately 12 TB capacity. Stop here if it does not.
 
 Check whether numeric UID/GID `1999` are available:
 
@@ -124,7 +124,7 @@ sudo useradd \
   --system \
   --uid 1999 \
   --gid 1999 \
-  --home-dir /srv/storage/immich \
+  --home-dir /vtk/immich \
   --shell /usr/sbin/nologin \
   immich-storage
 ```
@@ -137,7 +137,7 @@ sudo install \
   -o 1999 \
   -g 1999 \
   -m 0770 \
-  /srv/storage/immich
+  /vtk/immich
 ```
 
 Create a marker used to ensure Docker never starts against an unmounted local
@@ -145,14 +145,14 @@ directory:
 
 ```bash
 sudo -u immich-storage \
-  touch /srv/storage/immich/.immich-storage-ready
+  touch /vtk/immich/.immich-storage-ready
 ```
 
 Confirm the directory still reports the 12 TB filesystem:
 
 ```bash
-df -hT /srv/storage/immich
-ls -la /srv/storage/immich/.immich-storage-ready
+df -hT /vtk/immich
+ls -la /vtk/immich/.immich-storage-ready
 ```
 
 ## 3. Export the storage using NFSv4
@@ -174,7 +174,7 @@ sudoedit /etc/exports
 Add this exact line:
 
 ```exports
-/srv/storage/immich 100.90.8.74(rw,sync,no_subtree_check,all_squash,anonuid=1999,anongid=1999)
+/vtk/immich 100.90.8.74(rw,sync,no_subtree_check,all_squash,anonuid=1999,anongid=1999)
 ```
 
 This restricts the export to the cloud server's Tailscale IP and maps all file
@@ -186,7 +186,7 @@ sudo exportfs -v
 sudo systemctl restart nfs-kernel-server
 ```
 
-The output must show `/srv/storage/immich` exported to `100.90.8.74`.
+The output must show `/vtk/immich` exported to `100.90.8.74`.
 
 If UFW is enabled, allow only NFSv4 from the cloud server over Tailscale:
 
@@ -237,7 +237,7 @@ Test a manual NFSv4.2 mount:
 sudo mount \
   -t nfs4 \
   -o vers=4.2,proto=tcp,hard,timeo=600,retrans=2,noatime \
-  100.90.192.112:/srv/storage/immich \
+  100.90.192.112:/vtk/immich \
   /mnt/immich
 ```
 
@@ -266,7 +266,7 @@ sudoedit /etc/fstab
 Add this single line:
 
 ```fstab
-100.90.192.112:/srv/storage/immich /mnt/immich nfs4 rw,vers=4.2,proto=tcp,hard,timeo=600,retrans=2,noatime,_netdev,x-systemd.automount,x-systemd.requires=tailscaled.service,x-systemd.after=tailscaled.service 0 0
+100.90.192.112:/vtk/immich /mnt/immich nfs4 rw,vers=4.2,proto=tcp,hard,timeo=600,retrans=2,noatime,_netdev,x-systemd.automount,x-systemd.requires=tailscaled.service,x-systemd.after=tailscaled.service 0 0
 ```
 
 Use `vers=4.1` here if the manual 4.2 mount did not work.
@@ -445,7 +445,7 @@ Upload one test photograph in Immich. On the storage server, confirm new files
 appear:
 
 ```bash
-find /srv/storage/immich -type f | tail -20
+find /vtk/immich -type f | tail -20
 ```
 
 Also verify:
@@ -522,7 +522,7 @@ docker compose -f infra/docker-compose.yml up -d --force-recreate \
 
 A complete recovery requires both:
 
-- A backup or snapshot of `/srv/storage/immich` on the 12 TB server.
+- A backup or snapshot of `/vtk/immich` on the 12 TB server.
 - A PostgreSQL backup from `immich-database` on the cloud server.
 
 The media directory alone is not a complete Immich backup, and RAID is not an
@@ -535,7 +535,7 @@ findmnt /mnt/immich
 tailscale ping 100.90.192.112
 
 # Storage server
-df -hT /srv/storage/immich
+df -hT /vtk/immich
 sudo exportfs -v
 ```
 
