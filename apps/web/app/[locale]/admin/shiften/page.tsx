@@ -1,5 +1,4 @@
 import { prisma } from "@vtk/db";
-import { GroupCode } from "@prisma/client";
 import { format } from "date-fns";
 import { notFound } from "next/navigation";
 import { hasLocale } from "@/lib/locale";
@@ -168,6 +167,16 @@ export default async function AdminShifts({
   }
   const rewards = [...rewardMap.values()];
 
+  // Postkeuzes voor nieuwe/te bewerken shiften: de codes van de actieve posten.
+  // Gedeactiveerde posten vallen weg uit de keuzes; hun historiek op oude shiften
+  // blijft wel als opgeslagen tekst bestaan.
+  const activeGroups = await prisma.group.findMany({
+    where: { active: true },
+    orderBy: { orderInPraesidium: "asc" },
+    select: { code: true },
+  });
+  const postOptions = activeGroups.map((g) => g.code);
+
   return (
     <div className="space-y-5">
       <h1 className="text-2xl font-semibold">{locale === "nl" ? "Shiften" : "Shifts"}</h1>
@@ -177,7 +186,7 @@ export default async function AdminShifts({
         shifts={shifts}
         ranking={ranking}
         rewards={rewards}
-        postOptions={Object.values(GroupCode)}
+        postOptions={postOptions}
         from={format(rangeStart, "yyyy-MM-dd")}
         to={format(rangeToDay, "yyyy-MM-dd")}
         year={selectedYear}

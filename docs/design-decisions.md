@@ -6,10 +6,10 @@ code of git-historiek kan afleiden. Bedoeld zodat toekomstige (AI-)sessies de co
 kennen en betere keuzes maken.
 
 > **Voor toekomstige agents:** wanneer je een feature implementeert waarvan de
-> gewenste werking een *kringkeuze* is (niet puur technisch, niet vanzelfsprekend),
+> gewenste werking een _kringkeuze_ is (niet puur technisch, niet vanzelfsprekend),
 > voeg hier een sectie toe. `CLAUDE.md` verwijst naar dit bestand.
 
-De inhoud beschrijft *waarom* het zo werkt. De concrete implementatie staat in de code
+De inhoud beschrijft _waarom_ het zo werkt. De concrete implementatie staat in de code
 (schema in `packages/db/prisma/schema.prisma`, logica in `apps/web/lib/theokot*.ts`,
 acties in `apps/web/app/actions/theokot.ts`).
 
@@ -45,6 +45,7 @@ Theokot is de cafetaria/broodjesbar van VTK. Studenten reserveren vooraf broodje
 halen ze af aan de balie en betalen daar. Post **Theokot** beheert het systeem.
 
 ### Verkoopsessies & aanbod
+
 - Eén **`TheokotSession`** = één open verkoopdag. Iemand van Theokot zet wekelijks
   (meestal vrijdag/zaterdag) de sessies van de **volgende week** online.
 - Er is een **standaardaanbod** (`TheokotProduct`, geseed) met vaste broodjes,
@@ -56,7 +57,7 @@ halen ze af aan de balie en betalen daar. Post **Theokot** beheert het systeem.
   ('Afhalen vanaf/tot', 'Besteldeadline', 'Bestellen opent') in die voor álle gekozen
   dagen gelden. Dat scheelt werk in weken met een volledig ander aanbod. **Nadien** kan
   je nog steeds per dag bijsturen (uren, open/dicht, aanbod).
-- **"Broodje van de week"** is gewoon het aanbod-item dat als *weekly special*
+- **"Broodje van de week"** is gewoon het aanbod-item dat als _weekly special_
   gemarkeerd is (checkbox "V/d week" in de aanbod-editor). De **naam** van dat item is
   wat het die week concreet is (bv. hernoem "Broodje van de week" naar "Broodje kip
   curry"). Er is dus geen apart label-veld: je stelt het in bij "Aanbod bewerken", en
@@ -64,6 +65,7 @@ halen ze af aan de balie en betalen daar. Post **Theokot** beheert het systeem.
   `weeklySpecialLabel*` bestaan nog maar worden niet meer gebruikt.)
 
 ### Bestelvenster (tijden zijn Brussel-tijd, zomer én winter)
+
 - Studenten bestellen **2 dagen op voorhand** (`orderLeadDays`), vanaf **12:00**
   (`orderOpenTime`). Dus om 12:00 komen de broodjes voor over 2 dagen online.
 - Annuleren/wijzigen kan tot **10:30** op de verkoopdag (`cancelDeadline`); dan wordt
@@ -73,6 +75,7 @@ halen ze af aan de balie en betalen daar. Post **Theokot** beheert het systeem.
   `Intl` (geen vaste UTC-offset).
 
 ### Limieten
+
 - Max **X** items per bestelling (`maxItemsPerOrder`) waarvan max **Y** broodje van
   de week (`maxWeeklySpecialPerOrder`), met **X > Y**. Instelbaar in het admin-paneel;
   hoeft niet wekelijks te wijzigen.
@@ -81,6 +84,7 @@ halen ze af aan de balie en betalen daar. Post **Theokot** beheert het systeem.
   de deadline). Er wordt dus geen annulatie-historiek bijgehouden — enkel no-shows.
 
 ### Afhalen
+
 - **Afhaalpagina** (recht `theokot.pickup`): baliemedewerker geeft het **r-nummer** in of
   **scant de studentenkaart**, ziet de bestelling + totaal te betalen, en drukt op
   **"opgehaald"**. Daarna kan die bestelling geen tweede keer opgehaald worden. Bestaat in
@@ -102,6 +106,7 @@ halen ze af aan de balie en betalen daar. Post **Theokot** beheert het systeem.
   r-nummerpagina werkt ook vóór 12:00.
 
 ### No-shows & bans
+
 - Een bestelling telt pas als **no-show** vanaf **15 min na sluitingstijd**
   (`noShowGraceMinutes`). Verwerking gebeurt door een **ingebouwde scheduler**
   (`apps/web/instrumentation.ts`) die periodiek `processDueNoShows` draait — geen
@@ -116,12 +121,14 @@ halen ze af aan de balie en betalen daar. Post **Theokot** beheert het systeem.
   (`/admin/theokot/bans`). Een correctie kan meteen de actieve ban opheffen.
 
 ### Turf-lijst
+
 - Voor elke verkoopdag kan een **turf-lijst** geprint worden (`/admin/theokot/turflijst`,
   print-geoptimaliseerde HTML → browser-PDF). Per broodjesoort: **aantal gereserveerd**,
   een **lege kolom om te turven** hoeveel er al gemaakt zijn, en een **checkmark-kolom**
   om af te vinken dat alle broodjes van die soort klaar zijn.
 
 ### Scheduler-caveat
+
 - De no-show-scheduler draait in-proces. In deze single-container deploy is er precies
   één instance. Bij horizontaal schalen zou hij meervoudig draaien; de verwerking blijft
   correct (idempotent via `processedAt`), maar mails zouden dan dubbel geprobeerd kunnen
@@ -129,6 +136,7 @@ halen ze af aan de balie en betalen daar. Post **Theokot** beheert het systeem.
   `processDueNoShows` aanroept.
 
 ### Permissies
+
 - `theokot.manage` — sessies/aanbod, config, bericht, openingsuren, bans, historiek.
 - `theokot.pickup` — afhaalbalie + turf-lijst.
 - Beide worden in de seed toegekend aan groep **THEOKOT**.
@@ -144,6 +152,7 @@ SSO. Concrete implementatie: hook in `packages/auth/src/auth.ts`, gate in
 `apps/web/app/actions/onboarding.ts`, velden in het `User`-model.
 
 ### Wie mag registreren
+
 - **Elke KU Leuven-account** mag zichzelf aanmaken via SSO. Dit is een **bewuste
   omkering** van de vroegere policy (self-provisioning was geblokkeerd; enkel
   vooraf door admins toegevoegde leden konden inloggen). Reden: VTK is een
@@ -154,6 +163,7 @@ SSO. Concrete implementatie: hook in `packages/auth/src/auth.ts`, gate in
 - Een nieuw lid start **zonder groepen/permissies** en met `onboardedAt = null`.
 
 ### Verplichte onboarding
+
 - Zolang `onboardedAt` null is, stuurt de **onboarding-gate** het lid bij elke
   pagina naar `/onboarding`. Pas na het invullen (dan wordt `onboardedAt`
   gestempeld) valt die gate weg. De gate (samen met de studiebevestiging-gate)
@@ -162,7 +172,7 @@ SSO. Concrete implementatie: hook in `packages/auth/src/auth.ts`, gate in
   Router-cache in een oneindige refetch-lus. Op de netwerkgrens is het een
   gewone 307 die de router netjes volgt. Zie `gateRedirect` in `proxy.ts`.
 - Gevraagde gegevens: **naam** (voor- en achternaam apart), **r-nummer**
-  (*optioneel*), **kotadres** (straat, huisnummer, bus *optioneel*, postcode,
+  (_optioneel_), **kotadres** (straat, huisnummer, bus _optioneel_, postcode,
   stad), **geboortedatum**, **persoonlijke mail**, en welk adres (universiteits-
   of persoonlijke mail) de **voorkeur** krijgt voor communicatie. De
   universiteitsmail is de SSO-/login-mail (`User.email`) en wordt niet apart
@@ -181,6 +191,7 @@ SSO. Concrete implementatie: hook in `packages/auth/src/auth.ts`, gate in
   `onboardedAt` opnieuw gezet wordt).
 
 ### Studie (richtingen & studiejaren)
+
 - Een lid kan **meerdere richtingen** aanduiden (`StudyProgramme`-enum,
   `User.studyProgrammes` array) en ook **meerdere studiejaren** (`StudyYear`-enum,
   `User.studyYears` array): 1ste/2de/3de bachelor of 1ste/2de master. Meerdere
@@ -201,11 +212,12 @@ SSO. Concrete implementatie: hook in `packages/auth/src/auth.ts`, gate in
   werken.
 
 ### Jaarlijkse studiebevestiging ("wie is nog actief student?")
+
 - **Het probleem:** vroeger zat de cursusdienst in dezelfde applicatie. Wie boeken
   wou bestellen moest een richting aanduiden, en die werd elk jaar gereset. Dat
   gaf ongewild een jaarlijks signaal over wie nog actief studeerde. Nu cudi een
   aparte site is (en we die bewust **niet** koppelen), viel dat signaal weg.
-- **De oplossing:** niet de koppeling herbouwen, maar de *jaarlijkse herdeclaratie*.
+- **De oplossing:** niet de koppeling herbouwen, maar de _jaarlijkse herdeclaratie_.
   `User.studyConfirmedYear` houdt bij in welk werkingsjaar het lid zijn studie
   laatst bevestigde. Loopt dat achter op `currentWorkingYear()` (rollover op
   15 juli, zie `lib/workingYear.ts`), dan is het profiel verlopen.
@@ -223,6 +235,7 @@ SSO. Concrete implementatie: hook in `packages/auth/src/auth.ts`, gate in
   want wie dat formulier invult declareert daarmee net zijn studie.
 
 ### Mailinglijsten (admin-export)
+
 - De admin-tab **Mailinglijsten** (`mailinglists.export`) exporteert per categorie
   de leden die ze aangevinkt hebben. Kolommen zijn altijd `firstname`, `lastname`,
   `email`, waarbij `email` het **voorkeursadres** is (`emailPreference`), niet per
@@ -250,6 +263,7 @@ SSO. Concrete implementatie: hook in `packages/auth/src/auth.ts`, gate in
   mappenstructuur voorspelbaar is.
 
 ### Posten (groepen) & werkingsjaren
+
 - Een **post** = een `Group`. In de admin heet dit voortaan **"Posten"** (niet
   "Groepen"); intern blijven het `Group`/`GroupMembership`-modellen.
 - **De praesidiumsamenstelling wisselt per jaar.** Elk lidmaatschap
@@ -276,9 +290,21 @@ SSO. Concrete implementatie: hook in `packages/auth/src/auth.ts`, gate in
   alfabetisch.
 - **De post "Algemeen" is verwijderd** (hoorde niet in de praesidiumstructuur en
   was niet wisbaar in de admin). Verwijderd uit de seed en via de migratie uit de
-  DB; de enum-waarde `GroupCode.ALGEMEEN` blijft ongebruikt bestaan.
+  DB.
+- **Posten zijn GUI-beheerd.** `Group.code` is geen `GroupCode`-enum meer
+  maar een vrije, unieke string, zodat posten via `/admin/groepen` toegevoegd,
+  bewerkt en gedeactiveerd kunnen worden. Een post uitzetten (`active=false`) haalt
+  ze uit de nieuwe-shift-keuzes maar behoudt de historiek (memberships per jaar);
+  posten worden dus gedeactiveerd, niet verwijderd.
+- **Een post verleent rollen, geen losse rechten.** Het oude "recht per
+  post"-raster is vervangen door rol-grants (`GroupRole`): een post kent rollen toe
+  aan elk lid (`DEFAULT`) of enkel aan de verantwoordelijke (`LEADER`). De seed legt
+  de baseline: **basis-werkgroep** (evenementen voor eigen groep + foto's uploaden)
+  op elke post, de **admin**-rol op IT en Groep 5, en een **theokot**-rol op de post
+  Theokot; alles als `DEFAULT` (elk lid), wat het vroegere gedrag exact behoudt.
 
 ### Mailinglijsten (opt-in)
+
 - Acht categorieën: **Feest, Career, Sport, Evenementen, Onderwijs, VTK
   International, Eerstejaars, Bakske** (`MailCategory`-enum, opgeslagen als
   opt-in array op `User.mailCategories`).

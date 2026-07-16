@@ -24,9 +24,7 @@ export async function getSession(headers: Headers): Promise<SessionPayload | nul
         include: {
           group: {
             include: {
-              // Legacy: directe rechten op de post (wordt uitgefaseerd naar rollen).
-              permissions: { include: { permission: true } },
-              // Nieuw: rollen die de post toekent aan leden (DEFAULT) en lead (LEADER).
+              // Rollen die de post toekent aan leden (DEFAULT) en lead (LEADER).
               roleGrants: {
                 include: { role: { include: { permissions: { include: { permission: true } } } } },
               },
@@ -52,12 +50,8 @@ export async function getSession(headers: Headers): Promise<SessionPayload | nul
   // 1. Direct toegewezen rollen.
   for (const userRole of user.roles) addRolePermissions(userRole.role);
 
+  // 2. Rollen via de post: DEFAULT voor elk lid, LEADER enkel voor de lead.
   for (const membership of user.memberships) {
-    // 2. Legacy directe rechten op de post.
-    for (const entry of membership.group.permissions) {
-      permissions.add(entry.permission.code);
-    }
-    // 3. Rollen via de post: DEFAULT voor elk lid, LEADER enkel voor de lead.
     for (const grant of membership.group.roleGrants) {
       if (grant.kind === 'LEADER' && membership.role !== 'LEAD') continue;
       addRolePermissions(grant.role);

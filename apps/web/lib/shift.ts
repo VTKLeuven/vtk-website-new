@@ -1,4 +1,4 @@
-import { GroupCode, Shift } from '@prisma/client';
+import { Shift } from '@prisma/client';
 
 /**
  * De velden die nodig zijn om een shift aan te maken/te valideren.
@@ -15,7 +15,9 @@ export type ShiftInput = {
   description: string;
   maxParticipants: number;
   reward: number;
-  post: GroupCode | null;
+  // Postcode (Group.code) of null. Vrije string: posten zijn nu GUI-beheerd, dus
+  // dit valideert enkel het type; welke codes bestaan is een data-vraag.
+  post: string | null;
 };
 
 /**
@@ -32,8 +34,6 @@ export class ShiftValidationError extends Error {
     this.details = details;
   }
 }
-
-const GROUP_CODES = new Set<string>(Object.values(GroupCode));
 
 /** Accepteert een Date, ISO-string of timestamp en geeft een geldige Date of null. */
 function toDate(value: unknown): Date | null {
@@ -94,8 +94,8 @@ export function parseShift(value: unknown): ShiftInput {
     errors.push('reward must be a non-negative integer');
   }
 
-  if (post !== undefined && post !== null && !GROUP_CODES.has(post as string)) {
-    errors.push('post must be a valid group code');
+  if (post !== undefined && post !== null && typeof post !== 'string') {
+    errors.push('post must be a group code string or null');
   }
 
   if (errors.length > 0) {
@@ -110,7 +110,7 @@ export function parseShift(value: unknown): ShiftInput {
     description: (description as string).trim(),
     maxParticipants: maxParticipants as number,
     reward: reward as number,
-    post: (post as GroupCode | null | undefined) ?? null,
+    post: (post as string | null | undefined) ?? null,
   };
 }
 
@@ -172,8 +172,8 @@ function parseShiftEntry(value: unknown, errors: string[], label: string): Shift
     errors.push(`${label}.reward must be a non-negative integer`);
   }
 
-  if (src.post !== null && !GROUP_CODES.has(src.post as string)) {
-    errors.push(`${label}.post must be a valid group code or null`);
+  if (src.post !== null && typeof src.post !== 'string') {
+    errors.push(`${label}.post must be a group code string or null`);
   }
 
   // `participantIds` zit niet in elke response; is het aanwezig, dan moet het een
@@ -203,7 +203,7 @@ function parseShiftEntry(value: unknown, errors: string[], label: string): Shift
     description: src.description as string,
     maxParticipants: src.maxParticipants as number,
     reward: src.reward as number,
-    post: src.post as GroupCode | null,
+    post: src.post as string | null,
   } as ShiftResponse;
 }
 
@@ -316,10 +316,10 @@ export function parsePartialShift(value: unknown): Partial<ShiftInput> {
 
   if ('post' in src) {
     const post = src.post;
-    if (post !== null && !GROUP_CODES.has(post as string)) {
-      errors.push('post must be a valid group code');
+    if (post !== null && typeof post !== 'string') {
+      errors.push('post must be a group code string or null');
     } else {
-      result.post = post as GroupCode | null;
+      result.post = post as string | null;
     }
   }
 

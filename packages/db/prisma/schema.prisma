@@ -19,25 +19,6 @@ enum Locale {
   EN
 }
 
-enum GroupCode {
-  ACTIVITEITEN
-  BEDRIJVENRELATIES
-  COMMUNICATIE
-  CULTUUR
-  CURSUSDIENST
-  DEVELOPMENT
-  FAKBAR
-  GROEP5
-  INTERNATIONAAL
-  IT
-  LOGISTIEK
-  ONDERWIJS
-  ONTHAAL
-  SPORT
-  THEOKOT
-  ALGEMEEN
-}
-
 enum MembershipRole {
   MEMBER
   LEAD
@@ -295,20 +276,23 @@ model User {
 }
 
 model Group {
-  id                String    @id @default(cuid())
-  code              GroupCode @unique
-  slug              String    @unique
+  id                String  @id @default(cuid())
+  // Vrije, GUI-beheerde code (was een `GroupCode`-enum). Uniek, en de waarde die
+  // shiften opslaan in `Shift.post` en de sessie meegeeft als `groups[].code`.
+  code              String  @unique
+  slug              String  @unique
   nameNl            String
   nameEn            String
   descriptionNl     String?
   descriptionEn     String?
-  orderInPraesidium Int       @default(0)
+  orderInPraesidium Int     @default(0)
   photoKey          String?
+  // Een gedeactiveerde post verdwijnt uit de nieuwe-shift-keuzes en het
+  // postenbeheer voor nieuwe jaren, maar de historiek (memberships per jaar)
+  // blijft bewaard i.p.v. de post te verwijderen.
+  active            Boolean @default(true)
 
   memberships       GroupMembership[]
-  // Legacy: directe rechten op de post. Wordt uitgefaseerd ten voordele van
-  // rollen (zie GroupRole); de sessie-resolver leest voorlopig nog beide.
-  permissions       GroupPermission[]
   // Rollen die deze post toekent aan haar leden (DEFAULT) en verantwoordelijke (LEADER).
   roleGrants        GroupRole[]
   events            CalendarEvent[]
@@ -345,18 +329,7 @@ model Permission {
   labelEn  String
   category String @default("general")
 
-  groups GroupPermission[]
-  roles  RolePermission[]
-}
-
-model GroupPermission {
-  groupId      String
-  permissionId String
-
-  group      Group      @relation(fields: [groupId], references: [id], onDelete: Cascade)
-  permission Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
-
-  @@id([groupId, permissionId])
+  roles RolePermission[]
 }
 
 // Een rol bundelt rechten. Leden krijgen rollen direct (UserRole) of via een
@@ -1172,7 +1145,10 @@ model Shift {
   maxParticipants Int
   reward          Int
 
-  post GroupCode?
+  // Postcode (Group.code) waarvoor deze shift telt; los tekstveld i.p.v. een
+  // relatie, zodat een oude postcode behouden blijft ook als de post later
+  // gedeactiveerd of hernoemd wordt.
+  post String?
   // Ook een field bijhouden voor het evenement waarbij de shift hoort?
 }
 
