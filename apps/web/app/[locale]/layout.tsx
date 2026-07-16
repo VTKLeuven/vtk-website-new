@@ -7,9 +7,10 @@ import { hasLocale } from '@/lib/locale';
 import { getCurrentSession } from '@/lib/session';
 import { currentWorkingYear } from '@/lib/workingYear';
 
-import '@/app/design/vtk-base.css';
-import '@/app/design/vtk-site-header.css';
-import '@/app/design/vtk-site-chrome.css';
+import "@/app/design/vtk-base.css";
+import "@/app/design/vtk-site-header.css";
+import "@/app/design/vtk-site-chrome.css";
+import "@/app/design/vtk-immich-gallery.css";
 
 export default async function LocaleLayout({
   children,

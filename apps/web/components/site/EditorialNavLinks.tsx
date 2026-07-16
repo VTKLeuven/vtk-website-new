@@ -2,7 +2,10 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useSyncExternalStore } from "react";
 import { pick, type Locale } from "@vtk/i18n";
+
+const subscribeToClient = () => () => undefined;
 
 export function EditorialNavLinks({
   tabs,
@@ -16,6 +19,7 @@ export function EditorialNavLinks({
   ariaLabel: string;
 }) {
   const pathname = usePathname() ?? "/";
+  const isClient = useSyncExternalStore(subscribeToClient, () => true, () => false);
 
   function tabHref(slug: string): string {
     if (base === "") return `/${slug}`;
@@ -31,7 +35,11 @@ export function EditorialNavLinks({
   return (
     <nav className="nav-links" aria-label={ariaLabel}>
       {tabs.map((tab) => (
-        <Link key={tab.id} href={tabHref(tab.slug)} className={isActive(tab.slug) ? "active" : undefined}>
+        <Link
+          key={tab.id}
+          href={tabHref(tab.slug)}
+          className={isClient && isActive(tab.slug) ? "active" : undefined}
+        >
           {pick(tab.labelNl, tab.labelEn, locale)}
         </Link>
       ))}
