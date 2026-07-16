@@ -30,11 +30,11 @@ export type StoredSentry = {
 
 function envS3(): S3Config {
   return {
-    endpoint: process.env.S3_ENDPOINT || "http://localhost:9000",
-    accessKeyId: process.env.S3_ACCESS_KEY || "minioadmin",
-    secretAccessKey: process.env.S3_SECRET_KEY || "minioadmin",
-    bucket: process.env.S3_BUCKET || "vtk",
-    region: process.env.S3_REGION || "us-east-1",
+    endpoint: process.env.S3_ENDPOINT || "",
+    accessKeyId: process.env.S3_ACCESS_KEY || "",
+    secretAccessKey: process.env.S3_SECRET_KEY || "",
+    bucket: process.env.S3_BUCKET || "",
+    region: process.env.S3_REGION || "fsn1",
     forcePathStyle: process.env.S3_FORCE_PATH_STYLE !== "false",
   };
 }

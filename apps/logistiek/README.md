@@ -10,7 +10,7 @@ into the main VTK site at `logistiek.vtk.be`.
   using `@vtk/auth/remote`.
 - Only users whose session includes the `Logistiek` group (or superadmins) can
   access the module.
-- Deployed as a separate container behind Nginx on its own subdomain.
+- Deployed as a separate loopback-bound container behind the host Caddy proxy.
 
 ## Environment
 

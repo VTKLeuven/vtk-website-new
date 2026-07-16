@@ -1,7 +1,8 @@
 # VTK Website
 
 Modular site for **Vlaamse Technische Kring (VTK)**: an npm **workspaces** monorepo
-with **Next.js 16** (React 19), **Prisma** + PostgreSQL, **MinIO** (S3), and
+with **Next.js 16** (React 19), **Prisma** + PostgreSQL, Hetzner S3 object storage,
+an integrated **Immich** gallery, and
 shared-session checks for subdomains (`*.vtk.be`). The public homepage follows
 the editorial system under `design/` and `apps/web/app/design/`; admin uses the
 same tokens via scoped CSS.
@@ -16,14 +17,13 @@ packages/
   db/          Prisma schema, client, seeds, permission codes
   auth/        argon2id hashing, sessions, RBAC helpers, remote session verify
   i18n/        NL/EN dictionaries and helpers
-  storage/     MinIO/S3 client, sharp image pipeline, ZIP streaming
+  storage/     S3 client, sharp image pipeline, ZIP streaming
   ui/          Shared UI primitives
   tsconfig/    Shared base tsconfig
 infra/
-  docker-compose.yml  Postgres, MinIO, web, logistiek, Nginx, Certbot
+  docker-compose.yml  Postgres, web, logistiek, ticket worker, and Immich
   docker/             Dockerfiles for apps
-  immich/             Optional local Immich stack for the public media gallery
-  nginx/conf.d/       Subdomain routing + TLS termination
+  immich/             Immich configuration, data, and optional demo seeding
 docs/
   immich-gallery.md   Immich-backed public media gallery setup
 ```
@@ -32,7 +32,7 @@ docs/
 
 - Node.js 20+
 - npm 10+
-- Docker 24+ (for Postgres, MinIO, and the production stack)
+- Docker 24+ with Docker Compose (for Postgres, Immich, and production)
 
 ---
 
@@ -57,8 +57,8 @@ cp .env.example .env
 ln -sf ../../.env apps/web/.env
 ln -sf ../../.env apps/logistiek/.env
 
-# Start local infrastructure (Postgres, MinIO, and the bucket-creation one-shot)
-docker compose -f infra/docker-compose.yml up -d postgres minio minio-setup
+# Start local PostgreSQL
+docker compose -f infra/docker-compose.yml up -d postgres
 ```
 
 **Postgres reachable from your host:** the default Compose file does **not**
@@ -84,7 +84,7 @@ npm run dev
 
 - Main site (dev): `http://localhost:3000`
 - Full Docker stack (`web` in Compose): `http://127.0.0.1:3011` (see `infra/docker-compose.yml`)
-- MinIO console: `http://localhost:9001` (default login `minioadmin` / `minioadmin` from `.env.example`)
+- Immich (when started): `http://127.0.0.1:2283`
 - Postgres: only on `localhost:5432` if you publish that port or use a local instance; defaults in `.env.example` assume `vtk` / `vtk`
 
 To run the `logistiek` submodule against the same main app:
@@ -97,7 +97,7 @@ npm run dev --workspace=@vtk/logistiek   # listens on :3100
 
 ```bash
 # If Docker services aren't already running:
-docker compose -f infra/docker-compose.yml up -d postgres minio minio-setup
+docker compose -f infra/docker-compose.yml up -d postgres
 
 # Start Next.js
 npm run dev
@@ -147,7 +147,8 @@ troubleshooting.
 # Stop but keep data
 docker compose -f infra/docker-compose.yml stop
 
-# Stop and wipe Postgres + MinIO volumes (destructive)
+# Stop and wipe named Postgres/model-cache volumes (destructive). Immich photos
+# and its database use bind mounts under infra/immich/data and are not deleted.
 docker compose -f infra/docker-compose.yml down -v
 ```
 
@@ -292,7 +293,7 @@ in client-side environment variables.
 Guest order links keep the capability token in the URL fragment, exchange it
 for an expiring `HttpOnly`, `SameSite=Lax` cookie, and immediately navigate
 to a clean order URL. Fragments are not sent in HTTP requests, so the token is
-not included in Nginx access logs or Stripe return URLs. The cookie and signed
+not included in reverse-proxy access logs or Stripe return URLs. The cookie and signed
 link expire shortly after the event; resending a confirmation reuses that same
 bounded capability.
 
@@ -421,8 +422,10 @@ The canonical file is `/.env`. Prisma CLI scripts load it via
 
 ## Production (self-hosted, Docker)
 
-The full stack — Postgres, MinIO, the main app, the submodule, Nginx, and
-Certbot — is defined in `infra/docker-compose.yml`.
+The application stack is defined in `infra/docker-compose.yml`: the website,
+logistics app, ticket worker, PostgreSQL, Immich, machine learning, Valkey, and
+Immich Public Proxy. Caddy runs on the host and owns public routing and TLS.
+MinIO, Nginx, and Certbot are deliberately not part of this stack.
 
 ### 1. DNS
 
@@ -430,7 +433,8 @@ Point the following records at the server:
 
 - `vtk.be`, `www.vtk.be` → main site
 - `logistiek.vtk.be`     → logistiek submodule
-- `cdn.vtk.be`           → public MinIO bucket
+- `immich.vtk.be`        → Immich management interface (choose any hostname)
+- `photos.vtk.be`        → Immich Public Proxy (choose any hostname)
 
 Add one record per future submodule (`<name>.vtk.be`).
 
@@ -439,10 +443,11 @@ Add one record per future submodule (`<name>.vtk.be`).
 On the server:
 
 ```bash
-cp .env.example .env
+test -f .env || cp .env.example .env
+test -f infra/immich/.env || cp infra/immich/.env.example infra/immich/.env
 ```
 
-Fill in at minimum (same **repo-root** `.env` Compose uses for variable substitution **and** for the `web` service via `env_file`):
+Fill in at minimum in the repo-root `.env`:
 
 ```dotenv
 POSTGRES_USER=vtk
@@ -453,70 +458,71 @@ DATABASE_URL=postgresql://vtk:<strong password>@postgres:5432/vtk?schema=public
 SESSION_COOKIE_DOMAIN=.vtk.be
 VTK_MAIN_URL=https://vtk.be
 
-S3_ACCESS_KEY=<minio access key>
-S3_SECRET_KEY=<minio secret key>
-S3_BUCKET=vtk
-S3_PUBLIC_URL=https://cdn.vtk.be
+GALLERY_IMMICH_API_KEY=<create this in Immich after first start>
+GALLERY_PUBLIC_PROXY_URL=https://photos.vtk.be
 
 # Loaded into the web container for `npx tsx packages/db/prisma/seed.ts`
 SEED_ADMIN_EMAIL=admin@vtk.be
 SEED_ADMIN_PASSWORD=<strong password>
 ```
 
-The `web` service sets `env_file: ../.env` so seeding inside the container sees
-`SEED_ADMIN_*`. **`DATABASE_URL` and S3-related keys in the Compose `environment`
-block override** values from `.env` so the app always targets the in-stack
-Postgres and MinIO. After changing `.env`, recreate `web` so the container picks
-up edits: `docker compose -f infra/docker-compose.yml up -d --force-recreate web`.
+In `infra/immich/.env`, replace all example passwords and set
+`PUBLIC_BASE_URL=https://photos.vtk.be`. Keep the `DB_*`, `POSTGRES_*`, and
+`GALLERY_DATABASE_*` credentials identical as the file comments instruct.
 
-### 3. TLS certificates (first time)
+Configure Hetzner object storage after login under **Admin → IT**. Its encrypted
+database setting is authoritative; root `S3_*` variables are only an optional
+fallback. After editing either env file, recreate the affected containers.
 
-The bundled `certbot` container does *renewal*; you have to mint the initial
-certificates. The easiest way is a one-off standalone run before Nginx is up:
+### 3. Caddy reverse proxy
+
+All published container ports bind to `127.0.0.1`; Caddy is the only public
+edge. A minimal host Caddyfile is:
 
 ```bash
-# Stop anything on :80
-docker compose -f infra/docker-compose.yml stop nginx || true
+vtk.be, www.vtk.be {
+    reverse_proxy 127.0.0.1:3011
+}
 
-docker run --rm -it \
-  -p 80:80 \
-  -v "$PWD/infra/nginx/letsencrypt:/etc/letsencrypt" \
-  -v "$PWD/infra/nginx/www:/var/www/certbot" \
-  certbot/certbot certonly --standalone \
-  -d vtk.be -d www.vtk.be -d logistiek.vtk.be -d cdn.vtk.be \
-  --email <ops@vtk.be> --agree-tos --no-eff-email
+logistiek.vtk.be {
+    reverse_proxy 127.0.0.1:3100
+}
+
+immich.vtk.be {
+    reverse_proxy 127.0.0.1:2283
+}
+
+photos.vtk.be {
+    reverse_proxy 127.0.0.1:3001
+}
 ```
 
-Certificates land in `infra/nginx/letsencrypt/live/<domain>/`. The paths in
-`infra/nginx/conf.d/vtk.conf` already expect them there.
+Caddy obtains and renews certificates itself. Keep the Immich management
+hostname access-controlled if it should not be generally reachable.
 
 ### 4. Launch the stack
 
 ```bash
-# Core services when TLS is handled by a host proxy:
-docker compose -f infra/docker-compose.yml up -d --build
-
-# Or include the bundled Nginx TLS edge:
-docker compose --profile edge-tls -f infra/docker-compose.yml up -d --build
+docker compose -f infra/docker-compose.yml up -d --build --remove-orphans
 ```
 
-The bundled checkout rate/body limits and trusted `X-Real-IP` handling live in
-the `edge-tls` Nginx profile. When a host proxy is used, configure equivalent
-limits for `POST /api/tickets/checkout`, cap the Stripe webhook body, and
-overwrite (do not pass through) `X-Real-IP` before exposing ticket sales.
+`--remove-orphans` is important for the first deployment after this change: it
+stops and removes old `infra-minio-1`, `infra-nginx-1`, and `infra-certbot-1`
+containers. It does not delete their volumes or files.
 
 This brings up:
 
 | Service        | Role                                                   |
 |----------------|--------------------------------------------------------|
 | `postgres`     | PostgreSQL 16, data in the `postgres-data` volume      |
-| `minio`        | S3-compatible object storage, data in `minio-data`     |
-| `minio-setup`  | One-shot: creates the public `vtk` bucket              |
 | `web`          | Main Next.js app on **127.0.0.1:3011** → container :3000 |
 | `logistiek`    | Submodule app on **127.0.0.1:3100** → container :3000  |
-| `nginx`        | Optional `edge-tls` profile: TLS, rate limits, and subdomain routing on :80/:443 |
-| `certbot`      | Background renew loop (every 12h)                      |
 | `ticket-worker` | Reconciliation, reservation expiry, and mail outbox (every 15s) |
+| `immich-server` | Immich API/UI on **127.0.0.1:2283**                   |
+| `immich-machine-learning` | Immich face recognition and search          |
+| `immich-redis` | Private Immich queue/cache                             |
+| `immich-database` | Private Immich PostgreSQL with face embeddings      |
+| `immich-public-proxy` | Public gallery proxy on **127.0.0.1:3001**      |
 
 During image **build**, the `web` Dockerfile runs `prisma generate` and
 `next build`. At **container start**, the default command runs
@@ -562,7 +568,8 @@ means they are missing inside the container (see env_file / recreate above).
 
 ```bash
 git pull
-docker compose -f infra/docker-compose.yml up -d --build web logistiek
+docker compose -f infra/docker-compose.yml pull
+docker compose -f infra/docker-compose.yml up -d --build --remove-orphans
 ```
 
 The rebuilt `web` container runs migrations on startup. It does **not** reseed
@@ -571,17 +578,28 @@ redeploy.
 
 ### 7. Backups
 
-- **Postgres:** `docker compose exec postgres pg_dump -U vtk vtk > backup-$(date +%F).sql`
-- **MinIO bucket:** back up the `minio-data` volume, or mirror the `vtk`
-  bucket with `mc mirror local/vtk ./backup-vtk/`.
+- **Postgres:** `docker compose -f infra/docker-compose.yml exec -T postgres pg_dump -U vtk vtk > backup-$(date +%F).sql`
+- **Immich:** back up `infra/immich/data/library` and dump `immich-database`;
+  both the library and database are required for a complete restore.
+- **Hetzner S3:** enable provider-side protections and maintain a separate
+  bucket backup according to the organisation's retention policy.
+
+After confirming all former MinIO objects exist in Hetzner, inspect the legacy
+volume with `docker volume ls` and remove it explicitly if it is no longer
+needed. A normal redeploy intentionally never deletes volumes.
 
 ### 8. Logs and diagnostics
 
 ```bash
 docker compose -f infra/docker-compose.yml logs -f web
-docker compose -f infra/docker-compose.yml logs -f nginx
+docker compose -f infra/docker-compose.yml logs -f immich-server immich-public-proxy
 docker compose -f infra/docker-compose.yml ps
 ```
+
+If `ticket-worker` is unhealthy, inspect its logs first. An empty
+`TICKETING_MAINTENANCE_SECRET` disables it intentionally; a `401` means `web`
+and `ticket-worker` were not recreated with the same secret. Set a strong value
+in the root `.env`, then force-recreate both services.
 
 ---
 
@@ -597,9 +615,8 @@ docker compose -f infra/docker-compose.yml ps
 5. Add a service block to `infra/docker-compose.yml` (copy the `logistiek`
    block, rename, pick a free loopback port) and a matching Dockerfile in
    `infra/docker/`.
-6. Add a `server` block to `infra/nginx/conf.d/vtk.conf` for `<name>.vtk.be`
-   that proxies to the new container.
-7. Add `<name>.vtk.be` to the Certbot `certonly` domain list (step 3 above).
+6. Add a matching `<name>.vtk.be` site to the host Caddyfile and reverse proxy
+   it to the new loopback port. Caddy handles its TLS certificate.
 
 No main-app code changes are needed; the submodule verifies sessions by
 calling `GET ${VTK_MAIN_URL}/api/auth/session` and receives the full

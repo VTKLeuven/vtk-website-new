@@ -65,7 +65,7 @@ export function S3ConfigForm({ status }: { status: S3Status }) {
 
         <label className="inline-flex items-center gap-2 text-sm text-vtk-ink">
           <input type="checkbox" name="forcePathStyle" defaultChecked={status.forcePathStyle} />
-          Force path-style URLs (required for MinIO; usually fine for Hetzner)
+          Force path-style URLs (recommended for Hetzner Object Storage)
         </label>
       </SaveForm>
 

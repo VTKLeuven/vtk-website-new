@@ -1,3 +1,8 @@
+x-immich-env: &immich-env
+  - path: ./immich/.env.example
+  - path: ./immich/.env
+    required: false
+
 services:
   postgres:
     image: postgres:16
@@ -8,10 +13,6 @@ services:
       POSTGRES_DB: ${POSTGRES_DB:-vtk}
     volumes:
       - postgres-data:/var/lib/postgresql/data
-    # No host `ports`: avoids clashes with Postgres (or anything) already bound on
-    # the machine. Other services reach this DB at hostname `postgres` port 5432.
-    # To expose on the host (e.g. psql), add under this service:
-    #   ports: ["127.0.0.1:YOUR_FREE_PORT:5432"]
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER:-vtk}"]
       interval: 10s
@@ -23,11 +24,13 @@ services:
       context: ..
       dockerfile: infra/docker/web.Dockerfile
     restart: unless-stopped
-    # Repo-root `.env` (relative to this compose file). Brings SEED_ADMIN_* etc. into
-    # the container. Do NOT also set SEED_* under `environment:` with ${VAR:-} —
-    # an empty compose substitution overrides env_file and skips admin seeding.
+    # The root env contains app settings. The optional Immich env overlay keeps
+    # face-search DB credentials synchronized with the Immich database.
     env_file:
       - ../.env
+      - path: ./immich/.env.example
+      - path: ./immich/.env
+        required: false
     depends_on:
       postgres:
         condition: service_healthy
@@ -36,9 +39,11 @@ services:
       DATABASE_URL: postgresql://${POSTGRES_USER:-vtk}:${POSTGRES_PASSWORD:-vtk}@postgres:5432/${POSTGRES_DB:-vtk}?schema=public
       SESSION_COOKIE_DOMAIN: ${SESSION_COOKIE_DOMAIN:-.vtk.be}
       VTK_MAIN_URL: ${VTK_MAIN_URL:-https://vtk.be}
-      # Object storage (S3/Hetzner) is configured at runtime via Admin -> IT and
-      # stored in the database (secret key encrypted). Any S3_* values coming
-      # from ../.env act only as a fallback until it is configured there.
+      # The website talks to Immich over the private Compose network.
+      GALLERY_IMMICH_API_URL: http://immich-server:2283/api
+      GALLERY_DATABASE_HOST: immich-database
+      # Object storage (Hetzner S3) is configured at runtime via Admin -> IT and
+      # stored in the database. S3_* values from ../.env are only a fallback.
     ports:
       - "127.0.0.1:3011:3000"
 
@@ -93,36 +98,74 @@ services:
       retries: 1
       start_period: 45s
 
-  # Optional: TLS + reverse proxy in Docker. Skip if you use Caddy/Traefik/etc. on
-  # the host and only proxy to web (3011) / logistiek (3100). Start with:
-  #   docker compose --profile edge-tls -f infra/docker-compose.yml up -d
-  nginx:
-    profiles: ["edge-tls"]
-    image: nginx:alpine
+  immich-server:
+    image: ghcr.io/immich-app/immich-server:v3.0.1
     restart: unless-stopped
     depends_on:
-      - web
-      - logistiek
+      immich-redis:
+        condition: service_healthy
+      immich-database:
+        condition: service_healthy
+    env_file: *immich-env
+    environment:
+      DB_HOSTNAME: immich-database
+      REDIS_HOSTNAME: immich-redis
+    volumes:
+      - ./immich/data/library:/data
+      - /etc/localtime:/etc/localtime:ro
     ports:
-      - "80:80"
-      - "443:443"
-    volumes:
-      - ./nginx/conf.d:/etc/nginx/conf.d:ro
-      - ./nginx/letsencrypt:/etc/letsencrypt:ro
-      - ./nginx/www:/var/www/certbot:ro
+      # Caddy is the public edge; Immich itself is reachable only from the host.
+      - "127.0.0.1:2283:2283"
+    healthcheck:
+      disable: false
 
-  certbot:
-    profiles: ["edge-tls"]
-    image: certbot/certbot:latest
-    restart: "no"
+  immich-machine-learning:
+    image: ghcr.io/immich-app/immich-machine-learning:v3.0.1
+    restart: unless-stopped
+    env_file: *immich-env
     volumes:
-      - ./nginx/letsencrypt:/etc/letsencrypt
-      - ./nginx/www:/var/www/certbot
-    entrypoint: >
-      /bin/sh -c "
-      trap exit TERM;
-      while :; do certbot renew --webroot -w /var/www/certbot --quiet; sleep 12h & wait $${!}; done
-      "
+      - immich-model-cache:/cache
+    healthcheck:
+      disable: false
+
+  immich-redis:
+    image: docker.io/valkey/valkey:9@sha256:3b55fbaa0cd93cf0d9d961f405e4dfcc70efe325e2d84da207a0a8e6d8fde4f9
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+
+  immich-database:
+    image: ghcr.io/immich-app/postgres:14-vectorchord0.4.3-pgvectors0.2.0@sha256:bcf63357191b76a916ae5eb93464d65c07511da41e3bf7a8416db519b40b1c23
+    restart: unless-stopped
+    env_file: *immich-env
+    environment:
+      POSTGRES_INITDB_ARGS: "--data-checksums"
+    volumes:
+      - ./immich/data/postgres:/var/lib/postgresql/data
+    shm_size: 128mb
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -d $${POSTGRES_DB} -U $${POSTGRES_USER}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  immich-public-proxy:
+    image: alangrainger/immich-public-proxy:latest
+    restart: unless-stopped
+    depends_on:
+      immich-server:
+        condition: service_healthy
+    env_file: *immich-env
+    environment:
+      IMMICH_URL: http://immich-server:2283
+    ports:
+      # Point the public gallery hostname in Caddy at this loopback port.
+      - "127.0.0.1:3001:3000"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:3000/share/healthcheck -o /dev/null || exit 1"]
+      start_period: 10s
+      timeout: 5s
 
 volumes:
   postgres-data:
+  immich-model-cache:

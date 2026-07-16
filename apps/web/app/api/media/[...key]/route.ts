@@ -5,12 +5,10 @@ import { getObjectStream } from "@vtk/storage";
  * Serveert opgeslagen objecten (logo's, afbeeldingen, pagina-bijlagen, foto's)
  * via de app zelf, zodat de browser enkel met deze origin praat.
  *
- * Vroeger stopte `publicUrl()` een directe bucket-URL in `<img src>`, bv.
- * `http://localhost:9000/vtk/...`. Dat werkt nooit in de browser van een
- * bezoeker: `localhost` is diens eigen machine, niet de server, en MinIO
- * luistert daar bovendien enkel op `127.0.0.1`. De upload sloeg het bestand wel
- * op (server-side bereikt de app MinIO via `S3_ENDPOINT`), dus het leek alsof
- * "er niks gebeurt": het beeld laadde gewoon nooit terug.
+ * Vroeger stopte `publicUrl()` een directe object-storage-URL in `<img src>`.
+ * Dat maakte de browser afhankelijk van een publiek bereikbare bucket en de
+ * juiste CORS/policy-instellingen, terwijl de upload server-side wel kon
+ * slagen. Daardoor leek een geslaagde upload soms verdwenen.
  *
  * Deze route haalt het object server-side op en streamt het terug. De bucket
  * hoeft niet publiek te zijn en zijn host hoeft niet bereikbaar te zijn vanuit
