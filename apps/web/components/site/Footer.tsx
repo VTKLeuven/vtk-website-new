@@ -22,7 +22,7 @@ export async function Footer({ locale }: { locale: Locale }) {
             <h2>{f.colStudy}</h2>
             <ul>
               <li>
-                <Link href={`${base}/aanbod`}>{f.linkOffer}</Link>
+                <Link href={`${base}/info`}>{f.linkOffer}</Link>
               </li>
               <li>
                 <Link href={`${base}/eerstejaars`}>{f.linkFirstYear}</Link>
@@ -39,23 +39,19 @@ export async function Footer({ locale }: { locale: Locale }) {
             <h2>{f.colService}</h2>
             <ul>
               <li>
-                <Link href={`${base}/aanbod`}>{f.linkSandwiches}</Link>
-              </li>
-              <li>
-                <Link href={`${base}/cursusdienst`}>{f.linkSecondHand}</Link>
+                <Link href={`${base}/theokot`}>{f.linkSandwiches}</Link>
               </li>
               <li>
                 <Link href={`${base}/cursusdienst`}>{f.linkBooks}</Link>
               </li>
               <li>
-                <span>
-                  {f.linkShifts} {f.mutedSoon}
-                </span>
+                <a href="https://cudi.vtk.be/vtk/secondhand">{f.linkSecondHand}</a>
               </li>
               <li>
-                <span>
-                  {f.linkSlots} {f.mutedSoon}
-                </span>
+                <a href="https://cudi.vtk.be/vtk/account/slots">{f.linkSlots}</a>
+              </li>
+              <li>
+                <Link href={`${base}/shift`}>{f.linkShifts}</Link>
               </li>
             </ul>
           </div>

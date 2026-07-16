@@ -163,7 +163,7 @@ export async function AanbodEditorial({ locale }: { locale: Locale }) {
             <b>Shiften</b>{" "}
             <span className="cl">{locale === "nl" ? "online via shiften.vtk.be" : "online at shiften.vtk.be"}</span>.
           </div>
-          <Link href={`${base}/aanbod`} className="btn btn-accent arrow" style={{ borderColor: "var(--accent)" }}>
+          <Link href={`${base}/info`} className="btn btn-accent arrow" style={{ borderColor: "var(--accent)" }}>
             {locale === "nl" ? "Alle diensten" : "All services"}
           </Link>
         </section>

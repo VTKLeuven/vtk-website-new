@@ -13,6 +13,8 @@ import { hashPassword } from '../logins/password';
 type CreateUserInput = {
   email: string;
   name: string;
+  firstName?: string | null;
+  lastName?: string | null;
   password: string;
   locale: Locale;
   avatarKey?: string | null;
@@ -22,6 +24,8 @@ type CreateUserInput = {
 type UpdateUserInput = {
   email?: string;
   name?: string;
+  firstName?: string | null;
+  lastName?: string | null;
   locale?: Locale;
   avatarKey?: string | null;
   active?: boolean;
@@ -48,6 +52,8 @@ export async function createUser(actor: SessionPayload, input: CreateUserInput):
       data: {
         email: normalizeEmail(input.email),
         name: input.name.trim(),
+        firstName: input.firstName?.trim() || null,
+        lastName: input.lastName?.trim() || null,
         locale: input.locale,
         avatarKey: input.avatarKey ?? null,
         active: input.active ?? true,
@@ -78,6 +84,8 @@ export async function updateUser(
   const data: Prisma.UserUpdateInput = {
     ...(input.email ? { email: normalizeEmail(input.email) } : {}),
     ...(input.name !== undefined ? { name: input.name.trim() } : {}),
+    ...(input.firstName !== undefined ? { firstName: input.firstName?.trim() || null } : {}),
+    ...(input.lastName !== undefined ? { lastName: input.lastName?.trim() || null } : {}),
     ...(input.locale !== undefined ? { locale: input.locale } : {}),
     ...(input.avatarKey !== undefined ? { avatarKey: input.avatarKey } : {}),
     ...(input.active !== undefined ? { active: input.active } : {}),

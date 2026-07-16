@@ -11,7 +11,10 @@ export async function POST(request: Request) {
     !session.user.isSuperAdmin &&
     !hasPermission(session, "pages.edit") &&
     !hasPermission(session, "photos.upload") &&
-    !hasPermission(session, "home.edit")
+    !hasPermission(session, "home.edit") &&
+    !hasPermission(session, "partners.manage") &&
+    !hasPermission(session, "calendar.create") &&
+    !hasPermission(session, "calendar.manageAll")
   ) {
     return NextResponse.json({ error: "forbidden" }, { status: 403 });
   }
@@ -28,6 +31,9 @@ export async function POST(request: Request) {
   let body: Buffer = bytes;
   let contentType = file.type || "application/octet-stream";
   let prefix = "uploads";
+  // Wanneer we het bestand hercoderen, moet de key-extensie het resultaat volgen
+  // en niet de originele naam. null = originele naam/extensie behouden.
+  let outputName: string | null = null;
 
   if (kind === "image") {
     prefix = "images";
@@ -37,6 +43,25 @@ export async function POST(request: Request) {
     } catch {
       /* fall back to raw bytes */
     }
+  } else if (kind === "logo") {
+    // Logo's moeten transparantie behouden: JPEG kent geen alfakanaal en sharp
+    // plakt die dan op zwart, wat een zwart blok oplevert op een witte tegel.
+    prefix = "logos";
+    if (contentType === "image/svg+xml") {
+      // SVG blijft as-is: al klein en schaalt scherp mee.
+    } else {
+      try {
+        body = await sharp(bytes)
+          .rotate()
+          .resize({ width: 600, height: 200, fit: "inside", withoutEnlargement: true })
+          .png()
+          .toBuffer();
+        contentType = "image/png";
+        outputName = "logo.png";
+      } catch {
+        /* fall back to raw bytes */
+      }
+    }
   } else if (kind === "pdf") {
     prefix = "pdfs";
     contentType = "application/pdf";
@@ -44,7 +69,7 @@ export async function POST(request: Request) {
     prefix = "files";
   }
 
-  const key = newStorageKey(prefix, file.name);
+  const key = newStorageKey(prefix, outputName ?? file.name);
   await putObject(key, body, contentType);
 
   return NextResponse.json({

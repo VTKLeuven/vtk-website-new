@@ -1,3 +1,4 @@
+import { forwardRef } from "react";
 import type {
   InputHTMLAttributes,
   LabelHTMLAttributes,
@@ -10,25 +11,29 @@ import { cn } from "./cn";
 const base =
   "w-full rounded-xl border border-vtk-blue/12 bg-white px-3 py-2 text-sm text-vtk-ink shadow-sm placeholder:text-zinc-400 focus:border-vtk-ink focus:outline-none focus:ring-2 focus:ring-vtk-blue/10 disabled:cursor-not-allowed disabled:opacity-50";
 
-export function Input({ className, ...rest }: InputHTMLAttributes<HTMLInputElement>) {
-  return <input className={cn(base, className)} {...rest} />;
-}
+// forwardRef zodat callers (bvb een auto-focus scannerveld) een ref kunnen meegeven.
+export const Input = forwardRef<HTMLInputElement, InputHTMLAttributes<HTMLInputElement>>(
+  function Input({ className, ...rest }, ref) {
+    return <input ref={ref} className={cn(base, className)} {...rest} />;
+  },
+);
 
-export function Textarea({ className, ...rest }: TextareaHTMLAttributes<HTMLTextAreaElement>) {
-  return <textarea className={cn(base, "min-h-[6rem]", className)} {...rest} />;
-}
+export const Textarea = forwardRef<HTMLTextAreaElement, TextareaHTMLAttributes<HTMLTextAreaElement>>(
+  function Textarea({ className, ...rest }, ref) {
+    return <textarea ref={ref} className={cn(base, "min-h-[6rem]", className)} {...rest} />;
+  },
+);
 
-export function Select({
-  className,
-  children,
-  ...rest
-}: SelectHTMLAttributes<HTMLSelectElement> & { children: ReactNode }) {
+export const Select = forwardRef<
+  HTMLSelectElement,
+  SelectHTMLAttributes<HTMLSelectElement> & { children: ReactNode }
+>(function Select({ className, children, ...rest }, ref) {
   return (
-    <select className={cn(base, className)} {...rest}>
+    <select ref={ref} className={cn(base, className)} {...rest}>
       {children}
     </select>
   );
-}
+});
 
 export function Label({
   className,

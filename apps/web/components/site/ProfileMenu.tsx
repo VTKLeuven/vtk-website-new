@@ -19,6 +19,7 @@ export function ProfileMenu({
 }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
+  const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     if (!open) return;
@@ -28,6 +29,29 @@ export function ProfileMenu({
     document.addEventListener("mousedown", onDocClick);
     return () => document.removeEventListener("mousedown", onDocClick);
   }, [open]);
+
+  // Clean up a pending hover-close timer on unmount.
+  useEffect(() => () => {
+    if (closeTimer.current) clearTimeout(closeTimer.current);
+  }, []);
+
+  function cancelClose() {
+    if (closeTimer.current) {
+      clearTimeout(closeTimer.current);
+      closeTimer.current = null;
+    }
+  }
+
+  function hoverOpen() {
+    cancelClose();
+    setOpen(true);
+  }
+
+  // Small delay so moving the cursor across the gap to the menu does not close it.
+  function hoverClose() {
+    cancelClose();
+    closeTimer.current = setTimeout(() => setOpen(false), 120);
+  }
 
   const triggerClass =
     variant === "editorial"
@@ -45,7 +69,12 @@ export function ProfileMenu({
       : "block px-4 py-2.5 text-sm hover:bg-vtk-blue-soft";
 
   return (
-    <div className="relative" ref={ref}>
+    <div
+      className="relative"
+      ref={ref}
+      onMouseEnter={hoverOpen}
+      onMouseLeave={hoverClose}
+    >
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}

@@ -59,14 +59,76 @@ enum DashboardTileScope {
   USER
 }
 
+enum TheokotOrderStatus {
+  RESERVED   // gereserveerd, nog niet opgehaald
+  PICKED_UP  // afgehaald aan de balie
+  NO_SHOW    // niet opgehaald na sluitingstijd + grace
+  CANCELLED  // door de student geannuleerd voor de deadline
+}
+
+// Welk e-mailadres de kring gebruikt om een lid te contacteren.
+enum EmailPreference {
+  UNIVERSITY // universiteitsmail (= login-mail via KUL SSO)
+  PERSONAL   // persoonlijke mail
+}
+
+// Mailinglijst-categorieën waarvoor een lid zich (opt-in) kan inschrijven.
+enum MailCategory {
+  FEEST
+  CAREER
+  SPORT
+  EVENEMENTEN
+  ONDERWIJS
+  INTERNATIONAAL
+  EERSTEJAARS
+  BAKSKE
+}
+
+// In welk studiejaar een lid zit.
+enum StudyYear {
+  BACHELOR_1
+  BACHELOR_2
+  BACHELOR_3
+  MASTER_1
+  MASTER_2
+}
+
+// Studierichtingen (een lid kan er meerdere aanduiden). Labels (NL/EN) leven in
+// de i18n-dictionaries, niet in de enum.
+enum StudyProgramme {
+  ARCHITECTURE
+  BIOMEDICAL
+  COMMON_BACHELOR
+  CIVIL
+  CHEMICAL
+  COMPUTER_SCIENCE
+  CYBERSECURITY
+  DIGITAL_HUMANITIES
+  ELECTRICAL
+  ENERGY
+  ARTIFICIAL_INTELLIGENCE
+  MATERIALS
+  NANO
+  URBANISM
+  MATHEMATICAL
+  MECHANICAL
+}
+
 // -----------------------------------------------------------------------------
 // Users, groups, permissions
 // -----------------------------------------------------------------------------
 
 model User {
   id               String              @id @default(cuid())
+  // `name` blijft de weergavenaam (en het veld dat better-auth zelf zet bij een
+  // SSO-login). `firstName`/`lastName` zijn de gestructureerde variant die de
+  // mailinglijst-exports nodig hebben; ze worden ingevuld tijdens de onboarding
+  // en in het gebruikersbeheer, en `name` wordt daaruit samengesteld.
   name             String
+  firstName        String?
+  lastName         String?
   email            String              @unique
+  rNumber          String?             @unique // KU Leuven studentennummer (bvb r0123456), voor zoeken
   emailVerified Boolean                @default(false)
   avatarKey        String?
   image         String?
@@ -74,6 +136,38 @@ model User {
   locale           Locale              @default(NL)
   active           Boolean             @default(true)
   isSuperAdmin     Boolean             @default(false)
+
+  // Onboarding-profiel (ingevuld bij de eerste KUL SSO-login). Zolang
+  // onboardedAt null is, wordt het lid naar de onboarding-flow gestuurd.
+  onboardedAt      DateTime?
+  // Kotadres
+  street           String?
+  houseNumber      String?
+  bus              String?             // busnummer, optioneel
+  postalCode       String?
+  city             String?
+  birthDate        DateTime?
+  // Contact: `email` is de login-/universiteitsmail (via SSO). Persoonlijke
+  // mail en de voorkeur voor communicatie komen erbij.
+  personalEmail    String?
+  emailPreference  EmailPreference     @default(UNIVERSITY)
+  // Opt-in mailinglijsten: enkel de aangeduide categorieën zitten in de array.
+  mailCategories   MailCategory[]      @default([])
+  // Studie: meerdere studiejaren en richtingen mogelijk (iemand kan bv. deels in
+  // 2de en deels in 3de bachelor zitten).
+  studyYears       StudyYear[]         @default([])
+  studyProgrammes  StudyProgramme[]    @default([])
+  // Lid dat niet aan de faculteit Ingenieurswetenschappen studeert. Bewust geen
+  // `StudyProgramme`-waarde: het is geen richting, en als enum-waarde zou het
+  // overal opduiken waar richtingen opgelijst worden (o.a. de career-export).
+  notAtFaculty     Boolean             @default(false)
+  // Werkingsjaar waarin het lid zijn studieprofiel laatst bevestigde (2026 =
+  // "26-27"). Loopt dat achter op het huidige werkingsjaar, dan is het profiel
+  // verlopen: de bevestigingsgate vraagt het opnieuw en het lid valt zolang uit
+  // de mailinglijsten. Zo blijft "actief student" een jaarlijks vers signaal
+  // zonder koppeling met de cursusdienst.
+  studyConfirmedYear Int?
+
   sessions         Session[]
   accounts      Account[]
   createdAt        DateTime            @default(now())
@@ -85,6 +179,12 @@ model User {
   createdEvents    CalendarEvent[]     @relation("EventCreatedBy")
   dashboardTiles   DashboardTile[]
   dashboardTilePrefs UserDashboardTilePref[]
+  participatingShifts ShiftParticipant[]
+  createdShortLinks ShortLink[]           @relation("ShortLinkCreatedBy")
+
+  theokotOrders      TheokotOrder[]      @relation("TheokotOrderUser")
+  theokotPickedUp    TheokotOrder[]      @relation("TheokotPickedUpBy")
+  theokotBans        TheokotBan[]
 }
 
 model Group {
@@ -109,7 +209,10 @@ model GroupMembership {
   userId        String
   groupId       String
   role          MembershipRole  @default(MEMBER)
-  year          Int?
+  // Werkingsjaar (startjaar van het academiejaar): 2026 = "26-27". Elk jaar is
+  // een aparte rij, zodat de historiek per post per jaar bewaard blijft en een
+  // nieuw werkingsjaar automatisch met een lege post begint.
+  year          Int
   titleNl       String?
   titleEn       String?
   displayOrder  Int             @default(0)
@@ -117,8 +220,9 @@ model GroupMembership {
   user          User            @relation(fields: [userId], references: [id], onDelete: Cascade)
   group         Group           @relation(fields: [groupId], references: [id], onDelete: Cascade)
 
-  @@unique([userId, groupId])
+  @@unique([userId, groupId, year])
   @@index([groupId])
+  @@index([year])
 }
 
 model Permission {
@@ -153,6 +257,14 @@ model HeaderTab {
   labelEn    String
   order      Int     @default(0)
   visible    Boolean @default(true)
+
+  // Inhoud van de categoriepagina zelf, bewerkbaar via /admin/inhoud.
+  introNl    String?
+  introEn    String?
+  // Optionele knop naast de titel (bv. cudi.vtk.be bij Cursusdienst).
+  ctaLabelNl String?
+  ctaLabelEn String?
+  ctaUrl     String?
 
   pages      Page[]
 }
@@ -214,6 +326,7 @@ model CalendarEvent {
   allDay         Boolean          @default(false)
   visibility     EventVisibility  @default(PUBLIC)
   url            String?
+  imageKey       String?
   groupId        String
   createdById    String?
   createdAt      DateTime         @default(now())
@@ -364,6 +477,181 @@ model UserDashboardTilePref {
 
   @@id([userId, tileId])
   @@index([userId])
+}
+
+// -----------------------------------------------------------------------------
+// Shifts
+// -----------------------------------------------------------------------------
+
+model Shift {
+  id  String @id @default(cuid())
+
+  participantIds Int[]
+  participants ShiftParticipant[]
+
+  name String
+  startTime DateTime
+  endTime DateTime
+  location String
+  description String
+  maxParticipants Int
+  reward Int
+
+  post GroupCode?
+  // Ook een field bijhouden voor het evenement waarbij de shift hoort?
+}
+
+model ShiftParticipant {
+  shiftId String
+  shift Shift @relation(fields: [shiftId], references: [id], onDelete: Cascade)
+
+  userId  String
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  payedOut Boolean
+
+  @@id([shiftId, userId])
+}
+
+// -----------------------------------------------------------------------------
+// Short links (on.vtk.be/<slug> -> target URL)
+// -----------------------------------------------------------------------------
+
+model ShortLink {
+  id          String    @id @default(cuid())
+  slug        String    @unique
+  url         String
+  enabled     Boolean   @default(true)
+  clicks      Int       @default(0)
+  note        String?
+  expiresAt   DateTime? // when set, the link stops resolving after this instant
+  createdById String?
+  createdBy   User?     @relation("ShortLinkCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
+
+// -----------------------------------------------------------------------------
+// Theokot (cafetaria / broodjesbar) reservatiesysteem
+//
+// Zie docs/design-decisions.md voor de niet-vanzelfsprekende keuzes achter dit
+// systeem (bestelvenster, annulatie-deadline, no-show/ban-logica, turf-lijst,
+// snapshots i.p.v. live catalogus).
+// -----------------------------------------------------------------------------
+
+/// Catalogus met het standaardaanbod. Prijs in eurocent (Int, geen floats).
+/// Bij het aanmaken van een week worden deze rijen naar `TheokotSessionItem`
+/// gekopieerd (snapshot), zodat latere catalogus-edits oude sessies niet wijzigen.
+model TheokotProduct {
+  id                  String   @id @default(cuid())
+  nameNl              String
+  nameEn              String?
+  priceCents          Int
+  defaultQuantity     Int      @default(0)
+  isWeeklySpecialSlot Boolean  @default(false) // "broodje van de week"-slot
+  order               Int      @default(0)
+  active              Boolean  @default(true)
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+}
+
+/// Eén verkoopsessie = één open dag. Uren en aanbod zijn per dag aanpasbaar;
+/// `isOpen=false` betekent dat Theokot die dag dicht is. De venster-momenten
+/// (order/pickup) worden bij aanmaak berekend uit config + Brussel-tijd en
+/// opgeslagen zodat ze daarna manueel bijgesteld kunnen worden.
+model TheokotSession {
+  id                    String              @id @default(cuid())
+  date                  DateTime            @unique // lokale middernacht van de verkoopdag
+  isOpen                Boolean             @default(true)
+  orderOpenAt           DateTime // vanaf wanneer studenten kunnen bestellen
+  orderCloseAt          DateTime // annulatie-/besteldeadline (turf-lijst wordt geprint)
+  pickupStart           DateTime
+  pickupEnd             DateTime
+  weeklySpecialLabelNl  String? // welk broodje deze week "van de week" is
+  weeklySpecialLabelEn  String?
+  processedAt           DateTime? // wanneer no-shows verwerkt zijn (idempotentie)
+  createdById           String?
+  createdAt             DateTime            @default(now())
+  updatedAt             DateTime            @updatedAt
+
+  items                 TheokotSessionItem[]
+  orders                TheokotOrder[]
+
+  @@index([date])
+}
+
+/// Aanbod van één sessie (snapshot van een product op het moment van aanmaken).
+model TheokotSessionItem {
+  id             String            @id @default(cuid())
+  sessionId      String
+  productId      String? // herkomst-catalogusitem, puur informatief
+  nameNl         String
+  nameEn         String?
+  priceCents     Int
+  quantity       Int // beschikbare voorraad voor deze sessie
+  isWeeklySpecial Boolean          @default(false)
+  order          Int               @default(0)
+
+  session        TheokotSession    @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  lines          TheokotOrderLine[]
+
+  @@index([sessionId])
+}
+
+/// Eén bestelling per persoon per sessie.
+model TheokotOrder {
+  id           String             @id @default(cuid())
+  sessionId    String
+  userId       String
+  status       TheokotOrderStatus @default(RESERVED)
+  totalCents   Int
+  statusNote   String? // vrije notitie bij correcties
+  createdAt    DateTime           @default(now())
+  updatedAt    DateTime           @updatedAt
+  pickedUpAt   DateTime?
+  pickedUpById String? // wie aan de balie op "opgehaald" drukte
+
+  session      TheokotSession     @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  user         User               @relation("TheokotOrderUser", fields: [userId], references: [id], onDelete: Cascade)
+  pickedUpBy   User?              @relation("TheokotPickedUpBy", fields: [pickedUpById], references: [id], onDelete: SetNull)
+  lines        TheokotOrderLine[]
+
+  @@unique([sessionId, userId])
+  @@index([userId])
+  @@index([status])
+}
+
+model TheokotOrderLine {
+  id             String             @id @default(cuid())
+  orderId        String
+  sessionItemId  String
+  quantity       Int
+  unitPriceCents Int // snapshot van de prijs op besteldatum
+
+  order          TheokotOrder       @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  sessionItem    TheokotSessionItem @relation(fields: [sessionItemId], references: [id], onDelete: Cascade)
+
+  @@index([orderId])
+  @@index([sessionItemId])
+}
+
+/// Tijdelijke ban na te veel no-shows. Historiek blijft bewaard; een ban
+/// opheffen zet `active=false` (i.p.v. verwijderen) zodat correcties zichtbaar blijven.
+model TheokotBan {
+  id          String   @id @default(cuid())
+  userId      String
+  reason      String
+  startsAt    DateTime @default(now())
+  endsAt      DateTime
+  active      Boolean  @default(true)
+  note        String?
+  createdById String?
+  createdAt   DateTime @default(now())
+
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([active])
 }
 
 // -----------------------------------------------------------------------------

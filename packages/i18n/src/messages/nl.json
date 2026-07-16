@@ -19,12 +19,12 @@
     "colService": "Service",
     "colCommunity": "Community",
     "colContact": "Contact",
-    "linkOffer": "Aanbod",
+    "linkOffer": "Info",
     "linkFirstYear": "Eerstejaars",
     "linkCourse": "Cursusdienst",
     "linkIntl": "Internationaal",
     "linkSandwiches": "Theokot broodjes",
-    "linkSecondHand": "Tweedehands",
+    "linkSecondHand": "Tweedehands Boeken",
     "linkBooks": "Boeken bestellen",
     "linkCalendar": "Kalender",
     "linkCareer": "Career",
@@ -34,8 +34,7 @@
     "linkFacebook": "Facebook",
     "linkLinkedIn": "LinkedIn",
     "linkShifts": "Shiften",
-    "linkSlots": "Tijdsloten",
-    "mutedSoon": "(binnenkort)",
+    "linkSlots": "Tijdsloten Cudi",
     "linkPrivacy": "Privacy"
   },
   "home": {
@@ -181,22 +180,110 @@
     "currentPassword": "Huidig wachtwoord",
     "newPassword": "Nieuw wachtwoord",
     "saved": "Opgeslagen",
-    "signInWithKul": "Inloggen met KU Leuven"
+    "signInWithKul": "Inloggen met KU Leuven",
+    "loginRequiredKicker": "Inloggen vereist",
+    "loginRequiredTitle": "Log in om deze pagina te bekijken",
+    "loginRequiredBody": "Je moet ingelogd zijn voordat je de inhoud van deze pagina kan bekijken.",
+    "goHome": "Naar home"
+  },
+  "onboarding": {
+    "kicker": "Welkom bij VTK",
+    "title": "Vervolledig je profiel",
+    "intro": "Nog even dit invullen en je bent helemaal geregistreerd. Je kan deze gegevens later altijd aanpassen bij je account.",
+    "identityHeading": "Naam & studentennummer",
+    "firstName": "Voornaam",
+    "lastName": "Achternaam",
+    "rNumber": "R-nummer",
+    "rNumberHint": "Formaat: r gevolgd door 7 cijfers, bv. r0123456.",
+    "addressHeading": "Kotadres",
+    "street": "Straatnaam",
+    "houseNumber": "Huisnummer",
+    "bus": "Bus",
+    "busHint": "optioneel",
+    "postalCode": "Postcode",
+    "city": "Stad",
+    "birthDate": "Geboortedatum",
+    "contactHeading": "Contactgegevens",
+    "universityEmail": "Universiteitsmail",
+    "universityEmailHint": "Dit is je login-mail via KU Leuven.",
+    "personalEmail": "Persoonlijke mail",
+    "preferenceHeading": "Voorkeur voor communicatie",
+    "preferenceHint": "Welk adres gebruiken we om je te contacteren?",
+    "preferenceUniversity": "Universiteitsmail",
+    "preferencePersonal": "Persoonlijke mail",
+    "mailHeading": "Mailinglijsten",
+    "mailIntro": "Van welke categorieën wil je mails ontvangen? Je kan er zoveel of zo weinig aanduiden als je wil.",
+    "photoHeading": "Profielfoto",
+    "photoHint": "Optioneel. Als je op het praesidium of bij een POC zit, verschijnt deze foto op de betreffende pagina.",
+    "photoChoose": "Kies een foto",
+    "studyHeading": "Studie",
+    "studyYearLabel": "Studiejaar",
+    "studyYearHint": "Duid alle jaren aan waarin je vakken opneemt.",
+    "programmesLabel": "Richtingen",
+    "programmesHint": "Duid alle richtingen aan die op jou van toepassing zijn.",
+    "notAtFaculty": "Ik studeer niet aan de faculteit",
+    "notAtFacultyHint": "Duid dit aan als je geen ingenieursopleiding aan de faculteit volgt. Je krijgt dan geen Career-mails, want die zijn op faculteitsstudenten gericht.",
+    "submit": "Registratie voltooien",
+    "required": "Verplicht veld",
+    "saved": "Gegevens opgeslagen",
+    "errorInvalid": "Niet opgeslagen: kijk de ingevulde gegevens na.",
+    "errorRnumberTaken": "Niet opgeslagen: dit r-nummer hoort al bij een ander lid.",
+    "errorAvatarTooLarge": "Niet opgeslagen: je profielfoto is groter dan 8 MB.",
+    "errorAvatarFailed": "Niet opgeslagen: je profielfoto kon niet verwerkt worden.",
+    "categories": {
+      "FEEST": "Feest",
+      "CAREER": "Career",
+      "SPORT": "Sport",
+      "EVENEMENTEN": "Evenementen",
+      "ONDERWIJS": "Onderwijs",
+      "INTERNATIONAAL": "VTK International",
+      "EERSTEJAARS": "Eerstejaars",
+      "BAKSKE": "Bakske"
+    },
+    "years": {
+      "BACHELOR_1": "1ste bachelor",
+      "BACHELOR_2": "2de bachelor",
+      "BACHELOR_3": "3de bachelor",
+      "MASTER_1": "1ste master",
+      "MASTER_2": "2de master"
+    },
+    "programmes": {
+      "ARCHITECTURE": "Architectuur",
+      "BIOMEDICAL": "Biomedische Wetenschappen",
+      "COMMON_BACHELOR": "Algemene Bachelor",
+      "CIVIL": "Bouwkunde",
+      "CHEMICAL": "Chemische Ingenieurstechnieken",
+      "COMPUTER_SCIENCE": "Computerwetenschappen",
+      "CYBERSECURITY": "Cybersecurity",
+      "DIGITAL_HUMANITIES": "Digital Humanities",
+      "ELECTRICAL": "Elektrotechniek",
+      "ENERGY": "Energie",
+      "ARTIFICIAL_INTELLIGENCE": "Artificiële Intelligentie (ir.)",
+      "MATERIALS": "Materiaalkunde",
+      "NANO": "Nanowetenschappen",
+      "URBANISM": "Urbanism Landscape and Planning",
+      "MATHEMATICAL": "Wiskundige Ingenieurstechnieken",
+      "MECHANICAL": "Werktuigkunde"
+    }
   },
   "admin": {
     "title": "Admin",
     "dashboard": "Dashboard",
-    "pages": "Pagina's",
-    "header": "Header",
+    "content": "Inhoud",
     "calendar": "Kalender",
     "users": "Gebruikers",
-    "groups": "Groepen",
+    "groups": "Posten",
     "albums": "Albums",
     "media": "Media",
     "pocs": "POC's",
     "partners": "Partners",
     "home": "Homepagina",
     "dashboardTiles": "Dashboardtegels",
+    "shortlinks": "Verkorte links",
+    "shift": "Shiften",
+    "theokot": "Theokot",
+    "mailinglists": "Mailinglijsten",
+    "it": "IT",
     "create": "Nieuw",
     "save": "Opslaan",
     "delete": "Verwijderen",
@@ -205,10 +292,30 @@
     "back": "Terug",
     "noAccess": "Geen toegang"
   },
+  "confirmStudy": {
+    "title": "Klopt je studie nog?",
+    "intro": "Bij de start van een nieuw academiejaar vragen we je even te bevestigen wat je studeert. Zo blijven onze mailinglijsten kloppen en krijg je enkel mails die voor jou relevant zijn.",
+    "unchangedHint": "Niets veranderd? Klik gewoon op bevestigen.",
+    "submit": "Bevestigen"
+  },
+  "mailinglists": {
+    "title": "Mailinglijsten",
+    "intro": "Download per categorie de leden die ze aangevinkt hebben bij hun account. De kolommen zijn firstname, lastname en email; dat is telkens het voorkeursadres van het lid.",
+    "allStudents": "Alle studenten",
+    "allStudentsHint": "iedereen, geen opt-in",
+    "careerHint": "ZIP met de opsplitsing per studiejaar en per richting",
+    "member": "lid",
+    "members": "leden",
+    "downloadCsv": "Download CSV",
+    "downloadZip": "Download ZIP"
+  },
   "common": {
     "loading": "Laden...",
     "yes": "Ja",
-    "no": "Nee"
+    "no": "Nee",
+    "saving": "Bezig met opslaan...",
+    "saved": "Opgeslagen",
+    "saveError": "Er ging iets mis bij het opslaan."
   },
   "info": {
     "kicker": "VTK · KU Leuven",
@@ -272,5 +379,68 @@
         "body": "We kunnen deze privacyverklaring aanpassen wanneer de dienst verandert. De datum bovenaan geeft aan wanneer we de tekst laatst hebben bijgewerkt."
       }
     ]
+  },
+  "shift": {
+    "shifts": "Shiften",
+    "available": "Beschikbare shiften",
+    "registered": "Mijn shiften",
+    "columns": {
+      "shift": "Shift",
+      "date": "Datum",
+      "time": "Tijd",
+      "where": "Locatie",
+      "action": "Actie"
+    },
+    "filter": {
+      "post": "Post",
+      "allPosts": "Alle posten",
+      "from": "Vanaf",
+      "sortAsc": "↑ Oplopend",
+      "sortDesc": "↓ Aflopend"
+    },
+    "register": "Registreer",
+    "unregister": "Uitschrijven",
+    "week": {
+      "prev": "← Vorige",
+      "today": "Vandaag",
+      "next": "Volgende →",
+      "startDate": "Startdatum"
+    },
+    "emptyAvailable": "Er zijn geen beschikbare shiften in deze periode.",
+    "emptyRegistered": "Je bent nog niet ingeschreven voor een shift.",
+    "detail": {
+      "start": "Start",
+      "end": "Einde",
+      "location": "Locatie",
+      "post": "Post",
+      "reward": "Beloning",
+      "spots": "Plaatsen",
+      "description": "Beschrijving"
+    },
+    "toast": {
+      "registered": "Je bent ingeschreven voor deze shift.",
+      "unregistered": "Je bent uitgeschreven voor deze shift."
+    },
+    "error": {
+      "full": "Deze shift zit vol.",
+      "alreadyRegistered": "Je bent al ingeschreven voor deze shift.",
+      "overlap": "Je bent al ingeschreven voor een overlappende shift.",
+      "overlapNamed": "Je bent al ingeschreven voor een overlappende shift: {name}.",
+      "notFound": "Deze shift bestaat niet meer.",
+      "registerFailed": "Inschrijven mislukt. Probeer later opnieuw.",
+      "notRegistered": "Je was niet ingeschreven voor deze shift.",
+      "unregisterFailed": "Uitschrijven mislukt. Probeer later opnieuw.",
+      "tooLateToUnregister": "Uitschrijven kan niet meer: minder dan 24u voor de start. Vraag een admin om je te verwijderen."
+    },
+    "history": {
+      "title": "Mijn shiftgeschiedenis",
+      "link": "Mijn geschiedenis",
+      "back": "Terug naar shiften",
+      "total": "Totaal aantal shiften",
+      "post": "Post",
+      "count": "Aantal",
+      "noPost": "Geen post",
+      "empty": "Je hebt nog geen shiften gedaan."
+    }
   }
 }

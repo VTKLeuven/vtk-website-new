@@ -19,12 +19,12 @@
     "colService": "Service",
     "colCommunity": "Community",
     "colContact": "Contact",
-    "linkOffer": "Offer",
+    "linkOffer": "Info",
     "linkFirstYear": "Freshmen",
     "linkCourse": "Course shop",
     "linkIntl": "International",
     "linkSandwiches": "Theokot sandwiches",
-    "linkSecondHand": "Second-hand",
+    "linkSecondHand": "Second-hand Books",
     "linkBooks": "Order books",
     "linkCalendar": "Calendar",
     "linkCareer": "Career",
@@ -34,8 +34,7 @@
     "linkFacebook": "Facebook",
     "linkLinkedIn": "LinkedIn",
     "linkShifts": "Shifts",
-    "linkSlots": "Time slots",
-    "mutedSoon": "(soon)",
+    "linkSlots": "Cudi Time Slots",
     "linkPrivacy": "Privacy"
   },
   "home": {
@@ -181,22 +180,110 @@
     "currentPassword": "Current password",
     "newPassword": "New password",
     "saved": "Saved",
-    "signInWithKul": "Sign in with KU Leuven"
+    "signInWithKul": "Sign in with KU Leuven",
+    "loginRequiredKicker": "Login required",
+    "loginRequiredTitle": "Please log in to view this page",
+    "loginRequiredBody": "You must be logged in before you can view the content on this page.",
+    "goHome": "Go home"
+  },
+  "onboarding": {
+    "kicker": "Welcome to VTK",
+    "title": "Complete your profile",
+    "intro": "Just a few things to fill in and your registration is done. You can always change these later in your account.",
+    "identityHeading": "Name & student number",
+    "firstName": "First name",
+    "lastName": "Last name",
+    "rNumber": "R-number",
+    "rNumberHint": "Format: r followed by 7 digits, e.g. r0123456.",
+    "addressHeading": "Room address",
+    "street": "Street",
+    "houseNumber": "House number",
+    "bus": "Box",
+    "busHint": "optional",
+    "postalCode": "Postal code",
+    "city": "City",
+    "birthDate": "Date of birth",
+    "contactHeading": "Contact details",
+    "universityEmail": "University email",
+    "universityEmailHint": "This is your KU Leuven login email.",
+    "personalEmail": "Personal email",
+    "preferenceHeading": "Communication preference",
+    "preferenceHint": "Which address should we use to contact you?",
+    "preferenceUniversity": "University email",
+    "preferencePersonal": "Personal email",
+    "mailHeading": "Mailing lists",
+    "mailIntro": "Which categories would you like to receive emails about? Pick as many or as few as you like.",
+    "photoHeading": "Profile picture",
+    "photoHint": "Optional. If you are on the praesidium or a POC, this picture appears on the relevant page.",
+    "photoChoose": "Choose a picture",
+    "studyHeading": "Studies",
+    "studyYearLabel": "Year of study",
+    "studyYearHint": "Select every year you are taking courses in.",
+    "programmesLabel": "Programmes",
+    "programmesHint": "Select every programme that applies to you.",
+    "notAtFaculty": "I am not studying at the faculty",
+    "notAtFacultyHint": "Tick this if you are not enrolled in an engineering programme at the faculty. You will not receive Career emails, as those target faculty students.",
+    "submit": "Complete registration",
+    "required": "Required field",
+    "saved": "Details saved",
+    "errorInvalid": "Not saved: please check the details you entered.",
+    "errorRnumberTaken": "Not saved: this r-number already belongs to another member.",
+    "errorAvatarTooLarge": "Not saved: your profile picture is larger than 8 MB.",
+    "errorAvatarFailed": "Not saved: your profile picture could not be processed.",
+    "categories": {
+      "FEEST": "Party",
+      "CAREER": "Career",
+      "SPORT": "Sport",
+      "EVENEMENTEN": "Events",
+      "ONDERWIJS": "Education",
+      "INTERNATIONAAL": "VTK International",
+      "EERSTEJAARS": "First years",
+      "BAKSKE": "Bakske"
+    },
+    "years": {
+      "BACHELOR_1": "1st bachelor",
+      "BACHELOR_2": "2nd bachelor",
+      "BACHELOR_3": "3rd bachelor",
+      "MASTER_1": "1st master",
+      "MASTER_2": "2nd master"
+    },
+    "programmes": {
+      "ARCHITECTURE": "Architecture",
+      "BIOMEDICAL": "Biomedical Engineering",
+      "COMMON_BACHELOR": "Common Bachelor",
+      "CIVIL": "Civil Engineering",
+      "CHEMICAL": "Chemical Engineering",
+      "COMPUTER_SCIENCE": "Computer Science",
+      "CYBERSECURITY": "Cybersecurity",
+      "DIGITAL_HUMANITIES": "Digital Humanities",
+      "ELECTRICAL": "Electrical Engineering",
+      "ENERGY": "Energy Engineering",
+      "ARTIFICIAL_INTELLIGENCE": "Artificial Intelligence (ir.)",
+      "MATERIALS": "Materials Engineering",
+      "NANO": "Nano engineering",
+      "URBANISM": "Urbanism Landscape and Planning",
+      "MATHEMATICAL": "Mathematical Engineering",
+      "MECHANICAL": "Mechanical Engineering"
+    }
   },
   "admin": {
     "title": "Admin",
     "dashboard": "Dashboard",
-    "pages": "Pages",
-    "header": "Header",
+    "content": "Content",
     "calendar": "Calendar",
     "users": "Users",
-    "groups": "Groups",
+    "groups": "Posts",
     "albums": "Albums",
     "media": "Media",
     "pocs": "POCs",
     "partners": "Partners",
     "home": "Homepage",
     "dashboardTiles": "Dashboard tiles",
+    "shortlinks": "Short links",
+    "shift": "Shifts",
+    "theokot": "Theokot",
+    "mailinglists": "Mailing lists",
+    "it": "IT",
     "create": "New",
     "save": "Save",
     "delete": "Delete",
@@ -205,10 +292,30 @@
     "back": "Back",
     "noAccess": "No access"
   },
+  "confirmStudy": {
+    "title": "Are your studies still up to date?",
+    "intro": "At the start of every academic year we ask you to confirm what you are studying. That keeps our mailing lists accurate, so you only get emails that are relevant to you.",
+    "unchangedHint": "Nothing changed? Just click confirm.",
+    "submit": "Confirm"
+  },
+  "mailinglists": {
+    "title": "Mailing lists",
+    "intro": "Download the members who opted in to each category in their account. The columns are firstname, lastname and email; that address is always the member's preferred one.",
+    "allStudents": "All students",
+    "allStudentsHint": "everyone, no opt-in",
+    "careerHint": "ZIP with the breakdown per year of study and per programme",
+    "member": "member",
+    "members": "members",
+    "downloadCsv": "Download CSV",
+    "downloadZip": "Download ZIP"
+  },
   "common": {
     "loading": "Loading...",
     "yes": "Yes",
-    "no": "No"
+    "no": "No",
+    "saving": "Saving...",
+    "saved": "Saved",
+    "saveError": "Something went wrong while saving."
   },
   "info": {
     "kicker": "VTK · KU Leuven",
@@ -272,5 +379,68 @@
         "body": "We may update this privacy statement when the service changes. The date at the top shows when we last updated the text."
       }
     ]
+  },
+  "shift": {
+    "shifts": "Shifts",
+    "available": "Available shifts",
+    "registered": "My shifts",
+    "columns": {
+      "shift": "Shift",
+      "date": "Date",
+      "time": "Time",
+      "where": "Location",
+      "action": "Action"
+    },
+    "filter": {
+      "post": "Group",
+      "allPosts": "All groups",
+      "from": "From",
+      "sortAsc": "↑ Ascending",
+      "sortDesc": "↓ Descending"
+    },
+    "register": "Register",
+    "unregister": "Unregister",
+    "week": {
+      "prev": "← Previous",
+      "today": "Today",
+      "next": "Next →",
+      "startDate": "Start date"
+    },
+    "emptyAvailable": "There are no available shifts in this period.",
+    "emptyRegistered": "You are not registered for any shift yet.",
+    "detail": {
+      "start": "Start",
+      "end": "End",
+      "location": "Location",
+      "post": "Group",
+      "reward": "Reward",
+      "spots": "Spots",
+      "description": "Description"
+    },
+    "toast": {
+      "registered": "You are registered for this shift.",
+      "unregistered": "You are unregistered from this shift."
+    },
+    "error": {
+      "full": "This shift is full.",
+      "alreadyRegistered": "You are already registered for this shift.",
+      "overlap": "You are already registered for an overlapping shift.",
+      "overlapNamed": "You are already registered for an overlapping shift: {name}.",
+      "notFound": "This shift no longer exists.",
+      "registerFailed": "Registration failed. Please try again later.",
+      "notRegistered": "You were not registered for this shift.",
+      "unregisterFailed": "Unregistration failed. Please try again later.",
+      "tooLateToUnregister": "You can no longer unregister: less than 24 hours before the start. Ask an admin to remove you."
+    },
+    "history": {
+      "title": "My shift history",
+      "link": "My history",
+      "back": "Back to shifts",
+      "total": "Total shifts",
+      "post": "Group",
+      "count": "Count",
+      "noPost": "No group",
+      "empty": "You have not done any shifts yet."
+    }
   }
 }
