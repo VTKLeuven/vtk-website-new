@@ -142,10 +142,12 @@ async function main() {
   // Posten kennen rechten niet meer direct toe: ze verlenen ROLLEN aan hun leden
   // (GroupRole, kind DEFAULT = elk lid). De geseede rolset:
   //   - admin (alle rechten, systeemrol)                 -> IT + Groep 5
-  //   - praesidium (calendar.create + photos.upload)     -> elke post
+  //   - praesidium (calendar.create + photos.upload +    -> elke post
+  //       tickets.create)
   //   - werkgroep, medewerker                            -> beschikbaar, nog niet toegekend
   //   - theokot (theokot.manage + theokot.pickup)        -> Theokot
   //   - één rol per post, met de postnaam                -> die post zelf
+  //       (Communicatie krijgt meteen media.manage)
   // Alles als DEFAULT, zodat elk lid van de post de rol krijgt. Rechten voor de
   // lege rollen (werkgroep, medewerker, per-post) stel je in via /admin/roles.
 
@@ -204,10 +206,10 @@ async function main() {
     "Praesidium",
     "Praesidium",
     1,
-    "Basisrol voor elk praesidiumlid: evenementen voor de eigen groep aanmaken en foto's uploaden.",
-    "Base role for every praesidium member: create events for the own group and upload photos.",
+    "Basisrol voor elk praesidiumlid: evenementen (incl. ticketevents) voor de eigen groep aanmaken en foto's uploaden.",
+    "Base role for every praesidium member: create events (incl. ticket events) for the own group and upload photos.",
   );
-  await setRolePermissions(praesidiumRole.id, ["calendar.create", "photos.upload"]);
+  await setRolePermissions(praesidiumRole.id, ["calendar.create", "photos.upload", "tickets.create"]);
   for (const g of GROUP_SEEDS) {
     await grantRoleToGroup(g.code, praesidiumRole.id, "DEFAULT");
   }
@@ -242,8 +244,13 @@ async function main() {
   await setRolePermissions(theokotRole.id, ["theokot.manage", "theokot.pickup"]);
   await grantRoleToGroup("THEOKOT", theokotRole.id, "DEFAULT");
 
-  // Eén rol per post, met de postnaam, toegekend aan die post zelf (elk lid). Nog
-  // zonder rechten: een container per post om er later rechten aan te hangen.
+  // Eén rol per post, met de postnaam, toegekend aan die post zelf (elk lid).
+  // Meestal een lege container om er later rechten aan te hangen; enkele posten
+  // krijgen meteen hun vaste, postspecifieke recht(en) mee (zie postRolePerms).
+  const postRolePerms: Record<string, string[]> = {
+    // Communicatie beheert de publieke mediapagina (magazines, promovideo's, albums).
+    COMMUNICATIE: ["media.manage"],
+  };
   for (const g of GROUP_SEEDS) {
     const postRole = await upsertRole(
       `post-${g.code.toLowerCase()}`,
@@ -253,6 +260,8 @@ async function main() {
       `Rol voor de post ${g.nameNl}.`,
       `Role for the ${g.nameEn} post.`,
     );
+    const perms = postRolePerms[g.code];
+    if (perms) await setRolePermissions(postRole.id, perms);
     await grantRoleToGroup(g.code, postRole.id, "DEFAULT");
   }
 

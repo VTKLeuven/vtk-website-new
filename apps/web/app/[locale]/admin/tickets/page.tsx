@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { prisma } from "@vtk/db";
+import { currentWorkingYear } from "@vtk/auth";
 import {
   ArrowRight,
   CalendarClock,
@@ -48,13 +49,22 @@ export default async function TicketAdminOverview({
   const session = await requireSession();
   const canManageAll = await hasLiveTicketManageAll(session.user.id, session.user.isSuperAdmin);
   const memberships = await prisma.groupMembership.findMany({
-    where: { userId: session.user.id },
+    where: { userId: session.user.id, year: currentWorkingYear() },
     select: {
       groupId: true,
       role: true,
       group: {
         select: {
-          permissions: { select: { permission: { select: { code: true } } } },
+          // Posten kennen rechten toe via rollen (GroupRole -> Role -> permissions).
+          roleGrants: {
+            select: {
+              role: {
+                select: {
+                  permissions: { select: { permission: { select: { code: true } } } },
+                },
+              },
+            },
+          },
         },
       },
     },
@@ -68,7 +78,9 @@ export default async function TicketAdminOverview({
     memberships.some(
       (membership) =>
         membership.role === "LEAD" &&
-        membership.group.permissions.some((entry) => entry.permission.code === "tickets.create")
+        membership.group.roleGrants.some((grant) =>
+          grant.role.permissions.some((entry) => entry.permission.code === "tickets.create")
+        )
     );
 
   const events = await prisma.ticketEvent.findMany({
