@@ -22,8 +22,6 @@
 .env.*
 **/.env
 **/.env.*
-!.env.example
-!**/.env.example
 .claude
 
 # Logs & OS cruft
@@ -36,9 +34,4 @@
 .idea
 
 # Docker/infra artifacts not needed for the app build
-infra/immich/.env
-infra/immich/data
-infra/immich/seed/photos
-infra/immich/seed/state.json
-infra/nginx/letsencrypt
-infra/nginx/www
+infra/immich/

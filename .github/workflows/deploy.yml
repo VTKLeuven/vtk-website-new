@@ -91,6 +91,7 @@ jobs:
             git fetch --all &&
             git reset --hard origin/main &&
 
-            # Build and restart Docker stack (compose file lives under infra/)
-            docker compose -f infra/docker-compose.yml up -d --build
+            # Validate, build, restart, and remove services deleted from Compose.
+            docker compose -f infra/docker-compose.yml config --quiet &&
+            docker compose -f infra/docker-compose.yml up -d --build --remove-orphans
           "
