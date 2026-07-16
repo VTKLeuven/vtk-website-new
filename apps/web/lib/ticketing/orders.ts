@@ -164,7 +164,6 @@ export async function createTicketCheckout(
         return [];
       }
       return [{
-          eventId: event.id,
           questionId: question.id,
           questionCode: question.code,
           questionLabel: question.labelNl,
