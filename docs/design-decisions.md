@@ -299,9 +299,11 @@ SSO. Concrete implementatie: hook in `packages/auth/src/auth.ts`, gate in
 - **Een post verleent rollen, geen losse rechten.** Het oude "recht per
   post"-raster is vervangen door rol-grants (`GroupRole`): een post kent rollen toe
   aan elk lid (`DEFAULT`) of enkel aan de verantwoordelijke (`LEADER`). De seed legt
-  de baseline: **basis-werkgroep** (evenementen voor eigen groep + foto's uploaden)
-  op elke post, de **admin**-rol op IT en Groep 5, en een **theokot**-rol op de post
-  Theokot; alles als `DEFAULT` (elk lid), wat het vroegere gedrag exact behoudt.
+  de rolset: **admin** op IT en Groep 5; **praesidium** (evenementen voor eigen groep +
+  foto's uploaden) op elke post; **theokot** op de post Theokot; en **één rol per post**
+  (met de postnaam, leeg) toegekend aan die post zelf. **werkgroep** en **medewerker**
+  bestaan als toewijsbare rollen maar hangen nog aan geen enkele post. Alles als
+  `DEFAULT` (elk lid). De lege rollen vul je met rechten via `/admin/roles`.
 
 ### Mailinglijsten (opt-in)
 

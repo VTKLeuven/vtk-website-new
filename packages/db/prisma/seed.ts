@@ -138,14 +138,16 @@ async function main() {
     });
   }
 
-  console.log("Seeding post role grants...");
+  console.log("Seeding roles and post role grants...");
   // Posten kennen rechten niet meer direct toe: ze verlenen ROLLEN aan hun leden
-  // (GroupRole, kind DEFAULT = elk lid). We herbouwen hier de baseline die vroeger
-  // via GroupPermission liep, nu als rollen:
-  //   - basis-werkgroep (calendar.create + photos.upload) -> elke post
-  //   - admin (alle rechten, bestaande systeemrol)         -> IT + Groep 5
-  //   - theokot (theokot.manage + theokot.pickup)          -> Theokot
-  // Alles als DEFAULT, zodat elk lid van de post de rol krijgt (zoals voorheen).
+  // (GroupRole, kind DEFAULT = elk lid). De geseede rolset:
+  //   - admin (alle rechten, systeemrol)                 -> IT + Groep 5
+  //   - praesidium (calendar.create + photos.upload)     -> elke post
+  //   - werkgroep, medewerker                            -> beschikbaar, nog niet toegekend
+  //   - theokot (theokot.manage + theokot.pickup)        -> Theokot
+  //   - één rol per post, met de postnaam                -> die post zelf
+  // Alles als DEFAULT, zodat elk lid van de post de rol krijgt. Rechten voor de
+  // lege rollen (werkgroep, medewerker, per-post) stel je in via /admin/roles.
 
   /** Zet (idempotent) de rechten van een rol op exact `permCodes`. */
   async function setRolePermissions(roleId: string, permCodes: string[]) {
@@ -170,44 +172,89 @@ async function main() {
     });
   }
 
-  // basis-werkgroep: elke post kan evenementen voor de eigen groep aanmaken en foto's uploaden.
-  const baseRole = await prisma.role.upsert({
-    where: { code: "basis-werkgroep" },
-    update: { nameNl: "Basis werkgroep", nameEn: "Base work group" },
-    create: {
-      code: "basis-werkgroep",
-      nameNl: "Basis werkgroep",
-      nameEn: "Base work group",
-      order: 1,
-      descriptionNl: "Evenementen aanmaken voor de eigen groep en foto's uploaden.",
-      descriptionEn: "Create events for the own group and upload photos.",
-    },
-  });
-  await setRolePermissions(baseRole.id, ["calendar.create", "photos.upload"]);
-  for (const g of GROUP_SEEDS) {
-    await grantRoleToGroup(g.code, baseRole.id, "DEFAULT");
+  /** Maakt/behoudt een rol. `update` raakt enkel de labels aan, zodat GUI-edits
+   *  aan volgorde/beschrijving/kleur bij een herseed niet teruggedraaid worden. */
+  async function upsertRole(
+    code: string,
+    nameNl: string,
+    nameEn: string,
+    order: number,
+    descriptionNl: string,
+    descriptionEn: string,
+  ) {
+    return prisma.role.upsert({
+      where: { code },
+      update: { nameNl, nameEn },
+      create: { code, nameNl, nameEn, order, descriptionNl, descriptionEn },
+    });
   }
+
+  // basis-werkgroep is vervangen door praesidium; verwijder de oude rol (en zo via
+  // cascade haar grants) op bestaande DB's. Idempotent: no-op als ze al weg is.
+  await prisma.role.deleteMany({ where: { code: "basis-werkgroep" } });
 
   // admin (systeemrol, alle rechten) -> IT en Groep 5, elk lid.
   for (const code of ["IT", "GROEP5"]) {
     await grantRoleToGroup(code, adminRole.id, "DEFAULT");
   }
 
+  // praesidium: de basisrol voor elk praesidiumlid, op elke post.
+  const praesidiumRole = await upsertRole(
+    "praesidium",
+    "Praesidium",
+    "Praesidium",
+    1,
+    "Basisrol voor elk praesidiumlid: evenementen voor de eigen groep aanmaken en foto's uploaden.",
+    "Base role for every praesidium member: create events for the own group and upload photos.",
+  );
+  await setRolePermissions(praesidiumRole.id, ["calendar.create", "photos.upload"]);
+  for (const g of GROUP_SEEDS) {
+    await grantRoleToGroup(g.code, praesidiumRole.id, "DEFAULT");
+  }
+
+  // werkgroep en medewerker: beschikbare rollen, nog zonder rechten of grants.
+  await upsertRole(
+    "werkgroep",
+    "Werkgroep",
+    "Work group",
+    2,
+    "Rol voor werkgroepleden. Rechten stel je in via het rollenbeheer.",
+    "Role for work group members. Set permissions in the roles admin.",
+  );
+  await upsertRole(
+    "medewerker",
+    "Medewerker",
+    "Collaborator",
+    3,
+    "Rol voor medewerkers die een werkgroep helpen. Rechten stel je in via het rollenbeheer.",
+    "Role for collaborators helping a work group. Set permissions in the roles admin.",
+  );
+
   // theokot: het broodjes-reservatiesysteem beheren en de afhaalbalie bedienen.
-  const theokotRole = await prisma.role.upsert({
-    where: { code: "theokot" },
-    update: { nameNl: "Theokot", nameEn: "Theokot" },
-    create: {
-      code: "theokot",
-      nameNl: "Theokot",
-      nameEn: "Theokot",
-      order: 2,
-      descriptionNl: "Theokot beheren (sessies, aanbod, bans, instellingen) en de afhaalbalie bedienen.",
-      descriptionEn: "Manage Theokot (sessions, offering, bans, settings) and operate the pickup counter.",
-    },
-  });
+  const theokotRole = await upsertRole(
+    "theokot",
+    "Theokot",
+    "Theokot",
+    4,
+    "Theokot beheren (sessies, aanbod, bans, instellingen) en de afhaalbalie bedienen.",
+    "Manage Theokot (sessions, offering, bans, settings) and operate the pickup counter.",
+  );
   await setRolePermissions(theokotRole.id, ["theokot.manage", "theokot.pickup"]);
   await grantRoleToGroup("THEOKOT", theokotRole.id, "DEFAULT");
+
+  // Eén rol per post, met de postnaam, toegekend aan die post zelf (elk lid). Nog
+  // zonder rechten: een container per post om er later rechten aan te hangen.
+  for (const g of GROUP_SEEDS) {
+    const postRole = await upsertRole(
+      `post-${g.code.toLowerCase()}`,
+      g.nameNl,
+      g.nameEn,
+      10 + g.orderInPraesidium,
+      `Rol voor de post ${g.nameNl}.`,
+      `Role for the ${g.nameEn} post.`,
+    );
+    await grantRoleToGroup(g.code, postRole.id, "DEFAULT");
+  }
 
   console.log("Seeding default homepage settings...");
   const defaultSettings: Array<{

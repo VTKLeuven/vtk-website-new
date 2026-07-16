@@ -140,16 +140,22 @@ a full user load, so they scale.
 
 ## Seeded baseline
 
-`packages/db/prisma/seed.ts` seeds three roles and wires the posts to them (all grants `DEFAULT`, so
+`packages/db/prisma/seed.ts` seeds the role set and wires posts to them (all grants `DEFAULT`, so
 every member of the post gets the role):
 
 | Role | Permissions | Granted to (post → DEFAULT) |
 |------|-------------|-----------------------------|
 | `admin` (system) | all | IT, Groep 5 |
-| `basis-werkgroep` | `calendar.create`, `photos.upload` | every post |
+| `praesidium` | `calendar.create`, `photos.upload` | every post |
+| `werkgroep` | none (fill in the GUI) | — |
+| `medewerker` | none (fill in the GUI) | — |
 | `theokot` | `theokot.manage`, `theokot.pickup` | Theokot |
+| `post-<code>` (one per post) | none (container to fill in the GUI) | its own post |
 
-Your seeded admin account is a member of IT (which grants `admin`), so it can see every admin screen.
+The per-post roles (`post-it`, `post-cursusdienst`, …) are empty containers so you can hang
+post-specific permissions off each werkgroep over time. `werkgroep`/`medewerker` are seeded as
+available roles but not auto-assigned to any post. Your seeded admin account is a member of IT
+(which grants `admin`), so it can see every admin screen.
 
 ## Operational notes
 
