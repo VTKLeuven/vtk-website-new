@@ -148,8 +148,9 @@ the design language into the application instead of copying mockup content.
   disappears. See `docs/design-decisions.md` for the section ordering rationale.
 - Photography: content cards open with a real photo under a navy scrim, never a
   decorative illustration. Aanbod cards carry a photo header (light 115deg
-  scrim); the featured card becomes a mini-hero with the photo as full
-  background under the hero's 103deg scrim. Werkingen without a photo fall back
+  scrim) and are uniform: every card in the grid gets the same photo-header +
+  white-body treatment, no card is singled out as a featured/mini-hero (that was
+  reviewed and removed). Werkingen without a photo fall back
   to the striped placeholder pattern (`repeating-linear-gradient` of
   `--paper-2`/`--paper`) so missing images stay visible. Admins upload the photo
   per werking via /admin/home (`HeaderTab.imageKey`); the `AANBOD_PHOTOS` map
@@ -172,8 +173,7 @@ the design language into the application instead of copying mockup content.
   the primary button inverts to a `--surface` fill with ink text.
 - Cards: `--surface` (white) panels with thin `--line` borders on the cool
   `--paper` ground, small elevation at most, and restrained hover movement. No
-  flat navy/dark card fills; a featured card is marked with a yellow accent rail
-  (or, with a real photo available, the photo mini-hero treatment).
+  flat navy/dark card fills; a featured card is marked with a yellow accent rail.
 - Footer: a dark `--navy` band on every page (light text, yellow serif accent,
   yellow brand badge), the same navy as the header; it bookends the dark hero,
   so do not lighten it per page.

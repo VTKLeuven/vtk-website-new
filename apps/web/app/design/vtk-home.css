@@ -571,54 +571,6 @@
   content: none;
 }
 
-/* De featured kaart wordt een mini-hero: de foto vult de hele kaart onder de
-   103deg-scrim van de hero, met lichte tekst en de gele tag-pill erop. Zonder
-   foto blijft de gewone feat-stijl (gele accentrail) gelden. */
-.vtk-design .acard.acard-photo {
-  background: var(--navy);
-  border-color: rgba(255, 255, 255, 0.14);
-  box-shadow: none;
-  min-height: 280px;
-}
-
-.vtk-design .acard-photo .acard-bg {
-  position: absolute;
-  inset: 0;
-}
-
-.vtk-design .acard-photo .acard-bg img {
-  object-fit: cover;
-}
-
-.vtk-design .acard-photo .acard-bg::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(
-    103deg,
-    rgba(9, 12, 24, 0.88) 0%,
-    rgba(10, 15, 31, 0.72) 45%,
-    rgba(14, 26, 54, 0.45) 100%
-  );
-}
-
-.vtk-design .acard-photo .acard-body,
-.vtk-design .acard-photo .cta {
-  position: relative;
-}
-
-.vtk-design .acard-photo h3 {
-  color: var(--paper);
-}
-
-.vtk-design .acard-photo p {
-  color: rgba(250, 250, 247, 0.85);
-}
-
-.vtk-design .acard-photo .cta {
-  color: var(--paper);
-}
-
 .vtk-design .career {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
@@ -988,14 +940,17 @@
   letter-spacing: -0.01em;
 }
 
-/* Evenementen en POC's delen de lichtblauwe band. */
+/* Evenementen en POC's delen de lichtblauwe band. De lichtblauwe band leest als
+   een lichter tussenblok, geen groot statement zoals de navy banden: bij één rij
+   kaarten voelt zware padding als lege ruimte, dus houden we die hier compacter
+   dan bij de aftermovie-/career-band. */
 .vtk-design .events-band,
 .vtk-design .poc-band {
   position: relative;
   z-index: 0;
   margin-top: clamp(84px, 10vw, 120px);
-  padding-top: clamp(56px, 7vw, 88px);
-  padding-bottom: clamp(64px, 8vw, 96px);
+  padding-top: clamp(36px, 4vw, 52px);
+  padding-bottom: clamp(40px, 4.5vw, 58px);
 }
 
 .vtk-design .events-band::before,

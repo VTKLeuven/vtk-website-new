@@ -460,44 +460,26 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
           </div>
         </div>
         <div className="aanbod">
-          {aanbodCards.slice(0, 6).map((card, index) => {
-            const feat = index === 0;
+          {aanbodCards.slice(0, 6).map((card) => {
             const photo = card.photo;
-            // De featured kaart wordt een mini-hero met de foto als volledige
-            // achtergrond; gewone kaarten krijgen een fotokop onder navy scrim.
-            const photoCard = feat && Boolean(photo);
+            // Alle aanbod-kaarten zijn identiek: een fotokop onder navy scrim met
+            // witte body. Geen enkele kaart krijgt een aparte featured-stijl.
             return (
-              <Link
-                key={card.href}
-                href={card.href}
-                className={`acard${feat ? " feat" : ""}${photoCard ? " acard-photo" : ""}`}
-              >
-                {photoCard && photo ? (
-                  <span className="acard-bg" aria-hidden="true">
-                    <Image
-                      src={photo}
-                      alt=""
-                      fill
-                      sizes="(max-width: 640px) 100vw, (max-width: 980px) 50vw, 33vw"
-                    />
-                  </span>
-                ) : null}
+              <Link key={card.href} href={card.href} className="acard">
                 <div className="acard-body">
-                  {photoCard ? null : (
-                    <span
-                      className={`acard-media${photo ? "" : " acard-media-ph"}`}
-                      aria-hidden="true"
-                    >
-                      {photo ? (
-                        <Image
-                          src={photo}
-                          alt=""
-                          fill
-                          sizes="(max-width: 640px) 100vw, (max-width: 980px) 50vw, 33vw"
-                        />
-                      ) : null}
-                    </span>
-                  )}
+                  <span
+                    className={`acard-media${photo ? "" : " acard-media-ph"}`}
+                    aria-hidden="true"
+                  >
+                    {photo ? (
+                      <Image
+                        src={photo}
+                        alt=""
+                        fill
+                        sizes="(max-width: 640px) 100vw, (max-width: 980px) 50vw, 33vw"
+                      />
+                    ) : null}
+                  </span>
                   <div className="tag">→ {pick(card.labelNl, card.labelEn, locale)}</div>
                   <h3>{pick(card.titleNl, card.titleEn, locale)}</h3>
                   <p>{pick(card.bodyNl, card.bodyEn, locale)}</p>
@@ -514,7 +496,7 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
           <div className="sec-head">
             <h2>{nl ? "Aftermovies." : "Aftermovies."}</h2>
             <div className="meta">
-              {nl ? "Beeld van het voorbije jaar" : "Footage from the past year"} ·{" "}
+              {nl ? "Beelden van de afgelopen jaren" : "Footage from past years"} ·{" "}
               <Link href={`${base}/media`}>{nl ? "alle media" : "all media"}</Link>
             </div>
           </div>
