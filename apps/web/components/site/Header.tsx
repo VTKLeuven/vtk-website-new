@@ -94,17 +94,13 @@ export async function Header({ locale }: { locale: Locale }) {
       <div className="nav-inner">
         <Link href={`${base}/`} className="brand" aria-label="VTK — home">
           <Image
-            src="/VTK.png"
+            src="/vtk-logo.png"
             alt=""
-            width={320}
-            height={96}
+            width={1152}
+            height={650}
             className="brand-logo-img"
             priority
           />
-          <div className="brand-text">
-            <div className="brand-name">VTK</div>
-            <div className="brand-sub">EST. 1920</div>
-          </div>
         </Link>
 
         <EditorialNavLinks
