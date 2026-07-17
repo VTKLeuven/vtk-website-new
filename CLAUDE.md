@@ -129,15 +129,23 @@ the design language into the application instead of copying mockup content.
   transparently over this hero and turns solid once scrolled past it (desktop;
   `components/site/SiteHeaderShell`).
 - Band rhythm: the hero's dark deliberately returns down the page as full-width
-  bands (openingsuren and career both on `--navy`, via the full-bleed
-  `::before` pattern) and the site-wide dark footer closes the bookend. Header,
-  bands and footer share the same `--navy` so the dark chrome reads as one
-  system. The
-  openingsuren band butts directly against the dark zone's crisp seam with a
-  compact heading; later bands sit in the light flow with normal section
-  spacing. On a band, panels are dark glass (`rgba(255,255,255,.06)` fill,
-  `.14` white border), headings go `--paper`, muted text uses
-  `--on-dark-muted`, and the primary button inverts like on the hero.
+  navy bands and the site-wide dark footer closes the bookend. Header, bands and
+  footer share the same `--navy` so the dark chrome reads as one system. The
+  lower half of the page alternates navy and light-blue (`--paper-2`) bands:
+  **Wat we doen** (paper) → **Aftermovies** (navy) → **Opkomende evenementen**
+  (`--paper-2`) → **VTK Career** (navy) → **Jouw POC's** (`--paper-2`) →
+  **Hoofdpartners** (paper). The navy bands (openingsuren, aftermovies, career)
+  carry the full-bleed `::before` navy fill plus the shared `::after` technical
+  pattern, each with its own crop of `technisch-pattern.svg` so no two bands show
+  the same wallpaper. The openingsuren band butts directly against the dark
+  zone's crisp seam with a compact heading; later bands sit in the light flow
+  with normal section spacing. On a navy band, panels are dark glass
+  (`rgba(255,255,255,.06)` fill, `.14` white border), headings go `--paper`,
+  muted text uses `--on-dark-muted`, and the primary button inverts like on the
+  hero. The **Jouw POC's** band is personal (only rendered for a logged-in member
+  with study programmes) and therefore sits *after* Career, never between two
+  navy bands: were it between them, the two navy bands would collide the moment it
+  disappears. See `docs/design-decisions.md` for the section ordering rationale.
 - Photography: content cards open with a real photo under a navy scrim, never a
   decorative illustration. Aanbod cards carry a photo header (light 115deg
   scrim); the featured card becomes a mini-hero with the photo as full

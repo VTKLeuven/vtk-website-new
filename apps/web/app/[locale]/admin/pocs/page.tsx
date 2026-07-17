@@ -5,6 +5,7 @@ import { requirePermission } from "@/lib/session";
 import { getDictionary, type Locale } from "@vtk/i18n";
 import { publicUrl } from "@/lib/storage";
 import { saveErrorMessages } from "@/lib/saveMessages";
+import { STUDY_PROGRAMMES } from "@/lib/profile";
 import { PocsTable, type PocRow } from "./PocsTable";
 
 export default async function AdminPocs({
@@ -52,10 +53,18 @@ export default async function AdminPocs({
       descriptionNl: poc.descriptionNl ?? "",
       descriptionEn: poc.descriptionEn ?? "",
       order: poc.order,
+      studyProgrammes: poc.studyProgrammes,
       reps,
       searchText,
     };
   });
+
+  // De richtingen komen van de server mee: `PocsTable` is een client component
+  // en hoeft zo geen woordenboek te bundelen.
+  const programmeOptions = STUDY_PROGRAMMES.map((value) => ({
+    value,
+    label: dict.onboarding.programmes[value],
+  }));
 
   const saveLabels = {
     submitLabel: dict.admin.save,
@@ -81,7 +90,13 @@ export default async function AdminPocs({
         </p>
       </div>
 
-      <PocsTable pocs={pocRows} locale={nl ? "nl" : "en"} saveLabels={saveLabels} createLabels={createLabels} />
+      <PocsTable
+        pocs={pocRows}
+        locale={nl ? "nl" : "en"}
+        saveLabels={saveLabels}
+        createLabels={createLabels}
+        programmeOptions={programmeOptions}
+      />
     </div>
   );
 }

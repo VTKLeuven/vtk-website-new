@@ -4,8 +4,12 @@ import { prisma } from "@vtk/db";
 import { pick, type Locale } from "@vtk/i18n";
 import { getVisibleHeaderTabsForNav } from "@/lib/headerTabs";
 import { AANBOD_PHOTOS } from "@/lib/aanbodPhotos";
+import { getMediaContent } from "@/lib/media-content";
+import { videoEmbed } from "@/lib/videoEmbed";
+import { getCurrentSession } from "@/lib/session";
 import { publicUrl } from "@/lib/storage";
 import { PartnerLogo } from "@/components/site/PartnerLogo";
+import { AftermovieGrid, type AftermovieGridItem } from "./AftermovieGrid";
 import {
   dutchDayNameForDate,
   entryForDate,
@@ -56,7 +60,7 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
   const now = new Date();
   const nl = locale === "nl";
 
-  const [settings, upcomingEvents, tabs, partners] = await Promise.all([
+  const [settings, upcomingEvents, tabs, partners, media, session] = await Promise.all([
     prisma.setting.findMany({
       where: {
         key: {
@@ -81,7 +85,62 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
       orderBy: [{ order: "asc" }, { name: "asc" }],
       take: 12,
     }),
+    getMediaContent(),
+    // De POC-sectie is persoonlijk, dus de homepage leest de sessie. Dat maakt
+    // de pagina dynamisch: ze wordt per bezoeker gerenderd in plaats van
+    // gecachet. De rest van de pagina deed al een DB-lezing per render, dus dat
+    // blijft één ronde extra en geen nieuw soort werk.
+    getCurrentSession(),
   ]);
+
+  // Aftermovies: `media.aftermovies` is dezelfde instelling als op /media, te
+  // beheren via /admin/home. Enkel echte embeds tonen; een losse mp4 of een
+  // onherkenbare link hoort in het rooster niet thuis en valt hier weg.
+  const aftermovies: AftermovieGridItem[] = media.videos
+    .flatMap((video) => {
+      const embed = videoEmbed(video.url, video.posterUrl);
+      if (!embed) return [];
+      return [{
+        id: video.id,
+        title: pick(video.titleNl, video.titleEn ?? video.titleNl, locale),
+        embedUrl: embed.embedUrl,
+        externalUrl: embed.externalUrl,
+        posterUrl: embed.posterUrl,
+      }];
+    })
+    .slice(0, 6);
+
+  // Opkomende evenementen: 2 rijen van 3. Zijn er minder, dan krimpt het
+  // rooster gewoon mee (zie `.ev-grid`), zonder lege plaatsen op te vullen.
+  const eventCards = upcomingEvents.slice(0, 6);
+
+  // POC's van jouw richtingen. Zonder sessie of zonder richtingen valt de hele
+  // sectie weg: een lijst van alle POC's is hier niet wat gevraagd wordt.
+  //
+  // De richtingen komen uit de database en niet uit de sessie: `AuthUser` draagt
+  // ze niet, en ze daar bij zetten zou elke sessie-payload zwaarder maken voor
+  // één sectie op één pagina. Deze lezing gebeurt enkel voor wie ingelogd is.
+  const myProgrammes = session
+    ? (
+        await prisma.user.findUnique({
+          where: { id: session.user.id },
+          select: { studyProgrammes: true },
+        })
+      )?.studyProgrammes ?? []
+    : [];
+
+  const myPocs =
+    myProgrammes.length > 0
+      ? await prisma.poc.findMany({
+          where: { studyProgrammes: { hasSome: myProgrammes } },
+          orderBy: { order: "asc" },
+          include: {
+            representatives: { orderBy: { order: "asc" }, include: { user: true } },
+          },
+        })
+      : [];
+  // Een POC zonder vertegenwoordigers levert een lege kaart op; die tonen we niet.
+  const pocsWithPeople = myPocs.filter((poc) => poc.representatives.length > 0);
 
   const map = new Map(settings.map((s) => [s.key, s.value as unknown]));
   const cursus = map.get("home.openingHours.cursusdienst") as OpeningHoursSetting | undefined;
@@ -450,6 +509,71 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
         </div>
       </section>
 
+      {aftermovies.length > 0 && (
+        <section className="section aftermovie-band">
+          <div className="sec-head">
+            <h2>{nl ? "Aftermovies." : "Aftermovies."}</h2>
+            <div className="meta">
+              {nl ? "Beeld van het voorbije jaar" : "Footage from the past year"} ·{" "}
+              <Link href={`${base}/media`}>{nl ? "alle media" : "all media"}</Link>
+            </div>
+          </div>
+          <AftermovieGrid
+            items={aftermovies}
+            playLabel={nl ? "Video afspelen" : "Play video"}
+          />
+        </section>
+      )}
+
+      {eventCards.length > 0 && (
+        <section className="section events-band">
+          <div className="sec-head">
+            <h2>{nl ? "Opkomende evenementen." : "Upcoming events."}</h2>
+            <div className="meta">
+              {eventCards.length} {nl ? "gepland" : "planned"} ·{" "}
+              <Link href={`${base}/kalender`}>{nl ? "volledige kalender" : "full calendar"}</Link>
+            </div>
+          </div>
+          <div className="ev-grid">
+            {eventCards.map((event) => {
+              const start = new Date(event.start);
+              const photo = publicUrl(event.imageKey) ?? "/default-event.jpg";
+              return (
+                <Link key={event.id} href={`${base}/kalender/${event.id}`} className="evcard">
+                  <span className="evcard-media" aria-hidden="true">
+                    <Image
+                      src={photo}
+                      alt=""
+                      fill
+                      sizes="(max-width: 640px) 100vw, (max-width: 980px) 50vw, 33vw"
+                    />
+                  </span>
+                  <div className="evcard-body">
+                    <div className="evcard-when">
+                      <span className="num">{String(start.getDate()).padStart(2, "0")}</span>
+                      <span className="mon">
+                        {start.toLocaleDateString(locale === "nl" ? "nl-BE" : "en-GB", {
+                          month: "short",
+                        })}
+                      </span>
+                      <span className="time">{event.allDay
+                        ? nl ? "Hele dag" : "All day"
+                        : formatTime(start, locale)}</span>
+                    </div>
+                    <h3>{pick(event.titleNl, event.titleEn ?? event.titleNl, locale)}</h3>
+                    <p>
+                      {[event.location, pick(event.group.nameNl, event.group.nameEn, locale)]
+                        .filter(Boolean)
+                        .join(" · ")}
+                    </p>
+                  </div>
+                </Link>
+              );
+            })}
+          </div>
+        </section>
+      )}
+
       <section className="section career-band">
         <div className="sec-head">
           <h2>
@@ -514,6 +638,52 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
           </figure>
         </div>
       </section>
+
+      {pocsWithPeople.length > 0 && (
+        <section className="section poc-band">
+          <div className="sec-head">
+            <h2>{nl ? "Jouw POC's." : "Your POCs."}</h2>
+            <div className="meta">
+              {nl ? "Op basis van je richtingen" : "Based on your programmes"} ·{" "}
+              <Link href={`${base}/pocs`}>{nl ? "alle POC's" : "all POCs"}</Link>
+            </div>
+          </div>
+          <div className="poc-grid">
+            {pocsWithPeople.map((poc) => (
+              <div className="poccard" key={poc.id}>
+                <div className="poccard-head">
+                  <h3>{pick(poc.nameNl, poc.nameEn ?? poc.nameNl, locale)}</h3>
+                  <span className="track">{poc.studyTrack}</span>
+                </div>
+                <ul className="poc-people">
+                  {poc.representatives.map((rep) => {
+                    const avatar = publicUrl(rep.user.avatarKey);
+                    const role = pick(rep.roleNl ?? "", rep.roleEn ?? rep.roleNl ?? "", locale);
+                    return (
+                      <li key={rep.id}>
+                        <span className="poc-face">
+                          {avatar ? (
+                            // Avatars staan achter /api/media; die route streamt uit
+                            // object storage en next/image hoeft er niet tussen.
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img src={avatar} alt="" loading="lazy" />
+                          ) : (
+                            <span className="poc-initial" aria-hidden="true">
+                              {rep.user.name.slice(0, 1).toUpperCase()}
+                            </span>
+                          )}
+                        </span>
+                        <span className="poc-name">{rep.user.name}</span>
+                        {role ? <span className="poc-role">{role}</span> : null}
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
 
       <section className="partners">
         <div className="partners-head">

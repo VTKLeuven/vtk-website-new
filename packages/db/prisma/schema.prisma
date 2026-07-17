@@ -1073,6 +1073,13 @@ model Poc {
   descriptionEn String?
   order         Int     @default(0)
 
+  // Aan welke richtingen deze POC hangt. `studyTrack` blijft de vrije tekst die
+  // op de POC-pagina getoond wordt ("Master Computer Science"); dit is de
+  // machineleesbare koppeling naar `User.studyProgrammes`, zodat de homepage de
+  // POC's van jouw richtingen kan tonen. Meerdere richtingen per POC kan: één
+  // POC bedient soms verschillende opleidingen.
+  studyProgrammes StudyProgramme[] @default([])
+
   representatives PocRepresentative[]
 }
 

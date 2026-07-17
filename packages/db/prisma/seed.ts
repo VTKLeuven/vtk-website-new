@@ -349,18 +349,25 @@ async function main() {
         titleEn: "Aftermovies",
         items: [
           {
-            id: "galabal-aftermovie",
+            id: "rondleiding-campus-arenberg",
             type: "video",
-            url: "https://www.youtube.com/watch?v=WdGqhrVUJog",
-            titleNl: "Galabal aftermovie",
-            titleEn: "Gala aftermovie",
+            url: "https://www.youtube.com/watch?v=SzDa_109lMI",
+            titleNl: "Rondleiding Campus Arenberg 25-26",
+            titleEn: "Campus Arenberg tour 25-26",
           },
           {
-            id: "jobfair-aftermovie",
+            id: "galabal-2025",
             type: "video",
-            url: "https://www.youtube.com/watch?v=9CyqfzXWYME",
-            titleNl: "Jobfair aftermovie",
-            titleEn: "Job fair aftermovie",
+            url: "https://www.youtube.com/watch?v=WdGqhrVUJog",
+            titleNl: "Galabal VTK Leuven 2025",
+            titleEn: "Galabal VTK Leuven 2025",
+          },
+          {
+            id: "24-urenloop-2024",
+            type: "video",
+            url: "https://www.youtube.com/watch?v=AdUriTc6RB4",
+            titleNl: "24 Urenloop Aftermovie 2024",
+            titleEn: "24 Urenloop aftermovie 2024",
           },
         ],
       },
@@ -668,6 +675,7 @@ async function main() {
       nameNl: "Computerwetenschappen",
       nameEn: "Computer Science",
       studyTrack: "Master Computer Science",
+      studyProgrammes: ["COMPUTER_SCIENCE"] as const,
       descriptionNl: "Aanspreekpunt voor major-keuzes, ISP-vragen en feedback over softwarevakken.",
       descriptionEn: "Point of contact for major choices, ISP questions and feedback on software courses.",
       order: 0,
@@ -681,6 +689,7 @@ async function main() {
       nameNl: "Werktuigkunde",
       nameEn: "Mechanical Engineering",
       studyTrack: "Master Mechanical Engineering",
+      studyProgrammes: ["MECHANICAL"] as const,
       descriptionNl: "Voor labo's, projectwerk, uurroosters en opleidingsfeedback.",
       descriptionEn: "For labs, project work, schedules and programme feedback.",
       order: 1,
@@ -693,6 +702,7 @@ async function main() {
       nameNl: "Elektrotechniek",
       nameEn: "Electrical Engineering",
       studyTrack: "Master Electrical Engineering",
+      studyProgrammes: ["ELECTRICAL"] as const,
       descriptionNl: "Bundelt opmerkingen rond practica, examens en communicatie met professoren.",
       descriptionEn: "Collects remarks about practicals, exams and communication with professors.",
       order: 2,
@@ -705,6 +715,7 @@ async function main() {
       nameNl: "Chemische technologie",
       nameEn: "Chemical Engineering",
       studyTrack: "Master Chemical Engineering",
+      studyProgrammes: ["CHEMICAL"] as const,
       descriptionNl: "Contactpunt voor practica, stages en facultaire overlegmomenten.",
       descriptionEn: "Contact point for labs, internships and faculty consultations.",
       order: 3,
@@ -729,8 +740,19 @@ async function main() {
         descriptionNl: poc.descriptionNl,
         descriptionEn: poc.descriptionEn,
         order: poc.order,
+        studyProgrammes: [...poc.studyProgrammes],
       },
     });
+    // `studyProgrammes` is een nieuw veld: POC's die al bestonden hebben nog
+    // geen richtingen, waardoor ze op de homepage bij niemand zouden opduiken.
+    // Een lege lijst betekent hier "nog niet ingevuld", niet "bewust leeg", dus
+    // vullen we de standaard aan zolang niemand ze zelf heeft gezet.
+    if (row.studyProgrammes.length === 0) {
+      await prisma.poc.update({
+        where: { id: row.id },
+        data: { studyProgrammes: [...poc.studyProgrammes] },
+      });
+    }
     for (const rep of poc.representatives) {
       const user = prototypeUserByEmail.get(rep.email);
       if (!user) continue;

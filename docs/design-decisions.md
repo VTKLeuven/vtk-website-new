@@ -313,3 +313,64 @@ SSO. Concrete implementatie: hook in `packages/auth/src/auth.ts`, gate in
 - **Default staat alles uit (opt-in):** een lid vinkt bij registratie expliciet
   aan waarvoor het mails wil. Bewuste keuze i.p.v. opt-out, om te stroken met de
   verwachting dat je zelf kiest waarvoor je ingeschreven wordt.
+
+## Homepage-secties & bandenritme
+
+De homepage is opgebouwd uit volle-breedte banden die bewust van kleur
+afwisselen (zie ook de styling-sectie in `CLAUDE.md`). De volgorde van de
+onderste helft is een ontwerpkeuze, geen toeval:
+
+- **Wat we doen** (paper) → **Aftermovies** (navy + technisch patroon) →
+  **Opkomende evenementen** (lichtblauw) → **VTK Career** (navy) → **Jouw POC's**
+  (lichtblauw) → **Hoofdpartners** (paper).
+- **Waarom POC's ná Career en niet ervoor?** De POC-band is _persoonlijk_: ze
+  verschijnt enkel voor wie ingelogd is én richtingen op zijn profiel heeft. Voor
+  iedereen anders valt ze weg. Stond ze tussen twee navy banden, dan botsten die
+  twee zodra de band verdwijnt (navy tegen navy, geen naad). Als laatste
+  lichtblauwe band vóór de paper-partners klopt het ritme in beide gevallen: valt
+  ze weg, dan volgt Career (navy) gewoon op Partners (paper), precies zoals de
+  pagina eruitzag vóór deze feature.
+
+### Aftermovies op de homepage
+
+- Dezelfde `media.aftermovies`-instelling als de /media-pagina, te beheren via
+  **/admin/home**. De homepage toont er maximaal **zes** van in een 3-koloms
+  rooster (2×3).
+- **Enkel echte embeds** (YouTube/Vimeo) komen in het rooster; een losse mp4 of
+  een niet-herkende link valt weg. De YouTube-herkenning is gedeeld met de
+  /media-speler (`lib/videoEmbed.ts`).
+- **Klik-om-te-laden:** de iframe wordt pas geplaatst na een klik op de poster.
+  Zes YouTube-iframes meteen inladen zou trackers zetten en verkeer kosten op een
+  pagina waar de meeste bezoekers voorbijscrollen; de poster is één afbeelding.
+
+### Opkomende evenementen op de homepage
+
+- Tot **zes** publieke, toekomstige evenementen in een 2×3 rooster, met de foto
+  van het evenement (`CalendarEvent.imageKey`, met `/default-event.jpg` als
+  fallback) op dezelfde manier als de "Wat we doen"-kaarten.
+- **Minder dan zes vult geen lege plaatsen op:** het rooster krimpt mee (1, 2 of
+  3 kaarten op een rij, links uitgelijnd) in plaats van gaten te tonen.
+- Valt weg als er geen enkel toekomstig evenement is.
+
+### POC's per richting (`Poc.studyProgrammes`)
+
+- De homepage toont de POC's van **jouw eigen richtingen**: heb je bv.
+  Elektrotechniek en Computerwetenschappen op je profiel, dan zie je de POC-leden
+  van beide.
+- Dit vereist een machineleesbare koppeling tussen een POC en een richting.
+  `Poc.studyTrack` was vrije tekst ("Master Computer Science") en niet
+  betrouwbaar te matchen op de `StudyProgramme`-enum van een profiel. Daarom
+  heeft `Poc` nu een **`studyProgrammes`-array** (`StudyProgramme[]`), beheerd via
+  een multi-select in **/admin/pocs**. `studyTrack` blijft de vrije tekst die op
+  de POC-pagina zelf verschijnt.
+- **Meerdere richtingen per POC** kan: één POC bedient soms verschillende
+  opleidingen.
+- **Lege staat = sectie verbergen.** Zonder sessie, zonder richtingen, of zonder
+  een matchende POC met vertegenwoordigers valt de hele sectie weg. Bewuste keuze
+  boven "toon dan alle POC's" of een uitnodigingsbanner: de sectie is enkel
+  zinvol als ze persoonlijk is, en zo blijft de homepage voor bezoekers exact
+  zoals ze was.
+- **Gevolg voor caching:** omdat de homepage nu de sessie leest, wordt ze per
+  bezoeker gerenderd i.p.v. statisch gecachet. Dat was al zo qua DB-lezingen; het
+  is één gerichte query extra (de richtingen van de ingelogde gebruiker), en enkel
+  voor wie ingelogd is.

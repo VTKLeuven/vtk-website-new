@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Input, Label, Textarea } from "@vtk/ui";
 import { SaveForm } from "@/components/ui/SaveForm";
 import { DeleteButton, DeleteIconButton } from "@/components/ui/DeleteIconButton";
+import { CheckboxChip } from "@/components/profile/StudyFieldset";
 import { savePocAction, deletePocAction, removePocRepresentativeAction } from "@/app/actions/pocs-partners";
 import { AddRepresentativeForm } from "./AddRepresentativeForm";
 import { Avatar, Chevron, Modal, Panel, SearchBar, SortHeader, useTableControls } from "../admin-table";
@@ -30,9 +31,51 @@ export type PocRow = {
   descriptionNl: string;
   descriptionEn: string;
   order: number;
+  studyProgrammes: string[];
   reps: Rep[];
   searchText: string;
 };
+
+/** Richting-waarde uit `StudyProgramme` met haar vertaalde label. */
+export type ProgrammeOption = { value: string; label: string };
+
+/**
+ * De richtingen waar deze POC voor staat. Dit is de koppeling die de homepage
+ * gebruikt om leden de POC's van hun eigen richtingen te tonen; `studyTrack`
+ * ernaast blijft de vrije tekst die op de POC-pagina zelf verschijnt.
+ */
+function ProgrammesField({
+  options,
+  selected,
+  nl,
+}: {
+  options: ProgrammeOption[];
+  selected: string[];
+  nl: boolean;
+}) {
+  const chosen = new Set(selected);
+  return (
+    <div>
+      <Label>{nl ? "Richtingen" : "Study programmes"}</Label>
+      <p className="mb-2 text-xs text-[#5c667f]">
+        {nl
+          ? "Leden zien deze POC op de homepage wanneer ze een van deze richtingen op hun profiel hebben staan. Zonder richting verschijnt de POC daar bij niemand."
+          : "Members see this POC on the homepage when one of these programmes is on their profile. Without a programme it appears for no one there."}
+      </p>
+      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
+        {options.map((option) => (
+          <CheckboxChip
+            key={option.value}
+            name="studyProgrammes"
+            value={option.value}
+            defaultChecked={chosen.has(option.value)}
+            label={option.label}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
 
 export type SaveLabels = {
   submitLabel: string;
@@ -47,11 +90,13 @@ export function PocsTable({
   locale,
   saveLabels,
   createLabels,
+  programmeOptions,
 }: {
   pocs: PocRow[];
   locale: "nl" | "en";
   saveLabels: SaveLabels;
   createLabels: SaveLabels;
+  programmeOptions: ProgrammeOption[];
 }) {
   const nl = locale === "nl";
   const [createOpen, setCreateOpen] = useState(false);
@@ -100,6 +145,7 @@ export function PocsTable({
                 nl={nl}
                 locale={locale}
                 saveLabels={saveLabels}
+                programmeOptions={programmeOptions}
               />
             ))}
           </tbody>
@@ -126,6 +172,9 @@ export function PocsTable({
             <div><Label>{nl ? "Naam (EN)" : "Name (EN)"}</Label><Input name="nameEn" /></div>
             <div className="md:col-span-2"><Label>{nl ? "Beschrijving (NL)" : "Description (NL)"}</Label><Textarea name="descriptionNl" rows={2} /></div>
             <div className="md:col-span-2"><Label>{nl ? "Beschrijving (EN)" : "Description (EN)"}</Label><Textarea name="descriptionEn" rows={2} /></div>
+            <div className="md:col-span-2">
+              <ProgrammesField options={programmeOptions} selected={[]} nl={nl} />
+            </div>
             <div><Label>{nl ? "Volgorde" : "Order"}</Label><Input name="order" type="number" defaultValue={pocs.length} /></div>
           </SaveForm>
         </Modal>
@@ -141,6 +190,7 @@ function PocRowView({
   nl,
   locale,
   saveLabels,
+  programmeOptions,
 }: {
   poc: PocRow;
   isOpen: boolean;
@@ -148,6 +198,7 @@ function PocRowView({
   nl: boolean;
   locale: "nl" | "en";
   saveLabels: SaveLabels;
+  programmeOptions: ProgrammeOption[];
 }) {
   const detailId = `poc-detail-${poc.id}`;
   return (
@@ -184,7 +235,13 @@ function PocRowView({
       {isOpen && (
         <tr id={detailId}>
           <td colSpan={3} className="bg-vtk-blue-soft/20">
-            <PocDetail poc={poc} nl={nl} locale={locale} saveLabels={saveLabels} />
+            <PocDetail
+              poc={poc}
+              nl={nl}
+              locale={locale}
+              saveLabels={saveLabels}
+              programmeOptions={programmeOptions}
+            />
           </td>
         </tr>
       )}
@@ -197,11 +254,13 @@ function PocDetail({
   nl,
   locale,
   saveLabels,
+  programmeOptions,
 }: {
   poc: PocRow;
   nl: boolean;
   locale: "nl" | "en";
   saveLabels: SaveLabels;
+  programmeOptions: ProgrammeOption[];
 }) {
   return (
     <div className="space-y-4 py-1">
@@ -286,6 +345,9 @@ function PocDetail({
             <div className="md:col-span-3"><Label>{nl ? "Studierichting" : "Study track"}</Label><Input name="studyTrack" defaultValue={poc.studyTrack} required /></div>
             <div className="md:col-span-6"><Label>{nl ? "Beschrijving (NL)" : "Description (NL)"}</Label><Textarea name="descriptionNl" defaultValue={poc.descriptionNl} rows={2} /></div>
             <div className="md:col-span-6"><Label>{nl ? "Beschrijving (EN)" : "Description (EN)"}</Label><Textarea name="descriptionEn" defaultValue={poc.descriptionEn} rows={2} /></div>
+            <div className="md:col-span-6">
+              <ProgrammesField options={programmeOptions} selected={poc.studyProgrammes} nl={nl} />
+            </div>
           </SaveForm>
 
           <DeleteButton

@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { ExternalLink, Play, Video, VideoOff } from "lucide-react";
 
+import { safeUrl, vimeoVideoId, youtubeVideoId } from "@/lib/videoEmbed";
 import styles from "./AftermoviePlayer.module.css";
 
 export type AftermoviePlayerItem = {
@@ -17,11 +18,6 @@ export type AftermoviePlayerLabels = {
   play: string;
   unavailable: string;
   openExternal: string;
-};
-
-type SafeUrl = {
-  href: string;
-  parsed: URL;
 };
 
 type NormalizedSource =
@@ -47,67 +43,11 @@ type NormalizedItem = AftermoviePlayerItem & {
   source: NormalizedSource;
 };
 
-const LOCAL_URL_BASE = "https://vtk.invalid";
 const DIRECT_MEDIA_TYPES: Record<string, string> = {
   mp4: "video/mp4",
   webm: "video/webm",
   ogg: "video/ogg",
 };
-
-function safeUrl(value: string | null | undefined): SafeUrl | null {
-  const raw = value?.trim();
-  if (!raw) return null;
-
-  try {
-    if (raw.startsWith("/") && !raw.startsWith("//")) {
-      return { href: raw, parsed: new URL(raw, LOCAL_URL_BASE) };
-    }
-
-    let candidate = raw;
-    if (raw.startsWith("//")) {
-      candidate = `https:${raw}`;
-    } else if (/^[a-z0-9.-]+\.[a-z]{2,}(?::\d+)?(?:[/?#]|$)/i.test(raw)) {
-      candidate = `https://${raw}`;
-    }
-
-    const parsed = new URL(candidate);
-    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") return null;
-    return { href: parsed.toString(), parsed };
-  } catch {
-    return null;
-  }
-}
-
-function youtubeVideoId(url: URL): string | null {
-  const hostname = url.hostname.toLowerCase().replace(/^(?:www\.|m\.)/, "");
-  let candidate: string | null = null;
-
-  if (hostname === "youtu.be") {
-    candidate = url.pathname.split("/").filter(Boolean)[0] ?? null;
-  } else if (hostname === "youtube.com" || hostname === "youtube-nocookie.com") {
-    if (url.pathname === "/watch") {
-      candidate = url.searchParams.get("v");
-    } else {
-      const match = url.pathname.match(/^\/(?:embed|shorts|live)\/([^/?#]+)/);
-      candidate = match?.[1] ?? null;
-    }
-  }
-
-  return candidate && /^[a-zA-Z0-9_-]{11}$/.test(candidate) ? candidate : null;
-}
-
-function vimeoVideoId(url: URL): { id: string; hash: string | null } | null {
-  const hostname = url.hostname.toLowerCase().replace(/^www\./, "");
-  if (hostname !== "vimeo.com" && hostname !== "player.vimeo.com") return null;
-
-  const segments = url.pathname.split("/").filter(Boolean);
-  const idIndex = segments.findIndex((segment) => /^\d+$/.test(segment));
-  if (idIndex === -1) return null;
-
-  const pathHash = segments[idIndex + 1];
-  const hash = url.searchParams.get("h") ?? (pathHash && /^[a-zA-Z0-9]+$/.test(pathHash) ? pathHash : null);
-  return { id: segments[idIndex], hash };
-}
 
 function normalizeItem(item: AftermoviePlayerItem): NormalizedItem {
   const mediaUrl = safeUrl(item.url);

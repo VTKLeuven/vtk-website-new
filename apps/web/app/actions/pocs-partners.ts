@@ -6,6 +6,7 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "@vtk/db";
 import { requirePermission } from "@/lib/session";
 import { saveError, saveOk, type SaveState } from "@/lib/saveState";
+import { STUDY_PROGRAMMES } from "@/lib/profile";
 import { deleteObject } from "@vtk/storage";
 
 /** `P2002` op een bepaald veld: de unieke constraint die Prisma noemt. */
@@ -28,6 +29,9 @@ const pocSchema = z.object({
   descriptionNl: z.string().optional().nullable(),
   descriptionEn: z.string().optional().nullable(),
   order: z.coerce.number().int().default(0),
+  // De aangevinkte richtingen. Onbekende waarden weren we hier: het formulier
+  // stuurt enkel `StudyProgramme`-codes, dus iets anders is geknoei.
+  studyProgrammes: z.array(z.enum(STUDY_PROGRAMMES)).default([]),
 });
 
 export async function savePocAction(_prev: SaveState, formData: FormData): Promise<SaveState> {
@@ -41,6 +45,7 @@ export async function savePocAction(_prev: SaveState, formData: FormData): Promi
     descriptionNl: formData.get("descriptionNl") || null,
     descriptionEn: formData.get("descriptionEn") || null,
     order: formData.get("order") || 0,
+    studyProgrammes: formData.getAll("studyProgrammes"),
   });
   if (!parsed.success) return saveError("INVALID_INPUT");
 
@@ -57,6 +62,9 @@ export async function savePocAction(_prev: SaveState, formData: FormData): Promi
 
   revalidatePath("/pocs");
   revalidatePath("/admin/pocs");
+  // De homepage toont de POC's van je eigen richtingen; een gewijzigde
+  // richting of naam hoort daar meteen door te komen.
+  revalidatePath("/", "layout");
   return saveOk();
 }
 
@@ -67,6 +75,7 @@ export async function deletePocAction(formData: FormData): Promise<void> {
   revalidatePath("/pocs");
   // Geen redirect: de lijst staat op deze pagina en ververst ter plaatse.
   revalidatePath("/admin/pocs");
+  revalidatePath("/", "layout");
 }
 
 const repSchema = z.object({
@@ -93,6 +102,7 @@ export async function addPocRepresentativeAction(formData: FormData): Promise<vo
   });
   revalidatePath("/pocs");
   revalidatePath("/admin/pocs");
+  revalidatePath("/", "layout");
 }
 
 export async function removePocRepresentativeAction(formData: FormData): Promise<void> {
@@ -101,6 +111,7 @@ export async function removePocRepresentativeAction(formData: FormData): Promise
   if (id) await prisma.pocRepresentative.delete({ where: { id } });
   revalidatePath("/pocs");
   revalidatePath("/admin/pocs");
+  revalidatePath("/", "layout");
 }
 
 // ---- Partners ---------------------------------------------------------------
