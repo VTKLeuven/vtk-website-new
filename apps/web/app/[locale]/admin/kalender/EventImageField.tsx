@@ -19,11 +19,12 @@ export function EventImageField({
     <StorageImageField
       defaultKey={defaultKey}
       locale={locale}
+      fallbackUrl="/default-event.jpg"
       emptyHint={nl ? "Standaardfoto" : "Default photo"}
       helpText={
         nl
-          ? "Optioneel. Zonder afbeelding toont de eventpagina de standaardfoto."
-          : "Optional. Without an image the event page shows the default photo."
+          ? "Optioneel. Zonder afbeelding toont de eventpagina de standaardfoto hiernaast."
+          : "Optional. Without an image the event page shows the default photo shown here."
       }
     />
   );

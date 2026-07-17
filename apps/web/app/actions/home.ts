@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@vtk/db";
 import { deleteObject } from "@vtk/storage";
 import { requirePermission } from "@/lib/session";
+import { readImageField, resolveImageKey } from "@/lib/imageField";
 import { saveError, saveOk, type SaveState } from "@/lib/saveState";
 
 /** Foto op één kaart in de homepage-sectie "Wat we doen". */
@@ -13,14 +14,9 @@ export async function saveHomepageCardImageAction(
 ): Promise<SaveState> {
   await requirePermission("home.edit");
   const id = formData.get("id");
-  const rawImageKey = formData.get("imageKey");
-  const imageKey = typeof rawImageKey === "string" && rawImageKey ? rawImageKey : null;
+  const image = readImageField(formData);
 
-  if (
-    typeof id !== "string" ||
-    !id ||
-    (imageKey !== null && !imageKey.startsWith("images/"))
-  ) {
+  if (typeof id !== "string" || !id || image.kind === "invalid") {
     return saveError("INVALID_INPUT");
   }
 
@@ -29,6 +25,8 @@ export async function saveHomepageCardImageAction(
     select: { imageKey: true },
   });
   if (!existing) return saveError("INVALID_INPUT");
+
+  const imageKey = resolveImageKey(image, existing.imageKey);
 
   await prisma.headerTab.update({
     where: { id },

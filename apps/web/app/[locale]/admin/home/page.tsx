@@ -6,6 +6,7 @@ import { requirePermission } from "@/lib/session";
 import { getDictionary, type Locale } from "@vtk/i18n";
 import { Card, Input, Label, Select, Textarea } from "@vtk/ui";
 import { StorageImageField } from "@/components/admin/StorageImageField";
+import { AANBOD_PHOTOS } from "@/lib/aanbodPhotos";
 import { SaveForm } from "@/components/ui/SaveForm";
 import {
   saveHomepageCardImageAction,
@@ -140,11 +141,16 @@ export default async function AdminHome({
                   defaultKey={tab.imageKey}
                   locale={locale}
                   label={locale === "nl" ? "Kaartfoto" : "Card photo"}
-                  emptyHint={locale === "nl" ? "Standaardfoto" : "Default photo"}
+                  fallbackUrl={AANBOD_PHOTOS[tab.slug]}
+                  srContext={locale === "nl" ? tab.labelNl : tab.labelEn}
                   helpText={
-                    locale === "nl"
-                      ? "Zonder upload gebruikt deze kaart de standaardfoto of het gestreepte patroon."
-                      : "Without an upload, this card uses its default photo or the striped pattern."
+                    AANBOD_PHOTOS[tab.slug]
+                      ? locale === "nl"
+                        ? "Zonder upload gebruikt deze kaart de standaardfoto hiernaast."
+                        : "Without an upload, this card uses the default photo shown here."
+                      : locale === "nl"
+                        ? "Deze kaart heeft geen standaardfoto: zonder upload toont ze het gestreepte patroon."
+                        : "This card has no default photo: without an upload it shows the striped pattern."
                   }
                 />
               </SaveForm>

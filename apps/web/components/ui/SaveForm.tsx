@@ -3,6 +3,7 @@
 import { useActionState, useEffect, useRef, type ReactNode } from "react";
 import { Button } from "@vtk/ui";
 import { useToast } from "@/components/ui/toast";
+import { FormBusyProvider, useFormBusy } from "@/components/ui/formBusy";
 import { SAVE_IDLE, type SaveAction } from "@/lib/saveState";
 
 /**
@@ -41,6 +42,9 @@ export function SaveForm({
 }) {
   const [state, formAction, pending] = useActionState(action, SAVE_IDLE);
   const showToast = useToast();
+  // Een veld kan nog bezig zijn (een upload die pas achteraf zijn key kent).
+  // Verzenden zou dan een lege waarde bewaren onder een groene toast.
+  const { busy, register } = useFormBusy();
   // Per submit exact één toast, ook als de component om een andere reden
   // hertekent met dezelfde state.
   const handled = useRef<number | null>(null);
@@ -65,8 +69,8 @@ export function SaveForm({
 
   return (
     <form action={formAction} className={className}>
-      {children}
-      <Button type="submit" disabled={pending || submitDisabled}>
+      <FormBusyProvider register={register}>{children}</FormBusyProvider>
+      <Button type="submit" disabled={pending || submitDisabled || busy}>
         {pending ? savingLabel : submitLabel}
       </Button>
     </form>
