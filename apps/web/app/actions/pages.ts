@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { Prisma } from "@prisma/client";
 import { prisma, HEADER_TABS } from "@vtk/db";
+import { deleteObject } from "@vtk/storage";
 import { requirePermission } from "@/lib/session";
 import { saveError, saveOk, type SaveState } from "@/lib/saveState";
 
@@ -196,6 +197,7 @@ const headerSchema = z.object({
   labelNl: z.string().min(1),
   labelEn: z.string().min(1),
   visible: z.coerce.boolean().default(true),
+  imageKey: z.string().optional().nullable(),
   introNl: z.string().optional().nullable(),
   introEn: z.string().optional().nullable(),
   ctaLabelNl: z.string().optional().nullable(),
@@ -212,6 +214,7 @@ export async function saveHeaderTabAction(_prev: SaveState, formData: FormData):
     labelNl: formData.get("labelNl"),
     labelEn: formData.get("labelEn"),
     visible: formData.get("visible") === "on",
+    imageKey: formData.get("imageKey") || null,
     introNl: formData.get("introNl") || null,
     introEn: formData.get("introEn") || null,
     ctaLabelNl: formData.get("ctaLabelNl") || null,
@@ -226,6 +229,7 @@ export async function saveHeaderTabAction(_prev: SaveState, formData: FormData):
     labelNl: p.labelNl,
     labelEn: p.labelEn,
     visible: p.visible,
+    imageKey: p.imageKey || null,
     introNl: p.introNl || null,
     introEn: p.introEn || null,
     ctaLabelNl: p.ctaLabelNl || null,
@@ -237,7 +241,19 @@ export async function saveHeaderTabAction(_prev: SaveState, formData: FormData):
     if (p.id) {
       // `code` bewust niet bijwerkbaar: het is de sleutel waarop de seed upsert
       // en waarop code als `code: "AANBOD"` filtert.
+      const existing = await prisma.headerTab.findUnique({
+        where: { id: p.id },
+        select: { imageKey: true },
+      });
       await prisma.headerTab.update({ where: { id: p.id }, data });
+      // Vervangen of verwijderde foto: het oude object opruimen (zie partners).
+      if (existing?.imageKey && existing.imageKey !== data.imageKey) {
+        try {
+          await deleteObject(existing.imageKey);
+        } catch {
+          /* ignore */
+        }
+      }
     } else {
       const last = await prisma.headerTab.findFirst({
         orderBy: { order: "desc" },
@@ -266,7 +282,18 @@ export async function deleteHeaderTabAction(
   if (!id) return saveError("INVALID_INPUT" satisfies ContentErrorCode);
   // Page.headerTabId is onDelete: SetNull, dus pagina's blijven bestaan en komen
   // onder "Niet gekoppeld" te staan.
+  const existing = await prisma.headerTab.findUnique({
+    where: { id },
+    select: { imageKey: true },
+  });
   await prisma.headerTab.delete({ where: { id } });
+  if (existing?.imageKey) {
+    try {
+      await deleteObject(existing.imageKey);
+    } catch {
+      /* ignore */
+    }
+  }
   revalidatePath("/", "layout");
   return saveOk();
 }

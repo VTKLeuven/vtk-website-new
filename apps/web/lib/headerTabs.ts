@@ -1,6 +1,13 @@
 import { HEADER_TABS, prisma } from "@vtk/db";
 
-export type NavHeaderTab = { id: string; slug: string; labelNl: string; labelEn: string };
+export type NavHeaderTab = {
+  id: string;
+  slug: string;
+  labelNl: string;
+  labelEn: string;
+  /** Storage-key van de foto op de homepage-aanbodkaart (via /admin/inhoud). */
+  imageKey: string | null;
+};
 
 /**
  * Header tabs from the CMS. When the table is empty (e.g. production DB never
@@ -17,5 +24,6 @@ export async function getVisibleHeaderTabsForNav(): Promise<NavHeaderTab[]> {
     slug: t.slug,
     labelNl: t.labelNl,
     labelEn: t.labelEn,
+    imageKey: null,
   }));
 }
