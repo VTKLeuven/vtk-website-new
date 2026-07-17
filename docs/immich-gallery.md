@@ -1,5 +1,9 @@
 # Immich Media Gallery
 
+For the production setup that stores Immich media on the separate 12 TB server
+over Tailscale and NFS, see
+[Immich Remote Storage over Tailscale and NFS](immich-remote-storage.md).
+
 The public media page can show albums directly from Immich. The website does
 not copy album photos into this repository. It reads album metadata through the
 server-side Immich API and renders images through Immich Public Proxy URLs.

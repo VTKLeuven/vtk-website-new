@@ -111,7 +111,9 @@ services:
       DB_HOSTNAME: immich-database
       REDIS_HOSTNAME: immich-redis
     volumes:
-      - ./immich/data/library:/data
+      # Local development uses the repository path. Production overrides this
+      # with IMMICH_MEDIA_LOCATION=/mnt/immich in the root .env.
+      - ${IMMICH_MEDIA_LOCATION:-./immich/data/library}:/data
       - /etc/localtime:/etc/localtime:ro
     ports:
       # Caddy is the public edge; Immich itself is reachable only from the host.

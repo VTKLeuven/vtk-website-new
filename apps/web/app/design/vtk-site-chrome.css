@@ -1,8 +1,10 @@
+/* Donkere footer als boekensteun: elke pagina eindigt op hetzelfde navy als de
+   header, zodat de site donker opent en donker sluit. */
 .vtk-site-footer {
   margin-top: 0;
-  border-top: 1px solid var(--line);
-  background: var(--paper);
-  color: var(--ink);
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  background: var(--navy);
+  color: var(--paper);
   font-family: var(--sans);
   -webkit-font-smoothing: antialiased;
 }
@@ -20,7 +22,7 @@
 }
 
 .vtk-site-footer-mega {
-  color: var(--ink);
+  color: var(--paper);
   font-size: 22px;
   line-height: 1.12;
   letter-spacing: -0.02em;
@@ -35,14 +37,14 @@
   place-items: center;
   margin-right: 10px;
   border-radius: 8px;
-  background: var(--navy);
-  color: var(--yellow);
+  background: var(--yellow);
+  color: var(--navy);
   font-size: 14px;
   vertical-align: middle;
 }
 
 .vtk-site-footer-mega .acc {
-  color: var(--navy);
+  color: var(--yellow);
   font-family: var(--serif);
   font-style: italic;
   font-weight: 400;
@@ -51,7 +53,7 @@
 .vtk-site-footer-address {
   margin-top: 14px;
   max-width: 36ch;
-  color: var(--muted);
+  color: var(--on-dark-muted);
   font-size: 13px;
   line-height: 1.55;
   white-space: pre-line;
@@ -59,7 +61,7 @@
 
 .vtk-site-footer h2 {
   margin: 0 0 14px;
-  color: var(--muted);
+  color: var(--on-dark-muted);
   font-size: 12px;
   font-weight: 600;
   letter-spacing: 0.1em;
@@ -77,13 +79,13 @@
 
 .vtk-site-footer a,
 .vtk-site-footer span {
-  color: rgba(10, 15, 31, 0.82);
+  color: rgba(239, 242, 248, 0.78);
   text-decoration: none;
   font-size: 14px;
 }
 
 .vtk-site-footer a:hover {
-  color: var(--ink);
+  color: #fff;
 }
 
 .vtk-site-footer-bottom {
@@ -92,8 +94,8 @@
   gap: 16px;
   margin-top: 36px;
   padding-top: 18px;
-  border-top: 1px solid var(--line);
-  color: var(--muted);
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
+  color: var(--on-dark-muted);
   font-size: 12px;
 }
 
@@ -103,7 +105,7 @@
 }
 
 .vtk-site-footer-bottom a:hover {
-  color: var(--ink);
+  color: #fff;
   text-decoration: underline;
 }
 

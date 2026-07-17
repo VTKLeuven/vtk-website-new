@@ -20,6 +20,21 @@ export const metadata: Metadata = {
   title: "Vlaamse Technische Kring",
   description:
     "De officiële website van VTK, de studentenvereniging van de faculteit ingenieurswetenschappers.",
+  icons: {
+    icon: [
+      {
+        url: "/vtk-shield-favicon-32.png",
+        type: "image/png",
+        sizes: "32x32",
+      },
+      {
+        url: "/vtk-shield-favicon.png",
+        type: "image/png",
+        sizes: "512x512",
+      },
+    ],
+    shortcut: "/vtk-shield-favicon-32.png",
+  },
 };
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {

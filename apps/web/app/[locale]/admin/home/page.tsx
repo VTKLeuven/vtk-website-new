@@ -5,8 +5,11 @@ import { hasLocale } from "@/lib/locale";
 import { requirePermission } from "@/lib/session";
 import { getDictionary, type Locale } from "@vtk/i18n";
 import { Card, Input, Label, Select, Textarea } from "@vtk/ui";
+import { StorageImageField } from "@/components/admin/StorageImageField";
+import { AANBOD_PHOTOS } from "@/lib/aanbodPhotos";
 import { SaveForm } from "@/components/ui/SaveForm";
 import {
+  saveHomepageCardImageAction,
   saveOpeningHoursAction,
   saveCareerAction,
   saveAftermoviesAction,
@@ -69,19 +72,32 @@ export default async function AdminHome({
   const dict = getDictionary(locale);
 
   const base = locale === "nl" ? "" : "/en";
-  const rows = await prisma.setting.findMany({
-    where: {
-      key: {
-        in: [
-          "home.openingHours.cursusdienst",
-          "home.career",
-          "media.aftermovies",
-          "home.aftermovies",
-          "home.featuredAlbums",
-        ],
+  const [rows, homepageCards] = await Promise.all([
+    prisma.setting.findMany({
+      where: {
+        key: {
+          in: [
+            "home.openingHours.cursusdienst",
+            "home.career",
+            "media.aftermovies",
+            "home.aftermovies",
+            "home.featuredAlbums",
+          ],
+        },
       },
-    },
-  });
+    }),
+    prisma.headerTab.findMany({
+      where: { visible: true },
+      orderBy: { order: "asc" },
+      select: {
+        id: true,
+        slug: true,
+        labelNl: true,
+        labelEn: true,
+        imageKey: true,
+      },
+    }),
+  ]);
   const map = new Map(rows.map((row: { key: string; value: unknown }) => [row.key, row.value]));
   const cursus = (map.get("home.openingHours.cursusdienst") as OpeningHours | undefined) ?? { titleNl: "", titleEn: "", entries: [] };
   const career = (map.get("home.career") as Career | undefined) ?? { titleNl: "", titleEn: "", bodyNl: "", bodyEn: "" };
@@ -93,6 +109,61 @@ export default async function AdminHome({
   return (
     <div className="space-y-6">
       <h1 className="text-2xl font-semibold">{locale === "nl" ? "Homepagina" : "Homepage"}</h1>
+
+      <Card className="p-5">
+        <h2 className="mb-1 font-semibold">{locale === "nl" ? "Wat we doen" : "What we do"}</h2>
+        <p className="mb-5 text-sm text-[#5c667f]">
+          {locale === "nl"
+            ? "Beheer de foto op elke categoriekaart. De eerste zes zichtbare categorieën verschijnen op de homepage; hun volgorde beheer je onder Inhoud."
+            : "Manage the photo on each category card. The first six visible categories appear on the homepage; manage their order under Content."}
+        </p>
+
+        {homepageCards.length > 0 ? (
+          <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+            {homepageCards.map((tab) => (
+              <SaveForm
+                key={tab.id}
+                action={saveHomepageCardImageAction}
+                className="space-y-4 rounded-xl border border-vtk-blue/10 p-4"
+                submitLabel={dict.admin.save}
+                savingLabel={dict.common.saving}
+                savedMessage={dict.common.saved}
+                fallbackErrorMessage={dict.common.saveError}
+              >
+                <input type="hidden" name="id" value={tab.id} />
+                <div>
+                  <h3 className="font-medium">
+                    {locale === "nl" ? tab.labelNl : tab.labelEn}
+                  </h3>
+                  <p className="font-mono text-xs text-[#5c667f]">/{tab.slug}</p>
+                </div>
+                <StorageImageField
+                  defaultKey={tab.imageKey}
+                  locale={locale}
+                  label={locale === "nl" ? "Kaartfoto" : "Card photo"}
+                  fallbackUrl={AANBOD_PHOTOS[tab.slug]}
+                  srContext={locale === "nl" ? tab.labelNl : tab.labelEn}
+                  helpText={
+                    AANBOD_PHOTOS[tab.slug]
+                      ? locale === "nl"
+                        ? "Zonder upload gebruikt deze kaart de standaardfoto hiernaast."
+                        : "Without an upload, this card uses the default photo shown here."
+                      : locale === "nl"
+                        ? "Deze kaart heeft geen standaardfoto: zonder upload toont ze het gestreepte patroon."
+                        : "This card has no default photo: without an upload it shows the striped pattern."
+                  }
+                />
+              </SaveForm>
+            ))}
+          </div>
+        ) : (
+          <p className="text-sm text-[#5c667f]">
+            {locale === "nl"
+              ? "Er zijn nog geen zichtbare categorieën. Maak ze eerst aan onder Inhoud."
+              : "There are no visible categories yet. Create them under Content first."}
+          </p>
+        )}
+      </Card>
 
       <Card className="p-5">
         <h2 className="font-semibold mb-3">

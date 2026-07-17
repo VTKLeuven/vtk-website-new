@@ -3,6 +3,7 @@ import Link from "next/link";
 import { prisma } from "@vtk/db";
 import { pick, type Locale } from "@vtk/i18n";
 import { getVisibleHeaderTabsForNav } from "@/lib/headerTabs";
+import { AANBOD_PHOTOS } from "@/lib/aanbodPhotos";
 import { publicUrl } from "@/lib/storage";
 import { PartnerLogo } from "@/components/site/PartnerLogo";
 import {
@@ -143,6 +144,7 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
       bodyNl: "Alles wat de ingenieursstudent buiten de aula samenbrengt.",
       bodyEn: "Everything that brings engineering students together outside the lecture hall.",
       href: `${base}/kalender`,
+      photo: "/aanbod/sport.jpg",
     },
     {
       labelNl: "Career",
@@ -152,6 +154,7 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
       bodyNl: "Bedrijvenrelaties, events en kansen om je toekomst scherp te krijgen.",
       bodyEn: "Company relations, events and opportunities to shape what comes next.",
       href: `${base}/career`,
+      photo: "/career-fair.jpg",
     },
     {
       labelNl: "Studies",
@@ -161,6 +164,7 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
       bodyNl: "Praktische ondersteuning voor je semester.",
       bodyEn: "Practical support for your semester.",
       href: `${base}/cursusdienst`,
+      photo: "/aanbod/cursusdienst.jpg",
     },
   ];
 
@@ -174,162 +178,165 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
           bodyNl: "Ontdek pagina's, activiteiten en praktische info van deze werking.",
           bodyEn: "Discover pages, activities and practical information from this work group.",
           href: `${base}/${tab.slug}`,
+          photo: publicUrl(tab.imageKey) ?? AANBOD_PHOTOS[tab.slug],
         }))
       : fallbackAanbod;
 
   return (
     <div className="vtk-design">
-      <section className="home-hero">
-        <div>
-          <div className="eyebrow">
-            <span className="dot" />
-            Vlaamse Technische Kring · KU Leuven
-          </div>
-          <h1>
-            {nl ? (
-              <>
-                De thuis voor <span className="serif">ingenieurs</span>
-                <br />
-                in Leuven.
-              </>
-            ) : (
-              <>
-                The home for <span className="serif">engineers</span>
-                <br />
-                in Leuven.
-              </>
-            )}
-          </h1>
-          <p className="hero-sub">
-            {nl
-              ? "Events, cursussen, career, broodjes en alles wat je dag op de campus praktischer maakt. Gerund door studenten, sinds 1920."
-              : "Events, courses, careers, sandwiches and everything that makes your day on campus more practical. Run by students, since 1920."}
-          </p>
-          <div className="hero-cta">
-            <Link href={`${base}/over-vtk`} className="btn btn-primary arrow">
-              {nl ? "Word lid" : "Become a member"}
-            </Link>
-            <Link href={`${base}/eerstejaars`} className="btn btn-ghost">
-              {nl ? "Eerstejaars? Start hier" : "First-year? Start here"}
-            </Link>
-          </div>
-          <div className="hero-meta">
-            <div className="meta">
-              <div className="k">{nl ? "Editie" : "Edition"}</div>
-              <div className="v">{academicYearLabel(now)}</div>
+      {/* De hero-foto en scrim lopen door tot en met de quick links; de zone
+          draagt de achtergrond zodat beide secties op hetzelfde donker zitten. */}
+      <div className="home-dark-zone">
+        <section className="home-hero">
+          <div>
+            <div className="eyebrow">
+              <span className="dot" />
+              Vlaamse Technische Kring · KU Leuven
             </div>
-            <div className="meta">
-              <div className="k">{nl ? "Binnenkort" : "This week"}</div>
-              <div className="v">
-                {upcomingEvents.length} {nl ? "events" : "events"}
-              </div>
-            </div>
-            <div className="meta">
-              <div className="k">{nl ? "Sinds" : "Since"}</div>
-              <div className="v">1920</div>
-            </div>
-          </div>
-        </div>
-
-        <aside className="cal">
-          <div className="cal-head">
-            <div>
-              <h3>{nl ? "Aankomende events" : "Upcoming events"}</h3>
-              <div className="sub">
-                {upcomingEvents[0]
-                  ? `${dayKey(new Date(upcomingEvents[0].start), locale)} → ${dayKey(new Date(upcomingEvents[Math.min(upcomingEvents.length - 1, 4)].start), locale)}`
-                  : nl
-                    ? "Geen geplande events"
-                    : "No planned events"}
-              </div>
-            </div>
-            <Link href={`${base}/kalender`} className="all">
-              {nl ? "Volledige kalender" : "Full calendar"}
-            </Link>
-          </div>
-          <div className="agenda">
-            {eventGroups.length === 0 ? (
-              <div className="day-group">
-                <div className="day-label">
-                  <span className="num">—</span>
-                  <span className="dow">{nl ? "Geen data" : "No data"}</span>
-                </div>
-              </div>
-            ) : (
-              eventGroups.map((group, groupIndex) => (
-                <div className="day-group" key={group.key}>
-                  <div className="day-label">
-                    <span className="num">{String(group.date.getDate()).padStart(2, "0")}</span>
-                    <span className="dow">
-                      {group.date.toLocaleDateString(locale === "nl" ? "nl-BE" : "en-GB", { weekday: "long" })}
-                    </span>
-                    {group.date.toDateString() === now.toDateString() ? (
-                      <span className="today">{nl ? "vandaag" : "today"}</span>
-                    ) : null}
-                  </div>
-                  {group.events.map((event, eventIndex) => {
-                    const eventDate = new Date(event.start);
-                    const content = (
-                      <>
-                        <div className="t">{formatTime(eventDate, locale)}</div>
-                        <div className="n">
-                          {groupIndex === 0 && eventIndex === 0 ? <span className="pin" /> : null}
-                          {pick(event.titleNl, event.titleEn, locale)}
-                          <small>
-                            {[event.location, pick(event.group.nameNl, event.group.nameEn, locale)]
-                              .filter(Boolean)
-                              .join(" · ")}
-                          </small>
-                        </div>
-                        <span className="arrow">→</span>
-                      </>
-                    );
-                    return (
-                      <Link
-                        key={event.id}
-                        href={`${base}/kalender/${event.id}`}
-                        className={`ev${groupIndex === 0 && eventIndex === 0 ? " featured" : ""}`}
-                      >
-                        {content}
-                      </Link>
-                    );
-                  })}
-                </div>
-              ))
-            )}
-          </div>
-        </aside>
-      </section>
-
-      <section className="quick">
-        <div className="quick-row">
-          {quickLinks.map((item) => {
-            const body = (
-              <>
-                <span className="k">{item.k}</span>
-                <span className="v">{item.v}</span>
-                <span className="m">{item.m}</span>
-              </>
-            );
-            return item.href.startsWith("http") ? (
-              <a key={item.k} className="ql" href={item.href}>
-                {body}
-              </a>
-            ) : (
-              <Link key={item.k} className="ql" href={item.href}>
-                {body}
+            <h1>
+              {nl ? (
+                <>
+                  De thuis voor <span className="serif">ingenieurs</span>
+                  <br />
+                  in Leuven.
+                </>
+              ) : (
+                <>
+                  The home for <span className="serif">engineers</span>
+                  <br />
+                  in Leuven.
+                </>
+              )}
+            </h1>
+            <p className="hero-sub">
+              {nl
+                ? "Events, cursussen, career, broodjes en alles wat je dag op de campus praktischer maakt. Gerund door studenten, sinds 1920."
+                : "Events, courses, careers, sandwiches and everything that makes your day on campus more practical. Run by students, since 1920."}
+            </p>
+            <div className="hero-cta">
+              <Link href={`${base}/over-vtk`} className="btn btn-primary arrow">
+                {nl ? "Word lid" : "Become a member"}
               </Link>
-            );
-          })}
-        </div>
-      </section>
+              <Link href={`${base}/eerstejaars`} className="btn btn-ghost">
+                {nl ? "Eerstejaars? Start hier" : "First-year? Start here"}
+              </Link>
+            </div>
+            <div className="hero-meta">
+              <div className="meta">
+                <div className="k">{nl ? "Editie" : "Edition"}</div>
+                <div className="v">{academicYearLabel(now)}</div>
+              </div>
+              <div className="meta">
+                <div className="k">{nl ? "Binnenkort" : "This week"}</div>
+                <div className="v">
+                  {upcomingEvents.length} {nl ? "events" : "events"}
+                </div>
+              </div>
+              <div className="meta">
+                <div className="k">{nl ? "Sinds" : "Since"}</div>
+                <div className="v">1920</div>
+              </div>
+            </div>
+          </div>
+
+          <aside className="cal">
+            <div className="cal-head">
+              <div>
+                <h3>{nl ? "Aankomende events" : "Upcoming events"}</h3>
+                <div className="sub">
+                  {upcomingEvents[0]
+                    ? `${dayKey(new Date(upcomingEvents[0].start), locale)} → ${dayKey(new Date(upcomingEvents[Math.min(upcomingEvents.length - 1, 4)].start), locale)}`
+                    : nl
+                      ? "Geen geplande events"
+                      : "No planned events"}
+                </div>
+              </div>
+              <Link href={`${base}/kalender`} className="all">
+                {nl ? "Volledige kalender" : "Full calendar"}
+              </Link>
+            </div>
+            <div className="agenda">
+              {eventGroups.length === 0 ? (
+                <div className="day-group">
+                  <div className="day-label">
+                    <span className="num">—</span>
+                    <span className="dow">{nl ? "Geen data" : "No data"}</span>
+                  </div>
+                </div>
+              ) : (
+                eventGroups.map((group, groupIndex) => (
+                  <div className="day-group" key={group.key}>
+                    <div className="day-label">
+                      <span className="num">{String(group.date.getDate()).padStart(2, "0")}</span>
+                      <span className="dow">
+                        {group.date.toLocaleDateString(locale === "nl" ? "nl-BE" : "en-GB", { weekday: "long" })}
+                      </span>
+                      {group.date.toDateString() === now.toDateString() ? (
+                        <span className="today">{nl ? "vandaag" : "today"}</span>
+                      ) : null}
+                    </div>
+                    {group.events.map((event, eventIndex) => {
+                      const eventDate = new Date(event.start);
+                      const content = (
+                        <>
+                          <div className="t">{formatTime(eventDate, locale)}</div>
+                          <div className="n">
+                            {groupIndex === 0 && eventIndex === 0 ? <span className="pin" /> : null}
+                            {pick(event.titleNl, event.titleEn, locale)}
+                            <small>
+                              {[event.location, pick(event.group.nameNl, event.group.nameEn, locale)]
+                                .filter(Boolean)
+                                .join(" · ")}
+                            </small>
+                          </div>
+                          <span className="arrow">→</span>
+                        </>
+                      );
+                      return (
+                        <Link
+                          key={event.id}
+                          href={`${base}/kalender/${event.id}`}
+                          className={`ev${groupIndex === 0 && eventIndex === 0 ? " featured" : ""}`}
+                        >
+                          {content}
+                        </Link>
+                      );
+                    })}
+                  </div>
+                ))
+              )}
+            </div>
+          </aside>
+        </section>
+
+        <section className="quick">
+          <div className="quick-row">
+            {quickLinks.map((item) => {
+              const body = (
+                <>
+                  <span className="k">{item.k}</span>
+                  <span className="v">{item.v}</span>
+                  <span className="m">{item.m}</span>
+                </>
+              );
+              return item.href.startsWith("http") ? (
+                <a key={item.k} className="ql" href={item.href}>
+                  {body}
+                </a>
+              ) : (
+                <Link key={item.k} className="ql" href={item.href}>
+                  {body}
+                </Link>
+              );
+            })}
+          </div>
+        </section>
+      </div>
 
       {(theokot || cursus) && (
         <section className="hours-strip">
           <div className="sec-head">
-            <h2>
-              {nl ? "Openings" : "Opening"} <span className="serif">{nl ? "uren" : "hours"}</span>.
-            </h2>
+            <h2>{nl ? "Openingsuren." : "Opening hours."}</h2>
             <div className="meta">
               {now.toLocaleString(locale === "nl" ? "nl-BE" : "en-GB", {
                 weekday: "short",
@@ -387,33 +394,66 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
 
       <section className="section">
         <div className="sec-head">
-          <h2>
-            {nl ? "Wat we " : "What we "}
-            <span className="serif">{nl ? "doen" : "do"}</span>.
-          </h2>
+          <h2>{nl ? "Wat we doen." : "What we do."}</h2>
           <div className="meta">
             {nl ? "Werkgroepen en diensten" : "Work groups and services"} ·{" "}
             <Link href={`${base}/info`}>{nl ? "bekijk alles" : "see all"}</Link>
           </div>
         </div>
         <div className="aanbod">
-          {aanbodCards.slice(0, 6).map((card, index) => (
-            <Link key={card.href} href={card.href} className={`acard${index === 0 ? " feat" : ""}`}>
-              <div>
-                <div className="tag">→ {pick(card.labelNl, card.labelEn, locale)}</div>
-                <h3>{pick(card.titleNl, card.titleEn, locale)}</h3>
-                <p>{pick(card.bodyNl, card.bodyEn, locale)}</p>
-              </div>
-              <div className="cta">{nl ? "Ontdek" : "Explore"}</div>
-            </Link>
-          ))}
+          {aanbodCards.slice(0, 6).map((card, index) => {
+            const feat = index === 0;
+            const photo = card.photo;
+            // De featured kaart wordt een mini-hero met de foto als volledige
+            // achtergrond; gewone kaarten krijgen een fotokop onder navy scrim.
+            const photoCard = feat && Boolean(photo);
+            return (
+              <Link
+                key={card.href}
+                href={card.href}
+                className={`acard${feat ? " feat" : ""}${photoCard ? " acard-photo" : ""}`}
+              >
+                {photoCard && photo ? (
+                  <span className="acard-bg" aria-hidden="true">
+                    <Image
+                      src={photo}
+                      alt=""
+                      fill
+                      sizes="(max-width: 640px) 100vw, (max-width: 980px) 50vw, 33vw"
+                    />
+                  </span>
+                ) : null}
+                <div className="acard-body">
+                  {photoCard ? null : (
+                    <span
+                      className={`acard-media${photo ? "" : " acard-media-ph"}`}
+                      aria-hidden="true"
+                    >
+                      {photo ? (
+                        <Image
+                          src={photo}
+                          alt=""
+                          fill
+                          sizes="(max-width: 640px) 100vw, (max-width: 980px) 50vw, 33vw"
+                        />
+                      ) : null}
+                    </span>
+                  )}
+                  <div className="tag">→ {pick(card.labelNl, card.labelEn, locale)}</div>
+                  <h3>{pick(card.titleNl, card.titleEn, locale)}</h3>
+                  <p>{pick(card.bodyNl, card.bodyEn, locale)}</p>
+                </div>
+                <div className="cta">{nl ? "Ontdek" : "Explore"}</div>
+              </Link>
+            );
+          })}
         </div>
       </section>
 
-      <section className="section">
+      <section className="section career-band">
         <div className="sec-head">
           <h2>
-            Career, <span className="serif">{nl ? "eerlijk" : "honestly"}</span>.
+            Never too early to build <span className="accent">your career</span>
           </h2>
           <div className="meta">career.vtk.be · {nl ? "vacatures & events" : "vacancies & events"}</div>
         </div>
@@ -467,6 +507,10 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
               height={1067}
               sizes="(max-width: 1000px) 100vw, 50vw"
             />
+            <figcaption>
+              <span className="pin" />
+              VTK Career Fair
+            </figcaption>
           </figure>
         </div>
       </section>

@@ -4,14 +4,16 @@
   --vtk-header-height: 73px;
 }
 
+/* Solide navy header met lichte navigatie: dezelfde donkere boekensteun als de
+   footer, in plaats van de doorschijnende paper-balk. Op de homepage-hero wordt
+   enkel de achtergrond transparant; de tekst is in beide toestanden licht. */
 .vtk-site-header {
-  color: var(--ink);
+  color: var(--paper);
   position: sticky;
   top: 0;
   z-index: 50;
-  background: color-mix(in srgb, var(--paper) 88%, transparent);
-  border-bottom: 1px solid var(--line);
-  backdrop-filter: blur(12px);
+  background: var(--navy);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
   font-family: var(--sans);
   -webkit-font-smoothing: antialiased;
   transition: background 220ms ease, border-color 220ms ease, color 220ms ease;
@@ -35,7 +37,7 @@
   display: inline-flex;
   align-items: center;
   gap: 10px;
-  color: var(--ink);
+  color: var(--paper);
   text-decoration: none;
   font-weight: 700;
   letter-spacing: -0.02em;
@@ -78,7 +80,7 @@
 }
 
 .vtk-site-header .nav-links a {
-  color: rgba(10, 15, 31, 0.74);
+  color: rgba(250, 250, 247, 0.78);
   text-decoration: none;
   white-space: nowrap;
   font-size: 14px;
@@ -88,7 +90,7 @@
 
 .vtk-site-header .nav-links a:hover,
 .vtk-site-header .nav-links a.active {
-  color: var(--ink);
+  color: #fff;
 }
 
 .vtk-site-header .nav-scroll-next {
@@ -107,7 +109,7 @@
   display: inline-flex;
   align-items: center;
   gap: 2px;
-  color: var(--muted);
+  color: rgba(250, 250, 247, 0.72);
   font-size: 13px;
 }
 
@@ -122,12 +124,12 @@
 }
 
 .vtk-site-header .lang-toggle button[aria-pressed="true"] {
-  color: var(--ink);
+  color: #fff;
   font-weight: 600;
 }
 
 .vtk-site-header .lang-sep {
-  color: var(--line-2);
+  color: rgba(250, 250, 247, 0.4);
 }
 
 .vtk-site-header .profile-menu-trigger,
@@ -136,18 +138,18 @@
   height: 38px;
   display: inline-grid;
   place-items: center;
-  border: 1px solid var(--line-2);
+  border: 1px solid rgba(250, 250, 247, 0.34);
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.6);
-  color: var(--ink);
+  background: rgba(255, 255, 255, 0.12);
+  color: var(--paper);
   font-weight: 600;
   transition: background 160ms ease, border-color 160ms ease;
 }
 
 .vtk-site-header .profile-menu-trigger:hover,
 .vtk-site-header .nav-login:hover {
-  border-color: var(--ink);
-  background: var(--surface);
+  border-color: var(--paper);
+  background: rgba(255, 255, 255, 0.22);
 }
 
 .vtk-site-header .profile-menu {
@@ -180,54 +182,15 @@
 }
 
 /* Homepage: the header sits directly on the dark hero (SiteHeaderShell sets
-   data-over-hero while the hero is in view). Light nav on a transparent bar,
-   fading back to the solid paper strip once you scroll past the hero. Desktop
-   only: it matches the hero overlap in vtk-home.css, and below 981px the header
-   stays a solid strip above the hero so the wrapping nav never covers it. */
+   data-over-hero while the hero is in view). The text is light in both states;
+   only the bar itself goes transparent over the photo and fades back to solid
+   navy once you scroll past the hero. Desktop only: it matches the hero overlap
+   in vtk-home.css, and below 981px the header stays a solid strip above the
+   hero so the wrapping nav never covers it. */
 @media (min-width: 981px) {
   .vtk-site-header[data-over-hero="true"] {
     background: transparent;
     border-bottom-color: transparent;
-    backdrop-filter: none;
-    color: var(--paper);
-  }
-
-  .vtk-site-header[data-over-hero="true"] .brand {
-    color: var(--paper);
-  }
-
-  .vtk-site-header[data-over-hero="true"] .nav-links a {
-    color: rgba(250, 250, 247, 0.8);
-  }
-
-  .vtk-site-header[data-over-hero="true"] .nav-links a:hover,
-  .vtk-site-header[data-over-hero="true"] .nav-links a.active {
-    color: #fff;
-  }
-
-  .vtk-site-header[data-over-hero="true"] .lang-toggle {
-    color: rgba(250, 250, 247, 0.72);
-  }
-
-  .vtk-site-header[data-over-hero="true"] .lang-toggle button[aria-pressed="true"] {
-    color: #fff;
-  }
-
-  .vtk-site-header[data-over-hero="true"] .lang-sep {
-    color: rgba(250, 250, 247, 0.4);
-  }
-
-  .vtk-site-header[data-over-hero="true"] .profile-menu-trigger,
-  .vtk-site-header[data-over-hero="true"] .nav-login {
-    border-color: rgba(250, 250, 247, 0.34);
-    background: rgba(255, 255, 255, 0.12);
-    color: var(--paper);
-  }
-
-  .vtk-site-header[data-over-hero="true"] .profile-menu-trigger:hover,
-  .vtk-site-header[data-over-hero="true"] .nav-login:hover {
-    border-color: var(--paper);
-    background: rgba(255, 255, 255, 0.22);
   }
 }
 
@@ -246,7 +209,7 @@
   .vtk-site-header .nav-links {
     padding: 0 38px 9px 0;
     scrollbar-width: thin;
-    scrollbar-color: rgba(10, 15, 31, 0.32) transparent;
+    scrollbar-color: rgba(250, 250, 247, 0.4) transparent;
   }
 
   .vtk-site-header .nav-links::-webkit-scrollbar {
@@ -256,7 +219,7 @@
 
   .vtk-site-header .nav-links::-webkit-scrollbar-thumb {
     border-radius: 2px;
-    background: rgba(10, 15, 31, 0.32);
+    background: rgba(250, 250, 247, 0.4);
   }
 
   .vtk-site-header .nav-scroll-next {
@@ -267,11 +230,11 @@
     width: 30px;
     height: 30px;
     place-items: center;
-    border: 1px solid var(--line-2);
+    border: 1px solid rgba(250, 250, 247, 0.34);
     border-radius: 50%;
-    background: #fafaf7;
-    color: var(--ink);
-    box-shadow: -8px 0 0 #fafaf7;
+    background: var(--navy);
+    color: var(--paper);
+    box-shadow: -8px 0 0 var(--navy);
     cursor: pointer;
   }
 

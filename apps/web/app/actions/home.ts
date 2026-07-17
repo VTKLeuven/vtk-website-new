@@ -2,8 +2,49 @@
 
 import { revalidatePath } from "next/cache";
 import { prisma } from "@vtk/db";
+import { deleteObject } from "@vtk/storage";
 import { requirePermission } from "@/lib/session";
-import { saveOk, type SaveState } from "@/lib/saveState";
+import { readImageField, resolveImageKey } from "@/lib/imageField";
+import { saveError, saveOk, type SaveState } from "@/lib/saveState";
+
+/** Foto op één kaart in de homepage-sectie "Wat we doen". */
+export async function saveHomepageCardImageAction(
+  _prev: SaveState,
+  formData: FormData,
+): Promise<SaveState> {
+  await requirePermission("home.edit");
+  const id = formData.get("id");
+  const image = readImageField(formData);
+
+  if (typeof id !== "string" || !id || image.kind === "invalid") {
+    return saveError("INVALID_INPUT");
+  }
+
+  const existing = await prisma.headerTab.findUnique({
+    where: { id },
+    select: { imageKey: true },
+  });
+  if (!existing) return saveError("INVALID_INPUT");
+
+  const imageKey = resolveImageKey(image, existing.imageKey);
+
+  await prisma.headerTab.update({
+    where: { id },
+    data: { imageKey },
+  });
+
+  if (existing.imageKey && existing.imageKey !== imageKey) {
+    try {
+      await deleteObject(existing.imageKey);
+    } catch {
+      /* De databasewijziging blijft geldig als storage-opruiming tijdelijk faalt. */
+    }
+  }
+
+  revalidatePath("/", "layout");
+  revalidatePath("/admin/home");
+  return saveOk();
+}
 
 export async function saveOpeningHoursAction(_prev: SaveState, formData: FormData): Promise<SaveState> {
   await requirePermission("home.edit");

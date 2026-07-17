@@ -97,7 +97,9 @@ the design language into the application instead of copying mockup content.
 ## Visual System
 
 - Fonts: use Inter for UI and body text. Use Instrument Serif only as an italic
-  accent inside large headlines, never for dense interface copy.
+  accent in the hero headline and the footer tagline, never for dense interface
+  copy; homepage section headings are plain sans (the serif accent there was
+  reviewed and removed).
 - Palette: cool paper, light mode. Every colour is a CSS custom property defined
   **once** in `apps/web/app/design/vtk-base.css`; components reference the tokens,
   never raw hexes. Retune the palette there and the whole site follows. Key
@@ -118,27 +120,55 @@ the design language into the application instead of copying mockup content.
   gradients, decorative blobs, nested cards, or oversized explanatory text.
 - Hero (homepage): a full-bleed photo under a navy scrim (heaviest top-left,
   behind the headline) carries light copy, a yellow italic-serif accent, and the
-  white events card. Keep the bottom edge a subtle dark vignette; do not wash it
-  to `--paper` (a fade to the light ground read as a harsh transition). The sticky
-  header sits transparently over this hero and turns solid once scrolled past it
-  (desktop; `components/site/SiteHeaderShell`).
+  dark-glass events card. The dark zone (`.home-dark-zone`) stretches the photo
+  through the quick-links row, which sits on it as a dark glass panel; the zone
+  ends on a crisp seam: a short bottom-anchored vignette settles the photo edge
+  and the openingsuren band starts right below it. Both a paper gap and a long
+  dissolve into navy were reviewed and rejected there (the gap broke the dark
+  flow; the dissolve read as murky, empty dark). The sticky header sits
+  transparently over this hero and turns solid once scrolled past it (desktop;
+  `components/site/SiteHeaderShell`).
+- Band rhythm: the hero's dark deliberately returns down the page as full-width
+  bands (openingsuren and career both on `--navy`, via the full-bleed
+  `::before` pattern) and the site-wide dark footer closes the bookend. Header,
+  bands and footer share the same `--navy` so the dark chrome reads as one
+  system. The
+  openingsuren band butts directly against the dark zone's crisp seam with a
+  compact heading; later bands sit in the light flow with normal section
+  spacing. On a band, panels are dark glass (`rgba(255,255,255,.06)` fill,
+  `.14` white border), headings go `--paper`, muted text uses
+  `--on-dark-muted`, and the primary button inverts like on the hero.
+- Photography: content cards open with a real photo under a navy scrim, never a
+  decorative illustration. Aanbod cards carry a photo header (light 115deg
+  scrim); the featured card becomes a mini-hero with the photo as full
+  background under the hero's 103deg scrim. Werkingen without a photo fall back
+  to the striped placeholder pattern (`repeating-linear-gradient` of
+  `--paper-2`/`--paper`) so missing images stay visible. Admins upload the photo
+  per werking via /admin/home (`HeaderTab.imageKey`); the `AANBOD_PHOTOS` map
+  in HomeEditorial is only the static fallback for tabs without an upload.
 - Dark surfaces: `--navy`/`--ink` are for text, buttons, small accents, and
-  intentional full-width bands only, never as a card fill in a light grid. Mark a
-  featured card with a yellow accent rail (`box-shadow: inset 3px 0 0 var(--yellow)`)
-  on a `--surface` card, not a navy block.
+  intentional full-width bands only, never as a flat card fill in a light grid.
+  In a light grid, mark a featured card with a yellow accent rail
+  (`box-shadow: inset 3px 0 0 var(--yellow)`) on a `--surface` card, not a navy
+  block; a photo under a scrim is the only dark card fill that is allowed.
 
 ## Components
 
-- Header: sticky, translucent paper background (tracks `--paper`) with blur,
-  compact brand mark, plain nav links, subtle language/account controls, and one
-  strong dark CTA. On the homepage it sits transparently over the dark hero with
-  light nav and turns solid on scroll; solid everywhere else.
+- Header: sticky, solid `--navy` bar with light nav links, compact brand mark,
+  and subtle language/account controls; it pairs with the dark footer as the top
+  bookend (the old translucent paper bar was reviewed and replaced). The text is
+  light in every state; on the homepage only the background goes transparent
+  over the dark hero and fades back to solid navy on scroll.
 - Buttons: primary is dark ink/navy with paper text; secondary/ghost is bordered
   on paper; yellow is reserved for accents and active states. Over the dark hero,
   the primary button inverts to a `--surface` fill with ink text.
 - Cards: `--surface` (white) panels with thin `--line` borders on the cool
   `--paper` ground, small elevation at most, and restrained hover movement. No
-  navy/dark card fills; a featured card is marked with a yellow accent rail.
+  flat navy/dark card fills; a featured card is marked with a yellow accent rail
+  (or, with a real photo available, the photo mini-hero treatment).
+- Footer: a dark `--navy` band on every page (light text, yellow serif accent,
+  yellow brand badge), the same navy as the header; it bookends the dark hero,
+  so do not lighten it per page.
 - Lists and calendars: favor agenda/list layouts, tabular times, compact day
   labels, and small yellow status pins.
 - Admin: keep pages operationally dense. Forms, tables, and upload/editor

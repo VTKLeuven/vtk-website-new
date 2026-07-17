@@ -516,7 +516,18 @@ export async function deleteHeaderTabAction(
   if (!id) return saveError("INVALID_INPUT" satisfies ContentErrorCode);
   // Page.headerTabId is onDelete: SetNull, dus pagina's blijven bestaan en komen
   // onder "Niet gekoppeld" te staan.
+  const existing = await prisma.headerTab.findUnique({
+    where: { id },
+    select: { imageKey: true },
+  });
   await prisma.headerTab.delete({ where: { id } });
+  if (existing?.imageKey) {
+    try {
+      await deleteObject(existing.imageKey);
+    } catch {
+      /* ignore */
+    }
+  }
   revalidatePath("/", "layout");
   return saveOk();
 }

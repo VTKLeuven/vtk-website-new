@@ -7,6 +7,7 @@ import { prisma } from "@vtk/db";
 import { hasPermission } from "@vtk/auth";
 import { deleteObject } from "@vtk/storage";
 import { requireSession } from "@/lib/session";
+import { readImageField, resolveImageKey } from "@/lib/imageField";
 import { saveError, type SaveState } from "@/lib/saveState";
 
 const eventSchema = z.object({
@@ -22,7 +23,6 @@ const eventSchema = z.object({
   allDay: z.coerce.boolean().default(false),
   visibility: z.enum(["PUBLIC", "MEMBERS"]).default("PUBLIC"),
   url: z.string().optional().nullable(),
-  imageKey: z.string().optional().nullable(),
 });
 
 async function assertCanManageEvent(userGroups: string[], groupId: string, superOrAll: boolean) {
@@ -47,9 +47,9 @@ export async function saveEventAction(_prev: SaveState, formData: FormData): Pro
     allDay: formData.get("allDay") === "on",
     visibility: formData.get("visibility") || "PUBLIC",
     url: formData.get("url") || null,
-    imageKey: (formData.get("imageKey") as string) || null,
   });
-  if (!parsed.success) return saveError("INVALID_INPUT");
+  const image = readImageField(formData);
+  if (!parsed.success || image.kind === "invalid") return saveError("INVALID_INPUT");
   const input = parsed.data;
 
   const start = new Date(input.start);
@@ -79,7 +79,6 @@ export async function saveEventAction(_prev: SaveState, formData: FormData): Pro
     allDay: input.allDay,
     visibility: input.visibility,
     url: input.url,
-    imageKey: input.imageKey,
     createdById: session.user.id,
   };
 
@@ -87,10 +86,11 @@ export async function saveEventAction(_prev: SaveState, formData: FormData): Pro
     const existing = await prisma.calendarEvent.findUnique({ where: { id: input.id } });
     if (!existing) return saveError("INVALID_INPUT");
     await assertCanManageEvent(userGroupIds, existing.groupId, superOrAll);
-    await prisma.calendarEvent.update({ where: { id: input.id }, data });
+    const imageKey = resolveImageKey(image, existing.imageKey);
+    await prisma.calendarEvent.update({ where: { id: input.id }, data: { ...data, imageKey } });
     // De vervangen (of gewiste) afbeelding opruimen, zodat losse objecten niet
     // in de bucket blijven staan. Mislukt dat, dan is dat geen opslaanfout.
-    if (existing.imageKey && existing.imageKey !== input.imageKey) {
+    if (existing.imageKey && existing.imageKey !== imageKey) {
       try {
         await deleteObject(existing.imageKey);
       } catch {
@@ -98,7 +98,9 @@ export async function saveEventAction(_prev: SaveState, formData: FormData): Pro
       }
     }
   } else {
-    await prisma.calendarEvent.create({ data });
+    await prisma.calendarEvent.create({
+      data: { ...data, imageKey: resolveImageKey(image, null) },
+    });
   }
   revalidatePath("/kalender");
   revalidatePath("/admin/kalender");

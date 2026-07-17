@@ -11,22 +11,27 @@
 }
 
 /* Full-bleed Arenberg photo under a navy scrim (heaviest top-left, behind the
-   headline) with light copy on top. A top band keeps the overlapping header
-   legible; a subtle dark vignette settles the very bottom edge (no wash to
-   --paper, which read as a harsh transition). Light text and the white events
-   card sit on a reliably dark ground, so contrast never depends on which part of
-   the photo happens to show through. */
-.vtk-design .home-hero::before {
+   headline) with light copy on top. The zone stretches the photo through the
+   quick-links row, so the hero does not end on a hard edge; the quick links sit
+   on the photo as a dark glass panel. A top band keeps the overlapping header
+   legible. The zone ends on a crisp seam ("strakke naad"): only a short,
+   bottom-anchored vignette settles the photo edge, and the openingsuren band
+   starts right below it. No long dissolve into navy; that read as a murky,
+   empty stretch between the quick links and the band. */
+.vtk-design .home-dark-zone {
+  position: relative;
+  z-index: 0;
+  padding-bottom: 36px;
+}
+
+.vtk-design .home-dark-zone::before {
   content: "";
   position: absolute;
   z-index: -1;
-  top: 0;
-  bottom: 0;
-  left: calc(50% - 50vw);
-  right: calc(50% - 50vw);
+  inset: 0;
   background:
     linear-gradient(to bottom, rgba(10, 15, 31, 0.55) 0, rgba(10, 15, 31, 0) 160px),
-    linear-gradient(to bottom, rgba(10, 15, 31, 0) 82%, rgba(10, 15, 31, 0.24) 100%),
+    linear-gradient(to top, rgba(10, 15, 31, 0.35) 0, rgba(10, 15, 31, 0) 150px),
     linear-gradient(
       103deg,
       rgba(9, 12, 24, 0.92) 0%,
@@ -149,13 +154,17 @@
   background: rgba(250, 250, 247, 0.12);
 }
 
-/* Desktop: let the hero slide up under the sticky header so the scrim runs
-   edge to edge and the header sits on the photo (see SiteHeaderShell). The top
-   padding gains the header height back so the copy still clears the nav. Below
-   this width the header stays a solid strip above the hero (no overlap). */
+/* Desktop: let the dark zone slide up under the sticky header so the scrim runs
+   edge to edge and the header sits on the photo (see SiteHeaderShell). The
+   hero's top padding gains the header height back so the copy still clears the
+   nav. Below this width the header stays a solid strip above the hero (no
+   overlap). */
 @media (min-width: 981px) {
-  .vtk-design .home-hero {
+  .vtk-design .home-dark-zone {
     margin-top: calc(-1 * var(--vtk-header-height));
+  }
+
+  .vtk-design .home-hero {
     padding-top: calc(var(--vtk-header-height) + clamp(56px, 7vw, 84px));
   }
 }
@@ -364,6 +373,35 @@
   font-size: 12px;
 }
 
+/* Op de homepage staan de quick links binnen de donkere zone: dan worden ze een
+   donker glaspaneel zoals de agenda-kaart, met lichte tekst. De lichte variant
+   hierboven blijft gelden op andere oppervlakken (bv. de sample-pagina). */
+.vtk-design .home-dark-zone .quick-row {
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 18px;
+  overflow: hidden;
+  background: rgba(9, 15, 32, 0.42);
+  -webkit-backdrop-filter: blur(16px) saturate(1.05);
+  backdrop-filter: blur(16px) saturate(1.05);
+}
+
+.vtk-design .home-dark-zone .ql {
+  border-right-color: rgba(255, 255, 255, 0.12);
+}
+
+.vtk-design .home-dark-zone .ql:hover {
+  background: rgba(255, 210, 63, 0.14);
+}
+
+.vtk-design .home-dark-zone .ql .k,
+.vtk-design .home-dark-zone .ql .m {
+  color: var(--on-dark-muted);
+}
+
+.vtk-design .home-dark-zone .ql .v {
+  color: var(--paper);
+}
+
 .vtk-design .section,
 .vtk-design section.block {
   max-width: var(--max);
@@ -409,6 +447,8 @@
 }
 
 .vtk-design .acard {
+  position: relative;
+  overflow: hidden;
   min-height: 240px;
   display: flex;
   flex-direction: column;
@@ -494,6 +534,91 @@
   color: var(--navy);
 }
 
+/* Fotokop op de aanbod-kaarten: elke werking opent met beeld onder een lichte
+   navy scrim (fotografie-richting). De kop bloedt tot de kaartranden; werkingen
+   zonder foto vallen terug op het gestreepte placeholder-patroon, zodat het
+   ritme blijft kloppen en meteen zichtbaar is waar nog beeld ontbreekt. */
+.vtk-design .acard-media {
+  position: relative;
+  display: block;
+  height: 118px;
+  margin: -28px -28px 20px;
+  overflow: hidden;
+  border-bottom: 1px solid var(--line);
+}
+
+.vtk-design .acard-media img {
+  object-fit: cover;
+}
+
+.vtk-design .acard-media::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    115deg,
+    rgba(10, 15, 31, 0.5) 0%,
+    rgba(14, 26, 54, 0.16) 55%,
+    rgba(14, 26, 54, 0) 100%
+  );
+}
+
+.vtk-design .acard-media-ph {
+  background: repeating-linear-gradient(-45deg, var(--paper-2) 0 8px, var(--paper) 8px 16px);
+}
+
+.vtk-design .acard-media-ph::after {
+  content: none;
+}
+
+/* De featured kaart wordt een mini-hero: de foto vult de hele kaart onder de
+   103deg-scrim van de hero, met lichte tekst en de gele tag-pill erop. Zonder
+   foto blijft de gewone feat-stijl (gele accentrail) gelden. */
+.vtk-design .acard.acard-photo {
+  background: var(--navy);
+  border-color: rgba(255, 255, 255, 0.14);
+  box-shadow: none;
+  min-height: 280px;
+}
+
+.vtk-design .acard-photo .acard-bg {
+  position: absolute;
+  inset: 0;
+}
+
+.vtk-design .acard-photo .acard-bg img {
+  object-fit: cover;
+}
+
+.vtk-design .acard-photo .acard-bg::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    103deg,
+    rgba(9, 12, 24, 0.88) 0%,
+    rgba(10, 15, 31, 0.72) 45%,
+    rgba(14, 26, 54, 0.45) 100%
+  );
+}
+
+.vtk-design .acard-photo .acard-body,
+.vtk-design .acard-photo .cta {
+  position: relative;
+}
+
+.vtk-design .acard-photo h3 {
+  color: var(--paper);
+}
+
+.vtk-design .acard-photo p {
+  color: rgba(250, 250, 247, 0.85);
+}
+
+.vtk-design .acard-photo .cta {
+  color: var(--paper);
+}
+
 .vtk-design .career {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
@@ -533,6 +658,7 @@
    `display: grid` geeft de img een definiete hoogte om op te vullen; de
    min-height staat op de figure zodat de gridrij meegroeit i.p.v. te clippen. */
 .vtk-design .career-photo {
+  position: relative;
   align-self: stretch;
   display: grid;
   min-height: 280px;
@@ -549,12 +675,177 @@
   object-fit: cover;
 }
 
-.vtk-design .hours-strip {
-  max-width: var(--max);
-  margin: clamp(84px, 10vw, 120px) auto 0;
-  padding: 0 clamp(20px, 3vw, 36px);
+.vtk-design .career-photo figcaption {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  padding: 44px 18px 14px;
+  background: linear-gradient(to top, rgba(10, 15, 31, 0.72), rgba(10, 15, 31, 0));
+  color: var(--paper);
+  font-size: 13px;
+  font-weight: 500;
+}
+
+/* Career als navy band (bandenritme, zelfde navy als header en footer): het
+   paneel lost op in de band, de tekst wordt licht, de cijfers geel en de
+   primaire knop inverteert zoals op de hero. */
+.vtk-design .career-band {
+  position: relative;
+  z-index: 0;
+  margin-top: clamp(84px, 10vw, 120px);
+  padding-top: clamp(56px, 7vw, 88px);
+  padding-bottom: clamp(64px, 8vw, 96px);
+}
+
+.vtk-design .career-band::before {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  top: 0;
+  bottom: 0;
+  left: calc(50% - 50vw);
+  right: calc(50% - 50vw);
+  background: var(--navy);
+}
+
+.vtk-design .career-band .sec-head h2 {
+  color: var(--paper);
+}
+
+/* "your career" krijgt een eigen regel in het geel: display:block zet de breuk
+   vast zonder <br>, zodat de kop op smalle schermen gewoon verder mag wrappen. */
+.vtk-design .career-band .sec-head h2 .accent {
+  display: block;
+  color: var(--yellow);
+}
+
+.vtk-design .career-band .sec-head .meta {
+  color: var(--on-dark-muted);
+}
+
+.vtk-design .career-band .career {
   background: transparent;
-  color: var(--ink);
+  border: 0;
+  padding: 0;
+}
+
+.vtk-design .career-band .eyebrow {
+  color: rgba(250, 250, 247, 0.74);
+}
+
+.vtk-design .career-band .career h3 {
+  color: var(--paper);
+}
+
+.vtk-design .career-band .career p {
+  color: var(--on-dark-muted);
+}
+
+.vtk-design .career-band .pcount .k {
+  color: var(--on-dark-muted);
+}
+
+.vtk-design .career-band .pcount .v {
+  color: var(--yellow);
+}
+
+.vtk-design .career-band .btn-primary {
+  background: var(--paper);
+  border-color: var(--paper);
+  color: var(--ink) !important;
+}
+
+.vtk-design .career-band .btn-primary:hover {
+  background: var(--surface);
+  border-color: #fff;
+}
+
+.vtk-design .career-band .career-photo {
+  border-color: rgba(255, 255, 255, 0.18);
+}
+
+/* Openingsuren als volwaardige navy band: het donker van de hero keert hier
+   bewust terug (bandenritme). De band begint direct onder de strakke naad van
+   de donkere zone (geen marge, compacte kop) en de panelen worden donker glas
+   zoals de agenda-kaart. */
+.vtk-design .hours-strip {
+  position: relative;
+  z-index: 0;
+  max-width: var(--max);
+  margin: 0 auto;
+  padding: 44px clamp(20px, 3vw, 36px) clamp(64px, 8vw, 96px);
+  background: transparent;
+  color: var(--paper);
+}
+
+.vtk-design .hours-strip::before {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  top: 0;
+  bottom: 0;
+  left: calc(50% - 50vw);
+  right: calc(50% - 50vw);
+  background: var(--navy);
+}
+
+/* Technisch patroon (huisstijl) als achtergrond in de navy banden: dezelfde
+   tekentaal als de huisstijl-achtergrond - cirkels, raaklijnen, arceringen,
+   maatpijlen. Het ligt als aparte laag boven de navy vulling (::before) maar
+   onder de inhoud, zodat de sterkte los te regelen is. De tegel is bewust groot
+   (880px) zodat je grote bogen ziet in plaats van behangetje, en het masker laat
+   het patroon aan de naden uitdoven: bij de strakke naad boven de openingsuren
+   mag geen ruis staan. Wit op navy, laag genoeg om tekst niet te storen. */
+.vtk-design .hours-strip::after,
+.vtk-design .career-band::after {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  top: 0;
+  bottom: 0;
+  left: calc(50% - 50vw);
+  right: calc(50% - 50vw);
+  pointer-events: none;
+  background-image: url("/technisch-pattern.svg");
+  background-size: 880px 880px;
+  background-repeat: repeat;
+  opacity: 0.38;
+  -webkit-mask-image: linear-gradient(
+    to bottom,
+    transparent 0,
+    #000 88px,
+    #000 calc(100% - 88px),
+    transparent 100%
+  );
+  mask-image: linear-gradient(
+    to bottom,
+    transparent 0,
+    #000 88px,
+    #000 calc(100% - 88px),
+    transparent 100%
+  );
+}
+
+/* Elke band krijgt een andere uitsnede van de tekening. Zonder dit staat het
+   patroon in beide banden op exact dezelfde plek (even breed, zelfde positie) en
+   zie je twee keer hetzelfde behang in plaats van twee details van een plan. */
+.vtk-design .hours-strip::after {
+  background-position: calc(50% - 90px) -70px;
+}
+
+.vtk-design .career-band::after {
+  background-position: calc(50% + 300px) -480px;
+}
+
+.vtk-design .hours-strip .sec-head h2 {
+  color: var(--paper);
+}
+
+.vtk-design .hours-strip .sec-head .meta {
+  color: var(--on-dark-muted);
 }
 
 .vtk-design .hours-grid {
@@ -565,15 +856,15 @@
 }
 
 .vtk-design .hours-col {
-  border: 1px solid var(--line);
+  border: 1px solid rgba(255, 255, 255, 0.14);
   border-radius: 18px;
-  background: var(--surface);
+  background: rgba(255, 255, 255, 0.06);
   padding: 28px;
 }
 
 .vtk-design .hours-col.section-hours-bg {
-  background: var(--surface);
-  color: var(--ink);
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--paper);
 }
 
 .vtk-design .hours-col h3 {
@@ -585,12 +876,12 @@
 
 .vtk-design .hours-col .sub,
 .vtk-design .hours-col .status {
-  color: var(--muted);
+  color: var(--on-dark-muted);
   font-size: 13px;
 }
 
 .vtk-design .hours-col.section-hours-bg .sub {
-  color: var(--muted);
+  color: var(--on-dark-muted);
 }
 
 .vtk-design .hours-col .status {
@@ -598,6 +889,7 @@
   font-weight: 600;
 }
 
+/* Statusgroen/-rood iets lichter dan op wit, zodat ze op navy blijven lezen. */
 .vtk-design .hours-col .status::before {
   content: "";
   display: inline-block;
@@ -605,11 +897,11 @@
   height: 7px;
   margin-right: 8px;
   border-radius: 50%;
-  background: #30b56b;
+  background: #52d98b;
 }
 
 .vtk-design .hours-col .status.closed::before {
-  background: #c35b43;
+  background: #e58a70;
 }
 
 .vtk-design .hours-list {
@@ -620,7 +912,7 @@
 }
 
 .vtk-design .hours-list dt {
-  color: var(--muted);
+  color: var(--on-dark-muted);
   text-transform: uppercase;
 }
 
@@ -629,7 +921,7 @@
 }
 
 .vtk-design .hours-col.section-hours-bg .hours-list dt {
-  color: var(--muted);
+  color: var(--on-dark-muted);
 }
 
 .vtk-design .hours-list .today {
@@ -714,6 +1006,10 @@
   .vtk-design .ql {
     border-right: 0;
     border-bottom: 1px solid var(--line);
+  }
+
+  .vtk-design .home-dark-zone .ql {
+    border-bottom-color: rgba(255, 255, 255, 0.12);
   }
 
   .vtk-design .ql:last-child {
