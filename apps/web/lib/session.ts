@@ -31,7 +31,7 @@ export async function requirePermission(permission: Permission) {
 
 /**
  * Toegang zodra de gebruiker één van de rechten heeft. Voor schermen die meerdere
- * rechten bundelen (bv. /admin/inhoud met `pages.edit` én `header.manage`); gate
+ * rechten bundelen (bv. /admin/paginas met `pages.edit` én `pages.editAll`); gate
  * de onderdelen daar zelf nog per recht.
  */
 export async function requireAnyPermission(permissions: Permission[]) {

@@ -1,17 +1,15 @@
 import { notFound } from "next/navigation";
 import { prisma } from "@vtk/db";
 import { hasLocale } from "@/lib/locale";
-import { requireAnyPermission } from "@/lib/session";
-import { hasPermission } from "@vtk/auth";
-import { publicUrl } from "@/lib/storage";
+import { requirePermission } from "@/lib/session";
 import type { Locale } from "@vtk/i18n";
-import { ContentManager, type TabNode, type PageNode } from "./ContentManager";
+import { ContentManager, type TabNode, type PageNode, type RoleOption } from "./ContentManager";
 
 /**
- * Beheer van de navigatiestructuur en alle CMS-pagina's op één scherm: welke
- * categorieën in de header staan, wat er op die categoriepagina's komt, en de
- * inhoud van de pagina's eronder. Vervangt de losse /admin/header en
- * /admin/paginas.
+ * Beheer van de navigatiestructuur: welke categorieën in de header staan, welke
+ * pagina's daaronder hangen, en de metadata van die pagina's (titels, slug,
+ * publicatie, bewerkrollen). De INHOUD, de bijlagen en het verwijderen van een
+ * pagina horen in /admin/paginas; elke pagina heeft daarvoor een snelkoppeling.
  */
 export default async function AdminContent({
   params,
@@ -22,18 +20,39 @@ export default async function AdminContent({
   if (!hasLocale(localeParam)) notFound();
   const locale: Locale = localeParam;
 
-  const session = await requireAnyPermission(["pages.edit", "header.manage"]);
-  const canEditPages = hasPermission(session, "pages.edit");
-  const canDeletePages = hasPermission(session, "pages.delete");
-  const canManageHeader = hasPermission(session, "header.manage");
+  await requirePermission("pages.manage");
 
-  const [tabs, pages] = await Promise.all([
+  const [tabs, pages, roles] = await Promise.all([
     prisma.headerTab.findMany({ orderBy: { order: "asc" } }),
+    // Enkel de pagina's die in de boom staan (losse pagina's hangen per definitie
+    // nergens onder), en enkel de velden die de inspector toont. De markdown en
+    // de bijlagen blijven bewust ongelezen: die zijn groot en worden hier niet
+    // bewerkt.
     prisma.page.findMany({
-      include: { assets: { orderBy: { order: "asc" } } },
+      where: { headerTabId: { not: null } },
+      select: {
+        id: true,
+        slug: true,
+        headerTabId: true,
+        visibleInHeader: true,
+        titleNl: true,
+        titleEn: true,
+        excerptNl: true,
+        excerptEn: true,
+        publishedAt: true,
+        needsYearlyEdit: true,
+        order: true,
+        editorRoles: { select: { roleId: true } },
+      },
       orderBy: [{ order: "asc" }, { titleNl: "asc" }],
     }),
+    prisma.role.findMany({ orderBy: [{ order: "asc" }, { nameNl: "asc" }] }),
   ]);
+
+  const roleOptions: RoleOption[] = roles.map((r) => ({
+    id: r.id,
+    name: locale === "nl" ? r.nameNl : r.nameEn,
+  }));
 
   const toPageNode = (p: (typeof pages)[number]): PageNode => ({
     id: p.id,
@@ -44,17 +63,10 @@ export default async function AdminContent({
     titleEn: p.titleEn,
     excerptNl: p.excerptNl,
     excerptEn: p.excerptEn,
-    contentJsonNl: p.contentJsonNl,
-    contentJsonEn: p.contentJsonEn,
     published: Boolean(p.publishedAt),
+    needsYearlyEdit: p.needsYearlyEdit,
+    editorRoleIds: p.editorRoles.map((r) => r.roleId),
     order: p.order,
-    assets: p.assets.map((a) => ({
-      id: a.id,
-      labelNl: a.labelNl,
-      kind: a.kind,
-      storageKey: a.storageKey,
-      url: publicUrl(a.storageKey),
-    })),
   });
 
   const tabNodes: TabNode[] = tabs.map((t) => ({
@@ -72,16 +84,11 @@ export default async function AdminContent({
     pages: pages.filter((p) => p.headerTabId === t.id).map(toPageNode),
   }));
 
-  const unlinked = pages.filter((p) => p.headerTabId === null).map(toPageNode);
-
   return (
     <ContentManager
       locale={locale}
       tabs={tabNodes}
-      unlinked={unlinked}
-      canEditPages={canEditPages}
-      canDeletePages={canDeletePages}
-      canManageHeader={canManageHeader}
+      roles={roleOptions}
       usingDefaults={tabs.length === 0}
     />
   );

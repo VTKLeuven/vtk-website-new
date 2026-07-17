@@ -270,6 +270,7 @@
   "admin": {
     "title": "Admin",
     "dashboard": "Dashboard",
+    "pages": "Pages",
     "content": "Content",
     "calendar": "Calendar",
     "users": "Users",
@@ -294,7 +295,8 @@
     "edit": "Edit",
     "back": "Back",
     "noAccess": "No access",
-    "ledenbeheer": "Members"
+    "ledenbeheer": "Members",
+    "website": "Website"
   },
   "confirmStudy": {
     "title": "Are your studies still up to date?",

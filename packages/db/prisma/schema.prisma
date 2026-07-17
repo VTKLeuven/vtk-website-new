@@ -353,6 +353,7 @@ model Role {
   permissions RolePermission[]
   users       UserRole[]
   groupGrants GroupRole[]
+  pageGrants  PageEditorRole[]
 }
 
 model RolePermission {
@@ -436,21 +437,47 @@ model Page {
   visibleInHeader Boolean   @default(true)
   titleNl         String
   titleEn         String?
+  // Legacy tiptap-documenten. Markdown (contentMdNl/En) is de bron van waarheid;
+  // deze JSON wordt enkel nog gerenderd zolang de pagina niet één keer in de
+  // markdown-editor opgeslagen is.
   contentJsonNl   Json
   contentJsonEn   Json?
+  contentMdNl     String?
+  contentMdEn     String?
   excerptNl       String?
   excerptEn       String?
+  // Jaarlijks na te kijken pagina (namen, telefoonnummers, ...): komt bovenaan
+  // het paginabeheer te staan zolang ze dit werkingsjaar niet bewerkt is.
+  needsYearlyEdit Boolean   @default(false)
+  // Laatste keer dat de INHOUD via de editor opgeslagen is. updatedAt telt niet:
+  // die verschuift ook bij structuurwijzigingen (verslepen, hernoemen, ...).
+  contentEditedAt DateTime?
   publishedAt     DateTime?
   order           Int       @default(0)
   createdById     String?
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
 
-  headerTab HeaderTab?  @relation(fields: [headerTabId], references: [id], onDelete: SetNull)
-  createdBy User?       @relation("PageCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
-  assets    PageAsset[]
+  headerTab   HeaderTab?       @relation(fields: [headerTabId], references: [id], onDelete: SetNull)
+  createdBy   User?            @relation("PageCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  assets      PageAsset[]
+  editorRoles PageEditorRole[]
 
   @@index([headerTabId])
+}
+
+// Rollen die de inhoud van een pagina mogen bewerken (naast superadmin en
+// pages.editAll). Een pagina zonder rijen hier is vergrendeld voor gewone
+// pages.edit-houders.
+model PageEditorRole {
+  pageId String
+  roleId String
+
+  page Page @relation(fields: [pageId], references: [id], onDelete: Cascade)
+  role Role @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@id([pageId, roleId])
+  @@index([roleId])
 }
 
 model PageAsset {

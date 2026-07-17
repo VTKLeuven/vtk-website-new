@@ -33,6 +33,27 @@ container mounts (which contain symlink cycles).
 explicit `@source` directives. Do not switch back to auto-detection: the
 oxide scanner follows symlinks and was walking `~/OrbStack/**`.
 
+# Never hand-edit deps; regenerate the lockfile
+
+npm drops other platforms' native binaries from `package-lock.json` on an
+incremental `npm install` (npm/cli#4828). The lockfile keeps working on the
+machine that wrote it, so this ships unnoticed: `npm ci` on Linux (the server
+and CI) or macOS then installs a binding package with no `.node` file in it,
+and the failure only surfaces at build/dev time as a cryptic "cannot find
+native binding". It has bitten us twice: `@rolldown/binding-*` (fixed in
+691f554) and `lightningcss-*` (fixed after `cee7046` shipped it broken again).
+
+- After changing dependencies, do NOT commit an incrementally-updated lockfile.
+  Regenerate it: `rm -rf node_modules package-lock.json && npm install`.
+  A clean resolve pulls in every platform's optional deps.
+- `npm run verify:lockfile` (`scripts/check-lockfile-platforms.mjs`) asserts
+  that every declared platform binding has a lockfile entry. CI runs it before
+  `npm ci`, so a pruned lockfile fails the PR instead of the deploy.
+- Symptom on Windows: every page 500s in dev with a lightningcss error.
+  Installing just the one missing binary (`npm install --no-save
+  lightningcss-win32-x64-msvc`) unblocks your machine but leaves the lockfile
+  broken for Linux and macOS. Fix the lockfile instead.
+
 # Prisma client must not be re-exported from @vtk/db
 
 `packages/db/src/index.ts` exports `prisma` only. Do NOT re-export from

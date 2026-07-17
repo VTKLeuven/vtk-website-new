@@ -100,12 +100,13 @@ async function main() {
   }
 
   console.log("Seeding permissions...");
-  // Create-only: bestaande permission-rijen niet overschrijven bij een reseed.
-  // Nieuwe permission-codes worden nog toegevoegd via `create`.
+  // Labels en categorie volgen de registry (packages/db/src/permissions.ts): die
+  // is de bron van waarheid en permissies zijn niet via de GUI bewerkbaar, dus
+  // een reseed mag ze gewoon bijwerken.
   for (const p of PERMISSIONS) {
     await prisma.permission.upsert({
       where: { code: p.code },
-      update: {},
+      update: { labelNl: p.labelNl, labelEn: p.labelEn, category: p.category },
       create: { code: p.code, labelNl: p.labelNl, labelEn: p.labelEn, category: p.category },
     });
   }

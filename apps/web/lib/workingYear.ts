@@ -31,6 +31,15 @@ export function workingYearTabs(yearsWithData: number[] = [], now: Date = new Da
   return [...set].sort((a, b) => b - a);
 }
 
+/**
+ * Startmoment van een werkingsjaar: 15 juli van dat jaar (Brussel-tijd, hier
+ * benaderd als middernacht UTC; het uur doet er niet toe voor "is deze pagina
+ * dit werkingsjaar al bijgewerkt?"-checks).
+ */
+export function workingYearStart(year: number): Date {
+  return new Date(Date.UTC(year, 6, 15));
+}
+
 /** Parse een `?jaar=`-querywaarde naar een geldig werkingsjaar (of het huidige). */
 export function parseWorkingYear(raw: string | undefined, now: Date = new Date()): number {
   const n = Number(raw);

@@ -270,6 +270,7 @@
   "admin": {
     "title": "Admin",
     "dashboard": "Dashboard",
+    "pages": "Pagina's",
     "content": "Inhoud",
     "calendar": "Kalender",
     "users": "Gebruikers",
@@ -294,7 +295,8 @@
     "edit": "Bewerken",
     "back": "Terug",
     "noAccess": "Geen toegang",
-    "ledenbeheer": "Ledenbeheer"
+    "ledenbeheer": "Ledenbeheer",
+    "website": "Website"
   },
   "confirmStudy": {
     "title": "Klopt je studie nog?",
