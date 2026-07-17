@@ -104,7 +104,8 @@ input errors are *returned* as `saveError(code)`, not thrown (see `CLAUDE.md`).
 
 Info pages are the one place where a plain permission is not enough: the **content** of a page may
 only be edited by users holding one of the page's **editor roles** (`PageEditorRole`, assigned in
-`/admin/inhoud`). The check lives in `apps/web/lib/pageAccess.ts`:
+`/admin/inhoud` or in the settings card at the bottom of the editor). The check lives in
+`apps/web/lib/pageAccess.ts`:
 
 ```ts
 canEditPageContent(session, page /* with editorRoles */)
@@ -114,10 +115,43 @@ canEditPageContent(session, page /* with editorRoles */)
 ```
 
 The pages permission family: `pages.edit` (edit assigned pages), `pages.editAll` (bypass the role
-match), `pages.manage` (structure/metadata: `/admin/inhoud`), `pages.delete`. `header.manage` still
+match), `pages.manage` (structure: `/admin/inhoud`), `pages.publish`, `pages.delete`. `header.manage` still
 exists and is accepted alongside `pages.manage` by the header-tab actions, but `/admin/inhoud`
 itself is gated on `pages.manage` only. Product rationale in
 `docs/design-decisions.md` ("Infopagina's").
+
+**Editor roles, the yearly flag and the slug are not gated on `pages.manage`.**
+`savePageSettingsAction` (the editor's settings card) authorises with the same `canEditPageContent`
+check as the content itself, evaluated against the page **as it is now**. So whoever may edit a page
+may also hand that page to another role, and may rename its slug (globally unique; a taken slug
+comes back as `SLUG_TAKEN`, not a 500). This is deliberate (a werkgroep adds a colleague or fixes an
+address without going through IT) and is not a self-escalation: you cannot open a page you could not
+already edit. What it does allow is removing your own access, which the UI confirms with an extra
+dialog and which only `pages.editAll`/superadmin can undo.
+
+**Creating pages is `pages.edit`/`pages.editAll`, not `pages.manage`.** `createPageAction` takes only
+a title and slug, and stamps the **creator's own roles** as the page's editor roles (otherwise the
+page would be locked the moment it exists). The new page is an unpublished draft with no category:
+publishing and hanging it under a header category remain `pages.manage`, so this does not let a
+content editor put anything on the public site or in the navigation. It is the **only** create path;
+`savePageAction` updates existing pages only, so no page can be born without editor roles.
+
+**Deleting needs `pages.delete` AND `canEditPageContent`.** The button moved to the editor, which
+plain `pages.edit` users reach, so the permission alone is no longer a sufficient gate:
+`deletePageAction` checks page access too. Otherwise anyone holding `pages.delete` could wipe any
+werkgroep's page by posting its id.
+
+**Publishing is its own permission: `pages.publish` (or `pages.manage`)** — see `canPublishPages` in
+`apps/web/lib/pageAccess.ts`. Writing a page is not the same right as putting it on the site, so
+plain `pages.edit`/`pages.editAll` cannot publish. The checkbox lives in the editor's settings card
+and only renders for holders.
+
+The subtle part is the **absent** field. HTML checkboxes post nothing when unticked, so reading
+"absent" as "unpublish" would mean a plain editor silently takes a live page offline just by saving
+their roles. `savePageSettingsAction` therefore treats the field as tri-state: `on` / `off` /
+**absent = do not touch** (`publishedAt: undefined`), and it ignores a posted value entirely from
+anyone without the right. `/admin/inhoud` needs no such care: it is gated on `pages.manage`, which
+grants publishing by definition.
 
 ## Adding a permission (code) vs. a role (GUI)
 
@@ -156,8 +190,9 @@ table whose rows expand into per-category editors, with create/import in modals.
 | `/admin/groepen` (`PostsTable`) | `groups.manage` | Per working-year tabs. Row = post + member count. Expands to: members, roles this post grants (DEFAULT/LEADER), post settings (incl. `active`). Posts are deactivated, never hard-deleted. |
 | `/admin/gebruikers` | `users.view` (edit needs `users.edit`) | **Server-driven** table (URL `?q&sort&dir&page`, `count` + `findMany` with `take`/`skip`, no memberships join) — built to scale to tens of thousands of users. Editing opens `/admin/gebruikers/[id]`. |
 | `/admin/pocs` (`PocsTable`) | `pocs.manage` | Row = POC + representative count. Expands to representatives (added via the `/api/users/search` typeahead) and POC settings. |
-| `/admin/paginas` (`PagesTable`) | `pages.edit` or `pages.editAll` | Lists only the pages the user may edit (role match; editAll/superadmin sees all). Yearly-review pages not yet edited this working year float to the top with a yellow cue. Row → full-page markdown editor (`/admin/paginas/[id]`). |
-| `/admin/inhoud` (`ContentManager`) | `pages.manage` | Header categories + page structure/metadata (slug, category, publish, editor roles, yearly flag, attachments). Content editing moved to `/admin/paginas`; every page has a quick link. Delete needs `pages.delete`. |
+| `/admin/paginas` (server-rendered table) | `pages.edit` or `pages.editAll` | Lists only the pages the user may edit (role match; editAll/superadmin sees all). Search + sort + pagination run in the DB (25/page); search spans every page the user may edit. Yearly-review pages not yet edited this working year float to the top with a yellow cue. Row → full-page markdown editor (`/admin/paginas/[id]`). "Nieuwe pagina" (title + slug) creates a draft and redirects to its editor. |
+| `/admin/paginas/[id]` (`PageContentEditor`) | `canEditPageContent` | Markdown content (NL/EN) + attachments, plus a settings card for the page's slug, editor roles and yearly flag (same check, not `pages.manage`), and Delete (`pages.delete` **and** `canEditPageContent`). |
+| `/admin/inhoud` (`ContentManager`) | `pages.manage` | Structure only: header categories, which page hangs where, titles, slug, publish, excerpts, editor roles + yearly flag. The tree lists only pages that hang under a category. "Pagina toevoegen" links an **existing** page (search via `/api/admin/pages/search`, `pages.manage`); creating, content, attachments and delete all live in `/admin/paginas`. |
 
 User pickers everywhere use the server-side typeahead `GET /api/users/search` (capped results), not
 a full user load, so they scale.

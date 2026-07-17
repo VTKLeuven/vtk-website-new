@@ -295,7 +295,8 @@
     "edit": "Edit",
     "back": "Back",
     "noAccess": "No access",
-    "ledenbeheer": "Members"
+    "ledenbeheer": "Members",
+    "website": "Website"
   },
   "confirmStudy": {
     "title": "Are your studies still up to date?",

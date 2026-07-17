@@ -1,9 +1,10 @@
 import { notFound } from "next/navigation";
 import { prisma } from "@vtk/db";
+import { hasPermission } from "@vtk/auth";
 import type { Locale } from "@vtk/i18n";
 import { hasLocale } from "@/lib/locale";
 import { requireAnyPermission } from "@/lib/session";
-import { canEditPageContent, needsYearlyReview } from "@/lib/pageAccess";
+import { canEditPageContent, canPublishPages, needsYearlyReview } from "@/lib/pageAccess";
 import { tiptapToMarkdown } from "@/lib/tiptap-to-markdown";
 import { publicUrl } from "@/lib/storage";
 import { PageContentEditor } from "./PageContentEditor";
@@ -24,14 +25,17 @@ export default async function AdminPageEditor({
 
   const session = await requireAnyPermission(["pages.edit", "pages.editAll"]);
 
-  const page = await prisma.page.findUnique({
-    where: { id },
-    include: {
-      headerTab: true,
-      assets: { orderBy: { order: "asc" } },
-      editorRoles: { select: { roleId: true } },
-    },
-  });
+  const [page, roles] = await Promise.all([
+    prisma.page.findUnique({
+      where: { id },
+      include: {
+        headerTab: true,
+        assets: { orderBy: { order: "asc" } },
+        editorRoles: { select: { roleId: true } },
+      },
+    }),
+    prisma.role.findMany({ orderBy: [{ order: "asc" }, { nameNl: "asc" }] }),
+  ]);
   if (!page) notFound();
   if (!canEditPageContent(session, page)) throw new Error("FORBIDDEN");
 
@@ -57,6 +61,7 @@ export default async function AdminPageEditor({
         published: page.publishedAt !== null,
         needsYearlyEdit: page.needsYearlyEdit,
         needsReview: needsYearlyReview(page),
+        editorRoleIds: page.editorRoles.map((r) => r.roleId),
         assets: page.assets.map((a) => ({
           id: a.id,
           labelNl: a.labelNl,
@@ -68,6 +73,11 @@ export default async function AdminPageEditor({
       initialNl={initialNl}
       initialEn={initialEn}
       convertedFromLegacy={legacy}
+      roles={roles.map((r) => ({ id: r.id, name: locale === "nl" ? r.nameNl : r.nameEn }))}
+      myRoleIds={session.roleIds}
+      canEditAll={session.user.isSuperAdmin || hasPermission(session, "pages.editAll")}
+      canDelete={hasPermission(session, "pages.delete")}
+      canPublish={canPublishPages(session)}
     />
   );
 }

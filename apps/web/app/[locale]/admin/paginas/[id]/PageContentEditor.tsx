@@ -11,6 +11,7 @@ import { saveErrorMessages } from "@/lib/saveMessages";
 import { AssetList } from "../../inhoud/AssetList";
 import { FileUploader } from "../../inhoud/FileUploader";
 import type { AssetNode } from "../../inhoud/ContentManager";
+import { PageSettingsCard, type SettingsRole } from "./PageSettingsCard";
 
 type EditorPage = {
   id: string;
@@ -21,6 +22,7 @@ type EditorPage = {
   published: boolean;
   needsYearlyEdit: boolean;
   needsReview: boolean;
+  editorRoleIds: string[];
   assets: AssetNode[];
 };
 
@@ -35,12 +37,22 @@ export function PageContentEditor({
   initialNl,
   initialEn,
   convertedFromLegacy,
+  roles,
+  myRoleIds,
+  canEditAll,
+  canDelete,
+  canPublish,
 }: {
   locale: Locale;
   page: EditorPage;
   initialNl: string;
   initialEn: string;
   convertedFromLegacy: boolean;
+  roles: SettingsRole[];
+  myRoleIds: string[];
+  canEditAll: boolean;
+  canDelete: boolean;
+  canPublish: boolean;
 }) {
   const nl = locale === "nl";
   const dict = getDictionary(locale);
@@ -164,6 +176,22 @@ export function PageContentEditor({
         <AssetList locale={locale} pageId={page.id} assets={page.assets} />
         <FileUploader pageId={page.id} locale={locale} />
       </Card>
+
+      <PageSettingsCard
+        locale={locale}
+        pageId={page.id}
+        roles={roles}
+        myRoleIds={myRoleIds}
+        canEditAll={canEditAll}
+        canDelete={canDelete}
+        canPublish={canPublish}
+        pageTitle={page.titleNl}
+        assetCount={page.assets.length}
+        initialSlug={page.slug}
+        initialPublished={page.published}
+        initialNeedsYearlyEdit={page.needsYearlyEdit}
+        initialRoleIds={page.editorRoleIds}
+      />
     </div>
   );
 }

@@ -5,6 +5,7 @@ export const PERMISSIONS = [
   { code: "pages.edit", labelNl: "Toegewezen pagina's bewerken", labelEn: "Edit assigned pages", category: "pages" },
   { code: "pages.editAll", labelNl: "Alle pagina's bewerken", labelEn: "Edit all pages", category: "pages" },
   { code: "pages.manage", labelNl: "Paginastructuur beheren", labelEn: "Manage page structure", category: "pages" },
+  { code: "pages.publish", labelNl: "Pagina's publiceren", labelEn: "Publish pages", category: "pages" },
   { code: "pages.delete", labelNl: "Pagina's verwijderen", labelEn: "Delete pages", category: "pages" },
 
   // Header

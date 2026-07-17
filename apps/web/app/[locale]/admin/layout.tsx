@@ -48,15 +48,17 @@ const NAV: NavEntry[] = [
     item('pocs', '/pocs', { perm: 'pocs.manage' }),
     item('roles', '/roles', { perm: 'roles.manage' }),
   ]),
+  group('website', [
+    item('home', '/home', { perm: 'home.edit' }),
+    item('content', '/inhoud', { perm: 'pages.manage' }),
+    item('pages', '/paginas', { anyPerm: ['pages.edit', 'pages.editAll'] }),
+    item('partners', '/partners', { perm: 'partners.manage' }),
+  ]),
   item('mailinglists', '/mailinglijsten', { perm: 'mailinglists.export' }),
-  item('pages', '/paginas', { anyPerm: ['pages.edit', 'pages.editAll'] }),
-  item('content', '/inhoud', { perm: 'pages.manage' }),
   item('calendar', '/kalender', { perm: 'calendar.create' }),
   item('tickets', '/tickets', { ticketing: true }),
   item('albums', '/albums', { perm: 'photos.manageAlbums' }),
   item('media', '/media', { perm: 'media.manage' }),
-  item('partners', '/partners', { perm: 'partners.manage' }),
-  item('home', '/home', { perm: 'home.edit' }),
   item('dashboardTiles', '/dashboard-tiles', { perm: 'dashboard.manage' }),
   item('shortlinks', '/links', { perm: 'shortlinks.manage' }),
   item('shift', '/shiften', { anyPerm: ['shift.edit', 'shift.reward', 'shift.ranking'] }),
@@ -85,8 +87,8 @@ export default async function AdminLayout({
   const adminDict = dict.admin as DictAdmin & { [key: string]: string };
   const canAccessTickets =
     session.user.isSuperAdmin ||
-    session.permissions.includes("tickets.create") ||
-    session.permissions.includes("tickets.manageAll") ||
+    session.permissions.includes('tickets.create') ||
+    session.permissions.includes('tickets.manageAll') ||
     (await canAccessAnyTicketEvent());
 
   // Mag de huidige gebruiker deze entry zien? Superadmin ziet alles.

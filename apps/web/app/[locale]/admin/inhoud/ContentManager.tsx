@@ -12,6 +12,7 @@ import {
 } from "@/app/actions/pages";
 import { TabInspector } from "./TabInspector";
 import { PageInspector } from "./PageInspector";
+import { AddPagePicker } from "./AddPagePicker";
 
 export type AssetNode = {
   id: string;
@@ -35,7 +36,6 @@ export type PageNode = {
   /** Rollen die de inhoud mogen bewerken (PageEditorRole). */
   editorRoleIds: string[];
   order: number;
-  assets: AssetNode[];
 };
 
 /** Rol-optie voor de bewerkrollen-checkboxes, naam al in de juiste taal. */
@@ -56,13 +56,12 @@ export type TabNode = {
   pages: PageNode[];
 };
 
-/** Wat de rechterkolom toont. `new-page`/`new-tab` zijn nog niet opgeslagen. */
+/** Wat de rechterkolom toont. `new-tab` is nog niet opgeslagen. */
 type Selection =
   | { kind: "none" }
   | { kind: "tab"; id: string }
   | { kind: "page"; id: string }
-  | { kind: "new-tab" }
-  | { kind: "new-page"; headerTabId: string | null };
+  | { kind: "new-tab" };
 
 /** Sleepbron: een categorie of een pagina uit een bepaalde categorie. */
 type Drag =
@@ -72,16 +71,12 @@ type Drag =
 export function ContentManager({
   locale,
   tabs,
-  unlinked,
   roles,
-  canDeletePages,
   usingDefaults,
 }: {
   locale: Locale;
   tabs: TabNode[];
-  unlinked: PageNode[];
   roles: RoleOption[];
-  canDeletePages: boolean;
   usingDefaults: boolean;
 }) {
   const nl = locale === "nl";
@@ -97,11 +92,10 @@ export function ContentManager({
   });
   const drag = useRef<Drag | null>(null);
   const [dropTarget, setDropTarget] = useState<string | null>(null);
+  /** Categorie waarvoor de "pagina toevoegen"-picker openstaat. */
+  const [addingTo, setAddingTo] = useState<TabNode | null>(null);
 
-  const allPages = useMemo(
-    () => [...tabs.flatMap((t) => t.pages), ...unlinked],
-    [tabs, unlinked],
-  );
+  const allPages = useMemo(() => tabs.flatMap((t) => t.pages), [tabs]);
 
   const select = useCallback(
     (next: Selection) => {
@@ -155,10 +149,7 @@ export function ContentManager({
       return;
     }
 
-    const siblings =
-      target.headerTabId === null
-        ? unlinked
-        : (tabs.find((t) => t.id === target.headerTabId)?.pages ?? []);
+    const siblings = tabs.find((t) => t.id === target.headerTabId)?.pages ?? [];
     const ids = siblings.map((p) => p.id);
     const from = ids.indexOf(d.id);
     const to = ids.indexOf(target.id);
@@ -272,7 +263,7 @@ export function ContentManager({
 
         <button
           type="button"
-          onClick={() => select({ kind: "new-page", headerTabId: tab.id })}
+          onClick={() => setAddingTo(tab)}
           className="mb-1 ml-8 mt-0.5 text-xs font-medium text-[#5c667f] hover:text-vtk-ink"
         >
           + {nl ? "Pagina toevoegen" : "Add page"}
@@ -314,54 +305,6 @@ export function ContentManager({
               {nl ? "Nog geen categorieën." : "No categories yet."}
             </p>
           )}
-
-          <div
-            className={[
-              "mt-3 border-t border-vtk-blue/10 pt-3",
-              dropTarget === "__unlinked__" ? "rounded-xl ring-2 ring-vtk-yellow" : "",
-            ].join(" ")}
-            onDragOver={(e) => {
-              // Een categorie hoort niet in de losse-pagina's sectie thuis; enkel
-              // pagina's kun je hier droppen.
-              if (drag.current?.kind !== "page") return;
-              e.preventDefault();
-              if (dropTarget !== "__unlinked__") setDropTarget("__unlinked__");
-            }}
-            onDrop={(e) => {
-              e.preventDefault();
-              const d = drag.current;
-              drag.current = null;
-              setDropTarget(null);
-              if (d?.kind === "page" && d.fromTabId !== null) {
-                startTransition(() => void movePageToTabAction(d.id, null));
-              }
-            }}
-          >
-            <div className="px-3 pb-1 text-xs font-semibold uppercase tracking-wide text-[#5c667f]">
-              {nl ? "Niet gekoppeld" : "Unlinked"}
-            </div>
-            <ul className="space-y-0.5">
-              {unlinked.map((p) => (
-                <li key={p.id}>
-                  <PageRow page={p} />
-                </li>
-              ))}
-            </ul>
-            {unlinked.length === 0 && (
-              <p className="px-3 py-2 text-xs text-[#5c667f]">
-                {nl
-                  ? "Sleep hier een pagina om ze uit de navigatie te halen."
-                  : "Drag a page here to take it out of the navigation."}
-              </p>
-            )}
-            <button
-              type="button"
-              onClick={() => select({ kind: "new-page", headerTabId: null })}
-              className="ml-8 mt-1 text-xs font-medium text-[#5c667f] hover:text-vtk-ink"
-            >
-              + {nl ? "Losse pagina" : "Unlinked page"}
-            </button>
-          </div>
         </Card>
 
         <div className="min-w-0">
@@ -387,24 +330,20 @@ export function ContentManager({
               page={selectedPage}
               tabs={tabs}
               roles={roles}
-              canDelete={canDeletePages}
-              onClose={close}
-            />
-          )}
-          {selection.kind === "new-page" && (
-            <PageInspector
-              key={`new-${selection.headerTabId ?? "none"}`}
-              locale={locale}
-              page={null}
-              defaultTabId={selection.headerTabId}
-              tabs={tabs}
-              roles={roles}
-              canDelete={false}
               onClose={close}
             />
           )}
         </div>
       </div>
+
+      {addingTo && (
+        <AddPagePicker
+          locale={locale}
+          tabId={addingTo.id}
+          tabLabel={nl ? addingTo.labelNl : addingTo.labelEn}
+          onClose={() => setAddingTo(null)}
+        />
+      )}
     </div>
   );
 }

@@ -1,11 +1,12 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import { z } from "zod";
 import { Prisma } from "@prisma/client";
 import { prisma, HEADER_TABS } from "@vtk/db";
 import { requireAnyPermission, requirePermission, requireSession } from "@/lib/session";
-import { canEditPageContent } from "@/lib/pageAccess";
+import { canEditPageContent, canPublishPages } from "@/lib/pageAccess";
 import { saveError, saveOk, type SaveState } from "@/lib/saveState";
 
 /** Foutcodes die /admin/inhoud en /admin/paginas op vertaalde meldingen mappen. */
@@ -28,7 +29,7 @@ function isUniqueViolation(err: unknown, field: string): boolean {
 // ---- Pagina's: structuur & metadata (pages.manage, /admin/inhoud) -----------
 
 const saveSchema = z.object({
-  id: z.string().optional(),
+  id: z.string().min(1),
   slug: z.string().min(1).regex(SLUG_REGEX),
   headerTabId: z.string().optional().nullable(),
   visibleInHeader: z.coerce.boolean().optional().default(true),
@@ -43,14 +44,18 @@ const saveSchema = z.object({
 });
 
 /**
- * Metadata en structuur van een pagina (of een nieuwe pagina aanmaken). De
- * INHOUD wordt hier bewust niet geraakt: die bewerk je in /admin/paginas via
+ * Metadata en structuur van een BESTAANDE pagina (/admin/inhoud). De INHOUD
+ * wordt hier bewust niet geraakt: die bewerk je in /admin/paginas via
  * {@link savePageContentAction}.
+ *
+ * Aanmaken kan hier niet: dat is {@link createPageAction}, die de pagina meteen
+ * de rollen van de maker geeft. Een tweede aanmaakpad zonder die stap zou
+ * pagina's opleveren die vergrendeld zijn zodra ze bestaan.
  */
 export async function savePageAction(_prev: SaveState, formData: FormData): Promise<SaveState> {
-  const session = await requirePermission("pages.manage");
+  await requirePermission("pages.manage");
   const parsed = saveSchema.safeParse({
-    id: (formData.get("id") as string) || undefined,
+    id: formData.get("id"),
     slug: formData.get("slug"),
     headerTabId: formData.get("headerTabId") || null,
     visibleInHeader: formData.get("visibleInHeader") === "on",
@@ -66,55 +71,36 @@ export async function savePageAction(_prev: SaveState, formData: FormData): Prom
   if (!parsed.success) return saveError("INVALID_INPUT" satisfies ContentErrorCode);
   const data = parsed.data;
 
-  const common = {
-    slug: data.slug,
-    headerTabId: data.headerTabId || null,
-    visibleInHeader: data.visibleInHeader,
-    titleNl: data.titleNl,
-    titleEn: data.titleEn,
-    excerptNl: data.excerptNl,
-    excerptEn: data.excerptEn,
-    needsYearlyEdit: data.needsYearlyEdit,
-    order: data.order,
-  };
+  const existing = await prisma.page.findUnique({
+    where: { id: data.id },
+    select: { publishedAt: true },
+  });
+  if (!existing) return saveError("INVALID_INPUT" satisfies ContentErrorCode);
 
   try {
-    if (data.id) {
-      const existing = await prisma.page.findUnique({
-        where: { id: data.id },
-        select: { publishedAt: true },
-      });
-      await prisma.page.update({
-        where: { id: data.id },
-        data: {
-          ...common,
-          // Enkel de eerste publicatie stempelen: een bewerking van een al
-          // gepubliceerde pagina mag de publicatiedatum niet verzetten.
-          publishedAt: data.published ? (existing?.publishedAt ?? new Date()) : null,
-          // createdById bewust niet: dat blijft de oorspronkelijke auteur.
-          // Bewerkrollen exact op de aangevinkte set zetten.
-          editorRoles: {
-            deleteMany: {},
-            create: data.editorRoleIds.map((roleId) => ({ roleId })),
-          },
+    await prisma.page.update({
+      where: { id: data.id },
+      data: {
+        slug: data.slug,
+        headerTabId: data.headerTabId || null,
+        visibleInHeader: data.visibleInHeader,
+        titleNl: data.titleNl,
+        titleEn: data.titleEn,
+        excerptNl: data.excerptNl,
+        excerptEn: data.excerptEn,
+        needsYearlyEdit: data.needsYearlyEdit,
+        order: data.order,
+        // Enkel de eerste publicatie stempelen: een bewerking van een al
+        // gepubliceerde pagina mag de publicatiedatum niet verzetten.
+        publishedAt: data.published ? (existing.publishedAt ?? new Date()) : null,
+        // createdById bewust niet: dat blijft de oorspronkelijke auteur.
+        // Bewerkrollen exact op de aangevinkte set zetten.
+        editorRoles: {
+          deleteMany: {},
+          create: [...new Set(data.editorRoleIds)].map((roleId) => ({ roleId })),
         },
-      });
-    } else {
-      await prisma.page.create({
-        data: {
-          ...common,
-          // Nieuwe pagina's zijn vanaf dag één markdown; de JSON-kolom is
-          // verplicht en krijgt een leeg legacy-document.
-          contentMdNl: "",
-          contentJsonNl: EMPTY_DOC as Prisma.InputJsonValue,
-          publishedAt: data.published ? new Date() : null,
-          createdById: session.user.id,
-          editorRoles: {
-            create: data.editorRoleIds.map((roleId) => ({ roleId })),
-          },
-        },
-      });
-    }
+      },
+    });
   } catch (err) {
     // Page.slug is globaal uniek, niet per categorie.
     if (isUniqueViolation(err, "slug")) return saveError("SLUG_TAKEN" satisfies ContentErrorCode);
@@ -125,10 +111,25 @@ export async function savePageAction(_prev: SaveState, formData: FormData): Prom
   return saveOk();
 }
 
+/**
+ * Een pagina verwijderen. Twee voorwaarden, want dit staat sinds de rework in de
+ * editor (die ook gewone `pages.edit`-bewerkers bereiken): het recht
+ * `pages.delete` ÉN toegang tot deze specifieke pagina. Zonder die tweede check
+ * zou iedereen met `pages.delete` elke pagina kunnen wissen door een id te
+ * posten, ook pagina's van een werkgroep waar hij niets mee te maken heeft.
+ */
 export async function deletePageAction(_prev: SaveState, formData: FormData): Promise<SaveState> {
-  await requirePermission("pages.delete");
+  const session = await requirePermission("pages.delete");
   const id = formData.get("id") as string;
   if (!id) return saveError("INVALID_INPUT" satisfies ContentErrorCode);
+
+  const page = await prisma.page.findUnique({
+    where: { id },
+    select: { editorRoles: { select: { roleId: true } } },
+  });
+  if (!page) return saveError("INVALID_INPUT" satisfies ContentErrorCode);
+  if (!canEditPageContent(session, page)) throw new Error("FORBIDDEN");
+
   await prisma.page.delete({ where: { id } });
   revalidatePath("/", "layout");
   return saveOk();
@@ -217,6 +218,160 @@ export async function savePageContentAction(
       contentEditedAt: new Date(),
     },
   });
+
+  revalidatePath("/", "layout");
+  return saveOk();
+}
+
+// ---- Pagina's aanmaken & instellen vanuit de editor -------------------------
+
+const createPageSchema = z.object({
+  titleNl: z.string().min(1),
+  slug: z.string().min(1).regex(SLUG_REGEX),
+  locale: z.enum(["nl", "en"]).optional().default("nl"),
+});
+
+/**
+ * Een nieuwe pagina vanuit `/admin/paginas`, voor wie pagina's mag bewerken.
+ * Bewust minimaal: titel en slug. Categorie, publicatie en excerpts zijn
+ * structuur en blijven bij `pages.manage` (`/admin/inhoud`); een nieuwe pagina
+ * start dus als ongepubliceerd concept zonder categorie.
+ *
+ * De pagina krijgt meteen de rollen van de maker als bewerkrollen. Anders zou ze
+ * vergrendeld zijn op het moment dat ze bestaat (een pagina zonder rollen is
+ * enkel voor `pages.editAll`/superadmin), en zou de maker zijn eigen pagina niet
+ * kunnen openen. Aanpasbaar in de instellingen-kaart van de editor.
+ */
+export async function createPageAction(_prev: SaveState, formData: FormData): Promise<SaveState> {
+  const session = await requireAnyPermission(["pages.edit", "pages.editAll"]);
+  const parsed = createPageSchema.safeParse({
+    titleNl: formData.get("titleNl"),
+    slug: formData.get("slug"),
+    locale: formData.get("locale") || "nl",
+  });
+  if (!parsed.success) return saveError("INVALID_INPUT" satisfies ContentErrorCode);
+  const data = parsed.data;
+
+  let id: string;
+  try {
+    const created = await prisma.page.create({
+      data: {
+        slug: data.slug,
+        titleNl: data.titleNl,
+        contentMdNl: "",
+        contentJsonNl: EMPTY_DOC as Prisma.InputJsonValue,
+        createdById: session.user.id,
+        editorRoles: { create: session.roleIds.map((roleId) => ({ roleId })) },
+      },
+      select: { id: true },
+    });
+    id = created.id;
+  } catch (err) {
+    if (isUniqueViolation(err, "slug")) return saveError("SLUG_TAKEN" satisfies ContentErrorCode);
+    throw err;
+  }
+
+  revalidatePath("/", "layout");
+  // Buiten de try/catch: redirect() werkt via een throw. De navigatie naar de
+  // verse editor is meteen de bevestiging, dus geen toast nodig.
+  redirect(`${data.locale === "nl" ? "" : "/en"}/admin/paginas/${id}`);
+}
+
+// ---- Pagina-instellingen vanuit de inhoudseditor ----------------------------
+
+const pageSettingsSchema = z.object({
+  id: z.string().min(1),
+  slug: z.string().min(1).regex(SLUG_REGEX),
+  needsYearlyEdit: z.coerce.boolean().optional().default(false),
+  // Ontbreekt = "niet aangeraakt", niet "depubliceren". Zie de action.
+  published: z.enum(["on", "off"]).nullable().optional(),
+  editorRoleIds: z.array(z.string().min(1)),
+});
+
+/**
+ * De bewerkrollen en het jaarlijks-nakijken-vinkje van één pagina, vanuit de
+ * inhoudseditor (`/admin/paginas/[id]`).
+ *
+ * Wie de inhoud van een pagina mag bewerken, mag hier ook bepalen welke rollen
+ * dat verder mogen; dat is bewust ruimer dan `pages.manage` (zie
+ * docs/design-decisions.md). De check is dus dezelfde als voor de inhoud, op de
+ * pagina zoals ze NU is: je kan enkel rollen wijzigen van een pagina waar je al
+ * aan mag. Zichzelf de toegang ontnemen kan wel; de UI vraagt dat expliciet te
+ * bevestigen.
+ *
+ * `contentEditedAt` blijft hier bewust ongemoeid: dit is geen inhoudswijziging,
+ * dus het jaarlijkse nakijken mag hiermee niet afgevinkt raken.
+ *
+ * De slug hoort hier ook thuis: wie een pagina mag bewerken, mag haar adres
+ * kiezen zolang het vrij is. Slugs zijn globaal uniek, dus een bezette slug is
+ * verwachte invoer en komt als `SLUG_TAKEN` terug, niet als serverfout.
+ *
+ * Publiceren is een APART recht (`pages.publish` of `pages.manage`). Wie dat niet
+ * heeft, stuurt het veld niet mee en dan blijft de publicatiestatus staan zoals
+ * ze is. Dat is bewust geen "afwezig = uit": anders zou een gewone bewerker een
+ * gepubliceerde pagina offline halen door gewoon zijn rollen op te slaan.
+ */
+export async function savePageSettingsAction(
+  _prev: SaveState,
+  formData: FormData,
+): Promise<SaveState> {
+  const session = await requireSession();
+  const parsed = pageSettingsSchema.safeParse({
+    id: formData.get("id"),
+    slug: formData.get("slug"),
+    needsYearlyEdit: formData.get("needsYearlyEdit") === "on",
+    published: formData.get("published"),
+    editorRoleIds: formData.getAll("editorRoleIds").map(String),
+  });
+  if (!parsed.success) return saveError("INVALID_INPUT" satisfies ContentErrorCode);
+  const data = parsed.data;
+
+  const page = await prisma.page.findUnique({
+    where: { id: data.id },
+    select: { publishedAt: true, editorRoles: { select: { roleId: true } } },
+  });
+  if (!page) return saveError("INVALID_INPUT" satisfies ContentErrorCode);
+  if (!canEditPageContent(session, page)) throw new Error("FORBIDDEN");
+
+  // Publiceren mag enkel met het aparte recht; een gepost `published`-veld van
+  // iemand anders wordt genegeerd, niet geweigerd (het formulier toont het veld
+  // dan gewoon niet).
+  const mayPublish = canPublishPages(session);
+  const publishedAt =
+    mayPublish && data.published != null
+      ? data.published === "on"
+        ? (page.publishedAt ?? new Date())
+        : null
+      : undefined;
+
+  // Dubbels eruit: (pageId, roleId) is de primaire sleutel, dus een dubbele rol
+  // zou de create laten klappen op een unique violation.
+  const roleIds = [...new Set(data.editorRoleIds)];
+
+  // Onbestaande rol-id's zijn ongeldige invoer, geen serverfout: zonder deze
+  // check wordt het een FK-violation en dus een error boundary.
+  if (roleIds.length > 0) {
+    const known = await prisma.role.count({ where: { id: { in: roleIds } } });
+    if (known !== roleIds.length) return saveError("INVALID_INPUT" satisfies ContentErrorCode);
+  }
+
+  try {
+    await prisma.page.update({
+      where: { id: data.id },
+      data: {
+        slug: data.slug,
+        needsYearlyEdit: data.needsYearlyEdit,
+        // `undefined` = kolom niet aanraken (geen publicatierecht of veld niet
+        // meegestuurd). Enkel de eerste publicatie stempelen: een latere save
+        // mag de publicatiedatum niet verzetten.
+        publishedAt,
+        editorRoles: { deleteMany: {}, create: roleIds.map((roleId) => ({ roleId })) },
+      },
+    });
+  } catch (err) {
+    if (isUniqueViolation(err, "slug")) return saveError("SLUG_TAKEN" satisfies ContentErrorCode);
+    throw err;
+  }
 
   revalidatePath("/", "layout");
   return saveOk();
