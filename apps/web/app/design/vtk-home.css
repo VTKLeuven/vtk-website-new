@@ -410,6 +410,16 @@
   border-bottom: 0;
 }
 
+/* Volle-breedte banden (aftermovies, evenementen, career, POC's) dragen elk een
+   margin-top om los te komen van de paper-sectie erboven ("Wat we doen"). Twee
+   banden na elkaar mogen die marge niet houden: een paper-gat tussen navy en
+   lichtblauw leest als een fout. Volgt een band direct op een andere band, dan
+   raken ze elkaar met een strakke naad (margin-top 0). De marge blijft enkel
+   wanneer een band op paper volgt. */
+.vtk-design .band + .band {
+  margin-top: 0;
+}
+
 .vtk-design .sec-head,
 .vtk-design .block-head {
   display: flex;

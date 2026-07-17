@@ -138,8 +138,13 @@ the design language into the application instead of copying mockup content.
   carry the full-bleed `::before` navy fill plus the shared `::after` technical
   pattern, each with its own crop of `technisch-pattern.svg` so no two bands show
   the same wallpaper. The openingsuren band butts directly against the dark
-  zone's crisp seam with a compact heading; later bands sit in the light flow
-  with normal section spacing. On a navy band, panels are dark glass
+  zone's crisp seam with a compact heading. The full-bleed bands
+  (aftermovies, evenementen, career, POC's) share a `band` class: each carries a
+  top margin to separate from the paper section above it, but two consecutive
+  bands butt directly against each other with a crisp navy/light-blue seam
+  (`.band + .band { margin-top: 0 }`) rather than a paper gap; the light-blue
+  bands also keep tighter internal padding than the navy ones. On a navy band,
+  panels are dark glass
   (`rgba(255,255,255,.06)` fill, `.14` white border), headings go `--paper`,
   muted text uses `--on-dark-muted`, and the primary button inverts like on the
   hero. The **Jouw POC's** band is personal (only rendered for a logged-in member

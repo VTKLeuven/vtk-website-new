@@ -492,7 +492,7 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
       </section>
 
       {aftermovies.length > 0 && (
-        <section className="section aftermovie-band">
+        <section className="section band aftermovie-band">
           <div className="sec-head">
             <h2>{nl ? "Aftermovies." : "Aftermovies."}</h2>
             <div className="meta">
@@ -508,7 +508,7 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
       )}
 
       {eventCards.length > 0 && (
-        <section className="section events-band">
+        <section className="section band events-band">
           <div className="sec-head">
             <h2>{nl ? "Opkomende evenementen." : "Upcoming events."}</h2>
             <div className="meta">
@@ -556,7 +556,7 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
         </section>
       )}
 
-      <section className="section career-band">
+      <section className="section band career-band">
         <div className="sec-head">
           <h2>
             Never too early to build <span className="accent">your career</span>
@@ -622,7 +622,7 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
       </section>
 
       {pocsWithPeople.length > 0 && (
-        <section className="section poc-band">
+        <section className="section band poc-band">
           <div className="sec-head">
             <h2>{nl ? "Jouw POC's." : "Your POCs."}</h2>
             <div className="meta">
