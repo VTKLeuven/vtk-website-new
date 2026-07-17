@@ -5,7 +5,7 @@ export type NavHeaderTab = {
   slug: string;
   labelNl: string;
   labelEn: string;
-  /** Storage-key van de foto op de homepage-aanbodkaart (via /admin/inhoud). */
+  /** Storage-key van de foto op de homepage-aanbodkaart (via /admin/home). */
   imageKey: string | null;
 };
 

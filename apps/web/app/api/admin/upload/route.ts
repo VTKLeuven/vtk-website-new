@@ -13,7 +13,6 @@ export async function POST(request: Request) {
     !hasPermission(session, "photos.upload") &&
     !hasPermission(session, "home.edit") &&
     !hasPermission(session, "partners.manage") &&
-    !hasPermission(session, "header.manage") &&
     !hasPermission(session, "calendar.create") &&
     !hasPermission(session, "calendar.manageAll")
   ) {

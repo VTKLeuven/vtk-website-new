@@ -44,7 +44,6 @@ export type TabNode = {
   labelNl: string;
   labelEn: string;
   visible: boolean;
-  imageKey: string | null;
   introNl: string | null;
   introEn: string | null;
   ctaLabelNl: string | null;

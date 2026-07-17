@@ -32,7 +32,7 @@ type CareerSetting = {
 
 /**
  * Fallback-foto per werking op de aanbod-kaarten (fotografie-richting).
- * Beheerders uploaden per tab een eigen foto via /admin/inhoud
+ * Beheerders uploaden per tab een eigen foto via /admin/home
  * (HeaderTab.imageKey); deze statische set geldt enkel zolang een tab er geen
  * heeft. Slugs zonder foto vallen terug op het gestreepte placeholder-patroon.
  */

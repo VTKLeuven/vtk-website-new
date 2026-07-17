@@ -4,7 +4,6 @@ import { useState, useTransition } from "react";
 import { Button, Card, ConfirmDialog, Input, Label, Textarea } from "@vtk/ui";
 import { getDictionary, type Locale } from "@vtk/i18n";
 import { SaveForm } from "@/components/ui/SaveForm";
-import { StorageImageField } from "@/components/admin/StorageImageField";
 import { deleteHeaderTabAction, saveHeaderTabAction } from "@/app/actions/pages";
 import { SAVE_IDLE } from "@/lib/saveState";
 import { contentErrorMessages } from "./messages";
@@ -93,18 +92,6 @@ export function TabInspector({
           <input type="checkbox" name="visible" defaultChecked={tab?.visible ?? true} />
           {nl ? "Zichtbaar in de header" : "Visible in the header"}
         </label>
-
-        <StorageImageField
-          defaultKey={tab?.imageKey}
-          locale={locale}
-          label={nl ? "Foto op de homepage" : "Photo on the homepage"}
-          emptyHint={nl ? "Standaardfoto" : "Default photo"}
-          helpText={
-            nl
-              ? 'Verschijnt op de kaart van deze werking onder "Wat we doen" op de homepage. Zonder upload gebruikt de kaart de standaardfoto of het gestreepte patroon.'
-              : 'Shown on this group\'s card under "What we do" on the homepage. Without an upload, the card uses its default photo or the striped pattern.'
-          }
-        />
 
         <fieldset className="space-y-4 border-t border-vtk-blue/10 pt-5">
           <legend className="text-sm font-semibold text-vtk-ink">

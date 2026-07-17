@@ -144,7 +144,7 @@ the design language into the application instead of copying mockup content.
   background under the hero's 103deg scrim. Werkingen without a photo fall back
   to the striped placeholder pattern (`repeating-linear-gradient` of
   `--paper-2`/`--paper`) so missing images stay visible. Admins upload the photo
-  per werking via /admin/inhoud (`HeaderTab.imageKey`); the `AANBOD_PHOTOS` map
+  per werking via /admin/home (`HeaderTab.imageKey`); the `AANBOD_PHOTOS` map
   in HomeEditorial is only the static fallback for tabs without an upload.
 - Dark surfaces: `--navy`/`--ink` are for text, buttons, small accents, and
   intentional full-width bands only, never as a flat card fill in a light grid.

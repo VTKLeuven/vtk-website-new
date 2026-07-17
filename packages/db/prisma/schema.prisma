@@ -414,7 +414,7 @@ model HeaderTab {
   visible Boolean @default(true)
 
   // Foto op de aanbod-kaart van deze werking op de homepage (storage-key,
-  // uploadbaar via /admin/inhoud). Zonder foto valt de kaart terug op het
+  // uploadbaar via /admin/home). Zonder foto valt de kaart terug op het
   // gestreepte placeholder-patroon of de statische default in HomeEditorial.
   imageKey String?
 
