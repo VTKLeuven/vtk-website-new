@@ -468,7 +468,9 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
 
       <section className="section career-band">
         <div className="sec-head">
-          <h2>Never too early to build your career</h2>
+          <h2>
+            Never too early to build <span className="accent">your career</span>
+          </h2>
           <div className="meta">career.vtk.be · {nl ? "vacatures & events" : "vacancies & events"}</div>
         </div>
         <div className="career">

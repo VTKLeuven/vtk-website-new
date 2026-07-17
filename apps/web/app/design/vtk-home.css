@@ -715,6 +715,13 @@
   color: var(--paper);
 }
 
+/* "your career" krijgt een eigen regel in het geel: display:block zet de breuk
+   vast zonder <br>, zodat de kop op smalle schermen gewoon verder mag wrappen. */
+.vtk-design .career-band .sec-head h2 .accent {
+  display: block;
+  color: var(--yellow);
+}
+
 .vtk-design .career-band .sec-head .meta {
   color: var(--on-dark-muted);
 }
@@ -783,6 +790,54 @@
   left: calc(50% - 50vw);
   right: calc(50% - 50vw);
   background: var(--navy);
+}
+
+/* Technisch patroon (huisstijl) als achtergrond in de navy banden: dezelfde
+   tekentaal als de huisstijl-achtergrond - cirkels, raaklijnen, arceringen,
+   maatpijlen. Het ligt als aparte laag boven de navy vulling (::before) maar
+   onder de inhoud, zodat de sterkte los te regelen is. De tegel is bewust groot
+   (880px) zodat je grote bogen ziet in plaats van behangetje, en het masker laat
+   het patroon aan de naden uitdoven: bij de strakke naad boven de openingsuren
+   mag geen ruis staan. Wit op navy, laag genoeg om tekst niet te storen. */
+.vtk-design .hours-strip::after,
+.vtk-design .career-band::after {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  top: 0;
+  bottom: 0;
+  left: calc(50% - 50vw);
+  right: calc(50% - 50vw);
+  pointer-events: none;
+  background-image: url("/technisch-pattern.svg");
+  background-size: 880px 880px;
+  background-repeat: repeat;
+  opacity: 0.38;
+  -webkit-mask-image: linear-gradient(
+    to bottom,
+    transparent 0,
+    #000 88px,
+    #000 calc(100% - 88px),
+    transparent 100%
+  );
+  mask-image: linear-gradient(
+    to bottom,
+    transparent 0,
+    #000 88px,
+    #000 calc(100% - 88px),
+    transparent 100%
+  );
+}
+
+/* Elke band krijgt een andere uitsnede van de tekening. Zonder dit staat het
+   patroon in beide banden op exact dezelfde plek (even breed, zelfde positie) en
+   zie je twee keer hetzelfde behang in plaats van twee details van een plan. */
+.vtk-design .hours-strip::after {
+  background-position: calc(50% - 90px) -70px;
+}
+
+.vtk-design .career-band::after {
+  background-position: calc(50% + 300px) -480px;
 }
 
 .vtk-design .hours-strip .sec-head h2 {

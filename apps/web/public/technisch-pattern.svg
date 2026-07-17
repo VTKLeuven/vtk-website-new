@@ -1,0 +1,99 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 640" width="640" height="640">
+  <!--
+    Technisch patroon uit de huisstijl (zie design/huisstijl): cirkels, raaklijnen,
+    arceringen, stippellijnen, maatpijlen en knooppunten - de tekentaal van een
+    technische plan. Bedoeld als achtergrond in de navy banden.
+
+    Naadloos tegelbaar: de tekening staat een keer in #art en wordt 9x geplaatst
+    (-640 / 0 / +640 in x en y) en afgeknipt op de tegel, zodat alles wat aan de
+    ene rand uitsteekt aan de overkant terugkomt. Daarom moeten alle periodes
+    (arcering, streepjes) delers van 640 zijn, anders verspringt de fase op de naad.
+
+    Lijnen zijn wit; de sterkte regel je met opacity op de laag die dit gebruikt.
+  -->
+  <defs>
+    <clipPath id="tile">
+      <rect width="640" height="640" />
+    </clipPath>
+
+    <!-- 45 graden arcering; 8x8 rooster (640 = 80 periodes) houdt de naad sluitend -->
+    <pattern id="hatch" patternUnits="userSpaceOnUse" width="8" height="8">
+      <path d="M0,8 L8,0" fill="none" stroke="#fff" stroke-width="0.6" stroke-opacity="0.26" />
+    </pattern>
+
+    <g id="art" fill="none" stroke="#fff" stroke-width="0.72">
+      <!-- gearceerde wig linksboven -->
+      <path d="M0,300 L250,60 L250,300 Z" fill="url(#hatch)" stroke="none" />
+      <path d="M0,300 L250,60 L250,300 Z" stroke-opacity="0.24" />
+
+      <!-- gearceerd blokje, loopt over de onderrand -->
+      <rect x="518" y="566" width="92" height="72" fill="url(#hatch)" stroke="none" />
+      <rect x="518" y="566" width="92" height="72" stroke-opacity="0.34" />
+
+      <!-- grote cirkel linksboven, loopt over de boven- en linkerrand -->
+      <circle cx="150" cy="110" r="205" stroke-opacity="0.42" />
+      <circle cx="150" cy="110" r="118" stroke-opacity="0.24" />
+
+      <!-- ring rechtsboven -->
+      <circle cx="565" cy="85" r="58" stroke-opacity="0.42" />
+      <circle cx="565" cy="85" r="24" stroke-opacity="0.3" />
+
+      <!-- grote cirkel rechtsonder met hartlijnen -->
+      <circle cx="470" cy="440" r="170" stroke-opacity="0.42" />
+      <circle cx="470" cy="440" r="74" stroke-opacity="0.26" />
+      <path d="M446,440 H494 M470,416 V464" stroke-opacity="0.3" />
+
+      <!-- cirkel linksonder -->
+      <circle cx="205" cy="545" r="98" stroke-opacity="0.34" />
+      <circle cx="330" cy="300" r="46" stroke-opacity="0.26" />
+
+      <!-- rechthoek met diagonaal -->
+      <rect x="330" y="30" width="150" height="105" stroke-opacity="0.28" />
+      <path d="M330,30 L480,135" stroke-opacity="0.18" />
+      <rect x="60" y="470" width="130" height="100" stroke-opacity="0.24" />
+
+      <!-- constructielijnen -->
+      <path d="M0,250 H640" stroke-opacity="0.26" />
+      <path d="M0,440 H640" stroke-opacity="0.18" />
+      <path d="M250,0 V640" stroke-opacity="0.24" />
+      <path d="M0,640 L640,0" stroke-opacity="0.18" />
+      <path d="M-60,180 L400,640" stroke-opacity="0.14" />
+
+      <!-- stippellijnen; periodes 8 en 20 delen 640 -->
+      <path d="M0,95 H640" stroke-opacity="0.26" stroke-dasharray="4 4" />
+      <path d="M470,0 V640" stroke-opacity="0.24" stroke-dasharray="12 8" />
+      <path d="M0,530 H320" stroke-opacity="0.2" stroke-dasharray="4 4" />
+
+      <!-- maatpijl horizontaal -->
+      <path d="M350,163 V187 M600,163 V187" stroke-opacity="0.34" />
+      <path d="M350,175 H600" stroke-opacity="0.34" />
+      <path d="M357,171 L350,175 L357,179 M593,171 L600,175 L593,179" stroke-opacity="0.34" />
+
+      <!-- maatpijl verticaal -->
+      <path d="M78,382 H102 M78,470 V470 M78,470 H102" stroke-opacity="0.3" />
+      <path d="M90,382 V470" stroke-opacity="0.3" />
+      <path d="M86,389 L90,382 L94,389 M86,463 L90,470 L94,463" stroke-opacity="0.3" />
+
+      <!-- knooppunten -->
+      <circle cx="250" cy="250" r="3" fill="#fff" fill-opacity="0.5" stroke="none" />
+      <circle cx="470" cy="440" r="3" fill="#fff" fill-opacity="0.45" stroke="none" />
+      <circle cx="250" cy="440" r="2.5" fill="#fff" fill-opacity="0.35" stroke="none" />
+      <circle cx="470" cy="250" r="2.5" fill="#fff" fill-opacity="0.35" stroke="none" />
+      <circle cx="350" cy="175" r="4.5" stroke-opacity="0.4" />
+      <circle cx="150" cy="110" r="4.5" stroke-opacity="0.35" />
+      <circle cx="0" cy="300" r="4" stroke-opacity="0.3" />
+    </g>
+  </defs>
+
+  <g clip-path="url(#tile)">
+    <use href="#art" x="-640" y="-640" />
+    <use href="#art" x="0" y="-640" />
+    <use href="#art" x="640" y="-640" />
+    <use href="#art" x="-640" y="0" />
+    <use href="#art" x="0" y="0" />
+    <use href="#art" x="640" y="0" />
+    <use href="#art" x="-640" y="640" />
+    <use href="#art" x="0" y="640" />
+    <use href="#art" x="640" y="640" />
+  </g>
+</svg>
