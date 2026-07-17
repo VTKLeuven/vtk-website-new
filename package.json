@@ -7,6 +7,7 @@
     "packages/*"
   ],
   "scripts": {
+    "verify:lockfile": "node scripts/check-lockfile-platforms.mjs",
     "dev": "npm run dev --workspace=@vtk/web",
     "build": "npm run build --workspace=@vtk/db && npm run build --workspace=@vtk/web",
     "start": "npm run start --workspace=@vtk/web",

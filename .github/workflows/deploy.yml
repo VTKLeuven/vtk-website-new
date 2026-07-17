@@ -39,6 +39,11 @@ jobs:
           node-version: 20
           cache: npm
 
+      # Voor npm ci: een lockfile zonder de native binaries van dit platform
+      # installeert "gewoon" en breekt pas veel later bij het builden.
+      - name: Verify lockfile has every platform's native binaries
+        run: npm run verify:lockfile
+
       - name: Install dependencies
         run: npm ci
 
