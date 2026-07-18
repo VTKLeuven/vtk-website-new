@@ -61,6 +61,9 @@ export const PERMISSIONS = [
   { code: "theokot.manage", labelNl: "Theokot beheren (sessies, aanbod, bans, instellingen)", labelEn: "Manage Theokot (sessions, offering, bans, settings)", category: "theokot" },
   { code: "theokot.pickup", labelNl: "Theokot afhaalbalie bedienen", labelEn: "Operate Theokot pickup counter", category: "theokot" },
 
+  // Logistiek (uitleendienst op logistiek.vtk.be)
+  { code: "logistiek.manage", labelNl: "Uitleendienst beheren (inventaris, aanvragen, camionette)", labelEn: "Manage equipment rental (inventory, requests, van)", category: "logistiek" },
+
   // Deurtoegang (KU Leuven-kaartscanner op de deur)
   { code: "door.open", labelNl: "Deur openen met studentenkaart", labelEn: "Open the door with a student card", category: "door" },
   { code: "door.remoteOpen", labelNl: "Deur openen vanaf het dashboard", labelEn: "Open the door from the dashboard", category: "door" },

@@ -1,25 +1,38 @@
 import "server-only";
 
-import { configuredPaymentProvider } from "../config";
-import { MockPaymentGateway } from "./mock";
-import { MolliePaymentGateway } from "./mollie";
-import type { PaymentGateway } from "./types";
+import {
+  MockPaymentGateway,
+  MolliePaymentGateway,
+  publicWebhookUrl,
+  type PaymentGateway,
+} from "@vtk/payments";
+import { configuredPaymentProvider, ticketingBaseUrl } from "../config";
+
+// De gedeelde gateways in @vtk/payments zijn app-agnostisch; hier krijgen ze
+// hun ticketing-configuratie (webhook-URL, idempotency-namespace, mock-route).
+export function newMollieGateway(): MolliePaymentGateway {
+  return new MolliePaymentGateway({
+    webhookUrl: () => publicWebhookUrl(ticketingBaseUrl(), "/api/tickets/mollie/webhook"),
+    idempotencyNamespace: "vtk-ticket",
+  });
+}
+
+function newMockGateway(): MockPaymentGateway {
+  return new MockPaymentGateway({ completePath: "/api/tickets/mock/complete" });
+}
 
 let gateway: PaymentGateway | null = null;
 
 export function paymentGateway(): PaymentGateway {
   if (gateway) return gateway;
-  gateway =
-    configuredPaymentProvider() === "mollie"
-      ? new MolliePaymentGateway()
-      : new MockPaymentGateway();
+  gateway = configuredPaymentProvider() === "mollie" ? newMollieGateway() : newMockGateway();
   return gateway;
 }
 
 export function paymentGatewayFor(provider: string): PaymentGateway {
-  if (provider === "mollie") return new MolliePaymentGateway();
+  if (provider === "mollie") return newMollieGateway();
   if (provider === "mock" && process.env.NODE_ENV !== "production") {
-    return new MockPaymentGateway();
+    return newMockGateway();
   }
   throw new Error(`Unsupported payment provider: ${provider}`);
 }
@@ -33,4 +46,4 @@ export type {
   RefundInput,
   RefundResult,
   RefundStatusResult,
-} from "./types";
+} from "@vtk/payments";

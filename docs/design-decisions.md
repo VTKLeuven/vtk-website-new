@@ -455,3 +455,62 @@ onderste helft is een ontwerpkeuze, geen toeval:
   bezoeker gerenderd i.p.v. statisch gecachet. Dat was al zo qua DB-lezingen; het
   is één gerichte query extra (de richtingen van de ingelogde gebruiker), en enkel
   voor wie ingelogd is.
+
+---
+
+## Uitleendienst (logistiek.vtk.be)
+
+Het reservatiesysteem voor de uitleendienst leeft in `apps/logistiek`, niet op de
+hoofdsite: het is de eerste echte invulling van de submodule-opzet
+(`logistiek.vtk.be`, gedeelde sessie via het `.vtk.be`-cookie). De UX volgt de
+filosofie van de Cudi-app: een login-gated takenhub met grote taakkaarten
+(Materiaal lenen / Camionette / Mijn reservaties), eenvoudige verticale flows en
+een eigen account-overzicht. Technische kaart: `docs/uitleendienst.md`.
+
+### Aanvraag + goedkeuring, geen instantboeking
+
+- Een reservatie is een **aanvraag** (`REQUESTED`) die het Logistiek-team
+  goedkeurt of afwijst. Bewuste keuze tegen instantboeking: **VTK-evenementen
+  hebben voorrang op het materiaal** en het team wil elke aanvraag zien.
+- `REQUESTED` neemt daarom nog **geen voorraad** in; de harde
+  beschikbaarheidscheck (voorraad min overlappende `APPROVED`/`PICKED_UP`)
+  gebeurt pas bij goedkeuring, in een Serializable-transactie. Leden zien bij het
+  aanvragen wel een zachte indicator per item.
+- Afwijzen vraagt een verplichte reden die het lid te zien krijgt.
+
+### Camionette is een eigen model, geen catalogus-item
+
+- Uurprijs (7,50 EUR/u, elk begonnen uur, minimum één uur), een tijdvenster
+  i.p.v. een dagbereik, en een **chauffeur van VTK** (leden rijden nooit zelf):
+  dat past niet in het item/lijn-model, dus `UitleenVanBooking` staat apart.
+- Het uurtarief wordt bij de aanvraag gesnapshot en de prijs bij goedkeuring
+  herberekend; één camionette betekent: geen twee goedgekeurde ritten die
+  overlappen.
+
+### Betalen: online of aan de balie, per reservatie
+
+- Bij goedkeuring kiest het **team** de betaalwijze: `ONLINE` (Mollie-checkout
+  via de gedeelde `@vtk/payments`-gateways) of `OFFLINE` (cash/Payconiq bij
+  afhaling, team drukt "betaald"). Niet het lid: het team weet wanneer online
+  betalen zinvol is.
+- **Enkel de huurprijs gaat online; de waarborg blijft cash bij afhaling.**
+  Online waarborgen zouden een refund-flow vragen; de balie geeft ze gewoon
+  terug. `depositReturnedAt` registreert dat.
+- Een al betaalde reservatie kan het lid niet meer zelf annuleren (dat zou een
+  refund impliceren); dat loopt via logistiek@vtk.be.
+
+### Kleinere keuzes
+
+- **Interface in NL/EN, catalogusinhoud vrij**: de taalkeuze in de header wordt
+  onthouden via een cookie en vertaalt de interface. Catalogusvelden blijven
+  bewust enkel `name`/`description`: die inhoud wordt door Logistiek beheerd en
+  krijgt geen verplicht tweede vertaalveld.
+- **Geen mails in v1**: de status staat altijd onder "Mijn reservaties"; de
+  ticketing-outbox is event-gebonden en werd niet veralgemeend.
+- `SaveForm`/`toast`/`ConfirmActionButton` in `apps/logistiek/components/ui`
+  zijn bewuste minimale kopieën van `apps/web/components/ui`; **kandidaat om te
+  hoisten naar `@vtk/ui`** zodra een derde afnemer opduikt.
+- De vroegere groepscheck op logistiek.vtk.be (groep "Logistiek", met verkeerde
+  casing zodat ze niemand doorliet) is vervangen: **elk ingelogd lid** mag
+  aanvragen, beheer hangt aan de permissie `logistiek.manage` (rol "logistiek",
+  toegekend aan de post LOGISTIEK).

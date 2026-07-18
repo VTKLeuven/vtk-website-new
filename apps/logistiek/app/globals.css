@@ -1,20 +1,27 @@
 /* See apps/web/app/globals.css for Tailwind source locking rationale. */
 @import "tailwindcss" source(none);
 @source "../app";
+@source "../components";
 @source "../lib";
 @source "../../../packages/ui/src";
 
+/* Palet gespiegeld aan het canonieke koele palet in
+   apps/web/app/design/vtk-base.css; hertune je daar, hertune dan ook hier. */
 @theme {
   --color-vtk-ink: #0a0f1f;
   --color-vtk-navy: #0e1a36;
   --color-vtk-blue: #0e1a36;
   --color-vtk-blue-dark: #0a0f1f;
   --color-vtk-blue-light: #34405e;
-  --color-vtk-blue-soft: #f2f0e9;
-  --color-vtk-blue-muted: #fafaf7;
+  --color-vtk-blue-soft: #e6ecf5;
+  --color-vtk-blue-muted: #5c667f;
   --color-vtk-yellow: #ffd23f;
   --color-vtk-yellow-dark: #edbd22;
-  --color-vtk-surface: #fafaf7;
+  --color-vtk-paper: #eff2f8;
+  --color-vtk-paper-2: #e6ecf5;
+  --color-vtk-surface: #ffffff;
+  --color-vtk-body: #34405e;
+  --color-vtk-muted: #5c667f;
   --font-sans: var(--font-vtk-sans), ui-sans-serif, system-ui, sans-serif;
 }
 
@@ -25,11 +32,554 @@ body {
 }
 
 :root {
+  --vtk-header-height: 73px;
   --ink: #0a0f1f;
   --navy: #0e1a36;
-  --paper: #fafaf7;
-  --paper-2: #f2f0e9;
+  --paper: #eff2f8;
+  --paper-2: #e6ecf5;
+  --surface: #ffffff;
   --line: rgba(14, 26, 54, 0.1);
+  --line-2: rgba(14, 26, 54, 0.18);
   --yellow: #ffd23f;
   --muted: #5c667f;
+  --body: #34405e;
+  --on-dark-muted: #b7c0dc;
+}
+
+/* De uitleendienst gebruikt dezelfde vaste headerstructuur als vtk.be. Enkel
+   de navigatie-inhoud verschilt per applicatie. */
+.vtk-site-header {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  background: var(--navy);
+  color: var(--paper);
+  font-family: var(--font-vtk-sans), ui-sans-serif, system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+.vtk-site-header .nav-inner {
+  display: flex;
+  min-height: 72px;
+  max-width: 1320px;
+  align-items: center;
+  gap: clamp(18px, 3vw, 46px);
+  margin: 0 auto;
+  padding: 0 clamp(20px, 3vw, 36px);
+}
+
+.vtk-site-header .brand {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  color: var(--paper);
+  text-decoration: none;
+}
+
+.vtk-site-header .brand-logo-img {
+  display: block;
+  width: auto;
+  max-width: min(190px, 36vw);
+  height: 38px;
+  object-fit: contain;
+  object-position: left center;
+}
+
+.vtk-site-header .nav-links-shell {
+  position: relative;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.vtk-site-header .nav-links {
+  display: flex;
+  width: 100%;
+  min-width: 0;
+  flex: none;
+  align-items: center;
+  gap: clamp(16px, 2vw, 30px);
+  overflow-x: auto;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+
+.vtk-site-header .nav-links::-webkit-scrollbar {
+  display: none;
+}
+
+.vtk-site-header .nav-links a {
+  color: rgba(250, 250, 247, 0.78);
+  font-size: 14px;
+  font-weight: 500;
+  text-decoration: none;
+  white-space: nowrap;
+  transition: color 160ms ease;
+}
+
+.vtk-site-header .nav-links a:hover {
+  color: #fff;
+}
+
+.vtk-site-header .nav-right {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 10px;
+  margin-left: auto;
+}
+
+.vtk-site-header .lang-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  color: rgba(250, 250, 247, 0.72);
+  font-size: 13px;
+}
+
+.vtk-site-header .lang-toggle button {
+  padding: 4px;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.vtk-site-header .lang-toggle button[aria-pressed="true"] {
+  color: #fff;
+  font-weight: 600;
+}
+
+.vtk-site-header .lang-sep {
+  color: rgba(250, 250, 247, 0.4);
+}
+
+.vtk-site-header .profile-menu-trigger,
+.vtk-site-header .nav-login {
+  display: inline-grid;
+  width: 38px;
+  min-width: 38px;
+  height: 38px;
+  place-items: center;
+  border: 1px solid rgba(250, 250, 247, 0.34);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.12);
+  color: var(--paper);
+  font-weight: 600;
+  text-decoration: none;
+  transition: background 160ms ease, border-color 160ms ease;
+}
+
+.vtk-site-header .profile-menu-trigger:hover,
+.vtk-site-header .nav-login:hover {
+  border-color: var(--paper);
+  background: rgba(255, 255, 255, 0.22);
+}
+
+.vtk-site-header .profile-menu-root {
+  position: relative;
+}
+
+.vtk-site-header .profile-menu {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  z-index: 60;
+  min-width: 180px;
+  margin-top: 8px;
+  padding: 6px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--surface);
+  box-shadow: 0 18px 42px rgba(10, 15, 31, 0.12);
+}
+
+.vtk-site-header .profile-menu-item {
+  display: block;
+  width: 100%;
+  padding: 9px 10px;
+  border-radius: 10px;
+  color: var(--ink);
+  font-size: 14px;
+  text-align: left;
+  text-decoration: none;
+}
+
+.vtk-site-header .profile-menu-item:hover,
+.vtk-site-header .profile-menu-item:focus-visible {
+  background: var(--paper-2);
+  outline: none;
+}
+
+@media (max-width: 720px) {
+  :root {
+    --vtk-header-height: 112px;
+  }
+
+  .vtk-site-header .nav-inner {
+    min-height: 64px;
+    flex-wrap: wrap;
+    gap: 14px;
+    padding-top: 12px;
+  }
+
+  .vtk-site-header .nav-links-shell {
+    order: 3;
+    width: 100%;
+    flex-basis: 100%;
+  }
+
+  .vtk-site-header .nav-links {
+    padding: 0 0 9px;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(250, 250, 247, 0.4) transparent;
+  }
+
+  .vtk-site-header .nav-links::-webkit-scrollbar {
+    display: block;
+    height: 3px;
+  }
+
+  .vtk-site-header .nav-links::-webkit-scrollbar-thumb {
+    border-radius: 2px;
+    background: rgba(250, 250, 247, 0.4);
+  }
+}
+
+/* Navy band met het technisch patroon, zelfde recept als de banden op de
+   hoofdsite (homepage, media, tickets). Elke band kiest via --band-crop een
+   eigen uitsnede van de tekening, zodat geen twee banden hetzelfde behang
+   tonen; de mask laat het patroon aan de naden uitdoven. */
+.vtk-band {
+  position: relative;
+  z-index: 0;
+  background: var(--navy);
+  color: #fff;
+}
+
+.vtk-band::after {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  inset: 0;
+  pointer-events: none;
+  background-image: url("/technisch-pattern.svg");
+  background-size: 880px 880px;
+  background-repeat: repeat;
+  background-position: var(--band-crop, calc(50% - 90px) -70px);
+  opacity: 0.38;
+  -webkit-mask-image: linear-gradient(
+    to bottom,
+    transparent 0,
+    #000 56px,
+    #000 calc(100% - 56px),
+    transparent 100%
+  );
+  mask-image: linear-gradient(
+    to bottom,
+    transparent 0,
+    #000 56px,
+    #000 calc(100% - 56px),
+    transparent 100%
+  );
+}
+
+/* De uitleendienst neemt dezelfde foto-led hero en donker-glazen panelen over
+   van homepage en media. De foto geeft de tool warmte; de technische tekening
+   houdt de praktische, ingenieursachtige kant zichtbaar. */
+.logistics-home-hero,
+.logistics-page-hero,
+.logistics-auth {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  background: var(--navy);
+}
+
+.logistics-home-hero::before,
+.logistics-page-hero::before,
+.logistics-auth::before {
+  content: '';
+  position: absolute;
+  z-index: -2;
+  inset: 0;
+  background:
+    linear-gradient(to bottom, rgba(10, 15, 31, 0.34), rgba(10, 15, 31, 0.06) 42%, rgba(10, 15, 31, 0.48)),
+    linear-gradient(103deg, rgba(9, 12, 24, 0.95) 0%, rgba(10, 15, 31, 0.84) 40%, rgba(12, 20, 42, 0.58) 100%),
+    url('/hero-arenberg.jpg') center 46% / cover no-repeat;
+}
+
+.logistics-info-band::after {
+  content: '';
+  position: absolute;
+  z-index: -1;
+  inset: 0;
+  pointer-events: none;
+  background-image: url('/technisch-pattern.svg');
+  background-size: 880px 880px;
+  background-repeat: repeat;
+  background-position: var(--band-crop, calc(50% - 90px) -70px);
+  opacity: 0.2;
+  -webkit-mask-image: linear-gradient(to bottom, transparent, #000 18%, #000 82%, transparent);
+  mask-image: linear-gradient(to bottom, transparent, #000 18%, #000 82%, transparent);
+}
+
+.logistics-home-hero-inner {
+  display: grid;
+  max-width: 1320px;
+  grid-template-columns: minmax(0, 1.25fr) minmax(330px, 0.75fr);
+  gap: clamp(32px, 6vw, 76px);
+  align-items: center;
+  margin: 0 auto;
+  padding: clamp(62px, 8vw, 104px) clamp(20px, 3vw, 36px) clamp(76px, 9vw, 112px);
+}
+
+.logistics-eyebrow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: rgba(250, 250, 247, 0.74);
+  font-size: 13px;
+}
+
+.logistics-home-hero h1 {
+  max-width: 780px;
+  margin: 18px 0 0;
+  color: var(--paper);
+  font-size: clamp(46px, 6vw, 80px);
+  font-weight: 600;
+  letter-spacing: -0.045em;
+  line-height: 0.98;
+  text-shadow: 0 1px 30px rgba(10, 15, 31, 0.45);
+}
+
+.logistics-hero-sub {
+  max-width: 48ch;
+  margin: 24px 0 0;
+  color: rgba(250, 250, 247, 0.86);
+  font-size: 17px;
+  line-height: 1.6;
+  text-shadow: 0 1px 24px rgba(10, 15, 31, 0.4);
+}
+
+.logistics-hero-button,
+.logistics-login-button {
+  display: inline-flex;
+  min-height: 44px;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  padding: 10px 18px;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  font-size: 14px;
+  font-weight: 600;
+  text-decoration: none;
+  transition: transform 160ms ease, background 160ms ease, border-color 160ms ease;
+}
+
+.logistics-hero-button:hover,
+.logistics-login-button:hover {
+  transform: translateY(-1px);
+}
+
+.logistics-hero-button-primary {
+  border-color: var(--yellow);
+  background: var(--yellow);
+  color: var(--ink);
+}
+
+.logistics-hero-button-primary:hover {
+  background: #ffe066;
+}
+
+.logistics-hero-button-secondary {
+  border-color: rgba(250, 250, 247, 0.44);
+  color: var(--paper);
+}
+
+.logistics-hero-button-secondary:hover {
+  border-color: var(--paper);
+  background: rgba(250, 250, 247, 0.12);
+}
+
+.logistics-hero-panel {
+  padding: clamp(22px, 3vw, 30px);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 18px;
+  background: rgba(9, 15, 32, 0.48);
+  box-shadow: 0 18px 50px rgba(10, 15, 31, 0.16);
+  -webkit-backdrop-filter: blur(16px) saturate(1.05);
+  backdrop-filter: blur(16px) saturate(1.05);
+}
+
+.logistics-card-number {
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+}
+
+.logistics-service-grid {
+  position: relative;
+  z-index: 1;
+  margin-top: -44px;
+  padding-bottom: 72px;
+}
+
+.logistics-service-card {
+  min-height: 280px;
+  padding: clamp(24px, 3vw, 30px);
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: var(--surface);
+  box-shadow: 0 18px 42px rgba(10, 15, 31, 0.08);
+  text-decoration: none;
+  transition: transform 180ms ease, border-color 180ms ease, box-shadow 180ms ease;
+}
+
+.logistics-service-card:hover {
+  transform: translateY(-3px);
+  border-color: var(--line-2);
+  box-shadow: 0 22px 48px rgba(10, 15, 31, 0.12);
+}
+
+.logistics-service-card:focus-visible,
+.logistics-hero-button:focus-visible,
+.logistics-login-button:focus-visible {
+  outline: 3px solid var(--yellow);
+  outline-offset: 3px;
+}
+
+.logistics-service-icon {
+  display: grid;
+  width: 48px;
+  height: 48px;
+  place-items: center;
+  border-radius: 14px;
+  background: var(--yellow);
+  color: var(--ink);
+}
+
+.logistics-info-band,
+.logistics-footer {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  background: var(--navy);
+}
+
+.logistics-info-band::after {
+  background-position: calc(50% + 240px) -480px;
+  opacity: 0.34;
+}
+
+.logistics-page-hero {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.11);
+}
+
+.logistics-page-hero::before {
+  background:
+    linear-gradient(103deg, rgba(9, 12, 24, 0.94) 0%, rgba(10, 15, 31, 0.78) 52%, rgba(12, 20, 42, 0.52) 100%),
+    url('/hero-arenberg.jpg') center 56% / cover no-repeat;
+}
+
+.logistics-page-hero-inner {
+  position: relative;
+}
+
+.logistics-page-hero h1 em {
+  color: var(--yellow) !important;
+}
+
+.logistics-page-hero p:last-child {
+  color: var(--on-dark-muted);
+}
+
+.logistics-auth {
+  min-height: 480px;
+}
+
+.logistics-auth::before {
+  opacity: 0.92;
+}
+
+.logistics-auth-panel {
+  position: relative;
+  padding: clamp(28px, 5vw, 44px);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 22px;
+  background: rgba(239, 242, 248, 0.96);
+  box-shadow: 0 24px 70px rgba(10, 15, 31, 0.25);
+}
+
+.logistics-login-button {
+  border-color: var(--ink);
+  background: var(--ink);
+  color: var(--surface);
+}
+
+.logistics-login-button:hover {
+  background: var(--navy);
+}
+
+.logistics-footer {
+  border-top: 1px solid rgba(255, 255, 255, 0.11);
+}
+
+.logistics-footer::after {
+  content: '';
+  position: absolute;
+  z-index: -1;
+  inset: 0;
+  background-image: url('/technisch-pattern.svg');
+  background-position: calc(50% - 240px) -420px;
+  background-size: 880px 880px;
+  opacity: 0.14;
+  -webkit-mask-image: linear-gradient(to right, transparent, #000 28%, #000 72%, transparent);
+  mask-image: linear-gradient(to right, transparent, #000 28%, #000 72%, transparent);
+}
+
+input,
+textarea,
+select {
+  transition: border-color 150ms ease, box-shadow 150ms ease;
+}
+
+button:not(:disabled),
+[role='button']:not([aria-disabled='true']) {
+  cursor: pointer;
+}
+
+button:disabled {
+  cursor: not-allowed;
+}
+
+input:focus,
+textarea:focus,
+select:focus {
+  outline: none;
+  border-color: var(--navy) !important;
+  box-shadow: 0 0 0 3px rgba(255, 210, 63, 0.32);
+}
+
+@media (max-width: 800px) {
+  .logistics-home-hero-inner {
+    grid-template-columns: 1fr;
+  }
+
+  .logistics-home-hero {
+    background-position: 62% center;
+  }
+
+  .logistics-service-grid {
+    margin-top: -24px;
+    padding-bottom: 48px;
+  }
+
+  .logistics-service-card {
+    min-height: 0;
+  }
 }

@@ -14,8 +14,8 @@ into the main VTK site at `logistiek.vtk.be`.
 
 ## Environment
 
-- `VTK_MAIN_URL` – base URL of the main site (e.g. `https://vtk.be`).
-- `SESSION_COOKIE_DOMAIN` – must match the main site (e.g. `.vtk.be`).
+- `VTK_MAIN_URL` - base URL of the main site (e.g. `https://vtk.be`).
+- `SESSION_COOKIE_DOMAIN` - must match the main site (e.g. `.vtk.be`).
 
 ## Local development
 

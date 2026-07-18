@@ -150,6 +150,40 @@ enum TheokotOrderStatus {
   CANCELLED // door de student geannuleerd voor de deadline
 }
 
+enum UitleenReservationStatus {
+  REQUESTED // aangevraagd, wacht op beslissing van Logistiek
+  APPROVED // goedgekeurd; telt mee voor de voorraad
+  REJECTED // afgewezen door Logistiek
+  CANCELLED // door het lid geannuleerd
+  PICKED_UP // materiaal afgehaald
+  RETURNED // materiaal teruggebracht; reservatie afgerond
+}
+
+enum UitleenVanBookingStatus {
+  REQUESTED
+  APPROVED
+  REJECTED
+  CANCELLED
+  COMPLETED // rit uitgevoerd
+}
+
+// Hoe een goedgekeurde reservatie betaald wordt: online via de payment
+// provider, of offline (cash/Payconiq) bij afhaling. Keuze van het team
+// bij goedkeuring.
+enum UitleenPaymentMode {
+  ONLINE
+  OFFLINE
+}
+
+enum UitleenPaymentStatus {
+  CREATED
+  PENDING
+  SUCCEEDED
+  FAILED
+  CANCELLED
+  EXPIRED
+}
+
 // Hoe een deurgebeurtenis tot stand kwam: een fysieke kaartscan aan de deur, of
 // een remote-open vanaf het dashboard.
 enum DoorMethod {
@@ -286,6 +320,14 @@ model User {
   theokotPickedUp TheokotOrder[] @relation("TheokotPickedUpBy")
   theokotBans     TheokotBan[]
 
+  uitleenReservations UitleenReservation[] @relation("UitleenReservationUser")
+  uitleenDecided      UitleenReservation[] @relation("UitleenDecidedBy")
+  uitleenPickedUp     UitleenReservation[] @relation("UitleenPickedUpBy")
+  uitleenReturned     UitleenReservation[] @relation("UitleenReturnedBy")
+  uitleenVanBookings  UitleenVanBooking[]  @relation("UitleenVanBookingUser")
+  uitleenVanDriven    UitleenVanBooking[]  @relation("UitleenVanDriver")
+  uitleenVanDecided   UitleenVanBooking[]  @relation("UitleenVanDecidedBy")
+
   doorGrants DoorAccessGrant[]
   doorLogs   DoorAccessLog[]
 
@@ -302,16 +344,16 @@ model User {
 }
 
 model Group {
-  id                String  @id @default(cuid())
+  id                String    @id @default(cuid())
   // Vrije, GUI-beheerde code (was een `GroupCode`-enum). Uniek, en de waarde die
   // shiften opslaan in `Shift.post` en de sessie meegeeft als `groups[].code`.
-  code              String  @unique
-  slug              String  @unique
+  code              String    @unique
+  slug              String    @unique
   nameNl            String
   nameEn            String
   descriptionNl     String?
   descriptionEn     String?
-  orderInPraesidium Int     @default(0)
+  orderInPraesidium Int       @default(0)
   photoKey          String?
   // Praesidiumpost of werkgroep. Een werkgroep gebruikt dezelfde leden/rollen
   // maar staat niet op /praesidium; ze krijgt /werkgroepen met haar eigen
@@ -321,7 +363,7 @@ model Group {
   // Een gedeactiveerde post verdwijnt uit de nieuwe-shift-keuzes en het
   // postenbeheer voor nieuwe jaren, maar de historiek (memberships per jaar)
   // blijft bewaard i.p.v. de post te verwijderen.
-  active            Boolean @default(true)
+  active            Boolean   @default(true)
 
   memberships       GroupMembership[]
   // Rollen die deze post toekent aan haar leden (DEFAULT) en verantwoordelijke (LEADER).
@@ -1371,6 +1413,207 @@ model TheokotBan {
 
   @@index([userId])
   @@index([active])
+}
+
+// -----------------------------------------------------------------------------
+// Uitleendienst (logistiek.vtk.be): materiaal lenen en de camionette boeken.
+// Flow: lid vraagt aan (REQUESTED), Logistiek keurt goed of wijst af; de harde
+// voorraadcheck gebeurt bij goedkeuring. Prijzen/waarborgen worden gesnapshot
+// zodat catalogswijzigingen bestaande reservaties niet herschrijven.
+// -----------------------------------------------------------------------------
+
+model UitleenCategory {
+  id        String   @id @default(cuid())
+  name      String
+  sortIndex Int      @default(0)
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  items UitleenItem[]
+}
+
+model UitleenItem {
+  id           String  @id @default(cuid())
+  categoryId   String?
+  name         String
+  description  String?
+  photoKey     String?
+  // Aantal fysieke exemplaren; beschikbaarheid = quantity min overlappende
+  // APPROVED/PICKED_UP-reservaties in de gevraagde periode.
+  quantity     Int     @default(1)
+  depositCents Int     @default(0) // waarborg per stuk
+  priceCents   Int     @default(0) // huurprijs per stuk per reservatie; 0 = gratis
+  active       Boolean @default(true) // soft-delete: uit de catalogus, historiek blijft
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  category UitleenCategory?         @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  lines    UitleenReservationLine[]
+
+  @@index([categoryId, active])
+}
+
+model UitleenReservation {
+  id     String                   @id @default(cuid())
+  userId String
+  status UitleenReservationStatus @default(REQUESTED)
+
+  // Afhaal- en terugbrengdag (hele dagen; de concrete uren spreekt het team af).
+  pickupDate DateTime @db.Date
+  returnDate DateTime @db.Date
+
+  memberNote String? // waarvoor het lid het materiaal nodig heeft
+  adminNote  String? // nota van het team (bv. reden van afwijzing)
+
+  // Totalen gesnapshot bij de aanvraag.
+  totalPriceCents   Int
+  totalDepositCents Int
+
+  paymentMode       UitleenPaymentMode? // gezet door het team bij goedkeuring
+  paidOfflineAt     DateTime? // team drukte "betaald bij afhaling"
+  depositReturnedAt DateTime?
+
+  decidedAt    DateTime?
+  decidedById  String?
+  pickedUpAt   DateTime?
+  pickedUpById String?
+  returnedAt   DateTime?
+  returnedById String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user       User  @relation("UitleenReservationUser", fields: [userId], references: [id], onDelete: Cascade)
+  decidedBy  User? @relation("UitleenDecidedBy", fields: [decidedById], references: [id], onDelete: SetNull)
+  pickedUpBy User? @relation("UitleenPickedUpBy", fields: [pickedUpById], references: [id], onDelete: SetNull)
+  returnedBy User? @relation("UitleenReturnedBy", fields: [returnedById], references: [id], onDelete: SetNull)
+
+  lines    UitleenReservationLine[]
+  payments UitleenPayment[]
+
+  @@index([userId])
+  @@index([status, pickupDate])
+  @@index([pickupDate, returnDate])
+}
+
+model UitleenReservationLine {
+  id            String @id @default(cuid())
+  reservationId String
+  itemId        String
+
+  // Snapshot van het item op aanvraagmoment.
+  itemName         String
+  quantity         Int
+  unitPriceCents   Int
+  unitDepositCents Int
+
+  reservation UitleenReservation @relation(fields: [reservationId], references: [id], onDelete: Cascade)
+  // Items worden soft-deleted (active=false), nooit hard verwijderd zolang er
+  // reservaties aan hangen.
+  item        UitleenItem        @relation(fields: [itemId], references: [id], onDelete: Restrict)
+
+  @@index([reservationId])
+  @@index([itemId])
+}
+
+/// Camionette-boeking: uurprijs met minimum, VTK-vrijwilliger rijdt. Bewust een
+/// eigen model (geen UitleenItem): tijdvenster i.p.v. dagbereik, chauffeur en
+/// een andere lifecycle.
+model UitleenVanBooking {
+  id     String                  @id @default(cuid())
+  userId String
+  status UitleenVanBookingStatus @default(REQUESTED)
+
+  startAt DateTime @db.Timestamptz(3)
+  endAt   DateTime @db.Timestamptz(3)
+
+  purpose       String // waarvoor de rit dient
+  pickupAddress String?
+  destination   String?
+
+  driverId String? // toegewezen door het team bij goedkeuring
+
+  // Prijs: ceil(uren) x uurtarief, met het uurtarief als minimum. Tarief wordt
+  // gesnapshot bij de aanvraag en de prijs herberekend bij goedkeuring.
+  hourlyRateCents Int @default(750)
+  priceCents      Int
+
+  paymentMode   UitleenPaymentMode?
+  paidOfflineAt DateTime?
+
+  memberNote String?
+  adminNote  String?
+
+  decidedAt   DateTime?
+  decidedById String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user      User  @relation("UitleenVanBookingUser", fields: [userId], references: [id], onDelete: Cascade)
+  driver    User? @relation("UitleenVanDriver", fields: [driverId], references: [id], onDelete: SetNull)
+  decidedBy User? @relation("UitleenVanDecidedBy", fields: [decidedById], references: [id], onDelete: SetNull)
+
+  payments UitleenPayment[]
+
+  @@index([userId])
+  @@index([status, startAt])
+  @@index([startAt, endAt])
+}
+
+/// Spiegel van TicketPayment (zonder refunds): provider is een vrije string
+/// zodat een providerwissel geen migratie vraagt. Precies één van
+/// reservationId/vanBookingId is gezet.
+model UitleenPayment {
+  id                 String               @id @default(cuid())
+  reservationId      String?
+  vanBookingId       String?
+  provider           String
+  providerCheckoutId String?
+  providerPaymentId  String?
+  idempotencyKey     String
+  status             UitleenPaymentStatus @default(CREATED)
+  amountCents        Int
+  currency           String               @default("EUR")
+  checkoutUrl        String?
+  providerStatus     String?
+  expiresAt          DateTime?            @db.Timestamptz(3)
+  succeededAt        DateTime?            @db.Timestamptz(3)
+  failedAt           DateTime?            @db.Timestamptz(3)
+  createdAt          DateTime             @default(now()) @db.Timestamptz(3)
+  updatedAt          DateTime             @updatedAt @db.Timestamptz(3)
+
+  reservation UitleenReservation?     @relation(fields: [reservationId], references: [id], onDelete: Restrict)
+  vanBooking  UitleenVanBooking?      @relation(fields: [vanBookingId], references: [id], onDelete: Restrict)
+  webhooks    UitleenPaymentWebhook[]
+
+  @@unique([provider, providerCheckoutId])
+  @@unique([provider, providerPaymentId])
+  @@unique([provider, idempotencyKey])
+  @@index([reservationId, status])
+  @@index([vanBookingId, status])
+  @@index([status, expiresAt])
+}
+
+model UitleenPaymentWebhook {
+  id                 String    @id @default(cuid())
+  provider           String
+  externalEventId    String
+  paymentId          String?
+  signatureValid     Boolean
+  payload            Json
+  processingAttempts Int       @default(0)
+  receivedAt         DateTime  @default(now()) @db.Timestamptz(3)
+  processedAt        DateTime? @db.Timestamptz(3)
+  lastError          String?
+
+  payment UitleenPayment? @relation(fields: [paymentId], references: [id], onDelete: Restrict)
+
+  @@unique([provider, externalEventId])
+  @@index([paymentId])
+  @@index([processedAt, receivedAt])
 }
 
 // -----------------------------------------------------------------------------
