@@ -42,16 +42,24 @@ export function SiteHeaderShell({ children }: { children: React.ReactNode }) {
 
     // Stay transparent while any part of the hero still sits below the header
     // line; once the hero has scrolled fully above it, the header goes solid.
+    // Ignore entries for a hero that already left the DOM: navigating away
+    // scrolls to top, and the observer can deliver that late
+    // `isIntersecting: true` after the path-change reset above already ran;
+    // without this guard the header stays transparent on a hero-less page.
     const observer = new IntersectionObserver(
-      ([entry]) => setOverHero(entry.isIntersecting),
+      ([entry]) => {
+        if (entry.target.isConnected) setOverHero(entry.isIntersecting);
+      },
       { rootMargin: `-${headerHeight}px 0px 0px 0px`, threshold: 0 }
     );
     observer.observe(hero);
     return () => observer.disconnect();
   }, [pathname]);
 
+  // Belt and braces: only the homepage has a hero, so never render the
+  // transparent state elsewhere, whatever a stale observer update left behind.
   return (
-    <header className="vtk-site-header" data-over-hero={overHero ? 'true' : undefined}>
+    <header className="vtk-site-header" data-over-hero={overHero && isHome ? 'true' : undefined}>
       {children}
     </header>
   );
