@@ -51,8 +51,8 @@ export default async function CookiePolicyPage({
                 body: "Deze zijn nodig voor de dienst die je vraagt en kan je in onze interface niet uitschakelen:\n• VTK-aanmeld- en beveiligingscookies: houden een aangemelde sessie bij, normaal niet langer dan 30 dagen\n• tickettoegangscookies: openen een bestelling of ticket opnieuw, tot de ingestelde vervaldatum\n• vtk-logistiek-locale: onthoudt de taal van de logistieke site\n• vtk_cookie_consent: onthoudt deze keuze 180 dagen\nZe worden niet voor reclame gebruikt.",
               },
               {
-                heading: "Optionele diagnostiek",
-                body: "Enkel nadat je “Diagnostiek toestaan” kiest, kan Sentry browserfouten, performantiemetingen en gemaskeerde sessieherhalingen ontvangen. Tekst wordt gemaskeerd en media geblokkeerd. VTK stuurt niet bewust wachtwoorden of formulierinhoud door. Je kan toestemming altijd intrekken via “Cookie-instellingen” in de footer; na herladen stopt de browsermonitoring.",
+                heading: "Optionele monitoring",
+                body: "Enkel nadat je “Optionele cookies toestaan” kiest, kan Sentry technische monitoringgegevens ontvangen: browser errors, performance traces and masked session replays. Tekst wordt gemaskeerd en media geblokkeerd in replays. VTK stuurt niet bewust wachtwoorden of formulierinhoud door. Je kan toestemming altijd intrekken via “Cookie-instellingen” in de footer; na herladen stopt de browsermonitoring.",
               },
               {
                 heading: "Externe media",
@@ -64,7 +64,7 @@ export default async function CookiePolicyPage({
               },
               {
                 heading: "Contact",
-                body: "Vragen over cookies of diagnostiek kan je sturen naar it@vtk.be. Meer informatie over alle verwerkingen van persoonsgegevens staat in de privacyverklaring.",
+                body: "Vragen over cookies of monitoring kan je sturen naar it@vtk.be. Meer informatie over alle verwerkingen van persoonsgegevens staat in de privacyverklaring.",
               },
             ]
       }

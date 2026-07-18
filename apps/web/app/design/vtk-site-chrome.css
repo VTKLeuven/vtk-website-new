@@ -122,13 +122,22 @@
   text-decoration: underline;
 }
 
-.vtk-cookie-consent {
+.vtk-cookie-consent-positioner {
   position: fixed;
-  right: clamp(16px, 3vw, 32px);
+  inset-inline: 0;
   bottom: clamp(16px, 3vw, 32px);
   z-index: 1000;
+  display: flex;
+  justify-content: flex-end;
+  width: 100%;
+  padding-inline: clamp(16px, 3vw, 32px);
+  box-sizing: border-box;
+  pointer-events: none;
+}
+
+.vtk-cookie-consent {
   display: grid;
-  width: min(560px, calc(100vw - 32px));
+  width: min(560px, 100%);
   gap: 16px;
   padding: 22px;
   border: 1px solid rgba(255, 255, 255, 0.16);
@@ -137,6 +146,25 @@
   color: var(--paper);
   box-shadow: 0 24px 70px rgba(10, 15, 31, 0.3);
   font-family: var(--sans);
+  pointer-events: auto;
+}
+
+/* Match the homepage hero grid exactly so the cookie panel shares both edges
+   with the upcoming-events card instead of floating a few pixels beside it. */
+@media (min-width: 981px) {
+  body:has(.home-hero) .vtk-cookie-consent-positioner {
+    max-width: var(--max);
+    margin-inline: auto;
+    padding-inline: clamp(20px, 3vw, 36px);
+    display: grid;
+    grid-template-columns: minmax(0, 1.2fr) minmax(340px, 1fr);
+    gap: clamp(36px, 5vw, 64px);
+  }
+
+  body:has(.home-hero) .vtk-cookie-consent {
+    grid-column: 2;
+    width: 100%;
+  }
 }
 
 .vtk-cookie-consent h2 {
@@ -164,10 +192,15 @@
   color: var(--paper);
   font-size: 14px;
   line-height: 1.4;
+  cursor: pointer;
 }
 
 .vtk-cookie-consent-option input {
+  width: 16px;
+  height: 16px;
   margin-top: 3px;
+  accent-color: var(--yellow);
+  cursor: pointer;
 }
 
 .vtk-cookie-consent-actions {

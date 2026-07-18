@@ -24,12 +24,12 @@ function copy() {
       }
     : {
         title: "Jouw cookiekeuze",
-        body: "VTK gebruikt noodzakelijke cookies voor aanmelden, beveiliging, taal en tickettoegang. Met jouw toestemming mag Sentry ook foutdiagnostiek, performantiemetingen en gemaskeerde sessieherhalingen verzamelen.",
+        body: "VTK gebruikt noodzakelijke cookies voor aanmelden, beveiliging, taal en tickettoegang. Met jouw toestemming mag Sentry ook technische monitoringgegevens verzamelen: browser errors, performance traces and masked session replays.",
         privacy: "Lees het cookiebeleid",
-        accept: "Diagnostiek toestaan",
+        accept: "Optionele cookies toestaan",
         reject: "Enkel noodzakelijk",
         save: "Keuze opslaan",
-        analytics: "Optionele diagnostiek en gemaskeerde sessieherhaling",
+        analytics: "Optional monitoring: browser errors, performance traces and masked session replays",
       };
 }
 
@@ -63,7 +63,6 @@ export function CookieConsent() {
   if (current === "server" || (!preferencesOpen && current !== null)) return null;
   const labels = copy();
   const base = window.location.pathname === "/en" || window.location.pathname.startsWith("/en/") ? "/en" : "";
-  const choice = preferencesOpen ? draft : "essential";
 
   const save = (next: CookieConsentChoice) => {
     setConsent(next);
@@ -74,32 +73,34 @@ export function CookieConsent() {
   };
 
   return (
-    <section className="vtk-cookie-consent" role="dialog" aria-modal="true" aria-labelledby="vtk-cookie-title">
-      <div className="vtk-cookie-consent-copy">
-        <h2 id="vtk-cookie-title">{labels.title}</h2>
-        <p>{labels.body}</p>
-        <a href={`${base}/cookies`}>{labels.privacy}</a>
-      </div>
-      <label className="vtk-cookie-consent-option">
-        <input
-          type="checkbox"
-          checked={choice === "analytics"}
-          onChange={(event) => setDraft(event.target.checked ? "analytics" : "essential")}
-        />
-        <span>{labels.analytics}</span>
-      </label>
-      <div className="vtk-cookie-consent-actions">
-        <button type="button" className="vtk-cookie-secondary" onClick={() => save("essential")}>
-          {labels.reject}
-        </button>
-        <button type="button" className="vtk-cookie-secondary" onClick={() => save(choice)}>
-          {labels.save}
-        </button>
-        <button type="button" className="vtk-cookie-primary" onClick={() => save("analytics")}>
-          {labels.accept}
-        </button>
-      </div>
-    </section>
+    <div className="vtk-cookie-consent-positioner">
+      <section className="vtk-cookie-consent" role="dialog" aria-modal="true" aria-labelledby="vtk-cookie-title">
+        <div className="vtk-cookie-consent-copy">
+          <h2 id="vtk-cookie-title">{labels.title}</h2>
+          <p>{labels.body}</p>
+          <a href={`${base}/cookies`}>{labels.privacy}</a>
+        </div>
+        <label className="vtk-cookie-consent-option">
+          <input
+            type="checkbox"
+            checked={draft === "analytics"}
+            onChange={(event) => setDraft(event.target.checked ? "analytics" : "essential")}
+          />
+          <span>{labels.analytics}</span>
+        </label>
+        <div className="vtk-cookie-consent-actions">
+          <button type="button" className="vtk-cookie-secondary" onClick={() => save("essential")}>
+            {labels.reject}
+          </button>
+          <button type="button" className="vtk-cookie-secondary" onClick={() => save(draft)}>
+            {labels.save}
+          </button>
+          <button type="button" className="vtk-cookie-primary" onClick={() => save("analytics")}>
+            {labels.accept}
+          </button>
+        </div>
+      </section>
+    </div>
   );
 }
 
