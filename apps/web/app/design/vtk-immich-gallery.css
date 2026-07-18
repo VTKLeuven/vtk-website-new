@@ -96,6 +96,122 @@
   border: 0;
 }
 
+/* Albumbanner: navy band met het technisch patroon, zelfde recept als de navy
+   banden op de homepage en de aftermoviesband op /media (eigen uitsnede van de
+   tekening, mask laat het patroon aan de naden uitdoven). */
+.vtk-album-hero {
+  position: relative;
+  z-index: 0;
+  border-bottom: 1px solid var(--line);
+  background: var(--navy);
+}
+
+.vtk-album-hero::after {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  inset: 0;
+  pointer-events: none;
+  background-image: url("/technisch-pattern.svg");
+  background-size: 880px 880px;
+  background-repeat: repeat;
+  background-position: calc(50% - 260px) -420px;
+  opacity: 0.38;
+  -webkit-mask-image: linear-gradient(
+    to bottom,
+    transparent 0,
+    #000 64px,
+    #000 calc(100% - 64px),
+    transparent 100%
+  );
+  mask-image: linear-gradient(
+    to bottom,
+    transparent 0,
+    #000 64px,
+    #000 calc(100% - 64px),
+    transparent 100%
+  );
+}
+
+.vtk-album-hero-inner {
+  display: grid;
+  max-width: var(--max);
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 32px;
+  align-items: end;
+  margin: 0 auto;
+  padding: clamp(44px, 6vw, 68px) clamp(20px, 3vw, 36px);
+}
+
+.vtk-album-hero-kicker {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--on-dark-muted);
+  font-size: 13px;
+}
+
+.vtk-album-hero-kicker .vtk-dot {
+  margin-right: 6px;
+}
+
+.vtk-album-hero-kicker a {
+  color: var(--paper);
+  font-weight: 500;
+  text-decoration: underline;
+  text-decoration-color: var(--yellow);
+  text-underline-offset: 4px;
+}
+
+.vtk-album-hero h1 {
+  margin: 14px 0 0;
+  color: var(--paper);
+  font-size: clamp(30px, 4vw, 52px);
+  font-weight: 600;
+  letter-spacing: -0.03em;
+  line-height: 1.03;
+  overflow-wrap: anywhere;
+}
+
+.vtk-album-hero-inner > div > p {
+  max-width: 60ch;
+  margin: 14px 0 0;
+  color: var(--on-dark-muted);
+  font-size: 16px;
+  line-height: 1.6;
+}
+
+.vtk-album-hero-meta {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  color: var(--on-dark-muted);
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  line-height: 1.8;
+  text-align: right;
+  text-transform: uppercase;
+}
+
+.vtk-album-hero-meta b {
+  color: var(--paper);
+  font-size: 22px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+
+@media (max-width: 760px) {
+  .vtk-album-hero-inner {
+    grid-template-columns: 1fr;
+    gap: 18px;
+  }
+
+  .vtk-album-hero-meta {
+    align-items: flex-start;
+    text-align: left;
+  }
+}
+
 .vtk-immich-detail-shell {
   padding-top: clamp(28px, 5vw, 56px);
 }
