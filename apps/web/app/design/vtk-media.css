@@ -9,57 +9,139 @@
   letter-spacing: 0;
 }
 
+/* Hero: full-width navy band with the Arenberg photo under a heavy scrim, the
+   same recipe as the homepage hero. Light copy with the yellow serif accent;
+   the section index sits on the photo as dark-glass tiles (huispatroon van de
+   quick-connect rij). The sticky header stays solid above this band. */
 .vtk-media-hero {
-  padding-bottom: 48px;
+  position: relative;
+  z-index: 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.vtk-media-hero::before {
+  content: '';
+  position: absolute;
+  z-index: -1;
+  inset: 0;
+  background:
+    linear-gradient(to bottom, rgba(10, 15, 31, 0) 82%, rgba(10, 15, 31, 0.24) 100%),
+    linear-gradient(
+      103deg,
+      rgba(9, 12, 24, 0.93) 0%,
+      rgba(10, 15, 31, 0.84) 40%,
+      rgba(12, 20, 42, 0.64) 70%,
+      rgba(14, 26, 54, 0.5) 100%
+    ),
+    url('/hero-arenberg.jpg') center 62% / cover no-repeat;
+  pointer-events: none;
+}
+
+.vtk-media-hero-inner {
+  display: grid;
+  max-width: var(--max);
+  grid-template-columns: minmax(0, 1.25fr) minmax(320px, 0.75fr);
+  gap: clamp(32px, 5vw, 64px);
+  align-items: center;
+  margin: 0 auto;
+  padding: clamp(48px, 6vw, 76px) clamp(20px, 3vw, 36px);
+}
+
+.vtk-media-hero-eyebrow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: rgba(250, 250, 247, 0.74);
+  font-size: 13px;
+}
+
+.vtk-media-hero-copy h1 {
+  margin: 16px 0 0;
+  color: var(--paper);
+  font-size: clamp(38px, 4.6vw, 64px);
+  font-weight: 600;
+  letter-spacing: -0.035em;
+  line-height: 1.02;
+  text-shadow: 0 1px 30px rgba(10, 15, 31, 0.45);
+}
+
+.vtk-media-hero-copy h1 em {
+  color: var(--yellow);
+  font-family: var(--serif);
+  font-size: 0.92em;
+  font-style: normal;
+  font-weight: 700;
+  letter-spacing: -0.05em;
+}
+
+.vtk-media-hero-copy p {
+  max-width: 48ch;
+  margin: 18px 0 0;
+  color: rgba(250, 250, 247, 0.86);
+  font-size: 17px;
+  line-height: 1.55;
+  text-shadow: 0 1px 24px rgba(10, 15, 31, 0.4);
 }
 
 .vtk-media-index {
-  display: grid;
-  max-width: var(--max);
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  margin: 0 auto;
-  padding: 0 clamp(20px, 3vw, 36px);
-  border-bottom: 1px solid var(--line);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
 }
 
 .vtk-media-index a {
   display: grid;
   min-width: 0;
-  grid-template-columns: auto minmax(0, 1fr) auto;
-  gap: 12px;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  gap: 14px;
   align-items: center;
-  padding: 20px 18px;
-  border-left: 1px solid var(--line);
-  color: var(--ink);
+  padding: 18px 22px;
+  border: 1px solid rgba(255, 255, 255, 0.11);
+  border-radius: 16px;
+  background: rgba(9, 15, 32, 0.46);
+  -webkit-backdrop-filter: blur(16px) saturate(1.05);
+  backdrop-filter: blur(16px) saturate(1.05);
+  color: var(--paper);
   text-decoration: none;
-  transition: background 160ms ease;
-}
-
-.vtk-media-index a:last-child {
-  border-right: 1px solid var(--line);
+  transition:
+    background 160ms ease,
+    border-color 160ms ease;
 }
 
 .vtk-media-index a:hover {
-  background: rgba(255, 210, 63, 0.14);
+  border-color: rgba(255, 255, 255, 0.24);
+  background: rgba(12, 20, 42, 0.62);
 }
 
 .vtk-media-index a:focus-visible {
   outline: 3px solid var(--yellow);
-  outline-offset: -3px;
+  outline-offset: 3px;
 }
 
-.vtk-media-index span,
+.vtk-media-index-num,
 .vtk-media-index small {
-  color: var(--muted);
+  color: rgba(250, 250, 247, 0.6);
   font-size: 11px;
   font-variant-numeric: tabular-nums;
+  letter-spacing: 0.1em;
 }
 
 .vtk-media-index strong {
   min-width: 0;
   overflow-wrap: anywhere;
-  font-size: 14px;
+  font-size: 16px;
   font-weight: 600;
+}
+
+.vtk-media-index-arrow {
+  color: var(--yellow);
+  font-size: 16px;
+  line-height: 1;
+  transition: transform 160ms ease;
+}
+
+.vtk-media-index a:hover .vtk-media-index-arrow {
+  transform: translateX(3px);
 }
 
 .vtk-media-section {
@@ -67,12 +149,46 @@
   border-bottom: 1px solid var(--line);
 }
 
+/* Aftermovies: an intentional full-width navy band (cinema-donker), light copy
+   on top; the playlist tiles in the module CSS follow with a glass look. */
 .vtk-media-video-section {
-  background: #eef1f4;
+  position: relative;
+  z-index: 0;
+  background: var(--navy);
+}
+
+/* Zelfde technisch patroon als de navy banden op de homepage, met een eigen
+   uitsnede zodat deze band geen kopie van dat behang toont; de mask laat het
+   patroon aan beide naden uitdoven. */
+.vtk-media-video-section::after {
+  content: '';
+  position: absolute;
+  z-index: -1;
+  inset: 0;
+  pointer-events: none;
+  background-image: url('/technisch-pattern.svg');
+  background-size: 880px 880px;
+  background-repeat: repeat;
+  background-position: calc(50% + 150px) -640px;
+  opacity: 0.38;
+  -webkit-mask-image: linear-gradient(
+    to bottom,
+    transparent 0,
+    #000 88px,
+    #000 calc(100% - 88px),
+    transparent 100%
+  );
+  mask-image: linear-gradient(
+    to bottom,
+    transparent 0,
+    #000 88px,
+    #000 calc(100% - 88px),
+    transparent 100%
+  );
 }
 
 .vtk-media-magazine-section {
-  background: #f7f6f1;
+  background: var(--paper-2);
 }
 
 .vtk-media-section-inner {
@@ -83,25 +199,31 @@
 
 .vtk-media-section-head {
   display: grid;
-  grid-template-columns: 52px minmax(0, 1fr) auto;
+  grid-template-columns: auto minmax(0, 1fr) auto;
   gap: 24px;
   align-items: start;
   margin-bottom: 40px;
 }
 
 .vtk-media-section-number {
-  padding-top: 8px;
-  color: var(--muted);
+  display: inline-flex;
+  margin-top: 10px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: var(--yellow);
+  color: var(--ink);
   font-size: 12px;
   font-variant-numeric: tabular-nums;
+  font-weight: 700;
 }
 
 .vtk-media-section-head h2 {
   margin: 0;
   color: var(--ink);
-  font-size: 48px;
+  font-size: clamp(36px, 5vw, 52px);
   font-weight: 600;
-  line-height: 1.05;
+  letter-spacing: -0.03em;
+  line-height: 1.02;
 }
 
 .vtk-media-section-head p {
@@ -135,13 +257,31 @@
   text-transform: uppercase;
 }
 
+/* Light copy on the navy aftermovie band. */
+.vtk-media-video-section .vtk-media-section-head h2 {
+  color: #fff;
+}
+
+.vtk-media-video-section .vtk-media-section-head p {
+  color: var(--on-dark-muted);
+}
+
+.vtk-media-video-section .vtk-media-section-count,
+.vtk-media-video-section .vtk-media-section-count span {
+  color: var(--on-dark-muted);
+}
+
+.vtk-media-video-section .vtk-media-section-count b {
+  color: #fff;
+}
+
 .vtk-media-page .vtk-immich-album-grid {
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 30px 18px;
 }
 
 .vtk-media-page .vtk-immich-album-cover {
-  border-radius: 8px;
+  border-radius: 14px;
 }
 
 .vtk-media-page .vtk-immich-album-card:focus-visible {
@@ -167,9 +307,9 @@
   align-items: center;
   justify-content: center;
   gap: 9px;
-  padding: 10px 16px;
+  padding: 10px 18px;
   border: 1px solid var(--line-2);
-  border-radius: 6px;
+  border-radius: 999px;
   background: var(--surface);
   color: var(--ink);
   font: inherit;
@@ -246,9 +386,9 @@
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  padding: 10px 14px;
+  padding: 10px 18px;
   border: 1px solid var(--line-2);
-  border-radius: 6px;
+  border-radius: 999px;
   background: var(--surface);
   color: var(--ink);
   font: inherit;
@@ -284,7 +424,7 @@
   overflow: hidden;
   margin-top: 8px;
   border: 1px solid var(--line-2);
-  border-radius: 6px;
+  border-radius: 14px;
   background: var(--surface);
 }
 
@@ -325,7 +465,7 @@
 }
 
 .vtk-media-magazine-archive-open:hover {
-  background: #f3f4f5;
+  background: rgba(255, 210, 63, 0.14);
 }
 
 .vtk-media-magazine-archive-copy {
@@ -351,13 +491,15 @@
   font-size: 11px;
 }
 
+/* Featured issue card: white surface with the yellow accent rail (huispatroon
+   voor featured cards), never a dark fill. */
 .vtk-media-magazine-card {
   display: grid;
   min-width: 0;
   grid-template-columns: minmax(180px, 0.7fr) minmax(0, 1fr);
   overflow: hidden;
   border: 1px solid var(--line-2);
-  border-radius: 8px;
+  border-radius: 18px;
   background: var(--surface);
   transition:
     border-color 160ms ease,
@@ -373,11 +515,13 @@
   position: relative;
   display: block;
   min-width: 0;
-  padding: 18px;
+  padding: 18px 18px 18px 21px;
   border: 0;
   border-right: 1px solid var(--line);
-  background: #e8ebee;
+  background: var(--paper);
   color: var(--ink);
+  /* Yellow accent rail: marks the latest issue as the featured card. */
+  box-shadow: inset 3px 0 0 var(--yellow);
   cursor: zoom-in;
 }
 
@@ -500,8 +644,14 @@
 }
 
 .vtk-media-magazine-heading p {
-  color: var(--muted);
+  display: inline-flex;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: var(--yellow);
+  color: var(--ink);
   font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
 }
 
@@ -637,7 +787,7 @@
 .vtk-media-document-frame {
   position: relative;
   min-height: 0;
-  background: #dfe3e7;
+  background: var(--paper-2);
 }
 
 .vtk-media-pdf-viewer {
@@ -676,7 +826,7 @@
   gap: 10px;
   z-index: 2;
   padding: 24px;
-  background: rgba(223, 227, 231, 0.9);
+  background: rgba(230, 236, 245, 0.9);
   color: var(--muted);
   font-size: 13px;
   text-align: center;
@@ -772,20 +922,22 @@
   }
 }
 
-@media (max-width: 780px) {
-  .vtk-media-index {
-    overflow-x: auto;
-    grid-template-columns: repeat(3, minmax(180px, 1fr));
-    scrollbar-width: thin;
+@media (max-width: 980px) {
+  .vtk-media-hero-inner {
+    grid-template-columns: 1fr;
+    gap: 28px;
+    align-items: stretch;
   }
+}
 
+@media (max-width: 780px) {
   .vtk-media-section-inner {
     padding-top: 68px;
     padding-bottom: 82px;
   }
 
   .vtk-media-section-head {
-    grid-template-columns: 36px minmax(0, 1fr);
+    grid-template-columns: auto minmax(0, 1fr);
     gap: 16px;
   }
 
@@ -814,17 +966,8 @@
 }
 
 @media (max-width: 560px) {
-  .vtk-media-hero {
-    padding-bottom: 36px;
-  }
-
-  .vtk-media-index {
-    padding-right: 20px;
-    padding-left: 20px;
-  }
-
   .vtk-media-index a {
-    padding: 17px 14px;
+    padding: 15px 18px;
   }
 
   .vtk-media-section-head {
@@ -905,6 +1048,7 @@
 
 @media (prefers-reduced-motion: reduce) {
   .vtk-media-index a,
+  .vtk-media-index-arrow,
   .vtk-media-magazine-card,
   .vtk-media-magazine-preview canvas,
   .vtk-media-pdf-viewer canvas,

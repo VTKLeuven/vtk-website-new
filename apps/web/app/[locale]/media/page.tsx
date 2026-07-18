@@ -47,28 +47,42 @@ export default async function MediaPage({ params }: { params: Promise<{ locale: 
 
   return (
     <div className="vtk-page vtk-media-page">
-      <header className="vtk-page-head vtk-media-hero">
-        <div>
-          <div className="vtk-page-kicker">VTK · Media</div>
-          <h1 className="vtk-page-title">{dict.media.title}</h1>
-          <p className="vtk-page-subtitle">{dict.media.lead}</p>
-        </div>
-        <div className="page-head-meta">
-          <b>03</b>
-          <br />
-          {dict.media.sections}
+      <header className="vtk-media-hero">
+        <div className="vtk-media-hero-inner">
+          <div className="vtk-media-hero-copy">
+            <div className="vtk-media-hero-eyebrow">
+              <span className="vtk-dot" />
+              VTK · Media
+            </div>
+            <h1>
+              {locale === 'nl' ? (
+                <>
+                  {"Foto's, films en "}
+                  <em>magazines</em>.
+                </>
+              ) : (
+                <>
+                  Photos, films and <em>magazines</em>.
+                </>
+              )}
+            </h1>
+            <p>{dict.media.lead}</p>
+          </div>
+
+          <nav className="vtk-media-index" aria-label={dict.media.sectionNav}>
+            {sectionLinks.map((section, index) => (
+              <a key={section.href} href={section.href}>
+                <span className="vtk-media-index-num">{String(index + 1).padStart(2, '0')}</span>
+                <strong>{section.label}</strong>
+                <small>{section.count}</small>
+                <span className="vtk-media-index-arrow" aria-hidden="true">
+                  →
+                </span>
+              </a>
+            ))}
+          </nav>
         </div>
       </header>
-
-      <nav className="vtk-media-index" aria-label={dict.media.sectionNav}>
-        {sectionLinks.map((section, index) => (
-          <a key={section.href} href={section.href}>
-            <span>{String(index + 1).padStart(2, '0')}</span>
-            <strong>{section.label}</strong>
-            <small>{section.count}</small>
-          </a>
-        ))}
-      </nav>
 
       <main>
         <section id="photos" className="vtk-media-section vtk-media-photos-section">
