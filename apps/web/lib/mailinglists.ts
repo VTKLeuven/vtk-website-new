@@ -27,7 +27,9 @@ export const ALL_STUDENTS = "ALLE_STUDENTEN" as const;
 export type MailingListId = MailCategory | typeof ALL_STUDENTS;
 
 /** Alle lijsten die de admin-tab toont, in volgorde. */
-export const MAILING_LISTS: MailingListId[] = [ALL_STUDENTS, ...MAIL_CATEGORIES];
+// Bulk exports are consent-based. Operational/contractual messages must be
+// sent from the relevant transaction workflow, not through an opt-in bypass.
+export const MAILING_LISTS: MailingListId[] = [...MAIL_CATEGORIES];
 
 /** Career wordt als ZIP geëxporteerd, de rest als losse CSV. */
 export function isZipList(id: MailingListId): boolean {

@@ -6,10 +6,10 @@ import { hasLocale } from "@/lib/locale";
 import { requireSession } from "@/lib/session";
 import { getDictionary, pick } from "@vtk/i18n";
 import { formatEuro } from "@/lib/theokot";
-import type { SaveState } from "@/lib/saveState";
 import { updateProfileAction, logoutAction } from "@/app/actions/auth";
 import { ProfileForm } from "@/components/profile/ProfileForm";
 import { SaveForm } from "@/components/ui/SaveForm";
+import { deleteMyAccountAction } from "@/app/actions/privacy";
 
 export default async function AccountPage({ params }: { params: Promise<{ locale: string }> }) {
   const { locale } = await params;
@@ -69,11 +69,6 @@ export default async function AccountPage({ params }: { params: Promise<{ locale
     minute: "2-digit",
   });
 
-  async function onSaveLocale(_prev: SaveState, formData: FormData): Promise<SaveState> {
-    "use server";
-    return updateProfileAction(session.user.id, formData);
-  }
-
   return (
     <div className="vtk-page vtk-page-shell vtk-page-narrow space-y-6">
       <div>
@@ -82,7 +77,7 @@ export default async function AccountPage({ params }: { params: Promise<{ locale
       </div>
       <Card className="p-6">
         <SaveForm
-          action={onSaveLocale}
+          action={updateProfileAction}
           className="space-y-4"
           submitLabel={dict.auth.updateProfile}
           savingLabel={dict.common.saving}
@@ -190,6 +185,52 @@ export default async function AccountPage({ params }: { params: Promise<{ locale
             )}
           </p>
         )}
+      </Card>
+
+      <Card className="p-6">
+        <h2 className="text-lg font-semibold text-vtk-ink">
+          {nl ? "Jouw privacyrechten" : "Your privacy rights"}
+        </h2>
+        <p className="mt-2 text-sm leading-6 text-[#5c667f]">
+          {nl
+            ? "Download een machineleesbare kopie van je profiel, lidmaatschappen, reservaties, ticketbestellingen en toegangslogs. Geheime tokens worden niet opgenomen en gestructureerde gegevens van andere deelnemers worden afgeschermd."
+            : "Download a machine-readable copy of your profile, memberships, reservations, ticket orders and access logs. Secret tokens are excluded and structured details of other attendees are redacted."}
+        </p>
+        {/* A normal navigation is intentional: the API response is an attachment. */}
+        {/* eslint-disable-next-line @next/next/no-html-link-for-pages */}
+        <a
+          href="/api/account/export"
+          download
+          className="mt-4 inline-flex min-h-10 items-center rounded-full border border-vtk-ink px-4 text-sm font-medium text-vtk-ink"
+        >
+          {nl ? "Download mijn gegevens (JSON)" : "Download my data (JSON)"}
+        </a>
+
+        <div className="mt-8 border-t border-vtk-blue/12 pt-6">
+          <h3 className="font-semibold text-red-800">
+            {nl ? "Account verwijderen" : "Delete account"}
+          </h3>
+          <p className="mt-2 text-sm leading-6 text-[#5c667f]">
+            {nl
+              ? "Dit wist je login, profiel, lidmaatschappen en huidige rechten. Transacties die VTK wettelijk of voor de integriteit van de administratie moet bewaren, worden geanonimiseerd. Typ DELETE om te bevestigen."
+              : "This removes your login, profile, memberships and current permissions. Transactions VTK must keep for legal or administrative integrity reasons are anonymised. Type DELETE to confirm."}
+          </p>
+          <form action={deleteMyAccountAction} className="mt-4 flex flex-wrap items-end gap-3">
+            <div>
+              <Label htmlFor="delete-confirmation">DELETE</Label>
+              <Input
+                id="delete-confirmation"
+                name="confirmation"
+                autoComplete="off"
+                pattern="DELETE"
+                required
+              />
+            </div>
+            <Button type="submit" variant="ghost">
+              {nl ? "Mijn account verwijderen" : "Delete my account"}
+            </Button>
+          </form>
+        </div>
       </Card>
 
       <form action={logoutAction}>

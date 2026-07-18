@@ -614,6 +614,17 @@ export function TicketShop({
                 </div>
               </label>
             </div>
+            <p className="mt-3 text-sm text-[#5c667f]">
+              {locale === "nl"
+                ? "VTK gebruikt deze gegevens om je bestelling uit te voeren, tickets te leveren, fraude te voorkomen en de boekhouding bij te houden. "
+                : "VTK uses these details to fulfil your order, deliver tickets, prevent fraud and maintain accounting records. "}
+              <a
+                href={`${locale === "nl" ? "" : "/en"}/privacy`}
+                className="font-medium text-vtk-ink underline"
+              >
+                {locale === "nl" ? "Lees de privacyverklaring." : "Read the privacy statement."}
+              </a>
+            </p>
           </section>
         ) : null}
       </div>

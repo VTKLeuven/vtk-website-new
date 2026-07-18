@@ -63,13 +63,22 @@ const profileSchema = z.object({
     .toLowerCase()
     .refine((v) => v === "" || R_NUMBER_REGEX.test(v), { message: "INVALID_RNUMBER" })
     .default(""),
-  street: z.string().trim().min(1),
-  houseNumber: z.string().trim().min(1),
+  street: z.string().trim().max(120).default(""),
+  houseNumber: z.string().trim().max(20).default(""),
   bus: z.string().trim().max(20).optional().default(""),
-  postalCode: z.string().trim().min(1).max(12),
-  city: z.string().trim().min(1),
-  birthDate: z.coerce.date(),
-  personalEmail: z.string().trim().toLowerCase().email(),
+  postalCode: z.string().trim().max(12).default(""),
+  city: z.string().trim().max(120).default(""),
+  birthDate: z
+    .string()
+    .trim()
+    .refine((value) => value === "" || !Number.isNaN(Date.parse(value)))
+    .default(""),
+  personalEmail: z
+    .string()
+    .trim()
+    .toLowerCase()
+    .refine((value) => value === "" || z.string().email().safeParse(value).success)
+    .default(""),
   emailPreference: z.enum(EMAIL_PREFERENCES),
   mailCategories: z.array(z.enum(MAIL_CATEGORIES)).default([]),
   ...studySchema,
@@ -166,13 +175,13 @@ export async function saveProfileAction(
         // De weergavenaam blijft afgeleid van voor- + achternaam.
         name: fullName(data.firstName, data.lastName),
         rNumber: data.rNumber ? data.rNumber : null,
-        street: data.street,
-        houseNumber: data.houseNumber,
+        street: data.street || null,
+        houseNumber: data.houseNumber || null,
         bus: data.bus ? data.bus : null,
-        postalCode: data.postalCode,
-        city: data.city,
-        birthDate: data.birthDate,
-        personalEmail: data.personalEmail,
+        postalCode: data.postalCode || null,
+        city: data.city || null,
+        birthDate: data.birthDate ? new Date(data.birthDate) : null,
+        personalEmail: data.personalEmail || null,
         emailPreference: data.emailPreference,
         mailCategories: { set: data.mailCategories },
         studyYears: { set: data.studyYears },

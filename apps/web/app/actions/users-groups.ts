@@ -7,7 +7,6 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "@vtk/db";
 import {
   createUser,
-  deleteUser,
   setUserPassword,
   updateUser,
 } from "@vtk/auth/server";
@@ -15,6 +14,7 @@ import { hasPermission, fullName, splitFullName } from "@vtk/auth";
 import { requirePermission, requireSession } from "@/lib/session";
 import { saveError, saveOk, type SaveState } from "@/lib/saveState";
 import { currentWorkingYear } from "@/lib/workingYear";
+import { eraseUserData } from "@/lib/privacy/account";
 
 /** `P2002` op een bepaald veld: de unieke constraint die Prisma noemt. */
 function isUniqueViolation(err: unknown, field: string): boolean {
@@ -103,9 +103,9 @@ export async function saveUserAction(_prev: SaveState, formData: FormData): Prom
 }
 
 export async function deleteUserAction(formData: FormData): Promise<void> {
-  const session = await requirePermission("users.edit");
+  await requirePermission("users.edit");
   const id = formData.get("id") as string;
-  if (id) await deleteUser(session, id);
+  if (id) await eraseUserData(id);
   revalidatePath("/admin/gebruikers");
   redirect("/admin/gebruikers");
 }

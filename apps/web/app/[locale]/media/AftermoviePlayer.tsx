@@ -68,7 +68,8 @@ function normalizeItem(item: AftermoviePlayerItem): NormalizedItem {
         kind: "embed",
         embedUrl: `https://www.youtube-nocookie.com/embed/${youtubeId}?rel=0`,
         externalUrl: mediaUrl.href,
-        posterUrl: suppliedPoster ?? `https://i.ytimg.com/vi/${youtubeId}/hqdefault.jpg`,
+        // Avoid a third-party YouTube request before the visitor presses play.
+        posterUrl: suppliedPoster,
       },
     };
   }

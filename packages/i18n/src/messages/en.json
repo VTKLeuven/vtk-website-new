@@ -37,7 +37,9 @@
     "linkLinkedIn": "LinkedIn",
     "linkShifts": "Shifts",
     "linkSlots": "Cudi Time Slots",
-    "linkPrivacy": "Privacy"
+    "linkPrivacy": "Privacy",
+    "linkCookies": "Cookies",
+    "linkCookieSettings": "Cookie choices"
   },
   "home": {
     "welcome": "Welcome to VTK",
@@ -113,7 +115,7 @@
     "cameraOpenFailed": "The camera could not be opened in this browser. Choose a photo or use your device camera button.",
     "cameraNotReady": "The camera is not ready yet. Try again in a moment.",
     "cameraSaveFailed": "This browser could not save the selfie. Choose a photo instead.",
-    "faceSearchConsent": "I consent to temporarily use this photo for face recognition within this album.",
+    "faceSearchConsent": "I explicitly consent to VTK temporarily creating a biometric face template from this photo to search for me in this album. My selfie and template are deleted after the search.",
     "startFaceSearch": "Find matches",
     "processing": "Processing...",
     "again": "Search again",
@@ -202,6 +204,8 @@
     "kicker": "Welcome to VTK",
     "title": "Complete your profile",
     "intro": "Just a few things to fill in and your registration is done. You can always change these later in your account.",
+    "privacyNotice": "We use your name and university email for membership and access. Student number, address, date of birth, personal email, study details and photo are optional and only used for features you choose. Only provide what is needed.",
+    "privacyLink": "Read how VTK uses your data.",
     "identityHeading": "Name & student number",
     "firstName": "First name",
     "lastName": "Last name",
@@ -361,41 +365,45 @@
   },
   "privacy": {
     "kicker": "VTK · KU Leuven",
-    "title": "Member portal privacy statement",
-    "lead": "This statement explains which personal data VTK processes when you sign in to the member portal, and why.",
-    "updated": "Last updated on 27 June 2026.",
+    "title": "Privacy statement",
+    "lead": "This statement explains which personal data VTK processes on the public website, in the member portal, for tickets and reservations, in logistics tools and for optional face recognition.",
+    "updated": "Last updated on 18 July 2026.",
     "sections": [
       {
         "heading": "Who is responsible?",
-        "body": "VTK, Vlaamse Technische Kring, Studentenwijk Arenberg 6/1, 3001 Heverlee, Belgium. For questions about your data, contact it@vtk.be."
+        "body": "VTK, Vlaamse Technische Kring, Studentenwijk Arenberg 6/1, 3001 Heverlee, Belgium, is the controller. For questions, rights requests or withdrawal of consent, contact it@vtk.be."
       },
       {
         "heading": "Which data do we process?",
-        "body": "When you use the member portal, we process:\n• your name and email address\n• your language preference and optionally your profile picture\n• your memberships and the permissions attached to them\n• technical sign-in data such as the time of sign-in, your IP address and your browser type, to secure your session"
+        "body": "Depending on the features you use, we process:\n• account and membership data: name, KU Leuven email, language, r-number, roles and session data\n• optional profile data: address, date of birth, personal email, email preferences, study profile and profile picture\n• orders and activities: ticket buyer and attendees, answers, payments and refunds, sandwiches, shifts, equipment and van reservations and related notes\n• access and security data: card number/name, door events, IP address, browser and technical logs\n• photo albums: a selfie and biometric face template, but only when you explicitly consent"
       },
       {
-        "heading": "Why do we process this data?",
-        "body": "We use this data to authenticate you, to give you access to the right parts of the portal and to protect the security of your account. We do not process your data for advertising and we do not sell it."
+        "heading": "Purposes and legal bases",
+        "body": "We process necessary account, ticket and reservation data to provide the requested service or perform an agreement. Roles, fraud prevention, access control and limited security logs rely on VTK's legitimate interest in operating the association and its systems securely. We retain accounting data where a legal obligation requires it. Mailing categories, optional browser diagnostics and face recognition are used only with consent. You may withdraw consent without affecting earlier lawful processing. VTK does not sell personal data or use it for advertising profiles."
       },
       {
         "heading": "Signing in with your KU Leuven account",
         "body": "When you sign in with your KU Leuven account, the login service of the Associatie KU Leuven shares your name and your verified email address with VTK. We use that email address to link you to your existing VTK account. VTK does not receive your password."
       },
       {
-        "heading": "How long do we keep your data?",
-        "body": "Sign-in sessions expire automatically after at most 30 days. We keep your account data for as long as you are a member or contributor of VTK. After that it is deleted or anonymised, unless we are legally required to keep it longer."
+        "heading": "Face recognition in photo albums",
+        "body": "This optional feature is disabled by default. If VTK enables it after a data protection impact assessment, you must explicitly consent before every search. The uploaded selfie and its temporary template are deleted after the search, and a cleanup job removes leftovers within one hour. The album index may contain face templates of people shown in photos; questions, objections or deletion requests can be sent to it@vtk.be. No decision with legal or similarly significant effect is made solely by automation."
       },
       {
         "heading": "Who do we share your data with?",
-        "body": "We only share your data with parties needed to run the service, such as the KU Leuven login service and our hosting provider, who act as processors. We do not share your data with third parties for commercial purposes."
+        "body": "We use only parties needed to provide the service: KU Leuven/Associatie KU Leuven for sign-in and card data; our hosting, database, object-storage and email suppliers; Mollie for payments; VTK's managed Immich service for albums; and, only with browser consent, Sentry for diagnostics. YouTube or Vimeo is contacted only when you start external media. The actual suppliers, locations and retention settings are maintained in the processing register. Where data leaves the EEA, VTK must use an adequacy decision or appropriate safeguards such as standard contractual clauses."
       },
       {
-        "heading": "Your rights",
-        "body": "You have the right to access, correct or delete your data, and to object to its processing. To exercise these rights, send a message to it@vtk.be. You can also file a complaint with the Belgian Data Protection Authority."
+        "heading": "How long do we keep your data?",
+        "body": "Sign-in sessions expire within 30 days. Technical door and access logs are deleted after 12 months by default; raw diagnostic payloads and delivery details are cleaned after 90 days and fraud fingerprints after 30 days. Account and membership details remain while needed for membership and administration. Ticket, reservation and payment data is then deleted or anonymised, except where accounting or other law requires longer retention. Retention periods are periodically enforced by the privacy maintenance task."
       },
       {
-        "heading": "Changes to this statement",
-        "body": "We may update this privacy statement when the service changes. The date at the top shows when we last updated the text."
+        "heading": "Your rights and choices",
+        "body": "In your account you can correct your profile, download a copy of your data and request deletion. Deletion removes the account and anonymises personal details in transactions VTK must retain for legal, financial or integrity reasons. You may also request access, rectification, erasure, restriction, portability or object by emailing it@vtk.be. VTK may verify your identity and normally responds within one month. You may complain to the Belgian Data Protection Authority."
+      },
+      {
+        "heading": "Children and changes",
+        "body": "The services are intended for (prospective) students and members. Where a minor's consent is insufficient under applicable rules, a parent or guardian must act. We update this statement when the service or suppliers change; the date above shows the latest material update."
       }
     ]
   },

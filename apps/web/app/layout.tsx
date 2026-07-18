@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono, Instrument_Serif, Inter } from "next/font/google";
 import { getSentryDsn } from "@/lib/runtimeConfig";
+import { CookieConsent } from "@/components/site/CookieConsent";
 import "./globals.css";
 
 const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
@@ -57,6 +58,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           />
         )}
         {children}
+        <CookieConsent />
       </body>
     </html>
   );

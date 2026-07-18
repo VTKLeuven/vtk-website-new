@@ -93,7 +93,9 @@ export function videoEmbed(url: string, posterUrl?: string | null): VideoEmbed |
     return {
       embedUrl: `https://www.youtube-nocookie.com/embed/${youtubeId}?rel=0`,
       externalUrl: media.href,
-      posterUrl: suppliedPoster ?? `https://i.ytimg.com/vi/${youtubeId}/hqdefault.jpg`,
+      // Do not contact YouTube before the visitor deliberately starts external
+      // media. Editors can upload/configure a first-party poster if desired.
+      posterUrl: suppliedPoster,
     };
   }
 

@@ -136,7 +136,9 @@ function readConfig(): FaceSearchConfig {
   const maxDistance = Number(process.env.GALLERY_FACE_MATCH_MAX_DISTANCE);
 
   return {
-    enabled: process.env.GALLERY_FACE_SEARCH_ENABLED !== "false",
+    // Biometric processing must be deliberately enabled after the controller
+    // has approved the DPIA, notice, consent flow and retention configuration.
+    enabled: process.env.GALLERY_FACE_SEARCH_ENABLED === "true",
     database: {
       host: process.env.GALLERY_DATABASE_HOST || "",
       port: parsePositiveInteger(process.env.GALLERY_DATABASE_PORT, 5432),

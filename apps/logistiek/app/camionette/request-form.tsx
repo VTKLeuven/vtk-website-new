@@ -123,6 +123,11 @@ export function VanRequestForm({ locale }: { locale: 'nl' | 'en' }) {
           <span className="text-vtk-muted"> ({en ? 'final after approval' : 'definitief bij goedkeuring'})</span>
         ) : null}
       </p>
+      <p className="mt-3 text-xs leading-5 text-vtk-muted">
+        {en
+          ? 'VTK uses these details to plan and administer the trip. Avoid sensitive information in the free-text note unless it is necessary.'
+          : 'VTK gebruikt deze gegevens om de rit te plannen en administreren. Zet geen gevoelige informatie in de vrije nota tenzij dat noodzakelijk is.'}
+      </p>
 
       {error ? (
         <p role="alert" className="mt-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">

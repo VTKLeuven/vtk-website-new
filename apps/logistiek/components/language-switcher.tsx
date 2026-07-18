@@ -8,7 +8,7 @@ export function LanguageSwitcher({ locale }: { locale: LogistiekLocale }) {
 
   function change(next: LogistiekLocale) {
     if (next === locale) return;
-    document.cookie = `${LOCALE_COOKIE}=${next}; Path=/; Max-Age=31536000; SameSite=Lax`;
+    document.cookie = `${LOCALE_COOKIE}=${next}; Path=/; Max-Age=15552000; SameSite=Lax`;
     router.refresh();
   }
 

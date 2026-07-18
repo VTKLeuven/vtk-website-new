@@ -210,7 +210,13 @@ export function MaterialRequestForm({
           </p>
         ) : null}
 
-        <Button
+          <p className="text-xs leading-5 text-vtk-muted">
+            {en
+              ? 'VTK uses the dates, selected equipment and note to handle this reservation. Avoid sensitive information in the free-text note unless necessary.'
+              : 'VTK gebruikt de datums, het gekozen materiaal en de nota om deze reservatie af te handelen. Zet geen gevoelige informatie in de vrije nota tenzij noodzakelijk.'}
+          </p>
+
+          <Button
           type="button"
           size="lg"
           className="mt-5 w-full"

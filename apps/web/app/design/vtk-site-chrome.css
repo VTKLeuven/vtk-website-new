@@ -101,6 +101,104 @@
   text-decoration: underline;
 }
 
+.vtk-site-footer-legal {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.vtk-cookie-settings-button {
+  appearance: none;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.vtk-cookie-settings-button:hover {
+  color: #fff;
+  text-decoration: underline;
+}
+
+.vtk-cookie-consent {
+  position: fixed;
+  right: clamp(16px, 3vw, 32px);
+  bottom: clamp(16px, 3vw, 32px);
+  z-index: 1000;
+  display: grid;
+  width: min(560px, calc(100vw - 32px));
+  gap: 16px;
+  padding: 22px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 18px;
+  background: var(--navy);
+  color: var(--paper);
+  box-shadow: 0 24px 70px rgba(10, 15, 31, 0.3);
+  font-family: var(--sans);
+}
+
+.vtk-cookie-consent h2 {
+  margin: 0 0 8px;
+  font-size: 20px;
+}
+
+.vtk-cookie-consent p {
+  margin: 0 0 8px;
+  color: var(--on-dark-muted);
+  font-size: 14px;
+  line-height: 1.55;
+}
+
+.vtk-cookie-consent a {
+  color: var(--paper);
+  font-size: 13px;
+  text-decoration: underline;
+}
+
+.vtk-cookie-consent-option {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  color: var(--paper);
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+.vtk-cookie-consent-option input {
+  margin-top: 3px;
+}
+
+.vtk-cookie-consent-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.vtk-cookie-consent-actions button {
+  min-height: 40px;
+  padding: 8px 14px;
+  border-radius: 999px;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.vtk-cookie-secondary {
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  background: transparent;
+  color: var(--paper);
+}
+
+.vtk-cookie-primary {
+  border: 1px solid var(--yellow);
+  background: var(--yellow);
+  color: var(--navy);
+}
+
 .vtk-auth {
   flex: 1;
   display: flex;
@@ -227,5 +325,18 @@
 @media (max-width: 620px) {
   .vtk-site-footer-top {
     grid-template-columns: 1fr;
+  }
+
+  .vtk-site-footer-bottom {
+    flex-direction: column;
+  }
+
+  .vtk-cookie-consent-actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .vtk-cookie-consent-actions button {
+    width: 100%;
   }
 }
