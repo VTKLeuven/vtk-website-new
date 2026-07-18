@@ -1,6 +1,6 @@
 import { hash } from "@node-rs/argon2";
 import { PrismaClient } from "@prisma/client";
-import { GROUP_SEEDS, HEADER_TABS } from "../src/groups";
+import { GROUP_SEEDS, WERKGROEP_SEEDS, HEADER_TABS } from "../src/groups";
 import { PERMISSIONS } from "../src/permissions";
 
 const prisma = new PrismaClient();
@@ -75,7 +75,7 @@ async function main() {
   console.log("Seeding groups...");
   // Create-only: een reseed op een DB met data mag bestaande groepen (naam,
   // slug, volgorde) niet overschrijven. Nieuwe codes worden nog wel aangemaakt.
-  for (const g of GROUP_SEEDS) {
+  for (const g of [...GROUP_SEEDS, ...WERKGROEP_SEEDS]) {
     await prisma.group.upsert({
       where: { code: g.code },
       update: {},
@@ -264,6 +264,20 @@ async function main() {
     const perms = postRolePerms[g.code];
     if (perms) await setRolePermissions(postRole.id, perms);
     await grantRoleToGroup(g.code, postRole.id, "DEFAULT");
+  }
+
+  // Eén lege rol-container per werkgroep, aan elk lid toegekend (DEFAULT). Zo
+  // hebben werkgroepen meteen "hun eigen rol" om er later rechten aan te hangen.
+  for (const g of WERKGROEP_SEEDS) {
+    const role = await upsertRole(
+      `werkgroep-${g.code.toLowerCase()}`,
+      g.nameNl,
+      g.nameEn,
+      30 + g.orderInPraesidium,
+      `Rol voor werkgroep ${g.nameNl}.`,
+      `Role for werkgroep ${g.nameEn}.`,
+    );
+    await grantRoleToGroup(g.code, role.id, "DEFAULT");
   }
 
   console.log("Seeding default homepage settings...");
@@ -674,7 +688,6 @@ async function main() {
       slug: "computerwetenschappen",
       nameNl: "Computerwetenschappen",
       nameEn: "Computer Science",
-      studyTrack: "Master Computer Science",
       studyProgrammes: ["COMPUTER_SCIENCE"] as const,
       descriptionNl: "Aanspreekpunt voor major-keuzes, ISP-vragen en feedback over softwarevakken.",
       descriptionEn: "Point of contact for major choices, ISP questions and feedback on software courses.",
@@ -688,7 +701,6 @@ async function main() {
       slug: "werktuigkunde",
       nameNl: "Werktuigkunde",
       nameEn: "Mechanical Engineering",
-      studyTrack: "Master Mechanical Engineering",
       studyProgrammes: ["MECHANICAL"] as const,
       descriptionNl: "Voor labo's, projectwerk, uurroosters en opleidingsfeedback.",
       descriptionEn: "For labs, project work, schedules and programme feedback.",
@@ -701,7 +713,6 @@ async function main() {
       slug: "elektrotechniek",
       nameNl: "Elektrotechniek",
       nameEn: "Electrical Engineering",
-      studyTrack: "Master Electrical Engineering",
       studyProgrammes: ["ELECTRICAL"] as const,
       descriptionNl: "Bundelt opmerkingen rond practica, examens en communicatie met professoren.",
       descriptionEn: "Collects remarks about practicals, exams and communication with professors.",
@@ -714,7 +725,6 @@ async function main() {
       slug: "chemische-technologie",
       nameNl: "Chemische technologie",
       nameEn: "Chemical Engineering",
-      studyTrack: "Master Chemical Engineering",
       studyProgrammes: ["CHEMICAL"] as const,
       descriptionNl: "Contactpunt voor practica, stages en facultaire overlegmomenten.",
       descriptionEn: "Contact point for labs, internships and faculty consultations.",
@@ -736,7 +746,6 @@ async function main() {
         slug: poc.slug,
         nameNl: poc.nameNl,
         nameEn: poc.nameEn,
-        studyTrack: poc.studyTrack,
         descriptionNl: poc.descriptionNl,
         descriptionEn: poc.descriptionEn,
         order: poc.order,

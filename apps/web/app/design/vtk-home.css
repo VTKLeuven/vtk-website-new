@@ -1116,14 +1116,6 @@
   font-weight: 600;
 }
 
-.vtk-design .poccard-head .track {
-  color: var(--muted);
-  font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  white-space: nowrap;
-}
-
 .vtk-design .poc-people {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(88px, 1fr));

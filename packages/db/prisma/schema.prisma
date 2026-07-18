@@ -24,6 +24,14 @@ enum MembershipRole {
   LEAD
 }
 
+// Soort Group. PRAESIDIUM = een praesidiumpost (op /praesidium). WERKGROEP = een
+// werkgroep (BEST, Revue, ...): dezelfde leden/rollen-machinerie, maar niet op
+// /praesidium; ze verschijnen op /werkgroepen met een eigen infotekst + website.
+enum GroupType {
+  PRAESIDIUM
+  WERKGROEP
+}
+
 // Hoe een post (Group) een rol toekent aan haar leden.
 // DEFAULT: elk lid van de post krijgt de rol. LEADER: enkel de
 // verantwoordelijke (membership.role == LEAD) krijgt de rol, bovenop de
@@ -305,6 +313,11 @@ model Group {
   descriptionEn     String?
   orderInPraesidium Int     @default(0)
   photoKey          String?
+  // Praesidiumpost of werkgroep. Een werkgroep gebruikt dezelfde leden/rollen
+  // maar staat niet op /praesidium; ze krijgt /werkgroepen met haar eigen
+  // infotekst (description*, door de leden zelf bewerkbaar) en optionele website.
+  type              GroupType @default(PRAESIDIUM)
+  website           String?
   // Een gedeactiveerde post verdwijnt uit de nieuwe-shift-keuzes en het
   // postenbeheer voor nieuwe jaren, maar de historiek (memberships per jaar)
   // blijft bewaard i.p.v. de post te verwijderen.
@@ -1086,16 +1099,14 @@ model Poc {
   slug          String  @unique
   nameNl        String
   nameEn        String?
-  studyTrack    String
   descriptionNl String?
   descriptionEn String?
   order         Int     @default(0)
 
-  // Aan welke richtingen deze POC hangt. `studyTrack` blijft de vrije tekst die
-  // op de POC-pagina getoond wordt ("Master Computer Science"); dit is de
-  // machineleesbare koppeling naar `User.studyProgrammes`, zodat de homepage de
-  // POC's van jouw richtingen kan tonen. Meerdere richtingen per POC kan: één
-  // POC bedient soms verschillende opleidingen.
+  // Aan welke richtingen deze POC hangt. Dit is de enige koppeling met een
+  // studierichting: het is de machineleesbare link naar `User.studyProgrammes`,
+  // zodat de homepage de POC's van jouw richtingen kan tonen. Meerdere richtingen
+  // per POC kan: één POC bedient soms verschillende opleidingen.
   studyProgrammes StudyProgramme[] @default([])
 
   representatives PocRepresentative[]

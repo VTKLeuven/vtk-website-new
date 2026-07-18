@@ -119,22 +119,37 @@ const membershipSchema = z.object({
   year: z.coerce.number().int(),
 });
 
-// Lidmaatschappen beheren mag met users.edit (gebruikersbeheer) of met
-// groups.manage (postenbeheer). Superadmin altijd.
-async function requireMembershipManager() {
+// Lidmaatschappen beheren mag met users.edit (gebruikersbeheer). Verder hangt het
+// af van het soort groep: een praesidiumpost vraagt groups.manage, een werkgroep
+// vraagt werkgroepen.manage. Zo kan werkgroepbeheer los gedelegeerd worden.
+// Superadmin altijd (via hasPermission).
+async function requireMembershipManager(groupId: string) {
   const session = await requireSession();
-  if (!hasPermission(session, "users.edit") && !hasPermission(session, "groups.manage")) {
-    throw new Error("FORBIDDEN");
-  }
+  if (hasPermission(session, "users.edit")) return session;
+  const group = groupId
+    ? await prisma.group.findUnique({ where: { id: groupId }, select: { type: true } })
+    : null;
+  const needed = group?.type === "WERKGROEP" ? "werkgroepen.manage" : "groups.manage";
+  if (!hasPermission(session, needed)) throw new Error("FORBIDDEN");
   return session;
 }
 
+/** Revalideert alle plekken waar een lidmaatschap zichtbaar is (post of werkgroep). */
+function revalidateMembershipSurfaces(userId?: string) {
+  if (userId) revalidatePath(`/admin/gebruikers/${userId}`);
+  revalidatePath("/admin/groepen");
+  revalidatePath("/admin/werkgroepen");
+  revalidatePath("/praesidium");
+  revalidatePath("/werkgroepen");
+}
+
 export async function addMembershipAction(formData: FormData): Promise<void> {
-  await requireMembershipManager();
+  const groupId = String(formData.get("groupId") ?? "");
+  await requireMembershipManager(groupId);
   const rawYear = String(formData.get("year") ?? "").trim();
   const parsed = membershipSchema.parse({
     userId: formData.get("userId"),
-    groupId: formData.get("groupId"),
+    groupId,
     role: formData.get("role") || "MEMBER",
     titleNl: formData.get("titleNl") || null,
     titleEn: formData.get("titleEn") || null,
@@ -152,19 +167,20 @@ export async function addMembershipAction(formData: FormData): Promise<void> {
     update: { role: parsed.role, titleNl: parsed.titleNl, titleEn: parsed.titleEn },
     create: parsed,
   });
-  revalidatePath(`/admin/gebruikers/${parsed.userId}`);
-  revalidatePath("/admin/groepen");
-  revalidatePath("/praesidium");
+  revalidateMembershipSurfaces(parsed.userId);
 }
 
 export async function removeMembershipAction(formData: FormData): Promise<void> {
-  await requireMembershipManager();
   const id = formData.get("id") as string;
   const userId = formData.get("userId") as string;
-  if (id) await prisma.groupMembership.delete({ where: { id } });
-  if (userId) revalidatePath(`/admin/gebruikers/${userId}`);
-  revalidatePath("/admin/groepen");
-  revalidatePath("/praesidium");
+  if (id) {
+    const membership = await prisma.groupMembership.findUnique({ where: { id }, select: { groupId: true } });
+    if (membership) {
+      await requireMembershipManager(membership.groupId);
+      await prisma.groupMembership.delete({ where: { id } });
+    }
+  }
+  revalidateMembershipSurfaces(userId || undefined);
 }
 
 // Bulk CSV import. Columns: email,name,password,groupCode,role,year,rNumber
@@ -390,4 +406,135 @@ export async function setGroupRoleAction(formData: FormData): Promise<void> {
   }
   revalidatePath("/admin/groepen");
   revalidatePath("/praesidium");
+}
+
+// ---- Werkgroepen ------------------------------------------------------------
+// Werkgroepen delen het Group-model met de posten, maar hebben hun eigen
+// beheerrecht (werkgroepen.manage) en een eigen publieke pagina (/werkgroepen).
+// De infotekst + website mag elk lid van de werkgroep zelf aanpassen; leden en
+// rollen blijven voorbehouden aan werkgroepen.manage.
+
+const werkgroepSchema = z.object({
+  id: z.string().optional(),
+  code: z.string().trim().optional(),
+  nameNl: z.string().trim().min(1),
+  nameEn: z.string().trim().min(1),
+  orderInPraesidium: z.coerce.number().int().default(0),
+  active: z.coerce.boolean().default(true),
+});
+
+/**
+ * Werkgroep aanmaken of haar basisinstellingen (naam, volgorde, actief) bewerken.
+ * De infotekst + website lopen apart via {@link saveWerkgroepInfoAction} zodat
+ * ook gewone leden die mogen aanpassen. Enkel werkgroepen.manage (of superadmin).
+ */
+export async function saveWerkgroepAction(_prev: SaveState, formData: FormData): Promise<SaveState> {
+  await requirePermission("werkgroepen.manage");
+  const result = werkgroepSchema.safeParse({
+    id: (formData.get("id") as string) || undefined,
+    code: (formData.get("code") as string) || undefined,
+    nameNl: formData.get("nameNl"),
+    nameEn: formData.get("nameEn"),
+    orderInPraesidium: formData.get("orderInPraesidium") || 0,
+    active: formData.get("active") === "on",
+  });
+  if (!result.success) return saveError("INVALID_INPUT");
+  const parsed = result.data;
+
+  const data = {
+    nameNl: parsed.nameNl,
+    nameEn: parsed.nameEn,
+    orderInPraesidium: parsed.orderInPraesidium,
+    active: parsed.active,
+  };
+
+  try {
+    if (parsed.id) {
+      await prisma.group.update({ where: { id: parsed.id }, data });
+    } else {
+      const code = codeify(parsed.code || parsed.nameNl);
+      const slug = slugify(parsed.nameNl);
+      if (!code || !slug) return saveError("INVALID_INPUT");
+      await prisma.group.create({ data: { ...data, code, slug, type: "WERKGROEP" } });
+    }
+  } catch (err) {
+    if (isUniqueViolation(err, "code")) return saveError("GROUP_CODE_TAKEN");
+    if (isUniqueViolation(err, "slug")) return saveError("SLUG_TAKEN");
+    throw err;
+  }
+
+  revalidatePath("/admin/werkgroepen");
+  revalidatePath("/werkgroepen");
+  return saveOk();
+}
+
+const werkgroepInfoSchema = z.object({
+  descriptionNl: z.string().trim().optional().nullable(),
+  descriptionEn: z.string().trim().optional().nullable(),
+  website: z.string().trim().optional().nullable(),
+});
+
+/**
+ * Infotekst + website van een werkgroep bewerken. Toegestaan voor elk lid van
+ * die werkgroep (huidig werkingsjaar) en voor werkgroepen.manage/superadmin. Een
+ * lid van BEST kan dus enkel de tekst van BEST wijzigen, niet die van een andere
+ * werkgroep.
+ */
+export async function saveWerkgroepInfoAction(_prev: SaveState, formData: FormData): Promise<SaveState> {
+  const session = await requireSession();
+  const id = String(formData.get("id") ?? "");
+  const group = id ? await prisma.group.findUnique({ where: { id }, select: { type: true } }) : null;
+  if (!group || group.type !== "WERKGROEP") return saveError("INVALID_INPUT");
+
+  const isMember = session.groups.some((g) => g.id === id);
+  const canManage = session.user.isSuperAdmin || hasPermission(session, "werkgroepen.manage");
+  if (!isMember && !canManage) return saveError("FORBIDDEN");
+
+  const result = werkgroepInfoSchema.safeParse({
+    descriptionNl: (formData.get("descriptionNl") as string) || null,
+    descriptionEn: (formData.get("descriptionEn") as string) || null,
+    website: (formData.get("website") as string) || null,
+  });
+  if (!result.success) return saveError("INVALID_INPUT");
+
+  // Website mag zonder schema ingevuld worden (best.vtk.be); we normaliseren naar
+  // een volwaardige https-URL zodat de link op /werkgroepen werkt.
+  let website = result.data.website?.trim() || null;
+  if (website && !/^https?:\/\//i.test(website)) website = `https://${website}`;
+
+  await prisma.group.update({
+    where: { id },
+    data: {
+      descriptionNl: result.data.descriptionNl || null,
+      descriptionEn: result.data.descriptionEn || null,
+      website,
+    },
+  });
+
+  revalidatePath("/admin/werkgroepen");
+  revalidatePath("/werkgroepen");
+  return saveOk();
+}
+
+/** Zoals {@link setGroupRoleAction}, maar voor werkgroepen (werkgroepen.manage). */
+export async function setWerkgroepRoleAction(formData: FormData): Promise<void> {
+  await requirePermission("werkgroepen.manage");
+  const groupId = formData.get("groupId") as string;
+  const roleId = formData.get("roleId") as string;
+  const kind = formData.get("kind") === "LEADER" ? "LEADER" : "DEFAULT";
+  const enabled = formData.get("enabled") === "1";
+  if (!groupId || !roleId) return;
+  if (enabled) {
+    await prisma.groupRole.upsert({
+      where: { groupId_roleId_kind: { groupId, roleId, kind } },
+      update: {},
+      create: { groupId, roleId, kind },
+    });
+  } else {
+    await prisma.groupRole
+      .delete({ where: { groupId_roleId_kind: { groupId, roleId, kind } } })
+      .catch(() => null);
+  }
+  revalidatePath("/admin/werkgroepen");
+  revalidatePath("/werkgroepen");
 }

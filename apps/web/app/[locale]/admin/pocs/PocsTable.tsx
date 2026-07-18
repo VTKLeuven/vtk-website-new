@@ -23,7 +23,6 @@ export type Rep = {
 export type PocRow = {
   id: string;
   slug: string;
-  studyTrack: string;
   name: string;
   nameNl: string;
   nameEn: string;
@@ -40,9 +39,9 @@ export type PocRow = {
 export type ProgrammeOption = { value: string; label: string };
 
 /**
- * De richtingen waar deze POC voor staat. Dit is de koppeling die de homepage
- * gebruikt om leden de POC's van hun eigen richtingen te tonen; `studyTrack`
- * ernaast blijft de vrije tekst die op de POC-pagina zelf verschijnt.
+ * De richtingen waar deze POC voor staat. Dit is de enige koppeling met een
+ * studierichting: de homepage gebruikt ze om leden de POC's van hun eigen
+ * richtingen te tonen.
  */
 function ProgrammesField({
   options,
@@ -167,7 +166,7 @@ export function PocsTable({
             onSuccess={() => setCreateOpen(false)}
           >
             <div><Label>Slug</Label><Input name="slug" required placeholder="computerwetenschappen" /></div>
-            <div><Label>{nl ? "Studierichting" : "Study track"}</Label><Input name="studyTrack" required placeholder={nl ? "bv. Computer Science" : "e.g. Computer Science"} /></div>
+            <div><Label>{nl ? "Volgorde" : "Order"}</Label><Input name="order" type="number" defaultValue={pocs.length} /></div>
             <div><Label>{nl ? "Naam (NL)" : "Name (NL)"}</Label><Input name="nameNl" required /></div>
             <div><Label>{nl ? "Naam (EN)" : "Name (EN)"}</Label><Input name="nameEn" /></div>
             <div className="md:col-span-2"><Label>{nl ? "Beschrijving (NL)" : "Description (NL)"}</Label><Textarea name="descriptionNl" rows={2} /></div>
@@ -175,7 +174,6 @@ export function PocsTable({
             <div className="md:col-span-2">
               <ProgrammesField options={programmeOptions} selected={[]} nl={nl} />
             </div>
-            <div><Label>{nl ? "Volgorde" : "Order"}</Label><Input name="order" type="number" defaultValue={pocs.length} /></div>
           </SaveForm>
         </Modal>
       )}
@@ -225,7 +223,6 @@ function PocRowView({
                 <span className="font-medium text-vtk-ink">{poc.name}</span>
                 <code className="rounded bg-vtk-blue-soft/60 px-1.5 py-0.5 text-[11px] text-[#5c667f]">{poc.slug}</code>
               </div>
-              <div className="mt-0.5 text-xs text-[#5c667f]">{poc.studyTrack}</div>
             </div>
           </div>
         </td>
@@ -338,11 +335,10 @@ function PocDetail({
             {...saveLabels}
           >
             <input type="hidden" name="id" value={poc.id} />
-            <div className="md:col-span-2"><Label>{nl ? "Naam (NL)" : "Name (NL)"}</Label><Input name="nameNl" defaultValue={poc.nameNl} required /></div>
-            <div className="md:col-span-2"><Label>{nl ? "Naam (EN)" : "Name (EN)"}</Label><Input name="nameEn" defaultValue={poc.nameEn} /></div>
-            <div className="md:col-span-2"><Label>{nl ? "Volgorde" : "Order"}</Label><Input name="order" type="number" defaultValue={poc.order} /></div>
+            <div className="md:col-span-3"><Label>{nl ? "Naam (NL)" : "Name (NL)"}</Label><Input name="nameNl" defaultValue={poc.nameNl} required /></div>
+            <div className="md:col-span-3"><Label>{nl ? "Naam (EN)" : "Name (EN)"}</Label><Input name="nameEn" defaultValue={poc.nameEn} /></div>
             <div className="md:col-span-3"><Label>Slug</Label><Input name="slug" defaultValue={poc.slug} required /></div>
-            <div className="md:col-span-3"><Label>{nl ? "Studierichting" : "Study track"}</Label><Input name="studyTrack" defaultValue={poc.studyTrack} required /></div>
+            <div className="md:col-span-3"><Label>{nl ? "Volgorde" : "Order"}</Label><Input name="order" type="number" defaultValue={poc.order} /></div>
             <div className="md:col-span-6"><Label>{nl ? "Beschrijving (NL)" : "Description (NL)"}</Label><Textarea name="descriptionNl" defaultValue={poc.descriptionNl} rows={2} /></div>
             <div className="md:col-span-6"><Label>{nl ? "Beschrijving (EN)" : "Description (EN)"}</Label><Textarea name="descriptionEn" defaultValue={poc.descriptionEn} rows={2} /></div>
             <div className="md:col-span-6">

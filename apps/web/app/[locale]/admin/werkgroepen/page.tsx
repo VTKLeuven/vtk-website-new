@@ -2,14 +2,15 @@ import Link from "next/link";
 import { prisma } from "@vtk/db";
 import { notFound } from "next/navigation";
 import { hasLocale } from "@/lib/locale";
-import { requirePermission } from "@/lib/session";
+import { requireSession } from "@/lib/session";
+import { hasPermission } from "@vtk/auth";
 import type { Locale } from "@vtk/i18n";
 import { publicUrl } from "@/lib/storage";
 import { formatWorkingYear, parseWorkingYear, workingYearTabs } from "@/lib/workingYear";
-import { groupErrorMessages } from "./messages";
-import { PostsTable, type PostRow, type RoleOption } from "./PostsTable";
+import { werkgroepErrorMessages } from "./messages";
+import { WerkgroepenTable, type WerkgroepRow, type RoleOption } from "./WerkgroepenTable";
 
-export default async function AdminGroups({
+export default async function AdminWerkgroepen({
   params,
   searchParams,
 }: {
@@ -22,28 +23,44 @@ export default async function AdminGroups({
   const locale: Locale = localeParam;
   const nl = locale === "nl";
   const base = nl ? "" : "/en";
-  await requirePermission("groups.manage");
+
+  // Toegang: beheerders (werkgroepen.manage/superadmin) zien alle werkgroepen en
+  // beheren leden/rollen; een gewoon lid ziet enkel de werkgroep(en) waar het lid
+  // van is en mag daar enkel de infotekst + website aanpassen.
+  const session = await requireSession();
+  const canManage = hasPermission(session, "werkgroepen.manage");
+  const myGroupIds = new Set(session.groups.map((g) => g.id));
 
   const year = parseWorkingYear(jaar);
 
   const [groups, roles, distinctYears] = await Promise.all([
     prisma.group.findMany({
-      where: { type: "PRAESIDIUM" },
+      where: { type: "WERKGROEP" },
       orderBy: [{ active: "desc" }, { orderInPraesidium: "asc" }],
       include: {
         roleGrants: { include: { role: { select: { code: true, nameNl: true, nameEn: true } } } },
         memberships: { where: { year }, include: { user: true } },
       },
     }),
-    prisma.role.findMany({ orderBy: [{ order: "asc" }, { nameNl: "asc" }], select: { id: true, code: true, nameNl: true, nameEn: true } }),
-    prisma.groupMembership.findMany({ where: { group: { type: "PRAESIDIUM" } }, distinct: ["year"], select: { year: true } }),
+    prisma.role.findMany({
+      orderBy: [{ order: "asc" }, { nameNl: "asc" }],
+      select: { id: true, code: true, nameNl: true, nameEn: true },
+    }),
+    prisma.groupMembership.findMany({
+      where: { group: { type: "WERKGROEP" } },
+      distinct: ["year"],
+      select: { year: true },
+    }),
   ]);
 
-  const tabs = workingYearTabs(distinctYears.map((r) => r.year));
+  // Een lid ziet enkel de eigen werkgroepen.
+  const visible = canManage ? groups : groups.filter((g) => myGroupIds.has(g.id));
+  if (!canManage && visible.length === 0) notFound();
 
+  const tabs = workingYearTabs(distinctYears.map((r) => r.year));
   const allRoles: RoleOption[] = roles.map((r) => ({ roleId: r.id, code: r.code, name: nl ? r.nameNl : r.nameEn }));
 
-  const postRows: PostRow[] = groups.map((group) => {
+  const rows: WerkgroepRow[] = visible.map((group) => {
     const members = [...group.memberships]
       .sort((a, b) => {
         if (a.role !== b.role) return a.role === "LEAD" ? -1 : 1;
@@ -67,17 +84,8 @@ export default async function AdminGroups({
     }));
 
     const name = nl ? group.nameNl : group.nameEn;
-    const description = nl ? group.descriptionNl : group.descriptionEn;
 
-    const searchText = [
-      name,
-      group.nameNl,
-      group.nameEn,
-      group.code,
-      description ?? "",
-      ...roleGrants.map((g) => g.name),
-      ...members.map((m) => `${m.name} ${m.email}`),
-    ]
+    const searchText = [name, group.nameNl, group.nameEn, group.code, ...roleGrants.map((g) => g.name), ...members.map((m) => `${m.name} ${m.email}`)]
       .join(" ")
       .toLowerCase();
 
@@ -87,9 +95,9 @@ export default async function AdminGroups({
       name,
       nameNl: group.nameNl,
       nameEn: group.nameEn,
-      description,
       descriptionNl: group.descriptionNl ?? "",
       descriptionEn: group.descriptionEn ?? "",
+      website: group.website ?? "",
       orderInPraesidium: group.orderInPraesidium,
       active: group.active,
       memberCount: members.length,
@@ -104,28 +112,32 @@ export default async function AdminGroups({
     savingLabel: nl ? "Bezig..." : "Saving...",
     savedMessage: nl ? "Opgeslagen" : "Saved",
     fallbackErrorMessage: nl ? "Er ging iets mis bij het opslaan." : "Something went wrong while saving.",
-    errorMessages: groupErrorMessages(locale),
+    errorMessages: werkgroepErrorMessages(locale),
   };
 
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold">{nl ? "Posten & rollen" : "Posts & roles"}</h1>
+        <h1 className="text-2xl font-semibold">{nl ? "Werkgroepen" : "Werkgroepen"}</h1>
         <p className="mt-1 text-sm text-[#5c667f]">
-          {nl
-            ? "Een post verleent rollen aan haar leden: DEFAULT-rollen aan elk lid, LEADER-rollen enkel aan de verantwoordelijke. De rechten van een rol beheer je bij Rollen. Lidmaatschappen gelden per werkingsjaar en resetten op 15 juli."
-            : "A post grants roles to its members: DEFAULT roles to every member, LEADER roles only to the lead. A role's permissions are managed under Roles. Memberships apply per working year and reset on 15 July."}
+          {canManage
+            ? nl
+              ? "Werkgroepen werken zoals posten: ze verlenen rollen aan hun leden. Lidmaatschappen gelden per werkingsjaar en resetten op 15 juli. Elke werkgroep verschijnt op /werkgroepen met haar eigen infotekst en website."
+              : "Werkgroepen work like posts: they grant roles to their members. Memberships apply per working year and reset on 15 July. Each werkgroep appears on /werkgroepen with its own info text and website."
+            : nl
+              ? "Hier pas je de infotekst en website van je eigen werkgroep aan. Die verschijnen op de publieke /werkgroepen-pagina."
+              : "Here you edit the info text and website of your own werkgroep. They appear on the public /werkgroepen page."}
         </p>
       </div>
 
-      {/* Werkingsjaar-tabjes */}
+      {/* Werkingsjaar-tabjes (relevant voor de ledenlijst) */}
       <div className="flex flex-wrap gap-2">
         {tabs.map((y) => {
           const active = y === year;
           return (
             <Link
               key={y}
-              href={`${base}/admin/groepen?jaar=${y}`}
+              href={`${base}/admin/werkgroepen?jaar=${y}`}
               className={
                 "rounded-full border px-4 py-1.5 text-sm font-medium transition " +
                 (active
@@ -139,12 +151,13 @@ export default async function AdminGroups({
         })}
       </div>
 
-      <PostsTable
-        posts={postRows}
+      <WerkgroepenTable
+        werkgroepen={rows}
         allRoles={allRoles}
         year={year}
         yearLabel={formatWorkingYear(year)}
         locale={nl ? "nl" : "en"}
+        canManage={canManage}
         saveLabels={saveLabels}
       />
     </div>

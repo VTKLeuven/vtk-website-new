@@ -168,6 +168,23 @@ the design language into the application instead of copying mockup content.
 
 ## Components
 
+- Markdown editing: gebruik
+  `apps/web/components/editor/MarkdownEditor.tsx` voor alle langere,
+  opgemaakte tekst die als Markdown wordt opgeslagen. Gebruik
+  `MarkdownEditorField` in een gewoon formulier; die beheert de waarde en voegt
+  zelf de hidden input met `name` toe. Gebruik de controlled `MarkdownEditor`
+  wanneer de parent de waarde nodig heeft, bijvoorbeeld bij taaltabs. Bouw voor
+  nieuwe velden geen losse textarea met een eigen Markdown-werkbalk.
+  - De standaardwerkbalk bevat H1, H2, H3, links, image-upload, bold, italics,
+    inline of fenced code, unordered en ordered lists, blockquotes en een
+    horizontal rule. Zet `allowImages={false}` wanneer uploads niet bij het
+    inhoudstype passen.
+  - Render opgeslagen inhoud met
+    `apps/web/components/ui/Markdown.tsx` in een `prose-vtk` container. Gebruik
+    `markdownToPlainText` uit `apps/web/lib/markdown.ts` voor compacte previews
+    waarin rijke HTML niet past.
+  - Ruwe HTML blijft uitgeschakeld. Voeg geen `rehype-raw` toe, want deze inhoud
+    wordt door leden beheerd.
 - Header: sticky, solid `--navy` bar with light nav links, compact brand mark,
   and subtle language/account controls; it pairs with the dark footer as the top
   bookend (the old translucent paper bar was reviewed and replaced). The text is

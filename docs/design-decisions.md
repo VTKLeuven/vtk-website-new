@@ -358,6 +358,34 @@ SSO. Concrete implementatie: hook in `packages/auth/src/auth.ts`, gate in
   bestaan als toewijsbare rollen maar hangen nog aan geen enkele post. Alles als
   `DEFAULT` (elk lid). De lege rollen vul je met rechten via `/admin/roles`.
 
+### Werkgroepen (BEST, Revue, ...)
+
+- Een **werkgroep** is technisch **dezelfde `Group`** als een post, met een
+  discriminator `Group.type` (`PRAESIDIUM` | `WERKGROEP`, default `PRAESIDIUM`).
+  Ze deelt de volledige machinerie van de posten: leden per werkingsjaar
+  (`GroupMembership`), rol-grants (`GroupRole`, DEFAULT/LEADER) en dezelfde
+  add/remove-lid-flow. De seed maakt zeven werkgroepen (BEST, Biomedix, Chemix,
+  Existenz, Mechanix, Revue, Statix), elk met een lege rol-container.
+- **Waarom een `type`-discriminator en geen apart model?** Werkgroepen "werken
+  zoals posten"; een tweede kopie van memberships + rollen + admin-UI zou pure
+  duplicatie zijn. Het verschil zit enkel in *waar* ze verschijnen.
+- **Niet op /praesidium, wel op /werkgroepen.** `/praesidium`, de admin-tab
+  "Posten" en de shift-postkeuzes filteren op `type = PRAESIDIUM`; werkgroepen
+  krijgen hun eigen publieke `/werkgroepen` (zelfde ledenraster + werkingsjaar-
+  tabjes als praesidium) en een eigen admin-tab "Werkgroepen".
+- **Eigen infotekst + website.** De werkgroep-`description*` is de blurb op
+  `/werkgroepen`; `Group.website` is een optionele link (mag zonder schema
+  ingevuld worden, wordt genormaliseerd naar `https://`). Beide staan los van de
+  naam en de rollen.
+- **Wie mag wat.** Leden en rollen beheren vraagt het aparte recht
+  `werkgroepen.manage` (los van `groups.manage`, zodat het delegeerbaar is). De
+  **infotekst + website** mag daarnaast **elk lid van díe werkgroep** zelf
+  aanpassen (huidig werkingsjaar), maar enkel van de eigen werkgroep: de
+  admin-tab toont een gewoon lid enkel zijn eigen werkgroep(en) en enkel het
+  infotekst-formulier; `saveWerkgroepInfoAction` checkt het lidmaatschap
+  server-side. Beheerders (met het recht of superadmin) zien en beheren alles.
+- **Footer** linkt naar zowel `/praesidium` als `/werkgroepen`.
+
 ### Mailinglijsten (opt-in)
 
 - Acht categorieën: **Feest, Career, Sport, Evenementen, Onderwijs, VTK

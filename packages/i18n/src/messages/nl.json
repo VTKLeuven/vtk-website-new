@@ -30,6 +30,8 @@
     "linkCareer": "Career",
     "linkMedia": "Media",
     "linkAbout": "Over VTK",
+    "linkPraesidium": "Praesidium",
+    "linkWerkgroepen": "Werkgroepen",
     "linkInstagram": "Instagram",
     "linkFacebook": "Facebook",
     "linkLinkedIn": "LinkedIn",
@@ -56,6 +58,16 @@
     "title": "Praesidium",
     "lead": "Voorzitter",
     "member": "Lid"
+  },
+  "werkgroepen": {
+    "kicker": "VTK · Werkgroepen",
+    "title": "Werkgroepen",
+    "intro": "De werkgroepen van VTK, elk met hun eigen ploeg.",
+    "lead": "Verantwoordelijke",
+    "member": "Lid",
+    "website": "Website",
+    "empty": "Er zijn nog geen werkgroepen.",
+    "noMembers": "Nog geen leden voor dit werkingsjaar."
   },
   "pocs": {
     "title": "POC's",
@@ -274,6 +286,7 @@
     "calendar": "Kalender",
     "users": "Gebruikers",
     "groups": "Posten",
+    "werkgroepen": "Werkgroepen",
     "roles": "Rollen",
     "albums": "Albums",
     "media": "Media",

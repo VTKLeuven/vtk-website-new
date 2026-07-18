@@ -30,6 +30,8 @@
     "linkCareer": "Career",
     "linkMedia": "Media",
     "linkAbout": "About VTK",
+    "linkPraesidium": "Praesidium",
+    "linkWerkgroepen": "Werkgroepen",
     "linkInstagram": "Instagram",
     "linkFacebook": "Facebook",
     "linkLinkedIn": "LinkedIn",
@@ -56,6 +58,16 @@
     "title": "Praesidium",
     "lead": "Lead",
     "member": "Member"
+  },
+  "werkgroepen": {
+    "kicker": "VTK · Werkgroepen",
+    "title": "Werkgroepen",
+    "intro": "VTK's werkgroepen, each with its own team.",
+    "lead": "Lead",
+    "member": "Member",
+    "website": "Website",
+    "empty": "There are no werkgroepen yet.",
+    "noMembers": "No members for this working year yet."
   },
   "pocs": {
     "title": "POCs",
@@ -274,6 +286,7 @@
     "calendar": "Calendar",
     "users": "Users",
     "groups": "Posts",
+    "werkgroepen": "Werkgroepen",
     "roles": "Roles",
     "albums": "Albums",
     "media": "Media",

@@ -74,6 +74,12 @@ export async function Footer({ locale }: { locale: Locale }) {
                 <Link href={`${base}/media`}>{f.linkMedia}</Link>
               </li>
               <li>
+                <Link href={`${base}/praesidium`}>{f.linkPraesidium}</Link>
+              </li>
+              <li>
+                <Link href={`${base}/werkgroepen`}>{f.linkWerkgroepen}</Link>
+              </li>
+              <li>
                 <Link href={`${base}/over-vtk`}>{f.linkAbout}</Link>
               </li>
             </ul>

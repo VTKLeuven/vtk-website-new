@@ -6,6 +6,9 @@ export type GroupSeed = {
   nameNl: string;
   nameEn: string;
   orderInPraesidium: number;
+  // Werkgroepen zetten dit op "WERKGROEP"; praesidiumposten laten het weg
+  // (default in de DB is PRAESIDIUM).
+  type?: "WERKGROEP";
 };
 
 export const GROUP_SEEDS: GroupSeed[] = [
@@ -24,6 +27,22 @@ export const GROUP_SEEDS: GroupSeed[] = [
   { code: "ONTHAAL", slug: "onthaal", nameNl: "Onthaal", nameEn: "Welcome", orderInPraesidium: 13 },
   { code: "SPORT", slug: "sport", nameNl: "Sport", nameEn: "Sports", orderInPraesidium: 14 },
   { code: "THEOKOT", slug: "theokot", nameNl: "Theokot", nameEn: "Theokot", orderInPraesidium: 15 },
+];
+
+/**
+ * De werkgroepen. Ze delen het `Group`-model (leden + rollen per werkingsjaar)
+ * met de praesidiumposten, maar staan niet op /praesidium: ze krijgen
+ * /werkgroepen met hun eigen infotekst en optionele website. `orderInPraesidium`
+ * dient hier gewoon als volgorde op die pagina.
+ */
+export const WERKGROEP_SEEDS: GroupSeed[] = [
+  { code: "BEST", slug: "best", nameNl: "BEST", nameEn: "BEST", orderInPraesidium: 1, type: "WERKGROEP" },
+  { code: "BIOMEDIX", slug: "biomedix", nameNl: "Biomedix", nameEn: "Biomedix", orderInPraesidium: 2, type: "WERKGROEP" },
+  { code: "CHEMIX", slug: "chemix", nameNl: "Chemix", nameEn: "Chemix", orderInPraesidium: 3, type: "WERKGROEP" },
+  { code: "EXISTENZ", slug: "existenz", nameNl: "Existenz", nameEn: "Existenz", orderInPraesidium: 4, type: "WERKGROEP" },
+  { code: "MECHANIX", slug: "mechanix", nameNl: "Mechanix", nameEn: "Mechanix", orderInPraesidium: 5, type: "WERKGROEP" },
+  { code: "REVUE", slug: "revue", nameNl: "Revue", nameEn: "Revue", orderInPraesidium: 6, type: "WERKGROEP" },
+  { code: "STATIX", slug: "statix", nameNl: "Statix", nameEn: "Statix", orderInPraesidium: 7, type: "WERKGROEP" },
 ];
 
 /**

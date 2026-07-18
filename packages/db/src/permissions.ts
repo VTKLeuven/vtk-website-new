@@ -28,6 +28,7 @@ export const PERMISSIONS = [
   { code: "users.edit", labelNl: "Gebruikers bewerken", labelEn: "Edit users", category: "users" },
   { code: "users.bulkImport", labelNl: "Bulk gebruikers importeren", labelEn: "Bulk import users", category: "users" },
   { code: "groups.manage", labelNl: "Posten en hun rollen beheren", labelEn: "Manage posts and their roles", category: "users" },
+  { code: "werkgroepen.manage", labelNl: "Werkgroepen en hun rollen beheren", labelEn: "Manage werkgroepen and their roles", category: "users" },
   { code: "roles.manage", labelNl: "Rollen beheren en toewijzen", labelEn: "Manage and assign roles", category: "users" },
 
   // Mailing lists

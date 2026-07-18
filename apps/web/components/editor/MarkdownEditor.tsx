@@ -1,16 +1,15 @@
 "use client";
 
-import { useId, useRef, useState, type ReactNode } from "react";
+import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import type { Locale } from "@vtk/i18n";
 import { Markdown } from "@/components/ui/Markdown";
+import { useReportFormBusy } from "@/components/ui/formBusy";
 
 /**
- * Herbruikbare markdown-editor: platte tekst met een werkbalk voor de basis
- * (koppen, vet, cursief, links, afbeeldingen, lijsten) en een voorbeeld-tab die
- * rendert met dezelfde Markdown-component als de publieke pagina's.
- *
- * Geavanceerdere markdown (tabellen, citaten, codeblokken, ...) werkt gewoon,
- * maar krijgt bewust geen knop: wie het kent, typt het zelf.
+ * Herbruikbare markdown-editor met werkbalk en visueel voorbeeld. De werkbalk
+ * ondersteunt H1, H2, H3, links, afbeeldingen, vet, cursief, code, lijsten,
+ * citaten en horizontale lijnen. Het voorbeeld gebruikt exact dezelfde
+ * Markdown-component als de publieke pagina's.
  *
  * Afbeeldingen gaan via POST /api/admin/upload (kind=image) en worden als
  * markdown-syntax op de cursorpositie ingevoegd; zet `allowImages` uit voor
@@ -39,12 +38,19 @@ export function MarkdownEditor({
   const [uploadFailed, setUploadFailed] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  const valueRef = useRef(value);
+  useReportFormBusy(uploading);
+
+  useEffect(() => {
+    valueRef.current = value;
+  }, [value]);
 
   /** Vervangt [from, to) door `text` en herstelt focus + selectie. */
   function replaceRange(from: number, to: number, text: string, select?: { start: number; end: number }) {
     const ta = textareaRef.current;
     if (!ta) return;
-    onChange(value.slice(0, from) + text + value.slice(to));
+    const currentValue = valueRef.current;
+    onChange(currentValue.slice(0, from) + text + currentValue.slice(to));
     requestAnimationFrame(() => {
       ta.focus();
       if (select) ta.setSelectionRange(select.start, select.end);
@@ -93,6 +99,36 @@ export function MarkdownEditor({
     replaceRange(start, end, text, { start: urlStart, end: urlStart + 8 });
   }
 
+  function insertCode() {
+    const ta = textareaRef.current;
+    if (!ta) return;
+    const { selectionStart: start, selectionEnd: end } = ta;
+    const selected = value.slice(start, end);
+
+    if (selected.includes("\n")) {
+      const text = `\`\`\`\n${selected}\n\`\`\``;
+      replaceRange(start, end, text, {
+        start: start + 4,
+        end: start + 4 + selected.length,
+      });
+      return;
+    }
+
+    surroundSelection("`", "`", "code");
+  }
+
+  function insertHorizontalRule() {
+    const ta = textareaRef.current;
+    if (!ta) return;
+    const { selectionStart: start, selectionEnd: end } = ta;
+    const before = start > 0 && value[start - 1] !== "\n" ? "\n\n" : start > 0 ? "\n" : "";
+    const after =
+      end < value.length && value[end] !== "\n" ? "\n\n" : end < value.length ? "\n" : "";
+    const text = `${before}---${after}`;
+    const cursor = start + before.length + 3 + after.length;
+    replaceRange(start, end, text, { start: cursor, end: cursor });
+  }
+
   async function uploadImage(file: File) {
     setUploading(true);
     setUploadFailed(false);
@@ -119,8 +155,8 @@ export function MarkdownEditor({
 
   const strip = {
     heading: /^#{1,6} /,
-    bullet: /^[-*] /,
-    ordered: /^\d+\. /,
+    list: /^(?:[-*+]|\d+\.)\s+/,
+    quote: /^>\s?/,
   };
 
   return (
@@ -168,6 +204,9 @@ export function MarkdownEditor({
             >
               <span className="text-xs font-semibold italic">I</span>
             </ToolbarButton>
+            <ToolbarButton label={nl ? "Code" : "Code"} onClick={insertCode}>
+              <CodeGlyph />
+            </ToolbarButton>
             <ToolbarDivider />
             <ToolbarButton label={nl ? "Link invoegen" : "Insert link"} onClick={insertLink}>
               <LinkGlyph />
@@ -184,15 +223,27 @@ export function MarkdownEditor({
             <ToolbarDivider />
             <ToolbarButton
               label={nl ? "Opsomming" : "Bullet list"}
-              onClick={() => prefixSelectedLines("- ", strip.bullet)}
+              onClick={() => prefixSelectedLines("- ", strip.list)}
             >
               <ListGlyph />
             </ToolbarButton>
             <ToolbarButton
               label={nl ? "Genummerde lijst" : "Numbered list"}
-              onClick={() => prefixSelectedLines((i) => `${i + 1}. `, strip.ordered)}
+              onClick={() => prefixSelectedLines((i) => `${i + 1}. `, strip.list)}
             >
               <OrderedListGlyph />
+            </ToolbarButton>
+            <ToolbarButton
+              label={nl ? "Citaat" : "Blockquote"}
+              onClick={() => prefixSelectedLines("> ", strip.quote)}
+            >
+              <QuoteGlyph />
+            </ToolbarButton>
+            <ToolbarButton
+              label={nl ? "Horizontale lijn" : "Horizontal rule"}
+              onClick={insertHorizontalRule}
+            >
+              <HorizontalRuleGlyph />
             </ToolbarButton>
             {uploading && (
               <span className="ml-2 text-xs text-[#5c667f]">
@@ -247,6 +298,32 @@ export function MarkdownEditor({
         </div>
       )}
     </div>
+  );
+}
+
+/**
+ * Formuliervariant van MarkdownEditor. De component beheert haar eigen waarde en
+ * verstuurt die via een hidden input met de opgegeven veldnaam.
+ */
+export function MarkdownEditorField({
+  name,
+  defaultValue = "",
+  ...editorProps
+}: {
+  name: string;
+  defaultValue?: string | null;
+  locale: Locale;
+  rows?: number;
+  allowImages?: boolean;
+  textareaId?: string;
+}) {
+  const [value, setValue] = useState(defaultValue ?? "");
+
+  return (
+    <>
+      <input type="hidden" name={name} value={value} />
+      <MarkdownEditor {...editorProps} value={value} onChange={setValue} />
+    </>
   );
 }
 
@@ -363,6 +440,33 @@ function OrderedListGlyph() {
       <path d="M4 6h1v4" />
       <path d="M4 10h2" />
       <path d="M6 18H4c0-1 2-2 2-3s-1-1.5-2-1" />
+    </Glyph>
+  );
+}
+
+function CodeGlyph() {
+  return (
+    <Glyph>
+      <path d="m8 9-3 3 3 3" />
+      <path d="m16 9 3 3-3 3" />
+      <path d="m14 5-4 14" />
+    </Glyph>
+  );
+}
+
+function QuoteGlyph() {
+  return (
+    <Glyph>
+      <path d="M3 21c3 0 7-1 7-8V5c0-1.25-.75-2-2-2H4c-1.25 0-2 .75-2 1.972V11c0 1.25.75 2 2 2h3c0 3-1 4-4 5v3z" />
+      <path d="M15 21c3 0 7-1 7-8V5c0-1.25-.75-2-2-2h-4c-1.25 0-2 .75-2 1.972V11c0 1.25.75 2 2 2h3c0 3-1 4-4 5v3z" />
+    </Glyph>
+  );
+}
+
+function HorizontalRuleGlyph() {
+  return (
+    <Glyph>
+      <path d="M4 12h16" />
     </Glyph>
   );
 }
