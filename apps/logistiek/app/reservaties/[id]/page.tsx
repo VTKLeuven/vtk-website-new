@@ -129,13 +129,13 @@ export default async function ReservatieDetailPage({
 
           {reservation.status === 'REQUESTED' ? (
             <p className="mt-4 text-sm leading-6 text-vtk-muted">
-              Het team van Logistiek bekijkt je aanvraag. Je ziet hier meteen wanneer ze beslist is.
+              Logistiek moet deze aanvraag nog beoordelen.
             </p>
           ) : null}
 
           {betaling && paid ? (
             <p className="mt-4 rounded-lg border border-vtk-yellow-dark/40 bg-vtk-yellow/20 px-3 py-2 text-sm font-medium text-vtk-ink">
-              Je betaling is gelukt. Tot bij de afhaling!
+              Betaling ontvangen.
             </p>
           ) : null}
 
@@ -163,7 +163,7 @@ export default async function ReservatieDetailPage({
               <CancelButton
                 label="Reservatie annuleren"
                 dialogTitle="Reservatie annuleren?"
-                dialogDescription="Je aanvraag vervalt en het materiaal komt weer vrij voor anderen. Dit kan je niet ongedaan maken; een nieuwe aanvraag indienen kan altijd."
+                dialogDescription="Na annulering kun je deze aanvraag niet herstellen. Je kunt wel een nieuwe aanvraag indienen."
                 action={cancelReservationAction.bind(null, reservation.id)}
               />
             </div>

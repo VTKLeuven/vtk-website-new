@@ -119,13 +119,13 @@ export default async function VanBookingDetailPage({
 
           {booking.status === 'REQUESTED' ? (
             <p className="mt-4 text-sm leading-6 text-vtk-muted">
-              Het team van Logistiek bekijkt je aanvraag en wijst bij goedkeuring een chauffeur toe.
+              Logistiek moet deze aanvraag nog beoordelen en een chauffeur toewijzen.
             </p>
           ) : null}
 
           {betaling && paid ? (
             <p className="mt-4 rounded-lg border border-vtk-yellow-dark/40 bg-vtk-yellow/20 px-3 py-2 text-sm font-medium text-vtk-ink">
-              Je betaling is gelukt. Goede rit!
+              Betaling ontvangen.
             </p>
           ) : null}
 
@@ -140,7 +140,7 @@ export default async function VanBookingDetailPage({
               <CancelButton
                 label="Rit annuleren"
                 dialogTitle="Rit annuleren?"
-                dialogDescription="Je aanvraag vervalt en het tijdslot komt weer vrij. Dit kan je niet ongedaan maken; een nieuwe rit aanvragen kan altijd."
+                dialogDescription="Na annulering kun je deze aanvraag niet herstellen. Je kunt wel een nieuwe rit aanvragen."
                 action={cancelVanBookingAction.bind(null, booking.id)}
               />
             </div>

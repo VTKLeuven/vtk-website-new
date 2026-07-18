@@ -9,6 +9,7 @@ const NAV = [
   { href: '/beheer/camionette', label: 'Camionette' },
   { href: '/beheer/materiaal', label: 'Inventaris' },
   { href: '/beheer/kalender', label: 'Kalender' },
+  { href: '/beheer/teksten', label: 'Teksten' },
 ];
 
 export function BeheerNav() {

@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import type { UitleenCategory, UitleenItem } from '@prisma/client';
+import { Button } from '@vtk/ui';
 import {
   activateItemAction,
   deactivateCategoryAction,
@@ -11,6 +12,7 @@ import {
 } from '@/app/actions/beheer';
 import { ConfirmActionButton } from '@/components/ui/confirm-action-button';
 import { SaveForm } from '@/components/ui/save-form';
+import { LogisticsIcon } from '@/components/logistics-icon';
 
 const CATEGORY_ERRORS = { NAME_REQUIRED: 'Geef de categorie een naam.' };
 const ITEM_ERRORS = {
@@ -102,14 +104,18 @@ function ItemCard({
           <span><strong className="text-vtk-ink">{item.quantity}</strong> in voorraad</span>
         </div>
         <div className="flex items-center gap-2">
-          <button
+          <Button
             type="button"
+            variant="ghost"
+            size="sm"
             onClick={() => setEditing((open) => !open)}
-            className="rounded-full border border-vtk-navy/15 px-3 py-1.5 text-sm font-semibold text-vtk-ink transition hover:border-vtk-navy/40 hover:bg-vtk-paper"
+            className="w-8 !px-0"
             aria-expanded={editing}
+            aria-label={editing ? 'Bewerken sluiten' : 'Item bewerken'}
+            title={editing ? 'Bewerken sluiten' : 'Item bewerken'}
           >
-            {editing ? 'Sluiten' : 'Bewerken'}
-          </button>
+            <LogisticsIcon name={editing ? 'close' : 'edit'} className="h-4 w-4" />
+          </Button>
           <ConfirmActionButton
             label="Uit catalogus halen"
             successMessage="Item uit de catalogus gehaald."
@@ -117,6 +123,7 @@ function ItemCard({
             destructive
             dialogTitle="Item uit de catalogus halen?"
             dialogDescription="Leden kunnen dit item niet meer aanvragen. Bestaande reservaties en de historiek blijven bewaard; je kan het item later terugzetten."
+            icon={<LogisticsIcon name="hide" className="h-4 w-4" />}
           />
         </div>
       </div>
@@ -208,7 +215,13 @@ export function InventoryManager({
                 {inactiveItems.map((item) => (
                   <li key={item.id} className="flex flex-wrap items-center justify-between gap-3 rounded-[12px] bg-vtk-surface px-3 py-2.5 text-sm">
                     <span className="text-vtk-muted">{item.name}</span>
-                    <ConfirmActionButton label="Terugzetten" successMessage="Item terug in de catalogus gezet." action={activateItemAction.bind(null, item.id)} confirm={false} />
+                    <ConfirmActionButton
+                      label="Terug in catalogus zetten"
+                      successMessage="Item terug in de catalogus gezet."
+                      action={activateItemAction.bind(null, item.id)}
+                      confirm={false}
+                      icon={<LogisticsIcon name="show" className="h-4 w-4" />}
+                    />
                   </li>
                 ))}
               </ul>
@@ -235,7 +248,17 @@ export function InventoryManager({
                         <label className="grid gap-1 text-xs font-medium text-vtk-muted">Naam<input type="text" name="name" defaultValue={category.name} className={inputClass} /></label>
                         <label className="grid gap-1 text-xs font-medium text-vtk-muted">Volgorde <input type="number" name="sortIndex" defaultValue={category.sortIndex} className={inputClass} /></label>
                       </SaveForm>
-                      <div className="mt-3"><ConfirmActionButton label="Uit catalogus halen" successMessage="Categorie uit de catalogus gehaald." action={deactivateCategoryAction.bind(null, category.id)} destructive dialogTitle="Categorie uit de catalogus halen?" dialogDescription="De categorie verdwijnt uit de catalogus; haar items blijven bestaan en verhuizen naar ‘Overig’. Bestaande reservaties veranderen niet." /></div>
+                      <div className="mt-3">
+                        <ConfirmActionButton
+                          label="Uit catalogus halen"
+                          successMessage="Categorie uit de catalogus gehaald."
+                          action={deactivateCategoryAction.bind(null, category.id)}
+                          destructive
+                          dialogTitle="Categorie uit de catalogus halen?"
+                          dialogDescription="De categorie verdwijnt uit de catalogus; haar items blijven bestaan en verhuizen naar ‘Overig’. Bestaande reservaties veranderen niet."
+                          icon={<LogisticsIcon name="hide" className="h-4 w-4" />}
+                        />
+                      </div>
                     </div>
                   </details>
                 </li>

@@ -7,7 +7,15 @@ import { checkAvailabilityAction, createReservationAction } from '@/app/actions/
 import { formatEuro } from '@/lib/uitleen';
 import type { CatalogCategory } from '@/lib/uitleen-server';
 
-export function MaterialRequestForm({ catalog, locale }: { catalog: CatalogCategory[]; locale: 'nl' | 'en' }) {
+export function MaterialRequestForm({
+  catalog,
+  locale,
+  paymentNote,
+}: {
+  catalog: CatalogCategory[];
+  locale: 'nl' | 'en';
+  paymentNote: string;
+}) {
   const en = locale === 'en';
   const router = useRouter();
   const [pickupDate, setPickupDate] = useState('');
@@ -144,7 +152,7 @@ export function MaterialRequestForm({ catalog, locale }: { catalog: CatalogCateg
       </div>
 
       <aside className="h-fit rounded-[18px] border border-vtk-navy/10 bg-vtk-surface p-6 lg:sticky lg:top-6">
-        <h2 className="text-lg font-semibold tracking-tight text-vtk-ink">{en ? 'Your request' : 'Jouw aanvraag'}</h2>
+        <h2 className="text-lg font-semibold tracking-tight text-vtk-ink">{en ? 'Request' : 'Aanvraag'}</h2>
 
         <div className="mt-4 grid gap-3">
           <label className="grid gap-1 text-sm">
@@ -192,9 +200,9 @@ export function MaterialRequestForm({ catalog, locale }: { catalog: CatalogCateg
             <dd className="font-medium text-vtk-ink">{formatEuro(totals.deposit)}</dd>
           </div>
         </dl>
-        <p className="mt-2 text-xs leading-5 text-vtk-muted">
-          {en ? 'You only pay after approval; your deposit is returned when everything comes back in good condition.' : 'Je betaalt pas na goedkeuring; de waarborg krijg je terug wanneer alles in orde terugkomt.'}
-        </p>
+        {paymentNote ? (
+          <p className="mt-2 text-xs leading-5 text-vtk-muted">{paymentNote}</p>
+        ) : null}
 
         {error ? (
           <p role="alert" className="mt-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">

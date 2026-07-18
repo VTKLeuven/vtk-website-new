@@ -1,6 +1,14 @@
 import type { ReactNode, SVGProps } from 'react';
 
-type IconName = 'material' | 'van' | 'reservation' | 'check';
+type IconName =
+  | 'material'
+  | 'van'
+  | 'reservation'
+  | 'check'
+  | 'edit'
+  | 'close'
+  | 'hide'
+  | 'show';
 
 export function LogisticsIcon({ name, className, ...props }: SVGProps<SVGSVGElement> & { name: IconName }) {
   const paths = {
@@ -23,6 +31,26 @@ export function LogisticsIcon({ name, className, ...props }: SVGProps<SVGSVGElem
       </>
     ),
     check: <path d="m5 12 4.25 4.25L19 6.5" />,
+    edit: (
+      <>
+        <path d="m14.7 5.3 4 4" />
+        <path d="M4 20h4l10.7-10.7a2.83 2.83 0 0 0-4-4L4 16v4Z" />
+      </>
+    ),
+    close: <path d="m6 6 12 12M18 6 6 18" />,
+    hide: (
+      <>
+        <path d="M3 3l18 18" />
+        <path d="M10.6 10.7a2 2 0 0 0 2.7 2.7" />
+        <path d="M9.9 4.2A10.8 10.8 0 0 1 12 4c5.5 0 9 5.5 9 5.5a15.7 15.7 0 0 1-2.1 2.8M6.6 6.6C4.4 8 3 10.2 3 10.2s3.5 5.5 9 5.5c1.1 0 2.1-.2 3-.5" />
+      </>
+    ),
+    show: (
+      <>
+        <path d="M3 12s3.5-5.5 9-5.5 9 5.5 9 5.5-3.5 5.5-9 5.5S3 12 3 12Z" />
+        <circle cx="12" cy="12" r="2.5" />
+      </>
+    ),
   } satisfies Record<IconName, ReactNode>;
 
   return (

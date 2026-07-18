@@ -108,7 +108,7 @@ export async function createReservationAction(input: {
   });
 
   revalidateMember();
-  return { ok: true, message: 'Aanvraag ingediend. Je krijgt bericht zodra Logistiek beslist.' };
+  return { ok: true, message: 'Aanvraag ingediend. Je vindt de status bij Mijn aanvragen.' };
 }
 
 export async function cancelReservationAction(reservationId: string): Promise<ActionResult> {
@@ -193,7 +193,7 @@ export async function createVanBookingAction(input: {
   });
 
   revalidateMember();
-  return { ok: true, message: 'Rit aangevraagd. Je krijgt bericht zodra Logistiek beslist.' };
+  return { ok: true, message: 'Rit aangevraagd. Je vindt de status bij Mijn aanvragen.' };
 }
 
 export async function cancelVanBookingAction(bookingId: string): Promise<ActionResult> {

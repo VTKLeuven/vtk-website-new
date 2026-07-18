@@ -1,5 +1,6 @@
 'use client';
 
+import type { ReactNode } from 'react';
 import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button, ConfirmDialog } from '@vtk/ui';
@@ -20,6 +21,7 @@ export function ConfirmActionButton({
   confirm = true,
   destructive = false,
   variant = 'ghost',
+  icon,
 }: {
   label: string;
   action: () => Promise<ActionResult>;
@@ -29,6 +31,7 @@ export function ConfirmActionButton({
   confirm?: boolean;
   destructive?: boolean;
   variant?: 'primary' | 'secondary' | 'ghost' | 'danger';
+  icon?: ReactNode;
 }) {
   const router = useRouter();
   const showToast = useToast();
@@ -56,8 +59,11 @@ export function ConfirmActionButton({
         size="sm"
         disabled={pending}
         onClick={() => (confirm ? setOpen(true) : run())}
+        className={icon ? 'w-8 !px-0' : undefined}
+        aria-label={icon ? label : undefined}
+        title={icon ? label : undefined}
       >
-        {label}
+        {icon ?? label}
       </Button>
       {confirm ? (
         <ConfirmDialog

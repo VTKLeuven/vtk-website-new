@@ -3,6 +3,7 @@ import { LoginGate } from '@/components/login-gate';
 import { LogisticsIcon } from '@/components/logistics-icon';
 import { getSession } from '@/lib/session';
 import { copy, getLocale } from '@/lib/i18n';
+import { getPublicCopy } from '@/lib/public-copy';
 
 function CtaCard({
   href,
@@ -49,6 +50,7 @@ export default async function LogistiekHome() {
   if (!session) {
     return <LoginGate />;
   }
+  const content = await getPublicCopy(locale);
 
   return (
     <main className="flex-1">
@@ -59,11 +61,9 @@ export default async function LogistiekHome() {
               <span className="h-1.5 w-1.5 rounded-full bg-vtk-yellow" aria-hidden />
               {t.homeEyebrow}
             </p>
-            <h1>
-              {t.homeTitle} <em>{t.homeAccent}</em>.
-            </h1>
+            <h1>{t.homeTitle}</h1>
             <p className="logistics-hero-sub">
-              {t.homeLead}
+              {content.homeLead}
             </p>
             <div className="mt-8 flex flex-wrap gap-3">
               <Link href="/materiaal" className="logistics-hero-button logistics-hero-button-primary">
@@ -75,16 +75,16 @@ export default async function LogistiekHome() {
             </div>
           </div>
 
-          <aside className="logistics-hero-panel" aria-label="Zo werkt de uitleendienst">
+          <aside className="logistics-hero-panel" aria-label={t.howItWorks}>
             <div className="flex items-center justify-between gap-4">
               <p className="text-sm font-semibold text-vtk-paper">{t.howItWorks}</p>
-              <span className="logistics-card-number text-vtk-yellow">01—03</span>
+              <span className="logistics-card-number text-vtk-yellow">01-03</span>
             </div>
             <ol className="mt-5 divide-y divide-white/15">
               {[
-                [t.stepChoose, 'material'],
-                [t.stepRequest, 'reservation'],
-                [t.stepReturn, 'check'],
+                [content.stepChoose, 'material'],
+                [content.stepRequest, 'reservation'],
+                [content.stepReturn, 'check'],
               ].map(([label, icon], index) => (
                 <li key={label} className="flex items-center gap-3 py-3 first:pt-0 last:pb-0">
                   <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-vtk-yellow text-vtk-ink">
@@ -103,7 +103,7 @@ export default async function LogistiekHome() {
         <CtaCard
           href="/materiaal"
           title={t.homeMaterial}
-          description={t.homeMaterialLead}
+          description={content.homeMaterialLead}
           cta={t.homeMaterialCta}
           icon="material"
           index="01"
@@ -111,7 +111,7 @@ export default async function LogistiekHome() {
         <CtaCard
           href="/camionette"
           title={t.homeVan}
-          description={t.homeVanLead}
+          description={content.homeVanLead}
           cta={t.homeVanCta}
           icon="van"
           index="02"
@@ -119,7 +119,7 @@ export default async function LogistiekHome() {
         <CtaCard
           href="/reservaties"
           title={t.homeReservations}
-          description={t.homeReservationsLead}
+          description={content.homeReservationsLead}
           cta={t.homeReservationsCta}
           icon="reservation"
           index="03"
@@ -134,11 +134,11 @@ export default async function LogistiekHome() {
               {t.infoKicker}
             </p>
             <h2 className="mt-4 max-w-xl text-3xl font-semibold tracking-[-0.03em] text-vtk-paper sm:text-4xl">
-              {t.infoTitle} <em className="font-serif font-normal italic text-vtk-yellow">{t.infoAccent}</em>.
+              {content.infoTitle}
             </h2>
           </div>
           <p className="max-w-xl self-end leading-7 text-[#b7c0dc]">
-            {t.infoLead}
+            {content.infoLead}
           </p>
         </div>
       </section>
