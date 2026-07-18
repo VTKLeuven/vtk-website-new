@@ -83,12 +83,49 @@
   background: var(--paper-2);
 }
 
-.ticket-catalog-head {
+/* Navy band met het technisch patroon, zelfde recept als de banden op de
+   homepage en de media/albumpagina's; elke kop een eigen uitsnede van de
+   tekening. De gele rand onderaan is het bestaande tickets-accent en blijft. */
+.ticket-catalog-head,
+.ticket-shop-head {
   position: relative;
+  z-index: 0;
   overflow: hidden;
   border-bottom: 5px solid var(--yellow);
-  background: var(--ink);
+  background: var(--navy);
   color: white;
+}
+
+.ticket-shop-head::after,
+.ticket-catalog-head::after {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  inset: 0;
+  pointer-events: none;
+  background-image: url("/technisch-pattern.svg");
+  background-size: 880px 880px;
+  background-repeat: repeat;
+  background-position: calc(50% + 340px) -160px;
+  opacity: 0.38;
+  -webkit-mask-image: linear-gradient(
+    to bottom,
+    transparent 0,
+    #000 64px,
+    #000 calc(100% - 48px),
+    transparent 100%
+  );
+  mask-image: linear-gradient(
+    to bottom,
+    transparent 0,
+    #000 64px,
+    #000 calc(100% - 48px),
+    transparent 100%
+  );
+}
+
+.ticket-shop-head::after {
+  background-position: calc(50% - 380px) -520px;
 }
 
 .ticket-catalog-head-inner {
@@ -111,11 +148,19 @@
 .ticket-catalog-head h1 {
   max-width: 760px;
   margin: 14px 0 0;
+  color: var(--paper);
+  font-size: clamp(38px, 4.6vw, 64px);
+  font-weight: 600;
+  letter-spacing: -0.035em;
+  line-height: 1.02;
+}
+
+/* Zelfde geel serif-accent als "ingenieurs" op de homepage. */
+.ticket-catalog-head h1 em {
+  color: var(--yellow);
   font-family: var(--serif);
-  font-size: 64px;
   font-style: italic;
   font-weight: 400;
-  line-height: 1;
 }
 
 .ticket-catalog-head p {
@@ -365,46 +410,52 @@
 
 /* Event shop */
 
-.ticket-shop-head {
-  border-bottom: 1px solid var(--line);
-  background: white;
-}
-
 .ticket-shop-head-inner {
   width: min(100%, var(--max));
   margin: 0 auto;
-  padding: 42px clamp(20px, 3vw, 36px) 36px;
+  padding: 42px clamp(20px, 3vw, 36px) 40px;
 }
 
+/* De terugknop en de eyebrow zijn elk een eigen regel; inline naast elkaar
+   plakten ze aan elkaar ("All tickets● ACTIVITIES"). */
 .ticket-back-link {
   display: inline-flex;
   align-items: center;
   gap: 7px;
-  margin-bottom: 30px;
-  color: var(--muted);
+  color: var(--on-dark-muted);
   font-size: 13px;
   font-weight: 700;
   text-decoration: none;
 }
 
 .ticket-back-link:hover {
-  color: var(--ink);
+  color: var(--paper);
+}
+
+.ticket-shop-head .ticket-back-link {
+  margin-bottom: 30px;
+}
+
+.ticket-shop-head .ticket-eyebrow {
+  display: flex;
+  color: rgba(255, 255, 255, 0.68);
 }
 
 .ticket-shop-head h1 {
   max-width: 920px;
-  margin: 11px 0 0;
-  font-family: var(--serif);
-  font-size: 58px;
-  font-style: italic;
-  font-weight: 400;
-  line-height: 1.05;
+  margin: 12px 0 0;
+  color: var(--paper);
+  font-size: clamp(36px, 4.4vw, 58px);
+  font-weight: 600;
+  letter-spacing: -0.035em;
+  line-height: 1.03;
+  overflow-wrap: anywhere;
 }
 
 .ticket-shop-description {
   max-width: 760px;
   margin: 16px 0 0;
-  color: var(--body);
+  color: var(--on-dark-muted);
   font-size: 16px;
   line-height: 1.6;
   white-space: pre-line;
@@ -415,9 +466,14 @@
   flex-wrap: wrap;
   gap: 10px 24px;
   margin-top: 27px;
-  color: var(--body);
+  color: rgba(255, 255, 255, 0.86);
   font-size: 13px;
   font-weight: 600;
+}
+
+/* Gele iconen als kleuraccent op de donkere band. */
+.ticket-shop-head .ticket-shop-facts svg {
+  color: var(--yellow);
 }
 
 .ticket-shop-shell {
@@ -465,8 +521,8 @@
   align-items: center;
   justify-content: center;
   border-radius: 50%;
-  background: var(--ink);
-  color: white;
+  background: var(--yellow);
+  color: var(--ink);
   font-family: var(--mono);
   font-size: 10px;
   font-weight: 700;
