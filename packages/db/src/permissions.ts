@@ -60,6 +60,11 @@ export const PERMISSIONS = [
   { code: "theokot.manage", labelNl: "Theokot beheren (sessies, aanbod, bans, instellingen)", labelEn: "Manage Theokot (sessions, offering, bans, settings)", category: "theokot" },
   { code: "theokot.pickup", labelNl: "Theokot afhaalbalie bedienen", labelEn: "Operate Theokot pickup counter", category: "theokot" },
 
+  // Deurtoegang (KU Leuven-kaartscanner op de deur)
+  { code: "door.open", labelNl: "Deur openen met studentenkaart", labelEn: "Open the door with a student card", category: "door" },
+  { code: "door.remoteOpen", labelNl: "Deur openen vanaf het dashboard", labelEn: "Open the door from the dashboard", category: "door" },
+  { code: "door.manage", labelNl: "Deurtoegang beheren (logs, tijdelijke toegang)", labelEn: "Manage door access (logs, temporary access)", category: "door" },
+
   // Module access flags (gate submodules via group permissions)
   { code: "modules.logistiek.access", labelNl: "Toegang tot Logistiek module", labelEn: "Access to Logistics module", category: "modules" },
   { code: "modules.cursusdienst.access", labelNl: "Toegang tot Cursusdienst module", labelEn: "Access to Course Shop module", category: "modules" },

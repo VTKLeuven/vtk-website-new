@@ -59,7 +59,16 @@ export const HEADER_TABS: Array<{
   { code: "THEOKOT", slug: "theokot", labelNl: "Theokot", labelEn: "Theokot", order: 1 },
   { code: "SHIFTEN", slug: "shift", labelNl: "Shiften", labelEn: "Shifts", order: 2 },
   { code: "EERSTEJAARS", slug: "eerstejaars", labelNl: "Eerstejaars", labelEn: "Freshmen", order: 3 },
-  { code: "CAREER", slug: "career", labelNl: "Career", labelEn: "Career", order: 4 },
+  {
+    code: "CAREER",
+    slug: "career",
+    labelNl: "Career",
+    labelEn: "Career",
+    order: 4,
+    ctaLabelNl: "Meer info op career.vtk.be",
+    ctaLabelEn: "More info on career.vtk.be",
+    ctaUrl: "https://career.vtk.be",
+  },
   {
     code: "CURSUSDIENST",
     slug: "cursusdienst",

@@ -963,6 +963,14 @@
   padding-bottom: clamp(40px, 4.5vw, 58px);
 }
 
+/* De evenementenband krijgt bewust meer verticale ademruimte dan de POC-band.
+   Die extra ruimte zit binnen de band, dus valt ze in het lichtblauw (--paper-2)
+   dat de ::before voluit trekt; het witte paper eromheen blijft ongemoeid. */
+.vtk-design .events-band {
+  padding-top: clamp(56px, 7.3vw, 96px);
+  padding-bottom: clamp(60px, 7.9vw, 104px);
+}
+
 .vtk-design .events-band::before,
 .vtk-design .poc-band::before {
   content: "";

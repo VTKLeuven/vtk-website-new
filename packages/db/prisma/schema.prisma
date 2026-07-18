@@ -142,6 +142,21 @@ enum TheokotOrderStatus {
   CANCELLED // door de student geannuleerd voor de deadline
 }
 
+// Hoe een deurgebeurtenis tot stand kwam: een fysieke kaartscan aan de deur, of
+// een remote-open vanaf het dashboard.
+enum DoorMethod {
+  CARD
+  REMOTE
+}
+
+// De uitkomst van een deurgebeurtenis.
+enum DoorLogResult {
+  ALLOWED // deur ging open
+  DENIED // gekende gebruiker zonder toegang
+  UNKNOWN_CARD // kaart geverifieerd maar niet aan een gebruiker gekoppeld
+  ERROR // verificatie/lookup mislukt
+}
+
 // Welk e-mailadres de kring gebruikt om een lid te contacteren.
 enum EmailPreference {
   UNIVERSITY // universiteitsmail (= login-mail via KUL SSO)
@@ -262,6 +277,9 @@ model User {
   theokotOrders   TheokotOrder[] @relation("TheokotOrderUser")
   theokotPickedUp TheokotOrder[] @relation("TheokotPickedUpBy")
   theokotBans     TheokotBan[]
+
+  doorGrants DoorAccessGrant[]
+  doorLogs   DoorAccessLog[]
 
   createdTicketEvents      TicketEvent[]           @relation("TicketEventCreatedBy")
   ticketEventGrants        TicketEventUserGrant[]  @relation("TicketEventGrantUser")
@@ -1342,6 +1360,52 @@ model TheokotBan {
 
   @@index([userId])
   @@index([active])
+}
+
+// -----------------------------------------------------------------------------
+// Deurtoegang (KU Leuven-kaartscanner op de deur, bediend door een Raspberry Pi)
+// -----------------------------------------------------------------------------
+
+// Tijdelijke deurtoegang los van de rollen: wie geen `door.open`-recht heeft maar
+// binnen [startsAt, endsAt] valt, mag de deur toch openen. Bedoeld voor gasten,
+// externen of kortlopende uitzonderingen. Verlopen grants blijven staan als
+// historiek; ze tellen enkel mee zolang now in het venster valt.
+model DoorAccessGrant {
+  id          String   @id @default(cuid())
+  userId      String
+  startsAt    DateTime @default(now())
+  endsAt      DateTime
+  note        String?
+  createdById String?
+  createdAt   DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([endsAt])
+}
+
+// Eén rij per deurgebeurtenis: elke kaartscan (toegelaten, geweigerd, onbekende
+// kaart of fout) en elke remote-open vanaf het dashboard. Voedt de statistiek en
+// het logoverzicht in /admin/deur. `userId` is null wanneer de kaart niet aan een
+// gebruiker gekoppeld kon worden; `offline` markeert events die de Pi tijdens een
+// outage bufferde en later naflushte.
+model DoorAccessLog {
+  id       String        @id @default(cuid())
+  at       DateTime      @default(now())
+  userId   String?
+  rNumber  String?
+  cardName String?
+  method   DoorMethod
+  result   DoorLogResult
+  reason   String?
+  offline  Boolean       @default(false)
+
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([at])
+  @@index([result])
+  @@index([userId])
 }
 
 // -----------------------------------------------------------------------------

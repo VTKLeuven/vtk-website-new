@@ -29,25 +29,17 @@
   font-weight: 700;
 }
 
-.vtk-site-footer-mega::before {
-  content: "vtk";
-  width: 34px;
-  height: 34px;
-  display: inline-grid;
-  place-items: center;
-  margin-right: 10px;
-  border-radius: 8px;
-  background: var(--yellow);
-  color: var(--navy);
-  font-size: 14px;
-  vertical-align: middle;
-}
-
-.vtk-site-footer-mega .acc {
-  color: var(--yellow);
-  font-family: var(--serif);
-  font-style: italic;
-  font-weight: 400;
+/* Merkteken in de footer: hetzelfde VTK-logo als in de header (geen los geel
+   badge-blokje meer), zodat de donkere boekensteunen bovenaan en onderaan
+   dezelfde merkweergave delen. */
+.vtk-site-footer-logo {
+  display: block;
+  height: 38px;
+  width: auto;
+  max-width: min(190px, 60vw);
+  object-fit: contain;
+  object-position: left center;
+  margin-bottom: 16px;
 }
 
 .vtk-site-footer-address {

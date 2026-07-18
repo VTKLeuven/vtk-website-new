@@ -301,4 +301,12 @@ const icons: Record<string, ReactNode> = {
       <line x1="12" y1="19" x2="20" y2="19" />
     </Svg>
   ),
+  // door: deur met klink
+  door: (
+    <Svg>
+      <path d="M3 21h18" />
+      <path d="M6 21V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v17" />
+      <path d="M14 12h.01" />
+    </Svg>
+  ),
 };

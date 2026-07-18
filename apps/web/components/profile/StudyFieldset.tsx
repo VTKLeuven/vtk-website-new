@@ -24,8 +24,8 @@ export function CheckboxChip({
         className
       )}
     >
-      <input type="checkbox" name={name} value={value} defaultChecked={defaultChecked} />
-      {label}
+      <input type="checkbox" name={name} value={value} defaultChecked={defaultChecked} className="shrink-0" />
+      <span className="min-w-0 break-words">{label}</span>
     </label>
   );
 }

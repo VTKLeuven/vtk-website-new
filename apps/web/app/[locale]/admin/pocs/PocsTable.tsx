@@ -55,14 +55,14 @@ function ProgrammesField({
 }) {
   const chosen = new Set(selected);
   return (
-    <div>
+    <div className="@container">
       <Label>{nl ? "Richtingen" : "Study programmes"}</Label>
       <p className="mb-2 text-xs text-[#5c667f]">
         {nl
           ? "Leden zien deze POC op de homepage wanneer ze een van deze richtingen op hun profiel hebben staan. Zonder richting verschijnt de POC daar bij niemand."
           : "Members see this POC on the homepage when one of these programmes is on their profile. Without a programme it appears for no one there."}
       </p>
-      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
+      <div className="grid grid-cols-1 gap-2 @md:grid-cols-2 @3xl:grid-cols-3">
         {options.map((option) => (
           <CheckboxChip
             key={option.value}

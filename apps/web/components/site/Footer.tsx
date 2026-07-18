@@ -1,3 +1,4 @@
+import Image from "next/image";
 import Link from "next/link";
 import { getDictionary, type Locale } from "@vtk/i18n";
 
@@ -12,9 +13,14 @@ export async function Footer({ locale }: { locale: Locale }) {
         <div className="vtk-site-footer-top">
           <div>
             <div className="vtk-site-footer-mega">
+              <Image
+                src="/vtk-logo.png"
+                alt="VTK"
+                width={1152}
+                height={650}
+                className="vtk-site-footer-logo"
+              />
               {f.tagline}
-              <br />
-              <span className="acc">{f.taglineAccent}</span>
             </div>
             <div className="vtk-site-footer-address">{f.address}</div>
           </div>
@@ -98,7 +104,7 @@ export async function Footer({ locale }: { locale: Locale }) {
         </div>
         <div className="vtk-site-footer-bottom">
           <span>
-            © {new Date().getFullYear()} — {f.copyright}
+            © {new Date().getFullYear()} - {f.copyright}
           </span>
           <Link href={`${base}/privacy`}>{f.linkPrivacy}</Link>
         </div>
