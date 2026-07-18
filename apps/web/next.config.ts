@@ -22,7 +22,7 @@ loadEnvConfig(monorepoRoot);
 
 const nextConfig: NextConfig = {
   allowedDevOrigins: ["192.168.9.206", "192.168.9.226", "127.0.0.1", "*.trycloudflare.com"],
-  transpilePackages: ["@vtk/ui", "@vtk/auth", "@vtk/db", "@vtk/i18n", "@vtk/storage"],
+  transpilePackages: ["@vtk/ui", "@vtk/auth", "@vtk/db", "@vtk/i18n", "@vtk/storage", "@vtk/payments"],
   // Keep heavy, native, or generated server-only packages OUT of the
   // bundler module graph. Without this, the bundler tries to fully
   // resolve the generated Prisma client (which is huge) across every

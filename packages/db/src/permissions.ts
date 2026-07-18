@@ -60,6 +60,9 @@ export const PERMISSIONS = [
   { code: "theokot.manage", labelNl: "Theokot beheren (sessies, aanbod, bans, instellingen)", labelEn: "Manage Theokot (sessions, offering, bans, settings)", category: "theokot" },
   { code: "theokot.pickup", labelNl: "Theokot afhaalbalie bedienen", labelEn: "Operate Theokot pickup counter", category: "theokot" },
 
+  // Logistiek (uitleendienst op logistiek.vtk.be)
+  { code: "logistiek.manage", labelNl: "Uitleendienst beheren (inventaris, aanvragen, camionette)", labelEn: "Manage equipment rental (inventory, requests, van)", category: "logistiek" },
+
   // Module access flags (gate submodules via group permissions)
   { code: "modules.logistiek.access", labelNl: "Toegang tot Logistiek module", labelEn: "Access to Logistics module", category: "modules" },
   { code: "modules.cursusdienst.access", labelNl: "Toegang tot Cursusdienst module", labelEn: "Access to Course Shop module", category: "modules" },

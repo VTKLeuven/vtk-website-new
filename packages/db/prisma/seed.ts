@@ -245,6 +245,18 @@ async function main() {
   await setRolePermissions(theokotRole.id, ["theokot.manage", "theokot.pickup"]);
   await grantRoleToGroup("THEOKOT", theokotRole.id, "DEFAULT");
 
+  // logistiek: de uitleendienst op logistiek.vtk.be beheren.
+  const logistiekRole = await upsertRole(
+    "logistiek",
+    "Logistiek",
+    "Logistics",
+    5,
+    "Uitleendienst beheren op logistiek.vtk.be: inventaris, aanvragen en de camionette.",
+    "Manage the equipment rental on logistiek.vtk.be: inventory, requests and the van.",
+  );
+  await setRolePermissions(logistiekRole.id, ["logistiek.manage", "modules.logistiek.access"]);
+  await grantRoleToGroup("LOGISTIEK", logistiekRole.id, "DEFAULT");
+
   // Eén rol per post, met de postnaam, toegekend aan die post zelf (elk lid).
   // Meestal een lege container om er later rechten aan te hangen; enkele posten
   // krijgen meteen hun vaste, postspecifieke recht(en) mee (zie postRolePerms).

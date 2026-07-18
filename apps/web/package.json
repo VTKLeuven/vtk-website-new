@@ -25,6 +25,7 @@
     "@vtk/auth": "*",
     "@vtk/db": "*",
     "@vtk/i18n": "*",
+    "@vtk/payments": "*",
     "@vtk/storage": "*",
     "@vtk/ui": "*",
     "@zxing/browser": "^0.2.1",
