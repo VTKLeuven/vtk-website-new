@@ -40,8 +40,7 @@ export default async function PocsPage({
         <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
           {pocs.map((poc) => (
             <Card key={poc.id} className="p-6">
-              <h2 className="text-xl font-semibold tracking-tight text-vtk-ink">{pick(poc.nameNl, poc.nameEn, locale)}</h2>
-              <p className="mb-4 text-xs uppercase tracking-[0.08em] text-[#5c667f]">{poc.studyTrack}</p>
+              <h2 className="mb-4 text-xl font-semibold tracking-tight text-vtk-ink">{pick(poc.nameNl, poc.nameEn, locale)}</h2>
               {(poc.descriptionNl || poc.descriptionEn) && (
                 <p className="mb-4 text-sm leading-6 text-[#34405e]">
                   {pick(poc.descriptionNl ?? "", poc.descriptionEn ?? "", locale)}

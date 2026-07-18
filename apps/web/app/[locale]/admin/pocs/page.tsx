@@ -38,14 +38,13 @@ export default async function AdminPocs({
     }));
     const name = nl ? poc.nameNl : poc.nameEn ?? poc.nameNl;
 
-    const searchText = [name, poc.nameNl, poc.nameEn ?? "", poc.slug, poc.studyTrack, ...reps.map((r) => `${r.name} ${r.email}`)]
+    const searchText = [name, poc.nameNl, poc.nameEn ?? "", poc.slug, ...reps.map((r) => `${r.name} ${r.email}`)]
       .join(" ")
       .toLowerCase();
 
     return {
       id: poc.id,
       slug: poc.slug,
-      studyTrack: poc.studyTrack,
       name,
       nameNl: poc.nameNl,
       nameEn: poc.nameEn ?? "",
@@ -60,11 +59,12 @@ export default async function AdminPocs({
   });
 
   // De richtingen komen van de server mee: `PocsTable` is een client component
-  // en hoeft zo geen woordenboek te bundelen.
+  // en hoeft zo geen woordenboek te bundelen. Alfabetisch op label, zodat de
+  // checkboxes in het beheerscherm in een voorspelbare volgorde staan.
   const programmeOptions = STUDY_PROGRAMMES.map((value) => ({
     value,
     label: dict.onboarding.programmes[value],
-  }));
+  })).sort((a, b) => a.label.localeCompare(b.label, locale));
 
   const saveLabels = {
     submitLabel: dict.admin.save,

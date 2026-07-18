@@ -24,6 +24,14 @@ enum MembershipRole {
   LEAD
 }
 
+// Soort Group. PRAESIDIUM = een praesidiumpost (op /praesidium). WERKGROEP = een
+// werkgroep (BEST, Revue, ...): dezelfde leden/rollen-machinerie, maar niet op
+// /praesidium; ze verschijnen op /werkgroepen met een eigen infotekst + website.
+enum GroupType {
+  PRAESIDIUM
+  WERKGROEP
+}
+
 // Hoe een post (Group) een rol toekent aan haar leden.
 // DEFAULT: elk lid van de post krijgt de rol. LEADER: enkel de
 // verantwoordelijke (membership.role == LEAD) krijgt de rol, bovenop de
@@ -176,6 +184,21 @@ enum UitleenPaymentStatus {
   EXPIRED
 }
 
+// Hoe een deurgebeurtenis tot stand kwam: een fysieke kaartscan aan de deur, of
+// een remote-open vanaf het dashboard.
+enum DoorMethod {
+  CARD
+  REMOTE
+}
+
+// De uitkomst van een deurgebeurtenis.
+enum DoorLogResult {
+  ALLOWED // deur ging open
+  DENIED // gekende gebruiker zonder toegang
+  UNKNOWN_CARD // kaart geverifieerd maar niet aan een gebruiker gekoppeld
+  ERROR // verificatie/lookup mislukt
+}
+
 // Welk e-mailadres de kring gebruikt om een lid te contacteren.
 enum EmailPreference {
   UNIVERSITY // universiteitsmail (= login-mail via KUL SSO)
@@ -305,6 +328,9 @@ model User {
   uitleenVanDriven    UitleenVanBooking[]  @relation("UitleenVanDriver")
   uitleenVanDecided   UitleenVanBooking[]  @relation("UitleenVanDecidedBy")
 
+  doorGrants DoorAccessGrant[]
+  doorLogs   DoorAccessLog[]
+
   createdTicketEvents      TicketEvent[]           @relation("TicketEventCreatedBy")
   ticketEventGrants        TicketEventUserGrant[]  @relation("TicketEventGrantUser")
   ticketEventGrantsGiven   TicketEventUserGrant[]  @relation("TicketEventGrantGrantedBy")
@@ -318,21 +344,26 @@ model User {
 }
 
 model Group {
-  id                String  @id @default(cuid())
+  id                String    @id @default(cuid())
   // Vrije, GUI-beheerde code (was een `GroupCode`-enum). Uniek, en de waarde die
   // shiften opslaan in `Shift.post` en de sessie meegeeft als `groups[].code`.
-  code              String  @unique
-  slug              String  @unique
+  code              String    @unique
+  slug              String    @unique
   nameNl            String
   nameEn            String
   descriptionNl     String?
   descriptionEn     String?
-  orderInPraesidium Int     @default(0)
+  orderInPraesidium Int       @default(0)
   photoKey          String?
+  // Praesidiumpost of werkgroep. Een werkgroep gebruikt dezelfde leden/rollen
+  // maar staat niet op /praesidium; ze krijgt /werkgroepen met haar eigen
+  // infotekst (description*, door de leden zelf bewerkbaar) en optionele website.
+  type              GroupType @default(PRAESIDIUM)
+  website           String?
   // Een gedeactiveerde post verdwijnt uit de nieuwe-shift-keuzes en het
   // postenbeheer voor nieuwe jaren, maar de historiek (memberships per jaar)
   // blijft bewaard i.p.v. de post te verwijderen.
-  active            Boolean @default(true)
+  active            Boolean   @default(true)
 
   memberships       GroupMembership[]
   // Rollen die deze post toekent aan haar leden (DEFAULT) en verantwoordelijke (LEADER).
@@ -1110,16 +1141,14 @@ model Poc {
   slug          String  @unique
   nameNl        String
   nameEn        String?
-  studyTrack    String
   descriptionNl String?
   descriptionEn String?
   order         Int     @default(0)
 
-  // Aan welke richtingen deze POC hangt. `studyTrack` blijft de vrije tekst die
-  // op de POC-pagina getoond wordt ("Master Computer Science"); dit is de
-  // machineleesbare koppeling naar `User.studyProgrammes`, zodat de homepage de
-  // POC's van jouw richtingen kan tonen. Meerdere richtingen per POC kan: één
-  // POC bedient soms verschillende opleidingen.
+  // Aan welke richtingen deze POC hangt. Dit is de enige koppeling met een
+  // studierichting: het is de machineleesbare link naar `User.studyProgrammes`,
+  // zodat de homepage de POC's van jouw richtingen kan tonen. Meerdere richtingen
+  // per POC kan: één POC bedient soms verschillende opleidingen.
   studyProgrammes StudyProgramme[] @default([])
 
   representatives PocRepresentative[]
@@ -1556,8 +1585,8 @@ model UitleenPayment {
   createdAt          DateTime             @default(now()) @db.Timestamptz(3)
   updatedAt          DateTime             @updatedAt @db.Timestamptz(3)
 
-  reservation UitleenReservation? @relation(fields: [reservationId], references: [id], onDelete: Restrict)
-  vanBooking  UitleenVanBooking?  @relation(fields: [vanBookingId], references: [id], onDelete: Restrict)
+  reservation UitleenReservation?     @relation(fields: [reservationId], references: [id], onDelete: Restrict)
+  vanBooking  UitleenVanBooking?      @relation(fields: [vanBookingId], references: [id], onDelete: Restrict)
   webhooks    UitleenPaymentWebhook[]
 
   @@unique([provider, providerCheckoutId])
@@ -1585,6 +1614,52 @@ model UitleenPaymentWebhook {
   @@unique([provider, externalEventId])
   @@index([paymentId])
   @@index([processedAt, receivedAt])
+}
+
+// -----------------------------------------------------------------------------
+// Deurtoegang (KU Leuven-kaartscanner op de deur, bediend door een Raspberry Pi)
+// -----------------------------------------------------------------------------
+
+// Tijdelijke deurtoegang los van de rollen: wie geen `door.open`-recht heeft maar
+// binnen [startsAt, endsAt] valt, mag de deur toch openen. Bedoeld voor gasten,
+// externen of kortlopende uitzonderingen. Verlopen grants blijven staan als
+// historiek; ze tellen enkel mee zolang now in het venster valt.
+model DoorAccessGrant {
+  id          String   @id @default(cuid())
+  userId      String
+  startsAt    DateTime @default(now())
+  endsAt      DateTime
+  note        String?
+  createdById String?
+  createdAt   DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([endsAt])
+}
+
+// Eén rij per deurgebeurtenis: elke kaartscan (toegelaten, geweigerd, onbekende
+// kaart of fout) en elke remote-open vanaf het dashboard. Voedt de statistiek en
+// het logoverzicht in /admin/deur. `userId` is null wanneer de kaart niet aan een
+// gebruiker gekoppeld kon worden; `offline` markeert events die de Pi tijdens een
+// outage bufferde en later naflushte.
+model DoorAccessLog {
+  id       String        @id @default(cuid())
+  at       DateTime      @default(now())
+  userId   String?
+  rNumber  String?
+  cardName String?
+  method   DoorMethod
+  result   DoorLogResult
+  reason   String?
+  offline  Boolean       @default(false)
+
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([at])
+  @@index([result])
+  @@index([userId])
 }
 
 // -----------------------------------------------------------------------------

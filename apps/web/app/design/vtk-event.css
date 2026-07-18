@@ -74,7 +74,7 @@
   padding: clamp(24px, 3vw, 32px);
 }
 
-.vtk-event-info h2 {
+.vtk-event-info > h2 {
   margin: 0 0 12px;
   color: var(--ink);
   font-size: clamp(24px, 3vw, 34px);
@@ -82,7 +82,7 @@
   letter-spacing: -0.02em;
 }
 
-.vtk-event-info p {
+.vtk-event-info > p {
   margin: 0;
   color: var(--body);
   font-size: 15px;

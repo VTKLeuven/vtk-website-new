@@ -635,7 +635,6 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
               <div className="poccard" key={poc.id}>
                 <div className="poccard-head">
                   <h3>{pick(poc.nameNl, poc.nameEn ?? poc.nameNl, locale)}</h3>
-                  <span className="track">{poc.studyTrack}</span>
                 </div>
                 <ul className="poc-people">
                   {poc.representatives.map((rep) => {

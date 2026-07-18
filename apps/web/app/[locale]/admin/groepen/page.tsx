@@ -28,6 +28,7 @@ export default async function AdminGroups({
 
   const [groups, roles, distinctYears] = await Promise.all([
     prisma.group.findMany({
+      where: { type: "PRAESIDIUM" },
       orderBy: [{ active: "desc" }, { orderInPraesidium: "asc" }],
       include: {
         roleGrants: { include: { role: { select: { code: true, nameNl: true, nameEn: true } } } },
@@ -35,7 +36,7 @@ export default async function AdminGroups({
       },
     }),
     prisma.role.findMany({ orderBy: [{ order: "asc" }, { nameNl: "asc" }], select: { id: true, code: true, nameNl: true, nameEn: true } }),
-    prisma.groupMembership.findMany({ distinct: ["year"], select: { year: true } }),
+    prisma.groupMembership.findMany({ where: { group: { type: "PRAESIDIUM" } }, distinct: ["year"], select: { year: true } }),
   ]);
 
   const tabs = workingYearTabs(distinctYears.map((r) => r.year));

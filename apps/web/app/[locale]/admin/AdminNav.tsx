@@ -248,6 +248,14 @@ const icons: Record<string, ReactNode> = {
       <path d="M16 3.13a4 4 0 0 1 0 7.75" />
     </Svg>
   ),
+  // werkgroepen: gestapelde lagen (werkgroepen naast de posten)
+  werkgroepen: (
+    <Svg>
+      <path d="M12 2 2 7l10 5 10-5-10-5Z" />
+      <path d="m2 12 10 5 10-5" />
+      <path d="m2 17 10 5 10-5" />
+    </Svg>
+  ),
   // roles: rechtenbundel -> schild met vinkje
   roles: (
     <Svg>
@@ -299,6 +307,14 @@ const icons: Record<string, ReactNode> = {
     <Svg>
       <polyline points="4 17 10 11 4 5" />
       <line x1="12" y1="19" x2="20" y2="19" />
+    </Svg>
+  ),
+  // door: deur met klink
+  door: (
+    <Svg>
+      <path d="M3 21h18" />
+      <path d="M6 21V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v17" />
+      <path d="M14 12h.01" />
     </Svg>
   ),
 };

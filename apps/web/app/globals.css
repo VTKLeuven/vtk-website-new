@@ -64,7 +64,7 @@ body {
   font-family: var(--font-vtk-sans), var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
 }
 
-/* Prose content produced by Tiptap */
+/* Gedeelde opmaak voor content uit de Markdown-renderer. */
 .prose-vtk h1 {
   @apply text-3xl font-semibold mt-6 mb-3 text-vtk-ink tracking-tight;
 }
@@ -88,6 +88,18 @@ body {
 }
 .prose-vtk blockquote {
   @apply border-l-4 border-vtk-yellow pl-4 italic text-[#34405e] bg-vtk-blue-soft/70 rounded-r-xl py-1;
+}
+.prose-vtk code {
+  @apply rounded-md bg-vtk-blue-soft px-1.5 py-0.5 font-mono text-[0.9em] text-vtk-ink;
+}
+.prose-vtk pre {
+  @apply my-4 overflow-x-auto rounded-xl bg-vtk-ink p-4 text-vtk-surface;
+}
+.prose-vtk pre code {
+  @apply bg-transparent p-0 text-inherit;
+}
+.prose-vtk hr {
+  @apply my-6 border-0 border-t border-vtk-blue/20;
 }
 .prose-vtk img {
   @apply rounded-2xl my-4 max-w-full h-auto shadow-sm border border-vtk-blue/10;

@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { markdownToPlainText } from "@/lib/markdown";
 import { monthGridCells, isSameCalendarDay } from "./calendarGrid";
 
 type ApiEvent = {
@@ -179,7 +180,7 @@ export function KalenderEditorialView({
 
   function pickDesc(e: ApiEvent) {
     const d = locale === "nl" ? e.extendedProps.descriptionNl : e.extendedProps.descriptionEn;
-    return d ?? "";
+    return markdownToPlainText(d ?? "");
   }
 
   function pickGroup(e: ApiEvent) {
