@@ -188,7 +188,10 @@
    in vtk-home.css, and below 981px the header stays a solid strip above the
    hero so the wrapping nav never covers it. */
 @media (min-width: 981px) {
-  .vtk-site-header[data-over-hero="true"] {
+  /* De proxy kan na login de onboardinginhoud onder het homepagepad renderen.
+     Maak de header daarom alleen transparant wanneer de hero echt aanwezig is,
+     niet enkel wanneer de client-router denkt dat dit de homepage is. */
+  body:has(.home-hero) .vtk-site-header[data-over-hero="true"] {
     background: transparent;
     border-bottom-color: transparent;
   }
