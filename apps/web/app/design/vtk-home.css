@@ -1136,11 +1136,10 @@
   gap: 18px;
 }
 
-/* Eén POC: iets breder dan de helft en gecentreerd. Een halve kaart tegen de
-   linkerrand liet de rest van de band leeg ogen. */
+/* Eén POC: 60% breed, links uitgelijnd zoals alle andere secties. Een halve
+   kaart liet te veel van de band leeg; centreren brak de linkermarge. */
 .vtk-design .poc-grid[data-groups="1"] {
   grid-template-columns: minmax(0, 60%);
-  justify-content: center;
 }
 
 .vtk-design .poc-grid[data-groups="2"] {
