@@ -47,6 +47,83 @@ function legendKey(code: string): "gala" | "cantus" | "career" | "service" | "bl
   return "blok";
 }
 
+type LegendCounts = { gala: number; cantus: number; career: number; service: number; blok: number };
+
+/**
+ * Legende plus abonneer-blok. Staat naast het maandraster, en naast de
+ * agendalijst wanneer er geen raster is; daarom een eigen component in plaats
+ * van twee keer dezelfde markup. Bewust op moduleniveau: een component die in
+ * de render van een ander component wordt gedefinieerd, is bij elke render een
+ * nieuw type en verliest dus zijn state (react-hooks/static-components).
+ */
+function LegendAside({
+  labels,
+  legendCounts,
+}: {
+  labels: { legendTitle: string; legendSub: string; subscribeTitle: string; subscribeSub: string; ical: string; google: string; outlook: string };
+  legendCounts: LegendCounts;
+}) {
+  return (
+    <aside className="agenda-side">
+      <h3>{labels.legendTitle}</h3>
+      <div className="sub">{labels.legendSub}</div>
+      <ul className="agenda-side-list">
+        <li className="gala">
+          <span>
+            <span className="sw" />
+            Gala · TD
+          </span>
+          <span className="count">{String(legendCounts.gala).padStart(2, "0")}</span>
+        </li>
+        <li className="cantus">
+          <span>
+            <span className="sw" />
+            Cantus
+          </span>
+          <span className="count">{String(legendCounts.cantus).padStart(2, "0")}</span>
+        </li>
+        <li className="career">
+          <span>
+            <span className="sw" />
+            Career
+          </span>
+          <span className="count">{String(legendCounts.career).padStart(2, "0")}</span>
+        </li>
+        <li className="service">
+          <span>
+            <span className="sw" />
+            Service
+          </span>
+          <span className="count">{String(legendCounts.service).padStart(2, "0")}</span>
+        </li>
+        <li className="blok">
+          <span>
+            <span className="sw" />
+            Blok · studie
+          </span>
+          <span className="count">{String(legendCounts.blok).padStart(2, "0")}</span>
+        </li>
+      </ul>
+
+      <div className="subscribe-box">
+        <h3>{labels.subscribeTitle}</h3>
+        <div className="sub">{labels.subscribeSub}</div>
+        <div className="subscribe-actions">
+          <span className="btn btn-ghost arrow">
+            {labels.ical}
+          </span>
+          <span className="btn btn-ghost arrow">
+            {labels.google}
+          </span>
+          <span className="btn btn-ghost arrow">
+            {labels.outlook}
+          </span>
+        </div>
+      </div>
+    </aside>
+  );
+}
+
 export function KalenderEditorialView({
   locale,
   labels,
@@ -203,73 +280,6 @@ export function KalenderEditorialView({
     return `${base}/kalender/${e.id}`;
   }
 
-  /**
-   * Legende plus abonneer-blok. Staat naast het maandraster, en naast de
-   * agendalijst wanneer er geen raster is; daarom een eigen component in plaats
-   * van twee keer dezelfde markup.
-   */
-  function LegendAside() {
-    return (
-      <aside className="agenda-side">
-        <h3>{labels.legendTitle}</h3>
-        <div className="sub">{labels.legendSub}</div>
-        <ul className="agenda-side-list">
-          <li className="gala">
-            <span>
-              <span className="sw" />
-              Gala · TD
-            </span>
-            <span className="count">{String(legendCounts.gala).padStart(2, "0")}</span>
-          </li>
-          <li className="cantus">
-            <span>
-              <span className="sw" />
-              Cantus
-            </span>
-            <span className="count">{String(legendCounts.cantus).padStart(2, "0")}</span>
-          </li>
-          <li className="career">
-            <span>
-              <span className="sw" />
-              Career
-            </span>
-            <span className="count">{String(legendCounts.career).padStart(2, "0")}</span>
-          </li>
-          <li className="service">
-            <span>
-              <span className="sw" />
-              Service
-            </span>
-            <span className="count">{String(legendCounts.service).padStart(2, "0")}</span>
-          </li>
-          <li className="blok">
-            <span>
-              <span className="sw" />
-              Blok · studie
-            </span>
-            <span className="count">{String(legendCounts.blok).padStart(2, "0")}</span>
-          </li>
-        </ul>
-
-        <div className="subscribe-box">
-          <h3>{labels.subscribeTitle}</h3>
-          <div className="sub">{labels.subscribeSub}</div>
-          <div className="subscribe-actions">
-            <span className="btn btn-ghost arrow">
-              {labels.ical}
-            </span>
-            <span className="btn btn-ghost arrow">
-              {labels.google}
-            </span>
-            <span className="btn btn-ghost arrow">
-              {labels.outlook}
-            </span>
-          </div>
-        </div>
-      </aside>
-    );
-  }
-
   const showGrid = view === "month";
 
   return (
@@ -377,7 +387,7 @@ export function KalenderEditorialView({
                 );
               })}
             </div>
-            <LegendAside />
+            <LegendAside labels={labels} legendCounts={legendCounts} />
           </div>
         )}
 
@@ -389,7 +399,7 @@ export function KalenderEditorialView({
               gridTemplateColumns: view === "agenda" ? undefined : "1fr",
             }}
           >
-            {view === "agenda" && <LegendAside />}
+            {view === "agenda" && <LegendAside labels={labels} legendCounts={legendCounts} />}
 
             <div>
               <div className="agenda-head">
