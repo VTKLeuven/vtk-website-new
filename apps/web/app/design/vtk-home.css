@@ -1013,7 +1013,7 @@
 
 /* Minder dan drie evenementen mag geen lege plaatsen opvullen: auto-fit met een
    max van 3 kolommen laat het rooster meekrimpen naar 1 of 2 kaarten. */
-.vtk-design .home-hero .ev-grid {
+.vtk-design .ev-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(0, calc((100% - 36px) / 3)));
   justify-content: start;
