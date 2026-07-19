@@ -1111,41 +1111,40 @@
   line-height: 1.5;
 }
 
-.vtk-design .poc-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(0, calc((100% - 18px) / 2)));
-  justify-content: start;
-  gap: 18px;
+/* "Richtingsvertegenwoordigers" is één woord van 27 letters: op de gewone
+   sectiegrootte breekt de kop van deze band altijd over twee regels. */
+.vtk-design .poc-band .sec-head h2 {
+  font-size: clamp(26px, 3.1vw, 38px);
+  line-height: 1.05;
+}
+
+.vtk-design .poc-band .sec-head .meta {
+  flex: 0 0 auto;
+  white-space: nowrap;
 }
 
 /*
- * De meeste leden hebben één richting, hooguit twee. Dan vullen de kaarten de
- * volle breedte (in plaats van een halve pagina leeg te laten) en staat de
- * richtingsnaam naast de mensen: een brede kaart met enkel een naam bovenaan en
- * één avatar linksonder leest als een half ingevuld formulier.
+ * Een POC-kaart groeit in hoogte met het aantal mensen (meestal 3 tot 8, soms
+ * 15), nooit in breedte. Het aantal POC's bepaalt de kolommen: drie of meer
+ * vullen de band, meer dan drie schuiven door naar een tweede rij.
  */
-.vtk-design .poc-grid-few {
-  grid-template-columns: repeat(auto-fit, minmax(0, 1fr));
-}
-
-.vtk-design .poc-grid-few .poccard {
+.vtk-design .poc-grid {
   display: grid;
-  grid-template-columns: minmax(140px, 1fr) minmax(0, 2.4fr);
-  align-items: stretch;
-  gap: 26px;
-}
-
-.vtk-design .poc-grid-few .poccard-head {
-  padding: 0 26px 0 0;
-  margin: 0;
-  border-bottom: 0;
-  border-right: 1px solid var(--line);
-  align-items: center;
-}
-
-.vtk-design .poc-grid-few .poc-people {
+  grid-template-columns: repeat(auto-fill, minmax(0, calc((100% - 36px) / 3)));
   justify-content: start;
-  align-content: center;
+  align-items: start;
+  gap: 18px;
+}
+
+/* Eén POC: iets breder dan de helft en gecentreerd. Een halve kaart tegen de
+   linkerrand liet de rest van de band leeg ogen. */
+.vtk-design .poc-grid[data-groups="1"] {
+  grid-template-columns: minmax(0, 60%);
+  justify-content: center;
+}
+
+.vtk-design .poc-grid[data-groups="2"] {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 .vtk-design .poccard {
@@ -1172,6 +1171,13 @@
   line-height: 1.15;
   letter-spacing: -0.02em;
   font-weight: 600;
+}
+
+.vtk-design .poc-count {
+  flex: 0 0 auto;
+  color: var(--muted);
+  font-size: 12px;
+  white-space: nowrap;
 }
 
 .vtk-design .poc-people {
@@ -1386,20 +1392,12 @@
     grid-template-columns: repeat(auto-fit, minmax(0, calc((100% - 18px) / 2)));
   }
 
-  .vtk-design .poc-grid {
+  /* Te smal voor kolommen naast elkaar, ook voor de gecentreerde enkele kaart. */
+  .vtk-design .poc-grid,
+  .vtk-design .poc-grid[data-groups="1"],
+  .vtk-design .poc-grid[data-groups="2"] {
     grid-template-columns: minmax(0, 1fr);
-  }
-
-  /* Te smal voor kop-naast-mensen: terug naar de gestapelde kaart. */
-  .vtk-design .poc-grid-few .poccard {
-    display: block;
-  }
-
-  .vtk-design .poc-grid-few .poccard-head {
-    padding: 0 0 16px;
-    margin-bottom: 18px;
-    border-right: 0;
-    border-bottom: 1px solid var(--line);
+    justify-content: stretch;
   }
 }
 

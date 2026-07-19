@@ -670,19 +670,28 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
             <h2>{nl ? "Jouw richtingsvertegenwoordigers." : "Your student representatives."}</h2>
             <div className="meta">
               {nl ? "Op basis van je richtingen" : "Based on your programmes"} ·{" "}
-              <Link href={`${base}/pocs`}>
-                {nl ? "alle richtingsvertegenwoordigers" : "all student representatives"}
-              </Link>
+              <Link href={`${base}/pocs`}>{nl ? "bekijk alles" : "see all"}</Link>
             </div>
           </div>
-          {/* De meeste leden hebben één richting, hooguit twee: laat de kaarten
-              dan de volle breedte delen in plaats van een halve pagina leeg te
-              laten. Vanaf drie valt het rooster terug op vaste kolommen. */}
-          <div className={`poc-grid${pocsWithPeople.length < 3 ? " poc-grid-few" : ""}`}>
+          {/* Een lid zit in één POC, soms twee, uitzonderlijk drie; per POC gaat
+              het meestal om 3 tot 8 mensen. De kaart groeit dus in hoogte met het
+              aantal mensen en niet in breedte: `data-groups` bepaalt hoeveel
+              kolommen de band krijgt (zie vtk-home.css). */}
+          <div className="poc-grid" data-groups={Math.min(pocsWithPeople.length, 3)}>
             {pocsWithPeople.map((poc) => (
               <div className="poccard" key={poc.id}>
                 <div className="poccard-head">
                   <h3>{pick(poc.nameNl, poc.nameEn ?? poc.nameNl, locale)}</h3>
+                  <span className="poc-count">
+                    {poc.representatives.length}{" "}
+                    {nl
+                      ? poc.representatives.length === 1
+                        ? "vertegenwoordiger"
+                        : "vertegenwoordigers"
+                      : poc.representatives.length === 1
+                        ? "representative"
+                        : "representatives"}
+                  </span>
                 </div>
                 <ul className="poc-people">
                   {poc.representatives.map((rep) => {
