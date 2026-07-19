@@ -95,15 +95,6 @@ export function AddRepresentativeForm({ pocId, locale }: { pocId: string; locale
         )}
       </div>
 
-      <div className="min-w-[130px]">
-        <label className="mb-1 block text-xs font-medium text-[#5c667f]">{nl ? "Rol (NL)" : "Role (NL)"}</label>
-        <Input name="roleNl" placeholder={nl ? "bv. POC" : "e.g. POC"} autoComplete="off" />
-      </div>
-      <div className="min-w-[130px]">
-        <label className="mb-1 block text-xs font-medium text-[#5c667f]">{nl ? "Rol (EN)" : "Role (EN)"}</label>
-        <Input name="roleEn" autoComplete="off" />
-      </div>
-
       <Button type="submit" disabled={!selected}>
         {nl ? "Toevoegen" : "Add"}
       </Button>

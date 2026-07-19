@@ -1141,6 +1141,9 @@ model Poc {
   slug          String  @unique
   nameNl        String
   nameEn        String?
+  /// Eén adres voor de hele POC (bv. wtk-poc@vtk.be). Studenten mailen de POC,
+  /// niet een individuele vertegenwoordiger; die adressen tonen we nergens.
+  email         String?
   descriptionNl String?
   descriptionEn String?
   order         Int     @default(0)

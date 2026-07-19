@@ -446,6 +446,21 @@ onderste helft is een ontwerpkeuze, geen toeval:
   de POC-pagina zelf verschijnt.
 - **Meerdere richtingen per POC** kan: één POC bedient soms verschillende
   opleidingen.
+- **Eén mailadres per POC, geen persoonlijke adressen.** `Poc.email` (bv.
+  `wtk-poc@vtk.be`) is het enige contactadres dat de site toont. Een student
+  mailt de POC als geheel; wie er dit jaar in zit mag wisselen zonder dat een
+  adres op de site verandert, en een vertegenwoordiger hoeft zijn persoonlijke
+  adres niet publiek te zetten. `User.email` van een vertegenwoordiger
+  verschijnt daarom nergens meer op `/pocs` of de homepage.
+- **Geen beschrijvingen en geen rollen op de publieke POC-schermen.** De
+  richtingsnaam en de gezichten zijn wat een student zoekt; een zin uitleg per
+  POC en een functietitel per persoon werden als ruis ervaren. De kolommen
+  `Poc.description*` en `PocRepresentative.role*` bestaan nog in de database
+  (weggooien zou bestaande tekst vernietigen), maar worden nergens meer getoond
+  of bewerkt.
+- **`/pocs` gebruikt dezelfde kaarten als de homepage-band** (`.poc-grid` /
+  `.poccard` uit `vtk-home.css`): wie zijn eigen POC op de homepage ziet en
+  doorklikt, hoort hetzelfde beeld te krijgen.
 - **Lege staat = sectie verbergen.** Zonder sessie, zonder richtingen, of zonder
   een matchende POC met vertegenwoordigers valt de hele sectie weg. Bewuste keuze
   boven "toon dan alle POC's" of een uitnodigingsbanner: de sectie is enkel

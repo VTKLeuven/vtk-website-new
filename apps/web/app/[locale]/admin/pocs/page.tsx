@@ -34,7 +34,6 @@ export default async function AdminPocs({
       name: r.user.name,
       email: r.user.email,
       avatarUrl: publicUrl(r.user.avatarKey),
-      role: (nl ? r.roleNl : r.roleEn ?? r.roleNl) ?? null,
     }));
     const name = nl ? poc.nameNl : poc.nameEn ?? poc.nameNl;
 
@@ -48,9 +47,7 @@ export default async function AdminPocs({
       name,
       nameNl: poc.nameNl,
       nameEn: poc.nameEn ?? "",
-      description: nl ? poc.descriptionNl : poc.descriptionEn,
-      descriptionNl: poc.descriptionNl ?? "",
-      descriptionEn: poc.descriptionEn ?? "",
+      email: poc.email ?? "",
       order: poc.order,
       studyProgrammes: poc.studyProgrammes,
       reps,

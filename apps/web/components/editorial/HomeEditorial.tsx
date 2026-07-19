@@ -682,21 +682,16 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
               <div className="poccard" key={poc.id}>
                 <div className="poccard-head">
                   <h3>{pick(poc.nameNl, poc.nameEn ?? poc.nameNl, locale)}</h3>
-                  <span className="poc-count">
-                    {poc.representatives.length}{" "}
-                    {nl
-                      ? poc.representatives.length === 1
-                        ? "vertegenwoordiger"
-                        : "vertegenwoordigers"
-                      : poc.representatives.length === 1
-                        ? "representative"
-                        : "representatives"}
-                  </span>
+                  {/* Studenten mailen de POC als geheel, niet één vertegenwoordiger. */}
+                  {poc.email ? (
+                    <a className="poc-mail" href={`mailto:${poc.email}`}>
+                      {poc.email}
+                    </a>
+                  ) : null}
                 </div>
                 <ul className="poc-people">
                   {poc.representatives.map((rep) => {
                     const avatar = publicUrl(rep.user.avatarKey);
-                    const role = pick(rep.roleNl ?? "", rep.roleEn ?? rep.roleNl ?? "", locale);
                     return (
                       <li key={rep.id}>
                         <span className="poc-face">
@@ -712,7 +707,6 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
                           )}
                         </span>
                         <span className="poc-name">{rep.user.name}</span>
-                        {role ? <span className="poc-role">{role}</span> : null}
                       </li>
                     );
                   })}

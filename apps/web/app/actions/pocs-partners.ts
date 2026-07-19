@@ -25,8 +25,8 @@ const pocSchema = z.object({
   slug: z.string().min(1).regex(/^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/),
   nameNl: z.string().min(1),
   nameEn: z.string().optional().nullable(),
-  descriptionNl: z.string().optional().nullable(),
-  descriptionEn: z.string().optional().nullable(),
+  // Eén adres voor de hele POC; leeg mag, een half ingevuld adres niet.
+  email: z.string().email().optional().nullable(),
   order: z.coerce.number().int().default(0),
   // De aangevinkte richtingen. Onbekende waarden weren we hier: het formulier
   // stuurt enkel `StudyProgramme`-codes, dus iets anders is geknoei.
@@ -40,8 +40,7 @@ export async function savePocAction(_prev: SaveState, formData: FormData): Promi
     slug: formData.get("slug"),
     nameNl: formData.get("nameNl"),
     nameEn: formData.get("nameEn") || null,
-    descriptionNl: formData.get("descriptionNl") || null,
-    descriptionEn: formData.get("descriptionEn") || null,
+    email: formData.get("email") || null,
     order: formData.get("order") || 0,
     studyProgrammes: formData.getAll("studyProgrammes"),
   });
@@ -79,8 +78,6 @@ export async function deletePocAction(formData: FormData): Promise<void> {
 const repSchema = z.object({
   pocId: z.string(),
   userId: z.string(),
-  roleNl: z.string().optional().nullable(),
-  roleEn: z.string().optional().nullable(),
   order: z.coerce.number().int().default(0),
 });
 
@@ -89,13 +86,11 @@ export async function addPocRepresentativeAction(formData: FormData): Promise<vo
   const parsed = repSchema.parse({
     pocId: formData.get("pocId"),
     userId: formData.get("userId"),
-    roleNl: formData.get("roleNl") || null,
-    roleEn: formData.get("roleEn") || null,
     order: formData.get("order") || 0,
   });
   await prisma.pocRepresentative.upsert({
     where: { pocId_userId: { pocId: parsed.pocId, userId: parsed.userId } },
-    update: { roleNl: parsed.roleNl, roleEn: parsed.roleEn, order: parsed.order },
+    update: { order: parsed.order },
     create: parsed,
   });
   revalidatePath("/pocs");
