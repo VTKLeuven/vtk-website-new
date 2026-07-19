@@ -6,8 +6,9 @@
  */
 import { betterAuth } from 'better-auth';
 import { prismaAdapter } from 'better-auth/adapters/prisma';
-import { genericOAuth } from 'better-auth/plugins';
+import { genericOAuth, jwt } from 'better-auth/plugins';
 import { APIError } from 'better-auth/api';
+import { oauthProvider } from '@better-auth/oauth-provider';
 import { prisma } from '@vtk/db';
 import { nextCookies } from 'better-auth/next-js';
 
@@ -33,7 +34,18 @@ export const auth = betterAuth({
 
   // nextCookies must stay last. The KU Leuven OIDC provider is only registered
   // when its env vars are present (see logins/kul.ts).
-  plugins: [...(kulConfig ? [genericOAuth({ config: [kulConfig] })] : []), nextCookies()],
+  plugins: [
+    ...(kulConfig ? [genericOAuth({ config: [kulConfig] })] : []),
+    jwt({ disableSettingJwtHeader: true }),
+    oauthProvider({
+      loginPage: '/sign-in',
+      consentPage: '/consent',
+      // ...other options
+    }),
+    nextCookies(),
+  ],
+
+  disabledPaths: ['/token'], //disable for Oauth
 
   emailAndPassword: {
     enabled: true,

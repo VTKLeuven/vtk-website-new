@@ -273,6 +273,12 @@ model User {
   ticketScans              TicketScanLog[]         @relation("TicketScanActor")
   ticketAuditLogs          TicketAuditLog[]        @relation("TicketAuditActor")
   checkedInTickets         Ticket[]                @relation("TicketCheckedInBy")
+
+  //Oauth / SSO fields
+  oauthClients             OauthClient[]
+  oauthRefreshTokens       OauthRefreshToken[]
+  oauthAccessTokens        OauthAccessToken[]
+  oauthConsents            OauthConsent[]
 }
 
 model Group {
@@ -1349,15 +1355,17 @@ model TheokotBan {
 // -----------------------------------------------------------------------------
 
 model Session {
-  id        String   @id
-  token     String
-  expiresAt DateTime
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  ipAddress String?
-  userAgent String?
-  userId    String
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id                 String              @id
+  token              String
+  expiresAt          DateTime
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+  ipAddress          String?
+  userAgent          String?
+  userId             String
+  user               User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  oauthRefreshTokens OauthRefreshToken[]
+  oauthAccessTokens  OauthAccessToken[]
 
   @@unique([token])
   @@index([userId])
@@ -1394,4 +1402,108 @@ model Verification {
 
   @@index([identifier])
   @@map("verification")
+}
+
+//JWT plugin
+model Jwks {
+  id         String    @id
+  publicKey  String
+  privateKey String
+  createdAt  DateTime  @db.Timestamptz(3)
+  expiresAt  DateTime? @db.Timestamptz(3)
+
+  @@map("jwks")
+}
+
+//SSO-provider
+model OauthClient {
+  id                      String              @id
+  clientId                String              @unique
+  clientSecret            String?
+  disabled                Boolean?
+  skipConsent             Boolean?
+  enableEndSession        Boolean?
+  subjectType             String?
+  scopes                  String[]
+  user                    User?               @relation(fields: [userId], references: [id])
+  userId                  String?
+  referenceId             String?
+  createdAt               DateTime?           @db.Timestamptz(3)
+  updatedAt               DateTime?           @db.Timestamptz(3)
+  name                    String?
+  uri                     String?
+  icon                    String?
+  contacts                String[]
+  tos                     String?
+  policy                  String?
+  softwareId              String?
+  softwareVersion         String?
+  softwareStatement       String?
+  redirectUris            String[]
+  postLogoutRedirectUris  String[]
+  tokenEndpointAuthMethod String?
+  grantTypes              String[]
+  responseTypes           String[]
+  public                  Boolean?
+  type                    String?
+  requirePKCE             Boolean?
+  metadata                Json?
+  oauthRefreshTokens      OauthRefreshToken[]
+  oauthAccessTokens       OauthAccessToken[]
+  oauthConsents           OauthConsent[]
+
+  @@map("oauthClient")
+}
+
+model OauthRefreshToken {
+  id                String             @id
+  token             String
+  client            OauthClient        @relation(fields: [clientId], references: [clientId])
+  clientId          String
+  session           Session?           @relation(fields: [sessionId], references: [id])
+  sessionId         String?
+  user              User               @relation(fields: [userId], references: [id])
+  userId            String
+  referenceId       String?
+  scopes            String[]
+  revoked           DateTime?          @db.Timestamptz(3)
+  authTime          DateTime?          @db.Timestamptz(3)
+  createdAt         DateTime           @db.Timestamptz(3)
+  expiresAt         DateTime           @db.Timestamptz(3)
+  oauthAccessTokens OauthAccessToken[]
+
+  @@map("oauthRefreshToken")
+}
+
+model OauthAccessToken {
+  id          String             @id
+  token       String             @unique
+  client      OauthClient        @relation(fields: [clientId], references: [clientId])
+  clientId    String
+  session     Session?           @relation(fields: [sessionId], references: [id])
+  sessionId   String?
+  refresh     OauthRefreshToken? @relation(fields: [refreshId], references: [id])
+  refreshId   String?
+  user        User?              @relation(fields: [userId], references: [id])
+  userId      String?
+  referenceId String?
+  scopes      String[]
+  createdAt   DateTime           @db.Timestamptz(3)
+  expiresAt   DateTime           @db.Timestamptz(3)
+
+  @@map("oauthAccessToken")
+}
+
+model OauthConsent {
+  id          String      @id
+  user        User        @relation(fields: [userId], references: [id])
+  userId      String
+  client      OauthClient @relation(fields: [clientId], references: [clientId])
+  clientId    String
+  referenceId String?
+  scopes      String[]
+  createdAt   DateTime    @db.Timestamptz(3)
+  updatedAt   DateTime    @db.Timestamptz(3)
+
+  @@map("oauthConsent")
 }
