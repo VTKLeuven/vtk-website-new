@@ -4,39 +4,36 @@
  * @author Witse Panneels
  * @date 2026-06-19
  */
-import { betterAuth } from "better-auth";
-import { prismaAdapter } from "better-auth/adapters/prisma";
-import { genericOAuth } from "better-auth/plugins";
-import { APIError } from "better-auth/api";
-import { prisma } from "@vtk/db";
-import { nextCookies } from "better-auth/next-js";
+import { betterAuth } from 'better-auth';
+import { prismaAdapter } from 'better-auth/adapters/prisma';
+import { genericOAuth } from 'better-auth/plugins';
+import { APIError } from 'better-auth/api';
+import { prisma } from '@vtk/db';
+import { nextCookies } from 'better-auth/next-js';
 
-import { hashPassword, verifyPassword } from "./logins/password";
-import { kulOAuthConfig, KUL_PROVIDER_ID } from "./logins/kul";
+import { hashPassword, verifyPassword } from './logins/password';
+import { kulOAuthConfig, KUL_PROVIDER_ID } from './logins/kul';
 
-const isProduction = process.env.NODE_ENV === "production";
+const isProduction = process.env.NODE_ENV === 'production';
 
 const kulConfig = kulOAuthConfig();
 
 export const auth = betterAuth({
-  appName: "VTK",
+  appName: 'VTK',
   baseURL: process.env.BETTER_AUTH_URL,
-  basePath: "/api/auth/better",
+  basePath: '/api/auth/better',
   secret: process.env.BETTER_AUTH_SECRET,
   trustedOrigins: isProduction
-    ? ["https://*.vtk.be"]
-    : ["http://localhost:3000", "http://localhost:3001"],
+    ? ['https://*.vtk.be']
+    : ['http://localhost:3000', 'http://localhost:3001'],
 
   database: prismaAdapter(prisma, {
-    provider: "postgresql",
+    provider: 'postgresql',
   }),
 
   // nextCookies must stay last. The KU Leuven OIDC provider is only registered
   // when its env vars are present (see logins/kul.ts).
-  plugins: [
-    ...(kulConfig ? [genericOAuth({ config: [kulConfig] })] : []),
-    nextCookies(),
-  ],
+  plugins: [...(kulConfig ? [genericOAuth({ config: [kulConfig] })] : []), nextCookies()],
 
   emailAndPassword: {
     enabled: true,
@@ -73,7 +70,7 @@ export const auth = betterAuth({
             select: { active: true },
           });
           if (!user?.active) {
-            throw new APIError("FORBIDDEN", { message: "INACTIVE_USER" });
+            throw new APIError('FORBIDDEN', { message: 'INACTIVE_USER' });
           }
           return { data: session };
         },
@@ -87,7 +84,7 @@ export const auth = betterAuth({
   },
 
   advanced: {
-    cookiePrefix: "vtk",
+    cookiePrefix: 'vtk',
     useSecureCookies: isProduction,
     crossSubDomainCookies: {
       enabled: isProduction,
@@ -98,23 +95,23 @@ export const auth = betterAuth({
   user: {
     additionalFields: {
       avatarKey: {
-        type: "string",
+        type: 'string',
         required: false,
         input: false,
       },
       locale: {
-        type: "string",
+        type: 'string',
         required: false,
-        defaultValue: "NL",
+        defaultValue: 'NL',
       },
       active: {
-        type: "boolean",
+        type: 'boolean',
         required: false,
         defaultValue: true,
         input: false,
       },
       isSuperAdmin: {
-        type: "boolean",
+        type: 'boolean',
         required: false,
         defaultValue: false,
         input: false,
