@@ -1,14 +1,16 @@
 /* Kalender editorial (from design/kalender.html) */
 
+/* Compacte paginakop: de titel is een oriëntatiepunt, geen banner. Hoe kleiner
+   die is, hoe meer van de kalender zelf meteen in beeld staat. */
 .vtk-design .page-head {
   max-width: var(--max);
   margin: 0 auto;
-  padding: 64px 32px 48px;
+  padding: 28px 32px 20px;
   border-bottom: 1px solid var(--rule);
   display: grid;
   grid-template-columns: 1fr auto;
-  gap: 40px;
-  align-items: end;
+  gap: 24px;
+  align-items: baseline;
 }
 .vtk-design .page-head .crumbs {
   font-family: var(--mono);
@@ -16,11 +18,11 @@
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--muted);
-  margin-bottom: 16px;
+  margin-bottom: 8px;
 }
 .vtk-design .page-head h1 {
-  font-size: clamp(56px, 7vw, 112px);
-  line-height: 0.9;
+  font-size: clamp(30px, 3.4vw, 44px);
+  line-height: 1.05;
   letter-spacing: -0.035em;
   font-weight: 500;
 }
@@ -46,7 +48,15 @@
 .vtk-design .kal-wrap {
   max-width: var(--max);
   margin: 0 auto;
-  padding: 48px 32px 96px;
+  padding: 24px 32px 96px;
+}
+
+/* Maandraster met de legende ernaast. */
+.vtk-design .kal-main {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 260px;
+  gap: 32px;
+  align-items: start;
 }
 
 .vtk-design .toolbar {
@@ -399,6 +409,10 @@
     text-align: left;
   }
   .vtk-design .agenda {
+    grid-template-columns: 1fr;
+  }
+  /* Te smal voor raster + legende naast elkaar. */
+  .vtk-design .kal-main {
     grid-template-columns: 1fr;
   }
   .vtk-design .ag-row {

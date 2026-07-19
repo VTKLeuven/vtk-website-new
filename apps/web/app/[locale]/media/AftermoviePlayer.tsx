@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { ExternalLink, Play, Video, VideoOff } from "lucide-react";
 
-import { safeUrl, vimeoVideoId, youtubeVideoId } from "@/lib/videoEmbed";
+import { safeUrl, vimeoVideoId, youtubeThumbnailUrl, youtubeVideoId } from "@/lib/videoEmbed";
 import styles from "./AftermoviePlayer.module.css";
 
 export type AftermoviePlayerItem = {
@@ -68,8 +68,9 @@ function normalizeItem(item: AftermoviePlayerItem): NormalizedItem {
         kind: "embed",
         embedUrl: `https://www.youtube-nocookie.com/embed/${youtubeId}?rel=0`,
         externalUrl: mediaUrl.href,
-        // Avoid a third-party YouTube request before the visitor presses play.
-        posterUrl: suppliedPoster,
+        // De thumbnail loopt via onze eigen origin, zodat de browser YouTube
+        // pas contacteert wanneer de bezoeker op play klikt.
+        posterUrl: suppliedPoster ?? youtubeThumbnailUrl(youtubeId),
       },
     };
   }

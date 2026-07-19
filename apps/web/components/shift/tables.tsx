@@ -1,7 +1,7 @@
 'use client';
 import { Fragment, useEffect, useMemo, useState } from 'react';
 import { getDictionary, type Dictionary, type Locale } from '@vtk/i18n';
-import { parseShiftArray, type ShiftResponse } from '@/lib/shift';
+import { canUnregister, parseShiftArray, type ShiftResponse } from '@/lib/shift';
 import { useToast, type ToastInput } from '@/components/ui/toast';
 import { format } from 'date-fns';
 import '@/app/design/vtk-basic.css';
@@ -275,22 +275,23 @@ export function AvailableShiftsTable({ locale }: { locale: Locale; userId: strin
                         {fmtTime(shift.startTime)}-{fmtTime(shift.endTime)}
                       </td>
                       <td data-label={t.columns.where}>{shift.location}</td>
-                      <td>
-                        <button
-                          type="button"
-                          className={`vtk-basic-badge ${badgeVariant}`}
-                          onClick={(e) => {
-                            e.stopPropagation(); // niet de rij uitklappen bij registreren
-                            registerShift(shift.id, showToast, t);
-                          }}
-                          disabled={isFull}
-                          style={{
-                            cursor: isFull ? 'not-allowed' : 'pointer',
-                            fontFamily: 'inherit',
-                          }}
-                        >
-                          {t.register} ({shift.takenSpots}/{shift.maxParticipants})
-                        </button>
+                      <td data-label={t.columns.action}>
+                        <div className="vtk-shift-action">
+                          <span className={`vtk-basic-badge ${badgeVariant}`}>
+                            {shift.takenSpots}/{shift.maxParticipants}
+                          </span>
+                          <button
+                            type="button"
+                            className="vtk-basic-action"
+                            onClick={(e) => {
+                              e.stopPropagation(); // niet de rij uitklappen bij registreren
+                              registerShift(shift.id, showToast, t);
+                            }}
+                            disabled={isFull}
+                          >
+                            {t.register}
+                          </button>
+                        </div>
                       </td>
                     </tr>
                     {expandedId === shift.id ? <ShiftDetailRow shift={shift} t={t} /> : null}
@@ -340,8 +341,9 @@ export function RegisteredShiftsTable({ locale }: { locale: Locale; userId: stri
               </tr>
             ) : (
               shifts.map((shift) => {
-                // Binnen 24u voor de start kan je jezelf niet meer uitschrijven.
-                const locked = shift.startTime.getTime() - now < 24 * 60 * 60 * 1000;
+                // Binnen 24u voor de start kan je jezelf niet meer uitschrijven,
+                // behalve vlak na het inschrijven (misklik rechtzetten).
+                const locked = !canUnregister(shift, now);
                 return (
                   <Fragment key={shift.id}>
                     <tr className="vtk-basic-row-click" onClick={() => toggle(shift.id)}>
@@ -351,23 +353,21 @@ export function RegisteredShiftsTable({ locale }: { locale: Locale; userId: stri
                         {fmtTime(shift.startTime)}-{fmtTime(shift.endTime)}
                       </td>
                       <td data-label={t.columns.where}>{shift.location}</td>
-                      <td>
-                        <button
-                          type="button"
-                          className="vtk-basic-badge vtk-basic-badge-danger"
-                          disabled={locked}
-                          title={locked ? t.error.tooLateToUnregister : undefined}
-                          onClick={(e) => {
-                            e.stopPropagation(); // niet de rij uitklappen bij uitschrijven
-                            unregisterShift(shift.id, showToast, t);
-                          }}
-                          style={{
-                            cursor: locked ? 'not-allowed' : 'pointer',
-                            fontFamily: 'inherit',
-                          }}
-                        >
-                          {t.unregister}
-                        </button>
+                      <td data-label={t.columns.action}>
+                        <div className="vtk-shift-action">
+                          <button
+                            type="button"
+                            className="vtk-basic-action vtk-basic-action-danger"
+                            disabled={locked}
+                            title={locked ? t.error.tooLateToUnregister : undefined}
+                            onClick={(e) => {
+                              e.stopPropagation(); // niet de rij uitklappen bij uitschrijven
+                              unregisterShift(shift.id, showToast, t);
+                            }}
+                          >
+                            {t.unregister}
+                          </button>
+                        </div>
                       </td>
                     </tr>
                     {expandedId === shift.id ? <ShiftDetailRow shift={shift} t={t} /> : null}

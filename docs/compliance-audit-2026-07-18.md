@@ -146,9 +146,11 @@ the privacy statement.
 **Found:** a default YouTube thumbnail contacted `i.ytimg.com` before the
 visitor played the video.
 
-**Fixed:** the code no longer generates a third-party YouTube poster URL.
-Editors can configure a first-party poster; YouTube/Vimeo is contacted only
-after deliberate playback. The cookie policy explains this boundary.
+**Fixed:** the browser no longer requests anything from YouTube before playback.
+The poster is served from our own origin by `/api/video-thumbnail`, which fetches
+the image server-side, so the visitor's IP never reaches Google; editors can
+still configure their own poster. YouTube/Vimeo is contacted only after
+deliberate playback. The cookie policy explains this boundary.
 
 ### 9. Profile action trusted a caller-supplied user ID — security/privacy
 

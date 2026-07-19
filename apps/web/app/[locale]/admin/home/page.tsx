@@ -8,7 +8,9 @@ import { Card, Input, Label, Select, Textarea } from "@vtk/ui";
 import { StorageImageField } from "@/components/admin/StorageImageField";
 import { AANBOD_PHOTOS } from "@/lib/aanbodPhotos";
 import { SaveForm } from "@/components/ui/SaveForm";
+import { BUILTIN_DEFAULT_EVENT_IMAGE, DEFAULT_EVENT_IMAGE_SETTING } from "@/lib/defaultEventImage";
 import {
+  saveDefaultEventImageAction,
   saveHomepageCardImageAction,
   saveOpeningHoursAction,
   saveCareerAction,
@@ -16,7 +18,13 @@ import {
   saveFeaturedAlbumsAction,
 } from "@/app/actions/home";
 
-type OpeningHours = { titleNl: string; titleEn: string; entries: Array<{ dayNl: string; dayEn: string; hours: string }> };
+type OpeningHours = {
+  titleNl: string;
+  titleEn: string;
+  subtitleNl?: string;
+  subtitleEn?: string;
+  entries: Array<{ dayNl: string; dayEn: string; hours: string }>;
+};
 type Career = { titleNl: string; titleEn: string; bodyNl: string; bodyEn: string; ctaLabelNl?: string; ctaLabelEn?: string; ctaUrl?: string };
 type Aftermovies = {
   titleNl: string;
@@ -82,6 +90,7 @@ export default async function AdminHome({
             "media.aftermovies",
             "home.aftermovies",
             "home.featuredAlbums",
+            DEFAULT_EVENT_IMAGE_SETTING,
           ],
         },
       },
@@ -105,6 +114,8 @@ export default async function AdminHome({
     ?? readAftermoviesSetting(map.get("home.aftermovies"))
     ?? { titleNl: "", titleEn: "", items: [] };
   const featured = (map.get("home.featuredAlbums") as Featured | undefined) ?? { albumSlugs: [] };
+  const defaultEventImageKey =
+    (map.get(DEFAULT_EVENT_IMAGE_SETTING) as { imageKey?: string | null } | undefined)?.imageKey ?? null;
 
   return (
     <div className="space-y-6">
@@ -166,6 +177,37 @@ export default async function AdminHome({
       </Card>
 
       <Card className="p-5">
+        <h2 className="mb-1 font-semibold">
+          {locale === "nl" ? "Standaardfoto evenementen" : "Default event photo"}
+        </h2>
+        <p className="mb-4 text-sm text-[#5c667f]">
+          {locale === "nl"
+            ? "Deze foto verschijnt op de homepage en op eventpagina's van evenementen zonder eigen cover."
+            : "This photo appears on the homepage and on event pages for events without their own cover."}
+        </p>
+        <SaveForm
+          action={saveDefaultEventImageAction}
+          submitLabel={dict.admin.save}
+          savingLabel={dict.common.saving}
+          savedMessage={dict.common.saved}
+          fallbackErrorMessage={dict.common.saveError}
+        >
+          <StorageImageField
+            defaultKey={defaultEventImageKey}
+            locale={locale}
+            label={locale === "nl" ? "Standaardfoto" : "Default photo"}
+            fallbackUrl={BUILTIN_DEFAULT_EVENT_IMAGE}
+            srContext={locale === "nl" ? "Standaardfoto evenementen" : "Default event photo"}
+            helpText={
+              locale === "nl"
+                ? "Zonder upload gebruiken evenementen de meegeleverde foto hiernaast."
+                : "Without an upload, events use the bundled photo shown here."
+            }
+          />
+        </SaveForm>
+      </Card>
+
+      <Card className="p-5">
         <h2 className="font-semibold mb-3">
           {locale === "nl" ? "Openingsuren" : "Opening hours"} – Cursusdienst
         </h2>
@@ -181,7 +223,20 @@ export default async function AdminHome({
           <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
             <div><Label>Title (NL)</Label><Input name="titleNl" defaultValue={cursus.titleNl} /></div>
             <div><Label>Title (EN)</Label><Input name="titleEn" defaultValue={cursus.titleEn} /></div>
+            <div>
+              <Label>{locale === "nl" ? "Ondertitel (NL)" : "Subtitle (NL)"}</Label>
+              <Input name="subtitleNl" defaultValue={cursus.subtitleNl ?? ""} placeholder="Cursussen & tweedehands" />
+            </div>
+            <div>
+              <Label>{locale === "nl" ? "Ondertitel (EN)" : "Subtitle (EN)"}</Label>
+              <Input name="subtitleEn" defaultValue={cursus.subtitleEn ?? ""} placeholder="Courses & second-hand" />
+            </div>
           </div>
+          <p className="text-xs text-[#5c667f]">
+            {locale === "nl"
+              ? "De ondertitel staat op de homepage onder de titel van de kaart. Laat leeg voor de standaardtekst."
+              : "The subtitle appears on the homepage below the card title. Leave empty for the default text."}
+          </p>
           <table className="w-full text-sm">
             <thead className="text-left"><tr><th>Day (NL)</th><th>Day (EN)</th><th>Hours</th></tr></thead>
             <tbody>

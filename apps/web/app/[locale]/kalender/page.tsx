@@ -15,7 +15,7 @@ function editorialLabels(locale: Locale) {
     metaCategories: nl ? "Categorieën" : "Categories",
     metaExport: nl ? "Export" : "Export",
     weekLine: nl ? "Raster" : "Grid",
-    legendTitle: nl ? "Legenda" : "Legend",
+    legendTitle: nl ? "Legende" : "Legend",
     legendSub: nl ? "Op basis van groep" : "By group",
     agendaNext: nl ? "Eerstvolgend" : "Up next",
     agendaSub: nl ? "Komende 14 dagen" : "Next 14 days",

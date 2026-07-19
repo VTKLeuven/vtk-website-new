@@ -331,6 +331,8 @@ export async function saveTheokotOpeningHoursAction(formData: FormData): Promise
   await requirePermission("theokot.manage");
   const titleNl = (formData.get("titleNl") as string) || "Openingsuren Theokot";
   const titleEn = (formData.get("titleEn") as string) || "Theokot opening hours";
+  const subtitleNl = ((formData.get("subtitleNl") as string) || "").trim();
+  const subtitleEn = ((formData.get("subtitleEn") as string) || "").trim();
   const entries: Array<{ dayNl: string; dayEn: string; hours: string }> = [];
   for (let i = 0; i < 7; i += 1) {
     const dayNl = formData.get(`dayNl-${i}`) as string | null;
@@ -339,7 +341,7 @@ export async function saveTheokotOpeningHoursAction(formData: FormData): Promise
     if (!dayNl && !hours) continue;
     entries.push({ dayNl: dayNl ?? "", dayEn: dayEn ?? dayNl ?? "", hours: hours ?? "" });
   }
-  const value = { titleNl, titleEn, entries };
+  const value = { titleNl, titleEn, subtitleNl, subtitleEn, entries };
   await prisma.setting.upsert({
     where: { key: "home.openingHours.theokot" },
     update: { value },

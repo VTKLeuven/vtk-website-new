@@ -97,42 +97,6 @@
   color: var(--paper);
 }
 
-/* The events card sits on the dark hero scrim as "donker glas": a translucent
-   navy panel with blur and light text, so it reads as part of the hero instead
-   of a bright white cut-out that wins every contrast battle. Light-on-dark tones
-   use --paper and --on-dark-muted. Scoped to .home-hero so the same .cal classes
-   stay light on other surfaces (e.g. the sample page). */
-.vtk-design .home-hero .cal {
-  background: rgba(9, 15, 32, 0.46);
-  border-color: rgba(255, 255, 255, 0.11);
-  box-shadow: none;
-  -webkit-backdrop-filter: blur(16px) saturate(1.05);
-  backdrop-filter: blur(16px) saturate(1.05);
-  color: rgba(255, 255, 255, 0.92);
-}
-
-.vtk-design .home-hero .cal-head h3,
-.vtk-design .home-hero .day-label .num,
-.vtk-design .home-hero .ev .n {
-  color: var(--paper);
-}
-
-.vtk-design .home-hero .cal-head .sub,
-.vtk-design .home-hero .day-label .dow,
-.vtk-design .home-hero .ev .t,
-.vtk-design .home-hero .ev .n small {
-  color: var(--on-dark-muted);
-}
-
-.vtk-design .home-hero .cal-head .all {
-  color: #fff;
-  border-bottom-color: rgba(255, 255, 255, 0.45);
-}
-
-.vtk-design .home-hero .day-group {
-  border-top-color: rgba(255, 255, 255, 0.14);
-}
-
 .vtk-design .home-hero .btn-primary {
   background: var(--paper);
   border-color: var(--paper);
@@ -202,14 +166,21 @@
   letter-spacing: -0.02em;
 }
 
-.vtk-design .cal {
+/*
+ * De eventkaart in de hero. Alles hieronder staat bewust onder `.home-hero`:
+ * `vtk-kalender.css` gebruikt dezelfde klassenamen (`.cal` is daar een
+ * 7-koloms maandraster, `.agenda` een tweekoloms layout). Beide stylesheets
+ * zijn globaal, dus na een bezoek aan /kalender kon die versie hier winnen en
+ * viel de kaart uiteen in kolommen. De extra klasse hier wint altijd.
+ */
+.vtk-design .home-hero .cal {
   border: 1px solid var(--line);
   border-radius: 18px;
   background: var(--surface);
   padding: 24px;
 }
 
-.vtk-design .cal-head {
+.vtk-design .home-hero .cal-head {
   display: flex;
   justify-content: space-between;
   gap: 16px;
@@ -217,20 +188,20 @@
   margin-bottom: 8px;
 }
 
-.vtk-design .cal-head h3 {
+.vtk-design .home-hero .cal-head h3 {
   margin: 0;
   color: var(--ink);
   font-size: 16px;
   font-weight: 600;
 }
 
-.vtk-design .cal-head .sub {
+.vtk-design .home-hero .cal-head .sub {
   margin-top: 2px;
   color: var(--muted);
   font-size: 12px;
 }
 
-.vtk-design .cal-head .all {
+.vtk-design .home-hero .cal-head .all {
   color: var(--navy);
   border-bottom: 1px solid var(--navy);
   padding-bottom: 1px;
@@ -238,43 +209,52 @@
   white-space: nowrap;
 }
 
-.vtk-design .agenda {
+.vtk-design .home-hero .agenda {
   margin-top: 22px;
   display: flex;
   flex-direction: column;
 }
 
-.vtk-design .day-group {
+.vtk-design .home-hero .day-group {
   padding: 14px 0;
   border-top: 1px solid var(--line);
 }
 
-.vtk-design .day-group:first-child {
+.vtk-design .home-hero .day-group:first-child {
   border-top: 0;
   padding-top: 0;
 }
 
-.vtk-design .day-label {
+.vtk-design .home-hero .day-label {
   display: flex;
   align-items: baseline;
   gap: 10px;
   margin-bottom: 8px;
 }
 
-.vtk-design .day-label .num {
+.vtk-design .home-hero .day-label .num {
   color: var(--ink);
   font-size: 20px;
   font-weight: 600;
 }
 
-.vtk-design .day-label .dow {
+.vtk-design .home-hero .day-label .mon {
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  margin-left: -4px;
+}
+
+.vtk-design .home-hero .day-label .dow {
   color: var(--muted);
   font-size: 12px;
   letter-spacing: 0.1em;
   text-transform: uppercase;
 }
 
-.vtk-design .day-label .today {
+.vtk-design .home-hero .day-label .today {
   padding: 2px 8px;
   border-radius: 999px;
   background: var(--yellow);
@@ -283,7 +263,7 @@
   font-weight: 600;
 }
 
-.vtk-design .ev {
+.vtk-design .home-hero .ev {
   display: grid;
   grid-template-columns: 56px 1fr auto;
   gap: 14px;
@@ -293,23 +273,23 @@
   transition: transform 150ms ease;
 }
 
-.vtk-design .ev:hover {
+.vtk-design .home-hero .ev:hover {
   transform: translateX(2px);
 }
 
-.vtk-design .ev .t {
+.vtk-design .home-hero .ev .t {
   color: var(--muted);
   font-size: 13px;
   font-variant-numeric: tabular-nums;
 }
 
-.vtk-design .ev .n {
+.vtk-design .home-hero .ev .n {
   color: var(--ink);
   font-size: 15px;
   font-weight: 500;
 }
 
-.vtk-design .ev .n small {
+.vtk-design .home-hero .ev .n small {
   display: block;
   margin-top: 2px;
   color: var(--muted);
@@ -317,11 +297,21 @@
   font-weight: 400;
 }
 
-.vtk-design .ev.featured .n {
+.vtk-design .home-hero .ev.featured .n {
   font-weight: 600;
 }
 
-.vtk-design .pin {
+.vtk-design .home-hero .ev .ev-go {
+  color: var(--muted);
+  font-size: 15px;
+  transition: transform 150ms ease;
+}
+
+.vtk-design .home-hero .ev:hover .ev-go {
+  transform: translateX(2px);
+}
+
+.vtk-design .home-hero .pin {
   display: inline-block;
   width: 6px;
   height: 6px;
@@ -329,6 +319,44 @@
   border-radius: 50%;
   background: var(--yellow);
   vertical-align: middle;
+}
+
+/* The events card sits on the dark hero scrim as "donker glas": a translucent
+   navy panel with blur and light text, so it reads as part of the hero instead
+   of a bright white cut-out that wins every contrast battle. Light-on-dark tones
+   use --paper and --on-dark-muted. Scoped to .home-hero so the same .cal classes
+   stay light on other surfaces (e.g. the sample page). */
+.vtk-design .home-hero .cal {
+  background: rgba(9, 15, 32, 0.46);
+  border-color: rgba(255, 255, 255, 0.11);
+  box-shadow: none;
+  -webkit-backdrop-filter: blur(16px) saturate(1.05);
+  backdrop-filter: blur(16px) saturate(1.05);
+  color: rgba(255, 255, 255, 0.92);
+}
+
+.vtk-design .home-hero .cal-head h3,
+.vtk-design .home-hero .day-label .num,
+.vtk-design .home-hero .day-label .mon,
+.vtk-design .home-hero .ev .n {
+  color: var(--paper);
+}
+
+.vtk-design .home-hero .cal-head .sub,
+.vtk-design .home-hero .day-label .dow,
+.vtk-design .home-hero .ev .t,
+.vtk-design .home-hero .ev .ev-go,
+.vtk-design .home-hero .ev .n small {
+  color: var(--on-dark-muted);
+}
+
+.vtk-design .home-hero .cal-head .all {
+  color: #fff;
+  border-bottom-color: rgba(255, 255, 255, 0.45);
+}
+
+.vtk-design .home-hero .day-group {
+  border-top-color: rgba(255, 255, 255, 0.14);
 }
 
 .vtk-design .quick {
@@ -985,7 +1013,7 @@
 
 /* Minder dan drie evenementen mag geen lege plaatsen opvullen: auto-fit met een
    max van 3 kolommen laat het rooster meekrimpen naar 1 of 2 kaarten. */
-.vtk-design .ev-grid {
+.vtk-design .home-hero .ev-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(0, calc((100% - 36px) / 3)));
   justify-content: start;
@@ -1088,6 +1116,36 @@
   grid-template-columns: repeat(auto-fit, minmax(0, calc((100% - 18px) / 2)));
   justify-content: start;
   gap: 18px;
+}
+
+/*
+ * De meeste leden hebben één richting, hooguit twee. Dan vullen de kaarten de
+ * volle breedte (in plaats van een halve pagina leeg te laten) en staat de
+ * richtingsnaam naast de mensen: een brede kaart met enkel een naam bovenaan en
+ * één avatar linksonder leest als een half ingevuld formulier.
+ */
+.vtk-design .poc-grid-few {
+  grid-template-columns: repeat(auto-fit, minmax(0, 1fr));
+}
+
+.vtk-design .poc-grid-few .poccard {
+  display: grid;
+  grid-template-columns: minmax(140px, 1fr) minmax(0, 2.4fr);
+  align-items: stretch;
+  gap: 26px;
+}
+
+.vtk-design .poc-grid-few .poccard-head {
+  padding: 0 26px 0 0;
+  margin: 0;
+  border-bottom: 0;
+  border-right: 1px solid var(--line);
+  align-items: center;
+}
+
+.vtk-design .poc-grid-few .poc-people {
+  justify-content: start;
+  align-content: center;
 }
 
 .vtk-design .poccard {
@@ -1330,6 +1388,18 @@
 
   .vtk-design .poc-grid {
     grid-template-columns: minmax(0, 1fr);
+  }
+
+  /* Te smal voor kop-naast-mensen: terug naar de gestapelde kaart. */
+  .vtk-design .poc-grid-few .poccard {
+    display: block;
+  }
+
+  .vtk-design .poc-grid-few .poccard-head {
+    padding: 0 0 16px;
+    margin-bottom: 18px;
+    border-right: 0;
+    border-bottom: 1px solid var(--line);
   }
 }
 

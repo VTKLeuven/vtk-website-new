@@ -174,7 +174,10 @@
     "documentError": "The document could not be displayed.",
     "previousPage": "Previous page",
     "nextPage": "Next page",
-    "pageCounter": "Page {current} of {total}"
+    "pageCounter": "Page {current} of {total}",
+    "zoomIn": "Zoom in",
+    "zoomOut": "Zoom out",
+    "resetZoom": "Reset zoom"
   },
   "pages": {
     "empty": "No pages yet",

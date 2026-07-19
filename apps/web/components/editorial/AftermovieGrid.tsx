@@ -49,9 +49,9 @@ export function AftermovieGrid({
                 title={playLabel}
               >
                 {item.posterUrl ? (
-                  // De poster komt van YouTube (i.ytimg.com); die host staat niet
-                  // in next/image remotePatterns, en de admin mag zelf een poster
-                  // opgeven, dus die set is niet op voorhand te kennen.
+                  // De poster is ofwel onze eigen thumbnail-route ofwel een door
+                  // de admin opgegeven URL; die set is niet op voorhand te kennen
+                  // en staat dus niet in next/image remotePatterns.
                   // eslint-disable-next-line @next/next/no-img-element
                   <img className="am-poster" src={item.posterUrl} alt="" loading="lazy" />
                 ) : (

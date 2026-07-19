@@ -203,6 +203,73 @@ export function KalenderEditorialView({
     return `${base}/kalender/${e.id}`;
   }
 
+  /**
+   * Legende plus abonneer-blok. Staat naast het maandraster, en naast de
+   * agendalijst wanneer er geen raster is; daarom een eigen component in plaats
+   * van twee keer dezelfde markup.
+   */
+  function LegendAside() {
+    return (
+      <aside className="agenda-side">
+        <h3>{labels.legendTitle}</h3>
+        <div className="sub">{labels.legendSub}</div>
+        <ul className="agenda-side-list">
+          <li className="gala">
+            <span>
+              <span className="sw" />
+              Gala · TD
+            </span>
+            <span className="count">{String(legendCounts.gala).padStart(2, "0")}</span>
+          </li>
+          <li className="cantus">
+            <span>
+              <span className="sw" />
+              Cantus
+            </span>
+            <span className="count">{String(legendCounts.cantus).padStart(2, "0")}</span>
+          </li>
+          <li className="career">
+            <span>
+              <span className="sw" />
+              Career
+            </span>
+            <span className="count">{String(legendCounts.career).padStart(2, "0")}</span>
+          </li>
+          <li className="service">
+            <span>
+              <span className="sw" />
+              Service
+            </span>
+            <span className="count">{String(legendCounts.service).padStart(2, "0")}</span>
+          </li>
+          <li className="blok">
+            <span>
+              <span className="sw" />
+              Blok · studie
+            </span>
+            <span className="count">{String(legendCounts.blok).padStart(2, "0")}</span>
+          </li>
+        </ul>
+
+        <div className="subscribe-box">
+          <h3>{labels.subscribeTitle}</h3>
+          <div className="sub">{labels.subscribeSub}</div>
+          <div className="subscribe-actions">
+            <span className="btn btn-ghost arrow">
+              {labels.ical}
+            </span>
+            <span className="btn btn-ghost arrow">
+              {labels.google}
+            </span>
+            <span className="btn btn-ghost arrow">
+              {labels.outlook}
+            </span>
+          </div>
+        </div>
+      </aside>
+    );
+  }
+
   const showGrid = view === "month";
 
   return (
@@ -217,20 +284,11 @@ export function KalenderEditorialView({
             <em>{year}.</em>
           </h1>
         </div>
+        {/* Compacte kop: enkel de teller. De categorieën staan al als filters in
+            de toolbar en als legende naast de kalender, en de export-opties in
+            het abonneer-blok; drie keer hetzelfde duwde de kalender uit beeld. */}
         <div className="page-head-meta">
-          {labels.metaEvents}
-          <br />
-          <b>{monthEvents.length}</b>
-          <br />
-          <br />
-          {labels.metaCategories}
-          <br />
-          <b>Gala · Career · Cantus · Service · Blok</b>
-          <br />
-          <br />
-          {labels.metaExport}
-          <br />
-          <b>iCal · Google · Outlook</b>
+          <b>{monthEvents.length}</b> {labels.metaEvents}
         </div>
       </header>
 
@@ -276,45 +334,50 @@ export function KalenderEditorialView({
           </div>
         </div>
 
+        {/* De legende staat naast het maandraster: onder de kalender viel ze
+            buiten beeld, en het raster hoeft niet de volle breedte. */}
         {showGrid && (
-          <div className="cal">
-            <div className="cal-header">
-              {(locale === "nl"
-                ? ["Ma", "Di", "Wo", "Do", "Vr", "Za", "Zo"]
-                : ["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"]
-              ).map((d) => (
-                <div key={d}>{d}</div>
-              ))}
+          <div className="kal-main">
+            <div className="cal">
+              <div className="cal-header">
+                {(locale === "nl"
+                  ? ["Ma", "Di", "Wo", "Do", "Vr", "Za", "Zo"]
+                  : ["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"]
+                ).map((d) => (
+                  <div key={d}>{d}</div>
+                ))}
+              </div>
+              {cells.map(({ date, inMonth }) => {
+                const key = `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`;
+                const list = eventsByDay.get(key) ?? [];
+                const isToday = isSameCalendarDay(date, new Date());
+                const more = list.length > 2 ? list.length - 2 : 0;
+                const show = list.slice(0, 2);
+                return (
+                  <div key={key} className={`cal-cell${!inMonth ? " out" : ""}${isToday ? " today" : ""}`}>
+                    <div className="num">{String(date.getDate()).padStart(2, "0")}</div>
+                    {show.map((e) => {
+                      const pc = pillClass(e.extendedProps.groupCode);
+                      return (
+                        <a key={e.id} href={eventHref(e)} className={`ev-pill${pc ? ` ${pc}` : ""}`}>
+                          <b>{pickTitle(e)}</b>
+                          <span>
+                            {eventTime(e)}
+                            {e.location ? ` · ${e.location}` : ""}
+                          </span>
+                        </a>
+                      );
+                    })}
+                    {more > 0 ? (
+                      <div className="ev-pill more" title={list.map((e) => pickTitle(e)).join(", ")}>
+                        +{more}
+                      </div>
+                    ) : null}
+                  </div>
+                );
+              })}
             </div>
-            {cells.map(({ date, inMonth }) => {
-              const key = `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`;
-              const list = eventsByDay.get(key) ?? [];
-              const isToday = isSameCalendarDay(date, new Date());
-              const more = list.length > 2 ? list.length - 2 : 0;
-              const show = list.slice(0, 2);
-              return (
-                <div key={key} className={`cal-cell${!inMonth ? " out" : ""}${isToday ? " today" : ""}`}>
-                  <div className="num">{String(date.getDate()).padStart(2, "0")}</div>
-                  {show.map((e) => {
-                    const pc = pillClass(e.extendedProps.groupCode);
-                    return (
-                      <a key={e.id} href={eventHref(e)} className={`ev-pill${pc ? ` ${pc}` : ""}`}>
-                        <b>{pickTitle(e)}</b>
-                        <span>
-                          {eventTime(e)}
-                          {e.location ? ` · ${e.location}` : ""}
-                        </span>
-                      </a>
-                    );
-                  })}
-                  {more > 0 ? (
-                    <div className="ev-pill more" title={list.map((e) => pickTitle(e)).join(", ")}>
-                      +{more}
-                    </div>
-                  ) : null}
-                </div>
-              );
-            })}
+            <LegendAside />
           </div>
         )}
 
@@ -323,68 +386,10 @@ export function KalenderEditorialView({
             className="agenda"
             style={{
               marginTop: view === "list" && !showGrid ? 0 : 48,
-              gridTemplateColumns: view === "list" ? "1fr" : undefined,
+              gridTemplateColumns: view === "agenda" ? undefined : "1fr",
             }}
           >
-            {view !== "list" && (
-              <aside className="agenda-side">
-                <h3>{labels.legendTitle}</h3>
-                <div className="sub">{labels.legendSub}</div>
-                <ul className="agenda-side-list">
-                  <li className="gala">
-                    <span>
-                      <span className="sw" />
-                      Gala · TD
-                    </span>
-                    <span className="count">{String(legendCounts.gala).padStart(2, "0")}</span>
-                  </li>
-                  <li className="cantus">
-                    <span>
-                      <span className="sw" />
-                      Cantus
-                    </span>
-                    <span className="count">{String(legendCounts.cantus).padStart(2, "0")}</span>
-                  </li>
-                  <li className="career">
-                    <span>
-                      <span className="sw" />
-                      Career
-                    </span>
-                    <span className="count">{String(legendCounts.career).padStart(2, "0")}</span>
-                  </li>
-                  <li className="service">
-                    <span>
-                      <span className="sw" />
-                      Service
-                    </span>
-                    <span className="count">{String(legendCounts.service).padStart(2, "0")}</span>
-                  </li>
-                  <li className="blok">
-                    <span>
-                      <span className="sw" />
-                      Blok · studie
-                    </span>
-                    <span className="count">{String(legendCounts.blok).padStart(2, "0")}</span>
-                  </li>
-                </ul>
-
-                <div className="subscribe-box">
-                  <h3>{labels.subscribeTitle}</h3>
-                  <div className="sub">{labels.subscribeSub}</div>
-                  <div className="subscribe-actions">
-                    <span className="btn btn-ghost arrow">
-                      {labels.ical}
-                    </span>
-                    <span className="btn btn-ghost arrow">
-                      {labels.google}
-                    </span>
-                    <span className="btn btn-ghost arrow">
-                      {labels.outlook}
-                    </span>
-                  </div>
-                </div>
-              </aside>
-            )}
+            {view === "agenda" && <LegendAside />}
 
             <div>
               <div className="agenda-head">

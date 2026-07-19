@@ -1271,6 +1271,10 @@ model ShiftParticipant {
 
   payedOut Boolean
 
+  /// Moment van inschrijven: binnen een korte bedenktijd mag je je nog
+  /// uitschrijven, ook wanneer de shift al binnen 24 uur begint.
+  registeredAt DateTime @default(now())
+
   @@id([shiftId, userId])
 }
 

@@ -6,6 +6,7 @@ import { pick, type Locale } from "@vtk/i18n";
 import { Markdown } from "@/components/ui/Markdown";
 import { hasLocale } from "@/lib/locale";
 import { publicUrl } from "@/lib/storage";
+import { getDefaultEventImage } from "@/lib/defaultEventImage";
 
 import "@/app/design/vtk-event.css";
 
@@ -44,7 +45,7 @@ export default async function EventPage({
   const title = pick(event.titleNl, event.titleEn, locale);
   const description = pick(event.descriptionNl ?? "", event.descriptionEn ?? "", locale);
   const groupName = pick(event.group.nameNl, event.group.nameEn, locale);
-  const imageSrc = publicUrl(event.imageKey) ?? "/default-event.jpg";
+  const imageSrc = publicUrl(event.imageKey) ?? (await getDefaultEventImage());
 
   return (
     <article className="vtk-page">

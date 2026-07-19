@@ -174,7 +174,10 @@
     "documentError": "Het document kon niet worden weergegeven.",
     "previousPage": "Vorige pagina",
     "nextPage": "Volgende pagina",
-    "pageCounter": "Pagina {current} van {total}"
+    "pageCounter": "Pagina {current} van {total}",
+    "zoomIn": "Inzoomen",
+    "zoomOut": "Uitzoomen",
+    "resetZoom": "Zoom herstellen"
   },
   "pages": {
     "empty": "Nog geen pagina's",

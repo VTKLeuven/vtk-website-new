@@ -72,6 +72,15 @@ export function vimeoVideoId(url: URL): { id: string; hash: string | null } | nu
   return { id: segments[idIndex], hash };
 }
 
+/**
+ * De poster van een YouTube-video via onze eigen origin. De route haalt het
+ * beeld server-side bij YouTube op, zodat het IP van de bezoeker daar niet
+ * terechtkomt (zie `app/api/video-thumbnail/route.ts`).
+ */
+export function youtubeThumbnailUrl(videoId: string): string {
+  return `/api/video-thumbnail?id=${encodeURIComponent(videoId)}`;
+}
+
 export type VideoEmbed = {
   embedUrl: string;
   externalUrl: string;
@@ -93,9 +102,9 @@ export function videoEmbed(url: string, posterUrl?: string | null): VideoEmbed |
     return {
       embedUrl: `https://www.youtube-nocookie.com/embed/${youtubeId}?rel=0`,
       externalUrl: media.href,
-      // Do not contact YouTube before the visitor deliberately starts external
-      // media. Editors can upload/configure a first-party poster if desired.
-      posterUrl: suppliedPoster,
+      // De browser mag YouTube niet contacteren voor er op play geklikt is; de
+      // thumbnail loopt daarom via onze eigen origin (`/api/video-thumbnail`).
+      posterUrl: suppliedPoster ?? youtubeThumbnailUrl(youtubeId),
     };
   }
 
