@@ -6,16 +6,11 @@
  * Safe to use in browser and server components :))
  */
 import type { NextRequest } from 'next/server';
-import type { Permission } from './permissions';
+import type { Permission } from './lib/permissions';
 
-export { splitFullName, fullName, nameParts, type NameParts } from './names';
-export {
-  PERMISSIONS,
-  isPermission,
-  permissionCodes,
-  type Permission,
-} from './permissions';
-export { currentWorkingYear, FIRST_WORKING_YEAR } from './workingYear';
+export { splitFullName, fullName, nameParts, type NameParts } from './lib/names';
+export { PERMISSIONS, isPermission, permissionCodes, type Permission } from './lib/permissions';
+export { currentWorkingYear, FIRST_WORKING_YEAR } from './lib/workingYear';
 
 /** */
 export type Locale = 'NL' | 'EN';
@@ -107,11 +102,7 @@ export function isMemberOfGroup(
 // ==============================
 
 export type AuthErrorCode =
-  | 'UNAUTHENTICATED'
-  | 'FORBIDDEN'
-  | 'INACTIVE_USER'
-  | 'INVALID_INPUT'
-  | 'REMOTE_AUTH_UNAVAILABLE';
+  'UNAUTHENTICATED' | 'FORBIDDEN' | 'INACTIVE_USER' | 'INVALID_INPUT' | 'REMOTE_AUTH_UNAVAILABLE';
 
 export class AuthError extends Error {
   constructor(
