@@ -11,6 +11,7 @@ import { APIError } from 'better-auth/api';
 import { oauthProvider } from '@better-auth/oauth-provider';
 import { prisma } from '@vtk/db';
 import { nextCookies } from 'better-auth/next-js';
+import { hasSSOPrivileges } from './server/sso';
 
 import { hashPassword, verifyPassword } from './logins/password';
 import { kulOAuthConfig, KUL_PROVIDER_ID } from './logins/kul';
@@ -24,9 +25,7 @@ export const auth = betterAuth({
   baseURL: process.env.BETTER_AUTH_URL,
   basePath: '/api/auth/better',
   secret: process.env.BETTER_AUTH_SECRET,
-  trustedOrigins: isProduction
-    ? ['https://*.vtk.be']
-    : ['http://localhost:3000', 'http://localhost:3001'],
+  trustedOrigins: isProduction ? ['https://*.vtk.be'] : ['http://localhost:3000', 'http://localhost:3001'],
 
   database: prismaAdapter(prisma, {
     provider: 'postgresql',
@@ -38,9 +37,11 @@ export const auth = betterAuth({
     ...(kulConfig ? [genericOAuth({ config: [kulConfig] })] : []),
     jwt({ disableSettingJwtHeader: true }),
     oauthProvider({
-      loginPage: '/sign-in',
-      consentPage: '/consent',
-      // ...other options
+      loginPage: '/sign-in', //TODO juiste link
+      consentPage: '/consent', //TODO juiste link
+      clientPrivileges: async ({ action, headers, user, session }) => {
+        return hasSSOPrivileges(headers); // alle actions zijn enkel toegankelijk voor admins (IT en G5)
+      },
     }),
     nextCookies(),
   ],

@@ -1,8 +1,10 @@
 import 'server-only';
 import { prisma } from '@vtk/db';
 import type { SessionPayload } from '../index';
-import { currentWorkingYear } from '../workingYear';
+import { currentWorkingYear } from '../lib/workingYear';
+import type { Permission } from '../index';
 import { auth } from '../auth';
+import { hasPermission as rootHasPermission } from '../index';
 
 // Rollen bundelen permissies; hieruit halen we de codes (en het rol-id zelf,
 // voor checks die aan een specifieke rol hangen zoals paginabewerking).
@@ -86,3 +88,16 @@ export async function getSession(headers: Headers): Promise<SessionPayload | nul
     roleIds: [...roleIds],
   };
 }
+
+/**
+ * check if a user has the correct permissions from the headers (with simple cache as to limit the amount of DB hits)
+ *
+ * Only use this function in non react/nextjs methods => in those case use reacts native cache() function
+ */
+export async function hasPermission(headers: Headers, permission: Permission): Promise<boolean> {
+  if (!sessionCache.has(headers)) sessionCache.set(headers, getSession(headers));
+
+  return rootHasPermission(await sessionCache.get(headers), permission);
+}
+
+const sessionCache = new WeakMap<Headers, Promise<SessionPayload | null>>();
