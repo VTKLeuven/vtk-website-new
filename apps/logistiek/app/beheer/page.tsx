@@ -51,7 +51,7 @@ export default async function BeheerDashboardPage() {
   const today = todayDateOnly();
   const [reservationStatuses, vanStatuses, agenda] = await Promise.all([
     prisma.uitleenReservation.groupBy({ by: ['status'], _count: { _all: true } }),
-    prisma.uitleenVanBooking.groupBy({ by: ['status'], _count: { _all: true } }),
+    prisma.uitleenTransportBooking.groupBy({ by: ['status'], _count: { _all: true } }),
     adminAgenda(today, today),
   ]);
 
@@ -143,8 +143,8 @@ export default async function BeheerDashboardPage() {
           counts={materialCounts}
         />
         <StatusGroup
-          title="Camionette"
-          href="/beheer/camionette"
+          title="Vervoer"
+          href="/beheer/vervoer"
           description="Ritaanvragen, geplande ritten en historiek."
           counts={vanCounts}
         />
@@ -182,7 +182,7 @@ export default async function BeheerDashboardPage() {
             ))}
             {agenda.vanBookings.map((booking) => (
               <li key={`v-${booking.id}`} className="flex flex-wrap items-center gap-3 rounded-[14px] border border-vtk-navy/10 bg-vtk-surface px-4 py-3">
-                <span className="rounded-full bg-vtk-navy px-2.5 py-1 text-xs font-semibold text-white">Camionette</span>
+                <span className="rounded-full bg-vtk-navy px-2.5 py-1 text-xs font-semibold text-white">Vervoer</span>
                 <span className="text-vtk-body"><strong className="text-vtk-ink">{booking.user.name}</strong> · {booking.purpose}{booking.driver ? ` · chauffeur: ${booking.driver.name}` : ' · chauffeur nog te kiezen'}</span>
               </li>
             ))}

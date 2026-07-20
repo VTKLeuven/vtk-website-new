@@ -8,7 +8,7 @@ export default async function BeheerLayout({ children }: { children: React.React
   const [session, locale] = await Promise.all([getSession(), getLocale()]);
   const t = copy[locale];
   if (!session) {
-    return <LoginGate message="Log in om het beheer van de uitleendienst te openen." />;
+    return <LoginGate variant="manage" />;
   }
   if (!canManage(session)) {
     return (

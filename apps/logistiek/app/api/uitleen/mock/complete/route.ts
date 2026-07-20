@@ -17,7 +17,7 @@ export async function GET(request: Request): Promise<Response> {
     where: {
       provider: 'mock',
       status: { in: ['CREATED', 'PENDING'] },
-      OR: [{ reservationId: orderId }, { vanBookingId: orderId }],
+      OR: [{ reservationId: orderId }, { transportBookingId: orderId }],
     },
     orderBy: { createdAt: 'desc' },
   });

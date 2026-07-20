@@ -12,7 +12,7 @@ export default async function BeheerKalenderPage() {
   const to = new Date(from.getTime() + DAYS_AHEAD * 24 * 60 * 60 * 1000);
   const agenda = await adminAgenda(from, to);
 
-  type Entry = { kind: 'Afhaling' | 'Terugbrengen' | 'Camionette'; text: string; href: string };
+  type Entry = { kind: 'Afhaling' | 'Terugbrengen' | 'Vervoer'; text: string; href: string };
   const byDay = new Map<string, Entry[]>();
 
   function push(day: Date, entry: Entry) {
@@ -46,9 +46,9 @@ export default async function BeheerKalenderPage() {
       `${new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Brussels', year: 'numeric', month: '2-digit', day: '2-digit' }).format(booking.startAt)}T00:00:00.000Z`
     );
     push(day, {
-      kind: 'Camionette',
+      kind: 'Vervoer',
       text: `${timeFormatter.format(booking.startAt)}-${timeFormatter.format(booking.endAt)} ${booking.user.name}: ${booking.purpose}${booking.driver ? ` (${booking.driver.name})` : ' (geen chauffeur)'}`,
-      href: '/beheer/camionette',
+      href: '/beheer/vervoer',
     });
   }
 
@@ -57,7 +57,7 @@ export default async function BeheerKalenderPage() {
   const KIND_STYLES: Record<Entry['kind'], string> = {
     Afhaling: 'bg-vtk-yellow/25 text-vtk-ink',
     Terugbrengen: 'bg-vtk-paper-2 text-vtk-navy',
-    Camionette: 'bg-vtk-navy text-white',
+    Vervoer: 'bg-vtk-navy text-white',
   };
 
   return (

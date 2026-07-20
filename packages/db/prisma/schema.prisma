@@ -151,12 +151,38 @@ enum UitleenReservationStatus {
   RETURNED // materiaal teruggebracht; reservatie afgerond
 }
 
-enum UitleenVanBookingStatus {
+enum UitleenTransportBookingStatus {
   REQUESTED
   APPROVED
   REJECTED
   CANCELLED
   COMPLETED // rit uitgevoerd
+}
+
+// Namens wie een aanvraag gebeurt. De drie kanalen uit de Logi-werking met elk
+// een eigen behandelaar: interne posten, werkgroepen/jaarwerkingen, externen.
+enum UitleenRequesterType {
+  INTERN // eigen post (praesidium)
+  WERKGROEP // werkgroep of jaarwerking
+  EXTERN // extern of individueel
+}
+
+// Hoe de prijs van een voertuig berekend wordt. Team-configureerbaar per
+// voertuig, want de kring bevestigt de tarieven nog.
+enum UitleenPricingMode {
+  FREE // gratis
+  PER_HOUR // rateCents per begonnen uur
+  PER_KM // rateCents per kilometer (km ingevuld bij afronden)
+  FLAT // vast bedrag = rateCents
+}
+
+// Staat van een materiaalstuk. Puur informatief (badge in het beheer); muteert
+// nooit automatisch de beschikbaarheid.
+enum UitleenItemCondition {
+  WERKT
+  KAPOT
+  TESTEN
+  ONVOLLEDIG
 }
 
 // Hoe een goedgekeurde reservatie betaald wordt: online via de payment
@@ -297,13 +323,14 @@ model User {
   theokotPickedUp TheokotOrder[] @relation("TheokotPickedUpBy")
   theokotBans     TheokotBan[]
 
-  uitleenReservations UitleenReservation[] @relation("UitleenReservationUser")
-  uitleenDecided      UitleenReservation[] @relation("UitleenDecidedBy")
-  uitleenPickedUp     UitleenReservation[] @relation("UitleenPickedUpBy")
-  uitleenReturned     UitleenReservation[] @relation("UitleenReturnedBy")
-  uitleenVanBookings  UitleenVanBooking[]  @relation("UitleenVanBookingUser")
-  uitleenVanDriven    UitleenVanBooking[]  @relation("UitleenVanDriver")
-  uitleenVanDecided   UitleenVanBooking[]  @relation("UitleenVanDecidedBy")
+  uitleenReservations     UitleenReservation[]      @relation("UitleenReservationUser")
+  uitleenDecided          UitleenReservation[]      @relation("UitleenDecidedBy")
+  uitleenPickedUp         UitleenReservation[]      @relation("UitleenPickedUpBy")
+  uitleenReturned         UitleenReservation[]      @relation("UitleenReturnedBy")
+  uitleenTransport        UitleenTransportBooking[] @relation("UitleenTransportUser")
+  uitleenTransportDriven  UitleenTransportBooking[] @relation("UitleenTransportDriver")
+  uitleenTransportDecided UitleenTransportBooking[] @relation("UitleenTransportDecidedBy")
+  uitleenTransportDone    UitleenTransportBooking[] @relation("UitleenTransportCompletedBy")
 
   createdTicketEvents      TicketEvent[]           @relation("TicketEventCreatedBy")
   ticketEventGrants        TicketEventUserGrant[]  @relation("TicketEventGrantUser")
@@ -341,6 +368,9 @@ model Group {
   dashboardTiles    DashboardTile[]
   ownedTicketEvents TicketEvent[]           @relation("TicketEventOwnerGroup")
   ticketEventGrants TicketEventGroupGrant[]
+
+  uitleenReservations UitleenReservation[]
+  uitleenTransport    UitleenTransportBooking[]
 }
 
 model GroupMembership {
@@ -1387,10 +1417,12 @@ model TheokotBan {
 }
 
 // -----------------------------------------------------------------------------
-// Uitleendienst (logistiek.vtk.be): materiaal lenen en de camionette boeken.
-// Flow: lid vraagt aan (REQUESTED), Logistiek keurt goed of wijst af; de harde
-// voorraadcheck gebeurt bij goedkeuring. Prijzen/waarborgen worden gesnapshot
-// zodat catalogswijzigingen bestaande reservaties niet herschrijven.
+// Uitleendienst (logistiek.vtk.be): materiaal lenen, transport (kar/auto/
+// bakfiets) en flesserke. Aanvragen gebeuren per evenement, met een
+// aanvragertype (intern/werkgroep/extern). Flow: lid vraagt aan (REQUESTED),
+// Logistiek keurt goed of wijst af; de harde voorraadcheck gebeurt bij
+// goedkeuring in een Serializable-transactie. Prijzen/waarborgen worden
+// gesnapshot zodat catalogswijzigingen bestaande reservaties niet herschrijven.
 // -----------------------------------------------------------------------------
 
 model UitleenCategory {
@@ -1417,13 +1449,38 @@ model UitleenItem {
   priceCents   Int     @default(0) // huurprijs per stuk per reservatie; 0 = gratis
   active       Boolean @default(true) // soft-delete: uit de catalogus, historiek blijft
 
+  // Een set is een fysiek samengestelde bundel met eigen voorraad; de inhoud
+  // (setContents) is louter beschrijvend en koppelt niet aan andere items.
+  isSet Boolean @default(false)
+
+  // Locatie in de loods (schap/rek) en staat; puur informatief voor het team.
+  locationShelf String? // bv. "2R"
+  locationRack  String? // bv. "A1"
+  condition     UitleenItemCondition @default(WERKT)
+  conditionNote String?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  category UitleenCategory?         @relation(fields: [categoryId], references: [id], onDelete: SetNull)
-  lines    UitleenReservationLine[]
+  category    UitleenCategory?         @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  lines       UitleenReservationLine[]
+  setContents UitleenSetContent[]
 
   @@index([categoryId, active])
+}
+
+/// Beschrijvende inhoud van een set (vrije tekst, geen koppeling aan andere
+/// items zodat de voorraad niet dubbel geteld wordt).
+model UitleenSetContent {
+  id        String @id @default(cuid())
+  itemId    String
+  label     String
+  quantity  Int    @default(1)
+  sortIndex Int    @default(0)
+
+  item UitleenItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
+
+  @@index([itemId, sortIndex])
 }
 
 model UitleenReservation {
@@ -1431,11 +1488,27 @@ model UitleenReservation {
   userId String
   status UitleenReservationStatus @default(REQUESTED)
 
+  // Namens wie de aanvraag gebeurt. INTERN koppelt aan een post (groupId);
+  // WERKGROEP/EXTERN bewaren een vrije naam (requesterName).
+  requesterType UitleenRequesterType @default(INTERN)
+  groupId       String?
+  requesterName String?
+
+  // Evenement-context (de Logi-werking vraagt aan per evenement).
+  eventName          String // verplicht: waarvoor het materiaal dient
+  eventLocation      String?
+  eventStart         DateTime? @db.Timestamptz(3) // startuur (opbouw) van het evenement
+  expectedAttendance Int?
+  contactName        String?
+  contactPhone       String?
+  delivery           Boolean   @default(false) // levering nodig?
+  deliveryNote       String?
+
   // Afhaal- en terugbrengdag (hele dagen; de concrete uren spreekt het team af).
   pickupDate DateTime @db.Date
   returnDate DateTime @db.Date
 
-  memberNote String? // waarvoor het lid het materiaal nodig heeft
+  memberNote String? // extra info van het lid
   adminNote  String? // nota van het team (bv. reden van afwijzing)
 
   // Totalen gesnapshot bij de aanvraag.
@@ -1456,17 +1529,20 @@ model UitleenReservation {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  user       User  @relation("UitleenReservationUser", fields: [userId], references: [id], onDelete: Cascade)
-  decidedBy  User? @relation("UitleenDecidedBy", fields: [decidedById], references: [id], onDelete: SetNull)
-  pickedUpBy User? @relation("UitleenPickedUpBy", fields: [pickedUpById], references: [id], onDelete: SetNull)
-  returnedBy User? @relation("UitleenReturnedBy", fields: [returnedById], references: [id], onDelete: SetNull)
+  user       User   @relation("UitleenReservationUser", fields: [userId], references: [id], onDelete: Cascade)
+  group      Group? @relation(fields: [groupId], references: [id], onDelete: SetNull)
+  decidedBy  User?  @relation("UitleenDecidedBy", fields: [decidedById], references: [id], onDelete: SetNull)
+  pickedUpBy User?  @relation("UitleenPickedUpBy", fields: [pickedUpById], references: [id], onDelete: SetNull)
+  returnedBy User?  @relation("UitleenReturnedBy", fields: [returnedById], references: [id], onDelete: SetNull)
 
-  lines    UitleenReservationLine[]
-  payments UitleenPayment[]
+  lines          UitleenReservationLine[]
+  flesserkeLines UitleenFlesserkeLine[]
+  payments       UitleenPayment[]
 
   @@index([userId])
   @@index([status, pickupDate])
   @@index([pickupDate, returnDate])
+  @@index([requesterType, status])
 }
 
 model UitleenReservationLine {
@@ -1489,27 +1565,54 @@ model UitleenReservationLine {
   @@index([itemId])
 }
 
-/// Camionette-boeking: uurprijs met minimum, VTK-vrijwilliger rijdt. Bewust een
-/// eigen model (geen UitleenItem): tijdvenster i.p.v. dagbereik, chauffeur en
-/// een andere lifecycle.
-model UitleenVanBooking {
-  id     String                  @id @default(cuid())
-  userId String
-  status UitleenVanBookingStatus @default(REQUESTED)
+/// Een voertuig van de transportdienst (kar, auto, bakfiets). Tarieven zijn
+/// team-configureerbaar, daarom DB-rijen i.p.v. een enum.
+model UitleenVehicle {
+  id          String             @id @default(cuid())
+  code        String             @unique // kar | auto | bakfiets
+  nameNl      String
+  nameEn      String
+  description String?
+  pricingMode UitleenPricingMode @default(FREE)
+  rateCents   Int                @default(0) // per uur / per km / vast, naargelang pricingMode
+  sortIndex   Int                @default(0)
+  active      Boolean            @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  bookings UitleenTransportBooking[]
+}
+
+/// Transportaanvraag met een voertuig, een tijdvenster en (later) een chauffeur.
+/// Bewust een eigen model (geen materiaalaanvraag): aparte behandelaar, aparte
+/// lifecycle. Prijs kan pas bij afronden gekend zijn (per-km).
+model UitleenTransportBooking {
+  id        String                        @id @default(cuid())
+  userId    String
+  vehicleId String
+  status    UitleenTransportBookingStatus @default(REQUESTED)
+
+  requesterType UitleenRequesterType @default(INTERN)
+  groupId       String?
+  requesterName String?
 
   startAt DateTime @db.Timestamptz(3)
   endAt   DateTime @db.Timestamptz(3)
 
+  eventName     String? // vrije koppeling aan het evenement (geen FK)
   purpose       String // waarvoor de rit dient
   pickupAddress String?
   destination   String?
+  helpersNote   String? // bijrijders die de aanvrager zelf voorziet
 
-  driverId String? // toegewezen door het team bij goedkeuring
+  driverId String? // pas het weekend ervoor toegewezen; blijft optioneel bij goedkeuring
 
-  // Prijs: ceil(uren) x uurtarief, met het uurtarief als minimum. Tarief wordt
-  // gesnapshot bij de aanvraag en de prijs herberekend bij goedkeuring.
-  hourlyRateCents Int @default(750)
-  priceCents      Int
+  // Tarief gesnapshot bij de aanvraag (en her-gesnapshot bij een voertuigwissel).
+  pricingMode UitleenPricingMode
+  rateCents   Int
+  kilometers  Int? // ingevuld bij afronden voor PER_KM
+  priceCents  Int? // null = nog niet gekend (PER_KM voor de rit)
 
   paymentMode   UitleenPaymentMode?
   paidOfflineAt DateTime?
@@ -1517,30 +1620,37 @@ model UitleenVanBooking {
   memberNote String?
   adminNote  String?
 
-  decidedAt   DateTime?
-  decidedById String?
+  decidedAt     DateTime?
+  decidedById   String?
+  completedAt   DateTime?
+  completedById String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  user      User  @relation("UitleenVanBookingUser", fields: [userId], references: [id], onDelete: Cascade)
-  driver    User? @relation("UitleenVanDriver", fields: [driverId], references: [id], onDelete: SetNull)
-  decidedBy User? @relation("UitleenVanDecidedBy", fields: [decidedById], references: [id], onDelete: SetNull)
+  user        User           @relation("UitleenTransportUser", fields: [userId], references: [id], onDelete: Cascade)
+  vehicle     UitleenVehicle @relation(fields: [vehicleId], references: [id], onDelete: Restrict)
+  group       Group?         @relation(fields: [groupId], references: [id], onDelete: SetNull)
+  driver      User?          @relation("UitleenTransportDriver", fields: [driverId], references: [id], onDelete: SetNull)
+  decidedBy   User?          @relation("UitleenTransportDecidedBy", fields: [decidedById], references: [id], onDelete: SetNull)
+  completedBy User?          @relation("UitleenTransportCompletedBy", fields: [completedById], references: [id], onDelete: SetNull)
 
   payments UitleenPayment[]
 
   @@index([userId])
   @@index([status, startAt])
   @@index([startAt, endAt])
+  @@index([vehicleId, status])
+  @@index([requesterType, status])
 }
 
 /// Spiegel van TicketPayment (zonder refunds): provider is een vrije string
 /// zodat een providerwissel geen migratie vraagt. Precies één van
-/// reservationId/vanBookingId is gezet.
+/// reservationId/transportBookingId is gezet.
 model UitleenPayment {
   id                 String               @id @default(cuid())
   reservationId      String?
-  vanBookingId       String?
+  transportBookingId String?
   provider           String
   providerCheckoutId String?
   providerPaymentId  String?
@@ -1556,15 +1666,15 @@ model UitleenPayment {
   createdAt          DateTime             @default(now()) @db.Timestamptz(3)
   updatedAt          DateTime             @updatedAt @db.Timestamptz(3)
 
-  reservation UitleenReservation? @relation(fields: [reservationId], references: [id], onDelete: Restrict)
-  vanBooking  UitleenVanBooking?  @relation(fields: [vanBookingId], references: [id], onDelete: Restrict)
-  webhooks    UitleenPaymentWebhook[]
+  reservation      UitleenReservation?      @relation(fields: [reservationId], references: [id], onDelete: Restrict)
+  transportBooking UitleenTransportBooking? @relation(fields: [transportBookingId], references: [id], onDelete: Restrict)
+  webhooks         UitleenPaymentWebhook[]
 
   @@unique([provider, providerCheckoutId])
   @@unique([provider, providerPaymentId])
   @@unique([provider, idempotencyKey])
   @@index([reservationId, status])
-  @@index([vanBookingId, status])
+  @@index([transportBookingId, status])
   @@index([status, expiresAt])
 }
 
@@ -1585,6 +1695,63 @@ model UitleenPaymentWebhook {
   @@unique([provider, externalEventId])
   @@index([paymentId])
   @@index([processedAt, receivedAt])
+}
+
+// -----------------------------------------------------------------------------
+// Flesserke: verbruiksstock (voeding, drank, huishoudproducten) die per event
+// wordt klaargezet. Enkel voor interne werking (INTERN/WERKGROEP). Beschikbaar
+// wordt altijd berekend (quantity min gereserveerd), nooit opgeslagen. Bij het
+// terugbrengen boekt het team het verbruik af (gesloten terug, open weg).
+// -----------------------------------------------------------------------------
+
+model UitleenFlesserkeCategory {
+  id        String   @id @default(cuid())
+  name      String
+  sortIndex Int      @default(0)
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  items UitleenFlesserkeItem[]
+}
+
+model UitleenFlesserkeItem {
+  id            String    @id @default(cuid())
+  categoryId    String?
+  name          String
+  brand         String?
+  contentAmount String? // "Hoeveelheid [kg of L]"
+  expiryDate    DateTime? @db.Date // eerste vervaldatum
+  colruytUrl    String?
+  quantity      Int       @default(0) // fysieke voorraad; beschikbaar = quantity - gereserveerd
+  locationShelf String?
+  locationRack  String?
+  note          String?
+  active        Boolean   @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  category UitleenFlesserkeCategory? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  lines    UitleenFlesserkeLine[]
+
+  @@index([categoryId, active])
+}
+
+model UitleenFlesserkeLine {
+  id              String @id @default(cuid())
+  reservationId   String
+  flesserkeItemId String
+
+  itemName         String // snapshot
+  quantity         Int
+  returnedQuantity Int? // ingevuld bij terugbrengen; verbruik = quantity - returnedQuantity
+
+  reservation UitleenReservation   @relation(fields: [reservationId], references: [id], onDelete: Cascade)
+  item        UitleenFlesserkeItem @relation(fields: [flesserkeItemId], references: [id], onDelete: Restrict)
+
+  @@index([reservationId])
+  @@index([flesserkeItemId])
 }
 
 // -----------------------------------------------------------------------------

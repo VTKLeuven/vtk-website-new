@@ -6,9 +6,11 @@ import { usePathname } from 'next/navigation';
 const NAV = [
   { href: '/beheer', label: 'Overzicht' },
   { href: '/beheer/aanvragen', label: 'Aanvragen' },
-  { href: '/beheer/camionette', label: 'Camionette' },
+  { href: '/beheer/vervoer', label: 'Vervoer' },
   { href: '/beheer/materiaal', label: 'Inventaris' },
+  { href: '/beheer/flesserke', label: 'Flesserke' },
   { href: '/beheer/kalender', label: 'Kalender' },
+  { href: '/beheer/instellingen', label: 'Instellingen' },
 ];
 
 export function BeheerNav() {

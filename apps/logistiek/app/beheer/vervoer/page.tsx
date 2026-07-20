@@ -1,15 +1,28 @@
-import { completeVanBookingAction, markVanPaidOfflineAction } from '@/app/actions/beheer';
-import { ConfirmActionButton } from '@/components/ui/confirm-action-button';
 import { VanStatusBadge } from '@/components/status-badge';
 import { requireManage } from '@/lib/session';
-import { formatDateTime, formatEuro } from '@/lib/uitleen';
-import { adminVanBookings, hasSucceededPayment, logistiekTeamMembers } from '@/lib/uitleen-server';
-import { VanDecisionForms } from './van-decision-forms';
+import { formatDateTime, formatPriceCents } from '@/lib/uitleen';
+import {
+  adminVanBookings,
+  adminVehicles,
+  hasSucceededPayment,
+  logistiekTeamMembers,
+  type AdminTransportBooking,
+} from '@/lib/uitleen-server';
+import { TransportControls } from './transport-controls';
+import { TransportDecisionForms } from './transport-decision-forms';
 
-export default async function BeheerCamionettePage() {
+export default async function BeheerVervoerPage() {
   await requireManage();
 
-  const [bookings, drivers] = await Promise.all([adminVanBookings(), logistiekTeamMembers()]);
+  const [bookings, drivers, vehicles] = await Promise.all([
+    adminVanBookings(),
+    logistiekTeamMembers(),
+    adminVehicles(),
+  ]);
+  const activeVehicleOptions = vehicles
+    .filter((v) => v.active)
+    .map((v) => ({ id: v.id, name: v.nameNl }));
+
   const open = bookings.filter((booking) => booking.status === 'REQUESTED');
   const approved = bookings.filter((booking) => booking.status === 'APPROVED');
   const rest = bookings.filter((booking) => !['REQUESTED', 'APPROVED'].includes(booking.status));
@@ -18,7 +31,7 @@ export default async function BeheerCamionettePage() {
     booking,
     children,
   }: {
-    booking: (typeof bookings)[number];
+    booking: AdminTransportBooking;
     children?: React.ReactNode;
   }) {
     const paid = hasSucceededPayment(booking.payments) || booking.paidOfflineAt !== null;
@@ -26,13 +39,16 @@ export default async function BeheerCamionettePage() {
       <li className="rounded-[16px] border border-vtk-navy/10 bg-vtk-surface p-5">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="min-w-0 flex-1">
-            <p className="font-medium text-vtk-ink">
+            <p className="flex flex-wrap items-center gap-2 font-medium text-vtk-ink">
+              <span className="rounded-full bg-vtk-paper-2 px-2.5 py-0.5 text-xs font-semibold text-vtk-navy">
+                {booking.vehicle.nameNl}
+              </span>
               {booking.user.name}
-              <span className="ml-2 text-sm font-normal text-vtk-muted">{booking.purpose}</span>
+              <span className="text-sm font-normal text-vtk-muted">{booking.purpose}</span>
             </p>
             <p className="mt-0.5 text-sm text-vtk-muted">
               {formatDateTime(booking.startAt)} tot {formatDateTime(booking.endAt)} ·{' '}
-              {formatEuro(booking.priceCents)}
+              {formatPriceCents(booking.priceCents)}
               {booking.driver ? ` · chauffeur: ${booking.driver.name}` : ' · nog geen chauffeur'}
               {booking.paymentMode ? (paid ? ' · betaald' : ' · nog niet betaald') : ''}
             </p>
@@ -41,9 +57,10 @@ export default async function BeheerCamionettePage() {
                 {[booking.pickupAddress, booking.destination].filter(Boolean).join(' → ')}
               </p>
             ) : null}
-            {booking.memberNote ? (
-              <p className="mt-1 text-sm text-vtk-body">{booking.memberNote}</p>
+            {booking.helpersNote ? (
+              <p className="mt-0.5 text-sm text-vtk-muted">Bijrijders: {booking.helpersNote}</p>
             ) : null}
+            {booking.memberNote ? <p className="mt-1 text-sm text-vtk-body">{booking.memberNote}</p> : null}
           </div>
           <VanStatusBadge status={booking.status} />
         </div>
@@ -55,9 +72,7 @@ export default async function BeheerCamionettePage() {
   return (
     <div className="grid gap-8">
       <section>
-        <h2 className="text-lg font-semibold tracking-tight text-vtk-ink">
-          Te beslissen ({open.length})
-        </h2>
+        <h2 className="text-lg font-semibold tracking-tight text-vtk-ink">Te beslissen ({open.length})</h2>
         {open.length === 0 ? (
           <p className="mt-3 text-sm text-vtk-muted">Geen open ritaanvragen.</p>
         ) : (
@@ -65,7 +80,11 @@ export default async function BeheerCamionettePage() {
             {open.map((booking) => (
               <BookingCard key={booking.id} booking={booking}>
                 <div className="mt-4">
-                  <VanDecisionForms bookingId={booking.id} drivers={drivers} />
+                  <TransportDecisionForms
+                    bookingId={booking.id}
+                    drivers={drivers}
+                    pricingIsPerKm={booking.pricingMode === 'PER_KM'}
+                  />
                 </div>
               </BookingCard>
             ))}
@@ -74,9 +93,7 @@ export default async function BeheerCamionettePage() {
       </section>
 
       <section>
-        <h2 className="text-lg font-semibold tracking-tight text-vtk-ink">
-          Goedgekeurd ({approved.length})
-        </h2>
+        <h2 className="text-lg font-semibold tracking-tight text-vtk-ink">Goedgekeurd ({approved.length})</h2>
         {approved.length === 0 ? (
           <p className="mt-3 text-sm text-vtk-muted">Geen goedgekeurde ritten.</p>
         ) : (
@@ -85,24 +102,15 @@ export default async function BeheerCamionettePage() {
               const paid = hasSucceededPayment(booking.payments) || booking.paidOfflineAt !== null;
               return (
                 <BookingCard key={booking.id} booking={booking}>
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    {!paid ? (
-                      <ConfirmActionButton
-                        label="Markeer als betaald"
-                        successMessage="Gemarkeerd als betaald."
-                        action={markVanPaidOfflineAction.bind(null, booking.id)}
-                        dialogTitle="Betaling registreren?"
-                        dialogDescription={`Je bevestigt dat ${formatEuro(booking.priceCents)} betaald is (cash of Payconiq).`}
-                      />
-                    ) : null}
-                    <ConfirmActionButton
-                      label="Rit afgerond"
-                      successMessage="Rit afgerond."
-                      action={completeVanBookingAction.bind(null, booking.id)}
-                      confirm={false}
-                      variant="primary"
-                    />
-                  </div>
+                  <TransportControls
+                    bookingId={booking.id}
+                    vehicleId={booking.vehicleId}
+                    driverId={booking.driverId}
+                    pricingMode={booking.pricingMode}
+                    paid={paid}
+                    drivers={drivers}
+                    vehicles={activeVehicleOptions}
+                  />
                 </BookingCard>
               );
             })}

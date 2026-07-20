@@ -36,9 +36,14 @@ export async function SiteHeader() {
           <Link href="/materiaal" className="transition hover:text-white">
             {t.navMaterial}
           </Link>
-          <Link href="/camionette" className="transition hover:text-white">
+          <Link href="/vervoer" className="transition hover:text-white">
             {t.navVan}
           </Link>
+          {session && session.groups.length > 0 ? (
+            <Link href="/flesserke" className="transition hover:text-white">
+              {t.navFlesserke}
+            </Link>
+          ) : null}
           {session ? (
             <Link href="/reservaties" className="transition hover:text-white">
               {t.navReservations}

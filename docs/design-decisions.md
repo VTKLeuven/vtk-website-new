@@ -433,3 +433,53 @@ een eigen account-overzicht. Technische kaart: `docs/uitleendienst.md`.
   casing zodat ze niemand doorliet) is vervangen: **elk ingelogd lid** mag
   aanvragen, beheer hangt aan de permissie `logistiek.manage` (rol "logistiek",
   toegekend aan de post LOGISTIEK).
+
+### Uitleendienst v2 (events, vervoer, sets, flesserke)
+
+De uitleendienst kreeg een grondige uitbreiding op basis van de "How to logi" en
+feedback van de groepscoordinator. De onderliggende werking:
+
+- **Aanvragen zijn event-centrisch en dragen een aanvragertype** (INTERN eigen
+  post / WERKGROEP / EXTERN), de drie kanalen uit de Logi-werking met elk een
+  eigen behandelaar. Het beheer filtert de wachtrij op dat type.
+- **Het aanvragertype wordt automatisch uit de login afgeleid; het lid kiest het
+  nooit zelf.** Een praesidiumlid (in een post) vraagt aan als INTERN namens die
+  post; wie geen post heeft, is EXTERN met de eigen naam. De server dwingt dit af
+  en negeert wat de client meestuurt (niet te vervalsen). Enkel wanneer een lid
+  in meerdere posten zit, kiest het nog *welke* post (geen type). Werkgroepen
+  zitten niet in de DB en worden dus niet automatisch afgeleid; in het beheer kan
+  het team het type wel manueel zetten (het is daar zichtbaar en duidelijk).
+- **Flesserke is een aparte tab**, enkel zichtbaar en bruikbaar voor het
+  praesidium (leden met een post). Het is een eigen aanvraagflow (aparte
+  reservatie met enkel flesserke-lijnen), los van materiaal. Materiaal- en
+  flesserke-aanvragen hebben elk hun eigen create/edit-actie zodat een bewerking
+  van de ene de lijnen van de andere nooit overschrijft.
+- **Bewerken.** Een lid bewerkt zolang de aanvraag `REQUESTED` is; daarna
+  annuleert het of contacteert het team. Het team mag ook een `APPROVED` aanvraag
+  bewerken: die save loopt in dezelfde Serializable-transactie als het goedkeuren
+  en hercheckt de voorraad, zodat een goedgekeurde aanvraag altijd door voorraad
+  gedekt blijft.
+- **Vervoer i.p.v. camionette.** Kar, auto en bakfiets zijn DB-rijen
+  (`UitleenVehicle`), geen enum, want de tarieven zijn **team-configureerbaar**
+  (gratis / per uur / per km / vast) via het instellingenscherm. De kar rekent
+  standaard per kilometer; die prijs is pas gekend na de rit, dus `priceCents` is
+  nullable en het team voert de kilometers in bij het afronden. De **chauffeur
+  wordt pas het weekend voor de rit toegewezen**, dus is optioneel bij
+  goedkeuring. Materiaal rekent standaard enkel waarborg aan; een instelling
+  (`logistiek.showRentPrices`, default uit) toont huurprijzen wanneer nodig.
+- **Sets** zijn gewone catalogusitems met een beschrijvende inhoudslijst
+  (`UitleenSetContent`). De inhoud koppelt bewust niet aan andere items, zodat de
+  voorraad niet dubbel geteld wordt; de set heeft zijn eigen fysieke voorraad.
+- **Flesserke** (voeding/drank/huishoud) is verbruiksstock in een **aparte tab,
+  enkel voor het praesidium** (server-side afgedwongen). Een flesserke-aanvraag is
+  een eigen reservatie met enkel flesserke-lijnen. Beschikbaar wordt altijd
+  berekend (voorraad min status-gebaseerd gereserveerd), nooit opgeslagen. Bij het
+  terugbrengen voert het team per lijn in hoeveel er gesloten terugkomt; het
+  verschil is verbruik en wordt afgeboekt. "Stock moet kloppen" is hier de harde
+  eis, dus alle voorraadmutaties gebeuren in een transactie.
+- **Foto-serving via een eigen `/api/media`-proxy** (same-origin), niet via
+  directe bucket-URL's, net als op de hoofdsite. De S3-config wordt gedeeld met de
+  web-admin via de `Setting`-tabel.
+- **NL-only DB-inhoud**; de UI-chrome is NL/EN via een eigen cookie-copysysteem.
+- De import van de bestaande "Inventaris Loods.xlsx" is eenmalig en idempotent;
+  ze deletet nooit, zodat een herimport na een sheet-correctie veilig is.

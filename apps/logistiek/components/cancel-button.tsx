@@ -12,11 +12,13 @@ export function CancelButton({
   dialogTitle,
   dialogDescription,
   action,
+  locale = 'nl',
 }: {
   label: string;
   dialogTitle: string;
   dialogDescription: string;
   action: () => Promise<ActionResult>;
+  locale?: 'nl' | 'en';
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -50,8 +52,8 @@ export function CancelButton({
         open={open}
         title={dialogTitle}
         description={dialogDescription}
-        confirmLabel="Ja, annuleren"
-        cancelLabel="Terug"
+        confirmLabel={locale === 'en' ? 'Yes, cancel' : 'Ja, annuleren'}
+        cancelLabel={locale === 'en' ? 'Back' : 'Terug'}
         pending={pending}
         onConfirm={confirm}
         onCancel={() => setOpen(false)}

@@ -1442,6 +1442,37 @@ async function main() {
     await prisma.theokotProduct.upsert({ where: { id }, update: {}, create: { id, ...data } });
   }
 
+  console.log("Seeding uitleendienst vehicles...");
+  // De drie voertuigen van de transportdienst. Tarieven zijn team-configureerbaar
+  // via het beheer; de seed zet enkel een redelijk startpunt. Create-only zodat
+  // een reseed door het team ingestelde tarieven niet terugdraait.
+  const uitleenVehicles: Array<{
+    code: string;
+    nameNl: string;
+    nameEn: string;
+    pricingMode: "FREE" | "PER_HOUR" | "PER_KM" | "FLAT";
+    rateCents: number;
+  }> = [
+    { code: "kar", nameNl: "Kar", nameEn: "Trailer", pricingMode: "FREE", rateCents: 0 },
+    { code: "auto", nameNl: "Auto", nameEn: "Car", pricingMode: "PER_KM", rateCents: 35 },
+    { code: "bakfiets", nameNl: "Bakfiets", nameEn: "Cargo bike", pricingMode: "FREE", rateCents: 0 },
+  ];
+  for (let i = 0; i < uitleenVehicles.length; i += 1) {
+    const v = uitleenVehicles[i];
+    await prisma.uitleenVehicle.upsert({
+      where: { code: v.code },
+      update: {},
+      create: {
+        code: v.code,
+        nameNl: v.nameNl,
+        nameEn: v.nameEn,
+        pricingMode: v.pricingMode,
+        rateCents: v.rateCents,
+        sortIndex: i,
+      },
+    });
+  }
+
   console.log("Seed complete.");
 }
 

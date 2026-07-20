@@ -65,14 +65,6 @@ export default async function LogistiekHome() {
             <p className="logistics-hero-sub">
               {t.homeLead}
             </p>
-            <div className="mt-8 flex flex-wrap gap-3">
-              <Link href="/materiaal" className="logistics-hero-button logistics-hero-button-primary">
-                {t.homeMaterialCta} <span aria-hidden>→</span>
-              </Link>
-              <Link href="/camionette" className="logistics-hero-button logistics-hero-button-secondary">
-                {t.homeVanCta}
-              </Link>
-            </div>
           </div>
 
           <aside className="logistics-hero-panel" aria-label="Zo werkt de uitleendienst">
@@ -109,7 +101,7 @@ export default async function LogistiekHome() {
           index="01"
         />
         <CtaCard
-          href="/camionette"
+          href="/vervoer"
           title={t.homeVan}
           description={t.homeVanLead}
           cta={t.homeVanCta}
