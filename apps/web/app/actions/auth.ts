@@ -12,9 +12,15 @@ const loginSchema = z.object({
   email: z.string().email(),
   password: z.string().min(1),
   next: z.string().optional(),
+  hardRedirect: z.boolean(),
 });
 
-export type LoginState = { error?: string } | undefined;
+/**
+ * `redirectTo` wordt gezet in plaats van te redirecten wanneer de bestemming
+ * geen pagina is maar het OAuth-authorize-endpoint; de client navigeert er dan
+ * zelf hard naartoe. Zie `hardRedirect` in LoginForm.
+ */
+export type LoginState = { error?: string; redirectTo?: string } | undefined;
 
 export async function loginAction(_prev: LoginState, formData: FormData): Promise<LoginState> {
   const parsed = loginSchema.safeParse({
@@ -23,6 +29,7 @@ export async function loginAction(_prev: LoginState, formData: FormData): Promis
       .toLowerCase(),
     password: String(formData.get('password') || ''),
     next: (formData.get('next') as string | null) ?? undefined,
+    hardRedirect: formData.get('hardRedirect') === '1',
   });
   if (!parsed.success) {
     return { error: 'Invalid input' };
@@ -46,9 +53,13 @@ export async function loginAction(_prev: LoginState, formData: FormData): Promis
   }
 
   const next =
-    parsed.data.next && parsed.data.next.startsWith('/') && !parsed.data.next.startsWith('//')
-      ? parsed.data.next
-      : '/';
+    parsed.data.next && parsed.data.next.startsWith('/') && !parsed.data.next.startsWith('//') ? parsed.data.next : '/';
+
+  // Het authorize-endpoint is een route handler, geen pagina: daar kan de App
+  // Router niet client-side naartoe navigeren. Geef de URL terug en laat de
+  // browser hem echt volgen, zodat de OAuth-redirectketen intact blijft.
+  if (parsed.data.hardRedirect) return { redirectTo: next };
+
   redirect(next);
 }
 

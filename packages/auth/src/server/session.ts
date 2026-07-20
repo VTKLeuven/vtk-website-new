@@ -93,6 +93,12 @@ export async function getSession(headers: Headers): Promise<SessionPayload | nul
  * check if a user has the correct permissions from the headers (with simple cache as to limit the amount of DB hits)
  *
  * Only use this function in non react/nextjs methods => in those case use reacts native cache() function
+ *
+ * De cache raakt vandaag nooit: de enige oproeper is `hasSSOPrivileges`, en de
+ * plugin roept die precies één keer per client-mutatie aan. Ze blijft staan
+ * voor wanneer één request wél twee checks doet. Let dan op: de WeakMap hangt
+ * aan de identiteit van het `Headers`-object, dus verifieer eerst met een
+ * teller dat Next dat object hergebruikt.
  */
 export async function hasPermission(headers: Headers, permission: Permission): Promise<boolean> {
   if (!sessionCache.has(headers)) sessionCache.set(headers, getSession(headers));

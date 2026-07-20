@@ -15,6 +15,7 @@ import { hasSSOPrivileges } from './server/sso';
 
 import { hashPassword, verifyPassword } from './logins/password';
 import { kulOAuthConfig, KUL_PROVIDER_ID } from './logins/kul';
+import { AUTH_BASE_PATH } from './index';
 
 const isProduction = process.env.NODE_ENV === 'production';
 
@@ -23,7 +24,7 @@ const kulConfig = kulOAuthConfig();
 export const auth = betterAuth({
   appName: 'VTK',
   baseURL: process.env.BETTER_AUTH_URL,
-  basePath: '/api/auth/better',
+  basePath: AUTH_BASE_PATH,
   secret: process.env.BETTER_AUTH_SECRET,
   trustedOrigins: isProduction ? ['https://*.vtk.be'] : ['http://localhost:3000', 'http://localhost:3001'],
 
@@ -37,11 +38,36 @@ export const auth = betterAuth({
     ...(kulConfig ? [genericOAuth({ config: [kulConfig] })] : []),
     jwt({ disableSettingJwtHeader: true }),
     oauthProvider({
-      loginPage: '/sign-in', //TODO juiste link
-      consentPage: '/consent', //TODO juiste link
+      // Padden zonder locale-prefix: de proxy herschrijft die naar /nl, zodat
+      // de Nederlandse URL's schoon blijven. De plugin plakt de ondertekende
+      // autorisatie-query erachter; die query draagt de volledige flowstatus.
+      loginPage: '/inloggen',
+      consentPage: '/inloggen/consent',
+      // Bewust alles-of-niets: binnen IT heeft iedereen dezelfde rechten, dus
+      // een map per action zou een verschil suggereren dat niet bestaat.
       clientPrivileges: async ({ action, headers, user, session }) => {
         return hasSSOPrivileges(headers); // alle actions zijn enkel toegankelijk voor admins (IT en G5)
       },
+
+      // Herkenbaar voor secret scanners. De prefix wordt niet mee opgeslagen,
+      // dus dit moet vastliggen vóór de eerste echte client: achteraf toevoegen
+      // maakt elke bestaande token ongeldig.
+      prefix: {
+        opaqueAccessToken: 'vtk_at_',
+        refreshToken: 'vtk_rt_',
+        clientSecret: 'vtk_cs_',
+      },
+
+      // Optioneel: zonder deze env-var adverteert discovery enkel
+      // subject_type "public" en kan geen client op "pairwise" staan. De
+      // plugin eist minstens 32 tekens en gooit anders bij het opbouwen van
+      // `auth`. Behandel de waarde als BETTER_AUTH_SECRET: raakt ze kwijt, dan
+      // breekt in één klap elke accountkoppeling van elke pairwise client.
+      pairwiseSecret: process.env.OAUTH_PAIRWISE_SECRET,
+      // De issuer draagt een pad, dus hoort discovery onder basePath en niet op
+      // de host-root; de plugin serveert dat al. Enkel de RFC 8414-variant valt
+      // buiten de /api/auth-catch-all, en die rewrite de proxy. Zie 16.3.
+      silenceWarnings: { oauthAuthServerConfig: true },
     }),
     nextCookies(),
   ],

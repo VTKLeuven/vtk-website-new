@@ -36,3 +36,22 @@ export async function signOut(headers: Headers) {
     headers,
   });
 }
+
+/**
+ * Verwerkt de keuze van het lid op het toestemmingsscherm. `oauth_query` moet
+ * de ondertekende autorisatie-query zijn zoals ze binnenkwam; een ontbrekende
+ * ondertekende parameter geeft `invalid_signature`. Geeft de URL terug waar de
+ * browser naartoe moet.
+ */
+export async function oauthConsent(
+  headers: Headers,
+  body: { accept: boolean; scope?: string; oauth_query: string }
+): Promise<{ url: string }> {
+  const result = await auth.api.oauth2Consent({ headers, body });
+
+  // De plugin zet zelf `accept: application/json`, dus komt de bestemming als
+  // waarde terug in plaats van als een echte 302.
+  const url = (result as { redirect?: boolean; url?: string })?.url;
+  if (!url) throw new Error('oauth2Consent gaf geen redirect-URL terug');
+  return { url };
+}

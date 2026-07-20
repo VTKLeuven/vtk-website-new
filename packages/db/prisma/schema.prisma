@@ -1457,7 +1457,7 @@ model OauthClient {
 
 model OauthRefreshToken {
   id                String             @id
-  token             String
+  token             String             @unique
   client            OauthClient        @relation(fields: [clientId], references: [clientId])
   clientId          String
   session           Session?           @relation(fields: [sessionId], references: [id])
@@ -1472,6 +1472,13 @@ model OauthRefreshToken {
   expiresAt         DateTime           @db.Timestamptz(3)
   oauthAccessTokens OauthAccessToken[]
 
+  // De plugin declareert deze indexen wel, de Prisma-modellen droegen ze niet.
+  // Ze bedienen de hete paden: token-uitwisseling zoekt op clientId/userId, en
+  // de opkuis van verlopen tokens scant op expiresAt.
+  @@index([clientId])
+  @@index([userId])
+  @@index([sessionId])
+  @@index([expiresAt])
   @@map("oauthRefreshToken")
 }
 
@@ -1491,6 +1498,11 @@ model OauthAccessToken {
   createdAt   DateTime           @db.Timestamptz(3)
   expiresAt   DateTime           @db.Timestamptz(3)
 
+  @@index([clientId])
+  @@index([userId])
+  @@index([sessionId])
+  @@index([refreshId])
+  @@index([expiresAt])
   @@map("oauthAccessToken")
 }
 
@@ -1505,5 +1517,12 @@ model OauthConsent {
   createdAt   DateTime    @db.Timestamptz(3)
   updatedAt   DateTime    @db.Timestamptz(3)
 
+  // De uniciteit van een toestemming (clientId, userId, referenceId) staat NIET
+  // hier maar als expressie-index in de migratie: Postgres beschouwt NULL's als
+  // onderling verschillend, dus een gewone @@unique zou net het courante geval
+  // (referenceId IS NULL) ongemoeid laten en duplicaten toelaten. De migratie
+  // gebruikt COALESCE("referenceId",'').
+  @@index([clientId])
+  @@index([userId])
   @@map("oauthConsent")
 }
