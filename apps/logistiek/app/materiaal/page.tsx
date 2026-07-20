@@ -3,6 +3,7 @@ import { PageShell } from '@/components/page-shell';
 import { getSession } from '@/lib/session';
 import { getCatalog, getLogistiekSettings } from '@/lib/uitleen-server';
 import { copy, getLocale } from '@/lib/i18n';
+import { getPublicCopy } from '@/lib/public-copy';
 import { MaterialRequestForm } from './request-form';
 
 export default async function MateriaalPage() {
@@ -12,16 +13,16 @@ export default async function MateriaalPage() {
     return <LoginGate variant="material" />;
   }
 
-  const [catalog, settings] = await Promise.all([getCatalog(), getLogistiekSettings()]);
+  const [catalog, settings, content] = await Promise.all([
+    getCatalog(),
+    getLogistiekSettings(),
+    getPublicCopy(locale),
+  ]);
 
   return (
     <PageShell
-      title={
-        <>
-          {t.pageMaterialTitle} <em className="font-serif font-normal italic text-vtk-navy">{t.pageMaterialAccent}</em>
-        </>
-      }
-      intro={t.pageMaterialLead}
+      title={t.pageMaterialTitle}
+      intro={content.pageMaterialLead}
     >
       {catalog.length === 0 ? (
         <p className="rounded-[18px] border border-vtk-navy/10 bg-vtk-surface p-7 text-vtk-body">

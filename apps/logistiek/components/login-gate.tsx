@@ -1,6 +1,7 @@
 import Image from 'next/image';
 import Link from 'next/link';
 import { copy, getLocale } from '@/lib/i18n';
+import { getPublicCopy } from '@/lib/public-copy';
 
 const MAIN_URL = process.env.VTK_MAIN_URL || 'https://vtk.be';
 
@@ -32,7 +33,10 @@ const VARIANT_KEY = {
 export async function LoginGate({ variant = 'default' }: { variant?: LoginVariant }) {
   const locale = await getLocale();
   const t = copy[locale];
-  const message = t[VARIANT_KEY[variant]];
+  // Specifieke context-boodschap per variant; de generieke 'default' komt uit de
+  // beheerbare copy (getPublicCopy), zodat het team de openingszin kan aanpassen.
+  const content = await getPublicCopy(locale);
+  const message = variant === 'default' ? content.loginLead : t[VARIANT_KEY[variant]];
   return (
     <main className="logistics-auth mx-auto grid w-full flex-1 place-items-center px-5 py-12">
       <section className="logistics-auth-panel w-full max-w-xl">

@@ -13,12 +13,12 @@ export function LanguageSwitcher({ locale }: { locale: LogistiekLocale }) {
   }
 
   return (
-    <div className="flex items-center gap-2 text-sm" aria-label="Language">
-      <button type="button" onClick={() => change('nl')} className={locale === 'nl' ? 'cursor-pointer font-semibold text-white' : 'cursor-pointer text-white/55 transition hover:text-white'} aria-pressed={locale === 'nl'}>
+    <div className="lang-toggle" role="group" aria-label="Taal / Language">
+      <button type="button" onClick={() => change('nl')} aria-pressed={locale === 'nl'}>
         NL
       </button>
-      <span className="text-white/35" aria-hidden>/</span>
-      <button type="button" onClick={() => change('en')} className={locale === 'en' ? 'cursor-pointer font-semibold text-white' : 'cursor-pointer text-white/55 transition hover:text-white'} aria-pressed={locale === 'en'}>
+      <span className="lang-sep" aria-hidden>/</span>
+      <button type="button" onClick={() => change('en')} aria-pressed={locale === 'en'}>
         EN
       </button>
     </div>

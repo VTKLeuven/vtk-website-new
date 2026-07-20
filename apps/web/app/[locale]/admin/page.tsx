@@ -7,6 +7,7 @@ import { hasPermission } from "@vtk/auth";
 import { Card } from "@vtk/ui";
 import { mergeTiles } from "@/lib/dashboard-tiles";
 import { DashboardTiles } from "./DashboardTiles";
+import { DoorOpenButton } from "./DoorOpenButton";
 
 export default async function AdminDashboard({
   params,
@@ -70,6 +71,7 @@ export default async function AdminDashboard({
   );
 
   const canManage = hasPermission(session, "dashboard.manage");
+  const canOpenDoor = hasPermission(session, "door.remoteOpen");
 
   return (
     <div className="space-y-6">
@@ -79,6 +81,8 @@ export default async function AdminDashboard({
           {locale === "nl" ? "Welkom" : "Welcome"}, {session.user.name}.
         </p>
       </header>
+
+      {canOpenDoor && <DoorOpenButton locale={locale} />}
 
       <DashboardTiles
         tiles={tiles}

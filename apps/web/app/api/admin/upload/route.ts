@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import sharp from "sharp";
+import { prisma } from "@vtk/db";
 import { newStorageKey, putObject } from "@vtk/storage";
 import { publicUrl } from "@/lib/storage";
 import { requireSession } from "@/lib/session";
@@ -7,23 +8,38 @@ import { hasPermission } from "@vtk/auth";
 
 export async function POST(request: Request) {
   const session = await requireSession();
-  if (
-    !session.user.isSuperAdmin &&
-    !hasPermission(session, "pages.edit") &&
-    !hasPermission(session, "pages.editAll") &&
-    !hasPermission(session, "pages.manage") &&
-    !hasPermission(session, "photos.upload") &&
-    !hasPermission(session, "home.edit") &&
-    !hasPermission(session, "partners.manage") &&
-    !hasPermission(session, "calendar.create") &&
-    !hasPermission(session, "calendar.manageAll")
-  ) {
-    return NextResponse.json({ error: "forbidden" }, { status: 403 });
-  }
-
   const form = await request.formData();
   const file = form.get("file");
   const kind = (form.get("kind") as string) || "file";
+  const canUpload =
+    session.user.isSuperAdmin ||
+    hasPermission(session, "pages.edit") ||
+    hasPermission(session, "pages.editAll") ||
+    hasPermission(session, "pages.manage") ||
+    hasPermission(session, "photos.upload") ||
+    hasPermission(session, "home.edit") ||
+    hasPermission(session, "partners.manage") ||
+    hasPermission(session, "calendar.create") ||
+    hasPermission(session, "calendar.manageAll") ||
+    hasPermission(session, "werkgroepen.manage");
+
+  // Een gewoon werkgroeplid mag afbeeldingen invoegen in de eigen infotekst.
+  // Beperk die extra toegang tot image-uploads. Andere bestandstypes blijven
+  // achter de bestaande uploadpermissies zitten.
+  const werkgroepMember =
+    !canUpload && kind === "image" && session.groups.length > 0
+      ? await prisma.group.findFirst({
+          where: {
+            id: { in: session.groups.map((group) => group.id) },
+            type: "WERKGROEP",
+          },
+          select: { id: true },
+        })
+      : null;
+
+  if (!canUpload && !werkgroepMember) {
+    return NextResponse.json({ error: "forbidden" }, { status: 403 });
+  }
 
   if (!(file instanceof File)) {
     return NextResponse.json({ error: "no_file" }, { status: 400 });

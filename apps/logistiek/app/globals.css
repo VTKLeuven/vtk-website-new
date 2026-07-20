@@ -23,7 +23,6 @@
   --color-vtk-body: #34405e;
   --color-vtk-muted: #5c667f;
   --font-sans: var(--font-vtk-sans), ui-sans-serif, system-ui, sans-serif;
-  --font-serif: var(--font-vtk-serif), Georgia, serif;
 }
 
 html,
@@ -33,6 +32,7 @@ body {
 }
 
 :root {
+  --vtk-header-height: 73px;
   --ink: #0a0f1f;
   --navy: #0e1a36;
   --paper: #eff2f8;
@@ -44,6 +44,208 @@ body {
   --muted: #5c667f;
   --body: #34405e;
   --on-dark-muted: #b7c0dc;
+}
+
+/* De uitleendienst gebruikt dezelfde vaste headerstructuur als vtk.be. Enkel
+   de navigatie-inhoud verschilt per applicatie. */
+.vtk-site-header {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  background: var(--navy);
+  color: var(--paper);
+  font-family: var(--font-vtk-sans), ui-sans-serif, system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+.vtk-site-header .nav-inner {
+  display: flex;
+  min-height: 72px;
+  max-width: 1320px;
+  align-items: center;
+  gap: clamp(18px, 3vw, 46px);
+  margin: 0 auto;
+  padding: 0 clamp(20px, 3vw, 36px);
+}
+
+.vtk-site-header .brand {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  color: var(--paper);
+  text-decoration: none;
+}
+
+.vtk-site-header .brand-logo-img {
+  display: block;
+  width: auto;
+  max-width: min(190px, 36vw);
+  height: 38px;
+  object-fit: contain;
+  object-position: left center;
+}
+
+.vtk-site-header .nav-links-shell {
+  position: relative;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.vtk-site-header .nav-links {
+  display: flex;
+  width: 100%;
+  min-width: 0;
+  flex: none;
+  align-items: center;
+  gap: clamp(16px, 2vw, 30px);
+  overflow-x: auto;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+
+.vtk-site-header .nav-links::-webkit-scrollbar {
+  display: none;
+}
+
+.vtk-site-header .nav-links a {
+  color: rgba(250, 250, 247, 0.78);
+  font-size: 14px;
+  font-weight: 500;
+  text-decoration: none;
+  white-space: nowrap;
+  transition: color 160ms ease;
+}
+
+.vtk-site-header .nav-links a:hover {
+  color: #fff;
+}
+
+.vtk-site-header .nav-right {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 10px;
+  margin-left: auto;
+}
+
+.vtk-site-header .lang-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  color: rgba(250, 250, 247, 0.72);
+  font-size: 13px;
+}
+
+.vtk-site-header .lang-toggle button {
+  padding: 4px;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.vtk-site-header .lang-toggle button[aria-pressed="true"] {
+  color: #fff;
+  font-weight: 600;
+}
+
+.vtk-site-header .lang-sep {
+  color: rgba(250, 250, 247, 0.4);
+}
+
+.vtk-site-header .profile-menu-trigger,
+.vtk-site-header .nav-login {
+  display: inline-grid;
+  width: 38px;
+  min-width: 38px;
+  height: 38px;
+  place-items: center;
+  border: 1px solid rgba(250, 250, 247, 0.34);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.12);
+  color: var(--paper);
+  font-weight: 600;
+  text-decoration: none;
+  transition: background 160ms ease, border-color 160ms ease;
+}
+
+.vtk-site-header .profile-menu-trigger:hover,
+.vtk-site-header .nav-login:hover {
+  border-color: var(--paper);
+  background: rgba(255, 255, 255, 0.22);
+}
+
+.vtk-site-header .profile-menu-root {
+  position: relative;
+}
+
+.vtk-site-header .profile-menu {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  z-index: 60;
+  min-width: 180px;
+  margin-top: 8px;
+  padding: 6px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--surface);
+  box-shadow: 0 18px 42px rgba(10, 15, 31, 0.12);
+}
+
+.vtk-site-header .profile-menu-item {
+  display: block;
+  width: 100%;
+  padding: 9px 10px;
+  border-radius: 10px;
+  color: var(--ink);
+  font-size: 14px;
+  text-align: left;
+  text-decoration: none;
+}
+
+.vtk-site-header .profile-menu-item:hover,
+.vtk-site-header .profile-menu-item:focus-visible {
+  background: var(--paper-2);
+  outline: none;
+}
+
+@media (max-width: 720px) {
+  :root {
+    --vtk-header-height: 112px;
+  }
+
+  .vtk-site-header .nav-inner {
+    min-height: 64px;
+    flex-wrap: wrap;
+    gap: 14px;
+    padding-top: 12px;
+  }
+
+  .vtk-site-header .nav-links-shell {
+    order: 3;
+    width: 100%;
+    flex-basis: 100%;
+  }
+
+  .vtk-site-header .nav-links {
+    padding: 0 0 9px;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(250, 250, 247, 0.4) transparent;
+  }
+
+  .vtk-site-header .nav-links::-webkit-scrollbar {
+    display: block;
+    height: 3px;
+  }
+
+  .vtk-site-header .nav-links::-webkit-scrollbar-thumb {
+    border-radius: 2px;
+    background: rgba(250, 250, 247, 0.4);
+  }
 }
 
 /* Navy band met het technisch patroon, zelfde recept als de banden op de
@@ -109,8 +311,6 @@ body {
     url('/hero-arenberg.jpg') center 46% / cover no-repeat;
 }
 
-.logistics-home-hero::after,
-.logistics-page-hero::after,
 .logistics-info-band::after {
   content: '';
   position: absolute;
@@ -153,13 +353,6 @@ body {
   letter-spacing: -0.045em;
   line-height: 0.98;
   text-shadow: 0 1px 30px rgba(10, 15, 31, 0.45);
-}
-
-.logistics-home-hero h1 em {
-  color: var(--yellow);
-  font-family: var(--font-vtk-serif), Georgia, serif;
-  font-style: italic;
-  font-weight: 400;
 }
 
 .logistics-hero-sub {

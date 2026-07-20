@@ -143,6 +143,59 @@ halen ze af aan de balie en betalen daar. Post **Theokot** beheert het systeem.
 
 ---
 
+## Deurtoegang (kaartscanner op de deur)
+
+Aan de deur hangt dezelfde KU Leuven-kaartlezer als aan de Theokot-balie, maar dan
+gekoppeld aan een Raspberry Pi die een elektrische lock bedient. De scan wordt
+server-side geverifieerd (`verifyStudentCard` → r-nummer → `User`), net als bij de
+balie; de Pi stuurt enkel de ruwe scan door. Website-kant: `apps/web/app/api/door/*`
+en `apps/web/lib/door-*.ts`; Pi-kant: `infra/door/`.
+
+### Drie aparte rechten (bewust gescheiden)
+
+- **`door.open`** — mag de deur openen met zijn studentenkaart. Dit ken je toe aan
+  rollen in `/admin/roles`, zodat "wie geraakt binnen" gewoon werkingsjaar-gescoped
+  meeloopt met de rollen/posten (reset dus mee op 15 juli, zoals alle rechten).
+- **`door.remoteOpen`** — toont de "deur openen"-knop op het admin-dashboard.
+  **Bewust los van `door.open`:** wie met zijn kaart binnen mag, hoeft daarom nog
+  niet de deur voor anderen te kunnen openen vanop afstand. Dit is de kleinere,
+  bewustere groep (bv. praesidium/onthaal).
+- **`door.manage`** — de `/admin/deur`-tab: tijdelijke toegang geven, de
+  gebruiksstatistiek en de log bekijken.
+
+### Tijdelijke toegang los van de rollen
+
+Naast `door.open` kan een `door.manage`-houder iemand **tijdelijke** toegang geven met
+een start/eind-venster (`DoorAccessGrant`). Bedoeld voor gasten, externen of
+kortlopende uitzonderingen waarvoor je geen rol wil aanmaken. `userMayOpenDoor` =
+`door.open` **OF** een lopende grant. Verlopen grants blijven staan als historiek maar
+tellen niet meer mee, en verdwijnen uit de beheerlijst.
+
+### Alles wordt gelogd, ook wat weigerde
+
+Elke deurgebeurtenis is één `DoorAccessLog`-rij: toegelaten én geweigerde kaarten,
+onbekende kaarten (geverifieerd maar niet aan een gebruiker gekoppeld), fouten, en
+remote-opens. Zo zie je in `/admin/deur` niet enkel wie binnenging, maar ook of er
+kaarten geweigerd werden (bv. iemand zonder toegang die het toch probeert).
+
+### Offline blijft de deur werken
+
+De deur mag niet vastlopen als het internet of de site wegvalt. De Pi houdt daarom een
+**offline-cache** (per kaart, TTL) en beslist daarop wanneer de site onbereikbaar is;
+geweigerde/onbekende scans tijdens een outage worden lokaal gebufferd en naar de site
+geflusht zodra ze terug bereikbaar is (die rijen dragen `offline = true`).
+
+### Remote-open gaat rechtstreeks over Tailscale
+
+De server en de Pi zitten op hetzelfde tailnet. De dashboardknop laat de **server de Pi
+rechtstreeks aanroepen** (`POST /open` op de listener van de Pi), niet omgekeerd: geen
+polling, geen command-queue, near-instant. De vorige oplossing (een iPhone-shortcut die
+naar de server ssh'te) had merkbare vertraging. Eén gedeeld device-secret authenticeert
+beide richtingen (Pi → site en site → Pi); het staat versleuteld onder Admin → IT met
+een env-fallback.
+
+---
+
 ## Ledenregistratie & onboarding (KUL SSO)
 
 Studenten **registreren zichzelf** door voor het eerst in te loggen met KU Leuven
@@ -304,6 +357,34 @@ SSO. Concrete implementatie: hook in `packages/auth/src/auth.ts`, gate in
   (met de postnaam, leeg) toegekend aan die post zelf. **werkgroep** en **medewerker**
   bestaan als toewijsbare rollen maar hangen nog aan geen enkele post. Alles als
   `DEFAULT` (elk lid). De lege rollen vul je met rechten via `/admin/roles`.
+
+### Werkgroepen (BEST, Revue, ...)
+
+- Een **werkgroep** is technisch **dezelfde `Group`** als een post, met een
+  discriminator `Group.type` (`PRAESIDIUM` | `WERKGROEP`, default `PRAESIDIUM`).
+  Ze deelt de volledige machinerie van de posten: leden per werkingsjaar
+  (`GroupMembership`), rol-grants (`GroupRole`, DEFAULT/LEADER) en dezelfde
+  add/remove-lid-flow. De seed maakt zeven werkgroepen (BEST, Biomedix, Chemix,
+  Existenz, Mechanix, Revue, Statix), elk met een lege rol-container.
+- **Waarom een `type`-discriminator en geen apart model?** Werkgroepen "werken
+  zoals posten"; een tweede kopie van memberships + rollen + admin-UI zou pure
+  duplicatie zijn. Het verschil zit enkel in *waar* ze verschijnen.
+- **Niet op /praesidium, wel op /werkgroepen.** `/praesidium`, de admin-tab
+  "Posten" en de shift-postkeuzes filteren op `type = PRAESIDIUM`; werkgroepen
+  krijgen hun eigen publieke `/werkgroepen` (zelfde ledenraster + werkingsjaar-
+  tabjes als praesidium) en een eigen admin-tab "Werkgroepen".
+- **Eigen infotekst + website.** De werkgroep-`description*` is de blurb op
+  `/werkgroepen`; `Group.website` is een optionele link (mag zonder schema
+  ingevuld worden, wordt genormaliseerd naar `https://`). Beide staan los van de
+  naam en de rollen.
+- **Wie mag wat.** Leden en rollen beheren vraagt het aparte recht
+  `werkgroepen.manage` (los van `groups.manage`, zodat het delegeerbaar is). De
+  **infotekst + website** mag daarnaast **elk lid van díe werkgroep** zelf
+  aanpassen (huidig werkingsjaar), maar enkel van de eigen werkgroep: de
+  admin-tab toont een gewoon lid enkel zijn eigen werkgroep(en) en enkel het
+  infotekst-formulier; `saveWerkgroepInfoAction` checkt het lidmaatschap
+  server-side. Beheerders (met het recht of superadmin) zien en beheren alles.
+- **Footer** linkt naar zowel `/praesidium` als `/werkgroepen`.
 
 ### Mailinglijsten (opt-in)
 

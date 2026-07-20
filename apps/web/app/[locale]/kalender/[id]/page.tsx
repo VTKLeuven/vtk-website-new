@@ -3,6 +3,7 @@ import Image from "next/image";
 import { notFound } from "next/navigation";
 import { prisma } from "@vtk/db";
 import { pick, type Locale } from "@vtk/i18n";
+import { Markdown } from "@/components/ui/Markdown";
 import { hasLocale } from "@/lib/locale";
 import { publicUrl } from "@/lib/storage";
 
@@ -86,12 +87,17 @@ export default async function EventPage({
           <h2>
             {locale === "nl" ? "Over dit event" : "About this event"}
           </h2>
-          <p>
-            {description ||
-              (locale === "nl"
+          {description ? (
+            <div className="prose-vtk vtk-event-description">
+              <Markdown>{description}</Markdown>
+            </div>
+          ) : (
+            <p>
+              {locale === "nl"
                 ? "Meer details worden later aangevuld door de organiserende werkgroep."
-                : "More details will be added later by the organising work group.")}
-          </p>
+                : "More details will be added later by the organising work group."}
+            </p>
+          )}
           <dl className="spec">
             <dt>{locale === "nl" ? "Start" : "Start"}</dt>
             <dd>{event.start.toLocaleString(locale === "nl" ? "nl-BE" : "en-GB")}</dd>

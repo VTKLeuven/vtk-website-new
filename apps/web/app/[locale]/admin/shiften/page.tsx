@@ -171,7 +171,7 @@ export default async function AdminShifts({
   // Gedeactiveerde posten vallen weg uit de keuzes; hun historiek op oude shiften
   // blijft wel als opgeslagen tekst bestaan.
   const activeGroups = await prisma.group.findMany({
-    where: { active: true },
+    where: { active: true, type: "PRAESIDIUM" },
     orderBy: { orderInPraesidium: "asc" },
     select: { code: true },
   });

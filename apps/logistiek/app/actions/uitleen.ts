@@ -57,7 +57,7 @@ export async function createReservationAction(input: ReservationFormInput): Prom
   });
 
   revalidateMember();
-  return { ok: true, message: 'Aanvraag ingediend. Je krijgt bericht zodra Logistiek beslist.' };
+  return { ok: true, message: 'Aanvraag ingediend. Je vindt de status bij Mijn aanvragen.' };
 }
 
 /** Een lid mag zijn eigen materiaalaanvraag bewerken zolang ze nog niet beslist is. */
@@ -259,7 +259,7 @@ export async function createVanBookingAction(input: {
   });
 
   revalidateMember();
-  return { ok: true, message: 'Rit aangevraagd. Je krijgt bericht zodra Logistiek beslist.' };
+  return { ok: true, message: 'Rit aangevraagd. Je vindt de status bij Mijn aanvragen.' };
 }
 
 export async function cancelVanBookingAction(bookingId: string): Promise<ActionResult> {

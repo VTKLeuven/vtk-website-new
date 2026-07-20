@@ -10,6 +10,7 @@ const NAV = [
   { href: '/beheer/materiaal', label: 'Inventaris' },
   { href: '/beheer/flesserke', label: 'Flesserke' },
   { href: '/beheer/kalender', label: 'Kalender' },
+  { href: '/beheer/teksten', label: 'Teksten' },
   { href: '/beheer/instellingen', label: 'Instellingen' },
 ];
 
