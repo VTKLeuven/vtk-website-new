@@ -1,19 +1,22 @@
 /**
  * KU Leuven SSO via OpenID Connect (OIDC).
  *
- * KU Leuven federates identity through Microsoft Entra ID, which speaks OIDC
- * natively. We register this as a better-auth `genericOAuth` provider and let
- * better-auth handle the authorization-code + PKCE flow and the userinfo call.
+ * KU Leuven runs a Shibboleth OIDC OP at https://idp.kuleuven.be, which speaks
+ * OIDC natively. We register this as a better-auth `genericOAuth` provider and
+ * let better-auth handle the authorization-code + PKCE flow and the userinfo
+ * call. ICTS onboards the client under the Authorization Code Flow with a
+ * confidential (server-side) client secret; better-auth keeps that secret on
+ * the backend and authenticates the token request with `client_secret_post`.
  *
- * Configuration comes entirely from env vars so the ICTS-provided tenant and
- * client credentials can be dropped in without code changes. When the required
- * vars are absent the provider is simply not registered (see `auth.ts`), so the
- * app keeps working with email/password only.
+ * Configuration comes entirely from env vars so the ICTS-provided client
+ * credentials can be dropped in without code changes. When the required vars are
+ * absent the provider is simply not registered (see `auth.ts`), so the app keeps
+ * working with email/password only.
  *
  * Required env:
- *   KUL_OIDC_DISCOVERY_URL  e.g. https://login.microsoftonline.com/<tenant>/v2.0/.well-known/openid-configuration
- *   KUL_OIDC_CLIENT_ID
- *   KUL_OIDC_CLIENT_SECRET
+ *   KUL_OIDC_DISCOVERY_URL  https://idp.kuleuven.be/.well-known/openid-configuration
+ *   KUL_OIDC_CLIENT_ID      the client_id / Entity ID ICTS registered (e.g. dev.vtk.be)
+ *   KUL_OIDC_CLIENT_SECRET  delivered by ICTS in a separate mail; backend-only
  * Optional env:
  *   KUL_OIDC_REDIRECT_URI   override the default callback URL (handy in prod)
  *
@@ -80,6 +83,11 @@ export function kulOAuthConfig() {
       : {}),
     scopes: ["openid", "profile", "email"],
     pkce: true,
+    // ICTS registered the client with token_endpoint_auth_method
+    // `client_secret_post`, so send the secret in the token request body. This
+    // is also better-auth's default; we pin it so a future default change or a
+    // provider re-registration cannot silently switch us to HTTP basic auth.
+    authentication: "post" as const,
     // KU Leuven is authoritative for identity. Map to the fields better-auth
     // uses to locate/link an existing User. The email drives account linking
     // (see `accountLinking.trustedProviders` in auth.ts), so it must match the
