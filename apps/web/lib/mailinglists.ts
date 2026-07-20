@@ -58,11 +58,14 @@ export type Recipient = {
 /**
  * Wie in een lijst zit.
  *
- * Drie filters gelden voor **elke** lijst:
+ * Vier filters gelden voor **elke** lijst:
  * - enkel **actieve** leden: gedeactiveerde accounts horen geen mails te krijgen;
  * - enkel leden die hun studie **dit werkingsjaar bevestigd** hebben, zodat
  *   afgestudeerden vanzelf uit de lijsten vallen (zie de gate in
  *   `app/[locale]/layout.tsx`);
+ * - enkel leden die **nog studeren**: wie bij de bevestiging "ik studeer niet
+ *   (meer)" aanduidde bevestigt zijn profiel wel (en passeert dus de gate), maar
+ *   hoort in geen enkele studiegerichte lijst;
  * - voor alles behalve "Alle studenten" moet de categorie aangevinkt zijn.
  *
  * Gedeeld door de export en de aantallen in de admin-tab, zodat het getoonde
@@ -72,6 +75,7 @@ export function listWhere(id: MailingListId): Prisma.UserWhereInput {
   return {
     active: true,
     studyConfirmedYear: currentWorkingYear(),
+    notStudying: false,
     ...(id === ALL_STUDENTS ? {} : { mailCategories: { has: id } }),
     // Career is op faculteitsstudenten gericht: wie aangaf niet aan de
     // faculteit te studeren valt uit élke career-lijst, ook de algemene.

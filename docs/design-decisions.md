@@ -263,6 +263,14 @@ SSO. Concrete implementatie: hook in `packages/auth/src/auth.ts`, gate in
   opgelijst worden (o.a. de mappen in de career-ZIP). Wie dit aanduidt valt uit
   **alle** career-lijsten, ook de algemene; de andere categorieën blijven gewoon
   werken.
+- **"Ik studeer niet (meer)"** (`User.notStudying`) is er voor afgestudeerden of
+  gestopte leden. Bewust **los van `notAtFaculty`**: dat betekent "studeert wél,
+  maar elders"; dit betekent "studeert niet". Ook bewust **geen `StudyYear`**:
+  het is geen jaar, en als enum-waarde zou het overal opduiken waar jaren
+  opgelijst worden (o.a. de per-jaar-mappen in de career-ZIP). Het lid blijft
+  lid, maar valt uit **élke** studiegerichte mailinglijst (zie hieronder). Beide
+  vlaggen zijn onafhankelijk; wie niet (meer) studeert hoeft geen richting of
+  jaar meer aan te duiden.
 
 ### Jaarlijkse studiebevestiging ("wie is nog actief student?")
 
@@ -300,6 +308,10 @@ SSO. Concrete implementatie: hook in `packages/auth/src/auth.ts`, gate in
   jaarlijkse studiebevestiging hierboven) zitten in een lijst; dat geldt voor
   **alle** lijsten, ook "Alle studenten". Afgestudeerden vallen er zo vanzelf
   uit, zonder manuele opkuis.
+- Enkel leden die **nog studeren**: wie bij de bevestiging "ik studeer niet
+  (meer)" (`notStudying`) aanduidde, bevestigt zijn profiel wél en passeert dus
+  de gate, maar hoort in **geen enkele** studiegerichte lijst. Zonder deze extra
+  filter zou zo'n lid via de bevestiging net terug in de lijsten belanden.
 - **"Alle studenten"** is een synthetische lijst: iedereen, zonder opt-in. Ze is
   bewust **geen `MailCategory`** en heeft dus geen checkbox bij "Mijn account",
   want dit is de lijst om sowieso iedereen te kunnen bereiken.

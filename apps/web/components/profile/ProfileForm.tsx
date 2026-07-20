@@ -48,6 +48,8 @@ export function ProfileForm({
     | "studyYears"
     | "studyProgrammes"
     | "notAtFaculty"
+    | "notStudying"
+    | "rNumberFromKul"
   >;
   next?: string;
   submitLabel: string;
@@ -103,15 +105,27 @@ export function ProfileForm({
           </div>
           <div>
             <Label htmlFor="rNumber">{t.rNumber}</Label>
-            <Input
-              id="rNumber"
-              name="rNumber"
-              defaultValue={user.rNumber ?? ""}
-              placeholder="r0123456"
-              pattern={R_NUMBER_PATTERN}
-              title={t.rNumberHint}
-            />
-            <p className="mt-1 text-xs text-[#5c667f]">{t.rNumberHint}</p>
+            {user.rNumberFromKul ? (
+              // Van de KU Leuven-authenticator: read-only, net als de e-mail.
+              // Geen `name`, dus het wordt niet meegepost; saveProfileAction
+              // laat het r-nummer sowieso ongemoeid wanneer deze vlag staat.
+              <>
+                <Input id="rNumber" defaultValue={user.rNumber ?? ""} disabled />
+                <p className="mt-1 text-xs text-[#5c667f]">{t.rNumberFromKul}</p>
+              </>
+            ) : (
+              <>
+                <Input
+                  id="rNumber"
+                  name="rNumber"
+                  defaultValue={user.rNumber ?? ""}
+                  placeholder="r0123456"
+                  pattern={R_NUMBER_PATTERN}
+                  title={t.rNumberHint}
+                />
+                <p className="mt-1 text-xs text-[#5c667f]">{t.rNumberHint}</p>
+              </>
+            )}
           </div>
         </div>
       </fieldset>
@@ -223,6 +237,7 @@ export function ProfileForm({
           studyYears={user.studyYears}
           studyProgrammes={user.studyProgrammes}
           notAtFaculty={user.notAtFaculty}
+          notStudying={user.notStudying}
         />
       </fieldset>
 

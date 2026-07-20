@@ -42,11 +42,13 @@ export function StudyFieldset({
   studyYears,
   studyProgrammes,
   notAtFaculty,
+  notStudying,
 }: {
   locale: Locale;
   studyYears: StudyYear[];
   studyProgrammes: StudyProgramme[];
   notAtFaculty: boolean;
+  notStudying: boolean;
 }) {
   const t = getDictionary(locale).onboarding;
   const selectedYears = new Set(studyYears);
@@ -68,6 +70,16 @@ export function StudyFieldset({
             />
           ))}
         </div>
+        {/* Wie niet (meer) studeert heeft geen studiejaar; aparte optie onder de
+            jaren, want ze valt uit élke studiegerichte mailinglijst. */}
+        <CheckboxChip
+          name="notStudying"
+          value="on"
+          defaultChecked={notStudying}
+          label={t.notStudying}
+          className="mt-2"
+        />
+        <p className="mt-1 text-xs text-[#5c667f]">{t.notStudyingHint}</p>
       </div>
       <div>
         <span className="text-sm font-medium text-vtk-ink">{t.programmesLabel}</span>

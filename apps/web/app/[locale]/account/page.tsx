@@ -27,6 +27,7 @@ export default async function AccountPage({ params }: { params: Promise<{ locale
       firstName: true,
       lastName: true,
       rNumber: true,
+      rNumberFromKul: true,
       avatarKey: true,
       street: true,
       houseNumber: true,
@@ -40,6 +41,7 @@ export default async function AccountPage({ params }: { params: Promise<{ locale
       studyYears: true,
       studyProgrammes: true,
       notAtFaculty: true,
+      notStudying: true,
     },
   });
 

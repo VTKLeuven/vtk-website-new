@@ -262,6 +262,11 @@ model User {
   lastName      String?
   email         String  @unique
   rNumber       String? @unique // KU Leuven studentennummer (bvb r0123456), voor zoeken
+  // `true` als het r-nummer van de KU Leuven-authenticator komt (bij SSO gezet,
+  // zie packages/auth/src/logins/kul.ts). Dan staat het veld read-only in het
+  // profielformulier, net als de e-mail; een zelf ingevuld r-nummer (flag false)
+  // blijft aanpasbaar.
+  rNumberFromKul Boolean @default(false)
   emailVerified Boolean @default(false)
   avatarKey     String?
   image         String?
@@ -294,6 +299,11 @@ model User {
   // `StudyProgramme`-waarde: het is geen richting, en als enum-waarde zou het
   // overal opduiken waar richtingen opgelijst worden (o.a. de career-export).
   notAtFaculty       Boolean          @default(false)
+  // Lid dat niet (meer) studeert: afgestudeerd of gestopt. Bewust los van
+  // `notAtFaculty` (dat is "studeert wél, maar elders"): wie dit aanduidt valt
+  // uit élke studiegerichte mailinglijst (zie lib/mailinglists.ts). Blijft een
+  // aparte boolean om dezelfde reden als notAtFaculty.
+  notStudying        Boolean          @default(false)
   // Werkingsjaar waarin het lid zijn studieprofiel laatst bevestigde (2026 =
   // "26-27"). Loopt dat achter op het huidige werkingsjaar, dan is het profiel
   // verlopen: de bevestigingsgate vraagt het opnieuw en het lid valt zolang uit

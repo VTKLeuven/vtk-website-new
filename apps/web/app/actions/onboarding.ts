@@ -31,6 +31,7 @@ const studySchema = {
   studyYears: z.array(z.enum(STUDY_YEARS)).default([]),
   studyProgrammes: z.array(z.enum(STUDY_PROGRAMMES)).default([]),
   notAtFaculty: z.boolean().default(false),
+  notStudying: z.boolean().default(false),
 };
 
 /**
@@ -50,6 +51,7 @@ function studyFields(formData: FormData) {
     studyProgrammes: formData.getAll("studyProgrammes"),
     // Niet-aangevinkte checkbox zit niet in de FormData.
     notAtFaculty: formData.get("notAtFaculty") === "on",
+    notStudying: formData.get("notStudying") === "on",
   };
 }
 
@@ -166,6 +168,15 @@ export async function saveProfileAction(
   const wasOnboarded = session.user.onboarded;
   const previousAvatarKey = session.user.avatarKey;
 
+  // Een r-nummer dat van de KU Leuven-authenticator komt is read-only (het veld
+  // wordt disabled getoond, zie ProfileForm). We dwingen dat ook serverside af:
+  // zelfs een gemanipuleerde submit laat het r-nummer dan ongemoeid.
+  const existing = await prisma.user.findUnique({
+    where: { id: session.user.id },
+    select: { rNumberFromKul: true },
+  });
+  const rNumberLocked = existing?.rNumberFromKul ?? false;
+
   try {
     await prisma.user.update({
       where: { id: session.user.id },
@@ -174,7 +185,7 @@ export async function saveProfileAction(
         lastName: data.lastName,
         // De weergavenaam blijft afgeleid van voor- + achternaam.
         name: fullName(data.firstName, data.lastName),
-        rNumber: data.rNumber ? data.rNumber : null,
+        ...(rNumberLocked ? {} : { rNumber: data.rNumber ? data.rNumber : null }),
         street: data.street || null,
         houseNumber: data.houseNumber || null,
         bus: data.bus ? data.bus : null,
@@ -187,6 +198,7 @@ export async function saveProfileAction(
         studyYears: { set: data.studyYears },
         studyProgrammes: { set: data.studyProgrammes },
         notAtFaculty: data.notAtFaculty,
+        notStudying: data.notStudying,
         // Wie dit formulier invult, declareert daarmee zijn studie voor dit
         // werkingsjaar; de bevestigingsgate hoeft er dan niet meer op te vallen.
         studyConfirmedYear: currentWorkingYear(),
@@ -250,6 +262,7 @@ export async function confirmStudyAction(formData: FormData): Promise<void> {
       studyYears: { set: parsed.data.studyYears },
       studyProgrammes: { set: parsed.data.studyProgrammes },
       notAtFaculty: parsed.data.notAtFaculty,
+      notStudying: parsed.data.notStudying,
       studyConfirmedYear: currentWorkingYear(),
     },
   });

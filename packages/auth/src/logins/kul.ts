@@ -29,6 +29,8 @@ export const KUL_PROVIDER_ID = "kuleuven";
 // KU Leuven releases claims under SAML-style names (displayName, givenName,
 // surname). We also accept the standard OIDC spellings (name, given_name,
 // family_name) so the mapping keeps working if KU Leuven ever changes them.
+// The index signature lets us also read claims we don't name explicitly (uid,
+// sub, ...) when scanning for the r-number.
 type ProfileLike = {
   email?: string;
   preferred_username?: string;
@@ -40,6 +42,7 @@ type ProfileLike = {
   givenName?: string;
   family_name?: string;
   surname?: string;
+  [claim: string]: unknown;
 };
 
 /** Best-effort email extraction from an OIDC profile, normalized lower-case. */
@@ -55,6 +58,26 @@ function profileName(profile: ProfileLike): string {
   const last = profile.family_name ?? profile.surname;
   const parts = [first, last].filter(Boolean);
   return parts.length ? parts.join(" ") : (profileEmail(profile) ?? "KU Leuven user");
+}
+
+/**
+ * KU Leuven student number (r-number), or `undefined` for staff (u-numbers) and
+ * anyone without one.
+ *
+ * KU Leuven's `uid` attribute is the account name, which for students is `r`
+ * followed by exactly 7 digits, and ICTS releases it as an OIDC claim (usually
+ * `preferred_username`, sometimes `uid`). Rather than hard-code the claim name,
+ * we scan every string claim for that distinctive shape, so the mapping keeps
+ * working whichever claim carries it (and even picks it up from an
+ * r-number-based email). Returned lower-case to match the onboarding format.
+ */
+function profileRNumber(profile: ProfileLike): string | undefined {
+  for (const value of Object.values(profile)) {
+    if (typeof value !== "string") continue;
+    const match = value.match(/\br\d{7}\b/i);
+    if (match) return match[0].toLowerCase();
+  }
+  return undefined;
 }
 
 /** `true` when all required env vars for KU Leuven OIDC are present. */
@@ -91,11 +114,21 @@ export function kulOAuthConfig() {
     // KU Leuven is authoritative for identity. Map to the fields better-auth
     // uses to locate/link an existing User. The email drives account linking
     // (see `accountLinking.trustedProviders` in auth.ts), so it must match the
-    // pre-provisioned User.email.
-    mapProfileToUser: (profile: ProfileLike) => ({
-      email: profileEmail(profile),
-      name: profileName(profile),
-      emailVerified: true,
-    }),
+    // pre-provisioned User.email. `rNumber` is stored so the onboarding form is
+    // pre-filled; it only persists on first login (user creation), which is when
+    // onboarding runs, so no override of later edits is needed. `rNumberFromKul`
+    // marks it as authoritative so the form renders it read-only (like the
+    // e-mail); a member who typed their own r-number keeps it editable. Both
+    // require an additionalField in auth.ts (better-auth drops profile fields
+    // that aren't declared there).
+    mapProfileToUser: (profile: ProfileLike) => {
+      const rNumber = profileRNumber(profile);
+      return {
+        email: profileEmail(profile),
+        name: profileName(profile),
+        emailVerified: true,
+        ...(rNumber ? { rNumber, rNumberFromKul: true } : {}),
+      };
+    },
   };
 }

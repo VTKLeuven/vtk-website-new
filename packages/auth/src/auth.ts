@@ -97,6 +97,27 @@ export const auth = betterAuth({
 
   user: {
     additionalFields: {
+      // KU Leuven r-number, stored on first login from the OIDC profile (see
+      // logins/kul.ts) so the onboarding form is pre-filled. `input` stays at
+      // its default (true) on purpose: better-auth drops `input: false` fields
+      // when persisting an OAuth profile, so this must stay writable for the
+      // provider mapping to land. The column is unique in Prisma, which guards
+      // against collisions.
+      rNumber: {
+        type: "string",
+        required: false,
+      },
+      // `true` when `rNumber` came from KU Leuven (set alongside it in
+      // logins/kul.ts). The profile form renders the r-number read-only when
+      // this is set, and saveProfileAction refuses to change it. Same reason as
+      // rNumber for keeping `input` at its default: it is written from the OIDC
+      // profile. Flipping it via the client only unlocks your own r-number (a
+      // value already user-editable in the self-entered case), so no hard gate.
+      rNumberFromKul: {
+        type: "boolean",
+        required: false,
+        defaultValue: false,
+      },
       avatarKey: {
         type: "string",
         required: false,
