@@ -175,6 +175,30 @@ met enkel wachtwoord-login (`isKulEnabled()`).
     (flag blijft `false`) mag het gewoon aanpassen. Ook een `additionalField`,
     om dezelfde reden als `rNumber`.
 
+### Debuglog: welke claims geeft KU Leuven vrij?
+
+Om te controleren welke attributen ICTS effectief vrijgeeft (bv. of
+`KULeuvenEmployeeType`/de faculteit binnenkomt), is er een opt-in debuglog onder
+**Admin -> IT**, sectie "KU Leuven SSO (OIDC)". Superadmin-only.
+
+- **Toggle in de DB**, niet in de omgeving: `Setting`-sleutel `kul.debug`
+  (`{ enabled: boolean }`). `mapProfileToUser` leest die live bij elke login, dus
+  aan/uit werkt zonder redeploy. Zie `packages/auth/src/logins/kul-debug.ts`.
+- **Wat er bewaard wordt**: staat de toggle aan, dan schrijft `recordKulProfile`
+  bij elke KU Leuven-login één `KulAuthLog`-rij met de **ruwe claims** die
+  better-auth aan `mapProfileToUser` doorgeeft, plus de afgeleide `email`/`rNumber`.
+  Het loggen faalt dicht: een DB-fout mag een login nooit breken.
+- **Privacy**: die claims bevatten persoonsgegevens (naam, e-mail, r-nummer,
+  faculteit). Daarom staat het standaard uit, bewaren we enkel de laatste
+  `KUL_LOG_KEEP` (50) logins, en is er een "Clear logs"-knop.
+- **Belangrijke kanttekening**: better-auth leest eerst de **ID-token**-claims en
+  roept de userinfo-endpoint alleen aan wanneer `sub` of `email` daar ontbreekt
+  (`getUserInfo` in de generic-oauth-plugin). Attributen die KU Leuven enkel op de
+  userinfo-endpoint vrijgeeft, verschijnen dus mogelijk niet in de log ook al
+  geeft ICTS ze vrij. Ontbreekt de faculteit terwijl ze wel verwacht wordt, dan is
+  een custom `getUserInfo` (die de userinfo-endpoint altijd aanroept of samenvoegt)
+  de volgende stap.
+
 ### Account-linking & self-provisioning
 
 `account.accountLinking.trustedProviders: ["kuleuven"]`. Omdat KU Leuven een

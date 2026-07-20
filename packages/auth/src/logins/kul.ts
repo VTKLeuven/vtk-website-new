@@ -24,6 +24,8 @@
  *   <BETTER_AUTH_URL>/api/auth/better/oauth2/callback/kuleuven
  */
 
+import { recordKulProfile } from "./kul-debug";
+
 export const KUL_PROVIDER_ID = "kuleuven";
 
 // KU Leuven releases claims under SAML-style names (displayName, givenName,
@@ -121,10 +123,15 @@ export function kulOAuthConfig() {
     // e-mail); a member who typed their own r-number keeps it editable. Both
     // require an additionalField in auth.ts (better-auth drops profile fields
     // that aren't declared there).
-    mapProfileToUser: (profile: ProfileLike) => {
+    mapProfileToUser: async (profile: ProfileLike) => {
+      const email = profileEmail(profile);
       const rNumber = profileRNumber(profile);
+      // Opt-in debuglog (Admin -> IT): bewaart de ruwe claims zodat een superadmin
+      // ziet welke attributen ICTS vrijgeeft. Doet niets als de toggle uit staat en
+      // gooit nooit, dus deze await kan de login niet breken.
+      await recordKulProfile(profile, { email, rNumber });
       return {
-        email: profileEmail(profile),
+        email,
         name: profileName(profile),
         emailVerified: true,
         ...(rNumber ? { rNumber, rNumberFromKul: true } : {}),

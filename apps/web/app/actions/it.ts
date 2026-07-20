@@ -16,6 +16,7 @@ import {
   type StoredSentry,
 } from "@/lib/runtimeConfig";
 import { DOOR_SETTING_KEY, getDoorConfig, type StoredDoor } from "@/lib/door-config";
+import { KUL_DEBUG_SETTING_KEY, clearKulAuthLogs } from "@vtk/auth/server";
 import { saveError, saveOk, type SaveState } from "@/lib/saveState";
 
 /** Alle IT-acties zijn superadmin-only, net als de IT-tab zelf. */
@@ -253,4 +254,42 @@ export async function testDoorConnectionAction(): Promise<{ ok: boolean; error?:
   } finally {
     clearTimeout(timeout);
   }
+}
+
+// ---- KU Leuven SSO (OIDC) debug ---------------------------------------------
+
+/**
+ * Zet het loggen van KU Leuven-claims aan of uit (Setting-sleutel `kul.debug`).
+ * De auth-flow leest deze toggle live bij elke login (zie packages/auth
+ * logins/kul-debug.ts), dus er is geen herstart nodig. Superadmin-only.
+ */
+export async function saveKulDebugAction(
+  _prev: SaveState,
+  formData: FormData,
+): Promise<SaveState> {
+  await requireSuperAdmin();
+
+  const enabled = formData.get("enabled") === "on";
+  await prisma.setting.upsert({
+    where: { key: KUL_DEBUG_SETTING_KEY },
+    create: {
+      key: KUL_DEBUG_SETTING_KEY,
+      value: { enabled } as unknown as Prisma.InputJsonValue,
+    },
+    update: { value: { enabled } as unknown as Prisma.InputJsonValue },
+  });
+
+  revalidatePath("/admin/it");
+  return saveOk();
+}
+
+/**
+ * Wist alle bewaarde KU Leuven-loginclaims. De toggle blijft ongewijzigd: staat
+ * het loggen aan, dan vullen nieuwe logins de log weer aan. Superadmin-only; de
+ * bevestiging gebeurt in de UI via `DeleteButton`.
+ */
+export async function clearKulAuthLogsAction(): Promise<void> {
+  await requireSuperAdmin();
+  await clearKulAuthLogs();
+  revalidatePath("/admin/it");
 }
