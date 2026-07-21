@@ -315,6 +315,10 @@ export async function eraseUserData(userId: string) {
         rNumber: null,
         rNumberFromKul: false,
         emailVerified: false,
+        // Markeert de rij als tombstone in plaats van als gedeactiveerd lid, zodat
+        // gebruikerslijsten hem kunnen wegfilteren zonder ook echte inactieve
+        // leden te verbergen.
+        deletedAt: new Date(),
         avatarKey: null,
         image: null,
         locale: "NL",

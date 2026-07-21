@@ -25,6 +25,26 @@
     grid-template-columns: 220px minmax(0, 1fr);
     gap: 48px;
   }
+
+  /*
+   * De kolom blijft meescrollen als sticky blok. Het `max-height` is essentieel:
+   * een sticky element dat hoger is dan het scherm (de nav telt voor een
+   * superadmin ~20 items) pint zijn bovenrand vast en laat zijn onderkant pas
+   * los wanneer de pagina zelf onderaan komt. Op een lange adminpagina zag je de
+   * onderste tabs dus nooit. Nu past de kolom altijd in het scherm en scrollt de
+   * nav intern verder.
+   *
+   * Sticky hoort hier, op de aside, en niet op `.vtk-admin-nav`: die zit in een
+   * aside die precies zo hoog is als haar inhoud (`align-items: start`), en
+   * binnen dat blok heeft een sticky element geen ruimte om te bewegen.
+   */
+  .vtk-admin-surface-inner > aside {
+    position: sticky;
+    top: 96px;
+    display: flex;
+    flex-direction: column;
+    max-height: calc(100vh - 96px - 24px);
+  }
 }
 
 .vtk-admin-nav-title {
@@ -45,11 +65,14 @@
 
 @media (min-width: 860px) {
   .vtk-admin-nav {
-    position: sticky;
-    top: 96px;
     display: flex;
     flex-direction: column;
-    overflow: visible;
+    /* Scrollt binnen de sticky kolom hierboven; `min-height: 0` laat dit
+     * flexitem krimpen, anders groeit het gewoon door en scrollt er niets. */
+    min-height: 0;
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior: contain;
     padding: 8px;
     border: 1px solid var(--line);
     border-radius: 18px;

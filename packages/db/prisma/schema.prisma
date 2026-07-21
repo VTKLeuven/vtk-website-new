@@ -311,6 +311,13 @@ model User {
   active       Boolean @default(true)
   isSuperAdmin Boolean @default(false)
 
+  // Gezet door `eraseUserData` (lib/privacy/account.ts). De User-rij zelf kan niet
+  // weg: te veel tabellen (theokot, uitleen, shifts) hangen er met een FK aan, dus
+  // wordt ze geanonimiseerd tot een tombstone. Dat is bewust iets anders dan
+  // `active: false`, wat een gewoon gedeactiveerd lid is dat je in het beheer nog
+  // wil zien. Filter `deletedAt: null` in elke lijst die gebruikers toont.
+  deletedAt    DateTime?
+
   // Onboarding-profiel (ingevuld bij de eerste KUL SSO-login). Zolang
   // onboardedAt null is, wordt het lid naar de onboarding-flow gestuurd.
   onboardedAt        DateTime?
@@ -397,6 +404,8 @@ model User {
   oauthConsents            OauthConsent[]
   ssoAuditLogs             SsoAuditLog[]
   ssoClientPermissions     SsoUserClientPermission[]
+
+  @@index([deletedAt])
 }
 
 model Group {
