@@ -18,6 +18,7 @@ export { isKulEnabled } from './logins/kul';
 export { ApiHandler } from './apiHandlers/apiHandler';
 export { getSession } from './server/session';
 export { resolveClaims, type ResolveClaimsInput } from './server/claims';
+export { verifySignedOAuthQuery } from './server/oauthQuery';
 export { createUser, updateUser, setUserPassword, deleteUser } from './server/users';
 export {
   listSsoClients,
@@ -49,8 +50,8 @@ export {
   listClientPermissions,
   listClientGrants,
   accessRoleGrantCountsByClient,
+  accessRoleGrantCount,
   listAllClientPermissions,
-  listRoleClientPermissions,
   setRoleClientPermission,
   setClientAccessMode,
   createClientPermission,

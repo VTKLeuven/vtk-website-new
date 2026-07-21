@@ -309,45 +309,51 @@ export async function deletePermissionAction(formData: FormData): Promise<void> 
   revalidateClient(clientId);
 }
 
-export async function grantPermissionAction(formData: FormData): Promise<void> {
+/**
+ * Toekennen kan enkel via een rol of een post; rechtstreeks aan één lid bestaat
+ * bewust niet meer (zie GrantTarget in de auth-laag).
+ *
+ * Geeft `SaveState` terug zodat het scherm de uitkomst kan tonen: een
+ * toekenning die stil mislukt, laat de beheerder denken dat iemand toegang
+ * heeft terwijl dat niet zo is.
+ */
+export async function grantPermissionAction(_prev: SaveState, formData: FormData): Promise<SaveState> {
   const clientId = String(formData.get('clientId') || '');
   const permissionId = String(formData.get('permissionId') || '');
   const kind = String(formData.get('kind') || '');
-  if (!clientId || !permissionId) return;
+  if (!clientId || !permissionId) return saveError('INVALID_INPUT');
 
   const requestHeaders = await headers();
-  if (kind === 'user') {
-    const userId = String(formData.get('userId') || '');
-    if (!userId) return;
-    const raw = String(formData.get('expiresAt') || '');
-    const expiresAt = raw ? new Date(raw) : null;
-    await grantClientPermission(requestHeaders, permissionId, {
-      kind: 'user',
-      userId,
-      expiresAt: expiresAt && !Number.isNaN(expiresAt.getTime()) ? expiresAt : null,
-    });
-  } else if (kind === 'role') {
-    const roleId = String(formData.get('roleId') || '');
-    if (!roleId) return;
-    await grantClientPermission(requestHeaders, permissionId, { kind: 'role', roleId });
-  } else if (kind === 'group') {
-    const groupId = String(formData.get('groupId') || '');
-    if (!groupId) return;
-    await grantClientPermission(requestHeaders, permissionId, {
-      kind: 'group',
-      groupId,
-      grantKind: formData.get('grantKind') === 'LEADER' ? 'LEADER' : 'DEFAULT',
-    });
+  try {
+    if (kind === 'role') {
+      const roleId = String(formData.get('roleId') || '');
+      if (!roleId) return saveError('INVALID_INPUT');
+      await grantClientPermission(requestHeaders, permissionId, { kind: 'role', roleId });
+    } else if (kind === 'group') {
+      const groupId = String(formData.get('groupId') || '');
+      if (!groupId) return saveError('INVALID_INPUT');
+      await grantClientPermission(requestHeaders, permissionId, {
+        kind: 'group',
+        groupId,
+        grantKind: formData.get('grantKind') === 'LEADER' ? 'LEADER' : 'DEFAULT',
+      });
+    } else {
+      return saveError('INVALID_INPUT');
+    }
+  } catch (error) {
+    console.error('[sso] permissie toekennen mislukt:', error);
+    return saveError(permissionErrorCode(error));
   }
 
   revalidateClient(clientId);
+  return saveOk();
 }
 
 export async function revokePermissionAction(formData: FormData): Promise<void> {
   const clientId = String(formData.get('clientId') || '');
   const grantId = String(formData.get('grantId') || '');
   const kind = String(formData.get('kind') || '');
-  if (!clientId || !grantId || (kind !== 'user' && kind !== 'role' && kind !== 'group')) return;
+  if (!clientId || !grantId || (kind !== 'role' && kind !== 'group')) return;
 
   await revokeClientPermission(await headers(), grantId, kind);
   revalidateClient(clientId);

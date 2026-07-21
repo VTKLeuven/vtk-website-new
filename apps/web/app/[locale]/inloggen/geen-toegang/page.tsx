@@ -13,7 +13,7 @@
 import { headers } from 'next/headers';
 import { notFound, redirect } from 'next/navigation';
 import { prisma } from '@vtk/db';
-import { getSession } from '@vtk/auth/server';
+import { getSession, verifySignedOAuthQuery } from '@vtk/auth/server';
 import { hasLocale } from '@/lib/locale';
 import { signedOAuthQuery, type RawSearchParams } from '@/lib/oauthFlow';
 
@@ -37,6 +37,13 @@ export default async function NoAccessPage({
   const oauthQuery = signedOAuthQuery(sp);
   if (!oauthQuery) notFound();
 
+  // En de handtekening moet ook kloppen. `signedOAuthQuery` kijkt enkel of de
+  // ondertekende sleutels aanwezig zijn; zonder deze controle kan elk ingelogd
+  // lid een `client_id` naar keuze in de URL zetten en aan de titel aflezen of
+  // die client bestaat. Dat is precies het lek dat het toestemmingsscherm
+  // vermijdt, en het hoort hier niet alsnog open te staan.
+  if (!(await verifySignedOAuthQuery(oauthQuery))) notFound();
+
   const session = await getSession(await headers());
   if (!session) redirect(`/inloggen?${oauthQuery}`);
 
@@ -46,8 +53,9 @@ export default async function NoAccessPage({
     redirect(`/en/inloggen/geen-toegang?${oauthQuery}`);
   }
 
-  // Enkel de naam ophalen. Bestaat de client niet, dan tonen we de neutrale
-  // tekst: deze pagina bevestigt nooit of een client_id bestaat.
+  // Enkel de naam ophalen. De handtekening hierboven is al gecontroleerd, dus
+  // dit `client_id` komt van de plugin en niet van de bezoeker; de naam tonen
+  // verklapt hier dus niets.
   const clientId = one(sp.client_id);
   const client = clientId
     ? await prisma.oauthClient.findUnique({ where: { clientId }, select: { name: true } })

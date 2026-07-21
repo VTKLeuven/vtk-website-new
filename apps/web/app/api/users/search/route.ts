@@ -5,7 +5,7 @@ import { requireSession, authErrorResponse } from '@/lib/session';
 /**
  * Zoek actieve gebruikers op naam, e-mail of r-nummer (server-side, gelimiteerd).
  *
- * `GET /api/users/search?q=<term>&limit=<n>` — bedoeld voor pickers zoals de
+ * `GET /api/users/search?q=<term>&limit=<n>`: bedoeld voor pickers zoals de
  * deelnemer-selectie in shiftbeheer. Schaalt naar duizenden users: er wordt
  * altijd maar een klein aantal matches teruggegeven i.p.v. de hele tabel.
  *

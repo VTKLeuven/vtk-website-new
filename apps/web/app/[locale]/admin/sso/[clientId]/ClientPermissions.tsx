@@ -8,8 +8,8 @@
  * **permissies** bepalen wat het er mag. Bij een beperkte client doet
  * `<namespace>.access` het eerste; alle andere codes doen het tweede.
  */
-import { useEffect, useState } from 'react';
-import { Button, Input } from '@vtk/ui';
+import { useState } from 'react';
+import { Input } from '@vtk/ui';
 import { SaveForm } from '@/components/ui/SaveForm';
 import { DeleteIconButton } from '@/components/ui/DeleteIconButton';
 import {
@@ -18,6 +18,7 @@ import {
   grantPermissionAction,
   revokePermissionAction,
   setAccessModeAction,
+  updatePermissionAction,
 } from '../actions';
 
 type Permission = {
@@ -30,13 +31,11 @@ type Permission = {
 };
 
 type Grants = {
-  users: { id: string; permissionId: string; userId: string; userName: string; expiresAt: string | null }[];
   roles: { id: string; permissionId: string; roleId: string }[];
   groups: { id: string; permissionId: string; groupId: string; kind: 'DEFAULT' | 'LEADER' }[];
 };
 
 type Named = { id: string; name: string };
-type SearchUser = { id: string; name: string; email: string; rNumber: string | null };
 
 const errorMessagesNl: Record<string, string> = {
   NAMESPACE_INVALID: 'Ongeldige namespace: gebruik kleine letters, cijfers en streepjes.',
@@ -164,6 +163,13 @@ export function ClientPermissions({
                 ? 'Elke code van deze applicatie begint hiermee, bijvoorbeeld wiki.read.'
                 : 'Every code for this application starts with this, for example wiki.read.'}
             </p>
+            {permissionNamespace && namespace !== permissionNamespace && (
+              <p className="mt-2 rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
+                {nl
+                  ? `Alle codes worden hernoemd van ${permissionNamespace}.* naar ${namespace || '…'}.*. De toekenningen blijven behouden, maar de applicatie zelf leest nog de oude codes: pas die aan voor je dit opslaat.`
+                  : `Every code is renamed from ${permissionNamespace}.* to ${namespace || '…'}.*. Grants are kept, but the application itself still reads the old codes: update it before you save this.`}
+              </p>
+            )}
           </div>
 
           {/* De faalwijze van dit ontwerp: de access-permissie vergeten toekennen
@@ -276,10 +282,11 @@ function PermissionRow({
   roles: Named[];
   groups: Named[];
 }) {
-  const userGrants = grants.users.filter((g) => g.permissionId === permission.id);
   const roleGrants = grants.roles.filter((g) => g.permissionId === permission.id);
   const groupGrants = grants.groups.filter((g) => g.permissionId === permission.id);
+  const grantCount = roleGrants.length + groupGrants.length;
   const nameOf = (list: Named[], id: string) => list.find((item) => item.id === id)?.name ?? id;
+  const errorMessages = nl ? errorMessagesNl : errorMessagesEn;
 
   return (
     <li className="rounded-xl border border-zinc-200 p-3">
@@ -306,8 +313,8 @@ function PermissionRow({
             title={nl ? 'Permissie verwijderen?' : 'Delete permission?'}
             description={
               nl
-                ? `${permission.code} verdwijnt, samen met ${userGrants.length + roleGrants.length + groupGrants.length} toekenning(en). De lopende tokens van deze applicatie worden ingetrokken, zodat het recht niet blijft doorwerken.`
-                : `${permission.code} disappears, along with ${userGrants.length + roleGrants.length + groupGrants.length} grant(s). This application's current tokens are revoked so the right does not keep working.`
+                ? `${permission.code} verdwijnt, samen met ${grantCount} toekenning(en). Leden die deze code hierdoor kwijtraken, worden uitgelogd bij deze applicatie; wie ze langs een ander pad houdt, merkt niets.`
+                : `${permission.code} disappears, along with ${grantCount} grant(s). Members who lose this code are signed out of this application; anyone who keeps it by another path is unaffected.`
             }
             confirmLabel={nl ? 'Verwijderen' : 'Delete'}
             cancelLabel={nl ? 'Annuleren' : 'Cancel'}
@@ -337,17 +344,7 @@ function PermissionRow({
             label={`${nl ? 'post' : 'post'}: ${nameOf(groups, grant.groupId)}${grant.kind === 'LEADER' ? ' (lead)' : ''}`}
           />
         ))}
-        {userGrants.map((grant) => (
-          <GrantChip
-            key={grant.id}
-            nl={nl}
-            clientId={clientId}
-            grantId={grant.id}
-            kind="user"
-            label={grant.userName}
-          />
-        ))}
-        {userGrants.length + roleGrants.length + groupGrants.length === 0 && (
+        {grantCount === 0 && (
           <span className="text-xs text-zinc-500">
             {nl ? 'Nog aan niemand toegekend.' : 'Not granted to anyone yet.'}
           </span>
@@ -356,8 +353,22 @@ function PermissionRow({
 
       <details className="mt-2">
         <summary className="cursor-pointer text-xs text-zinc-500">{nl ? 'Toekennen' : 'Grant'}</summary>
-        <div className="mt-2 space-y-2">
-          <form action={grantPermissionAction} className="flex flex-wrap items-end gap-2">
+        <div className="mt-2 space-y-3">
+          <p className="text-xs text-zinc-500">
+            {nl
+              ? 'Toekennen kan enkel via een rol of een post. Rechtstreeks aan één lid bestaat niet: zo n toekenning valt stil zodra die persoon vertrekt, zonder dat iemand het merkt.'
+              : 'Granting goes through a role or a post only. Directly to one member does not exist: such a grant quietly dies the moment that person leaves.'}
+          </p>
+
+          <SaveForm
+            action={grantPermissionAction}
+            submitLabel={nl ? 'Toekennen' : 'Grant'}
+            savingLabel={nl ? 'Toekennen…' : 'Granting…'}
+            savedMessage={nl ? 'Toegekend' : 'Granted'}
+            fallbackErrorMessage={nl ? 'Toekennen mislukt' : 'Could not grant'}
+            errorMessages={errorMessages}
+            className="flex flex-wrap items-end gap-2"
+          >
             <input type="hidden" name="clientId" value={clientId} />
             <input type="hidden" name="permissionId" value={permission.id} />
             <input type="hidden" name="kind" value="role" />
@@ -371,12 +382,17 @@ function PermissionRow({
                 ))}
               </select>
             </label>
-            <Button type="submit" variant="secondary">
-              {nl ? 'Toekennen' : 'Grant'}
-            </Button>
-          </form>
+          </SaveForm>
 
-          <form action={grantPermissionAction} className="flex flex-wrap items-end gap-2">
+          <SaveForm
+            action={grantPermissionAction}
+            submitLabel={nl ? 'Toekennen' : 'Grant'}
+            savingLabel={nl ? 'Toekennen…' : 'Granting…'}
+            savedMessage={nl ? 'Toegekend' : 'Granted'}
+            fallbackErrorMessage={nl ? 'Toekennen mislukt' : 'Could not grant'}
+            errorMessages={errorMessages}
+            className="flex flex-wrap items-end gap-2"
+          >
             <input type="hidden" name="clientId" value={clientId} />
             <input type="hidden" name="permissionId" value={permission.id} />
             <input type="hidden" name="kind" value="group" />
@@ -397,13 +413,49 @@ function PermissionRow({
                 <option value="LEADER">{nl ? 'enkel de verantwoordelijke' : 'only the lead'}</option>
               </select>
             </label>
-            <Button type="submit" variant="secondary">
-              {nl ? 'Toekennen' : 'Grant'}
-            </Button>
-          </form>
-
-          <GrantToUserForm nl={nl} clientId={clientId} permissionId={permission.id} />
+          </SaveForm>
         </div>
+      </details>
+
+      <details className="mt-2">
+        <summary className="cursor-pointer text-xs text-zinc-500">{nl ? 'Bewerken' : 'Edit'}</summary>
+        <SaveForm
+          action={updatePermissionAction}
+          submitLabel={nl ? 'Opslaan' : 'Save'}
+          savingLabel={nl ? 'Opslaan…' : 'Saving…'}
+          savedMessage={nl ? 'Permissie bijgewerkt' : 'Permission updated'}
+          fallbackErrorMessage={nl ? 'Opslaan mislukt' : 'Could not save'}
+          errorMessages={errorMessages}
+          className="mt-2 space-y-3"
+        >
+          <input type="hidden" name="clientId" value={clientId} />
+          <input type="hidden" name="permissionId" value={permission.id} />
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div>
+              <label className="mb-1 block text-xs font-medium text-[#5c667f]">Label (NL)</label>
+              <Input name="labelNl" defaultValue={permission.labelNl} required />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-medium text-[#5c667f]">Label (EN)</label>
+              <Input name="labelEn" defaultValue={permission.labelEn} required />
+            </div>
+          </div>
+          {/* De toegangspermissie afvoeren zou iedereen buitensluiten zonder dat
+              er zichtbaar iets verandert; daarom enkel voor de gewone codes. */}
+          {!permission.system && (
+            <label className="flex items-start gap-2 text-sm">
+              <input type="checkbox" name="deprecated" value="1" defaultChecked={permission.deprecated} className="mt-1" />
+              <span>
+                {nl ? 'Afvoeren' : 'Deprecate'}
+                <span className="block text-xs text-zinc-500">
+                  {nl
+                    ? 'Verbergt de code bij het toekennen en laat ze uit nieuwe tokens weg. Bestaande toekenningen blijven staan, zodat je later veilig kan verwijderen.'
+                    : 'Hides the code when granting and leaves it out of new tokens. Existing grants stay, so you can delete it safely later.'}
+                </span>
+              </span>
+            </label>
+          )}
+        </SaveForm>
       </details>
     </li>
   );
@@ -419,7 +471,7 @@ function GrantChip({
   nl: boolean;
   clientId: string;
   grantId: string;
-  kind: 'user' | 'role' | 'group';
+  kind: 'role' | 'group';
   label: string;
 }) {
   return (
@@ -432,117 +484,14 @@ function GrantChip({
         srLabel={`${nl ? 'Intrekken' : 'Revoke'}: ${label}`}
         title={nl ? 'Toekenning intrekken?' : 'Revoke grant?'}
         description={
-          kind === 'user'
-            ? nl
-              ? 'De tokens van dit lid voor deze applicatie worden ingetrokken. Een al uitgedeeld access token blijft geldig tot het vervalt (max. 10 minuten).'
-              : "This member's tokens for this application are revoked. An access token already handed out stays valid until it expires (max. 10 minutes)."
-            : nl
-              ? 'Welke leden dit raakt is niet vooraf te bepalen, dus worden de lopende tokens van de hele applicatie ingetrokken. Iedereen moet opnieuw aanmelden.'
-              : 'Which members this affects cannot be determined up front, so all current tokens for this application are revoked. Everyone has to sign in again.'
+          nl
+            ? 'Enkel de leden die deze code hierdoor kwijtraken, worden uitgelogd bij deze applicatie; wie ze ook via een andere rol of post heeft, merkt niets. Een al uitgedeeld access token blijft geldig tot het vervalt (max. 10 minuten).'
+            : 'Only the members who actually lose this code are signed out of this application; anyone who also has it through another role or post is unaffected. An access token already handed out stays valid until it expires (max. 10 minutes).'
         }
         confirmLabel={nl ? 'Intrekken' : 'Revoke'}
         cancelLabel={nl ? 'Annuleren' : 'Cancel'}
         successMessage={nl ? 'Toekenning ingetrokken' : 'Grant revoked'}
       />
     </span>
-  );
-}
-
-/** Zelfde patroon als AddRoleMemberForm in admin/roles: server-side zoeken, nooit alle leden laden. */
-function GrantToUserForm({ nl, clientId, permissionId }: { nl: boolean; clientId: string; permissionId: string }) {
-  const [query, setQuery] = useState('');
-  const [results, setResults] = useState<SearchUser[]>([]);
-  const [selected, setSelected] = useState<SearchUser | null>(null);
-  const [open, setOpen] = useState(false);
-
-  useEffect(() => {
-    const q = query.trim();
-    if (selected || q.length < 2) return;
-    const timer = setTimeout(async () => {
-      try {
-        const resp = await fetch(`/api/users/search?q=${encodeURIComponent(q)}`, { cache: 'no-store' });
-        if (resp.ok) {
-          setResults(await resp.json());
-          setOpen(true);
-        }
-      } catch {
-        /* stille fout: gebruiker kan opnieuw typen */
-      }
-    }, 250);
-    return () => clearTimeout(timer);
-  }, [query, selected]);
-
-  function reset() {
-    setSelected(null);
-    setQuery('');
-    setResults([]);
-    setOpen(false);
-  }
-
-  return (
-    <form
-      action={grantPermissionAction}
-      onSubmit={() => setTimeout(reset, 0)}
-      className="flex flex-wrap items-end gap-2"
-    >
-      <input type="hidden" name="clientId" value={clientId} />
-      <input type="hidden" name="permissionId" value={permissionId} />
-      <input type="hidden" name="kind" value="user" />
-      <input type="hidden" name="userId" value={selected?.id ?? ''} />
-
-      <div className="relative min-w-[220px]">
-        <label className="mb-1 block text-xs font-medium text-[#5c667f]">
-          {nl ? 'Rechtstreeks aan een lid' : 'Directly to a member'}
-        </label>
-        <Input
-          value={query}
-          onChange={(e) => {
-            const value = e.target.value;
-            setQuery(value);
-            if (selected) setSelected(null);
-            if (value.trim().length < 2) {
-              setResults([]);
-              setOpen(false);
-            }
-          }}
-          onFocus={() => results.length > 0 && setOpen(true)}
-          placeholder={nl ? 'Naam, e-mail of r-nummer' : 'Name, email or r-number'}
-          autoComplete="off"
-        />
-        {open && results.length > 0 && (
-          <ul className="absolute z-10 mt-1 max-h-60 w-full overflow-auto rounded-xl border border-zinc-200 bg-white shadow-lg">
-            {results.map((user) => (
-              <li key={user.id}>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setSelected(user);
-                    setQuery(user.name);
-                    setOpen(false);
-                  }}
-                  className="flex w-full flex-col items-start px-3 py-2 text-left text-sm hover:bg-zinc-50"
-                >
-                  <span className="font-medium">{user.name}</span>
-                  <span className="text-xs text-zinc-500">{user.email}</span>
-                </button>
-              </li>
-            ))}
-          </ul>
-        )}
-      </div>
-
-      <label className="text-xs text-[#5c667f]">
-        {nl ? 'Vervalt op (optioneel)' : 'Expires on (optional)'}
-        <input
-          type="date"
-          name="expiresAt"
-          className="mt-1 block rounded-lg border border-zinc-300 px-2 py-1 text-sm"
-        />
-      </label>
-
-      <Button type="submit" variant="secondary" disabled={!selected}>
-        {nl ? 'Toekennen' : 'Grant'}
-      </Button>
-    </form>
   );
 }

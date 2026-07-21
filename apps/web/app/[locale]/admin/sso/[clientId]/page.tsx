@@ -5,7 +5,7 @@ import { hasLocale } from '@/lib/locale';
 import { requirePermission } from '@/lib/session';
 import { prisma } from '@vtk/db';
 import {
-  accessRoleGrantCountsByClient,
+  accessRoleGrantCount,
   countMembersWithAccess,
   getSsoClient,
   listClientGrants,
@@ -35,7 +35,7 @@ export default async function SsoClientDetail({ params }: { params: Promise<{ lo
   // Twee verschillende vragen, dus twee tellingen. Het formulier waarschuwt of
   // er überhaupt iemand binnen raakt (elk pad telt); "Aandacht vereist" kijkt of
   // toegang via een rol geregeld is (zie attention.ts).
-  const [permissions, grants, roles, groups, accessGrantCount, accessRoleGrantCounts] = await Promise.all([
+  const [permissions, grants, roles, groups, accessGrantCount, accessRoleGrants] = await Promise.all([
     listClientPermissions(requestHeaders, clientId),
     listClientGrants(requestHeaders, clientId),
     prisma.role.findMany({ orderBy: { order: 'asc' }, select: { id: true, nameNl: true, nameEn: true } }),
@@ -45,10 +45,10 @@ export default async function SsoClientDetail({ params }: { params: Promise<{ lo
       select: { id: true, nameNl: true, nameEn: true },
     }),
     countMembersWithAccess(clientId),
-    accessRoleGrantCountsByClient(requestHeaders),
+    accessRoleGrantCount(requestHeaders, clientId),
   ]);
 
-  const warnings = attentionFor(client, accessRoleGrantCounts[clientId] ?? 0);
+  const warnings = attentionFor(client, accessRoleGrants);
   const nl = locale === 'nl';
   const base = nl ? '' : '/en';
 
@@ -110,12 +110,7 @@ export default async function SsoClientDetail({ params }: { params: Promise<{ lo
           system: permission.system,
           deprecated: permission.deprecated,
         }))}
-        grants={{
-          // Dates zijn niet serialiseerbaar naar een client component.
-          users: grants.users.map((grant) => ({ ...grant, expiresAt: grant.expiresAt?.toISOString() ?? null })),
-          roles: grants.roles,
-          groups: grants.groups,
-        }}
+        grants={{ roles: grants.roles, groups: grants.groups }}
         roles={roles.map((role) => ({ id: role.id, name: nl ? role.nameNl : role.nameEn }))}
         groups={groups.map((group) => ({ id: group.id, name: nl ? group.nameNl : group.nameEn }))}
       />
@@ -132,7 +127,7 @@ export default async function SsoClientDetail({ params }: { params: Promise<{ lo
                 <span className="font-medium">{row.actorName}</span>
                 <span className="text-zinc-600">
                   {row.action}
-                  {row.summary ? ` — ${row.summary}` : ''}
+                  {row.summary ? `, ${row.summary}` : ''}
                 </span>
               </li>
             ))}

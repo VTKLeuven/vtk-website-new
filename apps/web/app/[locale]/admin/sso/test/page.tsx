@@ -66,19 +66,19 @@ export default async function FlowTestPage({ params }: { params: Promise<{ local
             {[
               {
                 value: 'open',
-                label: nl ? 'Open — elk lid mag binnen' : 'Open — any member may enter',
+                label: nl ? 'Open, elk lid mag binnen' : 'Open, any member may enter',
                 hint: nl ? 'De gewone flow.' : 'The ordinary flow.',
               },
               {
                 value: 'restricted-denied',
-                label: nl ? 'Beperkt — zonder toegang voor mij' : 'Restricted — without access for me',
+                label: nl ? 'Beperkt, zonder toegang voor mij' : 'Restricted, without access for me',
                 hint: nl
                   ? 'Je hoort op de blokpagina te landen in plaats van bij het toestemmingsscherm.'
                   : 'You should land on the block page instead of the consent screen.',
               },
               {
                 value: 'restricted-granted',
-                label: nl ? 'Beperkt — met toegang voor mij' : 'Restricted — with access for me',
+                label: nl ? 'Beperkt, met toegang voor mij' : 'Restricted, with access for me',
                 hint: nl
                   ? 'Je krijgt flowtest.access toegekend en de flow hoort gewoon door te gaan.'
                   : 'You are granted flowtest.access and the flow should continue as normal.',
@@ -120,9 +120,9 @@ export default async function FlowTestPage({ params }: { params: Promise<{ local
           <select id="prompt" name="prompt" className="rounded border p-2 text-sm">
             <option value="">{nl ? '(geen)' : '(none)'}</option>
             <option value="consent">
-              consent {nl ? '— toon het toestemmingsscherm altijd' : '— always show consent'}
+              consent {nl ? ', toon het toestemmingsscherm altijd' : ', always show consent'}
             </option>
-            <option value="login">login {nl ? '— vraag opnieuw aanmelden' : '— force re-authentication'}</option>
+            <option value="login">login {nl ? ', vraag opnieuw aanmelden' : ', force re-authentication'}</option>
           </select>
           <p className="mt-1 text-xs text-zinc-500">
             {nl

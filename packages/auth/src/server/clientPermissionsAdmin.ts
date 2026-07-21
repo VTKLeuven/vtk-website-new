@@ -13,6 +13,8 @@ import 'server-only';
 import type { RoleGrantKind, SsoAccessMode, SsoClientPermission } from '@prisma/client';
 import { prisma } from '@vtk/db';
 import { AuthError, hasPermission as rootHasPermission } from '..';
+import { currentWorkingYear } from '../lib/workingYear';
+import { effectiveClientPermissions } from './clientPermissions';
 import { getSessionCached } from './session';
 import {
   MAX_PERMISSIONS_PER_CLIENT,
@@ -93,8 +95,22 @@ export async function accessRoleGrantCountsByClient(headers: Headers): Promise<R
   });
 
   const counts: Record<string, number> = {};
-  for (const row of rows) counts[row.clientId] = row._count.roleGrants;
+  // Optellen en niet toewijzen: er hoort één systeempermissie per client te
+  // zijn, maar niets in het schema dwingt dat af. Overschrijven zou bij een
+  // tweede rij de telling van de eerste weggooien, en dan blijft de
+  // lock-out-waarschuwing stil terwijl niemand nog binnen raakt.
+  for (const row of rows) counts[row.clientId] = (counts[row.clientId] ?? 0) + row._count.roleGrants;
   return counts;
+}
+
+/** Zelfde telling voor één client; de detailpagina heeft de rest niet nodig. */
+export async function accessRoleGrantCount(headers: Headers, clientId: string): Promise<number> {
+  await requireSsoAdmin(headers);
+  const rows = await prisma.ssoClientPermission.findMany({
+    where: { clientId, system: true },
+    select: { _count: { select: { roleGrants: true } } },
+  });
+  return rows.reduce((total, row) => total + row._count.roleGrants, 0);
 }
 
 // ── Vanuit het rollenscherm ──────────────────────────────────────────────────
@@ -145,13 +161,6 @@ export async function listAllClientPermissions(headers: Headers) {
   }));
 }
 
-/** Welke client-permissies deze rol toekent. */
-export async function listRoleClientPermissions(headers: Headers, roleId: string): Promise<string[]> {
-  await requireRoleAdmin(headers);
-  const rows = await prisma.ssoRoleClientPermission.findMany({ where: { roleId }, select: { permissionId: true } });
-  return rows.map((row) => row.permissionId);
-}
-
 /**
  * Zet één client-permissie aan of uit voor een rol. Tegenhanger van
  * `setRolePermissionAction` voor gewone VTK-permissies.
@@ -174,9 +183,12 @@ export async function setRoleClientPermission(
       create: { permissionId, clientId: permission.clientId, roleId, grantedByUserId: actor.user.id },
     });
   } else {
+    // Wie de rol draagt, bepalen vóór het verwijderen; daarna is de link weg.
+    const candidates = await membersOfRole(roleId);
     await prisma.ssoRoleClientPermission.deleteMany({ where: { permissionId, roleId } });
-    // Wie de rol had, verliest het recht meteen; laat er geen token op doorleven.
-    await revokeTokensForClient(permission.clientId);
+    // Enkel wie de code hierdoor écht kwijtraakt, wordt uitgelogd. Wie ze ook
+    // via een andere rol of post heeft, merkt niets.
+    await revokeTokensForUsersLosing(permission.clientId, permission.code, candidates);
   }
 
   await writeAudit(
@@ -241,16 +253,44 @@ export async function setClientAccessMode(
   const actor = await requireSsoAdmin(headers);
   const client = await loadClient(clientId);
 
-  const namespace = input.permissionNamespace?.trim() || client.permissionNamespace;
+  const previous = client.permissionNamespace;
+  const namespace = input.permissionNamespace?.trim() || previous;
   if (input.accessMode === 'RESTRICTED' && !namespace) fail('NAMESPACE_REQUIRED');
   if (namespace) {
     const problem = checkNamespace(namespace);
     if (problem) fail(problem);
   }
 
-  await prisma.oauthClient.update({
-    where: { clientId },
-    data: { accessMode: input.accessMode, permissionNamespace: namespace ?? null },
+  const renamed = !!previous && !!namespace && previous !== namespace;
+
+  await prisma.$transaction(async (tx) => {
+    await tx.oauthClient.update({
+      where: { clientId },
+      data: { accessMode: input.accessMode, permissionNamespace: namespace ?? null },
+    });
+
+    // De namespace hernoemen betekent élke code van deze client hernoemen.
+    //
+    // De toekenningen wijzen naar `permissionId` en niet naar de code, dus ze
+    // overleven dit ongeschonden: wie `wiki.read` had, houdt `kb.read`. Zonder
+    // die hernoeming zouden de oude codes blijven staan terwijl de poort naar
+    // `<nieuw>.access` zoekt, en verloor iedereen stilzwijgend zijn toegang.
+    //
+    // Wat hier wél breekt is de applicatie aan de andere kant: die leest nog de
+    // oude codes uit de claim. Het scherm waarschuwt daarvoor.
+    if (renamed) {
+      const rows = await tx.ssoClientPermission.findMany({
+        where: { clientId },
+        select: { id: true, code: true },
+      });
+      for (const row of rows) {
+        if (!row.code.startsWith(`${previous}.`)) continue;
+        await tx.ssoClientPermission.update({
+          where: { id: row.id },
+          data: { code: `${namespace}.${row.code.slice(previous.length + 1)}` },
+        });
+      }
+    }
   });
 
   if (input.accessMode === 'RESTRICTED' && namespace) {
@@ -272,9 +312,20 @@ export async function setClientAccessMode(
   }
 
   // Van open naar beperkt: wie nu geen toegang meer heeft, mag niet met een
-  // lopend token binnen blijven. De GUI waarschuwt hiervoor.
-  if (input.accessMode === 'RESTRICTED' && client.accessMode === 'OPEN') {
-    await revokeTokensForClient(clientId);
+  // lopend token binnen blijven. Enkel die leden, niet iedereen: wie de
+  // toegangspermissie wél houdt, hoeft niet opnieuw aan te melden. Kandidaten
+  // zijn de leden met een lopend token; wie er geen heeft, valt vanzelf om.
+  if (input.accessMode === 'RESTRICTED' && client.accessMode === 'OPEN' && namespace) {
+    const tokenHolders = await prisma.oauthAccessToken.findMany({
+      where: { clientId, userId: { not: null } },
+      select: { userId: true },
+      distinct: ['userId'],
+    });
+    await revokeTokensForUsersLosing(
+      clientId,
+      accessCodeFor(namespace),
+      tokenHolders.map((token) => token.userId).filter((id): id is string => id !== null)
+    );
   }
 
   await writeAudit(
@@ -364,18 +415,28 @@ export async function deleteClientPermission(headers: Headers, permissionId: str
   // De access-permissie van een beperkte client weghalen sluit iedereen buiten.
   if (permission.system && client.accessMode === 'RESTRICTED') fail('SYSTEM_PERMISSION');
 
-  // Toekenningen verdwijnen mee via cascade, dus de tokens van wie ze had
-  // moeten weg: anders werkt een net ingetrokken recht nog tien minuten door.
+  // Wie de code had, verliest ze nu. Bepaal dat vóór het verwijderen: daarna is
+  // er niets meer om uit af te leiden.
+  const affected = await holdersOf(permissionId);
   await prisma.ssoClientPermission.delete({ where: { id: permissionId } });
-  await revokeTokensForClient(client.clientId);
+  await revokeTokensForUsers(client.clientId, affected);
 
   await writeAudit(actor, client, 'permission-delete', permission.code);
 }
 
 // ── Toekennen en intrekken ───────────────────────────────────────────────────
 
+/**
+ * Toekennen kan enkel via een rol of een post, nooit rechtstreeks aan een lid.
+ *
+ * Een losse toekenning aan één persoon werkt vandaag en valt stil zodra die
+ * persoon vertrekt, zonder dat iemand het merkt. Rollen en posten zijn
+ * werkingsjaar-gebonden en worden op het rollenscherm beheerd; dat is waar
+ * toegang thuishoort. De tabel `SsoUserClientPermission` blijft bestaan voor
+ * bestaande rijen en voor de flow-tester, maar er is geen beheerpad meer dat
+ * er nieuwe aanmaakt.
+ */
 export type GrantTarget =
-  | { kind: 'user'; userId: string; expiresAt?: Date | null }
   | { kind: 'role'; roleId: string }
   | { kind: 'group'; groupId: string; grantKind: RoleGrantKind };
 
@@ -390,13 +451,7 @@ export async function grantClientPermission(
   const client = await loadClient(permission.clientId);
   const common = { permissionId, clientId: permission.clientId, grantedByUserId: actor.user.id };
 
-  if (target.kind === 'user') {
-    await prisma.ssoUserClientPermission.upsert({
-      where: { permissionId_userId: { permissionId, userId: target.userId } },
-      update: { expiresAt: target.expiresAt ?? null },
-      create: { ...common, userId: target.userId, expiresAt: target.expiresAt ?? null },
-    });
-  } else if (target.kind === 'role') {
+  if (target.kind === 'role') {
     await prisma.ssoRoleClientPermission.upsert({
       where: { permissionId_roleId: { permissionId, roleId: target.roleId } },
       update: {},
@@ -412,25 +467,12 @@ export async function grantClientPermission(
     });
   }
 
+  // Toekennen neemt niemand iets af, dus hier hoeft geen token weg.
   await writeAudit(actor, client, 'grant', `${permission.code} via ${target.kind}`);
 }
 
 export async function revokeClientPermission(headers: Headers, grantId: string, kind: GrantTarget['kind']) {
   const actor = await requireSsoAdmin(headers);
-
-  if (kind === 'user') {
-    const grant = await prisma.ssoUserClientPermission.findUnique({
-      where: { id: grantId },
-      include: { permission: true },
-    });
-    if (!grant) fail('PERMISSION_NOT_FOUND');
-    const client = await loadClient(grant.clientId);
-    await prisma.ssoUserClientPermission.delete({ where: { id: grantId } });
-    // Alleen dit lid raakt zijn recht kwijt, dus alleen zijn tokens weg.
-    await revokeTokensForUser(grant.clientId, grant.userId);
-    await writeAudit(actor, client, 'revoke', `${grant.permission.code} van één lid`);
-    return;
-  }
 
   const grant =
     kind === 'role'
@@ -439,13 +481,70 @@ export async function revokeClientPermission(headers: Headers, grantId: string, 
   if (!grant) fail('PERMISSION_NOT_FOUND');
   const client = await loadClient(grant.clientId);
 
+  const candidates =
+    kind === 'role'
+      ? await membersOfRole((grant as { roleId: string }).roleId)
+      : await membersOfGroup(
+          (grant as { groupId: string }).groupId,
+          (grant as { kind: RoleGrantKind }).kind
+        );
+
   if (kind === 'role') await prisma.ssoRoleClientPermission.delete({ where: { id: grantId } });
   else await prisma.ssoGroupClientPermission.delete({ where: { id: grantId } });
 
-  // Welke leden dit raakt, is niet zonder de resolver per lid te weten; de hele
-  // client intrekken is grover maar wél volledig.
-  await revokeTokensForClient(grant.clientId);
+  await revokeTokensForUsersLosing(grant.clientId, grant.permission.code, candidates);
   await writeAudit(actor, client, 'revoke', `${grant.permission.code} via ${kind}`);
+}
+
+// ── Wie raakt dit ────────────────────────────────────────────────────────────
+
+/** Leden die deze rol dit werkingsjaar dragen, rechtstreeks of via een post. */
+async function membersOfRole(roleId: string): Promise<string[]> {
+  const year = currentWorkingYear();
+  const [direct, viaGroup] = await Promise.all([
+    prisma.userRole.findMany({ where: { roleId, year }, select: { userId: true } }),
+    prisma.groupRole.findMany({
+      where: { roleId },
+      select: {
+        kind: true,
+        group: { select: { memberships: { where: { year }, select: { userId: true, role: true } } } },
+      },
+    }),
+  ]);
+
+  const ids = new Set(direct.map((row) => row.userId));
+  for (const grant of viaGroup) {
+    for (const membership of grant.group.memberships) {
+      if (grant.kind === 'LEADER' && membership.role !== 'LEAD') continue;
+      ids.add(membership.userId);
+    }
+  }
+  return [...ids];
+}
+
+/** Leden van deze post dit werkingsjaar; `LEADER` enkel de verantwoordelijke. */
+async function membersOfGroup(groupId: string, kind: RoleGrantKind): Promise<string[]> {
+  const memberships = await prisma.groupMembership.findMany({
+    where: { groupId, year: currentWorkingYear() },
+    select: { userId: true, role: true },
+  });
+  return memberships
+    .filter((membership) => kind !== 'LEADER' || membership.role === 'LEAD')
+    .map((membership) => membership.userId);
+}
+
+/** Iedereen die een permissie op dit moment houdt, langs welk pad dan ook. */
+async function holdersOf(permissionId: string): Promise<string[]> {
+  const [users, roles, groups] = await Promise.all([
+    prisma.ssoUserClientPermission.findMany({ where: { permissionId }, select: { userId: true } }),
+    prisma.ssoRoleClientPermission.findMany({ where: { permissionId }, select: { roleId: true } }),
+    prisma.ssoGroupClientPermission.findMany({ where: { permissionId }, select: { groupId: true, kind: true } }),
+  ]);
+
+  const ids = new Set(users.map((row) => row.userId));
+  for (const role of roles) for (const id of await membersOfRole(role.roleId)) ids.add(id);
+  for (const group of groups) for (const id of await membersOfGroup(group.groupId, group.kind)) ids.add(id);
+  return [...ids];
 }
 
 // ── Tokens ───────────────────────────────────────────────────────────────────
@@ -455,16 +554,30 @@ export async function revokeClientPermission(headers: Headers, grantId: string, 
 // dat hoogstens tien minuten. Wat hier weggaat zijn de refresh tokens, zodat er
 // niets nieuws meer uit voortkomt.
 
-async function revokeTokensForClient(clientId: string): Promise<void> {
+async function revokeTokensForUsers(clientId: string, userIds: string[]): Promise<void> {
+  if (!userIds.length) return;
   await prisma.$transaction([
-    prisma.oauthAccessToken.deleteMany({ where: { clientId } }),
-    prisma.oauthRefreshToken.deleteMany({ where: { clientId } }),
+    prisma.oauthAccessToken.deleteMany({ where: { clientId, userId: { in: userIds } } }),
+    prisma.oauthRefreshToken.deleteMany({ where: { clientId, userId: { in: userIds } } }),
   ]);
 }
 
-async function revokeTokensForUser(clientId: string, userId: string): Promise<void> {
-  await prisma.$transaction([
-    prisma.oauthAccessToken.deleteMany({ where: { clientId, userId } }),
-    prisma.oauthRefreshToken.deleteMany({ where: { clientId, userId } }),
-  ]);
+/**
+ * Trekt de tokens in van precies die leden die de code **niet meer** houden.
+ *
+ * Een rol- of postgrant intrekken raakt lang niet iedereen: wie de code ook via
+ * een andere rol krijgt, verandert er niets aan. Iedereen uitloggen omdat één
+ * toekenning wegviel, is een storing veroorzaken om een storing te vermijden.
+ *
+ * Roep dit aan **nadat** de toekenning weg is; de resolver moet de nieuwe
+ * toestand zien. De lus is bewust serieel: dit is een beheeractie op een
+ * handvol leden, geen heet pad.
+ */
+async function revokeTokensForUsersLosing(clientId: string, code: string, candidates: string[]): Promise<void> {
+  const losing: string[] = [];
+  for (const userId of candidates) {
+    const codes = await effectiveClientPermissions(userId, clientId);
+    if (!codes.includes(code)) losing.push(userId);
+  }
+  await revokeTokensForUsers(clientId, losing);
 }

@@ -27,7 +27,7 @@ function protectTicketResponse(response: NextResponse, pathname: string): NextRe
 }
 
 // A request is a short-link request when its host is a short-link host. By
-// convention that is any host whose first label is "on" — so it works in every
+// convention that is any host whose first label is "on", so it works in every
 // environment without configuration: on.vtk.be (prod), on.main-dev.vtk.be
 // (dev), etc. Set SHORTLINK_HOST to a comma-separated list to override the
 // convention with an exact allowlist instead.

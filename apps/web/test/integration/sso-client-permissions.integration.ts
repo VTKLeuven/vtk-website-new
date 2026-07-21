@@ -155,6 +155,30 @@ describe.sequential('client permissions', () => {
     });
   });
 
+  it('keeps the code when a second path still grants it', async () => {
+    // De regel waarop het gericht uitloggen steunt: één toekenning intrekken mag
+    // niemand raken die de code ook via een ander pad houdt.
+    const second = await prisma.role.create({
+      data: { id: randomUUID(), code: `perm-role2-${suffix}`, nameNl: 'Tweede', nameEn: 'Second' },
+    });
+    await prisma.userRole.create({ data: { userId: ids.user, roleId: second.id, year } });
+    await prisma.ssoRoleClientPermission.create({
+      data: { permissionId: permissionIds[`${namespace}.edit`], clientId, roleId: second.id },
+    });
+
+    // De eerste rol verliezen laat de code staan, want de tweede geeft ze ook.
+    await prisma.userRole.deleteMany({ where: { userId: ids.user, roleId: ids.role, year } });
+    expect(await effectiveClientPermissions(ids.user, clientId)).toContain(`${namespace}.edit`);
+
+    // Pas als het laatste pad wegvalt, is de code echt weg.
+    await prisma.ssoRoleClientPermission.deleteMany({ where: { roleId: second.id } });
+    expect(await effectiveClientPermissions(ids.user, clientId)).not.toContain(`${namespace}.edit`);
+
+    await prisma.userRole.deleteMany({ where: { roleId: second.id } });
+    await prisma.role.delete({ where: { id: second.id } });
+    await prisma.userRole.create({ data: { userId: ids.user, roleId: ids.role, year } });
+  });
+
   it('releases nothing for a deactivated member', async () => {
     await prisma.user.update({ where: { id: ids.user }, data: { active: false } });
     expect(await effectiveClientPermissions(ids.user, clientId)).toEqual([]);

@@ -8,11 +8,11 @@ import {
   saveRoleAction,
   deleteRoleAction,
   setRolePermissionAction,
-  setRoleClientPermissionAction,
   removeUserRoleAction,
 } from "@/app/actions/roles";
 import { setGroupRoleAction } from "@/app/actions/users-groups";
 import { AddRoleMemberForm } from "./AddRoleMemberForm";
+import { ClientPermToggle } from "./ClientPermToggle";
 import {
   Avatar,
   Chevron,
@@ -510,27 +510,20 @@ function RoleDetail({
                     <div key={clientName}>
                       <h5 className="mb-1 text-[11px] font-semibold uppercase text-zinc-500">{clientName}</h5>
                       <ul className="space-y-1 text-sm">
-                        {perms.map((p) => {
-                          const on = enabledClientPerms.has(p.id);
-                          return (
-                            <li key={p.id}>
-                              <form action={setRoleClientPermissionAction}>
-                                <input type="hidden" name="roleId" value={role.id} />
-                                <input type="hidden" name="permissionId" value={p.id} />
-                                <input type="hidden" name="enabled" value={on ? "0" : "1"} />
-                                <label className="inline-flex cursor-pointer items-center gap-2">
-                                  <ToggleDot on={on} title={p.code} />
-                                  <span>{p.label}</span>
-                                  {p.grantsAccess && (
-                                    <span className="rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] text-amber-900">
-                                      {nl ? "toegang" : "access"}
-                                    </span>
-                                  )}
-                                </label>
-                              </form>
-                            </li>
-                          );
-                        })}
+                        {perms.map((p) => (
+                          <li key={p.id}>
+                            <ClientPermToggle
+                              nl={nl}
+                              roleId={role.id}
+                              permissionId={p.id}
+                              code={p.code}
+                              label={p.label}
+                              clientName={p.clientName}
+                              grantsAccess={p.grantsAccess}
+                              on={enabledClientPerms.has(p.id)}
+                            />
+                          </li>
+                        ))}
                       </ul>
                     </div>
                   ))}
@@ -654,7 +647,7 @@ function GrantToggle({
       <input type="hidden" name="roleId" value={roleId} />
       <input type="hidden" name="kind" value={kind} />
       <input type="hidden" name="enabled" value={on ? "0" : "1"} />
-      <ToggleDot on={on} title={`${roleName} — ${post.name}: ${which}`} />
+      <ToggleDot on={on} title={`${roleName}, ${post.name}: ${which}`} />
     </form>
   );
 }
