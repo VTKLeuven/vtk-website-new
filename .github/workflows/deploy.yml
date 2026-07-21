@@ -2,9 +2,9 @@ name: Verify and deploy
 
 on:
   push:
-    branches: ["main"]
+    branches: ['main']
   pull_request:
-    branches: ["main"]
+    branches: ['main']
 
 jobs:
   verify:
@@ -12,6 +12,7 @@ jobs:
     env:
       DATABASE_URL: postgresql://vtk:vtk@127.0.0.1:5432/vtk_test?schema=public
       BETTER_AUTH_SECRET: 4tFQwV8Gq2YcX9nB6mR3kL7sP5uD1zH0jA8eC4vN2xM
+      BETTER_AUTH_URL: http://localhost:3000
       TICKETING_TOKEN_SECRET: 7gK3wQ9cT2mV8xN4pR6yH1dF5sL0aJ7uB9eC3zX6qWk
       TICKETING_MAINTENANCE_SECRET: 5nD8vL2qH7xM4cR9wT1sF6jK3pY0uA5eB8gN2zQ7mVc
     services:
