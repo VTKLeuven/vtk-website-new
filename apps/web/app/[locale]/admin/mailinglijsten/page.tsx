@@ -4,6 +4,9 @@ import { Card } from "@vtk/ui";
 import { getDictionary, type Locale } from "@vtk/i18n";
 import { hasLocale } from "@/lib/locale";
 import { requirePermission } from "@/lib/session";
+import { SaveForm } from "@/components/ui/SaveForm";
+import { syncMailingListsAction } from "@/app/actions/mailinglists";
+import { brevoEnabled } from "@/lib/brevo/client";
 import {
   ALL_STUDENTS,
   MAILING_LISTS,
@@ -15,6 +18,10 @@ import {
 /**
  * Mailinglijst-tab: per categorie een download met de leden die ze aangevinkt
  * hebben. De aantallen tellen enkel actieve leden, net als de export zelf.
+ *
+ * Bovenaan staat de Brevo-sync: is die geconfigureerd, dan gaan de lijsten
+ * automatisch naar Brevo (real-time + dagelijkse reconciliatie) en dient de
+ * download enkel nog als backup. Zonder `BREVO_KEY` blijft alles bij het oude.
  */
 export default async function AdminMailingLists({
   params,
@@ -29,6 +36,7 @@ export default async function AdminMailingLists({
   const t = getDictionary(locale).mailinglists;
   const categories = getDictionary(locale).onboarding.categories;
   const nl = locale === "nl";
+  const syncOn = brevoEnabled();
 
   const counts = await Promise.all(
     MAILING_LISTS.map((id) => prisma.user.count({ where: listWhere(id) }))
@@ -43,6 +51,38 @@ export default async function AdminMailingLists({
         <h1 className="text-2xl font-semibold text-vtk-ink">{t.title}</h1>
         <p className="mt-1 max-w-2xl text-sm text-[#5c667f]">{t.intro}</p>
       </div>
+
+      <Card className="p-5">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="max-w-2xl">
+            <div className="flex items-center gap-2">
+              <h2 className="font-medium text-vtk-ink">{t.syncTitle}</h2>
+              <span
+                className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
+                  syncOn ? "bg-emerald-100 text-emerald-800" : "bg-vtk-blue/10 text-[#5c667f]"
+                }`}
+              >
+                {syncOn ? t.syncOn : t.syncOff}
+              </span>
+            </div>
+            <p className="mt-1 text-sm text-[#5c667f]">{syncOn ? t.syncIntroOn : t.syncIntroOff}</p>
+          </div>
+
+          {syncOn ? (
+            <SaveForm
+              action={syncMailingListsAction}
+              submitLabel={t.syncButton}
+              savingLabel={t.syncing}
+              savedMessage={t.syncedToast}
+              errorMessages={{
+                BREVO_DISABLED: t.syncDisabledToast,
+                BREVO_PARTIAL: t.syncPartialToast,
+              }}
+              fallbackErrorMessage={t.syncErrorToast}
+            />
+          ) : null}
+        </div>
+      </Card>
 
       <Card className="p-5">
         <ul className="divide-y divide-vtk-blue/10">

@@ -327,6 +327,60 @@ SSO. Concrete implementatie: hook in `packages/auth/src/auth.ts`, gate in
   elke lijst waar het bij hoort**. Lege lijsten blijven in de ZIP zitten zodat de
   mappenstructuur voorspelbaar is.
 
+### Mailinglijsten in Brevo (automatische sync)
+
+De vroegere werkwijze was: begin van het jaar, nadat iedereen ingelogd en zijn
+richting aangeduid had, de lijsten één keer downloaden en handmatig in Brevo
+importeren. Dat had twee stille gebreken: leden die hun richting **later**
+invulden werden gemist, en de voorkeuren die een lid op de site kon zetten (welke
+mails, welke richting) **deden niets**, want de lijsten in Brevo werden nooit meer
+bijgewerkt. De Brevo-sync (`apps/web/lib/brevo/`) haalt de tussenpersoon weg.
+
+- **Optioneel, achter `BREVO_KEY`.** Geen key = integratie uit en alles gedraagt
+  zich zoals vroeger; de CSV/ZIP-download blijft dan (en ook mét sync) bestaan als
+  backup. Zelfde stramien als de cudi-koppeling.
+- **Twee sporen, net als cudi.** Een **real-time** best-effort push bij elke
+  profiel- of studiewijziging (via `after()` in de onboarding-/bevestig-actions,
+  zodat een hapering bij Brevo het opslaan niet breekt), plus een **dagelijkse
+  reconciliatie** (`POST /api/admin/mailinglijsten/sync`, bearer-secret
+  `BREVO_SYNC_SECRET`) als vangnet. Er is ook een "Nu synchroniseren"-knop in de
+  admin-tab.
+- **De site is de enige bron van waarheid.** De reconciliatie doet upsert **én
+  prune**: wie een categorie afvinkt, van richting verandert, afstudeert
+  (`studyConfirmedYear` verloopt), gedeactiveerd wordt of "ik studeer niet meer"
+  aanduidt, verdwijnt vanzelf uit de betrokken lijsten. Daarom zijn het **verse,
+  door de site aangemaakte** Brevo-lijsten (folder "VTK Website"), niet bestaande
+  lijsten waar ook handmatig toegevoegde contacten in kunnen zitten die een prune
+  zou wissen.
+- **Wie in welke lijst hoort, is exact dezelfde regel als de CSV-export.**
+  `desiredListKeys()` in `lib/brevo/contacts.ts` is de JS-tegenhanger van
+  `listWhere()` in `lib/mailinglists.ts`; `test/brevoSync.test.ts` bewaakt dat ze
+  gelijk blijven. Lopen ze uiteen, dan verschilt de sync van de download.
+- **Career splitst niet in tientallen lijsten, maar via attributen + segmenten.**
+  Er is één `VTK - Career`-lijst; studiejaar en richting gaan als **boolean
+  contactattributen** mee (`YEAR_BACHELOR_2`, `PROG_CIVIL`, ...). De Career-ploeg
+  bouwt de opsplitsing (bv. Burgerlijk + 2de bach) in Brevo als **segment**. Dat
+  vervangt de ~50 CSV's uit de ZIP door één lijst plus segmenten; veel minder te
+  synchroniseren en te laten driften. De ZIP-download blijft wel bestaan voor wie
+  liever de kant-en-klare opsplitsing heeft.
+- **Consent blijft de website.** De site is de opt-in-plek; we importeren als
+  reeds-opted-in (single opt-in via de API), geen dubbele-opt-in-mail vanuit Brevo.
+- **Identiteit via het voorkeursadres, met `ext_id = user.id`.** Wisselt een lid
+  tussen universiteits- en persoonlijke mail, dan haalt de real-time push het
+  níét-gekozen adres uit alle lijsten, zodat er geen dubbele inschrijving op het
+  oude adres achterblijft; de reconciliatie prunet zo'n restadres sowieso weg.
+- **Lijst-ID's leven in de `Setting`-tabel** (`brevo.lists`), idempotent
+  op naam aangemaakt: geen migratie, en een bestaande folder/lijst wordt
+  hergebruikt in plaats van gedupliceerd.
+- **Val om te kennen: Brevo's "Authorised IPs".** Staat die accountbeveiliging
+  aan, dan geeft élke API-call een `401` met `code: "unauthorized"` en een
+  IP-adres in de melding, ook al is de key geldig. Voeg het uitgaande IP van de
+  productieserver toe in Brevo (Security, Authorised IPs) of zet de restrictie af;
+  anders faalt de sync stil (real-time via `after()`) tot de reconciliatie ze
+  opnieuw probeert en óók faalt. De folder/lijsten/attributen worden pas
+  aangemaakt bij de eerste geslaagde sync (knop, cron of profielwijziging), niet
+  bij het deployen; er wordt dus niets in Brevo gezet zolang de key/IP niet werkt.
+
 ### Posten (groepen) & werkingsjaren
 
 - Een **post** = een `Group`. In de admin heet dit voortaan **"Posten"** (niet

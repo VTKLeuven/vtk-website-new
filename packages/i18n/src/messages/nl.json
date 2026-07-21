@@ -337,7 +337,19 @@
     "member": "lid",
     "members": "leden",
     "downloadCsv": "Download CSV",
-    "downloadZip": "Download ZIP"
+    "downloadZip": "Download ZIP",
+    "syncTitle": "Automatische sync met Brevo",
+    "syncIntroOn": "De lijsten gaan automatisch naar Brevo zodra een lid zijn voorkeuren of studie wijzigt, met een dagelijkse reconciliatie als vangnet. Downloaden en handmatig importeren hoeft niet meer; de CSV/ZIP hieronder blijft als backup.",
+    "syncIntroOff": "Nog niet geconfigureerd. Zonder Brevo-API-key (BREVO_KEY) verandert er niets en blijf je op de handmatige CSV-download hieronder aangewezen.",
+    "syncStatus": "Status",
+    "syncOn": "Actief",
+    "syncOff": "Uit",
+    "syncButton": "Nu synchroniseren",
+    "syncing": "Bezig met synchroniseren…",
+    "syncedToast": "Mailinglijsten gesynchroniseerd met Brevo.",
+    "syncErrorToast": "Synchroniseren met Brevo is mislukt.",
+    "syncDisabledToast": "Brevo-integratie staat uit (geen BREVO_KEY).",
+    "syncPartialToast": "Deels gesynchroniseerd: één of meer lijsten faalden. Probeer opnieuw of bekijk de logs."
   },
   "common": {
     "loading": "Laden...",

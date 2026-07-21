@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { after } from "next/server";
 import { z } from "zod";
 import sharp from "sharp";
 import { Prisma } from "@prisma/client";
@@ -18,6 +19,7 @@ import {
   STUDY_PROGRAMMES,
   R_NUMBER_REGEX,
 } from "@/lib/profile";
+import { syncUserToBrevo } from "@/lib/brevo/sync";
 
 /**
  * De studievelden, gedeeld door het volledige profielformulier en de jaarlijkse
@@ -232,6 +234,11 @@ export async function saveProfileAction(
   revalidatePath("/pocs");
   revalidatePath("/account");
 
+  // Voorkeuren en studie kunnen net gewijzigd zijn: duw het lid naar Brevo zodat
+  // de mailinglijsten meteen kloppen. Best-effort na de response (blokkeert het
+  // opslaan niet); de dagelijkse reconciliatie is het vangnet als dit faalt.
+  after(() => syncUserToBrevo(session.user.id));
+
   // Buiten elke try/catch: redirect() werkt via een throw en mag niet als
   // "onverwachte fout" opgevangen worden.
   const next = safeNext(formData);
@@ -268,5 +275,7 @@ export async function confirmStudyAction(formData: FormData): Promise<void> {
   });
 
   revalidatePath("/account");
+  // Studiejaar/richting/bevestiging kunnen net gewijzigd zijn: houd Brevo gelijk.
+  after(() => syncUserToBrevo(session.user.id));
   redirect(safeNext(formData) ?? "/");
 }

@@ -337,7 +337,19 @@
     "member": "member",
     "members": "members",
     "downloadCsv": "Download CSV",
-    "downloadZip": "Download ZIP"
+    "downloadZip": "Download ZIP",
+    "syncTitle": "Automatic sync with Brevo",
+    "syncIntroOn": "Lists are pushed to Brevo automatically as soon as a member changes their preferences or study details, with a daily reconciliation as a safety net. No more downloading and importing by hand; the CSV/ZIP below stays as a backup.",
+    "syncIntroOff": "Not configured yet. Without a Brevo API key (BREVO_KEY) nothing is pushed and you keep relying on the manual CSV download below.",
+    "syncStatus": "Status",
+    "syncOn": "Active",
+    "syncOff": "Off",
+    "syncButton": "Sync now",
+    "syncing": "Syncing…",
+    "syncedToast": "Mailing lists synced with Brevo.",
+    "syncErrorToast": "Syncing with Brevo failed.",
+    "syncDisabledToast": "Brevo integration is off (no BREVO_KEY).",
+    "syncPartialToast": "Partially synced: one or more lists failed. Try again or check the logs."
   },
   "common": {
     "loading": "Loading...",
