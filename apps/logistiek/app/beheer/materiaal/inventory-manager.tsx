@@ -38,7 +38,7 @@ const CONDITIONS: Array<{ value: string; label: string }> = [
 
 const CONDITION_LABEL: Record<string, string> = Object.fromEntries(CONDITIONS.map((c) => [c.value, c.label]));
 
-const inputClass = 'h-10 rounded-lg border border-vtk-navy/15 bg-white px-3 text-sm text-vtk-ink';
+const inputClass = 'h-10 min-w-0 rounded-lg border border-vtk-navy/15 bg-white px-3 text-sm text-vtk-ink';
 
 function centsToEuroInput(cents: number): string {
   return cents === 0 ? '' : (cents / 100).toFixed(2).replace('.', ',');
@@ -97,14 +97,15 @@ function ItemFields({ item, categories }: { item?: AdminInventoryItem; categorie
     <>
       {item ? <input type="hidden" name="id" value={item.id} /> : null}
       {item ? <input type="hidden" name="expectedUpdatedAt" value={item.updatedAt.toISOString()} /> : null}
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
-        <div className="sm:col-span-2 xl:col-span-6">
+      <div className="@container">
+      <div className="grid gap-3 @lg:grid-cols-2 @3xl:grid-cols-6">
+        <div className="col-span-full">
           <PhotoUpload name="photoKey" initialKey={item?.photoKey ?? null} />
         </div>
-        <label className="grid gap-1 text-xs font-medium text-vtk-muted xl:col-span-2">
+        <label className="grid gap-1 text-xs font-medium text-vtk-muted @3xl:col-span-2">
           Naam<input type="text" name="name" defaultValue={item?.name ?? ''} className={inputClass} />
         </label>
-        <label className="grid gap-1 text-xs font-medium text-vtk-muted xl:col-span-2">
+        <label className="grid gap-1 text-xs font-medium text-vtk-muted @3xl:col-span-2">
           Categorie
           <select name="categoryId" defaultValue={item?.categoryId ?? ''} className={inputClass}>
             <option value="">Overig</option>
@@ -142,14 +143,15 @@ function ItemFields({ item, categories }: { item?: AdminInventoryItem; categorie
             ))}
           </select>
         </label>
-        <label className="grid gap-1 text-xs font-medium text-vtk-muted sm:col-span-2 xl:col-span-4">
+        <label className="grid gap-1 text-xs font-medium text-vtk-muted @lg:col-span-2 @3xl:col-span-4">
           Beschrijving <span className="font-normal">(optioneel)</span>
           <input type="text" name="description" defaultValue={item?.description ?? ''} placeholder="Bv. inclusief statief en kabel" className={inputClass} />
         </label>
-        <label className="grid gap-1 text-xs font-medium text-vtk-muted sm:col-span-2 xl:col-span-6">
+        <label className="grid gap-1 text-xs font-medium text-vtk-muted col-span-full">
           Notitie bij de staat <span className="font-normal">(optioneel)</span>
           <input type="text" name="conditionNote" defaultValue={item?.conditionNote ?? ''} className={inputClass} />
         </label>
+      </div>
       </div>
 
       <div className="rounded-[14px] border border-vtk-navy/10 bg-vtk-paper/50 p-4">

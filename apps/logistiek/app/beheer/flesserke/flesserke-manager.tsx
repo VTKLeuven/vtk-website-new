@@ -27,7 +27,7 @@ const ITEM_ERRORS = {
 };
 const CATEGORY_ERRORS = { NAME_REQUIRED: 'Geef de categorie een naam.', STALE: STALE_MESSAGE };
 
-const inputClass = 'h-9 rounded-lg border border-vtk-navy/15 bg-white px-3 text-sm text-vtk-ink';
+const inputClass = 'h-9 min-w-0 rounded-lg border border-vtk-navy/15 bg-white px-3 text-sm text-vtk-ink';
 
 function isExpiringSoon(date: Date | null): boolean {
   if (!date) return false;
@@ -83,10 +83,11 @@ function ItemFields({ item, categories }: { item?: AdminFlesserkeItem; categorie
       )
     : '';
   return (
-    <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+    <div className="@container">
+    <div className="grid gap-3 @lg:grid-cols-2 @2xl:grid-cols-4">
       {item ? <input type="hidden" name="id" value={item.id} /> : null}
       {item ? <input type="hidden" name="expectedUpdatedAt" value={item.updatedAt.toISOString()} /> : null}
-      <label className="grid gap-1 text-xs font-medium text-vtk-muted xl:col-span-2">
+      <label className="grid gap-1 text-xs font-medium text-vtk-muted @2xl:col-span-2">
         Naam<input type="text" name="name" defaultValue={item?.name ?? ''} className={inputClass} />
       </label>
       <label className="grid gap-1 text-xs font-medium text-vtk-muted">
@@ -118,12 +119,13 @@ function ItemFields({ item, categories }: { item?: AdminFlesserkeItem; categorie
       <label className="grid gap-1 text-xs font-medium text-vtk-muted">
         Rek<input type="text" name="locationRack" defaultValue={item?.locationRack ?? ''} className={inputClass} />
       </label>
-      <label className="grid gap-1 text-xs font-medium text-vtk-muted xl:col-span-2">
+      <label className="grid gap-1 text-xs font-medium text-vtk-muted @lg:col-span-2">
         Colruyt-link<input type="url" name="colruytUrl" defaultValue={item?.colruytUrl ?? ''} className={inputClass} />
       </label>
-      <label className="grid gap-1 text-xs font-medium text-vtk-muted xl:col-span-2">
+      <label className="grid gap-1 text-xs font-medium text-vtk-muted @lg:col-span-2">
         Notitie<input type="text" name="note" defaultValue={item?.note ?? ''} className={inputClass} />
       </label>
+    </div>
     </div>
   );
 }
