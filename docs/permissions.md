@@ -94,8 +94,8 @@ if (isMemberOfGroup(session, "LOGISTIEK")) { … }   // takes a group CODE, not 
 ```
 
 **API routes** — guard explicitly and return `authErrorResponse(err)` on the thrown auth errors;
-see `apps/web/app/api/users/search/route.ts` for the pattern (it allows any of `users.view`,
-`shift.edit`, `groups.manage`, `pocs.manage`, or super admin).
+see `apps/web/app/api/users/search/route.ts` for the pattern (it requires `users.search`, or super
+admin).
 
 **Server actions** must re-check (`await requirePermission(...)`) — never trust the client. Expected
 input errors are *returned* as `saveError(code)`, not thrown (see `CLAUDE.md`).
@@ -197,7 +197,11 @@ table whose rows expand into per-category editors, with create/import in modals.
 | `/admin/deur` (door access) | `door.manage` | Usage stats (1/7/30 d), temporary access grants (`DoorAccessGrant`, user typeahead + window), and the full access log (`DoorAccessLog`, incl. denied/unknown scans). |
 
 User pickers everywhere use the server-side typeahead `GET /api/users/search` (capped results), not
-a full user load, so they scale.
+a full user load, so they scale. That endpoint is gated on its own permission, **`users.search`**,
+rather than on the permission of whichever screen embeds the picker: the seeded `praesidium` role
+carries it, so every praesidium member can resolve a name. A role that needs a picker but is not
+praesidium (a werkgroep- or medewerker-role, say) must be given `users.search` explicitly in
+`/admin/roles`; holding `shift.edit` or `pocs.manage` alone is no longer enough.
 
 The **door** family is separate from the admin screens above: `door.open` (open the door with a
 student card, assigned to roles), `door.remoteOpen` (adds the open-door button to the `/admin`
@@ -214,7 +218,7 @@ every member of the post gets the role):
 | Role | Permissions | Granted to (post → DEFAULT) |
 |------|-------------|-----------------------------|
 | `admin` (system) | all | IT, Groep 5 |
-| `praesidium` | `calendar.create`, `photos.upload` | every post |
+| `praesidium` | `calendar.create`, `photos.upload`, `tickets.create`, `users.search` | every post |
 | `werkgroep` | none (fill in the GUI) | — |
 | `medewerker` | none (fill in the GUI) | — |
 | `theokot` | `theokot.manage`, `theokot.pickup` | Theokot |
