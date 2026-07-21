@@ -1273,6 +1273,17 @@ model Shift {
   // gedeactiveerd of hernoemd wordt.
   post String?
   // Ook een field bijhouden voor het evenement waarbij de shift hoort?
+
+  // Herkomst van een gespiegelde shift. Cursusdienst-shiften worden op
+  // cudi.vtk.be aangemaakt en hierheen gespiegeld; `sourceSystem` ("cudi") +
+  // `sourceId` (de cudi-shift-id) maken die spiegeling idempotent en markeren
+  // dat main-admins ze niet manueel beheren. Native VTK-shiften laten beide
+  // leeg (NULL, en NULLs botsen niet in de unieke index). Zie
+  // docs/design-decisions.md, "Cursusdienst-shiften op de main site".
+  sourceSystem String?
+  sourceId     String?
+
+  @@unique([sourceSystem, sourceId])
 }
 
 model ShiftParticipant {

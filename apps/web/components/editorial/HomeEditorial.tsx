@@ -8,6 +8,7 @@ import { AANBOD_PHOTOS } from "@/lib/aanbodPhotos";
 import { getMediaContent } from "@/lib/media-content";
 import { videoEmbed } from "@/lib/videoEmbed";
 import { getCurrentSession } from "@/lib/session";
+import { getCursusdienstHours } from "@/lib/cursusdienstHours";
 import { publicUrl } from "@/lib/storage";
 import { BUILTIN_DEFAULT_EVENT_IMAGE, DEFAULT_EVENT_IMAGE_SETTING } from "@/lib/defaultEventImage";
 import { PartnerLogo } from "@/components/site/PartnerLogo";
@@ -81,12 +82,11 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
   const now = new Date();
   const nl = locale === "nl";
 
-  const [settings, upcomingEvents, tabs, partners, media, session] = await Promise.all([
+  const [settings, upcomingEvents, tabs, partners, media, session, cursusEntries] = await Promise.all([
     prisma.setting.findMany({
       where: {
         key: {
           in: [
-            "home.openingHours.cursusdienst",
             "home.openingHours.theokot",
             "home.featuredAlbums",
             "home.career",
@@ -113,6 +113,9 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
     // gecachet. De rest van de pagina deed al een DB-lezing per render, dus dat
     // blijft één ronde extra en geen nieuw soort werk.
     getCurrentSession(),
+    // Cursusdienst-uren komen live van cudi.vtk.be; deze lezing valt terug op de
+    // laatst gecachte waarde en anders op null (kaart toont "niet beschikbaar").
+    getCursusdienstHours(locale),
   ]);
 
   // Aftermovies: `media.aftermovies` is dezelfde instelling als op /media, te
@@ -165,8 +168,8 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
   const pocsWithPeople = myPocs.filter((poc) => poc.representatives.length > 0);
 
   const map = new Map(settings.map((s) => [s.key, s.value as unknown]));
-  const cursus = map.get("home.openingHours.cursusdienst") as OpeningHoursSetting | undefined;
   const theokot = map.get("home.openingHours.theokot") as OpeningHoursSetting | undefined;
+  const cursusUnavailable = cursusEntries === null;
   const career = map.get("home.career") as CareerSetting | undefined;
   const defaultEventImage =
     publicUrl((map.get(DEFAULT_EVENT_IMAGE_SETTING) as { imageKey?: string | null } | undefined)?.imageKey) ??
@@ -174,16 +177,14 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
 
   const theoToday = theokot ? entryForDate(theokot.entries, now, locale) : undefined;
   const theoOpen = theoToday && isOpenAt(theoToday.hours, now);
-  const curToday = cursus ? entryForDate(cursus.entries, now, locale) : undefined;
+  const curToday = cursusEntries ? entryForDate(cursusEntries, now, locale) : undefined;
   const curOpen = curToday && !isClosedHours(curToday.hours) && isOpenAt(curToday.hours, now);
   // De titel is "Openingsuren Theokot"; de kaartkop en de gesloten-melding
   // gebruiken enkel de naam zelf.
   const theokotName = theokot
     ? pick(theokot.titleNl, theokot.titleEn, locale).replace(/^Openingsuren\s+/i, "")
     : "";
-  const cursusName = cursus
-    ? pick(cursus.titleNl, cursus.titleEn, locale).replace(/^Openingsuren\s+/i, "")
-    : "";
+  const cursusName = "Cursusdienst";
 
   const eventGroups = upcomingEvents.slice(0, 5).reduce<Array<{ key: string; date: Date; events: typeof upcomingEvents }>>(
     (acc, event) => {
@@ -430,7 +431,7 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
         </section>
       </div>
 
-      {(theokot || cursus) && (
+      {(theokot || cursusEntries || cursusUnavailable) && (
         <section className="hours-strip">
           <div className="sec-head">
             <h2>{nl ? "Openingsuren." : "Opening hours."}</h2>
@@ -468,29 +469,34 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
                 </dl>
               </div>
             ) : null}
-            {cursus ? (
-              <div className="hours-col section-hours-bg">
-                <h3>{cursusName}</h3>
+            <div className="hours-col section-hours-bg">
+              <h3>{cursusName}</h3>
+              {cursusEntries ? (
+                <>
+                  <div className="sub">{nl ? "Cursussen & tweedehands" : "Courses & second-hand"}</div>
+                  <div className={`status${curOpen ? "" : " closed"}`}>
+                    {curOpen ? (nl ? "Nu open" : "Open now") : closedLabel(cursusName, nl)}
+                  </div>
+                  <dl className="hours-list">
+                    {cursusEntries.map((row, i) => {
+                      const todayCls = row.dayNl === dutchDayNameForDate(now) ? "today" : "";
+                      return (
+                        <div key={i} style={{ display: "contents" }}>
+                          <dt className={todayCls}>{row.dayNl.slice(0, 2).toUpperCase()}</dt>
+                          <dd className={todayCls}>{row.hours}</dd>
+                        </div>
+                      );
+                    })}
+                  </dl>
+                </>
+              ) : (
                 <div className="sub">
-                  {pick(cursus.subtitleNl, cursus.subtitleEn, locale) ||
-                    (nl ? "Cursussen & tweedehands" : "Courses & second-hand")}
+                  {nl
+                    ? "De cursusdienst openingsuren zijn momenteel niet beschikbaar."
+                    : "The course shop opening hours are currently unavailable."}
                 </div>
-                <div className={`status${curOpen ? "" : " closed"}`}>
-                  {curOpen ? (nl ? "Nu open" : "Open now") : closedLabel(cursusName, nl)}
-                </div>
-                <dl className="hours-list">
-                  {cursus.entries.map((row, i) => {
-                    const todayCls = row.dayNl === dutchDayNameForDate(now) ? "today" : "";
-                    return (
-                      <div key={i} style={{ display: "contents" }}>
-                        <dt className={todayCls}>{row.dayNl.slice(0, 2).toUpperCase()}</dt>
-                        <dd className={todayCls}>{row.hours}</dd>
-                      </div>
-                    );
-                  })}
-                </dl>
-              </div>
-            ) : null}
+              )}
+            </div>
           </div>
         </section>
       )}

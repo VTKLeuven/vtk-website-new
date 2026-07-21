@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { prisma } from "@vtk/db";
 import { pick, type Locale } from "@vtk/i18n";
+import { getCursusdienstHours } from "@/lib/cursusdienstHours";
 import {
   DUTCH_FULL_DAYS,
   barPercentForHours,
@@ -62,15 +63,19 @@ export async function AanbodEditorial({ locale }: { locale: Locale }) {
   const base = locale === "nl" ? "" : "/en";
   const now = new Date();
 
-  const settings = await prisma.setting.findMany({
-    where: { key: { in: ["home.openingHours.cursusdienst", "home.openingHours.theokot"] } },
-  });
+  const [settings, cursusEntries] = await Promise.all([
+    prisma.setting.findMany({
+      where: { key: { in: ["home.openingHours.theokot"] } },
+    }),
+    // Cursusdienst-uren komen live van cudi.vtk.be, met terugval op de laatst
+    // gecachte waarde en anders null (dan tonen we "niet beschikbaar").
+    getCursusdienstHours(locale),
+  ]);
   const map = new Map(settings.map((s) => [s.key, s.value as unknown]));
-  const cursus = map.get("home.openingHours.cursusdienst") as OpeningHoursSetting | undefined;
   const theokot = map.get("home.openingHours.theokot") as OpeningHoursSetting | undefined;
 
   const theoToday = theokot ? entryForDate(theokot.entries, now, locale) : undefined;
-  const curToday = cursus ? entryForDate(cursus.entries, now, locale) : undefined;
+  const curToday = cursusEntries ? entryForDate(cursusEntries, now, locale) : undefined;
   const theoOpen = theoToday && !isClosedHours(theoToday.hours) && isOpenAt(theoToday.hours, now);
   const curOpen = curToday && !isClosedHours(curToday.hours) && isOpenAt(curToday.hours, now);
 
@@ -83,7 +88,7 @@ export async function AanbodEditorial({ locale }: { locale: Locale }) {
   });
 
   const theoTitle = theokot ? pick(theokot.titleNl, theokot.titleEn, locale).replace(/^Openingsuren\s+/i, "") : "Theokot";
-  const curTitle = cursus ? pick(cursus.titleNl, cursus.titleEn, locale).replace(/^Openingsuren\s+/i, "") : "Cursusdienst";
+  const curTitle = "Cursusdienst";
 
   return (
     <div className="vtk-design">
@@ -148,18 +153,20 @@ export async function AanbodEditorial({ locale }: { locale: Locale }) {
                 {" · "}
               </>
             ) : null}
-            {cursus ? (
+            <b>{curTitle}</b>{" "}
+            {cursusEntries ? (
               <>
-                <b>{curTitle}</b>{" "}
                 {curOpen ? (
                   <span className="op">{locale === "nl" ? "nu open" : "open now"}</span>
                 ) : (
                   <span className="cl">{locale === "nl" ? "gesloten of buiten uur" : "closed or outside hours"}</span>
                 )}
                 {curToday && !isClosedHours(curToday.hours) ? ` · ${curToday.hours}` : ""}
-                {" · "}
               </>
-            ) : null}
+            ) : (
+              <span className="cl">{locale === "nl" ? "uren niet beschikbaar" : "hours unavailable"}</span>
+            )}
+            {" · "}
             <b>Shiften</b>{" "}
             <span className="cl">{locale === "nl" ? "online via shiften.vtk.be" : "online at shiften.vtk.be"}</span>.
           </div>
@@ -224,60 +231,70 @@ export async function AanbodEditorial({ locale }: { locale: Locale }) {
             </article>
           ) : null}
 
-          {cursus ? (
-            <article className="svc">
-              <div className="svc-head">
-                <div>
-                  <div className="svc-num">{"// 002 · Cursusdienst"}</div>
-                  <h2>Cursusdienst</h2>
-                  <div className="tagline">{locale === "nl" ? "syllabi · boeken · tweedehands" : "syllabi · books · second-hand"}</div>
-                </div>
-                <div
-                  style={{
-                    fontFamily: "var(--mono)",
-                    fontSize: 11,
-                    letterSpacing: "0.06em",
-                    textTransform: "uppercase",
-                    textAlign: "right",
-                    color: "var(--muted)",
-                  }}
-                >
-                  KU Leuven
-                  <br />
-                  <b style={{ color: "var(--ink)", fontFamily: "var(--sans)", fontSize: 24, letterSpacing: "-0.02em", fontWeight: 500 }}>
-                    VTK
-                  </b>
-                </div>
+          <article className="svc">
+            <div className="svc-head">
+              <div>
+                <div className="svc-num">{"// 002 · Cursusdienst"}</div>
+                <h2>Cursusdienst</h2>
+                <div className="tagline">{locale === "nl" ? "syllabi · boeken · tweedehands" : "syllabi · books · second-hand"}</div>
               </div>
-              <div className="svc-status">
-                <span className={`state${curOpen ? " open" : " closed"}`}>
-                  {curOpen
+              <div
+                style={{
+                  fontFamily: "var(--mono)",
+                  fontSize: 11,
+                  letterSpacing: "0.06em",
+                  textTransform: "uppercase",
+                  textAlign: "right",
+                  color: "var(--muted)",
+                }}
+              >
+                KU Leuven
+                <br />
+                <b style={{ color: "var(--ink)", fontFamily: "var(--sans)", fontSize: 24, letterSpacing: "-0.02em", fontWeight: 500 }}>
+                  VTK
+                </b>
+              </div>
+            </div>
+            <div className="svc-status">
+              <span className={`state${cursusEntries && curOpen ? " open" : " closed"}`}>
+                {!cursusEntries
+                  ? locale === "nl"
+                    ? "Uren niet beschikbaar"
+                    : "Hours unavailable"
+                  : curOpen
                     ? locale === "nl"
                       ? "Nu open"
                       : "Open now"
                     : locale === "nl"
                       ? "Gesloten / buiten uren"
                       : "Closed / outside hours"}
-                </span>
-                <span className="change">{locale === "nl" ? "Cursussen & verkoop" : "Courses & sales"}</span>
-              </div>
-              <HoursViz entries={cursus.entries} now={now} locale={locale} />
-              <dl className="svc-meta">
-                <dt>{locale === "nl" ? "LOCATIE" : "LOCATION"}</dt>
-                <dd>Dozaal · −1</dd>
-                <dt>{locale === "nl" ? "WEB" : "WEB"}</dt>
-                <dd>vtk.be</dd>
-              </dl>
-              <div className="svc-actions">
-                <Link href={`${base}/cursusdienst`} className="btn btn-primary arrow">
-                  {locale === "nl" ? "Naar Cursusdienst" : "Course shop"}
-                </Link>
-                <span className="btn btn-ghost arrow" style={{ opacity: 0.55, pointerEvents: "none" }}>
-                  {locale === "nl" ? "Tweedehands" : "Second-hand"}
-                </span>
-              </div>
-            </article>
-          ) : null}
+              </span>
+              <span className="change">{locale === "nl" ? "Cursussen & verkoop" : "Courses & sales"}</span>
+            </div>
+            {cursusEntries ? (
+              <HoursViz entries={cursusEntries} now={now} locale={locale} />
+            ) : (
+              <p style={{ margin: "24px 0", color: "var(--muted)" }}>
+                {locale === "nl"
+                  ? "De cursusdienst openingsuren zijn momenteel niet beschikbaar."
+                  : "The course shop opening hours are currently unavailable."}
+              </p>
+            )}
+            <dl className="svc-meta">
+              <dt>{locale === "nl" ? "LOCATIE" : "LOCATION"}</dt>
+              <dd>Dozaal · −1</dd>
+              <dt>{locale === "nl" ? "WEB" : "WEB"}</dt>
+              <dd>vtk.be</dd>
+            </dl>
+            <div className="svc-actions">
+              <Link href={`${base}/cursusdienst`} className="btn btn-primary arrow">
+                {locale === "nl" ? "Naar Cursusdienst" : "Course shop"}
+              </Link>
+              <span className="btn btn-ghost arrow" style={{ opacity: 0.55, pointerEvents: "none" }}>
+                {locale === "nl" ? "Tweedehands" : "Second-hand"}
+              </span>
+            </div>
+          </article>
 
           <article className="svc">
             <div className="svc-head">
@@ -363,7 +380,7 @@ export async function AanbodEditorial({ locale }: { locale: Locale }) {
               <span className="state open">{locale === "nl" ? "Volgt Cursusdienst" : "Follows course shop"}</span>
               <span className="change">{locale === "nl" ? "Zelfde openingsuren" : "Same opening hours"}</span>
             </div>
-            {cursus ? <HoursViz entries={cursus.entries} now={now} locale={locale} /> : null}
+            {cursusEntries ? <HoursViz entries={cursusEntries} now={now} locale={locale} /> : null}
             <dl className="svc-meta">
               <dt>{locale === "nl" ? "LOCATIE" : "LOCATION"}</dt>
               <dd>Dozaal · −1</dd>

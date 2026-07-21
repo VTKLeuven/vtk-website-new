@@ -483,6 +483,28 @@ onderste helft is een ontwerpkeuze, geen toeval:
   is één gerichte query extra (de richtingen van de ingelogde gebruiker), en enkel
   voor wie ingelogd is.
 
+### Cursusdienst-openingsuren komen live van cudi.vtk.be
+
+- De **Theokot**-uren beheert VTK zelf in de admin (`Setting`
+  `home.openingHours.theokot`). De **cursusdienst**-uren daarentegen worden
+  ingevoerd op het aparte cursusdienst-platform (cudi.vtk.be), waar ze meteen ook
+  shiften en tijdsloten genereren. Dat platform is dus de single source of truth;
+  ze hier nog eens met de hand overtypen zou onvermijdelijk uit elkaar lopen.
+- Daarom haalt de homepage (en `/aanbod`) ze **live** op via een publieke,
+  read-only endpoint op cudi (`GET /api/opening-hours?association=vtk`), gemapt in
+  `lib/cursusdienstHours.ts` naar dezelfde `entries`-vorm als Theokot. De
+  admin-form voor deze uren is verdwenen; `/admin/home` verwijst enkel nog door.
+- **Waarom pullen i.p.v. een gedeelde DB of een push-webhook:** de twee apps
+  hebben elk hun eigen database en deployment. Een directe cross-DB-lezing koppelt
+  hun schema's op rendertijd; een push zou een write-endpoint + secret vragen. Een
+  gecachte pull (Next data-cache, ~1×/uur) houdt ze losgekoppeld en de bron enkelvoudig.
+- **Fallback in drie trappen** (uren wijzigen zelden, dus resilience gaat voor
+  versheid): live fetch → de laatst succesvol opgehaalde week uit een DB-cache
+  (`Setting` `cursusdienst.weekHoursCache`, best-effort weggeschreven bij elke
+  verse fetch) → en als zelfs dat er niet is, de melding "De cursusdienst
+  openingsuren zijn momenteel niet beschikbaar". Zo breekt de homepage nooit,
+  ook niet bij een koude cache terwijl cudi plat ligt.
+
 ---
 
 ## Uitleendienst (logistiek.vtk.be)
@@ -541,3 +563,91 @@ een eigen account-overzicht. Technische kaart: `docs/uitleendienst.md`.
   casing zodat ze niemand doorliet) is vervangen: **elk ingelogd lid** mag
   aanvragen, beheer hangt aan de permissie `logistiek.manage` (rol "logistiek",
   toegekend aan de post LOGISTIEK).
+
+---
+
+## Cursusdienst-shiften op de main site (brug met cudi.vtk.be)
+
+De cursusdienst-shiften worden **aangemaakt op cudi.vtk.be** (gegenereerd uit de
+openingsuren-instances), maar leden schrijven zich **enkel op de main site** in.
+De cudi-shiftpagina voor studenten gaat uit (`settings.useShifts`); cudi houdt
+enkel nog de admin-authoring en zijn roster-/verantwoordelijke-views.
+
+### Waarom een brug i.p.v. federatie
+
+Er was een keuze: cursusdienst-shiften als een aparte, gefedereerde sectie tonen
+(cudi blijft de enige eigenaar, main site is puur een client), óf ze **volwaardig
+native** maken. VTK koos native: ze moeten meetellen voor de **shift-ranking** én
+de **reward-payout**, en die draaien op de eigen tabellen van de main site
+(`ranking` groepeert `ShiftParticipant` per `Shift.post`, `reward` sommeert
+`Shift.reward`). Native meetellen kan dus enkel als elke cursusdienst-shift een
+echte `Shift`-rij op de main site is en de inschrijving een echte
+`ShiftParticipant`. Daarom een **twee-weg-brug**:
+
+- **Definities cudi → main:** bij aanmaken/wijzigen/verwijderen van een
+  cursusdienst-shift spiegelt cudi de shift naar een `Shift`-rij op de main site
+  (gemarkeerd met zijn cudi-herkomst, zodat main-admins ze niet manueel bewerken
+  en de spiegeling idempotent is). Zo verschijnt elke cudi-wijziging meteen op de
+  main site.
+- **Inschrijven native op main:** leden (de)registreren via de bestaande
+  main-flow (`/shift` + `app/api/shift/register`), dus overlap-check,
+  24u-uitschrijflock + bedenktijd, ranking, reward en history werken ongewijzigd.
+- **Roster main → cudi:** elke (de)registratie wordt teruggeduwd naar cudi's
+  `ShiftRegistration` zodat de cursusdienst-verantwoordelijken hun roster op cudi
+  houden.
+
+Identiteit tussen de twee auth-systemen (main = KUL OIDC, cudi = Better Auth)
+loopt via de **r-nummer** (`User.rNumber` is `@unique` in beide DBs). Een lid dat
+nog nooit op cudi kwam, krijgt bij de eerste inschrijving **automatisch** een
+cudi-gebruiker aangemaakt op basis van zijn KUL-profiel (r-nummer, naam, e-mail).
+
+### Reward: 1 bonnetje per begonnen uur
+
+Een cursusdienst-shift is **1 bonnetje per begonnen uur** waard, dus
+`reward = ⌈(eindtijd − starttijd) / 1u⌉`:
+
+- 1u00 → 1, 1u30 → 2, 2u00 → 2, 2u01 → 3.
+
+Deze regel wordt **berekend bij het spiegelen** (de producer zet `Shift.reward`);
+centraliseer hem in één helper zodat hij op één plek aanpasbaar is. De reward
+wordt **verbruikt** in `apps/web/app/api/shift/reward/route.ts` (sommeert
+`shift.reward` over voltooide, niet-uitbetaalde deelnames). Wil je de waardering
+wijzigen, pas dan die helper aan; de rest van het reward-systeem blijft gelijk.
+
+### Post: "Cursusdienst"
+
+Gemirrorde shiften krijgen `Shift.post = "Cursusdienst"`, zodat ze als een aparte
+post in de ranking verschijnen. De post wordt **gezet bij het spiegelen** (zelfde
+producer/helper als de reward) en **verbruikt** in
+`apps/web/app/api/shift/ranking/route.ts` (groepeert per `shift.post`; leeg valt
+onder `GEEN`). Eén constante voor het post-label, zodat hernoemen op één plek
+gebeurt.
+
+### Inschrijven blokkeert bij een cudi-storing (bewust)
+
+Inschrijven/uitschrijven op de main site handelt de cudi-registratie **blokkerend**
+af (`apps/web/lib/cudiRegistrationSync.ts` + de shift-register-route): een
+inschrijving slaagt enkel als cudi ze ook registreert, anders wordt de native
+`ShiftParticipant` teruggedraaid en krijgt het lid een foutmelding. Zo blijven de
+main-roster en de cudi-roster strikt consistent. De capaciteit wordt op de main
+site afgedwongen (`maxParticipants`); cudi is een tweede gate + de roster voor de
+verantwoordelijken. Een vangnet-reconcile (`/api/integrations/cudi/sync-registrations`,
+voor een cron) zet zeldzame randgevallen alsnog gelijk.
+
+### Volledig opt-in (uit by default)
+
+De hele shift-brug staat **uit** tot je het gedeelde secret zet (`CUDI_SYNC_SECRET`
+op de main site, gelijk aan `MAIN_SITE_SHIFT_SYNC_SECRET` op cudi). Zonder secret:
+cudi spiegelt niets, het spiegel-endpoint weigert alles (401), er bestaan dus geen
+`sourceSystem = "cudi"`-shiften, en de inschrijfflow doet geen enkele cudi-call
+(gedraagt zich exact zoals vroeger). De migratie voegt enkel twee nullable kolommen
+toe en verandert op zich niets.
+
+### Roster-autoriteit ligt op de main site
+
+Zodra de brug aanstaat, is de main site de autoriteit voor de inschrijvingen: een
+reconcile duwt de main-roster naar cudi en **pruned** cudi-registraties die de main
+site niet kent. Cudi-side roster-bewerkingen voor cursusdienst-shiften (bv.
+`adminAddShiftRegistration`) worden dus door de volgende reconcile overschreven;
+roster-beheer hoort daarom op de main site te gebeuren. Daarom zet cudi ook zijn
+student-shiftpagina uit (fase 4); de admin-authoring van de shiften zelf blijft.

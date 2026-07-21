@@ -81,32 +81,6 @@ export async function saveDefaultEventImageAction(
   return saveOk();
 }
 
-export async function saveOpeningHoursAction(_prev: SaveState, formData: FormData): Promise<SaveState> {
-  await requirePermission("home.edit");
-  const key = formData.get("key") as string;
-  const titleNl = formData.get("titleNl") as string;
-  const titleEn = formData.get("titleEn") as string;
-  const subtitleNl = ((formData.get("subtitleNl") as string) || "").trim();
-  const subtitleEn = ((formData.get("subtitleEn") as string) || "").trim();
-  const entries: Array<{ dayNl: string; dayEn: string; hours: string }> = [];
-  for (let i = 0; i < 14; i += 1) {
-    const dayNl = formData.get(`dayNl-${i}`) as string | null;
-    const dayEn = formData.get(`dayEn-${i}`) as string | null;
-    const hours = formData.get(`hours-${i}`) as string | null;
-    if (!dayNl && !hours) continue;
-    entries.push({ dayNl: dayNl ?? "", dayEn: dayEn ?? dayNl ?? "", hours: hours ?? "" });
-  }
-  const value = { titleNl, titleEn, subtitleNl, subtitleEn, entries };
-  await prisma.setting.upsert({
-    where: { key },
-    update: { value },
-    create: { key, value },
-  });
-  revalidatePath("/");
-  revalidatePath("/admin/home");
-  return saveOk();
-}
-
 export async function saveCareerAction(_prev: SaveState, formData: FormData): Promise<SaveState> {
   await requirePermission("home.edit");
   const value = {

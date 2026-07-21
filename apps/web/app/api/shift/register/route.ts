@@ -3,6 +3,8 @@ import { requirePermission, requireSession } from '@/lib/session';
 import { prisma } from '@vtk/db';
 import { isRecordNotFound, isUniqueViolation } from '@/lib/shift';
 import { authErrorResponse } from '@/lib/session';
+import { CUDI_SHIFT_SOURCE } from '@/lib/cudiShiftMirror';
+import { pushCudiRegistration } from '@/lib/cudiRegistrationSync';
 
 /** Binnen dit venster voor de start kan een user zichzelf niet meer uitschrijven. */
 const UNREGISTER_LOCK_MS = 24 * 60 * 60 * 1000;
@@ -124,6 +126,23 @@ export async function POST(request: Request) {
     throw err;
   }
 
+  // Cursusdienst-shiften wonen op cudi.vtk.be; de inschrijving moet daar ook
+  // geregistreerd worden. Blokkerend: lukt dat niet, draai de native inschrijving
+  // terug zodat main en cudi consistent blijven. Zonder integratie (geen secret)
+  // geeft de push `skipped` terug en verandert er hier niets.
+  if (shift.sourceSystem === CUDI_SHIFT_SOURCE && shift.sourceId) {
+    const push = await pushCudiRegistration('register', shift.sourceId, session.user.id);
+    if (!push.ok) {
+      await prisma.shiftParticipant
+        .delete({ where: { shiftId_userId: { shiftId: id, userId: session.user.id } } })
+        .catch(() => {});
+      if (push.status === 409) {
+        return NextResponse.json({ error: 'Shift is full' }, { status: 409 });
+      }
+      return NextResponse.json({ error: 'Could not sync with cursusdienst' }, { status: 502 });
+    }
+  }
+
   return NextResponse.json({ success: true }, { status: 201 });
 }
 
@@ -147,7 +166,10 @@ export async function DELETE(request: Request) {
     return NextResponse.json({ error: 'id query parameter is required' }, { status: 400 });
   }
 
-  const shift = await prisma.shift.findUnique({ where: { id }, select: { startTime: true } });
+  const shift = await prisma.shift.findUnique({
+    where: { id },
+    select: { startTime: true, sourceSystem: true, sourceId: true },
+  });
   if (!shift) {
     return NextResponse.json({ error: 'Shift not found' }, { status: 404 });
   }
@@ -172,6 +194,16 @@ export async function DELETE(request: Request) {
       { error: 'Cannot unregister within 24 hours of the shift start' },
       { status: 409 },
     );
+  }
+
+  // Cursusdienst-shift: eerst op cudi uitschrijven, dan hier. Lukt cudi niet, dan
+  // blijft de native inschrijving staan zodat main en cudi consistent blijven.
+  // Zonder integratie (geen secret) geeft de push `skipped` terug en verandert er niets.
+  if (shift.sourceSystem === CUDI_SHIFT_SOURCE && shift.sourceId) {
+    const push = await pushCudiRegistration('unregister', shift.sourceId, session.user.id);
+    if (!push.ok) {
+      return NextResponse.json({ error: 'Could not sync with cursusdienst' }, { status: 502 });
+    }
   }
 
   try {

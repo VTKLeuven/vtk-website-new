@@ -12,19 +12,11 @@ import { BUILTIN_DEFAULT_EVENT_IMAGE, DEFAULT_EVENT_IMAGE_SETTING } from "@/lib/
 import {
   saveDefaultEventImageAction,
   saveHomepageCardImageAction,
-  saveOpeningHoursAction,
   saveCareerAction,
   saveAftermoviesAction,
   saveFeaturedAlbumsAction,
 } from "@/app/actions/home";
 
-type OpeningHours = {
-  titleNl: string;
-  titleEn: string;
-  subtitleNl?: string;
-  subtitleEn?: string;
-  entries: Array<{ dayNl: string; dayEn: string; hours: string }>;
-};
 type Career = { titleNl: string; titleEn: string; bodyNl: string; bodyEn: string; ctaLabelNl?: string; ctaLabelEn?: string; ctaUrl?: string };
 type Aftermovies = {
   titleNl: string;
@@ -85,7 +77,6 @@ export default async function AdminHome({
       where: {
         key: {
           in: [
-            "home.openingHours.cursusdienst",
             "home.career",
             "media.aftermovies",
             "home.aftermovies",
@@ -108,7 +99,6 @@ export default async function AdminHome({
     }),
   ]);
   const map = new Map(rows.map((row: { key: string; value: unknown }) => [row.key, row.value]));
-  const cursus = (map.get("home.openingHours.cursusdienst") as OpeningHours | undefined) ?? { titleNl: "", titleEn: "", entries: [] };
   const career = (map.get("home.career") as Career | undefined) ?? { titleNl: "", titleEn: "", bodyNl: "", bodyEn: "" };
   const after = readAftermoviesSetting(map.get("media.aftermovies"))
     ?? readAftermoviesSetting(map.get("home.aftermovies"))
@@ -208,51 +198,30 @@ export default async function AdminHome({
       </Card>
 
       <Card className="p-5">
-        <h2 className="font-semibold mb-3">
+        <h2 className="font-semibold mb-1">
           {locale === "nl" ? "Openingsuren" : "Opening hours"} – Cursusdienst
         </h2>
-        <SaveForm
-          action={saveOpeningHoursAction}
-          className="space-y-2"
-          submitLabel={dict.admin.save}
-          savingLabel={dict.common.saving}
-          savedMessage={dict.common.saved}
-          fallbackErrorMessage={dict.common.saveError}
-        >
-          <input type="hidden" name="key" value="home.openingHours.cursusdienst" />
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-            <div><Label>Title (NL)</Label><Input name="titleNl" defaultValue={cursus.titleNl} /></div>
-            <div><Label>Title (EN)</Label><Input name="titleEn" defaultValue={cursus.titleEn} /></div>
-            <div>
-              <Label>{locale === "nl" ? "Ondertitel (NL)" : "Subtitle (NL)"}</Label>
-              <Input name="subtitleNl" defaultValue={cursus.subtitleNl ?? ""} placeholder="Cursussen & tweedehands" />
-            </div>
-            <div>
-              <Label>{locale === "nl" ? "Ondertitel (EN)" : "Subtitle (EN)"}</Label>
-              <Input name="subtitleEn" defaultValue={cursus.subtitleEn ?? ""} placeholder="Courses & second-hand" />
-            </div>
-          </div>
-          <p className="text-xs text-[#5c667f]">
-            {locale === "nl"
-              ? "De ondertitel staat op de homepage onder de titel van de kaart. Laat leeg voor de standaardtekst."
-              : "The subtitle appears on the homepage below the card title. Leave empty for the default text."}
-          </p>
-          <table className="w-full text-sm">
-            <thead className="text-left"><tr><th>Day (NL)</th><th>Day (EN)</th><th>Hours</th></tr></thead>
-            <tbody>
-              {Array.from({ length: 7 }).map((_, i) => {
-                const e = cursus.entries[i] || { dayNl: "", dayEn: "", hours: "" };
-                return (
-                  <tr key={i}>
-                    <td className="pr-2 py-1"><Input name={`dayNl-${i}`} defaultValue={e.dayNl} /></td>
-                    <td className="pr-2 py-1"><Input name={`dayEn-${i}`} defaultValue={e.dayEn} /></td>
-                    <td className="py-1"><Input name={`hours-${i}`} defaultValue={e.hours} /></td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </SaveForm>
+        <p className="text-sm text-[#5c667f]">
+          {locale === "nl" ? (
+            <>
+              De cursusdienst-openingsuren komen live van{" "}
+              <a href="https://cudi.vtk.be/vtk/admin/slots" className="underline" target="_blank" rel="noreferrer">
+                cudi.vtk.be
+              </a>
+              , waar ze meteen ook shiften en tijdsloten genereren. Ze verschijnen
+              automatisch op de startpagina; hier valt niets in te stellen.
+            </>
+          ) : (
+            <>
+              The course shop opening hours come live from{" "}
+              <a href="https://cudi.vtk.be/vtk/admin/slots" className="underline" target="_blank" rel="noreferrer">
+                cudi.vtk.be
+              </a>
+              , where they also generate shifts and time slots. They appear on the
+              homepage automatically; there is nothing to set here.
+            </>
+          )}
+        </p>
       </Card>
 
       <Card className="p-5">

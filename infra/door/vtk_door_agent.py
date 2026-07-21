@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 #
-# VTK deurscanner (Raspberry Pi)
+# VTK website-deuragent (Raspberry Pi)
 # ------------------------------
 # Draait op de Pi aan de deur. Twee dingen tegelijk:
 #
@@ -21,7 +21,7 @@
 # Config gebeurt volledig via omgevingsvariabelen (zie het README en de
 # systemd-unit). Afhankelijkheden: `requests` en (op een echte Pi) `RPi.GPIO`.
 #
-# Historie: herbouw van de oude Litus-`door.py` voor de nieuwe VTK-website.
+# Staat bewust naast de oude Litus-`door.py` tijdens de migratie.
 
 import json
 import os
@@ -43,6 +43,8 @@ DEVICE_SECRET = os.environ.get("DOOR_DEVICE_SECRET", "")
 
 LISTEN_HOST = os.environ.get("DOOR_LISTEN_HOST", "0.0.0.0")
 LISTEN_PORT = int(os.environ.get("DOOR_LISTEN_PORT", "8080"))
+INPUT_DEVICE = os.environ.get("DOOR_INPUT_DEVICE", "").strip()
+INPUT_RETRY_SECONDS = float(os.environ.get("DOOR_INPUT_RETRY_SECONDS", "3"))
 
 GPIO_PORT = int(os.environ.get("DOOR_GPIO_PORT", "7"))
 UNLOCK_SECONDS = float(os.environ.get("DOOR_UNLOCK_SECONDS", "5"))
@@ -297,6 +299,147 @@ def handle_offline(card):
         queue_event("DENIED", rnumber=entry.get("rNumber"), card_name=entry.get("person"), reason="offline_cache")
 
 
+def scan_stdin():
+    """Leest scans als tekst van stdin, vooral voor handmatige/debug-runs."""
+    for line in sys.stdin:
+        card = line.strip()
+        if card == "STOP":
+            return
+        if card:
+            try:
+                handle_scan(card)
+            except Exception as exc:  # noqa: BLE001
+                log(f"Onverwachte fout bij scan: {exc}")
+                time.sleep(0.5)
+    log("stdin is gesloten; kaartscan-worker stopt (remote-open blijft actief).")
+
+
+def scan_input_device():
+    """Leest een USB-keyboardscanner rechtstreeks via Linux evdev."""
+    from evdev import InputDevice, ecodes  # type: ignore
+
+    keymap = {
+        ecodes.KEY_0: "0",
+        ecodes.KEY_1: "1",
+        ecodes.KEY_2: "2",
+        ecodes.KEY_3: "3",
+        ecodes.KEY_4: "4",
+        ecodes.KEY_5: "5",
+        ecodes.KEY_6: "6",
+        ecodes.KEY_7: "7",
+        ecodes.KEY_8: "8",
+        ecodes.KEY_9: "9",
+        ecodes.KEY_MINUS: "-",
+        ecodes.KEY_EQUAL: "=",
+        ecodes.KEY_LEFTBRACE: "[",
+        ecodes.KEY_RIGHTBRACE: "]",
+        ecodes.KEY_BACKSLASH: "\\",
+        ecodes.KEY_SEMICOLON: ";",
+        ecodes.KEY_APOSTROPHE: "'",
+        ecodes.KEY_GRAVE: "`",
+        ecodes.KEY_COMMA: ",",
+        ecodes.KEY_DOT: ".",
+        ecodes.KEY_SLASH: "/",
+        ecodes.KEY_SPACE: " ",
+        ecodes.KEY_KP0: "0",
+        ecodes.KEY_KP1: "1",
+        ecodes.KEY_KP2: "2",
+        ecodes.KEY_KP3: "3",
+        ecodes.KEY_KP4: "4",
+        ecodes.KEY_KP5: "5",
+        ecodes.KEY_KP6: "6",
+        ecodes.KEY_KP7: "7",
+        ecodes.KEY_KP8: "8",
+        ecodes.KEY_KP9: "9",
+        ecodes.KEY_KPDOT: ".",
+        ecodes.KEY_KPMINUS: "-",
+        ecodes.KEY_KPPLUS: "+",
+        ecodes.KEY_KPSLASH: "/",
+        ecodes.KEY_KPASTERISK: "*",
+    }
+    for letter in "abcdefghijklmnopqrstuvwxyz":
+        keymap[getattr(ecodes, f"KEY_{letter.upper()}")] = letter
+
+    shifted = {
+        "1": "!",
+        "2": "@",
+        "3": "#",
+        "4": "$",
+        "5": "%",
+        "6": "^",
+        "7": "&",
+        "8": "*",
+        "9": "(",
+        "0": ")",
+        "-": "_",
+        "=": "+",
+        "[": "{",
+        "]": "}",
+        "\\": "|",
+        ";": ":",
+        "'": '"',
+        "`": "~",
+        ",": "<",
+        ".": ">",
+        "/": "?",
+    }
+    enter_keys = {ecodes.KEY_ENTER, ecodes.KEY_KPENTER}
+    shift_keys = {ecodes.KEY_LEFTSHIFT, ecodes.KEY_RIGHTSHIFT}
+
+    while True:
+        device = None
+        try:
+            device = InputDevice(INPUT_DEVICE)
+            # Geen EVIOCGRAB: tijdens de migratie moet de oude door.py dezelfde
+            # keyboardscanner parallel kunnen blijven ontvangen.
+            log(f"Kaartlezer verbonden: {INPUT_DEVICE} ({device.name})")
+            buffer = []
+            shift_down = set()
+
+            for event in device.read_loop():
+                if event.type != ecodes.EV_KEY:
+                    continue
+                if event.code in shift_keys:
+                    if event.value == 1:
+                        shift_down.add(event.code)
+                    elif event.value == 0:
+                        shift_down.discard(event.code)
+                    continue
+                if event.value != 1:  # enkel key-down; negeer release/repeat
+                    continue
+                if event.code in enter_keys:
+                    card = "".join(buffer).strip()
+                    buffer.clear()
+                    if card:
+                        try:
+                            handle_scan(card)
+                        except Exception as exc:  # noqa: BLE001
+                            log(f"Onverwachte fout bij scan: {exc}")
+                    continue
+                if event.code == ecodes.KEY_BACKSPACE:
+                    if buffer:
+                        buffer.pop()
+                    continue
+
+                char = keymap.get(event.code)
+                if char:
+                    if shift_down:
+                        char = shifted.get(char, char.upper())
+                    buffer.append(char)
+        except OSError as exc:
+            log(
+                f"Kaartlezer niet beschikbaar ({exc}); "
+                f"probeer opnieuw over {INPUT_RETRY_SECONDS:g}s."
+            )
+        finally:
+            if device is not None:
+                try:
+                    device.close()
+                except OSError:
+                    pass
+        time.sleep(INPUT_RETRY_SECONDS)
+
+
 # ---------------------------------------------------------------------------
 # Remote-open listener (HTTP over Tailscale)
 # ---------------------------------------------------------------------------
@@ -364,21 +507,22 @@ def main():
         log("WAARSCHUWING: DOOR_DEVICE_SECRET is leeg. De site en remote-open zullen weigeren.")
     log(f"Deurscanner gestart (API_BASE={API_BASE}, DEBUG={DEBUG}).")
 
-    threading.Thread(target=serve_listener, daemon=True).start()
+    if INPUT_DEVICE:
+        try:
+            import evdev  # noqa: F401
+        except ImportError:
+            log("python3-evdev ontbreekt; installeer het pakket om DOOR_INPUT_DEVICE te gebruiken.")
+            return 1
+
+    scan_target = scan_input_device if INPUT_DEVICE else scan_stdin
+    threading.Thread(target=scan_target, daemon=True).start()
     threading.Thread(target=flush_daemon, daemon=True).start()
     flush_queue()  # meteen proberen bij opstart
 
     try:
-        for line in sys.stdin:
-            card = line.strip()
-            if card == "STOP":
-                break
-            if card:
-                try:
-                    handle_scan(card)
-                except Exception as exc:  # noqa: BLE001
-                    log(f"Onverwachte fout bij scan: {exc}")
-                    time.sleep(0.5)
+        # De listener bepaalt de levensduur van het proces. Een ontbrekende of
+        # losgekoppelde kaartlezer schakelt remote-open daardoor niet meer uit.
+        serve_listener()
     except KeyboardInterrupt:
         pass
     finally:
@@ -388,7 +532,8 @@ def main():
                 GPIO.cleanup()
             except Exception:  # noqa: BLE001
                 pass
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())

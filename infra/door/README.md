@@ -1,6 +1,6 @@
 # Deurscanner (Raspberry Pi)
 
-`door.py` draait op de Raspberry Pi aan de deur. Het leest KU Leuven-studentenkaarten
+`vtk_door_agent.py` draait op de Raspberry Pi aan de deur. Het leest KU Leuven-studentenkaarten
 via de kaartlezer (die als toetsenbord `serial;cardAppId` + Enter "typt") en opent de
 GPIO-lock wanneer de website de scan goedkeurt. Daarnaast luistert het op een HTTP-poort
 zodat de main-server de deur **remote** kan openen (dashboardknop) over Tailscale.
@@ -25,16 +25,29 @@ config onder **Admin -> IT -> Door scanner**. De rechten (`door.open`, `door.rem
 Beide richtingen gebruiken hetzelfde secret: `DOOR_DEVICE_SECRET` op de Pi == het secret
 onder Admin -> IT.
 
+## Parallel met de oude website
+
+De nieuwe agent gebruikt bewust de aparte bestandsnaam `vtk_door_agent.py` en neemt de
+keyboardscanner niet exclusief in beslag (`EVIOCGRAB` wordt niet gebruikt). De oude
+`door.py` kan dezelfde scanner daardoor tijdens de migratie blijven ontvangen. Gebruik
+wel aparte systemd-services, werkmappen, logs en cachebestanden voor beide processen.
+
+Beide processen kunnen dezelfde GPIO-pin aansturen, maar coördineren hun timers niet met
+elkaar. Twee vrijwel gelijktijdige open-opdrachten kunnen de kortste timer laten winnen.
+Voor een korte migratieperiode is dat doorgaans werkbaar; structureel hoort slechts één
+proces eigenaar van de relaispin te zijn.
+
 ## Vereisten
 
 ```bash
 sudo apt update && sudo apt install -y python3 python3-pip
-pip3 install requests RPi.GPIO
+sudo apt install python3-requests python3-rpi.gpio python3-evdev
 ```
 
-De kaartlezer is een toetsenbord-emulator; koppel z'n stdin aan het script (zie de
-systemd-unit hieronder, die de lezer via het inputdevice naar stdin pipe't, of draai het
-script in de sessie waar de lezer "typt").
+De kaartlezer is een toetsenbord-emulator. Configureer het stabiele
+`/dev/input/by-id/*-event-kbd`-pad via `DOOR_INPUT_DEVICE`; het script leest het device
+rechtstreeks via evdev. Zonder die variabele blijft stdin beschikbaar voor handmatige
+tests en oudere opstellingen.
 
 ## Configuratie (omgevingsvariabelen)
 
@@ -44,6 +57,8 @@ script in de sessie waar de lezer "typt").
 | `DOOR_DEVICE_SECRET` | *(leeg)* | Gedeeld Bearer-secret. **Verplicht.** Zelfde als Admin -> IT. |
 | `DOOR_LISTEN_HOST` | `0.0.0.0` | Bind-adres van de remote-open listener (mag de Tailscale-IP zijn). |
 | `DOOR_LISTEN_PORT` | `8080` | Poort van de listener. |
+| `DOOR_INPUT_DEVICE` | *(leeg)* | Stabiel `/dev/input/by-id/*-event-kbd`-pad van de USB-kaartlezer. Zonder waarde leest de scanner stdin (debug/legacy). |
+| `DOOR_INPUT_RETRY_SECONDS` | `3` | Wachttijd voordat een losgekoppelde kaartlezer opnieuw geopend wordt. |
 | `DOOR_GPIO_PORT` | `7` | BOARD-pin van de lock. |
 | `DOOR_UNLOCK_SECONDS` | `5` | Hoelang de lock open blijft (de server kan dit per open overschrijven). |
 | `DOOR_REQUEST_TIMEOUT` | `5` | Timeout (s) voor calls naar de site. |
@@ -70,38 +85,38 @@ After=network-online.target tailscaled.service
 Wants=network-online.target
 
 [Service]
-# De kaartlezer is /dev/input/... (een keyboard). Pas het pad aan, of vervang de
-# ExecStart door je eigen manier om de scans naar stdin te sturen.
-ExecStart=/bin/sh -c '/usr/bin/python3 /opt/vtk-door/door.py'
+User=pi
+SupplementaryGroups=input gpio
+ExecStart=/usr/bin/python3 /opt/vtk-door/vtk_door_agent.py
 WorkingDirectory=/opt/vtk-door
 Environment=API_BASE=https://vtk.be
 Environment=DOOR_DEVICE_SECRET=CHANGE_ME
 Environment=DOOR_LISTEN_PORT=8080
+Environment=DOOR_INPUT_DEVICE=/dev/input/by-id/usb-SpringCard_RFIDScanner4KULeuven_97DB0D9F-event-kbd
 Environment=DOOR_UNLOCK_SECONDS=5
-Restart=always
+Restart=on-failure
 RestartSec=3
-User=pi
 
 [Install]
 WantedBy=multi-user.target
 ```
 
 ```bash
-sudo mkdir -p /opt/vtk-door && sudo cp door.py /opt/vtk-door/
+sudo mkdir -p /opt/vtk-door && sudo cp vtk_door_agent.py /opt/vtk-door/
 sudo systemctl daemon-reload
 sudo systemctl enable --now vtk-door
 journalctl -u vtk-door -f
 ```
 
 > De lock draait op GPIO, dus de service heeft toegang tot `/dev/gpiomem` nodig (user in
-> de `gpio`-groep). De kaartlezer koppel je aan stdin op de manier die bij jullie opstelling
-> past (bv. via `evtest`/`ykush`-achtige tooling of een kleine wrapper die het inputdevice
-> naar stdin schrijft).
+> de `gpio`-groep). De kaartlezer vereist toegang tot het evdev-device (user in de
+> `input`-groep). Gebruik altijd het stabiele `/dev/input/by-id/`-pad; `/dev/input/event0`
+> kan na een reboot veranderen.
 
 ## Testen zonder hardware
 
 ```bash
-DOOR_DEBUG=1 DOOR_DEVICE_SECRET=test API_BASE=http://localhost:3000 python3 door.py
+DOOR_DEBUG=1 DOOR_DEVICE_SECRET=test API_BASE=http://localhost:3000 python3 vtk_door_agent.py
 # typ een scan + Enter:  1234;5678
 # remote-open testen (andere terminal):
 curl -X POST http://localhost:8080/open -H "Authorization: Bearer test" -d '{"unlockSeconds":3}'
