@@ -33,6 +33,10 @@ export {
   type UpdateSsoClientInput,
   type ConnectedApp,
   type SsoAuditAction,
+  ensureFlowTestClient,
+  exchangeFlowTestCode,
+  FLOW_TEST_CLIENT_ID,
+  type FlowTestResult,
 } from './server/sso';
 
 export async function signInEmail(

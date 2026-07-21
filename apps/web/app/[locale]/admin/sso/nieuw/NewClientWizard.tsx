@@ -83,6 +83,10 @@ export function NewClientWizard({ nl, scopes, listHref }: { nl: boolean; scopes:
     return null;
   }
 
+  function toggleScope(code: string, checked: boolean) {
+    setSelectedScopes((prev) => (checked ? [...prev, code] : prev.filter((existing) => existing !== code)));
+  }
+
   function next() {
     const error = validate(step);
     setStepError(error);
@@ -118,6 +122,9 @@ export function NewClientWizard({ nl, scopes, listHref }: { nl: boolean; scopes:
     // dat regelt de `action`-prop normaal, en die gebruiken we hier bewust niet.
     startTransition(() => formAction(formData));
   }
+
+  const offlineScope = scopes.find((scope) => scope.code === 'offline_access');
+  const dataScopes = scopes.filter((scope) => scope.code !== 'offline_access');
 
   const steps = nl ? ['Identiteit', 'Techniek', 'Toegang'] : ['Identity', 'Technical', 'Access'];
 
@@ -253,18 +260,14 @@ export function NewClientWizard({ nl, scopes, listHref }: { nl: boolean; scopes:
           <fieldset>
             <legend className="text-sm">{nl ? 'Wat mag deze app zien?' : 'What may this app see?'}</legend>
             <div className="mt-2 space-y-1">
-              {scopes.map((scope) => (
+              {dataScopes.map((scope) => (
                 <label key={scope.code} className="flex items-start gap-2 text-sm">
                   <input
                     type="checkbox"
                     name="scopes"
                     value={scope.code}
                     checked={selectedScopes.includes(scope.code)}
-                    onChange={(e) =>
-                      setSelectedScopes((prev) =>
-                        e.target.checked ? [...prev, scope.code] : prev.filter((code) => code !== scope.code)
-                      )
-                    }
+                    onChange={(e) => toggleScope(scope.code, e.target.checked)}
                     className="mt-1"
                   />
                   <span>
@@ -280,6 +283,36 @@ export function NewClientWizard({ nl, scopes, listHref }: { nl: boolean; scopes:
                 : 'Only request what the app truly needs: this is what the member reads before consenting.'}
             </p>
           </fieldset>
+
+          {/*
+            offline_access staat apart omdat het als enige geen gegevens
+            vrijgeeft: het bepaalt of de app mag blijven werken wanneer het lid
+            er niet is. Tussen de andere vinkjes leest het als "nog een veldje".
+          */}
+          {offlineScope && (
+            <div className="rounded-xl border border-amber-300 bg-amber-50 p-3">
+              <label className="flex items-start gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  name="scopes"
+                  value={offlineScope.code}
+                  checked={selectedScopes.includes(offlineScope.code)}
+                  onChange={(e) => toggleScope(offlineScope.code, e.target.checked)}
+                  className="mt-1"
+                />
+                <span>
+                  <span className="font-medium">
+                    {nl ? 'Toegang houden zonder het lid erbij' : 'Keep access without the member present'}
+                  </span>
+                  <span className="mt-1 block text-xs text-amber-900">
+                    {nl
+                      ? 'Geeft geen extra gegevens vrij, maar wel een refresh token: de app kan blijven werken wanneer het lid niet ingelogd is, tot iemand de toegang intrekt. Vink dit enkel aan voor apps die echt op de achtergrond moeten draaien.'
+                      : 'Releases no extra data, but grants a refresh token: the app keeps working while the member is signed out, until someone revokes it. Only tick this for apps that genuinely run in the background.'}
+                  </span>
+                </span>
+              </label>
+            </div>
+          )}
 
           <div className="rounded-xl border border-amber-300 bg-amber-50 p-3">
             <label className="flex items-start gap-2 text-sm">

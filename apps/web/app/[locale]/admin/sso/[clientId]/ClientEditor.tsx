@@ -137,22 +137,49 @@ export function ClientEditor({
           <fieldset>
             <legend className="text-sm">{nl ? 'Wat mag deze app zien?' : 'What may this app see?'}</legend>
             <div className="mt-2 space-y-1">
-              {scopes.map((scope) => (
-                <label key={scope.code} className="flex items-start gap-2 text-sm">
+              {scopes
+                .filter((scope) => scope.code !== 'offline_access')
+                .map((scope) => (
+                  <label key={scope.code} className="flex items-start gap-2 text-sm">
+                    <input
+                      type="checkbox"
+                      name="scopes"
+                      value={scope.code}
+                      defaultChecked={client.scopes.includes(scope.code)}
+                      className="mt-1"
+                    />
+                    <span>
+                      <span className={scope.sensitive ? 'text-amber-800' : ''}>{scope.label}</span>
+                      <code className="ml-2 text-xs text-zinc-400">{scope.code}</code>
+                    </span>
+                  </label>
+                ))}
+            </div>
+
+            {/* Zie de wizard: dit vinkje geeft geen gegevens vrij maar duur. */}
+            {scopes.some((scope) => scope.code === 'offline_access') && (
+              <div className="mt-2 rounded-xl border border-amber-300 bg-amber-50 p-3">
+                <label className="flex items-start gap-2 text-sm">
                   <input
                     type="checkbox"
                     name="scopes"
-                    value={scope.code}
-                    defaultChecked={client.scopes.includes(scope.code)}
+                    value="offline_access"
+                    defaultChecked={client.scopes.includes('offline_access')}
                     className="mt-1"
                   />
                   <span>
-                    <span className={scope.sensitive ? 'text-amber-800' : ''}>{scope.label}</span>
-                    <code className="ml-2 text-xs text-zinc-400">{scope.code}</code>
+                    <span className="font-medium">
+                      {nl ? 'Toegang houden zonder het lid erbij' : 'Keep access without the member present'}
+                    </span>
+                    <span className="mt-1 block text-xs text-amber-900">
+                      {nl
+                        ? 'Geeft geen extra gegevens vrij, maar wel een refresh token: de app kan blijven werken wanneer het lid niet ingelogd is, tot iemand de toegang intrekt.'
+                        : 'Releases no extra data, but grants a refresh token: the app keeps working while the member is signed out, until someone revokes it.'}
+                    </span>
                   </span>
                 </label>
-              ))}
-            </div>
+              </div>
+            )}
             <p className="mt-2 text-xs text-amber-700">
               {nl
                 ? 'Een scope wegnemen geldt meteen voor nieuwe aanvragen, maar reeds uitgedeelde tokens houden hun oude scopes tot ze vervallen. Trek de tokens in wanneer het echt nu moet stoppen.'

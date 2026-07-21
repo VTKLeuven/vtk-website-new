@@ -7,32 +7,38 @@ import { oauthConsent } from '@vtk/auth/server';
 const consentSchema = z.object({
   accept: z.boolean(),
   oauthQuery: z.string().min(1),
+  scopes: z.array(z.string()),
 });
 
-export type ConsentState = { error?: string; redirectTo?: string } | undefined;
+export type ConsentState =
+  { status: 'idle' } | { status: 'done'; redirectTo: string } | { status: 'error'; code: string };
 
 /**
  * Geeft de bestemming terug in plaats van te redirecten: die ligt buiten deze
- * app (bij de client), dus moet de browser er echt naartoe navigeren.
+ * app (bij de client), dus moet de browser er echt naartoe navigeren. Ook bij
+ * weigeren, want dan gaat het lid terug naar de client met `access_denied`.
  */
 export async function consentAction(_prev: ConsentState, formData: FormData): Promise<ConsentState> {
   const parsed = consentSchema.safeParse({
     accept: formData.get('accept') === '1',
     oauthQuery: String(formData.get('oauthQuery') || ''),
+    scopes: formData.getAll('scopes').map(String),
   });
-  if (!parsed.success) return { error: 'INVALID' };
+  if (!parsed.success) return { status: 'error', code: 'INVALID' };
 
   try {
-    // Geen `scope`: toestemming geldt voor alle gevraagde scopes. Gedeeltelijke
-    // toestemming komt in fase 3.
     const { url } = await oauthConsent(await headers(), {
       accept: parsed.data.accept,
+      // Enkel meesturen bij toestaan. De plugin eist dat elke scope hier ook
+      // oorspronkelijk gevraagd was, en weigert het verzoek anders volledig.
+      ...(parsed.data.accept && parsed.data.scopes.length ? { scope: parsed.data.scopes.join(' ') } : {}),
       oauth_query: parsed.data.oauthQuery,
     });
-    return { redirectTo: url };
-  } catch {
-    // Verwachte fout: verlopen of kapotte handtekening. Niet te repareren, de
-    // gebruiker moet opnieuw vertrekken bij de externe applicatie.
-    return { error: 'EXPIRED' };
+    return { status: 'done', redirectTo: url };
+  } catch (error) {
+    // Verwachte fout: verlopen of kapotte handtekening. Niet te repareren, het
+    // lid moet opnieuw vertrekken bij de externe applicatie.
+    console.error('[sso] toestemming verwerken mislukt:', error);
+    return { status: 'error', code: 'EXPIRED' };
   }
 }

@@ -1,5 +1,5 @@
-import { describe, expect, it } from "vitest";
-import { reviewFirstWindow } from "@/lib/reviewFirstPaging";
+import { describe, expect, it } from 'vitest';
+import { reviewFirstWindow } from '@/lib/reviewFirstPaging';
 
 /**
  * Referentiemodel: de oude implementatie haalde ALLE pagina's op, zette de na te
@@ -23,26 +23,26 @@ function stitched(reviewTotal: number, restTotal: number, offset: number, pageSi
   ];
 }
 
-describe("reviewFirstWindow", () => {
+describe('reviewFirstWindow', () => {
   it("zet de na te kijken pagina's vooraan op pagina 1", () => {
     const w = reviewFirstWindow(0, 25, 3);
     expect(w).toEqual({ reviewSkip: 0, reviewTake: 3, restSkip: 0, restTake: 22 });
   });
 
-  it("vraagt niets uit het review-blok zodra dat voorbij is", () => {
+  it('vraagt niets uit het review-blok zodra dat voorbij is', () => {
     // 3 na te kijken, pagina 2 (offset 25): alles komt uit de rest.
     const w = reviewFirstWindow(25, 25, 3);
     expect(w.reviewTake).toBe(0);
     expect(w).toMatchObject({ restSkip: 22, restTake: 25 });
   });
 
-  it("splitst een pagina die precies over de grens valt", () => {
+  it('splitst een pagina die precies over de grens valt', () => {
     // 30 na te kijken: pagina 2 begint op 25, dus 5 review + 20 rest.
     const w = reviewFirstWindow(25, 25, 30);
     expect(w).toEqual({ reviewSkip: 25, reviewTake: 5, restSkip: 0, restTake: 20 });
   });
 
-  it("vult een volledige pagina uit het review-blok als dat groot genoeg is", () => {
+  it('vult een volledige pagina uit het review-blok als dat groot genoeg is', () => {
     const w = reviewFirstWindow(0, 25, 100);
     expect(w).toEqual({ reviewSkip: 0, reviewTake: 25, restSkip: 0, restTake: 0 });
   });
@@ -54,7 +54,7 @@ describe("reviewFirstWindow", () => {
 
   // De echte garantie: over elke combinatie exact dezelfde rijen als het oude
   // "alles ophalen en sorteren"-gedrag, inclusief alle randgevallen.
-  it("levert dezelfde rijen als alles-ophalen-en-snijden, voor elke grens", () => {
+  it('levert dezelfde rijen als alles-ophalen-en-snijden, voor elke grens', () => {
     const sizes = [1, 3, 25];
     for (const pageSize of sizes) {
       for (let reviewTotal = 0; reviewTotal <= 12; reviewTotal += 1) {
@@ -65,7 +65,7 @@ describe("reviewFirstWindow", () => {
             const offset = (page - 1) * pageSize;
             expect(
               stitched(reviewTotal, restTotal, offset, pageSize),
-              `size=${pageSize} review=${reviewTotal} rest=${restTotal} page=${page}`,
+              `size=${pageSize} review=${reviewTotal} rest=${restTotal} page=${page}`
             ).toEqual(naive(reviewTotal, restTotal, offset, pageSize));
           }
         }
@@ -73,7 +73,7 @@ describe("reviewFirstWindow", () => {
     }
   });
 
-  it("vraagt nooit meer dan één pagina aan rijen op", () => {
+  it('vraagt nooit meer dan één pagina aan rijen op', () => {
     for (let reviewTotal = 0; reviewTotal <= 30; reviewTotal += 1) {
       for (let offset = 0; offset <= 60; offset += 5) {
         const w = reviewFirstWindow(offset, 25, reviewTotal);

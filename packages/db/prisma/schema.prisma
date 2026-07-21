@@ -1459,7 +1459,7 @@ model OauthClient {
 model OauthRefreshToken {
   id                String             @id
   token             String             @unique
-  client            OauthClient        @relation(fields: [clientId], references: [clientId])
+  client            OauthClient        @relation(fields: [clientId], references: [clientId], onDelete: Cascade)
   clientId          String
   session           Session?           @relation(fields: [sessionId], references: [id])
   sessionId         String?
@@ -1486,11 +1486,11 @@ model OauthRefreshToken {
 model OauthAccessToken {
   id          String             @id
   token       String             @unique
-  client      OauthClient        @relation(fields: [clientId], references: [clientId])
+  client      OauthClient        @relation(fields: [clientId], references: [clientId], onDelete: Cascade)
   clientId    String
   session     Session?           @relation(fields: [sessionId], references: [id])
   sessionId   String?
-  refresh     OauthRefreshToken? @relation(fields: [refreshId], references: [id])
+  refresh     OauthRefreshToken? @relation(fields: [refreshId], references: [id], onDelete: SetNull)
   refreshId   String?
   user        User?              @relation(fields: [userId], references: [id])
   userId      String?
@@ -1511,7 +1511,7 @@ model OauthConsent {
   id          String      @id
   user        User        @relation(fields: [userId], references: [id])
   userId      String
-  client      OauthClient @relation(fields: [clientId], references: [clientId])
+  client      OauthClient @relation(fields: [clientId], references: [clientId], onDelete: Cascade)
   clientId    String
   referenceId String?
   scopes      String[]

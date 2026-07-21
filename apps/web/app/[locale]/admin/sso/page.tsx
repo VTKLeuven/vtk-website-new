@@ -62,6 +62,9 @@ export default async function AdminSsoPage({ params }: { params: Promise<{ local
         >
           {nl ? 'Nieuwe applicatie' : 'New application'}
         </Link>
+        <Link href={`${base}/admin/sso/test`} className="ml-3 text-sm underline">
+          {nl ? 'Flow testen' : 'Test a flow'}
+        </Link>
       </div>
 
       <div className="overflow-x-auto rounded-2xl border border-zinc-200 bg-white">
