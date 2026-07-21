@@ -163,7 +163,9 @@ export default async function AdminLayout({
   return (
     <div className="vtk-admin-surface">
       <div className="vtk-admin-surface-inner">
-        <aside className="md:sticky md:top-24 self-start">
+        {/* Sticky/scrollgedrag staat in vtk-admin.css, op het 860px-breekpunt van
+            de tweekolomslayout (niet op Tailwinds md:, dat 768px is). */}
+        <aside>
           <AdminNav title={dict.admin.title} nodes={nodes} />
         </aside>
         <section className="vtk-admin-main">{children}</section>

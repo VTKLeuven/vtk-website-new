@@ -39,17 +39,25 @@ export default async function AdminUsers({
 
   // Zoeken gebeurt in de DB (niet op een geladen lijst): match op naam, e-mail of
   // r-nummer. Met paginatie (take/skip) blijft dit schaalbaar bij 24k+ gebruikers.
-  const where: Prisma.UserWhereInput = q
-    ? {
-        OR: [
-          { name: { contains: q, mode: "insensitive" } },
-          { firstName: { contains: q, mode: "insensitive" } },
-          { lastName: { contains: q, mode: "insensitive" } },
-          { email: { contains: q, mode: "insensitive" } },
-          { rNumber: { contains: q, mode: "insensitive" } },
-        ],
-      }
-    : {};
+  //
+  // Gewiste accounts blijven als geanonimiseerde tombstone in de tabel staan (de
+  // FK's van o.a. theokot en uitleen laten geen echte delete toe), maar horen niet
+  // in het gebruikersbeheer thuis. Filter op `deletedAt`, niet op `active`: een
+  // gedeactiveerd lid is geen gewist lid en blijft wél zichtbaar.
+  const where: Prisma.UserWhereInput = {
+    deletedAt: null,
+    ...(q
+      ? {
+          OR: [
+            { name: { contains: q, mode: "insensitive" } },
+            { firstName: { contains: q, mode: "insensitive" } },
+            { lastName: { contains: q, mode: "insensitive" } },
+            { email: { contains: q, mode: "insensitive" } },
+            { rNumber: { contains: q, mode: "insensitive" } },
+          ],
+        }
+      : {}),
+  };
 
   const total = await prisma.user.count({ where });
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
