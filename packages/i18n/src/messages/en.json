@@ -311,6 +311,8 @@
     "door": "Door",
     "mailinglists": "Mailing lists",
     "it": "IT",
+    "itConfig": "Configuration",
+    "authorizationPreview": "Authorization preview",
     "create": "New",
     "save": "Save",
     "delete": "Delete",

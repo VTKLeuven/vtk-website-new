@@ -59,18 +59,23 @@ const NAV: NavEntry[] = [
     item('pages', '/paginas', { anyPerm: ['pages.edit', 'pages.editAll'] }),
     item('partners', '/partners', { perm: 'partners.manage' }),
   ]),
-  item('mailinglists', '/mailinglijsten', { perm: 'mailinglists.export' }),
   item('calendar', '/kalender', { perm: 'calendar.create' }),
   item('tickets', '/tickets', { ticketing: true }),
   item('albums', '/albums', { perm: 'photos.manageAlbums' }),
   item('media', '/media', { perm: 'media.manage' }),
-  item('dashboardTiles', '/dashboard-tiles', { perm: 'dashboard.manage' }),
-  item('shortlinks', '/links', { perm: 'shortlinks.manage' }),
   item('shift', '/shiften', { anyPerm: ['shift.edit', 'shift.reward', 'shift.ranking'] }),
   item('theokot', '/theokot', { anyPerm: ['theokot.manage', 'theokot.pickup'] }),
-  item('sso', '/sso', { perm: 'oauth.client.edit' }),
-  item('door', '/deur', { perm: 'door.manage' }),
-  item('it', '/it', { superAdminOnly: true }),
+  item('mailinglists', '/mailinglijsten', { perm: 'mailinglists.export' }),
+  item('shortlinks', '/links', { perm: 'shortlinks.manage' }),
+  item('dashboardTiles', '/dashboard-tiles', { perm: 'dashboard.manage' }),
+  group('it', [
+    // `exact`, anders licht Configuratie (/admin/it) ook op wanneer je op de
+    // onderliggende /admin/it/preview staat.
+    item('itConfig', '/it', { superAdminOnly: true, exact: true }),
+    item('authorizationPreview', '/it/preview', { superAdminOnly: true }),
+    item('door', '/deur', { perm: 'door.manage' }),
+    item('sso', '/sso', { perm: 'oauth.client.edit' }),
+  ]),
 ];
 
 type DictAdmin = ReturnType<typeof getDictionary>['admin'];
@@ -127,9 +132,10 @@ export default async function AdminLayout({
     exact: leaf.exact,
   });
 
-  // Bouw de zichtbare nav en sorteer daarna op het gelokaliseerde label. Het
-  // dashboard blijft bewust de vaste eerste entry; groepen blijven bij elkaar
-  // en hun eigen items worden afzonderlijk alfabetisch gesorteerd.
+  // Bouw de zichtbare nav. De volgorde is exact die van NAV hierboven: dat is de
+  // plek waar je ze aanpast, dus we sorteren hier bewust niet (een alfabetische
+  // sortering op het gelokaliseerde label maakte de array-volgorde betekenisloos
+  // en gaf nl en en een andere volgorde).
   const nodes: NavNode[] = [];
   for (const entry of NAV) {
     if ('group' in entry) {
@@ -142,29 +148,11 @@ export default async function AdminLayout({
     }
   }
 
-  const collator = new Intl.Collator(locale === 'nl' ? 'nl-BE' : 'en-GB', {
-    sensitivity: 'base',
-    numeric: true,
-  });
-  for (const node of nodes) {
-    if (node.type === 'group') {
-      node.items.sort((a, b) => collator.compare(a.label, b.label));
-    }
-  }
-  nodes.sort((a, b) => {
-    const aDashboard = a.type === 'item' && a.item.key === 'dashboard';
-    const bDashboard = b.type === 'item' && b.item.key === 'dashboard';
-    if (aDashboard !== bDashboard) return aDashboard ? -1 : 1;
-    const aLabel = a.type === 'group' ? a.label : a.item.label;
-    const bLabel = b.type === 'group' ? b.label : b.item.label;
-    return collator.compare(aLabel, bLabel);
-  });
-
   return (
     <div className="vtk-admin-surface">
       <div className="vtk-admin-surface-inner">
-        {/* Sticky/scrollgedrag staat in vtk-admin.css, op het 860px-breekpunt van
-            de tweekolomslayout (niet op Tailwinds md:, dat 768px is). */}
+        {/* Sticky/scrollgedrag staat in AdminNav (useSmartSticky) plus het
+            860px-breekpunt in vtk-admin.css (niet Tailwinds md:, dat 768px is). */}
         <aside>
           <AdminNav title={dict.admin.title} nodes={nodes} />
         </aside>

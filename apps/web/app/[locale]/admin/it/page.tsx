@@ -1,6 +1,5 @@
 import { notFound } from "next/navigation";
 import { Card } from "@vtk/ui";
-import { prisma } from "@vtk/db";
 import {
   isKulEnabled,
   isKulDebugEnabled,
@@ -20,7 +19,6 @@ import { DoorConfigForm } from "./DoorConfigForm";
 import { DoorTestButton } from "./DoorTestButton";
 import { KulDebugForm } from "./KulDebugForm";
 import { KulAuthLogViewer } from "./KulAuthLogViewer";
-import { AuthorizationPreviewPanel } from "@/components/admin/AuthorizationPreviewPanel";
 
 // This is an internal, superadmin-only tooling page, so the copy stays in
 // English (technical terms) rather than being localized like the public admin.
@@ -36,54 +34,24 @@ export default async function AdminIT({
   const session = await requireSession();
   if (!session.user.isSuperAdmin) notFound();
 
-  const [s3Status, sentryStatus, doorStatus, kulDebugEnabled, kulLogs, roles, groups] =
-    await Promise.all([
-      getS3Status(),
-      getSentryStatus(),
-      getDoorStatus(),
-      isKulDebugEnabled(),
-      getKulAuthLogs(),
-      prisma.role.findMany({
-        orderBy: [{ order: "asc" }, { nameNl: "asc" }],
-        select: {
-          id: true,
-          code: true,
-          nameNl: true,
-          nameEn: true,
-          permissions: { select: { permission: { select: { code: true } } } },
-        },
-      }),
-      prisma.group.findMany({
-        where: { active: true },
-        orderBy: [{ type: "asc" }, { orderInPraesidium: "asc" }, { nameNl: "asc" }],
-        select: {
-          id: true,
-          nameNl: true,
-          nameEn: true,
-          type: true,
-          roleGrants: {
-            select: { kind: true, role: { select: { nameNl: true, nameEn: true } } },
-          },
-        },
-      }),
-    ]);
+  const [s3Status, sentryStatus, doorStatus, kulDebugEnabled, kulLogs] = await Promise.all([
+    getS3Status(),
+    getSentryStatus(),
+    getDoorStatus(),
+    isKulDebugEnabled(),
+    getKulAuthLogs(),
+  ]);
   const kulConfigured = isKulEnabled();
 
   return (
     <div className="space-y-8">
       <div>
-        <h1 className="text-2xl font-semibold">IT</h1>
+        <h1 className="text-2xl font-semibold">Configuration</h1>
         <p className="mt-1 text-sm text-zinc-500">
           Technical configuration and tools for administrators. Sensitive keys are stored
           encrypted and never shown again after saving.
         </p>
       </div>
-
-      <AuthorizationPreviewPanel
-        locale={localeParam === "en" ? "en" : "nl"}
-        roles={roles}
-        groups={groups}
-      />
 
       <section className="space-y-3">
         <div>
