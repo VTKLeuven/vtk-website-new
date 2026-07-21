@@ -158,10 +158,32 @@ grants publishing by definition.
 **A new permission is a code change** — permissions are the fixed vocabulary of the app:
 1. Add one line to the registry `packages/db/src/permissions.ts`
    (`{ code, labelNl, labelEn, category }`).
-2. Run `npm run seed -w @vtk/db` to upsert it into the `Permission` table (safe while the dev
-   server runs).
+2. Run `npm run sync -w @vtk/db` to mirror it into the `Permission` table (safe while the dev
+   server runs). On a deployed environment you do **not** need to do this by hand: the config sync
+   runs on every container start (see below).
 3. Use it: `requirePermission("your.code")` / `hasPermission(session, "your.code")` now type-check
    against it. Tick it onto roles in `/admin/roles`.
+
+### Config sync (`packages/db/prisma/sync.ts`)
+
+The seed deliberately does not run on a deploy (it would push admin-managed content back to its
+defaults), which used to mean a new permission never reached the DB on dev.vtk.be: the code shipped,
+the `Permission` row did not, and the screen stayed shut. `sync.ts` closes that gap. It runs on every
+container start, right after `prisma migrate deploy`, and touches **only** data that code owns:
+
+- `Permission` — creates missing codes, updates labels/category when they drift from the registry.
+- the `admin` system role's grants — a new permission is linked immediately, since that role bundles
+  everything by definition. It does not create the role if it is absent.
+
+It creates **no users, roles or groups**; those are GUI actions on a live environment. Posts,
+werkgroepen and header tabs that exist in the seed but not in the DB are only *reported*, never
+written back, because deleting one via the GUI is a legitimate choice.
+
+- `npm run sync -w @vtk/db` — apply.
+- `npm run sync:check -w @vtk/db` — dry run; prints what would change and writes nothing.
+- `npx tsx packages/db/prisma/sync.ts --prune` — also delete `Permission` rows no longer in the
+  registry (cascades to their role grants). Not part of the automatic run: dropping a permission is
+  destructive, so a removed code is reported as a warning and cleaned up deliberately.
 
 The registry is the **single source of truth**; the DB table is a mirror (so permissions are
 queryable in SQL). It is exposed to client bundles without pulling in Prisma via the
@@ -238,6 +260,9 @@ available roles but not auto-assigned to any post. Your seeded admin account is 
   `npx dotenv -e ../../.env -- npx prisma migrate status` first (read-only). An enum→string column
   change needs a hand-written `USING ::text` cast — Prisma won't generate it.
 - **Seed:** `npm run seed -w @vtk/db` — idempotent upserts; safe while the dev server is up.
+- **Config sync:** `npm run sync -w @vtk/db` (or `sync:check` for a dry run) — mirrors the
+  permission registry into the DB without touching admin-managed content. Runs automatically on
+  every deploy.
 - **Typecheck (no server needed):** `cd apps/web && npx tsc --noEmit`;
   `cd packages/auth && npx tsc --noEmit -p tsconfig.json`.
 - **Route health without auth:**

@@ -14,6 +14,8 @@
     "migrate": "dotenv -e ../../.env -- prisma migrate dev",
     "migrate:deploy": "dotenv -e ../../.env -- prisma migrate deploy",
     "seed": "dotenv -e ../../.env -- tsx prisma/seed.ts",
+    "sync": "dotenv -e ../../.env -- tsx prisma/sync.ts",
+    "sync:check": "dotenv -e ../../.env -- tsx prisma/sync.ts --dry-run",
     "db:setup": "npm run migrate:deploy && npm run seed",
     "db:reset": "dotenv -e ../../.env -- prisma migrate reset --force",
     "build": "dotenv -e ../../.env -- prisma generate"

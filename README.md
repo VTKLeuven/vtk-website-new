@@ -526,12 +526,22 @@ This brings up:
 
 During image **build**, the `web` Dockerfile runs `prisma generate` and
 `next build`. At **container start**, the default command runs
-`prisma migrate deploy` (applies migrations under `packages/db/prisma/migrations`)
-and then starts Next.js. The seed runs on start **only when `RUN_SEED=true`**;
-otherwise it is skipped. This keeps redeploys from re-asserting seeded and
-admin-managed content (header tabs, CMS pages, partners, ...) over changes made
-in `/admin`. Seed a fresh DB explicitly (next section) or set `RUN_SEED=true`
-for a single start.
+`prisma migrate deploy` (applies migrations under `packages/db/prisma/migrations`),
+then the **config sync** (`packages/db/prisma/sync.ts`), and then starts Next.js.
+The seed runs on start **only when `RUN_SEED=true`**; otherwise it is skipped.
+This keeps redeploys from re-asserting seeded and admin-managed content (header
+tabs, CMS pages, partners, ...) over changes made in `/admin`. Seed a fresh DB
+explicitly (next section) or set `RUN_SEED=true` for a single start.
+
+The **config sync** does run on every start, because it only mirrors registries
+that live in code into the DB: the permission list
+(`packages/db/src/permissions.ts`) and the grants of the `admin` system role.
+Without it a permission added in code never reached the deployed DB and its
+screens stayed unreachable until someone reseeded by hand. It creates no users,
+roles or groups (those are GUI actions here) and it never overwrites
+admin-managed content; missing posts or header tabs are only reported in the
+container log. Run it manually with `npm run sync -w @vtk/db`, or
+`npm run sync:check -w @vtk/db` for a dry run.
 
 ### 5. First-time database init (once, on the server)
 
@@ -572,8 +582,9 @@ docker compose -f infra/docker-compose.yml pull
 docker compose -f infra/docker-compose.yml up -d --build --remove-orphans
 ```
 
-The rebuilt `web` container runs migrations on startup. It does **not** reseed
-(the seed only runs when `RUN_SEED=true`), so admin-managed content survives the
+The rebuilt `web` container runs migrations and the config sync on startup, so
+permissions added in this release land in the DB. It does **not** reseed (the
+seed only runs when `RUN_SEED=true`), so admin-managed content survives the
 redeploy.
 
 ### 7. Backups

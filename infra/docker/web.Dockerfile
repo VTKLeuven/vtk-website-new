@@ -40,10 +40,14 @@ WORKDIR /app/apps/web
 EXPOSE 3000
 ENTRYPOINT ["/sbin/tini", "--"]
 # next is hoisted to /app/node_modules; cwd must stay the app dir for .next.
-# Migrations run on every start (safe, versioned). The seed does NOT: it only
-# runs when RUN_SEED=true, so a redeploy never re-asserts seeded/admin-managed
-# content (header tabs, pages, partners, ...) over edits made in /admin. For a
-# fresh DB, run it once (README "First-time database init") or set RUN_SEED=true
-# for a single start. Keep the seed in a subshell: `cd /app` must not leak into
-# `next start`, which needs cwd = /app/apps/web to find .next.
-CMD ["/bin/sh", "-c", "npx prisma migrate deploy --schema=/app/packages/db/prisma/schema.prisma && if [ \"$RUN_SEED\" = \"true\" ]; then (cd /app && npx tsx packages/db/prisma/seed.ts); else echo 'Skipping seed (set RUN_SEED=true to run it)'; fi && exec node /app/node_modules/next/dist/bin/next start -p 3000"]
+# Migrations run on every start (safe, versioned). So does the config sync
+# (packages/db/prisma/sync.ts): it only mirrors code-owned registries into the
+# DB (permissions + the admin system role's grants), so a new permission is
+# actually usable after a deploy. It creates no users, roles or groups.
+# The seed does NOT run on every start: it only runs when RUN_SEED=true, so a
+# redeploy never re-asserts seeded/admin-managed content (header tabs, pages,
+# partners, ...) over edits made in /admin. For a fresh DB, run it once (README
+# "First-time database init") or set RUN_SEED=true for a single start. Keep both
+# scripts in a subshell: `cd /app` must not leak into `next start`, which needs
+# cwd = /app/apps/web to find .next.
+CMD ["/bin/sh", "-c", "npx prisma migrate deploy --schema=/app/packages/db/prisma/schema.prisma && (cd /app && npx tsx packages/db/prisma/sync.ts) && if [ \"$RUN_SEED\" = \"true\" ]; then (cd /app && npx tsx packages/db/prisma/seed.ts); else echo 'Skipping seed (set RUN_SEED=true to run it)'; fi && exec node /app/node_modules/next/dist/bin/next start -p 3000"]
