@@ -14,7 +14,11 @@ import {
 import { logistiekBaseUrl, paymentGateway } from '@/lib/payments';
 
 export type ActionResult = { ok: true; message?: string } | { ok: false; error: string };
-export type { ReservationFormInput };
+// `ReservationFormInput` NIET her-exporteren vanuit dit `'use server'`-bestand:
+// Turbopack behandelt elke export van een use-server-module als een server action,
+// en een her-geëxporteerde type-binding laat de build falen ("export doesn't exist
+// in target module"). Consumers importeren het type rechtstreeks uit
+// `@/lib/reservation-form`.
 
 function revalidateMember() {
   revalidatePath('/reservaties');

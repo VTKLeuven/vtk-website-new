@@ -3,7 +3,8 @@
 import { useCallback, useEffect, useMemo, useState, useTransition } from 'react';
 import Link from 'next/link';
 import { Button } from '@vtk/ui';
-import { checkAvailabilityAction, type ActionResult, type ReservationFormInput } from '@/app/actions/uitleen';
+import { checkAvailabilityAction, type ActionResult } from '@/app/actions/uitleen';
+import type { ReservationFormInput } from '@/lib/reservation-form';
 import { formatEuro } from '@/lib/uitleen';
 import type { CatalogCategory } from '@/lib/uitleen-server';
 import {

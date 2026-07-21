@@ -7,8 +7,8 @@ import {
   createFlesserkeReservationAction,
   editFlesserkeReservationAction,
   type ActionResult,
-  type ReservationFormInput,
 } from '@/app/actions/uitleen';
+import type { ReservationFormInput } from '@/lib/reservation-form';
 import type { FlesserkeCatalogCategory } from '@/lib/uitleen-server';
 import {
   EventRequesterFields,
