@@ -4,6 +4,7 @@ import { getSession } from '@/lib/session';
 import { copy, getLocale } from '@/lib/i18n';
 import { pricingModeLabel, formatEuro } from '@/lib/uitleen';
 import { activeVehicles } from '@/lib/uitleen-server';
+import { getPublicCopy } from '@/lib/public-copy';
 import { VanRequestForm } from './request-form';
 
 export default async function VervoerPage() {
@@ -14,7 +15,7 @@ export default async function VervoerPage() {
   }
   const en = locale === 'en';
 
-  const vehicles = await activeVehicles();
+  const [vehicles, content] = await Promise.all([activeVehicles(), getPublicCopy(locale)]);
 
   return (
     <PageShell
@@ -23,7 +24,7 @@ export default async function VervoerPage() {
           {t.pageVanTitle} <em className="font-serif font-normal italic text-vtk-navy">{t.pageVanAccent}</em>
         </>
       }
-      intro={t.pageVanLead}
+      intro={content.pageVanLead}
     >
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
         <VanRequestForm
@@ -42,21 +43,9 @@ export default async function VervoerPage() {
             {en ? 'Good to know' : 'Goed om te weten'}
           </h2>
           <ul className="mt-4 space-y-3 text-sm leading-6 text-vtk-body">
-            <li>
-              {en
-                ? 'A VTK volunteer drives; you help load and unload.'
-                : 'Een VTK-vrijwilliger rijdt; jij helpt laden en lossen.'}
-            </li>
-            <li>
-              {en
-                ? 'Request at least two weeks ahead; VTK events have priority.'
-                : 'Vraag minstens twee weken op voorhand aan; VTK-evenementen hebben voorrang.'}
-            </li>
-            <li>
-              {en
-                ? 'The driver is assigned the weekend before the trip.'
-                : 'De chauffeur wordt het weekend voor de rit toegewezen.'}
-            </li>
+            {content.vanDriverInfo ? <li>{content.vanDriverInfo}</li> : null}
+            {content.vanTimingInfo ? <li>{content.vanTimingInfo}</li> : null}
+            {content.vanPaymentInfo ? <li>{content.vanPaymentInfo}</li> : null}
           </ul>
           <h3 className="mt-5 text-sm font-semibold text-vtk-ink">{en ? 'Rates' : 'Tarieven'}</h3>
           <ul className="mt-2 space-y-1 text-sm text-vtk-body">

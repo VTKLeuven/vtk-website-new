@@ -36,6 +36,7 @@ export function ReservationForm({
   onCancel,
   cancelLabel,
   showRentPrices = false,
+  paymentNote,
   mode = 'member',
 }: {
   catalog: CatalogCategory[];
@@ -48,6 +49,8 @@ export function ReservationForm({
   onCancel?: () => void;
   cancelLabel?: string;
   showRentPrices?: boolean;
+  /** Beheerbare waarborg-/betaalnota (getPublicCopy); valt terug op de vaste zin. */
+  paymentNote?: string;
   mode?: 'member' | 'team';
 }) {
   const en = locale === 'en';
@@ -303,9 +306,10 @@ export function ReservationForm({
             </div>
           </dl>
           <p className="mt-2 text-xs leading-5 text-vtk-muted">
-            {en
-              ? 'Your deposit is returned when everything comes back in good condition.'
-              : 'De waarborg krijg je terug wanneer alles in orde terugkomt.'}
+            {paymentNote ??
+              (en
+                ? 'Your deposit is returned when everything comes back in good condition.'
+                : 'De waarborg krijg je terug wanneer alles in orde terugkomt.')}
           </p>
 
           {error ? (

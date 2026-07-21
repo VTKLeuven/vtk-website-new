@@ -11,11 +11,14 @@ export function MaterialRequestForm({
   groups,
   locale,
   showRentPrices = false,
+  paymentNote,
 }: {
   catalog: CatalogCategory[];
   groups: RequesterOption[];
   locale: 'nl' | 'en';
   showRentPrices?: boolean;
+  /** Beheerbare waarborg-/betaalnota uit /beheer/teksten (getPublicCopy). */
+  paymentNote?: string;
 }) {
   const en = locale === 'en';
   const router = useRouter();
@@ -26,6 +29,7 @@ export function MaterialRequestForm({
       groups={groups}
       locale={locale}
       showRentPrices={showRentPrices}
+      paymentNote={paymentNote}
       initial={{
         event: emptyEventValues(groups),
         pickupDate: '',

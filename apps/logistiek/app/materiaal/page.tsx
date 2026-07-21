@@ -38,6 +38,7 @@ export default async function MateriaalPage() {
           groups={session.groups.map((g) => ({ id: g.id, name: locale === 'en' ? g.nameEn : g.nameNl }))}
           locale={locale}
           showRentPrices={settings.showRentPrices}
+          paymentNote={content.materialPaymentNote}
         />
       )}
     </PageShell>
