@@ -7,7 +7,7 @@
  * is al ingelogd; "weigeren" stuurt terug naar de client met `access_denied`,
  * niet naar vtk.be.
  *
- * Zie docs/oauth2-oidc-design.md hoofdstuk 13 voor je hier iets wijzigt: de
+ * Zie docs/sso.md voor je hier iets wijzigt: de
  * vormgeving van dit scherm is een veiligheidsmaatregel tegen consent-phishing,
  * geen smaakkwestie.
  */
