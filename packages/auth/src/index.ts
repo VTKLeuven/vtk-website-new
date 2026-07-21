@@ -20,6 +20,15 @@ export {
   type Scope,
   type ScopeDefinition,
 } from './lib/scopes';
+export {
+  CLAIMS,
+  CLAIM_NAMES,
+  claimsForScope,
+  type ClaimDefinition,
+  type ClaimDestination,
+  type ClaimSource,
+} from './lib/claims';
+export { transform, TRANSFORMER_NAMES, type TransformerName, type TransformerArgs } from './lib/transformers';
 
 /**
  * Staat hier en niet in `auth.ts` omdat de proxy hem nodig heeft en die

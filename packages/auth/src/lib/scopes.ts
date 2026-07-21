@@ -64,18 +64,15 @@ export const SCOPES = [
     consentEn: 'Keep access while you are signed out',
   },
   {
+    // Levert pas claims op vanaf fase 5, wanneer een client zijn eigen
+    // permissies kan definiëren. De consent-tekst zegt bewust "in deze
+    // toepassing": het gaat over rechten binnen die client, niet over de
+    // rechten die iemand binnen VTK heeft.
     code: 'entitlements',
     sensitive: false,
     defaultSelected: true,
     consentNl: 'Zien welke rechten je hebt in deze toepassing',
     consentEn: 'See which rights you have in this application',
-  },
-  {
-    code: 'vtk:membership',
-    sensitive: false,
-    defaultSelected: false,
-    consentNl: 'Van welke posten je lid bent',
-    consentEn: 'Which groups you belong to',
   },
 
   // Studie stond eerst als één scope. Apart, omdat een app die enkel de

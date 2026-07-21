@@ -12,6 +12,7 @@ import { oauthProvider } from '@better-auth/oauth-provider';
 import { prisma } from '@vtk/db';
 import { nextCookies } from 'better-auth/next-js';
 import { hasSSOPrivileges } from './server/sso';
+import { resolveClaims } from './server/claims';
 
 import { hashPassword, verifyPassword } from './logins/password';
 import { kulOAuthConfig, KUL_PROVIDER_ID } from './logins/kul';
@@ -46,12 +47,19 @@ export const auth = betterAuth({
       // De scope-registry (lib/scopes.ts) is de bron; zonder deze regel staat de
       // plugin enkel haar vier standaardscopes toe en faalt het aanmaken van een
       // client met bv. `vtk:study_programme` op `invalid_scope`.
-      //
-      // De `vtk:`-scopes leveren pas echte claims op in fase 4. Tot dan mag een
-      // client ze vragen en beschrijft het toestemmingsscherm ze correct, maar
-      // bevat de token er niets extra van. Dat is de bewuste asymmetrie uit het
-      // ontwerp: toestemming beschrijft het maximum, de token levert het minimum.
       scopes: [...SCOPE_CODES],
+
+      // Welke claims onder welke scope vrijkomen, staat in lib/claims.ts. De
+      // meeste zitten enkel in UserInfo en niet in het ID token: dat wordt één
+      // keer uitgegeven en veroudert, terwijl UserInfo live opgehaald wordt.
+      customIdTokenClaims: async ({ user, scopes }) =>
+        resolveClaims({ destination: 'id_token', userId: user.id, scopes: [...scopes] }),
+
+      customUserInfoClaims: async ({ user, scopes }) =>
+        resolveClaims({ destination: 'userinfo', userId: user.id, scopes: [...scopes] }),
+
+      customAccessTokenClaims: async ({ user, scopes }) =>
+        user ? resolveClaims({ destination: 'access_token', userId: user.id, scopes: [...scopes] }) : {},
 
       // Clients zijn van VTK, niet van de persoon die ze aanmaakte. De plugin
       // hangt eigenaarschap aan `userId` OF aan deze referentie, en weigert
