@@ -57,9 +57,12 @@
     "addEvent": "Evenement toevoegen"
   },
   "praesidium": {
+    "kicker": "VTK · Praesidium",
     "title": "Praesidium",
-    "lead": "Voorzitter",
-    "member": "Lid"
+    "intro": "Het praesidium van VTK, per werkingsjaar.",
+    "coordinator": "Groepscoördinator",
+    "member": "Lid",
+    "empty": "Voor dit werkingsjaar zijn er nog geen posten ingevuld."
   },
   "werkgroepen": {
     "kicker": "VTK · Werkgroepen",

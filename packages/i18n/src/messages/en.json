@@ -57,9 +57,12 @@
     "addEvent": "Add event"
   },
   "praesidium": {
+    "kicker": "VTK · Praesidium",
     "title": "Praesidium",
-    "lead": "Lead",
-    "member": "Member"
+    "intro": "The praesidium of VTK, per working year.",
+    "coordinator": "Group coordinator",
+    "member": "Member",
+    "empty": "No posts have been filled in for this working year yet."
   },
   "werkgroepen": {
     "kicker": "VTK · Werkgroepen",

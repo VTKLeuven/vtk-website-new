@@ -394,10 +394,17 @@ bijgewerkt. De Brevo-sync (`apps/web/lib/brevo/`) haalt de tussenpersoon weg.
   `apps/web/lib/workingYear.ts`). Er is **geen cron of wisactie** nodig: omdat
   memberships per jaar staan, is de post in een nieuw werkingsjaar automatisch
   leeg tot ze ingevuld wordt, en blijven vorige jaren zichtbaar.
-- **Tabjes per jaar** (zoals Theokot), startend bij **"26-27"**
-  (`FIRST_WORKING_YEAR = 2026`; er is geen historiek van daarvoor). Zowel de
-  admin-postenpagina als de publieke `/praesidium` tonen deze tabjes; standaard
+- **Tabjes per jaar** (zoals Theokot). De **admin-postenpagina** start bij
+  **"26-27"** (`FIRST_WORKING_YEAR = 2026`) via `workingYearTabs()`; standaard
   staat het huidige werkingsjaar open. De gekozen jaar zit in de URL (`?jaar=`).
+- **De publieke `/praesidium` toont bewust óók jaren van vóór 26-27.** Anders dan
+  de admin en `/werkgroepen` bouwt die pagina haar jarenlijst uit de **distinct
+  membership-jaren in de data** (plus het huidige werkingsjaar), niet uit
+  `workingYearTabs()`/`parseWorkingYear()` (die klemmen op `FIRST_WORKING_YEAR` en
+  zouden alle historiek droppen). Zo kan de **historiek van ~20 vorige
+  praesidia** (zie hieronder) getoond worden zonder aparte historiek-tabel.
+  Standaardjaar is het huidige werkingsjaar wanneer dat ingevuld is, anders het
+  nieuwste jaar met data (zodat de pagina niet leeg opent).
 - **Migratie-keuze:** bestaande memberships zonder jaar zijn bij de migratie op
   `2026` gezet, zodat de huidige samenstelling onder "26-27" verschijnt.
 - **Admin-postenpagina** toont per post standaard enkel de **leden van het
@@ -405,8 +412,25 @@ bijgewerkt. De Brevo-sync (`apps/web/lib/brevo/`) haalt de tussenpersoon weg.
   staan **ingeklapt** (`<details>`). Een lid verwijderen gaat via een
   bevestigings-modal (verwijdert enkel dat jaar; andere jaren blijven).
 - **Publieke `/praesidium`** toont per post de leden van het gekozen jaar met hun
-  profielfoto (uit "Mijn account"), verantwoordelijke(n) eerst en daarna
-  alfabetisch.
+  profielfoto (uit "Mijn account"), de **groepscoördinator** (`membership.role =
+  LEAD`) eerst en daarna op `displayOrder` en alfabetisch. Een post zonder leden
+  voor dat jaar verschijnt niet.
+  - **Groepscoördinator én titel staan los van elkaar.** De `LEAD` van een post
+    krijgt de gele pin "Groepscoördinator"; de optionele `titleNl/titleEn` (bv.
+    "Praeses") is de subtitel. Iemand kan allebei zijn (de coördinator mét titel),
+    dus ze worden apart getoond i.p.v. het één-of-het-ander dat er eerst stond.
+  - **Inactieve leden blijven zichtbaar.** De pagina filtert bewust **niet** op
+    `user.active`: afgestudeerde leden wiens account later gedeactiveerd wordt,
+    horen in de historiek thuis (mét foto). Tombstones (`deletedAt` na een
+    account-verwijdering) worden wél weggelaten.
+- **Historiek-import zonder aparte tabel.** De ~20 vorige praesidia worden
+  geïmporteerd als **inactieve `User`-rijen** (enkel naam + foto reëel, de rest
+  dummy) met per lid `GroupMembership`-rijen (`groupId`, `year`, `role`,
+  `titleNl/En`, `displayOrder`). `year` is het startjaar (2010 = "10-11"). Posten
+  die intussen niet meer bestaan, maak je aan als **gedeactiveerde `Group`-rijen**
+  (`active=false`, `type=PRAESIDIUM`) zodat hun historiek blijft renderen. Dit is
+  een bewuste keuze: geen apart historiek-model, gewoon dezelfde memberships-
+  machinerie met inactieve leden.
 - **De post "Algemeen" is verwijderd** (hoorde niet in de praesidiumstructuur en
   was niet wisbaar in de admin). Verwijderd uit de seed en via de migratie uit de
   DB.
