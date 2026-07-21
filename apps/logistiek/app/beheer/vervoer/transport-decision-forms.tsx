@@ -1,13 +1,13 @@
 'use client';
 
 import { SaveForm } from '@/components/ui/save-form';
-import { approveVanBookingAction, rejectVanBookingAction } from '@/app/actions/beheer';
+import { approveTransportAction, rejectTransportAction } from '@/app/actions/beheer';
 
 const APPROVE_ERRORS = {
   MODE_REQUIRED: 'Kies hoe er betaald wordt.',
   NOT_FOUND: 'Rit niet gevonden.',
   NOT_REQUESTED: 'Deze rit is al beslist.',
-  OVERLAP: 'De camionette is al geboekt op dat moment.',
+  OVERLAP: 'Dit voertuig is al geboekt op dat moment.',
 };
 
 const REJECT_ERRORS = {
@@ -16,17 +16,19 @@ const REJECT_ERRORS = {
   NOT_REQUESTED: 'Deze rit is al beslist.',
 };
 
-export function VanDecisionForms({
+export function TransportDecisionForms({
   bookingId,
   drivers,
+  pricingIsPerKm,
 }: {
   bookingId: string;
   drivers: Array<{ id: string; name: string }>;
+  pricingIsPerKm: boolean;
 }) {
   return (
     <div className="grid gap-4">
       <SaveForm
-        action={approveVanBookingAction}
+        action={approveTransportAction}
         submitLabel="Goedkeuren"
         savingLabel="Goedkeuren..."
         savedMessage="Rit goedgekeurd."
@@ -36,7 +38,7 @@ export function VanDecisionForms({
         <input type="hidden" name="bookingId" value={bookingId} />
         <p className="text-sm font-semibold text-vtk-ink">Goedkeuren</p>
         <label className="grid gap-1 text-sm">
-          <span className="text-vtk-muted">Chauffeur</span>
+          <span className="text-vtk-muted">Chauffeur (optioneel, kan later)</span>
           <select
             name="driverId"
             className="h-10 rounded-lg border border-vtk-navy/15 bg-white px-3 text-vtk-ink"
@@ -53,14 +55,19 @@ export function VanDecisionForms({
         <fieldset className="grid gap-2 text-sm">
           <legend className="sr-only">Betaalwijze</legend>
           <label className="flex items-center gap-2">
-            <input type="radio" name="paymentMode" value="ONLINE" defaultChecked />
+            <input type="radio" name="paymentMode" value="ONLINE" defaultChecked={!pricingIsPerKm} />
             <span>Online betalen (betaallink voor het lid)</span>
           </label>
           <label className="flex items-center gap-2">
-            <input type="radio" name="paymentMode" value="OFFLINE" />
+            <input type="radio" name="paymentMode" value="OFFLINE" defaultChecked={pricingIsPerKm} />
             <span>Ter plaatse betalen (cash/Payconiq)</span>
           </label>
         </fieldset>
+        {pricingIsPerKm ? (
+          <p className="text-xs text-vtk-muted">
+            De prijs wordt pas bekend na de rit (per km); online betalen kan na het afronden.
+          </p>
+        ) : null}
         <label className="grid gap-1 text-sm">
           <span className="text-vtk-muted">Nota voor het lid (optioneel)</span>
           <input
@@ -72,7 +79,7 @@ export function VanDecisionForms({
       </SaveForm>
 
       <SaveForm
-        action={rejectVanBookingAction}
+        action={rejectTransportAction}
         submitLabel="Afwijzen"
         savingLabel="Afwijzen..."
         savedMessage="Rit afgewezen."

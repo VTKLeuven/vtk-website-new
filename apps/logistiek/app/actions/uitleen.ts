@@ -3,112 +3,158 @@
 import { revalidatePath } from 'next/cache';
 import { prisma } from '@vtk/db';
 import { requireSession } from '@/lib/session';
-import {
-  parseDateOnly,
-  todayDateOnly,
-  vanPriceCents,
-  VAN_HOURLY_RATE_CENTS,
-  type ReservationLineInput,
-} from '@/lib/uitleen';
+import { parseDateOnly, todayDateOnly, transportPriceCents } from '@/lib/uitleen';
 import { availabilityForRange } from '@/lib/uitleen-server';
+import {
+  buildReservationData,
+  parseBrusselsDateTime,
+  MAX_NOTE_LENGTH,
+  type ReservationFormInput,
+} from '@/lib/reservation-form';
 import { logistiekBaseUrl, paymentGateway } from '@/lib/payments';
 
 export type ActionResult = { ok: true; message?: string } | { ok: false; error: string };
-
-/** Max lengte van een uitleenperiode; langere aanvragen verlopen via e-mail. */
-const MAX_RESERVATION_DAYS = 14;
-const MAX_NOTE_LENGTH = 1000;
+export type { ReservationFormInput };
 
 function revalidateMember() {
   revalidatePath('/reservaties');
   revalidatePath('/materiaal');
-  revalidatePath('/camionette');
+  revalidatePath('/vervoer');
 }
 
-export async function createReservationAction(input: {
-  pickupDate: string;
-  returnDate: string;
-  note: string;
-  lines: ReservationLineInput[];
-}): Promise<ActionResult> {
+type SessionLike = { user: { id: string; name: string }; groups: Array<{ id: string }> };
+
+/**
+ * Leidt het aanvragertype automatisch af uit de login: een praesidiumlid (in een
+ * post) vraagt aan als INTERN namens die post; wie geen post heeft, is EXTERN met
+ * de eigen naam. Het lid kiest dit dus nooit zelf; de client-waarde wordt
+ * genegeerd. (Werkgroepen zitten niet in de DB en worden hier niet afgeleid.)
+ */
+function deriveMemberRequester(
+  session: SessionLike,
+  chosenGroupId?: string
+): { requesterType: 'INTERN' | 'EXTERN'; groupId: string | null; requesterName?: string } {
+  if (session.groups.length > 0) {
+    const groupId = session.groups.some((g) => g.id === chosenGroupId)
+      ? chosenGroupId!
+      : session.groups[0].id;
+    return { requesterType: 'INTERN', groupId, requesterName: undefined };
+  }
+  return { requesterType: 'EXTERN', groupId: null, requesterName: session.user.name };
+}
+
+export async function createReservationAction(input: ReservationFormInput): Promise<ActionResult> {
   const session = await requireSession();
-
-  const pickupDate = parseDateOnly(input.pickupDate);
-  const returnDate = parseDateOnly(input.returnDate);
-  if (!pickupDate || !returnDate) return { ok: false, error: 'Kies een afhaal- en terugbrengdatum.' };
-  if (pickupDate < todayDateOnly()) return { ok: false, error: 'De afhaaldatum ligt in het verleden.' };
-  if (returnDate < pickupDate) {
-    return { ok: false, error: 'De terugbrengdatum ligt voor de afhaaldatum.' };
-  }
-  const days = (returnDate.getTime() - pickupDate.getTime()) / (24 * 60 * 60 * 1000) + 1;
-  if (days > MAX_RESERVATION_DAYS) {
-    return {
-      ok: false,
-      error: `Een reservatie kan maximaal ${MAX_RESERVATION_DAYS} dagen duren; mail logistiek@vtk.be voor langere periodes.`,
-    };
-  }
-
-  const note = input.note.trim().slice(0, MAX_NOTE_LENGTH);
-  const lines = input.lines.filter((line) => Number.isInteger(line.quantity) && line.quantity > 0);
-  if (lines.length === 0) return { ok: false, error: 'Kies minstens één item.' };
-  const itemIds = lines.map((line) => line.itemId);
-  if (new Set(itemIds).size !== itemIds.length) {
-    return { ok: false, error: 'Elk item mag maar één keer in de aanvraag staan.' };
-  }
-
-  const items = await prisma.uitleenItem.findMany({
-    where: { id: { in: itemIds }, active: true },
-  });
-  if (items.length !== itemIds.length) {
-    return { ok: false, error: 'Een van de gekozen items bestaat niet meer; herlaad de catalogus.' };
-  }
-  const byId = new Map(items.map((item) => [item.id, item]));
-
-  // Zachte check: een aanvraag boven de totale voorraad is zinloos. De harde
-  // check tegen andere reservaties gebeurt bij goedkeuring door het team.
-  for (const line of lines) {
-    const item = byId.get(line.itemId)!;
-    if (line.quantity > item.quantity) {
-      return {
-        ok: false,
-        error: `Van "${item.name}" zijn er maar ${item.quantity} beschikbaar.`,
-      };
-    }
-  }
-
-  let totalPriceCents = 0;
-  let totalDepositCents = 0;
-  for (const line of lines) {
-    const item = byId.get(line.itemId)!;
-    totalPriceCents += item.priceCents * line.quantity;
-    totalDepositCents += item.depositCents * line.quantity;
-  }
+  const requester = deriveMemberRequester(session, input.groupId ?? undefined);
+  const built = await buildReservationData(
+    { ...input, ...requester, flesserkeLines: [] },
+    session.groups.map((g) => g.id)
+  );
+  if (!built.ok) return built;
 
   await prisma.uitleenReservation.create({
-    data: {
-      userId: session.user.id,
-      pickupDate,
-      returnDate,
-      memberNote: note || null,
-      totalPriceCents,
-      totalDepositCents,
-      lines: {
-        create: lines.map((line) => {
-          const item = byId.get(line.itemId)!;
-          return {
-            itemId: item.id,
-            itemName: item.name,
-            quantity: line.quantity,
-            unitPriceCents: item.priceCents,
-            unitDepositCents: item.depositCents,
-          };
-        }),
-      },
-    },
+    data: { userId: session.user.id, ...built.scalars, lines: { create: built.lineCreates } },
   });
 
   revalidateMember();
   return { ok: true, message: 'Aanvraag ingediend. Je vindt de status bij Mijn aanvragen.' };
+}
+
+/** Een lid mag zijn eigen materiaalaanvraag bewerken zolang ze nog niet beslist is. */
+export async function editReservationAction(
+  reservationId: string,
+  input: ReservationFormInput
+): Promise<ActionResult> {
+  const session = await requireSession();
+
+  const existing = await prisma.uitleenReservation.findFirst({
+    where: { id: reservationId, userId: session.user.id },
+    select: { id: true, status: true },
+  });
+  if (!existing) return { ok: false, error: 'Reservatie niet gevonden.' };
+  if (existing.status !== 'REQUESTED') {
+    return { ok: false, error: 'Deze aanvraag is al beslist; bewerken kan niet meer. Neem contact op met Logistiek.' };
+  }
+
+  const requester = deriveMemberRequester(session, input.groupId ?? undefined);
+  const built = await buildReservationData(
+    { ...input, ...requester, flesserkeLines: [] },
+    session.groups.map((g) => g.id)
+  );
+  if (!built.ok) return built;
+
+  // Enkel de materiaallijnen vervangen; flesserke loopt via een aparte flow.
+  await prisma.$transaction([
+    prisma.uitleenReservationLine.deleteMany({ where: { reservationId } }),
+    prisma.uitleenReservation.update({
+      where: { id: reservationId },
+      data: { ...built.scalars, lines: { create: built.lineCreates } },
+    }),
+  ]);
+
+  revalidateMember();
+  return { ok: true, message: 'Aanvraag bijgewerkt.' };
+}
+
+function revalidateFlesserke() {
+  revalidatePath('/reservaties');
+  revalidatePath('/flesserke');
+}
+
+/** Flesserke-aanvraag (enkel praesidium). Aparte reservatie met enkel flesserke-lijnen. */
+export async function createFlesserkeReservationAction(input: ReservationFormInput): Promise<ActionResult> {
+  const session = await requireSession();
+  if (session.groups.length === 0) {
+    return { ok: false, error: 'Flesserke is enkel voor het praesidium.' };
+  }
+  const requester = deriveMemberRequester(session, input.groupId ?? undefined);
+  const built = await buildReservationData(
+    { ...input, ...requester, lines: [] },
+    session.groups.map((g) => g.id)
+  );
+  if (!built.ok) return built;
+
+  await prisma.uitleenReservation.create({
+    data: { userId: session.user.id, ...built.scalars, flesserkeLines: { create: built.flesserkeLineCreates } },
+  });
+
+  revalidateFlesserke();
+  return { ok: true, message: 'Flesserke-aanvraag ingediend. Je krijgt bericht zodra Logistiek beslist.' };
+}
+
+export async function editFlesserkeReservationAction(
+  reservationId: string,
+  input: ReservationFormInput
+): Promise<ActionResult> {
+  const session = await requireSession();
+  if (session.groups.length === 0) return { ok: false, error: 'Flesserke is enkel voor het praesidium.' };
+
+  const existing = await prisma.uitleenReservation.findFirst({
+    where: { id: reservationId, userId: session.user.id },
+    select: { id: true, status: true },
+  });
+  if (!existing) return { ok: false, error: 'Aanvraag niet gevonden.' };
+  if (existing.status !== 'REQUESTED') {
+    return { ok: false, error: 'Deze aanvraag is al beslist; bewerken kan niet meer.' };
+  }
+
+  const requester = deriveMemberRequester(session, input.groupId ?? undefined);
+  const built = await buildReservationData(
+    { ...input, ...requester, lines: [] },
+    session.groups.map((g) => g.id)
+  );
+  if (!built.ok) return built;
+
+  await prisma.$transaction([
+    prisma.uitleenFlesserkeLine.deleteMany({ where: { reservationId } }),
+    prisma.uitleenReservation.update({
+      where: { id: reservationId },
+      data: { ...built.scalars, flesserkeLines: { create: built.flesserkeLineCreates } },
+    }),
+  ]);
+
+  revalidateFlesserke();
+  return { ok: true, message: 'Flesserke-aanvraag bijgewerkt.' };
 }
 
 export async function cancelReservationAction(reservationId: string): Promise<ActionResult> {
@@ -159,6 +205,9 @@ export async function createVanBookingAction(input: {
   pickupAddress: string;
   destination: string;
   note: string;
+  vehicleId?: string;
+  eventName?: string;
+  helpersNote?: string;
 }): Promise<ActionResult> {
   const session = await requireSession();
 
@@ -176,19 +225,36 @@ export async function createVanBookingAction(input: {
   }
 
   const purpose = input.purpose.trim();
-  if (!purpose) return { ok: false, error: 'Beschrijf waarvoor je de camionette nodig hebt.' };
+  if (!purpose) return { ok: false, error: 'Beschrijf waarvoor je het voertuig nodig hebt.' };
 
-  await prisma.uitleenVanBooking.create({
+  const vehicle = input.vehicleId
+    ? await prisma.uitleenVehicle.findFirst({ where: { id: input.vehicleId, active: true } })
+    : await prisma.uitleenVehicle.findFirst({ where: { active: true }, orderBy: { sortIndex: 'asc' } });
+  if (!vehicle) return { ok: false, error: 'Kies een voertuig.' };
+
+  // Tarief snapshotten; prijs is null wanneer ze pas na de rit gekend is (per km).
+  const priceCents = transportPriceCents({
+    pricingMode: vehicle.pricingMode,
+    rateCents: vehicle.rateCents,
+    startAt,
+    endAt,
+  });
+
+  await prisma.uitleenTransportBooking.create({
     data: {
       userId: session.user.id,
+      vehicleId: vehicle.id,
       startAt,
       endAt,
       purpose: purpose.slice(0, MAX_NOTE_LENGTH),
+      eventName: input.eventName?.trim().slice(0, 300) || null,
       pickupAddress: input.pickupAddress.trim().slice(0, 300) || null,
       destination: input.destination.trim().slice(0, 300) || null,
+      helpersNote: input.helpersNote?.trim().slice(0, 300) || null,
       memberNote: input.note.trim().slice(0, MAX_NOTE_LENGTH) || null,
-      hourlyRateCents: VAN_HOURLY_RATE_CENTS,
-      priceCents: vanPriceCents(startAt, endAt),
+      pricingMode: vehicle.pricingMode,
+      rateCents: vehicle.rateCents,
+      priceCents,
     },
   });
 
@@ -199,7 +265,7 @@ export async function createVanBookingAction(input: {
 export async function cancelVanBookingAction(bookingId: string): Promise<ActionResult> {
   const session = await requireSession();
 
-  const booking = await prisma.uitleenVanBooking.findFirst({
+  const booking = await prisma.uitleenTransportBooking.findFirst({
     where: { id: bookingId, userId: session.user.id },
     include: { payments: { where: { status: 'SUCCEEDED' }, select: { id: true } } },
   });
@@ -211,7 +277,7 @@ export async function cancelVanBookingAction(bookingId: string): Promise<ActionR
     return { ok: false, error: 'Deze rit is al betaald; mail logistiek@vtk.be om ze te annuleren.' };
   }
 
-  await prisma.uitleenVanBooking.update({
+  await prisma.uitleenTransportBooking.update({
     where: { id: booking.id },
     data: { status: 'CANCELLED' },
   });
@@ -245,7 +311,7 @@ export async function startPaymentAction(
           where: { id, userId: session.user.id },
           include: { payments: true },
         })
-      : await prisma.uitleenVanBooking.findFirst({
+      : await prisma.uitleenTransportBooking.findFirst({
           where: { id, userId: session.user.id },
           include: { payments: true },
         });
@@ -280,12 +346,12 @@ export async function startPaymentAction(
   const idempotencyKey = `${target === 'reservation' ? 'res' : 'van'}:${record.id}:${attempt}`;
   const expiresAt = new Date(Date.now() + CHECKOUT_MINUTES * 60 * 1000);
   const base = logistiekBaseUrl();
-  const detailPath = target === 'reservation' ? `/reservaties/${record.id}` : `/camionette/${record.id}`;
+  const detailPath = target === 'reservation' ? `/reservaties/${record.id}` : `/vervoer/${record.id}`;
 
   const payment = await prisma.uitleenPayment.create({
     data: {
       reservationId: target === 'reservation' ? record.id : null,
-      vanBookingId: target === 'van' ? record.id : null,
+      transportBookingId: target === 'van' ? record.id : null,
       provider: gateway.name,
       idempotencyKey,
       amountCents,
@@ -298,11 +364,11 @@ export async function startPaymentAction(
       orderId: record.id,
       orderNumber: record.id.slice(-8).toUpperCase(),
       buyerEmail: session.user.email,
-      eventName: target === 'reservation' ? 'VTK uitleendienst' : 'VTK camionette',
+      eventName: target === 'reservation' ? 'VTK uitleendienst' : 'VTK vervoer',
       currency: 'EUR',
       lines: [
         {
-          name: target === 'reservation' ? 'Huur materiaal' : 'Camionette-rit',
+          name: target === 'reservation' ? 'Huur materiaal' : 'Vervoer',
           quantity: 1,
           unitAmountCents: amountCents,
         },
@@ -332,33 +398,4 @@ export async function startPaymentAction(
     });
     return { ok: false, error: 'De betaalprovider is niet bereikbaar. Probeer straks opnieuw.' };
   }
-}
-
-/**
- * "YYYY-MM-DDTHH:mm" uit een datetime-local-input, gelezen als Belgische
- * wall-clock tijd en omgezet naar een absoluut tijdstip.
- */
-function parseBrusselsDateTime(value: string): Date | null {
-  if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(value)) return null;
-  // Bepaal de UTC-offset van Brussel op die dag (CET of CEST) door de wall-clock
-  // te vergelijken met dezelfde string als UTC gelezen.
-  const asUtc = new Date(`${value}:00.000Z`);
-  if (Number.isNaN(asUtc.getTime())) return null;
-  const formatter = new Intl.DateTimeFormat('en-CA', {
-    timeZone: 'Europe/Brussels',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false,
-  });
-  const parts = Object.fromEntries(
-    formatter.formatToParts(asUtc).map((part) => [part.type, part.value])
-  );
-  const brusselsAsUtc = new Date(
-    `${parts.year}-${parts.month}-${parts.day}T${parts.hour === '24' ? '00' : parts.hour}:${parts.minute}:00.000Z`
-  );
-  const offsetMs = brusselsAsUtc.getTime() - asUtc.getTime();
-  return new Date(asUtc.getTime() - offsetMs);
 }

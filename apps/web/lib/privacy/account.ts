@@ -96,7 +96,7 @@ export async function exportUserData(userId: string) {
           },
         },
       },
-      uitleenVanBookings: {
+      uitleenTransport: {
         select: {
           status: true,
           startAt: true,
@@ -281,7 +281,7 @@ export async function eraseUserData(userId: string) {
       where: { userId },
       data: { memberNote: null, adminNote: null },
     });
-    await tx.uitleenVanBooking.updateMany({
+    await tx.uitleenTransportBooking.updateMany({
       where: { userId },
       data: {
         purpose: "Anonymised booking",

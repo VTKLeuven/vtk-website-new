@@ -9,11 +9,14 @@ export function PayButton({
   target,
   id,
   amountLabel,
+  locale = 'nl',
 }: {
   target: 'reservation' | 'van';
   id: string;
   amountLabel: string;
+  locale?: 'nl' | 'en';
 }) {
+  const en = locale === 'en';
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
@@ -32,7 +35,7 @@ export function PayButton({
   return (
     <div>
       <Button type="button" className="w-full" onClick={pay} disabled={pending}>
-        {pending ? 'Even geduld...' : `Betaal ${amountLabel} online`}
+        {pending ? (en ? 'One moment...' : 'Even geduld...') : en ? `Pay ${amountLabel} online` : `Betaal ${amountLabel} online`}
       </Button>
       {error ? (
         <p role="alert" className="mt-2 text-sm text-red-700">

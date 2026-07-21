@@ -50,9 +50,14 @@ export async function SiteHeader() {
             <Link href="/materiaal">
               {t.navMaterial}
             </Link>
-            <Link href="/camionette">
+            <Link href="/vervoer">
               {t.navVan}
             </Link>
+            {session && session.groups.length > 0 ? (
+              <Link href="/flesserke">
+                {t.navFlesserke}
+              </Link>
+            ) : null}
             {session ? (
               <Link href="/reservaties">
                 {t.navReservations}
