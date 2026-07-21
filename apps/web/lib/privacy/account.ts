@@ -169,6 +169,16 @@ export async function exportUserData(userId: string) {
         },
         orderBy: { at: "desc" },
       },
+      doorShortcutTokens: {
+        select: {
+          label: true,
+          expiresAt: true,
+          lastUsedAt: true,
+          revokedAt: true,
+          createdAt: true,
+        },
+        orderBy: { createdAt: "desc" },
+      },
     },
   });
 
@@ -232,6 +242,9 @@ export async function eraseUserData(userId: string) {
     await tx.shiftParticipant.deleteMany({ where: { userId } });
     await tx.ticketEventUserGrant.deleteMany({ where: { userId } });
     await tx.doorAccessGrant.deleteMany({ where: { userId } });
+    // De User-rij blijft als anonieme tombstone bestaan, dus een FK-cascade zou
+    // deze credentials niet opruimen. Verwijder ze expliciet vóór anonimisering.
+    await tx.doorShortcutToken.deleteMany({ where: { userId } });
 
     await tx.doorAccessLog.updateMany({
       where: { userId },

@@ -5,11 +5,13 @@ import { Card, Label, Input, Select, Button } from "@vtk/ui";
 import { hasLocale } from "@/lib/locale";
 import { requireSession } from "@/lib/session";
 import { getDictionary, pick } from "@vtk/i18n";
+import { hasPermission } from "@vtk/auth";
 import { formatEuro } from "@/lib/theokot";
 import { updateProfileAction, logoutAction } from "@/app/actions/auth";
 import { ProfileForm } from "@/components/profile/ProfileForm";
 import { SaveForm } from "@/components/ui/SaveForm";
 import { deleteMyAccountAction } from "@/app/actions/privacy";
+import { DoorShortcutTokens } from "./DoorShortcutTokens";
 
 export default async function AccountPage({ params }: { params: Promise<{ locale: string }> }) {
   const { locale } = await params;
@@ -47,17 +49,27 @@ export default async function AccountPage({ params }: { params: Promise<{ locale
 
   // Aankomende reservaties (nog niet opgehaald, afhaalvenster nog niet voorbij).
   const now = new Date();
-  const reservations = await prisma.theokotOrder.findMany({
-    where: { userId: session.user.id, status: "RESERVED", session: { pickupEnd: { gte: now } } },
-    orderBy: { session: { date: "asc" } },
-    include: {
-      session: { select: { date: true, pickupStart: true, pickupEnd: true } },
-      lines: {
-        include: { sessionItem: { select: { nameNl: true, nameEn: true } } },
-        orderBy: { sessionItem: { order: "asc" } },
+  const canUseDoorShortcut = hasPermission(session, "door.remoteOpen");
+  const [reservations, doorShortcutTokens] = await Promise.all([
+    prisma.theokotOrder.findMany({
+      where: { userId: session.user.id, status: "RESERVED", session: { pickupEnd: { gte: now } } },
+      orderBy: { session: { date: "asc" } },
+      include: {
+        session: { select: { date: true, pickupStart: true, pickupEnd: true } },
+        lines: {
+          include: { sessionItem: { select: { nameNl: true, nameEn: true } } },
+          orderBy: { sessionItem: { order: "asc" } },
+        },
       },
-    },
-  });
+    }),
+    canUseDoorShortcut
+      ? prisma.doorShortcutToken.findMany({
+          where: { userId: session.user.id, revokedAt: null, expiresAt: { gt: now } },
+          orderBy: { createdAt: "desc" },
+          select: { id: true, label: true, createdAt: true, expiresAt: true, lastUsedAt: true },
+        })
+      : Promise.resolve([]),
+  ]);
 
   const dayFmt = new Intl.DateTimeFormat(nl ? "nl-BE" : "en-GB", {
     timeZone: "Europe/Brussels",
@@ -67,6 +79,14 @@ export default async function AccountPage({ params }: { params: Promise<{ locale
   });
   const timeFmt = new Intl.DateTimeFormat(nl ? "nl-BE" : "en-GB", {
     timeZone: "Europe/Brussels",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+  const tokenDateFmt = new Intl.DateTimeFormat(nl ? "nl-BE" : "en-GB", {
+    timeZone: "Europe/Brussels",
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
     hour: "2-digit",
     minute: "2-digit",
   });
@@ -99,6 +119,21 @@ export default async function AccountPage({ params }: { params: Promise<{ locale
           </div>
         </SaveForm>
       </Card>
+
+      {canUseDoorShortcut ? (
+        <Card className="p-6">
+          <DoorShortcutTokens
+            locale={locale}
+            tokens={doorShortcutTokens.map((token) => ({
+              id: token.id,
+              label: token.label,
+              createdAt: tokenDateFmt.format(token.createdAt),
+              expiresAt: tokenDateFmt.format(token.expiresAt),
+              lastUsedAt: token.lastUsedAt ? tokenDateFmt.format(token.lastUsedAt) : null,
+            }))}
+          />
+        </Card>
+      ) : null}
 
       <Card className="p-6">
         <ProfileForm

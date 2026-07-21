@@ -278,24 +278,24 @@ enum StudyProgramme {
 // -----------------------------------------------------------------------------
 
 model User {
-  id            String  @id @default(cuid())
+  id             String  @id @default(cuid())
   // `name` blijft de weergavenaam (en het veld dat better-auth zelf zet bij een
   // SSO-login). `firstName`/`lastName` zijn de gestructureerde variant die de
   // mailinglijst-exports nodig hebben; ze worden ingevuld tijdens de onboarding
   // en in het gebruikersbeheer, en `name` wordt daaruit samengesteld.
-  name          String
-  firstName     String?
-  lastName      String?
-  email         String  @unique
-  rNumber       String? @unique // KU Leuven studentennummer (bvb r0123456), voor zoeken
+  name           String
+  firstName      String?
+  lastName       String?
+  email          String  @unique
+  rNumber        String? @unique // KU Leuven studentennummer (bvb r0123456), voor zoeken
   // `true` als het r-nummer van de KU Leuven-authenticator komt (bij SSO gezet,
   // zie packages/auth/src/logins/kul.ts). Dan staat het veld read-only in het
   // profielformulier, net als de e-mail; een zelf ingevuld r-nummer (flag false)
   // blijft aanpasbaar.
   rNumberFromKul Boolean @default(false)
-  emailVerified Boolean @default(false)
-  avatarKey     String?
-  image         String?
+  emailVerified  Boolean @default(false)
+  avatarKey      String?
+  image          String?
 
   locale       Locale  @default(NL)
   active       Boolean @default(true)
@@ -365,8 +365,9 @@ model User {
   uitleenTransportDecided UitleenTransportBooking[] @relation("UitleenTransportDecidedBy")
   uitleenTransportDone    UitleenTransportBooking[] @relation("UitleenTransportCompletedBy")
 
-  doorGrants DoorAccessGrant[]
-  doorLogs   DoorAccessLog[]
+  doorGrants         DoorAccessGrant[]
+  doorLogs           DoorAccessLog[]
+  doorShortcutTokens DoorShortcutToken[]
 
   createdTicketEvents      TicketEvent[]           @relation("TicketEventCreatedBy")
   ticketEventGrants        TicketEventUserGrant[]  @relation("TicketEventGrantUser")
@@ -1855,6 +1856,26 @@ model DoorAccessLog {
   @@index([at])
   @@index([result])
   @@index([userId])
+}
+
+// Persoonlijk, intrekbaar token waarmee een Apple Shortcut de deur via de
+// publieke website-API kan openen. Alleen de SHA-256-hash wordt bewaard; het
+// ruwe token wordt bij aanmaak exact één keer aan de gebruiker getoond.
+model DoorShortcutToken {
+  id         String    @id @default(cuid())
+  userId     String
+  label      String
+  tokenHash  String    @unique
+  expiresAt  DateTime  @db.Timestamptz(3)
+  lastUsedAt DateTime? @db.Timestamptz(3)
+  revokedAt  DateTime? @db.Timestamptz(3)
+  createdAt  DateTime  @default(now()) @db.Timestamptz(3)
+  updatedAt  DateTime  @updatedAt @db.Timestamptz(3)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, revokedAt])
+  @@index([expiresAt])
 }
 
 // -----------------------------------------------------------------------------

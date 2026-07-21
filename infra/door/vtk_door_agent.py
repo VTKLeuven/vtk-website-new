@@ -475,8 +475,13 @@ class DoorHandler(BaseHTTPRequestHandler):
                     seconds = body.get("unlockSeconds")
             except Exception:  # noqa: BLE001
                 seconds = None
-            opened = open_door(seconds, source="remote")
-            return self._reply(200 if opened else 500, {"opened": opened})
+            # Bevestig eerst: open_door blijft gedurende de volledige unlocktijd
+            # bezig. Als we pas daarna antwoorden, ziet de website bij de default
+            # van 5s ten onrechte haar 5s-requesttimeout afgaan terwijl de deur wel
+            # degelijk geopend werd.
+            self._reply(202, {"accepted": True})
+            open_door(seconds, source="remote")
+            return
         self._reply(404, {"error": "not_found"})
 
     def log_message(self, *_args):  # stil: we loggen zelf via `log()`

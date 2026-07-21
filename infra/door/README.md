@@ -25,6 +25,14 @@ config onder **Admin -> IT -> Door scanner**. De rechten (`door.open`, `door.rem
 Beide richtingen gebruiken hetzelfde secret: `DOOR_DEVICE_SECRET` op de Pi == het secret
 onder Admin -> IT.
 
+## Apple Shortcut
+
+Een iPhone hoort niet rechtstreeks met SSH of Tailscale naar de Pi te verbinden.
+De publieke website biedt een persoonlijke-tokenendpoint en stuurt de aanvaarde
+opdracht zelf over het tailnet door naar deze listener. Zie
+[`docs/door-apple-shortcut.md`](../../docs/door-apple-shortcut.md) voor tokenbeheer,
+de Shortcut-configuratie, beveiliging en troubleshooting.
+
 ## Parallel met de oude website
 
 De nieuwe agent gebruikt bewust de aparte bestandsnaam `vtk_door_agent.py` en neemt de

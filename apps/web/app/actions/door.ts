@@ -3,13 +3,16 @@
 import { revalidatePath } from "next/cache";
 import { prisma } from "@vtk/db";
 import { requirePermission } from "@/lib/session";
-import { getDoorConfig } from "@/lib/door-config";
-import { logDoorAccess } from "@/lib/door-server";
+import { logDoorAccess, requestDoorOpen } from "@/lib/door-server";
+import {
+  createDoorShortcutToken,
+  doorShortcutExpiry,
+  hashDoorShortcutToken,
+  MAX_ACTIVE_DOOR_SHORTCUT_TOKENS,
+} from "@/lib/door-shortcut";
 import { saveError, saveOk, type SaveState } from "@/lib/saveState";
 
 export type ActionResult = { ok: true } | { ok: false; error: string };
-
-const PI_TIMEOUT_MS = 5000;
 
 /** Revalidatie van de deur-adminpagina in beide locales na een grant-wijziging. */
 function revalidateDoorAdmin() {
@@ -29,33 +32,61 @@ function revalidateDoorAdmin() {
 export async function openDoorRemoteAction(): Promise<ActionResult> {
   const session = await requirePermission("door.remoteOpen");
 
-  const cfg = await getDoorConfig();
-  if (!cfg.piUrl || !cfg.deviceSecret) {
-    return { ok: false, error: "not_configured" };
-  }
-
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), PI_TIMEOUT_MS);
-  try {
-    const res = await fetch(`${cfg.piUrl}/open`, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${cfg.deviceSecret}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ unlockSeconds: cfg.unlockSeconds }),
-      signal: controller.signal,
-      cache: "no-store",
-    });
-    if (!res.ok) return { ok: false, error: "pi_error" };
-  } catch {
-    return { ok: false, error: "unreachable" };
-  } finally {
-    clearTimeout(timeout);
-  }
+  const result = await requestDoorOpen();
+  if (!result.ok) return result;
 
   await logDoorAccess({ method: "REMOTE", result: "ALLOWED", userId: session.user.id });
   return { ok: true };
+}
+
+export type CreateDoorShortcutTokenResult =
+  | { ok: true; token: string; expiresAt: string }
+  | { ok: false; error: "invalid_label" | "too_many_tokens" };
+
+/** Maakt een persoonlijk Shortcut-token; de ruwe waarde verlaat deze action exact één keer. */
+export async function createDoorShortcutTokenAction(
+  formData: FormData,
+): Promise<CreateDoorShortcutTokenResult> {
+  const session = await requirePermission("door.remoteOpen");
+  const label = String(formData.get("label") ?? "").trim().replace(/\s+/g, " ");
+  if (label.length < 1 || label.length > 80) return { ok: false, error: "invalid_label" };
+
+  const now = new Date();
+  const activeCount = await prisma.doorShortcutToken.count({
+    where: { userId: session.user.id, revokedAt: null, expiresAt: { gt: now } },
+  });
+  if (activeCount >= MAX_ACTIVE_DOOR_SHORTCUT_TOKENS) {
+    return { ok: false, error: "too_many_tokens" };
+  }
+
+  const token = createDoorShortcutToken();
+  const expiresAt = doorShortcutExpiry(now);
+  await prisma.doorShortcutToken.create({
+    data: {
+      userId: session.user.id,
+      label,
+      tokenHash: hashDoorShortcutToken(token),
+      expiresAt,
+    },
+  });
+
+  revalidatePath("/account");
+  revalidatePath("/en/account");
+  return { ok: true, token, expiresAt: expiresAt.toISOString() };
+}
+
+/** Trekt alleen een token van de ingelogde gebruiker in. */
+export async function revokeDoorShortcutTokenAction(formData: FormData): Promise<void> {
+  const session = await requirePermission("door.remoteOpen");
+  const id = String(formData.get("id") ?? "").trim();
+  if (!id) return;
+
+  await prisma.doorShortcutToken.updateMany({
+    where: { id, userId: session.user.id, revokedAt: null },
+    data: { revokedAt: new Date() },
+  });
+  revalidatePath("/account");
+  revalidatePath("/en/account");
 }
 
 /**

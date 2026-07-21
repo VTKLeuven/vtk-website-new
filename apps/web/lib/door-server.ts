@@ -2,6 +2,7 @@ import "server-only";
 import { prisma } from "@vtk/db";
 import { currentWorkingYear } from "@vtk/auth";
 import type { DoorLogResult, DoorMethod } from "@prisma/client";
+import { getDoorConfig } from "./door-config";
 
 /**
  * Server-only deurlogica: wie mag de deur openen, en het wegschrijven + samenvatten
@@ -103,6 +104,42 @@ export async function logDoorAccess(entry: {
 }
 
 export type DoorStatWindow = { days: number; card: number; remote: number; total: number };
+
+export type DoorOpenResult =
+  | { ok: true }
+  | { ok: false; error: "not_configured" | "unreachable" | "pi_error" };
+
+const PI_TIMEOUT_MS = 5000;
+
+/**
+ * Stuurt één open-opdracht naar de Pi. Dashboard en Shortcut-API gebruiken
+ * bewust dezelfde netwerkcode en foutsemantiek. De Pi antwoordt meteen met 202
+ * en houdt daarna zelf de GPIO gedurende `unlockSeconds` actief.
+ */
+export async function requestDoorOpen(): Promise<DoorOpenResult> {
+  const cfg = await getDoorConfig();
+  if (!cfg.piUrl || !cfg.deviceSecret) return { ok: false, error: "not_configured" };
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), PI_TIMEOUT_MS);
+  try {
+    const res = await fetch(`${cfg.piUrl}/open`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${cfg.deviceSecret}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ unlockSeconds: cfg.unlockSeconds }),
+      signal: controller.signal,
+      cache: "no-store",
+    });
+    return res.ok ? { ok: true } : { ok: false, error: "pi_error" };
+  } catch {
+    return { ok: false, error: "unreachable" };
+  } finally {
+    clearTimeout(timeout);
+  }
+}
 
 /** Aantal geslaagde openingen (kaart vs remote) over 1, 7 en 30 dagen. */
 export async function getDoorStats(now: Date = new Date()): Promise<DoorStatWindow[]> {
