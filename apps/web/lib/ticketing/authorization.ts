@@ -1,8 +1,8 @@
 import "server-only";
 
 import { prisma } from "@vtk/db";
-import { currentWorkingYear } from "@vtk/auth";
-import { requireSession } from "@/lib/session";
+import { currentWorkingYear, hasPermission, type SessionPayload } from "@vtk/auth";
+import { getAuthorizationPreview, requireSession } from "@/lib/session";
 
 export const TICKET_CAPABILITIES = [
   "VIEW_EVENT",
@@ -132,6 +132,18 @@ export async function canCreateTicketEventForGroup(
   return Boolean(membership);
 }
 
+/** Session-snapshot variant used by read-only admin rendering and previews. */
+export function canSessionCreateTicketEventForGroup(
+  session: SessionPayload,
+  groupId: string,
+): boolean {
+  if (hasPermission(session, "tickets.manageAll")) return true;
+  return (
+    hasPermission(session, "tickets.create") &&
+    session.groups.some((group) => group.id === groupId && group.role === "LEAD")
+  );
+}
+
 export async function getTicketEventAccess(eventId: string) {
   const session = await requireSession();
   const event = await prisma.ticketEvent.findUnique({
@@ -141,24 +153,20 @@ export async function getTicketEventAccess(eventId: string) {
   if (!event) return null;
 
   const capabilities = new Set<TicketCapability>();
-  const hasGlobalAccess = await hasLiveTicketManageAll(
-    session.user.id,
-    session.user.isSuperAdmin
-  );
+  const hasGlobalAccess = hasPermission(session, "tickets.manageAll");
 
   if (hasGlobalAccess) {
     TICKET_CAPABILITIES.forEach((capability) => capabilities.add(capability));
   } else {
-    const memberships = await prisma.groupMembership.findMany({
-      where: { userId: session.user.id },
-      select: { groupId: true, role: true },
-    });
-    const membershipByGroup = new Map(memberships.map((row) => [row.groupId, row.role]));
+    const preview = await getAuthorizationPreview();
+    const membershipByGroup = new Map(session.groups.map((group) => [group.id, group.role]));
     const [userGrant, groupGrants] = await Promise.all([
-      prisma.ticketEventUserGrant.findUnique({
-        where: { eventId_userId: { eventId, userId: session.user.id } },
-        select: { role: true },
-      }),
+      preview
+        ? Promise.resolve(null)
+        : prisma.ticketEventUserGrant.findUnique({
+            where: { eventId_userId: { eventId, userId: session.user.id } },
+            select: { role: true },
+          }),
       prisma.ticketEventGroupGrant.findMany({
         where: { eventId, groupId: { in: [...membershipByGroup.keys()] } },
         select: { groupId: true, role: true, scope: true },
@@ -191,20 +199,16 @@ export async function requireTicketEventCapability(
 
 export async function canAccessAnyTicketEvent(): Promise<boolean> {
   const session = await requireSession();
-  if (session.user.isSuperAdmin) return true;
-  if (await hasLivePermission(session.user.id, "tickets.manageAll")) return true;
+  if (hasPermission(session, "tickets.manageAll")) return true;
 
-  const memberships = await prisma.groupMembership.findMany({
-    where: { userId: session.user.id, year: currentWorkingYear() },
-    select: { groupId: true, role: true },
-  });
-  const allGroupIds = memberships.map((row) => row.groupId);
-  const leadGroupIds = memberships.filter((row) => row.role === "LEAD").map((row) => row.groupId);
+  const preview = await getAuthorizationPreview();
+  const allGroupIds = session.groups.map((group) => group.id);
+  const leadGroupIds = session.groups.filter((group) => group.role === "LEAD").map((group) => group.id);
 
   const count = await prisma.ticketEvent.count({
     where: {
       OR: [
-        { userGrants: { some: { userId: session.user.id } } },
+        ...(preview ? [] : [{ userGrants: { some: { userId: session.user.id } } }]),
         {
           groupGrants: {
             some: {

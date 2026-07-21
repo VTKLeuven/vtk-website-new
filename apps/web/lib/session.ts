@@ -1,16 +1,47 @@
 import { cache } from 'react';
-import { headers } from 'next/headers';
+import { cookies, headers } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { getSession } from '@vtk/auth/server';
 import type { Permission } from '@vtk/auth';
 import { NextResponse } from 'next/server';
+import {
+  AUTHORIZATION_PREVIEW_COOKIE,
+  decodeAuthorizationPreview,
+  resolveAuthorizationPreview,
+  type AuthorizationPreview,
+} from '@/lib/authorization-preview';
 
 /**
  * Request-deduped session read. Wrapped in React `cache` so the several server
  * components that need the session within one render (layout onboarding gate,
  * Header, the page itself) share a single DB round-trip.
  */
-export const getCurrentSession = cache(async () => getSession(await headers()));
+const getSessionContext = cache(async () => {
+  const actualSession = await getSession(await headers());
+  if (!actualSession?.user.isSuperAdmin) {
+    return { actualSession, session: actualSession, preview: null };
+  }
+
+  const cookie = (await cookies()).get(AUTHORIZATION_PREVIEW_COOKIE)?.value;
+  const selection = decodeAuthorizationPreview(cookie);
+  if (!selection) return { actualSession, session: actualSession, preview: null };
+
+  const resolved = await resolveAuthorizationPreview(actualSession, selection);
+  return {
+    actualSession,
+    session: resolved?.session ?? actualSession,
+    preview: resolved?.preview ?? null,
+  };
+});
+
+export const getCurrentSession = cache(async () => (await getSessionContext()).session);
+
+/** The authenticated actor, unaffected by authorization preview mode. */
+export const getActualSession = cache(async () => (await getSessionContext()).actualSession);
+
+export const getAuthorizationPreview = cache(
+  async (): Promise<AuthorizationPreview | null> => (await getSessionContext()).preview,
+);
 
 export async function requireSession(redirectTo?: string) {
   const session = await getCurrentSession();

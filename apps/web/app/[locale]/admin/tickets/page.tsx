@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { prisma } from "@vtk/db";
-import { currentWorkingYear } from "@vtk/auth";
+import { currentWorkingYear, hasPermission } from "@vtk/auth";
 import {
   ArrowRight,
   CalendarClock,
@@ -14,7 +14,7 @@ import {
   Tickets,
 } from "lucide-react";
 import { hasLocale } from "@/lib/locale";
-import { requireSession } from "@/lib/session";
+import { getAuthorizationPreview, requireSession } from "@/lib/session";
 import { hasLiveTicketManageAll } from "@/lib/ticketing/authorization";
 import { AdminEmptyState } from "@/components/ticketing/admin/AdminEmptyState";
 import { AdminMetric } from "@/components/ticketing/admin/AdminMetric";
@@ -47,48 +47,54 @@ export default async function TicketAdminOverview({
   if (!hasLocale(localeParam)) notFound();
   const locale: AdminLocale = localeParam;
   const session = await requireSession();
-  const canManageAll = await hasLiveTicketManageAll(session.user.id, session.user.isSuperAdmin);
-  const memberships = await prisma.groupMembership.findMany({
-    where: { userId: session.user.id, year: currentWorkingYear() },
-    select: {
-      groupId: true,
-      role: true,
-      group: {
+  const preview = await getAuthorizationPreview();
+  const canManageAll = preview
+    ? hasPermission(session, "tickets.manageAll")
+    : await hasLiveTicketManageAll(session.user.id, session.user.isSuperAdmin);
+  const memberships = preview
+    ? session.groups.map((group) => ({
+        groupId: group.id,
+        role: group.role,
+        grantsTicketCreation: hasPermission(session, "tickets.create"),
+      }))
+    : await prisma.groupMembership.findMany({
+        where: { userId: session.user.id, year: currentWorkingYear() },
         select: {
-          // Posten kennen rechten toe via rollen (GroupRole -> Role -> permissions).
-          roleGrants: {
+          groupId: true,
+          role: true,
+          group: {
             select: {
-              role: {
+              roleGrants: {
                 select: {
-                  permissions: { select: { permission: { select: { code: true } } } },
+                  role: {
+                    select: {
+                      permissions: { select: { permission: { select: { code: true } } } },
+                    },
+                  },
                 },
               },
             },
           },
         },
-      },
-    },
-  });
+      }).then((rows) => rows.map((membership) => ({
+        groupId: membership.groupId,
+        role: membership.role,
+        grantsTicketCreation: membership.group.roleGrants.some((grant) =>
+          grant.role.permissions.some((entry) => entry.permission.code === "tickets.create")
+        ),
+      })));
   const allGroupIds = memberships.map((membership) => membership.groupId);
-  const leadGroupIds = memberships
-    .filter((membership) => membership.role === "LEAD")
-    .map((membership) => membership.groupId);
+  const leadGroupIds = memberships.filter((membership) => membership.role === "LEAD").map((membership) => membership.groupId);
   const canCreate =
     canManageAll ||
-    memberships.some(
-      (membership) =>
-        membership.role === "LEAD" &&
-        membership.group.roleGrants.some((grant) =>
-          grant.role.permissions.some((entry) => entry.permission.code === "tickets.create")
-        )
-    );
+    memberships.some((membership) => membership.role === "LEAD" && membership.grantsTicketCreation);
 
   const events = await prisma.ticketEvent.findMany({
     where: canManageAll
       ? undefined
       : {
           OR: [
-            { userGrants: { some: { userId: session.user.id } } },
+            ...(preview ? [] : [{ userGrants: { some: { userId: session.user.id } } }]),
             {
               groupGrants: {
                 some: { groupId: { in: allGroupIds }, scope: "ALL_MEMBERS" },

@@ -3,8 +3,13 @@ import { notFound } from "next/navigation";
 import { prisma } from "@vtk/db";
 import { ArrowLeft, ShieldAlert } from "lucide-react";
 import { hasLocale } from "@/lib/locale";
-import { requireSession } from "@/lib/session";
-import { canCreateTicketEventForGroup, hasLiveTicketManageAll } from "@/lib/ticketing/authorization";
+import { getAuthorizationPreview, requireSession } from "@/lib/session";
+import { hasPermission } from "@vtk/auth";
+import {
+  canCreateTicketEventForGroup,
+  canSessionCreateTicketEventForGroup,
+  hasLiveTicketManageAll,
+} from "@/lib/ticketing/authorization";
 import { TicketEventForm } from "@/components/ticketing/admin/TicketEventForm";
 import { ticketBase, type AdminLocale } from "@/components/ticketing/admin/format";
 
@@ -17,24 +22,23 @@ export default async function NewTicketEventPage({
   if (!hasLocale(localeParam)) notFound();
   const locale: AdminLocale = localeParam;
   const session = await requireSession();
-  const canManageAll = await hasLiveTicketManageAll(session.user.id, session.user.isSuperAdmin);
+  const preview = await getAuthorizationPreview();
+  const canManageAll = preview
+    ? hasPermission(session, "tickets.manageAll")
+    : await hasLiveTicketManageAll(session.user.id, session.user.isSuperAdmin);
 
   const allGroups = canManageAll
     ? await prisma.group.findMany({ orderBy: { orderInPraesidium: "asc" } })
     : await prisma.group.findMany({
-        where: { memberships: { some: { userId: session.user.id } } },
+        where: { id: { in: session.groups.map((group) => group.id) } },
         orderBy: { orderInPraesidium: "asc" },
       });
-  const allowed = await Promise.all(
-    allGroups.map(async (group) => ({
-      group,
-      allowed: await canCreateTicketEventForGroup(
-        session.user.id,
-        group.id,
-        session.user.isSuperAdmin
-      ),
-    }))
-  );
+  const allowed = await Promise.all(allGroups.map(async (group) => ({
+    group,
+    allowed: preview
+      ? canSessionCreateTicketEventForGroup(session, group.id)
+      : await canCreateTicketEventForGroup(session.user.id, group.id, session.user.isSuperAdmin),
+  })));
   const groups = canManageAll
     ? allGroups
     : allowed.filter((entry) => entry.allowed).map((entry) => entry.group);

@@ -1,6 +1,10 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { AUTH_BASE_PATH, currentWorkingYear } from '@vtk/auth';
 import { getSession } from '@vtk/auth/server';
+import {
+  AUTHORIZATION_PREVIEW_COOKIE,
+  blocksAuthorizationPreviewMutation,
+} from '@/lib/authorization-preview-constants';
 
 // RFC 8414 par. 3.1 schuift het well-known-segment tussen host en pad. Die vorm
 // valt buiten de catch-all van `app/api/auth/[...all]`, dus rewriten we hem naar
@@ -108,6 +112,25 @@ async function gateRedirect(request: NextRequest, internalPath: string): Promise
 export async function proxy(request: NextRequest) {
   const { pathname, search } = request.nextUrl;
 
+  // Authorization preview is deliberately read-only. Block every mutation at
+  // the network boundary, including Server Actions and API routes. The single
+  // stop endpoint is the escape hatch that clears the HttpOnly cookie.
+  const previewMutation = blocksAuthorizationPreviewMutation(
+    request.cookies.has(AUTHORIZATION_PREVIEW_COOKIE),
+    request.method,
+    pathname,
+  );
+  if (previewMutation && (await getSession(request.headers))?.user.isSuperAdmin) {
+    return NextResponse.json(
+      { error: 'AUTHORIZATION_PREVIEW_READ_ONLY' },
+      { status: 403, headers: { 'Cache-Control': 'private, no-store' } },
+    );
+  }
+
+  // API routes need the preview mutation guard above, but never locale
+  // rewriting or the profile-completion gate below.
+  if (pathname.startsWith('/api/')) return NextResponse.next();
+
   const host = (request.headers.get('host') ?? '').split(':')[0].toLowerCase();
   if (isShortlinkHost(host)) {
     const slug = pathname.replace(/^\/+/, '').split('/')[0];
@@ -164,6 +187,8 @@ export async function proxy(request: NextRequest) {
 
 export const config = {
   matcher: [
+    // API routes participate only in the read-only preview guard.
+    '/api/:path*',
     // Exclude Next internals, API routes, static assets.
     '/((?!api|_next/static|_next/image|favicon.ico|.*\\..*).*)',
     // Bovenstaande sluit elk pad met een punt erin uit (statische assets), dus

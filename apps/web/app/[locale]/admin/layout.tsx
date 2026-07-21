@@ -127,7 +127,9 @@ export default async function AdminLayout({
     exact: leaf.exact,
   });
 
-  // Bouw de nav in bronvolgorde. Een groep valt weg als geen enkel sub-item zichtbaar is.
+  // Bouw de zichtbare nav en sorteer daarna op het gelokaliseerde label. Het
+  // dashboard blijft bewust de vaste eerste entry; groepen blijven bij elkaar
+  // en hun eigen items worden afzonderlijk alfabetisch gesorteerd.
   const nodes: NavNode[] = [];
   for (const entry of NAV) {
     if ('group' in entry) {
@@ -139,6 +141,24 @@ export default async function AdminLayout({
       nodes.push({ type: 'item', item: toItem(entry) });
     }
   }
+
+  const collator = new Intl.Collator(locale === 'nl' ? 'nl-BE' : 'en-GB', {
+    sensitivity: 'base',
+    numeric: true,
+  });
+  for (const node of nodes) {
+    if (node.type === 'group') {
+      node.items.sort((a, b) => collator.compare(a.label, b.label));
+    }
+  }
+  nodes.sort((a, b) => {
+    const aDashboard = a.type === 'item' && a.item.key === 'dashboard';
+    const bDashboard = b.type === 'item' && b.item.key === 'dashboard';
+    if (aDashboard !== bDashboard) return aDashboard ? -1 : 1;
+    const aLabel = a.type === 'group' ? a.label : a.item.label;
+    const bLabel = b.type === 'group' ? b.label : b.item.label;
+    return collator.compare(aLabel, bLabel);
+  });
 
   return (
     <div className="vtk-admin-surface">

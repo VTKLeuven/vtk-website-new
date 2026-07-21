@@ -7,6 +7,7 @@ import { MAIL_CATEGORIES, R_NUMBER_PATTERN } from "@/lib/profile";
 import { CheckboxChip, StudyFieldset } from "./StudyFieldset";
 import { SaveForm } from "@/components/ui/SaveForm";
 import { saveProfileAction, type ProfileErrorCode } from "@/app/actions/onboarding";
+import { AvatarCropField } from "./AvatarCropField";
 
 function dateInputValue(date: Date | null): string {
   if (!date) return "";
@@ -245,20 +246,7 @@ export function ProfileForm({
       <fieldset className="space-y-3">
         <legend className="text-lg font-semibold text-vtk-ink">{t.photoHeading}</legend>
         <p className="text-sm text-[#5c667f]">{t.photoHint}</p>
-        <div className="flex items-center gap-4">
-          <div className="h-20 w-20 shrink-0 overflow-hidden rounded-[16px] border border-vtk-blue/10 bg-vtk-blue-soft">
-            {currentAvatar ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={currentAvatar} alt="" className="h-full w-full object-cover" />
-            ) : null}
-          </div>
-          <input
-            type="file"
-            name="photo"
-            accept="image/*"
-            className="text-sm text-[#34405e] file:mr-3 file:rounded-full file:border-0 file:bg-vtk-ink file:px-4 file:py-2 file:text-sm file:font-medium file:text-white hover:file:opacity-90"
-          />
-        </div>
+        <AvatarCropField locale={locale} currentAvatar={currentAvatar} />
       </fieldset>
     </SaveForm>
   );
