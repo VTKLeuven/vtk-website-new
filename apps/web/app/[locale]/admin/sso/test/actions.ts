@@ -28,10 +28,18 @@ async function origin(): Promise<string> {
 export async function startFlowTestAction(formData: FormData): Promise<void> {
   const scopes = formData.getAll('scopes').map(String);
   const prompt = String(formData.get('prompt') || '');
+  const access = String(formData.get('access') || 'open');
   const requestHeaders = await headers();
 
   const redirectUri = `${await origin()}/admin/sso/test/callback`;
-  await ensureFlowTestClient(requestHeaders, redirectUri);
+  await ensureFlowTestClient(requestHeaders, redirectUri, {
+    accessMode: access === 'open' ? 'OPEN' : 'RESTRICTED',
+    // Enkel bij "beperkt, met toegang" ken je jezelf de permissie toe; bij
+    // "beperkt, zonder toegang" wordt ze net weggehaald, zodat de poort echt
+    // getest wordt en niet een restje van een vorige run.
+    grantAccessToSelf: access === 'restricted-granted',
+    skipConsent: formData.get('skipConsent') === 'on',
+  });
 
   const codeVerifier = base64url(randomBytes(48));
   const codeChallenge = base64url(createHash('sha256').update(codeVerifier).digest());

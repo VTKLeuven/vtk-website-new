@@ -10,7 +10,8 @@ import { requireSession, authErrorResponse } from '@/lib/session';
  * altijd maar een klein aantal matches teruggegeven i.p.v. de hele tabel.
  *
  * Toegang: ingelogd én een recht dat een user-picker nodig heeft
- * (`users.view`, `shift.edit`, `groups.manage` of `pocs.manage`), of superadmin.
+ * (`users.view`, `shift.edit`, `groups.manage`, `pocs.manage` of
+ * `oauth.client.edit`), of superadmin.
  */
 export async function GET(request: Request) {
   let session;
@@ -25,7 +26,10 @@ export async function GET(request: Request) {
     session.permissions.includes('users.view') ||
     session.permissions.includes('shift.edit') ||
     session.permissions.includes('groups.manage') ||
-    session.permissions.includes('pocs.manage');
+    session.permissions.includes('pocs.manage') ||
+    // Nodig om een per-client permissie rechtstreeks aan een lid toe te kennen
+    // op /admin/sso/[clientId].
+    session.permissions.includes('oauth.client.edit');
   if (!allowed) {
     return NextResponse.json({ error: 'FORBIDDEN' }, { status: 403 });
   }

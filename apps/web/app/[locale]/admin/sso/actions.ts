@@ -5,11 +5,17 @@ import { redirect } from 'next/navigation';
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import {
+  createClientPermission,
   createSsoClient,
+  deleteClientPermission,
   deleteSsoClient,
+  grantClientPermission,
+  revokeClientPermission,
   revokeSsoClientTokens,
   rotateSsoClientSecret,
+  setClientAccessMode,
   setSsoClientDisabled,
+  updateClientPermission,
   updateSsoClient,
 } from '@vtk/auth/server';
 import { saveError, saveOk, type SaveState } from '@/lib/saveState';
@@ -188,4 +194,161 @@ export async function deleteClientAction(formData: FormData): Promise<void> {
   // `redirect` werkt via een throw, dus houd ze buiten elke try/catch.
   const redirectTo = String(formData.get('redirectTo') || '/admin/sso');
   redirect(redirectTo);
+}
+
+// ── Toegang en per-client permissies ────────────────────────────────────────
+//
+// Ook hier blijft de schil dun: de regels (codevalidatie, het automatisch
+// aanmaken van `<ns>.access`, het intrekken van tokens) staan in
+// packages/auth/src/server/clientPermissionsAdmin.ts.
+
+/**
+ * Vertaalt een fout uit de auth-laag naar een foutcode voor de toast. De
+ * problemen die hier voorbijkomen (een code die al bestaat, een gereserveerde
+ * namespace) zijn verwachte invoerfouten en horen geen error boundary te geven.
+ */
+function permissionErrorCode(error: unknown): string {
+  const problem = (error as { problem?: string } | null)?.problem;
+  return typeof problem === 'string' ? problem : 'SAVE_FAILED';
+}
+
+function revalidateClient(clientId: string): void {
+  revalidatePath('/admin/sso');
+  revalidatePath(`/admin/sso/${clientId}`);
+}
+
+const accessModeSchema = z.object({
+  clientId: z.string().min(1),
+  accessMode: z.enum(['OPEN', 'RESTRICTED']),
+  permissionNamespace: z.string().optional(),
+});
+
+export async function setAccessModeAction(_prev: SaveState, formData: FormData): Promise<SaveState> {
+  const parsed = accessModeSchema.safeParse({
+    clientId: formData.get('clientId'),
+    accessMode: formData.get('accessMode'),
+    permissionNamespace: String(formData.get('permissionNamespace') || '').trim() || undefined,
+  });
+  if (!parsed.success) return saveError('INVALID_INPUT');
+
+  try {
+    await setClientAccessMode(await headers(), parsed.data.clientId, {
+      accessMode: parsed.data.accessMode,
+      permissionNamespace: parsed.data.permissionNamespace ?? null,
+    });
+  } catch (error) {
+    console.error('[sso] toegangsmodus wijzigen mislukt:', error);
+    return saveError(permissionErrorCode(error));
+  }
+
+  revalidateClient(parsed.data.clientId);
+  return saveOk();
+}
+
+const permissionSchema = z.object({
+  clientId: z.string().min(1),
+  code: z.string().min(1),
+  labelNl: z.string().min(1),
+  labelEn: z.string().min(1),
+  descriptionNl: z.string().optional(),
+  descriptionEn: z.string().optional(),
+});
+
+export async function createPermissionAction(_prev: SaveState, formData: FormData): Promise<SaveState> {
+  const parsed = permissionSchema.safeParse({
+    clientId: formData.get('clientId'),
+    code: formData.get('code'),
+    labelNl: formData.get('labelNl'),
+    labelEn: formData.get('labelEn'),
+    descriptionNl: String(formData.get('descriptionNl') || '') || undefined,
+    descriptionEn: String(formData.get('descriptionEn') || '') || undefined,
+  });
+  if (!parsed.success) return saveError('INVALID_INPUT');
+
+  const { clientId, ...input } = parsed.data;
+  try {
+    await createClientPermission(await headers(), clientId, input);
+  } catch (error) {
+    console.error('[sso] permissie aanmaken mislukt:', error);
+    return saveError(permissionErrorCode(error));
+  }
+
+  revalidateClient(clientId);
+  return saveOk();
+}
+
+export async function updatePermissionAction(_prev: SaveState, formData: FormData): Promise<SaveState> {
+  const clientId = String(formData.get('clientId') || '');
+  const permissionId = String(formData.get('permissionId') || '');
+  const labelNl = String(formData.get('labelNl') || '');
+  const labelEn = String(formData.get('labelEn') || '');
+  if (!clientId || !permissionId || !labelNl || !labelEn) return saveError('INVALID_INPUT');
+
+  try {
+    await updateClientPermission(await headers(), permissionId, {
+      labelNl,
+      labelEn,
+      descriptionNl: String(formData.get('descriptionNl') || '') || null,
+      descriptionEn: String(formData.get('descriptionEn') || '') || null,
+      deprecated: formData.get('deprecated') === '1',
+    });
+  } catch (error) {
+    console.error('[sso] permissie bijwerken mislukt:', error);
+    return saveError(permissionErrorCode(error));
+  }
+
+  revalidateClient(clientId);
+  return saveOk();
+}
+
+export async function deletePermissionAction(formData: FormData): Promise<void> {
+  const clientId = String(formData.get('clientId') || '');
+  const permissionId = String(formData.get('permissionId') || '');
+  if (!clientId || !permissionId) return;
+  await deleteClientPermission(await headers(), permissionId);
+  revalidateClient(clientId);
+}
+
+export async function grantPermissionAction(formData: FormData): Promise<void> {
+  const clientId = String(formData.get('clientId') || '');
+  const permissionId = String(formData.get('permissionId') || '');
+  const kind = String(formData.get('kind') || '');
+  if (!clientId || !permissionId) return;
+
+  const requestHeaders = await headers();
+  if (kind === 'user') {
+    const userId = String(formData.get('userId') || '');
+    if (!userId) return;
+    const raw = String(formData.get('expiresAt') || '');
+    const expiresAt = raw ? new Date(raw) : null;
+    await grantClientPermission(requestHeaders, permissionId, {
+      kind: 'user',
+      userId,
+      expiresAt: expiresAt && !Number.isNaN(expiresAt.getTime()) ? expiresAt : null,
+    });
+  } else if (kind === 'role') {
+    const roleId = String(formData.get('roleId') || '');
+    if (!roleId) return;
+    await grantClientPermission(requestHeaders, permissionId, { kind: 'role', roleId });
+  } else if (kind === 'group') {
+    const groupId = String(formData.get('groupId') || '');
+    if (!groupId) return;
+    await grantClientPermission(requestHeaders, permissionId, {
+      kind: 'group',
+      groupId,
+      grantKind: formData.get('grantKind') === 'LEADER' ? 'LEADER' : 'DEFAULT',
+    });
+  }
+
+  revalidateClient(clientId);
+}
+
+export async function revokePermissionAction(formData: FormData): Promise<void> {
+  const clientId = String(formData.get('clientId') || '');
+  const grantId = String(formData.get('grantId') || '');
+  const kind = String(formData.get('kind') || '');
+  if (!clientId || !grantId || (kind !== 'user' && kind !== 'role' && kind !== 'group')) return;
+
+  await revokeClientPermission(await headers(), grantId, kind);
+  revalidateClient(clientId);
 }

@@ -3,7 +3,7 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { hasLocale } from '@/lib/locale';
 import { requirePermission } from '@/lib/session';
-import { listSsoClients } from '@vtk/auth/server';
+import { accessRoleGrantCountsByClient, listSsoClients } from '@vtk/auth/server';
 import type { Locale } from '@vtk/i18n';
 import { attentionForAll } from './attention';
 
@@ -13,8 +13,12 @@ export default async function AdminSsoPage({ params }: { params: Promise<{ local
   const locale: Locale = localeParam;
   await requirePermission('oauth.client.edit');
 
-  const clients = await listSsoClients(await headers());
-  const attention = attentionForAll(clients);
+  const requestHeaders = await headers();
+  const [clients, accessRoleGrantCounts] = await Promise.all([
+    listSsoClients(requestHeaders),
+    accessRoleGrantCountsByClient(requestHeaders),
+  ]);
+  const attention = attentionForAll(clients, accessRoleGrantCounts);
   const nl = locale === 'nl';
   const base = nl ? '' : '/en';
 

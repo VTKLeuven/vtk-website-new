@@ -33,6 +33,16 @@ enum RoleGrantKind {
   LEADER
 }
 
+// Wie mag inloggen bij een OAuth-client.
+// OPEN: elk actief lid; permissies bepalen enkel wat je er méér mag (de
+// cudi-tool). RESTRICTED: enkel wie de `<namespace>.access`-permissie van die
+// client houdt, geraakt er binnen (de interne wiki). De blokkade zit in de
+// autorisatieflow zelf, niet in de applicatie.
+enum SsoAccessMode {
+  OPEN
+  RESTRICTED
+}
+
 enum PageAssetKind {
   EMBEDDED_PDF
   DOWNLOAD
@@ -280,6 +290,7 @@ model User {
   oauthAccessTokens        OauthAccessToken[]
   oauthConsents            OauthConsent[]
   ssoAuditLogs             SsoAuditLog[]
+  ssoClientPermissions     SsoUserClientPermission[]
 }
 
 model Group {
@@ -306,6 +317,7 @@ model Group {
   dashboardTiles    DashboardTile[]
   ownedTicketEvents TicketEvent[]           @relation("TicketEventOwnerGroup")
   ticketEventGrants TicketEventGroupGrant[]
+  ssoGrants         SsoGroupClientPermission[]
 }
 
 model GroupMembership {
@@ -361,6 +373,7 @@ model Role {
   users       UserRole[]
   groupGrants GroupRole[]
   pageGrants  PageEditorRole[]
+  ssoGrants   SsoRoleClientPermission[]
 }
 
 model RolePermission {
@@ -1449,11 +1462,115 @@ model OauthClient {
   type                    String?
   requirePKCE             Boolean?
   metadata                Json?
+
+  /// Wie hier mag inloggen; zie SsoAccessMode. Staat bewust op deze tabel en
+  /// niet in een aparte VTK-tabel: de poort draait op het hete pad van élke
+  /// autorisatie en moet zonder join te beantwoorden zijn. De plugin negeert
+  /// kolommen die ze niet kent.
+  accessMode              SsoAccessMode       @default(OPEN)
+  /// Prefix waarop de permissiecodes van deze client gevalideerd worden
+  /// ("wiki" -> wiki.read, wiki.access). Null zolang er geen vocabulaire is.
+  permissionNamespace     String?
+
   oauthRefreshTokens      OauthRefreshToken[]
   oauthAccessTokens       OauthAccessToken[]
   oauthConsents           OauthConsent[]
+  clientPermissions       SsoClientPermission[]
 
   @@map("oauthClient")
+}
+
+/// Het permissievocabulaire dat één client zelf definieert (`wiki.read`,
+/// `cudi.admin`). Bewust géén VTK-permissies: dit zegt wat een lid mag binnen
+/// die ene applicatie, niet wat het binnen VTK mag.
+model SsoClientPermission {
+  id       String      @id @default(cuid())
+  client   OauthClient @relation(fields: [clientId], references: [clientId], onDelete: Cascade)
+  clientId String
+
+  code          String
+  labelNl       String
+  labelEn       String
+  descriptionNl String?
+  descriptionEn String?
+
+  /// De `<namespace>.access`-rij die toegang verleent tot een RESTRICTED client.
+  /// Wordt automatisch aangemaakt en mag niet verwijderd worden zolang de client
+  /// beperkt is: ze weghalen sluit iedereen buiten.
+  system Boolean @default(false)
+  /// Verbergt de code in toekenningsformulieren maar laat bestaande
+  /// toekenningen werken. Veiliger dan verwijderen; zie ontwerp 9.7.
+  deprecated Boolean @default(false)
+
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  userGrants  SsoUserClientPermission[]
+  roleGrants  SsoRoleClientPermission[]
+  groupGrants SsoGroupClientPermission[]
+
+  @@unique([clientId, code])
+  @@index([clientId, deprecated])
+}
+
+/// Directe toekenning aan één lid. Deze reset NIET op 15 juli: een grant aan de
+/// ene persoon die een integratie onderhoudt is geen werkingsjaar-begrip, en
+/// elke partnertoepassing 's nachts leegmaken is een storing die niemand zag
+/// aankomen. Gebruik `expiresAt` voor wat wél tijdelijk is. Zie ontwerp 9.5.
+model SsoUserClientPermission {
+  id           String              @id @default(cuid())
+  permission   SsoClientPermission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+  permissionId String
+  /// Gedenormaliseerd zodat de hete query (userId + clientId) één indexlookup is.
+  clientId     String
+  user         User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId       String
+
+  grantedByUserId String?
+  grantedAt       DateTime  @default(now())
+  expiresAt       DateTime?
+  note            String?
+
+  @@unique([permissionId, userId])
+  @@index([userId, clientId])
+  @@index([clientId])
+  @@index([expiresAt])
+}
+
+/// Toekenning via een VTK-rol. Werkingsjaar-gescoped via UserRole, dus deze
+/// erft de 15-juli-reset.
+model SsoRoleClientPermission {
+  id           String              @id @default(cuid())
+  permission   SsoClientPermission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+  permissionId String
+  clientId     String
+  role         Role                @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  roleId       String
+
+  grantedByUserId String?
+  grantedAt       DateTime @default(now())
+
+  @@unique([permissionId, roleId])
+  @@index([roleId, clientId])
+}
+
+/// Toekenning via een post. LEADER geldt enkel voor de verantwoordelijke,
+/// exact zoals GroupRole dat voor rollen doet. Ook werkingsjaar-gescoped.
+model SsoGroupClientPermission {
+  id           String              @id @default(cuid())
+  permission   SsoClientPermission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+  permissionId String
+  clientId     String
+  group        Group               @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  groupId      String
+  kind         RoleGrantKind       @default(DEFAULT)
+
+  grantedByUserId String?
+  grantedAt       DateTime @default(now())
+
+  @@unique([permissionId, groupId, kind])
+  @@index([groupId, clientId])
 }
 
 model OauthRefreshToken {

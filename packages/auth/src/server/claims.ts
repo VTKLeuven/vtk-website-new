@@ -9,8 +9,15 @@ import 'server-only';
 import { prisma } from '@vtk/db';
 import { CLAIMS, type ClaimDefinition, type ClaimDestination } from '../lib/claims';
 import { transform } from '../lib/transformers';
+import { effectiveClientPermissions } from './clientPermissions';
 
 type UserRow = NonNullable<Awaited<ReturnType<typeof loadUser>>>;
+
+/** Wat een resolver naast het lid nodig kan hebben. */
+type ClaimContext = {
+  /** Welke client dit token vraagt; ontbreekt buiten UserInfo. */
+  clientId?: string;
+};
 
 /**
  * Enkel de `User`-rij: geen rollen, posten of permissies.
@@ -28,13 +35,21 @@ async function loadUser(userId: string) {
  * Claims die logica nodig hebben. Bewust code en geen expressietaal in een
  * tabel: dat laatste is een sandbox-ontsnapping in wording, en niet te reviewen.
  */
-const COMPUTED: Record<string, (user: UserRow) => unknown> = {
+const COMPUTED: Record<string, (user: UserRow, ctx: ClaimContext) => unknown | Promise<unknown>> = {
   /** Het adres waarop de kring dit lid effectief contacteert. */
   preferredEmail: (user) =>
     user.emailPreference === 'PERSONAL' && user.personalEmail ? user.personalEmail : user.email,
 
   /** Een geüpload avatar wint van de afbeelding die de SSO-provider meegaf. */
   picture: (user) => user.avatarKey ?? user.image ?? null,
+
+  /**
+   * De permissies die dit lid houdt *binnen deze client*. Zonder client is de
+   * vraag niet te beantwoorden, en dan hoort de claim weg te blijven in plaats
+   * van een lege lijst te suggereren dat het lid niets mag.
+   */
+  clientPermissions: async (user, ctx) =>
+    ctx.clientId ? effectiveClientPermissions(user.id, ctx.clientId) : null,
 
   /** Het adresformaat uit OpenID Connect Core 5.1.1. */
   oidcAddress: (user) => {
@@ -51,12 +66,12 @@ const COMPUTED: Record<string, (user: UserRow) => unknown> = {
   },
 };
 
-function readSource(claim: ClaimDefinition, user: UserRow): unknown {
+function readSource(claim: ClaimDefinition, user: UserRow, ctx: ClaimContext): unknown | Promise<unknown> {
   switch (claim.source.kind) {
     case 'USER_FIELD':
       return (user as unknown as Record<string, unknown>)[claim.source.field];
     case 'COMPUTED':
-      return COMPUTED[claim.source.resolver]?.(user) ?? null;
+      return COMPUTED[claim.source.resolver]?.(user, ctx) ?? null;
   }
 }
 
@@ -64,6 +79,12 @@ export type ResolveClaimsInput = {
   destination: ClaimDestination;
   userId: string;
   scopes: string[];
+  /**
+   * De client die het token vraagt. Enkel UserInfo kan dit aanleveren
+   * (`jwt.azp`); de token-hooks van de plugin krijgen de client niet mee.
+   * Claims die er van afhangen blijven zonder deze waarde gewoon weg.
+   */
+  clientId?: string;
 };
 
 /**
@@ -77,6 +98,7 @@ export async function resolveClaims(input: ResolveClaimsInput): Promise<Record<s
   if (!user || !user.active) return {};
 
   const granted = new Set(input.scopes);
+  const ctx: ClaimContext = { clientId: input.clientId };
   const out: Record<string, unknown> = {};
 
   for (const claim of CLAIMS) {
@@ -84,7 +106,7 @@ export async function resolveClaims(input: ResolveClaimsInput): Promise<Record<s
     if (!claim.destinations.includes(input.destination)) continue;
 
     try {
-      const value = transform(readSource(claim, user), claim.transformer, claim.transformerArgs);
+      const value = transform(await readSource(claim, user, ctx), claim.transformer, claim.transformerArgs);
       // `null` betekent "niets in te vullen"; die claim hoort dan niet in het
       // token te staan in plaats van als lege waarde.
       if (value !== null && value !== undefined) out[claim.name] = value;

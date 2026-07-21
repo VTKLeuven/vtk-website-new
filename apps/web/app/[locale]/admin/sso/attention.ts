@@ -7,10 +7,16 @@ import type { OauthClient } from '@prisma/client';
 export type Attention = {
   clientId: string;
   clientName: string;
-  code: 'insecure-redirect' | 'skip-consent' | 'no-contacts' | 'disabled';
+  code: 'insecure-redirect' | 'skip-consent' | 'no-contacts' | 'disabled' | 'locked-out';
   /** Waarom dit een probleem is, niet enkel wat er aan de hand is. */
   message: string;
 };
+
+/**
+ * Hoeveel **rollen** de `<ns>.access`-permissie van een client toekennen, per
+ * clientId. Zie `attentionFor` voor waarom enkel rollen tellen.
+ */
+export type AccessRoleGrantCounts = Record<string, number>;
 
 /**
  * Een redirect-URI over http stuurt de autorisatiecode onversleuteld over de
@@ -51,10 +57,26 @@ function isVtkOwned(uris: string[]): boolean {
   });
 }
 
-export function attentionFor(client: OauthClient): Attention[] {
+export function attentionFor(client: OauthClient, accessRoleGrantCount?: number): Attention[] {
   const name = client.name ?? client.clientId;
   const base = { clientId: client.clientId, clientName: name };
   const items: Attention[] = [];
+
+  // De faalwijze van het toegangsontwerp: beperkt zetten en de access-permissie
+  // nooit toekennen. Dan werkt alles behalve inloggen, en dat is precies het
+  // soort stilte waar je pas achterkomt als iemand belt.
+  //
+  // Enkel rollen tellen mee, en dat is met opzet. Toegang hoort via een rol te
+  // lopen: die wordt beheerd op het rollenscherm en volgt het werkingsjaar. Een
+  // beperkte app die enkel op losse toekenningen aan personen draait, is broos
+  // (valt stil zodra die ene persoon vertrekt) en verdient net wél een melding.
+  if (client.accessMode === 'RESTRICTED' && accessRoleGrantCount === 0) {
+    items.push({
+      ...base,
+      code: 'locked-out',
+      message: 'Beperkt, maar geen enkele rol geeft toegang: regel dit via een rol op het rollenscherm.',
+    });
+  }
 
   if (hasInsecureRedirect(client.redirectUris)) {
     items.push({
@@ -91,6 +113,9 @@ export function attentionFor(client: OauthClient): Attention[] {
   return items;
 }
 
-export function attentionForAll(clients: OauthClient[]): Attention[] {
-  return clients.flatMap(attentionFor);
+export function attentionForAll(
+  clients: OauthClient[],
+  accessRoleGrantCounts: AccessRoleGrantCounts = {}
+): Attention[] {
+  return clients.flatMap((client) => attentionFor(client, accessRoleGrantCounts[client.clientId] ?? 0));
 }

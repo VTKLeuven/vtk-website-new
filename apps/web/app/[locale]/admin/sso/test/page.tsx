@@ -55,6 +55,64 @@ export default async function FlowTestPage({ params }: { params: Promise<{ local
           </div>
         </fieldset>
 
+        <fieldset>
+          <legend className="text-sm font-medium">{nl ? 'Toegang' : 'Access'}</legend>
+          <p className="mt-1 text-xs text-zinc-500">
+            {nl
+              ? 'De testclient wordt hierop ingesteld voor je vertrekt. Zo test je de toegangspoort met dezelfde flow als een echt lid.'
+              : 'The test client is set to this before you leave. That way you test the access gate with the same flow a real member takes.'}
+          </p>
+          <div className="mt-2 space-y-1">
+            {[
+              {
+                value: 'open',
+                label: nl ? 'Open — elk lid mag binnen' : 'Open — any member may enter',
+                hint: nl ? 'De gewone flow.' : 'The ordinary flow.',
+              },
+              {
+                value: 'restricted-denied',
+                label: nl ? 'Beperkt — zonder toegang voor mij' : 'Restricted — without access for me',
+                hint: nl
+                  ? 'Je hoort op de blokpagina te landen in plaats van bij het toestemmingsscherm.'
+                  : 'You should land on the block page instead of the consent screen.',
+              },
+              {
+                value: 'restricted-granted',
+                label: nl ? 'Beperkt — met toegang voor mij' : 'Restricted — with access for me',
+                hint: nl
+                  ? 'Je krijgt flowtest.access toegekend en de flow hoort gewoon door te gaan.'
+                  : 'You are granted flowtest.access and the flow should continue as normal.',
+              },
+            ].map((option) => (
+              <label key={option.value} className="flex items-start gap-2 text-sm">
+                <input
+                  type="radio"
+                  name="access"
+                  value={option.value}
+                  defaultChecked={option.value === 'open'}
+                  className="mt-1"
+                />
+                <span>
+                  {option.label}
+                  <span className="block text-xs text-zinc-500">{option.hint}</span>
+                </span>
+              </label>
+            ))}
+          </div>
+        </fieldset>
+
+        <label className="flex items-start gap-2 text-sm">
+          <input type="checkbox" name="skipConsent" className="mt-1" />
+          <span>
+            {nl ? 'Toestemmingsscherm overslaan' : 'Skip the consent screen'}
+            <span className="block text-xs text-zinc-500">
+              {nl
+                ? 'De sluiproute waar een toegangscontrole op het toestemmingsscherm zou openvallen. Gecombineerd met "beperkt zonder toegang" hoort de blokkade nog altijd te werken.'
+                : 'The shortcut where an access check on the consent screen would fail open. Combined with "restricted without access", the block should still hold.'}
+            </span>
+          </span>
+        </label>
+
         <div>
           <label htmlFor="prompt" className="block text-sm font-medium">
             prompt
@@ -75,8 +133,8 @@ export default async function FlowTestPage({ params }: { params: Promise<{ local
 
         <p className="text-xs text-zinc-500">
           {nl
-            ? 'De test gebruikt een aparte publieke client (vtk-flow-tester) met PKCE. Je geeft toestemming als jezelf, dus je ziet exact wat een lid zou zien.'
-            : 'The test uses a separate public client (vtk-flow-tester) with PKCE. You consent as yourself, so you see exactly what a member would see.'}
+            ? 'De test gebruikt een aparte publieke client (vtk-flow-tester) met PKCE. Je geeft toestemming als jezelf, dus je ziet exact wat een lid zou zien. Na afloop worden de toestemming, de tokens en de testpermissie weer opgeruimd, zodat elke run gelijk begint.'
+            : 'The test uses a separate public client (vtk-flow-tester) with PKCE. You consent as yourself, so you see exactly what a member would see. Afterwards the consent, the tokens and the test permission are cleaned up again, so every run starts the same.'}
         </p>
 
         <button

@@ -3,11 +3,20 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { hasLocale } from '@/lib/locale';
 import { requirePermission } from '@/lib/session';
-import { getSsoClient, listSsoAuditLog } from '@vtk/auth/server';
+import { prisma } from '@vtk/db';
+import {
+  accessRoleGrantCountsByClient,
+  countMembersWithAccess,
+  getSsoClient,
+  listClientGrants,
+  listClientPermissions,
+  listSsoAuditLog,
+} from '@vtk/auth/server';
 import { SCOPES } from '@vtk/auth';
 import type { Locale } from '@vtk/i18n';
 import { attentionFor } from '../attention';
 import { ClientEditor } from './ClientEditor';
+import { ClientPermissions } from './ClientPermissions';
 
 export default async function SsoClientDetail({ params }: { params: Promise<{ locale: string; clientId: string }> }) {
   const { locale: localeParam, clientId } = await params;
@@ -20,7 +29,26 @@ export default async function SsoClientDetail({ params }: { params: Promise<{ lo
   if (!client) notFound();
 
   const audit = await listSsoAuditLog(requestHeaders, { clientId, take: 25 });
-  const warnings = attentionFor(client);
+
+  // Rollen en posten worden hier geladen en als naam meegegeven: het
+  // toekenningsformulier toont namen, terwijl de grants enkel id's bevatten.
+  // Twee verschillende vragen, dus twee tellingen. Het formulier waarschuwt of
+  // er überhaupt iemand binnen raakt (elk pad telt); "Aandacht vereist" kijkt of
+  // toegang via een rol geregeld is (zie attention.ts).
+  const [permissions, grants, roles, groups, accessGrantCount, accessRoleGrantCounts] = await Promise.all([
+    listClientPermissions(requestHeaders, clientId),
+    listClientGrants(requestHeaders, clientId),
+    prisma.role.findMany({ orderBy: { order: 'asc' }, select: { id: true, nameNl: true, nameEn: true } }),
+    prisma.group.findMany({
+      where: { active: true },
+      orderBy: { orderInPraesidium: 'asc' },
+      select: { id: true, nameNl: true, nameEn: true },
+    }),
+    countMembersWithAccess(clientId),
+    accessRoleGrantCountsByClient(requestHeaders),
+  ]);
+
+  const warnings = attentionFor(client, accessRoleGrantCounts[clientId] ?? 0);
   const nl = locale === 'nl';
   const base = nl ? '' : '/en';
 
@@ -66,6 +94,30 @@ export default async function SsoClientDetail({ params }: { params: Promise<{ lo
           disabled: !!client.disabled,
           isPublic: !client.clientSecret,
         }}
+      />
+
+      <ClientPermissions
+        nl={nl}
+        clientId={client.clientId}
+        accessMode={client.accessMode}
+        permissionNamespace={client.permissionNamespace}
+        accessGrantCount={accessGrantCount}
+        permissions={permissions.map((permission) => ({
+          id: permission.id,
+          code: permission.code,
+          labelNl: permission.labelNl,
+          labelEn: permission.labelEn,
+          system: permission.system,
+          deprecated: permission.deprecated,
+        }))}
+        grants={{
+          // Dates zijn niet serialiseerbaar naar een client component.
+          users: grants.users.map((grant) => ({ ...grant, expiresAt: grant.expiresAt?.toISOString() ?? null })),
+          roles: grants.roles,
+          groups: grants.groups,
+        }}
+        roles={roles.map((role) => ({ id: role.id, name: nl ? role.nameNl : role.nameEn }))}
+        groups={groups.map((group) => ({ id: group.id, name: nl ? group.nameNl : group.nameEn }))}
       />
 
       <section className="rounded-2xl border border-zinc-200 bg-white p-4">

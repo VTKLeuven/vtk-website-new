@@ -202,16 +202,29 @@ export const CLAIMS: readonly ClaimDefinition[] = [
   },
 
   // --- entitlements --------------------------------------------------------
-  // Bewust leeg tot fase 5. `entitlements` gaat over wat een lid mag *binnen
-  // die ene client*, en die vocabulaire bestaat nog niet; de scope staat er al
-  // zodat clients en toestemmingen niet hoeven te wijzigen zodra ze er is.
-  //
-  // Wat hier NIET terugkomt: `vtk:roles`, `vtk:permissions`, `vtk:groups`.
-  // Dat is VTK's interne organisatiestructuur, geen antwoord op "wat mag dit
-  // lid in jouw toepassing". Een client hoort te beslissen op een permissie die
-  // hij zelf gedefinieerd heeft, niet op het feit dat iemand in het praesidium
-  // zit; anders schrijft hij onze postenstructuur in zijn code en breekt hij
-  // wanneer wij die hernoemen.
+  {
+    // De permissies die dit lid houdt binnen déze client, en niets anders.
+    //
+    // Wat hier bewust NIET staat: `vtk:roles`, `vtk:permissions`, `vtk:groups`.
+    // Dat is VTK's interne organisatiestructuur, geen antwoord op "wat mag dit
+    // lid in jouw toepassing". Een client hoort te beslissen op een permissie
+    // die hij zelf gedefinieerd heeft, niet op het feit dat iemand in het
+    // praesidium zit; anders schrijft hij onze postenstructuur in zijn code en
+    // breekt hij wanneer wij die hernoemen.
+    //
+    // Naam zonder `vtk:`-prefix: de codes zijn per constructie van de client
+    // zelf (`wiki.read`), en dit is de naam waar bibliotheken van integrators
+    // naar kijken (ontwerp 10.4).
+    //
+    // Enkel UserInfo: daar is de client bekend (`jwt.azp`) én wordt de lijst
+    // live opgehaald, dus een ingetrokken permissie is meteen weg in plaats van
+    // te blijven staan tot een token vervalt.
+    name: 'permissions',
+    scope: 'entitlements',
+    source: { kind: 'COMPUTED', resolver: 'clientPermissions' },
+    transformer: 'identity',
+    destinations: ['userinfo'],
+  },
 ] as const;
 
 export const CLAIM_NAMES: readonly string[] = CLAIMS.map((claim) => claim.name);

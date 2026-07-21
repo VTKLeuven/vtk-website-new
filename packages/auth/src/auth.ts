@@ -8,11 +8,12 @@ import { betterAuth } from 'better-auth';
 import { prismaAdapter } from 'better-auth/adapters/prisma';
 import { genericOAuth, jwt } from 'better-auth/plugins';
 import { APIError } from 'better-auth/api';
-import { oauthProvider } from '@better-auth/oauth-provider';
+import { oauthProvider, getOAuthProviderState } from '@better-auth/oauth-provider';
 import { prisma } from '@vtk/db';
 import { nextCookies } from 'better-auth/next-js';
 import { hasSSOPrivileges } from './server/sso';
 import { resolveClaims } from './server/claims';
+import { checkClientAccess } from './server/clientAccess';
 
 import { hashPassword, verifyPassword } from './logins/password';
 import { kulOAuthConfig, KUL_PROVIDER_ID } from './logins/kul';
@@ -44,6 +45,50 @@ export const auth = betterAuth({
       // autorisatie-query erachter; die query draagt de volledige flowstatus.
       loginPage: '/inloggen',
       consentPage: '/inloggen/consent',
+
+      // ── Toegangspoort ─────────────────────────────────────────────────────
+      // LET OP: dit is de registratie-haak, en we gebruiken ze als
+      // toegangscontrole. Dat is bewust, en het is de enige plek die werkt.
+      //
+      // De plugin heeft geen haak die "mag deze gebruiker bij deze client" kan
+      // beantwoorden. Wat we nodig hadden is een punt dat draait op ELKE
+      // doorgang door authorize, ook wanneer het toestemmingsscherm wordt
+      // overgeslagen. Er is er precies één:
+      //
+      //   · een check op ons consent-scherm valt open voor clients met
+      //     `skipConsent` en voor leden die al eerder toestemden; in beide
+      //     gevallen komt de plugin daar nooit;
+      //   · een `hooks.before` op /oauth2/authorize vangt de eerste browserhit,
+      //     maar de consent-postback roept authorize rechtstreeks als functie
+      //     aan en gaat dus niet door de router;
+      //   · `signup.shouldRedirect` draait ongeconditioneerd, vóór zowel de
+      //     `skipConsent`-sluiproute als de bestaande-toestemming-sluiproute.
+      //
+      // Een string teruggeven betekent "stuur naar deze pagina"; de plugin plakt
+      // de ondertekende query erachter, dus de blokpagina weet over welke app
+      // het gaat. Verplaats dit niet naar een andere haak zonder de volgorde in
+      // `authorizeEndpoint` opnieuw na te lezen; de integratietest
+      // apps/web/test/integration/sso-client-permissions.integration.ts legt de
+      // toegangsregel zelf vast.
+      signup: {
+        page: '/inloggen/geen-toegang',
+        shouldRedirect: async ({ user }) => {
+          const state = await getOAuthProviderState();
+          const clientId = state?.query ? new URLSearchParams(state.query).get('client_id') : null;
+          // Geen client in beeld: dit is geen autorisatieflow, dus niets te
+          // blokkeren. Doorlaten en de plugin haar werk laten doen.
+          if (!clientId) return false;
+
+          const { allowed } = await checkClientAccess(user.id, clientId);
+          return allowed ? false : '/inloggen/geen-toegang';
+        },
+      },
+
+      // Elk token dat `entitlements` draagt vervalt na tien minuten (ontwerp
+      // 10.6). Dat is het antwoord op "hoe lang blijft een ingetrokken
+      // permissie werken": tien minuten, altijd, zonder dat de client iets moet
+      // doen. Een gewoon `openid profile`-token houdt zijn volle uur.
+      scopeExpirations: { entitlements: 600 },
       // De scope-registry (lib/scopes.ts) is de bron; zonder deze regel staat de
       // plugin enkel haar vier standaardscopes toe en faalt het aanmaken van een
       // client met bv. `vtk:study_programme` op `invalid_scope`.
@@ -55,8 +100,17 @@ export const auth = betterAuth({
       customIdTokenClaims: async ({ user, scopes }) =>
         resolveClaims({ destination: 'id_token', userId: user.id, scopes: [...scopes] }),
 
-      customUserInfoClaims: async ({ user, scopes }) =>
-        resolveClaims({ destination: 'userinfo', userId: user.id, scopes: [...scopes] }),
+      // `jwt` is de payload van het access token waarmee UserInfo opgehaald
+      // wordt; `azp` is de client die het kreeg. Dat is de enige plek waar de
+      // client bekend is, en dus de enige plek waar de `permissions`-claim
+      // opgelost kan worden.
+      customUserInfoClaims: async ({ user, scopes, jwt }) =>
+        resolveClaims({
+          destination: 'userinfo',
+          userId: user.id,
+          scopes: [...scopes],
+          clientId: typeof jwt?.azp === 'string' ? jwt.azp : undefined,
+        }),
 
       customAccessTokenClaims: async ({ user, scopes }) =>
         user ? resolveClaims({ destination: 'access_token', userId: user.id, scopes: [...scopes] }) : {},

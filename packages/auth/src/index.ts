@@ -29,6 +29,15 @@ export {
   type ClaimSource,
 } from './lib/claims';
 export { transform, TRANSFORMER_NAMES, type TransformerName, type TransformerArgs } from './lib/transformers';
+export {
+  ACCESS_SUFFIX,
+  MAX_PERMISSIONS_PER_CLIENT,
+  RESERVED_NAMESPACES,
+  accessCodeFor,
+  checkCode,
+  checkNamespace,
+  type CodeProblem,
+} from './lib/clientPermissionCodes';
 
 /**
  * Staat hier en niet in `auth.ts` omdat de proxy hem nodig heeft en die

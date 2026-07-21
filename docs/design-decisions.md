@@ -374,3 +374,73 @@ onderste helft is een ontwerpkeuze, geen toeval:
   bezoeker gerenderd i.p.v. statisch gecachet. Dat was al zo qua DB-lezingen; het
   is één gerichte query extra (de richtingen van de ingelogde gebruiker), en enkel
   voor wie ingelogd is.
+
+## Toegang tot externe applicaties (SSO)
+
+VTK is OAuth2-provider: applicaties laten leden aanmelden met hun VTK-account.
+Wie waar binnen mag, is een kringkeuze en geen technisch detail.
+
+### Twee soorten applicaties
+
+- **Open** (bv. de cudi-tool): elk lid met een VTK-account kan aanmelden.
+  Permissies bepalen enkel wat iemand er *méér* mag; wie in het praesidium zit of
+  cudiwerker is, krijgt verhoogde rechten, de rest kan gewoon binnen.
+- **Beperkt** (bv. de interne wiki): enkel wie er expliciet toegang toe kreeg,
+  raakt binnen. Iedereen anders wordt geweigerd tijdens het aanmelden en landt op
+  een pagina die uitlegt waarom.
+
+De blokkade zit in de aanmeldflow bij VTK, niet in de applicatie zelf. Een app
+die zelf moet controleren of je binnen mag, vergeet dat ooit; en dan staat de
+deur open zonder dat iemand het merkt.
+
+### Toegang is een permissie, geen rol
+
+Een beperkte applicatie heeft één speciale permissie, `<namespace>.access`, die
+niets anders doet dan toegang verlenen. Ze wordt automatisch aangemaakt zodra je
+een applicatie beperkt zet.
+
+Toekennen gebeurt via de gewone weg: aan een VTK-rol, aan een post, of
+rechtstreeks aan één lid. Maar wat de applicatie te horen krijgt, is enkel de
+lijst permissiecodes; **niet** onze rollen, posten of interne permissies. Zo
+schrijft een externe app onze postenstructuur niet in zijn code, en breekt hij
+niet wanneer wij een post hernoemen.
+
+**Via een rol is de normale weg.** Dat is niet enkel een aanbeveling: een rol
+wordt beheerd op het rollenscherm, volgt het werkingsjaar, en overleeft het
+vertrek van één persoon. Daarom staat een beperkte applicatie waaraan geen
+enkele rol toegang geeft in "Aandacht vereist", ook wanneer er wel losse
+toekenningen aan personen bestaan; die app werkt vandaag, maar valt stil zodra
+die ene persoon vertrekt.
+
+### Wie mag toekennen
+
+Het **vocabulaire** definiëren (welke codes bestaan er, en is de app beperkt)
+hoort bij de SSO-beheerder: dat is een technische beslissing over de integratie.
+
+Het **toekennen** van bestaande codes aan een rol kan iedereen die rollen
+beheert, vanaf het rollenscherm onder "Externe apps". Wie een post of werkgroep
+runt, moet toegang tot de tools van die post kunnen regelen zonder daarvoor
+SSO-beheerder te worden. Dat is ook geen verruiming: wie rollen beheert, kan
+sowieso al élk VTK-recht aan een rol hangen.
+
+Let op: een andere permissie van dezelfde applicatie hebben (`wiki.read`) geeft
+géén toegang. Dat onderscheid is de reden dat `access` apart bestaat: je kan
+iemand alvast rechten geven zonder hem al binnen te laten.
+
+### Wat op 15 juli reset en wat niet
+
+- Toekenningen **via een rol of een post** volgen het werkingsjaar en resetten
+  dus mee op 15 juli. Dat is het punt van via een rol toekennen: wie de post
+  verlaat, verliest de toegang vanzelf.
+- **Rechtstreekse** toekenningen aan één lid blijven staan tot ze ingetrokken
+  worden. De persoon die een integratie onderhoudt, is geen werkingsjaar-begrip,
+  en elke externe toepassing 's nachts leegmaken is een storing die niemand zag
+  aankomen. Wat wél tijdelijk is, krijgt een vervaldatum mee.
+
+### De faalwijze om te kennen
+
+Een applicatie beperkt zetten en vergeten de toegangspermissie toe te kennen,
+sluit iedereen buiten, inclusief degene die de knop omzette. Daarom drie
+vangnetten: de permissie wordt automatisch aangemaakt, het scherm waarschuwt
+vooraf wanneer nog niemand ze heeft, en zo'n applicatie komt in "Aandacht
+vereist" op /admin/sso.

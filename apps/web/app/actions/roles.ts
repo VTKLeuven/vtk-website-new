@@ -1,9 +1,11 @@
 "use server";
 
+import { headers } from "next/headers";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@vtk/db";
+import { setRoleClientPermission } from "@vtk/auth/server";
 import { requirePermission } from "@/lib/session";
 import { saveError, saveOk, type SaveState } from "@/lib/saveState";
 import { currentWorkingYear } from "@/lib/workingYear";
@@ -115,6 +117,27 @@ export async function setRolePermissionAction(formData: FormData): Promise<void>
       .catch(() => null);
   }
   revalidatePath("/admin/roles");
+}
+
+/**
+ * Zelfde als hierboven, maar voor een permissie van een externe applicatie
+ * (SSO). Het vocabulaire zelf wordt beheerd op /admin/sso; hier wordt een
+ * bestaande code enkel aan een rol gehangen, zodat wie rollen beheert ook
+ * toegang tot de externe apps kan regelen zonder OAuth-beheerder te zijn.
+ *
+ * De regels (en het intrekken van tokens bij uitzetten) zitten in
+ * packages/auth/src/server/clientPermissionsAdmin.ts.
+ */
+export async function setRoleClientPermissionAction(formData: FormData): Promise<void> {
+  await requirePermission("roles.manage");
+  const roleId = formData.get("roleId") as string;
+  const permissionId = formData.get("permissionId") as string;
+  const enabled = formData.get("enabled") === "1";
+  if (!roleId || !permissionId) return;
+
+  await setRoleClientPermission(await headers(), roleId, permissionId, enabled);
+  revalidatePath("/admin/roles");
+  revalidatePath("/admin/sso");
 }
 
 // ---- Roltoewijzing aan gebruikers -------------------------------------------

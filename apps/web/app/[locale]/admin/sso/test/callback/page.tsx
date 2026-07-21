@@ -3,7 +3,7 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { hasLocale } from '@/lib/locale';
 import { requirePermission } from '@/lib/session';
-import { exchangeFlowTestCode } from '@vtk/auth/server';
+import { exchangeFlowTestCode, resetFlowTestState } from '@vtk/auth/server';
 import { takeFlowTestState } from '../actions';
 
 function one(value: string | string[] | undefined): string | undefined {
@@ -56,6 +56,9 @@ export default async function FlowTestCallback({
   // De client kreeg een fout terug in plaats van een code, bv. omdat je op
   // "Weigeren" klikte. Dat is een geldig testresultaat.
   if (error) {
+    // Ook een afgebroken flow is afgelopen: laat geen halve toestemming of
+    // testpermissie achter, anders test de volgende run iets anders.
+    await resetFlowTestState(await headers());
     return (
       <div className="space-y-4">
         <h1 className="text-2xl font-semibold">{nl ? 'Flow afgebroken' : 'Flow stopped'}</h1>

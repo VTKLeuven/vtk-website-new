@@ -97,6 +97,25 @@ describe('client attention rules', () => {
   it('flags a disabled client', () => {
     expect(attentionFor(client({ disabled: true })).map((a) => a.code)).toContain('disabled');
   });
+
+  it('flags a restricted client that no role gives access to', () => {
+    const restricted = client({ accessMode: 'RESTRICTED', permissionNamespace: 'wiki' });
+    expect(attentionFor(restricted, 0).map((a) => a.code)).toContain('locked-out');
+    expect(attentionFor(restricted, 1).map((a) => a.code)).not.toContain('locked-out');
+  });
+
+  it('keeps quiet for an open client with no access grants', () => {
+    // Open betekent dat iedereen binnen mag; nul toekenningen is daar de normale
+    // toestand en geen probleem.
+    expect(attentionFor(client({ accessMode: 'OPEN' }), 0).map((a) => a.code)).not.toContain('locked-out');
+  });
+
+  it('still flags when only individuals hold access, since that is not durable', () => {
+    // De teller die binnenkomt telt enkel rollen. Een beperkte app die op losse
+    // persoonlijke toekenningen draait, valt stil zodra die persoon vertrekt.
+    const restricted = client({ accessMode: 'RESTRICTED', permissionNamespace: 'wiki' });
+    expect(attentionFor(restricted, 0).map((a) => a.code)).toContain('locked-out');
+  });
 });
 
 describe('scope registry', () => {

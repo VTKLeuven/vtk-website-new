@@ -42,20 +42,37 @@ export async function hasSSOPrivileges(headers: Headers): Promise<boolean> {
  * Via `getSessionCached` en niet `getSession`: de plugin controleert zo dadelijk
  * hetzelfde recht op dezelfde headers, en dan is de sessie al geladen.
  */
-async function requireSsoAdmin(headers: Headers): Promise<SessionPayload> {
+export async function requireSsoAdmin(headers: Headers): Promise<SessionPayload> {
   const session = await getSessionCached(headers);
   if (!session) throw new AuthError('UNAUTHENTICATED');
   if (!rootHasPermission(session, 'oauth.client.edit')) throw new AuthError('FORBIDDEN');
   return session;
 }
 
-export type SsoAuditAction = 'create' | 'update' | 'rotate-secret' | 'enable' | 'disable' | 'delete' | 'revoke-tokens';
+export type SsoAuditAction =
+  | 'create'
+  | 'update'
+  | 'rotate-secret'
+  | 'enable'
+  | 'disable'
+  | 'delete'
+  | 'revoke-tokens'
+  | 'access-mode'
+  | 'permission-create'
+  | 'permission-update'
+  | 'permission-delete'
+  | 'grant'
+  | 'revoke';
 
 /**
  * Schrijft één regel in de audit-log. Namen worden meegekopieerd zodat de regel
  * leesbaar blijft nadat de client of het lid verdwenen is.
+ *
+ * Geëxporteerd binnen het pakket (niet via de index) zodat
+ * `clientPermissions.ts` dezelfde log gebruikt in plaats van een tweede te
+ * beginnen.
  */
-async function writeAudit(
+export async function writeAudit(
   actor: SessionPayload,
   client: { clientId: string; name: string | null },
   action: SsoAuditAction,
@@ -351,23 +368,41 @@ export const FLOW_TEST_CLIENT_ID = 'vtk-flow-tester';
  * willekeurig client_id, en we willen net een vast id. Er valt hier niets te
  * hashen, want een publieke client heeft geen secret.
  */
-export async function ensureFlowTestClient(headers: Headers, redirectUri: string): Promise<OauthClient> {
-  await requireSsoAdmin(headers);
+/** Namespace van de testclient; `flowtest.access` verleent er toegang toe. */
+export const FLOW_TEST_NAMESPACE = 'flowtest';
+
+export type FlowTestSetup = {
+  /** `RESTRICTED` test de toegangspoort, `OPEN` de gewone flow. */
+  accessMode: 'OPEN' | 'RESTRICTED';
+  /** Beperkt én zonder toegang: dan hoor je op de blokpagina te landen. */
+  grantAccessToSelf: boolean;
+  /** Slaat het toestemmingsscherm over; de sluiproute die de poort moet overleven. */
+  skipConsent: boolean;
+};
+
+export async function ensureFlowTestClient(
+  headers: Headers,
+  redirectUri: string,
+  setup: FlowTestSetup
+): Promise<OauthClient> {
+  const actor = await requireSsoAdmin(headers);
 
   const base = {
     name: 'VTK flow-tester',
     redirectUris: [redirectUri],
     scopes: [...SCOPE_CODES],
     disabled: false,
-    skipConsent: false,
+    skipConsent: setup.skipConsent,
     type: 'user-agent-based',
     tokenEndpointAuthMethod: 'none',
     requirePKCE: true,
     referenceId: OAUTH_CLIENT_OWNER,
+    accessMode: setup.accessMode,
+    permissionNamespace: FLOW_TEST_NAMESPACE,
     updatedAt: new Date(),
   };
 
-  return prisma.oauthClient.upsert({
+  const client = await prisma.oauthClient.upsert({
     where: { clientId: FLOW_TEST_CLIENT_ID },
     update: base,
     create: {
@@ -378,6 +413,63 @@ export async function ensureFlowTestClient(headers: Headers, redirectUri: string
       ...base,
     },
   });
+
+  // De toegangspermissie bestaat altijd; enkel de toekenning aan jezelf wisselt.
+  // Zo test je beide kanten van de poort zonder iets met de hand te moeten
+  // klaarzetten.
+  const permission = await prisma.ssoClientPermission.upsert({
+    where: { clientId_code: { clientId: FLOW_TEST_CLIENT_ID, code: `${FLOW_TEST_NAMESPACE}.access` } },
+    update: { system: true, deprecated: false },
+    create: {
+      clientId: FLOW_TEST_CLIENT_ID,
+      code: `${FLOW_TEST_NAMESPACE}.access`,
+      labelNl: 'Toegang tot de flow-tester',
+      labelEn: 'Access to the flow tester',
+      system: true,
+      sortOrder: -1,
+    },
+  });
+
+  if (setup.grantAccessToSelf) {
+    await prisma.ssoUserClientPermission.upsert({
+      where: { permissionId_userId: { permissionId: permission.id, userId: actor.user.id } },
+      update: { expiresAt: null },
+      create: {
+        permissionId: permission.id,
+        clientId: FLOW_TEST_CLIENT_ID,
+        userId: actor.user.id,
+        grantedByUserId: actor.user.id,
+      },
+    });
+  } else {
+    await prisma.ssoUserClientPermission.deleteMany({
+      where: { permissionId: permission.id, userId: actor.user.id },
+    });
+  }
+
+  return client;
+}
+
+/**
+ * Zet de testclient terug op nul voor dit lid: toestemming, tokens en de
+ * toegekende testpermissie.
+ *
+ * Zonder dit sleept elke test iets mee naar de volgende. Een bewaarde
+ * toestemming laat de plugin het toestemmingsscherm overslaan, waardoor je de
+ * tweede keer iets anders test dan de eerste zonder dat je dat ziet. Een tester
+ * die zijn eigen sporen laat liggen, meet uiteindelijk zichzelf.
+ */
+export async function resetFlowTestState(headers: Headers): Promise<void> {
+  const actor = await requireSsoAdmin(headers);
+
+  await prisma.$transaction([
+    prisma.oauthConsent.deleteMany({ where: { clientId: FLOW_TEST_CLIENT_ID, userId: actor.user.id } }),
+    prisma.oauthAccessToken.deleteMany({ where: { clientId: FLOW_TEST_CLIENT_ID, userId: actor.user.id } }),
+    prisma.oauthRefreshToken.deleteMany({ where: { clientId: FLOW_TEST_CLIENT_ID, userId: actor.user.id } }),
+    prisma.ssoUserClientPermission.deleteMany({
+      where: { clientId: FLOW_TEST_CLIENT_ID, userId: actor.user.id },
+    }),
+  ]);
 }
 
 export type FlowTestResult = {
@@ -442,7 +534,7 @@ export async function exchangeFlowTestCode(
     if (!userRes.ok) errors.push(`userinfo: ${userRes.status} ${JSON.stringify(userInfo)}`);
   }
 
-  return {
+  const result: FlowTestResult = {
     tokenResponse,
     idTokenClaims: idToken ? decodeJwtPayload(idToken) : null,
     // Een opaque access token is geen JWT; dan blijft dit leeg en dat is correct.
@@ -450,4 +542,10 @@ export async function exchangeFlowTestCode(
     userInfo,
     errors,
   };
+
+  // Pas opruimen nadat UserInfo opgehaald is: die heeft het access token nodig.
+  // Vanaf hier is de flow af, dus laat er niets van achter.
+  await resetFlowTestState(headers);
+
+  return result;
 }
