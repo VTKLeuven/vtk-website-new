@@ -72,22 +72,25 @@ export function ClientPermToggle({
 
   return (
     <>
-      <label className="inline-flex cursor-pointer items-center gap-2">
+      <span className="inline-flex items-center gap-2">
         <button
           type="button"
+          className="inline-flex cursor-pointer items-center gap-2"
           disabled={pending}
           onClick={() => (on ? setConfirming(true) : submit())}
           aria-label={`${label} (${code})`}
+          aria-pressed={on}
+          title={code}
         >
-          <ToggleDot on={on} title={code} />
+          <ToggleDot on={on} title={code} visual />
+          <span>{label}</span>
         </button>
-        <span>{label}</span>
         {grantsAccess && (
           <span className="rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] text-amber-900">
             {nl ? "toegang" : "access"}
           </span>
         )}
-      </label>
+      </span>
 
       <ConfirmDialog
         open={confirming}
