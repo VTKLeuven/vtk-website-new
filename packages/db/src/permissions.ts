@@ -24,6 +24,7 @@ export const PERMISSIONS = [
   { code: "photos.manageAlbums", labelNl: "Albums beheren", labelEn: "Manage albums", category: "photos" },
 
   // Users & groups
+  { code: "users.search", labelNl: "Gebruikers opzoeken (user-pickers)", labelEn: "Search users (user pickers)", category: "users" },
   { code: "users.view", labelNl: "Gebruikers bekijken", labelEn: "View users", category: "users" },
   { code: "users.edit", labelNl: "Gebruikers bewerken", labelEn: "Edit users", category: "users" },
   { code: "users.bulkImport", labelNl: "Bulk gebruikers importeren", labelEn: "Bulk import users", category: "users" },

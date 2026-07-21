@@ -9,9 +9,9 @@ import { requireSession, authErrorResponse } from '@/lib/session';
  * deelnemer-selectie in shiftbeheer. Schaalt naar duizenden users: er wordt
  * altijd maar een klein aantal matches teruggegeven i.p.v. de hele tabel.
  *
- * Toegang: ingelogd én een recht dat een user-picker nodig heeft
- * (`users.view`, `shift.edit`, `groups.manage`, `pocs.manage` of
- * `oauth.client.edit`), of superadmin.
+ * Toegang: ingelogd én `users.search`, of superadmin. Dat recht zit in de
+ * praesidium-rol, dus elk praesidiumlid heeft het; rollen die een user-picker
+ * nodig hebben maar geen praesidium zijn, moeten het expliciet krijgen.
  */
 export async function GET(request: Request) {
   let session;
@@ -21,15 +21,7 @@ export async function GET(request: Request) {
     return authErrorResponse(err);
   }
 
-  const allowed =
-    session.user.isSuperAdmin ||
-    session.permissions.includes('users.view') ||
-    session.permissions.includes('shift.edit') ||
-    session.permissions.includes('groups.manage') ||
-    session.permissions.includes('pocs.manage') ||
-    // Nodig om een per-client permissie rechtstreeks aan een lid toe te kennen
-    // op /admin/sso/[clientId].
-    session.permissions.includes('oauth.client.edit');
+  const allowed = session.user.isSuperAdmin || session.permissions.includes('users.search');
   if (!allowed) {
     return NextResponse.json({ error: 'FORBIDDEN' }, { status: 403 });
   }

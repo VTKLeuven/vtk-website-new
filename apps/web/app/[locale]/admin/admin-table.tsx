@@ -216,16 +216,23 @@ export function Modal({ title, onClose, children }: { title: string; onClose: ()
   );
 }
 
-/** Toggle-knop in de stijl van een checkbox (voor rechten-/rol-grants). */
-export function ToggleDot({ on, title }: { on: boolean; title: string }) {
-  return (
-    <button
-      type="submit"
-      className={"inline-block h-4 w-4 rounded border " + (on ? "border-vtk-blue bg-vtk-blue" : "border-zinc-400")}
-      aria-pressed={on}
-      title={title}
-    />
-  );
+/**
+ * Toggle-knop in de stijl van een checkbox (voor rechten-/rol-grants).
+ *
+ * Standaard is dit zelf de submitknop van het omliggende `<form>`. Zet
+ * `visual` wanneer de aanroeper al een eigen knop rond de dot zet (bv.
+ * `ClientPermToggle`, dat eerst bevestiging vraagt): een `<button>` in een
+ * `<button>` is ongeldige HTML en breekt de hydratie.
+ */
+export function ToggleDot({ on, title, visual = false }: { on: boolean; title: string; visual?: boolean }) {
+  const className =
+    "inline-block h-4 w-4 rounded border " + (on ? "border-vtk-blue bg-vtk-blue" : "border-zinc-400");
+
+  if (visual) {
+    return <span className={className} aria-hidden="true" />;
+  }
+
+  return <button type="submit" className={className} aria-pressed={on} title={title} />;
 }
 
 export function Chevron({ open }: { open: boolean }) {
