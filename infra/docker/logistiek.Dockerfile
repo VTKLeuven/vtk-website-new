@@ -13,6 +13,7 @@ FROM node:${NODE_VERSION}-alpine AS builder
 WORKDIR /repo
 ENV NEXT_TELEMETRY_DISABLED=1
 COPY --from=deps /repo/node_modules ./node_modules
+COPY --from=deps /repo/packages ./packages
 COPY . .
 RUN npx --yes prisma generate --schema packages/db/prisma/schema.prisma
 RUN npm run build --workspace=@vtk/logistiek
