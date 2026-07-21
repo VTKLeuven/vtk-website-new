@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Input, Label, Textarea } from "@vtk/ui";
+import { Input, Label } from "@vtk/ui";
 import { SaveForm } from "@/components/ui/SaveForm";
 import { DeleteButton, DeleteIconButton } from "@/components/ui/DeleteIconButton";
 import { CheckboxChip } from "@/components/profile/StudyFieldset";
@@ -17,7 +17,6 @@ export type Rep = {
   name: string;
   email: string;
   avatarUrl: string | null;
-  role: string | null;
 };
 
 export type PocRow = {
@@ -26,9 +25,7 @@ export type PocRow = {
   name: string;
   nameNl: string;
   nameEn: string;
-  description: string | null;
-  descriptionNl: string;
-  descriptionEn: string;
+  email: string;
   order: number;
   studyProgrammes: string[];
   reps: Rep[];
@@ -169,8 +166,10 @@ export function PocsTable({
             <div><Label>{nl ? "Volgorde" : "Order"}</Label><Input name="order" type="number" defaultValue={pocs.length} /></div>
             <div><Label>{nl ? "Naam (NL)" : "Name (NL)"}</Label><Input name="nameNl" required /></div>
             <div><Label>{nl ? "Naam (EN)" : "Name (EN)"}</Label><Input name="nameEn" /></div>
-            <div className="md:col-span-2"><Label>{nl ? "Beschrijving (NL)" : "Description (NL)"}</Label><Textarea name="descriptionNl" rows={2} /></div>
-            <div className="md:col-span-2"><Label>{nl ? "Beschrijving (EN)" : "Description (EN)"}</Label><Textarea name="descriptionEn" rows={2} /></div>
+            <div className="md:col-span-2">
+              <Label>{nl ? "E-mailadres van de POC" : "POC email address"}</Label>
+              <Input name="email" type="email" placeholder="wtk-poc@vtk.be" autoComplete="off" />
+            </div>
             <div className="md:col-span-2">
               <ProgrammesField options={programmeOptions} selected={[]} nl={nl} />
             </div>
@@ -280,7 +279,6 @@ function PocDetail({
                       <div className="min-w-0 flex-1">
                         <div className="truncate text-sm font-medium text-vtk-ink">
                           {r.name}
-                          {r.role ? <span className="ml-1 text-xs font-normal text-[#5c667f]">· {r.role}</span> : null}
                         </div>
                         <div className="truncate text-xs text-[#5c667f]">{r.email}</div>
                       </div>
@@ -313,7 +311,6 @@ function PocDetail({
                 <li key={r.id} className="flex items-center gap-2 rounded-full border border-vtk-blue/12 bg-white py-1 pl-1 pr-3">
                   <Avatar name={r.name} avatarUrl={r.avatarUrl} sm />
                   <span className="text-sm text-vtk-ink">{r.name}</span>
-                  {r.role ? <span className="text-xs text-[#5c667f]">· {r.role}</span> : null}
                 </li>
               ))}
             </ul>
@@ -339,8 +336,10 @@ function PocDetail({
             <div className="md:col-span-3"><Label>{nl ? "Naam (EN)" : "Name (EN)"}</Label><Input name="nameEn" defaultValue={poc.nameEn} /></div>
             <div className="md:col-span-3"><Label>Slug</Label><Input name="slug" defaultValue={poc.slug} required /></div>
             <div className="md:col-span-3"><Label>{nl ? "Volgorde" : "Order"}</Label><Input name="order" type="number" defaultValue={poc.order} /></div>
-            <div className="md:col-span-6"><Label>{nl ? "Beschrijving (NL)" : "Description (NL)"}</Label><Textarea name="descriptionNl" defaultValue={poc.descriptionNl} rows={2} /></div>
-            <div className="md:col-span-6"><Label>{nl ? "Beschrijving (EN)" : "Description (EN)"}</Label><Textarea name="descriptionEn" defaultValue={poc.descriptionEn} rows={2} /></div>
+            <div className="md:col-span-6">
+              <Label>{nl ? "E-mailadres van de POC" : "POC email address"}</Label>
+              <Input name="email" type="email" defaultValue={poc.email} placeholder="wtk-poc@vtk.be" autoComplete="off" />
+            </div>
             <div className="md:col-span-6">
               <ProgrammesField options={programmeOptions} selected={poc.studyProgrammes} nl={nl} />
             </div>

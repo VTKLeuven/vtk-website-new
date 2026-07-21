@@ -33,6 +33,13 @@ export async function SiteFooter() {
           <a href={MAIN_URL} className="text-white underline decoration-vtk-yellow underline-offset-4">
             vtk.be
           </a>
+          {' · '}
+          <a
+            href={`${MAIN_URL}${locale === 'en' ? '/en' : ''}/privacy`}
+            className="text-white underline decoration-vtk-yellow underline-offset-4"
+          >
+            {locale === 'en' ? 'Privacy' : 'Privacy'}
+          </a>
         </p>
       </div>
     </footer>

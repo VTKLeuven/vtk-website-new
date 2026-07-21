@@ -16,21 +16,31 @@ import { getObjectStream } from "@vtk/storage";
  * gelijk aan de vorige publieke-URL-aanpak.
  */
 export async function GET(
-  _request: Request,
+  request: Request,
   context: { params: Promise<{ key: string[] }> },
 ) {
   const { key: segments } = await context.params;
   const key = segments.join("/");
   if (!key) return new Response("Not found", { status: 404 });
 
+  // Range doorgeven aan S3: een PDF-lezer haalt zo enkel de stukken op die hij
+  // nodig heeft, in plaats van het hele bestand voor bladzijde 1.
+  const range = request.headers.get("range");
+
   try {
-    const { stream, contentType, contentLength } = await getObjectStream(key);
+    const object = await getObjectStream(key, range);
+    const { stream, contentType, contentLength, contentRange, etag, lastModified } = object;
     const headers = new Headers();
     headers.set("content-type", contentType ?? "application/octet-stream");
     if (contentLength != null) headers.set("content-length", String(contentLength));
+    if (contentRange) headers.set("content-range", contentRange);
+    if (etag) headers.set("etag", etag);
+    if (lastModified) headers.set("last-modified", lastModified.toUTCString());
+    headers.set("accept-ranges", "bytes");
     // Keys zijn content-adres-achtig (random hex) en dus onveranderlijk: hard cachen.
     headers.set("cache-control", "public, max-age=31536000, immutable");
     return new Response(Readable.toWeb(stream as Readable) as unknown as BodyInit, {
+      status: contentRange ? 206 : 200,
       headers,
     });
   } catch {

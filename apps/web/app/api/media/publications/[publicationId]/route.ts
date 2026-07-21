@@ -106,6 +106,9 @@ function responseHeaders(upstream: Response, publicationId: string): Headers {
     "content-type": "application/pdf",
     "content-disposition": `inline; filename="${publicationId}.pdf"`,
     "x-content-type-options": "nosniff",
+    // Zonder cache haalt de lezer bij elke bladzijde-sprong dezelfde stukken
+    // opnieuw op. Kort en privé: een vervangen editie is snel weer zichtbaar.
+    "cache-control": "private, max-age=3600",
   });
 
   for (const name of ["content-length", "content-range", "accept-ranges", "etag", "last-modified"]) {

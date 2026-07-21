@@ -101,6 +101,137 @@
   text-decoration: underline;
 }
 
+.vtk-site-footer-legal {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.vtk-cookie-settings-button {
+  appearance: none;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.vtk-cookie-settings-button:hover {
+  color: #fff;
+  text-decoration: underline;
+}
+
+.vtk-cookie-consent-positioner {
+  position: fixed;
+  inset-inline: 0;
+  bottom: clamp(16px, 3vw, 32px);
+  z-index: 1000;
+  display: flex;
+  justify-content: flex-end;
+  width: 100%;
+  padding-inline: clamp(16px, 3vw, 32px);
+  box-sizing: border-box;
+  pointer-events: none;
+}
+
+.vtk-cookie-consent {
+  display: grid;
+  width: min(560px, 100%);
+  gap: 16px;
+  padding: 22px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 18px;
+  background: var(--navy);
+  color: var(--paper);
+  box-shadow: 0 24px 70px rgba(10, 15, 31, 0.3);
+  font-family: var(--sans);
+  pointer-events: auto;
+}
+
+/* Match the homepage hero grid exactly so the cookie panel shares both edges
+   with the upcoming-events card instead of floating a few pixels beside it. */
+@media (min-width: 981px) {
+  body:has(.home-hero) .vtk-cookie-consent-positioner {
+    max-width: var(--max);
+    margin-inline: auto;
+    padding-inline: clamp(20px, 3vw, 36px);
+    display: grid;
+    grid-template-columns: minmax(0, 1.2fr) minmax(340px, 1fr);
+    gap: clamp(36px, 5vw, 64px);
+  }
+
+  body:has(.home-hero) .vtk-cookie-consent {
+    grid-column: 2;
+    width: 100%;
+  }
+}
+
+.vtk-cookie-consent h2 {
+  margin: 0 0 8px;
+  font-size: 20px;
+}
+
+.vtk-cookie-consent p {
+  margin: 0 0 8px;
+  color: var(--on-dark-muted);
+  font-size: 14px;
+  line-height: 1.55;
+}
+
+.vtk-cookie-consent a {
+  color: var(--paper);
+  font-size: 13px;
+  text-decoration: underline;
+}
+
+.vtk-cookie-consent-option {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  color: var(--paper);
+  font-size: 14px;
+  line-height: 1.4;
+  cursor: pointer;
+}
+
+.vtk-cookie-consent-option input {
+  width: 16px;
+  height: 16px;
+  margin-top: 3px;
+  accent-color: var(--yellow);
+  cursor: pointer;
+}
+
+.vtk-cookie-consent-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.vtk-cookie-consent-actions button {
+  min-height: 40px;
+  padding: 8px 14px;
+  border-radius: 999px;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.vtk-cookie-secondary {
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  background: transparent;
+  color: var(--paper);
+}
+
+.vtk-cookie-primary {
+  border: 1px solid var(--yellow);
+  background: var(--yellow);
+  color: var(--navy);
+}
+
 .vtk-auth {
   flex: 1;
   display: flex;
@@ -227,5 +358,18 @@
 @media (max-width: 620px) {
   .vtk-site-footer-top {
     grid-template-columns: 1fr;
+  }
+
+  .vtk-site-footer-bottom {
+    flex-direction: column;
+  }
+
+  .vtk-cookie-consent-actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .vtk-cookie-consent-actions button {
+    width: 100%;
   }
 }

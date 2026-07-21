@@ -6,6 +6,7 @@ import { deleteObject } from "@vtk/storage";
 import { requirePermission } from "@/lib/session";
 import { readImageField, resolveImageKey } from "@/lib/imageField";
 import { saveError, saveOk, type SaveState } from "@/lib/saveState";
+import { DEFAULT_EVENT_IMAGE_SETTING } from "@/lib/defaultEventImage";
 
 /** Foto op één kaart in de homepage-sectie "Wat we doen". */
 export async function saveHomepageCardImageAction(
@@ -46,11 +47,47 @@ export async function saveHomepageCardImageAction(
   return saveOk();
 }
 
+/** Standaardfoto voor evenementen zonder eigen cover. */
+export async function saveDefaultEventImageAction(
+  _prev: SaveState,
+  formData: FormData,
+): Promise<SaveState> {
+  await requirePermission("home.edit");
+  const image = readImageField(formData);
+  if (image.kind === "invalid") return saveError("INVALID_INPUT");
+
+  const row = await prisma.setting.findUnique({ where: { key: DEFAULT_EVENT_IMAGE_SETTING } });
+  const existingKey = (row?.value as { imageKey?: string | null } | undefined)?.imageKey ?? null;
+  const imageKey = resolveImageKey(image, existingKey);
+
+  const value = { imageKey };
+  await prisma.setting.upsert({
+    where: { key: DEFAULT_EVENT_IMAGE_SETTING },
+    update: { value },
+    create: { key: DEFAULT_EVENT_IMAGE_SETTING, value },
+  });
+
+  if (existingKey && existingKey !== imageKey) {
+    try {
+      await deleteObject(existingKey);
+    } catch {
+      /* De databasewijziging blijft geldig als storage-opruiming tijdelijk faalt. */
+    }
+  }
+
+  // Elke eventpagina en de homepage kunnen deze foto tonen.
+  revalidatePath("/", "layout");
+  revalidatePath("/admin/home");
+  return saveOk();
+}
+
 export async function saveOpeningHoursAction(_prev: SaveState, formData: FormData): Promise<SaveState> {
   await requirePermission("home.edit");
   const key = formData.get("key") as string;
   const titleNl = formData.get("titleNl") as string;
   const titleEn = formData.get("titleEn") as string;
+  const subtitleNl = ((formData.get("subtitleNl") as string) || "").trim();
+  const subtitleEn = ((formData.get("subtitleEn") as string) || "").trim();
   const entries: Array<{ dayNl: string; dayEn: string; hours: string }> = [];
   for (let i = 0; i < 14; i += 1) {
     const dayNl = formData.get(`dayNl-${i}`) as string | null;
@@ -59,10 +96,11 @@ export async function saveOpeningHoursAction(_prev: SaveState, formData: FormDat
     if (!dayNl && !hours) continue;
     entries.push({ dayNl: dayNl ?? "", dayEn: dayEn ?? dayNl ?? "", hours: hours ?? "" });
   }
+  const value = { titleNl, titleEn, subtitleNl, subtitleEn, entries };
   await prisma.setting.upsert({
     where: { key },
-    update: { value: { titleNl, titleEn, entries } },
-    create: { key, value: { titleNl, titleEn, entries } },
+    update: { value },
+    create: { key, value },
   });
   revalidatePath("/");
   revalidatePath("/admin/home");

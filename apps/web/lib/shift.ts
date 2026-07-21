@@ -125,7 +125,29 @@ export type ShiftResponse = Shift & {
   availableSpots?: number;
   isRegistered?: boolean;
   participants?: { userId: string; payedOut: boolean }[];
+  /** ISO-tijdstip waarop de opvragende user zich inschreef (enkel op /register). */
+  registeredAt?: string | null;
 };
+
+/**
+ * Bedenktijd na inschrijven waarin uitschrijven nog mag, ook binnen de 24u-grens
+ * voor de start. Moet gelijk blijven aan `UNREGISTER_GRACE_MS` in de API-route.
+ */
+export const UNREGISTER_GRACE_MS = 10 * 60 * 1000;
+
+/** Binnen dit venster voor de start is uitschrijven geblokkeerd. */
+export const UNREGISTER_LOCK_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * Mag deze user zich nog uitschrijven? Binnen 24u voor de start niet, tenzij de
+ * inschrijving zelf nog geen tien minuten oud is (misklik rechtzetten).
+ */
+export function canUnregister(shift: ShiftResponse, now: number): boolean {
+  if (shift.startTime.getTime() - now >= UNREGISTER_LOCK_MS) return true;
+  if (!shift.registeredAt) return false;
+  const registeredAt = Date.parse(shift.registeredAt);
+  return Number.isFinite(registeredAt) && now - registeredAt < UNREGISTER_GRACE_MS;
+}
 
 /**
  * Valideert één shift zoals die uit een API-response komt (dus mét `id`, en met

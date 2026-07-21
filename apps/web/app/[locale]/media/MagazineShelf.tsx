@@ -10,6 +10,8 @@ import {
   FileText,
   LoaderCircle,
   X,
+  ZoomIn,
+  ZoomOut,
 } from 'lucide-react';
 import { useEffect, useId, useRef, useState, type MouseEvent as ReactMouseEvent } from 'react';
 
@@ -40,6 +42,9 @@ type Labels = {
   archiveTitle: string;
   showArchive: string;
   hideArchive: string;
+  zoomIn: string;
+  zoomOut: string;
+  resetZoom: string;
 };
 
 type PdfJs = typeof import('pdfjs-dist');
@@ -73,6 +78,21 @@ function formatArchiveToggle(label: string, count: number) {
   const formatted = label.replace('{count}', String(count));
   return formatted === label ? `${label} (${count})` : formatted;
 }
+
+/**
+ * Opties voor elk `getDocument`. `disableAutoFetch` laat pdf.js enkel de stukken
+ * ophalen die het echt nodig heeft: zonder dat haalt de lezer eerst de volledige
+ * PDF binnen (tientallen MB voor een magazine) voor hij bladzijde 1 kan tonen.
+ * Werkt samen met de byte-ranges die `/api/media` sinds kort ondersteunt.
+ */
+const PDF_LOAD_OPTIONS = {
+  disableAutoFetch: true,
+  rangeChunkSize: 262144,
+} as const;
+
+/** Zoomstappen in de lezer; 1 = precies passend op de breedte. */
+const ZOOM_STEPS = [0.5, 0.75, 1, 1.25, 1.5, 2, 3] as const;
+const DEFAULT_ZOOM_INDEX = 2;
 
 function loadPdfJs() {
   if (!pdfJsPromise) {
@@ -129,7 +149,7 @@ function PdfThumbnail({ issue, labels }: { issue: MagazineIssue; labels: Labels 
         const pdfjs = await loadPdfJs();
         if (disposed) return;
 
-        const task = pdfjs.getDocument({ url: issue.documentUrl });
+        const task = pdfjs.getDocument({ url: issue.documentUrl, ...PDF_LOAD_OPTIONS });
         loadingTask = task;
         const pdf = await task.promise;
         const page = await pdf.getPage(1);
@@ -199,6 +219,7 @@ function PdfDocumentViewer({ issue, labels }: { issue: MagazineIssue; labels: La
   const [pageCount, setPageCount] = useState(0);
   const [bounds, setBounds] = useState({ width: 0, height: 0 });
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading');
+  const [zoomIndex, setZoomIndex] = useState<number>(DEFAULT_ZOOM_INDEX);
 
   useEffect(() => {
     let disposed = false;
@@ -208,7 +229,7 @@ function PdfDocumentViewer({ issue, labels }: { issue: MagazineIssue; labels: La
       try {
         const pdfjs = await loadPdfJs();
         if (disposed) return;
-        loadingTask = pdfjs.getDocument({ url: issue.documentUrl });
+        loadingTask = pdfjs.getDocument({ url: issue.documentUrl, ...PDF_LOAD_OPTIONS });
         const loadedDocument = await loadingTask.promise;
         if (disposed) return;
         setDocument(loadedDocument);
@@ -250,12 +271,10 @@ function PdfDocumentViewer({ issue, labels }: { issue: MagazineIssue; labels: La
         if (!canvas || disposed) return;
 
         const baseViewport = page.getViewport({ scale: 1 });
-        const availableWidth = Math.max(bounds.width - 32, 120);
-        const availableHeight = Math.max(bounds.height - 96, 120);
-        const cssScale = Math.min(
-          availableWidth / baseViewport.width,
-          availableHeight / baseViewport.height
-        );
+        // Standaard vult de bladzijde de breedte (leesbaar), niet de hoogte; de
+        // zoomknoppen vertrekken van die basis.
+        const availableWidth = Math.max(bounds.width, 120);
+        const cssScale = (availableWidth / baseViewport.width) * ZOOM_STEPS[zoomIndex];
         const pixelRatio = Math.min(window.devicePixelRatio || 1, 2);
         const viewport = page.getViewport({ scale: cssScale * pixelRatio });
         const context = canvas.getContext('2d', { alpha: false });
@@ -284,11 +303,12 @@ function PdfDocumentViewer({ issue, labels }: { issue: MagazineIssue; labels: La
       disposed = true;
       renderTask?.cancel();
     };
-  }, [bounds.height, bounds.width, document, pageNumber]);
+  }, [bounds.height, bounds.width, document, pageNumber, zoomIndex]);
 
   function selectPage(nextPage: number) {
     setStatus('loading');
     setPageNumber(nextPage);
+    viewportRef.current?.scrollTo({ top: 0, left: 0 });
   }
 
   const counter = labels.pageCounter
@@ -296,13 +316,17 @@ function PdfDocumentViewer({ issue, labels }: { issue: MagazineIssue; labels: La
     .replace('{total}', String(pageCount));
 
   return (
-    <div ref={viewportRef} className="vtk-media-pdf-viewer" aria-busy={status === 'loading'}>
-      <canvas
-        ref={canvasRef}
-        className={status === 'ready' ? 'is-ready' : ''}
-        role="img"
-        aria-label={`${issue.publicationTitle}, ${counter}`}
-      />
+    <div className="vtk-media-pdf-viewer" aria-busy={status === 'loading'}>
+      <div ref={viewportRef} className="vtk-media-pdf-scroll">
+        <div className="vtk-media-pdf-page">
+          <canvas
+            ref={canvasRef}
+            className={status === 'ready' ? 'is-ready' : ''}
+            role="img"
+            aria-label={`${issue.publicationTitle}, ${counter}`}
+          />
+        </div>
+      </div>
       {status === 'loading' ? (
         <span className="vtk-media-document-loading">
           <LoaderCircle aria-hidden="true" />
@@ -336,6 +360,36 @@ function PdfDocumentViewer({ issue, labels }: { issue: MagazineIssue; labels: La
             <ChevronRight aria-hidden="true" />
             <span className="vtk-immich-visually-hidden">{labels.nextPage}</span>
           </button>
+          <span className="vtk-media-pdf-zoom">
+            <button
+              type="button"
+              onClick={() => setZoomIndex((current) => Math.max(0, current - 1))}
+              disabled={zoomIndex <= 0}
+              title={labels.zoomOut}
+            >
+              <ZoomOut aria-hidden="true" />
+              <span className="vtk-immich-visually-hidden">{labels.zoomOut}</span>
+            </button>
+            <button
+              type="button"
+              className="vtk-media-pdf-zoom-level"
+              onClick={() => setZoomIndex(DEFAULT_ZOOM_INDEX)}
+              title={labels.resetZoom}
+            >
+              {Math.round(ZOOM_STEPS[zoomIndex] * 100)}%
+            </button>
+            <button
+              type="button"
+              onClick={() =>
+                setZoomIndex((current) => Math.min(ZOOM_STEPS.length - 1, current + 1))
+              }
+              disabled={zoomIndex >= ZOOM_STEPS.length - 1}
+              title={labels.zoomIn}
+            >
+              <ZoomIn aria-hidden="true" />
+              <span className="vtk-immich-visually-hidden">{labels.zoomIn}</span>
+            </button>
+          </span>
         </nav>
       ) : null}
     </div>

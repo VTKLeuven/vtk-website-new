@@ -7,7 +7,13 @@ import { Button, Card, Input, Label } from "@vtk/ui";
 import { saveTheokotOpeningHoursAction } from "@/app/actions/theokot";
 import { TheokotAdminNav } from "../TheokotAdminNav";
 
-type Hours = { titleNl?: string; titleEn?: string; entries?: Array<{ dayNl: string; dayEn: string; hours: string }> };
+type Hours = {
+  titleNl?: string;
+  titleEn?: string;
+  subtitleNl?: string;
+  subtitleEn?: string;
+  entries?: Array<{ dayNl: string; dayEn: string; hours: string }>;
+};
 
 export default async function TheokotOpeningHoursPage({ params }: { params: Promise<{ locale: string }> }) {
   const { locale: localeParam } = await params;
@@ -45,7 +51,20 @@ export default async function TheokotOpeningHoursPage({ params }: { params: Prom
               <Label>{nl ? "Titel (EN)" : "Title (EN)"}</Label>
               <Input name="titleEn" defaultValue={hours.titleEn ?? "Theokot opening hours"} />
             </div>
+            <div>
+              <Label>{nl ? "Ondertitel (NL)" : "Subtitle (NL)"}</Label>
+              <Input name="subtitleNl" defaultValue={hours.subtitleNl ?? ""} placeholder="Broodjes & warme snacks" />
+            </div>
+            <div>
+              <Label>{nl ? "Ondertitel (EN)" : "Subtitle (EN)"}</Label>
+              <Input name="subtitleEn" defaultValue={hours.subtitleEn ?? ""} placeholder="Sandwiches & snacks" />
+            </div>
           </div>
+          <p className="text-xs text-[#5c667f]">
+            {nl
+              ? "De ondertitel staat op de startpagina onder de titel van de kaart. Laat leeg voor de standaardtekst."
+              : "The subtitle appears on the homepage below the card title. Leave empty for the default text."}
+          </p>
           <div className="space-y-2">
             {Array.from({ length: 7 }).map((_, i) => {
               const entry = hourEntries[i];

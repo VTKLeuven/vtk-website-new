@@ -363,16 +363,18 @@
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 18px;
+  /*
+   * Elke kolom houdt zijn eigen hoogte. Rekten ze mee met de rij, dan groeide de
+   * kaart naast een uitgeklapt archief mee en verspringt een halve pagina bij
+   * het openen van "vorige edities".
+   */
+  align-items: start;
 }
 
 .vtk-media-publication-group {
   display: flex;
   min-width: 0;
   flex-direction: column;
-}
-
-.vtk-media-publication-group > .vtk-media-magazine-card {
-  flex: 1 1 auto;
 }
 
 .vtk-media-magazine-archive-shell {
@@ -683,6 +685,9 @@
   height: min(940px, calc(100dvh - 32px));
   max-width: none;
   max-height: none;
+  /* De Tailwind-reset zet `margin: 0` op alles; zonder deze regel plakt de
+     dialoog tegen de linkerbovenhoek in plaats van gecentreerd te staan. */
+  margin: auto;
   overflow: hidden;
   padding: 0;
   border: 0;
@@ -793,18 +798,35 @@
 .vtk-media-pdf-viewer {
   position: absolute;
   inset: 0;
-  display: grid;
   min-width: 0;
   min-height: 0;
-  place-items: center;
   overflow: hidden;
-  padding: 16px 16px 64px;
+}
+
+/*
+ * De bladzijde staat in een eigen scrollvlak: ingezoomd moet je kunnen pannen,
+ * en `min-width`/`min-height: 100%` op de binnenste laag houdt ze gecentreerd
+ * zonder de bovenkant af te snijden zodra ze groter is dan het venster.
+ */
+.vtk-media-pdf-scroll {
+  position: absolute;
+  inset: 0;
+  overflow: auto;
+  padding: 16px 16px 72px;
+  overscroll-behavior: contain;
+}
+
+.vtk-media-pdf-page {
+  display: flex;
+  min-width: 100%;
+  min-height: 100%;
+  width: max-content;
+  align-items: center;
+  justify-content: center;
 }
 
 .vtk-media-pdf-viewer canvas {
   display: block;
-  max-width: 100%;
-  max-height: 100%;
   border: 1px solid rgba(14, 26, 54, 0.12);
   background: #fff;
   box-shadow: 0 12px 36px rgba(10, 15, 31, 0.16);
@@ -851,7 +873,22 @@
   pointer-events: none;
 }
 
-.vtk-media-pdf-pagination > span {
+.vtk-media-pdf-zoom {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: 6px;
+}
+
+.vtk-media-pdf-zoom-level {
+  width: auto !important;
+  min-width: 62px;
+  padding: 0 10px !important;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.vtk-media-pdf-pagination > span:not(.vtk-media-pdf-zoom) {
   min-width: 112px;
   padding: 8px 12px;
   border: 1px solid rgba(255, 255, 255, 0.2);

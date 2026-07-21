@@ -701,12 +701,11 @@ async function main() {
       nameNl: "Computerwetenschappen",
       nameEn: "Computer Science",
       studyProgrammes: ["COMPUTER_SCIENCE"] as const,
-      descriptionNl: "Aanspreekpunt voor major-keuzes, ISP-vragen en feedback over softwarevakken.",
-      descriptionEn: "Point of contact for major choices, ISP questions and feedback on software courses.",
+      email: "cw-poc@vtk.be",
       order: 0,
       representatives: [
-        { email: "onderwijs@vtk.prototype", roleNl: "POC Computerwetenschappen", roleEn: "POC Computer Science", order: 0 },
-        { email: "it@vtk.prototype", roleNl: "Studentenvertegenwoordiger", roleEn: "Student representative", order: 1 },
+        { email: "onderwijs@vtk.prototype", order: 0 },
+        { email: "it@vtk.prototype", order: 1 },
       ],
     },
     {
@@ -714,11 +713,10 @@ async function main() {
       nameNl: "Werktuigkunde",
       nameEn: "Mechanical Engineering",
       studyProgrammes: ["MECHANICAL"] as const,
-      descriptionNl: "Voor labo's, projectwerk, uurroosters en opleidingsfeedback.",
-      descriptionEn: "For labs, project work, schedules and programme feedback.",
+      email: "wtk-poc@vtk.be",
       order: 1,
       representatives: [
-        { email: "sport@vtk.prototype", roleNl: "POC Werktuigkunde", roleEn: "POC Mechanical Engineering", order: 0 },
+        { email: "sport@vtk.prototype", order: 0 },
       ],
     },
     {
@@ -726,11 +724,10 @@ async function main() {
       nameNl: "Elektrotechniek",
       nameEn: "Electrical Engineering",
       studyProgrammes: ["ELECTRICAL"] as const,
-      descriptionNl: "Bundelt opmerkingen rond practica, examens en communicatie met professoren.",
-      descriptionEn: "Collects remarks about practicals, exams and communication with professors.",
+      email: "elt-poc@vtk.be",
       order: 2,
       representatives: [
-        { email: "vice@vtk.prototype", roleNl: "POC Elektrotechniek", roleEn: "POC Electrical Engineering", order: 0 },
+        { email: "vice@vtk.prototype", order: 0 },
       ],
     },
     {
@@ -738,11 +735,10 @@ async function main() {
       nameNl: "Chemische technologie",
       nameEn: "Chemical Engineering",
       studyProgrammes: ["CHEMICAL"] as const,
-      descriptionNl: "Contactpunt voor practica, stages en facultaire overlegmomenten.",
-      descriptionEn: "Contact point for labs, internships and faculty consultations.",
+      email: "chem-poc@vtk.be",
       order: 3,
       representatives: [
-        { email: "theokot@vtk.prototype", roleNl: "POC Chemische technologie", roleEn: "POC Chemical Engineering", order: 0 },
+        { email: "theokot@vtk.prototype", order: 0 },
       ],
     },
   ];
@@ -758,8 +754,7 @@ async function main() {
         slug: poc.slug,
         nameNl: poc.nameNl,
         nameEn: poc.nameEn,
-        descriptionNl: poc.descriptionNl,
-        descriptionEn: poc.descriptionEn,
+        email: poc.email,
         order: poc.order,
         studyProgrammes: [...poc.studyProgrammes],
       },
@@ -780,7 +775,7 @@ async function main() {
       await prisma.pocRepresentative.upsert({
         where: { pocId_userId: { pocId: row.id, userId: user.id } },
         update: {},
-        create: { pocId: row.id, userId: user.id, roleNl: rep.roleNl, roleEn: rep.roleEn, order: rep.order },
+        create: { pocId: row.id, userId: user.id, order: rep.order },
       });
     }
   }

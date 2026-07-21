@@ -274,12 +274,72 @@
   gap: 12px;
 }
 
+/* Alle filtervelden even breed: een select die op zijn inhoud krimpt naast een
+   datumveld op volle breedte oogt als een fout uitgelijnd formulier. */
 .vtk-basic-toolbar .vtk-basic-field {
+  flex: 0 1 200px;
   min-width: 160px;
 }
 
 .vtk-basic-toolbar .vtk-basic-select {
-  width: auto;
+  width: 100%;
+}
+
+/*
+ * Rij-actie: een echte knop, geen status-pil. De vrije plaatsen staan ernaast
+ * als badge, zodat kleur de beschikbaarheid vertelt en de knop de actie.
+ */
+.vtk-shift-action {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.vtk-basic-action {
+  display: inline-flex;
+  min-height: 34px;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 6px 14px;
+  border: 1px solid var(--ink);
+  border-radius: 999px;
+  background: var(--ink);
+  color: var(--paper);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1;
+  cursor: pointer;
+  transition:
+    background-color 140ms ease,
+    border-color 140ms ease,
+    color 140ms ease;
+}
+
+.vtk-basic-action:hover:not(:disabled) {
+  background: var(--navy);
+  border-color: var(--navy);
+}
+
+.vtk-basic-action:disabled {
+  border-color: var(--line-2);
+  background: var(--paper-2);
+  color: var(--muted);
+  cursor: not-allowed;
+}
+
+.vtk-basic-action-danger {
+  border-color: #d8a89d;
+  background: var(--surface);
+  color: #9d2f1f;
+}
+
+.vtk-basic-action-danger:hover:not(:disabled) {
+  border-color: #9d2f1f;
+  background: #fff0ed;
+  color: #9d2f1f;
 }
 
 .vtk-basic-table-empty {

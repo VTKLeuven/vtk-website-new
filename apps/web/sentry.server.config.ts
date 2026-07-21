@@ -10,11 +10,12 @@ import * as Sentry from "@sentry/nextjs";
 export function initServerSentry(dsn: string | undefined): void {
   Sentry.init({
     dsn,
+    sendDefaultPii: false,
 
     tracesSampleRate: process.env.NODE_ENV === "development" ? 1.0 : 0.1,
 
-    // Attach local variable values to server-side stack frames.
-    includeLocalVariables: true,
+    // Local variables can contain form bodies, e-mail addresses or secrets.
+    includeLocalVariables: false,
 
     enableLogs: true,
   });

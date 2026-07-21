@@ -5,6 +5,7 @@
  * SDK stays inert, so this is safe to ship without a DSN configured locally.
  */
 import * as Sentry from "@sentry/nextjs";
+import { analyticsConsentGranted } from "@/lib/cookie-consent";
 
 declare global {
   interface Window {
@@ -14,20 +15,37 @@ declare global {
   }
 }
 
-Sentry.init({
-  dsn: window.__SENTRY_DSN__ ?? process.env.NEXT_PUBLIC_SENTRY_DSN,
+const dsn = window.__SENTRY_DSN__ ?? process.env.NEXT_PUBLIC_SENTRY_DSN;
+const sentryEnabled = Boolean(dsn && analyticsConsentGranted());
 
-  // 100% tracing in dev, 10% in production.
-  tracesSampleRate: process.env.NODE_ENV === "development" ? 1.0 : 0.1,
+if (sentryEnabled) {
+  Sentry.init({
+    dsn,
+    sendDefaultPii: false,
 
-  // Session Replay: 10% of all sessions, 100% of sessions with an error.
-  replaysSessionSampleRate: 0.1,
-  replaysOnErrorSampleRate: 1.0,
+    // 100% tracing in dev, 10% in production.
+    tracesSampleRate: process.env.NODE_ENV === "development" ? 1.0 : 0.1,
 
-  enableLogs: true,
+    // Session Replay is optional and only runs after explicit consent. Keep
+    // text masked and media blocked even after consent has been granted.
+    replaysSessionSampleRate: 0.1,
+    replaysOnErrorSampleRate: 1.0,
 
-  integrations: [Sentry.replayIntegration()],
-});
+    enableLogs: true,
+
+    integrations: [
+      Sentry.replayIntegration({
+        maskAllText: true,
+        blockAllMedia: true,
+      }),
+    ],
+  });
+}
 
 // Report App Router client-side navigations to Sentry.
-export const onRouterTransitionStart = Sentry.captureRouterTransitionStart;
+export function onRouterTransitionStart(
+  href: string,
+  navigationType: "push" | "replace" | "traverse",
+) {
+  if (sentryEnabled) Sentry.captureRouterTransitionStart(href, navigationType);
+}

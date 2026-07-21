@@ -7,6 +7,9 @@
     "packages/*"
   ],
   "scripts": {
+    "prepare": "git config core.hooksPath .githooks || true",
+    "verify": "npm run verify:lockfile && npm run verify:types && npm run lint && npm run test --workspace=@vtk/web",
+    "verify:types": "npm exec --workspace=@vtk/web -- next typegen && tsc --noEmit -p apps/web/tsconfig.json",
     "verify:lockfile": "node scripts/check-lockfile-platforms.mjs",
     "dev": "npm run dev --workspace=@vtk/web",
     "build": "npm run build --workspace=@vtk/db && npm run build --workspace=@vtk/web",

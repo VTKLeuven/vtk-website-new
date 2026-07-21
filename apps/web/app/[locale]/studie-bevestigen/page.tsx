@@ -37,7 +37,12 @@ export default async function ConfirmStudyPage({
 
   const user = await prisma.user.findUniqueOrThrow({
     where: { id: session.user.id },
-    select: { studyYears: true, studyProgrammes: true, notAtFaculty: true },
+    select: {
+      studyYears: true,
+      studyProgrammes: true,
+      notAtFaculty: true,
+      notStudying: true,
+    },
   });
 
   const t = getDictionary(locale).confirmStudy;
@@ -58,6 +63,7 @@ export default async function ConfirmStudyPage({
             studyYears={user.studyYears}
             studyProgrammes={user.studyProgrammes}
             notAtFaculty={user.notAtFaculty}
+            notStudying={user.notStudying}
           />
           <div className="flex flex-wrap items-center gap-3">
             <Button type="submit">{t.submit}</Button>

@@ -263,6 +263,14 @@ SSO. Concrete implementatie: hook in `packages/auth/src/auth.ts`, gate in
   opgelijst worden (o.a. de mappen in de career-ZIP). Wie dit aanduidt valt uit
   **alle** career-lijsten, ook de algemene; de andere categorieën blijven gewoon
   werken.
+- **"Ik studeer niet (meer)"** (`User.notStudying`) is er voor afgestudeerden of
+  gestopte leden. Bewust **los van `notAtFaculty`**: dat betekent "studeert wél,
+  maar elders"; dit betekent "studeert niet". Ook bewust **geen `StudyYear`**:
+  het is geen jaar, en als enum-waarde zou het overal opduiken waar jaren
+  opgelijst worden (o.a. de per-jaar-mappen in de career-ZIP). Het lid blijft
+  lid, maar valt uit **élke** studiegerichte mailinglijst (zie hieronder). Beide
+  vlaggen zijn onafhankelijk; wie niet (meer) studeert hoeft geen richting of
+  jaar meer aan te duiden.
 
 ### Jaarlijkse studiebevestiging ("wie is nog actief student?")
 
@@ -300,6 +308,10 @@ SSO. Concrete implementatie: hook in `packages/auth/src/auth.ts`, gate in
   jaarlijkse studiebevestiging hierboven) zitten in een lijst; dat geldt voor
   **alle** lijsten, ook "Alle studenten". Afgestudeerden vallen er zo vanzelf
   uit, zonder manuele opkuis.
+- Enkel leden die **nog studeren**: wie bij de bevestiging "ik studeer niet
+  (meer)" (`notStudying`) aanduidde, bevestigt zijn profiel wél en passeert dus
+  de gate, maar hoort in **geen enkele** studiegerichte lijst. Zonder deze extra
+  filter zou zo'n lid via de bevestiging net terug in de lijsten belanden.
 - **"Alle studenten"** is een synthetische lijst: iedereen, zonder opt-in. Ze is
   bewust **geen `MailCategory`** en heeft dus geen checkbox bij "Mijn account",
   want dit is de lijst om sowieso iedereen te kunnen bereiken.
@@ -446,6 +458,21 @@ onderste helft is een ontwerpkeuze, geen toeval:
   de POC-pagina zelf verschijnt.
 - **Meerdere richtingen per POC** kan: één POC bedient soms verschillende
   opleidingen.
+- **Eén mailadres per POC, geen persoonlijke adressen.** `Poc.email` (bv.
+  `wtk-poc@vtk.be`) is het enige contactadres dat de site toont. Een student
+  mailt de POC als geheel; wie er dit jaar in zit mag wisselen zonder dat een
+  adres op de site verandert, en een vertegenwoordiger hoeft zijn persoonlijke
+  adres niet publiek te zetten. `User.email` van een vertegenwoordiger
+  verschijnt daarom nergens meer op `/pocs` of de homepage.
+- **Geen beschrijvingen en geen rollen op de publieke POC-schermen.** De
+  richtingsnaam en de gezichten zijn wat een student zoekt; een zin uitleg per
+  POC en een functietitel per persoon werden als ruis ervaren. De kolommen
+  `Poc.description*` en `PocRepresentative.role*` bestaan nog in de database
+  (weggooien zou bestaande tekst vernietigen), maar worden nergens meer getoond
+  of bewerkt.
+- **`/pocs` gebruikt dezelfde kaarten als de homepage-band** (`.poc-grid` /
+  `.poccard` uit `vtk-home.css`): wie zijn eigen POC op de homepage ziet en
+  doorklikt, hoort hetzelfde beeld te krijgen.
 - **Lege staat = sectie verbergen.** Zonder sessie, zonder richtingen, of zonder
   een matchende POC met vertegenwoordigers valt de hele sectie weg. Bewuste keuze
   boven "toon dan alle POC's" of een uitnodigingsbanner: de sectie is enkel

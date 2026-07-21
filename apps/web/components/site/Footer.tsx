@@ -1,6 +1,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { getDictionary, type Locale } from "@vtk/i18n";
+import { CookieSettingsButton } from "./CookieConsent";
 
 export async function Footer({ locale }: { locale: Locale }) {
   const dict = getDictionary(locale);
@@ -112,7 +113,11 @@ export async function Footer({ locale }: { locale: Locale }) {
           <span>
             © {new Date().getFullYear()} - {f.copyright}
           </span>
-          <Link href={`${base}/privacy`}>{f.linkPrivacy}</Link>
+          <div className="vtk-site-footer-legal">
+            <Link href={`${base}/privacy`}>{f.linkPrivacy}</Link>
+            <Link href={`${base}/cookies`}>{f.linkCookies}</Link>
+            <CookieSettingsButton>{f.linkCookieSettings}</CookieSettingsButton>
+          </div>
         </div>
       </div>
     </footer>

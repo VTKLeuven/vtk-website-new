@@ -48,6 +48,8 @@ export function ProfileForm({
     | "studyYears"
     | "studyProgrammes"
     | "notAtFaculty"
+    | "notStudying"
+    | "rNumberFromKul"
   >;
   next?: string;
   submitLabel: string;
@@ -79,6 +81,16 @@ export function ProfileForm({
     >
       {next ? <input type="hidden" name="next" value={next} /> : null}
 
+      <p className="rounded-xl border border-vtk-blue/12 bg-vtk-blue-soft/40 p-4 text-sm leading-6 text-[#34405e]">
+        {t.privacyNotice}{" "}
+        <a
+          href={`${locale === "en" ? "/en" : ""}/privacy`}
+          className="font-medium text-vtk-ink underline"
+        >
+          {t.privacyLink}
+        </a>
+      </p>
+
       {/* Naam & studentennummer */}
       <fieldset className="space-y-4">
         <legend className="text-lg font-semibold text-vtk-ink">{t.identityHeading}</legend>
@@ -93,15 +105,27 @@ export function ProfileForm({
           </div>
           <div>
             <Label htmlFor="rNumber">{t.rNumber}</Label>
-            <Input
-              id="rNumber"
-              name="rNumber"
-              defaultValue={user.rNumber ?? ""}
-              placeholder="r0123456"
-              pattern={R_NUMBER_PATTERN}
-              title={t.rNumberHint}
-            />
-            <p className="mt-1 text-xs text-[#5c667f]">{t.rNumberHint}</p>
+            {user.rNumberFromKul ? (
+              // Van de KU Leuven-authenticator: read-only, net als de e-mail.
+              // Geen `name`, dus het wordt niet meegepost; saveProfileAction
+              // laat het r-nummer sowieso ongemoeid wanneer deze vlag staat.
+              <>
+                <Input id="rNumber" defaultValue={user.rNumber ?? ""} disabled />
+                <p className="mt-1 text-xs text-[#5c667f]">{t.rNumberFromKul}</p>
+              </>
+            ) : (
+              <>
+                <Input
+                  id="rNumber"
+                  name="rNumber"
+                  defaultValue={user.rNumber ?? ""}
+                  placeholder="r0123456"
+                  pattern={R_NUMBER_PATTERN}
+                  title={t.rNumberHint}
+                />
+                <p className="mt-1 text-xs text-[#5c667f]">{t.rNumberHint}</p>
+              </>
+            )}
           </div>
         </div>
       </fieldset>
@@ -112,11 +136,11 @@ export function ProfileForm({
         <div className="grid grid-cols-1 items-end gap-4 sm:grid-cols-6">
           <div className="sm:col-span-3">
             <Label htmlFor="street">{t.street}</Label>
-            <Input id="street" name="street" defaultValue={user.street ?? ""} required />
+            <Input id="street" name="street" defaultValue={user.street ?? ""} />
           </div>
           <div className="sm:col-span-1">
             <Label htmlFor="houseNumber">{t.houseNumber}</Label>
-            <Input id="houseNumber" name="houseNumber" defaultValue={user.houseNumber ?? ""} required />
+            <Input id="houseNumber" name="houseNumber" defaultValue={user.houseNumber ?? ""} />
           </div>
           <div className="sm:col-span-2">
             <Label htmlFor="bus" className="whitespace-nowrap">
@@ -126,11 +150,11 @@ export function ProfileForm({
           </div>
           <div className="sm:col-span-2">
             <Label htmlFor="postalCode">{t.postalCode}</Label>
-            <Input id="postalCode" name="postalCode" defaultValue={user.postalCode ?? ""} required />
+            <Input id="postalCode" name="postalCode" defaultValue={user.postalCode ?? ""} />
           </div>
           <div className="sm:col-span-4">
             <Label htmlFor="city">{t.city}</Label>
-            <Input id="city" name="city" defaultValue={user.city ?? ""} required />
+            <Input id="city" name="city" defaultValue={user.city ?? ""} />
           </div>
         </div>
         <div className="sm:max-w-xs">
@@ -140,7 +164,6 @@ export function ProfileForm({
             name="birthDate"
             type="date"
             defaultValue={dateInputValue(user.birthDate)}
-            required
           />
         </div>
       </fieldset>
@@ -161,7 +184,6 @@ export function ProfileForm({
               name="personalEmail"
               type="email"
               defaultValue={user.personalEmail ?? ""}
-              required
             />
           </div>
         </div>
@@ -215,6 +237,7 @@ export function ProfileForm({
           studyYears={user.studyYears}
           studyProgrammes={user.studyProgrammes}
           notAtFaculty={user.notAtFaculty}
+          notStudying={user.notStudying}
         />
       </fieldset>
 

@@ -288,6 +288,11 @@ model User {
   lastName      String?
   email         String  @unique
   rNumber       String? @unique // KU Leuven studentennummer (bvb r0123456), voor zoeken
+  // `true` als het r-nummer van de KU Leuven-authenticator komt (bij SSO gezet,
+  // zie packages/auth/src/logins/kul.ts). Dan staat het veld read-only in het
+  // profielformulier, net als de e-mail; een zelf ingevuld r-nummer (flag false)
+  // blijft aanpasbaar.
+  rNumberFromKul Boolean @default(false)
   emailVerified Boolean @default(false)
   avatarKey     String?
   image         String?
@@ -320,6 +325,11 @@ model User {
   // `StudyProgramme`-waarde: het is geen richting, en als enum-waarde zou het
   // overal opduiken waar richtingen opgelijst worden (o.a. de career-export).
   notAtFaculty       Boolean          @default(false)
+  // Lid dat niet (meer) studeert: afgestudeerd of gestopt. Bewust los van
+  // `notAtFaculty` (dat is "studeert wél, maar elders"): wie dit aanduidt valt
+  // uit élke studiegerichte mailinglijst (zie lib/mailinglists.ts). Blijft een
+  // aparte boolean om dezelfde reden als notAtFaculty.
+  notStudying        Boolean          @default(false)
   // Werkingsjaar waarin het lid zijn studieprofiel laatst bevestigde (2026 =
   // "26-27"). Loopt dat achter op het huidige werkingsjaar, dan is het profiel
   // verlopen: de bevestigingsgate vraagt het opnieuw en het lid valt zolang uit
@@ -1171,6 +1181,9 @@ model Poc {
   slug          String  @unique
   nameNl        String
   nameEn        String?
+  /// Eén adres voor de hele POC (bv. wtk-poc@vtk.be). Studenten mailen de POC,
+  /// niet een individuele vertegenwoordiger; die adressen tonen we nergens.
+  email         String?
   descriptionNl String?
   descriptionEn String?
   order         Int     @default(0)
@@ -1300,6 +1313,10 @@ model ShiftParticipant {
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   payedOut Boolean
+
+  /// Moment van inschrijven: binnen een korte bedenktijd mag je je nog
+  /// uitschrijven, ook wanneer de shift al binnen 24 uur begint.
+  registeredAt DateTime @default(now())
 
   @@id([shiftId, userId])
 }
@@ -1827,6 +1844,24 @@ model DoorAccessLog {
   @@index([at])
   @@index([result])
   @@index([userId])
+}
+
+// -----------------------------------------------------------------------------
+// KU Leuven SSO (OIDC) debug log
+// -----------------------------------------------------------------------------
+// Opt-in via Admin -> IT (Setting-sleutel "kul.debug"). Eén rij per KU Leuven-
+// login met de ruwe claims die better-auth aan `mapProfileToUser` doorgeeft,
+// zodat een superadmin kan zien welke attributen ICTS effectief vrijgeeft (bv. of
+// KULeuvenEmployeeType/faculteit binnenkomt). Bevat persoonsgegevens, staat
+// daarom standaard uit en wordt tot de laatste N rijen gesnoeid.
+model KulAuthLog {
+  id      String   @id @default(cuid())
+  at      DateTime @default(now())
+  email   String?
+  rNumber String?
+  claims  Json
+
+  @@index([at])
 }
 
 // -----------------------------------------------------------------------------
