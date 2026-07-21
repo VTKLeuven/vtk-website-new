@@ -1,12 +1,14 @@
+import { headers } from "next/headers";
 import { prisma } from "@vtk/db";
 import { notFound } from "next/navigation";
 import { hasLocale } from "@/lib/locale";
 import { requirePermission } from "@/lib/session";
+import { listAllClientPermissions } from "@vtk/auth/server";
 import type { Locale } from "@vtk/i18n";
 import { publicUrl } from "@/lib/storage";
 import { currentWorkingYear, formatWorkingYear } from "@/lib/workingYear";
 import { roleErrorMessages } from "./messages";
-import { RolesTable, type RoleRow, type Perm, type Post } from "./RolesTable";
+import { RolesTable, type RoleRow, type Perm, type Post, type ClientPerm } from "./RolesTable";
 
 export default async function AdminRoles({
   params,
@@ -22,11 +24,13 @@ export default async function AdminRoles({
 
   const year = currentWorkingYear();
 
-  const [roles, permissions, posts] = await Promise.all([
+  const [roles, permissions, posts, clientPermissions] = await Promise.all([
     prisma.role.findMany({
       orderBy: [{ order: "asc" }, { nameNl: "asc" }],
       include: {
         permissions: true,
+        // Permissies van externe applicaties die deze rol toekent (SSO).
+        ssoGrants: { select: { permissionId: true } },
         users: { where: { year }, include: { user: true } },
         groupGrants: {
           include: {
@@ -43,7 +47,19 @@ export default async function AdminRoles({
       orderBy: { orderInPraesidium: "asc" },
       select: { id: true, code: true, nameNl: true, nameEn: true },
     }),
+    listAllClientPermissions(await headers()),
   ]);
+
+  const allClientPermissions: ClientPerm[] = clientPermissions.map((permission) => ({
+    id: permission.id,
+    code: permission.code,
+    label: nl ? permission.labelNl : permission.labelEn,
+    clientId: permission.clientId,
+    clientName: permission.clientName,
+    grantsAccess: permission.grantsAccess,
+    clientRestricted: permission.clientRestricted,
+  }));
+  const clientPermLabelById = new Map(allClientPermissions.map((p) => [p.id, `${p.clientName}: ${p.label}`]));
 
   const allPermissions: Perm[] = permissions.map((p) => ({
     id: p.id,
@@ -81,6 +97,7 @@ export default async function AdminRoles({
     }));
 
     const permissionIds = role.permissions.map((rp) => rp.permissionId);
+    const clientPermissionIds = role.ssoGrants.map((grant) => grant.permissionId);
     const name = nl ? role.nameNl : role.nameEn;
     const description = nl ? role.descriptionNl : role.descriptionEn;
 
@@ -91,6 +108,7 @@ export default async function AdminRoles({
       role.code,
       description ?? "",
       ...permissionIds.map((id) => permLabelById.get(id) ?? ""),
+      ...clientPermissionIds.map((id) => clientPermLabelById.get(id) ?? ""),
       ...postGrants.map((g) => g.name),
       ...directHolders.map((h) => `${h.name} ${h.email}`),
     ]
@@ -112,6 +130,7 @@ export default async function AdminRoles({
       directHolders,
       postGrants,
       permissionIds,
+      clientPermissionIds,
       searchText,
     };
   });
@@ -138,6 +157,7 @@ export default async function AdminRoles({
       <RolesTable
         roles={roleRows}
         allPermissions={allPermissions}
+        allClientPermissions={allClientPermissions}
         allPosts={allPosts}
         can={{ manageRoles: true, manageGroups: canManageGroups }}
         year={year}

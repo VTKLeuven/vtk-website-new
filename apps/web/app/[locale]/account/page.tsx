@@ -144,6 +144,23 @@ export default async function AccountPage({ params }: { params: Promise<{ locale
       </Card>
 
       <Card className="p-6">
+        <h2 className="mb-2 text-lg font-semibold text-vtk-ink">
+          {nl ? "Verbonden apps" : "Connected apps"}
+        </h2>
+        <p className="mb-4 text-sm text-[#5c667f]">
+          {nl
+            ? "Bekijk welke applicaties toegang hebben tot je VTK-account, en verbreek de verbinding wanneer je wil."
+            : "See which applications have access to your VTK account, and disconnect them whenever you want."}
+        </p>
+        <Link
+          href={nl ? "/account/verbonden-apps" : "/en/account/verbonden-apps"}
+          className="font-medium text-vtk-ink underline"
+        >
+          {nl ? "Verbonden apps beheren" : "Manage connected apps"}
+        </Link>
+      </Card>
+
+      <Card className="p-6">
         <h2 className="mb-4 text-lg font-semibold text-vtk-ink">
           {nl ? "Gereserveerde broodjes" : "Reserved sandwiches"}
         </h2>

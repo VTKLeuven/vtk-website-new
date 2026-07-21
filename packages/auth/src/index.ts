@@ -6,16 +6,52 @@
  * Safe to use in browser and server components :))
  */
 import type { NextRequest } from 'next/server';
-import type { Permission } from './permissions';
+import type { Permission } from './lib/permissions';
 
-export { splitFullName, fullName, nameParts, type NameParts } from './names';
+export { splitFullName, fullName, nameParts, type NameParts } from './lib/names';
+export { PERMISSIONS, isPermission, permissionCodes, type Permission } from './lib/permissions';
+export { currentWorkingYear, FIRST_WORKING_YEAR } from './lib/workingYear';
 export {
-  PERMISSIONS,
-  isPermission,
-  permissionCodes,
-  type Permission,
-} from './permissions';
-export { currentWorkingYear, FIRST_WORKING_YEAR } from './workingYear';
+  SCOPES,
+  SCOPE_CODES,
+  DEFAULT_SCOPE_CODES,
+  describeScope,
+  isSensitiveScope,
+  type Scope,
+  type ScopeDefinition,
+} from './lib/scopes';
+export {
+  CLAIMS,
+  CLAIM_NAMES,
+  claimsForScope,
+  type ClaimDefinition,
+  type ClaimDestination,
+  type ClaimSource,
+} from './lib/claims';
+export { transform, TRANSFORMER_NAMES, type TransformerName, type TransformerArgs } from './lib/transformers';
+export {
+  ACCESS_SUFFIX,
+  MAX_PERMISSIONS_PER_CLIENT,
+  RESERVED_NAMESPACES,
+  accessCodeFor,
+  checkCode,
+  checkNamespace,
+  type CodeProblem,
+} from './lib/clientPermissionCodes';
+
+/**
+ * Staat hier en niet in `auth.ts` omdat de proxy hem nodig heeft en die
+ * `auth.ts` niet mag importeren (trekt Prisma de proxy-bundle in). De
+ * OAuth-issuer is `BETTER_AUTH_URL` + dit pad: wijzigen breekt elke
+ * geregistreerde client.
+ */
+export const AUTH_BASE_PATH = '/api/auth/better';
+
+/**
+ * Eigenaar van elke OAuth-client. Vast, want clients zijn van VTK en niet van
+ * de beheerder die ze toevallig aanmaakte; zie `clientReference` in auth.ts.
+ */
+export const OAUTH_CLIENT_OWNER = 'vtk';
 
 /** */
 export type Locale = 'NL' | 'EN';
@@ -80,24 +116,15 @@ export function hasPermission(
   return true;
 }
 
-export function hasAnyPermission(
-  session: SessionPayload | null | undefined,
-  permissions: Permission[]
-): boolean {
+export function hasAnyPermission(session: SessionPayload | null | undefined, permissions: Permission[]): boolean {
   return permissions.some((permission) => hasPermission(session, permission));
 }
 
-export function hasAllPermissions(
-  session: SessionPayload | null | undefined,
-  permissions: Permission[]
-): boolean {
+export function hasAllPermissions(session: SessionPayload | null | undefined, permissions: Permission[]): boolean {
   return permissions.every((permission) => hasPermission(session, permission));
 }
 
-export function isMemberOfGroup(
-  session: SessionPayload | null | undefined,
-  groupCode: string
-): boolean {
+export function isMemberOfGroup(session: SessionPayload | null | undefined, groupCode: string): boolean {
   if (!session) return false;
   return session.groups.some((g) => g.code === groupCode);
 }
@@ -107,11 +134,7 @@ export function isMemberOfGroup(
 // ==============================
 
 export type AuthErrorCode =
-  | 'UNAUTHENTICATED'
-  | 'FORBIDDEN'
-  | 'INACTIVE_USER'
-  | 'INVALID_INPUT'
-  | 'REMOTE_AUTH_UNAVAILABLE';
+  'UNAUTHENTICATED' | 'FORBIDDEN' | 'INACTIVE_USER' | 'INVALID_INPUT' | 'REMOTE_AUTH_UNAVAILABLE';
 
 export class AuthError extends Error {
   constructor(
@@ -132,10 +155,7 @@ export type RouteContext = {
   }>;
 };
 
-export type RouteHandler = (
-  request: NextRequest,
-  context: RouteContext
-) => Promise<Response> | Response;
+export type RouteHandler = (request: NextRequest, context: RouteContext) => Promise<Response> | Response;
 
 export type ApiHandlers = {
   GET: RouteHandler;

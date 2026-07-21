@@ -12,6 +12,7 @@ import {
 } from "@/app/actions/roles";
 import { setGroupRoleAction } from "@/app/actions/users-groups";
 import { AddRoleMemberForm } from "./AddRoleMemberForm";
+import { ClientPermToggle } from "./ClientPermToggle";
 import {
   Avatar,
   Chevron,
@@ -28,6 +29,20 @@ import {
 export type Person = { userId: string; name: string; email: string; avatarUrl: string | null };
 export type PostGrant = { groupId: string; code: string; name: string; kind: "DEFAULT" | "LEADER" };
 export type Perm = { id: string; code: string; label: string; category: string };
+/**
+ * Een permissie van een externe applicatie (SSO). Het vocabulaire wordt beheerd
+ * op /admin/sso; hier worden bestaande codes enkel aan een rol gehangen.
+ */
+export type ClientPerm = {
+  id: string;
+  code: string;
+  label: string;
+  clientId: string;
+  clientName: string;
+  /** De permissie die toegang tot de applicatie verleent, niet zomaar een recht erin. */
+  grantsAccess: boolean;
+  clientRestricted: boolean;
+};
 export type Post = { groupId: string; code: string; name: string };
 
 export type RoleRow = {
@@ -45,6 +60,7 @@ export type RoleRow = {
   directHolders: Person[];
   postGrants: PostGrant[];
   permissionIds: string[];
+  clientPermissionIds: string[];
   /** Voorbereide, lowercased zoekstring (naam, code, beschrijving, rechten, posten, personen). */
   searchText: string;
 };
@@ -60,6 +76,7 @@ export type SaveLabels = {
 export function RolesTable({
   roles,
   allPermissions,
+  allClientPermissions,
   allPosts,
   can,
   year,
@@ -69,6 +86,7 @@ export function RolesTable({
 }: {
   roles: RoleRow[];
   allPermissions: Perm[];
+  allClientPermissions: ClientPerm[];
   allPosts: Post[];
   can: { manageRoles: boolean; manageGroups: boolean };
   year: number;
@@ -126,6 +144,7 @@ export function RolesTable({
                 nl={nl}
                 can={can}
                 allPermissions={allPermissions}
+                allClientPermissions={allClientPermissions}
                 allPosts={allPosts}
                 year={year}
                 yearLabel={yearLabel}
@@ -172,6 +191,7 @@ function RoleRowView({
   nl,
   can,
   allPermissions,
+  allClientPermissions,
   allPosts,
   year,
   yearLabel,
@@ -184,6 +204,7 @@ function RoleRowView({
   nl: boolean;
   can: { manageRoles: boolean; manageGroups: boolean };
   allPermissions: Perm[];
+  allClientPermissions: ClientPerm[];
   allPosts: Post[];
   year: number;
   yearLabel: string;
@@ -238,6 +259,7 @@ function RoleRowView({
               nl={nl}
               can={can}
               allPermissions={allPermissions}
+              allClientPermissions={allClientPermissions}
               allPosts={allPosts}
               year={year}
               yearLabel={yearLabel}
@@ -256,6 +278,7 @@ function RoleDetail({
   nl,
   can,
   allPermissions,
+  allClientPermissions,
   allPosts,
   year,
   yearLabel,
@@ -266,6 +289,7 @@ function RoleDetail({
   nl: boolean;
   can: { manageRoles: boolean; manageGroups: boolean };
   allPermissions: Perm[];
+  allClientPermissions: ClientPerm[];
   allPosts: Post[];
   year: number;
   yearLabel: string;
@@ -284,6 +308,23 @@ function RoleDetail({
 
   const enabledPerms = useMemo(() => new Set(role.permissionIds), [role.permissionIds]);
   const permLabel = (id: string) => allPermissions.find((p) => p.id === id)?.label ?? id;
+
+  // Permissies van externe apps, gegroepeerd per applicatie: de codes zeggen
+  // niets zonder te weten van welke app ze zijn.
+  const clientPermsByApp = useMemo(() => {
+    const map = new Map<string, ClientPerm[]>();
+    for (const permission of allClientPermissions) {
+      if (!map.has(permission.clientName)) map.set(permission.clientName, []);
+      map.get(permission.clientName)!.push(permission);
+    }
+    return [...map.entries()];
+  }, [allClientPermissions]);
+
+  const enabledClientPerms = useMemo(() => new Set(role.clientPermissionIds), [role.clientPermissionIds]);
+  const clientPermLabel = (id: string) => {
+    const permission = allClientPermissions.find((p) => p.id === id);
+    return permission ? `${permission.clientName}: ${permission.label}` : id;
+  };
   const grants = useMemo(() => new Set(role.postGrants.map((g) => `${g.groupId}:${g.kind}`)), [role.postGrants]);
 
   return (
@@ -447,6 +488,64 @@ function RoleDetail({
         }
       </Panel>
 
+      {/* 4. Externe apps (SSO) */}
+      {allClientPermissions.length > 0 && (
+        <Panel
+          title={nl ? "Externe apps" : "External apps"}
+          count={role.clientPermissionIds.length}
+          canEdit={can.manageRoles}
+          editLabel={nl ? "Bewerken" : "Edit"}
+          doneLabel={nl ? "Klaar" : "Done"}
+        >
+          {(editing) =>
+            editing ? (
+              <div className="space-y-4">
+                <p className="text-xs text-[#5c667f]">
+                  {nl
+                    ? "Rechten binnen applicaties die met een VTK-account aanmelden. Een permissie met “toegang” bepaalt of iemand er überhaupt binnen raakt; de rest bepaalt wat je er mag."
+                    : "Rights inside applications that sign in with a VTK account. A permission marked “access” decides whether someone gets in at all; the rest decide what they may do."}
+                </p>
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+                  {clientPermsByApp.map(([clientName, perms]) => (
+                    <div key={clientName}>
+                      <h5 className="mb-1 text-[11px] font-semibold uppercase text-zinc-500">{clientName}</h5>
+                      <ul className="space-y-1 text-sm">
+                        {perms.map((p) => (
+                          <li key={p.id}>
+                            <ClientPermToggle
+                              nl={nl}
+                              roleId={role.id}
+                              permissionId={p.id}
+                              code={p.code}
+                              label={p.label}
+                              clientName={p.clientName}
+                              grantsAccess={p.grantsAccess}
+                              on={enabledClientPerms.has(p.id)}
+                            />
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : role.clientPermissionIds.length > 0 ? (
+              <ul className="flex flex-wrap gap-1.5">
+                {role.clientPermissionIds.map((id) => (
+                  <li key={id} className="rounded-full bg-vtk-blue-soft/60 px-2.5 py-0.5 text-xs text-vtk-ink">
+                    {clientPermLabel(id)}
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="text-sm text-[#5c667f]">
+                {nl ? "Geen rechten in externe apps." : "No rights in external apps."}
+              </p>
+            )
+          }
+        </Panel>
+      )}
+
       {/* Rolinstellingen (naam/beschrijving/kleur + verwijderen) */}
       {can.manageRoles && (
         <details className="rounded-xl border border-vtk-blue/12 bg-white">
@@ -548,7 +647,7 @@ function GrantToggle({
       <input type="hidden" name="roleId" value={roleId} />
       <input type="hidden" name="kind" value={kind} />
       <input type="hidden" name="enabled" value={on ? "0" : "1"} />
-      <ToggleDot on={on} title={`${roleName} — ${post.name}: ${which}`} />
+      <ToggleDot on={on} title={`${roleName}, ${post.name}: ${which}`} />
     </form>
   );
 }

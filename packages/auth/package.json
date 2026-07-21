@@ -11,6 +11,7 @@
     "./client": "./src/client.ts"
   },
   "dependencies": {
+    "@better-auth/oauth-provider": "^1.6.23",
     "@node-rs/argon2": "^2.0.2",
     "@vtk/db": "*",
     "better-auth": "^1.6.19",

@@ -68,6 +68,7 @@ const NAV: NavEntry[] = [
   item('shortlinks', '/links', { perm: 'shortlinks.manage' }),
   item('shift', '/shiften', { anyPerm: ['shift.edit', 'shift.reward', 'shift.ranking'] }),
   item('theokot', '/theokot', { anyPerm: ['theokot.manage', 'theokot.pickup'] }),
+  item('sso', '/sso', { perm: 'oauth.client.edit' }),
   item('door', '/deur', { perm: 'door.manage' }),
   item('it', '/it', { superAdminOnly: true }),
 ];

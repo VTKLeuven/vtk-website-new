@@ -72,6 +72,10 @@ export const PERMISSIONS = [
   // Module access flags (gate submodules via group permissions)
   { code: "modules.logistiek.access", labelNl: "Toegang tot Logistiek module", labelEn: "Access to Logistics module", category: "modules" },
   { code: "modules.cursusdienst.access", labelNl: "Toegang tot Cursusdienst module", labelEn: "Access to Course Shop module", category: "modules" },
+
+  // SSO / OAuth Authorization Server
+  { code: "oauth.client.edit", labelNl: "OAuth-clients aanmaken en bewerken", labelEn: "Create and edit OAuth clients", category: "external" },
+
 ] as const;
 
 export type PermissionCode = (typeof PERMISSIONS)[number]["code"];

@@ -41,6 +41,16 @@ enum RoleGrantKind {
   LEADER
 }
 
+// Wie mag inloggen bij een OAuth-client.
+// OPEN: elk actief lid; permissies bepalen enkel wat je er méér mag (de
+// cudi-tool). RESTRICTED: enkel wie de `<namespace>.access`-permissie van die
+// client houdt, geraakt er binnen (de interne wiki). De blokkade zit in de
+// autorisatieflow zelf, niet in de applicatie.
+enum SsoAccessMode {
+  OPEN
+  RESTRICTED
+}
+
 enum PageAssetKind {
   EMBEDDED_PDF
   DOWNLOAD
@@ -379,6 +389,14 @@ model User {
   ticketScans              TicketScanLog[]         @relation("TicketScanActor")
   ticketAuditLogs          TicketAuditLog[]        @relation("TicketAuditActor")
   checkedInTickets         Ticket[]                @relation("TicketCheckedInBy")
+
+  //Oauth / SSO fields
+  oauthClients             OauthClient[]
+  oauthRefreshTokens       OauthRefreshToken[]
+  oauthAccessTokens        OauthAccessToken[]
+  oauthConsents            OauthConsent[]
+  ssoAuditLogs             SsoAuditLog[]
+  ssoClientPermissions     SsoUserClientPermission[]
 }
 
 model Group {
@@ -410,6 +428,7 @@ model Group {
   dashboardTiles    DashboardTile[]
   ownedTicketEvents TicketEvent[]           @relation("TicketEventOwnerGroup")
   ticketEventGrants TicketEventGroupGrant[]
+  ssoGrants         SsoGroupClientPermission[]
 
   uitleenReservations UitleenReservation[]
   uitleenTransport    UitleenTransportBooking[]
@@ -468,6 +487,7 @@ model Role {
   users       UserRole[]
   groupGrants GroupRole[]
   pageGrants  PageEditorRole[]
+  ssoGrants   SsoRoleClientPermission[]
 }
 
 model RolePermission {
@@ -1901,15 +1921,17 @@ model KulAuthLog {
 // -----------------------------------------------------------------------------
 
 model Session {
-  id        String   @id
-  token     String
-  expiresAt DateTime
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  ipAddress String?
-  userAgent String?
-  userId    String
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id                 String              @id
+  token              String
+  expiresAt          DateTime
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+  ipAddress          String?
+  userAgent          String?
+  userId             String
+  user               User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  oauthRefreshTokens OauthRefreshToken[]
+  oauthAccessTokens  OauthAccessToken[]
 
   @@unique([token])
   @@index([userId])
@@ -1946,4 +1968,264 @@ model Verification {
 
   @@index([identifier])
   @@map("verification")
+}
+
+//JWT plugin
+model Jwks {
+  id         String    @id
+  publicKey  String
+  privateKey String
+  createdAt  DateTime  @db.Timestamptz(3)
+  expiresAt  DateTime? @db.Timestamptz(3)
+
+  @@map("jwks")
+}
+
+//SSO-provider
+model OauthClient {
+  id                      String              @id
+  clientId                String              @unique
+  clientSecret            String?
+  disabled                Boolean?
+  skipConsent             Boolean?
+  enableEndSession        Boolean?
+  subjectType             String?
+  scopes                  String[]
+  user                    User?               @relation(fields: [userId], references: [id])
+  userId                  String?
+  referenceId             String?
+  createdAt               DateTime?           @db.Timestamptz(3)
+  updatedAt               DateTime?           @db.Timestamptz(3)
+  name                    String?
+  uri                     String?
+  icon                    String?
+  contacts                String[]
+  tos                     String?
+  policy                  String?
+  softwareId              String?
+  softwareVersion         String?
+  softwareStatement       String?
+  redirectUris            String[]
+  postLogoutRedirectUris  String[]
+  tokenEndpointAuthMethod String?
+  grantTypes              String[]
+  responseTypes           String[]
+  public                  Boolean?
+  type                    String?
+  requirePKCE             Boolean?
+  metadata                Json?
+
+  /// Wie hier mag inloggen; zie SsoAccessMode. Staat bewust op deze tabel en
+  /// niet in een aparte VTK-tabel: de poort draait op het hete pad van élke
+  /// autorisatie en moet zonder join te beantwoorden zijn. De plugin negeert
+  /// kolommen die ze niet kent.
+  accessMode              SsoAccessMode       @default(OPEN)
+  /// Prefix waarop de permissiecodes van deze client gevalideerd worden
+  /// ("wiki" -> wiki.read, wiki.access). Null zolang er geen vocabulaire is.
+  permissionNamespace     String?
+
+  oauthRefreshTokens      OauthRefreshToken[]
+  oauthAccessTokens       OauthAccessToken[]
+  oauthConsents           OauthConsent[]
+  clientPermissions       SsoClientPermission[]
+
+  @@map("oauthClient")
+}
+
+/// Het permissievocabulaire dat één client zelf definieert (`wiki.read`,
+/// `cudi.admin`). Bewust géén VTK-permissies: dit zegt wat een lid mag binnen
+/// die ene applicatie, niet wat het binnen VTK mag.
+model SsoClientPermission {
+  id       String      @id @default(cuid())
+  client   OauthClient @relation(fields: [clientId], references: [clientId], onDelete: Cascade)
+  clientId String
+
+  code          String
+  labelNl       String
+  labelEn       String
+  descriptionNl String?
+  descriptionEn String?
+
+  /// De `<namespace>.access`-rij die toegang verleent tot een RESTRICTED client.
+  /// Wordt automatisch aangemaakt en mag niet verwijderd worden zolang de client
+  /// beperkt is: ze weghalen sluit iedereen buiten.
+  system Boolean @default(false)
+  /// Verbergt de code in toekenningsformulieren maar laat bestaande
+  /// toekenningen werken. Veiliger dan verwijderen; zie ontwerp 9.7.
+  deprecated Boolean @default(false)
+
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  userGrants  SsoUserClientPermission[]
+  roleGrants  SsoRoleClientPermission[]
+  groupGrants SsoGroupClientPermission[]
+
+  @@unique([clientId, code])
+  @@index([clientId, deprecated])
+}
+
+/// Directe toekenning aan één lid. Deze reset NIET op 15 juli: een grant aan de
+/// ene persoon die een integratie onderhoudt is geen werkingsjaar-begrip, en
+/// elke partnertoepassing 's nachts leegmaken is een storing die niemand zag
+/// aankomen. Gebruik `expiresAt` voor wat wél tijdelijk is. Zie ontwerp 9.5.
+model SsoUserClientPermission {
+  id           String              @id @default(cuid())
+  permission   SsoClientPermission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+  permissionId String
+  /// Gedenormaliseerd zodat de hete query (userId + clientId) één indexlookup is.
+  clientId     String
+  user         User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId       String
+
+  grantedByUserId String?
+  grantedAt       DateTime  @default(now())
+  expiresAt       DateTime?
+  note            String?
+
+  @@unique([permissionId, userId])
+  @@index([userId, clientId])
+  @@index([clientId])
+  @@index([expiresAt])
+}
+
+/// Toekenning via een VTK-rol. Werkingsjaar-gescoped via UserRole, dus deze
+/// erft de 15-juli-reset.
+model SsoRoleClientPermission {
+  id           String              @id @default(cuid())
+  permission   SsoClientPermission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+  permissionId String
+  clientId     String
+  role         Role                @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  roleId       String
+
+  grantedByUserId String?
+  grantedAt       DateTime @default(now())
+
+  @@unique([permissionId, roleId])
+  @@index([roleId, clientId])
+}
+
+/// Toekenning via een post. LEADER geldt enkel voor de verantwoordelijke,
+/// exact zoals GroupRole dat voor rollen doet. Ook werkingsjaar-gescoped.
+model SsoGroupClientPermission {
+  id           String              @id @default(cuid())
+  permission   SsoClientPermission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+  permissionId String
+  clientId     String
+  group        Group               @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  groupId      String
+  kind         RoleGrantKind       @default(DEFAULT)
+
+  grantedByUserId String?
+  grantedAt       DateTime @default(now())
+
+  @@unique([permissionId, groupId, kind])
+  @@index([groupId, clientId])
+}
+
+model OauthRefreshToken {
+  id                String             @id
+  token             String             @unique
+  client            OauthClient        @relation(fields: [clientId], references: [clientId], onDelete: Cascade)
+  clientId          String
+  session           Session?           @relation(fields: [sessionId], references: [id])
+  sessionId         String?
+  user              User               @relation(fields: [userId], references: [id])
+  userId            String
+  referenceId       String?
+  scopes            String[]
+  revoked           DateTime?          @db.Timestamptz(3)
+  authTime          DateTime?          @db.Timestamptz(3)
+  createdAt         DateTime           @db.Timestamptz(3)
+  expiresAt         DateTime           @db.Timestamptz(3)
+  oauthAccessTokens OauthAccessToken[]
+
+  // De plugin declareert deze indexen wel, de Prisma-modellen droegen ze niet.
+  // Ze bedienen de hete paden: token-uitwisseling zoekt op clientId/userId, en
+  // de opkuis van verlopen tokens scant op expiresAt.
+  @@index([clientId])
+  @@index([userId])
+  @@index([sessionId])
+  @@index([expiresAt])
+  @@map("oauthRefreshToken")
+}
+
+model OauthAccessToken {
+  id          String             @id
+  token       String             @unique
+  client      OauthClient        @relation(fields: [clientId], references: [clientId], onDelete: Cascade)
+  clientId    String
+  session     Session?           @relation(fields: [sessionId], references: [id])
+  sessionId   String?
+  refresh     OauthRefreshToken? @relation(fields: [refreshId], references: [id], onDelete: SetNull)
+  refreshId   String?
+  user        User?              @relation(fields: [userId], references: [id])
+  userId      String?
+  referenceId String?
+  scopes      String[]
+  createdAt   DateTime           @db.Timestamptz(3)
+  expiresAt   DateTime           @db.Timestamptz(3)
+
+  @@index([clientId])
+  @@index([userId])
+  @@index([sessionId])
+  @@index([refreshId])
+  @@index([expiresAt])
+  @@map("oauthAccessToken")
+}
+
+model OauthConsent {
+  id          String      @id
+  user        User        @relation(fields: [userId], references: [id])
+  userId      String
+  client      OauthClient @relation(fields: [clientId], references: [clientId], onDelete: Cascade)
+  clientId    String
+  referenceId String?
+  scopes      String[]
+  createdAt   DateTime    @db.Timestamptz(3)
+  updatedAt   DateTime    @db.Timestamptz(3)
+
+  // De uniciteit van een toestemming (clientId, userId, referenceId) staat NIET
+  // hier maar als expressie-index in de migratie: Postgres beschouwt NULL's als
+  // onderling verschillend, dus een gewone @@unique zou net het courante geval
+  // (referenceId IS NULL) ongemoeid laten en duplicaten toelaten. De migratie
+  // gebruikt COALESCE("referenceId",'').
+  @@index([clientId])
+  @@index([userId])
+  @@map("oauthConsent")
+}
+
+/// Wie heeft wat gewijzigd aan welke OAuth-client. Bewust geen veld-diffs: het
+/// SSO-team is klein, en de vraag is in de praktijk "wie zette dit aan en
+/// wanneer", niet "welke byte veranderde".
+///
+/// Deze log is de enige verantwoording die er is: iedereen met
+/// `oauth.client.edit` mag elke client bewerken, dus er is geen eigenaar of
+/// fijnmazig recht dat een wijziging nog tegenhoudt.
+model SsoAuditLog {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+
+  actor   User?   @relation(fields: [actorId], references: [id], onDelete: SetNull)
+  actorId String?
+  /// Naam op het moment van de actie. Los van de relatie, zodat de regel
+  /// leesbaar blijft nadat het lid verwijderd is.
+  actorName String
+
+  /// Geen relatie naar OauthClient: een verwijderde client moet juist in de log
+  /// blijven staan, en een FK zou die regel mee weggooien of het verwijderen
+  /// blokkeren.
+  clientId   String
+  clientName String
+
+  /// create | update | rotate-secret | enable | disable | delete | revoke-tokens
+  action String
+  /// Korte, leesbare samenvatting, bv. "redirect-URI's gewijzigd".
+  summary String?
+
+  @@index([createdAt])
+  @@index([clientId])
+  @@map("ssoAuditLog")
 }

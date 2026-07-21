@@ -4,39 +4,155 @@
  * @author Witse Panneels
  * @date 2026-06-19
  */
-import { betterAuth } from "better-auth";
-import { prismaAdapter } from "better-auth/adapters/prisma";
-import { genericOAuth } from "better-auth/plugins";
-import { APIError } from "better-auth/api";
-import { prisma } from "@vtk/db";
-import { nextCookies } from "better-auth/next-js";
+import { betterAuth } from 'better-auth';
+import { prismaAdapter } from 'better-auth/adapters/prisma';
+import { genericOAuth, jwt } from 'better-auth/plugins';
+import { APIError } from 'better-auth/api';
+import { oauthProvider, getOAuthProviderState } from '@better-auth/oauth-provider';
+import { prisma } from '@vtk/db';
+import { nextCookies } from 'better-auth/next-js';
+import { hasSSOPrivileges } from './server/sso';
+import { resolveClaims } from './server/claims';
+import { checkClientAccess } from './server/clientAccess';
 
-import { hashPassword, verifyPassword } from "./logins/password";
-import { kulOAuthConfig, KUL_PROVIDER_ID } from "./logins/kul";
+import { hashPassword, verifyPassword } from './logins/password';
+import { kulOAuthConfig, KUL_PROVIDER_ID } from './logins/kul';
+import { AUTH_BASE_PATH, OAUTH_CLIENT_OWNER, SCOPE_CODES } from './index';
 
-const isProduction = process.env.NODE_ENV === "production";
+const isProduction = process.env.NODE_ENV === 'production';
 
 const kulConfig = kulOAuthConfig();
 
 export const auth = betterAuth({
-  appName: "VTK",
+  appName: 'VTK',
   baseURL: process.env.BETTER_AUTH_URL,
-  basePath: "/api/auth/better",
+  basePath: AUTH_BASE_PATH,
   secret: process.env.BETTER_AUTH_SECRET,
-  trustedOrigins: isProduction
-    ? ["https://*.vtk.be"]
-    : ["http://localhost:3000", "http://localhost:3001"],
+  trustedOrigins: isProduction ? ['https://*.vtk.be'] : ['http://localhost:3000', 'http://localhost:3001'],
 
   database: prismaAdapter(prisma, {
-    provider: "postgresql",
+    provider: 'postgresql',
   }),
 
   // nextCookies must stay last. The KU Leuven OIDC provider is only registered
   // when its env vars are present (see logins/kul.ts).
   plugins: [
     ...(kulConfig ? [genericOAuth({ config: [kulConfig] })] : []),
+    jwt({ disableSettingJwtHeader: true }),
+    oauthProvider({
+      // Padden zonder locale-prefix: de proxy herschrijft die naar /nl, zodat
+      // de Nederlandse URL's schoon blijven. De plugin plakt de ondertekende
+      // autorisatie-query erachter; die query draagt de volledige flowstatus.
+      loginPage: '/inloggen',
+      consentPage: '/inloggen/consent',
+
+      // ── Toegangspoort ─────────────────────────────────────────────────────
+      // LET OP: dit is de registratie-haak, en we gebruiken ze als
+      // toegangscontrole. Dat is bewust, en het is de enige plek die werkt.
+      //
+      // De plugin heeft geen haak die "mag deze gebruiker bij deze client" kan
+      // beantwoorden. Wat we nodig hadden is een punt dat draait op ELKE
+      // doorgang door authorize, ook wanneer het toestemmingsscherm wordt
+      // overgeslagen. Er is er precies één:
+      //
+      //   · een check op ons consent-scherm valt open voor clients met
+      //     `skipConsent` en voor leden die al eerder toestemden; in beide
+      //     gevallen komt de plugin daar nooit;
+      //   · een `hooks.before` op /oauth2/authorize vangt de eerste browserhit,
+      //     maar de consent-postback roept authorize rechtstreeks als functie
+      //     aan en gaat dus niet door de router;
+      //   · `signup.shouldRedirect` draait ongeconditioneerd, vóór zowel de
+      //     `skipConsent`-sluiproute als de bestaande-toestemming-sluiproute.
+      //
+      // Een string teruggeven betekent "stuur naar deze pagina"; de plugin plakt
+      // de ondertekende query erachter, dus de blokpagina weet over welke app
+      // het gaat. Verplaats dit niet naar een andere haak zonder de volgorde in
+      // `authorizeEndpoint` opnieuw na te lezen; de integratietest
+      // apps/web/test/integration/sso-client-permissions.integration.ts legt de
+      // toegangsregel zelf vast.
+      signup: {
+        page: '/inloggen/geen-toegang',
+        shouldRedirect: async ({ user }) => {
+          const state = await getOAuthProviderState();
+          const clientId = state?.query ? new URLSearchParams(state.query).get('client_id') : null;
+          // Geen client in beeld: dit is geen autorisatieflow, dus niets te
+          // blokkeren. Doorlaten en de plugin haar werk laten doen.
+          if (!clientId) return false;
+
+          const { allowed } = await checkClientAccess(user.id, clientId);
+          return allowed ? false : '/inloggen/geen-toegang';
+        },
+      },
+
+      // Elk token dat `entitlements` draagt vervalt na tien minuten (ontwerp
+      // 10.6). Dat is het antwoord op "hoe lang blijft een ingetrokken
+      // permissie werken": tien minuten, altijd, zonder dat de client iets moet
+      // doen. Een gewoon `openid profile`-token houdt zijn volle uur.
+      scopeExpirations: { entitlements: 600 },
+      // De scope-registry (lib/scopes.ts) is de bron; zonder deze regel staat de
+      // plugin enkel haar vier standaardscopes toe en faalt het aanmaken van een
+      // client met bv. `vtk:study_programme` op `invalid_scope`.
+      scopes: [...SCOPE_CODES],
+
+      // Welke claims onder welke scope vrijkomen, staat in lib/claims.ts. De
+      // meeste zitten enkel in UserInfo en niet in het ID token: dat wordt één
+      // keer uitgegeven en veroudert, terwijl UserInfo live opgehaald wordt.
+      customIdTokenClaims: async ({ user, scopes }) =>
+        resolveClaims({ destination: 'id_token', userId: user.id, scopes: [...scopes] }),
+
+      // `jwt` is de payload van het access token waarmee UserInfo opgehaald
+      // wordt; `azp` is de client die het kreeg. Dat is de enige plek waar de
+      // client bekend is, en dus de enige plek waar de `permissions`-claim
+      // opgelost kan worden.
+      customUserInfoClaims: async ({ user, scopes, jwt }) =>
+        resolveClaims({
+          destination: 'userinfo',
+          userId: user.id,
+          scopes: [...scopes],
+          clientId: typeof jwt?.azp === 'string' ? jwt.azp : undefined,
+        }),
+
+      customAccessTokenClaims: async ({ user, scopes }) =>
+        user ? resolveClaims({ destination: 'access_token', userId: user.id, scopes: [...scopes] }) : {},
+
+      // Clients zijn van VTK, niet van de persoon die ze aanmaakte. De plugin
+      // hangt eigenaarschap aan `userId` OF aan deze referentie, en weigert
+      // verwijderen en secret-rotatie wanneer beide leeg zijn. Een vaste waarde
+      // maakt elke beheerder eigenaar van elke client, wat hier de bedoeling is.
+      // Bewust een constante: de plugin roept deze hook niet overal met dezelfde
+      // argumenten aan, dus negeren we ze.
+      clientReference: () => OAUTH_CLIENT_OWNER,
+
+      // Bewust alles-of-niets: binnen IT heeft iedereen dezelfde rechten, dus
+      // een map per action zou een verschil suggereren dat niet bestaat.
+      clientPrivileges: async ({ action, headers, user, session }) => {
+        return hasSSOPrivileges(headers); // alle actions zijn enkel toegankelijk voor admins (IT en G5)
+      },
+
+      // Herkenbaar voor secret scanners. De prefix wordt niet mee opgeslagen,
+      // dus dit moet vastliggen vóór de eerste echte client: achteraf toevoegen
+      // maakt elke bestaande token ongeldig.
+      prefix: {
+        opaqueAccessToken: 'vtk_at_',
+        refreshToken: 'vtk_rt_',
+        clientSecret: 'vtk_cs_',
+      },
+
+      // Optioneel: zonder deze env-var adverteert discovery enkel
+      // subject_type "public" en kan geen client op "pairwise" staan. De
+      // plugin eist minstens 32 tekens en gooit anders bij het opbouwen van
+      // `auth`. Behandel de waarde als BETTER_AUTH_SECRET: raakt ze kwijt, dan
+      // breekt in één klap elke accountkoppeling van elke pairwise client.
+      pairwiseSecret: process.env.OAUTH_PAIRWISE_SECRET,
+      // De issuer draagt een pad, dus hoort discovery onder basePath en niet op
+      // de host-root; de plugin serveert dat al. Enkel de RFC 8414-variant valt
+      // buiten de /api/auth-catch-all, en die rewrite de proxy. Zie 16.3.
+      silenceWarnings: { oauthAuthServerConfig: true },
+    }),
     nextCookies(),
   ],
+
+  disabledPaths: ['/token'], //disable for Oauth
 
   emailAndPassword: {
     enabled: true,
@@ -73,7 +189,7 @@ export const auth = betterAuth({
             select: { active: true },
           });
           if (!user?.active) {
-            throw new APIError("FORBIDDEN", { message: "INACTIVE_USER" });
+            throw new APIError('FORBIDDEN', { message: 'INACTIVE_USER' });
           }
           return { data: session };
         },
@@ -87,7 +203,7 @@ export const auth = betterAuth({
   },
 
   advanced: {
-    cookiePrefix: "vtk",
+    cookiePrefix: 'vtk',
     useSecureCookies: isProduction,
     crossSubDomainCookies: {
       enabled: isProduction,
@@ -119,23 +235,23 @@ export const auth = betterAuth({
         defaultValue: false,
       },
       avatarKey: {
-        type: "string",
+        type: 'string',
         required: false,
         input: false,
       },
       locale: {
-        type: "string",
+        type: 'string',
         required: false,
-        defaultValue: "NL",
+        defaultValue: 'NL',
       },
       active: {
-        type: "boolean",
+        type: 'boolean',
         required: false,
         defaultValue: true,
         input: false,
       },
       isSuperAdmin: {
-        type: "boolean",
+        type: 'boolean',
         required: false,
         defaultValue: false,
         input: false,

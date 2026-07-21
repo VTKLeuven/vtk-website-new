@@ -88,6 +88,15 @@ permissie toevoegt (registry in `packages/db/src/permissions.ts` + seed) en hoe 
 checkt (`requirePermission` / `hasPermission`, getypeerd op de `Permission`-union). Lees dit
 voor je iets aan auth, admin-schermen of permissie-checks wijzigt.
 
+# VTK als SSO-provider
+
+`docs/sso.md` is de referentie voor OAuth2/OIDC: welke scopes en claims we uitgeven,
+hoe de toegangspoort per applicatie werkt (open vs. beperkt, `<namespace>.access`),
+hoe per-client permissies toegekend worden, en wat er bewust níét gebouwd is. Lees
+zeker de sectie "Vallen waar we in gelopen zijn" voor je aan `packages/auth`, het
+toestemmingsscherm of de plugin-config komt; die punten hebben allemaal ooit tijd
+gekost en een paar ervan falen stil.
+
 # Styling Guidelines
 
 Use `design/new-design.html` as the visual source of truth for VTK surfaces.
