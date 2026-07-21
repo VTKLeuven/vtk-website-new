@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Input, Label, Textarea } from "@vtk/ui";
+import { Input, Label } from "@vtk/ui";
 import { SaveForm } from "@/components/ui/SaveForm";
 import { DeleteButton, DeleteIconButton } from "@/components/ui/DeleteIconButton";
 import { CheckboxChip } from "@/components/profile/StudyFieldset";
@@ -17,19 +17,15 @@ export type Rep = {
   name: string;
   email: string;
   avatarUrl: string | null;
-  role: string | null;
 };
 
 export type PocRow = {
   id: string;
   slug: string;
-  studyTrack: string;
   name: string;
   nameNl: string;
   nameEn: string;
-  description: string | null;
-  descriptionNl: string;
-  descriptionEn: string;
+  email: string;
   order: number;
   studyProgrammes: string[];
   reps: Rep[];
@@ -40,9 +36,9 @@ export type PocRow = {
 export type ProgrammeOption = { value: string; label: string };
 
 /**
- * De richtingen waar deze POC voor staat. Dit is de koppeling die de homepage
- * gebruikt om leden de POC's van hun eigen richtingen te tonen; `studyTrack`
- * ernaast blijft de vrije tekst die op de POC-pagina zelf verschijnt.
+ * De richtingen waar deze POC voor staat. Dit is de enige koppeling met een
+ * studierichting: de homepage gebruikt ze om leden de POC's van hun eigen
+ * richtingen te tonen.
  */
 function ProgrammesField({
   options,
@@ -55,14 +51,14 @@ function ProgrammesField({
 }) {
   const chosen = new Set(selected);
   return (
-    <div>
+    <div className="@container">
       <Label>{nl ? "Richtingen" : "Study programmes"}</Label>
       <p className="mb-2 text-xs text-[#5c667f]">
         {nl
           ? "Leden zien deze POC op de homepage wanneer ze een van deze richtingen op hun profiel hebben staan. Zonder richting verschijnt de POC daar bij niemand."
           : "Members see this POC on the homepage when one of these programmes is on their profile. Without a programme it appears for no one there."}
       </p>
-      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
+      <div className="grid grid-cols-1 gap-2 @md:grid-cols-2 @3xl:grid-cols-3">
         {options.map((option) => (
           <CheckboxChip
             key={option.value}
@@ -167,15 +163,16 @@ export function PocsTable({
             onSuccess={() => setCreateOpen(false)}
           >
             <div><Label>Slug</Label><Input name="slug" required placeholder="computerwetenschappen" /></div>
-            <div><Label>{nl ? "Studierichting" : "Study track"}</Label><Input name="studyTrack" required placeholder={nl ? "bv. Computer Science" : "e.g. Computer Science"} /></div>
+            <div><Label>{nl ? "Volgorde" : "Order"}</Label><Input name="order" type="number" defaultValue={pocs.length} /></div>
             <div><Label>{nl ? "Naam (NL)" : "Name (NL)"}</Label><Input name="nameNl" required /></div>
             <div><Label>{nl ? "Naam (EN)" : "Name (EN)"}</Label><Input name="nameEn" /></div>
-            <div className="md:col-span-2"><Label>{nl ? "Beschrijving (NL)" : "Description (NL)"}</Label><Textarea name="descriptionNl" rows={2} /></div>
-            <div className="md:col-span-2"><Label>{nl ? "Beschrijving (EN)" : "Description (EN)"}</Label><Textarea name="descriptionEn" rows={2} /></div>
+            <div className="md:col-span-2">
+              <Label>{nl ? "E-mailadres van de POC" : "POC email address"}</Label>
+              <Input name="email" type="email" placeholder="wtk-poc@vtk.be" autoComplete="off" />
+            </div>
             <div className="md:col-span-2">
               <ProgrammesField options={programmeOptions} selected={[]} nl={nl} />
             </div>
-            <div><Label>{nl ? "Volgorde" : "Order"}</Label><Input name="order" type="number" defaultValue={pocs.length} /></div>
           </SaveForm>
         </Modal>
       )}
@@ -225,7 +222,6 @@ function PocRowView({
                 <span className="font-medium text-vtk-ink">{poc.name}</span>
                 <code className="rounded bg-vtk-blue-soft/60 px-1.5 py-0.5 text-[11px] text-[#5c667f]">{poc.slug}</code>
               </div>
-              <div className="mt-0.5 text-xs text-[#5c667f]">{poc.studyTrack}</div>
             </div>
           </div>
         </td>
@@ -283,7 +279,6 @@ function PocDetail({
                       <div className="min-w-0 flex-1">
                         <div className="truncate text-sm font-medium text-vtk-ink">
                           {r.name}
-                          {r.role ? <span className="ml-1 text-xs font-normal text-[#5c667f]">· {r.role}</span> : null}
                         </div>
                         <div className="truncate text-xs text-[#5c667f]">{r.email}</div>
                       </div>
@@ -316,7 +311,6 @@ function PocDetail({
                 <li key={r.id} className="flex items-center gap-2 rounded-full border border-vtk-blue/12 bg-white py-1 pl-1 pr-3">
                   <Avatar name={r.name} avatarUrl={r.avatarUrl} sm />
                   <span className="text-sm text-vtk-ink">{r.name}</span>
-                  {r.role ? <span className="text-xs text-[#5c667f]">· {r.role}</span> : null}
                 </li>
               ))}
             </ul>
@@ -338,13 +332,14 @@ function PocDetail({
             {...saveLabels}
           >
             <input type="hidden" name="id" value={poc.id} />
-            <div className="md:col-span-2"><Label>{nl ? "Naam (NL)" : "Name (NL)"}</Label><Input name="nameNl" defaultValue={poc.nameNl} required /></div>
-            <div className="md:col-span-2"><Label>{nl ? "Naam (EN)" : "Name (EN)"}</Label><Input name="nameEn" defaultValue={poc.nameEn} /></div>
-            <div className="md:col-span-2"><Label>{nl ? "Volgorde" : "Order"}</Label><Input name="order" type="number" defaultValue={poc.order} /></div>
+            <div className="md:col-span-3"><Label>{nl ? "Naam (NL)" : "Name (NL)"}</Label><Input name="nameNl" defaultValue={poc.nameNl} required /></div>
+            <div className="md:col-span-3"><Label>{nl ? "Naam (EN)" : "Name (EN)"}</Label><Input name="nameEn" defaultValue={poc.nameEn} /></div>
             <div className="md:col-span-3"><Label>Slug</Label><Input name="slug" defaultValue={poc.slug} required /></div>
-            <div className="md:col-span-3"><Label>{nl ? "Studierichting" : "Study track"}</Label><Input name="studyTrack" defaultValue={poc.studyTrack} required /></div>
-            <div className="md:col-span-6"><Label>{nl ? "Beschrijving (NL)" : "Description (NL)"}</Label><Textarea name="descriptionNl" defaultValue={poc.descriptionNl} rows={2} /></div>
-            <div className="md:col-span-6"><Label>{nl ? "Beschrijving (EN)" : "Description (EN)"}</Label><Textarea name="descriptionEn" defaultValue={poc.descriptionEn} rows={2} /></div>
+            <div className="md:col-span-3"><Label>{nl ? "Volgorde" : "Order"}</Label><Input name="order" type="number" defaultValue={poc.order} /></div>
+            <div className="md:col-span-6">
+              <Label>{nl ? "E-mailadres van de POC" : "POC email address"}</Label>
+              <Input name="email" type="email" defaultValue={poc.email} placeholder="wtk-poc@vtk.be" autoComplete="off" />
+            </div>
             <div className="md:col-span-6">
               <ProgrammesField options={programmeOptions} selected={poc.studyProgrammes} nl={nl} />
             </div>

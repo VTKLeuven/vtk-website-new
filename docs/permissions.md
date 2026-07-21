@@ -187,15 +187,24 @@ table whose rows expand into per-category editors, with create/import in modals.
 | Screen | Gate | Notes |
 |--------|------|-------|
 | `/admin/roles` (`RolesTable`) | `roles.manage` | Row = role + effective holder count. Expands to: direct holders, posts that grant it (edit needs `groups.manage`), permissions. |
-| `/admin/groepen` (`PostsTable`) | `groups.manage` | Per working-year tabs. Row = post + member count. Expands to: members, roles this post grants (DEFAULT/LEADER), post settings (incl. `active`). Posts are deactivated, never hard-deleted. |
+| `/admin/groepen` (`PostsTable`) | `groups.manage` | Per working-year tabs. Row = post + member count. Expands to: members, roles this post grants (DEFAULT/LEADER), post settings (incl. `active`). Posts are deactivated, never hard-deleted. Filtered to `Group.type = PRAESIDIUM`. |
+| `/admin/werkgroepen` (`WerkgroepenTable`) | `werkgroepen.manage` **or** werkgroep member | Werkgroepen = `Group` with `type = WERKGROEP`. Managers see all and manage members/roles/settings like posts; a plain member sees only their own werkgroep(s) and may edit just the info text + website (`saveWerkgroepInfoAction`, scoped to their own membership). Public page: `/werkgroepen`. |
 | `/admin/gebruikers` | `users.view` (edit needs `users.edit`) | **Server-driven** table (URL `?q&sort&dir&page`, `count` + `findMany` with `take`/`skip`, no memberships join) — built to scale to tens of thousands of users. Editing opens `/admin/gebruikers/[id]`. |
 | `/admin/pocs` (`PocsTable`) | `pocs.manage` | Row = POC + representative count. Expands to representatives (added via the `/api/users/search` typeahead) and POC settings. |
 | `/admin/paginas` (server-rendered table) | `pages.edit` or `pages.editAll` | Lists only the pages the user may edit (role match; editAll/superadmin sees all). Search + sort + pagination run in the DB (25/page); search spans every page the user may edit. Yearly-review pages not yet edited this working year float to the top with a yellow cue. Row → full-page markdown editor (`/admin/paginas/[id]`). "Nieuwe pagina" (title + slug) creates a draft and redirects to its editor. |
 | `/admin/paginas/[id]` (`PageContentEditor`) | `canEditPageContent` | Markdown content (NL/EN) + attachments, plus a settings card for the page's slug, editor roles and yearly flag (same check, not `pages.manage`), and Delete (`pages.delete` **and** `canEditPageContent`). |
 | `/admin/inhoud` (`ContentManager`) | `pages.manage` | Structure only: header categories, which page hangs where, titles, slug, publish, excerpts, editor roles + yearly flag. The tree lists only pages that hang under a category. "Pagina toevoegen" links an **existing** page (search via `/api/admin/pages/search`, `pages.manage`); creating, content, attachments and delete all live in `/admin/paginas`. |
+| `/admin/deur` (door access) | `door.manage` | Usage stats (1/7/30 d), temporary access grants (`DoorAccessGrant`, user typeahead + window), and the full access log (`DoorAccessLog`, incl. denied/unknown scans). |
 
 User pickers everywhere use the server-side typeahead `GET /api/users/search` (capped results), not
 a full user load, so they scale.
+
+The **door** family is separate from the admin screens above: `door.open` (open the door with a
+student card, assigned to roles), `door.remoteOpen` (adds the open-door button to the `/admin`
+dashboard — deliberately *not* implied by `door.open`), and `door.manage` (the tab above). The
+device endpoints `POST /api/door/scan` + `/api/door/logs` are for the Raspberry Pi and authenticate
+on a shared Bearer secret (`getDoorConfig`), not a session; see `docs/design-decisions.md`
+("Deurtoegang") and `infra/door/`.
 
 ## Seeded baseline
 

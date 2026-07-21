@@ -28,6 +28,7 @@ export const PERMISSIONS = [
   { code: "users.edit", labelNl: "Gebruikers bewerken", labelEn: "Edit users", category: "users" },
   { code: "users.bulkImport", labelNl: "Bulk gebruikers importeren", labelEn: "Bulk import users", category: "users" },
   { code: "groups.manage", labelNl: "Posten en hun rollen beheren", labelEn: "Manage posts and their roles", category: "users" },
+  { code: "werkgroepen.manage", labelNl: "Werkgroepen en hun rollen beheren", labelEn: "Manage werkgroepen and their roles", category: "users" },
   { code: "roles.manage", labelNl: "Rollen beheren en toewijzen", labelEn: "Manage and assign roles", category: "users" },
 
   // Mailing lists
@@ -59,6 +60,14 @@ export const PERMISSIONS = [
   // Theokot (cafetaria / broodjesbar)
   { code: "theokot.manage", labelNl: "Theokot beheren (sessies, aanbod, bans, instellingen)", labelEn: "Manage Theokot (sessions, offering, bans, settings)", category: "theokot" },
   { code: "theokot.pickup", labelNl: "Theokot afhaalbalie bedienen", labelEn: "Operate Theokot pickup counter", category: "theokot" },
+
+  // Logistiek (uitleendienst op logistiek.vtk.be)
+  { code: "logistiek.manage", labelNl: "Uitleendienst beheren (inventaris, aanvragen, camionette)", labelEn: "Manage equipment rental (inventory, requests, van)", category: "logistiek" },
+
+  // Deurtoegang (KU Leuven-kaartscanner op de deur)
+  { code: "door.open", labelNl: "Deur openen met studentenkaart", labelEn: "Open the door with a student card", category: "door" },
+  { code: "door.remoteOpen", labelNl: "Deur openen vanaf het dashboard", labelEn: "Open the door from the dashboard", category: "door" },
+  { code: "door.manage", labelNl: "Deurtoegang beheren (logs, tijdelijke toegang)", labelEn: "Manage door access (logs, temporary access)", category: "door" },
 
   // Module access flags (gate submodules via group permissions)
   { code: "modules.logistiek.access", labelNl: "Toegang tot Logistiek module", labelEn: "Access to Logistics module", category: "modules" },

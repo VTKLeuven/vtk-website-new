@@ -14,7 +14,6 @@
     "noPartners": "Nog geen partners.",
     "copyright": "Vlaamse Technische Kring",
     "tagline": "Partner in crime",
-    "taglineAccent": "sinds 1920.",
     "address": "VTK · Vlaamse Technische Kring\nStudentenwijk Arenberg 6/1\n3001 Heverlee · België",
     "colStudy": "Studie",
     "colService": "Service",
@@ -31,12 +30,16 @@
     "linkCareer": "Career",
     "linkMedia": "Media",
     "linkAbout": "Over VTK",
+    "linkPraesidium": "Praesidium",
+    "linkWerkgroepen": "Werkgroepen",
     "linkInstagram": "Instagram",
     "linkFacebook": "Facebook",
     "linkLinkedIn": "LinkedIn",
     "linkShifts": "Shiften",
     "linkSlots": "Tijdsloten Cudi",
-    "linkPrivacy": "Privacy"
+    "linkPrivacy": "Privacy",
+    "linkCookies": "Cookies",
+    "linkCookieSettings": "Cookiekeuze"
   },
   "home": {
     "welcome": "Welkom bij VTK",
@@ -57,6 +60,16 @@
     "title": "Praesidium",
     "lead": "Voorzitter",
     "member": "Lid"
+  },
+  "werkgroepen": {
+    "kicker": "VTK · Werkgroepen",
+    "title": "Werkgroepen",
+    "intro": "De werkgroepen van VTK, elk met hun eigen ploeg.",
+    "lead": "Verantwoordelijke",
+    "member": "Lid",
+    "website": "Website",
+    "empty": "Er zijn nog geen werkgroepen.",
+    "noMembers": "Nog geen leden voor dit werkingsjaar."
   },
   "pocs": {
     "title": "POC's",
@@ -102,7 +115,7 @@
     "cameraOpenFailed": "Camera openen lukt niet in deze browser. Kies een foto of gebruik de cameraknop van je toestel.",
     "cameraNotReady": "De camera is nog niet klaar. Probeer zo meteen opnieuw.",
     "cameraSaveFailed": "Deze browser kon de selfie niet opslaan. Kies een foto als alternatief.",
-    "faceSearchConsent": "Ik geef toestemming om deze foto tijdelijk te gebruiken voor gezichtsherkenning binnen dit album.",
+    "faceSearchConsent": "Ik geef uitdrukkelijk toestemming dat VTK van deze foto tijdelijk een biometrische gezichtstemplate maakt om mij in dit album te zoeken. Mijn selfie en template worden na de zoekopdracht verwijderd.",
     "startFaceSearch": "Zoek matches",
     "processing": "Verwerken...",
     "again": "Opnieuw zoeken",
@@ -161,7 +174,10 @@
     "documentError": "Het document kon niet worden weergegeven.",
     "previousPage": "Vorige pagina",
     "nextPage": "Volgende pagina",
-    "pageCounter": "Pagina {current} van {total}"
+    "pageCounter": "Pagina {current} van {total}",
+    "zoomIn": "Inzoomen",
+    "zoomOut": "Uitzoomen",
+    "resetZoom": "Zoom herstellen"
   },
   "pages": {
     "empty": "Nog geen pagina's",
@@ -191,11 +207,14 @@
     "kicker": "Welkom bij VTK",
     "title": "Vervolledig je profiel",
     "intro": "Nog even dit invullen en je bent helemaal geregistreerd. Je kan deze gegevens later altijd aanpassen bij je account.",
+    "privacyNotice": "We gebruiken je naam en universiteitsmail voor je lidmaatschap en toegang. Studentennummer, adres, geboortedatum, persoonlijke mail, studiegegevens en foto zijn optioneel en worden enkel gebruikt voor de functies die je kiest. Vul dus alleen in wat nodig is.",
+    "privacyLink": "Lees hoe VTK je gegevens gebruikt.",
     "identityHeading": "Naam & studentennummer",
     "firstName": "Voornaam",
     "lastName": "Achternaam",
     "rNumber": "R-nummer",
     "rNumberHint": "Formaat: r gevolgd door 7 cijfers, bv. r0123456.",
+    "rNumberFromKul": "Dit r-nummer komt van je KU Leuven-account en kan je niet aanpassen.",
     "addressHeading": "Kotadres",
     "street": "Straatnaam",
     "houseNumber": "Huisnummer",
@@ -224,6 +243,8 @@
     "programmesHint": "Duid alle richtingen aan die op jou van toepassing zijn.",
     "notAtFaculty": "Ik studeer niet aan de faculteit",
     "notAtFacultyHint": "Duid dit aan als je geen ingenieursopleiding aan de faculteit volgt. Je krijgt dan geen Career-mails, want die zijn op faculteitsstudenten gericht.",
+    "notStudying": "Ik studeer niet (meer)",
+    "notStudyingHint": "Duid dit aan als je afgestudeerd bent of gestopt. Je blijft lid, maar valt uit de studiegerichte mailinglijsten.",
     "submit": "Registratie voltooien",
     "required": "Verplicht veld",
     "saved": "Gegevens opgeslagen",
@@ -275,6 +296,7 @@
     "calendar": "Kalender",
     "users": "Gebruikers",
     "groups": "Posten",
+    "werkgroepen": "Werkgroepen",
     "roles": "Rollen",
     "albums": "Albums",
     "media": "Media",
@@ -286,6 +308,7 @@
     "shortlinks": "Verkorte links",
     "shift": "Shiften",
     "theokot": "Theokot",
+    "door": "Deur",
     "mailinglists": "Mailinglijsten",
     "it": "IT",
     "create": "Nieuw",
@@ -349,41 +372,45 @@
   },
   "privacy": {
     "kicker": "VTK · KU Leuven",
-    "title": "Privacyverklaring ledenportaal",
-    "lead": "Deze verklaring legt uit welke persoonsgegevens VTK verwerkt wanneer je je aanmeldt op het ledenportaal, en waarom.",
-    "updated": "Laatst bijgewerkt op 27 juni 2026.",
+    "title": "Privacyverklaring",
+    "lead": "Deze verklaring legt uit welke persoonsgegevens VTK verwerkt op de publieke website, in het ledenportaal, bij tickets en reservaties, in de logistieke tools en bij optionele gezichtsherkenning.",
+    "updated": "Laatst bijgewerkt op 18 juli 2026.",
     "sections": [
       {
         "heading": "Wie is verantwoordelijk?",
-        "body": "VTK, Vlaamse Technische Kring, Studentenwijk Arenberg 6/1, 3001 Heverlee, België. Voor vragen over je gegevens kan je terecht bij it@vtk.be."
+        "body": "VTK, Vlaamse Technische Kring, Studentenwijk Arenberg 6/1, 3001 Heverlee, België, is de verwerkingsverantwoordelijke. Voor vragen, verzoeken of het intrekken van toestemming kan je terecht bij it@vtk.be."
       },
       {
         "heading": "Welke gegevens verwerken we?",
-        "body": "Wanneer je het ledenportaal gebruikt, verwerken we:\n• je naam en e-mailadres\n• je taalvoorkeur en eventueel je profielfoto\n• je lidmaatschappen en de rechten die daaraan verbonden zijn\n• technische aanmeldgegevens zoals het tijdstip van aanmelden, je IP-adres en je browsertype, om je sessie te beveiligen"
+        "body": "Afhankelijk van de functies die je gebruikt verwerken we:\n• account- en lidmaatschapsgegevens: naam, KU Leuven-mail, taal, r-nummer, rollen en sessiegegevens\n• optionele profielgegevens: adres, geboortedatum, persoonlijke mail, mailvoorkeuren, studieprofiel en profielfoto\n• bestellingen en activiteiten: ticketkoper en deelnemers, antwoorden, betalingen en terugbetalingen, broodjes, shiften, materiaal- en camionettereservaties en bijbehorende nota's\n• toegangs- en beveiligingsgegevens: kaartnummer/naam, deurgebeurtenissen, IP-adres, browser en technische logs\n• fotoalbums: een selfie en biometrische gezichtstemplate, maar alleen als je daarvoor uitdrukkelijk toestemming geeft"
       },
       {
-        "heading": "Waarom verwerken we deze gegevens?",
-        "body": "We gebruiken deze gegevens om je te authenticeren, om je toegang te geven tot de juiste onderdelen van het portaal en om de beveiliging van je account te bewaken. We verwerken je gegevens niet voor reclame en we verkopen ze niet."
+        "heading": "Doelen en rechtsgronden",
+        "body": "We verwerken noodzakelijke account-, ticket- en reservatiegegevens om de gevraagde dienst of overeenkomst uit te voeren. Rollen, fraudepreventie, toegangscontrole en beperkte beveiligingslogs steunen op het gerechtvaardigd belang van VTK om de vereniging en haar systemen veilig te beheren. Boekhoudkundige gegevens bewaren we wanneer een wettelijke verplichting dat vereist. Mailingcategorieën, optionele browserdiagnostiek en gezichtsherkenning gebruiken we alleen op basis van toestemming. Je kan toestemming intrekken zonder dat dit de rechtmatigheid van eerdere verwerking aantast. VTK verkoopt geen persoonsgegevens en gebruikt ze niet voor advertentieprofilering."
       },
       {
         "heading": "Aanmelden met je KU Leuven account",
         "body": "Als je je aanmeldt met je KU Leuven account, deelt de aanmelddienst van de Associatie KU Leuven je naam en je geverifieerde e-mailadres met VTK. We gebruiken dat e-mailadres om je te koppelen aan je bestaande VTK-account. VTK ontvangt je wachtwoord niet."
       },
       {
-        "heading": "Hoelang bewaren we je gegevens?",
-        "body": "Aanmeldsessies verlopen automatisch na uiterlijk 30 dagen. Je accountgegevens bewaren we zolang je lid of medewerker van VTK bent. Daarna worden ze verwijderd of geanonimiseerd, tenzij we ze wettelijk langer moeten bijhouden."
+        "heading": "Gezichtsherkenning in fotoalbums",
+        "body": "Deze optionele functie is standaard uitgeschakeld. Als VTK ze na een gegevensbeschermingseffectbeoordeling inschakelt, moet je vóór elke zoekopdracht uitdrukkelijk toestemmen. De geüploade selfie en daarvan gemaakte tijdelijke template worden na de zoekopdracht verwijderd en een opruimtaak verwijdert achterblijvers uiterlijk na één uur. De albumindex kan gezichtstemplates van afgebeelde personen bevatten; vragen, bezwaar of een verzoek om verwijdering kan je sturen naar it@vtk.be. Er wordt geen beslissing met rechtsgevolg uitsluitend automatisch genomen."
       },
       {
         "heading": "Met wie delen we je gegevens?",
-        "body": "We delen je gegevens enkel met partijen die nodig zijn om de dienst te laten werken, zoals de aanmelddienst van de KU Leuven en onze hostingleverancier, die optreden als verwerker. We delen je gegevens niet met derden voor commerciële doeleinden."
+        "body": "We gebruiken alleen partijen die nodig zijn om de dienst te leveren: KU Leuven/Associatie KU Leuven voor aanmelding en kaartgegevens; onze hosting-, database-, objectopslag- en mailleveranciers; Mollie voor betalingen; de door VTK beheerde Immich-dienst voor albums; en, alleen met browsertoestemming, Sentry voor diagnostiek. YouTube of Vimeo wordt pas gecontacteerd als je externe media start. De concrete leveranciers, locaties en bewaartermijnen worden in het verwerkingsregister bijgehouden. Waar gegevens buiten de EER gaan, moet VTK een adequaatheidsbesluit of passende waarborgen zoals standaardcontractbepalingen gebruiken."
       },
       {
-        "heading": "Je rechten",
-        "body": "Je hebt het recht om je gegevens in te kijken, te laten verbeteren of te laten verwijderen, en om bezwaar te maken tegen de verwerking. Stuur hiervoor een bericht naar it@vtk.be. Je kan ook klacht indienen bij de Gegevensbeschermingsautoriteit."
+        "heading": "Hoelang bewaren we je gegevens?",
+        "body": "Aanmeldsessies verlopen uiterlijk na 30 dagen. Technische deur- en toegangslogs worden standaard na 12 maanden verwijderd; diagnostische ruwe payloads en verzendgegevens worden na 90 dagen opgeschoond en fraudefingerprints na 30 dagen. Account- en lidmaatschapsgegevens blijven zolang ze nodig zijn voor je lidmaatschap en administratie. Ticket-, reservatie- en betalingsgegevens worden daarna verwijderd of geanonimiseerd, behalve waar boekhoud- of andere wetgeving langere bewaring vereist. De bewaartermijnen worden periodiek uitgevoerd via de privacy-onderhoudstaak."
       },
       {
-        "heading": "Wijzigingen aan deze verklaring",
-        "body": "We kunnen deze privacyverklaring aanpassen wanneer de dienst verandert. De datum bovenaan geeft aan wanneer we de tekst laatst hebben bijgewerkt."
+        "heading": "Je rechten en keuzes",
+        "body": "In je account kan je je profiel verbeteren, een kopie van je gegevens downloaden en verwijdering aanvragen. Verwijdering wist je account en anonimiseert persoonsgegevens in transacties die VTK om wettelijke, financiële of integriteitsredenen moet bewaren. Je kan ook inzage, rectificatie, wissing, beperking, overdraagbaarheid of bezwaar vragen via it@vtk.be. VTK kan je identiteit controleren en antwoordt normaal binnen één maand. Je kan klacht indienen bij de Belgische Gegevensbeschermingsautoriteit."
+      },
+      {
+        "heading": "Kinderen en wijzigingen",
+        "body": "De diensten zijn gericht op (toekomstige) studenten en leden. Wanneer toestemming van een minderjarige volgens de toepasselijke regels niet volstaat, moet een ouder of voogd handelen. We passen deze verklaring aan wanneer de dienst of leveranciers wijzigen; de datum bovenaan toont de laatste inhoudelijke update."
       }
     ]
   },

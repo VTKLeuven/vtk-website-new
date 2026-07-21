@@ -200,14 +200,17 @@ export function Modal({ title, onClose, children }: { title: string; onClose: ()
       aria-modal="true"
       onClick={onClose}
     >
-      <div className="w-full max-w-xl rounded-2xl border border-vtk-blue/15 bg-white p-5 shadow-lg" onClick={(e) => e.stopPropagation()}>
-        <div className="mb-4 flex items-center justify-between">
+      <div
+        className="flex max-h-[calc(100dvh-2rem)] w-full max-w-xl flex-col rounded-2xl border border-vtk-blue/15 bg-white shadow-lg"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex shrink-0 items-center justify-between gap-4 border-b border-vtk-blue/10 px-5 py-4">
           <h2 className="text-lg font-semibold text-vtk-ink">{title}</h2>
-          <button type="button" onClick={onClose} className="text-[#5c667f] hover:text-vtk-ink" aria-label="Close">
+          <button type="button" onClick={onClose} className="shrink-0 text-[#5c667f] hover:text-vtk-ink" aria-label="Close">
             <CloseIcon />
           </button>
         </div>
-        {children}
+        <div className="overflow-y-auto px-5 py-4">{children}</div>
       </div>
     </div>
   );

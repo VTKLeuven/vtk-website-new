@@ -1,4 +1,5 @@
 import { notFound } from 'next/navigation';
+import { prisma } from '@vtk/db';
 import { hasLocale } from '@/lib/locale';
 import { requireSession } from '@/lib/session';
 import { getDictionary, type Locale } from '@vtk/i18n';
@@ -27,6 +28,9 @@ type NavGuard = {
   superAdminOnly?: boolean;
   /** Ticketing-tab: zichtbaar bij een eigen event-grant of een globale ticket-permissie. */
   ticketing?: boolean;
+  /** Werkgroepen-tab: zichtbaar voor beheerders (werkgroepen.manage) en voor leden
+   *  van een werkgroep (die zien enkel hun eigen werkgroep, enkel de infotekst). */
+  werkgroep?: boolean;
   /** Enkel bij exacte padmatch actief markeren (voor de dashboard-landing op /admin). */
   exact?: boolean;
 };
@@ -45,6 +49,7 @@ const NAV: NavEntry[] = [
   group('ledenbeheer', [
     item('users', '/gebruikers', { perm: 'users.view' }),
     item('groups', '/groepen', { perm: 'groups.manage' }),
+    item('werkgroepen', '/werkgroepen', { werkgroep: true }),
     item('pocs', '/pocs', { perm: 'pocs.manage' }),
     item('roles', '/roles', { perm: 'roles.manage' }),
   ]),
@@ -64,6 +69,7 @@ const NAV: NavEntry[] = [
   item('shift', '/shiften', { anyPerm: ['shift.edit', 'shift.reward', 'shift.ranking'] }),
   item('theokot', '/theokot', { anyPerm: ['theokot.manage', 'theokot.pickup'] }),
   item('sso', '/sso', { perm: 'oauth.client.edit' }),
+  item('door', '/deur', { perm: 'door.manage' }),
   item('it', '/it', { superAdminOnly: true }),
 ];
 
@@ -92,6 +98,14 @@ export default async function AdminLayout({
     session.permissions.includes('tickets.manageAll') ||
     (await canAccessAnyTicketEvent());
 
+  // Is de gebruiker lid van minstens één werkgroep (huidig werkingsjaar)? Zij
+  // krijgen de Werkgroepen-tab om enkel hun eigen infotekst te bewerken.
+  const werkgroepMember =
+    session.groups.length > 0 &&
+    (await prisma.group.count({
+      where: { type: 'WERKGROEP', id: { in: session.groups.map((g) => g.id) } },
+    })) > 0;
+
   // Mag de huidige gebruiker deze entry zien? Superadmin ziet alles.
   const canSee = (guard: NavGuard): boolean => {
     if (session.user.isSuperAdmin) return true;
@@ -99,6 +113,8 @@ export default async function AdminLayout({
     // Ticketing-tab hangt af van ticket-toegang (eigen grant of globale perm),
     // niet van de gewone admin-permissies. canAccessTickets dekt superadmins al.
     if (guard.ticketing) return canAccessTickets;
+    // Werkgroepen-tab: beheerders óf gewone werkgroepleden.
+    if (guard.werkgroep) return session.permissions.includes('werkgroepen.manage') || werkgroepMember;
     if (guard.anyPerm) return guard.anyPerm.some((p) => session.permissions.includes(p));
     if (guard.perm) return session.permissions.includes(guard.perm);
     return true;

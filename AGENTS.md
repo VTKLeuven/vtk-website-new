@@ -61,3 +61,19 @@ native binding". It has bitten us twice: `@rolldown/binding-*` (fixed in
 ~28k lines and pulling it through the bundler is pathologically slow.
 Import Prisma model types directly from `@prisma/client` at the call site
 if you need them.
+
+# `npm run verify` draait automatisch voor elke push
+
+`.githooks/pre-push` draait `npm run verify` (lockfile-check, `next typegen` +
+`tsc --noEmit`, eslint en de unit tests van `@vtk/web`). Dat zijn dezelfde
+checks als de `verify`-job in `.github/workflows/deploy.yml`, minus wat een
+database, een browser of een volledige build nodig heeft. Een mislukte verify op
+main blokkeert de deploy, dus je wil dat lokaal weten en niet uit de pipeline.
+
+- De hook installeert zichzelf: het `prepare`-script zet bij `npm install`
+  `core.hooksPath` op `.githooks`. Na een verse clone volstaat `npm install`.
+  Handmatig kan ook: `git config core.hooksPath .githooks`.
+- Overslaan doe je met `git push --no-verify` of `SKIP_VERIFY=1 git push`.
+  Enkel doen als je zeker weet dat de checks elders al groen stonden.
+- Voeg je een check toe aan de CI-job, voeg ze dan ook toe aan `npm run verify`
+  wanneer ze zonder database en zonder build kan draaien.

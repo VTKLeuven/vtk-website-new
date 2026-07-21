@@ -2,12 +2,15 @@ import Image from "next/image";
 import Link from "next/link";
 import { prisma } from "@vtk/db";
 import { pick, type Locale } from "@vtk/i18n";
+import { currentWorkingYear } from "@/lib/workingYear";
 import { getVisibleHeaderTabsForNav } from "@/lib/headerTabs";
 import { AANBOD_PHOTOS } from "@/lib/aanbodPhotos";
 import { getMediaContent } from "@/lib/media-content";
 import { videoEmbed } from "@/lib/videoEmbed";
 import { getCurrentSession } from "@/lib/session";
+import { getCursusdienstHours } from "@/lib/cursusdienstHours";
 import { publicUrl } from "@/lib/storage";
+import { BUILTIN_DEFAULT_EVENT_IMAGE, DEFAULT_EVENT_IMAGE_SETTING } from "@/lib/defaultEventImage";
 import { PartnerLogo } from "@/components/site/PartnerLogo";
 import { AftermovieGrid, type AftermovieGridItem } from "./AftermovieGrid";
 import {
@@ -22,6 +25,9 @@ import "@/app/design/vtk-home.css";
 type OpeningHoursSetting = {
   titleNl: string;
   titleEn: string;
+  /** Ondertitel op de homepage-kaart ("Broodjes & warme snacks"), via admin. */
+  subtitleNl?: string;
+  subtitleEn?: string;
   entries: Array<{ dayNl: string; dayEn: string; hours: string }>;
 };
 
@@ -35,9 +41,25 @@ type CareerSetting = {
   ctaUrl?: string;
 };
 
-function academicYearLabel(d: Date): string {
-  const y = d.getMonth() >= 8 ? d.getFullYear() : d.getFullYear() - 1;
+/** "2026-27" voor het werkingsjaar dat op 15 juli begint (zie @vtk/auth). */
+function workingYearLabel(d: Date): string {
+  const y = currentWorkingYear(d);
   return `${y}-${String(y + 1).slice(-2)}`;
+}
+
+/**
+ * Maandlabel bij een dag in de agenda ("sep"), met jaartal zodra de dag in een
+ * ander kalenderjaar valt dan vandaag ("jan '27"), anders staat er enkel een
+ * dagnummer en weet je niet welke maand bedoeld wordt.
+ */
+function monthLabel(d: Date, now: Date, locale: Locale): string {
+  const month = d.toLocaleDateString(locale === "nl" ? "nl-BE" : "en-GB", { month: "short" }).replace(".", "");
+  return d.getFullYear() === now.getFullYear() ? month : `${month} '${String(d.getFullYear()).slice(-2)}`;
+}
+
+/** Gesloten-melding op een openingsurenkaart, met de naam van de dienst erin. */
+function closedLabel(name: string, nl: boolean): string {
+  return nl ? `${name} is momenteel gesloten :(` : `${name} is currently closed :(`;
 }
 
 function dayKey(d: Date, locale: Locale): string {
@@ -60,15 +82,15 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
   const now = new Date();
   const nl = locale === "nl";
 
-  const [settings, upcomingEvents, tabs, partners, media, session] = await Promise.all([
+  const [settings, upcomingEvents, tabs, partners, media, session, cursusEntries] = await Promise.all([
     prisma.setting.findMany({
       where: {
         key: {
           in: [
-            "home.openingHours.cursusdienst",
             "home.openingHours.theokot",
             "home.featuredAlbums",
             "home.career",
+            DEFAULT_EVENT_IMAGE_SETTING,
           ],
         },
       },
@@ -91,6 +113,9 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
     // gecachet. De rest van de pagina deed al een DB-lezing per render, dus dat
     // blijft één ronde extra en geen nieuw soort werk.
     getCurrentSession(),
+    // Cursusdienst-uren komen live van cudi.vtk.be; deze lezing valt terug op de
+    // laatst gecachte waarde en anders op null (kaart toont "niet beschikbaar").
+    getCursusdienstHours(locale),
   ]);
 
   // Aftermovies: `media.aftermovies` is dezelfde instelling als op /media, te
@@ -143,14 +168,23 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
   const pocsWithPeople = myPocs.filter((poc) => poc.representatives.length > 0);
 
   const map = new Map(settings.map((s) => [s.key, s.value as unknown]));
-  const cursus = map.get("home.openingHours.cursusdienst") as OpeningHoursSetting | undefined;
   const theokot = map.get("home.openingHours.theokot") as OpeningHoursSetting | undefined;
+  const cursusUnavailable = cursusEntries === null;
   const career = map.get("home.career") as CareerSetting | undefined;
+  const defaultEventImage =
+    publicUrl((map.get(DEFAULT_EVENT_IMAGE_SETTING) as { imageKey?: string | null } | undefined)?.imageKey) ??
+    BUILTIN_DEFAULT_EVENT_IMAGE;
 
   const theoToday = theokot ? entryForDate(theokot.entries, now, locale) : undefined;
   const theoOpen = theoToday && isOpenAt(theoToday.hours, now);
-  const curToday = cursus ? entryForDate(cursus.entries, now, locale) : undefined;
+  const curToday = cursusEntries ? entryForDate(cursusEntries, now, locale) : undefined;
   const curOpen = curToday && !isClosedHours(curToday.hours) && isOpenAt(curToday.hours, now);
+  // De titel is "Openingsuren Theokot"; de kaartkop en de gesloten-melding
+  // gebruiken enkel de naam zelf.
+  const theokotName = theokot
+    ? pick(theokot.titleNl, theokot.titleEn, locale).replace(/^Openingsuren\s+/i, "")
+    : "";
+  const cursusName = "Cursusdienst";
 
   const eventGroups = upcomingEvents.slice(0, 5).reduce<Array<{ key: string; date: Date; events: typeof upcomingEvents }>>(
     (acc, event) => {
@@ -273,8 +307,8 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
                 : "Events, courses, careers, sandwiches and everything that makes your day on campus more practical. Run by students, since 1920."}
             </p>
             <div className="hero-cta">
-              <Link href={`${base}/over-vtk`} className="btn btn-primary arrow">
-                {nl ? "Word lid" : "Become a member"}
+              <Link href={`${base}/aanbod`} className="btn btn-primary arrow">
+                {nl ? "Ontdek wat we doen" : "Discover what we do"}
               </Link>
               <Link href={`${base}/eerstejaars`} className="btn btn-ghost">
                 {nl ? "Eerstejaars? Start hier" : "First-year? Start here"}
@@ -282,8 +316,8 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
             </div>
             <div className="hero-meta">
               <div className="meta">
-                <div className="k">{nl ? "Editie" : "Edition"}</div>
-                <div className="v">{academicYearLabel(now)}</div>
+                <div className="k">{nl ? "Werkingsjaar" : "Working year"}</div>
+                <div className="v">{workingYearLabel(now)}</div>
               </div>
               <div className="meta">
                 <div className="k">{nl ? "Binnenkort" : "This week"}</div>
@@ -327,6 +361,7 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
                   <div className="day-group" key={group.key}>
                     <div className="day-label">
                       <span className="num">{String(group.date.getDate()).padStart(2, "0")}</span>
+                      <span className="mon">{monthLabel(group.date, now, locale)}</span>
                       <span className="dow">
                         {group.date.toLocaleDateString(locale === "nl" ? "nl-BE" : "en-GB", { weekday: "long" })}
                       </span>
@@ -348,7 +383,11 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
                                 .join(" · ")}
                             </small>
                           </div>
-                          <span className="arrow">→</span>
+                          {/* Eigen klasse: de globale `.arrow` plakt er via ::after
+                              een tweede pijl achter. */}
+                          <span className="ev-go" aria-hidden="true">
+                            →
+                          </span>
                         </>
                       );
                       return (
@@ -392,7 +431,7 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
         </section>
       </div>
 
-      {(theokot || cursus) && (
+      {(theokot || cursusEntries || cursusUnavailable) && (
         <section className="hours-strip">
           <div className="sec-head">
             <h2>{nl ? "Openingsuren." : "Opening hours."}</h2>
@@ -409,10 +448,13 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
           <div className="hours-grid">
             {theokot ? (
               <div className="hours-col">
-                <h3>{pick(theokot.titleNl, theokot.titleEn, locale).replace(/^Openingsuren\s+/i, "")}</h3>
-                <div className="sub">{nl ? "Broodjes & warme snacks" : "Sandwiches & snacks"}</div>
+                <h3>{theokotName}</h3>
+                <div className="sub">
+                  {pick(theokot.subtitleNl, theokot.subtitleEn, locale) ||
+                    (nl ? "Broodjes & warme snacks" : "Sandwiches & snacks")}
+                </div>
                 <div className={`status${theoOpen ? "" : " closed"}`}>
-                  {theoOpen ? (nl ? "Nu open" : "Open now") : nl ? "Gesloten / buiten uren" : "Closed / outside hours"}
+                  {theoOpen ? (nl ? "Nu open" : "Open now") : closedLabel(theokotName, nl)}
                 </div>
                 <dl className="hours-list">
                   {theokot.entries.map((row, i) => {
@@ -427,26 +469,34 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
                 </dl>
               </div>
             ) : null}
-            {cursus ? (
-              <div className="hours-col section-hours-bg">
-                <h3>{pick(cursus.titleNl, cursus.titleEn, locale).replace(/^Openingsuren\s+/i, "")}</h3>
-                <div className="sub">{nl ? "Cursussen & tweedehands" : "Courses & second-hand"}</div>
-                <div className={`status${curOpen ? "" : " closed"}`}>
-                  {curOpen ? (nl ? "Nu open" : "Open now") : nl ? "Gesloten / buiten uren" : "Closed / outside hours"}
+            <div className="hours-col section-hours-bg">
+              <h3>{cursusName}</h3>
+              {cursusEntries ? (
+                <>
+                  <div className="sub">{nl ? "Cursussen & tweedehands" : "Courses & second-hand"}</div>
+                  <div className={`status${curOpen ? "" : " closed"}`}>
+                    {curOpen ? (nl ? "Nu open" : "Open now") : closedLabel(cursusName, nl)}
+                  </div>
+                  <dl className="hours-list">
+                    {cursusEntries.map((row, i) => {
+                      const todayCls = row.dayNl === dutchDayNameForDate(now) ? "today" : "";
+                      return (
+                        <div key={i} style={{ display: "contents" }}>
+                          <dt className={todayCls}>{row.dayNl.slice(0, 2).toUpperCase()}</dt>
+                          <dd className={todayCls}>{row.hours}</dd>
+                        </div>
+                      );
+                    })}
+                  </dl>
+                </>
+              ) : (
+                <div className="sub">
+                  {nl
+                    ? "De cursusdienst openingsuren zijn momenteel niet beschikbaar."
+                    : "The course shop opening hours are currently unavailable."}
                 </div>
-                <dl className="hours-list">
-                  {cursus.entries.map((row, i) => {
-                    const todayCls = row.dayNl === dutchDayNameForDate(now) ? "today" : "";
-                    return (
-                      <div key={i} style={{ display: "contents" }}>
-                        <dt className={todayCls}>{row.dayNl.slice(0, 2).toUpperCase()}</dt>
-                        <dd className={todayCls}>{row.hours}</dd>
-                      </div>
-                    );
-                  })}
-                </dl>
-              </div>
-            ) : null}
+              )}
+            </div>
           </div>
         </section>
       )}
@@ -455,8 +505,7 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
         <div className="sec-head">
           <h2>{nl ? "Wat we doen." : "What we do."}</h2>
           <div className="meta">
-            {nl ? "Werkgroepen en diensten" : "Work groups and services"} ·{" "}
-            <Link href={`${base}/info`}>{nl ? "bekijk alles" : "see all"}</Link>
+            <Link href={`${base}/aanbod`}>{nl ? "bekijk alles" : "see all"}</Link>
           </div>
         </div>
         <div className="aanbod">
@@ -519,7 +568,7 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
           <div className="ev-grid">
             {eventCards.map((event) => {
               const start = new Date(event.start);
-              const photo = publicUrl(event.imageKey) ?? "/default-event.jpg";
+              const photo = publicUrl(event.imageKey) ?? defaultEventImage;
               return (
                 <Link key={event.id} href={`${base}/kalender/${event.id}`} className="evcard">
                   <span className="evcard-media" aria-hidden="true">
@@ -624,23 +673,31 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
       {pocsWithPeople.length > 0 && (
         <section className="section band poc-band">
           <div className="sec-head">
-            <h2>{nl ? "Jouw POC's." : "Your POCs."}</h2>
+            <h2>{nl ? "Jouw richtingsvertegenwoordigers." : "Your student representatives."}</h2>
             <div className="meta">
               {nl ? "Op basis van je richtingen" : "Based on your programmes"} ·{" "}
-              <Link href={`${base}/pocs`}>{nl ? "alle POC's" : "all POCs"}</Link>
+              <Link href={`${base}/pocs`}>{nl ? "bekijk alles" : "see all"}</Link>
             </div>
           </div>
-          <div className="poc-grid">
+          {/* Een lid zit in één POC, soms twee, uitzonderlijk drie; per POC gaat
+              het meestal om 3 tot 8 mensen. De kaart groeit dus in hoogte met het
+              aantal mensen en niet in breedte: `data-groups` bepaalt hoeveel
+              kolommen de band krijgt (zie vtk-home.css). */}
+          <div className="poc-grid" data-groups={Math.min(pocsWithPeople.length, 3)}>
             {pocsWithPeople.map((poc) => (
               <div className="poccard" key={poc.id}>
                 <div className="poccard-head">
                   <h3>{pick(poc.nameNl, poc.nameEn ?? poc.nameNl, locale)}</h3>
-                  <span className="track">{poc.studyTrack}</span>
+                  {/* Studenten mailen de POC als geheel, niet één vertegenwoordiger. */}
+                  {poc.email ? (
+                    <a className="poc-mail" href={`mailto:${poc.email}`}>
+                      {poc.email}
+                    </a>
+                  ) : null}
                 </div>
                 <ul className="poc-people">
                   {poc.representatives.map((rep) => {
                     const avatar = publicUrl(rep.user.avatarKey);
-                    const role = pick(rep.roleNl ?? "", rep.roleEn ?? rep.roleNl ?? "", locale);
                     return (
                       <li key={rep.id}>
                         <span className="poc-face">
@@ -656,7 +713,6 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
                           )}
                         </span>
                         <span className="poc-name">{rep.user.name}</span>
-                        {role ? <span className="poc-role">{role}</span> : null}
                       </li>
                     );
                   })}
@@ -676,9 +732,16 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
             </div>
             <h3>{nl ? "Hoofdpartners" : "Main partners"}</h3>
           </div>
-          <Link href={`${base}/contact`} className="btn btn-ghost arrow">
+          {/* Bedrijven die partner willen worden komen bij VTK Career terecht,
+              niet bij de algemene contactpagina. */}
+          <a
+            href="https://www.career.vtk.be/contact"
+            className="btn btn-ghost arrow"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
             Contact
-          </Link>
+          </a>
         </div>
         <div className="partners-grid">
           {partners.length === 0 ? (

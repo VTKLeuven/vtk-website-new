@@ -1,6 +1,6 @@
 import { hash } from "@node-rs/argon2";
 import { PrismaClient } from "@prisma/client";
-import { GROUP_SEEDS, HEADER_TABS } from "../src/groups";
+import { GROUP_SEEDS, WERKGROEP_SEEDS, HEADER_TABS } from "../src/groups";
 import { PERMISSIONS } from "../src/permissions";
 
 const prisma = new PrismaClient();
@@ -75,7 +75,7 @@ async function main() {
   console.log("Seeding groups...");
   // Create-only: een reseed op een DB met data mag bestaande groepen (naam,
   // slug, volgorde) niet overschrijven. Nieuwe codes worden nog wel aangemaakt.
-  for (const g of GROUP_SEEDS) {
+  for (const g of [...GROUP_SEEDS, ...WERKGROEP_SEEDS]) {
     await prisma.group.upsert({
       where: { code: g.code },
       update: {},
@@ -245,6 +245,18 @@ async function main() {
   await setRolePermissions(theokotRole.id, ["theokot.manage", "theokot.pickup"]);
   await grantRoleToGroup("THEOKOT", theokotRole.id, "DEFAULT");
 
+  // logistiek: de uitleendienst op logistiek.vtk.be beheren.
+  const logistiekRole = await upsertRole(
+    "logistiek",
+    "Logistiek",
+    "Logistics",
+    5,
+    "Uitleendienst beheren op logistiek.vtk.be: inventaris, aanvragen en de camionette.",
+    "Manage the equipment rental on logistiek.vtk.be: inventory, requests and the van.",
+  );
+  await setRolePermissions(logistiekRole.id, ["logistiek.manage", "modules.logistiek.access"]);
+  await grantRoleToGroup("LOGISTIEK", logistiekRole.id, "DEFAULT");
+
   // Eén rol per post, met de postnaam, toegekend aan die post zelf (elk lid).
   // Meestal een lege container om er later rechten aan te hangen; enkele posten
   // krijgen meteen hun vaste, postspecifieke recht(en) mee (zie postRolePerms).
@@ -264,6 +276,20 @@ async function main() {
     const perms = postRolePerms[g.code];
     if (perms) await setRolePermissions(postRole.id, perms);
     await grantRoleToGroup(g.code, postRole.id, "DEFAULT");
+  }
+
+  // Eén lege rol-container per werkgroep, aan elk lid toegekend (DEFAULT). Zo
+  // hebben werkgroepen meteen "hun eigen rol" om er later rechten aan te hangen.
+  for (const g of WERKGROEP_SEEDS) {
+    const role = await upsertRole(
+      `werkgroep-${g.code.toLowerCase()}`,
+      g.nameNl,
+      g.nameEn,
+      30 + g.orderInPraesidium,
+      `Rol voor werkgroep ${g.nameNl}.`,
+      `Role for werkgroep ${g.nameEn}.`,
+    );
+    await grantRoleToGroup(g.code, role.id, "DEFAULT");
   }
 
   console.log("Seeding default homepage settings...");
@@ -674,53 +700,45 @@ async function main() {
       slug: "computerwetenschappen",
       nameNl: "Computerwetenschappen",
       nameEn: "Computer Science",
-      studyTrack: "Master Computer Science",
       studyProgrammes: ["COMPUTER_SCIENCE"] as const,
-      descriptionNl: "Aanspreekpunt voor major-keuzes, ISP-vragen en feedback over softwarevakken.",
-      descriptionEn: "Point of contact for major choices, ISP questions and feedback on software courses.",
+      email: "cw-poc@vtk.be",
       order: 0,
       representatives: [
-        { email: "onderwijs@vtk.prototype", roleNl: "POC Computerwetenschappen", roleEn: "POC Computer Science", order: 0 },
-        { email: "it@vtk.prototype", roleNl: "Studentenvertegenwoordiger", roleEn: "Student representative", order: 1 },
+        { email: "onderwijs@vtk.prototype", order: 0 },
+        { email: "it@vtk.prototype", order: 1 },
       ],
     },
     {
       slug: "werktuigkunde",
       nameNl: "Werktuigkunde",
       nameEn: "Mechanical Engineering",
-      studyTrack: "Master Mechanical Engineering",
       studyProgrammes: ["MECHANICAL"] as const,
-      descriptionNl: "Voor labo's, projectwerk, uurroosters en opleidingsfeedback.",
-      descriptionEn: "For labs, project work, schedules and programme feedback.",
+      email: "wtk-poc@vtk.be",
       order: 1,
       representatives: [
-        { email: "sport@vtk.prototype", roleNl: "POC Werktuigkunde", roleEn: "POC Mechanical Engineering", order: 0 },
+        { email: "sport@vtk.prototype", order: 0 },
       ],
     },
     {
       slug: "elektrotechniek",
       nameNl: "Elektrotechniek",
       nameEn: "Electrical Engineering",
-      studyTrack: "Master Electrical Engineering",
       studyProgrammes: ["ELECTRICAL"] as const,
-      descriptionNl: "Bundelt opmerkingen rond practica, examens en communicatie met professoren.",
-      descriptionEn: "Collects remarks about practicals, exams and communication with professors.",
+      email: "elt-poc@vtk.be",
       order: 2,
       representatives: [
-        { email: "vice@vtk.prototype", roleNl: "POC Elektrotechniek", roleEn: "POC Electrical Engineering", order: 0 },
+        { email: "vice@vtk.prototype", order: 0 },
       ],
     },
     {
       slug: "chemische-technologie",
       nameNl: "Chemische technologie",
       nameEn: "Chemical Engineering",
-      studyTrack: "Master Chemical Engineering",
       studyProgrammes: ["CHEMICAL"] as const,
-      descriptionNl: "Contactpunt voor practica, stages en facultaire overlegmomenten.",
-      descriptionEn: "Contact point for labs, internships and faculty consultations.",
+      email: "chem-poc@vtk.be",
       order: 3,
       representatives: [
-        { email: "theokot@vtk.prototype", roleNl: "POC Chemische technologie", roleEn: "POC Chemical Engineering", order: 0 },
+        { email: "theokot@vtk.prototype", order: 0 },
       ],
     },
   ];
@@ -736,9 +754,7 @@ async function main() {
         slug: poc.slug,
         nameNl: poc.nameNl,
         nameEn: poc.nameEn,
-        studyTrack: poc.studyTrack,
-        descriptionNl: poc.descriptionNl,
-        descriptionEn: poc.descriptionEn,
+        email: poc.email,
         order: poc.order,
         studyProgrammes: [...poc.studyProgrammes],
       },
@@ -759,7 +775,7 @@ async function main() {
       await prisma.pocRepresentative.upsert({
         where: { pocId_userId: { pocId: row.id, userId: user.id } },
         update: {},
-        create: { pocId: row.id, userId: user.id, roleNl: rep.roleNl, roleEn: rep.roleEn, order: rep.order },
+        create: { pocId: row.id, userId: user.id, order: rep.order },
       });
     }
   }
@@ -1428,6 +1444,37 @@ async function main() {
     // Create-only: een bestaand product (prijs, naam, hoeveelheid, volgorde) niet
     // overschrijven bij een reseed.
     await prisma.theokotProduct.upsert({ where: { id }, update: {}, create: { id, ...data } });
+  }
+
+  console.log("Seeding uitleendienst vehicles...");
+  // De drie voertuigen van de transportdienst. Tarieven zijn team-configureerbaar
+  // via het beheer; de seed zet enkel een redelijk startpunt. Create-only zodat
+  // een reseed door het team ingestelde tarieven niet terugdraait.
+  const uitleenVehicles: Array<{
+    code: string;
+    nameNl: string;
+    nameEn: string;
+    pricingMode: "FREE" | "PER_HOUR" | "PER_KM" | "FLAT";
+    rateCents: number;
+  }> = [
+    { code: "kar", nameNl: "Kar", nameEn: "Trailer", pricingMode: "FREE", rateCents: 0 },
+    { code: "auto", nameNl: "Auto", nameEn: "Car", pricingMode: "PER_KM", rateCents: 35 },
+    { code: "bakfiets", nameNl: "Bakfiets", nameEn: "Cargo bike", pricingMode: "FREE", rateCents: 0 },
+  ];
+  for (let i = 0; i < uitleenVehicles.length; i += 1) {
+    const v = uitleenVehicles[i];
+    await prisma.uitleenVehicle.upsert({
+      where: { code: v.code },
+      update: {},
+      create: {
+        code: v.code,
+        nameNl: v.nameNl,
+        nameEn: v.nameEn,
+        pricingMode: v.pricingMode,
+        rateCents: v.rateCents,
+        sortIndex: i,
+      },
+    });
   }
 
   console.log("Seed complete.");

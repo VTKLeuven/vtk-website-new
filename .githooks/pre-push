@@ -1,0 +1,22 @@
+#!/bin/sh
+# Draait `npm run verify` voor elke push. De CI-workflow (.github/workflows/deploy.yml)
+# draait dezelfde checks en blokkeert anders de deploy; hier merk je het in tien
+# seconden in plaats van na een mislukte pipeline op main.
+#
+# Installatie gebeurt vanzelf: `npm install` zet core.hooksPath op .githooks
+# (zie het "prepare"-script in package.json).
+#
+# Overslaan kan met `git push --no-verify` of `SKIP_VERIFY=1 git push`; doe dat
+# enkel wanneer je weet dat de checks elders al gedraaid hebben.
+
+if [ -n "$SKIP_VERIFY" ]; then
+  echo "pre-push: verify overgeslagen (SKIP_VERIFY)"
+  exit 0
+fi
+
+echo "pre-push: npm run verify"
+npm run verify || {
+  echo ""
+  echo "pre-push: verify faalde. Fix de fouten hierboven, of push met --no-verify."
+  exit 1
+}

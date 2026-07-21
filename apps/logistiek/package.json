@@ -6,14 +6,21 @@
     "dev": "next dev --webpack -p 3100",
     "dev:turbopack": "next dev -p 3100",
     "build": "next build",
-    "start": "next start -p 3100"
+    "start": "next start -p 3100",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "import:inventaris": "dotenv -e ../../.env -- tsx scripts/import-inventaris.ts"
   },
   "dependencies": {
     "@vtk/auth": "*",
+    "@vtk/db": "*",
+    "@vtk/payments": "*",
+    "@vtk/storage": "*",
     "@vtk/ui": "*",
     "next": "16.2.10",
     "react": "19.2.4",
-    "react-dom": "19.2.4"
+    "react-dom": "19.2.4",
+    "sharp": "^0.33.5"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
@@ -21,7 +28,10 @@
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "@vtk/tsconfig": "*",
+    "dotenv-cli": "^7.4.2",
     "tailwindcss": "^4",
-    "typescript": "^5"
+    "tsx": "^4.19.2",
+    "typescript": "^5",
+    "xlsx": "^0.18.5"
   }
 }

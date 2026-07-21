@@ -31,6 +31,7 @@ export default async function OnboardingPage({
       firstName: true,
       lastName: true,
       rNumber: true,
+      rNumberFromKul: true,
       avatarKey: true,
       street: true,
       houseNumber: true,
@@ -44,6 +45,7 @@ export default async function OnboardingPage({
       studyYears: true,
       studyProgrammes: true,
       notAtFaculty: true,
+      notStudying: true,
     },
   });
 

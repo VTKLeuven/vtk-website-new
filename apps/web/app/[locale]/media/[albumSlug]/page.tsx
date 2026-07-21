@@ -54,27 +54,22 @@ export default async function MediaAlbumPage({
 
   return (
     <div className="vtk-page">
-      <header className="vtk-page-head">
-        <div>
-          <div className="vtk-page-kicker">
-            <Link className="vtk-link" href={`${base}/media`}>
-              {dict.photos.title}
-            </Link>
-            {" · Media"}
+      <header className="vtk-album-hero">
+        <div className="vtk-album-hero-inner">
+          <div>
+            <div className="vtk-album-hero-kicker">
+              <span className="vtk-dot" />
+              <Link href={`${base}/media`}>{dict.photos.title}</Link>
+              {" · Media"}
+            </div>
+            <h1>{album.title}</h1>
+            {album.description ? <p>{album.description}</p> : null}
           </div>
-          <h1 className="vtk-page-title">{album.title}</h1>
-          {album.description ? <p className="vtk-page-subtitle">{album.description}</p> : null}
-        </div>
-        <div className="page-head-meta">
-          <b>{album.photos.length}</b>
-          <br />
-          {album.photos.length === 1 ? dict.photos.photo : dict.photos.photos}
-          {date ? (
-            <>
-              <br />
-              {date}
-            </>
-          ) : null}
+          <div className="vtk-album-hero-meta">
+            <b>{album.photos.length}</b>
+            <span>{album.photos.length === 1 ? dict.photos.photo : dict.photos.photos}</span>
+            {date ? <time dateTime={album.date ?? undefined}>{date}</time> : null}
+          </div>
         </div>
       </header>
 

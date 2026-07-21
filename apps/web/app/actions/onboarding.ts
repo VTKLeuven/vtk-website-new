@@ -31,6 +31,7 @@ const studySchema = {
   studyYears: z.array(z.enum(STUDY_YEARS)).default([]),
   studyProgrammes: z.array(z.enum(STUDY_PROGRAMMES)).default([]),
   notAtFaculty: z.boolean().default(false),
+  notStudying: z.boolean().default(false),
 };
 
 /**
@@ -50,6 +51,7 @@ function studyFields(formData: FormData) {
     studyProgrammes: formData.getAll("studyProgrammes"),
     // Niet-aangevinkte checkbox zit niet in de FormData.
     notAtFaculty: formData.get("notAtFaculty") === "on",
+    notStudying: formData.get("notStudying") === "on",
   };
 }
 
@@ -63,13 +65,22 @@ const profileSchema = z.object({
     .toLowerCase()
     .refine((v) => v === "" || R_NUMBER_REGEX.test(v), { message: "INVALID_RNUMBER" })
     .default(""),
-  street: z.string().trim().min(1),
-  houseNumber: z.string().trim().min(1),
+  street: z.string().trim().max(120).default(""),
+  houseNumber: z.string().trim().max(20).default(""),
   bus: z.string().trim().max(20).optional().default(""),
-  postalCode: z.string().trim().min(1).max(12),
-  city: z.string().trim().min(1),
-  birthDate: z.coerce.date(),
-  personalEmail: z.string().trim().toLowerCase().email(),
+  postalCode: z.string().trim().max(12).default(""),
+  city: z.string().trim().max(120).default(""),
+  birthDate: z
+    .string()
+    .trim()
+    .refine((value) => value === "" || !Number.isNaN(Date.parse(value)))
+    .default(""),
+  personalEmail: z
+    .string()
+    .trim()
+    .toLowerCase()
+    .refine((value) => value === "" || z.string().email().safeParse(value).success)
+    .default(""),
   emailPreference: z.enum(EMAIL_PREFERENCES),
   mailCategories: z.array(z.enum(MAIL_CATEGORIES)).default([]),
   ...studySchema,
@@ -157,6 +168,15 @@ export async function saveProfileAction(
   const wasOnboarded = session.user.onboarded;
   const previousAvatarKey = session.user.avatarKey;
 
+  // Een r-nummer dat van de KU Leuven-authenticator komt is read-only (het veld
+  // wordt disabled getoond, zie ProfileForm). We dwingen dat ook serverside af:
+  // zelfs een gemanipuleerde submit laat het r-nummer dan ongemoeid.
+  const existing = await prisma.user.findUnique({
+    where: { id: session.user.id },
+    select: { rNumberFromKul: true },
+  });
+  const rNumberLocked = existing?.rNumberFromKul ?? false;
+
   try {
     await prisma.user.update({
       where: { id: session.user.id },
@@ -165,19 +185,20 @@ export async function saveProfileAction(
         lastName: data.lastName,
         // De weergavenaam blijft afgeleid van voor- + achternaam.
         name: fullName(data.firstName, data.lastName),
-        rNumber: data.rNumber ? data.rNumber : null,
-        street: data.street,
-        houseNumber: data.houseNumber,
+        ...(rNumberLocked ? {} : { rNumber: data.rNumber ? data.rNumber : null }),
+        street: data.street || null,
+        houseNumber: data.houseNumber || null,
         bus: data.bus ? data.bus : null,
-        postalCode: data.postalCode,
-        city: data.city,
-        birthDate: data.birthDate,
-        personalEmail: data.personalEmail,
+        postalCode: data.postalCode || null,
+        city: data.city || null,
+        birthDate: data.birthDate ? new Date(data.birthDate) : null,
+        personalEmail: data.personalEmail || null,
         emailPreference: data.emailPreference,
         mailCategories: { set: data.mailCategories },
         studyYears: { set: data.studyYears },
         studyProgrammes: { set: data.studyProgrammes },
         notAtFaculty: data.notAtFaculty,
+        notStudying: data.notStudying,
         // Wie dit formulier invult, declareert daarmee zijn studie voor dit
         // werkingsjaar; de bevestigingsgate hoeft er dan niet meer op te vallen.
         studyConfirmedYear: currentWorkingYear(),
@@ -241,6 +262,7 @@ export async function confirmStudyAction(formData: FormData): Promise<void> {
       studyYears: { set: parsed.data.studyYears },
       studyProgrammes: { set: parsed.data.studyProgrammes },
       notAtFaculty: parsed.data.notAtFaculty,
+      notStudying: parsed.data.notStudying,
       studyConfirmedYear: currentWorkingYear(),
     },
   });

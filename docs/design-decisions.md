@@ -143,6 +143,59 @@ halen ze af aan de balie en betalen daar. Post **Theokot** beheert het systeem.
 
 ---
 
+## Deurtoegang (kaartscanner op de deur)
+
+Aan de deur hangt dezelfde KU Leuven-kaartlezer als aan de Theokot-balie, maar dan
+gekoppeld aan een Raspberry Pi die een elektrische lock bedient. De scan wordt
+server-side geverifieerd (`verifyStudentCard` → r-nummer → `User`), net als bij de
+balie; de Pi stuurt enkel de ruwe scan door. Website-kant: `apps/web/app/api/door/*`
+en `apps/web/lib/door-*.ts`; Pi-kant: `infra/door/`.
+
+### Drie aparte rechten (bewust gescheiden)
+
+- **`door.open`** — mag de deur openen met zijn studentenkaart. Dit ken je toe aan
+  rollen in `/admin/roles`, zodat "wie geraakt binnen" gewoon werkingsjaar-gescoped
+  meeloopt met de rollen/posten (reset dus mee op 15 juli, zoals alle rechten).
+- **`door.remoteOpen`** — toont de "deur openen"-knop op het admin-dashboard.
+  **Bewust los van `door.open`:** wie met zijn kaart binnen mag, hoeft daarom nog
+  niet de deur voor anderen te kunnen openen vanop afstand. Dit is de kleinere,
+  bewustere groep (bv. praesidium/onthaal).
+- **`door.manage`** — de `/admin/deur`-tab: tijdelijke toegang geven, de
+  gebruiksstatistiek en de log bekijken.
+
+### Tijdelijke toegang los van de rollen
+
+Naast `door.open` kan een `door.manage`-houder iemand **tijdelijke** toegang geven met
+een start/eind-venster (`DoorAccessGrant`). Bedoeld voor gasten, externen of
+kortlopende uitzonderingen waarvoor je geen rol wil aanmaken. `userMayOpenDoor` =
+`door.open` **OF** een lopende grant. Verlopen grants blijven staan als historiek maar
+tellen niet meer mee, en verdwijnen uit de beheerlijst.
+
+### Alles wordt gelogd, ook wat weigerde
+
+Elke deurgebeurtenis is één `DoorAccessLog`-rij: toegelaten én geweigerde kaarten,
+onbekende kaarten (geverifieerd maar niet aan een gebruiker gekoppeld), fouten, en
+remote-opens. Zo zie je in `/admin/deur` niet enkel wie binnenging, maar ook of er
+kaarten geweigerd werden (bv. iemand zonder toegang die het toch probeert).
+
+### Offline blijft de deur werken
+
+De deur mag niet vastlopen als het internet of de site wegvalt. De Pi houdt daarom een
+**offline-cache** (per kaart, TTL) en beslist daarop wanneer de site onbereikbaar is;
+geweigerde/onbekende scans tijdens een outage worden lokaal gebufferd en naar de site
+geflusht zodra ze terug bereikbaar is (die rijen dragen `offline = true`).
+
+### Remote-open gaat rechtstreeks over Tailscale
+
+De server en de Pi zitten op hetzelfde tailnet. De dashboardknop laat de **server de Pi
+rechtstreeks aanroepen** (`POST /open` op de listener van de Pi), niet omgekeerd: geen
+polling, geen command-queue, near-instant. De vorige oplossing (een iPhone-shortcut die
+naar de server ssh'te) had merkbare vertraging. Eén gedeeld device-secret authenticeert
+beide richtingen (Pi → site en site → Pi); het staat versleuteld onder Admin → IT met
+een env-fallback.
+
+---
+
 ## Ledenregistratie & onboarding (KUL SSO)
 
 Studenten **registreren zichzelf** door voor het eerst in te loggen met KU Leuven
@@ -210,6 +263,14 @@ SSO. Concrete implementatie: hook in `packages/auth/src/auth.ts`, gate in
   opgelijst worden (o.a. de mappen in de career-ZIP). Wie dit aanduidt valt uit
   **alle** career-lijsten, ook de algemene; de andere categorieën blijven gewoon
   werken.
+- **"Ik studeer niet (meer)"** (`User.notStudying`) is er voor afgestudeerden of
+  gestopte leden. Bewust **los van `notAtFaculty`**: dat betekent "studeert wél,
+  maar elders"; dit betekent "studeert niet". Ook bewust **geen `StudyYear`**:
+  het is geen jaar, en als enum-waarde zou het overal opduiken waar jaren
+  opgelijst worden (o.a. de per-jaar-mappen in de career-ZIP). Het lid blijft
+  lid, maar valt uit **élke** studiegerichte mailinglijst (zie hieronder). Beide
+  vlaggen zijn onafhankelijk; wie niet (meer) studeert hoeft geen richting of
+  jaar meer aan te duiden.
 
 ### Jaarlijkse studiebevestiging ("wie is nog actief student?")
 
@@ -247,6 +308,10 @@ SSO. Concrete implementatie: hook in `packages/auth/src/auth.ts`, gate in
   jaarlijkse studiebevestiging hierboven) zitten in een lijst; dat geldt voor
   **alle** lijsten, ook "Alle studenten". Afgestudeerden vallen er zo vanzelf
   uit, zonder manuele opkuis.
+- Enkel leden die **nog studeren**: wie bij de bevestiging "ik studeer niet
+  (meer)" (`notStudying`) aanduidde, bevestigt zijn profiel wél en passeert dus
+  de gate, maar hoort in **geen enkele** studiegerichte lijst. Zonder deze extra
+  filter zou zo'n lid via de bevestiging net terug in de lijsten belanden.
 - **"Alle studenten"** is een synthetische lijst: iedereen, zonder opt-in. Ze is
   bewust **geen `MailCategory`** en heeft dus geen checkbox bij "Mijn account",
   want dit is de lijst om sowieso iedereen te kunnen bereiken.
@@ -304,6 +369,34 @@ SSO. Concrete implementatie: hook in `packages/auth/src/auth.ts`, gate in
   (met de postnaam, leeg) toegekend aan die post zelf. **werkgroep** en **medewerker**
   bestaan als toewijsbare rollen maar hangen nog aan geen enkele post. Alles als
   `DEFAULT` (elk lid). De lege rollen vul je met rechten via `/admin/roles`.
+
+### Werkgroepen (BEST, Revue, ...)
+
+- Een **werkgroep** is technisch **dezelfde `Group`** als een post, met een
+  discriminator `Group.type` (`PRAESIDIUM` | `WERKGROEP`, default `PRAESIDIUM`).
+  Ze deelt de volledige machinerie van de posten: leden per werkingsjaar
+  (`GroupMembership`), rol-grants (`GroupRole`, DEFAULT/LEADER) en dezelfde
+  add/remove-lid-flow. De seed maakt zeven werkgroepen (BEST, Biomedix, Chemix,
+  Existenz, Mechanix, Revue, Statix), elk met een lege rol-container.
+- **Waarom een `type`-discriminator en geen apart model?** Werkgroepen "werken
+  zoals posten"; een tweede kopie van memberships + rollen + admin-UI zou pure
+  duplicatie zijn. Het verschil zit enkel in *waar* ze verschijnen.
+- **Niet op /praesidium, wel op /werkgroepen.** `/praesidium`, de admin-tab
+  "Posten" en de shift-postkeuzes filteren op `type = PRAESIDIUM`; werkgroepen
+  krijgen hun eigen publieke `/werkgroepen` (zelfde ledenraster + werkingsjaar-
+  tabjes als praesidium) en een eigen admin-tab "Werkgroepen".
+- **Eigen infotekst + website.** De werkgroep-`description*` is de blurb op
+  `/werkgroepen`; `Group.website` is een optionele link (mag zonder schema
+  ingevuld worden, wordt genormaliseerd naar `https://`). Beide staan los van de
+  naam en de rollen.
+- **Wie mag wat.** Leden en rollen beheren vraagt het aparte recht
+  `werkgroepen.manage` (los van `groups.manage`, zodat het delegeerbaar is). De
+  **infotekst + website** mag daarnaast **elk lid van díe werkgroep** zelf
+  aanpassen (huidig werkingsjaar), maar enkel van de eigen werkgroep: de
+  admin-tab toont een gewoon lid enkel zijn eigen werkgroep(en) en enkel het
+  infotekst-formulier; `saveWerkgroepInfoAction` checkt het lidmaatschap
+  server-side. Beheerders (met het recht of superadmin) zien en beheren alles.
+- **Footer** linkt naar zowel `/praesidium` als `/werkgroepen`.
 
 ### Mailinglijsten (opt-in)
 
@@ -365,6 +458,21 @@ onderste helft is een ontwerpkeuze, geen toeval:
   de POC-pagina zelf verschijnt.
 - **Meerdere richtingen per POC** kan: één POC bedient soms verschillende
   opleidingen.
+- **Eén mailadres per POC, geen persoonlijke adressen.** `Poc.email` (bv.
+  `wtk-poc@vtk.be`) is het enige contactadres dat de site toont. Een student
+  mailt de POC als geheel; wie er dit jaar in zit mag wisselen zonder dat een
+  adres op de site verandert, en een vertegenwoordiger hoeft zijn persoonlijke
+  adres niet publiek te zetten. `User.email` van een vertegenwoordiger
+  verschijnt daarom nergens meer op `/pocs` of de homepage.
+- **Geen beschrijvingen en geen rollen op de publieke POC-schermen.** De
+  richtingsnaam en de gezichten zijn wat een student zoekt; een zin uitleg per
+  POC en een functietitel per persoon werden als ruis ervaren. De kolommen
+  `Poc.description*` en `PocRepresentative.role*` bestaan nog in de database
+  (weggooien zou bestaande tekst vernietigen), maar worden nergens meer getoond
+  of bewerkt.
+- **`/pocs` gebruikt dezelfde kaarten als de homepage-band** (`.poc-grid` /
+  `.poccard` uit `vtk-home.css`): wie zijn eigen POC op de homepage ziet en
+  doorklikt, hoort hetzelfde beeld te krijgen.
 - **Lege staat = sectie verbergen.** Zonder sessie, zonder richtingen, of zonder
   een matchende POC met vertegenwoordigers valt de hele sectie weg. Bewuste keuze
   boven "toon dan alle POC's" of een uitnodigingsbanner: de sectie is enkel
@@ -374,6 +482,227 @@ onderste helft is een ontwerpkeuze, geen toeval:
   bezoeker gerenderd i.p.v. statisch gecachet. Dat was al zo qua DB-lezingen; het
   is één gerichte query extra (de richtingen van de ingelogde gebruiker), en enkel
   voor wie ingelogd is.
+
+### Cursusdienst-openingsuren komen live van cudi.vtk.be
+
+- De **Theokot**-uren beheert VTK zelf in de admin (`Setting`
+  `home.openingHours.theokot`). De **cursusdienst**-uren daarentegen worden
+  ingevoerd op het aparte cursusdienst-platform (cudi.vtk.be), waar ze meteen ook
+  shiften en tijdsloten genereren. Dat platform is dus de single source of truth;
+  ze hier nog eens met de hand overtypen zou onvermijdelijk uit elkaar lopen.
+- Daarom haalt de homepage (en `/aanbod`) ze **live** op via een publieke,
+  read-only endpoint op cudi (`GET /api/opening-hours?association=vtk`), gemapt in
+  `lib/cursusdienstHours.ts` naar dezelfde `entries`-vorm als Theokot. De
+  admin-form voor deze uren is verdwenen; `/admin/home` verwijst enkel nog door.
+- **Waarom pullen i.p.v. een gedeelde DB of een push-webhook:** de twee apps
+  hebben elk hun eigen database en deployment. Een directe cross-DB-lezing koppelt
+  hun schema's op rendertijd; een push zou een write-endpoint + secret vragen. Een
+  gecachte pull (Next data-cache, ~1×/uur) houdt ze losgekoppeld en de bron enkelvoudig.
+- **Fallback in drie trappen** (uren wijzigen zelden, dus resilience gaat voor
+  versheid): live fetch → de laatst succesvol opgehaalde week uit een DB-cache
+  (`Setting` `cursusdienst.weekHoursCache`, best-effort weggeschreven bij elke
+  verse fetch) → en als zelfs dat er niet is, de melding "De cursusdienst
+  openingsuren zijn momenteel niet beschikbaar". Zo breekt de homepage nooit,
+  ook niet bij een koude cache terwijl cudi plat ligt.
+
+---
+
+## Uitleendienst (logistiek.vtk.be)
+
+Het reservatiesysteem voor de uitleendienst leeft in `apps/logistiek`, niet op de
+hoofdsite: het is de eerste echte invulling van de submodule-opzet
+(`logistiek.vtk.be`, gedeelde sessie via het `.vtk.be`-cookie). De UX volgt de
+filosofie van de Cudi-app: een login-gated takenhub met grote taakkaarten
+(Materiaal lenen / Camionette / Mijn reservaties), eenvoudige verticale flows en
+een eigen account-overzicht. Technische kaart: `docs/uitleendienst.md`.
+
+### Aanvraag + goedkeuring, geen instantboeking
+
+- Een reservatie is een **aanvraag** (`REQUESTED`) die het Logistiek-team
+  goedkeurt of afwijst. Bewuste keuze tegen instantboeking: **VTK-evenementen
+  hebben voorrang op het materiaal** en het team wil elke aanvraag zien.
+- `REQUESTED` neemt daarom nog **geen voorraad** in; de harde
+  beschikbaarheidscheck (voorraad min overlappende `APPROVED`/`PICKED_UP`)
+  gebeurt pas bij goedkeuring, in een Serializable-transactie. Leden zien bij het
+  aanvragen wel een zachte indicator per item.
+- Afwijzen vraagt een verplichte reden die het lid te zien krijgt.
+
+### Camionette is een eigen model, geen catalogus-item
+
+- Uurprijs (7,50 EUR/u, elk begonnen uur, minimum één uur), een tijdvenster
+  i.p.v. een dagbereik, en een **chauffeur van VTK** (leden rijden nooit zelf):
+  dat past niet in het item/lijn-model, dus `UitleenVanBooking` staat apart.
+- Het uurtarief wordt bij de aanvraag gesnapshot en de prijs bij goedkeuring
+  herberekend; één camionette betekent: geen twee goedgekeurde ritten die
+  overlappen.
+
+### Betalen: online of aan de balie, per reservatie
+
+- Bij goedkeuring kiest het **team** de betaalwijze: `ONLINE` (Mollie-checkout
+  via de gedeelde `@vtk/payments`-gateways) of `OFFLINE` (cash/Payconiq bij
+  afhaling, team drukt "betaald"). Niet het lid: het team weet wanneer online
+  betalen zinvol is.
+- **Enkel de huurprijs gaat online; de waarborg blijft cash bij afhaling.**
+  Online waarborgen zouden een refund-flow vragen; de balie geeft ze gewoon
+  terug. `depositReturnedAt` registreert dat.
+- Een al betaalde reservatie kan het lid niet meer zelf annuleren (dat zou een
+  refund impliceren); dat loopt via logistiek@vtk.be.
+
+### Kleinere keuzes
+
+- **Interface in NL/EN, catalogusinhoud vrij**: de taalkeuze in de header wordt
+  onthouden via een cookie en vertaalt de interface. Catalogusvelden blijven
+  bewust enkel `name`/`description`: die inhoud wordt door Logistiek beheerd en
+  krijgt geen verplicht tweede vertaalveld.
+- **Geen mails in v1**: de status staat altijd onder "Mijn reservaties"; de
+  ticketing-outbox is event-gebonden en werd niet veralgemeend.
+- `SaveForm`/`toast`/`ConfirmActionButton` in `apps/logistiek/components/ui`
+  zijn bewuste minimale kopieën van `apps/web/components/ui`; **kandidaat om te
+  hoisten naar `@vtk/ui`** zodra een derde afnemer opduikt.
+- De vroegere groepscheck op logistiek.vtk.be (groep "Logistiek", met verkeerde
+  casing zodat ze niemand doorliet) is vervangen: **elk ingelogd lid** mag
+  aanvragen, beheer hangt aan de permissie `logistiek.manage` (rol "logistiek",
+  toegekend aan de post LOGISTIEK).
+
+### Uitleendienst v2 (events, vervoer, sets, flesserke)
+
+De uitleendienst kreeg een grondige uitbreiding op basis van de "How to logi" en
+feedback van de groepscoordinator. De onderliggende werking:
+
+- **Aanvragen zijn event-centrisch en dragen een aanvragertype** (INTERN eigen
+  post / WERKGROEP / EXTERN), de drie kanalen uit de Logi-werking met elk een
+  eigen behandelaar. Het beheer filtert de wachtrij op dat type.
+- **Het aanvragertype wordt automatisch uit de login afgeleid; het lid kiest het
+  nooit zelf.** Een praesidiumlid (in een post) vraagt aan als INTERN namens die
+  post; wie geen post heeft, is EXTERN met de eigen naam. De server dwingt dit af
+  en negeert wat de client meestuurt (niet te vervalsen). Enkel wanneer een lid
+  in meerdere posten zit, kiest het nog *welke* post (geen type). Werkgroepen
+  zitten niet in de DB en worden dus niet automatisch afgeleid; in het beheer kan
+  het team het type wel manueel zetten (het is daar zichtbaar en duidelijk).
+- **Flesserke is een aparte tab**, enkel zichtbaar en bruikbaar voor het
+  praesidium (leden met een post). Het is een eigen aanvraagflow (aparte
+  reservatie met enkel flesserke-lijnen), los van materiaal. Materiaal- en
+  flesserke-aanvragen hebben elk hun eigen create/edit-actie zodat een bewerking
+  van de ene de lijnen van de andere nooit overschrijft.
+- **Bewerken.** Een lid bewerkt zolang de aanvraag `REQUESTED` is; daarna
+  annuleert het of contacteert het team. Het team mag ook een `APPROVED` aanvraag
+  bewerken: die save loopt in dezelfde Serializable-transactie als het goedkeuren
+  en hercheckt de voorraad, zodat een goedgekeurde aanvraag altijd door voorraad
+  gedekt blijft.
+- **Vervoer i.p.v. camionette.** Kar, auto en bakfiets zijn DB-rijen
+  (`UitleenVehicle`), geen enum, want de tarieven zijn **team-configureerbaar**
+  (gratis / per uur / per km / vast) via het instellingenscherm. De kar rekent
+  standaard per kilometer; die prijs is pas gekend na de rit, dus `priceCents` is
+  nullable en het team voert de kilometers in bij het afronden. De **chauffeur
+  wordt pas het weekend voor de rit toegewezen**, dus is optioneel bij
+  goedkeuring. Materiaal rekent standaard enkel waarborg aan; een instelling
+  (`logistiek.showRentPrices`, default uit) toont huurprijzen wanneer nodig.
+- **Sets** zijn gewone catalogusitems met een beschrijvende inhoudslijst
+  (`UitleenSetContent`). De inhoud koppelt bewust niet aan andere items, zodat de
+  voorraad niet dubbel geteld wordt; de set heeft zijn eigen fysieke voorraad.
+- **Flesserke** (voeding/drank/huishoud) is verbruiksstock in een **aparte tab,
+  enkel voor het praesidium** (server-side afgedwongen). Een flesserke-aanvraag is
+  een eigen reservatie met enkel flesserke-lijnen. Beschikbaar wordt altijd
+  berekend (voorraad min status-gebaseerd gereserveerd), nooit opgeslagen. Bij het
+  terugbrengen voert het team per lijn in hoeveel er gesloten terugkomt; het
+  verschil is verbruik en wordt afgeboekt. "Stock moet kloppen" is hier de harde
+  eis, dus alle voorraadmutaties gebeuren in een transactie.
+- **Foto-serving via een eigen `/api/media`-proxy** (same-origin), niet via
+  directe bucket-URL's, net als op de hoofdsite. De S3-config wordt gedeeld met de
+  web-admin via de `Setting`-tabel.
+- **NL-only DB-inhoud**; de UI-chrome is NL/EN via een eigen cookie-copysysteem.
+- De import van de bestaande "Inventaris Loods.xlsx" is eenmalig en idempotent;
+  ze deletet nooit, zodat een herimport na een sheet-correctie veilig is.
+
+---
+
+## Cursusdienst-shiften op de main site (brug met cudi.vtk.be)
+
+De cursusdienst-shiften worden **aangemaakt op cudi.vtk.be** (gegenereerd uit de
+openingsuren-instances), maar leden schrijven zich **enkel op de main site** in.
+De cudi-shiftpagina voor studenten gaat uit (`settings.useShifts`); cudi houdt
+enkel nog de admin-authoring en zijn roster-/verantwoordelijke-views.
+
+### Waarom een brug i.p.v. federatie
+
+Er was een keuze: cursusdienst-shiften als een aparte, gefedereerde sectie tonen
+(cudi blijft de enige eigenaar, main site is puur een client), óf ze **volwaardig
+native** maken. VTK koos native: ze moeten meetellen voor de **shift-ranking** én
+de **reward-payout**, en die draaien op de eigen tabellen van de main site
+(`ranking` groepeert `ShiftParticipant` per `Shift.post`, `reward` sommeert
+`Shift.reward`). Native meetellen kan dus enkel als elke cursusdienst-shift een
+echte `Shift`-rij op de main site is en de inschrijving een echte
+`ShiftParticipant`. Daarom een **twee-weg-brug**:
+
+- **Definities cudi → main:** bij aanmaken/wijzigen/verwijderen van een
+  cursusdienst-shift spiegelt cudi de shift naar een `Shift`-rij op de main site
+  (gemarkeerd met zijn cudi-herkomst, zodat main-admins ze niet manueel bewerken
+  en de spiegeling idempotent is). Zo verschijnt elke cudi-wijziging meteen op de
+  main site.
+- **Inschrijven native op main:** leden (de)registreren via de bestaande
+  main-flow (`/shift` + `app/api/shift/register`), dus overlap-check,
+  24u-uitschrijflock + bedenktijd, ranking, reward en history werken ongewijzigd.
+- **Roster main → cudi:** elke (de)registratie wordt teruggeduwd naar cudi's
+  `ShiftRegistration` zodat de cursusdienst-verantwoordelijken hun roster op cudi
+  houden.
+
+Identiteit tussen de twee auth-systemen (main = KUL OIDC, cudi = Better Auth)
+loopt via de **r-nummer** (`User.rNumber` is `@unique` in beide DBs). Een lid dat
+nog nooit op cudi kwam, krijgt bij de eerste inschrijving **automatisch** een
+cudi-gebruiker aangemaakt op basis van zijn KUL-profiel (r-nummer, naam, e-mail).
+
+### Reward: 1 bonnetje per begonnen uur
+
+Een cursusdienst-shift is **1 bonnetje per begonnen uur** waard, dus
+`reward = ⌈(eindtijd − starttijd) / 1u⌉`:
+
+- 1u00 → 1, 1u30 → 2, 2u00 → 2, 2u01 → 3.
+
+Deze regel wordt **berekend bij het spiegelen** (de producer zet `Shift.reward`);
+centraliseer hem in één helper zodat hij op één plek aanpasbaar is. De reward
+wordt **verbruikt** in `apps/web/app/api/shift/reward/route.ts` (sommeert
+`shift.reward` over voltooide, niet-uitbetaalde deelnames). Wil je de waardering
+wijzigen, pas dan die helper aan; de rest van het reward-systeem blijft gelijk.
+
+### Post: "Cursusdienst"
+
+Gemirrorde shiften krijgen `Shift.post = "Cursusdienst"`, zodat ze als een aparte
+post in de ranking verschijnen. De post wordt **gezet bij het spiegelen** (zelfde
+producer/helper als de reward) en **verbruikt** in
+`apps/web/app/api/shift/ranking/route.ts` (groepeert per `shift.post`; leeg valt
+onder `GEEN`). Eén constante voor het post-label, zodat hernoemen op één plek
+gebeurt.
+
+### Inschrijven blokkeert bij een cudi-storing (bewust)
+
+Inschrijven/uitschrijven op de main site handelt de cudi-registratie **blokkerend**
+af (`apps/web/lib/cudiRegistrationSync.ts` + de shift-register-route): een
+inschrijving slaagt enkel als cudi ze ook registreert, anders wordt de native
+`ShiftParticipant` teruggedraaid en krijgt het lid een foutmelding. Zo blijven de
+main-roster en de cudi-roster strikt consistent. De capaciteit wordt op de main
+site afgedwongen (`maxParticipants`); cudi is een tweede gate + de roster voor de
+verantwoordelijken. Een vangnet-reconcile (`/api/integrations/cudi/sync-registrations`,
+voor een cron) zet zeldzame randgevallen alsnog gelijk.
+
+### Volledig opt-in (uit by default)
+
+De hele shift-brug staat **uit** tot je het gedeelde secret zet (`CUDI_SYNC_SECRET`
+op de main site, gelijk aan `MAIN_SITE_SHIFT_SYNC_SECRET` op cudi). Zonder secret:
+cudi spiegelt niets, het spiegel-endpoint weigert alles (401), er bestaan dus geen
+`sourceSystem = "cudi"`-shiften, en de inschrijfflow doet geen enkele cudi-call
+(gedraagt zich exact zoals vroeger). De migratie voegt enkel twee nullable kolommen
+toe en verandert op zich niets.
+
+### Roster-autoriteit ligt op de main site
+
+Zodra de brug aanstaat, is de main site de autoriteit voor de inschrijvingen: een
+reconcile duwt de main-roster naar cudi en **pruned** cudi-registraties die de main
+site niet kent. Cudi-side roster-bewerkingen voor cursusdienst-shiften (bv.
+`adminAddShiftRegistration`) worden dus door de volgende reconcile overschreven;
+roster-beheer hoort daarom op de main site te gebeuren. Daarom zet cudi ook zijn
+student-shiftpagina uit (fase 4); de admin-authoring van de shiften zelf blijft.
+
+---
 
 ## Toegang tot externe applicaties (SSO)
 

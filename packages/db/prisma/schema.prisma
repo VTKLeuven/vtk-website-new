@@ -24,6 +24,14 @@ enum MembershipRole {
   LEAD
 }
 
+// Soort Group. PRAESIDIUM = een praesidiumpost (op /praesidium). WERKGROEP = een
+// werkgroep (BEST, Revue, ...): dezelfde leden/rollen-machinerie, maar niet op
+// /praesidium; ze verschijnen op /werkgroepen met een eigen infotekst + website.
+enum GroupType {
+  PRAESIDIUM
+  WERKGROEP
+}
+
 // Hoe een post (Group) een rol toekent aan haar leden.
 // DEFAULT: elk lid van de post krijgt de rol. LEADER: enkel de
 // verantwoordelijke (membership.role == LEAD) krijgt de rol, bovenop de
@@ -152,6 +160,81 @@ enum TheokotOrderStatus {
   CANCELLED // door de student geannuleerd voor de deadline
 }
 
+enum UitleenReservationStatus {
+  REQUESTED // aangevraagd, wacht op beslissing van Logistiek
+  APPROVED // goedgekeurd; telt mee voor de voorraad
+  REJECTED // afgewezen door Logistiek
+  CANCELLED // door het lid geannuleerd
+  PICKED_UP // materiaal afgehaald
+  RETURNED // materiaal teruggebracht; reservatie afgerond
+}
+
+enum UitleenTransportBookingStatus {
+  REQUESTED
+  APPROVED
+  REJECTED
+  CANCELLED
+  COMPLETED // rit uitgevoerd
+}
+
+// Namens wie een aanvraag gebeurt. De drie kanalen uit de Logi-werking met elk
+// een eigen behandelaar: interne posten, werkgroepen/jaarwerkingen, externen.
+enum UitleenRequesterType {
+  INTERN // eigen post (praesidium)
+  WERKGROEP // werkgroep of jaarwerking
+  EXTERN // extern of individueel
+}
+
+// Hoe de prijs van een voertuig berekend wordt. Team-configureerbaar per
+// voertuig, want de kring bevestigt de tarieven nog.
+enum UitleenPricingMode {
+  FREE // gratis
+  PER_HOUR // rateCents per begonnen uur
+  PER_KM // rateCents per kilometer (km ingevuld bij afronden)
+  FLAT // vast bedrag = rateCents
+}
+
+// Staat van een materiaalstuk. Puur informatief (badge in het beheer); muteert
+// nooit automatisch de beschikbaarheid.
+enum UitleenItemCondition {
+  WERKT
+  KAPOT
+  TESTEN
+  ONVOLLEDIG
+}
+
+// Hoe een goedgekeurde reservatie betaald wordt: online via de payment
+// provider, of offline (cash/Payconiq) bij afhaling. Keuze van het team
+// bij goedkeuring.
+enum UitleenPaymentMode {
+  ONLINE
+  OFFLINE
+}
+
+enum UitleenPaymentStatus {
+  CREATED
+  PENDING
+  SUCCEEDED
+  FAILED
+  CANCELLED
+  EXPIRED
+}
+
+// Hoe een deurgebeurtenis tot stand kwam: een fysieke kaartscan aan de deur, of
+// een remote-open vanaf het dashboard.
+enum DoorMethod {
+  CARD
+  REMOTE
+}
+
+// De uitkomst van een deurgebeurtenis.
+enum DoorLogResult {
+  ALLOWED // deur ging open
+  DENIED // gekende gebruiker zonder toegang
+  UNKNOWN_CARD // kaart geverifieerd maar niet aan een gebruiker gekoppeld
+  ERROR // verificatie/lookup mislukt
+}
+
 // Welk e-mailadres de kring gebruikt om een lid te contacteren.
 enum EmailPreference {
   UNIVERSITY // universiteitsmail (= login-mail via KUL SSO)
@@ -205,19 +288,24 @@ enum StudyProgramme {
 // -----------------------------------------------------------------------------
 
 model User {
-  id            String  @id @default(cuid())
+  id             String  @id @default(cuid())
   // `name` blijft de weergavenaam (en het veld dat better-auth zelf zet bij een
   // SSO-login). `firstName`/`lastName` zijn de gestructureerde variant die de
   // mailinglijst-exports nodig hebben; ze worden ingevuld tijdens de onboarding
   // en in het gebruikersbeheer, en `name` wordt daaruit samengesteld.
-  name          String
-  firstName     String?
-  lastName      String?
-  email         String  @unique
-  rNumber       String? @unique // KU Leuven studentennummer (bvb r0123456), voor zoeken
-  emailVerified Boolean @default(false)
-  avatarKey     String?
-  image         String?
+  name           String
+  firstName      String?
+  lastName       String?
+  email          String  @unique
+  rNumber        String? @unique // KU Leuven studentennummer (bvb r0123456), voor zoeken
+  // `true` als het r-nummer van de KU Leuven-authenticator komt (bij SSO gezet,
+  // zie packages/auth/src/logins/kul.ts). Dan staat het veld read-only in het
+  // profielformulier, net als de e-mail; een zelf ingevuld r-nummer (flag false)
+  // blijft aanpasbaar.
+  rNumberFromKul Boolean @default(false)
+  emailVerified  Boolean @default(false)
+  avatarKey      String?
+  image          String?
 
   locale       Locale  @default(NL)
   active       Boolean @default(true)
@@ -247,6 +335,11 @@ model User {
   // `StudyProgramme`-waarde: het is geen richting, en als enum-waarde zou het
   // overal opduiken waar richtingen opgelijst worden (o.a. de career-export).
   notAtFaculty       Boolean          @default(false)
+  // Lid dat niet (meer) studeert: afgestudeerd of gestopt. Bewust los van
+  // `notAtFaculty` (dat is "studeert wél, maar elders"): wie dit aanduidt valt
+  // uit élke studiegerichte mailinglijst (zie lib/mailinglists.ts). Blijft een
+  // aparte boolean om dezelfde reden als notAtFaculty.
+  notStudying        Boolean          @default(false)
   // Werkingsjaar waarin het lid zijn studieprofiel laatst bevestigde (2026 =
   // "26-27"). Loopt dat achter op het huidige werkingsjaar, dan is het profiel
   // verlopen: de bevestigingsgate vraagt het opnieuw en het lid valt zolang uit
@@ -273,6 +366,19 @@ model User {
   theokotPickedUp TheokotOrder[] @relation("TheokotPickedUpBy")
   theokotBans     TheokotBan[]
 
+  uitleenReservations     UitleenReservation[]      @relation("UitleenReservationUser")
+  uitleenDecided          UitleenReservation[]      @relation("UitleenDecidedBy")
+  uitleenPickedUp         UitleenReservation[]      @relation("UitleenPickedUpBy")
+  uitleenReturned         UitleenReservation[]      @relation("UitleenReturnedBy")
+  uitleenTransport        UitleenTransportBooking[] @relation("UitleenTransportUser")
+  uitleenTransportDriven  UitleenTransportBooking[] @relation("UitleenTransportDriver")
+  uitleenTransportDecided UitleenTransportBooking[] @relation("UitleenTransportDecidedBy")
+  uitleenTransportDone    UitleenTransportBooking[] @relation("UitleenTransportCompletedBy")
+
+  doorGrants         DoorAccessGrant[]
+  doorLogs           DoorAccessLog[]
+  doorShortcutTokens DoorShortcutToken[]
+
   createdTicketEvents      TicketEvent[]           @relation("TicketEventCreatedBy")
   ticketEventGrants        TicketEventUserGrant[]  @relation("TicketEventGrantUser")
   ticketEventGrantsGiven   TicketEventUserGrant[]  @relation("TicketEventGrantGrantedBy")
@@ -294,21 +400,26 @@ model User {
 }
 
 model Group {
-  id                String  @id @default(cuid())
+  id                String    @id @default(cuid())
   // Vrije, GUI-beheerde code (was een `GroupCode`-enum). Uniek, en de waarde die
   // shiften opslaan in `Shift.post` en de sessie meegeeft als `groups[].code`.
-  code              String  @unique
-  slug              String  @unique
+  code              String    @unique
+  slug              String    @unique
   nameNl            String
   nameEn            String
   descriptionNl     String?
   descriptionEn     String?
-  orderInPraesidium Int     @default(0)
+  orderInPraesidium Int       @default(0)
   photoKey          String?
+  // Praesidiumpost of werkgroep. Een werkgroep gebruikt dezelfde leden/rollen
+  // maar staat niet op /praesidium; ze krijgt /werkgroepen met haar eigen
+  // infotekst (description*, door de leden zelf bewerkbaar) en optionele website.
+  type              GroupType @default(PRAESIDIUM)
+  website           String?
   // Een gedeactiveerde post verdwijnt uit de nieuwe-shift-keuzes en het
   // postenbeheer voor nieuwe jaren, maar de historiek (memberships per jaar)
   // blijft bewaard i.p.v. de post te verwijderen.
-  active            Boolean @default(true)
+  active            Boolean   @default(true)
 
   memberships       GroupMembership[]
   // Rollen die deze post toekent aan haar leden (DEFAULT) en verantwoordelijke (LEADER).
@@ -318,6 +429,9 @@ model Group {
   ownedTicketEvents TicketEvent[]           @relation("TicketEventOwnerGroup")
   ticketEventGrants TicketEventGroupGrant[]
   ssoGrants         SsoGroupClientPermission[]
+
+  uitleenReservations UitleenReservation[]
+  uitleenTransport    UitleenTransportBooking[]
 }
 
 model GroupMembership {
@@ -1088,16 +1202,17 @@ model Poc {
   slug          String  @unique
   nameNl        String
   nameEn        String?
-  studyTrack    String
+  /// Eén adres voor de hele POC (bv. wtk-poc@vtk.be). Studenten mailen de POC,
+  /// niet een individuele vertegenwoordiger; die adressen tonen we nergens.
+  email         String?
   descriptionNl String?
   descriptionEn String?
   order         Int     @default(0)
 
-  // Aan welke richtingen deze POC hangt. `studyTrack` blijft de vrije tekst die
-  // op de POC-pagina getoond wordt ("Master Computer Science"); dit is de
-  // machineleesbare koppeling naar `User.studyProgrammes`, zodat de homepage de
-  // POC's van jouw richtingen kan tonen. Meerdere richtingen per POC kan: één
-  // POC bedient soms verschillende opleidingen.
+  // Aan welke richtingen deze POC hangt. Dit is de enige koppeling met een
+  // studierichting: het is de machineleesbare link naar `User.studyProgrammes`,
+  // zodat de homepage de POC's van jouw richtingen kan tonen. Meerdere richtingen
+  // per POC kan: één POC bedient soms verschillende opleidingen.
   studyProgrammes StudyProgramme[] @default([])
 
   representatives PocRepresentative[]
@@ -1209,6 +1324,17 @@ model Shift {
   // gedeactiveerd of hernoemd wordt.
   post String?
   // Ook een field bijhouden voor het evenement waarbij de shift hoort?
+
+  // Herkomst van een gespiegelde shift. Cursusdienst-shiften worden op
+  // cudi.vtk.be aangemaakt en hierheen gespiegeld; `sourceSystem` ("cudi") +
+  // `sourceId` (de cudi-shift-id) maken die spiegeling idempotent en markeren
+  // dat main-admins ze niet manueel beheren. Native VTK-shiften laten beide
+  // leeg (NULL, en NULLs botsen niet in de unieke index). Zie
+  // docs/design-decisions.md, "Cursusdienst-shiften op de main site".
+  sourceSystem String?
+  sourceId     String?
+
+  @@unique([sourceSystem, sourceId])
 }
 
 model ShiftParticipant {
@@ -1219,6 +1345,10 @@ model ShiftParticipant {
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   payedOut Boolean
+
+  /// Moment van inschrijven: binnen een korte bedenktijd mag je je nog
+  /// uitschrijven, ook wanneer de shift al binnen 24 uur begint.
+  registeredAt DateTime @default(now())
 
   @@id([shiftId, userId])
 }
@@ -1362,6 +1492,428 @@ model TheokotBan {
 
   @@index([userId])
   @@index([active])
+}
+
+// -----------------------------------------------------------------------------
+// Uitleendienst (logistiek.vtk.be): materiaal lenen, transport (kar/auto/
+// bakfiets) en flesserke. Aanvragen gebeuren per evenement, met een
+// aanvragertype (intern/werkgroep/extern). Flow: lid vraagt aan (REQUESTED),
+// Logistiek keurt goed of wijst af; de harde voorraadcheck gebeurt bij
+// goedkeuring in een Serializable-transactie. Prijzen/waarborgen worden
+// gesnapshot zodat catalogswijzigingen bestaande reservaties niet herschrijven.
+// -----------------------------------------------------------------------------
+
+model UitleenCategory {
+  id        String   @id @default(cuid())
+  name      String
+  sortIndex Int      @default(0)
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  items UitleenItem[]
+}
+
+model UitleenItem {
+  id           String  @id @default(cuid())
+  categoryId   String?
+  name         String
+  description  String?
+  photoKey     String?
+  // Aantal fysieke exemplaren; beschikbaarheid = quantity min overlappende
+  // APPROVED/PICKED_UP-reservaties in de gevraagde periode.
+  quantity     Int     @default(1)
+  depositCents Int     @default(0) // waarborg per stuk
+  priceCents   Int     @default(0) // huurprijs per stuk per reservatie; 0 = gratis
+  active       Boolean @default(true) // soft-delete: uit de catalogus, historiek blijft
+
+  // Een set is een fysiek samengestelde bundel met eigen voorraad; de inhoud
+  // (setContents) is louter beschrijvend en koppelt niet aan andere items.
+  isSet Boolean @default(false)
+
+  // Locatie in de loods (schap/rek) en staat; puur informatief voor het team.
+  locationShelf String? // bv. "2R"
+  locationRack  String? // bv. "A1"
+  condition     UitleenItemCondition @default(WERKT)
+  conditionNote String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  category    UitleenCategory?         @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  lines       UitleenReservationLine[]
+  setContents UitleenSetContent[]
+
+  @@index([categoryId, active])
+}
+
+/// Beschrijvende inhoud van een set (vrije tekst, geen koppeling aan andere
+/// items zodat de voorraad niet dubbel geteld wordt).
+model UitleenSetContent {
+  id        String @id @default(cuid())
+  itemId    String
+  label     String
+  quantity  Int    @default(1)
+  sortIndex Int    @default(0)
+
+  item UitleenItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
+
+  @@index([itemId, sortIndex])
+}
+
+model UitleenReservation {
+  id     String                   @id @default(cuid())
+  userId String
+  status UitleenReservationStatus @default(REQUESTED)
+
+  // Namens wie de aanvraag gebeurt. INTERN koppelt aan een post (groupId);
+  // WERKGROEP/EXTERN bewaren een vrije naam (requesterName).
+  requesterType UitleenRequesterType @default(INTERN)
+  groupId       String?
+  requesterName String?
+
+  // Evenement-context (de Logi-werking vraagt aan per evenement).
+  eventName          String // verplicht: waarvoor het materiaal dient
+  eventLocation      String?
+  eventStart         DateTime? @db.Timestamptz(3) // startuur (opbouw) van het evenement
+  expectedAttendance Int?
+  contactName        String?
+  contactPhone       String?
+  delivery           Boolean   @default(false) // levering nodig?
+  deliveryNote       String?
+
+  // Afhaal- en terugbrengdag (hele dagen; de concrete uren spreekt het team af).
+  pickupDate DateTime @db.Date
+  returnDate DateTime @db.Date
+
+  memberNote String? // extra info van het lid
+  adminNote  String? // nota van het team (bv. reden van afwijzing)
+
+  // Totalen gesnapshot bij de aanvraag.
+  totalPriceCents   Int
+  totalDepositCents Int
+
+  paymentMode       UitleenPaymentMode? // gezet door het team bij goedkeuring
+  paidOfflineAt     DateTime? // team drukte "betaald bij afhaling"
+  depositReturnedAt DateTime?
+
+  decidedAt    DateTime?
+  decidedById  String?
+  pickedUpAt   DateTime?
+  pickedUpById String?
+  returnedAt   DateTime?
+  returnedById String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user       User   @relation("UitleenReservationUser", fields: [userId], references: [id], onDelete: Cascade)
+  group      Group? @relation(fields: [groupId], references: [id], onDelete: SetNull)
+  decidedBy  User?  @relation("UitleenDecidedBy", fields: [decidedById], references: [id], onDelete: SetNull)
+  pickedUpBy User?  @relation("UitleenPickedUpBy", fields: [pickedUpById], references: [id], onDelete: SetNull)
+  returnedBy User?  @relation("UitleenReturnedBy", fields: [returnedById], references: [id], onDelete: SetNull)
+
+  lines          UitleenReservationLine[]
+  flesserkeLines UitleenFlesserkeLine[]
+  payments       UitleenPayment[]
+
+  @@index([userId])
+  @@index([status, pickupDate])
+  @@index([pickupDate, returnDate])
+  @@index([requesterType, status])
+}
+
+model UitleenReservationLine {
+  id            String @id @default(cuid())
+  reservationId String
+  itemId        String
+
+  // Snapshot van het item op aanvraagmoment.
+  itemName         String
+  quantity         Int
+  unitPriceCents   Int
+  unitDepositCents Int
+
+  reservation UitleenReservation @relation(fields: [reservationId], references: [id], onDelete: Cascade)
+  // Items worden soft-deleted (active=false), nooit hard verwijderd zolang er
+  // reservaties aan hangen.
+  item        UitleenItem        @relation(fields: [itemId], references: [id], onDelete: Restrict)
+
+  @@index([reservationId])
+  @@index([itemId])
+}
+
+/// Een voertuig van de transportdienst (kar, auto, bakfiets). Tarieven zijn
+/// team-configureerbaar, daarom DB-rijen i.p.v. een enum.
+model UitleenVehicle {
+  id          String             @id @default(cuid())
+  code        String             @unique // kar | auto | bakfiets
+  nameNl      String
+  nameEn      String
+  description String?
+  pricingMode UitleenPricingMode @default(FREE)
+  rateCents   Int                @default(0) // per uur / per km / vast, naargelang pricingMode
+  sortIndex   Int                @default(0)
+  active      Boolean            @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  bookings UitleenTransportBooking[]
+}
+
+/// Transportaanvraag met een voertuig, een tijdvenster en (later) een chauffeur.
+/// Bewust een eigen model (geen materiaalaanvraag): aparte behandelaar, aparte
+/// lifecycle. Prijs kan pas bij afronden gekend zijn (per-km).
+model UitleenTransportBooking {
+  id        String                        @id @default(cuid())
+  userId    String
+  vehicleId String
+  status    UitleenTransportBookingStatus @default(REQUESTED)
+
+  requesterType UitleenRequesterType @default(INTERN)
+  groupId       String?
+  requesterName String?
+
+  startAt DateTime @db.Timestamptz(3)
+  endAt   DateTime @db.Timestamptz(3)
+
+  eventName     String? // vrije koppeling aan het evenement (geen FK)
+  purpose       String // waarvoor de rit dient
+  pickupAddress String?
+  destination   String?
+  helpersNote   String? // bijrijders die de aanvrager zelf voorziet
+
+  driverId String? // pas het weekend ervoor toegewezen; blijft optioneel bij goedkeuring
+
+  // Tarief gesnapshot bij de aanvraag (en her-gesnapshot bij een voertuigwissel).
+  pricingMode UitleenPricingMode
+  rateCents   Int
+  kilometers  Int? // ingevuld bij afronden voor PER_KM
+  priceCents  Int? // null = nog niet gekend (PER_KM voor de rit)
+
+  paymentMode   UitleenPaymentMode?
+  paidOfflineAt DateTime?
+
+  memberNote String?
+  adminNote  String?
+
+  decidedAt     DateTime?
+  decidedById   String?
+  completedAt   DateTime?
+  completedById String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user        User           @relation("UitleenTransportUser", fields: [userId], references: [id], onDelete: Cascade)
+  vehicle     UitleenVehicle @relation(fields: [vehicleId], references: [id], onDelete: Restrict)
+  group       Group?         @relation(fields: [groupId], references: [id], onDelete: SetNull)
+  driver      User?          @relation("UitleenTransportDriver", fields: [driverId], references: [id], onDelete: SetNull)
+  decidedBy   User?          @relation("UitleenTransportDecidedBy", fields: [decidedById], references: [id], onDelete: SetNull)
+  completedBy User?          @relation("UitleenTransportCompletedBy", fields: [completedById], references: [id], onDelete: SetNull)
+
+  payments UitleenPayment[]
+
+  @@index([userId])
+  @@index([status, startAt])
+  @@index([startAt, endAt])
+  @@index([vehicleId, status])
+  @@index([requesterType, status])
+}
+
+/// Spiegel van TicketPayment (zonder refunds): provider is een vrije string
+/// zodat een providerwissel geen migratie vraagt. Precies één van
+/// reservationId/transportBookingId is gezet.
+model UitleenPayment {
+  id                 String               @id @default(cuid())
+  reservationId      String?
+  transportBookingId String?
+  provider           String
+  providerCheckoutId String?
+  providerPaymentId  String?
+  idempotencyKey     String
+  status             UitleenPaymentStatus @default(CREATED)
+  amountCents        Int
+  currency           String               @default("EUR")
+  checkoutUrl        String?
+  providerStatus     String?
+  expiresAt          DateTime?            @db.Timestamptz(3)
+  succeededAt        DateTime?            @db.Timestamptz(3)
+  failedAt           DateTime?            @db.Timestamptz(3)
+  createdAt          DateTime             @default(now()) @db.Timestamptz(3)
+  updatedAt          DateTime             @updatedAt @db.Timestamptz(3)
+
+  reservation      UitleenReservation?      @relation(fields: [reservationId], references: [id], onDelete: Restrict)
+  transportBooking UitleenTransportBooking? @relation(fields: [transportBookingId], references: [id], onDelete: Restrict)
+  webhooks         UitleenPaymentWebhook[]
+
+  @@unique([provider, providerCheckoutId])
+  @@unique([provider, providerPaymentId])
+  @@unique([provider, idempotencyKey])
+  @@index([reservationId, status])
+  @@index([transportBookingId, status])
+  @@index([status, expiresAt])
+}
+
+model UitleenPaymentWebhook {
+  id                 String    @id @default(cuid())
+  provider           String
+  externalEventId    String
+  paymentId          String?
+  signatureValid     Boolean
+  payload            Json
+  processingAttempts Int       @default(0)
+  receivedAt         DateTime  @default(now()) @db.Timestamptz(3)
+  processedAt        DateTime? @db.Timestamptz(3)
+  lastError          String?
+
+  payment UitleenPayment? @relation(fields: [paymentId], references: [id], onDelete: Restrict)
+
+  @@unique([provider, externalEventId])
+  @@index([paymentId])
+  @@index([processedAt, receivedAt])
+}
+
+// -----------------------------------------------------------------------------
+// Flesserke: verbruiksstock (voeding, drank, huishoudproducten) die per event
+// wordt klaargezet. Enkel voor interne werking (INTERN/WERKGROEP). Beschikbaar
+// wordt altijd berekend (quantity min gereserveerd), nooit opgeslagen. Bij het
+// terugbrengen boekt het team het verbruik af (gesloten terug, open weg).
+// -----------------------------------------------------------------------------
+
+model UitleenFlesserkeCategory {
+  id        String   @id @default(cuid())
+  name      String
+  sortIndex Int      @default(0)
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  items UitleenFlesserkeItem[]
+}
+
+model UitleenFlesserkeItem {
+  id            String    @id @default(cuid())
+  categoryId    String?
+  name          String
+  brand         String?
+  contentAmount String? // "Hoeveelheid [kg of L]"
+  expiryDate    DateTime? @db.Date // eerste vervaldatum
+  colruytUrl    String?
+  quantity      Int       @default(0) // fysieke voorraad; beschikbaar = quantity - gereserveerd
+  locationShelf String?
+  locationRack  String?
+  note          String?
+  active        Boolean   @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  category UitleenFlesserkeCategory? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  lines    UitleenFlesserkeLine[]
+
+  @@index([categoryId, active])
+}
+
+model UitleenFlesserkeLine {
+  id              String @id @default(cuid())
+  reservationId   String
+  flesserkeItemId String
+
+  itemName         String // snapshot
+  quantity         Int
+  returnedQuantity Int? // ingevuld bij terugbrengen; verbruik = quantity - returnedQuantity
+
+  reservation UitleenReservation   @relation(fields: [reservationId], references: [id], onDelete: Cascade)
+  item        UitleenFlesserkeItem @relation(fields: [flesserkeItemId], references: [id], onDelete: Restrict)
+
+  @@index([reservationId])
+  @@index([flesserkeItemId])
+}
+
+// -----------------------------------------------------------------------------
+// Deurtoegang (KU Leuven-kaartscanner op de deur, bediend door een Raspberry Pi)
+// -----------------------------------------------------------------------------
+
+// Tijdelijke deurtoegang los van de rollen: wie geen `door.open`-recht heeft maar
+// binnen [startsAt, endsAt] valt, mag de deur toch openen. Bedoeld voor gasten,
+// externen of kortlopende uitzonderingen. Verlopen grants blijven staan als
+// historiek; ze tellen enkel mee zolang now in het venster valt.
+model DoorAccessGrant {
+  id          String   @id @default(cuid())
+  userId      String
+  startsAt    DateTime @default(now())
+  endsAt      DateTime
+  note        String?
+  createdById String?
+  createdAt   DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([endsAt])
+}
+
+// Eén rij per deurgebeurtenis: elke kaartscan (toegelaten, geweigerd, onbekende
+// kaart of fout) en elke remote-open vanaf het dashboard. Voedt de statistiek en
+// het logoverzicht in /admin/deur. `userId` is null wanneer de kaart niet aan een
+// gebruiker gekoppeld kon worden; `offline` markeert events die de Pi tijdens een
+// outage bufferde en later naflushte.
+model DoorAccessLog {
+  id       String        @id @default(cuid())
+  at       DateTime      @default(now())
+  userId   String?
+  rNumber  String?
+  cardName String?
+  method   DoorMethod
+  result   DoorLogResult
+  reason   String?
+  offline  Boolean       @default(false)
+
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([at])
+  @@index([result])
+  @@index([userId])
+}
+
+// Persoonlijk, intrekbaar token waarmee een Apple Shortcut de deur via de
+// publieke website-API kan openen. Alleen de SHA-256-hash wordt bewaard; het
+// ruwe token wordt bij aanmaak exact één keer aan de gebruiker getoond.
+model DoorShortcutToken {
+  id         String    @id @default(cuid())
+  userId     String
+  label      String
+  tokenHash  String    @unique
+  expiresAt  DateTime  @db.Timestamptz(3)
+  lastUsedAt DateTime? @db.Timestamptz(3)
+  revokedAt  DateTime? @db.Timestamptz(3)
+  createdAt  DateTime  @default(now()) @db.Timestamptz(3)
+  updatedAt  DateTime  @updatedAt @db.Timestamptz(3)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, revokedAt])
+  @@index([expiresAt])
+}
+
+// -----------------------------------------------------------------------------
+// KU Leuven SSO (OIDC) debug log
+// -----------------------------------------------------------------------------
+// Opt-in via Admin -> IT (Setting-sleutel "kul.debug"). Eén rij per KU Leuven-
+// login met de ruwe claims die better-auth aan `mapProfileToUser` doorgeeft,
+// zodat een superadmin kan zien welke attributen ICTS effectief vrijgeeft (bv. of
+// KULeuvenEmployeeType/faculteit binnenkomt). Bevat persoonsgegevens, staat
+// daarom standaard uit en wordt tot de laatste N rijen gesnoeid.
+model KulAuthLog {
+  id      String   @id @default(cuid())
+  at      DateTime @default(now())
+  email   String?
+  rNumber String?
+  claims  Json
+
+  @@index([at])
 }
 
 // -----------------------------------------------------------------------------

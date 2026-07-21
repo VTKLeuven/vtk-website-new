@@ -97,9 +97,9 @@ the design language into the application instead of copying mockup content.
 ## Visual System
 
 - Fonts: use Inter for UI and body text. Use Instrument Serif only as an italic
-  accent in the hero headline and the footer tagline, never for dense interface
-  copy; homepage section headings are plain sans (the serif accent there was
-  reviewed and removed).
+  accent in the hero headline, never for dense interface copy; homepage section
+  headings are plain sans (the serif accent there was reviewed and removed), and
+  the footer serif tagline accent was reviewed and removed too.
 - Palette: cool paper, light mode. Every colour is a CSS custom property defined
   **once** in `apps/web/app/design/vtk-base.css`; components reference the tokens,
   never raw hexes. Retune the palette there and the whole site follows. Key
@@ -168,6 +168,23 @@ the design language into the application instead of copying mockup content.
 
 ## Components
 
+- Markdown editing: gebruik
+  `apps/web/components/editor/MarkdownEditor.tsx` voor alle langere,
+  opgemaakte tekst die als Markdown wordt opgeslagen. Gebruik
+  `MarkdownEditorField` in een gewoon formulier; die beheert de waarde en voegt
+  zelf de hidden input met `name` toe. Gebruik de controlled `MarkdownEditor`
+  wanneer de parent de waarde nodig heeft, bijvoorbeeld bij taaltabs. Bouw voor
+  nieuwe velden geen losse textarea met een eigen Markdown-werkbalk.
+  - De standaardwerkbalk bevat H1, H2, H3, links, image-upload, bold, italics,
+    inline of fenced code, unordered en ordered lists, blockquotes en een
+    horizontal rule. Zet `allowImages={false}` wanneer uploads niet bij het
+    inhoudstype passen.
+  - Render opgeslagen inhoud met
+    `apps/web/components/ui/Markdown.tsx` in een `prose-vtk` container. Gebruik
+    `markdownToPlainText` uit `apps/web/lib/markdown.ts` voor compacte previews
+    waarin rijke HTML niet past.
+  - Ruwe HTML blijft uitgeschakeld. Voeg geen `rehype-raw` toe, want deze inhoud
+    wordt door leden beheerd.
 - Header: sticky, solid `--navy` bar with light nav links, compact brand mark,
   and subtle language/account controls; it pairs with the dark footer as the top
   bookend (the old translucent paper bar was reviewed and replaced). The text is
@@ -179,9 +196,9 @@ the design language into the application instead of copying mockup content.
 - Cards: `--surface` (white) panels with thin `--line` borders on the cool
   `--paper` ground, small elevation at most, and restrained hover movement. No
   flat navy/dark card fills; a featured card is marked with a yellow accent rail.
-- Footer: a dark `--navy` band on every page (light text, yellow serif accent,
-  yellow brand badge), the same navy as the header; it bookends the dark hero,
-  so do not lighten it per page.
+- Footer: a dark `--navy` band on every page (light text, the same `vtk-logo.png`
+  brand mark as the header rather than a separate yellow badge), the same navy as
+  the header; it bookends the dark hero, so do not lighten it per page.
 - Lists and calendars: favor agenda/list layouts, tabular times, compact day
   labels, and small yellow status pins.
 - Admin: keep pages operationally dense. Forms, tables, and upload/editor

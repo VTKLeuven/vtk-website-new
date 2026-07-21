@@ -1,5 +1,6 @@
-import { Card, Input, Label, Select, Textarea } from "@vtk/ui";
+import { Card, Input, Label, Select } from "@vtk/ui";
 import { saveEventAction } from "@/app/actions/calendar";
+import { MarkdownEditorField } from "@/components/editor/MarkdownEditor";
 import { SaveForm } from "@/components/ui/SaveForm";
 import { saveErrorMessages } from "@/lib/saveMessages";
 import { EventImageField } from "./EventImageField";
@@ -110,12 +111,24 @@ export function EventForm({
           </div>
         </div>
         <div>
-          <Label>Description (NL)</Label>
-          <Textarea name="descriptionNl" defaultValue={event.descriptionNl ?? ""} rows={3} />
+          <Label htmlFor="calendar-description-nl">Description (NL)</Label>
+          <MarkdownEditorField
+            name="descriptionNl"
+            defaultValue={event.descriptionNl}
+            locale={locale}
+            rows={8}
+            textareaId="calendar-description-nl"
+          />
         </div>
         <div>
-          <Label>Description (EN)</Label>
-          <Textarea name="descriptionEn" defaultValue={event.descriptionEn ?? ""} rows={3} />
+          <Label htmlFor="calendar-description-en">Description (EN)</Label>
+          <MarkdownEditorField
+            name="descriptionEn"
+            defaultValue={event.descriptionEn}
+            locale={locale}
+            rows={8}
+            textareaId="calendar-description-en"
+          />
         </div>
       </Card>
     </SaveForm>

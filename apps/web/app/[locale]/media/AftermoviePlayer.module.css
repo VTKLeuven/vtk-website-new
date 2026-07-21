@@ -13,6 +13,8 @@
   min-width: 0;
 }
 
+/* The whole gallery sits on the navy media-band, so surfaces are dark glass and
+   copy is light; tokens follow the on-dark recipe from the homepage hero. */
 .vtk-media-aftermovie-viewport {
   position: relative;
   display: grid;
@@ -20,9 +22,9 @@
   overflow: hidden;
   place-items: center;
   border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 8px;
-  background: #0a0f1f;
-  color: #fafaf7;
+  border-radius: 16px;
+  background: var(--ink, #0a0f1f);
+  color: var(--paper, #eff2f8);
 }
 
 .vtk-media-aftermovie-media,
@@ -34,7 +36,7 @@
 }
 
 .vtk-media-aftermovie-media {
-  background: #0a0f1f;
+  background: var(--ink, #0a0f1f);
 }
 
 .vtk-media-aftermovie-viewport video {
@@ -52,7 +54,7 @@
 .vtk-media-aftermovie-placeholder-icon {
   width: 42px;
   height: 42px;
-  color: rgba(250, 250, 247, 0.48);
+  color: rgba(239, 242, 248, 0.48);
   stroke-width: 1.5;
 }
 
@@ -67,8 +69,8 @@
   padding: 11px 16px;
   border: 1px solid rgba(255, 255, 255, 0.25);
   border-radius: 999px;
-  background: #ffd23f;
-  color: #0a0f1f;
+  background: var(--yellow, #ffd23f);
+  color: var(--ink, #0a0f1f);
   font: inherit;
   font-size: 14px;
   font-weight: 700;
@@ -106,7 +108,7 @@
 }
 
 .vtk-media-aftermovie-caption h3 {
-  color: var(--ink, #0a0f1f);
+  color: var(--paper, #eff2f8);
   font-size: clamp(19px, 2vw, 24px);
   font-weight: 600;
   line-height: 1.25;
@@ -114,7 +116,7 @@
 
 .vtk-media-aftermovie-caption p {
   flex: 0 0 auto;
-  color: var(--muted, #5c667f);
+  color: var(--on-dark-muted, #b7c0dc);
   font-size: 12px;
   line-height: 1.5;
 }
@@ -139,10 +141,10 @@
   gap: 12px;
   align-items: center;
   padding: 7px;
-  border: 1px solid var(--line, rgba(14, 26, 54, 0.1));
-  border-radius: 8px;
-  background: var(--surface, #fff);
-  color: var(--ink, #0a0f1f);
+  border: 1px solid rgba(255, 255, 255, 0.11);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--paper, #eff2f8);
   font: inherit;
   text-align: left;
   cursor: pointer;
@@ -150,12 +152,12 @@
 }
 
 .vtk-media-aftermovie-item:hover {
-  border-color: var(--line-2, rgba(14, 26, 54, 0.18));
-  background: var(--paper-2, #f2f0e9);
+  border-color: rgba(255, 255, 255, 0.24);
+  background: rgba(255, 255, 255, 0.11);
 }
 
 .vtk-media-aftermovie-item-active {
-  border-color: var(--ink, #0a0f1f);
+  border-color: rgba(255, 255, 255, 0.35);
   box-shadow: inset 3px 0 0 var(--yellow, #ffd23f);
 }
 
@@ -166,8 +168,8 @@
   aspect-ratio: 16 / 9;
   overflow: hidden;
   place-items: center;
-  border-radius: 5px;
-  background: #0a0f1f;
+  border-radius: 8px;
+  background: var(--ink, #0a0f1f);
   color: #fff;
 }
 
@@ -188,7 +190,7 @@
 .vtk-media-aftermovie-thumbnail > .vtk-media-aftermovie-placeholder-icon {
   width: 26px;
   height: 26px;
-  color: rgba(250, 250, 247, 0.42);
+  color: rgba(239, 242, 248, 0.42);
 }
 
 .vtk-media-aftermovie-item-copy {
@@ -216,7 +218,7 @@
 
 .vtk-media-aftermovie-item-copy span {
   margin-top: 5px;
-  color: var(--muted, #5c667f);
+  color: var(--on-dark-muted, #b7c0dc);
   font-size: 11px;
   line-height: 1.35;
 }
@@ -227,7 +229,7 @@
   align-items: center;
   justify-content: center;
   gap: 12px;
-  color: var(--muted, #5c667f);
+  color: var(--on-dark-muted, #b7c0dc);
 }
 
 .vtk-media-aftermovie-fallback {
@@ -254,10 +256,10 @@
   min-height: 40px;
   align-items: center;
   gap: 8px;
-  padding: 9px 13px;
-  border: 1px solid rgba(250, 250, 247, 0.28);
-  border-radius: 6px;
-  color: #fafaf7;
+  padding: 9px 16px;
+  border: 1px solid rgba(239, 242, 248, 0.28);
+  border-radius: 999px;
+  color: var(--paper, #eff2f8);
   font-size: 13px;
   font-weight: 600;
   text-decoration: none;
@@ -275,8 +277,8 @@
 
 .vtk-media-aftermovie-empty {
   min-height: 180px;
-  border-top: 1px solid var(--line, rgba(14, 26, 54, 0.1));
-  border-bottom: 1px solid var(--line, rgba(14, 26, 54, 0.1));
+  border-top: 1px solid rgba(255, 255, 255, 0.14);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.14);
 }
 
 .vtk-media-aftermovie-play:focus-visible,

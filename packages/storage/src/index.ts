@@ -122,13 +122,28 @@ export async function deleteObject(key: string): Promise<void> {
   await client.send(new DeleteObjectCommand({ Bucket: bucket, Key: key }));
 }
 
-export async function getObjectStream(key: string): Promise<{
+/**
+ * Streamt een object, optioneel een byte-range (de ruwe `Range`-header).
+ *
+ * De range gaat ongewijzigd naar S3 en het antwoord draagt `contentRange`, zodat
+ * de route een echte 206 kan teruggeven. Zonder dat moet een PDF-lezer het hele
+ * bestand binnenhalen voor hij bladzijde 1 kan tonen.
+ */
+export async function getObjectStream(
+  key: string,
+  range?: string | null
+): Promise<{
   stream: NodeJS.ReadableStream;
   contentType: string | undefined;
   contentLength: number | undefined;
+  contentRange: string | undefined;
+  etag: string | undefined;
+  lastModified: Date | undefined;
 }> {
   const { client, bucket } = await getClient();
-  const res = await client.send(new GetObjectCommand({ Bucket: bucket, Key: key }));
+  const res = await client.send(
+    new GetObjectCommand({ Bucket: bucket, Key: key, Range: range ?? undefined })
+  );
   const body = res.Body;
   if (!body) throw new Error(`Object not found: ${key}`);
   const stream = body as unknown as NodeJS.ReadableStream;
@@ -136,6 +151,9 @@ export async function getObjectStream(key: string): Promise<{
     stream,
     contentType: res.ContentType,
     contentLength: res.ContentLength,
+    contentRange: res.ContentRange,
+    etag: res.ETag,
+    lastModified: res.LastModified,
   };
 }
 

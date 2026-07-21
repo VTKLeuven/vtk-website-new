@@ -10,12 +10,22 @@ import type {
   RefundStatusResult,
 } from "./types";
 
+export type MockGatewayConfig = {
+  /** App-pad van de dev-only complete-route, bv. "/api/tickets/mock/complete". */
+  completePath: string;
+};
+
 export class MockPaymentGateway implements PaymentGateway {
   readonly name = "mock";
+  private readonly config: MockGatewayConfig;
+
+  constructor(config: MockGatewayConfig) {
+    this.config = config;
+  }
 
   async createCheckout(input: CreateCheckoutInput): Promise<CheckoutResult> {
     if (process.env.NODE_ENV === "production") throw new Error("Mock payments are disabled");
-    const url = new URL(`/api/tickets/mock/complete`, input.successUrl);
+    const url = new URL(this.config.completePath, input.successUrl);
     url.searchParams.set("orderId", input.orderId);
     url.searchParams.set("returnTo", input.successUrl);
     return {

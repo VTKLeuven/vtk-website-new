@@ -15,6 +15,8 @@ import {
   type StoredS3,
   type StoredSentry,
 } from "@/lib/runtimeConfig";
+import { DOOR_SETTING_KEY, getDoorConfig, type StoredDoor } from "@/lib/door-config";
+import { KUL_DEBUG_SETTING_KEY, clearKulAuthLogs } from "@vtk/auth/server";
 import { saveError, saveOk, type SaveState } from "@/lib/saveState";
 
 /** Alle IT-acties zijn superadmin-only, net als de IT-tab zelf. */
@@ -174,4 +176,120 @@ export async function saveSentryConfigAction(
   revalidatePath("/", "layout");
   revalidatePath("/admin/it");
   return saveOk();
+}
+
+/**
+ * Bewaart de deurscanner-config (Pi-adres, unlock-pulse, gedeeld device-secret).
+ * Het secret staat versleuteld; laat het veld leeg om het bestaande te behouden.
+ * Superadmin-only, net als de rest van de IT-tab.
+ */
+export async function saveDoorConfigAction(
+  _prev: SaveState,
+  formData: FormData,
+): Promise<SaveState> {
+  await requireSuperAdmin();
+
+  const piUrl = ((formData.get("piUrl") as string) ?? "").trim().replace(/\/+$/, "");
+  const unlockRaw = ((formData.get("unlockSeconds") as string) ?? "").trim();
+  const secret = ((formData.get("deviceSecret") as string) ?? "").trim();
+
+  if (piUrl) {
+    try {
+      const u = new URL(piUrl);
+      if (u.protocol !== "http:" && u.protocol !== "https:") return saveError("INVALID_URL");
+    } catch {
+      return saveError("INVALID_URL");
+    }
+  }
+
+  let unlockSeconds: number | undefined;
+  if (unlockRaw) {
+    const n = Number(unlockRaw);
+    if (!Number.isFinite(n) || n <= 0 || n > 60) return saveError("INVALID_SECONDS");
+    unlockSeconds = n;
+  }
+
+  const existingRow = await prisma.setting.findUnique({ where: { key: DOOR_SETTING_KEY } });
+  const existing = (existingRow?.value ?? null) as unknown as StoredDoor | null;
+
+  const value: StoredDoor = {
+    piUrl: piUrl || existing?.piUrl,
+    unlockSeconds: unlockSeconds ?? existing?.unlockSeconds,
+    deviceSecretEnc: secret ? encryptSecret(secret) : existing?.deviceSecretEnc,
+  };
+
+  await prisma.setting.upsert({
+    where: { key: DOOR_SETTING_KEY },
+    create: { key: DOOR_SETTING_KEY, value: value as unknown as Prisma.InputJsonValue },
+    update: { value: value as unknown as Prisma.InputJsonValue },
+  });
+
+  revalidatePath("/admin/it");
+  return saveOk();
+}
+
+/**
+ * Test de verbinding met de Pi-listener over Tailscale: een GET naar `/health`
+ * met het device-secret. Geeft een leesbare status terug voor de IT-tab.
+ */
+export async function testDoorConnectionAction(): Promise<{ ok: boolean; error?: string }> {
+  await requireSuperAdmin();
+  const cfg = await getDoorConfig();
+  if (!cfg.piUrl) return { ok: false, error: "no_url" };
+  if (!cfg.deviceSecret) return { ok: false, error: "no_secret" };
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 5000);
+  try {
+    const res = await fetch(`${cfg.piUrl}/health`, {
+      headers: { Authorization: `Bearer ${cfg.deviceSecret}` },
+      signal: controller.signal,
+      cache: "no-store",
+    });
+    if (res.status === 401) return { ok: false, error: "unauthorized" };
+    if (!res.ok) return { ok: false, error: "pi_error" };
+    return { ok: true };
+  } catch {
+    return { ok: false, error: "unreachable" };
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+// ---- KU Leuven SSO (OIDC) debug ---------------------------------------------
+
+/**
+ * Zet het loggen van KU Leuven-claims aan of uit (Setting-sleutel `kul.debug`).
+ * De auth-flow leest deze toggle live bij elke login (zie packages/auth
+ * logins/kul-debug.ts), dus er is geen herstart nodig. Superadmin-only.
+ */
+export async function saveKulDebugAction(
+  _prev: SaveState,
+  formData: FormData,
+): Promise<SaveState> {
+  await requireSuperAdmin();
+
+  const enabled = formData.get("enabled") === "on";
+  await prisma.setting.upsert({
+    where: { key: KUL_DEBUG_SETTING_KEY },
+    create: {
+      key: KUL_DEBUG_SETTING_KEY,
+      value: { enabled } as unknown as Prisma.InputJsonValue,
+    },
+    update: { value: { enabled } as unknown as Prisma.InputJsonValue },
+  });
+
+  revalidatePath("/admin/it");
+  return saveOk();
+}
+
+/**
+ * Wist alle bewaarde KU Leuven-loginclaims. De toggle blijft ongewijzigd: staat
+ * het loggen aan, dan vullen nieuwe logins de log weer aan. Superadmin-only; de
+ * bevestiging gebeurt in de UI via `DeleteButton`.
+ */
+export async function clearKulAuthLogsAction(): Promise<void> {
+  await requireSuperAdmin();
+  await clearKulAuthLogs();
+  revalidatePath("/admin/it");
 }

@@ -25,6 +25,7 @@ export default async function PraesidiumPage({
 
   const [groups, distinctYears] = await Promise.all([
     prisma.group.findMany({
+      where: { type: "PRAESIDIUM" },
       orderBy: { orderInPraesidium: "asc" },
       include: {
         memberships: {
@@ -33,7 +34,7 @@ export default async function PraesidiumPage({
         },
       },
     }),
-    prisma.groupMembership.findMany({ distinct: ["year"], select: { year: true } }),
+    prisma.groupMembership.findMany({ where: { group: { type: "PRAESIDIUM" } }, distinct: ["year"], select: { year: true } }),
   ]);
 
   const tabs = workingYearTabs(distinctYears.map((r) => r.year));
