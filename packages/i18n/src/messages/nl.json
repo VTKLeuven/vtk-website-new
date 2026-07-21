@@ -296,7 +296,8 @@
     "back": "Terug",
     "noAccess": "Geen toegang",
     "ledenbeheer": "Ledenbeheer",
-    "website": "Website"
+    "website": "Website",
+    "sso": "SSO & apps"
   },
   "confirmStudy": {
     "title": "Klopt je studie nog?",

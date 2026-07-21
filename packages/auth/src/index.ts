@@ -11,6 +11,15 @@ import type { Permission } from './lib/permissions';
 export { splitFullName, fullName, nameParts, type NameParts } from './lib/names';
 export { PERMISSIONS, isPermission, permissionCodes, type Permission } from './lib/permissions';
 export { currentWorkingYear, FIRST_WORKING_YEAR } from './lib/workingYear';
+export {
+  SCOPES,
+  SCOPE_CODES,
+  DEFAULT_SCOPE_CODES,
+  describeScope,
+  isSensitiveScope,
+  type Scope,
+  type ScopeDefinition,
+} from './lib/scopes';
 
 /**
  * Staat hier en niet in `auth.ts` omdat de proxy hem nodig heeft en die
@@ -19,6 +28,12 @@ export { currentWorkingYear, FIRST_WORKING_YEAR } from './lib/workingYear';
  * geregistreerde client.
  */
 export const AUTH_BASE_PATH = '/api/auth/better';
+
+/**
+ * Eigenaar van elke OAuth-client. Vast, want clients zijn van VTK en niet van
+ * de beheerder die ze toevallig aanmaakte; zie `clientReference` in auth.ts.
+ */
+export const OAUTH_CLIENT_OWNER = 'vtk';
 
 /** */
 export type Locale = 'NL' | 'EN';

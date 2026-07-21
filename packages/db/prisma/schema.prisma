@@ -279,6 +279,7 @@ model User {
   oauthRefreshTokens       OauthRefreshToken[]
   oauthAccessTokens        OauthAccessToken[]
   oauthConsents            OauthConsent[]
+  ssoAuditLogs             SsoAuditLog[]
 }
 
 model Group {
@@ -1525,4 +1526,37 @@ model OauthConsent {
   @@index([clientId])
   @@index([userId])
   @@map("oauthConsent")
+}
+
+/// Wie heeft wat gewijzigd aan welke OAuth-client. Bewust geen veld-diffs: het
+/// SSO-team is klein, en de vraag is in de praktijk "wie zette dit aan en
+/// wanneer", niet "welke byte veranderde".
+///
+/// Deze log is de enige verantwoording die er is: iedereen met
+/// `oauth.client.edit` mag elke client bewerken, dus er is geen eigenaar of
+/// fijnmazig recht dat een wijziging nog tegenhoudt.
+model SsoAuditLog {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+
+  actor   User?   @relation(fields: [actorId], references: [id], onDelete: SetNull)
+  actorId String?
+  /// Naam op het moment van de actie. Los van de relatie, zodat de regel
+  /// leesbaar blijft nadat het lid verwijderd is.
+  actorName String
+
+  /// Geen relatie naar OauthClient: een verwijderde client moet juist in de log
+  /// blijven staan, en een FK zou die regel mee weggooien of het verwijderen
+  /// blokkeren.
+  clientId   String
+  clientName String
+
+  /// create | update | rotate-secret | enable | disable | delete | revoke-tokens
+  action String
+  /// Korte, leesbare samenvatting, bv. "redirect-URI's gewijzigd".
+  summary String?
+
+  @@index([createdAt])
+  @@index([clientId])
+  @@map("ssoAuditLog")
 }

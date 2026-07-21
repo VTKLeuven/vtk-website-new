@@ -1,21 +1,21 @@
-import Link from "next/link";
-import { notFound } from "next/navigation";
-import { prisma } from "@vtk/db";
-import { Card, Label, Input, Select, Button } from "@vtk/ui";
-import { hasLocale } from "@/lib/locale";
-import { requireSession } from "@/lib/session";
-import { getDictionary, pick } from "@vtk/i18n";
-import { formatEuro } from "@/lib/theokot";
-import type { SaveState } from "@/lib/saveState";
-import { updateProfileAction, logoutAction } from "@/app/actions/auth";
-import { ProfileForm } from "@/components/profile/ProfileForm";
-import { SaveForm } from "@/components/ui/SaveForm";
+import Link from 'next/link';
+import { notFound } from 'next/navigation';
+import { prisma } from '@vtk/db';
+import { Card, Label, Input, Select, Button } from '@vtk/ui';
+import { hasLocale } from '@/lib/locale';
+import { requireSession } from '@/lib/session';
+import { getDictionary, pick } from '@vtk/i18n';
+import { formatEuro } from '@/lib/theokot';
+import type { SaveState } from '@/lib/saveState';
+import { updateProfileAction, logoutAction } from '@/app/actions/auth';
+import { ProfileForm } from '@/components/profile/ProfileForm';
+import { SaveForm } from '@/components/ui/SaveForm';
 
 export default async function AccountPage({ params }: { params: Promise<{ locale: string }> }) {
   const { locale } = await params;
   if (!hasLocale(locale)) notFound();
-  const nl = locale === "nl";
-  const session = await requireSession(`/inloggen?next=${nl ? "" : "/en"}/account`);
+  const nl = locale === 'nl';
+  const session = await requireSession(`/inloggen?next=${nl ? '' : '/en'}/account`);
   const dict = getDictionary(locale);
 
   // Volledig profiel voor het bewerkbare gegevensformulier (kotadres, mails, ...).
@@ -46,31 +46,31 @@ export default async function AccountPage({ params }: { params: Promise<{ locale
   // Aankomende reservaties (nog niet opgehaald, afhaalvenster nog niet voorbij).
   const now = new Date();
   const reservations = await prisma.theokotOrder.findMany({
-    where: { userId: session.user.id, status: "RESERVED", session: { pickupEnd: { gte: now } } },
-    orderBy: { session: { date: "asc" } },
+    where: { userId: session.user.id, status: 'RESERVED', session: { pickupEnd: { gte: now } } },
+    orderBy: { session: { date: 'asc' } },
     include: {
       session: { select: { date: true, pickupStart: true, pickupEnd: true } },
       lines: {
         include: { sessionItem: { select: { nameNl: true, nameEn: true } } },
-        orderBy: { sessionItem: { order: "asc" } },
+        orderBy: { sessionItem: { order: 'asc' } },
       },
     },
   });
 
-  const dayFmt = new Intl.DateTimeFormat(nl ? "nl-BE" : "en-GB", {
-    timeZone: "Europe/Brussels",
-    weekday: "long",
-    day: "numeric",
-    month: "long",
+  const dayFmt = new Intl.DateTimeFormat(nl ? 'nl-BE' : 'en-GB', {
+    timeZone: 'Europe/Brussels',
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
   });
-  const timeFmt = new Intl.DateTimeFormat(nl ? "nl-BE" : "en-GB", {
-    timeZone: "Europe/Brussels",
-    hour: "2-digit",
-    minute: "2-digit",
+  const timeFmt = new Intl.DateTimeFormat(nl ? 'nl-BE' : 'en-GB', {
+    timeZone: 'Europe/Brussels',
+    hour: '2-digit',
+    minute: '2-digit',
   });
 
   async function onSaveLocale(_prev: SaveState, formData: FormData): Promise<SaveState> {
-    "use server";
+    'use server';
     return updateProfileAction(session.user.id, formData);
   }
 
@@ -104,22 +104,33 @@ export default async function AccountPage({ params }: { params: Promise<{ locale
       </Card>
 
       <Card className="p-6">
-        <ProfileForm
-          locale={locale}
-          user={profile}
-          submitLabel={nl ? "Gegevens opslaan" : "Save details"}
-        />
+        <ProfileForm locale={locale} user={profile} submitLabel={nl ? 'Gegevens opslaan' : 'Save details'} />
+      </Card>
+
+      <Card className="p-6">
+        <h2 className="mb-2 text-lg font-semibold text-vtk-ink">{nl ? 'Verbonden apps' : 'Connected apps'}</h2>
+        <p className="mb-4 text-sm text-[#5c667f]">
+          {nl
+            ? 'Bekijk welke applicaties toegang hebben tot je VTK-account, en verbreek de verbinding wanneer je wil.'
+            : 'See which applications have access to your VTK account, and disconnect them whenever you want.'}
+        </p>
+        <Link
+          href={nl ? '/account/verbonden-apps' : '/en/account/verbonden-apps'}
+          className="font-medium text-vtk-ink underline"
+        >
+          {nl ? 'Verbonden apps beheren' : 'Manage connected apps'}
+        </Link>
       </Card>
 
       <Card className="p-6">
         <h2 className="mb-4 text-lg font-semibold text-vtk-ink">
-          {nl ? "Gereserveerde broodjes" : "Reserved sandwiches"}
+          {nl ? 'Gereserveerde broodjes' : 'Reserved sandwiches'}
         </h2>
         {reservations.length === 0 ? (
           <p className="text-sm text-[#5c667f]">
             {nl ? (
               <>
-                Je hebt geen openstaande reservaties.{" "}
+                Je hebt geen openstaande reservaties.{' '}
                 <Link href="/theokot" className="font-medium text-vtk-ink underline">
                   Reserveer broodjes
                 </Link>
@@ -127,7 +138,7 @@ export default async function AccountPage({ params }: { params: Promise<{ locale
               </>
             ) : (
               <>
-                You have no open reservations.{" "}
+                You have no open reservations.{' '}
                 <Link href="/en/theokot" className="font-medium text-vtk-ink underline">
                   Reserve sandwiches
                 </Link>
@@ -138,16 +149,13 @@ export default async function AccountPage({ params }: { params: Promise<{ locale
         ) : (
           <ul className="space-y-4">
             {reservations.map((order) => (
-              <li
-                key={order.id}
-                className="rounded-xl border border-vtk-blue/12 bg-vtk-blue-soft/40 p-4"
-              >
+              <li key={order.id} className="rounded-xl border border-vtk-blue/12 bg-vtk-blue-soft/40 p-4">
                 <div className="mb-2 flex flex-wrap items-baseline justify-between gap-2">
                   <span className="text-sm font-semibold capitalize text-vtk-ink">
                     {dayFmt.format(order.session.date)}
                   </span>
                   <span className="text-xs text-[#5c667f]">
-                    {nl ? "Afhalen" : "Pickup"}: {timeFmt.format(order.session.pickupStart)} –{" "}
+                    {nl ? 'Afhalen' : 'Pickup'}: {timeFmt.format(order.session.pickupStart)} –{' '}
                     {timeFmt.format(order.session.pickupEnd)}
                   </span>
                 </div>
@@ -155,14 +163,15 @@ export default async function AccountPage({ params }: { params: Promise<{ locale
                   {order.lines.map((line) => (
                     <li key={line.id} className="flex justify-between py-0.5">
                       <span>
-                        {line.quantity}× {pick(line.sessionItem.nameNl, line.sessionItem.nameEn, locale) ?? line.sessionItem.nameNl}
+                        {line.quantity}×{' '}
+                        {pick(line.sessionItem.nameNl, line.sessionItem.nameEn, locale) ?? line.sessionItem.nameNl}
                       </span>
                       <span className="tabular-nums">{formatEuro(line.quantity * line.unitPriceCents)}</span>
                     </li>
                   ))}
                 </ul>
                 <div className="mt-2 flex items-center justify-between border-t border-vtk-blue/10 pt-2 text-sm">
-                  <span className="font-semibold">{nl ? "Totaal" : "Total"}</span>
+                  <span className="font-semibold">{nl ? 'Totaal' : 'Total'}</span>
                   <span className="font-semibold tabular-nums">{formatEuro(order.totalCents)}</span>
                 </div>
               </li>
@@ -173,7 +182,7 @@ export default async function AccountPage({ params }: { params: Promise<{ locale
           <p className="mt-4 text-xs text-[#5c667f]">
             {nl ? (
               <>
-                Reservaties beheren of annuleren doe je op de{" "}
+                Reservaties beheren of annuleren doe je op de{' '}
                 <Link href="/theokot" className="font-medium text-vtk-ink underline">
                   Theokot-pagina
                 </Link>
@@ -181,7 +190,7 @@ export default async function AccountPage({ params }: { params: Promise<{ locale
               </>
             ) : (
               <>
-                Manage or cancel reservations on the{" "}
+                Manage or cancel reservations on the{' '}
                 <Link href="/en/theokot" className="font-medium text-vtk-ink underline">
                   Theokot page
                 </Link>

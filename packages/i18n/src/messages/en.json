@@ -296,7 +296,8 @@
     "back": "Back",
     "noAccess": "No access",
     "ledenbeheer": "Members",
-    "website": "Website"
+    "website": "Website",
+    "sso": "SSO & apps"
   },
   "confirmStudy": {
     "title": "Are your studies still up to date?",

@@ -15,7 +15,7 @@ import { hasSSOPrivileges } from './server/sso';
 
 import { hashPassword, verifyPassword } from './logins/password';
 import { kulOAuthConfig, KUL_PROVIDER_ID } from './logins/kul';
-import { AUTH_BASE_PATH } from './index';
+import { AUTH_BASE_PATH, OAUTH_CLIENT_OWNER, SCOPE_CODES } from './index';
 
 const isProduction = process.env.NODE_ENV === 'production';
 
@@ -43,6 +43,24 @@ export const auth = betterAuth({
       // autorisatie-query erachter; die query draagt de volledige flowstatus.
       loginPage: '/inloggen',
       consentPage: '/inloggen/consent',
+      // De scope-registry (lib/scopes.ts) is de bron; zonder deze regel staat de
+      // plugin enkel haar vier standaardscopes toe en faalt het aanmaken van een
+      // client met bv. `vtk:study_programme` op `invalid_scope`.
+      //
+      // De `vtk:`-scopes leveren pas echte claims op in fase 4. Tot dan mag een
+      // client ze vragen en beschrijft het toestemmingsscherm ze correct, maar
+      // bevat de token er niets extra van. Dat is de bewuste asymmetrie uit het
+      // ontwerp: toestemming beschrijft het maximum, de token levert het minimum.
+      scopes: [...SCOPE_CODES],
+
+      // Clients zijn van VTK, niet van de persoon die ze aanmaakte. De plugin
+      // hangt eigenaarschap aan `userId` OF aan deze referentie, en weigert
+      // verwijderen en secret-rotatie wanneer beide leeg zijn. Een vaste waarde
+      // maakt elke beheerder eigenaar van elke client, wat hier de bedoeling is.
+      // Bewust een constante: de plugin roept deze hook niet overal met dezelfde
+      // argumenten aan, dus negeren we ze.
+      clientReference: () => OAUTH_CLIENT_OWNER,
+
       // Bewust alles-of-niets: binnen IT heeft iedereen dezelfde rechten, dus
       // een map per action zou een verschil suggereren dat niet bestaat.
       clientPrivileges: async ({ action, headers, user, session }) => {

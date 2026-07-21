@@ -90,20 +90,30 @@ export async function getSession(headers: Headers): Promise<SessionPayload | nul
 }
 
 /**
- * check if a user has the correct permissions from the headers (with simple cache as to limit the amount of DB hits)
+ * De sessie voor deze `Headers`, hoogstens één keer per object opgehaald.
+ *
+ * `getSession` doet een zware query (posten, rollen, permissies), dus elke
+ * herhaling telt. Gebruik deze en niet `getSession` zodra binnen één request
+ * meerdere dingen de sessie nodig hebben.
+ *
+ * De cache hangt aan de identiteit van het `Headers`-object: krijgt een andere
+ * laag een kopie, dan mist ze gewoon en wordt er opnieuw geladen. Nooit fout,
+ * hoogstens trager.
  *
  * Only use this function in non react/nextjs methods => in those case use reacts native cache() function
- *
- * De cache raakt vandaag nooit: de enige oproeper is `hasSSOPrivileges`, en de
- * plugin roept die precies één keer per client-mutatie aan. Ze blijft staan
- * voor wanneer één request wél twee checks doet. Let dan op: de WeakMap hangt
- * aan de identiteit van het `Headers`-object, dus verifieer eerst met een
- * teller dat Next dat object hergebruikt.
  */
-export async function hasPermission(headers: Headers, permission: Permission): Promise<boolean> {
-  if (!sessionCache.has(headers)) sessionCache.set(headers, getSession(headers));
+export function getSessionCached(headers: Headers): Promise<SessionPayload | null> {
+  let cached = sessionCache.get(headers);
+  if (!cached) {
+    cached = getSession(headers);
+    sessionCache.set(headers, cached);
+  }
+  return cached;
+}
 
-  return rootHasPermission(await sessionCache.get(headers), permission);
+/** Zie getSessionCached: deelt dezelfde cache. */
+export async function hasPermission(headers: Headers, permission: Permission): Promise<boolean> {
+  return rootHasPermission(await getSessionCached(headers), permission);
 }
 
 const sessionCache = new WeakMap<Headers, Promise<SessionPayload | null>>();

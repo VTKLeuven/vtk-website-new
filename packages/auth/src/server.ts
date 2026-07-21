@@ -17,6 +17,23 @@ export { isKulEnabled } from './logins/kul';
 export { ApiHandler } from './apiHandlers/apiHandler';
 export { getSession } from './server/session';
 export { createUser, updateUser, setUserPassword, deleteUser } from './server/users';
+export {
+  listSsoClients,
+  getSsoClient,
+  createSsoClient,
+  updateSsoClient,
+  setSsoClientDisabled,
+  rotateSsoClientSecret,
+  deleteSsoClient,
+  revokeSsoClientTokens,
+  listSsoAuditLog,
+  listConnectedApps,
+  disconnectApp,
+  type CreateSsoClientInput,
+  type UpdateSsoClientInput,
+  type ConnectedApp,
+  type SsoAuditAction,
+} from './server/sso';
 
 export async function signInEmail(
   headers: Headers,
