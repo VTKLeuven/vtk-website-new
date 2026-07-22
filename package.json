@@ -18,7 +18,8 @@
     "db:generate": "npm run generate --workspace=@vtk/db",
     "db:push": "npm run push --workspace=@vtk/db",
     "db:migrate": "npm run migrate --workspace=@vtk/db",
-    "db:seed": "npm run seed --workspace=@vtk/db"
+    "db:seed": "npm run seed --workspace=@vtk/db",
+    "import:praesidium": "dotenv -e .env -- tsx scripts/import-praesidium-history.ts"
   },
   "engines": {
     "node": ">=20.0.0"
