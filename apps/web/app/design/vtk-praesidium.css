@@ -1,0 +1,130 @@
+/* Praesidium: portretkaarten. Elke post toont zijn leden als portretfoto onder
+   een navy scrim die de naam in lichte tekst draagt, in dezelfde beeldtaal als de
+   fotokaarten elders op de site. De groepscoördinator (LEAD) krijgt een gele pin
+   plus accentrand; een lid zonder foto valt terug op een navy tegel met initiaal.
+   Enkel de kaarten wijzigen: de paginakop, jaartabjes en groepskoppen blijven de
+   gedeelde .vtk-page-primitieven. */
+
+.vtk-design .prae-tile {
+  position: relative;
+  aspect-ratio: 4 / 5;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  /* Cool navy tegel als achtergrond: de terugval voor foto-loze leden en de
+     ondergrond onder de scrim, zodat de lichte tekst altijd leesbaar blijft. */
+  background: linear-gradient(150deg, #1b294d 0%, #33507e 100%);
+  transition:
+    transform 200ms ease,
+    border-color 200ms ease,
+    box-shadow 200ms ease;
+}
+
+.vtk-design .prae-tile:hover {
+  transform: translateY(-2px);
+  border-color: var(--line-2);
+  box-shadow: 0 14px 34px -18px rgba(14, 26, 54, 0.5);
+}
+
+.vtk-design .prae-face {
+  position: absolute;
+  inset: 0;
+}
+
+.vtk-design .prae-face img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 300ms ease;
+}
+
+.vtk-design .prae-tile:hover .prae-face img {
+  transform: scale(1.04);
+}
+
+.vtk-design .prae-initial {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  font-size: clamp(38px, 8vw, 60px);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: rgba(255, 255, 255, 0.9);
+}
+
+/* Onderaan-zware scrim: houdt de lichte naam leesbaar over eender welke foto,
+   maar laat het gezicht bovenaan vrij. */
+.vtk-design .prae-meta {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  gap: 3px;
+  padding: 14px 15px 15px;
+  background: linear-gradient(
+    to top,
+    rgba(14, 26, 54, 0.94) 0%,
+    rgba(14, 26, 54, 0.58) 34%,
+    rgba(14, 26, 54, 0) 70%
+  );
+}
+
+.vtk-design .prae-name {
+  color: var(--paper);
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.vtk-design .prae-role {
+  color: var(--on-dark-muted);
+  font-size: 12px;
+  line-height: 1.3;
+}
+
+/* Groepscoördinator: gele pin (los van de titel) plus gele accentrand. Geen navy
+   vlak; het gele accent markeert de featured kaart zoals elders in het systeem. */
+.vtk-design .prae-pin {
+  position: absolute;
+  top: 11px;
+  left: 11px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: var(--yellow);
+  color: var(--ink);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1;
+}
+
+.vtk-design .prae-pin-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 999px;
+  background: rgba(10, 15, 31, 0.7);
+}
+
+.vtk-design .prae-tile.is-coordinator::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 18px;
+  box-shadow: inset 3px 0 0 var(--yellow);
+  pointer-events: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .vtk-design .prae-tile,
+  .vtk-design .prae-tile:hover,
+  .vtk-design .prae-face img,
+  .vtk-design .prae-tile:hover .prae-face img {
+    transform: none;
+    transition: none;
+  }
+}

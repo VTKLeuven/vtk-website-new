@@ -6,6 +6,8 @@ import { hasLocale } from "@/lib/locale";
 import { publicUrl } from "@/lib/storage";
 import { currentWorkingYear, formatWorkingYear } from "@/lib/workingYear";
 
+import "@/app/design/vtk-praesidium.css";
+
 export default async function PraesidiumPage({
   params,
   searchParams,
@@ -100,7 +102,7 @@ export default async function PraesidiumPage({
         {withMembers.length === 0 ? (
           <p className="text-[#5c667f]">{t.empty}</p>
         ) : (
-          <div className="space-y-14">
+          <div className="vtk-design space-y-14">
             {withMembers.map((group) => {
               const sorted = [...group.memberships].sort((a, b) => {
                 // Groepscoördinator (LEAD) eerst, dan de door de import/beheer
@@ -129,34 +131,29 @@ export default async function PraesidiumPage({
                       const title = pick(m.titleNl ?? "", m.titleEn ?? "", locale);
                       return (
                         <li key={m.id}>
-                          <div
-                            className={
-                              "flex h-full flex-col items-center rounded-2xl border border-vtk-blue/10 bg-white p-4 text-center transition duration-200 hover:-translate-y-0.5 hover:border-vtk-blue/20 hover:shadow-[0_10px_30px_-16px_rgba(14,26,54,0.45)] " +
-                              (isCoordinator ? "shadow-[inset_3px_0_0_var(--color-vtk-yellow)]" : "")
-                            }
-                          >
-                            <div className="h-24 w-24 overflow-hidden rounded-xl bg-vtk-blue-soft ring-1 ring-vtk-blue/10">
+                          <div className={"prae-tile" + (isCoordinator ? " is-coordinator" : "")}>
+                            <div className="prae-face">
                               {src ? (
+                                // Avatars staan achter /api/media; die route streamt uit
+                                // object storage en next/image hoeft er niet tussen.
                                 // eslint-disable-next-line @next/next/no-img-element
-                                <img src={src} alt={m.user.name} className="h-full w-full object-cover" />
+                                <img src={src} alt={m.user.name} loading="lazy" />
                               ) : (
-                                <div className="grid h-full w-full place-items-center text-3xl font-semibold text-vtk-blue-muted">
+                                <span className="prae-initial" aria-hidden="true">
                                   {m.user.name.slice(0, 1).toUpperCase()}
-                                </div>
+                                </span>
                               )}
                             </div>
-                            <div className="mt-3 text-sm font-semibold leading-tight text-vtk-ink">
-                              {m.user.name}
-                            </div>
-                            {title && (
-                              <div className="mt-1 text-xs font-medium text-vtk-blue">{title}</div>
-                            )}
                             {isCoordinator && (
-                              <span className="mt-2 inline-flex items-center gap-1 rounded-full bg-vtk-yellow px-2 py-0.5 text-[11px] font-semibold text-vtk-ink">
-                                <span className="h-1.5 w-1.5 rounded-full bg-vtk-ink/70" aria-hidden />
+                              <span className="prae-pin">
+                                <span className="prae-pin-dot" aria-hidden="true" />
                                 {t.coordinator}
                               </span>
                             )}
+                            <div className="prae-meta">
+                              <div className="prae-name">{m.user.name}</div>
+                              {title && <div className="prae-role">{title}</div>}
+                            </div>
                           </div>
                         </li>
                       );
