@@ -1,0 +1,571 @@
+<!doctype html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>VTK paginareview (Litus-import)</title>
+<style>
+  :root {
+    --paper: #EFF2F8; --paper-2: #E6ECF5; --surface: #FFFFFF;
+    --ink: #0A0F1F; --navy: #0E1A36; --yellow: #FFD23F;
+    --muted: #5C667F; --body: #34405E; --line: rgba(14, 26, 54, .14);
+    --red: #B3261E; --green: #1B7F4B; --amber: #9A6A00;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--paper); color: var(--body);
+    font: 14px/1.5 Inter, system-ui, -apple-system, "Segoe UI", sans-serif;
+    height: 100vh; display: flex; flex-direction: column;
+  }
+  .topbar {
+    background: var(--navy); color: #EAF0FB; padding: 10px 18px;
+    display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+  }
+  .topbar h1 { font-size: 15px; margin: 0; font-weight: 600; }
+  .topbar .stats { color: #B7C0DC; font-size: 13px; }
+  .topbar .spacer { flex: 1; }
+  button {
+    font: inherit; border-radius: 999px; border: 1px solid var(--line);
+    background: var(--surface); color: var(--ink); padding: 6px 14px; cursor: pointer;
+  }
+  button:hover { background: var(--paper-2); }
+  button.primary { background: var(--yellow); border-color: var(--yellow); font-weight: 600; }
+  button.primary:hover { filter: brightness(.96); }
+  button.ghost-dark { background: transparent; color: #EAF0FB; border-color: rgba(255,255,255,.3); }
+  button.ghost-dark:hover { background: rgba(255,255,255,.08); }
+  button.danger { color: var(--red); border-color: rgba(179,38,30,.4); }
+  main { flex: 1; display: flex; min-height: 0; }
+  aside {
+    width: 340px; min-width: 340px; border-right: 1px solid var(--line);
+    background: var(--surface); display: flex; flex-direction: column; min-height: 0;
+  }
+  .side-controls { padding: 10px; border-bottom: 1px solid var(--line); display: flex; flex-direction: column; gap: 8px; }
+  .side-controls input[type=search] {
+    width: 100%; padding: 6px 10px; border: 1px solid var(--line); border-radius: 10px; font: inherit;
+  }
+  .chips { display: flex; gap: 6px; flex-wrap: wrap; }
+  .chips button { padding: 3px 10px; font-size: 12px; }
+  .chips button.active { background: var(--navy); color: #fff; border-color: var(--navy); }
+  #pageList { overflow-y: auto; flex: 1; margin: 0; padding: 0; list-style: none; }
+  #pageList li {
+    padding: 8px 12px; border-bottom: 1px solid var(--line); cursor: pointer;
+    display: flex; align-items: center; gap: 8px;
+  }
+  #pageList li:hover { background: var(--paper); }
+  #pageList li.selected { background: var(--paper-2); box-shadow: inset 3px 0 0 var(--yellow); }
+  #pageList .slug { font-family: ui-monospace, Consolas, monospace; font-size: 12.5px; color: var(--ink); flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  #pageList li.deleted .slug { text-decoration: line-through; color: var(--muted); }
+  .badge { font-size: 11px; border-radius: 999px; padding: 1px 8px; white-space: nowrap; }
+  .badge.ok { background: rgba(27,127,75,.12); color: var(--green); }
+  .badge.todo { background: var(--paper-2); color: var(--muted); }
+  .badge.warn { background: rgba(154,106,0,.14); color: var(--amber); }
+  .badge.err { background: rgba(179,38,30,.12); color: var(--red); }
+  .badge.del { background: rgba(179,38,30,.12); color: var(--red); }
+  #editor { flex: 1; overflow-y: auto; padding: 20px 26px; }
+  .panel {
+    background: var(--surface); border: 1px solid var(--line); border-radius: 16px;
+    padding: 18px 20px; margin-bottom: 16px; max-width: 1000px;
+  }
+  .panel h2 { margin: 0 0 12px; font-size: 14px; color: var(--ink); }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px 16px; }
+  .field { display: flex; flex-direction: column; gap: 4px; }
+  .field.wide { grid-column: 1 / -1; }
+  .field label { font-size: 12px; font-weight: 600; color: var(--muted); }
+  .field input[type=text], .field input[type=number], .field select, .field textarea {
+    font: inherit; padding: 7px 10px; border: 1px solid var(--line); border-radius: 10px;
+    background: var(--surface); color: var(--ink); width: 100%;
+  }
+  .field textarea { font-family: ui-monospace, Consolas, monospace; font-size: 12.5px; min-height: 260px; resize: vertical; }
+  .checks { display: flex; gap: 18px; flex-wrap: wrap; align-items: center; }
+  .checks label { display: inline-flex; gap: 6px; align-items: center; font-size: 13px; cursor: pointer; }
+  .rolegrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 4px 12px; }
+  .rolegrid label { display: inline-flex; gap: 6px; align-items: center; font-size: 13px; cursor: pointer; }
+  .rolegrid .grp { grid-column: 1 / -1; font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; margin-top: 6px; }
+  .warnbox { border-radius: 10px; padding: 8px 12px; margin-bottom: 10px; font-size: 13px; }
+  .warnbox.err { background: rgba(179,38,30,.08); color: var(--red); }
+  .warnbox.warn { background: rgba(154,106,0,.1); color: var(--amber); }
+  .actions { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; max-width: 1000px; padding-bottom: 30px; }
+  .actions .spacer { flex: 1; }
+  .preview {
+    border: 1px dashed var(--line); border-radius: 10px; padding: 12px 16px; margin-top: 8px;
+    background: var(--paper); color: var(--body); overflow-x: auto;
+  }
+  .preview h1, .preview h2, .preview h3 { color: var(--ink); margin: .6em 0 .3em; }
+  .preview h1 { font-size: 20px; } .preview h2 { font-size: 17px; } .preview h3 { font-size: 15px; }
+  .preview code { background: var(--paper-2); border-radius: 4px; padding: 1px 4px; font-size: 12px; }
+  .preview blockquote { border-left: 3px solid var(--line); margin: .5em 0; padding-left: 12px; color: var(--muted); }
+  .preview a { color: var(--navy); }
+  .empty { color: var(--muted); padding: 60px; text-align: center; }
+  .drop { outline: 3px dashed var(--yellow); outline-offset: -6px; }
+  .langtabs { display: flex; gap: 6px; margin-bottom: 8px; }
+  .langtabs button { padding: 3px 12px; font-size: 12px; }
+  .langtabs button.active { background: var(--navy); color: #fff; border-color: var(--navy); }
+  .hint { font-size: 12px; color: var(--muted); }
+</style>
+</head>
+<body>
+<header class="topbar">
+  <h1>VTK paginareview</h1>
+  <span class="stats" id="stats">Geen data geladen</span>
+  <span class="spacer"></span>
+  <button class="ghost-dark" id="btnLoad">JSON laden</button>
+  <button class="ghost-dark" id="btnReset">Opnieuw beginnen</button>
+  <button class="primary" id="btnExport">Exporteer pages-import.json</button>
+  <input type="file" id="fileInput" accept=".json,application/json" hidden>
+</header>
+<main>
+  <aside>
+    <div class="side-controls">
+      <input type="search" id="search" placeholder="Zoek op slug of titel...">
+      <div class="chips" id="filterChips">
+        <button data-f="all" class="active">Alle</button>
+        <button data-f="todo">Nog te doen</button>
+        <button data-f="ok">OK</button>
+        <button data-f="warn">Waarschuwingen</button>
+        <button data-f="deleted">Verwijderd</button>
+      </div>
+    </div>
+    <ul id="pageList"></ul>
+  </aside>
+  <section id="editor">
+    <div class="empty" id="emptyMsg">
+      Laad <code>litus_website_pages.json</code> (of een eerder geexporteerd reviewbestand)
+      via de knop rechtsboven, of sleep het bestand hierheen.<br><br>
+      Voortgang wordt automatisch in de browser bewaard.
+    </div>
+  </section>
+</main>
+<script>
+'use strict';
+
+// ---------------------------------------------------------------------------
+// Vaste referentiedata: headertabs en rollen zoals geseed in de nieuwe DB
+// (packages/db/src/groups.ts + packages/db/prisma/seed.ts). Het import-script
+// resolvet op deze codes.
+// ---------------------------------------------------------------------------
+
+const HEADER_TABS = [
+  ['AANBOD', 'Info'], ['THEOKOT', 'Theokot'], ['SHIFTEN', 'Shiften'],
+  ['EERSTEJAARS', 'Eerstejaars'], ['CAREER', 'Career'], ['CURSUSDIENST', 'Cursusdienst'],
+  ['INTERNATIONAAL', 'Internationaal'], ['STUDIES', 'Studies'], ['MEDIA', 'Media'],
+  ['OVER_VTK', 'Over-VTK'], ['CONTACT', 'Contact'],
+];
+
+const ROLE_GROUPS = [
+  ['Algemeen', [
+    ['admin', 'Admin'], ['praesidium', 'Praesidium'], ['theokot', 'Theokot'],
+    ['logistiek', 'Logistiek'], ['werkgroep', 'Werkgroep'], ['medewerker', 'Medewerker'],
+  ]],
+  ['Posten', [
+    ['post-groep5', 'Groep 5'], ['post-activiteiten', 'Activiteiten'],
+    ['post-bedrijvenrelaties', 'Bedrijvenrelaties'], ['post-communicatie', 'Communicatie'],
+    ['post-cultuur', 'Cultuur'], ['post-cursusdienst', 'Cursusdienst'],
+    ['post-development', 'Development'], ['post-fakbar', 'Fakbar'],
+    ['post-internationaal', 'Internationaal'], ['post-it', 'IT'],
+    ['post-logistiek', 'Logistiek'], ['post-onderwijs', 'Onderwijs'],
+    ['post-onthaal', 'Onthaal'], ['post-sport', 'Sport'], ['post-theokot', 'Theokot'],
+  ]],
+  ['Werkgroepen', [
+    ['werkgroep-best', 'BEST'], ['werkgroep-biomedix', 'Biomedix'],
+    ['werkgroep-chemix', 'Chemix'], ['werkgroep-existenz', 'Existenz'],
+    ['werkgroep-mechanix', 'Mechanix'], ['werkgroep-revue', 'Revue'],
+    ['werkgroep-statix', 'Statix'],
+  ]],
+];
+const KNOWN_ROLES = new Set(ROLE_GROUPS.flatMap(([, rs]) => rs.map(([c]) => c)));
+
+const SLUG_RE = /^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/;
+const STORAGE_KEY = 'vtk-litus-pages-review';
+
+// ---------------------------------------------------------------------------
+// State
+// ---------------------------------------------------------------------------
+
+let state = null;           // { pages: [...] }
+let selected = -1;
+let filter = 'all';
+let search = '';
+let editorLang = 'nl';
+let showPreview = false;
+
+// ---------------------------------------------------------------------------
+// Inladen: ruwe Litus-export of eerder geexporteerd reviewbestand
+// ---------------------------------------------------------------------------
+
+function normalizeMd(s) { return (s || '').replace(/\r\n/g, '\n'); }
+
+/** Eerste H1 uit de markdown lichten: de nieuwe site rendert de titel zelf al
+ *  als H1, dus die regel zou dubbel staan. */
+function extractTitle(md) {
+  const m = /^\s*#[ \t]+(.+?)[ \t]*(?:\n|$)/.exec(md);
+  if (m) return { title: m[1].trim(), content: md.slice(m.index + m[0].length).replace(/^\n+/, '') };
+  return { title: null, content: md };
+}
+
+function humanizeSlug(slug) {
+  const s = slug.replace(/-/g, ' ');
+  return s.charAt(0).toUpperCase() + s.slice(1);
+}
+
+function fromLitus(rows) {
+  const seen = new Map();
+  return rows.map((r) => {
+    const nl = extractTitle(normalizeMd(r.content_nl));
+    const en = extractTitle(normalizeMd(r.content_en));
+    // Dubbele slugs bestaan in de export (Litus had ze per taal/sectie); hier
+    // uniek maken met een suffix zodat elke rij bewerkbaar blijft. Hernoem of
+    // verwijder ze tijdens de review.
+    let slug = r.slug;
+    const n = (seen.get(slug) || 0) + 1;
+    seen.set(slug, n);
+    if (n > 1) slug = slug + '-' + n;
+    return {
+      slug,
+      origSlug: r.slug,
+      titleNl: nl.title || humanizeSlug(r.slug),
+      titleEn: r.title_en || en.title || null,
+      excerptNl: null,
+      excerptEn: null,
+      contentMdNl: nl.content,
+      contentMdEn: r.content_en ? en.content : null,
+      headerTab: null,
+      visibleInHeader: true,
+      published: true,
+      needsYearlyEdit: false,
+      order: 0,
+      editorRoles: [],
+      status: 'todo',
+      deleted: false,
+    };
+  });
+}
+
+function loadData(json) {
+  if (Array.isArray(json) && json.length && 'content_nl' in json[0]) {
+    state = { pages: fromLitus(json) };
+  } else if (json && Array.isArray(json.pages)) {
+    state = { pages: json.pages };
+  } else {
+    alert('Onbekend formaat: verwacht de Litus-export (array met content_nl) of een eerder geexporteerd reviewbestand.');
+    return;
+  }
+  selected = 0;
+  persist();
+  renderAll();
+}
+
+// ---------------------------------------------------------------------------
+// Waarschuwingen per pagina
+// ---------------------------------------------------------------------------
+
+function pageWarnings(p, slugCounts) {
+  const errs = [], warns = [];
+  if (!p.deleted) {
+    if (!SLUG_RE.test(p.slug)) errs.push('Ongeldige slug (enkel a-z, 0-9 en -)');
+    if ((slugCounts.get(p.slug) || 0) > 1) errs.push('Slug botst met een andere pagina');
+    if (!p.titleNl || !p.titleNl.trim()) errs.push('Titel (NL) ontbreekt');
+    const all = (p.contentMdNl || '') + '\n' + (p.contentMdEn || '');
+    if (/<[a-z][^>]*>/i.test(all)) warns.push('Bevat HTML-tags; de nieuwe site rendert die niet (raw HTML staat uit)');
+    if (/vtk\.be\/nl\/|vtk\.be\/en\/|\]\(\/(nl|en)\//i.test(all)) warns.push('Bevat links naar oude vtk.be-paden; controleer of die nog kloppen');
+    if (p.editorRoles.length === 0) warns.push('Geen bewerkrollen: enkel superadmin en pages.editAll kunnen de pagina dan bewerken');
+  }
+  return { errs, warns };
+}
+
+function slugCounts() {
+  const c = new Map();
+  for (const p of state.pages) if (!p.deleted) c.set(p.slug, (c.get(p.slug) || 0) + 1);
+  return c;
+}
+
+// ---------------------------------------------------------------------------
+// Renderen
+// ---------------------------------------------------------------------------
+
+function esc(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
+
+function renderStats() {
+  const el = document.getElementById('stats');
+  if (!state) { el.textContent = 'Geen data geladen'; return; }
+  const total = state.pages.length;
+  const del = state.pages.filter((p) => p.deleted).length;
+  const ok = state.pages.filter((p) => !p.deleted && p.status === 'ok').length;
+  el.textContent = ok + ' / ' + (total - del) + ' nagekeken, ' + del + ' verwijderd';
+}
+
+function renderList() {
+  const ul = document.getElementById('pageList');
+  ul.innerHTML = '';
+  if (!state) return;
+  const counts = slugCounts();
+  const q = search.toLowerCase();
+  state.pages.forEach((p, i) => {
+    const { errs, warns } = pageWarnings(p, counts);
+    const hasWarn = errs.length + warns.length > 0;
+    if (filter === 'todo' && (p.deleted || p.status === 'ok')) return;
+    if (filter === 'ok' && (p.deleted || p.status !== 'ok')) return;
+    if (filter === 'warn' && (p.deleted || !hasWarn)) return;
+    if (filter === 'deleted' && !p.deleted) return;
+    if (q && !(p.slug.toLowerCase().includes(q) || (p.titleNl || '').toLowerCase().includes(q))) return;
+    const li = document.createElement('li');
+    li.className = (i === selected ? 'selected ' : '') + (p.deleted ? 'deleted' : '');
+    let badges = '';
+    if (p.deleted) badges = '<span class="badge del">weg</span>';
+    else {
+      if (errs.length) badges += '<span class="badge err">' + errs.length + '!</span>';
+      else if (warns.length) badges += '<span class="badge warn">' + warns.length + '</span>';
+      badges += p.status === 'ok' ? '<span class="badge ok">OK</span>' : '<span class="badge todo">todo</span>';
+    }
+    li.innerHTML = '<span class="slug">' + esc(p.slug) + '</span>' + badges;
+    li.onclick = () => { select(i); };
+    ul.appendChild(li);
+  });
+}
+
+function field(label, inner, wide) {
+  return '<div class="field' + (wide ? ' wide' : '') + '"><label>' + label + '</label>' + inner + '</div>';
+}
+
+function renderEditor() {
+  const box = document.getElementById('editor');
+  if (!state || selected < 0 || !state.pages[selected]) {
+    box.innerHTML = '<div class="empty">Kies een pagina links.</div>';
+    return;
+  }
+  const p = state.pages[selected];
+  const { errs, warns } = pageWarnings(p, slugCounts());
+
+  let warnHtml = '';
+  for (const e of errs) warnHtml += '<div class="warnbox err">' + esc(e) + '</div>';
+  for (const w of warns) warnHtml += '<div class="warnbox warn">' + esc(w) + '</div>';
+
+  const tabOpts = ['<option value="">(geen categorie)</option>']
+    .concat(HEADER_TABS.map(([code, label]) =>
+      '<option value="' + code + '"' + (p.headerTab === code ? ' selected' : '') + '>' + label + ' (' + code + ')</option>'))
+    .join('');
+
+  let roleHtml = '';
+  for (const [grp, roles] of ROLE_GROUPS) {
+    roleHtml += '<div class="grp">' + grp + '</div>';
+    for (const [code, label] of roles) {
+      roleHtml += '<label><input type="checkbox" data-role="' + code + '"' +
+        (p.editorRoles.includes(code) ? ' checked' : '') + '> ' + label +
+        ' <span class="hint">' + code + '</span></label>';
+    }
+  }
+  const extraRoles = p.editorRoles.filter((r) => !KNOWN_ROLES.has(r)).join(', ');
+
+  const content = editorLang === 'nl' ? (p.contentMdNl || '') : (p.contentMdEn || '');
+
+  box.innerHTML =
+    warnHtml +
+    '<div class="panel"><h2>Metadata <span class="hint">(oorspronkelijke slug: ' + esc(p.origSlug || p.slug) + ')</span></h2>' +
+    '<div class="grid">' +
+    field('Slug', '<input type="text" id="f_slug" value="' + esc(p.slug) + '">') +
+    field('Categorie (headertab)', '<select id="f_tab">' + tabOpts + '</select>') +
+    field('Titel NL', '<input type="text" id="f_titleNl" value="' + esc(p.titleNl || '') + '">') +
+    field('Titel EN', '<input type="text" id="f_titleEn" value="' + esc(p.titleEn || '') + '">') +
+    field('Excerpt NL', '<input type="text" id="f_excNl" value="' + esc(p.excerptNl || '') + '">') +
+    field('Excerpt EN', '<input type="text" id="f_excEn" value="' + esc(p.excerptEn || '') + '">') +
+    field('Volgorde binnen categorie', '<input type="number" id="f_order" value="' + (p.order || 0) + '">') +
+    '<div class="field"><label>Opties</label><div class="checks">' +
+    '<label><input type="checkbox" id="f_visible"' + (p.visibleInHeader ? ' checked' : '') + '> Zichtbaar in header</label>' +
+    '<label><input type="checkbox" id="f_published"' + (p.published ? ' checked' : '') + '> Gepubliceerd</label>' +
+    '<label><input type="checkbox" id="f_yearly"' + (p.needsYearlyEdit ? ' checked' : '') + '> Jaarlijks nakijken</label>' +
+    '</div></div>' +
+    '</div></div>' +
+    '<div class="panel"><h2>Bewerkrollen</h2><div class="rolegrid">' + roleHtml + '</div>' +
+    '<div class="field" style="margin-top:10px">' +
+    '<label>Extra rolcodes (komma-gescheiden, voor rollen die hierboven niet staan)</label>' +
+    '<input type="text" id="f_extraRoles" value="' + esc(extraRoles) + '"></div></div>' +
+    '<div class="panel"><h2>Inhoud (markdown)</h2>' +
+    '<div class="langtabs">' +
+    '<button id="langNl" class="' + (editorLang === 'nl' ? 'active' : '') + '">NL</button>' +
+    '<button id="langEn" class="' + (editorLang === 'en' ? 'active' : '') + '">EN' + (p.contentMdEn ? '' : ' (leeg)') + '</button>' +
+    '<button id="btnPreview">' + (showPreview ? 'Preview verbergen' : 'Preview tonen') + '</button>' +
+    '</div>' +
+    '<div class="field wide"><textarea id="f_content">' + esc(content) + '</textarea></div>' +
+    (showPreview ? '<div class="preview">' + mdPreview(content) + '</div>' : '') +
+    '</div>' +
+    '<div class="actions">' +
+    '<button id="btnPrev">&larr; Vorige</button>' +
+    '<button id="btnNext">Volgende &rarr;</button>' +
+    '<button class="primary" id="btnOkNext">Markeer OK &amp; volgende</button>' +
+    '<span class="spacer"></span>' +
+    (p.deleted
+      ? '<button id="btnRestore">Herstellen</button>'
+      : '<button class="danger" id="btnDelete">Verwijder pagina (niet importeren)</button>') +
+    '</div>';
+
+  bindEditor(p);
+}
+
+function bindEditor(p) {
+  const bind = (id, fn) => { const el = document.getElementById(id); if (el) el.onchange = () => { fn(el); persist(); renderList(); renderStats(); }; };
+  bind('f_slug', (el) => { p.slug = el.value.trim(); renderEditor(); });
+  bind('f_tab', (el) => { p.headerTab = el.value || null; });
+  bind('f_titleNl', (el) => { p.titleNl = el.value; });
+  bind('f_titleEn', (el) => { p.titleEn = el.value.trim() || null; });
+  bind('f_excNl', (el) => { p.excerptNl = el.value.trim() || null; });
+  bind('f_excEn', (el) => { p.excerptEn = el.value.trim() || null; });
+  bind('f_order', (el) => { p.order = parseInt(el.value, 10) || 0; });
+  bind('f_visible', (el) => { p.visibleInHeader = el.checked; });
+  bind('f_published', (el) => { p.published = el.checked; });
+  bind('f_yearly', (el) => { p.needsYearlyEdit = el.checked; });
+  bind('f_content', (el) => {
+    if (editorLang === 'nl') p.contentMdNl = el.value;
+    else p.contentMdEn = el.value.trim() === '' ? null : el.value;
+  });
+  bind('f_extraRoles', (el) => {
+    const extra = el.value.split(',').map((s) => s.trim()).filter(Boolean);
+    p.editorRoles = p.editorRoles.filter((r) => KNOWN_ROLES.has(r)).concat(extra);
+  });
+  document.querySelectorAll('#editor input[data-role]').forEach((el) => {
+    el.onchange = () => {
+      const code = el.getAttribute('data-role');
+      if (el.checked) { if (!p.editorRoles.includes(code)) p.editorRoles.push(code); }
+      else p.editorRoles = p.editorRoles.filter((r) => r !== code);
+      persist(); renderList(); renderEditor();
+    };
+  });
+  const commitContent = () => { const el = document.getElementById('f_content'); if (el) el.onchange(); };
+  document.getElementById('langNl').onclick = () => { commitContent(); editorLang = 'nl'; renderEditor(); };
+  document.getElementById('langEn').onclick = () => { commitContent(); editorLang = 'en'; renderEditor(); };
+  document.getElementById('btnPreview').onclick = () => { commitContent(); showPreview = !showPreview; renderEditor(); };
+  document.getElementById('btnPrev').onclick = () => select(Math.max(0, selected - 1));
+  document.getElementById('btnNext').onclick = () => select(Math.min(state.pages.length - 1, selected + 1));
+  document.getElementById('btnOkNext').onclick = () => {
+    p.status = 'ok'; persist();
+    select(Math.min(state.pages.length - 1, selected + 1));
+  };
+  const del = document.getElementById('btnDelete');
+  if (del) del.onclick = () => { p.deleted = true; persist(); renderAll(); };
+  const res = document.getElementById('btnRestore');
+  if (res) res.onclick = () => { p.deleted = false; persist(); renderAll(); };
+}
+
+function select(i) {
+  selected = i;
+  editorLang = 'nl';
+  renderAll();
+  const sel = document.querySelector('#pageList li.selected');
+  if (sel) sel.scrollIntoView({ block: 'nearest' });
+}
+
+function renderAll() { renderStats(); renderList(); renderEditor(); }
+
+// ---------------------------------------------------------------------------
+// Mini-markdownpreview (alleen indicatief; de site rendert met react-markdown)
+// ---------------------------------------------------------------------------
+
+function mdInline(s) {
+  return esc(s)
+    .replace(/`([^`]+)`/g, '<code>$1</code>')
+    .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+    .replace(/\*([^*]+)\*/g, '<em>$1</em>')
+    .replace(/\[([^\]]+)\]\(([^)\s]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
+}
+
+function mdPreview(md) {
+  const lines = (md || '').split('\n');
+  let html = '', list = null, para = [];
+  const flushPara = () => { if (para.length) { html += '<p>' + mdInline(para.join(' ')) + '</p>'; para = []; } };
+  const flushList = () => { if (list) { html += '</' + list + '>'; list = null; } };
+  for (const line of lines) {
+    const h = /^(#{1,3})[ \t]+(.*)$/.exec(line);
+    const ul = /^[-*][ \t]+(.*)$/.exec(line);
+    const ol = /^\d+\.[ \t]+(.*)$/.exec(line);
+    const bq = /^>[ \t]?(.*)$/.exec(line);
+    if (h) { flushPara(); flushList(); html += '<h' + h[1].length + '>' + mdInline(h[2]) + '</h' + h[1].length + '>'; }
+    else if (/^(---|\*\*\*)\s*$/.test(line)) { flushPara(); flushList(); html += '<hr>'; }
+    else if (ul) { flushPara(); if (list !== 'ul') { flushList(); html += '<ul>'; list = 'ul'; } html += '<li>' + mdInline(ul[1]) + '</li>'; }
+    else if (ol) { flushPara(); if (list !== 'ol') { flushList(); html += '<ol>'; list = 'ol'; } html += '<li>' + mdInline(ol[1]) + '</li>'; }
+    else if (bq) { flushPara(); flushList(); html += '<blockquote>' + mdInline(bq[1]) + '</blockquote>'; }
+    else if (line.trim() === '') { flushPara(); flushList(); }
+    else para.push(line);
+  }
+  flushPara(); flushList();
+  return html;
+}
+
+// ---------------------------------------------------------------------------
+// Opslaan / exporteren
+// ---------------------------------------------------------------------------
+
+function persist() {
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch (e) { /* quota */ }
+}
+
+function exportJson() {
+  if (!state) return;
+  const counts = slugCounts();
+  const broken = state.pages.filter((p) => !p.deleted && pageWarnings(p, counts).errs.length > 0);
+  if (broken.length) {
+    alert('Los eerst deze blokkerende fouten op (rode badges):\n\n' + broken.map((p) => '- ' + p.slug).join('\n'));
+    return;
+  }
+  const todo = state.pages.filter((p) => !p.deleted && p.status !== 'ok').length;
+  if (todo > 0 && !window.confirm(todo + " pagina's staan nog op 'todo'. Toch exporteren? (Ze worden gewoon mee geimporteerd.)")) return;
+  const out = { generatedAt: new Date().toISOString(), pages: state.pages };
+  const blob = new Blob([JSON.stringify(out, null, 2) + '\n'], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'pages-import.json';
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+// ---------------------------------------------------------------------------
+// Bestandsinvoer + init
+// ---------------------------------------------------------------------------
+
+function readFile(file) {
+  const r = new FileReader();
+  r.onload = () => {
+    try { loadData(JSON.parse(r.result)); }
+    catch (e) { alert('Kon JSON niet parsen: ' + e.message); }
+  };
+  r.readAsText(file);
+}
+
+document.getElementById('btnLoad').onclick = () => document.getElementById('fileInput').click();
+document.getElementById('fileInput').onchange = (e) => { if (e.target.files[0]) readFile(e.target.files[0]); };
+document.getElementById('btnExport').onclick = exportJson;
+document.getElementById('btnReset').onclick = () => {
+  if (window.confirm('Alle reviewvoortgang in deze browser wissen en opnieuw beginnen?')) {
+    localStorage.removeItem(STORAGE_KEY);
+    location.reload();
+  }
+};
+document.getElementById('search').oninput = (e) => { search = e.target.value; renderList(); };
+document.querySelectorAll('#filterChips button').forEach((b) => {
+  b.onclick = () => {
+    document.querySelectorAll('#filterChips button').forEach((x) => x.classList.remove('active'));
+    b.classList.add('active');
+    filter = b.getAttribute('data-f');
+    renderList();
+  };
+});
+document.body.addEventListener('dragover', (e) => { e.preventDefault(); document.body.classList.add('drop'); });
+document.body.addEventListener('dragleave', () => document.body.classList.remove('drop'));
+document.body.addEventListener('drop', (e) => {
+  e.preventDefault();
+  document.body.classList.remove('drop');
+  if (e.dataTransfer.files[0]) readFile(e.dataTransfer.files[0]);
+});
+
+// Hervat uit localStorage; anders proberen we het bronbestand te fetchen (werkt
+// enkel wanneer de tool via http geserveerd wordt, niet via file://).
+(function init() {
+  try {
+    const saved = localStorage.getItem(STORAGE_KEY);
+    if (saved) { state = JSON.parse(saved); selected = 0; renderAll(); return; }
+  } catch (e) { /* ignore */ }
+  fetch('litus_website_pages.json')
+    .then((r) => (r.ok ? r.json() : Promise.reject()))
+    .then((json) => loadData(json))
+    .catch(() => { /* file:// of niet gevonden: gebruiker laadt handmatig */ });
+})();
+</script>
+</body>
+</html>
