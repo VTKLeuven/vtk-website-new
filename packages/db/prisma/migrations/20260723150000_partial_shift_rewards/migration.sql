@@ -39,10 +39,10 @@ ON DELETE CASCADE ON UPDATE CASCADE;
 
 ALTER TABLE "TheokotVoucherRedemption"
 ADD CONSTRAINT "TheokotVoucherRedemption_userId_fkey"
-FOREIGN KEY ("userId") REFERENCES "user"("id")
+FOREIGN KEY ("userId") REFERENCES "User"("id")
 ON DELETE CASCADE ON UPDATE CASCADE;
 
 ALTER TABLE "TheokotVoucherRedemption"
 ADD CONSTRAINT "TheokotVoucherRedemption_processedById_fkey"
-FOREIGN KEY ("processedById") REFERENCES "user"("id")
+FOREIGN KEY ("processedById") REFERENCES "User"("id")
 ON DELETE SET NULL ON UPDATE CASCADE;
