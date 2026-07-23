@@ -8,9 +8,7 @@ type Crop = { zoom: number; x: number; y: number };
 const clamp = (value: number, lo: number, hi: number) =>
   Math.min(hi, Math.max(lo, value));
 
-function cropGeometry(image: HTMLImageElement, zoom: number) {
-  const width = image.naturalWidth;
-  const height = image.naturalHeight;
+function cropGeometry(width: number, height: number, zoom: number) {
   const sourceSize = Math.min(width, height) / zoom;
   const centeredX = (width - sourceSize) / 2;
   const centeredY = (height - sourceSize) / 2;
@@ -28,7 +26,11 @@ function drawSquareCrop(
   const context = canvas.getContext("2d");
   if (!context) throw new Error("CANVAS_UNAVAILABLE");
 
-  const { sourceSize, centeredX, centeredY } = cropGeometry(image, crop.zoom);
+  const { sourceSize, centeredX, centeredY } = cropGeometry(
+    image.naturalWidth,
+    image.naturalHeight,
+    crop.zoom,
+  );
   const sourceX = centeredX + crop.x * centeredX;
   const sourceY = centeredY + crop.y * centeredY;
 
@@ -74,6 +76,7 @@ export function AvatarCropField({
   const [cropReady, setCropReady] = useState(false);
   const [previewUrl, setPreviewUrl] = useState(currentAvatar);
   const [crop, setCrop] = useState<Crop>({ zoom: 1, x: 0, y: 0 });
+  const [imageDims, setImageDims] = useState<{ w: number; h: number } | null>(null);
   const [dragging, setDragging] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -128,6 +131,7 @@ export function AvatarCropField({
     const image = new Image();
     image.onload = () => {
       imageRef.current = image;
+      setImageDims({ w: image.naturalWidth, h: image.naturalHeight });
       setCrop({ zoom: 1, x: 0, y: 0 });
       setEditorOpen(true);
       requestAnimationFrame(redraw);
@@ -144,7 +148,11 @@ export function AvatarCropField({
     const canvas = canvasRef.current;
     if (!image || !canvas) return;
     const rect = canvas.getBoundingClientRect();
-    const { sourceSize, centeredX, centeredY } = cropGeometry(image, crop.zoom);
+    const { sourceSize, centeredX, centeredY } = cropGeometry(
+      image.naturalWidth,
+      image.naturalHeight,
+      crop.zoom,
+    );
     if (centeredX <= 0 && centeredY <= 0) return;
     dragRef.current = {
       pointerId: event.pointerId,
@@ -172,7 +180,7 @@ export function AvatarCropField({
     setCrop((value) => ({ ...value, x: nextX, y: nextY }));
   }
 
-  function endDrag(event: React.PointerEvent<HTMLCanvasElement>) {
+  function endDrag() {
     const drag = dragRef.current;
     if (!drag) return;
     const canvas = canvasRef.current;
@@ -210,10 +218,9 @@ export function AvatarCropField({
     setEditorOpen(false);
   }
 
-  const image = imageRef.current;
   let canPan = false;
-  if (image) {
-    const { centeredX, centeredY } = cropGeometry(image, crop.zoom);
+  if (imageDims) {
+    const { centeredX, centeredY } = cropGeometry(imageDims.w, imageDims.h, crop.zoom);
     canPan = centeredX > 0.5 || centeredY > 0.5;
   }
   const cursorClass = canPan ? (dragging ? "cursor-grabbing" : "cursor-grab") : "cursor-default";
