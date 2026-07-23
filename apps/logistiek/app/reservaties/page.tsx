@@ -26,7 +26,13 @@ export default async function ReservatiesPage({
   ]);
 
   return (
-    <PageShell title={t.pageReservationsTitle}>
+    <PageShell
+      title={
+        <>
+          {t.pageReservationsTitle} <em className="font-serif font-normal italic text-vtk-navy">{t.pageReservationsAccent}</em>
+        </>
+      }
+    >
       {aangevraagd ? (
         <p className="mb-6 rounded-[14px] border border-vtk-yellow-dark/40 bg-vtk-yellow/20 px-4 py-3 text-sm font-medium text-vtk-ink">
           {en

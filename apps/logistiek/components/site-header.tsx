@@ -2,6 +2,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { canManage, getSession } from '@/lib/session';
 import { copy, getLocale } from '@/lib/i18n';
+import { testLoginEnabled } from '@/lib/test-users';
 import { LanguageSwitcher } from './language-switcher';
 import { ProfileMenu } from './profile-menu';
 
@@ -30,6 +31,9 @@ function AnonymousUserIcon({ className }: { className?: string }) {
 export async function SiteHeader() {
   const [session, locale] = await Promise.all([getSession(), getLocale()]);
   const t = copy[locale];
+  // Op een testomgeving verwijst de login naar de test-picker in plaats van naar
+  // de KU Leuven-login op de hoofdsite. Zie lib/test-users.ts.
+  const testMode = testLoginEnabled();
 
   return (
     <header className="vtk-site-header">
@@ -73,14 +77,16 @@ export async function SiteHeader() {
               name={session.user.name}
               canManage={canManage(session)}
               mainUrl={MAIN_URL}
+              testLoginHref={testMode ? '/test-login' : undefined}
               labels={{
                 mainSite: t.profileMainSite,
                 manage: t.navManage,
+                testLogin: locale === 'nl' ? 'Wissel test-gebruiker' : 'Switch test user',
               }}
             />
           ) : (
             <a
-              href={`${MAIN_URL}/inloggen`}
+              href={testMode ? '/test-login' : `${MAIN_URL}/inloggen`}
               aria-label={t.signIn}
               title={t.signIn}
               className="nav-login"

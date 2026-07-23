@@ -21,7 +21,11 @@ export default async function MateriaalPage() {
 
   return (
     <PageShell
-      title={t.pageMaterialTitle}
+      title={
+        <>
+          {t.pageMaterialTitle} <em className="font-serif font-normal italic text-vtk-navy">{t.pageMaterialAccent}</em>
+        </>
+      }
       intro={content.pageMaterialLead}
     >
       {catalog.length === 0 ? (
