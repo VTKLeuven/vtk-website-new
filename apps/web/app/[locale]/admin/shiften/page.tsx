@@ -40,7 +40,7 @@ export default async function AdminShifts({
   const now = new Date();
   const { from: fromParam, to: toParam, year: yearParam } = await searchParams;
 
-  // Geselecteerd academiejaar voor ranglijst + vergoedingen (standaard huidige).
+  // Geselecteerd academiejaar voor ranglijst + bonnetjes (standaard huidige).
   const parsedYear = Number(yearParam);
   const selectedYear = Number.isInteger(parsedYear) ? parsedYear : currentAcademicYear(now);
   const ay = academicYearRangeFor(selectedYear);
@@ -80,7 +80,7 @@ export default async function AdminShifts({
           select: {
             userId: true,
             shiftId: true,
-            payedOut: true,
+            rewardPaid: true,
             user: { select: { name: true, email: true } },
             shift: { select: { reward: true } },
           },
@@ -128,40 +128,43 @@ export default async function AdminShifts({
   }
   const ranking = [...rankingMap.values()];
 
-  // Vergoedingen per user voor het gekozen academiejaar: betaald vs onbetaald.
+  // Bonnetjes per user voor het gekozen academiejaar: toegekend vs openstaand.
   const rewardMap = new Map<
     string,
     {
       userId: string;
       name: string;
       email: string;
-      claimedShifts: number;
-      claimedReward: number;
-      unclaimedShifts: number;
-      unclaimedReward: number;
-      unclaimedShiftIds: string[];
+      paidShiftCount: number;
+      paidBonnetjes: number;
+      outstandingShiftCount: number;
+      outstandingBonnetjes: number;
+      outstandingShiftIds: string[];
     }
   >();
-  for (const { userId, shiftId, payedOut, user, shift } of rewardsRaw) {
+  for (const { userId, shiftId, rewardPaid, user, shift } of rewardsRaw) {
     const entry =
       rewardMap.get(userId) ??
       {
         userId,
         name: user.name,
         email: user.email,
-        claimedShifts: 0,
-        claimedReward: 0,
-        unclaimedShifts: 0,
-        unclaimedReward: 0,
-        unclaimedShiftIds: [],
+        paidShiftCount: 0,
+        paidBonnetjes: 0,
+        outstandingShiftCount: 0,
+        outstandingBonnetjes: 0,
+        outstandingShiftIds: [],
       };
-    if (payedOut) {
-      entry.claimedShifts += 1;
-      entry.claimedReward += shift.reward;
-    } else {
-      entry.unclaimedShifts += 1;
-      entry.unclaimedReward += shift.reward;
-      entry.unclaimedShiftIds.push(shiftId);
+    const paid = Math.max(0, Math.min(rewardPaid, shift.reward));
+    const outstanding = Math.max(0, shift.reward - paid);
+    if (paid > 0) {
+      entry.paidShiftCount += 1;
+      entry.paidBonnetjes += paid;
+    }
+    if (outstanding > 0) {
+      entry.outstandingShiftCount += 1;
+      entry.outstandingBonnetjes += outstanding;
+      entry.outstandingShiftIds.push(shiftId);
     }
     rewardMap.set(userId, entry);
   }

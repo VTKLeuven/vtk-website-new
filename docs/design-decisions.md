@@ -738,9 +738,13 @@ Een cursusdienst-shift is **1 bonnetje per begonnen uur** waard, dus
 
 Deze regel wordt **berekend bij het spiegelen** (de producer zet `Shift.reward`);
 centraliseer hem in één helper zodat hij op één plek aanpasbaar is. De reward
-wordt **verbruikt** in `apps/web/app/api/shift/reward/route.ts` (sommeert
-`shift.reward` over voltooide, niet-uitbetaalde deelnames). Wil je de waardering
-wijzigen, pas dan die helper aan; de rest van het reward-systeem blijft gelijk.
+wordt **verbruikt** in `apps/web/app/api/shift/reward/route.ts`. Per deelname
+houdt `ShiftParticipant.rewardPaid` exact bij hoeveel bonnetjes al toegekend of
+digitaal gebruikt zijn; daardoor kan een beheerder bijvoorbeeld 10 van 12
+openstaande bonnetjes uitbetalen. De afhaalbalie kan twee openstaande bonnetjes
+atomair afboeken voor een broodje en schrijft daarvoor een auditrij in
+`TheokotVoucherRedemption`. Wil je de waardering wijzigen, pas dan de
+spiegel-helper aan; de saldo- en auditlogica blijft gelijk.
 
 ### Post: "Cursusdienst"
 

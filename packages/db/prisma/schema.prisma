@@ -369,9 +369,11 @@ model User {
   participatingShifts ShiftParticipant[]
   createdShortLinks   ShortLink[]             @relation("ShortLinkCreatedBy")
 
-  theokotOrders   TheokotOrder[] @relation("TheokotOrderUser")
-  theokotPickedUp TheokotOrder[] @relation("TheokotPickedUpBy")
-  theokotBans     TheokotBan[]
+  theokotOrders             TheokotOrder[]             @relation("TheokotOrderUser")
+  theokotPickedUp           TheokotOrder[]             @relation("TheokotPickedUpBy")
+  theokotVoucherRedemptions TheokotVoucherRedemption[] @relation("TheokotVoucherUser")
+  theokotVouchersProcessed  TheokotVoucherRedemption[] @relation("TheokotVoucherProcessedBy")
+  theokotBans               TheokotBan[]
 
   uitleenReservations     UitleenReservation[]      @relation("UitleenReservationUser")
   uitleenDecided          UitleenReservation[]      @relation("UitleenDecidedBy")
@@ -1353,7 +1355,11 @@ model ShiftParticipant {
   userId String
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  payedOut Boolean
+  // `payedOut` blijft de compatibele "volledig uitbetaald"-vlag voor bestaande
+  // API-consumers. `rewardPaid` bewaart het exacte aantal toegekende bonnetjes,
+  // zodat een shift ook gedeeltelijk kan worden uitbetaald.
+  payedOut   Boolean
+  rewardPaid Int     @default(0)
 
   /// Moment van inschrijven: binnen een korte bedenktijd mag je je nog
   /// uitschrijven, ook wanneer de shift al binnen 24 uur begint.
@@ -1460,14 +1466,33 @@ model TheokotOrder {
   pickedUpAt   DateTime?
   pickedUpById String? // wie aan de balie op "opgehaald" drukte
 
-  session    TheokotSession     @relation(fields: [sessionId], references: [id], onDelete: Cascade)
-  user       User               @relation("TheokotOrderUser", fields: [userId], references: [id], onDelete: Cascade)
-  pickedUpBy User?              @relation("TheokotPickedUpBy", fields: [pickedUpById], references: [id], onDelete: SetNull)
-  lines      TheokotOrderLine[]
+  session           TheokotSession            @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  user              User                      @relation("TheokotOrderUser", fields: [userId], references: [id], onDelete: Cascade)
+  pickedUpBy        User?                     @relation("TheokotPickedUpBy", fields: [pickedUpById], references: [id], onDelete: SetNull)
+  lines             TheokotOrderLine[]
+  voucherRedemption TheokotVoucherRedemption?
 
   @@unique([sessionId, userId])
   @@index([userId])
   @@index([status])
+}
+
+/// Auditrij wanneer een student aan de afhaalbalie twee nog openstaande
+/// medewerkersbonnetjes gebruikt voor een broodje.
+model TheokotVoucherRedemption {
+  id            String   @id @default(cuid())
+  orderId       String   @unique
+  userId        String
+  processedById String?
+  amount        Int      @default(2)
+  createdAt     DateTime @default(now())
+
+  order       TheokotOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  user        User         @relation("TheokotVoucherUser", fields: [userId], references: [id], onDelete: Cascade)
+  processedBy User?        @relation("TheokotVoucherProcessedBy", fields: [processedById], references: [id], onDelete: SetNull)
+
+  @@index([userId, createdAt])
+  @@index([createdAt])
 }
 
 model TheokotOrderLine {

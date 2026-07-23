@@ -23,11 +23,11 @@ export type RewardRow = {
   userId: string;
   name: string;
   email: string;
-  claimedShifts: number;
-  claimedReward: number;
-  unclaimedShifts: number;
-  unclaimedReward: number;
-  unclaimedShiftIds: string[];
+  paidShiftCount: number;
+  paidBonnetjes: number;
+  outstandingShiftCount: number;
+  outstandingBonnetjes: number;
+  outstandingShiftIds: string[];
 };
 export type Capabilities = { canEdit: boolean; canReward: boolean; canRanking: boolean };
 
@@ -60,7 +60,7 @@ export function ShiftAdmin({
   const tabs: { key: Tab; label: string; show: boolean }[] = [
     { key: "manage", label: nl ? "Beheer" : "Manage", show: capabilities.canEdit },
     { key: "ranking", label: nl ? "Ranglijst" : "Rankings", show: capabilities.canRanking },
-    { key: "rewards", label: nl ? "Vergoedingen" : "Rewards", show: capabilities.canReward },
+    { key: "rewards", label: nl ? "Bonnetjes" : "Vouchers", show: capabilities.canReward },
   ];
   const visible = tabs.filter((t) => t.show);
   const [tab, setTab] = useState<Tab>(visible[0]?.key ?? "manage");

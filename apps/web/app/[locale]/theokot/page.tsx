@@ -77,7 +77,10 @@ export default async function TheokotOrderPage({ params }: { params: Promise<{ l
       id: s.id,
       dateLabel: dayFmt.format(s.date),
       pickupLabel: `${timeFmt.format(s.pickupStart)} – ${timeFmt.format(s.pickupEnd)}`,
+      orderOpenLabel: `${dayFmt.format(s.orderOpenAt)}, ${timeFmt.format(s.orderOpenAt)}`,
       orderCloseLabel: `${dayFmt.format(s.orderCloseAt)}, ${timeFmt.format(s.orderCloseAt)}`,
+      orderWindowState:
+        now < s.orderOpenAt ? "UPCOMING" : now >= s.orderCloseAt ? "CLOSED" : "OPEN",
       weeklySpecialLabel: special ? (pick(special.nameNl, special.nameEn, locale) ?? special.nameNl) : null,
       canOrder: canOrderNow(s, now),
       items: s.items.map((i) => ({

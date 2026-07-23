@@ -56,6 +56,7 @@ export async function exportUserData(userId: string) {
       participatingShifts: {
         select: {
           payedOut: true,
+          rewardPaid: true,
           shift: {
             select: { name: true, startTime: true, endTime: true, location: true },
           },
@@ -67,6 +68,7 @@ export async function exportUserData(userId: string) {
           totalCents: true,
           createdAt: true,
           session: { select: { date: true } },
+          voucherRedemption: { select: { amount: true, createdAt: true } },
           lines: {
             select: {
               quantity: true,

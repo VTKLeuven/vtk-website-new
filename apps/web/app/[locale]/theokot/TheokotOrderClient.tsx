@@ -26,7 +26,9 @@ export type OrderSession = {
   id: string;
   dateLabel: string;
   pickupLabel: string;
+  orderOpenLabel: string;
   orderCloseLabel: string;
+  orderWindowState: "UPCOMING" | "OPEN" | "CLOSED";
   weeklySpecialLabel: string | null;
   canOrder: boolean;
   items: OrderItem[];
@@ -255,9 +257,13 @@ function SessionCard({
 
       {!existing && !session.canOrder && !disabled && (
         <p className="text-sm text-[#5c667f]">
-          {nl
-            ? "Reserveren voor deze dag is (nog) niet open."
-            : "Ordering for this day is not open (yet)."}
+          {session.orderWindowState === "UPCOMING"
+            ? nl
+              ? `Reserveren opent op ${session.orderOpenLabel} en sluit op ${session.orderCloseLabel}.`
+              : `Ordering opens on ${session.orderOpenLabel} and closes on ${session.orderCloseLabel}.`
+            : nl
+              ? `Reserveren is gesloten sinds ${session.orderCloseLabel}. Reservaties waren open vanaf ${session.orderOpenLabel}.`
+              : `Ordering has been closed since ${session.orderCloseLabel}. Reservations were open from ${session.orderOpenLabel}.`}
         </p>
       )}
 

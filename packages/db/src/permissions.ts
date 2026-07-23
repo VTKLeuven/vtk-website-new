@@ -55,7 +55,7 @@ export const PERMISSIONS = [
 
   // Shifts
   { code: "shift.edit", labelNl: "Shiften beheren", labelEn: "Manage shifts", category: "shift" },
-  { code: "shift.reward", labelNl: "Shiftvergoedingen beheren", labelEn: "Manage shift rewards", category: "shift" },
+  { code: "shift.reward", labelNl: "Shiftbonnetjes beheren", labelEn: "Manage shift vouchers", category: "shift" },
   { code: "shift.ranking", labelNl: "Shiftranglijst bekijken", labelEn: "View shift rankings", category: "shift" },
 
   // Theokot (cafetaria / broodjesbar)

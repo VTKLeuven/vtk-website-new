@@ -15,6 +15,12 @@ import {
 } from "@/lib/theokot";
 import { activeBanFor, getTheokotConfig } from "@/lib/theokot-server";
 import { verifyStudentCard } from "@/lib/kul-card";
+import {
+  allocateUserShiftReward,
+  ShiftRewardConflictError,
+} from "@/lib/shift-rewards.server";
+import { outstandingShiftReward } from "@/lib/shift-rewards";
+import { withSerializableTransaction } from "@/lib/ticketing/transactions";
 
 export type ActionResult = { ok: true; message?: string } | { ok: false; error: string };
 
@@ -43,8 +49,12 @@ function parseDayToBrusselsMidnight(value: string | null | undefined): Date | nu
 
 function revalidateTheokot() {
   revalidatePath(ADMIN_PATH);
+  revalidatePath("/admin/theokot/afhalen");
+  revalidatePath("/en/admin/theokot/afhalen");
   revalidatePath("/theokot");
   revalidatePath("/en/theokot");
+  revalidatePath("/theokot/balie");
+  revalidatePath("/en/theokot/balie");
   revalidatePath("/");
 }
 
@@ -448,10 +458,22 @@ export type PickupOrder = {
   lines: PickupLine[];
   pickupStart: string;
   pickupEnd: string;
+  voucherRedemption: { amount: number } | null;
 };
 export type PickupLookupResult =
-  | { ok: true; userName: string; rNumber: string; orders: PickupOrder[] }
+  | {
+      ok: true;
+      userName: string;
+      rNumber: string;
+      outstandingBonnetjes: number;
+      orders: PickupOrder[];
+    }
   | { ok: false; error: string };
+export type VoucherRedemptionResult =
+  | { ok: true; amount: number; remainingBonnetjes: number }
+  | { ok: false; error: string };
+
+const SANDWICH_VOUCHER_COST = 2;
 
 /** Kernlogica: bestelling(en) van vandaag voor een r-nummer opzoeken. */
 async function pickupByRNumber(rNumberRaw: string): Promise<PickupLookupResult> {
@@ -465,20 +487,31 @@ async function pickupByRNumber(rNumberRaw: string): Promise<PickupLookupResult> 
   const today = brusselsTimeOnDay(now, "00:00");
   const tomorrow = new Date(today.getTime() + 86400000);
 
-  const orders = await prisma.theokotOrder.findMany({
-    where: {
-      userId: user.id,
-      status: { in: ["RESERVED", "PICKED_UP"] },
-      session: { date: { gte: today, lt: tomorrow } },
-    },
-    include: {
-      session: { select: { pickupStart: true, pickupEnd: true } },
-      lines: {
-        include: { sessionItem: { select: { nameNl: true, nameEn: true } } },
-        orderBy: { sessionItem: { order: "asc" } },
+  const [orders, shiftBalances] = await Promise.all([
+    prisma.theokotOrder.findMany({
+      where: {
+        userId: user.id,
+        status: { in: ["RESERVED", "PICKED_UP"] },
+        session: { date: { gte: today, lt: tomorrow } },
       },
-    },
-  });
+      include: {
+        session: { select: { pickupStart: true, pickupEnd: true } },
+        voucherRedemption: { select: { amount: true } },
+        lines: {
+          include: { sessionItem: { select: { nameNl: true, nameEn: true } } },
+          orderBy: { sessionItem: { order: "asc" } },
+        },
+      },
+    }),
+    prisma.shiftParticipant.findMany({
+      where: { userId: user.id, shift: { endTime: { lt: now } } },
+      select: {
+        shiftId: true,
+        rewardPaid: true,
+        shift: { select: { reward: true } },
+      },
+    }),
+  ]);
 
   if (orders.length === 0) {
     return { ok: false, error: `${user.name} heeft geen bestelling voor vandaag.` };
@@ -491,12 +524,22 @@ async function pickupByRNumber(rNumberRaw: string): Promise<PickupLookupResult> 
     ok: true,
     userName: user.name,
     rNumber,
+    outstandingBonnetjes: shiftBalances.reduce(
+      (total, balance) =>
+        total +
+        outstandingShiftReward({
+          reward: balance.shift.reward,
+          rewardPaid: balance.rewardPaid,
+        }),
+      0,
+    ),
     orders: orders.map((o) => ({
       orderId: o.id,
       status: o.status,
       totalCents: o.totalCents,
       pickupStart: fmt(o.session.pickupStart),
       pickupEnd: fmt(o.session.pickupEnd),
+      voucherRedemption: o.voucherRedemption,
       lines: o.lines.map((l) => ({
         nameNl: l.sessionItem.nameNl,
         nameEn: l.sessionItem.nameEn,
@@ -539,6 +582,79 @@ export async function markPickedUpAction(orderId: string): Promise<ActionResult>
   });
   revalidateTheokot();
   return { ok: true, message: "Opgehaald geregistreerd." };
+}
+
+/**
+ * Gebruikt twee nog openstaande medewerkersbonnetjes voor één broodje en
+ * schrijft tegelijk een auditrij. De saldo-afboeking en auditregistratie zijn
+ * één serialiseerbare transactie.
+ */
+export async function redeemEmployeeVouchersAction(
+  orderId: string,
+): Promise<VoucherRedemptionResult> {
+  const admin = await requirePermission("theokot.pickup");
+
+  try {
+    const result = await withSerializableTransaction(async (tx) => {
+      const order = await tx.theokotOrder.findUnique({
+        where: { id: orderId },
+        select: {
+          id: true,
+          userId: true,
+          status: true,
+          voucherRedemption: { select: { id: true } },
+        },
+      });
+      if (!order) throw new Error("ORDER_NOT_FOUND");
+      if (order.status !== "RESERVED") throw new Error("ORDER_NOT_OPEN");
+      if (order.voucherRedemption) throw new Error("ALREADY_REDEEMED");
+
+      const allocation = await allocateUserShiftReward(tx, {
+        userId: order.userId,
+        amount: SANDWICH_VOUCHER_COST,
+      });
+
+      await tx.theokotVoucherRedemption.create({
+        data: {
+          orderId: order.id,
+          userId: order.userId,
+          processedById: admin.user.id,
+          amount: SANDWICH_VOUCHER_COST,
+        },
+      });
+
+      return allocation;
+    });
+
+    revalidateTheokot();
+    return {
+      ok: true,
+      amount: SANDWICH_VOUCHER_COST,
+      remainingBonnetjes: result.remaining,
+    };
+  } catch (error) {
+    if (error instanceof RangeError) {
+      return { ok: false, error: "De student heeft niet genoeg openstaande bonnetjes." };
+    }
+    if (error instanceof ShiftRewardConflictError) {
+      return { ok: false, error: "Het bonnetjessaldo is gewijzigd. Scan de kaart opnieuw." };
+    }
+    if (error instanceof Error) {
+      if (error.message === "ORDER_NOT_FOUND") {
+        return { ok: false, error: "Bestelling niet gevonden." };
+      }
+      if (error.message === "ORDER_NOT_OPEN") {
+        return { ok: false, error: "Deze bestelling kan niet meer met bonnetjes betaald worden." };
+      }
+      if (error.message === "ALREADY_REDEEMED") {
+        return { ok: false, error: "Voor deze bestelling zijn al medewerkersbonnetjes gebruikt." };
+      }
+    }
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+      return { ok: false, error: "Voor deze bestelling zijn al medewerkersbonnetjes gebruikt." };
+    }
+    throw error;
+  }
 }
 
 // -----------------------------------------------------------------------------

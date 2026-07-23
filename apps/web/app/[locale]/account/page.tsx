@@ -14,6 +14,7 @@ import { deleteMyAccountAction } from '@/app/actions/privacy';
 import { listTicketsForCurrentUser } from '@/lib/ticketing/queries';
 import type { PublicOrder } from '@/components/ticketing/public/types';
 import { AccountTickets } from './AccountTickets';
+import { AccountShifts } from './AccountShifts';
 import { DoorShortcutTokens } from './DoorShortcutTokens';
 
 export default async function AccountPage({ params }: { params: Promise<{ locale: string }> }) {
@@ -25,7 +26,7 @@ export default async function AccountPage({ params }: { params: Promise<{ locale
 
   const now = new Date();
   const canUseDoorShortcut = hasPermission(session, 'door.remoteOpen');
-  const [profile, reservations, doorShortcutTokens, ticketOrders] = await Promise.all([
+  const [profile, reservations, doorShortcutTokens, ticketOrders, registeredShifts] = await Promise.all([
     // Volledig profiel voor het bewerkbare gegevensformulier (kotadres, mails, ...).
     prisma.user.findUniqueOrThrow({
       where: { id: session.user.id },
@@ -72,6 +73,28 @@ export default async function AccountPage({ params }: { params: Promise<{ locale
         })
       : Promise.resolve([]),
     listTicketsForCurrentUser() as Promise<PublicOrder[]>,
+    prisma.shiftParticipant
+      .findMany({
+        where: {
+          userId: session.user.id,
+          shift: { endTime: { gte: now } },
+        },
+        orderBy: { shift: { startTime: 'asc' } },
+        select: {
+          shift: {
+            select: {
+              id: true,
+              name: true,
+              startTime: true,
+              endTime: true,
+              location: true,
+              post: true,
+              reward: true,
+            },
+          },
+        },
+      })
+      .then((participations) => participations.map(({ shift }) => shift)),
   ]);
 
   const dayFmt = new Intl.DateTimeFormat(nl ? 'nl-BE' : 'en-GB', {
@@ -108,8 +131,8 @@ export default async function AccountPage({ params }: { params: Promise<{ locale
           </h2>
           <p className="mt-1 text-sm text-[#5c667f]">
             {nl
-              ? 'Je tickets, reservaties en gekoppelde VTK-diensten.'
-              : 'Your tickets, reservations and connected VTK services.'}
+              ? 'Je tickets, reservaties, shiften en gekoppelde VTK-diensten.'
+              : 'Your tickets, reservations, shifts and connected VTK services.'}
           </p>
         </div>
 
@@ -193,6 +216,8 @@ export default async function AccountPage({ params }: { params: Promise<{ locale
             </p>
           )}
         </Card>
+
+        <AccountShifts locale={locale} shifts={registeredShifts} />
 
         {canUseDoorShortcut ? (
           <Card className="p-6">

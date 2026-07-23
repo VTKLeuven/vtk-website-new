@@ -1351,7 +1351,7 @@ async function main() {
 
   console.log("Seeding completed shifts + participants...");
   // Voltooide (verleden) shiften met deelnemers, gemengd betaald/onbetaald, zodat
-  // de admin-ranglijst en -vergoedingen data hebben. Negatieve dayOffsets houden ze
+  // de admin-ranglijst en -bonnetjesdata hebben. Negatieve dayOffsets houden ze
   // relatief in het verleden; de laatste twee vallen in het vorige academiejaar.
   const pastShiftSeeds: Array<{
     id: string;
@@ -1404,7 +1404,12 @@ async function main() {
       await prisma.shiftParticipant.upsert({
         where: { shiftId_userId: { shiftId: s.id, userId: user.id } },
         update: {},
-        create: { shiftId: s.id, userId: user.id, payedOut: p.payedOut },
+        create: {
+          shiftId: s.id,
+          userId: user.id,
+          payedOut: p.payedOut,
+          rewardPaid: p.payedOut ? s.reward : 0,
+        },
       });
     }
   }
