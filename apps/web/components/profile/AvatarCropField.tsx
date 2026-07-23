@@ -5,6 +5,18 @@ import { Button } from "@vtk/ui";
 
 type Crop = { zoom: number; x: number; y: number };
 
+const clamp = (value: number, lo: number, hi: number) =>
+  Math.min(hi, Math.max(lo, value));
+
+function cropGeometry(image: HTMLImageElement, zoom: number) {
+  const width = image.naturalWidth;
+  const height = image.naturalHeight;
+  const sourceSize = Math.min(width, height) / zoom;
+  const centeredX = (width - sourceSize) / 2;
+  const centeredY = (height - sourceSize) / 2;
+  return { sourceSize, centeredX, centeredY };
+}
+
 function drawSquareCrop(
   canvas: HTMLCanvasElement,
   image: HTMLImageElement,
@@ -16,11 +28,7 @@ function drawSquareCrop(
   const context = canvas.getContext("2d");
   if (!context) throw new Error("CANVAS_UNAVAILABLE");
 
-  const width = image.naturalWidth;
-  const height = image.naturalHeight;
-  const sourceSize = Math.min(width, height) / crop.zoom;
-  const centeredX = (width - sourceSize) / 2;
-  const centeredY = (height - sourceSize) / 2;
+  const { sourceSize, centeredX, centeredY } = cropGeometry(image, crop.zoom);
   const sourceX = centeredX + crop.x * centeredX;
   const sourceY = centeredY + crop.y * centeredY;
 
@@ -52,10 +60,21 @@ export function AvatarCropField({
   const sourceUrlRef = useRef<string | null>(null);
   const previewUrlRef = useRef<string | null>(null);
   const committedFileRef = useRef<File | null>(null);
+  const dragRef = useRef<{
+    pointerId: number;
+    startClientX: number;
+    startClientY: number;
+    startX: number;
+    startY: number;
+    scale: number;
+    centeredX: number;
+    centeredY: number;
+  } | null>(null);
   const [editorOpen, setEditorOpen] = useState(false);
   const [cropReady, setCropReady] = useState(false);
   const [previewUrl, setPreviewUrl] = useState(currentAvatar);
   const [crop, setCrop] = useState<Crop>({ zoom: 1, x: 0, y: 0 });
+  const [dragging, setDragging] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const redraw = useCallback(() => {
@@ -120,6 +139,50 @@ export function AvatarCropField({
     image.src = sourceUrl;
   }
 
+  function startDrag(event: React.PointerEvent<HTMLCanvasElement>) {
+    const image = imageRef.current;
+    const canvas = canvasRef.current;
+    if (!image || !canvas) return;
+    const rect = canvas.getBoundingClientRect();
+    const { sourceSize, centeredX, centeredY } = cropGeometry(image, crop.zoom);
+    if (centeredX <= 0 && centeredY <= 0) return;
+    dragRef.current = {
+      pointerId: event.pointerId,
+      startClientX: event.clientX,
+      startClientY: event.clientY,
+      startX: crop.x,
+      startY: crop.y,
+      scale: sourceSize / rect.width,
+      centeredX,
+      centeredY,
+    };
+    canvas.setPointerCapture(event.pointerId);
+    setDragging(true);
+  }
+
+  function moveDrag(event: React.PointerEvent<HTMLCanvasElement>) {
+    const drag = dragRef.current;
+    if (!drag || event.pointerId !== drag.pointerId) return;
+    const dxImage = (event.clientX - drag.startClientX) * drag.scale;
+    const dyImage = (event.clientY - drag.startClientY) * drag.scale;
+    // Slepen verplaatst de foto met de cursor mee, dus het uitsnede-venster
+    // schuift de andere kant op.
+    const nextX = drag.centeredX > 0 ? clamp(drag.startX - dxImage / drag.centeredX, -1, 1) : drag.startX;
+    const nextY = drag.centeredY > 0 ? clamp(drag.startY - dyImage / drag.centeredY, -1, 1) : drag.startY;
+    setCrop((value) => ({ ...value, x: nextX, y: nextY }));
+  }
+
+  function endDrag(event: React.PointerEvent<HTMLCanvasElement>) {
+    const drag = dragRef.current;
+    if (!drag) return;
+    const canvas = canvasRef.current;
+    if (canvas && canvas.hasPointerCapture(drag.pointerId)) {
+      canvas.releasePointerCapture(drag.pointerId);
+    }
+    dragRef.current = null;
+    setDragging(false);
+  }
+
   async function confirmCrop() {
     const image = imageRef.current;
     const input = inputRef.current;
@@ -146,6 +209,14 @@ export function AvatarCropField({
     setCropReady(true);
     setEditorOpen(false);
   }
+
+  const image = imageRef.current;
+  let canPan = false;
+  if (image) {
+    const { centeredX, centeredY } = cropGeometry(image, crop.zoom);
+    canPan = centeredX > 0.5 || centeredY > 0.5;
+  }
+  const cursorClass = canPan ? (dragging ? "cursor-grabbing" : "cursor-grab") : "cursor-default";
 
   return (
     <>
@@ -187,13 +258,17 @@ export function AvatarCropField({
             </h3>
             <p className="mt-1 text-sm text-[#5c667f]">
               {nl
-                ? "Pas de uitsnede aan. Alleen dit vierkant wordt geüpload."
-                : "Adjust the crop. Only this square will be uploaded."}
+                ? "Sleep de foto om ze te verplaatsen en gebruik de zoom. Alleen dit vierkant wordt geüpload."
+                : "Drag the photo to reposition and use the zoom. Only this square will be uploaded."}
             </p>
 
             <canvas
               ref={canvasRef}
-              className="mx-auto mt-4 aspect-square w-full max-w-80 rounded-2xl bg-vtk-blue-soft object-contain"
+              onPointerDown={startDrag}
+              onPointerMove={moveDrag}
+              onPointerUp={endDrag}
+              onPointerCancel={endDrag}
+              className={`mx-auto mt-4 aspect-square w-full max-w-80 touch-none select-none rounded-2xl bg-vtk-blue-soft object-contain ${cursorClass}`}
               aria-label={nl ? "Voorbeeld van de uitsnede" : "Crop preview"}
             />
 
@@ -208,30 +283,6 @@ export function AvatarCropField({
                   step="0.01"
                   value={crop.zoom}
                   onChange={(event) => setCrop((value) => ({ ...value, zoom: Number(event.target.value) }))}
-                />
-              </label>
-              <label className="block text-sm font-medium text-vtk-ink">
-                {nl ? "Horizontale positie" : "Horizontal position"}
-                <input
-                  className="mt-1 block w-full accent-vtk-ink"
-                  type="range"
-                  min="-1"
-                  max="1"
-                  step="0.01"
-                  value={crop.x}
-                  onChange={(event) => setCrop((value) => ({ ...value, x: Number(event.target.value) }))}
-                />
-              </label>
-              <label className="block text-sm font-medium text-vtk-ink">
-                {nl ? "Verticale positie" : "Vertical position"}
-                <input
-                  className="mt-1 block w-full accent-vtk-ink"
-                  type="range"
-                  min="-1"
-                  max="1"
-                  step="0.01"
-                  value={crop.y}
-                  onChange={(event) => setCrop((value) => ({ ...value, y: Number(event.target.value) }))}
                 />
               </label>
             </div>
