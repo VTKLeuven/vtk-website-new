@@ -5,8 +5,8 @@ import { PageShell } from '@/components/page-shell';
 import { getSession } from '@/lib/session';
 import { getLocale } from '@/lib/i18n';
 import { formatEuro } from '@/lib/uitleen';
-import { publicUrl } from '@/lib/storage';
 import { frequentlyRequestedWith, itemDetail } from '@/lib/uitleen-server';
+import { ItemGallery } from './item-gallery';
 
 export default async function ItemDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const [session, locale] = await Promise.all([getSession(), getLocale()]);
@@ -20,7 +20,7 @@ export default async function ItemDetailPage({ params }: { params: Promise<{ id:
   if (!item) notFound();
 
   const related = await frequentlyRequestedWith(item.id);
-  const photo = publicUrl(item.photoKey);
+  const photos = [...(item.photoKey ? [item.photoKey] : []), ...item.photos.map((photo) => photo.key)];
 
   return (
     <PageShell
@@ -34,14 +34,7 @@ export default async function ItemDetailPage({ params }: { params: Promise<{ id:
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
         <div className="space-y-6">
           <section className="overflow-hidden rounded-[18px] border border-vtk-navy/10 bg-vtk-surface">
-            {photo ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={photo} alt={item.name} className="aspect-[16/9] w-full object-cover" />
-            ) : (
-              <div className="grid aspect-[16/9] w-full place-items-center bg-vtk-paper-2 text-sm text-vtk-muted">
-                {en ? 'No photo yet' : 'Nog geen foto'}
-              </div>
-            )}
+            <ItemGallery name={item.name} keys={photos} categoryName={item.category?.name} />
             <div className="p-6">
               <div className="flex flex-wrap items-center gap-2">
                 {item.category ? (
@@ -60,6 +53,22 @@ export default async function ItemDetailPage({ params }: { params: Promise<{ id:
               ) : null}
             </div>
           </section>
+
+          {item.properties.length > 0 ? (
+            <section className="rounded-[18px] border border-vtk-navy/10 bg-vtk-surface p-6">
+              <h2 className="text-lg font-semibold tracking-tight text-vtk-ink">{en ? 'Properties' : 'Eigenschappen'}</h2>
+              <dl className="mt-3 divide-y divide-vtk-navy/10">
+                {item.properties.map((property) => <div key={property.id} className="grid gap-1 py-2.5 sm:grid-cols-2"><dt className="text-sm text-vtk-muted">{property.label}</dt><dd className="text-sm font-medium text-vtk-ink">{property.value}</dd></div>)}
+              </dl>
+            </section>
+          ) : null}
+
+          {item.downloads.length > 0 ? (
+            <section className="rounded-[18px] border border-vtk-navy/10 bg-vtk-surface p-6">
+              <h2 className="text-lg font-semibold tracking-tight text-vtk-ink">{en ? 'Downloads' : 'Downloads'}</h2>
+              <ul className="mt-3 grid gap-2 sm:grid-cols-2">{item.downloads.map((download) => <li key={download.id}><a href={`/api/media/${download.key.split('/').map(encodeURIComponent).join('/')}`} target="_blank" rel="noreferrer" className="flex items-center justify-between rounded-[14px] border border-vtk-navy/10 px-4 py-3 text-sm font-medium text-vtk-ink transition hover:border-vtk-navy/30"><span>{download.label}</span><span aria-hidden>↓</span></a></li>)}</ul>
+            </section>
+          ) : null}
 
           {item.isSet && item.setContents.length > 0 ? (
             <section className="rounded-[18px] border border-vtk-navy/10 bg-vtk-surface p-6">

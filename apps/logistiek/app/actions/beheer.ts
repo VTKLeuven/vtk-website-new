@@ -100,6 +100,20 @@ function parseSetContents(raw: FormDataEntryValue | null): Array<{ label: string
   }
 }
 
+function parseCatalogRows(raw: FormDataEntryValue | null, fields: readonly string[]) {
+  const text = String(raw ?? '').trim();
+  if (!text) return [] as Array<Record<string, string>>;
+  try {
+    const parsed: unknown = JSON.parse(text);
+    if (!Array.isArray(parsed)) return [];
+    return parsed
+      .map((row) => Object.fromEntries(fields.map((field) => [field, String(row?.[field] ?? '').trim()])))
+      .filter((row) => fields.every((field) => row[field]));
+  } catch {
+    return [];
+  }
+}
+
 export async function saveItemAction(_prev: SaveState, formData: FormData): Promise<SaveState> {
   await requireManage();
 
@@ -120,6 +134,9 @@ export async function saveItemAction(_prev: SaveState, formData: FormData): Prom
   const conditionNote = String(formData.get('conditionNote') ?? '').trim();
   const isSet = String(formData.get('isSet') ?? '') === 'on';
   const setContents = isSet ? parseSetContents(formData.get('setContents')) : [];
+  const photos = parseCatalogRows(formData.get('photos'), ['key']);
+  const properties = parseCatalogRows(formData.get('properties'), ['label', 'value']);
+  const downloads = parseCatalogRows(formData.get('downloads'), ['label', 'key']);
 
   if (!name) return saveError('NAME_REQUIRED');
   if (!Number.isInteger(quantity) || quantity < 1) return saveError('QUANTITY_INVALID');
@@ -152,6 +169,9 @@ export async function saveItemAction(_prev: SaveState, formData: FormData): Prom
       });
       if (updated.count === 0) return true;
       await tx.uitleenSetContent.deleteMany({ where: { itemId: id } });
+      await tx.uitleenItemPhoto.deleteMany({ where: { itemId: id } });
+      await tx.uitleenItemProperty.deleteMany({ where: { itemId: id } });
+      await tx.uitleenItemDownload.deleteMany({ where: { itemId: id } });
       if (setContents.length > 0) {
         await tx.uitleenSetContent.createMany({
           data: setContents.map((row, index) => ({
@@ -162,6 +182,9 @@ export async function saveItemAction(_prev: SaveState, formData: FormData): Prom
           })),
         });
       }
+      if (photos.length) await tx.uitleenItemPhoto.createMany({ data: photos.map((row, sortIndex) => ({ itemId: id, key: row.key, sortIndex })) });
+      if (properties.length) await tx.uitleenItemProperty.createMany({ data: properties.map((row, sortIndex) => ({ itemId: id, label: row.label, value: row.value, sortIndex })) });
+      if (downloads.length) await tx.uitleenItemDownload.createMany({ data: downloads.map((row, sortIndex) => ({ itemId: id, label: row.label, key: row.key, sortIndex })) });
       return false;
     });
     if (stale) return saveError('STALE');
@@ -176,6 +199,9 @@ export async function saveItemAction(_prev: SaveState, formData: FormData): Prom
             sortIndex: index,
           })),
         },
+        photos: { create: photos.map((row, sortIndex) => ({ key: row.key, sortIndex })) },
+        properties: { create: properties.map((row, sortIndex) => ({ label: row.label, value: row.value, sortIndex })) },
+        downloads: { create: downloads.map((row, sortIndex) => ({ label: row.label, key: row.key, sortIndex })) },
       },
     });
   }

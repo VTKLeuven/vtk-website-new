@@ -13,6 +13,7 @@ export type CatalogItem = {
   depositCents: number;
   priceCents: number;
   photoKey: string | null;
+  photoKeys: string[];
   isSet: boolean;
 };
 
@@ -30,6 +31,7 @@ type ItemRow = {
   depositCents: number;
   priceCents: number;
   photoKey: string | null;
+  photos?: Array<{ key: string }>;
   isSet: boolean;
   categoryId: string | null;
 };
@@ -43,6 +45,7 @@ function toCatalogItem(item: ItemRow): CatalogItem {
     depositCents: item.depositCents,
     priceCents: item.priceCents,
     photoKey: item.photoKey,
+    photoKeys: item.photos?.map((photo) => photo.key) ?? [],
     isSet: item.isSet,
   };
 }
@@ -54,7 +57,11 @@ export async function getCatalog(): Promise<CatalogCategory[]> {
       where: { active: true },
       orderBy: [{ sortIndex: 'asc' }, { name: 'asc' }],
     }),
-    prisma.uitleenItem.findMany({ where: { active: true }, orderBy: { name: 'asc' } }),
+    prisma.uitleenItem.findMany({
+      where: { active: true },
+      orderBy: { name: 'asc' },
+      include: { photos: { orderBy: { sortIndex: 'asc' } } },
+    }),
   ]);
 
   const grouped: CatalogCategory[] = categories.map((category) => ({
@@ -172,6 +179,9 @@ export async function itemDetail(id: string) {
     include: {
       category: { select: { name: true } },
       setContents: { orderBy: { sortIndex: 'asc' } },
+      photos: { orderBy: { sortIndex: 'asc' } },
+      properties: { orderBy: { sortIndex: 'asc' } },
+      downloads: { orderBy: { sortIndex: 'asc' } },
     },
   });
 }
@@ -200,6 +210,7 @@ export async function frequentlyRequestedWith(itemId: string, take = 4): Promise
 
   const items = await prisma.uitleenItem.findMany({
     where: { id: { in: grouped.map((g) => g.itemId) }, active: true },
+    include: { photos: { orderBy: { sortIndex: 'asc' } } },
   });
   const byId = new Map(items.map((i) => [i.id, i]));
   return grouped
@@ -393,7 +404,12 @@ export async function adminInventory() {
     prisma.uitleenCategory.findMany({ orderBy: [{ sortIndex: 'asc' }, { name: 'asc' }] }),
     prisma.uitleenItem.findMany({
       orderBy: { name: 'asc' },
-      include: { setContents: { orderBy: { sortIndex: 'asc' } } },
+      include: {
+        setContents: { orderBy: { sortIndex: 'asc' } },
+        photos: { orderBy: { sortIndex: 'asc' } },
+        properties: { orderBy: { sortIndex: 'asc' } },
+        downloads: { orderBy: { sortIndex: 'asc' } },
+      },
     }),
   ]);
   return { categories, items };
