@@ -13,7 +13,7 @@ export function ProfileMenu({
 }: {
   name: string;
   isAdmin: boolean;
-  labels: { myAccount: string; myTickets: string; admin: string; logout: string };
+  labels: { myAccount: string; admin: string; logout: string };
   base: string;
   variant?: "default" | "editorial";
 }) {
@@ -97,9 +97,6 @@ export function ProfileMenu({
         <div role="menu" className={menuClass}>
           <Link href={`${base}/account`} className={itemClass} role="menuitem">
             {labels.myAccount}
-          </Link>
-          <Link href={`${base}/mijn-tickets`} className={itemClass} role="menuitem">
-            {labels.myTickets}
           </Link>
           {isAdmin && (
             <Link href={`${base}/admin`} className={itemClass} role="menuitem">

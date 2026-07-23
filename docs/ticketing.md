@@ -21,8 +21,9 @@ setup (env, webhook, SMTP).
 3. **Pay** — Mollie hosted checkout. On completion Mollie calls the webhook,
    which re-fetches the payment and calls `fulfillPaidOrder` → tickets issued,
    confirmation mail enqueued in the same transaction.
-4. **Ticket** — buyer views the order at `/mijn-tickets/<orderId>` (or
-   `/tickets/bestelling/<orderId>`); each ticket renders a QR from a signed,
+4. **Ticket** — buyer finds paid orders in the "Mijn VTK" section at
+   `/account#mijn-vtk-tickets` and opens an order at
+   `/tickets/bestelling/<orderId>`; each ticket renders a QR from a signed,
    PII-free credential.
 5. **Scan** — an operator with `SCAN` capability opens `/scan/<eventId>` on a
    phone, scans the QR, and the server validates + marks it used (with duplicate
@@ -69,7 +70,8 @@ provider-agnostic and keys off the `provider` string stored on each row
 ### Routes — public (`apps/web/app/[locale]/...`)
 - `tickets/page.tsx` — public shop list (`/tickets`)
 - `tickets/[slug]/page.tsx` — event + purchase page
-- `mijn-tickets/[orderId]/page.tsx`, `tickets/bestelling/[orderId]` — order + QR
+- `account/page.tsx` — personal ticket overview in the "Mijn VTK" section
+- `tickets/bestelling/[orderId]` — order + QR
 
 ### Routes — admin (`apps/web/app/[locale]/admin/tickets/...`)
 - `page.tsx` — event list / management

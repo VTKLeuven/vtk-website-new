@@ -49,6 +49,40 @@ const nextConfig: NextConfig = {
       bodySizeLimit: "50mb",
     },
   },
+  async redirects() {
+    return [
+      {
+        source: "/mijn-tickets",
+        destination: "/account#mijn-vtk-tickets",
+        permanent: true,
+      },
+      {
+        source: "/mijn-tickets/:orderId",
+        destination: "/tickets/bestelling/:orderId",
+        permanent: true,
+      },
+      {
+        source: "/nl/mijn-tickets",
+        destination: "/account#mijn-vtk-tickets",
+        permanent: true,
+      },
+      {
+        source: "/nl/mijn-tickets/:orderId",
+        destination: "/tickets/bestelling/:orderId",
+        permanent: true,
+      },
+      {
+        source: "/en/mijn-tickets",
+        destination: "/en/account#mijn-vtk-tickets",
+        permanent: true,
+      },
+      {
+        source: "/en/mijn-tickets/:orderId",
+        destination: "/en/tickets/bestelling/:orderId",
+        permanent: true,
+      },
+    ];
+  },
   async headers() {
     return [
       {

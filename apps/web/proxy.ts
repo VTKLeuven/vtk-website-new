@@ -18,7 +18,7 @@ const DEFAULT_LOCALE = 'nl';
 function protectTicketResponse(response: NextResponse, pathname: string): NextResponse {
   const localizedPath = pathname.replace(/^\/(?:nl|en)(?=\/|$)/, '');
   const isOrderPage = localizedPath.startsWith('/tickets/bestelling/');
-  const isAccountPage = localizedPath === '/mijn-tickets' || localizedPath.startsWith('/mijn-tickets/');
+  const isAccountPage = localizedPath === '/account';
 
   if (isOrderPage || isAccountPage) {
     response.headers.set('Cache-Control', 'private, no-store, max-age=0');

@@ -118,7 +118,6 @@ export async function Header({ locale }: { locale: Locale }) {
               isAdmin={session.user.isSuperAdmin || session.permissions.length > 0}
               labels={{
                 myAccount: dict.header.myAccount,
-                myTickets: dict.header.myTickets,
                 admin: dict.header.admin,
                 logout: dict.header.logout,
               }}

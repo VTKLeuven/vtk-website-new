@@ -2,8 +2,7 @@
    separate layout rules so the camera route never inherits site chrome. */
 
 .vtk-tickets-page,
-.ticket-order-page,
-.my-tickets-page {
+.ticket-order-page {
   --ticket-green: #147a54;
   --ticket-green-soft: #e8f4ee;
   --ticket-red: #b4233c;
@@ -17,7 +16,6 @@
 
 .vtk-tickets-page *,
 .ticket-order-page *,
-.my-tickets-page *,
 .scanner-route-shell * {
   box-sizing: border-box;
   letter-spacing: 0;
@@ -185,8 +183,7 @@
   color: var(--yellow);
 }
 
-.ticket-catalog-shell,
-.my-tickets-shell {
+.ticket-catalog-shell {
   width: min(100%, var(--max));
   margin: 0 auto;
   padding: 48px clamp(20px, 3vw, 36px) 96px;
@@ -315,8 +312,7 @@
 
 .ticket-event-facts span,
 .ticket-shop-facts span,
-.ticket-order-event p,
-.my-ticket-order-copy p {
+.ticket-order-event p {
   display: inline-flex;
   min-width: 0;
   align-items: center;
@@ -325,8 +321,7 @@
 
 .ticket-event-facts svg,
 .ticket-shop-facts svg,
-.ticket-order-event svg,
-.my-ticket-order-copy svg {
+.ticket-order-event svg {
   flex: 0 0 auto;
   color: var(--muted);
 }
@@ -376,8 +371,7 @@
   transform: translateX(3px);
 }
 
-.ticket-empty-state,
-.ticket-auth-state {
+.ticket-empty-state {
   display: flex;
   min-height: 330px;
   flex-direction: column;
@@ -391,19 +385,16 @@
   text-align: center;
 }
 
-.ticket-empty-state > svg,
-.ticket-auth-state > svg {
+.ticket-empty-state > svg {
   color: var(--muted);
 }
 
-.ticket-empty-state h2,
-.ticket-auth-state h1 {
+.ticket-empty-state h2 {
   margin: 16px 0 0;
   font-size: 24px;
 }
 
-.ticket-empty-state p,
-.ticket-auth-state p {
+.ticket-empty-state p {
   max-width: 440px;
   margin: 8px 0 20px;
   color: var(--muted);
@@ -1333,159 +1324,6 @@
   cursor: pointer;
 }
 
-/* My tickets */
-
-.my-tickets-head {
-  display: flex;
-  width: min(100%, var(--max));
-  margin: 0 auto;
-  padding: 58px clamp(20px, 3vw, 36px) 35px;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: 25px;
-  border-bottom: 1px solid var(--line);
-}
-
-/* Zoals de rest van de site: sans, strak gespatieerd. De serif is enkel een
-   accent in de hero-titel op de homepage, niet voor gewone paginakoppen. */
-.my-tickets-head h1 {
-  margin: 10px 0 0;
-  font-size: clamp(34px, 4vw, 46px);
-  font-weight: 600;
-  letter-spacing: -0.035em;
-  line-height: 1.05;
-}
-
-.my-tickets-head p {
-  margin: 12px 0 0;
-  color: var(--muted);
-  font-size: 13px;
-}
-
-.my-ticket-orders {
-  display: grid;
-  gap: 14px;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-/* Zelfde kaartvorm als op de homepage: witte kaart, dunne navy lijn, ruime
-   afronding en een ingehouden hover. */
-.my-ticket-orders > li {
-  border: 1px solid var(--line);
-  border-radius: 18px;
-  background: var(--surface);
-  transition:
-    border-color 150ms ease,
-    box-shadow 150ms ease,
-    transform 150ms ease;
-}
-
-.my-ticket-orders > li:hover {
-  border-color: var(--line-2);
-  box-shadow: 0 10px 28px rgba(10, 15, 31, 0.08);
-  transform: translateY(-2px);
-}
-
-.my-ticket-order-link {
-  display: grid;
-  grid-template-columns: 70px minmax(0, 1fr) auto 24px;
-  min-height: 125px;
-  align-items: center;
-  gap: 23px;
-  padding: 18px 22px;
-  color: inherit;
-  text-decoration: none;
-}
-
-.my-ticket-order-date {
-  display: flex;
-  width: 62px;
-  height: 70px;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  border-radius: 14px;
-  background: var(--navy);
-  color: var(--paper);
-}
-
-.my-ticket-order-date strong {
-  font-family: var(--mono);
-  font-size: 25px;
-  line-height: 1;
-}
-
-.my-ticket-order-date span {
-  margin-top: 4px;
-  color: var(--yellow);
-  font-size: 10px;
-  font-weight: 800;
-  text-transform: uppercase;
-}
-
-.my-ticket-order-copy > div {
-  display: flex;
-  align-items: center;
-  gap: 9px;
-}
-
-.my-ticket-order-copy > div > span:last-child {
-  color: var(--muted);
-  font-family: var(--mono);
-  font-size: 10px;
-}
-
-.my-ticket-state {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  color: var(--ticket-amber);
-  font-size: 10px;
-  font-weight: 800;
-  text-transform: uppercase;
-}
-
-.my-ticket-state.is-ready {
-  color: var(--ticket-green);
-}
-
-.my-ticket-order-copy h2 {
-  margin: 7px 0 8px;
-  font-size: 20px;
-  font-weight: 600;
-  letter-spacing: -0.02em;
-}
-
-.my-ticket-order-copy p {
-  margin: 4px 0;
-  color: var(--muted);
-  font-size: 12px;
-}
-
-.my-ticket-order-meta {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 4px;
-}
-
-.my-ticket-order-meta span {
-  color: var(--muted);
-  font-size: 11px;
-}
-
-.my-ticket-order-meta strong {
-  font-size: 17px;
-}
-
-.ticket-auth-state {
-  width: min(calc(100% - 40px), 700px);
-  min-height: 420px;
-  margin: 60px auto 90px;
-}
-
 /* Scanner */
 
 .scanner-route-shell {
@@ -2205,8 +2043,7 @@
   }
 
   .ticket-catalog-head h1,
-  .ticket-shop-head h1,
-  .my-tickets-head h1 {
+  .ticket-shop-head h1 {
     font-size: 42px;
   }
 
@@ -2214,8 +2051,7 @@
     width: 100%;
   }
 
-  .ticket-catalog-shell,
-  .my-tickets-shell {
+  .ticket-catalog-shell {
     padding-top: 34px;
     padding-bottom: 70px;
   }
@@ -2330,30 +2166,6 @@
 
   .ticket-pass-state {
     width: 100%;
-    flex-direction: row;
-    align-items: center;
-    justify-content: space-between;
-  }
-
-  .my-tickets-head {
-    flex-direction: column;
-    align-items: flex-start;
-    padding-top: 40px;
-  }
-
-  .my-ticket-order-link {
-    grid-template-columns: 58px minmax(0, 1fr) 20px;
-    gap: 13px;
-    padding: 15px;
-  }
-
-  .my-ticket-order-date {
-    width: 54px;
-    height: 64px;
-  }
-
-  .my-ticket-order-meta {
-    grid-column: 2 / -1;
     flex-direction: row;
     align-items: center;
     justify-content: space-between;
@@ -2555,18 +2367,6 @@
 
   .ticket-pass-stub span {
     margin-top: 8px;
-  }
-
-  .my-ticket-order-link {
-    grid-template-columns: 1fr 20px;
-  }
-
-  .my-ticket-order-date {
-    display: none;
-  }
-
-  .my-ticket-order-meta {
-    grid-column: 1 / -1;
   }
 
   .scanner-manual-form > div {

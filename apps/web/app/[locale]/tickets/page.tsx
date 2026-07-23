@@ -34,7 +34,7 @@ export default async function TicketsPage({ params }: { params: Promise<{ locale
             </h1>
             <p>{locale === "nl" ? "Tickets voor cantussen, galabals en andere VTK-events." : "Tickets for cantuses, galas and other VTK events."}</p>
           </div>
-          <Link href={`${base}/mijn-tickets`} className="ticket-my-link">
+          <Link href={`${base}/account#mijn-vtk-tickets`} className="ticket-my-link">
             <TicketCheck size={19} aria-hidden="true" />
             {locale === "nl" ? "Mijn tickets" : "My tickets"}
             <ArrowRight size={17} aria-hidden="true" />
