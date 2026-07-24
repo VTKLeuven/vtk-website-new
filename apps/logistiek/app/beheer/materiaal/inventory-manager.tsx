@@ -13,6 +13,7 @@ import {
 } from '@/app/actions/beheer';
 import { ConfirmActionButton } from '@/components/ui/confirm-action-button';
 import { PhotoUpload } from '@/components/photo-upload';
+import { DownloadsEditor, GalleryEditor, PropertiesEditor } from '@/components/catalogue-editors';
 import { SaveForm } from '@/components/ui/save-form';
 import { useToast } from '@/components/ui/toast';
 import { SortHeader, compareText, useSort } from '@/app/beheer/sortable-header';
@@ -102,6 +103,10 @@ function ItemFields({ item, categories }: { item?: AdminInventoryItem; categorie
         <div className="col-span-full">
           <PhotoUpload name="photoKey" initialKey={item?.photoKey ?? null} />
         </div>
+        <div className="col-span-full grid gap-1 text-xs font-medium text-vtk-muted">
+          Extra foto’s
+          <GalleryEditor initial={item?.photos ?? []} />
+        </div>
         <label className="grid gap-1 text-xs font-medium text-vtk-muted @3xl:col-span-2">
           Naam<input type="text" name="name" defaultValue={item?.name ?? ''} className={inputClass} />
         </label>
@@ -145,13 +150,20 @@ function ItemFields({ item, categories }: { item?: AdminInventoryItem; categorie
         </label>
         <label className="grid gap-1 text-xs font-medium text-vtk-muted @lg:col-span-2 @3xl:col-span-4">
           Beschrijving <span className="font-normal">(optioneel)</span>
-          <input type="text" name="description" defaultValue={item?.description ?? ''} placeholder="Bv. inclusief statief en kabel" className={inputClass} />
+          <textarea name="description" defaultValue={item?.description ?? ''} placeholder="Bv. inclusief statief en kabel" rows={3} className="min-w-0 rounded-lg border border-vtk-navy/15 bg-white px-3 py-2 text-sm text-vtk-ink" />
         </label>
         <label className="grid gap-1 text-xs font-medium text-vtk-muted col-span-full">
           Notitie bij de staat <span className="font-normal">(optioneel)</span>
           <input type="text" name="conditionNote" defaultValue={item?.conditionNote ?? ''} className={inputClass} />
         </label>
       </div>
+      </div>
+
+      <div className="grid gap-4 rounded-[14px] border border-vtk-navy/10 bg-vtk-paper/50 p-4">
+        <div><p className="text-sm font-medium text-vtk-ink">Eigenschappen</p><p className="mt-1 text-xs text-vtk-muted">Technische kenmerken die leden op de detailpagina zien.</p></div>
+        <PropertiesEditor initial={item?.properties ?? []} />
+        <div><p className="text-sm font-medium text-vtk-ink">Downloads</p><p className="mt-1 text-xs text-vtk-muted">Handleidingen of fiches in pdf-formaat.</p></div>
+        <DownloadsEditor initial={item?.downloads ?? []} />
       </div>
 
       <div className="rounded-[14px] border border-vtk-navy/10 bg-vtk-paper/50 p-4">

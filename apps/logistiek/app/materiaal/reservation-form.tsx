@@ -7,6 +7,7 @@ import { checkAvailabilityAction, type ActionResult } from '@/app/actions/uitlee
 import type { ReservationFormInput } from '@/lib/reservation-form';
 import { formatEuro } from '@/lib/uitleen';
 import type { CatalogCategory } from '@/lib/uitleen-server';
+import { CategoryThumb } from '@/components/category-thumb';
 import {
   EventRequesterFields,
   type EventReservationValues,
@@ -166,6 +167,38 @@ export function ReservationForm({
             </select>
           </div>
 
+          {/* Landing: enkel categorie-tegels; klik een categorie om de materialen te
+              zien (drill-down zoals uitleendienst.vlaamsbrabant.be). Zoeken overschrijft
+              dit en toont treffers over alle categorieën. */}
+          {!search.trim() && activeCategory === 'all' ? (
+            <section aria-label={en ? 'Categories' : 'Categorieën'}>
+              <h2 className="mb-3 text-lg font-semibold text-vtk-ink">{en ? 'Choose a category' : 'Kies een categorie'}</h2>
+              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                {catalog.map((category) => (
+                  <button
+                    key={category.id ?? 'overig'}
+                    type="button"
+                    onClick={() => setActiveCategory(category.id ?? 'overig')}
+                    className="min-h-24 rounded-[16px] border border-vtk-navy/10 bg-vtk-surface p-4 text-left transition hover:border-vtk-navy/35"
+                  >
+                    <span className="block text-sm font-semibold text-vtk-ink">{category.name}</span>
+                    <span className="mt-1 block text-xs text-vtk-muted">{category.items.length} {en ? 'items' : 'items'}</span>
+                  </button>
+                ))}
+              </div>
+            </section>
+          ) : (
+            <>
+              {!search.trim() ? (
+                <button
+                  type="button"
+                  onClick={() => setActiveCategory('all')}
+                  className="inline-flex items-center gap-1 text-sm font-semibold text-vtk-navy"
+                >
+                  ← {en ? 'All categories' : 'Alle categorieën'}
+                </button>
+              ) : null}
+
           {shownCatalog.length === 0 ? (
             <p className="rounded-[18px] border border-vtk-navy/10 bg-vtk-surface p-6 text-sm text-vtk-muted">
               {en ? 'Nothing matches your search.' : 'Niets gevonden voor je zoekopdracht.'}
@@ -178,13 +211,26 @@ export function ReservationForm({
               className="rounded-[18px] border border-vtk-navy/10 bg-vtk-surface p-6"
             >
               <h2 className="text-lg font-semibold tracking-tight text-vtk-ink">{category.name}</h2>
-              <ul className="mt-4 divide-y divide-vtk-navy/10">
+              <ul className="mt-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
                 {category.items.map((item) => {
                   const quantity = quantities[item.id] ?? 0;
                   const available = availability?.[item.id];
+                  const imageKey = item.photoKey ?? item.photoKeys[0];
+                  const atMax = quantity >= (available ?? item.quantity);
                   return (
-                    <li key={item.id} className="flex flex-wrap items-center gap-3 py-3">
-                      <div className="min-w-0 flex-1">
+                    <li key={item.id} className="flex flex-col overflow-hidden rounded-[14px] border border-vtk-navy/10 bg-white">
+                      <Link href={`/materiaal/${item.id}`} className="block aspect-[4/3] w-full bg-vtk-paper-2">
+                        {imageKey ? (
+                          <img
+                            src={`/api/media/${imageKey.split('/').map(encodeURIComponent).join('/')}`}
+                            alt=""
+                            className="h-full w-full object-cover"
+                          />
+                        ) : (
+                          <CategoryThumb categoryName={category.name} />
+                        )}
+                      </Link>
+                      <div className="flex flex-1 flex-col p-4">
                         <p className="flex items-center gap-2 font-medium text-vtk-ink">
                           <Link href={`/materiaal/${item.id}`} className="hover:underline">
                             {item.name}
@@ -196,7 +242,7 @@ export function ReservationForm({
                           ) : null}
                         </p>
                         {item.description ? (
-                          <p className="mt-0.5 text-sm text-vtk-muted">{item.description}</p>
+                          <p className="mt-1 line-clamp-2 text-sm text-vtk-muted">{item.description}</p>
                         ) : null}
                         <p className="mt-0.5 text-xs text-vtk-muted">
                           {item.depositCents > 0
@@ -223,27 +269,34 @@ export function ReservationForm({
                             </span>
                           )}
                         </p>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <button
-                          type="button"
-                          onClick={() => setQuantity(item.id, quantity - 1)}
-                          disabled={quantity <= 0}
-                          aria-label={`${en ? 'Fewer' : 'Minder'}: ${item.name}`}
-                          className="grid h-8 w-8 place-items-center rounded-full border border-vtk-navy/15 text-vtk-ink transition hover:border-vtk-navy/40 disabled:opacity-30"
-                        >
-                          −
-                        </button>
-                        <span className="w-6 text-center text-sm font-semibold text-vtk-ink">{quantity}</span>
-                        <button
-                          type="button"
-                          onClick={() => setQuantity(item.id, quantity + 1)}
-                          disabled={quantity >= (available ?? item.quantity)}
-                          aria-label={`${en ? 'More' : 'Meer'}: ${item.name}`}
-                          className="grid h-8 w-8 place-items-center rounded-full border border-vtk-navy/15 text-vtk-ink transition hover:border-vtk-navy/40 disabled:opacity-30"
-                        >
-                          +
-                        </button>
+                        {/* Altijd onderaan de kaart, ongeacht de lengte van de beschrijving. */}
+                        <div className="mt-auto flex items-center justify-between gap-2 pt-4">
+                          <button
+                            type="button"
+                            onClick={() => setQuantity(item.id, quantity - 1)}
+                            disabled={quantity <= 0}
+                            aria-label={`${en ? 'Fewer' : 'Minder'}: ${item.name}`}
+                            className="grid h-9 w-9 shrink-0 place-items-center rounded-full border border-vtk-navy/25 text-lg font-medium text-vtk-navy transition hover:bg-vtk-navy/5 disabled:opacity-30"
+                          >
+                            −
+                          </button>
+                          <span
+                            className={`grid h-9 min-w-9 place-items-center rounded-full px-2 text-sm font-semibold tabular-nums ${
+                              quantity > 0 ? 'bg-vtk-yellow text-vtk-ink' : 'text-vtk-ink'
+                            }`}
+                          >
+                            {quantity}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => setQuantity(item.id, quantity + 1)}
+                            disabled={atMax}
+                            aria-label={`${en ? 'More' : 'Meer'}: ${item.name}`}
+                            className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-vtk-navy text-lg font-medium text-white transition hover:bg-vtk-ink disabled:opacity-30"
+                          >
+                            +
+                          </button>
+                        </div>
                       </div>
                     </li>
                   );
@@ -251,6 +304,8 @@ export function ReservationForm({
               </ul>
             </section>
           ))}
+            </>
+          )}
         </div>
 
         <aside className="h-fit rounded-[18px] border border-vtk-navy/10 bg-vtk-surface p-6 lg:sticky lg:top-6">
@@ -291,6 +346,7 @@ export function ReservationForm({
           </div>
 
           <dl className="mt-5 space-y-1 border-t border-vtk-navy/10 pt-4 text-sm">
+            {items.filter((item) => quantities[item.id]).map((item) => <div key={item.id} className="flex items-center justify-between gap-3"><dt className="truncate text-vtk-muted">{item.name} × {quantities[item.id]}</dt><dd><button type="button" onClick={() => setQuantity(item.id, 0)} aria-label={`${en ? 'Remove' : 'Verwijderen'}: ${item.name}`} className="grid h-6 w-6 place-items-center rounded-full text-base font-semibold text-red-600 transition hover:bg-red-50 hover:text-red-700">×</button></dd></div>)}
             <div className="flex justify-between">
               <dt className="text-vtk-muted">Items</dt>
               <dd className="font-medium text-vtk-ink">{totals.count}</dd>

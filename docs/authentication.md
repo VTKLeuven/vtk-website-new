@@ -329,6 +329,25 @@ De submodule-apps draaien geen better-auth. Ze hergebruiken de gedeelde
 Belangrijk: een remote app importeert **`@vtk/auth/remote`**, nooit
 `@vtk/auth/server` (dat zou better-auth + Prisma mee de submodule in trekken).
 
+### Test-login (enkel testomgeving)
+
+Op een testomgeving (lokaal, `logistiek.dev.vtk.be`) is inloggen via de echte KU
+Leuven-SSO lastig, en logistiek heeft zelf geen auth. De toggle
+`LOGISTIEK_TEST_LOGIN=true` schakelt daarom een **test-login** in: via
+`/test-login` kies je een vast profiel en `getSession` fabriceert een
+`SessionPayload` voor die persoon (cookie `logistiek-test-user`). Zonder geldige
+cookie valt hij terug op de echte `fetchSession`, dus de gewone website-login
+blijft ernaast werken.
+
+- De profielen (`apps/logistiek/lib/test-users.ts`) dekken elk toegangsniveau:
+  `logistiek` (post Logistiek, `logistiek.manage` -> beheer), `it` (superadmin),
+  `post` (gewoon praesidiumlid), `mechanix` (werkgrooplid), `student` (extern).
+- **Nooit aanzetten in productie:** de profielen geven echte permissies (incl.
+  superadmin) zonder wachtwoord. Staat de toggle uit, dan geeft `/test-login`
+  404 en wordt de cookie volledig genegeerd; enkel de gewone website-login werkt.
+- Bekabeling: `LOGISTIEK_TEST_LOGIN` in `.env` -> de logistiek-service in
+  `infra/docker-compose.yml` geeft ze door aan de container.
+
 ## Gebruikersbeheer (`src/server/users.ts`)
 
 Admin-CRUD op accounts, allemaal achter de `users.edit`-permissie

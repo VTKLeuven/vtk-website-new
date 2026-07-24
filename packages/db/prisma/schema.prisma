@@ -1582,8 +1582,52 @@ model UitleenItem {
   category    UitleenCategory?         @relation(fields: [categoryId], references: [id], onDelete: SetNull)
   lines       UitleenReservationLine[]
   setContents UitleenSetContent[]
+  photos      UitleenItemPhoto[]
+  properties  UitleenItemProperty[]
+  downloads   UitleenItemDownload[]
 
   @@index([categoryId, active])
+}
+
+/// Extra productbeelden. `photoKey` op UitleenItem blijft de oudere hoofdfoto;
+/// de catalogus gebruikt het eerste beeld hieronder wanneer het bestaat.
+model UitleenItemPhoto {
+  id        String @id @default(cuid())
+  itemId    String
+  key       String
+  sortIndex Int    @default(0)
+
+  item UitleenItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
+
+  @@index([itemId, sortIndex])
+}
+
+/// Vrije technische eigenschappen, zodat Logistiek geen schemawijziging nodig
+/// heeft voor bijvoorbeeld afmetingen, vermogen of aansluitingen.
+model UitleenItemProperty {
+  id        String @id @default(cuid())
+  itemId    String
+  label     String
+  value     String
+  sortIndex Int    @default(0)
+
+  item UitleenItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
+
+  @@index([itemId, sortIndex])
+}
+
+/// Handleidingen, fiches en andere documenten die leden bij een item kunnen
+/// downloaden. De bestanden staan net als foto's in de bestaande opslag.
+model UitleenItemDownload {
+  id        String @id @default(cuid())
+  itemId    String
+  label     String
+  key       String
+  sortIndex Int    @default(0)
+
+  item UitleenItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
+
+  @@index([itemId, sortIndex])
 }
 
 /// Beschrijvende inhoud van een set (vrije tekst, geen koppeling aan andere

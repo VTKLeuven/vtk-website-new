@@ -66,6 +66,9 @@ services:
       LOGISTIEK_PAYMENT_PROVIDER: ${LOGISTIEK_PAYMENT_PROVIDER:-mollie}
       LOGISTIEK_MAINTENANCE_SECRET: ${LOGISTIEK_MAINTENANCE_SECRET:-}
       MOLLIE_API_KEY: ${MOLLIE_API_KEY:-}
+      # Test-login toggle. Enkel op een testomgeving op "true" zetten; nooit in
+      # productie (geeft echte permissies zonder wachtwoord). Zie .env.example.
+      LOGISTIEK_TEST_LOGIN: ${LOGISTIEK_TEST_LOGIN:-}
     ports:
       - "127.0.0.1:3100:3000"
 

@@ -61,7 +61,9 @@ export default async function LogistiekHome() {
               <span className="h-1.5 w-1.5 rounded-full bg-vtk-yellow" aria-hidden />
               {t.homeEyebrow}
             </p>
-            <h1>{t.homeTitle}</h1>
+            <h1>
+              <em className="font-serif font-normal italic text-vtk-yellow">{t.homeAccent}</em> {t.homeTitle}
+            </h1>
             <p className="logistics-hero-sub">
               {content.homeLead}
             </p>
