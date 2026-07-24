@@ -22,6 +22,10 @@ export default async function LoginPage({
 
   const nextRaw = Array.isArray(sp.next) ? sp.next[0] : sp.next;
   const error = Array.isArray(sp.error) ? sp.error[0] : sp.error;
+  const source = Array.isArray(sp.source) ? sp.source[0] : sp.source;
+  // `error=kul` ondersteunt callbacks die vóór de nieuwe `source`-parameter
+  // gestart zijn. Nieuwe callbacks behouden Better Auths eigen foutcode.
+  const hasKulError = source === 'kul' || error === 'kul';
 
   // Bij een OAuth-flow is de bestemming na login het authorize-endpoint, niet
   // een pagina.
@@ -45,7 +49,7 @@ export default async function LoginPage({
       <div className="vtk-auth-panel">
         <p className="vtk-auth-kicker">{dict.auth.signInLead}</p>
         <h1 className="vtk-auth-title">{dict.auth.signIn}</h1>
-        {error === 'kul' && <p className="vtk-auth-error">{dict.auth.invalidCredentials}</p>}
+        {hasKulError && <p className="vtk-auth-error">{dict.auth.kulSignInFailed}</p>}
         <LoginForm
           nextParam={next}
           hardRedirect={oauth}

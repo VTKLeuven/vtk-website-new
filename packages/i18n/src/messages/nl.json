@@ -200,6 +200,7 @@
     "newPassword": "Nieuw wachtwoord",
     "saved": "Opgeslagen",
     "signInWithKul": "Inloggen met KU Leuven",
+    "kulSignInFailed": "Inloggen via KU Leuven is mislukt. Probeer het later opnieuw.",
     "loginRequiredKicker": "Inloggen vereist",
     "loginRequiredTitle": "Log in om deze pagina te bekijken",
     "loginRequiredBody": "Je moet ingelogd zijn voordat je de inhoud van deze pagina kan bekijken.",

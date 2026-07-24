@@ -200,6 +200,7 @@
     "newPassword": "New password",
     "saved": "Saved",
     "signInWithKul": "Sign in with KU Leuven",
+    "kulSignInFailed": "Signing in through KU Leuven failed. Please try again later.",
     "loginRequiredKicker": "Login required",
     "loginRequiredTitle": "Please log in to view this page",
     "loginRequiredBody": "You must be logged in before you can view the content on this page.",

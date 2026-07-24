@@ -212,6 +212,13 @@ services:
       start_period: 10s
       timeout: 5s
 
+# KU Leuvens IdP is vanaf de productieserver enkel via IPv6 bereikbaar.
+# Docker kent voor een IPv6-enabled custom bridge automatisch een ULA-subnet
+# toe en NAT dat via de IPv6-route van de host.
+networks:
+  default:
+    enable_ipv6: true
+
 volumes:
   postgres-data:
   immich-model-cache:

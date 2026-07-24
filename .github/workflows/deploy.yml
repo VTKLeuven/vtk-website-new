@@ -102,7 +102,17 @@ jobs:
             timeout 30 stat /mnt/immich/.immich-storage-ready >/dev/null 2>&1 &&
             findmnt -rn -M /mnt/immich -t nfs4 >/dev/null &&
 
-            # Validate, build, restart, and remove services deleted from Compose.
+            # Build while the current containers are still serving traffic.
             docker compose -f infra/docker-compose.yml config --quiet &&
-            docker compose -f infra/docker-compose.yml up -d --build --remove-orphans
+            docker compose -f infra/docker-compose.yml build &&
+
+            # One-time migration of the existing IPv4-only default network.
+            # Doing this explicitly avoids Compose reusing a container that
+            # still references the removed network ID. Named volumes survive.
+            if docker network inspect infra_default --format '{{.EnableIPv6}}' 2>/dev/null |
+              grep -qx false; then
+              docker compose -f infra/docker-compose.yml down --remove-orphans
+            fi &&
+
+            docker compose -f infra/docker-compose.yml up -d --remove-orphans
           "

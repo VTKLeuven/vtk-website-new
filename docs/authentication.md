@@ -406,6 +406,23 @@ wijziging: `docker compose -f infra/docker-compose.yml up -d --force-recreate we
 (een kale `restart` herleest env-file-wijzigingen niet). Controleer met
 `docker compose ... exec web env | grep KUL`.
 
+Het default Compose-netwerk heeft IPv6 aanstaan. Dat is nodig omdat
+`idp.kuleuven.be` vanaf de productieserver niet via IPv4 bereikbaar is, terwijl
+de host wel een werkende IPv6-route heeft. Bij de eerste deploy van deze
+netwerkwijziging bouwt de workflow de images vooraf en voert ze daarna een
+eenmalige `docker compose down` uit voor het oude IPv4-only `infra_default`
+netwerk. De named volumes (waaronder PostgreSQL) worden daarbij niet verwijderd.
+
+Een `ETIMEDOUT` uit Better Auth vóór er een regel in **Admin -> IT -> KU Leuven
+SSO** verschijnt, betekent dat de token- of userinfo-call de IdP niet bereikte:
+het adminlog wordt pas in `mapProfileToUser` geschreven nadat beide calls
+geslaagd zijn. Controleer vanuit de web-container:
+
+```bash
+docker compose -f infra/docker-compose.yml exec web \
+  node -e 'fetch("https://idp.kuleuven.be/.well-known/openid-configuration").then(r => console.log(r.status))'
+```
+
 ## Niet-verwarren: KU Leuven-kaartverificatie
 
 Er is een **tweede, losstaande** KU Leuven-integratie die niets met inloggen te
