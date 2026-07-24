@@ -69,7 +69,11 @@
   display: flex;
   width: 100%;
   align-items: center;
-  gap: clamp(11px, 1.5vw, 22px);
+  /* De elf tabs met hun chevrons zijn samen ~765px breed. De tussenruimte groeit
+     mee met het scherm: 14px zodra de tabs verschijnen (1211px) tot 20px. Meer
+     kan niet: boven 1320px stopt de container met groeien, dus de ruimte voor de
+     nav ligt daar vast. */
+  gap: clamp(14px, calc(2.6vw - 17px), 20px);
   min-width: 0;
   flex: none;
 }
@@ -102,12 +106,12 @@
 .vtk-site-header .nav-links a {
   display: inline-flex;
   align-items: center;
-  gap: 3px;
+  gap: 4px;
 }
 
 .vtk-site-header .nav-caret {
   flex: none;
-  opacity: 0.6;
+  opacity: 0.45;
   transition: transform 160ms ease, opacity 160ms ease;
 }
 
@@ -170,15 +174,16 @@
   color: var(--ink);
 }
 
-@media (min-width: 1181px) and (max-width: 1400px) {
-  .vtk-site-header .nav-links {
-    gap: 10px;
-  }
+/* Elf tabs met chevrons zijn ongeveer 765px breed. Onder de 1600px komt die
+   ruimte van de marge rond de nav: die stond royaal terwijl de tabs zelf
+   tegen elkaar plakten. */
+/* De ruimte voor de tabs komt uit de marge rondom de nav: die stond royaal
+   terwijl de tabs zelf tegen elkaar plakten. */
+.vtk-site-header .nav-inner {
+  gap: 32px;
+}
 
-  .vtk-site-header .nav-links a {
-    font-size: 13px;
-  }
-
+@media (max-width: 1500px) {
   .vtk-site-header .nav-inner {
     gap: 18px;
   }
@@ -296,9 +301,10 @@
 
 /* Smal en middelbreed scherm: één menuknop in plaats van elf tabs. De knop
    staat rechts naast taal en account; het paneel klapt onder de header uit en
-   toont per categorie de pagina's die eronder hangen. De grens ligt op 1180px,
-   want daaronder passen de tabs met hun uitklapmenu's niet meer naast elkaar. */
-@media (max-width: 1180px) {
+   toont per categorie de pagina's die eronder hangen. De grens ligt op 1210px,
+   want daaronder passen de tabs met hun uitklapmenu's niet meer leesbaar naast
+   elkaar. */
+@media (max-width: 1210px) {
   :root {
     --vtk-header-height: 65px;
   }
