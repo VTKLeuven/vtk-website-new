@@ -96,6 +96,24 @@ function profileRNumber(profile: ProfileLike): string | undefined {
   return undefined;
 }
 
+/**
+ * KU Leuven releases an OIDC `locale` claim as a lower-case BCP47 language tag
+ * (e.g. "nl", "en", "nl-BE"). Our `User.locale` is a Prisma enum whose only
+ * values are `NL` and `EN`, so the raw claim must be normalized. If we don't,
+ * better-auth spreads the raw profile (`...userInfo`) into the create payload
+ * and the claim survives, because `locale` is a declared additionalField that
+ * `mapProfileToUser` otherwise leaves untouched; Prisma then rejects "nl" with
+ * `Expected Locale` and the whole sign-up fails. Anything that clearly reads as
+ * English maps to `EN`; everything else falls back to `NL` (the site default).
+ */
+function profileLocale(profile: ProfileLike): "NL" | "EN" {
+  const raw = profile.locale;
+  if (typeof raw === "string" && raw.trim().toLowerCase().startsWith("en")) {
+    return "EN";
+  }
+  return "NL";
+}
+
 /** `true` when all required env vars for KU Leuven OIDC are present. */
 export function isKulEnabled(): boolean {
   return Boolean(
@@ -175,6 +193,10 @@ export function kulOAuthConfig() {
         email,
         name: profileName(profile),
         emailVerified: true,
+        // Normalize KU Leuven's `locale` claim ("nl") to our enum; the raw
+        // claim would otherwise leak through better-auth's `...userInfo` spread
+        // and break sign-up with `Expected Locale` (see profileLocale above).
+        locale: profileLocale(profile),
         ...(rNumber ? { rNumber, rNumberFromKul: true } : {}),
         ...(firwStudent !== undefined && firwStudentChangedAt
           ? { firwStudent, firwStudentChangedAt }
