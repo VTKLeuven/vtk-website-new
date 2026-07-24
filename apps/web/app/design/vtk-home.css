@@ -167,20 +167,28 @@
 }
 
 /*
- * De eventkaart in de hero. Alles hieronder staat bewust onder `.home-hero`:
- * `vtk-kalender.css` gebruikt dezelfde klassenamen (`.cal` is daar een
- * 7-koloms maandraster, `.agenda` een tweekoloms layout). Beide stylesheets
- * zijn globaal, dus na een bezoek aan /kalender kon die versie hier winnen en
- * viel de kaart uiteen in kolommen. De extra klasse hier wint altijd.
+ * De eventkaart in de hero. De klassen hieronder heten bewust `hero-*` en niet
+ * `cal` / `agenda` / `day-group` / `ev`: `vtk-kalender.css` gebruikt die korte
+ * namen voor iets heel anders (`.cal` is daar een 7-koloms maandraster,
+ * `.agenda` een tweekoloms layout). Beide stylesheets zijn globaal en Next
+ * verwijdert de CSS van /kalender niet meer uit het document na een
+ * client-side navigatie, dus stond die versie daarna óók op de homepage.
+ *
+ * Enkel `.home-hero` ervoor zetten volstond niet: die selector is wel
+ * specifieker, maar hij overschreef alleen de properties die hij zelf zet.
+ * `display: grid` en `grid-template-columns: repeat(7, 1fr)` uit
+ * `.vtk-design .cal` bleven gewoon gelden, waardoor de kop en de agenda in twee
+ * kolommen van een maandraster belandden. Met eigen namen kan dat niet meer
+ * botsen, ongeacht welke stylesheets er geladen zijn.
  */
-.vtk-design .home-hero .cal {
+.vtk-design .home-hero .hero-cal {
   border: 1px solid var(--line);
   border-radius: 18px;
   background: var(--surface);
   padding: 24px;
 }
 
-.vtk-design .home-hero .cal-head {
+.vtk-design .home-hero .hero-cal-head {
   display: flex;
   justify-content: space-between;
   gap: 16px;
@@ -188,20 +196,20 @@
   margin-bottom: 8px;
 }
 
-.vtk-design .home-hero .cal-head h3 {
+.vtk-design .home-hero .hero-cal-head h3 {
   margin: 0;
   color: var(--ink);
   font-size: 16px;
   font-weight: 600;
 }
 
-.vtk-design .home-hero .cal-head .sub {
+.vtk-design .home-hero .hero-cal-head .sub {
   margin-top: 2px;
   color: var(--muted);
   font-size: 12px;
 }
 
-.vtk-design .home-hero .cal-head .all {
+.vtk-design .home-hero .hero-cal-head .all {
   color: var(--navy);
   border-bottom: 1px solid var(--navy);
   padding-bottom: 1px;
@@ -209,36 +217,36 @@
   white-space: nowrap;
 }
 
-.vtk-design .home-hero .agenda {
+.vtk-design .home-hero .hero-agenda {
   margin-top: 22px;
   display: flex;
   flex-direction: column;
 }
 
-.vtk-design .home-hero .day-group {
+.vtk-design .home-hero .hero-day {
   padding: 14px 0;
   border-top: 1px solid var(--line);
 }
 
-.vtk-design .home-hero .day-group:first-child {
+.vtk-design .home-hero .hero-day:first-child {
   border-top: 0;
   padding-top: 0;
 }
 
-.vtk-design .home-hero .day-label {
+.vtk-design .home-hero .hero-day-label {
   display: flex;
   align-items: baseline;
   gap: 10px;
   margin-bottom: 8px;
 }
 
-.vtk-design .home-hero .day-label .num {
+.vtk-design .home-hero .hero-day-label .num {
   color: var(--ink);
   font-size: 20px;
   font-weight: 600;
 }
 
-.vtk-design .home-hero .day-label .mon {
+.vtk-design .home-hero .hero-day-label .mon {
   color: var(--ink);
   font-size: 12px;
   font-weight: 600;
@@ -247,14 +255,14 @@
   margin-left: -4px;
 }
 
-.vtk-design .home-hero .day-label .dow {
+.vtk-design .home-hero .hero-day-label .dow {
   color: var(--muted);
   font-size: 12px;
   letter-spacing: 0.1em;
   text-transform: uppercase;
 }
 
-.vtk-design .home-hero .day-label .today {
+.vtk-design .home-hero .hero-day-label .today {
   padding: 2px 8px;
   border-radius: 999px;
   background: var(--yellow);
@@ -263,7 +271,7 @@
   font-weight: 600;
 }
 
-.vtk-design .home-hero .ev {
+.vtk-design .home-hero .hero-ev {
   display: grid;
   grid-template-columns: 56px 1fr auto;
   gap: 14px;
@@ -273,23 +281,23 @@
   transition: transform 150ms ease;
 }
 
-.vtk-design .home-hero .ev:hover {
+.vtk-design .home-hero .hero-ev:hover {
   transform: translateX(2px);
 }
 
-.vtk-design .home-hero .ev .t {
+.vtk-design .home-hero .hero-ev .t {
   color: var(--muted);
   font-size: 13px;
   font-variant-numeric: tabular-nums;
 }
 
-.vtk-design .home-hero .ev .n {
+.vtk-design .home-hero .hero-ev .n {
   color: var(--ink);
   font-size: 15px;
   font-weight: 500;
 }
 
-.vtk-design .home-hero .ev .n small {
+.vtk-design .home-hero .hero-ev .n small {
   display: block;
   margin-top: 2px;
   color: var(--muted);
@@ -297,17 +305,17 @@
   font-weight: 400;
 }
 
-.vtk-design .home-hero .ev.featured .n {
+.vtk-design .home-hero .hero-ev.featured .n {
   font-weight: 600;
 }
 
-.vtk-design .home-hero .ev .ev-go {
+.vtk-design .home-hero .hero-ev .ev-go {
   color: var(--muted);
   font-size: 15px;
   transition: transform 150ms ease;
 }
 
-.vtk-design .home-hero .ev:hover .ev-go {
+.vtk-design .home-hero .hero-ev:hover .ev-go {
   transform: translateX(2px);
 }
 
@@ -324,9 +332,9 @@
 /* The events card sits on the dark hero scrim as "donker glas": a translucent
    navy panel with blur and light text, so it reads as part of the hero instead
    of a bright white cut-out that wins every contrast battle. Light-on-dark tones
-   use --paper and --on-dark-muted. Scoped to .home-hero so the same .cal classes
-   stay light on other surfaces (e.g. the sample page). */
-.vtk-design .home-hero .cal {
+   use --paper and --on-dark-muted. Scoped to .home-hero so the same hero-cal
+   classes stay light on other surfaces (e.g. the sample page). */
+.vtk-design .home-hero .hero-cal {
   background: rgba(9, 15, 32, 0.46);
   border-color: rgba(255, 255, 255, 0.11);
   box-shadow: none;
@@ -335,27 +343,27 @@
   color: rgba(255, 255, 255, 0.92);
 }
 
-.vtk-design .home-hero .cal-head h3,
-.vtk-design .home-hero .day-label .num,
-.vtk-design .home-hero .day-label .mon,
-.vtk-design .home-hero .ev .n {
+.vtk-design .home-hero .hero-cal-head h3,
+.vtk-design .home-hero .hero-day-label .num,
+.vtk-design .home-hero .hero-day-label .mon,
+.vtk-design .home-hero .hero-ev .n {
   color: var(--paper);
 }
 
-.vtk-design .home-hero .cal-head .sub,
-.vtk-design .home-hero .day-label .dow,
-.vtk-design .home-hero .ev .t,
-.vtk-design .home-hero .ev .ev-go,
-.vtk-design .home-hero .ev .n small {
+.vtk-design .home-hero .hero-cal-head .sub,
+.vtk-design .home-hero .hero-day-label .dow,
+.vtk-design .home-hero .hero-ev .t,
+.vtk-design .home-hero .hero-ev .ev-go,
+.vtk-design .home-hero .hero-ev .n small {
   color: var(--on-dark-muted);
 }
 
-.vtk-design .home-hero .cal-head .all {
+.vtk-design .home-hero .hero-cal-head .all {
   color: #fff;
   border-bottom-color: rgba(255, 255, 255, 0.45);
 }
 
-.vtk-design .home-hero .day-group {
+.vtk-design .home-hero .hero-day {
   border-top-color: rgba(255, 255, 255, 0.14);
 }
 

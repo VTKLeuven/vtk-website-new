@@ -331,8 +331,8 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
             </div>
           </div>
 
-          <aside className="cal">
-            <div className="cal-head">
+          <aside className="hero-cal">
+            <div className="hero-cal-head">
               <div>
                 <h3>{nl ? "Aankomende events" : "Upcoming events"}</h3>
                 <div className="sub">
@@ -347,18 +347,18 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
                 {nl ? "Volledige kalender" : "Full calendar"}
               </Link>
             </div>
-            <div className="agenda">
+            <div className="hero-agenda">
               {eventGroups.length === 0 ? (
-                <div className="day-group">
-                  <div className="day-label">
+                <div className="hero-day">
+                  <div className="hero-day-label">
                     <span className="num">—</span>
                     <span className="dow">{nl ? "Geen data" : "No data"}</span>
                   </div>
                 </div>
               ) : (
                 eventGroups.map((group, groupIndex) => (
-                  <div className="day-group" key={group.key}>
-                    <div className="day-label">
+                  <div className="hero-day" key={group.key}>
+                    <div className="hero-day-label">
                       <span className="num">{String(group.date.getDate()).padStart(2, "0")}</span>
                       <span className="mon">{monthLabel(group.date, now, locale)}</span>
                       <span className="dow">
@@ -393,7 +393,7 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
                         <Link
                           key={event.id}
                           href={`${base}/kalender/${event.id}`}
-                          className={`ev${groupIndex === 0 && eventIndex === 0 ? " featured" : ""}`}
+                          className={`hero-ev${groupIndex === 0 && eventIndex === 0 ? " featured" : ""}`}
                         >
                           {content}
                         </Link>
