@@ -142,7 +142,10 @@ met enkel wachtwoord-login (`isKulEnabled()`).
   providerId: "kuleuven",
   clientId: KUL_OIDC_CLIENT_ID,           // = de Entity ID die ICTS registreerde (bv. dev.vtk.be)
   clientSecret: KUL_OIDC_CLIENT_SECRET,   // backend-only, uit de aparte ICTS-mail
-  discoveryUrl: KUL_OIDC_DISCOVERY_URL,   // https://idp.kuleuven.be/.well-known/openid-configuration
+  issuer: "https://idp.kuleuven.be",
+  authorizationUrl: "https://idp.kuleuven.be/idp/profile/oidc/authorize",
+  tokenUrl: "https://idp.kuleuven.be/idp/profile/oidc/token",
+  userInfoUrl: "https://idp.kuleuven.be/idp/profile/oidc/userinfo",
   scopes: ["openid", "profile", "email", "allattributes"],
   getUserInfo: getKulUserInfo,             // haalt userinfo altijd op en voegt ID-tokenclaims samen
   pkce: true,
@@ -156,6 +159,13 @@ met enkel wachtwoord-login (`isKulEnabled()`).
   `<BETTER_AUTH_URL>/api/auth/better/oauth2/callback/kuleuven`. Die moet exact
   matchen met wat bij ICTS geregistreerd staat. `KUL_OIDC_REDIRECT_URI` overschrijft
   dit enkel indien nodig; normaal leeg laten.
+- **Endpoints zijn expliciet geconfigureerd.** Ze komen overeen met KU Leuvens
+  officiële discoverydocument, maar Better Auth krijgt bewust geen
+  `discoveryUrl`: anders haalt de plugin dat document op vóór elke redirect en
+  nogmaals vóór elke callback. Een tijdelijke timeout van de metadata-URL zou
+  dan zelfs het openen van de KU Leuven-login blokkeren. De
+  `KUL_OIDC_DISCOVERY_URL`-env blijft voorlopig de feature-toggle, zodat bestaande
+  omgevingsconfiguratie compatibel blijft.
 - **`mapProfileToUser`** vertaalt de KU Leuven-claims naar de velden waarmee
   better-auth een User zoekt/aanmaakt:
   - **`email`**: stuurt account-linking aan (zie hieronder), dus moet matchen met

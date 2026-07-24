@@ -29,9 +29,18 @@
 
 import { recordKulProfile } from "./kul-debug";
 import { firwStudentFromProfile, syncFirwStudent } from "./kul-firw";
-import { getKulUserInfo, wasKulUserInfoFetched } from "./kul-userinfo";
+import {
+  getKulUserInfo,
+  KUL_USERINFO_URL,
+  wasKulUserInfoFetched,
+} from "./kul-userinfo";
 
 export const KUL_PROVIDER_ID = "kuleuven";
+export const KUL_OIDC_ISSUER = "https://idp.kuleuven.be";
+export const KUL_OIDC_AUTHORIZATION_URL =
+  `${KUL_OIDC_ISSUER}/idp/profile/oidc/authorize`;
+export const KUL_OIDC_TOKEN_URL =
+  `${KUL_OIDC_ISSUER}/idp/profile/oidc/token`;
 
 // KU Leuven releases claims under SAML-style names (displayName, givenName,
 // surname). We also accept the standard OIDC spellings (name, given_name,
@@ -107,7 +116,15 @@ export function kulOAuthConfig() {
     providerId: KUL_PROVIDER_ID,
     clientId: process.env.KUL_OIDC_CLIENT_ID!,
     clientSecret: process.env.KUL_OIDC_CLIENT_SECRET!,
-    discoveryUrl: process.env.KUL_OIDC_DISCOVERY_URL!,
+    // Deze waarden komen uit KU Leuvens discoverydocument, maar staan hier
+    // expliciet zodat Better Auth niet vóór elke redirect én callback opnieuw
+    // het discoverydocument moet ophalen. Een tijdelijke storing van die
+    // metadata-URL maakte anders zelfs het openen van de KU Leuven-login
+    // onmogelijk.
+    issuer: KUL_OIDC_ISSUER,
+    authorizationUrl: KUL_OIDC_AUTHORIZATION_URL,
+    tokenUrl: KUL_OIDC_TOKEN_URL,
+    userInfoUrl: KUL_USERINFO_URL,
     ...(process.env.KUL_OIDC_REDIRECT_URI
       ? { redirectURI: process.env.KUL_OIDC_REDIRECT_URI }
       : {}),

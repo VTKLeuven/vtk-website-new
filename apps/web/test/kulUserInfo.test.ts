@@ -1,4 +1,10 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import {
+  KUL_OIDC_AUTHORIZATION_URL,
+  KUL_OIDC_ISSUER,
+  KUL_OIDC_TOKEN_URL,
+  kulOAuthConfig,
+} from "../../../packages/auth/src/logins/kul";
 import {
   getKulUserInfo,
   KUL_USERINFO_URL,
@@ -15,6 +21,10 @@ function idToken(claims: Record<string, unknown>): string {
     Buffer.from(JSON.stringify(value)).toString("base64url");
   return `${encode({ alg: "none" })}.${encode(claims)}.signature`;
 }
+
+afterEach(() => {
+  vi.unstubAllEnvs();
+});
 
 describe("getKulUserInfo", () => {
   it("always fetches userinfo and merges its KU Leuven attributes", async () => {
@@ -121,6 +131,24 @@ describe("getKulUserInfo", () => {
         fetchImpl,
       ),
     ).resolves.toBeNull();
+  });
+});
+
+describe("kulOAuthConfig", () => {
+  it("uses explicit endpoints and does not fetch discovery during login", () => {
+    vi.stubEnv("KUL_OIDC_DISCOVERY_URL", `${KUL_OIDC_ISSUER}/.well-known/openid-configuration`);
+    vi.stubEnv("KUL_OIDC_CLIENT_ID", "dev.vtk.be");
+    vi.stubEnv("KUL_OIDC_CLIENT_SECRET", "test-secret");
+
+    const config = kulOAuthConfig();
+
+    expect(config).toMatchObject({
+      issuer: KUL_OIDC_ISSUER,
+      authorizationUrl: KUL_OIDC_AUTHORIZATION_URL,
+      tokenUrl: KUL_OIDC_TOKEN_URL,
+      userInfoUrl: KUL_USERINFO_URL,
+    });
+    expect(config).not.toHaveProperty("discoveryUrl");
   });
 });
 
