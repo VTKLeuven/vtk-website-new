@@ -27,6 +27,8 @@
  *   <BETTER_AUTH_URL>/api/auth/better/oauth2/callback/kuleuven
  */
 
+import { prisma } from "@vtk/db";
+
 import { recordKulProfile } from "./kul-debug";
 import { firwStudentFromProfile, syncFirwStudent } from "./kul-firw";
 import {
@@ -94,6 +96,46 @@ function profileRNumber(profile: ProfileLike): string | undefined {
     if (match) return match[0].toLowerCase();
   }
   return undefined;
+}
+
+/**
+ * Resolve the e-mail better-auth should link this KU Leuven login to.
+ *
+ * better-auth only links an OAuth login to an existing user when the profile
+ * e-mail matches that user's e-mail (or an already-linked KUL account). But an
+ * account can already carry this r-number under a *different* address: an admin
+ * pre-provisioned the member, or the member typed their r-number during
+ * onboarding, under a personal or bestuur e-mail; KU Leuven now authenticates
+ * the same person under their student e-mail. Without reconciliation better-auth
+ * takes the create path and Prisma rejects it on the unique `rNumber`, so the
+ * login fails instead of linking.
+ *
+ * The r-number is KU Leuven-verified and `User.rNumber` is unique, so a match
+ * reliably means the same person; only that person can authenticate as that
+ * r-number. When such an account exists we return its e-mail, which makes
+ * better-auth find it and link the KUL account to it (the account keeps its
+ * existing e-mail; better-auth does not override it on link).
+ *
+ * An exact e-mail match must always win, so we only redirect the link when no
+ * account already owns the KUL e-mail. Returns `undefined` to leave the KUL
+ * e-mail untouched (no match, same account, or the KUL e-mail is already taken).
+ */
+async function linkEmailForRNumber(
+  rNumber: string,
+  kulEmail: string,
+): Promise<string | undefined> {
+  const byRNumber = await prisma.user.findUnique({
+    where: { rNumber },
+    select: { email: true },
+  });
+  if (!byRNumber || byRNumber.email.toLowerCase() === kulEmail.toLowerCase()) {
+    return undefined;
+  }
+  const byEmail = await prisma.user.findUnique({
+    where: { email: kulEmail },
+    select: { id: true },
+  });
+  return byEmail ? undefined : byRNumber.email;
 }
 
 /**
@@ -185,12 +227,19 @@ export function kulOAuthConfig() {
         await syncFirwStudent(email, firwStudent, firwStudentChangedAt);
       }
 
+      // Link naar een bestaand account dat dit (KU Leuven-geverifieerde)
+      // r-nummer al onder een ander e-mailadres draagt, in plaats van een
+      // duplicaat te maken dat op de unieke `rNumber` botst. Zie
+      // linkEmailForRNumber.
+      const linkEmail =
+        email && rNumber ? await linkEmailForRNumber(rNumber, email) : undefined;
+
       // Opt-in debuglog (Admin -> IT): bewaart de ruwe claims zodat een superadmin
       // ziet welke attributen ICTS vrijgeeft. Doet niets als de toggle uit staat en
       // gooit nooit, dus deze await kan de login niet breken.
       await recordKulProfile(profile, { email, rNumber });
       return {
-        email,
+        email: linkEmail ?? email,
         name: profileName(profile),
         emailVerified: true,
         // Normalize KU Leuven's `locale` claim ("nl") to our enum; the raw
