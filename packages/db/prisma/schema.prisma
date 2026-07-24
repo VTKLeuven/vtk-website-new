@@ -569,6 +569,11 @@ model HeaderTab {
   // gestreepte placeholder-patroon of de statische default in HomeEditorial.
   imageKey String?
 
+  // Externe bestemming voor deze tab. Staat die ingevuld, dan linkt de header
+  // rechtstreeks naar die site (in een nieuw tabblad) in plaats van naar de
+  // categoriepagina /<slug>. Bv. Career -> career.vtk.be.
+  externalUrl String?
+
   // Inhoud van de categoriepagina zelf, bewerkbaar via /admin/inhoud.
   introNl    String?
   introEn    String?

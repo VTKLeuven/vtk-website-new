@@ -42,7 +42,6 @@ export default async function TheokotBaliePage({ params }: { params: Promise<{ l
     <div className="vtk-page">
       <header className="vtk-page-head">
         <div>
-          <div className="vtk-page-kicker">VTK · Theokot</div>
           <h1 className="vtk-page-title">{nl ? "Afhaalbalie" : "Pickup counter"}</h1>
         </div>
       </header>

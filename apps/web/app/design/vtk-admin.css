@@ -357,10 +357,19 @@
   flex-wrap: wrap;
 }
 
+.vtk-tiles-title {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
 .vtk-tiles-actions {
   display: flex;
+  align-items: center;
   gap: 8px;
   flex-wrap: wrap;
+  margin-left: auto;
 }
 
 .vtk-tile-btn {

@@ -195,18 +195,72 @@
   max-width: 820px;
 }
 
+/* Paginakop: een donkere band die het navy van de header doorzet, met het
+   technische patroon en een gele onderlijn als afsluiting. Dit is dezelfde kop
+   voor /tickets, de categoriepagina's en de contentpagina's, zodat de site één
+   systeem blijft in plaats van per rubriek een eigen aanhef. */
 .vtk-page-head,
 .vtk-design .page-head {
+  position: relative;
+  z-index: 0;
   max-width: var(--max);
   margin: 0 auto;
-  padding: clamp(28px, 3.5vw, 48px) clamp(20px, 3vw, 36px) clamp(18px, 2vw, 28px);
+  padding: clamp(44px, 5vw, 68px) clamp(20px, 3vw, 36px) clamp(40px, 4.5vw, 56px);
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   gap: 32px;
   align-items: end;
-  border-bottom: 1px solid var(--line);
+  color: var(--paper);
 }
 
+/* De band loopt van rand tot rand; de inhoud blijft binnen --max staan. */
+.vtk-page-head::before,
+.vtk-design .page-head::before {
+  content: "";
+  position: absolute;
+  z-index: -2;
+  top: 0;
+  bottom: 0;
+  left: calc(50% - 50vw);
+  right: calc(50% - 50vw);
+  background: var(--navy);
+  box-shadow: inset 0 -5px 0 var(--yellow);
+}
+
+.vtk-page-head::after,
+.vtk-design .page-head::after {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  top: 0;
+  bottom: 0;
+  left: calc(50% - 50vw);
+  right: calc(50% - 50vw);
+  pointer-events: none;
+  background-image: url("/technisch-pattern.svg");
+  background-size: 880px 880px;
+  background-repeat: repeat;
+  background-position: calc(50% + 340px) -160px;
+  opacity: 0.34;
+  -webkit-mask-image: linear-gradient(
+    to bottom,
+    transparent 0,
+    #000 56px,
+    #000 calc(100% - 40px),
+    transparent 100%
+  );
+  mask-image: linear-gradient(
+    to bottom,
+    transparent 0,
+    #000 56px,
+    #000 calc(100% - 40px),
+    transparent 100%
+  );
+}
+
+/* Deze drie klassen worden ook buiten de donkere band gebruikt (bv. de titel
+   van een contentpagina in PageView). Ze houden daarom hun donkere tekstkleur;
+   de lichte variant hangt aan `.vtk-page-head` hieronder. */
 .vtk-page-kicker,
 .vtk-design .page-head .crumbs,
 .vtk-design .aanbod-wrap .crumbs {
@@ -221,19 +275,21 @@
 .vtk-design .page-head h1 {
   margin: 0;
   max-width: 900px;
-  font-size: clamp(30px, 4vw, 52px);
-  line-height: 1.05;
-  letter-spacing: -0.025em;
+  font-size: clamp(32px, 4.4vw, 56px);
+  line-height: 1.04;
+  letter-spacing: -0.03em;
   font-weight: 600;
   color: var(--ink);
 }
 
+/* Accent binnen een paginatitel: dezelfde schreefloze letter als de rest. Het
+   serif-italic accent hoort op de homepage-hero en niet in elke kop. */
 .vtk-page-title em,
 .vtk-design .page-head h1 em {
   color: var(--navy);
-  font-family: var(--serif);
-  font-style: italic;
-  font-weight: 400;
+  font-family: inherit;
+  font-style: normal;
+  font-weight: 600;
 }
 
 .vtk-page-subtitle {
@@ -244,9 +300,29 @@
   line-height: 1.6;
 }
 
+/* In de donkere band draait de tekst om. */
+.vtk-page-head .vtk-page-kicker,
+.vtk-design .page-head .crumbs {
+  color: var(--on-dark-muted);
+}
+
+.vtk-page-head .vtk-page-title,
+.vtk-design .page-head h1 {
+  color: var(--paper);
+}
+
+.vtk-page-head .vtk-page-title em,
+.vtk-design .page-head h1 em {
+  color: var(--yellow);
+}
+
+.vtk-page-head .vtk-page-subtitle {
+  color: var(--on-dark-muted);
+}
+
 .page-head-meta,
 .vtk-design .page-head-meta {
-  color: var(--muted);
+  color: var(--on-dark-muted);
   font-size: 12px;
   line-height: 1.8;
   text-align: right;
@@ -256,8 +332,34 @@
 
 .page-head-meta b,
 .vtk-design .page-head-meta b {
-  color: var(--ink);
+  color: var(--paper);
   font-weight: 600;
+}
+
+/* Knoppen in de donkere kop draaien om, net als op de homepage-hero. */
+.vtk-page-head .vtk-button-primary,
+.vtk-design .page-head .vtk-button-primary {
+  background: var(--surface);
+  border-color: var(--surface);
+  color: var(--ink) !important;
+}
+
+.vtk-page-head .vtk-button-primary:hover,
+.vtk-design .page-head .vtk-button-primary:hover {
+  background: var(--paper-2);
+}
+
+.vtk-page-head .vtk-button-ghost,
+.vtk-design .page-head .vtk-button-ghost {
+  border-color: rgba(255, 255, 255, 0.3);
+  color: var(--paper) !important;
+}
+
+.vtk-page-head .vtk-button-ghost:hover,
+.vtk-design .page-head .vtk-button-ghost:hover {
+  border-color: var(--yellow);
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--yellow) !important;
 }
 
 .vtk-panel,

@@ -21,6 +21,7 @@ import {
 } from "@/lib/shift-rewards.server";
 import { outstandingShiftReward } from "@/lib/shift-rewards";
 import { withSerializableTransaction } from "@/lib/ticketing/transactions";
+import { saveError, saveOk, type SaveState } from "@/lib/saveState";
 
 export type ActionResult = { ok: true; message?: string } | { ok: false; error: string };
 
@@ -174,11 +175,14 @@ export async function createWeekSessionsAction(formData: FormData): Promise<void
 // Beheer: één sessie bewerken (uren, open/dicht, broodje van de week)
 // -----------------------------------------------------------------------------
 
-export async function updateSessionAction(formData: FormData): Promise<void> {
+export async function updateSessionAction(
+  _prev: SaveState,
+  formData: FormData,
+): Promise<SaveState> {
   await requirePermission("theokot.manage");
   const id = formData.get("sessionId") as string;
   const existing = await prisma.theokotSession.findUnique({ where: { id } });
-  if (!existing) throw new Error("Sessie niet gevonden");
+  if (!existing) return saveError("SESSION_NOT_FOUND");
 
   const isOpen = formData.get("isOpen") === "on";
   const pickupStart = (formData.get("pickupStart") as string) || null;
@@ -199,6 +203,7 @@ export async function updateSessionAction(formData: FormData): Promise<void> {
 
   await prisma.theokotSession.update({ where: { id }, data });
   revalidateTheokot();
+  return saveOk();
 }
 
 /**
@@ -207,7 +212,10 @@ export async function updateSessionAction(formData: FormData): Promise<void> {
  * niet meer voorkomen worden verwijderd tenzij ze al bestellijnen hebben (dan
  * blijven ze staan om historiek niet te breken).
  */
-export async function updateSessionItemsAction(formData: FormData): Promise<void> {
+export async function updateSessionItemsAction(
+  _prev: SaveState,
+  formData: FormData,
+): Promise<SaveState> {
   await requirePermission("theokot.manage");
   const sessionId = formData.get("sessionId") as string;
   const existing = await prisma.theokotSession.findUnique({
@@ -249,13 +257,17 @@ export async function updateSessionItemsAction(formData: FormData): Promise<void
   }
 
   revalidateTheokot();
+  return saveOk();
 }
 
 // -----------------------------------------------------------------------------
 // Beheer: configuratie, custom bericht, openingsuren
 // -----------------------------------------------------------------------------
 
-export async function saveConfigAction(formData: FormData): Promise<void> {
+export async function saveConfigAction(
+  _prev: SaveState,
+  formData: FormData,
+): Promise<SaveState> {
   await requirePermission("theokot.manage");
   const num = (key: string, min = 0) => Math.max(min, Number(formData.get(key)) || 0);
   const time = (key: string, fallback: string) => {
@@ -279,7 +291,9 @@ export async function saveConfigAction(formData: FormData): Promise<void> {
     update: { value },
     create: { key: "theokot.config", value },
   });
+  revalidatePath(`${ADMIN_PATH}/instellingen`);
   revalidateTheokot();
+  return saveOk();
 }
 
 /**
@@ -289,7 +303,10 @@ export async function saveConfigAction(formData: FormData): Promise<void> {
  * producten die niet meer voorkomen worden verwijderd (de catalogus is losstaand:
  * sessie-items zijn kopieën, dus bestaande weken blijven ongemoeid).
  */
-export async function saveProductCatalogAction(formData: FormData): Promise<void> {
+export async function saveProductCatalogAction(
+  _prev: SaveState,
+  formData: FormData,
+): Promise<SaveState> {
   await requirePermission("theokot.manage");
   const count = Number(formData.get("productCount")) || 0;
   const keepIds = new Set<string>();
@@ -319,10 +336,15 @@ export async function saveProductCatalogAction(formData: FormData): Promise<void
     if (!keepIds.has(p.id)) await prisma.theokotProduct.delete({ where: { id: p.id } });
   }
 
+  revalidatePath(`${ADMIN_PATH}/instellingen`);
   revalidateTheokot();
+  return saveOk();
 }
 
-export async function saveOrderMessageAction(formData: FormData): Promise<void> {
+export async function saveOrderMessageAction(
+  _prev: SaveState,
+  formData: FormData,
+): Promise<SaveState> {
   await requirePermission("theokot.manage");
   const value = {
     bodyNl: ((formData.get("bodyNl") as string) || "").trim(),
@@ -333,11 +355,16 @@ export async function saveOrderMessageAction(formData: FormData): Promise<void> 
     update: { value },
     create: { key: "theokot.orderMessage", value },
   });
+  revalidatePath(`${ADMIN_PATH}/instellingen`);
   revalidateTheokot();
+  return saveOk();
 }
 
 /** Schrijft de frontpage-openingsuren van Theokot (gedeelde key `home.openingHours.theokot`). */
-export async function saveTheokotOpeningHoursAction(formData: FormData): Promise<void> {
+export async function saveTheokotOpeningHoursAction(
+  _prev: SaveState,
+  formData: FormData,
+): Promise<SaveState> {
   await requirePermission("theokot.manage");
   const titleNl = (formData.get("titleNl") as string) || "Openingsuren Theokot";
   const titleEn = (formData.get("titleEn") as string) || "Theokot opening hours";
@@ -358,14 +385,19 @@ export async function saveTheokotOpeningHoursAction(formData: FormData): Promise
     create: { key: "home.openingHours.theokot", value },
   });
   revalidatePath("/");
+  revalidatePath(`${ADMIN_PATH}/openingsuren`);
   revalidateTheokot();
+  return saveOk();
 }
 
 // -----------------------------------------------------------------------------
 // Beheer: bans + no-show-correcties
 // -----------------------------------------------------------------------------
 
-export async function createBanAction(formData: FormData): Promise<void> {
+export async function createBanAction(
+  _prev: SaveState,
+  formData: FormData,
+): Promise<SaveState> {
   const admin = await requirePermission("theokot.manage");
   let userId = ((formData.get("userId") as string) || "").trim();
   const rNumber = ((formData.get("rNumber") as string) || "").trim().toLowerCase();
@@ -374,12 +406,14 @@ export async function createBanAction(formData: FormData): Promise<void> {
   const note = ((formData.get("note") as string) || "").trim() || null;
 
   // r-nummer heeft voorrang: laat een beheerder zonder `users.view` toch bannen.
+  // Een onbekend r-nummer is een gewone invoerfout: rode toast, geen error
+  // boundary (zie CLAUDE.md > UX-conventies).
   if (!userId && rNumber) {
     const user = await prisma.user.findUnique({ where: { rNumber }, select: { id: true } });
-    if (!user) throw new Error("Geen gebruiker gevonden met dit r-nummer");
+    if (!user) return saveError("USER_NOT_FOUND");
     userId = user.id;
   }
-  if (!userId) throw new Error("Gebruiker ontbreekt");
+  if (!userId) return saveError("USER_MISSING");
 
   await prisma.theokotBan.create({
     data: {
@@ -390,10 +424,15 @@ export async function createBanAction(formData: FormData): Promise<void> {
       createdById: admin.user.id,
     },
   });
+  revalidatePath(`${ADMIN_PATH}/bans`);
   revalidateTheokot();
+  return saveOk();
 }
 
-export async function updateBanAction(formData: FormData): Promise<void> {
+export async function updateBanAction(
+  _prev: SaveState,
+  formData: FormData,
+): Promise<SaveState> {
   await requirePermission("theokot.manage");
   const id = formData.get("banId") as string;
   const endsAtRaw = (formData.get("endsAt") as string) || "";
@@ -403,13 +442,16 @@ export async function updateBanAction(formData: FormData): Promise<void> {
   const endsAt = new Date(endsAtRaw);
   if (!Number.isNaN(endsAt.getTime())) data.endsAt = endsAt;
   await prisma.theokotBan.update({ where: { id }, data });
+  revalidatePath(`${ADMIN_PATH}/bans`);
   revalidateTheokot();
+  return saveOk();
 }
 
 export async function liftBanAction(formData: FormData): Promise<void> {
   await requirePermission("theokot.manage");
   const id = formData.get("banId") as string;
   await prisma.theokotBan.update({ where: { id }, data: { active: false } });
+  revalidatePath(`${ADMIN_PATH}/bans`);
   revalidateTheokot();
 }
 
@@ -417,7 +459,10 @@ export async function liftBanAction(formData: FormData): Promise<void> {
  * Corrigeert de status van een bestelling (bvb no-show → opgehaald). Optioneel
  * wordt de actieve ban van de gebruiker opgeheven (`liftBan=on`).
  */
-export async function correctOrderStatusAction(formData: FormData): Promise<void> {
+export async function correctOrderStatusAction(
+  _prev: SaveState,
+  formData: FormData,
+): Promise<SaveState> {
   await requirePermission("theokot.manage");
   const orderId = formData.get("orderId") as string;
   const status = formData.get("status") as TheokotOrderStatus;
@@ -425,7 +470,7 @@ export async function correctOrderStatusAction(formData: FormData): Promise<void
   const liftBan = formData.get("liftBan") === "on";
 
   const validStatuses: TheokotOrderStatus[] = ["RESERVED", "PICKED_UP", "NO_SHOW", "CANCELLED"];
-  if (!validStatuses.includes(status)) throw new Error("Ongeldige status");
+  if (!validStatuses.includes(status)) return saveError("INVALID_STATUS");
 
   const order = await prisma.theokotOrder.update({
     where: { id: orderId },
@@ -443,7 +488,9 @@ export async function correctOrderStatusAction(formData: FormData): Promise<void
     });
   }
 
+  revalidatePath(`${ADMIN_PATH}/bans`);
   revalidateTheokot();
+  return saveOk();
 }
 
 // -----------------------------------------------------------------------------

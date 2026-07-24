@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Button, Input } from "@vtk/ui";
 import { saveProductCatalogAction } from "@/app/actions/theokot";
+import { SaveForm } from "@/components/ui/SaveForm";
 
 export type CatalogItem = {
   id: string;
@@ -36,7 +37,14 @@ export function ProductCatalogManager({ nl, initial }: { nl: boolean; initial: C
   }
 
   return (
-    <form action={saveProductCatalogAction} className="space-y-2">
+    <SaveForm
+      action={saveProductCatalogAction}
+      className="space-y-2"
+      submitLabel={nl ? "Standaardaanbod opslaan" : "Save default offering"}
+      savingLabel={nl ? "Bezig met opslaan..." : "Saving..."}
+      savedMessage={nl ? "Standaardaanbod opgeslagen" : "Default offering saved"}
+      fallbackErrorMessage={nl ? "Opslaan van het aanbod mislukt." : "Saving the offering failed."}
+    >
       <input type="hidden" name="productCount" value={rows.length} />
 
       <div className="hidden gap-2 text-xs font-semibold uppercase tracking-wide text-[#5c667f] sm:grid sm:grid-cols-[1fr_1fr_5rem_4rem_3rem_2rem]">
@@ -100,9 +108,6 @@ export function ProductCatalogManager({ nl, initial }: { nl: boolean; initial: C
         + {nl ? "Broodje toevoegen" : "Add sandwich"}
       </Button>
 
-      <div>
-        <Button type="submit">{nl ? "Standaardaanbod opslaan" : "Save default offering"}</Button>
-      </div>
-    </form>
+    </SaveForm>
   );
 }

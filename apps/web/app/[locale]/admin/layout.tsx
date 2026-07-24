@@ -61,8 +61,11 @@ const NAV: NavEntry[] = [
   ]),
   item('calendar', '/kalender', { perm: 'calendar.create' }),
   item('tickets', '/tickets', { ticketing: true }),
-  item('albums', '/albums', { perm: 'photos.manageAlbums' }),
-  item('media', '/media', { perm: 'media.manage' }),
+  // Fotoalbums hebben één ingang: /admin/media. Daar staat de Immich-galerij,
+  // en dat is de enige bron die de publieke mediapagina leest. De oude
+  // /admin/albums beheerde een tweede, lokale albumopslag die nergens meer
+  // getoond werd.
+  item('media', '/media', { anyPerm: ['media.manage', 'photos.manageAlbums'] }),
   item('shift', '/shiften', { anyPerm: ['shift.edit', 'shift.reward', 'shift.ranking'] }),
   item('theokot', '/theokot', { anyPerm: ['theokot.manage', 'theokot.pickup'] }),
   item('mailinglists', '/mailinglijsten', { perm: 'mailinglists.export' }),

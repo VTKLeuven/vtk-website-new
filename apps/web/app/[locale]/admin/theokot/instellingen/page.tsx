@@ -3,9 +3,10 @@ import { notFound } from "next/navigation";
 import { hasLocale } from "@/lib/locale";
 import { requireSession } from "@/lib/session";
 import type { Locale } from "@vtk/i18n";
-import { Button, Card, Input, Label, Textarea } from "@vtk/ui";
+import { Card, Input, Label, Textarea } from "@vtk/ui";
 import { parseTheokotConfig } from "@/lib/theokot";
 import { saveConfigAction, saveOrderMessageAction } from "@/app/actions/theokot";
+import { SaveForm } from "@/components/ui/SaveForm";
 import { TheokotAdminNav } from "../TheokotAdminNav";
 import { ProductCatalogManager, type CatalogItem } from "../ProductCatalogManager";
 
@@ -62,7 +63,14 @@ export default async function TheokotSettingsPage({ params }: { params: Promise<
             ? "Deze waarden gelden voor nieuwe verkoopweken en het bestelgedrag. Ze hoeven niet elke week aangepast te worden."
             : "These values apply to new sale weeks and ordering behaviour. They need not be changed weekly."}
         </p>
-        <form action={saveConfigAction} className="grid gap-4 sm:grid-cols-3">
+        <SaveForm
+          action={saveConfigAction}
+          className="grid gap-4 sm:grid-cols-3"
+          submitLabel={nl ? "Configuratie opslaan" : "Save configuration"}
+          savingLabel={nl ? "Bezig met opslaan..." : "Saving..."}
+          savedMessage={nl ? "Configuratie opgeslagen" : "Configuration saved"}
+          fallbackErrorMessage={nl ? "Opslaan van de configuratie mislukt." : "Saving the configuration failed."}
+        >
           {numField("maxItemsPerOrder", "Max broodjes / bestelling (X)", "Max sandwiches / order (X)", config.maxItemsPerOrder, 1)}
           {numField("maxWeeklySpecialPerOrder", "Max v/d week / bestelling (Y)", "Max weekly special / order (Y)", config.maxWeeklySpecialPerOrder, 0)}
           {numField("orderLeadDays", "Dagen vooraf bestellen", "Order lead days", config.orderLeadDays, 0)}
@@ -73,10 +81,7 @@ export default async function TheokotSettingsPage({ params }: { params: Promise<
           {numField("noShowGraceMinutes", "No-show grace (min)", "No-show grace (min)", config.noShowGraceMinutes, 0)}
           {numField("noShowThreshold", "No-shows voor ban", "No-shows before ban", config.noShowThreshold, 1)}
           {numField("banDurationDays", "Ban-duur (dagen)", "Ban duration (days)", config.banDurationDays, 1)}
-          <div className="sm:col-span-3">
-            <Button type="submit">{nl ? "Configuratie opslaan" : "Save configuration"}</Button>
-          </div>
-        </form>
+        </SaveForm>
       </Card>
 
       {/* Standaardaanbod (catalogus) */}
@@ -96,7 +101,14 @@ export default async function TheokotSettingsPage({ params }: { params: Promise<
         <p className="mb-4 text-sm text-[#5c667f]">
           {nl ? "Laat leeg om geen bericht te tonen." : "Leave empty to show no message."}
         </p>
-        <form action={saveOrderMessageAction} className="space-y-4">
+        <SaveForm
+          action={saveOrderMessageAction}
+          className="space-y-4"
+          submitLabel={nl ? "Bericht opslaan" : "Save message"}
+          savingLabel={nl ? "Bezig met opslaan..." : "Saving..."}
+          savedMessage={nl ? "Bericht opgeslagen" : "Message saved"}
+          fallbackErrorMessage={nl ? "Opslaan van het bericht mislukt." : "Saving the message failed."}
+        >
           <div>
             <Label>{nl ? "Bericht (NL)" : "Message (NL)"}</Label>
             <Textarea name="bodyNl" defaultValue={message.bodyNl ?? ""} />
@@ -105,8 +117,7 @@ export default async function TheokotSettingsPage({ params }: { params: Promise<
             <Label>{nl ? "Bericht (EN)" : "Message (EN)"}</Label>
             <Textarea name="bodyEn" defaultValue={message.bodyEn ?? ""} />
           </div>
-          <Button type="submit">{nl ? "Bericht opslaan" : "Save message"}</Button>
-        </form>
+        </SaveForm>
       </Card>
     </div>
   );

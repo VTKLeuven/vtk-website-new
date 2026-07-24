@@ -152,8 +152,7 @@ export default async function TicketAdminOverview({
     <div className="ticket-admin-page">
       <div className="ticket-admin-page-head">
         <div>
-          <p className="ticket-admin-eyebrow">VTK</p>
-          <h1>{locale === "nl" ? "Ticketbeheer" : "Ticket management"}</h1>
+          <h1>{locale === "nl" ? "Tickets" : "Tickets"}</h1>
           <p>
             {locale === "nl"
               ? "Verkoop, deelnemers en toegang per evenement."

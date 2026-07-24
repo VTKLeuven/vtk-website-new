@@ -1,6 +1,7 @@
 "use client";
 
 import { Button, Card, Input, Label, Select } from "@vtk/ui";
+import { SaveForm } from "@/components/ui/SaveForm";
 import {
   correctOrderStatusAction,
   createBanAction,
@@ -36,7 +37,25 @@ export function BansClient({ nl, bans, noShows }: { nl: boolean; bans: BanRow[];
       {/* Manuele ban */}
       <Card className="p-5">
         <h2 className="mb-3 text-lg font-semibold">{nl ? "Manuele ban" : "Manual ban"}</h2>
-        <form action={createBanAction} className="flex flex-wrap items-end gap-3">
+        <SaveForm
+          action={createBanAction}
+          className="flex flex-wrap items-end gap-3"
+          submitLabel={nl ? "Ban toevoegen" : "Add ban"}
+          savingLabel={nl ? "Bezig..." : "Saving..."}
+          savedMessage={nl ? "Ban toegevoegd" : "Ban added"}
+          errorMessages={
+            nl
+              ? {
+                  USER_NOT_FOUND: "Geen lid gevonden met dit r-nummer.",
+                  USER_MISSING: "Vul een r-nummer in.",
+                }
+              : {
+                  USER_NOT_FOUND: "No member found with this r-number.",
+                  USER_MISSING: "Fill in an r-number.",
+                }
+          }
+          fallbackErrorMessage={nl ? "Ban toevoegen mislukt." : "Adding the ban failed."}
+        >
           <div>
             <Label>{nl ? "R-nummer" : "R-number"}</Label>
             <Input name="rNumber" placeholder="r0123456" required />
@@ -49,8 +68,7 @@ export function BansClient({ nl, bans, noShows }: { nl: boolean; bans: BanRow[];
             <Label>{nl ? "Reden" : "Reason"}</Label>
             <Input name="reason" placeholder={nl ? "Reden" : "Reason"} />
           </div>
-          <Button type="submit">{nl ? "Ban toevoegen" : "Add ban"}</Button>
-        </form>
+        </SaveForm>
       </Card>
 
       {/* Bans-lijst */}
@@ -79,7 +97,14 @@ export function BansClient({ nl, bans, noShows }: { nl: boolean; bans: BanRow[];
                   </span>
                 </div>
                 <div className="mt-1 text-sm text-[#34405e]">{b.reason}</div>
-                <form action={updateBanAction} className="mt-2 flex flex-wrap items-end gap-2">
+                <SaveForm
+                  action={updateBanAction}
+                  className="mt-2 flex flex-wrap items-end gap-2"
+                  submitLabel={nl ? "Opslaan" : "Save"}
+                  savingLabel={nl ? "Bezig..." : "Saving..."}
+                  savedMessage={nl ? "Ban bijgewerkt" : "Ban updated"}
+                  fallbackErrorMessage={nl ? "Bijwerken van de ban mislukt." : "Updating the ban failed."}
+                >
                   <input type="hidden" name="banId" value={b.id} />
                   <div>
                     <Label>{nl ? "Einddatum" : "End date"}</Label>
@@ -93,10 +118,7 @@ export function BansClient({ nl, bans, noShows }: { nl: boolean; bans: BanRow[];
                     <input type="checkbox" name="active" defaultChecked={b.stored} />
                     {nl ? "Actief" : "Active"}
                   </label>
-                  <Button type="submit" size="sm" variant="ghost">
-                    {nl ? "Opslaan" : "Save"}
-                  </Button>
-                </form>
+                </SaveForm>
                 {b.stored && (
                   <form action={liftBanAction} className="mt-1">
                     <input type="hidden" name="banId" value={b.id} />
@@ -134,7 +156,19 @@ export function BansClient({ nl, bans, noShows }: { nl: boolean; bans: BanRow[];
                     {o.dateLabel} · {o.totalLabel}
                   </span>
                 </div>
-                <form action={correctOrderStatusAction} className="mt-2 flex flex-wrap items-end gap-2">
+                <SaveForm
+                  action={correctOrderStatusAction}
+                  className="mt-2 flex flex-wrap items-end gap-2"
+                  submitLabel={nl ? "Corrigeren" : "Correct"}
+                  savingLabel={nl ? "Bezig..." : "Saving..."}
+                  savedMessage={nl ? "Status gecorrigeerd" : "Status corrected"}
+                  errorMessages={
+                    nl
+                      ? { INVALID_STATUS: "Die status bestaat niet." }
+                      : { INVALID_STATUS: "That status does not exist." }
+                  }
+                  fallbackErrorMessage={nl ? "Corrigeren mislukt." : "Correcting failed."}
+                >
                   <input type="hidden" name="orderId" value={o.orderId} />
                   <div>
                     <Label>{nl ? "Corrigeer naar" : "Correct to"}</Label>
@@ -153,10 +187,7 @@ export function BansClient({ nl, bans, noShows }: { nl: boolean; bans: BanRow[];
                     <input type="checkbox" name="liftBan" />
                     {nl ? "Ban opheffen" : "Lift ban"}
                   </label>
-                  <Button type="submit" size="sm">
-                    {nl ? "Corrigeren" : "Correct"}
-                  </Button>
-                </form>
+                </SaveForm>
               </li>
             ))}
           </ul>

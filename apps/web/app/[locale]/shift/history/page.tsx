@@ -44,7 +44,6 @@ export default async function ShiftHistoryPage({
     <div className="vtk-page">
       <header className="vtk-page-head">
         <div>
-          <div className="vtk-page-kicker">VTK · {t.shifts}</div>
           <h1 className="vtk-page-title">{t.history.title}</h1>
         </div>
       </header>

@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@vtk/db";
 import { newStorageKey, putObject } from "@vtk/storage";
 import { requirePermission } from "@/lib/session";
+import { saveOk, type SaveState } from "@/lib/saveState";
 import {
   getMediaContent,
   type MediaPublication,
@@ -113,9 +114,13 @@ export async function deleteMagazineAction(formData: FormData): Promise<void> {
   if (!id) return;
   const { publications: current } = await getMediaContent();
   await savePublications(current.filter((p) => p.id !== id));
+  revalidatePath("/admin/media");
 }
 
-export async function savePromoVideosAction(formData: FormData): Promise<void> {
+export async function savePromoVideosAction(
+  _prev: SaveState,
+  formData: FormData,
+): Promise<SaveState> {
   await requirePermission("media.manage");
 
   const existing = await prisma.setting.findUnique({ where: { key: "media.aftermovies" } });
@@ -163,6 +168,8 @@ export async function savePromoVideosAction(formData: FormData): Promise<void> {
   revalidatePath("/");
   revalidatePath("/media");
   revalidatePath("/en/media");
+  revalidatePath("/admin/media");
+  return saveOk();
 }
 
 export async function createImmichAlbumAction(

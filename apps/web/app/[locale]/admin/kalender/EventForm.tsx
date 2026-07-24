@@ -69,7 +69,7 @@ export function EventForm({
           <div>
             <Label>{locale === "nl" ? "Groep" : "Group"}</Label>
             <Select name="groupId" defaultValue={event.groupId ?? ""} required>
-              <option value="" disabled>—</option>
+              <option value="" disabled>{nl ? "Kies een groep" : "Choose a group"}</option>
               {groups.map((g) => (
                 <option key={g.id} value={g.id}>
                   {locale === "nl" ? g.nameNl : g.nameEn}

@@ -367,9 +367,6 @@ async function main() {
         ] as Array<{ type: "video" | "image"; url: string; titleNl?: string; titleEn?: string }>,
       },
     },
-    // `home.featuredAlbums` staat hier bewust niet: die wordt na het seeden van de
-    // albums create-only gezet (zie verderop), zodat een verse DB de seed-albums
-    // krijgt maar een admin-selectie niet overschreven wordt.
     // Theokot-configuratie: waarden die niet elke week wijzigen. maxItemsPerOrder = X,
     // maxWeeklySpecialPerOrder = Y (X > Y). Tijden zijn "HH:mm" in Brussel-tijd.
     {
@@ -968,72 +965,6 @@ async function main() {
       },
     });
   }
-
-  console.log("Seeding prototype photo albums...");
-  const albumSeeds = [
-    {
-      slug: "galabal-2026",
-      titleNl: "Galabal 2026",
-      titleEn: "Gala 2026",
-      descriptionNl: "Prototype-album voor de fotopagina. Upload echte beelden via het adminpaneel.",
-      descriptionEn: "Prototype album for the photo page. Upload real images through the admin panel.",
-      eventDate: "2026-03-14T20:00:00+01:00",
-      publishedAt: "2026-05-18T00:00:00+02:00",
-    },
-    {
-      slug: "vtk-ski-2026",
-      titleNl: "Skireis 2026",
-      titleEn: "Ski trip 2026",
-      descriptionNl: "Sfeerbeelden van de jaarlijkse VTK-skireis.",
-      descriptionEn: "Atmosphere shots from the yearly VTK ski trip.",
-      eventDate: "2026-02-08T08:00:00+01:00",
-      publishedAt: "2026-05-18T00:00:00+02:00",
-    },
-    {
-      slug: "cantus-lente-2026",
-      titleNl: "Lentecantus 2026",
-      titleEn: "Spring cantus 2026",
-      descriptionNl: "Een lege prototypecollectie zodat albumlijsten gevuld zijn voor review.",
-      descriptionEn: "An empty prototype collection so album lists are populated for review.",
-      eventDate: "2026-04-24T20:00:00+02:00",
-      publishedAt: "2026-05-18T00:00:00+02:00",
-    },
-    {
-      slug: "career-fair-2026",
-      titleNl: "Career Fair 2026",
-      titleEn: "Career Fair 2026",
-      descriptionNl: "Prototype-album voor partner- en careercontent.",
-      descriptionEn: "Prototype album for partner and career content.",
-      eventDate: "2026-03-04T10:00:00+01:00",
-      publishedAt: "2026-05-18T00:00:00+02:00",
-    },
-  ];
-  // Create-only: bestaande albums (titel, beschrijving, datums) niet overschrijven.
-  for (const album of albumSeeds) {
-    await prisma.photoAlbum.upsert({
-      where: { slug: album.slug },
-      update: {},
-      create: {
-        slug: album.slug,
-        titleNl: album.titleNl,
-        titleEn: album.titleEn,
-        descriptionNl: album.descriptionNl,
-        descriptionEn: album.descriptionEn,
-        eventDate: new Date(album.eventDate),
-        publishedAt: new Date(album.publishedAt),
-      },
-    });
-  }
-
-  // Create-only: op een verse DB de featured-albums vullen met de seed-albums;
-  // een bestaande (admin-gekozen) selectie niet overschrijven. Deze key staat
-  // daarom bewust NIET in `defaultSettings` hierboven (die zou hem eerst leeg
-  // aanmaken en deze create-branch nooit laten vuren).
-  await prisma.setting.upsert({
-    where: { key: "home.featuredAlbums" },
-    update: {},
-    create: { key: "home.featuredAlbums", value: { albumSlugs: albumSeeds.map((a) => a.slug) } },
-  });
 
   console.log("Seeding calendar events...");
   // Pulled from the vtk.be /nl/calendar iCal feed. Times are Europe/Brussels

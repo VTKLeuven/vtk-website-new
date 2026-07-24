@@ -115,7 +115,6 @@ export default async function TheokotOrderPage({ params }: { params: Promise<{ l
     <div className="vtk-page">
       <header className="vtk-page-head">
         <div>
-          <div className="vtk-page-kicker">VTK · Theokot</div>
           <h1 className="vtk-page-title">{nl ? "Broodjes reserveren" : "Reserve sandwiches"}</h1>
         </div>
       </header>

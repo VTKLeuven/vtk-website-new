@@ -93,6 +93,24 @@ export function TabInspector({
           {nl ? "Zichtbaar in de header" : "Visible in the header"}
         </label>
 
+        <div>
+          <Label htmlFor="externalUrl">
+            {nl ? "Linkt naar externe site" : "Links to an external site"}
+          </Label>
+          <Input
+            id="externalUrl"
+            name="externalUrl"
+            type="url"
+            placeholder="https://career.vtk.be"
+            defaultValue={tab?.externalUrl ?? ""}
+          />
+          <p className="mt-1 text-xs text-[#5c667f]">
+            {nl
+              ? "Laat leeg voor een gewone tab. Vul je iets in, dan opent de headerknop die site in een nieuw tabblad en gaat hij niet naar de categoriepagina."
+              : "Leave empty for a normal tab. When filled in, the header button opens that site in a new tab instead of the category page."}
+          </p>
+        </div>
+
         <fieldset className="space-y-4 border-t border-vtk-blue/10 pt-5">
           <legend className="text-sm font-semibold text-vtk-ink">
             {nl ? "Op de categoriepagina" : "On the category page"}

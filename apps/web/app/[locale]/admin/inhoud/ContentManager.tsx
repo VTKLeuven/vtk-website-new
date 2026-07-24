@@ -48,6 +48,8 @@ export type TabNode = {
   labelNl: string;
   labelEn: string;
   visible: boolean;
+  /** Externe bestemming voor de headerknop (bv. career.vtk.be). */
+  externalUrl: string | null;
   introNl: string | null;
   introEn: string | null;
   ctaLabelNl: string | null;

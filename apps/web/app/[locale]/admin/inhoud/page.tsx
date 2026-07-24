@@ -76,6 +76,7 @@ export default async function AdminContent({
     labelNl: t.labelNl,
     labelEn: t.labelEn,
     visible: t.visible,
+    externalUrl: t.externalUrl,
     introNl: t.introNl,
     introEn: t.introEn,
     ctaLabelNl: t.ctaLabelNl,

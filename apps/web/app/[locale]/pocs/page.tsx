@@ -35,7 +35,6 @@ export default async function PocsPage({
     <div className="vtk-page">
       <header className="vtk-page-head">
         <div>
-          <div className="vtk-page-kicker">VTK · Onderwijs</div>
           <h1 className="vtk-page-title">{dict.pocs.title}</h1>
         </div>
       </header>

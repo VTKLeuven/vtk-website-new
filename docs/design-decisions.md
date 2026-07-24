@@ -39,6 +39,48 @@ De volgorde en labels zijn dus een kringkeuze, geen technische:
 
 ---
 
+## Fotoalbums leven in Immich, en nergens anders
+
+De publieke mediapagina (`/media`, met `/fotos` als redirect) leest haar albums
+uitsluitend uit **Immich**: albums met de markering `[gallery]` in hun
+beschrijving verschijnen op de site. Beheer gebeurt op één plek, `/admin/media`:
+daar maak je een album aan, upload je de foto's en zie je meteen welke albums
+publiek staan.
+
+Daarnaast bestond er lang een tweede, lokale albumopslag (`PhotoAlbum` +
+`PhotoPhoto`, beheerd via een eigen `/admin/albums`-scherm met uploads naar onze
+eigen S3). Die kwam op geen enkele publieke pagina nog terecht: twee plaatsen om
+een album te maken, waarvan er één niets deed. Het adminscherm en de bijhorende
+acties zijn daarom verwijderd.
+
+- De **tabellen en de bestaande rijen blijven staan**, samen met de publieke
+  download-route `/api/albums/[slug]/download`. Er gaat dus geen data verloren en
+  oude links blijven werken; er is enkel geen scherm meer om ze te beheren.
+- `photos.manageAlbums` blijft de permissie voor fotoalbums: ze geeft nu toegang
+  tot het albumgedeelte van `/admin/media`. `media.manage` blijft over voor
+  magazines en promovideo's, zodat Communicatie en de fotografen apart bediend
+  kunnen worden.
+- De homepage-instelling **"Uitgelichte albums"** is mee verdwenen. Ze schreef
+  `home.featuredAlbums` weg met vrij getypte slugs, maar de homepage toonde die
+  albums nergens. Wil je later toch uitgelichte albums op de homepage, bouw dan
+  eerst de sectie en kies de albums met een keuzelijst uit Immich.
+
+---
+
+## Headertabs kunnen naar een externe site linken
+
+`HeaderTab.externalUrl` maakt van een tab een gewone link naar buiten: staat er
+een URL in, dan opent de headerknop die site in een nieuw tabblad in plaats van
+de categoriepagina `/<slug>` te tonen. **Career** gebruikt dit en gaat
+rechtstreeks naar `career.vtk.be`, omdat Career daar zijn eigen site heeft; de
+categoriepagina `/career` blijft bestaan voor wie ze via een directe link opent.
+
+Dit is bewust een veld en geen uitzondering in de code: Cursusdienst (cudi) en
+toekomstige werkingen met een eigen site kunnen hetzelfde doen zonder release.
+Je stelt het in bij Admin → Website → Inhoud, op de tab zelf.
+
+---
+
 ## Theokot — broodjes-reservatiesysteem
 
 Theokot is de cafetaria/broodjesbar van VTK. Studenten reserveren vooraf broodjes,

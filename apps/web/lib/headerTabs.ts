@@ -7,6 +7,11 @@ export type NavHeaderTab = {
   labelEn: string;
   /** Storage-key van de foto op de homepage-aanbodkaart (via /admin/home). */
   imageKey: string | null;
+  /**
+   * Externe site voor deze tab (bv. career.vtk.be). Is die gezet, dan gaat de
+   * headerknop daar rechtstreeks naartoe in plaats van naar /<slug>.
+   */
+  externalUrl: string | null;
 };
 
 /**
@@ -25,5 +30,6 @@ export async function getVisibleHeaderTabsForNav(): Promise<NavHeaderTab[]> {
     labelNl: t.labelNl,
     labelEn: t.labelEn,
     imageKey: null,
+    externalUrl: t.externalUrl ?? null,
   }));
 }

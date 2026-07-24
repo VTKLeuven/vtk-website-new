@@ -88,7 +88,6 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
         key: {
           in: [
             "home.openingHours.theokot",
-            "home.featuredAlbums",
             "home.career",
             DEFAULT_EVENT_IMAGE_SETTING,
           ],

@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { Button, Card, Input, Label } from "@vtk/ui";
+import { SaveForm } from "@/components/ui/SaveForm";
 import { createWeekSessionsAction, updateSessionAction, updateSessionItemsAction } from "@/app/actions/theokot";
 
 export type AdminItem = {
@@ -162,7 +163,19 @@ function SessionEditor({ nl, session }: { nl: boolean; session: AdminSession }) 
         <summary className="cursor-pointer text-sm text-vtk-ink/80 hover:text-vtk-ink">
           {nl ? "Uren & status bewerken" : "Edit hours & status"}
         </summary>
-        <form action={updateSessionAction} className="mt-3 grid gap-4 sm:grid-cols-2">
+        <SaveForm
+          action={updateSessionAction}
+          className="mt-3 grid gap-4 sm:grid-cols-2"
+          submitLabel={nl ? "Uren opslaan" : "Save hours"}
+          savingLabel={nl ? "Bezig..." : "Saving..."}
+          savedMessage={nl ? "Uren opgeslagen" : "Hours saved"}
+          errorMessages={
+            nl
+              ? { SESSION_NOT_FOUND: "Deze verkoopdag bestaat niet meer." }
+              : { SESSION_NOT_FOUND: "This sale day no longer exists." }
+          }
+          fallbackErrorMessage={nl ? "Opslaan van de uren mislukt." : "Saving the hours failed."}
+        >
           <input type="hidden" name="sessionId" value={session.id} />
           <label className="inline-flex items-center gap-2 text-sm sm:col-span-2">
             <input type="checkbox" name="isOpen" defaultChecked={session.isOpen} />
@@ -184,25 +197,24 @@ function SessionEditor({ nl, session }: { nl: boolean; session: AdminSession }) 
             <Label>{nl ? "Bestellen opent" : "Ordering opens"}</Label>
             <Input type="datetime-local" name="orderOpenAt" defaultValue={session.orderOpenAt} />
           </div>
-          <div className="sm:col-span-2">
-            <Button type="submit" size="sm">
-              {nl ? "Uren opslaan" : "Save hours"}
-            </Button>
-          </div>
-        </form>
+        </SaveForm>
       </details>
 
       <details className="group mt-2">
         <summary className="cursor-pointer text-sm text-vtk-ink/80 hover:text-vtk-ink">
           {nl ? `Aanbod bewerken (${session.items.length})` : `Edit offering (${session.items.length})`}
         </summary>
-        <form action={updateSessionItemsAction} className="mt-3 space-y-2">
+        <SaveForm
+          action={updateSessionItemsAction}
+          className="mt-3 space-y-2"
+          submitLabel={nl ? "Aanbod opslaan" : "Save offering"}
+          savingLabel={nl ? "Bezig..." : "Saving..."}
+          savedMessage={nl ? "Aanbod opgeslagen" : "Offering saved"}
+          fallbackErrorMessage={nl ? "Opslaan van het aanbod mislukt." : "Saving the offering failed."}
+        >
           <input type="hidden" name="sessionId" value={session.id} />
           <OfferingRows nl={nl} initial={session.items} />
-          <Button type="submit" size="sm">
-            {nl ? "Aanbod opslaan" : "Save offering"}
-          </Button>
-        </form>
+        </SaveForm>
       </details>
     </Card>
   );

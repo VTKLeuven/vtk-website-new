@@ -146,19 +146,3 @@ export async function saveAftermoviesAction(_prev: SaveState, formData: FormData
   revalidatePath("/admin/home");
   return saveOk();
 }
-
-export async function saveFeaturedAlbumsAction(_prev: SaveState, formData: FormData): Promise<SaveState> {
-  await requirePermission("home.edit");
-  const slugs = (formData.get("albumSlugs") as string)
-    .split(",")
-    .map((s) => s.trim())
-    .filter(Boolean);
-  await prisma.setting.upsert({
-    where: { key: "home.featuredAlbums" },
-    update: { value: { albumSlugs: slugs } },
-    create: { key: "home.featuredAlbums", value: { albumSlugs: slugs } },
-  });
-  revalidatePath("/");
-  revalidatePath("/admin/home");
-  return saveOk();
-}

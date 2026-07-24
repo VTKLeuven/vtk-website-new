@@ -14,7 +14,14 @@ export function EditorialNavLinks({
   locale,
   ariaLabel,
 }: {
-  tabs: Array<{ id: string; slug: string; labelNl: string; labelEn: string }>;
+  tabs: Array<{
+    id: string;
+    slug: string;
+    labelNl: string;
+    labelEn: string;
+    /** Externe bestemming (bv. career.vtk.be); opent in een nieuw tabblad. */
+    externalUrl?: string | null;
+  }>;
   base: string;
   locale: Locale;
   ariaLabel: string;
@@ -58,15 +65,33 @@ export function EditorialNavLinks({
           if (nav) setCanScrollForward(nav.scrollLeft + nav.clientWidth < nav.scrollWidth - 2);
         }}
       >
-        {tabs.map((tab) => (
-          <Link
-            key={tab.id}
-            href={tabHref(tab.slug)}
-            className={isClient && isActive(tab.slug) ? "active" : undefined}
-          >
-            {pick(tab.labelNl, tab.labelEn, locale)}
-          </Link>
-        ))}
+        {tabs.map((tab) => {
+          const label = pick(tab.labelNl, tab.labelEn, locale);
+          // Een tab met een externe bestemming (bv. Career -> career.vtk.be)
+          // verlaat de site: gewone anchor in een nieuw tabblad, en nooit
+          // "actief", want we staan er per definitie niet op.
+          if (tab.externalUrl) {
+            return (
+              <a
+                key={tab.id}
+                href={tab.externalUrl}
+                target="_blank"
+                rel="noreferrer noopener"
+              >
+                {label}
+              </a>
+            );
+          }
+          return (
+            <Link
+              key={tab.id}
+              href={tabHref(tab.slug)}
+              className={isClient && isActive(tab.slug) ? "active" : undefined}
+            >
+              {label}
+            </Link>
+          );
+        })}
       </nav>
       {canScrollForward ? (
         <button

@@ -25,6 +25,7 @@ type Loc = "nl" | "en";
 
 const T = {
   nl: {
+    shortcuts: "Snelkoppelingen",
     customize: "Aanpassen",
     done: "Klaar",
     addTile: "Tegel toevoegen",
@@ -49,6 +50,7 @@ const T = {
     dragHint: "Sleep om te herschikken",
   },
   en: {
+    shortcuts: "Shortcuts",
     customize: "Customize",
     done: "Done",
     addTile: "Add tile",
@@ -169,7 +171,11 @@ export function DashboardTiles({
 
   return (
     <div className="vtk-tiles">
+      {/* De knop hoort bij de tegels, niet bij de pagina: hij staat daarom op
+          dezelfde regel als de sectiekop en niet los boven het raster te
+          zweven. */}
       <div className="vtk-tiles-bar">
+        <h2 className="vtk-tiles-title">{t.shortcuts}</h2>
         <div className="vtk-tiles-actions">
           {editing && (
             <>
@@ -186,14 +192,18 @@ export function DashboardTiles({
               )}
             </>
           )}
+          <button
+            type="button"
+            className={
+              "vtk-tile-btn" +
+              (editing ? " vtk-tile-btn-primary" : "") +
+              (pending ? " is-pending" : "")
+            }
+            onClick={() => setEditing((v) => !v)}
+          >
+            {editing ? t.done : t.customize}
+          </button>
         </div>
-        <button
-          type="button"
-          className={"vtk-tile-btn vtk-tile-btn-primary" + (pending ? " is-pending" : "")}
-          onClick={() => setEditing((v) => !v)}
-        >
-          {editing ? t.done : t.customize}
-        </button>
       </div>
 
       {editing && <p className="vtk-tiles-hint">{t.dragHint}</p>}

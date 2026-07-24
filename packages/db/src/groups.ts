@@ -58,6 +58,8 @@ export const HEADER_TABS: Array<{
   order: number;
   introNl?: string;
   introEn?: string;
+  /** Externe site waar de headerknop naartoe gaat in plaats van naar /<slug>. */
+  externalUrl?: string;
   ctaLabelNl?: string;
   ctaLabelEn?: string;
   ctaUrl?: string;
@@ -84,6 +86,9 @@ export const HEADER_TABS: Array<{
     labelNl: "Career",
     labelEn: "Career",
     order: 4,
+    // Career heeft een eigen site; de headerknop gaat er rechtstreeks naartoe
+    // in plaats van naar de categoriepagina.
+    externalUrl: "https://career.vtk.be",
     ctaLabelNl: "Meer info op career.vtk.be",
     ctaLabelEn: "More info on career.vtk.be",
     ctaUrl: "https://career.vtk.be",
