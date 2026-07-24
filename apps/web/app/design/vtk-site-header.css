@@ -61,6 +61,9 @@
   position: relative;
   min-width: 0;
   flex: 1 1 auto;
+  /* Iets meer lucht tussen het logo en de eerste tab dan aan de rechterkant:
+     het merk mag niet tegen de navigatie plakken. */
+  margin-left: clamp(4px, 0.8vw, 14px);
 }
 
 /* Geen scroller meer: een overflow-container knipt het uitklapmenu weg, en

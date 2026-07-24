@@ -640,10 +640,6 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
                 <div className="k">{nl ? "Studenten" : "Students"}</div>
                 <div className="v">3000+</div>
               </div>
-              <div className="meta">
-                <div className="k">{nl ? "Platform" : "Platform"}</div>
-                <div className="v">career</div>
-              </div>
             </div>
             <div className="career-actions">
               <a href="https://career.vtk.be" className="btn btn-primary arrow">

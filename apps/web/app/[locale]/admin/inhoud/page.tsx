@@ -2,14 +2,15 @@ import { notFound } from "next/navigation";
 import { prisma } from "@vtk/db";
 import { hasLocale } from "@/lib/locale";
 import { requirePermission } from "@/lib/session";
+import { hasPermission } from "@vtk/auth";
 import type { Locale } from "@vtk/i18n";
 import { ContentManager, type TabNode, type PageNode, type RoleOption } from "./ContentManager";
 
 /**
  * Beheer van de navigatiestructuur: welke categorieën in de header staan, welke
  * pagina's daaronder hangen, en de metadata van die pagina's (titels, slug,
- * publicatie, bewerkrollen). De INHOUD, de bijlagen en het verwijderen van een
- * pagina horen in /admin/paginas; elke pagina heeft daarvoor een snelkoppeling.
+ * publicatie, bewerkrollen, verwijderen). De INHOUD en de bijlagen horen in
+ * /admin/paginas; elke pagina heeft daarvoor een snelkoppeling.
  */
 export default async function AdminContent({
   params,
@@ -20,7 +21,8 @@ export default async function AdminContent({
   if (!hasLocale(localeParam)) notFound();
   const locale: Locale = localeParam;
 
-  await requirePermission("pages.manage");
+  const session = await requirePermission("pages.manage");
+  const canDeletePages = hasPermission(session, "pages.delete");
 
   const [tabs, pages, roles] = await Promise.all([
     prisma.headerTab.findMany({
@@ -99,6 +101,7 @@ export default async function AdminContent({
       tabs={tabNodes}
       roles={roleOptions}
       usingDefaults={tabs.length === 0}
+      canDeletePages={canDeletePages}
     />
   );
 }

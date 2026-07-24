@@ -368,6 +368,7 @@ model User {
   roles               UserRole[]
   pocRepresentative   PocRepresentative[]
   createdPages        Page[]                  @relation("PageCreatedBy")
+  createdAnnouncements Announcement[]         @relation("AnnouncementCreatedBy")
   createdEvents       CalendarEvent[]         @relation("EventCreatedBy")
   dashboardTiles      DashboardTile[]
   dashboardTilePrefs  UserDashboardTilePref[]
@@ -604,6 +605,39 @@ model HeaderTabLink {
 
   @@unique([tabId, url])
   @@index([tabId])
+}
+
+/**
+ * Aankondiging: het bericht dat als modal op de homepage verschijnt.
+ *
+ * Meerdere aankondigingen mogen naast elkaar bestaan (elk met hun eigen
+ * venster), zodat je ze vooraf kan klaarzetten; de homepage toont er hoogstens
+ * één, en oude rijen blijven staan als historiek.
+ */
+model Announcement {
+  id      String @id @default(cuid())
+  titleNl String
+  titleEn String
+  /** Markdown, bewerkt met de gedeelde MarkdownEditor. */
+  bodyNl  String
+  bodyEn  String
+
+  ctaLabelNl String?
+  ctaLabelEn String?
+  ctaUrl     String?
+
+  /** Leeg = meteen zichtbaar / blijft zichtbaar. */
+  startsAt DateTime?
+  endsAt   DateTime?
+  /** Uit = nooit tonen, ongeacht het venster. */
+  active   Boolean   @default(true)
+
+  createdById String?
+  createdBy   User?    @relation("AnnouncementCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([active, startsAt, endsAt])
 }
 
 model Page {

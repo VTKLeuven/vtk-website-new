@@ -303,6 +303,101 @@
   text-decoration: underline;
 }
 
+/* Aankondigingsvenster op de homepage (AnnouncementModal). Rustige witte kaart
+   op een navy waas: hetzelfde materiaal als de rest van de site, niet een
+   pop-up die eruit springt met eigen kleuren. */
+.vtk-announcement-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: grid;
+  place-items: center;
+  padding: clamp(16px, 5vw, 40px);
+  background: rgba(10, 15, 31, 0.55);
+  animation: vtk-announcement-fade 180ms ease-out;
+}
+
+.vtk-announcement {
+  width: min(100%, 520px);
+  max-height: min(80dvh, 720px);
+  overflow-y: auto;
+  padding: clamp(20px, 3vw, 28px);
+  border: 1px solid var(--line);
+  border-radius: 22px;
+  background: var(--surface);
+  color: var(--ink);
+  box-shadow: 0 30px 70px rgba(10, 15, 31, 0.35);
+  animation: vtk-announcement-rise 200ms ease-out;
+}
+
+.vtk-announcement-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.vtk-announcement-head h2 {
+  margin: 0;
+  font-size: clamp(20px, 2.4vw, 24px);
+  line-height: 1.15;
+  letter-spacing: -0.02em;
+  font-weight: 600;
+  text-wrap: balance;
+}
+
+.vtk-announcement-close {
+  display: inline-grid;
+  width: 32px;
+  height: 32px;
+  flex: none;
+  place-items: center;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.vtk-announcement-close:hover {
+  border-color: var(--line-2);
+  background: var(--paper-2);
+  color: var(--ink);
+}
+
+.vtk-announcement-body {
+  margin-top: 12px;
+  color: var(--body);
+  font-size: 15px;
+}
+
+.vtk-announcement-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 20px;
+}
+
+@keyframes vtk-announcement-fade {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes vtk-announcement-rise {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .vtk-announcement-backdrop,
+  .vtk-announcement {
+    animation: none;
+  }
+}
+
 /* Ankers uit de rail mogen niet onder de sticky sitekop landen. */
 .prose-vtk :is(h2, h3) {
   scroll-margin-top: 96px;

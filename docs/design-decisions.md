@@ -67,6 +67,26 @@ acties zijn daarom verwijderd.
 
 ---
 
+## Aankondigingen op de homepage
+
+Een aankondiging is een bericht dat als venster over de homepage komt, beheerd
+via **Admin → Website → Aankondigingen** (recht: `home.edit`, want het is
+homepage-inhoud).
+
+- **Meerdere aankondigingen mogen naast elkaar bestaan**, elk met hun eigen
+  venster (`startsAt`/`endsAt`, allebei optioneel) en een aan/uit-schakelaar. Zo
+  kan je er een op voorhand klaarzetten zonder dat ze al verschijnt.
+- **De homepage toont er hoogstens één**: twee berichten tegelijk over dezelfde
+  pagina leest niemand. Staan er meerdere klaar, dan wint de meest recente.
+- **Wie ze wegklikt, ziet ze niet opnieuw.** Dat onthoudt de browser per id in
+  localStorage (de laatste tien), niet de server: het gaat om een venster
+  wegklikken, niet om iets dat we per lid willen bijhouden. Een nieuwe
+  aankondiging verschijnt dus wel weer, ook bij wie de vorige wegklikte.
+- **Oude aankondigingen blijven staan** als historiek in het beheerscherm. Uit
+  zetten haalt ze van de site; verwijderen wist ze ook uit die historiek.
+
+---
+
 ## Headertabs kunnen naar een externe site linken
 
 `HeaderTab.externalUrl` maakt van een tab een gewone link naar buiten: staat er

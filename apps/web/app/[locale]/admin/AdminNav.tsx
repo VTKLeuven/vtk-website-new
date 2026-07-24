@@ -362,6 +362,14 @@ const icons: Record<string, ReactNode> = {
       <path d="m9 12 2 2 4-4" />
     </Svg>
   ),
+  // announcements: megafoon
+  announcements: (
+    <Svg>
+      <path d="M3 11v2a1 1 0 0 0 1 1h2l4 4V6L6 10H4a1 1 0 0 0-1 1Z" />
+      <path d="M14 8a4 4 0 0 1 0 8" />
+      <path d="M17 5a8 8 0 0 1 0 14" />
+    </Svg>
+  ),
   // home: huis
   home: (
     <Svg>

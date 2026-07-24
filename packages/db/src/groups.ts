@@ -128,7 +128,16 @@ export const HEADER_TABS: Array<{
     ctaUrl: "https://cudi.vtk.be",
   },
   { code: "INTERNATIONAAL", slug: "internationaal", labelNl: "Internationaal", labelEn: "International", order: 6 },
-  { code: "STUDIES", slug: "studies", labelNl: "Studies", labelEn: "Studies", order: 7 },
+  {
+    code: "STUDIES",
+    slug: "studies",
+    labelNl: "Studies",
+    labelEn: "Studies",
+    order: 7,
+    links: [
+      { labelNl: "Burgieclan", labelEn: "Burgieclan", url: "https://burgieclan.vtk.be" },
+    ],
+  },
   { code: "MEDIA", slug: "media", labelNl: "Media", labelEn: "Media", order: 8 },
   { code: "OVER_VTK", slug: "over-vtk", labelNl: "Over-VTK", labelEn: "About VTK", order: 9 },
   { code: "CONTACT", slug: "contact", labelNl: "Contact", labelEn: "Contact", order: 10 },

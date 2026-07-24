@@ -9,11 +9,11 @@ import { AdminNav, type NavItem, type NavNode } from './AdminNav';
 import '@/app/design/vtk-admin.css';
 
 // -----------------------------------------------------------------------------
-// Admin-navigatie. De volgorde hieronder is exact de volgorde in de linkerkolom.
+// Admin-navigatie. Op het scherm staat alles alfabetisch (dashboard bovenaan);
+// deze lijst bepaalt dus enkel wat er is en wat bij elkaar hoort.
 //
-//   Item toevoegen     -> voeg een `item(...)`-regel toe waar je het wil zien.
+//   Item toevoegen     -> voeg een `item(...)`-regel toe.
 //   Groep toevoegen    -> voeg een `group("<key>", [ item(...), ... ])`-blok toe.
-//   Volgorde wijzigen  -> versleep de regels/blokken (bovenaan = bovenaan).
 //
 // `key` heeft een label nodig in de i18n-dictionaries (`admin.<key>`, in
 // packages/i18n) en mag een icoon hebben in AdminNav.tsx. Zichtbaarheid regel je
@@ -55,6 +55,7 @@ const NAV: NavEntry[] = [
   ]),
   group('website', [
     item('home', '/home', { perm: 'home.edit' }),
+    item('announcements', '/aankondigingen', { perm: 'home.edit' }),
     item('content', '/inhoud', { perm: 'pages.manage' }),
     item('pages', '/paginas', { anyPerm: ['pages.edit', 'pages.editAll'] }),
     item('partners', '/partners', { perm: 'partners.manage' }),
@@ -135,14 +136,21 @@ export default async function AdminLayout({
     exact: leaf.exact,
   });
 
-  // Bouw de zichtbare nav. De volgorde is exact die van NAV hierboven: dat is de
-  // plek waar je ze aanpast, dus we sorteren hier bewust niet (een alfabetische
-  // sortering op het gelokaliseerde label maakte de array-volgorde betekenisloos
-  // en gaf nl en en een andere volgorde).
+  // Bouw de zichtbare nav. De volgorde in NAV hierboven bepaalt enkel nog welke
+  // items bij elkaar staan; op het scherm staat alles alfabetisch, met het
+  // dashboard vastgepind bovenaan. Zoeken in een lijst van vijftien tabs gaat zo
+  // sneller dan onthouden waar iemand ze ooit gezet heeft. Gevolg: nl en en
+  // hebben een andere volgorde, want er wordt op het vertaalde label gesorteerd.
+  const collator = new Intl.Collator(locale === 'nl' ? 'nl-BE' : 'en-GB', {
+    sensitivity: 'base',
+  });
+  const byLabel = (a: { label: string }, b: { label: string }) =>
+    collator.compare(a.label, b.label);
+
   const nodes: NavNode[] = [];
   for (const entry of NAV) {
     if ('group' in entry) {
-      const items = entry.items.filter(canSee).map(toItem);
+      const items = entry.items.filter(canSee).map(toItem).sort(byLabel);
       if (items.length > 0) {
         nodes.push({ type: 'group', key: entry.group, label: adminDict[entry.group], items });
       }
@@ -150,6 +158,15 @@ export default async function AdminLayout({
       nodes.push({ type: 'item', item: toItem(entry) });
     }
   }
+
+  const isDashboard = (node: NavNode) => node.type === 'item' && node.item.key === 'dashboard';
+  nodes.sort((a, b) => {
+    if (isDashboard(a) !== isDashboard(b)) return isDashboard(a) ? -1 : 1;
+    return collator.compare(
+      a.type === 'group' ? a.label : a.item.label,
+      b.type === 'group' ? b.label : b.item.label,
+    );
+  });
 
   return (
     <div className="vtk-admin-surface">

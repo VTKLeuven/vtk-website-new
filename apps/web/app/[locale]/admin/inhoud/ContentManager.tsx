@@ -77,11 +77,14 @@ export function ContentManager({
   tabs,
   roles,
   usingDefaults,
+  canDeletePages,
 }: {
   locale: Locale;
   tabs: TabNode[];
   roles: RoleOption[];
   usingDefaults: boolean;
+  /** `pages.delete`; bepaalt of de inspector een verwijderknop toont. */
+  canDeletePages: boolean;
 }) {
   const nl = locale === "nl";
   const router = useRouter();
@@ -334,6 +337,7 @@ export function ContentManager({
               page={selectedPage}
               tabs={tabs}
               roles={roles}
+              canDelete={canDeletePages}
               onClose={close}
             />
           )}
