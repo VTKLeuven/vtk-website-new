@@ -60,6 +60,12 @@ export const HEADER_TABS: Array<{
   introEn?: string;
   /** Externe site waar de headerknop naartoe gaat in plaats van naar /<slug>. */
   externalUrl?: string;
+  /**
+   * Extra items in het uitklapmenu van deze tab. Voor werkingen met een eigen
+   * site: daar hangen geen pagina's onder deze tab, maar leden moeten er wel
+   * naartoe kunnen.
+   */
+  links?: Array<{ labelNl: string; labelEn: string; url: string }>;
   ctaLabelNl?: string;
   ctaLabelEn?: string;
   ctaUrl?: string;
@@ -89,6 +95,18 @@ export const HEADER_TABS: Array<{
     // Career heeft een eigen site; de headerknop gaat er rechtstreeks naartoe
     // in plaats van naar de categoriepagina.
     externalUrl: "https://career.vtk.be",
+    links: [
+      {
+        labelNl: "Jobfair",
+        labelEn: "Job fair",
+        url: "https://www.career.vtk.be/event/vtk-jobfair",
+      },
+      {
+        labelNl: "Contact voor bedrijven",
+        labelEn: "Contact for companies",
+        url: "https://www.career.vtk.be/contact",
+      },
+    ],
     ctaLabelNl: "Meer info op career.vtk.be",
     ctaLabelEn: "More info on career.vtk.be",
     ctaUrl: "https://career.vtk.be",
@@ -99,6 +117,12 @@ export const HEADER_TABS: Array<{
     labelNl: "Cursusdienst",
     labelEn: "Course Shop",
     order: 5,
+    links: [
+      { labelNl: "Bestel boeken", labelEn: "Order books", url: "https://cudi.vtk.be/vtk/shop" },
+      { labelNl: "Tweedehands", labelEn: "Second-hand", url: "https://cudi.vtk.be/vtk/secondhand" },
+      { labelNl: "Printer", labelEn: "Printer", url: "https://cudi.vtk.be/vtk/printer" },
+      { labelNl: "Subsidies", labelEn: "Subsidies", url: "https://cudi.vtk.be/vtk/subsidies" },
+    ],
     ctaLabelNl: "Bestel cursussen op cudi.vtk.be",
     ctaLabelEn: "Order courses on cudi.vtk.be",
     ctaUrl: "https://cudi.vtk.be",

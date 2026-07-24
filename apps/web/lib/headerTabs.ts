@@ -1,5 +1,15 @@
 import { HEADER_TABS, prisma } from "@vtk/db";
 
+/** Eén item in het uitklapmenu van een tab. */
+export type NavHeaderTabChild = {
+  id: string;
+  labelNl: string;
+  labelEn: string;
+  /** Intern pad zonder taalprefix (`/info/theokot`) of een volledige externe URL. */
+  href: string;
+  external: boolean;
+};
+
 export type NavHeaderTab = {
   id: string;
   slug: string;
@@ -12,6 +22,11 @@ export type NavHeaderTab = {
    * headerknop daar rechtstreeks naartoe in plaats van naar /<slug>.
    */
   externalUrl: string | null;
+  /**
+   * Wat er onder de tab uitklapt: de pagina's die onder deze categorie hangen,
+   * gevolgd door de extra (externe) menu-items. Leeg = gewone link zonder menu.
+   */
+  children: NavHeaderTabChild[];
 };
 
 /**
@@ -22,8 +37,45 @@ export async function getVisibleHeaderTabsForNav(): Promise<NavHeaderTab[]> {
   const tabs = await prisma.headerTab.findMany({
     where: { visible: true },
     orderBy: { order: "asc" },
+    include: {
+      // Dezelfde selectie als de categoriepagina toont, zodat het menu en die
+      // pagina niet uit elkaar lopen.
+      pages: {
+        where: { visibleInHeader: true, publishedAt: { not: null } },
+        orderBy: [{ order: "asc" }, { titleNl: "asc" }],
+        select: { id: true, slug: true, titleNl: true, titleEn: true },
+      },
+      links: { orderBy: { order: "asc" } },
+    },
   });
-  if (tabs.length > 0) return tabs;
+
+  if (tabs.length > 0) {
+    return tabs.map((tab) => ({
+      id: tab.id,
+      slug: tab.slug,
+      labelNl: tab.labelNl,
+      labelEn: tab.labelEn,
+      imageKey: tab.imageKey,
+      externalUrl: tab.externalUrl,
+      children: [
+        ...tab.pages.map((page) => ({
+          id: page.id,
+          labelNl: page.titleNl,
+          labelEn: page.titleEn ?? page.titleNl,
+          href: `/${tab.slug}/${page.slug}`,
+          external: false,
+        })),
+        ...tab.links.map((link) => ({
+          id: link.id,
+          labelNl: link.labelNl,
+          labelEn: link.labelEn,
+          href: link.url,
+          external: true,
+        })),
+      ],
+    }));
+  }
+
   return HEADER_TABS.map((t) => ({
     id: t.code,
     slug: t.slug,
@@ -31,5 +83,12 @@ export async function getVisibleHeaderTabsForNav(): Promise<NavHeaderTab[]> {
     labelEn: t.labelEn,
     imageKey: null,
     externalUrl: t.externalUrl ?? null,
+    children: (t.links ?? []).map((link) => ({
+      id: `${t.code}-${link.url}`,
+      labelNl: link.labelNl,
+      labelEn: link.labelEn,
+      href: link.url,
+      external: true,
+    })),
   }));
 }

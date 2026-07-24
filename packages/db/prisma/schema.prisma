@@ -583,6 +583,27 @@ model HeaderTab {
   ctaUrl     String?
 
   pages Page[]
+  links HeaderTabLink[]
+}
+
+/**
+ * Extra items in het uitklapmenu van een headertab, naast de pagina's die onder
+ * die tab hangen. Bedoeld voor werkingen met een eigen site: Career en
+ * Cursusdienst hebben geen pagina's hier, maar wel bestemmingen waar leden
+ * naartoe moeten (jobfair, boeken bestellen, ...).
+ */
+model HeaderTabLink {
+  id      String @id @default(cuid())
+  tabId   String
+  labelNl String
+  labelEn String
+  url     String
+  order   Int    @default(0)
+
+  tab HeaderTab @relation(fields: [tabId], references: [id], onDelete: Cascade)
+
+  @@unique([tabId, url])
+  @@index([tabId])
 }
 
 model Page {

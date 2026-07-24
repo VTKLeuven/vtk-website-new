@@ -493,19 +493,44 @@ export async function saveHeaderTabAction(
     ctaUrl: p.ctaUrl || null,
   };
 
+  // Extra menu-items komen als geïndexeerde velden binnen; de lijst in het
+  // formulier is de volledige waarheid, dus ze wordt in haar geheel vervangen.
+  const linkCount = Math.min(Number(formData.get('linkCount')) || 0, 20);
+  const links: Array<{ labelNl: string; labelEn: string; url: string; order: number }> = [];
+  for (let i = 0; i < linkCount; i += 1) {
+    const labelNl = String(formData.get(`link-${i}-labelNl`) ?? '').trim();
+    const labelEn = String(formData.get(`link-${i}-labelEn`) ?? '').trim();
+    const url = String(formData.get(`link-${i}-url`) ?? '').trim();
+    if (!labelNl || !url) continue;
+    if (!/^https?:\/\//i.test(url)) return saveError('INVALID_INPUT' satisfies ContentErrorCode);
+    // Twee items naar dezelfde URL kunnen niet (unieke index) en zeggen ook niets.
+    if (links.some((link) => link.url === url)) continue;
+    links.push({ labelNl, labelEn: labelEn || labelNl, url, order: links.length });
+  }
+
   try {
     if (p.id) {
       // `code` bewust niet bijwerkbaar: het is de sleutel waarop de seed upsert
       // en waarop code als `code: "AANBOD"` filtert.
-      await prisma.headerTab.update({ where: { id: p.id }, data });
+      const tabId = p.id;
+      await prisma.$transaction([
+        prisma.headerTab.update({ where: { id: tabId }, data }),
+        prisma.headerTabLink.deleteMany({ where: { tabId } }),
+        ...links.map((link) => prisma.headerTabLink.create({ data: { ...link, tabId } })),
+      ]);
     } else {
       const last = await prisma.headerTab.findFirst({
         orderBy: { order: 'desc' },
         select: { order: true },
       });
-      await prisma.headerTab.create({
+      const created = await prisma.headerTab.create({
         data: { ...data, code: p.code, order: (last?.order ?? -1) + 1 },
       });
+      if (links.length > 0) {
+        await prisma.headerTabLink.createMany({
+          data: links.map((link) => ({ ...link, tabId: created.id })),
+        });
+      }
     }
   } catch (err) {
     if (isUniqueViolation(err, 'slug')) return saveError('SLUG_TAKEN' satisfies ContentErrorCode);

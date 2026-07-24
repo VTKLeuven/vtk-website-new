@@ -91,12 +91,28 @@ async function main() {
   // terugdraaien. Daarom enkel ontbrekende tabs aanmaken en bestaande rijen NIET
   // overschrijven. Een verse of gereset DB krijgt nog steeds alle defaults via
   // `create`; nieuwe standaardtabs (nieuw `code`) worden nog wel toegevoegd.
-  for (const tab of HEADER_TABS) {
-    await prisma.headerTab.upsert({
+  for (const { links, ...tab } of HEADER_TABS) {
+    const row = await prisma.headerTab.upsert({
       where: { code: tab.code },
       update: {},
       create: tab,
     });
+    // Menu-items van werkingen met een eigen site (Career, Cursusdienst).
+    // Create-only op (tab, url), zodat een hernoemd label blijft staan en een
+    // door de admin verwijderd item niet terugkomt zolang de URL dezelfde is.
+    for (const [index, link] of (links ?? []).entries()) {
+      await prisma.headerTabLink.upsert({
+        where: { tabId_url: { tabId: row.id, url: link.url } },
+        update: {},
+        create: {
+          tabId: row.id,
+          labelNl: link.labelNl,
+          labelEn: link.labelEn,
+          url: link.url,
+          order: index,
+        },
+      });
+    }
   }
 
   console.log("Seeding permissions...");

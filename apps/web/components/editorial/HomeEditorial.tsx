@@ -645,9 +645,14 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
                 <div className="v">career</div>
               </div>
             </div>
-            <a href="https://career.vtk.be" className="btn btn-primary arrow" style={{ marginTop: 24 }}>
-              {nl ? "Naar VTK Career" : "Open VTK Career"}
-            </a>
+            <div className="career-actions">
+              <a href="https://career.vtk.be" className="btn btn-primary arrow">
+                {nl ? "Naar VTK Career" : "Open VTK Career"}
+              </a>
+              <a href="https://www.career.vtk.be/contact" className="btn btn-ghost arrow">
+                {nl ? "Contact voor bedrijven" : "Contact for companies"}
+              </a>
+            </div>
           </div>
           <figure className="career-photo">
             <Image

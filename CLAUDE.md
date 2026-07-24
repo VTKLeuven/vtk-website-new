@@ -199,6 +199,13 @@ the design language into the application instead of copying mockup content.
   bookend (the old translucent paper bar was reviewed and replaced). The text is
   light in every state; on the homepage only the background goes transparent
   over the dark hero and fades back to solid navy on scroll.
+  - A tab with pages under it (or extra `HeaderTabLink` items) shows a chevron
+    and drops a white panel on hover and `:focus-within`; that is CSS only, so
+    keep `.nav-links` free of `overflow` or the panel gets clipped.
+  - Below 1181px the tabs are replaced by one menu button that opens a navy
+    panel under the header, with the pages per category behind a chevron. Do not
+    reintroduce the horizontal scroller: eleven tabs in a scroll strip read as a
+    mistake and hide most of the navigation.
 - Buttons: primary is dark ink/navy with paper text; secondary/ghost is bordered
   on paper; yellow is reserved for accents and active states. Over the dark hero,
   the primary button inverts to a `--surface` fill with ink text.

@@ -23,7 +23,10 @@ export default async function AdminContent({
   await requirePermission("pages.manage");
 
   const [tabs, pages, roles] = await Promise.all([
-    prisma.headerTab.findMany({ orderBy: { order: "asc" } }),
+    prisma.headerTab.findMany({
+      orderBy: { order: "asc" },
+      include: { links: { orderBy: { order: "asc" } } },
+    }),
     // Enkel de pagina's die in de boom staan (losse pagina's hangen per definitie
     // nergens onder), en enkel de velden die de inspector toont. De markdown en
     // de bijlagen blijven bewust ongelezen: die zijn groot en worden hier niet
@@ -77,6 +80,11 @@ export default async function AdminContent({
     labelEn: t.labelEn,
     visible: t.visible,
     externalUrl: t.externalUrl,
+    links: t.links.map((link) => ({
+      labelNl: link.labelNl,
+      labelEn: link.labelEn,
+      url: link.url,
+    })),
     introNl: t.introNl,
     introEn: t.introEn,
     ctaLabelNl: t.ctaLabelNl,

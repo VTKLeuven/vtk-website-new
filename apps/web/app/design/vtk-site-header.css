@@ -63,20 +63,23 @@
   flex: 1 1 auto;
 }
 
+/* Geen scroller meer: een overflow-container knipt het uitklapmenu weg, en
+   smalle schermen hebben nu hun eigen menuknop. */
 .vtk-site-header .nav-links {
   display: flex;
   width: 100%;
   align-items: center;
-  gap: clamp(16px, 2vw, 30px);
+  gap: clamp(11px, 1.5vw, 22px);
   min-width: 0;
-  overflow-x: auto;
-  scrollbar-width: none;
-  -webkit-overflow-scrolling: touch;
   flex: none;
 }
 
-.vtk-site-header .nav-links::-webkit-scrollbar {
-  display: none;
+.vtk-site-header .nav-item {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  flex: none;
 }
 
 .vtk-site-header .nav-links a {
@@ -91,6 +94,100 @@
 .vtk-site-header .nav-links a:hover,
 .vtk-site-header .nav-links a.active {
   color: #fff;
+}
+
+/* Chevron in de tab zelf: enkel een teken dat er iets uitklapt. Openen doet de
+   CSS hieronder bij hover en focus-within, zodat er geen extra knop nodig is
+   die de nav breder maakt. */
+.vtk-site-header .nav-links a {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.vtk-site-header .nav-caret {
+  flex: none;
+  opacity: 0.6;
+  transition: transform 160ms ease, opacity 160ms ease;
+}
+
+.vtk-site-header .nav-item:hover .nav-caret,
+.vtk-site-header .nav-item:focus-within .nav-caret {
+  opacity: 1;
+  transform: rotate(180deg);
+}
+
+.vtk-site-header .nav-menu {
+  display: none;
+  position: absolute;
+  top: calc(100% + 14px);
+  left: -14px;
+  z-index: 60;
+  min-width: 216px;
+  padding: 6px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--surface);
+  box-shadow: 0 18px 42px rgba(10, 15, 31, 0.18);
+}
+
+.vtk-site-header .nav-item.has-menu:hover .nav-menu,
+.vtk-site-header .nav-item.has-menu:focus-within .nav-menu {
+  display: block;
+}
+
+/* Onzichtbare brug tussen tab en paneel, zodat het menu niet dichtklapt terwijl
+   je muis de tussenruimte oversteekt. */
+.vtk-site-header .nav-menu::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: -14px;
+  height: 14px;
+}
+
+.vtk-site-header .nav-menu ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+}
+
+.vtk-site-header .nav-menu a {
+  display: block;
+  padding: 9px 10px;
+  border-radius: 10px;
+  color: var(--ink);
+  font-size: 14px;
+  font-weight: 500;
+  white-space: normal;
+}
+
+.vtk-site-header .nav-menu a:hover {
+  background: var(--paper-2);
+  color: var(--ink);
+}
+
+@media (min-width: 1181px) and (max-width: 1400px) {
+  .vtk-site-header .nav-links {
+    gap: 10px;
+  }
+
+  .vtk-site-header .nav-links a {
+    font-size: 13px;
+  }
+
+  .vtk-site-header .nav-inner {
+    gap: 18px;
+  }
+}
+
+/* Menuknop en uitklappaneel bestaan alleen op smalle schermen. */
+.vtk-site-header .nav-menu-trigger,
+.vtk-site-header .nav-mobile-menu {
+  display: none;
 }
 
 .vtk-site-header .nav-scroll-next {
@@ -197,52 +294,139 @@
   }
 }
 
-@media (max-width: 720px) {
+/* Smal en middelbreed scherm: één menuknop in plaats van elf tabs. De knop
+   staat rechts naast taal en account; het paneel klapt onder de header uit en
+   toont per categorie de pagina's die eronder hangen. De grens ligt op 1180px,
+   want daaronder passen de tabs met hun uitklapmenu's niet meer naast elkaar. */
+@media (max-width: 1180px) {
+  :root {
+    --vtk-header-height: 65px;
+  }
+
   .vtk-site-header .nav-inner {
     min-height: 64px;
-    gap: 14px;
+    gap: 12px;
   }
 
   .vtk-site-header .nav-links-shell {
+    position: static;
     order: 3;
-    flex-basis: 100%;
-    width: 100%;
+    flex: 0 0 auto;
   }
 
   .vtk-site-header .nav-links {
-    padding: 0 38px 9px 0;
-    scrollbar-width: thin;
-    scrollbar-color: rgba(250, 250, 247, 0.4) transparent;
+    display: none;
   }
 
-  .vtk-site-header .nav-links::-webkit-scrollbar {
-    display: block;
-    height: 3px;
+  .vtk-site-header .nav-caret {
+    display: none;
   }
 
-  .vtk-site-header .nav-links::-webkit-scrollbar-thumb {
-    border-radius: 2px;
-    background: rgba(250, 250, 247, 0.4);
-  }
-
-  .vtk-site-header .nav-scroll-next {
-    position: absolute;
-    top: -3px;
-    right: -1px;
+  .vtk-site-header .nav-menu-trigger {
     display: inline-grid;
-    width: 30px;
-    height: 30px;
+    width: 38px;
+    height: 38px;
     place-items: center;
+    padding: 0;
     border: 1px solid rgba(250, 250, 247, 0.34);
-    border-radius: 50%;
-    background: var(--navy);
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.12);
     color: var(--paper);
-    box-shadow: -8px 0 0 var(--navy);
     cursor: pointer;
+    transition: background 160ms ease, border-color 160ms ease;
   }
 
-  .vtk-site-header .nav-inner {
-    flex-wrap: wrap;
-    padding-top: 12px;
+  .vtk-site-header .nav-menu-trigger:hover,
+  .vtk-site-header .nav-menu-trigger[aria-expanded="true"] {
+    border-color: var(--paper);
+    background: rgba(255, 255, 255, 0.22);
+  }
+
+  .vtk-site-header .nav-mobile-menu {
+    position: fixed;
+    top: var(--vtk-header-height);
+    left: 0;
+    right: 0;
+    z-index: 60;
+    display: block;
+    max-height: calc(100dvh - var(--vtk-header-height));
+    overflow-y: auto;
+    padding: 8px clamp(16px, 5vw, 28px) 20px;
+    background: var(--navy);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+    box-shadow: 0 24px 48px rgba(10, 15, 31, 0.35);
+  }
+
+  .vtk-site-header .nav-mobile-menu[hidden] {
+    display: none;
+  }
+
+  .vtk-site-header .nav-mobile-menu ul {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .vtk-site-header .nav-mobile-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  }
+
+  .vtk-site-header .nav-mobile-row a {
+    flex: 1 1 auto;
+    padding: 13px 2px;
+    color: rgba(250, 250, 247, 0.86);
+    font-size: 16px;
+    font-weight: 500;
+    text-decoration: none;
+  }
+
+  .vtk-site-header .nav-mobile-row a.active {
+    color: #fff;
+    box-shadow: inset 3px 0 0 var(--yellow);
+    padding-left: 12px;
+  }
+
+  .vtk-site-header .nav-mobile-expand {
+    display: inline-grid;
+    width: 38px;
+    height: 38px;
+    place-items: center;
+    padding: 0;
+    border: 0;
+    border-radius: 50%;
+    background: none;
+    color: rgba(250, 250, 247, 0.66);
+    cursor: pointer;
+    transition: transform 160ms ease, color 160ms ease;
+  }
+
+  .vtk-site-header .nav-mobile-expand.is-open {
+    color: #fff;
+    transform: rotate(180deg);
+  }
+
+  .vtk-site-header .nav-mobile-sub {
+    padding: 4px 0 10px 12px !important;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  }
+
+  .vtk-site-header .nav-mobile-sub[hidden] {
+    display: none;
+  }
+
+  .vtk-site-header .nav-mobile-sub a {
+    display: block;
+    padding: 9px 0;
+    color: var(--on-dark-muted);
+    font-size: 14.5px;
+    text-decoration: none;
+  }
+
+  .vtk-site-header .nav-mobile-sub a:hover {
+    color: #fff;
   }
 }

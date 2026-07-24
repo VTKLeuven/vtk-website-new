@@ -79,6 +79,20 @@ Dit is bewust een veld en geen uitzondering in de code: Cursusdienst (cudi) en
 toekomstige werkingen met een eigen site kunnen hetzelfde doen zonder release.
 Je stelt het in bij Admin → Website → Inhoud, op de tab zelf.
 
+Elke tab klapt in de header ook uit. Wat erin staat:
+
+- **De pagina's onder die categorie**, dezelfde selectie als de categoriepagina
+  toont (zichtbaar in de header en gepubliceerd). Daar hoef je niets voor te
+  doen; een nieuwe pagina staat meteen in het menu.
+- **Extra items uit `HeaderTabLink`**, voor bestemmingen op een andere site.
+  Career heeft zo *Jobfair* en *Contact voor bedrijven* op career.vtk.be;
+  Cursusdienst heeft *Bestel boeken*, *Tweedehands*, *Printer* en *Subsidies* op
+  cudi.vtk.be. Ook die beheer je op de tab in Admin → Website → Inhoud.
+
+De seed zet die items create-only per (tab, URL): een hernoemd label blijft dus
+staan, en een item dat de admin verwijderde komt bij een reseed niet terug zolang
+de URL dezelfde blijft.
+
 ---
 
 ## Theokot — broodjes-reservatiesysteem

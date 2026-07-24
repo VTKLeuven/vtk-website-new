@@ -50,6 +50,8 @@ export type TabNode = {
   visible: boolean;
   /** Externe bestemming voor de headerknop (bv. career.vtk.be). */
   externalUrl: string | null;
+  /** Extra menu-items naast de pagina's onder deze categorie. */
+  links: Array<{ labelNl: string; labelEn: string; url: string }>;
   introNl: string | null;
   introEn: string | null;
   ctaLabelNl: string | null;
