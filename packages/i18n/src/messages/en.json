@@ -184,7 +184,8 @@
   "pages": {
     "empty": "No pages yet",
     "overview": "Overview",
-    "downloads": "Downloads"
+    "downloads": "Downloads",
+    "onThisPage": "On this page"
   },
   "auth": {
     "signInLead": "Member sign-in",

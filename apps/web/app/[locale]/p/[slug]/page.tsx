@@ -21,5 +21,12 @@ export default async function UnlistedPage({
 
   if (!page || !page.publishedAt) notFound();
 
-  return <PageView page={page} locale={locale} downloadsLabel={dict.pages.downloads} />;
+  return (
+    <PageView
+      page={page}
+      locale={locale}
+      downloadsLabel={dict.pages.downloads}
+      onThisPageLabel={dict.pages.onThisPage}
+    />
+  );
 }

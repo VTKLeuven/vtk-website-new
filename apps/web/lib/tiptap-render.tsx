@@ -1,4 +1,5 @@
 import type { JSX, ReactNode } from "react";
+import { headingId, headingText } from "@/lib/pageOutline";
 
 type Node = {
   type: string;
@@ -47,7 +48,13 @@ function renderNode(node: Node, key: string): ReactNode {
     case "heading": {
       const level = (node.attrs?.level as number | undefined) ?? 2;
       const Tag = (`h${Math.min(Math.max(level, 1), 6)}` as keyof JSX.IntrinsicElements);
-      return <Tag key={key}>{children}</Tag>;
+      // Anker voor de "Op deze pagina"-rail; dezelfde id als pageOutline berekent.
+      const id = level === 2 || level === 3 ? headingId(headingText(node.content)) : undefined;
+      return (
+        <Tag key={key} id={id || undefined}>
+          {children}
+        </Tag>
+      );
     }
     case "bulletList":
       return <ul key={key}>{children}</ul>;

@@ -184,7 +184,8 @@
   "pages": {
     "empty": "Nog geen pagina's",
     "overview": "Overzicht",
-    "downloads": "Downloads"
+    "downloads": "Downloads",
+    "onThisPage": "Op deze pagina"
   },
   "auth": {
     "signInLead": "Ledenportaal",

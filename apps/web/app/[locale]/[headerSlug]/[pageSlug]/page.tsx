@@ -27,5 +27,12 @@ export default async function HeaderPage({
 
   if (!page || page.headerTabId !== tab.id || !page.publishedAt) notFound();
 
-  return <PageView page={page} locale={locale} downloadsLabel={dict.pages.downloads} />;
+  return (
+    <PageView
+      page={page}
+      locale={locale}
+      downloadsLabel={dict.pages.downloads}
+      onThisPageLabel={dict.pages.onThisPage}
+    />
+  );
 }

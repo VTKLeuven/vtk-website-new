@@ -208,6 +208,19 @@ the design language into the application instead of copying mockup content.
 - Footer: a dark `--navy` band on every page (light text, the same `vtk-logo.png`
   brand mark as the header rather than a separate yellow badge), the same navy as
   the header; it bookends the dark hero, so do not lighten it per page.
+- Page head: every non-home page opens with the same dark band
+  (`.vtk-page-head` in `apps/web/app/design/vtk-base.css`): full-bleed `--navy`,
+  its own crop of the technical pattern, a yellow bottom rule, light title and
+  `--on-dark-muted` subtitle. `/tickets`, the category pages and the content
+  pages all use it, so do not build a second kind of page opener. The classes
+  `.vtk-page-title`/`.vtk-page-subtitle`/`.vtk-page-kicker` keep dark text
+  outside that band (they are also used on light backgrounds); only inside
+  `.vtk-page-head` do they invert.
+- Content pages (`PageView`): dark head with a breadcrumb to the category, then
+  the text column with an optional rail beside it holding the page outline (H2
+  and H3, anchors from `lib/pageOutline.ts`) and the downloads. The rail only
+  appears when there are at least two headings or a download, sticks on desktop,
+  and moves above the text on narrow screens.
 - Lists and calendars: favor agenda/list layouts, tabular times, compact day
   labels, and small yellow status pins.
 - Admin: keep pages operationally dense. Forms, tables, and upload/editor
