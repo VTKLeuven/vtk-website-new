@@ -179,6 +179,20 @@ export const auth = betterAuth({
   },
 
   databaseHooks: {
+    user: {
+      update: {
+        // Deze velden zijn enkel `input: true` zodat de KU Leuven-provider ze
+        // bij een nieuw OAuth-account kan initialiseren. Gewone better-auth
+        // update-user-calls mogen de autoritatieve waarden nooit overschrijven;
+        // latere SSO-syncs schrijven rechtstreeks en conditioneel via Prisma.
+        before: async (user) => {
+          if ("firwStudent" in user || "firwStudentChangedAt" in user) {
+            throw new APIError("BAD_REQUEST", { message: "FIRW_STATUS_READ_ONLY" });
+          }
+          return { data: user };
+        },
+      },
+    },
     session: {
       // Mirror the `active` gate the password flow enforces in loginAction, so
       // deactivated members cannot obtain a session via SSO either.
@@ -233,6 +247,19 @@ export const auth = betterAuth({
         type: "boolean",
         required: false,
         defaultValue: false,
+      },
+      // Autoritatieve faculteitsstatus uit KU Leuven eduPersonOrgUnitDN. Beide
+      // velden moeten input aanvaarden zodat ze op de eerste OAuth-login mee in
+      // de nieuwe User-rij landen. De user.update-hook hierboven voorkomt dat
+      // een gewone client ze nadien zelf kan wijzigen.
+      firwStudent: {
+        type: "boolean",
+        required: false,
+        defaultValue: false,
+      },
+      firwStudentChangedAt: {
+        type: "date",
+        required: false,
       },
       avatarKey: {
         type: 'string',

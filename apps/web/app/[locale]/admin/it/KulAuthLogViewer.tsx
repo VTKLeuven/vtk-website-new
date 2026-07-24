@@ -2,6 +2,8 @@ import type { KulAuthLogEntry } from "@vtk/auth/server";
 
 // Superadmin-only tooling: copy stays in English (technical terms).
 
+const ENGINEERING_FACULTY_UNIT = "50000486";
+
 function formatAt(at: Date): string {
   return new Intl.DateTimeFormat("nl-BE", {
     dateStyle: "short",
@@ -25,8 +27,21 @@ function toText(value: unknown): string {
  */
 function facultyClaims(claims: Record<string, unknown>): [string, unknown][] {
   return Object.entries(claims).filter(([key]) =>
-    /employeetype|faculty|facult|department|affiliation|studie|program/i.test(key),
+    /employeetype|orgunit|faculty|facult|department|affiliation|studie|program|kuldipl|kulopl/i.test(
+      key,
+    ),
   );
+}
+
+function containsValue(value: unknown, needle: string): boolean {
+  if (typeof value === "string" || typeof value === "number") {
+    return String(value).includes(needle);
+  }
+  if (Array.isArray(value)) return value.some((item) => containsValue(item, needle));
+  if (value !== null && typeof value === "object") {
+    return Object.values(value).some((item) => containsValue(item, needle));
+  }
+  return false;
 }
 
 export function KulAuthLogViewer({ logs }: { logs: KulAuthLogEntry[] }) {
@@ -44,6 +59,9 @@ export function KulAuthLogViewer({ logs }: { logs: KulAuthLogEntry[] }) {
       {logs.map((log) => {
         const keys = Object.keys(log.claims);
         const faculty = facultyClaims(log.claims);
+        const engineeringFaculty = Object.values(log.claims).some((value) =>
+          containsValue(value, ENGINEERING_FACULTY_UNIT),
+        );
         return (
           <li key={log.id} className="rounded-lg border border-vtk-blue/10 p-3">
             <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 text-sm">
@@ -54,6 +72,11 @@ export function KulAuthLogViewer({ logs }: { logs: KulAuthLogEntry[] }) {
 
             {faculty.length > 0 ? (
               <div className="mt-2 flex flex-wrap gap-1.5">
+                {engineeringFaculty && (
+                  <span className="rounded-full border border-emerald-200 bg-emerald-100 px-2 py-0.5 text-xs text-emerald-900">
+                    Engineering faculty detected ({ENGINEERING_FACULTY_UNIT})
+                  </span>
+                )}
                 {faculty.map(([key, value]) => (
                   <span
                     key={key}

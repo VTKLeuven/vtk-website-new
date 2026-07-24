@@ -118,10 +118,10 @@ export default async function AdminIT({
               ? "Optionally log the claims KU Leuven returns on each login. "
               : "The KU Leuven OIDC provider is not configured in this environment (the KUL_OIDC_* env vars are absent), so no logins can be captured here yet. "}
             Use this to verify which attributes ICTS actually releases; for example whether
-            the faculty / employee type comes through. Note that better-auth reads the ID
-            token first: attributes KU Leuven only releases at the userinfo endpoint may not
-            appear here. Captured claims contain personal data, so this is off by default and
-            only the last {KUL_LOG_KEEP} logins are kept.
+            the faculty / employee type comes through. The login explicitly fetches KU
+            Leuven&apos;s userinfo endpoint and merges those attributes with the ID-token
+            claims. Captured claims contain personal data, so this is off by default and only
+            the last {KUL_LOG_KEEP} logins are kept.
           </p>
         </div>
         <Card className="space-y-6 p-5">

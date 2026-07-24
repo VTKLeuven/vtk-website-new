@@ -17,6 +17,8 @@ export async function exportUserData(userId: string) {
       email: true,
       rNumber: true,
       rNumberFromKul: true,
+      firwStudent: true,
+      firwStudentChangedAt: true,
       emailVerified: true,
       avatarKey: true,
       locale: true,
@@ -316,6 +318,8 @@ export async function eraseUserData(userId: string) {
         email: deletedEmail,
         rNumber: null,
         rNumberFromKul: false,
+        firwStudent: false,
+        firwStudentChangedAt: null,
         emailVerified: false,
         // Markeert de rij als tombstone in plaats van als gedeactiveerd lid, zodat
         // gebruikerslijsten hem kunnen wegfilteren zonder ook echte inactieve

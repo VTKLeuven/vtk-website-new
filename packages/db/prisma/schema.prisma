@@ -303,6 +303,11 @@ model User {
   // profielformulier, net als de e-mail; een zelf ingevuld r-nummer (flag false)
   // blijft aanpasbaar.
   rNumberFromKul Boolean @default(false)
+  // Autoritatieve faculteitsstatus uit KU Leuven OIDC. Bij elke geslaagde
+  // userinfo-call wordt 50000486 in eduPersonOrgUnitDN gecontroleerd. De datum
+  // wordt enkel bij de eerste controle of een echte booleanwijziging aangepast.
+  firwStudent          Boolean   @default(false)
+  firwStudentChangedAt DateTime?
   emailVerified  Boolean @default(false)
   avatarKey      String?
   image          String?

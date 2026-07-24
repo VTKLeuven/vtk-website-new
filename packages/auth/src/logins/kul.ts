@@ -3,8 +3,11 @@
  *
  * KU Leuven runs a Shibboleth OIDC OP at https://idp.kuleuven.be, which speaks
  * OIDC natively. We register this as a better-auth `genericOAuth` provider and
- * let better-auth handle the authorization-code + PKCE flow and the userinfo
- * call. ICTS onboards the client under the Authorization Code Flow with a
+ * let better-auth handle the authorization-code + PKCE flow. A custom
+ * `getUserInfo` always calls KU Leuven's userinfo endpoint because better-auth's
+ * default skips it when the ID token already has `sub` and `email`; KU Leuven
+ * can release client-specific attributes such as eduPersonOrgUnitDN only from
+ * userinfo. ICTS onboards the client under the Authorization Code Flow with a
  * confidential (server-side) client secret; better-auth keeps that secret on
  * the backend and authenticates the token request with `client_secret_post`.
  *
@@ -25,6 +28,8 @@
  */
 
 import { recordKulProfile } from "./kul-debug";
+import { firwStudentFromProfile, syncFirwStudent } from "./kul-firw";
+import { getKulUserInfo, wasKulUserInfoFetched } from "./kul-userinfo";
 
 export const KUL_PROVIDER_ID = "kuleuven";
 
@@ -106,7 +111,15 @@ export function kulOAuthConfig() {
     ...(process.env.KUL_OIDC_REDIRECT_URI
       ? { redirectURI: process.env.KUL_OIDC_REDIRECT_URI }
       : {}),
-    scopes: ["openid", "profile", "email"],
+    // KU Leuven's own OIDC test client requests `allattributes` in addition to
+    // the standard scopes. It is not advertised in discovery, but it is the
+    // scope that makes the client-specific ICTS attribute release available.
+    scopes: ["openid", "profile", "email", "allattributes"],
+    // The default generic-oauth implementation returns the ID-token claims
+    // immediately when `sub` and `email` are present. Always fetch userinfo so
+    // ICTS-released attributes (eduPersonOrgUnitDN, KULdipl, KULopl, ...) reach
+    // mapProfileToUser and the opt-in admin debug log.
+    getUserInfo: getKulUserInfo,
     pkce: true,
     // ICTS registered the client with token_endpoint_auth_method
     // `client_secret_post`, so send the secret in the token request body. This
@@ -126,6 +139,17 @@ export function kulOAuthConfig() {
     mapProfileToUser: async (profile: ProfileLike) => {
       const email = profileEmail(profile);
       const rNumber = profileRNumber(profile);
+      const hasUserInfo = wasKulUserInfoFetched(profile);
+      const firwStudent = hasUserInfo ? firwStudentFromProfile(profile) : undefined;
+      const firwStudentChangedAt = firwStudent === undefined ? undefined : new Date();
+
+      // Bestaande accounts worden bij elke geslaagde KU Leuven-userinfo-call
+      // atomair bijgewerkt. De WHERE-clausule schrijft alleen bij een echte
+      // statuswijziging of bij de eerste controle van een bestaand account.
+      if (email && firwStudent !== undefined && firwStudentChangedAt) {
+        await syncFirwStudent(email, firwStudent, firwStudentChangedAt);
+      }
+
       // Opt-in debuglog (Admin -> IT): bewaart de ruwe claims zodat een superadmin
       // ziet welke attributen ICTS vrijgeeft. Doet niets als de toggle uit staat en
       // gooit nooit, dus deze await kan de login niet breken.
@@ -135,6 +159,9 @@ export function kulOAuthConfig() {
         name: profileName(profile),
         emailVerified: true,
         ...(rNumber ? { rNumber, rNumberFromKul: true } : {}),
+        ...(firwStudent !== undefined && firwStudentChangedAt
+          ? { firwStudent, firwStudentChangedAt }
+          : {}),
       };
     },
   };
