@@ -219,6 +219,80 @@ halen ze af aan de balie en betalen daar. Post **Theokot** beheert het systeem.
 
 ---
 
+## Piano (lokaal 01.52 in het kasteel)
+
+VTK heeft een eigen piano in lokaal 01.52 van het kasteel, naast de promotiezaal.
+Studenten mogen er gratis op spelen en reserveren daarvoor zelf een tijdslot op
+`/piano`. Op de oude site stond dit op `/reservations/piano`; de afspraken
+(gratis, wekelijks, begeleidende brief) zijn overgenomen, de manier waarop ze
+afgedwongen worden niet helemaal. Zie hieronder.
+
+### Slots bestaan niet als rijen
+
+De uren volgen uit een handvol **terugkerende vensters** (`PianoWindow`, bv. "elke
+ma/di/do 19u-22u van eind september tot eind mei") min de **sluitingsdagen**
+(`PianoClosure`, in de praktijk de sluitingsdagen van de KU Leuven). De concrete
+tijdsloten worden per keer berekend voor de week die op het scherm staat.
+
+- Een academiejaar aan avondslots zou anders duizend rijen zijn die iemand elk
+  jaar opnieuw moet aanmaken. Nu is dat één rij met een begin- en einddatum.
+- De **slotlengte staat in de instellingen**, niet per venster: één piano, één
+  ritme. Wijzig je ze, dan verschuiven de uren op de pagina; reeds gemaakte
+  reservaties blijven op hun oorspronkelijke uur staan.
+- Enkel een **geboekt** slot krijgt een rij (`PianoReservation`), met een unieke
+  index op `startsAt`. De piano is er maar één, dus dubbel boeken hoort in de
+  database te falen en niet enkel in de check vooraf.
+- Annuleren **verwijdert** de rij. Er hangt geen geld en geen sanctie aan een
+  pianoreservatie, dus historiek zou hier enkel ruis zijn (anders dan bij Theokot,
+  waar no-shows tot een ban leiden).
+
+### De weeklimiet is hard, de oude site was zachter
+
+Op vtk.be stond: "One reservation each week will be assigned to you, if you want
+to play more times a week, other students are given priority." Dat veronderstelt
+iemand die de aanvragen manueel verdeelt. Hier is het een **harde limiet**
+(`maxPerWeek`, standaard 1, per ISO-week van maandag tot zondag): een tweede slot
+in dezelfde week wordt geweigerd met de uitleg dat je eerst moet annuleren.
+
+- Bewuste keuze: automatisch toewijzen vraagt een aanvraag-en-verdeel-flow die
+  niemand wil bedienen voor een piano. Wie er echt meer wil op, kan altijd de
+  vice aanspreken; die kan een slot vrijmaken in het beheer.
+- Enkel slots die **nog moeten komen** tellen mee. Een slot dat al gespeeld is
+  blokkeert je week niet meer, want dan zou een annulering achteraf nooit meer
+  helpen.
+- Er is ook een **horizon** (`horizonDays`, standaard 28 dagen): zonder die grens
+  zou één iemand het hele jaar kunnen volboeken.
+
+### De begeleidende brief blijft mensenwerk
+
+De brief die je bij de vice in Blok 6 haalt en aan de bewaking moet kunnen tonen,
+staat in de tekst boven de agenda (`Setting` `piano.info`, Markdown, beheerd via
+`/admin/piano`) en niet in de flow. We controleren niet of iemand ze heeft: dat
+is een afspraak tussen het lid en de vice, geen toestand die de site kent.
+
+### Uren zichtbaar zonder account, reserveren niet
+
+De agenda staat er ook voor wie niet aangemeld is, met een melding erboven; enkel
+het effectief boeken vraagt een aanmelding. Zo kan je nakijken wanneer de piano
+vrij is zonder eerst door de KUL-login te moeten. Dat volgt de oude site
+("Gelieve aan te melden om een slot te reserveren").
+
+### Een sluitingsdag schrapt de reservaties die erin vielen
+
+Wie al geboekt had binnen een periode die achteraf gesloten wordt, houdt anders
+een reservatie over voor een slot dat niet meer bestaat. Het beheerscherm zegt dat
+vooraf; er vertrekt **geen mail**, dus de vice verwittigt die leden zelf.
+
+### Permissies & navigatie
+
+- `piano.manage` — vensters, sluitingsdagen, instellingen, infotekst en het
+  schrappen van andermans reservatie. Hoort bij de vice.
+- De pagina hangt als menu-item onder de **Info**-tab (`HeaderTabLink` naar
+  `/piano`), zoals ze op de oude site onder "Aanbod" stond. Het is een eigen route
+  en geen contentpagina, dus ze komt er niet vanzelf in.
+
+---
+
 ## Deurtoegang (kaartscanner op de deur)
 
 Aan de deur hangt dezelfde KU Leuven-kaartlezer als aan de Theokot-balie, maar dan

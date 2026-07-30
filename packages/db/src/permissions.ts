@@ -62,6 +62,9 @@ export const PERMISSIONS = [
   { code: "theokot.manage", labelNl: "Theokot beheren (sessies, aanbod, bans, instellingen)", labelEn: "Manage Theokot (sessions, offering, bans, settings)", category: "theokot" },
   { code: "theokot.pickup", labelNl: "Theokot afhaalbalie bedienen", labelEn: "Operate Theokot pickup counter", category: "theokot" },
 
+  // Piano (reservaties voor het lokaal in het kasteel)
+  { code: "piano.manage", labelNl: "Piano beheren (uren, sluitingsdagen, reservaties)", labelEn: "Manage the piano (hours, closures, reservations)", category: "piano" },
+
   // Logistiek (uitleendienst op logistiek.vtk.be)
   { code: "logistiek.manage", labelNl: "Uitleendienst beheren (inventaris, aanvragen, camionette)", labelEn: "Manage equipment rental (inventory, requests, van)", category: "logistiek" },
 

@@ -69,6 +69,7 @@ const NAV: NavEntry[] = [
   item('media', '/media', { anyPerm: ['media.manage', 'photos.manageAlbums'] }),
   item('shift', '/shiften', { anyPerm: ['shift.edit', 'shift.reward', 'shift.ranking'] }),
   item('theokot', '/theokot', { anyPerm: ['theokot.manage', 'theokot.pickup'] }),
+  item('piano', '/piano', { perm: 'piano.manage' }),
   item('mailinglists', '/mailinglijsten', { perm: 'mailinglists.export' }),
   item('shortlinks', '/links', { perm: 'shortlinks.manage' }),
   item('dashboardTiles', '/dashboard-tiles', { perm: 'dashboard.manage' }),

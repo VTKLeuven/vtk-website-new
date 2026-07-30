@@ -312,6 +312,7 @@
     "shortlinks": "Short links",
     "shift": "Shifts",
     "theokot": "Theokot",
+    "piano": "Piano",
     "door": "Door",
     "mailinglists": "Mailing lists",
     "it": "IT",
@@ -493,6 +494,67 @@
       "count": "Count",
       "noPost": "No group",
       "empty": "You have not done any shifts yet."
+    }
+  },
+  "piano": {
+    "title": "Reserve the piano",
+    "subtitle": "Room 01.52 in the castle, next to the proclamation hall",
+    "practical": "Practical",
+    "facts": {
+      "location": "Where",
+      "locationValue": "Room 01.52, Arenberg castle",
+      "price": "Price",
+      "priceValue": "Free for students",
+      "letter": "Accompanying letter",
+      "letterValue": "Pick it up from the vice in Blok 6 (Studentenwijk Arenberg). Carry it with you while you play.",
+      "limit": "Limit",
+      "limitOne": "One time slot per week",
+      "limitMany": "{count} time slots per week",
+      "horizon": "You can book up to {days} days ahead."
+    },
+    "agenda": {
+      "title": "Pick a time slot",
+      "intro": "Click a free hour to reserve it.",
+      "week": "Week of {from} to {to}",
+      "prev": "← Previous week",
+      "next": "Next week →",
+      "thisWeek": "This week",
+      "empty": "The piano is not available this week.",
+      "emptyHint": "Browse to a later week, or check above when the piano is free."
+    },
+    "slot": {
+      "taken": "Taken",
+      "mine": "Your slot",
+      "past": "Past",
+      "book": "Reserve {time}",
+      "booking": "Working..."
+    },
+    "mine": {
+      "title": "Your reservations",
+      "empty": "You have not reserved a time slot yet.",
+      "cancel": "Cancel",
+      "confirmTitle": "Cancel this reservation?",
+      "confirmBody": "Your time slot becomes available to other students again. You can pick another moment afterwards.",
+      "confirmYes": "Yes, cancel",
+      "confirmNo": "Keep it",
+      "cancelled": "Your reservation has been cancelled."
+    },
+    "login": {
+      "title": "Sign in to reserve",
+      "body": "Please sign in to reserve a time slot. The hours below are visible without an account too."
+    },
+    "toast": {
+      "reserved": "Your time slot is reserved."
+    },
+    "error": {
+      "notLoggedIn": "Sign in first to reserve.",
+      "notFound": "This time slot no longer exists.",
+      "past": "This time slot has already started.",
+      "beyondHorizon": "This time slot is too far in the future.",
+      "taken": "Someone beat you to it: this time slot is taken.",
+      "weekLimit": "You already have a time slot this week. Cancel it first, or pick a later week.",
+      "fallback": "Reserving failed. Please try again later.",
+      "cancelFailed": "Cancelling failed. Please try again later."
     }
   }
 }

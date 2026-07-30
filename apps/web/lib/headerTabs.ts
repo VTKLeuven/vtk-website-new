@@ -1,5 +1,12 @@
 import { HEADER_TABS, prisma } from "@vtk/db";
 
+/**
+ * Een menu-item met een volledige URL gaat naar een andere site (en dus in een
+ * nieuw tabblad); een intern pad blijft een gewone `<Link>`. Zonder dit onderscheid
+ * opende een item als `/piano` een tweede tabblad naar onze eigen site.
+ */
+const isExternalUrl = (url: string) => /^[a-z][a-z0-9+.-]*:/i.test(url) || url.startsWith("//");
+
 /** Eén item in het uitklapmenu van een tab. */
 export type NavHeaderTabChild = {
   id: string;
@@ -70,7 +77,7 @@ export async function getVisibleHeaderTabsForNav(): Promise<NavHeaderTab[]> {
           labelNl: link.labelNl,
           labelEn: link.labelEn,
           href: link.url,
-          external: true,
+          external: isExternalUrl(link.url),
         })),
       ],
     }));
@@ -88,7 +95,7 @@ export async function getVisibleHeaderTabsForNav(): Promise<NavHeaderTab[]> {
       labelNl: link.labelNl,
       labelEn: link.labelEn,
       href: link.url,
-      external: true,
+      external: isExternalUrl(link.url),
     })),
   }));
 }

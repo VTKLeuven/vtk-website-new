@@ -409,6 +409,15 @@ const icons: Record<string, ReactNode> = {
       <path d="M16 8a1 1 0 0 1 1 1v8a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4V9a1 1 0 0 1 1-1h14a4 4 0 1 1 0 8h-1" />
     </Svg>
   ),
+  // piano: toetsen van een klavier
+  piano: (
+    <Svg>
+      <rect x="3" y="4" width="18" height="16" rx="2" />
+      <path d="M9 4v9" />
+      <path d="M15 4v9" />
+      <path d="M3 13h18" />
+    </Svg>
+  ),
   // it: terminal (de groep met de technische tabs)
   it: (
     <Svg>
