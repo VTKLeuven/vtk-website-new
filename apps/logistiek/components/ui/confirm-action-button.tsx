@@ -14,6 +14,7 @@ import type { ActionResult } from '@/app/actions/uitleen';
  */
 export function ConfirmActionButton({
   label,
+  confirmLabel,
   action,
   successMessage,
   dialogTitle,
@@ -23,7 +24,10 @@ export function ConfirmActionButton({
   variant = 'ghost',
   icon,
 }: {
+  /** Tooltip en aria-label van de knop; geef hier de context mee ("Verwijderen: Career Fair"). */
   label: string;
+  /** Korte knoptekst in de bevestigingsdialoog; standaard `label`. */
+  confirmLabel?: string;
   action: () => Promise<ActionResult>;
   successMessage: string;
   dialogTitle?: string;
@@ -70,7 +74,7 @@ export function ConfirmActionButton({
           open={open}
           title={dialogTitle ?? `${label}?`}
           description={dialogDescription}
-          confirmLabel={label}
+          confirmLabel={confirmLabel ?? label}
           cancelLabel="Annuleren"
           destructive={destructive}
           pending={pending}

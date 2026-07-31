@@ -1,11 +1,12 @@
+import Link from 'next/link';
 import { VanStatusBadge } from '@/components/status-badge';
 import { requireManage } from '@/lib/session';
 import { formatDateTime, formatPriceCents } from '@/lib/uitleen';
 import {
   adminVanBookings,
   adminVehicles,
+  driverOptions,
   hasSucceededPayment,
-  logistiekTeamMembers,
   type AdminTransportBooking,
 } from '@/lib/uitleen-server';
 import { TransportControls } from './transport-controls';
@@ -16,7 +17,7 @@ export default async function BeheerVervoerPage() {
 
   const [bookings, drivers, vehicles] = await Promise.all([
     adminVanBookings(),
-    logistiekTeamMembers(),
+    driverOptions(),
     adminVehicles(),
   ]);
   const activeVehicleOptions = vehicles
@@ -71,6 +72,18 @@ export default async function BeheerVervoerPage() {
 
   return (
     <div className="grid gap-8">
+      <p className="text-sm text-vtk-muted">
+        {drivers.length === 0
+          ? 'Er staat nog niemand in de chauffeurslijst, dus je kan nog geen chauffeur toewijzen. '
+          : `${drivers.length} chauffeur${drivers.length === 1 ? '' : 's'} beschikbaar. `}
+        <Link
+          href="/beheer/chauffeurs"
+          className="font-semibold text-vtk-navy underline decoration-vtk-yellow underline-offset-4"
+        >
+          Chauffeurs beheren
+        </Link>
+      </p>
+
       <section>
         <h2 className="text-lg font-semibold tracking-tight text-vtk-ink">Te beslissen ({open.length})</h2>
         {open.length === 0 ? (
@@ -106,6 +119,7 @@ export default async function BeheerVervoerPage() {
                     bookingId={booking.id}
                     vehicleId={booking.vehicleId}
                     driverId={booking.driverId}
+                    driver={booking.driver}
                     pricingMode={booking.pricingMode}
                     paid={paid}
                     drivers={drivers}

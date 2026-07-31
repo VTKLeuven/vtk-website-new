@@ -3,10 +3,17 @@
 import { revalidatePath } from 'next/cache';
 import { prisma } from '@vtk/db';
 import type { Prisma } from '@prisma/client';
+import { currentWorkingYear } from '@vtk/auth';
 import { requireManage } from '@/lib/session';
 import { saveError, saveOk, type SaveState } from '@/lib/saveState';
 import { rangesOverlap, transportPriceCents } from '@/lib/uitleen';
-import { flesserkeReserved, reservedQuantities } from '@/lib/uitleen-server';
+import {
+  flesserkeReserved,
+  isDriver,
+  reservedQuantities,
+  searchDriverCandidates,
+  type DriverCandidate,
+} from '@/lib/uitleen-server';
 import { buildReservationData, type ReservationFormInput } from '@/lib/reservation-form';
 import { runSerializable } from '@/lib/tx';
 import type { ActionResult } from './uitleen';
@@ -18,9 +25,11 @@ function revalidateBeheer() {
   revalidatePath('/beheer/materiaal');
   revalidatePath('/beheer/kalender');
   revalidatePath('/beheer/instellingen');
+  revalidatePath('/beheer/chauffeurs');
   revalidatePath('/materiaal');
   revalidatePath('/vervoer');
   revalidatePath('/reservaties');
+  revalidatePath('/ritten');
 }
 
 // ---------------------------------------------------------------------------
@@ -530,6 +539,9 @@ export async function approveTransportAction(
   const driverId = String(formData.get('driverId') ?? '').trim();
   const adminNote = String(formData.get('adminNote') ?? '').trim();
   if (paymentMode !== 'ONLINE' && paymentMode !== 'OFFLINE') return saveError('MODE_REQUIRED');
+  // De keuzelijst toont enkel chauffeurs, maar een formulier is te vervalsen; en
+  // een toegewezen rit is meteen ook leestoegang tot die rit ("Mijn ritten").
+  if (driverId && !(await isDriver(driverId))) return saveError('NOT_A_DRIVER');
 
   const outcome = await runSerializable(
     async (tx) => {
@@ -601,6 +613,9 @@ export async function assignDriverAction(bookingId: string, driverId: string): P
   if (!booking) return { ok: false, error: 'Rit niet gevonden.' };
   if (booking.status === 'REJECTED' || booking.status === 'CANCELLED' || booking.status === 'COMPLETED') {
     return { ok: false, error: 'Voor deze rit kan je geen chauffeur meer toewijzen.' };
+  }
+  if (driverId && !(await isDriver(driverId))) {
+    return { ok: false, error: 'Deze persoon staat niet in de chauffeurslijst.' };
   }
 
   await prisma.uitleenTransportBooking.update({
@@ -710,6 +725,87 @@ export async function markTransportPaidOfflineAction(bookingId: string): Promise
 
   revalidateBeheer();
   return { ok: true, message: 'Gemarkeerd als betaald.' };
+}
+
+// ---------------------------------------------------------------------------
+// Chauffeurs
+// ---------------------------------------------------------------------------
+
+/**
+ * Lid zoeken voor de chauffeurspicker. Een server action i.p.v. een API-route:
+ * de picker leeft in het beheer, dus `requireManage` is de enige poort die we
+ * nodig hebben (en we moeten geen aparte route beveiligen).
+ */
+export async function searchDriverCandidatesAction(query: string): Promise<DriverCandidate[]> {
+  await requireManage();
+  return searchDriverCandidates(query);
+}
+
+/** Chauffeur toevoegen aan de pool, gekozen uit de leden van vtk.be. */
+export async function addDriverAction(_prev: SaveState, formData: FormData): Promise<SaveState> {
+  const session = await requireManage();
+
+  const userId = String(formData.get('userId') ?? '').trim();
+  const note = String(formData.get('note') ?? '').trim();
+  if (!userId) return saveError('USER_REQUIRED');
+
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { id: true, active: true, deletedAt: true },
+  });
+  if (!user || user.deletedAt) return saveError('NOT_FOUND');
+  if (!user.active) return saveError('INACTIVE');
+
+  // Al chauffeur via de post: dan voegt een rij hier niets toe, en de melding
+  // legt uit waarom de naam toch al in de keuzelijst staat.
+  const inPost = await prisma.groupMembership.count({
+    where: { userId, year: currentWorkingYear(), group: { code: 'LOGISTIEK' } },
+  });
+  if (inPost > 0) return saveError('IN_POST');
+
+  const existing = await prisma.uitleenDriver.count({ where: { userId } });
+  if (existing > 0) return saveError('ALREADY_DRIVER');
+
+  await prisma.uitleenDriver.create({
+    data: { userId, note: note || null, addedById: session.user.id },
+  });
+
+  revalidateBeheer();
+  return saveOk();
+}
+
+/** Notitie bij een chauffeur bewerken. */
+export async function saveDriverNoteAction(_prev: SaveState, formData: FormData): Promise<SaveState> {
+  await requireManage();
+
+  const driverRowId = String(formData.get('driverRowId') ?? '').trim();
+  const note = String(formData.get('note') ?? '').trim();
+  if (!driverRowId) return saveError('NOT_FOUND');
+
+  const updated = await prisma.uitleenDriver.updateMany({
+    where: { id: driverRowId },
+    data: { note: note || null },
+  });
+  if (updated.count === 0) return saveError('NOT_FOUND');
+
+  revalidateBeheer();
+  return saveOk();
+}
+
+/**
+ * Chauffeur uit de pool halen. Ritten die al aan deze persoon toegewezen zijn
+ * blijven bewust staan: de rit is gereden of gepland, en de naam wissen zou de
+ * historiek en de planning stukmaken. Wel verdwijnt de keuze voor nieuwe ritten,
+ * en ziet de persoon "Mijn ritten" enkel nog zolang er ritten aan hangen.
+ */
+export async function removeDriverAction(driverRowId: string): Promise<ActionResult> {
+  await requireManage();
+
+  const deleted = await prisma.uitleenDriver.deleteMany({ where: { id: driverRowId } });
+  if (deleted.count === 0) return { ok: false, error: 'Deze chauffeur staat niet (meer) in de lijst.' };
+
+  revalidateBeheer();
+  return { ok: true, message: 'Chauffeur uit de lijst gehaald.' };
 }
 
 // ---------------------------------------------------------------------------

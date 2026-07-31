@@ -2,12 +2,15 @@
 
 import { SaveForm } from '@/components/ui/save-form';
 import { approveTransportAction, rejectTransportAction } from '@/app/actions/beheer';
+import type { DriverOption } from '@/lib/uitleen-server';
+import { DriverOptions } from './driver-select';
 
 const APPROVE_ERRORS = {
   MODE_REQUIRED: 'Kies hoe er betaald wordt.',
   NOT_FOUND: 'Rit niet gevonden.',
   NOT_REQUESTED: 'Deze rit is al beslist.',
   OVERLAP: 'Dit voertuig is al geboekt op dat moment.',
+  NOT_A_DRIVER: 'Deze persoon staat niet in de chauffeurslijst.',
 };
 
 const REJECT_ERRORS = {
@@ -22,7 +25,7 @@ export function TransportDecisionForms({
   pricingIsPerKm,
 }: {
   bookingId: string;
-  drivers: Array<{ id: string; name: string }>;
+  drivers: DriverOption[];
   pricingIsPerKm: boolean;
 }) {
   return (
@@ -45,11 +48,7 @@ export function TransportDecisionForms({
             defaultValue=""
           >
             <option value="">Nog geen chauffeur</option>
-            {drivers.map((driver) => (
-              <option key={driver.id} value={driver.id}>
-                {driver.name}
-              </option>
-            ))}
+            <DriverOptions drivers={drivers} />
           </select>
         </label>
         <fieldset className="grid gap-2 text-sm">
