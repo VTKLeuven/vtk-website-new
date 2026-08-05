@@ -659,6 +659,37 @@ onderste helft is een ontwerpkeuze, geen toeval:
   openingsuren zijn momenteel niet beschikbaar". Zo breekt de homepage nooit,
   ook niet bij een koude cache terwijl cudi plat ligt.
 
+### Snelle knoppen staan op mobiel vóór de eventkaart
+
+Op een breed scherm staan de hero-tekst en de eventkaart naast elkaar, en ligt de
+rij snelle knoppen (Theokot, Cursusdienst, Tweedehands, Tijdsloten, Shiften,
+Kalender) er meteen onder: allemaal in één blik, klikbaar zonder te scrollen.
+
+Zodra de hero stapelt (**≤980px**) valt die volgorde uit elkaar. De eventkaart
+gaat dan onder de tekst staan, en de knoppen kwamen daarachter: op een scherm van
+390×844 begon de eerste knop pas op **1287px**, dus anderhalf scherm naar
+beneden, met een kaart van ruim 500px ertussen. De knoppen zijn juist het
+utilitaire deel van de homepage (waar eet ik, is de cursusdienst open), dus dat
+is precies de verkeerde volgorde voor een telefoon.
+
+- **Keuze:** onder 980px schuiven de knoppen tussen de hero-tekst en de
+  eventkaart. Onder 640px staan ze bovendien in **twee kolommen** in plaats van
+  zes onder elkaar. Resultaat op 390×844: eerste knop op **700px**, vier van de
+  zes binnen het eerste scherm, en het blok krimpt van 682px naar 311px.
+- **De eventkaart schuift dus naar beneden op mobiel.** Dat is bewust: hij blijft
+  één korte scroll ver, terwijl de knoppen de bestemming zijn waar mensen
+  meerdere keren per week naartoe gaan.
+- **Desktop verandert niet.** Alles zit in `@media (max-width: 980px)` en
+  `@media (max-width: 640px)` in `vtk-home.css`.
+- **Hoe:** `.home-dark-zone` wordt een flex-kolom en `.home-hero` krijgt
+  `display: contents`, zodat de twee hero-kinderen broers worden van de
+  quick-sectie en met `order` te herschikken zijn. Enkel de box van de hero
+  verdwijnt, niet het element, dus descendant-selectors (`.home-hero .hero-cal`)
+  en `body:has(.home-hero)` in de header-CSS blijven werken. De padding van de
+  hero verhuist wel mee naar zijn kinderen. Let op: `.quick` staat op
+  `margin: 0 auto`, en een auto-marge in de dwarsrichting zet de stretch van een
+  flex-kind uit; die marges moeten in dat blok expliciet op 0.
+
 ---
 
 ## Uitleendienst (logistiek.vtk.be)

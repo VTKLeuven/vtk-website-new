@@ -1405,6 +1405,46 @@
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
+  /* Vanaf hier stapelt de hero: eerst de tekst, dan de eventkaart. De snelle
+     knoppen stonden daaronder en begonnen op een telefoon pas na ruim 1200px,
+     dus je moest er altijd eerst een kaart van ruim 500px voorbij scrollen. Ze
+     schuiven nu tussen de tekst en de kaart, waar de eerste rij nog binnen het
+     eerste scherm valt.
+
+     `display: contents` haalt enkel de box van de hero weg, niet het element:
+     zijn twee kinderen worden daardoor broers van de quick-sectie en zijn met
+     `order` te herschikken. De padding van de hero verhuist mee naar die
+     kinderen, en de `gap` wordt een marge. Descendant-selectors zoals
+     `.home-hero .hero-cal` en `body:has(.home-hero)` blijven gewoon werken,
+     want de DOM verandert niet. */
+  .vtk-design .home-dark-zone {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .vtk-design .home-hero {
+    display: contents;
+  }
+
+  .vtk-design .home-hero > div {
+    order: 1;
+    padding: clamp(64px, 8vw, 88px) clamp(20px, 3vw, 36px) 0;
+  }
+
+  /* De zijmarges expliciet op 0: `.quick` staat op `margin: 0 auto`, en een auto
+     marge in de dwarsrichting zet de stretch van een flex-kind uit. De rij werd
+     daardoor smaller dan de herotekst en lijnde er niet meer mee uit. */
+  .vtk-design .quick {
+    order: 2;
+    margin: clamp(28px, 5vw, 40px) 0 0;
+  }
+
+  .vtk-design .home-hero > aside {
+    order: 3;
+    margin-top: clamp(32px, 5vw, 44px);
+    padding: 0 clamp(20px, 3vw, 36px) clamp(56px, 7vw, 72px);
+  }
+
   .vtk-design .aanbod,
   .vtk-design .am-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -1424,7 +1464,6 @@
 }
 
 @media (max-width: 640px) {
-  .vtk-design .quick-row,
   .vtk-design .aanbod,
   .vtk-design .am-grid,
   .vtk-design .ev-grid {
@@ -1437,17 +1476,32 @@
     gap: 4px;
   }
 
+  /* Twee kolommen in plaats van zes onder elkaar: dat halveert de hoogte van de
+     rij, zodat het blok in één blik past in plaats van een scrollsessie te zijn.
+     De labels zijn kort genoeg voor de halve breedte. */
+  .vtk-design .quick-row {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .vtk-design .ql {
-    border-right: 0;
+    padding: 14px 14px 16px;
+    gap: 4px;
     border-bottom: 1px solid var(--line);
+  }
+
+  /* De buitenste randen zitten al op de container, dus enkel de scheidingen
+     binnenin tekenen: geen rechterrand op de rechterkolom, geen onderrand op de
+     laatste rij. */
+  .vtk-design .ql:nth-child(2n) {
+    border-right: 0;
+  }
+
+  .vtk-design .ql:nth-last-child(-n + 2) {
+    border-bottom: 0;
   }
 
   .vtk-design .home-dark-zone .ql {
     border-bottom-color: rgba(255, 255, 255, 0.12);
-  }
-
-  .vtk-design .ql:last-child {
-    border-bottom: 0;
   }
 
   .vtk-design .sec-head,
