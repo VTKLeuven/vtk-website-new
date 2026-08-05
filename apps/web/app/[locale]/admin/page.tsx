@@ -46,6 +46,7 @@ export default async function AdminDashboard({
       url: t.url,
       icon: t.icon,
       color: t.color,
+      imageKey: t.imageKey,
       order: t.order,
       scope: t.scope,
       groupId: t.groupId,
@@ -59,6 +60,8 @@ export default async function AdminDashboard({
       url: p.url,
       icon: p.icon,
       color: p.color,
+      imageKey: p.imageKey,
+      imageCleared: p.imageCleared,
     })),
     personalRows.map((t) => ({
       id: t.id,
@@ -66,6 +69,7 @@ export default async function AdminDashboard({
       url: t.url,
       icon: t.icon,
       color: t.color,
+      imageKey: t.imageKey,
       order: t.order,
     }))
   );

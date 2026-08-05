@@ -4,12 +4,8 @@ import { useState, useTransition } from "react";
 import { ConfirmDialog } from "@vtk/ui";
 import { IconButton } from "@/components/ui/IconButton";
 import { PencilIcon, TrashIcon } from "@/components/ui/icons";
-import {
-  TILE_COLORS,
-  TILE_ICONS,
-  TileIcon,
-  tileColor,
-} from "@/lib/dashboard-tiles";
+import { TileVisualPicker } from "@/components/admin/TileVisualPicker";
+import { TILE_COLORS, TileChip } from "@/lib/dashboard-tiles";
 import {
   deleteDefaultTileAction,
   saveDefaultTileAction,
@@ -23,6 +19,7 @@ export type SimpleTile = {
   url: string;
   icon: string;
   color: string;
+  imageKey: string | null;
   order: number;
 };
 
@@ -30,10 +27,12 @@ export type GroupSection = { id: string; name: string; tiles: SimpleTile[] };
 
 const T = {
   nl: {
-    global: "Globale tegels",
-    globalHint: "Zichtbaar voor iedereen.",
-    groups: "Tegels per groep",
-    groupHint: "Extra tegels voor leden van deze groep.",
+    global: "Voor iedereen",
+    globalHint:
+      "Iedereen die inlogt ziet deze tegels, onder de kop \"Voor iedereen\" op het dashboard.",
+    groups: "Per post of werkgroep",
+    groupHint:
+      "Enkel leden van die post zien deze tegels, in een eigen sectie met de naam van de post.",
     addTile: "Tegel toevoegen",
     edit: "Bewerken",
     remove: "Verwijderen",
@@ -42,7 +41,6 @@ const T = {
       `"${label}" verdwijnt van het dashboard van iedereen die de tegel ziet. Dit kan niet ongedaan gemaakt worden.`,
     label: "Naam",
     url: "URL",
-    icon: "Pictogram",
     color: "Kleur",
     order: "Volgorde",
     save: "Opslaan",
@@ -52,10 +50,12 @@ const T = {
     none: "Nog geen tegels.",
   },
   en: {
-    global: "Global tiles",
-    globalHint: "Shown to everyone.",
-    groups: "Tiles per group",
-    groupHint: "Extra tiles for members of this group.",
+    global: "For everyone",
+    globalHint:
+      'Everyone who signs in sees these tiles, under the "For everyone" heading on the dashboard.',
+    groups: "Per post or working group",
+    groupHint:
+      "Only members of that post see these tiles, in a section of their own carrying the post's name.",
     addTile: "Add tile",
     edit: "Edit",
     remove: "Remove",
@@ -64,7 +64,6 @@ const T = {
       `"${label}" will disappear from the dashboard of everyone who sees it. This cannot be undone.`,
     label: "Name",
     url: "URL",
-    icon: "Icon",
     color: "Color",
     order: "Order",
     save: "Save",
@@ -191,12 +190,15 @@ function TileList({
   return (
     <ul className="vtk-tiles-rows">
       {tiles.map((tile) => {
-        const c = tileColor(tile.color);
         return (
           <li key={tile.id} className="vtk-tiles-row">
-            <span className="vtk-tile-chip vtk-tile-chip-sm" style={{ background: c.chipBg, color: c.chipFg }}>
-              <TileIcon name={tile.icon} size={18} />
-            </span>
+            <TileChip
+              icon={tile.icon}
+              imageKey={tile.imageKey}
+              color={tile.color}
+              size={18}
+              className="vtk-tile-chip-sm"
+            />
             <span className="vtk-tiles-row-main">
               <strong>{tile.label}</strong>
               <span className="text-zinc-500 text-xs">{tile.url}</span>
@@ -232,7 +234,14 @@ function DefaultTileEditor({
   state: NonNullable<EditorState>;
   pending: boolean;
   onClose: () => void;
-  onSubmit: (data: { label: string; url: string; icon: string; color: string; order: number }) => void;
+  onSubmit: (data: {
+    label: string;
+    url: string;
+    icon: string;
+    color: string;
+    imageKey: string | null;
+    order: number;
+  }) => void;
 }) {
   const t = T[locale];
   const tile = state.tile;
@@ -240,8 +249,8 @@ function DefaultTileEditor({
   const [url, setUrl] = useState(tile?.url ?? "");
   const [icon, setIcon] = useState(tile?.icon ?? "link");
   const [color, setColor] = useState(tile?.color ?? "navy");
+  const [imageKey, setImageKey] = useState<string | null>(tile?.imageKey ?? null);
   const [order, setOrder] = useState(String(tile?.order ?? 0));
-  const c = tileColor(color);
 
   return (
     <div className="vtk-tile-modal-backdrop" onClick={onClose}>
@@ -249,9 +258,7 @@ function DefaultTileEditor({
         <h3>{tile ? t.editTile : t.newTile}</h3>
 
         <div className="vtk-tile-preview">
-          <span className="vtk-tile-chip" style={{ background: c.chipBg, color: c.chipFg }}>
-            <TileIcon name={icon} />
-          </span>
+          <TileChip icon={icon} imageKey={imageKey} color={color} />
           <span className="vtk-tile-label">{label || "—"}</span>
         </div>
 
@@ -268,22 +275,13 @@ function DefaultTileEditor({
           <input type="number" value={order} onChange={(e) => setOrder(e.target.value)} />
         </label>
 
-        <div className="vtk-tile-field">
-          <span>{t.icon}</span>
-          <div className="vtk-icon-grid">
-            {TILE_ICONS.map((i) => (
-              <button
-                key={i.key}
-                type="button"
-                className={"vtk-icon-opt" + (icon === i.key ? " is-active" : "")}
-                title={locale === "nl" ? i.labelNl : i.labelEn}
-                onClick={() => setIcon(i.key)}
-              >
-                <TileIcon name={i.key} size={20} />
-              </button>
-            ))}
-          </div>
-        </div>
+        <TileVisualPicker
+          locale={locale}
+          icon={icon}
+          imageKey={imageKey}
+          onIconChange={setIcon}
+          onImageChange={setImageKey}
+        />
 
         <div className="vtk-tile-field">
           <span>{t.color}</span>
@@ -294,6 +292,8 @@ function DefaultTileEditor({
                 type="button"
                 className={"vtk-color-opt" + (color === col.key ? " is-active" : "")}
                 title={locale === "nl" ? col.labelNl : col.labelEn}
+                aria-label={locale === "nl" ? col.labelNl : col.labelEn}
+                aria-pressed={color === col.key}
                 style={{ background: col.chipBg, color: col.chipFg }}
                 onClick={() => setColor(col.key)}
               >
@@ -311,7 +311,9 @@ function DefaultTileEditor({
             type="button"
             className="vtk-tile-btn vtk-tile-btn-primary"
             disabled={pending || !label.trim() || !url.trim()}
-            onClick={() => onSubmit({ label, url, icon, color, order: parseInt(order, 10) || 0 })}
+            onClick={() =>
+              onSubmit({ label, url, icon, color, imageKey, order: parseInt(order, 10) || 0 })
+            }
           >
             {t.save}
           </button>

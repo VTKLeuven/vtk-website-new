@@ -29,6 +29,7 @@ export default async function AdminDashboardTiles({
     url: t.url,
     icon: t.icon,
     color: t.color,
+    imageKey: t.imageKey,
     order: t.order,
   });
 

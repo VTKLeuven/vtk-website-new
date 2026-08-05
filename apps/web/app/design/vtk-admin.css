@@ -425,6 +425,60 @@
   text-align: center;
 }
 
+/* Secties per herkomst. Wie in drie posten zit, zag in één plat raster niet
+   welke snelkoppeling van wie kwam; de kop zegt het nu letterlijk. */
+.vtk-tiles-lane {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.vtk-tiles-lane-head {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--line);
+}
+
+.vtk-tiles-lane-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 2px;
+  flex: none;
+  align-self: center;
+  background: var(--muted);
+}
+
+.vtk-tiles-lane-dot.is-global {
+  background: var(--navy);
+}
+
+.vtk-tiles-lane-dot.is-group {
+  background: var(--yellow);
+}
+
+.vtk-tiles-lane-title {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink);
+}
+
+.vtk-tiles-lane-sub {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.vtk-tiles-lane-count {
+  margin-left: auto;
+  font-size: 12px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
 .vtk-tile-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
@@ -466,6 +520,13 @@ a.vtk-tile:hover {
   width: 32px;
   height: 32px;
   border-radius: 10px;
+}
+
+/* Een geüpload logo staat op dezelfde gekleurde chip als een pictogram, dus
+   `contain`: een logo mag niet bijgesneden worden zoals een foto. */
+.vtk-tile-chip-img {
+  object-fit: contain;
+  display: block;
 }
 
 .vtk-tile-label {
@@ -602,10 +663,90 @@ a.vtk-tile:hover {
   border-color: var(--navy);
 }
 
+/* Beeldkiezer: pictogram of eigen logo, op aparte tabbladen. */
+.vtk-tile-seg {
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--paper);
+  align-self: flex-start;
+}
+
+.vtk-tile-seg button {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--muted);
+  padding: 6px 14px;
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.vtk-tile-seg button[aria-selected="true"] {
+  background: var(--navy);
+  color: var(--paper);
+}
+
+.vtk-icon-picker {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.vtk-icon-search {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 8px 11px;
+  font-size: 13.5px;
+  font-family: inherit;
+  background: var(--surface);
+  color: var(--ink);
+  width: 100%;
+}
+
+.vtk-icon-search:focus {
+  outline: none;
+  border-color: var(--navy);
+}
+
+.vtk-icon-cats {
+  display: flex;
+  gap: 5px;
+  flex-wrap: wrap;
+}
+
+.vtk-icon-cats button {
+  appearance: none;
+  font: inherit;
+  font-size: 11.5px;
+  font-weight: 600;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--muted);
+  border-radius: 999px;
+  padding: 4px 10px;
+  cursor: pointer;
+}
+
+.vtk-icon-cats button[aria-pressed="true"] {
+  background: var(--paper-2);
+  color: var(--ink);
+}
+
 .vtk-icon-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(40px, 1fr));
   gap: 6px;
+  /* De set telt bijna negentig pictogrammen: laat het rooster scrollen in
+     plaats van de modal tot buiten het scherm te duwen. */
+  max-height: 210px;
+  overflow-y: auto;
+  padding: 2px;
 }
 
 .vtk-icon-opt {
@@ -628,6 +769,62 @@ a.vtk-tile:hover {
 .vtk-icon-opt.is-active {
   border-color: var(--navy);
   box-shadow: inset 0 0 0 1px var(--navy);
+}
+
+.vtk-tile-upload {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px;
+  border: 1px dashed var(--line);
+  border-radius: 14px;
+  background: var(--paper);
+}
+
+.vtk-tile-upload-thumb {
+  width: 56px;
+  height: 56px;
+  border-radius: 14px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--muted);
+  display: grid;
+  place-items: center;
+  flex: none;
+  overflow: hidden;
+}
+
+.vtk-tile-upload-thumb img {
+  width: 34px;
+  height: 34px;
+  object-fit: contain;
+}
+
+.vtk-tile-upload-body {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.vtk-tile-upload-actions {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+/* De uploadknop is een <label> om een verborgen file-input: hij moet zich als
+   knop gedragen, niet als tekst. */
+.vtk-tile-upload-actions label.vtk-tile-btn {
+  display: inline-flex;
+  align-items: center;
+  cursor: pointer;
+}
+
+.vtk-tile-error {
+  font-size: 12px;
+  color: #a31f1f;
+  margin: 0;
 }
 
 .vtk-color-grid {

@@ -1043,3 +1043,40 @@ sluit iedereen buiten, inclusief degene die de knop omzette. Daarom drie
 vangnetten: de permissie wordt automatisch aangemaakt, het scherm waarschuwt
 vooraf wanneer nog niemand ze heeft, en zo'n applicatie komt in "Aandacht
 vereist" op /admin/sso.
+
+## Dashboardtegels (snelkoppelingen op /admin)
+
+Het dashboard opent met een raster snelkoppelingen naar de externe tools die een
+post dagelijks nodig heeft: de drive, de wiki, een repository, de printbestellingen.
+Er zijn drie soorten, en dat onderscheid is de kern van de feature.
+
+- **Voor iedereen (GLOBAL).** Beheerders met `dashboard.manage` zetten deze op
+  /admin/dashboard-tiles; elk ingelogd lid ziet ze.
+- **Per post of werkgroep (GROUP).** Enkel leden van die groep zien ze. Wie in
+  drie posten zit, krijgt dus drie extra reeksen.
+- **Van jou (USER).** Elk lid mag eigen tegels maken. Die zijn persoonlijk en
+  komen op niemand anders zijn dashboard.
+
+Vastgelegde keuzes:
+
+- **De tegels staan gegroepeerd onder een kop per herkomst**, niet in één plat
+  raster. In één raster kon je niet zien welke snelkoppeling van welke post kwam,
+  en dat is precies wat je wil weten voor je ze aan een collega doorgeeft ("die
+  staat er alleen voor IT"). De kop noemt de post bij naam; een post zonder
+  tegels krijgt geen lege sectie.
+- **Slepen herschikt binnen één sectie.** Een volgorde tussen jouw tegel en die
+  van IT bestaat niet: de secties worden toch opnieuw gegroepeerd, dus een tegel
+  naar een andere sectie slepen zou terugspringen.
+- **Een lid mag een gedeelde tegel voor zichzelf aanpassen of verbergen**, maar
+  ze nooit voor anderen wijzigen. De aanpassing leeft in `UserDashboardTilePref`
+  en is met één klik terug te zetten. Verbergen is geen verwijderen: zet een
+  beheerder er later een andere URL op, dan krijg je die wel.
+- **Een tegel toont een pictogram uit een gecureerde set, of een eigen logo.**
+  Het logo is er voor tools met een sterk merk (een GitHub- of Notion-logo herken
+  je sneller dan een generiek icoon). Het pictogram blijft bewaard zolang er een
+  logo staat: haal je het logo weg, dan valt de tegel terug op het pictogram in
+  plaats van leeg te worden.
+- **Elk lid mag een tegellogo uploaden**, ook zonder uploadpermissie. Wie een
+  persoonlijke tegel mag maken, moet ze ook kunnen afwerken. De upload is daarom
+  apart gehouden (`kind=tile`): maximaal 2 MB, herschaald naar 128px, en onder een
+  eigen `tiles/`-prefix zodat de tegel-actions een key van elders weigeren.

@@ -1339,11 +1339,15 @@ model Setting {
 // -----------------------------------------------------------------------------
 
 model DashboardTile {
-  id        String             @id @default(cuid())
-  label     String
-  url       String
-  icon      String             @default("link") // key into curated icon set
-  color     String             @default("navy") // key into color palette
+  id    String @id @default(cuid())
+  label String
+  url   String
+  icon  String @default("link") // key into curated icon set
+  color String @default("navy") // key into color palette
+  // Eigen logo in plaats van een pictogram (bv. het GitHub-logo). Wanneer dit
+  // gezet is, wint het van `icon`; `icon` blijft staan zodat het terugvalt op
+  // het gekozen pictogram wanneer de afbeelding verwijderd wordt.
+  imageKey  String?
   scope     DashboardTileScope
   groupId   String? // set when scope = GROUP
   userId    String? // set when scope = USER (personal tile)
@@ -1371,6 +1375,11 @@ model UserDashboardTilePref {
   url    String?
   icon   String?
   color  String?
+  // Eigen logo bovenop een gedeelde tegel. `imageCleared` onderscheidt "erf de
+  // afbeelding van de standaardtegel" (null + false) van "ik wil hier bewust
+  // geen afbeelding maar een pictogram" (null + true).
+  imageKey     String?
+  imageCleared Boolean @default(false)
 
   user User          @relation(fields: [userId], references: [id], onDelete: Cascade)
   tile DashboardTile @relation(fields: [tileId], references: [id], onDelete: Cascade)
