@@ -9,6 +9,8 @@ import { getMediaContent } from "@/lib/media-content";
 import { videoEmbed } from "@/lib/videoEmbed";
 import { getCurrentSession } from "@/lib/session";
 import { getCursusdienstHours } from "@/lib/cursusdienstHours";
+import { ELIXIR_OPEN_DAYS, openingWindowPhase } from "@/lib/elixir/openingWindow";
+import { readBarStatus } from "@/lib/elixir/status";
 import { publicUrl } from "@/lib/storage";
 import { BUILTIN_DEFAULT_EVENT_IMAGE, DEFAULT_EVENT_IMAGE_SETTING } from "@/lib/defaultEventImage";
 import { PartnerLogo } from "@/components/site/PartnerLogo";
@@ -19,7 +21,6 @@ import {
   entryForDate,
   isClosedHours,
   isOpenAt,
-  mondayFirstWeekdayIndex,
 } from "./hoursUtils";
 
 import "@/app/design/vtk-home.css";
@@ -44,22 +45,13 @@ type CareerSetting = {
 };
 
 /**
- * 't Elixir opent zondag tot en met donderdag om 22u en sluit op een uur dat
- * per avond verschilt. Die uren staan hier hard: ze wijzigen niet per week, en
- * anders dan het Theokot heeft de bar geen beheerscherm. Komt daar ooit een
- * beheerscherm, dan hoort dit een `home.openingHours.elixir`-setting te worden.
- *
- * Indexen zijn maandag-eerst, net als `mondayFirstWeekdayIndex`.
+ * 't ElixIr opent zondag tot en met donderdag om 22u en sluit op een uur dat per
+ * avond verschilt. Die uren staan hard in `lib/elixir/openingWindow.ts`: ze
+ * wijzigen niet per week, en anders dan het Theokot heeft de bar geen
+ * beheerscherm. Komt daar ooit een beheerscherm, dan hoort dit een
+ * `home.openingHours.elixir`-setting te worden.
  */
 const ELIXIR_NAME = "'t ElixIr";
-const ELIXIR_OPEN_DAYS = [0, 1, 2, 3, 6];
-const ELIXIR_OPENS_AT_MIN = 22 * 60;
-/**
- * Na middernacht kan de avond van gisteren nog lopen. We weten niet tot wanneer,
- * dus tot 5u zeggen we "mogelijk nog open" in plaats van hard "gesloten" (wat
- * fout is als de bar nog draait) of hard "open" (wat fout is als ze al toe is).
- */
-const ELIXIR_LAST_CALL_MIN = 5 * 60;
 
 /** "2026-27" voor het werkingsjaar dat op 15 juli begint (zie @vtk/auth). */
 function workingYearLabel(d: Date): string {
@@ -102,7 +94,7 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
   const now = new Date();
   const nl = locale === "nl";
 
-  const [settings, upcomingEvents, tabs, partners, media, session, cursusEntries] = await Promise.all([
+  const [settings, upcomingEvents, tabs, partners, media, session, cursusEntries, barStatus] = await Promise.all([
     prisma.setting.findMany({
       where: {
         key: {
@@ -135,6 +127,10 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
     // Cursusdienst-uren komen live van cudi.vtk.be; deze lezing valt terug op de
     // laatst gecachte waarde en anders op null (kaart toont "niet beschikbaar").
     getCursusdienstHours(locale),
+    // Live geluidsstatus van 't ElixIr: enkel een lezing uit de cache (geheugen,
+    // of één Setting-rij vlak na een herstart). De worker praat met Munisense,
+    // niet deze render. Zie lib/elixir/status.ts.
+    readBarStatus(now),
   ]);
 
   // Aftermovies: `media.aftermovies` is dezelfde instelling als op /media, te
@@ -205,14 +201,17 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
     : "";
   const cursusName = "Cursusdienst";
 
-  const nowMinutes = now.getHours() * 60 + now.getMinutes();
-  const elixirDay = mondayFirstWeekdayIndex(now);
-  const elixirOpen =
-    ELIXIR_OPEN_DAYS.includes(elixirDay) && nowMinutes >= ELIXIR_OPENS_AT_MIN;
-  const elixirMaybeOpen =
-    !elixirOpen &&
-    nowMinutes < ELIXIR_LAST_CALL_MIN &&
-    ELIXIR_OPEN_DAYS.includes((elixirDay + 6) % 7);
+  // De geluidsmeting is de bron zodra ze vers is; het uurrooster is de fallback
+  // wanneer de meting ontbreekt of te oud is (worker plat, integratie niet
+  // geconfigureerd, of gewoon de eerste render na een deploy). De meting zelf
+  // spreekt enkel binnen de openingsuren, dus buiten het venster zeggen beide
+  // hetzelfde.
+  const elixirLive = barStatus && !barStatus.stale ? barStatus : null;
+  const elixirPhase = openingWindowPhase(now);
+  const elixirOpen = elixirLive ? elixirLive.isOpen : elixirPhase === "evening";
+  // Zonder meting weten we na middernacht niet of ze al toe is: dan "mogelijk
+  // nog open" in plaats van een harde bewering.
+  const elixirMaybeOpen = !elixirLive && elixirPhase === "after-midnight";
   const elixirEntries = DUTCH_FULL_DAYS.map((dayNl, i) => ({
     dayNl,
     hours: ELIXIR_OPEN_DAYS.includes(i)
