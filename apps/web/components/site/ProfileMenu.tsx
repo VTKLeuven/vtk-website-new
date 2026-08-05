@@ -53,24 +53,27 @@ export function ProfileMenu({
     closeTimer.current = setTimeout(() => setOpen(false), 120);
   }
 
-  const triggerClass =
-    variant === "editorial"
-      ? "profile-menu-trigger"
-      : "flex items-center gap-2 rounded-full border border-vtk-blue/15 bg-white px-2 py-1.5 text-sm text-vtk-blue shadow-sm transition hover:border-vtk-blue/25 hover:bg-vtk-blue-soft/60";
+  const editorial = variant === "editorial";
 
-  const menuClass =
-    variant === "editorial"
-      ? "profile-menu"
-      : "absolute right-0 z-50 mt-2 w-52 rounded-xl border border-vtk-blue/10 bg-white py-1 text-zinc-800 shadow-[0_12px_40px_-8px_rgba(26,31,74,0.18)] ring-1 ring-black/[0.03]";
+  const triggerClass = editorial
+    ? "profile-menu-trigger"
+    : "flex items-center gap-2 rounded-full border border-vtk-blue/15 bg-white px-2 py-1.5 text-sm text-vtk-blue shadow-sm transition hover:border-vtk-blue/25 hover:bg-vtk-blue-soft/60";
 
-  const itemClass =
-    variant === "editorial"
-      ? "profile-menu-item"
-      : "block px-4 py-2.5 text-sm hover:bg-vtk-blue-soft";
+  const menuClass = editorial
+    ? "profile-menu"
+    : "absolute right-0 z-50 mt-2 w-52 rounded-xl border border-vtk-blue/10 bg-white py-1 text-zinc-800 shadow-[0_12px_40px_-8px_rgba(26,31,74,0.18)] ring-1 ring-black/[0.03]";
+
+  const itemClass = editorial ? "profile-menu-item" : "block px-4 py-2.5 text-sm hover:bg-vtk-blue-soft";
+
+  // In de header hangt het paneel altijd in de DOM en regelt de CSS het openen,
+  // zodat het net als de navigatiepanelen kan in- en uitfaden. `visibility:
+  // hidden` houdt het dicht ook uit de tabvolgorde en de screenreader.
+  const openAttr = editorial && open ? "" : undefined;
 
   return (
     <div
-      className="relative"
+      className={editorial ? "profile-shell" : "relative"}
+      data-open={openAttr}
       ref={ref}
       onMouseEnter={hoverOpen}
       onMouseLeave={hoverClose}
@@ -82,7 +85,7 @@ export function ProfileMenu({
         aria-haspopup="menu"
         aria-expanded={open}
       >
-        {variant === "editorial" ? (
+        {editorial ? (
           name.slice(0, 1).toUpperCase()
         ) : (
           <>
@@ -93,8 +96,8 @@ export function ProfileMenu({
           </>
         )}
       </button>
-      {open && (
-        <div role="menu" className={menuClass}>
+      {(editorial || open) && (
+        <div role="menu" className={menuClass} data-open={openAttr}>
           <Link href={`${base}/account`} className={itemClass} role="menuitem">
             {labels.myAccount}
           </Link>

@@ -61,6 +61,10 @@
   position: relative;
   min-width: 0;
   flex: 1 1 auto;
+  /* Over de volle hoogte van de balk, zodat een tab tot aan de onderrand van de
+     header reikt en zijn uitklappaneel daar vandaan kan hangen in plaats van
+     ergens los eronder te zweven. */
+  align-self: stretch;
   /* Iets meer lucht tussen het logo en de eerste tab dan aan de rechterkant:
      het merk mag niet tegen de navigatie plakken. */
   margin-left: clamp(4px, 0.8vw, 14px);
@@ -79,14 +83,38 @@
   gap: clamp(14px, calc(2.6vw - 17px), 20px);
   min-width: 0;
   flex: none;
+  height: 100%;
 }
 
 .vtk-site-header .nav-item {
   position: relative;
   display: inline-flex;
   align-items: center;
+  align-self: stretch;
   gap: 2px;
   flex: none;
+}
+
+/* Gele naad op de onderrand van de header: hij markeert de tab waar je op staat
+   en is meteen de aanhechting van het uitklappaneel, dat daar begint. Dezelfde
+   gele regel als onderaan de `.vtk-page-head`-band. */
+.vtk-site-header .nav-item::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -1px;
+  height: 2px;
+  background: var(--yellow);
+  transform: scaleX(0);
+  transform-origin: left center;
+  transition: transform 180ms cubic-bezier(0.22, 1, 0.36, 1);
+  pointer-events: none;
+}
+
+.vtk-site-header .nav-item:hover::after,
+.vtk-site-header .nav-item:has(:focus-visible)::after {
+  transform: scaleX(1);
 }
 
 .vtk-site-header .nav-links a {
@@ -104,8 +132,16 @@
 }
 
 /* Chevron in de tab zelf: enkel een teken dat er iets uitklapt. Openen doet de
-   CSS hieronder bij hover en focus-within, zodat er geen extra knop nodig is
-   die de nav breder maakt. */
+   CSS hieronder bij hover en bij toetsenbordfocus, zodat er geen extra knop
+   nodig is die de nav breder maakt.
+
+   Let op: `:focus-visible`, niet `:focus-within`. Met focus-within bleef het
+   paneel na een muisklik open hangen: de router navigeert client-side, de
+   aangeklikte link houdt zijn focus, en het menu bleef dus openstaan boven de
+   nieuwe pagina terwijl je muis er al lang weg was. `:focus-visible` staat na
+   een klik niet aan, dus enkel toetsenbordfocus opent nog. `[data-suppressed]`
+   (gezet door EditorialNavLinks bij een klik) sluit het paneel meteen zolang de
+   muis op de tab blijft staan. */
 .vtk-site-header .nav-links a {
   display: inline-flex;
   align-items: center;
@@ -118,40 +154,74 @@
   transition: transform 160ms ease, opacity 160ms ease;
 }
 
-.vtk-site-header .nav-item:hover .nav-caret,
-.vtk-site-header .nav-item:focus-within .nav-caret {
+.vtk-site-header .nav-item.has-menu:not([data-suppressed]):hover .nav-caret,
+.vtk-site-header .nav-item.has-menu:not([data-suppressed]):has(:focus-visible) .nav-caret {
   opacity: 1;
   transform: rotate(180deg);
 }
 
-.vtk-site-header .nav-menu {
-  display: none;
+/* Het paneel hangt aan de onderrand van de header, niet los eronder: effen
+   dezelfde navy als de balk, vierkant bovenaan en enkel onderaan afgerond. Zo
+   leest de uitklap als een verlenging van de header in plaats van een witte
+   kaart die toevallig in de buurt zweeft. Een lichte doorschijnendheid laat de
+   pagina eronder net meespelen zonder de tekst te hinderen.
+
+   Eén set regels voor beide uitklappanelen in de header: de navigatietabs en
+   het accountmenu. Ze hangen aan dezelfde rand, dus ze horen er ook hetzelfde
+   uit te zien; twee losse kopieën lopen na de eerste aanpassing uit elkaar. */
+.vtk-site-header .nav-menu,
+.vtk-site-header .profile-menu {
   position: absolute;
-  top: calc(100% + 14px);
-  left: -14px;
+  top: calc(100% + 1px);
   z-index: 60;
-  min-width: 216px;
-  padding: 6px;
-  border: 1px solid var(--line);
-  border-radius: 14px;
-  background: var(--surface);
-  box-shadow: 0 18px 42px rgba(10, 15, 31, 0.18);
+  min-width: 248px;
+  max-width: 340px;
+  padding: 8px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-top: 0;
+  border-radius: 0 0 16px 16px;
+  background: color-mix(in srgb, var(--navy) 92%, transparent);
+  /* De blur hoort bij de doorschijnendheid: zonder hem las je de hero-titel en
+     de paginakop dwars door het paneel heen, tussen de menu-items door. Nu
+     schijnt de kleur eronder nog mee, maar zijn de vormen uitgesmeerd. */
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  box-shadow: 0 26px 52px rgba(10, 15, 31, 0.45);
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(-8px);
+  transition: opacity 130ms ease, transform 130ms ease, visibility 0s linear 130ms;
 }
 
-.vtk-site-header .nav-item.has-menu:hover .nav-menu,
-.vtk-site-header .nav-item.has-menu:focus-within .nav-menu {
-  display: block;
-}
-
-/* Onzichtbare brug tussen tab en paneel, zodat het menu niet dichtklapt terwijl
-   je muis de tussenruimte oversteekt. */
-.vtk-site-header .nav-menu::before {
-  content: "";
-  position: absolute;
+/* Linkerrand gelijk met de tab, zodat de gele naad de bovenkant van het paneel
+   afdekt; de items staan ingesprongen als kinderen van die tab. Het
+   accountmenu zit uiterst rechts en hangt dus aan zijn rechterrand. */
+.vtk-site-header .nav-menu {
   left: 0;
+}
+
+.vtk-site-header .profile-menu {
   right: 0;
-  top: -14px;
-  height: 14px;
+  min-width: 212px;
+}
+
+.vtk-site-header .nav-item.has-menu:not([data-suppressed]):hover .nav-menu,
+.vtk-site-header .nav-item.has-menu:not([data-suppressed]):has(:focus-visible) .nav-menu,
+.vtk-site-header .profile-menu[data-open] {
+  opacity: 1;
+  visibility: visible;
+  transform: none;
+  transition: opacity 160ms ease, transform 200ms cubic-bezier(0.22, 1, 0.36, 1),
+    visibility 0s;
+}
+
+/* De laatste tabs staan tegen de rechterkant van de balk; daar zou een paneel
+   dat naar rechts uitklapt buiten het scherm vallen. Die hangen we aan hun
+   rechterrand op. */
+.vtk-site-header .nav-item.has-menu:nth-last-child(-n + 2) .nav-menu {
+  left: auto;
+  right: 0;
 }
 
 .vtk-site-header .nav-menu ul {
@@ -162,19 +232,105 @@
   flex-direction: column;
 }
 
-.vtk-site-header .nav-menu a {
-  display: block;
-  padding: 9px 10px;
+.vtk-site-header .nav-menu a,
+.vtk-site-header .profile-menu-item {
+  position: relative;
+  display: flex;
+  width: 100%;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 12px 10px 22px;
   border-radius: 10px;
-  color: var(--ink);
-  font-size: 14px;
+  color: var(--on-dark-muted);
+  text-align: left;
+  text-decoration: none;
+  font-size: 14.5px;
   font-weight: 500;
   white-space: normal;
+  cursor: pointer;
+  transition: background 140ms ease, color 140ms ease;
 }
 
-.vtk-site-header .nav-menu a:hover {
-  background: var(--paper-2);
-  color: var(--ink);
+/* Gele markering links, als los staafje in plaats van een inset box-shadow: die
+   volgt de afronding van de knop en werd daar een gebogen sikkel. */
+.vtk-site-header .nav-menu a::before,
+.vtk-site-header .profile-menu-item::before {
+  content: "";
+  position: absolute;
+  left: 8px;
+  top: 9px;
+  bottom: 9px;
+  width: 2px;
+  border-radius: 2px;
+  background: var(--yellow);
+  opacity: 0;
+  transform: scaleY(0.35);
+  transition: opacity 140ms ease, transform 160ms ease;
+}
+
+/* Chevron met randen getekend in plaats van een pijlteken: puur decoratief, dus
+   een screenreader hoort er niets van. */
+.vtk-site-header .nav-menu a::after,
+.vtk-site-header .profile-menu-item::after {
+  content: "";
+  flex: none;
+  width: 6px;
+  height: 6px;
+  border-top: 1.5px solid var(--yellow);
+  border-right: 1.5px solid var(--yellow);
+  opacity: 0;
+  transform: rotate(45deg) translate(-3px, 3px);
+  transition: opacity 140ms ease, transform 160ms ease;
+}
+
+.vtk-site-header .nav-menu a:hover,
+.vtk-site-header .nav-menu a:focus-visible,
+.vtk-site-header .profile-menu-item:hover,
+.vtk-site-header .profile-menu-item:focus-visible {
+  background: rgba(255, 255, 255, 0.07);
+  color: #fff;
+}
+
+.vtk-site-header .nav-menu a:hover::before,
+.vtk-site-header .nav-menu a:focus-visible::before,
+.vtk-site-header .profile-menu-item:hover::before,
+.vtk-site-header .profile-menu-item:focus-visible::before {
+  opacity: 1;
+  transform: none;
+}
+
+.vtk-site-header .nav-menu a:hover::after,
+.vtk-site-header .nav-menu a:focus-visible::after,
+.vtk-site-header .profile-menu-item:hover::after,
+.vtk-site-header .profile-menu-item:focus-visible::after {
+  opacity: 1;
+  transform: rotate(45deg);
+}
+
+/* Het uitloggen-item zit in een <form>; die mag de knop niet als een eigen blok
+   inspringen, anders staat hij niet gelijk met de links erboven. */
+.vtk-site-header .profile-menu form {
+  display: contents;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .vtk-site-header .nav-item::after,
+  .vtk-site-header .profile-shell::after,
+  .vtk-site-header .nav-menu,
+  .vtk-site-header .profile-menu,
+  .vtk-site-header .nav-menu a::before,
+  .vtk-site-header .nav-menu a::after,
+  .vtk-site-header .profile-menu-item::before,
+  .vtk-site-header .profile-menu-item::after,
+  .vtk-site-header .nav-caret {
+    transition-duration: 1ms;
+  }
+
+  .vtk-site-header .nav-menu,
+  .vtk-site-header .profile-menu {
+    transform: none;
+  }
 }
 
 /* Elf tabs met chevrons zijn ongeveer 765px breed. Onder de 1600px komt die
@@ -208,6 +364,11 @@
   align-items: center;
   gap: 10px;
   flex: 0 0 auto;
+  /* Over de volle balkhoogte, net als .nav-links-shell. Zonder dit is deze rij
+     maar zo hoog als de accountknop (38px), en dan hangt het accountpaneel op
+     die hoogte in plaats van aan de onderrand van de header. De kinderen
+     blijven verticaal gecentreerd door de align-items hierboven. */
+  align-self: stretch;
 }
 
 .vtk-site-header .lang-toggle {
@@ -257,33 +418,32 @@
   background: rgba(255, 255, 255, 0.22);
 }
 
-.vtk-site-header .profile-menu {
+/* Het accountmenu hangt aan dezelfde onderrand als de navigatiepanelen, dus de
+   houder loopt net als een nav-item over de volle hoogte van de balk. De knop
+   zelf blijft verticaal gecentreerd. */
+.vtk-site-header .profile-shell {
+  position: relative;
+  display: flex;
+  align-items: center;
+  align-self: stretch;
+}
+
+.vtk-site-header .profile-shell::after {
+  content: "";
   position: absolute;
+  left: 0;
   right: 0;
-  top: 100%;
-  z-index: 60;
-  margin-top: 8px;
-  min-width: 180px;
-  padding: 6px;
-  border: 1px solid var(--line);
-  border-radius: 14px;
-  background: var(--surface);
-  box-shadow: 0 18px 42px rgba(10, 15, 31, 0.12);
+  bottom: -1px;
+  height: 2px;
+  background: var(--yellow);
+  transform: scaleX(0);
+  transform-origin: right center;
+  transition: transform 180ms cubic-bezier(0.22, 1, 0.36, 1);
+  pointer-events: none;
 }
 
-.vtk-site-header .profile-menu-item {
-  display: block;
-  width: 100%;
-  padding: 9px 10px;
-  border-radius: 10px;
-  color: var(--ink);
-  text-align: left;
-  text-decoration: none;
-  font-size: 14px;
-}
-
-.vtk-site-header .profile-menu-item:hover {
-  background: var(--paper-2);
+.vtk-site-header .profile-shell[data-open]::after {
+  transform: scaleX(1);
 }
 
 /* Homepage: the header sits directly on the dark hero (SiteHeaderShell sets
@@ -321,6 +481,7 @@
     position: static;
     order: 3;
     flex: 0 0 auto;
+    align-self: center;
   }
 
   .vtk-site-header .nav-links {
