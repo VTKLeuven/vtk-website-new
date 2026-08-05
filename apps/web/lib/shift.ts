@@ -18,6 +18,10 @@ export type ShiftInput = {
   // Postcode (Group.code) of null. Vrije string: posten zijn nu GUI-beheerd, dus
   // dit valideert enkel het type; welke codes bestaan is een data-vraag.
   post: string | null;
+  /** De shift kan zonder Nederlands gedaan worden. */
+  openToInternationals: boolean;
+  /** Langere uitleg (Markdown) over wat de shift inhoudt; null = niets tonen. */
+  instructions: string | null;
 };
 
 /**
@@ -59,8 +63,18 @@ export function parseShift(value: unknown): ShiftInput {
     throw new ShiftValidationError(['body must be an object']);
   }
 
-  const { name, startTime, endTime, location, description, maxParticipants, reward, post } =
-    value as Record<string, unknown>;
+  const {
+    name,
+    startTime,
+    endTime,
+    location,
+    description,
+    maxParticipants,
+    reward,
+    post,
+    openToInternationals,
+    instructions,
+  } = value as Record<string, unknown>;
 
   const errors: string[] = [];
 
@@ -98,6 +112,14 @@ export function parseShift(value: unknown): ShiftInput {
     errors.push('post must be a group code string or null');
   }
 
+  if (openToInternationals !== undefined && typeof openToInternationals !== 'boolean') {
+    errors.push('openToInternationals must be a boolean');
+  }
+
+  if (instructions !== undefined && instructions !== null && typeof instructions !== 'string') {
+    errors.push('instructions must be a string or null');
+  }
+
   if (errors.length > 0) {
     throw new ShiftValidationError(errors);
   }
@@ -111,7 +133,15 @@ export function parseShift(value: unknown): ShiftInput {
     maxParticipants: maxParticipants as number,
     reward: reward as number,
     post: (post as string | null | undefined) ?? null,
+    openToInternationals: (openToInternationals as boolean | undefined) ?? false,
+    instructions: emptyToNull(instructions as string | null | undefined),
   };
+}
+
+/** Lege of enkel-witruimte tekst is "niets ingevuld", dus NULL in de databank. */
+function emptyToNull(value: string | null | undefined): string | null {
+  const trimmed = value?.trim();
+  return trimmed ? trimmed : null;
 }
 
 /**
@@ -198,6 +228,20 @@ function parseShiftEntry(value: unknown, errors: string[], label: string): Shift
     errors.push(`${label}.post must be a group code string or null`);
   }
 
+  // Deze twee velden kwamen later bij: een response zonder ze is geldig en valt
+  // terug op de standaardwaarden.
+  if (src.openToInternationals !== undefined && typeof src.openToInternationals !== 'boolean') {
+    errors.push(`${label}.openToInternationals must be a boolean`);
+  }
+
+  if (
+    src.instructions !== undefined &&
+    src.instructions !== null &&
+    typeof src.instructions !== 'string'
+  ) {
+    errors.push(`${label}.instructions must be a string or null`);
+  }
+
   // `participantIds` zit niet in elke response; is het aanwezig, dan moet het een
   // array van gehele getallen zijn. Anders vallen we terug op een lege lijst.
   let participantIds: number[] = [];
@@ -226,6 +270,8 @@ function parseShiftEntry(value: unknown, errors: string[], label: string): Shift
     maxParticipants: src.maxParticipants as number,
     reward: src.reward as number,
     post: src.post as string | null,
+    openToInternationals: (src.openToInternationals as boolean | undefined) ?? false,
+    instructions: (src.instructions as string | null | undefined) ?? null,
   } as ShiftResponse;
 }
 
@@ -342,6 +388,23 @@ export function parsePartialShift(value: unknown): Partial<ShiftInput> {
       errors.push('post must be a group code string or null');
     } else {
       result.post = post as string | null;
+    }
+  }
+
+  if ('openToInternationals' in src) {
+    if (typeof src.openToInternationals !== 'boolean') {
+      errors.push('openToInternationals must be a boolean');
+    } else {
+      result.openToInternationals = src.openToInternationals;
+    }
+  }
+
+  if ('instructions' in src) {
+    const instructions = src.instructions;
+    if (instructions !== null && typeof instructions !== 'string') {
+      errors.push('instructions must be a string or null');
+    } else {
+      result.instructions = emptyToNull(instructions as string | null);
     }
   }
 

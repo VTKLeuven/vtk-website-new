@@ -434,32 +434,67 @@
   },
   "shift": {
     "shifts": "Shifts",
+    "subtitle": "Lend a hand behind the bar or at an event. Every shift earns vouchers.",
     "available": "Available shifts",
     "registered": "My shifts",
-    "columns": {
-      "shift": "Shift",
-      "date": "Date",
-      "time": "Time",
-      "where": "Location",
-      "action": "Action"
+    "view": {
+      "label": "View",
+      "week": "Week",
+      "list": "List"
+    },
+    "week": {
+      "prev": "Previous week",
+      "next": "Next week",
+      "today": "Today",
+      "range": "{from} to {to}"
     },
     "filter": {
       "post": "Group",
-      "allPosts": "All groups",
-      "from": "From",
-      "sortAsc": "↑ Ascending",
-      "sortDesc": "↓ Descending"
+      "allPosts": "All groups"
     },
-    "register": "Register",
+    "register": "Sign up",
     "unregister": "Unregister",
-    "week": {
-      "prev": "← Previous",
-      "today": "Today",
-      "next": "Next →",
-      "startDate": "Start date"
+    "isRegistered": "Registered",
+    "locked": "Locked within 24h",
+    "until": "until {time}",
+    "intl": {
+      "badge": "No Dutch required",
+      "hint": "You do not need to speak Dutch for this shift."
     },
-    "emptyAvailable": "There are no available shifts in this period.",
-    "emptyRegistered": "You are not registered for any shift yet.",
+    "instructions": "What does this shift involve?",
+    "dialog": {
+      "close": "Close",
+      "cancel": "Cancel",
+      "open": "View details"
+    },
+    "spots": {
+      "full": "Full",
+      "one": "1 spot left",
+      "few": "{n} spots left",
+      "taken": "{taken} of {max} spots taken"
+    },
+    "reward": {
+      "one": "1 voucher",
+      "many": "{n} vouchers"
+    },
+    "rel": {
+      "today": "Today",
+      "tomorrow": "Tomorrow",
+      "inDays": "In {n} days"
+    },
+    "empty": {
+      "week": "No shifts this week",
+      "next": "The next shift is {name} on {date}.",
+      "jump": "Go to {date}",
+      "none": "No shifts are scheduled at the moment."
+    },
+    "rail": {
+      "emptyTitle": "Nothing planned yet",
+      "emptyText": "Pick a shift from the overview; your registration shows up here right away.",
+      "year": "Academic year {year}",
+      "shiftsDone": "shifts done",
+      "vouchers": "vouchers earned"
+    },
     "detail": {
       "start": "Start",
       "end": "End",
@@ -467,7 +502,9 @@
       "post": "Group",
       "reward": "Reward",
       "spots": "Spots",
-      "description": "Description"
+      "description": "Description",
+      "open": "Show details",
+      "close": "Hide details"
     },
     "toast": {
       "registered": "You are registered for this shift.",

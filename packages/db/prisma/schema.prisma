@@ -1395,6 +1395,15 @@ model Shift {
   maxParticipants Int
   reward          Int
 
+  // Kan je deze shift doen zonder Nederlands? Dan krijgt ze de markering "Ook
+  // voor internationals" op /shift. Het gaat over de taal, niet over wie welkom
+  // is: iedereen mag inschrijven.
+  openToInternationals Boolean @default(false)
+
+  // Langere uitleg (Markdown) over wat de shift concreet inhoudt, los van de
+  // korte `description`. Leeg (NULL of "") = de frontend toont het blok niet.
+  instructions String?
+
   // Postcode (Group.code) waarvoor deze shift telt; los tekstveld i.p.v. een
   // relatie, zodat een oude postcode behouden blijft ook als de post later
   // gedeactiveerd of hernoemd wordt.

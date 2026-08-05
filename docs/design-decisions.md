@@ -770,6 +770,84 @@ feedback van de groepscoordinator. De onderliggende werking:
 
 ---
 
+## Shiftpagina: week is de standaard, lijst is de tweede weergave
+
+`/shift` toont **één week tegelijk** (maandag tot zondag), in twee weergaven die
+naar diezelfde week en dezelfde postfilter kijken:
+
+- **Weekrooster (standaard).** Een shift is in de eerste plaats een blok in je
+  agenda: je wil zien of ze botst met je les of met een andere shift, en dat leest
+  een raster meteen. Overlappende shiften komen naast elkaar in kolommen.
+- **Lijst.** Dezelfde week per dag onder elkaar, met de details uitklapbaar. Beter
+  wanneer de namen lang zijn of het scherm smal is, want daar wordt een raster
+  onleesbaar. De lijst blijft dus bestaan; ze is geen restant van de oude tabel.
+
+Verder vastgelegd:
+
+- **Je eigen shiften staan in een rail náást het overzicht**, niet als een tweede
+  tabel erboven. Ze blijven zo in beeld terwijl je door de week scrolt, en een
+  lege "Mijn shiften" kost geen halve pagina meer. Op smal scherm gaat de rail
+  bóven het overzicht staan: wat jij vandaag moet doen, hoort niet onder andermans
+  shiften te liggen.
+- **Je eigen shiften staan óók in het overzicht zelf** (geel randje,
+  "Ingeschreven"). De rail is je persoonlijke lijstje, het overzicht is de
+  volledige week; een week met een gat waar jouw shift hoort te staan, klopt niet.
+- **De rail toont de stand van het academiejaar** (voltooide shiften + bonnetjes,
+  zelfde telling als de admin-ranglijst: enkel shiften die al voorbij zijn). Dat
+  geeft de shiftranking eindelijk een plek op de publieke pagina en maakt van
+  `/shift/history` een logische doorklik i.p.v. een badge in de paginakop.
+- **Een lege week is een boodschap met een volgende stap**, niet een lege tabel:
+  ze noemt de eerstvolgende geplande shift en heeft een knop die naar die week
+  springt. In het rooster blijft het raster staan onder de boodschap, zodat een
+  rustige week er niet uitziet als een stuk pagina.
+- **De postfilter zijn chips met tellers**, en enkel voor posten die deze week
+  effectief voorkomen. De oude `<select>` + datumveld + sorteerknop zijn weg: de
+  weeknavigatie vertelt al waar je zit, en chronologisch is de enige zinnige
+  volgorde voor een week.
+- **Plaatsen lezen als "Nog 1 plaats" of "Vol"**, niet als `5/6`. De exacte
+  verhouding blijft in de tooltip en in het detailvenster staan.
+
+### Klikken op een shift opent een detailvenster
+
+Een klik op een blok in het rooster, op een rij in de lijst of op een kaart in de
+rail opent hetzelfde venster met alles over die shift, mét de knop Schrijf in /
+Uitschrijven erin. Inschrijven kost dus twee klikken. Dat is bewust: sinds een
+shift een langere uitleg kan dragen (zie hieronder) valt er iets te lezen vóór je
+intekent, en een blok dat je met één misklik inschrijft is daar te gevoelig voor.
+Het venster sluit enkel wanneer de actie lukte; faalt ze (vol, overlap), dan blijft
+het staan met de foutmelding als toast. In de lijst blijft de knop in de rij zelf
+bestaan als snelle weg voor wie de shift al kent.
+
+### `openToInternationals`: over de taal, niet over wie welkom is
+
+De markering **"Ook voor internationals"** (EN: "No Dutch required") betekent: je
+kan deze shift doen zónder Nederlands. Ze zegt niets over wie mag inschrijven,
+want dat mag iedereen. Zo blijft ze bruikbaar voor de vraag die een international
+zich effectief stelt, en leest een Nederlandstalige ze niet als "niet voor mij".
+
+De markering krijgt een eigen, blauwe pil. Geel, groen en rood zijn op deze pagina
+gereserveerd voor de vrije plaatsen; een taalmarkering in diezelfde kleuren zou
+als een capaciteitsstatus lezen. In een roosterblok is er enkel plaats voor het
+wereldbol-icoon; de volledige tekst zit in de tooltip, het aria-label en het
+detailvenster.
+
+### `instructions`: de lange uitleg, apart van `description`
+
+Een shift heeft twee teksten met een verschillende rol:
+
+- `description` blijft de **korte regel** ("Tapshift donderdagavond"), bovenaan het
+  detailvenster.
+- `instructions` is de **lange uitleg in Markdown**: wat je moet doen, waar je je
+  meldt, wat je mag verwachten. Niet ingevuld betekent dat het blok gewoon niet
+  verschijnt; er komt dus nooit een leeg kopje op de pagina.
+
+Cudi-shiften krijgen deze twee velden niet mee uit de spiegeling: cudi kent ze
+niet, en de mirror-update raakt enkel de velden die ze zelf stuurt. Een
+verantwoordelijke die de uitleg op de main site invult, ziet die dus niet
+overschreven worden bij de volgende sync.
+
+---
+
 ## Cursusdienst-shiften op de main site (brug met cudi.vtk.be)
 
 De cursusdienst-shiften worden **aangemaakt op cudi.vtk.be** (gegenereerd uit de

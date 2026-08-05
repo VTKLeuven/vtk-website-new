@@ -123,6 +123,8 @@ const SHIFT_FIELD_KEYS = [
   'maxParticipants',
   'reward',
   'post',
+  'openToInternationals',
+  'instructions',
 ];
 
 const isStringArray = (value: unknown): value is string[] =>

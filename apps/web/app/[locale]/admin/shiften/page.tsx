@@ -109,6 +109,8 @@ export default async function AdminShifts({
     maxParticipants: s.maxParticipants,
     reward: s.reward,
     post: s.post,
+    openToInternationals: s.openToInternationals,
+    instructions: s.instructions,
     participants: s.participants.map((p) => ({
       userId: p.userId,
       name: p.user.name,

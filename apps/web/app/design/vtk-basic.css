@@ -289,13 +289,6 @@
  * Rij-actie: een echte knop, geen status-pil. De vrije plaatsen staan ernaast
  * als badge, zodat kleur de beschikbaarheid vertelt en de knop de actie.
  */
-.vtk-shift-action {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  justify-content: flex-end;
-}
-
 .vtk-basic-action {
   display: inline-flex;
   min-height: 34px;
@@ -348,14 +341,7 @@
   text-align: center;
 }
 
-.vtk-basic-row-click {
-  cursor: pointer;
-}
-
-.vtk-basic-row-detail > td {
-  background: var(--paper-2);
-}
-
+/* Detailblok onder een shift: gedeeld door de lijstweergave op /shift. */
 .vtk-basic-shift-details {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
@@ -459,13 +445,6 @@
     width: 100%;
     justify-content: center;
     min-height: 40px;
-  }
-
-  /* Uitklap-detailrij: volledige breedte, geen label. */
-  .vtk-shift-table .vtk-basic-row-detail td {
-    display: block;
-    padding: 10px 16px;
-    text-align: left;
   }
 
   /* De empty-state-rij blijft één gecentreerde regel. */
