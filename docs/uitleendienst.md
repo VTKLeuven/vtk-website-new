@@ -26,7 +26,9 @@ e-mailproces (zie "How to logi"). Productkeuzes: `docs/design-decisions.md`
    ritten van hetzelfde voertuig op hetzelfde moment. Het team mag een `APPROVED`
    aanvraag bewerken; de save hercheckt dan de voorraad in dezelfde tx.
 3. **Vervoer** — tarief per voertuig (team-configureerbaar: gratis/per uur/per
-   km/vast). Chauffeur is optioneel bij goedkeuring en wordt later toegewezen.
+   km/vast). Chauffeur is optioneel bij goedkeuring en wordt later toegewezen; de
+   keuzelijst is de post Logistiek plus de zelf toegevoegde chauffeurs (zie
+   "Chauffeurs" hieronder).
    Prijs is `null` tot ze gekend is (per km: bij afronden voert het team de
    kilometers in). Het team kan het voertuig wisselen (re-snapshot + herberekening).
 4. **Betalen** — enkel de huurprijs gaat online (Mollie/mock); de waarborg blijft
@@ -44,6 +46,7 @@ e-mailproces (zie "How to logi"). Productkeuzes: `docs/design-decisions.md`
 | `UitleenReservation` + `UitleenReservationLine` | Aanvraag met event-context + `requesterType` (+ `groupId`/`requesterName`), dagbereik, snapshots. Statusmachine `REQUESTED → APPROVED/REJECTED/CANCELLED → PICKED_UP → RETURNED`. |
 | `UitleenVehicle` | Voertuig (kar/auto/bakfiets); `pricingMode` (FREE/PER_HOUR/PER_KM/FLAT) + `rateCents`, team-configureerbaar. |
 | `UitleenTransportBooking` | Rit met voertuig, tijdvenster, chauffeur, tarief-snapshot, `kilometers`/`priceCents` (nullable). |
+| `UitleenDriver` | Chauffeur die het team zelf toevoegt (uniek per `userId`, met notitie en `addedById`). Niet werkingsjaar-gescoped; verwijderen laat toegewezen ritten staan. |
 | `UitleenFlesserkeCategory` / `UitleenFlesserkeItem` / `UitleenFlesserkeLine` | Verbruiksstock (vervaldatum, merk, Colruyt-link). Lijnen hangen aan `UitleenReservation`. Beschikbaar wordt berekend, nooit opgeslagen; `returnedQuantity` legt het verbruik vast. |
 | `UitleenPayment` / `UitleenPaymentWebhook` | Spiegel van `TicketPayment`; `provider` vrije string; precies één van `reservationId`/`transportBookingId`. |
 
@@ -55,6 +58,14 @@ e-mailproces (zie "How to logi"). Productkeuzes: `docs/design-decisions.md`
   een post, `session.groups.length > 0`), server-side afgedwongen.
 - **Beheer**: `hasPermission(session, "logistiek.manage")` (`requireManage`). Rol
   `logistiek` (seed) hangt aan de post `LOGISTIEK` (DEFAULT).
+- **Chauffeurs**: geen permissie, maar data. De keuzelijst (`driverOptions()` in
+  `lib/uitleen-server.ts`) is de unie van de leden van de post `LOGISTIEK` in het
+  huidige werkingsjaar en de rijen in `UitleenDriver`, die het team beheert in
+  `/beheer/chauffeurs`. Een toegevoegde chauffeur krijgt daardoor géén
+  `logistiek.manage`: die ziet enkel `/ritten` ("Mijn ritten"), gefilterd op
+  `driverId = session.user.id` (`tripsForDriver`). `approveTransportAction` en
+  `assignDriverAction` herchecken `isDriver()`, want een toewijzing is meteen
+  leestoegang tot die rit.
 - Server actions herchecken altijd; verwachte fouten komen terug (SaveState/
   ActionResult), nooit als throw.
 
@@ -80,12 +91,16 @@ de same-origin `publicUrl`.
 - **Leden**: `app/page.tsx` (hub), `app/materiaal/` (catalogus met zoek/filter,
   gedeeld `reservation-form.tsx` incl. flesserke-sectie, `event-fields.tsx`,
   detailpagina `[id]` met set-inhoud + "vaak samen aangevraagd"), `app/vervoer/`
-  (voertuigkeuze), `app/reservaties/` (overzicht + detail + edit).
+  (voertuigkeuze), `app/reservaties/` (overzicht + detail + edit), `app/ritten/`
+  ("Mijn ritten" voor een chauffeur; link in de header en een banner op de hub,
+  enkel voor wie chauffeur is of nog een rit heeft staan).
 - **Beheer** (`app/beheer/`): `aanvragen/` (tabs, last-minute, decision/edit/
-  return-forms), `vervoer/` (decision + controls: chauffeur, voertuigwissel, km),
-  `materiaal/` (inventaris + set-editor + foto-upload), `flesserke/` (stockscherm
-  met inline voorraad + vervaldatum-highlight), `kalender/`, `instellingen/`
-  (voertuigtarieven + huurprijs-toggle).
+  return-forms), `vervoer/` (decision + controls: chauffeur, voertuigwissel, km;
+  `driver-select.tsx` groepeert de chauffeurs per bron), `chauffeurs/`
+  (chauffeurslijst + user-picker op vtk.be-leden), `materiaal/` (inventaris +
+  set-editor + foto-upload), `flesserke/` (stockscherm met inline voorraad +
+  vervaldatum-highlight), `kalender/`, `instellingen/` (voertuigtarieven +
+  huurprijs-toggle).
 - **Actions**: `app/actions/uitleen.ts` (leden), `app/actions/beheer.ts` (team).
 - **Lib**: `lib/uitleen.ts` (helpers), `lib/uitleen-server.ts` (queries +
   voorraad), `lib/reservation-form.ts` (`buildReservationData`, gedeeld),

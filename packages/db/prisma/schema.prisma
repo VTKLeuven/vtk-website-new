@@ -389,6 +389,8 @@ model User {
   uitleenTransportDriven  UitleenTransportBooking[] @relation("UitleenTransportDriver")
   uitleenTransportDecided UitleenTransportBooking[] @relation("UitleenTransportDecidedBy")
   uitleenTransportDone    UitleenTransportBooking[] @relation("UitleenTransportCompletedBy")
+  uitleenDriver           UitleenDriver?            @relation("UitleenDriverUser")
+  uitleenDriversAdded     UitleenDriver[]           @relation("UitleenDriverAddedBy")
 
   doorGrants         DoorAccessGrant[]
   doorLogs           DoorAccessLog[]
@@ -1814,6 +1816,29 @@ model UitleenVehicle {
   bookings UitleenTransportBooking[]
 }
 
+/// Chauffeur die Logistiek zelf toevoegt, buiten de post om.
+///
+/// De chauffeurskeuze bij een rit is de unie van twee bronnen: de leden van de
+/// post Logistiek in het huidige werkingsjaar (automatisch, via
+/// GroupMembership) en de rijen hier. Zo kan iemand met een rijbewijs rijden
+/// zonder praesidiumlid te worden (en dus zonder `logistiek.manage`, want die
+/// permissie hangt aan de post en niet aan deze tabel). De pool is bewust niet
+/// werkingsjaar-gescoped: hij wordt met de hand beheerd en resetten op 15 juli
+/// zou de ritten van de zomer zonder chauffeurs zetten.
+model UitleenDriver {
+  id        String  @id @default(cuid())
+  userId    String  @unique
+  // Vrije notitie van het team, bv. "rijbewijs B sinds 2023, rijdt niet met de kar".
+  note      String?
+  addedById String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user    User  @relation("UitleenDriverUser", fields: [userId], references: [id], onDelete: Cascade)
+  addedBy User? @relation("UitleenDriverAddedBy", fields: [addedById], references: [id], onDelete: SetNull)
+}
+
 /// Transportaanvraag met een voertuig, een tijdvenster en (later) een chauffeur.
 /// Bewust een eigen model (geen materiaalaanvraag): aparte behandelaar, aparte
 /// lifecycle. Prijs kan pas bij afronden gekend zijn (per-km).
@@ -1872,6 +1897,9 @@ model UitleenTransportBooking {
   @@index([startAt, endAt])
   @@index([vehicleId, status])
   @@index([requesterType, status])
+  // "Mijn ritten" voor een chauffeur, en de rittentelling per chauffeur in het
+  // chauffeursbeheer.
+  @@index([driverId, startAt])
 }
 
 /// Spiegel van TicketPayment (zonder refunds): provider is een vrije string

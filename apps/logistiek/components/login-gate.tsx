@@ -16,6 +16,7 @@ type LoginVariant =
   | 'reservation'
   | 'van'
   | 'trip'
+  | 'trips'
   | 'flesserke'
   | 'manage';
 
@@ -27,6 +28,7 @@ const VARIANT_KEY = {
   reservation: 'loginReservation',
   van: 'loginVan',
   trip: 'loginTrip',
+  trips: 'loginTrips',
   flesserke: 'loginFlesserke',
   manage: 'loginManage',
 } as const;

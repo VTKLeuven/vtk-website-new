@@ -2,6 +2,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { canManage, getSession } from '@/lib/session';
 import { copy, getLocale } from '@/lib/i18n';
+import { driverStatus, showsMyTrips } from '@/lib/uitleen-server';
 import { testLoginEnabled } from '@/lib/test-users';
 import { LanguageSwitcher } from './language-switcher';
 import { ProfileMenu } from './profile-menu';
@@ -31,6 +32,8 @@ function AnonymousUserIcon({ className }: { className?: string }) {
 export async function SiteHeader() {
   const [session, locale] = await Promise.all([getSession(), getLocale()]);
   const t = copy[locale];
+  // "Mijn ritten" is er enkel voor chauffeurs; voor de rest bestaat de link niet.
+  const showTrips = session ? showsMyTrips(await driverStatus(session.user.id)) : false;
   // Op een testomgeving verwijst de login naar de test-picker in plaats van naar
   // de KU Leuven-login op de hoofdsite. Zie lib/test-users.ts.
   const testMode = testLoginEnabled();
@@ -65,6 +68,11 @@ export async function SiteHeader() {
             {session ? (
               <Link href="/reservaties">
                 {t.navReservations}
+              </Link>
+            ) : null}
+            {showTrips ? (
+              <Link href="/ritten">
+                {t.navTrips}
               </Link>
             ) : null}
           </nav>

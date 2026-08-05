@@ -768,6 +768,40 @@ feedback van de groepscoordinator. De onderliggende werking:
 - De import van de bestaande "Inventaris Loods.xlsx" is eenmalig en idempotent;
   ze deletet nooit, zodat een herimport na een sheet-correctie veilig is.
 
+### Chauffeurs: een eigen lijst naast de post Logistiek
+
+Wie mag rijden was tot nu een afgeleide: iedereen met een lidmaatschap van de post
+`LOGISTIEK` in het huidige werkingsjaar stond in de chauffeurskeuze. Dat koppelt
+twee dingen die niet samenhoren: rijden vraagt een rijbewijs en goodwill, niet een
+praesidiumfunctie. Logistiek beheert nu zelf een chauffeurslijst in
+`/beheer/chauffeurs`.
+
+- **Unie van twee bronnen, geen vervanging.** De keuzelijst is de post Logistiek
+  (automatisch, per werkingsjaar) plus de handmatig toegevoegde chauffeurs
+  (`UitleenDriver`). De post blijft er automatisch bij: die lijst onderhoudt
+  zichzelf al op vtk.be en rolt op 15 juli vanzelf mee. Het beheerscherm toont
+  beide groepen apart, zodat zichtbaar is wat je waar aanpast.
+- **Chauffeur zijn geeft geen beheerrechten.** Een toegevoegde chauffeur krijgt
+  geen `logistiek.manage` (die hangt aan de rol van de post, niet aan deze lijst).
+  Die persoon ziet enkel "Mijn ritten" (`/ritten`): de ritten met zijn eigen
+  `driverId`, met laadadres, bestemming, contactpersoon en bijrijders, en zonder
+  prijs of betaalstatus. Dat laatste is bewust: de prijs is een zaak tussen de
+  aanvrager en Logistiek, en een chauffeur die een openstaande betaling ziet, gaat
+  zich daar ter plaatse mee moeien.
+- **De chauffeur is altijd een echte vtk.be-gebruiker**, gekozen via een
+  zoekpicker, nooit een vrije naam. Enkel zo kan de app die persoon zijn ritten
+  tonen na het inloggen, en enkel zo blijft de historiek ("wie reed die rit")
+  betrouwbaar. Wie geen account heeft, logt eerst één keer in op vtk.be.
+- **De lijst is niet werkingsjaar-gescoped.** Anders zou de 15-juli-reset de
+  chauffeurs midden in de zomer wegvegen, net wanneer er verhuisd en gesjouwd
+  wordt. Het team haalt iemand er zelf uit.
+- **Iemand uit de lijst halen laat toegewezen ritten staan.** De rit is gepland of
+  gereden; de naam wissen zou de planning en de historiek stukmaken. Die persoon
+  blijft die ritten dus ook zien tot ze voorbij zijn. Wil je dat niet, wijs de rit
+  dan eerst aan een andere chauffeur toe. In het beheer blijft een verwijderde
+  chauffeur zichtbaar in de keuzelijst van zijn eigen rit, onder "Niet meer in de
+  chauffeurslijst".
+
 ---
 
 ## Shiftpagina: week is de standaard, lijst is de tweede weergave
