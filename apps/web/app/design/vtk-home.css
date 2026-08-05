@@ -1261,9 +1261,11 @@
   overflow-wrap: anywhere;
 }
 
+/* Auto-fit: drie kaarten naast elkaar, maar de rij blijft kloppen wanneer er
+   eentje wegvalt (het Theokot rendert enkel met een instelling). */
 .vtk-design .hours-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
   gap: 18px;
   padding: 0;
 }
@@ -1315,6 +1317,17 @@
 
 .vtk-design .hours-col .status.closed::before {
   background: #e58a70;
+}
+
+/* Derde toestand: open of niet is niet te zeggen (zie 't Elixir na middernacht). */
+.vtk-design .hours-col .status.maybe::before {
+  background: var(--yellow);
+}
+
+.vtk-design .hours-col .hours-note {
+  margin: 14px 0 0;
+  color: var(--on-dark-muted);
+  font-size: 12px;
 }
 
 .vtk-design .hours-list {

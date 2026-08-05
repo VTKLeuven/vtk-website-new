@@ -14,10 +14,12 @@ import { BUILTIN_DEFAULT_EVENT_IMAGE, DEFAULT_EVENT_IMAGE_SETTING } from "@/lib/
 import { PartnerLogo } from "@/components/site/PartnerLogo";
 import { AftermovieGrid, type AftermovieGridItem } from "./AftermovieGrid";
 import {
+  DUTCH_FULL_DAYS,
   dutchDayNameForDate,
   entryForDate,
   isClosedHours,
   isOpenAt,
+  mondayFirstWeekdayIndex,
 } from "./hoursUtils";
 
 import "@/app/design/vtk-home.css";
@@ -40,6 +42,24 @@ type CareerSetting = {
   ctaLabelEn?: string;
   ctaUrl?: string;
 };
+
+/**
+ * 't Elixir opent zondag tot en met donderdag om 22u en sluit op een uur dat
+ * per avond verschilt. Die uren staan hier hard: ze wijzigen niet per week, en
+ * anders dan het Theokot heeft de bar geen beheerscherm. Komt daar ooit een
+ * beheerscherm, dan hoort dit een `home.openingHours.elixir`-setting te worden.
+ *
+ * Indexen zijn maandag-eerst, net als `mondayFirstWeekdayIndex`.
+ */
+const ELIXIR_NAME = "'t ElixIr";
+const ELIXIR_OPEN_DAYS = [0, 1, 2, 3, 6];
+const ELIXIR_OPENS_AT_MIN = 22 * 60;
+/**
+ * Na middernacht kan de avond van gisteren nog lopen. We weten niet tot wanneer,
+ * dus tot 5u zeggen we "mogelijk nog open" in plaats van hard "gesloten" (wat
+ * fout is als de bar nog draait) of hard "open" (wat fout is als ze al toe is).
+ */
+const ELIXIR_LAST_CALL_MIN = 5 * 60;
 
 /** "2026-27" voor het werkingsjaar dat op 15 juli begint (zie @vtk/auth). */
 function workingYearLabel(d: Date): string {
@@ -184,6 +204,25 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
     ? pick(theokot.titleNl, theokot.titleEn, locale).replace(/^Openingsuren\s+/i, "")
     : "";
   const cursusName = "Cursusdienst";
+
+  const nowMinutes = now.getHours() * 60 + now.getMinutes();
+  const elixirDay = mondayFirstWeekdayIndex(now);
+  const elixirOpen =
+    ELIXIR_OPEN_DAYS.includes(elixirDay) && nowMinutes >= ELIXIR_OPENS_AT_MIN;
+  const elixirMaybeOpen =
+    !elixirOpen &&
+    nowMinutes < ELIXIR_LAST_CALL_MIN &&
+    ELIXIR_OPEN_DAYS.includes((elixirDay + 6) % 7);
+  const elixirEntries = DUTCH_FULL_DAYS.map((dayNl, i) => ({
+    dayNl,
+    hours: ELIXIR_OPEN_DAYS.includes(i)
+      ? nl
+        ? "vanaf 22:00"
+        : "from 22:00"
+      : nl
+        ? "Gesloten"
+        : "Closed",
+  }));
 
   const eventGroups = upcomingEvents.slice(0, 5).reduce<Array<{ key: string; date: Date; events: typeof upcomingEvents }>>(
     (acc, event) => {
@@ -495,6 +534,39 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
                     : "The course shop opening hours are currently unavailable."}
                 </div>
               )}
+            </div>
+            <div className="hours-col">
+              <h3>{ELIXIR_NAME}</h3>
+              <div className="sub">{nl ? "Faculteitsbar Ingenieurswetenschappen" : "Faculty Bar Engineering Science"}</div>
+              <div
+                className={`status${elixirOpen ? "" : elixirMaybeOpen ? " maybe" : " closed"}`}
+              >
+                {elixirOpen
+                  ? nl
+                    ? "Nu open"
+                    : "Open now"
+                  : elixirMaybeOpen
+                    ? nl
+                      ? "Mogelijk nog open"
+                      : "Possibly still open"
+                    : closedLabel(ELIXIR_NAME, nl)}
+              </div>
+              <dl className="hours-list">
+                {elixirEntries.map((row, i) => {
+                  const todayCls = row.dayNl === dutchDayNameForDate(now) ? "today" : "";
+                  return (
+                    <div key={i} style={{ display: "contents" }}>
+                      <dt className={todayCls}>{row.dayNl.slice(0, 2).toUpperCase()}</dt>
+                      <dd className={todayCls}>{row.hours}</dd>
+                    </div>
+                  );
+                })}
+              </dl>
+              <p className="hours-note">
+                {nl
+                  ? "Het sluitingsuur varieert per avond."
+                  : "The closing time varies from night to night."}
+              </p>
             </div>
           </div>
         </section>
