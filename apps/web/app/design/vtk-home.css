@@ -1439,10 +1439,13 @@
     margin: clamp(28px, 5vw, 40px) 0 0;
   }
 
+  /* De aside is de eventkaart zelf (`.hero-cal`), geen wikkel eromheen. Ze moet
+     dus inspringen met een marge en niet met padding: padding zou binnenín de
+     kaart vallen, en `.home-hero .hero-cal` overschrijft ze toch. Dezelfde
+     inspringing als de knoppenrij, zodat beide even breed zijn. */
   .vtk-design .home-hero > aside {
     order: 3;
-    margin-top: clamp(32px, 5vw, 44px);
-    padding: 0 clamp(20px, 3vw, 36px) clamp(56px, 7vw, 72px);
+    margin: clamp(32px, 5vw, 44px) clamp(20px, 3vw, 36px) clamp(56px, 7vw, 72px);
   }
 
   .vtk-design .aanbod,
