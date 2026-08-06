@@ -1614,6 +1614,44 @@ model TheokotBan {
 }
 
 // -----------------------------------------------------------------------------
+// Fakbar
+// -----------------------------------------------------------------------------
+
+/// Categorie waarin een drank in het standaardaanbod staat.
+enum FakbarProductCategory {
+  VATEN
+  BIEREN
+  WIJNEN
+  FRISDRANK
+  STERKE_DRANK
+}
+
+/// Eén drank uit het standaardaanbod van de Fakbar, met de cijfers waarmee de
+/// marge berekend wordt. Bedragen in eurocent (Int, geen floats).
+///
+/// Een *aankoopeenheid* is wat de Fakbar inkoopt (een vat, een bak, een fles);
+/// een *consumptie* is wat er over de toog gaat (een pint, een glas, een shot).
+/// `purchasePricePerServing` en de winst per consumptie worden daaruit gerekend
+/// en dus NIET bewaard: waren ze een kolom, dan konden ze na een prijswijziging
+/// stilzwijgend uit de pas lopen met de twee cijfers waar ze uit volgen.
+model FakbarProduct {
+  id                  String                @id @default(cuid())
+  name                String
+  category            FakbarProductCategory
+  /// Aankoopprijs van één aankoopeenheid (vat, bak, fles).
+  purchaseUnitCents   Int
+  /// Aantal consumpties in één aankoopeenheid.
+  servingsPerUnit     Int
+  /// Verkoopprijs van één consumptie.
+  salePriceCents      Int
+  order               Int                   @default(0)
+  createdAt           DateTime              @default(now())
+  updatedAt           DateTime              @updatedAt
+
+  @@index([category, order])
+}
+
+// -----------------------------------------------------------------------------
 // Uitleendienst (logistiek.vtk.be): materiaal lenen, transport (kar/auto/
 // bakfiets) en flesserke. Aanvragen gebeuren per evenement, met een
 // aanvragertype (intern/werkgroep/extern). Flow: lid vraagt aan (REQUESTED),

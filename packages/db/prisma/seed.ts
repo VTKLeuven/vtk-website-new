@@ -278,6 +278,32 @@ async function main() {
   await setRolePermissions(logistiekRole.id, ["logistiek.manage", "modules.logistiek.access"]);
   await grantRoleToGroup("LOGISTIEK", logistiekRole.id, "DEFAULT");
 
+  // fakbar: de Fakbar-tab in het beheer, voor elk lid van de post Fakbar.
+  const fakbarRole = await upsertRole(
+    "fakbar",
+    "Fakbar",
+    "Fakbar",
+    6,
+    "Fakbar beheren.",
+    "Manage Fakbar.",
+  );
+  await setRolePermissions(fakbarRole.id, ["fakbar.manage"]);
+  await grantRoleToGroup("FAKBAR", fakbarRole.id, "DEFAULT");
+
+  // fakbar-lead: enkel de verantwoordelijke van de post Fakbar (GroupRole-kind
+  // LEADER, dus enkel het lid met membership.role = LEAD). Die mag als enige het
+  // standaardaanbod wijzigen; de rest van de post leest het.
+  const fakbarLeadRole = await upsertRole(
+    "fakbar-lead",
+    "Fakbar-verantwoordelijke",
+    "Fakbar lead",
+    7,
+    "Fakbar beheren en als enige het standaardaanbod (dranken, prijzen, marges) bewerken.",
+    "Manage Fakbar and, uniquely, edit the default offering (drinks, prices, margins).",
+  );
+  await setRolePermissions(fakbarLeadRole.id, ["fakbar.manage", "fakbar.offering.manage"]);
+  await grantRoleToGroup("FAKBAR", fakbarLeadRole.id, "LEADER");
+
   // Eén rol per post, met de postnaam, toegekend aan die post zelf (elk lid).
   // Meestal een lege container om er later rechten aan te hangen; enkele posten
   // krijgen meteen hun vaste, postspecifieke recht(en) mee (zie postRolePerms).
@@ -616,6 +642,14 @@ async function main() {
       locale: "NL" as const,
       groups: [
         { code: "THEOKOT" as const, role: "LEAD" as const, titleNl: "Theokot", titleEn: "Theokot", year: 2026, displayOrder: 0 },
+      ],
+    },
+    {
+      email: "fakbar@vtk.prototype",
+      name: "Wout Vermeulen",
+      locale: "NL" as const,
+      groups: [
+        { code: "FAKBAR" as const, role: "LEAD" as const, titleNl: "Fakbar", titleEn: "Fakbar", year: 2026, displayOrder: 0 },
       ],
     },
     {
@@ -1431,6 +1465,51 @@ async function main() {
     // Create-only: een bestaand product (prijs, naam, hoeveelheid, volgorde) niet
     // overschrijven bij een reseed.
     await prisma.theokotProduct.upsert({ where: { id }, update: {}, create: { id, ...data } });
+  }
+
+  console.log("Seeding Fakbar standard offering...");
+  // Standaardaanbod van de Fakbar. Bedragen in eurocent: `purchaseUnitCents` is
+  // wat één aankoopeenheid (vat, bak, fles) kost, `servingsPerUnit` hoeveel
+  // consumpties daaruit gaan. De aankoopprijs per consumptie en de winst worden
+  // in het scherm berekend; ze staan bewust niet in de databank.
+  const fakbarProducts: Array<{
+    key: string;
+    name: string;
+    category: "VATEN" | "BIEREN" | "WIJNEN" | "FRISDRANK" | "STERKE_DRANK";
+    purchaseUnitCents: number;
+    servingsPerUnit: number;
+    salePriceCents: number;
+  }> = [
+    { key: "stella-vat", name: "Stella (vat 50 l)", category: "VATEN", purchaseUnitCents: 15500, servingsPerUnit: 200, salePriceCents: 150 },
+    { key: "hoegaarden-vat", name: "Hoegaarden (vat 30 l)", category: "VATEN", purchaseUnitCents: 11000, servingsPerUnit: 120, salePriceCents: 180 },
+    { key: "duvel", name: "Duvel", category: "BIEREN", purchaseUnitCents: 2400, servingsPerUnit: 24, salePriceCents: 220 },
+    { key: "westmalle-tripel", name: "Westmalle Tripel", category: "BIEREN", purchaseUnitCents: 2640, servingsPerUnit: 24, salePriceCents: 240 },
+    { key: "kriek", name: "Kriek", category: "BIEREN", purchaseUnitCents: 1920, servingsPerUnit: 24, salePriceCents: 200 },
+    { key: "witte-wijn", name: "Witte wijn (huiswijn)", category: "WIJNEN", purchaseUnitCents: 650, servingsPerUnit: 6, salePriceCents: 250 },
+    { key: "rode-wijn", name: "Rode wijn (huiswijn)", category: "WIJNEN", purchaseUnitCents: 650, servingsPerUnit: 6, salePriceCents: 250 },
+    { key: "cola", name: "Cola", category: "FRISDRANK", purchaseUnitCents: 1200, servingsPerUnit: 24, salePriceCents: 150 },
+    { key: "fanta", name: "Fanta", category: "FRISDRANK", purchaseUnitCents: 1200, servingsPerUnit: 24, salePriceCents: 150 },
+    { key: "water", name: "Plat water", category: "FRISDRANK", purchaseUnitCents: 720, servingsPerUnit: 24, salePriceCents: 100 },
+    { key: "vodka", name: "Vodka", category: "STERKE_DRANK", purchaseUnitCents: 1800, servingsPerUnit: 20, salePriceCents: 200 },
+    { key: "rum", name: "Rum", category: "STERKE_DRANK", purchaseUnitCents: 2000, servingsPerUnit: 20, salePriceCents: 200 },
+  ];
+  for (let i = 0; i < fakbarProducts.length; i += 1) {
+    const p = fakbarProducts[i];
+    const id = `seed-fakbar-product-${p.key}`;
+    // Create-only: prijzen die de Fakbar-verantwoordelijke aanpaste blijven staan.
+    await prisma.fakbarProduct.upsert({
+      where: { id },
+      update: {},
+      create: {
+        id,
+        name: p.name,
+        category: p.category,
+        purchaseUnitCents: p.purchaseUnitCents,
+        servingsPerUnit: p.servingsPerUnit,
+        salePriceCents: p.salePriceCents,
+        order: i,
+      },
+    });
   }
 
   console.log("Seeding uitleendienst vehicles...");

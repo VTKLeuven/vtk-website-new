@@ -62,6 +62,10 @@ export const PERMISSIONS = [
   { code: "theokot.manage", labelNl: "Theokot beheren (sessies, aanbod, bans, instellingen)", labelEn: "Manage Theokot (sessions, offering, bans, settings)", category: "theokot" },
   { code: "theokot.pickup", labelNl: "Theokot afhaalbalie bedienen", labelEn: "Operate Theokot pickup counter", category: "theokot" },
 
+  // Fakbar
+  { code: "fakbar.manage", labelNl: "Fakbar beheren", labelEn: "Manage Fakbar", category: "fakbar" },
+  { code: "fakbar.offering.manage", labelNl: "Standaardaanbod van de Fakbar bewerken", labelEn: "Edit the Fakbar's default offering", category: "fakbar" },
+
   // Logistiek (uitleendienst op logistiek.vtk.be)
   { code: "logistiek.manage", labelNl: "Uitleendienst beheren (inventaris, aanvragen, camionette)", labelEn: "Manage equipment rental (inventory, requests, van)", category: "logistiek" },
 

@@ -216,6 +216,7 @@ table whose rows expand into per-category editors, with create/import in modals.
 | `/admin/paginas` (server-rendered table) | `pages.edit` or `pages.editAll` | Lists only the pages the user may edit (role match; editAll/superadmin sees all). Search + sort + pagination run in the DB (25/page); search spans every page the user may edit. Yearly-review pages not yet edited this working year float to the top with a yellow cue. Row → full-page markdown editor (`/admin/paginas/[id]`). "Nieuwe pagina" (title + slug) creates a draft and redirects to its editor. |
 | `/admin/paginas/[id]` (`PageContentEditor`) | `canEditPageContent` | Markdown content (NL/EN) + attachments, plus a settings card for the page's slug, editor roles and yearly flag (same check, not `pages.manage`), and Delete (`pages.delete` **and** `canEditPageContent`). |
 | `/admin/inhoud` (`ContentManager`) | `pages.manage` | Structure only: header categories, which page hangs where, titles, slug, publish, excerpts, editor roles + yearly flag. The tree lists only pages that hang under a category. "Pagina toevoegen" links an **existing** page (search via `/api/admin/pages/search`, `pages.manage`); creating, content, attachments and delete all live in `/admin/paginas`. |
+| `/admin/fakbar` | `fakbar.manage` | Scaffolding only for now: the tab exists and is gated, the screens still have to be built. The seeded `fakbar` role grants it to every member of the Fakbar post. |
 | `/admin/deur` (door access) | `door.manage` | Usage stats (1/7/30 d), temporary access grants (`DoorAccessGrant`, user typeahead + window), and the full access log (`DoorAccessLog`, incl. denied/unknown scans). |
 
 User pickers everywhere use the server-side typeahead `GET /api/users/search` (capped results), not
@@ -244,6 +245,8 @@ every member of the post gets the role):
 | `werkgroep` | none (fill in the GUI) | — |
 | `medewerker` | none (fill in the GUI) | — |
 | `theokot` | `theokot.manage`, `theokot.pickup` | Theokot |
+| `logistiek` | `logistiek.manage`, `modules.logistiek.access` | Logistiek |
+| `fakbar` | `fakbar.manage` | Fakbar |
 | `post-<code>` (one per post) | none (container to fill in the GUI) | its own post |
 
 The per-post roles (`post-it`, `post-cursusdienst`, …) are empty containers so you can hang

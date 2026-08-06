@@ -15,6 +15,7 @@ const CATEGORY_LABELS: Record<string, { nl: string; en: string }> = {
   general: { nl: "Website-inhoud", en: "Website content" },
   shift: { nl: "Shiften", en: "Shifts" },
   theokot: { nl: "Theokot", en: "Theokot" },
+  fakbar: { nl: "Fakbar", en: "Fakbar" },
   logistiek: { nl: "Logistiek", en: "Logistics" },
   door: { nl: "Deurtoegang", en: "Door access" },
   modules: { nl: "Moduletoegang", en: "Module access" },
