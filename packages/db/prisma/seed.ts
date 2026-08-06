@@ -1464,6 +1464,46 @@ async function main() {
     });
   }
 
+  // Kalendercategorieën: de doelgroep van een evenement, los van de post die het
+  // organiseert. Elke categorie krijgt een pagina (/kalender/<slug>) en een eigen
+  // ICS-feed. Naam, kleur en volgorde zijn daarna GUI-beheerd, dus we raken bij
+  // een herseed enkel de slug aan (`update: {}`); enkel nieuwe categorieën komen
+  // erbij.
+  // De eerste twee zijn doelgroepen: hun evenementen duiken vanzelf op bij wie
+  // erbij hoort en staan niet tussen de filterchips. De rest zijn gewone thema's.
+  const calendarCategories = [
+    {
+      slug: "eerstejaars",
+      nameNl: "Eerstejaars",
+      nameEn: "First years",
+      colour: "#EC4899",
+      audience: "FIRST_YEARS" as const,
+    },
+    {
+      slug: "internationaal",
+      nameNl: "Internationaal",
+      nameEn: "International",
+      colour: "#14B8A6",
+      audience: "INTERNATIONALS" as const,
+    },
+    { slug: "career", nameNl: "Career", nameEn: "Career", colour: "#0EA5E9", audience: null },
+    { slug: "cantus", nameNl: "Cantus", nameEn: "Cantus", colour: "#E11D48", audience: null },
+    { slug: "cultuur", nameNl: "Cultuur", nameEn: "Culture", colour: "#D946EF", audience: null },
+    { slug: "sport", nameNl: "Sport", nameEn: "Sports", colour: "#16A34A", audience: null },
+    { slug: "service", nameNl: "Service", nameEn: "Service", colour: "#F59E0B", audience: null },
+    { slug: "studie", nameNl: "Studie", nameEn: "Studies", colour: "#8B5CF6", audience: null },
+  ];
+  for (let i = 0; i < calendarCategories.length; i += 1) {
+    const c = calendarCategories[i];
+    await prisma.calendarCategory.upsert({
+      where: { slug: c.slug },
+      // Naam, kleur en volgorde zijn GUI-beheerd en blijven staan, maar `audience`
+      // hangt aan code (welk lid hoort erbij) en wordt dus wél bijgewerkt.
+      update: { audience: c.audience },
+      create: { ...c, order: i },
+    });
+  }
+
   console.log("Seed complete.");
 }
 

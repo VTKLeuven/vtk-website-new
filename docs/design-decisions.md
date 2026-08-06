@@ -561,6 +561,136 @@ bijgewerkt. De Brevo-sync (`apps/web/lib/brevo/`) haalt de tussenpersoon weg.
   aan waarvoor het mails wil. Bewuste keuze i.p.v. opt-out, om te stroken met de
   verwachting dat je zelf kiest waarvoor je ingeschreven wordt.
 
+## Kalender: categorieën en agenda-feeds
+
+### De site is de enige bron; geen koppeling met de Google-agenda
+
+VTK had een gedeelde Google Workspace-agenda. Die wordt **niet** gekoppeld: niet
+geïmporteerd, niet gespiegeld, niet gesynchroniseerd. De reden is dat
+`CalendarEvent` dingen draagt waar een Google-agenda geen plaats voor heeft: een
+Nederlandse én Engelse titel en beschrijving, `visibility` (publiek vs. enkel
+leden), `groupId` (dat bepaalt wie het event mag bewerken), een foto, en een 1:1-
+koppeling met `TicketEvent`. Zou Google de bron zijn, dan verlies je dat allemaal
+of moet je het in de eventbeschrijving proppen.
+
+Daar komt bij dat enkel praesidium en posten een `@vtk.be`-account hebben. Een
+agenda "gedeeld met alle VTK-leden" bereikt de gewone leden dus sowieso niet;
+daarvoor dient de persoonlijke feed hieronder.
+
+Two-way sync is bewust nooit overwogen: event-ids, verwijderingen, herhalingen en
+conflictresolutie leveren permanent onderhoud op voor iets wat een kring niet
+nodig heeft.
+
+### Categorieën staan naast de post, niet erin
+
+`CalendarEvent.groupId` zegt **wie** het evenement organiseert. `CalendarCategory`
+zegt **waarover het gaat** of **voor wie het is**. Dat zijn twee assen: een
+fakbar-cantus kan een eerstejaarsevent zijn, en een evenement van de post
+Internationaal hoeft niet op de internationale kalender te staan.
+
+Vóór deze feature stonden de filterchips en de legende hardgecodeerd in de client
+en mapten ze op groepscodes (gala=CULTUUR, career=BEDRIJVENRELATIES,
+cantus=FAKBAR). Dat klopte inhoudelijk niet en vereiste een release voor elke
+wijziging. Categorieën zijn nu GUI-beheerd (`/admin/kalender/categorieen`,
+`calendar.manageAll`), inclusief hun kleur: die komt als `--cat` op het element
+terecht, zodat er geen lijst CSS-klassen meer per categorie hoeft te bestaan.
+
+Een categorie verwijderen laat de evenementen zelf staan; enkel de koppeling en
+dus haar pagina en feed verdwijnen.
+
+### Doelgroepen filteren vanzelf, en zijn geen filterknop
+
+Een categorie kan een **doelgroep** dragen (`CalendarCategory.audience`:
+`FIRST_YEARS` of `INTERNATIONALS`). Zo'n categorie gedraagt zich anders dan een
+gewoon thema:
+
+- **Geen filterchip.** Een eerstejaars hoort niet op "Eerstejaars" te moeten
+  klikken om zijn eigen programma te zien; dat is precies de stap die niemand
+  zet. De kalender kijkt naar het profiel en toont die evenementen vanzelf.
+- **Wie er niet bij hoort, ziet ze standaard niet.** Dat is een standaard en geen
+  slot: één schakelaar ("ook andere doelgroepen") en alles staat er. Er wordt
+  dus niets afgeschermd; de kalender is enkel meteen relevant. De categoriepagina
+  `/kalender/eerstejaars` en haar feed blijven ook zonder die schakelaar gewoon
+  bereikbaar.
+- **Altijd zichtbaar gelabeld.** In het maandraster, in de agendalijst én op de
+  eventpagina draagt zo'n evenement de naam van zijn doelgroep in de kleur van de
+  categorie. Een evenement dat maar voor een deel van de leden bedoeld is, mag er
+  nooit uitzien als een gewoon evenement.
+
+De doelgroep is een enum en geen vrij veld, omdat er bij elke waarde code hoort
+die bepaalt wie erbij hoort (`lib/calendar/audience.ts`): eerstejaars zijn leden
+met `BACHELOR_1` in `studyYears`, internationals leden met
+`User.internationalStudent`. Een doelgroep toevoegen is dus bewust geen
+GUI-actie.
+
+**`internationalStudent` is een eigen profielveld**, gevraagd in de onboarding en
+te wijzigen op `/account`. De sitetaal (`locale`) leek een gratis alternatief,
+maar die zegt welke taal je leest, niet of je een uitwisselingsstudent bent: een
+Vlaming die de site op Engels zet zou dan internationale events krijgen en een
+Erasmusstudent die het in het Nederlands probeert niet. Vergelijk
+`Shift.openToInternationals`, dat om dezelfde reden over de taal van de shift
+gaat en niet over wie de persoon is.
+
+De homepage ("Opkomende evenementen") past dezelfde filter toe. Anders zou een
+eerstejaarsevent bij iedereen op de homepage staan terwijl het uit de kalender
+gefilterd is.
+
+### Eén dynamisch segment onder `/kalender`
+
+`/kalender/<slug>` (categorie) en `/kalender/<id>` (evenement) delen hetzelfde
+routesegment `[slugOrId]`, dat eerst een categorieslug probeert en anders een
+event-id. Twee dynamische segmenten naast elkaar kan Next.js niet, en de
+alternatieven waren slechter: `/kalender/c/<slug>` geeft een lelijke URL voor iets
+wat je aan een eerstejaars wil kunnen doorgeven, en de events verhuizen naar
+`/kalender/event/<id>` zou de bestaande links vanaf de homepage breken. Een
+botsing is uitgesloten omdat een slug beheerd wordt en alleen kleine letters,
+cijfers en koppeltekens mag bevatten, terwijl event-ids cuids zijn.
+
+### Twee weergaven: Agenda en Lijst
+
+`/kalender` had drie knoppen (Agenda, Maand, Lijst), maar Agenda en Lijst toonden
+allebei dezelfde lijst van de **komende 14 dagen**, ongeacht welke maand je
+bekeek; ze verschilden enkel in of de legende ernaast stond en of de lijst op
+acht items werd afgekapt. Bladeren met de maandpijlen deed er niets aan, en in een
+rustige periode waren beide leeg. Dat las als een defect.
+
+Nu zijn er twee: **Agenda** is het maandraster (de standaard; het raster *is* de
+agenda, dus "Maand" was een rare naam ernaast), met daaronder het blok
+"Eerstvolgend · komende 14 dagen". **Lijst** is dezelfde maand chronologisch, dus
+de pijlen werken in beide weergaven. Alleen het "eerstvolgend"-blok negeert
+bewust de gekozen maand: dat is precies waarvoor het dient.
+
+Een lege lijst zegt nu ook dát ze leeg is ("Geen evenementen deze maand"), in
+plaats van een leeg vlak te tonen.
+
+### Wat er in welke feed zit
+
+- Publieke feeds (`/api/calendar/feed`, `.../feed/c/<slug>`, `.../feed/g/<slug>`)
+  bevatten **enkel** `PUBLIC`-events. Een feed-URL is per definitie deelbaar, dus
+  ledenexclusieve evenementen horen daar niet in.
+- De algemene feed en de postfeeds laten **doelgroepevents weg**: dat is het
+  algemene programma. Wie enkel de eerstejaarskalender wil, abonneert zich op
+  `/feed/c/eerstejaars`.
+- De persoonlijke feed (`/api/calendar/feed/me/<token>`) is de enige met
+  `MEMBERS`-events, voegt de shiften toe waarvoor het lid is ingeschreven, en
+  volgt de doelgroepen van dat lid; een eerstejaars hoeft zich dus niet apart op
+  de eerstejaarsfeed te abonneren.
+- Elke feed draagt een venster van 12 maanden terug tot 24 vooruit. Clients halen
+  het bestand elk paar uur opnieuw op; de volledige historiek meesturen kost enkel
+  bandbreedte.
+- Feeds zijn abonnementen, geen downloads. Enkel op de detailpagina van één
+  evenement staat een echte `.ics`-download: dat ene event verandert zelden nog.
+
+### Feedtokens verlopen niet, deur-tokens wel
+
+`CalendarFeedToken` heeft bewust géén `expiresAt`, anders dan
+`DoorShortcutToken`. Een agenda-abonnement dat na 90 dagen stilletjes ophoudt met
+verversen, is erger dan geen abonnement: de agenda blijft verouderde evenementen
+tonen en niemand merkt dat er iets stuk is. Intrekken gebeurt expliciet vanuit
+`/account`. Een ingetrokken token geeft dezelfde 404 als een verzonnen token, en
+`lastUsedAt` wordt hoogstens één keer per uur weggeschreven; anders is elke poll
+van elke client een database-write.
+
 ## Homepage-secties & bandenritme
 
 De homepage is opgebouwd uit volle-breedte banden die bewust van kleur

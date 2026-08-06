@@ -8,7 +8,7 @@ import { hasPermission } from "@vtk/auth";
 import { deleteObject } from "@vtk/storage";
 import { requireSession } from "@/lib/session";
 import { readImageField, resolveImageKey } from "@/lib/imageField";
-import { saveError, type SaveState } from "@/lib/saveState";
+import { saveError, saveOk, type SaveState } from "@/lib/saveState";
 
 const eventSchema = z.object({
   id: z.string().optional(),
@@ -51,6 +51,7 @@ export async function saveEventAction(_prev: SaveState, formData: FormData): Pro
   const image = readImageField(formData);
   if (!parsed.success || image.kind === "invalid") return saveError("INVALID_INPUT");
   const input = parsed.data;
+  const categoryIds = formData.getAll("categoryIds").map(String).filter(Boolean);
 
   const start = new Date(input.start);
   const end = new Date(input.end);
@@ -82,12 +83,41 @@ export async function saveEventAction(_prev: SaveState, formData: FormData): Pro
     createdById: session.user.id,
   };
 
+  // De categorieën komen als losse checkbox-waarden binnen; alles wegdoen en
+  // opnieuw zetten houdt de koppeltabel gelijk aan wat het formulier toont, ook
+  // wanneer iemand een vinkje uitzet.
+  const setCategories = {
+    deleteMany: {},
+    create: categoryIds.map((categoryId) => ({ categoryId })),
+  };
+
+  let created: { id: string } | null = null;
+
   if (input.id) {
     const existing = await prisma.calendarEvent.findUnique({ where: { id: input.id } });
     if (!existing) return saveError("INVALID_INPUT");
     await assertCanManageEvent(userGroupIds, existing.groupId, superOrAll);
     const imageKey = resolveImageKey(image, existing.imageKey);
-    await prisma.calendarEvent.update({ where: { id: input.id }, data: { ...data, imageKey } });
+    await prisma.calendarEvent.update({
+      where: { id: input.id },
+      data: { ...data, imageKey, categories: setCategories },
+    });
+    // Een gekoppeld ticketevent erft deze velden. Zonder deze duw blijft de
+    // ticketshop de oude datum of locatie tonen tot iemand daar toevallig ook
+    // eens opslaat; dat verschil merkt niemand tot een koper op het verkeerde
+    // uur voor de deur staat.
+    await prisma.ticketEvent.updateMany({
+      where: { calendarEventId: input.id },
+      data: {
+        titleNl: input.titleNl,
+        titleEn: input.titleEn,
+        descriptionNl: input.descriptionNl,
+        descriptionEn: input.descriptionEn,
+        location: input.location,
+        startsAt: start,
+        endsAt: end,
+      },
+    });
     // De vervangen (of gewiste) afbeelding opruimen, zodat losse objecten niet
     // in de bucket blijven staan. Mislukt dat, dan is dat geen opslaanfout.
     if (existing.imageKey && existing.imageKey !== imageKey) {
@@ -98,15 +128,126 @@ export async function saveEventAction(_prev: SaveState, formData: FormData): Pro
       }
     }
   } else {
-    await prisma.calendarEvent.create({
-      data: { ...data, imageKey: resolveImageKey(image, null) },
+    created = await prisma.calendarEvent.create({
+      data: {
+        ...data,
+        imageKey: resolveImageKey(image, null),
+        categories: { create: categoryIds.map((categoryId) => ({ categoryId })) },
+      },
+      select: { id: true },
     });
   }
   revalidatePath("/kalender");
   revalidatePath("/admin/kalender");
-  // De redirect naar de lijst is zelf de bevestiging; loopt via een throw en
-  // hoort dus buiten elke try/catch te blijven.
+  // De categoriepagina's tonen dezelfde events; zonder dit blijft /kalender/<slug>
+  // de oude lijst tonen tot de cache vanzelf verloopt.
+  revalidatePath("/kalender/[slugOrId]", "page");
+  revalidatePath("/tickets");
+
+  // De redirect is zelf de bevestiging; loopt via een throw en hoort dus buiten
+  // elke try/catch te blijven.
+  //
+  // "Opslaan en tickets toevoegen" brengt je meteen naar het ticketformulier met
+  // dit evenement al gekoppeld, zodat je de titel, datums en locatie niet een
+  // tweede keer hoeft in te tikken.
+  if (created && formData.get("andThen") === "tickets") {
+    redirect(`/admin/tickets/new?calendarEvent=${created.id}`);
+  }
   redirect("/admin/kalender");
+}
+
+const categorySchema = z.object({
+  id: z.string().optional(),
+  slug: z
+    .string()
+    .trim()
+    .min(1)
+    .max(60)
+    // De slug zit in de publieke URL en in de feed-URL, dus enkel kleine letters,
+    // cijfers en koppeltekens; verder niets dat een URL nodig heeft te escapen.
+    .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/),
+  nameNl: z.string().trim().min(1).max(60),
+  nameEn: z.string().trim().min(1).max(60),
+  descriptionNl: z.string().optional().nullable(),
+  descriptionEn: z.string().optional().nullable(),
+  colour: z
+    .string()
+    .trim()
+    .regex(/^#[0-9a-fA-F]{6}$/),
+  order: z.coerce.number().int().min(0).max(999),
+  showOnCalendarPage: z.coerce.boolean().default(false),
+  // Leeg = gewoon thema. Bij elke doelgroepwaarde hoort code die bepaalt wie
+  // erbij hoort (lib/calendar/audience.ts), dus dit is een gesloten lijst.
+  audience: z.enum(["FIRST_YEARS", "INTERNATIONALS"]).nullable().default(null),
+});
+
+function revalidateCalendar() {
+  revalidatePath("/kalender");
+  revalidatePath("/en/kalender");
+  revalidatePath("/kalender/[slugOrId]", "page");
+  revalidatePath("/admin/kalender/categorieen");
+  revalidatePath("/en/admin/kalender/categorieen");
+}
+
+/**
+ * Maakt of bewerkt een kalendercategorie. De slug wijzigen breekt bestaande
+ * abonnementen en gedeelde links, dus dat is een bewuste beheerdersactie, geen
+ * bijwerking van een naamswijziging.
+ */
+export async function saveCalendarCategoryAction(
+  _prev: SaveState,
+  formData: FormData,
+): Promise<SaveState> {
+  const session = await requireSession();
+  if (!session.user.isSuperAdmin && !hasPermission(session, "calendar.manageAll")) {
+    throw new Error("forbidden");
+  }
+
+  const parsed = categorySchema.safeParse({
+    id: (formData.get("id") as string) || undefined,
+    slug: formData.get("slug"),
+    nameNl: formData.get("nameNl"),
+    nameEn: formData.get("nameEn"),
+    descriptionNl: formData.get("descriptionNl") || null,
+    descriptionEn: formData.get("descriptionEn") || null,
+    colour: formData.get("colour"),
+    order: formData.get("order") ?? 0,
+    showOnCalendarPage: formData.get("showOnCalendarPage") === "on",
+    audience: formData.get("audience") || null,
+  });
+  if (!parsed.success) return saveError("INVALID_INPUT");
+  const { id, ...data } = parsed.data;
+
+  // Een dubbele slug is gewone invoerfout, geen serverfout: hij hoort als rode
+  // toast terug te komen in plaats van in de error boundary te belanden.
+  const clash = await prisma.calendarCategory.findUnique({ where: { slug: data.slug } });
+  if (clash && clash.id !== id) return saveError("SLUG_TAKEN");
+
+  if (id) {
+    await prisma.calendarCategory.update({ where: { id }, data });
+  } else {
+    await prisma.calendarCategory.create({ data });
+  }
+
+  revalidateCalendar();
+  return saveOk();
+}
+
+/**
+ * Verwijdert een categorie. De events zelf blijven bestaan; enkel de koppeling
+ * verdwijnt (cascade op de koppeltabel), dus de pagina en de feed van die
+ * categorie houden op te bestaan maar er gaat geen enkel evenement verloren.
+ */
+export async function deleteCalendarCategoryAction(formData: FormData): Promise<void> {
+  const session = await requireSession();
+  if (!session.user.isSuperAdmin && !hasPermission(session, "calendar.manageAll")) {
+    throw new Error("forbidden");
+  }
+  const id = formData.get("id") as string;
+  if (!id) return;
+
+  await prisma.calendarCategory.delete({ where: { id } });
+  revalidateCalendar();
 }
 
 export async function deleteEventAction(formData: FormData): Promise<void> {

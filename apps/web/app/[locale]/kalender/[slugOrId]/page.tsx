@@ -7,8 +7,21 @@ import { Markdown } from "@/components/ui/Markdown";
 import { hasLocale } from "@/lib/locale";
 import { publicUrl } from "@/lib/storage";
 import { getDefaultEventImage } from "@/lib/defaultEventImage";
+import { CategoryCalendar, findCategoryBySlug } from "./CategoryCalendar";
 
 import "@/app/design/vtk-event.css";
+
+/**
+ * De zin op het doelgroeplabel. Bewust afgeleid van de doelgroep en niet van de
+ * categorienaam: "Voor " + naam levert "Voor internationaal" op, wat geen
+ * Nederlands is.
+ */
+function audienceLabel(audience: string | null, locale: Locale): string {
+  const nl = locale === "nl";
+  if (audience === "FIRST_YEARS") return nl ? "Voor eerstejaars" : "For first years";
+  if (audience === "INTERNATIONALS") return nl ? "Voor internationals" : "For international students";
+  return nl ? "Voor een specifieke doelgroep" : "For a specific audience";
+}
 
 function formatDateRange(start: Date, end: Date, locale: Locale, allDay: boolean) {
   const dateLocale = locale === "nl" ? "nl-BE" : "en-GB";
@@ -25,19 +38,38 @@ function formatDateRange(start: Date, end: Date, locale: Locale, allDay: boolean
   return `${day} · ${startTime} - ${endTime}`;
 }
 
-export default async function EventPage({
+/**
+ * Eén dynamisch segment onder /kalender voor twee dingen: een categorieslug
+ * ("eerstejaars") en een event-id (een cuid). De categorie krijgt voorrang,
+ * omdat haar slug beheerd wordt en dus nooit per ongeluk een cuid is. Zo houden
+ * we `vtk.be/kalender/eerstejaars` als URL zonder de bestaande links naar
+ * `/kalender/<id>` (vanaf de homepage) te breken.
+ */
+export default async function CalendarSegmentPage({
   params,
 }: {
-  params: Promise<{ locale: string; id: string }>;
+  params: Promise<{ locale: string; slugOrId: string }>;
 }) {
-  const { locale: localeParam, id } = await params;
+  const { locale: localeParam, slugOrId } = await params;
   if (!hasLocale(localeParam)) notFound();
   const locale: Locale = localeParam;
   const base = locale === "nl" ? "" : "/en";
 
+  const category = await findCategoryBySlug(slugOrId);
+  if (category) return <CategoryCalendar category={category} locale={locale} />;
+
   const event = await prisma.calendarEvent.findUnique({
-    where: { id },
-    include: { group: true, ticketEvent: { select: { slug: true, status: true } } },
+    where: { id: slugOrId },
+    include: {
+      group: true,
+      ticketEvent: { select: { slug: true, status: true } },
+      categories: {
+        select: {
+          category: { select: { slug: true, nameNl: true, nameEn: true, colour: true, audience: true } },
+        },
+        orderBy: { category: { order: "asc" } },
+      },
+    },
   });
 
   if (!event || event.visibility !== "PUBLIC") notFound();
@@ -46,6 +78,12 @@ export default async function EventPage({
   const description = pick(event.descriptionNl ?? "", event.descriptionEn ?? "", locale);
   const groupName = pick(event.group.nameNl, event.group.nameEn, locale);
   const imageSrc = publicUrl(event.imageKey) ?? (await getDefaultEventImage());
+  // Doelgroepen krijgen een eigen, opvallend label: wie hier toevallig belandt
+  // moet meteen zien dat het evenement voor eerstejaars of internationals is.
+  const audiences = event.categories
+    .map((c) => c.category)
+    .filter((c) => c.audience !== null);
+  const themes = event.categories.map((c) => c.category).filter((c) => c.audience === null);
 
   return (
     <article className="vtk-page">
@@ -59,6 +97,25 @@ export default async function EventPage({
           </div>
           <h1 className="vtk-page-title">{title}</h1>
           <p className="vtk-page-subtitle">{formatDateRange(event.start, event.end, locale, event.allDay)}</p>
+          {audiences.length > 0 || themes.length > 0 ? (
+            <div className="vtk-event-tags">
+              {audiences.map((c) => (
+                <Link
+                  key={c.slug}
+                  href={`${base}/kalender/${c.slug}`}
+                  className="vtk-event-tag audience"
+                  style={{ background: c.colour, borderColor: c.colour }}
+                >
+                  {audienceLabel(c.audience, locale)}
+                </Link>
+              ))}
+              {themes.map((c) => (
+                <Link key={c.slug} href={`${base}/kalender/${c.slug}`} className="vtk-event-tag">
+                  {pick(c.nameNl, c.nameEn, locale)}
+                </Link>
+              ))}
+            </div>
+          ) : null}
         </div>
         <div className="vtk-event-meta">
           <div>
@@ -111,6 +168,15 @@ export default async function EventPage({
             <Link href={`${base}/kalender`} className="btn btn-ghost">
               ← {locale === "nl" ? "Terug naar kalender" : "Back to calendar"}
             </Link>
+            {/* Losse download, geen abonnement: dit is één event, dat verandert
+                zelden nog na publicatie. Wie alles wil volgen, abonneert zich op
+                de feed vanaf /kalender. */}
+            <a
+              href={`/api/calendar/event/${event.id}${locale === "en" ? "?lang=en" : ""}`}
+              className="btn btn-ghost"
+            >
+              {locale === "nl" ? "Zet in mijn agenda" : "Add to my calendar"}
+            </a>
             {event.ticketEvent?.status === "PUBLISHED" ? (
               <Link href={`${base}/tickets/${event.ticketEvent.slug}`} className="btn btn-primary">
                 {locale === "nl" ? "Tickets kopen" : "Buy tickets"}

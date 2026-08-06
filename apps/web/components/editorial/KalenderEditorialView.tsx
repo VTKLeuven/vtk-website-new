@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { markdownToPlainText } from "@/lib/markdown";
+import { CalendarSubscribe } from "@/components/site/CalendarSubscribe";
 import { monthGridCells, isSameCalendarDay } from "./calendarGrid";
 
 type ApiEvent = {
@@ -19,122 +20,41 @@ type ApiEvent = {
     groupNameEn: string;
     descriptionNl: string | null;
     descriptionEn: string | null;
+    categories: Array<{
+      slug: string;
+      nameNl: string;
+      nameEn: string;
+      colour: string;
+      audience: string | null;
+    }>;
   };
 };
 
-const FILTER_CHIPS: Array<{ id: string; codes: string[] | null }> = [
-  { id: "all", codes: null },
-  { id: "gala", codes: ["CULTUUR"] },
-  { id: "career", codes: ["BEDRIJVENRELATIES"] },
-  { id: "cantus", codes: ["FAKBAR"] },
-  { id: "service", codes: ["THEOKOT", "CURSUSDIENST", "ONTHAAL", "LOGISTIEK"] },
-];
-
-function pillClass(code: string): "" | "gala" | "career" | "service" {
-  if (code === "CULTUUR") return "gala";
-  if (code === "BEDRIJVENRELATIES") return "career";
-  if (code === "THEOKOT" || code === "CURSUSDIENST" || code === "ONTHAAL" || code === "LOGISTIEK")
-    return "service";
-  return "";
-}
-
-function legendKey(code: string): "gala" | "cantus" | "career" | "service" | "blok" {
-  const p = pillClass(code);
-  if (p === "gala") return "gala";
-  if (p === "career") return "career";
-  if (p === "service") return "service";
-  if (code === "FAKBAR") return "cantus";
-  return "blok";
-}
-
-type LegendCounts = { gala: number; cantus: number; career: number; service: number; blok: number };
-
-/**
- * Legende plus abonneer-blok. Staat naast het maandraster, en naast de
- * agendalijst wanneer er geen raster is; daarom een eigen component in plaats
- * van twee keer dezelfde markup. Bewust op moduleniveau: een component die in
- * de render van een ander component wordt gedefinieerd, is bij elke render een
- * nieuw type en verliest dus zijn state (react-hooks/static-components).
- */
-function LegendAside({
-  labels,
-  legendCounts,
-}: {
-  labels: { legendTitle: string; legendSub: string; subscribeTitle: string; subscribeSub: string; ical: string; google: string; outlook: string };
-  legendCounts: LegendCounts;
-}) {
-  return (
-    <aside className="agenda-side">
-      <h3>{labels.legendTitle}</h3>
-      <div className="sub">{labels.legendSub}</div>
-      <ul className="agenda-side-list">
-        <li className="gala">
-          <span>
-            <span className="sw" />
-            Gala · TD
-          </span>
-          <span className="count">{String(legendCounts.gala).padStart(2, "0")}</span>
-        </li>
-        <li className="cantus">
-          <span>
-            <span className="sw" />
-            Cantus
-          </span>
-          <span className="count">{String(legendCounts.cantus).padStart(2, "0")}</span>
-        </li>
-        <li className="career">
-          <span>
-            <span className="sw" />
-            Career
-          </span>
-          <span className="count">{String(legendCounts.career).padStart(2, "0")}</span>
-        </li>
-        <li className="service">
-          <span>
-            <span className="sw" />
-            Service
-          </span>
-          <span className="count">{String(legendCounts.service).padStart(2, "0")}</span>
-        </li>
-        <li className="blok">
-          <span>
-            <span className="sw" />
-            Blok · studie
-          </span>
-          <span className="count">{String(legendCounts.blok).padStart(2, "0")}</span>
-        </li>
-      </ul>
-
-      <div className="subscribe-box">
-        <h3>{labels.subscribeTitle}</h3>
-        <div className="sub">{labels.subscribeSub}</div>
-        <div className="subscribe-actions">
-          <span className="btn btn-ghost arrow">
-            {labels.ical}
-          </span>
-          <span className="btn btn-ghost arrow">
-            {labels.google}
-          </span>
-          <span className="btn btn-ghost arrow">
-            {labels.outlook}
-          </span>
-        </div>
-      </div>
-    </aside>
-  );
-}
+/** Categorie zoals de serverpagina ze doorgeeft; de kleur komt uit de database. */
+export type CalendarCategoryOption = {
+  slug: string;
+  nameNl: string;
+  nameEn: string;
+  colour: string;
+  /** Niet-null = doelgroepcategorie: geen filterchip, maar een label op het event. */
+  audience: string | null;
+};
 
 export function KalenderEditorialView({
   locale,
   labels,
+  categories,
+  feedUrl,
+  lockedCategory,
+  heading,
+  parentCrumb,
+  intro,
 }: {
   locale: "nl" | "en";
   labels: {
     crumbsHome: string;
     crumbsHere: string;
     metaEvents: string;
-    metaCategories: string;
-    metaExport: string;
     weekLine: string;
     legendTitle: string;
     legendSub: string;
@@ -142,20 +62,39 @@ export function KalenderEditorialView({
     agendaSub: string;
     subscribeTitle: string;
     subscribeSub: string;
-    ical: string;
-    google: string;
-    outlook: string;
     prevEvents: string;
     nextMonth: string;
-    chips: Record<string, string>;
-    views: { agenda: string; month: string; list: string };
+    all: string;
+    uncategorised: string;
+    showAllAudiences: string;
+    showAllAudiencesHint: string;
+    emptyMonth: string;
+    emptyUpcoming: string;
+    views: { agenda: string; list: string };
   };
+  categories: CalendarCategoryOption[];
+  /** Absolute URL van de ICS-feed die bij deze weergave hoort. */
+  feedUrl: string;
+  /**
+   * Op een categoriepagina staat de filter vast op die categorie: de chips
+   * verdwijnen dan, want er valt niets meer te kiezen.
+   */
+  lockedCategory?: string;
+  /** Vervangt "Kalender <jaar>." als paginatitel, bv. door de categorienaam. */
+  heading?: string;
+  /** Extra kruimel tussen Home en de huidige pagina, bv. terug naar /kalender. */
+  parentCrumb?: { label: string; href: string };
+  /** Introtekst onder de kop, bv. de beschrijving van een categorie. */
+  intro?: React.ReactNode;
 }) {
   const base = locale === "nl" ? "" : "/en";
   const now = new Date();
   const [cursor, setCursor] = useState(() => new Date(now.getFullYear(), now.getMonth(), 1));
-  const [filter, setFilter] = useState("all");
-  const [view, setView] = useState<"month" | "agenda" | "list">("month");
+  const [filter, setFilter] = useState<string>(lockedCategory ?? "all");
+  const [view, setView] = useState<"agenda" | "list">("agenda");
+  // Standaard toont de kalender enkel de doelgroepevents die bij jou horen. Dit
+  // is een voorkeur, geen slot: één klik en alles staat er.
+  const [showAllAudiences, setShowAllAudiences] = useState(false);
   const [monthEvents, setMonthEvents] = useState<ApiEvent[]>([]);
   const [agendaEvents, setAgendaEvents] = useState<ApiEvent[]>([]);
 
@@ -163,21 +102,23 @@ export function KalenderEditorialView({
   const month = cursor.getMonth();
   const cells = useMemo(() => monthGridCells(year, month), [year, month]);
 
+  const categoryName = useCallback(
+    (c: { nameNl: string; nameEn: string }) => (locale === "nl" ? c.nameNl : c.nameEn),
+    [locale],
+  );
+
   const fetchForRange = useCallback(
     async (start: Date, end: Date) => {
       const url = new URL("/api/calendar/events", window.location.origin);
       url.searchParams.set("start", start.toISOString());
       url.searchParams.set("end", end.toISOString());
-      const chip = FILTER_CHIPS.find((c) => c.id === filter);
-      const codes = chip?.codes;
-      if (codes && codes.length > 0) {
-        for (const c of codes) url.searchParams.append("group", c);
-      }
+      if (filter !== "all") url.searchParams.set("category", filter);
+      if (showAllAudiences) url.searchParams.set("audience", "all");
       const res = await fetch(url.toString());
       if (!res.ok) return [];
       return (await res.json()) as ApiEvent[];
     },
-    [filter]
+    [filter, showAllAudiences],
   );
 
   useEffect(() => {
@@ -209,7 +150,7 @@ export function KalenderEditorialView({
     return () => {
       cancelled = true;
     };
-  }, [fetchForRange, filter]);
+  }, [fetchForRange]);
 
   const eventsByDay = useMemo(() => {
     const m = new Map<string, ApiEvent[]>();
@@ -226,13 +167,47 @@ export function KalenderEditorialView({
     return m;
   }, [monthEvents]);
 
-  const legendCounts = useMemo(() => {
-    const acc = { gala: 0, cantus: 0, career: 0, service: 0, blok: 0 };
+  /**
+   * De legende telt per categorie hoeveel events er deze maand in zitten. Een
+   * event met twee categorieën telt in beide; een event zonder categorie belandt
+   * in de restrij, die enkel verschijnt als ze niet leeg is.
+   */
+  /**
+   * De evenementen van de maand zelf, chronologisch. `monthEvents` dekt het hele
+   * raster van 42 cellen en bevat dus ook de uitlopers van de vorige en volgende
+   * maand; die horen niet in een lijst met "Augustus 2026" erboven.
+   */
+  const monthOnlyEvents = useMemo(
+    () =>
+      monthEvents
+        .filter((e) => {
+          const d = new Date(e.start);
+          return d.getFullYear() === year && d.getMonth() === month;
+        })
+        .sort((a, b) => +new Date(a.start) - +new Date(b.start)),
+    [monthEvents, year, month],
+  );
+
+  const legend = useMemo(() => {
+    const counts = new Map<string, number>();
+    let uncategorised = 0;
     for (const e of monthEvents) {
-      acc[legendKey(e.extendedProps.groupCode)] += 1;
+      if (e.extendedProps.categories.length === 0) {
+        uncategorised += 1;
+        continue;
+      }
+      for (const c of e.extendedProps.categories) {
+        counts.set(c.slug, (counts.get(c.slug) ?? 0) + 1);
+      }
     }
-    return acc;
-  }, [monthEvents]);
+    const rows = categories
+      .filter((c) => (counts.get(c.slug) ?? 0) > 0)
+      .map((c) => ({ key: c.slug, name: categoryName(c), colour: c.colour, count: counts.get(c.slug)! }));
+    if (uncategorised > 0) {
+      rows.push({ key: "__rest", name: labels.uncategorised, colour: "", count: uncategorised });
+    }
+    return rows;
+  }, [monthEvents, categories, categoryName, labels.uncategorised]);
 
   const monthLabel = cursor.toLocaleDateString(locale === "nl" ? "nl-BE" : "en-GB", {
     month: "long",
@@ -245,7 +220,7 @@ export function KalenderEditorialView({
       day: "2-digit",
       month: "short",
     }) +
-    " — " +
+    " - " +
     gridTo.toLocaleDateString(locale === "nl" ? "nl-BE" : "en-GB", {
       day: "2-digit",
       month: "short",
@@ -264,6 +239,20 @@ export function KalenderEditorialView({
     return locale === "nl" ? e.extendedProps.groupNameNl : e.extendedProps.groupNameEn;
   }
 
+  /** De eerste categorie bepaalt de kleur van de pil en het label in de agendalijst. */
+  function primaryCategory(e: ApiEvent) {
+    return e.extendedProps.categories[0] ?? null;
+  }
+
+  /**
+   * De doelgroepen van een event. Die moeten altijd zichtbaar zijn: een event dat
+   * voor eerstejaars of internationals bedoeld is, mag niet als een gewoon
+   * evenement in het raster staan waar iemand anders zich dan op verkijkt.
+   */
+  function audienceCategories(e: ApiEvent) {
+    return e.extendedProps.categories.filter((c) => c.audience !== null);
+  }
+
   function eventTime(e: ApiEvent) {
     if (e.allDay) return locale === "nl" ? "Hele dag" : "All day";
     return new Date(e.start).toLocaleTimeString(locale === "nl" ? "nl-BE" : "en-GB", {
@@ -280,72 +269,213 @@ export function KalenderEditorialView({
     return `${base}/kalender/${e.id}`;
   }
 
-  const showGrid = view === "month";
+  const showGrid = view === "agenda";
+
+  /**
+   * Eén rij in een evenementenlijst. Gedeeld door de "eerstvolgend"-lijst onder
+   * het raster en de maandlijst, zodat beide dezelfde labels en dezelfde
+   * kleurlogica houden.
+   */
+  function renderRow(e: ApiEvent) {
+    // Het label rechts toont het thema. De doelgroep staat al bij de titel, dus
+    // die hier herhalen zou twee keer "Eerstejaars" geven.
+    const cat = e.extendedProps.categories.find((c) => c.audience === null) ?? null;
+    const d = new Date(e.start);
+    const dateLocale = locale === "nl" ? "nl-BE" : "en-GB";
+    return (
+      <a key={e.id} href={eventHref(e)} className="ag-row">
+        <div className="ag-date">
+          <b>{String(d.getDate()).padStart(2, "0")}</b>
+          {d.toLocaleDateString(dateLocale, { month: "short" })} ·{" "}
+          {d.toLocaleDateString(dateLocale, { weekday: "short" })}
+        </div>
+        <div className="ag-title">
+          {pickTitle(e)}
+          {audienceCategories(e).map((a) => (
+            <span
+              key={a.slug}
+              className="ag-audience"
+              style={{ "--cat": a.colour } as React.CSSProperties}
+            >
+              {categoryName(a)}
+            </span>
+          ))}
+          <small>
+            {eventTime(e)}
+            {e.location ? ` · ${e.location}` : ""}
+          </small>
+        </div>
+        <div className="ag-desc">{pickDesc(e) || pickGroup(e)}</div>
+        <div
+          className="ag-tag"
+          style={
+            cat
+              ? ({ background: cat.colour, borderColor: cat.colour, color: "#fff" } as React.CSSProperties)
+              : undefined
+          }
+        >
+          {cat ? categoryName(cat) : pickGroup(e)}
+        </div>
+        <div className="ag-go">→</div>
+      </a>
+    );
+  }
+
+  const monthNav = (
+    <div style={{ display: "flex", justifyContent: "space-between", marginTop: 32, flexWrap: "wrap", gap: 12 }}>
+      <button type="button" className="btn btn-ghost arrow" onClick={() => shiftMonth(-1)}>
+        {labels.prevEvents}
+      </button>
+      <button type="button" className="btn btn-primary arrow" onClick={() => shiftMonth(1)}>
+        {labels.nextMonth}
+      </button>
+    </div>
+  );
+
+  /**
+   * Legende plus abonneerblok. Staat naast het maandraster, en naast de
+   * agendalijst wanneer er geen raster is.
+   */
+  const aside = (
+    <aside className="agenda-side">
+      <h3>{labels.legendTitle}</h3>
+      <div className="sub">{labels.legendSub}</div>
+      <ul className="agenda-side-list">
+        {legend.map((row) => (
+          <li key={row.key}>
+            <span>
+              <span
+                className="sw"
+                style={row.colour ? ({ "--cat": row.colour } as React.CSSProperties) : undefined}
+              />
+              {row.name}
+            </span>
+            <span className="count">{String(row.count).padStart(2, "0")}</span>
+          </li>
+        ))}
+      </ul>
+
+      <CalendarSubscribe
+        feedUrl={feedUrl}
+        locale={locale}
+        labels={{ title: labels.subscribeTitle, sub: labels.subscribeSub }}
+      />
+    </aside>
+  );
 
   return (
     <>
       <header className="page-head">
         <div>
           <div className="crumbs">
-            {labels.crumbsHome} · <span style={{ color: "var(--ink)" }}>{labels.crumbsHere}</span>
+            {labels.crumbsHome} ·{" "}
+            {parentCrumb ? (
+              <>
+                <a href={parentCrumb.href}>{parentCrumb.label}</a> ·{" "}
+              </>
+            ) : null}
+            <span style={{ color: "var(--ink)" }}>{labels.crumbsHere}</span>
           </div>
           <h1>
-            {locale === "nl" ? "Kalender " : "Calendar "}
-            <em>{year}.</em>
+            {heading ? (
+              heading
+            ) : (
+              <>
+                {locale === "nl" ? "Kalender " : "Calendar "}
+                <em>{year}.</em>
+              </>
+            )}
           </h1>
+          {intro ? <div className="page-head-intro">{intro}</div> : null}
         </div>
-        {/* Compacte kop: enkel de teller. De categorieën staan al als filters in
-            de toolbar en als legende naast de kalender, en de export-opties in
-            het abonneer-blok; drie keer hetzelfde duwde de kalender uit beeld. */}
         <div className="page-head-meta">
           <b>{monthEvents.length}</b> {labels.metaEvents}
         </div>
       </header>
 
       <div className="kal-wrap">
+        {/* De weergavekeuze staat bovenaan bij de maandnavigatie, niet naast de
+            filterchips: daar leek ze een categorie in plaats van "hoe kijk ik". */}
         <div className="toolbar">
-          <div className="nav-mo">
-            <button type="button" onClick={() => shiftMonth(-1)} aria-label="Previous month">
-              ←
-            </button>
-            <button type="button" onClick={() => shiftMonth(1)} aria-label="Next month">
-              →
-            </button>
-          </div>
-          <div className="mo-label">
-            {monthLabel.charAt(0).toUpperCase() + monthLabel.slice(1)}
-            <small>
-              {labels.weekLine} {gridRange} · {monthEvents.length}{" "}
-              {locale === "nl" ? "evenementen" : "events"}
-            </small>
-          </div>
-          <div className="filters">
-            {FILTER_CHIPS.map((c) => (
-              <button
-                key={c.id}
-                type="button"
-                className={`filter${filter === c.id ? " on" : ""}`}
-                onClick={() => setFilter(c.id)}
-              >
-                {labels.chips[c.id] ?? c.id}
+          <div className="toolbar-top">
+            <div className="nav-mo">
+              <button type="button" onClick={() => shiftMonth(-1)} aria-label="Previous month">
+                ←
               </button>
-            ))}
+              <button type="button" onClick={() => shiftMonth(1)} aria-label="Next month">
+                →
+              </button>
+            </div>
+            <div className="mo-label">
+              {monthLabel.charAt(0).toUpperCase() + monthLabel.slice(1)}
+              <small>
+                {labels.weekLine} {gridRange} · {monthEvents.length}{" "}
+                {monthEvents.length === 1
+                  ? locale === "nl"
+                    ? "evenement"
+                    : "event"
+                  : locale === "nl"
+                    ? "evenementen"
+                    : "events"}
+              </small>
+            </div>
+            <div className="view-switch" role="group" aria-label={locale === "nl" ? "Weergave" : "View"}>
+              <button
+                type="button"
+                className={view === "agenda" ? "on" : ""}
+                aria-pressed={view === "agenda"}
+                onClick={() => setView("agenda")}
+              >
+                {labels.views.agenda}
+              </button>
+              <button
+                type="button"
+                className={view === "list" ? "on" : ""}
+                aria-pressed={view === "list"}
+                onClick={() => setView("list")}
+              >
+                {labels.views.list}
+              </button>
+            </div>
           </div>
-          <div className="view-switch">
-            <button type="button" className={view === "agenda" ? "on" : ""} onClick={() => setView("agenda")}>
-              {labels.views.agenda}
-            </button>
-            <button type="button" className={view === "month" ? "on" : ""} onClick={() => setView("month")}>
-              {labels.views.month}
-            </button>
-            <button type="button" className={view === "list" ? "on" : ""} onClick={() => setView("list")}>
-              {labels.views.list}
-            </button>
-          </div>
+
+          {!lockedCategory && (
+            <div className="toolbar-filters">
+              <div className="filters">
+                <button
+                  type="button"
+                  className={`filter${filter === "all" ? " on" : ""}`}
+                  onClick={() => setFilter("all")}
+                >
+                  {labels.all}
+                </button>
+                {/* Enkel gewone thema's. Doelgroepen (eerstejaars, internationaal)
+                    zijn geen keuze maar volgen uit je profiel. */}
+                {categories
+                  .filter((c) => c.audience === null)
+                  .map((c) => (
+                    <button
+                      key={c.slug}
+                      type="button"
+                      className={`filter${filter === c.slug ? " on" : ""}`}
+                      onClick={() => setFilter(c.slug)}
+                    >
+                      {categoryName(c)}
+                    </button>
+                  ))}
+              </div>
+              <label className="audience-toggle" title={labels.showAllAudiencesHint}>
+                <input
+                  type="checkbox"
+                  checked={showAllAudiences}
+                  onChange={(e) => setShowAllAudiences(e.target.checked)}
+                />
+                {labels.showAllAudiences}
+              </label>
+            </div>
+          )}
         </div>
 
-        {/* De legende staat naast het maandraster: onder de kalender viel ze
-            buiten beeld, en het raster hoeft niet de volle breedte. */}
         {showGrid && (
           <div className="kal-main">
             <div className="cal">
@@ -367,9 +497,24 @@ export function KalenderEditorialView({
                   <div key={key} className={`cal-cell${!inMonth ? " out" : ""}${isToday ? " today" : ""}`}>
                     <div className="num">{String(date.getDate()).padStart(2, "0")}</div>
                     {show.map((e) => {
-                      const pc = pillClass(e.extendedProps.groupCode);
+                      const cat = primaryCategory(e);
+                      const audiences = audienceCategories(e);
                       return (
-                        <a key={e.id} href={eventHref(e)} className={`ev-pill${pc ? ` ${pc}` : ""}`}>
+                        <a
+                          key={e.id}
+                          href={eventHref(e)}
+                          className={`ev-pill${cat ? " tinted" : ""}`}
+                          style={cat ? ({ "--cat": cat.colour } as React.CSSProperties) : undefined}
+                        >
+                          {audiences.map((a) => (
+                            <span
+                              key={a.slug}
+                              className="ev-audience"
+                              style={{ "--cat": a.colour } as React.CSSProperties}
+                            >
+                              {categoryName(a)}
+                            </span>
+                          ))}
                           <b>{pickTitle(e)}</b>
                           <span>
                             {eventTime(e)}
@@ -387,87 +532,54 @@ export function KalenderEditorialView({
                 );
               })}
             </div>
-            <LegendAside labels={labels} legendCounts={legendCounts} />
+            {aside}
           </div>
         )}
 
-        {(view === "month" || view === "agenda" || view === "list") && (
-          <section
-            className="agenda"
-            style={{
-              marginTop: view === "list" && !showGrid ? 0 : 48,
-              gridTemplateColumns: view === "agenda" ? undefined : "1fr",
-            }}
-          >
-            {view === "agenda" && <LegendAside labels={labels} legendCounts={legendCounts} />}
-
+        {/* Agenda: onder het raster staat wat er de komende twee weken op je
+            afkomt. Dat is het enige blok dat bewust niet met de pijlen meegaat. */}
+        {view === "agenda" && (
+          <section className="agenda" style={{ marginTop: 48, gridTemplateColumns: "1fr" }}>
             <div>
               <div className="agenda-head">
                 <h2>{labels.agendaNext}</h2>
                 <div>{labels.agendaSub}</div>
               </div>
-              <div className="agenda-list">
-                {(view === "list" ? agendaEvents : agendaEvents.slice(0, 8)).map((e) => {
-                  const d = new Date(e.start);
-                  const tag =
-                    legendKey(e.extendedProps.groupCode) === "gala"
-                      ? "Gala"
-                      : legendKey(e.extendedProps.groupCode) === "career"
-                        ? "Career"
-                        : legendKey(e.extendedProps.groupCode) === "service"
-                          ? "Service"
-                          : legendKey(e.extendedProps.groupCode) === "cantus"
-                            ? "Cantus"
-                            : "Blok";
-                  const row = (
-                    <>
-                      <div className="ag-date">
-                        <b>{String(d.getDate()).padStart(2, "0")}</b>
-                        {d.toLocaleDateString(locale === "nl" ? "nl-BE" : "en-GB", {
-                          month: "short",
-                        })}{" "}
-                        ·{" "}
-                        {d.toLocaleDateString(locale === "nl" ? "nl-BE" : "en-GB", {
-                          weekday: "short",
-                        })}
-                      </div>
-                      <div className="ag-title">
-                        {pickTitle(e)}
-                        <small>
-                          {eventTime(e)}
-                          {e.location ? ` · ${e.location}` : ""}
-                        </small>
-                      </div>
-                      <div className="ag-desc">{pickDesc(e) || pickGroup(e)}</div>
-                      <div
-                        className="ag-tag"
-                        style={
-                          tag === "Gala"
-                            ? { background: "var(--accent)", borderColor: "var(--accent)" }
-                            : undefined
-                        }
-                      >
-                        {tag}
-                      </div>
-                      <div className="ag-go">→</div>
-                    </>
-                  );
-                  return (
-                    <a key={e.id} href={eventHref(e)} className="ag-row">
-                      {row}
-                    </a>
-                  );
-                })}
-              </div>
+              {agendaEvents.length === 0 ? (
+                <p className="agenda-empty">{labels.emptyUpcoming}</p>
+              ) : (
+                <div className="agenda-list">{agendaEvents.slice(0, 8).map(renderRow)}</div>
+              )}
+              {monthNav}
+            </div>
+          </section>
+        )}
 
-              <div style={{ display: "flex", justifyContent: "space-between", marginTop: 32, flexWrap: "wrap", gap: 12 }}>
-                <button type="button" className="btn btn-ghost arrow" onClick={() => shiftMonth(-1)}>
-                  {labels.prevEvents}
-                </button>
-                <button type="button" className="btn btn-primary arrow" onClick={() => shiftMonth(1)}>
-                  {labels.nextMonth}
-                </button>
+        {/* Lijst: dezelfde maand als het raster, chronologisch, met de legende en
+            het abonneerblok ernaast. */}
+        {view === "list" && (
+          <section className="agenda" style={{ marginTop: 0 }}>
+            {aside}
+            <div>
+              <div className="agenda-head">
+                <h2>{monthLabel.charAt(0).toUpperCase() + monthLabel.slice(1)}</h2>
+                <div>
+                  {monthOnlyEvents.length}{" "}
+                  {monthOnlyEvents.length === 1
+                    ? locale === "nl"
+                      ? "evenement"
+                      : "event"
+                    : locale === "nl"
+                      ? "evenementen"
+                      : "events"}
+                </div>
               </div>
+              {monthOnlyEvents.length === 0 ? (
+                <p className="agenda-empty">{labels.emptyMonth}</p>
+              ) : (
+                <div className="agenda-list">{monthOnlyEvents.map(renderRow)}</div>
+              )}
+              {monthNav}
             </div>
           </section>
         )}
