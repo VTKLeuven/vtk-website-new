@@ -301,6 +301,17 @@ const icons: Record<string, ReactNode> = {
       <path d="M13 17v2" />
     </Svg>
   ),
+  // evenementen: de groep met kalender + tickets -> kalender met een ster erin,
+  // zodat ze herkenbaar blijft naast de gewone kalender-tab eronder.
+  evenementen: (
+    <Svg>
+      <rect x="3" y="4" width="18" height="18" rx="2" />
+      <path d="M16 2v4" />
+      <path d="M8 2v4" />
+      <path d="M3 10h18" />
+      <path d="m12 13 1.2 2.4 2.8.4-2 1.9.5 2.7-2.5-1.3-2.5 1.3.5-2.7-2-1.9 2.8-.4Z" />
+    </Svg>
+  ),
   // calendar: kalender
   calendar: (
     <Svg>
