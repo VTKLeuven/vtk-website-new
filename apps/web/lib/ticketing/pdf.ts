@@ -168,6 +168,7 @@ const MARGIN = 48;
 function drawClassicTicket(
   page: PdfPage,
   design: TicketDesignSnapshot,
+  artwork: PdfImage | null,
   logo: PdfImage | null,
   sponsorLogo: PdfImage | null,
   fonts: { regular: PdfFont; bold: PdfFont },
@@ -205,7 +206,14 @@ function drawClassicTicket(
     drawContain(page, logo, (width - size) / 2, MARGIN, size, size, 0.045);
   }
 
-  page.drawRectangle({ x: 0, y: bandBottom, width, height: bandHeight, color: bandFill });
+  if (artwork) {
+    // Same idea as the site's hero: a full-bleed photo under a navy scrim, so
+    // uploaded artwork and the flat-colour fallback share one text treatment.
+    drawCover(page, artwork, 0, bandBottom, width, bandHeight, design.artwork?.focalX ?? 50, design.artwork?.focalY ?? 50);
+    page.drawRectangle({ x: 0, y: bandBottom, width, height: bandHeight, color: bandFill, opacity: 0.72 });
+  } else {
+    page.drawRectangle({ x: 0, y: bandBottom, width, height: bandHeight, color: bandFill });
+  }
   page.drawRectangle({ x: 0, y: bandBottom - ruleHeight, width, height: ruleHeight, color: accent });
 
   if (logo) drawContain(page, logo, MARGIN, height - MARGIN - 42, 42, 42);
@@ -366,7 +374,7 @@ export async function generateTicketsPdf(input: TicketPdfInput): Promise<Uint8Ar
     };
 
     if (design.template === "CLASSIC") {
-      drawClassicTicket(page, design, logo, sponsorLogo, { regular, bold }, content);
+      drawClassicTicket(page, design, artwork, logo, sponsorLogo, { regular, bold }, content);
     } else {
       drawArtworkTicket(page, design, artwork, logo, sponsorLogo, { regular, bold }, content);
     }
