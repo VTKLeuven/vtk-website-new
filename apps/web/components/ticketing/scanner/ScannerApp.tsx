@@ -17,10 +17,12 @@ import {
   RefreshCw,
   RotateCcw,
   ScanLine,
+  Search,
   Signal,
   SignalZero,
   TicketCheck,
   UserRound,
+  Users,
   WifiOff,
   X,
   XCircle,
@@ -38,6 +40,7 @@ import type {
   ScannerManifest,
 } from "./types";
 import { loadManifest, loadQueue, saveManifest, saveQueue, verifyOffline } from "./offline";
+import { InstallButton } from "./InstallButton";
 
 const ACCEPTED_RESULTS = new Set(["ACCEPTED", "CHECKED_IN", "SUCCESS", "VALID"]);
 const DUPLICATE_RESULTS = new Set(["DUPLICATE", "ALREADY_CHECKED_IN", "ALREADY_USED"]);
@@ -147,8 +150,11 @@ export function ScannerApp({ eventId }: { eventId: string }) {
   const [conflicts, setConflicts] = useState<ScanConflict[]>([]);
   // De codes die dit toestel deze sessie al aanvaardde. Dubbels aan dezelfde deur
   // vangen we daarmee ook offline af; dubbels tussen deuren pas bij het
-  // synchroniseren, want daar is netwerk voor nodig.
-  const scannedCodesRef = useRef<Set<string>>(new Set());
+  // synchroniseren, want daar is netwerk voor nodig. State en geen ref, want de
+  // namenlijst moet meteen zien wie er net binnen is.
+  const [scannedCodes, setScannedCodes] = useState<Set<string>>(new Set());
+  const [listOpen, setListOpen] = useState(false);
+  const [listQuery, setListQuery] = useState("");
 
   const loadBootstrap = useCallback(async () => {
     setLoading(true);
@@ -315,7 +321,7 @@ export function ScannerApp({ eventId }: { eventId: string }) {
         return;
       }
 
-      const verdict = verifyOffline(manifest, credential, scannedCodesRef.current);
+      const verdict = verifyOffline(manifest, credential, scannedCodes);
       const clientScanId = createId();
       const entry = "entry" in verdict ? verdict.entry : undefined;
       const item: ScanHistoryItem = {
@@ -338,7 +344,10 @@ export function ScannerApp({ eventId }: { eventId: string }) {
                   : "Code niet leesbaar",
       };
 
-      if (verdict.kind === "accepted") scannedCodesRef.current.add(verdict.entry.code);
+      if (verdict.kind === "accepted") {
+        const code = verdict.entry.code;
+        setScannedCodes((current) => new Set(current).add(code));
+      }
 
       // Ook een offline geweigerde scan gaat mee: de server doet de volledige
       // controle en het scanlogboek hoort compleet te zijn.
@@ -388,6 +397,10 @@ export function ScannerApp({ eventId }: { eventId: string }) {
       };
       setFeedback(item);
       setHistory((items) => [item, ...items].slice(0, 50));
+      if (kind === "accepted" && payload.ticket?.publicId) {
+        const code = payload.ticket.publicId;
+        setScannedCodes((current) => new Set(current).add(code));
+      }
       if (payload.stats) setServerStats(payload.stats);
       if (kind !== "error") {
         setSessionCounts((counts) => ({
@@ -411,7 +424,7 @@ export function ScannerApp({ eventId }: { eventId: string }) {
       if (feedbackTimerRef.current) clearTimeout(feedbackTimerRef.current);
       feedbackTimerRef.current = setTimeout(() => setFeedback(null), 1800);
     }
-  }, [deviceId, eventId, gateId, manifest]);
+  }, [deviceId, eventId, gateId, manifest, scannedCodes]);
 
   useEffect(() => {
     processRef.current = (value) => void processCredential(value);
@@ -483,6 +496,31 @@ export function ScannerApp({ eventId }: { eventId: string }) {
     void processCredential(manualCode);
     setManualCode("");
   }
+
+  /**
+   * De deelnemerslijst, gefilterd op naam of ticketcode.
+   *
+   * Voor wie zijn QR kwijt is of een telefoon zonder batterij heeft: je zoekt de
+   * naam op en checkt die persoon rechtstreeks in. Werkt ook offline, want de
+   * lijst is het manifest dat al op het toestel staat.
+   *
+   * Bewust afgekapt op vijftig rijen: een galabal telt er meer dan duizend, en
+   * die allemaal tekenen maakt het scrollen op een telefoon stroperig. Wie iemand
+   * zoekt, typt toch een paar letters.
+   */
+  const listResults = (() => {
+    if (!manifest) return { rows: [], total: 0 };
+    const query = listQuery.trim().toLowerCase();
+    const matches = manifest.tickets
+      .filter(
+        (ticket) =>
+          !query ||
+          ticket.name.toLowerCase().includes(query) ||
+          ticket.code.toLowerCase().includes(query),
+      )
+      .sort((a, b) => a.name.localeCompare(b.name, "nl"));
+    return { rows: matches.slice(0, 50), total: matches.length };
+  })();
 
   async function reverseScan(item: ScanHistoryItem) {
     if (!item.scanId || reversingScanId) return;
@@ -606,6 +644,8 @@ export function ScannerApp({ eventId }: { eventId: string }) {
         </div>
       ) : null}
 
+      <InstallButton />
+
       <div className="scanner-workspace">
         <section className="scanner-camera-panel">
           <div className="scanner-video-wrap" id="scanner-camera-view">
@@ -653,7 +693,80 @@ export function ScannerApp({ eventId }: { eventId: string }) {
             >
               <Keyboard size={19} aria-hidden="true" /> Handmatig
             </button>
+            <button
+              type="button"
+              className={listOpen ? "is-active" : ""}
+              aria-expanded={listOpen}
+              aria-controls="scanner-name-list"
+              disabled={!manifest}
+              title={manifest ? undefined : "Deelnemerslijst niet beschikbaar voor dit event"}
+              onClick={() => setListOpen((current) => !current)}
+            >
+              <Users size={19} aria-hidden="true" /> Op naam
+            </button>
           </div>
+
+          {/* Zoeken op naam. De lijst komt uit het manifest, dus dit werkt ook
+              zonder netwerk; aantikken checkt die persoon in via hetzelfde pad
+              als een handmatig ingetikte code. */}
+          {listOpen && manifest ? (
+            <section className="scanner-name-list" id="scanner-name-list" aria-label="Deelnemers zoeken">
+              <div className="scanner-name-search">
+                <Search size={17} aria-hidden="true" />
+                <input
+                  value={listQuery}
+                  onChange={(event) => setListQuery(event.target.value)}
+                  placeholder="Zoek een naam"
+                  aria-label="Zoek een deelnemer op naam"
+                  autoComplete="off"
+                  autoCapitalize="off"
+                  spellCheck={false}
+                />
+                {listQuery ? (
+                  <button type="button" onClick={() => setListQuery("")} aria-label="Zoekopdracht wissen">
+                    <X size={16} aria-hidden="true" />
+                  </button>
+                ) : null}
+              </div>
+
+              <p className="scanner-name-count">
+                {listResults.total} van {manifest.tickets.length} deelnemers
+                {listResults.total > listResults.rows.length
+                  ? ` · eerste ${listResults.rows.length} getoond`
+                  : ""}
+              </p>
+
+              {listResults.rows.length === 0 ? (
+                <p className="scanner-name-empty">Geen deelnemer gevonden.</p>
+              ) : (
+                <ul>
+                  {listResults.rows.map((ticket) => {
+                    const binnen = ticket.checkedIn || scannedCodes.has(ticket.code);
+                    return (
+                      <li key={ticket.code} className={binnen ? "is-in" : ""}>
+                        <button
+                          type="button"
+                          onClick={() => void processCredential(ticket.code)}
+                          disabled={binnen}
+                        >
+                          <span className="scanner-name-state" aria-hidden="true">
+                            {binnen ? <Check size={16} /> : <UserRound size={16} />}
+                          </span>
+                          <span className="scanner-name-who">
+                            <strong>{ticket.name}</strong>
+                            <small>{ticket.type}</small>
+                          </span>
+                          <span className="scanner-name-action">
+                            {binnen ? "Binnen" : "Inchecken"}
+                          </span>
+                        </button>
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+            </section>
+          ) : null}
 
           {manualOpen ? (
             <form className="scanner-manual-form" id="scanner-manual-entry" onSubmit={submitManual}>
