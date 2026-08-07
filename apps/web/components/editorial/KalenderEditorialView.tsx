@@ -30,6 +30,11 @@ type ApiEvent = {
   };
 };
 
+/** Sleutel per kalenderdag; gedeeld door het raster, de selectie en de dagpanelen. */
+function dayKey(date: Date): string {
+  return `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`;
+}
+
 /** Categorie zoals de serverpagina ze doorgeeft; de kleur komt uit de database. */
 export type CalendarCategoryOption = {
   slug: string;
@@ -95,6 +100,10 @@ export function KalenderEditorialView({
   // Standaard toont de kalender enkel de doelgroepevents die bij jou horen. Dit
   // is een voorkeur, geen slot: één klik en alles staat er.
   const [showAllAudiences, setShowAllAudiences] = useState(false);
+  // Enkel voor het smalle scherm: welke dag staat er open onder het raster. Op
+  // een telefoon passen de eventpillen niet in een cel van 45 pixels, dus toont
+  // het raster daar stippen en lees je de dag zelf hieronder.
+  const [selectedKey, setSelectedKey] = useState<string | null>(null);
   const [monthEvents, setMonthEvents] = useState<ApiEvent[]>([]);
   const [agendaEvents, setAgendaEvents] = useState<ApiEvent[]>([]);
 
@@ -156,7 +165,7 @@ export function KalenderEditorialView({
     const m = new Map<string, ApiEvent[]>();
     for (const e of monthEvents) {
       const d = new Date(e.start);
-      const key = `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+      const key = dayKey(d);
       const arr = m.get(key) ?? [];
       arr.push(e);
       m.set(key, arr);
@@ -208,6 +217,32 @@ export function KalenderEditorialView({
     }
     return rows;
   }, [monthEvents, categories, categoryName, labels.uncategorised]);
+
+  /**
+   * De dag die op smal scherm opengeklapt staat. Bewust afgeleid in plaats van in
+   * een effect bijgehouden: bladert de gebruiker naar een andere maand, dan valt
+   * de oude keuze buiten het raster en kiezen we meteen een zinnige nieuwe
+   * (vandaag, anders de eerste dag met iets erop, anders de eerste van de maand).
+   */
+  const selectedDayKey = useMemo(() => {
+    const inGrid = (key: string) => cells.some((c) => dayKey(c.date) === key);
+    if (selectedKey && inGrid(selectedKey)) return selectedKey;
+
+    const todayKey = dayKey(new Date());
+    if (cells.some((c) => c.inMonth && dayKey(c.date) === todayKey)) return todayKey;
+
+    const firstWithEvents = cells.find((c) => c.inMonth && (eventsByDay.get(dayKey(c.date))?.length ?? 0) > 0);
+    if (firstWithEvents) return dayKey(firstWithEvents.date);
+
+    const firstOfMonth = cells.find((c) => c.inMonth);
+    return firstOfMonth ? dayKey(firstOfMonth.date) : null;
+  }, [selectedKey, cells, eventsByDay]);
+
+  const selectedDate = useMemo(
+    () => cells.find((c) => dayKey(c.date) === selectedDayKey)?.date ?? null,
+    [cells, selectedDayKey],
+  );
+  const selectedEvents = selectedDayKey ? (eventsByDay.get(selectedDayKey) ?? []) : [];
 
   const monthLabel = cursor.toLocaleDateString(locale === "nl" ? "nl-BE" : "en-GB", {
     month: "long",
@@ -488,14 +523,54 @@ export function KalenderEditorialView({
                 ))}
               </div>
               {cells.map(({ date, inMonth }) => {
-                const key = `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`;
+                const key = dayKey(date);
                 const list = eventsByDay.get(key) ?? [];
                 const isToday = isSameCalendarDay(date, new Date());
                 const more = list.length > 2 ? list.length - 2 : 0;
                 const show = list.slice(0, 2);
+                const isSelected = key === selectedDayKey;
                 return (
-                  <div key={key} className={`cal-cell${!inMonth ? " out" : ""}${isToday ? " today" : ""}`}>
+                  <div
+                    key={key}
+                    className={`cal-cell${!inMonth ? " out" : ""}${isToday ? " today" : ""}${isSelected ? " selected" : ""}`}
+                  >
                     <div className="num">{String(date.getDate()).padStart(2, "0")}</div>
+                    {/* Enkel zichtbaar op smal scherm: één stip per evenement in de
+                        kleur van zijn categorie, plus een knop over de hele cel.
+                        De eventpillen hieronder passen daar niet in. */}
+                    {list.length > 0 ? (
+                      <span className="cal-dots" aria-hidden>
+                        {list.slice(0, 3).map((e) => {
+                          const cat = primaryCategory(e);
+                          return (
+                            <span
+                              key={e.id}
+                              className="cal-dot"
+                              style={cat ? ({ "--cat": cat.colour } as React.CSSProperties) : undefined}
+                            />
+                          );
+                        })}
+                      </span>
+                    ) : null}
+                    <button
+                      type="button"
+                      className="cal-cell-tap"
+                      aria-label={`${date.toLocaleDateString(locale === "nl" ? "nl-BE" : "en-GB", {
+                        weekday: "long",
+                        day: "numeric",
+                        month: "long",
+                      })}, ${list.length} ${
+                        list.length === 1
+                          ? locale === "nl"
+                            ? "evenement"
+                            : "event"
+                          : locale === "nl"
+                            ? "evenementen"
+                            : "events"
+                      }`}
+                      aria-pressed={isSelected}
+                      onClick={() => setSelectedKey(key)}
+                    />
                     {show.map((e) => {
                       const cat = primaryCategory(e);
                       const audiences = audienceCategories(e);
@@ -532,6 +607,57 @@ export function KalenderEditorialView({
                 );
               })}
             </div>
+
+            {/* De opengeklapte dag, enkel op smal scherm. Op een breed scherm
+                staan de evenementen al in de cellen zelf. */}
+            <div className="cal-day">
+              <h3>
+                {selectedDate
+                  ? (() => {
+                      const text = selectedDate.toLocaleDateString(
+                        locale === "nl" ? "nl-BE" : "en-GB",
+                        { weekday: "long", day: "numeric", month: "long" },
+                      );
+                      return text.charAt(0).toUpperCase() + text.slice(1);
+                    })()
+                  : ""}
+              </h3>
+              {selectedEvents.length === 0 ? (
+                <p className="cal-day-empty">
+                  {locale === "nl" ? "Niets gepland op deze dag." : "Nothing planned on this day."}
+                </p>
+              ) : (
+                <ul className="cal-day-list">
+                  {selectedEvents.map((e) => {
+                    const cat = primaryCategory(e);
+                    return (
+                      <li key={e.id}>
+                        <a
+                          href={eventHref(e)}
+                          style={cat ? ({ "--cat": cat.colour } as React.CSSProperties) : undefined}
+                        >
+                          <b>{pickTitle(e)}</b>
+                          <span>
+                            {eventTime(e)}
+                            {e.location ? ` · ${e.location}` : ""}
+                          </span>
+                          {audienceCategories(e).map((a) => (
+                            <span
+                              key={a.slug}
+                              className="cal-day-audience"
+                              style={{ "--cat": a.colour } as React.CSSProperties}
+                            >
+                              {categoryName(a)}
+                            </span>
+                          ))}
+                        </a>
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+            </div>
+
             {aside}
           </div>
         )}
