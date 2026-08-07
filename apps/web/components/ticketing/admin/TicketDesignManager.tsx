@@ -5,7 +5,7 @@
 /* eslint-disable @next/next/no-img-element */
 
 import { useEffect, useRef, useState, useTransition } from "react";
-import { CheckCircle2, ExternalLink, ImagePlus, LoaderCircle, Palette, Save, Send, Upload } from "lucide-react";
+import { CheckCircle2, ExternalLink, ImagePlus, LoaderCircle, Palette, RefreshCw, Save, Send, Upload } from "lucide-react";
 import {
   publishTicketDesignAction,
   saveTicketDesignDraftAction,
@@ -216,15 +216,25 @@ export function TicketDesignManager({
 
         <aside className="ticket-design-preview">
           <div className="ticket-design-preview-head">
-            <span>{message(locale, "Live voorbeeld", "Live preview")}</span>
-            {previewUrl ? (
-              <a className="ticket-admin-button" href={previewUrl} target="_blank" rel="noopener noreferrer">
-                <ExternalLink size={14} />{message(locale, "Volledig", "Full size")}
-              </a>
-            ) : null}
+            <span>{message(locale, "Voorbeeld", "Preview")}</span>
+            <div className="ticket-design-preview-actions">
+              <button className="ticket-admin-button" type="button" disabled={previewLoading} onClick={refreshPreview}>
+                {previewLoading ? <LoaderCircle className="animate-spin" size={14} /> : <RefreshCw size={14} />}
+                {message(locale, "Bijwerken", "Refresh")}
+              </button>
+              {previewUrl ? (
+                <a className="ticket-admin-button" href={previewUrl} target="_blank" rel="noopener noreferrer">
+                  <ExternalLink size={14} />{message(locale, "Volledig", "Full size")}
+                </a>
+              ) : null}
+            </div>
           </div>
           <div className="ticket-design-preview-frame">
-            {previewUrl ? <iframe src={previewUrl} title={message(locale, "Live voorbeeld van het ticket", "Live ticket preview")} /> : null}
+            {/* `key` forces a fresh <iframe> element per preview: React would
+                otherwise reuse the node and only swap `src`, which Chrome's
+                built-in PDF viewer ignores, leaving the previous ticket on
+                screen while the new one had already been fetched. */}
+            {previewUrl ? <iframe key={previewUrl} src={previewUrl} title={message(locale, "Voorbeeld van het ticket", "Ticket preview")} /> : null}
             {previewLoading ? <div className="ticket-design-preview-overlay"><LoaderCircle className="animate-spin" size={20} /></div> : null}
             {previewError && !previewLoading ? (
               <div className="ticket-design-preview-overlay">
@@ -232,7 +242,7 @@ export function TicketDesignManager({
               </div>
             ) : null}
           </div>
-          <p className="ticket-design-preview-note">{message(locale, "Toont het concept met voorbeeldgegevens; werkt automatisch bij, ook zonder opslaan.", "Shows the draft with sample data; updates automatically, even before you save.")}</p>
+          <p className="ticket-design-preview-note">{message(locale, "Toont het concept met voorbeeldgegevens; werkt vanzelf bij na een wijziging, of meteen via Bijwerken.", "Shows the draft with sample data; updates by itself after a change, or immediately via Refresh.")}</p>
         </aside>
       </div>
     </section>

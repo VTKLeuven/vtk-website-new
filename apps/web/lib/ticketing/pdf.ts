@@ -160,6 +160,13 @@ function drawContain(page: PdfPage, image: PdfImage, x: number, y: number, width
 
 const MARGIN = 48;
 
+/** Revision 0 only ever reaches the renderer through the admin preview of an
+ * unpublished draft, so calling it "v0" would invent a version that no ticket
+ * carries. */
+function revisionLabel(revision: number): string {
+  return revision === 0 ? "Ontwerp: concept" : `Ontwerp v${revision}`;
+}
+
 /** The default template: a dark header band (VTK's own navy/yellow system)
  * carries the shield, event title and schedule, so a ticket looks branded and
  * finished before any admin uploads custom artwork. The QR/details card sits
@@ -252,7 +259,7 @@ function drawClassicTicket(
     page.drawText(content.footer, { x: cardX, y: 78, maxWidth: cardWidth - (sponsorLogo ? 132 : 0), size: 8, lineHeight: 10, font: regular, color: bodyText });
   }
   if (sponsorLogo) drawContain(page, sponsorLogo, cardX + cardWidth - 112, 42, 112, 38);
-  page.drawText(`Ontwerp v${content.revision}`, { x: cardX, y: 22, size: 6.5, font: regular, color: rgb(0.45, 0.49, 0.56) });
+  page.drawText(revisionLabel(content.revision), { x: cardX, y: 22, size: 6.5, font: regular, color: rgb(0.45, 0.49, 0.56) });
 }
 
 function contentBox(design: TicketDesignSnapshot, width: number, height: number) {
@@ -332,7 +339,7 @@ function drawArtworkTicket(
 
   if (content.footer) page.drawText(content.footer, { x: box.x, y: 64, maxWidth: box.width - (sponsorLogo ? 132 : 0), size: 8, lineHeight: 10, font: regular, color: textColour });
   if (sponsorLogo) drawContain(page, sponsorLogo, box.x + box.width - 112, 42, 112, 38);
-  page.drawText(`Ontwerp v${content.revision}`, { x: box.x, y: 27, size: 6.5, font: regular, color: rgb(0.35, 0.39, 0.46) });
+  page.drawText(revisionLabel(content.revision), { x: box.x, y: 27, size: 6.5, font: regular, color: rgb(0.35, 0.39, 0.46) });
 }
 
 export async function generateTicketsPdf(input: TicketPdfInput): Promise<Uint8Array> {

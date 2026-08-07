@@ -29,8 +29,13 @@ export const ticketDesignDraftSchema = z.object({
 
 export type TicketDesignDraft = z.output<typeof ticketDesignDraftSchema>;
 
+/** Revision 0 is the unpublished draft the admin preview renders; a published
+ * snapshot copied onto a ticket always starts at 1. Rejecting 0 here made the
+ * preview silently fall back to the default design (the parse throws and
+ * `ticketDesignSnapshot` swallows it), so the editor showed the same ticket no
+ * matter what anyone changed. */
 export const ticketDesignSnapshotSchema = ticketDesignDraftSchema.extend({
-  revision: z.number().int().min(1),
+  revision: z.number().int().min(0),
   publishedAt: z.string().datetime({ offset: true }),
 });
 export type TicketDesignSnapshot = z.output<typeof ticketDesignSnapshotSchema>;

@@ -22,6 +22,11 @@
 .ticket-admin-page,
 .ticket-admin-event {
   display: grid;
+  /* Zonder een expliciete kolom is een grid-kolom `auto`: die groeit mee met
+     het breedste kind i.p.v. de container te volgen, en dan schuift de hele
+     pagina op een telefoon horizontaal weg. `min-width: 0` op de grid zelf
+     helpt daar niet tegen; de kolom moet het zeggen. */
+  grid-template-columns: minmax(0, 1fr);
   min-width: 0;
   gap: 24px;
 }
@@ -630,9 +635,11 @@
   opacity: 0.64;
 }
 
-.ticket-design-grid {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-}
+/* Geen eigen kolomregel hier: `.ticket-admin-form-grid` staat op één kolom en
+   gaat pas vanaf 680px naar twee (zie de media query onderaan). Een
+   onvoorwaardelijke twee-kolomsregel perste het ticketontwerp op een telefoon
+   naast elkaar, want een kleurveld is een 44px-staal plus een invoerveld en
+   past daar niet in de helft van een schermbreedte. */
 
 .ticket-design-templates {
   display: grid;
@@ -751,6 +758,7 @@
 
 .ticket-design-preview-head {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   gap: 8px;
@@ -759,6 +767,12 @@
   font-weight: 600;
   letter-spacing: 0.07em;
   text-transform: uppercase;
+}
+
+.ticket-design-preview-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
 }
 
 .ticket-design-preview-head .ticket-admin-button {
@@ -1261,7 +1275,8 @@
 @media (min-width: 680px) {
   .ticket-admin-form-grid,
   .ticket-admin-detail-grid,
-  .ticket-admin-access-groups {
+  .ticket-admin-access-groups,
+  .ticket-design-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 

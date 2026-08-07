@@ -37,6 +37,23 @@ describe("ticket design validation", () => {
       publishedAt: "2027-01-01T00:00:00.000Z",
     }, "event-1")).toMatchObject({ template: "CLASSIC", revision: 1 });
   });
+
+  // The admin preview renders an unpublished draft as revision 0. Rejecting
+  // that made every preview fall back to the default design, so the editor
+  // showed the same ticket no matter what anyone changed.
+  it("keeps a revision 0 draft preview instead of falling back to the default", () => {
+    expect(ticketDesignSnapshot({
+      ...DEFAULT_TICKET_DESIGN,
+      backgroundColor: "#FF0000",
+      accentColor: "#00FF00",
+      revision: 0,
+      publishedAt: "2027-01-01T00:00:00.000Z",
+    }, "event-1")).toMatchObject({
+      backgroundColor: "#FF0000",
+      accentColor: "#00FF00",
+      revision: 0,
+    });
+  });
 });
 
 describe("A4 ticket PDF", () => {
