@@ -23,6 +23,7 @@ import {
 import { paymentGateway, paymentGatewayFor, type CheckoutResult } from "./payments";
 import { orderAccessExpiry } from "./access";
 import { withSerializableTransaction } from "./transactions";
+import { publishedTicketDesign } from "./design";
 
 const answerValueSchema = z.union([
   z.string().max(2_000),
@@ -499,6 +500,15 @@ async function fulfillPaidOrderWithTx(
       if (!payment) throw new Error("PAYMENT_NOT_FOUND");
 
       await commitReservedInventory(tx, order.eventId, quantitiesByPool(order.items));
+      // Resolve once inside the fulfilment transaction. Every ticket in this
+      // order gets the same immutable published layout, even if an admin edits
+      // the next draft while payment is being processed.
+      const eventDesign = await tx.ticketEvent.findUnique({
+        where: { id: order.eventId },
+        select: { settings: true },
+      });
+      if (!eventDesign) throw new Error("EVENT_NOT_FOUND");
+      const designSnapshot = publishedTicketDesign(eventDesign.settings, order.eventId);
       for (const item of order.items) {
         if (item.ticket) continue;
         const publicCode = createPublicTicketId();
@@ -510,6 +520,7 @@ async function fulfillPaidOrderWithTx(
             publicCode,
             credentialHash: secureTokenHash(credential),
             credentialVersion: 1,
+            designSnapshot,
           },
         });
       }

@@ -490,6 +490,23 @@ describe.sequential("ticketing database invariants", () => {
         },
       },
     });
+    await prisma.ticketEvent.update({
+      where: { id: ids.event },
+      data: {
+        settings: {
+          ticketDesign: {
+            published: {
+              template: "POSTER_ARTWORK",
+              backgroundColor: "#F8F8F5",
+              accentColor: "#123456",
+              textColor: "#0A0F1F",
+              revision: 4,
+              publishedAt: "2027-01-01T00:00:00.000Z",
+            },
+          },
+        },
+      },
+    });
     await fulfillPaidOrder({
       orderId: ids.issuedOrder,
       provider: "free",
@@ -505,7 +522,8 @@ describe.sequential("ticketing database invariants", () => {
       reservedCount: 0,
       soldCount: 1,
     });
-    expect(await prisma.ticket.count({ where: { orderItemId: ids.issuedItem, status: "VALID" } })).toBe(1);
+    const issuedTicket = await prisma.ticket.findUniqueOrThrow({ where: { orderItemId: ids.issuedItem } });
+    expect(issuedTicket).toMatchObject({ status: "VALID", designSnapshot: { template: "POSTER_ARTWORK", revision: 4 } });
 
     const refund = await requestTicketRefund({
       eventId: ids.event,

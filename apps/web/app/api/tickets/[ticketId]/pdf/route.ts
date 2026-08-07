@@ -49,6 +49,8 @@ export async function GET(
         attendeeName: ticket.orderItem.attendeeName,
         typeName: ticket.orderItem.ticketTypeName,
         unitPriceCents: ticket.orderItem.totalCents,
+        status: ticket.status,
+        designSnapshot: ticket.designSnapshot,
       },
     ],
   });

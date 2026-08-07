@@ -4,6 +4,7 @@ import { randomBytes } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { redirect, unstable_rethrow } from "next/navigation";
 import { prisma } from "@vtk/db";
+import type { Prisma } from "@prisma/client";
 import { z } from "zod";
 import { requireSession } from "@/lib/session";
 import {
@@ -14,6 +15,13 @@ import { parseEuroAmount } from "@/lib/ticketing/money";
 import { requestTicketRefund } from "@/lib/ticketing/refunds";
 import { slugify } from "@/lib/ticketing/slug";
 import { localDateTimeToUtc } from "@/lib/ticketing/time";
+import { withSerializableTransaction } from "@/lib/ticketing/transactions";
+import {
+  parseTicketDesignDraft,
+  readTicketDesignSettings,
+  ticketDesignSettingsWith,
+  type TicketDesignDraft,
+} from "@/lib/ticketing/design";
 
 const localeSchema = z.enum(["nl", "en"]);
 const roleSchema = z.enum(["OWNER", "MANAGER", "FINANCE", "SCANNER", "REPORTER"]);
@@ -128,6 +136,80 @@ function refreshTicketEvent(locale: "nl" | "en", eventId: string) {
   revalidatePath(localePath(locale, "/admin/tickets"));
   revalidatePath(localePath(locale, `/admin/tickets/${eventId}`));
   revalidatePath(localePath(locale, "/tickets"));
+}
+
+/** Save a non-live ticket layout. The current published layout remains the one
+ * copied into newly issued tickets until this draft is explicitly published. */
+export async function saveTicketDesignDraftAction(
+  eventId: string,
+  locale: "nl" | "en",
+  rawDesign: unknown
+): Promise<{ revision: number | null }> {
+  const { session } = await requireTicketEventCapability(eventId, "MANAGE_EVENT");
+  const draft = parseTicketDesignDraft(rawDesign, eventId);
+  const revision = await withSerializableTransaction(async (tx) => {
+    const current = await tx.ticketEvent.findUniqueOrThrow({
+      where: { id: eventId },
+      select: { settings: true },
+    });
+    const existing = readTicketDesignSettings(current.settings, eventId);
+    await tx.ticketEvent.update({
+      where: { id: eventId },
+      data: { settings: ticketDesignSettingsWith(current.settings, { ...existing, draft }) as Prisma.InputJsonValue },
+    });
+    await tx.ticketAuditLog.create({
+      data: {
+        eventId,
+        actorUserId: session.user.id,
+        action: "TICKET_DESIGN_DRAFT_SAVED",
+        entityType: "TicketEvent",
+        entityId: eventId,
+      },
+    });
+    return existing.published?.revision ?? null;
+  });
+  refreshTicketEvent(locale, eventId);
+  return { revision };
+}
+
+/** Publishing is atomic with saving the draft, and advances the immutable
+ * revision that is copied onto tickets at payment fulfilment. */
+export async function publishTicketDesignAction(
+  eventId: string,
+  locale: "nl" | "en",
+  rawDesign: unknown
+): Promise<{ revision: number }> {
+  const { session } = await requireTicketEventCapability(eventId, "MANAGE_EVENT");
+  const draft: TicketDesignDraft = parseTicketDesignDraft(rawDesign, eventId);
+  const revision = await withSerializableTransaction(async (tx) => {
+    const current = await tx.ticketEvent.findUniqueOrThrow({
+      where: { id: eventId },
+      select: { settings: true },
+    });
+    const existing = readTicketDesignSettings(current.settings, eventId);
+    const published = {
+      ...draft,
+      revision: (existing.published?.revision ?? 0) + 1,
+      publishedAt: new Date().toISOString(),
+    };
+    await tx.ticketEvent.update({
+      where: { id: eventId },
+      data: { settings: ticketDesignSettingsWith(current.settings, { draft, published }) as Prisma.InputJsonValue },
+    });
+    await tx.ticketAuditLog.create({
+      data: {
+        eventId,
+        actorUserId: session.user.id,
+        action: "TICKET_DESIGN_PUBLISHED",
+        entityType: "TicketEvent",
+        entityId: eventId,
+        metadata: { revision: published.revision },
+      },
+    });
+    return published.revision;
+  });
+  refreshTicketEvent(locale, eventId);
+  return { revision };
 }
 
 export async function submitTicketEventFormAction(

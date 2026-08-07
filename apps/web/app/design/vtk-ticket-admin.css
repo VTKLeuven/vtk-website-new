@@ -630,6 +630,89 @@
   opacity: 0.64;
 }
 
+.ticket-design-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.ticket-design-templates {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.ticket-design-templates label {
+  display: grid;
+  min-height: 100px;
+  gap: 5px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  cursor: pointer;
+}
+
+.ticket-design-templates label.is-selected {
+  border-color: var(--ink);
+  background: var(--paper-2);
+}
+
+.ticket-design-templates input,
+.ticket-design-asset input[type="file"] {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+}
+
+.ticket-design-templates span,
+.ticket-design-asset small {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.ticket-design-colour {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr);
+  gap: 8px;
+}
+
+.ticket-admin-field .ticket-design-colour input[type="color"] {
+  min-height: 40px;
+  padding: 3px;
+}
+
+.ticket-design-asset > div {
+  display: flex;
+  min-height: 72px;
+  align-items: center;
+  gap: 12px;
+  padding: 8px;
+  border: 1px dashed var(--line-2);
+  border-radius: 10px;
+}
+
+.ticket-design-asset img {
+  width: 72px;
+  height: 52px;
+  object-fit: contain;
+}
+
+.ticket-design-message {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin: 14px 0 0;
+  color: var(--ticket-green);
+  font-size: 13px;
+}
+
+.ticket-design-message.is-error { color: var(--ticket-red); }
+
+@media (max-width: 680px) {
+  .ticket-design-templates { grid-template-columns: 1fr; }
+}
+
 .ticket-admin-input-icon {
   position: relative;
 }

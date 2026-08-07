@@ -1154,6 +1154,9 @@ model Ticket {
   checkedInById     String?
   voidedAt          DateTime?    @db.Timestamptz(3)
   refundedAt        DateTime?    @db.Timestamptz(3)
+  // Immutable copy of the published ticket design at issue time. Existing
+  // tickets deliberately remain null and use the Classic renderer fallback.
+  designSnapshot    Json?
 
   event       TicketEvent     @relation(fields: [eventId], references: [id], onDelete: Restrict)
   orderItem   TicketOrderItem @relation(fields: [orderItemId, eventId], references: [id, eventId], onDelete: Restrict)
