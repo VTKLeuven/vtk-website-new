@@ -58,9 +58,19 @@ export default async function AdminCalendar({
     <div className="space-y-5">
       <div className="flex items-center justify-between gap-4">
         <h1 className="text-2xl font-semibold">{nl ? "Evenementen" : "Events"}</h1>
-        <Link href={`${base}/admin/kalender/new`}>
-          <Button>{nl ? "Nieuw evenement" : "New event"}</Button>
-        </Link>
+        <div className="flex items-center gap-3">
+          {canAll && (
+            <Link
+              href={`${base}/admin/kalender/categorieen`}
+              className="text-sm text-vtk-blue-muted hover:underline"
+            >
+              {nl ? "Categorieën" : "Categories"}
+            </Link>
+          )}
+          <Link href={`${base}/admin/kalender/new`}>
+            <Button>{nl ? "Nieuw evenement" : "New event"}</Button>
+          </Link>
+        </div>
       </div>
 
       <div className="flex gap-2">

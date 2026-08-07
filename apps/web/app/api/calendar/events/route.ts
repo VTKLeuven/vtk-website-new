@@ -1,12 +1,22 @@
 import type { Prisma } from "@prisma/client";
 import { NextResponse } from "next/server";
 import { prisma } from "@vtk/db";
+import { audienceFilter, viewerAudiences } from "@/lib/calendar/audience";
+
+// Leest de sessie om de doelgroepen van de kijker te bepalen, dus per definitie
+// niet statisch te renderen.
+export const dynamic = "force-dynamic";
 
 export async function GET(request: Request) {
   const url = new URL(request.url);
   const start = url.searchParams.get("start");
   const end = url.searchParams.get("end");
   const groups = url.searchParams.getAll("group").filter(Boolean);
+  const categories = url.searchParams.getAll("category").filter(Boolean);
+  // "Alles tonen" in de kalender: dan valt de doelgroepfilter weg. Het is een
+  // standaard, geen slot; er wordt hier dus niets afgeschermd dat een lid niet
+  // gewoon mag zien.
+  const showAllAudiences = url.searchParams.get("audience") === "all";
 
   const where: Prisma.CalendarEventWhereInput = {
     visibility: "PUBLIC",
@@ -21,9 +31,31 @@ export async function GET(request: Request) {
     where.group = { code: { in: groups as never } };
   }
 
+  // Categorie en groep zijn twee losse assen: wie op beide filtert, krijgt de
+  // doorsnede. De kalenderpagina gebruikt enkel `category`.
+  if (categories.length > 0) {
+    where.categories = { some: { category: { slug: { in: categories } } } };
+  }
+
+  // Wie expliciet om één categorie vraagt (de categoriepagina), krijgt ze ook als
+  // het een doelgroepcategorie is: die pagina ís de eerstejaarskalender.
+  if (!showAllAudiences && categories.length === 0) {
+    Object.assign(where, audienceFilter(await viewerAudiences()));
+  }
+
   const events = await prisma.calendarEvent.findMany({
     where,
-    include: { group: true },
+    include: {
+      group: true,
+      categories: {
+        select: {
+          category: {
+            select: { slug: true, nameNl: true, nameEn: true, colour: true, audience: true },
+          },
+        },
+        orderBy: { category: { order: "asc" } },
+      },
+    },
     orderBy: { start: "asc" },
   });
 
@@ -43,6 +75,7 @@ export async function GET(request: Request) {
       groupNameEn: e.group.nameEn,
       descriptionNl: e.descriptionNl,
       descriptionEn: e.descriptionEn,
+      categories: e.categories.map((c) => c.category),
     },
   }));
 

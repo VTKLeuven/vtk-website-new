@@ -56,6 +56,26 @@
   cursor: pointer;
 }
 
+/* De reset hierboven (0,1,1) is specifieker dan `.btn-primary` (0,1,0), dus een
+   primaire knop die een <button> is verloor binnen `.vtk-design` zijn vulling en
+   werd lichte tekst op papier: onzichtbaar. Ankers met dezelfde klasse hadden dat
+   niet, waardoor het alleen opviel bij knoppen die geen link zijn. */
+.vtk-design button.btn-primary,
+.vtk-design button.vtk-button-primary {
+  background: var(--ink);
+  border: 1px solid var(--ink);
+}
+
+.vtk-design button.btn-primary:hover,
+.vtk-design button.vtk-button-primary:hover {
+  background: var(--navy);
+}
+
+.vtk-design button.btn-ghost,
+.vtk-design button.vtk-button-ghost {
+  border: 1px solid var(--line-2);
+}
+
 .serif,
 .vtk-serif {
   font-family: var(--serif);
@@ -526,6 +546,16 @@
 
 .vtk-page-head .vtk-page-subtitle {
   color: var(--on-dark-muted);
+}
+
+/* `.vtk-link` is navy, en dus onzichtbaar op de navy paginakop. Binnen de donkere
+   band draait hij mee met de rest van de tekst; het gele onderstreepje blijft. */
+.vtk-page-head .vtk-link {
+  color: var(--paper);
+}
+
+.vtk-page-head .vtk-link:hover {
+  color: var(--yellow);
 }
 
 .page-head-meta,

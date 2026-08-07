@@ -42,6 +42,7 @@ export default async function ConfirmStudyPage({
       studyProgrammes: true,
       notAtFaculty: true,
       notStudying: true,
+      internationalStudent: true,
     },
   });
 
@@ -64,6 +65,7 @@ export default async function ConfirmStudyPage({
             studyProgrammes={user.studyProgrammes}
             notAtFaculty={user.notAtFaculty}
             notStudying={user.notStudying}
+            internationalStudent={user.internationalStudent}
           />
           <div className="flex flex-wrap items-center gap-3">
             <Button type="submit">{t.submit}</Button>
