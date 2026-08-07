@@ -78,9 +78,13 @@ export function KulAuthLogViewer({ logs }: { logs: KulAuthLogEntry[] }) {
                   </span>
                 )}
                 {faculty.map(([key, value]) => (
+                  // `max-w-full break-words`: a claim value can be a long,
+                  // space-free token (a raw org-unit code, a JSON blob), which
+                  // would otherwise push this pill wider than the viewport on
+                  // a phone instead of wrapping inside it.
                   <span
                     key={key}
-                    className="rounded-full border border-amber-200 bg-amber-100 px-2 py-0.5 text-xs text-amber-900"
+                    className="max-w-full break-words rounded-full border border-amber-200 bg-amber-100 px-2 py-0.5 text-xs text-amber-900"
                   >
                     {key}: {toText(value) || "(empty)"}
                   </span>

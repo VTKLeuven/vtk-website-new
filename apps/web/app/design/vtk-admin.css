@@ -407,7 +407,12 @@
 
   .vtk-admin-main
     .flex.flex-wrap.items-end
-    :is(input:not([type="checkbox"]):not([type="radio"]), select) {
+    :is(
+      input:not([type="checkbox"]):not([type="radio"]):not([type="date"]):not([type="time"]):not(
+          [type="datetime-local"]
+        ),
+      select
+    ) {
     width: 100%;
   }
 
@@ -415,6 +420,18 @@
      de knop half buiten het scherm. */
   .vtk-admin-main .flex.items-center.justify-between:has(> h1) {
     flex-wrap: wrap;
+  }
+
+  /* `Input` (packages/ui/src/form.tsx) geeft elk veld `w-full` mee, terecht voor
+     tekst en e-mail maar niet voor een datum/tijdveld: "dd/mm/jjjj, --:--" past
+     ruim in een paar honderd pixel. Vol uitgerekt tot de kolombreedte (of, in een
+     filterrij, tot de breedte van de zoekbalk ernaast) oogt dat overdreven breed,
+     met een grote lege vlakte tussen de tekst en het kalender-icoon helemaal
+     rechts. Laat de browser zijn eigen, compacte breedte kiezen in plaats daarvan. */
+  .vtk-admin-main :is(input[type="date"], input[type="time"], input[type="datetime-local"]) {
+    width: auto;
+    max-width: 100%;
+    min-width: 0;
   }
 }
 
