@@ -64,6 +64,8 @@ export type PublicTicket = {
   checkedInAt?: string | Date | null;
   credential?: string | null;
   pdfUrl?: string | null;
+  walletAppleUrl?: string | null;
+  walletGoogleUrl?: string | null;
 };
 
 export type PublicOrder = {

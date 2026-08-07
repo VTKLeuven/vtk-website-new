@@ -1315,3 +1315,42 @@ Vastgelegde keuzes:
   persoonlijke tegel mag maken, moet ze ook kunnen afwerken. De upload is daarom
   apart gehouden (`kind=tile`): maximaal 2 MB, herschaald naar 128px, en onder een
   eigen `tiles/`-prefix zodat de tegel-actions een key van elders weigeren.
+
+## Apple/Google Wallet-tickets
+
+Naast de A4-PDF (`apps/web/lib/ticketing/pdf.ts`) kan een ticket ook als Apple- of
+Google Wallet-pass gedownload worden, in hetzelfde ontwerp (kleuren, logo) als de
+PDF. Code in `apps/web/lib/ticketing/wallet/`.
+
+- **Twee providers naast elkaar: "direct" en walletwallet.dev.** Een geldige Apple
+  Wallet-pass moet ondertekend zijn met een certificaat dat uiteindelijk naar Apple
+  herleidt; daar is geen weg omheen. "Direct" betekent: VTK's eigen Apple Developer
+  Program-account (99$/jaar) en Pass Type ID-certificaat, zelf ondertekend met
+  `passkit-generator`. Zolang dat er niet is (of bewust niet de moeite waard wordt
+  geacht), kan `WALLET_WALLETWALLET_API_KEY` gezet worden: een third-party API die
+  zelf al zo'n certificaat heeft en passes namens hen uitgeeft. Dat kost geen eigen
+  Apple-account, maar wel een terugkerend SaaS-abonnement (gratis tot 1000
+  passes/maand, nadien betalend) en de pass wordt technisch uitgegeven via hún
+  identiteit, niet die van VTK. Staat een direct-config voor een platform (Apple of
+  Google) klaar, dan wint die per platform altijd van walletwallet.dev
+  (`apps/web/lib/ticketing/wallet/index.ts`): vol eigenaarschap gaat voor wanneer het
+  er is.
+- **Elke knop verschijnt pas als de bijhorende config compleet is** (zie
+  `.env.example`). Geen halfwerkende "Voeg toe aan Wallet"-knop die daarna een
+  foutmelding geeft: ontbreekt de configuratie, dan bestaat de knop gewoon niet, net
+  als de ticketmail die in dev stil wegvalt zonder `SMTP_HOST`.
+- **Geen push-update-service.** Een pass wordt bij elke download vers opgebouwd uit
+  de actuele ticket- en ontwerpgegevens (zoals de PDF), maar er is geen Apple
+  Push/webservice-stuk dat een al toegevoegde pass op iemands telefoon achteraf
+  bijwerkt als het event verandert. Dat is een apart, optioneel stuk Apple
+  Wallet-infrastructuur (APNs + een update-webservice) dat bewust buiten deze eerste
+  versie valt: het voegt reële complexiteit toe voor een randgeval (een gewijzigd
+  event terwijl iemands pass al op hun telefoon staat) dat bij VTK's schaal zelden
+  voorkomt.
+- **Geen wallet-knoppen in de bevestigingsmail zelf.** De mail linkt (zoals
+  voorheen) naar de ticketpagina, waar de wallet-knoppen naast de PDF-knop staan.
+  Bij een bestelling met meerdere tickets zouden meerdere sets wallet-knoppen in de
+  mail rommelig ogen en zijn ze bovendien pas na de eerste keer openen van de
+  ticketpagina bruikbaar (dezelfde toegangscookie als de bestaande PDF-link vereist
+  dat). "Ook via mail" is zo gelezen als: bereikbaar via de link die de mail al
+  stuurt, niet letterlijk als knoppen in de mail-HTML.
