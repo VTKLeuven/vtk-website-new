@@ -31,6 +31,24 @@
   font-style: normal;
   font-weight: 400;
 }
+.vtk-design .page-head .crumbs a {
+  color: inherit;
+  text-decoration: none;
+  border-bottom: 1px solid var(--line-2);
+}
+.vtk-design .page-head .crumbs a:hover {
+  color: var(--ink);
+}
+
+/* Introtekst van een categoriepagina, direct onder de titel. */
+.vtk-design .page-head-intro {
+  max-width: 68ch;
+  margin-top: 10px;
+  color: var(--body);
+  font-size: 15px;
+  line-height: 1.55;
+}
+
 .vtk-design .page-head-meta {
   font-family: var(--mono);
   font-size: 11px;
@@ -239,22 +257,6 @@
   display: block;
   color: inherit;
 }
-.vtk-design .ev-pill.gala {
-  border-left-color: var(--accent-2);
-  background: oklch(0.95 0.08 90);
-}
-.vtk-design .ev-pill.gala:hover {
-  background: var(--accent);
-  color: var(--ink);
-}
-.vtk-design .ev-pill.career {
-  border-left-color: oklch(0.55 0.15 260);
-  background: oklch(0.92 0.04 260);
-}
-.vtk-design .ev-pill.service {
-  border-left-color: oklch(0.6 0.12 145);
-  background: oklch(0.93 0.05 145);
-}
 .vtk-design .ev-pill.more {
   background: var(--paper);
   color: var(--muted);
@@ -301,28 +303,15 @@
   border-bottom: 1px solid var(--rule);
   letter-spacing: 0.02em;
 }
+/* De kleur van een categorie komt uit de database en wordt als `--cat` op het
+   element gezet; zonder categorie valt alles terug op de neutrale inktkleur. */
 .vtk-design .agenda-side-list li .sw {
   display: inline-block;
   width: 10px;
   height: 10px;
-  background: var(--ink);
+  background: var(--cat, var(--ink));
   margin-right: 10px;
   vertical-align: middle;
-}
-.vtk-design .agenda-side-list li.gala .sw {
-  background: var(--accent-2);
-}
-.vtk-design .agenda-side-list li.career .sw {
-  background: oklch(0.55 0.15 260);
-}
-.vtk-design .agenda-side-list li.service .sw {
-  background: oklch(0.6 0.12 145);
-}
-.vtk-design .agenda-side-list li.cantus .sw {
-  background: var(--ink);
-}
-.vtk-design .agenda-side-list li.blok .sw {
-  background: oklch(0.5 0.02 260);
 }
 .vtk-design .agenda-side-list li .count {
   color: var(--muted);
@@ -484,7 +473,6 @@
 }
 
 .vtk-design .cal-cell.today .num,
-.vtk-design .ev-pill.gala,
 .vtk-design .ag-row:hover .ag-go {
   background: var(--yellow);
   color: var(--ink);
@@ -634,19 +622,12 @@
   color: var(--ink);
 }
 
-.vtk-design .ev-pill.gala {
-  border-left-color: var(--yellow);
-  background: #fff7cf;
-}
-
-.vtk-design .ev-pill.career {
-  border-left-color: #4b6fd6;
-  background: #eef2ff;
-}
-
-.vtk-design .ev-pill.service {
-  border-left-color: #5d9c59;
-  background: #eef8ea;
+/* Een event erft de kleur van zijn eerste categorie via `--cat`. Categorieën zijn
+   GUI-beheerd, dus er kan hier geen vaste lijst klassen staan: de rand neemt de
+   kleur zelf, de vulling een lichte menging ervan met het papier. */
+.vtk-design .ev-pill.tinted {
+  border-left-color: var(--cat);
+  background: color-mix(in oklab, var(--cat) 10%, var(--paper));
 }
 
 .vtk-design .ev-pill.more {
@@ -716,6 +697,18 @@
 .vtk-design .subscribe-actions .btn {
   justify-content: space-between;
   background: var(--surface);
+}
+
+/* De kopieerknop draagt een icoon vóór zijn label in plaats van een pijl erachter,
+   dus die twee horen bij elkaar te blijven staan in plaats van uit elkaar geduwd
+   te worden door de space-between hierboven. */
+.vtk-design .subscribe-actions .subscribe-copy {
+  justify-content: flex-start;
+}
+
+.vtk-design .subscribe-actions .subscribe-copy svg {
+  width: 16px;
+  height: 16px;
 }
 
 .vtk-design .agenda-head {
@@ -808,22 +801,285 @@
   }
 }
 
+/* ---------------------------------------------------------------------------
+   Maandraster op een telefoon.
+
+   Het raster viel hier uiteen in 42 cellen onder elkaar: een lijst van veertig
+   lege regels waar je doorheen moest scrollen om één evenement te vinden. Het
+   blijft nu een echt raster van zeven kolommen; de cellen worden vierkantjes met
+   het dagnummer en een stip per evenement, en de dag die je aantikt klapt eronder
+   open. Dat is hoe elke agenda-app op een telefoon werkt, en het past.
+   --------------------------------------------------------------------------- */
+
+/* Het aanraakvlak en de stippen bestaan alleen op smal scherm. */
+.vtk-design .cal-cell-tap,
+.vtk-design .cal-dots,
+.vtk-design .cal-day {
+  display: none;
+}
+
 @media (max-width: 720px) {
+  .vtk-design .kal-wrap {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+
   .vtk-design .cal {
-    display: block;
-    border-radius: 18px;
+    gap: 0;
+    border-radius: 16px;
+    overflow: hidden;
   }
 
   .vtk-design .cal-header {
-    display: none;
+    display: contents;
+  }
+
+  .vtk-design .cal-header > div {
+    padding: 8px 0;
+    font-size: 10px;
+    text-align: center;
   }
 
   .vtk-design .cal-cell {
-    min-height: auto;
-    border-right: 0;
+    position: relative;
+    min-height: 0;
+    aspect-ratio: 1;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    padding: 2px;
   }
 
-  .vtk-design .cal-cell.out:empty {
+  /* De eventpillen passen niet in een vakje van deze grootte; de stippen
+     vervangen ze en de details lees je in het dagpaneel eronder. */
+  .vtk-design .cal-cell .ev-pill {
     display: none;
   }
+
+  .vtk-design .cal-cell .num {
+    margin: 0;
+    font-size: 13px;
+  }
+
+  .vtk-design .cal-cell.today .num {
+    padding: 3px 6px;
+    border-radius: 999px;
+  }
+
+  .vtk-design .cal-cell.selected {
+    background: var(--paper-2);
+    box-shadow: inset 0 0 0 2px var(--ink);
+  }
+
+  .vtk-design .cal-dots {
+    display: flex;
+    gap: 3px;
+    height: 6px;
+    align-items: center;
+  }
+
+  .vtk-design .cal-dot {
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background: var(--cat, var(--navy));
+  }
+
+  /* Over de hele cel, zodat de tikzone groot genoeg is voor een duim. */
+  .vtk-design .cal-cell-tap {
+    display: block;
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    border: 0;
+    background: none;
+    cursor: pointer;
+  }
+
+  .vtk-design .cal-day {
+    display: block;
+    margin-top: 18px;
+  }
+
+  /* Geen `text-transform: capitalize`: dat zet ook de maand in hoofdletters
+     ("12 Augustus"), en maandnamen zijn in het Nederlands kleingeschreven. Enkel
+     de eerste letter gaat om, en dat doen we in de component. */
+  .vtk-design .cal-day h3 {
+    font-size: 17px;
+    font-weight: 600;
+  }
+
+  .vtk-design .cal-day-empty {
+    margin-top: 8px;
+    color: var(--muted);
+    font-size: 14px;
+  }
+
+  .vtk-design .cal-day-list {
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-top: 12px;
+    padding: 0;
+  }
+
+  .vtk-design .cal-day-list a {
+    display: block;
+    padding: 12px 14px;
+    border: 1px solid var(--line);
+    border-left: 4px solid var(--cat, var(--navy));
+    border-radius: 12px;
+    background: var(--surface);
+    color: inherit;
+    text-decoration: none;
+  }
+
+  .vtk-design .cal-day-list b {
+    display: block;
+    font-size: 15px;
+    font-weight: 600;
+  }
+
+  .vtk-design .cal-day-list a > span {
+    display: block;
+    margin-top: 3px;
+    color: var(--muted);
+    font-size: 13px;
+  }
+
+  .vtk-design .cal-day-audience {
+    display: inline-block;
+    margin-top: 8px;
+    padding: 2px 9px;
+    border-radius: 999px;
+    background: var(--cat);
+    color: #fff;
+    font-size: 11px;
+    font-weight: 600;
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   Toolbar in twee rijen, en doelgroeplabels op evenementen.
+
+   De weergavekeuze (agenda/maand/lijst) stond eerst naast de filterchips en las
+   daardoor als een categorie. Ze staat nu bovenaan bij de maandnavigatie; de
+   chips krijgen hun eigen rij eronder.
+   --------------------------------------------------------------------------- */
+
+.vtk-design .toolbar {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  /* De eerdere laag zet `align-items: center` voor de horizontale grid-variant.
+     In een kolom betekent dat "centreer elke rij", waardoor beide rijen smaller
+     werden dan de kaart eromheen. */
+  align-items: stretch;
+}
+
+/* Flex met wrap i.p.v. een vaste driekolomsgrid: wordt het krap, dan zakt de
+   weergavekeuze naar een eigen regel in plaats van tegen de kaartrand geduwd te
+   worden. De maandtitel is het enige dat mag krimpen. */
+.vtk-design .toolbar-top {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px 14px;
+}
+
+.vtk-design .toolbar-top .nav-mo,
+.vtk-design .toolbar-top .view-switch {
+  flex: none;
+}
+
+.vtk-design .toolbar-top .mo-label {
+  flex: 1 1 200px;
+  min-width: 0;
+}
+
+.vtk-design .toolbar-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+}
+
+/* "Ook evenementen voor andere doelgroepen": een voorkeur, geen filterchip, dus
+   bewust een gewone checkbox en geen pil die op de chips ernaast lijkt. */
+.vtk-design .audience-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.vtk-design .audience-toggle:hover {
+  color: var(--ink);
+}
+
+/* Doelgroeplabel op een eventpil in het maandraster. Staat boven de titel, want
+   "voor wie is dit" bepaalt of de rest van de regel je nog aanbelangt. */
+.vtk-design .ev-pill .ev-audience {
+  display: inline-block;
+  margin-bottom: 3px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: var(--cat);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  line-height: 1.5;
+  white-space: nowrap;
+}
+
+/* Zelfde label in de agendalijst, naast de titel. */
+.vtk-design .ag-title .ag-audience {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: var(--cat);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 600;
+  vertical-align: middle;
+}
+
+@media (max-width: 720px) {
+  .vtk-design .toolbar-top {
+    grid-template-columns: 1fr;
+  }
+  .vtk-design .toolbar-filters {
+    justify-content: flex-start;
+  }
+}
+
+/* Lege lijst: zeg wat er aan de hand is in plaats van niets te tonen. Een leeg
+   vlak leest als een defect, ook wanneer er gewoon geen evenementen zijn. */
+.vtk-design .agenda-empty {
+  padding: 28px 0;
+  color: var(--muted);
+  font-size: 15px;
+}
+
+/* De weergaveknoppen zijn losse pillen, geen segmented control meer. In die oude
+   opzet tekende elke knop enkel een `border-right` als scheiding, en haalde
+   `:last-child` die weg zodat er geen streep buiten het kader viel. Nu elke knop
+   een eigen rand heeft, knipte diezelfde regel de rechterkant van de laatste pil
+   eraf: "Lijst" stond open aan de rechterkant. Daarom hier één volledige rand,
+   na alle eerdere lagen. */
+.vtk-design .view-switch button,
+.vtk-design .view-switch button:last-child {
+  border: 1px solid var(--line-2);
+}
+
+.vtk-design .view-switch button.on {
+  border-color: var(--ink);
 }

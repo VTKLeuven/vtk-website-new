@@ -4,6 +4,7 @@ import { ListChecks, Package, Settings2 } from "lucide-react";
 import { hasLocale } from "@/lib/locale";
 import { requireTicketEventCapability } from "@/lib/ticketing/authorization";
 import { TicketEventForm } from "@/components/ticketing/admin/TicketEventForm";
+import { TicketPublishBar } from "@/components/ticketing/admin/TicketPublishBar";
 import { TicketTypeManager } from "@/components/ticketing/admin/TicketTypeManager";
 import { TicketQuestionManager } from "@/components/ticketing/admin/TicketQuestionManager";
 import type { AdminLocale } from "@/components/ticketing/admin/format";
@@ -75,10 +76,20 @@ export default async function TicketEventSettingsPage({
       </nav>
       {canManageEvent ? (
         <div id="event-instellingen" className="ticket-admin-anchor-section">
+          <TicketPublishBar
+            eventId={event.id}
+            status={event.status}
+            slug={event.slug}
+            hasActiveTicketType={event.ticketTypes.some((ticketType) => ticketType.active)}
+            locale={locale}
+          />
           <TicketEventForm
             event={event}
             groups={groups}
             calendarEvents={calendarEvents}
+            linkedCalendarEvent={
+              calendarEvents.find((candidate) => candidate.id === event.calendarEventId) ?? null
+            }
             hasActiveTicketType={event.ticketTypes.some((ticketType) => ticketType.active)}
             locale={locale}
           />

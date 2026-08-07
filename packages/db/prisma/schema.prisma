@@ -352,6 +352,11 @@ model User {
   // uit élke studiegerichte mailinglijst (zie lib/mailinglists.ts). Blijft een
   // aparte boolean om dezelfde reden als notAtFaculty.
   notStudying        Boolean          @default(false)
+  // Internationale of uitwisselingsstudent. Bewust een eigen veld en geen
+  // afleiding uit `locale`: de sitetaal zegt welke taal je leest, niet of je een
+  // exchange-student bent. Stuurt welke evenementen vanzelf in de kalender
+  // opduiken (zie CalendarAudience).
+  internationalStudent Boolean        @default(false)
   // Werkingsjaar waarin het lid zijn studieprofiel laatst bevestigde (2026 =
   // "26-27"). Loopt dat achter op het huidige werkingsjaar, dan is het profiel
   // verlopen: de bevestigingsgate vraagt het opnieuw en het lid valt zolang uit
@@ -391,10 +396,14 @@ model User {
   uitleenTransportDriven  UitleenTransportBooking[] @relation("UitleenTransportDriver")
   uitleenTransportDecided UitleenTransportBooking[] @relation("UitleenTransportDecidedBy")
   uitleenTransportDone    UitleenTransportBooking[] @relation("UitleenTransportCompletedBy")
+  uitleenDriver           UitleenDriver?            @relation("UitleenDriverUser")
+  uitleenDriversAdded     UitleenDriver[]           @relation("UitleenDriverAddedBy")
 
   doorGrants         DoorAccessGrant[]
   doorLogs           DoorAccessLog[]
   doorShortcutTokens DoorShortcutToken[]
+
+  calendarFeedTokens CalendarFeedToken[]
 
   createdTicketEvents      TicketEvent[]           @relation("TicketEventCreatedBy")
   ticketEventGrants        TicketEventUserGrant[]  @relation("TicketEventGrantUser")
@@ -734,9 +743,91 @@ model CalendarEvent {
   group       Group        @relation(fields: [groupId], references: [id], onDelete: Cascade)
   createdBy   User?        @relation("EventCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
   ticketEvent TicketEvent?
+  categories  CalendarEventCategory[]
 
   @@index([start])
   @@index([groupId])
+}
+
+// Doelgroep van een evenement ("Internationaal", "Eerstejaars", "Career", ...).
+// Bewust een eigen as naast `CalendarEvent.groupId`: de groep zegt wie het event
+// organiseert, de categorie voor wie het bedoeld is. Een fakbar-cantus kan een
+// eerstejaarsevent zijn, en een event van de post Internationaal hoeft niet op de
+// internationale kalender te staan. Elke categorie krijgt een eigen pagina
+// (/kalender/<slug>) en een eigen ICS-feed.
+// Doelgroep waar een categorie voor staat. Een categorie zonder `audience` is een
+// gewoon thema (Career, Sport, ...) dat iedereen ziet en dat als filterchip op
+// /kalender staat. Een categorie mét `audience` verschijnt niet als chip: haar
+// evenementen komen vanzelf bovendrijven bij wie tot die doelgroep hoort, en
+// blijven voor de rest standaard verborgen (zichtbaar te maken met "alles tonen").
+//
+// De waarde is een enum en geen vrij veld, want bij elke waarde hoort code die
+// bepaalt of een lid erbij hoort (zie lib/calendar/audience.ts). Een nieuwe
+// doelgroep toevoegen is dus bewust geen GUI-actie.
+enum CalendarAudience {
+  FIRST_YEARS
+  INTERNATIONALS
+}
+
+model CalendarCategory {
+  id            String  @id @default(cuid())
+  // Zit in de publieke URL en in de feed-URL, dus wijzigen breekt bestaande
+  // abonnementen; daarom niet vrij bewerkbaar zodra hij in gebruik is.
+  slug          String  @unique
+  nameNl        String
+  nameEn        String
+  // Introtekst bovenaan de categoriepagina (Markdown), optioneel.
+  descriptionNl String?
+  descriptionEn String?
+  // Hexkleur van het bolletje in de legende en van de eventpil in het raster.
+  colour        String  @default("#5C667F")
+  order         Int     @default(0)
+  // NULL = gewoon thema. Anders: doelgroepcategorie, zie de enum hierboven.
+  audience      CalendarAudience?
+  // Uit = de categorie bestaat nog (feed en pagina blijven werken) maar staat
+  // niet meer tussen de filterchips op /kalender.
+  showOnCalendarPage Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  events CalendarEventCategory[]
+
+  @@index([order])
+}
+
+model CalendarEventCategory {
+  eventId    String
+  categoryId String
+
+  event    CalendarEvent    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  category CalendarCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  @@id([eventId, categoryId])
+  @@index([categoryId])
+}
+
+// Persoonlijke ICS-feed van één lid: ledenexclusieve events, zijn shiften en de
+// events waarvoor hij een ticket heeft. Een agenda-client stuurt geen cookies,
+// dus de URL draagt zelf het geheim; we bewaren enkel de hash.
+//
+// Bewust **zonder `expiresAt`**, anders dan DoorShortcutToken: een abonnement dat
+// na 90 dagen stil ophoudt met verversen is erger dan geen abonnement, want de
+// agenda blijft dan verouderde events tonen zonder dat iemand het merkt.
+// Intrekken gebeurt expliciet vanuit /account.
+model CalendarFeedToken {
+  id         String    @id @default(cuid())
+  userId     String
+  label      String
+  tokenHash  String    @unique
+  lastUsedAt DateTime? @db.Timestamptz(3)
+  revokedAt  DateTime? @db.Timestamptz(3)
+  createdAt  DateTime  @default(now()) @db.Timestamptz(3)
+  updatedAt  DateTime  @updatedAt @db.Timestamptz(3)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, revokedAt])
 }
 
 // -----------------------------------------------------------------------------
@@ -1339,11 +1430,15 @@ model Setting {
 // -----------------------------------------------------------------------------
 
 model DashboardTile {
-  id        String             @id @default(cuid())
-  label     String
-  url       String
-  icon      String             @default("link") // key into curated icon set
-  color     String             @default("navy") // key into color palette
+  id    String @id @default(cuid())
+  label String
+  url   String
+  icon  String @default("link") // key into curated icon set
+  color String @default("navy") // key into color palette
+  // Eigen logo in plaats van een pictogram (bv. het GitHub-logo). Wanneer dit
+  // gezet is, wint het van `icon`; `icon` blijft staan zodat het terugvalt op
+  // het gekozen pictogram wanneer de afbeelding verwijderd wordt.
+  imageKey  String?
   scope     DashboardTileScope
   groupId   String? // set when scope = GROUP
   userId    String? // set when scope = USER (personal tile)
@@ -1371,6 +1466,11 @@ model UserDashboardTilePref {
   url    String?
   icon   String?
   color  String?
+  // Eigen logo bovenop een gedeelde tegel. `imageCleared` onderscheidt "erf de
+  // afbeelding van de standaardtegel" (null + false) van "ik wil hier bewust
+  // geen afbeelding maar een pictogram" (null + true).
+  imageKey     String?
+  imageCleared Boolean @default(false)
 
   user User          @relation(fields: [userId], references: [id], onDelete: Cascade)
   tile DashboardTile @relation(fields: [tileId], references: [id], onDelete: Cascade)
@@ -1396,6 +1496,15 @@ model Shift {
   description     String
   maxParticipants Int
   reward          Int
+
+  // Kan je deze shift doen zonder Nederlands? Dan krijgt ze de markering "Ook
+  // voor internationals" op /shift. Het gaat over de taal, niet over wie welkom
+  // is: iedereen mag inschrijven.
+  openToInternationals Boolean @default(false)
+
+  // Langere uitleg (Markdown) over wat de shift concreet inhoudt, los van de
+  // korte `description`. Leeg (NULL of "") = de frontend toont het blok niet.
+  instructions String?
 
   // Postcode (Group.code) waarvoor deze shift telt; los tekstveld i.p.v. een
   // relatie, zodat een oude postcode behouden blijft ook als de post later
@@ -1875,6 +1984,29 @@ model UitleenVehicle {
   bookings UitleenTransportBooking[]
 }
 
+/// Chauffeur die Logistiek zelf toevoegt, buiten de post om.
+///
+/// De chauffeurskeuze bij een rit is de unie van twee bronnen: de leden van de
+/// post Logistiek in het huidige werkingsjaar (automatisch, via
+/// GroupMembership) en de rijen hier. Zo kan iemand met een rijbewijs rijden
+/// zonder praesidiumlid te worden (en dus zonder `logistiek.manage`, want die
+/// permissie hangt aan de post en niet aan deze tabel). De pool is bewust niet
+/// werkingsjaar-gescoped: hij wordt met de hand beheerd en resetten op 15 juli
+/// zou de ritten van de zomer zonder chauffeurs zetten.
+model UitleenDriver {
+  id        String  @id @default(cuid())
+  userId    String  @unique
+  // Vrije notitie van het team, bv. "rijbewijs B sinds 2023, rijdt niet met de kar".
+  note      String?
+  addedById String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user    User  @relation("UitleenDriverUser", fields: [userId], references: [id], onDelete: Cascade)
+  addedBy User? @relation("UitleenDriverAddedBy", fields: [addedById], references: [id], onDelete: SetNull)
+}
+
 /// Transportaanvraag met een voertuig, een tijdvenster en (later) een chauffeur.
 /// Bewust een eigen model (geen materiaalaanvraag): aparte behandelaar, aparte
 /// lifecycle. Prijs kan pas bij afronden gekend zijn (per-km).
@@ -1933,6 +2065,9 @@ model UitleenTransportBooking {
   @@index([startAt, endAt])
   @@index([vehicleId, status])
   @@index([requesterType, status])
+  // "Mijn ritten" voor een chauffeur, en de rittentelling per chauffeur in het
+  // chauffeursbeheer.
+  @@index([driverId, startAt])
 }
 
 /// Spiegel van TicketPayment (zonder refunds): provider is een vrije string

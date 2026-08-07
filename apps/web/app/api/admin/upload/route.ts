@@ -37,12 +37,26 @@ export async function POST(request: Request) {
         })
       : null;
 
-  if (!canUpload && !werkgroepMember) {
+  // Iedereen die inlogt mag persoonlijke dashboardtegels maken, dus ook het
+  // logo daarvan uploaden. De permissielijst hierboven zou dat blokkeren voor
+  // een gewoon lid, terwijl de tegel zelf wel mag; vandaar deze aparte soort.
+  // Ze is bewust klein gehouden (zie de resize verderop) en het resultaat komt
+  // onder een eigen prefix, zodat de tegel-actions een key uit een ander
+  // prefix kunnen weigeren.
+  const tileUpload = kind === "tile";
+
+  if (!canUpload && !werkgroepMember && !tileUpload) {
     return NextResponse.json({ error: "forbidden" }, { status: 403 });
   }
 
   if (!(file instanceof File)) {
     return NextResponse.json({ error: "no_file" }, { status: 400 });
+  }
+
+  // Een tegellogo van meer dan 2 MB is altijd een vergissing; elk lid kan deze
+  // route bereiken, dus hier hoort een plafond.
+  if (tileUpload && file.size > 2 * 1024 * 1024) {
+    return NextResponse.json({ error: "too_large" }, { status: 413 });
   }
 
   const bytes = Buffer.from(await file.arrayBuffer());
@@ -76,6 +90,26 @@ export async function POST(request: Request) {
           .toBuffer();
         contentType = "image/png";
         outputName = "logo.png";
+      } catch {
+        /* fall back to raw bytes */
+      }
+    }
+  } else if (kind === "tile") {
+    // Zelfde redenering als bij "logo": een tegellogo staat op een gekleurde
+    // chip, dus transparantie moet blijven. De chip is 40px, dus 128px volstaat
+    // ook op een retina-scherm en houdt de bucket klein.
+    prefix = "tiles";
+    if (contentType === "image/svg+xml") {
+      // SVG blijft as-is: al klein en schaalt scherp mee.
+    } else {
+      try {
+        body = await sharp(bytes)
+          .rotate()
+          .resize({ width: 128, height: 128, fit: "inside", withoutEnlargement: true })
+          .png()
+          .toBuffer();
+        contentType = "image/png";
+        outputName = "tile.png";
       } catch {
         /* fall back to raw bytes */
       }

@@ -107,7 +107,9 @@ export function StorageImageField({
       <Label>{label ?? (nl ? "Afbeelding" : "Image")}</Label>
       <input type="hidden" name={name} value={key} />
       <input type="hidden" name={`${name}__cleared`} value={cleared ? "1" : ""} />
-      <div className="flex items-start gap-4">
+      {/* Smal: de preview boven de knop. Naast elkaar houdt de knop op een
+          telefoon nog geen tien tekens over en breekt "Foto kiezen" in tweeën. */}
+      <div className="flex flex-col items-start gap-3 sm:flex-row sm:gap-4">
         <div className="relative grid aspect-[16/10] w-40 shrink-0 place-items-center overflow-hidden rounded-xl border border-vtk-blue/15">
           {shownUrl ? (
             <>
@@ -133,7 +135,7 @@ export function StorageImageField({
             </div>
           )}
         </div>
-        <div className="min-w-0 flex-1 space-y-2">
+        <div className="w-full min-w-0 flex-1 space-y-2">
           <div className="flex items-center gap-2">
             <label
               className={`inline-flex items-center gap-2 rounded-full border border-vtk-blue/15 px-3 py-1.5 text-sm transition-colors ${

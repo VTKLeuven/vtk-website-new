@@ -8,6 +8,16 @@ import { HEADER_TABS, prisma } from "@vtk/db";
 const isExternalUrl = (url: string) => /^[a-z][a-z0-9+.-]*:/i.test(url) || url.startsWith("//");
 
 /** Eén item in het uitklapmenu van een tab. */
+/**
+ * Een menu-item van een headertab wijst meestal naar een andere site (Career,
+ * Cursusdienst). Maar een item mag ook naar een pagina op deze site wijzen, en
+ * dan moet het geen nieuw tabblad openen en wél de taalprefix krijgen. Alles wat
+ * met een schema begint is extern; een pad als "/kalender" niet.
+ */
+function isExternalUrl(url: string): boolean {
+  return /^[a-z][a-z0-9+.-]*:/i.test(url) || url.startsWith("//");
+}
+
 export type NavHeaderTabChild = {
   id: string;
   labelNl: string;

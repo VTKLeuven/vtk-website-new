@@ -5,6 +5,11 @@ on:
     branches: ['main']
   pull_request:
     branches: ['main']
+  # Handmatig te starten vanaf het Actions-tabblad. Nodig wanneer GitHub voor een
+  # push geen run heeft aangemaakt: bij een Actions-storing worden pushes die
+  # tijdens de storing binnenkomen niet ingehaald, en dan staat main wel vooruit
+  # maar draait de server nog op de vorige commit.
+  workflow_dispatch:
 
 jobs:
   verify:
@@ -77,7 +82,8 @@ jobs:
         run: npm run test:e2e:tickets --workspace=@vtk/web
 
   deploy:
-    if: github.event_name == 'push'
+    # Ook bij een handmatige start deployen; enkel een pull_request mag niet.
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
     needs: verify
     runs-on: ubuntu-latest
 

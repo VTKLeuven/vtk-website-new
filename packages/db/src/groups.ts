@@ -82,7 +82,15 @@ export const HEADER_TABS: Array<{
       "Praktische diensten, campusvoorzieningen en tools die je semester vlotter maken.",
     introEn:
       "Practical services, campus facilities and tools that make your semester smoother.",
+    // De kalender was buiten de homepage enkel via de footer te vinden. Ze staat
+    // hier in het menu i.p.v. als twaalfde headertab: elf tabs is al de grens
+    // waarop de header naar een menuknop overschakelt (zie CLAUDE.md).
     links: [
+      {
+        labelNl: "Kalender",
+        labelEn: "Calendar",
+        url: "/kalender",
+      },
       // Intern pad: de pianopagina is een eigen route, geen contentpagina onder
       // deze tab, dus ze komt er niet vanzelf in het uitklapmenu bij.
       { labelNl: "Piano reserveren", labelEn: "Reserve the piano", url: "/piano" },

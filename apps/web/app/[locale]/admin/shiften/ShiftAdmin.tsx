@@ -16,6 +16,8 @@ export type AdminShift = {
   maxParticipants: number;
   reward: number;
   post: string | null;
+  openToInternationals: boolean;
+  instructions: string | null;
   participants: AdminParticipant[];
 };
 export type RankingRow = { userId: string; name: string; post: string; count: number };

@@ -48,6 +48,10 @@ export function EditorialNavLinks({
   const [menuOpen, setMenuOpen] = useState(false);
   const [expanded, setExpanded] = useState<string[]>([]);
   const [menuPath, setMenuPath] = useState(pathname);
+  // Tab waarvan het uitklappaneel onderdrukt is omdat je er net op geklikt hebt.
+  // Zonder dit blijft het paneel na de klik openstaan zolang je muis op de tab
+  // rust, terwijl de router al naar de nieuwe pagina is gegaan.
+  const [suppressed, setSuppressed] = useState<string | null>(null);
 
   const nl = locale === "nl";
   const menuLabel = nl ? "Menu" : "Menu";
@@ -148,11 +152,22 @@ export function EditorialNavLinks({
               </div>
             );
           }
-          // Openen gebeurt met CSS (hover en focus-within): de links zitten
+          // Openen gebeurt met CSS (hover en :focus-visible): de links zitten
           // altijd in de DOM, dus toetsenbord en screenreader komen erbij
-          // zonder extra knop die de nav alleen maar breder maakt.
+          // zonder extra knop die de nav alleen maar breder maakt. Een klik
+          // onderdrukt het paneel tot de muis de tab verlaat of de focus
+          // wegvalt; anders blijft het na het navigeren hangen.
+          const isSuppressed = suppressed === tab.id;
+          const release = () => setSuppressed((current) => (current === tab.id ? null : current));
           return (
-            <div key={tab.id} className="nav-item has-menu">
+            <div
+              key={tab.id}
+              className="nav-item has-menu"
+              data-suppressed={isSuppressed ? "" : undefined}
+              onClick={() => setSuppressed(tab.id)}
+              onPointerLeave={release}
+              onBlur={release}
+            >
               {renderTabLink(tab, active, true)}
               <div className="nav-menu">
                 <ul>

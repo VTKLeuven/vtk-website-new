@@ -1,21 +1,18 @@
 'use client';
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useSyncExternalStore } from 'react';
 import { addDays, format } from 'date-fns';
+import { Globe } from 'lucide-react';
 import { getDictionary, type Locale } from '@vtk/i18n';
-import { type ShiftResponse } from '@/lib/shift';
-import { useToast } from '@/components/ui/toast';
-import { fmtTime, useShiftList, registerShift, unregisterShift } from './tables';
-import './week-view.css';
+import { fmtTime, freeSpots, spotsLabel, type MergedShift } from './shiftData';
 
 const HOUR_PX = 44;
 const MS_PER_HOUR = 3_600_000;
+const subscribeToClient = () => () => undefined;
 // Weekdag-afkortingen per locale, geïndexeerd via Date.getDay() (0 = zondag).
 const DOW = {
   nl: ['zo', 'ma', 'di', 'wo', 'do', 'vr', 'za'],
   en: ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'],
 } as const;
-
-type MergedShift = { shift: ShiftResponse; registered: boolean };
 
 type Segment = {
   key: string;
@@ -27,40 +24,47 @@ type Segment = {
   cols: number;
 };
 
-/** `yyyy-MM-dd` → lokale middernacht (niet UTC, zodat de dag niet verspringt). */
-function localMidnight(dateStr: string): Date {
-  const [y, m, d] = dateStr.split('-').map(Number);
-  return new Date(y, m - 1, d);
-}
-
 /**
- * Google-Calendar-achtige weekweergave: 7 dagkolommen vanaf een gekozen
- * startdatum (dus startdag + 6 dagen), met shiften als blokken op hun uren.
- * Klikken schrijft in/uit; blijft via de event-bus in sync met de lijstweergave.
+ * Google-Calendar-achtige weekweergave: 7 dagkolommen vanaf `weekStart`, met de
+ * shiften als blokken op hun uren. Een klik opent het detailvenster; van daaruit
+ * schrijf je in of uit.
  */
-export function ShiftWeekView({ locale }: { locale: Locale }) {
+export function ShiftWeekView({
+  locale,
+  weekStart,
+  shifts,
+  emptyState,
+  onOpen,
+}: {
+  locale: Locale;
+  weekStart: Date;
+  shifts: MergedShift[];
+  emptyState: React.ReactNode;
+  onOpen: (entry: MergedShift) => void;
+}) {
   const t = getDictionary(locale).shift;
-  const showToast = useToast();
-  const available = useShiftList('/api/shift');
-  const registered = useShiftList('/api/shift/register');
 
-  const [startStr, setStartStr] = useState<string>(() => format(new Date(), 'yyyy-MM-dd'));
-  const weekStart = useMemo(() => localMidnight(startStr), [startStr]);
-  const days = useMemo(() => Array.from({ length: 7 }, (_, i) => addDays(weekStart, i)), [weekStart]);
+  // De "nu"-lijn en de markering van vandaag horen bij de klok van de browser.
+  // Serverside blijven ze weg: een tijdstip dat bij hydratatie een paar pixels
+  // verschilt, geeft anders een mismatch.
+  const isClient = useSyncExternalStore(
+    subscribeToClient,
+    () => true,
+    () => false
+  );
+  const [mountedAt] = useState(() => Date.now());
+  const now = isClient ? mountedAt : null;
 
-  // Beschikbare + ingeschreven shiften samenvoegen (ingeschreven wint bij dubbel).
-  const merged = useMemo<MergedShift[]>(() => {
-    const map = new Map<string, MergedShift>();
-    for (const s of available) map.set(s.id, { shift: s, registered: false });
-    for (const s of registered) map.set(s.id, { shift: s, registered: true });
-    return [...map.values()];
-  }, [available, registered]);
+  const days = useMemo(
+    () => Array.from({ length: 7 }, (_, i) => addDays(weekStart, i)),
+    [weekStart]
+  );
 
   // Split shiften in dag-segmenten (voor shiften over middernacht), bepaal de
   // getoonde uren-range en leg overlappende shiften naast elkaar in kolommen.
   const { segments, minHour, maxHour } = useMemo(() => {
     const raw: Omit<Segment, 'col' | 'cols'>[] = [];
-    for (const m of merged) {
+    for (const m of shifts) {
       for (let d = 0; d < 7; d++) {
         const dayStart = addDays(weekStart, d);
         const dayEnd = addDays(dayStart, 1);
@@ -127,58 +131,41 @@ export function ShiftWeekView({ locale }: { locale: Locale }) {
     }
 
     return { segments: withCols, minHour: min, maxHour: max };
-  }, [merged, weekStart]);
+  }, [shifts, weekStart]);
 
   const gridHeight = (maxHour - minHour) * HOUR_PX;
   const hours = Array.from({ length: maxHour - minHour + 1 }, (_, i) => minHour + i);
-  const shiftWeek = (delta: number) =>
-    setStartStr(format(addDays(weekStart, delta), 'yyyy-MM-dd'));
+
+  // Positie van de "nu"-lijn: enkel wanneer vandaag in de getoonde week valt en
+  // het huidige uur binnen het getoonde bereik ligt.
+  const nowLine = useMemo(() => {
+    if (now === null) return null;
+    const today = new Date(now);
+    const index = days.findIndex(
+      (d) =>
+        d.getFullYear() === today.getFullYear() &&
+        d.getMonth() === today.getMonth() &&
+        d.getDate() === today.getDate()
+    );
+    if (index === -1) return null;
+    const frac = today.getHours() + today.getMinutes() / 60;
+    if (frac < minHour || frac > maxHour) return { index, top: null };
+    return { index, top: (frac - minHour) * HOUR_PX };
+  }, [now, days, minHour, maxHour]);
 
   return (
     <div className="vtk-week">
-      <div className="vtk-week-toolbar">
-        <button
-          type="button"
-          className="vtk-basic-badge"
-          onClick={() => shiftWeek(-7)}
-          style={{ cursor: 'pointer', fontFamily: 'inherit' }}
-        >
-          {t.week.prev}
-        </button>
-        <button
-          type="button"
-          className="vtk-basic-badge"
-          onClick={() => setStartStr(format(new Date(), 'yyyy-MM-dd'))}
-          style={{ cursor: 'pointer', fontFamily: 'inherit' }}
-        >
-          {t.week.today}
-        </button>
-        <button
-          type="button"
-          className="vtk-basic-badge"
-          onClick={() => shiftWeek(7)}
-          style={{ cursor: 'pointer', fontFamily: 'inherit' }}
-        >
-          {t.week.next}
-        </button>
-        <label className="vtk-basic-field">
-          <span className="vtk-basic-label">{t.week.startDate}</span>
-          <input
-            type="date"
-            className="vtk-basic-input"
-            value={startStr}
-            onChange={(e) => setStartStr(e.target.value)}
-          />
-        </label>
-      </div>
-
       <div className="vtk-week-scroll">
         <div className="vtk-week-grid">
           <div className="vtk-week-corner" />
-          {days.map((day) => (
-            <div key={day.toISOString()} className="vtk-week-head">
+          {days.map((day, d) => (
+            <div
+              key={day.toISOString()}
+              className="vtk-week-head"
+              data-today={nowLine?.index === d ? 'true' : undefined}
+            >
               <span className="vtk-week-dow">{DOW[locale][day.getDay()]}</span>
-              <span className="vtk-week-date">{format(day, 'dd/MM')}</span>
+              <span className="vtk-week-date">{format(day, 'd/MM')}</span>
             </div>
           ))}
 
@@ -194,50 +181,62 @@ export function ShiftWeekView({ locale }: { locale: Locale }) {
             <div
               key={day.toISOString()}
               className="vtk-week-daycol"
+              data-today={nowLine?.index === d ? 'true' : undefined}
               style={{
                 height: gridHeight,
                 backgroundImage: `repeating-linear-gradient(var(--line) 0 1px, transparent 1px ${HOUR_PX}px)`,
               }}
             >
+              {nowLine && nowLine.index === d && nowLine.top !== null ? (
+                <span className="vtk-week-now" style={{ top: nowLine.top }} aria-hidden="true" />
+              ) : null}
+
               {segments
                 .filter((s) => s.dayIndex === d)
                 .map((s) => {
                   const { shift, registered } = s.merged;
-                  const spots = shift.availableSpots ?? shift.maxParticipants - (shift.takenSpots ?? 0);
-                  const isFull = !registered && spots <= 0;
+                  const isFull = !registered && freeSpots(shift) <= 0;
                   const variant = registered
                     ? 'vtk-week-block-registered'
                     : isFull
                       ? 'vtk-week-block-full'
                       : 'vtk-week-block-available';
+                  const height = Math.max(18, (s.endFrac - s.startFrac) * HOUR_PX - 2);
+                  const status = registered ? t.isRegistered : spotsLabel(shift, t);
+                  const intl = shift.openToInternationals ? ` · ${t.intl.badge}` : '';
 
                   return (
                     <button
                       key={s.key}
                       type="button"
                       className={`vtk-week-block ${variant}`}
-                      title={`${shift.name} · ${fmtTime(shift.startTime)}–${fmtTime(shift.endTime)} · ${shift.location}`}
-                      disabled={isFull}
-                      onClick={() =>
-                        registered
-                          ? unregisterShift(shift.id, showToast, t)
-                          : registerShift(shift.id, showToast, t)
-                      }
+                      data-compact={height < 58 ? 'true' : undefined}
+                      title={`${shift.name} · ${fmtTime(shift.startTime)}-${fmtTime(shift.endTime)} · ${shift.location} · ${status}${intl}`}
+                      aria-label={`${t.dialog.open}: ${shift.name}, ${fmtTime(shift.startTime)}-${fmtTime(shift.endTime)}, ${shift.location}, ${status}${intl}`}
+                      onClick={() => onOpen(s.merged)}
                       style={{
                         top: (s.startFrac - minHour) * HOUR_PX,
-                        height: Math.max(18, (s.endFrac - s.startFrac) * HOUR_PX - 2),
+                        height,
                         left: `calc(${(s.col / s.cols) * 100}% + 2px)`,
                         width: `calc(${(1 / s.cols) * 100}% - 4px)`,
                       }}
                     >
-                      <span className="vtk-week-block-time">{fmtTime(shift.startTime)}</span>
+                      <span className="vtk-week-block-time">
+                        {fmtTime(shift.startTime)}
+                        {shift.openToInternationals ? (
+                          <Globe className="vtk-week-block-globe" aria-hidden="true" />
+                        ) : null}
+                      </span>
                       <span className="vtk-week-block-name">{shift.name}</span>
+                      <span className="vtk-week-block-status">{status}</span>
                     </button>
                   );
                 })}
             </div>
           ))}
         </div>
+
+        {segments.length === 0 ? <div className="vtk-week-empty">{emptyState}</div> : null}
       </div>
     </div>
   );

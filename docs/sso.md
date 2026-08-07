@@ -304,6 +304,16 @@ Elk punt hier heeft ooit tijd gekost.
     "update available"-kader achter en dan faalt de migratie op een syntaxfout.
     Zet `PRISMA_HIDE_UPDATE_MESSAGE=1` of schrijf het bestand met de hand.
 
+14. **`scopeExpirations` neemt een duurstring, geen getal.** De waarde gaat door
+    `toExpJWT()`, en die geeft een getal ongewijzigd terug als absolute
+    epoch-seconde: `600` betekent 1 januari 1970, 00:10 UTC, niet "over tien
+    minuten". Elke client die `entitlements` vroeg kreeg zo een access token dat
+    al verlopen was. UserInfo zegt dat niet: `validateAccessToken` geeft bij een
+    verlopen token `{ active: false }` terug, zonder `scope`, en de endpoint
+    antwoordt daarop met `invalid_scope` / "Missing required scope". Zoek bij die
+    foutmelding dus eerst naar een verlopen token, niet naar een scope-probleem.
+    Schrijf `'10m'`.
+
 ---
 
 ## Bewust niet gebouwd

@@ -19,9 +19,17 @@ type Event = {
   visibility?: "PUBLIC" | "MEMBERS";
   url?: string | null;
   imageKey?: string | null;
+  categoryIds?: string[];
 };
 
 type Group = { id: string; nameNl: string; nameEn: string };
+type Category = {
+  id: string;
+  nameNl: string;
+  nameEn: string;
+  colour: string;
+  audience: string | null;
+};
 
 function toLocalDatetime(d?: Date | null | string) {
   if (!d) return "";
@@ -30,16 +38,51 @@ function toLocalDatetime(d?: Date | null | string) {
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
 }
 
+/** Eén aanvinkbare categorie; doelgroep en thema gebruiken dezelfde `name`. */
+function CategoryCheckbox({
+  category,
+  checked,
+  nl,
+}: {
+  category: Category;
+  checked: boolean;
+  nl: boolean;
+}) {
+  return (
+    <label className="inline-flex items-center gap-2 text-sm">
+      <input type="checkbox" name="categoryIds" value={category.id} defaultChecked={checked} />
+      <span
+        aria-hidden
+        className="inline-block size-2.5 rounded-full"
+        style={{ background: category.colour }}
+      />
+      {nl ? category.nameNl : category.nameEn}
+    </label>
+  );
+}
+
 export function EventForm({
   event,
   groups,
+  categories,
   locale,
+  canCreateTickets = false,
 }: {
   event: Event;
   groups: Group[];
+  categories: Category[];
   locale: "nl" | "en";
+  /**
+   * Toont "Opslaan en tickets toevoegen" bij een nieuw evenement. Ticketevents
+   * aanmaken is een aparte permissie, dus wie enkel mag inplannen ziet die knop
+   * niet.
+   */
+  canCreateTickets?: boolean;
 }) {
   const nl = locale === "nl";
+  const selected = new Set(event.categoryIds ?? []);
+  const audienceCategories = categories.filter((c) => c.audience !== null);
+  const themeCategories = categories.filter((c) => c.audience === null);
   return (
     <SaveForm
       action={saveEventAction}
@@ -54,6 +97,15 @@ export function EventForm({
           : "Not saved: the end is before the start. Pick an end after the start date.",
       }}
       fallbackErrorMessage={nl ? "Er ging iets mis bij het opslaan." : "Something went wrong while saving."}
+      secondarySubmit={
+        canCreateTickets && !event.id
+          ? {
+              name: "andThen",
+              value: "tickets",
+              label: nl ? "Opslaan en tickets toevoegen" : "Save and add tickets",
+            }
+          : undefined
+      }
     >
       {event.id && <input type="hidden" name="id" value={event.id} />}
       <Card className="p-5 space-y-4">
@@ -108,6 +160,36 @@ export function EventForm({
           </div>
           <div className="md:col-span-2">
             <EventImageField defaultKey={event.imageKey} locale={locale} />
+          </div>
+          {/* Twee assen, bewust apart gezet. De doelgroep bepaalt wie het event
+              vanzelf in zijn kalender krijgt; het thema is enkel een filter en
+              een kleur. Ze staan in dezelfde koppeltabel, vandaar dezelfde
+              `name`. */}
+          <div className="md:col-span-2">
+            <Label>{nl ? "Doelgroep" : "Audience"}</Label>
+            <p className="mb-2 text-sm text-vtk-blue-muted">
+              {nl
+                ? "Laat leeg voor een event voor iedereen. Duid je een doelgroep aan, dan verschijnt het event vanzelf bij die leden en staat het bij de anderen pas onder “ook andere doelgroepen”."
+                : "Leave empty for an event for everyone. Pick an audience and the event surfaces automatically for those members, while others only see it under “other audiences too”."}
+            </p>
+            <div className="flex flex-wrap gap-x-5 gap-y-2">
+              {audienceCategories.map((c) => (
+                <CategoryCheckbox key={c.id} category={c} checked={selected.has(c.id)} nl={nl} />
+              ))}
+            </div>
+          </div>
+          <div className="md:col-span-2">
+            <Label>{nl ? "Categorieën" : "Categories"}</Label>
+            <p className="mb-2 text-sm text-vtk-blue-muted">
+              {nl
+                ? "Het thema van het event. Bepaalt de kleur in de kalender, de filterknop en de agenda-feed per categorie."
+                : "The event's theme. Determines its colour in the calendar, the filter button and the per-category calendar feed."}
+            </p>
+            <div className="flex flex-wrap gap-x-5 gap-y-2">
+              {themeCategories.map((c) => (
+                <CategoryCheckbox key={c.id} category={c} checked={selected.has(c.id)} nl={nl} />
+              ))}
+            </div>
           </div>
         </div>
         <div>

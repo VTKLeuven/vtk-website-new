@@ -247,6 +247,8 @@
     "programmesHint": "Duid alle richtingen aan die op jou van toepassing zijn.",
     "notAtFaculty": "Ik studeer niet aan de faculteit",
     "notAtFacultyHint": "Duid dit aan als je geen ingenieursopleiding aan de faculteit volgt. Je krijgt dan geen Career-mails, want die zijn op faculteitsstudenten gericht.",
+    "internationalStudent": "Ik ben een internationale of uitwisselingsstudent",
+    "internationalStudentHint": "Duid dit aan als je via een uitwisseling of als internationale student aan de faculteit zit. Evenementen voor internationals verschijnen dan vanzelf in je kalender.",
     "notStudying": "Ik studeer niet (meer)",
     "notStudyingHint": "Duid dit aan als je afgestudeerd bent of gestopt. Je blijft lid, maar valt uit de studiegerichte mailinglijsten.",
     "submit": "Registratie voltooien",
@@ -326,6 +328,7 @@
     "back": "Terug",
     "noAccess": "Geen toegang",
     "ledenbeheer": "Ledenbeheer",
+    "evenementen": "Evenementen",
     "website": "Website",
     "sso": "SSO & apps"
   },
@@ -435,32 +438,67 @@
   },
   "shift": {
     "shifts": "Shiften",
+    "subtitle": "Help mee achter de toog of op een evenement. Elke shift levert bonnetjes op.",
     "available": "Beschikbare shiften",
     "registered": "Mijn shiften",
-    "columns": {
-      "shift": "Shift",
-      "date": "Datum",
-      "time": "Tijd",
-      "where": "Locatie",
-      "action": "Actie"
+    "view": {
+      "label": "Weergave",
+      "week": "Week",
+      "list": "Lijst"
+    },
+    "week": {
+      "prev": "Vorige week",
+      "next": "Volgende week",
+      "today": "Vandaag",
+      "range": "{from} tot {to}"
     },
     "filter": {
       "post": "Post",
-      "allPosts": "Alle posten",
-      "from": "Vanaf",
-      "sortAsc": "↑ Oplopend",
-      "sortDesc": "↓ Aflopend"
+      "allPosts": "Alle posten"
     },
-    "register": "Registreer",
+    "register": "Schrijf in",
     "unregister": "Uitschrijven",
-    "week": {
-      "prev": "← Vorige",
-      "today": "Vandaag",
-      "next": "Volgende →",
-      "startDate": "Startdatum"
+    "isRegistered": "Ingeschreven",
+    "locked": "Vast binnen 24u",
+    "until": "tot {time}",
+    "intl": {
+      "badge": "Ook voor internationals",
+      "hint": "Je hoeft geen Nederlands te spreken voor deze shift."
     },
-    "emptyAvailable": "Er zijn geen beschikbare shiften in deze periode.",
-    "emptyRegistered": "Je bent nog niet ingeschreven voor een shift.",
+    "instructions": "Wat houdt deze shift in?",
+    "dialog": {
+      "close": "Sluiten",
+      "cancel": "Annuleren",
+      "open": "Bekijk details"
+    },
+    "spots": {
+      "full": "Vol",
+      "one": "Nog 1 plaats",
+      "few": "Nog {n} plaatsen",
+      "taken": "{taken} van {max} plaatsen bezet"
+    },
+    "reward": {
+      "one": "1 bonnetje",
+      "many": "{n} bonnetjes"
+    },
+    "rel": {
+      "today": "Vandaag",
+      "tomorrow": "Morgen",
+      "inDays": "Over {n} dagen"
+    },
+    "empty": {
+      "week": "Geen shiften deze week",
+      "next": "De eerstvolgende shift is {name} op {date}.",
+      "jump": "Ga naar {date}",
+      "none": "Er staan voorlopig geen shiften gepland."
+    },
+    "rail": {
+      "emptyTitle": "Nog niets ingepland",
+      "emptyText": "Kies een shift in het overzicht; je inschrijving verschijnt hier meteen.",
+      "year": "Academiejaar {year}",
+      "shiftsDone": "shiften gedaan",
+      "vouchers": "bonnetjes verdiend"
+    },
     "detail": {
       "start": "Start",
       "end": "Einde",
@@ -468,7 +506,9 @@
       "post": "Post",
       "reward": "Beloning",
       "spots": "Plaatsen",
-      "description": "Beschrijving"
+      "description": "Beschrijving",
+      "open": "Toon details",
+      "close": "Verberg details"
     },
     "toast": {
       "registered": "Je bent ingeschreven voor deze shift.",

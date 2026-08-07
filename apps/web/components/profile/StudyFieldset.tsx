@@ -43,12 +43,14 @@ export function StudyFieldset({
   studyProgrammes,
   notAtFaculty,
   notStudying,
+  internationalStudent,
 }: {
   locale: Locale;
   studyYears: StudyYear[];
   studyProgrammes: StudyProgramme[];
   notAtFaculty: boolean;
   notStudying: boolean;
+  internationalStudent: boolean;
 }) {
   const t = getDictionary(locale).onboarding;
   const selectedYears = new Set(studyYears);
@@ -105,6 +107,18 @@ export function StudyFieldset({
           />
         </div>
         <p className="mt-2 text-xs text-[#5c667f]">{t.notAtFacultyHint}</p>
+      </div>
+      {/* Geen richting en geen studiejaar, maar wel studie-context: het bepaalt
+          welke evenementen vanzelf in je kalender opduiken. Bewust een eigen veld
+          en geen afleiding uit de sitetaal. */}
+      <div>
+        <CheckboxChip
+          name="internationalStudent"
+          value="on"
+          defaultChecked={internationalStudent}
+          label={t.internationalStudent}
+        />
+        <p className="mt-1 text-xs text-[#5c667f]">{t.internationalStudentHint}</p>
       </div>
     </div>
   );

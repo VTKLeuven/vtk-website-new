@@ -46,6 +46,7 @@ export default async function OnboardingPage({
       studyProgrammes: true,
       notAtFaculty: true,
       notStudying: true,
+      internationalStudent: true,
     },
   });
 

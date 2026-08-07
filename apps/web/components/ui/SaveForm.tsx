@@ -23,6 +23,7 @@ export function SaveForm({
   fallbackErrorMessage,
   onSuccess,
   submitDisabled = false,
+  secondarySubmit,
   className,
   children,
 }: {
@@ -37,6 +38,13 @@ export function SaveForm({
   onSuccess?: () => void;
   /** Extra voorwaarde bovenop "bezig met opslaan", bv. een verplichte upload. */
   submitDisabled?: boolean;
+  /**
+   * Tweede opslaanknop die hetzelfde formulier verstuurt met een extra waarde
+   * mee, zodat de action daarna ergens anders naartoe kan (bv. "Opslaan en
+   * tickets toevoegen"). Bewust een submit en geen aparte link: het formulier
+   * moet eerst bewaard worden.
+   */
+  secondarySubmit?: { name: string; value: string; label: string };
   className?: string;
   children?: ReactNode;
 }) {
@@ -70,9 +78,24 @@ export function SaveForm({
   return (
     <form action={formAction} className={className}>
       <FormBusyProvider register={register}>{children}</FormBusyProvider>
-      <Button type="submit" disabled={pending || submitDisabled || busy}>
-        {pending ? savingLabel : submitLabel}
-      </Button>
+      <div className="flex flex-wrap items-center gap-3">
+        <Button type="submit" disabled={pending || submitDisabled || busy}>
+          {pending ? savingLabel : submitLabel}
+        </Button>
+        {secondarySubmit ? (
+          // `name`/`value` op de knop: die waarde komt enkel mee wanneer je op
+          // déze knop klikt, zodat de action ziet welke van de twee je gebruikte.
+          <Button
+            type="submit"
+            variant="secondary"
+            name={secondarySubmit.name}
+            value={secondarySubmit.value}
+            disabled={pending || submitDisabled || busy}
+          >
+            {secondarySubmit.label}
+          </Button>
+        ) : null}
+      </div>
     </form>
   );
 }

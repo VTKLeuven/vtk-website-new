@@ -7,6 +7,7 @@ const NAV = [
   { href: '/beheer', label: 'Overzicht' },
   { href: '/beheer/aanvragen', label: 'Aanvragen' },
   { href: '/beheer/vervoer', label: 'Vervoer' },
+  { href: '/beheer/chauffeurs', label: 'Chauffeurs' },
   { href: '/beheer/materiaal', label: 'Inventaris' },
   { href: '/beheer/flesserke', label: 'Flesserke' },
   { href: '/beheer/kalender', label: 'Kalender' },

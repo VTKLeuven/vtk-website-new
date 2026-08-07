@@ -550,7 +550,7 @@ async function holdersOf(permissionId: string): Promise<string[]> {
 // ── Tokens ───────────────────────────────────────────────────────────────────
 //
 // Let op: een al uitgedeeld JWT access token is niet in te trekken en blijft
-// geldig tot het vervalt. Dankzij `scopeExpirations: { entitlements: 600 }` is
+// geldig tot het vervalt. Dankzij `scopeExpirations: { entitlements: '10m' }` is
 // dat hoogstens tien minuten. Wat hier weggaat zijn de refresh tokens, zodat er
 // niets nieuws meer uit voortkomt.
 

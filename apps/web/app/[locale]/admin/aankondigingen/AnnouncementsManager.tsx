@@ -239,13 +239,16 @@ export function AnnouncementsManager({
         ) : (
           <ul className="divide-y divide-vtk-blue/10">
             {announcements.map((announcement) => (
-              <li key={announcement.id} className="flex flex-wrap items-center gap-3 py-3">
+              // `basis-48` op de titel: smal zakt het actieblok als geheel naar
+              // een tweede regel, in plaats van de titel tussen drie knoppen te
+              // pletten tot een paar letters.
+              <li key={announcement.id} className="flex flex-wrap items-center gap-x-3 gap-y-2 py-3">
                 <span
                   className={`rounded-full px-2 py-0.5 text-xs font-medium ${STATUS_CLASS[announcement.status]}`}
                 >
                   {statusLabels[announcement.status]}
                 </span>
-                <span className="min-w-0 flex-1">
+                <span className="min-w-0 flex-1 basis-48">
                   <span className="block truncate text-sm font-medium text-vtk-ink">
                     {nl ? announcement.titleNl : announcement.titleEn}
                   </span>
@@ -255,49 +258,51 @@ export function AnnouncementsManager({
                   </span>
                 </span>
 
-                <form action={setAnnouncementActiveAction}>
-                  <input type="hidden" name="id" value={announcement.id} />
-                  <input type="hidden" name="active" value={announcement.active ? "0" : "1"} />
-                  <button
-                    type="submit"
-                    className="rounded-full border border-vtk-blue/15 px-3 py-1 text-xs font-medium text-vtk-ink hover:bg-vtk-blue-soft/60"
+                <div className="ml-auto flex shrink-0 items-center gap-3">
+                  <form action={setAnnouncementActiveAction}>
+                    <input type="hidden" name="id" value={announcement.id} />
+                    <input type="hidden" name="active" value={announcement.active ? "0" : "1"} />
+                    <button
+                      type="submit"
+                      className="rounded-full border border-vtk-blue/15 px-3 py-1 text-xs font-medium text-vtk-ink hover:bg-vtk-blue-soft/60"
+                    >
+                      {announcement.active
+                        ? nl
+                          ? "Uitzetten"
+                          : "Turn off"
+                        : nl
+                          ? "Aanzetten"
+                          : "Turn on"}
+                    </button>
+                  </form>
+
+                  <IconButton
+                    label={nl ? "Bewerken" : "Edit"}
+                    srLabel={`${nl ? "Bewerken" : "Edit"}: ${nl ? announcement.titleNl : announcement.titleEn}`}
+                    onClick={() => {
+                      setEditing(announcement);
+                      window.scrollTo({ top: 0, behavior: "smooth" });
+                    }}
                   >
-                    {announcement.active
-                      ? nl
-                        ? "Uitzetten"
-                        : "Turn off"
-                      : nl
-                        ? "Aanzetten"
-                        : "Turn on"}
-                  </button>
-                </form>
+                    <PencilIcon />
+                  </IconButton>
 
-                <IconButton
-                  label={nl ? "Bewerken" : "Edit"}
-                  srLabel={`${nl ? "Bewerken" : "Edit"}: ${nl ? announcement.titleNl : announcement.titleEn}`}
-                  onClick={() => {
-                    setEditing(announcement);
-                    window.scrollTo({ top: 0, behavior: "smooth" });
-                  }}
-                >
-                  <PencilIcon />
-                </IconButton>
-
-                <DeleteIconButton
-                  action={deleteAnnouncementAction}
-                  fields={{ id: announcement.id }}
-                  label={nl ? "Verwijderen" : "Delete"}
-                  srLabel={`${nl ? "Verwijderen" : "Delete"}: ${nl ? announcement.titleNl : announcement.titleEn}`}
-                  title={nl ? "Aankondiging verwijderen?" : "Delete announcement?"}
-                  description={
-                    nl
-                      ? `"${announcement.titleNl}" verdwijnt ook uit de historiek. Wil je ze enkel van de homepage halen, zet ze dan op uit.`
-                      : `"${announcement.titleEn}" also disappears from the history. To only take it off the homepage, turn it off instead.`
-                  }
-                  confirmLabel={nl ? "Verwijderen" : "Delete"}
-                  cancelLabel={nl ? "Annuleren" : "Cancel"}
-                  successMessage={nl ? "Aankondiging verwijderd" : "Announcement deleted"}
-                />
+                  <DeleteIconButton
+                    action={deleteAnnouncementAction}
+                    fields={{ id: announcement.id }}
+                    label={nl ? "Verwijderen" : "Delete"}
+                    srLabel={`${nl ? "Verwijderen" : "Delete"}: ${nl ? announcement.titleNl : announcement.titleEn}`}
+                    title={nl ? "Aankondiging verwijderen?" : "Delete announcement?"}
+                    description={
+                      nl
+                        ? `"${announcement.titleNl}" verdwijnt ook uit de historiek. Wil je ze enkel van de homepage halen, zet ze dan op uit.`
+                        : `"${announcement.titleEn}" also disappears from the history. To only take it off the homepage, turn it off instead.`
+                    }
+                    confirmLabel={nl ? "Verwijderen" : "Delete"}
+                    cancelLabel={nl ? "Annuleren" : "Cancel"}
+                    successMessage={nl ? "Aankondiging verwijderd" : "Announcement deleted"}
+                  />
+                </div>
               </li>
             ))}
           </ul>

@@ -23,7 +23,7 @@ export function EventImageField({
       emptyHint={nl ? "Standaardfoto" : "Default photo"}
       helpText={
         nl
-          ? "Optioneel. Zonder afbeelding toont de eventpagina de standaardfoto hiernaast."
+          ? "Optioneel. Zonder afbeelding toont de eventpagina de standaardfoto uit de preview."
           : "Optional. Without an image the event page shows the default photo shown here."
       }
     />

@@ -88,7 +88,14 @@ export const auth = betterAuth({
       // 10.6). Dat is het antwoord op "hoe lang blijft een ingetrokken
       // permissie werken": tien minuten, altijd, zonder dat de client iets moet
       // doen. Een gewoon `openid profile`-token houdt zijn volle uur.
-      scopeExpirations: { entitlements: 600 },
+      //
+      // LET OP: dit moet een duurstring zijn, geen getal. De plugin duwt deze
+      // waarde door `toExpJWT()`, en dat behandelt een getal als een absolute
+      // epoch-seconde (`600` = 1 januari 1970, 00:10 UTC), niet als "over 600
+      // seconden". Met een getal krijgt elke client die `entitlements` vraagt
+      // een token dat al verlopen is; UserInfo antwoordt dan met het misleidende
+      // `invalid_scope` / "Missing required scope".
+      scopeExpirations: { entitlements: '10m' },
       // De scope-registry (lib/scopes.ts) is de bron; zonder deze regel staat de
       // plugin enkel haar vier standaardscopes toe en faalt het aanmaken van een
       // client met bv. `vtk:study_programme` op `invalid_scope`.
@@ -100,16 +107,21 @@ export const auth = betterAuth({
       customIdTokenClaims: async ({ user, scopes }) =>
         resolveClaims({ destination: 'id_token', userId: user.id, scopes: [...scopes] }),
 
-      // `jwt` is de payload van het access token waarmee UserInfo opgehaald
-      // wordt; `azp` is de client die het kreeg. Dat is de enige plek waar de
-      // client bekend is, en dus de enige plek waar de `permissions`-claim
-      // opgelost kan worden.
+      // `jwt` is de payload van het access token waarmee UserInfo opgehaald wordt,
+      // en de enige plek waar de client bekend is. Onze access tokens zijn opaque,
+      // dus die payload draagt `client_id`; `azp` bestaat enkel op een JWT access
+      // token. Lees allebei, anders valt de `permissions`-claim stil weg.
       customUserInfoClaims: async ({ user, scopes, jwt }) =>
         resolveClaims({
           destination: 'userinfo',
           userId: user.id,
           scopes: [...scopes],
-          clientId: typeof jwt?.azp === 'string' ? jwt.azp : undefined,
+          clientId:
+            typeof jwt?.client_id === 'string'
+              ? jwt.client_id
+              : typeof jwt?.azp === 'string'
+                ? jwt.azp
+                : undefined,
         }),
 
       customAccessTokenClaims: async ({ user, scopes }) =>

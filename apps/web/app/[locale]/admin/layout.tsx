@@ -60,8 +60,12 @@ const NAV: NavEntry[] = [
     item('pages', '/paginas', { anyPerm: ['pages.edit', 'pages.editAll'] }),
     item('partners', '/partners', { perm: 'partners.manage' }),
   ]),
-  item('calendar', '/kalender', { perm: 'calendar.create' }),
-  item('tickets', '/tickets', { ticketing: true }),
+  // Eén evenement is één ding voor wie het organiseert: je plant het in en je
+  // verkoopt er tickets voor. Die twee schermen hoorden daarom onder één tab.
+  group('evenementen', [
+    item('calendar', '/kalender', { perm: 'calendar.create' }),
+    item('tickets', '/tickets', { ticketing: true }),
+  ]),
   // Fotoalbums hebben één ingang: /admin/media. Daar staat de Immich-galerij,
   // en dat is de enige bron die de publieke mediapagina leest. De oude
   // /admin/albums beheerde een tweede, lokale albumopslag die nergens meer

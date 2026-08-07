@@ -635,6 +635,136 @@ bijgewerkt. De Brevo-sync (`apps/web/lib/brevo/`) haalt de tussenpersoon weg.
   aan waarvoor het mails wil. Bewuste keuze i.p.v. opt-out, om te stroken met de
   verwachting dat je zelf kiest waarvoor je ingeschreven wordt.
 
+## Kalender: categorieën en agenda-feeds
+
+### De site is de enige bron; geen koppeling met de Google-agenda
+
+VTK had een gedeelde Google Workspace-agenda. Die wordt **niet** gekoppeld: niet
+geïmporteerd, niet gespiegeld, niet gesynchroniseerd. De reden is dat
+`CalendarEvent` dingen draagt waar een Google-agenda geen plaats voor heeft: een
+Nederlandse én Engelse titel en beschrijving, `visibility` (publiek vs. enkel
+leden), `groupId` (dat bepaalt wie het event mag bewerken), een foto, en een 1:1-
+koppeling met `TicketEvent`. Zou Google de bron zijn, dan verlies je dat allemaal
+of moet je het in de eventbeschrijving proppen.
+
+Daar komt bij dat enkel praesidium en posten een `@vtk.be`-account hebben. Een
+agenda "gedeeld met alle VTK-leden" bereikt de gewone leden dus sowieso niet;
+daarvoor dient de persoonlijke feed hieronder.
+
+Two-way sync is bewust nooit overwogen: event-ids, verwijderingen, herhalingen en
+conflictresolutie leveren permanent onderhoud op voor iets wat een kring niet
+nodig heeft.
+
+### Categorieën staan naast de post, niet erin
+
+`CalendarEvent.groupId` zegt **wie** het evenement organiseert. `CalendarCategory`
+zegt **waarover het gaat** of **voor wie het is**. Dat zijn twee assen: een
+fakbar-cantus kan een eerstejaarsevent zijn, en een evenement van de post
+Internationaal hoeft niet op de internationale kalender te staan.
+
+Vóór deze feature stonden de filterchips en de legende hardgecodeerd in de client
+en mapten ze op groepscodes (gala=CULTUUR, career=BEDRIJVENRELATIES,
+cantus=FAKBAR). Dat klopte inhoudelijk niet en vereiste een release voor elke
+wijziging. Categorieën zijn nu GUI-beheerd (`/admin/kalender/categorieen`,
+`calendar.manageAll`), inclusief hun kleur: die komt als `--cat` op het element
+terecht, zodat er geen lijst CSS-klassen meer per categorie hoeft te bestaan.
+
+Een categorie verwijderen laat de evenementen zelf staan; enkel de koppeling en
+dus haar pagina en feed verdwijnen.
+
+### Doelgroepen filteren vanzelf, en zijn geen filterknop
+
+Een categorie kan een **doelgroep** dragen (`CalendarCategory.audience`:
+`FIRST_YEARS` of `INTERNATIONALS`). Zo'n categorie gedraagt zich anders dan een
+gewoon thema:
+
+- **Geen filterchip.** Een eerstejaars hoort niet op "Eerstejaars" te moeten
+  klikken om zijn eigen programma te zien; dat is precies de stap die niemand
+  zet. De kalender kijkt naar het profiel en toont die evenementen vanzelf.
+- **Wie er niet bij hoort, ziet ze standaard niet.** Dat is een standaard en geen
+  slot: één schakelaar ("ook andere doelgroepen") en alles staat er. Er wordt
+  dus niets afgeschermd; de kalender is enkel meteen relevant. De categoriepagina
+  `/kalender/eerstejaars` en haar feed blijven ook zonder die schakelaar gewoon
+  bereikbaar.
+- **Altijd zichtbaar gelabeld.** In het maandraster, in de agendalijst én op de
+  eventpagina draagt zo'n evenement de naam van zijn doelgroep in de kleur van de
+  categorie. Een evenement dat maar voor een deel van de leden bedoeld is, mag er
+  nooit uitzien als een gewoon evenement.
+
+De doelgroep is een enum en geen vrij veld, omdat er bij elke waarde code hoort
+die bepaalt wie erbij hoort (`lib/calendar/audience.ts`): eerstejaars zijn leden
+met `BACHELOR_1` in `studyYears`, internationals leden met
+`User.internationalStudent`. Een doelgroep toevoegen is dus bewust geen
+GUI-actie.
+
+**`internationalStudent` is een eigen profielveld**, gevraagd in de onboarding en
+te wijzigen op `/account`. De sitetaal (`locale`) leek een gratis alternatief,
+maar die zegt welke taal je leest, niet of je een uitwisselingsstudent bent: een
+Vlaming die de site op Engels zet zou dan internationale events krijgen en een
+Erasmusstudent die het in het Nederlands probeert niet. Vergelijk
+`Shift.openToInternationals`, dat om dezelfde reden over de taal van de shift
+gaat en niet over wie de persoon is.
+
+De homepage ("Opkomende evenementen") past dezelfde filter toe. Anders zou een
+eerstejaarsevent bij iedereen op de homepage staan terwijl het uit de kalender
+gefilterd is.
+
+### Eén dynamisch segment onder `/kalender`
+
+`/kalender/<slug>` (categorie) en `/kalender/<id>` (evenement) delen hetzelfde
+routesegment `[slugOrId]`, dat eerst een categorieslug probeert en anders een
+event-id. Twee dynamische segmenten naast elkaar kan Next.js niet, en de
+alternatieven waren slechter: `/kalender/c/<slug>` geeft een lelijke URL voor iets
+wat je aan een eerstejaars wil kunnen doorgeven, en de events verhuizen naar
+`/kalender/event/<id>` zou de bestaande links vanaf de homepage breken. Een
+botsing is uitgesloten omdat een slug beheerd wordt en alleen kleine letters,
+cijfers en koppeltekens mag bevatten, terwijl event-ids cuids zijn.
+
+### Twee weergaven: Agenda en Lijst
+
+`/kalender` had drie knoppen (Agenda, Maand, Lijst), maar Agenda en Lijst toonden
+allebei dezelfde lijst van de **komende 14 dagen**, ongeacht welke maand je
+bekeek; ze verschilden enkel in of de legende ernaast stond en of de lijst op
+acht items werd afgekapt. Bladeren met de maandpijlen deed er niets aan, en in een
+rustige periode waren beide leeg. Dat las als een defect.
+
+Nu zijn er twee: **Agenda** is het maandraster (de standaard; het raster *is* de
+agenda, dus "Maand" was een rare naam ernaast), met daaronder het blok
+"Eerstvolgend · komende 14 dagen". **Lijst** is dezelfde maand chronologisch, dus
+de pijlen werken in beide weergaven. Alleen het "eerstvolgend"-blok negeert
+bewust de gekozen maand: dat is precies waarvoor het dient.
+
+Een lege lijst zegt nu ook dát ze leeg is ("Geen evenementen deze maand"), in
+plaats van een leeg vlak te tonen.
+
+### Wat er in welke feed zit
+
+- Publieke feeds (`/api/calendar/feed`, `.../feed/c/<slug>`, `.../feed/g/<slug>`)
+  bevatten **enkel** `PUBLIC`-events. Een feed-URL is per definitie deelbaar, dus
+  ledenexclusieve evenementen horen daar niet in.
+- De algemene feed en de postfeeds laten **doelgroepevents weg**: dat is het
+  algemene programma. Wie enkel de eerstejaarskalender wil, abonneert zich op
+  `/feed/c/eerstejaars`.
+- De persoonlijke feed (`/api/calendar/feed/me/<token>`) is de enige met
+  `MEMBERS`-events, voegt de shiften toe waarvoor het lid is ingeschreven, en
+  volgt de doelgroepen van dat lid; een eerstejaars hoeft zich dus niet apart op
+  de eerstejaarsfeed te abonneren.
+- Elke feed draagt een venster van 12 maanden terug tot 24 vooruit. Clients halen
+  het bestand elk paar uur opnieuw op; de volledige historiek meesturen kost enkel
+  bandbreedte.
+- Feeds zijn abonnementen, geen downloads. Enkel op de detailpagina van één
+  evenement staat een echte `.ics`-download: dat ene event verandert zelden nog.
+
+### Feedtokens verlopen niet, deur-tokens wel
+
+`CalendarFeedToken` heeft bewust géén `expiresAt`, anders dan
+`DoorShortcutToken`. Een agenda-abonnement dat na 90 dagen stilletjes ophoudt met
+verversen, is erger dan geen abonnement: de agenda blijft verouderde evenementen
+tonen en niemand merkt dat er iets stuk is. Intrekken gebeurt expliciet vanuit
+`/account`. Een ingetrokken token geeft dezelfde 404 als een verzonnen token, en
+`lastUsedAt` wordt hoogstens één keer per uur weggeschreven; anders is elke poll
+van elke client een database-write.
+
 ## Homepage-secties & bandenritme
 
 De homepage is opgebouwd uit volle-breedte banden die bewust van kleur
@@ -732,6 +862,37 @@ onderste helft is een ontwerpkeuze, geen toeval:
   verse fetch) → en als zelfs dat er niet is, de melding "De cursusdienst
   openingsuren zijn momenteel niet beschikbaar". Zo breekt de homepage nooit,
   ook niet bij een koude cache terwijl cudi plat ligt.
+
+### Snelle knoppen staan op mobiel vóór de eventkaart
+
+Op een breed scherm staan de hero-tekst en de eventkaart naast elkaar, en ligt de
+rij snelle knoppen (Theokot, Cursusdienst, Tweedehands, Tijdsloten, Shiften,
+Kalender) er meteen onder: allemaal in één blik, klikbaar zonder te scrollen.
+
+Zodra de hero stapelt (**≤980px**) valt die volgorde uit elkaar. De eventkaart
+gaat dan onder de tekst staan, en de knoppen kwamen daarachter: op een scherm van
+390×844 begon de eerste knop pas op **1287px**, dus anderhalf scherm naar
+beneden, met een kaart van ruim 500px ertussen. De knoppen zijn juist het
+utilitaire deel van de homepage (waar eet ik, is de cursusdienst open), dus dat
+is precies de verkeerde volgorde voor een telefoon.
+
+- **Keuze:** onder 980px schuiven de knoppen tussen de hero-tekst en de
+  eventkaart. Onder 640px staan ze bovendien in **twee kolommen** in plaats van
+  zes onder elkaar. Resultaat op 390×844: eerste knop op **700px**, vier van de
+  zes binnen het eerste scherm, en het blok krimpt van 682px naar 311px.
+- **De eventkaart schuift dus naar beneden op mobiel.** Dat is bewust: hij blijft
+  één korte scroll ver, terwijl de knoppen de bestemming zijn waar mensen
+  meerdere keren per week naartoe gaan.
+- **Desktop verandert niet.** Alles zit in `@media (max-width: 980px)` en
+  `@media (max-width: 640px)` in `vtk-home.css`.
+- **Hoe:** `.home-dark-zone` wordt een flex-kolom en `.home-hero` krijgt
+  `display: contents`, zodat de twee hero-kinderen broers worden van de
+  quick-sectie en met `order` te herschikken zijn. Enkel de box van de hero
+  verdwijnt, niet het element, dus descendant-selectors (`.home-hero .hero-cal`)
+  en `body:has(.home-hero)` in de header-CSS blijven werken. De padding van de
+  hero verhuist wel mee naar zijn kinderen. Let op: `.quick` staat op
+  `margin: 0 auto`, en een auto-marge in de dwarsrichting zet de stretch van een
+  flex-kind uit; die marges moeten in dat blok expliciet op 0.
 
 ---
 
@@ -841,6 +1002,118 @@ feedback van de groepscoordinator. De onderliggende werking:
 - **NL-only DB-inhoud**; de UI-chrome is NL/EN via een eigen cookie-copysysteem.
 - De import van de bestaande "Inventaris Loods.xlsx" is eenmalig en idempotent;
   ze deletet nooit, zodat een herimport na een sheet-correctie veilig is.
+
+### Chauffeurs: een eigen lijst naast de post Logistiek
+
+Wie mag rijden was tot nu een afgeleide: iedereen met een lidmaatschap van de post
+`LOGISTIEK` in het huidige werkingsjaar stond in de chauffeurskeuze. Dat koppelt
+twee dingen die niet samenhoren: rijden vraagt een rijbewijs en goodwill, niet een
+praesidiumfunctie. Logistiek beheert nu zelf een chauffeurslijst in
+`/beheer/chauffeurs`.
+
+- **Unie van twee bronnen, geen vervanging.** De keuzelijst is de post Logistiek
+  (automatisch, per werkingsjaar) plus de handmatig toegevoegde chauffeurs
+  (`UitleenDriver`). De post blijft er automatisch bij: die lijst onderhoudt
+  zichzelf al op vtk.be en rolt op 15 juli vanzelf mee. Het beheerscherm toont
+  beide groepen apart, zodat zichtbaar is wat je waar aanpast.
+- **Chauffeur zijn geeft geen beheerrechten.** Een toegevoegde chauffeur krijgt
+  geen `logistiek.manage` (die hangt aan de rol van de post, niet aan deze lijst).
+  Die persoon ziet enkel "Mijn ritten" (`/ritten`): de ritten met zijn eigen
+  `driverId`, met laadadres, bestemming, contactpersoon en bijrijders, en zonder
+  prijs of betaalstatus. Dat laatste is bewust: de prijs is een zaak tussen de
+  aanvrager en Logistiek, en een chauffeur die een openstaande betaling ziet, gaat
+  zich daar ter plaatse mee moeien.
+- **De chauffeur is altijd een echte vtk.be-gebruiker**, gekozen via een
+  zoekpicker, nooit een vrije naam. Enkel zo kan de app die persoon zijn ritten
+  tonen na het inloggen, en enkel zo blijft de historiek ("wie reed die rit")
+  betrouwbaar. Wie geen account heeft, logt eerst één keer in op vtk.be.
+- **De lijst is niet werkingsjaar-gescoped.** Anders zou de 15-juli-reset de
+  chauffeurs midden in de zomer wegvegen, net wanneer er verhuisd en gesjouwd
+  wordt. Het team haalt iemand er zelf uit.
+- **Iemand uit de lijst halen laat toegewezen ritten staan.** De rit is gepland of
+  gereden; de naam wissen zou de planning en de historiek stukmaken. Die persoon
+  blijft die ritten dus ook zien tot ze voorbij zijn. Wil je dat niet, wijs de rit
+  dan eerst aan een andere chauffeur toe. In het beheer blijft een verwijderde
+  chauffeur zichtbaar in de keuzelijst van zijn eigen rit, onder "Niet meer in de
+  chauffeurslijst".
+
+---
+
+## Shiftpagina: week is de standaard, lijst is de tweede weergave
+
+`/shift` toont **één week tegelijk** (maandag tot zondag), in twee weergaven die
+naar diezelfde week en dezelfde postfilter kijken:
+
+- **Weekrooster (standaard).** Een shift is in de eerste plaats een blok in je
+  agenda: je wil zien of ze botst met je les of met een andere shift, en dat leest
+  een raster meteen. Overlappende shiften komen naast elkaar in kolommen.
+- **Lijst.** Dezelfde week per dag onder elkaar, met de details uitklapbaar. Beter
+  wanneer de namen lang zijn of het scherm smal is, want daar wordt een raster
+  onleesbaar. De lijst blijft dus bestaan; ze is geen restant van de oude tabel.
+
+Verder vastgelegd:
+
+- **Je eigen shiften staan in een rail náást het overzicht**, niet als een tweede
+  tabel erboven. Ze blijven zo in beeld terwijl je door de week scrolt, en een
+  lege "Mijn shiften" kost geen halve pagina meer. Op smal scherm gaat de rail
+  bóven het overzicht staan: wat jij vandaag moet doen, hoort niet onder andermans
+  shiften te liggen.
+- **Je eigen shiften staan óók in het overzicht zelf** (geel randje,
+  "Ingeschreven"). De rail is je persoonlijke lijstje, het overzicht is de
+  volledige week; een week met een gat waar jouw shift hoort te staan, klopt niet.
+- **De rail toont de stand van het academiejaar** (voltooide shiften + bonnetjes,
+  zelfde telling als de admin-ranglijst: enkel shiften die al voorbij zijn). Dat
+  geeft de shiftranking eindelijk een plek op de publieke pagina en maakt van
+  `/shift/history` een logische doorklik i.p.v. een badge in de paginakop.
+- **Een lege week is een boodschap met een volgende stap**, niet een lege tabel:
+  ze noemt de eerstvolgende geplande shift en heeft een knop die naar die week
+  springt. In het rooster blijft het raster staan onder de boodschap, zodat een
+  rustige week er niet uitziet als een stuk pagina.
+- **De postfilter zijn chips met tellers**, en enkel voor posten die deze week
+  effectief voorkomen. De oude `<select>` + datumveld + sorteerknop zijn weg: de
+  weeknavigatie vertelt al waar je zit, en chronologisch is de enige zinnige
+  volgorde voor een week.
+- **Plaatsen lezen als "Nog 1 plaats" of "Vol"**, niet als `5/6`. De exacte
+  verhouding blijft in de tooltip en in het detailvenster staan.
+
+### Klikken op een shift opent een detailvenster
+
+Een klik op een blok in het rooster, op een rij in de lijst of op een kaart in de
+rail opent hetzelfde venster met alles over die shift, mét de knop Schrijf in /
+Uitschrijven erin. Inschrijven kost dus twee klikken. Dat is bewust: sinds een
+shift een langere uitleg kan dragen (zie hieronder) valt er iets te lezen vóór je
+intekent, en een blok dat je met één misklik inschrijft is daar te gevoelig voor.
+Het venster sluit enkel wanneer de actie lukte; faalt ze (vol, overlap), dan blijft
+het staan met de foutmelding als toast. In de lijst blijft de knop in de rij zelf
+bestaan als snelle weg voor wie de shift al kent.
+
+### `openToInternationals`: over de taal, niet over wie welkom is
+
+De markering **"Ook voor internationals"** (EN: "No Dutch required") betekent: je
+kan deze shift doen zónder Nederlands. Ze zegt niets over wie mag inschrijven,
+want dat mag iedereen. Zo blijft ze bruikbaar voor de vraag die een international
+zich effectief stelt, en leest een Nederlandstalige ze niet als "niet voor mij".
+
+De markering krijgt een eigen, blauwe pil. Geel, groen en rood zijn op deze pagina
+gereserveerd voor de vrije plaatsen; een taalmarkering in diezelfde kleuren zou
+als een capaciteitsstatus lezen. In een roosterblok is er enkel plaats voor het
+wereldbol-icoon; de volledige tekst zit in de tooltip, het aria-label en het
+detailvenster.
+
+### `instructions`: de lange uitleg, apart van `description`
+
+Een shift heeft twee teksten met een verschillende rol:
+
+- `description` blijft de **korte regel** ("Tapshift donderdagavond"), bovenaan het
+  detailvenster.
+- `instructions` is de **lange uitleg in Markdown**: wat je moet doen, waar je je
+  meldt, wat je mag verwachten. Niet ingevuld betekent dat het blok gewoon niet
+  verschijnt; er komt dus nooit een leeg kopje op de pagina.
+
+Cudi-shiften krijgen deze twee velden niet mee uit de spiegeling: cudi kent ze
+niet, en de mirror-update raakt enkel de velden die ze zelf stuurt. Een
+verantwoordelijke die de uitleg op de main site invult, ziet die dus niet
+overschreven worden bij de volgende sync.
 
 ---
 
@@ -1005,3 +1278,40 @@ sluit iedereen buiten, inclusief degene die de knop omzette. Daarom drie
 vangnetten: de permissie wordt automatisch aangemaakt, het scherm waarschuwt
 vooraf wanneer nog niemand ze heeft, en zo'n applicatie komt in "Aandacht
 vereist" op /admin/sso.
+
+## Dashboardtegels (snelkoppelingen op /admin)
+
+Het dashboard opent met een raster snelkoppelingen naar de externe tools die een
+post dagelijks nodig heeft: de drive, de wiki, een repository, de printbestellingen.
+Er zijn drie soorten, en dat onderscheid is de kern van de feature.
+
+- **Voor iedereen (GLOBAL).** Beheerders met `dashboard.manage` zetten deze op
+  /admin/dashboard-tiles; elk ingelogd lid ziet ze.
+- **Per post of werkgroep (GROUP).** Enkel leden van die groep zien ze. Wie in
+  drie posten zit, krijgt dus drie extra reeksen.
+- **Van jou (USER).** Elk lid mag eigen tegels maken. Die zijn persoonlijk en
+  komen op niemand anders zijn dashboard.
+
+Vastgelegde keuzes:
+
+- **De tegels staan gegroepeerd onder een kop per herkomst**, niet in één plat
+  raster. In één raster kon je niet zien welke snelkoppeling van welke post kwam,
+  en dat is precies wat je wil weten voor je ze aan een collega doorgeeft ("die
+  staat er alleen voor IT"). De kop noemt de post bij naam; een post zonder
+  tegels krijgt geen lege sectie.
+- **Slepen herschikt binnen één sectie.** Een volgorde tussen jouw tegel en die
+  van IT bestaat niet: de secties worden toch opnieuw gegroepeerd, dus een tegel
+  naar een andere sectie slepen zou terugspringen.
+- **Een lid mag een gedeelde tegel voor zichzelf aanpassen of verbergen**, maar
+  ze nooit voor anderen wijzigen. De aanpassing leeft in `UserDashboardTilePref`
+  en is met één klik terug te zetten. Verbergen is geen verwijderen: zet een
+  beheerder er later een andere URL op, dan krijg je die wel.
+- **Een tegel toont een pictogram uit een gecureerde set, of een eigen logo.**
+  Het logo is er voor tools met een sterk merk (een GitHub- of Notion-logo herken
+  je sneller dan een generiek icoon). Het pictogram blijft bewaard zolang er een
+  logo staat: haal je het logo weg, dan valt de tegel terug op het pictogram in
+  plaats van leeg te worden.
+- **Elk lid mag een tegellogo uploaden**, ook zonder uploadpermissie. Wie een
+  persoonlijke tegel mag maken, moet ze ook kunnen afwerken. De upload is daarom
+  apart gehouden (`kind=tile`): maximaal 2 MB, herschaald naar 128px, en onder een
+  eigen `tiles/`-prefix zodat de tegel-actions een key van elders weigeren.

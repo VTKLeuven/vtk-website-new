@@ -1270,13 +1270,41 @@ async function main() {
     maxParticipants: number;
     reward: number;
     post: string | null;
+    openToInternationals?: boolean;
+    instructions?: string;
   }> = [
-    { id: "seed-shift-1", name: "Tapshift", dayOffset: 1, startHour: 20, endHour: 23, location: "Fakbar", description: "Tapshift donderdagavond", maxParticipants: 4, reward: 2, post: "FAKBAR" },
+    {
+      id: "seed-shift-1",
+      name: "Tapshift",
+      dayOffset: 1,
+      startHour: 20,
+      endHour: 23,
+      location: "Fakbar",
+      description: "Tapshift donderdagavond",
+      maxParticipants: 4,
+      reward: 2,
+      post: "FAKBAR",
+      openToInternationals: true,
+      instructions: [
+        "Je staat achter de toog: tappen, afrekenen en tussendoor de bar proper houden.",
+        "",
+        "## Wat je doet",
+        "",
+        "- Meld je tien minuten voor je shift bij de barverantwoordelijke.",
+        "- Tappen en afrekenen aan de kassa; de prijzen hangen naast de tap.",
+        "- Op het einde: glazen binnen, koelkasten bijvullen, toog afkuisen.",
+        "",
+        "## Goed om weten",
+        "",
+        "Ervaring is niet nodig, er staat altijd iemand ervaren bij je. Draag schoenen",
+        "die tegen een plas bier kunnen.",
+      ].join("\n"),
+    },
     { id: "seed-shift-2", name: "Cursusverkoop", dayOffset: 2, startHour: 9, endHour: 12, location: "Cursusdienst", description: "Cursussen verkopen tijdens de ochtend", maxParticipants: 3, reward: 1, post: "CURSUSDIENST" },
     { id: "seed-shift-3", name: "Quiz opbouw", dayOffset: 3, startHour: 18, endHour: 22, location: "Aula Q", description: "Opbouw quiz-avond", maxParticipants: 6, reward: 3, post: "ACTIVITEITEN" },
     { id: "seed-shift-4", name: "Sporttoernooi", dayOffset: 4, startHour: 13, endHour: 17, location: "Sporthal", description: "Begeleiding sporttoernooi", maxParticipants: 5, reward: 2, post: "SPORT" },
     { id: "seed-shift-5", name: "Cantus laden", dayOffset: 5, startHour: 8, endHour: 11, location: "Loods", description: "Materiaal laden voor cantus", maxParticipants: 4, reward: 3, post: "LOGISTIEK" },
-    { id: "seed-shift-6", name: "Galabal onthaal", dayOffset: 6, startHour: 19, endHour: 23, location: "Onthaal", description: "Onthaal en kaartcontrole galabal", maxParticipants: 8, reward: 2, post: null },
+    { id: "seed-shift-6", name: "Galabal onthaal", dayOffset: 6, startHour: 19, endHour: 23, location: "Onthaal", description: "Onthaal en kaartcontrole galabal", maxParticipants: 8, reward: 2, post: null, openToInternationals: true },
   ];
   for (const s of shiftSeeds) {
     const data = {
@@ -1288,6 +1316,8 @@ async function main() {
       maxParticipants: s.maxParticipants,
       reward: s.reward,
       post: s.post,
+      openToInternationals: s.openToInternationals ?? false,
+      instructions: s.instructions ?? null,
     };
     await prisma.shift.upsert({
       where: { id: s.id },
@@ -1431,6 +1461,46 @@ async function main() {
         rateCents: v.rateCents,
         sortIndex: i,
       },
+    });
+  }
+
+  // Kalendercategorieën: de doelgroep van een evenement, los van de post die het
+  // organiseert. Elke categorie krijgt een pagina (/kalender/<slug>) en een eigen
+  // ICS-feed. Naam, kleur en volgorde zijn daarna GUI-beheerd, dus we raken bij
+  // een herseed enkel de slug aan (`update: {}`); enkel nieuwe categorieën komen
+  // erbij.
+  // De eerste twee zijn doelgroepen: hun evenementen duiken vanzelf op bij wie
+  // erbij hoort en staan niet tussen de filterchips. De rest zijn gewone thema's.
+  const calendarCategories = [
+    {
+      slug: "eerstejaars",
+      nameNl: "Eerstejaars",
+      nameEn: "First years",
+      colour: "#EC4899",
+      audience: "FIRST_YEARS" as const,
+    },
+    {
+      slug: "internationaal",
+      nameNl: "Internationaal",
+      nameEn: "International",
+      colour: "#14B8A6",
+      audience: "INTERNATIONALS" as const,
+    },
+    { slug: "career", nameNl: "Career", nameEn: "Career", colour: "#0EA5E9", audience: null },
+    { slug: "cantus", nameNl: "Cantus", nameEn: "Cantus", colour: "#E11D48", audience: null },
+    { slug: "cultuur", nameNl: "Cultuur", nameEn: "Culture", colour: "#D946EF", audience: null },
+    { slug: "sport", nameNl: "Sport", nameEn: "Sports", colour: "#16A34A", audience: null },
+    { slug: "service", nameNl: "Service", nameEn: "Service", colour: "#F59E0B", audience: null },
+    { slug: "studie", nameNl: "Studie", nameEn: "Studies", colour: "#8B5CF6", audience: null },
+  ];
+  for (let i = 0; i < calendarCategories.length; i += 1) {
+    const c = calendarCategories[i];
+    await prisma.calendarCategory.upsert({
+      where: { slug: c.slug },
+      // Naam, kleur en volgorde zijn GUI-beheerd en blijven staan, maar `audience`
+      // hangt aan code (welk lid hoort erbij) en wordt dus wél bijgewerkt.
+      update: { audience: c.audience },
+      create: { ...c, order: i },
     });
   }
 

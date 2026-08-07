@@ -51,7 +51,11 @@ describe.sequential("ticketing database invariants", () => {
     await prisma.group.create({
       data: {
         id: ids.group,
-        code: "ALGEMEEN",
+        // Uniek per run, net als de slug hieronder. Met een vaste code botst de
+        // tweede run op de unieke index zodra een eerdere run halverwege afbrak
+        // en zijn groep liet staan; de test is dan blijvend stuk zonder dat er
+        // iets aan de code mankeert.
+        code: `integration-${ids.group}`,
         slug: `integration-${ids.group}`,
         nameNl: "Integratie",
         nameEn: "Integration",

@@ -247,6 +247,8 @@
     "programmesHint": "Select every programme that applies to you.",
     "notAtFaculty": "I am not studying at the faculty",
     "notAtFacultyHint": "Tick this if you are not enrolled in an engineering programme at the faculty. You will not receive Career emails, as those target faculty students.",
+    "internationalStudent": "I am an international or exchange student",
+    "internationalStudentHint": "Tick this if you are at the faculty on an exchange or as an international student. Events for internationals then show up in your calendar automatically.",
     "notStudying": "I am not studying (anymore)",
     "notStudyingHint": "Tick this if you have graduated or stopped studying. You stay a member, but drop out of the study-related mailing lists.",
     "submit": "Complete registration",
@@ -326,6 +328,7 @@
     "back": "Back",
     "noAccess": "No access",
     "ledenbeheer": "Members",
+    "evenementen": "Events",
     "website": "Website",
     "sso": "SSO & apps"
   },
@@ -435,32 +438,67 @@
   },
   "shift": {
     "shifts": "Shifts",
+    "subtitle": "Lend a hand behind the bar or at an event. Every shift earns vouchers.",
     "available": "Available shifts",
     "registered": "My shifts",
-    "columns": {
-      "shift": "Shift",
-      "date": "Date",
-      "time": "Time",
-      "where": "Location",
-      "action": "Action"
+    "view": {
+      "label": "View",
+      "week": "Week",
+      "list": "List"
+    },
+    "week": {
+      "prev": "Previous week",
+      "next": "Next week",
+      "today": "Today",
+      "range": "{from} to {to}"
     },
     "filter": {
       "post": "Group",
-      "allPosts": "All groups",
-      "from": "From",
-      "sortAsc": "↑ Ascending",
-      "sortDesc": "↓ Descending"
+      "allPosts": "All groups"
     },
-    "register": "Register",
+    "register": "Sign up",
     "unregister": "Unregister",
-    "week": {
-      "prev": "← Previous",
-      "today": "Today",
-      "next": "Next →",
-      "startDate": "Start date"
+    "isRegistered": "Registered",
+    "locked": "Locked within 24h",
+    "until": "until {time}",
+    "intl": {
+      "badge": "No Dutch required",
+      "hint": "You do not need to speak Dutch for this shift."
     },
-    "emptyAvailable": "There are no available shifts in this period.",
-    "emptyRegistered": "You are not registered for any shift yet.",
+    "instructions": "What does this shift involve?",
+    "dialog": {
+      "close": "Close",
+      "cancel": "Cancel",
+      "open": "View details"
+    },
+    "spots": {
+      "full": "Full",
+      "one": "1 spot left",
+      "few": "{n} spots left",
+      "taken": "{taken} of {max} spots taken"
+    },
+    "reward": {
+      "one": "1 voucher",
+      "many": "{n} vouchers"
+    },
+    "rel": {
+      "today": "Today",
+      "tomorrow": "Tomorrow",
+      "inDays": "In {n} days"
+    },
+    "empty": {
+      "week": "No shifts this week",
+      "next": "The next shift is {name} on {date}.",
+      "jump": "Go to {date}",
+      "none": "No shifts are scheduled at the moment."
+    },
+    "rail": {
+      "emptyTitle": "Nothing planned yet",
+      "emptyText": "Pick a shift from the overview; your registration shows up here right away.",
+      "year": "Academic year {year}",
+      "shiftsDone": "shifts done",
+      "vouchers": "vouchers earned"
+    },
     "detail": {
       "start": "Start",
       "end": "End",
@@ -468,7 +506,9 @@
       "post": "Group",
       "reward": "Reward",
       "spots": "Spots",
-      "description": "Description"
+      "description": "Description",
+      "open": "Show details",
+      "close": "Hide details"
     },
     "toast": {
       "registered": "You are registered for this shift.",

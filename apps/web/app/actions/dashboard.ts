@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { prisma } from "@vtk/db";
+import { isTileImageKey } from "@/lib/dashboard-tiles";
 import { requirePermission, requireSession } from "@/lib/session";
 
 function revalidateDashboard(): void {
@@ -21,6 +22,18 @@ function normalizeUrl(raw: string): string {
   if (!s) return s;
   if (/^[a-z][a-z0-9+.-]*:\/\//i.test(s)) return s;
   return `https://${s}`;
+}
+
+/**
+ * De client stuurt de storage-key van een geüpload tegellogo mee. Alleen keys
+ * uit het `tiles/`-prefix zijn geldig: de uploadroute legt tegelafbeeldingen
+ * daar, en zo kan niemand via het verborgen veld een willekeurig ander object
+ * uit de bucket op zijn dashboard trekken.
+ */
+function cleanImageKey(raw: string | null | undefined): string | null {
+  const s = (raw ?? "").trim();
+  if (!s) return null;
+  return isTileImageKey(s) ? s : null;
 }
 
 // -----------------------------------------------------------------------------
@@ -73,6 +86,8 @@ export type TileInput = {
   url: string;
   icon: string;
   color: string;
+  /** Storage-key van een eigen logo; null = toon het pictogram. */
+  imageKey: string | null;
 };
 
 export async function addPersonalTileAction(input: TileInput): Promise<void> {
@@ -91,6 +106,7 @@ export async function addPersonalTileAction(input: TileInput): Promise<void> {
       url,
       icon: input.icon || "link",
       color: input.color || "navy",
+      imageKey: cleanImageKey(input.imageKey),
       scope: "USER",
       userId,
       order: (max._max.order ?? 999) + 1,
@@ -111,7 +127,13 @@ export async function updatePersonalTileAction(input: TileInput & { id: string }
   if (!label || !url) return;
   await prisma.dashboardTile.update({
     where: { id: tile.id },
-    data: { label, url, icon: input.icon || "link", color: input.color || "navy" },
+    data: {
+      label,
+      url,
+      icon: input.icon || "link",
+      color: input.color || "navy",
+      imageKey: cleanImageKey(input.imageKey),
+    },
   });
   revalidateDashboard();
 }
@@ -129,27 +151,34 @@ export async function overrideSharedTileAction(input: TileInput & { tileId: stri
   const userId = session.user.id;
   const tile = await prisma.dashboardTile.findFirst({
     where: { id: input.tileId, scope: { in: ["GLOBAL", "GROUP"] } },
-    select: { id: true },
+    select: { id: true, imageKey: true },
   });
   if (!tile) return;
   const label = input.label.trim();
   const url = input.url.trim();
+
+  // De client stuurt gewoon wat de tegel moet tonen; hier vertalen we dat naar
+  // "erven" of "overschrijven". Zonder deze vergelijking zou een tegel die het
+  // standaardlogo houdt dat logo vastpinnen, en zou het weghalen van een
+  // standaardlogo stil genegeerd worden (null leest immers als "erf").
+  const wanted = cleanImageKey(input.imageKey);
+  const inheritsImage = wanted === tile.imageKey;
+  const imageKey = inheritsImage ? null : wanted;
+  const imageCleared = wanted === null && tile.imageKey !== null;
+
+  const fields = {
+    label: label || null,
+    url: url ? normalizeUrl(url) : null,
+    icon: input.icon || null,
+    color: input.color || null,
+    imageKey,
+    imageCleared,
+  };
+
   await prisma.userDashboardTilePref.upsert({
     where: { userId_tileId: { userId, tileId: input.tileId } },
-    update: {
-      label: label || null,
-      url: url ? normalizeUrl(url) : null,
-      icon: input.icon || null,
-      color: input.color || null,
-    },
-    create: {
-      userId,
-      tileId: input.tileId,
-      label: label || null,
-      url: url ? normalizeUrl(url) : null,
-      icon: input.icon || null,
-      color: input.color || null,
-    },
+    update: fields,
+    create: { userId, tileId: input.tileId, ...fields },
   });
   revalidateDashboard();
 }
@@ -193,6 +222,7 @@ export async function saveDefaultTileAction(input: DefaultTileInput): Promise<vo
     url,
     icon: input.icon || "link",
     color: input.color || "navy",
+    imageKey: cleanImageKey(input.imageKey),
     order: Number.isFinite(input.order) ? input.order : 0,
     scope: input.scope,
     groupId,

@@ -143,7 +143,7 @@ export default async function AdminHome({
                   helpText={
                     AANBOD_PHOTOS[tab.slug]
                       ? locale === "nl"
-                        ? "Zonder upload gebruikt deze kaart de standaardfoto hiernaast."
+                        ? "Zonder upload gebruikt deze kaart de standaardfoto uit de preview."
                         : "Without an upload, this card uses the default photo shown here."
                       : locale === "nl"
                         ? "Deze kaart heeft geen standaardfoto: zonder upload toont ze het gestreepte patroon."
@@ -186,7 +186,7 @@ export default async function AdminHome({
             srContext={locale === "nl" ? "Standaardfoto evenementen" : "Default event photo"}
             helpText={
               locale === "nl"
-                ? "Zonder upload gebruiken evenementen de meegeleverde foto hiernaast."
+                ? "Zonder upload gebruiken evenementen de meegeleverde foto uit de preview."
                 : "Without an upload, events use the bundled photo shown here."
             }
           />

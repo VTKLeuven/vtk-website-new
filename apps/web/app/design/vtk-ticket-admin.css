@@ -570,6 +570,10 @@
   grid-template-columns: minmax(0, 1fr);
   align-items: end;
   gap: 12px;
+  /* De filterbalk houdt zelf afstand tot wat ze filtert. Zonder deze marge plakt
+     de resultatenlijst eronder, wat vooral opvalt bij de lege staat: die heeft
+     een streepjesrand die dan tegen de invoervelden aan komt te liggen. */
+  margin-bottom: 18px;
 }
 
 .ticket-admin-field {
@@ -693,6 +697,12 @@
 }
 
 .ticket-admin-table-wrap {
+  /* Zelf het positie-anker. In de kop staat een `sr-only`-span; die is absoluut
+     gepositioneerd en zou zonder gepositioneerde ouder op de pagina ankeren
+     i.p.v. op de tabel. Ze landt dan op de x van haar kolom (~500px), waardoor
+     het document breder wordt dan het scherm en een telefoon de hele pagina
+     uitzoomt om die ene onzichtbare pixel te tonen. */
+  position: relative;
   width: 100%;
   overflow-x: auto;
   border: 1px solid var(--line);
@@ -883,19 +893,57 @@
   border-top: 0;
 }
 
+/* De uitklappers ("Capaciteit aanpassen", "Tickettype toevoegen", "Vraag
+   toevoegen") zagen eruit als vetgedrukte tekst en niet als iets waar je op kan
+   klikken. Ze krijgen dezelfde pilvorm als de andere knoppen op dit scherm, met
+   een plusteken dat naar een kruisje kantelt zodra het blok openstaat. */
 .ticket-admin-details > summary {
-  display: flex;
+  display: inline-flex;
   align-items: center;
   gap: 7px;
-  padding: 14px 0;
+  margin: 14px 0;
+  padding: 9px 13px;
+  min-height: 38px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface);
   color: var(--ink);
   font-size: 13px;
   font-weight: 600;
+  line-height: 1;
   cursor: pointer;
+  transition: background 120ms;
+}
+
+/* Het standaard driehoekje weg; we tekenen zelf een plusteken. */
+.ticket-admin-details > summary::marker,
+.ticket-admin-details > summary::-webkit-details-marker {
+  display: none;
+  content: "";
+}
+
+.ticket-admin-details > summary::before {
+  content: "+";
+  font-size: 15px;
+  line-height: 1;
+  transition: transform 140ms ease;
+}
+
+.ticket-admin-details[open] > summary::before {
+  transform: rotate(45deg);
+}
+
+.ticket-admin-details > summary:hover {
+  background: var(--paper-2);
+}
+
+.ticket-admin-details > summary:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
 }
 
 .ticket-admin-details[open] > summary {
-  padding-bottom: 10px;
+  margin-bottom: 10px;
 }
 
 .ticket-admin-details-body {
@@ -1208,4 +1256,183 @@
   .ticket-admin-person {
     align-items: flex-start;
   }
+}
+
+/* ---------------------------------------------------------------------------
+   Overgenomen van het kalenderevent.
+
+   Hangt een ticketevent aan een kalenderevent, dan worden titel, beschrijving,
+   locatie en datums niet meer gevraagd: ze komen daarvandaan. Dit blok toont wat
+   je krijgt, met een link naar de plek waar je het wél wijzigt. Zo staat er geen
+   invoerveld dat bij opslaan toch overschreven wordt.
+   --------------------------------------------------------------------------- */
+
+.ticket-admin-inherited {
+  margin-bottom: 18px;
+  padding: 16px 18px;
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--yellow);
+  border-radius: 14px;
+  background: var(--paper-2);
+}
+
+.ticket-admin-inherited-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 12px;
+  font-size: 13px;
+}
+
+.ticket-admin-inherited-head a {
+  color: var(--muted);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.ticket-admin-inherited-head a:hover {
+  color: var(--ink);
+}
+
+.ticket-admin-inherited-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px 24px;
+  margin: 0;
+}
+
+.ticket-admin-inherited-list dt {
+  color: var(--muted);
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.ticket-admin-inherited-list dd {
+  margin: 2px 0 0;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+/* ---------------------------------------------------------------------------
+   Publiceren als losse actie.
+
+   Publiceren zat vroeger als keuzelijst halverwege het instellingenformulier,
+   waarna je onderaan nog moest opslaan; de blokkade ("nog geen actief
+   tickettype") kreeg je pas ná dat opslaan te zien. Deze balk zegt het vooraf en
+   maakt er één knop van.
+   --------------------------------------------------------------------------- */
+
+.ticket-admin-publish-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 18px;
+  padding: 16px 18px;
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--yellow);
+  border-radius: 14px;
+  background: var(--paper-2);
+}
+
+.ticket-admin-publish-text {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 13px;
+}
+
+.ticket-admin-publish-text strong {
+  font-size: 14px;
+}
+
+.ticket-admin-publish-text span {
+  color: var(--muted);
+}
+
+.ticket-admin-publish-error {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: #b42318;
+}
+
+/* ---------------------------------------------------------------------------
+   Soort antwoord bij een deelnemersvraag.
+
+   Was een keuzelijst met vijf regels waaruit je zelf moest afleiden dat twee
+   ervan een lijst opties nodig hadden; het optieveld stond er intussen altijd,
+   met een voetnoot dat het meestal niet van toepassing was. Nu kies je eerst
+   het soort, en verschijnt enkel wat daarbij hoort.
+   --------------------------------------------------------------------------- */
+
+.ticket-admin-choice-set {
+  margin: 4px 0 2px;
+  padding: 0;
+  border: 0;
+}
+
+.ticket-admin-choice-set > legend {
+  padding: 0;
+  margin-bottom: 8px;
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.ticket-admin-choice-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 10px;
+}
+
+.ticket-admin-choice {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--surface);
+  cursor: pointer;
+  transition: border-color 120ms, background 120ms;
+}
+
+.ticket-admin-choice:hover {
+  background: var(--paper-2);
+}
+
+/* De gekozen kaart krijgt dezelfde gele accentrand als de andere "let hier
+   op"-blokken op dit scherm, in plaats van een eigen kleur. */
+.ticket-admin-choice[data-selected="true"] {
+  border-color: var(--ink);
+  box-shadow: inset 3px 0 0 var(--yellow);
+}
+
+.ticket-admin-choice input {
+  margin-top: 2px;
+  flex: none;
+}
+
+.ticket-admin-choice span {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.ticket-admin-choice strong {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.ticket-admin-choice small {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.4;
 }

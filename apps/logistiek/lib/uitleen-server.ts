@@ -388,16 +388,214 @@ export async function activeGroups() {
   });
 }
 
-/** Leden van de post Logistiek dit werkingsjaar, als chauffeurskeuze. */
-export async function logistiekTeamMembers() {
+// ---------------------------------------------------------------------------
+// Chauffeurs
+// ---------------------------------------------------------------------------
+
+/**
+ * Waar een chauffeur vandaan komt: uit de post Logistiek (automatisch, per
+ * werkingsjaar) of met de hand toegevoegd in /beheer/chauffeurs.
+ */
+export type DriverSource = 'POST' | 'EXTRA';
+
+export type DriverOption = { id: string; name: string; source: DriverSource };
+
+/** Leden van de post Logistiek dit werkingsjaar. */
+async function logistiekTeamMembers() {
   return prisma.user.findMany({
     where: {
+      active: true,
+      deletedAt: null,
       memberships: { some: { group: { code: 'LOGISTIEK' }, year: currentWorkingYear() } },
     },
-    select: { id: true, name: true },
+    select: { id: true, name: true, email: true },
     orderBy: { name: 'asc' },
   });
 }
+
+/**
+ * Iedereen die als chauffeur gekozen kan worden: de post Logistiek van dit
+ * werkingsjaar plus de handmatig toegevoegde chauffeurs. Zit iemand in allebei,
+ * dan telt de post (die kost geen beheerwerk en verdwijnt vanzelf op 15 juli).
+ */
+export async function driverOptions(): Promise<DriverOption[]> {
+  const [team, extra] = await Promise.all([
+    logistiekTeamMembers(),
+    prisma.uitleenDriver.findMany({
+      where: { user: { active: true, deletedAt: null } },
+      select: { user: { select: { id: true, name: true } } },
+    }),
+  ]);
+
+  const byId = new Map<string, DriverOption>();
+  for (const member of team) byId.set(member.id, { id: member.id, name: member.name, source: 'POST' });
+  for (const row of extra) {
+    if (byId.has(row.user.id)) continue;
+    byId.set(row.user.id, { id: row.user.id, name: row.user.name, source: 'EXTRA' });
+  }
+
+  return [...byId.values()].sort((a, b) => a.name.localeCompare(b.name, 'nl'));
+}
+
+export type DriverPoolEntry = DriverOption & {
+  email: string;
+  /** Id van de rij in `UitleenDriver`; null voor iemand die via de post chauffeur is. */
+  driverRowId: string | null;
+  note: string | null;
+  /** Gedeactiveerd op vtk.be: staat nog in de lijst, maar valt uit de keuze weg. */
+  inactive: boolean;
+  upcomingTrips: number;
+  totalTrips: number;
+};
+
+/**
+ * De chauffeurslijst voor het beheerscherm: dezelfde unie als
+ * {@link driverOptions}, met contactgegevens, herkomst en hoeveel ritten er aan
+ * elke chauffeur hangen (zodat je ziet wie je niet zomaar weghaalt).
+ */
+export async function driverPool(): Promise<DriverPoolEntry[]> {
+  const now = new Date();
+  const [team, extra, tripCounts, upcomingCounts] = await Promise.all([
+    logistiekTeamMembers(),
+    prisma.uitleenDriver.findMany({
+      where: { user: { deletedAt: null } },
+      select: {
+        id: true,
+        note: true,
+        user: { select: { id: true, name: true, email: true, active: true } },
+      },
+    }),
+    prisma.uitleenTransportBooking.groupBy({
+      by: ['driverId'],
+      where: { driverId: { not: null }, status: { in: ['APPROVED', 'COMPLETED'] } },
+      _count: { _all: true },
+    }),
+    prisma.uitleenTransportBooking.groupBy({
+      by: ['driverId'],
+      where: { driverId: { not: null }, status: 'APPROVED', endAt: { gte: now } },
+      _count: { _all: true },
+    }),
+  ]);
+
+  const total = new Map(tripCounts.map((row) => [row.driverId, row._count._all]));
+  const upcoming = new Map(upcomingCounts.map((row) => [row.driverId, row._count._all]));
+
+  const byId = new Map<string, DriverPoolEntry>();
+  const put = (entry: Omit<DriverPoolEntry, 'upcomingTrips' | 'totalTrips'>) => {
+    if (byId.has(entry.id)) return;
+    byId.set(entry.id, {
+      ...entry,
+      upcomingTrips: upcoming.get(entry.id) ?? 0,
+      totalTrips: total.get(entry.id) ?? 0,
+    });
+  };
+
+  for (const member of team) {
+    put({
+      id: member.id,
+      name: member.name,
+      email: member.email,
+      source: 'POST',
+      driverRowId: null,
+      note: null,
+      inactive: false,
+    });
+  }
+  for (const row of extra) {
+    put({
+      id: row.user.id,
+      name: row.user.name,
+      email: row.user.email,
+      source: 'EXTRA',
+      driverRowId: row.id,
+      note: row.note,
+      inactive: !row.user.active,
+    });
+  }
+
+  return [...byId.values()].sort((a, b) => a.name.localeCompare(b.name, 'nl'));
+}
+
+/**
+ * Actieve leden zoeken voor de chauffeurspicker, op naam, e-mail of r-nummer.
+ * Spiegelt /api/users/search op de hoofdsite: server-side en gelimiteerd, zodat
+ * de picker ook met duizenden leden werkt.
+ */
+export async function searchDriverCandidates(query: string, limit = 10) {
+  const q = query.trim();
+  if (q.length < 2) return [];
+
+  return prisma.user.findMany({
+    where: {
+      active: true,
+      deletedAt: null,
+      OR: [
+        { name: { contains: q, mode: 'insensitive' } },
+        { email: { contains: q, mode: 'insensitive' } },
+        { rNumber: { contains: q, mode: 'insensitive' } },
+      ],
+    },
+    select: { id: true, name: true, email: true, rNumber: true },
+    orderBy: { name: 'asc' },
+    take: Math.min(limit, 25),
+  });
+}
+
+export type DriverCandidate = Awaited<ReturnType<typeof searchDriverCandidates>>[number];
+
+/**
+ * Staat dit lid in de chauffeurspool? Via de post of handmatig toegevoegd.
+ * Bepaalt of "Mijn ritten" in de navigatie verschijnt.
+ */
+export async function isDriver(userId: string): Promise<boolean> {
+  const [extra, membership] = await Promise.all([
+    prisma.uitleenDriver.count({ where: { userId } }),
+    prisma.groupMembership.count({
+      where: { userId, year: currentWorkingYear(), group: { code: 'LOGISTIEK' } },
+    }),
+  ]);
+  return extra > 0 || membership > 0;
+}
+
+/**
+ * Wat de navigatie en de homepage over "Mijn ritten" moeten weten: staat dit lid
+ * in de chauffeurspool, en hoeveel ritten komen er nog aan. Wie uit de pool
+ * gehaald is maar nog een geplande rit heeft, houdt de link: anders verdwijnt
+ * zijn planning terwijl hij nog moet rijden.
+ */
+export async function driverStatus(userId: string): Promise<{ isDriver: boolean; upcomingTrips: number }> {
+  const [driver, upcomingTrips] = await Promise.all([
+    isDriver(userId),
+    prisma.uitleenTransportBooking.count({
+      where: { driverId: userId, status: 'APPROVED', endAt: { gte: new Date() } },
+    }),
+  ]);
+  return { isDriver: driver, upcomingTrips };
+}
+
+/** Toont de app "Mijn ritten" voor dit lid? */
+export function showsMyTrips(status: { isDriver: boolean; upcomingTrips: number }): boolean {
+  return status.isDriver || status.upcomingTrips > 0;
+}
+
+/**
+ * De ritten die aan dit lid toegewezen zijn. Enkel goedgekeurde en afgeronde
+ * ritten: een afgewezen of geannuleerde rit rijdt niemand, en een aanvraag die
+ * nog niet beslist is heeft nog geen chauffeur.
+ */
+export async function tripsForDriver(driverId: string) {
+  return prisma.uitleenTransportBooking.findMany({
+    where: { driverId, status: { in: ['APPROVED', 'COMPLETED'] } },
+    orderBy: { startAt: 'asc' },
+    include: {
+      user: { select: { name: true, email: true } },
+      vehicle: { select: { nameNl: true, nameEn: true } },
+      group: { select: { nameNl: true, nameEn: true } },
+    },
+  });
+}
+
+export type DriverTrip = Awaited<ReturnType<typeof tripsForDriver>>[number];
 
 export async function adminInventory() {
   const [categories, items] = await Promise.all([
