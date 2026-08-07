@@ -4,8 +4,8 @@
  * cannot know its dimensions before the upload. */
 /* eslint-disable @next/next/no-img-element */
 
-import { useState, useTransition } from "react";
-import { CheckCircle2, Eye, ImagePlus, LoaderCircle, Palette, Save, Send, Upload } from "lucide-react";
+import { useEffect, useRef, useState, useTransition } from "react";
+import { CheckCircle2, ExternalLink, ImagePlus, LoaderCircle, Palette, Save, Send, Upload } from "lucide-react";
 import {
   publishTicketDesignAction,
   saveTicketDesignDraftAction,
@@ -44,7 +44,62 @@ export function TicketDesignManager({
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [liveRevision, setLiveRevision] = useState(publishedRevision);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [previewLoading, setPreviewLoading] = useState(true);
+  const [previewError, setPreviewError] = useState(false);
+  const previewUrlRef = useRef<string | null>(null);
+  const previewRequestRef = useRef(0);
+  const hasGeneratedRef = useRef(false);
   const busy = pending || Boolean(uploading);
+
+  async function refreshPreview() {
+    const requestId = ++previewRequestRef.current;
+    setPreviewLoading(true);
+    try {
+      const response = await fetch(`/api/tickets/events/${encodeURIComponent(eventId)}/design/preview`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(design),
+      });
+      if (!response.ok) throw new Error("PREVIEW_FAILED");
+      const blob = await response.blob();
+      // A later edit may have started its own request while this one was in
+      // flight; only the most recent request may still update the preview.
+      if (requestId !== previewRequestRef.current) return;
+      const nextUrl = URL.createObjectURL(blob);
+      const previous = previewUrlRef.current;
+      previewUrlRef.current = nextUrl;
+      setPreviewUrl(nextUrl);
+      setPreviewError(false);
+      if (previous) URL.revokeObjectURL(previous);
+    } catch (previewFetchError) {
+      if (requestId !== previewRequestRef.current) return;
+      console.error("Ticket design preview failed", previewFetchError);
+      setPreviewError(true);
+    } finally {
+      if (requestId === previewRequestRef.current) setPreviewLoading(false);
+    }
+  }
+
+  // `design` is a fresh object on every edit, so it alone is the right
+  // dependency: the first change fires immediately, later ones debounce so
+  // typing doesn't refetch a full PDF on every keystroke. `refreshPreview` is
+  // recreated each render and always closes over this same `design`, so
+  // omitting it from the deps array does not risk a stale preview.
+  useEffect(() => {
+    if (!hasGeneratedRef.current) {
+      hasGeneratedRef.current = true;
+      refreshPreview();
+      return;
+    }
+    const timer = setTimeout(refreshPreview, 700);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [design]);
+
+  useEffect(() => () => {
+    if (previewUrlRef.current) URL.revokeObjectURL(previewUrlRef.current);
+  }, []);
 
   function update<K extends keyof TicketDesignDraft>(key: K, value: TicketDesignDraft[K]) {
     setDesign((current) => ({ ...current, [key]: value }));
@@ -100,25 +155,6 @@ export function TicketDesignManager({
     });
   }
 
-  async function preview() {
-    setError(null);
-    try {
-      const response = await fetch(`/api/tickets/events/${encodeURIComponent(eventId)}/design/preview`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(design),
-      });
-      if (!response.ok) throw new Error("PREVIEW_FAILED");
-      const objectUrl = URL.createObjectURL(await response.blob());
-      const previewWindow = window.open(objectUrl, "_blank", "noopener,noreferrer");
-      if (!previewWindow) window.location.assign(objectUrl);
-      window.setTimeout(() => URL.revokeObjectURL(objectUrl), 60_000);
-    } catch (previewError) {
-      console.error("Ticket design preview failed", previewError);
-      setError(message(locale, "De PDF-voorvertoning kon niet worden gemaakt.", "The PDF preview could not be generated."));
-    }
-  }
-
   const artworkUrl = assetUrl(design.artwork?.key);
   return (
     <section className="ticket-admin-section ticket-design-manager">
@@ -133,47 +169,71 @@ export function TicketDesignManager({
         {liveRevision ? <span className="ticket-admin-status" data-tone="success">{message(locale, `Live: versie ${liveRevision}`, `Live: revision ${liveRevision}`)}</span> : null}
       </div>
 
-      <div className="ticket-admin-form-grid ticket-design-grid">
-        <fieldset className="ticket-admin-field" data-span="2">
-          <legend>{message(locale, "Sjabloon", "Template")}</legend>
-          <div className="ticket-design-templates">
-            {TICKET_DESIGN_TEMPLATES.map((template) => (
-              <label key={template} className={design.template === template ? "is-selected" : ""}>
-                <input type="radio" checked={design.template === template} onChange={() => update("template", template)} />
-                <strong>{template === "CLASSIC" ? message(locale, "Classic", "Classic") : template === "POSTER_ARTWORK" ? message(locale, "Poster artwork", "Poster artwork") : message(locale, "Gesplitste artwork", "Split artwork")}</strong>
-                <span>{template === "CLASSIC" ? message(locale, "Rustige klassieke indeling", "Clean classic layout") : template === "POSTER_ARTWORK" ? message(locale, "Grote afbeelding bovenaan", "Large artwork header") : message(locale, "Artwork naast de ticketinfo", "Artwork beside ticket details")}</span>
-              </label>
-            ))}
+      <div className="ticket-design-layout">
+        <div className="ticket-design-layout-form">
+          <div className="ticket-admin-form-grid ticket-design-grid">
+            <fieldset className="ticket-admin-field" data-span="2">
+              <legend>{message(locale, "Sjabloon", "Template")}</legend>
+              <div className="ticket-design-templates">
+                {TICKET_DESIGN_TEMPLATES.map((template) => (
+                  <label key={template} className={design.template === template ? "is-selected" : ""}>
+                    <input type="radio" checked={design.template === template} onChange={() => update("template", template)} />
+                    <strong>{template === "CLASSIC" ? message(locale, "Classic", "Classic") : template === "POSTER_ARTWORK" ? message(locale, "Poster artwork", "Poster artwork") : message(locale, "Gesplitste artwork", "Split artwork")}</strong>
+                    <span>{template === "CLASSIC" ? message(locale, "Rustige klassieke indeling", "Clean classic layout") : template === "POSTER_ARTWORK" ? message(locale, "Grote afbeelding bovenaan", "Large artwork header") : message(locale, "Artwork naast de ticketinfo", "Artwork beside ticket details")}</span>
+                  </label>
+                ))}
+              </div>
+            </fieldset>
+
+            <ColourField label={message(locale, "Achtergrondkleur", "Background colour")} value={design.backgroundColor} onChange={(value) => update("backgroundColor", value)} />
+            <ColourField label={message(locale, "Accentkleur", "Accent colour")} value={design.accentColor} onChange={(value) => update("accentColor", value)} />
+            <ColourField label={message(locale, "Tekstkleur", "Text colour")} value={design.textColor} onChange={(value) => update("textColor", value)} />
+
+            <AssetField label={message(locale, "Achtergrond / hero artwork", "Background / hero artwork")} kind="artwork" url={artworkUrl} uploading={uploading === "artwork"} onFile={(file) => upload("artwork", file)} locale={locale} />
+            {design.artwork ? <>
+              <RangeField label={message(locale, "Focus horizontaal", "Horizontal focal point")} value={design.artwork.focalX} onChange={(focalX) => update("artwork", { ...design.artwork!, focalX })} />
+              <RangeField label={message(locale, "Focus verticaal", "Vertical focal point")} value={design.artwork.focalY} onChange={(focalY) => update("artwork", { ...design.artwork!, focalY })} />
+            </> : null}
+            <AssetField label={message(locale, "Eventlogo", "Event logo")} kind="eventLogo" url={assetUrl(design.eventLogoKey)} uploading={uploading === "eventLogo"} onFile={(file) => upload("eventLogo", file)} locale={locale} />
+            <AssetField label={message(locale, "Sponsorlogo (optioneel)", "Sponsor logo (optional)")} kind="sponsorLogo" url={assetUrl(design.sponsorLogoKey)} uploading={uploading === "sponsorLogo"} onFile={(file) => upload("sponsorLogo", file)} locale={locale} />
+            <label className="ticket-admin-field" data-span="2">
+              <span>{message(locale, "Footer (NL, optioneel)", "Footer (NL, optional)")}</span>
+              <textarea value={design.footerNl ?? ""} maxLength={280} onChange={(event) => update("footerNl", event.target.value || undefined)} />
+            </label>
+            <label className="ticket-admin-field" data-span="2">
+              <span>{message(locale, "Footer (EN, optioneel)", "Footer (EN, optional)")}</span>
+              <textarea value={design.footerEn ?? ""} maxLength={280} onChange={(event) => update("footerEn", event.target.value || undefined)} />
+            </label>
           </div>
-        </fieldset>
 
-        <ColourField label={message(locale, "Achtergrondkleur", "Background colour")} value={design.backgroundColor} onChange={(value) => update("backgroundColor", value)} />
-        <ColourField label={message(locale, "Accentkleur", "Accent colour")} value={design.accentColor} onChange={(value) => update("accentColor", value)} />
-        <ColourField label={message(locale, "Tekstkleur", "Text colour")} value={design.textColor} onChange={(value) => update("textColor", value)} />
+          {error ? <p className="ticket-design-message is-error">{error}</p> : null}
+          {notice ? <p className="ticket-design-message"><CheckCircle2 aria-hidden="true" size={16} />{notice}</p> : null}
+          <div className="ticket-admin-section-actions">
+            <button className="ticket-admin-button" type="button" disabled={busy} onClick={save}>{pending ? <LoaderCircle className="animate-spin" size={16} /> : <Save size={16} />}{message(locale, "Concept opslaan", "Save draft")}</button>
+            <button className="ticket-admin-button" data-variant="primary" type="button" disabled={busy} onClick={publish}><Send size={16} />{message(locale, "Ontwerp publiceren", "Publish design")}</button>
+          </div>
+        </div>
 
-        <AssetField label={message(locale, "Achtergrond / hero artwork", "Background / hero artwork")} kind="artwork" url={artworkUrl} uploading={uploading === "artwork"} onFile={(file) => upload("artwork", file)} locale={locale} />
-        {design.artwork ? <>
-          <RangeField label={message(locale, "Focus horizontaal", "Horizontal focal point")} value={design.artwork.focalX} onChange={(focalX) => update("artwork", { ...design.artwork!, focalX })} />
-          <RangeField label={message(locale, "Focus verticaal", "Vertical focal point")} value={design.artwork.focalY} onChange={(focalY) => update("artwork", { ...design.artwork!, focalY })} />
-        </> : null}
-        <AssetField label={message(locale, "Eventlogo", "Event logo")} kind="eventLogo" url={assetUrl(design.eventLogoKey)} uploading={uploading === "eventLogo"} onFile={(file) => upload("eventLogo", file)} locale={locale} />
-        <AssetField label={message(locale, "Sponsorlogo (optioneel)", "Sponsor logo (optional)")} kind="sponsorLogo" url={assetUrl(design.sponsorLogoKey)} uploading={uploading === "sponsorLogo"} onFile={(file) => upload("sponsorLogo", file)} locale={locale} />
-        <label className="ticket-admin-field" data-span="2">
-          <span>{message(locale, "Footer (NL, optioneel)", "Footer (NL, optional)")}</span>
-          <textarea value={design.footerNl ?? ""} maxLength={280} onChange={(event) => update("footerNl", event.target.value || undefined)} />
-        </label>
-        <label className="ticket-admin-field" data-span="2">
-          <span>{message(locale, "Footer (EN, optioneel)", "Footer (EN, optional)")}</span>
-          <textarea value={design.footerEn ?? ""} maxLength={280} onChange={(event) => update("footerEn", event.target.value || undefined)} />
-        </label>
-      </div>
-
-      {error ? <p className="ticket-design-message is-error">{error}</p> : null}
-      {notice ? <p className="ticket-design-message"><CheckCircle2 aria-hidden="true" size={16} />{notice}</p> : null}
-      <div className="ticket-admin-section-actions">
-        <button className="ticket-admin-button" type="button" disabled={busy} onClick={save}>{pending ? <LoaderCircle className="animate-spin" size={16} /> : <Save size={16} />}{message(locale, "Concept opslaan", "Save draft")}</button>
-        <button className="ticket-admin-button" type="button" disabled={busy} onClick={preview}><Eye size={16} />{message(locale, "A4-PDF bekijken", "Preview A4 PDF")}</button>
-        <button className="ticket-admin-button" data-variant="primary" type="button" disabled={busy} onClick={publish}><Send size={16} />{message(locale, "Ontwerp publiceren", "Publish design")}</button>
+        <aside className="ticket-design-preview">
+          <div className="ticket-design-preview-head">
+            <span>{message(locale, "Live voorbeeld", "Live preview")}</span>
+            {previewUrl ? (
+              <a className="ticket-admin-button" href={previewUrl} target="_blank" rel="noopener noreferrer">
+                <ExternalLink size={14} />{message(locale, "Volledig", "Full size")}
+              </a>
+            ) : null}
+          </div>
+          <div className="ticket-design-preview-frame">
+            {previewUrl ? <iframe src={previewUrl} title={message(locale, "Live voorbeeld van het ticket", "Live ticket preview")} /> : null}
+            {previewLoading ? <div className="ticket-design-preview-overlay"><LoaderCircle className="animate-spin" size={20} /></div> : null}
+            {previewError && !previewLoading ? (
+              <div className="ticket-design-preview-overlay">
+                <span>{message(locale, "Voorvertoning mislukt", "Preview failed")}</span>
+              </div>
+            ) : null}
+          </div>
+          <p className="ticket-design-preview-note">{message(locale, "Toont het concept met voorbeeldgegevens; werkt automatisch bij, ook zonder opslaan.", "Shows the draft with sample data; updates automatically, even before you save.")}</p>
+        </aside>
       </div>
     </section>
   );

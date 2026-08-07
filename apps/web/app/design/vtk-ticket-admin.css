@@ -713,6 +713,97 @@
   .ticket-design-templates { grid-template-columns: 1fr; }
 }
 
+/* Vorm + live voorbeeld naast elkaar vanaf een brede admin-kolom; op smal
+   scherm staat het voorbeeld gewoon onder het formulier (bewerken komt eerst,
+   het voorbeeld is ondersteunend, niet de hoofdtaak). */
+.ticket-design-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 24px;
+  align-items: start;
+}
+
+@media (min-width: 980px) {
+  .ticket-design-layout {
+    grid-template-columns: minmax(0, 1fr) 260px;
+  }
+
+  .ticket-design-preview {
+    position: sticky;
+    top: 20px;
+  }
+}
+
+.ticket-design-layout-form {
+  min-width: 0;
+}
+
+.ticket-design-preview {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--surface);
+}
+
+.ticket-design-preview-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
+.ticket-design-preview-head .ticket-admin-button {
+  min-height: 28px;
+  padding: 4px 10px;
+  font-size: 11px;
+  text-transform: none;
+  letter-spacing: normal;
+}
+
+.ticket-design-preview-frame {
+  position: relative;
+  overflow: hidden;
+  aspect-ratio: 595.28 / 841.89;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--paper-2);
+}
+
+.ticket-design-preview-frame iframe {
+  width: 100%;
+  height: 100%;
+  border: 0;
+}
+
+.ticket-design-preview-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 12px;
+  background: rgba(255, 255, 255, 0.7);
+  text-align: center;
+}
+
+.ticket-design-preview-note {
+  margin: 0;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
 .ticket-admin-input-icon {
   position: relative;
 }
