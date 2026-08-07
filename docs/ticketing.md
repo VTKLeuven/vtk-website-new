@@ -84,12 +84,47 @@ provider-agnostic and keys off the `provider` string stored on each row
   prefix). Requires session + `SCAN` capability. Needs HTTPS or localhost for
   camera access.
 
+### Offline scannen
+
+Een deur zonder bereik (kelder, tent, hal) is de regel, niet de uitzondering.
+Voorheen weigerde de scanner elke scan zolang `navigator.onLine` false was; nu
+werkt hij door.
+
+**Hoe het werkt.** Bij het laden haalt het toestel een *manifest* op: de lijst
+geldige tickets van dit event (`code`, `version`, `checkedIn`, naam, type). Valt
+het netwerk weg, dan beslist het toestel daarmee zelf en gaat de scan in een
+wachtrij in localStorage. Zodra er weer verbinding is, wordt die wachtrij in
+blokken van honderd naar `scan/batch` gestuurd.
+
+**Waarom geen handtekeningcontrole op het toestel.** De QR is een HMAC-token
+(`createTicketCredential`). Dat op het toestel verifiëren vraagt
+`TICKETING_TOKEN_SECRET`, en wie die telefoon uitleest kan dan zelf tickets
+maken. Offline controleren we dus op lidmaatschap van het manifest plus het
+versienummer. Gevolg: wie een geldige code van iemand anders kent, geraakt
+offline binnen. Dat conflict komt bij het synchroniseren alsnog boven, want de
+server doet de volledige controle en meldt de tweede scan als `ALREADY_USED`; de
+scanner toont die gevallen in een balk die blijft staan tot iemand ze wegklikt.
+
+**Waarom opnieuw versturen veilig is.** Elke scan draagt een `clientScanId` en
+`TicketScanLog.clientScanId` is uniek: een synchronisatie die halverwege afbreekt
+kan gewoon opnieuw. Ook een offline *geweigerde* scan gaat mee, zodat het
+scanlogboek compleet blijft.
+
+**Grenzen.** Boven de 5000 geldige tickets (`MANIFEST_LIMIT` in `scanner.ts`)
+krijgt het toestel geen manifest en scant het enkel online; met een halve lijst
+zou het geldige tickets weigeren. Dubbels *aan dezelfde deur* worden offline
+herkend, dubbels *tussen deuren* pas bij het synchroniseren: daarvoor is
+communicatie tussen de toestellen nodig. Wil je dat live, zet dan een lokale
+router of hotspot aan de ingang; LoRa-mesh (Meshtastic) haalt de EU-duty-cycle
+niet bij de toeloop van een galabal, en Web Bluetooth bestaat niet op iOS.
+
 ### API (`apps/web/app/api/tickets/...`)
 - `checkout/route.ts` — start an order + checkout
 - `mollie/webhook/route.ts` — Mollie payment/refund callback
 - `mock/complete/route.ts` — dev-only instant "payment complete"
 - `maintenance/route.ts` — reconciliation + outbox flush (Bearer `TICKETING_MAINTENANCE_SECRET`)
-- `events/[eventId]/scan`, `.../scan/reverse`, `.../scanner/bootstrap` — scanning
+- `events/[eventId]/scan`, `.../scan/batch`, `.../scan/reverse`,
+  `.../scanner/bootstrap` — scanning (`scan/batch` leegt de offline wachtrij)
 - `events/[eventId]/{stats,exports/*}`, `orders/[orderId]/{status,access}`,
   `[ticketId]/pdf` — supporting endpoints
 

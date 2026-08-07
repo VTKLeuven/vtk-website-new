@@ -1412,6 +1412,80 @@
   font-weight: 700;
 }
 
+/* Offline scannen is geen storing meer maar een werkmodus: de banner is
+   informatief in plaats van alarmerend rood. */
+.scanner-offline-banner {
+  background: #74520d;
+}
+
+/* Hoeveel scans nog naar de server moeten, met een knop om het nu te proberen. */
+.scanner-queue-banner {
+  display: flex;
+  min-height: 42px;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 8px 15px;
+  background: #0e1a36;
+  color: white;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.scanner-queue-banner button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 11px;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  border-radius: 999px;
+  background: none;
+  color: inherit;
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.scanner-queue-banner button:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.scanner-queue-banner button:disabled {
+  cursor: default;
+  opacity: 0.55;
+}
+
+/* Offline aanvaard, achteraf toch geweigerd. Blijft staan tot iemand ze wegklikt:
+   dit is precies het geval waar de deurploeg iets mee moet. */
+.scanner-conflict-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 15px;
+  background: #fbecee;
+  color: #7c2430;
+  font-size: 13px;
+}
+
+.scanner-conflict-banner > div {
+  flex: 1;
+  min-width: 0;
+}
+
+.scanner-conflict-banner ul {
+  margin: 4px 0 0;
+  padding-left: 18px;
+}
+
+.scanner-conflict-banner button {
+  flex: none;
+  padding: 4px;
+  border: 0;
+  background: none;
+  color: inherit;
+  cursor: pointer;
+}
+
 .scanner-workspace {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 360px;
