@@ -37,7 +37,7 @@ export function generateGoogleWalletSaveUrl(input: WalletTicketInput): string {
       address: { defaultValue: { language: "nl", value: location } },
     },
     dateTime: { start: input.event.startsAt.toISOString() },
-    logo: { sourceUri: { uri: logoUri } },
+    ...(logoUri ? { logo: { sourceUri: { uri: logoUri } } } : {}),
     hexBackgroundColor: design.backgroundColor,
     // New classes start under review; the direct "Save" link already works
     // while that's pending, they just won't surface in Wallet's own search.

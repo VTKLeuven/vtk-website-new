@@ -41,6 +41,7 @@ export async function generateViaWalletWallet(input: WalletTicketInput): Promise
   const daysUntilEvent = Math.ceil((input.event.startsAt.getTime() - Date.now()) / 86_400_000);
   const expirationDays = Math.min(3650, Math.max(1, daysUntilEvent + 1));
   const footer = [design.footerNl, design.footerEn].filter(Boolean).join(" / ");
+  const logoURL = absoluteLogoUrl(design);
 
   const response = await fetch(`${API_BASE}/api/passes`, {
     method: "POST",
@@ -67,14 +68,18 @@ export async function generateViaWalletWallet(input: WalletTicketInput): Promise
       // Free tier only accepts a preset; "dark" is the closest match to
       // VTK's default navy theme. `color`/`logoURL` are Pro-only extras: sent
       // best-effort so an upgraded account picks up real VTK branding
-      // without a code change.
+      // without a code change. The API fetches logoURL synchronously and
+      // rejects the whole pass if it can't, so it's omitted rather than sent
+      // as a dead localhost link.
       colorPreset: "dark",
       color: design.textColor,
-      logoURL: absoluteLogoUrl(design),
+      ...(logoURL ? { logoURL } : {}),
       expirationDays,
     }),
   });
   if (!response.ok) {
+    const body = await response.text().catch(() => "");
+    console.error("[walletwallet] request failed", response.status, body);
     throw new Error(`WALLETWALLET_REQUEST_FAILED_${response.status}`);
   }
   const data = (await response.json()) as { applePass: string; googleSaveUrl: string };
