@@ -9,12 +9,15 @@ import { getMediaContent } from "@/lib/media-content";
 import { videoEmbed } from "@/lib/videoEmbed";
 import { getCurrentSession } from "@/lib/session";
 import { getCursusdienstHours } from "@/lib/cursusdienstHours";
+import { ELIXIR_OPEN_DAYS, openingWindowPhase } from "@/lib/elixir/openingWindow";
+import { readBarStatus } from "@/lib/elixir/status";
 import { publicUrl } from "@/lib/storage";
 import { BUILTIN_DEFAULT_EVENT_IMAGE, DEFAULT_EVENT_IMAGE_SETTING } from "@/lib/defaultEventImage";
 import { PartnerLogo } from "@/components/site/PartnerLogo";
 import { audienceFilter, viewerAudiences } from "@/lib/calendar/audience";
 import { AftermovieGrid, type AftermovieGridItem } from "./AftermovieGrid";
 import {
+  DUTCH_FULL_DAYS,
   dutchDayNameForDate,
   entryForDate,
   isClosedHours,
@@ -41,6 +44,15 @@ type CareerSetting = {
   ctaLabelEn?: string;
   ctaUrl?: string;
 };
+
+/**
+ * 't ElixIr opent zondag tot en met donderdag om 22u en sluit op een uur dat per
+ * avond verschilt. Die uren staan hard in `lib/elixir/openingWindow.ts`: ze
+ * wijzigen niet per week, en anders dan het Theokot heeft de bar geen
+ * beheerscherm. Komt daar ooit een beheerscherm, dan hoort dit een
+ * `home.openingHours.elixir`-setting te worden.
+ */
+const ELIXIR_NAME = "'t ElixIr";
 
 /** "2026-27" voor het werkingsjaar dat op 15 juli begint (zie @vtk/auth). */
 function workingYearLabel(d: Date): string {
@@ -83,7 +95,7 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
   const now = new Date();
   const nl = locale === "nl";
 
-  const [settings, upcomingEvents, tabs, partners, media, session, cursusEntries] = await Promise.all([
+  const [settings, upcomingEvents, tabs, partners, media, session, cursusEntries, barStatus] = await Promise.all([
     prisma.setting.findMany({
       where: {
         key: {
@@ -120,6 +132,10 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
     // Cursusdienst-uren komen live van cudi.vtk.be; deze lezing valt terug op de
     // laatst gecachte waarde en anders op null (kaart toont "niet beschikbaar").
     getCursusdienstHours(locale),
+    // Live geluidsstatus van 't ElixIr: enkel een lezing uit de cache (geheugen,
+    // of één Setting-rij vlak na een herstart). De worker praat met Munisense,
+    // niet deze render. Zie lib/elixir/status.ts.
+    readBarStatus(now),
   ]);
 
   // Aftermovies: `media.aftermovies` is dezelfde instelling als op /media, te
@@ -189,6 +205,28 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
     ? pick(theokot.titleNl, theokot.titleEn, locale).replace(/^Openingsuren\s+/i, "")
     : "";
   const cursusName = "Cursusdienst";
+
+  // De geluidsmeting is de bron zodra ze vers is; het uurrooster is de fallback
+  // wanneer de meting ontbreekt of te oud is (worker plat, integratie niet
+  // geconfigureerd, of gewoon de eerste render na een deploy). De meting zelf
+  // spreekt enkel binnen de openingsuren, dus buiten het venster zeggen beide
+  // hetzelfde.
+  const elixirLive = barStatus && !barStatus.stale ? barStatus : null;
+  const elixirPhase = openingWindowPhase(now);
+  const elixirOpen = elixirLive ? elixirLive.isOpen : elixirPhase === "evening";
+  // Zonder meting weten we na middernacht niet of ze al toe is: dan "mogelijk
+  // nog open" in plaats van een harde bewering.
+  const elixirMaybeOpen = !elixirLive && elixirPhase === "after-midnight";
+  const elixirEntries = DUTCH_FULL_DAYS.map((dayNl, i) => ({
+    dayNl,
+    hours: ELIXIR_OPEN_DAYS.includes(i)
+      ? nl
+        ? "vanaf 22:00"
+        : "from 22:00"
+      : nl
+        ? "Gesloten"
+        : "Closed",
+  }));
 
   const eventGroups = upcomingEvents.slice(0, 5).reduce<Array<{ key: string; date: Date; events: typeof upcomingEvents }>>(
     (acc, event) => {
@@ -500,6 +538,39 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
                     : "The course shop opening hours are currently unavailable."}
                 </div>
               )}
+            </div>
+            <div className="hours-col">
+              <h3>{ELIXIR_NAME}</h3>
+              <div className="sub">{nl ? "Faculteitsbar Ingenieurswetenschappen" : "Faculty Bar Engineering Science"}</div>
+              <div
+                className={`status${elixirOpen ? "" : elixirMaybeOpen ? " maybe" : " closed"}`}
+              >
+                {elixirOpen
+                  ? nl
+                    ? "Nu open"
+                    : "Open now"
+                  : elixirMaybeOpen
+                    ? nl
+                      ? "Mogelijk nog open"
+                      : "Possibly still open"
+                    : closedLabel(ELIXIR_NAME, nl)}
+              </div>
+              <dl className="hours-list">
+                {elixirEntries.map((row, i) => {
+                  const todayCls = row.dayNl === dutchDayNameForDate(now) ? "today" : "";
+                  return (
+                    <div key={i} style={{ display: "contents" }}>
+                      <dt className={todayCls}>{row.dayNl.slice(0, 2).toUpperCase()}</dt>
+                      <dd className={todayCls}>{row.hours}</dd>
+                    </div>
+                  );
+                })}
+              </dl>
+              <p className="hours-note">
+                {nl
+                  ? "Het sluitingsuur varieert per avond."
+                  : "The closing time varies from night to night."}
+              </p>
             </div>
           </div>
         </section>
