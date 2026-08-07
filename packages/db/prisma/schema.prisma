@@ -386,6 +386,8 @@ model User {
   theokotVouchersProcessed  TheokotVoucherRedemption[] @relation("TheokotVoucherProcessedBy")
   theokotBans               TheokotBan[]
 
+  pianoReservations PianoReservation[]
+
   uitleenReservations     UitleenReservation[]      @relation("UitleenReservationUser")
   uitleenDecided          UitleenReservation[]      @relation("UitleenDecidedBy")
   uitleenPickedUp         UitleenReservation[]      @relation("UitleenPickedUpBy")
@@ -1700,6 +1702,74 @@ model TheokotBan {
 
   @@index([userId])
   @@index([active])
+}
+
+// -----------------------------------------------------------------------------
+// Piano (lokaal 01.52 in het kasteel). Leden reserveren zelf een tijdslot. De
+// slots bestaan niet als rijen: ze worden berekend uit de terugkerende vensters
+// (`PianoWindow`) min de sluitingsdagen (`PianoClosure`), zodat een venster van
+// een heel academiejaar één rij is in plaats van duizend. Enkel een geboekt slot
+// krijgt een rij (`PianoReservation`). Zie docs/design-decisions.md.
+// -----------------------------------------------------------------------------
+
+/// Terugkerend venster waarin de piano vrij is, bv. "elke ma/di/do 19u-22u van
+/// week 39 t.e.m. week 21". Meerdere vensters mogen naast elkaar bestaan; de
+/// slotgenerator neemt hun unie.
+model PianoWindow {
+  id      String  @id @default(cuid())
+  labelNl String
+  labelEn String?
+
+  /// ISO-weekdagen waarop dit venster geldt: 1 = maandag ... 7 = zondag.
+  weekdays Int[]
+  /// Begin en einde als minuten sinds middernacht (Brussel-wandklok), zodat het
+  /// venster in zomer- én winteruur op hetzelfde uur op de klok staat.
+  startMinute Int
+  endMinute   Int
+
+  /// Geldigheidsperiode als lokale middernacht, beide grenzen inclusief.
+  /// NULL = geen ondergrens respectievelijk geen bovengrens.
+  startDate DateTime?
+  endDate   DateTime?
+
+  active    Boolean  @default(true)
+  order     Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([active])
+}
+
+/// Dagen waarop er niets te reserveren valt, ook al valt er een venster over:
+/// sluitingsdagen van de KU Leuven, of de piano die in herstelling is.
+model PianoClosure {
+  id String @id @default(cuid())
+
+  /// Lokale middernacht, beide grenzen inclusief (één dag = start == eind).
+  startDate DateTime
+  endDate   DateTime
+  reasonNl  String
+  reasonEn  String?
+  createdAt DateTime @default(now())
+
+  @@index([startDate, endDate])
+}
+
+/// Eén geboekt slot. `startsAt` is uniek: de piano is er maar één, dus een slot
+/// is bezet of vrij. Annuleren verwijdert de rij; er is bewust geen historiek,
+/// want er hangt geen geld of sanctie aan een pianoreservatie.
+model PianoReservation {
+  id        String   @id @default(cuid())
+  userId    String
+  startsAt  DateTime
+  endsAt    DateTime
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([startsAt])
+  @@index([startsAt])
+  @@index([userId, startsAt])
 }
 
 // -----------------------------------------------------------------------------
