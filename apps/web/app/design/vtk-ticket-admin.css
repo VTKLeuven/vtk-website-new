@@ -570,6 +570,10 @@
   grid-template-columns: minmax(0, 1fr);
   align-items: end;
   gap: 12px;
+  /* De filterbalk houdt zelf afstand tot wat ze filtert. Zonder deze marge plakt
+     de resultatenlijst eronder, wat vooral opvalt bij de lege staat: die heeft
+     een streepjesrand die dan tegen de invoervelden aan komt te liggen. */
+  margin-bottom: 18px;
 }
 
 .ticket-admin-field {
