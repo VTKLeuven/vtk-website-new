@@ -5,7 +5,7 @@
 /* eslint-disable @next/next/no-img-element */
 
 import { useEffect, useRef, useState, useTransition } from "react";
-import { CheckCircle2, ExternalLink, ImagePlus, LoaderCircle, Palette, RefreshCw, Save, Send, Upload } from "lucide-react";
+import { CheckCircle2, ExternalLink, ImagePlus, LoaderCircle, Palette, RefreshCw, RotateCcw, Save, Send, Upload } from "lucide-react";
 import {
   publishTicketDesignAction,
   saveTicketDesignDraftAction,
@@ -185,9 +185,9 @@ export function TicketDesignManager({
               </div>
             </fieldset>
 
-            <ColourField label={message(locale, "Achtergrondkleur", "Background colour")} value={design.backgroundColor} onChange={(value) => update("backgroundColor", value)} />
-            <ColourField label={message(locale, "Accentkleur", "Accent colour")} value={design.accentColor} onChange={(value) => update("accentColor", value)} />
-            <ColourField label={message(locale, "Tekstkleur", "Text colour")} value={design.textColor} onChange={(value) => update("textColor", value)} />
+            <ColourField label={message(locale, "Achtergrondkleur", "Background colour")} value={design.backgroundColor} fallback={DEFAULT_TICKET_DESIGN.backgroundColor} onChange={(value) => update("backgroundColor", value)} locale={locale} />
+            <ColourField label={message(locale, "Accentkleur", "Accent colour")} value={design.accentColor} fallback={DEFAULT_TICKET_DESIGN.accentColor} onChange={(value) => update("accentColor", value)} locale={locale} />
+            <ColourField label={message(locale, "Tekstkleur", "Text colour")} value={design.textColor} fallback={DEFAULT_TICKET_DESIGN.textColor} onChange={(value) => update("textColor", value)} locale={locale} />
 
             <AssetField label={message(locale, "Achtergrond / hero artwork", "Background / hero artwork")} kind="artwork" url={artworkUrl} uploading={uploading === "artwork"} onFile={(file) => upload("artwork", file)} locale={locale} />
             {design.artwork ? <>
@@ -249,8 +249,48 @@ export function TicketDesignManager({
   );
 }
 
-function ColourField({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) {
-  return <label className="ticket-admin-field"><span>{label}</span><span className="ticket-design-colour"><input type="color" value={value} onChange={(event) => onChange(event.target.value.toUpperCase())} /><input value={value} pattern="#[0-9A-Fa-f]{6}" maxLength={7} onChange={(event) => onChange(event.target.value)} /></span></label>;
+/** The reset button only appears once the colour actually differs from the
+ * VTK default, so it never sits there as a control that does nothing. It is
+ * outside the <label> on purpose: a button nested in a label would also fire
+ * when someone clicks the label text to focus the field. */
+function ColourField({
+  label,
+  value,
+  fallback,
+  onChange,
+  locale,
+}: {
+  label: string;
+  value: string;
+  fallback: string;
+  onChange: (value: string) => void;
+  locale: AdminLocale;
+}) {
+  const isDefault = value.toUpperCase() === fallback.toUpperCase();
+  const resetLabel = message(locale, "Terug naar de standaardkleur", "Reset to the default colour");
+  return (
+    <div className="ticket-admin-field">
+      <div className="ticket-design-colour-head">
+        <label htmlFor={`colour-${label}`}>{label}</label>
+        {isDefault ? null : (
+          <button
+            type="button"
+            className="ticket-design-colour-reset"
+            onClick={() => onChange(fallback)}
+            title={resetLabel}
+            aria-label={`${resetLabel}: ${label}`}
+          >
+            <RotateCcw size={13} aria-hidden="true" />
+            {message(locale, "Standaard", "Default")}
+          </button>
+        )}
+      </div>
+      <span className="ticket-design-colour">
+        <input type="color" value={value} aria-label={label} onChange={(event) => onChange(event.target.value.toUpperCase())} />
+        <input id={`colour-${label}`} value={value} pattern="#[0-9A-Fa-f]{6}" maxLength={7} onChange={(event) => onChange(event.target.value)} />
+      </span>
+    </div>
+  );
 }
 
 function RangeField({ label, value, onChange }: { label: string; value: number; onChange: (value: number) => void }) {

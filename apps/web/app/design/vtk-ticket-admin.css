@@ -678,6 +678,43 @@
   font-size: 11px;
 }
 
+.ticket-design-colour-head {
+  display: flex;
+  min-height: 20px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.ticket-design-colour-head > label {
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.ticket-design-colour-reset {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--muted);
+  font: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.ticket-design-colour-reset:hover {
+  color: var(--ink);
+}
+
+.ticket-design-colour-reset:focus-visible {
+  outline: 3px solid rgba(14, 26, 54, 0.14);
+  outline-offset: 2px;
+}
+
 .ticket-design-colour {
   display: grid;
   grid-template-columns: 44px minmax(0, 1fr);
