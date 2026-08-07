@@ -697,6 +697,12 @@
 }
 
 .ticket-admin-table-wrap {
+  /* Zelf het positie-anker. In de kop staat een `sr-only`-span; die is absoluut
+     gepositioneerd en zou zonder gepositioneerde ouder op de pagina ankeren
+     i.p.v. op de tabel. Ze landt dan op de x van haar kolom (~500px), waardoor
+     het document breder wordt dan het scherm en een telefoon de hele pagina
+     uitzoomt om die ene onzichtbare pixel te tonen. */
+  position: relative;
   width: 100%;
   overflow-x: auto;
   border: 1px solid var(--line);

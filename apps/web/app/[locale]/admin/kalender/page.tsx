@@ -56,7 +56,7 @@ export default async function AdminCalendar({
 
   return (
     <div className="space-y-5">
-      <div className="flex items-center justify-between gap-4">
+      <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-3">
         <h1 className="text-2xl font-semibold">{nl ? "Evenementen" : "Events"}</h1>
         <div className="flex items-center gap-3">
           {canAll && (
@@ -82,7 +82,7 @@ export default async function AdminCalendar({
         </FilterPill>
       </div>
 
-      <Card className="overflow-hidden">
+      <Card className="overflow-x-auto">
         <table className="w-full text-sm">
           <thead className="bg-vtk-blue-soft text-left">
             <tr>

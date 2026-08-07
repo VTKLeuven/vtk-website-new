@@ -80,37 +80,42 @@ export default async function AdminMedia({
         </h2>
         <ul className="divide-y divide-zinc-200">
           {publications.map((p) => (
-            <li key={p.id} className="flex items-center gap-3 py-2">
+            // `basis-48` op de titel: smal past er naast het label niets meer
+            // bij, dus zakt het actieblok als geheel naar een tweede regel in
+            // plaats van de titel tot vier woorden per regel te knijpen.
+            <li key={p.id} className="flex flex-wrap items-center gap-x-3 gap-y-2 py-2">
               <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-semibold uppercase">
                 {p.kind === "bakske" ? "Bakske" : "Ir.Reëel"}
               </span>
-              <span className="flex-1 text-sm">
+              <span className="min-w-0 flex-1 basis-48 text-sm">
                 {nl ? p.titleNl : p.titleEn || p.titleNl} · {nl ? p.issueNl : p.issueEn || p.issueNl}
                 {p.publishedAt ? <span className="text-zinc-500"> · {p.publishedAt}</span> : null}
               </span>
-              <a
-                href={`/api/media/publications/${encodeURIComponent(p.id)}`}
-                target="_blank"
-                rel="noreferrer"
-                className="text-xs underline"
-              >
-                PDF
-              </a>
-              <DeleteIconButton
-                action={deleteMagazineAction}
-                fields={{ id: p.id }}
-                label={nl ? "Verwijderen" : "Delete"}
-                srLabel={`${nl ? "Verwijderen" : "Delete"}: ${nl ? p.titleNl : p.titleEn || p.titleNl} ${nl ? p.issueNl : p.issueEn || p.issueNl}`}
-                title={nl ? "Editie verwijderen?" : "Delete issue?"}
-                description={
-                  nl
-                    ? `"${p.titleNl} ${p.issueNl}" verdwijnt van de mediapagina. De andere edities blijven staan.`
-                    : `"${p.titleEn || p.titleNl} ${p.issueEn || p.issueNl}" disappears from the media page. The other issues remain.`
-                }
-                confirmLabel={nl ? "Verwijderen" : "Delete"}
-                cancelLabel={nl ? "Annuleren" : "Cancel"}
-                successMessage={nl ? "Editie verwijderd" : "Issue deleted"}
-              />
+              <div className="ml-auto flex shrink-0 items-center gap-3">
+                <a
+                  href={`/api/media/publications/${encodeURIComponent(p.id)}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-xs underline"
+                >
+                  PDF
+                </a>
+                <DeleteIconButton
+                  action={deleteMagazineAction}
+                  fields={{ id: p.id }}
+                  label={nl ? "Verwijderen" : "Delete"}
+                  srLabel={`${nl ? "Verwijderen" : "Delete"}: ${nl ? p.titleNl : p.titleEn || p.titleNl} ${nl ? p.issueNl : p.issueEn || p.issueNl}`}
+                  title={nl ? "Editie verwijderen?" : "Delete issue?"}
+                  description={
+                    nl
+                      ? `"${p.titleNl} ${p.issueNl}" verdwijnt van de mediapagina. De andere edities blijven staan.`
+                      : `"${p.titleEn || p.titleNl} ${p.issueEn || p.issueNl}" disappears from the media page. The other issues remain.`
+                  }
+                  confirmLabel={nl ? "Verwijderen" : "Delete"}
+                  cancelLabel={nl ? "Annuleren" : "Cancel"}
+                  successMessage={nl ? "Editie verwijderd" : "Issue deleted"}
+                />
+              </div>
             </li>
           ))}
           {publications.length === 0 ? (
