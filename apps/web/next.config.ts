@@ -2,6 +2,7 @@ import path from "node:path";
 import { loadEnvConfig } from "@next/env";
 import { withSentryConfig } from "@sentry/nextjs";
 import type { NextConfig } from "next";
+import { LEGACY_REDIRECTS } from "./lib/legacyRedirects";
 
 const monorepoRoot = path.resolve(process.cwd(), "../..");
 
@@ -81,6 +82,10 @@ const nextConfig: NextConfig = {
         destination: "/en/tickets/bestelling/:orderId",
         permanent: true,
       },
+      // De adressen van de oude vtk.be. De map zelf staat in
+      // lib/legacyRedirects.ts, zodat ze getest kan worden; hier rollen we ze
+      // enkel uit.
+      ...LEGACY_REDIRECTS,
     ];
   },
   async headers() {
