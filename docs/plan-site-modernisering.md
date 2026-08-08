@@ -8,6 +8,17 @@ Basis: de audit van 2026-08-08 tegen de live site. Punt 1 (migratie van de 59 NL
 en 60 EN infopagina's) en punt 14 (bekende SSO-bugs) zitten **niet** in dit plan;
 die zijn apart ingepland.
 
+## Vastgelegde keuzes
+
+Beslist door Maxime op 2026-08-08, voor de uitvoering begon:
+
+- **Alles op één branch**: `site-modernisering`. Niet op `main` committen en niet
+  pushen; de acht werkstromen worden in één keer nagekeken en gemerged.
+- **Statistieken**: Plausible, **self-hosted**, mee in `infra/docker-compose.yml`
+  naast Immich. Geen data bij derden, dus geen extra verwerker in het register.
+- **Contactformulier**: alles naar `info@vtk.be`, één bestemming. Geen routering
+  per onderwerp en geen adressentabel.
+
 ## Werkstromen
 
 | ID | Onderwerp | Auditpunt |
@@ -256,7 +267,8 @@ is de test die ertoe doet.
 ## WS-6 Contactformulier
 
 Nu staat er enkel `mailto:info@vtk.be`. Bouw een formulier op de contactpagina:
-naam, e-mail, onderwerp, bericht.
+naam, e-mail, onderwerp, bericht. Alles gaat naar **`info@vtk.be`**; geen
+routering per onderwerp, geen adressentabel.
 
 - Volg de conventies uit `CLAUDE.md`: `SaveForm`, een server action die
   `SaveState` teruggeeft via `saveOk()`/`saveError(code)`, verwachte
@@ -281,9 +293,13 @@ maximale berichtlengte, en het venster van de snelheidslimiet.
 
 ## WS-7 Bezoekersstatistieken
 
-Er is nu enkel Sentry voor fouten. Kies iets cookieloos en licht; dat past bij de
-compliance-houding van de site en houdt het toestemmingsscherm eerlijk.
+Er is nu enkel Sentry voor fouten. Het wordt **Plausible, self-hosted**: cookieloos,
+en omdat het op onze eigen infrastructuur draait komt er geen verwerker bij.
 
+- Voeg de Plausible-container toe aan `infra/docker-compose.yml`, in dezelfde
+  stijl als de bestaande diensten daar (eigen volume, healthcheck, en netjes
+  uitgeschakeld wanneer de omgevingsvariabelen leeg zijn, zoals de workers dat
+  doen).
 - Laad het script pas volgens de bestaande keuze in `lib/cookie-consent.ts`.
   Zelfs bij een cookieloze aanbieder is dat de veiligste vorm, en het scherm
   bestaat al.
@@ -308,8 +324,9 @@ compliance-houding van de site en houdt het toestemmingsscherm eerlijk.
    afbeeldingen raakt. `middleware.ts` heet hier `proxy.ts`.
 3. **`npm run verify` moet groen zijn voor je commit.** Dat is lockfile-check,
    typegen plus `tsc --noEmit`, eslint en de unittests van `@vtk/web`.
-4. **Niet pushen.** Commit gerust, maar `git push` gebeurt alleen op expliciete
-   vraag.
+4. **Commit op `site-modernisering`, nooit op `main`, en push niet.** Controleer
+   met `git branch --show-current` voor je commit. `git push` gebeurt alleen op
+   expliciete vraag van Maxime.
 5. **Geen nieuwe dependencies** tenzij het echt niet anders kan. Moet het toch,
    commit dan geen incrementeel bijgewerkte lockfile: regenereer met
    `rm -rf node_modules package-lock.json && npm install` (zie `AGENTS.md`).
