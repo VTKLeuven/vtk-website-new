@@ -138,4 +138,37 @@ describe('de sitemap als geheel', () => {
     );
     expect(new Set(list).size).toBe(list.length);
   });
+
+  // De echte tabs botsen wél met STATIC_ROUTES: /theokot, /shift en /media zijn
+  // allebei een eigen route en een categorie. De test hierboven gebruikt de slug
+  // 'info' en kan de botsing dus per definitie niet zien; deze wel.
+  it('telt een adres dat zowel vaste route als categorie is maar één keer', () => {
+    const list = urls(
+      build({
+        headerTabs: [
+          { slug: 'theokot', visible: true, externalUrl: null },
+          { slug: 'shift', visible: true, externalUrl: null },
+          { slug: 'media', visible: true, externalUrl: null },
+          { slug: 'info', visible: true, externalUrl: null },
+        ],
+      }),
+    );
+
+    expect(new Set(list).size).toBe(list.length);
+    for (const path of ['/theokot', '/shift', '/media']) {
+      expect(list.filter((url) => url === `${BASE}${path}`)).toHaveLength(1);
+    }
+    expect(list).toContain(`${BASE}/info`);
+  });
+
+  // De vaste route wint van de categorievorm, want ze draagt de hogere priority.
+  it('houdt bij een botsing de vaste route met haar eigen priority', () => {
+    const entries = build({
+      headerTabs: [{ slug: 'theokot', visible: true, externalUrl: null }],
+    });
+    const theokot = entries.filter((item) => item.url === `${BASE}/theokot`);
+
+    expect(theokot).toHaveLength(1);
+    expect(theokot[0].priority).toBe(0.8);
+  });
 });

@@ -100,5 +100,18 @@ export function buildSitemapEntries(input: SitemapInput): MetadataRoute.Sitemap 
     .filter((event) => event.visibility === "PUBLIC")
     .map((event) => entry(`/kalender/${event.id}`, event.updatedAt, 0.5));
 
-  return [...staticEntries, ...tabEntries, ...pageEntries, ...eventEntries];
+  // Ontdubbelen, want de lijsten overlappen elkaar echt: `/theokot`, `/shift` en
+  // `/media` staan zowel in STATIC_ROUTES (het zijn eigen routes met eigen
+  // functionaliteit) als in de headertabs (ze zijn óók een categorie). Dezelfde
+  // URL twee keer in een sitemap is een fout die Search Console meldt.
+  //
+  // De eerste wint, en de volgorde hierboven is daarop afgestemd: een vaste route
+  // draagt een hogere `priority` dan dezelfde URL als categorie.
+  const all = [...staticEntries, ...tabEntries, ...pageEntries, ...eventEntries];
+  const seen = new Set<string>();
+  return all.filter((item) => {
+    if (seen.has(item.url)) return false;
+    seen.add(item.url);
+    return true;
+  });
 }

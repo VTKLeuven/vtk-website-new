@@ -100,6 +100,11 @@ export async function Header({ locale }: { locale: Locale }) {
             alt=""
             width={1152}
             height={650}
+            // Het merkteken staat op 38px hoog met een max van 190px breed (zie
+            // .brand-logo-img). Zonder `sizes` leidt Next de srcset af uit de
+            // `width` hierboven en haalt de browser 1152px op voor iets van 67px,
+            // op elke pagina van de site.
+            sizes="190px"
             className="brand-logo-img"
             priority
           />

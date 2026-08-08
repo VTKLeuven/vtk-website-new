@@ -19,6 +19,9 @@ export async function Footer({ locale }: { locale: Locale }) {
                 alt="VTK"
                 width={1152}
                 height={650}
+                // Zie de header: zonder `sizes` haalt de browser het volledige
+                // bestand op voor een merkteken van 38px hoog.
+                sizes="190px"
                 className="vtk-site-footer-logo"
               />
               {f.tagline}
