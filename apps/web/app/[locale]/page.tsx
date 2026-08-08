@@ -3,8 +3,20 @@ import { AnnouncementModal } from "@/components/site/AnnouncementModal";
 import { Markdown } from "@/components/ui/Markdown";
 import { getCurrentAnnouncement } from "@/lib/announcements";
 import { hasLocale } from "@/lib/locale";
+import { staticMetadata } from "@/lib/pageMetadata";
 import { pick, type Locale } from "@vtk/i18n";
+import type { Metadata } from "next";
 import { notFound } from "next/navigation";
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ locale: string }>;
+}): Promise<Metadata> {
+  const { locale } = await params;
+  if (!hasLocale(locale)) return {};
+  return staticMetadata("home", "/", locale);
+}
 
 export default async function HomePage({
   params,

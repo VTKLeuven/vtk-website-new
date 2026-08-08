@@ -612,5 +612,111 @@
     "infoLead": "The practical pages: services, facilities and how to use them.",
     "calendarTitle": "Calendar",
     "calendarLead": "Every activity, from cantus to info session."
+  },
+  "seo": {
+    "home": {
+      "title": "Vlaamse Technische Kring",
+      "description": "VTK is the student association of the Faculty of Engineering Science at KU Leuven: activities, course notes, Theokot and more."
+    },
+    "kalender": {
+      "title": "Calendar",
+      "description": "Every VTK activity: cantuses, info sessions, sports, culture and the yearly classics."
+    },
+    "tickets": {
+      "title": "Tickets",
+      "description": "Tickets for cantuses, galas and other VTK events, paid safely and directly."
+    },
+    "media": {
+      "title": "Media",
+      "description": "Photos, aftermovies and VTK publications, gathered in one place."
+    },
+    "praesidium": {
+      "title": "Praesidium",
+      "description": "The VTK praesidium per working year: who holds which position and how to reach them."
+    },
+    "werkgroepen": {
+      "title": "Work groups",
+      "description": "The VTK work groups, each with their own team and their own programme."
+    },
+    "pocs": {
+      "title": "Programme committees",
+      "description": "The permanent education committees and the students representing your programme there."
+    },
+    "theokot": {
+      "title": "Theokot",
+      "description": "Order your sandwich at the Theokot and pick it up during opening hours."
+    },
+    "shift": {
+      "title": "Shifts",
+      "description": "Lend a hand behind the bar or at an event. Every shift earns you vouchers."
+    },
+    "piano": {
+      "title": "Book the piano",
+      "description": "Book a slot on the VTK piano in room 01.52 in Arenberg castle."
+    },
+    "privacy": {
+      "title": "Privacy statement",
+      "description": "Which personal data VTK processes on the website, in the member portal and for tickets and bookings."
+    },
+    "cookies": {
+      "title": "Cookie policy",
+      "description": "Which browser storage VTK uses, what it is for and how to change your choice."
+    },
+    "ledenportaal": {
+      "title": "About the member portal",
+      "description": "What the member portal is, who can get in and what you do there as a member."
+    },
+    "account": {
+      "title": "My account",
+      "description": "Your profile, your tickets, your shifts and your connected apps."
+    },
+    "connectedApps": {
+      "title": "Connected apps",
+      "description": "The applications you granted access with your VTK account."
+    },
+    "login": {
+      "title": "Sign in",
+      "description": "Sign in with your VTK account or through KU Leuven."
+    },
+    "consent": {
+      "title": "Grant access",
+      "description": "An application is asking for access to your VTK data."
+    },
+    "noAccess": {
+      "title": "No access",
+      "description": "Your account has no access to this application."
+    },
+    "onboarding": {
+      "title": "Complete your profile",
+      "description": "Fill in your profile to start using your VTK account."
+    },
+    "confirmStudy": {
+      "title": "Confirm your studies",
+      "description": "Confirm your programme for this working year."
+    },
+    "ticketOrder": {
+      "title": "My order",
+      "description": "The status of your ticket order and your tickets."
+    },
+    "ticketAccess": {
+      "title": "Access your tickets",
+      "description": "Open your order with the link from your confirmation e-mail."
+    },
+    "theokotCounter": {
+      "title": "Theokot pickup counter",
+      "description": "Tick off orders during a Theokot shift."
+    },
+    "shiftHistory": {
+      "title": "My shift history",
+      "description": "The shifts you did before and the vouchers they earned."
+    },
+    "ssoMetadata": {
+      "title": "SSO metadata",
+      "description": "Internal reference page for the KU Leuven connection."
+    },
+    "sample": {
+      "title": "Design samples",
+      "description": "Internal reference page with the building blocks of the VTK house style."
+    }
   }
 }
