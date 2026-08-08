@@ -1431,3 +1431,25 @@ product- en niet puur technisch:
 - Een not-found-component krijgt geen props, ook geen `params`. De taal komt daar
   uit de `x-pathname`-header die `proxy.ts` zet, net als in de root layout. De
   canonical wijst naar het adres dat niet bestond en de pagina staat op `noIndex`.
+
+---
+
+## Footer: welke socials, en de bevriende kringen
+
+- **De socials in de footer zijn Instagram, Facebook, LinkedIn, YouTube en
+  TikTok.** YouTube (`youtube.com/@VTKLeuven`) en TikTok
+  (`tiktok.com/@vtkleuven`) stonden wel op de oude site en op de officiële
+  linktree, maar niet in deze footer. De oude site linkte YouTube nog via de
+  verouderde `youtube.com/user/...`-vorm; we gebruiken de handle-URL.
+  Er bestaat ook een X/Twitter-account (`x.com/vtkleuven`), maar dat staat niet op
+  de linktree die communicatie zelf onderhoudt en is van buitenaf niet te
+  controleren op activiteit; het is dus niet toegevoegd. Wil VTK het er wel bij,
+  voeg het dan toe zoals de andere vijf.
+- **De bevriende kringen krijgen geen eigen lijst.** BEST, Biomedix, Chemix,
+  Existenz, Mechanix, Revue en Statix staan al als `WERKGROEP` in de database
+  (`WERKGROEP_SEEDS`) en dus op `/werkgroepen`, met hun ploeg per werkingsjaar en
+  hun eigen website. De footerlink noemt ze daarom bij naam
+  ("Werkgroepen & bevriende kringen") en wijst naar die ene pagina; een tweede,
+  handgeschreven lijst zou binnen het jaar uit elkaar lopen met de eerste. De
+  oude sleutel `footer.linkWerkgroepen` blijft ongebruikt achter in de
+  i18n-bestanden: die mochten tijdens deze werkstroom enkel aangevuld worden.

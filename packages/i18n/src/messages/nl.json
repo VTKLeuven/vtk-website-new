@@ -39,7 +39,10 @@
     "linkPrivacy": "Privacy",
     "linkCookies": "Cookies",
     "linkCookieSettings": "Cookiekeuze",
-    "linkRental": "Uitleendienst"
+    "linkRental": "Uitleendienst",
+    "linkWerkgroepenCircles": "Werkgroepen & bevriende kringen",
+    "linkYouTube": "YouTube",
+    "linkTikTok": "TikTok"
   },
   "home": {
     "welcome": "Welkom bij VTK",

@@ -39,7 +39,10 @@
     "linkPrivacy": "Privacy",
     "linkCookies": "Cookies",
     "linkCookieSettings": "Cookie choices",
-    "linkRental": "Equipment service"
+    "linkRental": "Equipment service",
+    "linkWerkgroepenCircles": "Working groups & partner societies",
+    "linkYouTube": "YouTube",
+    "linkTikTok": "TikTok"
   },
   "home": {
     "welcome": "Welcome to VTK",

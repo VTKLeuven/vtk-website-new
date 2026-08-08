@@ -85,7 +85,11 @@ export async function Footer({ locale }: { locale: Locale }) {
                 <Link href={`${base}/praesidium`}>{f.linkPraesidium}</Link>
               </li>
               <li>
-                <Link href={`${base}/werkgroepen`}>{f.linkWerkgroepen}</Link>
+                {/* De bevriende kringen (BEST, Biomedix, Chemix, Existenz, Mechanix,
+                    Revue, Statix) staan als werkgroep in de database en dus al op
+                    /werkgroepen. Daarom noemt deze ene link ze allebei, in plaats van
+                    een tweede handgeschreven lijst naast dezelfde pagina te zetten. */}
+                <Link href={`${base}/werkgroepen`}>{f.linkWerkgroepenCircles}</Link>
               </li>
               <li>
                 <Link href={`${base}/over-vtk`}>{f.linkAbout}</Link>
@@ -111,6 +115,16 @@ export async function Footer({ locale }: { locale: Locale }) {
               <li>
                 <a href="https://www.linkedin.com/company/vtk-leuven" rel="noopener noreferrer" target="_blank">
                   {f.linkLinkedIn}
+                </a>
+              </li>
+              <li>
+                <a href="https://www.youtube.com/@VTKLeuven" rel="noopener noreferrer" target="_blank">
+                  {f.linkYouTube}
+                </a>
+              </li>
+              <li>
+                <a href="https://www.tiktok.com/@vtkleuven" rel="noopener noreferrer" target="_blank">
+                  {f.linkTikTok}
                 </a>
               </li>
             </ul>
