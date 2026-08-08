@@ -144,6 +144,15 @@ export async function generateAppleWalletPass(input: WalletTicketInput): Promise
     messageEncoding: "iso-8859-1",
   });
   pass.setRelevantDate(input.event.startsAt);
+  // Met een locatie erbij toont iOS de pas op het vergrendelscherm zodra
+  // iemand ter plaatse komt, in plaats van enkel rond het aanvangsuur.
+  if (typeof input.event.latitude === "number" && typeof input.event.longitude === "number") {
+    pass.setLocations({
+      latitude: input.event.latitude,
+      longitude: input.event.longitude,
+      relevantText: input.event.location ? `${input.event.title} · ${input.event.location}` : input.event.title,
+    });
+  }
   // A day of slack after the event: attendees who screenshot-check the pass
   // the morning after shouldn't find it already greyed out.
   pass.setExpirationDate(new Date(input.event.startsAt.getTime() + 24 * 60 * 60 * 1000));

@@ -14,6 +14,11 @@ export type WalletTicketInput = {
     title: string;
     startsAt: Date;
     location: string | null;
+    /** Alleen gezet wanneer het adres van het event geocodeerd kon worden; dan
+     * krijgt de pas een geofence en komt hij bij aankomst vanzelf op het
+     * vergrendelscherm. */
+    latitude?: number | null;
+    longitude?: number | null;
   };
   orderNumber: string;
   currency: string;

@@ -50,6 +50,9 @@ type TicketEventFormValue = {
   descriptionNl?: string | null;
   descriptionEn?: string | null;
   location?: string | null;
+  locationAddress?: string | null;
+  locationLatitude?: number | null;
+  locationLongitude?: number | null;
   startsAt?: Date;
   endsAt?: Date;
   salesStartAt?: Date | null;
@@ -256,6 +259,35 @@ export function TicketEventForm({
               <div className="ticket-admin-field">
                 <label htmlFor="ticket-location">{locale === "nl" ? "Locatie" : "Location"}</label>
                 <input id="ticket-location" name="location" defaultValue={event.location ?? ""} />
+                <small>
+                  {locale === "nl"
+                    ? "De naam die bezoekers zien. Een vrije naam zoals \"Theokot\" mag."
+                    : "The name buyers see. A free-form name such as \"Theokot\" is fine."}
+                </small>
+              </div>
+              <div className="ticket-admin-field">
+                <label htmlFor="ticket-location-address">
+                  {locale === "nl" ? "Adres (optioneel)" : "Address (optional)"}
+                </label>
+                <input
+                  id="ticket-location-address"
+                  name="locationAddress"
+                  defaultValue={event.locationAddress ?? ""}
+                  placeholder={locale === "nl" ? "Studentenwijk Arenberg 6/1, 3001 Heverlee" : "Street 1, 3001 Leuven"}
+                />
+                <small>
+                  {event.locationAddress && event.locationLatitude != null && event.locationLongitude != null
+                    ? locale === "nl"
+                      ? `Coördinaten gevonden (${event.locationLatitude.toFixed(4)}, ${event.locationLongitude.toFixed(4)}): het ticket verschijnt vanzelf op het vergrendelscherm bij aankomst.`
+                      : `Coordinates found (${event.locationLatitude.toFixed(4)}, ${event.locationLongitude.toFixed(4)}): the wallet ticket surfaces on the lock screen on arrival.`
+                    : event.locationAddress
+                      ? locale === "nl"
+                        ? "Geen coördinaten gevonden voor dit adres. Het event werkt gewoon, enkel het automatisch tonen van het walletticket bij aankomst valt weg."
+                        : "No coordinates found for this address. The event works fine; only the automatic lock-screen ticket is unavailable."
+                      : locale === "nl"
+                        ? "Vul dit in om het walletticket automatisch te tonen wanneer iemand ter plaatse komt."
+                        : "Fill this in to surface the wallet ticket automatically when someone arrives."}
+                </small>
               </div>
               <div className="ticket-admin-field" data-span="2">
                 <label htmlFor="ticket-description-nl">Beschrijving (NL)</label>

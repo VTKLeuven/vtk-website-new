@@ -14,6 +14,7 @@ import {
 import { parseEuroAmount } from "@/lib/ticketing/money";
 import { requestTicketRefund } from "@/lib/ticketing/refunds";
 import { slugify } from "@/lib/ticketing/slug";
+import { geocodeAddress } from "@/lib/ticketing/geocode";
 import { localDateTimeToUtc } from "@/lib/ticketing/time";
 import { withSerializableTransaction } from "@/lib/ticketing/transactions";
 import {
@@ -130,6 +131,33 @@ function codeFrom(input: string): string {
 
 function localePath(locale: "nl" | "en", path: string): string {
   return `${locale === "en" ? "/en" : ""}${path}`;
+}
+
+/** Het adresveld is optioneel en dient enkel om coördinaten te krijgen voor de
+ * geofence op een walletticket; de zichtbare locatienaam blijft vrije tekst
+ * ("Theokot"). We zoeken enkel opnieuw op wanneer het adres effectief wijzigde:
+ * anders zou elke opslag van een event Nominatim aanroepen. Mislukt het
+ * opzoeken, dan bewaren we het adres zonder coördinaten (geen geofence) in
+ * plaats van de opslag te laten falen. */
+async function resolveLocationGeo(
+  address: string | null | undefined,
+  event: { locationAddress: string | null; locationLatitude: number | null; locationLongitude: number | null }
+): Promise<{ locationAddress: string | null; locationLatitude: number | null; locationLongitude: number | null }> {
+  const next = address?.trim() || null;
+  if (!next) return { locationAddress: null, locationLatitude: null, locationLongitude: null };
+  if (next === event.locationAddress && event.locationLatitude !== null && event.locationLongitude !== null) {
+    return {
+      locationAddress: next,
+      locationLatitude: event.locationLatitude,
+      locationLongitude: event.locationLongitude,
+    };
+  }
+  const found = await geocodeAddress(next);
+  return {
+    locationAddress: next,
+    locationLatitude: found?.latitude ?? null,
+    locationLongitude: found?.longitude ?? null,
+  };
 }
 
 function refreshTicketEvent(locale: "nl" | "en", eventId: string) {
@@ -271,6 +299,10 @@ export async function createTicketEventAction(formData: FormData): Promise<void>
   const requestedSlug = slugify(value(formData, "slug") || titleNl) || `event-${randomBytes(4).toString("hex")}`;
   const slugExists = await prisma.ticketEvent.findUnique({ where: { slug: requestedSlug } });
   const slug = slugExists ? `${requestedSlug}-${randomBytes(3).toString("hex")}` : requestedSlug;
+  const createdLocationGeo = await resolveLocationGeo(
+    limitedOptionalValue(formData, "locationAddress", 300),
+    { locationAddress: null, locationLatitude: null, locationLongitude: null }
+  );
 
   const event = await prisma.$transaction(async (tx) => {
     const created = await tx.ticketEvent.create({
@@ -283,6 +315,7 @@ export async function createTicketEventAction(formData: FormData): Promise<void>
         descriptionNl: limitedOptionalValue(formData, "descriptionNl", 20_000) ?? calendarEvent?.descriptionNl,
         descriptionEn: limitedOptionalValue(formData, "descriptionEn", 20_000) ?? calendarEvent?.descriptionEn,
         location: limitedOptionalValue(formData, "location", 300) ?? calendarEvent?.location,
+        ...createdLocationGeo,
         startsAt,
         endsAt,
         salesStartAt,
@@ -391,6 +424,10 @@ export async function updateTicketEventAction(formData: FormData): Promise<void>
   if (salesStartAt && salesEndAt && salesEndAt <= salesStartAt) {
     throw new Error("INVALID_SALES_DATES");
   }
+  const locationGeo = await resolveLocationGeo(
+    limitedOptionalValue(formData, "locationAddress", 300),
+    event
+  );
 
   await prisma.$transaction(async (tx) => {
     await tx.ticketEvent.update({
@@ -406,6 +443,7 @@ export async function updateTicketEventAction(formData: FormData): Promise<void>
           ? linked.descriptionEn
           : limitedOptionalValue(formData, "descriptionEn", 20_000),
         location: linked ? linked.location : limitedOptionalValue(formData, "location", 300),
+        ...locationGeo,
         startsAt,
         endsAt,
         salesStartAt,

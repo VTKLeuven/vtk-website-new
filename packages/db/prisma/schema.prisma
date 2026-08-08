@@ -843,7 +843,14 @@ model TicketEvent {
   titleEn               String?
   descriptionNl         String?
   descriptionEn         String?
+  // `location` blijft de vrije naam die bezoekers zien ("Theokot"). Het adres
+  // is optioneel en dient om coördinaten op te zoeken; enkel wanneer die
+  // gevonden zijn, krijgt een walletticket een geofence en komt het vanzelf op
+  // het vergrendelscherm bij aankomst.
   location              String?
+  locationAddress       String?
+  locationLatitude      Float?
+  locationLongitude     Float?
   startsAt              DateTime          @db.Timestamptz(3)
   endsAt                DateTime          @db.Timestamptz(3)
   timeZone              String            @default("Europe/Brussels")

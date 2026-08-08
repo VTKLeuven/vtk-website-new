@@ -40,6 +40,11 @@ export function generateGoogleWalletSaveUrl(input: WalletTicketInput): string {
     dateTime: { start: input.event.startsAt.toISOString() },
     ...(logoUri ? { logo: { sourceUri: { uri: logoUri } } } : {}),
     ...(heroUri ? { heroImage: { sourceUri: { uri: heroUri } } } : {}),
+    // Zelfde bedoeling als Apple's locations: de pas bovenaan laten komen
+    // zodra de bezoeker ter plaatse is.
+    ...(typeof input.event.latitude === "number" && typeof input.event.longitude === "number"
+      ? { locations: [{ latitude: input.event.latitude, longitude: input.event.longitude }] }
+      : {}),
     hexBackgroundColor: design.backgroundColor,
     // New classes start under review; the direct "Save" link already works
     // while that's pending, they just won't surface in Wallet's own search.

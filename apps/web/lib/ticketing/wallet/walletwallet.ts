@@ -76,6 +76,15 @@ export async function generateViaWalletWallet(input: WalletTicketInput): Promise
       color: design.textColor,
       ...(logoURL ? { logoURL } : {}),
       ...(stripURL ? { stripURL } : {}),
+      ...(typeof input.event.latitude === "number" && typeof input.event.longitude === "number"
+        ? {
+            locations: [{
+              latitude: input.event.latitude,
+              longitude: input.event.longitude,
+              relevantText: input.event.location ? `${input.event.title} · ${input.event.location}` : input.event.title,
+            }],
+          }
+        : {}),
       expirationDays,
     }),
   });

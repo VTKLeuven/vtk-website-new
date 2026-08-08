@@ -23,6 +23,8 @@ export function walletInputFromTicket(ticket: ResolvedTicket): WalletTicketInput
       title: order.locale === "EN" && ticket.event.titleEn ? ticket.event.titleEn : ticket.event.titleNl,
       startsAt: ticket.event.startsAt,
       location: ticket.event.location,
+      latitude: ticket.event.locationLatitude,
+      longitude: ticket.event.locationLongitude,
     },
     orderNumber: order.reference,
     currency: order.currency,
