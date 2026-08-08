@@ -14,8 +14,12 @@ Beslist door Maxime op 2026-08-08, voor de uitvoering begon:
 
 - **Alles op één branch**: `site-modernisering`. Niet op `main` committen en niet
   pushen; de acht werkstromen worden in één keer nagekeken en gemerged.
-- **Statistieken**: Plausible, **self-hosted**, mee in `infra/docker-compose.yml`
-  naast Immich. Geen data bij derden, dus geen extra verwerker in het register.
+- **Statistieken**: **self-hosted**, mee in `infra/docker-compose.yml` naast
+  Immich. Geen data bij derden, dus geen extra verwerker in het register.
+  Aanvankelijk Plausible; tijdens WS-7 gewijzigd naar **Umami**, omdat Plausible
+  Community Edition ClickHouse meesleept (1 tot 2 GB geheugen) en deze server al
+  de website, logistiek, drie workers en Immich draait. Umami is een Node-app met
+  enkel Postgres, en die staat er al. Zie `docs/design-decisions.md`.
 - **Contactformulier**: alles naar `info@vtk.be`, één bestemming. Geen routering
   per onderwerp en geen adressentabel.
 
@@ -293,13 +297,14 @@ maximale berichtlengte, en het venster van de snelheidslimiet.
 
 ## WS-7 Bezoekersstatistieken
 
-Er is nu enkel Sentry voor fouten. Het wordt **Plausible, self-hosted**: cookieloos,
-en omdat het op onze eigen infrastructuur draait komt er geen verwerker bij.
+Er is nu enkel Sentry voor fouten. Het wordt **Umami, self-hosted** (eerst
+Plausible, zie "Vastgelegde keuzes"): cookieloos, en omdat het op onze eigen
+infrastructuur draait komt er geen verwerker bij.
 
-- Voeg de Plausible-container toe aan `infra/docker-compose.yml`, in dezelfde
-  stijl als de bestaande diensten daar (eigen volume, healthcheck, en netjes
-  uitgeschakeld wanneer de omgevingsvariabelen leeg zijn, zoals de workers dat
-  doen).
+- Voeg de container toe aan `infra/docker-compose.yml`, in dezelfde stijl als de
+  bestaande diensten daar (healthcheck, en netjes uitgeschakeld wanneer de
+  omgevingsvariabelen leeg zijn, zoals de workers dat doen). Umami deelt de
+  bestaande Postgres en heeft dus geen eigen volume nodig.
 - Laad het script pas volgens de bestaande keuze in `lib/cookie-consent.ts`.
   Zelfs bij een cookieloze aanbieder is dat de veiligste vorm, en het scherm
   bestaat al.
@@ -308,7 +313,8 @@ en omdat het op onze eigen infrastructuur draait komt er geen verwerker bij.
 - Noteer de aanbieder in `docs/privacy-processors.md`, anders klopt het
   verwerkingsregister uit de audit niet meer.
 
-**Test** `test/analytics.test.ts`: geen script zonder toestemming, wel met.
+**Test** `test/analytics.test.ts`: geen script zonder toestemming, wel met, en de
+uitgesloten paden.
 
 **Commit**: "Bezoekersstatistieken, enkel na toestemming".
 
@@ -325,10 +331,10 @@ en omdat het op onze eigen infrastructuur draait komt er geen verwerker bij.
 | WS-5 zoeken | af | `73a1094` (backend), `4edc08f` (UI) |
 | WS-4 next/image | af | `8e04f31` |
 | WS-6 contactformulier | af | `09a7833`, `3783acb` (fix) |
-| **WS-7 statistieken** | **nog te doen** | Plausible self-hosted; niet gestart |
+| WS-7 statistieken | af | `6408d68` (Umami self-hosted) |
 | Integratie | grotendeels af | `bf32d74` |
 
-`npm run verify` is groen: 43 testbestanden, 417 tests, 0 lint-errors.
+`npm run verify` is groen: 44 testbestanden, 456 tests, 0 lint-errors.
 
 ## Op te ruimen bij de integratie (golf 4)
 
