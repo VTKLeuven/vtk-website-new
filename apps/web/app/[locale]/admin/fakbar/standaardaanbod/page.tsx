@@ -13,6 +13,7 @@ import {
 } from "@/lib/fakbar";
 import { FakbarAdminNav } from "../FakbarAdminNav";
 import { FakbarOfferingManager, type OfferingRow } from "./FakbarOfferingManager";
+import { CouponTypeManager, type CouponRow } from "./CouponTypeManager";
 
 /**
  * Standaardaanbod van de Fakbar: elke drank met haar aankoopeenheid, het aantal
@@ -37,9 +38,10 @@ export default async function AdminFakbarStandaardaanbod({
   const canEdit =
     session.user.isSuperAdmin || session.permissions.includes("fakbar.offering.manage");
 
-  const products = await prisma.fakbarProduct.findMany({
-    orderBy: [{ category: "asc" }, { order: "asc" }],
-  });
+  const [products, couponTypes] = await Promise.all([
+    prisma.fakbarProduct.findMany({ orderBy: [{ category: "asc" }, { order: "asc" }] }),
+    prisma.fakbarCouponType.findMany({ where: { active: true }, orderBy: { order: "asc" } }),
+  ]);
 
   const rows: OfferingRow[] = products.map((p) => ({
     id: p.id,
@@ -62,6 +64,43 @@ export default async function AdminFakbarStandaardaanbod({
           <FakbarOfferingManager nl={nl} initial={rows} />
         ) : (
           <ReadOnlyOffering nl={nl} products={products} />
+        )}
+      </Card>
+
+      {/* Bonnen staan hier en niet bij de shift: het is dezelfde soort
+          prijsconfiguratie als het aanbod, en dezelfde persoon beheert ze. Bij
+          het afsluiten van een shift wordt er alleen mee geteld. */}
+      <Card className="p-5">
+        <h2 className="text-lg font-semibold text-vtk-ink">{nl ? "Bonnen" : "Coupons"}</h2>
+        <p className="mt-1 mb-4 max-w-3xl text-sm text-[#5c667f]">
+          {nl
+            ? "Waarmee er aan de toog betaald kan worden naast cash en kaart. Deze types verschijnen als telveld bij het afsluiten van een shift."
+            : "What can be paid with at the counter besides cash and card. These types show up as count fields when a shift is closed."}
+        </p>
+        {canEdit ? (
+          <CouponTypeManager
+            nl={nl}
+            initial={couponTypes.map<CouponRow>((c) => ({
+              id: c.id,
+              name: c.name,
+              valueEuro: centsToEuroInput(c.valueCents),
+            }))}
+          />
+        ) : couponTypes.length === 0 ? (
+          <p className="text-sm text-[#5c667f]">
+            {nl ? "Er zijn nog geen bonnen ingesteld." : "No coupons are configured yet."}
+          </p>
+        ) : (
+          <ul className="space-y-1 text-sm">
+            {couponTypes.map((c) => (
+              <li key={c.id} className="flex justify-between gap-4 border-b border-vtk-blue/10 py-1 last:border-0">
+                <span className="text-vtk-ink">{c.name}</span>
+                <span className="tabular-nums text-[#5c667f]">
+                  {formatEuroCents(c.valueCents, nl)}
+                </span>
+              </li>
+            ))}
+          </ul>
         )}
       </Card>
     </div>

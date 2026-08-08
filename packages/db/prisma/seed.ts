@@ -1512,6 +1512,25 @@ async function main() {
     });
   }
 
+  console.log("Seeding Fakbar coupon types...");
+  // Bonnen waarmee aan de toog betaald kan worden. Namen en waardes zijn maar een
+  // startpunt: de Fakbar-verantwoordelijke past ze aan bij het standaardaanbod.
+  // Create-only, zodat een reseed die aanpassingen niet terugdraait.
+  const fakbarCoupons: Array<{ key: string; name: string; valueCents: number }> = [
+    { key: "shiftbon", name: "Shiftbon", valueCents: 150 },
+    { key: "drankbon", name: "Drankbon", valueCents: 150 },
+    { key: "sponsorbon", name: "Sponsorbon", valueCents: 250 },
+  ];
+  for (let i = 0; i < fakbarCoupons.length; i += 1) {
+    const c = fakbarCoupons[i];
+    const id = `seed-fakbar-coupon-${c.key}`;
+    await prisma.fakbarCouponType.upsert({
+      where: { id },
+      update: {},
+      create: { id, name: c.name, valueCents: c.valueCents, order: i },
+    });
+  }
+
   console.log("Seeding uitleendienst vehicles...");
   // De drie voertuigen van de transportdienst. Tarieven zijn team-configureerbaar
   // via het beheer; de seed zet enkel een redelijk startpunt. Create-only zodat
