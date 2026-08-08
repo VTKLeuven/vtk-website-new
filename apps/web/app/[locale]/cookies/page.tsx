@@ -32,7 +32,7 @@ export default async function CookiePolicyPage({
           ? "This page explains which browser storage VTK uses and how you can change your choice."
           : "Deze pagina legt uit welke browseropslag VTK gebruikt en hoe je jouw keuze aanpast."
       }
-      updated={english ? "Last updated on 18 July 2026." : "Laatst bijgewerkt op 18 juli 2026."}
+      updated={english ? "Last updated on 8 August 2026." : "Laatst bijgewerkt op 8 augustus 2026."}
       sections={
         english
           ? [
@@ -41,8 +41,8 @@ export default async function CookiePolicyPage({
                 body: "These are needed for the service you request and cannot be disabled in our interface:\n• VTK sign-in and security cookies: keep an authenticated session, normally no longer than 30 days\n• ticket access cookies: reopen an order or ticket, until the configured access expiry\n• vtk-logistiek-locale: remembers the language of the logistics site\n• vtk_cookie_consent: remembers this choice for 180 days\nThey are not used for advertising.",
               },
               {
-                heading: "Optional diagnostics",
-                body: "Only after you select “Allow diagnostics”, Sentry may receive browser errors, performance traces and masked session replays. Text is masked and media is blocked in replay. VTK does not intentionally send passwords or form contents. You can withdraw consent at any time through “Cookie settings” in the footer; reloading then stops browser monitoring.",
+                heading: "Optional statistics and diagnostics",
+                body: "Only after you select “Allow statistics and diagnostics” do two things start:\n• visitor statistics with Umami, which VTK runs on its own server. It sets no cookies and reads nothing from your device. It counts page views; to recognise a repeat view within the same day it derives a hash from your IP address, browser and a salt that rotates daily, and your IP address itself is not stored. Admin, scanner and ticket-order pages are never measured, and query strings are stripped.\n• error diagnostics with Sentry: browser errors, performance traces and masked session replays. Text is masked and media is blocked in replay. VTK does not intentionally send passwords or form contents.\nYou can withdraw consent at any time through “Cookie settings” in the footer; reloading then stops both.",
               },
               {
                 heading: "External media",
@@ -54,7 +54,7 @@ export default async function CookiePolicyPage({
               },
               {
                 heading: "Contact",
-                body: "Questions about cookies or diagnostics can be sent to it@vtk.be. More information about all personal-data processing is in the privacy statement.",
+                body: "Questions about cookies, statistics or diagnostics can be sent to it@vtk.be. More information about all personal-data processing is in the privacy statement.",
               },
             ]
           : [
@@ -63,8 +63,8 @@ export default async function CookiePolicyPage({
                 body: "Deze zijn nodig voor de dienst die je vraagt en kan je in onze interface niet uitschakelen:\n• VTK-aanmeld- en beveiligingscookies: houden een aangemelde sessie bij, normaal niet langer dan 30 dagen\n• tickettoegangscookies: openen een bestelling of ticket opnieuw, tot de ingestelde vervaldatum\n• vtk-logistiek-locale: onthoudt de taal van de logistieke site\n• vtk_cookie_consent: onthoudt deze keuze 180 dagen\nZe worden niet voor reclame gebruikt.",
               },
               {
-                heading: "Optionele monitoring",
-                body: "Enkel nadat je “Optionele cookies toestaan” kiest, kan Sentry technische monitoringgegevens ontvangen: browser errors, performance traces and masked session replays. Tekst wordt gemaskeerd en media geblokkeerd in replays. VTK stuurt niet bewust wachtwoorden of formulierinhoud door. Je kan toestemming altijd intrekken via “Cookie-instellingen” in de footer; na herladen stopt de browsermonitoring.",
+                heading: "Optionele statistieken en monitoring",
+                body: "Enkel nadat je “Statistieken en monitoring toestaan” kiest, starten twee dingen:\n• bezoekersstatistieken met Umami, dat VTK op zijn eigen server draait. Het plaatst geen cookies en leest niets van je toestel. Het telt paginaweergaves; om binnen dezelfde dag een herhaalde weergave te herkennen maakt het een hash van je IP-adres, je browser en een zout dat dagelijks wisselt, en je IP-adres zelf wordt niet bewaard. Beheer-, scanner- en ticketbestelpagina's worden nooit gemeten, en querystrings gaan er niet in mee.\n• technische monitoring met Sentry: browserfouten, prestatiemetingen en gemaskeerde sessieopnames. Tekst wordt gemaskeerd en media geblokkeerd in opnames. VTK stuurt niet bewust wachtwoorden of formulierinhoud door.\nJe kan toestemming altijd intrekken via “Cookie-instellingen” in de footer; na herladen stoppen ze allebei.",
               },
               {
                 heading: "Externe media",
@@ -76,7 +76,7 @@ export default async function CookiePolicyPage({
               },
               {
                 heading: "Contact",
-                body: "Vragen over cookies of monitoring kan je sturen naar it@vtk.be. Meer informatie over alle verwerkingen van persoonsgegevens staat in de privacyverklaring.",
+                body: "Vragen over cookies, statistieken of monitoring kan je sturen naar it@vtk.be. Meer informatie over alle verwerkingen van persoonsgegevens staat in de privacyverklaring.",
               },
             ]
       }

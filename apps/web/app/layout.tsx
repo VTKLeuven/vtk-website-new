@@ -1,8 +1,12 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono, Instrument_Serif, Inter } from "next/font/google";
+import Script from "next/script";
+import { cookies, headers } from "next/headers";
 import { getSentryDsn } from "@/lib/runtimeConfig";
 import { CookieConsent } from "@/components/site/CookieConsent";
 import { HTML_LANG, currentLocale } from "@/lib/locale";
+import { analyticsConfigFromEnv, analyticsScript } from "@/lib/analytics";
+import { COOKIE_CONSENT_NAME, parseCookieConsent } from "@/lib/cookie-consent";
 import {
   SITE_DESCRIPTION,
   SITE_LONG_NAME,
@@ -71,6 +75,17 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   // taalvoorvoegsel, ook wanneer de bezoeker op de voorvoegselloze NL-URL zit.
   const locale = await currentLocale();
 
+  // Bezoekersstatistieken (Umami, op onze eigen server). Het script staat er
+  // enkel na een expliciete keuze in de cookiebanner en nooit op de beheer- of
+  // bestelschermen; `lib/analytics.ts` neemt die beslissing. Het pad komt uit
+  // dezelfde `x-pathname`-header als de taal hierboven.
+  const [cookieStore, requestHeaders] = await Promise.all([cookies(), headers()]);
+  const analytics = analyticsScript({
+    config: analyticsConfigFromEnv(),
+    consent: parseCookieConsent(cookieStore.get(COOKIE_CONSENT_NAME)?.value),
+    pathname: requestHeaders.get("x-pathname") ?? "",
+  });
+
   return (
     <html
       lang={HTML_LANG[locale]}
@@ -83,6 +98,20 @@ export default async function RootLayout({ children }: { children: React.ReactNo
               __html: `window.__SENTRY_DSN__=${JSON.stringify(sentryDsn)}`,
             }}
           />
+        )}
+        {analytics && (
+          <>
+            {/* Definieert de filterfunctie voor het tracker-script laadt. */}
+            <script dangerouslySetInnerHTML={{ __html: analytics.filterSource }} />
+            <Script
+              strategy="afterInteractive"
+              src={analytics.src}
+              data-website-id={analytics.websiteId}
+              data-before-send={analytics.beforeSend}
+              data-exclude-search="true"
+              data-exclude-hash="true"
+            />
+          </>
         )}
         {children}
         <CookieConsent />

@@ -1548,3 +1548,58 @@ zichtbaarheidskeuze en geen technische:
   slug van die categorie ooit hernoemd, dan blijft het formulier op `/contact` staan
   terwijl de navigatie naar de nieuwe slug wijst; die pagina laadt de categorie
   daarom op `code` en niet op slug.
+
+---
+
+## Bezoekersstatistieken: Umami op onze eigen server, enkel na toestemming
+
+- **We meten zelf, of we meten niet.** De keuze was van bij het begin
+  self-hosted: het verkeer van bezoekers van een studentenkring hoort niet bij een
+  analytics-bedrijf terecht te komen, en zolang de meting op onze eigen server
+  draait komt er geen verwerker bij in `docs/privacy-processors.md`. Een gehoste
+  variant (Umami Cloud, Plausible Cloud) is dus geen terugvaloptie: dan meten we
+  liever niets.
+- **Umami, en niet Plausible.** De eerste keuze was Plausible Community Edition.
+  Dat is afgevoerd tijdens de uitvoering, om één reden: Plausible slaat zijn
+  events op in ClickHouse en sleept dus naast zijn eigen Postgres ook een
+  ClickHouse-container mee. ClickHouse vraagt in de praktijk 1 tot 2 GB geheugen,
+  en op deze server draaien al de website, de logistiekapp, drie workers en de
+  volledige Immich-stack. Twee zware containers erbij voor het tellen van
+  paginaweergaves staat niet in verhouding. Umami is een Node-app met enkel
+  Postgres, en Postgres staat er al.
+- **Umami deelt de bestaande Postgres.** Het krijgt daar een eigen database
+  (`umami`), geen tweede Postgres-container zoals Immich die heeft. Dat scheelt een
+  instantie om te back-uppen, te upgraden en in de gaten te houden, en de
+  statistiekendata is klein. Gevolg: er is geen apart volume voor Umami; zijn
+  gegevens zitten in `postgres-data`, dus in de bestaande back-up van die database.
+  `POSTGRES_DB` maakt enkel bij een leeg volume een database aan en het volume op
+  de productieserver bestaat al, dus maakt een eenmalige `umami-db-init`-stap in
+  Compose de database aan wanneer ze ontbreekt.
+- **Leeg `UMAMI_APP_SECRET` betekent uit.** Zelfde patroon als de workers: de
+  container draait dan leeg in plaats van in een herstartlus te vallen, en de
+  website laadt geen script zolang `UMAMI_PUBLIC_URL` of `UMAMI_WEBSITE_ID` leeg
+  is. Zo blijft een omgeving zonder statistieken (lokaal, dev) gewoon werken.
+- **Het script laadt pas na een expliciete keuze**, ook al plaatst Umami geen
+  cookies. Dezelfde keuze als voor Sentry en dezelfde knop in de cookiebanner:
+  er is geen tweede schakelaar bijgekomen. Omdat de beslissing server-side valt,
+  herlaadt de banner de pagina na een wijziging; dat deed ze voor Sentry al.
+  De banner en het cookiebeleid noemen nu allebei de statistieken, want een
+  scherm dat enkel over monitoring spreekt terwijl er ook geteld wordt, liegt.
+  De privacyverklaring hoefde niet aangepast: "met wie delen we je gegevens"
+  blijft kloppen, er komt niemand bij.
+- **Paginaweergaves, geen personen.** Geen custom events met persoonsgegevens,
+  geen identificatie van aangemelde leden. Querystrings en fragmenten gaan er niet
+  in mee (`data-exclude-search`, `data-exclude-hash`), want daar zitten tokens en
+  zoektermen in. Umami zelf bewaart geen IP-adres, maar leidt er samen met de
+  user-agent en een dagelijks wisselend zout een hash uit af om een herhaalde
+  weergave binnen dezelfde dag te herkennen; dat staat zo in het cookiebeleid.
+- **`/admin`, `/scan` en `/tickets/bestelling/...` worden niet gemeten.** De eerste
+  twee zijn interne schermen waar bezoekersaantallen niets betekenen; het derde
+  draagt een bestelnummer in het pad, en dat is een persoonsgegeven dat niet in een
+  statistiekendatabase hoort. Dat gebeurt op twee plaatsen tegelijk, want één
+  volstaat niet: de server rendert het script niet op zo'n pagina, en het script
+  krijgt daarnaast een filter mee (`data-before-send`) voor de navigaties die
+  daarna nog in de browser gebeuren. De App Router navigeert immers client-side,
+  dus zonder die filter zou een klik van de homepage naar `/admin` alsnog een
+  paginaweergave opleveren. Beide lagen lezen dezelfde lijst uit
+  `apps/web/lib/analytics.ts`, zodat ze niet uiteen kunnen lopen.

@@ -181,6 +181,77 @@ services:
       retries: 2
       start_period: 90s
 
+  # Umami deelt de bestaande Postgres en krijgt daar een eigen database. Die
+  # verschijnt niet vanzelf: `POSTGRES_DB` geldt enkel bij een leeg volume, en
+  # dat van de productieserver bestaat al. Deze eenmalige stap maakt de database
+  # aan wanneer ze ontbreekt en doet verder niets; de tabellen erin zet Umami
+  # zelf klaar met zijn eigen migraties.
+  umami-db-init:
+    image: postgres:16
+    restart: "no"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      PGHOST: postgres
+      PGUSER: ${POSTGRES_USER:-vtk}
+      PGPASSWORD: ${POSTGRES_PASSWORD:-vtk}
+      PGDATABASE: ${POSTGRES_DB:-vtk}
+      UMAMI_APP_SECRET: ${UMAMI_APP_SECRET:-}
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        if [ -z "$${UMAMI_APP_SECRET:-}" ]; then
+          echo "Umami disabled: UMAMI_APP_SECRET is empty"
+          exit 0
+        fi
+        if psql -tAc "SELECT 1 FROM pg_database WHERE datname = 'umami'" | grep -q 1; then
+          echo "Umami database already present"
+        else
+          createdb umami
+        fi
+
+  # Bezoekersstatistieken op onze eigen infrastructuur: cookieloos, geen
+  # persoonsgegevens, en het script laadt pas na toestemming (zie
+  # apps/web/lib/analytics.ts). Leeg UMAMI_APP_SECRET = uit, zoals bij de
+  # workers hierboven: de container blijft dan leeg draaien in plaats van in een
+  # herstartlus te vallen op een ontbrekend secret.
+  umami:
+    image: ghcr.io/umami-software/umami:3.2.0
+    restart: unless-stopped
+    init: true
+    depends_on:
+      umami-db-init:
+        condition: service_completed_successfully
+    environment:
+      DATABASE_TYPE: postgresql
+      DATABASE_URL: postgresql://${POSTGRES_USER:-vtk}:${POSTGRES_PASSWORD:-vtk}@postgres:5432/umami
+      APP_SECRET: ${UMAMI_APP_SECRET:-}
+      # Umami meldt zich anders bij elke start bij zijn eigen telemetriedienst.
+      # Dat is precies de derde partij die we hier niet willen.
+      DISABLE_TELEMETRY: "1"
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        if [ -z "$${APP_SECRET:-}" ]; then
+          echo "Umami disabled: UMAMI_APP_SECRET is empty"
+          while true; do sleep 3600; done
+        fi
+        exec npm run start-docker
+    ports:
+      # Caddy is de publieke rand; Umami zelf is enkel vanaf de host bereikbaar.
+      - "127.0.0.1:3013:3000"
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - >-
+          test -n "$${APP_SECRET:-}" &&
+          curl -fsS http://localhost:3000/api/heartbeat -o /dev/null
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
+
   immich-server:
     image: ghcr.io/immich-app/immich-server:v3.0.1
     restart: unless-stopped
