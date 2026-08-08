@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useRef, useState } from "react";
 import { Label } from "@vtk/ui";
 import { IconButton } from "@/components/ui/IconButton";
@@ -113,11 +114,14 @@ export function StorageImageField({
         <div className="relative grid aspect-[16/10] w-40 shrink-0 place-items-center overflow-hidden rounded-xl border border-vtk-blue/15">
           {shownUrl ? (
             <>
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
+              {/* De preview is 160px breed; zonder next/image haalt de browser
+                  hier de volledige upload binnen om er een duimnagel van te tonen. */}
+              <Image
                 src={shownUrl}
                 alt=""
-                className={`h-full w-full object-cover ${showingFallback ? "opacity-60" : ""}`}
+                fill
+                sizes="160px"
+                className={`object-cover ${showingFallback ? "opacity-60" : ""}`}
               />
               {showingFallback && (
                 <span className="absolute bottom-1 left-1 rounded-md bg-white/85 px-1.5 py-0.5 text-[11px] font-medium text-[#5c667f]">

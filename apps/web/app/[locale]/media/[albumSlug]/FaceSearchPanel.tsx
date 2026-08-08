@@ -470,6 +470,9 @@ export function FaceSearchPanel({
 
           <div className="vtk-immich-selfie-picker">
             <div className={`vtk-immich-selfie-preview ${previewUrl ? "has-image" : ""}`}>
+              {/* previewUrl is een blob-URL van de foto die de bezoeker net koos;
+                  die bestaat enkel in dit tabblad en valt niet te optimaliseren. */}
+              {/* eslint-disable-next-line @next/next/no-img-element */}
               {previewUrl ? <img src={previewUrl} alt={labels.selectedProfilePhoto} /> : <FileIcon />}
               {file ? (
                 <button

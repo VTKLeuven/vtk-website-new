@@ -77,6 +77,11 @@ function renderNode(node: Node, key: string): ReactNode {
     case "image": {
       const src = (node.attrs?.src as string | undefined) ?? "";
       const alt = (node.attrs?.alt as string | undefined) ?? "";
+      // Legacy tiptap-inhoud: de src staat zo in de opgeslagen JSON en kan net zo
+      // goed een externe URL zijn als een eigen upload. Afmetingen bewaren we niet,
+      // dus next/image heeft hier niets om mee te rekenen. De markdown-renderer
+      // (components/ui/Markdown.tsx) is de opvolger; die gaat via react-markdown.
+      // eslint-disable-next-line @next/next/no-img-element
       return <img key={key} src={src} alt={alt} />;
     }
     case "pdfEmbed": {

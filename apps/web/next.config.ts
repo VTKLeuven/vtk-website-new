@@ -50,6 +50,17 @@ const nextConfig: NextConfig = {
       bodySizeLimit: "50mb",
     },
   },
+  // Er staat hier bewust géén `images`-sleutel. Alles wat via next/image gaat is
+  // een pad op deze host (`/api/media/...` en de statische bestanden onder
+  // `public/`), en daar heeft de optimizer geen `remotePatterns` voor nodig.
+  //
+  // De fotogalerij is de reden dat je hier misschien naar zoekt: die haalt haar
+  // beelden bij Immich Public Proxy, een aparte host uit `GALLERY_PUBLIC_PROXY_URL`.
+  // Die kan hier niet in `remotePatterns`, want de hostname komt uit de omgeving en
+  // verschilt per installatie. Bovendien wijst ze lokaal naar localhost, en Next 16
+  // weigert een upstream die naar een privé-IP resolvet ("resolved to private ip",
+  // 400) tenzij je `dangerouslyAllowLocalIP` aanzet. De galerij houdt dus `<img>`;
+  // Immich levert daar al thumbnails en previews op maat aan.
   async redirects() {
     return [
       {

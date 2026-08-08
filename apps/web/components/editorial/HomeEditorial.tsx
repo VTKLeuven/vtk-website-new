@@ -778,10 +778,9 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
                       <li key={rep.id}>
                         <span className="poc-face">
                           {avatar ? (
-                            // Avatars staan achter /api/media; die route streamt uit
-                            // object storage en next/image hoeft er niet tussen.
-                            // eslint-disable-next-line @next/next/no-img-element
-                            <img src={avatar} alt="" loading="lazy" />
+                            // .poc-face is 64x64 (vtk-home.css); die maat meegeven
+                            // scheelt het verschil met de volledige profielfoto.
+                            <Image src={avatar} alt="" width={64} height={64} />
                           ) : (
                             <span className="poc-initial" aria-hidden="true">
                               {rep.user.name.slice(0, 1).toUpperCase()}

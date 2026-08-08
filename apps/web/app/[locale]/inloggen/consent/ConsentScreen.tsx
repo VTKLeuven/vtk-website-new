@@ -85,6 +85,9 @@ export function ConsentScreen({
     <div className="vtk-auth">
       <div className="vtk-auth-panel">
         {client.logoUri && (
+          // Het logo van een OAuth-client is een vrije URL die de beheerder van die
+          // applicatie opgeeft; die hosts zijn niet op voorhand op te sommen in
+          // remotePatterns, dus next/image kan er niet bij.
           // eslint-disable-next-line @next/next/no-img-element
           <img src={client.logoUri} alt="" className="mx-auto mb-3 h-12 w-12 rounded-xl object-cover" />
         )}
