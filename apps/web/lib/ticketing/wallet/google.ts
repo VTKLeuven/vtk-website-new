@@ -4,7 +4,7 @@ import jwt from "jsonwebtoken";
 import { createTicketCredential } from "../crypto";
 import { formatMoney } from "../money";
 import { ticketDesignSnapshot } from "../design";
-import { absoluteLogoUrl } from "./assets";
+import { absoluteArtworkUrl, absoluteLogoUrl } from "./assets";
 import { googleWalletConfig } from "./config";
 import type { WalletTicketInput } from "./types";
 
@@ -25,6 +25,7 @@ export function generateGoogleWalletSaveUrl(input: WalletTicketInput): string {
   const classId = `${config.issuerId}.vtk-event-${eventId}`;
   const objectId = `${config.issuerId}.vtk-ticket-${input.ticketId}`;
   const logoUri = absoluteLogoUrl(design);
+  const heroUri = absoluteArtworkUrl(design);
   const location = input.event.location || "Locatie wordt nog bevestigd / Location to be confirmed";
   const footer = [design.footerNl, design.footerEn].filter(Boolean).join(" / ");
 
@@ -38,6 +39,7 @@ export function generateGoogleWalletSaveUrl(input: WalletTicketInput): string {
     },
     dateTime: { start: input.event.startsAt.toISOString() },
     ...(logoUri ? { logo: { sourceUri: { uri: logoUri } } } : {}),
+    ...(heroUri ? { heroImage: { sourceUri: { uri: heroUri } } } : {}),
     hexBackgroundColor: design.backgroundColor,
     // New classes start under review; the direct "Save" link already works
     // while that's pending, they just won't surface in Wallet's own search.

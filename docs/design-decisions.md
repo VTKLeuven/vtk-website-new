@@ -1339,6 +1339,17 @@ PDF. Code in `apps/web/lib/ticketing/wallet/`.
   `.env.example`). Geen halfwerkende "Voeg toe aan Wallet"-knop die daarna een
   foutmelding geeft: ontbreekt de configuratie, dan bestaat de knop gewoon niet, net
   als de ticketmail die in dev stil wegvalt zonder `SMTP_HOST`.
+- **Wat er van het ticketontwerp meegaat: kleuren, logo, footer en de hero-foto.**
+  Het *sjabloon* (Classic / Poster / Gesplitst) gaat bewust niet mee: een walletpas
+  heeft een vaste, door iOS/Android opgelegde indeling, dus "foto bovenaan" versus
+  "foto ernaast" bestaat daar niet. De foto zelf heeft wel een vaste plek in beide
+  formaten (Apple's strip-afbeelding, Google's `heroImage`) en wordt daar gebruikt.
+  Op de directe Apple-weg snijden we de foto zelf bij naar 375x144pt (de
+  strip-verhouding voor een eventticket met vierkante barcode) rond hetzelfde
+  focuspunt dat de PDF gebruikt, zodat een staande foto niet blind gecentreerd
+  wordt. walletwallet.dev neemt enkel een URL en stuurt de afbeelding ongesneden
+  door; daar bepaalt het besturingssysteem de uitsnede. Wil je dat gelijktrekken,
+  dan is daar een eigen publieke route nodig die een bijgesneden variant serveert.
 - **Geen push-update-service.** Een pass wordt bij elke download vers opgebouwd uit
   de actuele ticket- en ontwerpgegevens (zoals de PDF), maar er is geen Apple
   Push/webservice-stuk dat een al toegevoegde pass op iemands telefoon achteraf

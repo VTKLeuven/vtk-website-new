@@ -32,3 +32,12 @@ export function absoluteLogoUrl(design: TicketDesignSnapshot): string | null {
   const url = path ? `${base}${path}` : null;
   return url && isPubliclyReachableHost(url) ? url : null;
 }
+
+/** The hero photo, for the banner slot both wallets reserve for one (Apple's
+ * strip image, Google's heroImage). Same reachability rule as the logo. */
+export function absoluteArtworkUrl(design: TicketDesignSnapshot): string | null {
+  if (!design.artwork?.key) return null;
+  const path = publicUrl(design.artwork.key);
+  const url = path ? `${ticketingBaseUrl()}${path}` : null;
+  return url && isPubliclyReachableHost(url) ? url : null;
+}

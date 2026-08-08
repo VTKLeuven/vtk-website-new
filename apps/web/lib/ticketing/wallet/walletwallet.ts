@@ -3,7 +3,7 @@ import "server-only";
 import { createTicketCredential } from "../crypto";
 import { formatMoney } from "../money";
 import { ticketDesignSnapshot } from "../design";
-import { absoluteLogoUrl } from "./assets";
+import { absoluteArtworkUrl, absoluteLogoUrl } from "./assets";
 import { walletWalletConfig } from "./config";
 import type { WalletTicketInput } from "./types";
 
@@ -42,6 +42,7 @@ export async function generateViaWalletWallet(input: WalletTicketInput): Promise
   const expirationDays = Math.min(3650, Math.max(1, daysUntilEvent + 1));
   const footer = [design.footerNl, design.footerEn].filter(Boolean).join(" / ");
   const logoURL = absoluteLogoUrl(design);
+  const stripURL = absoluteArtworkUrl(design);
 
   const response = await fetch(`${API_BASE}/api/passes`, {
     method: "POST",
@@ -74,6 +75,7 @@ export async function generateViaWalletWallet(input: WalletTicketInput): Promise
       colorPreset: "dark",
       color: design.textColor,
       ...(logoURL ? { logoURL } : {}),
+      ...(stripURL ? { stripURL } : {}),
       expirationDays,
     }),
   });

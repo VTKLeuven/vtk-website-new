@@ -43,6 +43,47 @@ function hexToRgbString(value: string): string {
   return `rgb(${(parsed >> 16) & 255}, ${(parsed >> 8) & 255}, ${parsed & 255})`;
 }
 
+/** An event ticket's strip is 375x144pt when the barcode is square, which
+ * ours always is (QR). Apple crops anything off-ratio itself, so do the crop
+ * here instead, honouring the same focal point the PDF uses; otherwise a
+ * portrait photo would be centre-cropped and lose whatever the admin aimed at. */
+const STRIP_ASPECT = 375 / 144;
+
+export async function stripImage(source: Buffer, focalX: number, focalY: number, scale: number): Promise<Buffer> {
+  const { width = 0, height = 0 } = await sharp(source).metadata();
+  if (!width || !height) throw new Error("UNREADABLE_ARTWORK");
+  const cropWidth = Math.min(width, Math.round(height * STRIP_ASPECT));
+  const cropHeight = Math.min(height, Math.round(width / STRIP_ASPECT));
+  const left = Math.round((width - cropWidth) * (focalX / 100));
+  const top = Math.round((height - cropHeight) * (focalY / 100));
+  return sharp(source)
+    .extract({ left, top, width: cropWidth, height: cropHeight })
+    .resize(375 * scale, 144 * scale)
+    .png()
+    .toBuffer();
+}
+
+/** Returns the three strip resolutions, or `null` when the event has no
+ * artwork or it cannot be read: a pass without a strip is a perfectly valid
+ * pass, so bad artwork must never fail the whole download. */
+async function stripImages(design: TicketDesignSnapshot): Promise<Record<string, Buffer> | null> {
+  if (!design.artwork?.key) return null;
+  try {
+    const source = await getObjectBuffer(design.artwork.key);
+    const focalX = design.artwork.focalX ?? 50;
+    const focalY = design.artwork.focalY ?? 50;
+    const [x1, x2, x3] = await Promise.all([
+      stripImage(source, focalX, focalY, 1),
+      stripImage(source, focalX, focalY, 2),
+      stripImage(source, focalX, focalY, 3),
+    ]);
+    return { "strip.png": x1, "strip@2x.png": x2, "strip@3x.png": x3 };
+  } catch (error) {
+    console.warn("Wallet strip artwork unavailable", { key: design.artwork.key, error });
+    return null;
+  }
+}
+
 export function isAppleWalletAvailable(): boolean {
   return appleWalletConfig() !== null;
 }
@@ -59,12 +100,13 @@ export async function generateAppleWalletPass(input: WalletTicketInput): Promise
 
   const design = ticketDesignSnapshot(input.designSnapshot, input.event.id ?? "legacy");
   const logoSource = await loadLogoSource(design);
-  const [icon1x, icon2x, icon3x, logo1x, logo2x] = await Promise.all([
+  const [icon1x, icon2x, icon3x, logo1x, logo2x, strips] = await Promise.all([
     squareIcon(logoSource, 29),
     squareIcon(logoSource, 58),
     squareIcon(logoSource, 87),
     fittedLogo(logoSource, 50),
     fittedLogo(logoSource, 100),
+    stripImages(design),
   ]);
 
   const pass = new PKPass(
@@ -74,6 +116,7 @@ export async function generateAppleWalletPass(input: WalletTicketInput): Promise
       "icon@3x.png": icon3x,
       "logo.png": logo1x,
       "logo@2x.png": logo2x,
+      ...(strips ?? {}),
     },
     {
       wwdr: config.wwdrPem,
