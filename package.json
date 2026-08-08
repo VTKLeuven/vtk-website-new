@@ -8,8 +8,8 @@
   ],
   "scripts": {
     "prepare": "git config core.hooksPath .githooks || true",
-    "verify": "npm run verify:lockfile && npm run verify:types && npm run lint && npm run test --workspace=@vtk/web",
-    "verify:types": "npm exec --workspace=@vtk/web -- next typegen && tsc --noEmit -p apps/web/tsconfig.json",
+    "verify": "npm run verify:lockfile && npm run verify:types && npm run lint && npm run test --workspace=@vtk/web && npm run test --workspace=@vtk/logistiek",
+    "verify:types": "npm run db:generate && npm exec --workspace=@vtk/web -- next typegen && npm exec --workspace=@vtk/logistiek -- next typegen && tsc --noEmit -p apps/web/tsconfig.build.json && tsc --noEmit -p apps/logistiek/tsconfig.build.json",
     "verify:lockfile": "node scripts/check-lockfile-platforms.mjs",
     "dev": "npm run dev --workspace=@vtk/web",
     "build": "npm run build --workspace=@vtk/db && npm run build --workspace=@vtk/web",
@@ -19,7 +19,8 @@
     "db:push": "npm run push --workspace=@vtk/db",
     "db:migrate": "npm run migrate --workspace=@vtk/db",
     "db:seed": "npm run seed --workspace=@vtk/db",
-    "import:praesidium": "dotenv -e .env -- tsx scripts/import-praesidium-history.ts"
+    "import:praesidium": "dotenv -e .env -- tsx scripts/import-praesidium-history.ts",
+    "probe:elixir": "dotenv -e .env -- tsx --conditions=react-server scripts/elixir-probe.ts"
   },
   "engines": {
     "node": ">=20.0.0"
@@ -29,5 +30,10 @@
   },
   "dependencies": {
     "date-fns": "^4.4.0"
+  },
+  "overrides": {
+    "passkit-generator": {
+      "joi": "17.13.4"
+    }
   }
 }

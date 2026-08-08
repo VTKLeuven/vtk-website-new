@@ -51,19 +51,48 @@ export function maintenanceSecret(): string | null {
 }
 
 /**
- * Past de providerstatus toe op een payment-rij. Idempotent: een eindstatus
- * (SUCCEEDED/FAILED/CANCELLED/EXPIRED) wordt nooit meer overschreven.
+ * Past de providerstatus toe op een payment-rij. Idempotent, met één bewuste
+ * uitzondering: een late, provider-bevestigde SUCCEEDED wint altijd van een
+ * eerder lokaal vastgelegde mislukte/geannuleerde/verlopen status.
  */
 export async function applyPaymentStatus(
   paymentId: string,
-  result: Pick<CheckoutStatusResult, 'status' | 'paymentId'>,
+  result: CheckoutStatusResult,
   providerStatus?: string | null
 ): Promise<void> {
   const now = new Date();
   await prisma.$transaction(async (tx) => {
     const payment = await tx.uitleenPayment.findUnique({ where: { id: paymentId } });
     if (!payment) return;
-    if (['SUCCEEDED', 'FAILED', 'CANCELLED', 'EXPIRED'].includes(payment.status)) return;
+    if (payment.status === 'SUCCEEDED') return;
+    // Een provider kan na een lokale cancel/expiry alsnog melden dat het geld
+    // ontvangen is. SUCCEEDED moet zo'n lokale eindstatus mogen overschrijven;
+    // alle andere eindstatussen blijven idempotent.
+    if (
+      ['FAILED', 'CANCELLED', 'EXPIRED'].includes(payment.status) &&
+      result.status !== 'SUCCEEDED'
+    ) return;
+
+    if (payment.providerCheckoutId && result.checkoutId !== payment.providerCheckoutId) {
+      throw new Error('PAYMENT_CHECKOUT_MISMATCH');
+    }
+    if (result.status === 'SUCCEEDED') {
+      const targetId = payment.reservationId ?? payment.transportBookingId;
+      if (payment.provider === 'mollie') {
+        if (result.orderId == null) throw new Error('PAYMENT_ORDER_MISSING');
+        if (result.amountCents == null) throw new Error('PAYMENT_AMOUNT_MISSING');
+        if (result.currency == null) throw new Error('PAYMENT_CURRENCY_MISSING');
+      }
+      if (result.orderId != null && result.orderId !== targetId) {
+        throw new Error('PAYMENT_ORDER_MISMATCH');
+      }
+      if (result.amountCents != null && result.amountCents !== payment.amountCents) {
+        throw new Error('PAYMENT_AMOUNT_MISMATCH');
+      }
+      if (result.currency != null && result.currency.toUpperCase() !== payment.currency.toUpperCase()) {
+        throw new Error('PAYMENT_CURRENCY_MISMATCH');
+      }
+    }
 
     const status: UitleenPaymentStatus =
       result.status === 'SUCCEEDED'
@@ -85,6 +114,57 @@ export async function applyPaymentStatus(
       },
     });
   });
+}
+
+/**
+ * Sluit alle nog levende checkouts voordat de gebruiker het onderliggende
+ * object annuleert. Een providerstatus wordt nog één keer authoritative
+ * opgehaald: blijkt de betaling al gelukt, dan mag de reservatie niet verdwijnen.
+ */
+export async function expireOpenPayments(
+  payments: UitleenPayment[]
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  for (const payment of payments) {
+    if (!['CREATED', 'PENDING'].includes(payment.status)) continue;
+    if (!payment.providerCheckoutId) {
+      await prisma.uitleenPayment.updateMany({
+        where: { id: payment.id, status: { in: ['CREATED', 'PENDING'] } },
+        data: { status: 'CANCELLED', failedAt: new Date() },
+      });
+      continue;
+    }
+
+    try {
+      const gateway = paymentGatewayFor(payment.provider);
+      await gateway.expireCheckout(payment.providerCheckoutId);
+      const result = await gateway.getCheckoutStatus(payment.providerCheckoutId);
+      await applyPaymentStatus(payment.id, result, result.status);
+      if (result.status === 'SUCCEEDED') {
+        return {
+          ok: false,
+          error: 'Deze aanvraag is intussen betaald; mail logistiek@vtk.be om ze te annuleren.',
+        };
+      }
+      if (result.status === 'PENDING') {
+        await prisma.uitleenPayment.updateMany({
+          where: { id: payment.id, status: { in: ['CREATED', 'PENDING'] } },
+          data: { status: 'CANCELLED', failedAt: new Date() },
+        });
+      }
+    } catch {
+      return {
+        ok: false,
+        error: 'De openstaande betaling kon niet veilig geannuleerd worden. Probeer straks opnieuw.',
+      };
+    }
+  }
+
+  const succeeded = await prisma.uitleenPayment.count({
+    where: { id: { in: payments.map((payment) => payment.id) }, status: 'SUCCEEDED' },
+  });
+  return succeeded > 0
+    ? { ok: false, error: 'Deze aanvraag is intussen betaald; mail logistiek@vtk.be om ze te annuleren.' }
+    : { ok: true };
 }
 
 /**

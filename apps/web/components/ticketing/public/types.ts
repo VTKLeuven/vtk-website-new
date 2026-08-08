@@ -64,6 +64,8 @@ export type PublicTicket = {
   checkedInAt?: string | Date | null;
   credential?: string | null;
   pdfUrl?: string | null;
+  walletAppleUrl?: string | null;
+  walletGoogleUrl?: string | null;
 };
 
 export type PublicOrder = {
@@ -111,6 +113,7 @@ export function formatTicketPrice(cents: number, currency: string, locale: "nl" 
 
 export function formatTicketDate(value: string | Date, locale: "nl" | "en") {
   return new Intl.DateTimeFormat(locale === "nl" ? "nl-BE" : "en-BE", {
+    timeZone: "Europe/Brussels",
     weekday: "long",
     day: "numeric",
     month: "long",

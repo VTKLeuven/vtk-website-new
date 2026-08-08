@@ -233,6 +233,22 @@ the design language into the application instead of copying mockup content.
 - Admin: keep pages operationally dense. Forms, tables, and upload/editor
   surfaces should use the same palette and rounded panels without becoming
   decorative.
+  - Below 860px the left column collapses into one button naming the tab you are
+    on, which opens the full grouped list as a panel underneath
+    (`AdminNav` + `vtk-admin.css`). Do not reintroduce the horizontal scroller
+    that was there: fifteen tabs in a scroll strip hide most of the navigation.
+  - **A wide table inside a horizontal scroller must have a positioned wrapper.**
+    `sr-only` is `position: absolute`; without a positioned ancestor it anchors
+    on the page instead of on the table, lands at the x of its column, and a
+    phone zooms the whole page out to show that one invisible pixel. This is why
+    `.vtk-admin-main .overflow-x-auto` and `.ticket-admin-table-wrap` carry
+    `position: relative`. It cost an afternoon on /admin/tickets and the
+    bonnetjes tab.
+  - Below `sm` the admin CSS puts every field of a `flex flex-wrap items-end`
+    filter row on its own full-width line: the fixed widths (`w-44`, `w-56`) and
+    the `ml-auto` button are meant for a wide column. Rows of unlabelled inputs
+    (the Theokot offering editor) need a per-field label on narrow screens; the
+    column headings above the table are hidden there.
 
 ## Implementation Constraints
 

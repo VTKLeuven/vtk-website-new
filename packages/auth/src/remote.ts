@@ -25,6 +25,7 @@ export async function fetchSession(headers: Headers): Promise<SessionPayload | n
     const res = await fetch(`${mainUrl}/api/auth/remote/session`, {
       headers: { cookie: cookieHeader },
       cache: 'no-store',
+      signal: AbortSignal.timeout(5_000),
     });
     if (!res.ok) return null;
     return (await res.json()) as SessionPayload;

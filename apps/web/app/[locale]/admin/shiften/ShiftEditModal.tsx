@@ -1,15 +1,15 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
-import { format } from "date-fns";
 import type { Locale } from "@vtk/i18n";
 import { Button, Card, FormError, Input, Label, Select, Textarea } from "@vtk/ui";
 import { useToast } from "@/components/ui/toast";
 import { MarkdownEditor } from "@/components/editor/MarkdownEditor";
+import { utcToLocalDateTime } from "@/lib/ticketing/time";
 import type { AdminParticipant, AdminShift } from "./ShiftAdmin";
 
 type SearchUser = { id: string; name: string; email: string; rNumber: string | null };
 
-const toLocalInput = (d: Date) => format(d, "yyyy-MM-dd'T'HH:mm");
+const toLocalInput = (date: Date) => utcToLocalDateTime(date);
 
 export function ShiftEditModal({
   locale,

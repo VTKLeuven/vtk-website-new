@@ -5,12 +5,11 @@ import { requirePermission } from "@/lib/session";
 import type { Locale } from "@vtk/i18n";
 import { announcementStatus } from "@/lib/announcements";
 import { AnnouncementsManager, type AnnouncementRow } from "./AnnouncementsManager";
+import { utcToLocalDateTime } from "@/lib/ticketing/time";
 
 /** "YYYY-MM-DDTHH:mm" voor een datetime-local-veld, in serverzone (Brussel). */
 function toLocalInput(date: Date | null): string {
-  if (!date) return "";
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+  return date ? utcToLocalDateTime(date) : "";
 }
 
 export default async function AdminAnnouncements({
@@ -31,6 +30,7 @@ export default async function AdminAnnouncements({
 
   const now = new Date();
   const dateFormat = new Intl.DateTimeFormat(nl ? "nl-BE" : "en-GB", {
+    timeZone: "Europe/Brussels",
     day: "2-digit",
     month: "short",
     year: "numeric",

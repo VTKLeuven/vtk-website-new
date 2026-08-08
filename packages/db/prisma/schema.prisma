@@ -386,6 +386,8 @@ model User {
   theokotVouchersProcessed  TheokotVoucherRedemption[] @relation("TheokotVoucherProcessedBy")
   theokotBans               TheokotBan[]
 
+  pianoReservations PianoReservation[]
+
   uitleenReservations     UitleenReservation[]      @relation("UitleenReservationUser")
   uitleenDecided          UitleenReservation[]      @relation("UitleenDecidedBy")
   uitleenPickedUp         UitleenReservation[]      @relation("UitleenPickedUpBy")
@@ -844,7 +846,14 @@ model TicketEvent {
   titleEn               String?
   descriptionNl         String?
   descriptionEn         String?
+  // `location` blijft de vrije naam die bezoekers zien ("Theokot"). Het adres
+  // is optioneel en dient om coördinaten op te zoeken; enkel wanneer die
+  // gevonden zijn, krijgt een walletticket een geofence en komt het vanzelf op
+  // het vergrendelscherm bij aankomst.
   location              String?
+  locationAddress       String?
+  locationLatitude      Float?
+  locationLongitude     Float?
   startsAt              DateTime          @db.Timestamptz(3)
   endsAt                DateTime          @db.Timestamptz(3)
   timeZone              String            @default("Europe/Brussels")
@@ -1155,6 +1164,9 @@ model Ticket {
   checkedInById     String?
   voidedAt          DateTime?    @db.Timestamptz(3)
   refundedAt        DateTime?    @db.Timestamptz(3)
+  // Immutable copy of the published ticket design at issue time. Existing
+  // tickets deliberately remain null and use the Classic renderer fallback.
+  designSnapshot    Json?
 
   event       TicketEvent     @relation(fields: [eventId], references: [id], onDelete: Restrict)
   orderItem   TicketOrderItem @relation(fields: [orderItemId, eventId], references: [id, eventId], onDelete: Restrict)
@@ -1602,6 +1614,7 @@ model TheokotSession {
   weeklySpecialLabelNl String? // welk broodje deze week "van de week" is
   weeklySpecialLabelEn String?
   processedAt          DateTime? // wanneer no-shows verwerkt zijn (idempotentie)
+  processingStartedAt  DateTime? // lease/claim voor een actieve no-show-worker
   createdById          String?
   createdAt            DateTime  @default(now())
   updatedAt            DateTime  @updatedAt
@@ -1610,6 +1623,7 @@ model TheokotSession {
   orders TheokotOrder[]
 
   @@index([date])
+  @@index([processedAt, isOpen, pickupEnd])
 }
 
 /// Aanbod van één sessie (snapshot van een product op het moment van aanmaken).
@@ -1642,6 +1656,7 @@ model TheokotOrder {
   updatedAt    DateTime           @updatedAt
   pickedUpAt   DateTime?
   pickedUpById String? // wie aan de balie op "opgehaald" drukte
+  noShowProcessedAt DateTime? // mail + eventuele ban voor deze order afgewerkt
 
   session           TheokotSession            @relation(fields: [sessionId], references: [id], onDelete: Cascade)
   user              User                      @relation("TheokotOrderUser", fields: [userId], references: [id], onDelete: Cascade)
@@ -1652,6 +1667,7 @@ model TheokotOrder {
   @@unique([sessionId, userId])
   @@index([userId])
   @@index([status])
+  @@index([status, noShowProcessedAt])
 }
 
 /// Auditrij wanneer een student aan de afhaalbalie twee nog openstaande
@@ -1845,6 +1861,74 @@ model FakbarShiftCoupon {
 
   @@unique([shiftId, couponTypeId])
   @@index([shiftId])
+}
+
+// -----------------------------------------------------------------------------
+// Piano (lokaal 01.52 in het kasteel). Leden reserveren zelf een tijdslot. De
+// slots bestaan niet als rijen: ze worden berekend uit de terugkerende vensters
+// (`PianoWindow`) min de sluitingsdagen (`PianoClosure`), zodat een venster van
+// een heel academiejaar één rij is in plaats van duizend. Enkel een geboekt slot
+// krijgt een rij (`PianoReservation`). Zie docs/design-decisions.md.
+// -----------------------------------------------------------------------------
+
+/// Terugkerend venster waarin de piano vrij is, bv. "elke ma/di/do 19u-22u van
+/// week 39 t.e.m. week 21". Meerdere vensters mogen naast elkaar bestaan; de
+/// slotgenerator neemt hun unie.
+model PianoWindow {
+  id      String  @id @default(cuid())
+  labelNl String
+  labelEn String?
+
+  /// ISO-weekdagen waarop dit venster geldt: 1 = maandag ... 7 = zondag.
+  weekdays Int[]
+  /// Begin en einde als minuten sinds middernacht (Brussel-wandklok), zodat het
+  /// venster in zomer- én winteruur op hetzelfde uur op de klok staat.
+  startMinute Int
+  endMinute   Int
+
+  /// Geldigheidsperiode als lokale middernacht, beide grenzen inclusief.
+  /// NULL = geen ondergrens respectievelijk geen bovengrens.
+  startDate DateTime?
+  endDate   DateTime?
+
+  active    Boolean  @default(true)
+  order     Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([active])
+}
+
+/// Dagen waarop er niets te reserveren valt, ook al valt er een venster over:
+/// sluitingsdagen van de KU Leuven, of de piano die in herstelling is.
+model PianoClosure {
+  id String @id @default(cuid())
+
+  /// Lokale middernacht, beide grenzen inclusief (één dag = start == eind).
+  startDate DateTime
+  endDate   DateTime
+  reasonNl  String
+  reasonEn  String?
+  createdAt DateTime @default(now())
+
+  @@index([startDate, endDate])
+}
+
+/// Eén geboekt slot. `startsAt` is uniek: de piano is er maar één, dus een slot
+/// is bezet of vrij. Annuleren verwijdert de rij; er is bewust geen historiek,
+/// want er hangt geen geld of sanctie aan een pianoreservatie.
+model PianoReservation {
+  id        String   @id @default(cuid())
+  userId    String
+  startsAt  DateTime
+  endsAt    DateTime
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([startsAt])
+  @@index([startsAt])
+  @@index([userId, startsAt])
 }
 
 // -----------------------------------------------------------------------------

@@ -5,12 +5,42 @@ import { newStorageKey, putObject } from "@vtk/storage";
 import { publicUrl } from "@/lib/storage";
 import { requireSession } from "@/lib/session";
 import { hasPermission } from "@vtk/auth";
+import {
+  readLimitedFormData,
+  RequestBodyTooLargeError,
+} from "@/lib/ticketing/http";
+
+const MAX_REQUEST_BYTES = 46 * 1024 * 1024;
+const MAX_BYTES_BY_KIND = {
+  image: 45 * 1024 * 1024,
+  logo: 10 * 1024 * 1024,
+  tile: 2 * 1024 * 1024,
+  pdf: 40 * 1024 * 1024,
+  file: 40 * 1024 * 1024,
+} as const;
+
+type UploadKind = keyof typeof MAX_BYTES_BY_KIND;
+
+function uploadKind(value: FormDataEntryValue | null): UploadKind | null {
+  return typeof value === "string" && value in MAX_BYTES_BY_KIND
+    ? (value as UploadKind)
+    : null;
+}
 
 export async function POST(request: Request) {
   const session = await requireSession();
-  const form = await request.formData();
+  let form: FormData;
+  try {
+    form = await readLimitedFormData(request, MAX_REQUEST_BYTES);
+  } catch (error) {
+    if (error instanceof RequestBodyTooLargeError) {
+      return NextResponse.json({ error: "too_large" }, { status: 413 });
+    }
+    return NextResponse.json({ error: "invalid_form" }, { status: 400 });
+  }
   const file = form.get("file");
-  const kind = (form.get("kind") as string) || "file";
+  const kind = uploadKind(form.get("kind") ?? "file");
+  if (!kind) return NextResponse.json({ error: "invalid_kind" }, { status: 400 });
   const canUpload =
     session.user.isSuperAdmin ||
     hasPermission(session, "pages.edit") ||
@@ -55,7 +85,7 @@ export async function POST(request: Request) {
 
   // Een tegellogo van meer dan 2 MB is altijd een vergissing; elk lid kan deze
   // route bereiken, dus hier hoort een plafond.
-  if (tileUpload && file.size > 2 * 1024 * 1024) {
+  if (file.size > MAX_BYTES_BY_KIND[kind]) {
     return NextResponse.json({ error: "too_large" }, { status: 413 });
   }
 
@@ -70,55 +100,57 @@ export async function POST(request: Request) {
   if (kind === "image") {
     prefix = "images";
     try {
-      body = await sharp(bytes).rotate().jpeg({ quality: 86, mozjpeg: true }).toBuffer();
+      body = await sharp(bytes, { failOn: "error", limitInputPixels: 40_000_000 })
+        .rotate()
+        .jpeg({ quality: 86, mozjpeg: true })
+        .toBuffer();
       contentType = "image/jpeg";
+      outputName = "image.jpg";
     } catch {
-      /* fall back to raw bytes */
+      return NextResponse.json({ error: "invalid_image" }, { status: 415 });
     }
   } else if (kind === "logo") {
     // Logo's moeten transparantie behouden: JPEG kent geen alfakanaal en sharp
     // plakt die dan op zwart, wat een zwart blok oplevert op een witte tegel.
     prefix = "logos";
-    if (contentType === "image/svg+xml") {
-      // SVG blijft as-is: al klein en schaalt scherp mee.
-    } else {
-      try {
-        body = await sharp(bytes)
-          .rotate()
-          .resize({ width: 600, height: 200, fit: "inside", withoutEnlargement: true })
-          .png()
-          .toBuffer();
-        contentType = "image/png";
-        outputName = "logo.png";
-      } catch {
-        /* fall back to raw bytes */
-      }
+    try {
+      body = await sharp(bytes, { failOn: "error", limitInputPixels: 40_000_000 })
+        .rotate()
+        .resize({ width: 600, height: 200, fit: "inside", withoutEnlargement: true })
+        .png()
+        .toBuffer();
+      contentType = "image/png";
+      outputName = "logo.png";
+    } catch {
+      return NextResponse.json({ error: "invalid_image" }, { status: 415 });
     }
   } else if (kind === "tile") {
     // Zelfde redenering als bij "logo": een tegellogo staat op een gekleurde
     // chip, dus transparantie moet blijven. De chip is 40px, dus 128px volstaat
     // ook op een retina-scherm en houdt de bucket klein.
     prefix = "tiles";
-    if (contentType === "image/svg+xml") {
-      // SVG blijft as-is: al klein en schaalt scherp mee.
-    } else {
-      try {
-        body = await sharp(bytes)
-          .rotate()
-          .resize({ width: 128, height: 128, fit: "inside", withoutEnlargement: true })
-          .png()
-          .toBuffer();
-        contentType = "image/png";
-        outputName = "tile.png";
-      } catch {
-        /* fall back to raw bytes */
-      }
+    try {
+      body = await sharp(bytes, { failOn: "error", limitInputPixels: 20_000_000 })
+        .rotate()
+        .resize({ width: 128, height: 128, fit: "inside", withoutEnlargement: true })
+        .png()
+        .toBuffer();
+      contentType = "image/png";
+      outputName = "tile.png";
+    } catch {
+      return NextResponse.json({ error: "invalid_image" }, { status: 415 });
     }
   } else if (kind === "pdf") {
+    if (!bytes.subarray(0, 5).equals(Buffer.from("%PDF-"))) {
+      return NextResponse.json({ error: "invalid_pdf" }, { status: 415 });
+    }
     prefix = "pdfs";
     contentType = "application/pdf";
   } else {
     prefix = "files";
+    // User-controlled MIME types are unsafe when later served from our own
+    // origin. Generic files are always downloaded as opaque bytes.
+    contentType = "application/octet-stream";
   }
 
   const key = newStorageKey(prefix, outputName ?? file.name);

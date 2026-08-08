@@ -50,17 +50,56 @@
   text-transform: uppercase;
 }
 
-.vtk-admin-nav {
+/* Smal scherm: de nav is een uitklapbaar paneel achter één knop. */
+.vtk-admin-nav-toggle {
+  appearance: none;
+  width: 100%;
   display: flex;
-  gap: 6px;
-  overflow-x: auto;
-  padding-bottom: 6px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 11px 16px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--ink);
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.vtk-admin-nav-toggle-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.vtk-admin-nav {
+  display: none;
+  flex-direction: column;
+  gap: 2px;
+  margin-top: 8px;
+  padding: 8px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: var(--surface);
+}
+
+.vtk-admin-nav.is-open {
+  display: flex;
 }
 
 @media (min-width: 860px) {
+  .vtk-admin-nav-toggle {
+    display: none;
+  }
+
   .vtk-admin-nav {
     display: flex;
     flex-direction: column;
+    gap: 6px;
+    margin-top: 0;
     /* Bewust geen `overflow-y`/`max-height`: de nav mag hoger zijn dan het
      * scherm, useSmartSticky zorgt dat je alles bereikt zonder tweede
      * scrollbalk. */
@@ -94,16 +133,10 @@
   font-weight: 600;
 }
 
-/* Ledenbeheer-groep.
-   Smal scherm: de sub-items vallen terug op losse pillen in de horizontale
-   scroller (`.vtk-admin-nav-flat` = display:contents), het groepsblok is
-   verborgen. Breed scherm: omgekeerd (inklapbare groep in de kolom-nav). */
-.vtk-admin-nav-flat {
-  display: contents;
-}
-
+/* Groep (Ledenbeheer, Website, ...): inklapbare kop met de tabs eronder. Dit
+   werkt op elke schermbreedte; smal zit het gewoon in het uitklappaneel. */
 .vtk-admin-nav-group {
-  display: none;
+  display: block;
 }
 
 .vtk-admin-nav-group-toggle {
@@ -159,13 +192,16 @@
   font-size: 12.5px;
 }
 
-@media (min-width: 860px) {
-  .vtk-admin-nav-flat {
-    display: none;
+/* In het uitklappaneel op een telefoon zijn dit aanraakdoelen, geen muispillen. */
+@media (max-width: 859px) {
+  .vtk-admin-nav a,
+  .vtk-admin-nav-group-toggle {
+    padding: 11px 12px;
+    font-size: 14px;
   }
 
-  .vtk-admin-nav-group {
-    display: block;
+  .vtk-admin-nav a.vtk-admin-nav-sublink {
+    font-size: 13.5px;
   }
 }
 
@@ -195,7 +231,12 @@
 .vtk-admin-main p,
 .vtk-admin-main .text-zinc-500,
 .vtk-admin-main .text-zinc-600,
-.vtk-admin-main .text-zinc-700 {
+.vtk-admin-main .text-zinc-700,
+/* `text-vtk-blue-muted` is de papierkleur (#EFF2F8), bedoeld als achtergrond.
+   Op een witte kaart is die tekst onzichtbaar: "0 evenementen", de feed-link en
+   "Nog niets gekozen" stonden er wel, maar je zag ze niet. Op een <p> viel dat
+   niet op omdat de regel hierboven die toch al overschreef. */
+.vtk-admin-main .text-vtk-blue-muted {
   color: var(--muted) !important;
 }
 
@@ -214,6 +255,15 @@
   width: 100%;
   border-collapse: collapse;
   font-size: 14px;
+}
+
+/* Een zijwaartse scrollcontainer is zelf het positie-anker. Tabellen erin
+   dragen `sr-only`-labels, en die zijn absoluut gepositioneerd: zonder
+   gepositioneerde ouder ankeren ze op de pagina i.p.v. op de tabel, landen ze
+   op de x van hun kolom (ver buiten het scherm), en zoomt een telefoon de hele
+   pagina uit om die ene onzichtbare pixel te tonen. */
+.vtk-admin-main .overflow-x-auto {
+  position: relative;
 }
 
 .vtk-admin-main thead,
@@ -337,6 +387,52 @@
 .vtk-admin-main span[class*="bg-vtk-blue/10"] {
   background: var(--paper-2) !important;
   color: var(--ink) !important;
+}
+
+/* -----------------------------------------------------------------------------
+   Telefoon (< sm). Enkel hier: de brede layout blijft ongemoeid.
+   -------------------------------------------------------------------------- */
+
+@media (max-width: 639px) {
+  /* Filter- en actierijen (`flex flex-wrap items-end`) zijn ontworpen voor een
+     brede kolom: vaste veldbreedtes (w-44, w-56, ...) en een `ml-auto`-knop
+     rechts. Op een telefoon past er geen tweede veld naast een eerste, dus
+     krijgt elk veld zijn eigen regel over de volle breedte in plaats van een
+     halve zoekbalk naast een half afgesneden knop. */
+  .vtk-admin-main .flex.flex-wrap.items-end > * {
+    flex: 1 1 100%;
+    min-width: 0;
+    margin-left: 0;
+  }
+
+  .vtk-admin-main
+    .flex.flex-wrap.items-end
+    :is(
+      input:not([type="checkbox"]):not([type="radio"]):not([type="date"]):not([type="time"]):not(
+          [type="datetime-local"]
+        ),
+      select
+    ) {
+    width: 100%;
+  }
+
+  /* Kopregel van een beheerpagina: titel en knoppen onder elkaar in plaats van
+     de knop half buiten het scherm. */
+  .vtk-admin-main .flex.items-center.justify-between:has(> h1) {
+    flex-wrap: wrap;
+  }
+
+  /* `Input` (packages/ui/src/form.tsx) geeft elk veld `w-full` mee, terecht voor
+     tekst en e-mail maar niet voor een datum/tijdveld: "dd/mm/jjjj, --:--" past
+     ruim in een paar honderd pixel. Vol uitgerekt tot de kolombreedte (of, in een
+     filterrij, tot de breedte van de zoekbalk ernaast) oogt dat overdreven breed,
+     met een grote lege vlakte tussen de tekst en het kalender-icoon helemaal
+     rechts. Laat de browser zijn eigen, compacte breedte kiezen in plaats daarvan. */
+  .vtk-admin-main :is(input[type="date"], input[type="time"], input[type="datetime-local"]) {
+    width: auto;
+    max-width: 100%;
+    min-width: 0;
+  }
 }
 
 /* -----------------------------------------------------------------------------

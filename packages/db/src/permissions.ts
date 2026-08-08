@@ -66,6 +66,9 @@ export const PERMISSIONS = [
   { code: "fakbar.manage", labelNl: "Fakbar beheren", labelEn: "Manage Fakbar", category: "fakbar" },
   { code: "fakbar.offering.manage", labelNl: "Standaardaanbod van de Fakbar bewerken", labelEn: "Edit the Fakbar's default offering", category: "fakbar" },
 
+  // Piano (reservaties voor het lokaal in het kasteel)
+  { code: "piano.manage", labelNl: "Piano beheren (uren, sluitingsdagen, reservaties)", labelEn: "Manage the piano (hours, closures, reservations)", category: "piano" },
+
   // Logistiek (uitleendienst op logistiek.vtk.be)
   { code: "logistiek.manage", labelNl: "Uitleendienst beheren (inventaris, aanvragen, camionette)", labelEn: "Manage equipment rental (inventory, requests, van)", category: "logistiek" },
 

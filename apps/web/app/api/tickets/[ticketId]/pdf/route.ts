@@ -1,8 +1,4 @@
-import { cookies, headers } from "next/headers";
-import { getSession } from "@vtk/auth/server";
-import { prisma } from "@vtk/db";
-import { secureTokenHash, verifyOrderAccessToken } from "@/lib/ticketing/crypto";
-import { orderAccessCookieName } from "@/lib/ticketing/access";
+import { resolveAuthorizedTicket } from "@/lib/ticketing/ticketAccess";
 import { generateTicketsPdf } from "@/lib/ticketing/pdf";
 
 export const runtime = "nodejs";
@@ -13,25 +9,9 @@ export async function GET(
   { params }: { params: Promise<{ ticketId: string }> }
 ) {
   const { ticketId } = await params;
-  const [session, cookieStore] = await Promise.all([getSession(await headers()), cookies()]);
-  const ticket = await prisma.ticket.findUnique({
-    where: { id: ticketId },
-    include: {
-      event: true,
-      orderItem: { include: { order: true } },
-    },
-  });
-  if (!ticket) return Response.json({ error: "NOT_FOUND" }, { status: 404 });
-  const order = ticket.orderItem.order;
-  const access = cookieStore.get(orderAccessCookieName(order.id))?.value;
-  const tokenValid = Boolean(
-    access &&
-      order.accessExpiresAt > new Date() &&
-      secureTokenHash(access) === order.accessTokenHash &&
-      verifyOrderAccessToken(access, order.id)
-  );
-  const owner = session?.user.id === order.buyerUserId || session?.user.isSuperAdmin;
-  if (!tokenValid && !owner) return Response.json({ error: "NOT_FOUND" }, { status: 404 });
+  const resolved = await resolveAuthorizedTicket(ticketId);
+  if (!resolved) return Response.json({ error: "NOT_FOUND" }, { status: 404 });
+  const { ticket, order } = resolved;
 
   const locale = order.locale === "EN" ? "en-GB" : "nl-BE";
   const pdf = await generateTicketsPdf({
@@ -49,6 +29,8 @@ export async function GET(
         attendeeName: ticket.orderItem.attendeeName,
         typeName: ticket.orderItem.ticketTypeName,
         unitPriceCents: ticket.orderItem.totalCents,
+        status: ticket.status,
+        designSnapshot: ticket.designSnapshot,
       },
     ],
   });

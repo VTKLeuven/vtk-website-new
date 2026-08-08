@@ -5,6 +5,7 @@ import { z } from "zod";
 import { prisma } from "@vtk/db";
 import { requirePermission } from "@/lib/session";
 import { saveError, saveOk, type SaveState } from "@/lib/saveState";
+import { localDateTimeToUtc } from "@/lib/ticketing/time";
 
 /**
  * Aankondigingen: het bericht dat als modal op de homepage verschijnt. Beheer
@@ -28,8 +29,11 @@ const schema = z.object({
 /** "YYYY-MM-DDTHH:mm" uit een datetime-local-veld; leeg = geen grens. */
 function parseMoment(value: string | undefined): Date | null {
   if (!value) return null;
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? null : date;
+  try {
+    return localDateTimeToUtc(value);
+  } catch {
+    return null;
+  }
 }
 
 function revalidate() {
@@ -62,6 +66,9 @@ export async function saveAnnouncementAction(
   const input = parsed.data;
   const startsAt = parseMoment(input.startsAt);
   const endsAt = parseMoment(input.endsAt);
+  if ((input.startsAt && !startsAt) || (input.endsAt && !endsAt)) {
+    return saveError("INVALID_INPUT");
+  }
   // Een venster dat eindigt voor het begint toont nooit iets; dat is een typfout,
   // geen serverfout, dus het komt als rode toast terug.
   if (startsAt && endsAt && endsAt <= startsAt) return saveError("WINDOW_INVALID");

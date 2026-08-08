@@ -91,6 +91,9 @@ export const HEADER_TABS: Array<{
         labelEn: "Calendar",
         url: "/kalender",
       },
+      // Intern pad: de pianopagina is een eigen route, geen contentpagina onder
+      // deze tab, dus ze komt er niet vanzelf in het uitklapmenu bij.
+      { labelNl: "Piano reserveren", labelEn: "Reserve the piano", url: "/piano" },
     ],
   },
   { code: "THEOKOT", slug: "theokot", labelNl: "Theokot", labelEn: "Theokot", order: 1 },

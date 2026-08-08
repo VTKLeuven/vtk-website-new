@@ -17,6 +17,7 @@ const INTERVAL_MS = 5 * 60 * 1000; // elke 5 minuten
 
 declare global {
   var __theokotNoShowTimer: NodeJS.Timeout | undefined;
+  var __theokotNoShowRunning: boolean | undefined;
 }
 
 export async function register(): Promise<void> {
@@ -43,6 +44,8 @@ export async function register(): Promise<void> {
     // niet gebruik maken van early return, want met npm run dev worden branches niet altijd correct gepruned en anders komen deze functies in de browser bundle terecht
 
     const run = async () => {
+      if (globalThis.__theokotNoShowRunning) return;
+      globalThis.__theokotNoShowRunning = true;
       try {
         const { processDueNoShows } = await import('./lib/theokot-server');
         const result = await processDueNoShows(new Date());
@@ -53,6 +56,8 @@ export async function register(): Promise<void> {
         }
       } catch (err) {
         console.error('[theokot] no-show-verwerking mislukt:', err);
+      } finally {
+        globalThis.__theokotNoShowRunning = false;
       }
     };
 

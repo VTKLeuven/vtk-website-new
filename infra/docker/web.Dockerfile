@@ -23,10 +23,11 @@ RUN npx --yes prisma generate --schema packages/db/prisma/schema.prisma
 RUN npm run build --workspace=@vtk/web
 
 FROM node:${NODE_VERSION}-alpine AS runner
-RUN apk add --no-cache libc6-compat openssl tini
+RUN apk add --no-cache libc6-compat openssl tini tzdata
 WORKDIR /app
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
+ENV TZ=Europe/Brussels
 
 COPY --from=builder /repo/apps/web/.next ./apps/web/.next
 COPY --from=builder /repo/apps/web/public ./apps/web/public

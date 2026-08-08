@@ -452,39 +452,36 @@ export async function adminEditReservationAction(
 ): Promise<ActionResult> {
   await requireManage();
 
-  const existing = await prisma.uitleenReservation.findUnique({
-    where: { id: reservationId },
-    select: { id: true, status: true },
-  });
-  if (!existing) return { ok: false, error: 'Reservatie niet gevonden.' };
-  if (existing.status !== 'REQUESTED' && existing.status !== 'APPROVED') {
-    return { ok: false, error: 'Deze aanvraag kan niet meer bewerkt worden.' };
-  }
-
   // Team-editor beheert de materiaallijnen; flesserke loopt via een eigen flow.
   const built = await buildReservationData({ ...input, flesserkeLines: [] }, null);
   if (!built.ok) return built;
 
-  if (existing.status === 'REQUESTED') {
-    await prisma.$transaction([
-      prisma.uitleenReservationLine.deleteMany({ where: { reservationId } }),
-      prisma.uitleenReservation.update({
-        where: { id: reservationId },
-        data: { ...built.scalars, lines: { create: built.lineCreates } },
-      }),
-    ]);
-    revalidateBeheer();
-    return { ok: true, message: 'Aanvraag bijgewerkt.' };
-  }
+  // Status, betaalstatus, voorraadcontrole en write gebeuren in één serializable
+  // transactie. Zo kan een gelijktijdige goedkeuring/betaling nooit tussen de
+  // controle en de edit komen, en een validatiefout commit geen halve edit.
+  const outcome = await runSerializable(async (tx) => {
+    const existing = await tx.uitleenReservation.findUnique({
+      where: { id: reservationId },
+      select: {
+        status: true,
+        paidOfflineAt: true,
+        payments: { select: { status: true } },
+      },
+    });
+    if (!existing) return { error: 'NOT_FOUND' };
+    if (existing.status !== 'REQUESTED' && existing.status !== 'APPROVED') {
+      return { error: 'LOCKED' };
+    }
+    if (
+      existing.paidOfflineAt ||
+      existing.payments.some((payment) =>
+        ['CREATED', 'PENDING', 'SUCCEEDED'].includes(payment.status),
+      )
+    ) {
+      return { error: 'PAYMENT_LOCKED' };
+    }
 
-  // APPROVED: voorraad hercontroleren na de wijziging, in één transactie.
-  const outcome = await runSerializable(
-    async (tx) => {
-      await tx.uitleenReservationLine.deleteMany({ where: { reservationId } });
-      await tx.uitleenReservation.update({
-        where: { id: reservationId },
-        data: { ...built.scalars, lines: { create: built.lineCreates } },
-      });
+    if (existing.status === 'APPROVED') {
       const reserved = await reservedQuantities(tx, built.scalars.pickupDate, built.scalars.returnDate, {
         excludeReservationId: reservationId,
       });
@@ -497,14 +494,29 @@ export async function adminEditReservationAction(
         const item = byId.get(line.itemId);
         const available = (item?.quantity ?? 0) - (reserved.get(line.itemId) ?? 0);
         if (line.quantity > available) {
-          return { error: `Onvoldoende voorraad voor "${item?.name ?? line.itemName}".` };
+          return { error: `STOCK:${item?.name ?? line.itemName}` };
         }
       }
-      return { error: null };
     }
-  );
 
-  if (outcome.error) return { ok: false, error: outcome.error };
+    await tx.uitleenReservationLine.deleteMany({ where: { reservationId } });
+    await tx.uitleenReservation.update({
+      where: { id: reservationId },
+      data: { ...built.scalars, lines: { create: built.lineCreates } },
+    });
+    return { error: null };
+  });
+
+  if (outcome.error === 'NOT_FOUND') return { ok: false, error: 'Reservatie niet gevonden.' };
+  if (outcome.error === 'LOCKED') {
+    return { ok: false, error: 'Deze aanvraag kan niet meer bewerkt worden.' };
+  }
+  if (outcome.error === 'PAYMENT_LOCKED') {
+    return { ok: false, error: 'Deze aanvraag heeft een actieve of voltooide betaling en kan niet meer gewijzigd worden.' };
+  }
+  if (outcome.error?.startsWith('STOCK:')) {
+    return { ok: false, error: `Onvoldoende voorraad voor "${outcome.error.slice(6)}".` };
+  }
   revalidateBeheer();
   return { ok: true, message: 'Aanvraag bijgewerkt.' };
 }
@@ -545,7 +557,9 @@ export async function approveTransportAction(
 
   const outcome = await runSerializable(
     async (tx) => {
-      const booking = await tx.uitleenTransportBooking.findUnique({ where: { id: bookingId } });
+      const booking = await tx.uitleenTransportBooking.findUnique({
+        where: { id: bookingId },
+      });
       if (!booking) return { error: 'NOT_FOUND' as const };
       if (booking.status !== 'REQUESTED') return { error: 'NOT_REQUESTED' as const };
 
@@ -633,10 +647,21 @@ export async function changeVehicleAction(bookingId: string, vehicleId: string):
 
   const outcome = await runSerializable(
     async (tx) => {
-      const booking = await tx.uitleenTransportBooking.findUnique({ where: { id: bookingId } });
+      const booking = await tx.uitleenTransportBooking.findUnique({
+        where: { id: bookingId },
+        include: { payments: { select: { status: true } } },
+      });
       if (!booking) return { error: 'NOT_FOUND' as const };
       if (booking.status === 'REJECTED' || booking.status === 'CANCELLED' || booking.status === 'COMPLETED') {
         return { error: 'LOCKED' as const };
+      }
+      if (
+        booking.paidOfflineAt ||
+        booking.payments.some((payment) =>
+          ['CREATED', 'PENDING', 'SUCCEEDED'].includes(payment.status),
+        )
+      ) {
+        return { error: 'PAYMENT_LOCKED' as const };
       }
       const vehicle = await tx.uitleenVehicle.findFirst({ where: { id: vehicleId, active: true } });
       if (!vehicle) return { error: 'NO_VEHICLE' as const };
@@ -670,6 +695,9 @@ export async function changeVehicleAction(bookingId: string, vehicleId: string):
   if (outcome.error === 'LOCKED') return { ok: false, error: 'Voor deze rit kan je het voertuig niet meer wisselen.' };
   if (outcome.error === 'NO_VEHICLE') return { ok: false, error: 'Voertuig niet gevonden.' };
   if (outcome.error === 'OVERLAP') return { ok: false, error: 'Dat voertuig is al geboekt op dat moment.' };
+  if (outcome.error === 'PAYMENT_LOCKED') {
+    return { ok: false, error: 'Deze rit heeft een actieve of voltooide betaling en kan niet meer gewijzigd worden.' };
+  }
 
   revalidateBeheer();
   return { ok: true, message: 'Voertuig gewijzigd.' };

@@ -40,16 +40,48 @@ async function eventStats(eventId: string) {
   return { total, checkedIn };
 }
 
+/**
+ * Bovengrens op het offline-manifest. Een jobbeurs of galabal zit rond de 1000 à
+ * 1500 tickets; met deze grens blijft de download onder een paar honderd kilobyte
+ * en blijft ze in het geheugen van een telefoon hanteerbaar. Zit een event
+ * erboven, dan krijgt het toestel geen manifest en blijft het gewoon online
+ * scannen (`manifestComplete: false`), in plaats van met een halve lijst te
+ * werken en geldige tickets te weigeren.
+ */
+const MANIFEST_LIMIT = 5_000;
+
 export async function scannerBootstrap(eventId: string) {
   const { event } = await requireTicketEventCapability(eventId, "SCAN");
-  const [gates, stats] = await Promise.all([
+  const [gates, stats, ticketCount] = await Promise.all([
     prisma.ticketGate.findMany({
       where: { eventId, active: true },
       select: { id: true, name: true },
       orderBy: { name: "asc" },
     }),
     eventStats(eventId),
+    prisma.ticket.count({ where: { eventId, status: "VALID" } }),
   ]);
+
+  // De lijst geldige tickets, zodat een toestel zonder netwerk zelf kan zeggen of
+  // een QR bij dit event hoort. De handtekening kán hier niet gecontroleerd
+  // worden: daarvoor is het servergeheim nodig, en dat op een telefoon zetten
+  // betekent dat wie die telefoon uitleest zelf tickets kan maken. Offline
+  // controleren we dus op lidmaatschap van deze lijst plus het versienummer; de
+  // handtekening wordt alsnog geverifieerd wanneer de scan gesynchroniseerd
+  // wordt.
+  const manifestComplete = ticketCount <= MANIFEST_LIMIT;
+  const tickets = manifestComplete
+    ? await prisma.ticket.findMany({
+        where: { eventId, status: "VALID" },
+        select: {
+          publicCode: true,
+          credentialVersion: true,
+          checkedInAt: true,
+          orderItem: { select: { attendeeName: true, ticketTypeName: true } },
+        },
+      })
+    : [];
+
   return {
     event: {
       id: event.id,
@@ -59,6 +91,18 @@ export async function scannerBootstrap(eventId: string) {
     },
     gates,
     stats,
+    manifest: {
+      complete: manifestComplete,
+      generatedAt: new Date().toISOString(),
+      ticketCount,
+      tickets: tickets.map((ticket) => ({
+        code: ticket.publicCode,
+        version: ticket.credentialVersion,
+        checkedIn: ticket.checkedInAt !== null,
+        name: ticket.orderItem.attendeeName,
+        type: ticket.orderItem.ticketTypeName,
+      })),
+    },
   };
 }
 
@@ -217,6 +261,54 @@ export async function scanTicket(eventId: string, rawInput: unknown) {
     ticket: ticketDto(freshTicket),
     stats: await eventStats(eventId),
   };
+}
+
+/** Hoeveel gequeuede scans één synchronisatie mag meesturen. */
+export const SCAN_BATCH_LIMIT = 100;
+
+export const scanBatchSchema = z.object({
+  scans: z.array(scanRequestSchema).min(1).max(SCAN_BATCH_LIMIT),
+});
+
+/**
+ * Verwerkt een wachtrij offline gemaakte scans.
+ *
+ * Bewust één voor één door hetzelfde `scanTicket` als een gewone scan: die doet
+ * de check-in in een transactie en dedupliceert op `clientScanId`, dus een
+ * synchronisatie die halverwege afbreekt kan gewoon opnieuw. De volgorde blijft
+ * die van de wachtrij, zodat bij twee scans van hetzelfde ticket de eerste
+ * binnenkomt en de tweede als ALREADY_USED terugkomt; dat is precies het
+ * conflict dat de scanner achteraf moet tonen.
+ */
+export async function scanTicketBatch(eventId: string, rawInput: unknown) {
+  const { scans } = scanBatchSchema.parse(rawInput);
+  const results: Array<{
+    clientScanId: string;
+    result: string;
+    ticket?: ReturnType<typeof ticketDto>;
+    error?: string;
+  }> = [];
+
+  for (const scan of scans) {
+    try {
+      const outcome = await scanTicket(eventId, scan);
+      results.push({
+        clientScanId: scan.clientScanId,
+        result: outcome.result,
+        ticket: outcome.ticket,
+      });
+    } catch (error) {
+      // Eén kapotte scan mag de rest van de wachtrij niet blokkeren; het toestel
+      // houdt hem bij en probeert later opnieuw.
+      results.push({
+        clientScanId: scan.clientScanId,
+        result: "ERROR",
+        error: error instanceof Error ? error.message : "UNKNOWN",
+      });
+    }
+  }
+
+  return { results, stats: await eventStats(eventId) };
 }
 
 export async function reverseTicketScan(

@@ -315,6 +315,7 @@
     "shift": "Shiften",
     "theokot": "Theokot",
     "fakbar": "Fakbar",
+    "piano": "Piano",
     "door": "Deur",
     "mailinglists": "Mailinglijsten",
     "it": "IT",
@@ -534,6 +535,67 @@
       "count": "Aantal",
       "noPost": "Geen post",
       "empty": "Je hebt nog geen shiften gedaan."
+    }
+  },
+  "piano": {
+    "title": "Piano reserveren",
+    "subtitle": "Lokaal 01.52 in het kasteel, naast de promotiezaal",
+    "practical": "Praktisch",
+    "facts": {
+      "location": "Waar",
+      "locationValue": "Lokaal 01.52, kasteel Arenberg",
+      "price": "Prijs",
+      "priceValue": "Gratis voor studenten",
+      "letter": "Begeleidende brief",
+      "letterValue": "Af te halen bij de vice in Blok 6 (Studentenwijk Arenberg). Hou ze bij tijdens het spelen.",
+      "limit": "Limiet",
+      "limitOne": "Eén tijdslot per week",
+      "limitMany": "{count} tijdsloten per week",
+      "horizon": "Reserveren kan tot {days} dagen vooruit."
+    },
+    "agenda": {
+      "title": "Kies een tijdslot",
+      "intro": "Klik op een vrij uur om het te reserveren.",
+      "week": "Week van {from} tot {to}",
+      "prev": "← Vorige week",
+      "next": "Volgende week →",
+      "thisWeek": "Deze week",
+      "empty": "Deze week staat de piano niet open.",
+      "emptyHint": "Blader naar een volgende week, of kijk hierboven wanneer de piano vrij is."
+    },
+    "slot": {
+      "taken": "Bezet",
+      "mine": "Jouw slot",
+      "past": "Voorbij",
+      "book": "Reserveer {time}",
+      "booking": "Bezig..."
+    },
+    "mine": {
+      "title": "Jouw reservaties",
+      "empty": "Je hebt nog geen tijdslot gereserveerd.",
+      "cancel": "Annuleren",
+      "confirmTitle": "Reservatie annuleren?",
+      "confirmBody": "Je tijdslot komt weer vrij voor andere studenten. Je kan daarna zelf een ander moment kiezen.",
+      "confirmYes": "Ja, annuleren",
+      "confirmNo": "Behouden",
+      "cancelled": "Je reservatie is geannuleerd."
+    },
+    "login": {
+      "title": "Aanmelden om te reserveren",
+      "body": "Gelieve aan te melden om een tijdslot te reserveren. De uren hieronder zie je ook zonder account."
+    },
+    "toast": {
+      "reserved": "Je tijdslot is gereserveerd."
+    },
+    "error": {
+      "notLoggedIn": "Meld je eerst aan om te reserveren.",
+      "notFound": "Dit tijdslot bestaat niet (meer).",
+      "past": "Dit tijdslot is al begonnen.",
+      "beyondHorizon": "Dit tijdslot ligt te ver in de toekomst.",
+      "taken": "Iemand was je net voor: dit tijdslot is intussen bezet.",
+      "weekLimit": "Je hebt deze week al een tijdslot. Annuleer dat eerst, of kies een volgende week.",
+      "fallback": "Reserveren mislukt. Probeer later opnieuw.",
+      "cancelFailed": "Annuleren mislukt. Probeer later opnieuw."
     }
   }
 }

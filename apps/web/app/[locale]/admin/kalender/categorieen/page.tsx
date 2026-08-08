@@ -60,7 +60,7 @@ export default async function AdminCalendarCategories({
           categories.map((c) => (
             <div key={c.id} className="space-y-2 py-4 first:pt-0 last:pb-0">
               <div className="flex flex-wrap items-center justify-between gap-3">
-                <div className="flex items-center gap-3 text-sm">
+                <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 text-sm">
                   <span
                     aria-hidden
                     className="inline-block size-3 rounded-full"

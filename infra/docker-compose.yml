@@ -142,6 +142,45 @@ services:
       retries: 1
       start_period: 45s
 
+  # Haalt elke 3 minuten de geluidsmeting van 't ElixIr op bij Munisense en
+  # cachet de barstatus. Dit is de enige plek die Munisense aanspreekt: de
+  # website leest enkel de cache, hoeveel bezoekers er ook zijn.
+  elixir-worker:
+    image: curlimages/curl:8.10.1
+    restart: unless-stopped
+    depends_on:
+      web:
+        condition: service_started
+    env_file:
+      - ../.env
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        if [ -z "$${ELIXIR_MAINTENANCE_SECRET:-}" ]; then
+          echo "Elixir worker disabled: ELIXIR_MAINTENANCE_SECRET is empty"
+          while true; do sleep 3600; done
+        fi
+        while true; do
+          if curl --fail --silent --show-error \
+            -X POST \
+            -H "Authorization: Bearer $${ELIXIR_MAINTENANCE_SECRET}" \
+            http://web:3000/api/elixir/maintenance; then
+            date +%s > /tmp/elixir-worker-heartbeat
+          fi
+          sleep 180
+        done
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - >-
+          test -n "$${ELIXIR_MAINTENANCE_SECRET:-}" &&
+          test -f /tmp/elixir-worker-heartbeat &&
+          [ "$$(($$(date +%s) - $$(cat /tmp/elixir-worker-heartbeat)))" -lt 600 ]
+      interval: 60s
+      timeout: 5s
+      retries: 2
+      start_period: 90s
+
   immich-server:
     image: ghcr.io/immich-app/immich-server:v3.0.1
     restart: unless-stopped

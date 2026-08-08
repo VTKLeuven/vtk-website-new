@@ -255,49 +255,65 @@ function OfferingRows({ nl, initial }: { nl: boolean; initial: AdminItem[] }) {
       </div>
 
       {rows.map((row, i) => (
-        <div key={i} className="grid gap-2 sm:grid-cols-[1fr_1fr_5rem_4rem_3rem_2rem] sm:items-center">
+        <div
+          key={i}
+          className="grid gap-2 rounded-xl border border-vtk-blue/10 p-3 sm:grid-cols-[1fr_1fr_5rem_4rem_3rem_2rem] sm:items-center sm:rounded-none sm:border-0 sm:p-0"
+        >
           <input type="hidden" name={`item-${i}-id`} value={row.id} />
-          <Input
-            name={`item-${i}-nameNl`}
-            value={row.nameNl}
-            onChange={(e) => update(i, { nameNl: e.target.value })}
-            placeholder={nl ? "Naam" : "Name"}
-            required
-          />
-          <Input
-            name={`item-${i}-nameEn`}
-            value={row.nameEn}
-            onChange={(e) => update(i, { nameEn: e.target.value })}
-            placeholder={nl ? "Naam (EN)" : "Name (EN)"}
-          />
-          <Input
-            name={`item-${i}-price`}
-            value={row.priceEuro}
-            onChange={(e) => update(i, { priceEuro: e.target.value })}
-            inputMode="decimal"
-          />
-          <Input
-            name={`item-${i}-quantity`}
-            type="number"
-            min={0}
-            value={row.quantity}
-            onChange={(e) => update(i, { quantity: Number(e.target.value) })}
-          />
-          <label className="inline-flex items-center justify-center" title={nl ? "Broodje van de week" : "Sandwich of the week"}>
+          <Cell label={nl ? "Naam (NL)" : "Name (NL)"}>
+            <Input
+              name={`item-${i}-nameNl`}
+              value={row.nameNl}
+              onChange={(e) => update(i, { nameNl: e.target.value })}
+              placeholder={nl ? "Naam" : "Name"}
+              required
+            />
+          </Cell>
+          <Cell label={nl ? "Naam (EN)" : "Name (EN)"}>
+            <Input
+              name={`item-${i}-nameEn`}
+              value={row.nameEn}
+              onChange={(e) => update(i, { nameEn: e.target.value })}
+              placeholder={nl ? "Naam (EN)" : "Name (EN)"}
+            />
+          </Cell>
+          <Cell label={nl ? "Prijs €" : "Price €"}>
+            <Input
+              name={`item-${i}-price`}
+              value={row.priceEuro}
+              onChange={(e) => update(i, { priceEuro: e.target.value })}
+              inputMode="decimal"
+            />
+          </Cell>
+          <Cell label={nl ? "Aantal" : "Qty"}>
+            <Input
+              name={`item-${i}-quantity`}
+              type="number"
+              min={0}
+              value={row.quantity}
+              onChange={(e) => update(i, { quantity: Number(e.target.value) })}
+            />
+          </Cell>
+          <label
+            className="inline-flex items-center gap-2 text-sm sm:justify-center sm:gap-0"
+            title={nl ? "Broodje van de week" : "Sandwich of the week"}
+          >
             <input
               type="checkbox"
               name={`item-${i}-weekly`}
               checked={row.isWeeklySpecial}
               onChange={(e) => update(i, { isWeeklySpecial: e.target.checked })}
             />
+            <span className="sm:hidden">{nl ? "Broodje van de week" : "Sandwich of the week"}</span>
           </label>
           <button
             type="button"
             onClick={() => removeRow(i)}
-            className="text-zinc-400 hover:text-red-600"
-            title={row.hasLines ? (nl ? "Heeft bestellingen — blijft behouden" : "Has orders — kept") : nl ? "Verwijderen" : "Remove"}
+            className="inline-flex items-center gap-2 justify-self-start text-sm text-zinc-400 hover:text-red-600 sm:justify-self-auto"
+            title={row.hasLines ? (nl ? "Heeft bestellingen; blijft behouden" : "Has orders; kept") : nl ? "Verwijderen" : "Remove"}
           >
             ✕
+            <span className="sm:hidden">{nl ? "Verwijderen" : "Remove"}</span>
           </button>
         </div>
       ))}
@@ -305,6 +321,22 @@ function OfferingRows({ nl, initial }: { nl: boolean; initial: AdminItem[] }) {
       <Button type="button" variant="ghost" size="sm" onClick={addRow}>
         + {nl ? "Broodje toevoegen" : "Add sandwich"}
       </Button>
+    </div>
+  );
+}
+
+/**
+ * Eén veld in een aanbodrij. Breed staan de kolomkoppen boven de tabel; smal
+ * staat elk veld onder elkaar en heeft het zijn eigen opschrift nodig, anders
+ * is een rij een stapel naamloze vakjes.
+ */
+function Cell({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="grid gap-1">
+      <span className="text-xs font-semibold uppercase tracking-[0.08em] text-[#5c667f] sm:hidden">
+        {label}
+      </span>
+      {children}
     </div>
   );
 }

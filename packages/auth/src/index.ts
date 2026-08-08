@@ -134,7 +134,13 @@ export function isMemberOfGroup(session: SessionPayload | null | undefined, grou
 // ==============================
 
 export type AuthErrorCode =
-  'UNAUTHENTICATED' | 'FORBIDDEN' | 'INACTIVE_USER' | 'INVALID_INPUT' | 'REMOTE_AUTH_UNAVAILABLE';
+  | 'UNAUTHENTICATED'
+  | 'FORBIDDEN'
+  | 'INACTIVE_USER'
+  | 'INVALID_INPUT'
+  | 'NOT_FOUND'
+  | 'PASSWORD_TOO_SHORT'
+  | 'REMOTE_AUTH_UNAVAILABLE';
 
 export class AuthError extends Error {
   constructor(

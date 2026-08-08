@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import { useActionState } from "react";
 import { toDatetimeLocal, type AdminLocale } from "./format";
+import { AddressPicker } from "./AddressPicker";
 
 const initialState: TicketEventFormActionState = { status: "idle" };
 
@@ -50,6 +51,9 @@ type TicketEventFormValue = {
   descriptionNl?: string | null;
   descriptionEn?: string | null;
   location?: string | null;
+  locationAddress?: string | null;
+  locationLatitude?: number | null;
+  locationLongitude?: number | null;
   startsAt?: Date;
   endsAt?: Date;
   salesStartAt?: Date | null;
@@ -252,11 +256,29 @@ export function TicketEventForm({
             </div>
           )}
           {linkedCalendarEvent ? null : (
+            <div className="ticket-admin-field">
+              <label htmlFor="ticket-location">{locale === "nl" ? "Locatie" : "Location"}</label>
+              <input id="ticket-location" name="location" defaultValue={event.location ?? ""} />
+              <small>
+                {locale === "nl"
+                  ? "De naam die bezoekers zien. Een vrije naam zoals \"Theokot\" mag."
+                  : "The name buyers see. A free-form name such as \"Theokot\" is fine."}
+              </small>
+            </div>
+          )}
+          {/* Het adres hoort bij het ticketevent, niet bij het kalenderevent:
+              het bestaat enkel om de geofence op de walletpas te voeden. Het
+              blijft dus ook staan wanneer titel, locatie en beschrijving van de
+              kalender overgenomen worden; anders was het veld onbereikbaar voor
+              precies de events die aan de kalender hangen. */}
+          <AddressPicker
+            defaultAddress={event.locationAddress}
+            defaultLatitude={event.locationLatitude}
+            defaultLongitude={event.locationLongitude}
+            locale={locale}
+          />
+          {linkedCalendarEvent ? null : (
             <>
-              <div className="ticket-admin-field">
-                <label htmlFor="ticket-location">{locale === "nl" ? "Locatie" : "Location"}</label>
-                <input id="ticket-location" name="location" defaultValue={event.location ?? ""} />
-              </div>
               <div className="ticket-admin-field" data-span="2">
                 <label htmlFor="ticket-description-nl">Beschrijving (NL)</label>
                 <textarea

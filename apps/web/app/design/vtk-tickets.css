@@ -42,7 +42,8 @@
 .ticket-secondary-button,
 .ticket-my-link,
 .ticket-checkout-button,
-.ticket-download-button {
+.ticket-download-button,
+.ticket-wallet-button {
   display: inline-flex;
   min-height: 42px;
   align-items: center;
@@ -1254,6 +1255,26 @@
   background: var(--paper-2);
 }
 
+.ticket-wallet-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.ticket-wallet-button {
+  min-height: 30px;
+  padding: 6px 11px;
+  border: 1px solid var(--line-2);
+  color: var(--ink);
+  font-size: 12px;
+}
+
+.ticket-wallet-button:hover {
+  border-color: var(--ink);
+  background: var(--paper-2);
+}
+
 .ticket-mail-note {
   margin-top: 13px;
   padding: 11px 13px;
@@ -1410,6 +1431,80 @@
   color: white;
   font-size: 12px;
   font-weight: 700;
+}
+
+/* Offline scannen is geen storing meer maar een werkmodus: de banner is
+   informatief in plaats van alarmerend rood. */
+.scanner-offline-banner {
+  background: #74520d;
+}
+
+/* Hoeveel scans nog naar de server moeten, met een knop om het nu te proberen. */
+.scanner-queue-banner {
+  display: flex;
+  min-height: 42px;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 8px 15px;
+  background: #0e1a36;
+  color: white;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.scanner-queue-banner button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 11px;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  border-radius: 999px;
+  background: none;
+  color: inherit;
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.scanner-queue-banner button:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.scanner-queue-banner button:disabled {
+  cursor: default;
+  opacity: 0.55;
+}
+
+/* Offline aanvaard, achteraf toch geweigerd. Blijft staan tot iemand ze wegklikt:
+   dit is precies het geval waar de deurploeg iets mee moet. */
+.scanner-conflict-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 15px;
+  background: #fbecee;
+  color: #7c2430;
+  font-size: 13px;
+}
+
+.scanner-conflict-banner > div {
+  flex: 1;
+  min-width: 0;
+}
+
+.scanner-conflict-banner ul {
+  margin: 4px 0 0;
+  padding-left: 18px;
+}
+
+.scanner-conflict-banner button {
+  flex: none;
+  padding: 4px;
+  border: 0;
+  background: none;
+  color: inherit;
+  cursor: pointer;
 }
 
 .scanner-workspace {
@@ -2328,4 +2423,261 @@
     animation: none;
     transition: none;
   }
+}
+
+/* ---------------------------------------------------------------------------
+   Deelnemers zoeken op naam.
+
+   Voor wie zijn QR kwijt is: je zoekt de naam en checkt die persoon rechtstreeks
+   in. De lijst komt uit het offline-manifest, dus dit werkt ook zonder netwerk.
+   Donker zoals de rest van de scanner, en met rijen die groot genoeg zijn om met
+   een duim te raken.
+   --------------------------------------------------------------------------- */
+
+.scanner-name-list {
+  margin-top: 10px;
+  padding: 13px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  background: #1a1d22;
+}
+
+.scanner-name-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 11px;
+  border: 1px solid rgba(255, 255, 255, 0.17);
+  border-radius: 6px;
+  background: #101216;
+  color: #aeb3bd;
+}
+
+.scanner-name-search input {
+  min-width: 0;
+  flex: 1;
+  min-height: 44px;
+  border: 0;
+  outline: 0;
+  background: none;
+  color: white;
+  font: inherit;
+  font-size: 16px; /* onder 16px zoomt iOS in bij focus */
+}
+
+.scanner-name-search button {
+  flex: none;
+  padding: 6px;
+  border: 0;
+  background: none;
+  color: inherit;
+  cursor: pointer;
+}
+
+.scanner-name-count {
+  margin: 9px 0 0;
+  color: #aeb3bd;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.scanner-name-empty {
+  margin: 14px 0 4px;
+  color: #aeb3bd;
+  font-size: 13px;
+  text-align: center;
+}
+
+.scanner-name-list ul {
+  /* Begrensde hoogte: de lijst mag de camera niet van het scherm duwen. */
+  max-height: 46vh;
+  margin: 8px 0 0;
+  padding: 0;
+  overflow-y: auto;
+  list-style: none;
+  -webkit-overflow-scrolling: touch;
+}
+
+.scanner-name-list li + li {
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.scanner-name-list li > button {
+  display: flex;
+  width: 100%;
+  min-height: 54px;
+  align-items: center;
+  gap: 11px;
+  padding: 9px 4px;
+  border: 0;
+  background: none;
+  color: white;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.scanner-name-list li > button:disabled {
+  cursor: default;
+  opacity: 0.55;
+}
+
+.scanner-name-state {
+  display: grid;
+  width: 30px;
+  height: 30px;
+  flex: none;
+  place-items: center;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.09);
+  color: #aeb3bd;
+}
+
+.scanner-name-list li.is-in .scanner-name-state {
+  background: rgba(23, 107, 77, 0.28);
+  color: #6fd3a6;
+}
+
+.scanner-name-who {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+}
+
+.scanner-name-who strong {
+  overflow: hidden;
+  font-size: 15px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.scanner-name-who small {
+  color: #aeb3bd;
+  font-size: 12px;
+}
+
+.scanner-name-action {
+  flex: none;
+  padding: 5px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.scanner-name-list li.is-in .scanner-name-action {
+  border-color: transparent;
+  color: #6fd3a6;
+}
+
+/* ---------------------------------------------------------------------------
+   Op het beginscherm zetten. Verdwijnt zodra de app geïnstalleerd is of de
+   gebruiker ze wegklikt.
+   --------------------------------------------------------------------------- */
+
+.scanner-install {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 15px;
+  background: #1a1d22;
+  color: #dfe3ea;
+  font-size: 13px;
+}
+
+.scanner-install > span {
+  flex: 1;
+  min-width: 0;
+}
+
+.scanner-install > span svg {
+  display: inline;
+  vertical-align: -2px;
+}
+
+.scanner-install > button {
+  flex: none;
+  padding: 7px 13px;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  border-radius: 999px;
+  background: none;
+  color: inherit;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.scanner-install > button:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.scanner-install-close {
+  border-color: transparent !important;
+  padding: 6px !important;
+  color: #aeb3bd;
+}
+
+/* Keuzescherm van de scanner (/scan): waar het icoon op het beginscherm landt. */
+.scanner-picker-list {
+  list-style: none;
+  margin: 0;
+  padding: 14px;
+  display: grid;
+  gap: 10px;
+}
+
+.scanner-picker-list a {
+  display: grid;
+  gap: 5px;
+  padding: 15px 16px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 14px;
+  background: #16191f;
+  color: #e7eaf0;
+  text-decoration: none;
+}
+
+.scanner-picker-list a:hover,
+.scanner-picker-list a:focus-visible {
+  border-color: rgba(255, 210, 63, 0.5);
+}
+
+.scanner-picker-list strong {
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.scanner-picker-list span {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  color: #a6adbb;
+  font-size: 13px;
+}
+
+.scanner-picker-empty {
+  display: grid;
+  justify-items: center;
+  gap: 9px;
+  margin: 14px;
+  padding: 32px 22px;
+  border: 1px dashed rgba(255, 255, 255, 0.18);
+  border-radius: 16px;
+  color: #a6adbb;
+  text-align: center;
+}
+
+.scanner-picker-empty strong {
+  color: #e7eaf0;
+  font-size: 16px;
+}
+
+.scanner-picker-empty p {
+  max-width: 40ch;
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.55;
 }

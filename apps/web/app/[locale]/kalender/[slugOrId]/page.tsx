@@ -26,6 +26,7 @@ function audienceLabel(audience: string | null, locale: Locale): string {
 function formatDateRange(start: Date, end: Date, locale: Locale, allDay: boolean) {
   const dateLocale = locale === "nl" ? "nl-BE" : "en-GB";
   const day = start.toLocaleDateString(dateLocale, {
+    timeZone: "Europe/Brussels",
     weekday: "long",
     day: "2-digit",
     month: "long",
@@ -33,8 +34,8 @@ function formatDateRange(start: Date, end: Date, locale: Locale, allDay: boolean
   });
   if (allDay) return `${day} · ${locale === "nl" ? "hele dag" : "all day"}`;
 
-  const startTime = start.toLocaleTimeString(dateLocale, { hour: "2-digit", minute: "2-digit" });
-  const endTime = end.toLocaleTimeString(dateLocale, { hour: "2-digit", minute: "2-digit" });
+  const startTime = start.toLocaleTimeString(dateLocale, { timeZone: "Europe/Brussels", hour: "2-digit", minute: "2-digit" });
+  const endTime = end.toLocaleTimeString(dateLocale, { timeZone: "Europe/Brussels", hour: "2-digit", minute: "2-digit" });
   return `${day} · ${startTime} - ${endTime}`;
 }
 
@@ -158,9 +159,9 @@ export default async function CalendarSegmentPage({
           )}
           <dl className="spec">
             <dt>{locale === "nl" ? "Start" : "Start"}</dt>
-            <dd>{event.start.toLocaleString(locale === "nl" ? "nl-BE" : "en-GB")}</dd>
+            <dd>{event.start.toLocaleString(locale === "nl" ? "nl-BE" : "en-GB", { timeZone: "Europe/Brussels" })}</dd>
             <dt>{locale === "nl" ? "Einde" : "End"}</dt>
-            <dd>{event.end.toLocaleString(locale === "nl" ? "nl-BE" : "en-GB")}</dd>
+            <dd>{event.end.toLocaleString(locale === "nl" ? "nl-BE" : "en-GB", { timeZone: "Europe/Brussels" })}</dd>
             <dt>{locale === "nl" ? "Zichtbaarheid" : "Visibility"}</dt>
             <dd>{locale === "nl" ? "Publiek" : "Public"}</dd>
           </dl>

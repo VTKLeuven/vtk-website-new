@@ -1,4 +1,5 @@
-import { Shift } from '@prisma/client';
+import type { Shift } from '@prisma/client';
+import { localDateTimeToUtc } from '@/lib/ticketing/time';
 
 /**
  * De velden die nodig zijn om een shift aan te maken/te valideren.
@@ -44,7 +45,20 @@ function toDate(value: unknown): Date | null {
   if (value instanceof Date) {
     return Number.isNaN(value.getTime()) ? null : value;
   }
-  if (typeof value === 'string' || typeof value === 'number') {
+  if (typeof value === 'string') {
+    try {
+      // datetime-local has no offset. Shift times are Belgian wall-clock times,
+      // independent of the browser or server timezone.
+      if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2})?$/.test(value)) {
+        return localDateTimeToUtc(value);
+      }
+    } catch {
+      return null;
+    }
+    const date = new Date(value);
+    return Number.isNaN(date.getTime()) ? null : date;
+  }
+  if (typeof value === 'number') {
     const date = new Date(value);
     return Number.isNaN(date.getTime()) ? null : date;
   }

@@ -10,10 +10,11 @@
  * beschrijving. Gereserveerd/Beschikbaar uit de sheet worden genegeerd (live
  * berekend). Draai twee keer om de idempotentie te bevestigen (2de run: 0 nieuw).
  */
-import { readFile, utils, type WorkBook, type WorkSheet } from 'xlsx';
+import readExcelFile from 'read-excel-file/node';
 import { prisma } from '@vtk/db';
 
 type Row = Record<string, unknown>;
+type Workbook = Awaited<ReturnType<typeof readExcelFile>>;
 
 function cell(row: Row, ...keys: string[]): string {
   for (const key of keys) {
@@ -64,18 +65,29 @@ async function upsertCategory(name: string, cache: Map<string, string>): Promise
   return id;
 }
 
-function sheetRows(wb: WorkBook, name: string): Row[] | null {
-  const sheet: WorkSheet | undefined = wb.Sheets[name] ?? wb.Sheets[wb.SheetNames.find((n) => n.trim() === name) ?? ''];
+function sheetRows(wb: Workbook, name: string): Row[] | null {
+  const sheet = wb.find((candidate) => candidate.sheet === name)
+    ?? wb.find((candidate) => candidate.sheet.trim() === name);
   if (!sheet) return null;
-  return utils.sheet_to_json<Row>(sheet, { defval: '' });
+  const [headerRow, ...dataRows] = sheet.data;
+  if (!headerRow) return [];
+  const headers = headerRow.map((value) => String(value ?? ''));
+  return dataRows.map((values) =>
+    Object.fromEntries(headers.map((header, index) => [header, values[index] ?? '']))
+  );
 }
 
-async function importMateriaal(wb: WorkBook): Promise<void> {
+async function importMateriaal(wb: Workbook): Promise<void> {
   // Het actuele materiaalblad heet "25-26 " (met spatie); val terug op varianten.
+  const sheetNames = wb.map((sheet) => sheet.sheet);
   const sheetName =
-    wb.SheetNames.find((n) => /^25-?26/.test(n.trim())) ??
-    wb.SheetNames.find((n) => n.toLowerCase().includes('materiaal')) ??
-    wb.SheetNames[0];
+    sheetNames.find((n) => /^25-?26/.test(n.trim())) ??
+    sheetNames.find((n) => n.toLowerCase().includes('materiaal')) ??
+    sheetNames[0];
+  if (!sheetName) {
+    console.warn('Geen materiaalblad gevonden.');
+    return;
+  }
   const rows = sheetRows(wb, sheetName);
   if (!rows) {
     console.warn(`Geen materiaalblad gevonden (${sheetName}).`);
@@ -129,7 +141,7 @@ async function importMateriaal(wb: WorkBook): Promise<void> {
   console.log(`Materiaal (${sheetName}): ${created} nieuw, ${updated} bijgewerkt, ${skipped} overgeslagen.`);
 }
 
-async function importFlesserke(wb: WorkBook): Promise<void> {
+async function importFlesserke(wb: Workbook): Promise<void> {
   const rows = sheetRows(wb, 'Flesserke');
   if (!rows) {
     console.warn('Geen Flesserke-blad gevonden.');
@@ -193,7 +205,7 @@ async function main() {
   const onlyFlesserke = args.includes('--flesserke-only');
   const onlyMateriaal = args.includes('--materiaal-only');
 
-  const wb = readFile(path, { cellDates: true });
+  const wb = await readExcelFile(path);
   if (!onlyFlesserke) await importMateriaal(wb);
   if (!onlyMateriaal) await importFlesserke(wb);
 }

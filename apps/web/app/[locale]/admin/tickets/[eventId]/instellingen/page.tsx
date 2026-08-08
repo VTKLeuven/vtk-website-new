@@ -1,13 +1,15 @@
 import { notFound } from "next/navigation";
 import { prisma } from "@vtk/db";
-import { ListChecks, Package, Settings2 } from "lucide-react";
+import { ListChecks, Package, Palette, Settings2 } from "lucide-react";
 import { hasLocale } from "@/lib/locale";
 import { requireTicketEventCapability } from "@/lib/ticketing/authorization";
 import { TicketEventForm } from "@/components/ticketing/admin/TicketEventForm";
 import { TicketPublishBar } from "@/components/ticketing/admin/TicketPublishBar";
 import { TicketTypeManager } from "@/components/ticketing/admin/TicketTypeManager";
 import { TicketQuestionManager } from "@/components/ticketing/admin/TicketQuestionManager";
+import { TicketDesignManager } from "@/components/ticketing/admin/TicketDesignManager";
 import type { AdminLocale } from "@/components/ticketing/admin/format";
+import { readTicketDesignSettings } from "@/lib/ticketing/design";
 
 export default async function TicketEventSettingsPage({
   params,
@@ -56,6 +58,7 @@ export default async function TicketEventSettingsPage({
         take: 100,
       })
     : [];
+  const ticketDesign = readTicketDesignSettings(event.settings, eventId);
 
   return (
     <div className="ticket-admin-page">
@@ -71,6 +74,7 @@ export default async function TicketEventSettingsPage({
       </div>
       <nav className="ticket-admin-subnav" aria-label={locale === "nl" ? "Instellingsonderdelen" : "Settings sections"}>
         {canManageEvent ? <a href="#event-instellingen"><Settings2 aria-hidden="true" size={15} />{locale === "nl" ? "Event" : "Event"}</a> : null}
+        {canManageEvent ? <a href="#ticketontwerp"><Palette aria-hidden="true" size={15} />{locale === "nl" ? "Ticketontwerp" : "Ticket design"}</a> : null}
         {canManageInventory ? <a href="#ticket-aanbod"><Package aria-hidden="true" size={15} />{locale === "nl" ? "Aanbod" : "Inventory"}</a> : null}
         {canManageEvent ? <a href="#deelnemersvragen"><ListChecks aria-hidden="true" size={15} />{locale === "nl" ? "Vragen" : "Questions"}</a> : null}
       </nav>
@@ -91,6 +95,16 @@ export default async function TicketEventSettingsPage({
               calendarEvents.find((candidate) => candidate.id === event.calendarEventId) ?? null
             }
             hasActiveTicketType={event.ticketTypes.some((ticketType) => ticketType.active)}
+            locale={locale}
+          />
+        </div>
+      ) : null}
+      {canManageEvent ? (
+        <div id="ticketontwerp" className="ticket-admin-anchor-section">
+          <TicketDesignManager
+            eventId={eventId}
+            initialDraft={ticketDesign.draft ?? ticketDesign.published}
+            publishedRevision={ticketDesign.published?.revision}
             locale={locale}
           />
         </div>

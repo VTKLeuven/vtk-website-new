@@ -7,6 +7,7 @@
 import { prisma } from '@vtk/db';
 import { DEFAULT_THEOKOT_CONFIG, parseTheokotConfig, type TheokotConfig } from './theokot';
 import { sendNoShowWarning } from './mail';
+import { withSerializableTransaction } from './ticketing/transactions';
 
 /** Leest `theokot.config` uit de Setting-tabel, aangevuld met defaults. */
 export async function getTheokotConfig(): Promise<TheokotConfig> {
@@ -45,33 +46,39 @@ function sessionDateLabel(date: Date, locale: 'NL' | 'EN'): string {
  * begint en niet meteen opnieuw geband wordt.
  */
 async function applyNoShowConsequences(
-  order: { userId: string; user: { name: string; email: string; locale: 'NL' | 'EN' } },
+  order: { id: string; userId: string; user: { name: string; email: string; locale: 'NL' | 'EN' } },
   sessionDate: Date,
   config: TheokotConfig,
 ): Promise<void> {
-  await sendNoShowWarning(order.user, sessionDateLabel(sessionDate, order.user.locale));
+  await sendNoShowWarning(
+    order.user,
+    sessionDateLabel(sessionDate, order.user.locale),
+    order.id,
+  );
 
-  const lastBan = await prisma.theokotBan.findFirst({
-    where: { userId: order.userId },
-    orderBy: { endsAt: 'desc' },
-  });
-  const since = lastBan ? lastBan.endsAt : new Date(0);
-
-  const noShowCount = await prisma.theokotOrder.count({
-    where: { userId: order.userId, status: 'NO_SHOW', updatedAt: { gt: since } },
-  });
-
-  if (noShowCount < config.noShowThreshold) return;
-  if (await activeBanFor(order.userId)) return;
-
-  const endsAt = new Date(Date.now() + config.banDurationDays * 86400000);
-  await prisma.theokotBan.create({
-    data: {
-      userId: order.userId,
-      reason: `${noShowCount} niet-opgehaalde bestellingen`,
-      endsAt,
-      note: 'Automatisch aangemaakt door de no-show-verwerking.',
-    },
+  await withSerializableTransaction(async (tx) => {
+    const lastBan = await tx.theokotBan.findFirst({
+      where: { userId: order.userId },
+      orderBy: { endsAt: 'desc' },
+    });
+    const since = lastBan ? lastBan.endsAt : new Date(0);
+    const noShowCount = await tx.theokotOrder.count({
+      where: { userId: order.userId, status: 'NO_SHOW', updatedAt: { gt: since } },
+    });
+    if (noShowCount < config.noShowThreshold) return;
+    const active = await tx.theokotBan.findFirst({
+      where: { userId: order.userId, active: true, startsAt: { lte: new Date() }, endsAt: { gt: new Date() } },
+      select: { id: true },
+    });
+    if (active) return;
+    await tx.theokotBan.create({
+      data: {
+        userId: order.userId,
+        reason: `${noShowCount} niet-opgehaalde bestellingen`,
+        endsAt: new Date(Date.now() + config.banDurationDays * 86400000),
+        note: 'Automatisch aangemaakt door de no-show-verwerking.',
+      },
+    });
   });
 }
 
@@ -87,37 +94,75 @@ export async function processDueNoShows(now: Date = new Date()): Promise<{ sessi
   const config = await getTheokotConfig();
   const cutoff = new Date(now.getTime() - config.noShowGraceMinutes * 60000);
 
+  const staleClaim = new Date(now.getTime() - 15 * 60 * 1000);
   const sessions = await prisma.theokotSession.findMany({
-    where: { processedAt: null, isOpen: true, pickupEnd: { lte: cutoff } },
-    include: {
-      orders: {
-        where: { status: 'RESERVED' },
-        include: { user: { select: { name: true, email: true, locale: true } } },
-      },
+    where: {
+      processedAt: null,
+      isOpen: true,
+      pickupEnd: { lte: cutoff },
+      OR: [{ processingStartedAt: null }, { processingStartedAt: { lt: staleClaim } }],
     },
+    select: { id: true },
   });
 
   let noShows = 0;
+  let processedSessions = 0;
 
-  for (const session of sessions) {
-    // Markeer + zet processedAt in één transactie zodat een crash halverwege niet
-    // tot dubbele verwerking leidt.
-    await prisma.$transaction(async (tx) => {
-      if (session.orders.length > 0) {
+  for (const candidate of sessions) {
+    const { count: claimed } = await prisma.theokotSession.updateMany({
+      where: {
+        id: candidate.id,
+        processedAt: null,
+        OR: [{ processingStartedAt: null }, { processingStartedAt: { lt: staleClaim } }],
+      },
+      data: { processingStartedAt: now },
+    });
+    if (claimed === 0) continue;
+
+    try {
+      const session = await prisma.$transaction(async (tx) => {
         await tx.theokotOrder.updateMany({
-          where: { id: { in: session.orders.map((o) => o.id) } },
+          where: { sessionId: candidate.id, status: 'RESERVED' },
           data: { status: 'NO_SHOW' },
         });
-      }
-      await tx.theokotSession.update({ where: { id: session.id }, data: { processedAt: now } });
-    });
+        return tx.theokotSession.findUniqueOrThrow({
+          where: { id: candidate.id },
+          include: {
+            orders: {
+              where: { status: 'NO_SHOW', noShowProcessedAt: null },
+              include: { user: { select: { name: true, email: true, locale: true } } },
+            },
+          },
+        });
+      });
 
-    // Mails + bans ná de commit: een mislukte mail mag de statuswijziging niet terugdraaien.
-    for (const order of session.orders) {
-      noShows += 1;
-      await applyNoShowConsequences(order, session.date, config);
+      for (const order of session.orders) {
+        await applyNoShowConsequences(order, session.date, config);
+        await prisma.theokotOrder.updateMany({
+          where: { id: order.id, noShowProcessedAt: null },
+          data: { noShowProcessedAt: new Date() },
+        });
+        noShows += 1;
+      }
+
+      const remaining = await prisma.theokotOrder.count({
+        where: { sessionId: session.id, status: 'NO_SHOW', noShowProcessedAt: null },
+      });
+      if (remaining === 0) {
+        await prisma.theokotSession.update({
+          where: { id: session.id },
+          data: { processedAt: new Date(), processingStartedAt: null },
+        });
+        processedSessions += 1;
+      }
+    } catch (error) {
+      await prisma.theokotSession.updateMany({
+        where: { id: candidate.id, processedAt: null },
+        data: { processingStartedAt: null },
+      });
+      console.error(`[theokot] no-show sessie ${candidate.id} niet volledig verwerkt:`, error);
     }
   }
 
-  return { sessions: sessions.length, noShows };
+  return { sessions: processedSessions, noShows };
 }

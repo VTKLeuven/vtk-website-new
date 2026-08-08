@@ -219,6 +219,80 @@ halen ze af aan de balie en betalen daar. Post **Theokot** beheert het systeem.
 
 ---
 
+## Piano (lokaal 01.52 in het kasteel)
+
+VTK heeft een eigen piano in lokaal 01.52 van het kasteel, naast de promotiezaal.
+Studenten mogen er gratis op spelen en reserveren daarvoor zelf een tijdslot op
+`/piano`. Op de oude site stond dit op `/reservations/piano`; de afspraken
+(gratis, wekelijks, begeleidende brief) zijn overgenomen, de manier waarop ze
+afgedwongen worden niet helemaal. Zie hieronder.
+
+### Slots bestaan niet als rijen
+
+De uren volgen uit een handvol **terugkerende vensters** (`PianoWindow`, bv. "elke
+ma/di/do 19u-22u van eind september tot eind mei") min de **sluitingsdagen**
+(`PianoClosure`, in de praktijk de sluitingsdagen van de KU Leuven). De concrete
+tijdsloten worden per keer berekend voor de week die op het scherm staat.
+
+- Een academiejaar aan avondslots zou anders duizend rijen zijn die iemand elk
+  jaar opnieuw moet aanmaken. Nu is dat één rij met een begin- en einddatum.
+- De **slotlengte staat in de instellingen**, niet per venster: één piano, één
+  ritme. Wijzig je ze, dan verschuiven de uren op de pagina; reeds gemaakte
+  reservaties blijven op hun oorspronkelijke uur staan.
+- Enkel een **geboekt** slot krijgt een rij (`PianoReservation`), met een unieke
+  index op `startsAt`. De piano is er maar één, dus dubbel boeken hoort in de
+  database te falen en niet enkel in de check vooraf.
+- Annuleren **verwijdert** de rij. Er hangt geen geld en geen sanctie aan een
+  pianoreservatie, dus historiek zou hier enkel ruis zijn (anders dan bij Theokot,
+  waar no-shows tot een ban leiden).
+
+### De weeklimiet is hard, de oude site was zachter
+
+Op vtk.be stond: "One reservation each week will be assigned to you, if you want
+to play more times a week, other students are given priority." Dat veronderstelt
+iemand die de aanvragen manueel verdeelt. Hier is het een **harde limiet**
+(`maxPerWeek`, standaard 1, per ISO-week van maandag tot zondag): een tweede slot
+in dezelfde week wordt geweigerd met de uitleg dat je eerst moet annuleren.
+
+- Bewuste keuze: automatisch toewijzen vraagt een aanvraag-en-verdeel-flow die
+  niemand wil bedienen voor een piano. Wie er echt meer wil op, kan altijd de
+  vice aanspreken; die kan een slot vrijmaken in het beheer.
+- Enkel slots die **nog moeten komen** tellen mee. Een slot dat al gespeeld is
+  blokkeert je week niet meer, want dan zou een annulering achteraf nooit meer
+  helpen.
+- Er is ook een **horizon** (`horizonDays`, standaard 28 dagen): zonder die grens
+  zou één iemand het hele jaar kunnen volboeken.
+
+### De begeleidende brief blijft mensenwerk
+
+De brief die je bij de vice in Blok 6 haalt en aan de bewaking moet kunnen tonen,
+staat in de tekst boven de agenda (`Setting` `piano.info`, Markdown, beheerd via
+`/admin/piano`) en niet in de flow. We controleren niet of iemand ze heeft: dat
+is een afspraak tussen het lid en de vice, geen toestand die de site kent.
+
+### Uren zichtbaar zonder account, reserveren niet
+
+De agenda staat er ook voor wie niet aangemeld is, met een melding erboven; enkel
+het effectief boeken vraagt een aanmelding. Zo kan je nakijken wanneer de piano
+vrij is zonder eerst door de KUL-login te moeten. Dat volgt de oude site
+("Gelieve aan te melden om een slot te reserveren").
+
+### Een sluitingsdag schrapt de reservaties die erin vielen
+
+Wie al geboekt had binnen een periode die achteraf gesloten wordt, houdt anders
+een reservatie over voor een slot dat niet meer bestaat. Het beheerscherm zegt dat
+vooraf; er vertrekt **geen mail**, dus de vice verwittigt die leden zelf.
+
+### Permissies & navigatie
+
+- `piano.manage` — vensters, sluitingsdagen, instellingen, infotekst en het
+  schrappen van andermans reservatie. Hoort bij de vice.
+- De pagina hangt als menu-item onder de **Info**-tab (`HeaderTabLink` naar
+  `/piano`), zoals ze op de oude site onder "Aanbod" stond. Het is een eigen route
+  en geen contentpagina, dus ze komt er niet vanzelf in.
+
+---
+
 ## Deurtoegang (kaartscanner op de deur)
 
 Aan de deur hangt dezelfde KU Leuven-kaartlezer als aan de Theokot-balie, maar dan
@@ -1241,3 +1315,77 @@ Vastgelegde keuzes:
   persoonlijke tegel mag maken, moet ze ook kunnen afwerken. De upload is daarom
   apart gehouden (`kind=tile`): maximaal 2 MB, herschaald naar 128px, en onder een
   eigen `tiles/`-prefix zodat de tegel-actions een key van elders weigeren.
+
+## Apple/Google Wallet-tickets
+
+Naast de A4-PDF (`apps/web/lib/ticketing/pdf.ts`) kan een ticket ook als Apple- of
+Google Wallet-pass gedownload worden, in hetzelfde ontwerp (kleuren, logo) als de
+PDF. Code in `apps/web/lib/ticketing/wallet/`.
+
+- **Twee providers naast elkaar: "direct" en walletwallet.dev.** Een geldige Apple
+  Wallet-pass moet ondertekend zijn met een certificaat dat uiteindelijk naar Apple
+  herleidt; daar is geen weg omheen. "Direct" betekent: VTK's eigen Apple Developer
+  Program-account (99$/jaar) en Pass Type ID-certificaat, zelf ondertekend met
+  `passkit-generator`. Zolang dat er niet is (of bewust niet de moeite waard wordt
+  geacht), kan `WALLET_WALLETWALLET_API_KEY` gezet worden: een third-party API die
+  zelf al zo'n certificaat heeft en passes namens hen uitgeeft. Dat kost geen eigen
+  Apple-account, maar wel een terugkerend SaaS-abonnement (gratis tot 1000
+  passes/maand, nadien betalend) en de pass wordt technisch uitgegeven via hún
+  identiteit, niet die van VTK. Staat een direct-config voor een platform (Apple of
+  Google) klaar, dan wint die per platform altijd van walletwallet.dev
+  (`apps/web/lib/ticketing/wallet/index.ts`): vol eigenaarschap gaat voor wanneer het
+  er is.
+- **Elke knop verschijnt pas als de bijhorende config compleet is** (zie
+  `.env.example`). Geen halfwerkende "Voeg toe aan Wallet"-knop die daarna een
+  foutmelding geeft: ontbreekt de configuratie, dan bestaat de knop gewoon niet, net
+  als de ticketmail die in dev stil wegvalt zonder `SMTP_HOST`.
+- **Wat er van het ticketontwerp meegaat: kleuren, logo, footer en de hero-foto.**
+  Het *sjabloon* (Classic / Poster / Gesplitst) gaat bewust niet mee: een walletpas
+  heeft een vaste, door iOS/Android opgelegde indeling, dus "foto bovenaan" versus
+  "foto ernaast" bestaat daar niet. De foto zelf heeft wel een vaste plek in beide
+  formaten (Apple's strip-afbeelding, Google's `heroImage`) en wordt daar gebruikt.
+  Op de directe Apple-weg snijden we de foto zelf bij naar 375x144pt (de
+  strip-verhouding voor een eventticket met vierkante barcode) rond hetzelfde
+  focuspunt dat de PDF gebruikt, zodat een staande foto niet blind gecentreerd
+  wordt. walletwallet.dev neemt enkel een URL en stuurt de afbeelding ongesneden
+  door; daar bepaalt het besturingssysteem de uitsnede. Wil je dat gelijktrekken,
+  dan is daar een eigen publieke route nodig die een bijgesneden variant serveert.
+- **Geen push-update-service.** Een pass wordt bij elke download vers opgebouwd uit
+  de actuele ticket- en ontwerpgegevens (zoals de PDF), maar er is geen Apple
+  Push/webservice-stuk dat een al toegevoegde pass op iemands telefoon achteraf
+  bijwerkt als het event verandert. Dat is een apart, optioneel stuk Apple
+  Wallet-infrastructuur (APNs + een update-webservice) dat bewust buiten deze eerste
+  versie valt: het voegt reële complexiteit toe voor een randgeval (een gewijzigd
+  event terwijl iemands pass al op hun telefoon staat) dat bij VTK's schaal zelden
+  voorkomt.
+- **Geen wallet-knoppen in de bevestigingsmail zelf.** De mail linkt (zoals
+  voorheen) naar de ticketpagina, waar de wallet-knoppen naast de PDF-knop staan.
+  Bij een bestelling met meerdere tickets zouden meerdere sets wallet-knoppen in de
+  mail rommelig ogen en zijn ze bovendien pas na de eerste keer openen van de
+  ticketpagina bruikbaar (dezelfde toegangscookie als de bestaande PDF-link vereist
+  dat). "Ook via mail" is zo gelezen als: bereikbaar via de link die de mail al
+  stuurt, niet letterlijk als knoppen in de mail-HTML.
+
+## Praesidiumlijst (CSV-export op /admin/groepen)
+
+De knop "Download praesidiumlijst" op Ledenbeheer → Posten levert één CSV met twee
+kolommen: naam en r-nummer. Het is de lijst die je aan de universiteit of aan een
+externe partij doorgeeft wanneer die wil weten wie dit jaar praesidium is, dus de
+inhoud is bewust een lijst van *personen*, niet van posten.
+
+- **De export volgt het werkingsjaar dat op het scherm geselecteerd staat**, niet
+  altijd het huidige. Wie op het tabje 25-26 staat en downloadt, krijgt 25-26.
+  Anders zou de knop iets anders exporteren dan wat eronder in de tabel staat.
+- **Eén rij per persoon.** Wie twee posten heeft (bv. een werkgroep en het
+  praesidium) staat één keer in de lijst; welke post iemand heeft, staat er niet
+  in. De vraag die deze lijst beantwoordt is "wie hoort erbij", niet "wie doet wat".
+- **Ook leden van een inactieve post tellen mee.** Een post op inactief zetten
+  verbergt ze in de shift-keuzes, maar dat jaar hingen er wel degelijk mensen aan;
+  de historiek van een werkingsjaar mag niet veranderen doordat een post later
+  gearchiveerd wordt.
+- **Ook leden met een gedeactiveerd account tellen mee.** Een account deactiveren
+  is een login-kwestie; het haalt iemand niet uit de post waaraan die dat jaar hing.
+  Gewiste accounts (de geanonimiseerde tombstones) vallen er wel uit.
+- **Het r-nummer mag leeg zijn.** Niet elk lid heeft er een (bv. een alumnus of
+  een extern bestuurslid); die persoon hoort wel in de lijst, met een lege cel,
+  zodat wie de lijst nakijkt zelf ziet dat er iets ontbreekt.

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 
 export type NavItem = {
   key: string;
@@ -118,20 +118,59 @@ function useSmartSticky<T extends HTMLElement>() {
   return ref;
 }
 
+/** Het label van de tab waar je nu staat, voor de knop op smalle schermen. */
+function activeLabel(nodes: NavNode[], pathname: string, fallback: string): string {
+  for (const node of nodes) {
+    if (node.type === "item") {
+      if (isActive(pathname, node.item)) return node.item.label;
+    } else {
+      const hit = node.items.find((i) => isActive(pathname, i));
+      if (hit) return hit.label;
+    }
+  }
+  return fallback;
+}
+
 /**
  * Linkerkolom-navigatie van het adminpaneel. Server component levert de
  * (permissie-gefilterde, gelokaliseerde) `nodes` aan; deze client-schil zorgt
  * voor de actieve-markering (via `usePathname`), het in-/uitklappen van
- * groepen en het meereizen bij scrollen. Op smalle schermen valt de groep terug
- * op losse pillen in de horizontale scroller (zie vtk-admin.css).
+ * groepen en het meereizen bij scrollen.
+ *
+ * Op smalle schermen is de kolom één knop die zegt waar je staat en het paneel
+ * eronder opent. De vroegere horizontale scroller stond hier ook: vijftien tabs
+ * in een scrollstrip betekent dat je de helft nooit ziet, en op een telefoon
+ * duwt zo'n strip de rest van de pagina breder dan het scherm.
  */
 export function AdminNav({ title, nodes }: { title: string; nodes: NavNode[] }) {
   const pathname = usePathname();
   const stickyRef = useSmartSticky<HTMLDivElement>();
+  const panelId = useId();
+  const [open, setOpen] = useState(false);
+  const current = activeLabel(nodes, pathname, title);
+
+  // Navigeren sluit het paneel: de layout blijft gemount tussen admin-routes,
+  // dus zonder dit blijft het menu over de nieuwe pagina hangen.
+  const [prevPath, setPrevPath] = useState(pathname);
+  if (pathname !== prevPath) {
+    setPrevPath(pathname);
+    if (open) setOpen(false);
+  }
+
   return (
     <div className="vtk-admin-nav-sticky" ref={stickyRef}>
       <h2 className="vtk-admin-nav-title">{title}</h2>
-      <nav className="vtk-admin-nav">
+      <button
+        type="button"
+        className={"vtk-admin-nav-toggle" + (open ? " is-open" : "")}
+        aria-expanded={open}
+        aria-controls={panelId}
+        onClick={() => setOpen((o) => !o)}
+      >
+        <span className="vtk-admin-nav-toggle-label">{current}</span>
+        <Chevron open={open} />
+      </button>
+      <nav id={panelId} className={"vtk-admin-nav" + (open ? " is-open" : "")}>
         {nodes.map((node) =>
           node.type === "item" ? (
             <NavLink key={node.item.key} item={node.item} active={isActive(pathname, node.item)} />
@@ -177,33 +216,23 @@ function NavGroup({ group, pathname }: { group: Extract<NavNode, { type: "group"
   }
 
   return (
-    <>
-      {/* Smal scherm: losse pillen in de horizontale scroller (geen groepskop). */}
-      <span className="vtk-admin-nav-flat">
+    <div className="vtk-admin-nav-group">
+      <button
+        type="button"
+        className={"vtk-admin-nav-group-toggle" + (containsActive ? " has-active" : "")}
+        aria-expanded={open}
+        onClick={() => setOpen((o) => !o)}
+      >
+        {icons[group.key] ?? icons.groups}
+        <span className="flex-1 text-left">{group.label}</span>
+        <Chevron open={open} />
+      </button>
+      <div className={"vtk-admin-nav-sub" + (open ? " is-open" : "")}>
         {group.items.map((item) => (
-          <NavLink key={item.key} item={item} active={isActive(pathname, item)} />
+          <NavLink key={item.key} item={item} active={isActive(pathname, item)} sub />
         ))}
-      </span>
-
-      {/* Breed scherm: inklapbare groep. */}
-      <div className="vtk-admin-nav-group">
-        <button
-          type="button"
-          className={"vtk-admin-nav-group-toggle" + (containsActive ? " has-active" : "")}
-          aria-expanded={open}
-          onClick={() => setOpen((o) => !o)}
-        >
-          {icons[group.key] ?? icons.groups}
-          <span className="flex-1 text-left">{group.label}</span>
-          <Chevron open={open} />
-        </button>
-        <div className={"vtk-admin-nav-sub" + (open ? " is-open" : "")}>
-          {group.items.map((item) => (
-            <NavLink key={item.key} item={item} active={isActive(pathname, item)} sub />
-          ))}
-        </div>
       </div>
-    </>
+    </div>
   );
 }
 
@@ -426,6 +455,15 @@ const icons: Record<string, ReactNode> = {
       <path d="M7 8h10l-1 12a2 2 0 0 1-2 2h-4a2 2 0 0 1-2-2L7 8Z" />
       <path d="M17 10h2a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2h-2.5" />
       <path d="M7.5 8a2.5 2.5 0 0 1 .5-4.9 3 3 0 0 1 5.6-.6A2.5 2.5 0 0 1 16.5 8" />
+    </Svg>
+  ),
+  // piano: toetsen van een klavier
+  piano: (
+    <Svg>
+      <rect x="3" y="4" width="18" height="16" rx="2" />
+      <path d="M9 4v9" />
+      <path d="M15 4v9" />
+      <path d="M3 13h18" />
     </Svg>
   ),
   // it: terminal (de groep met de technische tabs)
