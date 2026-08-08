@@ -613,6 +613,26 @@
     "calendarTitle": "Calendar",
     "calendarLead": "Every activity, from cantus to info session."
   },
+  "search": {
+    "title": "Search",
+    "subtitle": "Search the pages of this site and the public activities in the calendar.",
+    "description": "Search the pages and activities of VTK.",
+    "formLabel": "Search this site",
+    "inputLabel": "Search term",
+    "placeholder": "Search this site",
+    "submit": "Search",
+    "prompt": "Type what you are looking for above.",
+    "tooShort": "Type at least two letters: a single letter matches almost everything.",
+    "resultsOne": "1 result for “{query}”.",
+    "resultsMany": "{count} results for “{query}”.",
+    "limited": "Only the first {count} results are shown. Add a word to narrow them down.",
+    "emptyTitle": "No results for “{query}”",
+    "emptyBody": "Try a shorter or different word and check the spelling. Looking for an activity? Browse the calendar; practical explanations live under Info.",
+    "emptyCalendar": "Go to the calendar",
+    "emptyInfo": "Go to Info",
+    "kindPage": "Page",
+    "kindEvent": "Activity"
+  },
   "seo": {
     "home": {
       "title": "Vlaamse Technische Kring",

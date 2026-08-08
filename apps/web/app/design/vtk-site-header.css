@@ -399,7 +399,8 @@
 }
 
 .vtk-site-header .profile-menu-trigger,
-.vtk-site-header .nav-login {
+.vtk-site-header .nav-login,
+.vtk-site-header .nav-search {
   min-width: 38px;
   height: 38px;
   display: inline-grid;
@@ -413,9 +414,26 @@
 }
 
 .vtk-site-header .profile-menu-trigger:hover,
-.vtk-site-header .nav-login:hover {
+.vtk-site-header .nav-login:hover,
+.vtk-site-header .nav-search:hover {
   border-color: var(--paper);
   background: rgba(255, 255, 255, 0.22);
+}
+
+/* De zoekknop verschijnt pas vanaf 1280px, en niet al vanaf 1211px waar de tabs
+   beginnen. Daartussen is de balk vol: de elf tabs eindigen daar op negen pixels
+   van de knoppenrij, dus een knop van 38px zou over de laatste tab vallen. Onder
+   1211px is er wel een oplossing, want daar staat het echte zoekveld in het
+   uitklapmenu. Blijft die smalle strook zonder ingang zitten, verklein dan eerst
+   de navigatie; niet deze knop, want dan botst hij gewoon. */
+.vtk-site-header .nav-search {
+  display: none;
+}
+
+@media (min-width: 1280px) {
+  .vtk-site-header .nav-search {
+    display: inline-grid;
+  }
 }
 
 /* Het accountmenu hangt aan dezelfde onderrand als de navigatiepanelen, dus de
@@ -529,6 +547,10 @@
 
   .vtk-site-header .nav-mobile-menu[hidden] {
     display: none;
+  }
+
+  .vtk-site-header .nav-mobile-search {
+    padding: 8px 0 12px;
   }
 
   .vtk-site-header .nav-mobile-menu ul {

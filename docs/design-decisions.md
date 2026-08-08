@@ -1417,6 +1417,51 @@ product- en niet puur technisch:
 
 ---
 
+## Zoeken: wat er in de resultaten mag staan
+
+De zoekfunctie (`/zoeken`) doorzoekt twee dingen en bewust niet meer: **de pagina's
+van de site** en **de activiteiten in de kalender**. Wat er per soort in mag, is een
+zichtbaarheidskeuze en geen technische:
+
+- **Enkel gepubliceerde pagina's.** Een concept (`publishedAt` leeg) staat niet in de
+  resultaten, ook niet als losse titel: dat zou verklappen dat er iets in de maak is
+  en waarover het gaat. Een gepubliceerde pagina die niet aan een headertab hangt,
+  komt wél in de resultaten. Ze is niet via de navigatie bereikbaar, maar ze staat
+  ook in de sitemap en is gewoon publiek; zoeken is dan vaak de enige manier om ze
+  terug te vinden.
+- **Enkel publieke evenementen, en enkel die van jouw doelgroep.** Een
+  ledenexclusief of intern evenement hoort er niet in, en een evenement met een
+  doelgroepcategorie (eerstejaars, internationals) verschijnt enkel bij wie erbij
+  hoort; wie niet ingelogd is, ziet die dus niet. Dat is dezelfde regel als op de
+  kalender zelf, waar een doelgroepevent ook pas opduikt bij het juiste profiel.
+- **Die regels worden hergebruikt en niet nagebouwd.** De zoekopdracht haalt eerst
+  kandidaten op met Postgres (rang en fragment), maar de rijen zelf komen via Prisma
+  binnen met exact dezelfde `where` als de rest van de site: `publishedAt` voor een
+  pagina, `visibility: "PUBLIC"` plus `audienceFilter()` uit
+  `apps/web/lib/calendar/audience.ts` voor een evenement, precies zoals
+  `/api/calendar/events` en de ics-feeds. Een tweede, met de hand geschreven
+  zichtbaarheidsregel in SQL loopt vroeg of laat uiteen met de eerste, en dan lekt er
+  een intern evenement in de zoekresultaten. Verandert de kalenderzichtbaarheid, dan
+  verandert het zoekresultaat mee, zonder dat iemand daaraan hoeft te denken.
+- **Wat er niet doorzocht wordt**: tickets, bestellingen, fotoalbums, praesidiumleden
+  en alles achter een login. Die schermen staan om dezelfde reden niet in de sitemap.
+- **De resultatenpagina staat zelf op `noIndex`.** Elke zoekterm is een eigen URL, en
+  die horen niet als duizenden dunne pagina's in Google te belanden.
+- **In de sitekop staat op breed scherm een knop en geen invoerveld.** De elf tabs
+  vullen de navigatiebalk tot op negen pixels na, en `.nav-inner` stopt met groeien
+  op `--max` (1320px), dus een breder scherm levert geen ruimte op. Een zoekveld
+  ernaast zou over de laatste tab vallen. De knop (vanaf 1280px, waar hij past)
+  brengt je naar `/zoeken`, waar de cursor meteen in het veld staat. Onder 1211px
+  zijn de tabs één menuknop en staat het echte veld bovenaan dat paneel. In de
+  strook tussen 1211 en 1280px is er geen ingang in de balk; wil je die er wel,
+  verklein dan eerst de navigatie zelf.
+- **Zoeken is een gewoon GET-formulier.** De zoekterm staat in de URL, de pagina
+  rendert op de server, en er is geen client-state. Zo is een zoekresultaat
+  deelbaar en herlaadbaar en werkt de terugknop; een veld met eigen state en
+  live-resultaten maakt die drie kapot en voegt bij tientallen pagina's weinig toe.
+
+---
+
 ## De 404-pagina
 
 - Er is er één, in de huisstijl: dezelfde donkere `.vtk-page-head`-band als elke

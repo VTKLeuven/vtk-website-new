@@ -1,0 +1,114 @@
+/* Zoekresultaten (/zoeken). Het zoekveld zelf staat in vtk-base.css, want het
+   hangt ook in de sitekop op elke pagina; hier staat enkel wat bij de
+   resultatenlijst hoort. */
+
+.vtk-search-head-form {
+  margin-top: 24px;
+}
+
+/* Statusregel boven de lijst: hoeveel resultaten, of waarom er nog geen zijn. */
+.vtk-search-note {
+  margin: 0;
+  color: var(--body);
+  font-size: 15px;
+}
+
+.vtk-search-hint {
+  margin: 6px 0 0;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.vtk-search-results {
+  margin: 24px 0 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.vtk-search-result {
+  padding: 18px 20px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: var(--surface);
+}
+
+.vtk-search-kind {
+  display: inline-block;
+  margin-bottom: 8px;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+
+.vtk-search-result h2 {
+  margin: 0;
+  font-size: 19px;
+  line-height: 1.3;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.vtk-search-result h2 a {
+  color: var(--ink);
+  text-decoration: none;
+}
+
+.vtk-search-result h2 a:hover {
+  text-decoration: underline;
+}
+
+.vtk-search-meta {
+  margin: 6px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.vtk-search-snippet {
+  margin: 10px 0 0;
+  color: var(--body);
+  font-size: 15px;
+  line-height: 1.6;
+}
+
+/* De treffer zelf. Geel is het enige accent van de site, dus dat is hier ook de
+   markering; de tekstkleur blijft de inktkleur zodat het leesbaar blijft. */
+.vtk-search-snippet mark {
+  padding: 0 2px;
+  border-radius: 3px;
+  background: var(--yellow);
+  color: var(--ink);
+}
+
+.vtk-search-empty {
+  padding: 28px 24px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: var(--surface);
+}
+
+.vtk-search-empty h2 {
+  margin: 0;
+  font-size: 21px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.vtk-search-empty p {
+  max-width: 60ch;
+  margin: 10px 0 0;
+  color: var(--body);
+  font-size: 15px;
+  line-height: 1.6;
+}
+
+.vtk-search-empty-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 18px;
+}
