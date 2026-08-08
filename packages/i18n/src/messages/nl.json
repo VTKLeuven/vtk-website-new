@@ -738,5 +738,46 @@
       "title": "Ontwerpvoorbeelden",
       "description": "Interne referentiepagina met de bouwstenen van de VTK-huisstijl."
     }
+  },
+  "contact": {
+    "title": "Contact",
+    "subtitle": "Een vraag, een voorstel of iets dat niet werkt? Laat het hier achter, dan komt het bij de juiste persoon terecht.",
+    "description": "Stel je vraag aan VTK via het contactformulier, of mail rechtstreeks naar info@vtk.be.",
+    "formTitle": "Stuur een bericht",
+    "formIntro": "Elk bericht komt binnen op info@vtk.be en wordt van daar intern doorgegeven. We proberen binnen enkele werkdagen te antwoorden.",
+    "nameLabel": "Naam",
+    "namePlaceholder": "Je voor- en achternaam",
+    "emailLabel": "E-mail",
+    "emailPlaceholder": "jij@voorbeeld.be",
+    "emailHelp": "Op dit adres antwoorden we; kijk het even na.",
+    "subjectLabel": "Onderwerp",
+    "subjectPlaceholder": "Waar gaat het over?",
+    "messageLabel": "Bericht",
+    "messagePlaceholder": "Vertel wat we voor je kunnen doen.",
+    "messageHelp": "Maximaal {max} tekens. Grote bijlagen stuur je best rechtstreeks per mail.",
+    "honeypotLabel": "Laat dit veld leeg",
+    "submit": "Bericht versturen",
+    "submitting": "Bezig met versturen...",
+    "sent": "Bedankt, je bericht is verstuurd. We antwoorden op het adres dat je opgaf.",
+    "directTitle": "Liever rechtstreeks mailen?",
+    "directBody": "Dat mag ook, op hetzelfde adres:",
+    "privacyTitle": "Wat gebeurt er met je gegevens?",
+    "privacyBody": "We gebruiken je naam, je adres en je bericht enkel om je vraag te beantwoorden. Er vertrekt geen automatische bevestigingsmail.",
+    "privacyLink": "Privacyverklaring",
+    "pagesTitle": "Meer contactinfo",
+    "errors": {
+      "fallback": "Je bericht is niet verstuurd. Probeer het opnieuw of mail rechtstreeks naar info@vtk.be.",
+      "nameRequired": "Niet verstuurd: vul je naam in.",
+      "nameTooLong": "Niet verstuurd: je naam is te lang (maximaal {max} tekens).",
+      "emailRequired": "Niet verstuurd: vul je e-mailadres in, anders kunnen we niet antwoorden.",
+      "emailInvalid": "Niet verstuurd: dat e-mailadres klopt niet. Kijk het na, want daar sturen we het antwoord naartoe.",
+      "emailTooLong": "Niet verstuurd: dat e-mailadres is te lang.",
+      "subjectRequired": "Niet verstuurd: vul een onderwerp in.",
+      "subjectTooLong": "Niet verstuurd: het onderwerp is te lang (maximaal {max} tekens).",
+      "messageRequired": "Niet verstuurd: schrijf eerst een bericht.",
+      "messageTooLong": "Niet verstuurd: je bericht is te lang (maximaal {max} tekens). Kort het in of mail rechtstreeks naar info@vtk.be.",
+      "rateLimited": "Niet verstuurd: je stuurde net al enkele berichten. Wacht een kwartier of mail rechtstreeks naar info@vtk.be.",
+      "mailFailed": "Je bericht raakte niet weg door een probleem aan onze kant. Probeer het straks opnieuw of mail rechtstreeks naar info@vtk.be."
+    }
   }
 }

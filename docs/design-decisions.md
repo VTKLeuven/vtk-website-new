@@ -1498,3 +1498,53 @@ zichtbaarheidskeuze en geen technische:
   handgeschreven lijst zou binnen het jaar uit elkaar lopen met de eerste. De
   oude sleutel `footer.linkWerkgroepen` blijft ongebruikt achter in de
   i18n-bestanden: die mochten tijdens deze werkstroom enkel aangevuld worden.
+
+---
+
+## Contactformulier: één bestemming, geen bevestigingsmail
+
+- **Alles gaat naar `info@vtk.be`.** Eén bestemming, geen keuzelijst met
+  onderwerpen die elk naar een ander adres routeren en geen tabel met
+  postadressen in de database. Beslist voor de uitvoering begon. De reden is
+  onderhoud: zo'n tabel loopt binnen een werkingsjaar achter op de werkelijkheid,
+  want posten wisselen elk jaar en een verkeerd gerouteerd bericht valt in een
+  mailbox die niemand meer leest. Nu ziet altijd dezelfde mailbox alles binnenkomen
+  en gaat het van daar intern verder; dat is één menselijke stap in ruil voor de
+  garantie dat er niets verdwijnt. Het onderwerp dat de bezoeker zelf typt, komt in
+  de titel van de mail met een `[Website]`-voorvoegsel ervoor, zodat er een filter
+  of label op kan staan.
+- **Er vertrekt geen automatische bevestigingsmail naar de verzender.** Iedereen
+  kan om het even welk adres in het formulier typen, dus zo'n mail is te misbruiken
+  als spamversterker: een bot vult het adres van zijn slachtoffer in en onze server
+  levert de mail af, met onze reputatie eronder. De bevestiging staat daarom op het
+  scherm (een groene toast plus een leeggelopen formulier). Wie wél een spoor wil,
+  ziet ons antwoord vanzelf: `replyTo` staat op de bezoeker, dus "Beantwoorden"
+  komt rechtstreeks bij hem terecht.
+- **De afzender is een VTK-adres, niet dat van de bezoeker.** Mailen namens
+  `@gmail.com` mag onze server niet ondertekenen; SPF en DKIM gooien zo'n bericht
+  in de spam. De bezoeker zit in `replyTo`, en naam en adres staan ook in de tekst
+  van de mail zelf, zodat doorsturen het antwoordadres niet verliest. De afzender
+  staat los van `MAIL_FROM` (`MAIL_FROM_CONTACT`): die eerste is de ticket-
+  afzender, en een contactvraag hoort niet als "VTK Tickets" binnen te komen.
+- **Spam wordt tegengehouden met een honeypot en een limiet per IP, niet met een
+  captcha.** Een captcha kost elke echte bezoeker moeite (en zet vaak een derde
+  partij op de pagina) om een handvol scripts tegen te houden. Het verborgen veld
+  levert bij invulling een **groene** toast op en er vertrekt niets: een bot die een
+  foutmelding krijgt, weet dat hij ontdekt is en past zijn volgende poging aan. De
+  limiet staat op drie berichten per kwartier per IP en telt in het geheugen van het
+  proces; bij een herstart begint ze opnieuw. Dat is bewust: dit hoeft geen
+  boekhouding te zijn, enkel een drempel, en het scheelt een tabel en een opkuistaak.
+- **De inhoud van een bericht gaat nooit naar Sentry.** Mislukt het versturen, dan
+  loggen we dát, niet wat er in stond. Het is de post van een bezoeker.
+- **`/contact` is een eigen route en geen speciaal geval in het
+  categorie-overzicht.** Contact is in de database een gewone `HeaderTab` (code
+  `CONTACT`) met pagina's eronder, dus zonder eigen map zou `/contact` de generieke
+  categorieweergave tonen. Een `if (slug === "contact")` daarin zou elke andere
+  categorie meeslepen. Het statische segment `app/[locale]/contact` wint van
+  `[headerSlug]` en neemt enkel `/contact` over; de pagina's eronder blijven op
+  `/contact/<pagina>` bij de generieke weergave, en het formulierscherm herhaalt hun
+  lijst onderaan zodat er niets onbereikbaar wordt. De titel en de intro komen nog
+  altijd uit de categorie in `/admin/inhoud`; enkel het formulier is code. Wordt de
+  slug van die categorie ooit hernoemd, dan blijft het formulier op `/contact` staan
+  terwijl de navigatie naar de nieuwe slug wijst; die pagina laadt de categorie
+  daarom op `code` en niet op slug.

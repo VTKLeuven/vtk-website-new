@@ -738,5 +738,46 @@
       "title": "Design samples",
       "description": "Internal reference page with the building blocks of the VTK house style."
     }
+  },
+  "contact": {
+    "title": "Contact",
+    "subtitle": "A question, a suggestion or something that is broken? Leave it here and it reaches the right person.",
+    "description": "Ask VTK a question through the contact form, or mail info@vtk.be directly.",
+    "formTitle": "Send a message",
+    "formIntro": "Every message arrives at info@vtk.be and is passed on internally from there. We aim to reply within a few working days.",
+    "nameLabel": "Name",
+    "namePlaceholder": "Your first and last name",
+    "emailLabel": "Email",
+    "emailPlaceholder": "you@example.com",
+    "emailHelp": "We reply to this address, so double-check it.",
+    "subjectLabel": "Subject",
+    "subjectPlaceholder": "What is it about?",
+    "messageLabel": "Message",
+    "messagePlaceholder": "Tell us what we can do for you.",
+    "messageHelp": "At most {max} characters. Send large attachments by mail instead.",
+    "honeypotLabel": "Leave this field empty",
+    "submit": "Send message",
+    "submitting": "Sending...",
+    "sent": "Thanks, your message has been sent. We will reply to the address you gave us.",
+    "directTitle": "Prefer to mail us directly?",
+    "directBody": "That works too, at the same address:",
+    "privacyTitle": "What happens with your details?",
+    "privacyBody": "We use your name, address and message only to answer your question. No automatic confirmation mail is sent.",
+    "privacyLink": "Privacy statement",
+    "pagesTitle": "More contact details",
+    "errors": {
+      "fallback": "Your message was not sent. Try again or mail info@vtk.be directly.",
+      "nameRequired": "Not sent: fill in your name.",
+      "nameTooLong": "Not sent: your name is too long (at most {max} characters).",
+      "emailRequired": "Not sent: fill in your email address, otherwise we cannot reply.",
+      "emailInvalid": "Not sent: that email address is not valid. Check it, because that is where the reply goes.",
+      "emailTooLong": "Not sent: that email address is too long.",
+      "subjectRequired": "Not sent: fill in a subject.",
+      "subjectTooLong": "Not sent: the subject is too long (at most {max} characters).",
+      "messageRequired": "Not sent: write a message first.",
+      "messageTooLong": "Not sent: your message is too long (at most {max} characters). Shorten it or mail info@vtk.be directly.",
+      "rateLimited": "Not sent: you just sent a few messages. Wait fifteen minutes or mail info@vtk.be directly.",
+      "mailFailed": "Your message did not go out because of a problem on our side. Try again later or mail info@vtk.be directly."
+    }
   }
 }
