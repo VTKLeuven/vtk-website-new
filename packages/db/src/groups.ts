@@ -82,6 +82,16 @@ export const HEADER_TABS: Array<{
       "Praktische diensten, campusvoorzieningen en tools die je semester vlotter maken.",
     introEn:
       "Practical services, campus facilities and tools that make your semester smoother.",
+    // De kalender was buiten de homepage enkel via de footer te vinden. Ze staat
+    // hier in het menu i.p.v. als twaalfde headertab: elf tabs is al de grens
+    // waarop de header naar een menuknop overschakelt (zie CLAUDE.md).
+    links: [
+      {
+        labelNl: "Kalender",
+        labelEn: "Calendar",
+        url: "/kalender",
+      },
+    ],
   },
   { code: "THEOKOT", slug: "theokot", labelNl: "Theokot", labelEn: "Theokot", order: 1 },
   { code: "SHIFTEN", slug: "shift", labelNl: "Shiften", labelEn: "Shifts", order: 2 },

@@ -352,6 +352,11 @@ model User {
   // uit élke studiegerichte mailinglijst (zie lib/mailinglists.ts). Blijft een
   // aparte boolean om dezelfde reden als notAtFaculty.
   notStudying        Boolean          @default(false)
+  // Internationale of uitwisselingsstudent. Bewust een eigen veld en geen
+  // afleiding uit `locale`: de sitetaal zegt welke taal je leest, niet of je een
+  // exchange-student bent. Stuurt welke evenementen vanzelf in de kalender
+  // opduiken (zie CalendarAudience).
+  internationalStudent Boolean        @default(false)
   // Werkingsjaar waarin het lid zijn studieprofiel laatst bevestigde (2026 =
   // "26-27"). Loopt dat achter op het huidige werkingsjaar, dan is het profiel
   // verlopen: de bevestigingsgate vraagt het opnieuw en het lid valt zolang uit
@@ -398,6 +403,8 @@ model User {
   doorGrants         DoorAccessGrant[]
   doorLogs           DoorAccessLog[]
   doorShortcutTokens DoorShortcutToken[]
+
+  calendarFeedTokens CalendarFeedToken[]
 
   createdTicketEvents      TicketEvent[]           @relation("TicketEventCreatedBy")
   ticketEventGrants        TicketEventUserGrant[]  @relation("TicketEventGrantUser")
@@ -737,9 +744,91 @@ model CalendarEvent {
   group       Group        @relation(fields: [groupId], references: [id], onDelete: Cascade)
   createdBy   User?        @relation("EventCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
   ticketEvent TicketEvent?
+  categories  CalendarEventCategory[]
 
   @@index([start])
   @@index([groupId])
+}
+
+// Doelgroep van een evenement ("Internationaal", "Eerstejaars", "Career", ...).
+// Bewust een eigen as naast `CalendarEvent.groupId`: de groep zegt wie het event
+// organiseert, de categorie voor wie het bedoeld is. Een fakbar-cantus kan een
+// eerstejaarsevent zijn, en een event van de post Internationaal hoeft niet op de
+// internationale kalender te staan. Elke categorie krijgt een eigen pagina
+// (/kalender/<slug>) en een eigen ICS-feed.
+// Doelgroep waar een categorie voor staat. Een categorie zonder `audience` is een
+// gewoon thema (Career, Sport, ...) dat iedereen ziet en dat als filterchip op
+// /kalender staat. Een categorie mét `audience` verschijnt niet als chip: haar
+// evenementen komen vanzelf bovendrijven bij wie tot die doelgroep hoort, en
+// blijven voor de rest standaard verborgen (zichtbaar te maken met "alles tonen").
+//
+// De waarde is een enum en geen vrij veld, want bij elke waarde hoort code die
+// bepaalt of een lid erbij hoort (zie lib/calendar/audience.ts). Een nieuwe
+// doelgroep toevoegen is dus bewust geen GUI-actie.
+enum CalendarAudience {
+  FIRST_YEARS
+  INTERNATIONALS
+}
+
+model CalendarCategory {
+  id            String  @id @default(cuid())
+  // Zit in de publieke URL en in de feed-URL, dus wijzigen breekt bestaande
+  // abonnementen; daarom niet vrij bewerkbaar zodra hij in gebruik is.
+  slug          String  @unique
+  nameNl        String
+  nameEn        String
+  // Introtekst bovenaan de categoriepagina (Markdown), optioneel.
+  descriptionNl String?
+  descriptionEn String?
+  // Hexkleur van het bolletje in de legende en van de eventpil in het raster.
+  colour        String  @default("#5C667F")
+  order         Int     @default(0)
+  // NULL = gewoon thema. Anders: doelgroepcategorie, zie de enum hierboven.
+  audience      CalendarAudience?
+  // Uit = de categorie bestaat nog (feed en pagina blijven werken) maar staat
+  // niet meer tussen de filterchips op /kalender.
+  showOnCalendarPage Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  events CalendarEventCategory[]
+
+  @@index([order])
+}
+
+model CalendarEventCategory {
+  eventId    String
+  categoryId String
+
+  event    CalendarEvent    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  category CalendarCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  @@id([eventId, categoryId])
+  @@index([categoryId])
+}
+
+// Persoonlijke ICS-feed van één lid: ledenexclusieve events, zijn shiften en de
+// events waarvoor hij een ticket heeft. Een agenda-client stuurt geen cookies,
+// dus de URL draagt zelf het geheim; we bewaren enkel de hash.
+//
+// Bewust **zonder `expiresAt`**, anders dan DoorShortcutToken: een abonnement dat
+// na 90 dagen stil ophoudt met verversen is erger dan geen abonnement, want de
+// agenda blijft dan verouderde events tonen zonder dat iemand het merkt.
+// Intrekken gebeurt expliciet vanuit /account.
+model CalendarFeedToken {
+  id         String    @id @default(cuid())
+  userId     String
+  label      String
+  tokenHash  String    @unique
+  lastUsedAt DateTime? @db.Timestamptz(3)
+  revokedAt  DateTime? @db.Timestamptz(3)
+  createdAt  DateTime  @default(now()) @db.Timestamptz(3)
+  updatedAt  DateTime  @updatedAt @db.Timestamptz(3)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, revokedAt])
 }
 
 // -----------------------------------------------------------------------------

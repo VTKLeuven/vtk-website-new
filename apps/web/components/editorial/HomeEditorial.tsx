@@ -12,6 +12,7 @@ import { getCursusdienstHours } from "@/lib/cursusdienstHours";
 import { publicUrl } from "@/lib/storage";
 import { BUILTIN_DEFAULT_EVENT_IMAGE, DEFAULT_EVENT_IMAGE_SETTING } from "@/lib/defaultEventImage";
 import { PartnerLogo } from "@/components/site/PartnerLogo";
+import { audienceFilter, viewerAudiences } from "@/lib/calendar/audience";
 import { AftermovieGrid, type AftermovieGridItem } from "./AftermovieGrid";
 import {
   dutchDayNameForDate,
@@ -94,12 +95,16 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
         },
       },
     }),
-    prisma.calendarEvent.findMany({
-      where: { start: { gte: now }, visibility: "PUBLIC" },
-      orderBy: { start: "asc" },
-      take: 8,
-      include: { group: true },
-    }),
+    // Dezelfde doelgroepfilter als /kalender: een eerstejaarsevent hoort niet bij
+    // iedereen op de homepage te staan terwijl het uit de kalender gefilterd is.
+    viewerAudiences().then((audiences) =>
+      prisma.calendarEvent.findMany({
+        where: { start: { gte: now }, visibility: "PUBLIC", ...audienceFilter(audiences) },
+        orderBy: { start: "asc" },
+        take: 8,
+        include: { group: true },
+      }),
+    ),
     getVisibleHeaderTabsForNav(),
     prisma.partner.findMany({
       where: { active: true },

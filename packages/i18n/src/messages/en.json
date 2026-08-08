@@ -247,6 +247,8 @@
     "programmesHint": "Select every programme that applies to you.",
     "notAtFaculty": "I am not studying at the faculty",
     "notAtFacultyHint": "Tick this if you are not enrolled in an engineering programme at the faculty. You will not receive Career emails, as those target faculty students.",
+    "internationalStudent": "I am an international or exchange student",
+    "internationalStudentHint": "Tick this if you are at the faculty on an exchange or as an international student. Events for internationals then show up in your calendar automatically.",
     "notStudying": "I am not studying (anymore)",
     "notStudyingHint": "Tick this if you have graduated or stopped studying. You stay a member, but drop out of the study-related mailing lists.",
     "submit": "Complete registration",
@@ -326,6 +328,7 @@
     "back": "Back",
     "noAccess": "No access",
     "ledenbeheer": "Members",
+    "evenementen": "Events",
     "website": "Website",
     "sso": "SSO & apps"
   },

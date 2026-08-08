@@ -125,3 +125,41 @@
     aspect-ratio: 4 / 3;
   }
 }
+
+/* Categorie- en doelgroeplabels onder de titel in de donkere eventkop. De
+   doelgroep krijgt de kleur van haar categorie als vulling, een thema blijft een
+   rustige omtrek: "voor eerstejaars" is informatie die je niet mag missen, het
+   thema is enkel context. */
+.vtk-event-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.vtk-event-tag {
+  display: inline-block;
+  padding: 4px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  border-radius: 999px;
+  color: var(--on-dark-muted);
+  font-size: 12px;
+  font-weight: 500;
+  text-decoration: none;
+  transition: 120ms;
+}
+
+.vtk-event-tag:hover {
+  border-color: rgba(255, 255, 255, 0.5);
+  color: var(--paper);
+}
+
+.vtk-event-tag.audience {
+  color: #fff;
+  font-weight: 600;
+}
+
+.vtk-event-tag.audience:hover {
+  filter: brightness(1.1);
+  color: #fff;
+}

@@ -10,13 +10,16 @@ import {
   canSessionCreateTicketEventForGroup,
   hasLiveTicketManageAll,
 } from "@/lib/ticketing/authorization";
+import { slugify } from "@/lib/ticketing/slug";
 import { TicketEventForm } from "@/components/ticketing/admin/TicketEventForm";
 import { ticketBase, type AdminLocale } from "@/components/ticketing/admin/format";
 
 export default async function NewTicketEventPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ locale: string }>;
+  searchParams: Promise<{ calendarEvent?: string }>;
 }) {
   const { locale: localeParam } = await params;
   if (!hasLocale(localeParam)) notFound();
@@ -52,6 +55,12 @@ export default async function NewTicketEventPage({
         take: 100,
       })
     : [];
+  // Kwam je hier via "Tickets verkopen voor dit evenement", dan is het
+  // kalenderevent al gekozen en erft dit ticketevent er zijn gegevens van.
+  const requestedCalendarEventId = (await searchParams).calendarEvent;
+  const linkedCalendarEvent = requestedCalendarEventId
+    ? (calendarEvents.find((e) => e.id === requestedCalendarEventId) ?? null)
+    : null;
   const base = ticketBase(locale);
 
   return (
@@ -83,6 +92,12 @@ export default async function NewTicketEventPage({
         <TicketEventForm
           groups={groups}
           calendarEvents={calendarEvents}
+          linkedCalendarEvent={linkedCalendarEvent}
+          event={
+            linkedCalendarEvent
+              ? { ownerGroupId: linkedCalendarEvent.groupId, slug: slugify(linkedCalendarEvent.titleNl) }
+              : undefined
+          }
           locale={locale}
         />
       )}

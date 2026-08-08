@@ -249,6 +249,9 @@ export async function eraseUserData(userId: string) {
     // De User-rij blijft als anonieme tombstone bestaan, dus een FK-cascade zou
     // deze credentials niet opruimen. Verwijder ze expliciet vóór anonimisering.
     await tx.doorShortcutToken.deleteMany({ where: { userId } });
+    // Om dezelfde reden: een persoonlijke feed-URL blijft anders werken en zou de
+    // agenda van een gewist account aan de houder van de link blijven tonen.
+    await tx.calendarFeedToken.deleteMany({ where: { userId } });
 
     await tx.doorAccessLog.updateMany({
       where: { userId },

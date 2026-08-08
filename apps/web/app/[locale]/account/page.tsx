@@ -17,6 +17,8 @@ import { AccountTabs } from './AccountTabs';
 import { AccountTickets } from './AccountTickets';
 import { AccountShifts } from './AccountShifts';
 import { DoorShortcutTokens } from './DoorShortcutTokens';
+import { CalendarFeedTokens } from './CalendarFeedTokens';
+import { siteBaseUrl } from '@/lib/calendar/feeds';
 
 export default async function AccountPage({ params }: { params: Promise<{ locale: string }> }) {
   const { locale } = await params;
@@ -27,7 +29,7 @@ export default async function AccountPage({ params }: { params: Promise<{ locale
 
   const now = new Date();
   const canUseDoorShortcut = hasPermission(session, 'door.remoteOpen');
-  const [profile, reservations, doorShortcutTokens, ticketOrders, registeredShifts] = await Promise.all([
+  const [profile, reservations, doorShortcutTokens, ticketOrders, registeredShifts, calendarFeedTokens] = await Promise.all([
     // Volledig profiel voor het bewerkbare gegevensformulier (kotadres, mails, ...).
     prisma.user.findUniqueOrThrow({
       where: { id: session.user.id },
@@ -52,6 +54,7 @@ export default async function AccountPage({ params }: { params: Promise<{ locale
         studyProgrammes: true,
         notAtFaculty: true,
         notStudying: true,
+        internationalStudent: true,
       },
     }),
     // Aankomende reservaties (nog niet opgehaald, afhaalvenster nog niet voorbij).
@@ -96,6 +99,11 @@ export default async function AccountPage({ params }: { params: Promise<{ locale
         },
       })
       .then((participations) => participations.map(({ shift }) => shift)),
+    prisma.calendarFeedToken.findMany({
+      where: { userId: session.user.id, revokedAt: null },
+      orderBy: { createdAt: 'desc' },
+      select: { id: true, label: true, createdAt: true, lastUsedAt: true },
+    }),
   ]);
 
   const dayFmt = new Intl.DateTimeFormat(nl ? 'nl-BE' : 'en-GB', {
@@ -218,6 +226,19 @@ export default async function AccountPage({ params }: { params: Promise<{ locale
             </Card>
 
             <AccountShifts locale={locale} shifts={registeredShifts} />
+
+            <Card className="p-6">
+              <CalendarFeedTokens
+                locale={locale}
+                origin={siteBaseUrl()}
+                tokens={calendarFeedTokens.map((token) => ({
+                  id: token.id,
+                  label: token.label,
+                  createdAt: tokenDateFmt.format(token.createdAt),
+                  lastUsedAt: token.lastUsedAt ? tokenDateFmt.format(token.lastUsedAt) : null,
+                }))}
+              />
+            </Card>
 
             {canUseDoorShortcut ? (
               <Card className="p-6">

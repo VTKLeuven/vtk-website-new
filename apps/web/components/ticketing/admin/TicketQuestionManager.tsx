@@ -1,3 +1,6 @@
+"use client";
+
+import { useState } from "react";
 import {
   archiveTicketQuestionAction,
   createTicketQuestionAction,
@@ -24,6 +27,41 @@ type TicketTypeOption = {
   active: boolean;
 };
 
+/**
+ * Wat voor soort antwoord je vraagt. Dit is de eerste beslissing, dus staat ze
+ * als drie kaartjes bovenaan in plaats van als vijf regels in een keuzelijst
+ * ("Korte tekst / Lange tekst / Eén keuze / Meerdere keuzes / Ja / nee"): daar
+ * moest je zelf uit afleiden dat twee ervan om een lijst opties vroegen en de
+ * andere drie niet, terwijl het optieveld altijd zichtbaar was met een
+ * voetnootje "alleen nodig bij één of meerdere keuzes".
+ */
+type AnswerKind = "TEXT" | "CHOICE" | "BOOLEAN";
+
+const KINDS: Array<{ kind: AnswerKind; nl: [string, string]; en: [string, string] }> = [
+  {
+    kind: "TEXT",
+    nl: ["Open antwoord", "De deelnemer typt zelf iets, bv. allergieën."],
+    en: ["Open answer", "The attendee types something, e.g. allergies."],
+  },
+  {
+    kind: "CHOICE",
+    nl: ["Keuze uit opties", "De deelnemer kiest uit een lijst die jij opgeeft."],
+    en: ["Pick from options", "The attendee picks from a list you provide."],
+  },
+  {
+    kind: "BOOLEAN",
+    nl: ["Ja of nee", "Eén vraag om te bevestigen, bv. vegetarisch."],
+    en: ["Yes or no", "A single confirmation, e.g. vegetarian."],
+  },
+];
+
+/** De opgeslagen `type`-waarde volgt uit het soort plus de verfijning erbij. */
+function questionType(kind: AnswerKind, longText: boolean, multiple: boolean): string {
+  if (kind === "BOOLEAN") return "BOOLEAN";
+  if (kind === "CHOICE") return multiple ? "MULTIPLE_CHOICE" : "SINGLE_CHOICE";
+  return longText ? "LONG_TEXT" : "SHORT_TEXT";
+}
+
 export function TicketQuestionManager({
   eventId,
   questions,
@@ -35,23 +73,23 @@ export function TicketQuestionManager({
   ticketTypes: TicketTypeOption[];
   locale: AdminLocale;
 }) {
+  const nl = locale === "nl";
+  const [kind, setKind] = useState<AnswerKind>("TEXT");
+  const [longText, setLongText] = useState(false);
+  const [multiple, setMultiple] = useState(false);
+
   return (
     <section className="ticket-admin-section">
       <div className="ticket-admin-section-head">
         <div className="ticket-admin-section-heading">
           <span className="ticket-admin-section-icon"><ListChecks aria-hidden="true" size={17} /></span>
           <div>
-          <h2>{locale === "nl" ? "Vragen aan deelnemers" : "Attendee questions"}</h2>
-          <p>
-            {locale === "nl"
-              ? "Globale vragen gelden voor ieder ticket; optioneel koppel je een vraag aan één type."
-              : "Global questions apply to every ticket; optionally limit a question to one type."}
-          </p>
+          <h2>{nl ? "Vragen aan deelnemers" : "Attendee questions"}</h2>
           </div>
         </div>
       </div>
       {questions.length === 0 ? (
-        <p className="ticket-admin-empty">{locale === "nl" ? "Nog geen vragen." : "No questions yet."}</p>
+        <p className="ticket-admin-empty">{nl ? "Nog geen vragen." : "No questions yet."}</p>
       ) : (
         <ul className="ticket-admin-list">
           {questions.map((question) => (
@@ -62,7 +100,7 @@ export function TicketQuestionManager({
                     {locale === "en" && question.labelEn ? question.labelEn : question.labelNl}
                   </p>
                   <p className="ticket-admin-row-meta">
-                    {question.type.replaceAll("_", " ").toLowerCase()} · {question.required ? (locale === "nl" ? "Verplicht" : "Required") : (locale === "nl" ? "Optioneel" : "Optional")} · {question.ticketType ? question.ticketType.nameNl : (locale === "nl" ? "Alle tickettypes" : "All ticket types")}
+                    {question.type.replaceAll("_", " ").toLowerCase()} · {question.required ? (nl ? "Verplicht" : "Required") : (nl ? "Optioneel" : "Optional")} · {question.ticketType ? question.ticketType.nameNl : (nl ? "Alle tickettypes" : "All ticket types")}
                   </p>
                   <p className="ticket-admin-row-meta ticket-admin-code">{question.code}</p>
                 </div>
@@ -73,12 +111,12 @@ export function TicketQuestionManager({
                     <input type="hidden" name="questionId" value={question.id} />
                     <button className="ticket-admin-button" data-variant="danger" type="submit">
                       <Archive aria-hidden="true" size={15} />
-                      {locale === "nl" ? "Archiveren" : "Archive"}
+                      {nl ? "Archiveren" : "Archive"}
                     </button>
                   </form>
                 ) : (
                   <span className="ticket-admin-status" data-tone="neutral">
-                    {locale === "nl" ? "Gearchiveerd" : "Archived"}
+                    {nl ? "Gearchiveerd" : "Archived"}
                   </span>
                 )}
               </div>
@@ -89,38 +127,116 @@ export function TicketQuestionManager({
 
       <hr className="ticket-admin-divider" />
       <details className="ticket-admin-details">
-        <summary>{locale === "nl" ? "Vraag toevoegen" : "Add question"}</summary>
+        <summary>{nl ? "Vraag toevoegen" : "Add question"}</summary>
         <div className="ticket-admin-details-body">
           <form action={createTicketQuestionAction} className="ticket-admin-form">
             <input type="hidden" name="locale" value={locale} />
             <input type="hidden" name="eventId" value={eventId} />
+            {/* De action leidt de code af uit het label wanneer er geen wordt
+                meegegeven, dus we vragen die niet meer: `DIET` intikken zei de
+                gebruiker niets en de waarde is nergens zichtbaar. */}
+            <input type="hidden" name="type" value={questionType(kind, longText, multiple)} />
+
             <div className="ticket-admin-form-grid">
               <div className="ticket-admin-field">
-                <label htmlFor="question-label-nl">Vraag (NL)</label>
-                <input id="question-label-nl" name="labelNl" required />
+                <label htmlFor="question-label-nl">{nl ? "Vraag (NL)" : "Question (NL)"}</label>
+                <input
+                  id="question-label-nl"
+                  name="labelNl"
+                  placeholder={nl ? "Heb je allergieën?" : "Do you have any allergies?"}
+                  required
+                />
               </div>
               <div className="ticket-admin-field">
-                <label htmlFor="question-label-en">Vraag (EN)</label>
+                <label htmlFor="question-label-en">{nl ? "Vraag (EN)" : "Question (EN)"}</label>
                 <input id="question-label-en" name="labelEn" />
               </div>
-              <div className="ticket-admin-field">
-                <label htmlFor="question-code">Code</label>
-                <input id="question-code" name="code" placeholder="DIET" required />
+            </div>
+
+            <fieldset className="ticket-admin-choice-set">
+              <legend>{nl ? "Hoe antwoordt de deelnemer?" : "How does the attendee answer?"}</legend>
+              <div className="ticket-admin-choice-grid">
+                {KINDS.map((option) => {
+                  const [title, help] = nl ? option.nl : option.en;
+                  return (
+                    <label
+                      key={option.kind}
+                      className="ticket-admin-choice"
+                      data-selected={kind === option.kind}
+                    >
+                      <input
+                        type="radio"
+                        name="answerKind"
+                        value={option.kind}
+                        checked={kind === option.kind}
+                        onChange={() => setKind(option.kind)}
+                      />
+                      <span>
+                        <strong>{title}</strong>
+                        <small>{help}</small>
+                      </span>
+                    </label>
+                  );
+                })}
               </div>
-              <div className="ticket-admin-field">
-                <label htmlFor="question-type">Type</label>
-                <select id="question-type" name="type" defaultValue="SHORT_TEXT">
-                  <option value="SHORT_TEXT">{locale === "nl" ? "Korte tekst" : "Short text"}</option>
-                  <option value="LONG_TEXT">{locale === "nl" ? "Lange tekst" : "Long text"}</option>
-                  <option value="SINGLE_CHOICE">{locale === "nl" ? "Eén keuze" : "Single choice"}</option>
-                  <option value="MULTIPLE_CHOICE">{locale === "nl" ? "Meerdere keuzes" : "Multiple choice"}</option>
-                  <option value="BOOLEAN">{locale === "nl" ? "Ja / nee" : "Yes / no"}</option>
-                </select>
+            </fieldset>
+
+            {/* Enkel de verfijning die bij het gekozen soort hoort. Zo staat er
+                nooit een optieveld op het scherm bij een open vraag. */}
+            {kind === "TEXT" ? (
+              <label className="ticket-admin-check">
+                <input
+                  type="checkbox"
+                  checked={longText}
+                  onChange={(event) => setLongText(event.target.checked)}
+                />
+                {nl
+                  ? "Meerdere regels (voor een langer antwoord)"
+                  : "Multiple lines (for a longer answer)"}
+              </label>
+            ) : null}
+
+            {kind === "CHOICE" ? (
+              <div className="ticket-admin-form-grid">
+                <div className="ticket-admin-field" data-span="2">
+                  <label htmlFor="question-options">{nl ? "De opties" : "The options"}</label>
+                  <textarea
+                    id="question-options"
+                    name="options"
+                    rows={4}
+                    required
+                    placeholder={
+                      nl
+                        ? "Eén optie per regel, bijvoorbeeld:\nVegetarisch\nVeganistisch\nGeen voorkeur"
+                        : "One option per line, for example:\nVegetarian\nVegan\nNo preference"
+                    }
+                  />
+                  <span className="ticket-admin-help">
+                    {nl ? "Minstens twee opties." : "At least two options."}
+                  </span>
+                </div>
+                <div className="ticket-admin-field" data-span="2">
+                  <label className="ticket-admin-check">
+                    <input
+                      type="checkbox"
+                      checked={multiple}
+                      onChange={(event) => setMultiple(event.target.checked)}
+                    />
+                    {nl
+                      ? "De deelnemer mag meerdere opties aanduiden"
+                      : "The attendee may pick several options"}
+                  </label>
+                </div>
               </div>
+            ) : null}
+
+            <div className="ticket-admin-form-grid">
               <div className="ticket-admin-field">
-                <label htmlFor="question-ticket-type">Tickettype</label>
+                <label htmlFor="question-ticket-type">
+                  {nl ? "Geldt voor" : "Applies to"}
+                </label>
                 <select id="question-ticket-type" name="ticketTypeId" defaultValue="">
-                  <option value="">{locale === "nl" ? "Alle tickettypes" : "All ticket types"}</option>
+                  <option value="">{nl ? "Alle tickettypes" : "All ticket types"}</option>
                   {ticketTypes.filter((ticketType) => ticketType.active).map((ticketType) => (
                     <option key={ticketType.id} value={ticketType.id}>
                       {locale === "en" && ticketType.nameEn ? ticketType.nameEn : ticketType.nameNl}
@@ -129,41 +245,30 @@ export function TicketQuestionManager({
                 </select>
               </div>
               <div className="ticket-admin-field">
-                <label htmlFor="question-sort">{locale === "nl" ? "Volgorde" : "Order"}</label>
+                <label htmlFor="question-sort">{nl ? "Volgorde" : "Order"}</label>
                 <input id="question-sort" name="sortOrder" type="number" defaultValue="0" />
               </div>
               <div className="ticket-admin-field" data-span="2">
-                <label htmlFor="question-description-nl">Toelichting (NL)</label>
+                <label htmlFor="question-description-nl">
+                  {nl ? "Toelichting (NL)" : "Explanation (NL)"}
+                </label>
                 <textarea id="question-description-nl" name="descriptionNl" rows={2} />
               </div>
               <div className="ticket-admin-field" data-span="2">
-                <label htmlFor="question-description-en">Toelichting (EN)</label>
+                <label htmlFor="question-description-en">
+                  {nl ? "Toelichting (EN)" : "Explanation (EN)"}
+                </label>
                 <textarea id="question-description-en" name="descriptionEn" rows={2} />
               </div>
-              <div className="ticket-admin-field" data-span="2">
-                <label htmlFor="question-options">
-                  {locale === "nl" ? "Keuzeopties" : "Choice options"}
-                </label>
-                <textarea
-                  id="question-options"
-                  name="options"
-                  rows={4}
-                  placeholder={locale === "nl" ? "Eén optie per regel" : "One option per line"}
-                />
-                <span className="ticket-admin-help">
-                  {locale === "nl"
-                    ? "Alleen nodig bij één of meerdere keuzes."
-                    : "Only needed for single or multiple choice."}
-                </span>
-              </div>
             </div>
+
             <label className="ticket-admin-check">
               <input type="checkbox" name="required" value="true" />
-              {locale === "nl" ? "Verplicht invullen" : "Required"}
+              {nl ? "Verplicht invullen" : "Required"}
             </label>
             <button className="ticket-admin-button" data-variant="primary" type="submit">
               <Plus aria-hidden="true" size={16} />
-              {locale === "nl" ? "Vraag toevoegen" : "Add question"}
+              {nl ? "Vraag toevoegen" : "Add question"}
             </button>
           </form>
         </div>

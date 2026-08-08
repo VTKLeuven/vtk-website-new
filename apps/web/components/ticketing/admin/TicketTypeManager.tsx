@@ -56,11 +56,6 @@ export function TicketTypeManager({
             <span className="ticket-admin-section-icon"><Package aria-hidden="true" size={17} /></span>
             <div>
             <h2>{locale === "nl" ? "Voorraad" : "Inventory"}</h2>
-            <p>
-              {locale === "nl"
-                ? "Een voorraadpool kan door meerdere tickettypes worden gedeeld."
-                : "An inventory pool can be shared by multiple ticket types."}
-            </p>
             </div>
           </div>
         </div>
@@ -147,11 +142,6 @@ export function TicketTypeManager({
             <span className="ticket-admin-section-icon"><Ticket aria-hidden="true" size={17} /></span>
             <div>
             <h2>{locale === "nl" ? "Tickettypes" : "Ticket types"}</h2>
-            <p>
-              {locale === "nl"
-                ? "Prijzen worden in eurocent opgeslagen en kunnen na verkoop niet stilzwijgend worden aangepast."
-                : "Prices are stored in cents and should not be changed silently after sales."}
-            </p>
             </div>
           </div>
         </div>

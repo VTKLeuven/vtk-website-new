@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Button, Input, Label } from "@vtk/ui";
 import { saveMagazineAction } from "@/app/actions/media";
+import { FileField } from "@/components/ui/FileField";
 
 const ERRORS: Record<string, { nl: string; en: string }> = {
   missing_fields: { nl: "Vul soort, titel en editie in.", en: "Fill in kind, title, and issue." },
@@ -91,7 +92,14 @@ export function MagazineUploadForm({ locale }: { locale: "nl" | "en" }) {
       </div>
       <div className="md:col-span-2">
         <Label>PDF</Label>
-        <input type="file" name="file" accept="application/pdf,.pdf" required className="block w-full text-sm" />
+        <FileField
+          name="file"
+          accept="application/pdf,.pdf"
+          required
+          locale={locale}
+          chooseLabel={nl ? "PDF kiezen" : "Choose PDF"}
+          hint={nl ? "Enkel PDF-bestanden." : "PDF files only."}
+        />
       </div>
       <div className="md:col-span-2 flex items-center gap-3">
         <Button type="submit" disabled={busy}>
