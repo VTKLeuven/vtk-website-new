@@ -1,3 +1,5 @@
+import type { Metadata } from "next";
+import { staticMetadata } from "@/lib/pageMetadata";
 import { prisma } from "@vtk/db";
 import { notFound } from "next/navigation";
 import { getDictionary, pick, type Locale } from "@vtk/i18n";
@@ -5,6 +7,16 @@ import { hasLocale } from "@/lib/locale";
 import { publicUrl } from "@/lib/storage";
 
 import "@/app/design/vtk-home.css";
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ locale: string }>;
+}): Promise<Metadata> {
+  const { locale } = await params;
+  if (!hasLocale(locale)) return {};
+  return staticMetadata("pocs", "/pocs", locale);
+}
 
 /**
  * Alle POC's. Bewust dezelfde kaarten als de POC-band op de homepage

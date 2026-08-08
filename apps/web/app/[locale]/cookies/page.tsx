@@ -1,6 +1,18 @@
+import type { Metadata } from "next";
+import { staticMetadata } from "@/lib/pageMetadata";
 import { notFound } from "next/navigation";
 import { hasLocale } from "@/lib/locale";
 import { LegalArticle } from "@/components/site/LegalArticle";
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ locale: string }>;
+}): Promise<Metadata> {
+  const { locale } = await params;
+  if (!hasLocale(locale)) return {};
+  return staticMetadata("cookies", "/cookies", locale);
+}
 
 export default async function CookiePolicyPage({
   params,

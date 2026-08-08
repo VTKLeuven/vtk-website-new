@@ -1,3 +1,5 @@
+import type { Metadata } from "next";
+import { staticMetadata } from "@/lib/pageMetadata";
 import Link from "next/link";
 import { prisma } from "@vtk/db";
 import { notFound } from "next/navigation";
@@ -5,6 +7,16 @@ import { getDictionary, pick, type Locale } from "@vtk/i18n";
 import { hasLocale } from "@/lib/locale";
 import { publicUrl } from "@/lib/storage";
 import { currentWorkingYear, formatWorkingYear } from "@/lib/workingYear";
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ locale: string }>;
+}): Promise<Metadata> {
+  const { locale } = await params;
+  if (!hasLocale(locale)) return {};
+  return staticMetadata("praesidium", "/praesidium", locale);
+}
 
 export default async function PraesidiumPage({
   params,

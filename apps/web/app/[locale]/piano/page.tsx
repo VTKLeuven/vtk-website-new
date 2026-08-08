@@ -1,3 +1,5 @@
+import type { Metadata } from "next";
+import { staticMetadata } from "@/lib/pageMetadata";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { prisma } from "@vtk/db";
@@ -14,6 +16,16 @@ import { PianoAgenda, type AgendaDay } from "./PianoAgenda";
 
 import "@/app/design/vtk-basic.css";
 import "@/app/design/vtk-piano.css";
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ locale: string }>;
+}): Promise<Metadata> {
+  const { locale } = await params;
+  if (!hasLocale(locale)) return {};
+  return staticMetadata("piano", "/piano", locale);
+}
 
 /**
  * Publieke pianopagina: de praktische afspraken en de weekagenda met tijdsloten.
