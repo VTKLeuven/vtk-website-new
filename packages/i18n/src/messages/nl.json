@@ -597,5 +597,17 @@
       "fallback": "Reserveren mislukt. Probeer later opnieuw.",
       "cancelFailed": "Annuleren mislukt. Probeer later opnieuw."
     }
+  },
+  "notFound": {
+    "kicker": "404",
+    "title": "Deze pagina bestaat niet",
+    "lead": "Het adres klopt niet, of de pagina is verhuisd bij de overstap naar de nieuwe site.",
+    "body": "Kwam je hier via een oude link of een bladwijzer? Onderstaande wegen brengen je terug. Blijft er iets kapot, laat het weten via",
+    "homeTitle": "Naar de homepage",
+    "homeLead": "Het nieuws, de openingsuren en wat er de komende dagen te doen is.",
+    "infoTitle": "Info",
+    "infoLead": "De praktische pagina's: diensten, voorzieningen en hoe je ze gebruikt.",
+    "calendarTitle": "Kalender",
+    "calendarLead": "Alle activiteiten, van cantus tot infosessie."
   }
 }

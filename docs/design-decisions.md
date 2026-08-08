@@ -1414,3 +1414,20 @@ product- en niet puur technisch:
   VTK-wordmerk** (`apps/web/app/opengraph-image.jpg`, gebouwd uit
   `public/hero-arenberg.jpg`). Eén beeld voor de hele site; een pagina met een
   echte eigen foto geeft die mee aan `buildMetadata()`.
+
+---
+
+## De 404-pagina
+
+- Er is er één, in de huisstijl: dezelfde donkere `.vtk-page-head`-band als elke
+  andere pagina, en daaronder drie wegen terug (home, Info, kalender). Geen vierde
+  of vijfde: dat zijn de drie plekken waar verdwaald verkeer op uitkomt.
+- **Twee bestanden, één scherm.** `app/[locale]/not-found.tsx` vangt elke
+  `notFound()` in een segment onder de taal (het gros: een onbekende
+  `/[headerSlug]` valt gewoon binnen de routeboom); `app/not-found.tsx` vangt een
+  adres dat op geen enkele route valt en staat buiten `[locale]/layout.tsx`, dus
+  dat bestand haalt zelf de sitekop, de sitevoet en de ontwerp-CSS binnen. Beide
+  renderen `components/site/NotFoundView.tsx`.
+- Een not-found-component krijgt geen props, ook geen `params`. De taal komt daar
+  uit de `x-pathname`-header die `proxy.ts` zet, net als in de root layout. De
+  canonical wijst naar het adres dat niet bestond en de pagina staat op `noIndex`.

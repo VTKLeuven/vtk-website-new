@@ -597,5 +597,17 @@
       "fallback": "Reserving failed. Please try again later.",
       "cancelFailed": "Cancelling failed. Please try again later."
     }
+  },
+  "notFound": {
+    "kicker": "404",
+    "title": "This page does not exist",
+    "lead": "The address is wrong, or the page moved when we rebuilt the site.",
+    "body": "Did you get here from an old link or a bookmark? The routes below take you back. If something stays broken, let us know at",
+    "homeTitle": "Go to the homepage",
+    "homeLead": "News, opening hours and what is coming up in the next few days.",
+    "infoTitle": "Info",
+    "infoLead": "The practical pages: services, facilities and how to use them.",
+    "calendarTitle": "Calendar",
+    "calendarLead": "Every activity, from cantus to info session."
   }
 }
