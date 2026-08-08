@@ -1365,3 +1365,39 @@ PDF. Code in `apps/web/lib/ticketing/wallet/`.
   ticketpagina bruikbaar (dezelfde toegangscookie als de bestaande PDF-link vereist
   dat). "Ook via mail" is zo gelezen als: bereikbaar via de link die de mail al
   stuurt, niet letterlijk als knoppen in de mail-HTML.
+
+---
+
+## Wat er in Google mag staan (canonicals, sitemap, robots)
+
+De site draait op twee URL-vormen voor dezelfde pagina: Nederlands leeft op de root
+(`/kalender`), maar `/nl/kalender` rendert exact dezelfde inhoud omdat `proxy.ts`
+een pad met taalvoorvoegsel gewoon doorlaat. De keuze die daaruit volgt is
+product- en niet puur technisch:
+
+- **De voorvoegselloze NL-URL is de echte URL.** Elke canonical wijst daarheen, en
+  `x-default` in de hreflang-tabel ook: wie zonder taalvoorkeur binnenkomt, hoort
+  op het Nederlands te landen. Engels leeft onder `/en/...`. Alles hiervoor loopt
+  via `buildMetadata()` in `apps/web/lib/seo.ts`; schrijf geen losse `metadata` met
+  een handgeschreven titel, want dan lopen canonical en hreflang uiteen.
+- **`/nl/...` staat bewust niet op disallow in robots.txt.** Een crawler die een
+  URL niet mag ophalen ziet de canonical erop ook niet en kan hem alsnog kaal
+  indexeren. Duplicate content los je op met de canonical, niet met robots.txt.
+- **Hreflang gebruikt `nl` en `en`, het `<html lang>`-attribuut `nl-BE` en `en`.**
+  Dat lijkt inconsistent maar is het niet: `hreflang="nl-BE"` betekent voor een
+  zoekmachine "enkel Nederlandstaligen in België", waardoor een zoeker uit
+  Nederland buiten de match valt. Voor de taal van het document is de Belgische
+  variant wel de juiste (spelling, uitspraak in een screenreader).
+- **Wat in de sitemap komt**: de vaste publieke routes (expliciete lijst in
+  `apps/web/lib/sitemap.ts`, geen scan van de bestandsboom, want `app/[locale]`
+  bevat ook account- en bestelschermen), de zichtbare categorieën die een eigen
+  pagina hebben, elke gepubliceerde infopagina, en enkel `PUBLIC`-evenementen. Een
+  concept en een ledenexclusief evenement horen er niet in, ook niet als losse
+  titel: dat zou het bestaan ervan alsnog verklappen.
+- **Een pagina onder een categorie is canoniek `/<categorie>/<slug>`**, niet
+  `/p/<slug>`, hoewel beide werken. De categorievorm is de weg die de navigatie
+  aanbiedt, dus dat is de URL die gedeeld hoort te worden.
+- **Het standaard deelbeeld is het Arenbergkasteel onder een navy scrim met het
+  VTK-wordmerk** (`apps/web/app/opengraph-image.jpg`, gebouwd uit
+  `public/hero-arenberg.jpg`). Eén beeld voor de hele site; een pagina met een
+  echte eigen foto geeft die mee aan `buildMetadata()`.

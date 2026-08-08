@@ -3,6 +3,12 @@ import { Geist, Geist_Mono, Instrument_Serif, Inter } from "next/font/google";
 import { getSentryDsn } from "@/lib/runtimeConfig";
 import { CookieConsent } from "@/components/site/CookieConsent";
 import { HTML_LANG, currentLocale } from "@/lib/locale";
+import {
+  SITE_DESCRIPTION,
+  SITE_LONG_NAME,
+  SITE_TITLE_TEMPLATE,
+  siteMetadataBase,
+} from "@/lib/seo";
 import "./globals.css";
 
 const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
@@ -19,9 +25,24 @@ const vtkSerif = Instrument_Serif({
 });
 
 export const metadata: Metadata = {
-  title: "Vlaamse Technische Kring",
-  description:
-    "De officiële website van VTK, de studentenvereniging van de faculteit ingenieurswetenschappers.",
+  // Basis voor elke relatieve URL in metadata. `lib/seo.ts` levert absolute
+  // URL's, maar de bestandsconventies (opengraph-image) hebben dit wel nodig.
+  metadataBase: siteMetadataBase(),
+  // Een pagina zet enkel haar eigen titel; het sjabloon plakt de sitenaam eraan.
+  // Ook onder `openGraph`, want Next houdt dat sjabloon apart bij en past het
+  // toe op de `og:title` van een dieper segment.
+  title: { default: SITE_LONG_NAME, template: SITE_TITLE_TEMPLATE },
+  description: SITE_DESCRIPTION,
+  openGraph: {
+    type: "website",
+    title: { default: SITE_LONG_NAME, template: SITE_TITLE_TEMPLATE },
+    description: SITE_DESCRIPTION,
+    siteName: "VTK",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: { default: SITE_LONG_NAME, template: SITE_TITLE_TEMPLATE },
+  },
   icons: {
     icon: [
       {
