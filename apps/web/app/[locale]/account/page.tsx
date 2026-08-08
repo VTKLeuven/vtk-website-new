@@ -1,3 +1,5 @@
+import type { Metadata } from 'next';
+import { staticMetadata } from '@/lib/pageMetadata';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { prisma } from '@vtk/db';
@@ -19,6 +21,16 @@ import { AccountShifts } from './AccountShifts';
 import { DoorShortcutTokens } from './DoorShortcutTokens';
 import { CalendarFeedTokens } from './CalendarFeedTokens';
 import { siteBaseUrl } from '@/lib/calendar/feeds';
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ locale: string }>;
+}): Promise<Metadata> {
+  const { locale } = await params;
+  if (!hasLocale(locale)) return {};
+  return staticMetadata('account', '/account', locale, { noIndex: true });
+}
 
 export default async function AccountPage({ params }: { params: Promise<{ locale: string }> }) {
   const { locale } = await params;

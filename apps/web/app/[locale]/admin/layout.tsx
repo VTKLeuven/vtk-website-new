@@ -1,3 +1,4 @@
+import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { prisma } from '@vtk/db';
 import { hasLocale } from '@/lib/locale';
@@ -88,6 +89,15 @@ const NAV: NavEntry[] = [
 ];
 
 type DictAdmin = ReturnType<typeof getDictionary>['admin'];
+
+/**
+ * Eén keer op de layout, niet per pagina: alles onder /admin staat achter een
+ * login en hoort in geen enkele zoekmachine. De admin-schermen krijgen bewust
+ * geen verdere metadata; ze worden nooit gedeeld als link.
+ */
+export const metadata: Metadata = {
+  robots: { index: false, follow: false },
+};
 
 export default async function AdminLayout({
   children,

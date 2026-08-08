@@ -1,3 +1,5 @@
+import type { Metadata } from 'next';
+import { staticMetadata } from '@/lib/pageMetadata';
 import { headers } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { notFound } from 'next/navigation';
@@ -7,6 +9,16 @@ import { getSession, isKulEnabled } from '@vtk/auth/server';
 import { hasPrompt, isOAuthRequest, resumeAuthorizeUrl, type RawSearchParams } from '@/lib/oauthFlow';
 import { LoginForm } from './LoginForm';
 import { KulSignInButton } from './KulSignInButton';
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ locale: string }>;
+}): Promise<Metadata> {
+  const { locale } = await params;
+  if (!hasLocale(locale)) return {};
+  return staticMetadata('login', '/inloggen', locale, { noIndex: true });
+}
 
 export default async function LoginPage({
   params,
