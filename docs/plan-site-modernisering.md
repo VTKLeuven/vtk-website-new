@@ -314,6 +314,32 @@ en omdat het op onze eigen infrastructuur draait komt er geen verwerker bij.
 
 ---
 
+## Op te ruimen bij de integratie (golf 4)
+
+Verzameld tijdens de uitvoering. Elk punt is bewust blijven liggen omdat het
+buiten het bestandseigendom van de lopende werkstroom viel.
+
+1. **Ongebruikte i18n-sleutel `footer.linkWerkgroepen`** in `nl.json` en
+   `en.json`. WS-3 verving hem door `footer.linkWerkgroepenCircles` maar mocht de
+   oude niet verwijderen, want die bestanden zijn alleen-toevoegen.
+2. **De canonical van `/p/theokot` wijst naar `/info/theokot`, en dat adres
+   307't naar `/theokot`.** Een canonical die naar een redirect wijst is slordig.
+   Oorzaak: `app/[locale]/info/theokot/page.tsx` is een harde redirect-route die
+   het categoriepad van de gelijknamige contentpagina overschaduwt. WS-0's
+   sitemap heeft dezelfde aanname. Kies één van beide: de canonical op `/p/<slug>`
+   houden zodra een vaste route het categoriepad afdekt, of die redirect-route
+   schrappen. Waarschijnlijk lost de inhoudsmigratie (auditpunt 1) dit vanzelf op,
+   want de prototypepagina "theokot" dubbelt met de echte `/theokot`-route.
+3. **Twee 308's op elke oude vtk.be-URL.** Next normaliseert eerst de afsluitende
+   slash en past dan pas de redirect toe. Functioneel prima; enkel
+   `skipTrailingSlashRedirect` zou het platslaan en dat verandert globaal gedrag.
+   Bewust zo gelaten, hier genoteerd zodat het geen verrassing is.
+4. **`STATIC_ROUTES` in `lib/sitemap.ts` nakijken** nu WS-3 en latere
+   werkstromen routes toevoegen (`/zoeken`, `/contact`).
+5. **Productie nakijken op de Aanbod/Info-migratie.** Lokaal stond de
+   `HeaderTab`-rij nog op slug `aanbod`; de nieuwe migratie zet dat recht, maar
+   controleer na de deploy dat `/info` daar ook echt 200 geeft.
+
 ## Werkafspraken voor elke werkstroom
 
 1. **Lees eerst `AGENTS.md` en `CLAUDE.md`.** De schrijf- en UX-conventies zijn
