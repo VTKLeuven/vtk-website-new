@@ -1,13 +1,15 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import Image from "next/image";
 import { notFound } from "next/navigation";
-import { prisma } from "@vtk/db";
 import { pick, type Locale } from "@vtk/i18n";
 import { Markdown } from "@/components/ui/Markdown";
 import { hasLocale } from "@/lib/locale";
 import { publicUrl } from "@/lib/storage";
-import { getDefaultEventImage } from "@/lib/defaultEventImage";
-import { CategoryCalendar, findCategoryBySlug } from "./CategoryCalendar";
+import { eventMetadata } from "@/lib/pageMetadata";
+import { loadCalendarCategory, loadCalendarEvent, loadDefaultEventImage } from "@/lib/pageQueries";
+import { buildMetadata } from "@/lib/seo";
+import { CategoryCalendar } from "./CategoryCalendar";
 
 import "@/app/design/vtk-event.css";
 
@@ -38,6 +40,30 @@ function formatDateRange(start: Date, end: Date, locale: Locale, allDay: boolean
   return `${day} · ${startTime} - ${endTime}`;
 }
 
+type Params = Promise<{ locale: string; slugOrId: string }>;
+
+export async function generateMetadata({ params }: { params: Params }): Promise<Metadata> {
+  const { locale, slugOrId } = await params;
+  if (!hasLocale(locale)) return {};
+
+  // Zelfde volgorde als de pagina hieronder: eerst de categorie, dan het event.
+  const category = await loadCalendarCategory(slugOrId);
+  if (category) {
+    return buildMetadata({
+      title: pick(category.nameNl, category.nameEn, locale),
+      description: pick(category.descriptionNl ?? "", category.descriptionEn ?? "", locale),
+      path: `/kalender/${category.slug}`,
+      locale,
+    });
+  }
+
+  const event = await loadCalendarEvent(slugOrId);
+  if (!event || event.visibility !== "PUBLIC") return {};
+
+  const image = publicUrl(event.imageKey) ?? (await loadDefaultEventImage());
+  return eventMetadata(event, locale, `/kalender/${event.id}`, image);
+}
+
 /**
  * Eén dynamisch segment onder /kalender voor twee dingen: een categorieslug
  * ("eerstejaars") en een event-id (een cuid). De categorie krijgt voorrang,
@@ -45,39 +71,23 @@ function formatDateRange(start: Date, end: Date, locale: Locale, allDay: boolean
  * we `vtk.be/kalender/eerstejaars` als URL zonder de bestaande links naar
  * `/kalender/<id>` (vanaf de homepage) te breken.
  */
-export default async function CalendarSegmentPage({
-  params,
-}: {
-  params: Promise<{ locale: string; slugOrId: string }>;
-}) {
+export default async function CalendarSegmentPage({ params }: { params: Params }) {
   const { locale: localeParam, slugOrId } = await params;
   if (!hasLocale(localeParam)) notFound();
   const locale: Locale = localeParam;
   const base = locale === "nl" ? "" : "/en";
 
-  const category = await findCategoryBySlug(slugOrId);
+  const category = await loadCalendarCategory(slugOrId);
   if (category) return <CategoryCalendar category={category} locale={locale} />;
 
-  const event = await prisma.calendarEvent.findUnique({
-    where: { id: slugOrId },
-    include: {
-      group: true,
-      ticketEvent: { select: { slug: true, status: true } },
-      categories: {
-        select: {
-          category: { select: { slug: true, nameNl: true, nameEn: true, colour: true, audience: true } },
-        },
-        orderBy: { category: { order: "asc" } },
-      },
-    },
-  });
+  const event = await loadCalendarEvent(slugOrId);
 
   if (!event || event.visibility !== "PUBLIC") notFound();
 
   const title = pick(event.titleNl, event.titleEn, locale);
   const description = pick(event.descriptionNl ?? "", event.descriptionEn ?? "", locale);
   const groupName = pick(event.group.nameNl, event.group.nameEn, locale);
-  const imageSrc = publicUrl(event.imageKey) ?? (await getDefaultEventImage());
+  const imageSrc = publicUrl(event.imageKey) ?? (await loadDefaultEventImage());
   // Doelgroepen krijgen een eigen, opvallend label: wie hier toevallig belandt
   // moet meteen zien dat het evenement voor eerstejaars of internationals is.
   const audiences = event.categories
