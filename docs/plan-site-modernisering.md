@@ -314,14 +314,28 @@ en omdat het op onze eigen infrastructuur draait komt er geen verwerker bij.
 
 ---
 
+## Stand van zaken
+
+| Werkstroom | Status | Commits |
+|---|---|---|
+| WS-0 fundament | af | `dd88a67`, `5cd720b` |
+| WS-1 redirects | af | `7731490` |
+| WS-3 chrome | af | `49602a0`, `ff64fa4`, `34d5d34`, `713cf1b` |
+| WS-2 metadata | af | `b3d1ec6`, `c645850`, `46ad0c5`, `8685868` |
+| WS-5 zoeken | af | `73a1094` (backend), `4edc08f` (UI) |
+| WS-4 next/image | af | `8e04f31` |
+| WS-6 contactformulier | af | `09a7833`, `3783acb` (fix) |
+| **WS-7 statistieken** | **nog te doen** | Plausible self-hosted; niet gestart |
+| Integratie | grotendeels af | `bf32d74` |
+
+`npm run verify` is groen: 43 testbestanden, 417 tests, 0 lint-errors.
+
 ## Op te ruimen bij de integratie (golf 4)
 
 Verzameld tijdens de uitvoering. Elk punt is bewust blijven liggen omdat het
 buiten het bestandseigendom van de lopende werkstroom viel.
 
-1. **Ongebruikte i18n-sleutel `footer.linkWerkgroepen`** in `nl.json` en
-   `en.json`. WS-3 verving hem door `footer.linkWerkgroepenCircles` maar mocht de
-   oude niet verwijderen, want die bestanden zijn alleen-toevoegen.
+1. ~~Ongebruikte i18n-sleutel `footer.linkWerkgroepen`~~ opgeruimd in `bf32d74`.
 2. **De canonical van `/p/theokot` wijst naar `/info/theokot`, en dat adres
    307't naar `/theokot`.** Een canonical die naar een redirect wijst is slordig.
    Oorzaak: `app/[locale]/info/theokot/page.tsx` is een harde redirect-route die
@@ -334,11 +348,22 @@ buiten het bestandseigendom van de lopende werkstroom viel.
    slash en past dan pas de redirect toe. Functioneel prima; enkel
    `skipTrailingSlashRedirect` zou het platslaan en dat verandert globaal gedrag.
    Bewust zo gelaten, hier genoteerd zodat het geen verrassing is.
-4. **`STATIC_ROUTES` in `lib/sitemap.ts` nakijken** nu WS-3 en latere
-   werkstromen routes toevoegen (`/zoeken`, `/contact`).
+4. ~~`STATIC_ROUTES` nakijken~~ gedaan in `bf32d74`. `/zoeken` hoort er niet in
+   (noindex) en `/contact` zit er al in als headertab. Daarbij bleek dat de
+   sitemap `/theokot`, `/shift` en `/media` dubbel opnam; die ontdubbeling zit
+   nu in `buildSitemapEntries`.
 5. **Productie nakijken op de Aanbod/Info-migratie.** Lokaal stond de
    `HeaderTab`-rij nog op slug `aanbod`; de nieuwe migratie zet dat recht, maar
    controleer na de deploy dat `/info` daar ook echt 200 geeft.
+6. **Geen zoekingang in de kop tussen 1211px en 1280px.** Een invoerveld naast de
+   elf tabs past niet (ze eindigen op 9px van de knoppenrij), dus er staat een
+   zoekknop vanaf 1280px en een volwaardig veld in het menupaneel onder 1211px.
+   Daartussen is er niets. Oplossen vraagt een keuze: de tabs vroeger laten
+   inklappen, of iets anders in de balk inkorten. Bewust niet eenzijdig gedaan,
+   want die navigatie is al gereviewd.
+7. **De snelheidslimiet van het contactformulier zit in procesgeheugen.** Drie
+   berichten per kwartier per IP, maar de teller reset bij elke deploy en klopt
+   niet meer zodra er een tweede webcontainer bijkomt.
 
 ## Werkafspraken voor elke werkstroom
 
