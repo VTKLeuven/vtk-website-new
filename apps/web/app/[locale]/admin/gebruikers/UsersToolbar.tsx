@@ -17,9 +17,10 @@ export type NewUserLabels = {
 };
 
 /**
- * Toolbar boven de gebruikerstabel: doorzoeken (server-side, via de URL) plus de
- * knoppen die "nieuwe gebruiker" en "CSV import" in een modal openen. Zoeken werkt
- * op de volledige DB, niet op een reeds geladen lijst: de term komt in `?q=` en de
+ * Toolbar boven de gebruikerstabel: doorzoeken (server-side, via de URL), de toggle
+ * die inactieve leden toont, plus de knoppen die "nieuwe gebruiker" en "CSV import"
+ * in een modal openen. Zoeken en filteren werken op de volledige DB, niet op een
+ * reeds geladen lijst: de term komt in `?q=` en de toggle in `?inactive=1`, en de
  * server-pagina query't ermee (met paginatie), zodat 24k+ gebruikers schaalbaar blijven.
  */
 export function UsersToolbar({
@@ -27,12 +28,16 @@ export function UsersToolbar({
   canEdit,
   canBulkImport,
   initialQuery,
+  showInactive,
+  inactiveCount,
   newUserLabels,
 }: {
   locale: "nl" | "en";
   canEdit: boolean;
   canBulkImport: boolean;
   initialQuery: string;
+  showInactive: boolean;
+  inactiveCount: number;
   newUserLabels: NewUserLabels;
 }) {
   const nl = locale === "nl";
@@ -64,6 +69,19 @@ export function UsersToolbar({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [query]);
 
+  // De toggle gaat direct naar de server (geen debounce), maar neemt de lokale
+  // zoekterm mee: anders wist ze een term die nog in de debounce hangt.
+  function toggleInactive(next: boolean) {
+    const sp = new URLSearchParams(params.toString());
+    const q = query.trim();
+    if (q) sp.set("q", q);
+    else sp.delete("q");
+    if (next) sp.set("inactive", "1");
+    else sp.delete("inactive");
+    sp.delete("page");
+    router.replace(`${pathname}?${sp.toString()}`);
+  }
+
   return (
     <div className="flex flex-wrap items-center gap-3">
       <SearchBar
@@ -82,6 +100,16 @@ export function UsersToolbar({
           {nl ? "CSV import" : "CSV import"}
         </button>
       )}
+      <label className="inline-flex items-center gap-2 text-sm text-[#5c667f]">
+        <input
+          type="checkbox"
+          checked={showInactive}
+          onChange={(e) => toggleInactive(e.target.checked)}
+          className="size-4 rounded border-zinc-400"
+        />
+        {nl ? "Toon inactieve" : "Show inactive"}
+        {inactiveCount > 0 && <span className="tabular-nums text-zinc-400">({inactiveCount})</span>}
+      </label>
 
       {newOpen && (
         <Modal title={nl ? "Nieuwe gebruiker" : "New user"} onClose={() => setNewOpen(false)}>
