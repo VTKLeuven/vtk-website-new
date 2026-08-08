@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono, Instrument_Serif, Inter } from "next/font/google";
 import { getSentryDsn } from "@/lib/runtimeConfig";
 import { CookieConsent } from "@/components/site/CookieConsent";
+import { HTML_LANG, currentLocale } from "@/lib/locale";
 import "./globals.css";
 
 const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
@@ -44,9 +45,14 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   // na het laden van het document. De client-DSN is publiek per ontwerp.
   const sentryDsn = await getSentryDsn();
 
+  // Deze layout staat boven `[locale]` en krijgt dus geen params. De taal komt
+  // uit de `x-pathname`-header die `proxy.ts` zet: die draagt altijd het
+  // taalvoorvoegsel, ook wanneer de bezoeker op de voorvoegselloze NL-URL zit.
+  const locale = await currentLocale();
+
   return (
     <html
-      lang="nl"
+      lang={HTML_LANG[locale]}
       className={`${geistSans.variable} ${geistMono.variable} ${vtkSans.variable} ${vtkSerif.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col bg-vtk-surface text-vtk-ink antialiased selection:bg-vtk-yellow/40 selection:text-vtk-ink">
