@@ -678,6 +678,92 @@
   font-size: 11px;
 }
 
+/* Adreskiezer: het suggestielijstje hangt onder het invoerveld, dus de
+   container is het positioneringsanker. */
+.ticket-address-picker {
+  position: relative;
+}
+
+.ticket-address-input {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.ticket-address-input input {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.ticket-address-input > button {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: none;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.ticket-address-input > button:hover {
+  background: var(--paper-2);
+  color: var(--ink);
+}
+
+.ticket-address-suggestions {
+  position: absolute;
+  z-index: 20;
+  top: 100%;
+  right: 0;
+  left: 0;
+  margin: 4px 0 0;
+  padding: 4px;
+  list-style: none;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface);
+  box-shadow: 0 12px 28px rgba(14, 26, 54, 0.14);
+}
+
+.ticket-address-suggestions button {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  color: var(--ink);
+  font: inherit;
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.ticket-address-suggestions button:hover,
+.ticket-address-suggestions button:focus-visible {
+  background: var(--paper-2);
+}
+
+.ticket-address-suggestions svg {
+  flex: none;
+  color: var(--muted);
+}
+
+.ticket-address-confirmed {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--ticket-green);
+}
+
 .ticket-design-colour-head {
   display: flex;
   min-height: 20px;
