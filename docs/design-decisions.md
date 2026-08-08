@@ -36,6 +36,15 @@ De volgorde en labels zijn dus een kringkeuze, geen technische:
   aangepast worden.
 - **Tweedehands en tijdsloten draaien op Cudi**, niet op deze site. De footer en de
   homepage-quicklinks linken daarom extern naar `cudi.vtk.be`.
+- **Een hernoeming van een tab bereikt een bestaande database enkel via een
+  migratie.** De seed doet `headerTab.upsert(... update: {} ...)` en werkt een
+  bestaande rij bewust niet bij (labels, slug en volgorde zijn admin-beheerd).
+  Toen "Aanbod" naar "Info" ging, is dat blijven liggen: elke database van voor de
+  hernoeming stond nog op slug `aanbod`, dus `/info` gaf daar 404 terwijl de
+  footer en de redirects van de oude vtk.be-adressen er wel naartoe wezen. De
+  migratie `20260808150000_header_tab_aanbod_to_info` zet dat recht. Doe dit
+  voortaan meteen mee: verander je een default in `HEADER_TABS`, schrijf er dan de
+  migratie bij.
 
 ---
 
