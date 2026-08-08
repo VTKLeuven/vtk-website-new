@@ -38,7 +38,8 @@
     "linkSlots": "Cudi Time Slots",
     "linkPrivacy": "Privacy",
     "linkCookies": "Cookies",
-    "linkCookieSettings": "Cookie choices"
+    "linkCookieSettings": "Cookie choices",
+    "linkRental": "Equipment service"
   },
   "home": {
     "welcome": "Welcome to VTK",

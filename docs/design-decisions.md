@@ -36,6 +36,10 @@ De volgorde en labels zijn dus een kringkeuze, geen technische:
   aangepast worden.
 - **Tweedehands en tijdsloten draaien op Cudi**, niet op deze site. De footer en de
   homepage-quicklinks linken daarom extern naar `cudi.vtk.be`.
+- De **uitleendienst** (`logistiek.vtk.be`) hangt als menu-item onder Info, naast
+  Kalender en Piano, en niet als twaalfde tab: elf tabs is al de grens waarop de
+  header naar een menuknop overschakelt. Ze staat ook in de footerkolom Service,
+  want ze is een dienst en geen categoriepagina.
 - **Een hernoeming van een tab bereikt een bestaande database enkel via een
   migratie.** De seed doet `headerTab.upsert(... update: {} ...)` en werkt een
   bestaande rij bewust niet bij (labels, slug en volgorde zijn admin-beheerd).
