@@ -5,17 +5,16 @@ export class RequestBodyTooLargeError extends Error {
   }
 }
 
-export async function readLimitedText(request: Request, maxBytes: number): Promise<string> {
+export async function readLimitedBytes(request: Request, maxBytes: number): Promise<Uint8Array> {
   const contentLength = Number.parseInt(request.headers.get("content-length") ?? "", 10);
   if (Number.isFinite(contentLength) && contentLength > maxBytes) {
     throw new RequestBodyTooLargeError();
   }
-  if (!request.body) throw new SyntaxError("Missing JSON body");
+  if (!request.body) throw new SyntaxError("Missing request body");
 
   const reader = request.body.getReader();
-  const decoder = new TextDecoder("utf-8", { fatal: true });
   let bytesRead = 0;
-  let body = "";
+  const chunks: Uint8Array[] = [];
   try {
     while (true) {
       const { done, value } = await reader.read();
@@ -25,13 +24,40 @@ export async function readLimitedText(request: Request, maxBytes: number): Promi
         await reader.cancel();
         throw new RequestBodyTooLargeError();
       }
-      body += decoder.decode(value, { stream: true });
+      chunks.push(value);
     }
-    body += decoder.decode();
   } finally {
     reader.releaseLock();
   }
+
+  const body = new Uint8Array(bytesRead);
+  let offset = 0;
+  for (const chunk of chunks) {
+    body.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
   return body;
+}
+
+export async function readLimitedText(request: Request, maxBytes: number): Promise<string> {
+  return new TextDecoder("utf-8", { fatal: true }).decode(
+    await readLimitedBytes(request, maxBytes),
+  );
+}
+
+export async function readLimitedFormData(request: Request, maxBytes: number): Promise<FormData> {
+  const contentType = request.headers.get("content-type") ?? "";
+  const normalizedContentType = contentType.toLowerCase();
+  if (
+    !normalizedContentType.startsWith("multipart/form-data") &&
+    !normalizedContentType.startsWith("application/x-www-form-urlencoded")
+  ) {
+    throw new Error("UNSUPPORTED_MEDIA_TYPE");
+  }
+  const bytes = await readLimitedBytes(request, maxBytes);
+  const body = new ArrayBuffer(bytes.byteLength);
+  new Uint8Array(body).set(bytes);
+  return new Response(body, { headers: { "content-type": contentType } }).formData();
 }
 
 export async function readLimitedJson(request: Request, maxBytes: number): Promise<unknown> {
@@ -41,8 +67,9 @@ export async function readLimitedJson(request: Request, maxBytes: number): Promi
 }
 
 export function trustedClientIp(request: Request): string {
-  const realIp = request.headers.get("x-real-ip")?.trim();
-  if (realIp) return realIp;
+  // X-Real-IP is not set or scrubbed by the documented Caddy deployment, so a
+  // browser can supply it itself. Caddy owns X-Forwarded-For and puts the
+  // directly connected client at the final hop; only that hop is trusted.
   const forwarded = request.headers.get("x-forwarded-for")
     ?.split(",")
     .map((entry) => entry.trim())

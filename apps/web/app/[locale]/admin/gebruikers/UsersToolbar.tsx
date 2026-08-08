@@ -123,7 +123,7 @@ export function UsersToolbar({
             <div><Label>{nl ? "Achternaam" : "Last name"}</Label><Input name="lastName" required /></div>
             <div><Label>Email</Label><Input name="email" type="email" required /></div>
             <div><Label>{nl ? "R-nummer" : "R-number"}</Label><Input name="rNumber" placeholder="r0123456" /></div>
-            <div><Label>{nl ? "Wachtwoord" : "Password"}</Label><Input name="password" type="text" required /></div>
+            <div><Label>{nl ? "Wachtwoord" : "Password"}</Label><Input name="password" type="text" minLength={8} required /></div>
             <div>
               <Label>Locale</Label>
               <Select name="locale" defaultValue="NL">

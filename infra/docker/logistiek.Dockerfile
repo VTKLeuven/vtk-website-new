@@ -19,10 +19,11 @@ RUN npx --yes prisma generate --schema packages/db/prisma/schema.prisma
 RUN npm run build --workspace=@vtk/logistiek
 
 FROM node:${NODE_VERSION}-alpine AS runner
-RUN apk add --no-cache libc6-compat tini
+RUN apk add --no-cache libc6-compat tini tzdata
 WORKDIR /app
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
+ENV TZ=Europe/Brussels
 COPY --from=builder /repo/apps/logistiek/.next ./apps/logistiek/.next
 COPY --from=builder /repo/apps/logistiek/public ./apps/logistiek/public
 COPY --from=builder /repo/apps/logistiek/next.config.ts ./apps/logistiek/next.config.ts

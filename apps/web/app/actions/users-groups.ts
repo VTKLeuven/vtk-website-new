@@ -7,7 +7,6 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "@vtk/db";
 import {
   createUser,
-  setUserPassword,
   updateUser,
 } from "@vtk/auth/server";
 import { hasPermission, fullName, splitFullName } from "@vtk/auth";
@@ -40,12 +39,14 @@ const userSchema = z.object({
 
 export async function saveUserAction(_prev: SaveState, formData: FormData): Promise<SaveState> {
   const session = await requirePermission("users.edit");
+  const password = String(formData.get("password") ?? "");
+  if (password && password.length < 8) return saveError("PASSWORD_TOO_SHORT");
   const result = userSchema.safeParse({
     id: (formData.get("id") as string) || undefined,
     email: String(formData.get("email")).toLowerCase().trim(),
     firstName: formData.get("firstName"),
     lastName: formData.get("lastName"),
-    password: formData.get("password") || undefined,
+    password: password || undefined,
     locale: formData.get("locale") || "NL",
     active: formData.get("active") === "on",
     isSuperAdmin: formData.get("isSuperAdmin") === "on",
@@ -54,6 +55,9 @@ export async function saveUserAction(_prev: SaveState, formData: FormData): Prom
   const parsed = result.data;
   // De weergavenaam blijft afgeleid van voor- + achternaam.
   const name = fullName(parsed.firstName, parsed.lastName);
+  const rNumber = formData.has("rNumber")
+    ? String(formData.get("rNumber") ?? "").trim() || null
+    : undefined;
 
   try {
     if (parsed.id) {
@@ -65,10 +69,9 @@ export async function saveUserAction(_prev: SaveState, formData: FormData): Prom
         locale: parsed.locale,
         active: parsed.active,
         isSuperAdmin: parsed.isSuperAdmin,
+        rNumber,
+        password: parsed.password,
       });
-      if (parsed.password && parsed.password.length > 0) {
-        await setUserPassword(session, parsed.id, parsed.password);
-      }
     } else {
       if (!parsed.password) return saveError("PASSWORD_REQUIRED");
       await createUser(session, {
@@ -80,14 +83,8 @@ export async function saveUserAction(_prev: SaveState, formData: FormData): Prom
         locale: parsed.locale,
         active: parsed.active,
         isSuperAdmin: parsed.isSuperAdmin,
+        rNumber,
       });
-    }
-
-    // rNumber zit niet in createUser/updateUser; enkel bijwerken wanneer het veld
-    // effectief in het formulier zat (lege waarde = wissen).
-    if (formData.has("rNumber")) {
-      const rNumber = String(formData.get("rNumber") ?? "").trim() || null;
-      await prisma.user.update({ where: { email: parsed.email }, data: { rNumber } });
     }
   } catch (err) {
     if (isUniqueViolation(err, "email")) return saveError("EMAIL_TAKEN");
@@ -103,9 +100,13 @@ export async function saveUserAction(_prev: SaveState, formData: FormData): Prom
 }
 
 export async function deleteUserAction(formData: FormData): Promise<void> {
-  await requirePermission("users.edit");
+  const session = await requirePermission("users.edit");
   const id = formData.get("id") as string;
-  if (id) await eraseUserData(id);
+  if (id) {
+    const target = await prisma.user.findUnique({ where: { id }, select: { isSuperAdmin: true } });
+    if (target?.isSuperAdmin && !session.user.isSuperAdmin) throw new Error("forbidden");
+    await eraseUserData(id);
+  }
   revalidatePath("/admin/gebruikers");
   redirect("/admin/gebruikers");
 }
@@ -206,28 +207,37 @@ export async function bulkImportUsersAction(formData: FormData): Promise<{ ok: b
       continue;
     }
     const rNumber = rNumberRaw?.trim() || undefined;
+    if (password && password.length < 8) {
+      errors.push(`Line ${i + 1}: password must contain at least 8 characters`);
+      continue;
+    }
     // De CSV heeft één naamkolom; voor- en achternaam worden eruit afgeleid en
     // zijn achteraf te corrigeren door het lid zelf of in het gebruikersbeheer.
     const parts = splitFullName(name);
     try {
-      const user = await prisma.user.upsert({
-        where: { email: email.toLowerCase() },
-        // rNumber enkel meenemen wanneer de kolom een waarde heeft (niet wissen).
-        update: {
-          name,
-          firstName: parts.firstName || null,
-          lastName: parts.lastName || null,
-          ...(rNumber ? { rNumber } : {}),
-        },
-        create: {
-          email: email.toLowerCase(),
-          name,
-          firstName: parts.firstName || null,
-          lastName: parts.lastName || null,
-          ...(rNumber ? { rNumber } : {}),
-        },
-      });
-      await setUserPassword(session, user.id, password || cryptoRandomPassword());
+      const normalizedEmail = email.toLowerCase();
+      const existing = await prisma.user.findUnique({ where: { email: normalizedEmail } });
+      const effectivePassword = password || cryptoRandomPassword();
+      // Profiel, r-nummer en credential vormen één auth-transactie; een fout in
+      // het wachtwoord laat zo geen half geïmporteerde gebruiker achter.
+      const user = existing
+        ? await updateUser(session, existing.id, {
+            email: normalizedEmail,
+            name,
+            firstName: parts.firstName || null,
+            lastName: parts.lastName || null,
+            ...(rNumber ? { rNumber } : {}),
+            password: effectivePassword,
+          })
+        : await createUser(session, {
+            email: normalizedEmail,
+            name,
+            firstName: parts.firstName || null,
+            lastName: parts.lastName || null,
+            password: effectivePassword,
+            locale: "NL",
+            rNumber,
+          });
       if (groupCode) {
         const group = groupByCode.get(groupCode.trim() as never);
         if (!group) {

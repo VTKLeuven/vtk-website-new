@@ -15,12 +15,16 @@ export type MailInput = {
   subject: string;
   text: string;
   html?: string;
+  messageId?: string;
 };
 
 const FROM = process.env.MAIL_FROM || 'Theokot VTK <theokot@vtk.be>';
 
 /** Verstuurt een mail, of logt ze wanneer SMTP niet geconfigureerd is. */
-export async function sendMail(input: MailInput): Promise<void> {
+export async function sendMail(
+  input: MailInput,
+  options: { throwOnError?: boolean } = {},
+): Promise<void> {
   const host = process.env.SMTP_HOST;
   if (!host) {
     console.info(
@@ -45,10 +49,11 @@ export async function sendMail(input: MailInput): Promise<void> {
       subject: input.subject,
       text: input.text,
       html: input.html,
+      messageId: input.messageId,
     });
   } catch (err) {
-    // Mail-fouten mogen de aanroeper (bvb no-show-verwerking) niet doen falen.
     console.error('[mail] versturen mislukt:', err);
+    if (options.throwOnError) throw err;
   }
 }
 
@@ -58,6 +63,7 @@ type NoShowMailUser = { name: string; email: string; locale: 'NL' | 'EN' };
 export async function sendNoShowWarning(
   user: NoShowMailUser,
   sessionDateLabel: string,
+  orderId: string,
 ): Promise<void> {
   const nl = user.locale !== 'EN';
   const subject = nl
@@ -66,5 +72,8 @@ export async function sendNoShowWarning(
   const text = nl
     ? `Dag ${user.name},\n\nJe hebt broodjes gereserveerd bij Theokot voor ${sessionDateLabel}, maar deze werden niet opgehaald.\n\nGereserveerde broodjes die niet worden afgehaald, gaan verloren. Herhaaldelijk niet komen opdagen kan leiden tot een tijdelijke schorsing van het reservatiesysteem.\n\nGroeten,\nTheokot VTK`
     : `Hi ${user.name},\n\nYou reserved sandwiches at Theokot for ${sessionDateLabel}, but they were not picked up.\n\nReserved sandwiches that are not collected go to waste. Repeatedly not showing up can lead to a temporary suspension from the reservation system.\n\nRegards,\nTheokot VTK`;
-  await sendMail({ to: user.email, subject, text });
+  await sendMail(
+    { to: user.email, subject, text, messageId: `<theokot-no-show-${orderId}@vtk.be>` },
+    { throwOnError: true },
+  );
 }

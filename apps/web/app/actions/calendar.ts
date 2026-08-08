@@ -9,6 +9,7 @@ import { deleteObject } from "@vtk/storage";
 import { requireSession } from "@/lib/session";
 import { readImageField, resolveImageKey } from "@/lib/imageField";
 import { saveError, saveOk, type SaveState } from "@/lib/saveState";
+import { localDateTimeToUtc } from "@/lib/ticketing/time";
 
 const eventSchema = z.object({
   id: z.string().optional(),
@@ -53,8 +54,14 @@ export async function saveEventAction(_prev: SaveState, formData: FormData): Pro
   const input = parsed.data;
   const categoryIds = formData.getAll("categoryIds").map(String).filter(Boolean);
 
-  const start = new Date(input.start);
-  const end = new Date(input.end);
+  let start: Date;
+  let end: Date;
+  try {
+    start = localDateTimeToUtc(input.start);
+    end = localDateTimeToUtc(input.end);
+  } catch {
+    return saveError("INVALID_INPUT");
+  }
   // Het einde mag niet voor de start liggen. Anders is het evenement tegelijk
   // "aankomend" op de homepage (die op `start` filtert) en "verleden" in de
   // admin (die op `end` filtert): dezelfde datum, twee tegengestelde statussen.
@@ -258,6 +265,9 @@ export async function deleteEventAction(formData: FormData): Promise<void> {
   if (!evt) return;
   const superOrAll =
     session.user.isSuperAdmin || hasPermission(session, "calendar.manageAll");
+  if (!superOrAll && !hasPermission(session, "calendar.create")) {
+    throw new Error("forbidden");
+  }
   const userGroupIds = session.groups.map((g) => g.id);
   await assertCanManageEvent(userGroupIds, evt.groupId, superOrAll);
   await prisma.calendarEvent.delete({ where: { id } });

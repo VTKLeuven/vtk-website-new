@@ -19,6 +19,7 @@ import {
   PIANO_INFO_KEY,
 } from "@/lib/piano-server";
 import { saveError, saveOk, type SaveState } from "@/lib/saveState";
+import { withSerializableTransaction } from "@/lib/ticketing/transactions";
 
 const PUBLIC_PATHS = ["/piano", "/en/piano"];
 const ADMIN_PATHS = ["/admin/piano", "/en/admin/piano"];
@@ -79,19 +80,22 @@ export async function reservePianoSlotAction(
   // Weeklimiet: enkel slots die nog moeten komen tellen mee. Een slot dat al
   // gespeeld is mag je week niet blokkeren.
   const week = pianoWeekRange(startsAt);
-  const thisWeek = await prisma.pianoReservation.count({
-    where: {
-      userId: session.user.id,
-      startsAt: { gte: week.from, lt: week.to },
-      endsAt: { gt: now },
-    },
-  });
-  if (thisWeek >= config.maxPerWeek) return saveError("weekLimit");
-
   try {
-    await prisma.pianoReservation.create({
-      data: { userId: session.user.id, startsAt: slot.startsAt, endsAt: slot.endsAt },
+    const outcome = await withSerializableTransaction(async (tx) => {
+      const thisWeek = await tx.pianoReservation.count({
+        where: {
+          userId: session.user.id,
+          startsAt: { gte: week.from, lt: week.to },
+          endsAt: { gt: now },
+        },
+      });
+      if (thisWeek >= config.maxPerWeek) return "WEEK_LIMIT" as const;
+      await tx.pianoReservation.create({
+        data: { userId: session.user.id, startsAt: slot.startsAt, endsAt: slot.endsAt },
+      });
+      return "OK" as const;
     });
+    if (outcome === "WEEK_LIMIT") return saveError("weekLimit");
   } catch (err) {
     if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002") {
       return saveError("taken");

@@ -17,10 +17,10 @@
     "@vtk/payments": "*",
     "@vtk/storage": "*",
     "@vtk/ui": "*",
-    "next": "16.2.10",
+    "next": "16.3.0",
     "react": "19.2.4",
     "react-dom": "19.2.4",
-    "sharp": "^0.33.5"
+    "sharp": "^0.35.3"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
@@ -32,6 +32,6 @@
     "tailwindcss": "^4",
     "tsx": "^4.19.2",
     "typescript": "^5",
-    "xlsx": "^0.18.5"
+    "read-excel-file": "^9.3.8"
   }
 }

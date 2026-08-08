@@ -5,15 +5,13 @@ import { Input } from "@vtk/ui";
 import { SaveForm } from "@/components/ui/SaveForm";
 import { grantDoorAccessAction } from "@/app/actions/door";
 import type { SaveLabels } from "@/app/[locale]/admin/pocs/PocsTable";
+import { utcToLocalDateTime } from "@/lib/ticketing/time";
 
 type SearchUser = { id: string; name: string; email: string; rNumber: string | null };
 
 /** `YYYY-MM-DDTHH:mm` in lokale tijd, voor de default van een datetime-local-veld. */
 function localInputValue(date: Date): string {
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(
-    date.getMinutes(),
-  )}`;
+  return utcToLocalDateTime(date);
 }
 
 /**

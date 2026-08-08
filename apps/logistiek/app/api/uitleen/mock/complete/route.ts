@@ -1,4 +1,5 @@
 import { prisma } from '@vtk/db';
+import { applyPaymentStatus } from '@/lib/payments';
 
 export const runtime = 'nodejs';
 
@@ -22,12 +23,29 @@ export async function GET(request: Request): Promise<Response> {
     orderBy: { createdAt: 'desc' },
   });
   if (payment) {
-    await prisma.uitleenPayment.update({
-      where: { id: payment.id },
-      data: { status: 'SUCCEEDED', succeededAt: new Date(), providerStatus: 'paid' },
-    });
+    const targetId = payment.reservationId ?? payment.transportBookingId;
+    await applyPaymentStatus(
+      payment.id,
+      {
+        status: 'SUCCEEDED',
+        checkoutId: payment.providerCheckoutId ?? `mock_${targetId}`,
+        paymentId: payment.providerPaymentId,
+        orderId: targetId,
+        amountCents: payment.amountCents,
+        currency: payment.currency,
+      },
+      'paid',
+    );
   }
 
-  const target = returnTo && returnTo.startsWith('http') ? returnTo : '/reservaties';
+  let target = '/reservaties';
+  if (returnTo) {
+    try {
+      const parsed = new URL(returnTo);
+      if (parsed.origin === new URL(request.url).origin) target = parsed.toString();
+    } catch {
+      // Ongeldige of relatieve waarden vallen terug naar de interne lijst.
+    }
+  }
   return Response.redirect(target, 302);
 }

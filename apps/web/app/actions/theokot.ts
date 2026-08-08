@@ -726,7 +726,7 @@ export async function placeOrderAction(sessionId: string, lines: OrderLineInput[
   }
 
   try {
-    await prisma.$transaction(async (tx) => {
+    await withSerializableTransaction(async (tx) => {
       const sess = await tx.theokotSession.findUnique({ where: { id: sessionId }, include: { items: true } });
       if (!sess) throw new TheokotValidationError(["Verkoopsessie niet gevonden."]);
       if (!canOrderNow(sess, new Date())) {

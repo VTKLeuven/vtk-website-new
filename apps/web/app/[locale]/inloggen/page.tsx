@@ -38,7 +38,8 @@ export default async function LoginPage({
 
   const session = await getSession(await headers());
   if (session && !mustReauthenticate) {
-    redirect(oauth ? next : nextRaw && nextRaw.startsWith('/') ? nextRaw : '/');
+    const safeNext = nextRaw?.startsWith('/') && !nextRaw.startsWith('//') ? nextRaw : '/';
+    redirect(oauth ? next : safeNext);
   }
 
   const dict = getDictionary(locale);

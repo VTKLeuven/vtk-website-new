@@ -133,7 +133,10 @@ export default async function VanBookingDetailPage({
             </p>
           ) : null}
 
-          {booking.status === 'APPROVED' && booking.paymentMode === 'ONLINE' && !paid ? (
+          {(booking.status === 'APPROVED' || booking.status === 'COMPLETED') &&
+          booking.paymentMode === 'ONLINE' &&
+          booking.priceCents !== null &&
+          !paid ? (
             <div className="mt-5 border-t border-vtk-navy/10 pt-4">
               <PayButton target="van" id={booking.id} amountLabel={formatPriceCents(booking.priceCents, locale)} locale={locale} />
             </div>
