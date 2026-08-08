@@ -46,6 +46,15 @@ describe('toestemming', () => {
   it('laadt niets zonder configuratie, ook niet met toestemming', () => {
     expect(analyticsScript({ config: null, consent: 'analytics', pathname: '/nl' })).toBeNull();
   });
+
+  // `/scan` slaat de locale-rewrite in proxy.ts over en heeft dus geen
+  // `x-pathname`; de layout geeft dan een lege string door. Die mag niet door de
+  // uitsluiting glippen omdat ze toevallig op geen enkel patroon matcht.
+  it('laadt niets wanneer het pad onbekend is', () => {
+    for (const pathname of ['', '   ']) {
+      expect(analyticsScript({ config, consent: 'analytics', pathname })).toBeNull();
+    }
+  });
 });
 
 describe('configuratie uit de omgeving', () => {

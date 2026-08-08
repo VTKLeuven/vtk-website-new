@@ -119,6 +119,14 @@ export function analyticsScript(input: {
   const { config, consent, pathname } = input;
   if (!config) return null;
   if (consent !== "analytics") return null;
+
+  // Onbekend pad betekent niet meten. `proxy.ts` zet `x-pathname` op elke route
+  // die door de locale-rewrite gaat, maar `/scan` slaat die bewust over en heeft
+  // de header dus niet. Zonder deze regel valt zo'n aanvraag door de uitsluiting
+  // heen (een lege string matcht geen enkel patroon) en zou het script daar juist
+  // wél renderen. Falen doen we dan liever dicht.
+  if (pathname.trim() === "") return null;
+
   if (isExcludedFromAnalytics(pathname)) return null;
 
   return {
