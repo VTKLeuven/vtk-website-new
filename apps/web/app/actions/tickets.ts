@@ -133,18 +133,31 @@ function localePath(locale: "nl" | "en", path: string): string {
   return `${locale === "en" ? "/en" : ""}${path}`;
 }
 
+function coordinateValue(formData: FormData, field: string, bound: number): number | null {
+  const parsed = Number.parseFloat(String(formData.get(field) ?? ""));
+  return Number.isFinite(parsed) && Math.abs(parsed) <= bound ? parsed : null;
+}
+
 /** Het adresveld is optioneel en dient enkel om coördinaten te krijgen voor de
  * geofence op een walletticket; de zichtbare locatienaam blijft vrije tekst
- * ("Theokot"). We zoeken enkel opnieuw op wanneer het adres effectief wijzigde:
- * anders zou elke opslag van een event Nominatim aanroepen. Mislukt het
- * opzoeken, dan bewaren we het adres zonder coördinaten (geen geofence) in
- * plaats van de opslag te laten falen. */
+ * ("Theokot"). Mislukt het opzoeken, dan bewaren we het adres zonder
+ * coördinaten (geen geofence) in plaats van de opslag te laten falen. */
 async function resolveLocationGeo(
-  address: string | null | undefined,
+  formData: FormData,
   event: { locationAddress: string | null; locationLatitude: number | null; locationLongitude: number | null }
 ): Promise<{ locationAddress: string | null; locationLatitude: number | null; locationLongitude: number | null }> {
-  const next = address?.trim() || null;
+  const next = limitedOptionalValue(formData, "locationAddress", 300)?.trim() || null;
   if (!next) return { locationAddress: null, locationLatitude: null, locationLongitude: null };
+
+  // De adreskiezer stuurt de coördinaten van het aangeklikte adres mee; die
+  // komen van dezelfde geocoder en zijn al door de beheerder bevestigd, dus we
+  // zoeken niet nog eens op.
+  const latitude = coordinateValue(formData, "locationLatitude", 90);
+  const longitude = coordinateValue(formData, "locationLongitude", 180);
+  if (latitude !== null && longitude !== null) {
+    return { locationAddress: next, locationLatitude: latitude, locationLongitude: longitude };
+  }
+
   if (next === event.locationAddress && event.locationLatitude !== null && event.locationLongitude !== null) {
     return {
       locationAddress: next,
@@ -152,6 +165,7 @@ async function resolveLocationGeo(
       locationLongitude: event.locationLongitude,
     };
   }
+  // Vrij ingetypt adres zonder keuze uit de lijst: alsnog proberen op te zoeken.
   const found = await geocodeAddress(next);
   return {
     locationAddress: next,
@@ -299,10 +313,7 @@ export async function createTicketEventAction(formData: FormData): Promise<void>
   const requestedSlug = slugify(value(formData, "slug") || titleNl) || `event-${randomBytes(4).toString("hex")}`;
   const slugExists = await prisma.ticketEvent.findUnique({ where: { slug: requestedSlug } });
   const slug = slugExists ? `${requestedSlug}-${randomBytes(3).toString("hex")}` : requestedSlug;
-  const createdLocationGeo = await resolveLocationGeo(
-    limitedOptionalValue(formData, "locationAddress", 300),
-    { locationAddress: null, locationLatitude: null, locationLongitude: null }
-  );
+  const createdLocationGeo = await resolveLocationGeo(formData, { locationAddress: null, locationLatitude: null, locationLongitude: null });
 
   const event = await prisma.$transaction(async (tx) => {
     const created = await tx.ticketEvent.create({
@@ -424,10 +435,7 @@ export async function updateTicketEventAction(formData: FormData): Promise<void>
   if (salesStartAt && salesEndAt && salesEndAt <= salesStartAt) {
     throw new Error("INVALID_SALES_DATES");
   }
-  const locationGeo = await resolveLocationGeo(
-    limitedOptionalValue(formData, "locationAddress", 300),
-    event
-  );
+  const locationGeo = await resolveLocationGeo(formData, event);
 
   await prisma.$transaction(async (tx) => {
     await tx.ticketEvent.update({

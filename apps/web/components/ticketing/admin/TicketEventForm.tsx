@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import { useActionState } from "react";
 import { toDatetimeLocal, type AdminLocale } from "./format";
+import { AddressPicker } from "./AddressPicker";
 
 const initialState: TicketEventFormActionState = { status: "idle" };
 
@@ -270,30 +271,12 @@ export function TicketEventForm({
               blijft dus ook staan wanneer titel, locatie en beschrijving van de
               kalender overgenomen worden; anders was het veld onbereikbaar voor
               precies de events die aan de kalender hangen. */}
-              <div className="ticket-admin-field">
-                <label htmlFor="ticket-location-address">
-                  {locale === "nl" ? "Adres (optioneel)" : "Address (optional)"}
-                </label>
-                <input
-                  id="ticket-location-address"
-                  name="locationAddress"
-                  defaultValue={event.locationAddress ?? ""}
-                  placeholder={locale === "nl" ? "Studentenwijk Arenberg 6/1, 3001 Heverlee" : "Street 1, 3001 Leuven"}
-                />
-                <small>
-                  {event.locationAddress && event.locationLatitude != null && event.locationLongitude != null
-                    ? locale === "nl"
-                      ? `Coördinaten gevonden (${event.locationLatitude.toFixed(4)}, ${event.locationLongitude.toFixed(4)}): het ticket verschijnt vanzelf op het vergrendelscherm bij aankomst.`
-                      : `Coordinates found (${event.locationLatitude.toFixed(4)}, ${event.locationLongitude.toFixed(4)}): the wallet ticket surfaces on the lock screen on arrival.`
-                    : event.locationAddress
-                      ? locale === "nl"
-                        ? "Geen coördinaten gevonden voor dit adres. Het event werkt gewoon, enkel het automatisch tonen van het walletticket bij aankomst valt weg."
-                        : "No coordinates found for this address. The event works fine; only the automatic lock-screen ticket is unavailable."
-                      : locale === "nl"
-                        ? "Vul dit in om het walletticket automatisch te tonen wanneer iemand ter plaatse komt."
-                        : "Fill this in to surface the wallet ticket automatically when someone arrives."}
-                </small>
-              </div>
+          <AddressPicker
+            defaultAddress={event.locationAddress}
+            defaultLatitude={event.locationLatitude}
+            defaultLongitude={event.locationLongitude}
+            locale={locale}
+          />
           {linkedCalendarEvent ? null : (
             <>
               <div className="ticket-admin-field" data-span="2">
