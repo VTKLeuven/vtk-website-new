@@ -331,10 +331,15 @@ uitgesloten paden.
 | WS-5 zoeken | af | `73a1094` (backend), `4edc08f` (UI) |
 | WS-4 next/image | af | `8e04f31` |
 | WS-6 contactformulier | af | `09a7833`, `3783acb` (fix) |
-| WS-7 statistieken | af | `6408d68` (Umami self-hosted) |
-| Integratie | grotendeels af | `bf32d74` |
+| WS-7 statistieken | af | `6408d68` (Umami self-hosted), `6600aa6` (fix) |
+| Integratie | af | `bf32d74` |
 
-`npm run verify` is groen: 44 testbestanden, 456 tests, 0 lint-errors.
+**Alle acht werkstromen zijn af.** `npm run verify` is groen: 44 testbestanden,
+457 tests, 0 lint-errors. `docker compose config` slaagt.
+
+Wat nog openstaat is de review door Maxime, en daarna de merge naar `main`. De
+punten hieronder zijn bewuste keuzes en bekende beperkingen, geen onafgewerkt
+werk; ze mogen mee gemerged worden.
 
 ## Op te ruimen bij de integratie (golf 4)
 
