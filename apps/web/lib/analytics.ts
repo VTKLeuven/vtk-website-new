@@ -180,3 +180,86 @@ export function magazineViewTitle(issue: { publicationTitle: string; issueLabel:
   const label = issue.issueLabel.trim();
   return label ? `${issue.publicationTitle} - ${label}` : issue.publicationTitle;
 }
+
+// -----------------------------------------------------------------------------
+// Klikken die geen paginaweergave zijn
+// -----------------------------------------------------------------------------
+
+/**
+ * Umami meet zelf klikken op elk element met een `data-umami-event`-attribuut,
+ * en neemt `data-umami-event-<sleutel>` mee als gegevens. Het script vangt dat
+ * op met `closest()` en verstuurt met `keepalive`, dus het werkt ook op een link
+ * die meteen wegnavigeert of een bestand downloadt.
+ *
+ * Vandaar attributen en geen klikafhandelaars: het meeste wat we willen weten
+ * hangt aan server components, en een attribuut vraagt daar geen `use client`
+ * omheen. Wat niet als attribuut kan (een leeg zoekresultaat, een videospeler)
+ * loopt via `lib/analytics-client.ts`.
+ */
+
+/** Een klik naar een andere site: career.vtk.be, de cudi-webshop, logistiek. */
+export const OUTBOUND_EVENT = "externe-link";
+/** Een bijlage die van een inhoudspagina gedownload wordt. */
+export const DOWNLOAD_EVENT = "download";
+/** Een aftermovie die afgespeeld wordt. */
+export const AFTERMOVIE_EVENT = "aftermovie";
+/** Een klik op de homepage: quicklink, aanbodkaart, hero-knop. */
+export const HOME_LINK_EVENT = "homepage-link";
+/** Een zoekopdracht die niets opleverde. */
+export const SEARCH_EMPTY_EVENT = "zoeken-zonder-resultaat";
+/** Het begin van een ticketbestelling; bewust zonder bestelnummer. */
+export const CHECKOUT_START_EVENT = "afrekenen-gestart";
+
+/**
+ * Sleutels van gebeurtenisgegevens moeten aan `[\w-_]+` voldoen, want zo leest
+ * het script ze uit het attribuut. Een sleutel met een accent of een spatie
+ * wordt stil genegeerd, en dat merk je pas als het cijfer ontbreekt.
+ */
+function eventDataKey(key: string): string {
+  return key
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9_-]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
+/**
+ * De attributen voor een meetbare klik, klaar om in JSX uit te spreiden.
+ * Waarden die leeg zijn vallen weg: een lege gegevenswaarde vult het rapport
+ * met ruis zonder iets te zeggen.
+ */
+export function umamiEvent(
+  name: string,
+  data: Record<string, string | null | undefined> = {},
+): Record<string, string> {
+  const attributes: Record<string, string> = { "data-umami-event": name };
+  for (const [key, value] of Object.entries(data)) {
+    const clean = (value ?? "").trim();
+    const attribute = eventDataKey(key);
+    if (!clean || !attribute) continue;
+    attributes[`data-umami-event-${attribute}`] = clean;
+  }
+  return attributes;
+}
+
+/**
+ * De hostnaam van een externe bestemming, als waarde bij {@link OUTBOUND_EVENT}.
+ * De volledige URL zou het rapport vullen met varianten van hetzelfde adres;
+ * "career.vtk.be" is wat je wil weten. Een adres dat niet te lezen valt, geeft
+ * een lege waarde en dus geen attribuut.
+ */
+export function outboundHost(url: string): string {
+  try {
+    const parsed = new URL(url);
+    // Enkel http(s). Zonder deze controle zou een relatief pad tegen een
+    // basis-URL oplossen en `vtk.be` teruggeven, en dan telt een knop naar een
+    // pagina op deze site mee als een klik naar buiten.
+    return parsed.protocol === "http:" || parsed.protocol === "https:" ? parsed.hostname : "";
+  } catch {
+    return "";
+  }
+}
+
+/** Een knop naast de titel van een pagina die op deze site blijft. */
+export const PAGE_CTA_EVENT = "pagina-knop";

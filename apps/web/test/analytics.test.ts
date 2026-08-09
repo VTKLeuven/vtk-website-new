@@ -7,6 +7,8 @@ import {
   excludedAnalyticsPaths,
   isExcludedFromAnalytics,
   magazineViewTitle,
+  outboundHost,
+  umamiEvent,
   magazineViewUrl,
 } from '@/lib/analytics';
 
@@ -155,5 +157,54 @@ describe('magazines per nummer meten', () => {
 
   it('laat het streepje weg wanneer een nummer geen label heeft', () => {
     expect(magazineViewTitle({ publicationTitle: 'Ir.Reëel', issueLabel: '  ' })).toBe('Ir.Reëel');
+  });
+});
+
+describe('attributen voor een meetbare klik', () => {
+  it('zet naam en gegevens als data-attributen', () => {
+    expect(umamiEvent('externe-link', { bestemming: 'career.vtk.be', vanaf: 'menu' })).toEqual({
+      'data-umami-event': 'externe-link',
+      'data-umami-event-bestemming': 'career.vtk.be',
+      'data-umami-event-vanaf': 'menu',
+    });
+  });
+
+  it('laat lege waarden weg', () => {
+    // Een leeg attribuut vult het rapport met ruis zonder iets te zeggen.
+    expect(umamiEvent('download', { pagina: 'shiften', bestand: '  ' })).toEqual({
+      'data-umami-event': 'download',
+      'data-umami-event-pagina': 'shiften',
+    });
+    expect(umamiEvent('download', { pagina: null })).toEqual({ 'data-umami-event': 'download' });
+  });
+
+  it('maakt van een sleutel iets dat de tracker kan lezen', () => {
+    // Het script leest gegevens uit met /data-umami-event-([\w-_]+)/. Een sleutel
+    // met een accent of een spatie wordt stil genegeerd, en dan ontbreekt het
+    // cijfer zonder dat iets kapot lijkt.
+    const attributes = umamiEvent('test', { 'Vanaf Café': 'x' });
+    expect(Object.keys(attributes)).toContain('data-umami-event-vanaf-cafe');
+  });
+
+  it('trimt de waarde', () => {
+    expect(umamiEvent('test', { a: '  b  ' })['data-umami-event-a']).toBe('b');
+  });
+});
+
+describe('bestemming van een externe link', () => {
+  it('houdt de hostnaam over', () => {
+    // De volledige URL zou het rapport vullen met varianten van hetzelfde adres.
+    expect(outboundHost('https://career.vtk.be/jobs?x=1')).toBe('career.vtk.be');
+    expect(outboundHost('https://cudi.vtk.be/vtk/shop')).toBe('cudi.vtk.be');
+  });
+
+  it('geeft een lege waarde bij een adres dat niet te lezen valt', () => {
+    // Dan valt het attribuut weg in plaats van er iets zinloos in te zetten.
+    expect(outboundHost('')).toBe('');
+    expect(outboundHost('ht tp://kapot')).toBe('');
+    // Een pad op deze site is geen externe bestemming; zonder deze regel telde
+    // de knop op een pagina mee als een klik naar buiten.
+    expect(outboundHost('/en/shift')).toBe('');
+    expect(outboundHost('mailto:info@vtk.be')).toBe('');
   });
 });

@@ -5,6 +5,7 @@ import { ExternalLink, Play, Video, VideoOff } from "lucide-react";
 
 import { safeUrl, vimeoVideoId, youtubeThumbnailUrl, youtubeVideoId } from "@/lib/videoEmbed";
 import styles from "./AftermoviePlayer.module.css";
+import { trackAftermovie } from '@/lib/analytics-client';
 
 export type AftermoviePlayerItem = {
   id: string;
@@ -268,7 +269,12 @@ export function AftermoviePlayer({
             item={activeItem}
             labels={labels}
             started={startedId === activeItem.id}
-            onPlay={() => setStartedId(activeItem.id)}
+            onPlay={() => {
+              setStartedId(activeItem.id);
+              // Welke aftermovie effectief bekeken wordt; het bezoek aan /media
+              // zegt daar niets over.
+              trackAftermovie({ id: activeItem.id, title: activeItem.title });
+            }}
           />
         </div>
         <div className={styles["vtk-media-aftermovie-caption"]} aria-live="polite">

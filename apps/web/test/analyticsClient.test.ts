@@ -1,5 +1,8 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
+  trackAftermovie,
+  trackCheckoutStart,
+  trackEmptySearch,
   trackMagazineDownload,
   trackMagazineNewTab,
   trackMagazineView,
@@ -72,5 +75,46 @@ describe('meten met toestemming', () => {
       'magazine-nieuw-tabblad',
       { publicatie: 'bakske', nummer: 'bakske-2025-2026-s2w6' },
     ]);
+  });
+});
+
+describe('de overige metingen', () => {
+  it('stuurt een mislukte zoekopdracht met de term erbij', () => {
+    const track = vi.fn();
+    vi.stubGlobal('window', { umami: { track } });
+
+    trackEmptySearch('  fakbar openingsuren  ');
+
+    expect(track).toHaveBeenCalledWith('zoeken-zonder-resultaat', {
+      zoekterm: 'fakbar openingsuren',
+    });
+  });
+
+  it('stuurt niets bij een lege zoekterm', () => {
+    const track = vi.fn();
+    vi.stubGlobal('window', { umami: { track } });
+
+    trackEmptySearch('   ');
+
+    expect(track).not.toHaveBeenCalled();
+  });
+
+  it('meet een aftermovie en een begonnen bestelling', () => {
+    const track = vi.fn();
+    vi.stubGlobal('window', { umami: { track } });
+
+    trackAftermovie({ id: 'galabal-aftermovie', title: 'Galabal' });
+    trackCheckoutStart({ slug: 'galabal-2026', title: 'Galabal 2026' });
+
+    expect(track.mock.calls[0]).toEqual([
+      'aftermovie',
+      { video: 'galabal-aftermovie', titel: 'Galabal' },
+    ]);
+    // Geen bestelnummer: dat hoort bij een persoon.
+    expect(track.mock.calls[1]).toEqual([
+      'afrekenen-gestart',
+      { evenement: 'galabal-2026', titel: 'Galabal 2026' },
+    ]);
+    expect(JSON.stringify(track.mock.calls[1])).not.toMatch(/order|bestelling/i);
   });
 });

@@ -1,5 +1,12 @@
 import Link from "next/link";
-import { withLocaleBase } from "@/lib/href";
+import {
+  DOWNLOAD_EVENT,
+  OUTBOUND_EVENT,
+  PAGE_CTA_EVENT,
+  outboundHost,
+  umamiEvent,
+} from "@/lib/analytics";
+import { isExternalUrl, withLocaleBase } from "@/lib/href";
 import { publicUrl } from "@/lib/storage";
 import { renderTiptap } from "@/lib/tiptap-render";
 import { Markdown } from "@/components/ui/Markdown";
@@ -81,7 +88,16 @@ export function PageView({
         </div>
         {showCta ? (
           <div>
-            <a href={ctaHref} className="vtk-button vtk-button-primary arrow">
+            <a
+              href={ctaHref}
+              className="vtk-button vtk-button-primary arrow"
+              {...(isExternalUrl(ctaHref)
+                ? umamiEvent(OUTBOUND_EVENT, {
+                    bestemming: outboundHost(ctaHref),
+                    vanaf: `pagina:${page.slug}`,
+                  })
+                : umamiEvent(PAGE_CTA_EVENT, { pagina: page.slug, naar: ctaHref }))}
+            >
               {ctaLabel}
             </a>
           </div>
@@ -117,7 +133,14 @@ export function PageView({
                     if (!href) return null;
                     return (
                       <li key={a.id}>
-                        <a href={href} download>
+                        <a
+                          href={href}
+                          download
+                          {...umamiEvent(DOWNLOAD_EVENT, {
+                            pagina: page.slug,
+                            bestand: pick(a.labelNl, a.labelEn, locale),
+                          })}
+                        >
                           {pick(a.labelNl, a.labelEn, locale)}
                           {a.sizeBytes ? (
                             <span className="vtk-rail-meta">

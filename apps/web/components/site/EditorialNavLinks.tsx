@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { ChevronDown, Menu, X } from "lucide-react";
 import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import { pick, type Locale } from "@vtk/i18n";
+import { OUTBOUND_EVENT, outboundHost, umamiEvent } from "@/lib/analytics";
 
 const subscribeToClient = () => () => undefined;
 
@@ -119,7 +120,12 @@ export function EditorialNavLinks({
     const label = pick(child.labelNl, child.labelEn, locale);
     if (child.external) {
       return (
-        <a href={href} target="_blank" rel="noreferrer noopener">
+        <a
+          href={href}
+          target="_blank"
+          rel="noreferrer noopener"
+          {...umamiEvent(OUTBOUND_EVENT, { bestemming: outboundHost(href), vanaf: "menu" })}
+        >
           {label}
         </a>
       );
@@ -132,7 +138,15 @@ export function EditorialNavLinks({
     const caret = withCaret ? <ChevronDown className="nav-caret" aria-hidden="true" size={14} /> : null;
     if (tab.externalUrl) {
       return (
-        <a href={tab.externalUrl} target="_blank" rel="noreferrer noopener">
+        <a
+          href={tab.externalUrl}
+          target="_blank"
+          rel="noreferrer noopener"
+          {...umamiEvent(OUTBOUND_EVENT, {
+            bestemming: outboundHost(tab.externalUrl),
+            vanaf: "menu",
+          })}
+        >
           {label}
           {caret}
         </a>

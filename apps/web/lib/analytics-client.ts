@@ -1,6 +1,9 @@
 import {
+  AFTERMOVIE_EVENT,
+  CHECKOUT_START_EVENT,
   MAGAZINE_DOWNLOAD_EVENT,
   MAGAZINE_NEW_TAB_EVENT,
+  SEARCH_EMPTY_EVENT,
   magazineViewTitle,
   magazineViewUrl,
 } from "@/lib/analytics";
@@ -67,4 +70,31 @@ export function trackMagazineNewTab(issue: TrackedIssue): void {
  */
 function magazineEventData(issue: TrackedIssue): Record<string, string> {
   return { publicatie: issue.kind, nummer: issue.id };
+}
+
+/**
+ * Een zoekopdracht zonder resultaat, met de term erbij. De term staat sowieso al
+ * in het adres van de zoekpagina (Umami bewaart de querystring), dus dit voegt
+ * geen gegevens toe die er nog niet waren; het maakt enkel zichtbaar welke
+ * ervan op niets uitliepen.
+ */
+export function trackEmptySearch(query: string): void {
+  const term = query.trim();
+  if (!term) return;
+  tracker()?.track(SEARCH_EMPTY_EVENT, { zoekterm: term });
+}
+
+/** Een aftermovie die begint te spelen. */
+export function trackAftermovie(video: { id: string; title: string }): void {
+  tracker()?.track(AFTERMOVIE_EVENT, { video: video.id, titel: video.title });
+}
+
+/**
+ * Het begin van een ticketbestelling. Bewust zonder bestelnummer: dat hoort bij
+ * een persoon, en de bestelpagina's worden juist daarom niet gemeten. Wat we
+ * willen weten is hoeveel mensen die een evenement openen ook effectief
+ * beginnen af te rekenen.
+ */
+export function trackCheckoutStart(event: { slug: string; title: string }): void {
+  tracker()?.track(CHECKOUT_START_EVENT, { evenement: event.slug, titel: event.title });
 }

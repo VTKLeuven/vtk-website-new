@@ -3,6 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getDictionary, pick, type Locale } from "@vtk/i18n";
 import { Card } from "@vtk/ui";
+import { OUTBOUND_EVENT, outboundHost, umamiEvent } from "@/lib/analytics";
 import { categoryTiles } from "@/lib/categoryTiles";
 import { hasLocale } from "@/lib/locale";
 import { loadHeaderTabWithPages } from "@/lib/pageQueries";
@@ -85,7 +86,15 @@ export default async function HeaderOverviewPage({ params }: { params: Params })
                   {tile.external ? (
                     // Een andere site opent in een nieuw tabblad, net als in het
                     // uitklapmenu van de header.
-                    <a href={tile.href} target="_blank" rel="noopener noreferrer">
+                    <a
+                      href={tile.href}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      {...umamiEvent(OUTBOUND_EVENT, {
+                        bestemming: outboundHost(tile.href),
+                        vanaf: `categorie:${tab.slug}`,
+                      })}
+                    >
                       {card}
                     </a>
                   ) : (

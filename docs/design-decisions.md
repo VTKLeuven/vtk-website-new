@@ -1620,6 +1620,42 @@ zichtbaarheidskeuze en geen technische:
   dus zonder die filter zou een klik van de homepage naar `/admin` alsnog een
   paginaweergave opleveren. Beide lagen lezen dezelfde lijst uit
   `apps/web/lib/analytics.ts`, zodat ze niet uiteen kunnen lopen.
+- **Wat niet vanzelf een paginaweergave is, meten we apart.** Een deel van de
+  site leeft binnen een pagina: de magazines openen in een leesvenster op
+  `/media`, een aftermovie speelt daar af, en een klik naar career.vtk.be of de
+  cudi-webshop verlaat de site zonder spoor. Zonder extra meting ziet een
+  redactie enkel dat `/media` bezocht is, en dat is geen cijfer waar iemand iets
+  aan heeft.
+  - **Een geopend magazinenummer is een paginaweergave**, met een verzonnen adres
+    per nummer (`/media/bakske/2025-2026-s2w6`), en geen los event. Zo staan de
+    nummers gewoon naast elkaar in het Pages-overzicht; een redactie moet niet
+    eerst leren waar de gebeurtenissenrapporten zitten om haar eigen cijfers te
+    vinden. Downloaden en openen in een nieuw tabblad zijn wél events: dat zijn
+    andere handelingen dan lezen en ze horen niet als weergave mee te tellen.
+  - **Klikken naar buiten en downloads lopen via `data-umami-event`-attributen**
+    en niet via klikafhandelaars. Umami vangt die zelf op met `closest()` en
+    verstuurt met `keepalive`, dus het werkt op een link die meteen wegnavigeert,
+    en het vraagt geen `use client` rond een server component. De helper
+    `umamiEvent()` in `lib/analytics.ts` bouwt die attributen, want de sleutels
+    moeten aan `[\w-_]+` voldoen: een sleutel met een accent wordt stil genegeerd
+    en dan ontbreekt het cijfer zonder dat iets kapot lijkt.
+  - **Bij een externe klik gaat enkel de hostnaam mee**, niet de volledige URL.
+    Dat houdt het rapport leesbaar (`career.vtk.be` in plaats van twintig
+    varianten) en voorkomt dat er per ongeluk een token in een querystring
+    meegaat.
+  - **De ticketmeting stopt bij "afrekenen gestart".** Dat getal zegt of de
+    koopstroom werkt; het bestelnummer hoort bij een persoon en gaat dus niet
+    mee, net zoals `/tickets/bestelling/...` niet gemeten wordt.
+- **Eén uitzondering op "geen zoektermen": een zoekopdracht zonder resultaat.**
+  De regel hierboven blijft staan; querystrings gaan nog altijd niet mee, dus
+  een geslaagde zoekopdracht laat geen term achter. Maar een zoekopdracht die
+  niets oplevert is het scherpste signaal dat er inhoud ontbreekt of anders heet
+  dan mensen denken, en dat signaal is waardeloos zonder de term. Daarom stuurt
+  enkel het lege resultaat een event `zoeken-zonder-resultaat` met de zoekterm.
+  De afweging: de term kan een naam bevatten die niemand op de site kon vinden.
+  Dat is bewust aanvaard omdat het om de mislukte gevallen gaat en het aantal
+  klein is; wil je dat niet, dan haal je `zoekterm` uit `trackEmptySearch()` in
+  `lib/analytics-client.ts` en blijft het aantal mislukte zoekopdrachten over.
 
 ---
 

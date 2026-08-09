@@ -28,6 +28,7 @@ import {
   type SerializedTicketEvent,
   type TicketQuestion,
 } from "./types";
+import { trackCheckoutStart } from "@/lib/analytics-client";
 
 type Attendee = {
   attendeeName: string;
@@ -299,6 +300,10 @@ export function TicketShop({
 
     setSubmitting(true);
     setError(null);
+    // Hoeveel mensen die een evenement openen ook effectief beginnen af te
+    // rekenen. Zonder bestelnummer: dat hoort bij een persoon, en de
+    // bestelpagina's worden juist daarom niet gemeten.
+    trackCheckoutStart({ slug: event.slug, title: event.title });
 
     const items = event.ticketTypes.flatMap((type) =>
       (attendees[type.id] ?? []).map((attendee) => ({

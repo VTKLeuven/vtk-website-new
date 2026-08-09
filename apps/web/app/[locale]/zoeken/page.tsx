@@ -4,8 +4,10 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getDictionary, type Locale } from "@vtk/i18n";
 import { SiteSearchForm } from "@/components/site/SiteSearchForm";
+import { TrackEmptySearch } from "./TrackEmptySearch";
 import { viewerAudiences } from "@/lib/calendar/audience";
 import { hasLocale } from "@/lib/locale";
+import { OUTBOUND_EVENT, outboundHost, umamiEvent } from "@/lib/analytics";
 import { RESULT_LIMIT, type SearchResult } from "@/lib/search";
 import { searchSite } from "@/lib/search-server";
 import { buildMetadata } from "@/lib/seo";
@@ -105,6 +107,9 @@ export default async function SearchPage({ params, searchParams }: PageProps) {
           <p className="vtk-search-note">{query === "" ? t.prompt : t.tooShort}</p>
         ) : results.length === 0 ? (
           <section className="vtk-search-empty">
+            {/* Welke zoekopdrachten niets opleveren, is het scherpste signaal
+                dat er inhoud ontbreekt of anders heet dan mensen denken. */}
+            <TrackEmptySearch query={query} />
             <h2>{t.emptyTitle.replace("{query}", query)}</h2>
             <p>{t.emptyBody}</p>
             <div className="vtk-search-empty-links">
@@ -134,7 +139,15 @@ export default async function SearchPage({ params, searchParams }: PageProps) {
                   <h2>
                     {result.kind === "link" ? (
                       // Een andere site opent in een nieuw tabblad, net als elders.
-                      <a href={result.href} target="_blank" rel="noopener noreferrer">
+                      <a
+                        href={result.href}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        {...umamiEvent(OUTBOUND_EVENT, {
+                          bestemming: outboundHost(result.href),
+                          vanaf: "zoeken",
+                        })}
+                      >
                         {result.title}
                       </a>
                     ) : (

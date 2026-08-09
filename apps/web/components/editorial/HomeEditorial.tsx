@@ -25,6 +25,12 @@ import {
 } from "./hoursUtils";
 
 import "@/app/design/vtk-home.css";
+import {
+  HOME_LINK_EVENT,
+  OUTBOUND_EVENT,
+  outboundHost,
+  umamiEvent,
+} from "@/lib/analytics";
 
 type OpeningHoursSetting = {
   titleNl: string;
@@ -349,7 +355,7 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
                 : "Events, courses, careers, sandwiches and everything that makes your day on campus more practical. Run by students, since 1920."}
             </p>
             <div className="hero-cta">
-              <Link href={`${base}/aanbod`} className="btn btn-primary arrow">
+              <Link href={`${base}/info`} className="btn btn-primary arrow">
                 {nl ? "Ontdek wat we doen" : "Discover what we do"}
               </Link>
               <Link href={`${base}/eerstejaars`} className="btn btn-ghost">
@@ -459,12 +465,20 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
                   <span className="m">{item.m}</span>
                 </>
               );
+              // Welke quicklink gebruikt wordt, zegt of de volgorde hier klopt
+              // met waar mensen voor komen.
+              const tracking = item.href.startsWith("http")
+                ? umamiEvent(OUTBOUND_EVENT, {
+                    bestemming: outboundHost(item.href),
+                    vanaf: "quicklink",
+                  })
+                : umamiEvent(HOME_LINK_EVENT, { soort: "quicklink", naar: item.href });
               return item.href.startsWith("http") ? (
-                <a key={item.k} className="ql" href={item.href}>
+                <a key={item.k} className="ql" href={item.href} {...tracking}>
                   {body}
                 </a>
               ) : (
-                <Link key={item.k} className="ql" href={item.href}>
+                <Link key={item.k} className="ql" href={item.href} {...tracking}>
                   {body}
                 </Link>
               );
@@ -580,7 +594,7 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
         <div className="sec-head">
           <h2>{nl ? "Wat we doen." : "What we do."}</h2>
           <div className="meta">
-            <Link href={`${base}/aanbod`}>{nl ? "bekijk alles" : "see all"}</Link>
+            <Link href={`${base}/info`}>{nl ? "bekijk alles" : "see all"}</Link>
           </div>
         </div>
         <div className="aanbod">
@@ -589,7 +603,12 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
             // Alle aanbod-kaarten zijn identiek: een fotokop onder navy scrim met
             // witte body. Geen enkele kaart krijgt een aparte featured-stijl.
             return (
-              <Link key={card.href} href={card.href} className="acard">
+              <Link
+                key={card.href}
+                href={card.href}
+                className="acard"
+                {...umamiEvent(HOME_LINK_EVENT, { soort: "aanbodkaart", naar: card.href })}
+              >
                 <div className="acard-body">
                   <span
                     className={`acard-media${photo ? "" : " acard-media-ph"}`}
@@ -718,10 +737,21 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
               </div>
             </div>
             <div className="career-actions">
-              <a href="https://career.vtk.be" className="btn btn-primary arrow">
+              <a
+                href="https://career.vtk.be"
+                className="btn btn-primary arrow"
+                {...umamiEvent(OUTBOUND_EVENT, { bestemming: "career.vtk.be", vanaf: "homepage" })}
+              >
                 {nl ? "Naar VTK Career" : "Open VTK Career"}
               </a>
-              <a href="https://www.career.vtk.be/contact" className="btn btn-ghost arrow">
+              <a
+                href="https://www.career.vtk.be/contact"
+                className="btn btn-ghost arrow"
+                {...umamiEvent(OUTBOUND_EVENT, {
+                  bestemming: "www.career.vtk.be",
+                  vanaf: "homepage",
+                })}
+              >
                 {nl ? "Contact voor bedrijven" : "Contact for companies"}
               </a>
             </div>
