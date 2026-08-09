@@ -1,4 +1,5 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { smtpEhloName } from "@/lib/mail";
 import { attachmentLine, orderConfirmationMail } from "@/lib/ticketing/mail";
 import {
   MAX_ATTACHMENT_BYTES,
@@ -78,6 +79,31 @@ describe("wat de mail over zijn bijlagen zegt", () => {
     });
     expect(mail.html).toContain(base.orderUrl.replace(/&/g, "&amp;"));
     expect(mail.text).toContain("Deel deze link niet");
+  });
+});
+
+describe("hoe we ons voorstellen bij de mailserver", () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it("gebruikt een echte hostnaam, nooit wat nodemailer zelf verzint", () => {
+    // Zonder expliciete naam stuurt nodemailer in een container `EHLO
+    // [127.0.0.1]`, en dan verbreekt de relay van Google de verbinding met een
+    // 421 die eruitziet als een tijdelijke storing. Er vertrekt dan geen enkele
+    // mail, terwijl dezelfde container met `EHLO vtk.be` gewoon 250 krijgt.
+    expect(smtpEhloName()).toBe("vtk.be");
+    expect(smtpEhloName()).not.toContain("127.0.0.1");
+  });
+
+  it("laat een andere mailserver een eigen naam opleggen", () => {
+    vi.stubEnv("SMTP_EHLO_NAME", "mail.vtk.be");
+    expect(smtpEhloName()).toBe("mail.vtk.be");
+  });
+
+  it("valt terug op de standaard bij een lege instelling", () => {
+    vi.stubEnv("SMTP_EHLO_NAME", "   ");
+    expect(smtpEhloName()).toBe("vtk.be");
   });
 });
 

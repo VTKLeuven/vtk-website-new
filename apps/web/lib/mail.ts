@@ -47,6 +47,24 @@ export function smtpConfigured(): boolean {
 }
 
 /**
+ * De naam waarmee we ons bij de mailserver voorstellen (het EHLO-commando).
+ *
+ * Zonder dit vult nodemailer zelf iets in, en in een container werd dat
+ * `[127.0.0.1]`. De relay van Google antwoordt daarop met
+ * "421 4.7.0 Try again later, closing connection. (EHLO)" en verbreekt de
+ * verbinding: geen enkele mail vertrekt, terwijl dezelfde container met
+ * `EHLO vtk.be` gewoon 250 krijgt. Het kostte een avond omdat de fout eruitziet
+ * als een tijdelijke storing bij Google ("try again later") en de outbox dus
+ * braaf blijft herproberen.
+ *
+ * Een echte hostnaam dus, met `SMTP_EHLO_NAME` te overschrijven wanneer een
+ * andere mailserver een specifieke naam wil zien.
+ */
+export function smtpEhloName(): string {
+  return process.env.SMTP_EHLO_NAME?.trim() || 'vtk.be';
+}
+
+/**
  * Verstuurt een mail, of logt ze wanneer SMTP niet geconfigureerd is.
  *
  * Geeft terug of de mail de deur uit is. Bestaande aanroepers mogen dat negeren
@@ -78,6 +96,7 @@ export async function sendMail(
       host,
       port: Number(process.env.SMTP_PORT) || 587,
       secure,
+      name: smtpEhloName(),
       // Zonder dit valt nodemailer terug op een onversleutelde verbinding
       // wanneer de server STARTTLS niet aankondigt. Op poort 587 is dat nooit de
       // bedoeling: dan gaan een wachtwoord en de inhoud van de mail in het klare

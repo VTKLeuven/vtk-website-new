@@ -1838,3 +1838,23 @@ save-link binnen), dus die staat als knop in de mail.
   elke betaalde bestelling. Eén aanroep levert de Apple- en de Google-pas samen
   (de tweede komt uit de cache van tien minuten), dus reken op één aanroep per
   ticket. Op het gratis plan zijn dat er 1000 per maand.
+
+---
+
+## De mailserver wil weten wie er belt (EHLO)
+
+Beide mailers zetten expliciet de naam waarmee de site zich voorstelt bij de
+mailserver (`smtpEhloName()`, standaard `vtk.be`, te overschrijven met
+`SMTP_EHLO_NAME`). Laat dat niet weg.
+
+Zonder die instelling vult nodemailer zelf iets in, en in een container werd dat
+`EHLO [127.0.0.1]`. De relay van Google antwoordt daarop met
+`421 4.7.0 Try again later, closing connection. (EHLO)` en verbreekt de
+verbinding voor er ook maar een afzender genoemd is. Dezelfde container, dezelfde
+verbinding, met `EHLO vtk.be` krijgt gewoon `250`.
+
+Waarom dit een avond kostte: de foutmelding leest als een tijdelijke storing bij
+Google, dus de outbox blijft braaf herproberen met een oplopende wachttijd en
+niemand denkt aan een configuratiefout. Bovendien werkte een test met `curl`
+vanaf dezelfde machine wel, want die stuurt een andere EHLO-naam. Het lijkt dan
+alsof de mailserver het ene moment wel en het andere niet doet.

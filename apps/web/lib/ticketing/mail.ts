@@ -2,6 +2,8 @@ import "server-only";
 
 import nodemailer from "nodemailer";
 
+import { smtpEhloName } from "@/lib/mail";
+
 export type MailAttachment = {
   filename: string;
   content: Buffer;
@@ -27,6 +29,10 @@ function smtpTransport(): nodemailer.Transporter | null {
     host,
     port: Number.parseInt(process.env.SMTP_PORT ?? "587", 10),
     secure,
+    // Zonder een expliciete naam stelt nodemailer zich in een container voor als
+    // `EHLO [127.0.0.1]`, en dan verbreekt de relay van Google de verbinding met
+    // een 421. Zie `smtpEhloName()`.
+    name: smtpEhloName(),
     // Op poort 587 mag de verbinding nooit onversleuteld doorgaan: daar reizen
     // een wachtwoord en de tickets van een koper over. Zonder dit valt
     // nodemailer terug op plain wanneer STARTTLS niet aangekondigd wordt.
