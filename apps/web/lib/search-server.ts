@@ -66,16 +66,29 @@ function byId(rows: Candidate[]): CandidateMap {
  * cast. Wat wél als SQL-fragment wisselt is de kolomnaam, en die komt uit de
  * `Locale`-union en niet uit de invoer van de bezoeker.
  */
+
 /**
  * De tsquery zelf. `websearch_to_tsquery` is de eerste poging: die begrijpt
  * aanhalingstekens, `or` en `-`, en zoekt op hele woorden via de stammer. Wie
  * halverwege een woord stopt met typen (`uitleen`) vindt daarmee niets, en dan
- * is `to_tsquery` met `:*` de tweede poging.
+ * volgt de tweede poging met `:*`.
+ *
+ * Die tweede poging vraagt twee configuraties naast elkaar, en dat is niet
+ * overdreven maar noodzakelijk. Een prefix mag je namelijk niet stemmen: de
+ * Nederlandse stammer maakt van `uitleen` het woord `uitlen`, en `uitlen:*`
+ * matcht "uitleendienst" niet meer. `simple` stemt niet en lost dat op. Maar de
+ * index zelf is wél gestemd, dus omgekeerd matcht `cursusse:*` enkel via
+ * `dutch` op de opgeslagen stam `cursuss`. Elk van de twee vangt precies op wat
+ * de andere laat vallen; samen dekken ze allebei de gevallen.
+ *
+ * Allebei de vormen komen als subquery terug en niet als kale uitdrukking: in
+ * een `FROM` mag een functieaanroep staan, maar `a || b` niet. Dat is een
+ * syntaxfout die pas tegen een echte database bovenkomt.
  */
 function tsQuery(query: string, config: string, prefix: string | null): Prisma.Sql {
   return prefix === null
-    ? Prisma.sql`websearch_to_tsquery(${config}::regconfig, ${query})`
-    : Prisma.sql`to_tsquery(${config}::regconfig, ${prefix})`;
+    ? Prisma.sql`(SELECT websearch_to_tsquery(${config}::regconfig, ${query}))`
+    : Prisma.sql`(SELECT to_tsquery('simple', ${prefix}) || to_tsquery(${config}::regconfig, ${prefix}))`;
 }
 
 async function pageCandidates(

@@ -19,6 +19,18 @@ const TERM = "kwibusfluitketel";
 /** Een tweede verzonnen woord, enkel in de Engelse velden. */
 const TERM_EN = "wobblegantry";
 
+/**
+ * Een samenstelling met een dubbele klinker erin, en het halve woord ervoor.
+ *
+ * Dit paar bewijst waarom de tweede zoekpoging twee configuraties naast elkaar
+ * nodig heeft. De Nederlandse stammer maakt van `...veer` het woord `...ver`, en
+ * `...ver:*` matcht de opgeslagen lexeme `...veerdienst` niet. Precies zo vond
+ * "uitleen" de uitleendienst niet. Zonder een woord met die vorm slaagt de test
+ * ook met alleen de Nederlandse configuratie, en bewaakt ze niets.
+ */
+const COMPOUND = `${TERM}veerdienst`;
+const COMPOUND_PREFIX = `${TERM}veer`;
+
 describe.sequential("zoeken", () => {
   const ids = {
     tab: randomUUID(),
@@ -27,6 +39,7 @@ describe.sequential("zoeken", () => {
     publishedPage: randomUUID(),
     draftPage: randomUUID(),
     loosePage: randomUUID(),
+    compoundPage: randomUUID(),
     publicEvent: randomUUID(),
     membersEvent: randomUUID(),
     audienceEvent: randomUUID(),
@@ -37,6 +50,7 @@ describe.sequential("zoeken", () => {
     publishedPage: `gepubliceerd-${ids.publishedPage}`,
     draftPage: `concept-${ids.draftPage}`,
     loosePage: `los-${ids.loosePage}`,
+    compoundPage: `samen-${ids.compoundPage}`,
     firstYearCat: `ej-${ids.firstYearCat}`,
   };
 
@@ -124,6 +138,7 @@ describe.sequential("zoeken", () => {
     // Een gepubliceerde pagina zonder categorie: die hoort via /p/<slug> gevonden
     // te worden, niet via een categoriepad dat niet bestaat.
     await makePage(ids.loosePage, slugs.loosePage, `Los: ${TERM}`, true);
+    await makePage(ids.compoundPage, slugs.compoundPage, `Samenstelling: ${COMPOUND}`, true);
 
     await makeEvent(ids.publicEvent, `Publiek: ${TERM}`, "PUBLIC");
     await makeEvent(ids.membersEvent, `Intern: ${TERM}`, "MEMBERS");
@@ -137,7 +152,7 @@ describe.sequential("zoeken", () => {
     await prisma.calendarCategory.delete({ where: { id: ids.firstYearCat } });
     await prisma.group.delete({ where: { id: ids.group } });
     await prisma.page.deleteMany({
-      where: { id: { in: [ids.publishedPage, ids.draftPage, ids.loosePage] } },
+      where: { id: { in: [ids.publishedPage, ids.draftPage, ids.loosePage, ids.compoundPage] } },
     });
     await prisma.headerTab.delete({ where: { id: ids.tab } });
   });
@@ -271,6 +286,15 @@ describe.sequential("zoeken", () => {
     const half = TERM.slice(0, 8);
     const { results } = await visitorSearch(half);
     expect(results.map((r) => r.id)).toContain(ids.publishedPage);
+  });
+
+  it("vindt ook een half woord dat de stammer zou verminken", async () => {
+    // Dit is het geval waar "uitleen" op stukliep: de stammer maakt van `veer`
+    // het woord `ver`, en `...ver:*` matcht `...veerdienst` niet. Slaagt deze
+    // test, dan draait de tweede poging naast de taalconfiguratie ook op
+    // `simple`, die niet stemt.
+    const { results } = await visitorSearch(COMPOUND_PREFIX);
+    expect(results.map((r) => r.id)).toContain(ids.compoundPage);
   });
 
   it("houdt de zichtbaarheidsregels ook in die tweede poging aan", async () => {
