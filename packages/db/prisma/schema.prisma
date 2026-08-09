@@ -1627,6 +1627,7 @@ model TheokotSession {
   weeklySpecialLabelNl String? // welk broodje deze week "van de week" is
   weeklySpecialLabelEn String?
   processedAt          DateTime? // wanneer no-shows verwerkt zijn (idempotentie)
+  processingStartedAt  DateTime? // lease/claim voor een actieve no-show-worker
   createdById          String?
   createdAt            DateTime  @default(now())
   updatedAt            DateTime  @updatedAt
@@ -1635,6 +1636,7 @@ model TheokotSession {
   orders TheokotOrder[]
 
   @@index([date])
+  @@index([processedAt, isOpen, pickupEnd])
 }
 
 /// Aanbod van één sessie (snapshot van een product op het moment van aanmaken).
@@ -1667,6 +1669,7 @@ model TheokotOrder {
   updatedAt    DateTime           @updatedAt
   pickedUpAt   DateTime?
   pickedUpById String? // wie aan de balie op "opgehaald" drukte
+  noShowProcessedAt DateTime? // mail + eventuele ban voor deze order afgewerkt
 
   session           TheokotSession            @relation(fields: [sessionId], references: [id], onDelete: Cascade)
   user              User                      @relation("TheokotOrderUser", fields: [userId], references: [id], onDelete: Cascade)
@@ -1677,6 +1680,7 @@ model TheokotOrder {
   @@unique([sessionId, userId])
   @@index([userId])
   @@index([status])
+  @@index([status, noShowProcessedAt])
 }
 
 /// Auditrij wanneer een student aan de afhaalbalie twee nog openstaande

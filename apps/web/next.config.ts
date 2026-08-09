@@ -22,6 +22,11 @@ loadEnvConfig(monorepoRoot);
 //   (single shot, no leak), which is fine.
 
 const nextConfig: NextConfig = {
+  // Do not let stale declarations from a previous dev server break a clean
+  // production build (Next 16 stores them separately in .next/dev/types).
+  typescript: {
+    tsconfigPath: process.env.NODE_ENV === "production" ? "tsconfig.build.json" : "tsconfig.json",
+  },
   allowedDevOrigins: ["192.168.9.206", "192.168.9.226", "127.0.0.1", "*.trycloudflare.com"],
   transpilePackages: ["@vtk/ui", "@vtk/auth", "@vtk/db", "@vtk/i18n", "@vtk/storage", "@vtk/payments"],
   // Keep heavy, native, or generated server-only packages OUT of the

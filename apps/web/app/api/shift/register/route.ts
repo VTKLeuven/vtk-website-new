@@ -5,6 +5,7 @@ import { isRecordNotFound, isUniqueViolation } from '@/lib/shift';
 import { authErrorResponse } from '@/lib/session';
 import { CUDI_SHIFT_SOURCE } from '@/lib/cudiShiftMirror';
 import { pushCudiRegistration } from '@/lib/cudiRegistrationSync';
+import { withSerializableTransaction } from '@/lib/ticketing/transactions';
 
 /** Binnen dit venster voor de start kan een user zichzelf niet meer uitschrijven. */
 const UNREGISTER_LOCK_MS = 24 * 60 * 60 * 1000;
@@ -83,41 +84,39 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'id query parameter is required' }, { status: 400 });
   }
 
-  const shift = await prisma.shift.findUnique({
-    where: { id },
-    include: { _count: { select: { participants: true } } },
-  });
-  if (!shift) {
-    return NextResponse.json({ error: 'Shift not found' }, { status: 404 });
-  }
-  if (shift._count.participants >= shift.maxParticipants) {
-    return NextResponse.json({ error: 'Shift is full' }, { status: 409 });
-  }
-
-  // Weiger als de user al ingeschreven is voor een (zelfs deels) overlappende
-  // shift. Half-open interval: aansluitende shiften (einde == start) botsen niet.
-  const overlap = await prisma.shift.findFirst({
-    where: {
-      id: { not: id },
-      participants: { some: { userId: session.user.id } },
-      startTime: { lt: shift.endTime },
-      endTime: { gt: shift.startTime },
-    },
-    select: { id: true, name: true },
-  });
-  if (overlap) {
-    return NextResponse.json(
-      {
-        error: 'You are already registered for an overlapping shift',
-        conflictShift: { id: overlap.id, name: overlap.name },
-      },
-      { status: 409 },
-    );
-  }
-
+  let registration;
   try {
-    await prisma.shiftParticipant.create({
-      data: { shiftId: id, userId: session.user.id, payedOut: false },
+    registration = await withSerializableTransaction(async (tx) => {
+      const shift = await tx.shift.findUnique({
+        where: { id },
+        include: { _count: { select: { participants: true } } },
+      });
+      if (!shift) return { status: 'NOT_FOUND' as const };
+      if (shift.startTime <= new Date()) return { status: 'STARTED' as const };
+      if (shift._count.participants >= shift.maxParticipants) {
+        return { status: 'FULL' as const };
+      }
+
+      // Half-open interval: aansluitende shiften (einde == start) botsen niet.
+      const overlap = await tx.shift.findFirst({
+        where: {
+          id: { not: id },
+          participants: { some: { userId: session.user.id } },
+          startTime: { lt: shift.endTime },
+          endTime: { gt: shift.startTime },
+        },
+        select: { id: true, name: true },
+      });
+      if (overlap) return { status: 'OVERLAP' as const, overlap };
+
+      await tx.shiftParticipant.create({
+        data: { shiftId: id, userId: session.user.id, payedOut: false },
+      });
+      return {
+        status: 'OK' as const,
+        sourceSystem: shift.sourceSystem,
+        sourceId: shift.sourceId,
+      };
     });
   } catch (err) {
     if (isUniqueViolation(err)) {
@@ -126,12 +125,31 @@ export async function POST(request: Request) {
     throw err;
   }
 
+  if (registration.status === 'NOT_FOUND') {
+    return NextResponse.json({ error: 'Shift not found' }, { status: 404 });
+  }
+  if (registration.status === 'STARTED') {
+    return NextResponse.json({ error: 'Registration has closed for this shift' }, { status: 409 });
+  }
+  if (registration.status === 'FULL') {
+    return NextResponse.json({ error: 'Shift is full' }, { status: 409 });
+  }
+  if (registration.status === 'OVERLAP') {
+    return NextResponse.json(
+      {
+        error: 'You are already registered for an overlapping shift',
+        conflictShift: { id: registration.overlap.id, name: registration.overlap.name },
+      },
+      { status: 409 },
+    );
+  }
+
   // Cursusdienst-shiften wonen op cudi.vtk.be; de inschrijving moet daar ook
   // geregistreerd worden. Blokkerend: lukt dat niet, draai de native inschrijving
   // terug zodat main en cudi consistent blijven. Zonder integratie (geen secret)
   // geeft de push `skipped` terug en verandert er hier niets.
-  if (shift.sourceSystem === CUDI_SHIFT_SOURCE && shift.sourceId) {
-    const push = await pushCudiRegistration('register', shift.sourceId, session.user.id);
+  if (registration.sourceSystem === CUDI_SHIFT_SOURCE && registration.sourceId) {
+    const push = await pushCudiRegistration('register', registration.sourceId, session.user.id);
     if (!push.ok) {
       await prisma.shiftParticipant
         .delete({ where: { shiftId_userId: { shiftId: id, userId: session.user.id } } })

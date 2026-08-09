@@ -59,12 +59,16 @@ jobs:
           npm run db:generate
 
       - name: Run web unit tests
-        run: npm run test --workspace=@vtk/web
+        run: |
+          npm run test --workspace=@vtk/web
+          npm run test --workspace=@vtk/logistiek
 
       - name: Validate types and lint
         run: |
           npm exec --workspace=@vtk/web -- next typegen
-          npx tsc --noEmit -p apps/web/tsconfig.json
+          npm exec --workspace=@vtk/logistiek -- next typegen
+          npx tsc --noEmit -p apps/web/tsconfig.build.json
+          npx tsc --noEmit -p apps/logistiek/tsconfig.build.json
           npm run lint --workspace=@vtk/web
 
       - name: Apply migrations and run database integration tests
@@ -73,7 +77,9 @@ jobs:
           npm run test:integration --workspace=@vtk/web
 
       - name: Build production application
-        run: npm run build --workspace=@vtk/web
+        run: |
+          npm run build --workspace=@vtk/web
+          npm run build --workspace=@vtk/logistiek
 
       - name: Install Playwright Chromium
         run: npx playwright install --with-deps chromium

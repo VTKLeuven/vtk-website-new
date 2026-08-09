@@ -89,6 +89,7 @@ export default async function EditUserPage({
             <Input
               name="password"
               type="text"
+              minLength={8}
               placeholder={
                 locale === 'nl' ? 'Leeg laten om niet te wijzigen' : 'Leave blank to keep'
               }

@@ -27,6 +27,7 @@ export type MailInput = {
    * op: dan komt het antwoord bij onszelf terecht.
    */
   replyTo?: string;
+  messageId?: string;
 };
 
 const FROM = process.env.MAIL_FROM || 'Theokot VTK <theokot@vtk.be>';
@@ -37,8 +38,15 @@ const FROM = process.env.MAIL_FROM || 'Theokot VTK <theokot@vtk.be>';
  * Geeft terug of de mail de deur uit is. Bestaande aanroepers mogen dat negeren
  * (een mislukte no-show-waarschuwing mag de verwerking niet doen falen), maar
  * een formulier dat de gebruiker "verstuurd" meldt, moet het verschil weten.
+ *
+ * `throwOnError` is het zwaardere alternatief: dan gooit een mislukking door naar
+ * de aanroeper. Gebruik het waar de mail zelf de opdracht is en stil falen dus
+ * niet mag, zoals bij de no-show-waarschuwing hieronder.
  */
-export async function sendMail(input: MailInput): Promise<boolean> {
+export async function sendMail(
+  input: MailInput,
+  options: { throwOnError?: boolean } = {},
+): Promise<boolean> {
   const from = input.from?.trim() || FROM;
   const host = process.env.SMTP_HOST;
   if (!host) {
@@ -66,11 +74,12 @@ export async function sendMail(input: MailInput): Promise<boolean> {
       text: input.text,
       html: input.html,
       replyTo: input.replyTo,
+      messageId: input.messageId,
     });
     return true;
   } catch (err) {
-    // Mail-fouten mogen de aanroeper (bvb no-show-verwerking) niet doen falen.
     console.error('[mail] versturen mislukt:', err);
+    if (options.throwOnError) throw err;
     return false;
   }
 }
@@ -81,6 +90,7 @@ type NoShowMailUser = { name: string; email: string; locale: 'NL' | 'EN' };
 export async function sendNoShowWarning(
   user: NoShowMailUser,
   sessionDateLabel: string,
+  orderId: string,
 ): Promise<void> {
   const nl = user.locale !== 'EN';
   const subject = nl
@@ -89,5 +99,8 @@ export async function sendNoShowWarning(
   const text = nl
     ? `Dag ${user.name},\n\nJe hebt broodjes gereserveerd bij Theokot voor ${sessionDateLabel}, maar deze werden niet opgehaald.\n\nGereserveerde broodjes die niet worden afgehaald, gaan verloren. Herhaaldelijk niet komen opdagen kan leiden tot een tijdelijke schorsing van het reservatiesysteem.\n\nGroeten,\nTheokot VTK`
     : `Hi ${user.name},\n\nYou reserved sandwiches at Theokot for ${sessionDateLabel}, but they were not picked up.\n\nReserved sandwiches that are not collected go to waste. Repeatedly not showing up can lead to a temporary suspension from the reservation system.\n\nRegards,\nTheokot VTK`;
-  await sendMail({ to: user.email, subject, text });
+  await sendMail(
+    { to: user.email, subject, text, messageId: `<theokot-no-show-${orderId}@vtk.be>` },
+    { throwOnError: true },
+  );
 }

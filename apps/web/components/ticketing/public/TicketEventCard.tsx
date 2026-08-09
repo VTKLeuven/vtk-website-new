@@ -28,11 +28,17 @@ export function TicketEventCard({
           <span>
             {new Intl.DateTimeFormat(locale === "nl" ? "nl-BE" : "en-BE", {
               month: "short",
+              timeZone: "Europe/Brussels",
             })
               .format(new Date(event.startsAt))
               .replace(".", "")}
           </span>
-          <strong>{new Date(event.startsAt).getDate()}</strong>
+          <strong>
+            {new Intl.DateTimeFormat("en-GB", {
+              day: "numeric",
+              timeZone: "Europe/Brussels",
+            }).format(new Date(event.startsAt))}
+          </strong>
         </div>
 
         <div className="ticket-event-copy">

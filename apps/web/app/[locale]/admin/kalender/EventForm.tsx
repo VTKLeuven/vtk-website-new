@@ -4,6 +4,7 @@ import { MarkdownEditorField } from "@/components/editor/MarkdownEditor";
 import { SaveForm } from "@/components/ui/SaveForm";
 import { saveErrorMessages } from "@/lib/saveMessages";
 import { EventImageField } from "./EventImageField";
+import { utcToLocalDateTime } from "@/lib/ticketing/time";
 
 type Event = {
   id?: string;
@@ -34,8 +35,7 @@ type Category = {
 function toLocalDatetime(d?: Date | null | string) {
   if (!d) return "";
   const date = typeof d === "string" ? new Date(d) : d;
-  const pad = (n: number) => n.toString().padStart(2, "0");
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+  return utcToLocalDateTime(date);
 }
 
 /** Eén aanvinkbare categorie; doelgroep en thema gebruiken dezelfde `name`. */

@@ -66,3 +66,19 @@ export function localDateTimeToUtc(value: string, timeZone = "Europe/Brussels"):
   }
   return result;
 }
+
+export function utcToLocalDateTime(value: Date, timeZone = "Europe/Brussels"): string {
+  if (Number.isNaN(value.getTime())) throw new Error("INVALID_DATE");
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  }).formatToParts(value);
+  const part = (type: Intl.DateTimeFormatPartTypes) =>
+    parts.find((candidate) => candidate.type === type)?.value ?? "";
+  return `${part("year")}-${part("month")}-${part("day")}T${part("hour")}:${part("minute")}`;
+}

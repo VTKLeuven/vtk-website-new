@@ -20,6 +20,7 @@ type CreateUserInput = {
   avatarKey?: string | null;
   active?: boolean;
   isSuperAdmin?: boolean;
+  rNumber?: string | null;
 };
 type UpdateUserInput = {
   email?: string;
@@ -30,6 +31,8 @@ type UpdateUserInput = {
   avatarKey?: string | null;
   active?: boolean;
   isSuperAdmin?: boolean;
+  rNumber?: string | null;
+  password?: string;
 };
 
 function assertCan(actor: SessionPayload, permission: Permission): void {
@@ -42,8 +45,18 @@ function normalizeEmail(email: string): string {
   return email.trim().toLowerCase();
 }
 
+function assertStrongEnoughPassword(password: string): void {
+  if (password.length < 8) throw new AuthError('PASSWORD_TOO_SHORT');
+}
+
+function assertCanManageSuperAdmin(actor: SessionPayload, targetIsSuperAdmin: boolean): void {
+  if (targetIsSuperAdmin && !actor.user.isSuperAdmin) throw new AuthError('FORBIDDEN');
+}
+
 export async function createUser(actor: SessionPayload, input: CreateUserInput): Promise<User> {
   assertCan(actor, 'users.edit');
+  assertCanManageSuperAdmin(actor, input.isSuperAdmin === true);
+  assertStrongEnoughPassword(input.password);
 
   const passwordHash = await hashPassword(input.password);
 
@@ -58,6 +71,7 @@ export async function createUser(actor: SessionPayload, input: CreateUserInput):
         avatarKey: input.avatarKey ?? null,
         active: input.active ?? true,
         isSuperAdmin: input.isSuperAdmin ?? false,
+        rNumber: input.rNumber?.trim() || null,
       },
     });
 
@@ -81,6 +95,8 @@ export async function updateUser(
   input: UpdateUserInput
 ): Promise<User> {
   assertCan(actor, 'users.edit');
+  if (input.password) assertStrongEnoughPassword(input.password);
+  const passwordHash = input.password ? await hashPassword(input.password) : null;
   const data: Prisma.UserUpdateInput = {
     ...(input.email ? { email: normalizeEmail(input.email) } : {}),
     ...(input.name !== undefined ? { name: input.name.trim() } : {}),
@@ -90,10 +106,27 @@ export async function updateUser(
     ...(input.avatarKey !== undefined ? { avatarKey: input.avatarKey } : {}),
     ...(input.active !== undefined ? { active: input.active } : {}),
     ...(input.isSuperAdmin !== undefined ? { isSuperAdmin: input.isSuperAdmin } : {}),
+    ...(input.rNumber !== undefined ? { rNumber: input.rNumber?.trim() || null } : {}),
   };
-  return prisma.user.update({
-    where: { id: userId },
-    data,
+  return prisma.$transaction(async (tx) => {
+    const existing = await tx.user.findUnique({ where: { id: userId }, select: { isSuperAdmin: true } });
+    if (!existing) throw new AuthError('NOT_FOUND');
+    assertCanManageSuperAdmin(actor, existing.isSuperAdmin || input.isSuperAdmin === true);
+    const user = await tx.user.update({ where: { id: userId }, data });
+    if (passwordHash) {
+      await tx.account.upsert({
+        where: { id: `credential:${userId}` },
+        update: { password: passwordHash },
+        create: {
+          id: `credential:${userId}`,
+          accountId: userId,
+          providerId: 'credential',
+          userId,
+          password: passwordHash,
+        },
+      });
+    }
+    return user;
   });
 }
 
@@ -103,22 +136,31 @@ export async function setUserPassword(
   password: string
 ): Promise<void> {
   assertCan(actor, 'users.edit');
+  assertStrongEnoughPassword(password);
   const passwordHash = await hashPassword(password);
-  await prisma.account.upsert({
-    where: { id: `credential:${userId}` },
-    update: { password: passwordHash },
-    create: {
-      id: `credential:${userId}`,
-      accountId: userId,
-      providerId: 'credential',
-      userId,
-      password: passwordHash,
-    },
+  await prisma.$transaction(async (tx) => {
+    const target = await tx.user.findUnique({ where: { id: userId }, select: { isSuperAdmin: true } });
+    if (!target) throw new AuthError('NOT_FOUND');
+    assertCanManageSuperAdmin(actor, target.isSuperAdmin);
+    await tx.account.upsert({
+      where: { id: `credential:${userId}` },
+      update: { password: passwordHash },
+      create: {
+        id: `credential:${userId}`,
+        accountId: userId,
+        providerId: 'credential',
+        userId,
+        password: passwordHash,
+      },
+    });
   });
 }
 export async function deleteUser(actor: SessionPayload, userId: string): Promise<void> {
   assertCan(actor, 'users.edit');
   await prisma.$transaction(async (tx) => {
+    const target = await tx.user.findUnique({ where: { id: userId }, select: { isSuperAdmin: true } });
+    if (!target) return;
+    assertCanManageSuperAdmin(actor, target.isSuperAdmin);
     await tx.account.deleteMany({ where: { userId } });
     await tx.session.deleteMany({ where: { userId } });
     await tx.user.delete({ where: { id: userId } });

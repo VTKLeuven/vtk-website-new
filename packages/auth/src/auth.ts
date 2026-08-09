@@ -101,6 +101,13 @@ export const auth = betterAuth({
       // client met bv. `vtk:study_programme` op `invalid_scope`.
       scopes: [...SCOPE_CODES],
 
+      // We publiceren geen losse RFC 8707 resource servers. De upstream plugin
+      // bindt toegelaten `resource`-audiences momenteel niet per OAuth-client
+      // (GHSA-p2fr-6hmx-4528). Een lege expliciete lijst schakelt die globale
+      // resource-indicatorroute uit; enkel de door de plugin afgeleide UserInfo-
+      // audience blijft beschikbaar voor normale OpenID Connect-clients.
+      validAudiences: [],
+
       // Welke claims onder welke scope vrijkomen, staat in lib/claims.ts. De
       // meeste zitten enkel in UserInfo en niet in het ID token: dat wordt één
       // keer uitgegeven en veroudert, terwijl UserInfo live opgehaald wordt.

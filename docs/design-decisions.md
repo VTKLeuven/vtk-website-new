@@ -1603,3 +1603,29 @@ zichtbaarheidskeuze en geen technische:
   dus zonder die filter zou een klik van de homepage naar `/admin` alsnog een
   paginaweergave opleveren. Beide lagen lezen dezelfde lijst uit
   `apps/web/lib/analytics.ts`, zodat ze niet uiteen kunnen lopen.
+
+---
+
+## Praesidiumlijst (CSV-export op /admin/groepen)
+
+De knop "Download praesidiumlijst" op Ledenbeheer → Posten levert één CSV met twee
+kolommen: naam en r-nummer. Het is de lijst die je aan de universiteit of aan een
+externe partij doorgeeft wanneer die wil weten wie dit jaar praesidium is, dus de
+inhoud is bewust een lijst van *personen*, niet van posten.
+
+- **De export volgt het werkingsjaar dat op het scherm geselecteerd staat**, niet
+  altijd het huidige. Wie op het tabje 25-26 staat en downloadt, krijgt 25-26.
+  Anders zou de knop iets anders exporteren dan wat eronder in de tabel staat.
+- **Eén rij per persoon.** Wie twee posten heeft (bv. een werkgroep en het
+  praesidium) staat één keer in de lijst; welke post iemand heeft, staat er niet
+  in. De vraag die deze lijst beantwoordt is "wie hoort erbij", niet "wie doet wat".
+- **Ook leden van een inactieve post tellen mee.** Een post op inactief zetten
+  verbergt ze in de shift-keuzes, maar dat jaar hingen er wel degelijk mensen aan;
+  de historiek van een werkingsjaar mag niet veranderen doordat een post later
+  gearchiveerd wordt.
+- **Ook leden met een gedeactiveerd account tellen mee.** Een account deactiveren
+  is een login-kwestie; het haalt iemand niet uit de post waaraan die dat jaar hing.
+  Gewiste accounts (de geanonimiseerde tombstones) vallen er wel uit.
+- **Het r-nummer mag leeg zijn.** Niet elk lid heeft er een (bv. een alumnus of
+  een extern bestuurslid); die persoon hoort wel in de lijst, met een lege cel,
+  zodat wie de lijst nakijkt zelf ziet dat er iets ontbreekt.

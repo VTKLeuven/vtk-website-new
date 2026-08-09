@@ -94,6 +94,19 @@ export function PostsTable({
         <button type="button" className="vtk-tile-btn vtk-tile-btn-primary" onClick={() => setCreateOpen(true)}>
           {nl ? "Nieuwe post" : "New post"}
         </button>
+        {/* Exporteert het jaar dat hierboven geselecteerd staat, niet altijd het huidige. */}
+        <a
+          className="vtk-tile-btn"
+          href={`/api/admin/praesidiumlijst?jaar=${year}&locale=${locale}`}
+          download
+          title={
+            nl
+              ? `Naam en r-nummer van iedereen met een post in ${yearLabel}`
+              : `Name and r-number of everyone holding a post in ${yearLabel}`
+          }
+        >
+          {nl ? "Download praesidiumlijst" : "Download praesidium list"}
+        </a>
       </div>
 
       <div className="overflow-x-auto">

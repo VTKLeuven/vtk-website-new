@@ -69,8 +69,7 @@ describe('parseDateOnly', () => {
   });
 
   it('rejects an impossible calendar date', () => {
-    // JS Date rolls 2026-02-30 over; the regex passes but getTime stays valid,
-    // so guard only structurally. Month 13 is caught by Date -> NaN.
+    expect(parseDateOnly('2026-02-30')).toBeNull();
     expect(parseDateOnly('2026-13-01')).toBeNull();
   });
 });

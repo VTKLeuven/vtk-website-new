@@ -19,7 +19,7 @@ export default async function AdminUsers({
   searchParams,
 }: {
   params: Promise<{ locale: string }>;
-  searchParams: Promise<{ q?: string; sort?: string; dir?: string; page?: string }>;
+  searchParams: Promise<{ q?: string; sort?: string; dir?: string; page?: string; inactive?: string }>;
 }) {
   const { locale: localeParam } = await params;
   const sp = await searchParams;
@@ -36,15 +36,17 @@ export default async function AdminUsers({
   const sortKey: SortKey = SORT_KEYS.includes(sp.sort as SortKey) ? (sp.sort as SortKey) : "name";
   const dir: "asc" | "desc" = sp.dir === "desc" ? "desc" : "asc";
   const rawPage = Math.max(1, Number(sp.page) || 1);
+  const showInactive = sp.inactive === "1";
 
   // Zoeken gebeurt in de DB (niet op een geladen lijst): match op naam, e-mail of
   // r-nummer. Met paginatie (take/skip) blijft dit schaalbaar bij 24k+ gebruikers.
   //
   // Gewiste accounts blijven als geanonimiseerde tombstone in de tabel staan (de
   // FK's van o.a. theokot en uitleen laten geen echte delete toe), maar horen niet
-  // in het gebruikersbeheer thuis. Filter op `deletedAt`, niet op `active`: een
-  // gedeactiveerd lid is geen gewist lid en blijft wél zichtbaar.
-  const where: Prisma.UserWhereInput = {
+  // in het gebruikersbeheer thuis. `deletedAt` filtert die altijd weg; `active`
+  // hangt aan de toggle: een gedeactiveerd lid is geen gewist lid, dus het blijft
+  // opvraagbaar, het staat enkel niet standaard in de lijst.
+  const searchWhere: Prisma.UserWhereInput = {
     deletedAt: null,
     ...(q
       ? {
@@ -58,8 +60,14 @@ export default async function AdminUsers({
         }
       : {}),
   };
+  const where: Prisma.UserWhereInput = showInactive ? searchWhere : { ...searchWhere, active: true };
 
-  const total = await prisma.user.count({ where });
+  // Aantal inactieve treffers binnen dezelfde zoekterm, zodat de toggle kan zeggen
+  // hoeveel er verborgen zit in plaats van enkel dát er iets verborgen zit.
+  const [total, inactiveCount] = await Promise.all([
+    prisma.user.count({ where }),
+    prisma.user.count({ where: { ...searchWhere, active: false } }),
+  ]);
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const page = Math.min(rawPage, totalPages);
 
@@ -75,6 +83,7 @@ export default async function AdminUsers({
   const buildParams = () => {
     const params = new URLSearchParams();
     if (q) params.set("q", q);
+    if (showInactive) params.set("inactive", "1");
     params.set("sort", sortKey);
     params.set("dir", dir);
     return params;
@@ -94,6 +103,21 @@ export default async function AdminUsers({
   const colCount = canEdit ? 4 : 3;
   const from = total === 0 ? 0 : (page - 1) * PAGE_SIZE + 1;
   const to = Math.min(page * PAGE_SIZE, total);
+
+  // Een lege lijst met verborgen inactieve treffers is geen "niets gevonden": zeg
+  // dat de toggle ze zichtbaar maakt, anders lijkt het lid gewist.
+  const emptyMessage =
+    !showInactive && inactiveCount > 0
+      ? nl
+        ? `Geen actieve gebruikers gevonden; ${inactiveCount} inactieve ${inactiveCount === 1 ? "gebruiker" : "gebruikers"} verborgen.`
+        : `No active users found; ${inactiveCount} inactive ${inactiveCount === 1 ? "user" : "users"} hidden.`
+      : q
+        ? nl
+          ? "Geen gebruikers gevonden."
+          : "No users found."
+        : nl
+          ? "Nog geen gebruikers."
+          : "No users yet.";
 
   const newUserLabels = {
     submitLabel: nl ? "Aanmaken" : "Create",
@@ -119,6 +143,8 @@ export default async function AdminUsers({
         canEdit={canEdit}
         canBulkImport={canBulkImport}
         initialQuery={q}
+        showInactive={showInactive}
+        inactiveCount={inactiveCount}
         newUserLabels={newUserLabels}
       />
 
@@ -166,7 +192,7 @@ export default async function AdminUsers({
             {users.length === 0 && (
               <tr>
                 <td colSpan={colCount} className="px-4 py-8 text-center text-[#5c667f]">
-                  {q ? (nl ? "Geen gebruikers gevonden." : "No users found.") : nl ? "Nog geen gebruikers." : "No users yet."}
+                  {emptyMessage}
                 </td>
               </tr>
             )}

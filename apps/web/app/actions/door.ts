@@ -11,6 +11,7 @@ import {
   MAX_ACTIVE_DOOR_SHORTCUT_TOKENS,
 } from "@/lib/door-shortcut";
 import { saveError, saveOk, type SaveState } from "@/lib/saveState";
+import { localDateTimeToUtc } from "@/lib/ticketing/time";
 
 export type ActionResult = { ok: true } | { ok: false; error: string };
 
@@ -104,11 +105,14 @@ export async function grantDoorAccessAction(_prev: SaveState, formData: FormData
 
   if (!userId) return saveError("no_user");
 
-  // datetime-local-waarden worden als lokale tijd (Europe/Brussels van de beheerder)
-  // geinterpreteerd door de browser; new Date(...) leest ze in de servertijdzone.
-  const startsAt = startsRaw ? new Date(startsRaw) : new Date();
-  const endsAt = endsRaw ? new Date(endsRaw) : new Date(NaN);
-  if (Number.isNaN(endsAt.getTime())) return saveError("bad_dates");
+  let startsAt: Date;
+  let endsAt: Date;
+  try {
+    startsAt = startsRaw ? localDateTimeToUtc(startsRaw) : new Date();
+    endsAt = localDateTimeToUtc(endsRaw);
+  } catch {
+    return saveError("bad_dates");
+  }
   if (endsAt <= startsAt) return saveError("bad_dates");
 
   const user = await prisma.user.findUnique({ where: { id: userId }, select: { id: true } });
