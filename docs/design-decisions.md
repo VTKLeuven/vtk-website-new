@@ -1799,3 +1799,42 @@ inhoud is bewust een lijst van *personen*, niet van posten.
 - **Het r-nummer mag leeg zijn.** Niet elk lid heeft er een (bv. een alumnus of
   een extern bestuurslid); die persoon hoort wel in de lijst, met een lege cel,
   zodat wie de lijst nakijkt zelf ziet dat er iets ontbreekt.
+
+---
+
+## De tickets zitten in de bevestigingsmail
+
+De bevestigingsmail bevat naast de link naar de ticketpagina ook de tickets zelf:
+één pdf met alle tickets van de bestelling, en per ticket een pas voor Apple
+Wallet. Google Wallet kan geen bijlage zijn (een pas komt daar altijd via een
+save-link binnen), dus die staat als knop in de mail.
+
+- **De link blijft de hoofdweg, de bijlage is het vangnet.** De ticketpagina toont
+  de laatste stand van zaken (ingetrokken, terugbetaald, een nieuwe qr na een
+  reset); een bijlage is de toestand van het moment van versturen. De bijlage is er
+  voor aan de deur: geen bereik, een lege batterij, of iemand die zijn ticket
+  liever afdrukt. Daarom verdwijnt de knop "Bekijk je tickets" niet uit de mail.
+- **Enkel geldige tickets gaan mee.** Bij een terugbetaalde of ingetrokken
+  bestelling zit er geen pdf en geen pas in de mail. Een geweigerd ticket dat wel
+  als bijlage in een mailbox staat, belooft iets dat aan de deur niet waar is.
+- **De mail zegt enkel wat er echt bij zit.** Loopt de pdf-generator of de
+  wallet-provider stuk, dan vertrekt de bevestiging toch, zonder die bijlage en
+  zonder ze te noemen. De omgekeerde keuze (de mail laten mislukken) is al eens
+  fout gelopen: dan blijft de outbox proberen, gaat de rij uiteindelijk op DEAD,
+  en krijgt de koper helemaal niets.
+- **Boven acht tickets vallen de wallet-passen weg.** Zo'n bestelling is er een
+  voor een groep: die persoon deelt de tickets door via de link en heeft geen
+  twintig passen in zijn eigen wallet nodig. De pdf gaat wel gewoon mee.
+- **Er zit een grens van 8 MB op de bijlagen samen.** Mailservers weigeren een te
+  grote boodschap in haar geheel; dan zou een bestelling met een zwaar
+  ticketontwerp helemaal geen bevestiging opleveren. Boven de grens vallen de
+  passen weg, de pdf eerst.
+- **De Google Wallet-links staan enkel in de html-versie.** Zo'n save-link is een
+  jwt van enkele kilobytes; in platte tekst is dat per ticket een onleesbaar blok
+  dat mailclients afkappen, waarna de link stuk is. De tekstversie verwijst naar
+  de ticketpagina, waar dezelfde knop staat.
+- **Let op het verbruik bij walletwallet.dev.** Vroeger vertrok er pas een aanroep
+  wanneer een koper op een wallet-knop klikte; nu gebeurt dat voor elk ticket van
+  elke betaalde bestelling. Eén aanroep levert de Apple- en de Google-pas samen
+  (de tweede komt uit de cache van tien minuten), dus reken op één aanroep per
+  ticket. Op het gratis plan zijn dat er 1000 per maand.

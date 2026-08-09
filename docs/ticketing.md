@@ -21,11 +21,16 @@ setup (env, webhook, SMTP).
 3. **Pay** — Mollie hosted checkout. On completion Mollie calls the webhook,
    which re-fetches the payment and calls `fulfillPaidOrder` → tickets issued,
    confirmation mail enqueued in the same transaction.
-4. **Ticket** — buyer finds paid orders in the "Mijn VTK" section at
+4. **Mail** — the confirmation carries the tickets themselves: one PDF with every
+   valid ticket of the order, one Apple Wallet pass per ticket, and a Google
+   Wallet save button per ticket (Google passes can only be links). The link to
+   the ticket page stays the primary route; the attachments are the fallback at
+   the door. See `docs/design-decisions.md` for the limits and the failure mode.
+5. **Ticket** — buyer finds paid orders in the "Mijn VTK" section at
    `/account#mijn-vtk-tickets` and opens an order at
    `/tickets/bestelling/<orderId>`; each ticket renders a QR from a signed,
    PII-free credential.
-5. **Scan** — an operator with `SCAN` capability opens `/scan/<eventId>` on a
+6. **Scan** — an operator with `SCAN` capability opens `/scan/<eventId>` on a
    phone, scans the QR, and the server validates + marks it used (with duplicate
    detection and reversal).
 
@@ -174,6 +179,9 @@ klopt; een scanner-URL van één event is dat niet.
 - `config.ts` — env-driven config (provider, base URL, secrets, reservation window)
 - `crypto.ts` — signed ticket credentials + order access tokens
 - `mail.ts`, `outbox.ts` — durable confirmation-mail queue
+- `mailBundle.ts` — the ticket PDF and the Apple Wallet passes that ride along
+  with that mail, plus the Google Wallet save links (best effort: a failing
+  generator or provider never blocks the confirmation itself)
 - `money.ts`, `time.ts`, `pdf.ts`, `csv.ts`, `http.ts`, `access.ts`, `queries.ts` — helpers
 
 ### Components (`apps/web/components/ticketing/`)
