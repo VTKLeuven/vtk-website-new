@@ -269,7 +269,10 @@ services:
         exec npm run start-docker
     ports:
       # Caddy is de publieke rand; Umami zelf is enkel vanaf de host bereikbaar.
-      - "127.0.0.1:3013:3000"
+      # 3013 en 3014 zijn op liv al door de cursusdienst bezet; dat is buiten
+      # deze compose om, dus `docker compose up` zou daar stilvallen op een poort
+      # die al in gebruik is.
+      - "127.0.0.1:3016:3000"
     healthcheck:
       test:
         - CMD-SHELL
