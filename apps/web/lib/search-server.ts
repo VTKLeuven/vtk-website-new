@@ -12,11 +12,17 @@ import {
   isUsableQuery,
   normalizeQuery,
   pageResultHref,
+  prefixTsQuery,
   snippetParts,
   sortResults,
   textSearchConfig,
   type SearchResult,
 } from "@/lib/search";
+import {
+  buildDestinations,
+  matchDestinations,
+  type DestinationTab,
+} from "@/lib/searchDestinations";
 
 /**
  * De zoekopdracht zelf.
@@ -60,7 +66,23 @@ function byId(rows: Candidate[]): CandidateMap {
  * cast. Wat wél als SQL-fragment wisselt is de kolomnaam, en die komt uit de
  * `Locale`-union en niet uit de invoer van de bezoeker.
  */
-async function pageCandidates(query: string, locale: Locale): Promise<Candidate[]> {
+/**
+ * De tsquery zelf. `websearch_to_tsquery` is de eerste poging: die begrijpt
+ * aanhalingstekens, `or` en `-`, en zoekt op hele woorden via de stammer. Wie
+ * halverwege een woord stopt met typen (`uitleen`) vindt daarmee niets, en dan
+ * is `to_tsquery` met `:*` de tweede poging.
+ */
+function tsQuery(query: string, config: string, prefix: string | null): Prisma.Sql {
+  return prefix === null
+    ? Prisma.sql`websearch_to_tsquery(${config}::regconfig, ${query})`
+    : Prisma.sql`to_tsquery(${config}::regconfig, ${prefix})`;
+}
+
+async function pageCandidates(
+  query: string,
+  locale: Locale,
+  prefix: string | null = null,
+): Promise<Candidate[]> {
   const config = textSearchConfig(locale);
   const vector = locale === "en" ? Prisma.sql`p."searchEn"` : Prisma.sql`p."searchNl"`;
   // Het fragment komt uit de tekst en niet uit de titel: de titel staat er in het
@@ -74,7 +96,7 @@ async function pageCandidates(query: string, locale: Locale): Promise<Candidate[
     SELECT p."id",
            ts_rank(${vector}, q.query) AS "rank",
            ts_headline(${config}::regconfig, ${body}, q.query, ${HEADLINE_OPTIONS}) AS headline
-    FROM "Page" p, websearch_to_tsquery(${config}::regconfig, ${query}) AS q(query)
+    FROM "Page" p, ${tsQuery(query, config, prefix)} AS q(query)
     WHERE p."publishedAt" IS NOT NULL
       AND ${vector} @@ q.query
     ORDER BY "rank" DESC
@@ -82,7 +104,11 @@ async function pageCandidates(query: string, locale: Locale): Promise<Candidate[
   `;
 }
 
-async function eventCandidates(query: string, locale: Locale): Promise<Candidate[]> {
+async function eventCandidates(
+  query: string,
+  locale: Locale,
+  prefix: string | null = null,
+): Promise<Candidate[]> {
   const config = textSearchConfig(locale);
   const vector = locale === "en" ? Prisma.sql`e."searchEn"` : Prisma.sql`e."searchNl"`;
   const body =
@@ -97,7 +123,7 @@ async function eventCandidates(query: string, locale: Locale): Promise<Candidate
     SELECT e."id",
            ts_rank(${vector}, q.query) AS "rank",
            ts_headline(${config}::regconfig, ${body}, q.query, ${HEADLINE_OPTIONS}) AS headline
-    FROM "CalendarEvent" e, websearch_to_tsquery(${config}::regconfig, ${query}) AS q(query)
+    FROM "CalendarEvent" e, ${tsQuery(query, config, prefix)} AS q(query)
     WHERE e."visibility" = 'PUBLIC'
       AND ${vector} @@ q.query
     ORDER BY "rank" DESC
@@ -203,23 +229,76 @@ export type SearchOutcome = {
   results: SearchResult[];
 };
 
+/**
+ * De categorieën met hun menu-items, als voer voor de bestemmingenlijst.
+ * Dezelfde selectie als de header toont, zodat wat vindbaar is en wat in het
+ * menu staat niet uiteenlopen.
+ */
+async function destinationTabs(): Promise<DestinationTab[]> {
+  return prisma.headerTab.findMany({
+    where: { visible: true },
+    orderBy: { order: "asc" },
+    select: {
+      slug: true,
+      labelNl: true,
+      labelEn: true,
+      introNl: true,
+      introEn: true,
+      externalUrl: true,
+      visible: true,
+      links: {
+        orderBy: { order: "asc" },
+        select: { id: true, labelNl: true, labelEn: true, url: true },
+      },
+    },
+  });
+}
+
 export async function searchSite(input: SearchInput): Promise<SearchOutcome> {
   const query = normalizeQuery(input.query);
   if (!isUsableQuery(query)) return { query, searched: false, results: [] };
 
-  const [pages, events] = await Promise.all([
+  const [pages, events, tabs] = await Promise.all([
     pageCandidates(query, input.locale),
     eventCandidates(query, input.locale),
+    destinationTabs(),
   ]);
 
+  // Tweede poging op woordbegin, en enkel wanneer de eerste niets opleverde: zo
+  // blijft `"job fair"` een exacte zin en vindt `uitleen` toch de uitleendienst.
+  const prefix = pages.length === 0 && events.length === 0 ? prefixTsQuery(query) : null;
+  const [fallbackPages, fallbackEvents] =
+    prefix === null
+      ? [[], []]
+      : await Promise.all([
+          pageCandidates(query, input.locale, prefix),
+          eventCandidates(query, input.locale, prefix),
+        ]);
+
   const [pageRows, eventRows] = await Promise.all([
-    pageResults(byId(pages), input.locale),
-    eventResults(byId(events), input.locale, input.audiences),
+    pageResults(byId(prefix === null ? pages : fallbackPages), input.locale),
+    eventResults(byId(prefix === null ? events : fallbackEvents), input.locale, input.audiences),
   ]);
+
+  const destinationRows = matchDestinations(
+    buildDestinations(tabs, input.locale),
+    query,
+    input.locale,
+  );
+
+  // Een bestemming kan hetzelfde adres hebben als een gevonden pagina (een
+  // categorie met een pagina eronder deelt dat niet, maar een menu-item dat naar
+  // /info/shiften wijst wel). Twee keer dezelfde link onder elkaar leest als een
+  // fout; de best scorende wint.
+  const seen = new Map<string, SearchResult>();
+  for (const result of [...destinationRows, ...pageRows, ...eventRows]) {
+    const existing = seen.get(result.href);
+    if (!existing || result.rank > existing.rank) seen.set(result.href, result);
+  }
 
   return {
     query,
     searched: true,
-    results: sortResults([...pageRows, ...eventRows]).slice(0, input.limit ?? RESULT_LIMIT),
+    results: sortResults([...seen.values()]).slice(0, input.limit ?? RESULT_LIMIT),
   };
 }

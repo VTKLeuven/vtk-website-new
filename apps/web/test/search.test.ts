@@ -5,7 +5,9 @@ import {
   MAX_QUERY_LENGTH,
   compareResults,
   isUsableQuery,
+  normalizeForMatch,
   normalizeQuery,
+  prefixTsQuery,
   snippetParts,
   sortResults,
   type SearchResult,
@@ -155,5 +157,45 @@ describe('de volgorde van de resultaten', () => {
     const input = [result({ id: 'b', rank: 0.1 }), result({ id: 'a', rank: 0.9 })];
     sortResults(input);
     expect(input.map((r) => r.id)).toEqual(['b', 'a']);
+  });
+
+  it('zet bij gelijke rang een externe link tussen pagina en evenement', () => {
+    // Een link naar een andere site is nuttig, maar wie op deze site zoekt, wil
+    // eerst zien wat er hier staat.
+    const page = result({ kind: 'page', id: 'p', title: 'Zeus' });
+    const link = result({ kind: 'link', id: 'l', title: 'Aap' });
+    const event = result({ kind: 'event', id: 'e', title: 'Aap' });
+    expect(sortResults([event, link, page]).map((r) => r.id)).toEqual(['p', 'l', 'e']);
+  });
+});
+
+describe('zoeken op woordbegin', () => {
+  it('maakt van elke term een prefix', () => {
+    // Zonder dit vindt "uitleen" de uitleendienst niet: de stammer zoekt op
+    // hele woorden.
+    expect(prefixTsQuery('uitleen')).toBe('uitleen:*');
+    expect(prefixTsQuery('job fair')).toBe('job:* & fair:*');
+  });
+
+  it('gooit de operatoren van tsquery eruit in plaats van te crashen', () => {
+    // `&`, `|` en `!` zijn syntaxis voor to_tsquery. Wie ze intypt hoort geen
+    // databasefout te krijgen.
+    expect(prefixTsQuery('piano & !kasteel')).toBe('piano:* & kasteel:*');
+    // Het lidwoord 't valt hier weg als losse letter; "elixir" doet het werk.
+    expect(prefixTsQuery("'t elixir")).toBe('elixir:*');
+  });
+
+  it('laat losse letters vallen', () => {
+    // `a:*` matcht zowat elke rij en maakt de tweede poging waardeloos.
+    expect(prefixTsQuery('a piano')).toBe('piano:*');
+    expect(prefixTsQuery('a')).toBeNull();
+    expect(prefixTsQuery('!!!')).toBeNull();
+  });
+});
+
+describe('tekst vergelijkbaar maken', () => {
+  it('haalt accenten, hoofdletters en leestekens weg', () => {
+    expect(normalizeForMatch('Café  Théokot')).toBe('cafe theokot');
+    expect(normalizeForMatch("POC's")).toBe('pocs');
   });
 });

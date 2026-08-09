@@ -35,6 +35,16 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   });
 }
 
+/** Het label boven een resultaat: wat voor ding heeft de bezoeker gevonden? */
+function kindLabel(
+  kind: SearchResult["kind"],
+  t: ReturnType<typeof getDictionary>["search"],
+): string {
+  if (kind === "event") return t.kindEvent;
+  if (kind === "link") return t.kindLink;
+  return t.kindPage;
+}
+
 /** Het fragment als losse stukjes tekst; de gemarkeerde delen in een `<mark>`. */
 function Snippet({ parts }: { parts: SearchResult["snippet"] }) {
   return (
@@ -120,11 +130,16 @@ export default async function SearchPage({ params, searchParams }: PageProps) {
             <ol className="vtk-search-results">
               {results.map((result) => (
                 <li key={`${result.kind}:${result.id}`} className="vtk-search-result">
-                  <span className="vtk-search-kind">
-                    {result.kind === "page" ? t.kindPage : t.kindEvent}
-                  </span>
+                  <span className="vtk-search-kind">{kindLabel(result.kind, t)}</span>
                   <h2>
-                    <Link href={result.href}>{result.title}</Link>
+                    {result.kind === "link" ? (
+                      // Een andere site opent in een nieuw tabblad, net als elders.
+                      <a href={result.href} target="_blank" rel="noopener noreferrer">
+                        {result.title}
+                      </a>
+                    ) : (
+                      <Link href={result.href}>{result.title}</Link>
+                    )}
                   </h2>
                   {result.meta ? <p className="vtk-search-meta">{result.meta}</p> : null}
                   {result.snippet.length > 0 ? <Snippet parts={result.snippet} /> : null}

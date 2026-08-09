@@ -630,7 +630,8 @@
     "emptyCalendar": "Naar de kalender",
     "emptyInfo": "Naar Info",
     "kindPage": "Pagina",
-    "kindEvent": "Activiteit"
+    "kindEvent": "Activiteit",
+    "kindLink": "Andere site"
   },
   "seo": {
     "home": {

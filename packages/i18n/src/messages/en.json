@@ -630,7 +630,8 @@
     "emptyCalendar": "Go to the calendar",
     "emptyInfo": "Go to Info",
     "kindPage": "Page",
-    "kindEvent": "Activity"
+    "kindEvent": "Activity",
+    "kindLink": "Other site"
   },
   "seo": {
     "home": {

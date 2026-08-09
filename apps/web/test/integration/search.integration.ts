@@ -247,4 +247,44 @@ describe.sequential("zoeken", () => {
     // De tabel staat er nog: de zoekterm ging als parameter mee, niet als SQL.
     expect(await prisma.page.count({ where: { id: ids.publishedPage } })).toBe(1);
   });
+
+  it("vindt een vaste route die in geen enkele tabel staat", async () => {
+    // De klacht waarmee dit begon: /piano is een eigen route zonder Page-rij,
+    // dus geen enkele zoekopdracht in de database kon hem ooit vinden.
+    const { results } = await visitorSearch("piano");
+    const piano = results.find((r) => r.href === "/piano");
+    expect(piano).toBeDefined();
+    expect(piano?.kind).toBe("page");
+    // En hij staat vooraan: een exacte bestemming wint van een tekstpagina waar
+    // het woord toevallig in voorkomt.
+    expect(results[0]?.href).toBe("/piano");
+  });
+
+  it("vindt diezelfde route ook halverwege het woord", async () => {
+    const { results } = await visitorSearch("kalen");
+    expect(results.some((r) => r.href === "/kalender")).toBe(true);
+  });
+
+  it("valt terug op zoeken per woordbegin wanneer het hele woord niets geeft", async () => {
+    // `websearch_to_tsquery` zoekt via de stammer op hele woorden, dus een
+    // half woord levert niets op. Dan pas komt de tweede poging met `:*`.
+    const half = TERM.slice(0, 8);
+    const { results } = await visitorSearch(half);
+    expect(results.map((r) => r.id)).toContain(ids.publishedPage);
+  });
+
+  it("houdt de zichtbaarheidsregels ook in die tweede poging aan", async () => {
+    // De tweede poging is een tweede query; als daar de where-regels ontbreken,
+    // lekt er een concept-pagina of een ledenevenement doorheen.
+    const half = TERM.slice(0, 8);
+    const { results } = await visitorSearch(half);
+    expect(results.map((r) => r.id)).not.toContain(ids.draftPage);
+    expect(results.map((r) => r.id)).not.toContain(ids.membersEvent);
+  });
+
+  it("toont een adres maar één keer", async () => {
+    const { results } = await visitorSearch("piano");
+    const hrefs = results.map((r) => r.href);
+    expect(new Set(hrefs).size).toBe(hrefs.length);
+  });
 });

@@ -87,6 +87,48 @@ export function isUsableQuery(query: string): boolean {
   return query.length >= MIN_QUERY_LENGTH;
 }
 
+/**
+ * De vorm waarin we tekst met tekst vergelijken: accenten weg, kleine letters,
+ * en alles wat geen letter of cijfer is wordt een spatie.
+ *
+ * Dat laatste is wat "POC's" vindbaar maakt met `pocs` en "'t ElixIr" met
+ * `elixir`. Het maakt de uitkomst meteen ook veilig om als `to_tsquery` mee te
+ * geven: `&`, `|` en `!` zijn operatoren in die taal, en een bezoeker die ze
+ * intypt hoort geen databasefout te krijgen.
+ */
+export function normalizeForMatch(value: string): string {
+  return value
+    .normalize("NFD")
+    // De combining marks die NFD losmaakt van hun letter (é -> e + accent).
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    // De apostrof valt weg in plaats van een woordgrens te worden: "POC's" moet
+    // "pocs" geven, want zo typt iemand het in. De rechte en de gekrulde vorm
+    // allebei; van die tweede maakt een tekstverwerker er ongevraagd een.
+    .replace(/['\u2019]/g, "")
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+}
+
+/**
+ * Een tsquery die op woordbegin matcht: `uitleen` vindt zo "uitleendienst".
+ *
+ * `websearch_to_tsquery` doet dat niet, en dat is meestal juist: het zoekt op
+ * hele woorden via de stammer. Maar wie halverwege een woord stopt met typen,
+ * krijgt daardoor niets. Deze query is de tweede poging, niet de eerste, want
+ * ze verliest de betekenis van aanhalingstekens, `or` en `-`.
+ *
+ * Termen van één letter vallen weg: `a:*` matcht zowat elke rij.
+ * `null` betekent dat er niets bruikbaars overblijft om mee te zoeken.
+ */
+export function prefixTsQuery(query: string): string | null {
+  const terms = normalizeForMatch(query)
+    .split(" ")
+    .filter((term) => term.length >= MIN_QUERY_LENGTH);
+  if (terms.length === 0) return null;
+  return terms.map((term) => `${term}:*`).join(" & ");
+}
+
 export type SnippetPart = { text: string; highlight: boolean };
 
 /**
@@ -141,12 +183,22 @@ export function snippetParts(headline: string | null | undefined): SnippetPart[]
   return parts.filter((part) => part.text !== "");
 }
 
-export type SearchResultKind = "page" | "event";
+/**
+ * Wat een resultaat is, in de woorden van de bezoeker en niet in die van de
+ * database. Een vaste route (`/piano`) en een CMS-pagina zijn allebei gewoon
+ * "een pagina"; dat de ene uit een tabel komt en de andere niet, is voor wie
+ * zoekt een detail. `link` is het enige echte onderscheid: dat opent een andere
+ * site, en dat hoor je te weten voor je klikt.
+ */
+export type SearchResultKind = "page" | "event" | "link";
+
+/** Voor gelijke rang: eerst een pagina, dan een externe link, dan een activiteit. */
+const KIND_ORDER: Record<SearchResultKind, number> = { page: 0, link: 1, event: 2 };
 
 export type SearchResult = {
   kind: SearchResultKind;
   id: string;
-  /** Pad inclusief taalvoorvoegsel, klaar voor een `<Link>`. */
+  /** Pad inclusief taalvoorvoegsel, klaar voor een `<Link>`; of een volledige URL. */
   href: string;
   title: string;
   /** Eén regel context: de categorie van een pagina, de datum van een evenement. */
@@ -169,7 +221,7 @@ export type SearchResult = {
  */
 export function compareResults(a: SearchResult, b: SearchResult): number {
   if (b.rank !== a.rank) return b.rank - a.rank;
-  if (a.kind !== b.kind) return a.kind === "page" ? -1 : 1;
+  if (a.kind !== b.kind) return KIND_ORDER[a.kind] - KIND_ORDER[b.kind];
 
   const byTitle = a.title.localeCompare(b.title, "nl");
   if (byTitle !== 0) return byTitle;
