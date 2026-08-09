@@ -1,11 +1,23 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   REMINDER_LEADS,
   handledLeadFields,
   passedLeads,
+  processDueShiftReminders,
   shiftReminderMail,
   windowFor,
 } from '@/lib/shift-reminders';
+
+vi.mock('@vtk/db', () => ({
+  prisma: {
+    shiftParticipant: {
+      findMany: vi.fn(async () => {
+        throw new Error('de database mag hier niet aangesproken worden');
+      }),
+      updateMany: vi.fn(),
+    },
+  },
+}));
 
 const HOUR = 60 * 60 * 1000;
 const now = new Date('2026-08-10T09:00:00Z');
@@ -42,6 +54,37 @@ describe('welke herinneringen nog zinvol zijn', () => {
 
   it('telt het venster als voorbij wanneer de start er precies op valt', () => {
     expect(passedLeads(new Date(now.getTime() + 24 * HOUR), now)).toEqual(['dayBefore']);
+  });
+});
+
+describe('zonder mailserver', () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it('slaat in productie alles over in plaats van iedereen af te vinken', async () => {
+    // `sendMail` meldt zonder SMTP "gelukt", en de markering staat er dan al op.
+    // Zonder deze grendel zouden alle herinneringen als verstuurd afgevinkt
+    // worden terwijl er nooit iets aankwam, en niemand zou dat merken. Dat de
+    // database hier niet eens aangesproken wordt, is het bewijs: de mock gooit.
+    vi.stubEnv('NODE_ENV', 'production');
+    vi.stubEnv('SMTP_HOST', '');
+
+    await expect(processDueShiftReminders(now)).resolves.toEqual({
+      sent: 0,
+      failed: 0,
+      skipped: 'geen-smtp',
+    });
+  });
+
+  it('blijft lokaal wel gewoon loggen', async () => {
+    // Buiten productie is de console het doel; dan mag de gewone weg lopen.
+    vi.stubEnv('NODE_ENV', 'development');
+    vi.stubEnv('SMTP_HOST', '');
+
+    await expect(processDueShiftReminders(now)).rejects.toThrow(
+      'de database mag hier niet aangesproken worden',
+    );
   });
 });
 

@@ -28,8 +28,11 @@ export async function POST(request: Request) {
   }
 
   const result = await processDueShiftReminders();
-  // 502 zodat de healthcheck van de worker het merkt wanneer de mailserver
-  // structureel weigert: verzonden noch mislukt is dan onwaar.
-  const status = result.failed > 0 && result.sent === 0 ? 502 : 200;
+  // 503 wanneer er geen mailserver is (zelfde signaal als de andere
+  // maintenance-routes bij een ontbrekende configuratie), 502 wanneer de
+  // verzending structureel weigert. In beide gevallen ziet de healthcheck van de
+  // worker dat er iets scheelt in plaats van stil niets te doen.
+  const status =
+    result.skipped === "geen-smtp" ? 503 : result.failed > 0 && result.sent === 0 ? 502 : 200;
   return Response.json(result, { status, headers: { "Cache-Control": "no-store" } });
 }

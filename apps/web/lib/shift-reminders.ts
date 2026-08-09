@@ -1,5 +1,5 @@
 import { prisma } from '@vtk/db';
-import { sendMail } from '@/lib/mail';
+import { sendMail, smtpConfigured } from '@/lib/mail';
 import { preferredEmail } from '@/lib/brevo/contacts';
 
 /**
@@ -212,6 +212,13 @@ async function candidatesFor(lead: ReminderLead, now: Date): Promise<Candidate[]
   return rows as Candidate[];
 }
 
+export type ReminderRun = {
+  sent: number;
+  failed: number;
+  /** Gezet wanneer er niets geprobeerd is, met de reden erbij. */
+  skipped?: 'geen-smtp';
+};
+
 /**
  * Verstuurt alle herinneringen die nu aan de beurt zijn.
  *
@@ -219,10 +226,19 @@ async function candidatesFor(lead: ReminderLead, now: Date): Promise<Candidate[]
  * `updateMany`, en enkel wie die update wint, verstuurt. Bij twijfel liever geen
  * mail dan twee, dus een mislukte verzending zet de markering niet terug. Zelfde
  * afweging als bij de no-show-mails in `theokot-server.ts`.
+ *
+ * Zonder mailserver doet dit in productie niets. `sendMail` logt dan naar de
+ * console en meldt "gelukt", en omdat wij de markering al gezet hebben zouden
+ * alle herinneringen als verstuurd afgevinkt worden zonder dat er ooit iets
+ * aankwam; niemand zou dat merken. Lokaal blijft loggen wel de bedoeling, dus de
+ * grens ligt bij `NODE_ENV`, net zoals de ticketmailer die enkel in productie
+ * gooit.
  */
-export async function processDueShiftReminders(
-  now: Date = new Date(),
-): Promise<{ sent: number; failed: number }> {
+export async function processDueShiftReminders(now: Date = new Date()): Promise<ReminderRun> {
+  if (!smtpConfigured() && process.env.NODE_ENV === 'production') {
+    return { sent: 0, failed: 0, skipped: 'geen-smtp' };
+  }
+
   let sent = 0;
   let failed = 0;
 

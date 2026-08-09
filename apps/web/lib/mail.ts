@@ -3,9 +3,14 @@
  *
  * Is `SMTP_HOST` niet gezet, dan wordt de mail gelogd i.p.v. verstuurd. Zo werkt
  * lokale ontwikkeling zonder mailserver, terwijl in productie een echte SMTP-config
- * (`SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_SECURE`, `MAIL_FROM`)
- * volstaat. nodemailer wordt lui geladen zodat de module ook laadt zonder de dep
- * of zonder SMTP-config.
+ * (`SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_SECURE`,
+ * `MAIL_FROM`) volstaat. nodemailer wordt lui geladen zodat de module ook laadt
+ * zonder de dep of zonder SMTP-config.
+ *
+ * Let op wie hierop bouwt: zonder SMTP geeft deze functie `true` terug. Dat is
+ * juist voor een formulier dat lokaal getest wordt, maar wie een verzending
+ * eenmalig afvinkt (zoals de shift-herinneringen) moet zelf eerst nagaan of er
+ * een mailserver is; zie `smtpConfigured()`.
  *
  * Enkel server-side gebruiken (server actions, instrumentation).
  */
@@ -31,6 +36,15 @@ export type MailInput = {
 };
 
 const FROM = process.env.MAIL_FROM || 'Theokot VTK <theokot@vtk.be>';
+
+/**
+ * Is er een mailserver? Voor het onderscheid tussen "verstuurd" en "gelogd omdat
+ * er niets ingesteld is". Wie een verzending maar één keer probeert, moet dit
+ * eerst vragen; anders vinkt hij in productie iets af dat nooit vertrokken is.
+ */
+export function smtpConfigured(): boolean {
+  return Boolean(process.env.SMTP_HOST?.trim());
+}
 
 /**
  * Verstuurt een mail, of logt ze wanneer SMTP niet geconfigureerd is.
@@ -64,7 +78,17 @@ export async function sendMail(
       port: Number(process.env.SMTP_PORT) || 587,
       secure: process.env.SMTP_SECURE === 'true',
       auth: process.env.SMTP_USER
-        ? { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS }
+        ? {
+            user: process.env.SMTP_USER,
+            // Twee namen voor hetzelfde wachtwoord. De ticketmailer
+            // (`lib/ticketing/mail.ts`) leest `SMTP_PASSWORD`, deze las van
+            // oudsher `SMTP_PASS`, en `.env.example` declareerde allebei in twee
+            // aparte blokken. In een plat `.env` won de laatste, dus wie er één
+            // invulde kreeg stil een helft van de mails die niet authenticeerde.
+            // Nu volstaat `SMTP_PASSWORD`; `SMTP_PASS` blijft werken voor
+            // omgevingen die het al gezet hebben.
+            pass: process.env.SMTP_PASSWORD || process.env.SMTP_PASS,
+          }
         : undefined,
     });
     await transport.sendMail({

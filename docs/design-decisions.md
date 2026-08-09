@@ -1726,6 +1726,19 @@ en twee uur vooraf. Beide zijn per lid uitzetbaar in het profiel.
   voorwaardelijke `updateMany` gezet *voor* er verstuurd wordt, en een mislukte
   verzending zet ze niet terug. Dezelfde afweging als bij de no-show-mails van
   Theokot: een dubbele herinnering is vervelender dan een gemiste.
+- **Geen mailserver betekent niets versturen, niet alles afvinken.** `sendMail`
+  logt zonder `SMTP_HOST` naar de console en meldt "gelukt"; dat is juist voor lokaal
+  werk, maar hier staat de markering dan al. In productie zouden alle herinneringen
+  dus als verstuurd afgevinkt worden zonder dat er ooit iets aankwam, en niemand zou
+  dat merken. De verwerking stopt daarom meteen wanneer er in productie geen SMTP
+  is, en de route antwoordt 503 zodat de healthcheck het ziet. Buiten productie
+  blijft loggen wél de bedoeling; dezelfde grens als bij de ticketmailer, die enkel
+  in productie gooit.
+- **Eén SMTP-blok voor de hele site.** `.env.example` declareerde het ooit twee keer,
+  met `SMTP_PASS` in het ene en `SMTP_PASSWORD` in het andere. In een plat `.env`
+  wint de laatste, dus wie er één invulde kreeg stil een helft van de mails die niet
+  authenticeerde. Er staat nu één blok; `lib/mail.ts` aanvaardt allebei de namen,
+  zodat een omgeving die `SMTP_PASS` al gezet had blijft werken.
 - **Een eigen worker.** `shift-worker` in `infra/docker-compose.yml` klopt elke vijf
   minuten aan bij `/api/shift/maintenance`. Bewust niet meeliftend op de
   `ticket-worker`: een klemgelopen mailserver mag de ticketbevestigingen niet
