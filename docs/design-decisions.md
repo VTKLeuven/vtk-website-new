@@ -1419,9 +1419,9 @@ product- en niet puur technisch:
 
 ## Zoeken: wat er in de resultaten mag staan
 
-De zoekfunctie (`/zoeken`) doorzoekt twee dingen en bewust niet meer: **de pagina's
-van de site** en **de activiteiten in de kalender**. Wat er per soort in mag, is een
-zichtbaarheidskeuze en geen technische:
+De zoekfunctie (`/zoeken`) doorzoekt **de pagina's van de site**, **de activiteiten
+in de kalender**, **de fotoalbums** en **het materiaal van de uitleendienst**. Wat er
+per soort in mag, is een zichtbaarheidskeuze en geen technische:
 
 - **Enkel gepubliceerde pagina's.** Een concept (`publishedAt` leeg) staat niet in de
   resultaten, ook niet als losse titel: dat zou verklappen dat er iets in de maak is
@@ -1443,8 +1443,23 @@ zichtbaarheidskeuze en geen technische:
   zichtbaarheidsregel in SQL loopt vroeg of laat uiteen met de eerste, en dan lekt er
   een intern evenement in de zoekresultaten. Verandert de kalenderzichtbaarheid, dan
   verandert het zoekresultaat mee, zonder dat iemand daaraan hoeft te denken.
-- **Wat er niet doorzocht wordt**: tickets, bestellingen, fotoalbums, praesidiumleden
-  en alles achter een login. Die schermen staan om dezelfde reden niet in de sitemap.
+- **Uitleenmateriaal enkel voor wie ingelogd is.** "Hebben jullie een beamer" is
+  precies het soort vraag waarmee iemand op de site landt, dus materiaal hoort
+  vindbaar te zijn. Maar de catalogus zelf zit in de logistiek-app achter een login
+  (zie `docs/uitleendienst.md`), en materiaalnamen in een publieke resultatenlijst
+  zetten zou die keuze langs de achterdeur ongedaan maken. Een uitgelogde bezoeker
+  zou bovendien op een loginscherm landen, wat een zoekresultaat is dat niets
+  oplevert. Daarom draait die zoekpas enkel met een sessie, en het resultaat linkt
+  naar `LOGISTIEK_PUBLIC_URL`; zonder die instelling toont de site geen materiaal,
+  want dan valt er nergens naartoe te linken.
+- **Fotoalbums volgen wat er op /media staat.** Ze komen niet uit de database maar
+  uit Immich, en enkel albums met de `[gallery]`-markering zitten in die snapshot.
+  Zichtbaarheid is dus gratis: wat niet publiek op /media staat, kan ook niet
+  gevonden worden. Het matchen gebeurt in het geheugen (er valt niets te indexeren),
+  en de aanroep zit in een try/catch: Immich is af en toe onbereikbaar, en dat mag
+  een zoekopdracht hoogstens albums kosten, niet de hele resultatenlijst.
+- **Wat er niet doorzocht wordt**: tickets, bestellingen, praesidiumleden en alles
+  achter een login. Die schermen staan om dezelfde reden niet in de sitemap.
 - **De resultatenpagina staat zelf op `noIndex`.** Elke zoekterm is een eigen URL, en
   die horen niet als duizenden dunne pagina's in Google te belanden.
 - **In de sitekop staat op breed scherm een knop en geen invoerveld.** De elf tabs
@@ -1656,6 +1671,95 @@ zichtbaarheidskeuze en geen technische:
   Dat is bewust aanvaard omdat het om de mislukte gevallen gaat en het aantal
   klein is; wil je dat niet, dan haal je `zoekterm` uit `trackEmptySearch()` in
   `lib/analytics-client.ts` en blijft het aantal mislukte zoekopdrachten over.
+- **De cijfers komen terug naar het beheer, niet naar de publieke site.** Bovenaan
+  `/admin/media` staat per nummer hoe vaak het geopend is. Dat is waar de redactie
+  toch al komt om een nummer te uploaden, en het spaart haar een Umami-login.
+  Publiek zetten ("3.412 keer gelezen" op /media) is bewust niet gedaan: dat is een
+  ander soort claim, en een tegenvallend cijfer naast een nummer is geen prettige
+  plek om een jaargang mee af te sluiten.
+  - **De toegang loopt via een share-token, niet via een wachtwoord.** In Umami zet
+    je voor de website een Share URL aan; het id daaruit staat als `UMAMI_SHARE_ID`
+    in de omgeving en geeft enkel leesrecht. Zo staat er geen beheerderswachtwoord
+    in de `.env` van de website, en trek je de toegang met één klik in Umami weer
+    in. Self-hosted Umami 3.x kent geen API-key (die is er enkel in Umami Cloud), en
+    de andere weg (`/api/auth/login` met de beheerder) zou dat wachtwoord wél in de
+    omgeving zetten.
+  - **De koppeling nummer → adres gebeurt met dezelfde functie als bij het meten**
+    (`magazineViewUrl` in `lib/analytics.ts`). Zou het beheer dat adres zelf
+    opnieuw samenstellen, dan staat er bij de eerste wijziging aan het formaat
+    overal nul terwijl er wel degelijk gemeten wordt.
+  - **Geen cijfer is geen fout.** Ontbreekt de configuratie of antwoordt de
+    statistiekserver niet, dan staat er één regel uitleg en werkt de rest van het
+    mediabeheer gewoon. Downloads per nummer zijn best effort: lukt die tweede
+    bevraging niet, dan tonen we de weergaven zonder downloads in plaats van
+    helemaal niets.
+
+---
+
+## Herinnering voor een shift
+
+Wie zich inschrijft voor een shift, krijgt standaard **twee** mails: een dag vooraf
+en twee uur vooraf. Beide zijn per lid uitzetbaar in het profiel.
+
+- **Waarom een dag vooraf.** Dat is exact het moment waarop je jezelf niet meer kan
+  uitschrijven (`UNREGISTER_LOCK_MS` in `apps/web/lib/shift.ts`). De mail zegt dat er
+  dus meteen bij: één bericht dat zowel herinnert als aankondigt dat het nu vastligt.
+  Wie echt niet kan, weet dat op dat moment nog vroeg genoeg om iemand te zoeken.
+- **Waarom twee uur vooraf erbovenop.** Een mail van gisteren is tegen vanavond weer
+  vergeten. Deze tweede is het vangnet, en hij is kort: waar, hoe laat, en zeg het
+  als je niet kan.
+- **Waarom het uitzetbaar is.** Twee mails per shift is voor iemand die er vijftien
+  per jaar doet veel post. De keuze staat in het profiel naast de mailvoorkeuren,
+  maar bewust *niet* als `MailCategory`: die array is opt-in nieuwsbrieven, en dit is
+  transactionele post over iets waarvoor je je zelf hebt ingeschreven. Daarom is er
+  ook geen toestemming voor nodig en staat ze standaard aan.
+- **Nooit twee mails vlak na elkaar.** Wie zich drie uur voor de start inschrijft,
+  hoort geen bericht te krijgen dat begint met "morgen sta je ingepland". Bij het
+  inschrijven worden de vensters die al voorbij zijn meteen als afgehandeld
+  gemarkeerd (`handledLeadFields`), dus die persoon krijgt enkel de mail van twee uur
+  vooraf. Hetzelfde geldt wanneer een admin iemand aan een shift toevoegt.
+- **Een verplaatste shift waarschuwt opnieuw.** `Shift` heeft geen `updatedAt` en
+  geen geannuleerd-status, dus de herinnering is het enige bericht dat een deelnemer
+  over een nieuwe tijd te zien krijgt. Wijzigt `startTime` via de admin-PATCH, dan
+  gaan beide markeringen leeg en beginnen de vensters opnieuw te lopen.
+- **Bij twijfel geen mail in plaats van twee.** De markering wordt met een
+  voorwaardelijke `updateMany` gezet *voor* er verstuurd wordt, en een mislukte
+  verzending zet ze niet terug. Dezelfde afweging als bij de no-show-mails van
+  Theokot: een dubbele herinnering is vervelender dan een gemiste.
+- **Een eigen worker.** `shift-worker` in `infra/docker-compose.yml` klopt elke vijf
+  minuten aan bij `/api/shift/maintenance`. Bewust niet meeliftend op de
+  `ticket-worker`: een klemgelopen mailserver mag de ticketbevestigingen niet
+  meesleuren. Leeg `SHIFT_MAINTENANCE_SECRET` = geen herinneringen, de rest van de
+  shiften werkt gewoon door.
+
+---
+
+## Aankondigingen: homepage of de hele site
+
+Een aankondiging is het venster dat over de site verschijnt, beheerd op
+`/admin/aankondigingen`. Er is één keuze per bericht: **enkel de homepage** of **elke
+pagina**.
+
+- **Waarom die keuze er is.** Het venster hing eerst alleen aan de homepage, en dat
+  is de pagina waar het minst volk binnenkomt: wie via Google, een gedeelde link of
+  een QR-code arriveert, landt op een infopagina of een activiteit en zag een
+  afgelasting dus nooit. Altijd-overal was het alternatief, maar dan is er geen
+  ontsnapping meer voor een bericht dat echt enkel bij de homepage hoort (een
+  welkomstboodschap bij de start van het jaar). Standaard blijft `HOME`, zodat
+  bestaande aankondigingen zich gedragen zoals ze bedoeld waren.
+- **Nooit op `/admin`, `/scan` of tijdens het afrekenen.** Een reclamevenster over
+  een lopende betaling is geen aankondiging maar een storing, en de ticketscanner
+  draait op een gsm aan de deur. Die lijst staat los van de lijst met paden die niet
+  gemeten worden, ook al is ze vandaag dezelfde: het ene gaat over wat we niet meten,
+  het andere over waar we de bezoeker niet onderbreken.
+- **Wegklikken geldt voor de hele site.** Dat zat al zo: de modal onthoudt in
+  `localStorage` welke id's weggeklikt zijn. Nu ze op elke pagina kan verschijnen, is
+  dat het verschil tussen één venster en een venster bij elke klik.
+- **Het venster hangt in de gedeelde layout.** Die is toch al dynamisch (de header
+  leest de sessie), dus het kost één query per render en geen omslag in caching. Wel
+  belangrijk: de save-action revalideert daarom `revalidatePath("/", "layout")` en
+  niet enkel `"/"`, anders blijft een site-brede aankondiging overal onzichtbaar tot
+  ze vanzelf verloopt.
 
 ---
 

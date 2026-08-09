@@ -46,6 +46,8 @@ export function ProfileForm({
     | "personalEmail"
     | "emailPreference"
     | "mailCategories"
+    | "shiftReminderDayBefore"
+    | "shiftReminderSoon"
     | "studyYears"
     | "studyProgrammes"
     | "notAtFaculty"
@@ -227,6 +229,27 @@ export function ProfileForm({
                 label={t.categories[cat]}
               />
             ))}
+          </div>
+        </div>
+        {/* Herinneringen voor een shift staan bewust náást de mailinglijsten en
+            niet ertussen: dit is post over iets waarvoor je jezelf inschreef, en
+            geen categorie waar je je op abonneert. */}
+        <div>
+          <span className="text-sm font-medium text-vtk-ink">{t.shiftRemindersHeading}</span>
+          <p className="text-xs text-[#5c667f]">{t.shiftRemindersHint}</p>
+          <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2">
+            <CheckboxChip
+              name="shiftReminderDayBefore"
+              value="on"
+              defaultChecked={user.shiftReminderDayBefore}
+              label={t.shiftReminderDayBefore}
+            />
+            <CheckboxChip
+              name="shiftReminderSoon"
+              value="on"
+              defaultChecked={user.shiftReminderSoon}
+              label={t.shiftReminderSoon}
+            />
           </div>
         </div>
       </fieldset>

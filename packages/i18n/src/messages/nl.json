@@ -240,6 +240,10 @@
     "preferencePersonal": "Persoonlijke mail",
     "mailHeading": "Mailinglijsten",
     "mailIntro": "Van welke categorieën wil je mails ontvangen? Je kan er zoveel of zo weinig aanduiden als je wil.",
+    "shiftRemindersHeading": "Herinneringen voor je shift",
+    "shiftRemindersHint": "Een mailtje voor een shift waarvoor je jezelf inschreef. Dit staat los van de mailinglijsten hierboven.",
+    "shiftReminderDayBefore": "Een dag op voorhand",
+    "shiftReminderSoon": "Twee uur op voorhand",
     "photoHeading": "Profielfoto",
     "photoHint": "Optioneel. Als je op het praesidium of bij een POC zit, verschijnt deze foto op de betreffende pagina.",
     "photoChoose": "Kies een foto",
@@ -370,7 +374,8 @@
     "no": "Nee",
     "saving": "Bezig met opslaan...",
     "saved": "Opgeslagen",
-    "saveError": "Er ging iets mis bij het opslaan."
+    "saveError": "Er ging iets mis bij het opslaan.",
+    "close": "Sluiten"
   },
   "info": {
     "kicker": "VTK · KU Leuven",
@@ -614,8 +619,8 @@
   },
   "search": {
     "title": "Zoeken",
-    "subtitle": "Doorzoek de pagina's van de site en de publieke activiteiten in de kalender.",
-    "description": "Doorzoek de pagina's en de activiteiten van VTK.",
+    "subtitle": "Doorzoek de pagina's van de site, de activiteiten in de kalender, de fotoalbums en het materiaal van de uitleendienst.",
+    "description": "Doorzoek de pagina's, activiteiten en foto's van VTK.",
     "formLabel": "Zoeken op de site",
     "inputLabel": "Zoekterm",
     "placeholder": "Zoek op de site",
@@ -631,7 +636,9 @@
     "emptyInfo": "Naar Info",
     "kindPage": "Pagina",
     "kindEvent": "Activiteit",
-    "kindLink": "Andere site"
+    "kindLink": "Andere site",
+    "kindMaterial": "Materiaal",
+    "kindAlbum": "Fotoalbum"
   },
   "seo": {
     "home": {

@@ -16,11 +16,14 @@ import {
 import { deleteMagazineAction, savePromoVideosAction } from "@/app/actions/media";
 import { MagazineUploadForm } from "./MagazineUploadForm";
 import { ImmichAlbumUploader } from "./ImmichAlbumUploader";
+import { MagazineStats, parsePeriod } from "./MagazineStats";
 
 export default async function AdminMedia({
   params,
+  searchParams,
 }: {
   params: Promise<{ locale: string }>;
+  searchParams: Promise<{ stats?: string | string[] }>;
 }) {
   const { locale: localeParam } = await params;
   if (!hasLocale(localeParam)) notFound();
@@ -33,6 +36,7 @@ export default async function AdminMedia({
   const nl = locale === "nl";
   const base = nl ? "" : "/en";
 
+  const { stats: statsPeriod } = await searchParams;
   const { publications, videos } = await getMediaContent();
 
   let galleryAlbums: GalleryAlbumSummary[] = [];
@@ -64,6 +68,10 @@ export default async function AdminMedia({
 
       {canManageMedia && (
       <>
+      {/* Bovenaan, want dit is waar de redactie voor komt kijken; uploaden doe je
+          een paar keer per jaar, cijfers bekijk je vaker. */}
+      <MagazineStats locale={locale} publications={publications} period={parsePeriod(statsPeriod)} />
+
       <Card className="p-5">
         <h2 className="font-semibold mb-1">{nl ? "Nieuwe magazine-editie" : "New magazine issue"}</h2>
         <p className="text-sm text-zinc-500 mb-3">

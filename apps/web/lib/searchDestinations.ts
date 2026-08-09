@@ -1,7 +1,7 @@
 import { getDictionary, pick, type Locale } from "@vtk/i18n";
 import { isExternalUrl } from "@/lib/href";
 import type { SeoKey } from "@/lib/pageMetadata";
-import { normalizeForMatch, type SearchResult } from "@/lib/search";
+import { scoreTextMatch, type SearchResult } from "@/lib/search";
 import { localizedPath } from "@/lib/seo";
 
 /**
@@ -123,37 +123,13 @@ export function buildDestinations(tabs: DestinationTab[], locale: Locale): Searc
 }
 
 /**
- * Staat `term` aan het begin van een woord in `haystack`? Allebei genormaliseerd.
- *
- * Bewust geen losse `includes`: dan matcht `in` op "Printer" en `co` op zowat
- * alles, en staat de lijst vol ruis. Op woordbegin matchen geeft precies wat
- * iemand bedoelt die halverwege een woord stopt met typen.
- */
-function startsWord(haystack: string, term: string): boolean {
-  return haystack === term || haystack.startsWith(`${term} `) || haystack.includes(` ${term}`);
-}
-
-/**
  * Hoe goed een bestemming bij de zoekterm past, op dezelfde schaal als
- * `ts_rank` (0 tot 1). Een exacte titel wint van eender welke tekstpagina: wie
- * "piano" typt, wil de pianopagina en niet het verslag waarin het woord staat.
- *
- * `0` betekent: geen treffer.
+ * `ts_rank` (0 tot 1). De maat zelf staat in `lib/search.ts`, want de
+ * fotoalbums gebruiken ze ook; anders ranken twee dingen die naast elkaar in
+ * dezelfde lijst komen op verschillende schalen.
  */
 export function scoreDestination(destination: SearchDestination, query: string): number {
-  const q = normalizeForMatch(query);
-  if (q === "") return 0;
-
-  const title = normalizeForMatch(destination.title);
-  const haystack = `${title} ${normalizeForMatch(destination.description ?? "")}`.trim();
-  const terms = q.split(" ");
-
-  if (title === q) return 1;
-  if (title.startsWith(q)) return 0.92;
-  if (startsWord(title, q)) return 0.85;
-  if (terms.every((term) => startsWord(title, term))) return 0.8;
-  if (terms.every((term) => startsWord(haystack, term))) return 0.45;
-  return 0;
+  return scoreTextMatch(destination.title, destination.description, query);
 }
 
 /** De bestemmingen die bij de zoekterm passen, als gewone zoekresultaten. */

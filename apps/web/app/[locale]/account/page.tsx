@@ -62,6 +62,8 @@ export default async function AccountPage({ params }: { params: Promise<{ locale
         personalEmail: true,
         emailPreference: true,
         mailCategories: true,
+        shiftReminderDayBefore: true,
+        shiftReminderSoon: true,
         studyYears: true,
         studyProgrammes: true,
         notAtFaculty: true,

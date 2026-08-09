@@ -1,14 +1,17 @@
 import "server-only";
 import { prisma } from "@vtk/db";
 
+export { announcementFits, ANNOUNCEMENT_EXCLUDED_PREFIXES } from "./announcementScope";
+
 /**
- * De aankondiging die nu op de homepage hoort te staan.
+ * De aankondiging die nu aan de beurt is.
  *
  * Er kunnen er meerdere klaarstaan (elk met hun eigen venster), maar de modal
  * toont er één: twee berichten tegelijk over de pagina leest niemand. Bij
  * overlap wint de laatst aangemaakte, want dat is het meest recente nieuws.
  *
  * Een leeg `startsAt` betekent "meteen", een leeg `endsAt` "blijft staan".
+ * Waar ze mag verschijnen is een aparte vraag; zie `announcementFits`.
  */
 export async function getCurrentAnnouncement(now = new Date()) {
   return prisma.announcement.findFirst({

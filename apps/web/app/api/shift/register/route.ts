@@ -5,6 +5,7 @@ import { isRecordNotFound, isUniqueViolation } from '@/lib/shift';
 import { authErrorResponse } from '@/lib/session';
 import { CUDI_SHIFT_SOURCE } from '@/lib/cudiShiftMirror';
 import { pushCudiRegistration } from '@/lib/cudiRegistrationSync';
+import { handledLeadFields } from '@/lib/shift-reminders';
 import { withSerializableTransaction } from '@/lib/ticketing/transactions';
 
 /** Binnen dit venster voor de start kan een user zichzelf niet meer uitschrijven. */
@@ -110,7 +111,15 @@ export async function POST(request: Request) {
       if (overlap) return { status: 'OVERLAP' as const, overlap };
 
       await tx.shiftParticipant.create({
-        data: { shiftId: id, userId: session.user.id, payedOut: false },
+        data: {
+          shiftId: id,
+          userId: session.user.id,
+          payedOut: false,
+          // Wie zich vlak voor de start inschrijft, krijgt geen mail meer die
+          // begint met "morgen sta je ingepland": die vensters zijn al voorbij
+          // en worden meteen als afgehandeld gemarkeerd.
+          ...handledLeadFields(shift.startTime, new Date()),
+        },
       });
       return {
         status: 'OK' as const,

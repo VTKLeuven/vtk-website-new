@@ -240,6 +240,10 @@
     "preferencePersonal": "Personal email",
     "mailHeading": "Mailing lists",
     "mailIntro": "Which categories would you like to receive emails about? Pick as many or as few as you like.",
+    "shiftRemindersHeading": "Shift reminders",
+    "shiftRemindersHint": "An email about a shift you signed up for yourself. This is separate from the mailing lists above.",
+    "shiftReminderDayBefore": "A day in advance",
+    "shiftReminderSoon": "Two hours in advance",
     "photoHeading": "Profile picture",
     "photoHint": "Optional. If you are on the praesidium or a POC, this picture appears on the relevant page.",
     "photoChoose": "Choose a picture",
@@ -370,7 +374,8 @@
     "no": "No",
     "saving": "Saving...",
     "saved": "Saved",
-    "saveError": "Something went wrong while saving."
+    "saveError": "Something went wrong while saving.",
+    "close": "Close"
   },
   "info": {
     "kicker": "VTK · KU Leuven",
@@ -614,8 +619,8 @@
   },
   "search": {
     "title": "Search",
-    "subtitle": "Search the pages of this site and the public activities in the calendar.",
-    "description": "Search the pages and activities of VTK.",
+    "subtitle": "Search the pages of this site, the activities in the calendar, the photo albums and the equipment of the lending service.",
+    "description": "Search the pages, activities and photos of VTK.",
     "formLabel": "Search this site",
     "inputLabel": "Search term",
     "placeholder": "Search this site",
@@ -631,7 +636,9 @@
     "emptyInfo": "Go to Info",
     "kindPage": "Page",
     "kindEvent": "Activity",
-    "kindLink": "Other site"
+    "kindLink": "Other site",
+    "kindMaterial": "Equipment",
+    "kindAlbum": "Photo album"
   },
   "seo": {
     "home": {

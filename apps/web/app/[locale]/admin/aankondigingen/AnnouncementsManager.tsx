@@ -27,6 +27,8 @@ export type AnnouncementRow = {
   startsAt: string;
   endsAt: string;
   active: boolean;
+  /** Enkel de homepage, of elke publieke pagina. */
+  scope: "HOME" | "SITE";
   status: "live" | "scheduled" | "expired" | "off";
   createdLabel: string;
   windowLabel: string;
@@ -45,6 +47,7 @@ const EMPTY: AnnouncementRow = {
   startsAt: "",
   endsAt: "",
   active: true,
+  scope: "HOME",
   status: "off",
   createdLabel: "",
   windowLabel: "",
@@ -212,14 +215,45 @@ export function AnnouncementsManager({
             </div>
           </div>
 
+          <div>
+            <span className="text-sm font-medium text-vtk-ink">
+              {nl ? "Waar verschijnt ze?" : "Where does it appear?"}
+            </span>
+            <div className="mt-2 flex flex-wrap gap-4">
+              <label className="inline-flex items-center gap-2 text-sm">
+                <input
+                  type="radio"
+                  name="scope"
+                  value="HOME"
+                  defaultChecked={editing.scope !== "SITE"}
+                />
+                {nl ? "Enkel de homepage" : "Homepage only"}
+              </label>
+              <label className="inline-flex items-center gap-2 text-sm">
+                <input
+                  type="radio"
+                  name="scope"
+                  value="SITE"
+                  defaultChecked={editing.scope === "SITE"}
+                />
+                {nl ? "Elke pagina" : "Every page"}
+              </label>
+            </div>
+            <p className="mt-1 text-xs text-[#5c667f]">
+              {nl
+                ? "Wie via Google of een gedeelde link binnenkomt, landt zelden op de homepage. Kies “elke pagina” voor iets dat iedereen moet weten, zoals een afgelasting. Nooit in het beheer, op de ticketscanner of tijdens het afrekenen."
+                : "People arriving from Google or a shared link rarely land on the homepage. Pick “every page” for something everyone needs to know, like a cancellation. Never in admin, on the ticket scanner or during checkout."}
+            </p>
+          </div>
+
           <label className="inline-flex items-center gap-2 text-sm">
             <input type="checkbox" name="active" defaultChecked={editing.active} />
             {nl ? "Actief" : "Active"}
           </label>
           <p className="text-xs text-[#5c667f]">
             {nl
-              ? "Enkel actieve aankondigingen binnen hun venster verschijnen op de homepage. Staan er meerdere tegelijk klaar, dan toont de site de meest recente."
-              : "Only active announcements inside their window appear on the homepage. If several are live at once, the site shows the most recent one."}
+              ? "Enkel actieve aankondigingen binnen hun venster verschijnen. Staan er meerdere tegelijk klaar, dan toont de site de meest recente."
+              : "Only active announcements inside their window appear. If several are live at once, the site shows the most recent one."}
           </p>
         </SaveForm>
       </Card>
@@ -253,6 +287,14 @@ export function AnnouncementsManager({
                     {nl ? announcement.titleNl : announcement.titleEn}
                   </span>
                   <span className="block text-xs text-[#5c667f]">
+                    {announcement.scope === "SITE"
+                      ? nl
+                        ? "Elke pagina"
+                        : "Every page"
+                      : nl
+                        ? "Homepage"
+                        : "Homepage"}
+                    {" · "}
                     {announcement.windowLabel}
                     {announcement.authorName ? ` · ${announcement.authorName}` : ""}
                   </span>
@@ -295,8 +337,8 @@ export function AnnouncementsManager({
                     title={nl ? "Aankondiging verwijderen?" : "Delete announcement?"}
                     description={
                       nl
-                        ? `"${announcement.titleNl}" verdwijnt ook uit de historiek. Wil je ze enkel van de homepage halen, zet ze dan op uit.`
-                        : `"${announcement.titleEn}" also disappears from the history. To only take it off the homepage, turn it off instead.`
+                        ? `"${announcement.titleNl}" verdwijnt ook uit de historiek. Wil je ze enkel van de site halen, zet ze dan op uit.`
+                        : `"${announcement.titleEn}" also disappears from the history. To only take it off the site, turn it off instead.`
                     }
                     confirmLabel={nl ? "Verwijderen" : "Delete"}
                     cancelLabel={nl ? "Annuleren" : "Cancel"}

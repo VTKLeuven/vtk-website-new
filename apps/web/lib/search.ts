@@ -129,6 +129,47 @@ export function prefixTsQuery(query: string): string | null {
   return terms.map((term) => `${term}:*`).join(" & ");
 }
 
+/**
+ * Staat `term` aan het begin van een woord in `haystack`? Allebei genormaliseerd.
+ *
+ * Bewust geen losse `includes`: dan matcht `in` op "Printer" en `co` op zowat
+ * alles, en staat de lijst vol ruis. Op woordbegin matchen geeft precies wat
+ * iemand bedoelt die halverwege een woord stopt met typen.
+ */
+function startsWord(haystack: string, term: string): boolean {
+  return haystack === term || haystack.startsWith(`${term} `) || haystack.includes(` ${term}`);
+}
+
+/**
+ * Hoe goed een titel (met eventueel een beschrijving erbij) bij de zoekterm past,
+ * op dezelfde schaal als `ts_rank` (0 tot 1). Een exacte titel wint van eender
+ * welke tekstpagina: wie "piano" typt, wil de pianopagina en niet het verslag
+ * waarin het woord staat. `0` betekent: geen treffer.
+ *
+ * Dit is de maat voor alles wat niet in een tsvector staat: de vaste routes en
+ * menu-items in `searchDestinations.ts`, en de fotoalbums die uit Immich komen.
+ * Eén functie, zodat die dingen onderling niet op verschillende schalen ranken.
+ */
+export function scoreTextMatch(
+  title: string,
+  description: string | null,
+  query: string,
+): number {
+  const q = normalizeForMatch(query);
+  if (q === "") return 0;
+
+  const normalizedTitle = normalizeForMatch(title);
+  const haystack = `${normalizedTitle} ${normalizeForMatch(description ?? "")}`.trim();
+  const terms = q.split(" ");
+
+  if (normalizedTitle === q) return 1;
+  if (normalizedTitle.startsWith(q)) return 0.92;
+  if (startsWord(normalizedTitle, q)) return 0.85;
+  if (terms.every((term) => startsWord(normalizedTitle, term))) return 0.8;
+  if (terms.every((term) => startsWord(haystack, term))) return 0.45;
+  return 0;
+}
+
 export type SnippetPart = { text: string; highlight: boolean };
 
 /**
@@ -190,10 +231,28 @@ export function snippetParts(headline: string | null | undefined): SnippetPart[]
  * zoekt een detail. `link` is het enige echte onderscheid: dat opent een andere
  * site, en dat hoor je te weten voor je klikt.
  */
-export type SearchResultKind = "page" | "event" | "link";
+export type SearchResultKind = "page" | "event" | "link" | "material" | "album";
 
-/** Voor gelijke rang: eerst een pagina, dan een externe link, dan een activiteit. */
-const KIND_ORDER: Record<SearchResultKind, number> = { page: 0, link: 1, event: 2 };
+/**
+ * Voor gelijke rang: eerst een pagina, dan een externe link, dan materiaal, dan
+ * een fotoalbum, en ten slotte een activiteit.
+ */
+const KIND_ORDER: Record<SearchResultKind, number> = {
+  page: 0,
+  link: 1,
+  material: 2,
+  album: 3,
+  event: 4,
+};
+
+/**
+ * Opent dit resultaat een andere site? Dan hoort het in een nieuw tabblad, en
+ * hoort de bezoeker dat te weten voor hij klikt. Materiaal woont in de
+ * logistiek-app, dus dat telt mee.
+ */
+export function isExternalResult(kind: SearchResultKind): boolean {
+  return kind === "link" || kind === "material";
+}
 
 export type SearchResult = {
   kind: SearchResultKind;

@@ -31,6 +31,14 @@ const TERM_EN = "wobblegantry";
 const COMPOUND = `${TERM}veerdienst`;
 const COMPOUND_PREFIX = `${TERM}veer`;
 
+/**
+ * Zonder deze instelling toont `searchSite` geen materiaal: er valt dan nergens
+ * naartoe te linken. De test zet ze zelf, zodat ze niet afhangt van wat er
+ * toevallig in de omgeving staat.
+ */
+const LOGISTIEK_URL = "https://logistiek.test";
+process.env.LOGISTIEK_PUBLIC_URL = LOGISTIEK_URL;
+
 describe.sequential("zoeken", () => {
   const ids = {
     tab: randomUUID(),
@@ -43,6 +51,8 @@ describe.sequential("zoeken", () => {
     publicEvent: randomUUID(),
     membersEvent: randomUUID(),
     audienceEvent: randomUUID(),
+    material: randomUUID(),
+    inactiveMaterial: randomUUID(),
   };
 
   const slugs = {
@@ -143,9 +153,29 @@ describe.sequential("zoeken", () => {
     await makeEvent(ids.publicEvent, `Publiek: ${TERM}`, "PUBLIC");
     await makeEvent(ids.membersEvent, `Intern: ${TERM}`, "MEMBERS");
     await makeEvent(ids.audienceEvent, `Eerstejaars: ${TERM}`, "PUBLIC", [ids.firstYearCat]);
+
+    await prisma.uitleenItem.createMany({
+      data: [
+        {
+          id: ids.material,
+          name: `Beamer ${TERM}`,
+          description: `Een beamer voor de ${TERM}.`,
+          active: true,
+        },
+        {
+          id: ids.inactiveMaterial,
+          name: `Kapotte beamer ${TERM}`,
+          description: `Uit de catalogus gehaald, maar de ${TERM} staat er nog in.`,
+          active: false,
+        },
+      ],
+    });
   });
 
   afterAll(async () => {
+    await prisma.uitleenItem.deleteMany({
+      where: { id: { in: [ids.material, ids.inactiveMaterial] } },
+    });
     await prisma.calendarEvent.deleteMany({
       where: { id: { in: [ids.publicEvent, ids.membersEvent, ids.audienceEvent] } },
     });
@@ -159,7 +189,12 @@ describe.sequential("zoeken", () => {
 
   /** De testset zoals een niet-ingelogde bezoeker ze ziet. */
   async function visitorSearch(query: string, locale: "nl" | "en" = "nl") {
-    return searchSite({ query, locale, audiences: [] });
+    return searchSite({ query, locale, audiences: [], signedIn: false });
+  }
+
+  /** Dezelfde zoekopdracht, maar dan als ingelogd lid. */
+  async function memberSearch(query: string, locale: "nl" | "en" = "nl") {
+    return searchSite({ query, locale, audiences: [], signedIn: true });
   }
 
   it("vult de zoekvector bij het aanmaken, zonder dat er iets opnieuw opgeslagen wordt", async () => {
@@ -200,6 +235,7 @@ describe.sequential("zoeken", () => {
       query: TERM,
       locale: "nl",
       audiences: ["FIRST_YEARS"],
+      signedIn: false,
     });
     expect(eerstejaars.results.map((r) => r.id)).toContain(ids.audienceEvent);
     // De rest van de regels blijft ook voor een eerstejaars gelden.
@@ -254,7 +290,7 @@ describe.sequential("zoeken", () => {
       `"${TERM}"`,
       `${TERM} `.repeat(200),
     ]) {
-      const uitkomst = await searchSite({ query, locale: "nl", audiences: [] });
+      const uitkomst = await searchSite({ query, locale: "nl", audiences: [], signedIn: false });
       expect(uitkomst.results.map((r) => r.id)).not.toContain(ids.draftPage);
       expect(uitkomst.results.map((r) => r.id)).not.toContain(ids.membersEvent);
     }
@@ -310,5 +346,30 @@ describe.sequential("zoeken", () => {
     const { results } = await visitorSearch("piano");
     const hrefs = results.map((r) => r.href);
     expect(new Set(hrefs).size).toBe(hrefs.length);
+  });
+
+  it("houdt uitleenmateriaal weg bij een niet-ingelogde bezoeker", async () => {
+    // De catalogus zit in de logistiek-app achter een login. Materiaalnamen in
+    // een publieke resultatenlijst zetten zou die keuze langs de achterdeur
+    // ongedaan maken, dus dit is de regel die bewaakt moet worden.
+    const { results } = await visitorSearch(TERM);
+    expect(results.map((r) => r.id)).not.toContain(ids.material);
+    const alleTekst = results
+      .map((r) => `${r.title} ${r.snippet.map((p) => p.text).join(" ")}`)
+      .join(" ");
+    expect(alleTekst).not.toContain("Beamer");
+  });
+
+  it("toont het wel aan een ingelogd lid, met een link naar de logistiek-app", async () => {
+    const { results } = await memberSearch(TERM);
+    const materiaal = results.find((r) => r.id === ids.material);
+    expect(materiaal).toBeDefined();
+    expect(materiaal?.kind).toBe("material");
+    expect(materiaal?.href).toBe(`${LOGISTIEK_URL}/materiaal/${ids.material}`);
+  });
+
+  it("laat materiaal dat uit de catalogus gehaald is nergens zien", async () => {
+    const { results } = await memberSearch(TERM);
+    expect(results.map((r) => r.id)).not.toContain(ids.inactiveMaterial);
   });
 });

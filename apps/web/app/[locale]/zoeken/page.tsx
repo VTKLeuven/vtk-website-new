@@ -8,7 +8,8 @@ import { TrackEmptySearch } from "./TrackEmptySearch";
 import { viewerAudiences } from "@/lib/calendar/audience";
 import { hasLocale } from "@/lib/locale";
 import { OUTBOUND_EVENT, outboundHost, umamiEvent } from "@/lib/analytics";
-import { RESULT_LIMIT, type SearchResult } from "@/lib/search";
+import { RESULT_LIMIT, isExternalResult, type SearchResult } from "@/lib/search";
+import { getCurrentSession } from "@/lib/session";
 import { searchSite } from "@/lib/search-server";
 import { buildMetadata } from "@/lib/seo";
 
@@ -44,6 +45,8 @@ function kindLabel(
 ): string {
   if (kind === "event") return t.kindEvent;
   if (kind === "link") return t.kindLink;
+  if (kind === "material") return t.kindMaterial;
+  if (kind === "album") return t.kindAlbum;
   return t.kindPage;
 }
 
@@ -74,10 +77,14 @@ export default async function SearchPage({ params, searchParams }: PageProps) {
   // `searchSite` zelf, zodat het invoerveld en de query dezelfde tekst zien.
   const raw = Array.isArray(q) ? q[0] : q;
 
+  const [audiences, session] = await Promise.all([viewerAudiences(), getCurrentSession()]);
   const { query, searched, results } = await searchSite({
     query: raw,
     locale,
-    audiences: await viewerAudiences(),
+    audiences,
+    // Materiaal uit de uitleendienst enkel voor wie ingelogd is; de catalogus
+    // zelf zit ook achter een login.
+    signedIn: session !== null,
   });
 
   const summary =
@@ -137,7 +144,7 @@ export default async function SearchPage({ params, searchParams }: PageProps) {
                 <li key={`${result.kind}:${result.id}`} className="vtk-search-result">
                   <span className="vtk-search-kind">{kindLabel(result.kind, t)}</span>
                   <h2>
-                    {result.kind === "link" ? (
+                    {isExternalResult(result.kind) ? (
                       // Een andere site opent in een nieuw tabblad, net als elders.
                       <a
                         href={result.href}

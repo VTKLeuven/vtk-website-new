@@ -23,6 +23,8 @@ import {
   matchDestinations,
   type DestinationTab,
 } from "@/lib/searchDestinations";
+import { matchAlbums } from "@/lib/searchAlbums";
+import { listImmichGalleryAlbums } from "@/lib/immich-gallery";
 
 /**
  * De zoekopdracht zelf.
@@ -144,6 +146,76 @@ async function eventCandidates(
   `;
 }
 
+/**
+ * Materiaal uit de uitleendienst. Eén vector en altijd `dutch`: het model heeft
+ * geen Engelse velden, de catalogus staat in het Nederlands.
+ */
+async function materialCandidates(
+  query: string,
+  prefix: string | null = null,
+): Promise<Candidate[]> {
+  return prisma.$queryRaw<Candidate[]>`
+    SELECT i."id",
+           ts_rank(i."search", q.query) AS "rank",
+           ts_headline('dutch'::regconfig, coalesce(i."description", ''), q.query, ${HEADLINE_OPTIONS}) AS headline
+    FROM "UitleenItem" i, ${tsQuery(query, "dutch", prefix)} AS q(query)
+    WHERE i."active" = true
+      AND i."search" @@ q.query
+    ORDER BY "rank" DESC
+    LIMIT ${CANDIDATE_LIMIT}
+  `;
+}
+
+/**
+ * De basis-URL van de logistiek-app. Zonder die instelling kunnen we nergens
+ * naartoe linken en tonen we dus ook geen materiaal: een zoekresultaat zonder
+ * werkend adres is erger dan geen resultaat.
+ */
+function logistiekBaseUrl(): string | null {
+  const url = process.env.LOGISTIEK_PUBLIC_URL?.trim();
+  return url ? url.replace(/\/+$/, "") : null;
+}
+
+async function materialResults(candidates: CandidateMap): Promise<SearchResult[]> {
+  const base = logistiekBaseUrl();
+  if (candidates.size === 0 || !base) return [];
+
+  const items = await prisma.uitleenItem.findMany({
+    // Nog eens `active`, net als bij de pagina's: dit is de query waar de
+    // zichtbaarheid van afhangt. Bewust niet op de categorie filteren; de
+    // catalogus toont items van een inactieve categorie ook, onder "Overig".
+    where: { id: { in: [...candidates.keys()] }, active: true },
+    select: { id: true, name: true, category: { select: { name: true } } },
+  });
+
+  return items.map((item) => {
+    const candidate = candidates.get(item.id)!;
+    return {
+      kind: "material" as const,
+      id: item.id,
+      href: `${base}/materiaal/${item.id}`,
+      title: item.name,
+      meta: item.category?.name ?? null,
+      rank: candidate.rank,
+      snippet: snippetParts(candidate.headline),
+    };
+  });
+}
+
+/**
+ * De fotoalbums, uit de Immich-snapshot. In een try/catch omdat Immich af en toe
+ * onbereikbaar is: dat mag een zoekopdracht hoogstens albums kosten, niet de
+ * hele resultatenlijst. `/media` doet hetzelfde met `Promise.allSettled`.
+ */
+async function albumResults(query: string, locale: Locale): Promise<SearchResult[]> {
+  try {
+    const { albums } = await listImmichGalleryAlbums();
+    return matchAlbums(albums, query, locale);
+  } catch {
+    return [];
+  }
+}
+
 async function pageResults(
   candidates: CandidateMap,
   locale: Locale,
@@ -231,6 +303,17 @@ export type SearchInput = {
    * kunnen kiezen.
    */
   audiences: CalendarAudience[];
+  /**
+   * Is de bezoeker ingelogd? Bepaalt of het uitleenmateriaal meezoekt. De
+   * catalogus zit in de logistiek-app achter een login (zie
+   * docs/uitleendienst.md); materiaalnamen in een publieke resultatenlijst
+   * zetten zou die keuze langs de achterdeur ongedaan maken, en een
+   * uitgelogde bezoeker zou toch op een loginscherm landen.
+   *
+   * Net als `audiences` een parameter en geen sessielezing hierbinnen, zodat een
+   * test kan bewijzen dat er niets lekt.
+   */
+  signedIn: boolean;
   limit?: number;
 };
 
@@ -271,26 +354,33 @@ export async function searchSite(input: SearchInput): Promise<SearchOutcome> {
   const query = normalizeQuery(input.query);
   if (!isUsableQuery(query)) return { query, searched: false, results: [] };
 
-  const [pages, events, tabs] = await Promise.all([
+  const [pages, events, materials, tabs, albumRows] = await Promise.all([
     pageCandidates(query, input.locale),
     eventCandidates(query, input.locale),
+    input.signedIn ? materialCandidates(query) : Promise.resolve([]),
     destinationTabs(),
+    albumResults(query, input.locale),
   ]);
 
   // Tweede poging op woordbegin, en enkel wanneer de eerste niets opleverde: zo
   // blijft `"job fair"` een exacte zin en vindt `uitleen` toch de uitleendienst.
-  const prefix = pages.length === 0 && events.length === 0 ? prefixTsQuery(query) : null;
-  const [fallbackPages, fallbackEvents] =
+  const prefix =
+    pages.length === 0 && events.length === 0 && materials.length === 0
+      ? prefixTsQuery(query)
+      : null;
+  const [fallbackPages, fallbackEvents, fallbackMaterials] =
     prefix === null
-      ? [[], []]
+      ? [[], [], []]
       : await Promise.all([
           pageCandidates(query, input.locale, prefix),
           eventCandidates(query, input.locale, prefix),
+          input.signedIn ? materialCandidates(query, prefix) : Promise.resolve([]),
         ]);
 
-  const [pageRows, eventRows] = await Promise.all([
+  const [pageRows, eventRows, materialRows] = await Promise.all([
     pageResults(byId(prefix === null ? pages : fallbackPages), input.locale),
     eventResults(byId(prefix === null ? events : fallbackEvents), input.locale, input.audiences),
+    materialResults(byId(prefix === null ? materials : fallbackMaterials)),
   ]);
 
   const destinationRows = matchDestinations(
@@ -304,7 +394,13 @@ export async function searchSite(input: SearchInput): Promise<SearchOutcome> {
   // /info/shiften wijst wel). Twee keer dezelfde link onder elkaar leest als een
   // fout; de best scorende wint.
   const seen = new Map<string, SearchResult>();
-  for (const result of [...destinationRows, ...pageRows, ...eventRows]) {
+  for (const result of [
+    ...destinationRows,
+    ...pageRows,
+    ...materialRows,
+    ...albumRows,
+    ...eventRows,
+  ]) {
     const existing = seen.get(result.href);
     if (!existing || result.rank > existing.rank) seen.set(result.href, result);
   }

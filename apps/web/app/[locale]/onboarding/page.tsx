@@ -54,6 +54,8 @@ export default async function OnboardingPage({
       personalEmail: true,
       emailPreference: true,
       mailCategories: true,
+      shiftReminderDayBefore: true,
+      shiftReminderSoon: true,
       studyYears: true,
       studyProgrammes: true,
       notAtFaculty: true,

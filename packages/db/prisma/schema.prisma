@@ -339,6 +339,11 @@ model User {
   emailPreference    EmailPreference  @default(UNIVERSITY)
   // Opt-in mailinglijsten: enkel de aangeduide categorieën zitten in de array.
   mailCategories     MailCategory[]   @default([])
+  // Herinneringen voor een shift waarvoor je jezelf inschreef. Bewust geen
+  // `MailCategory`: dat zijn opt-in nieuwsbrieven, dit is transactioneel. Wel
+  // uitzetbaar, want niet iedereen wil twee mails per shift.
+  shiftReminderDayBefore Boolean       @default(true)
+  shiftReminderSoon      Boolean       @default(true)
   // Studie: meerdere studiejaren en richtingen mogelijk (iemand kan bv. deels in
   // 2de en deels in 3de bachelor zitten).
   studyYears         StudyYear[]      @default([])
@@ -642,6 +647,8 @@ model Announcement {
   endsAt   DateTime?
   /** Uit = nooit tonen, ongeacht het venster. */
   active   Boolean   @default(true)
+  /** Waar ze mag verschijnen: enkel de homepage, of elke publieke pagina. */
+  scope    AnnouncementScope @default(HOME)
 
   createdById String?
   createdBy   User?    @relation("AnnouncementCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
@@ -649,6 +656,11 @@ model Announcement {
   updatedAt   DateTime @updatedAt
 
   @@index([active, startsAt, endsAt])
+}
+
+enum AnnouncementScope {
+  HOME
+  SITE
 }
 
 model Page {
@@ -1574,6 +1586,13 @@ model ShiftParticipant {
   /// uitschrijven, ook wanneer de shift al binnen 24 uur begint.
   registeredAt DateTime @default(now())
 
+  /// Wanneer de herinnering afgehandeld is: verstuurd, of bewust overgeslagen
+  /// (wie zich twee uur op voorhand inschrijft, hoeft geen mail van een dag
+  /// vooraf meer). Leeg = staat nog te wachten. De samengestelde sleutel
+  /// hieronder maakt dat er per persoon per shift maar één van elk kan bestaan.
+  reminderDayBeforeAt DateTime?
+  reminderSoonAt      DateTime?
+
   @@id([shiftId, userId])
 }
 
@@ -1862,7 +1881,12 @@ model UitleenItem {
   properties  UitleenItemProperty[]
   downloads   UitleenItemDownload[]
 
+  /// Zoekvector voor /zoeken, door een trigger bijgehouden (naam + omschrijving,
+  /// dutch). Eén kolom: dit model heeft geen Engelse velden.
+  search Unsupported("tsvector")?
+
   @@index([categoryId, active])
+  @@index([search], type: Gin)
 }
 
 /// Extra productbeelden. `photoKey` op UitleenItem blijft de oudere hoofdfoto;

@@ -8,8 +8,8 @@ import { saveError, saveOk, type SaveState } from "@/lib/saveState";
 import { localDateTimeToUtc } from "@/lib/ticketing/time";
 
 /**
- * Aankondigingen: het bericht dat als modal op de homepage verschijnt. Beheer
- * valt onder `home.edit`, want het is homepage-inhoud.
+ * Aankondigingen: het bericht dat als modal verschijnt, op de homepage of op de
+ * hele site. Beheer valt onder `home.edit`, want het begon als homepage-inhoud.
  */
 
 const schema = z.object({
@@ -24,6 +24,7 @@ const schema = z.object({
   startsAt: z.string().optional(),
   endsAt: z.string().optional(),
   active: z.boolean(),
+  scope: z.enum(["HOME", "SITE"]),
 });
 
 /** "YYYY-MM-DDTHH:mm" uit een datetime-local-veld; leeg = geen grens. */
@@ -37,9 +38,10 @@ function parseMoment(value: string | undefined): Date | null {
 }
 
 function revalidate() {
-  // De modal hangt aan de homepage; het beheer toont de lijst.
-  revalidatePath("/");
-  revalidatePath("/en");
+  // De modal hangt in de gedeelde layout, dus "/" alleen volstaat niet: zonder
+  // het tweede argument blijft een site-brede aankondiging op elke andere route
+  // onzichtbaar tot ze vanzelf verloopt.
+  revalidatePath("/", "layout");
   revalidatePath("/admin/aankondigingen");
 }
 
@@ -60,6 +62,7 @@ export async function saveAnnouncementAction(
     startsAt: (formData.get("startsAt") as string) || undefined,
     endsAt: (formData.get("endsAt") as string) || undefined,
     active: formData.get("active") === "on",
+    scope: (formData.get("scope") as string) || "HOME",
   });
   if (!parsed.success) return saveError("INVALID_INPUT");
 
@@ -87,6 +90,7 @@ export async function saveAnnouncementAction(
     startsAt,
     endsAt,
     active: input.active,
+    scope: input.scope,
   };
 
   if (input.id) {

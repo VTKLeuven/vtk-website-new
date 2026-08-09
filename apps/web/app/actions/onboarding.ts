@@ -87,6 +87,8 @@ const profileSchema = z.object({
     .default(""),
   emailPreference: z.enum(EMAIL_PREFERENCES),
   mailCategories: z.array(z.enum(MAIL_CATEGORIES)).default([]),
+  shiftReminderDayBefore: z.boolean(),
+  shiftReminderSoon: z.boolean(),
   ...studySchema,
 });
 
@@ -148,6 +150,8 @@ export async function saveProfileAction(
     personalEmail: formData.get("personalEmail") ?? "",
     emailPreference: formData.get("emailPreference") ?? "UNIVERSITY",
     mailCategories: formData.getAll("mailCategories"),
+    shiftReminderDayBefore: formData.get("shiftReminderDayBefore") !== null,
+    shiftReminderSoon: formData.get("shiftReminderSoon") !== null,
     ...studyFields(formData),
   });
 
@@ -199,6 +203,8 @@ export async function saveProfileAction(
         personalEmail: data.personalEmail || null,
         emailPreference: data.emailPreference,
         mailCategories: { set: data.mailCategories },
+        shiftReminderDayBefore: data.shiftReminderDayBefore,
+        shiftReminderSoon: data.shiftReminderSoon,
         studyYears: { set: data.studyYears },
         studyProgrammes: { set: data.studyProgrammes },
         notAtFaculty: data.notAtFaculty,
