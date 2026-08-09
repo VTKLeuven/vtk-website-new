@@ -62,6 +62,10 @@ export const PERMISSIONS = [
   { code: "theokot.manage", labelNl: "Theokot beheren (sessies, aanbod, bans, instellingen)", labelEn: "Manage Theokot (sessions, offering, bans, settings)", category: "theokot" },
   { code: "theokot.pickup", labelNl: "Theokot afhaalbalie bedienen", labelEn: "Operate Theokot pickup counter", category: "theokot" },
 
+  // Fakbar
+  { code: "fakbar.manage", labelNl: "Fakbar beheren", labelEn: "Manage Fakbar", category: "fakbar" },
+  { code: "fakbar.offering.manage", labelNl: "Standaardaanbod van de Fakbar bewerken", labelEn: "Edit the Fakbar's default offering", category: "fakbar" },
+
   // Piano (reservaties voor het lokaal in het kasteel)
   { code: "piano.manage", labelNl: "Piano beheren (uren, sluitingsdagen, reservaties)", labelEn: "Manage the piano (hours, closures, reservations)", category: "piano" },
 

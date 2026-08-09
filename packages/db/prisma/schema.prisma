@@ -399,6 +399,9 @@ model User {
   uitleenDriver           UitleenDriver?            @relation("UitleenDriverUser")
   uitleenDriversAdded     UitleenDriver[]           @relation("UitleenDriverAddedBy")
 
+  fakbarShiftsOpened FakbarShift[] @relation("FakbarShiftOpenedBy")
+  fakbarShiftsClosed FakbarShift[] @relation("FakbarShiftClosedBy")
+
   doorGrants         DoorAccessGrant[]
   doorLogs           DoorAccessLog[]
   doorShortcutTokens DoorShortcutToken[]
@@ -1739,6 +1742,148 @@ model TheokotBan {
 
   @@index([userId])
   @@index([active])
+}
+
+// -----------------------------------------------------------------------------
+// Fakbar
+// -----------------------------------------------------------------------------
+
+/// Categorie waarin een drank in het standaardaanbod staat.
+enum FakbarProductCategory {
+  VATEN
+  BIEREN
+  WIJNEN
+  FRISDRANK
+  STERKE_DRANK
+}
+
+/// Eén drank uit het standaardaanbod van de Fakbar, met de cijfers waarmee de
+/// marge berekend wordt. Bedragen in eurocent (Int, geen floats).
+///
+/// Een *aankoopeenheid* is wat de Fakbar inkoopt (een vat, een bak, een fles);
+/// een *consumptie* is wat er over de toog gaat (een pint, een glas, een shot).
+/// `purchasePricePerServing` en de winst per consumptie worden daaruit gerekend
+/// en dus NIET bewaard: waren ze een kolom, dan konden ze na een prijswijziging
+/// stilzwijgend uit de pas lopen met de twee cijfers waar ze uit volgen.
+model FakbarProduct {
+  id                  String                @id @default(cuid())
+  name                String
+  category            FakbarProductCategory
+  /// Aankoopprijs van één aankoopeenheid (vat, bak, fles).
+  purchaseUnitCents   Int
+  /// Aantal consumpties in één aankoopeenheid.
+  servingsPerUnit     Int
+  /// Verkoopprijs van één consumptie.
+  salePriceCents      Int
+  order               Int                   @default(0)
+  createdAt           DateTime              @default(now())
+  updatedAt           DateTime              @updatedAt
+
+  @@index([category, order])
+}
+
+/// Een bon waarmee aan de toog betaald kan worden (shiftbon, drankbon, ...).
+/// Naam en waarde beheert de Fakbar-verantwoordelijke; de drie types uit de seed
+/// zijn maar een startpunt.
+///
+/// Een bon die niet meer uitgedeeld wordt zet je op `active = false` in plaats
+/// van te verwijderen: de tellingen van oude shiften verwijzen ernaar en die
+/// mogen niet mee verdwijnen.
+model FakbarCouponType {
+  id         String   @id @default(cuid())
+  name       String
+  /// Wat één bon waard is aan de toog.
+  valueCents Int
+  order      Int      @default(0)
+  active     Boolean  @default(true)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  shiftCounts FakbarShiftCoupon[]
+}
+
+/// Op welk moment van de shift een telling gebeurde. `VAULT` is geen telling van
+/// de kassa maar van wat er naar de kluis ging.
+enum FakbarCashMoment {
+  START
+  END
+  VAULT
+}
+
+/// Waar het SumUp-bedrag vandaan komt. Vandaag typt de toog het over uit de
+/// SumUp-app; het veld staat er zodat een latere API-koppeling zichzelf kan
+/// onderscheiden van een handmatige invoer (en die niet stil overschrijft).
+enum FakbarSumUpSource {
+  MANUAL
+  API
+}
+
+/// Eén toogshift: openen met een kassatelling, afsluiten met een tweede
+/// telling, wat er naar de kluis ging, de bonnen die binnenkwamen en de
+/// SumUp-omzet.
+///
+/// Er kan er maar één tegelijk openstaan (`closedAt = null`); dat wordt in de
+/// actie afgedwongen, niet in het schema, omdat een partial unique index op
+/// "closedAt is null" geen Prisma-concept is.
+model FakbarShift {
+  id         String    @id @default(cuid())
+  openedAt   DateTime  @default(now())
+  openedById String
+  closedAt   DateTime?
+  closedById String?
+
+  /// Kaartomzet van de shift. Null zolang de shift openstaat.
+  sumUpCents  Int?
+  sumUpSource FakbarSumUpSource @default(MANUAL)
+
+  note String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  openedBy User  @relation("FakbarShiftOpenedBy", fields: [openedById], references: [id])
+  closedBy User? @relation("FakbarShiftClosedBy", fields: [closedById], references: [id])
+
+  cashCounts FakbarCashCount[]
+  coupons    FakbarShiftCoupon[]
+
+  @@index([openedAt])
+  @@index([closedAt])
+}
+
+/// Hoeveel stuks van één munt of biljet er op één moment geteld zijn.
+/// `denominationCents` is de waarde zelf (200 = € 2, 5000 = € 50), geen enum:
+/// de lijst staat in `apps/web/lib/fakbar-cash.ts` en een muntstuk erbij of
+/// eraf hoort geen migratie te kosten.
+model FakbarCashCount {
+  id                String           @id @default(cuid())
+  shiftId           String
+  moment            FakbarCashMoment
+  denominationCents Int
+  quantity          Int
+
+  shift FakbarShift @relation(fields: [shiftId], references: [id], onDelete: Cascade)
+
+  @@unique([shiftId, moment, denominationCents])
+  @@index([shiftId])
+}
+
+/// Hoeveel bonnen van één type er tijdens de shift binnenkwamen.
+model FakbarShiftCoupon {
+  id           String @id @default(cuid())
+  shiftId      String
+  couponTypeId String
+  quantity     Int
+  /// Waarde op het moment van tellen. Snapshot, zoals bij ticketing en
+  /// uitleendienst: herprijst de verantwoordelijke een bon, dan mag dat de
+  /// omzet van vorige maand niet herschrijven.
+  valueCents   Int
+
+  shift      FakbarShift      @relation(fields: [shiftId], references: [id], onDelete: Cascade)
+  couponType FakbarCouponType @relation(fields: [couponTypeId], references: [id])
+
+  @@unique([shiftId, couponTypeId])
+  @@index([shiftId])
 }
 
 // -----------------------------------------------------------------------------

@@ -449,6 +449,14 @@ const icons: Record<string, ReactNode> = {
       <path d="M16 8a1 1 0 0 1 1 1v8a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4V9a1 1 0 0 1 1-1h14a4 4 0 1 1 0 8h-1" />
     </Svg>
   ),
+  // fakbar: de bar -> bierglas
+  fakbar: (
+    <Svg>
+      <path d="M7 8h10l-1 12a2 2 0 0 1-2 2h-4a2 2 0 0 1-2-2L7 8Z" />
+      <path d="M17 10h2a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2h-2.5" />
+      <path d="M7.5 8a2.5 2.5 0 0 1 .5-4.9 3 3 0 0 1 5.6-.6A2.5 2.5 0 0 1 16.5 8" />
+    </Svg>
+  ),
   // piano: toetsen van een klavier
   piano: (
     <Svg>
