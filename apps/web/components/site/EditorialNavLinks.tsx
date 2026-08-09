@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { ChevronDown, Menu, X } from "lucide-react";
-import { useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import { pick, type Locale } from "@vtk/i18n";
 
 const subscribeToClient = () => () => undefined;
@@ -35,11 +35,18 @@ export function EditorialNavLinks({
   base,
   locale,
   ariaLabel,
+  search,
 }: {
   tabs: NavTab[];
   base: string;
   locale: Locale;
   ariaLabel: string;
+  /**
+   * Het zoekveld voor het uitklappaneel. Komt als klaar gerenderde node uit de
+   * sitekop (een server component), want op smal scherm is dit paneel de enige
+   * plek waar het zoekveld past.
+   */
+  search?: ReactNode;
 }) {
   const pathname = usePathname() ?? "/";
   const shellRef = useRef<HTMLDivElement>(null);
@@ -193,6 +200,7 @@ export function EditorialNavLinks({
       </button>
 
       <div className="nav-mobile-menu" id="site-mobile-menu" hidden={!menuOpen}>
+        {search ? <div className="nav-mobile-search">{search}</div> : null}
         <nav aria-label={ariaLabel}>
           <ul>
             {tabs.map((tab) => {

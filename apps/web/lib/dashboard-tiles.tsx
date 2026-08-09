@@ -747,6 +747,9 @@ export function TileChip({
       style={{ background: c.chipBg, color: c.chipFg }}
     >
       {imageKey ? (
+        // Geen next/image: de upload perst een tegellogo al tot binnen 128x128 en
+        // laat SVG ongemoeid, dus er valt niets meer te winnen. De verhouding
+        // verschilt bovendien per logo, dus width/height zou hier een gok zijn.
         // eslint-disable-next-line @next/next/no-img-element
         <img
           src={tileImageUrl(imageKey)}

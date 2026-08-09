@@ -30,7 +30,6 @@
     "linkMedia": "Media",
     "linkAbout": "Over VTK",
     "linkPraesidium": "Praesidium",
-    "linkWerkgroepen": "Werkgroepen",
     "linkInstagram": "Instagram",
     "linkFacebook": "Facebook",
     "linkLinkedIn": "LinkedIn",
@@ -38,7 +37,11 @@
     "linkSlots": "Tijdsloten Cudi",
     "linkPrivacy": "Privacy",
     "linkCookies": "Cookies",
-    "linkCookieSettings": "Cookiekeuze"
+    "linkCookieSettings": "Cookiekeuze",
+    "linkRental": "Uitleendienst",
+    "linkWerkgroepenCircles": "Werkgroepen & bevriende kringen",
+    "linkYouTube": "YouTube",
+    "linkTikTok": "TikTok"
   },
   "home": {
     "welcome": "Welkom bij VTK",
@@ -595,6 +598,185 @@
       "weekLimit": "Je hebt deze week al een tijdslot. Annuleer dat eerst, of kies een volgende week.",
       "fallback": "Reserveren mislukt. Probeer later opnieuw.",
       "cancelFailed": "Annuleren mislukt. Probeer later opnieuw."
+    }
+  },
+  "notFound": {
+    "kicker": "404",
+    "title": "Deze pagina bestaat niet",
+    "lead": "Het adres klopt niet, of de pagina is verhuisd bij de overstap naar de nieuwe site.",
+    "body": "Kwam je hier via een oude link of een bladwijzer? Onderstaande wegen brengen je terug. Blijft er iets kapot, laat het weten via",
+    "homeTitle": "Naar de homepage",
+    "homeLead": "Het nieuws, de openingsuren en wat er de komende dagen te doen is.",
+    "infoTitle": "Info",
+    "infoLead": "De praktische pagina's: diensten, voorzieningen en hoe je ze gebruikt.",
+    "calendarTitle": "Kalender",
+    "calendarLead": "Alle activiteiten, van cantus tot infosessie."
+  },
+  "search": {
+    "title": "Zoeken",
+    "subtitle": "Doorzoek de pagina's van de site en de publieke activiteiten in de kalender.",
+    "description": "Doorzoek de pagina's en de activiteiten van VTK.",
+    "formLabel": "Zoeken op de site",
+    "inputLabel": "Zoekterm",
+    "placeholder": "Zoek op de site",
+    "submit": "Zoeken",
+    "prompt": "Typ hierboven waar je naar op zoek bent.",
+    "tooShort": "Typ minstens twee letters: met één letter valt er niets zinnigs te vinden.",
+    "resultsOne": "1 resultaat voor “{query}”.",
+    "resultsMany": "{count} resultaten voor “{query}”.",
+    "limited": "Enkel de eerste {count} resultaten staan hieronder. Voeg een woord toe om te verfijnen.",
+    "emptyTitle": "Geen resultaten voor “{query}”",
+    "emptyBody": "Probeer een korter of ander woord en kijk de spelling na. Zoek je een activiteit, blader dan door de kalender; praktische uitleg staat onder Info.",
+    "emptyCalendar": "Naar de kalender",
+    "emptyInfo": "Naar Info",
+    "kindPage": "Pagina",
+    "kindEvent": "Activiteit"
+  },
+  "seo": {
+    "home": {
+      "title": "Vlaamse Technische Kring",
+      "description": "VTK is de studentenvereniging van de faculteit Ingenieurswetenschappen aan de KU Leuven: activiteiten, cursussen, Theokot en meer."
+    },
+    "kalender": {
+      "title": "Kalender",
+      "description": "Alle activiteiten van VTK: cantussen, infosessies, sport, cultuur en de jaarlijkse klassiekers."
+    },
+    "tickets": {
+      "title": "Tickets",
+      "description": "Tickets voor cantussen, galabals en andere VTK-events, rechtstreeks en veilig betaald."
+    },
+    "media": {
+      "title": "Media",
+      "description": "Foto's, aftermovies en VTK-publicaties, overzichtelijk samengebracht op een plek."
+    },
+    "praesidium": {
+      "title": "Praesidium",
+      "description": "Het praesidium van VTK, per werkingsjaar: wie welke post opneemt en hoe je hen bereikt."
+    },
+    "werkgroepen": {
+      "title": "Werkgroepen",
+      "description": "De werkgroepen van VTK, elk met hun eigen ploeg en hun eigen werking."
+    },
+    "pocs": {
+      "title": "POC's",
+      "description": "De permanente onderwijscommissies en de studenten die jouw opleiding daar vertegenwoordigen."
+    },
+    "theokot": {
+      "title": "Theokot",
+      "description": "Bestel je broodje bij het Theokot en haal het af tijdens de openingsuren."
+    },
+    "shift": {
+      "title": "Shiften",
+      "description": "Help mee achter de toog of op een evenement. Elke shift levert bonnetjes op."
+    },
+    "piano": {
+      "title": "Piano reserveren",
+      "description": "Reserveer een tijdslot op de VTK-piano in lokaal 01.52 in het kasteel Arenberg."
+    },
+    "privacy": {
+      "title": "Privacyverklaring",
+      "description": "Welke persoonsgegevens VTK verwerkt op de website, in het ledenportaal en bij tickets en reservaties."
+    },
+    "cookies": {
+      "title": "Cookiebeleid",
+      "description": "Welke browseropslag VTK gebruikt, waarvoor ze dient en hoe je jouw keuze aanpast."
+    },
+    "ledenportaal": {
+      "title": "Over het ledenportaal",
+      "description": "Wat het ledenportaal is, wie er binnen kan en wat je er als lid of praesidiumlid doet."
+    },
+    "account": {
+      "title": "Mijn account",
+      "description": "Je profiel, je tickets, je shiften en je gekoppelde toepassingen."
+    },
+    "connectedApps": {
+      "title": "Verbonden apps",
+      "description": "De toepassingen waaraan je toegang gaf met je VTK-account."
+    },
+    "login": {
+      "title": "Aanmelden",
+      "description": "Meld je aan met je VTK-account of via KU Leuven."
+    },
+    "consent": {
+      "title": "Toestemming geven",
+      "description": "Een toepassing vraagt toegang tot je VTK-gegevens."
+    },
+    "noAccess": {
+      "title": "Geen toegang",
+      "description": "Je account heeft geen toegang tot deze toepassing."
+    },
+    "onboarding": {
+      "title": "Profiel vervolledigen",
+      "description": "Vul je profiel aan om je VTK-account in gebruik te nemen."
+    },
+    "confirmStudy": {
+      "title": "Studie bevestigen",
+      "description": "Bevestig je opleiding voor dit werkingsjaar."
+    },
+    "ticketOrder": {
+      "title": "Mijn bestelling",
+      "description": "De status van je ticketbestelling en je tickets."
+    },
+    "ticketAccess": {
+      "title": "Toegang tot je tickets",
+      "description": "Open je bestelling met de link uit je bevestigingsmail."
+    },
+    "theokotCounter": {
+      "title": "Theokot-afhaalbalie",
+      "description": "Bestellingen afvinken tijdens een Theokot-shift."
+    },
+    "shiftHistory": {
+      "title": "Mijn shiftgeschiedenis",
+      "description": "De shiften die je eerder deed en de bonnetjes die ze opleverden."
+    },
+    "ssoMetadata": {
+      "title": "SSO-metadata",
+      "description": "Interne referentiepagina voor de KU Leuven-koppeling."
+    },
+    "sample": {
+      "title": "Ontwerpvoorbeelden",
+      "description": "Interne referentiepagina met de bouwstenen van de VTK-huisstijl."
+    }
+  },
+  "contact": {
+    "title": "Contact",
+    "subtitle": "Een vraag, een voorstel of iets dat niet werkt? Laat het hier achter, dan komt het bij de juiste persoon terecht.",
+    "description": "Stel je vraag aan VTK via het contactformulier, of mail rechtstreeks naar info@vtk.be.",
+    "formTitle": "Stuur een bericht",
+    "formIntro": "Elk bericht komt binnen op info@vtk.be en wordt van daar intern doorgegeven. We proberen binnen enkele werkdagen te antwoorden.",
+    "nameLabel": "Naam",
+    "namePlaceholder": "Je voor- en achternaam",
+    "emailLabel": "E-mail",
+    "emailPlaceholder": "jij@voorbeeld.be",
+    "emailHelp": "Op dit adres antwoorden we; kijk het even na.",
+    "subjectLabel": "Onderwerp",
+    "subjectPlaceholder": "Waar gaat het over?",
+    "messageLabel": "Bericht",
+    "messagePlaceholder": "Vertel wat we voor je kunnen doen.",
+    "messageHelp": "Maximaal {max} tekens. Grote bijlagen stuur je best rechtstreeks per mail.",
+    "honeypotLabel": "Laat dit veld leeg",
+    "submit": "Bericht versturen",
+    "submitting": "Bezig met versturen...",
+    "sent": "Bedankt, je bericht is verstuurd. We antwoorden op het adres dat je opgaf.",
+    "directTitle": "Liever rechtstreeks mailen?",
+    "directBody": "Dat mag ook, op hetzelfde adres:",
+    "privacyTitle": "Wat gebeurt er met je gegevens?",
+    "privacyBody": "We gebruiken je naam, je adres en je bericht enkel om je vraag te beantwoorden. Er vertrekt geen automatische bevestigingsmail.",
+    "privacyLink": "Privacyverklaring",
+    "pagesTitle": "Meer contactinfo",
+    "errors": {
+      "fallback": "Je bericht is niet verstuurd. Probeer het opnieuw of mail rechtstreeks naar info@vtk.be.",
+      "nameRequired": "Niet verstuurd: vul je naam in.",
+      "nameTooLong": "Niet verstuurd: je naam is te lang (maximaal {max} tekens).",
+      "emailRequired": "Niet verstuurd: vul je e-mailadres in, anders kunnen we niet antwoorden.",
+      "emailInvalid": "Niet verstuurd: dat e-mailadres klopt niet. Kijk het na, want daar sturen we het antwoord naartoe.",
+      "emailTooLong": "Niet verstuurd: dat e-mailadres is te lang.",
+      "subjectRequired": "Niet verstuurd: vul een onderwerp in.",
+      "subjectTooLong": "Niet verstuurd: het onderwerp is te lang (maximaal {max} tekens).",
+      "messageRequired": "Niet verstuurd: schrijf eerst een bericht.",
+      "messageTooLong": "Niet verstuurd: je bericht is te lang (maximaal {max} tekens). Kort het in of mail rechtstreeks naar info@vtk.be.",
+      "rateLimited": "Niet verstuurd: je stuurde net al enkele berichten. Wacht een kwartier of mail rechtstreeks naar info@vtk.be.",
+      "mailFailed": "Je bericht raakte niet weg door een probleem aan onze kant. Probeer het straks opnieuw of mail rechtstreeks naar info@vtk.be."
     }
   }
 }

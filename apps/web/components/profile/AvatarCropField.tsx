@@ -230,6 +230,8 @@ export function AvatarCropField({
       <div className="flex flex-wrap items-center gap-4">
         <div className="h-20 w-20 shrink-0 overflow-hidden rounded-[16px] border border-vtk-blue/10 bg-vtk-blue-soft">
           {previewUrl ? (
+            // Een blob-URL van de bijsnede die nog in de browser zit; die bestaat
+            // enkel in dit tabblad en valt niet te optimaliseren.
             // eslint-disable-next-line @next/next/no-img-element
             <img src={previewUrl} alt="" className="h-full w-full object-cover" />
           ) : null}

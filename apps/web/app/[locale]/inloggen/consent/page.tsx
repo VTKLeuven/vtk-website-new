@@ -1,3 +1,5 @@
+import type { Metadata } from 'next';
+import { staticMetadata } from '@/lib/pageMetadata';
 /**
  * ⚠ DIT IS GEEN VTK-LOGINSCHERM.
  *
@@ -36,6 +38,16 @@ function isVtkOwned(uris: string[]): boolean {
 
 function one(value: string | string[] | undefined): string | undefined {
   return Array.isArray(value) ? value[0] : value;
+}
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ locale: string }>;
+}): Promise<Metadata> {
+  const { locale } = await params;
+  if (!hasLocale(locale)) return {};
+  return staticMetadata('consent', '/inloggen/consent', locale, { noIndex: true });
 }
 
 export default async function ConsentPage({

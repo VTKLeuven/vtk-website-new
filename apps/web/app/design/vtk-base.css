@@ -600,6 +600,78 @@
   color: var(--yellow) !important;
 }
 
+/* Zoekveld. Het staat op een donkere ondergrond (het uitklapmenu van de sitekop
+   en de paginakop van /zoeken), dus één licht-op-donker behandeling volstaat.
+   In de balk zelf staat geen veld maar een knop naar /zoeken: de elf tabs vullen
+   de navigatie tot op ~40px na en `.nav-inner` groeit niet voorbij --max. */
+.vtk-search-form {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  max-width: 560px;
+  padding: 0 5px 0 14px;
+  border: 1px solid rgba(250, 250, 247, 0.34);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.12);
+  color: var(--paper);
+  transition: background 160ms ease, border-color 160ms ease;
+}
+
+.vtk-search-form:focus-within {
+  border-color: var(--paper);
+  background: rgba(255, 255, 255, 0.22);
+}
+
+.vtk-search-icon {
+  flex: 0 0 auto;
+  color: rgba(250, 250, 247, 0.7);
+}
+
+.vtk-search-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 12px 0;
+  border: 0;
+  background: none;
+  color: var(--paper);
+  font: inherit;
+  /* 16px en niet kleiner: iOS zoomt anders in bij het focussen op het veld. */
+  font-size: 16px;
+  outline: none;
+}
+
+.vtk-search-input::placeholder {
+  color: rgba(250, 250, 247, 0.6);
+}
+
+/* Het wisknopje dat WebKit in een `type=search` zet is donkergrijs, en dus
+   onzichtbaar op navy. */
+.vtk-search-input::-webkit-search-cancel-button {
+  filter: invert(1);
+  opacity: 0.6;
+}
+
+/* De knop draait om naar een lichte vulling, net als elke primaire knop op een
+   donkere band. */
+.vtk-search-submit {
+  flex: 0 0 auto;
+  padding: 9px 18px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--ink);
+  cursor: pointer;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  transition: background 160ms ease;
+}
+
+.vtk-search-submit:hover {
+  background: var(--paper-2);
+}
+
 .vtk-panel,
 .vtk-card {
   border: 1px solid var(--line);

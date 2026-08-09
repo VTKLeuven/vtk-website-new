@@ -679,12 +679,21 @@ model Page {
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
 
+  // Zoekvectoren voor /zoeken, één per taalconfiguratie. Een trigger houdt ze
+  // bij (zie de migratie `search_vectors`); Prisma schrijft ze nooit zelf en
+  // kent het type niet, dus ze staan hier enkel zodat schema en database niet
+  // uiteenlopen. Bevraagd wordt er via ruwe SQL in `lib/search-server.ts`.
+  searchNl        Unsupported("tsvector")?
+  searchEn        Unsupported("tsvector")?
+
   headerTab   HeaderTab?       @relation(fields: [headerTabId], references: [id], onDelete: SetNull)
   createdBy   User?            @relation("PageCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
   assets      PageAsset[]
   editorRoles PageEditorRole[]
 
   @@index([headerTabId])
+  @@index([searchNl], type: Gin)
+  @@index([searchEn], type: Gin)
 }
 
 // Rollen die de inhoud van een pagina mogen bewerken (naast superadmin en
@@ -740,6 +749,11 @@ model CalendarEvent {
   createdAt     DateTime        @default(now())
   updatedAt     DateTime        @updatedAt
 
+  // Zie de gelijknamige velden op `Page`: door een trigger onderhouden
+  // zoekvectoren, enkel via ruwe SQL bevraagd.
+  searchNl      Unsupported("tsvector")?
+  searchEn      Unsupported("tsvector")?
+
   group       Group        @relation(fields: [groupId], references: [id], onDelete: Cascade)
   createdBy   User?        @relation("EventCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
   ticketEvent TicketEvent?
@@ -747,6 +761,8 @@ model CalendarEvent {
 
   @@index([start])
   @@index([groupId])
+  @@index([searchNl], type: Gin)
+  @@index([searchEn], type: Gin)
 }
 
 // Doelgroep van een evenement ("Internationaal", "Eerstejaars", "Career", ...).

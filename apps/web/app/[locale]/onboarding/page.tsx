@@ -1,3 +1,5 @@
+import type { Metadata } from "next";
+import { staticMetadata } from "@/lib/pageMetadata";
 import { notFound, redirect } from "next/navigation";
 import { prisma } from "@vtk/db";
 import { Card, Button } from "@vtk/ui";
@@ -6,6 +8,16 @@ import { hasLocale } from "@/lib/locale";
 import { requireSession } from "@/lib/session";
 import { logoutAction } from "@/app/actions/auth";
 import { ProfileForm } from "@/components/profile/ProfileForm";
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ locale: string }>;
+}): Promise<Metadata> {
+  const { locale } = await params;
+  if (!hasLocale(locale)) return {};
+  return staticMetadata("onboarding", "/onboarding", locale, { noIndex: true });
+}
 
 export default async function OnboardingPage({
   params,

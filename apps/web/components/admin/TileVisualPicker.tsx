@@ -196,6 +196,9 @@ export function TileVisualPicker({
         <div className="vtk-tile-upload">
           <div className="vtk-tile-upload-thumb">
             {imageKey ? (
+              // Zelfde reden als bij TileChip (lib/dashboard-tiles.tsx): het logo is
+              // bij de upload al tot binnen 128x128 geperst, SVG blijft SVG, en de
+              // verhouding verschilt per logo.
               // eslint-disable-next-line @next/next/no-img-element
               <img src={tileImageUrl(imageKey)} alt="" />
             ) : (

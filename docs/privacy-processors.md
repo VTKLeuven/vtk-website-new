@@ -1,7 +1,7 @@
 # Privacy processor register
 
 Owner: VTK board / IT  
-Last repository review: 18 July 2026
+Last repository review: 8 August 2026
 
 This is the repository-side inventory. The controller must complete the
 production-specific fields, keep signed agreements and review it whenever a
@@ -16,6 +16,7 @@ supplier or configuration changes.
 | Brevo (Sendinblue) | Opt-in mailing lists: name, preferred email and study attributes (year/programme booleans) of active, opted-in members, synced from the site | `apps/web/lib/brevo/`, `apps/web/app/api/admin/mailinglijsten/sync/`, `.env.example` (`BREVO_KEY`) | Only active when `BREVO_KEY` is set. Record Brevo (Sendinblue GmbH/entity), DPA, EEA region, list access, sender authentication and provider-side retention; keep the site the single source of truth (sync prunes) |
 | Mollie | Hosted payment processing, order reference, amount, status and payment identifiers | `apps/web/lib/ticketing/payments/mollie.ts`, logistics payment code | Keep merchant DPA/terms, document controller roles, enable least-access accounts and set dashboard retention |
 | Immich instance managed for VTK | Photo albums and, only after approval, biometric face templates | `apps/web/lib/immich-gallery.ts`, `apps/web/lib/immich-face-search.ts`, `infra/immich/` | Complete DPIA before enabling face search; document hosting, access, album notices, subject requests, template deletion and backups |
+| Umami, self-hosted by VTK (no third party) | Consent-gated, cookieless page-view statistics: page path, referrer, screen size, browser language and a daily-rotating hash of IP address plus user agent; the IP address itself is not stored | `apps/web/lib/analytics.ts`, `apps/web/app/layout.tsx`, `infra/docker-compose.yml` (`umami`, `umami-db-init`), `.env.example` (`UMAMI_*`) | Runs on VTK's own server and database, so there is no recipient to sign a DPA with; the hosting and PostgreSQL row already covers where it lives. Keep `DISABLE_TELEMETRY=1` so the instance itself calls nobody, limit dashboard accounts, set a retention window and never point `UMAMI_PUBLIC_URL` at a hosted Umami |
 | Sentry | Server errors; optional consent-gated browser errors, traces and masked replay | `apps/web/instrumentation-client.ts`, `apps/web/instrumentation.ts`, Sentry config | Record actual Sentry entity, DPA, region, retention, integrations, access and transfer safeguards; keep replay/PII settings restricted |
 | YouTube / Vimeo | External media requested by the visitor; receives IP/browser data after play | `apps/web/lib/videoEmbed.ts`, `apps/web/app/[locale]/media/AftermoviePlayer.tsx` | Keep click-to-load behaviour, review privacy mode/provider settings and avoid third-party posters before play |
 

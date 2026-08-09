@@ -1,27 +1,11 @@
-import { prisma } from "@vtk/db";
 import { pick, type Locale } from "@vtk/i18n";
 import { KalenderEditorialView } from "@/components/editorial/KalenderEditorialView";
 import { Markdown } from "@/components/ui/Markdown";
 import { calendarLabels, feedUrlFor, listCalendarCategories } from "@/lib/calendar/categories";
+import type { CalendarCategory } from "@/lib/pageQueries";
 
 import "@/app/design/vtk-base.css";
 import "@/app/design/vtk-kalender.css";
-
-type Category = {
-  slug: string;
-  nameNl: string;
-  nameEn: string;
-  descriptionNl: string | null;
-  descriptionEn: string | null;
-};
-
-/** De categorie achter een slug, of null als die slug geen categorie is. */
-export function findCategoryBySlug(slug: string): Promise<Category | null> {
-  return prisma.calendarCategory.findUnique({
-    where: { slug },
-    select: { slug: true, nameNl: true, nameEn: true, descriptionNl: true, descriptionEn: true },
-  });
-}
 
 /**
  * Een categoriepagina is dezelfde kalender als /kalender, vastgezet op één
@@ -32,7 +16,7 @@ export async function CategoryCalendar({
   category,
   locale,
 }: {
-  category: Category;
+  category: CalendarCategory;
   locale: Locale;
 }) {
   const base = locale === "nl" ? "" : "/en";

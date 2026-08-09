@@ -1,3 +1,5 @@
+import type { Metadata } from "next";
+import { staticMetadata } from "@/lib/pageMetadata";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowRight, CalendarDays, TicketCheck } from "lucide-react";
@@ -7,6 +9,16 @@ import { TicketEventCard } from "@/components/ticketing/public/TicketEventCard";
 import type { PublicTicketEvent } from "@/components/ticketing/public/types";
 
 import "@/app/design/vtk-tickets.css";
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ locale: string }>;
+}): Promise<Metadata> {
+  const { locale } = await params;
+  if (!hasLocale(locale)) return {};
+  return staticMetadata("tickets", "/tickets", locale);
+}
 
 export default async function TicketsPage({ params }: { params: Promise<{ locale: string }> }) {
   const { locale: localeParam } = await params;

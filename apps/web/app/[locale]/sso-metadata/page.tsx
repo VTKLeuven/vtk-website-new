@@ -1,7 +1,19 @@
+import type { Metadata } from "next";
+import { staticMetadata } from "@/lib/pageMetadata";
 import { notFound } from "next/navigation";
 import { hasLocale } from "@/lib/locale";
 import { requireSession } from "@/lib/session";
 import { ssoMetadata } from "@/lib/sso";
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ locale: string }>;
+}): Promise<Metadata> {
+  const { locale } = await params;
+  if (!hasLocale(locale)) return {};
+  return staticMetadata("ssoMetadata", "/sso-metadata", locale, { noIndex: true });
+}
 
 /**
  * Superadmin-only reference page listing the exact values to register in the

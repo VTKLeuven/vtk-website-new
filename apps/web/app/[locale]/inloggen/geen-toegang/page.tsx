@@ -1,3 +1,5 @@
+import type { Metadata } from 'next';
+import { staticMetadata } from '@/lib/pageMetadata';
 /**
  * ⚠ DIT IS GEEN VTK-LOGINSCHERM.
  *
@@ -19,6 +21,16 @@ import { signedOAuthQuery, type RawSearchParams } from '@/lib/oauthFlow';
 
 function one(value: string | string[] | undefined): string | undefined {
   return Array.isArray(value) ? value[0] : value;
+}
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ locale: string }>;
+}): Promise<Metadata> {
+  const { locale } = await params;
+  if (!hasLocale(locale)) return {};
+  return staticMetadata('noAccess', '/inloggen/geen-toegang', locale, { noIndex: true });
 }
 
 export default async function NoAccessPage({

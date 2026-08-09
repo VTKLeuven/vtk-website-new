@@ -1,3 +1,5 @@
+import type { Metadata } from "next";
+import { staticMetadata } from "@/lib/pageMetadata";
 import { prisma } from "@vtk/db";
 import { notFound } from "next/navigation";
 import { hasLocale } from "@/lib/locale";
@@ -9,6 +11,16 @@ import { activeBanFor, getTheokotConfig } from "@/lib/theokot-server";
 import { TheokotOrderClient, type OrderSession, type OrderMessage } from "./TheokotOrderClient";
 
 import "@/app/design/vtk-basic.css";
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ locale: string }>;
+}): Promise<Metadata> {
+  const { locale } = await params;
+  if (!hasLocale(locale)) return {};
+  return staticMetadata("theokot", "/theokot", locale);
+}
 
 export default async function TheokotOrderPage({ params }: { params: Promise<{ locale: string }> }) {
   const { locale: localeParam } = await params;

@@ -1,3 +1,6 @@
+import type { Metadata } from "next";
+import { staticMetadata } from "@/lib/pageMetadata";
+import Image from "next/image";
 import Link from "next/link";
 import { prisma } from "@vtk/db";
 import { notFound } from "next/navigation";
@@ -5,6 +8,16 @@ import { getDictionary, pick, type Locale } from "@vtk/i18n";
 import { hasLocale } from "@/lib/locale";
 import { publicUrl } from "@/lib/storage";
 import { currentWorkingYear, formatWorkingYear } from "@/lib/workingYear";
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ locale: string }>;
+}): Promise<Metadata> {
+  const { locale } = await params;
+  if (!hasLocale(locale)) return {};
+  return staticMetadata("praesidium", "/praesidium", locale);
+}
 
 export default async function PraesidiumPage({
   params,
@@ -137,8 +150,15 @@ export default async function PraesidiumPage({
                           >
                             <div className="h-24 w-24 overflow-hidden rounded-xl bg-vtk-blue-soft ring-1 ring-vtk-blue/10">
                               {src ? (
-                                // eslint-disable-next-line @next/next/no-img-element
-                                <img src={src} alt={m.user.name} className="h-full w-full object-cover" />
+                                // De tegel is 96x96; een profielfoto uit storage is dat
+                                // zelden, dus laat next/image ze op maat snijden.
+                                <Image
+                                  src={src}
+                                  alt={m.user.name}
+                                  width={96}
+                                  height={96}
+                                  className="h-full w-full object-cover"
+                                />
                               ) : (
                                 <div className="grid h-full w-full place-items-center text-3xl font-semibold text-vtk-blue-muted">
                                   {m.user.name.slice(0, 1).toUpperCase()}

@@ -30,7 +30,6 @@
     "linkMedia": "Media",
     "linkAbout": "About VTK",
     "linkPraesidium": "Praesidium",
-    "linkWerkgroepen": "Werkgroepen",
     "linkInstagram": "Instagram",
     "linkFacebook": "Facebook",
     "linkLinkedIn": "LinkedIn",
@@ -38,7 +37,11 @@
     "linkSlots": "Cudi Time Slots",
     "linkPrivacy": "Privacy",
     "linkCookies": "Cookies",
-    "linkCookieSettings": "Cookie choices"
+    "linkCookieSettings": "Cookie choices",
+    "linkRental": "Equipment service",
+    "linkWerkgroepenCircles": "Working groups & partner societies",
+    "linkYouTube": "YouTube",
+    "linkTikTok": "TikTok"
   },
   "home": {
     "welcome": "Welcome to VTK",
@@ -595,6 +598,185 @@
       "weekLimit": "You already have a time slot this week. Cancel it first, or pick a later week.",
       "fallback": "Reserving failed. Please try again later.",
       "cancelFailed": "Cancelling failed. Please try again later."
+    }
+  },
+  "notFound": {
+    "kicker": "404",
+    "title": "This page does not exist",
+    "lead": "The address is wrong, or the page moved when we rebuilt the site.",
+    "body": "Did you get here from an old link or a bookmark? The routes below take you back. If something stays broken, let us know at",
+    "homeTitle": "Go to the homepage",
+    "homeLead": "News, opening hours and what is coming up in the next few days.",
+    "infoTitle": "Info",
+    "infoLead": "The practical pages: services, facilities and how to use them.",
+    "calendarTitle": "Calendar",
+    "calendarLead": "Every activity, from cantus to info session."
+  },
+  "search": {
+    "title": "Search",
+    "subtitle": "Search the pages of this site and the public activities in the calendar.",
+    "description": "Search the pages and activities of VTK.",
+    "formLabel": "Search this site",
+    "inputLabel": "Search term",
+    "placeholder": "Search this site",
+    "submit": "Search",
+    "prompt": "Type what you are looking for above.",
+    "tooShort": "Type at least two letters: a single letter matches almost everything.",
+    "resultsOne": "1 result for “{query}”.",
+    "resultsMany": "{count} results for “{query}”.",
+    "limited": "Only the first {count} results are shown. Add a word to narrow them down.",
+    "emptyTitle": "No results for “{query}”",
+    "emptyBody": "Try a shorter or different word and check the spelling. Looking for an activity? Browse the calendar; practical explanations live under Info.",
+    "emptyCalendar": "Go to the calendar",
+    "emptyInfo": "Go to Info",
+    "kindPage": "Page",
+    "kindEvent": "Activity"
+  },
+  "seo": {
+    "home": {
+      "title": "Vlaamse Technische Kring",
+      "description": "VTK is the student association of the Faculty of Engineering Science at KU Leuven: activities, course notes, Theokot and more."
+    },
+    "kalender": {
+      "title": "Calendar",
+      "description": "Every VTK activity: cantuses, info sessions, sports, culture and the yearly classics."
+    },
+    "tickets": {
+      "title": "Tickets",
+      "description": "Tickets for cantuses, galas and other VTK events, paid safely and directly."
+    },
+    "media": {
+      "title": "Media",
+      "description": "Photos, aftermovies and VTK publications, gathered in one place."
+    },
+    "praesidium": {
+      "title": "Praesidium",
+      "description": "The VTK praesidium per working year: who holds which position and how to reach them."
+    },
+    "werkgroepen": {
+      "title": "Work groups",
+      "description": "The VTK work groups, each with their own team and their own programme."
+    },
+    "pocs": {
+      "title": "Programme committees",
+      "description": "The permanent education committees and the students representing your programme there."
+    },
+    "theokot": {
+      "title": "Theokot",
+      "description": "Order your sandwich at the Theokot and pick it up during opening hours."
+    },
+    "shift": {
+      "title": "Shifts",
+      "description": "Lend a hand behind the bar or at an event. Every shift earns you vouchers."
+    },
+    "piano": {
+      "title": "Book the piano",
+      "description": "Book a slot on the VTK piano in room 01.52 in Arenberg castle."
+    },
+    "privacy": {
+      "title": "Privacy statement",
+      "description": "Which personal data VTK processes on the website, in the member portal and for tickets and bookings."
+    },
+    "cookies": {
+      "title": "Cookie policy",
+      "description": "Which browser storage VTK uses, what it is for and how to change your choice."
+    },
+    "ledenportaal": {
+      "title": "About the member portal",
+      "description": "What the member portal is, who can get in and what you do there as a member."
+    },
+    "account": {
+      "title": "My account",
+      "description": "Your profile, your tickets, your shifts and your connected apps."
+    },
+    "connectedApps": {
+      "title": "Connected apps",
+      "description": "The applications you granted access with your VTK account."
+    },
+    "login": {
+      "title": "Sign in",
+      "description": "Sign in with your VTK account or through KU Leuven."
+    },
+    "consent": {
+      "title": "Grant access",
+      "description": "An application is asking for access to your VTK data."
+    },
+    "noAccess": {
+      "title": "No access",
+      "description": "Your account has no access to this application."
+    },
+    "onboarding": {
+      "title": "Complete your profile",
+      "description": "Fill in your profile to start using your VTK account."
+    },
+    "confirmStudy": {
+      "title": "Confirm your studies",
+      "description": "Confirm your programme for this working year."
+    },
+    "ticketOrder": {
+      "title": "My order",
+      "description": "The status of your ticket order and your tickets."
+    },
+    "ticketAccess": {
+      "title": "Access your tickets",
+      "description": "Open your order with the link from your confirmation e-mail."
+    },
+    "theokotCounter": {
+      "title": "Theokot pickup counter",
+      "description": "Tick off orders during a Theokot shift."
+    },
+    "shiftHistory": {
+      "title": "My shift history",
+      "description": "The shifts you did before and the vouchers they earned."
+    },
+    "ssoMetadata": {
+      "title": "SSO metadata",
+      "description": "Internal reference page for the KU Leuven connection."
+    },
+    "sample": {
+      "title": "Design samples",
+      "description": "Internal reference page with the building blocks of the VTK house style."
+    }
+  },
+  "contact": {
+    "title": "Contact",
+    "subtitle": "A question, a suggestion or something that is broken? Leave it here and it reaches the right person.",
+    "description": "Ask VTK a question through the contact form, or mail info@vtk.be directly.",
+    "formTitle": "Send a message",
+    "formIntro": "Every message arrives at info@vtk.be and is passed on internally from there. We aim to reply within a few working days.",
+    "nameLabel": "Name",
+    "namePlaceholder": "Your first and last name",
+    "emailLabel": "Email",
+    "emailPlaceholder": "you@example.com",
+    "emailHelp": "We reply to this address, so double-check it.",
+    "subjectLabel": "Subject",
+    "subjectPlaceholder": "What is it about?",
+    "messageLabel": "Message",
+    "messagePlaceholder": "Tell us what we can do for you.",
+    "messageHelp": "At most {max} characters. Send large attachments by mail instead.",
+    "honeypotLabel": "Leave this field empty",
+    "submit": "Send message",
+    "submitting": "Sending...",
+    "sent": "Thanks, your message has been sent. We will reply to the address you gave us.",
+    "directTitle": "Prefer to mail us directly?",
+    "directBody": "That works too, at the same address:",
+    "privacyTitle": "What happens with your details?",
+    "privacyBody": "We use your name, address and message only to answer your question. No automatic confirmation mail is sent.",
+    "privacyLink": "Privacy statement",
+    "pagesTitle": "More contact details",
+    "errors": {
+      "fallback": "Your message was not sent. Try again or mail info@vtk.be directly.",
+      "nameRequired": "Not sent: fill in your name.",
+      "nameTooLong": "Not sent: your name is too long (at most {max} characters).",
+      "emailRequired": "Not sent: fill in your email address, otherwise we cannot reply.",
+      "emailInvalid": "Not sent: that email address is not valid. Check it, because that is where the reply goes.",
+      "emailTooLong": "Not sent: that email address is too long.",
+      "subjectRequired": "Not sent: fill in a subject.",
+      "subjectTooLong": "Not sent: the subject is too long (at most {max} characters).",
+      "messageRequired": "Not sent: write a message first.",
+      "messageTooLong": "Not sent: your message is too long (at most {max} characters). Shorten it or mail info@vtk.be directly.",
+      "rateLimited": "Not sent: you just sent a few messages. Wait fifteen minutes or mail info@vtk.be directly.",
+      "mailFailed": "Your message did not go out because of a problem on our side. Try again later or mail info@vtk.be directly."
     }
   }
 }

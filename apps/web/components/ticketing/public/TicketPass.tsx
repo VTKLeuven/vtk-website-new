@@ -30,7 +30,8 @@ export function TicketPass({ ticket, locale }: { ticket: PublicTicket; locale: "
     <article className={`ticket-pass${checkedIn ? " is-used" : ""}${!valid && !checkedIn ? " is-invalid" : ""}`}>
       <div className="ticket-pass-stub">
         {qrDataUrl ? (
-          // Generated locally from the signed, PII-free ticket credential.
+          // Een data-URL die hier in de browser getekend wordt uit de ondertekende,
+          // PII-vrije ticketcredential. Er is geen bestand om te optimaliseren.
           // eslint-disable-next-line @next/next/no-img-element
           <img src={qrDataUrl} alt={locale === "nl" ? "QR-code van ticket" : "Ticket QR code"} />
         ) : (

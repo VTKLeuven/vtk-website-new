@@ -1,30 +1,39 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { prisma } from "@vtk/db";
 import { getDictionary, pick, type Locale } from "@vtk/i18n";
 import { Card } from "@vtk/ui";
 import { hasLocale } from "@/lib/locale";
+import { loadHeaderTabWithPages } from "@/lib/pageQueries";
+import { buildMetadata } from "@/lib/seo";
 
-export default async function HeaderOverviewPage({
-  params,
-}: {
-  params: Promise<{ locale: string; headerSlug: string }>;
-}) {
+type Params = Promise<{ locale: string; headerSlug: string }>;
+
+export async function generateMetadata({ params }: { params: Params }): Promise<Metadata> {
+  const { locale, headerSlug } = await params;
+  if (!hasLocale(locale)) return {};
+
+  const tab = await loadHeaderTabWithPages(headerSlug);
+  if (!tab || !tab.visible) return {};
+
+  // De intro van de categorie is de beschrijving; zonder intro valt
+  // `buildMetadata` terug op de sitebeschrijving.
+  return buildMetadata({
+    title: pick(tab.labelNl, tab.labelEn, locale),
+    description: pick(tab.introNl ?? "", tab.introEn ?? "", locale),
+    path: `/${tab.slug}`,
+    locale,
+  });
+}
+
+export default async function HeaderOverviewPage({ params }: { params: Params }) {
   const { locale: localeParam, headerSlug } = await params;
   if (!hasLocale(localeParam)) notFound();
   const locale: Locale = localeParam;
   const dict = getDictionary(locale);
   const base = locale === "nl" ? "" : "/en";
 
-  const tab = await prisma.headerTab.findUnique({
-    where: { slug: headerSlug },
-    include: {
-      pages: {
-        where: { visibleInHeader: true, publishedAt: { not: null } },
-        orderBy: [{ order: "asc" }, { titleNl: "asc" }],
-      },
-    },
-  });
+  const tab = await loadHeaderTabWithPages(headerSlug);
 
   if (!tab || !tab.visible) notFound();
 

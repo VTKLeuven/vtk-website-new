@@ -36,6 +36,19 @@ De volgorde en labels zijn dus een kringkeuze, geen technische:
   aangepast worden.
 - **Tweedehands en tijdsloten draaien op Cudi**, niet op deze site. De footer en de
   homepage-quicklinks linken daarom extern naar `cudi.vtk.be`.
+- De **uitleendienst** (`logistiek.vtk.be`) hangt als menu-item onder Info, naast
+  Kalender en Piano, en niet als twaalfde tab: elf tabs is al de grens waarop de
+  header naar een menuknop overschakelt. Ze staat ook in de footerkolom Service,
+  want ze is een dienst en geen categoriepagina.
+- **Een hernoeming van een tab bereikt een bestaande database enkel via een
+  migratie.** De seed doet `headerTab.upsert(... update: {} ...)` en werkt een
+  bestaande rij bewust niet bij (labels, slug en volgorde zijn admin-beheerd).
+  Toen "Aanbod" naar "Info" ging, is dat blijven liggen: elke database van voor de
+  hernoeming stond nog op slug `aanbod`, dus `/info` gaf daar 404 terwijl de
+  footer en de redirects van de oude vtk.be-adressen er wel naartoe wezen. De
+  migratie `20260808150000_header_tab_aanbod_to_info` zet dat recht. Doe dit
+  voortaan meteen mee: verander je een default in `HEADER_TABS`, schrijf er dan de
+  migratie bij.
 
 ---
 
@@ -1365,6 +1378,233 @@ PDF. Code in `apps/web/lib/ticketing/wallet/`.
   ticketpagina bruikbaar (dezelfde toegangscookie als de bestaande PDF-link vereist
   dat). "Ook via mail" is zo gelezen als: bereikbaar via de link die de mail al
   stuurt, niet letterlijk als knoppen in de mail-HTML.
+
+---
+
+## Wat er in Google mag staan (canonicals, sitemap, robots)
+
+De site draait op twee URL-vormen voor dezelfde pagina: Nederlands leeft op de root
+(`/kalender`), maar `/nl/kalender` rendert exact dezelfde inhoud omdat `proxy.ts`
+een pad met taalvoorvoegsel gewoon doorlaat. De keuze die daaruit volgt is
+product- en niet puur technisch:
+
+- **De voorvoegselloze NL-URL is de echte URL.** Elke canonical wijst daarheen, en
+  `x-default` in de hreflang-tabel ook: wie zonder taalvoorkeur binnenkomt, hoort
+  op het Nederlands te landen. Engels leeft onder `/en/...`. Alles hiervoor loopt
+  via `buildMetadata()` in `apps/web/lib/seo.ts`; schrijf geen losse `metadata` met
+  een handgeschreven titel, want dan lopen canonical en hreflang uiteen.
+- **`/nl/...` staat bewust niet op disallow in robots.txt.** Een crawler die een
+  URL niet mag ophalen ziet de canonical erop ook niet en kan hem alsnog kaal
+  indexeren. Duplicate content los je op met de canonical, niet met robots.txt.
+- **Hreflang gebruikt `nl` en `en`, het `<html lang>`-attribuut `nl-BE` en `en`.**
+  Dat lijkt inconsistent maar is het niet: `hreflang="nl-BE"` betekent voor een
+  zoekmachine "enkel Nederlandstaligen in België", waardoor een zoeker uit
+  Nederland buiten de match valt. Voor de taal van het document is de Belgische
+  variant wel de juiste (spelling, uitspraak in een screenreader).
+- **Wat in de sitemap komt**: de vaste publieke routes (expliciete lijst in
+  `apps/web/lib/sitemap.ts`, geen scan van de bestandsboom, want `app/[locale]`
+  bevat ook account- en bestelschermen), de zichtbare categorieën die een eigen
+  pagina hebben, elke gepubliceerde infopagina, en enkel `PUBLIC`-evenementen. Een
+  concept en een ledenexclusief evenement horen er niet in, ook niet als losse
+  titel: dat zou het bestaan ervan alsnog verklappen.
+- **Een pagina onder een categorie is canoniek `/<categorie>/<slug>`**, niet
+  `/p/<slug>`, hoewel beide werken. De categorievorm is de weg die de navigatie
+  aanbiedt, dus dat is de URL die gedeeld hoort te worden.
+- **Het standaard deelbeeld is het Arenbergkasteel onder een navy scrim met het
+  VTK-wordmerk** (`apps/web/app/opengraph-image.jpg`, gebouwd uit
+  `public/hero-arenberg.jpg`). Eén beeld voor de hele site; een pagina met een
+  echte eigen foto geeft die mee aan `buildMetadata()`.
+
+---
+
+## Zoeken: wat er in de resultaten mag staan
+
+De zoekfunctie (`/zoeken`) doorzoekt twee dingen en bewust niet meer: **de pagina's
+van de site** en **de activiteiten in de kalender**. Wat er per soort in mag, is een
+zichtbaarheidskeuze en geen technische:
+
+- **Enkel gepubliceerde pagina's.** Een concept (`publishedAt` leeg) staat niet in de
+  resultaten, ook niet als losse titel: dat zou verklappen dat er iets in de maak is
+  en waarover het gaat. Een gepubliceerde pagina die niet aan een headertab hangt,
+  komt wél in de resultaten. Ze is niet via de navigatie bereikbaar, maar ze staat
+  ook in de sitemap en is gewoon publiek; zoeken is dan vaak de enige manier om ze
+  terug te vinden.
+- **Enkel publieke evenementen, en enkel die van jouw doelgroep.** Een
+  ledenexclusief of intern evenement hoort er niet in, en een evenement met een
+  doelgroepcategorie (eerstejaars, internationals) verschijnt enkel bij wie erbij
+  hoort; wie niet ingelogd is, ziet die dus niet. Dat is dezelfde regel als op de
+  kalender zelf, waar een doelgroepevent ook pas opduikt bij het juiste profiel.
+- **Die regels worden hergebruikt en niet nagebouwd.** De zoekopdracht haalt eerst
+  kandidaten op met Postgres (rang en fragment), maar de rijen zelf komen via Prisma
+  binnen met exact dezelfde `where` als de rest van de site: `publishedAt` voor een
+  pagina, `visibility: "PUBLIC"` plus `audienceFilter()` uit
+  `apps/web/lib/calendar/audience.ts` voor een evenement, precies zoals
+  `/api/calendar/events` en de ics-feeds. Een tweede, met de hand geschreven
+  zichtbaarheidsregel in SQL loopt vroeg of laat uiteen met de eerste, en dan lekt er
+  een intern evenement in de zoekresultaten. Verandert de kalenderzichtbaarheid, dan
+  verandert het zoekresultaat mee, zonder dat iemand daaraan hoeft te denken.
+- **Wat er niet doorzocht wordt**: tickets, bestellingen, fotoalbums, praesidiumleden
+  en alles achter een login. Die schermen staan om dezelfde reden niet in de sitemap.
+- **De resultatenpagina staat zelf op `noIndex`.** Elke zoekterm is een eigen URL, en
+  die horen niet als duizenden dunne pagina's in Google te belanden.
+- **In de sitekop staat op breed scherm een knop en geen invoerveld.** De elf tabs
+  vullen de navigatiebalk tot op negen pixels na, en `.nav-inner` stopt met groeien
+  op `--max` (1320px), dus een breder scherm levert geen ruimte op. Een zoekveld
+  ernaast zou over de laatste tab vallen. De knop (vanaf 1280px, waar hij past)
+  brengt je naar `/zoeken`, waar de cursor meteen in het veld staat. Onder 1211px
+  zijn de tabs één menuknop en staat het echte veld bovenaan dat paneel. In de
+  strook tussen 1211 en 1280px is er geen ingang in de balk; wil je die er wel,
+  verklein dan eerst de navigatie zelf.
+- **Zoeken is een gewoon GET-formulier.** De zoekterm staat in de URL, de pagina
+  rendert op de server, en er is geen client-state. Zo is een zoekresultaat
+  deelbaar en herlaadbaar en werkt de terugknop; een veld met eigen state en
+  live-resultaten maakt die drie kapot en voegt bij tientallen pagina's weinig toe.
+
+---
+
+## De 404-pagina
+
+- Er is er één, in de huisstijl: dezelfde donkere `.vtk-page-head`-band als elke
+  andere pagina, en daaronder drie wegen terug (home, Info, kalender). Geen vierde
+  of vijfde: dat zijn de drie plekken waar verdwaald verkeer op uitkomt.
+- **Twee bestanden, één scherm.** `app/[locale]/not-found.tsx` vangt elke
+  `notFound()` in een segment onder de taal (het gros: een onbekende
+  `/[headerSlug]` valt gewoon binnen de routeboom); `app/not-found.tsx` vangt een
+  adres dat op geen enkele route valt en staat buiten `[locale]/layout.tsx`, dus
+  dat bestand haalt zelf de sitekop, de sitevoet en de ontwerp-CSS binnen. Beide
+  renderen `components/site/NotFoundView.tsx`.
+- Een not-found-component krijgt geen props, ook geen `params`. De taal komt daar
+  uit de `x-pathname`-header die `proxy.ts` zet, net als in de root layout. De
+  canonical wijst naar het adres dat niet bestond en de pagina staat op `noIndex`.
+
+---
+
+## Footer: welke socials, en de bevriende kringen
+
+- **De socials in de footer zijn Instagram, Facebook, LinkedIn, YouTube en
+  TikTok.** YouTube (`youtube.com/@VTKLeuven`) en TikTok
+  (`tiktok.com/@vtkleuven`) stonden wel op de oude site en op de officiële
+  linktree, maar niet in deze footer. De oude site linkte YouTube nog via de
+  verouderde `youtube.com/user/...`-vorm; we gebruiken de handle-URL.
+  Er bestaat ook een X/Twitter-account (`x.com/vtkleuven`), maar dat staat niet op
+  de linktree die communicatie zelf onderhoudt en is van buitenaf niet te
+  controleren op activiteit; het is dus niet toegevoegd. Wil VTK het er wel bij,
+  voeg het dan toe zoals de andere vijf.
+- **De bevriende kringen krijgen geen eigen lijst.** BEST, Biomedix, Chemix,
+  Existenz, Mechanix, Revue en Statix staan al als `WERKGROEP` in de database
+  (`WERKGROEP_SEEDS`) en dus op `/werkgroepen`, met hun ploeg per werkingsjaar en
+  hun eigen website. De footerlink noemt ze daarom bij naam
+  ("Werkgroepen & bevriende kringen") en wijst naar die ene pagina; een tweede,
+  handgeschreven lijst zou binnen het jaar uit elkaar lopen met de eerste. De
+  oude sleutel `footer.linkWerkgroepen` blijft ongebruikt achter in de
+  i18n-bestanden: die mochten tijdens deze werkstroom enkel aangevuld worden.
+
+---
+
+## Contactformulier: één bestemming, geen bevestigingsmail
+
+- **Alles gaat naar `info@vtk.be`.** Eén bestemming, geen keuzelijst met
+  onderwerpen die elk naar een ander adres routeren en geen tabel met
+  postadressen in de database. Beslist voor de uitvoering begon. De reden is
+  onderhoud: zo'n tabel loopt binnen een werkingsjaar achter op de werkelijkheid,
+  want posten wisselen elk jaar en een verkeerd gerouteerd bericht valt in een
+  mailbox die niemand meer leest. Nu ziet altijd dezelfde mailbox alles binnenkomen
+  en gaat het van daar intern verder; dat is één menselijke stap in ruil voor de
+  garantie dat er niets verdwijnt. Het onderwerp dat de bezoeker zelf typt, komt in
+  de titel van de mail met een `[Website]`-voorvoegsel ervoor, zodat er een filter
+  of label op kan staan.
+- **Er vertrekt geen automatische bevestigingsmail naar de verzender.** Iedereen
+  kan om het even welk adres in het formulier typen, dus zo'n mail is te misbruiken
+  als spamversterker: een bot vult het adres van zijn slachtoffer in en onze server
+  levert de mail af, met onze reputatie eronder. De bevestiging staat daarom op het
+  scherm (een groene toast plus een leeggelopen formulier). Wie wél een spoor wil,
+  ziet ons antwoord vanzelf: `replyTo` staat op de bezoeker, dus "Beantwoorden"
+  komt rechtstreeks bij hem terecht.
+- **De afzender is een VTK-adres, niet dat van de bezoeker.** Mailen namens
+  `@gmail.com` mag onze server niet ondertekenen; SPF en DKIM gooien zo'n bericht
+  in de spam. De bezoeker zit in `replyTo`, en naam en adres staan ook in de tekst
+  van de mail zelf, zodat doorsturen het antwoordadres niet verliest. De afzender
+  staat los van `MAIL_FROM` (`MAIL_FROM_CONTACT`): die eerste is de ticket-
+  afzender, en een contactvraag hoort niet als "VTK Tickets" binnen te komen.
+- **Spam wordt tegengehouden met een honeypot en een limiet per IP, niet met een
+  captcha.** Een captcha kost elke echte bezoeker moeite (en zet vaak een derde
+  partij op de pagina) om een handvol scripts tegen te houden. Het verborgen veld
+  levert bij invulling een **groene** toast op en er vertrekt niets: een bot die een
+  foutmelding krijgt, weet dat hij ontdekt is en past zijn volgende poging aan. De
+  limiet staat op drie berichten per kwartier per IP en telt in het geheugen van het
+  proces; bij een herstart begint ze opnieuw. Dat is bewust: dit hoeft geen
+  boekhouding te zijn, enkel een drempel, en het scheelt een tabel en een opkuistaak.
+- **De inhoud van een bericht gaat nooit naar Sentry.** Mislukt het versturen, dan
+  loggen we dát, niet wat er in stond. Het is de post van een bezoeker.
+- **`/contact` is een eigen route en geen speciaal geval in het
+  categorie-overzicht.** Contact is in de database een gewone `HeaderTab` (code
+  `CONTACT`) met pagina's eronder, dus zonder eigen map zou `/contact` de generieke
+  categorieweergave tonen. Een `if (slug === "contact")` daarin zou elke andere
+  categorie meeslepen. Het statische segment `app/[locale]/contact` wint van
+  `[headerSlug]` en neemt enkel `/contact` over; de pagina's eronder blijven op
+  `/contact/<pagina>` bij de generieke weergave, en het formulierscherm herhaalt hun
+  lijst onderaan zodat er niets onbereikbaar wordt. De titel en de intro komen nog
+  altijd uit de categorie in `/admin/inhoud`; enkel het formulier is code. Wordt de
+  slug van die categorie ooit hernoemd, dan blijft het formulier op `/contact` staan
+  terwijl de navigatie naar de nieuwe slug wijst; die pagina laadt de categorie
+  daarom op `code` en niet op slug.
+
+---
+
+## Bezoekersstatistieken: Umami op onze eigen server, enkel na toestemming
+
+- **We meten zelf, of we meten niet.** De keuze was van bij het begin
+  self-hosted: het verkeer van bezoekers van een studentenkring hoort niet bij een
+  analytics-bedrijf terecht te komen, en zolang de meting op onze eigen server
+  draait komt er geen verwerker bij in `docs/privacy-processors.md`. Een gehoste
+  variant (Umami Cloud, Plausible Cloud) is dus geen terugvaloptie: dan meten we
+  liever niets.
+- **Umami, en niet Plausible.** De eerste keuze was Plausible Community Edition.
+  Dat is afgevoerd tijdens de uitvoering, om één reden: Plausible slaat zijn
+  events op in ClickHouse en sleept dus naast zijn eigen Postgres ook een
+  ClickHouse-container mee. ClickHouse vraagt in de praktijk 1 tot 2 GB geheugen,
+  en op deze server draaien al de website, de logistiekapp, drie workers en de
+  volledige Immich-stack. Twee zware containers erbij voor het tellen van
+  paginaweergaves staat niet in verhouding. Umami is een Node-app met enkel
+  Postgres, en Postgres staat er al.
+- **Umami deelt de bestaande Postgres.** Het krijgt daar een eigen database
+  (`umami`), geen tweede Postgres-container zoals Immich die heeft. Dat scheelt een
+  instantie om te back-uppen, te upgraden en in de gaten te houden, en de
+  statistiekendata is klein. Gevolg: er is geen apart volume voor Umami; zijn
+  gegevens zitten in `postgres-data`, dus in de bestaande back-up van die database.
+  `POSTGRES_DB` maakt enkel bij een leeg volume een database aan en het volume op
+  de productieserver bestaat al, dus maakt een eenmalige `umami-db-init`-stap in
+  Compose de database aan wanneer ze ontbreekt.
+- **Leeg `UMAMI_APP_SECRET` betekent uit.** Zelfde patroon als de workers: de
+  container draait dan leeg in plaats van in een herstartlus te vallen, en de
+  website laadt geen script zolang `UMAMI_PUBLIC_URL` of `UMAMI_WEBSITE_ID` leeg
+  is. Zo blijft een omgeving zonder statistieken (lokaal, dev) gewoon werken.
+- **Het script laadt pas na een expliciete keuze**, ook al plaatst Umami geen
+  cookies. Dezelfde keuze als voor Sentry en dezelfde knop in de cookiebanner:
+  er is geen tweede schakelaar bijgekomen. Omdat de beslissing server-side valt,
+  herlaadt de banner de pagina na een wijziging; dat deed ze voor Sentry al.
+  De banner en het cookiebeleid noemen nu allebei de statistieken, want een
+  scherm dat enkel over monitoring spreekt terwijl er ook geteld wordt, liegt.
+  De privacyverklaring hoefde niet aangepast: "met wie delen we je gegevens"
+  blijft kloppen, er komt niemand bij.
+- **Paginaweergaves, geen personen.** Geen custom events met persoonsgegevens,
+  geen identificatie van aangemelde leden. Querystrings en fragmenten gaan er niet
+  in mee (`data-exclude-search`, `data-exclude-hash`), want daar zitten tokens en
+  zoektermen in. Umami zelf bewaart geen IP-adres, maar leidt er samen met de
+  user-agent en een dagelijks wisselend zout een hash uit af om een herhaalde
+  weergave binnen dezelfde dag te herkennen; dat staat zo in het cookiebeleid.
+- **`/admin`, `/scan` en `/tickets/bestelling/...` worden niet gemeten.** De eerste
+  twee zijn interne schermen waar bezoekersaantallen niets betekenen; het derde
+  draagt een bestelnummer in het pad, en dat is een persoonsgegeven dat niet in een
+  statistiekendatabase hoort. Dat gebeurt op twee plaatsen tegelijk, want één
+  volstaat niet: de server rendert het script niet op zo'n pagina, en het script
+  krijgt daarnaast een filter mee (`data-before-send`) voor de navigaties die
+  daarna nog in de browser gebeuren. De App Router navigeert immers client-side,
+  dus zonder die filter zou een klik van de homepage naar `/admin` alsnog een
+  paginaweergave opleveren. Beide lagen lezen dezelfde lijst uit
+  `apps/web/lib/analytics.ts`, zodat ze niet uiteen kunnen lopen.
+
+---
 
 ## Praesidiumlijst (CSV-export op /admin/groepen)
 

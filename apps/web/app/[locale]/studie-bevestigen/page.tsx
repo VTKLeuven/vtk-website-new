@@ -1,3 +1,5 @@
+import type { Metadata } from "next";
+import { staticMetadata } from "@/lib/pageMetadata";
 import { notFound, redirect } from "next/navigation";
 import { prisma } from "@vtk/db";
 import { Card, Button } from "@vtk/ui";
@@ -8,6 +10,16 @@ import { currentWorkingYear, formatWorkingYear } from "@/lib/workingYear";
 import { logoutAction } from "@/app/actions/auth";
 import { confirmStudyAction } from "@/app/actions/onboarding";
 import { StudyFieldset } from "@/components/profile/StudyFieldset";
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ locale: string }>;
+}): Promise<Metadata> {
+  const { locale } = await params;
+  if (!hasLocale(locale)) return {};
+  return staticMetadata("confirmStudy", "/studie-bevestigen", locale, { noIndex: true });
+}
 
 /**
  * Jaarlijkse bevestiging van het studieprofiel. De gate in `[locale]/layout.tsx`

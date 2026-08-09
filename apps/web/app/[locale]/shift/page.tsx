@@ -1,3 +1,5 @@
+import type { Metadata } from 'next';
+import { staticMetadata } from '@/lib/pageMetadata';
 import { hasLocale } from '@/lib/locale';
 import { Locale, getDictionary } from '@vtk/i18n';
 import { notFound } from 'next/navigation';
@@ -38,6 +40,16 @@ async function yearStats(userId: string): Promise<ShiftYearStats> {
     shiftsDone: done.length,
     vouchers: done.reduce((total, p) => total + p.shift.reward, 0),
   };
+}
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ locale: string }>;
+}): Promise<Metadata> {
+  const { locale } = await params;
+  if (!hasLocale(locale)) return {};
+  return staticMetadata('shift', '/shift', locale);
 }
 
 export default async function ShiftPage({ params }: { params: Promise<{ locale: string }> }) {
