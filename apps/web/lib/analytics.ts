@@ -136,3 +136,47 @@ export function analyticsScript(input: {
     filterSource: analyticsFilterSource(),
   };
 }
+
+// -----------------------------------------------------------------------------
+// Magazines: per nummer meten
+// -----------------------------------------------------------------------------
+
+/**
+ * 't Bakske en Ir.Reëel staan allemaal op /media en openen in een leesvenster
+ * op diezelfde pagina. Umami zag daardoor één paginaweergave voor de hele
+ * verzameling, en de redacties konden onmogelijk zien welk nummer gelezen werd.
+ *
+ * Vandaar dat het openen van een nummer een eigen paginaweergave stuurt, met een
+ * verzonnen adres per nummer. Bewust een paginaweergave en geen los event: dan
+ * komen de nummers gewoon in het overzicht "Pages" van Umami te staan, naast
+ * elkaar en met hun aantal ernaast. Een redactie moet niet eerst leren waar de
+ * gebeurtenissenrapporten zitten om haar eigen cijfers te vinden.
+ *
+ * Downloaden en openen in een nieuw tabblad zijn wél events: dat zijn andere
+ * handelingen dan lezen, en ze horen niet als extra paginaweergave mee te tellen.
+ */
+
+/** De gebeurtenissen die het leesvenster stuurt, zoals ze in Umami heten. */
+export const MAGAZINE_DOWNLOAD_EVENT = "magazine-download";
+export const MAGAZINE_NEW_TAB_EVENT = "magazine-nieuw-tabblad";
+
+/**
+ * Het adres waaronder een nummer in Umami verschijnt, bijvoorbeeld
+ * `/media/bakske/2025-2026-s2w6`.
+ *
+ * De id's beginnen al met de soort (`bakske-...`), dus die wordt er hier
+ * afgehaald; anders leest het overzicht als `/media/bakske/bakske-...`. Blijft
+ * er niets over, dan valt het terug op de volledige id in plaats van een adres
+ * te maken dat op een afsluitende slash eindigt.
+ */
+export function magazineViewUrl(issue: { kind: string; id: string }): string {
+  const prefix = `${issue.kind}-`;
+  const rest = issue.id.startsWith(prefix) ? issue.id.slice(prefix.length) : issue.id;
+  return `/media/${issue.kind}/${rest || issue.id}`;
+}
+
+/** De titel die naast dat adres in Umami komt te staan. */
+export function magazineViewTitle(issue: { publicationTitle: string; issueLabel: string }): string {
+  const label = issue.issueLabel.trim();
+  return label ? `${issue.publicationTitle} - ${label}` : issue.publicationTitle;
+}

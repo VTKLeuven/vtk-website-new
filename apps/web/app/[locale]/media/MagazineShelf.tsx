@@ -14,6 +14,11 @@ import {
   ZoomOut,
 } from 'lucide-react';
 import { useEffect, useId, useRef, useState, type MouseEvent as ReactMouseEvent } from 'react';
+import {
+  trackMagazineDownload,
+  trackMagazineNewTab,
+  trackMagazineView,
+} from '@/lib/analytics-client';
 
 type MagazineIssue = {
   id: string;
@@ -423,6 +428,10 @@ export function MagazineShelf({ issues, labels }: { issues: MagazineIssue[]; lab
   function openIssue(issue: MagazineIssue, event: ReactMouseEvent<HTMLButtonElement>) {
     returnFocusRef.current = event.currentTarget;
     setActiveIssue(issue);
+    // Elk nummer krijgt een eigen paginaweergave, anders ziet de redactie enkel
+    // dat /media bezocht is en niet wat er gelezen werd. Doet niets zonder
+    // toestemming voor statistieken.
+    trackMagazineView(issue);
   }
 
   function closeIssue() {
@@ -565,6 +574,7 @@ export function MagazineShelf({ issues, labels }: { issues: MagazineIssue[]; lab
                   target="_blank"
                   rel="noreferrer"
                   title={labels.openNewTab}
+                  onClick={() => trackMagazineNewTab(activeIssue)}
                 >
                   <ExternalLink aria-hidden="true" />
                   <span>{labels.openNewTab}</span>
@@ -573,6 +583,7 @@ export function MagazineShelf({ issues, labels }: { issues: MagazineIssue[]; lab
                   href={activeIssue.documentUrl}
                   download={`${activeIssue.id}.pdf`}
                   title={labels.download}
+                  onClick={() => trackMagazineDownload(activeIssue)}
                 >
                   <Download aria-hidden="true" />
                   <span>{labels.download}</span>
