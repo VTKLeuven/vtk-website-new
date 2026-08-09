@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { withLocaleBase } from "@/lib/href";
 import { publicUrl } from "@/lib/storage";
 import { renderTiptap } from "@/lib/tiptap-render";
 import { Markdown } from "@/components/ui/Markdown";
@@ -52,6 +53,8 @@ export function PageView({
   // adres is er geen knop: een knop zonder bestemming is een dode klik.
   const ctaLabel = pick(page.ctaLabelNl ?? "", page.ctaLabelEn ?? "", locale);
   const showCta = Boolean(ctaLabel && page.ctaUrl);
+  // Wijst de knop naar deze site, dan moet ze in dezelfde taal blijven.
+  const ctaHref = page.ctaUrl ? withLocaleBase(page.ctaUrl, base) : "";
 
   // Eén kopje is geen inhoudsopgave maar een herhaling van de titel; vanaf twee
   // wordt de rail nuttig. Zonder kopjes en zonder downloads valt ze helemaal weg
@@ -78,7 +81,7 @@ export function PageView({
         </div>
         {showCta ? (
           <div>
-            <a href={page.ctaUrl!} className="vtk-button vtk-button-primary arrow">
+            <a href={ctaHref} className="vtk-button vtk-button-primary arrow">
               {ctaLabel}
             </a>
           </div>

@@ -12,6 +12,8 @@
  * volgorde naast elkaar op hetzelfde scherm.
  */
 
+import { isExternalUrl } from "./href";
+
 /** Een item dat als kaart op de categoriepagina komt. */
 export type CategoryTile = {
   /** Uniek binnen één categorie; bruikbaar als React-key. */
@@ -41,15 +43,6 @@ type TileLink = {
   labelEn: string;
   url: string;
 };
-
-/**
- * Alles met een schema (`https:`, `mailto:`) of een protocol-relatief adres is
- * extern; een pad als `/piano` niet. Zelfde regel als in `lib/headerTabs.ts`,
- * bewust gedupliceerd gehouden zolang die module de nav-vorm bepaalt.
- */
-function isExternalUrl(url: string): boolean {
-  return /^[a-z][a-z0-9+.-]*:/i.test(url) || url.startsWith("//");
-}
 
 export function categoryTiles(tab: {
   slug: string;

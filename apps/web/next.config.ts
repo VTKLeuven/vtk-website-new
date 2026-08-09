@@ -98,6 +98,18 @@ const nextConfig: NextConfig = {
         destination: "/en/tickets/bestelling/:orderId",
         permanent: true,
       },
+      // De uitleendienstpagina heette hier eerst "reservaties-en-logistiek".
+      // Die naam heeft in de sitemap gestaan, dus ze mag niet doodlopen.
+      {
+        source: "/info/reservaties-en-logistiek",
+        destination: "/info/uitleendienst",
+        permanent: true,
+      },
+      {
+        source: "/en/info/reservaties-en-logistiek",
+        destination: "/en/info/uitleendienst",
+        permanent: true,
+      },
       // De adressen van de oude vtk.be. De map zelf staat in
       // lib/legacyRedirects.ts, zodat ze getest kan worden; hier rollen we ze
       // enkel uit.
