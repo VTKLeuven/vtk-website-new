@@ -56,7 +56,13 @@ describe('de cijfers ophalen', () => {
 
   it('wisselt het share-id om voor een token en telt per adres', async () => {
     const calls = stubFetch({
-      '/api/share/': { id: 'website-1', token: 'geheim' },
+      // Zo antwoordt Umami 3.2 echt: `websiteId`, niet `id`.
+      '/api/share/': {
+        shareId: 'deel-id',
+        websiteId: 'website-1',
+        token: 'geheim',
+        parameters: {},
+      },
       '/metrics': [
         { x: '/media/bakske/2025-2026-s2w6', y: 412 },
         { x: '/media/ir-reeel/2025-september', y: 88 },
@@ -71,6 +77,41 @@ describe('de cijfers ophalen', () => {
     expect(result.downloads['bakske-2025-2026-s2w6']).toBe(17);
     // Het website-id komt uit het share-antwoord, niet uit de omgeving.
     expect(calls.some((url) => url.includes('/api/websites/website-1/metrics'))).toBe(true);
+    // `type=path`: `type=url` is de oude naam en geeft bij Umami 3.x een 400.
+    expect(calls.some((url) => url.includes('type=path'))).toBe(true);
+  });
+
+  it('blijft werken met het oudere `id`-veld in het share-antwoord', async () => {
+    const calls = stubFetch({
+      '/api/share/': { id: 'oud-1', token: 'geheim' },
+      '/metrics': [],
+      '/event-data/values': [],
+    });
+    const result = await magazineStats('30d', now);
+    expect(result.ok).toBe(true);
+    expect(calls.some((url) => url.includes('/api/websites/oud-1/metrics'))).toBe(true);
+  });
+
+  it('stuurt naast het token ook de share-context mee', async () => {
+    // Zonder die tweede header weigert Umami met "Share token used outside
+    // share context", en dat kwam als 401 terug.
+    const headers: Array<Record<string, string>> = [];
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string, init?: { headers?: Record<string, string> }) => {
+        headers.push(init?.headers ?? {});
+        return {
+          ok: true,
+          status: 200,
+          json: async () => (url.includes('/api/share/') ? { websiteId: 'w', token: 't' } : []),
+        };
+      }),
+    );
+
+    await magazineStats('30d', now);
+    const metricsCall = headers[1];
+    expect(metricsCall['x-umami-share-token']).toBe('t');
+    expect(metricsCall['x-umami-share-context']).toBe('1');
   });
 
   it('valt terug op onbereikbaar wanneer het share-id niets oplevert', async () => {

@@ -78,10 +78,16 @@ async function getShareToken(config: Config): Promise<CachedToken | null> {
   const body = await fetchJson(`${config.url}/api/share/${encodeURIComponent(config.shareId)}`);
   if (!body || typeof body !== "object") return null;
 
-  const { id, token } = body as { id?: unknown; token?: unknown };
-  if (typeof id !== "string" || typeof token !== "string") return null;
+  // Umami 3.2 noemt dit veld `websiteId`; oudere versies gaven `id` terug.
+  const { websiteId, id, token } = body as {
+    websiteId?: unknown;
+    id?: unknown;
+    token?: unknown;
+  };
+  const website = typeof websiteId === "string" ? websiteId : id;
+  if (typeof website !== "string" || typeof token !== "string") return null;
 
-  tokenCache = { websiteId: id, token, expiresAt: now + TOKEN_TTL_MS };
+  tokenCache = { websiteId: website, token, expiresAt: now + TOKEN_TTL_MS };
   return tokenCache;
 }
 
@@ -89,7 +95,12 @@ async function getShareToken(config: Config): Promise<CachedToken | null> {
 async function fetchJson(url: string, token?: string): Promise<unknown | null> {
   try {
     const response = await fetch(url, {
-      headers: token ? { "x-umami-share-token": token } : {},
+      // Het token alleen volstaat niet: Umami weigert een share-token dat
+      // "buiten een share-context" gebruikt wordt, en die context is niets meer
+      // dan de aanwezigheid van deze tweede header. Zonder haar krijg je 401.
+      headers: token
+        ? { "x-umami-share-token": token, "x-umami-share-context": "1" }
+        : {},
       // Umami's eigen antwoorden cachen we hierboven zelf; de fetch-cache van
       // Next zou daar een tweede, onzichtbare laag bovenop leggen.
       cache: "no-store",
@@ -162,7 +173,9 @@ async function loadStats(period: UmamiPeriod, now: Date): Promise<UmamiStatsResu
   const range = `startAt=${since.getTime()}&endAt=${now.getTime()}`;
   const base = `${config.url}/api/websites/${encodeURIComponent(share.websiteId)}`;
 
-  const urls = await fetchJson(`${base}/metrics?${range}&type=url&limit=500`, share.token);
+  // `type=path` en niet `type=url`: Umami 3.x hernoemde die metriek, en de oude
+  // naam geeft een 400 terug in plaats van een lege lijst.
+  const urls = await fetchJson(`${base}/metrics?${range}&type=path&limit=500`, share.token);
   if (urls === null) return { ok: false, error: "umami_error" };
 
   const events = await fetchJson(
