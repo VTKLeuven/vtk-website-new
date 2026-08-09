@@ -1579,6 +1579,23 @@ zichtbaarheidskeuze en geen technische:
   container draait dan leeg in plaats van in een herstartlus te vallen, en de
   website laadt geen script zolang `UMAMI_PUBLIC_URL` of `UMAMI_WEBSITE_ID` leeg
   is. Zo blijft een omgeving zonder statistieken (lokaal, dev) gewoon werken.
+- **Umami staat daarbovenop achter het compose-profiel `umami`**, en dat is geen
+  dubbelop. Het "leeg secret = uit"-patroon schakelt een dienst uit *nadat* de
+  container bestaat, en om die te maken haalt `docker compose up` eerst de image
+  op. Voor de workers valt dat niet op (ze draaien op images die de server toch
+  al heeft), maar Umami is een verse pull van ghcr.io, en die liet de deploy
+  falen op `denied: denied` terwijl de dienst niet eens aan stond. Een profiel
+  houdt de dienst helemaal buiten het project tot je hem bewust aanzet.
+  - Aanzetten raakt daardoor **twee** bestanden: de sleutels in de root-`.env`
+    (die gaat naar de containers) en `COMPOSE_PROFILES=umami` in `infra/.env`
+    (dat leest compose zelf, voor zijn eigen interpolatie en profielen). Dat
+    onderscheid kostte tijd: `${UMAMI_APP_SECRET}` in de compose-file resolveerde
+    altijd naar leeg, want compose kijkt daarvoor niet in de root-`.env`. Het
+    secret komt nu via `env_file`, precies zoals bij de workers.
+  - Komt de pull daarna alsnog op `denied` terecht, kijk dan naar
+    `~/.docker/config.json` op de server: een verlopen ghcr-login laat ghcr die
+    credentials gebruiken en weigeren in plaats van anoniem door te laten. De
+    image is publiek, dus `docker logout ghcr.io` volstaat.
 - **Het script laadt pas na een expliciete keuze**, ook al plaatst Umami geen
   cookies. Dezelfde keuze als voor Sentry en dezelfde knop in de cookiebanner:
   er is geen tweede schakelaar bijgekomen. Omdat de beslissing server-side valt,

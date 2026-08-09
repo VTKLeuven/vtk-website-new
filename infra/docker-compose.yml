@@ -186,18 +186,42 @@ services:
   # dat van de productieserver bestaat al. Deze eenmalige stap maakt de database
   # aan wanneer ze ontbreekt en doet verder niets; de tabellen erin zet Umami
   # zelf klaar met zijn eigen migraties.
+  # Umami staat achter een compose-profiel en draait dus NIET mee met een gewone
+  # deploy. Dat is geen luxe: `docker compose up` haalt de image op van elke
+  # dienst die in het project zit, ook wanneer die zichzelf meteen zou
+  # uitschakelen. Het "leeg secret = uit"-patroon van de workers hierboven werkt
+  # daar wel, want die draaien op images die de server toch al heeft; Umami is
+  # een verse pull van ghcr.io en liet de deploy struikelen op
+  # `denied: denied` terwijl de dienst niet eens aan stond.
+  #
+  # Aanzetten doe je bewust, en dat is meer dan een secret invullen (database,
+  # dashboardaccount, website-ID, Caddy ervoor). Zie docs/design-decisions.md.
+  # Kort: zet `UMAMI_APP_SECRET`, `UMAMI_PUBLIC_URL` en `UMAMI_WEBSITE_ID` in de
+  # root-`.env`, en `COMPOSE_PROFILES=umami` in `infra/.env` (dat is het
+  # env-bestand dat compose zelf leest; de root-`.env` gaat enkel naar de
+  # containers).
+  #
+  # Loopt de pull dan alsnog op `denied`, dan zit er een verlopen ghcr-login in
+  # `~/.docker/config.json` op de server: ghcr gebruikt die credentials en
+  # weigert, in plaats van terug te vallen op anonieme toegang. `docker logout
+  # ghcr.io` volstaat, want de image is publiek.
   umami-db-init:
     image: postgres:16
+    profiles: ["umami"]
     restart: "no"
     depends_on:
       postgres:
         condition: service_healthy
+    # Het secret komt uit de root-`.env`, net als bij de workers. Bewust niet via
+    # `${UMAMI_APP_SECRET}`: compose interpoleert dat uit zijn eigen env-bestand
+    # (`infra/.env`), niet uit de root-`.env`, en het viel dus altijd leeg.
+    env_file:
+      - ../.env
     environment:
       PGHOST: postgres
       PGUSER: ${POSTGRES_USER:-vtk}
       PGPASSWORD: ${POSTGRES_PASSWORD:-vtk}
       PGDATABASE: ${POSTGRES_DB:-vtk}
-      UMAMI_APP_SECRET: ${UMAMI_APP_SECRET:-}
     entrypoint: ["/bin/sh", "-c"]
     command:
       - |
@@ -213,30 +237,35 @@ services:
 
   # Bezoekersstatistieken op onze eigen infrastructuur: cookieloos, geen
   # persoonsgegevens, en het script laadt pas na toestemming (zie
-  # apps/web/lib/analytics.ts). Leeg UMAMI_APP_SECRET = uit, zoals bij de
-  # workers hierboven: de container blijft dan leeg draaien in plaats van in een
-  # herstartlus te vallen op een ontbrekend secret.
+  # apps/web/lib/analytics.ts). Het lege secret blijft als vangnet: staat het
+  # profiel aan maar het secret niet, dan draait de container leeg in plaats van
+  # in een herstartlus te vallen.
   umami:
     image: ghcr.io/umami-software/umami:3.2.0
+    profiles: ["umami"]
     restart: unless-stopped
     init: true
     depends_on:
       umami-db-init:
         condition: service_completed_successfully
+    env_file:
+      - ../.env
     environment:
       DATABASE_TYPE: postgresql
+      # Staat expliciet hier en wint daarmee van wat er in de root-`.env` zit:
+      # Umami hoort in zijn eigen database, niet in die van de website.
       DATABASE_URL: postgresql://${POSTGRES_USER:-vtk}:${POSTGRES_PASSWORD:-vtk}@postgres:5432/umami
-      APP_SECRET: ${UMAMI_APP_SECRET:-}
       # Umami meldt zich anders bij elke start bij zijn eigen telemetriedienst.
       # Dat is precies de derde partij die we hier niet willen.
       DISABLE_TELEMETRY: "1"
     entrypoint: ["/bin/sh", "-c"]
     command:
       - |
-        if [ -z "$${APP_SECRET:-}" ]; then
+        if [ -z "$${UMAMI_APP_SECRET:-}" ]; then
           echo "Umami disabled: UMAMI_APP_SECRET is empty"
           while true; do sleep 3600; done
         fi
+        export APP_SECRET="$${UMAMI_APP_SECRET}"
         exec npm run start-docker
     ports:
       # Caddy is de publieke rand; Umami zelf is enkel vanaf de host bereikbaar.
@@ -245,7 +274,7 @@ services:
       test:
         - CMD-SHELL
         - >-
-          test -n "$${APP_SECRET:-}" &&
+          test -n "$${UMAMI_APP_SECRET:-}" &&
           curl -fsS http://localhost:3000/api/heartbeat -o /dev/null
       interval: 30s
       timeout: 5s
