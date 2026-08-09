@@ -48,6 +48,10 @@ export function PageView({
   const title = pick(page.titleNl, page.titleEn, locale);
   const excerpt = pick(page.excerptNl ?? "", page.excerptEn ?? "", locale);
   const tab = page.headerTab ?? null;
+  // Knop naast de titel, net als op de categoriepagina. Zonder label of zonder
+  // adres is er geen knop: een knop zonder bestemming is een dode klik.
+  const ctaLabel = pick(page.ctaLabelNl ?? "", page.ctaLabelEn ?? "", locale);
+  const showCta = Boolean(ctaLabel && page.ctaUrl);
 
   // Eén kopje is geen inhoudsopgave maar een herhaling van de titel; vanaf twee
   // wordt de rail nuttig. Zonder kopjes en zonder downloads valt ze helemaal weg
@@ -72,6 +76,13 @@ export function PageView({
           <h1 className="vtk-page-title">{title}</h1>
           {excerpt ? <p className="vtk-page-subtitle">{excerpt}</p> : null}
         </div>
+        {showCta ? (
+          <div>
+            <a href={page.ctaUrl!} className="vtk-button vtk-button-primary arrow">
+              {ctaLabel}
+            </a>
+          </div>
+        ) : null}
       </header>
 
       <div className={`vtk-page-shell vtk-page-body${showRail ? " has-rail" : ""}`}>

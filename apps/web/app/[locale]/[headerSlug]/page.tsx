@@ -3,6 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getDictionary, pick, type Locale } from "@vtk/i18n";
 import { Card } from "@vtk/ui";
+import { categoryTiles } from "@/lib/categoryTiles";
 import { hasLocale } from "@/lib/locale";
 import { loadHeaderTabWithPages } from "@/lib/pageQueries";
 import { buildMetadata } from "@/lib/seo";
@@ -37,6 +38,7 @@ export default async function HeaderOverviewPage({ params }: { params: Params })
 
   if (!tab || !tab.visible) notFound();
 
+  const tiles = categoryTiles(tab);
   const intro = pick(tab.introNl ?? "", tab.introEn ?? "", locale);
   const ctaLabel = pick(tab.ctaLabelNl ?? "", tab.ctaLabelEn ?? "", locale);
   // Intro en knop komen uit de categorie zelf, beheerd via /admin/inhoud.
@@ -59,29 +61,39 @@ export default async function HeaderOverviewPage({ params }: { params: Params })
       </header>
 
       <div className="vtk-page-shell">
-        {tab.pages.length === 0 ? (
+        {tiles.length === 0 ? (
           <p className="text-sm text-[#5c667f]">{dict.pages.empty}</p>
         ) : (
           <ul className="vtk-card-grid">
-            {tab.pages.map((page) => (
-              <li key={page.id}>
-                <Link href={`${base}/${tab.slug}/${page.slug}`}>
-                  <Card className="vtk-card h-full">
-                    <h2 className="text-xl font-semibold tracking-tight text-vtk-ink">
-                      {pick(page.titleNl, page.titleEn, locale)}
-                    </h2>
-                    {(page.excerptNl || page.excerptEn) && (
-                      <p className="mt-2 line-clamp-3 text-sm leading-6 text-[#34405e]">
-                        {pick(page.excerptNl ?? "", page.excerptEn ?? "", locale)}
-                      </p>
-                    )}
-                    <span className="mt-4 inline-block text-sm font-medium text-vtk-ink">
-                      {dict.home.readMore} →
-                    </span>
-                  </Card>
-                </Link>
-              </li>
-            ))}
+            {tiles.map((tile) => {
+              const excerpt = pick(tile.excerptNl ?? "", tile.excerptEn ?? "", locale);
+              const card = (
+                <Card className="vtk-card h-full">
+                  <h2 className="text-xl font-semibold tracking-tight text-vtk-ink">
+                    {pick(tile.labelNl, tile.labelEn, locale)}
+                  </h2>
+                  {excerpt && (
+                    <p className="mt-2 line-clamp-3 text-sm leading-6 text-[#34405e]">{excerpt}</p>
+                  )}
+                  <span className="mt-4 inline-block text-sm font-medium text-vtk-ink">
+                    {dict.home.readMore} →
+                  </span>
+                </Card>
+              );
+              return (
+                <li key={tile.key}>
+                  {tile.external ? (
+                    // Een andere site opent in een nieuw tabblad, net als in het
+                    // uitklapmenu van de header.
+                    <a href={tile.href} target="_blank" rel="noopener noreferrer">
+                      {card}
+                    </a>
+                  ) : (
+                    <Link href={`${base}${tile.href}`}>{card}</Link>
+                  )}
+                </li>
+              );
+            })}
           </ul>
         )}
       </div>

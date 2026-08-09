@@ -15,7 +15,8 @@ import type { PageNode, RoleOption, TabNode } from "./ContentManager";
 
 /**
  * Instellingen van een pagina in de rechterkolom: titels, slug, categorie,
- * publicatie, bewerkrollen en excerpts, plus verwijderen onderaan.
+ * publicatie, bewerkrollen, excerpts en de knop naast de titel, plus
+ * verwijderen onderaan.
  *
  * De INHOUD en de bijlagen horen hier niet: die zitten in de editor
  * (`/admin/paginas/[id]`, knop bovenaan). Dit scherm gaat over waar een pagina
@@ -135,6 +136,31 @@ export function PageInspector({
               {nl ? "Korte beschrijving (EN)" : "Excerpt (EN)"}
             </Label>
             <Textarea id={`${uid}-excerptEn`} name="excerptEn" rows={2} defaultValue={page.excerptEn ?? ""} />
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 gap-4 border-t border-vtk-blue/10 pt-5 sm:grid-cols-3">
+          <div>
+            <Label htmlFor={`${uid}-ctaLabelNl`}>{nl ? "Knoptekst (NL)" : "Button label (NL)"}</Label>
+            <Input id={`${uid}-ctaLabelNl`} name="ctaLabelNl" defaultValue={page.ctaLabelNl ?? ""} />
+            <p className="mt-1 text-xs text-[#5c667f]">
+              {nl
+                ? "Knop naast de titel, voor de app of het formulier waar deze pagina over gaat. Leeg laten geeft geen knop."
+                : "Button next to the title, for the app or form this page is about. Leave empty for no button."}
+            </p>
+          </div>
+          <div>
+            <Label htmlFor={`${uid}-ctaLabelEn`}>{nl ? "Knoptekst (EN)" : "Button label (EN)"}</Label>
+            <Input id={`${uid}-ctaLabelEn`} name="ctaLabelEn" defaultValue={page.ctaLabelEn ?? ""} />
+          </div>
+          <div>
+            <Label htmlFor={`${uid}-ctaUrl`}>{nl ? "Knopadres" : "Button URL"}</Label>
+            <Input id={`${uid}-ctaUrl`} name="ctaUrl" defaultValue={page.ctaUrl ?? ""} />
+            <p className="mt-1 text-xs text-[#5c667f]">
+              {nl
+                ? "Een pad op deze site (/shift) of een volledig adres (https://...)."
+                : "A path on this site (/shift) or a full address (https://...)."}
+            </p>
           </div>
         </div>
       </SaveForm>

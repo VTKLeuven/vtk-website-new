@@ -667,6 +667,13 @@ model Page {
   contentMdEn     String?
   excerptNl       String?
   excerptEn       String?
+  // Optionele knop naast de titel, dezelfde velden als op HeaderTab. Voor een
+  // pagina die een aparte app beschrijft (Uitleendienst -> logistiek, Shiften ->
+  // de shiftenlijst) hoort die app één klik ver te staan en niet ergens
+  // halverwege de tekst.
+  ctaLabelNl      String?
+  ctaLabelEn      String?
+  ctaUrl          String?
   // Jaarlijks na te kijken pagina (namen, telefoonnummers, ...): komt bovenaan
   // het paginabeheer te staan zolang ze dit werkingsjaar niet bewerkt is.
   needsYearlyEdit Boolean   @default(false)

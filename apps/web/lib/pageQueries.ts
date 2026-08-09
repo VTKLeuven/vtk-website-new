@@ -37,6 +37,10 @@ export const loadHeaderTabWithPages = cache(async (slug: string) =>
         where: { visibleInHeader: true, publishedAt: { not: null } },
         orderBy: [{ order: "asc" }, { titleNl: "asc" }],
       },
+      // De categoriepagina toont dezelfde items als het uitklapmenu in de
+      // header, dus ook de menu-items die naar een app of een andere site
+      // wijzen (piano, uitleendienst, de cudi-webshop).
+      links: { orderBy: { order: "asc" } },
     },
   }),
 );

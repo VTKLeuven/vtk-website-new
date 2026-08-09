@@ -38,6 +38,17 @@ const saveSchema = z.object({
   titleEn: z.string().optional().nullable(),
   excerptNl: z.string().optional().nullable(),
   excerptEn: z.string().optional().nullable(),
+  ctaLabelNl: z.string().optional().nullable(),
+  ctaLabelEn: z.string().optional().nullable(),
+  // Anders dan bij een headertab mag dit ook een pad op deze site zijn: de knop
+  // op Shiften wijst naar /shift, die op Uitleendienst naar een andere host.
+  ctaUrl: z
+    .string()
+    .refine((v) => v === '' || v.startsWith('/') || /^https?:\/\//i.test(v), {
+      message: 'Geef een pad op deze site (/shift) of een volledig adres (https://...).',
+    })
+    .optional()
+    .nullable(),
   published: z.coerce.boolean().optional().default(false),
   needsYearlyEdit: z.coerce.boolean().optional().default(false),
   editorRoleIds: z.array(z.string().min(1)),
@@ -64,6 +75,9 @@ export async function savePageAction(_prev: SaveState, formData: FormData): Prom
     titleEn: formData.get('titleEn') || null,
     excerptNl: formData.get('excerptNl') || null,
     excerptEn: formData.get('excerptEn') || null,
+    ctaLabelNl: formData.get('ctaLabelNl') || null,
+    ctaLabelEn: formData.get('ctaLabelEn') || null,
+    ctaUrl: formData.get('ctaUrl') || null,
     published: formData.get('published') === 'on',
     needsYearlyEdit: formData.get('needsYearlyEdit') === 'on',
     editorRoleIds: formData.getAll('editorRoleIds').map(String),
@@ -89,6 +103,9 @@ export async function savePageAction(_prev: SaveState, formData: FormData): Prom
         titleEn: data.titleEn,
         excerptNl: data.excerptNl,
         excerptEn: data.excerptEn,
+        ctaLabelNl: data.ctaLabelNl || null,
+        ctaLabelEn: data.ctaLabelEn || null,
+        ctaUrl: data.ctaUrl || null,
         needsYearlyEdit: data.needsYearlyEdit,
         order: data.order,
         // Enkel de eerste publicatie stempelen: een bewerking van een al

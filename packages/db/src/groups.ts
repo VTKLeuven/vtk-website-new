@@ -94,15 +94,11 @@ export const HEADER_TABS: Array<{
       // Intern pad: de pianopagina is een eigen route, geen contentpagina onder
       // deze tab, dus ze komt er niet vanzelf in het uitklapmenu bij.
       { labelNl: "Piano reserveren", labelEn: "Reserve the piano", url: "/piano" },
-      // De uitleendienst draait als eigen app (apps/logistiek) op een eigen host,
-      // net als Career en Cursusdienst. Zonder dit item is ze vanaf de hoofdsite
-      // nergens te vinden. Het label volgt de app zelf ("Uitleendienst" /
-      // "Equipment service").
-      {
-        labelNl: "Uitleendienst",
-        labelEn: "Equipment service",
-        url: "https://logistiek.vtk.be",
-      },
+      // De uitleendienst (apps/logistiek) staat hier bewust NIET als los
+      // menu-item. Ze heeft een eigen pagina onder deze tab (/info/uitleendienst)
+      // die de voorwaarden uitlegt en met een knop naar de app gaat; een tweede
+      // kale link ernaast maakte hetzelfde ding twee keer zichtbaar onder een
+      // andere naam.
     ],
   },
   { code: "THEOKOT", slug: "theokot", labelNl: "Theokot", labelEn: "Theokot", order: 1 },

@@ -85,6 +85,14 @@ describe('infopagina’s', () => {
   it('verwijst permanent, want de slugs zijn ongewijzigd meeverhuisd', () => {
     expect(resolve('/nl/page/theokot')?.rule.permanent).toBe(true);
   });
+
+  it('brengt de hernoemde pagina naar haar nieuwe plek en niet naar /p', () => {
+    // "Medewerkers" heet hier Shiften. Deze regel moet vóór het algemene
+    // /page/:slug-patroon staan, anders wint dat en landt de bezoeker op
+    // /p/medewerkers, een slug die niet bestaat.
+    expect(resolve('/nl/page/medewerkers')?.destination).toBe('/info/shiften');
+    expect(resolve('/en/page/medewerkers')?.destination).toBe('/en/info/shiften');
+  });
 });
 
 describe('categorieën', () => {

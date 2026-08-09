@@ -72,6 +72,11 @@ function redirectsForLocale(locale: LegacyLocale): LegacyRedirect[] {
   const to = prefix(locale);
 
   return [
+    // Pagina's die op deze site een andere naam kregen. Ze staan vóór het
+    // algemene patroon hieronder, want Next neemt de eerste regel die past.
+    // "Medewerkers" op de oude site is hier de pagina Shiften geworden.
+    { source: `/${locale}/page/medewerkers`, destination: `${to}/info/shiften`, permanent: true },
+
     // Infopagina's. De slugs zijn ongewijzigd meeverhuisd, dus dit is één
     // patroon en geen tabel van 59 regels.
     { source: `/${locale}/page/:slug`, destination: `${to}/p/:slug`, permanent: true },

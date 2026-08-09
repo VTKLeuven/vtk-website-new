@@ -17,14 +17,12 @@ describe('HEADER_TABS', () => {
     expect(infoTab?.slug).toBe('info');
   });
 
-  it('linkt de uitleendienst vanuit de Info-tab', () => {
-    // apps/logistiek is een volledige app op een eigen host. Zonder dit item is
-    // ze vanaf de hoofdsite nergens te bereiken.
-    const rental = (infoTab?.links ?? []).find((link) => link.url.includes('logistiek.vtk.be'));
-    expect(rental).toBeDefined();
-    expect(rental?.url).toBe('https://logistiek.vtk.be');
-    expect(rental?.labelNl).toBe('Uitleendienst');
-    expect(rental?.labelEn).not.toBe('');
+  it('zet de uitleendienst niet als los menu-item naast haar eigen pagina', () => {
+    // De uitleendienst heeft een pagina onder deze tab (/info/uitleendienst) met
+    // een knop naar apps/logistiek. Stond de app daarnaast ook nog als kale
+    // link in het menu, dan zag je hetzelfde ding twee keer onder twee namen.
+    const rental = (infoTab?.links ?? []).filter((link) => /logistiek/i.test(link.url));
+    expect(rental).toEqual([]);
   });
 
   it('heeft geen enkel menu-item met een leeg pad', () => {

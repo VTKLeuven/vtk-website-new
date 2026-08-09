@@ -31,6 +31,9 @@ export type PageNode = {
   titleEn: string | null;
   excerptNl: string | null;
   excerptEn: string | null;
+  ctaLabelNl: string | null;
+  ctaLabelEn: string | null;
+  ctaUrl: string | null;
   published: boolean;
   needsYearlyEdit: boolean;
   /** Rollen die de inhoud mogen bewerken (PageEditorRole). */

@@ -1,6 +1,7 @@
 import { hash } from "@node-rs/argon2";
 import { PrismaClient } from "@prisma/client";
 import { GROUP_SEEDS, WERKGROEP_SEEDS, HEADER_TABS } from "../src/groups";
+import { SHIFTEN_PAGE, UITLEENDIENST_PAGE } from "../src/infoPages";
 import { PERMISSIONS } from "../src/permissions";
 
 const prisma = new PrismaClient();
@@ -820,36 +821,39 @@ async function main() {
     {
       headerCode: "AANBOD",
       slug: "shiften",
-      titleNl: "Shiften",
-      titleEn: "Shifts",
-      excerptNl: "Help mee achter de schermen bij VTK-diensten en events.",
-      excerptEn: "Help behind the scenes at VTK services and events.",
+      titleNl: SHIFTEN_PAGE.titleNl,
+      titleEn: SHIFTEN_PAGE.titleEn,
+      excerptNl: SHIFTEN_PAGE.excerptNl,
+      excerptEn: SHIFTEN_PAGE.excerptEn,
       order: 1,
-      contentNl: richText([
-        "Vrijwilligers houden Theokot, events en praktische werkingen draaiende.",
-        "Voor het prototype verwijzen we naar het aparte shiftenplatform. Later kan deze pagina de belangrijkste uitleg, voorwaarden en contactinfo tonen.",
-      ]),
-      contentEn: richText([
-        "Volunteers keep Theokot, events and practical services running.",
-        "For the prototype, this page points towards the separate shifts platform. Later, it can contain the main explanation, conditions and contact details.",
-      ]),
+      // Echte inhoud, geen prototypetekst: deze twee pagina's beschrijven een
+      // werking die vandaag al draait. Markdown wint van de tiptap-JSON zodra
+      // ze gezet is, dus die JSON is hier enkel nog de terugval.
+      contentMdNl: SHIFTEN_PAGE.contentMdNl,
+      contentMdEn: SHIFTEN_PAGE.contentMdEn,
+      ctaLabelNl: SHIFTEN_PAGE.ctaLabelNl,
+      ctaLabelEn: SHIFTEN_PAGE.ctaLabelEn,
+      ctaUrl: SHIFTEN_PAGE.ctaUrl,
+      needsYearlyEdit: true,
+      contentNl: richText([SHIFTEN_PAGE.excerptNl]),
+      contentEn: richText([SHIFTEN_PAGE.excerptEn]),
     },
     {
       headerCode: "AANBOD",
-      slug: "reservaties-en-logistiek",
-      titleNl: "Reservaties en logistiek",
-      titleEn: "Reservations and logistics",
-      excerptNl: "Praktische ondersteuning, materiaal en logistieke aanvragen.",
-      excerptEn: "Practical support, materials and logistics requests.",
+      slug: "uitleendienst",
+      titleNl: UITLEENDIENST_PAGE.titleNl,
+      titleEn: UITLEENDIENST_PAGE.titleEn,
+      excerptNl: UITLEENDIENST_PAGE.excerptNl,
+      excerptEn: UITLEENDIENST_PAGE.excerptEn,
       order: 2,
-      contentNl: richText([
-        "VTK ondersteunt werkgroepen met materiaal, lokalen, transport en praktische voorbereiding.",
-        "Deze prototypepagina toont hoe het aanbod als gewone CMS-categorie kan groeien zonder aparte layout.",
-      ]),
-      contentEn: richText([
-        "VTK supports work groups with materials, rooms, transport and practical preparation.",
-        "This prototype page shows how the offer section can grow as a normal CMS category without a separate layout.",
-      ]),
+      contentMdNl: UITLEENDIENST_PAGE.contentMdNl,
+      contentMdEn: UITLEENDIENST_PAGE.contentMdEn,
+      ctaLabelNl: UITLEENDIENST_PAGE.ctaLabelNl,
+      ctaLabelEn: UITLEENDIENST_PAGE.ctaLabelEn,
+      ctaUrl: UITLEENDIENST_PAGE.ctaUrl,
+      needsYearlyEdit: true,
+      contentNl: richText([UITLEENDIENST_PAGE.excerptNl]),
+      contentEn: richText([UITLEENDIENST_PAGE.excerptEn]),
     },
     {
       headerCode: "EERSTEJAARS",
@@ -976,6 +980,12 @@ async function main() {
         excerptEn: page.excerptEn,
         contentJsonNl: page.contentNl,
         contentJsonEn: page.contentEn,
+        contentMdNl: "contentMdNl" in page ? page.contentMdNl : null,
+        contentMdEn: "contentMdEn" in page ? page.contentMdEn : null,
+        ctaLabelNl: "ctaLabelNl" in page ? page.ctaLabelNl : null,
+        ctaLabelEn: "ctaLabelEn" in page ? page.ctaLabelEn : null,
+        ctaUrl: "ctaUrl" in page ? page.ctaUrl : null,
+        needsYearlyEdit: "needsYearlyEdit" in page ? page.needsYearlyEdit : false,
         publishedAt: new Date("2026-05-18T00:00:00+02:00"),
         order: page.order,
       },
