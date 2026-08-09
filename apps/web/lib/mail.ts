@@ -73,10 +73,21 @@ export async function sendMail(
 
   try {
     const nodemailer = await import('nodemailer');
+    const secure = process.env.SMTP_SECURE === 'true';
     const transport = nodemailer.createTransport({
       host,
       port: Number(process.env.SMTP_PORT) || 587,
-      secure: process.env.SMTP_SECURE === 'true',
+      secure,
+      // Zonder dit valt nodemailer terug op een onversleutelde verbinding
+      // wanneer de server STARTTLS niet aankondigt. Op poort 587 is dat nooit de
+      // bedoeling: dan gaan een wachtwoord en de inhoud van de mail in het klare
+      // over de lijn. De relay van Google weigert zo'n verbinding sowieso.
+      requireTLS: !secure,
+      // Een mailserver die niet antwoordt mag de worker niet vasthouden; anders
+      // blijft de herinneringsronde hangen tot de volgende interval erover valt.
+      connectionTimeout: 15_000,
+      greetingTimeout: 15_000,
+      socketTimeout: 30_000,
       auth: process.env.SMTP_USER
         ? {
             user: process.env.SMTP_USER,

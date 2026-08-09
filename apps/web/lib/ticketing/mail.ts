@@ -22,10 +22,15 @@ let transport: nodemailer.Transporter | null = null;
 function smtpTransport(): nodemailer.Transporter | null {
   const host = process.env.SMTP_HOST?.trim();
   if (!host) return null;
+  const secure = process.env.SMTP_SECURE === "true";
   transport ??= nodemailer.createTransport({
     host,
     port: Number.parseInt(process.env.SMTP_PORT ?? "587", 10),
-    secure: process.env.SMTP_SECURE === "true",
+    secure,
+    // Op poort 587 mag de verbinding nooit onversleuteld doorgaan: daar reizen
+    // een wachtwoord en de tickets van een koper over. Zonder dit valt
+    // nodemailer terug op plain wanneer STARTTLS niet aangekondigd wordt.
+    requireTLS: !secure,
     auth: process.env.SMTP_USER
       ? { user: process.env.SMTP_USER, pass: process.env.SMTP_PASSWORD }
       : undefined,
