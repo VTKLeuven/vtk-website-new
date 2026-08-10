@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { prisma } from "@vtk/db";
-import { ArrowRight, BarChart3, Download, FileArchive, Filter, Inbox, Search } from "lucide-react";
+import { ArrowRight, BarChart3, Filter, Inbox, Search } from "lucide-react";
 import { hasLocale } from "@/lib/locale";
 import { requireFormCapability } from "@/lib/forms/authorization";
 import { answerSummary, answerToText, exportColumns } from "@/lib/forms/export";
@@ -9,6 +9,8 @@ import { AdminEmptyState } from "@/components/ticketing/admin/AdminEmptyState";
 import { AdminMetric } from "@/components/ticketing/admin/AdminMetric";
 import { FormStatusBadge } from "@/components/forms/admin/FormStatusBadge";
 import { MailingPanel } from "@/components/forms/admin/MailingPanel";
+import { AddEntryPanel, ExportPanel } from "@/components/forms/admin/EntryTools";
+import { formConditions, loadPublicForm, toPublicFields } from "@/lib/forms/publicForm";
 import {
   formBase,
   formatDateTime,
@@ -119,8 +121,17 @@ export default async function FormEntriesPage({
   }));
 
   // Hoogstens zes kolommen in de tabel: de rest staat in het detail, en een
-  // tabel van dertig kolommen leest niemand.
-  const columns = exportColumns(exportFields, rows, { locale }).slice(0, 6);
+  // tabel van dertig kolommen leest niemand. De kolomkiezer van de export
+  // krijgt wel de volledige lijst.
+  const allColumns = exportColumns(exportFields, rows, { locale });
+  const columns = allColumns.slice(0, 6);
+
+  // Het toevoegformulier gebruikt dezelfde velden als de publieke pagina.
+  const publicForm = capabilities.includes("MANAGE_ENTRIES")
+    ? await loadPublicForm(form.slug)
+    : null;
+  const publicFields = publicForm ? toPublicFields(publicForm, locale) : [];
+  const conditions = publicForm ? formConditions(publicForm) : [];
   const summary = answerSummary(
     exportFields,
     allEntriesForSummary.map((entry) => ({
@@ -139,13 +150,6 @@ export default async function FormEntriesPage({
     })),
     locale
   );
-
-  const exportQuery = new URLSearchParams({
-    locale,
-    ...(query ? { q: query } : {}),
-    ...(review ? { beoordeling: review } : {}),
-    ...(includeTest ? { test: "1" } : {}),
-  }).toString();
 
   const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
@@ -178,25 +182,29 @@ export default async function FormEntriesPage({
                 : `${formatNumber(total, locale)} entries`}
             </p>
           </div>
-          {capabilities.includes("EXPORT") ? (
-            <div className="ticket-admin-row-actions">
-              <a
-                className="ticket-admin-button"
-                href={`/api/forms/${formId}/exports/entries?${exportQuery}`}
-              >
-                <Download aria-hidden="true" size={15} />
-                CSV
-              </a>
-              <a
-                className="ticket-admin-button"
-                href={`/api/forms/${formId}/exports/bestanden`}
-              >
-                <FileArchive aria-hidden="true" size={15} />
-                {nl ? "Bestanden (zip)" : "Files (zip)"}
-              </a>
-            </div>
-          ) : null}
         </div>
+
+        {capabilities.includes("EXPORT") ? (
+          <ExportPanel
+            locale={locale}
+            formId={formId}
+            columns={allColumns.map((column) => ({
+              code: column.code,
+              label: locale === "en" && column.labelEn ? column.labelEn : column.labelNl,
+              archived: Boolean(column.archivedAt),
+            }))}
+            filters={{ q: query, beoordeling: review ?? undefined, test: includeTest ? "1" : undefined }}
+          />
+        ) : null}
+
+        {capabilities.includes("MANAGE_ENTRIES") ? (
+          <AddEntryPanel
+            locale={locale}
+            formId={formId}
+            fields={publicFields}
+            conditions={conditions}
+          />
+        ) : null}
 
         <form className="ticket-admin-filterbar" method="get">
           <div className="ticket-admin-field ticket-admin-filter-search">

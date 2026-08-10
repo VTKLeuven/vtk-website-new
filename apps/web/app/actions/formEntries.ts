@@ -6,6 +6,10 @@ import { prisma } from "@vtk/db";
 import { deleteObject } from "@vtk/storage";
 import { z } from "zod";
 import { requireFormCapability } from "@/lib/forms/authorization";
+import { formConditions, loadPublicForm } from "@/lib/forms/publicForm";
+import { claimedOptionCodes, validateSubmission } from "@/lib/forms/validation";
+import { saveFormEntry } from "@/lib/forms/submit";
+import type { AnswerValue } from "@/lib/forms/visibility";
 import { logFormAudit } from "@/lib/forms/audit";
 import { answerLines } from "@/lib/forms/outbox";
 import { fillPlaceholders } from "@/lib/forms/mail";
@@ -259,4 +263,125 @@ export async function sendFormMailingAction(rawInput: unknown): Promise<SaveStat
 
     refresh(input.locale, input.formId);
   });
+}
+
+// -----------------------------------------------------------------------------
+// Een inzending toevoegen namens iemand anders
+// -----------------------------------------------------------------------------
+
+const behalfSchema = z.object({
+  formId: z.string().min(1),
+  locale: localeSchema,
+  submitterName: z.string().trim().max(200).nullish(),
+  submitterEmail: z.string().trim().max(320).nullish(),
+  answers: z.record(
+    z.string(),
+    z.object({
+      text: z.string().max(20_000).nullish(),
+      number: z.number().nullish(),
+      checked: z.boolean().nullish(),
+      options: z.array(z.string().max(60)).max(200).nullish(),
+    })
+  ),
+});
+
+export type BehalfResult =
+  | { status: "ok"; entryId: string }
+  | { status: "invalid"; errors: Record<string, string> }
+  | { status: "rejected"; reason: string };
+
+/**
+ * Iemand belt of mailt zijn inschrijving door en een beheerder tikt ze in.
+ *
+ * Loopt door exact dezelfde validatie en quota-reservatie als een gewone
+ * inzending: een tweede weg naar de database die de regels niet kent, is precies
+ * hoe zo'n systeem zijn tellingen kwijtraakt. Wat hier wél anders is: het
+ * formulier hoeft niet open te staan (een beheerder mag ook nadien nog iemand
+ * toevoegen) en er vertrekt geen bevestigingsmail, want de inzender heeft dit
+ * niet zelf gedaan.
+ */
+export async function addEntryOnBehalfAction(rawInput: unknown): Promise<BehalfResult> {
+  try {
+    const input = behalfSchema.parse(rawInput);
+    const { session } = await requireFormCapability(input.formId, "MANAGE_ENTRIES");
+
+    const form = await prisma.form.findUnique({
+      where: { id: input.formId },
+      select: { slug: true },
+    });
+    if (!form) return { status: "rejected", reason: "FORM_NOT_FOUND" };
+
+    const full = await loadPublicForm(form.slug);
+    if (!full) return { status: "rejected", reason: "FORM_NOT_FOUND" };
+
+    const validation = validateSubmission({
+      fields: full.fields.map((field) => ({
+        id: field.id,
+        code: field.code,
+        type: field.type,
+        required: field.required,
+        config: field.config,
+        options: field.options.map((option) => ({
+          code: option.code,
+          archivedAt: option.archivedAt,
+        })),
+      })),
+      conditions: formConditions(full),
+      answers: input.answers as Record<string, AnswerValue>,
+    });
+    if (Object.keys(validation.errors).length > 0) {
+      return { status: "invalid", errors: validation.errors };
+    }
+
+    const fieldById = new Map(full.fields.map((field) => [field.id, field]));
+    const result = await saveFormEntry({
+      formId: full.id,
+      submittedById: null,
+      submitterName: input.submitterName?.trim() || null,
+      submitterEmail: input.submitterEmail?.trim().toLowerCase() || null,
+      locale: input.locale === "en" ? "EN" : "NL",
+      isTest: false,
+      requestFingerprint: null,
+      answers: Object.entries(validation.cleaned).map(([fieldId, value]) => ({
+        fieldId,
+        fieldCode: fieldById.get(fieldId)?.code ?? fieldId,
+        type: fieldById.get(fieldId)?.type ?? "SHORT_TEXT",
+        value,
+      })),
+      uploads: [],
+      claimedOptions: claimedOptionCodes(
+        full.fields.map((field) => ({
+          id: field.id,
+          code: field.code,
+          type: field.type,
+          required: field.required,
+          config: field.config,
+          options: field.options,
+        })),
+        validation.cleaned
+      ),
+      asDraft: false,
+      maxEntries: full.maxEntries,
+    });
+
+    if (!result.ok) {
+      return { status: "rejected", reason: result.code };
+    }
+
+    await logFormAudit(prisma, {
+      formId: input.formId,
+      actorUserId: session.user.id,
+      action: "FORM_ENTRY_ADDED_ON_BEHALF",
+      entityType: "FormEntry",
+      entityId: result.entryId,
+      metadata: { email: input.submitterEmail ?? null },
+    });
+
+    refresh(input.locale, input.formId);
+    return { status: "ok", entryId: result.entryId };
+  } catch (error) {
+    unstable_rethrow(error);
+    console.error("Inzending namens iemand toevoegen mislukt", error);
+    throw error;
+  }
 }
