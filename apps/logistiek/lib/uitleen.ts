@@ -53,6 +53,32 @@ export function todayDateOnly(now: Date = new Date()): Date {
   return new Date(`${formatter.format(now)}T00:00:00.000Z`);
 }
 
+/**
+ * De maandag van de week waarin dit moment valt, als date-only (UTC-middernacht,
+ * zoals `todayDateOnly`). Belgische wall-clock, dus een rit van zondagavond
+ * 23:00 hoort nog bij die week en niet bij de volgende.
+ */
+export function startOfWeek(date: Date = new Date()): Date {
+  const day = todayDateOnly(date);
+  const weekday = (day.getUTCDay() + 6) % 7; // maandag = 0
+  return new Date(day.getTime() - weekday * 24 * 60 * 60 * 1000);
+}
+
+/**
+ * ISO-weeknummer (maandag als eerste dag, week 1 bevat 4 januari). Voor de titel
+ * van het weekoverzicht: "week 38" zegt Logistiek meer dan een datumbereik.
+ */
+export function isoWeekNumber(date: Date): number {
+  const thursday = new Date(
+    Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate())
+  );
+  // Naar de donderdag van deze week: die bepaalt in welk jaar de week valt.
+  thursday.setUTCDate(thursday.getUTCDate() - ((thursday.getUTCDay() + 6) % 7) + 3);
+  const firstThursday = new Date(Date.UTC(thursday.getUTCFullYear(), 0, 4));
+  firstThursday.setUTCDate(firstThursday.getUTCDate() - ((firstThursday.getUTCDay() + 6) % 7) + 3);
+  return 1 + Math.round((thursday.getTime() - firstThursday.getTime()) / (7 * 24 * 60 * 60 * 1000));
+}
+
 export function formatDateOnly(date: Date, locale: LogistiekLocale = 'nl'): string {
   return new Intl.DateTimeFormat(locale === 'en' ? 'en-GB' : 'nl-BE', {
     timeZone: 'UTC',
@@ -61,6 +87,30 @@ export function formatDateOnly(date: Date, locale: LogistiekLocale = 'nl'): stri
     month: 'long',
     year: 'numeric',
   }).format(date);
+}
+
+/**
+ * Compacte periode: "1 tot 30 augustus 2026", "1 augustus tot 3 september 2026"
+ * of twee volledige datums wanneer het jaar verschilt. Voor koppen boven een
+ * lijst, waar twee volledige datums naast elkaar te veel ruis geven.
+ */
+export function formatDateRange(from: Date, to: Date, locale: LogistiekLocale = 'nl'): string {
+  const tag = locale === 'en' ? 'en-GB' : 'nl-BE';
+  const part = (date: Date, opts: Intl.DateTimeFormatOptions) =>
+    new Intl.DateTimeFormat(tag, { timeZone: 'UTC', ...opts }).format(date);
+  const joiner = locale === 'en' ? 'to' : 'tot';
+
+  const sameYear = from.getUTCFullYear() === to.getUTCFullYear();
+  const sameMonth = sameYear && from.getUTCMonth() === to.getUTCMonth();
+
+  if (sameMonth) {
+    return `${part(from, { day: 'numeric' })} ${joiner} ${part(to, { day: 'numeric', month: 'long', year: 'numeric' })}`;
+  }
+  if (sameYear) {
+    return `${part(from, { day: 'numeric', month: 'long' })} ${joiner} ${part(to, { day: 'numeric', month: 'long', year: 'numeric' })}`;
+  }
+  const full = { day: 'numeric', month: 'long', year: 'numeric' } as const;
+  return `${part(from, full)} ${joiner} ${part(to, full)}`;
 }
 
 /** Date (@db.Date, UTC-middernacht) naar de "YYYY-MM-DD"-waarde van een date-input. */

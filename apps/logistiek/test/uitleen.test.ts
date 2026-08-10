@@ -2,12 +2,15 @@ import { describe, expect, it } from 'vitest';
 import {
   billedHours,
   formatDateOnly,
+  formatDateRange,
   formatDateTime,
   formatEuro,
   formatPriceCents,
   isLastMinute,
   isOnQuarterHour,
+  isoWeekNumber,
   parseDateOnly,
+  startOfWeek,
   pricingModeLabel,
   rangesOverlap,
   requesterTypeLabel,
@@ -130,6 +133,71 @@ describe('rangesOverlap', () => {
     expect(
       rangesOverlap(d('2026-07-01'), d('2026-07-31'), d('2026-07-10'), d('2026-07-12'))
     ).toBe(true);
+  });
+});
+
+describe('startOfWeek', () => {
+  it('gives the Monday of that week', () => {
+    // 2026-09-16 is een woensdag.
+    expect(startOfWeek(new Date('2026-09-16T12:00:00Z')).toISOString()).toBe(
+      '2026-09-14T00:00:00.000Z'
+    );
+  });
+
+  it('keeps a Monday on itself', () => {
+    expect(startOfWeek(new Date('2026-09-14T08:00:00Z')).toISOString()).toBe(
+      '2026-09-14T00:00:00.000Z'
+    );
+  });
+
+  it('counts Sunday as the end of its week, not the start of the next', () => {
+    expect(startOfWeek(new Date('2026-09-20T21:00:00Z')).toISOString()).toBe(
+      '2026-09-14T00:00:00.000Z'
+    );
+  });
+
+  it('uses the Brussels day, so late Sunday evening stays in that week', () => {
+    // 23:30 UTC op zondag is maandag 01:30 in Brussel (zomertijd).
+    expect(startOfWeek(new Date('2026-09-20T23:30:00Z')).toISOString()).toBe(
+      '2026-09-21T00:00:00.000Z'
+    );
+  });
+});
+
+describe('isoWeekNumber', () => {
+  it('numbers an ordinary week', () => {
+    expect(isoWeekNumber(new Date('2026-09-14T00:00:00Z'))).toBe(38);
+  });
+
+  it('puts 4 January in week 1', () => {
+    expect(isoWeekNumber(new Date('2026-01-04T00:00:00Z'))).toBe(1);
+  });
+
+  it('gives the last days of a year the week of the following year when ISO says so', () => {
+    // 31 december 2025 is een woensdag en hoort bij week 1 van 2026.
+    expect(isoWeekNumber(new Date('2025-12-31T00:00:00Z'))).toBe(1);
+    // 1 januari 2027 is een vrijdag en hoort nog bij week 53 van 2026.
+    expect(isoWeekNumber(new Date('2027-01-01T00:00:00Z'))).toBe(53);
+  });
+});
+
+describe('formatDateRange', () => {
+  it('mentions the month once when both dates share it', () => {
+    expect(
+      formatDateRange(new Date('2026-08-01T00:00:00Z'), new Date('2026-08-30T00:00:00Z'))
+    ).toBe('1 tot 30 augustus 2026');
+  });
+
+  it('names both months within one year', () => {
+    expect(
+      formatDateRange(new Date('2026-08-01T00:00:00Z'), new Date('2026-09-03T00:00:00Z'))
+    ).toBe('1 augustus tot 3 september 2026');
+  });
+
+  it('spells out both years when they differ', () => {
+    expect(
+      formatDateRange(new Date('2026-12-28T00:00:00Z'), new Date('2027-01-03T00:00:00Z'))
+    ).toBe('28 december 2026 tot 3 januari 2027');
   });
 });
 

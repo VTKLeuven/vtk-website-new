@@ -9,7 +9,8 @@ type IconName =
   | 'close'
   | 'hide'
   | 'show'
-  | 'external';
+  | 'external'
+  | 'chevron';
 
 export function LogisticsIcon({ name, className, ...props }: SVGProps<SVGSVGElement> & { name: IconName }) {
   const paths = {
@@ -52,6 +53,7 @@ export function LogisticsIcon({ name, className, ...props }: SVGProps<SVGSVGElem
         <circle cx="12" cy="12" r="2.5" />
       </>
     ),
+    chevron: <path d="m7 10 5 5 5-5" />,
     external: (
       <>
         <path d="M14 4h6v6" />

@@ -381,6 +381,68 @@ export async function adminVanBookings() {
 
 export type AdminTransportBooking = Awaited<ReturnType<typeof adminVanBookings>>[number];
 
+/**
+ * Ritten die een venster raken, voor het weekoverzicht. Een rit telt mee zodra
+ * ze het venster overlapt en niet enkel wanneer ze erin start: een rit van
+ * vrijdag tot maandag hoort in beide weken te staan.
+ *
+ * `REQUESTED` komt mee, want het weekraster dient net om te zien waar een
+ * nieuwe aanvraag nog past; het beheer toont ze in een lichtere stijl.
+ */
+const transportWindowWhere = (
+  from: Date,
+  to: Date
+): Prisma.UitleenTransportBookingWhereInput => ({
+  status: { in: ['REQUESTED', 'APPROVED'] },
+  startAt: { lt: to },
+  endAt: { gt: from },
+});
+
+export async function transportWeek(from: Date, to: Date) {
+  return prisma.uitleenTransportBooking.findMany({
+    where: transportWindowWhere(from, to),
+    select: {
+      id: true,
+      vehicleId: true,
+      startAt: true,
+      endAt: true,
+      status: true,
+      purpose: true,
+      eventName: true,
+      requesterType: true,
+      requesterName: true,
+      vehicle: { select: { nameNl: true } },
+      user: { select: { name: true } },
+      driver: { select: { name: true } },
+      group: { select: { nameNl: true } },
+    },
+    orderBy: { startAt: 'asc' },
+  });
+}
+
+export type TransportWeekBooking = Awaited<ReturnType<typeof transportWeek>>[number];
+
+/**
+ * Zelfde venster, maar enkel wanneer welk voertuig bezet is: geen namen, doelen,
+ * adressen of chauffeurs. Bewust een eigen `select` en geen filter over
+ * `transportWeek`: een projectie achteraf laat vroeg of laat een veld door
+ * wanneer iemand hierboven een relatie toevoegt. Voor het publieke overzicht
+ * (zie docs/logistiek-feedback-plan.md, V13).
+ */
+export async function transportWeekPublic(from: Date, to: Date) {
+  return prisma.uitleenTransportBooking.findMany({
+    where: transportWindowWhere(from, to),
+    select: {
+      id: true,
+      vehicleId: true,
+      startAt: true,
+      endAt: true,
+      status: true,
+    },
+    orderBy: { startAt: 'asc' },
+  });
+}
+
 /** Alle actieve posten, voor de INTERN-keuze door het team bij het bewerken. */
 export async function activeGroups() {
   return prisma.group.findMany({

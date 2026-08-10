@@ -28,7 +28,7 @@ verbetering, **P3** = groter of "ooit".
 | --- | --- | --- | --- |
 | 0 | Beslissingen die eerst moeten vallen | 9 vragen | ✅ beslist 10 aug 2026 |
 | 1 | Kleine bugs en ergernissen | A3, M8, M9, M10, M11, M14, V4, V10, V11, F1, F4 | ✅ af 10 aug 2026 |
-| 2 | Beheer-overzichten (kalender, lijsten) | A1, A2, V3, V7 | 2 werkdagen |
+| 2 | Beheer-overzichten (kalender, lijsten) | A1, A2, V3, V7 | ✅ af 10 aug 2026 |
 | 3 | Statussen terugdraaien en historiek | A5, A6 | 1 werkdag |
 | 4 | Materiaal: catalogus en aanvragen | M3, M4, M5, M6, M13, M15 | 2,5 werkdagen |
 | 5 | Vervoer | V2, V5, V8, V9, V12, V13 | 2,5 werkdagen |
@@ -276,9 +276,20 @@ naar boven kwamen:
 
 ---
 
-# Fase 2: beheer-overzichten
+# Fase 2: beheer-overzichten ✅ af op 10 augustus 2026
 
-### A1. Kalender: aanvinken wat je wil zien
+Twee dingen die tijdens het werk naar boven kwamen:
+
+- **Constanten mogen niet uit een `'use client'`-module komen.** De kalender
+  importeerde `CALENDAR_KINDS` uit de filterbalk, en in een client-module wordt
+  élke export een client-referentie: de server-component kreeg geen array maar
+  een proxy en de pagina viel om met "CALENDAR_KINDS is not iterable". Dat komt
+  enkel bij het draaien boven, niet uit `tsc`. Gedeelde constanten staan nu in
+  `kalender-kinds.ts`.
+- **V13 (publiek transportoverzicht) is half gebouwd**: `transportWeekPublic()`
+  staat er al, met een eigen smalle `select`. Er ontbreekt enkel nog de route.
+
+### A1. Kalender: aanvinken wat je wil zien ✅
 **P2 · code**
 
 - **Raakt:** `apps/logistiek/app/beheer/kalender/page.tsx` (nieuw
@@ -296,7 +307,7 @@ naar boven kwamen:
 - **Klaar wanneer:** de transportverantwoordelijke kan in twee kliks enkel de
   ritten van de kar zien.
 
-### A2. Kalender: zelf de periode kiezen
+### A2. Kalender: zelf de periode kiezen ✅
 **P2 · code**
 
 - **Raakt:** `apps/logistiek/app/beheer/kalender/page.tsx` (`DAYS_AHEAD = 30`).
@@ -312,7 +323,7 @@ naar boven kwamen:
 - **Klaar wanneer:** je kan de kalender van het weekend van de 24 urenloop
   opvragen zonder te scrollen door drie weken.
 
-### V3. Vervoeraanvragen compacter
+### V3. Vervoeraanvragen compacter ✅
 **P2 · code**
 
 - **Raakt:** `apps/logistiek/app/beheer/vervoer/page.tsx` (`BookingCard`).
@@ -330,7 +341,7 @@ naar boven kwamen:
      (CLAUDE.md); "Goedkeuren" en "Afwijzen" blijven tekstknoppen.
 - **Klaar wanneer:** twintig goedgekeurde ritten passen op één scherm.
 
-### V7. Weekoverzicht voor vervoer
+### V7. Weekoverzicht voor vervoer ✅
 **P2 · code · groter**
 
 - **Raakt:** nieuw: `apps/logistiek/app/beheer/vervoer/week/page.tsx` (of een
