@@ -370,6 +370,18 @@ export function InventoryManager({
           ))}
           <option value="overig">Overig</option>
         </select>
+        {search.trim() !== '' || activeCategory !== 'all' ? (
+          <button
+            type="button"
+            onClick={() => {
+              setSearch('');
+              setActiveCategory('all');
+            }}
+            className="h-10 rounded-lg border border-vtk-navy/15 px-3 text-sm font-medium text-vtk-ink transition hover:border-vtk-navy/40"
+          >
+            Filters wissen
+          </button>
+        ) : null}
       </div>
 
       <section>

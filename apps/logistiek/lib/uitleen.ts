@@ -106,6 +106,24 @@ export function rangesOverlap(aFrom: Date, aTo: Date, bFrom: Date, bTo: Date): b
   return aFrom <= bTo && aTo >= bFrom;
 }
 
+/**
+ * Ligt dit moment op een kwartier?
+ *
+ * Ritten worden op het kwartier gepland: zo plant Logistiek de kar in, en uren
+ * als 14:07 maken het weekoverzicht onleesbaar. De server weigert een ander
+ * tijdstip in plaats van stil af te ronden, want afronden verschuift een rit
+ * zonder dat de aanvrager het ziet.
+ *
+ * In UTC gerekend zodat de server-timezone niet meespeelt; elke echte
+ * tijdzone-offset is een veelvoud van een kwartier, dus het antwoord verandert
+ * niet met de zone.
+ */
+export function isOnQuarterHour(date: Date): boolean {
+  return (
+    date.getUTCMinutes() % 15 === 0 && date.getUTCSeconds() === 0 && date.getUTCMilliseconds() === 0
+  );
+}
+
 /** Aantal begonnen uren tussen twee momenten, met één uur als minimum. */
 export function billedHours(startAt: Date, endAt: Date): number {
   const ms = endAt.getTime() - startAt.getTime();
@@ -173,6 +191,22 @@ const REQUESTER_TYPE_LABELS_EN: Record<UitleenRequesterType, string> = {
 
 export function requesterTypeLabel(type: UitleenRequesterType, locale: LogistiekLocale): string {
   return (locale === 'en' ? REQUESTER_TYPE_LABELS_EN : REQUESTER_TYPE_LABELS)[type];
+}
+
+/**
+ * Namens wie een aanvraag gebeurt, als één label: de post bij INTERN, anders de
+ * bewaarde naam van de werkgroep of de externe. Gedeeld door de aanvragenlijst
+ * en de kalender, zodat beide schermen dezelfde naam tonen.
+ */
+export function requesterLabel(request: {
+  requesterType: UitleenRequesterType;
+  requesterName: string | null;
+  group: { nameNl: string } | null;
+}): string {
+  if (request.requesterType === 'INTERN') {
+    return request.group?.nameNl ?? REQUESTER_TYPE_LABELS.INTERN;
+  }
+  return request.requesterName ?? REQUESTER_TYPE_LABELS[request.requesterType];
 }
 
 /** Deadline-signaal: de opbouw start binnen de 14 dagen na de aanvraag. */

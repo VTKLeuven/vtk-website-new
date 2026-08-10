@@ -92,6 +92,7 @@ export type FlesserkeCatalogItem = {
   name: string;
   brand: string | null;
   contentAmount: string | null;
+  colruytUrl: string | null;
   quantity: number;
 };
 
@@ -111,6 +112,7 @@ export async function getFlesserkeCatalog(): Promise<FlesserkeCatalogCategory[]>
     name: i.name,
     brand: i.brand,
     contentAmount: i.contentAmount,
+    colruytUrl: i.colruytUrl,
     quantity: i.quantity,
   });
   const grouped: FlesserkeCatalogCategory[] = categories.map((c) => ({
@@ -615,17 +617,29 @@ export async function adminInventory() {
 
 export type AdminInventoryItem = Awaited<ReturnType<typeof adminInventory>>['items'][number];
 
-/** Afhalingen, terugbrengmomenten en ritten in een periode, voor de daglijst. */
+/**
+ * Afhalingen, terugbrengmomenten en ritten in een periode, voor de daglijst.
+ *
+ * De post (`group`), het evenement en het voertuig horen er expliciet bij: een
+ * kalenderregel met enkel de naam van de aanvrager zegt het team te weinig om
+ * zonder doorklikken te weten waarover het gaat.
+ */
 export async function adminAgenda(from: Date, to: Date) {
+  const agendaReservationInclude = {
+    lines: true,
+    user: { select: { name: true } },
+    group: { select: { nameNl: true } },
+  } satisfies Prisma.UitleenReservationInclude;
+
   const [pickups, returns, vanBookings] = await Promise.all([
     prisma.uitleenReservation.findMany({
       where: { status: { in: ['APPROVED', 'PICKED_UP'] }, pickupDate: { gte: from, lte: to } },
-      include: { lines: true, user: { select: { name: true } } },
+      include: agendaReservationInclude,
       orderBy: { pickupDate: 'asc' },
     }),
     prisma.uitleenReservation.findMany({
       where: { status: { in: ['APPROVED', 'PICKED_UP'] }, returnDate: { gte: from, lte: to } },
-      include: { lines: true, user: { select: { name: true } } },
+      include: agendaReservationInclude,
       orderBy: { returnDate: 'asc' },
     }),
     prisma.uitleenTransportBooking.findMany({
@@ -634,6 +648,7 @@ export async function adminAgenda(from: Date, to: Date) {
         user: { select: { name: true } },
         driver: { select: { name: true } },
         vehicle: { select: { nameNl: true } },
+        group: { select: { nameNl: true } },
       },
       orderBy: { startAt: 'asc' },
     }),

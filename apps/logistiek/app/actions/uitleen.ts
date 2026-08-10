@@ -3,7 +3,7 @@
 import { revalidatePath } from 'next/cache';
 import { prisma } from '@vtk/db';
 import { requireSession } from '@/lib/session';
-import { parseDateOnly, todayDateOnly, transportPriceCents } from '@/lib/uitleen';
+import { isOnQuarterHour, parseDateOnly, todayDateOnly, transportPriceCents } from '@/lib/uitleen';
 import { availabilityForRange } from '@/lib/uitleen-server';
 import {
   buildReservationData,
@@ -231,7 +231,12 @@ export async function checkAvailabilityAction(input: {
   return { ok: true, availability: await availabilityForRange(pickupDate, returnDate) };
 }
 
-const MAX_VAN_BOOKING_HOURS = 12;
+/**
+ * Bovengrens tegen tikfouten, geen beleid. Er stond ooit 12 uur op, maar een
+ * praesidiumweekend of een karroadtrip duurt langer; die aanvragen werden zo
+ * naar de mail geduwd. Dit vangt enkel nog een verkeerd getypt jaartal.
+ */
+const MAX_VAN_BOOKING_DAYS = 30;
 
 export async function createVanBookingAction(input: {
   startAt: string; // datetime-local, Belgische wall-clock
@@ -251,11 +256,14 @@ export async function createVanBookingAction(input: {
   if (!startAt || !endAt) return { ok: false, error: 'Kies een start- en eindmoment.' };
   if (startAt <= new Date()) return { ok: false, error: 'Het startmoment ligt in het verleden.' };
   if (endAt <= startAt) return { ok: false, error: 'Het eindmoment ligt voor het startmoment.' };
-  const hours = (endAt.getTime() - startAt.getTime()) / (60 * 60 * 1000);
-  if (hours > MAX_VAN_BOOKING_HOURS) {
+  if (!isOnQuarterHour(startAt) || !isOnQuarterHour(endAt)) {
+    return { ok: false, error: 'Kies een begin- en einduur op het kwartier (bv. 14:00, 14:15).' };
+  }
+  const days = (endAt.getTime() - startAt.getTime()) / (24 * 60 * 60 * 1000);
+  if (days > MAX_VAN_BOOKING_DAYS) {
     return {
       ok: false,
-      error: `Een rit kan maximaal ${MAX_VAN_BOOKING_HOURS} uur duren; mail logistiek@vtk.be voor langere ritten.`,
+      error: `Een rit kan maximaal ${MAX_VAN_BOOKING_DAYS} dagen duren; controleer de datums.`,
     };
   }
 

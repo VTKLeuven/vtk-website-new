@@ -10,6 +10,7 @@ import {
   setFlesserkeItemActiveAction,
   setFlesserkeQuantityAction,
 } from '@/app/actions/beheer';
+import { FlesserkeItemName } from '@/components/flesserke-item-name';
 import { ConfirmActionButton } from '@/components/ui/confirm-action-button';
 import { SaveForm } from '@/components/ui/save-form';
 import { useToast } from '@/components/ui/toast';
@@ -157,7 +158,8 @@ export function FlesserkeManager({
         (item) =>
           !needle ||
           item.name.toLowerCase().includes(needle) ||
-          (item.brand ?? '').toLowerCase().includes(needle)
+          (item.brand ?? '').toLowerCase().includes(needle) ||
+          (item.contentAmount ?? '').toLowerCase().includes(needle)
       );
     return [...filtered].sort((a, b) => {
       if (sort.key === 'category') return compareText(nameOf(a.categoryId), nameOf(b.categoryId), sort.dir);
@@ -291,6 +293,7 @@ export function FlesserkeManager({
             <thead>
               <tr className="border-b border-vtk-navy/10 text-left text-xs text-vtk-muted">
                 <SortHeader label="Item" sortKey="name" activeKey={sort.key} dir={sort.dir} onSort={sort.toggle} />
+                <th className="py-2 pr-3 font-medium">Inhoud</th>
                 <SortHeader label="Categorie" sortKey="category" activeKey={sort.key} dir={sort.dir} onSort={sort.toggle} />
                 <th className="py-2 pr-3 font-medium">Vervalt</th>
                 <th className="py-2 pr-3 font-medium">Gereserveerd</th>
@@ -307,9 +310,10 @@ export function FlesserkeManager({
                 return (
                   <tr key={item.id} className="border-b border-vtk-navy/5">
                     <td className="py-2 pr-3 text-vtk-ink">
-                      {item.name}
+                      <FlesserkeItemName name={item.name} colruytUrl={item.colruytUrl} />
                       {item.brand ? <span className="text-vtk-muted"> · {item.brand}</span> : null}
                     </td>
+                    <td className="py-2 pr-3 text-vtk-muted">{item.contentAmount}</td>
                     <td className="py-2 pr-3 text-vtk-muted">{categoryName}</td>
                     <td className={`py-2 pr-3 ${soon ? 'font-semibold text-red-700' : 'text-vtk-muted'}`}>
                       {item.expiryDate

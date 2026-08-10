@@ -8,6 +8,7 @@ import type { ReservationFormInput } from '@/lib/reservation-form';
 import { formatEuro } from '@/lib/uitleen';
 import type { CatalogCategory } from '@/lib/uitleen-server';
 import { CategoryThumb } from '@/components/category-thumb';
+import { QuantityInput } from '@/components/quantity-input';
 import {
   EventRequesterFields,
   type EventReservationValues,
@@ -88,6 +89,14 @@ export function ReservationForm({
       .filter((category) => category.items.length > 0);
   }, [catalog, search, activeCategory]);
 
+  // Eén knop terug naar de categorie-landing; anders moet je de zoekterm
+  // wissen én de categorie terugzetten om weer een overzicht te krijgen.
+  const filtersActive = search.trim() !== '' || activeCategory !== 'all';
+  const clearFilters = useCallback(() => {
+    setSearch('');
+    setActiveCategory('all');
+  }, []);
+
   const setQuantity = useCallback((itemId: string, quantity: number) => {
     setQuantities((prev) => {
       const next = { ...prev };
@@ -165,6 +174,15 @@ export function ReservationForm({
                 </option>
               ))}
             </select>
+            {filtersActive ? (
+              <button
+                type="button"
+                onClick={clearFilters}
+                className="h-10 rounded-lg border border-vtk-navy/15 px-3 text-sm font-medium text-vtk-ink transition hover:border-vtk-navy/40"
+              >
+                {en ? 'Clear filters' : 'Filters wissen'}
+              </button>
+            ) : null}
           </div>
 
           {/* Landing: enkel categorie-tegels; klik een categorie om de materialen te
@@ -205,13 +223,17 @@ export function ReservationForm({
             </p>
           ) : null}
 
+          {/* @container: het aantal kolommen volgt de breedte van dít blok, niet
+              van het venster. Datzelfde formulier wordt ook in de smallere
+              beheerkolom gerenderd, en daar liep de +-knop uit de kaart omdat
+              sm:/xl: naar het venster keken. */}
           {shownCatalog.map((category) => (
             <section
               key={category.id ?? 'overig'}
-              className="rounded-[18px] border border-vtk-navy/10 bg-vtk-surface p-6"
+              className="@container rounded-[18px] border border-vtk-navy/10 bg-vtk-surface p-6"
             >
               <h2 className="text-lg font-semibold tracking-tight text-vtk-ink">{category.name}</h2>
-              <ul className="mt-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+              <ul className="mt-4 grid gap-4 @lg:grid-cols-2 @4xl:grid-cols-3">
                 {category.items.map((item) => {
                   const quantity = quantities[item.id] ?? 0;
                   const available = availability?.[item.id];
@@ -280,13 +302,12 @@ export function ReservationForm({
                           >
                             −
                           </button>
-                          <span
-                            className={`grid h-9 min-w-9 place-items-center rounded-full px-2 text-sm font-semibold tabular-nums ${
-                              quantity > 0 ? 'bg-vtk-yellow text-vtk-ink' : 'text-vtk-ink'
-                            }`}
-                          >
-                            {quantity}
-                          </span>
+                          <QuantityInput
+                            value={quantity}
+                            max={available ?? item.quantity}
+                            onChange={(next) => setQuantity(item.id, next)}
+                            label={`${en ? 'Number' : 'Aantal'}: ${item.name}`}
+                          />
                           <button
                             type="button"
                             onClick={() => setQuantity(item.id, quantity + 1)}
@@ -346,7 +367,11 @@ export function ReservationForm({
           </div>
 
           <dl className="mt-5 space-y-1 border-t border-vtk-navy/10 pt-4 text-sm">
-            {items.filter((item) => quantities[item.id]).map((item) => <div key={item.id} className="flex items-center justify-between gap-3"><dt className="truncate text-vtk-muted">{item.name} × {quantities[item.id]}</dt><dd><button type="button" onClick={() => setQuantity(item.id, 0)} aria-label={`${en ? 'Remove' : 'Verwijderen'}: ${item.name}`} className="grid h-6 w-6 place-items-center rounded-full text-base font-semibold text-red-600 transition hover:bg-red-50 hover:text-red-700">×</button></dd></div>)}
+            {/* Eigen scroll: bij een aanvraag van twintig items duwde deze lijst
+                de indienknop voorbij de onderkant van het scherm. */}
+            <div className="max-h-64 space-y-1 overflow-y-auto">
+              {items.filter((item) => quantities[item.id]).map((item) => <div key={item.id} className="flex items-center justify-between gap-3"><dt className="truncate text-vtk-muted">{item.name} × {quantities[item.id]}</dt><dd><button type="button" onClick={() => setQuantity(item.id, 0)} aria-label={`${en ? 'Remove' : 'Verwijderen'}: ${item.name}`} className="grid h-6 w-6 shrink-0 place-items-center rounded-full text-base font-semibold text-red-600 transition hover:bg-red-50 hover:text-red-700">×</button></dd></div>)}
+            </div>
             <div className="flex justify-between">
               <dt className="text-vtk-muted">Items</dt>
               <dd className="font-medium text-vtk-ink">{totals.count}</dd>

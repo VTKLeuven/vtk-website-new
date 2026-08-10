@@ -27,7 +27,7 @@ verbetering, **P3** = groter of "ooit".
 | Fase | Inhoud | Taken | Zwaarte |
 | --- | --- | --- | --- |
 | 0 | Beslissingen die eerst moeten vallen | 9 vragen | ✅ beslist 10 aug 2026 |
-| 1 | Kleine bugs en ergernissen | A3, M8, M9, M10, M11, M14, V4, V10, V11, F1, F4 | 1 werkdag |
+| 1 | Kleine bugs en ergernissen | A3, M8, M9, M10, M11, M14, V4, V10, V11, F1, F4 | ✅ af 10 aug 2026 |
 | 2 | Beheer-overzichten (kalender, lijsten) | A1, A2, V3, V7 | 2 werkdagen |
 | 3 | Statussen terugdraaien en historiek | A5, A6 | 1 werkdag |
 | 4 | Materiaal: catalogus en aanvragen | M3, M4, M5, M6, M13, M15 | 2,5 werkdagen |
@@ -81,11 +81,21 @@ Ook uit de feedback, maar puur intern werk voor Logistiek zelf (geen code):
 
 ---
 
-# Fase 1: kleine bugs en ergernissen
+# Fase 1: kleine bugs en ergernissen ✅ af op 10 augustus 2026
 
-Alles hier is klein, zichtbaar en zonder migratie. Goede eerste opdracht.
+Alles hier is klein, zichtbaar en zonder migratie. Wat er per taak effectief
+gebeurd is, staat hieronder bij de taak zelf; twee dingen die tijdens het werk
+naar boven kwamen:
 
-### A3. Kalender toont post en evenement, niet enkel de aanvrager
+- **F1 lost het maar half op, en dat ligt aan de data.** De kolom "Inhoud" staat
+  er nu, maar de geïmporteerde waarden zijn kale getallen (0.7, 1.5): het
+  importscript neemt de Excel-kolom "Hoeveelheid [kg of L]" over, en daar staat
+  de eenheid enkel in de kolomtitel. De eenheid per item invullen kan pas zinvol
+  wanneer flesserke-items bewerkbaar zijn (**F2**, fase 6).
+- **Het aantalveld deelt nu één component** (`components/quantity-input.tsx`)
+  tussen materiaal en flesserke, dus M9 geldt voor beide flows.
+
+### A3. Kalender toont post en evenement, niet enkel de aanvrager ✅
 **P1 · code · ❗quick win**
 
 - **Raakt:** `apps/logistiek/app/beheer/kalender/page.tsx`,
@@ -104,7 +114,7 @@ Alles hier is klein, zichtbaar en zonder migratie. Goede eerste opdracht.
 - **Klaar wanneer:** een kalenderregel toont post/werkgroep, evenementnaam,
   aanvrager en (bij vervoer) het voertuig, zonder dat je moet doorklikken.
 
-### M8. De "+"-knop valt buiten beeld bij materiaalaanvraag bewerken als logi
+### M8. De "+"-knop valt buiten beeld bij materiaalaanvraag bewerken als logi ✅
 **P1 · code**
 
 - **Raakt:** `apps/logistiek/app/beheer/aanvragen/[id]/admin-edit-form.tsx`,
@@ -125,7 +135,7 @@ Alles hier is klein, zichtbaar en zonder migratie. Goede eerste opdracht.
 - **Klaar wanneer:** op elke breedte staan `−`, aantal en `+` volledig binnen de
   kaart, zowel op `/materiaal` als in het beheer-bewerkscherm.
 
-### M9. Aantal intypen in plaats van dertig keer klikken
+### M9. Aantal intypen in plaats van dertig keer klikken ✅
 **P1 · code**
 
 - **Raakt:** `apps/logistiek/app/materiaal/reservation-form.tsx` (rond regel
@@ -143,7 +153,7 @@ Alles hier is klein, zichtbaar en zonder migratie. Goede eerste opdracht.
      maximum wordt geklemd, lege invoer wordt 0.
 - **Klaar wanneer:** je kan `30` typen in het veld en de aanvraag bevat 30 stuks.
 
-### M10. Layout "flipt" bij een grote aanvraag
+### M10. Layout "flipt" bij een grote aanvraag ✅
 **P1 · code**
 
 - **Raakt:** `apps/logistiek/app/reservaties/page.tsx`,
@@ -168,7 +178,7 @@ Alles hier is klein, zichtbaar en zonder migratie. Goede eerste opdracht.
 - **Klaar wanneer:** een aanvraag met 20 items ziet er in `/reservaties`, in
   `/beheer/aanvragen` en in het formulier hetzelfde uit als eentje met 2 items.
 
-### M11. Aanvragen sorteren op datum
+### M11. Aanvragen sorteren op datum ✅
 **P1 · code**
 
 - **Raakt:** `apps/logistiek/lib/uitleen-server.ts` (`adminReservations`),
@@ -186,7 +196,7 @@ Alles hier is klein, zichtbaar en zonder migratie. Goede eerste opdracht.
      deelbaar is en een refresh niets vergeet.
 - **Klaar wanneer:** de eerstvolgende afhaling staat bovenaan zonder scrollen.
 
-### M14. "Filters wissen"-knop op materiaal
+### M14. "Filters wissen"-knop op materiaal ✅
 **P1 · code · klein**
 
 - **Raakt:** `apps/logistiek/app/materiaal/reservation-form.tsx` (zoek + categorie),
@@ -196,7 +206,7 @@ Alles hier is klein, zichtbaar en zonder migratie. Goede eerste opdracht.
   `'all'`. Tekstknop, geen icoon (geen rij-actie).
 - **Klaar wanneer:** één klik brengt je terug naar de categorie-landing.
 
-### V4. Mijn reservaties toont welk voertuig je aanvroeg
+### V4. Mijn reservaties toont welk voertuig je aanvroeg ✅
 **P1 · code · klein**
 
 - **Raakt:** `apps/logistiek/app/reservaties/page.tsx` (transportsectie).
@@ -207,7 +217,7 @@ Alles hier is klein, zichtbaar en zonder migratie. Goede eerste opdracht.
 - **Klaar wanneer:** je ziet op `/reservaties` of je de kar, de auto of de
   bakfiets aanvroeg.
 
-### V10. De limiet van 12 uur op een rit verdwijnt
+### V10. De limiet van 12 uur op een rit verdwijnt ✅
 **P1 · code · klein**
 
 - **Raakt:** `apps/logistiek/app/actions/uitleen.ts` (regel 234 en 254-259).
@@ -223,7 +233,7 @@ Alles hier is klein, zichtbaar en zonder migratie. Goede eerste opdracht.
      ergens vermeld staat.
 - **Klaar wanneer:** een rit van drie dagen kan gewoon aangevraagd worden.
 
-### V11. Van- en tot-uren van een rit staan altijd op het kwartier
+### V11. Van- en tot-uren van een rit staan altijd op het kwartier ✅
 **P1 · code · klein**
 
 - **Raakt:** `apps/logistiek/app/vervoer/request-form.tsx` (de twee
@@ -239,7 +249,7 @@ Alles hier is klein, zichtbaar en zonder migratie. Goede eerste opdracht.
   3. Unittest in `apps/logistiek/test/`: `10:07` wordt geweigerd, `10:15` niet.
 - **Klaar wanneer:** elke rit in de database heeft minuten uit {0, 15, 30, 45}.
 
-### F1. Eenheid staat bij een flesserke-item
+### F1. Eenheid staat bij een flesserke-item ✅
 **P1 · code · klein**
 
 - **Raakt:** `apps/logistiek/app/beheer/flesserke/flesserke-manager.tsx`
@@ -253,7 +263,7 @@ Alles hier is klein, zichtbaar en zonder migratie. Goede eerste opdracht.
 - **Klaar wanneer:** je ziet in het beheer of een lijn over blikjes van 33 cl of
   flessen van 1,5 L gaat.
 
-### F4. Colruyt-link is terug te vinden
+### F4. Colruyt-link is terug te vinden ✅
 **P1 · code · klein**
 
 - **Raakt:** `apps/logistiek/app/beheer/flesserke/flesserke-manager.tsx`,

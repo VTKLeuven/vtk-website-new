@@ -6,6 +6,7 @@ import {
   formatEuro,
   formatPriceCents,
   isLastMinute,
+  isOnQuarterHour,
   parseDateOnly,
   pricingModeLabel,
   rangesOverlap,
@@ -129,6 +130,25 @@ describe('rangesOverlap', () => {
     expect(
       rangesOverlap(d('2026-07-01'), d('2026-07-31'), d('2026-07-10'), d('2026-07-12'))
     ).toBe(true);
+  });
+});
+
+describe('isOnQuarterHour', () => {
+  it('accepts the four quarters of an hour', () => {
+    expect(isOnQuarterHour(new Date('2026-09-12T14:00:00Z'))).toBe(true);
+    expect(isOnQuarterHour(new Date('2026-09-12T14:15:00Z'))).toBe(true);
+    expect(isOnQuarterHour(new Date('2026-09-12T14:30:00Z'))).toBe(true);
+    expect(isOnQuarterHour(new Date('2026-09-12T14:45:00Z'))).toBe(true);
+  });
+
+  it('rejects anything in between', () => {
+    expect(isOnQuarterHour(new Date('2026-09-12T14:07:00Z'))).toBe(false);
+    expect(isOnQuarterHour(new Date('2026-09-12T14:20:00Z'))).toBe(false);
+  });
+
+  it('rejects stray seconds and milliseconds on a whole quarter', () => {
+    expect(isOnQuarterHour(new Date('2026-09-12T14:15:30Z'))).toBe(false);
+    expect(isOnQuarterHour(new Date('2026-09-12T14:15:00.500Z'))).toBe(false);
   });
 });
 

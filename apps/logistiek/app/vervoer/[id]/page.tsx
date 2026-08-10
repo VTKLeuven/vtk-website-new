@@ -58,6 +58,12 @@ export default async function VanBookingDetailPage({
           </div>
 
           <dl className="mt-4 space-y-2 text-sm">
+            <div className="flex justify-between gap-4">
+              <dt className="text-vtk-muted">{en ? 'Vehicle' : 'Voertuig'}</dt>
+              <dd className="text-right font-medium text-vtk-ink">
+                {en ? booking.vehicle.nameEn : booking.vehicle.nameNl}
+              </dd>
+            </div>
             {booking.pickupAddress ? (
               <div className="flex justify-between gap-4">
                 <dt className="text-vtk-muted">{en ? 'Loading address' : 'Laadadres'}</dt>

@@ -114,12 +114,21 @@ export function VanRequestForm({
       <div className="mt-4 grid gap-3 sm:grid-cols-2">
         <label className="grid gap-1 text-sm">
           <span className="font-medium text-vtk-ink">{en ? 'From' : 'Van'}</span>
-          <input type="datetime-local" value={startAt} onChange={(e) => setStartAt(e.target.value)} className={inputClass} />
+          {/* step=900: ritten worden op het kwartier gepland, en de server weigert
+              een ander tijdstip. De picker springt zo mee in kwartieren. */}
+          <input
+            type="datetime-local"
+            step={900}
+            value={startAt}
+            onChange={(e) => setStartAt(e.target.value)}
+            className={inputClass}
+          />
         </label>
         <label className="grid gap-1 text-sm">
           <span className="font-medium text-vtk-ink">{en ? 'Until' : 'Tot'}</span>
           <input
             type="datetime-local"
+            step={900}
             value={endAt}
             min={startAt || undefined}
             onChange={(e) => setEndAt(e.target.value)}

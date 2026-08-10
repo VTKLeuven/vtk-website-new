@@ -8,6 +8,8 @@ import {
   editFlesserkeReservationAction,
   type ActionResult,
 } from '@/app/actions/uitleen';
+import { FlesserkeItemName } from '@/components/flesserke-item-name';
+import { QuantityInput } from '@/components/quantity-input';
 import type { ReservationFormInput } from '@/lib/reservation-form';
 import type { FlesserkeCatalogCategory } from '@/lib/uitleen-server';
 import {
@@ -135,6 +137,18 @@ export function FlesserkeForm({
                 </option>
               ))}
             </select>
+            {search.trim() !== '' || activeCategory !== 'all' ? (
+              <button
+                type="button"
+                onClick={() => {
+                  setSearch('');
+                  setActiveCategory('all');
+                }}
+                className="h-10 rounded-lg border border-vtk-navy/15 px-3 text-sm font-medium text-vtk-ink transition hover:border-vtk-navy/40"
+              >
+                {en ? 'Clear filters' : 'Filters wissen'}
+              </button>
+            ) : null}
           </div>
 
           {shownCatalog.length === 0 ? (
@@ -153,7 +167,7 @@ export function FlesserkeForm({
                     <li key={item.id} className="flex flex-wrap items-center gap-3 py-2.5">
                       <div className="min-w-0 flex-1">
                         <p className="text-sm font-medium text-vtk-ink">
-                          {item.name}
+                          <FlesserkeItemName name={item.name} colruytUrl={item.colruytUrl} />
                           {item.brand ? <span className="text-vtk-muted"> · {item.brand}</span> : null}
                         </p>
                         <p className="text-xs text-vtk-muted">
@@ -167,17 +181,22 @@ export function FlesserkeForm({
                           onClick={() => setQty(item.id, qty - 1)}
                           disabled={qty <= 0}
                           aria-label={`${en ? 'Fewer' : 'Minder'}: ${item.name}`}
-                          className="grid h-8 w-8 place-items-center rounded-full border border-vtk-navy/15 text-vtk-ink transition hover:border-vtk-navy/40 disabled:opacity-30"
+                          className="grid h-8 w-8 shrink-0 place-items-center rounded-full border border-vtk-navy/15 text-vtk-ink transition hover:border-vtk-navy/40 disabled:opacity-30"
                         >
                           −
                         </button>
-                        <span className="w-6 text-center text-sm font-semibold text-vtk-ink">{qty}</span>
+                        <QuantityInput
+                          value={qty}
+                          max={item.quantity}
+                          onChange={(next) => setQty(item.id, next)}
+                          label={`${en ? 'Number' : 'Aantal'}: ${item.name}`}
+                        />
                         <button
                           type="button"
                           onClick={() => setQty(item.id, qty + 1)}
                           disabled={qty >= item.quantity}
                           aria-label={`${en ? 'More' : 'Meer'}: ${item.name}`}
-                          className="grid h-8 w-8 place-items-center rounded-full border border-vtk-navy/15 text-vtk-ink transition hover:border-vtk-navy/40 disabled:opacity-30"
+                          className="grid h-8 w-8 shrink-0 place-items-center rounded-full border border-vtk-navy/15 text-vtk-ink transition hover:border-vtk-navy/40 disabled:opacity-30"
                         >
                           +
                         </button>
