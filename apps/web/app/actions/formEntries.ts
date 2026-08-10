@@ -6,10 +6,15 @@ import { prisma } from "@vtk/db";
 import { deleteObject } from "@vtk/storage";
 import { z } from "zod";
 import { requireFormCapability } from "@/lib/forms/authorization";
-import { formConditions, loadPublicForm } from "@/lib/forms/publicForm";
+import {
+  formConditions,
+  loadPublicForm,
+  type PublicFormData,
+} from "@/lib/forms/publicForm";
 import { claimedOptionCodes, validateSubmission } from "@/lib/forms/validation";
 import { saveFormEntry } from "@/lib/forms/submit";
 import type { AnswerValue } from "@/lib/forms/visibility";
+import { extensionOf } from "@/lib/forms/uploadToken";
 import { logFormAudit } from "@/lib/forms/audit";
 import { answerLines } from "@/lib/forms/outbox";
 import { fillPlaceholders } from "@/lib/forms/mail";
@@ -270,26 +275,221 @@ export async function sendFormMailingAction(rawInput: unknown): Promise<SaveStat
 // Een inzending toevoegen namens iemand anders
 // -----------------------------------------------------------------------------
 
+const managedAnswerSchema = z.object({
+  text: z.string().max(20_000).nullish(),
+  number: z.number().nullish(),
+  checked: z.boolean().nullish(),
+  options: z.array(z.string().max(60)).max(200).nullish(),
+});
+
 const behalfSchema = z.object({
   formId: z.string().min(1),
   locale: localeSchema,
   submitterName: z.string().trim().max(200).nullish(),
   submitterEmail: z.string().trim().max(320).nullish(),
-  answers: z.record(
-    z.string(),
-    z.object({
-      text: z.string().max(20_000).nullish(),
-      number: z.number().nullish(),
-      checked: z.boolean().nullish(),
-      options: z.array(z.string().max(60)).max(200).nullish(),
-    })
-  ),
+  answers: z.record(z.string(), managedAnswerSchema),
 });
+
+const editEntrySchema = behalfSchema.extend({ entryId: z.string().min(1) });
 
 export type BehalfResult =
   | { status: "ok"; entryId: string }
   | { status: "invalid"; errors: Record<string, string> }
   | { status: "rejected"; reason: string };
+
+type ManagedEntryInput = z.infer<typeof behalfSchema> & { entryId?: string };
+
+type StoredAnswer = {
+  fieldId: string;
+  fieldCode: string;
+  valueText: string | null;
+  valueNumber: number | null;
+  valueBool: boolean | null;
+  valueOptions: string[];
+  field: { type: string };
+};
+
+function storedAnswerValue(answer: StoredAnswer): AnswerValue {
+  return {
+    text: answer.valueText,
+    number: answer.valueNumber,
+    checked: answer.valueBool,
+    options: answer.valueOptions,
+  };
+}
+
+function validationFields(
+  form: PublicFormData,
+  existingAnswers: readonly StoredAnswer[]
+) {
+  const existingOptions = new Map(
+    existingAnswers.map((answer) => [answer.fieldId, new Set(answer.valueOptions)])
+  );
+
+  return form.fields.map((field) => {
+    const activeCodes = new Set(field.options.map((option) => option.code));
+    const retainedCodes = [...(existingOptions.get(field.id) ?? [])].filter(
+      (code) => !activeCodes.has(code)
+    );
+    return {
+      id: field.id,
+      code: field.code,
+      type: field.type,
+      required: field.required,
+      config: field.config,
+      sectionId: field.sectionId,
+      sortOrder: field.sortOrder,
+      options: [
+        ...field.options.map((option) => ({
+          code: option.code,
+          archivedAt: option.archivedAt,
+        })),
+        // Een intussen geschrapte keuze mag bij een bewerking blijven staan,
+        // maar de client kan geen andere geschrapte keuze toevoegen.
+        ...retainedCodes.map((code) => ({ code, archivedAt: null })),
+      ],
+    };
+  });
+}
+
+async function saveManagedEntry(input: ManagedEntryInput): Promise<BehalfResult> {
+  const { session, form } = await requireFormCapability(input.formId, "MANAGE_ENTRIES");
+  const full = await loadPublicForm(form.slug);
+  if (!full) return { status: "rejected", reason: "FORM_NOT_FOUND" };
+
+  const existing = input.entryId
+    ? await prisma.formEntry.findFirst({
+        where: { id: input.entryId, formId: input.formId, status: "SUBMITTED" },
+        select: {
+          id: true,
+          submittedById: true,
+          locale: true,
+          isTest: true,
+          requestFingerprint: true,
+          answers: {
+            select: {
+              fieldId: true,
+              fieldCode: true,
+              valueText: true,
+              valueNumber: true,
+              valueBool: true,
+              valueOptions: true,
+              field: { select: { type: true } },
+            },
+          },
+          uploads: { select: { fieldId: true, originalName: true } },
+        },
+      })
+    : null;
+  if (input.entryId && !existing) {
+    return { status: "rejected", reason: "ENTRY_NOT_FOUND" };
+  }
+
+  const fields = validationFields(full, existing?.answers ?? []);
+  const fileCounts: Record<string, { count: number; extensions: string[] }> = {};
+  for (const upload of existing?.uploads ?? []) {
+    const info = (fileCounts[upload.fieldId] ??= { count: 0, extensions: [] });
+    info.count += 1;
+    info.extensions.push(extensionOf(upload.originalName));
+  }
+
+  const retainedOptionPairs = (existing?.answers ?? []).flatMap((answer) =>
+    answer.valueOptions
+      .filter(
+        (code) =>
+          !full.fields
+            .find((field) => field.id === answer.fieldId)
+            ?.options.some((option) => option.code === code)
+      )
+      .map((code) => ({ fieldId: answer.fieldId, code }))
+  );
+  const retainedOptionRoutes =
+    retainedOptionPairs.length > 0
+      ? await prisma.formFieldOption.findMany({
+          where: {
+            formId: input.formId,
+            OR: retainedOptionPairs,
+          },
+          select: { fieldId: true, code: true, nextSectionId: true, endsForm: true },
+        })
+      : [];
+
+  const validation = validateSubmission({
+    fields,
+    conditions: formConditions(full),
+    answers: input.answers as Record<string, AnswerValue>,
+    fileCounts,
+    sections: full.stepBySections ? full.sections : undefined,
+    branchOptions: full.stepBySections
+      ? [
+          ...full.fields.flatMap((field) =>
+            field.options.map((option) => ({
+              fieldId: field.id,
+              code: option.code,
+              nextSectionId: option.nextSectionId,
+              endsForm: option.endsForm,
+            }))
+          ),
+          ...retainedOptionRoutes,
+        ]
+      : undefined,
+  });
+  if (Object.keys(validation.errors).length > 0) {
+    return { status: "invalid", errors: validation.errors };
+  }
+
+  const fieldById = new Map(full.fields.map((field) => [field.id, field]));
+  const activeFieldIds = new Set(full.fields.map((field) => field.id));
+  const retainedAnswers = (existing?.answers ?? [])
+    .filter((answer) => !activeFieldIds.has(answer.fieldId))
+    .map((answer) => ({
+      fieldId: answer.fieldId,
+      fieldCode: answer.fieldCode,
+      type: answer.field.type,
+      value: storedAnswerValue(answer),
+    }));
+
+  const result = await saveFormEntry({
+    formId: full.id,
+    entryId: existing?.id ?? null,
+    submittedById: existing?.submittedById ?? null,
+    submitterName: input.submitterName?.trim() || null,
+    submitterEmail: input.submitterEmail?.trim().toLowerCase() || null,
+    locale: existing?.locale ?? (input.locale === "en" ? "EN" : "NL"),
+    isTest: existing?.isTest ?? false,
+    requestFingerprint: existing?.requestFingerprint ?? null,
+    answers: [
+      ...Object.entries(validation.cleaned).map(([fieldId, answerValue]) => ({
+        fieldId,
+        fieldCode: fieldById.get(fieldId)?.code ?? fieldId,
+        type: fieldById.get(fieldId)?.type ?? "SHORT_TEXT",
+        value: answerValue,
+      })),
+      ...retainedAnswers,
+    ],
+    // Bestaande uploads blijven aan de inzending hangen. Geen uploadtokens
+    // meesturen voorkomt dat dezelfde bestanden opnieuw worden aangemaakt.
+    uploads: [],
+    claimedOptions: claimedOptionCodes(fields, validation.cleaned),
+    asDraft: false,
+    maxEntries: full.maxEntries,
+    allowWaitlist: full.allowWaitlist,
+  });
+
+  if (!result.ok) return { status: "rejected", reason: result.code };
+
+  await logFormAudit(prisma, {
+    formId: input.formId,
+    actorUserId: session.user.id,
+    action: existing ? "FORM_ENTRY_EDITED" : "FORM_ENTRY_ADDED_ON_BEHALF",
+    entityType: "FormEntry",
+    entityId: result.entryId,
+    metadata: { email: input.submitterEmail ?? null },
+  });
+
+  refresh(input.locale, input.formId, existing?.id);
+  return { status: "ok", entryId: result.entryId };
+}
 
 /**
  * Iemand belt of mailt zijn inschrijving door en een beheerder tikt ze in.
@@ -304,86 +504,46 @@ export type BehalfResult =
 export async function addEntryOnBehalfAction(rawInput: unknown): Promise<BehalfResult> {
   try {
     const input = behalfSchema.parse(rawInput);
-    const { session } = await requireFormCapability(input.formId, "MANAGE_ENTRIES");
-
-    const form = await prisma.form.findUnique({
-      where: { id: input.formId },
-      select: { slug: true },
-    });
-    if (!form) return { status: "rejected", reason: "FORM_NOT_FOUND" };
-
-    const full = await loadPublicForm(form.slug);
-    if (!full) return { status: "rejected", reason: "FORM_NOT_FOUND" };
-
-    const validation = validateSubmission({
-      fields: full.fields.map((field) => ({
-        id: field.id,
-        code: field.code,
-        type: field.type,
-        required: field.required,
-        config: field.config,
-        options: field.options.map((option) => ({
-          code: option.code,
-          archivedAt: option.archivedAt,
-        })),
-      })),
-      conditions: formConditions(full),
-      answers: input.answers as Record<string, AnswerValue>,
-    });
-    if (Object.keys(validation.errors).length > 0) {
-      return { status: "invalid", errors: validation.errors };
-    }
-
-    const fieldById = new Map(full.fields.map((field) => [field.id, field]));
-    const result = await saveFormEntry({
-      formId: full.id,
-      submittedById: null,
-      submitterName: input.submitterName?.trim() || null,
-      submitterEmail: input.submitterEmail?.trim().toLowerCase() || null,
-      locale: input.locale === "en" ? "EN" : "NL",
-      isTest: false,
-      requestFingerprint: null,
-      answers: Object.entries(validation.cleaned).map(([fieldId, value]) => ({
-        fieldId,
-        fieldCode: fieldById.get(fieldId)?.code ?? fieldId,
-        type: fieldById.get(fieldId)?.type ?? "SHORT_TEXT",
-        value,
-      })),
-      uploads: [],
-      claimedOptions: claimedOptionCodes(
-        full.fields.map((field) => ({
-          id: field.id,
-          code: field.code,
-          type: field.type,
-          required: field.required,
-          config: field.config,
-          options: field.options,
-        })),
-        validation.cleaned
-      ),
-      asDraft: false,
-      maxEntries: full.maxEntries,
-      allowWaitlist: full.allowWaitlist,
-    });
-
-    if (!result.ok) {
-      return { status: "rejected", reason: result.code };
-    }
-
-    await logFormAudit(prisma, {
-      formId: input.formId,
-      actorUserId: session.user.id,
-      action: "FORM_ENTRY_ADDED_ON_BEHALF",
-      entityType: "FormEntry",
-      entityId: result.entryId,
-      metadata: { email: input.submitterEmail ?? null },
-    });
-
-    refresh(input.locale, input.formId);
-    return { status: "ok", entryId: result.entryId };
+    return await saveManagedEntry(input);
   } catch (error) {
     unstable_rethrow(error);
     console.error("Inzending namens iemand toevoegen mislukt", error);
+    throw error;
+  }
+}
+
+/** Antwoorden van een bestaande inzending aanpassen zonder een mail te sturen. */
+export async function editFormEntryAction(
+  _previous: SaveState,
+  formData: FormData
+): Promise<SaveState> {
+  let answers: unknown;
+  try {
+    answers = JSON.parse(value(formData, "answers"));
+  } catch {
+    return saveError("INVALID_INPUT");
+  }
+
+  const parsed = editEntrySchema.safeParse({
+    formId: value(formData, "formId"),
+    entryId: value(formData, "entryId"),
+    locale: value(formData, "locale") || "nl",
+    submitterName: value(formData, "submitterName"),
+    submitterEmail: value(formData, "submitterEmail"),
+    answers,
+  });
+  if (!parsed.success) return saveError("INVALID_INPUT");
+
+  try {
+    const result = await saveManagedEntry(parsed.data);
+    if (result.status === "invalid") return saveError("INVALID_ANSWERS");
+    if (result.status === "rejected") return saveError(result.reason);
+    return saveOk();
+  } catch (error) {
+    unstable_rethrow(error);
+    const code = error instanceof Error ? error.message : "";
+    if (EXPECTED_ERRORS.has(code) || code.startsWith("INVALID_")) return saveError(code);
+    console.error("Inzending bewerken mislukt", error);
     throw error;
   }
 }

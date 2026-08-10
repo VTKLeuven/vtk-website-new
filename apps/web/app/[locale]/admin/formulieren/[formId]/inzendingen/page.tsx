@@ -149,8 +149,31 @@ export default async function FormEntriesPage({
   const publicForm = capabilities.includes("MANAGE_ENTRIES")
     ? await loadPublicForm(form.slug)
     : null;
-  const publicFields = publicForm ? toPublicFields(publicForm, locale) : [];
+  const publicFields = publicForm
+    ? toPublicFields(publicForm, locale).map((field) => ({
+        ...field,
+        sectionId: field.sectionId,
+        sortOrder:
+          publicForm.fields.find((candidate) => candidate.id === field.id)?.sortOrder ?? 0,
+      }))
+    : [];
   const conditions = publicForm ? formConditions(publicForm) : [];
+  const sections =
+    publicForm?.sections.map((section) => ({
+      id: section.id,
+      sortOrder: section.sortOrder,
+      nextSectionId: section.nextSectionId,
+      endsForm: section.endsForm,
+    })) ?? [];
+  const branchOptions =
+    publicForm?.fields.flatMap((field) =>
+      field.options.map((option) => ({
+        fieldId: field.id,
+        code: option.code,
+        nextSectionId: option.nextSectionId,
+        endsForm: option.endsForm,
+      }))
+    ) ?? [];
   const summary = answerSummary(
     exportFields,
     allEntriesForSummary.map((entry) => ({
@@ -230,6 +253,9 @@ export default async function FormEntriesPage({
             formId={formId}
             fields={publicFields}
             conditions={conditions}
+            stepBySections={publicForm?.stepBySections ?? false}
+            sections={sections}
+            branchOptions={branchOptions}
           />
         ) : null}
 

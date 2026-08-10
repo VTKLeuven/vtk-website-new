@@ -128,109 +128,126 @@ export type SubmitResult =
   | { ok: true; entryId: string; waitlisted: boolean }
   | { ok: false; code: "FULL" | "OPTION_FULL"; option?: string };
 
+class OptionReservationRejected extends Error {
+  constructor(readonly option: string) {
+    super("OPTION_FULL");
+  }
+}
+
 export async function saveFormEntry(input: SubmitInput): Promise<SubmitResult> {
-  return prisma.$transaction(async (tx) => {
-    // De telling van hierboven kan intussen achterhaald zijn; dit is de check
-    // die telt. Een inzending op de wachtlijst telt niet mee voor `maxEntries`:
-    // ze heeft net geen plaats.
-    let waitlisted = false;
-    if (!input.asDraft && input.maxEntries != null) {
-      const submitted = await tx.formEntry.count({
-        where: {
-          formId: input.formId,
-          status: "SUBMITTED",
-          isTest: false,
-          waitlisted: false,
-          ...(input.entryId ? { id: { not: input.entryId } } : {}),
-        },
-      });
-      if (submitted >= input.maxEntries) {
-        if (!input.allowWaitlist) return { ok: false, code: "FULL" as const };
-        waitlisted = true;
-      }
-    }
-
-    const existing = input.entryId
-      ? await tx.formEntry.findFirst({
-          where: { id: input.entryId, formId: input.formId },
-          include: { answers: { select: { valueOptions: true } } },
-        })
-      : null;
-
-    // Bij een wijziging eerst teruggeven wat de vorige versie claimde, anders
-    // telt dezelfde persoon twee keer mee voor het quotum.
-    if (existing && existing.status === "SUBMITTED" && !existing.waitlisted) {
-      await releaseOptions(
-        tx,
-        input.formId,
-        existing.answers.flatMap((answer) => answer.valueOptions)
-      );
-    }
-
-    if (!input.asDraft && !input.isTest && !waitlisted) {
-      const reserved = await reserveOptions(tx, input.formId, input.claimedOptions);
-      if (!reserved.ok) {
-        return { ok: false, code: "OPTION_FULL" as const, option: reserved.option };
-      }
-      if (reserved.waitlisted) waitlisted = true;
-    }
-
-    const entry = existing
-      ? await tx.formEntry.update({
-          where: { id: existing.id },
-          data: {
-            status: input.asDraft ? "DRAFT" : "SUBMITTED",
-            submitterName: input.submitterName,
-            submitterEmail: input.submitterEmail,
-            locale: input.locale,
-            submittedAt: input.asDraft ? null : existing.submittedAt ?? new Date(),
-            waitlisted,
-            waitlistedAt: waitlisted ? existing.waitlistedAt ?? new Date() : null,
-          },
-          select: { id: true },
-        })
-      : await tx.formEntry.create({
-          data: {
+  try {
+    return await prisma.$transaction(async (tx) => {
+      // De telling van hierboven kan intussen achterhaald zijn; dit is de check
+      // die telt. Een inzending op de wachtlijst telt niet mee voor `maxEntries`:
+      // ze heeft net geen plaats.
+      let waitlisted = false;
+      if (!input.asDraft && input.maxEntries != null) {
+        const submitted = await tx.formEntry.count({
+          where: {
             formId: input.formId,
-            status: input.asDraft ? "DRAFT" : "SUBMITTED",
-            submittedById: input.submittedById,
-            submitterName: input.submitterName,
-            submitterEmail: input.submitterEmail,
-            locale: input.locale,
-            isTest: input.isTest,
-            requestFingerprint: input.requestFingerprint,
-            submittedAt: input.asDraft ? null : new Date(),
-            waitlisted,
-            waitlistedAt: waitlisted ? new Date() : null,
+            status: "SUBMITTED",
+            isTest: false,
+            waitlisted: false,
+            ...(input.entryId ? { id: { not: input.entryId } } : {}),
           },
-          select: { id: true },
         });
+        if (submitted >= input.maxEntries) {
+          if (!input.allowWaitlist) return { ok: false, code: "FULL" as const };
+          waitlisted = true;
+        }
+      }
 
-    // Antwoorden volledig vervangen: een veld dat onzichtbaar werd, hoort geen
-    // oud antwoord meer achter te laten.
-    await tx.formAnswer.deleteMany({ where: { entryId: entry.id } });
-    for (const row of input.answers) {
-      await tx.formAnswer.create({
-        data: { formId: input.formId, entryId: entry.id, ...answerData(row) },
-      });
+      const existing = input.entryId
+        ? await tx.formEntry.findFirst({
+            where: { id: input.entryId, formId: input.formId },
+            include: { answers: { select: { valueOptions: true } } },
+          })
+        : null;
+      if (input.entryId && !existing) throw new Error("ENTRY_NOT_FOUND");
+
+      // Bij een wijziging eerst teruggeven wat de vorige versie claimde, anders
+      // telt dezelfde persoon twee keer mee voor het quotum.
+      if (existing && existing.status === "SUBMITTED" && !existing.waitlisted) {
+        await releaseOptions(
+          tx,
+          input.formId,
+          existing.answers.flatMap((answer) => answer.valueOptions)
+        );
+      }
+
+      if (!input.asDraft && !input.isTest && !waitlisted) {
+        const reserved = await reserveOptions(tx, input.formId, input.claimedOptions);
+        if (!reserved.ok) {
+          // Bij een bewerking zijn de vorige quota hierboven al vrijgegeven.
+          // Gooien rolt de volledige transactie terug, zodat een geweigerde
+          // wijziging de bestaande inzending en haar plaats intact laat.
+          throw new OptionReservationRejected(reserved.option);
+        }
+        if (reserved.waitlisted) waitlisted = true;
+      }
+
+      const entry = existing
+        ? await tx.formEntry.update({
+            where: { id: existing.id },
+            data: {
+              status: input.asDraft ? "DRAFT" : "SUBMITTED",
+              submitterName: input.submitterName,
+              submitterEmail: input.submitterEmail,
+              locale: input.locale,
+              submittedAt: input.asDraft ? null : existing.submittedAt ?? new Date(),
+              waitlisted,
+              waitlistedAt: waitlisted ? existing.waitlistedAt ?? new Date() : null,
+            },
+            select: { id: true },
+          })
+        : await tx.formEntry.create({
+            data: {
+              formId: input.formId,
+              status: input.asDraft ? "DRAFT" : "SUBMITTED",
+              submittedById: input.submittedById,
+              submitterName: input.submitterName,
+              submitterEmail: input.submitterEmail,
+              locale: input.locale,
+              isTest: input.isTest,
+              requestFingerprint: input.requestFingerprint,
+              submittedAt: input.asDraft ? null : new Date(),
+              waitlisted,
+              waitlistedAt: waitlisted ? new Date() : null,
+            },
+            select: { id: true },
+          });
+
+      // Antwoorden volledig vervangen: een veld dat onzichtbaar werd, hoort geen
+      // oud antwoord meer achter te laten.
+      await tx.formAnswer.deleteMany({ where: { entryId: entry.id } });
+      for (const row of input.answers) {
+        await tx.formAnswer.create({
+          data: { formId: input.formId, entryId: entry.id, ...answerData(row) },
+        });
+      }
+
+      if (input.uploads.length > 0) {
+        await tx.formFileUpload.createMany({
+          data: input.uploads.map((upload) => ({
+            formId: input.formId,
+            entryId: entry.id,
+            fieldId: upload.fieldId,
+            storageKey: upload.storageKey,
+            originalName: upload.originalName,
+            contentType: upload.contentType,
+            sizeBytes: upload.sizeBytes,
+          })),
+        });
+      }
+
+      return { ok: true as const, entryId: entry.id, waitlisted };
+    });
+  } catch (error) {
+    if (error instanceof OptionReservationRejected) {
+      return { ok: false, code: "OPTION_FULL", option: error.option };
     }
-
-    if (input.uploads.length > 0) {
-      await tx.formFileUpload.createMany({
-        data: input.uploads.map((upload) => ({
-          formId: input.formId,
-          entryId: entry.id,
-          fieldId: upload.fieldId,
-          storageKey: upload.storageKey,
-          originalName: upload.originalName,
-          contentType: upload.contentType,
-          sizeBytes: upload.sizeBytes,
-        })),
-      });
-    }
-
-    return { ok: true as const, entryId: entry.id, waitlisted };
-  });
+    throw error;
+  }
 }
 
 /**

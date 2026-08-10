@@ -29,6 +29,7 @@ export function SaveForm({
   errorMessages,
   fallbackErrorMessage,
   onSuccess,
+  resetOnSuccess = true,
   submitDisabled = false,
   secondarySubmit,
   className,
@@ -43,6 +44,8 @@ export function SaveForm({
   fallbackErrorMessage: string;
   /** Loopt na een geslaagde opslag, bv. om een net aangemaakt item te sluiten. */
   onSuccess?: () => void;
+  /** Uit voor bewerkformulieren die hun gecontroleerde waarden moeten behouden. */
+  resetOnSuccess?: boolean;
   /** Extra voorwaarde bovenop "bezig met opslaan", bv. een verplichte upload. */
   submitDisabled?: boolean;
   /**
@@ -98,7 +101,7 @@ export function SaveForm({
     handled.current = state.nonce;
 
     if (state.status === "success") {
-      formRef.current?.reset();
+      if (resetOnSuccess) formRef.current?.reset();
       showToast({ message: savedMessage, variant: "success" });
       onSuccess?.();
     } else {
@@ -110,7 +113,15 @@ export function SaveForm({
         duration: 0,
       });
     }
-  }, [state, showToast, savedMessage, errorMessages, fallbackErrorMessage, onSuccess]);
+  }, [
+    state,
+    showToast,
+    savedMessage,
+    errorMessages,
+    fallbackErrorMessage,
+    onSuccess,
+    resetOnSuccess,
+  ]);
 
   return (
     <form ref={formRef} onSubmit={onSubmit} className={className}>

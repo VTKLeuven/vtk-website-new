@@ -8,9 +8,12 @@ import { answerToText } from "@/lib/forms/export";
 import { deleteFormEntryAction } from "@/app/actions/formEntries";
 import { DeleteButton } from "@/components/ui/DeleteIconButton";
 import { EntryReviewForm } from "@/components/forms/admin/EntryReviewForm";
+import { EditEntryForm } from "@/components/forms/admin/EntryTools";
 import { PromoteWaitlistForm } from "@/components/forms/admin/PromoteWaitlistForm";
 import { FormStatusBadge } from "@/components/forms/admin/FormStatusBadge";
 import { formBase, formatDateTime, type AdminLocale } from "@/components/forms/admin/format";
+import { parseFieldConfig } from "@/lib/forms/schema";
+import type { AnswerValue } from "@/lib/forms/visibility";
 
 export default async function FormEntryDetailPage({
   params,
@@ -22,24 +25,29 @@ export default async function FormEntryDetailPage({
   const locale: AdminLocale = localeParam;
   const nl = locale === "nl";
   const base = formBase(locale);
-  const { capabilities } = await requireFormCapability(formId, "VIEW_ENTRIES");
+  const { form, capabilities } = await requireFormCapability(formId, "VIEW_ENTRIES");
 
-  const entry = await prisma.formEntry.findFirst({
-    where: { id: entryId, formId },
-    include: {
-      answers: true,
-      uploads: true,
-      reviewer: { select: { name: true, email: true } },
-      submittedBy: { select: { name: true, email: true } },
-    },
-  });
+  const [entry, fields, sections] = await Promise.all([
+    prisma.formEntry.findFirst({
+      where: { id: entryId, formId },
+      include: {
+        answers: true,
+        uploads: true,
+        reviewer: { select: { name: true, email: true } },
+        submittedBy: { select: { name: true, email: true } },
+      },
+    }),
+    prisma.formField.findMany({
+      where: { formId },
+      include: { options: true, conditions: { orderBy: { sortOrder: "asc" } } },
+      orderBy: { sortOrder: "asc" },
+    }),
+    prisma.formSection.findMany({
+      where: { formId },
+      orderBy: { sortOrder: "asc" },
+    }),
+  ]);
   if (!entry) notFound();
-
-  const fields = await prisma.formField.findMany({
-    where: { formId },
-    include: { options: true },
-    orderBy: { sortOrder: "asc" },
-  });
 
   const answeredFieldIds = new Set(entry.answers.map((answer) => answer.fieldId));
   // Gearchiveerde velden tonen we enkel wanneer deze inzending erop antwoordde;
@@ -49,7 +57,91 @@ export default async function FormEntryDetailPage({
   );
 
   const canManage = capabilities.includes("MANAGE_ENTRIES");
-
+  const selectedByField = new Map(
+    entry.answers.map((answer) => [answer.fieldId, new Set(answer.valueOptions)])
+  );
+  const editorFields = fields
+    .filter((field) => !field.archivedAt)
+    .map((field) => ({
+      id: field.id,
+      code: field.code,
+      type: field.type,
+      labelNl: field.labelNl,
+      labelEn: field.labelEn,
+      helpNl: field.helpNl,
+      helpEn: field.helpEn,
+      required: field.required,
+      sectionId: field.sectionId,
+      sortOrder: field.sortOrder,
+      config: parseFieldConfig(field.type, field.config),
+      options: field.options
+        .filter(
+          (option) =>
+            !option.archivedAt || selectedByField.get(field.id)?.has(option.code)
+        )
+        .sort((a, b) => a.sortOrder - b.sortOrder)
+        .map((option) => ({
+          id: option.id,
+          code: option.code,
+          labelNl: option.archivedAt
+            ? `${option.labelNl} (van het formulier gehaald)`
+            : option.labelNl,
+          labelEn: option.archivedAt
+            ? `${option.labelEn ?? option.labelNl} (removed from the form)`
+            : option.labelEn,
+          soldOut: option.quotaLimit != null && option.quotaUsed >= option.quotaLimit,
+          waitlist: option.allowWaitlist,
+          remaining:
+            option.quotaLimit != null && option.quotaLimit - option.quotaUsed <= 10
+              ? Math.max(0, option.quotaLimit - option.quotaUsed)
+              : null,
+        })),
+    }));
+  const initialAnswers: Record<string, AnswerValue> = Object.fromEntries(
+    entry.answers.map((answer) => [
+      answer.fieldId,
+      {
+        text: answer.valueText,
+        number: answer.valueNumber,
+        checked: answer.valueBool,
+        options: answer.valueOptions,
+      },
+    ])
+  );
+  const conditions = fields
+    .filter((field) => !field.archivedAt)
+    .flatMap((field) =>
+      field.conditions.map((condition) => ({
+        fieldId: field.id,
+        sourceFieldId: condition.sourceFieldId,
+        operator: condition.operator,
+        value: condition.value,
+      }))
+    );
+  const branchSections = sections.map((section) => ({
+    id: section.id,
+    sortOrder: section.sortOrder,
+    nextSectionId: section.nextSectionId,
+    endsForm: section.endsForm,
+  }));
+  const branchOptions = fields
+    .filter((field) => !field.archivedAt)
+    .flatMap((field) =>
+      field.options
+        .filter(
+          (option) =>
+            !option.archivedAt || selectedByField.get(field.id)?.has(option.code)
+        )
+        .map((option) => ({
+          fieldId: field.id,
+          code: option.code,
+          nextSectionId: option.nextSectionId,
+          endsForm: option.endsForm,
+        }))
+    );
+  const readOnlyFields = canManage
+    ? visibleFields.filter((field) => field.type === "FILE" || field.archivedAt)
+    : visibleFields;
 
   return (
     <div className="ticket-admin-page">
@@ -101,62 +193,81 @@ export default async function FormEntryDetailPage({
             </div>
           </div>
         </div>
-        <dl className="ticket-admin-definitions">
-          {visibleFields.map((field) => {
-            const answer = entry.answers.find((candidate) => candidate.fieldId === field.id);
-            const uploads = entry.uploads.filter((upload) => upload.fieldId === field.id);
-            const text = answerToText(
-              {
-                id: field.id,
-                code: field.code,
-                type: field.type,
-                labelNl: field.labelNl,
-                labelEn: field.labelEn,
-                sortOrder: field.sortOrder,
-                archivedAt: field.archivedAt,
-                options: field.options.map((option) => ({
-                  code: option.code,
-                  labelNl: option.labelNl,
-                  labelEn: option.labelEn,
-                })),
-              },
-              answer,
-              entry.uploads,
-              locale
-            );
-            return (
-              <div key={field.id}>
-                <dt>
-                  {locale === "en" && field.labelEn ? field.labelEn : field.labelNl}
-                  {field.archivedAt ? (
-                    <span className="ticket-admin-row-meta">
-                      {nl ? " (van het formulier gehaald)" : " (removed from the form)"}
-                    </span>
-                  ) : null}
-                </dt>
-                <dd>
-                  {field.type === "FILE" && uploads.length > 0 ? (
-                    <ul className="ticket-admin-list">
-                      {uploads.map((upload) => (
-                        <li key={upload.id}>
-                          <a
-                            className="ticket-admin-button"
-                            href={`/api/forms/${formId}/bestanden/${upload.id}`}
-                          >
-                            <Download aria-hidden="true" size={15} />
-                            {upload.originalName}
-                          </a>
-                        </li>
-                      ))}
-                    </ul>
-                  ) : (
-                    text || <span className="ticket-admin-row-meta">{nl ? "leeg" : "empty"}</span>
-                  )}
-                </dd>
-              </div>
-            );
-          })}
-        </dl>
+        {canManage ? (
+          <EditEntryForm
+            locale={locale}
+            formId={formId}
+            entryId={entry.id}
+            fields={editorFields}
+            conditions={conditions}
+            stepBySections={form.stepBySections}
+            sections={branchSections}
+            branchOptions={branchOptions}
+            initialAnswers={initialAnswers}
+            initialName={entry.submitterName ?? ""}
+            initialEmail={entry.submitterEmail ?? ""}
+          />
+        ) : null}
+        {readOnlyFields.length > 0 ? (
+          <dl className="ticket-admin-definitions">
+            {readOnlyFields.map((field) => {
+              const answer = entry.answers.find((candidate) => candidate.fieldId === field.id);
+              const uploads = entry.uploads.filter((upload) => upload.fieldId === field.id);
+              const text = answerToText(
+                {
+                  id: field.id,
+                  code: field.code,
+                  type: field.type,
+                  labelNl: field.labelNl,
+                  labelEn: field.labelEn,
+                  sortOrder: field.sortOrder,
+                  archivedAt: field.archivedAt,
+                  options: field.options.map((option) => ({
+                    code: option.code,
+                    labelNl: option.labelNl,
+                    labelEn: option.labelEn,
+                  })),
+                },
+                answer,
+                entry.uploads,
+                locale
+              );
+              return (
+                <div key={field.id}>
+                  <dt>
+                    {locale === "en" && field.labelEn ? field.labelEn : field.labelNl}
+                    {field.archivedAt ? (
+                      <span className="ticket-admin-row-meta">
+                        {nl ? " (van het formulier gehaald)" : " (removed from the form)"}
+                      </span>
+                    ) : null}
+                  </dt>
+                  <dd>
+                    {field.type === "FILE" && uploads.length > 0 ? (
+                      <ul className="ticket-admin-list">
+                        {uploads.map((upload) => (
+                          <li key={upload.id}>
+                            <a
+                              className="ticket-admin-button"
+                              href={`/api/forms/${formId}/bestanden/${upload.id}`}
+                            >
+                              <Download aria-hidden="true" size={15} />
+                              {upload.originalName}
+                            </a>
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      text || (
+                        <span className="ticket-admin-row-meta">{nl ? "leeg" : "empty"}</span>
+                      )
+                    )}
+                  </dd>
+                </div>
+              );
+            })}
+          </dl>
+        ) : null}
       </section>
 
       {canManage ? (

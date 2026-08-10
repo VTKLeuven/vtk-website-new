@@ -27,9 +27,11 @@ adminskin, hetzelfde outboxpatroon. Wie ticketing kent, herkent dit.
 5. **Indienen** — `submitFormAction` herberekent de zichtbaarheid, valideert
    elk veld, reserveert de quota en bewaart alles in één transactie. Daarna gaan
    de bevestigingsmail en de melding aan de organisatoren naar de outbox.
-6. **Opvolgen** — `/admin/formulieren/<id>/inzendingen`: tabel, detail, status
-   en notitie per inzending, export (CSV, PDF, zip met de bestanden) en een
-   mailing naar de deelnemers.
+6. **Opvolgen**: `/admin/formulieren/<id>/inzendingen` heeft de tabel, het
+   detail en de export (CSV, PDF en zip met de bestanden). Een editor kan op het
+   detail de antwoorden aanpassen, de status, notitie en beoordelaar bijwerken,
+   een inzending verwijderen en deelnemers mailen. Een beheerderswijziging
+   herberekent de quota en verstuurt geen bevestigingsmail.
 
 ## Datamodel
 

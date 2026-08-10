@@ -1,16 +1,109 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useMemo, useState, useTransition } from "react";
 import { Download, FileArchive, FileText, UserPlus } from "lucide-react";
 import { Button } from "@vtk/ui";
-import { addEntryOnBehalfAction } from "@/app/actions/formEntries";
+import {
+  addEntryOnBehalfAction,
+  editFormEntryAction,
+} from "@/app/actions/formEntries";
 import { useToast } from "@/components/ui/toast";
+import { SaveForm } from "@/components/ui/SaveForm";
 import { FormFieldBlock } from "@/components/forms/FormFieldBlock";
 import type { PublicFormField } from "@/components/forms/FormFieldInput";
 import { visibleFieldIds, type AnswerValue, type VisibilityCondition } from "@/lib/forms/visibility";
+import {
+  fieldsOnPath,
+  sectionPath,
+  type BranchOption,
+  type BranchSection,
+} from "@/lib/forms/branching";
 import type { AdminLocale } from "./format";
 
 export type ExportColumn = { code: string; label: string; archived: boolean };
+export type ManagedEntryField = PublicFormField & {
+  sectionId: string | null;
+  sortOrder: number;
+};
+
+function entryVisibleFieldIds({
+  fields,
+  conditions,
+  answers,
+  stepBySections,
+  sections,
+  branchOptions,
+}: {
+  fields: ManagedEntryField[];
+  conditions: VisibilityCondition[];
+  answers: Record<string, AnswerValue>;
+  stepBySections: boolean;
+  sections: BranchSection[];
+  branchOptions: BranchOption[];
+}): Set<string> {
+  const visible = visibleFieldIds(
+    fields.map((field) => ({ id: field.id, type: field.type })),
+    conditions,
+    answers
+  );
+  if (!stepBySections) return visible;
+
+  const path = sectionPath(sections, fields, branchOptions, answers, visible);
+  const onPath = fieldsOnPath(fields, path);
+  for (const field of fields) {
+    if (!onPath.has(field.id)) visible.delete(field.id);
+  }
+  return visible;
+}
+
+function EntryAnswerFields({
+  locale,
+  fields,
+  visible,
+  answers,
+  setAnswers,
+  errors,
+  fileHint,
+}: {
+  locale: AdminLocale;
+  fields: ManagedEntryField[];
+  visible: Set<string>;
+  answers: Record<string, AnswerValue>;
+  setAnswers: (next: (current: Record<string, AnswerValue>) => Record<string, AnswerValue>) => void;
+  errors: Record<string, string>;
+  fileHint: string;
+}) {
+  const nl = locale === "nl";
+  return (
+    <>
+      <div className="vtk-form">
+        {fields
+          .filter((field) => visible.has(field.id) && field.type !== "FILE")
+          .map((field) => (
+            <FormFieldBlock
+              key={field.id}
+              field={field}
+              locale={locale}
+              error={
+                errors[field.id]
+                  ? nl
+                    ? "Dit antwoord kan niet."
+                    : "This answer is not valid."
+                  : null
+              }
+              value={answers[field.id] ?? {}}
+              onChange={(next) =>
+                setAnswers((current) => ({ ...current, [field.id]: next }))
+              }
+            />
+          ))}
+      </div>
+      {fields.some((field) => visible.has(field.id) && field.type === "FILE") ? (
+        <p className="form-admin-hint">{fileHint}</p>
+      ) : null}
+    </>
+  );
+}
 
 /**
  * Exporteren met een kolomkeuze.
@@ -122,11 +215,17 @@ export function AddEntryPanel({
   formId,
   fields,
   conditions,
+  stepBySections,
+  sections,
+  branchOptions,
 }: {
   locale: AdminLocale;
   formId: string;
-  fields: PublicFormField[];
+  fields: ManagedEntryField[];
   conditions: VisibilityCondition[];
+  stepBySections: boolean;
+  sections: BranchSection[];
+  branchOptions: BranchOption[];
 }) {
   const nl = locale === "nl";
   const showToast = useToast();
@@ -136,10 +235,17 @@ export function AddEntryPanel({
   const [email, setEmail] = useState("");
   const [errors, setErrors] = useState<Record<string, string>>({});
 
-  const visible = visibleFieldIds(
-    fields.map((field) => ({ id: field.id, type: field.type })),
-    conditions,
-    answers
+  const visible = useMemo(
+    () =>
+      entryVisibleFieldIds({
+        fields,
+        conditions,
+        answers,
+        stepBySections,
+        sections,
+        branchOptions,
+      }),
+    [fields, conditions, answers, stepBySections, sections, branchOptions]
   );
 
   function submit() {
@@ -227,27 +333,14 @@ export function AddEntryPanel({
           </div>
         </div>
 
-        <div className="vtk-form">
-          {fields
-            .filter((field) => visible.has(field.id) && field.type !== "FILE")
-            .map((field) => (
-              <FormFieldBlock
-                key={field.id}
-                field={field}
-                locale={locale}
-                error={errors[field.id] ? (nl ? "Dit antwoord kan niet." : "This answer is not valid.") : null}
-                value={answers[field.id] ?? {}}
-                onChange={(next) => setAnswers((current) => ({ ...current, [field.id]: next }))}
-              />
-            ))}
-        </div>
-        {fields.some((field) => field.type === "FILE") ? (
-          <p className="form-admin-hint">
-            {nl
+        <EntryAnswerFields
+          {...{ locale, fields, visible, answers, setAnswers, errors }}
+          fileHint={
+            nl
               ? "Uploadvelden staan hier niet: die vult de inzender zelf in."
-              : "Upload fields are not here: the submitter fills those in themselves."}
-          </p>
-        ) : null}
+              : "Upload fields are not here: the submitter fills those in themselves."
+          }
+        />
 
         <div className="ticket-admin-row-actions">
           <Button type="button" onClick={submit} disabled={pending}>
@@ -257,5 +350,122 @@ export function AddEntryPanel({
         </div>
       </div>
     </details>
+  );
+}
+
+/** De antwoorden aanpassen met dezelfde renderer en vertakkingen als publiek. */
+export function EditEntryForm({
+  locale,
+  formId,
+  entryId,
+  fields,
+  conditions,
+  stepBySections,
+  sections,
+  branchOptions,
+  initialAnswers,
+  initialName,
+  initialEmail,
+}: {
+  locale: AdminLocale;
+  formId: string;
+  entryId: string;
+  fields: ManagedEntryField[];
+  conditions: VisibilityCondition[];
+  stepBySections: boolean;
+  sections: BranchSection[];
+  branchOptions: BranchOption[];
+  initialAnswers: Record<string, AnswerValue>;
+  initialName: string;
+  initialEmail: string;
+}) {
+  const nl = locale === "nl";
+  const [answers, setAnswers] = useState(initialAnswers);
+  const [name, setName] = useState(initialName);
+  const [email, setEmail] = useState(initialEmail);
+  const visible = useMemo(
+    () =>
+      entryVisibleFieldIds({
+        fields,
+        conditions,
+        answers,
+        stepBySections,
+        sections,
+        branchOptions,
+      }),
+    [fields, conditions, answers, stepBySections, sections, branchOptions]
+  );
+  const submittedAnswers = Object.fromEntries(
+    Object.entries(answers).filter(([fieldId]) => visible.has(fieldId))
+  );
+
+  return (
+    <SaveForm
+      action={editFormEntryAction}
+      className="ticket-admin-form"
+      submitLabel={nl ? "Wijzigingen opslaan" : "Save changes"}
+      savingLabel={nl ? "Bezig met opslaan..." : "Saving..."}
+      savedMessage={nl ? "Inzending bijgewerkt" : "Entry updated"}
+      resetOnSuccess={false}
+      fallbackErrorMessage={
+        nl ? "De inzending kon niet worden bijgewerkt." : "The entry could not be updated."
+      }
+      errorMessages={{
+        INVALID_INPUT: nl ? "De invoer is niet geldig." : "The input is not valid.",
+        INVALID_ANSWERS: nl
+          ? "Een paar antwoorden kloppen nog niet."
+          : "A few answers are not valid yet.",
+        ENTRY_NOT_FOUND: nl
+          ? "Deze inzending bestaat niet meer."
+          : "This entry no longer exists.",
+        FULL: nl ? "Het formulier zit vol." : "The form is full.",
+        OPTION_FULL: nl
+          ? "Een van de gekozen opties is volzet."
+          : "One of the selected options is full.",
+      }}
+    >
+      <input type="hidden" name="locale" value={locale} />
+      <input type="hidden" name="formId" value={formId} />
+      <input type="hidden" name="entryId" value={entryId} />
+      <input type="hidden" name="answers" value={JSON.stringify(submittedAnswers)} />
+
+      <div className="ticket-admin-form-grid">
+        <div className="ticket-admin-field">
+          <label htmlFor={`entry-name-${entryId}`}>{nl ? "Naam" : "Name"}</label>
+          <input
+            id={`entry-name-${entryId}`}
+            name="submitterName"
+            value={name}
+            maxLength={200}
+            onChange={(event) => setName(event.target.value)}
+          />
+        </div>
+        <div className="ticket-admin-field">
+          <label htmlFor={`entry-email-${entryId}`}>E-mail</label>
+          <input
+            id={`entry-email-${entryId}`}
+            name="submitterEmail"
+            type="email"
+            value={email}
+            maxLength={320}
+            onChange={(event) => setEmail(event.target.value)}
+          />
+        </div>
+      </div>
+
+      <EntryAnswerFields
+        locale={locale}
+        fields={fields}
+        visible={visible}
+        answers={answers}
+        setAnswers={setAnswers}
+        errors={{}}
+        fileHint={
+          nl
+            ? "Bestaande bestanden blijven bij de inzending. Uploadvelden kan je hier niet wijzigen."
+            : "Existing files remain attached to the entry. Upload fields cannot be changed here."
+        }
+      />
+    </SaveForm>
   );
 }
