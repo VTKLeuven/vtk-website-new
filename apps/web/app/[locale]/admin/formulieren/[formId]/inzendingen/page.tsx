@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { prisma } from "@vtk/db";
+import type { Prisma } from "@prisma/client";
 import { ArrowRight, BarChart3, Filter, Hourglass, Inbox, Search } from "lucide-react";
 import { hasLocale } from "@/lib/locale";
 import { requireFormCapability } from "@/lib/forms/authorization";
@@ -21,6 +22,9 @@ import {
 
 const REVIEW_STATUSES = ["NEW", "ACCEPTED", "REJECTED"] as const;
 const PAGE_SIZE = 50;
+type SortKey = "submittedAt" | "name" | "review";
+type SortDirection = "asc" | "desc";
+const SORT_KEYS: SortKey[] = ["submittedAt", "name", "review"];
 
 export default async function FormEntriesPage({
   params,
@@ -33,6 +37,8 @@ export default async function FormEntriesPage({
     test?: string;
     p?: string;
     wachtlijst?: string;
+    sort?: string;
+    dir?: string;
   }>;
 }) {
   const [{ locale: localeParam, formId }, filters] = await Promise.all([params, searchParams]);
@@ -52,6 +58,23 @@ export default async function FormEntriesPage({
     : null;
   const query = filters.q?.trim().slice(0, 200) ?? "";
   const page = Math.max(1, Number.parseInt(filters.p ?? "1", 10) || 1);
+  const sortKey: SortKey = SORT_KEYS.includes(filters.sort as SortKey)
+    ? (filters.sort as SortKey)
+    : "submittedAt";
+  const defaultDirection: SortDirection = sortKey === "submittedAt" ? "desc" : "asc";
+  const direction: SortDirection =
+    filters.dir === "asc" || filters.dir === "desc" ? filters.dir : defaultDirection;
+
+  const orderBy: Prisma.FormEntryOrderByWithRelationInput[] =
+    sortKey === "name"
+      ? [
+          { submitterName: { sort: direction, nulls: "last" } },
+          { submittedAt: "desc" },
+          { id: "asc" },
+        ]
+      : sortKey === "review"
+        ? [{ reviewStatus: direction }, { submittedAt: "desc" }, { id: "asc" }]
+        : [{ submittedAt: direction }, { id: "asc" }];
 
   const where = {
     formId,
@@ -91,7 +114,7 @@ export default async function FormEntriesPage({
         uploads: { select: { fieldId: true, originalName: true } },
         reviewer: { select: { name: true } },
       },
-      orderBy: { submittedAt: "desc" },
+      orderBy,
       skip: (page - 1) * PAGE_SIZE,
       take: PAGE_SIZE,
     }),
@@ -194,6 +217,35 @@ export default async function FormEntriesPage({
   );
 
   const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  const buildParams = () => {
+    const params = new URLSearchParams();
+    if (query) params.set("q", query);
+    if (review) params.set("beoordeling", review);
+    if (includeTest) params.set("test", "1");
+    if (waitlistFilter) params.set("wachtlijst", waitlistFilter);
+    params.set("sort", sortKey);
+    params.set("dir", direction);
+    return params;
+  };
+  const sortHref = (key: SortKey) => {
+    const params = buildParams();
+    const nextDirection: SortDirection =
+      sortKey === key
+        ? direction === "asc"
+          ? "desc"
+          : "asc"
+        : key === "submittedAt"
+          ? "desc"
+          : "asc";
+    params.set("sort", key);
+    params.set("dir", nextDirection);
+    return `${base}/admin/formulieren/${formId}/inzendingen?${params.toString()}`;
+  };
+  const pageHref = (nextPage: number) => {
+    const params = buildParams();
+    params.set("p", String(nextPage));
+    return `${base}/admin/formulieren/${formId}/inzendingen?${params.toString()}`;
+  };
 
   return (
     <div className="ticket-admin-page">
@@ -260,6 +312,8 @@ export default async function FormEntriesPage({
         ) : null}
 
         <form className="ticket-admin-filterbar" method="get">
+          <input type="hidden" name="sort" value={sortKey} />
+          <input type="hidden" name="dir" value={direction} />
           <div className="ticket-admin-field ticket-admin-filter-search">
             <label htmlFor="entry-search">{nl ? "Zoeken" : "Search"}</label>
             <div className="ticket-admin-input-icon">
@@ -328,9 +382,26 @@ export default async function FormEntriesPage({
               <table className="ticket-admin-table">
                 <thead>
                   <tr>
-                    <th>{nl ? "Ingediend" : "Submitted"}</th>
-                    <th>{nl ? "Wie" : "Who"}</th>
-                    <th>{nl ? "Beoordeling" : "Review"}</th>
+                    <SortableHeader
+                      href={sortHref("submittedAt")}
+                      label={nl ? "Ingediend" : "Submitted"}
+                      active={sortKey === "submittedAt"}
+                      direction={direction}
+                    />
+                    <SortableHeader
+                      href={sortHref("name")}
+                      label={nl ? "Wie" : "Who"}
+                      active={sortKey === "name"}
+                      direction={direction}
+                    />
+                    <SortableHeader
+                      href={sortHref("review")}
+                      label={nl ? "Beoordeling" : "Review"}
+                      active={sortKey === "review"}
+                      direction={direction}
+                    />
+                    {/* Antwoordkolommen staan in FormAnswer. Sorteren daarop
+                        zou per gekozen kolom een relationele join vragen. */}
                     {columns.map((column) => (
                       <th key={column.id} data-priority="low">
                         {locale === "en" && column.labelEn ? column.labelEn : column.labelNl}
@@ -398,7 +469,7 @@ export default async function FormEntriesPage({
             {pages > 1 ? (
               <nav className="ticket-admin-pagination" aria-label={nl ? "Paginering" : "Pagination"}>
                 {page > 1 ? (
-                  <Link href={`?${new URLSearchParams({ ...filters, p: String(page - 1) })}`}>
+                  <Link href={pageHref(page - 1)}>
                     {nl ? "Vorige" : "Previous"}
                   </Link>
                 ) : null}
@@ -406,7 +477,7 @@ export default async function FormEntriesPage({
                   {nl ? "Pagina" : "Page"} {page} / {pages}
                 </span>
                 {page < pages ? (
-                  <Link href={`?${new URLSearchParams({ ...filters, p: String(page + 1) })}`}>
+                  <Link href={pageHref(page + 1)}>
                     {nl ? "Volgende" : "Next"}
                   </Link>
                 ) : null}
@@ -467,5 +538,44 @@ export default async function FormEntriesPage({
         />
       ) : null}
     </div>
+  );
+}
+
+function SortableHeader({
+  href,
+  label,
+  active,
+  direction,
+}: {
+  href: string;
+  label: string;
+  active: boolean;
+  direction: SortDirection;
+}) {
+  return (
+    <th aria-sort={active ? (direction === "asc" ? "ascending" : "descending") : "none"}>
+      <Link href={href} className="inline-flex items-center gap-1">
+        <span>{label}</span>
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          width="12"
+          height="12"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          aria-hidden="true"
+          opacity={active ? 1 : 0.35}
+        >
+          {active && direction === "desc" ? (
+            <polyline points="6 9 12 15 18 9" />
+          ) : (
+            <polyline points="18 15 12 9 6 15" />
+          )}
+        </svg>
+      </Link>
+    </th>
   );
 }
