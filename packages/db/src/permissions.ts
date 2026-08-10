@@ -19,6 +19,10 @@ export const PERMISSIONS = [
   { code: "tickets.create", labelNl: "Ticketevents aanmaken voor eigen groep", labelEn: "Create ticket events for own group", category: "tickets" },
   { code: "tickets.manageAll", labelNl: "Alle ticketevents beheren", labelEn: "Manage all ticket events", category: "tickets" },
 
+  // Formulieren
+  { code: "forms.create", labelNl: "Formulieren aanmaken voor eigen groep", labelEn: "Create forms for own group", category: "forms" },
+  { code: "forms.manageAll", labelNl: "Alle formulieren beheren", labelEn: "Manage all forms", category: "forms" },
+
   // Photos
   { code: "photos.upload", labelNl: "Foto's uploaden", labelEn: "Upload photos", category: "photos" },
   { code: "photos.manageAlbums", labelNl: "Albums beheren", labelEn: "Manage albums", category: "photos" },

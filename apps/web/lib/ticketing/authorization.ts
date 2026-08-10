@@ -6,6 +6,7 @@ import { prisma } from "@vtk/db";
 import type { TicketEventStatus, TicketGrantRole } from "@prisma/client";
 import { currentWorkingYear, hasPermission, type SessionPayload } from "@vtk/auth";
 import { getAuthorizationPreview, requireSession } from "@/lib/session";
+import { hasLivePermission } from "@/lib/livePermissions";
 
 export const TICKET_CAPABILITIES = [
   "VIEW_EVENT",
@@ -55,52 +56,6 @@ export function capabilitiesForTicketRoles(roles: readonly TicketRole[]): Ticket
     ROLE_CAPABILITIES[role].forEach((capability) => capabilities.add(capability));
   }
   return [...capabilities];
-}
-
-// Live (uit de DB, niet uit de sessie-snapshot) checken of een gebruiker een
-// permissie heeft voor het huidige werkingsjaar. Spiegelt de resolver in
-// packages/auth/src/server/session.ts: rechten komen uit rollen, direct
-// toegewezen (UserRole) of via een post (GroupRole; DEFAULT voor elk lid,
-// LEADER enkel voor de lead).
-async function hasLivePermission(userId: string, code: string): Promise<boolean> {
-  const year = currentWorkingYear();
-
-  const directRole = await prisma.userRole.findFirst({
-    where: {
-      userId,
-      year,
-      role: { permissions: { some: { permission: { code } } } },
-    },
-    select: { roleId: true },
-  });
-  if (directRole) return true;
-
-  // Post-granted: DEFAULT telt voor elk lid, LEADER enkel wanneer je de lead bent.
-  const memberships = await prisma.groupMembership.findMany({
-    where: {
-      userId,
-      year,
-      group: {
-        roleGrants: {
-          some: { role: { permissions: { some: { permission: { code } } } } },
-        },
-      },
-    },
-    select: {
-      role: true,
-      group: {
-        select: {
-          roleGrants: {
-            where: { role: { permissions: { some: { permission: { code } } } } },
-            select: { kind: true },
-          },
-        },
-      },
-    },
-  });
-  return memberships.some((m) =>
-    m.group.roleGrants.some((grant) => grant.kind === "DEFAULT" || m.role === "LEAD")
-  );
 }
 
 export async function hasLiveTicketManageAll(

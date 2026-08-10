@@ -161,7 +161,7 @@ async function main() {
   // (GroupRole, kind DEFAULT = elk lid). De geseede rolset:
   //   - admin (alle rechten, systeemrol)                 -> IT + Groep 5
   //   - praesidium (calendar.create + photos.upload +    -> elke post
-  //       tickets.create + users.search)
+  //       tickets.create + forms.create + users.search)
   //   - werkgroep, medewerker                            -> beschikbaar, nog niet toegekend
   //   - theokot (theokot.manage + theokot.pickup)        -> Theokot
   //   - één rol per post, met de postnaam                -> die post zelf
@@ -224,13 +224,14 @@ async function main() {
     "Praesidium",
     "Praesidium",
     1,
-    "Basisrol voor elk praesidiumlid: evenementen (incl. ticketevents) voor de eigen groep aanmaken, foto's uploaden en gebruikers opzoeken.",
-    "Base role for every praesidium member: create events (incl. ticket events) for the own group, upload photos and search users.",
+    "Basisrol voor elk praesidiumlid: evenementen (incl. ticketevents) en formulieren voor de eigen groep aanmaken, foto's uploaden en gebruikers opzoeken.",
+    "Base role for every praesidium member: create events (incl. ticket events) and forms for the own group, upload photos and search users.",
   );
   await setRolePermissions(praesidiumRole.id, [
     "calendar.create",
     "photos.upload",
     "tickets.create",
+    "forms.create",
     "users.search",
   ]);
   for (const g of GROUP_SEEDS) {
