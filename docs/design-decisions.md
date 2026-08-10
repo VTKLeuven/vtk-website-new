@@ -978,9 +978,12 @@ feedback van de groepscoordinator. De onderliggende werking:
   nooit zelf.** Een praesidiumlid (in een post) vraagt aan als INTERN namens die
   post; wie geen post heeft, is EXTERN met de eigen naam. De server dwingt dit af
   en negeert wat de client meestuurt (niet te vervalsen). Enkel wanneer een lid
-  in meerdere posten zit, kiest het nog *welke* post (geen type). Werkgroepen
-  zitten niet in de DB en worden dus niet automatisch afgeleid; in het beheer kan
-  het team het type wel manueel zetten (het is daar zichtbaar en duidelijk).
+  in meerdere posten zit, kiest het nog *welke* post (geen type). In het beheer
+  kan het team het type wel manueel zetten (het is daar zichtbaar en duidelijk).
+  *Achterhaald sinds augustus 2026:* werkgroepen zitten intussen wél in de DB
+  (`GroupType.WERKGROEP`, `WERKGROEP_SEEDS` in `packages/db/src/groups.ts`) en
+  `deriveMemberRequester` leidt ze automatisch af. Enkel de keuzelijst in de UI
+  noemt ze nog "post"; dat is taak M4 in het feedbackplan.
 - **Flesserke is een aparte tab**, enkel zichtbaar en bruikbaar voor het
   praesidium (leden met een post). Het is een eigen aanvraagflow (aparte
   reservatie met enkel flesserke-lijnen), los van materiaal. Materiaal- en
@@ -1049,6 +1052,70 @@ praesidiumfunctie. Logistiek beheert nu zelf een chauffeurslijst in
   dan eerst aan een andere chauffeur toe. In het beheer blijft een verwijderde
   chauffeur zichtbaar in de keuzelijst van zijn eigen rit, onder "Niet meer in de
   chauffeurslijst".
+
+### Feedbackronde augustus 2026: negen keuzes
+
+Na een half werkingsjaar gaf het team Logistiek feedback op de app. Negen punten
+daaruit waren geen bug maar een werkingskeuze; hieronder wat beslist is en
+waarom. Het werkplan dat eruit volgt staat in `docs/logistiek-feedback-plan.md`.
+
+- **Klaarzetten gebeurt online én op papier.** Per aanvraag vinkt het team elk
+  item af (met een opmerking per lijn, bv. "zie vorig event"), en dezelfde
+  aanvraag is afdrukbaar als A4 om aan het rek te hangen. Het papier alleen laat
+  geen spoor na van wie wat klaarzette; het scherm alleen werkt niet aan een rek
+  in de loods. Daarom beide, met het scherm als bron van waarheid.
+- **Eén evenement wordt de koepel, maar blijft optioneel.** Materiaal,
+  flesserke en transport van hetzelfde evenement komen onder één
+  `UitleenEvent` te hangen, zodat je ziet dat er bijvoorbeeld nog geen transport
+  aangevraagd is en de transportverantwoordelijke de lading kan inschatten. Het
+  blijft optioneel: een losse aanvraag zonder evenement moet mogelijk blijven,
+  anders wordt "snel twee tafels lenen" een formulier van drie schermen.
+- **De catalogus blijft achter de login; schap en rek enkel voor Logistiek.**
+  Wat we hebben mag elk lid zien, waar het ligt niet. Zo blijft de catalogus
+  bruikbaar zonder dat een uitgelekte pagina een plattegrond van de loods is.
+  Dit is de eerste keer dat een veld in deze module op permissie verborgen
+  wordt; `logistiek.manage` is de grens.
+- **Gas is een gewoon catalogusitem.** Geen aparte flow en geen verplichte
+  waarschuwingstekst: het is materiaal zoals de rest, en een uitzonderingsflow
+  voor één productgroep is onderhoud dat niemand later nog begrijpt. Moet er
+  toch iets bij staan, dan hoort dat in de omschrijving van het item.
+- **Last minute begint op 7 dagen, en het team stelt het zelf in.** De grens
+  stond hardcoded op 14 dagen en dat bleek te ruim: bijna elke aanvraag kreeg de
+  badge, en een badge die altijd oplicht leest niemand nog. Zeven dagen houdt ze
+  betekenisvol. De waarde zit in de `logistiek.settings`-`Setting`, dus
+  bijstellen vraagt geen deploy.
+- **Een conflicterende aanvraag mag ingediend worden.** Wie materiaal vraagt dat
+  in die periode al volledig geboekt is, kan dat voortaan tóch indienen, met
+  zichtbaar wat er niet past. Anders heeft de tweede aanvrager geen enkel kanaal
+  en verdwijnt het gesprek naar mail. **Goedkeuren blijft wel hard geblokkeerd
+  zolang de voorraad niet klopt**: het conflict is een signaal, geen
+  overboeking. Logistiek kan van daaruit beide aanvragers mailen en met de
+  periodes schuiven, zodat de twee aanvragen samen wél passen; dat schuiven is
+  de bedoeling van de functie, niet het afwijzen van de tweede.
+- **Het publieke transportoverzicht toont bezet, niet wie.** Het weekraster mag
+  zonder login te bekijken zijn, maar dan enkel voertuig, dag en tijdvenster:
+  geen namen, doelen of adressen, en `noindex`. Zo kan iemand zien of de kar
+  vrij is zonder dat de werking van de kring op straat ligt. Bouw dat op een
+  eigen, geanonimiseerde projectie en niet op de beheerquery met een filter
+  erover: dat laatste lekt vroeg of laat een veld mee.
+- **Geen barcodes.** Het afvinken bij het klaarzetten levert dezelfde vraag
+  ("wanneer is dit stuk laatst gezien") zonder labels, scanners of een extra
+  model per exemplaar. De vraag komt terug als dat te weinig blijkt.
+- **Dagdelen zijn een afspraak, geen boekingseenheid.** Afhalen en terugbrengen
+  krijgen naast de dag een dagdeel (voormiddag / namiddag / avond), zodat
+  "dinsdagnamiddag" in het systeem staat in plaats van in een mail. De
+  **voorraadberekening blijft op hele dagen**. Halve dagen in de beschikbaarheid
+  zouden élke overlapquery raken (aanvragen, goedkeuren, kalender, bewerken) en
+  dubbele boekingen op dezelfde dag mogelijk maken; de winst daarvan weegt niet
+  op tegen dat risico.
+
+Twee dingen hierboven halen een eerdere keuze onderuit. **"Geen mails in v1"**
+(zie § Kleinere keuzes) vervalt: wanneer Logistiek een aanvraag wijzigt, moet de
+aanvrager dat weten zonder in te loggen, en een aanvraag kan een extra
+mailadres meekrijgen (bv. logistiek.existenz@vtk.be) zodat een werkgroepmailbox
+meeleest. En **`condition` is niet langer puur informatief** zodra de staat per
+exemplaar bijgehouden wordt: een kapot exemplaar telt dan niet meer mee voor de
+beschikbaarheid.
 
 ---
 
