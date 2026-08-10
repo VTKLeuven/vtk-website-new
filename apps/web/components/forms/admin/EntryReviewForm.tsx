@@ -3,6 +3,7 @@
 import { ClipboardCheck } from "lucide-react";
 import { saveEntryReviewAction } from "@/app/actions/formEntries";
 import { SaveForm } from "@/components/ui/SaveForm";
+import { ThemedSelect } from "@/components/ui/ThemedSelect";
 import type { AdminLocale } from "./format";
 
 /**
@@ -68,11 +69,16 @@ export function EntryReviewForm({
         <div className="ticket-admin-form-grid">
           <div className="ticket-admin-field">
             <label htmlFor="review-status">{nl ? "Status" : "Status"}</label>
-            <select id="review-status" name="reviewStatus" defaultValue={reviewStatus}>
-              <option value="NEW">{nl ? "Nieuw" : "New"}</option>
-              <option value="ACCEPTED">{nl ? "Geaccepteerd" : "Accepted"}</option>
-              <option value="REJECTED">{nl ? "Geweigerd" : "Rejected"}</option>
-            </select>
+            <ThemedSelect
+              id="review-status"
+              name="reviewStatus"
+              defaultValue={reviewStatus}
+              options={[
+                { value: "NEW", label: nl ? "Nieuw" : "New" },
+                { value: "ACCEPTED", label: nl ? "Geaccepteerd" : "Accepted" },
+                { value: "REJECTED", label: nl ? "Geweigerd" : "Rejected" },
+              ]}
+            />
           </div>
           <div className="ticket-admin-field">
             <label htmlFor="review-reviewer">{nl ? "Beoordelaar" : "Reviewer"}</label>

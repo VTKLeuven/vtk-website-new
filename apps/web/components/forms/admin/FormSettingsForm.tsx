@@ -1,9 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { saveFormSettingsAction } from "@/app/actions/forms";
-import { SaveForm } from "@/components/ui/SaveForm";
 import { MarkdownEditorField } from "@/components/editor/MarkdownEditor";
+import { AutoSaveForm } from "@/components/ui/AutoSaveForm";
+import { ExclusiveChoiceGroup } from "@/components/ui/ExclusiveChoiceGroup";
+import { ThemedSelect } from "@/components/ui/ThemedSelect";
 import type { AdminLocale } from "./format";
 
 export type FormSettingsValues = {
@@ -67,23 +69,27 @@ export function FormSettingsForm({
   const showDutch = localeMode !== "EN_ONLY";
 
   return (
-    <SaveForm
+    <AutoSaveForm
       action={saveFormSettingsAction}
       className="ticket-admin-form"
-      submitLabel={nl ? "Opslaan" : "Save"}
-      savingLabel={nl ? "Bezig met opslaan..." : "Saving..."}
-      savedMessage={nl ? "Instellingen opgeslagen" : "Settings saved"}
+      savedMessage={nl ? "Alle wijzigingen opgeslagen" : "All changes saved"}
+      dirtyMessage={nl ? "Wijzigingen worden zo opgeslagen" : "Changes will be saved shortly"}
+      savingMessage={nl ? "Wijzigingen opslaan..." : "Saving changes..."}
+      invalidMessage={
+        nl ? "Vul de gemarkeerde velden aan om op te slaan" : "Complete the marked fields to save"
+      }
+      retryLabel={nl ? "Opnieuw proberen" : "Try again"}
       fallbackErrorMessage={nl ? "Opslaan is niet gelukt." : "Saving failed."}
       errorMessages={{
-        TITLE_REQUIRED: nl ? "Geef het formulier een titel." : "Give the form a title.",
+        TITLE_REQUIRED: nl ? "Geef de form een titel." : "Give the form a title.",
         SLUG_TAKEN: nl
-          ? "Deze URL is al in gebruik door een ander formulier."
+          ? "Deze URL is al in gebruik door een andere form."
           : "This URL is already used by another form.",
         INVALID_SLUG: nl
           ? "Deze URL kan niet: gebruik letters, cijfers en koppeltekens."
           : "This URL will not work: use letters, digits and hyphens.",
         NO_FIELDS_TO_PUBLISH: nl
-          ? "Voeg eerst minstens één veld toe voor je het formulier online zet."
+          ? "Voeg eerst minstens één veld toe voor je de form online zet."
           : "Add at least one field before putting the form online.",
         CONSENT_TEXT_REQUIRED: nl
           ? "Schrijf de tekst bij het toestemmingsvinkje."
@@ -102,7 +108,7 @@ export function FormSettingsForm({
           ? "Een van de meldingsadressen klopt niet."
           : "One of the notification addresses is not valid.",
         INVALID_CALENDAREVENTID: nl
-          ? "Dat evenement hoort niet bij de eigenaarspost van dit formulier."
+          ? "Dat evenement hoort niet bij de eigenaarspost van deze form."
           : "That event does not belong to this form's owning post.",
       }}
     >
@@ -110,8 +116,8 @@ export function FormSettingsForm({
       <input type="hidden" name="formId" value={values.id} />
 
       <fieldset className="form-admin-fieldset">
-        <legend>{nl ? "Het formulier" : "The form"}</legend>
-        <div className="ticket-admin-form-grid">
+        <legend>{nl ? "De form" : "The form"}</legend>
+        <div className="form-admin-language-grid">
           <div className="ticket-admin-field">
             <label htmlFor="settings-title-nl">{nl ? "Titel (NL)" : "Title (NL)"}</label>
             <input
@@ -131,6 +137,8 @@ export function FormSettingsForm({
               maxLength={200}
             />
           </div>
+        </div>
+        <div className="ticket-admin-form-grid form-admin-align-fields">
           <div className="ticket-admin-field">
             <label htmlFor="settings-slug">URL</label>
             <input
@@ -145,67 +153,99 @@ export function FormSettingsForm({
           </div>
           <div className="ticket-admin-field">
             <label htmlFor="settings-status">Status</label>
-            <select id="settings-status" name="status" defaultValue={values.status}>
-              <option value="DRAFT">{nl ? "Concept (niet zichtbaar)" : "Draft (not visible)"}</option>
-              <option value="PUBLISHED">{nl ? "Online" : "Online"}</option>
-              <option value="CLOSED">{nl ? "Gesloten" : "Closed"}</option>
-              <option value="ARCHIVED">{nl ? "Gearchiveerd" : "Archived"}</option>
-            </select>
+            <ThemedSelect
+              id="settings-status"
+              name="status"
+              defaultValue={values.status}
+              options={[
+                { value: "DRAFT", label: nl ? "Concept (niet zichtbaar)" : "Draft (not visible)" },
+                { value: "PUBLISHED", label: nl ? "Online" : "Online" },
+                { value: "CLOSED", label: nl ? "Gesloten" : "Closed" },
+                { value: "ARCHIVED", label: nl ? "Gearchiveerd" : "Archived" },
+              ]}
+            />
+            <span className="ticket-admin-help">
+              {nl
+                ? "Bepaalt of bezoekers de form kunnen openen."
+                : "Controls whether visitors can open the form."}
+            </span>
           </div>
         </div>
 
-        {showDutch ? (
-          <div className="ticket-admin-field">
-            <label htmlFor="settings-intro-nl">{nl ? "Introductie (NL)" : "Introduction (NL)"}</label>
-            <MarkdownEditorField
-              name="introNl"
-              defaultValue={values.introNl}
-              locale={locale}
-              rows={8}
-              textareaId="settings-intro-nl"
-            />
-          </div>
-        ) : null}
-        {showEnglish ? (
-          <div className="ticket-admin-field">
-            <label htmlFor="settings-intro-en">{nl ? "Introductie (EN)" : "Introduction (EN)"}</label>
-            <MarkdownEditorField
-              name="introEn"
-              defaultValue={values.introEn}
-              locale={locale}
-              rows={8}
-              textareaId="settings-intro-en"
-            />
-          </div>
-        ) : null}
+        <div className="form-admin-language-grid">
+          {showDutch ? (
+            <div className="ticket-admin-field">
+              <label htmlFor="settings-intro-nl">
+                {nl ? "Introductie (NL)" : "Introduction (NL)"}
+              </label>
+              <MarkdownEditorField
+                name="introNl"
+                defaultValue={values.introNl}
+                locale={locale}
+                rows={7}
+                textareaId="settings-intro-nl"
+              />
+            </div>
+          ) : (
+            <input type="hidden" name="introNl" value={values.introNl ?? ""} />
+          )}
+          {showEnglish ? (
+            <div className="ticket-admin-field">
+              <label htmlFor="settings-intro-en">
+                {nl ? "Introductie (EN)" : "Introduction (EN)"}
+              </label>
+              <MarkdownEditorField
+                name="introEn"
+                defaultValue={values.introEn}
+                locale={locale}
+                rows={7}
+                textareaId="settings-intro-en"
+              />
+            </div>
+          ) : (
+            <input type="hidden" name="introEn" value={values.introEn ?? ""} />
+          )}
+        </div>
       </fieldset>
 
       <fieldset className="form-admin-fieldset">
         <legend>{nl ? "Talen" : "Languages"}</legend>
-        <div className="ticket-admin-field">
-          <label htmlFor="settings-locale-mode">
-            {nl ? "In welke talen bestaat dit formulier?" : "Which languages does this form have?"}
-          </label>
-          <select
-            id="settings-locale-mode"
-            name="localeMode"
-            value={localeMode}
-            onChange={(event) => setLocaleMode(event.target.value)}
-          >
-            <option value="BOTH">{nl ? "Nederlands en Engels" : "Dutch and English"}</option>
-            <option value="NL_ONLY">{nl ? "Enkel Nederlands" : "Dutch only"}</option>
-            <option value="EN_ONLY">{nl ? "Enkel Engels" : "English only"}</option>
-          </select>
-        </div>
+        <ExclusiveChoiceGroup
+          name="localeMode"
+          value={localeMode}
+          onChange={setLocaleMode}
+          ariaLabel={nl ? "Talen van de form" : "Form languages"}
+          options={[
+            {
+              value: "BOTH",
+              label: nl ? "Nederlands en Engels" : "Dutch and English",
+              description: nl ? "Beide versies zijn beschikbaar." : "Both versions are available.",
+            },
+            {
+              value: "NL_ONLY",
+              label: nl ? "Enkel Nederlands" : "Dutch only",
+              description: nl
+                ? "Engelstaligen krijgen een melding."
+                : "English visitors see a notice.",
+            },
+            {
+              value: "EN_ONLY",
+              label: nl ? "Enkel Engels" : "English only",
+              description: nl
+                ? "Nederlandstaligen krijgen een melding."
+                : "Dutch visitors see a notice.",
+            },
+          ]}
+        />
         {localeMode !== "BOTH" ? (
           <div className="ticket-admin-field">
             <label htmlFor="settings-unavailable">
               {localeMode === "NL_ONLY"
                 ? nl
-                  ? "Bericht voor Engelstalige bezoekers"
+                  ? "Melding voor Engelstalige bezoekers"
                   : "Message for English visitors"
                 : nl
-                  ? "Bericht voor Nederlandstalige bezoekers"
+                  ? "Melding voor Nederlandstalige bezoekers"
                   : "Message for Dutch visitors"}
             </label>
             <textarea
@@ -219,17 +259,16 @@ export function FormSettingsForm({
               placeholder={
                 localeMode === "NL_ONLY"
                   ? "Sorry, this form is only available in Dutch."
-                  : "Sorry, dit formulier is enkel voor internationals."
+                  : "Sorry, deze form is enkel voor internationals."
               }
             />
             <span className="ticket-admin-help">
               {nl
-                ? "Zonder eigen tekst staat er een standaardbericht; in geen geval een halfleeg formulier of een 404."
-                : "Without your own text a default message appears; never a half-empty form or a 404."}
+                ? "Zonder eigen tekst verschijnt een standaardmelding."
+                : "Without your own text a default message appears."}
             </span>
           </div>
         ) : null}
-        {/* Het veld van de andere taal blijft meegaan, anders wist opslaan het. */}
         {localeMode === "NL_ONLY" ? (
           <input type="hidden" name="unavailableNl" value={values.unavailableNl ?? ""} />
         ) : null}
@@ -246,15 +285,23 @@ export function FormSettingsForm({
 
       <fieldset className="form-admin-fieldset">
         <legend>{nl ? "Wie, wanneer en hoeveel" : "Who, when and how many"}</legend>
-        <div className="ticket-admin-form-grid">
+        <div className="ticket-admin-form-grid form-admin-align-fields">
           <div className="ticket-admin-field">
-            <label htmlFor="settings-audience">{nl ? "Wie mag invullen?" : "Who can fill it in?"}</label>
-            <select id="settings-audience" name="audience" defaultValue={values.audience}>
-              <option value="PUBLIC">{nl ? "Iedereen" : "Everyone"}</option>
-              <option value="MEMBERS">
-                {nl ? "Enkel ingelogde leden" : "Logged-in members only"}
-              </option>
-            </select>
+            <label htmlFor="settings-audience">
+              {nl ? "Wie mag invullen?" : "Who can fill it in?"}
+            </label>
+            <ThemedSelect
+              id="settings-audience"
+              name="audience"
+              defaultValue={values.audience}
+              options={[
+                { value: "PUBLIC", label: nl ? "Iedereen" : "Everyone" },
+                {
+                  value: "MEMBERS",
+                  label: nl ? "Enkel ingelogde leden" : "Logged-in members only",
+                },
+              ]}
+            />
           </div>
           <div className="ticket-admin-field">
             <label htmlFor="settings-max-entries">
@@ -295,213 +342,220 @@ export function FormSettingsForm({
           </div>
         </div>
 
-        <label className="ticket-admin-check">
-          <input
-            type="checkbox"
+        <div className="form-admin-toggle-grid">
+          <SettingToggle
             name="listed"
             defaultChecked={values.listed}
+            title={nl ? "Zichtbaar in het overzicht" : "Visible in the overview"}
+            description={
+              nl
+                ? "Uitgeschakeld blijft de form bereikbaar via de rechtstreekse link."
+                : "When off, the form remains reachable through its direct link."
+            }
           />
-          {nl ? "Toon dit formulier in het overzicht op /formulieren" : "List this form on /formulieren"}
-        </label>
-        <p className="form-admin-hint">
-          {nl
-            ? "Staat dit uit, dan blijft het formulier gewoon bereikbaar via zijn link; het staat enkel niet in de lijst. Handig voor een sollicitatie die je gericht deelt."
-            : "When off the form stays reachable through its link; it is only left out of the list. Useful for an application you share on purpose."}
-        </p>
-
-        <label className="ticket-admin-check">
-          <input type="checkbox" name="allowWaitlist" defaultChecked={values.allowWaitlist} />
-          {nl
-            ? "Blijf inzendingen aanvaarden als het vol zit (wachtlijst)"
-            : "Keep accepting entries when full (waiting list)"}
-        </label>
-        <p className="form-admin-hint">
-          {nl
-            ? "Wie na het maximum indient, komt op de wachtlijst en claimt geen plaats. Je haalt zo iemand er zelf bij zodra er iets vrijkomt. Ditzelfde kan je per keuzeoptie instellen bij Velden."
-            : "Anyone submitting past the limit lands on the waiting list and holds no spot. You promote them yourself when one frees up. The same setting exists per choice option under Fields."}
-        </p>
-
-        <label className="ticket-admin-check">
-          <input type="checkbox" name="stepBySections" defaultChecked={values.stepBySections} />
-          {nl
-            ? "Toon de secties één voor één, met een vorige- en volgende-knop"
-            : "Show the sections one by one, with back and next buttons"}
-        </label>
-        <p className="form-admin-hint">
-          {nl
-            ? "Nodig om te kunnen springen: naar een sectie verderop springen heeft geen betekenis wanneer alles toch al op één pagina staat. Je stelt de sprongen in bij Velden."
-            : "Required for jumping: jumping to a later section means nothing when everything is on one page already. You set the jumps under Fields."}
-        </p>
-
-        <label className="ticket-admin-check">
-          <input
-            type="checkbox"
+          <SettingToggle
+            name="allowWaitlist"
+            defaultChecked={values.allowWaitlist}
+            title={nl ? "Wachtlijst bij een volle form" : "Waiting list when full"}
+            description={
+              nl
+                ? "Extra inzendingen claimen geen plaats en worden handmatig toegelaten."
+                : "Extra entries hold no spot and are promoted manually."
+            }
+          />
+          <SettingToggle
+            name="stepBySections"
+            defaultChecked={values.stepBySections}
+            title={nl ? "Secties stap voor stap tonen" : "Show sections step by step"}
+            description={
+              nl
+                ? "Nodig voor sprongen en toont vorige- en volgende-knoppen."
+                : "Required for branching and shows back and next buttons."
+            }
+          />
+          <SettingToggle
             name="allowMultipleSubmissions"
             defaultChecked={values.allowMultipleSubmissions}
+            title={nl ? "Meerdere keren indienen" : "Allow multiple submissions"}
+            description={
+              nl
+                ? "Dezelfde persoon mag meer dan één inzending versturen."
+                : "The same person may send more than one entry."
+            }
           />
-          {nl ? "Iemand mag meerdere keren indienen" : "Someone may submit more than once"}
-        </label>
-        <label className="ticket-admin-check">
-          <input
-            type="checkbox"
+          <SettingToggle
             name="allowEditAfterSubmit"
             defaultChecked={values.allowEditAfterSubmit}
+            title={nl ? "Inzending nadien bewerken" : "Edit an entry afterwards"}
+            description={
+              nl
+                ? "Enkel beschikbaar voor ingelogde leden."
+                : "Available to logged-in members only."
+            }
           />
-          {nl ? "Ingelogde leden mogen hun inzending nadien bewerken" : "Logged-in members may edit their entry afterwards"}
-        </label>
-        <label className="ticket-admin-check">
-          <input type="checkbox" name="allowDrafts" defaultChecked={values.allowDrafts} />
-          {nl
-            ? "Ingelogde leden mogen een concept bewaren en later verdergaan"
-            : "Logged-in members may save a draft and continue later"}
-        </label>
-        <p className="form-admin-hint">
-          {nl
-            ? "Bewerken en concepten gelden enkel voor wie ingelogd is: een anonieme inzending heeft geen eigenaar om ze aan terug te geven."
-            : "Editing and drafts only apply to logged-in visitors: an anonymous entry has no owner to hand it back to."}
-        </p>
+          <SettingToggle
+            name="allowDrafts"
+            defaultChecked={values.allowDrafts}
+            title={nl ? "Concept bewaren" : "Save a draft"}
+            description={
+              nl
+                ? "Ingelogde leden kunnen later verdergaan."
+                : "Logged-in members can continue later."
+            }
+          />
+        </div>
       </fieldset>
 
       <fieldset className="form-admin-fieldset">
         <legend>{nl ? "Na het indienen" : "After submitting"}</legend>
-        {showDutch ? (
-          <div className="ticket-admin-field">
-            <label htmlFor="settings-thankyou-nl">{nl ? "Bedanktekst (NL)" : "Thank-you text (NL)"}</label>
-            <textarea
-              id="settings-thankyou-nl"
-              name="thankYouNl"
-              defaultValue={values.thankYouNl ?? ""}
-              rows={3}
-              maxLength={5_000}
-              placeholder={nl ? "Bedankt, we hebben je inzending goed ontvangen." : ""}
-            />
-          </div>
-        ) : (
-          <input type="hidden" name="thankYouNl" value={values.thankYouNl ?? ""} />
-        )}
-        {showEnglish ? (
-          <div className="ticket-admin-field">
-            <label htmlFor="settings-thankyou-en">{nl ? "Bedanktekst (EN)" : "Thank-you text (EN)"}</label>
-            <textarea
-              id="settings-thankyou-en"
-              name="thankYouEn"
-              defaultValue={values.thankYouEn ?? ""}
-              rows={3}
-              maxLength={5_000}
-            />
-          </div>
-        ) : (
-          <input type="hidden" name="thankYouEn" value={values.thankYouEn ?? ""} />
-        )}
+        <div className="form-admin-language-grid">
+          {showDutch ? (
+            <div className="ticket-admin-field">
+              <label htmlFor="settings-thankyou-nl">
+                {nl ? "Bedanktekst (NL)" : "Thank-you text (NL)"}
+              </label>
+              <textarea
+                id="settings-thankyou-nl"
+                name="thankYouNl"
+                defaultValue={values.thankYouNl ?? ""}
+                rows={3}
+                maxLength={5_000}
+                placeholder={nl ? "Bedankt, we hebben je inzending goed ontvangen." : ""}
+              />
+            </div>
+          ) : (
+            <input type="hidden" name="thankYouNl" value={values.thankYouNl ?? ""} />
+          )}
+          {showEnglish ? (
+            <div className="ticket-admin-field">
+              <label htmlFor="settings-thankyou-en">
+                {nl ? "Bedanktekst (EN)" : "Thank-you text (EN)"}
+              </label>
+              <textarea
+                id="settings-thankyou-en"
+                name="thankYouEn"
+                defaultValue={values.thankYouEn ?? ""}
+                rows={3}
+                maxLength={5_000}
+              />
+            </div>
+          ) : (
+            <input type="hidden" name="thankYouEn" value={values.thankYouEn ?? ""} />
+          )}
+        </div>
 
-        <label className="ticket-admin-check">
-          <input
-            type="checkbox"
-            name="confirmationEnabled"
-            checked={confirmationEnabled}
-            onChange={(event) => setConfirmationEnabled(event.target.checked)}
-          />
-          {nl ? "Stuur een bevestigingsmail naar de inzender" : "Send a confirmation mail to the submitter"}
-        </label>
+        <SettingToggle
+          name="confirmationEnabled"
+          checked={confirmationEnabled}
+          onChange={setConfirmationEnabled}
+          title={nl ? "Bevestigingsmail versturen" : "Send a confirmation email"}
+          description={
+            nl
+              ? "De inzender krijgt na verzending een mail op het opgegeven adres."
+              : "The submitter receives an email after submitting."
+          }
+        />
 
         {confirmationEnabled ? (
-          <div className="ticket-admin-form-grid">
-            {showDutch ? (
-              <div className="ticket-admin-field" data-span="2">
-                <label htmlFor="settings-confirm-subject-nl">
-                  {nl ? "Onderwerp (NL)" : "Subject (NL)"}
-                </label>
-                <input
-                  id="settings-confirm-subject-nl"
-                  name="confirmationSubjectNl"
-                  defaultValue={values.confirmationSubjectNl ?? ""}
-                  maxLength={200}
-                />
-              </div>
-            ) : (
-              <input
-                type="hidden"
-                name="confirmationSubjectNl"
-                value={values.confirmationSubjectNl ?? ""}
-              />
-            )}
-            {showEnglish ? (
-              <div className="ticket-admin-field" data-span="2">
-                <label htmlFor="settings-confirm-subject-en">
-                  {nl ? "Onderwerp (EN)" : "Subject (EN)"}
-                </label>
-                <input
-                  id="settings-confirm-subject-en"
-                  name="confirmationSubjectEn"
-                  defaultValue={values.confirmationSubjectEn ?? ""}
-                  maxLength={200}
-                />
-              </div>
-            ) : (
-              <input
-                type="hidden"
-                name="confirmationSubjectEn"
-                value={values.confirmationSubjectEn ?? ""}
-              />
-            )}
-            {showDutch ? (
-              <div className="ticket-admin-field" data-span="2">
-                <label htmlFor="settings-confirm-body-nl">{nl ? "Bericht (NL)" : "Message (NL)"}</label>
-                <textarea
-                  id="settings-confirm-body-nl"
-                  name="confirmationBodyNl"
-                  defaultValue={values.confirmationBodyNl ?? ""}
-                  rows={4}
-                  maxLength={10_000}
-                />
-              </div>
-            ) : (
-              <input
-                type="hidden"
-                name="confirmationBodyNl"
-                value={values.confirmationBodyNl ?? ""}
-              />
-            )}
-            {showEnglish ? (
-              <div className="ticket-admin-field" data-span="2">
-                <label htmlFor="settings-confirm-body-en">{nl ? "Bericht (EN)" : "Message (EN)"}</label>
-                <textarea
-                  id="settings-confirm-body-en"
-                  name="confirmationBodyEn"
-                  defaultValue={values.confirmationBodyEn ?? ""}
-                  rows={4}
-                  maxLength={10_000}
-                />
-              </div>
-            ) : (
-              <input
-                type="hidden"
-                name="confirmationBodyEn"
-                value={values.confirmationBodyEn ?? ""}
-              />
-            )}
-            <div className="ticket-admin-field" data-span="2">
-              <label className="ticket-admin-check">
-                <input
-                  type="checkbox"
-                  name="confirmationIncludeAnswers"
-                  defaultChecked={values.confirmationIncludeAnswers}
-                />
-                {nl
-                  ? "Zet een kopie van de eigen antwoorden in de mail"
-                  : "Include a copy of the submitted answers"}
-              </label>
-              {values.hasCalendarEvent ? (
-                <label className="ticket-admin-check">
+          <div className="ticket-admin-form form-admin-nested-settings">
+            <div className="form-admin-language-grid">
+              {showDutch ? (
+                <div className="ticket-admin-field">
+                  <label htmlFor="settings-confirm-subject-nl">
+                    {nl ? "Onderwerp (NL)" : "Subject (NL)"}
+                  </label>
                   <input
-                    type="checkbox"
-                    name="confirmationIncludeIcs"
-                    defaultChecked={values.confirmationIncludeIcs}
+                    id="settings-confirm-subject-nl"
+                    name="confirmationSubjectNl"
+                    defaultValue={values.confirmationSubjectNl ?? ""}
+                    maxLength={200}
                   />
-                  {nl
-                    ? "Steek het agenda-item van het gekoppelde evenement bij de mail"
-                    : "Attach the calendar item of the linked event"}
-                </label>
+                </div>
+              ) : (
+                <input
+                  type="hidden"
+                  name="confirmationSubjectNl"
+                  value={values.confirmationSubjectNl ?? ""}
+                />
+              )}
+              {showEnglish ? (
+                <div className="ticket-admin-field">
+                  <label htmlFor="settings-confirm-subject-en">
+                    {nl ? "Onderwerp (EN)" : "Subject (EN)"}
+                  </label>
+                  <input
+                    id="settings-confirm-subject-en"
+                    name="confirmationSubjectEn"
+                    defaultValue={values.confirmationSubjectEn ?? ""}
+                    maxLength={200}
+                  />
+                </div>
+              ) : (
+                <input
+                  type="hidden"
+                  name="confirmationSubjectEn"
+                  value={values.confirmationSubjectEn ?? ""}
+                />
+              )}
+            </div>
+            <div className="form-admin-language-grid">
+              {showDutch ? (
+                <div className="ticket-admin-field">
+                  <label htmlFor="settings-confirm-body-nl">
+                    {nl ? "Bericht (NL)" : "Message (NL)"}
+                  </label>
+                  <textarea
+                    id="settings-confirm-body-nl"
+                    name="confirmationBodyNl"
+                    defaultValue={values.confirmationBodyNl ?? ""}
+                    rows={4}
+                    maxLength={10_000}
+                  />
+                </div>
+              ) : (
+                <input
+                  type="hidden"
+                  name="confirmationBodyNl"
+                  value={values.confirmationBodyNl ?? ""}
+                />
+              )}
+              {showEnglish ? (
+                <div className="ticket-admin-field">
+                  <label htmlFor="settings-confirm-body-en">
+                    {nl ? "Bericht (EN)" : "Message (EN)"}
+                  </label>
+                  <textarea
+                    id="settings-confirm-body-en"
+                    name="confirmationBodyEn"
+                    defaultValue={values.confirmationBodyEn ?? ""}
+                    rows={4}
+                    maxLength={10_000}
+                  />
+                </div>
+              ) : (
+                <input
+                  type="hidden"
+                  name="confirmationBodyEn"
+                  value={values.confirmationBodyEn ?? ""}
+                />
+              )}
+            </div>
+            <div className="form-admin-toggle-grid">
+              <SettingToggle
+                name="confirmationIncludeAnswers"
+                defaultChecked={values.confirmationIncludeAnswers}
+                title={nl ? "Antwoorden meesturen" : "Include answers"}
+                description={nl ? "Zet een kopie in de mail." : "Adds a copy to the email."}
+              />
+              {values.hasCalendarEvent ? (
+                <SettingToggle
+                  name="confirmationIncludeIcs"
+                  defaultChecked={values.confirmationIncludeIcs}
+                  title={nl ? "Agenda-item meesturen" : "Include calendar item"}
+                  description={
+                    nl ? "Voegt het gekoppelde evenement toe." : "Adds the linked event."
+                  }
+                />
               ) : (
                 <input
                   type="hidden"
@@ -512,8 +566,6 @@ export function FormSettingsForm({
             </div>
           </div>
         ) : (
-          // De mail staat uit, maar de tekst die er ooit in stond mag niet
-          // verdwijnen: wie de mail morgen weer aanzet, wil ze terugvinden.
           <>
             <input
               type="hidden"
@@ -551,65 +603,73 @@ export function FormSettingsForm({
 
       <fieldset className="form-admin-fieldset">
         <legend>{nl ? "Meldingen aan de organisatoren" : "Notifications to the organisers"}</legend>
-        <div className="ticket-admin-form-grid">
+        <ExclusiveChoiceGroup
+          name="notifyMode"
+          value={notifyMode}
+          onChange={setNotifyMode}
+          ariaLabel={nl ? "Moment van meldingen" : "Notification timing"}
+          options={[
+            {
+              value: "NONE",
+              label: nl ? "Geen meldingen" : "No notifications",
+              description: nl ? "Bekijk inzendingen in de admin." : "Review entries in the admin.",
+            },
+            {
+              value: "EACH",
+              label: nl ? "Bij elke inzending" : "On every entry",
+              description: nl ? "Meteen een e-mail per inzending." : "An email for every entry.",
+            },
+            {
+              value: "DAILY",
+              label: nl ? "Dagelijkse samenvatting" : "Daily summary",
+              description: nl ? "Eén overzicht per dag." : "One overview each day.",
+            },
+          ]}
+        />
+        {notifyMode !== "NONE" ? (
           <div className="ticket-admin-field">
-            <label htmlFor="settings-notify-mode">{nl ? "Wanneer melden?" : "When to notify?"}</label>
-            <select
-              id="settings-notify-mode"
-              name="notifyMode"
-              value={notifyMode}
-              onChange={(event) => setNotifyMode(event.target.value)}
-            >
-              <option value="NONE">{nl ? "Nooit" : "Never"}</option>
-              <option value="EACH">{nl ? "Bij elke inzending" : "On every entry"}</option>
-              <option value="DAILY">{nl ? "Eén samenvatting per dag" : "One daily summary"}</option>
-            </select>
+            <label htmlFor="settings-notify-emails">
+              {nl ? "Naar welke adressen?" : "To which addresses?"}
+            </label>
+            <textarea
+              id="settings-notify-emails"
+              name="notifyEmails"
+              defaultValue={values.notifyEmails.join("\n")}
+              rows={3}
+              placeholder="cursusdienst@vtk.be"
+            />
+            <span className="ticket-admin-help">
+              {nl ? "Eén adres per regel." : "One address per line."}
+            </span>
           </div>
-          {notifyMode !== "NONE" ? (
-            <div className="ticket-admin-field" data-span="2">
-              <label htmlFor="settings-notify-emails">
-                {nl ? "Naar welke adressen?" : "To which addresses?"}
-              </label>
-              <textarea
-                id="settings-notify-emails"
-                name="notifyEmails"
-                defaultValue={values.notifyEmails.join("\n")}
-                rows={3}
-                placeholder="cursusdienst@vtk.be"
-              />
-              <span className="ticket-admin-help">
-                {nl ? "Eén adres per regel." : "One address per line."}
-              </span>
-            </div>
-          ) : (
-            <input type="hidden" name="notifyEmails" value={values.notifyEmails.join("\n")} />
-          )}
-        </div>
+        ) : (
+          <input type="hidden" name="notifyEmails" value={values.notifyEmails.join("\n")} />
+        )}
       </fieldset>
 
       <fieldset className="form-admin-fieldset">
         <legend>{nl ? "Privacy" : "Privacy"}</legend>
-        <label className="ticket-admin-check">
-          <input
-            type="checkbox"
-            name="requireConsent"
-            checked={requireConsent}
-            onChange={(event) => setRequireConsent(event.target.checked)}
-          />
-          {nl
-            ? "Vraag een expliciet vinkje voor toestemming"
-            : "Ask for an explicit consent checkbox"}
-        </label>
+        <SettingToggle
+          name="requireConsent"
+          checked={requireConsent}
+          onChange={setRequireConsent}
+          title={nl ? "Expliciete toestemming vragen" : "Ask for explicit consent"}
+          description={
+            nl
+              ? "De bezoeker moet een extra vinkje aanduiden voor verzending."
+              : "The visitor must tick an extra checkbox before submitting."
+          }
+        />
         {requireConsent ? (
-          <div className="ticket-admin-form-grid">
+          <div className="form-admin-language-grid">
             {showDutch ? (
-              <div className="ticket-admin-field" data-span="2">
+              <div className="ticket-admin-field">
                 <label htmlFor="settings-consent-nl">{nl ? "Tekst (NL)" : "Text (NL)"}</label>
                 <textarea
                   id="settings-consent-nl"
                   name="consentTextNl"
                   defaultValue={values.consentTextNl ?? ""}
-                  rows={2}
+                  rows={3}
                   maxLength={1_000}
                   placeholder={
                     nl
@@ -622,13 +682,13 @@ export function FormSettingsForm({
               <input type="hidden" name="consentTextNl" value={values.consentTextNl ?? ""} />
             )}
             {showEnglish ? (
-              <div className="ticket-admin-field" data-span="2">
+              <div className="ticket-admin-field">
                 <label htmlFor="settings-consent-en">{nl ? "Tekst (EN)" : "Text (EN)"}</label>
                 <textarea
                   id="settings-consent-en"
                   name="consentTextEn"
                   defaultValue={values.consentTextEn ?? ""}
-                  rows={2}
+                  rows={3}
                   maxLength={1_000}
                 />
               </div>
@@ -643,7 +703,7 @@ export function FormSettingsForm({
           </>
         )}
 
-        <div className="ticket-admin-field">
+        <div className="ticket-admin-field form-admin-short-field">
           <label htmlFor="settings-retention">
             {nl ? "Bewaartermijn inzendingen (dagen)" : "Entry retention (days)"}
           </label>
@@ -658,8 +718,8 @@ export function FormSettingsForm({
           />
           <span className="ticket-admin-help">
             {nl
-              ? "Na dit aantal dagen verdwijnen de inzendingen en hun bestanden vanzelf. Leeg laten betekent bewaren tot iemand ze zelf verwijdert."
-              : "After this many days entries and their files disappear by themselves. Leave empty to keep them until someone deletes them."}
+              ? "Leeg betekent bewaren tot iemand de inzendingen zelf verwijdert."
+              : "Empty means keeping entries until someone removes them manually."}
           </span>
         </div>
       </fieldset>
@@ -671,23 +731,53 @@ export function FormSettingsForm({
             <label htmlFor="settings-calendar-event">
               {nl ? "Hangt aan dit evenement" : "Attached to this event"}
             </label>
-            <select
+            <ThemedSelect
               id="settings-calendar-event"
               name="calendarEventId"
               defaultValue={values.calendarEventId ?? ""}
-            >
-              <option value="">{nl ? "Geen evenement" : "No event"}</option>
-              {calendarEvents.map((event) => (
-                <option key={event.id} value={event.id}>
-                  {event.label}
-                </option>
-              ))}
-            </select>
+              options={[
+                { value: "", label: nl ? "Geen evenement" : "No event" },
+                ...calendarEvents.map((event) => ({ value: event.id, label: event.label })),
+              ]}
+            />
           </div>
         </fieldset>
       ) : (
         <input type="hidden" name="calendarEventId" value={values.calendarEventId ?? ""} />
       )}
-    </SaveForm>
+    </AutoSaveForm>
+  );
+}
+
+function SettingToggle({
+  name,
+  title,
+  description,
+  defaultChecked,
+  checked,
+  onChange,
+}: {
+  name: string;
+  title: ReactNode;
+  description: ReactNode;
+  defaultChecked?: boolean;
+  checked?: boolean;
+  onChange?: (checked: boolean) => void;
+}) {
+  const controlled = checked !== undefined;
+  return (
+    <label className="form-admin-toggle">
+      <input
+        type="checkbox"
+        name={name}
+        {...(controlled
+          ? { checked, onChange: (event) => onChange?.(event.target.checked) }
+          : { defaultChecked })}
+      />
+      <span>
+        <strong>{title}</strong>
+        <small>{description}</small>
+      </span>
+    </label>
   );
 }

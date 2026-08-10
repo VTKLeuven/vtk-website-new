@@ -1,11 +1,13 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import QRCode from "qrcode";
 import { Check, Copy, Link2, QrCode } from "lucide-react";
 import { createFormShortLinkAction } from "@/app/actions/forms";
 import { SaveForm } from "@/components/ui/SaveForm";
 import { IconButton } from "@/components/ui/IconButton";
+import { ExclusiveChoiceGroup } from "@/components/ui/ExclusiveChoiceGroup";
 import type { AdminLocale } from "./format";
 
 /**
@@ -26,7 +28,9 @@ export function SharePanel({
   shortLink: string | null;
 }) {
   const nl = locale === "nl";
-  const shareUrl = shortLink ?? formUrl;
+  const router = useRouter();
+  const [linkType, setLinkType] = useState<"regular" | "short">(shortLink ? "short" : "regular");
+  const shareUrl = linkType === "short" && shortLink ? shortLink : formUrl;
   const [qr, setQr] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
 
@@ -64,13 +68,36 @@ export function SharePanel({
           </span>
           <div>
             <h2 id="share-heading">{nl ? "Delen" : "Share"}</h2>
-            <p>{nl ? "Voor een affiche, een story of een mail." : "For a poster, a story or a mail."}</p>
+            <p>
+              {nl ? "Voor een affiche, een story of een mail." : "For a poster, a story or a mail."}
+            </p>
           </div>
         </div>
       </div>
 
       <div className="form-admin-share">
         <div>
+          {shortLink ? (
+            <ExclusiveChoiceGroup
+              name="shareLinkType"
+              value={linkType}
+              onChange={(value) => setLinkType(value as "regular" | "short")}
+              columns={2}
+              ariaLabel={nl ? "Type link" : "Link type"}
+              options={[
+                {
+                  value: "regular",
+                  label: nl ? "Gewone link" : "Regular link",
+                  description: nl ? "De vaste URL van de form." : "The form's permanent URL.",
+                },
+                {
+                  value: "short",
+                  label: nl ? "Verkorte link" : "Short link",
+                  description: nl ? "Korter en met klikteller." : "Shorter and tracks clicks.",
+                },
+              ]}
+            />
+          ) : null}
           <p className="ticket-admin-row-meta">{nl ? "Link" : "Link"}</p>
           <p className="ticket-admin-row-title form-admin-share-url">
             {shareUrl}
@@ -85,15 +112,23 @@ export function SharePanel({
               }}
             >
               {/* Het vinkje zit in het icoon zelf, niet enkel in de tooltip. */}
-              {copied ? <Check size={16} aria-hidden="true" /> : <Copy size={16} aria-hidden="true" />}
+              {copied ? (
+                <Check size={16} aria-hidden="true" />
+              ) : (
+                <Copy size={16} aria-hidden="true" />
+              )}
             </IconButton>
           </p>
 
           {shortLink ? (
             <p className="form-admin-hint">
-              {nl
-                ? "Deze verkorte link telt kliks; je vindt hem terug bij Verkorte links."
-                : "This short link counts clicks; you find it under Short links."}
+              {linkType === "short"
+                ? nl
+                  ? "Deze verkorte link telt kliks; je vindt hem terug bij Verkorte links."
+                  : "This short link counts clicks; you find it under Short links."
+                : nl
+                  ? "De gewone link blijft altijd bruikbaar, ook nadat je een verkorte link maakte."
+                  : "The regular link remains usable after creating a short link."}
             </p>
           ) : (
             <SaveForm
@@ -105,6 +140,7 @@ export function SharePanel({
               fallbackErrorMessage={
                 nl ? "Verkorte link maken is niet gelukt." : "Creating the short link failed."
               }
+              onSuccess={() => router.refresh()}
             >
               <input type="hidden" name="locale" value={locale} />
               <input type="hidden" name="formId" value={formId} />

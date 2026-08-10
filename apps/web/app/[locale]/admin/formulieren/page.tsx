@@ -2,21 +2,13 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { prisma } from "@vtk/db";
 import { hasPermission } from "@vtk/auth";
-import {
-  ArrowRight,
-  ClipboardList,
-  Filter,
-  Inbox,
-  Plus,
-  Radio,
-  Search,
-} from "lucide-react";
+import { ArrowRight, ClipboardList, Filter, Plus, Search } from "lucide-react";
 import { hasLocale } from "@/lib/locale";
 import { requireSession } from "@/lib/session";
 import { visibleFormsFilter } from "@/lib/forms/authorization";
 import { AdminEmptyState } from "@/components/ticketing/admin/AdminEmptyState";
-import { AdminMetric } from "@/components/ticketing/admin/AdminMetric";
 import { FormStatusBadge } from "@/components/forms/admin/FormStatusBadge";
+import { ThemedSelect } from "@/components/ui/ThemedSelect";
 import {
   formatDateTime,
   formatNumber,
@@ -78,14 +70,11 @@ export default async function FormsAdminOverview({
     return searchable.includes(query);
   });
 
-  const online = forms.filter((form) => form.status === "PUBLISHED").length;
-  const entries = forms.reduce((sum, form) => sum + form._count.entries, 0);
-
   return (
     <div className="ticket-admin-page">
       <div className="ticket-admin-page-head">
         <div>
-          <h1>{locale === "nl" ? "Formulieren" : "Forms"}</h1>
+          <h1>Forms</h1>
           <p>
             {locale === "nl"
               ? "Inschrijvingen, sollicitaties en bevragingen, met hun inzendingen."
@@ -99,40 +88,18 @@ export default async function FormsAdminOverview({
             href={`${base}/admin/formulieren/nieuw`}
           >
             <Plus aria-hidden="true" size={16} />
-            {locale === "nl" ? "Nieuw formulier" : "New form"}
+            {locale === "nl" ? "Nieuwe form" : "New form"}
           </Link>
         ) : null}
-      </div>
-
-      <div
-        className="ticket-admin-metrics"
-        aria-label={locale === "nl" ? "Samenvatting" : "Summary"}
-      >
-        <AdminMetric
-          icon={ClipboardList}
-          label={locale === "nl" ? "Formulieren" : "Forms"}
-          value={formatNumber(forms.length, locale)}
-        />
-        <AdminMetric
-          icon={Radio}
-          label={locale === "nl" ? "Online" : "Online"}
-          value={formatNumber(online, locale)}
-          tone={online > 0 ? "success" : "default"}
-        />
-        <AdminMetric
-          icon={Inbox}
-          label={locale === "nl" ? "Inzendingen" : "Entries"}
-          value={formatNumber(entries, locale)}
-        />
       </div>
 
       <section className="ticket-admin-section" aria-labelledby="forms-heading">
         <div className="ticket-admin-section-head">
           <div>
-            <h2 id="forms-heading">{locale === "nl" ? "Alle formulieren" : "All forms"}</h2>
+            <h2 id="forms-heading">{locale === "nl" ? "Alle forms" : "All forms"}</h2>
             <p>
               {locale === "nl"
-                ? `${visibleForms.length} van ${forms.length} formulieren`
+                ? `${visibleForms.length} van ${forms.length} forms`
                 : `${visibleForms.length} of ${forms.length} forms`}
             </p>
           </div>
@@ -154,14 +121,18 @@ export default async function FormsAdminOverview({
           </div>
           <div className="ticket-admin-field">
             <label htmlFor="form-status">Status</label>
-            <select id="form-status" name="status" defaultValue={selectedStatus}>
-              <option value="">{locale === "nl" ? "Alle statussen" : "All statuses"}</option>
-              {FORM_STATUSES.map((status) => (
-                <option key={status} value={status}>
-                  {formStatusLabel(status, locale)}
-                </option>
-              ))}
-            </select>
+            <ThemedSelect
+              id="form-status"
+              name="status"
+              defaultValue={selectedStatus}
+              options={[
+                { value: "", label: locale === "nl" ? "Alle statussen" : "All statuses" },
+                ...FORM_STATUSES.map((status) => ({
+                  value: status,
+                  label: formStatusLabel(status, locale),
+                })),
+              ]}
+            />
           </div>
           <button className="ticket-admin-button" type="submit">
             <Filter aria-hidden="true" size={15} />
@@ -172,13 +143,11 @@ export default async function FormsAdminOverview({
         {visibleForms.length === 0 ? (
           <AdminEmptyState
             icon={ClipboardList}
-            title={
-              locale === "nl" ? "Geen formulieren gevonden" : "No forms found"
-            }
+            title={locale === "nl" ? "Geen forms gevonden" : "No forms found"}
             description={
               forms.length === 0
                 ? locale === "nl"
-                  ? "Er zijn nog geen formulieren waar je toegang toe hebt."
+                  ? "Er zijn nog geen forms waar je toegang toe hebt."
                   : "There are no forms you can access yet."
                 : locale === "nl"
                   ? "Pas je zoekopdracht of filter aan."
@@ -192,7 +161,7 @@ export default async function FormsAdminOverview({
                   href={`${base}/admin/formulieren/nieuw`}
                 >
                   <Plus aria-hidden="true" size={16} />
-                  {locale === "nl" ? "Formulier aanmaken" : "Create form"}
+                  {locale === "nl" ? "Form aanmaken" : "Create form"}
                 </Link>
               ) : undefined
             }
@@ -202,7 +171,7 @@ export default async function FormsAdminOverview({
             <table className="ticket-admin-table">
               <thead>
                 <tr>
-                  <th>{locale === "nl" ? "Formulier" : "Form"}</th>
+                  <th>Form</th>
                   <th data-priority="low">{locale === "nl" ? "Groep" : "Group"}</th>
                   <th>Status</th>
                   <th>{locale === "nl" ? "Inzendingen" : "Entries"}</th>
@@ -245,7 +214,7 @@ export default async function FormsAdminOverview({
                         className="ticket-admin-icon-button"
                         href={`${base}/admin/formulieren/${form.id}`}
                         aria-label={`${locale === "nl" ? "Open" : "Open"}: ${form.titleNl}`}
-                        title={locale === "nl" ? "Formulier openen" : "Open form"}
+                        title={locale === "nl" ? "Form openen" : "Open form"}
                       >
                         <ArrowRight aria-hidden="true" size={17} />
                       </Link>

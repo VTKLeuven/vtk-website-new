@@ -319,13 +319,11 @@ export async function saveFormSettingsAction(
       consentTextNl,
       consentTextEn: limitedOptional(formData, "consentTextEn", 1_000),
       retentionDays: boundedInteger(formData, "retentionDays", 1, 3_650),
-      calendarEvent: calendarEventId
-        ? { connect: { id: calendarEventId } }
-        : { disconnect: true },
+      calendarEvent: calendarEventId ? { connect: { id: calendarEventId } } : { disconnect: true },
       // Eén keer gepubliceerd blijft `publishedAt` staan; het is het moment
       // waarop het formulier voor het eerst online kwam, geen statusvlag.
       publishedAt: status === "PUBLISHED" && !form.publishedAt ? new Date() : undefined,
-      archivedAt: status === "ARCHIVED" ? form.archivedAt ?? new Date() : null,
+      archivedAt: status === "ARCHIVED" ? (form.archivedAt ?? new Date()) : null,
     };
 
     await prisma.$transaction(async (tx) => {
@@ -363,9 +361,7 @@ export async function deleteFormAction(formData: FormData): Promise<void> {
     await tx.form.delete({ where: { id: formId } });
   });
 
-  console.info(
-    `[forms] formulier ${form.slug} (${formId}) verwijderd door ${session.user.email}`
-  );
+  console.info(`[forms] formulier ${form.slug} (${formId}) verwijderd door ${session.user.email}`);
   refreshForm(locale, formId, form.slug);
   redirect(localePath(locale, "/admin/formulieren"));
 }
@@ -455,7 +451,7 @@ export async function duplicateFormAction(formData: FormData): Promise<void> {
       const created = await tx.formField.create({
         data: {
           formId: copy.id,
-          sectionId: field.sectionId ? sectionIds.get(field.sectionId) ?? null : null,
+          sectionId: field.sectionId ? (sectionIds.get(field.sectionId) ?? null) : null,
           code: field.code,
           type: field.type,
           sortOrder: field.sortOrder,
@@ -549,13 +545,21 @@ export async function addFormUserGrantAction(
     const formId = value(formData, "formId");
     const { session } = await requireFormCapability(formId, "MANAGE_ACCESS");
 
-    const email = limited(formData, "email", 320).toLowerCase();
-    if (!z.string().email().safeParse(email).success) throw new Error("INVALID_EMAIL");
+    const userId = limitedOptional(formData, "userId", 60);
+    const email = limitedOptional(formData, "email", 320)?.toLowerCase() ?? null;
+    if (!userId && !email) throw new Error("USER_REQUIRED");
+    if (!userId && email && !z.string().email().safeParse(email).success) {
+      throw new Error("INVALID_EMAIL");
+    }
     const role = grantRoleSchema.parse(value(formData, "role") || "EDITOR");
 
     const user = await prisma.user.findFirst({
-      where: { email, deletedAt: null },
-      select: { id: true, name: true },
+      where: {
+        ...(userId ? { id: userId } : { email: email ?? "" }),
+        active: true,
+        deletedAt: null,
+      },
+      select: { id: true, name: true, email: true },
     });
     if (!user) throw new Error("USER_NOT_FOUND");
 
@@ -571,7 +575,7 @@ export async function addFormUserGrantAction(
         action: "FORM_GRANT_SET",
         entityType: "FormUserGrant",
         entityId: user.id,
-        metadata: { role, email },
+        metadata: { role, email: user.email },
       });
     });
 

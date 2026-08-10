@@ -1,11 +1,13 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import { LayoutList, Pencil, Plus } from "lucide-react";
 import { Button } from "@vtk/ui";
 import { deleteFormSectionAction, saveFormSectionAction } from "@/app/actions/formFields";
 import { DeleteIconButton } from "@/components/ui/DeleteIconButton";
 import { IconButton } from "@/components/ui/IconButton";
+import { ThemedSelect } from "@/components/ui/ThemedSelect";
 import { useToast } from "@/components/ui/toast";
 import type { AdminLocale } from "./format";
 
@@ -30,6 +32,13 @@ type SectionDraft = {
   endsForm: boolean;
 };
 
+type SectionField = {
+  id: string;
+  sectionId: string | null;
+  labelNl: string;
+  labelEn: string | null;
+};
+
 /**
  * Secties knippen een lang formulier in stukken en geven de voortgangsbalk haar
  * stappen. Ze zijn optioneel: zonder secties staat alles gewoon onder elkaar.
@@ -38,15 +47,18 @@ export function SectionManager({
   locale,
   formId,
   sections,
+  fields,
   stepBySections,
 }: {
   locale: AdminLocale;
   formId: string;
   sections: Section[];
+  fields: SectionField[];
   /** Sprongen instellen heeft enkel zin wanneer de secties stap voor stap komen. */
   stepBySections: boolean;
 }) {
   const nl = locale === "nl";
+  const router = useRouter();
   const showToast = useToast();
   const [pending, startTransition] = useTransition();
   const [draft, setDraft] = useState<SectionDraft | null>(null);
@@ -79,6 +91,7 @@ export function SectionManager({
       }
       showToast({ message: nl ? "Sectie opgeslagen" : "Section saved", variant: "success" });
       setDraft(null);
+      router.refresh();
     });
   }
 
@@ -93,7 +106,7 @@ export function SectionManager({
             <h2 id="sections-heading">{nl ? "Secties" : "Sections"}</h2>
             <p>
               {nl
-                ? "Optioneel. Ze maken een lang formulier leesbaar en tonen de bezoeker zijn voortgang."
+                ? "Groepeer vragen in herkenbare stappen. Onder elke sectie zie je meteen welke velden erbij horen."
                 : "Optional. They make a long form readable and show the visitor their progress."}
             </p>
           </div>
@@ -102,65 +115,89 @@ export function SectionManager({
 
       {sections.length > 0 ? (
         <ul className="ticket-admin-list">
-          {sections.map((section) => (
-            <li key={section.id}>
-              <div className="ticket-admin-row-head">
-                <div>
-                  <p className="ticket-admin-row-title">{section.titleNl}</p>
-                  <p className="ticket-admin-row-meta">
-                    {section.fieldCount} {nl ? "velden" : "fields"}
-                    {section.titleEn ? "" : ` · ${nl ? "geen vertaling" : "no translation"}`}
-                    {stepBySections && section.endsForm
-                      ? ` · ${nl ? "eindigt hier" : "ends here"}`
-                      : stepBySections && section.nextSectionId
-                        ? ` · ${nl ? "springt naar" : "jumps to"} ${
-                            sections.find((other) => other.id === section.nextSectionId)?.titleNl ??
-                            "?"
-                          }`
-                        : ""}
-                  </p>
+          {sections.map((section) => {
+            const sectionFields = fields.filter((field) => field.sectionId === section.id);
+            return (
+              <li key={section.id} className="form-admin-section-row">
+                <div className="ticket-admin-row-head">
+                  <div>
+                    <p className="ticket-admin-row-title">{section.titleNl}</p>
+                    <p className="ticket-admin-row-meta">
+                      {section.fieldCount}{" "}
+                      {nl
+                        ? section.fieldCount === 1
+                          ? "veld"
+                          : "velden"
+                        : section.fieldCount === 1
+                          ? "field"
+                          : "fields"}
+                      {section.titleEn ? "" : ` · ${nl ? "geen vertaling" : "no translation"}`}
+                      {stepBySections && section.endsForm
+                        ? ` · ${nl ? "eindigt hier" : "ends here"}`
+                        : stepBySections && section.nextSectionId
+                          ? ` · ${nl ? "springt naar" : "jumps to"} ${
+                              sections.find((other) => other.id === section.nextSectionId)
+                                ?.titleNl ?? "?"
+                            }`
+                          : ""}
+                    </p>
+                  </div>
+                  <div className="ticket-admin-row-actions">
+                    <IconButton
+                      label={nl ? "Bewerken" : "Edit"}
+                      srLabel={`${nl ? "Bewerken" : "Edit"}: ${section.titleNl}`}
+                      onClick={() =>
+                        setDraft({
+                          id: section.id,
+                          titleNl: section.titleNl,
+                          titleEn: section.titleEn ?? "",
+                          descriptionNl: section.descriptionNl ?? "",
+                          descriptionEn: section.descriptionEn ?? "",
+                          nextSectionId: section.nextSectionId,
+                          endsForm: section.endsForm,
+                        })
+                      }
+                    >
+                      <Pencil size={16} aria-hidden="true" />
+                    </IconButton>
+                    <DeleteIconButton
+                      action={deleteFormSectionAction}
+                      fields={{ formId, sectionId: section.id }}
+                      label={nl ? "Sectie verwijderen" : "Delete section"}
+                      srLabel={`${nl ? "Sectie verwijderen" : "Delete section"}: ${section.titleNl}`}
+                      title={nl ? "Sectie verwijderen?" : "Delete section?"}
+                      description={
+                        section.fieldCount > 0
+                          ? nl
+                            ? `De ${section.fieldCount} velden in deze sectie blijven bestaan en schuiven naar het deel bovenaan het formulier. Er gaan geen antwoorden verloren.`
+                            : `The ${section.fieldCount} fields in this section stay and move to the part at the top of the form. No answers are lost.`
+                          : nl
+                            ? "Deze sectie is leeg."
+                            : "This section is empty."
+                      }
+                      confirmLabel={nl ? "Verwijderen" : "Delete"}
+                      cancelLabel={nl ? "Annuleren" : "Cancel"}
+                      successMessage={nl ? "Sectie verwijderd" : "Section deleted"}
+                    />
+                  </div>
                 </div>
-                <div className="ticket-admin-row-actions">
-                  <IconButton
-                    label={nl ? "Bewerken" : "Edit"}
-                    srLabel={`${nl ? "Bewerken" : "Edit"}: ${section.titleNl}`}
-                    onClick={() =>
-                      setDraft({
-                        id: section.id,
-                        titleNl: section.titleNl,
-                        titleEn: section.titleEn ?? "",
-                        descriptionNl: section.descriptionNl ?? "",
-                        descriptionEn: section.descriptionEn ?? "",
-                        nextSectionId: section.nextSectionId,
-                        endsForm: section.endsForm,
-                      })
-                    }
-                  >
-                    <Pencil size={16} aria-hidden="true" />
-                  </IconButton>
-                  <DeleteIconButton
-                    action={deleteFormSectionAction}
-                    fields={{ formId, sectionId: section.id }}
-                    label={nl ? "Sectie verwijderen" : "Delete section"}
-                    srLabel={`${nl ? "Sectie verwijderen" : "Delete section"}: ${section.titleNl}`}
-                    title={nl ? "Sectie verwijderen?" : "Delete section?"}
-                    description={
-                      section.fieldCount > 0
-                        ? nl
-                          ? `De ${section.fieldCount} velden in deze sectie blijven bestaan en schuiven naar het deel bovenaan het formulier. Er gaan geen antwoorden verloren.`
-                          : `The ${section.fieldCount} fields in this section stay and move to the part at the top of the form. No answers are lost.`
-                        : nl
-                          ? "Deze sectie is leeg."
-                          : "This section is empty."
-                    }
-                    confirmLabel={nl ? "Verwijderen" : "Delete"}
-                    cancelLabel={nl ? "Annuleren" : "Cancel"}
-                    successMessage={nl ? "Sectie verwijderd" : "Section deleted"}
-                  />
+                <div className="form-admin-section-fields">
+                  <span>{nl ? "Velden in deze sectie" : "Fields in this section"}</span>
+                  {sectionFields.length > 0 ? (
+                    <ul>
+                      {sectionFields.map((field) => (
+                        <li key={field.id}>
+                          {locale === "en" && field.labelEn ? field.labelEn : field.labelNl}
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p>{nl ? "Nog geen velden gekoppeld" : "No fields linked yet"}</p>
+                  )}
                 </div>
-              </div>
-            </li>
-          ))}
+              </li>
+            );
+          })}
         </ul>
       ) : null}
 
@@ -185,7 +222,7 @@ export function SectionManager({
                 onChange={(event) => setDraft({ ...draft, titleEn: event.target.value })}
               />
             </div>
-            <div className="ticket-admin-field" data-span="2">
+            <div className="ticket-admin-field">
               <label htmlFor="section-description-nl">
                 {nl ? "Beschrijving (NL)" : "Description (NL)"}
               </label>
@@ -197,7 +234,7 @@ export function SectionManager({
                 onChange={(event) => setDraft({ ...draft, descriptionNl: event.target.value })}
               />
             </div>
-            <div className="ticket-admin-field" data-span="2">
+            <div className="ticket-admin-field">
               <label htmlFor="section-description-en">
                 {nl ? "Beschrijving (EN)" : "Description (EN)"}
               </label>
@@ -213,28 +250,28 @@ export function SectionManager({
           {stepBySections ? (
             <div className="ticket-admin-field">
               <label htmlFor="section-next">{nl ? "Ga hierna naar" : "Then go to"}</label>
-              <select
+              <ThemedSelect
                 id="section-next"
-                value={draft.endsForm ? "__end" : draft.nextSectionId ?? ""}
-                onChange={(event) => {
-                  const chosen = event.target.value;
+                name="sectionNext"
+                value={draft.endsForm ? "__end" : (draft.nextSectionId ?? "")}
+                onChange={(chosen) => {
                   setDraft({
                     ...draft,
                     endsForm: chosen === "__end",
                     nextSectionId: chosen === "__end" || !chosen ? null : chosen,
                   });
                 }}
-              >
-                <option value="">{nl ? "de volgende sectie" : "the next section"}</option>
-                {sections
-                  .filter((section) => section.id !== draft.id)
-                  .map((section) => (
-                    <option key={section.id} value={section.id}>
-                      {locale === "en" && section.titleEn ? section.titleEn : section.titleNl}
-                    </option>
-                  ))}
-                <option value="__end">{nl ? "het einde van het formulier" : "the end of the form"}</option>
-              </select>
+                options={[
+                  { value: "", label: nl ? "de volgende sectie" : "the next section" },
+                  ...sections
+                    .filter((section) => section.id !== draft.id)
+                    .map((section) => ({
+                      value: section.id,
+                      label: locale === "en" && section.titleEn ? section.titleEn : section.titleNl,
+                    })),
+                  { value: "__end", label: nl ? "het einde van de form" : "the end of the form" },
+                ]}
+              />
               <span className="ticket-admin-help">
                 {nl
                   ? "Dit is het standaardvervolg. Een antwoord met een eigen sprong (bij Velden) gaat hierop voor."

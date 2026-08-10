@@ -10,7 +10,7 @@ const CATEGORY_LABELS: Record<string, { nl: string; en: string }> = {
   pages: { nl: "Pagina's", en: "Pages" },
   calendar: { nl: "Kalender", en: "Calendar" },
   tickets: { nl: "Tickets", en: "Tickets" },
-  forms: { nl: "Formulieren", en: "Forms" },
+  forms: { nl: "Forms", en: "Forms" },
   photos: { nl: "Foto's", en: "Photos" },
   users: { nl: "Leden en rollen", en: "Members and roles" },
   general: { nl: "Website-inhoud", en: "Website content" },

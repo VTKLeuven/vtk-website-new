@@ -1,15 +1,8 @@
 "use client";
 
 import { useMemo, useState, useTransition } from "react";
-import {
-  ChevronDown,
-  ChevronUp,
-  Copy,
-  Eye,
-  GripVertical,
-  Pencil,
-  Plus,
-} from "lucide-react";
+import { useRouter } from "next/navigation";
+import { ChevronDown, ChevronUp, Copy, Eye, GripVertical, Pencil, Plus } from "lucide-react";
 import { Button } from "@vtk/ui";
 import {
   duplicateFormFieldAction,
@@ -25,6 +18,7 @@ import { FormFieldBlock } from "@/components/forms/FormFieldBlock";
 import type { PublicFormField } from "@/components/forms/FormFieldInput";
 import { isChoiceType, parseFieldConfig, type FormFieldConfig } from "@/lib/forms/schema";
 import { visibleFieldIds, type AnswerValue } from "@/lib/forms/visibility";
+import { groupBySections } from "@/lib/forms/groupBySections";
 import type { AdminLocale } from "./format";
 import { FieldSettings, TYPE_GROUPS, typeLabel } from "./FieldSettings";
 
@@ -69,6 +63,8 @@ export type EditorSection = {
   id: string;
   titleNl: string;
   titleEn: string | null;
+  descriptionNl: string | null;
+  descriptionEn: string | null;
 };
 
 /** Alleen zinvol wanneer het formulier zijn secties één voor één toont. */
@@ -148,8 +144,30 @@ function emptyDraft(type: string, sectionId: string | null): FieldDraft {
     config: parseFieldConfig(type, {}),
     options: isChoiceType(type)
       ? [
-          { id: null, code: null, labelNl: "", labelEn: "", quotaLimit: null, quotaUsed: 0, answerCount: 0, allowWaitlist: false, nextSectionId: null, endsForm: false },
-          { id: null, code: null, labelNl: "", labelEn: "", quotaLimit: null, quotaUsed: 0, answerCount: 0, allowWaitlist: false, nextSectionId: null, endsForm: false },
+          {
+            id: null,
+            code: null,
+            labelNl: "",
+            labelEn: "",
+            quotaLimit: null,
+            quotaUsed: 0,
+            answerCount: 0,
+            allowWaitlist: false,
+            nextSectionId: null,
+            endsForm: false,
+          },
+          {
+            id: null,
+            code: null,
+            labelNl: "",
+            labelEn: "",
+            quotaLimit: null,
+            quotaUsed: 0,
+            answerCount: 0,
+            allowWaitlist: false,
+            nextSectionId: null,
+            endsForm: false,
+          },
         ]
       : [],
     conditions: [],
@@ -192,13 +210,23 @@ export function FieldEditor({
   branching: BranchingContext;
 }) {
   const nl = locale === "nl";
+  const router = useRouter();
   const showToast = useToast();
   const [pending, startTransition] = useTransition();
   const [fields, setFields] = useState(initialFields);
+  const [fieldsSource, setFieldsSource] = useState(initialFields);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [draft, setDraft] = useState<FieldDraft | null>(null);
   const [adding, setAdding] = useState(false);
   const [dragId, setDragId] = useState<string | null>(null);
+
+  // Na een servermutatie levert router.refresh een nieuwe propverwijzing. Leid
+  // de lokale lijst daar tijdens render van af, zoals React voor prop-state
+  // synchronisatie voorschrijft, zodat geen tweede effectrender nodig is.
+  if (initialFields !== fieldsSource) {
+    setFieldsSource(initialFields);
+    setFields(initialFields);
+  }
 
   const active = useMemo(() => fields.filter((field) => !field.archivedAt), [fields]);
   const archived = useMemo(() => fields.filter((field) => field.archivedAt), [fields]);
@@ -277,6 +305,7 @@ export function FieldEditor({
       setEditingId(null);
       setDraft(null);
       setAdding(false);
+      router.refresh();
     });
   }
 
@@ -323,9 +352,14 @@ export function FieldEditor({
       const state = await duplicateFormFieldAction(formId, fieldId);
       showToast(
         state.status === "error"
-          ? { message: nl ? "Dupliceren is niet gelukt." : "Duplicating failed.", variant: "error", duration: 0 }
+          ? {
+              message: nl ? "Dupliceren is niet gelukt." : "Duplicating failed.",
+              variant: "error",
+              duration: 0,
+            }
           : { message: nl ? "Veld gedupliceerd" : "Field duplicated", variant: "success" }
       );
+      if (state.status === "success") router.refresh();
     });
   }
 
@@ -340,6 +374,27 @@ export function FieldEditor({
     ),
     previewAnswers
   );
+  const visiblePreviewFields = previewFields.filter((field) => visible.has(field.id));
+  const groupedPreviewFields = groupBySections(
+    visiblePreviewFields.map((field) => ({
+      item: field,
+      sectionId: active.find((item) => item.id === field.id)?.sectionId ?? null,
+    })),
+    sections.map((section) => section.id)
+  );
+
+  function previewField(field: PublicFormField) {
+    return (
+      <FormFieldBlock
+        key={field.id}
+        field={field}
+        locale={locale}
+        value={previewAnswers[field.id] ?? {}}
+        onChange={(next) => setPreviewAnswers((current) => ({ ...current, [field.id]: next }))}
+        shuffleSeed="preview"
+      />
+    );
+  }
 
   return (
     <div className="ticket-admin-grid" data-columns="2">
@@ -356,9 +411,7 @@ export function FieldEditor({
         </div>
 
         {active.length === 0 && !adding ? (
-          <p className="ticket-admin-empty">
-            {nl ? "Nog geen velden." : "No fields yet."}
-          </p>
+          <p className="ticket-admin-empty">{nl ? "Nog geen velden." : "No fields yet."}</p>
         ) : null}
 
         <ul className="ticket-admin-list form-admin-field-list">
@@ -392,6 +445,20 @@ export function FieldEditor({
                           : ""}
                       </p>
                       <p className="ticket-admin-row-meta ticket-admin-code">{field.code}</p>
+                      <p className="form-admin-field-section">
+                        {field.sectionId
+                          ? `${nl ? "Sectie" : "Section"}: ${
+                              (locale === "en"
+                                ? sections.find((section) => section.id === field.sectionId)
+                                    ?.titleEn
+                                : null) ??
+                              sections.find((section) => section.id === field.sectionId)?.titleNl ??
+                              "?"
+                            }`
+                          : nl
+                            ? "Bovenaan, zonder sectie"
+                            : "At the top, without a section"}
+                      </p>
                     </div>
                   </div>
                   <div className="ticket-admin-row-actions">
@@ -518,7 +585,7 @@ export function FieldEditor({
                         onClick={() => {
                           setEditingId(null);
                           setAdding(true);
-                          setDraft(emptyDraft(type, null));
+                          setDraft(emptyDraft(type, sections.length === 1 ? sections[0].id : null));
                         }}
                       >
                         <Plus aria-hidden="true" size={15} />
@@ -580,20 +647,30 @@ export function FieldEditor({
               {nl ? "Nog niets om te tonen." : "Nothing to show yet."}
             </p>
           ) : (
-            previewFields
-              .filter((field) => visible.has(field.id))
-              .map((field) => (
-                <FormFieldBlock
-                  key={field.id}
-                  field={field}
-                  locale={locale}
-                  value={previewAnswers[field.id] ?? {}}
-                  onChange={(next) =>
-                    setPreviewAnswers((current) => ({ ...current, [field.id]: next }))
-                  }
-                  shuffleSeed="preview"
-                />
-              ))
+            <>
+              {groupedPreviewFields.unsectioned.map(previewField)}
+              {sections.map((section) => {
+                const fieldsInSection = groupedPreviewFields.bySection.get(section.id) ?? [];
+                if (fieldsInSection.length === 0) return null;
+                const title =
+                  locale === "en" && section.titleEn ? section.titleEn : section.titleNl;
+                const description =
+                  locale === "en" && section.descriptionEn
+                    ? section.descriptionEn
+                    : section.descriptionNl;
+                return (
+                  <section
+                    key={section.id}
+                    className="vtk-form-section"
+                    aria-labelledby={`preview-section-${section.id}`}
+                  >
+                    <h3 id={`preview-section-${section.id}`}>{title}</h3>
+                    {description ? <p className="vtk-form-section-intro">{description}</p> : null}
+                    {fieldsInSection.map(previewField)}
+                  </section>
+                );
+              })}
+            </>
           )}
           {previewFields.length > 0 ? (
             <Button type="button" disabled>

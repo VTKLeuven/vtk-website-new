@@ -326,11 +326,21 @@ export function MarkdownEditorField({
   maxLength?: number;
 }) {
   const [value, setValue] = useState(defaultValue ?? "");
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  function changeValue(next: string) {
+    setValue(next);
+    // Ook werkbalkacties wijzigen Markdown zonder een native textarea-event.
+    // Meld dit expliciet aan een eventuele autosave-schil.
+    requestAnimationFrame(() => {
+      inputRef.current?.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+  }
 
   return (
     <>
-      <input type="hidden" name={name} value={value} />
-      <MarkdownEditor {...editorProps} value={value} onChange={setValue} />
+      <input ref={inputRef} type="hidden" name={name} value={value} />
+      <MarkdownEditor {...editorProps} value={value} onChange={changeValue} />
     </>
   );
 }

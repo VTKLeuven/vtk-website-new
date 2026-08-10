@@ -7,8 +7,8 @@ import { hasLocale } from "@/lib/locale";
 import { requireFormCapability } from "@/lib/forms/authorization";
 import { answerSummary, answerToText, exportColumns } from "@/lib/forms/export";
 import { AdminEmptyState } from "@/components/ticketing/admin/AdminEmptyState";
-import { AdminMetric } from "@/components/ticketing/admin/AdminMetric";
 import { FormStatusBadge } from "@/components/forms/admin/FormStatusBadge";
+import { ThemedSelect } from "@/components/ui/ThemedSelect";
 import { MailingPanel } from "@/components/forms/admin/MailingPanel";
 import { AddEntryPanel, ExportPanel } from "@/components/forms/admin/EntryTools";
 import { formConditions, loadPublicForm, toPublicFields } from "@/lib/forms/publicForm";
@@ -176,8 +176,7 @@ export default async function FormEntriesPage({
     ? toPublicFields(publicForm, locale).map((field) => ({
         ...field,
         sectionId: field.sectionId,
-        sortOrder:
-          publicForm.fields.find((candidate) => candidate.id === field.id)?.sortOrder ?? 0,
+        sortOrder: publicForm.fields.find((candidate) => candidate.id === field.id)?.sortOrder ?? 0,
       }))
     : [];
   const conditions = publicForm ? formConditions(publicForm) : [];
@@ -249,28 +248,27 @@ export default async function FormEntriesPage({
 
   return (
     <div className="ticket-admin-page">
-      <div className="ticket-admin-metrics">
-        <AdminMetric
-          icon={Inbox}
-          label={nl ? "Ingediend" : "Submitted"}
-          value={
-            form.maxEntries
+      <div className="form-admin-entry-stats" aria-label={nl ? "Kerncijfers" : "Key figures"}>
+        <div>
+          <Inbox aria-hidden="true" size={16} />
+          <strong>
+            {form.maxEntries
               ? `${formatNumber(total, locale)} / ${formatNumber(form.maxEntries, locale)}`
-              : formatNumber(total, locale)
-          }
-        />
-        <AdminMetric
-          icon={BarChart3}
-          label={nl ? "Concepten" : "Drafts"}
-          value={formatNumber(drafts, locale)}
-        />
+              : formatNumber(total, locale)}
+          </strong>
+          <span>{nl ? "ingediend" : "submitted"}</span>
+        </div>
+        <div>
+          <BarChart3 aria-hidden="true" size={16} />
+          <strong>{formatNumber(drafts, locale)}</strong>
+          <span>{nl ? "concepten" : "drafts"}</span>
+        </div>
         {waitlisted > 0 ? (
-          <AdminMetric
-            icon={Hourglass}
-            label={nl ? "Op de wachtlijst" : "On the waiting list"}
-            value={formatNumber(waitlisted, locale)}
-            tone="warning"
-          />
+          <div>
+            <Hourglass aria-hidden="true" size={16} />
+            <strong>{formatNumber(waitlisted, locale)}</strong>
+            <span>{nl ? "op de wachtlijst" : "on the waiting list"}</span>
+          </div>
         ) : null}
       </div>
 
@@ -295,7 +293,11 @@ export default async function FormEntriesPage({
               label: locale === "en" && column.labelEn ? column.labelEn : column.labelNl,
               archived: Boolean(column.archivedAt),
             }))}
-            filters={{ q: query, beoordeling: review ?? undefined, test: includeTest ? "1" : undefined }}
+            filters={{
+              q: query,
+              beoordeling: review ?? undefined,
+              test: includeTest ? "1" : undefined,
+            }}
           />
         ) : null}
 
@@ -329,29 +331,43 @@ export default async function FormEntriesPage({
           </div>
           <div className="ticket-admin-field">
             <label htmlFor="entry-review">{nl ? "Beoordeling" : "Review"}</label>
-            <select id="entry-review" name="beoordeling" defaultValue={review ?? ""}>
-              <option value="">{nl ? "Alle" : "All"}</option>
-              {REVIEW_STATUSES.map((status) => (
-                <option key={status} value={status}>
-                  {formStatusLabel(status, locale)}
-                </option>
-              ))}
-            </select>
+            <ThemedSelect
+              id="entry-review"
+              name="beoordeling"
+              defaultValue={review ?? ""}
+              options={[
+                { value: "", label: nl ? "Alle" : "All" },
+                ...REVIEW_STATUSES.map((status) => ({
+                  value: status,
+                  label: formStatusLabel(status, locale),
+                })),
+              ]}
+            />
           </div>
           <div className="ticket-admin-field">
             <label htmlFor="entry-waitlist">{nl ? "Wachtlijst" : "Waiting list"}</label>
-            <select id="entry-waitlist" name="wachtlijst" defaultValue={waitlistFilter ?? ""}>
-              <option value="">{nl ? "Alles" : "Everything"}</option>
-              <option value="zonder">{nl ? "Enkel met plaats" : "Only with a spot"}</option>
-              <option value="alleen">{nl ? "Enkel de wachtlijst" : "Only the waiting list"}</option>
-            </select>
+            <ThemedSelect
+              id="entry-waitlist"
+              name="wachtlijst"
+              defaultValue={waitlistFilter ?? ""}
+              options={[
+                { value: "", label: nl ? "Alles" : "Everything" },
+                { value: "zonder", label: nl ? "Enkel met plaats" : "Only with a spot" },
+                { value: "alleen", label: nl ? "Enkel de wachtlijst" : "Only the waiting list" },
+              ]}
+            />
           </div>
           <div className="ticket-admin-field">
             <label htmlFor="entry-test">{nl ? "Testinzendingen" : "Test entries"}</label>
-            <select id="entry-test" name="test" defaultValue={includeTest ? "1" : ""}>
-              <option value="">{nl ? "Verbergen" : "Hide"}</option>
-              <option value="1">{nl ? "Tonen" : "Show"}</option>
-            </select>
+            <ThemedSelect
+              id="entry-test"
+              name="test"
+              defaultValue={includeTest ? "1" : ""}
+              options={[
+                { value: "", label: nl ? "Verbergen" : "Hide" },
+                { value: "1", label: nl ? "Tonen" : "Show" },
+              ]}
+            />
           </div>
           <button className="ticket-admin-button" type="submit">
             <Filter aria-hidden="true" size={15} />
@@ -443,10 +459,12 @@ export default async function FormEntriesPage({
                         </td>
                         {columns.map((column) => (
                           <td key={column.id} data-priority="low" data-wrap="true">
-                            {answerToText(column, byField.get(column.id), entry.uploads, locale).slice(
-                              0,
-                              80
-                            )}
+                            {answerToText(
+                              column,
+                              byField.get(column.id),
+                              entry.uploads,
+                              locale
+                            ).slice(0, 80)}
                           </td>
                         ))}
                         <td>
@@ -467,19 +485,18 @@ export default async function FormEntriesPage({
             </div>
 
             {pages > 1 ? (
-              <nav className="ticket-admin-pagination" aria-label={nl ? "Paginering" : "Pagination"}>
+              <nav
+                className="ticket-admin-pagination"
+                aria-label={nl ? "Paginering" : "Pagination"}
+              >
                 {page > 1 ? (
-                  <Link href={pageHref(page - 1)}>
-                    {nl ? "Vorige" : "Previous"}
-                  </Link>
+                  <Link href={pageHref(page - 1)}>{nl ? "Vorige" : "Previous"}</Link>
                 ) : null}
                 <span>
                   {nl ? "Pagina" : "Page"} {page} / {pages}
                 </span>
                 {page < pages ? (
-                  <Link href={pageHref(page + 1)}>
-                    {nl ? "Volgende" : "Next"}
-                  </Link>
+                  <Link href={pageHref(page + 1)}>{nl ? "Volgende" : "Next"}</Link>
                 ) : null}
               </nav>
             ) : null}
@@ -488,23 +505,22 @@ export default async function FormEntriesPage({
       </section>
 
       {summary.length > 0 ? (
-        <section className="ticket-admin-section" aria-labelledby="summary-heading">
-          <div className="ticket-admin-section-head">
-            <div className="ticket-admin-section-heading">
-              <span className="ticket-admin-section-icon">
-                <BarChart3 aria-hidden="true" size={17} />
-              </span>
-              <div>
-                <h2 id="summary-heading">{nl ? "Antwoordoverzicht" : "Answer overview"}</h2>
-                <p>
-                  {nl
-                    ? "Per gesloten vraag, over alle echte inzendingen."
-                    : "Per closed question, across all real entries."}
-                </p>
-              </div>
-            </div>
-          </div>
-          <div className="form-admin-summary">
+        <details className="ticket-admin-details form-admin-summary-details">
+          <summary>
+            <BarChart3 aria-hidden="true" size={16} />
+            {nl ? "Antwoordoverzicht" : "Answer overview"}
+            <span>
+              {summary.length}{" "}
+              {nl
+                ? summary.length === 1
+                  ? "vraag"
+                  : "vragen"
+                : summary.length === 1
+                  ? "question"
+                  : "questions"}
+            </span>
+          </summary>
+          <div className="ticket-admin-details-body form-admin-summary">
             {summary.map((question) => (
               <div key={question.fieldId}>
                 <h3>{question.label}</h3>
@@ -526,7 +542,7 @@ export default async function FormEntriesPage({
               </div>
             ))}
           </div>
-        </section>
+        </details>
       ) : null}
 
       {capabilities.includes("MAIL_PARTICIPANTS") ? (

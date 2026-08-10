@@ -75,6 +75,14 @@ export default async function FormFieldsPage({
         locale={locale}
         formId={formId}
         stepBySections={form.stepBySections}
+        fields={editorFields
+          .filter((field) => !field.archivedAt)
+          .map((field) => ({
+            id: field.id,
+            sectionId: field.sectionId,
+            labelNl: field.labelNl,
+            labelEn: field.labelEn,
+          }))}
         sections={sections.map((section) => ({
           id: section.id,
           titleNl: section.titleNl,
@@ -83,9 +91,8 @@ export default async function FormFieldsPage({
           descriptionEn: section.descriptionEn,
           nextSectionId: section.nextSectionId,
           endsForm: section.endsForm,
-          fieldCount: fields.filter(
-            (field) => field.sectionId === section.id && !field.archivedAt
-          ).length,
+          fieldCount: fields.filter((field) => field.sectionId === section.id && !field.archivedAt)
+            .length,
         }))}
       />
       <FieldEditor
@@ -95,6 +102,8 @@ export default async function FormFieldsPage({
           id: section.id,
           titleNl: section.titleNl,
           titleEn: section.titleEn,
+          descriptionNl: section.descriptionNl,
+          descriptionEn: section.descriptionEn,
         }))}
         fields={editorFields}
         branching={{ enabled: form.stepBySections }}

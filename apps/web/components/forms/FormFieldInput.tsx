@@ -8,6 +8,7 @@ import {
   isMultiChoiceType,
   type FormFieldConfig,
 } from "@/lib/forms/schema";
+import { ThemedSelect } from "@/components/ui/ThemedSelect";
 
 /**
  * Eén veld, zoals de bezoeker het ziet.
@@ -230,34 +231,35 @@ export function FormFieldInput({
 
     case "DROPDOWN":
       return (
-        <select
-          {...common}
-          className="vtk-form-input"
+        <ThemedSelect
+          id={inputId}
+          name={inputId}
+          variant="public"
+          disabled={disabled}
+          required={field.required}
+          ariaDescribedBy={describedById}
+          invalid={invalid}
           value={value.options?.[0] ?? ""}
-          onChange={(event) =>
-            onChange({ options: event.target.value ? [event.target.value] : [] })
-          }
-        >
-          <option value="">{locale === "nl" ? "Maak een keuze" : "Choose an option"}</option>
-          {options.map((option) => (
-            <option
-              key={option.id}
-              value={option.code}
-              disabled={option.soldOut && !option.waitlist}
-            >
-              {pickText(option.labelNl, option.labelEn, locale)}
-              {option.soldOut
-                ? option.waitlist
-                  ? locale === "nl"
-                    ? " (volzet, wachtlijst)"
-                    : " (full, waiting list)"
-                  : locale === "nl"
-                    ? " (volzet)"
-                    : " (full)"
-                : ""}
-            </option>
-          ))}
-        </select>
+          onChange={(selected) => onChange({ options: selected ? [selected] : [] })}
+          options={[
+            { value: "", label: locale === "nl" ? "Maak een keuze" : "Choose an option" },
+            ...options.map((option) => ({
+              value: option.code,
+              disabled: option.soldOut && !option.waitlist,
+              label: `${pickText(option.labelNl, option.labelEn, locale)}${
+                option.soldOut
+                  ? option.waitlist
+                    ? locale === "nl"
+                      ? " (volzet, wachtlijst)"
+                      : " (full, waiting list)"
+                    : locale === "nl"
+                      ? " (volzet)"
+                      : " (full)"
+                  : ""
+              }`,
+            })),
+          ]}
+        />
       );
 
     case "SINGLE_CHOICE":
@@ -338,9 +340,7 @@ export function FormFieldInput({
                 maxLength={300}
                 disabled={disabled}
                 value={value.text ?? ""}
-                onChange={(event) =>
-                  onChange({ options: selected, text: event.target.value })
-                }
+                onChange={(event) => onChange({ options: selected, text: event.target.value })}
               />
             </label>
           ) : null}

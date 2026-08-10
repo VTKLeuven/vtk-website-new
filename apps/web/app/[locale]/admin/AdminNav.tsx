@@ -330,6 +330,18 @@ const icons: Record<string, ReactNode> = {
       <path d="M13 17v2" />
     </Svg>
   ),
+  // forms: document met invulvelden en vinkjes
+  forms: (
+    <Svg>
+      <rect x="4" y="3" width="16" height="18" rx="2" />
+      <path d="M8 8h.01" />
+      <path d="M11 8h5" />
+      <path d="M8 12h.01" />
+      <path d="M11 12h5" />
+      <path d="M8 16h.01" />
+      <path d="M11 16h5" />
+    </Svg>
+  ),
   // evenementen: de groep met kalender + tickets -> kalender met een ster erin,
   // zodat ze herkenbaar blijft naast de gewone kalender-tab eronder.
   evenementen: (

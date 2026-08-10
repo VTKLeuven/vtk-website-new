@@ -6,6 +6,7 @@ import { Button, ConfirmDialog } from "@vtk/ui";
 import { IconButton } from "@/components/ui/IconButton";
 import { StorageImageField } from "@/components/admin/StorageImageField";
 import { MarkdownEditor } from "@/components/editor/MarkdownEditor";
+import { ThemedSelect } from "@/components/ui/ThemedSelect";
 import {
   canChangeTypeWithAnswers,
   isChoiceType,
@@ -97,8 +98,7 @@ export function FieldSettings({
   const nl = locale === "nl";
   const config = draft.config;
   const [removingOption, setRemovingOption] = useState<number | null>(null);
-  const optionToRemove =
-    removingOption === null ? null : draft.options[removingOption] ?? null;
+  const optionToRemove = removingOption === null ? null : (draft.options[removingOption] ?? null);
 
   function removeOption(index: number) {
     onChange({
@@ -120,12 +120,35 @@ export function FieldSettings({
       ...draft,
       type,
       config: parseFieldConfig(type, config),
-      options: isChoiceType(type) && draft.options.length === 0
-        ? [
-            { id: null, code: null, labelNl: "", labelEn: "", quotaLimit: null, quotaUsed: 0, answerCount: 0, allowWaitlist: false, nextSectionId: null, endsForm: false },
-            { id: null, code: null, labelNl: "", labelEn: "", quotaLimit: null, quotaUsed: 0, answerCount: 0, allowWaitlist: false, nextSectionId: null, endsForm: false },
-          ]
-        : draft.options,
+      options:
+        isChoiceType(type) && draft.options.length === 0
+          ? [
+              {
+                id: null,
+                code: null,
+                labelNl: "",
+                labelEn: "",
+                quotaLimit: null,
+                quotaUsed: 0,
+                answerCount: 0,
+                allowWaitlist: false,
+                nextSectionId: null,
+                endsForm: false,
+              },
+              {
+                id: null,
+                code: null,
+                labelNl: "",
+                labelEn: "",
+                quotaLimit: null,
+                quotaUsed: 0,
+                answerCount: 0,
+                allowWaitlist: false,
+                nextSectionId: null,
+                endsForm: false,
+              },
+            ]
+          : draft.options,
     });
   }
 
@@ -149,21 +172,17 @@ export function FieldSettings({
       <div className="ticket-admin-form-grid">
         <div className="ticket-admin-field">
           <label htmlFor={`type-${draft.id ?? "new"}`}>{nl ? "Soort veld" : "Field type"}</label>
-          <select
+          <ThemedSelect
             id={`type-${draft.id ?? "new"}`}
+            name={`type-${draft.id ?? "new"}`}
             value={draft.type}
-            onChange={(event) => setType(event.target.value)}
-          >
-            {ALL_TYPES.map((type) => (
-              <option
-                key={type}
-                value={type}
-                disabled={answerCount > 0 && !canChangeTypeWithAnswers(draft.type, type)}
-              >
-                {typeLabel(type, locale)}
-              </option>
-            ))}
-          </select>
+            onChange={setType}
+            options={ALL_TYPES.map((type) => ({
+              value: type,
+              label: typeLabel(type, locale),
+              disabled: answerCount > 0 && !canChangeTypeWithAnswers(draft.type, type),
+            }))}
+          />
           {answerCount > 0 ? (
             <span className="ticket-admin-help">
               {nl
@@ -176,23 +195,26 @@ export function FieldSettings({
         {sections.length > 0 ? (
           <div className="ticket-admin-field">
             <label htmlFor={`section-${draft.id ?? "new"}`}>{nl ? "Sectie" : "Section"}</label>
-            <select
+            <ThemedSelect
               id={`section-${draft.id ?? "new"}`}
+              name={`section-${draft.id ?? "new"}`}
               value={draft.sectionId ?? ""}
-              onChange={(event) => onChange({ ...draft, sectionId: event.target.value || null })}
-            >
-              <option value="">{nl ? "Bovenaan, zonder sectie" : "At the top, no section"}</option>
-              {sections.map((section) => (
-                <option key={section.id} value={section.id}>
-                  {locale === "en" && section.titleEn ? section.titleEn : section.titleNl}
-                </option>
-              ))}
-            </select>
+              onChange={(sectionId) => onChange({ ...draft, sectionId: sectionId || null })}
+              options={[
+                { value: "", label: nl ? "Bovenaan, zonder sectie" : "At the top, no section" },
+                ...sections.map((section) => ({
+                  value: section.id,
+                  label: locale === "en" && section.titleEn ? section.titleEn : section.titleNl,
+                })),
+              ]}
+            />
           </div>
         ) : null}
 
         <div className="ticket-admin-field">
-          <label htmlFor={`label-nl-${draft.id ?? "new"}`}>{nl ? "Vraag (NL)" : "Question (NL)"}</label>
+          <label htmlFor={`label-nl-${draft.id ?? "new"}`}>
+            {nl ? "Vraag (NL)" : "Question (NL)"}
+          </label>
           <input
             id={`label-nl-${draft.id ?? "new"}`}
             value={draft.labelNl}
@@ -201,7 +223,9 @@ export function FieldSettings({
           />
         </div>
         <div className="ticket-admin-field">
-          <label htmlFor={`label-en-${draft.id ?? "new"}`}>{nl ? "Vraag (EN)" : "Question (EN)"}</label>
+          <label htmlFor={`label-en-${draft.id ?? "new"}`}>
+            {nl ? "Vraag (EN)" : "Question (EN)"}
+          </label>
           <input
             id={`label-en-${draft.id ?? "new"}`}
             value={draft.labelEn}
@@ -215,7 +239,7 @@ export function FieldSettings({
           ) : null}
         </div>
 
-        <div className="ticket-admin-field" data-span="2">
+        <div className="ticket-admin-field">
           <label htmlFor={`help-nl-${draft.id ?? "new"}`}>
             {nl ? "Toelichting (NL, markdown)" : "Explanation (NL, markdown)"}
           </label>
@@ -229,7 +253,7 @@ export function FieldSettings({
             onChange={(helpNl) => onChange({ ...draft, helpNl })}
           />
         </div>
-        <div className="ticket-admin-field" data-span="2">
+        <div className="ticket-admin-field">
           <label htmlFor={`help-en-${draft.id ?? "new"}`}>
             {nl ? "Toelichting (EN, markdown)" : "Explanation (EN, markdown)"}
           </label>
@@ -304,9 +328,7 @@ export function FieldSettings({
                 <input
                   value={config.patternMessageNl ?? ""}
                   placeholder={nl ? "Een r-nummer ziet eruit als r0123456." : ""}
-                  onChange={(event) =>
-                    setConfig({ patternMessageNl: event.target.value || null })
-                  }
+                  onChange={(event) => setConfig({ patternMessageNl: event.target.value || null })}
                 />
               </div>
             ) : null}
@@ -390,15 +412,15 @@ export function FieldSettings({
             </div>
             <div className="ticket-admin-field">
               <label>{nl ? "Weergave" : "Display"}</label>
-              <select
+              <ThemedSelect
+                name={`scale-display-${draft.id ?? "new"}`}
                 value={config.display ?? "numbers"}
-                onChange={(event) =>
-                  setConfig({ display: event.target.value as "numbers" | "stars" })
-                }
-              >
-                <option value="numbers">{nl ? "Cijfers" : "Numbers"}</option>
-                <option value="stars">{nl ? "Sterren" : "Stars"}</option>
-              </select>
+                onChange={(display) => setConfig({ display: display as "numbers" | "stars" })}
+                options={[
+                  { value: "numbers", label: nl ? "Cijfers" : "Numbers" },
+                  { value: "stars", label: nl ? "Sterren" : "Stars" },
+                ]}
+              />
             </div>
           </div>
         </fieldset>
@@ -437,9 +459,7 @@ export function FieldSettings({
                 }
               />
               <span className="ticket-admin-help">
-                {nl
-                  ? "Leeg laten betekent: alles toegelaten."
-                  : "Leave empty to allow everything."}
+                {nl ? "Leeg laten betekent: alles toegelaten." : "Leave empty to allow everything."}
               </span>
             </div>
           </div>
@@ -450,18 +470,20 @@ export function FieldSettings({
         <fieldset className="form-admin-fieldset">
           <legend>{nl ? "Welk gegeven" : "Which detail"}</legend>
           <div className="ticket-admin-field">
-            <select
+            <ThemedSelect
+              name={`profile-field-${draft.id ?? "new"}`}
               value={config.profileField ?? "RNUMBER"}
-              onChange={(event) =>
-                setConfig({ profileField: event.target.value as FormFieldConfig["profileField"] })
+              onChange={(profileField) =>
+                setConfig({ profileField: profileField as FormFieldConfig["profileField"] })
               }
-            >
-              <option value="NAME">{nl ? "Naam" : "Name"}</option>
-              <option value="EMAIL">{nl ? "E-mailadres" : "E-mail address"}</option>
-              <option value="RNUMBER">{nl ? "R-nummer" : "R-number"}</option>
-              <option value="STUDY_PROGRAMME">{nl ? "Studierichting" : "Study programme"}</option>
-              <option value="STUDY_YEAR">{nl ? "Studiejaar" : "Study year"}</option>
-            </select>
+              options={[
+                { value: "NAME", label: nl ? "Naam" : "Name" },
+                { value: "EMAIL", label: nl ? "E-mailadres" : "E-mail address" },
+                { value: "RNUMBER", label: nl ? "R-nummer" : "R-number" },
+                { value: "STUDY_PROGRAMME", label: nl ? "Studierichting" : "Study programme" },
+                { value: "STUDY_YEAR", label: nl ? "Studiejaar" : "Study year" },
+              ]}
+            />
             <span className="ticket-admin-help">
               {nl
                 ? "Wordt voorgevuld uit het profiel van wie ingelogd is, en gecontroleerd op vorm."
@@ -527,9 +549,7 @@ export function FieldSettings({
                   srLabel={`${nl ? "Optie verwijderen" : "Remove option"}: ${option.labelNl || index + 1}`}
                   tone="danger"
                   onClick={() =>
-                    option.answerCount > 0
-                      ? setRemovingOption(index)
-                      : removeOption(index)
+                    option.answerCount > 0 ? setRemovingOption(index) : removeOption(index)
                   }
                 >
                   <Trash2 size={16} aria-hidden="true" />
@@ -554,10 +574,10 @@ export function FieldSettings({
                   {branching.enabled && sections.length > 0 ? (
                     <label className="form-admin-option-jump">
                       <span>{nl ? "Ga daarna naar" : "Then go to"}</span>
-                      <select
-                        value={option.endsForm ? "__end" : option.nextSectionId ?? ""}
-                        onChange={(event) => {
-                          const chosen = event.target.value;
+                      <ThemedSelect
+                        name={`option-jump-${draft.id ?? "new"}-${index}`}
+                        value={option.endsForm ? "__end" : (option.nextSectionId ?? "")}
+                        onChange={(chosen) => {
                           const next = [...draft.options];
                           next[index] = {
                             ...option,
@@ -566,15 +586,21 @@ export function FieldSettings({
                           };
                           onChange({ ...draft, options: next });
                         }}
-                      >
-                        <option value="">{nl ? "de volgende sectie" : "the next section"}</option>
-                        {sections.map((section) => (
-                          <option key={section.id} value={section.id}>
-                            {locale === "en" && section.titleEn ? section.titleEn : section.titleNl}
-                          </option>
-                        ))}
-                        <option value="__end">{nl ? "het einde van het formulier" : "the end of the form"}</option>
-                      </select>
+                        options={[
+                          { value: "", label: nl ? "de volgende sectie" : "the next section" },
+                          ...sections.map((section) => ({
+                            value: section.id,
+                            label:
+                              locale === "en" && section.titleEn
+                                ? section.titleEn
+                                : section.titleNl,
+                          })),
+                          {
+                            value: "__end",
+                            label: nl ? "het einde van de form" : "the end of the form",
+                          },
+                        ]}
+                      />
                     </label>
                   ) : null}
                 </div>
@@ -629,7 +655,9 @@ export function FieldSettings({
               checked={Boolean(config.allowOther)}
               onChange={(event) => setConfig({ allowOther: event.target.checked })}
             />
-            {nl ? '"Andere, namelijk ..." met een eigen tekstveld' : '"Other, namely ..." with a free text field'}
+            {nl
+              ? '"Andere, namelijk ..." met een eigen tekstveld'
+              : '"Other, namely ..." with a free text field'}
           </label>
 
           {isMultiChoiceType(draft.type) ? (
@@ -656,7 +684,9 @@ export function FieldSettings({
       {optionToRemove ? (
         <ConfirmDialog
           open
-          title={nl ? "Gekozen optie van het formulier halen?" : "Remove selected option from the form?"}
+          title={
+            nl ? "Gekozen optie van het formulier halen?" : "Remove selected option from the form?"
+          }
           description={
             nl
               ? `Deze optie verdwijnt van het formulier. Ze werd gekozen door ${optionToRemove.answerCount} ${optionToRemove.answerCount === 1 ? "inzending" : "inzendingen"}; die bestaande antwoorden blijven bewaard en blijven in de export staan.`
@@ -718,9 +748,7 @@ function ConditionEditor({
         <>
           {conditions.length === 0 ? (
             <p className="form-admin-hint">
-              {nl
-                ? "Dit veld staat altijd op het formulier."
-                : "This field is always on the form."}
+              {nl ? "Dit veld staat altijd op het formulier." : "This field is always on the form."}
             </p>
           ) : null}
           <ul className="form-admin-condition-list">
@@ -728,62 +756,61 @@ function ConditionEditor({
               const source = usable.find((field) => field.id === condition.sourceFieldId);
               return (
                 <li key={index}>
-                  <select
-                    aria-label={nl ? "Vraag" : "Question"}
+                  <ThemedSelect
+                    name={`condition-source-${index}`}
+                    ariaLabel={nl ? "Vraag" : "Question"}
                     value={condition.sourceFieldId}
-                    onChange={(event) => {
+                    onChange={(sourceFieldId) => {
                       const next = [...conditions];
                       next[index] = {
                         ...condition,
-                        sourceFieldId: event.target.value,
+                        sourceFieldId,
                         value: null,
                       };
                       onChange(next);
                     }}
-                  >
-                    {usable.map((field) => (
-                      <option key={field.id} value={field.id}>
-                        {field.labelNl}
-                      </option>
-                    ))}
-                  </select>
-                  <select
-                    aria-label={nl ? "Voorwaarde" : "Condition"}
+                    options={usable.map((field) => ({
+                      value: field.id,
+                      label: field.labelNl,
+                    }))}
+                  />
+                  <ThemedSelect
+                    name={`condition-operator-${index}`}
+                    ariaLabel={nl ? "Voorwaarde" : "Condition"}
                     value={condition.operator}
-                    onChange={(event) => {
+                    onChange={(operator) => {
                       const next = [...conditions];
                       next[index] = {
                         ...condition,
-                        operator: event.target.value as EditorCondition["operator"],
+                        operator: operator as EditorCondition["operator"],
                       };
                       onChange(next);
                     }}
-                  >
-                    <option value="EQUALS">{nl ? "is gelijk aan" : "equals"}</option>
-                    <option value="NOT_EQUALS">{nl ? "is niet" : "is not"}</option>
-                    <option value="INCLUDES">{nl ? "bevat" : "includes"}</option>
-                    <option value="IS_ANSWERED">{nl ? "is ingevuld" : "is answered"}</option>
-                  </select>
+                    options={[
+                      { value: "EQUALS", label: nl ? "is gelijk aan" : "equals" },
+                      { value: "NOT_EQUALS", label: nl ? "is niet" : "is not" },
+                      { value: "INCLUDES", label: nl ? "bevat" : "includes" },
+                      { value: "IS_ANSWERED", label: nl ? "is ingevuld" : "is answered" },
+                    ]}
+                  />
                   {condition.operator === "IS_ANSWERED" ? null : source &&
                     isChoiceType(source.type) ? (
-                    <select
-                      aria-label={nl ? "Antwoord" : "Answer"}
+                    <ThemedSelect
+                      name={`condition-answer-${index}`}
+                      ariaLabel={nl ? "Antwoord" : "Answer"}
                       value={condition.value ?? ""}
-                      onChange={(event) => {
+                      onChange={(value) => {
                         const next = [...conditions];
-                        next[index] = { ...condition, value: event.target.value || null };
+                        next[index] = { ...condition, value: value || null };
                         onChange(next);
                       }}
-                    >
-                      <option value="">{nl ? "Kies een antwoord" : "Pick an answer"}</option>
-                      {source.options
-                        .filter((option) => !option.archivedAt)
-                        .map((option) => (
-                          <option key={option.id} value={option.code}>
-                            {option.labelNl}
-                          </option>
-                        ))}
-                    </select>
+                      options={[
+                        { value: "", label: nl ? "Kies een antwoord" : "Pick an answer" },
+                        ...source.options
+                          .filter((option) => !option.archivedAt)
+                          .map((option) => ({ value: option.code, label: option.labelNl })),
+                      ]}
+                    />
                   ) : (
                     <input
                       aria-label={nl ? "Antwoord" : "Answer"}

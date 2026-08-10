@@ -79,7 +79,7 @@ export function FormAdminNav({
         <div>
           <Link className="ticket-admin-back" href={`${formBase(locale)}/admin/formulieren`}>
             <ArrowLeft aria-hidden="true" size={14} />
-            {locale === "nl" ? "Alle formulieren" : "All forms"}
+            {locale === "nl" ? "Alle forms" : "All forms"}
           </Link>
           <h1>{locale === "en" && form.titleEn ? form.titleEn : form.titleNl}</h1>
         </div>
@@ -88,17 +88,14 @@ export function FormAdminNav({
           <Link
             className="ticket-admin-icon-button"
             href={`${formBase(locale)}/formulieren/${form.slug}`}
-            aria-label={locale === "nl" ? "Formulier openen" : "Open form"}
-            title={locale === "nl" ? "Formulier openen" : "Open form"}
+            aria-label={locale === "nl" ? "Form openen" : "Open form"}
+            title={locale === "nl" ? "Form openen" : "Open form"}
           >
             <ExternalLink aria-hidden="true" size={17} />
           </Link>
         </div>
       </div>
-      <nav
-        className="ticket-admin-tabs"
-        aria-label={locale === "nl" ? "Formulier" : "Form"}
-      >
+      <nav className="ticket-admin-tabs" aria-label="Form">
         {links.map(({ icon: Icon, ...link }) => {
           const active = (selectedSegment ?? null) === link.segment;
           return (

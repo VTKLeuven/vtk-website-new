@@ -9,11 +9,7 @@ import { canSessionCreateFormForGroup } from "@/lib/forms/authorization";
 import { FormCreateForm } from "@/components/forms/admin/FormCreateForm";
 import { formBase, formatDate, type AdminLocale } from "@/components/forms/admin/format";
 
-export default async function NewFormPage({
-  params,
-}: {
-  params: Promise<{ locale: string }>;
-}) {
+export default async function NewFormPage({ params }: { params: Promise<{ locale: string }> }) {
   const { locale: localeParam } = await params;
   if (!hasLocale(localeParam)) notFound();
   const locale: AdminLocale = localeParam;
@@ -43,10 +39,10 @@ export default async function NewFormPage({
       <div className="ticket-admin-page">
         <div className="ticket-admin-page-head">
           <div>
-            <h1>{locale === "nl" ? "Nieuw formulier" : "New form"}</h1>
+            <h1>{locale === "nl" ? "Nieuwe form" : "New form"}</h1>
             <p>
               {locale === "nl"
-                ? "Je hebt geen post waarvoor je formulieren mag aanmaken. Vraag de verantwoordelijke van je post of IT om het recht `forms.create`."
+                ? "Je hebt geen post waarvoor je forms mag aanmaken. Vraag de verantwoordelijke van je post of IT om het recht `forms.create`."
                 : "You have no post you can create forms for. Ask your post lead or IT for the `forms.create` permission."}
             </p>
           </div>
@@ -88,9 +84,9 @@ export default async function NewFormPage({
         <div>
           <Link className="ticket-admin-back" href={`${base}/admin/formulieren`}>
             <ArrowLeft aria-hidden="true" size={14} />
-            {locale === "nl" ? "Alle formulieren" : "All forms"}
+            {locale === "nl" ? "Alle forms" : "All forms"}
           </Link>
-          <h1>{locale === "nl" ? "Nieuw formulier" : "New form"}</h1>
+          <h1>{locale === "nl" ? "Nieuwe form" : "New form"}</h1>
           <p>
             {locale === "nl"
               ? "Hierna kom je meteen in de veldeditor terecht."
@@ -106,7 +102,7 @@ export default async function NewFormPage({
               <ClipboardPlus aria-hidden="true" size={17} />
             </span>
             <div>
-              <h2 id="new-form-heading">{locale === "nl" ? "Het formulier" : "The form"}</h2>
+              <h2 id="new-form-heading">{locale === "nl" ? "De form" : "The form"}</h2>
             </div>
           </div>
         </div>

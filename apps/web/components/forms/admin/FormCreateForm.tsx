@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { createFormAction } from "@/app/actions/forms";
 import { SaveForm } from "@/components/ui/SaveForm";
+import { ThemedSelect } from "@/components/ui/ThemedSelect";
 import { slugify } from "@/lib/ticketing/slug";
 import type { AdminLocale } from "./format";
 
@@ -36,12 +37,10 @@ export function FormCreateForm({
     <SaveForm
       action={createFormAction}
       className="ticket-admin-form"
-      submitLabel={nl ? "Formulier aanmaken" : "Create form"}
+      submitLabel={nl ? "Form aanmaken" : "Create form"}
       savingLabel={nl ? "Bezig met aanmaken..." : "Creating..."}
-      savedMessage={nl ? "Formulier aangemaakt" : "Form created"}
-      fallbackErrorMessage={
-        nl ? "Aanmaken is niet gelukt." : "The form could not be created."
-      }
+      savedMessage={nl ? "Form aangemaakt" : "Form created"}
+      fallbackErrorMessage={nl ? "Aanmaken is niet gelukt." : "The form could not be created."}
       errorMessages={{
         TITLE_REQUIRED: nl ? "Geef het formulier een titel." : "Give the form a title.",
         GROUP_REQUIRED: nl ? "Kies een eigenaar." : "Pick an owner.",
@@ -75,7 +74,9 @@ export function FormCreateForm({
           />
         </div>
         <div className="ticket-admin-field" data-span="2">
-          <label htmlFor="form-title-en">{nl ? "Titel (EN, optioneel)" : "Title (EN, optional)"}</label>
+          <label htmlFor="form-title-en">
+            {nl ? "Titel (EN, optioneel)" : "Title (EN, optional)"}
+          </label>
           <input id="form-title-en" name="titleEn" maxLength={200} />
           <span className="ticket-admin-help">
             {nl
@@ -104,19 +105,14 @@ export function FormCreateForm({
 
         <div className="ticket-admin-field">
           <label htmlFor="form-owner">{nl ? "Eigenaar" : "Owner"}</label>
-          <select
+          <ThemedSelect
             id="form-owner"
             name="ownerGroupId"
             value={groupId}
-            onChange={(event) => setGroupId(event.target.value)}
+            onChange={setGroupId}
             required
-          >
-            {groups.map((group) => (
-              <option key={group.id} value={group.id}>
-                {group.name}
-              </option>
-            ))}
-          </select>
+            options={groups.map((group) => ({ value: group.id, label: group.name }))}
+          />
           <span className="ticket-admin-help">
             {nl
               ? "De post die dit formulier beheert. De leiding van die post krijgt meteen toegang."
@@ -126,10 +122,15 @@ export function FormCreateForm({
 
         <div className="ticket-admin-field">
           <label htmlFor="form-audience">{nl ? "Wie mag invullen?" : "Who can fill it in?"}</label>
-          <select id="form-audience" name="audience" defaultValue="PUBLIC">
-            <option value="PUBLIC">{nl ? "Iedereen" : "Everyone"}</option>
-            <option value="MEMBERS">{nl ? "Enkel ingelogde leden" : "Logged-in members only"}</option>
-          </select>
+          <ThemedSelect
+            id="form-audience"
+            name="audience"
+            defaultValue="PUBLIC"
+            options={[
+              { value: "PUBLIC", label: nl ? "Iedereen" : "Everyone" },
+              { value: "MEMBERS", label: nl ? "Enkel ingelogde leden" : "Logged-in members only" },
+            ]}
+          />
         </div>
 
         {eventsForGroup.length > 0 ? (
@@ -137,14 +138,16 @@ export function FormCreateForm({
             <label htmlFor="form-calendar-event">
               {nl ? "Hangt aan een evenement (optioneel)" : "Attached to an event (optional)"}
             </label>
-            <select id="form-calendar-event" name="calendarEventId" defaultValue="">
-              <option value="">{nl ? "Geen evenement" : "No event"}</option>
-              {eventsForGroup.map((event) => (
-                <option key={event.id} value={event.id}>
-                  {event.label}
-                </option>
-              ))}
-            </select>
+            <ThemedSelect
+              key={groupId}
+              id="form-calendar-event"
+              name="calendarEventId"
+              defaultValue=""
+              options={[
+                { value: "", label: nl ? "Geen evenement" : "No event" },
+                ...eventsForGroup.map((event) => ({ value: event.id, label: event.label })),
+              ]}
+            />
             <span className="ticket-admin-help">
               {nl
                 ? "Het formulier verschijnt dan bij dat evenement, en de bevestigingsmail kan er een agenda-item bij steken."

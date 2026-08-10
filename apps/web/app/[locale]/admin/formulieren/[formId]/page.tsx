@@ -1,14 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { prisma } from "@vtk/db";
-import {
-  CalendarClock,
-  Copy,
-  Inbox,
-  ListChecks,
-  Pencil,
-  Users,
-} from "lucide-react";
+import { CalendarClock, Copy, Inbox, ListChecks, Pencil, Users } from "lucide-react";
 import { hasLocale } from "@/lib/locale";
 import { requireFormCapability } from "@/lib/forms/authorization";
 import { deleteFormAction, duplicateFormAction } from "@/app/actions/forms";
@@ -50,22 +43,23 @@ export default async function FormAdminOverviewPage({
     `on.${new URL(publicBase).hostname.split(".").slice(-2).join(".")}`
   }`;
 
-  const [fieldCount, submitted, drafts, grantCount, fields, sections, shortLink] = await Promise.all([
-    prisma.formField.count({ where: { formId, archivedAt: null } }),
-    prisma.formEntry.count({ where: { formId, status: "SUBMITTED", isTest: false } }),
-    prisma.formEntry.count({ where: { formId, status: "DRAFT" } }),
-    prisma.formUserGrant.count({ where: { formId } }),
-    prisma.formField.findMany({
-      where: { formId },
-      include: { options: true },
-      orderBy: { sortOrder: "asc" },
-    }),
-    prisma.formSection.findMany({ where: { formId }, orderBy: { sortOrder: "asc" } }),
-    prisma.shortLink.findFirst({
-      where: { url: `${publicBase}/formulieren/${form.slug}` },
-      select: { slug: true },
-    }),
-  ]);
+  const [fieldCount, submitted, drafts, grantCount, fields, sections, shortLink] =
+    await Promise.all([
+      prisma.formField.count({ where: { formId, archivedAt: null } }),
+      prisma.formEntry.count({ where: { formId, status: "SUBMITTED", isTest: false } }),
+      prisma.formEntry.count({ where: { formId, status: "DRAFT" } }),
+      prisma.formUserGrant.count({ where: { formId } }),
+      prisma.formField.findMany({
+        where: { formId },
+        include: { options: true },
+        orderBy: { sortOrder: "asc" },
+      }),
+      prisma.formSection.findMany({ where: { formId }, orderBy: { sortOrder: "asc" } }),
+      prisma.shortLink.findFirst({
+        where: { url: `${publicBase}/formulieren/${form.slug}` },
+        select: { slug: true },
+      }),
+    ]);
 
   // Half vertaald publiceren mag, maar niet zonder het te weten: de bezoeker
   // krijgt anders een Engelse pagina met Nederlandse vragen ertussen.
@@ -149,12 +143,12 @@ export default async function FormAdminOverviewPage({
               <CalendarClock aria-hidden="true" size={17} />
             </span>
             <div>
-              <h2 id="form-summary-heading">{nl ? "Samenvatting" : "Summary"}</h2>
+              <h2 id="form-summary-heading">{nl ? "In één oogopslag" : "At a glance"}</h2>
             </div>
           </div>
         </div>
-        <dl className="ticket-admin-definitions">
-          <div>
+        <dl className="form-admin-overview-grid">
+          <div data-wide="true">
             <dt>{nl ? "Publieke link" : "Public link"}</dt>
             <dd>
               <Link href={`${base}/formulieren/${form.slug}`}>/formulieren/{form.slug}</Link>
@@ -228,13 +222,13 @@ export default async function FormAdminOverviewPage({
               <input type="hidden" name="formId" value={formId} />
               <button className="ticket-admin-button" type="submit">
                 <Copy aria-hidden="true" size={15} />
-                {nl ? "Formulier dupliceren" : "Duplicate form"}
+                {nl ? "Form dupliceren" : "Duplicate form"}
               </button>
             </form>
             <DeleteButton
               action={deleteFormAction}
               fields={{ locale, formId }}
-              title={nl ? "Formulier verwijderen?" : "Delete this form?"}
+              title={nl ? "Form verwijderen?" : "Delete this form?"}
               description={
                 submitted + drafts > 0
                   ? nl
@@ -247,7 +241,7 @@ export default async function FormAdminOverviewPage({
               confirmLabel={nl ? "Verwijderen" : "Delete"}
               cancelLabel={nl ? "Annuleren" : "Cancel"}
             >
-              {nl ? "Formulier verwijderen" : "Delete form"}
+              {nl ? "Form verwijderen" : "Delete form"}
             </DeleteButton>
           </div>
         </section>
