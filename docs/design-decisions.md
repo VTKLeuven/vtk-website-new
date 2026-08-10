@@ -1053,6 +1053,42 @@ praesidiumfunctie. Logistiek beheert nu zelf een chauffeurslijst in
   chauffeur zichtbaar in de keuzelijst van zijn eigen rit, onder "Niet meer in de
   chauffeurslijst".
 
+### Terugdraaien: één stap terug, behalve bij een online betaling
+
+Elke stap in de flow kan één stap terug: goedkeuren en afwijzen naar
+"aangevraagd", afgehaald naar goedgekeurd, teruggebracht naar afgehaald, en de
+markeringen "betaald aan de balie" en "waarborg terug" kunnen gewist worden.
+Bij vervoer geldt hetzelfde, plus het terugdraaien van een afronding. Zonder dit
+betekende één verkeerde klik een ingreep in de database, en dat is net wat deze
+app kwam vervangen.
+
+Wat daarbij vastligt:
+
+- **Voorraad wordt hercheckt zodra terugdraaien ze opnieuw inneemt.**
+  "Teruggebracht" terugdraaien zet het materiaal weer buiten en zet het
+  flesserke-verbruik terug op de plank; dat loopt in dezelfde
+  Serializable-transactie en met dezelfde check als het goedkeuren. Is de
+  periode intussen aan iemand anders toegewezen, dan gaat er niets door.
+  Voorraad *vrijgeven* (een goedkeuring terugdraaien) is altijd veilig.
+- **Een geslaagde online betaling draai je hier niet terug.** Dat vraagt een
+  terugbetaling bij de betaalprovider, en een knop die enkel de markering wist,
+  zou doen alsof het geld terug is. De actie weigert en zegt waarom. "Betaling
+  terugdraaien" wist enkel de markering *aan de balie*.
+- **Een goedkeuring terugdraaien kan niet zolang er betaald is.** Eerst de
+  betaling terugdraaien, dan de goedkeuring; anders zou een aanvraag zonder
+  betaalwijze toch als betaald blijven staan.
+- **Een afronding terugdraaien wist de kilometers** bij een voertuig dat per
+  kilometer rekent. Wie een afronding terugdraait, doet dat meestal net omdat de
+  kilometers fout stonden, en het afrondformulier vraagt ze dan opnieuw.
+- **Terugdraaien staat apart in de interface**, onder een eigen kopje
+  "Rechtzetten", en nooit in de rij knoppen waar je normaal op klikt.
+
+De velden op de aanvraag (`decidedAt`, `pickedUpAt`, ...) bewaren enkel de
+laatste toestand, dus ze zijn geen historiek meer zodra je kan terugdraaien.
+Daarom schrijft elke beheeractie een regel in `UitleenAuditLog`, in dezelfde
+transactie als de wijziging: zo staat er nooit een regel voor iets dat niet
+gebeurd is, en zie je op de detailpagina wie wat wanneer deed.
+
 ### Feedbackronde augustus 2026: negen keuzes
 
 Na een half werkingsjaar gaf het team Logistiek feedback op de app. Negen punten

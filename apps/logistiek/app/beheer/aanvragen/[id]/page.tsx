@@ -5,7 +5,14 @@ import {
   markDepositReturnedAction,
   markPaidOfflineAction,
   markPickedUpAction,
+  reopenReservationAction,
+  undoDepositReturnedAction,
+  undoPaidOfflineAction,
+  undoPickedUpAction,
+  undoReturnedAction,
 } from '@/app/actions/beheer';
+import type { ActionResult } from '@/app/actions/uitleen';
+import { AuditTimeline } from '@/components/audit-timeline';
 import { ConfirmActionButton } from '@/components/ui/confirm-action-button';
 import { ReservationStatusBadge } from '@/components/status-badge';
 import { requireManage } from '@/lib/session';
@@ -63,6 +70,66 @@ export default async function BeheerAanvraagDetailPage({
     reservation.requesterType === 'INTERN'
       ? (reservation.group?.nameNl ?? REQUESTER_TYPE_LABELS.INTERN)
       : (reservation.requesterName ?? REQUESTER_TYPE_LABELS[reservation.requesterType]);
+
+  /**
+   * Wat er op dit moment terug kan. Eén stap per keer, in de volgorde van de
+   * flow. Een geslaagde online betaling staat er niet bij: die draai je terug
+   * bij de betaalprovider, niet hier (zie de acties zelf).
+   */
+  const undoable: Array<{
+    label: string;
+    success: string;
+    description: string;
+    action: () => Promise<ActionResult>;
+  }> = [];
+
+  if (reservation.status === 'APPROVED' || reservation.status === 'REJECTED') {
+    undoable.push({
+      label: reservation.status === 'APPROVED' ? 'Goedkeuring terugdraaien' : 'Afwijzing terugdraaien',
+      success: 'De aanvraag staat terug op "aangevraagd".',
+      description:
+        reservation.status === 'APPROVED'
+          ? 'De aanvraag gaat terug naar "aangevraagd". Het materiaal komt weer vrij voor anderen in die periode, en de gekozen betaalwijze vervalt. De aanvraag zelf en haar historiek blijven bestaan.'
+          : 'De aanvraag gaat terug naar "aangevraagd" en komt weer in de wachtrij te staan. De reden die je meegaf, blijft als nota bewaard.',
+      action: reopenReservationAction.bind(null, reservation.id),
+    });
+  }
+  if (reservation.status === 'PICKED_UP') {
+    undoable.push({
+      label: 'Afhaling terugdraaien',
+      success: 'De afhaling is teruggedraaid.',
+      description:
+        'De aanvraag gaat terug naar "goedgekeurd", alsof het materiaal nog niet opgehaald is. De voorraad verandert niet: goedgekeurd materiaal staat sowieso apart.',
+      action: undoPickedUpAction.bind(null, reservation.id),
+    });
+  }
+  if (reservation.status === 'RETURNED') {
+    undoable.push({
+      label: 'Terugbrengen terugdraaien',
+      success: 'Het terugbrengen is teruggedraaid.',
+      description:
+        'De aanvraag gaat terug naar "afgehaald". Het materiaal staat dan weer uit, en het flesserke-verbruik dat bij het terugbrengen afgeboekt werd, komt terug in de voorraad. Is de periode intussen aan iemand anders toegewezen, dan gaat dit niet door.',
+      action: undoReturnedAction.bind(null, reservation.id),
+    });
+  }
+  if (reservation.paidOfflineAt && !paidOnline) {
+    undoable.push({
+      label: 'Betaling terugdraaien',
+      success: 'De aanvraag staat weer als niet betaald.',
+      description:
+        'De aanvraag staat weer als niet betaald. Dit wist enkel de markering aan de balie; er wordt niets terugbetaald.',
+      action: undoPaidOfflineAction.bind(null, reservation.id),
+    });
+  }
+  if (reservation.depositReturnedAt) {
+    undoable.push({
+      label: 'Waarborg teruggeven terugdraaien',
+      success: 'De waarborg staat weer open.',
+      description:
+        'De waarborg staat weer als niet teruggegeven. Dit wist enkel de markering; er verandert niets aan het geld zelf.',
+      action: undoDepositReturnedAction.bind(null, reservation.id),
+    });
+  }
 
   return (
     <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_380px]">
@@ -313,6 +380,26 @@ export default async function BeheerAanvraagDetailPage({
             />
           </div>
         ) : null}
+
+        {/* Eén stap terug. Staat apart en onderaan: het is de uitzondering, niet
+            de gewone weg door de flow. */}
+        {undoable.length > 0 ? (
+          <div className="grid gap-3 rounded-[14px] border border-dashed border-vtk-navy/25 bg-vtk-paper/60 p-4">
+            <p className="text-sm font-semibold text-vtk-ink">Rechtzetten</p>
+            {undoable.map((undo) => (
+              <ConfirmActionButton
+                key={undo.label}
+                label={undo.label}
+                successMessage={undo.success}
+                action={undo.action}
+                dialogTitle={undo.label + '?'}
+                dialogDescription={undo.description}
+              />
+            ))}
+          </div>
+        ) : null}
+
+        <AuditTimeline entries={reservation.auditLogs} />
       </aside>
     </div>
   );

@@ -358,11 +358,55 @@ export async function adminReservations() {
   });
 }
 
+/**
+ * Historiek, oudste eerst. Enkel op een detailpagina opgehaald: in de lijst van
+ * tweehonderd aanvragen zou dit per rij een extra query kosten voor iets dat
+ * daar toch niet getoond wordt.
+ */
+const auditLogInclude = {
+  orderBy: { createdAt: 'asc' as const },
+  include: { actor: { select: { name: true } } },
+};
+
 export async function adminReservation(id: string) {
   return prisma.uitleenReservation.findUnique({
     where: { id },
-    include: adminReservationInclude,
+    include: { ...adminReservationInclude, auditLogs: auditLogInclude },
   });
+}
+
+export type UitleenAuditEntry = {
+  id: string;
+  kind: string;
+  fromStatus: string | null;
+  toStatus: string | null;
+  note: string | null;
+  createdAt: Date;
+  actor: { name: string } | null;
+};
+
+/**
+ * Historiek van meerdere ritten in één query, gegroepeerd per rit. De
+ * vervoerlijst rendert de details van elke rij (ingeklapt), dus een query per
+ * rit zou er tweehonderd zijn.
+ */
+export async function transportAuditLogsByBooking(
+  bookingIds: string[]
+): Promise<Map<string, UitleenAuditEntry[]>> {
+  const byBooking = new Map<string, UitleenAuditEntry[]>();
+  if (bookingIds.length === 0) return byBooking;
+
+  const logs = await prisma.uitleenAuditLog.findMany({
+    where: { transportBookingId: { in: bookingIds } },
+    ...auditLogInclude,
+  });
+  for (const log of logs) {
+    if (!log.transportBookingId) continue;
+    const list = byBooking.get(log.transportBookingId) ?? [];
+    list.push(log);
+    byBooking.set(log.transportBookingId, list);
+  }
+  return byBooking;
 }
 
 export async function adminVanBookings() {

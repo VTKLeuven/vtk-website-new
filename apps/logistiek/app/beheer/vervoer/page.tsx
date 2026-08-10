@@ -2,16 +2,19 @@ import Link from 'next/link';
 import { VanStatusBadge } from '@/components/status-badge';
 import { requireManage } from '@/lib/session';
 import { formatDateTime, formatPriceCents, requesterLabel } from '@/lib/uitleen';
+import { AuditTimeline } from '@/components/audit-timeline';
 import {
   adminVanBookings,
   adminVehicles,
   driverOptions,
   hasSucceededPayment,
+  transportAuditLogsByBooking,
   type AdminTransportBooking,
 } from '@/lib/uitleen-server';
 import { BookingRow } from './booking-row';
 import { TransportControls } from './transport-controls';
 import { TransportDecisionForms } from './transport-decision-forms';
+import { TransportUndoButtons } from './transport-undo';
 
 const dateFormatter = new Intl.DateTimeFormat('nl-BE', {
   timeZone: 'Europe/Brussels',
@@ -57,6 +60,10 @@ export default async function BeheerVervoerPage() {
     .filter((booking) => booking.status === 'APPROVED')
     .sort((a, b) => a.startAt.getTime() - b.startAt.getTime());
   const rest = bookings.filter((booking) => !['REQUESTED', 'APPROVED'].includes(booking.status));
+
+  // Historiek van alle getoonde ritten in één query; de details staan wel
+  // ingeklapt, maar worden hier server-side gerenderd.
+  const auditLogs = await transportAuditLogsByBooking(bookings.map((booking) => booking.id));
 
   function paidOf(booking: AdminTransportBooking): boolean {
     return hasSucceededPayment(booking.payments) || booking.paidOfflineAt !== null;
@@ -139,6 +146,15 @@ export default async function BeheerVervoerPage() {
           </dl>
         ) : null}
         {children}
+        <TransportUndoButtons
+          bookingId={booking.id}
+          status={booking.status}
+          paidOffline={booking.paidOfflineAt !== null}
+          paidOnline={hasSucceededPayment(booking.payments)}
+        />
+        <div className="mt-3">
+          <AuditTimeline entries={auditLogs.get(booking.id) ?? []} />
+        </div>
       </div>
     );
   }

@@ -29,7 +29,7 @@ verbetering, **P3** = groter of "ooit".
 | 0 | Beslissingen die eerst moeten vallen | 9 vragen | ✅ beslist 10 aug 2026 |
 | 1 | Kleine bugs en ergernissen | A3, M8, M9, M10, M11, M14, V4, V10, V11, F1, F4 | ✅ af 10 aug 2026 |
 | 2 | Beheer-overzichten (kalender, lijsten) | A1, A2, V3, V7 | ✅ af 10 aug 2026 |
-| 3 | Statussen terugdraaien en historiek | A5, A6 | 1 werkdag |
+| 3 | Statussen terugdraaien en historiek | A5, A6 | ✅ af 10 aug 2026 |
 | 4 | Materiaal: catalogus en aanvragen | M3, M4, M5, M6, M13, M15 | 2,5 werkdagen |
 | 5 | Vervoer | V2, V5, V8, V9, V12, V13 | 2,5 werkdagen |
 | 6 | Flesserke | F2, F3, F5, F6, F7 | 1,5 werkdag |
@@ -366,9 +366,22 @@ Twee dingen die tijdens het werk naar boven kwamen:
 
 ---
 
-# Fase 3: statussen terugdraaien en historiek
+# Fase 3: statussen terugdraaien en historiek ✅ af op 10 augustus 2026
 
-### A5. Ont-afronden, ont-goedkeuren en ont-markeren als betaald
+Wat er tijdens het werk bijkwam:
+
+- **Terugbrengen terugdraaien is de zwaarste van de reeks**, want het flesserke-
+  verbruik moet terug op de plank én het materiaal komt weer uit de voorraad.
+  Dat loopt in één Serializable-transactie met dezelfde check als het
+  goedkeuren; end-to-end nagekeken met een aanvraag van 5 stuks waarvan er 2
+  terugkwamen (voorraad 6 → 3 → 6 na het terugdraaien).
+- **De historiek is één tabel voor aanvragen én ritten** (`UitleenAuditLog`,
+  precies één van beide id's gezet, zoals `UitleenPayment`). `fromStatus`/
+  `toStatus` zijn `String`: de twee soorten hebben elk hun eigen statusenum.
+- De vervoerlijst haalt de historiek van alle getoonde ritten in **één** query
+  op; de details staan wel ingeklapt, maar worden server-side gerenderd.
+
+### A5. Ont-afronden, ont-goedkeuren en ont-markeren als betaald ✅
 **P1 · code · 📝**
 
 - **Raakt:** `apps/logistiek/app/actions/beheer.ts` (naast
@@ -409,7 +422,7 @@ Twee dingen die tijdens het werk naar boven kwamen:
 - **Klaar wanneer:** een foute klik is met twee kliks recht te zetten, en de
   voorraad klopt daarna nog.
 
-### A6. Historiek: wie deed wat wanneer
+### A6. Historiek: wie deed wat wanneer ✅
 **P2 · 🗄️ · code**
 
 - **Raakt:** `packages/db/prisma/schema.prisma`,

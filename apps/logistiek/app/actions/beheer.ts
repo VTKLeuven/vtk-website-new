@@ -5,6 +5,7 @@ import { prisma } from '@vtk/db';
 import type { Prisma } from '@prisma/client';
 import { currentWorkingYear } from '@vtk/auth';
 import { requireManage } from '@/lib/session';
+import { writeAudit } from '@/lib/audit';
 import { saveError, saveOk, type SaveState } from '@/lib/saveState';
 import { rangesOverlap, transportPriceCents } from '@/lib/uitleen';
 import {
@@ -298,6 +299,13 @@ export async function approveReservationAction(
         decidedById: session.user.id,
       },
     });
+    await writeAudit(tx, { reservationId: reservation.id }, {
+      kind: 'STATUS_CHANGED',
+      fromStatus: reservation.status,
+      toStatus: 'APPROVED',
+      note: paymentMode === 'ONLINE' ? 'online betalen' : 'betalen aan de balie',
+      actorId: session.user.id,
+    });
     return { error: null };
   });
 
@@ -332,6 +340,13 @@ export async function rejectReservationAction(
       decidedById: session.user.id,
     },
   });
+  await writeAudit(prisma, { reservationId }, {
+    kind: 'STATUS_CHANGED',
+    fromStatus: reservation.status,
+    toStatus: 'REJECTED',
+    note: `reden: ${adminNote}`,
+    actorId: session.user.id,
+  });
 
   revalidateBeheer();
   return saveOk();
@@ -349,6 +364,12 @@ export async function markPickedUpAction(reservationId: string): Promise<ActionR
   await prisma.uitleenReservation.update({
     where: { id: reservationId },
     data: { status: 'PICKED_UP', pickedUpAt: new Date(), pickedUpById: session.user.id },
+  });
+  await writeAudit(prisma, { reservationId }, {
+    kind: 'STATUS_CHANGED',
+    fromStatus: 'APPROVED',
+    toStatus: 'PICKED_UP',
+    actorId: session.user.id,
   });
 
   revalidateBeheer();
@@ -394,6 +415,12 @@ export async function markReturnedAction(
         });
       }
     }
+    await writeAudit(tx, { reservationId }, {
+      kind: 'STATUS_CHANGED',
+      fromStatus: 'PICKED_UP',
+      toStatus: 'RETURNED',
+      actorId: session.user.id,
+    });
     return { error: null };
   });
 
@@ -407,7 +434,7 @@ export async function markReturnedAction(
 }
 
 export async function markPaidOfflineAction(reservationId: string): Promise<ActionResult> {
-  await requireManage();
+  const session = await requireManage();
 
   const reservation = await prisma.uitleenReservation.findUnique({ where: { id: reservationId } });
   if (!reservation) return { ok: false, error: 'Reservatie niet gevonden.' };
@@ -417,13 +444,18 @@ export async function markPaidOfflineAction(reservationId: string): Promise<Acti
     where: { id: reservationId },
     data: { paidOfflineAt: new Date() },
   });
+  await writeAudit(prisma, { reservationId }, {
+    kind: 'PAYMENT_MARKED',
+    note: 'betaald aan de balie',
+    actorId: session.user.id,
+  });
 
   revalidateBeheer();
   return { ok: true, message: 'Gemarkeerd als betaald.' };
 }
 
 export async function markDepositReturnedAction(reservationId: string): Promise<ActionResult> {
-  await requireManage();
+  const session = await requireManage();
 
   const reservation = await prisma.uitleenReservation.findUnique({ where: { id: reservationId } });
   if (!reservation) return { ok: false, error: 'Reservatie niet gevonden.' };
@@ -435,9 +467,253 @@ export async function markDepositReturnedAction(reservationId: string): Promise<
     where: { id: reservationId },
     data: { depositReturnedAt: new Date() },
   });
+  await writeAudit(prisma, { reservationId }, {
+    kind: 'PAYMENT_MARKED',
+    note: 'waarborg teruggegeven',
+    actorId: session.user.id,
+  });
 
   revalidateBeheer();
   return { ok: true, message: 'Waarborg gemarkeerd als teruggegeven.' };
+}
+
+// ---------------------------------------------------------------------------
+// Terugdraaien
+//
+// Elke stap in de flow kan één stap terug. Zonder dit betekende één verkeerde
+// klik een ingreep in de database, en dat is precies wat deze app moest
+// vervangen. Drie regels gelden overal:
+//
+// 1. Een stap die voorraad opnieuw inneemt (teruggebracht terugdraaien) doet dat
+//    in dezelfde Serializable-transactie als de gewone flow, met dezelfde
+//    voorraadcheck. Voorraad vrijgeven (goedkeuring terugdraaien) is altijd veilig.
+// 2. Een geslaagde online betaling draai je hier niet terug: dat vraagt een
+//    terugbetaling bij de provider. De actie weigert en zegt dat ook.
+// 3. Elke terugdraaiing komt in de historiek, anders verdwijnt net het feit dat
+//    je iets rechtgezet hebt.
+// ---------------------------------------------------------------------------
+
+/** Betalingen die een wijziging blokkeren: lopend of geslaagd. */
+const BLOCKING_PAYMENT_STATUSES = ['CREATED', 'PENDING', 'SUCCEEDED'];
+
+export async function reopenReservationAction(reservationId: string): Promise<ActionResult> {
+  const session = await requireManage();
+
+  const reservation = await prisma.uitleenReservation.findUnique({
+    where: { id: reservationId },
+    select: { status: true, paidOfflineAt: true, payments: { select: { status: true } } },
+  });
+  if (!reservation) return { ok: false, error: 'Reservatie niet gevonden.' };
+  if (reservation.status !== 'APPROVED' && reservation.status !== 'REJECTED') {
+    return {
+      ok: false,
+      error: 'Enkel een goedgekeurde of afgewezen aanvraag kan terug op "aangevraagd".',
+    };
+  }
+  if (reservation.paidOfflineAt) {
+    return { ok: false, error: 'Draai eerst de betaling terug; daarna kan de goedkeuring terug.' };
+  }
+  if (reservation.payments.some((payment) => BLOCKING_PAYMENT_STATUSES.includes(payment.status))) {
+    return {
+      ok: false,
+      error: 'Er loopt een online betaling voor deze aanvraag; die moet eerst afgehandeld worden.',
+    };
+  }
+
+  await prisma.uitleenReservation.update({
+    where: { id: reservationId },
+    data: { status: 'REQUESTED', paymentMode: null, decidedAt: null, decidedById: null },
+  });
+  await writeAudit(prisma, { reservationId }, {
+    kind: 'STATUS_CHANGED',
+    fromStatus: reservation.status,
+    toStatus: 'REQUESTED',
+    note: 'beslissing teruggedraaid',
+    actorId: session.user.id,
+  });
+
+  revalidateBeheer();
+  return { ok: true, message: 'De aanvraag staat terug op "aangevraagd".' };
+}
+
+export async function undoPickedUpAction(reservationId: string): Promise<ActionResult> {
+  const session = await requireManage();
+
+  const reservation = await prisma.uitleenReservation.findUnique({
+    where: { id: reservationId },
+    select: { status: true },
+  });
+  if (!reservation) return { ok: false, error: 'Reservatie niet gevonden.' };
+  if (reservation.status !== 'PICKED_UP') {
+    return { ok: false, error: 'Deze aanvraag staat niet op "afgehaald".' };
+  }
+
+  // Geen voorraadcheck nodig: APPROVED en PICKED_UP nemen allebei voorraad in.
+  await prisma.uitleenReservation.update({
+    where: { id: reservationId },
+    data: { status: 'APPROVED', pickedUpAt: null, pickedUpById: null },
+  });
+  await writeAudit(prisma, { reservationId }, {
+    kind: 'STATUS_CHANGED',
+    fromStatus: 'PICKED_UP',
+    toStatus: 'APPROVED',
+    note: 'afhaling teruggedraaid',
+    actorId: session.user.id,
+  });
+
+  revalidateBeheer();
+  return { ok: true, message: 'De afhaling is teruggedraaid.' };
+}
+
+/**
+ * Terugbrengen terugdraaien. Dit is de zwaarste van de reeks: het materiaal komt
+ * opnieuw uit de voorraad, en het flesserke-verbruik dat bij het terugbrengen
+ * afgeboekt werd, moet terug op de plank. Beide in één transactie, met dezelfde
+ * voorraadcheck als bij het goedkeuren; is de periode intussen volgeboekt, dan
+ * gaat er niets door.
+ */
+export async function undoReturnedAction(reservationId: string): Promise<ActionResult> {
+  const session = await requireManage();
+
+  const outcome = await runSerializable(async (tx) => {
+    const reservation = await tx.uitleenReservation.findUnique({
+      where: { id: reservationId },
+      include: {
+        lines: { include: { item: { select: { quantity: true } } } },
+        flesserkeLines: { include: { item: { select: { quantity: true } } } },
+      },
+    });
+    if (!reservation) return { error: 'NOT_FOUND' as const };
+    if (reservation.status !== 'RETURNED') return { error: 'NOT_RETURNED' as const };
+
+    // Materiaal komt weer uit de voorraad zodra de aanvraag terug op PICKED_UP staat.
+    const reserved = await reservedQuantities(tx, reservation.pickupDate, reservation.returnDate, {
+      excludeReservationId: reservation.id,
+    });
+    for (const line of reservation.lines) {
+      const available = line.item.quantity - (reserved.get(line.itemId) ?? 0);
+      if (line.quantity > available) {
+        return { error: 'NO_STOCK' as const, itemName: line.itemName };
+      }
+    }
+
+    // Flesserke: het verbruik gaat terug naar de voorraad, maar de lijn neemt
+    // ook weer plaats in. Per item optellen, want twee lijnen kunnen hetzelfde
+    // item raken.
+    const flReserved = await flesserkeReserved(tx, { excludeReservationId: reservation.id });
+    const perItem = new Map<string, { stock: number; restored: number; needed: number; name: string }>();
+    for (const line of reservation.flesserkeLines) {
+      const entry = perItem.get(line.flesserkeItemId) ?? {
+        stock: line.item.quantity,
+        restored: 0,
+        needed: 0,
+        name: line.itemName,
+      };
+      entry.restored += line.quantity - (line.returnedQuantity ?? 0);
+      entry.needed += line.quantity;
+      perItem.set(line.flesserkeItemId, entry);
+    }
+    for (const [itemId, entry] of perItem) {
+      const available = entry.stock + entry.restored - (flReserved.get(itemId) ?? 0) - entry.needed;
+      if (available < 0) return { error: 'NO_STOCK' as const, itemName: entry.name };
+    }
+
+    await tx.uitleenReservation.update({
+      where: { id: reservationId },
+      data: { status: 'PICKED_UP', returnedAt: null, returnedById: null },
+    });
+    for (const line of reservation.flesserkeLines) {
+      const consumed = line.quantity - (line.returnedQuantity ?? 0);
+      await tx.uitleenFlesserkeLine.update({
+        where: { id: line.id },
+        data: { returnedQuantity: null },
+      });
+      if (consumed > 0) {
+        await tx.uitleenFlesserkeItem.update({
+          where: { id: line.flesserkeItemId },
+          data: { quantity: { increment: consumed } },
+        });
+      }
+    }
+    await writeAudit(tx, { reservationId }, {
+      kind: 'STATUS_CHANGED',
+      fromStatus: 'RETURNED',
+      toStatus: 'PICKED_UP',
+      note: 'terugbrengen teruggedraaid',
+      actorId: session.user.id,
+    });
+    return { error: null };
+  });
+
+  if (outcome.error === 'NOT_FOUND') return { ok: false, error: 'Reservatie niet gevonden.' };
+  if (outcome.error === 'NOT_RETURNED') {
+    return { ok: false, error: 'Deze aanvraag staat niet op "teruggebracht".' };
+  }
+  if (outcome.error === 'NO_STOCK') {
+    return {
+      ok: false,
+      error: `Terugdraaien kan niet: ${outcome.itemName} is intussen aan iemand anders toegewezen.`,
+    };
+  }
+
+  revalidateBeheer();
+  return { ok: true, message: 'Het terugbrengen is teruggedraaid; het materiaal staat weer uit.' };
+}
+
+export async function undoPaidOfflineAction(reservationId: string): Promise<ActionResult> {
+  const session = await requireManage();
+
+  const reservation = await prisma.uitleenReservation.findUnique({
+    where: { id: reservationId },
+    select: { paidOfflineAt: true, payments: { select: { status: true } } },
+  });
+  if (!reservation) return { ok: false, error: 'Reservatie niet gevonden.' };
+  if (!reservation.paidOfflineAt) return { ok: false, error: 'Deze aanvraag staat niet als betaald.' };
+  if (reservation.payments.some((payment) => payment.status === 'SUCCEEDED')) {
+    return {
+      ok: false,
+      error: 'Er is online betaald; terugbetalen loopt via de betaalprovider, niet via dit scherm.',
+    };
+  }
+
+  await prisma.uitleenReservation.update({
+    where: { id: reservationId },
+    data: { paidOfflineAt: null },
+  });
+  await writeAudit(prisma, { reservationId }, {
+    kind: 'PAYMENT_MARKED',
+    note: 'betaling aan de balie teruggedraaid',
+    actorId: session.user.id,
+  });
+
+  revalidateBeheer();
+  return { ok: true, message: 'De aanvraag staat weer als niet betaald.' };
+}
+
+export async function undoDepositReturnedAction(reservationId: string): Promise<ActionResult> {
+  const session = await requireManage();
+
+  const reservation = await prisma.uitleenReservation.findUnique({
+    where: { id: reservationId },
+    select: { depositReturnedAt: true },
+  });
+  if (!reservation) return { ok: false, error: 'Reservatie niet gevonden.' };
+  if (!reservation.depositReturnedAt) {
+    return { ok: false, error: 'De waarborg staat niet als teruggegeven.' };
+  }
+
+  await prisma.uitleenReservation.update({
+    where: { id: reservationId },
+    data: { depositReturnedAt: null },
+  });
+  await writeAudit(prisma, { reservationId }, {
+    kind: 'PAYMENT_MARKED',
+    note: 'waarborg teruggeven teruggedraaid',
+    actorId: session.user.id,
+  });
+
+  revalidateBeheer();
+  return { ok: true, message: 'De waarborg staat weer open.' };
 }
 
 /**
@@ -450,7 +726,7 @@ export async function adminEditReservationAction(
   reservationId: string,
   input: ReservationFormInput
 ): Promise<ActionResult> {
-  await requireManage();
+  const session = await requireManage();
 
   // Team-editor beheert de materiaallijnen; flesserke loopt via een eigen flow.
   const built = await buildReservationData({ ...input, flesserkeLines: [] }, null);
@@ -503,6 +779,11 @@ export async function adminEditReservationAction(
     await tx.uitleenReservation.update({
       where: { id: reservationId },
       data: { ...built.scalars, lines: { create: built.lineCreates } },
+    });
+    await writeAudit(tx, { reservationId }, {
+      kind: 'EDITED',
+      note: `${built.lineCreates.length} materiaallijn${built.lineCreates.length === 1 ? '' : 'en'} na de wijziging`,
+      actorId: session.user.id,
     });
     return { error: null };
   });
@@ -587,6 +868,13 @@ export async function approveTransportAction(
           decidedById: session.user.id,
         },
       });
+      await writeAudit(tx, { transportBookingId: booking.id }, {
+        kind: 'STATUS_CHANGED',
+        fromStatus: booking.status,
+        toStatus: 'APPROVED',
+        note: paymentMode === 'ONLINE' ? 'online betalen' : 'betalen aan de balie',
+        actorId: session.user.id,
+      });
       return { error: null };
     }
   );
@@ -614,6 +902,13 @@ export async function rejectTransportAction(_prev: SaveState, formData: FormData
     where: { id: bookingId },
     data: { status: 'REJECTED', adminNote, decidedAt: new Date(), decidedById: session.user.id },
   });
+  await writeAudit(prisma, { transportBookingId: bookingId }, {
+    kind: 'STATUS_CHANGED',
+    fromStatus: booking.status,
+    toStatus: 'REJECTED',
+    note: `reden: ${adminNote}`,
+    actorId: session.user.id,
+  });
 
   revalidateBeheer();
   return saveOk();
@@ -621,7 +916,7 @@ export async function rejectTransportAction(_prev: SaveState, formData: FormData
 
 /** Chauffeur toewijzen of wijzigen; kan op elk moment voor de rit afgerond is. */
 export async function assignDriverAction(bookingId: string, driverId: string): Promise<ActionResult> {
-  await requireManage();
+  const session = await requireManage();
 
   const booking = await prisma.uitleenTransportBooking.findUnique({ where: { id: bookingId } });
   if (!booking) return { ok: false, error: 'Rit niet gevonden.' };
@@ -632,9 +927,18 @@ export async function assignDriverAction(bookingId: string, driverId: string): P
     return { ok: false, error: 'Deze persoon staat niet in de chauffeurslijst.' };
   }
 
+  const driver = driverId
+    ? await prisma.user.findUnique({ where: { id: driverId }, select: { name: true } })
+    : null;
+
   await prisma.uitleenTransportBooking.update({
     where: { id: bookingId },
     data: { driverId: driverId || null },
+  });
+  await writeAudit(prisma, { transportBookingId: bookingId }, {
+    kind: 'EDITED',
+    note: driver ? `chauffeur: ${driver.name}` : 'chauffeur verwijderd',
+    actorId: session.user.id,
   });
 
   revalidateBeheer();
@@ -643,7 +947,7 @@ export async function assignDriverAction(bookingId: string, driverId: string): P
 
 /** Voertuig wisselen: tarief opnieuw snapshotten en de prijs herberekenen. */
 export async function changeVehicleAction(bookingId: string, vehicleId: string): Promise<ActionResult> {
-  await requireManage();
+  const session = await requireManage();
 
   const outcome = await runSerializable(
     async (tx) => {
@@ -686,6 +990,11 @@ export async function changeVehicleAction(bookingId: string, vehicleId: string):
       await tx.uitleenTransportBooking.update({
         where: { id: booking.id },
         data: { vehicleId: vehicle.id, pricingMode: vehicle.pricingMode, rateCents: vehicle.rateCents, priceCents },
+      });
+      await writeAudit(tx, { transportBookingId: booking.id }, {
+        kind: 'EDITED',
+        note: `voertuig: ${vehicle.nameNl}`,
+        actorId: session.user.id,
       });
       return { error: null };
     }
@@ -734,13 +1043,20 @@ export async function completeTransportAction(bookingId: string, kilometersRaw?:
       completedById: session.user.id,
     },
   });
+  await writeAudit(prisma, { transportBookingId: bookingId }, {
+    kind: 'STATUS_CHANGED',
+    fromStatus: 'APPROVED',
+    toStatus: 'COMPLETED',
+    note: kilometers !== null ? `${kilometers} km` : null,
+    actorId: session.user.id,
+  });
 
   revalidateBeheer();
   return { ok: true, message: 'Rit afgerond.' };
 }
 
 export async function markTransportPaidOfflineAction(bookingId: string): Promise<ActionResult> {
-  await requireManage();
+  const session = await requireManage();
 
   const booking = await prisma.uitleenTransportBooking.findUnique({ where: { id: bookingId } });
   if (!booking) return { ok: false, error: 'Rit niet gevonden.' };
@@ -750,9 +1066,134 @@ export async function markTransportPaidOfflineAction(bookingId: string): Promise
     where: { id: bookingId },
     data: { paidOfflineAt: new Date() },
   });
+  await writeAudit(prisma, { transportBookingId: bookingId }, {
+    kind: 'PAYMENT_MARKED',
+    note: 'betaald aan de balie',
+    actorId: session.user.id,
+  });
 
   revalidateBeheer();
   return { ok: true, message: 'Gemarkeerd als betaald.' };
+}
+
+export async function reopenTransportAction(bookingId: string): Promise<ActionResult> {
+  const session = await requireManage();
+
+  const booking = await prisma.uitleenTransportBooking.findUnique({
+    where: { id: bookingId },
+    include: { payments: { select: { status: true } } },
+  });
+  if (!booking) return { ok: false, error: 'Rit niet gevonden.' };
+  if (booking.status !== 'APPROVED' && booking.status !== 'REJECTED') {
+    return { ok: false, error: 'Enkel een goedgekeurde of afgewezen rit kan terug op "aangevraagd".' };
+  }
+  if (booking.paidOfflineAt) {
+    return { ok: false, error: 'Draai eerst de betaling terug; daarna kan de goedkeuring terug.' };
+  }
+  if (booking.payments.some((payment) => BLOCKING_PAYMENT_STATUSES.includes(payment.status))) {
+    return { ok: false, error: 'Er loopt een online betaling voor deze rit.' };
+  }
+
+  await prisma.uitleenTransportBooking.update({
+    where: { id: bookingId },
+    data: {
+      status: 'REQUESTED',
+      paymentMode: null,
+      decidedAt: null,
+      decidedById: null,
+      // Terug naar de prijsindicatie van de aanvraag; per km blijft ze onbekend.
+      priceCents: transportPriceCents({
+        pricingMode: booking.pricingMode,
+        rateCents: booking.rateCents,
+        startAt: booking.startAt,
+        endAt: booking.endAt,
+      }),
+    },
+  });
+  await writeAudit(prisma, { transportBookingId: bookingId }, {
+    kind: 'STATUS_CHANGED',
+    fromStatus: booking.status,
+    toStatus: 'REQUESTED',
+    note: 'beslissing teruggedraaid',
+    actorId: session.user.id,
+  });
+
+  revalidateBeheer();
+  return { ok: true, message: 'De rit staat terug op "aangevraagd".' };
+}
+
+/**
+ * Afronden terugdraaien. De rit wordt weer goedgekeurd en de kilometers gaan
+ * leeg: wie een afronding terugdraait, doet dat meestal net omdat de km fout
+ * stonden, en dan moet het afrondformulier ze opnieuw vragen.
+ */
+export async function undoCompleteTransportAction(bookingId: string): Promise<ActionResult> {
+  const session = await requireManage();
+
+  const booking = await prisma.uitleenTransportBooking.findUnique({
+    where: { id: bookingId },
+    include: { payments: { select: { status: true } } },
+  });
+  if (!booking) return { ok: false, error: 'Rit niet gevonden.' };
+  if (booking.status !== 'COMPLETED') return { ok: false, error: 'Deze rit is niet afgerond.' };
+  if (booking.payments.some((payment) => payment.status === 'SUCCEEDED')) {
+    return {
+      ok: false,
+      error: 'Deze rit is online betaald; terugbetalen loopt via de betaalprovider.',
+    };
+  }
+
+  const perKm = booking.pricingMode === 'PER_KM';
+  await prisma.uitleenTransportBooking.update({
+    where: { id: bookingId },
+    data: {
+      status: 'APPROVED',
+      completedAt: null,
+      completedById: null,
+      kilometers: perKm ? null : booking.kilometers,
+      priceCents: perKm ? null : booking.priceCents,
+    },
+  });
+  await writeAudit(prisma, { transportBookingId: bookingId }, {
+    kind: 'STATUS_CHANGED',
+    fromStatus: 'COMPLETED',
+    toStatus: 'APPROVED',
+    note: perKm ? 'afronding teruggedraaid; kilometers gewist' : 'afronding teruggedraaid',
+    actorId: session.user.id,
+  });
+
+  revalidateBeheer();
+  return { ok: true, message: 'De afronding is teruggedraaid.' };
+}
+
+export async function undoTransportPaidOfflineAction(bookingId: string): Promise<ActionResult> {
+  const session = await requireManage();
+
+  const booking = await prisma.uitleenTransportBooking.findUnique({
+    where: { id: bookingId },
+    include: { payments: { select: { status: true } } },
+  });
+  if (!booking) return { ok: false, error: 'Rit niet gevonden.' };
+  if (!booking.paidOfflineAt) return { ok: false, error: 'Deze rit staat niet als betaald.' };
+  if (booking.payments.some((payment) => payment.status === 'SUCCEEDED')) {
+    return {
+      ok: false,
+      error: 'Er is online betaald; terugbetalen loopt via de betaalprovider, niet via dit scherm.',
+    };
+  }
+
+  await prisma.uitleenTransportBooking.update({
+    where: { id: bookingId },
+    data: { paidOfflineAt: null },
+  });
+  await writeAudit(prisma, { transportBookingId: bookingId }, {
+    kind: 'PAYMENT_MARKED',
+    note: 'betaling aan de balie teruggedraaid',
+    actorId: session.user.id,
+  });
+
+  revalidateBeheer();
+  return { ok: true, message: 'De rit staat weer als niet betaald.' };
 }
 
 // ---------------------------------------------------------------------------

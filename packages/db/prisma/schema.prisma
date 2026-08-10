@@ -211,6 +211,14 @@ enum UitleenPaymentMode {
   OFFLINE
 }
 
+/// Soort gebeurtenis in de historiek van een aanvraag of rit.
+enum UitleenAuditKind {
+  STATUS_CHANGED // goedgekeurd, afgehaald, teruggebracht, en het terugdraaien daarvan
+  PAYMENT_MARKED // betaald aan de balie gezet of teruggedraaid, waarborg terug
+  EDITED // het team paste de inhoud van de aanvraag aan
+  NOTE // vrije notitie
+}
+
 enum UitleenPaymentStatus {
   CREATED
   PENDING
@@ -403,6 +411,7 @@ model User {
   uitleenTransportDone    UitleenTransportBooking[] @relation("UitleenTransportCompletedBy")
   uitleenDriver           UitleenDriver?            @relation("UitleenDriverUser")
   uitleenDriversAdded     UitleenDriver[]           @relation("UitleenDriverAddedBy")
+  uitleenAuditLogs        UitleenAuditLog[]         @relation("UitleenAuditActor")
 
   doorGrants         DoorAccessGrant[]
   doorLogs           DoorAccessLog[]
@@ -1999,6 +2008,7 @@ model UitleenReservation {
   lines          UitleenReservationLine[]
   flesserkeLines UitleenFlesserkeLine[]
   payments       UitleenPayment[]
+  auditLogs      UitleenAuditLog[]
 
   @@index([userId])
   @@index([status, pickupDate])
@@ -2119,7 +2129,8 @@ model UitleenTransportBooking {
   decidedBy   User?          @relation("UitleenTransportDecidedBy", fields: [decidedById], references: [id], onDelete: SetNull)
   completedBy User?          @relation("UitleenTransportCompletedBy", fields: [completedById], references: [id], onDelete: SetNull)
 
-  payments UitleenPayment[]
+  payments  UitleenPayment[]
+  auditLogs UitleenAuditLog[]
 
   @@index([userId])
   @@index([status, startAt])
@@ -2239,6 +2250,40 @@ model UitleenFlesserkeLine {
 
   @@index([reservationId])
   @@index([flesserkeItemId])
+}
+
+/// Wat er met een aanvraag of een rit gebeurd is, in volgorde.
+///
+/// De velden op de aanvraag zelf (`decidedAt`, `pickedUpAt`, ...) bewaren enkel
+/// de laatste toestand. Sinds het team een beslissing kan terugdraaien, is dat
+/// te weinig: een terugdraaiing overschreef die velden en er bleef niets van
+/// over. Hier staat elke stap, met wie ze zette.
+///
+/// `fromStatus`/`toStatus` zijn `String` en geen enum: materiaalaanvragen en
+/// ritten hebben elk hun eigen statusenum, en één gedeelde tabel weegt zwaarder
+/// dan typeveiligheid op een veld dat enkel getoond wordt.
+model UitleenAuditLog {
+  id String @id @default(cuid())
+
+  /// Precies één van beide is gezet, zoals bij UitleenPayment.
+  reservationId      String?
+  transportBookingId String?
+
+  kind       UitleenAuditKind
+  fromStatus String?
+  toStatus   String?
+  /// Vrije toelichting, bv. de reden van een afwijzing of wat er gewijzigd is.
+  note       String?
+
+  actorId   String?
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+
+  reservation      UitleenReservation?      @relation(fields: [reservationId], references: [id], onDelete: Cascade)
+  transportBooking UitleenTransportBooking? @relation(fields: [transportBookingId], references: [id], onDelete: Cascade)
+  actor            User?                    @relation("UitleenAuditActor", fields: [actorId], references: [id], onDelete: SetNull)
+
+  @@index([reservationId, createdAt])
+  @@index([transportBookingId, createdAt])
 }
 
 // -----------------------------------------------------------------------------
