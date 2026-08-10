@@ -2,12 +2,13 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { prisma } from "@vtk/db";
 import { hasPermission } from "@vtk/auth";
-import { ArrowRight, ClipboardList, Filter, Plus, Search } from "lucide-react";
+import { ChevronRight, ClipboardList, Filter, Plus, Search } from "lucide-react";
 import { hasLocale } from "@/lib/locale";
 import { requireSession } from "@/lib/session";
-import { visibleFormsFilter } from "@/lib/forms/authorization";
+import { formCapabilitiesByForm, visibleFormsFilter } from "@/lib/forms/authorization";
 import { AdminEmptyState } from "@/components/ticketing/admin/AdminEmptyState";
 import { FormStatusBadge } from "@/components/forms/admin/FormStatusBadge";
+import { FormStatusSelect } from "@/components/forms/admin/FormStatusSelect";
 import { ThemedSelect } from "@/components/ui/ThemedSelect";
 import {
   formatDateTime,
@@ -69,6 +70,10 @@ export default async function FormsAdminOverview({
       .toLocaleLowerCase(localeTag);
     return searchable.includes(query);
   });
+
+  // Wie een form beheert, mag de status er in de lijst zelf uit wisselen; wie ze
+  // enkel mag lezen, ziet het label.
+  const capabilities = await formCapabilitiesByForm(visibleForms.map((form) => form.id));
 
   return (
     <div className="ticket-admin-page">
@@ -182,45 +187,59 @@ export default async function FormsAdminOverview({
                 </tr>
               </thead>
               <tbody>
-                {visibleForms.map((form) => (
-                  <tr key={form.id}>
-                    <td data-wrap="true">
-                      <strong>
-                        {locale === "en" && form.titleEn ? form.titleEn : form.titleNl}
-                      </strong>
-                      <div className="ticket-admin-row-meta ticket-admin-code">
-                        /formulieren/{form.slug}
-                      </div>
-                    </td>
-                    <td data-priority="low">
-                      {locale === "en" ? form.ownerGroup.nameEn : form.ownerGroup.nameNl}
-                    </td>
-                    <td>
-                      <FormStatusBadge status={form.status} locale={locale} />
-                    </td>
-                    <td>
-                      <strong>{formatNumber(form._count.entries, locale)}</strong>
-                      {form.maxEntries ? (
-                        <div className="ticket-admin-row-meta">
-                          {locale === "nl" ? "van" : "of"} {formatNumber(form.maxEntries, locale)}
+                {visibleForms.map((form) => {
+                  const title = locale === "en" && form.titleEn ? form.titleEn : form.titleNl;
+                  return (
+                    <tr key={form.id} className="ticket-admin-linked-row">
+                      <td data-wrap="true">
+                        {/* De link overspant de hele rij (zie .ticket-admin-row-link),
+                            zodat je niet op het pijltje hoeft te mikken. */}
+                        <Link
+                          className="ticket-admin-row-link"
+                          href={`${base}/admin/formulieren/${form.id}`}
+                        >
+                          <strong>{title}</strong>
+                        </Link>
+                        <div className="ticket-admin-row-meta ticket-admin-code">
+                          /formulieren/{form.slug}
                         </div>
-                      ) : null}
-                    </td>
-                    <td data-priority="low" data-wrap="true">
-                      {formatDateTime(form.updatedAt, locale)}
-                    </td>
-                    <td>
-                      <Link
-                        className="ticket-admin-icon-button"
-                        href={`${base}/admin/formulieren/${form.id}`}
-                        aria-label={`${locale === "nl" ? "Open" : "Open"}: ${form.titleNl}`}
-                        title={locale === "nl" ? "Form openen" : "Open form"}
-                      >
-                        <ArrowRight aria-hidden="true" size={17} />
-                      </Link>
-                    </td>
-                  </tr>
-                ))}
+                      </td>
+                      <td data-priority="low">
+                        {locale === "en" ? form.ownerGroup.nameEn : form.ownerGroup.nameNl}
+                      </td>
+                      <td>
+                        {capabilities.get(form.id)?.includes("MANAGE_FORM") ? (
+                          <FormStatusSelect
+                            formId={form.id}
+                            status={form.status}
+                            locale={locale}
+                            formTitle={title}
+                          />
+                        ) : (
+                          <FormStatusBadge status={form.status} locale={locale} />
+                        )}
+                      </td>
+                      <td>
+                        <strong>{formatNumber(form._count.entries, locale)}</strong>
+                        {form.maxEntries ? (
+                          <div className="ticket-admin-row-meta">
+                            {locale === "nl" ? "van" : "of"} {formatNumber(form.maxEntries, locale)}
+                          </div>
+                        ) : null}
+                      </td>
+                      <td data-priority="low" data-wrap="true">
+                        {formatDateTime(form.updatedAt, locale)}
+                      </td>
+                      <td>
+                        <ChevronRight
+                          className="ticket-admin-row-chevron"
+                          aria-hidden="true"
+                          size={18}
+                        />
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>

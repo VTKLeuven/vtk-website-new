@@ -48,7 +48,6 @@ export default async function FormSettingsPage({
     titleEn: form.titleEn,
     introNl: form.introNl,
     introEn: form.introEn,
-    status: form.status,
     audience: form.audience,
     listed: form.listed,
     localeMode: form.localeMode,
@@ -100,8 +99,8 @@ export default async function FormSettingsPage({
               </h2>
               <p>
                 {locale === "nl"
-                  ? "De vragen zelf staan onder Velden."
-                  : "The questions themselves live under Fields."}
+                  ? "De vragen zelf staan onder Velden; of de form online staat, wissel je op Overzicht."
+                  : "The questions themselves live under Fields; whether the form is online is switched on Overview."}
               </p>
             </div>
           </div>
