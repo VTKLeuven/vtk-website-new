@@ -5,6 +5,7 @@ import { Plus, Trash2 } from "lucide-react";
 import { Button, ConfirmDialog } from "@vtk/ui";
 import { IconButton } from "@/components/ui/IconButton";
 import { StorageImageField } from "@/components/admin/StorageImageField";
+import { MarkdownEditor } from "@/components/editor/MarkdownEditor";
 import {
   canChangeTypeWithAnswers,
   isChoiceType,
@@ -218,24 +219,28 @@ export function FieldSettings({
           <label htmlFor={`help-nl-${draft.id ?? "new"}`}>
             {nl ? "Toelichting (NL, markdown)" : "Explanation (NL, markdown)"}
           </label>
-          <textarea
-            id={`help-nl-${draft.id ?? "new"}`}
-            rows={2}
+          <MarkdownEditor
+            textareaId={`help-nl-${draft.id ?? "new"}`}
+            locale={locale}
+            rows={6}
+            allowImages={false}
             value={draft.helpNl}
             maxLength={2_000}
-            onChange={(event) => onChange({ ...draft, helpNl: event.target.value })}
+            onChange={(helpNl) => onChange({ ...draft, helpNl })}
           />
         </div>
         <div className="ticket-admin-field" data-span="2">
           <label htmlFor={`help-en-${draft.id ?? "new"}`}>
             {nl ? "Toelichting (EN, markdown)" : "Explanation (EN, markdown)"}
           </label>
-          <textarea
-            id={`help-en-${draft.id ?? "new"}`}
-            rows={2}
+          <MarkdownEditor
+            textareaId={`help-en-${draft.id ?? "new"}`}
+            locale={locale}
+            rows={6}
+            allowImages={false}
             value={draft.helpEn}
             maxLength={2_000}
-            onChange={(event) => onChange({ ...draft, helpEn: event.target.value })}
+            onChange={(helpEn) => onChange({ ...draft, helpEn })}
           />
         </div>
       </div>
