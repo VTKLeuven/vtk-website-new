@@ -1,12 +1,26 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { prisma } from "@vtk/db";
-import { CalendarClock, Copy, Inbox, ListChecks, Pencil, Users } from "lucide-react";
+import {
+  CalendarDays,
+  Copy,
+  DoorClosed,
+  DoorOpen,
+  Inbox,
+  Link2,
+  ListChecks,
+  Pencil,
+  Radio,
+  Timer,
+  Users,
+  UsersRound,
+} from "lucide-react";
 import { hasLocale } from "@/lib/locale";
 import { requireFormCapability } from "@/lib/forms/authorization";
 import { deleteFormAction, duplicateFormAction } from "@/app/actions/forms";
-import { AdminMetric } from "@/components/ticketing/admin/AdminMetric";
 import { SharePanel } from "@/components/forms/admin/SharePanel";
+import { FormStatusBadge } from "@/components/forms/admin/FormStatusBadge";
+import { FormStatusSelect } from "@/components/forms/admin/FormStatusSelect";
 import { missingTranslations } from "@/lib/forms/translation";
 import { DeleteButton } from "@/components/ui/DeleteIconButton";
 import {
@@ -43,12 +57,11 @@ export default async function FormAdminOverviewPage({
     `on.${new URL(publicBase).hostname.split(".").slice(-2).join(".")}`
   }`;
 
-  const [fieldCount, submitted, drafts, grantCount, fields, sections, shortLink] =
+  const [fieldCount, submitted, drafts, fields, sections, shortLink] =
     await Promise.all([
       prisma.formField.count({ where: { formId, archivedAt: null } }),
       prisma.formEntry.count({ where: { formId, status: "SUBMITTED", isTest: false } }),
       prisma.formEntry.count({ where: { formId, status: "DRAFT" } }),
-      prisma.formUserGrant.count({ where: { formId } }),
       prisma.formField.findMany({
         where: { formId },
         include: { options: true },
@@ -67,33 +80,119 @@ export default async function FormAdminOverviewPage({
 
   return (
     <div className="ticket-admin-page">
-      <div className="ticket-admin-metrics">
-        <AdminMetric
-          icon={Inbox}
-          label={nl ? "Inzendingen" : "Entries"}
-          value={
-            form.maxEntries
+      {/* Cijfers en kenmerken staan bewust in één raster: het zijn allemaal
+          antwoorden op "hoe staat dit formulier ervoor?", en gesplitst in twee
+          blokken moest je twee keer kijken. */}
+      <dl className="form-admin-facts">
+        <div data-metric="true">
+          <dt>
+            <Inbox aria-hidden="true" size={15} strokeWidth={1.8} />
+            {nl ? "Inzendingen" : "Entries"}
+          </dt>
+          <dd>
+            {form.maxEntries
               ? `${formatNumber(submitted, locale)} / ${formatNumber(form.maxEntries, locale)}`
-              : formatNumber(submitted, locale)
-          }
-        />
-        <AdminMetric
-          icon={ListChecks}
-          label={nl ? "Velden" : "Fields"}
-          value={formatNumber(fieldCount, locale)}
-          tone={fieldCount === 0 ? "warning" : "default"}
-        />
-        <AdminMetric
-          icon={Pencil}
-          label={nl ? "Concepten" : "Drafts"}
-          value={formatNumber(drafts, locale)}
-        />
-        <AdminMetric
-          icon={Users}
-          label={nl ? "Medewerkers" : "Staff"}
-          value={formatNumber(grantCount, locale)}
-        />
-      </div>
+              : formatNumber(submitted, locale)}
+          </dd>
+        </div>
+        <div data-metric="true" data-tone={fieldCount === 0 ? "warning" : undefined}>
+          <dt>
+            <ListChecks aria-hidden="true" size={15} strokeWidth={1.8} />
+            {nl ? "Velden" : "Fields"}
+          </dt>
+          <dd>{formatNumber(fieldCount, locale)}</dd>
+        </div>
+        <div data-metric="true">
+          <dt>
+            <Pencil aria-hidden="true" size={15} strokeWidth={1.8} />
+            {nl ? "Concepten" : "Drafts"}
+          </dt>
+          <dd>{formatNumber(drafts, locale)}</dd>
+        </div>
+        <div>
+          <dt>
+            <Radio aria-hidden="true" size={15} strokeWidth={1.8} />
+            Status
+          </dt>
+          <dd>
+            {canManage ? (
+              <FormStatusSelect
+                formId={formId}
+                status={form.status}
+                locale={locale}
+                formTitle={form.titleNl}
+              />
+            ) : (
+              <FormStatusBadge status={form.status} locale={locale} />
+            )}
+          </dd>
+        </div>
+        <div data-wide="true">
+          <dt>
+            <Link2 aria-hidden="true" size={15} strokeWidth={1.8} />
+            {nl ? "Publieke link" : "Public link"}
+          </dt>
+          <dd>
+            <Link href={`${base}/formulieren/${form.slug}`}>/formulieren/{form.slug}</Link>
+          </dd>
+        </div>
+        <div>
+          <dt>
+            <Users aria-hidden="true" size={15} strokeWidth={1.8} />
+            {nl ? "Doelpubliek" : "Audience"}
+          </dt>
+          <dd>{audienceLabel(form.audience, locale)}</dd>
+        </div>
+        <div>
+          <dt>
+            <UsersRound aria-hidden="true" size={15} strokeWidth={1.8} />
+            {nl ? "Eigenaar" : "Owner"}
+          </dt>
+          <dd>{locale === "en" ? form.ownerGroup.nameEn : form.ownerGroup.nameNl}</dd>
+        </div>
+        {/* Opent en sluit horen samen gelezen te worden, dus staan ze in één cel:
+            zo blijven ze naast elkaar, hoe het raster ook kantelt. */}
+        <div className="form-admin-fact-pair" data-wide="true">
+          <dt>
+            <DoorOpen aria-hidden="true" size={15} strokeWidth={1.8} />
+            {nl ? "Opent" : "Opens"}
+          </dt>
+          <dd>{formatDateTime(form.opensAt, locale)}</dd>
+          <dt>
+            <DoorClosed aria-hidden="true" size={15} strokeWidth={1.8} />
+            {nl ? "Sluit" : "Closes"}
+          </dt>
+          <dd>{formatDateTime(form.closesAt, locale)}</dd>
+        </div>
+        <div>
+          <dt>
+            <Timer aria-hidden="true" size={15} strokeWidth={1.8} />
+            {nl ? "Bewaartermijn" : "Retention"}
+          </dt>
+          <dd>
+            {form.retentionDays
+              ? nl
+                ? `${form.retentionDays} dagen`
+                : `${form.retentionDays} days`
+              : nl
+                ? "Niet automatisch verwijderen"
+                : "No automatic deletion"}
+          </dd>
+        </div>
+        {form.calendarEvent ? (
+          <div>
+            <dt>
+              <CalendarDays aria-hidden="true" size={15} strokeWidth={1.8} />
+              {nl ? "Evenement" : "Event"}
+            </dt>
+            <dd>
+              {locale === "en" && form.calendarEvent.titleEn
+                ? form.calendarEvent.titleEn
+                : form.calendarEvent.titleNl}
+            </dd>
+          </div>
+        ) : null}
+      </dl>
 
       {gaps.length > 0 ? (
         <section className="ticket-admin-section ticket-admin-section-compact">
@@ -135,65 +234,6 @@ export default async function FormAdminOverviewPage({
           </Link>
         </section>
       ) : null}
-
-      <section className="ticket-admin-section" aria-labelledby="form-summary-heading">
-        <div className="ticket-admin-section-head">
-          <div className="ticket-admin-section-heading">
-            <span className="ticket-admin-section-icon">
-              <CalendarClock aria-hidden="true" size={17} />
-            </span>
-            <div>
-              <h2 id="form-summary-heading">{nl ? "In één oogopslag" : "At a glance"}</h2>
-            </div>
-          </div>
-        </div>
-        <dl className="form-admin-overview-grid">
-          <div data-wide="true">
-            <dt>{nl ? "Publieke link" : "Public link"}</dt>
-            <dd>
-              <Link href={`${base}/formulieren/${form.slug}`}>/formulieren/{form.slug}</Link>
-            </dd>
-          </div>
-          <div>
-            <dt>{nl ? "Doelpubliek" : "Audience"}</dt>
-            <dd>{audienceLabel(form.audience, locale)}</dd>
-          </div>
-          <div>
-            <dt>{nl ? "Opent" : "Opens"}</dt>
-            <dd>{formatDateTime(form.opensAt, locale)}</dd>
-          </div>
-          <div>
-            <dt>{nl ? "Sluit" : "Closes"}</dt>
-            <dd>{formatDateTime(form.closesAt, locale)}</dd>
-          </div>
-          <div>
-            <dt>{nl ? "Eigenaar" : "Owner"}</dt>
-            <dd>{locale === "en" ? form.ownerGroup.nameEn : form.ownerGroup.nameNl}</dd>
-          </div>
-          {form.calendarEvent ? (
-            <div>
-              <dt>{nl ? "Evenement" : "Event"}</dt>
-              <dd>
-                {locale === "en" && form.calendarEvent.titleEn
-                  ? form.calendarEvent.titleEn
-                  : form.calendarEvent.titleNl}
-              </dd>
-            </div>
-          ) : null}
-          <div>
-            <dt>{nl ? "Bewaartermijn" : "Retention"}</dt>
-            <dd>
-              {form.retentionDays
-                ? nl
-                  ? `${form.retentionDays} dagen`
-                  : `${form.retentionDays} days`
-                : nl
-                  ? "Niet automatisch verwijderen"
-                  : "No automatic deletion"}
-            </dd>
-          </div>
-        </dl>
-      </section>
 
       {canManage ? (
         <SharePanel

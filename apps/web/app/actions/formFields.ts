@@ -340,24 +340,45 @@ async function syncOptions(
   }
 }
 
-export async function reorderFormFieldsAction(
+/**
+ * De hele opbouw in één keer: de volgorde van de secties én de volgorde en
+ * sectie van elk veld.
+ *
+ * Bewust één actie. In de editor staan secties en velden door elkaar in dezelfde
+ * lijst, dus één sleepbeweging kan beide raken (een sectie verplaatsen schuift
+ * haar velden mee door de volgorde). Twee losse acties zouden die ene beweging
+ * half kunnen opslaan.
+ */
+export async function reorderFormStructureAction(
   formId: string,
-  order: Array<{ id: string; sectionId: string | null }>
+  order: {
+    sections: string[];
+    fields: Array<{ id: string; sectionId: string | null }>;
+  }
 ): Promise<SaveState> {
   return guard(async () => {
     const { session } = await requireFormCapability(formId, "MANAGE_FORM");
-    const fields = await prisma.formField.findMany({
-      where: { formId },
-      select: { id: true },
-    });
-    const known = new Set(fields.map((field) => field.id));
+    const [fields, sections] = await Promise.all([
+      prisma.formField.findMany({ where: { formId }, select: { id: true } }),
+      prisma.formSection.findMany({ where: { formId }, select: { id: true } }),
+    ]);
+    const knownFields = new Set(fields.map((field) => field.id));
+    const knownSections = new Set(sections.map((section) => section.id));
 
     await prisma.$transaction(async (tx) => {
-      for (const [index, entry] of order.entries()) {
-        if (!known.has(entry.id)) continue;
+      for (const [index, sectionId] of order.sections.entries()) {
+        if (!knownSections.has(sectionId)) continue;
+        await tx.formSection.update({ where: { id: sectionId }, data: { sortOrder: index } });
+      }
+      for (const [index, entry] of order.fields.entries()) {
+        if (!knownFields.has(entry.id)) continue;
+        // Een veld in een sectie van een ánder formulier zou onzichtbaar worden;
+        // val terug op "bovenaan, zonder sectie" in plaats van dat te bewaren.
+        const sectionId =
+          entry.sectionId && knownSections.has(entry.sectionId) ? entry.sectionId : null;
         await tx.formField.update({
           where: { id: entry.id },
-          data: { sortOrder: index, sectionId: entry.sectionId },
+          data: { sortOrder: index, sectionId },
         });
       }
       await logFormAudit(tx, {

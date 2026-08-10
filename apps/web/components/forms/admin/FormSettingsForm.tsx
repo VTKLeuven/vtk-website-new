@@ -15,7 +15,6 @@ export type FormSettingsValues = {
   titleEn: string | null;
   introNl: string | null;
   introEn: string | null;
-  status: string;
   audience: string;
   listed: boolean;
   localeMode: string;
@@ -88,9 +87,6 @@ export function FormSettingsForm({
         INVALID_SLUG: nl
           ? "Deze URL kan niet: gebruik letters, cijfers en koppeltekens."
           : "This URL will not work: use letters, digits and hyphens.",
-        NO_FIELDS_TO_PUBLISH: nl
-          ? "Voeg eerst minstens één veld toe voor je de form online zet."
-          : "Add at least one field before putting the form online.",
         CONSENT_TEXT_REQUIRED: nl
           ? "Schrijf de tekst bij het toestemmingsvinkje."
           : "Write the text next to the consent checkbox.",
@@ -150,25 +146,6 @@ export function FormSettingsForm({
               required
             />
             <span className="ticket-admin-help">/formulieren/{values.slug}</span>
-          </div>
-          <div className="ticket-admin-field">
-            <label htmlFor="settings-status">Status</label>
-            <ThemedSelect
-              id="settings-status"
-              name="status"
-              defaultValue={values.status}
-              options={[
-                { value: "DRAFT", label: nl ? "Concept (niet zichtbaar)" : "Draft (not visible)" },
-                { value: "PUBLISHED", label: nl ? "Online" : "Online" },
-                { value: "CLOSED", label: nl ? "Gesloten" : "Closed" },
-                { value: "ARCHIVED", label: nl ? "Gearchiveerd" : "Archived" },
-              ]}
-            />
-            <span className="ticket-admin-help">
-              {nl
-                ? "Bepaalt of bezoekers de form kunnen openen."
-                : "Controls whether visitors can open the form."}
-            </span>
           </div>
         </div>
 
@@ -649,22 +626,33 @@ export function FormSettingsForm({
 
       <fieldset className="form-admin-fieldset">
         <legend>{nl ? "Privacy" : "Privacy"}</legend>
+        <p className="form-admin-hint">
+          {nl
+            ? "Vraag je gevoelige gegevens (gezondheid, allergieën, foto's, gegevens die je doorgeeft aan een bedrijf), dan moet de invuller daar expliciet mee akkoord gaan. Voor een gewone inschrijving met naam en e-mailadres is dat niet nodig."
+            : "If you ask for sensitive data (health, allergies, photos, data you pass on to a company), the person filling it in must explicitly agree. A plain sign-up with a name and an e-mail address does not need this."}
+        </p>
         <SettingToggle
           name="requireConsent"
           checked={requireConsent}
           onChange={setRequireConsent}
-          title={nl ? "Expliciete toestemming vragen" : "Ask for explicit consent"}
+          title={
+            nl
+              ? "Akkoord vragen met wat er met deze gegevens gebeurt"
+              : "Ask for consent on what happens with this data"
+          }
           description={
             nl
-              ? "De bezoeker moet een extra vinkje aanduiden voor verzending."
-              : "The visitor must tick an extra checkbox before submitting."
+              ? "Onderaan de form komt een verplicht vinkje met een tekst die je zelf schrijft. Zonder dat vinkje kan de bezoeker niet verzenden."
+              : "A required checkbox with a text you write yourself appears at the bottom of the form. Without ticking it, the visitor cannot submit."
           }
         />
         {requireConsent ? (
           <div className="form-admin-language-grid">
             {showDutch ? (
               <div className="ticket-admin-field">
-                <label htmlFor="settings-consent-nl">{nl ? "Tekst (NL)" : "Text (NL)"}</label>
+                <label htmlFor="settings-consent-nl">
+                  {nl ? "Tekst naast het vinkje (NL)" : "Text next to the checkbox (NL)"}
+                </label>
                 <textarea
                   id="settings-consent-nl"
                   name="consentTextNl"
@@ -677,13 +665,20 @@ export function FormSettingsForm({
                       : ""
                   }
                 />
+                <span className="ticket-admin-help">
+                  {nl
+                    ? "Zeg wat je met de gegevens doet en wie ze te zien krijgt, niet enkel dat de bezoeker akkoord gaat."
+                    : "Say what you do with the data and who gets to see it, not only that the visitor agrees."}
+                </span>
               </div>
             ) : (
               <input type="hidden" name="consentTextNl" value={values.consentTextNl ?? ""} />
             )}
             {showEnglish ? (
               <div className="ticket-admin-field">
-                <label htmlFor="settings-consent-en">{nl ? "Tekst (EN)" : "Text (EN)"}</label>
+                <label htmlFor="settings-consent-en">
+                  {nl ? "Tekst naast het vinkje (EN)" : "Text next to the checkbox (EN)"}
+                </label>
                 <textarea
                   id="settings-consent-en"
                   name="consentTextEn"

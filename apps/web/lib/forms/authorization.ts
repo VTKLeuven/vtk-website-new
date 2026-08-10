@@ -150,6 +150,56 @@ export async function getFormAccess(formId: string) {
   return { session, form, capabilities: [...capabilities] };
 }
 
+/**
+ * Dezelfde rekensom als {@link getFormAccess}, maar voor een hele lijst in twee
+ * queries in plaats van twee per rij. Het overzicht heeft dit nodig om te weten
+ * bij welke forms het de status mag laten wisselen.
+ */
+export async function formCapabilitiesByForm(
+  formIds: readonly string[]
+): Promise<Map<string, FormCapability[]>> {
+  const session = await requireSession();
+  if (formIds.length === 0) return new Map();
+  if (hasPermission(session, "forms.manageAll")) {
+    return new Map(formIds.map((id) => [id, [...FORM_CAPABILITIES]]));
+  }
+
+  // In previewmodus doet de superadmin alsof hij iemand anders is; zijn eigen
+  // persoonlijke grants mogen dan niet meetellen (zoals in getFormAccess).
+  const preview = await getAuthorizationPreview();
+  const membershipByGroup = new Map(session.groups.map((group) => [group.id, group.role]));
+  const [userGrants, groupGrants] = await Promise.all([
+    preview
+      ? Promise.resolve([])
+      : prisma.formUserGrant.findMany({
+          where: { formId: { in: [...formIds] }, userId: session.user.id },
+          select: { formId: true, role: true },
+        }),
+    prisma.formGroupGrant.findMany({
+      where: { formId: { in: [...formIds] }, groupId: { in: [...membershipByGroup.keys()] } },
+      select: { formId: true, groupId: true, role: true, scope: true },
+    }),
+  ]);
+
+  const rolesByForm = new Map<string, FormGrantRole[]>();
+  function addRole(formId: string, role: FormGrantRole) {
+    const current = rolesByForm.get(formId);
+    if (current) current.push(role);
+    else rolesByForm.set(formId, [role]);
+  }
+  for (const grant of userGrants) addRole(grant.formId, grant.role);
+  for (const grant of groupGrants) {
+    const membershipRole = membershipByGroup.get(grant.groupId);
+    if (!membershipRole) continue;
+    if (grant.scope === "LEADS_ONLY" && membershipRole !== "LEAD") continue;
+    addRole(grant.formId, grant.role);
+  }
+
+  return new Map(
+    formIds.map((id) => [id, capabilitiesForFormRoles(rolesByForm.get(id) ?? [])])
+  );
+}
+
 export async function requireFormCapability(formId: string, capability: FormCapability) {
   const access = await getFormAccess(formId);
   if (!access) throw new Error("FORM_NOT_FOUND");

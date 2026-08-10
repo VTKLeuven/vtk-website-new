@@ -348,6 +348,16 @@
   border-top: 1px solid var(--line);
 }
 
+/* De lijn boven een sectie scheidt haar van wat erboven staat. Staat er niets
+   boven, of sluit de kop erboven al af met een eigen lijn, dan zou het een
+   tweede lijn op een handbreedte van de eerste zijn. */
+.ticket-admin-page > .ticket-admin-section:first-child,
+.ticket-admin-page-head + .ticket-admin-section,
+.ticket-admin-page > .ticket-admin-grid:first-child > .ticket-admin-section:first-child {
+  padding-top: 0;
+  border-top: 0;
+}
+
 .ticket-admin-section-compact {
   padding-top: 16px;
 }
@@ -1044,6 +1054,41 @@
   font-weight: 600;
 }
 
+/* Een rij die naar één plek leidt, hoort in haar geheel klikbaar te zijn: op een
+   pijltje van 36px mikken is werk dat de rij zelf kan doen. De link blijft één
+   tabstop en één screenreader-doel; het vlak eronder is enkel een muisdoel. */
+.ticket-admin-linked-row {
+  position: relative;
+  cursor: pointer;
+}
+
+.ticket-admin-row-link {
+  text-decoration: none;
+}
+
+.ticket-admin-row-link::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+}
+
+.ticket-admin-linked-row:focus-within {
+  background: var(--paper-2);
+}
+
+.ticket-admin-row-chevron {
+  display: block;
+  margin-left: auto;
+  color: var(--muted);
+}
+
+/* Bedieningselementen in zo'n rij moeten bóven het kliksvlak liggen, anders
+   vangt de rijlink de klik en navigeer je weg i.p.v. de knop te gebruiken. */
+.ticket-admin-linked-row :is(button, select, a:not(.ticket-admin-row-link), label) {
+  position: relative;
+  z-index: 1;
+}
+
 .ticket-admin-orders-table,
 .ticket-admin-attendees-table {
   display: block;
@@ -1431,6 +1476,13 @@
 @media (min-width: 1000px) {
   .ticket-admin-grid[data-columns="2"] {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  /* Naast elkaar staat de tweede kolom niet ónder de eerste, dus scheidt haar
+     lijn niets; gestapeld (smaller dan dit) heeft ze die wel nodig. */
+  .ticket-admin-page > .ticket-admin-grid[data-columns="2"]:first-child > .ticket-admin-section {
+    padding-top: 0;
+    border-top: 0;
   }
 
   .ticket-admin-grid[data-columns="access"] {

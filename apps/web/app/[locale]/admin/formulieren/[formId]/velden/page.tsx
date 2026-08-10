@@ -3,7 +3,6 @@ import { prisma } from "@vtk/db";
 import { hasLocale } from "@/lib/locale";
 import { requireFormCapability } from "@/lib/forms/authorization";
 import { FieldEditor, type EditorField } from "@/components/forms/admin/FieldEditor";
-import { SectionManager } from "@/components/forms/admin/SectionManager";
 import type { AdminLocale } from "@/components/forms/admin/format";
 import { optionAnswerCounts } from "@/lib/forms/optionAnswerCounts";
 
@@ -71,30 +70,6 @@ export default async function FormFieldsPage({
 
   return (
     <div className="ticket-admin-page">
-      <SectionManager
-        locale={locale}
-        formId={formId}
-        stepBySections={form.stepBySections}
-        fields={editorFields
-          .filter((field) => !field.archivedAt)
-          .map((field) => ({
-            id: field.id,
-            sectionId: field.sectionId,
-            labelNl: field.labelNl,
-            labelEn: field.labelEn,
-          }))}
-        sections={sections.map((section) => ({
-          id: section.id,
-          titleNl: section.titleNl,
-          titleEn: section.titleEn,
-          descriptionNl: section.descriptionNl,
-          descriptionEn: section.descriptionEn,
-          nextSectionId: section.nextSectionId,
-          endsForm: section.endsForm,
-          fieldCount: fields.filter((field) => field.sectionId === section.id && !field.archivedAt)
-            .length,
-        }))}
-      />
       <FieldEditor
         formId={formId}
         locale={locale}
@@ -104,6 +79,8 @@ export default async function FormFieldsPage({
           titleEn: section.titleEn,
           descriptionNl: section.descriptionNl,
           descriptionEn: section.descriptionEn,
+          nextSectionId: section.nextSectionId,
+          endsForm: section.endsForm,
         }))}
         fields={editorFields}
         branching={{ enabled: form.stepBySections }}

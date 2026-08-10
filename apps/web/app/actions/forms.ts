@@ -265,13 +265,9 @@ export async function saveFormSettingsAction(
     const titleNl = limited(formData, "titleNl", 200);
     if (!titleNl) throw new Error("TITLE_REQUIRED");
 
+    // De status zelf staat op het overzicht, niet in dit formulier; hier komt ze
+    // enkel ongewijzigd mee zodat opslaan haar niet stilletjes terugzet.
     const status = statusSchema.parse(value(formData, "status") || form.status);
-    if (status === "PUBLISHED") {
-      const fieldCount = await prisma.formField.count({
-        where: { formId, archivedAt: null },
-      });
-      if (fieldCount === 0) throw new Error("NO_FIELDS_TO_PUBLISH");
-    }
 
     const requireConsent = checkbox(formData, "requireConsent");
     const consentTextNl = limitedOptional(formData, "consentTextNl", 1_000);
@@ -340,6 +336,62 @@ export async function saveFormSettingsAction(
 
     refreshForm(locale, formId, slug);
     if (form.slug !== slug) refreshForm(locale, formId, form.slug);
+  });
+
+  return outcome.ok ? saveOk() : outcome.state;
+}
+
+// -----------------------------------------------------------------------------
+// Status
+// -----------------------------------------------------------------------------
+
+/**
+ * Enkel de status wisselen, los van de rest van de instellingen.
+ *
+ * Staat bewust apart: of een formulier online staat, is de beslissing die je het
+ * vaakst neemt en het snelst wil kunnen terugdraaien. Ze hoort daarom op het
+ * overzicht en op de overzichtstab van één form, niet weggestopt tussen twintig
+ * andere instellingen.
+ */
+export async function setFormStatusAction(
+  formId: string,
+  nextStatus: string,
+  rawLocale?: string
+): Promise<SaveState> {
+  const outcome = await guard(async () => {
+    const locale = localeSchema.parse(rawLocale || "nl");
+    const { session, form } = await requireFormCapability(formId, "MANAGE_FORM");
+    const status = statusSchema.parse(nextStatus);
+    if (status === form.status) return;
+
+    // Een leeg formulier online zetten geeft de bezoeker een pagina met enkel een
+    // verzendknop; de instellingenpagina bewaakte dit al, dit is dezelfde grendel.
+    if (status === "PUBLISHED") {
+      const fieldCount = await prisma.formField.count({ where: { formId, archivedAt: null } });
+      if (fieldCount === 0) throw new Error("NO_FIELDS_TO_PUBLISH");
+    }
+
+    await prisma.$transaction(async (tx) => {
+      await tx.form.update({
+        where: { id: formId },
+        data: {
+          status,
+          // `publishedAt` is het moment van de eerste keer online, geen statusvlag.
+          publishedAt: status === "PUBLISHED" && !form.publishedAt ? new Date() : undefined,
+          archivedAt: status === "ARCHIVED" ? (form.archivedAt ?? new Date()) : null,
+        },
+      });
+      await logFormAudit(tx, {
+        formId,
+        actorUserId: session.user.id,
+        action: "FORM_UPDATED",
+        entityType: "Form",
+        entityId: formId,
+        metadata: { status },
+      });
+    });
+
+    refreshForm(locale, formId, form.slug);
   });
 
   return outcome.ok ? saveOk() : outcome.state;
