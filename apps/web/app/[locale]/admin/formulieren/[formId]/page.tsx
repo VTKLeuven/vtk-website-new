@@ -13,6 +13,8 @@ import { hasLocale } from "@/lib/locale";
 import { requireFormCapability } from "@/lib/forms/authorization";
 import { deleteFormAction, duplicateFormAction } from "@/app/actions/forms";
 import { AdminMetric } from "@/components/ticketing/admin/AdminMetric";
+import { SharePanel } from "@/components/forms/admin/SharePanel";
+import { missingTranslations } from "@/lib/forms/translation";
 import { DeleteButton } from "@/components/ui/DeleteIconButton";
 import {
   audienceLabel,
@@ -35,12 +37,39 @@ export default async function FormAdminOverviewPage({
   const base = formBase(locale);
   const canManage = capabilities.includes("MANAGE_FORM");
 
-  const [fieldCount, submitted, drafts, grantCount] = await Promise.all([
+  const publicBase = (
+    process.env.TICKETING_PUBLIC_URL?.trim() ||
+    process.env.VTK_MAIN_URL?.trim() ||
+    "https://vtk.be"
+  ).replace(/\/$/, "");
+
+  // Verkorte links draaien op hun eigen host (on.vtk.be), niet op een pad van
+  // de hoofdsite; zie isShortlinkHost in proxy.ts.
+  const shortLinkBase = `https://${
+    process.env.SHORTLINK_HOST?.split(",")[0]?.trim() ||
+    `on.${new URL(publicBase).hostname.split(".").slice(-2).join(".")}`
+  }`;
+
+  const [fieldCount, submitted, drafts, grantCount, fields, sections, shortLink] = await Promise.all([
     prisma.formField.count({ where: { formId, archivedAt: null } }),
     prisma.formEntry.count({ where: { formId, status: "SUBMITTED", isTest: false } }),
     prisma.formEntry.count({ where: { formId, status: "DRAFT" } }),
     prisma.formUserGrant.count({ where: { formId } }),
+    prisma.formField.findMany({
+      where: { formId },
+      include: { options: true },
+      orderBy: { sortOrder: "asc" },
+    }),
+    prisma.formSection.findMany({ where: { formId }, orderBy: { sortOrder: "asc" } }),
+    prisma.shortLink.findFirst({
+      where: { url: `${publicBase}/formulieren/${form.slug}` },
+      select: { slug: true },
+    }),
   ]);
+
+  // Half vertaald publiceren mag, maar niet zonder het te weten: de bezoeker
+  // krijgt anders een Engelse pagina met Nederlandse vragen ertussen.
+  const gaps = missingTranslations(form, fields, sections);
 
   return (
     <div className="ticket-admin-page">
@@ -71,6 +100,29 @@ export default async function FormAdminOverviewPage({
           value={formatNumber(grantCount, locale)}
         />
       </div>
+
+      {gaps.length > 0 ? (
+        <section className="ticket-admin-section ticket-admin-section-compact">
+          <p className="ticket-admin-row-title">
+            {nl
+              ? `Dit formulier staat op Nederlands en Engels, maar ${gaps.length} ${gaps.length === 1 ? "onderdeel is" : "onderdelen zijn"} nog niet vertaald.`
+              : `This form offers Dutch and English, but ${gaps.length} ${gaps.length === 1 ? "item is" : "items are"} not translated yet.`}
+          </p>
+          <ul className="form-admin-gaps">
+            {gaps.slice(0, 12).map((gap) => (
+              <li key={`${gap.where}-${gap.what}`}>{gap.what}</li>
+            ))}
+            {gaps.length > 12 ? (
+              <li>{nl ? `en nog ${gaps.length - 12} andere` : `and ${gaps.length - 12} more`}</li>
+            ) : null}
+          </ul>
+          <p className="form-admin-hint">
+            {nl
+              ? "Vul ze aan, of zet het formulier bij Instellingen op één taal; dan krijgt de andere taal een eigen bericht."
+              : "Fill them in, or set the form to one language under Settings; the other language then gets its own message."}
+          </p>
+        </section>
+      ) : null}
 
       {fieldCount === 0 ? (
         <section className="ticket-admin-section ticket-admin-section-compact">
@@ -148,6 +200,15 @@ export default async function FormAdminOverviewPage({
           </div>
         </dl>
       </section>
+
+      {canManage ? (
+        <SharePanel
+          locale={locale}
+          formId={formId}
+          formUrl={`${publicBase}/formulieren/${form.slug}`}
+          shortLink={shortLink ? `${shortLinkBase}/${shortLink.slug}` : null}
+        />
+      ) : null}
 
       {canManage ? (
         <section className="ticket-admin-section" aria-labelledby="form-actions-heading">

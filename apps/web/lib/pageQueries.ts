@@ -69,6 +69,7 @@ export const loadCalendarEvent = cache(async (id: string) =>
     include: {
       group: true,
       ticketEvent: { select: { slug: true, status: true } },
+      form: { select: { slug: true, status: true, opensAt: true, closesAt: true } },
       categories: {
         select: {
           category: {

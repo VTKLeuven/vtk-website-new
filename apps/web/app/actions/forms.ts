@@ -647,3 +647,76 @@ export async function removeFormGrantAction(formData: FormData): Promise<void> {
 
   refreshForm(locale, formId);
 }
+
+// -----------------------------------------------------------------------------
+// Korte link
+// -----------------------------------------------------------------------------
+
+/**
+ * Maakt (of hergebruikt) een verkorte link naar het formulier, om op een
+ * affiche of in een story te zetten. De QR-code wordt uit die link getekend.
+ *
+ * Bewust een gewone `ShortLink`: die tabel bestaat al, wordt al beheerd op
+ * /admin/links, en telt kliks. Een tweede, formulier-eigen linksysteem zou dat
+ * allemaal opnieuw moeten doen.
+ */
+export async function createFormShortLinkAction(
+  _previous: SaveState,
+  formData: FormData
+): Promise<SaveState> {
+  const outcome = await guard(async () => {
+    const locale = localeSchema.parse(value(formData, "locale") || "nl");
+    const formId = value(formData, "formId");
+    const { session, form } = await requireFormCapability(formId, "MANAGE_FORM");
+
+    const base = (
+      process.env.TICKETING_PUBLIC_URL?.trim() ||
+      process.env.VTK_MAIN_URL?.trim() ||
+      "https://vtk.be"
+    ).replace(/\/$/, "");
+    const target = `${base}/formulieren/${form.slug}`;
+
+    const existing = await prisma.shortLink.findFirst({ where: { url: target } });
+    if (existing) {
+      // Al eentje: die blijft, want hij hangt misschien al ergens op een affiche.
+      if (!existing.enabled) {
+        await prisma.shortLink.update({ where: { id: existing.id }, data: { enabled: true } });
+      }
+      refreshForm(locale, formId, form.slug);
+      return;
+    }
+
+    const wanted = slugify(value(formData, "slug") || form.slug).slice(0, 40);
+    let slug = wanted || "formulier";
+    // Botst de gewenste naam, dan plakken we er een cijfer achter in plaats van
+    // te falen: dit is een knop, geen formulier met een foutmelding.
+    for (let attempt = 2; attempt < 50; attempt += 1) {
+      const taken = await prisma.shortLink.count({ where: { slug } });
+      if (!taken) break;
+      slug = `${wanted}-${attempt}`.slice(0, 48);
+    }
+
+    await prisma.$transaction(async (tx) => {
+      await tx.shortLink.create({
+        data: {
+          slug,
+          url: target,
+          note: `Formulier: ${form.titleNl}`,
+          createdById: session.user.id,
+        },
+      });
+      await logFormAudit(tx, {
+        formId,
+        actorUserId: session.user.id,
+        action: "FORM_SHORTLINK_CREATED",
+        entityType: "Form",
+        entityId: formId,
+        metadata: { slug },
+      });
+    });
+
+    refreshForm(locale, formId, form.slug);
+  });
+
+  return outcome.ok ? saveOk() : outcome.state;
+}

@@ -1858,3 +1858,58 @@ Google, dus de outbox blijft braaf herproberen met een oplopende wachttijd en
 niemand denkt aan een configuratiefout. Bovendien werkte een test met `curl`
 vanaf dezelfde machine wel, want die stuurt een andere EHLO-naam. Het lijkt dan
 alsof de mailserver het ene moment wel en het andere niet doet.
+
+---
+
+## Formulieren: wat de kring ermee wil, en wat we bewust niet doen
+
+De formulierenmodule (`docs/forms.md` legt uit waar wat staat) heeft een paar
+keuzes die niet uit de code volgen.
+
+- **Anonieme inzenders kunnen hun antwoord niet bewerken.** Bewerken en concepten
+  gelden enkel voor wie ingelogd is. De alternatieve weg is een bewerklink met een
+  token in de bevestigingsmail, en die hebben we bewust niet gebouwd: zo'n link is
+  een sleutel naar persoonsgegevens die per mail rondgaat en doorgestuurd wordt.
+  Wie zijn inzending wil kunnen aanpassen, logt in; de rest dient één keer in.
+- **Een formulier dat vol zit, blijft leesbaar.** Een keuzeoptie met een quotum
+  verdwijnt niet wanneer ze vol is, maar staat er grijs bij met "volzet". Anders
+  denkt iemand die de affiche zag dat hij op het verkeerde formulier zit. Wie de
+  optie al koos vóór ze vollliep, houdt ze bij het bewerken.
+- **Dubbels waarschuwen, ze blokkeren niet.** Twee inzendingen met hetzelfde
+  e-mailadres kunnen legitiem zijn (iemand schrijft zijn kotgenoot mee in), en een
+  harde blokkade op e-mail is toch te omzeilen met een plusadres. De tweede
+  inzending komt binnen; de bevestigingspagina zegt dat er al een was.
+- **Een formulier staat niet automatisch in het overzicht.** `listed` bepaalt of
+  het op `/formulieren` verschijnt. Een sollicitatie- of evaluatieformulier deel
+  je gericht; het blijft wel gewoon bereikbaar via zijn link, want een verborgen
+  formulier is geen beveiligd formulier.
+- **Formulieren horen niet in Google.** Alle formulierpagina's staan op
+  `noindex`. Een formulier is een actie met een deadline, geen inhoud om te
+  vinden; een verlopen inschrijving in de zoekresultaten helpt niemand.
+- **De bewaartermijn staat standaard uit.** Een beheerder kan er een instellen
+  (`retentionDays`), maar zonder die keuze verdwijnt er niets vanzelf. Stil
+  verdwijnende inzendingen zijn erger dan een volle tabel; wie een formulier met
+  gevoelige antwoorden maakt, zet de termijn zelf.
+- **Bij een gewist account verdwijnen de inzendingen echt.** Bij een
+  ticketbestelling volstaat het de identiteit te strippen, want die rij is een
+  financieel record. Een formulierantwoord is dat niet: de persoonsgegevens zitten
+  juist in de antwoorden, en een vrije tekst met een naam erin blijft anders
+  gewoon staan. De quota die de inzending innam, komen weer vrij.
+- **Half vertaald publiceren mag, maar niet ongemerkt.** Een beheerder mag een
+  formulier bewust in één taal aanbieden; dan krijgt de andere taal een eigen
+  bericht ("Sorry, dit formulier is enkel voor internationals") in plaats van een
+  halfleeg formulier of een 404. Staat het formulier op beide talen terwijl er
+  stukken ontbreken, dan somt het overzicht op wélke, want een waarschuwing zonder
+  lijstje leidt enkel tot zoeken.
+- **Voorinvullen gebeurt enkel waar de beheerder het vraagt.** Het veldtype "uit
+  het profiel" vult naam, e-mail, r-nummer, studierichting of jaar in. Raden op
+  basis van de veldnaam is geprobeerd en meteen fout gegaan: de vraag "Naam van je
+  partner" kreeg de naam van de ingelogde bezoeker. Enkel het eerste e-mailveld
+  vult zichzelf nog automatisch in.
+- **Geen captcha.** Zoals bij het contactformulier: een honeypot, een limiet per
+  IP en een minimale invultijd. Een captcha kost elke echte bezoeker moeite en zet
+  vaak een derde partij op de pagina, voor een handvol scripts.
+- **Een inzending namens iemand stuurt geen bevestiging.** Wanneer een beheerder
+  een inschrijving intikt die per mail of telefoon binnenkwam, krijgt die persoon
+  geen "bedankt voor je inzending"-mail: hij heeft niets ingevuld en zou zich
+  afvragen wat er gebeurd is. Het formulier hoeft daarvoor ook niet open te staan.

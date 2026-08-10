@@ -1,4 +1,5 @@
 import { prisma } from "@vtk/db";
+import { deleteObject } from "@vtk/storage";
 
 function positiveDays(name: string, fallback: number): number {
   const parsed = Number.parseInt(process.env[name] ?? "", 10);
@@ -7,6 +8,50 @@ function positiveDays(name: string, fallback: number): number {
 
 function before(days: number, now: Date): Date {
   return new Date(now.getTime() - days * 24 * 60 * 60 * 1000);
+}
+
+/**
+ * Inzendingen van formulieren met een eigen bewaartermijn.
+ *
+ * De termijn staat per formulier (`retentionDays`) en is standaard leeg: dan
+ * wordt er niets opgeruimd. Dat is bewust; stil verdwijnende inzendingen zijn
+ * erger dan een volle tabel, en wie ze wil laten verlopen, zet het zelf aan.
+ *
+ * De bestanden gaan eerst weg en de rijen daarna: een wees in de objectopslag
+ * is minder erg dan een rij die naar een bestand wijst dat er niet meer is.
+ */
+async function purgeExpiredFormEntries(now: Date): Promise<number> {
+  const forms = await prisma.form.findMany({
+    where: { retentionDays: { not: null } },
+    select: { id: true, retentionDays: true },
+  });
+
+  let removed = 0;
+  for (const form of forms) {
+    const cutoff = before(form.retentionDays as number, now);
+    const expired = await prisma.formEntry.findMany({
+      where: {
+        formId: form.id,
+        OR: [{ submittedAt: { lt: cutoff } }, { submittedAt: null, createdAt: { lt: cutoff } }],
+      },
+      select: { id: true, uploads: { select: { storageKey: true } } },
+      take: 500,
+    });
+    if (expired.length === 0) continue;
+
+    for (const entry of expired) {
+      for (const upload of entry.uploads) {
+        await deleteObject(upload.storageKey).catch((error) => {
+          console.error("[privacy] formulierbestand verwijderen mislukt", error);
+        });
+      }
+    }
+    const deleted = await prisma.formEntry.deleteMany({
+      where: { id: { in: expired.map((entry) => entry.id) } },
+    });
+    removed += deleted.count;
+  }
+  return removed;
 }
 
 /**
@@ -45,6 +90,24 @@ export async function runPrivacyRetention(now = new Date()) {
       },
       data: { recipient: null, payload: { purged: true }, lastError: null },
     }),
+    prisma.formAuditLog.updateMany({
+      where: { createdAt: { lt: rawCutoff } },
+      data: { ipAddress: null, metadata: { purged: true } },
+    }),
+    prisma.formOutboxMessage.updateMany({
+      where: {
+        createdAt: { lt: rawCutoff },
+        status: { in: ["SENT", "FAILED"] },
+      },
+      data: { recipient: null, payload: { purged: true }, lastError: null },
+    }),
+    prisma.formEntry.updateMany({
+      where: {
+        createdAt: { lt: fingerprintCutoff },
+        requestFingerprint: { not: null },
+      },
+      data: { requestFingerprint: null },
+    }),
     prisma.ticketOrder.updateMany({
       where: {
         createdAt: { lt: fingerprintCutoff },
@@ -54,6 +117,8 @@ export async function runPrivacyRetention(now = new Date()) {
     }),
   ]);
 
+  const formEntries = await purgeExpiredFormEntries(now);
+
   return {
     ranAt: now.toISOString(),
     policies: {
@@ -62,6 +127,7 @@ export async function runPrivacyRetention(now = new Date()) {
       fingerprintDays: positiveDays("PRIVACY_FINGERPRINT_DAYS", 30),
     },
     affected: {
+      formEntries,
       expiredSessions: results[0].count,
       expiredVerifications: results[1].count,
       doorLogs: results[2].count,
@@ -69,7 +135,10 @@ export async function runPrivacyRetention(now = new Date()) {
       ticketWebhookPayloads: results[4].count,
       logisticsWebhookPayloads: results[5].count,
       emailOutboxPayloads: results[6].count,
-      orderFingerprints: results[7].count,
+      formAuditLogs: results[7].count,
+      formOutboxPayloads: results[8].count,
+      formEntryFingerprints: results[9].count,
+      orderFingerprints: results[10].count,
     },
   };
 }

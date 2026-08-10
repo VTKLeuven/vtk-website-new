@@ -188,6 +188,18 @@ export default async function CalendarSegmentPage({ params }: { params: Params }
             >
               {locale === "nl" ? "Zet in mijn agenda" : "Add to my calendar"}
             </a>
+            {/* Een formulier bij dit evenement, zolang het openstaat. Onder de
+                tickets, want wie tickets verkoopt, wil die knop eerst. */}
+            {event.form?.status === "PUBLISHED" &&
+            (!event.form.opensAt || event.form.opensAt <= new Date()) &&
+            (!event.form.closesAt || event.form.closesAt > new Date()) ? (
+              <Link
+                href={`${base}/formulieren/${event.form.slug}`}
+                className={event.ticketEvent?.status === "PUBLISHED" ? "btn btn-ghost" : "btn btn-primary"}
+              >
+                {locale === "nl" ? "Inschrijven" : "Sign up"}
+              </Link>
+            ) : null}
             {event.ticketEvent?.status === "PUBLISHED" ? (
               <Link href={`${base}/tickets/${event.ticketEvent.slug}`} className="btn btn-primary">
                 {locale === "nl" ? "Tickets kopen" : "Buy tickets"}
