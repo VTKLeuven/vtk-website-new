@@ -5,6 +5,7 @@ import { useSelectedLayoutSegment } from "next/navigation";
 import {
   ArrowLeft,
   ExternalLink,
+  Inbox,
   LayoutDashboard,
   ListChecks,
   Settings2,
@@ -55,6 +56,13 @@ export function FormAdminNav({
       icon: ListChecks,
       segment: "velden",
       visible: can("MANAGE_FORM"),
+    },
+    {
+      href: `${base}/inzendingen`,
+      label: locale === "nl" ? "Inzendingen" : "Entries",
+      icon: Inbox,
+      segment: "inzendingen",
+      visible: can("VIEW_ENTRIES"),
     },
     {
       href: `${base}/toegang`,

@@ -157,3 +157,66 @@
     width: 100%;
   }
 }
+
+/* Inzendingen ---------------------------------------------------------------- */
+
+.form-admin-summary {
+  display: grid;
+  gap: 20px;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+}
+
+.form-admin-summary h3 {
+  margin: 0 0 8px;
+  font-size: 15px;
+}
+
+.form-admin-summary ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+}
+
+.form-admin-summary li {
+  display: grid;
+  grid-template-columns: minmax(80px, 1fr) 2fr auto;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+}
+
+.form-admin-summary-bar {
+  height: 8px;
+  border-radius: 999px;
+  background: var(--paper-2, #e6ecf5);
+  overflow: hidden;
+}
+
+.form-admin-summary-bar > span {
+  display: block;
+  height: 100%;
+  background: var(--yellow, #ffd23f);
+}
+
+.form-admin-summary-count {
+  font-weight: 700;
+}
+
+.form-admin-mail-preview {
+  padding: 14px 16px;
+  border: 1px solid var(--line, rgba(14, 26, 54, 0.12));
+  border-radius: 14px;
+  background: var(--paper, #eff2f8);
+  display: grid;
+  gap: 8px;
+}
+
+.form-admin-mail-preview pre {
+  margin: 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-size: 13px;
+  line-height: 1.5;
+}
