@@ -3,6 +3,7 @@
 import { Plus, Trash2 } from "lucide-react";
 import { Button } from "@vtk/ui";
 import { IconButton } from "@/components/ui/IconButton";
+import { StorageImageField } from "@/components/admin/StorageImageField";
 import {
   canChangeTypeWithAnswers,
   isChoiceType,
@@ -67,6 +68,7 @@ export function typeLabel(type: string, locale: AdminLocale): string {
 const ALL_TYPES = TYPE_GROUPS.flatMap((group) => group.types);
 
 export function FieldSettings({
+  formId,
   locale,
   draft,
   sections,
@@ -78,6 +80,7 @@ export function FieldSettings({
   onSave,
   onCancel,
 }: {
+  formId: string;
   locale: AdminLocale;
   draft: FieldDraft;
   sections: EditorSection[];
@@ -233,6 +236,23 @@ export function FieldSettings({
         />
         {nl ? "Verplicht invullen" : "Required"}
       </label>
+
+      <fieldset className="form-admin-fieldset">
+        <legend>{nl ? "Afbeelding bij de vraag" : "Image with the question"}</legend>
+        <StorageImageField
+          defaultKey={config.imageKey}
+          locale={locale}
+          formId={formId}
+          label={nl ? "Vraagafbeelding" : "Question image"}
+          srContext={draft.labelNl || (nl ? "Nieuwe vraag" : "New question")}
+          helpText={
+            nl
+              ? "Optioneel. De afbeelding verschijnt tussen de vraag en de toelichting."
+              : "Optional. The image appears between the question and its explanation."
+          }
+          onChange={(key) => setConfig({ imageKey: key || null })}
+        />
+      </fieldset>
 
       {/* Type-specifieke instellingen. Enkel wat bij dit soort veld hoort, zodat
           er nooit een optieveld op het scherm staat bij een open vraag. */}

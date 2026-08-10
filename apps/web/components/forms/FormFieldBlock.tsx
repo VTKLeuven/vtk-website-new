@@ -3,6 +3,7 @@
 import { useId } from "react";
 import { Markdown } from "@/components/ui/Markdown";
 import type { AnswerValue } from "@/lib/forms/visibility";
+import { storageKeyPath } from "@/lib/storageKeyPath";
 import {
   FormFieldInput,
   fieldLabel,
@@ -66,7 +67,7 @@ export function FormFieldBlock({
         // eslint-disable-next-line @next/next/no-img-element -- vrije verhouding, geen vaste maat bekend
         <img
           className="vtk-form-image"
-          src={`/api/media/${field.config.imageKey}`}
+          src={`/api/media/${storageKeyPath(field.config.imageKey)}`}
           alt=""
           loading="lazy"
         />

@@ -4,6 +4,7 @@ import { prisma } from "@vtk/db";
 import { newStorageKey, putObject } from "@vtk/storage";
 import { publicUrl } from "@/lib/storage";
 import { requireSession } from "@/lib/session";
+import { getFormAccess } from "@/lib/forms/authorization";
 import { hasPermission } from "@vtk/auth";
 import {
   readLimitedFormData,
@@ -40,6 +41,7 @@ export async function POST(request: Request) {
   }
   const file = form.get("file");
   const kind = uploadKind(form.get("kind") ?? "file");
+  const formId = String(form.get("formId") ?? "").slice(0, 100);
   if (!kind) return NextResponse.json({ error: "invalid_kind" }, { status: 400 });
   const canUpload =
     session.user.isSuperAdmin ||
@@ -52,6 +54,14 @@ export async function POST(request: Request) {
     hasPermission(session, "calendar.create") ||
     hasPermission(session, "calendar.manageAll") ||
     hasPermission(session, "werkgroepen.manage");
+
+  // Een formuliermanager heeft niet noodzakelijk een globale uploadpermissie.
+  // De meegestuurde formulier-id geeft enkel toegang tot een afbeelding voor
+  // een formulier dat die gebruiker zelf mag beheren.
+  const formManager =
+    !canUpload && kind === "image" && formId
+      ? (await getFormAccess(formId))?.capabilities.includes("MANAGE_FORM") === true
+      : false;
 
   // Een gewoon werkgroeplid mag afbeeldingen invoegen in de eigen infotekst.
   // Beperk die extra toegang tot image-uploads. Andere bestandstypes blijven
@@ -75,7 +85,7 @@ export async function POST(request: Request) {
   // prefix kunnen weigeren.
   const tileUpload = kind === "tile";
 
-  if (!canUpload && !werkgroepMember && !tileUpload) {
+  if (!canUpload && !formManager && !werkgroepMember && !tileUpload) {
     return NextResponse.json({ error: "forbidden" }, { status: 403 });
   }
 

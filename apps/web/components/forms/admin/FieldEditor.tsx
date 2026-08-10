@@ -459,6 +459,7 @@ export function FieldEditor({
 
                 {isEditing && draft ? (
                   <FieldSettings
+                    formId={formId}
                     locale={locale}
                     draft={draft}
                     sections={sections}
@@ -482,6 +483,7 @@ export function FieldEditor({
         {adding && draft ? (
           <div className="form-admin-new-field">
             <FieldSettings
+              formId={formId}
               locale={locale}
               draft={draft}
               sections={sections}
@@ -600,5 +602,4 @@ export function FieldEditor({
     </div>
   );
 }
-
 
