@@ -1,0 +1,187 @@
+/*
+ * Het formulier zoals een bezoeker het ziet.
+ *
+ * Gedeeld door de publieke pagina en de live preview in de veldeditor: één
+ * stylesheet, want een preview die er net iets anders uitziet dan het echte
+ * formulier is erger dan geen preview. Alle kleuren komen uit de tokens in
+ * vtk-base.css; hier staan geen nieuwe.
+ */
+
+.vtk-form {
+  display: grid;
+  gap: 22px;
+  max-width: 720px;
+}
+
+.vtk-form-field {
+  display: grid;
+  gap: 8px;
+}
+
+.vtk-form-label {
+  font-weight: 600;
+  color: var(--ink);
+  line-height: 1.4;
+}
+
+.vtk-form-required {
+  margin-left: 3px;
+  color: var(--muted);
+}
+
+.vtk-form-help {
+  font-size: 14px;
+  color: var(--muted);
+}
+
+.vtk-form-help p:last-child {
+  margin-bottom: 0;
+}
+
+.vtk-form-image {
+  max-width: 100%;
+  height: auto;
+  border-radius: 14px;
+  border: 1px solid var(--line);
+}
+
+.vtk-form-input {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+  font-size: 15px;
+}
+
+.vtk-form-input:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 1px;
+}
+
+.vtk-form-field[data-invalid="true"] .vtk-form-input {
+  border-color: var(--ink);
+  box-shadow: inset 3px 0 0 var(--yellow);
+}
+
+.vtk-form-error {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ink);
+  padding-left: 10px;
+  box-shadow: inset 3px 0 0 var(--yellow);
+}
+
+.vtk-form-options {
+  display: grid;
+  gap: 8px;
+}
+
+.vtk-form-check {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface);
+  cursor: pointer;
+  line-height: 1.4;
+}
+
+.vtk-form-check:hover {
+  background: var(--paper-2);
+}
+
+.vtk-form-check[data-disabled="true"] {
+  cursor: not-allowed;
+  color: var(--muted);
+}
+
+.vtk-form-check input {
+  margin-top: 2px;
+  flex: none;
+}
+
+.vtk-form-soldout,
+.vtk-form-remaining {
+  margin-left: 8px;
+  font-size: 13px;
+  font-style: normal;
+  color: var(--muted);
+}
+
+.vtk-form-soldout {
+  font-weight: 600;
+}
+
+.vtk-form-other {
+  display: grid;
+  gap: 6px;
+  padding-left: 12px;
+  font-size: 14px;
+  color: var(--muted);
+}
+
+.vtk-form-scale {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.vtk-form-scale-label {
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.vtk-form-scale-step {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0 10px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface);
+  cursor: pointer;
+  font-weight: 600;
+}
+
+/* De radio zelf blijft bereikbaar voor toetsenbord en screenreader, maar de
+   klikbare vorm is het hele vakje. */
+.vtk-form-scale-step input {
+  position: absolute;
+  opacity: 0;
+  width: 1px;
+  height: 1px;
+}
+
+.vtk-form-scale-step:has(input:checked) {
+  background: var(--ink);
+  color: var(--paper);
+  border-color: var(--ink);
+}
+
+.vtk-form-scale-step:has(input:focus-visible) {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
+}
+
+.vtk-form-scale-step[data-stars="true"] {
+  min-width: 44px;
+  font-size: 20px;
+}
+
+.vtk-form-preview {
+  display: grid;
+  gap: 20px;
+  padding: 18px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--paper);
+}

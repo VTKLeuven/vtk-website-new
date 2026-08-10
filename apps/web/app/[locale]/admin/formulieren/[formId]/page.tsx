@@ -79,6 +79,14 @@ export default async function FormAdminOverviewPage({
               ? "Dit formulier heeft nog geen velden, dus je kan het nog niet online zetten."
               : "This form has no fields yet, so it cannot go online."}
           </p>
+          <Link
+            className="ticket-admin-button"
+            data-variant="primary"
+            href={`${base}/admin/formulieren/${formId}/velden`}
+          >
+            <ListChecks aria-hidden="true" size={16} />
+            {nl ? "Velden toevoegen" : "Add fields"}
+          </Link>
         </section>
       ) : null}
 

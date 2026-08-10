@@ -2,7 +2,14 @@
 
 import Link from "next/link";
 import { useSelectedLayoutSegment } from "next/navigation";
-import { ArrowLeft, ExternalLink, LayoutDashboard, Settings2, ShieldCheck } from "lucide-react";
+import {
+  ArrowLeft,
+  ExternalLink,
+  LayoutDashboard,
+  ListChecks,
+  Settings2,
+  ShieldCheck,
+} from "lucide-react";
 import type { FormCapability } from "@/lib/forms/authorization";
 import { FormStatusBadge } from "./FormStatusBadge";
 import { formBase, type AdminLocale } from "./format";
@@ -40,6 +47,13 @@ export function FormAdminNav({
       label: locale === "nl" ? "Instellingen" : "Settings",
       icon: Settings2,
       segment: "instellingen",
+      visible: can("MANAGE_FORM"),
+    },
+    {
+      href: `${base}/velden`,
+      label: locale === "nl" ? "Velden" : "Fields",
+      icon: ListChecks,
+      segment: "velden",
       visible: can("MANAGE_FORM"),
     },
     {
