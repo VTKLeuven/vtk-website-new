@@ -1,0 +1,62 @@
+/*
+ * Formulierenadmin.
+ *
+ * De algemene panelen, tabellen, knoppen en velden komen uit
+ * `vtk-ticket-admin.css`: dat is een volwaardige adminskin die toevallig voor
+ * ticketing geschreven is, en er een tweede kopie van maken zou binnen een jaar
+ * uiteenlopen. Vandaar ook `.ticket-admin` op de root van deze schermen: de
+ * kleurtokens van die skin staan op die klasse. Hier staat enkel wat echt eigen
+ * is aan formulieren.
+ */
+
+.form-admin-lang {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+}
+
+/* Een taal die nog leeg is, verdient een cue in de editor zelf: anders ontdek
+   je pas na publiceren dat de helft van het formulier Nederlands blijft. */
+.form-admin-lang-flag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--line, rgba(14, 26, 54, 0.12));
+  background: var(--paper-2, #e6ecf5);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted, #5c667f);
+}
+
+.form-admin-lang-flag[data-missing="true"] {
+  background: var(--yellow, #ffd23f);
+  border-color: rgba(14, 26, 54, 0.18);
+  color: var(--ink, #0a0f1f);
+}
+
+.form-admin-hint {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--muted, #5c667f);
+}
+
+.form-admin-fieldset {
+  border: 1px solid var(--line, rgba(14, 26, 54, 0.12));
+  border-radius: 16px;
+  padding: 16px;
+  margin: 0;
+  display: grid;
+  gap: 14px;
+}
+
+.form-admin-fieldset > legend {
+  padding: 0 6px;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--muted, #5c667f);
+}
