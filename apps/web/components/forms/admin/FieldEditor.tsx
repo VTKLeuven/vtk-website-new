@@ -805,9 +805,13 @@ export function FieldEditor({
               <p className="ticket-admin-row-title">
                 {section
                   ? section.titleNl
-                  : nl
-                    ? "Bovenaan, zonder sectie"
-                    : "At the top, without a section"}
+                  : sections.length === 0
+                    ? nl
+                      ? "Vragen"
+                      : "Questions"
+                    : nl
+                      ? "Bovenaan, zonder sectie"
+                      : "At the top, without a section"}
               </p>
               <p className="ticket-admin-row-meta">
                 {group.fields.length}{" "}
@@ -907,9 +911,13 @@ export function FieldEditor({
                 ? nl
                   ? "Nog geen vragen in deze sectie."
                   : "No questions in this section yet."
-                : nl
-                  ? "Geen vragen boven de eerste sectie."
-                  : "No questions above the first section."}
+                : sections.length === 0
+                  ? nl
+                    ? "Nog geen vragen."
+                    : "No questions yet."
+                  : nl
+                    ? "Vragen hier staan boven de eerste sectie, buiten elke sectie."
+                    : "Questions here sit above the first section, outside every section."}
             </p>
           ) : (
             <ul className="ticket-admin-list form-admin-field-list">
@@ -1088,16 +1096,6 @@ export function FieldEditor({
     );
   }
 
-  // Het losse deel bovenaan verdwijnt zodra alles in secties zit; tijdens het
-  // slepen komt het terug, want anders kan je een vraag er niet meer uit halen.
-  const looseGroup = groups[0];
-  const showLoose =
-    looseGroup.fields.length > 0 ||
-    sections.length === 0 ||
-    dragging?.kind === "field" ||
-    (addingIn !== null && addingIn.sectionId === null);
-  const visibleGroups = showLoose ? groups : groups.slice(1);
-
   return (
     <div className="ticket-admin-grid" data-columns="2">
       <section className="ticket-admin-section" aria-labelledby="structure-heading">
@@ -1117,7 +1115,10 @@ export function FieldEditor({
           </div>
         </div>
 
-        <ul className="form-admin-structure">{visibleGroups.map(groupBlock)}</ul>
+        {/* Het losse deel bovenaan blijft altijd staan, ook leeg: het is de plek
+            om een vraag zonder sectie te maken, en verstopt kan je die niet
+            meer maken en een bestaande vraag er ook niet meer naartoe slepen. */}
+        <ul className="form-admin-structure">{groups.map(groupBlock)}</ul>
 
         {sectionDraft && sectionDraft.id === null ? (
           <div className="form-admin-new-field">{sectionForm(sectionDraft)}</div>
