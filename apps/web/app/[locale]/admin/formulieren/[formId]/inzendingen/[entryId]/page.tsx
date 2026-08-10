@@ -8,6 +8,7 @@ import { answerToText } from "@/lib/forms/export";
 import { deleteFormEntryAction } from "@/app/actions/formEntries";
 import { DeleteButton } from "@/components/ui/DeleteIconButton";
 import { EntryReviewForm } from "@/components/forms/admin/EntryReviewForm";
+import { PromoteWaitlistForm } from "@/components/forms/admin/PromoteWaitlistForm";
 import { FormStatusBadge } from "@/components/forms/admin/FormStatusBadge";
 import { formBase, formatDateTime, type AdminLocale } from "@/components/forms/admin/format";
 
@@ -49,6 +50,7 @@ export default async function FormEntryDetailPage({
 
   const canManage = capabilities.includes("MANAGE_ENTRIES");
 
+
   return (
     <div className="ticket-admin-page">
       <div className="ticket-admin-page-head">
@@ -67,8 +69,26 @@ export default async function FormEntryDetailPage({
             {entry.isTest ? ` · ${nl ? "testinzending" : "test entry"}` : ""}
           </p>
         </div>
-        <FormStatusBadge status={entry.reviewStatus} locale={locale} />
+        <div className="ticket-admin-row-actions">
+          <FormStatusBadge status={entry.reviewStatus} locale={locale} />
+          {entry.waitlisted ? (
+            <span className="ticket-admin-status" data-tone="warning">
+              {nl ? "Op de wachtlijst" : "On the waiting list"}
+            </span>
+          ) : null}
+        </div>
       </div>
+
+      {entry.waitlisted && canManage ? (
+        <section className="ticket-admin-section ticket-admin-section-compact">
+          <p className="form-admin-hint">
+            {nl
+              ? "Deze inzending kwam binnen toen het formulier vol zat en claimt geen plaats. Haal ze erbij zodra er iets vrijkomt; lukt dat niet, dan zit het nog altijd vol."
+              : "This entry arrived when the form was full and holds no spot. Promote it as soon as one frees up; if that fails, it is still full."}
+          </p>
+          <PromoteWaitlistForm locale={locale} formId={formId} entryId={entry.id} />
+        </section>
+      ) : null}
 
       <section className="ticket-admin-section" aria-labelledby="answers-heading">
         <div className="ticket-admin-section-head">

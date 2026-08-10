@@ -46,7 +46,7 @@ const payloadSchema = z.object({
 export type FormSubmitPayload = z.input<typeof payloadSchema>;
 
 export type FormSubmitResult =
-  | { status: "ok"; entryId: string; duplicate: boolean }
+  | { status: "ok"; entryId: string; duplicate: boolean; waitlisted: boolean }
   | { status: "draft"; entryId: string }
   | { status: "invalid"; errors: Record<string, string>; formError?: string }
   | { status: "rejected"; reason: string };
@@ -75,7 +75,7 @@ export async function submitFormAction(rawPayload: unknown): Promise<FormSubmitR
     // dezelfde uitkomst als een geslaagde inzending, maar er wordt niets
     // bewaard.
     if (trippedHoneypot(payload.honeypot) || filledTooFast(payload.startedAt)) {
-      return { status: "ok", entryId: "", duplicate: false };
+      return { status: "ok", entryId: "", duplicate: false, waitlisted: false };
     }
 
     const requestHeaders = await headers();
@@ -106,7 +106,10 @@ export async function submitFormAction(rawPayload: unknown): Promise<FormSubmitR
     // Bewerken van een bestaande inzending mag ook nadat het formulier sloot
     // voor nieuwe inzendingen; daarover beslist `allowEditAfterSubmit`.
     const editingOwnEntry = Boolean(payload.entryId);
-    if (availability !== "OPEN" && !(editingOwnEntry && availability === "ALREADY_SUBMITTED")) {
+    // WAITLIST is geen blokkade maar een waarschuwing: invullen mag, de
+    // inzending komt enkel zonder plaats binnen.
+    const openish = availability === "OPEN" || availability === "WAITLIST";
+    if (!openish && !(editingOwnEntry && availability === "ALREADY_SUBMITTED")) {
       return { status: "rejected", reason: availability };
     }
     if (payload.asDraft && (!session || !full.allowDrafts)) {
@@ -145,6 +148,8 @@ export async function submitFormAction(rawPayload: unknown): Promise<FormSubmitR
         type: field.type,
         required: field.required,
         config: field.config,
+        sectionId: field.sectionId,
+        sortOrder: field.sortOrder,
         options: field.options.map((option) => ({
           code: option.code,
           archivedAt: option.archivedAt,
@@ -160,6 +165,19 @@ export async function submitFormAction(rawPayload: unknown): Promise<FormSubmitR
       ),
       answers,
       fileCounts,
+      // Een sectie die het pad niet aandoet, telt als verborgen: haar velden
+      // zijn niet verplicht en hun antwoord wordt niet bewaard.
+      sections: full.stepBySections ? full.sections : undefined,
+      branchOptions: full.stepBySections
+        ? full.fields.flatMap((field) =>
+            field.options.map((option) => ({
+              fieldId: field.id,
+              code: option.code,
+              nextSectionId: option.nextSectionId,
+              endsForm: option.endsForm,
+            }))
+          )
+        : undefined,
     });
 
     // Een concept mag half ingevuld zijn; dat is net het punt ervan.
@@ -199,6 +217,7 @@ export async function submitFormAction(rawPayload: unknown): Promise<FormSubmitR
       ),
       asDraft: payload.asDraft,
       maxEntries: full.maxEntries,
+      allowWaitlist: full.allowWaitlist,
     });
 
     if (!result.ok) {
@@ -217,7 +236,12 @@ export async function submitFormAction(rawPayload: unknown): Promise<FormSubmitR
     const duplicate = await findDuplicateEntry(full.id, identity.email, result.entryId);
     await enqueueFormMail(full, result.entryId, identity, payload.locale);
 
-    return { status: "ok", entryId: result.entryId, duplicate: Boolean(duplicate) };
+    return {
+      status: "ok",
+      entryId: result.entryId,
+      duplicate: Boolean(duplicate),
+      waitlisted: result.waitlisted,
+    };
   } catch (error) {
     unstable_rethrow(error);
     console.error("Formulier indienen mislukt", error);

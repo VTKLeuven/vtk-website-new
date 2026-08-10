@@ -35,6 +35,9 @@ export type EditorOption = {
   labelEn: string | null;
   quotaLimit: number | null;
   quotaUsed: number;
+  allowWaitlist: boolean;
+  nextSectionId: string | null;
+  endsForm: boolean;
   archivedAt: string | null;
 };
 
@@ -67,6 +70,9 @@ export type EditorSection = {
   titleEn: string | null;
 };
 
+/** Alleen zinvol wanneer het formulier zijn secties één voor één toont. */
+export type BranchingContext = { enabled: boolean };
+
 /** De lokale, bewerkbare vorm van één veld. */
 export type FieldDraft = {
   id: string | null;
@@ -91,6 +97,9 @@ export type FieldDraft = {
     labelEn: string;
     quotaLimit: number | null;
     quotaUsed: number;
+    allowWaitlist: boolean;
+    nextSectionId: string | null;
+    endsForm: boolean;
   }>;
   conditions: EditorCondition[];
 };
@@ -115,6 +124,9 @@ function toDraft(field: EditorField): FieldDraft {
         labelEn: option.labelEn ?? "",
         quotaLimit: option.quotaLimit,
         quotaUsed: option.quotaUsed,
+        allowWaitlist: option.allowWaitlist,
+        nextSectionId: option.nextSectionId,
+        endsForm: option.endsForm,
       })),
     conditions: field.conditions,
   };
@@ -133,8 +145,8 @@ function emptyDraft(type: string, sectionId: string | null): FieldDraft {
     config: parseFieldConfig(type, {}),
     options: isChoiceType(type)
       ? [
-          { id: null, code: null, labelNl: "", labelEn: "", quotaLimit: null, quotaUsed: 0 },
-          { id: null, code: null, labelNl: "", labelEn: "", quotaLimit: null, quotaUsed: 0 },
+          { id: null, code: null, labelNl: "", labelEn: "", quotaLimit: null, quotaUsed: 0, allowWaitlist: false, nextSectionId: null, endsForm: false },
+          { id: null, code: null, labelNl: "", labelEn: "", quotaLimit: null, quotaUsed: 0, allowWaitlist: false, nextSectionId: null, endsForm: false },
         ]
       : [],
     conditions: [],
@@ -158,6 +170,7 @@ function toPublicField(draft: FieldDraft, fallbackId: string): PublicFormField {
       labelNl: option.labelNl || "…",
       labelEn: option.labelEn || null,
       soldOut: option.quotaLimit != null && option.quotaUsed >= option.quotaLimit,
+      waitlist: option.allowWaitlist,
     })),
   };
 }
@@ -167,11 +180,13 @@ export function FieldEditor({
   locale,
   sections,
   fields: initialFields,
+  branching,
 }: {
   formId: string;
   locale: AdminLocale;
   sections: EditorSection[];
   fields: EditorField[];
+  branching: BranchingContext;
 }) {
   const nl = locale === "nl";
   const showToast = useToast();
@@ -238,6 +253,9 @@ export function FieldEditor({
               labelNl: option.labelNl,
               labelEn: option.labelEn || null,
               quotaLimit: option.quotaLimit,
+              allowWaitlist: option.allowWaitlist,
+              nextSectionId: option.nextSectionId,
+              endsForm: option.endsForm,
             }))
         : [],
       conditions: current.conditions,
@@ -445,6 +463,7 @@ export function FieldEditor({
                     draft={draft}
                     sections={sections}
                     otherFields={active.filter((other) => other.id !== field.id)}
+                    branching={branching}
                     answerCount={field.answerCount}
                     pending={pending}
                     onChange={setDraft}
@@ -467,6 +486,7 @@ export function FieldEditor({
               draft={draft}
               sections={sections}
               otherFields={active}
+              branching={branching}
               answerCount={0}
               pending={pending}
               onChange={setDraft}

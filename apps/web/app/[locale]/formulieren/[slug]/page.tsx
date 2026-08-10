@@ -79,6 +79,13 @@ function reasonCopy(
           ? "Alle plaatsen zijn ingenomen."
           : "All spots have been taken.",
       };
+    case "WAITLIST":
+      return {
+        title: nl ? "Volzet, wachtlijst open" : "Full, waiting list open",
+        body: nl
+          ? "Je kan nog invullen; je komt dan op de wachtlijst."
+          : "You can still fill it in; you will be on the waiting list.",
+      };
     case "ALREADY_SUBMITTED":
       return {
         title: nl ? "Je diende al in" : "You already submitted",
@@ -159,6 +166,7 @@ export default async function PublicFormPage({
 
   const blocked =
     availability !== "OPEN" &&
+    availability !== "WAITLIST" &&
     !(editable && availability === "ALREADY_SUBMITTED") &&
     !(canPreview && availability === "DRAFT");
 
@@ -354,6 +362,16 @@ export default async function PublicFormPage({
                   }
                   privacyUrl={`${base}/privacy`}
                   canTest={canPreview}
+                  stepBySections={form.stepBySections}
+                  branchOptions={form.fields.flatMap((field) =>
+                    field.options.map((option) => ({
+                      fieldId: field.id,
+                      code: option.code,
+                      nextSectionId: option.nextSectionId,
+                      endsForm: option.endsForm,
+                    }))
+                  )}
+                  onWaitlist={availability === "WAITLIST"}
                 />
               </>
             )}

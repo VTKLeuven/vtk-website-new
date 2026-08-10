@@ -35,6 +35,7 @@ export async function POST(
       opensAt: true,
       closesAt: true,
       maxEntries: true,
+      allowWaitlist: true,
       localeMode: true,
       allowMultipleSubmissions: true,
     },
@@ -48,7 +49,8 @@ export async function POST(
     { ...form, submittedCount: 0 },
     { loggedIn: Boolean(session), ownEntries: 0, locale: "nl" }
   );
-  if (availability !== "OPEN" && availability !== "LANGUAGE_UNAVAILABLE") {
+  // Ook op de wachtlijst mag je nog uploaden; enkel een dicht formulier niet.
+  if (!["OPEN", "WAITLIST", "LANGUAGE_UNAVAILABLE"].includes(availability)) {
     return NextResponse.json({ error: "closed" }, { status: 403 });
   }
   if (form.audience === "MEMBERS" && !session) {

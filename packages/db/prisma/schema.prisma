@@ -2794,6 +2794,12 @@ model Form {
   timeZone String    @default("Europe/Brussels")
 
   maxEntries               Int?
+  /// Vol, maar toch invulbaar: inzendingen komen dan op de wachtlijst.
+  allowWaitlist            Boolean @default(false)
+  /// Secties één voor één tonen in plaats van onder elkaar. Nodig om te kunnen
+  /// springen: naar een sectie verderop springen heeft geen betekenis wanneer
+  /// alles toch al op één pagina staat.
+  stepBySections           Boolean @default(false)
   allowMultipleSubmissions Boolean @default(false)
   /// Enkel ingelogde leden kunnen bewerken: een anonieme inzending heeft geen
   /// eigenaar om ze aan terug te geven, en een bewerklink per mail zou
@@ -2857,21 +2863,35 @@ model Form {
 /// Secties maken een lang formulier leesbaar en geven de voortgangsbalk haar
 /// stappen. Velden zonder sectie horen bovenaan, vóór de eerste sectie.
 model FormSection {
-  id            String   @id @default(cuid())
+  id            String  @id @default(cuid())
   formId        String
-  sortOrder     Int      @default(0)
+  sortOrder     Int     @default(0)
   titleNl       String
   titleEn       String?
   descriptionNl String?
   descriptionEn String?
-  createdAt     DateTime @default(now()) @db.Timestamptz(3)
-  updatedAt     DateTime @updatedAt @db.Timestamptz(3)
 
-  form   Form        @relation(fields: [formId], references: [id], onDelete: Cascade)
-  fields FormField[]
+  /// Waar de bezoeker na deze sectie belandt wanneer geen enkel antwoord iets
+  /// anders zegt. Leeg = gewoon de volgende sectie in volgorde.
+  nextSectionId String?
+  /// Het formulier eindigt na deze sectie, ook al volgen er nog secties.
+  endsForm      Boolean @default(false)
+
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+
+  form         Form              @relation(fields: [formId], references: [id], onDelete: Cascade)
+  fields       FormField[]
+  /// Zelfverwijzing voor de standaardsprong. SetNull: wie de doelsectie
+  /// verwijdert, laat de bezoeker gewoon weer naar de volgende sectie gaan in
+  /// plaats van naar een sectie die niet meer bestaat.
+  nextSection  FormSection?      @relation("FormSectionNext", fields: [nextSectionId], references: [id], onDelete: SetNull)
+  previousOf   FormSection[]     @relation("FormSectionNext")
+  optionRoutes FormFieldOption[] @relation("FormOptionNextSection")
 
   @@unique([id, formId])
   @@index([formId, sortOrder])
+  @@index([nextSectionId])
 }
 
 model FormField {
@@ -2932,16 +2952,25 @@ model FormFieldOption {
   sortOrder Int     @default(0)
 
   /// Leeg = onbeperkt. `quotaUsed` en `version` maken het aftellen race-veilig.
-  quotaLimit Int?
-  quotaUsed  Int  @default(0)
-  version    Int  @default(0)
+  quotaLimit    Int?
+  quotaUsed     Int     @default(0)
+  version       Int     @default(0)
+  /// Vol, maar toch kiesbaar: de inzending komt dan op de wachtlijst in plaats
+  /// van geweigerd te worden.
+  allowWaitlist Boolean @default(false)
+
+  /// Springt naar deze sectie wanneer de bezoeker deze optie kiest.
+  nextSectionId String?
+  /// Beëindigt het formulier meteen bij deze keuze.
+  endsForm      Boolean @default(false)
 
   archivedAt DateTime? @db.Timestamptz(3)
   createdAt  DateTime  @default(now()) @db.Timestamptz(3)
   updatedAt  DateTime  @updatedAt @db.Timestamptz(3)
 
-  form  Form      @relation(fields: [formId], references: [id], onDelete: Cascade)
-  field FormField @relation(fields: [fieldId, formId], references: [id, formId], onDelete: Cascade)
+  form        Form         @relation(fields: [formId], references: [id], onDelete: Cascade)
+  field       FormField    @relation(fields: [fieldId, formId], references: [id, formId], onDelete: Cascade)
+  nextSection FormSection? @relation("FormOptionNextSection", fields: [nextSectionId], references: [id], onDelete: SetNull)
 
   @@unique([fieldId, code])
   @@unique([id, formId])
@@ -2994,6 +3023,11 @@ model FormEntry {
   /// Testinzending: telt niet mee in tellingen, quota of export tenzij expliciet
   /// gevraagd, zodat een beheerder zijn eigen formulier kan uitproberen.
   isTest Boolean @default(false)
+
+  /// Op de wachtlijst: wel ingediend, maar zonder plaats. Zo'n inzending claimt
+  /// geen quotum; een beheerder haalt ze erbij wanneer er iets vrijkomt.
+  waitlisted   Boolean   @default(false)
+  waitlistedAt DateTime? @db.Timestamptz(3)
 
   /// Enkel om misbruik te herkennen; de retentie kuist dit op.
   requestFingerprint String?

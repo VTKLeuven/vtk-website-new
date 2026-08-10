@@ -1913,3 +1913,27 @@ keuzes die niet uit de code volgen.
   een inschrijving intikt die per mail of telefoon binnenkwam, krijgt die persoon
   geen "bedankt voor je inzending"-mail: hij heeft niets ingevuld en zou zich
   afvragen wat er gebeurd is. Het formulier hoeft daarvoor ook niet open te staan.
+
+### Springen en wachtlijsten (aanvulling op de formulierenmodule)
+
+- **Springen kan enkel wanneer de secties stap voor stap komen.** Naar een
+  sectie verderop springen heeft geen betekenis wanneer alles toch al op één
+  pagina staat, dus `stepBySections` is een aparte instelling en geen automatisme.
+  Zo blijft een kort formulier ook gewoon één pagina, want dat leest sneller.
+- **Een sprong die het formulier beëindigt, is een volwaardige uitkomst.** "Kom
+  je? Nee" hoort niet door te gaan naar de vragen over het menu. De bezoeker
+  krijgt dan meteen de verzendknop, en de vragen die hij oversloeg zijn ook
+  serverside niet verplicht.
+- **Een wachtlijst claimt geen plaats.** Dat is het hele punt: de teller blijft
+  kloppen met wie er echt binnen mag. Een beheerder haalt iemand er handmatig
+  bij, en die actie probeert het quotum op dat moment alsnog te nemen; is het nog
+  vol, dan blijft de inzending staan waar ze stond.
+- **Automatisch opschuiven doen we niet.** Zodra een plaats vrijkomt de eerste
+  van de wachtlijst binnenlaten klinkt logisch, maar dan hoort er ook een mail
+  bij, een termijn om te bevestigen, en een regel voor wie niet reageert. Dat is
+  een eigen systeem; handmatig opschuiven met een knop is voor een kring van deze
+  grootte genoeg.
+- **Zit één keuze vol, dan claimt de hele inzending niets.** Wie drie shiften
+  aanduidt waarvan de tweede vol zit, komt volledig op de wachtlijst in plaats van
+  twee plaatsen te bezetten en voor de derde te wachten. Half ingeschreven zijn is
+  voor niemand bruikbaar.

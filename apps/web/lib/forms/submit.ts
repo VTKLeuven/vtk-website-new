@@ -42,20 +42,31 @@ function answerData(row: AnswerRow) {
   };
 }
 
+type ReserveOutcome =
+  | { ok: true; waitlisted: false }
+  | { ok: true; waitlisted: true; option: string }
+  | { ok: false; option: string };
+
 /**
  * Reserveert de opties met een quotum. Race-veilig door de update zelf te laten
  * tellen (`quotaUsed < quotaLimit`) in plaats van eerst te lezen en dan te
  * schrijven; een `updateMany` die niets raakt, betekent vol.
+ *
+ * Zit een optie vol en staat er een wachtlijst op, dan claimt deze inzending
+ * niets meer en komt ze op de wachtlijst; wat ze al claimde, gaat terug. Anders
+ * had ze de helft van haar keuzes bezet zonder plaats te hebben.
  */
 async function reserveOptions(
   tx: Prisma.TransactionClient,
   formId: string,
   optionCodes: readonly string[]
-): Promise<string | null> {
+): Promise<ReserveOutcome> {
+  const claimedCodes: string[] = [];
+
   for (const code of optionCodes) {
     const options = await tx.formFieldOption.findMany({
       where: { formId, code },
-      select: { id: true, quotaLimit: true },
+      select: { id: true, quotaLimit: true, allowWaitlist: true },
     });
     for (const option of options) {
       if (option.quotaLimit == null) continue;
@@ -63,10 +74,19 @@ async function reserveOptions(
         where: { id: option.id, quotaUsed: { lt: option.quotaLimit } },
         data: { quotaUsed: { increment: 1 }, version: { increment: 1 } },
       });
-      if (claimed.count === 0) return code;
+      if (claimed.count === 1) {
+        claimedCodes.push(code);
+        continue;
+      }
+      if (!option.allowWaitlist) {
+        await releaseOptions(tx, formId, claimedCodes);
+        return { ok: false, option: code };
+      }
+      await releaseOptions(tx, formId, claimedCodes);
+      return { ok: true, waitlisted: true, option: code };
     }
   }
-  return null;
+  return { ok: true, waitlisted: false };
 }
 
 /** Geeft de quota van een ingetrokken of gewijzigde inzending terug. */
@@ -100,26 +120,34 @@ export type SubmitInput = {
   asDraft: boolean;
   /** Harde grens op het aantal inzendingen, opnieuw gecheckt in de transactie. */
   maxEntries: number | null;
+  /** Mag een volle inzending op de wachtlijst in plaats van geweigerd te worden? */
+  allowWaitlist: boolean;
 };
 
 export type SubmitResult =
-  | { ok: true; entryId: string }
+  | { ok: true; entryId: string; waitlisted: boolean }
   | { ok: false; code: "FULL" | "OPTION_FULL"; option?: string };
 
 export async function saveFormEntry(input: SubmitInput): Promise<SubmitResult> {
   return prisma.$transaction(async (tx) => {
     // De telling van hierboven kan intussen achterhaald zijn; dit is de check
-    // die telt.
+    // die telt. Een inzending op de wachtlijst telt niet mee voor `maxEntries`:
+    // ze heeft net geen plaats.
+    let waitlisted = false;
     if (!input.asDraft && input.maxEntries != null) {
       const submitted = await tx.formEntry.count({
         where: {
           formId: input.formId,
           status: "SUBMITTED",
           isTest: false,
+          waitlisted: false,
           ...(input.entryId ? { id: { not: input.entryId } } : {}),
         },
       });
-      if (submitted >= input.maxEntries) return { ok: false, code: "FULL" as const };
+      if (submitted >= input.maxEntries) {
+        if (!input.allowWaitlist) return { ok: false, code: "FULL" as const };
+        waitlisted = true;
+      }
     }
 
     const existing = input.entryId
@@ -131,7 +159,7 @@ export async function saveFormEntry(input: SubmitInput): Promise<SubmitResult> {
 
     // Bij een wijziging eerst teruggeven wat de vorige versie claimde, anders
     // telt dezelfde persoon twee keer mee voor het quotum.
-    if (existing && existing.status === "SUBMITTED") {
+    if (existing && existing.status === "SUBMITTED" && !existing.waitlisted) {
       await releaseOptions(
         tx,
         input.formId,
@@ -139,9 +167,12 @@ export async function saveFormEntry(input: SubmitInput): Promise<SubmitResult> {
       );
     }
 
-    if (!input.asDraft && !input.isTest) {
-      const full = await reserveOptions(tx, input.formId, input.claimedOptions);
-      if (full) return { ok: false, code: "OPTION_FULL" as const, option: full };
+    if (!input.asDraft && !input.isTest && !waitlisted) {
+      const reserved = await reserveOptions(tx, input.formId, input.claimedOptions);
+      if (!reserved.ok) {
+        return { ok: false, code: "OPTION_FULL" as const, option: reserved.option };
+      }
+      if (reserved.waitlisted) waitlisted = true;
     }
 
     const entry = existing
@@ -153,6 +184,8 @@ export async function saveFormEntry(input: SubmitInput): Promise<SubmitResult> {
             submitterEmail: input.submitterEmail,
             locale: input.locale,
             submittedAt: input.asDraft ? null : existing.submittedAt ?? new Date(),
+            waitlisted,
+            waitlistedAt: waitlisted ? existing.waitlistedAt ?? new Date() : null,
           },
           select: { id: true },
         })
@@ -167,6 +200,8 @@ export async function saveFormEntry(input: SubmitInput): Promise<SubmitResult> {
             isTest: input.isTest,
             requestFingerprint: input.requestFingerprint,
             submittedAt: input.asDraft ? null : new Date(),
+            waitlisted,
+            waitlistedAt: waitlisted ? new Date() : null,
           },
           select: { id: true },
         });
@@ -194,7 +229,7 @@ export async function saveFormEntry(input: SubmitInput): Promise<SubmitResult> {
       });
     }
 
-    return { ok: true as const, entryId: entry.id };
+    return { ok: true as const, entryId: entry.id, waitlisted };
   });
 }
 

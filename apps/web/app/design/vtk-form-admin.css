@@ -270,3 +270,38 @@
     grid-template-columns: minmax(0, 1fr);
   }
 }
+
+/* Wachtlijst en sprongen per optie ------------------------------------------- */
+
+.form-admin-option-extras {
+  flex-basis: 100%;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 14px;
+  padding-left: 4px;
+  font-size: 13px;
+}
+
+.form-admin-option-jump {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--muted, #5c667f);
+}
+
+.form-admin-option-jump select {
+  max-width: 260px;
+}
+
+@media (max-width: 640px) {
+  .form-admin-option-extras {
+    grid-column: 1 / -1;
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .form-admin-option-jump select {
+    max-width: none;
+  }
+}

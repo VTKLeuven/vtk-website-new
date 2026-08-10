@@ -22,6 +22,8 @@ export type FormSettingsValues = {
   opensAt: string;
   closesAt: string;
   maxEntries: number | null;
+  allowWaitlist: boolean;
+  stepBySections: boolean;
   allowMultipleSubmissions: boolean;
   allowEditAfterSubmit: boolean;
   allowDrafts: boolean;
@@ -305,6 +307,30 @@ export function FormSettingsForm({
           {nl
             ? "Staat dit uit, dan blijft het formulier gewoon bereikbaar via zijn link; het staat enkel niet in de lijst. Handig voor een sollicitatie die je gericht deelt."
             : "When off the form stays reachable through its link; it is only left out of the list. Useful for an application you share on purpose."}
+        </p>
+
+        <label className="ticket-admin-check">
+          <input type="checkbox" name="allowWaitlist" defaultChecked={values.allowWaitlist} />
+          {nl
+            ? "Blijf inzendingen aanvaarden als het vol zit (wachtlijst)"
+            : "Keep accepting entries when full (waiting list)"}
+        </label>
+        <p className="form-admin-hint">
+          {nl
+            ? "Wie na het maximum indient, komt op de wachtlijst en claimt geen plaats. Je haalt zo iemand er zelf bij zodra er iets vrijkomt. Ditzelfde kan je per keuzeoptie instellen bij Velden."
+            : "Anyone submitting past the limit lands on the waiting list and holds no spot. You promote them yourself when one frees up. The same setting exists per choice option under Fields."}
+        </p>
+
+        <label className="ticket-admin-check">
+          <input type="checkbox" name="stepBySections" defaultChecked={values.stepBySections} />
+          {nl
+            ? "Toon de secties één voor één, met een vorige- en volgende-knop"
+            : "Show the sections one by one, with back and next buttons"}
+        </label>
+        <p className="form-admin-hint">
+          {nl
+            ? "Nodig om te kunnen springen: naar een sectie verderop springen heeft geen betekenis wanneer alles toch al op één pagina staat. Je stelt de sprongen in bij Velden."
+            : "Required for jumping: jumping to a later section means nothing when everything is on one page already. You set the jumps under Fields."}
         </p>
 
         <label className="ticket-admin-check">

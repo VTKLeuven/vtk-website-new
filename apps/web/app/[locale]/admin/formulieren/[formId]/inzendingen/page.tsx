@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { prisma } from "@vtk/db";
-import { ArrowRight, BarChart3, Filter, Inbox, Search } from "lucide-react";
+import { ArrowRight, BarChart3, Filter, Hourglass, Inbox, Search } from "lucide-react";
 import { hasLocale } from "@/lib/locale";
 import { requireFormCapability } from "@/lib/forms/authorization";
 import { answerSummary, answerToText, exportColumns } from "@/lib/forms/export";
@@ -27,7 +27,13 @@ export default async function FormEntriesPage({
   searchParams,
 }: {
   params: Promise<{ locale: string; formId: string }>;
-  searchParams: Promise<{ q?: string; beoordeling?: string; test?: string; p?: string }>;
+  searchParams: Promise<{
+    q?: string;
+    beoordeling?: string;
+    test?: string;
+    p?: string;
+    wachtlijst?: string;
+  }>;
 }) {
   const [{ locale: localeParam, formId }, filters] = await Promise.all([params, searchParams]);
   if (!hasLocale(localeParam)) notFound();
@@ -40,6 +46,10 @@ export default async function FormEntriesPage({
     ? (filters.beoordeling as (typeof REVIEW_STATUSES)[number])
     : null;
   const includeTest = filters.test === "1";
+  // "alles", "enkel de wachtlijst", of "enkel wie een plaats heeft".
+  const waitlistFilter = ["alleen", "zonder"].includes(filters.wachtlijst ?? "")
+    ? (filters.wachtlijst as "alleen" | "zonder")
+    : null;
   const query = filters.q?.trim().slice(0, 200) ?? "";
   const page = Math.max(1, Number.parseInt(filters.p ?? "1", 10) || 1);
 
@@ -48,6 +58,11 @@ export default async function FormEntriesPage({
     status: "SUBMITTED" as const,
     ...(includeTest ? {} : { isTest: false }),
     ...(review ? { reviewStatus: review } : {}),
+    ...(waitlistFilter === "alleen"
+      ? { waitlisted: true }
+      : waitlistFilter === "zonder"
+        ? { waitlisted: false }
+        : {}),
     ...(query
       ? {
           OR: [
@@ -63,7 +78,7 @@ export default async function FormEntriesPage({
       : {}),
   };
 
-  const [fields, entries, total, drafts, allEntriesForSummary] = await Promise.all([
+  const [fields, entries, total, drafts, waitlisted, allEntriesForSummary] = await Promise.all([
     prisma.formField.findMany({
       where: { formId },
       include: { options: true },
@@ -82,6 +97,9 @@ export default async function FormEntriesPage({
     }),
     prisma.formEntry.count({ where }),
     prisma.formEntry.count({ where: { formId, status: "DRAFT" } }),
+    prisma.formEntry.count({
+      where: { formId, status: "SUBMITTED", isTest: false, waitlisted: true },
+    }),
     // Het overzicht telt over alle inzendingen, niet enkel de zichtbare pagina.
     prisma.formEntry.findMany({
       where: { formId, status: "SUBMITTED", isTest: false },
@@ -115,6 +133,7 @@ export default async function FormEntriesPage({
     submittedAt: entry.submittedAt,
     createdAt: entry.createdAt,
     isTest: entry.isTest,
+    waitlisted: entry.waitlisted,
     reviewerName: entry.reviewer?.name ?? null,
     answers: entry.answers,
     uploads: entry.uploads,
@@ -170,6 +189,14 @@ export default async function FormEntriesPage({
           label={nl ? "Concepten" : "Drafts"}
           value={formatNumber(drafts, locale)}
         />
+        {waitlisted > 0 ? (
+          <AdminMetric
+            icon={Hourglass}
+            label={nl ? "Op de wachtlijst" : "On the waiting list"}
+            value={formatNumber(waitlisted, locale)}
+            tone="warning"
+          />
+        ) : null}
       </div>
 
       <section className="ticket-admin-section" aria-labelledby="entries-heading">
@@ -229,6 +256,14 @@ export default async function FormEntriesPage({
                   {formStatusLabel(status, locale)}
                 </option>
               ))}
+            </select>
+          </div>
+          <div className="ticket-admin-field">
+            <label htmlFor="entry-waitlist">{nl ? "Wachtlijst" : "Waiting list"}</label>
+            <select id="entry-waitlist" name="wachtlijst" defaultValue={waitlistFilter ?? ""}>
+              <option value="">{nl ? "Alles" : "Everything"}</option>
+              <option value="zonder">{nl ? "Enkel met plaats" : "Only with a spot"}</option>
+              <option value="alleen">{nl ? "Enkel de wachtlijst" : "Only the waiting list"}</option>
             </select>
           </div>
           <div className="ticket-admin-field">
@@ -303,6 +338,11 @@ export default async function FormEntriesPage({
                         </td>
                         <td>
                           <FormStatusBadge status={entry.reviewStatus} locale={locale} />
+                          {entry.waitlisted ? (
+                            <div className="ticket-admin-row-meta">
+                              {nl ? "wachtlijst" : "waiting list"}
+                            </div>
+                          ) : null}
                         </td>
                         {columns.map((column) => (
                           <td key={column.id} data-priority="low" data-wrap="true">

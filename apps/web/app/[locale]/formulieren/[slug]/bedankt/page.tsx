@@ -22,7 +22,7 @@ export default async function FormThanksPage({
   searchParams,
 }: {
   params: Promise<{ locale: string; slug: string }>;
-  searchParams: Promise<{ dubbel?: string }>;
+  searchParams: Promise<{ dubbel?: string; wachtlijst?: string }>;
 }) {
   const [{ locale: localeParam, slug }, query] = await Promise.all([params, searchParams]);
   if (!hasLocale(localeParam)) notFound();
@@ -71,6 +71,18 @@ export default async function FormThanksPage({
 
       <main className="vtk-form-page">
         <div className="vtk-form-notice" data-tone="done">
+          {query.wachtlijst ? (
+            <p>
+              <strong>
+                {nl
+                  ? "Je staat op de wachtlijst."
+                  : "You are on the waiting list."}
+              </strong>{" "}
+              {nl
+                ? "Het formulier zat vol op het moment dat je indiende. We nemen contact op zodra er een plaats vrijkomt."
+                : "The form was full when you submitted. We will get in touch as soon as a spot frees up."}
+            </p>
+          ) : null}
           <p>{thanks}</p>
           {form.confirmationEnabled ? (
             <p>

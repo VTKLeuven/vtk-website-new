@@ -16,6 +16,7 @@ import {
   validateFieldConfig,
 } from "@/lib/forms/schema";
 import { wouldCreateCycle } from "@/lib/forms/visibility";
+import { wouldLoop } from "@/lib/forms/branching";
 import { saveError, saveOk, type SaveState } from "@/lib/saveState";
 
 const fieldDraftSchema = z.object({
@@ -35,6 +36,10 @@ const fieldDraftSchema = z.object({
         labelNl: z.string().trim().min(1).max(300),
         labelEn: z.string().trim().max(300).nullish(),
         quotaLimit: z.number().int().min(1).max(100_000).nullish(),
+        allowWaitlist: z.boolean().default(false),
+        /** Springt naar deze sectie wanneer deze optie gekozen wordt. */
+        nextSectionId: z.string().nullish(),
+        endsForm: z.boolean().default(false),
       })
     )
     .max(200)
@@ -66,6 +71,8 @@ const EXPECTED_ERRORS = new Set([
   "INVALID_FIELD_RANGE",
   "INVALID_FIELD_PATTERN",
   "SECTION_NOT_FOUND",
+  "SECTION_LOOP",
+  "SECTION_ROUTE_INVALID",
 ]);
 
 async function guard(run: () => Promise<void>): Promise<SaveState> {
@@ -219,6 +226,15 @@ export async function saveFormFieldAction(
       }
 
       if (isChoiceType(draft.type)) {
+        const targets = (draft.options ?? [])
+          .map((option) => option.nextSectionId)
+          .filter((id): id is string => Boolean(id));
+        if (targets.length > 0) {
+          const known = await tx.formSection.count({
+            where: { formId, id: { in: targets } },
+          });
+          if (known !== new Set(targets).size) throw new Error("SECTION_ROUTE_INVALID");
+        }
         await syncOptions(tx, { formId, fieldId, options: draft.options ?? [] });
       }
 
@@ -253,6 +269,9 @@ async function syncOptions(
       labelNl: string;
       labelEn?: string | null;
       quotaLimit?: number | null;
+      allowWaitlist?: boolean;
+      nextSectionId?: string | null;
+      endsForm?: boolean;
     }>;
   }
 ) {
@@ -278,6 +297,9 @@ async function syncOptions(
           labelNl: option.labelNl,
           labelEn: option.labelEn || null,
           quotaLimit: option.quotaLimit ?? null,
+          allowWaitlist: option.allowWaitlist ?? false,
+          nextSectionId: option.nextSectionId ?? null,
+          endsForm: option.endsForm ?? false,
           sortOrder: index,
           archivedAt: null,
         },
@@ -294,6 +316,9 @@ async function syncOptions(
         labelNl: option.labelNl,
         labelEn: option.labelEn || null,
         quotaLimit: option.quotaLimit ?? null,
+        allowWaitlist: option.allowWaitlist ?? false,
+        nextSectionId: option.nextSectionId ?? null,
+        endsForm: option.endsForm ?? false,
         sortOrder: index,
       },
     });
@@ -473,6 +498,9 @@ const sectionDraftSchema = z.object({
   titleEn: z.string().trim().max(300).nullish(),
   descriptionNl: z.string().trim().max(2_000).nullish(),
   descriptionEn: z.string().trim().max(2_000).nullish(),
+  /** Het standaardvervolg; een antwoord met een eigen sprong gaat hierop voor. */
+  nextSectionId: z.string().nullish(),
+  endsForm: z.boolean().default(false),
 });
 
 export async function saveFormSectionAction(
@@ -488,7 +516,24 @@ export async function saveFormSectionAction(
       titleEn: draft.titleEn || null,
       descriptionNl: draft.descriptionNl || null,
       descriptionEn: draft.descriptionEn || null,
+      nextSectionId: draft.endsForm ? null : draft.nextSectionId || null,
+      endsForm: draft.endsForm,
     };
+
+    // Een kring tussen secties laat de bezoeker nooit meer bij het einde komen;
+    // dat hoort hier tegengehouden te worden en niet pas bij het invullen.
+    if (draft.id && data.nextSectionId) {
+      const siblings = await prisma.formSection.findMany({
+        where: { formId },
+        select: { id: true, sortOrder: true, nextSectionId: true, endsForm: true },
+      });
+      if (!siblings.some((section) => section.id === data.nextSectionId)) {
+        throw new Error("SECTION_ROUTE_INVALID");
+      }
+      if (wouldLoop(siblings, { fromSectionId: draft.id, toSectionId: data.nextSectionId })) {
+        throw new Error("SECTION_LOOP");
+      }
+    }
 
     await prisma.$transaction(async (tx) => {
       if (draft.id) {

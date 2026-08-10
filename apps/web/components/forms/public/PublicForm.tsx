@@ -9,14 +9,18 @@ import type { PublicFormField } from "@/components/forms/FormFieldInput";
 import { FormFileField, type UploadedFile } from "./FormFileField";
 import { submitFormAction } from "@/app/actions/formSubmission";
 import { visibleFieldIds, type AnswerValue, type VisibilityCondition } from "@/lib/forms/visibility";
+import { steps as branchSteps, type BranchOption, type BranchSection } from "@/lib/forms/branching";
 import { DEFAULT_FILE_MAX_FILES } from "@/lib/forms/schema";
 
 export type PublicSection = {
   id: string;
+  sortOrder: number;
   titleNl: string;
   titleEn: string | null;
   descriptionNl: string | null;
   descriptionEn: string | null;
+  nextSectionId: string | null;
+  endsForm: boolean;
 };
 
 type FieldWithSection = PublicFormField & { sectionId: string | null };
@@ -67,6 +71,9 @@ export function PublicForm({
   consent,
   privacyUrl,
   canTest,
+  stepBySections,
+  branchOptions,
+  onWaitlist,
 }: {
   formId: string;
   slug: string;
@@ -81,6 +88,11 @@ export function PublicForm({
   consent: { required: boolean; text: string } | null;
   privacyUrl: string;
   canTest: boolean;
+  /** Secties één voor één tonen, met sprongen op basis van de antwoorden. */
+  stepBySections: boolean;
+  branchOptions: BranchOption[];
+  /** Het formulier zit vol maar aanvaardt nog wachtlijstinzendingen. */
+  onWaitlist: boolean;
 }) {
   const nl = locale === "nl";
   const router = useRouter();
@@ -112,10 +124,56 @@ export function PublicForm({
     [fields, conditions, answers]
   );
 
+  const branchSections: BranchSection[] = useMemo(
+    () =>
+      sections.map((section) => ({
+        id: section.id,
+        sortOrder: section.sortOrder,
+        nextSectionId: section.nextSectionId,
+        endsForm: section.endsForm,
+      })),
+    [sections]
+  );
+
+  const branchFields = useMemo(
+    () =>
+      fields.map((field) => ({
+        id: field.id,
+        type: field.type,
+        sectionId: field.sectionId,
+        sortOrder: 0,
+      })),
+    [fields]
+  );
+
+  // De stappen volgen de antwoorden: een sprong die een sectie overslaat, haalt
+  // ze meteen uit deze lijst, dus ook uit de voortgangsbalk.
+  const formSteps = useMemo(
+    () =>
+      stepBySections
+        ? branchSteps(branchSections, branchFields, branchOptions, answers, visible)
+        : [],
+    [stepBySections, branchSections, branchFields, branchOptions, answers, visible]
+  );
+
+  const [stepIndex, setStepIndex] = useState(0);
+  // Springt de bezoeker terug en kiest hij iets anders, dan kan het pad korter
+  // worden dan waar hij stond.
+  const currentStep = Math.min(stepIndex, Math.max(0, formSteps.length - 1));
+  const isLastStep = !stepBySections || currentStep >= formSteps.length - 1;
+
   const visibleFields = fields.filter((field) => visible.has(field.id));
   // De voortgang telt de verplichte velden die zichtbaar én ingevuld zijn; dat
   // is wat een bezoeker wil weten, niet hoeveel velden er in totaal bestaan.
-  const requiredFields = visibleFields.filter((field) => field.required);
+  const stepFields = stepBySections
+    ? visibleFields.filter(
+        (field) => (field.sectionId ?? null) === (formSteps[currentStep]?.sectionId ?? null)
+      )
+    : visibleFields;
+
+  const requiredFields = (stepBySections ? stepFields : visibleFields).filter(
+    (field) => field.required
+  );
   const doneCount = requiredFields.filter((field) =>
     field.type === "FILE"
       ? (files[field.id]?.length ?? 0) > 0
@@ -180,9 +238,11 @@ export function PublicForm({
         return;
       }
 
-      const target = `${nl ? "" : "/en"}/formulieren/${slug}/bedankt${
-        result.duplicate ? "?dubbel=1" : ""
-      }`;
+      const flags = new URLSearchParams();
+      if (result.duplicate) flags.set("dubbel", "1");
+      if (result.waitlisted) flags.set("wachtlijst", "1");
+      const query = flags.toString();
+      const target = `${nl ? "" : "/en"}/formulieren/${slug}/bedankt${query ? `?${query}` : ""}`;
       router.push(target);
     });
   }
@@ -195,6 +255,12 @@ export function PublicForm({
       noValidate
       onSubmit={(event) => {
         event.preventDefault();
+        // Enter in een tekstveld verstuurt een formulier. Halverwege een reeks
+        // stappen is dat nooit de bedoeling, dus dan gaan we gewoon verder.
+        if (stepBySections && !isLastStep) {
+          setStepIndex(currentStep + 1);
+          return;
+        }
         send(false);
       }}
     >
@@ -223,7 +289,28 @@ export function PublicForm({
         </div>
       ) : null}
 
-      {requiredFields.length > 0 && sections.length > 0 ? (
+      {onWaitlist ? (
+        <div className="vtk-form-notice" data-tone="warning">
+          <p>
+            {nl
+              ? "Dit formulier zit vol. Je kan nog invullen, maar je komt op de wachtlijst; we laten weten of er een plaats vrijkomt."
+              : "This form is full. You can still fill it in, but you will be on the waiting list; we will let you know if a spot frees up."}
+          </p>
+        </div>
+      ) : null}
+
+      {stepBySections && formSteps.length > 1 ? (
+        <div className="vtk-form-progress-summary">
+          <div className="vtk-form-progress-bar">
+            <span style={{ width: `${Math.round(((currentStep + 1) / formSteps.length) * 100)}%` }} />
+          </div>
+          <p>
+            {nl
+              ? `Stap ${currentStep + 1} van ${formSteps.length}`
+              : `Step ${currentStep + 1} of ${formSteps.length}`}
+          </p>
+        </div>
+      ) : requiredFields.length > 0 && sections.length > 0 ? (
         <div className="vtk-form-progress-summary">
           <div className="vtk-form-progress-bar">
             <span
@@ -238,12 +325,23 @@ export function PublicForm({
         </div>
       ) : null}
 
-      <FieldGroup
-        fields={visibleFields.filter((field) => !field.sectionId)}
-        {...{ formId, locale, answers, setAnswers, files, setFiles, errors, nl }}
-      />
+      {stepBySections ? (
+        <StepView
+          section={sections.find((entry) => entry.id === formSteps[currentStep]?.sectionId) ?? null}
+          fields={stepFields}
+          locale={locale}
+          {...{ formId, answers, setAnswers, files, setFiles, errors, nl }}
+        />
+      ) : null}
 
-      {sections.map((section) => {
+      {stepBySections ? null : (
+        <FieldGroup
+          fields={visibleFields.filter((field) => !field.sectionId)}
+          {...{ formId, locale, answers, setAnswers, files, setFiles, errors, nl }}
+        />
+      )}
+
+      {(stepBySections ? [] : sections).map((section) => {
         const inSection = visibleFields.filter((field) => field.sectionId === section.id);
         if (inSection.length === 0) return null;
         const title = locale === "en" && section.titleEn ? section.titleEn : section.titleNl;
@@ -263,7 +361,7 @@ export function PublicForm({
         );
       })}
 
-      {consent ? (
+      {consent && isLastStep ? (
         <label className="vtk-form-check">
           <input
             type="checkbox"
@@ -280,7 +378,7 @@ export function PublicForm({
         </label>
       ) : null}
 
-      {canTest ? (
+      {canTest && isLastStep ? (
         <label className="vtk-form-check">
           <input
             type="checkbox"
@@ -296,7 +394,21 @@ export function PublicForm({
       ) : null}
 
       <div className="vtk-form-actions">
-        <Button type="submit" disabled={pending}>
+        {stepBySections && currentStep > 0 ? (
+          <Button
+            type="button"
+            variant="ghost"
+            disabled={pending}
+            onClick={() => setStepIndex(currentStep - 1)}
+          >
+            {nl ? "Vorige" : "Back"}
+          </Button>
+        ) : null}
+
+        {stepBySections && !isLastStep ? (
+          <Button type="submit">{nl ? "Volgende" : "Next"}</Button>
+        ) : (
+          <Button type="submit" disabled={pending}>
           {pending
             ? nl
               ? "Bezig met versturen..."
@@ -305,10 +417,15 @@ export function PublicForm({
               ? nl
                 ? "Wijzigingen opslaan"
                 : "Save changes"
+              : onWaitlist
+              ? nl
+                ? "Op de wachtlijst zetten"
+                : "Join the waiting list"
               : nl
                 ? "Versturen"
                 : "Submit"}
-        </Button>
+          </Button>
+        )}
         {allowDrafts ? (
           <Button type="button" variant="ghost" disabled={pending} onClick={() => send(true)}>
             {nl ? "Bewaren en later verdergaan" : "Save and continue later"}
@@ -387,6 +504,53 @@ function FieldGroup({
         );
       })}
     </>
+  );
+}
+
+/** Eén stap: de titel en beschrijving van de sectie, plus haar velden. */
+function StepView({
+  section,
+  fields,
+  formId,
+  locale,
+  answers,
+  setAnswers,
+  files,
+  setFiles,
+  errors,
+  nl,
+}: {
+  section: PublicSection | null;
+  fields: FieldWithSection[];
+  formId: string;
+  locale: "nl" | "en";
+  answers: Record<string, AnswerValue>;
+  setAnswers: (next: (current: Record<string, AnswerValue>) => Record<string, AnswerValue>) => void;
+  files: Record<string, UploadedFile[]>;
+  setFiles: (next: (current: Record<string, UploadedFile[]>) => Record<string, UploadedFile[]>) => void;
+  errors: Record<string, string>;
+  nl: boolean;
+}) {
+  const title = section
+    ? locale === "en" && section.titleEn
+      ? section.titleEn
+      : section.titleNl
+    : null;
+  const description = section
+    ? locale === "en" && section.descriptionEn
+      ? section.descriptionEn
+      : section.descriptionNl
+    : null;
+
+  return (
+    <section className="vtk-form-section" aria-labelledby={section ? `s-${section.id}` : undefined}>
+      {title ? <h2 id={`s-${section?.id}`}>{title}</h2> : null}
+      {description ? <p className="vtk-form-section-intro">{description}</p> : null}
+      <FieldGroup
+        fields={fields}
+        {...{ formId, locale, answers, setAnswers, files, setFiles, errors, nl }}
+      />
+    </section>
   );
 }
 

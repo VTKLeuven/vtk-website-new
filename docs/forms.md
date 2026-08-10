@@ -38,11 +38,11 @@ Alles in `packages/db/prisma/schema.prisma`, sectie "Formulieren".
 | Model | Wat het is |
 | --- | --- |
 | `Form` | Het formulier zelf: slug, NL/EN-titels en intro, status, doelpubliek, open- en sluitmoment, `maxEntries`, bevestigingsmail, meldingen, toestemming, `retentionDays`, optionele `calendarEventId`. |
-| `FormSection` | Optionele groepering met volgorde; voedt ook de voortgangsbalk. |
+| `FormSection` | Optionele groepering met volgorde; voedt de voortgangsbalk en draagt haar standaardvervolg (`nextSectionId`, `endsForm`). |
 | `FormField` | Type, **stabiele `code`**, volgorde, labels, `required`, typespecifieke `config` (Json), `archivedAt` voor soft delete. |
-| `FormFieldOption` | Keuzeopties als rijen (niet als JSON), met `quotaLimit`/`quotaUsed`/`version`. |
+| `FormFieldOption` | Keuzeopties als rijen (niet als JSON), met `quotaLimit`/`quotaUsed`/`version`, een eigen wachtlijst en een eigen sprong. |
 | `FormFieldCondition` | "Toon dit veld wanneer veld X ...". Meerdere condities op één veld gelden samen (AND). |
-| `FormEntry` | Eén inzending: `status` (DRAFT/SUBMITTED), `reviewStatus`, notitie, beoordelaar, `isTest`, inzender. |
+| `FormEntry` | Eén inzending: `status` (DRAFT/SUBMITTED), `reviewStatus`, notitie, beoordelaar, `isTest`, `waitlisted`, inzender. |
 | `FormAnswer` | Eén antwoord, met `fieldCode` als **momentopname** naast de FK. |
 | `FormFileUpload` | Bestand in de objectopslag onder `forms/<formId>/`. |
 | `FormUserGrant` / `FormGroupGrant` | Toegang per persoon en per post (`ALL_MEMBERS` vs. `LEADS_ONLY`). |
@@ -73,6 +73,8 @@ Dit is de reden dat verschillende keuzes eruitzien zoals ze eruitzien:
   afleiden van stabiele codes. Puur, dus gedeeld met de client.
 - `visibility.ts` — welke velden zichtbaar zijn, plus kringdetectie voor de
   editor. Ook puur en gedeeld.
+- `branching.ts` — welke secties het antwoordenpatroon aandoet, de stappen die
+  daaruit volgen, en de kringdetectie voor sprongen. Ook puur en gedeeld.
 - `validation.ts` — de serverside waarheid bij het indienen.
 - `publicForm.ts` — het formulier laden en beslissen of het invulbaar is.
 - `submit.ts` — de transactie: antwoorden, bestanden en quota.
@@ -147,16 +149,60 @@ wachtrij**: anders staat alles op `SENT` terwijl er nooit iets vertrok.
   `retentionDays`. Leeg is de standaard en betekent: niets opruimen.
 - `requireConsent` zet een verplicht vinkje met een link naar het privacybeleid.
 
+## Springen tussen secties
+
+Zet `Form.stepBySections` aan en het formulier komt stap voor stap: eerst de
+velden zonder sectie, daarna elke sectie op het pad. Springen heeft enkel
+betekenis in die weergave; op één pagina staat alles toch al onder elkaar.
+
+De route komt uit drie lagen, van sterk naar zwak:
+
+1. **Een gekozen optie** met een `nextSectionId` of `endsForm`. De eerste
+   keuzevraag van de stap die iets aanwijst, beslist.
+2. **Het standaardvervolg van de sectie** (`nextSectionId` / `endsForm`).
+3. **De volgende sectie in volgorde.**
+
+Twee dingen die gemakkelijk fout gaan en die de tests vastleggen:
+
+- **De eerste stap mag ook sturen.** Staat de vraag "kom je?" bovenaan buiten
+  elke sectie, dan bepaalt haar antwoord welke sectie volgt. De eerste versie
+  keek enkel naar velden ín een sectie en begon altijd bij de eerste sectie; het
+  formulier sprong dan gewoon niet.
+- **Een overgeslagen sectie telt als verborgen.** Bij het indienen wordt het pad
+  opnieuw uitgerekend: velden in een tak die de bezoeker nooit zag, zijn niet
+  verplicht en hun antwoord wordt niet bewaard.
+
+Kringen worden in de editor tegengehouden (`wouldLoop`). Komt er via oudere data
+toch een door, dan stopt het pad bij een sectie die het al bezocht in plaats van
+te bevriezen.
+
+## Wachtlijst
+
+Twee plekken, dezelfde uitkomst: `Form.allowWaitlist` voor wanneer `maxEntries`
+bereikt is, en `FormFieldOption.allowWaitlist` voor wanneer één keuze vol zit.
+In beide gevallen komt de inzending binnen met `waitlisted = true` en claimt ze
+**geen** quotum.
+
+- Een volle optie met wachtlijst blijft kiesbaar en staat er als "volzet,
+  wachtlijst" bij; zonder wachtlijst is ze grijs.
+- Zit één van de gekozen opties vol, dan claimt de inzending helemaal niets meer
+  en gaat terug wat ze al claimde. Anders had ze de helft van haar keuzes bezet
+  zonder plaats te hebben.
+- Een beheerder haalt iemand erbij met "Een plaats geven" op de detailpagina.
+  Dat claimt de quota op dat moment alsnog; lukt dat niet, dan blijft de
+  inzending op de wachtlijst en zegt de melding dat het nog vol is. Automatisch
+  opschuiven met een mail erbij is er bewust niet: dat is een eigen levenscyclus
+  met een deadline en een vervaltermijn.
+
 ## Wat er (nog) niet is
 
-- Branching tussen secties ("spring naar sectie X"). De condities dekken het
-  courante geval; het datamodel laat het toe zonder migratie.
-- Een wachtlijst bij een vol quotum.
+- Automatisch opschuiven van de wachtlijst.
 - Betalingen, quizscores, en de migratie van de bestaande ticketvragen naar deze
   velden. Bewust buiten scope gehouden.
 
 ## Tests
 
 `npm run test --workspace=@vtk/web`, in het bijzonder:
-`formsSchema`, `formsVisibility`, `formsValidation`, `formsExport`, `formsMail`,
-`formsPdf`, `formsTranslation` en `formsAuthorization`.
+`formsSchema`, `formsVisibility`, `formsBranching`, `formsValidation`,
+`formsExport`, `formsMail`, `formsPdf`, `formsTranslation` en
+`formsAuthorization`.

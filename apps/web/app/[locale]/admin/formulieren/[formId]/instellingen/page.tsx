@@ -57,6 +57,8 @@ export default async function FormSettingsPage({
     opensAt: toDatetimeLocal(form.opensAt),
     closesAt: toDatetimeLocal(form.closesAt),
     maxEntries: form.maxEntries,
+    allowWaitlist: form.allowWaitlist,
+    stepBySections: form.stepBySections,
     allowMultipleSubmissions: form.allowMultipleSubmissions,
     allowEditAfterSubmit: form.allowEditAfterSubmit,
     allowDrafts: form.allowDrafts,

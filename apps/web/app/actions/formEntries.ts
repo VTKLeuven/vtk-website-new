@@ -28,6 +28,7 @@ const EXPECTED_ERRORS = new Set([
   "BODY_REQUIRED",
   "NO_MAILSERVER",
   "REVIEWER_NOT_FOUND",
+  "STILL_FULL",
 ]);
 
 async function guard(run: () => Promise<void>): Promise<SaveState> {
@@ -362,6 +363,7 @@ export async function addEntryOnBehalfAction(rawInput: unknown): Promise<BehalfR
       ),
       asDraft: false,
       maxEntries: full.maxEntries,
+      allowWaitlist: full.allowWaitlist,
     });
 
     if (!result.ok) {
@@ -384,4 +386,81 @@ export async function addEntryOnBehalfAction(rawInput: unknown): Promise<BehalfR
     console.error("Inzending namens iemand toevoegen mislukt", error);
     throw error;
   }
+}
+
+/**
+ * Iemand van de wachtlijst een plaats geven.
+ *
+ * Probeert alsnog de quota te claimen die de inzending nodig heeft. Lukt dat
+ * niet, dan blijft ze op de wachtlijst staan in plaats van een plaats te krijgen
+ * die er niet is; anders zou de teller er twee tonen waar er één past.
+ */
+export async function promoteWaitlistedEntryAction(
+  _previous: SaveState,
+  formData: FormData
+): Promise<SaveState> {
+  return guard(async () => {
+    const locale = localeSchema.parse(value(formData, "locale") || "nl");
+    const formId = value(formData, "formId");
+    const entryId = value(formData, "entryId");
+    const { session, form } = await requireFormCapability(formId, "MANAGE_ENTRIES");
+
+    const entry = await prisma.formEntry.findFirst({
+      where: { id: entryId, formId, waitlisted: true },
+      include: { answers: { select: { valueOptions: true } } },
+    });
+    if (!entry) throw new Error("ENTRY_NOT_FOUND");
+
+    const wanted = entry.answers.flatMap((answer) => answer.valueOptions);
+
+    await prisma.$transaction(async (tx) => {
+      if (form.maxEntries != null) {
+        const taken = await tx.formEntry.count({
+          where: { formId, status: "SUBMITTED", isTest: false, waitlisted: false },
+        });
+        if (taken >= form.maxEntries) throw new Error("STILL_FULL");
+      }
+
+      const claimed: string[] = [];
+      for (const code of wanted) {
+        const options = await tx.formFieldOption.findMany({
+          where: { formId, code },
+          select: { id: true, quotaLimit: true },
+        });
+        for (const option of options) {
+          if (option.quotaLimit == null) continue;
+          const took = await tx.formFieldOption.updateMany({
+            where: { id: option.id, quotaUsed: { lt: option.quotaLimit } },
+            data: { quotaUsed: { increment: 1 }, version: { increment: 1 } },
+          });
+          if (took.count === 1) {
+            claimed.push(code);
+            continue;
+          }
+          // Halve plaatsen bestaan niet: teruggeven wat we net namen.
+          for (const back of claimed) {
+            await tx.formFieldOption.updateMany({
+              where: { formId, code: back, quotaUsed: { gt: 0 } },
+              data: { quotaUsed: { decrement: 1 }, version: { increment: 1 } },
+            });
+          }
+          throw new Error("STILL_FULL");
+        }
+      }
+
+      await tx.formEntry.update({
+        where: { id: entryId },
+        data: { waitlisted: false, waitlistedAt: null },
+      });
+      await logFormAudit(tx, {
+        formId,
+        actorUserId: session.user.id,
+        action: "FORM_ENTRY_PROMOTED",
+        entityType: "FormEntry",
+        entityId: entryId,
+      });
+    });
+
+    refresh(locale, formId, entryId);
+  });
 }

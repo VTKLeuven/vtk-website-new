@@ -14,7 +14,7 @@ export default async function FormFieldsPage({
   const { locale: localeParam, formId } = await params;
   if (!hasLocale(localeParam)) notFound();
   const locale: AdminLocale = localeParam;
-  await requireFormCapability(formId, "MANAGE_FORM");
+  const { form } = await requireFormCapability(formId, "MANAGE_FORM");
 
   const [sections, fields] = await Promise.all([
     prisma.formSection.findMany({ where: { formId }, orderBy: { sortOrder: "asc" } }),
@@ -47,6 +47,9 @@ export default async function FormFieldsPage({
       labelEn: option.labelEn,
       quotaLimit: option.quotaLimit,
       quotaUsed: option.quotaUsed,
+      allowWaitlist: option.allowWaitlist,
+      nextSectionId: option.nextSectionId,
+      endsForm: option.endsForm,
       archivedAt: option.archivedAt?.toISOString() ?? null,
     })),
     conditions: field.conditions.map((condition) => ({
@@ -63,12 +66,15 @@ export default async function FormFieldsPage({
       <SectionManager
         locale={locale}
         formId={formId}
+        stepBySections={form.stepBySections}
         sections={sections.map((section) => ({
           id: section.id,
           titleNl: section.titleNl,
           titleEn: section.titleEn,
           descriptionNl: section.descriptionNl,
           descriptionEn: section.descriptionEn,
+          nextSectionId: section.nextSectionId,
+          endsForm: section.endsForm,
           fieldCount: fields.filter(
             (field) => field.sectionId === section.id && !field.archivedAt
           ).length,
@@ -83,6 +89,7 @@ export default async function FormFieldsPage({
           titleEn: section.titleEn,
         }))}
         fields={editorFields}
+        branching={{ enabled: form.stepBySections }}
       />
     </div>
   );

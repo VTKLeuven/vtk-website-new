@@ -15,6 +15,8 @@ type Section = {
   titleEn: string | null;
   descriptionNl: string | null;
   descriptionEn: string | null;
+  nextSectionId: string | null;
+  endsForm: boolean;
   fieldCount: number;
 };
 
@@ -24,6 +26,8 @@ type SectionDraft = {
   titleEn: string;
   descriptionNl: string;
   descriptionEn: string;
+  nextSectionId: string | null;
+  endsForm: boolean;
 };
 
 /**
@@ -34,10 +38,13 @@ export function SectionManager({
   locale,
   formId,
   sections,
+  stepBySections,
 }: {
   locale: AdminLocale;
   formId: string;
   sections: Section[];
+  /** Sprongen instellen heeft enkel zin wanneer de secties stap voor stap komen. */
+  stepBySections: boolean;
 }) {
   const nl = locale === "nl";
   const showToast = useToast();
@@ -52,10 +59,19 @@ export function SectionManager({
         titleEn: current.titleEn || null,
         descriptionNl: current.descriptionNl || null,
         descriptionEn: current.descriptionEn || null,
+        nextSectionId: current.nextSectionId,
+        endsForm: current.endsForm,
       });
       if (state.status === "error") {
         showToast({
-          message: nl ? "Sectie opslaan is niet gelukt." : "Saving the section failed.",
+          message:
+            state.code === "SECTION_LOOP"
+              ? nl
+                ? "Die sprong maakt een kring: de bezoeker zou er niet meer uit geraken."
+                : "That jump creates a loop: the visitor would never get out."
+              : nl
+                ? "Sectie opslaan is niet gelukt."
+                : "Saving the section failed.",
           variant: "error",
           duration: 0,
         });
@@ -94,6 +110,14 @@ export function SectionManager({
                   <p className="ticket-admin-row-meta">
                     {section.fieldCount} {nl ? "velden" : "fields"}
                     {section.titleEn ? "" : ` · ${nl ? "geen vertaling" : "no translation"}`}
+                    {stepBySections && section.endsForm
+                      ? ` · ${nl ? "eindigt hier" : "ends here"}`
+                      : stepBySections && section.nextSectionId
+                        ? ` · ${nl ? "springt naar" : "jumps to"} ${
+                            sections.find((other) => other.id === section.nextSectionId)?.titleNl ??
+                            "?"
+                          }`
+                        : ""}
                   </p>
                 </div>
                 <div className="ticket-admin-row-actions">
@@ -107,6 +131,8 @@ export function SectionManager({
                         titleEn: section.titleEn ?? "",
                         descriptionNl: section.descriptionNl ?? "",
                         descriptionEn: section.descriptionEn ?? "",
+                        nextSectionId: section.nextSectionId,
+                        endsForm: section.endsForm,
                       })
                     }
                   >
@@ -184,6 +210,39 @@ export function SectionManager({
               />
             </div>
           </div>
+          {stepBySections ? (
+            <div className="ticket-admin-field">
+              <label htmlFor="section-next">{nl ? "Ga hierna naar" : "Then go to"}</label>
+              <select
+                id="section-next"
+                value={draft.endsForm ? "__end" : draft.nextSectionId ?? ""}
+                onChange={(event) => {
+                  const chosen = event.target.value;
+                  setDraft({
+                    ...draft,
+                    endsForm: chosen === "__end",
+                    nextSectionId: chosen === "__end" || !chosen ? null : chosen,
+                  });
+                }}
+              >
+                <option value="">{nl ? "de volgende sectie" : "the next section"}</option>
+                {sections
+                  .filter((section) => section.id !== draft.id)
+                  .map((section) => (
+                    <option key={section.id} value={section.id}>
+                      {locale === "en" && section.titleEn ? section.titleEn : section.titleNl}
+                    </option>
+                  ))}
+                <option value="__end">{nl ? "het einde van het formulier" : "the end of the form"}</option>
+              </select>
+              <span className="ticket-admin-help">
+                {nl
+                  ? "Dit is het standaardvervolg. Een antwoord met een eigen sprong (bij Velden) gaat hierop voor."
+                  : "This is the default. An answer with its own jump (under Fields) takes precedence."}
+              </span>
+            </div>
+          ) : null}
+
           <div className="ticket-admin-row-actions">
             <Button
               type="button"
@@ -202,7 +261,15 @@ export function SectionManager({
           className="ticket-admin-button"
           type="button"
           onClick={() =>
-            setDraft({ id: null, titleNl: "", titleEn: "", descriptionNl: "", descriptionEn: "" })
+            setDraft({
+              id: null,
+              titleNl: "",
+              titleEn: "",
+              descriptionNl: "",
+              descriptionEn: "",
+              nextSectionId: null,
+              endsForm: false,
+            })
           }
         >
           <Plus aria-hidden="true" size={15} />

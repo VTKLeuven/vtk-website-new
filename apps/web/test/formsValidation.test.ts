@@ -253,3 +253,77 @@ describe('opschonen', () => {
     expect(claimedOptionCodes(fields, cleaned)).toEqual(['vroeg', 'laat']);
   });
 });
+
+describe('overgeslagen secties', () => {
+  it('maakt een verplicht veld in een overgeslagen sectie niet verplicht', () => {
+    // Precies hetzelfde principe als bij een verborgen veld: wie die tak nooit
+    // zag, kan er niets aan doen en mag er niet op vastlopen.
+    const result = validateSubmission({
+      fields: [
+        {
+          ...field({ id: 'soort', type: 'SINGLE_CHOICE', options: [{ code: 'lid' }, { code: 'gast' }] }),
+          sectionId: 'intro',
+        },
+        { ...field({ id: 'lidnummer', required: true }), sectionId: 'leden' },
+        { ...field({ id: 'gastnaam', required: true }), sectionId: 'gasten' },
+      ],
+      conditions: [],
+      answers: { soort: { options: ['gast'] }, gastnaam: { text: 'Marie' } },
+      sections: [
+        { id: 'intro', sortOrder: 0, nextSectionId: null, endsForm: false },
+        { id: 'leden', sortOrder: 1, nextSectionId: null, endsForm: false },
+        { id: 'gasten', sortOrder: 2, nextSectionId: null, endsForm: false },
+      ],
+      branchOptions: [
+        { fieldId: 'soort', code: 'gast', nextSectionId: 'gasten', endsForm: false },
+        { fieldId: 'soort', code: 'lid', nextSectionId: 'leden', endsForm: false },
+      ],
+    });
+
+    expect(result.errors).toEqual({});
+    expect(result.cleaned.gastnaam).toEqual({ text: 'Marie' });
+  });
+
+  it('bewaart geen antwoord uit een sectie die niet bezocht werd', () => {
+    const result = validateSubmission({
+      fields: [
+        {
+          ...field({ id: 'soort', type: 'SINGLE_CHOICE', options: [{ code: 'lid' }, { code: 'gast' }] }),
+          sectionId: 'intro',
+        },
+        { ...field({ id: 'lidnummer' }), sectionId: 'leden' },
+      ],
+      conditions: [],
+      answers: { soort: { options: ['gast'] }, lidnummer: { text: 'r0123456' } },
+      sections: [
+        { id: 'intro', sortOrder: 0, nextSectionId: null, endsForm: false },
+        { id: 'leden', sortOrder: 1, nextSectionId: null, endsForm: false },
+        { id: 'gasten', sortOrder: 2, nextSectionId: null, endsForm: false },
+      ],
+      branchOptions: [{ fieldId: 'soort', code: 'gast', nextSectionId: 'gasten', endsForm: false }],
+    });
+
+    expect(result.cleaned.lidnummer).toBeUndefined();
+  });
+
+  it('negeert alles na een optie die het formulier beëindigt', () => {
+    const result = validateSubmission({
+      fields: [
+        {
+          ...field({ id: 'komt', type: 'SINGLE_CHOICE', options: [{ code: 'ja' }, { code: 'nee' }] }),
+          sectionId: 'intro',
+        },
+        { ...field({ id: 'menu', required: true }), sectionId: 'details' },
+      ],
+      conditions: [],
+      answers: { komt: { options: ['nee'] } },
+      sections: [
+        { id: 'intro', sortOrder: 0, nextSectionId: null, endsForm: false },
+        { id: 'details', sortOrder: 1, nextSectionId: null, endsForm: false },
+      ],
+      branchOptions: [{ fieldId: 'komt', code: 'nee', nextSectionId: null, endsForm: true }],
+    });
+
+    expect(result.errors).toEqual({});
+  });
+});

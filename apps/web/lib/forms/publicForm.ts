@@ -19,6 +19,7 @@ export type FormAvailability =
   | "NOT_OPEN_YET"
   | "CLOSED"
   | "FULL"
+  | "WAITLIST"
   | "MEMBERS_ONLY"
   | "ALREADY_SUBMITTED"
   | "LANGUAGE_UNAVAILABLE";
@@ -46,7 +47,7 @@ export async function loadPublicForm(slug: string) {
   if (!form) return null;
 
   const submittedCount = await prisma.formEntry.count({
-    where: { formId: form.id, status: "SUBMITTED", isTest: false },
+    where: { formId: form.id, status: "SUBMITTED", isTest: false, waitlisted: false },
   });
 
   return { ...form, submittedCount };
@@ -71,6 +72,7 @@ export function toPublicFields(form: PublicFormData, locale: Locale) {
       labelNl: option.labelNl,
       labelEn: option.labelEn,
       soldOut: option.quotaLimit != null && option.quotaUsed >= option.quotaLimit,
+      waitlist: option.allowWaitlist,
       // Enkel tonen wanneer het krap wordt; "nog 97 plaatsen" is ruis.
       remaining:
         option.quotaLimit != null && option.quotaLimit - option.quotaUsed <= 10
@@ -123,6 +125,7 @@ export function formAvailability(
     opensAt: Date | null;
     closesAt: Date | null;
     maxEntries: number | null;
+    allowWaitlist: boolean;
     localeMode: string;
     allowMultipleSubmissions: boolean;
     submittedCount: number;
@@ -139,7 +142,11 @@ export function formAvailability(
   // Wie al indiende ziet dat liever dan "vol": het is een ander verhaal, ook
   // wanneer het formulier toevallig tegelijk vol zit.
   if (!form.allowMultipleSubmissions && context.ownEntries > 0) return "ALREADY_SUBMITTED";
-  if (form.maxEntries != null && form.submittedCount >= form.maxEntries) return "FULL";
+  if (form.maxEntries != null && form.submittedCount >= form.maxEntries) {
+    // Vol met een wachtlijst is niet hetzelfde als dicht: invullen kan nog,
+    // maar de bezoeker hoort te weten waar hij aan begint.
+    return form.allowWaitlist ? "WAITLIST" : "FULL";
+  }
   return "OPEN";
 }
 

@@ -24,6 +24,8 @@ export type PublicFormOption = {
   labelEn: string | null;
   /** Vol: de optie blijft zichtbaar maar is niet meer te kiezen. */
   soldOut?: boolean;
+  /** Vol én met een wachtlijst: dan blijft ze wél kiesbaar. */
+  waitlist?: boolean;
   remaining?: number | null;
 };
 
@@ -238,9 +240,21 @@ export function FormFieldInput({
         >
           <option value="">{locale === "nl" ? "Maak een keuze" : "Choose an option"}</option>
           {options.map((option) => (
-            <option key={option.id} value={option.code} disabled={option.soldOut}>
+            <option
+              key={option.id}
+              value={option.code}
+              disabled={option.soldOut && !option.waitlist}
+            >
               {pickText(option.labelNl, option.labelEn, locale)}
-              {option.soldOut ? (locale === "nl" ? " (volzet)" : " (full)") : ""}
+              {option.soldOut
+                ? option.waitlist
+                  ? locale === "nl"
+                    ? " (volzet, wachtlijst)"
+                    : " (full, waiting list)"
+                  : locale === "nl"
+                    ? " (volzet)"
+                    : " (full)"
+                : ""}
             </option>
           ))}
         </select>
@@ -261,15 +275,19 @@ export function FormFieldInput({
             <label
               key={option.id}
               className="vtk-form-check"
-              data-disabled={option.soldOut || undefined}
+              data-disabled={(option.soldOut && !option.waitlist) || undefined}
             >
               <input
                 type={multiple ? "checkbox" : "radio"}
                 name={inputId}
                 value={option.code}
                 // Wie de optie al aanduidde voor ze volliep, mag ze houden;
-                // anders verliest hij bij het bewerken stil zijn keuze.
-                disabled={disabled || (option.soldOut && !selected.includes(option.code))}
+                // anders verliest hij bij het bewerken stil zijn keuze. Met een
+                // wachtlijst blijft ze sowieso kiesbaar.
+                disabled={
+                  disabled ||
+                  (option.soldOut && !option.waitlist && !selected.includes(option.code))
+                }
                 checked={selected.includes(option.code)}
                 onChange={(event) => {
                   if (!multiple) {
@@ -286,7 +304,13 @@ export function FormFieldInput({
                 {pickText(option.labelNl, option.labelEn, locale)}
                 {option.soldOut ? (
                   <em className="vtk-form-soldout">
-                    {locale === "nl" ? "volzet" : "full"}
+                    {option.waitlist
+                      ? locale === "nl"
+                        ? "volzet, wachtlijst"
+                        : "full, waiting list"
+                      : locale === "nl"
+                        ? "volzet"
+                        : "full"}
                   </em>
                 ) : option.remaining != null ? (
                   <em className="vtk-form-remaining">

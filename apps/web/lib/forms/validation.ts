@@ -12,6 +12,12 @@ import {
   type AnswerValue,
   type VisibilityCondition,
 } from "./visibility";
+import {
+  fieldsOnPath,
+  sectionPath,
+  type BranchOption,
+  type BranchSection,
+} from "./branching";
 
 /**
  * De serverside waarheid over een inzending.
@@ -29,6 +35,9 @@ export type ValidationField = {
   required: boolean;
   config: unknown;
   options: Array<{ code: string; archivedAt?: Date | string | null }>;
+  /** Nodig om te weten of dit veld op het gelopen pad ligt; null = losse vraag. */
+  sectionId?: string | null;
+  sortOrder?: number;
 };
 
 export type ValidationInput = {
@@ -37,6 +46,13 @@ export type ValidationInput = {
   answers: Readonly<Record<string, AnswerValue>>;
   /** Aantal geüploade bestanden per veld; de upload zelf is al gebeurd. */
   fileCounts?: Readonly<Record<string, { count: number; extensions: string[] }>>;
+  /**
+   * Secties en hun sprongen. Meegeven zorgt dat velden in een overgeslagen
+   * sectie behandeld worden als verborgen: niet verplicht, en hun antwoord
+   * wordt niet bewaard. Weglaten betekent: alle secties tellen mee.
+   */
+  sections?: readonly BranchSection[];
+  branchOptions?: readonly BranchOption[];
 };
 
 export type ValidationResult = {
@@ -205,6 +221,28 @@ export function validateSubmission(input: ValidationInput): ValidationResult {
     input.conditions,
     input.answers
   );
+
+  // Een overgeslagen sectie telt als onzichtbaar. Zonder dit zou een verplichte
+  // vraag uit een tak die de bezoeker nooit zag, het indienen blokkeren.
+  if (input.sections && input.sections.length > 0) {
+    const branchFields = input.fields.map((field) => ({
+      id: field.id,
+      type: field.type,
+      sectionId: field.sectionId ?? null,
+      sortOrder: field.sortOrder ?? 0,
+    }));
+    const path = sectionPath(
+      input.sections,
+      branchFields,
+      input.branchOptions ?? [],
+      input.answers,
+      visible
+    );
+    const onPath = fieldsOnPath(branchFields, path);
+    for (const field of input.fields) {
+      if (!onPath.has(field.id)) visible.delete(field.id);
+    }
+  }
 
   const errors: Record<string, string> = {};
   const cleaned: Record<string, AnswerValue> = {};

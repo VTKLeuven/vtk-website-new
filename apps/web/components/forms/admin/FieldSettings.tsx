@@ -11,7 +11,13 @@ import {
   type FormFieldConfig,
 } from "@/lib/forms/schema";
 import type { AdminLocale } from "./format";
-import type { EditorCondition, EditorField, EditorSection, FieldDraft } from "./FieldEditor";
+import type {
+  BranchingContext,
+  EditorCondition,
+  EditorField,
+  EditorSection,
+  FieldDraft,
+} from "./FieldEditor";
 
 export const TYPE_GROUPS = [
   {
@@ -65,6 +71,7 @@ export function FieldSettings({
   draft,
   sections,
   otherFields,
+  branching,
   answerCount,
   pending,
   onChange,
@@ -75,6 +82,7 @@ export function FieldSettings({
   draft: FieldDraft;
   sections: EditorSection[];
   otherFields: EditorField[];
+  branching: BranchingContext;
   answerCount: number;
   pending: boolean;
   onChange: (next: FieldDraft) => void;
@@ -98,8 +106,8 @@ export function FieldSettings({
       config: parseFieldConfig(type, config),
       options: isChoiceType(type) && draft.options.length === 0
         ? [
-            { id: null, code: null, labelNl: "", labelEn: "", quotaLimit: null, quotaUsed: 0 },
-            { id: null, code: null, labelNl: "", labelEn: "", quotaLimit: null, quotaUsed: 0 },
+            { id: null, code: null, labelNl: "", labelEn: "", quotaLimit: null, quotaUsed: 0, allowWaitlist: false, nextSectionId: null, endsForm: false },
+            { id: null, code: null, labelNl: "", labelEn: "", quotaLimit: null, quotaUsed: 0, allowWaitlist: false, nextSectionId: null, endsForm: false },
           ]
         : draft.options,
     });
@@ -490,6 +498,50 @@ export function FieldSettings({
                 >
                   <Trash2 size={16} aria-hidden="true" />
                 </IconButton>
+
+                <div className="form-admin-option-extras">
+                  {option.quotaLimit != null ? (
+                    <label className="ticket-admin-check">
+                      <input
+                        type="checkbox"
+                        checked={option.allowWaitlist}
+                        onChange={(event) => {
+                          const next = [...draft.options];
+                          next[index] = { ...option, allowWaitlist: event.target.checked };
+                          onChange({ ...draft, options: next });
+                        }}
+                      />
+                      {nl ? "Wachtlijst als deze vol zit" : "Waiting list when full"}
+                    </label>
+                  ) : null}
+
+                  {branching.enabled && sections.length > 0 ? (
+                    <label className="form-admin-option-jump">
+                      <span>{nl ? "Ga daarna naar" : "Then go to"}</span>
+                      <select
+                        value={option.endsForm ? "__end" : option.nextSectionId ?? ""}
+                        onChange={(event) => {
+                          const chosen = event.target.value;
+                          const next = [...draft.options];
+                          next[index] = {
+                            ...option,
+                            endsForm: chosen === "__end",
+                            nextSectionId: chosen === "__end" || !chosen ? null : chosen,
+                          };
+                          onChange({ ...draft, options: next });
+                        }}
+                      >
+                        <option value="">{nl ? "de volgende sectie" : "the next section"}</option>
+                        {sections.map((section) => (
+                          <option key={section.id} value={section.id}>
+                            {locale === "en" && section.titleEn ? section.titleEn : section.titleNl}
+                          </option>
+                        ))}
+                        <option value="__end">{nl ? "het einde van het formulier" : "the end of the form"}</option>
+                      </select>
+                    </label>
+                  ) : null}
+                </div>
               </li>
             ))}
           </ul>
@@ -501,7 +553,17 @@ export function FieldSettings({
                 ...draft,
                 options: [
                   ...draft.options,
-                  { id: null, code: null, labelNl: "", labelEn: "", quotaLimit: null, quotaUsed: 0 },
+                  {
+                    id: null,
+                    code: null,
+                    labelNl: "",
+                    labelEn: "",
+                    quotaLimit: null,
+                    quotaUsed: 0,
+                    allowWaitlist: false,
+                    nextSectionId: null,
+                    endsForm: false,
+                  },
                 ],
               })
             }
