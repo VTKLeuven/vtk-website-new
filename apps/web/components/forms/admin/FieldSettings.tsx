@@ -411,6 +411,8 @@ export function FieldSettings({
                 setConfig({ profileField: event.target.value as FormFieldConfig["profileField"] })
               }
             >
+              <option value="NAME">{nl ? "Naam" : "Name"}</option>
+              <option value="EMAIL">{nl ? "E-mailadres" : "E-mail address"}</option>
               <option value="RNUMBER">{nl ? "R-nummer" : "R-number"}</option>
               <option value="STUDY_PROGRAMME">{nl ? "Studierichting" : "Study programme"}</option>
               <option value="STUDY_YEAR">{nl ? "Studiejaar" : "Study year"}</option>

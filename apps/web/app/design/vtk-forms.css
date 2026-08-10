@@ -185,3 +185,220 @@
   border-radius: 16px;
   background: var(--paper);
 }
+
+/* Publieke formulierpagina ---------------------------------------------------- */
+
+.vtk-form-page {
+  max-width: 820px;
+  margin: 0 auto;
+  padding: 40px 20px 72px;
+  display: grid;
+  gap: 24px;
+}
+
+.vtk-form-section {
+  display: grid;
+  gap: 18px;
+  padding-top: 8px;
+  border-top: 1px solid var(--line);
+}
+
+.vtk-form-section h2 {
+  margin: 0;
+  font-size: 20px;
+  color: var(--ink);
+}
+
+.vtk-form-section-intro {
+  margin: -8px 0 0;
+  color: var(--muted);
+}
+
+.vtk-form-notice {
+  padding: 16px 18px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--surface);
+  display: grid;
+  gap: 8px;
+}
+
+.vtk-form-notice h2 {
+  margin: 0;
+  font-size: 18px;
+}
+
+.vtk-form-notice p {
+  margin: 0;
+  color: var(--body);
+}
+
+/* Een blokkade is geen fout van de bezoeker, dus geen alarmkleur: een gele rail
+   zoals bij een uitgelichte kaart volstaat om ze te laten opvallen. */
+.vtk-form-notice[data-tone="blocked"],
+.vtk-form-notice[data-tone="preview"],
+.vtk-form-notice[data-tone="warning"],
+.vtk-form-notice[data-tone="done"] {
+  box-shadow: inset 3px 0 0 var(--yellow);
+}
+
+.vtk-form-summary {
+  padding: 12px 16px;
+  border-radius: 12px;
+  background: var(--paper-2);
+  box-shadow: inset 3px 0 0 var(--yellow);
+  font-weight: 600;
+}
+
+.vtk-form-deadline {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.vtk-form-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+}
+
+.vtk-form-login {
+  display: inline-flex;
+  align-items: center;
+  padding: 10px 18px;
+  border-radius: 999px;
+  background: var(--ink);
+  color: var(--paper);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.vtk-form-empty {
+  color: var(--muted);
+}
+
+.vtk-form-index {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 14px;
+}
+
+.vtk-form-index a {
+  display: block;
+  padding: 18px 20px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: var(--surface);
+  color: inherit;
+  text-decoration: none;
+}
+
+.vtk-form-index a:hover {
+  background: var(--paper-2);
+}
+
+.vtk-form-index h2 {
+  margin: 0 0 6px;
+  font-size: 18px;
+}
+
+.vtk-form-index p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.vtk-form-index-meta {
+  margin-top: 8px !important;
+  font-weight: 600;
+}
+
+/* Bestanden ------------------------------------------------------------------- */
+
+.vtk-form-files {
+  display: grid;
+  gap: 10px;
+}
+
+.vtk-form-file-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+}
+
+.vtk-form-file-list > li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface);
+  font-size: 14px;
+}
+
+.vtk-form-file-list small {
+  color: var(--muted);
+  margin-left: auto;
+}
+
+.vtk-form-file-button {
+  justify-self: start;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 16px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.vtk-form-file-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.vtk-form-progress,
+.vtk-form-progress-summary {
+  display: grid;
+  gap: 6px;
+}
+
+.vtk-form-progress p,
+.vtk-form-progress-summary p {
+  margin: 0;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+/* De native progress blijft in de boom staan voor screenreaders, maar de balk
+   die je ziet is de div eronder; die volgt de tokens. */
+.vtk-form-progress progress {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+}
+
+.vtk-form-progress-bar {
+  height: 8px;
+  border-radius: 999px;
+  background: var(--paper-2);
+  overflow: hidden;
+}
+
+.vtk-form-progress-bar > span {
+  display: block;
+  height: 100%;
+  background: var(--yellow);
+  transition: width 0.2s ease;
+}

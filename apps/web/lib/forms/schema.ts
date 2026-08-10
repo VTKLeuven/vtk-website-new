@@ -42,7 +42,13 @@ export function isMultiChoiceType(type: string): boolean {
   return type === "MULTIPLE_CHOICE";
 }
 
-export const PROFILE_FIELDS = ["RNUMBER", "STUDY_PROGRAMME", "STUDY_YEAR"] as const;
+export const PROFILE_FIELDS = [
+  "NAME",
+  "EMAIL",
+  "RNUMBER",
+  "STUDY_PROGRAMME",
+  "STUDY_YEAR",
+] as const;
 export type ProfileField = (typeof PROFILE_FIELDS)[number];
 
 /**
