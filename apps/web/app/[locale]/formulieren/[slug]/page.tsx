@@ -103,10 +103,12 @@ function reasonCopy(
 
 export default async function PublicFormPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ locale: string; slug: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  const { locale: localeParam, slug } = await params;
+  const [{ locale: localeParam, slug }, prefill] = await Promise.all([params, searchParams]);
   if (!hasLocale(localeParam)) notFound();
   const locale: Locale = localeParam;
   const nl = locale === "nl";
@@ -212,6 +214,43 @@ export default async function PublicFormPage({
                 : profile?.studyYears?.[0] ?? null;
       if (value) initialAnswers[field.id] = { text: String(value) };
     }
+  }
+
+  // Prefill-links: /formulieren/<slug>?shift=vroeg vult dat veld alvast in, om
+  // een half ingevuld formulier gericht te kunnen delen. Bewust niet voor
+  // bestanden en toestemming: die moet de bezoeker zelf geven, en een vinkje
+  // dat via een link al aanstaat is geen toestemming.
+  for (const field of form.fields) {
+    if (initialAnswers[field.id]) continue;
+    if (field.type === "FILE" || field.type === "CONSENT") continue;
+    const raw = prefill[field.code];
+    const given = (Array.isArray(raw) ? raw[0] : raw)?.slice(0, 500);
+    if (!given) continue;
+
+    if (field.options.length > 0) {
+      // Enkel een optie die echt bestaat; anders staat er een keuze aangeduid
+      // die de bezoeker niet in de lijst ziet.
+      const chosen = given
+        .split(",")
+        .map((code) => code.trim())
+        .filter((code) => field.options.some((option) => option.code === code));
+      if (chosen.length > 0) {
+        initialAnswers[field.id] = {
+          options: field.type === "MULTIPLE_CHOICE" ? chosen : chosen.slice(0, 1),
+        };
+      }
+      continue;
+    }
+    if (field.type === "NUMBER" || field.type === "SCALE") {
+      const number = Number(given);
+      if (Number.isFinite(number)) initialAnswers[field.id] = { number };
+      continue;
+    }
+    if (field.type === "BOOLEAN") {
+      initialAnswers[field.id] = { checked: given === "1" || given === "true" };
+      continue;
+    }
+    initialAnswers[field.id] = { text: given };
   }
 
   return (

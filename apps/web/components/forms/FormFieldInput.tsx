@@ -291,8 +291,8 @@ export function FormFieldInput({
                 ) : option.remaining != null ? (
                   <em className="vtk-form-remaining">
                     {locale === "nl"
-                      ? `nog ${option.remaining} plaatsen`
-                      : `${option.remaining} spots left`}
+                      ? `nog ${option.remaining} ${option.remaining === 1 ? "plaats" : "plaatsen"}`
+                      : `${option.remaining} ${option.remaining === 1 ? "spot" : "spots"} left`}
                   </em>
                 ) : null}
               </span>
