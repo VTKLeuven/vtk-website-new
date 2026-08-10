@@ -35,6 +35,7 @@ export type EditorOption = {
   labelEn: string | null;
   quotaLimit: number | null;
   quotaUsed: number;
+  answerCount: number;
   allowWaitlist: boolean;
   nextSectionId: string | null;
   endsForm: boolean;
@@ -97,6 +98,7 @@ export type FieldDraft = {
     labelEn: string;
     quotaLimit: number | null;
     quotaUsed: number;
+    answerCount: number;
     allowWaitlist: boolean;
     nextSectionId: string | null;
     endsForm: boolean;
@@ -124,6 +126,7 @@ function toDraft(field: EditorField): FieldDraft {
         labelEn: option.labelEn ?? "",
         quotaLimit: option.quotaLimit,
         quotaUsed: option.quotaUsed,
+        answerCount: option.answerCount,
         allowWaitlist: option.allowWaitlist,
         nextSectionId: option.nextSectionId,
         endsForm: option.endsForm,
@@ -145,8 +148,8 @@ function emptyDraft(type: string, sectionId: string | null): FieldDraft {
     config: parseFieldConfig(type, {}),
     options: isChoiceType(type)
       ? [
-          { id: null, code: null, labelNl: "", labelEn: "", quotaLimit: null, quotaUsed: 0, allowWaitlist: false, nextSectionId: null, endsForm: false },
-          { id: null, code: null, labelNl: "", labelEn: "", quotaLimit: null, quotaUsed: 0, allowWaitlist: false, nextSectionId: null, endsForm: false },
+          { id: null, code: null, labelNl: "", labelEn: "", quotaLimit: null, quotaUsed: 0, answerCount: 0, allowWaitlist: false, nextSectionId: null, endsForm: false },
+          { id: null, code: null, labelNl: "", labelEn: "", quotaLimit: null, quotaUsed: 0, answerCount: 0, allowWaitlist: false, nextSectionId: null, endsForm: false },
         ]
       : [],
     conditions: [],
@@ -602,4 +605,3 @@ export function FieldEditor({
     </div>
   );
 }
-

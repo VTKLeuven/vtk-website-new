@@ -5,6 +5,7 @@ import { requireFormCapability } from "@/lib/forms/authorization";
 import { FieldEditor, type EditorField } from "@/components/forms/admin/FieldEditor";
 import { SectionManager } from "@/components/forms/admin/SectionManager";
 import type { AdminLocale } from "@/components/forms/admin/format";
+import { optionAnswerCounts } from "@/lib/forms/optionAnswerCounts";
 
 export default async function FormFieldsPage({
   params,
@@ -16,7 +17,7 @@ export default async function FormFieldsPage({
   const locale: AdminLocale = localeParam;
   const { form } = await requireFormCapability(formId, "MANAGE_FORM");
 
-  const [sections, fields] = await Promise.all([
+  const [sections, fields, optionAnswers] = await Promise.all([
     prisma.formSection.findMany({ where: { formId }, orderBy: { sortOrder: "asc" } }),
     prisma.formField.findMany({
       where: { formId },
@@ -27,7 +28,13 @@ export default async function FormFieldsPage({
       },
       orderBy: { sortOrder: "asc" },
     }),
+    prisma.formAnswer.findMany({
+      where: { formId },
+      select: { fieldId: true, valueOptions: true },
+    }),
   ]);
+
+  const answerCounts = optionAnswerCounts(optionAnswers);
 
   const editorFields: EditorField[] = fields.map((field) => ({
     id: field.id,
@@ -47,6 +54,7 @@ export default async function FormFieldsPage({
       labelEn: option.labelEn,
       quotaLimit: option.quotaLimit,
       quotaUsed: option.quotaUsed,
+      answerCount: answerCounts.get(field.id)?.get(option.code) ?? 0,
       allowWaitlist: option.allowWaitlist,
       nextSectionId: option.nextSectionId,
       endsForm: option.endsForm,

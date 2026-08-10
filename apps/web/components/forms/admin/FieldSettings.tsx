@@ -1,7 +1,8 @@
 "use client";
 
+import { useState } from "react";
 import { Plus, Trash2 } from "lucide-react";
-import { Button } from "@vtk/ui";
+import { Button, ConfirmDialog } from "@vtk/ui";
 import { IconButton } from "@/components/ui/IconButton";
 import { StorageImageField } from "@/components/admin/StorageImageField";
 import {
@@ -94,6 +95,17 @@ export function FieldSettings({
 }) {
   const nl = locale === "nl";
   const config = draft.config;
+  const [removingOption, setRemovingOption] = useState<number | null>(null);
+  const optionToRemove =
+    removingOption === null ? null : draft.options[removingOption] ?? null;
+
+  function removeOption(index: number) {
+    onChange({
+      ...draft,
+      options: draft.options.filter((_, position) => position !== index),
+    });
+    setRemovingOption(null);
+  }
 
   function setConfig(patch: Partial<FormFieldConfig>) {
     onChange({ ...draft, config: { ...config, ...patch } });
@@ -109,8 +121,8 @@ export function FieldSettings({
       config: parseFieldConfig(type, config),
       options: isChoiceType(type) && draft.options.length === 0
         ? [
-            { id: null, code: null, labelNl: "", labelEn: "", quotaLimit: null, quotaUsed: 0, allowWaitlist: false, nextSectionId: null, endsForm: false },
-            { id: null, code: null, labelNl: "", labelEn: "", quotaLimit: null, quotaUsed: 0, allowWaitlist: false, nextSectionId: null, endsForm: false },
+            { id: null, code: null, labelNl: "", labelEn: "", quotaLimit: null, quotaUsed: 0, answerCount: 0, allowWaitlist: false, nextSectionId: null, endsForm: false },
+            { id: null, code: null, labelNl: "", labelEn: "", quotaLimit: null, quotaUsed: 0, answerCount: 0, allowWaitlist: false, nextSectionId: null, endsForm: false },
           ]
         : draft.options,
     });
@@ -499,10 +511,10 @@ export function FieldSettings({
                   }}
                 />
                 <span className="form-admin-option-used">
-                  {option.quotaUsed > 0
+                  {option.answerCount > 0
                     ? nl
-                      ? `${option.quotaUsed} gekozen`
-                      : `${option.quotaUsed} chosen`
+                      ? `gekozen door ${option.answerCount} ${option.answerCount === 1 ? "inzending" : "inzendingen"}`
+                      : `chosen by ${option.answerCount} ${option.answerCount === 1 ? "entry" : "entries"}`
                     : ""}
                 </span>
                 <IconButton
@@ -510,10 +522,9 @@ export function FieldSettings({
                   srLabel={`${nl ? "Optie verwijderen" : "Remove option"}: ${option.labelNl || index + 1}`}
                   tone="danger"
                   onClick={() =>
-                    onChange({
-                      ...draft,
-                      options: draft.options.filter((_, position) => position !== index),
-                    })
+                    option.answerCount > 0
+                      ? setRemovingOption(index)
+                      : removeOption(index)
                   }
                 >
                   <Trash2 size={16} aria-hidden="true" />
@@ -580,6 +591,7 @@ export function FieldSettings({
                     labelEn: "",
                     quotaLimit: null,
                     quotaUsed: 0,
+                    answerCount: 0,
                     allowWaitlist: false,
                     nextSectionId: null,
                     endsForm: false,
@@ -634,6 +646,25 @@ export function FieldSettings({
             </div>
           ) : null}
         </fieldset>
+      ) : null}
+
+      {optionToRemove ? (
+        <ConfirmDialog
+          open
+          title={nl ? "Gekozen optie van het formulier halen?" : "Remove selected option from the form?"}
+          description={
+            nl
+              ? `Deze optie verdwijnt van het formulier. Ze werd gekozen door ${optionToRemove.answerCount} ${optionToRemove.answerCount === 1 ? "inzending" : "inzendingen"}; die bestaande antwoorden blijven bewaard en blijven in de export staan.`
+              : `This option disappears from the form. It was selected by ${optionToRemove.answerCount} ${optionToRemove.answerCount === 1 ? "entry" : "entries"}; those existing answers are kept and remain in exports.`
+          }
+          confirmLabel={nl ? "Van formulier halen" : "Remove from form"}
+          cancelLabel={nl ? "Annuleren" : "Cancel"}
+          pending={false}
+          onConfirm={() => {
+            if (removingOption !== null) removeOption(removingOption);
+          }}
+          onCancel={() => setRemovingOption(null)}
+        />
       ) : null}
 
       <ConditionEditor
