@@ -53,7 +53,10 @@ export async function POST(request: Request) {
     hasPermission(session, "partners.manage") ||
     hasPermission(session, "calendar.create") ||
     hasPermission(session, "calendar.manageAll") ||
-    hasPermission(session, "werkgroepen.manage");
+    hasPermission(session, "werkgroepen.manage") ||
+    // Theokot beheert de foto per broodje in de eigen aanbod-editor; zonder dit
+    // recht ziet een beheerder daar een uploadknop die altijd faalt.
+    hasPermission(session, "theokot.manage");
 
   // Een formuliermanager heeft niet noodzakelijk een globale uploadpermissie.
   // De meegestuurde formulier-id geeft enkel toegang tot een afbeelding voor

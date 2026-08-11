@@ -1745,6 +1745,9 @@ model TheokotProduct {
   priceCents          Int
   defaultQuantity     Int      @default(0)
   isWeeklySpecialSlot Boolean  @default(false) // "broodje van de week"-slot
+  imageKey            String? // optionele foto; NULL = gestreept patroon
+  ingredientsNl       String? // optionele ingrediëntenlijst (info-icoontje)
+  ingredientsEn       String?
   order               Int      @default(0)
   active              Boolean  @default(true)
   createdAt           DateTime @default(now())
@@ -1788,6 +1791,9 @@ model TheokotSessionItem {
   priceCents      Int
   quantity        Int // beschikbare voorraad voor deze sessie
   isWeeklySpecial Boolean @default(false)
+  imageKey        String? // meegekopieerd uit de catalogus, per dag aanpasbaar
+  ingredientsNl   String?
+  ingredientsEn   String?
   order           Int     @default(0)
 
   session TheokotSession     @relation(fields: [sessionId], references: [id], onDelete: Cascade)

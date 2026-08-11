@@ -146,6 +146,21 @@ halen ze af aan de balie en betalen daar. Post **Theokot** beheert het systeem.
   ('Afhalen vanaf/tot', 'Besteldeadline', 'Bestellen opent') in die voor álle gekozen
   dagen gelden. Dat scheelt werk in weken met een volledig ander aanbod. **Nadien** kan
   je nog steeds per dag bijsturen (uren, open/dicht, aanbod).
+- **Foto en ingrediënten per broodje zijn optioneel.** Beheer ze in dezelfde
+  aanbod-editor (uitklap "Foto & ingrediënten" per rij), zowel op het standaardaanbod
+  als per verkoopdag. Een broodje zonder foto toont het gestreepte placeholder-patroon
+  van de site in plaats van een gat, want het aanbod raakt in de praktijk maar
+  geleidelijk gefotografeerd. Ingrediënten verschijnen achter een **info-icoontje**
+  naast het broodje; ze staan bewust niet altijd uitgeschreven, anders wordt een lijst
+  van tien broodjes onleesbaar.
+- **De weergave van het aanbod (lijst of raster) is een instelling**, geen vaste keuze
+  in de code: een raster geeft de foto's ruimte, een lijst blijft compacter zolang er
+  weinig foto's zijn. Ze staat bij de overige Theokot-instellingen en geldt voor de
+  hele bestelpagina (`itemLayout`). De standaard is een lijst, zodat een aanbod zonder
+  foto's er niet leger uitziet dan vroeger.
+- **Een foto in de catalogus vervangen verwijdert het oude bestand niet.** De
+  storage-key wordt mee gekopieerd naar de sessie-items van elke week die er al mee
+  aangemaakt is; opruimen zou de foto weghalen bij verkoopdagen die ze nog tonen.
 - **"Broodje van de week"** is gewoon het aanbod-item dat als _weekly special_
   gemarkeerd is (checkbox "V/d week" in de aanbod-editor). De **naam** van dat item is
   wat het die week concreet is (bv. hernoem "Broodje van de week" naar "Broodje kip

@@ -21,6 +21,13 @@ export { brusselsTimeOnDay, brusselsYMD } from './brussels';
 // Configuratie
 // -----------------------------------------------------------------------------
 
+/**
+ * Hoe de broodjes op de bestelpagina getoond worden. Een raster geeft de foto's
+ * ruimte; een lijst blijft compacter wanneer er (nog) geen foto's zijn. De keuze
+ * hoort daarom bij de beheerder en niet bij de code.
+ */
+export type TheokotItemLayout = 'list' | 'grid';
+
 export type TheokotConfig = {
   /** X: maximaal aantal items per bestelling. */
   maxItemsPerOrder: number;
@@ -42,6 +49,8 @@ export type TheokotConfig = {
   noShowThreshold: number;
   /** Duur van een ban in dagen. */
   banDurationDays: number;
+  /** Weergave van het aanbod op de bestelpagina. */
+  itemLayout: TheokotItemLayout;
 };
 
 export const DEFAULT_THEOKOT_CONFIG: TheokotConfig = {
@@ -55,6 +64,7 @@ export const DEFAULT_THEOKOT_CONFIG: TheokotConfig = {
   noShowGraceMinutes: 15,
   noShowThreshold: 3,
   banDurationDays: 14,
+  itemLayout: 'list',
 };
 
 const HHMM = /^([01]\d|2[0-3]):([0-5]\d)$/;
@@ -66,6 +76,11 @@ function coerceInt(value: unknown, fallback: number, min = 0): number {
 
 function coerceTime(value: unknown, fallback: string): string {
   return typeof value === 'string' && HHMM.test(value) ? value : fallback;
+}
+
+/** Leest de weergavekeuze; alles wat geen geldige waarde is valt terug op de default. */
+export function coerceItemLayout(value: unknown, fallback: TheokotItemLayout = 'list'): TheokotItemLayout {
+  return value === 'grid' || value === 'list' ? value : fallback;
 }
 
 /** Leest een (mogelijk gedeeltelijke of ongeldige) Setting-waarde uit en vult aan met defaults. */
@@ -83,6 +98,7 @@ export function parseTheokotConfig(value: unknown): TheokotConfig {
     noShowGraceMinutes: coerceInt(src.noShowGraceMinutes, d.noShowGraceMinutes, 0),
     noShowThreshold: coerceInt(src.noShowThreshold, d.noShowThreshold, 1),
     banDurationDays: coerceInt(src.banDurationDays, d.banDurationDays, 1),
+    itemLayout: coerceItemLayout(src.itemLayout, d.itemLayout),
   };
 }
 
