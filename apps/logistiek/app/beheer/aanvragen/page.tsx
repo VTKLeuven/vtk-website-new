@@ -4,6 +4,7 @@ import { requireManage } from '@/lib/session';
 import { formatDateOnly, formatEuro, isLastMinute, requesterLabel } from '@/lib/uitleen';
 import {
   adminReservations,
+  conflictingReservationIds,
   getLogistiekSettings,
   type AdminReservation,
 } from '@/lib/uitleen-server';
@@ -85,7 +86,11 @@ export default async function BeheerAanvragenPage({
   const activeSort: SortKey = chosenSort ?? 'pickup';
   const activeDir: SortDir = chosenDir ?? SORTS[activeSort].defaultDir;
 
-  const [all, settings] = await Promise.all([adminReservations(), getLogistiekSettings()]);
+  const [all, settings, conflicting] = await Promise.all([
+    adminReservations(),
+    getLogistiekSettings(),
+    conflictingReservationIds(),
+  ]);
   const reservations = activeTab === 'all' ? all : all.filter((r) => r.requesterType === activeTab);
 
   const open = reservations.filter((r) => r.status === 'REQUESTED');
@@ -132,6 +137,13 @@ export default async function BeheerAanvragenPage({
               {lastMinute ? (
                 <span className="rounded-full bg-red-50 px-2 py-0.5 text-[11px] font-semibold text-red-700">
                   Last minute
+                </span>
+              ) : null}
+              {/* Deze aanvraag past niet naast wat al goedgekeurd is. Altijd
+                  opnieuw berekend: annuleert de andere partij, dan is het weg. */}
+              {conflicting.has(reservation.id) ? (
+                <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-900">
+                  Conflict
                 </span>
               ) : null}
             </p>

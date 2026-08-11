@@ -11,6 +11,7 @@ import {
   describeReservationChanges,
   formatDateTime,
   isOnQuarterHour,
+  parseDateOnly,
   rangesOverlap,
   transportPriceCents,
 } from '@/lib/uitleen';
@@ -20,6 +21,7 @@ import {
   flesserkeReserved,
   isDriver,
   reservedQuantities,
+  reservationConflicts,
   restoreFlesserkeStock,
   searchDriverCandidates,
   syncFlesserkeItemTotals,
@@ -1079,6 +1081,129 @@ export async function adminEditFlesserkeReservationAction(
   revalidateBeheer();
   revalidatePath('/flesserke');
   return { ok: true, message: 'Flesserke-aanvraag bijgewerkt.' };
+}
+
+/**
+ * Wat er zou botsen als deze aanvraag naar die datums verschuift, zonder iets op
+ * te slaan. Voor de knop "past dit?" naast de datumvelden: schuiven zonder te
+ * weten of het helpt, is twee keer schuiven.
+ */
+export async function previewShiftAction(
+  reservationId: string,
+  pickup: string,
+  ret: string
+): Promise<{ ok: true; fits: boolean; detail: string } | { ok: false; error: string }> {
+  await requireManage();
+  const pickupDate = parseDateOnly(pickup);
+  const returnDate = parseDateOnly(ret);
+  if (!pickupDate || !returnDate) return { ok: false, error: 'Kies twee geldige datums.' };
+  if (returnDate < pickupDate) {
+    return { ok: false, error: 'De terugbrengdatum ligt voor de afhaaldatum.' };
+  }
+  const conflicts = await reservationConflicts(reservationId, { pickupDate, returnDate });
+  if (conflicts.length === 0) return { ok: true, fits: true, detail: 'Past in die periode.' };
+  return {
+    ok: true,
+    fits: false,
+    detail: conflicts
+      .map((conflict) => `${conflict.itemName}: ${conflict.requested} gevraagd, ${conflict.available} vrij`)
+      .join('; '),
+  };
+}
+
+/**
+ * Enkel de afhaal- en terugbrengdatum van een aanvraag verzetten.
+ *
+ * Voor twee aanvragen die om hetzelfde materiaal vechten: vaak passen ze samen
+ * na een dag schuiven, en dan is de tweede afwijzen te grof. Dezelfde ingreep als
+ * bij vervoer (V5), maar op dagen in plaats van uren.
+ *
+ * Een goedgekeurde aanvraag mag niet naar een periode schuiven waar ze niet past;
+ * anders schuif je het probleem naar een derde aanvraag. Een aanvraag die nog
+ * beslist moet worden, mag wél in een conflict blijven staan: dat is precies wat
+ * M2 mogelijk maakt, en de harde check bij goedkeuren blijft.
+ */
+export async function shiftReservationDatesAction(
+  _prev: SaveState,
+  formData: FormData
+): Promise<SaveState> {
+  const session = await requireManage();
+
+  const reservationId = String(formData.get('reservationId') ?? '');
+  const pickupDate = parseDateOnly(String(formData.get('pickupDate') ?? ''));
+  const returnDate = parseDateOnly(String(formData.get('returnDate') ?? ''));
+  if (!pickupDate || !returnDate) return saveError('DATE_INVALID');
+  if (returnDate < pickupDate) return saveError('DATE_ORDER');
+
+  const outcome = await runSerializable(
+    async (tx): Promise<{ error: string | null; note?: string }> => {
+      const existing = await tx.uitleenReservation.findUnique({
+        where: { id: reservationId },
+        select: {
+          status: true,
+          pickupDate: true,
+          returnDate: true,
+          lines: { select: { itemId: true, itemName: true, quantity: true } },
+        },
+      });
+      if (!existing) return { error: 'NOT_FOUND' };
+      if (existing.status !== 'REQUESTED' && existing.status !== 'APPROVED') {
+        return { error: 'LOCKED' };
+      }
+      if (
+        existing.pickupDate.getTime() === pickupDate.getTime() &&
+        existing.returnDate.getTime() === returnDate.getTime()
+      ) {
+        return { error: 'UNCHANGED' };
+      }
+
+      if (existing.status === 'APPROVED') {
+        const reserved = await reservedQuantities(tx, pickupDate, returnDate, {
+          excludeReservationId: reservationId,
+        });
+        const items = await tx.uitleenItem.findMany({
+          where: { id: { in: existing.lines.map((line) => line.itemId) } },
+          select: { id: true, quantity: true, name: true },
+        });
+        const byId = new Map(items.map((item) => [item.id, item]));
+        for (const line of existing.lines) {
+          const item = byId.get(line.itemId);
+          const available = (item?.quantity ?? 0) - (reserved.get(line.itemId) ?? 0);
+          if (line.quantity > available) return { error: `STOCK:${item?.name ?? line.itemName}` };
+        }
+      }
+
+      await tx.uitleenReservation.update({
+        where: { id: reservationId },
+        data: { pickupDate, returnDate },
+      });
+      const changes = describeReservationChanges(
+        { pickupDate: existing.pickupDate, returnDate: existing.returnDate, lines: existing.lines },
+        { pickupDate, returnDate, lines: existing.lines }
+      );
+      const note = changes.join('; ');
+      await writeAudit(tx, { reservationId }, {
+        kind: 'EDITED',
+        note,
+        actorId: session.user.id,
+      });
+      return { error: null, note };
+    }
+  );
+
+  if (outcome.error === 'NOT_FOUND') return saveError('NOT_FOUND');
+  if (outcome.error === 'LOCKED') return saveError('LOCKED');
+  if (outcome.error === 'UNCHANGED') return saveError('UNCHANGED');
+  if (outcome.error?.startsWith('STOCK:')) {
+    return saveError('STOCK', `"${outcome.error.slice(6)}" past niet in de nieuwe periode.`);
+  }
+
+  // De aanvrager hoort dit te weten zonder in te loggen; bij een conflict tussen
+  // twee aanvragen verschuif je ze allebei, en dan krijgt elke aanvrager de mail
+  // over zijn eigen aanvraag.
+  await notifyReservation(reservationId, 'EDITED', outcome.note);
+  revalidateBeheer();
+  return saveOk();
 }
 
 export async function adminEditReservationAction(

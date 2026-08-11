@@ -554,6 +554,182 @@ const adminReservationInclude = {
 
 export type AdminReservation = Awaited<ReturnType<typeof adminReservations>>[number];
 
+/**
+ * Een lijn die niet past in de gevraagde periode, met de aanvragen waarmee ze
+ * botst.
+ *
+ * Altijd opnieuw berekend en nooit opgeslagen: een conflict verdwijnt zodra de
+ * andere aanvraag geannuleerd of teruggedraaid wordt, en een opgeslagen vlag zou
+ * dan blijven staan tot iemand ze toevallig aanraakt.
+ */
+export type ReservationConflict = {
+  itemId: string;
+  itemName: string;
+  requested: number;
+  /** Vrij in deze periode, deze aanvraag zelf niet meegerekend. */
+  available: number;
+  clashes: Array<{
+    id: string;
+    eventName: string;
+    quantity: number;
+    pickupDate: Date;
+    returnDate: Date;
+    createdAt: Date;
+    requester: string;
+  }>;
+};
+
+function requesterLabelOf(reservation: {
+  requesterType: string;
+  requesterName: string | null;
+  group: { nameNl: string } | null;
+  user: { name: string };
+}): string {
+  if (reservation.requesterType === 'INTERN' && reservation.group) return reservation.group.nameNl;
+  return reservation.requesterName ?? reservation.user.name;
+}
+
+/**
+ * Welke lijnen van deze aanvraag niet passen, en met welke goedgekeurde
+ * aanvragen ze botsen. Leeg wanneer alles past.
+ *
+ * De aanvraag zelf telt niet mee (ook niet wanneer ze al goedgekeurd is): anders
+ * botst elke goedgekeurde aanvraag met zichzelf.
+ */
+export async function reservationConflicts(
+  reservationId: string,
+  /** Andere datums doorrekenen zonder ze op te slaan, voor de schuif-preview. */
+  override?: { pickupDate: Date; returnDate: Date }
+): Promise<ReservationConflict[]> {
+  const found = await prisma.uitleenReservation.findUnique({
+    where: { id: reservationId },
+    select: {
+      pickupDate: true,
+      returnDate: true,
+      lines: { select: { itemId: true, itemName: true, quantity: true } },
+    },
+  });
+  if (!found || found.lines.length === 0) return [];
+  const reservation = override ? { ...found, ...override } : found;
+
+  const itemIds = reservation.lines.map((line) => line.itemId);
+  const [items, overlapping] = await Promise.all([
+    prisma.uitleenItem.findMany({
+      where: { id: { in: itemIds } },
+      select: { id: true, quantity: true },
+    }),
+    prisma.uitleenReservation.findMany({
+      where: {
+        id: { not: reservationId },
+        status: { in: STOCK_CONSUMING_STATUSES },
+        pickupDate: { lte: reservation.returnDate },
+        returnDate: { gte: reservation.pickupDate },
+        lines: { some: { itemId: { in: itemIds } } },
+      },
+      select: {
+        id: true,
+        eventName: true,
+        pickupDate: true,
+        returnDate: true,
+        createdAt: true,
+        requesterType: true,
+        requesterName: true,
+        group: { select: { nameNl: true } },
+        user: { select: { name: true } },
+        lines: { select: { itemId: true, quantity: true } },
+      },
+      orderBy: { createdAt: 'asc' },
+    }),
+  ]);
+  const stockById = new Map(items.map((item) => [item.id, item.quantity]));
+
+  const conflicts: ReservationConflict[] = [];
+  for (const line of reservation.lines) {
+    const takenBy = overlapping.filter((other) =>
+      other.lines.some((otherLine) => otherLine.itemId === line.itemId)
+    );
+    const taken = takenBy.reduce(
+      (total, other) =>
+        total +
+        other.lines
+          .filter((otherLine) => otherLine.itemId === line.itemId)
+          .reduce((sum, otherLine) => sum + otherLine.quantity, 0),
+      0
+    );
+    const available = (stockById.get(line.itemId) ?? 0) - taken;
+    if (line.quantity <= available) continue;
+    conflicts.push({
+      itemId: line.itemId,
+      itemName: line.itemName,
+      requested: line.quantity,
+      available: Math.max(0, available),
+      clashes: takenBy.map((other) => ({
+        id: other.id,
+        eventName: other.eventName,
+        quantity: other.lines
+          .filter((otherLine) => otherLine.itemId === line.itemId)
+          .reduce((sum, otherLine) => sum + otherLine.quantity, 0),
+        pickupDate: other.pickupDate,
+        returnDate: other.returnDate,
+        createdAt: other.createdAt,
+        requester: requesterLabelOf(other),
+      })),
+    });
+  }
+  return conflicts;
+}
+
+/**
+ * De id's van de openstaande aanvragen die niet passen, voor de badge in de
+ * lijst. Eén query in plaats van `reservationConflicts` per rij: de lijst toont
+ * er tweehonderd.
+ */
+export async function conflictingReservationIds(): Promise<Set<string>> {
+  const [open, blocking, items] = await Promise.all([
+    prisma.uitleenReservation.findMany({
+      where: { status: 'REQUESTED', lines: { some: {} } },
+      select: {
+        id: true,
+        pickupDate: true,
+        returnDate: true,
+        lines: { select: { itemId: true, quantity: true } },
+      },
+    }),
+    prisma.uitleenReservation.findMany({
+      where: { status: { in: STOCK_CONSUMING_STATUSES } },
+      select: {
+        pickupDate: true,
+        returnDate: true,
+        lines: { select: { itemId: true, quantity: true } },
+      },
+    }),
+    prisma.uitleenItem.findMany({ select: { id: true, quantity: true } }),
+  ]);
+  const stockById = new Map(items.map((item) => [item.id, item.quantity]));
+
+  const conflicting = new Set<string>();
+  for (const reservation of open) {
+    const overlapping = blocking.filter(
+      (other) => other.pickupDate <= reservation.returnDate && other.returnDate >= reservation.pickupDate
+    );
+    for (const line of reservation.lines) {
+      const taken = overlapping.reduce(
+        (total, other) =>
+          total +
+          other.lines
+            .filter((otherLine) => otherLine.itemId === line.itemId)
+            .reduce((sum, otherLine) => sum + otherLine.quantity, 0),
+        0
+      );
+      if (line.quantity > (stockById.get(line.itemId) ?? 0) - taken) {
+        conflicting.add(reservation.id);
+        break;
+      }
+    }
+  }
+  return conflicting;
+}
+
 export async function adminReservations() {
   return prisma.uitleenReservation.findMany({
     orderBy: [{ createdAt: 'desc' }],

@@ -30,6 +30,7 @@ import {
 import {
   activeGroups,
   adminReservation,
+  reservationConflicts,
   getCatalog,
   getFlesserkeCatalog,
   getLogistiekSettings,
@@ -39,6 +40,7 @@ import {
 import { AdminFlesserkeEditor } from './admin-flesserke-form';
 import { AdminReservationEditor } from './admin-edit-form';
 import { DecisionForms } from './decision-forms';
+import { ConflictPanel, type ConflictParty } from './conflict-panel';
 import { PrepareList } from './prepare-list';
 import { ReturnForm } from './return-form';
 
@@ -59,6 +61,11 @@ export default async function BeheerAanvraagDetailPage({
           excludeReservationId: reservation.id,
         })
       : null;
+
+  // Een conflict is enkel nieuws zolang de aanvraag nog beslist moet worden: bij
+  // een goedgekeurde aanvraag is de voorraad al voor haar gereserveerd.
+  const conflicts =
+    reservation.status === 'REQUESTED' ? await reservationConflicts(reservation.id) : [];
 
   // Een aanvraag is materiaal- of flesserke-type; elk heeft zijn eigen editor,
   // want de lijnen en de voorraadcheck verschillen.
@@ -147,6 +154,38 @@ export default async function BeheerAanvraagDetailPage({
         'De waarborg staat weer als niet teruggegeven. Dit wist enkel de markering; er verandert niets aan het geld zelf.',
       action: undoDepositReturnedAction.bind(null, reservation.id),
     });
+  }
+
+  /**
+   * De partijen in het conflict: deze aanvraag plus elke goedgekeurde aanvraag
+   * die hetzelfde item in dezelfde periode vasthoudt. Eén rij per aanvraag, ook
+   * wanneer ze op twee items botst; twee keer dezelfde aanvraag met twee
+   * schuifformulieren zou twee verschillende antwoorden suggereren.
+   */
+  const conflictParties: ConflictParty[] = [
+    {
+      id: reservation.id,
+      label: reservation.eventName,
+      requester: requesterLabel,
+      pickupDate: toDateInputValue(reservation.pickupDate),
+      returnDate: toDateInputValue(reservation.returnDate),
+      requestedAtLabel: formatDateOnly(reservation.createdAt),
+      self: true,
+    },
+  ];
+  for (const conflict of conflicts) {
+    for (const clash of conflict.clashes) {
+      if (conflictParties.some((party) => party.id === clash.id)) continue;
+      conflictParties.push({
+        id: clash.id,
+        label: clash.eventName,
+        requester: clash.requester,
+        pickupDate: toDateInputValue(clash.pickupDate),
+        returnDate: toDateInputValue(clash.returnDate),
+        requestedAtLabel: formatDateOnly(clash.createdAt),
+        holding: `houdt ${clash.quantity}× ${conflict.itemName}`,
+      });
+    }
   }
 
   return (
@@ -288,6 +327,17 @@ export default async function BeheerAanvraagDetailPage({
               })}
             </ul>
           </>
+        ) : null}
+
+        {conflicts.length > 0 ? (
+          <ConflictPanel
+            lines={conflicts.map((conflict) => ({
+              itemName: conflict.itemName,
+              requested: conflict.requested,
+              available: conflict.available,
+            }))}
+            parties={conflictParties}
+          />
         ) : null}
 
         {/* Klaarzetten hoort bij een aanvraag die goedgekeurd is en nog moet

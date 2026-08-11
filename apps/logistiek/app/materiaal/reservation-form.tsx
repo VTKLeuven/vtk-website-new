@@ -74,6 +74,7 @@ export function ReservationForm({
   const [quantities, setQuantities] = useState<Record<string, number>>(initial.quantities);
   const [lineNotes, setLineNotes] = useState<Record<string, string>>(initial.lineNotes ?? {});
   const [availability, setAvailability] = useState<Record<string, number> | null>(null);
+  const [acceptConflicts, setAcceptConflicts] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
@@ -132,6 +133,17 @@ export function ReservationForm({
       cancelled = true;
     };
   }, [pickupDate, returnDate]);
+
+  /**
+   * Wat er niet past in de gevraagde periode. Afgeleid en nooit bewaard: zodra
+   * een andere aanvraag geannuleerd wordt, verdwijnt het conflict vanzelf.
+   */
+  const conflictLines = useMemo(() => {
+    if (!availability) return [];
+    return items
+      .map((item) => ({ item, quantity: quantities[item.id] ?? 0, free: availability[item.id] ?? 0 }))
+      .filter((line) => line.quantity > 0 && line.quantity > line.free);
+  }, [items, quantities, availability]);
 
   const totals = useMemo(() => {
     let deposit = 0;
@@ -254,7 +266,11 @@ export function ReservationForm({
                   const quantity = quantities[item.id] ?? 0;
                   const available = availability?.[item.id];
                   const imageKey = item.photoKey ?? item.photoKeys[0];
-                  const atMax = quantity >= (available ?? item.quantity);
+                  // Meer vragen dan er in deze periode vrij is, mag: dan wordt het
+                  // een conflict dat Logistiek kan oplossen door te schuiven. Meer
+                  // dan er bestaat, kan nooit.
+                  const atMax = quantity >= item.quantity;
+                  const short = available !== undefined && quantity > available;
                   return (
                     <li key={item.id} className="flex flex-col overflow-hidden rounded-[14px] border border-vtk-navy/10 bg-white">
                       <Link href={`/materiaal/${item.id}`} className="block aspect-[4/3] w-full bg-vtk-paper-2">
@@ -308,6 +324,13 @@ export function ReservationForm({
                             </span>
                           )}
                         </p>
+                        {short ? (
+                          <p className="mt-1.5 rounded-lg bg-amber-50 px-2 py-1 text-xs text-amber-900">
+                            {en
+                              ? `You are asking for ${quantity}, but only ${available} are free then. Logistics will look at it.`
+                              : `Je vraagt er ${quantity}, maar in die periode zijn er maar ${available} vrij. Logistiek bekijkt het.`}
+                          </p>
+                        ) : null}
                         {/* Alternatieven tonen we pas wanneer het gevraagde item
                             écht niet kan in deze periode: anders staat er bij elk
                             item een suggestie die niemand nodig heeft. */}
@@ -346,7 +369,7 @@ export function ReservationForm({
                           </button>
                           <QuantityInput
                             value={quantity}
-                            max={available ?? item.quantity}
+                            max={item.quantity}
                             onChange={(next) => setQuantity(item.id, next)}
                             label={`${en ? 'Number' : 'Aantal'}: ${item.name}`}
                           />
@@ -472,6 +495,38 @@ export function ReservationForm({
                 : 'De waarborg krijg je terug wanneer alles in orde terugkomt.')}
           </p>
 
+          {/* Indienen mag, maar niet per ongeluk: wie meer vraagt dan er vrij is,
+              zegt hier expliciet dat hij dat weet. Zonder die stap belandt het
+              conflict bij Logistiek zonder dat de aanvrager het doorhad. */}
+          {conflictLines.length > 0 ? (
+            <div className="mt-4 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2.5 text-sm text-amber-900">
+              <p className="font-semibold">
+                {en ? 'Not everything is free then' : 'Niet alles is vrij in je periode'}
+              </p>
+              <ul className="mt-1 space-y-0.5">
+                {conflictLines.map((line) => (
+                  <li key={line.item.id}>
+                    {line.item.name}: {en ? 'you ask' : 'je vraagt er'} {line.quantity},{' '}
+                    {en ? 'free' : 'vrij'} {line.free}
+                  </li>
+                ))}
+              </ul>
+              <label className="mt-2 flex items-start gap-2">
+                <input
+                  type="checkbox"
+                  checked={acceptConflicts}
+                  onChange={(e) => setAcceptConflicts(e.target.checked)}
+                  className="mt-0.5 h-4 w-4"
+                />
+                <span>
+                  {en
+                    ? 'Send it anyway. Logistics will contact me to move the dates or find something else.'
+                    : 'Toch indienen. Logistiek neemt contact op om de datums te verschuiven of iets anders te zoeken.'}
+                </span>
+              </label>
+            </div>
+          ) : null}
+
           {error ? (
             <p role="alert" className="mt-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
               {error}
@@ -483,7 +538,14 @@ export function ReservationForm({
             size="lg"
             className="mt-5 w-full"
             onClick={submit}
-            disabled={pending || totals.count === 0 || !pickupDate || !returnDate || !event.eventName.trim()}
+            disabled={
+              pending ||
+              totals.count === 0 ||
+              !pickupDate ||
+              !returnDate ||
+              !event.eventName.trim() ||
+              (conflictLines.length > 0 && !acceptConflicts)
+            }
           >
             {pending ? submittingLabel : submitLabel}
           </Button>

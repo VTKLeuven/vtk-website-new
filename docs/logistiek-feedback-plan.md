@@ -33,7 +33,7 @@ verbetering, **P3** = groter of "ooit".
 | 4 | Materiaal: catalogus en aanvragen | M3, M4, M5, M6, M13, M15 | ✅ af 11 aug 2026 |
 | 5 | Vervoer | V2, V5, V8, V9, V12, V13 | ✅ af 11 aug 2026 |
 | 6 | Flesserke | F2, F3, F5, F6, F7 | ✅ af 11 aug 2026 |
-| 7 | Grote stukken | ~~A7~~, A8, ~~A9~~, ~~M1~~, M2, M12, M17, M18, V1 | bezig; A7 + A9 + M1 af 11 aug 2026 |
+| 7 | Grote stukken | ~~A7~~, A8, ~~A9~~, ~~M1~~, ~~M2~~, M12, M17, M18, V1 | bezig; A7, A9, M1, M2 af 11 aug 2026 |
 
 Vervallen: **M7** (gas wordt een gewoon catalogusitem, dus geen code) en **M16**
 (geen barcodes). Zie fase 0.
@@ -1021,8 +1021,24 @@ Wat er tijdens het werk bijkwam:
   4. In de item-editor: uitklapbare unitlijst met per unit de staat en een nota.
 - **Klaar wanneer:** één kapotte box haalt één stuk uit de beschikbaarheid.
 
-### M2. Conflicterende aanvragen doorgeven, en ze uit elkaar schuiven
-**P2 · code · beslist: B6**
+### M2. Conflicterende aanvragen doorgeven, en ze uit elkaar schuiven ✅
+**P2 · code · beslist: B6** · af op 11 augustus 2026
+
+Wat er tijdens het werk bijkwam:
+
+- **De "mail beide aanvragers"-knop uit stap 5 is er niet gekomen, met opzet.**
+  Schuiven mailt de aanvrager al (A9), dus beide partijen krijgen bericht over hun
+  eigen aanvraag zodra het team schuift. Een aparte voorstelknop zou een
+  onderhandeling starten die de app nergens bijhoudt; wie niet akkoord is,
+  antwoordt op de mail.
+- **De schuifactie is een eigen, smalle action** (`shiftReservationDatesAction`)
+  en niet de bestaande team-edit: die verwacht het hele formulier, en het
+  conflictpaneel heeft enkel twee datums.
+- **Een goedgekeurde aanvraag mag niet in een conflict geschoven worden**; dan
+  verplaats je het probleem naar een derde aanvraag. Bij een aanvraag die nog
+  beslist moet worden mag het wel: dat is precies wat M2 mogelijk maakt.
+- **De lijst gebruikt één query voor alle conflicten** in plaats van
+  `reservationConflicts` per rij; de lijst toont er tweehonderd.
 
 - **Raakt:** `app/materiaal/reservation-form.tsx`, `app/actions/uitleen.ts`,
   `app/beheer/aanvragen/page.tsx` en `[id]/`, `lib/uitleen-server.ts`.

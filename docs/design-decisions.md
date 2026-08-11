@@ -1215,6 +1215,35 @@ aan geen enkele groep. Dat is ledenbeheer op vtk.be (`/admin/werkgroepen`) en ge
 zaak van de uitleendienst; de gate opzetten zou het verbergen in plaats van het
 oplossen.
 
+### Conflicten: aanvragen mag, goedkeuren niet
+
+Wie materiaal wil dat al volledig geboekt is, kon zijn vraag niet kwijt: de
+knoppen stonden op nul en daarmee hield het op. Logistiek wist dan niet dat er
+een tweede gegadigde was, en die tweede wist niet dat schuiven een optie was.
+
+- **Indienen mag, met een expliciete bevestiging.** Het lid ziet per item wat er
+  niet past en vinkt aan dat hij het tóch indient. Zonder die stap belandt het
+  conflict bij Logistiek zonder dat de aanvrager het doorhad; met die stap is het
+  een bewuste vraag om te bemiddelen.
+- **Goedkeuren blijft hard geblokkeerd.** De voorraadcheck bij goedkeuring is
+  ongewijzigd. Zo kan de voorraad nooit in de min gaan; het conflict leeft enkel
+  in de wachtrij.
+- **Het conflict wordt altijd opnieuw berekend, nooit opgeslagen.** Annuleert de
+  eerste partij, dan is het conflict weg zonder dat iemand iets moet aanraken.
+  Een opgeslagen vlag zou blijven staan tot ze toevallig herberekend werd.
+- **Schuiven in plaats van afwijzen.** Vanaf de detailpagina kan het team de
+  datums van beide aanvragen aanpassen, met een "past dit?"-knop die doorrekent
+  zonder op te slaan. Twee aanvragen passen vaak samen na een dag schuiven, en
+  dan is de tweede afwijzen te grof.
+- **Schuiven mailt de aanvrager** (via A9). Er is dus geen aparte "voorstel
+  mailen"-knop: een voorstel dat de app niet kan opvolgen, zou een onderhandeling
+  starten die nergens bijgehouden wordt. Het team schuift, beide aanvragers
+  krijgen bericht over hun eigen aanvraag, en wie niet akkoord is, antwoordt op
+  de mail.
+- **Een goedgekeurde aanvraag mag niet in een conflict geschoven worden.** Dan
+  verplaats je het probleem naar een derde aanvraag. Een aanvraag die nog beslist
+  moet worden, mag wel in een conflict blijven staan.
+
 ### Staat per exemplaar: kapot telt niet meer mee
 
 `UitleenItem.condition` geldt voor de hele rij: van vier frigo's kon er geen
