@@ -42,7 +42,8 @@ e-mailproces (zie "How to logi"). Productkeuzes: `docs/design-decisions.md`
 
 | Model | Wat |
 | --- | --- |
-| `UitleenCategory` / `UitleenItem` | Catalogus. `isSet` + `UitleenSetContent` (vrije-tekst inhoud, telt niet apart mee), `photoKey`, locatie (`locationShelf`/`Rack`), `condition` (informatief). Soft-delete via `active`. |
+| `UitleenCategory` / `UitleenItem` | Catalogus. `isSet` + `UitleenSetContent` (vrije-tekst inhoud, telt niet apart mee), `photoKey`, locatie (`locationShelf`/`Rack`), `condition` (informatief zolang het item geen exemplaren heeft). Soft-delete via `active`. |
+| `UitleenItemUnit` | Eén fysiek exemplaar met een eigen staat, optioneel per item. Bestaan er exemplaren, dan is `item.quantity` de telling van de bruikbare (actief en niet KAPOT), bijgehouden door `syncItemQuantityFromUnits`. |
 | `UitleenReservation` + `UitleenReservationLine` | Aanvraag met event-context + `requesterType` (+ `groupId`/`requesterName`), dagbereik, snapshots. Statusmachine `REQUESTED → APPROVED/REJECTED/CANCELLED → PICKED_UP → RETURNED`. Per lijn: `note` (M15) en `preparedAt`/`preparedById` (klaarzetten, A7). |
 | `UitleenVehicle` | Voertuig (kar/auto/bakfiets); `pricingMode` (FREE/PER_HOUR/PER_KM/FLAT) + `rateCents`, team-configureerbaar. |
 | `UitleenTransportBooking` | Rit met voertuig, tijdvenster, chauffeur, tarief-snapshot, `kilometers`/`priceCents` (nullable). |

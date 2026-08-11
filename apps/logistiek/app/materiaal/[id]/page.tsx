@@ -142,10 +142,26 @@ export default async function ItemDetailPage({ params }: { params: Promise<{ id:
                 <div className="flex justify-between gap-4">
                   <dt className="text-vtk-muted">Staat</dt>
                   <dd className="text-right font-medium text-vtk-ink">
-                    {ITEM_CONDITION_LABELS[team.condition] ?? team.condition}
+                    {team.units.length > 0
+                      ? `${team.units.filter((unit) => unit.condition !== 'KAPOT').length} bruikbaar van ${team.units.length}`
+                      : (ITEM_CONDITION_LABELS[team.condition] ?? team.condition)}
                   </dd>
                 </div>
-                {team.conditionNote ? (
+                {/* Houdt dit item exemplaren bij, dan hoort hier per exemplaar te
+                    staan wat eraan scheelt; "Werkt" op de rij zegt niets over die
+                    ene kapotte box. */}
+                {team.units
+                  .filter((unit) => unit.condition !== 'WERKT')
+                  .map((unit) => (
+                    <div key={unit.label} className="flex justify-between gap-4">
+                      <dt className="text-vtk-muted">{unit.label}</dt>
+                      <dd className="text-right text-vtk-body">
+                        {ITEM_CONDITION_LABELS[unit.condition] ?? unit.condition}
+                        {unit.conditionNote ? ` · ${unit.conditionNote}` : ''}
+                      </dd>
+                    </div>
+                  ))}
+                {team.conditionNote && team.units.length === 0 ? (
                   <div className="pt-1 text-vtk-body">{team.conditionNote}</div>
                 ) : null}
               </dl>

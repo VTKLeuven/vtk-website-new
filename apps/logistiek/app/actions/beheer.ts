@@ -23,6 +23,7 @@ import {
   restoreFlesserkeStock,
   searchDriverCandidates,
   syncFlesserkeItemTotals,
+  syncItemQuantityFromUnits,
   type DriverCandidate,
 } from '@/lib/uitleen-server';
 import {
@@ -224,6 +225,11 @@ export async function saveItemAction(_prev: SaveState, formData: FormData): Prom
       if (properties.length) await tx.uitleenItemProperty.createMany({ data: properties.map((row, sortIndex) => ({ itemId: id, label: row.label, value: row.value, sortIndex })) });
       if (downloads.length) await tx.uitleenItemDownload.createMany({ data: downloads.map((row, sortIndex) => ({ itemId: id, label: row.label, key: row.key, sortIndex })) });
       await writeAlternatives(tx, id, alternativeIds);
+      // Houdt dit item exemplaren bij, dan wint hun telling van het getal in het
+      // formulier. Het veld staat daar read-only, maar een oud tabblad of een
+      // handmatige post zou de voorraad anders stil laten afwijken van wat er in
+      // de loods staat.
+      await syncItemQuantityFromUnits(tx, id);
       return false;
     });
     if (stale) return saveError('STALE');
@@ -289,9 +295,137 @@ async function writeAlternatives(
 export async function setItemQuantityAction(itemId: string, quantity: number): Promise<ActionResult> {
   await requireManage();
   if (!Number.isInteger(quantity) || quantity < 0) return { ok: false, error: 'Ongeldig aantal.' };
+  // Houdt dit item exemplaren bij, dan is de voorraad hun telling. Een getal
+  // intypen zou dat stil overschrijven tot de eerstvolgende wijziging aan een
+  // exemplaar het weer terugzet; dan liever hier weigeren en zeggen waarom.
+  const units = await prisma.uitleenItemUnit.count({ where: { itemId } });
+  if (units > 0) {
+    return {
+      ok: false,
+      error: 'Dit item houdt exemplaren bij; de voorraad volgt daaruit. Pas de exemplaren aan.',
+    };
+  }
   await prisma.uitleenItem.update({ where: { id: itemId }, data: { quantity } });
   revalidateBeheer();
   return { ok: true, message: 'Voorraad bijgewerkt.' };
+}
+
+const UNIT_LABEL_MAX = 60;
+
+/**
+ * Splitst een item op in exemplaren, één per stuk dat er nu staat.
+ *
+ * Handmatig twaalf exemplaren toevoegen doet niemand, en dan blijft de staat per
+ * exemplaar ongebruikt. Labels zijn gewoon "1" tot "n"; het team hernoemt ze
+ * daarna naar wat er op de kast staat.
+ */
+export async function splitItemIntoUnitsAction(itemId: string): Promise<ActionResult> {
+  await requireManage();
+
+  const outcome = await runSerializable(async (tx) => {
+    const item = await tx.uitleenItem.findUnique({
+      where: { id: itemId },
+      select: { quantity: true, condition: true, conditionNote: true, _count: { select: { units: true } } },
+    });
+    if (!item) return 'NOT_FOUND' as const;
+    if (item._count.units > 0) return 'EXISTS' as const;
+    if (item.quantity < 1) return 'EMPTY' as const;
+
+    await tx.uitleenItemUnit.createMany({
+      data: Array.from({ length: item.quantity }, (_, index) => ({
+        itemId,
+        label: String(index + 1),
+        // De staat van de rij wordt de startstaat van elk exemplaar: dat is wat
+        // het team tot nu toe bedoelde toen het de rij op TESTEN zette.
+        condition: item.condition,
+        conditionNote: item.conditionNote,
+        sortIndex: index,
+      })),
+    });
+    await syncItemQuantityFromUnits(tx, itemId);
+    return 'OK' as const;
+  });
+
+  if (outcome === 'NOT_FOUND') return { ok: false, error: 'Item niet gevonden.' };
+  if (outcome === 'EXISTS') return { ok: false, error: 'Dit item houdt al exemplaren bij.' };
+  if (outcome === 'EMPTY') {
+    return { ok: false, error: 'Er staat niets in voorraad om in exemplaren te splitsen.' };
+  }
+
+  revalidateBeheer();
+  return { ok: true, message: 'Exemplaren aangemaakt.' };
+}
+
+/** Eén exemplaar toevoegen, bewaren of terug in roulatie zetten. */
+export async function saveItemUnitAction(_prev: SaveState, formData: FormData): Promise<SaveState> {
+  await requireManage();
+
+  const id = String(formData.get('unitId') ?? '').trim();
+  const itemId = String(formData.get('itemId') ?? '').trim();
+  const label = String(formData.get('label') ?? '').trim();
+  const conditionRaw = String(formData.get('condition') ?? 'WERKT').trim();
+  const condition: ItemCondition = ITEM_CONDITIONS.includes(conditionRaw as ItemCondition)
+    ? (conditionRaw as ItemCondition)
+    : 'WERKT';
+  const conditionNote = String(formData.get('conditionNote') ?? '').trim();
+  const active = String(formData.get('active') ?? '') === 'on';
+
+  if (!label) return saveError('LABEL_REQUIRED');
+  if (label.length > UNIT_LABEL_MAX) return saveError('LABEL_TOO_LONG');
+
+  const data = { condition, conditionNote: conditionNote || null, active, label };
+
+  await runSerializable(async (tx) => {
+    if (id) {
+      const existing = await tx.uitleenItemUnit.findUnique({
+        where: { id },
+        select: { itemId: true },
+      });
+      if (!existing) return;
+      await tx.uitleenItemUnit.update({ where: { id }, data });
+      await syncItemQuantityFromUnits(tx, existing.itemId);
+      return;
+    }
+    if (!itemId) return;
+    const last = await tx.uitleenItemUnit.findFirst({
+      where: { itemId },
+      orderBy: { sortIndex: 'desc' },
+      select: { sortIndex: true },
+    });
+    await tx.uitleenItemUnit.create({
+      data: { ...data, itemId, sortIndex: (last?.sortIndex ?? -1) + 1 },
+    });
+    await syncItemQuantityFromUnits(tx, itemId);
+  });
+
+  revalidateBeheer();
+  return saveOk();
+}
+
+/**
+ * Exemplaar definitief verwijderen. Voor een tikfout of een dubbel aangemaakt
+ * exemplaar; wat de loods uit is maar bestaan heeft, zet je op inactief.
+ */
+export async function deleteItemUnitAction(unitId: string): Promise<ActionResult> {
+  await requireManage();
+
+  const removed = await runSerializable(async (tx) => {
+    const unit = await tx.uitleenItemUnit.findUnique({
+      where: { id: unitId },
+      select: { itemId: true },
+    });
+    if (!unit) return false;
+    await tx.uitleenItemUnit.delete({ where: { id: unitId } });
+    // Was dit het laatste exemplaar, dan houdt het item er geen meer bij en
+    // blijft `quantity` staan waar de telling hem liet: dat is het aantal dat er
+    // effectief was, dus precies goed als vertrekpunt.
+    await syncItemQuantityFromUnits(tx, unit.itemId);
+    return true;
+  });
+  if (!removed) return { ok: false, error: 'Exemplaar niet gevonden.' };
+
+  revalidateBeheer();
+  return { ok: true, message: 'Exemplaar verwijderd.' };
 }
 
 export async function deactivateItemAction(itemId: string): Promise<ActionResult> {

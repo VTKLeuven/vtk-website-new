@@ -185,6 +185,32 @@ export async function flesserkeReserved(
 }
 
 /**
+ * Zet `quantity` van een materiaal-item gelijk aan zijn bruikbare exemplaren.
+ *
+ * Enkel wanneer het item exemplaren heeft; zonder exemplaren blijft `quantity`
+ * het getal dat het team zelf invulde, en verandert er dus niets aan het gedrag
+ * van voordien. Zo hoeft de inventaris niet in één keer opgesplitst te worden.
+ *
+ * Bruikbaar = actief en niet KAPOT. TESTEN en ONVOLLEDIG tellen wél mee: een
+ * onvolledige set is nog altijd uitleenbaar, en wie ze niet wil uitlenen zet het
+ * exemplaar op inactief. Alleen kapot is hard.
+ *
+ * Roep dit aan binnen dezelfde transactie als elke wijziging aan de exemplaren.
+ */
+export async function syncItemQuantityFromUnits(
+  tx: Prisma.TransactionClient,
+  itemId: string
+): Promise<void> {
+  const units = await tx.uitleenItemUnit.findMany({
+    where: { itemId },
+    select: { active: true, condition: true },
+  });
+  if (units.length === 0) return;
+  const usable = units.filter((unit) => unit.active && unit.condition !== 'KAPOT').length;
+  await tx.uitleenItem.update({ where: { id: itemId }, data: { quantity: usable } });
+}
+
+/**
  * Zet `quantity` en `expiryDate` van een flesserke-item gelijk aan zijn
  * ladingen: de som en de eerstvolgende datum. De batches zijn de waarheid, maar
  * de beschikbaarheidsberekening, de zoekfilter en de sortering lezen die twee
@@ -331,7 +357,19 @@ export async function itemDetail(id: string) {
 export async function itemTeamDetails(id: string) {
   return prisma.uitleenItem.findUnique({
     where: { id },
-    select: { locationShelf: true, locationRack: true, condition: true, conditionNote: true },
+    select: {
+      locationShelf: true,
+      locationRack: true,
+      condition: true,
+      conditionNote: true,
+      // De staat per exemplaar, wanneer dit item ze bijhoudt: "Werkt" op de rij
+      // zegt dan niets over die ene kapotte box.
+      units: {
+        where: { active: true },
+        orderBy: [{ sortIndex: 'asc' }, { label: 'asc' }],
+        select: { label: true, condition: true, conditionNote: true },
+      },
+    },
   });
 }
 
@@ -943,6 +981,7 @@ export async function adminInventory() {
         properties: { orderBy: { sortIndex: 'asc' } },
         downloads: { orderBy: { sortIndex: 'asc' } },
         alternatives: { select: { alternativeId: true } },
+        units: { orderBy: [{ sortIndex: 'asc' }, { label: 'asc' }] },
       },
     }),
   ]);

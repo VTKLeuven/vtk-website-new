@@ -1215,6 +1215,31 @@ aan geen enkele groep. Dat is ledenbeheer op vtk.be (`/admin/werkgroepen`) en ge
 zaak van de uitleendienst; de gate opzetten zou het verbergen in plaats van het
 oplossen.
 
+### Staat per exemplaar: kapot telt niet meer mee
+
+`UitleenItem.condition` geldt voor de hele rij: van vier frigo's kon er geen
+enkele als kapot gemarkeerd worden zonder ze alle vier te markeren. Wie dat
+onderscheid nodig heeft, splitst het item in exemplaren (`UitleenItemUnit`).
+
+- **Optioneel, per item.** Zonder exemplaren blijft `quantity` het getal dat het
+  team invulde en verandert er niets. De inventaris hoeft dus niet in één keer
+  opgesplitst te worden; 405 items in exemplaren splitsen is werk dat niemand
+  doet, en dan blijft de hele functie ongebruikt.
+- **`quantity` wordt de bijgehouden telling** van de bruikbare exemplaren, net
+  zoals bij de flesserke-ladingen. Zo blijft elke beschikbaarheidsberekening één
+  kolom lezen in plaats van te moeten weten of dit item exemplaren heeft. De
+  keerzijde: `quantity` betekent dan "bruikbaar", niet "hoeveel er staan"; de
+  editor zegt daarom "3 bruikbaar van 4".
+- **Dit is een gedragswijziging.** Tot nu toe was `condition` puur informatief:
+  een kapotte rij bleef gewoon uitleenbaar. Bij een item met exemplaren telt
+  KAPOT niet meer mee voor de beschikbaarheid.
+- **Alleen KAPOT is hard.** TESTEN en ONVOLLEDIG tellen wel mee: een onvolledige
+  set is nog altijd uitleenbaar, en wie ze niet wil uitlenen zet het exemplaar op
+  "niet in roulatie".
+- **Reserveren blijft op itemniveau.** Een lid vraagt "twee boxen", geen "box 3".
+  Welk exemplaar iemand meekrijgt, blijkt bij het klaarzetten (A7); dat in het
+  aanvraagformulier leggen zou elke aanvraag een inventarisoefening maken.
+
 ### Klaarzetten: het scherm is de waarheid, het papier de werkkopie
 
 Klaarzetten gebeurt per lijn (`preparedAt`/`preparedById` op

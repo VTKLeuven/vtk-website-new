@@ -19,6 +19,7 @@ import { DownloadsEditor, GalleryEditor, PropertiesEditor } from '@/components/c
 import { SaveForm } from '@/components/ui/save-form';
 import { useToast } from '@/components/ui/toast';
 import { SortHeader, compareText, useSort } from '@/app/beheer/sortable-header';
+import { UnitsEditor } from './units-editor';
 import { ITEM_CONDITION_LABELS } from '@/lib/uitleen';
 import type { AdminInventoryItem } from '@/lib/uitleen-server';
 
@@ -101,6 +102,7 @@ function ItemFields({
   items: AdminInventoryItem[];
 }) {
   const [isSet, setIsSet] = useState(item?.isSet ?? false);
+  const hasUnits = (item?.units.length ?? 0) > 0;
   return (
     <>
       {item ? <input type="hidden" name="id" value={item.id} /> : null}
@@ -129,7 +131,23 @@ function ItemFields({
           </select>
         </label>
         <label className="grid gap-1 text-xs font-medium text-vtk-muted">
-          Aantal<input type="number" name="quantity" min={1} defaultValue={item?.quantity ?? 1} className={inputClass} />
+          Aantal
+          {/* Houdt dit item exemplaren bij, dan is dit hun telling en niet iets
+              om in te typen; de actie zet het toch terug. */}
+          <input
+            type="number"
+            name="quantity"
+            min={1}
+            defaultValue={item?.quantity ?? 1}
+            readOnly={hasUnits}
+            aria-describedby={hasUnits ? `${item!.id}-quantity-hint` : undefined}
+            className={hasUnits ? `${inputClass} bg-vtk-paper text-vtk-muted` : inputClass}
+          />
+          {hasUnits ? (
+            <span id={`${item!.id}-quantity-hint`} className="font-normal">
+              Volgt uit de exemplaren hieronder.
+            </span>
+          ) : null}
         </label>
         <label className="grid gap-1 text-xs font-medium text-vtk-muted">
           Huurprijs (€)
@@ -208,7 +226,16 @@ function ItemFields({
   );
 }
 
-function QuantityQuickEdit({ itemId, quantity }: { itemId: string; quantity: number }) {
+function QuantityQuickEdit({
+  itemId,
+  quantity,
+  locked = false,
+}: {
+  itemId: string;
+  quantity: number;
+  /** Item met exemplaren: de voorraad is hun telling, niet iets om in te typen. */
+  locked?: boolean;
+}) {
   const router = useRouter();
   const showToast = useToast();
   const [value, setValue] = useState(String(quantity));
@@ -230,6 +257,17 @@ function QuantityQuickEdit({ itemId, quantity }: { itemId: string; quantity: num
     } else {
       showToast({ message: result.error ?? 'Er ging iets mis.', variant: 'error', duration: 0 });
     }
+  }
+
+  if (locked) {
+    return (
+      <span
+        className="inline-flex h-9 w-20 items-center px-1 tabular-nums text-vtk-muted"
+        title="Volgt uit de exemplaren; pas ze aan onder Bewerken."
+      >
+        {quantity}
+      </span>
+    );
   }
 
   return (
@@ -298,6 +336,7 @@ function ItemTable({
           {items.map((item) => {
             const editing = editingId === item.id;
             const location = [item.locationShelf, item.locationRack].filter(Boolean).join(' · ') || '—';
+            const broken = item.units.filter((unit) => unit.condition === 'KAPOT').length;
             return (
               <Fragment key={item.id}>
                 <tr className={`border-b border-vtk-navy/5 align-top ${archived ? 'opacity-70' : ''}`}>
@@ -317,12 +356,25 @@ function ItemTable({
                     <SetContents contents={item.setContents} locale="nl" />
                   </td>
                   <td className="py-2 pr-3 text-vtk-muted">{categoryName(item.categoryId)}</td>
-                  <td className={`py-2 pr-3 ${CONDITION_TONE[item.condition] ?? 'text-vtk-muted'}`}>
-                    {CONDITION_LABEL[item.condition] ?? item.condition}
-                  </td>
+                  {/* Bij exemplaren zegt de staat van de rij niets: dan telt de
+                      staat per exemplaar, en is het aantal kapotte stuks het
+                      nieuws. */}
+                  {item.units.length > 0 ? (
+                    <td className={`py-2 pr-3 ${broken > 0 ? 'font-semibold text-red-700' : 'text-vtk-muted'}`}>
+                      {broken > 0 ? `${broken} kapot van ${item.units.length}` : 'Per exemplaar'}
+                    </td>
+                  ) : (
+                    <td className={`py-2 pr-3 ${CONDITION_TONE[item.condition] ?? 'text-vtk-muted'}`}>
+                      {CONDITION_LABEL[item.condition] ?? item.condition}
+                    </td>
+                  )}
                   <td className="py-2 pr-3 text-vtk-muted">{location}</td>
                   <td className="py-2 pr-3">
-                    <QuantityQuickEdit itemId={item.id} quantity={item.quantity} />
+                    <QuantityQuickEdit
+                      itemId={item.id}
+                      quantity={item.quantity}
+                      locked={item.units.length > 0}
+                    />
                   </td>
                   <td className="py-2">
                     <div className="flex items-center gap-2">
@@ -369,6 +421,11 @@ function ItemTable({
                       >
                         <ItemFields item={item} categories={categories} items={allItems} />
                       </SaveForm>
+                      {/* Buiten het formulier: elk exemplaar bewaart apart, en
+                          een formulier in een formulier bestaat niet in HTML. */}
+                      <div className="mt-4">
+                        <UnitsEditor item={item} />
+                      </div>
                     </td>
                   </tr>
                 ) : null}

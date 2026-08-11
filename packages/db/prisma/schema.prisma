@@ -1875,7 +1875,11 @@ model UitleenItem {
   // (setContents) is louter beschrijvend en koppelt niet aan andere items.
   isSet Boolean @default(false)
 
-  // Locatie in de loods (schap/rek) en staat; puur informatief voor het team.
+  // Locatie in de loods (schap/rek) en staat.
+  //
+  // `condition` geldt voor de hele rij en is informatief, behalve wanneer er
+  // exemplaren (`units`) bijgehouden worden: dan telt de staat per exemplaar en
+  // is `quantity` de som van de bruikbare exemplaren. Zie UitleenItemUnit.
   locationShelf String? // bv. "2R"
   locationRack  String? // bv. "A1"
   condition     UitleenItemCondition @default(WERKT)
@@ -1886,6 +1890,7 @@ model UitleenItem {
 
   category    UitleenCategory?         @relation(fields: [categoryId], references: [id], onDelete: SetNull)
   lines       UitleenReservationLine[]
+  units       UitleenItemUnit[]
   setContents UitleenSetContent[]
   photos      UitleenItemPhoto[]
   properties  UitleenItemProperty[]
@@ -1970,6 +1975,41 @@ model UitleenSetContent {
   label     String
   quantity  Int    @default(1)
   sortIndex Int    @default(0)
+
+  item UitleenItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
+
+  @@index([itemId, sortIndex])
+}
+
+/// Eén fysiek exemplaar van een item, met een eigen staat.
+///
+/// `UitleenItem.condition` geldt voor de hele rij: van vier frigo's kan er geen
+/// enkele als kapot gemarkeerd worden zonder ze alle vier te markeren. Wie dat
+/// onderscheid nodig heeft, splitst het item in exemplaren; wie het niet nodig
+/// heeft, laat het staan en houdt het huidige gedrag (`quantity` als getal).
+///
+/// Bestaan er exemplaren, dan is `UitleenItem.quantity` de bijgehouden telling
+/// van de bruikbare exemplaren (actief en niet KAPOT), zoals
+/// `UitleenFlesserkeBatch` dat voor flesserke doet. Zo blijft elke
+/// beschikbaarheidsberekening één kolom lezen in plaats van te moeten weten of
+/// dit item exemplaren heeft.
+model UitleenItemUnit {
+  id     String @id @default(cuid())
+  itemId String
+
+  /// Hoe het team dit exemplaar noemt: "Box 3", "de blauwe", een serienummer.
+  label String
+
+  condition     UitleenItemCondition @default(WERKT)
+  conditionNote String?
+
+  /// Uit roulatie zonder de historiek te verliezen (weggegooid, uitgeleend aan
+  /// een andere kring). Telt niet mee voor de voorraad.
+  active Boolean @default(true)
+
+  sortIndex Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   item UitleenItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
 

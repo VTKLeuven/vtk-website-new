@@ -33,7 +33,7 @@ verbetering, **P3** = groter of "ooit".
 | 4 | Materiaal: catalogus en aanvragen | M3, M4, M5, M6, M13, M15 | ✅ af 11 aug 2026 |
 | 5 | Vervoer | V2, V5, V8, V9, V12, V13 | ✅ af 11 aug 2026 |
 | 6 | Flesserke | F2, F3, F5, F6, F7 | ✅ af 11 aug 2026 |
-| 7 | Grote stukken | ~~A7~~, A8, ~~A9~~, M1, M2, M12, M17, M18, V1 | bezig; A7 + A9 af 11 aug 2026 |
+| 7 | Grote stukken | ~~A7~~, A8, ~~A9~~, ~~M1~~, M2, M12, M17, M18, V1 | bezig; A7 + A9 + M1 af 11 aug 2026 |
 
 Vervallen: **M7** (gas wordt een gewoon catalogusitem, dus geen code) en **M16**
 (geen barcodes). Zie fase 0.
@@ -985,8 +985,25 @@ Wat er tijdens het werk bijkwam:
 - **Waarschuwing:** dit raakt de aanvraagflow, alle beheerschermen, de kalender
   en de mails. Doe het niet vóór fase 1 tot en met 6 afgewerkt zijn.
 
-### M1. Staat per exemplaar
-**P2 · 🗄️ · code · 📝**
+### M1. Staat per exemplaar ✅
+**P2 · 🗄️ · code · 📝** · af op 11 augustus 2026
+
+Wat er tijdens het werk bijkwam:
+
+- **`quantity` wordt de bijgehouden telling**, zoals bij de flesserke-ladingen,
+  in plaats van elke beschikbaarheidscheck te laten uitzoeken of dit item
+  exemplaren heeft. Dat scheelde een aanpassing in zes call-sites en houdt de
+  voorraadberekening één kolom.
+- **Een knop "opsplitsen in n exemplaren"** was nodig: handmatig twaalf
+  exemplaren toevoegen doet niemand, en dan blijft de staat per exemplaar
+  ongebruikt liggen.
+- **Twee plaatsen die de voorraad konden overschrijven** zijn dichtgezet: de
+  snelle voorraadbijstelling in de tabel weigert nu met uitleg, en het
+  itemformulier laat de telling winnen (het veld staat er read-only, maar een
+  oud tabblad post nog het oude getal).
+- **De staatkolom in de tabel toont bij exemplaren iets anders**: "1 kapot van 3"
+  in plaats van de staat van de rij, die dan niets meer zegt. Op de detailpagina
+  staat per afwijkend exemplaar wat eraan scheelt.
 
 - **Nu:** `UitleenItem.condition` geldt voor de hele rij van N stuks. Van vier
   frigo's kan er dus geen enkele als kapot gemarkeerd worden zonder ze alle vier
