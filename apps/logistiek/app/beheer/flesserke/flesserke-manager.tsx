@@ -1,7 +1,6 @@
 'use client';
 
-import { Fragment, useMemo, useState, useTransition } from 'react';
-import { useRouter } from 'next/navigation';
+import { Fragment, useMemo, useState } from 'react';
 import type { UitleenFlesserkeCategory } from '@prisma/client';
 import {
   deactivateFlesserkeCategoryAction,
@@ -10,12 +9,10 @@ import {
   saveFlesserkeCategoryAction,
   saveFlesserkeItemAction,
   setFlesserkeItemActiveAction,
-  setFlesserkeQuantityAction,
 } from '@/app/actions/beheer';
 import { FlesserkeItemName } from '@/components/flesserke-item-name';
 import { ConfirmActionButton } from '@/components/ui/confirm-action-button';
 import { SaveForm } from '@/components/ui/save-form';
-import { useToast } from '@/components/ui/toast';
 import { SortHeader, compareText, useSort } from '@/app/beheer/sortable-header';
 import type { AdminFlesserkeItem } from '@/lib/uitleen-server';
 
@@ -64,47 +61,6 @@ function isExpiringSoon(date: Date | null): boolean {
   if (!date) return false;
   const days = (date.getTime() - Date.now()) / (24 * 60 * 60 * 1000);
   return days < 21; // binnen 3 weken (of al verlopen)
-}
-
-function QuantityQuickEdit({ itemId, quantity }: { itemId: string; quantity: number }) {
-  const router = useRouter();
-  const showToast = useToast();
-  const [value, setValue] = useState(String(quantity));
-  const [pending, startTransition] = useTransition();
-
-  function save() {
-    const parsed = Number.parseInt(value, 10);
-    if (!Number.isInteger(parsed) || parsed < 0) {
-      showToast({ message: 'Ongeldig aantal.', variant: 'error', duration: 0 });
-      return;
-    }
-    if (parsed === quantity) return;
-    startTransition(async () => {
-      const result = await setFlesserkeQuantityAction(itemId, parsed);
-      if (result.ok) {
-        showToast({ message: 'Voorraad bijgewerkt.', variant: 'success' });
-        router.refresh();
-      } else {
-        showToast({ message: result.error ?? 'Er ging iets mis.', variant: 'error', duration: 0 });
-      }
-    });
-  }
-
-  return (
-    <input
-      type="number"
-      min={0}
-      value={value}
-      disabled={pending}
-      onChange={(e) => setValue(e.target.value)}
-      onBlur={save}
-      onKeyDown={(e) => {
-        if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
-      }}
-      className={`${inputClass} w-20`}
-      aria-label="Voorraad"
-    />
-  );
 }
 
 /**
@@ -179,7 +135,12 @@ function BatchEditor({ item }: { item: AdminFlesserkeItem }) {
         <p className="text-sm font-semibold text-vtk-ink">Ladingen ({item.batches.length})</p>
         <p className="mt-1 text-xs text-vtk-muted">
           Twee bakken van hetzelfde product die je apart kocht, vervallen apart. De voorraad van het item
-          is de som; verbruik gaat van de lading die het eerst vervalt.
+          is de som; verbruik gaat van de lading die het eerst vervalt. Dit is ook de plek waar je de
+          voorraad aanpast: in de lijst is het getal enkel om te lezen.
+        </p>
+        <p className="mt-1 text-xs text-vtk-muted">
+          Vervalt het niet (borden, bekers, kuisgerief), laat de vervaldatum dan leeg. Zo&apos;n lading
+          gaat als laatste op, en één lading zonder datum volstaat voor zulke items.
         </p>
       </div>
 
@@ -475,12 +436,21 @@ export function FlesserkeManager({
                       <td className={`py-2 pr-3 font-semibold ${available <= 0 ? 'text-red-700' : 'text-vtk-ink'}`}>
                         {available}
                       </td>
-                      <td className="py-2 pr-3">
-                        {multiBatch ? (
-                          <span className="text-vtk-ink">{item.quantity}</span>
-                        ) : (
-                          <QuantityQuickEdit itemId={item.id} quantity={item.quantity} />
-                        )}
+                      {/* Alleen lezen. De voorraad is de som van de ladingen en
+                          heeft dus maar één plek waar ze veranderd wordt: de
+                          ladingen zelf, onder "Bewerken". Hier stond ooit een
+                          invulveld dat bij één lading die lading aanpaste en bij
+                          nul ladingen er stil eentje aanmaakte, zonder
+                          vervaldatum; en het hield zijn eigen waarde bij, dus na
+                          een wijziging hieronder schreef het bij het verlaten
+                          van het veld het oude getal terug. */}
+                      <td className="py-2 pr-3 font-semibold text-vtk-ink">
+                        {item.quantity}
+                        {item.batches.length === 0 ? (
+                          <span className="block text-[11px] font-normal text-vtk-muted">
+                            geen lading
+                          </span>
+                        ) : null}
                       </td>
                       <td className="py-2">
                         <div className="flex items-center gap-2">

@@ -2378,34 +2378,6 @@ export async function deleteFlesserkeBatchAction(batchId: string): Promise<Actio
  * Werkt enkel wanneer er één lading is; liggen er meerdere, dan is niet te weten
  * van welke er twee bij of af moeten, en zou de app die keuze verzinnen.
  */
-export async function setFlesserkeQuantityAction(itemId: string, quantity: number): Promise<ActionResult> {
-  await requireManage();
-  if (!Number.isInteger(quantity) || quantity < 0) return { ok: false, error: 'Ongeldig aantal.' };
-
-  const batches = await prisma.uitleenFlesserkeBatch.findMany({
-    where: { itemId },
-    select: { id: true },
-  });
-  if (batches.length > 1) {
-    return {
-      ok: false,
-      error: 'Dit item heeft meerdere ladingen; pas het aantal per lading aan in de bewerkrij.',
-    };
-  }
-
-  await prisma.$transaction(async (tx) => {
-    if (batches.length === 1) {
-      await tx.uitleenFlesserkeBatch.update({ where: { id: batches[0].id }, data: { quantity } });
-    } else {
-      await tx.uitleenFlesserkeBatch.create({ data: { itemId, quantity } });
-    }
-    await syncFlesserkeItemTotals(tx, itemId);
-  });
-
-  revalidateBeheer();
-  return { ok: true, message: 'Voorraad bijgewerkt.' };
-}
-
 export async function setFlesserkeItemActiveAction(itemId: string, active: boolean): Promise<ActionResult> {
   await requireManage();
   await prisma.uitleenFlesserkeItem.update({ where: { id: itemId }, data: { active } });
