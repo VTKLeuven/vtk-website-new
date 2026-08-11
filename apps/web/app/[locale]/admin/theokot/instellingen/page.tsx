@@ -7,8 +7,10 @@ import { Card, Input, Label, Textarea } from "@vtk/ui";
 import { parseTheokotConfig } from "@/lib/theokot";
 import { saveConfigAction, saveOrderMessageAction } from "@/app/actions/theokot";
 import { SaveForm } from "@/components/ui/SaveForm";
+import { ThemedSelect } from "@/components/ui/ThemedSelect";
 import { TheokotAdminNav } from "../TheokotAdminNav";
-import { ProductCatalogManager, type CatalogItem } from "../ProductCatalogManager";
+import { ProductCatalogManager } from "../ProductCatalogManager";
+import type { OfferingRow } from "../OfferingRows";
 
 export default async function TheokotSettingsPage({ params }: { params: Promise<{ locale: string }> }) {
   const { locale: localeParam } = await params;
@@ -28,13 +30,17 @@ export default async function TheokotSettingsPage({ params }: { params: Promise<
   ]);
   const config = parseTheokotConfig(configRow?.value);
   const message = (messageRow?.value as { bodyNl?: string; bodyEn?: string }) ?? {};
-  const catalog: CatalogItem[] = products.map((p) => ({
+  const catalog: OfferingRow[] = products.map((p) => ({
     id: p.id,
     nameNl: p.nameNl,
     nameEn: p.nameEn ?? "",
     priceEuro: (p.priceCents / 100).toFixed(2),
     quantity: p.defaultQuantity,
     isWeeklySpecial: p.isWeeklySpecialSlot,
+    imageKey: p.imageKey,
+    ingredientsNl: p.ingredientsNl ?? "",
+    ingredientsEn: p.ingredientsEn ?? "",
+    hasLines: false,
   }));
 
   const numField = (name: string, labelNl: string, labelEn: string, value: number, min = 0) => (
@@ -81,6 +87,25 @@ export default async function TheokotSettingsPage({ params }: { params: Promise<
           {numField("noShowGraceMinutes", "No-show grace (min)", "No-show grace (min)", config.noShowGraceMinutes, 0)}
           {numField("noShowThreshold", "No-shows voor ban", "No-shows before ban", config.noShowThreshold, 1)}
           {numField("banDurationDays", "Ban-duur (dagen)", "Ban duration (days)", config.banDurationDays, 1)}
+          <div className="sm:col-span-3">
+            <Label htmlFor="itemLayout">{nl ? "Weergave van de broodjes" : "Sandwich display"}</Label>
+            <div className="max-w-xs">
+              <ThemedSelect
+                id="itemLayout"
+                name="itemLayout"
+                defaultValue={config.itemLayout}
+                options={[
+                  { value: "list", label: nl ? "Lijst" : "List" },
+                  { value: "grid", label: nl ? "Raster met foto's" : "Grid with photos" },
+                ]}
+              />
+            </div>
+            <p className="mt-1.5 text-sm text-[#5c667f]">
+              {nl
+                ? "Zo staan de broodjes op de bestelpagina. Een raster geeft de foto's ruimte; een lijst blijft compacter wanneer er weinig foto's zijn."
+                : "How the sandwiches appear on the order page. A grid gives the photos room; a list stays more compact when there are few photos."}
+            </p>
+          </div>
         </SaveForm>
       </Card>
 
@@ -89,8 +114,8 @@ export default async function TheokotSettingsPage({ params }: { params: Promise<
         <h2 className="mb-1 text-lg font-semibold">{nl ? "Standaardaanbod" : "Default offering"}</h2>
         <p className="mb-4 text-sm text-[#5c667f]">
           {nl
-            ? "De default namen, prijzen en aantallen die als startpunt getoond worden bij “Verkoopweek aanmaken”. Per week kan je nadien nog afwijken; wijzigingen hier raken bestaande weken niet."
-            : "The default names, prices and quantities shown as a starting point when creating a sale week. You can still deviate per week afterwards; changes here don't affect existing weeks."}
+            ? "De default namen, prijzen, aantallen, foto's en ingrediënten die als startpunt getoond worden bij “Verkoopweek aanmaken”. Per week kan je nadien nog afwijken; wijzigingen hier raken bestaande weken niet."
+            : "The default names, prices, quantities, photos and ingredients shown as a starting point when creating a sale week. You can still deviate per week afterwards; changes here don't affect existing weeks."}
         </p>
         <ProductCatalogManager nl={nl} initial={catalog} />
       </Card>

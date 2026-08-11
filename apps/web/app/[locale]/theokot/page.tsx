@@ -8,6 +8,8 @@ import { pick, type Locale } from "@vtk/i18n";
 import { PleaseLogin } from "@/components/site/pleaseLogin";
 import { canCancel, canOrderNow } from "@/lib/theokot";
 import { activeBanFor, getTheokotConfig } from "@/lib/theokot-server";
+import { usageForSessionItems } from "@/lib/meetings-server";
+import { publicUrl } from "@/lib/storage";
 import { TheokotOrderClient, type OrderSession, type OrderMessage } from "./TheokotOrderClient";
 
 import "@/app/design/vtk-basic.css";
@@ -56,17 +58,9 @@ export default async function TheokotOrderPage({ params }: { params: Promise<{ l
     prisma.setting.findUnique({ where: { key: "theokot.orderMessage" } }),
   ]);
 
-  // Reeds bestelde aantallen per sessie-item, om resterende voorraad te tonen.
-  const allItemIds = sessions.flatMap((s) => s.items.map((i) => i.id));
-  const used =
-    allItemIds.length > 0
-      ? await prisma.theokotOrderLine.groupBy({
-          by: ["sessionItemId"],
-          where: { sessionItemId: { in: allItemIds } },
-          _sum: { quantity: true },
-        })
-      : [];
-  const usedMap = new Map(used.map((u) => [u.sessionItemId, u._sum.quantity ?? 0]));
+  // Reeds weg per sessie-item: bestellingen van studenten plus de broodjes die
+  // voor een grocomeet of bureau opzijgezet zijn.
+  const usedMap = await usageForSessionItems(sessions.flatMap((s) => s.items.map((i) => i.id)));
 
   const dayFmt = new Intl.DateTimeFormat(nl ? "nl-BE" : "en-GB", {
     timeZone: "Europe/Brussels",
@@ -101,6 +95,9 @@ export default async function TheokotOrderPage({ params }: { params: Promise<{ l
         priceCents: i.priceCents,
         remaining: Math.max(0, i.quantity - (usedMap.get(i.id) ?? 0)),
         isWeeklySpecial: i.isWeeklySpecial,
+        imageUrl: publicUrl(i.imageKey),
+        // Beide talen leeg = geen ingrediënten, dus ook geen info-icoontje.
+        ingredients: pick(i.ingredientsNl, i.ingredientsEn, locale)?.trim() || null,
       })),
       existingOrder: existing
         ? {
@@ -138,6 +135,7 @@ export default async function TheokotOrderPage({ params }: { params: Promise<{ l
           message={message}
           maxItems={config.maxItemsPerOrder}
           maxWeeklySpecial={config.maxWeeklySpecialPerOrder}
+          layout={config.itemLayout}
           ban={
             ban
               ? {

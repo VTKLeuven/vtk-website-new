@@ -19,6 +19,10 @@ export const PERMISSIONS = [
   { code: "tickets.create", labelNl: "Ticketevents aanmaken voor eigen groep", labelEn: "Create ticket events for own group", category: "tickets" },
   { code: "tickets.manageAll", labelNl: "Alle ticketevents beheren", labelEn: "Manage all ticket events", category: "tickets" },
 
+  // Formulieren
+  { code: "forms.create", labelNl: "Formulieren aanmaken voor eigen groep", labelEn: "Create forms for own group", category: "forms" },
+  { code: "forms.manageAll", labelNl: "Alle formulieren beheren", labelEn: "Manage all forms", category: "forms" },
+
   // Photos
   { code: "photos.upload", labelNl: "Foto's uploaden", labelEn: "Upload photos", category: "photos" },
   { code: "photos.manageAlbums", labelNl: "Albums beheren", labelEn: "Manage albums", category: "photos" },
@@ -61,6 +65,11 @@ export const PERMISSIONS = [
   // Theokot (cafetaria / broodjesbar)
   { code: "theokot.manage", labelNl: "Theokot beheren (sessies, aanbod, bans, instellingen)", labelEn: "Manage Theokot (sessions, offering, bans, settings)", category: "theokot" },
   { code: "theokot.pickup", labelNl: "Theokot afhaalbalie bedienen", labelEn: "Operate Theokot pickup counter", category: "theokot" },
+
+  // Broodjesmomenten (grocomeet en VTK Bureau)
+  { code: "grocomeet.reserve", labelNl: "Broodje reserveren voor de grocomeet", labelEn: "Reserve a sandwich for the grocomeet", category: "meetings" },
+  { code: "grocomeet.manage", labelNl: "Grocomeets plannen en het geldoverzicht beheren", labelEn: "Plan grocomeets and manage the payment overview", category: "meetings" },
+  { code: "bureau.manage", labelNl: "Bureaus plannen, aanbod en totalen beheren", labelEn: "Plan bureaus, manage offering and totals", category: "meetings" },
 
   // Piano (reservaties voor het lokaal in het kasteel)
   { code: "piano.manage", labelNl: "Piano beheren (uren, sluitingsdagen, reservaties)", labelEn: "Manage the piano (hours, closures, reservations)", category: "piano" },

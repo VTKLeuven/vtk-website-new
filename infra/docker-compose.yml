@@ -146,6 +146,47 @@ services:
       retries: 1
       start_period: 45s
 
+  # Leegt de mailwachtrij van de formulierenmodule en zet de dagelijkse
+  # samenvattingen en de herinneringen voor onafgewerkte concepten klaar. Een
+  # eigen worker en niet mee in die van ticketing: die draait elke vijftien
+  # seconden voor een betaling die de bezoeker staat af te wachten, terwijl
+  # formuliermail gerust een minuut mag wachten.
+  forms-worker:
+    image: curlimages/curl:8.10.1
+    restart: unless-stopped
+    depends_on:
+      web:
+        condition: service_started
+    env_file:
+      - ../.env
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        SECRET="$${FORMS_MAINTENANCE_SECRET:-$${TICKETING_MAINTENANCE_SECRET:-}}"
+        if [ -z "$$SECRET" ]; then
+          echo "Forms worker disabled: FORMS_MAINTENANCE_SECRET is empty"
+          while true; do sleep 3600; done
+        fi
+        while true; do
+          if curl --fail --silent --show-error \
+            -X POST \
+            -H "Authorization: Bearer $$SECRET" \
+            http://web:3000/api/forms/maintenance; then
+            date +%s > /tmp/forms-worker-heartbeat
+          fi
+          sleep 60
+        done
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - >-
+          test -f /tmp/forms-worker-heartbeat &&
+          [ "$$(($$(date +%s) - $$(cat /tmp/forms-worker-heartbeat)))" -lt 300 ]
+      interval: 60s
+      timeout: 5s
+      retries: 1
+      start_period: 60s
+
   # Haalt elke 3 minuten de geluidsmeting van 't ElixIr op bij Munisense en
   # cachet de barstatus. Dit is de enige plek die Munisense aanspreekt: de
   # website leest enkel de cache, hoeveel bezoekers er ook zijn.

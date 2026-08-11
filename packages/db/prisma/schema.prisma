@@ -153,11 +153,119 @@ enum TicketOutboxStatus {
   DEAD
 }
 
+// -----------------------------------------------------------------------------
+// Formulieren (zie de modellen onderaan en docs/forms.md)
+// -----------------------------------------------------------------------------
+
+// Geen aparte "actief"-boolean ernaast: twee waarheden over "staat dit open"
+// lopen gegarandeerd uiteen. PUBLISHED plus opensAt/closesAt beslist het.
+enum FormStatus {
+  DRAFT
+  PUBLISHED
+  CLOSED
+  ARCHIVED
+}
+
+enum FormAudience {
+  PUBLIC
+  MEMBERS
+}
+
+/// Welke talen dit formulier bewust aanbiedt. Wie een formulier maar in één taal
+/// invult, toont in de andere taal een eigen bericht ("enkel voor
+/// internationals") in plaats van een halfleeg formulier of een 404.
+enum FormLocaleMode {
+  BOTH
+  NL_ONLY
+  EN_ONLY
+}
+
+enum FormFieldType {
+  SHORT_TEXT
+  LONG_TEXT
+  SINGLE_CHOICE
+  MULTIPLE_CHOICE
+  DROPDOWN
+  BOOLEAN
+  EMAIL
+  NUMBER
+  DATE
+  TIME
+  PHONE
+  URL
+  // Lineaire schaal. Sterren zijn dezelfde schaal met een andere weergave
+  // (`display` in de config), geen apart type.
+  SCALE
+  FILE
+  CONSENT
+  // Komt uit het profiel van het ingelogde lid (r-nummer, studierichting, jaar);
+  // welk veld precies staat in de config.
+  PROFILE
+}
+
+enum FormFieldConditionOperator {
+  EQUALS
+  NOT_EQUALS
+  INCLUDES
+  IS_ANSWERED
+}
+
+enum FormGrantRole {
+  VIEWER
+  EDITOR
+  MANAGER
+}
+
+enum FormGroupGrantScope {
+  ALL_MEMBERS
+  LEADS_ONLY
+}
+
+enum FormEntryStatus {
+  DRAFT
+  SUBMITTED
+}
+
+/// Opvolging van een inzending, los van haar levenscyclus: een sollicitatie is
+/// ingediend (status) én nog niet beoordeeld (reviewStatus).
+enum FormReviewStatus {
+  NEW
+  ACCEPTED
+  REJECTED
+}
+
+enum FormNotifyMode {
+  NONE
+  EACH
+  DAILY
+}
+
+enum FormOutboxStatus {
+  PENDING
+  PROCESSING
+  SENT
+  FAILED
+  DEAD
+}
+
 enum TheokotOrderStatus {
   RESERVED // gereserveerd, nog niet opgehaald
   PICKED_UP // afgehaald aan de balie
   NO_SHOW // niet opgehaald na sluitingstijd + grace
   CANCELLED // door de student geannuleerd voor de deadline
+}
+
+/// Terugkerende vergadering waarvoor vooraf een broodje en een drankje besteld
+/// kan worden. De twee soorten verschillen enkel in publiek en beheer, niet in
+/// werking (zie `Meeting`).
+enum MeetingKind {
+  GROCOMEET // wekelijks, enkel postverantwoordelijken + Groep 5
+  BUREAU // tweewekelijks, elke student via een gedeelde link
+}
+
+enum MeetingReservationStatus {
+  ACTIVE
+  INVALIDATED // het gekozen broodje staat niet (meer) op het aanbod van die dag
 }
 
 enum UitleenReservationStatus {
@@ -401,6 +509,10 @@ model User {
   participatingShifts  ShiftParticipant[]
   createdShortLinks    ShortLink[]             @relation("ShortLinkCreatedBy")
 
+  meetingsCreated           Meeting[]                  @relation("MeetingCreatedBy")
+  meetingReservations       MeetingReservation[]       @relation("MeetingReservationUser")
+  meetingPaymentsProcessed  MeetingReservation[]       @relation("MeetingReservationPaidBy")
+  meetingPlans              MeetingPlan[]              @relation("MeetingPlanBy")
   theokotOrders             TheokotOrder[]             @relation("TheokotOrderUser")
   theokotPickedUp           TheokotOrder[]             @relation("TheokotPickedUpBy")
   theokotVoucherRedemptions TheokotVoucherRedemption[] @relation("TheokotVoucherUser")
@@ -440,6 +552,14 @@ model User {
   ticketScans              TicketScanLog[]         @relation("TicketScanActor")
   ticketAuditLogs          TicketAuditLog[]        @relation("TicketAuditActor")
   checkedInTickets         Ticket[]                @relation("TicketCheckedInBy")
+
+  createdForms         Form[]           @relation("FormCreatedBy")
+  formGrants           FormUserGrant[]  @relation("FormGrantUser")
+  formGrantsGiven      FormUserGrant[]  @relation("FormGrantGrantedBy")
+  formGroupGrantsGiven FormGroupGrant[] @relation("FormGroupGrantGrantedBy")
+  formEntries          FormEntry[]      @relation("FormEntrySubmittedBy")
+  reviewedFormEntries  FormEntry[]      @relation("FormEntryReviewer")
+  formAuditLogs        FormAuditLog[]   @relation("FormAuditActor")
 
   //Oauth / SSO fields
   oauthClients         OauthClient[]
@@ -481,6 +601,8 @@ model Group {
   dashboardTiles    DashboardTile[]
   ownedTicketEvents TicketEvent[]              @relation("TicketEventOwnerGroup")
   ticketEventGrants TicketEventGroupGrant[]
+  ownedForms        Form[]                     @relation("FormOwnerGroup")
+  formGrants        FormGroupGrant[]
   ssoGrants         SsoGroupClientPermission[]
 
   uitleenReservations UitleenReservation[]
@@ -805,6 +927,7 @@ model CalendarEvent {
   group       Group                   @relation(fields: [groupId], references: [id], onDelete: Cascade)
   createdBy   User?                   @relation("EventCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
   ticketEvent TicketEvent?
+  form        Form?
   categories  CalendarEventCategory[]
 
   @@index([start])
@@ -1661,6 +1784,9 @@ model TheokotProduct {
   priceCents          Int
   defaultQuantity     Int      @default(0)
   isWeeklySpecialSlot Boolean  @default(false) // "broodje van de week"-slot
+  imageKey            String? // optionele foto; NULL = gestreept patroon
+  ingredientsNl       String? // optionele ingrediëntenlijst (info-icoontje)
+  ingredientsEn       String?
   order               Int      @default(0)
   active              Boolean  @default(true)
   createdAt           DateTime @default(now())
@@ -1704,10 +1830,16 @@ model TheokotSessionItem {
   priceCents      Int
   quantity        Int // beschikbare voorraad voor deze sessie
   isWeeklySpecial Boolean @default(false)
+  imageKey        String? // meegekopieerd uit de catalogus, per dag aanpasbaar
+  ingredientsNl   String?
+  ingredientsEn   String?
   order           Int     @default(0)
 
-  session TheokotSession     @relation(fields: [sessionId], references: [id], onDelete: Cascade)
-  lines   TheokotOrderLine[]
+  session             TheokotSession       @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  lines               TheokotOrderLine[]
+  /// Broodjes die voor een vergadering (GM/Bureau) op dit item gereserveerd zijn.
+  /// Ze gaan van dezelfde voorraad af en staan apart op de turflijst.
+  meetingReservations MeetingReservation[]
 
   @@index([sessionId])
 }
@@ -1768,6 +1900,141 @@ model TheokotOrderLine {
 
   @@index([orderId])
   @@index([sessionItemId])
+}
+
+// -----------------------------------------------------------------------------
+// Broodjesmomenten: grocomeet (GM) en VTK Bureau
+//
+// Twee vergaderingen met dezelfde werking: er wordt vooraf een broodje en een
+// drankje besteld, die broodjes gaan van de Theokot-voorraad af en komen in een
+// aparte doos. Ze delen daarom één model; `kind` bepaalt het publiek (GM: enkel
+// postverantwoordelijken en Groep 5, via het profielmenu; Bureau: elke student,
+// via een gedeelde link) en wie het beheert. Zie docs/design-decisions.md.
+// -----------------------------------------------------------------------------
+
+/// Eén vergadering. `startsAt` is het moment zelf; het bestelvenster hangt aan de
+/// Theokot-verkoopdag van diezelfde dag (dezelfde deadline als voor studenten).
+model Meeting {
+  id String @id @default(cuid())
+
+  kind MeetingKind
+  /// Werkingsjaar + semester waarin dit moment valt. Enkel voor de
+  /// planningskalender: die vraagt per semester welke dagen er een moment is.
+  year     Int
+  semester Int
+  /// Deelbare link voor een bureau (`/bureau/<slug>`). Ook een GM krijgt er een,
+  /// zodat een mail naar één moment kan verwijzen.
+  slug     String @unique
+
+  startsAt DateTime  @db.Timestamptz(3)
+  location String?
+  /// Vanaf wanneer studenten dit bureau kunnen invullen. Leeg = meteen open.
+  /// Een GM staat altijd open: de grocos bestellen weken op voorhand.
+  opensAt  DateTime? @db.Timestamptz(3)
+
+  /// Aanbod uit Theokot (standaard), of een eigen lijst wanneer Theokot die dag
+  /// niets kan voorzien (lasagne, broodjes van een bakker). Een eigen aanbod
+  /// raakt de Theokot-voorraad en de turflijst niet.
+  useTheokot Boolean @default(true)
+
+  /// Vrije toelichting boven het reservatieformulier.
+  noteNl String?
+  noteEn String?
+
+  createdById String?
+  createdAt   DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt   DateTime @updatedAt @db.Timestamptz(3)
+
+  createdBy    User?                @relation("MeetingCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  options      MeetingOption[]
+  reservations MeetingReservation[]
+
+  @@index([kind, startsAt])
+  @@index([year, semester, kind])
+}
+
+/// Eén keuze uit het eigen aanbod van een moment (enkel bij `useTheokot=false`).
+model MeetingOption {
+  id         String  @id @default(cuid())
+  meetingId  String
+  nameNl     String
+  nameEn     String?
+  priceCents Int     @default(0)
+  order      Int     @default(0)
+
+  meeting      Meeting              @relation(fields: [meetingId], references: [id], onDelete: Cascade)
+  reservations MeetingReservation[]
+
+  @@index([meetingId])
+}
+
+/// Eén bestelling per persoon per moment. Naam en prijs van het broodje en het
+/// drankje zijn snapshots van het moment van bestellen: prijzen in de catalogus
+/// mogen een openstaande schuld niet met terugwerkende kracht veranderen.
+model MeetingReservation {
+  id        String                   @id @default(cuid())
+  meetingId String
+  userId    String
+  status    MeetingReservationStatus @default(ACTIVE)
+
+  /// Leeg = enkel een drankje besteld.
+  itemNameNl     String?
+  itemNameEn     String?
+  itemPriceCents Int     @default(0)
+  /// Herkomst van het gekozen broodje: catalogusitem (`TheokotProduct`) of een
+  /// eigen optie van dit moment. Puur informatief; de naam is wat telt bij het
+  /// koppelen aan de verkoopdag.
+  productId      String?
+  optionId       String?
+  /// Het aanbod-item van die verkoopdag, zodra het gekoppeld kon worden. Dit is
+  /// wat de voorraad afroomt en op de turflijst verschijnt.
+  sessionItemId  String?
+
+  /// Leeg = geen drankje.
+  drinkName       String?
+  drinkPriceCents Int     @default(0)
+
+  /// Opmerking bij een bureau (onderwijsfeedback vooraf).
+  comment String?
+
+  /// Ongeldig gemaakt omdat het gekozen broodje die dag niet bestaat. De persoon
+  /// kreeg er een mail over en ziet het op de reservatiepagina.
+  invalidatedAt     DateTime? @db.Timestamptz(3)
+  invalidatedReason String?
+
+  /// Betaald (enkel gebruikt voor de GM; een bureau betaalt Onderwijs zelf).
+  paidAt   DateTime? @db.Timestamptz(3)
+  paidById String?
+
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+
+  meeting     Meeting             @relation(fields: [meetingId], references: [id], onDelete: Cascade)
+  user        User                @relation("MeetingReservationUser", fields: [userId], references: [id], onDelete: Cascade)
+  paidBy      User?               @relation("MeetingReservationPaidBy", fields: [paidById], references: [id], onDelete: SetNull)
+  option      MeetingOption?      @relation(fields: [optionId], references: [id], onDelete: SetNull)
+  sessionItem TheokotSessionItem? @relation(fields: [sessionItemId], references: [id], onDelete: SetNull)
+
+  @@unique([meetingId, userId])
+  @@index([userId, status])
+  @@index([sessionItemId])
+  @@index([status, paidAt])
+}
+
+/// Onthoudt dat de kalender voor dit semester al ingevuld is, zodat het beheer
+/// er maar één keer per semester ongevraagd naar vraagt.
+model MeetingPlan {
+  id          String   @id @default(cuid())
+  kind        MeetingKind
+  year        Int
+  semester    Int
+  plannedById String?
+  createdAt   DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt   DateTime @updatedAt @db.Timestamptz(3)
+
+  plannedBy User? @relation("MeetingPlanBy", fields: [plannedById], references: [id], onDelete: SetNull)
+
+  @@unique([kind, year, semester])
 }
 
 /// Tijdelijke ban na te veel no-shows. Historiek blijft bewaard; een ban
@@ -2947,4 +3214,436 @@ model SsoAuditLog {
   @@index([createdAt])
   @@index([clientId])
   @@map("ssoAuditLog")
+}
+
+// -----------------------------------------------------------------------------
+// Formulieren
+//
+// Leden beheren formulieren in de admin, bezoekers vullen ze in op de publieke
+// site, beheerders bekijken en exporteren de inzendingen. De structuur volgt
+// bewust die van ticketing: grants per formulier (persoon én post), NL/EN-
+// kolomparen in plaats van een JSON-blob met vertalingen, een auditlog en een
+// outbox voor mail. Zie docs/forms.md voor de end-to-end flow en
+// docs/design-decisions.md voor de kringkeuzes.
+// -----------------------------------------------------------------------------
+
+model Form {
+  id              String  @id @default(cuid())
+  slug            String  @unique
+  /// Optionele koppeling aan een kalenderevenement: het formulier verschijnt dan
+  /// bij dat evenement en de bevestigingsmail kan er een .ics bij steken.
+  calendarEventId String? @unique
+  ownerGroupId    String
+  createdById     String?
+
+  titleNl String
+  titleEn String?
+  /// Markdown, bewerkt met MarkdownEditor en gerenderd in een prose-vtk container.
+  introNl String?
+  introEn String?
+
+  status        FormStatus     @default(DRAFT)
+  audience      FormAudience   @default(PUBLIC)
+  /// Staat dit formulier in de publieke lijst op /formulieren? Uit betekent enkel
+  /// dat het er niet in staat; wie de link heeft, geraakt er gewoon op. Een
+  /// sollicitatieformulier hoort meestal niet in een overzicht.
+  listed        Boolean        @default(true)
+  localeMode    FormLocaleMode @default(BOTH)
+  /// Wat een bezoeker in de niet-aangeboden taal te zien krijgt.
+  unavailableNl String?
+  unavailableEn String?
+
+  opensAt  DateTime? @db.Timestamptz(3)
+  closesAt DateTime? @db.Timestamptz(3)
+  timeZone String    @default("Europe/Brussels")
+
+  maxEntries               Int?
+  /// Vol, maar toch invulbaar: inzendingen komen dan op de wachtlijst.
+  allowWaitlist            Boolean @default(false)
+  /// Secties één voor één tonen in plaats van onder elkaar. Nodig om te kunnen
+  /// springen: naar een sectie verderop springen heeft geen betekenis wanneer
+  /// alles toch al op één pagina staat.
+  stepBySections           Boolean @default(false)
+  allowMultipleSubmissions Boolean @default(false)
+  /// Enkel ingelogde leden kunnen bewerken: een anonieme inzending heeft geen
+  /// eigenaar om ze aan terug te geven, en een bewerklink per mail zou
+  /// persoonsgegevens ontsluiten aan wie hem doorgestuurd krijgt.
+  allowEditAfterSubmit     Boolean @default(false)
+  /// Concept opslaan en later verdergaan. Om dezelfde reden alleen voor leden.
+  allowDrafts              Boolean @default(false)
+
+  confirmationEnabled        Boolean @default(false)
+  confirmationSubjectNl      String?
+  confirmationSubjectEn      String?
+  confirmationBodyNl         String?
+  confirmationBodyEn         String?
+  confirmationIncludeAnswers Boolean @default(true)
+  confirmationIncludeIcs     Boolean @default(false)
+
+  /// Wie verwittigd wordt bij een inzending, en hoe vaak.
+  notifyMode   FormNotifyMode @default(NONE)
+  notifyEmails String[]       @default([])
+
+  thankYouNl String?
+  thankYouEn String?
+
+  /// Verplichte toestemmingsvraag bovenop de velden, met de link naar het
+  /// privacybeleid erbij.
+  requireConsent Boolean @default(false)
+  consentTextNl  String?
+  consentTextEn  String?
+
+  /// Leeg = niet automatisch opruimen; dat is bewust de standaard, want stil
+  /// verdwijnende inzendingen zijn erger dan een volle tabel.
+  retentionDays Int?
+
+  settings Json @default("{}")
+
+  publishedAt DateTime? @db.Timestamptz(3)
+  archivedAt  DateTime? @db.Timestamptz(3)
+  createdAt   DateTime  @default(now()) @db.Timestamptz(3)
+  updatedAt   DateTime  @updatedAt @db.Timestamptz(3)
+
+  calendarEvent CalendarEvent? @relation(fields: [calendarEventId], references: [id], onDelete: SetNull)
+  ownerGroup    Group          @relation("FormOwnerGroup", fields: [ownerGroupId], references: [id], onDelete: Restrict)
+  createdBy     User?          @relation("FormCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+
+  sections       FormSection[]
+  fields         FormField[]
+  options        FormFieldOption[]
+  conditions     FormFieldCondition[]
+  entries        FormEntry[]
+  answers        FormAnswer[]
+  uploads        FormFileUpload[]
+  userGrants     FormUserGrant[]
+  groupGrants    FormGroupGrant[]
+  auditLogs      FormAuditLog[]
+  outboxMessages FormOutboxMessage[]
+
+  @@index([ownerGroupId])
+  @@index([status, opensAt, closesAt])
+}
+
+/// Secties maken een lang formulier leesbaar en geven de voortgangsbalk haar
+/// stappen. Velden zonder sectie horen bovenaan, vóór de eerste sectie.
+model FormSection {
+  id            String  @id @default(cuid())
+  formId        String
+  sortOrder     Int     @default(0)
+  titleNl       String
+  titleEn       String?
+  descriptionNl String?
+  descriptionEn String?
+
+  /// Waar de bezoeker na deze sectie belandt wanneer geen enkel antwoord iets
+  /// anders zegt. Leeg = gewoon de volgende sectie in volgorde.
+  nextSectionId String?
+  /// Het formulier eindigt na deze sectie, ook al volgen er nog secties.
+  endsForm      Boolean @default(false)
+
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+
+  form         Form              @relation(fields: [formId], references: [id], onDelete: Cascade)
+  fields       FormField[]
+  /// Zelfverwijzing voor de standaardsprong. SetNull: wie de doelsectie
+  /// verwijdert, laat de bezoeker gewoon weer naar de volgende sectie gaan in
+  /// plaats van naar een sectie die niet meer bestaat.
+  nextSection  FormSection?      @relation("FormSectionNext", fields: [nextSectionId], references: [id], onDelete: SetNull)
+  previousOf   FormSection[]     @relation("FormSectionNext")
+  optionRoutes FormFieldOption[] @relation("FormOptionNextSection")
+
+  @@unique([id, formId])
+  @@index([formId, sortOrder])
+  @@index([nextSectionId])
+}
+
+model FormField {
+  id        String        @id @default(cuid())
+  formId    String
+  sectionId String?
+  /// Stabiele sleutel: de kolomnaam in de CSV en de sleutel in een prefill-link.
+  /// Het label hernoemen laat deze ongemoeid, zodat een export nooit van kolom
+  /// verspringt en een oud antwoord bij zijn eigen vraag blijft horen.
+  code      String
+  type      FormFieldType
+  sortOrder Int           @default(0)
+
+  labelNl String
+  labelEn String?
+  helpNl  String?
+  helpEn  String?
+
+  required Boolean @default(false)
+  /// Typespecifiek: maxLength, multiline, min/max, pattern met eigen
+  /// foutmelding, minChecked/maxChecked, maxFiles, toegelaten extensies,
+  /// schaalbereik, "Andere, namelijk", husselen, imageKey. Wordt door
+  /// lib/forms/schema.ts gevalideerd en nooit rauw vertrouwd.
+  config   Json    @default("{}")
+
+  /// Soft delete. Een veld met antwoorden verdwijnt van het formulier maar houdt
+  /// zijn kolom in de export; hard verwijderen zou bestaande inzendingen
+  /// uithollen.
+  archivedAt DateTime? @db.Timestamptz(3)
+  createdAt  DateTime  @default(now()) @db.Timestamptz(3)
+  updatedAt  DateTime  @updatedAt @db.Timestamptz(3)
+
+  form             Form                 @relation(fields: [formId], references: [id], onDelete: Cascade)
+  section          FormSection?         @relation(fields: [sectionId, formId], references: [id, formId], onDelete: Restrict)
+  options          FormFieldOption[]
+  answers          FormAnswer[]
+  uploads          FormFileUpload[]
+  conditions       FormFieldCondition[] @relation("FormFieldConditionTarget")
+  conditionSources FormFieldCondition[] @relation("FormFieldConditionSource")
+
+  @@unique([formId, code])
+  @@unique([id, formId])
+  @@index([formId, sortOrder])
+  @@index([sectionId])
+}
+
+/// Keuzeopties zijn rijen en geen JSON-lijst: een quotum per optie moet
+/// race-veilig afgeteld kunnen worden (zoals TicketInventoryPool doet), en een
+/// geschrapte optie moet zichtbaar blijven zolang iemand ze aangeduid heeft.
+model FormFieldOption {
+  id        String  @id @default(cuid())
+  formId    String
+  fieldId   String
+  /// Stabiel, net als FormField.code: dit is wat er in het antwoord belandt.
+  code      String
+  labelNl   String
+  labelEn   String?
+  sortOrder Int     @default(0)
+
+  /// Leeg = onbeperkt. `quotaUsed` en `version` maken het aftellen race-veilig.
+  quotaLimit    Int?
+  quotaUsed     Int     @default(0)
+  version       Int     @default(0)
+  /// Vol, maar toch kiesbaar: de inzending komt dan op de wachtlijst in plaats
+  /// van geweigerd te worden.
+  allowWaitlist Boolean @default(false)
+
+  /// Springt naar deze sectie wanneer de bezoeker deze optie kiest.
+  nextSectionId String?
+  /// Beëindigt het formulier meteen bij deze keuze.
+  endsForm      Boolean @default(false)
+
+  archivedAt DateTime? @db.Timestamptz(3)
+  createdAt  DateTime  @default(now()) @db.Timestamptz(3)
+  updatedAt  DateTime  @updatedAt @db.Timestamptz(3)
+
+  form        Form         @relation(fields: [formId], references: [id], onDelete: Cascade)
+  field       FormField    @relation(fields: [fieldId, formId], references: [id, formId], onDelete: Cascade)
+  nextSection FormSection? @relation("FormOptionNextSection", fields: [nextSectionId], references: [id], onDelete: SetNull)
+
+  @@unique([fieldId, code])
+  @@unique([id, formId])
+  @@index([formId])
+  @@index([fieldId, sortOrder])
+}
+
+/// Veld X is enkel zichtbaar wanneer veld Y een bepaald antwoord heeft. Meerdere
+/// condities op hetzelfde veld gelden samen (AND). De server herberekent dit bij
+/// het indienen: een onzichtbaar veld is nooit verplicht en aanvaardt geen
+/// antwoord, ongeacht wat de client opstuurt.
+model FormFieldCondition {
+  id            String                     @id @default(cuid())
+  formId        String
+  /// Het veld dat getoond of verborgen wordt.
+  fieldId       String
+  /// Het veld waarvan het antwoord beslist.
+  sourceFieldId String
+  operator      FormFieldConditionOperator @default(EQUALS)
+  /// Optiecode of vrije waarde; leeg bij IS_ANSWERED.
+  value         String?
+  sortOrder     Int                        @default(0)
+  createdAt     DateTime                   @default(now()) @db.Timestamptz(3)
+
+  form        Form      @relation(fields: [formId], references: [id], onDelete: Cascade)
+  field       FormField @relation("FormFieldConditionTarget", fields: [fieldId, formId], references: [id, formId], onDelete: Cascade)
+  sourceField FormField @relation("FormFieldConditionSource", fields: [sourceFieldId, formId], references: [id, formId], onDelete: Cascade)
+
+  @@index([formId])
+  @@index([fieldId])
+  @@index([sourceFieldId])
+}
+
+model FormEntry {
+  id     String @id @default(cuid())
+  formId String
+
+  status       FormEntryStatus  @default(DRAFT)
+  reviewStatus FormReviewStatus @default(NEW)
+  reviewerId   String?
+  internalNote String?
+
+  submittedById  String?
+  /// Naam en e-mail zoals ingevuld of overgenomen uit het profiel. Apart bewaard
+  /// zodat mailen en ontdubbelen niet elke keer door de antwoorden moet lopen.
+  submitterName  String?
+  submitterEmail String?
+  locale         Locale  @default(NL)
+
+  /// Testinzending: telt niet mee in tellingen, quota of export tenzij expliciet
+  /// gevraagd, zodat een beheerder zijn eigen formulier kan uitproberen.
+  isTest Boolean @default(false)
+
+  /// Op de wachtlijst: wel ingediend, maar zonder plaats. Zo'n inzending claimt
+  /// geen quotum; een beheerder haalt ze erbij wanneer er iets vrijkomt.
+  waitlisted   Boolean   @default(false)
+  waitlistedAt DateTime? @db.Timestamptz(3)
+
+  /// Enkel om misbruik te herkennen; de retentie kuist dit op.
+  requestFingerprint String?
+
+  submittedAt DateTime? @db.Timestamptz(3)
+  createdAt   DateTime  @default(now()) @db.Timestamptz(3)
+  updatedAt   DateTime  @updatedAt @db.Timestamptz(3)
+
+  form        Form  @relation(fields: [formId], references: [id], onDelete: Cascade)
+  submittedBy User? @relation("FormEntrySubmittedBy", fields: [submittedById], references: [id], onDelete: SetNull)
+  reviewer    User? @relation("FormEntryReviewer", fields: [reviewerId], references: [id], onDelete: SetNull)
+
+  answers FormAnswer[]
+  uploads FormFileUpload[]
+
+  @@unique([id, formId])
+  @@index([formId, status, submittedAt])
+  @@index([formId, submittedById])
+  @@index([submittedById])
+  @@index([reviewerId])
+  @@index([submitterEmail])
+}
+
+model FormAnswer {
+  id        String @id @default(cuid())
+  formId    String
+  entryId   String
+  fieldId   String
+  /// Momentopname van FormField.code. De export leest deze en niet de huidige
+  /// code, zodat een hernoemd of gearchiveerd veld zijn kolom houdt.
+  fieldCode String
+
+  valueText    String?
+  valueNumber  Float?
+  valueDate    DateTime? @db.Timestamptz(3)
+  valueBool    Boolean?
+  /// Optiecodes bij een keuzeveld.
+  valueOptions String[]  @default([])
+  /// De vrije tekst bij "Andere, namelijk ...".
+  otherText    String?
+
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+
+  form  Form      @relation(fields: [formId], references: [id], onDelete: Cascade)
+  entry FormEntry @relation(fields: [entryId, formId], references: [id, formId], onDelete: Cascade)
+  field FormField @relation(fields: [fieldId, formId], references: [id, formId], onDelete: Cascade)
+
+  @@unique([entryId, fieldId])
+  @@index([formId, fieldId])
+  @@index([entryId])
+}
+
+/// Bestanden landen in de objectopslag (packages/storage), nooit op het
+/// filesystem. Downloaden loopt door een route die de grants checkt.
+model FormFileUpload {
+  id           String   @id @default(cuid())
+  formId       String
+  entryId      String
+  fieldId      String
+  storageKey   String
+  originalName String
+  contentType  String?
+  sizeBytes    Int
+  createdAt    DateTime @default(now()) @db.Timestamptz(3)
+
+  form  Form      @relation(fields: [formId], references: [id], onDelete: Cascade)
+  entry FormEntry @relation(fields: [entryId, formId], references: [id, formId], onDelete: Cascade)
+  field FormField @relation(fields: [fieldId, formId], references: [id, formId], onDelete: Cascade)
+
+  @@index([entryId])
+  @@index([formId, fieldId])
+}
+
+model FormUserGrant {
+  id          String        @id @default(cuid())
+  formId      String
+  userId      String
+  role        FormGrantRole
+  grantedById String?
+  createdAt   DateTime      @default(now()) @db.Timestamptz(3)
+
+  form      Form  @relation(fields: [formId], references: [id], onDelete: Cascade)
+  user      User  @relation("FormGrantUser", fields: [userId], references: [id], onDelete: Cascade)
+  grantedBy User? @relation("FormGrantGrantedBy", fields: [grantedById], references: [id], onDelete: SetNull)
+
+  @@unique([formId, userId])
+  @@index([userId])
+}
+
+model FormGroupGrant {
+  id          String              @id @default(cuid())
+  formId      String
+  groupId     String
+  role        FormGrantRole
+  scope       FormGroupGrantScope @default(ALL_MEMBERS)
+  grantedById String?
+  createdAt   DateTime            @default(now()) @db.Timestamptz(3)
+
+  form      Form  @relation(fields: [formId], references: [id], onDelete: Cascade)
+  group     Group @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  grantedBy User? @relation("FormGroupGrantGrantedBy", fields: [grantedById], references: [id], onDelete: SetNull)
+
+  @@unique([formId, groupId])
+  @@index([groupId])
+}
+
+/// Wie wijzigde welk formulier, wie verwijderde welke inzending. In de stijl van
+/// TicketAuditLog; de retentie wist het IP-adres en de ruwe metadata.
+model FormAuditLog {
+  id          String   @id @default(cuid())
+  formId      String
+  actorUserId String?
+  action      String
+  entityType  String
+  entityId    String?
+  ipAddress   String?
+  metadata    Json?
+  createdAt   DateTime @default(now()) @db.Timestamptz(3)
+
+  form      Form  @relation(fields: [formId], references: [id], onDelete: Cascade)
+  actorUser User? @relation("FormAuditActor", fields: [actorUserId], references: [id], onDelete: SetNull)
+
+  @@index([formId, createdAt])
+  @@index([formId, entityType, entityId])
+  @@index([actorUserId])
+}
+
+/// Eigen outbox naast die van ticketing, en bewust geen gedeelde tabel: die
+/// hangt met verplichte FK's aan TicketEvent en TicketOrder, en die
+/// generaliseren zou de ticketmodule moeten migreren. Het patroon is identiek:
+/// een unieke dedupeKey, herpogingen met uitstel, en een status per bericht.
+model FormOutboxMessage {
+  id          String           @id @default(cuid())
+  formId      String?
+  entryId     String?
+  type        String
+  dedupeKey   String           @unique
+  recipient   String?
+  payload     Json
+  status      FormOutboxStatus @default(PENDING)
+  attempts    Int              @default(0)
+  availableAt DateTime         @default(now()) @db.Timestamptz(3)
+  lockedAt    DateTime?        @db.Timestamptz(3)
+  lockedBy    String?
+  lastError   String?
+  sentAt      DateTime?        @db.Timestamptz(3)
+  createdAt   DateTime         @default(now()) @db.Timestamptz(3)
+  updatedAt   DateTime         @updatedAt @db.Timestamptz(3)
+
+  form Form? @relation(fields: [formId], references: [id], onDelete: Cascade)
+
+  @@index([status, availableAt])
+  @@index([formId])
 }

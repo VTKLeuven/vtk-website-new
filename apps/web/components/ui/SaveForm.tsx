@@ -1,6 +1,13 @@
 "use client";
 
-import { useActionState, useEffect, useRef, type ReactNode } from "react";
+import {
+  startTransition,
+  useActionState,
+  useEffect,
+  useRef,
+  type FormEvent,
+  type ReactNode,
+} from "react";
 import { Button } from "@vtk/ui";
 import { useToast } from "@/components/ui/toast";
 import { FormBusyProvider, useFormBusy } from "@/components/ui/formBusy";
@@ -22,6 +29,7 @@ export function SaveForm({
   errorMessages,
   fallbackErrorMessage,
   onSuccess,
+  resetOnSuccess = true,
   submitDisabled = false,
   secondarySubmit,
   className,
@@ -36,6 +44,8 @@ export function SaveForm({
   fallbackErrorMessage: string;
   /** Loopt na een geslaagde opslag, bv. om een net aangemaakt item te sluiten. */
   onSuccess?: () => void;
+  /** Uit voor bewerkformulieren die hun gecontroleerde waarden moeten behouden. */
+  resetOnSuccess?: boolean;
   /** Extra voorwaarde bovenop "bezig met opslaan", bv. een verplichte upload. */
   submitDisabled?: boolean;
   /**
@@ -56,12 +66,42 @@ export function SaveForm({
   // Per submit exact één toast, ook als de component om een andere reden
   // hertekent met dezelfde state.
   const handled = useRef<number | null>(null);
+  const formRef = useRef<HTMLFormElement>(null);
+
+  /**
+   * Zelf verzenden in plaats van `<form action={formAction}>`.
+   *
+   * React leegt een uncontrolled formulier na élke afgelopen form action, dus
+   * ook na een geweigerde opslag: je typte twintig velden, één e-mailadres had
+   * een tikfout, en alles stond weer op de oude waarde onder een rode toast.
+   * Via een eigen submit gebeurt dat niet, en resetten we hieronder enkel na
+   * succes; daar rekenen de "toevoegen"-formulieren op, die na een geslaagde
+   * toevoeging leeg horen te zijn.
+   *
+   * De submitter moet mee in de FormData, anders verliest `secondarySubmit`
+   * zijn name/value en weet de action niet op welke knop je klikte.
+   */
+  function onSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const form = event.currentTarget;
+    // Alleen een echte submitknop mag als submitter mee; iets anders laat de
+    // FormData-constructor met een TypeError afgaan.
+    const submitter = (event.nativeEvent as SubmitEvent).submitter;
+    const data = new FormData(
+      form,
+      submitter instanceof HTMLButtonElement || submitter instanceof HTMLInputElement
+        ? submitter
+        : null
+    );
+    startTransition(() => formAction(data));
+  }
 
   useEffect(() => {
     if (state.status === "idle" || handled.current === state.nonce) return;
     handled.current = state.nonce;
 
     if (state.status === "success") {
+      if (resetOnSuccess) formRef.current?.reset();
       showToast({ message: savedMessage, variant: "success" });
       onSuccess?.();
     } else {
@@ -73,10 +113,18 @@ export function SaveForm({
         duration: 0,
       });
     }
-  }, [state, showToast, savedMessage, errorMessages, fallbackErrorMessage, onSuccess]);
+  }, [
+    state,
+    showToast,
+    savedMessage,
+    errorMessages,
+    fallbackErrorMessage,
+    onSuccess,
+    resetOnSuccess,
+  ]);
 
   return (
-    <form action={formAction} className={className}>
+    <form ref={formRef} onSubmit={onSubmit} className={className}>
       <FormBusyProvider register={register}>{children}</FormBusyProvider>
       <div className="flex flex-wrap items-center gap-3">
         <Button type="submit" disabled={pending || submitDisabled || busy}>

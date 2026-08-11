@@ -9,11 +9,18 @@ import {
   brusselsYMD,
   canCancel,
   canOrderNow,
+  coerceItemLayout,
   validateOrderLines,
   TheokotValidationError,
   type OrderLineInput,
 } from "@/lib/theokot";
+import { readImageField, resolveImageKey, type ImageFieldValue } from "@/lib/imageField";
 import { activeBanFor, getTheokotConfig } from "@/lib/theokot-server";
+import {
+  syncMeetingsForSession,
+  syncMeetingsOnDay,
+  usageForSessionItemsTx,
+} from "@/lib/meetings-server";
 import { verifyStudentCard } from "@/lib/kul-card";
 import {
   allocateUserShiftReward,
@@ -50,6 +57,12 @@ function parseDayToBrusselsMidnight(value: string | null | undefined): Date | nu
 
 function revalidateTheokot() {
   revalidatePath(ADMIN_PATH);
+  // Een gewijzigd aanbod verandert wat een vergadering nog kan bestellen.
+  revalidatePath("/grocomeet");
+  revalidatePath("/en/grocomeet");
+  revalidatePath("/admin/grocomeet");
+  revalidatePath("/admin/bureau");
+  revalidatePath("/admin/theokot/turflijst");
   revalidatePath("/admin/theokot/afhalen");
   revalidatePath("/en/admin/theokot/afhalen");
   revalidatePath("/theokot");
@@ -64,32 +77,59 @@ function validTime(value: unknown, fallback: string): string {
   return typeof value === "string" && TIME_RE.test(value) ? value : fallback;
 }
 
-type OfferingInput = {
+type OfferingRow = {
+  /** Leeg voor een nieuwe rij. */
+  id: string;
   nameNl: string;
   nameEn: string | null;
   priceCents: number;
   quantity: number;
   isWeeklySpecial: boolean;
+  ingredientsNl: string | null;
+  ingredientsEn: string | null;
+  /** Wat het foto-veld wil: bewaren, vervangen of wissen (zie `readImageField`). */
+  image: Exclude<ImageFieldValue, { kind: "invalid" }>;
   order: number;
 };
 
-/** Leest de geïndexeerde aanbod-velden (`item-<i>-{nameNl,nameEn,price,quantity,weekly}`). */
-function parseOfferingItems(formData: FormData): OfferingInput[] {
-  const count = Number(formData.get("itemCount")) || 0;
-  const items: OfferingInput[] = [];
+/** Eén aanbod-item zoals het in een nieuwe sessie terechtkomt (foto al opgelost). */
+type OfferingSnapshot = Omit<OfferingRow, "id" | "image"> & { imageKey: string | null };
+
+/**
+ * Leest de geïndexeerde aanbodvelden
+ * (`<prefix>-<i>-{id,nameNl,nameEn,price,quantity,weekly,ingredientsNl,ingredientsEn,imageKey}`)
+ * uit één van de twee editors: `item-` voor een sessie-aanbod, `product-` voor de
+ * catalogus. Rijen zonder Nederlandse naam vallen weg; ze zijn leeg gelaten.
+ *
+ * Geeft `null` terug wanneer een foto-key niet uit de upload-route komt: dat is
+ * geknoei met het verborgen veld en geen invoerfout die we stilzwijgend negeren.
+ */
+function parseOfferingRows(
+  formData: FormData,
+  prefix: "item" | "product",
+  countField: "itemCount" | "productCount",
+): OfferingRow[] | null {
+  const count = Number(formData.get(countField)) || 0;
+  const rows: OfferingRow[] = [];
   for (let i = 0; i < count; i += 1) {
-    const nameNl = ((formData.get(`item-${i}-nameNl`) as string) || "").trim();
+    const nameNl = ((formData.get(`${prefix}-${i}-nameNl`) as string) || "").trim();
     if (!nameNl) continue;
-    items.push({
+    const image = readImageField(formData, `${prefix}-${i}-imageKey`);
+    if (image.kind === "invalid") return null;
+    rows.push({
+      id: (formData.get(`${prefix}-${i}-id`) as string) || "",
       nameNl,
-      nameEn: ((formData.get(`item-${i}-nameEn`) as string) || "").trim() || null,
-      priceCents: euroToCents(formData.get(`item-${i}-price`)) ?? 0,
-      quantity: Math.max(0, Number(formData.get(`item-${i}-quantity`)) || 0),
-      isWeeklySpecial: formData.get(`item-${i}-weekly`) === "on",
-      order: items.length,
+      nameEn: ((formData.get(`${prefix}-${i}-nameEn`) as string) || "").trim() || null,
+      priceCents: euroToCents(formData.get(`${prefix}-${i}-price`)) ?? 0,
+      quantity: Math.max(0, Number(formData.get(`${prefix}-${i}-quantity`)) || 0),
+      isWeeklySpecial: formData.get(`${prefix}-${i}-weekly`) === "on",
+      ingredientsNl: ((formData.get(`${prefix}-${i}-ingredientsNl`) as string) || "").trim() || null,
+      ingredientsEn: ((formData.get(`${prefix}-${i}-ingredientsEn`) as string) || "").trim() || null,
+      image,
+      order: rows.length,
     });
   }
-  return items;
+  return rows;
 }
 
 // -----------------------------------------------------------------------------
@@ -119,7 +159,19 @@ export async function createWeekSessionsAction(formData: FormData): Promise<void
   const orderOpenTime = validTime(formData.get("orderOpenTime"), config.orderOpenTime);
 
   // Aanbod uit het formulier; valt terug op de actieve catalogus als er niets meekomt.
-  let offering = parseOfferingItems(formData);
+  const rows = parseOfferingRows(formData, "item", "itemCount");
+  if (!rows) throw new Error("Ongeldige foto bij het aanbod");
+  let offering: OfferingSnapshot[] = rows.map((row) => ({
+    nameNl: row.nameNl,
+    nameEn: row.nameEn,
+    priceCents: row.priceCents,
+    quantity: row.quantity,
+    isWeeklySpecial: row.isWeeklySpecial,
+    ingredientsNl: row.ingredientsNl,
+    ingredientsEn: row.ingredientsEn,
+    imageKey: resolveImageKey(row.image, null),
+    order: row.order,
+  }));
   if (offering.length === 0) {
     const products = await prisma.theokotProduct.findMany({ where: { active: true }, orderBy: { order: "asc" } });
     offering = products.map((p, i) => ({
@@ -128,6 +180,9 @@ export async function createWeekSessionsAction(formData: FormData): Promise<void
       priceCents: p.priceCents,
       quantity: p.defaultQuantity,
       isWeeklySpecial: p.isWeeklySpecialSlot,
+      ingredientsNl: p.ingredientsNl,
+      ingredientsEn: p.ingredientsEn,
+      imageKey: p.imageKey,
       order: i,
     }));
   }
@@ -161,11 +216,19 @@ export async function createWeekSessionsAction(formData: FormData): Promise<void
             priceCents: it.priceCents,
             quantity: it.quantity,
             isWeeklySpecial: it.isWeeklySpecial,
+            ingredientsNl: it.ingredientsNl,
+            ingredientsEn: it.ingredientsEn,
+            imageKey: it.imageKey,
             order: it.order,
           })),
         },
       },
     });
+
+    // Reservaties voor een grocomeet of bureau op deze dag zijn weken geleden
+    // uit de catalogus gekozen. Nu het aanbod van die dag bestaat, koppelen we
+    // ze eraan; wat er niet op staat, wordt ongeldig en de persoon krijgt een mail.
+    await syncMeetingsOnDay(dayMidnight);
   }
 
   revalidateTheokot();
@@ -202,15 +265,17 @@ export async function updateSessionAction(
   }
 
   await prisma.theokotSession.update({ where: { id }, data });
+  // Een dag dichtzetten of verplaatsen raakt ook de vergaderingen van die dag.
+  await syncMeetingsForSession(id);
   revalidateTheokot();
   return saveOk();
 }
 
 /**
  * Vervangt het aanbod van een sessie. Items worden meegestuurd als geïndexeerde
- * velden `item-<i>-{id,nameNl,nameEn,price,quantity,weekly}`. Bestaande items die
- * niet meer voorkomen worden verwijderd tenzij ze al bestellijnen hebben (dan
- * blijven ze staan om historiek niet te breken).
+ * velden `item-<i>-{id,nameNl,nameEn,price,quantity,weekly,ingredientsNl,ingredientsEn,imageKey}`.
+ * Bestaande items die niet meer voorkomen worden verwijderd tenzij ze al
+ * bestellijnen hebben (dan blijven ze staan om historiek niet te breken).
  */
 export async function updateSessionItemsAction(
   _prev: SaveState,
@@ -224,27 +289,23 @@ export async function updateSessionItemsAction(
   });
   if (!existing) throw new Error("Sessie niet gevonden");
 
-  const count = Number(formData.get("itemCount")) || 0;
+  const rows = parseOfferingRows(formData, "item", "itemCount");
+  if (!rows) return saveError("INVALID_IMAGE");
+
+  const currentKeys = new Map(existing.items.map((i) => [i.id, i.imageKey]));
   const keepIds = new Set<string>();
 
-  for (let i = 0; i < count; i += 1) {
-    const nameNl = ((formData.get(`item-${i}-nameNl`) as string) || "").trim();
-    if (!nameNl) continue;
-    const id = (formData.get(`item-${i}-id`) as string) || "";
-    const nameEn = ((formData.get(`item-${i}-nameEn`) as string) || "").trim() || null;
-    const priceCents = euroToCents(formData.get(`item-${i}-price`)) ?? 0;
-    const quantity = Math.max(0, Number(formData.get(`item-${i}-quantity`)) || 0);
-    const isWeeklySpecial = formData.get(`item-${i}-weekly`) === "on";
-
+  for (const row of rows) {
+    const { id, image, order, ...fields } = row;
     if (id) {
       keepIds.add(id);
       await prisma.theokotSessionItem.update({
         where: { id },
-        data: { nameNl, nameEn, priceCents, quantity, isWeeklySpecial, order: i },
+        data: { ...fields, imageKey: resolveImageKey(image, currentKeys.get(id) ?? null), order },
       });
     } else {
       await prisma.theokotSessionItem.create({
-        data: { sessionId, nameNl, nameEn, priceCents, quantity, isWeeklySpecial, order: i },
+        data: { sessionId, ...fields, imageKey: resolveImageKey(image, null), order },
       });
     }
   }
@@ -255,6 +316,11 @@ export async function updateSessionItemsAction(
       await prisma.theokotSessionItem.delete({ where: { id: item.id } });
     }
   }
+
+  // Dit is precies het geval waarvoor het uitlijnen bestaat: een week met een
+  // ander aanbod dan de catalogus. Wie een broodje reserveerde dat er nu niet
+  // meer is, krijgt een mail en een melding om opnieuw te kiezen.
+  await syncMeetingsForSession(sessionId);
 
   revalidateTheokot();
   return saveOk();
@@ -285,6 +351,7 @@ export async function saveConfigAction(
     noShowGraceMinutes: num("noShowGraceMinutes", 0),
     noShowThreshold: num("noShowThreshold", 1),
     banDurationDays: num("banDurationDays", 1),
+    itemLayout: coerceItemLayout(formData.get("itemLayout")),
   };
   await prisma.setting.upsert({
     where: { key: "theokot.config" },
@@ -297,41 +364,60 @@ export async function saveConfigAction(
 }
 
 /**
- * Vervangt de standaardcatalogus (`TheokotProduct`) — de default namen, prijzen en
- * aantallen die "Verkoopweek aanmaken" als startpunt gebruikt. Items komen als
- * geïndexeerde velden `product-<i>-{id,nameNl,nameEn,price,quantity,weekly}`. Actieve
- * producten die niet meer voorkomen worden verwijderd (de catalogus is losstaand:
- * sessie-items zijn kopieën, dus bestaande weken blijven ongemoeid).
+ * Vervangt de standaardcatalogus (`TheokotProduct`) — de default namen, prijzen,
+ * aantallen, foto's en ingrediënten die "Verkoopweek aanmaken" als startpunt
+ * gebruikt. Items komen als geïndexeerde velden
+ * `product-<i>-{id,nameNl,nameEn,price,quantity,weekly,ingredientsNl,ingredientsEn,imageKey}`.
+ * Actieve producten die niet meer voorkomen worden verwijderd (de catalogus is
+ * losstaand: sessie-items zijn kopieën, dus bestaande weken blijven ongemoeid).
+ *
+ * Een vervangen of gewiste foto laat het oude object bewust in storage staan: die
+ * key is meegekopieerd naar de sessie-items van elke week die er al mee aangemaakt
+ * is, en die weken moeten hun foto blijven tonen.
  */
 export async function saveProductCatalogAction(
   _prev: SaveState,
   formData: FormData,
 ): Promise<SaveState> {
   await requirePermission("theokot.manage");
-  const count = Number(formData.get("productCount")) || 0;
+  const rows = parseOfferingRows(formData, "product", "productCount");
+  if (!rows) return saveError("INVALID_IMAGE");
+
+  const active = await prisma.theokotProduct.findMany({
+    where: { active: true },
+    select: { id: true, imageKey: true },
+  });
+  const currentKeys = new Map(active.map((p) => [p.id, p.imageKey]));
   const keepIds = new Set<string>();
 
-  for (let i = 0; i < count; i += 1) {
-    const nameNl = ((formData.get(`product-${i}-nameNl`) as string) || "").trim();
-    if (!nameNl) continue;
-    const id = (formData.get(`product-${i}-id`) as string) || "";
-    const nameEn = ((formData.get(`product-${i}-nameEn`) as string) || "").trim() || null;
-    const priceCents = euroToCents(formData.get(`product-${i}-price`)) ?? 0;
-    const defaultQuantity = Math.max(0, Number(formData.get(`product-${i}-quantity`)) || 0);
-    const isWeeklySpecialSlot = formData.get(`product-${i}-weekly`) === "on";
-    const data = { nameNl, nameEn, priceCents, defaultQuantity, isWeeklySpecialSlot, order: i, active: true };
+  for (const row of rows) {
+    const data = {
+      nameNl: row.nameNl,
+      nameEn: row.nameEn,
+      priceCents: row.priceCents,
+      defaultQuantity: row.quantity,
+      isWeeklySpecialSlot: row.isWeeklySpecial,
+      ingredientsNl: row.ingredientsNl,
+      ingredientsEn: row.ingredientsEn,
+      order: row.order,
+      active: true,
+    };
 
-    if (id) {
-      keepIds.add(id);
-      await prisma.theokotProduct.update({ where: { id }, data });
+    if (row.id) {
+      keepIds.add(row.id);
+      await prisma.theokotProduct.update({
+        where: { id: row.id },
+        data: { ...data, imageKey: resolveImageKey(row.image, currentKeys.get(row.id) ?? null) },
+      });
     } else {
-      const created = await prisma.theokotProduct.create({ data });
+      const created = await prisma.theokotProduct.create({
+        data: { ...data, imageKey: resolveImageKey(row.image, null) },
+      });
       keepIds.add(created.id);
     }
   }
 
   // Verwijder actieve producten die uit de lijst gehaald zijn.
-  const active = await prisma.theokotProduct.findMany({ where: { active: true }, select: { id: true } });
   for (const p of active) {
     if (!keepIds.has(p.id)) await prisma.theokotProduct.delete({ where: { id: p.id } });
   }
@@ -738,13 +824,9 @@ export async function placeOrderAction(sessionId: string, lines: OrderLineInput[
       });
       if (existing) throw new TheokotValidationError(["Je hebt al een bestelling voor deze dag."]);
 
-      // Resterende voorraad = sessievoorraad − reeds bestelde aantallen.
-      const used = await tx.theokotOrderLine.groupBy({
-        by: ["sessionItemId"],
-        where: { sessionItem: { sessionId } },
-        _sum: { quantity: true },
-      });
-      const usedMap = new Map(used.map((u) => [u.sessionItemId, u._sum.quantity ?? 0]));
+      // Resterende voorraad = sessievoorraad − reeds bestelde aantallen − wat er
+      // voor een grocomeet of bureau opzijgezet is (zelfde voorraad, aparte doos).
+      const usedMap = await usageForSessionItemsTx(tx, sessionId);
       const items = sess.items.map((i) => ({
         id: i.id,
         priceCents: i.priceCents,

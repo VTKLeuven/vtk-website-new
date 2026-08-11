@@ -126,5 +126,26 @@ jobs:
               docker compose -f infra/docker-compose.yml down --remove-orphans
             fi &&
 
-            docker compose -f infra/docker-compose.yml up -d --remove-orphans
+            docker compose -f infra/docker-compose.yml up -d --remove-orphans &&
+
+            # Opruimen na de switch, want pas nu draaien de containers op de
+            # nieuwe images en is de vorige versie echt ongebruikt. Elke deploy
+            # bouwt een nieuwe image: de oude verliest daarbij haar tag en blijft
+            # anders als naamloze laag op de schijf staan, met de BuildKit-cache
+            # er bovenop. Dat is wat de schijf deed vollopen en waarvoor er af en
+            # toe handmatig 'docker system prune -a' aan te pas kwam.
+            #
+            # Bewust NIET 'prune -a': dat gooit ook getagde images weg die op dat
+            # moment geen draaiende container hebben (Immich, de deur-stack), en
+            # die moeten dan opnieuw gepulld worden. Naamloze images zijn altijd
+            # afval; getagde niet.
+            #
+            # De haakjes met '|| true' houden dit in dezelfde &&-ketting (een
+            # afgebroken deploy hierboven mag nog steeds rood zijn) zonder dat een
+            # mislukte opruiming de run doet falen.
+            { docker image prune -f || true; } &&
+
+            # Buildcache ouder dan een week. Recente lagen blijven staan, zodat de
+            # volgende build ze nog kan hergebruiken.
+            { docker builder prune -f --filter until=168h || true; }
           "

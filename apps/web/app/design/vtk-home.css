@@ -3,7 +3,7 @@
   z-index: 0;
   max-width: var(--max);
   margin: 0 auto;
-  padding: clamp(64px, 8vw, 88px) clamp(20px, 3vw, 36px) clamp(56px, 7vw, 72px);
+  padding: clamp(56px, 7vw, 76px) clamp(20px, 3vw, 36px) clamp(48px, 6vw, 64px);
   display: grid;
   grid-template-columns: minmax(0, 1.2fr) minmax(340px, 1fr);
   gap: clamp(36px, 5vw, 64px);
@@ -56,10 +56,14 @@
   margin-right: 0;
 }
 
+/* Het maximum ligt op 80px en niet op 92px: vanaf ongeveer 1230px stond de titel
+   op zijn plafond, en dan vult ze op een gewone laptop het halve scherm en valt
+   de rij snelle links net onder de vouw. De groeicurve eronder blijft dezelfde,
+   dus op smallere schermen verandert er niets. */
 .vtk-design .home-hero h1 {
-  margin: 18px 0 0;
+  margin: 16px 0 0;
   color: var(--paper);
-  font-size: clamp(48px, 6.5vw, 92px);
+  font-size: clamp(48px, 6.5vw, 80px);
   line-height: 0.98;
   letter-spacing: -0.035em;
   font-weight: 600;
@@ -72,9 +76,9 @@
 
 .vtk-design .hero-sub {
   max-width: 48ch;
-  margin: 28px 0 0;
+  margin: 24px 0 0;
   color: rgba(250, 250, 247, 0.86);
-  font-size: 17px;
+  font-size: 16px;
   line-height: 1.55;
   text-shadow: 0 1px 24px rgba(10, 15, 31, 0.4);
 }
@@ -93,8 +97,10 @@
   color: rgba(250, 250, 247, 0.62);
 }
 
+/* Enkel in de hero kleiner; `.meta .v` is een gedeelde klasse. */
 .vtk-design .home-hero .hero-meta .v {
   color: var(--paper);
+  font-size: 20px;
 }
 
 .vtk-design .home-hero .btn-primary {
@@ -129,7 +135,7 @@
   }
 
   .vtk-design .home-hero {
-    padding-top: calc(var(--vtk-header-height) + clamp(56px, 7vw, 84px));
+    padding-top: calc(var(--vtk-header-height) + clamp(48px, 6vw, 72px));
   }
 }
 
@@ -138,12 +144,12 @@
   display: flex;
   gap: 10px;
   flex-wrap: wrap;
-  margin-top: 32px;
+  margin-top: 26px;
 }
 
 .vtk-design .hero-meta {
-  margin-top: 56px;
-  padding-top: 24px;
+  margin-top: 44px;
+  padding-top: 20px;
   border-top: 1px solid var(--line);
   display: flex;
   gap: clamp(24px, 4vw, 48px);

@@ -1,0 +1,594 @@
+/*
+ * Het formulier zoals een bezoeker het ziet.
+ *
+ * Gedeeld door de publieke pagina en de live preview in de veldeditor: één
+ * stylesheet, want een preview die er net iets anders uitziet dan het echte
+ * formulier is erger dan geen preview. Alle kleuren komen uit de tokens in
+ * vtk-base.css; hier staan geen nieuwe.
+ */
+
+.vtk-form {
+  display: grid;
+  gap: 22px;
+  max-width: 720px;
+}
+
+.vtk-form-field {
+  display: grid;
+  gap: 8px;
+}
+
+.vtk-form-label {
+  font-weight: 600;
+  color: var(--ink);
+  line-height: 1.4;
+}
+
+.vtk-form-required {
+  margin-left: 3px;
+  color: var(--muted);
+}
+
+.vtk-form-help {
+  font-size: 14px;
+  color: var(--muted);
+}
+
+.vtk-form-help p:last-child {
+  margin-bottom: 0;
+}
+
+.vtk-form-image {
+  max-width: 100%;
+  height: auto;
+  border-radius: 14px;
+  border: 1px solid var(--line);
+}
+
+.vtk-form-input {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+  font-size: 15px;
+}
+
+.vtk-form-input:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 1px;
+}
+
+/* Gedeelde keuzelijst ------------------------------------------------------- */
+
+.vtk-themed-select {
+  position: relative;
+  width: 100%;
+}
+
+/* Blijft onderdeel van FormData en native validatie, maar de zichtbare knop
+   neemt focus over wanneer een verplichte keuze ontbreekt. */
+.vtk-themed-select-value {
+  position: absolute !important;
+  width: 1px !important;
+  height: 1px !important;
+  min-height: 1px !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.vtk-themed-select-trigger {
+  width: 100%;
+  min-height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 9px 11px;
+  border: 1px solid var(--line-2);
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+  font-size: 14px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.vtk-themed-select[data-variant='public'] .vtk-themed-select-trigger {
+  min-height: 44px;
+  padding: 10px 12px;
+  border-color: var(--line);
+  border-radius: 12px;
+  font-size: 15px;
+}
+
+.vtk-themed-select-trigger:focus-visible,
+.vtk-themed-select[data-open='true'] .vtk-themed-select-trigger {
+  border-color: var(--ink);
+  outline: 3px solid color-mix(in srgb, var(--ink) 9%, transparent);
+  outline-offset: 0;
+}
+
+.vtk-themed-select-trigger:disabled {
+  cursor: not-allowed;
+  opacity: 0.64;
+}
+
+.vtk-themed-select-trigger svg {
+  flex: none;
+  transition: transform 150ms ease;
+}
+
+.vtk-themed-select[data-open='true'] .vtk-themed-select-trigger svg {
+  transform: rotate(180deg);
+}
+
+.vtk-themed-select-options {
+  position: absolute;
+  z-index: 30;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  max-height: 280px;
+  overflow-y: auto;
+  padding: 5px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface);
+  box-shadow: 0 12px 28px color-mix(in srgb, var(--ink) 14%, transparent);
+}
+
+.vtk-themed-select-options > button {
+  width: 100%;
+  min-height: 38px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  font-size: 14px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.vtk-themed-select-options > button:is(:hover, [data-highlighted='true']) {
+  background: var(--paper-2);
+}
+
+.vtk-themed-select-options > button[aria-selected='true'] {
+  font-weight: 700;
+}
+
+.vtk-themed-select-options > button:disabled {
+  color: var(--muted);
+  cursor: not-allowed;
+}
+
+/* Een radio blijft de juiste semantiek voor precies één keuze. De volledige
+   kaart maakt de drie mogelijkheden tegelijk scanbaar. */
+.vtk-exclusive-choices {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 8px;
+}
+
+.vtk-exclusive-choices > label {
+  min-width: 0;
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface);
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.vtk-exclusive-choices > label:hover {
+  background: var(--paper-2);
+}
+
+.vtk-exclusive-choices > label[data-selected='true'] {
+  border-color: var(--ink);
+  box-shadow: inset 3px 0 0 var(--yellow);
+}
+
+/* Uitverkocht blijft staan: een keuze die zomaar uit de lijst verdwijnt, laat
+   iemand zoeken naar een broodje dat er gisteren nog was. */
+.vtk-exclusive-choices > label[data-disabled='true'] {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.vtk-exclusive-choices > label[data-disabled='true']:hover {
+  background: var(--surface);
+}
+
+.vtk-exclusive-choices input {
+  width: 16px;
+  height: 16px;
+  flex: none;
+  margin-top: 2px;
+  accent-color: var(--ink);
+}
+
+.vtk-exclusive-choices span {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+
+.vtk-exclusive-choices strong {
+  font-size: 13px;
+  line-height: 1.35;
+}
+
+.vtk-exclusive-choices small {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+@media (min-width: 680px) {
+  .vtk-exclusive-choices[data-columns='2'] {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .vtk-exclusive-choices[data-columns='3'] {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+.vtk-form-field[data-invalid='true'] .vtk-form-input {
+  border-color: var(--ink);
+  box-shadow: inset 3px 0 0 var(--yellow);
+}
+
+.vtk-form-error {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ink);
+  padding-left: 10px;
+  box-shadow: inset 3px 0 0 var(--yellow);
+}
+
+.vtk-form-options {
+  display: grid;
+  gap: 8px;
+}
+
+.vtk-form-check {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface);
+  cursor: pointer;
+  line-height: 1.4;
+}
+
+.vtk-form-check:hover {
+  background: var(--paper-2);
+}
+
+.vtk-form-check[data-disabled='true'] {
+  cursor: not-allowed;
+  color: var(--muted);
+}
+
+.vtk-form-check input {
+  margin-top: 2px;
+  flex: none;
+}
+
+.vtk-form-soldout,
+.vtk-form-remaining {
+  margin-left: 8px;
+  font-size: 13px;
+  font-style: normal;
+  color: var(--muted);
+}
+
+.vtk-form-soldout {
+  font-weight: 600;
+}
+
+.vtk-form-other {
+  display: grid;
+  gap: 6px;
+  padding-left: 12px;
+  font-size: 14px;
+  color: var(--muted);
+}
+
+.vtk-form-scale {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.vtk-form-scale-label {
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.vtk-form-scale-step {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0 10px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface);
+  cursor: pointer;
+  font-weight: 600;
+}
+
+/* De radio zelf blijft bereikbaar voor toetsenbord en screenreader, maar de
+   klikbare vorm is het hele vakje. */
+.vtk-form-scale-step input {
+  position: absolute;
+  opacity: 0;
+  width: 1px;
+  height: 1px;
+}
+
+.vtk-form-scale-step:has(input:checked) {
+  background: var(--ink);
+  color: var(--paper);
+  border-color: var(--ink);
+}
+
+.vtk-form-scale-step:has(input:focus-visible) {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
+}
+
+.vtk-form-scale-step[data-stars='true'] {
+  min-width: 44px;
+  font-size: 20px;
+}
+
+.vtk-form-preview {
+  display: grid;
+  gap: 20px;
+  padding: 18px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--paper);
+}
+
+/* Publieke formulierpagina ---------------------------------------------------- */
+
+.vtk-form-page {
+  max-width: 820px;
+  margin: 0 auto;
+  padding: 40px 20px 72px;
+  display: grid;
+  gap: 24px;
+}
+
+.vtk-form-section {
+  display: grid;
+  gap: 18px;
+  padding-top: 8px;
+  border-top: 1px solid var(--line);
+}
+
+.vtk-form-section :is(h2, h3) {
+  margin: 0;
+  font-size: 20px;
+  color: var(--ink);
+}
+
+.vtk-form-section-intro {
+  margin: -8px 0 0;
+  color: var(--muted);
+}
+
+.vtk-form-notice {
+  padding: 16px 18px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--surface);
+  display: grid;
+  gap: 8px;
+}
+
+.vtk-form-notice h2 {
+  margin: 0;
+  font-size: 18px;
+}
+
+.vtk-form-notice p {
+  margin: 0;
+  color: var(--body);
+}
+
+/* Een blokkade is geen fout van de bezoeker, dus geen alarmkleur: een gele rail
+   zoals bij een uitgelichte kaart volstaat om ze te laten opvallen. */
+.vtk-form-notice[data-tone='blocked'],
+.vtk-form-notice[data-tone='preview'],
+.vtk-form-notice[data-tone='warning'],
+.vtk-form-notice[data-tone='done'] {
+  box-shadow: inset 3px 0 0 var(--yellow);
+}
+
+.vtk-form-summary {
+  padding: 12px 16px;
+  border-radius: 12px;
+  background: var(--paper-2);
+  box-shadow: inset 3px 0 0 var(--yellow);
+  font-weight: 600;
+}
+
+.vtk-form-deadline {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.vtk-form-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+}
+
+.vtk-form-login {
+  display: inline-flex;
+  align-items: center;
+  padding: 10px 18px;
+  border-radius: 999px;
+  background: var(--ink);
+  color: var(--paper);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.vtk-form-empty {
+  color: var(--muted);
+}
+
+.vtk-form-index {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 14px;
+}
+
+.vtk-form-index a {
+  display: block;
+  padding: 18px 20px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: var(--surface);
+  color: inherit;
+  text-decoration: none;
+}
+
+.vtk-form-index a:hover {
+  background: var(--paper-2);
+}
+
+.vtk-form-index h2 {
+  margin: 0 0 6px;
+  font-size: 18px;
+}
+
+.vtk-form-index p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.vtk-form-index-meta {
+  margin-top: 8px !important;
+  font-weight: 600;
+}
+
+/* Bestanden ------------------------------------------------------------------- */
+
+.vtk-form-files {
+  display: grid;
+  gap: 10px;
+}
+
+.vtk-form-file-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+}
+
+.vtk-form-file-list > li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface);
+  font-size: 14px;
+}
+
+.vtk-form-file-list small {
+  color: var(--muted);
+  margin-left: auto;
+}
+
+.vtk-form-file-button {
+  justify-self: start;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 16px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.vtk-form-file-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.vtk-form-progress,
+.vtk-form-progress-summary {
+  display: grid;
+  gap: 6px;
+}
+
+.vtk-form-progress p,
+.vtk-form-progress-summary p {
+  margin: 0;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+/* De native progress blijft in de boom staan voor screenreaders, maar de balk
+   die je ziet is de div eronder; die volgt de tokens. */
+.vtk-form-progress progress {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+}
+
+.vtk-form-progress-bar {
+  height: 8px;
+  border-radius: 999px;
+  background: var(--paper-2);
+  overflow: hidden;
+}
+
+.vtk-form-progress-bar > span {
+  display: block;
+  height: 100%;
+  background: var(--yellow);
+  transition: width 0.2s ease;
+}

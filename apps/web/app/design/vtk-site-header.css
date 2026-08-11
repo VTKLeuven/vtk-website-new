@@ -76,11 +76,15 @@
   display: flex;
   width: 100%;
   align-items: center;
-  /* De elf tabs met hun chevrons zijn samen ~765px breed. De tussenruimte groeit
-     mee met het scherm: 14px zodra de tabs verschijnen (1211px) tot 20px. Meer
-     kan niet: boven 1320px stopt de container met groeien, dus de ruimte voor de
-     nav ligt daar vast. */
-  gap: clamp(14px, calc(2.6vw - 17px), 20px);
+  /* De tabs met hun chevrons zijn samen ~725px breed. De tussenruimte groeit mee
+     met het scherm: 14px zodra de tabs verschijnen (1211px) tot 18px. Meer kan
+     niet: boven 1240px stopt de container met groeien (`--max`), dus de ruimte
+     voor de nav ligt daar vast en elke extra pixel tussenruimte gaat af van de
+     marge die er nog is voor een tab erbij. Het bovenste getal stond op 20px
+     toen de container nog tot 1320px groeide; verander je `--max`, kijk dan hier
+     opnieuw, want overlopen wordt niet afgeknipt (het uitklappaneel mag niet
+     geknipt worden) en de tabs schuiven dan over de knoppen rechts. */
+  gap: clamp(14px, calc(2.6vw - 17px), 18px);
   min-width: 0;
   flex: none;
   height: 100%;

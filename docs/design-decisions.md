@@ -146,6 +146,21 @@ halen ze af aan de balie en betalen daar. Post **Theokot** beheert het systeem.
   ('Afhalen vanaf/tot', 'Besteldeadline', 'Bestellen opent') in die voor álle gekozen
   dagen gelden. Dat scheelt werk in weken met een volledig ander aanbod. **Nadien** kan
   je nog steeds per dag bijsturen (uren, open/dicht, aanbod).
+- **Foto en ingrediënten per broodje zijn optioneel.** Beheer ze in dezelfde
+  aanbod-editor (uitklap "Foto & ingrediënten" per rij), zowel op het standaardaanbod
+  als per verkoopdag. Een broodje zonder foto toont het gestreepte placeholder-patroon
+  van de site in plaats van een gat, want het aanbod raakt in de praktijk maar
+  geleidelijk gefotografeerd. Ingrediënten verschijnen achter een **info-icoontje**
+  naast het broodje; ze staan bewust niet altijd uitgeschreven, anders wordt een lijst
+  van tien broodjes onleesbaar.
+- **De weergave van het aanbod (lijst of raster) is een instelling**, geen vaste keuze
+  in de code: een raster geeft de foto's ruimte, een lijst blijft compacter zolang er
+  weinig foto's zijn. Ze staat bij de overige Theokot-instellingen en geldt voor de
+  hele bestelpagina (`itemLayout`). De standaard is een lijst, zodat een aanbod zonder
+  foto's er niet leger uitziet dan vroeger.
+- **Een foto in de catalogus vervangen verwijdert het oude bestand niet.** De
+  storage-key wordt mee gekopieerd naar de sessie-items van elke week die er al mee
+  aangemaakt is; opruimen zou de foto weghalen bij verkoopdagen die ze nog tonen.
 - **"Broodje van de week"** is gewoon het aanbod-item dat als _weekly special_
   gemarkeerd is (checkbox "V/d week" in de aanbod-editor). De **naam** van dat item is
   wat het die week concreet is (bv. hernoem "Broodje van de week" naar "Broodje kip
@@ -229,6 +244,100 @@ halen ze af aan de balie en betalen daar. Post **Theokot** beheert het systeem.
 - `theokot.manage` — sessies/aanbod, config, bericht, openingsuren, bans, historiek.
 - `theokot.pickup` — afhaalbalie + turf-lijst.
 - Beide worden in de seed toegekend aan groep **THEOKOT**.
+
+---
+
+## Grocomeet en VTK Bureau — broodjes voor een vergadering
+
+Twee terugkerende vergaderingen waar vooraf een broodje en een drankje voor besteld
+wordt. Ze staan in de code als één model (`Meeting`, met `kind`), want de werking is
+identiek; enkel het publiek en de beheerder verschillen.
+
+|  | Grocomeet (GM) | VTK Bureau |
+|---|---|---|
+| Wie | verantwoordelijken van de posten + Groep 5 | elke student |
+| Ritme (default) | wekelijks, vrijdag 12:45 | tweewekelijks, donderdag 12:40 |
+| Ingang | tabje in het profielmenu (`/grocomeet`) | gedeelde link per bureau (`/bureau/<slug>`) |
+| Opent | meteen; grocos bestellen weken vooruit | instelbaar per bureau (`opensAt`) |
+| Geld | per persoon bijgehouden en af te vinken | enkel totalen, Onderwijs betaalt |
+| Beheer | Groep 5 (`grocomeet.manage`) | Onderwijs (`bureau.manage`) |
+
+### Waarom dit geen formulier uit de formulierenmodule is
+
+Het lijkt een form met twee keuzevragen, maar de bestelling moet dingen doen die een
+generieke `FormEntry` niet kan: broodjes van de **Theokot-voorraad** afromen, de
+**prijs op het moment van bestellen** vastklikken, in een **aparte kolom op de
+turflijst** verschijnen (de doos voor de vergadering), en **ongeldig worden** wanneer
+het aanbod van die dag wijzigt. Dat is domeinlogica, geen formulierveld.
+
+### Aanbod en het uitlijnen met de verkoopdag
+
+- Er kan **één broodje en één drankje** per persoon per vergadering besteld worden,
+  allebei optioneel: enkel een drankje (of niets) kan ook.
+- Het **broodje van de week** staat er nooit bij: dat blijft voor de studenten.
+- Een reservatie wordt vaak **weken vooraf** gemaakt, terwijl Theokot het aanbod van
+  die week pas een week op voorhand vastlegt. Zolang die verkoopdag niet bestaat,
+  komen de keuzes uit de **catalogus** (`TheokotProduct`); bestaat ze wel, dan uit het
+  **aanbod van die dag**, met de resterende voorraad erbij.
+- Bij elke wijziging die dat aanbod raakt (week aanmaken, aanbod van een dag
+  bewerken, dag sluiten, vergadering verzetten) lijnt `syncMeetingReservations` de
+  reservaties opnieuw uit. Koppelen gebeurt **op naam** (`offeringNameKey`), want de
+  catalogus en het aanbod van die dag hebben verschillende id's; de naam is wat ze
+  gemeen hebben en waarop een mens ze ook vergelijkt.
+- Wat niet meer kan, wordt **ongeldig**: die persoon krijgt een mail én ziet het op de
+  reservatiepagina en op `/account`. Er wordt niets stil geschrapt en niets stil
+  vervangen door een ander broodje.
+- Blijft Theokot die dag helemaal weg (geen verkoopdag aangemaakt), dan blijft de
+  reservatie staan en zegt het beheerscherm dat er geen verkoopdag is. Er draait
+  bewust geen wachter op "de dag nadert en er is nog steeds niets": dat zou een tweede
+  scheduler vragen voor iets wat het beheer sowieso op zijn scherm ziet.
+
+### Eigen aanbod (bureau zonder Theokot)
+
+Een bureau gaat altijd door, ook wanneer Theokot geen broodjes kan voorzien. Daarom kan
+het aanbod per vergadering **losgekoppeld** worden van Theokot (`useTheokot = false`):
+je zet dan zelf de keuzes met hun prijs (lasagne, broodjes van een bakker). Zo'n
+vergadering raakt de Theokot-voorraad niet en krijgt geen kolom op de turflijst. Een GM
+kan dat ook; het is dezelfde knop.
+
+### Deadline
+
+Aanpassen of annuleren kan tot **dezelfde deadline als voor studenten**: het moment
+waarop de turflijst geprint wordt (`TheokotSession.orderCloseAt` van die dag). Is er
+geen verkoopdag, dan geldt het begin van de vergadering. Er is bewust geen aparte
+deadline per vergadering: twee deadlines voor hetzelfde broodje is één te veel.
+
+### Geld
+
+- Prijzen zijn **snapshots** op het moment van bestellen (broodje + drankje), zodat een
+  prijswijziging in de catalogus een openstaande schuld niet met terugwerkende kracht
+  verandert.
+- Het **drankje** kost standaard €1; de lijst en de prijs staan in één setting
+  (`meetings.drinks`) en gelden voor allebei de vergaderingen, want het is dezelfde koelkast.
+- Bij de **GM** kan per bestelling afgevinkt worden dat er betaald is; het beheerscherm
+  toont per persoon het totaal, het betaalde en het openstaande bedrag over het werkingsjaar.
+- Bij het **bureau** betaalt de student niets: daar staan enkel totalen per bureau, per
+  werkingsjaar en over alle bureaus heen, voor de boekhouding van Onderwijs.
+
+### Plannen per semester
+
+De kalender wordt **per semester** ingevuld: bij het begin van het academiejaar voor
+semester 1 en vanaf januari voor semester 2 (`semesterToPlan`). Het beheerscherm toont
+die kalender vanzelf zolang er voor dat semester nog geen plan is (`MeetingPlan`); daarna
+blijft ze staan om aan te passen. Een dag met bestellingen kan **niet** via de kalender
+verdwijnen; die verwijder je bewust bij de vergadering zelf, waar de bevestiging zegt
+hoeveel bestellingen eraan hangen.
+
+- **Uur en plaats staan per dag**, niet één keer bovenaan. Een vergadering verhuist
+  geregeld naar een ander lokaal of een ander uur, en dan hoort de kalender dat te
+  kunnen zeggen in plaats van je twintig keer naar het detailscherm te sturen. De twee
+  velden bovenaan zijn enkel het startpunt voor de volgende dag die je aanduidt.
+- **Het voorstel hangt aan de pariteit van het ISO-weeknummer** (`WeekParity`), niet aan
+  "elke tweede vanaf de start van het semester". Zo blijft een tweewekelijkse vergadering
+  kloppen over de kerstvakantie heen, en het is ook hoe een agenda erover praat. Met
+  "Elke week / Even weken / Oneven weken" zet je het voorstel in één klik om wanneer het
+  semester net verkeerd uitkomt; welke helft het juiste is, verschilt per jaar. Dagen
+  waarvoor al besteld is, blijven bij zo'n omschakeling staan.
 
 ---
 
@@ -2299,3 +2408,82 @@ Google, dus de outbox blijft braaf herproberen met een oplopende wachttijd en
 niemand denkt aan een configuratiefout. Bovendien werkte een test met `curl`
 vanaf dezelfde machine wel, want die stuurt een andere EHLO-naam. Het lijkt dan
 alsof de mailserver het ene moment wel en het andere niet doet.
+
+---
+
+## Formulieren: wat de kring ermee wil, en wat we bewust niet doen
+
+De formulierenmodule (`docs/forms.md` legt uit waar wat staat) heeft een paar
+keuzes die niet uit de code volgen.
+
+- **Anonieme inzenders kunnen hun antwoord niet bewerken.** Bewerken en concepten
+  gelden enkel voor wie ingelogd is. De alternatieve weg is een bewerklink met een
+  token in de bevestigingsmail, en die hebben we bewust niet gebouwd: zo'n link is
+  een sleutel naar persoonsgegevens die per mail rondgaat en doorgestuurd wordt.
+  Wie zijn inzending wil kunnen aanpassen, logt in; de rest dient één keer in.
+- **Een formulier dat vol zit, blijft leesbaar.** Een keuzeoptie met een quotum
+  verdwijnt niet wanneer ze vol is, maar staat er grijs bij met "volzet". Anders
+  denkt iemand die de affiche zag dat hij op het verkeerde formulier zit. Wie de
+  optie al koos vóór ze vollliep, houdt ze bij het bewerken.
+- **Dubbels waarschuwen, ze blokkeren niet.** Twee inzendingen met hetzelfde
+  e-mailadres kunnen legitiem zijn (iemand schrijft zijn kotgenoot mee in), en een
+  harde blokkade op e-mail is toch te omzeilen met een plusadres. De tweede
+  inzending komt binnen; de bevestigingspagina zegt dat er al een was.
+- **Een formulier staat niet automatisch in het overzicht.** `listed` bepaalt of
+  het op `/formulieren` verschijnt. Een sollicitatie- of evaluatieformulier deel
+  je gericht; het blijft wel gewoon bereikbaar via zijn link, want een verborgen
+  formulier is geen beveiligd formulier.
+- **Formulieren horen niet in Google.** Alle formulierpagina's staan op
+  `noindex`. Een formulier is een actie met een deadline, geen inhoud om te
+  vinden; een verlopen inschrijving in de zoekresultaten helpt niemand.
+- **De bewaartermijn staat standaard uit.** Een beheerder kan er een instellen
+  (`retentionDays`), maar zonder die keuze verdwijnt er niets vanzelf. Stil
+  verdwijnende inzendingen zijn erger dan een volle tabel; wie een formulier met
+  gevoelige antwoorden maakt, zet de termijn zelf.
+- **Bij een gewist account verdwijnen de inzendingen echt.** Bij een
+  ticketbestelling volstaat het de identiteit te strippen, want die rij is een
+  financieel record. Een formulierantwoord is dat niet: de persoonsgegevens zitten
+  juist in de antwoorden, en een vrije tekst met een naam erin blijft anders
+  gewoon staan. De quota die de inzending innam, komen weer vrij.
+- **Half vertaald publiceren mag, maar niet ongemerkt.** Een beheerder mag een
+  formulier bewust in één taal aanbieden; dan krijgt de andere taal een eigen
+  bericht ("Sorry, dit formulier is enkel voor internationals") in plaats van een
+  halfleeg formulier of een 404. Staat het formulier op beide talen terwijl er
+  stukken ontbreken, dan somt het overzicht op wélke, want een waarschuwing zonder
+  lijstje leidt enkel tot zoeken.
+- **Voorinvullen gebeurt enkel waar de beheerder het vraagt.** Het veldtype "uit
+  het profiel" vult naam, e-mail, r-nummer, studierichting of jaar in. Raden op
+  basis van de veldnaam is geprobeerd en meteen fout gegaan: de vraag "Naam van je
+  partner" kreeg de naam van de ingelogde bezoeker. Enkel het eerste e-mailveld
+  vult zichzelf nog automatisch in.
+- **Geen captcha.** Zoals bij het contactformulier: een honeypot, een limiet per
+  IP en een minimale invultijd. Een captcha kost elke echte bezoeker moeite en zet
+  vaak een derde partij op de pagina, voor een handvol scripts.
+- **Een inzending namens iemand stuurt geen bevestiging.** Wanneer een beheerder
+  een inschrijving intikt die per mail of telefoon binnenkwam, krijgt die persoon
+  geen "bedankt voor je inzending"-mail: hij heeft niets ingevuld en zou zich
+  afvragen wat er gebeurd is. Het formulier hoeft daarvoor ook niet open te staan.
+
+### Springen en wachtlijsten (aanvulling op de formulierenmodule)
+
+- **Springen kan enkel wanneer de secties stap voor stap komen.** Naar een
+  sectie verderop springen heeft geen betekenis wanneer alles toch al op één
+  pagina staat, dus `stepBySections` is een aparte instelling en geen automatisme.
+  Zo blijft een kort formulier ook gewoon één pagina, want dat leest sneller.
+- **Een sprong die het formulier beëindigt, is een volwaardige uitkomst.** "Kom
+  je? Nee" hoort niet door te gaan naar de vragen over het menu. De bezoeker
+  krijgt dan meteen de verzendknop, en de vragen die hij oversloeg zijn ook
+  serverside niet verplicht.
+- **Een wachtlijst claimt geen plaats.** Dat is het hele punt: de teller blijft
+  kloppen met wie er echt binnen mag. Een beheerder haalt iemand er handmatig
+  bij, en die actie probeert het quotum op dat moment alsnog te nemen; is het nog
+  vol, dan blijft de inzending staan waar ze stond.
+- **Automatisch opschuiven doen we niet.** Zodra een plaats vrijkomt de eerste
+  van de wachtlijst binnenlaten klinkt logisch, maar dan hoort er ook een mail
+  bij, een termijn om te bevestigen, en een regel voor wie niet reageert. Dat is
+  een eigen systeem; handmatig opschuiven met een knop is voor een kring van deze
+  grootte genoeg.
+- **Zit één keuze vol, dan claimt de hele inzending niets.** Wie drie shiften
+  aanduidt waarvan de tweede vol zit, komt volledig op de wachtlijst in plaats van
+  twee plaatsen te bezetten en voor de derde te wachten. Half ingeschreven zijn is
+  voor niemand bruikbaar.

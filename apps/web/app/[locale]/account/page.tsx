@@ -9,6 +9,7 @@ import { requireSession } from '@/lib/session';
 import { getDictionary, pick } from '@vtk/i18n';
 import { hasPermission } from '@vtk/auth';
 import { formatEuro } from '@/lib/theokot';
+import { meetingKindLabel, meetingPath } from '@/lib/meetings';
 import { updateProfileAction, logoutAction } from '@/app/actions/auth';
 import { ProfileForm } from '@/components/profile/ProfileForm';
 import { SaveForm } from '@/components/ui/SaveForm';
@@ -41,7 +42,15 @@ export default async function AccountPage({ params }: { params: Promise<{ locale
 
   const now = new Date();
   const canUseDoorShortcut = hasPermission(session, 'door.remoteOpen');
-  const [profile, reservations, doorShortcutTokens, ticketOrders, registeredShifts, calendarFeedTokens] = await Promise.all([
+  const [
+    profile,
+    reservations,
+    doorShortcutTokens,
+    ticketOrders,
+    registeredShifts,
+    calendarFeedTokens,
+    meetingReservations,
+  ] = await Promise.all([
     // Volledig profiel voor het bewerkbare gegevensformulier (kotadres, mails, ...).
     prisma.user.findUniqueOrThrow({
       where: { id: session.user.id },
@@ -118,6 +127,14 @@ export default async function AccountPage({ params }: { params: Promise<{ locale
       orderBy: { createdAt: 'desc' },
       select: { id: true, label: true, createdAt: true, lastUsedAt: true },
     }),
+    // Bestellingen voor een komende grocomeet of bureau. Dit is ook de melding op
+    // de site wanneer er eentje ongeldig werd: een bureau heeft geen eigen plek
+    // in de navigatie, dus zonder deze lijst zou de mail het enige signaal zijn.
+    prisma.meetingReservation.findMany({
+      where: { userId: session.user.id, meeting: { startsAt: { gte: now } } },
+      orderBy: { meeting: { startsAt: 'asc' } },
+      include: { meeting: { select: { kind: true, slug: true, startsAt: true } } },
+    }),
   ]);
 
   const dayFmt = new Intl.DateTimeFormat(nl ? 'nl-BE' : 'en-GB', {
@@ -128,6 +145,14 @@ export default async function AccountPage({ params }: { params: Promise<{ locale
   });
   const timeFmt = new Intl.DateTimeFormat(nl ? 'nl-BE' : 'en-GB', {
     timeZone: 'Europe/Brussels',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+  const meetingDateFmt = new Intl.DateTimeFormat(nl ? 'nl-BE' : 'en-GB', {
+    timeZone: 'Europe/Brussels',
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
     hour: '2-digit',
     minute: '2-digit',
   });
@@ -158,6 +183,60 @@ export default async function AccountPage({ params }: { params: Promise<{ locale
             </p>
 
             <AccountTickets locale={locale} orders={ticketOrders} />
+
+            {meetingReservations.length > 0 && (
+              <Card className="p-6">
+                <h3 className="mb-4 text-lg font-semibold text-vtk-ink">
+                  {nl ? 'Vergaderingen' : 'Meetings'}
+                </h3>
+                <ul className="space-y-3 text-sm">
+                  {meetingReservations.map((reservation) => {
+                    const invalid = reservation.status === 'INVALIDATED';
+                    const href = meetingPath(
+                      reservation.meeting.kind,
+                      reservation.meeting.slug,
+                      nl ? '' : '/en',
+                    );
+                    return (
+                      <li
+                        key={reservation.id}
+                        className={`rounded-xl border p-3 ${
+                          invalid ? 'border-red-200 bg-red-50' : 'border-vtk-blue/10'
+                        }`}
+                      >
+                        <div className="font-medium capitalize text-vtk-ink">
+                          {meetingKindLabel(reservation.meeting.kind, nl)} ·{' '}
+                          {meetingDateFmt.format(reservation.meeting.startsAt)}
+                        </div>
+                        {invalid ? (
+                          <p className="mt-1 text-red-700">
+                            {nl
+                              ? 'Je broodje kan niet meer doorgaan. '
+                              : 'Your sandwich is no longer available. '}
+                            <Link href={href} className="font-medium underline">
+                              {nl ? 'Kies opnieuw' : 'Pick again'}
+                            </Link>
+                            .
+                          </p>
+                        ) : (
+                          <p className="mt-1 text-[#34405e]">
+                            {reservation.itemNameNl ?? (nl ? 'geen broodje' : 'no sandwich')}
+                            {reservation.drinkName ? ` · ${reservation.drinkName}` : ''} ·{' '}
+                            <span className="tabular-nums">
+                              {formatEuro(reservation.itemPriceCents + reservation.drinkPriceCents)}
+                            </span>{' '}
+                            ·{' '}
+                            <Link href={href} className="font-medium text-vtk-ink underline">
+                              {nl ? 'Aanpassen' : 'Change'}
+                            </Link>
+                          </p>
+                        )}
+                      </li>
+                    );
+                  })}
+                </ul>
+              </Card>
+            )}
 
             <Card className="p-6">
               <h3 className="mb-4 text-lg font-semibold text-vtk-ink">

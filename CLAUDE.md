@@ -121,7 +121,7 @@ the design language into the application instead of copying mockup content.
   `apps/web/app/globals.css` (`--color-vtk-surface`, `--color-vtk-blue-soft`,
   `--color-vtk-blue-muted`) mirror these neutrals for `bg-vtk-*` utilities; keep
   them in sync when you retune.
-- Layout: use generous max-width containers around 1320px, the cool `--paper`
+- Layout: use generous max-width containers around 1240px (`--max`), the cool `--paper`
   page ground, thin navy-tinted `--line` borders, and clear horizontal rhythm.
 - Shape: cards and panels should be softly rounded, usually 16-22px. Small
   controls can be pill-shaped when they are CTAs or filters.

@@ -7,13 +7,25 @@ import { logoutAction } from "@/app/actions/auth";
 export function ProfileMenu({
   name,
   isAdmin,
+  canReserveGrocomeet,
+  grocomeetNeedsAttention = false,
   labels,
   base,
   variant = "default",
 }: {
   name: string;
   isAdmin: boolean;
-  labels: { myAccount: string; admin: string; logout: string };
+  /** Postverantwoordelijken en Groep 5 bestellen hier hun broodje voor de GM. */
+  canReserveGrocomeet: boolean;
+  /** Een reservatie werd ongeldig; er moet opnieuw gekozen worden. */
+  grocomeetNeedsAttention?: boolean;
+  labels: {
+    myAccount: string;
+    admin: string;
+    grocomeet: string;
+    grocomeetAttention: string;
+    logout: string;
+  };
   base: string;
   variant?: "default" | "editorial";
 }) {
@@ -101,6 +113,21 @@ export function ProfileMenu({
           <Link href={`${base}/account`} className={itemClass} role="menuitem">
             {labels.myAccount}
           </Link>
+          {canReserveGrocomeet && (
+            <Link href={`${base}/grocomeet`} className={itemClass} role="menuitem">
+              {labels.grocomeet}
+              {grocomeetNeedsAttention && (
+                <>
+                  {/* Een stip alleen zegt niets tegen een screenreader. */}
+                  <span
+                    aria-hidden="true"
+                    className="ml-2 inline-block h-2 w-2 rounded-full bg-vtk-yellow align-middle"
+                  />
+                  <span className="sr-only">({labels.grocomeetAttention})</span>
+                </>
+              )}
+            </Link>
+          )}
           {isAdmin && (
             <Link href={`${base}/admin`} className={itemClass} role="menuitem">
               {labels.admin}

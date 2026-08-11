@@ -1,0 +1,861 @@
+"use client";
+
+import { useState } from "react";
+import { Plus, Trash2 } from "lucide-react";
+import { Button, ConfirmDialog } from "@vtk/ui";
+import { IconButton } from "@/components/ui/IconButton";
+import { StorageImageField } from "@/components/admin/StorageImageField";
+import { MarkdownEditor } from "@/components/editor/MarkdownEditor";
+import { ThemedSelect } from "@/components/ui/ThemedSelect";
+import {
+  canChangeTypeWithAnswers,
+  isChoiceType,
+  isMultiChoiceType,
+  parseFieldConfig,
+  type FormFieldConfig,
+} from "@/lib/forms/schema";
+import type { AdminLocale } from "./format";
+import type {
+  BranchingContext,
+  EditorCondition,
+  EditorField,
+  EditorSection,
+  FieldDraft,
+} from "./FieldEditor";
+
+export const TYPE_GROUPS = [
+  {
+    key: "text",
+    nl: "Tekst",
+    en: "Text",
+    types: ["SHORT_TEXT", "LONG_TEXT", "EMAIL", "PHONE", "URL"],
+  },
+  {
+    key: "choice",
+    nl: "Keuze",
+    en: "Choice",
+    types: ["SINGLE_CHOICE", "MULTIPLE_CHOICE", "DROPDOWN", "BOOLEAN", "SCALE"],
+  },
+  {
+    key: "data",
+    nl: "Gegevens",
+    en: "Data",
+    types: ["NUMBER", "DATE", "TIME", "FILE", "PROFILE", "CONSENT"],
+  },
+] as const;
+
+const TYPE_LABELS: Record<string, [string, string]> = {
+  SHORT_TEXT: ["Korte tekst", "Short text"],
+  LONG_TEXT: ["Lange tekst", "Long text"],
+  EMAIL: ["E-mailadres", "E-mail address"],
+  PHONE: ["Telefoonnummer", "Phone number"],
+  URL: ["Link", "Link"],
+  NUMBER: ["Getal", "Number"],
+  DATE: ["Datum", "Date"],
+  TIME: ["Tijdstip", "Time"],
+  SINGLE_CHOICE: ["Eén keuze", "Single choice"],
+  MULTIPLE_CHOICE: ["Meerdere keuzes", "Multiple choice"],
+  DROPDOWN: ["Keuzelijst", "Dropdown"],
+  BOOLEAN: ["Ja of nee", "Yes or no"],
+  SCALE: ["Schaal", "Scale"],
+  FILE: ["Bestand", "File"],
+  CONSENT: ["Toestemming", "Consent"],
+  PROFILE: ["Uit het profiel", "From the profile"],
+};
+
+export function typeLabel(type: string, locale: AdminLocale): string {
+  const labels = TYPE_LABELS[type];
+  return labels ? labels[locale === "nl" ? 0 : 1] : type;
+}
+
+const ALL_TYPES = TYPE_GROUPS.flatMap((group) => group.types);
+
+export function FieldSettings({
+  formId,
+  locale,
+  draft,
+  sections,
+  otherFields,
+  branching,
+  answerCount,
+  pending,
+  onChange,
+  onSave,
+  onCancel,
+}: {
+  formId: string;
+  locale: AdminLocale;
+  draft: FieldDraft;
+  sections: EditorSection[];
+  otherFields: EditorField[];
+  branching: BranchingContext;
+  answerCount: number;
+  pending: boolean;
+  onChange: (next: FieldDraft) => void;
+  onSave: () => void;
+  onCancel: () => void;
+}) {
+  const nl = locale === "nl";
+  const config = draft.config;
+  const [removingOption, setRemovingOption] = useState<number | null>(null);
+  const optionToRemove = removingOption === null ? null : (draft.options[removingOption] ?? null);
+
+  function removeOption(index: number) {
+    onChange({
+      ...draft,
+      options: draft.options.filter((_, position) => position !== index),
+    });
+    setRemovingOption(null);
+  }
+
+  function setConfig(patch: Partial<FormFieldConfig>) {
+    onChange({ ...draft, config: { ...config, ...patch } });
+  }
+
+  function setType(type: string) {
+    // Wisselen van opslagvorm zou bestaande antwoorden onleesbaar maken; de
+    // keuzelijst laat het niet toe, dit is de tweede grendel.
+    if (answerCount > 0 && !canChangeTypeWithAnswers(draft.type, type)) return;
+    onChange({
+      ...draft,
+      type,
+      config: parseFieldConfig(type, config),
+      options:
+        isChoiceType(type) && draft.options.length === 0
+          ? [
+              {
+                id: null,
+                code: null,
+                labelNl: "",
+                labelEn: "",
+                quotaLimit: null,
+                quotaUsed: 0,
+                answerCount: 0,
+                allowWaitlist: false,
+                nextSectionId: null,
+                endsForm: false,
+              },
+              {
+                id: null,
+                code: null,
+                labelNl: "",
+                labelEn: "",
+                quotaLimit: null,
+                quotaUsed: 0,
+                answerCount: 0,
+                allowWaitlist: false,
+                nextSectionId: null,
+                endsForm: false,
+              },
+            ]
+          : draft.options,
+    });
+  }
+
+  const numberInput = (
+    value: number | null | undefined,
+    onNumber: (next: number | null) => void,
+    props: { min?: number; max?: number; step?: number } = {}
+  ) => (
+    <input
+      type="number"
+      value={value ?? ""}
+      min={props.min}
+      max={props.max}
+      step={props.step}
+      onChange={(event) => onNumber(event.target.value === "" ? null : Number(event.target.value))}
+    />
+  );
+
+  return (
+    <div className="form-admin-field-settings">
+      <div className="ticket-admin-form-grid">
+        <div className="ticket-admin-field">
+          <label htmlFor={`type-${draft.id ?? "new"}`}>{nl ? "Soort veld" : "Field type"}</label>
+          <ThemedSelect
+            id={`type-${draft.id ?? "new"}`}
+            name={`type-${draft.id ?? "new"}`}
+            value={draft.type}
+            onChange={setType}
+            options={ALL_TYPES.map((type) => ({
+              value: type,
+              label: typeLabel(type, locale),
+              disabled: answerCount > 0 && !canChangeTypeWithAnswers(draft.type, type),
+            }))}
+          />
+          {answerCount > 0 ? (
+            <span className="ticket-admin-help">
+              {nl
+                ? `Er zijn al ${answerCount} antwoorden, dus enkel een verwant type kan nog.`
+                : `There are already ${answerCount} answers, so only a related type is possible.`}
+            </span>
+          ) : null}
+        </div>
+
+        {sections.length > 0 ? (
+          <div className="ticket-admin-field">
+            <label htmlFor={`section-${draft.id ?? "new"}`}>{nl ? "Sectie" : "Section"}</label>
+            <ThemedSelect
+              id={`section-${draft.id ?? "new"}`}
+              name={`section-${draft.id ?? "new"}`}
+              value={draft.sectionId ?? ""}
+              onChange={(sectionId) => onChange({ ...draft, sectionId: sectionId || null })}
+              options={[
+                { value: "", label: nl ? "Bovenaan, zonder sectie" : "At the top, no section" },
+                ...sections.map((section) => ({
+                  value: section.id,
+                  label: locale === "en" && section.titleEn ? section.titleEn : section.titleNl,
+                })),
+              ]}
+            />
+          </div>
+        ) : null}
+
+        <div className="ticket-admin-field">
+          <label htmlFor={`label-nl-${draft.id ?? "new"}`}>
+            {nl ? "Vraag (NL)" : "Question (NL)"}
+          </label>
+          <input
+            id={`label-nl-${draft.id ?? "new"}`}
+            value={draft.labelNl}
+            maxLength={300}
+            onChange={(event) => onChange({ ...draft, labelNl: event.target.value })}
+          />
+        </div>
+        <div className="ticket-admin-field">
+          <label htmlFor={`label-en-${draft.id ?? "new"}`}>
+            {nl ? "Vraag (EN)" : "Question (EN)"}
+          </label>
+          <input
+            id={`label-en-${draft.id ?? "new"}`}
+            value={draft.labelEn}
+            maxLength={300}
+            onChange={(event) => onChange({ ...draft, labelEn: event.target.value })}
+          />
+          {!draft.labelEn ? (
+            <span className="form-admin-lang-flag" data-missing="true">
+              {nl ? "Geen vertaling" : "No translation"}
+            </span>
+          ) : null}
+        </div>
+
+        <div className="ticket-admin-field">
+          <label htmlFor={`help-nl-${draft.id ?? "new"}`}>
+            {nl ? "Toelichting (NL, markdown)" : "Explanation (NL, markdown)"}
+          </label>
+          <MarkdownEditor
+            textareaId={`help-nl-${draft.id ?? "new"}`}
+            locale={locale}
+            rows={6}
+            allowImages={false}
+            value={draft.helpNl}
+            maxLength={2_000}
+            onChange={(helpNl) => onChange({ ...draft, helpNl })}
+          />
+        </div>
+        <div className="ticket-admin-field">
+          <label htmlFor={`help-en-${draft.id ?? "new"}`}>
+            {nl ? "Toelichting (EN, markdown)" : "Explanation (EN, markdown)"}
+          </label>
+          <MarkdownEditor
+            textareaId={`help-en-${draft.id ?? "new"}`}
+            locale={locale}
+            rows={6}
+            allowImages={false}
+            value={draft.helpEn}
+            maxLength={2_000}
+            onChange={(helpEn) => onChange({ ...draft, helpEn })}
+          />
+        </div>
+      </div>
+
+      <label className="ticket-admin-check">
+        <input
+          type="checkbox"
+          checked={draft.required}
+          onChange={(event) => onChange({ ...draft, required: event.target.checked })}
+        />
+        {nl ? "Verplicht invullen" : "Required"}
+      </label>
+
+      <fieldset className="form-admin-fieldset">
+        <legend>{nl ? "Afbeelding bij de vraag" : "Image with the question"}</legend>
+        <StorageImageField
+          defaultKey={config.imageKey}
+          locale={locale}
+          formId={formId}
+          label={nl ? "Vraagafbeelding" : "Question image"}
+          srContext={draft.labelNl || (nl ? "Nieuwe vraag" : "New question")}
+          helpText={
+            nl
+              ? "Optioneel. De afbeelding verschijnt tussen de vraag en de toelichting."
+              : "Optional. The image appears between the question and its explanation."
+          }
+          onChange={(key) => setConfig({ imageKey: key || null })}
+        />
+      </fieldset>
+
+      {/* Type-specifieke instellingen. Enkel wat bij dit soort veld hoort, zodat
+          er nooit een optieveld op het scherm staat bij een open vraag. */}
+      {["SHORT_TEXT", "LONG_TEXT", "EMAIL", "PHONE", "URL"].includes(draft.type) ? (
+        <fieldset className="form-admin-fieldset">
+          <legend>{nl ? "Invoer" : "Input"}</legend>
+          <div className="ticket-admin-form-grid">
+            <div className="ticket-admin-field">
+              <label>{nl ? "Maximum aantal tekens" : "Maximum characters"}</label>
+              {numberInput(config.maxLength, (next) => setConfig({ maxLength: next }), {
+                min: 1,
+                max: 10_000,
+              })}
+            </div>
+            {draft.type === "LONG_TEXT" ? (
+              <div className="ticket-admin-field">
+                <label>{nl ? "Hoogte (regels)" : "Height (rows)"}</label>
+                {numberInput(config.rows, (next) => setConfig({ rows: next }), { min: 2, max: 30 })}
+              </div>
+            ) : null}
+            <div className="ticket-admin-field" data-span="2">
+              <label>{nl ? "Patroon (reguliere expressie)" : "Pattern (regular expression)"}</label>
+              <input
+                value={config.pattern ?? ""}
+                placeholder="^r[0-9]{7}$"
+                onChange={(event) => setConfig({ pattern: event.target.value || null })}
+              />
+            </div>
+            {config.pattern ? (
+              <div className="ticket-admin-field" data-span="2">
+                <label>{nl ? "Melding bij een fout antwoord" : "Message on a wrong answer"}</label>
+                <input
+                  value={config.patternMessageNl ?? ""}
+                  placeholder={nl ? "Een r-nummer ziet eruit als r0123456." : ""}
+                  onChange={(event) => setConfig({ patternMessageNl: event.target.value || null })}
+                />
+              </div>
+            ) : null}
+          </div>
+        </fieldset>
+      ) : null}
+
+      {draft.type === "NUMBER" ? (
+        <fieldset className="form-admin-fieldset">
+          <legend>{nl ? "Bereik" : "Range"}</legend>
+          <div className="ticket-admin-form-grid">
+            <div className="ticket-admin-field">
+              <label>{nl ? "Minimum" : "Minimum"}</label>
+              {numberInput(config.min, (next) => setConfig({ min: next }))}
+            </div>
+            <div className="ticket-admin-field">
+              <label>{nl ? "Maximum" : "Maximum"}</label>
+              {numberInput(config.max, (next) => setConfig({ max: next }))}
+            </div>
+          </div>
+          <label className="ticket-admin-check">
+            <input
+              type="checkbox"
+              checked={Boolean(config.integerOnly)}
+              onChange={(event) => setConfig({ integerOnly: event.target.checked })}
+            />
+            {nl ? "Enkel hele getallen" : "Whole numbers only"}
+          </label>
+        </fieldset>
+      ) : null}
+
+      {draft.type === "DATE" ? (
+        <fieldset className="form-admin-fieldset">
+          <legend>{nl ? "Toegelaten periode" : "Allowed period"}</legend>
+          <div className="ticket-admin-form-grid">
+            <div className="ticket-admin-field">
+              <label>{nl ? "Niet voor" : "Not before"}</label>
+              <input
+                type="date"
+                value={config.minDate ?? ""}
+                onChange={(event) => setConfig({ minDate: event.target.value || null })}
+              />
+            </div>
+            <div className="ticket-admin-field">
+              <label>{nl ? "Niet na" : "Not after"}</label>
+              <input
+                type="date"
+                value={config.maxDate ?? ""}
+                onChange={(event) => setConfig({ maxDate: event.target.value || null })}
+              />
+            </div>
+          </div>
+        </fieldset>
+      ) : null}
+
+      {draft.type === "SCALE" ? (
+        <fieldset className="form-admin-fieldset">
+          <legend>{nl ? "De schaal" : "The scale"}</legend>
+          <div className="ticket-admin-form-grid">
+            <div className="ticket-admin-field">
+              <label>{nl ? "Van" : "From"}</label>
+              {numberInput(config.min, (next) => setConfig({ min: next }), { min: 0, max: 10 })}
+            </div>
+            <div className="ticket-admin-field">
+              <label>{nl ? "Tot" : "To"}</label>
+              {numberInput(config.max, (next) => setConfig({ max: next }), { min: 2, max: 10 })}
+            </div>
+            <div className="ticket-admin-field">
+              <label>{nl ? "Label bij het laagste" : "Label at the lowest"}</label>
+              <input
+                value={config.minLabelNl ?? ""}
+                onChange={(event) => setConfig({ minLabelNl: event.target.value || null })}
+              />
+            </div>
+            <div className="ticket-admin-field">
+              <label>{nl ? "Label bij het hoogste" : "Label at the highest"}</label>
+              <input
+                value={config.maxLabelNl ?? ""}
+                onChange={(event) => setConfig({ maxLabelNl: event.target.value || null })}
+              />
+            </div>
+            <div className="ticket-admin-field">
+              <label>{nl ? "Weergave" : "Display"}</label>
+              <ThemedSelect
+                name={`scale-display-${draft.id ?? "new"}`}
+                value={config.display ?? "numbers"}
+                onChange={(display) => setConfig({ display: display as "numbers" | "stars" })}
+                options={[
+                  { value: "numbers", label: nl ? "Cijfers" : "Numbers" },
+                  { value: "stars", label: nl ? "Sterren" : "Stars" },
+                ]}
+              />
+            </div>
+          </div>
+        </fieldset>
+      ) : null}
+
+      {draft.type === "FILE" ? (
+        <fieldset className="form-admin-fieldset">
+          <legend>{nl ? "Bestanden" : "Files"}</legend>
+          <div className="ticket-admin-form-grid">
+            <div className="ticket-admin-field">
+              <label>{nl ? "Maximum aantal bestanden" : "Maximum number of files"}</label>
+              {numberInput(config.maxFiles, (next) => setConfig({ maxFiles: next }), {
+                min: 1,
+                max: 10,
+              })}
+            </div>
+            <div className="ticket-admin-field">
+              <label>{nl ? "Maximum per bestand (MB)" : "Maximum per file (MB)"}</label>
+              {numberInput(config.maxSizeMb, (next) => setConfig({ maxSizeMb: next }), {
+                min: 1,
+                max: 50,
+              })}
+            </div>
+            <div className="ticket-admin-field" data-span="2">
+              <label>{nl ? "Toegelaten types" : "Allowed types"}</label>
+              <input
+                value={(config.allowedExtensions ?? []).join(", ")}
+                placeholder="pdf, png, jpg"
+                onChange={(event) =>
+                  setConfig({
+                    allowedExtensions: event.target.value
+                      .split(/[,\s]+/)
+                      .map((entry) => entry.trim().toLowerCase().replace(/^\./, ""))
+                      .filter(Boolean),
+                  })
+                }
+              />
+              <span className="ticket-admin-help">
+                {nl ? "Leeg laten betekent: alles toegelaten." : "Leave empty to allow everything."}
+              </span>
+            </div>
+          </div>
+        </fieldset>
+      ) : null}
+
+      {draft.type === "PROFILE" ? (
+        <fieldset className="form-admin-fieldset">
+          <legend>{nl ? "Welk gegeven" : "Which detail"}</legend>
+          <div className="ticket-admin-field">
+            <ThemedSelect
+              name={`profile-field-${draft.id ?? "new"}`}
+              value={config.profileField ?? "RNUMBER"}
+              onChange={(profileField) =>
+                setConfig({ profileField: profileField as FormFieldConfig["profileField"] })
+              }
+              options={[
+                { value: "NAME", label: nl ? "Naam" : "Name" },
+                { value: "EMAIL", label: nl ? "E-mailadres" : "E-mail address" },
+                { value: "RNUMBER", label: nl ? "R-nummer" : "R-number" },
+                { value: "STUDY_PROGRAMME", label: nl ? "Studierichting" : "Study programme" },
+                { value: "STUDY_YEAR", label: nl ? "Studiejaar" : "Study year" },
+              ]}
+            />
+            <span className="ticket-admin-help">
+              {nl
+                ? "Wordt voorgevuld uit het profiel van wie ingelogd is, en gecontroleerd op vorm."
+                : "Pre-filled from the profile of whoever is logged in, and checked for shape."}
+            </span>
+          </div>
+        </fieldset>
+      ) : null}
+
+      {isChoiceType(draft.type) ? (
+        <fieldset className="form-admin-fieldset">
+          <legend>{nl ? "De opties" : "The options"}</legend>
+          <ul className="form-admin-option-list">
+            {draft.options.map((option, index) => (
+              <li key={option.id ?? `nieuw-${index}`}>
+                <input
+                  className="form-admin-option-label"
+                  value={option.labelNl}
+                  placeholder={nl ? "Optie" : "Option"}
+                  aria-label={`${nl ? "Optie" : "Option"} ${index + 1} (NL)`}
+                  onChange={(event) => {
+                    const next = [...draft.options];
+                    next[index] = { ...option, labelNl: event.target.value };
+                    onChange({ ...draft, options: next });
+                  }}
+                />
+                <input
+                  className="form-admin-option-label"
+                  value={option.labelEn}
+                  placeholder="EN"
+                  aria-label={`${nl ? "Optie" : "Option"} ${index + 1} (EN)`}
+                  onChange={(event) => {
+                    const next = [...draft.options];
+                    next[index] = { ...option, labelEn: event.target.value };
+                    onChange({ ...draft, options: next });
+                  }}
+                />
+                <input
+                  className="form-admin-option-quota"
+                  type="number"
+                  min={option.quotaUsed || 1}
+                  value={option.quotaLimit ?? ""}
+                  placeholder={nl ? "Geen max" : "No cap"}
+                  aria-label={`${nl ? "Maximum aantal voor optie" : "Cap for option"} ${index + 1}`}
+                  onChange={(event) => {
+                    const next = [...draft.options];
+                    next[index] = {
+                      ...option,
+                      quotaLimit: event.target.value === "" ? null : Number(event.target.value),
+                    };
+                    onChange({ ...draft, options: next });
+                  }}
+                />
+                <span className="form-admin-option-used">
+                  {option.answerCount > 0
+                    ? nl
+                      ? `gekozen door ${option.answerCount} ${option.answerCount === 1 ? "inzending" : "inzendingen"}`
+                      : `chosen by ${option.answerCount} ${option.answerCount === 1 ? "entry" : "entries"}`
+                    : ""}
+                </span>
+                <IconButton
+                  label={nl ? "Optie verwijderen" : "Remove option"}
+                  srLabel={`${nl ? "Optie verwijderen" : "Remove option"}: ${option.labelNl || index + 1}`}
+                  tone="danger"
+                  onClick={() =>
+                    option.answerCount > 0 ? setRemovingOption(index) : removeOption(index)
+                  }
+                >
+                  <Trash2 size={16} aria-hidden="true" />
+                </IconButton>
+
+                <div className="form-admin-option-extras">
+                  {option.quotaLimit != null ? (
+                    <label className="ticket-admin-check">
+                      <input
+                        type="checkbox"
+                        checked={option.allowWaitlist}
+                        onChange={(event) => {
+                          const next = [...draft.options];
+                          next[index] = { ...option, allowWaitlist: event.target.checked };
+                          onChange({ ...draft, options: next });
+                        }}
+                      />
+                      {nl ? "Wachtlijst als deze vol zit" : "Waiting list when full"}
+                    </label>
+                  ) : null}
+
+                  {branching.enabled && sections.length > 0 ? (
+                    <label className="form-admin-option-jump">
+                      <span>{nl ? "Ga daarna naar" : "Then go to"}</span>
+                      <ThemedSelect
+                        name={`option-jump-${draft.id ?? "new"}-${index}`}
+                        value={option.endsForm ? "__end" : (option.nextSectionId ?? "")}
+                        onChange={(chosen) => {
+                          const next = [...draft.options];
+                          next[index] = {
+                            ...option,
+                            endsForm: chosen === "__end",
+                            nextSectionId: chosen === "__end" || !chosen ? null : chosen,
+                          };
+                          onChange({ ...draft, options: next });
+                        }}
+                        options={[
+                          { value: "", label: nl ? "de volgende sectie" : "the next section" },
+                          ...sections.map((section) => ({
+                            value: section.id,
+                            label:
+                              locale === "en" && section.titleEn
+                                ? section.titleEn
+                                : section.titleNl,
+                          })),
+                          {
+                            value: "__end",
+                            label: nl ? "het einde van de form" : "the end of the form",
+                          },
+                        ]}
+                      />
+                    </label>
+                  ) : null}
+                </div>
+              </li>
+            ))}
+          </ul>
+          <button
+            className="ticket-admin-button"
+            type="button"
+            onClick={() =>
+              onChange({
+                ...draft,
+                options: [
+                  ...draft.options,
+                  {
+                    id: null,
+                    code: null,
+                    labelNl: "",
+                    labelEn: "",
+                    quotaLimit: null,
+                    quotaUsed: 0,
+                    answerCount: 0,
+                    allowWaitlist: false,
+                    nextSectionId: null,
+                    endsForm: false,
+                  },
+                ],
+              })
+            }
+          >
+            <Plus aria-hidden="true" size={15} />
+            {nl ? "Optie toevoegen" : "Add option"}
+          </button>
+
+          <p className="form-admin-hint">
+            {nl
+              ? "Een optie met een maximum verdwijnt niet wanneer ze vol zit: ze blijft zichtbaar met de vermelding volzet. Een optie schrappen die al aangeduid werd, haalt ze van het formulier maar bewaart de antwoorden."
+              : "An option with a cap does not disappear when full: it stays visible marked as full. Removing an option that was already picked takes it off the form but keeps the answers."}
+          </p>
+
+          <label className="ticket-admin-check">
+            <input
+              type="checkbox"
+              checked={Boolean(config.shuffle)}
+              onChange={(event) => setConfig({ shuffle: event.target.checked })}
+            />
+            {nl ? "Toon de opties in willekeurige volgorde" : "Show the options in random order"}
+          </label>
+          <label className="ticket-admin-check">
+            <input
+              type="checkbox"
+              checked={Boolean(config.allowOther)}
+              onChange={(event) => setConfig({ allowOther: event.target.checked })}
+            />
+            {nl
+              ? '"Andere, namelijk ..." met een eigen tekstveld'
+              : '"Other, namely ..." with a free text field'}
+          </label>
+
+          {isMultiChoiceType(draft.type) ? (
+            <div className="ticket-admin-form-grid">
+              <div className="ticket-admin-field">
+                <label>{nl ? "Minstens aanduiden" : "Minimum to check"}</label>
+                {numberInput(config.minChecked, (next) => setConfig({ minChecked: next }), {
+                  min: 0,
+                  max: 100,
+                })}
+              </div>
+              <div className="ticket-admin-field">
+                <label>{nl ? "Hoogstens aanduiden" : "Maximum to check"}</label>
+                {numberInput(config.maxChecked, (next) => setConfig({ maxChecked: next }), {
+                  min: 1,
+                  max: 100,
+                })}
+              </div>
+            </div>
+          ) : null}
+        </fieldset>
+      ) : null}
+
+      {optionToRemove ? (
+        <ConfirmDialog
+          open
+          title={
+            nl ? "Gekozen optie van het formulier halen?" : "Remove selected option from the form?"
+          }
+          description={
+            nl
+              ? `Deze optie verdwijnt van het formulier. Ze werd gekozen door ${optionToRemove.answerCount} ${optionToRemove.answerCount === 1 ? "inzending" : "inzendingen"}; die bestaande antwoorden blijven bewaard en blijven in de export staan.`
+              : `This option disappears from the form. It was selected by ${optionToRemove.answerCount} ${optionToRemove.answerCount === 1 ? "entry" : "entries"}; those existing answers are kept and remain in exports.`
+          }
+          confirmLabel={nl ? "Van formulier halen" : "Remove from form"}
+          cancelLabel={nl ? "Annuleren" : "Cancel"}
+          pending={false}
+          onConfirm={() => {
+            if (removingOption !== null) removeOption(removingOption);
+          }}
+          onCancel={() => setRemovingOption(null)}
+        />
+      ) : null}
+
+      <ConditionEditor
+        locale={locale}
+        conditions={draft.conditions}
+        otherFields={otherFields}
+        onChange={(conditions) => onChange({ ...draft, conditions })}
+      />
+
+      <div className="ticket-admin-row-actions">
+        <Button type="button" onClick={onSave} disabled={pending || !draft.labelNl.trim()}>
+          {pending ? (nl ? "Bezig..." : "Saving...") : nl ? "Veld opslaan" : "Save field"}
+        </Button>
+        <Button type="button" variant="ghost" onClick={onCancel} disabled={pending}>
+          {nl ? "Annuleren" : "Cancel"}
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+function ConditionEditor({
+  locale,
+  conditions,
+  otherFields,
+  onChange,
+}: {
+  locale: AdminLocale;
+  conditions: EditorCondition[];
+  otherFields: EditorField[];
+  onChange: (next: EditorCondition[]) => void;
+}) {
+  const nl = locale === "nl";
+  const usable = otherFields.filter((field) => !field.archivedAt);
+
+  return (
+    <fieldset className="form-admin-fieldset">
+      <legend>{nl ? "Wanneer tonen" : "When to show"}</legend>
+      {usable.length === 0 ? (
+        <p className="form-admin-hint">
+          {nl
+            ? "Er is nog geen andere vraag om dit veld van te laten afhangen."
+            : "There is no other question yet for this field to depend on."}
+        </p>
+      ) : (
+        <>
+          {conditions.length === 0 ? (
+            <p className="form-admin-hint">
+              {nl ? "Dit veld staat altijd op het formulier." : "This field is always on the form."}
+            </p>
+          ) : null}
+          <ul className="form-admin-condition-list">
+            {conditions.map((condition, index) => {
+              const source = usable.find((field) => field.id === condition.sourceFieldId);
+              return (
+                <li key={index}>
+                  <ThemedSelect
+                    name={`condition-source-${index}`}
+                    ariaLabel={nl ? "Vraag" : "Question"}
+                    value={condition.sourceFieldId}
+                    onChange={(sourceFieldId) => {
+                      const next = [...conditions];
+                      next[index] = {
+                        ...condition,
+                        sourceFieldId,
+                        value: null,
+                      };
+                      onChange(next);
+                    }}
+                    options={usable.map((field) => ({
+                      value: field.id,
+                      label: field.labelNl,
+                    }))}
+                  />
+                  <ThemedSelect
+                    name={`condition-operator-${index}`}
+                    ariaLabel={nl ? "Voorwaarde" : "Condition"}
+                    value={condition.operator}
+                    onChange={(operator) => {
+                      const next = [...conditions];
+                      next[index] = {
+                        ...condition,
+                        operator: operator as EditorCondition["operator"],
+                      };
+                      onChange(next);
+                    }}
+                    options={[
+                      { value: "EQUALS", label: nl ? "is gelijk aan" : "equals" },
+                      { value: "NOT_EQUALS", label: nl ? "is niet" : "is not" },
+                      { value: "INCLUDES", label: nl ? "bevat" : "includes" },
+                      { value: "IS_ANSWERED", label: nl ? "is ingevuld" : "is answered" },
+                    ]}
+                  />
+                  {condition.operator === "IS_ANSWERED" ? null : source &&
+                    isChoiceType(source.type) ? (
+                    <ThemedSelect
+                      name={`condition-answer-${index}`}
+                      ariaLabel={nl ? "Antwoord" : "Answer"}
+                      value={condition.value ?? ""}
+                      onChange={(value) => {
+                        const next = [...conditions];
+                        next[index] = { ...condition, value: value || null };
+                        onChange(next);
+                      }}
+                      options={[
+                        { value: "", label: nl ? "Kies een antwoord" : "Pick an answer" },
+                        ...source.options
+                          .filter((option) => !option.archivedAt)
+                          .map((option) => ({ value: option.code, label: option.labelNl })),
+                      ]}
+                    />
+                  ) : (
+                    <input
+                      aria-label={nl ? "Antwoord" : "Answer"}
+                      value={condition.value ?? ""}
+                      onChange={(event) => {
+                        const next = [...conditions];
+                        next[index] = { ...condition, value: event.target.value || null };
+                        onChange(next);
+                      }}
+                    />
+                  )}
+                  <IconButton
+                    label={nl ? "Voorwaarde verwijderen" : "Remove condition"}
+                    srLabel={nl ? "Voorwaarde verwijderen" : "Remove condition"}
+                    tone="danger"
+                    onClick={() => onChange(conditions.filter((_, position) => position !== index))}
+                  >
+                    <Trash2 size={16} aria-hidden="true" />
+                  </IconButton>
+                </li>
+              );
+            })}
+          </ul>
+          <button
+            className="ticket-admin-button"
+            type="button"
+            onClick={() =>
+              onChange([
+                ...conditions,
+                { sourceFieldId: usable[0].id, operator: "IS_ANSWERED", value: null },
+              ])
+            }
+          >
+            <Plus aria-hidden="true" size={15} />
+            {nl ? "Voorwaarde toevoegen" : "Add condition"}
+          </button>
+          {conditions.length > 1 ? (
+            <p className="form-admin-hint">
+              {nl
+                ? "Alle voorwaarden moeten kloppen voor het veld verschijnt."
+                : "All conditions must hold before the field appears."}
+            </p>
+          ) : null}
+        </>
+      )}
+    </fieldset>
+  );
+}

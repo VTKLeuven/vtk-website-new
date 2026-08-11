@@ -6,14 +6,10 @@ import { Label } from "@vtk/ui";
 import { IconButton } from "@/components/ui/IconButton";
 import { TrashIcon, UploadIcon } from "@/components/ui/icons";
 import { useReportFormBusy } from "@/components/ui/formBusy";
+import { storageKeyPath } from "@/lib/storageKeyPath";
 
-/**
- * Bouwt de same-origin media-URL client-side. `publicUrl` uit `lib/storage`
- * doet hetzelfde, maar dat bestand her-exporteert heel `@vtk/storage`
- * (aws-sdk, node) en hoort dus niet in een client-bundel.
- */
 function mediaUrl(key: string): string {
-  return `/api/media/${key.split("/").map(encodeURIComponent).join("/")}`;
+  return `/api/media/${storageKeyPath(key)}`;
 }
 
 /**
@@ -40,6 +36,8 @@ export function StorageImageField({
   emptyHint,
   helpText,
   srContext,
+  formId,
+  onChange,
 }: {
   defaultKey?: string | null;
   locale: "nl" | "en";
@@ -51,6 +49,10 @@ export function StorageImageField({
   helpText?: string;
   /** Waarover dit veld gaat ("Cursusdienst"), voor de screenreader-labels. */
   srContext?: string;
+  /** Formulier waarvoor de upload gebeurt, voor de capability-check van de route. */
+  formId?: string;
+  /** Voor gecontroleerde editors die de key in hun eigen state bewaren. */
+  onChange?: (key: string) => void;
 }) {
   const nl = locale === "nl";
   const [key, setKey] = useState(defaultKey ?? "");
@@ -73,6 +75,7 @@ export function StorageImageField({
       const form = new FormData();
       form.append("file", file);
       form.append("kind", "image");
+      if (formId) form.append("formId", formId);
       const res = await fetch("/api/admin/upload", { method: "POST", body: form });
       if (!res.ok) {
         setErr(nl ? "Upload mislukt; de foto is niet bewaard." : "Upload failed; the photo was not saved.");
@@ -82,6 +85,7 @@ export function StorageImageField({
       setKey(data.key);
       setPreviewUrl(data.url ?? mediaUrl(data.key));
       setCleared(false);
+      onChange?.(data.key);
     } catch {
       setErr(nl ? "Upload mislukt; de foto is niet bewaard." : "Upload failed; the photo was not saved.");
     } finally {
@@ -94,6 +98,7 @@ export function StorageImageField({
     setPreviewUrl(null);
     setErr(null);
     setCleared(true);
+    onChange?.("");
     // Anders weigert de browser hetzelfde bestand opnieuw te accepteren: de
     // waarde verandert niet en `change` vuurt niet.
     if (inputRef.current) inputRef.current.value = "";

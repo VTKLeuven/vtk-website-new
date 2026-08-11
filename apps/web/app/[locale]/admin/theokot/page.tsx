@@ -5,7 +5,8 @@ import { requireSession } from "@/lib/session";
 import type { Locale } from "@vtk/i18n";
 import { getTheokotConfig } from "@/lib/theokot-server";
 import { TheokotAdminNav } from "./TheokotAdminNav";
-import { SessionsManager, type AdminItem, type AdminSession } from "./SessionsManager";
+import { SessionsManager, type AdminSession } from "./SessionsManager";
+import type { OfferingRow } from "./OfferingRows";
 
 import "@/app/design/vtk-basic.css";
 
@@ -77,18 +78,24 @@ export default async function AdminTheokot({ params }: { params: Promise<{ local
       priceEuro: (i.priceCents / 100).toFixed(2),
       quantity: i.quantity,
       isWeeklySpecial: i.isWeeklySpecial,
+      imageKey: i.imageKey,
+      ingredientsNl: i.ingredientsNl ?? "",
+      ingredientsEn: i.ingredientsEn ?? "",
       hasLines: i._count.lines > 0,
     })),
   }));
 
   // Standaardaanbod (catalogus) + standaarduren als startpunt voor "week aanmaken".
-  const defaultProducts: AdminItem[] = products.map((p) => ({
+  const defaultProducts: OfferingRow[] = products.map((p) => ({
     id: "",
     nameNl: p.nameNl,
     nameEn: p.nameEn ?? "",
     priceEuro: (p.priceCents / 100).toFixed(2),
     quantity: p.defaultQuantity,
     isWeeklySpecial: p.isWeeklySpecialSlot,
+    imageKey: p.imageKey,
+    ingredientsNl: p.ingredientsNl ?? "",
+    ingredientsEn: p.ingredientsEn ?? "",
     hasLines: false,
   }));
   const defaultHours = {
