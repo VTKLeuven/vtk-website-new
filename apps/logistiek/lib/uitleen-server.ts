@@ -1218,7 +1218,13 @@ export async function adminRequestTemplates() {
       createdBy: { select: { name: true } },
       lines: {
         orderBy: { item: { name: 'asc' } },
-        select: { id: true, quantity: true, item: { select: { name: true, active: true } } },
+        // itemId erbij: de editor vult er de aantallen mee voor in de catalogus.
+        select: {
+          id: true,
+          itemId: true,
+          quantity: true,
+          item: { select: { name: true, active: true } },
+        },
       },
     },
   });

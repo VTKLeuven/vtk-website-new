@@ -1377,9 +1377,18 @@ aanvraagformulier en vult daar de aantallen in.
 - **Enkel Logistiek maakt ze aan.** Lieten we elke post zijn eigen sjablonen
   maken, dan staan er na één werkingsjaar dertig varianten van "cantus" in de
   keuzelijst en weet niemand nog welke de juiste is.
-- **Aanmaken gebeurt vanaf een bestaande aanvraag**, niet in een leeg
-  invulscherm. Een cantus bestaat al voor iemand er een sjabloon van wil, en de
-  lijst opnieuw intikken is precies het werk dat een sjabloon moet uitsparen.
+- **Twee wegen om er een te maken, met opzet.** Vanaf een bestaande aanvraag
+  ("Bewaar als sjabloon") is de gewone: een cantus bestaat al voor iemand er een
+  sjabloon van wil, en de lijst opnieuw intikken is precies het werk dat een
+  sjabloon moet uitsparen. Met de hand (/beheer/sjablonen) is voor het opzetten
+  van nul: dan bestaat die aanvraag nog niet, en drie nepaanvragen indienen en
+  weer opruimen om aan drie sjablonen te geraken is geen manier van werken.
+- **De handmatige kiezer is dezelfde catalogusbrowser als het
+  aanvraagformulier**, min de datums, het evenement en de contactvelden. Wie een
+  sjabloon opstelt zoekt op precies dezelfde manier als wie een aanvraag indient;
+  een tweede, kalere itemkiezer leren kennen is werk zonder opbrengst.
+- **Een handgemaakt sjabloon krijgt geen post.** Dat label kwam van de aanvraag
+  waaruit het gemaakt werd; verzinnen welke post erbij hoort maakt het een gok.
 - **Een sjabloon telt op bij wat er al staat**, en vervangt niet. Wie eerst iets
   koos en dan een sjabloon neemt, is zijn keuze anders kwijt zonder waarschuwing.
 - **De post op een sjabloon is een label, geen filter.** Een sjabloon van Cultuur
@@ -1513,6 +1522,20 @@ onderscheid nodig heeft, splitst het item in exemplaren (`UitleenItemUnit`).
   naar de waarde waarmee de pagina geladen was. De exemplaren zijn nu een veld
   van het itemformulier (JSON in een hidden input) in plaats van formuliertjes
   in een formulier.
+
+### De beheerbalk is een tabbalk, geen rij losse tegels
+
+Twaalf beheerpagina's naast elkaar lezen als een opsomming waarin je
+"Chauffeurs" alleen vindt als je al weet dat het bestaat. Ze groeperen hielp,
+maar de kopjes stonden als losse woordjes ("UITLEEN", "VERVOER", "OVERIG")
+tussen de knoppen en zagen eruit als kapotte knoppen.
+
+- **Vier tabs, met de pagina's op een tweede rij eronder.** De tab waar je in
+  zit staat open, dus elke pagina blijft op één klik.
+- **Een tab openen navigeert niet.** Het wisselt enkel de onderste rij, zodat je
+  kan rondkijken zonder de pagina te verlaten waar je aan bezig bent. Navigeer je
+  wel, dan volgt de balk mee naar de afdeling waar je terechtkomt.
+- Zet de groepslabels niet terug tussen de knoppen.
 
 ### Itemfoto's: de eerste is de thumbnail
 
