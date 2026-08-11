@@ -4,7 +4,8 @@ De uitleendienst van VTK Logistiek in `apps/logistiek`: leden vragen per
 **evenement** materiaal, vervoer (kar/auto/bakfiets) en flesserke aan; het team
 keurt goed en verwerkt afhaling/terugbrengen/betaling. Dit vervangt het
 e-mailproces (zie "How to logi"). Productkeuzes: `docs/design-decisions.md`
-(§ Uitleendienst). Dit is de technische kaart.
+(§ Uitleendienst). Dit is de technische kaart; het invul- en testwerk dat het team
+zelf doet staat in `docs/logistiek-ingebruikname.md`.
 
 ## End-to-end flow
 

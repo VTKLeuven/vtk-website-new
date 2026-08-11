@@ -7,6 +7,8 @@ zelfstandig leesbaar: je kan één sectie in plan-modus geven zonder de rest.
 Technische kaart van de module: `docs/uitleendienst.md`.
 Productkeuzes: `docs/design-decisions.md` (§ Uitleendienst).
 Rechten: `docs/permissions.md`.
+Wat er na dit plan nog ingevuld en getest moet worden (geen code):
+`docs/logistiek-ingebruikname.md`.
 
 ## Hoe je dit gebruikt
 
