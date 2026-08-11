@@ -15,7 +15,7 @@ type VehicleOption = { id: string; name: string; pricingMode: UitleenPricingMode
 export function VanRequestForm({
   locale,
   vehicles,
-  groups: _groups,
+  groups,
   draftKey,
   events,
 }: {
@@ -52,6 +52,9 @@ export function VanRequestForm({
   const [returnStartAt, setReturnStartAt] = useState('');
   const [returnEndAt, setReturnEndAt] = useState('');
   const [note, setNote] = useState('');
+  // Namens welke post of werkgroep. Enkel een keuze wanneer het lid er meer dan
+  // één heeft; anders leidt de server ze af, zoals bij een materiaalaanvraag.
+  const [groupId, setGroupId] = useState(groups[0]?.id ?? '');
   const [eventLink, setEventLink] = useState({ eventId: '', createEvent: false });
   /**
    * Een gekozen evenement vult de naam in plaats van dat je ze opnieuw typt; zie
@@ -201,6 +204,7 @@ export function VanRequestForm({
         helpersPhone,
         contactPhone,
         notifyEmail,
+        groupId: groupId || null,
         eventId: eventLink.eventId || null,
         createEvent: eventLink.createEvent,
         note,
@@ -259,6 +263,23 @@ export function VanRequestForm({
             newEventName={eventName}
           />
         </div>
+      ) : null}
+
+      {groups.length > 1 ? (
+        <label className="mt-4 grid gap-1 text-sm">
+          <span className="font-medium text-vtk-ink">{en ? 'On behalf of' : 'Namens'}</span>
+          <select
+            value={groupId}
+            onChange={(event) => setGroupId(event.target.value)}
+            className={inputClass}
+          >
+            {groups.map((group) => (
+              <option key={group.id} value={group.id}>
+                {group.name}
+              </option>
+            ))}
+          </select>
+        </label>
       ) : null}
 
       <fieldset className="mt-4">

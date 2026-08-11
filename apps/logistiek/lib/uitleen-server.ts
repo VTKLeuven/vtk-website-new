@@ -486,12 +486,17 @@ export async function myReservations(userId: string, groupIds: string[] = []) {
   });
 }
 
-export async function myVanBookings(userId: string) {
+/** Zoals `myReservations`: eigen ritten plus die van je posten. */
+export async function myVanBookings(userId: string, groupIds: string[] = []) {
   return prisma.uitleenTransportBooking.findMany({
-    where: { userId },
+    where:
+      groupIds.length > 0
+        ? { OR: [{ userId }, { requesterType: 'INTERN', groupId: { in: groupIds } }] }
+        : { userId },
     orderBy: { createdAt: 'desc' },
     include: {
       vehicle: { select: { nameNl: true, nameEn: true } },
+      user: { select: { id: true, name: true } },
       payments: { where: { status: 'SUCCEEDED' }, select: { id: true, status: true } },
     },
   });
@@ -571,13 +576,23 @@ export async function reservationForMember(id: string, userId: string, groupIds:
   });
 }
 
-export async function vanBookingForUser(id: string, userId: string) {
+/** Zoals `reservationForMember`: eigen rit, of een interne rit van je post. */
+export async function vanBookingForMember(id: string, userId: string, groupIds: string[]) {
   return prisma.uitleenTransportBooking.findFirst({
-    where: { id, userId },
+    where: {
+      id,
+      OR: [
+        { userId },
+        ...(groupIds.length > 0
+          ? [{ requesterType: 'INTERN' as const, groupId: { in: groupIds } }]
+          : []),
+      ],
+    },
     include: {
       payments: { orderBy: { createdAt: 'desc' } },
       driver: { select: { name: true } },
       vehicle: { select: { nameNl: true, nameEn: true } },
+      user: { select: { id: true, name: true } },
     },
   });
 }

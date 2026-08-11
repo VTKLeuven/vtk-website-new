@@ -298,11 +298,23 @@ export async function createVanBookingAction(input: TransportFormInput & {
   /** Koepel-evenement (A8), of `createEvent` om er een te maken van `eventName`. */
   eventId?: string | null;
   createEvent?: boolean;
+  /** Post of werkgroep waarvoor de rit dient; leeg = de eerste van het lid. */
+  groupId?: string | null;
 }): Promise<ActionResult> {
   const session = await requireSession();
 
-  const eventId = await resolveEventId(session, { ...input, eventStart: undefined }, null);
-  const built = await buildTransportBookings(input, { userId: session.user.id, eventId });
+  // Zoals bij een materiaalaanvraag: de rit hangt aan de post waarvoor ze dient.
+  // Dat stond hier niet, waardoor elke rit van een lid als "Interne post" zonder
+  // naam in het beheer stond en de post ze onderling niet kon zien.
+  const requester = await deriveMemberRequester(session, input.groupId ?? undefined);
+  const eventId = await resolveEventId(session, { ...input, eventStart: undefined }, requester.groupId);
+  const built = await buildTransportBookings(input, {
+    userId: session.user.id,
+    eventId,
+    requesterType: requester.requesterType,
+    groupId: requester.groupId,
+    requesterName: requester.requesterName ?? null,
+  });
   if (!built.ok) return { ok: false, error: built.error };
 
   await prisma.uitleenTransportBooking.createMany({ data: built.bookings });

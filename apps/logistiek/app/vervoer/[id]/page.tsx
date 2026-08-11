@@ -10,7 +10,7 @@ import { reconcilePayments } from '@/lib/payments';
 import { getLocale } from '@/lib/i18n';
 import { getSession } from '@/lib/session';
 import { formatDateTime, formatPriceCents } from '@/lib/uitleen';
-import { hasSucceededPayment, vanBookingForUser } from '@/lib/uitleen-server';
+import { hasSucceededPayment, vanBookingForMember } from '@/lib/uitleen-server';
 
 export default async function VanBookingDetailPage({
   params,
@@ -27,19 +27,23 @@ export default async function VanBookingDetailPage({
 
   const { id } = await params;
   const { betaling } = await searchParams;
-  let booking = await vanBookingForUser(id, session.user.id);
+  // Ook de ritten van je eigen post, leesalleen; zie reservaties/[id].
+  const postIds = session.groups.filter((group) => group.type === 'PRAESIDIUM').map((g) => g.id);
+  let booking = await vanBookingForMember(id, session.user.id, postIds);
   if (!booking) notFound();
+  const isOwner = booking.user.id === session.user.id;
 
   // Terug van de checkout: status meteen bij de provider ophalen (zie
   // reservaties/[id] voor de rationale).
   if (betaling && booking.payments.some((payment) => payment.status === 'PENDING')) {
     if ((await reconcilePayments(booking.payments)) > 0) {
-      booking = (await vanBookingForUser(id, session.user.id))!;
+      booking = (await vanBookingForMember(id, session.user.id, postIds))!;
     }
   }
 
   const paid = hasSucceededPayment(booking.payments) || booking.paidOfflineAt !== null;
-  const cancellable = (booking.status === 'REQUESTED' || booking.status === 'APPROVED') && !paid;
+  const cancellable =
+    isOwner && (booking.status === 'REQUESTED' || booking.status === 'APPROVED') && !paid;
 
   return (
     <PageShell
@@ -83,6 +87,15 @@ export default async function VanBookingDetailPage({
               </div>
             ) : null}
           </dl>
+
+          {/* Een rit van een collega uit je post: zichtbaar, niet van jou. */}
+          {!isOwner ? (
+            <p className="mt-4 rounded-lg border border-vtk-navy/10 bg-vtk-paper px-3 py-2 text-sm leading-6 text-vtk-body">
+              {en
+                ? `Requested by ${booking.user.name} for your post. You can see it; changing or cancelling stays with the requester.`
+                : `Aangevraagd door ${booking.user.name} voor jouw post. Je kan ze bekijken; aanpassen of annuleren blijft bij de aanvrager.`}
+            </p>
+          ) : null}
 
           {booking.memberNote ? (
             <p className="mt-4 rounded-lg bg-vtk-paper px-4 py-3 text-sm text-vtk-body">
@@ -139,7 +152,8 @@ export default async function VanBookingDetailPage({
             </p>
           ) : null}
 
-          {(booking.status === 'APPROVED' || booking.status === 'COMPLETED') &&
+          {isOwner &&
+          (booking.status === 'APPROVED' || booking.status === 'COMPLETED') &&
           booking.paymentMode === 'ONLINE' &&
           booking.priceCents !== null &&
           !paid ? (

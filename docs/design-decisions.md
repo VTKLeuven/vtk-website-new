@@ -1532,17 +1532,22 @@ itemopsomming.
 - **Drie secties: materiaal, flesserke, vervoer.** Een aanvraag met allebei hoort
   bij materiaal (daar zit het werk) en zegt in haar samenvatting dat er ook drank
   bij zit; ze twee keer tonen zou lijken op twee aanvragen.
-- **Materiaal toont de aanvragen van je hele post**, met eronder in het klein wie
+- **Alle drie tonen de aanvragen van je hele post**, met eronder in het klein wie
   ze deed. Een post bestelt als post: wie op maandag materiaal aanvroeg en op
   woensdag ziek is, laat de rest anders in het ongewisse, en dan wordt hetzelfde
-  twee keer aangevraagd.
+  twee keer aangevraagd. Dat geldt even hard voor een bak cola en voor de kar.
 - **Zien is niet wijzigen.** Een aanvraag van een collega opent leesalleen: geen
   aanpassen, geen annuleren, geen betaalknop. Anders haalt iemand materiaal weg
   onder de aanvrager zonder dat die het merkt.
 - **Enkel posten delen, geen werkgroepen.** Een werkgroepaanvraag bewaart geen
   `groupId` (zie `deriveMemberRequester`), enkel een vrije naam; er is dus niets
   om op te groeperen zonder daar eerst een echte koppeling van te maken.
-- **Flesserke en vervoer blijven persoonlijk.** Enkel materiaal wordt gedeeld.
+- **Een rit hangt sinds dit ook aan zijn post.** `createVanBookingAction` zette
+  `requesterType`/`groupId` niet, in tegenstelling tot de materiaal- en
+  flesserke-aanvragen: elke rit van een lid stond in het beheer als "Interne
+  post" zonder naam. Het vervoerformulier vraagt nu "Namens" wanneer het lid meer
+  dan één post heeft, net als de andere twee. Ritten van voor deze wijziging
+  hebben geen post en worden dus niet gedeeld.
 
 ### Een gekozen evenement vult de naam in
 

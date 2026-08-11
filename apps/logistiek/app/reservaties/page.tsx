@@ -42,7 +42,7 @@ export default async function ReservatiesPage({
   const postIds = session.groups.filter((group) => group.type === 'PRAESIDIUM').map((g) => g.id);
   const [reservations, vanBookings] = await Promise.all([
     myReservations(session.user.id, postIds),
-    myVanBookings(session.user.id),
+    myVanBookings(session.user.id, postIds),
   ]);
 
   // Materiaal en flesserke stonden onder één kopje "Materiaal", terwijl een
@@ -50,13 +50,21 @@ export default async function ReservatiesPage({
   // hoort bij materiaal (daar staat het zwaarste werk) en zegt in haar
   // samenvatting dat er ook drank bij zit.
   const materialRequests = reservations.filter((reservation) => reservation.lines.length > 0);
-  // Flesserke blijft persoonlijk: enkel materiaal wordt binnen de post gedeeld.
   const drinkRequests = reservations.filter(
-    (reservation) =>
-      reservation.lines.length === 0 &&
-      reservation.flesserkeLines.length > 0 &&
-      reservation.user.id === session.user.id
+    (reservation) => reservation.lines.length === 0 && reservation.flesserkeLines.length > 0
   );
+
+  /** "Door jou aangevraagd" of de naam van de collega, klein onder de rij. */
+  const requestedBy = (user: { id: string; name: string }) =>
+    user.id === session.user.id
+      ? en
+        ? 'Requested by you'
+        : 'Door jou aangevraagd'
+      : `${en ? 'Requested by' : 'Aangevraagd door'} ${user.name}`;
+
+  const postNote = en
+    ? 'Also shows what the rest of your post requested, so the same thing is not booked twice.'
+    : 'Toont ook wat de rest van je post aanvroeg, zodat hetzelfde niet twee keer geboekt wordt.';
 
   return (
     <PageShell
@@ -77,13 +85,7 @@ export default async function ReservatiesPage({
       <div className="grid gap-8">
         <section>
           <h2 className="text-lg font-semibold tracking-tight text-vtk-ink">{en ? 'Equipment' : 'Materiaal'}</h2>
-          {postIds.length > 0 ? (
-            <p className="mt-1 text-sm text-vtk-muted">
-              {en
-                ? 'Also shows what the rest of your post requested, so the same thing is not booked twice.'
-                : 'Toont ook wat de rest van je post aanvroeg, zodat hetzelfde niet twee keer geboekt wordt.'}
-            </p>
-          ) : null}
+          {postIds.length > 0 ? <p className="mt-1 text-sm text-vtk-muted">{postNote}</p> : null}
           {materialRequests.length === 0 ? (
             <p className="mt-3 text-sm text-vtk-muted">
               {en ? 'No requests yet. ' : 'Nog geen aanvragen. '}
@@ -120,13 +122,7 @@ export default async function ReservatiesPage({
                       </p>
                       {/* Wie ze aanvroeg, klein eronder. Bij je eigen aanvraag is
                           dat overbodig; bij die van een collega is het het punt. */}
-                      <p className="mt-1 text-xs text-vtk-muted">
-                        {reservation.user.id === session.user.id
-                          ? en
-                            ? 'Requested by you'
-                            : 'Door jou aangevraagd'
-                          : `${en ? 'Requested by' : 'Aangevraagd door'} ${reservation.user.name}`}
-                      </p>
+                      <p className="mt-1 text-xs text-vtk-muted">{requestedBy(reservation.user)}</p>
                     </div>
                     <ReservationStatusBadge status={reservation.status} locale={locale} />
                   </Link>
@@ -140,6 +136,7 @@ export default async function ReservatiesPage({
           <h2 className="text-lg font-semibold tracking-tight text-vtk-ink">
             {en ? 'Drinks' : 'Flesserke'}
           </h2>
+          {postIds.length > 0 ? <p className="mt-1 text-sm text-vtk-muted">{postNote}</p> : null}
           {drinkRequests.length === 0 ? (
             <p className="mt-3 text-sm text-vtk-muted">
               {en ? 'No requests yet. ' : 'Nog geen aanvragen. '}
@@ -164,6 +161,7 @@ export default async function ReservatiesPage({
                       <p className="mt-0.5 text-sm text-vtk-muted">
                         {formatDateWithPart(reservation.pickupDate, reservation.pickupPart, locale)}
                       </p>
+                      <p className="mt-1 text-xs text-vtk-muted">{requestedBy(reservation.user)}</p>
                     </div>
                     <ReservationStatusBadge status={reservation.status} locale={locale} />
                   </Link>
@@ -175,6 +173,7 @@ export default async function ReservatiesPage({
 
         <section>
           <h2 className="text-lg font-semibold tracking-tight text-vtk-ink">{en ? 'Transport' : 'Vervoer'}</h2>
+          {postIds.length > 0 ? <p className="mt-1 text-sm text-vtk-muted">{postNote}</p> : null}
           {vanBookings.length === 0 ? (
             <p className="mt-3 text-sm text-vtk-muted">
               {en ? 'No trips yet. ' : 'Nog geen ritten. '}
@@ -202,6 +201,7 @@ export default async function ReservatiesPage({
                         {formatDateTime(booking.startAt, locale)} {en ? 'to' : 'tot'} {formatDateTime(booking.endAt, locale)} ·{' '}
                         {formatPriceCents(booking.priceCents, locale)}
                       </p>
+                      <p className="mt-1 text-xs text-vtk-muted">{requestedBy(booking.user)}</p>
                     </div>
                     <VanStatusBadge status={booking.status} locale={locale} />
                   </Link>
