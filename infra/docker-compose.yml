@@ -56,6 +56,20 @@ services:
       context: ..
       dockerfile: infra/docker/logistiek.Dockerfile
     restart: unless-stopped
+    # Dezelfde root-`.env` als de website. Dit stond er lang niet, en dat viel
+    # niet op zolang de app enkel de vier variabelen hieronder nodig had. Sinds
+    # de uitleendienst mailt (`packages/mail`) is het wel nodig: SMTP_HOST c.s.
+    # staan enkel in de root-`.env`, en zonder SMTP_HOST logt `sendMail` het
+    # bericht in plaats van het te versturen. Zonder klacht, zonder foutmelding.
+    #
+    # Let op het verschil tussen de twee bronnen: `${VAR}` hieronder interpoleert
+    # compose uit zijn éigen env-bestand (`infra/.env`), niet uit deze. Wat hier
+    # met een lege standaard stond (MOLLIE_API_KEY, LOGISTIEK_MAINTENANCE_SECRET,
+    # LOGISTIEK_TEST_LOGIN) overschreef dus stil de waarde uit de root-`.env`
+    # met een lege string; die regels zijn daarom weg. Wat blijft staan, heeft
+    # een echte productiewaarde als standaard.
+    env_file:
+      - ../.env
     depends_on:
       web:
         condition: service_started
@@ -67,12 +81,10 @@ services:
       SESSION_COOKIE_DOMAIN: ${SESSION_COOKIE_DOMAIN:-.vtk.be}
       VTK_MAIN_URL: ${VTK_MAIN_URL:-https://vtk.be}
       LOGISTIEK_PUBLIC_URL: ${LOGISTIEK_PUBLIC_URL:-https://logistiek.vtk.be}
+      # Blijft expliciet staan: `mock` gooit in productie een fout, en de
+      # standaard in `.env.example` is `mock` (voor lokaal). Zou de root-`.env`
+      # hier winnen, dan legt één vergeten regel de betaalflow plat.
       LOGISTIEK_PAYMENT_PROVIDER: ${LOGISTIEK_PAYMENT_PROVIDER:-mollie}
-      LOGISTIEK_MAINTENANCE_SECRET: ${LOGISTIEK_MAINTENANCE_SECRET:-}
-      MOLLIE_API_KEY: ${MOLLIE_API_KEY:-}
-      # Test-login toggle. Enkel op een testomgeving op "true" zetten; nooit in
-      # productie (geeft echte permissies zonder wachtwoord). Zie .env.example.
-      LOGISTIEK_TEST_LOGIN: ${LOGISTIEK_TEST_LOGIN:-}
     ports:
       - "127.0.0.1:3100:3000"
 

@@ -11,12 +11,47 @@ Technische kaart: `docs/uitleendienst.md`. Productkeuzes: `docs/design-decisions
 
 ### Op de server (env)
 
-- `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_SECURE`, eventueel
-  `SMTP_EHLO_NAME`. **Zonder `SMTP_HOST` worden de mails enkel gelogd**, niet
-  verstuurd; de app meldt dat niet aan de gebruiker.
-- `LOGISTIEK_MAIL_FROM`: de afzender van de uitleendienst-mails.
-- `LOGISTIEK_PUBLIC_URL` op de echte https-URL. De link onderaan elke mail wordt
-  daaruit gebouwd; staat er localhost, dan staat dat in de mail.
+**Het SMTP-blok dat er al staat voor de ticketmails wordt hergebruikt.** Sinds A9
+loopt alle uitgaande mail van beide apps over `packages/mail`, dat dezelfde
+`SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`, `SMTP_PASSWORD` en
+`SMTP_EHLO_NAME` leest. Zet ze niet nog eens: in een plat `.env` wint de laatste
+van twee blokken, en dan verandert er stil iets aan de ticketmails.
+
+Toe te voegen aan de root-`.env`:
+
+- `LOGISTIEK_MAIL_FROM="Logistiek VTK <logistiek@vtk.be>"`. Enkel de afzender
+  verschilt; `MAIL_FROM` blijft van ticketing en Theokot. Het adres moet in
+  Workspace bestaan (zie hieronder), anders weigert de relay het bericht.
+- `LOGISTIEK_PUBLIC_URL="https://logistiek.vtk.be"`. De link onderaan elke mail
+  wordt daaruit gebouwd; staat er localhost, dan staat dat in de mail.
+
+Controleer ook `SMTP_EHLO_NAME`: leeg is goed (dan wordt het `vtk.be`), maar
+`[127.0.0.1]` uit een container laat de Google-relay de verbinding verbreken met
+"421 4.7.0 Try again later (EHLO)" en er vertrekt niets.
+
+**Zonder `SMTP_HOST` worden de mails enkel gelogd**, niet verstuurd, en de app
+meldt dat niet aan de gebruiker.
+
+### In de Google Workspace-admin
+
+Onder **Apps > Google Workspace > Gmail > Routing > SMTP relay service**, in de
+regel die de site al gebruikt:
+
+- **Allowed senders.** Staat die op "Only registered Apps users", dan moet
+  `logistiek@vtk.be` als gebruiker, alias of groep bestaan, én moet het account in
+  `SMTP_USER` ervan mogen afzenden ("Send as"). Bestaat het adres niet, dan
+  weigert de relay per bericht; dat zie je enkel in de logs van de container.
+- **Authentication.** Ofwel staat het publieke IP van de server in de lijst, ofwel
+  logt de site in met een Workspace-account plus app-wachtwoord in `SMTP_USER` /
+  `SMTP_PASSWORD`. Dat is al zo voor ticketing; er verandert niets.
+- **Encryption:** "Require TLS" mag aan blijven; `packages/mail` zet
+  `requireTLS` op poort 587.
+- SPF en DKIM van `vtk.be` staan al goed voor de ticketmails en gelden voor het
+  hele domein, dus daar hoeft niets bij.
+
+Het meelezende adres van de werkgroep (`logistiek.existenz@vtk.be` en dergelijke)
+komt in **kopie**, niet in de afzender. Dat mag dus een gewone groep zijn en heeft
+geen relay-rechten nodig.
 
 ### `/beheer/instellingen`
 
