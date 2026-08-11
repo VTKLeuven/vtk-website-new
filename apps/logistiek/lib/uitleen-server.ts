@@ -1167,6 +1167,62 @@ export async function adminInventory() {
 export type AdminInventoryItem = Awaited<ReturnType<typeof adminInventory>>['items'][number];
 
 /**
+ * Sjablonen voor het aanvraagformulier: naam plus de aantallen per item.
+ *
+ * Enkel actieve items: een sjabloon dat een item uit de catalogus voorstelt zou
+ * een aanvraag opleveren die de server meteen weigert. De lijn blijft wel staan,
+ * zodat het sjabloon weer compleet is als het item terugkomt.
+ */
+export type RequestTemplate = {
+  id: string;
+  name: string;
+  description: string | null;
+  groupName: string | null;
+  lines: Array<{ itemId: string; quantity: number }>;
+};
+
+export async function requestTemplates(): Promise<RequestTemplate[]> {
+  const templates = await prisma.uitleenRequestTemplate.findMany({
+    where: { active: true },
+    orderBy: [{ sortIndex: 'asc' }, { name: 'asc' }],
+    select: {
+      id: true,
+      name: true,
+      description: true,
+      group: { select: { nameNl: true } },
+      lines: {
+        where: { item: { active: true } },
+        select: { itemId: true, quantity: true },
+      },
+    },
+  });
+  return templates.map((template) => ({
+    id: template.id,
+    name: template.name,
+    description: template.description,
+    groupName: template.group?.nameNl ?? null,
+    lines: template.lines,
+  }));
+}
+
+/** Alle sjablonen met hun itemnamen, voor het beheerscherm. */
+export async function adminRequestTemplates() {
+  return prisma.uitleenRequestTemplate.findMany({
+    orderBy: [{ sortIndex: 'asc' }, { name: 'asc' }],
+    include: {
+      group: { select: { nameNl: true } },
+      createdBy: { select: { name: true } },
+      lines: {
+        orderBy: { item: { name: 'asc' } },
+        select: { id: true, quantity: true, item: { select: { name: true, active: true } } },
+      },
+    },
+  });
+}
+
+export type AdminRequestTemplate = Awaited<ReturnType<typeof adminRequestTemplates>>[number];
+
+/**
  * Afhalingen, terugbrengmomenten en ritten in een periode, voor de daglijst.
  *
  * De post (`group`), het evenement en het voertuig horen er expliciet bij: een

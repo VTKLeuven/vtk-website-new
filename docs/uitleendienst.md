@@ -43,6 +43,7 @@ e-mailproces (zie "How to logi"). Productkeuzes: `docs/design-decisions.md`
 | Model | Wat |
 | --- | --- |
 | `UitleenCategory` / `UitleenItem` | Catalogus. `isSet` + `UitleenSetContent` (vrije-tekst inhoud, telt niet apart mee), `photoKey`, locatie (`locationShelf`/`Rack`), `condition` (informatief zolang het item geen exemplaren heeft). Soft-delete via `active`. |
+| `UitleenRequestTemplate` / `...Line` | Vaste set materiaal die het aanvraagformulier invult (M17). Beheerd door Logistiek; aanmaken gebeurt vanaf een bestaande aanvraag. |
 | `UitleenItemUnit` | Eén fysiek exemplaar met een eigen staat, optioneel per item. Bestaan er exemplaren, dan is `item.quantity` de telling van de bruikbare (actief en niet KAPOT), bijgehouden door `syncItemQuantityFromUnits`. |
 | `UitleenReservation` + `UitleenReservationLine` | Aanvraag met event-context + `requesterType` (+ `groupId`/`requesterName`), dagbereik, snapshots. Statusmachine `REQUESTED → APPROVED/REJECTED/CANCELLED → PICKED_UP → RETURNED`. Per lijn: `note` (M15) en `preparedAt`/`preparedById` (klaarzetten, A7). `pickupPart`/`returnPart` zijn een afspraak tussen mensen: de voorraad rekent op hele dagen. |
 | `UitleenVehicle` | Voertuig (kar/auto/bakfiets); `pricingMode` (FREE/PER_HOUR/PER_KM/FLAT) + `rateCents`, team-configureerbaar. |

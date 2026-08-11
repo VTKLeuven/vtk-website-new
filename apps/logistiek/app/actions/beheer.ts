@@ -445,6 +445,88 @@ export async function activateItemAction(itemId: string): Promise<ActionResult> 
 }
 
 // ---------------------------------------------------------------------------
+// Sjablonen
+// ---------------------------------------------------------------------------
+
+/**
+ * Een bestaande aanvraag bewaren als sjabloon.
+ *
+ * Dit is de enige manier om er een te maken: een cantus bestaat al voor iemand
+ * hem als sjabloon wil, en de lijst opnieuw intikken in een leeg scherm is precies
+ * het werk dat we willen vermijden.
+ */
+export async function saveTemplateFromReservationAction(
+  _prev: SaveState,
+  formData: FormData
+): Promise<SaveState> {
+  const session = await requireManage();
+
+  const reservationId = String(formData.get('reservationId') ?? '');
+  const name = String(formData.get('name') ?? '').trim();
+  const description = String(formData.get('description') ?? '').trim();
+  if (!name) return saveError('NAME_REQUIRED');
+
+  const reservation = await prisma.uitleenReservation.findUnique({
+    where: { id: reservationId },
+    select: {
+      groupId: true,
+      lines: { select: { itemId: true, quantity: true } },
+    },
+  });
+  if (!reservation) return saveError('NOT_FOUND');
+  if (reservation.lines.length === 0) return saveError('NO_LINES');
+
+  // Dezelfde items kunnen niet twee keer in één sjabloon: de unieke index zou het
+  // anders weigeren met een databasefout in plaats van een nette melding.
+  const totals = new Map<string, number>();
+  for (const line of reservation.lines) {
+    totals.set(line.itemId, (totals.get(line.itemId) ?? 0) + line.quantity);
+  }
+
+  await prisma.uitleenRequestTemplate.create({
+    data: {
+      name: name.slice(0, 120),
+      description: description.slice(0, 300) || null,
+      groupId: reservation.groupId,
+      createdById: session.user.id,
+      lines: {
+        create: [...totals.entries()].map(([itemId, quantity]) => ({ itemId, quantity })),
+      },
+    },
+  });
+
+  revalidateBeheer();
+  return saveOk();
+}
+
+export async function renameTemplateAction(
+  _prev: SaveState,
+  formData: FormData
+): Promise<SaveState> {
+  await requireManage();
+
+  const id = String(formData.get('templateId') ?? '');
+  const name = String(formData.get('name') ?? '').trim();
+  const description = String(formData.get('description') ?? '').trim();
+  if (!name) return saveError('NAME_REQUIRED');
+
+  await prisma.uitleenRequestTemplate.update({
+    where: { id },
+    data: { name: name.slice(0, 120), description: description.slice(0, 300) || null },
+  });
+
+  revalidateBeheer();
+  return saveOk();
+}
+
+export async function deleteTemplateAction(templateId: string): Promise<ActionResult> {
+  await requireManage();
+  await prisma.uitleenRequestTemplate.delete({ where: { id: templateId } });
+  revalidateBeheer();
+  return { ok: true, message: 'Sjabloon verwijderd.' };
+}
+
+// ---------------------------------------------------------------------------
 // Materiaalaanvragen
 // ---------------------------------------------------------------------------
 

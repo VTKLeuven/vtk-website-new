@@ -1215,6 +1215,26 @@ aan geen enkele groep. Dat is ledenbeheer op vtk.be (`/admin/werkgroepen`) en ge
 zaak van de uitleendienst; de gate opzetten zou het verbergen in plaats van het
 oplossen.
 
+### Sjablonen maakt Logistiek, niet de posten
+
+Een vaste set materiaal (een cantus, een BBQ) staat als sjabloon in het
+aanvraagformulier en vult daar de aantallen in.
+
+- **Enkel Logistiek maakt ze aan.** Lieten we elke post zijn eigen sjablonen
+  maken, dan staan er na één werkingsjaar dertig varianten van "cantus" in de
+  keuzelijst en weet niemand nog welke de juiste is.
+- **Aanmaken gebeurt vanaf een bestaande aanvraag**, niet in een leeg
+  invulscherm. Een cantus bestaat al voor iemand er een sjabloon van wil, en de
+  lijst opnieuw intikken is precies het werk dat een sjabloon moet uitsparen.
+- **Een sjabloon telt op bij wat er al staat**, en vervangt niet. Wie eerst iets
+  koos en dan een sjabloon neemt, is zijn keuze anders kwijt zonder waarschuwing.
+- **De post op een sjabloon is een label, geen filter.** Een sjabloon van Cultuur
+  kan even goed voor een andere post passen; verbergen zou het onvindbaar maken
+  voor wie het net nodig heeft.
+- **Een item dat uit de catalogus verdwijnt, valt uit het sjabloon** maar de lijn
+  blijft staan: komt het item terug, dan is het sjabloon weer compleet. Het
+  beheerscherm zegt hoeveel lijnen overgeslagen worden.
+
 ### Meerdere voertuigen: één aanvraag, N boekingen
 
 Een verhuis met de kar én de auto is één vraag. Ze komt binnen als één aanvraag

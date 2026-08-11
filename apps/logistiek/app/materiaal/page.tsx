@@ -1,7 +1,7 @@
 import { LoginGate } from '@/components/login-gate';
 import { PageShell } from '@/components/page-shell';
 import { getSession } from '@/lib/session';
-import { getCatalog, getLogistiekSettings } from '@/lib/uitleen-server';
+import { getCatalog, getLogistiekSettings, requestTemplates } from '@/lib/uitleen-server';
 import { copy, getLocale } from '@/lib/i18n';
 import { getPublicCopy } from '@/lib/public-copy';
 import { requesterOptions } from './event-values';
@@ -14,10 +14,11 @@ export default async function MateriaalPage() {
     return <LoginGate variant="material" />;
   }
 
-  const [catalog, settings, content] = await Promise.all([
+  const [catalog, settings, content, templates] = await Promise.all([
     getCatalog(),
     getLogistiekSettings(),
     getPublicCopy(locale),
+    requestTemplates(),
   ]);
 
   return (
@@ -46,6 +47,7 @@ export default async function MateriaalPage() {
           lastMinuteDays={settings.lastMinuteDays}
           paymentNote={content.materialPaymentNote}
           userId={session.user.id}
+          templates={templates}
         />
       )}
     </PageShell>

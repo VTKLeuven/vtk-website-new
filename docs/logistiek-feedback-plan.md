@@ -33,7 +33,7 @@ verbetering, **P3** = groter of "ooit".
 | 4 | Materiaal: catalogus en aanvragen | M3, M4, M5, M6, M13, M15 | ✅ af 11 aug 2026 |
 | 5 | Vervoer | V2, V5, V8, V9, V12, V13 | ✅ af 11 aug 2026 |
 | 6 | Flesserke | F2, F3, F5, F6, F7 | ✅ af 11 aug 2026 |
-| 7 | Grote stukken | ~~A7~~, A8, ~~A9~~, ~~M1~~, ~~M2~~, ~~M12~~, M17, ~~M18~~, ~~V1~~ | enkel A8 + M17 rest; de rest af 11 aug 2026 |
+| 7 | Grote stukken | ~~A7~~, A8, ~~A9~~, ~~M1~~, ~~M2~~, ~~M12~~, ~~M17~~, ~~M18~~, ~~V1~~ | enkel A8 rest; de rest af 11 aug 2026 |
 
 Vervallen: **M7** (gas wordt een gewoon catalogusitem, dus geen code) en **M16**
 (geen barcodes). Zie fase 0.
@@ -1104,8 +1104,21 @@ Wat er tijdens het werk bijkwam:
 - **Klaar wanneer:** "afhalen dinsdagnamiddag" staat in het systeem in plaats van
   in een mail.
 
-### M17. Sjabloon-aanvraag (bv. cantus)
-**P3 · 🗄️ · code**
+### M17. Sjabloon-aanvraag (bv. cantus) ✅
+**P3 · 🗄️ · code** · af op 11 augustus 2026
+
+Wat er tijdens het werk bijkwam:
+
+- **Aanmaken kan enkel vanaf een bestaande aanvraag.** Het plan noemde het als
+  derde punt; het is de enige manier geworden. Een leeg invulscherm ernaast zou
+  dezelfde lijst twee keer laten intikken.
+- **Een sjabloon telt op bij wat er al staat.** Vervangen zou de keuze wissen van
+  wie eerst iets aanvinkte en dan een sjabloon neemt.
+- **De keuzelijst springt terug naar de placeholder** na het toepassen: het
+  sjabloon is toegepast, niet "gekozen", en de aantallen eronder zijn vanaf dan de
+  waarheid.
+- **Het beheer staat onderaan /beheer/materiaal**, niet als tiende tab in de
+  beheernavigatie: sjablonen raak je een paar keer per jaar aan.
 
 - **Doen:**
   1. Model `UitleenRequestTemplate` (`name`, `description`, `groupId?`,

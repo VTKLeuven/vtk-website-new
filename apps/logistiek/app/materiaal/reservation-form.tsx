@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { Button } from '@vtk/ui';
 import { checkAvailabilityAction, type ActionResult } from '@/app/actions/uitleen';
 import type { ReservationFormInput } from '@/lib/reservation-form';
+import type { RequestTemplate } from '@/lib/uitleen-server';
 import { formatDateTime, formatEuro } from '@/lib/uitleen';
 import type { CatalogCategory } from '@/lib/uitleen-server';
 import { CategoryThumb } from '@/components/category-thumb';
@@ -51,6 +52,7 @@ export function ReservationForm({
   lastMinuteDays,
   mode = 'member',
   draftKey,
+  templates = [],
 }: {
   catalog: CatalogCategory[];
   groups: RequesterOption[];
@@ -76,6 +78,8 @@ export function ReservationForm({
    * bron, en een concept eroverheen zou stil oude waarden terugzetten.
    */
   draftKey?: string;
+  /** Vaste sets die het formulier in één klik invullen (M17). */
+  templates?: RequestTemplate[];
 }) {
   const en = locale === 'en';
   const [event, setEvent] = useState<EventReservationValues>(initial.event);
@@ -93,6 +97,26 @@ export function ReservationForm({
 
   const [search, setSearch] = useState('');
   const [activeCategory, setActiveCategory] = useState<string>('all');
+
+  /**
+   * Een sjabloon vult de aantallen in en verdwijnt daarna uit beeld: wat er nu
+   * staat is een gewone aanvraag. Bewust optellen bij wat er al staat in plaats
+   * van te vervangen; wie eerst iets koos en dan een sjabloon neemt, is dat anders
+   * kwijt zonder waarschuwing.
+   */
+  function applyTemplate(templateId: string) {
+    const template = templates.find((entry) => entry.id === templateId);
+    if (!template) return;
+    setQuantities((current) => {
+      const next = { ...current };
+      for (const line of template.lines) {
+        const item = itemsById.get(line.itemId);
+        if (!item) continue;
+        next[line.itemId] = Math.min(item.quantity, (next[line.itemId] ?? 0) + line.quantity);
+      }
+      return next;
+    });
+  }
 
   // Alles wat het invullen van een aanvraag kost; de zoekterm en de gekozen
   // categorie horen er niet bij, dat is navigatie en geen invoer.
@@ -259,6 +283,40 @@ export function ReservationForm({
 
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
         <div className="space-y-6">
+          {/* Een sjabloon is een vertrekpunt, geen keuze die vastligt: het vult de
+              aantallen in en daarna is het een gewone aanvraag. */}
+          {templates.length > 0 ? (
+            <div className="flex flex-wrap items-center gap-3 rounded-[14px] border border-vtk-navy/10 bg-vtk-surface px-4 py-3">
+              <label className="text-sm font-medium text-vtk-ink" htmlFor="template">
+                {en ? 'Start from a template' : 'Start van een sjabloon'}
+              </label>
+              <select
+                id="template"
+                value=""
+                onChange={(event) => {
+                  applyTemplate(event.target.value);
+                  // Terug naar de placeholder: het sjabloon is toegepast, niet
+                  // "gekozen", en de aantallen hieronder zijn nu de waarheid.
+                  event.target.value = '';
+                }}
+                className="h-10 min-w-[220px] rounded-lg border border-vtk-navy/15 bg-white px-3 text-sm text-vtk-ink"
+              >
+                <option value="">{en ? 'Pick a template...' : 'Kies een sjabloon...'}</option>
+                {templates.map((template) => (
+                  <option key={template.id} value={template.id}>
+                    {template.name}
+                    {template.groupName ? ` (${template.groupName})` : ''}
+                  </option>
+                ))}
+              </select>
+              <span className="text-xs text-vtk-muted">
+                {en
+                  ? 'Fills in the amounts; you can change everything afterwards.'
+                  : 'Vult de aantallen in; je kan daarna alles nog aanpassen.'}
+              </span>
+            </div>
+          ) : null}
+
           <div className="flex flex-wrap items-center gap-3">
             <input
               type="search"

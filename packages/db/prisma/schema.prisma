@@ -414,6 +414,7 @@ model User {
   uitleenPickedUp         UitleenReservation[]      @relation("UitleenPickedUpBy")
   uitleenReturned         UitleenReservation[]      @relation("UitleenReturnedBy")
   uitleenLinesPrepared    UitleenReservationLine[]  @relation("UitleenLinePreparedBy")
+  uitleenTemplates        UitleenRequestTemplate[]  @relation("UitleenTemplateCreatedBy")
   uitleenTransport        UitleenTransportBooking[] @relation("UitleenTransportUser")
   uitleenTransportDriven  UitleenTransportBooking[] @relation("UitleenTransportDriver")
   uitleenTransportDecided UitleenTransportBooking[] @relation("UitleenTransportDecidedBy")
@@ -483,6 +484,7 @@ model Group {
 
   uitleenReservations UitleenReservation[]
   uitleenTransport    UitleenTransportBooking[]
+  uitleenTemplates    UitleenRequestTemplate[]
 }
 
 model GroupMembership {
@@ -1897,8 +1899,9 @@ model UitleenItem {
   updatedAt DateTime @updatedAt
 
   category    UitleenCategory?         @relation(fields: [categoryId], references: [id], onDelete: SetNull)
-  lines       UitleenReservationLine[]
-  units       UitleenItemUnit[]
+  lines         UitleenReservationLine[]
+  templateLines UitleenRequestTemplateLine[]
+  units         UitleenItemUnit[]
   setContents UitleenSetContent[]
   photos      UitleenItemPhoto[]
   properties  UitleenItemProperty[]
@@ -1987,6 +1990,50 @@ model UitleenSetContent {
   item UitleenItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
 
   @@index([itemId, sortIndex])
+}
+
+/// Een vaste set materiaal die vaak samen gevraagd wordt (een cantus, een BBQ).
+///
+/// Beheerd door Logistiek zelf: posten maken hun eigen sjablonen niet aan. Anders
+/// staan er na één jaar dertig varianten van "cantus" in de keuzelijst en weet
+/// niemand nog welke de juiste is. Een sjabloon vult het aanvraagformulier in;
+/// wat er daarna mee gebeurt, is een gewone aanvraag.
+model UitleenRequestTemplate {
+  id          String  @id @default(cuid())
+  name        String
+  description String?
+
+  /// Post waarvoor dit sjabloon typisch dient, enkel als toelichting in de lijst.
+  /// Filtert niet: een sjabloon van Cultuur kan even goed voor een andere post
+  /// passen, en verbergen zou het onvindbaar maken voor wie het nodig heeft.
+  groupId     String?
+  createdById String?
+
+  active    Boolean  @default(true)
+  sortIndex Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  group     Group?                       @relation(fields: [groupId], references: [id], onDelete: SetNull)
+  createdBy User?                        @relation("UitleenTemplateCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  lines     UitleenRequestTemplateLine[]
+
+  @@index([active, sortIndex])
+}
+
+model UitleenRequestTemplateLine {
+  id         String @id @default(cuid())
+  templateId String
+  itemId     String
+  quantity   Int    @default(1)
+
+  template UitleenRequestTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  /// Verdwijnt het item uit de catalogus (soft-delete), dan blijft de lijn staan;
+  /// het formulier slaat ze over. Hard verwijderen kan niet zolang er lijnen zijn.
+  item     UitleenItem            @relation(fields: [itemId], references: [id], onDelete: Restrict)
+
+  @@unique([templateId, itemId])
+  @@index([itemId])
 }
 
 /// Eén fysiek exemplaar van een item, met een eigen staat.

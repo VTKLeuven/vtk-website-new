@@ -43,6 +43,7 @@ import { AdminReservationEditor } from './admin-edit-form';
 import { DecisionForms } from './decision-forms';
 import { ConflictPanel, type ConflictParty } from './conflict-panel';
 import { PrepareList } from './prepare-list';
+import { SaveTemplateForm } from './save-template-form';
 import { ReturnForm } from './return-form';
 
 export default async function BeheerAanvraagDetailPage({
@@ -467,6 +468,14 @@ export default async function BeheerAanvraagDetailPage({
                 ),
               }}
             />
+          </div>
+        ) : null}
+
+        {/* Deze lijst vaker nodig? Dan is ze een sjabloon. Enkel bij materiaal:
+            flesserke is verbruik en verandert per keer. */}
+        {reservation.lines.length > 0 ? (
+          <div className="mt-5 border-t border-vtk-navy/10 pt-4">
+            <SaveTemplateForm reservationId={reservation.id} />
           </div>
         ) : null}
       </section>
