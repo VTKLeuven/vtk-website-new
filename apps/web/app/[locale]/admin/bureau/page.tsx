@@ -5,7 +5,7 @@ import type { Locale } from "@vtk/i18n";
 import { Card } from "@vtk/ui";
 import { currentWorkingYear, formatWorkingYear } from "@/lib/workingYear";
 import { formatEuro } from "@/lib/theokot";
-import { MEETING_DEFAULTS, semesterToPlan, suggestedMeetingDays, type Semester } from "@/lib/meetings";
+import { MEETING_DEFAULTS, semesterToPlan, type Semester } from "@/lib/meetings";
 import { getMeetingDrinks } from "@/lib/meetings-server";
 import { loadBureauTotals, loadMeetingAdmin } from "@/lib/meetingAdmin";
 import { MeetingAdminCard } from "@/components/meetings/MeetingAdminCard";
@@ -61,8 +61,8 @@ export default async function AdminBureauPage({
               ? "Duid aan op welke dagen er een bureau is. Dagen waarvoor al besteld is, kan je hier niet weghalen."
               : "Mark the days with a bureau. Days that already have orders cannot be removed here."
             : nl
-              ? "De kalender van dit semester staat nog niet vast. Duid aan wanneer de bureaus doorgaan; het voorstel volgt het ritme van om de twee weken."
-              : "This semester's calendar is not set yet. Mark when the bureaus take place; the suggestion follows the two-weekly rhythm."}
+              ? "De kalender van dit semester staat nog niet vast. Duid aan wanneer de bureaus doorgaan; het voorstel staat op de even weken en je wisselt met één klik naar de oneven weken."
+              : "This semester's calendar is not set yet. Mark when the bureaus take place; the suggestion uses the even weeks and one click switches to the odd ones."}
         </p>
         <MeetingPlanner
           nl={nl}
@@ -70,7 +70,6 @@ export default async function AdminBureauPage({
           year={workingYear}
           semester={semester}
           planned={planned}
-          suggested={suggestedMeetingDays(workingYear, semester, "BUREAU")}
           defaultTime={MEETING_DEFAULTS.BUREAU.time}
         />
       </Card>

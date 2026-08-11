@@ -5,7 +5,7 @@ import type { Locale } from "@vtk/i18n";
 import { Card } from "@vtk/ui";
 import { currentWorkingYear, formatWorkingYear } from "@/lib/workingYear";
 import { formatEuro } from "@/lib/theokot";
-import { MEETING_DEFAULTS, semesterToPlan, suggestedMeetingDays, type Semester } from "@/lib/meetings";
+import { MEETING_DEFAULTS, semesterToPlan, type Semester } from "@/lib/meetings";
 import { getMeetingDrinks } from "@/lib/meetings-server";
 import { loadGrocomeetDebts, loadMeetingAdmin } from "@/lib/meetingAdmin";
 import { MeetingAdminCard } from "@/components/meetings/MeetingAdminCard";
@@ -74,7 +74,6 @@ export default async function AdminGrocomeetPage({
           year={workingYear}
           semester={semester}
           planned={planned}
-          suggested={suggestedMeetingDays(workingYear, semester, "GROCOMEET")}
           defaultTime={MEETING_DEFAULTS.GROCOMEET.time}
         />
       </Card>

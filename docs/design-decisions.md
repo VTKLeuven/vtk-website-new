@@ -324,10 +324,20 @@ deadline per vergadering: twee deadlines voor hetzelfde broodje is één te veel
 De kalender wordt **per semester** ingevuld: bij het begin van het academiejaar voor
 semester 1 en vanaf januari voor semester 2 (`semesterToPlan`). Het beheerscherm toont
 die kalender vanzelf zolang er voor dat semester nog geen plan is (`MeetingPlan`); daarna
-blijft ze staan om aan te passen. De voorgestelde dagen volgen het gewone ritme, maar het
-is een voorstel: feestdagen, blok en verplaatsingen klik je gewoon weg. Een dag met
-bestellingen kan **niet** via de kalender verdwijnen; die verwijder je bewust bij de
-vergadering zelf, waar de bevestiging zegt hoeveel bestellingen eraan hangen.
+blijft ze staan om aan te passen. Een dag met bestellingen kan **niet** via de kalender
+verdwijnen; die verwijder je bewust bij de vergadering zelf, waar de bevestiging zegt
+hoeveel bestellingen eraan hangen.
+
+- **Uur en plaats staan per dag**, niet één keer bovenaan. Een vergadering verhuist
+  geregeld naar een ander lokaal of een ander uur, en dan hoort de kalender dat te
+  kunnen zeggen in plaats van je twintig keer naar het detailscherm te sturen. De twee
+  velden bovenaan zijn enkel het startpunt voor de volgende dag die je aanduidt.
+- **Het voorstel hangt aan de pariteit van het ISO-weeknummer** (`WeekParity`), niet aan
+  "elke tweede vanaf de start van het semester". Zo blijft een tweewekelijkse vergadering
+  kloppen over de kerstvakantie heen, en het is ook hoe een agenda erover praat. Met
+  "Elke week / Even weken / Oneven weken" zet je het voorstel in één klik om wanneer het
+  semester net verkeerd uitkomt; welke helft het juiste is, verschilt per jaar. Dagen
+  waarvoor al besteld is, blijven bij zo'n omschakeling staan.
 
 ---
 

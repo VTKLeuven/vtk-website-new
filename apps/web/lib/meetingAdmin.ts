@@ -138,6 +138,8 @@ export async function loadMeetingAdmin(
     planned: meetings.map((meeting) => ({
       day: ymdKey(brusselsYMD(meeting.startsAt)),
       reservations: meeting.reservations.length,
+      time: hhmm(meeting.startsAt),
+      location: meeting.location ?? "",
     })),
     hasPlan: plan !== null,
   };

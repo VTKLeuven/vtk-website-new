@@ -11,7 +11,7 @@
 
 import type { MeetingKind } from '@prisma/client';
 
-import { brusselsTimeOnDay, brusselsYMD, isoWeekday, ymdKey } from './brussels';
+import { brusselsTimeOnDay, brusselsYMD, isoWeekday, isoWeekKey, parseYMD, ymdKey } from './brussels';
 
 // -----------------------------------------------------------------------------
 // Soorten en standaardwaarden
@@ -19,13 +19,21 @@ import { brusselsTimeOnDay, brusselsYMD, isoWeekday, ymdKey } from './brussels';
 
 export const MEETING_KINDS = ['GROCOMEET', 'BUREAU'] as const satisfies readonly MeetingKind[];
 
+/**
+ * Welke weken het voorstel aanduidt. Een tweewekelijkse vergadering hangt aan de
+ * pariteit van het ISO-weeknummer en niet aan "elke tweede vanaf de start van het
+ * semester": zo blijft ze kloppen over de kerstvakantie heen, en het is ook hoe
+ * een agenda erover praat ("de even weken").
+ */
+export type WeekParity = 'all' | 'even' | 'odd';
+
 /** Standaardritme per soort. `weekday` is ISO: 1 = maandag ... 7 = zondag. */
 export const MEETING_DEFAULTS: Record<
   MeetingKind,
-  { weekday: number; time: string; intervalWeeks: number }
+  { weekday: number; time: string; parity: WeekParity }
 > = {
-  GROCOMEET: { weekday: 5, time: '12:45', intervalWeeks: 1 },
-  BUREAU: { weekday: 4, time: '12:40', intervalWeeks: 2 },
+  GROCOMEET: { weekday: 5, time: '12:45', parity: 'all' },
+  BUREAU: { weekday: 4, time: '12:40', parity: 'even' },
 };
 
 export function meetingKindLabel(kind: MeetingKind, nl: boolean): string {
@@ -96,21 +104,36 @@ export function monthDays(year: number, month: number): Array<{ value: string; d
   return days;
 }
 
+/** Het ISO-weeknummer van een "YYYY-MM-DD"-dag. */
+export function isoWeekNumber(dayValue: string): number {
+  const ymd = parseYMD(dayValue);
+  if (!ymd) return 0;
+  return Number(isoWeekKey(ymd).split('-W')[1]);
+}
+
 /**
- * De dagen die de kalender voorstelt: elke `intervalWeeks`-de weekdag van het
- * semester, te beginnen bij de eerste die past. Een voorstel, geen regel: het
- * beheer klikt dagen weg of bij.
+ * De dagen die de kalender voorstelt: elke vaste weekdag van het semester, in de
+ * gevraagde weken. Een voorstel, geen regel: het beheer klikt dagen weg of bij,
+ * en kan met één klik naar de andere weken springen wanneer het semester net
+ * verkeerd uitkomt.
  */
 export function suggestedMeetingDays(
   workingYear: number,
   semester: Semester,
   kind: MeetingKind,
+  parity: WeekParity = MEETING_DEFAULTS[kind].parity,
 ): string[] {
-  const { weekday, intervalWeeks } = MEETING_DEFAULTS[kind];
-  const all = semesterMonths(workingYear, semester)
+  const { weekday } = MEETING_DEFAULTS[kind];
+  return semesterMonths(workingYear, semester)
     .flatMap((m) => monthDays(m.year, m.month))
-    .filter((d) => d.weekday === weekday);
-  return all.filter((_, index) => index % intervalWeeks === 0).map((d) => d.value);
+    .filter((d) => d.weekday === weekday && matchesParity(d.value, parity))
+    .map((d) => d.value);
+}
+
+function matchesParity(dayValue: string, parity: WeekParity): boolean {
+  if (parity === 'all') return true;
+  const even = isoWeekNumber(dayValue) % 2 === 0;
+  return parity === 'even' ? even : !even;
 }
 
 // -----------------------------------------------------------------------------

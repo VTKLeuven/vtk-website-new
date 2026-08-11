@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   DEFAULT_DRINK_PRICE_CENTS,
   DEFAULT_MEETING_DRINKS,
+  isoWeekNumber,
   meetingCloseAt,
   meetingPath,
   meetingWindowState,
@@ -82,6 +83,26 @@ describe("suggestedMeetingDays", () => {
     const first = new Date(`${days[0]}T12:00:00Z`).getTime();
     const second = new Date(`${days[1]}T12:00:00Z`).getTime();
     expect(second - first).toBe(14 * 86400000);
+  });
+
+  it("hangt de tweewekelijkse keuze aan het ISO-weeknummer", () => {
+    const even = suggestedMeetingDays(2026, 1, "BUREAU", "even");
+    const odd = suggestedMeetingDays(2026, 1, "BUREAU", "odd");
+    const all = suggestedMeetingDays(2026, 1, "BUREAU", "all");
+
+    for (const day of even) expect(isoWeekNumber(day) % 2).toBe(0);
+    for (const day of odd) expect(isoWeekNumber(day) % 2).toBe(1);
+    // Samen dekken ze elke donderdag, en ze overlappen niet.
+    expect(even.length + odd.length).toBe(all.length);
+    expect(even.filter((day) => odd.includes(day))).toEqual([]);
+  });
+
+  it("houdt het ritme over de kerstvakantie heen", () => {
+    // Een telling "elke tweede vanaf de start" verspringt wanneer je een dag
+    // wegklikt; het weeknummer doet dat niet.
+    const days = suggestedMeetingDays(2026, 1, "BUREAU", "even");
+    const around = days.filter((day) => day >= "2026-12-01" && day <= "2027-01-31");
+    for (const day of around) expect(isoWeekNumber(day) % 2).toBe(0);
   });
 });
 

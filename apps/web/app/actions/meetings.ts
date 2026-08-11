@@ -109,13 +109,14 @@ function dayParts(date: Date) {
 
 /**
  * Zet de momenten van één semester klaar vanuit de kalender: elke aangeduide dag
- * wordt een moment op het opgegeven uur.
+ * wordt een moment, met haar eigen uur en plaats. Die twee staan per dag, want
+ * een vergadering verhuist geregeld naar een ander lokaal of een ander uur.
  *
- * Bestaande dagen blijven staan zoals ze zijn (uur en plaats kunnen per moment
- * bijgesteld zijn; dat mag een herbevestiging van de kalender niet terugdraaien).
- * Weggeklikte dagen verdwijnen enkel wanneer er nog niets voor gereserveerd is:
- * een moment met reservaties weghalen zou zonder waarschuwing bestellingen van
- * anderen wissen.
+ * Bestaande dagen worden bijgewerkt met wat de kalender toont (de velden staan er
+ * ingevuld met de huidige waarden, dus opnieuw opslaan verandert niets zolang je
+ * niets aanraakt). Weggeklikte dagen verdwijnen enkel wanneer er nog niets voor
+ * gereserveerd is: een moment met reservaties weghalen zou zonder waarschuwing
+ * bestellingen van anderen wissen.
  */
 export async function planMeetingsAction(_prev: SaveState, formData: FormData): Promise<SaveState> {
   const kind = parseKind(formData.get("kind"));
@@ -126,17 +127,23 @@ export async function planMeetingsAction(_prev: SaveState, formData: FormData): 
   const semester = parseSemester(formData.get("semester"));
   if (!Number.isInteger(year) || !semester) return saveError("INVALID_INPUT");
 
-  const time = String(formData.get("time") ?? "");
-  if (!HHMM.test(time)) return saveError("INVALID_TIME");
-  const location = String(formData.get("location") ?? "").trim() || null;
   const opensDaysRaw = Number(formData.get("opensDaysBefore"));
   const opensDaysBefore =
     kind === "BUREAU" && Number.isInteger(opensDaysRaw) && opensDaysRaw > 0 ? opensDaysRaw : null;
 
-  const days = formData
-    .getAll("days")
-    .map((value) => parseDayValue(String(value)))
-    .filter((day): day is Date => day !== null);
+  const dayCount = Number(formData.get("dayCount")) || 0;
+  const days: Array<{ day: Date; time: string; location: string | null }> = [];
+  for (let i = 0; i < dayCount; i += 1) {
+    const day = parseDayValue(String(formData.get(`day-${i}-date`) ?? ""));
+    if (!day) continue;
+    const time = String(formData.get(`day-${i}-time`) ?? "");
+    if (!HHMM.test(time)) return saveError("INVALID_TIME");
+    days.push({
+      day,
+      time,
+      location: String(formData.get(`day-${i}-location`) ?? "").trim() || null,
+    });
+  }
 
   const existing = await prisma.meeting.findMany({
     where: { kind, year, semester },
@@ -145,12 +152,24 @@ export async function planMeetingsAction(_prev: SaveState, formData: FormData): 
   const existingByDay = new Map(existing.map((meeting) => [ymdKey(dayParts(meeting.startsAt)), meeting]));
   const keptDays = new Set<string>();
 
-  for (const day of days) {
-    const key = ymdKey(dayParts(day));
+  for (const entry of days) {
+    const key = ymdKey(dayParts(entry.day));
     keptDays.add(key);
-    if (existingByDay.has(key)) continue;
+    const startsAt = brusselsTimeOnDay(entry.day, entry.time);
+    const current = existingByDay.get(key);
 
-    const startsAt = brusselsTimeOnDay(day, time);
+    if (current) {
+      // Enkel schrijven wanneer er echt iets verandert, zodat `updatedAt` niet bij
+      // elke herbevestiging van de kalender verspringt.
+      if (current.startsAt.getTime() !== startsAt.getTime() || current.location !== entry.location) {
+        await prisma.meeting.update({
+          where: { id: current.id },
+          data: { startsAt, location: entry.location },
+        });
+      }
+      continue;
+    }
+
     await prisma.meeting.create({
       data: {
         kind,
@@ -158,7 +177,7 @@ export async function planMeetingsAction(_prev: SaveState, formData: FormData): 
         semester,
         slug: await uniqueSlug(kind, startsAt),
         startsAt,
-        location,
+        location: entry.location,
         opensAt: opensDaysBefore ? new Date(startsAt.getTime() - opensDaysBefore * 86400000) : null,
         createdById: session.user.id,
       },
