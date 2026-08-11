@@ -33,6 +33,7 @@ export type ReservationLineCreate = {
   quantity: number;
   unitPriceCents: number;
   unitDepositCents: number;
+  note: string | null;
 };
 
 export type FlesserkeLineCreate = { flesserkeItemId: string; itemName: string; quantity: number };
@@ -219,6 +220,7 @@ export async function buildReservationData(
       quantity: line.quantity,
       unitPriceCents: item.priceCents,
       unitDepositCents: item.depositCents,
+      note: line.note && line.note.trim() ? line.note.trim().slice(0, FIELD_MAX) : null,
     };
   });
 

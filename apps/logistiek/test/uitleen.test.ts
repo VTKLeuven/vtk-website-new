@@ -262,12 +262,18 @@ describe('transportPriceCents', () => {
 describe('isLastMinute', () => {
   const requestedAt = new Date('2026-07-20T10:00:00Z');
 
-  it('flags a pickup within 14 days', () => {
+  it('flags a pickup within the default 7 days', () => {
     expect(isLastMinute(new Date('2026-07-25T10:00:00Z'), requestedAt)).toBe(true);
   });
 
-  it('does not flag a pickup 14+ days out', () => {
-    expect(isLastMinute(new Date('2026-08-10T10:00:00Z'), requestedAt)).toBe(false);
+  it('does not flag a pickup beyond the default 7 days', () => {
+    expect(isLastMinute(new Date('2026-07-28T10:00:00Z'), requestedAt)).toBe(false);
+  });
+
+  it('follows the configured term', () => {
+    const pickup = new Date('2026-07-28T10:00:00Z'); // acht dagen later
+    expect(isLastMinute(pickup, requestedAt, 14)).toBe(true);
+    expect(isLastMinute(pickup, requestedAt, 3)).toBe(false);
   });
 });
 

@@ -144,7 +144,17 @@ export function VehicleSettings({ vehicles }: { vehicles: UitleenVehicle[] }) {
   );
 }
 
-export function GeneralSettings({ showRentPrices }: { showRentPrices: boolean }) {
+const GENERAL_ERRORS = {
+  LAST_MINUTE_INVALID: 'De last-minute-termijn moet een aantal dagen tussen 1 en 90 zijn.',
+};
+
+export function GeneralSettings({
+  showRentPrices,
+  lastMinuteDays,
+}: {
+  showRentPrices: boolean;
+  lastMinuteDays: number;
+}) {
   return (
     <section className="rounded-[18px] border border-vtk-navy/10 bg-vtk-surface p-6">
       <h2 className="text-lg font-semibold tracking-tight text-vtk-ink">Algemeen</h2>
@@ -153,6 +163,7 @@ export function GeneralSettings({ showRentPrices }: { showRentPrices: boolean })
         submitLabel="Opslaan"
         savingLabel="Opslaan..."
         savedMessage="Instellingen opgeslagen."
+        errorMessages={GENERAL_ERRORS}
         className="mt-4 grid gap-3"
       >
         <label className="flex items-center gap-2 text-sm text-vtk-ink">
@@ -162,6 +173,23 @@ export function GeneralSettings({ showRentPrices }: { showRentPrices: boolean })
         <p className="text-xs text-vtk-muted">
           Standaard uit: de uitleendienst rekent doorgaans enkel waarborg aan. Zet dit aan als je materiaal
           met een huurprijs aanbiedt.
+        </p>
+
+        <label className="mt-2 grid gap-1 text-xs font-medium text-vtk-muted sm:max-w-[14rem]">
+          Last minute vanaf (dagen voor de afhaaldag)
+          <input
+            type="number"
+            name="lastMinuteDays"
+            min={1}
+            max={90}
+            defaultValue={lastMinuteDays}
+            className={inputClass}
+          />
+        </label>
+        <p className="text-xs text-vtk-muted">
+          Aanvragen die binnen deze termijn afgehaald worden, krijgen de badge &quot;last minute&quot; in de
+          aanvragenlijst. Het lid ziet de waarschuwing al bij het invullen, dus dit is ook wat je belooft:
+          korter dan dit mag je weigeren.
         </p>
       </SaveForm>
     </section>

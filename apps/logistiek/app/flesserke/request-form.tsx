@@ -9,6 +9,7 @@ import {
   type ActionResult,
 } from '@/app/actions/uitleen';
 import { FlesserkeItemName } from '@/components/flesserke-item-name';
+import { LastMinuteNotice } from '@/components/last-minute-notice';
 import { QuantityInput } from '@/components/quantity-input';
 import type { ReservationFormInput } from '@/lib/reservation-form';
 import type { FlesserkeCatalogCategory } from '@/lib/uitleen-server';
@@ -34,11 +35,14 @@ export function FlesserkeForm({
   initial,
   mode,
   onCancel,
+  lastMinuteDays,
 }: {
   catalog: FlesserkeCatalogCategory[];
   groups: RequesterOption[];
   locale: 'nl' | 'en';
   initial: FlesserkeInitial;
+  /** Termijn voor de last-minute-waarschuwing; zie /beheer/instellingen. */
+  lastMinuteDays: number;
   /** 'create' of een reservatie-id om te bewerken. */
   mode: { kind: 'create' } | { kind: 'edit'; reservationId: string };
   onCancel?: () => void;
@@ -231,6 +235,7 @@ export function FlesserkeForm({
                 className="h-10 rounded-lg border border-vtk-navy/15 bg-white px-3 text-vtk-ink"
               />
             </label>
+            <LastMinuteNotice pickupDate={pickupDate} days={lastMinuteDays} locale={locale} />
             <label className="grid gap-1 text-sm">
               <span className="font-medium text-vtk-ink">{en ? 'Extra info (optional)' : 'Extra info (optioneel)'}</span>
               <textarea

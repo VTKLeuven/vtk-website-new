@@ -5,6 +5,7 @@ import { copy, getLocale } from '@/lib/i18n';
 import { pricingModeLabel, formatEuro } from '@/lib/uitleen';
 import { activeVehicles } from '@/lib/uitleen-server';
 import { getPublicCopy } from '@/lib/public-copy';
+import { requesterOptions } from '@/app/materiaal/event-values';
 import { VanRequestForm } from './request-form';
 
 export default async function VervoerPage() {
@@ -29,7 +30,7 @@ export default async function VervoerPage() {
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
         <VanRequestForm
           locale={locale}
-          groups={session.groups.map((g) => ({ id: g.id, name: en ? g.nameEn : g.nameNl }))}
+          groups={requesterOptions(session.groups, locale)}
           vehicles={vehicles.map((v) => ({
             id: v.id,
             name: en ? v.nameEn : v.nameNl,

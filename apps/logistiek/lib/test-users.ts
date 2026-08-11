@@ -23,9 +23,16 @@ export function testLoginEnabled(): boolean {
 /** Cookie die onthoudt als welke test-gebruiker je bent ingelogd. */
 export const TEST_USER_COOKIE = 'logistiek-test-user';
 
-export type TestUserKey = 'logistiek' | 'it' | 'post' | 'mechanix' | 'student';
+export type TestUserKey = 'logistiek' | 'it' | 'post' | 'mechanix' | 'beide' | 'student';
 
-export const TEST_USER_KEYS: TestUserKey[] = ['logistiek', 'it', 'post', 'mechanix', 'student'];
+export const TEST_USER_KEYS: TestUserKey[] = [
+  'logistiek',
+  'it',
+  'post',
+  'mechanix',
+  'beide',
+  'student',
+];
 
 /** Enkel code + rol; naam/slug komen uit de DB (zie buildTestSession). */
 type TestGroup = {
@@ -51,6 +58,7 @@ type TestPersona = {
  * - it        : superadmin (post IT) -> ziet alles, bypasst elke check.
  * - post      : gewoon praesidiumlid (random post) -> INTERN aanvragen, geen beheer.
  * - mechanix  : werkgrooplid -> WERKGROEP aanvragen, geen beheer.
+ * - beide     : post én werkgroep -> moet kiezen namens wie hij aanvraagt.
  * - student   : gewone student zonder posten -> enkel EXTERN aanvragen.
  */
 const PERSONAS: Record<TestUserKey, TestPersona> = {
@@ -93,6 +101,16 @@ const PERSONAS: Record<TestUserKey, TestPersona> = {
     groups: [group('MECHANIX', 'MEMBER')],
     permissions: [],
     roleIds: ['test-role-werkgroep-mechanix'],
+  },
+  beide: {
+    key: 'beide',
+    name: 'Frank (test post + werkgroep)',
+    descriptionNl: 'Lid van post Cultuur én werkgroep Revue: kiest zelf namens wie hij aanvraagt.',
+    descriptionEn: 'Member of the Culture post and the Revue work group: picks who they request for.',
+    isSuperAdmin: false,
+    groups: [group('CULTUUR', 'MEMBER'), group('REVUE', 'LEAD')],
+    permissions: ['calendar.create', 'tickets.create'],
+    roleIds: ['test-role-praesidium', 'test-role-werkgroep-revue'],
   },
   student: {
     key: 'student',
@@ -167,7 +185,7 @@ export async function buildTestSession(key: TestUserKey): Promise<SessionPayload
   const rows = codes.length
     ? await prisma.group.findMany({
         where: { code: { in: codes } },
-        select: { id: true, code: true, slug: true, nameNl: true, nameEn: true },
+        select: { id: true, code: true, slug: true, nameNl: true, nameEn: true, type: true },
       })
     : [];
   const byCode = new Map(rows.map((r) => [r.code, r]));
@@ -189,7 +207,17 @@ export async function buildTestSession(key: TestUserKey): Promise<SessionPayload
     groups: p.groups.flatMap((g) => {
       const row = byCode.get(g.code);
       if (!row) return [];
-      return [{ id: row.id, code: row.code, slug: row.slug, nameNl: row.nameNl, nameEn: row.nameEn, role: g.role }];
+      return [
+        {
+          id: row.id,
+          code: row.code,
+          slug: row.slug,
+          nameNl: row.nameNl,
+          nameEn: row.nameEn,
+          role: g.role,
+          type: row.type,
+        },
+      ];
     }),
     permissions: p.permissions,
     roleIds: p.roleIds,

@@ -1889,6 +1889,9 @@ model UitleenItem {
   photos      UitleenItemPhoto[]
   properties  UitleenItemProperty[]
   downloads   UitleenItemDownload[]
+  // Beide richtingen van de alternatieven-koppeling; zie UitleenItemAlternative.
+  alternatives  UitleenItemAlternative[] @relation("UitleenItemAlternatives")
+  alternativeOf UitleenItemAlternative[] @relation("UitleenItemAlternativeOf")
 
   /// Zoekvector voor /zoeken, door een trigger bijgehouden (naam + omschrijving,
   /// dutch). Eén kolom: dit model heeft geen Engelse velden.
@@ -1896,6 +1899,25 @@ model UitleenItem {
 
   @@index([categoryId, active])
   @@index([search], type: Gin)
+}
+
+/// "Dit kan ook": een alternatief item dat de aanvrager kan overwegen wanneer
+/// het gevraagde in zijn periode op is. Een suggestie, geen automatische
+/// vervanging; de aanvrager kiest zelf (zie docs/design-decisions.md).
+///
+/// De koppeling is wederzijds: de actieve en de passieve box zijn elkaars
+/// alternatief. Beide richtingen staan als eigen rij, zodat één query per item
+/// volstaat; `saveItemAction` houdt de twee rijen samen.
+model UitleenItemAlternative {
+  itemId        String
+  alternativeId String
+  createdAt     DateTime @default(now())
+
+  item        UitleenItem @relation("UitleenItemAlternatives", fields: [itemId], references: [id], onDelete: Cascade)
+  alternative UitleenItem @relation("UitleenItemAlternativeOf", fields: [alternativeId], references: [id], onDelete: Cascade)
+
+  @@id([itemId, alternativeId])
+  @@index([alternativeId])
 }
 
 /// Extra productbeelden. `photoKey` op UitleenItem blijft de oudere hoofdfoto;
@@ -2026,6 +2048,11 @@ model UitleenReservationLine {
   quantity         Int
   unitPriceCents   Int
   unitDepositCents Int
+
+  // Opmerking bij deze lijn, van het lid ("liefst de zwarte") of van het team
+  // ("zie vorig event"). Eén veld: wie ze schreef blijkt uit de tekst, en twee
+  // notitievelden per lijn worden in de praktijk allebei half ingevuld.
+  note String?
 
   reservation UitleenReservation @relation(fields: [reservationId], references: [id], onDelete: Cascade)
   // Items worden soft-deleted (active=false), nooit hard verwijderd zolang er

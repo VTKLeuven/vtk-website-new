@@ -12,6 +12,7 @@ import {
   undoReturnedAction,
 } from '@/app/actions/beheer';
 import type { ActionResult } from '@/app/actions/uitleen';
+import { requesterOptions } from '@/app/materiaal/event-values';
 import { AuditTimeline } from '@/components/audit-timeline';
 import { ConfirmActionButton } from '@/components/ui/confirm-action-button';
 import { ReservationStatusBadge } from '@/components/status-badge';
@@ -236,17 +237,22 @@ export default async function BeheerAanvraagDetailPage({
                 const available = reserved ? line.item.quantity - (reserved.get(line.itemId) ?? 0) : null;
                 const short = available !== null && line.quantity > available;
                 return (
-                  <li key={line.id} className="flex flex-wrap items-center justify-between gap-3 py-2.5 text-sm">
-                    <span className="text-vtk-ink">
-                      {line.quantity}× {line.itemName}
-                      {!line.item.active ? (
-                        <span className="ml-2 text-xs text-vtk-muted">(niet meer in catalogus)</span>
-                      ) : null}
-                    </span>
-                    {available !== null ? (
-                      <span className={short ? 'font-semibold text-red-700' : 'text-vtk-muted'}>
-                        {available} beschikbaar in deze periode
+                  <li key={line.id} className="py-2.5 text-sm">
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <span className="text-vtk-ink">
+                        {line.quantity}× {line.itemName}
+                        {!line.item.active ? (
+                          <span className="ml-2 text-xs text-vtk-muted">(niet meer in catalogus)</span>
+                        ) : null}
                       </span>
+                      {available !== null ? (
+                        <span className={short ? 'font-semibold text-red-700' : 'text-vtk-muted'}>
+                          {available} beschikbaar in deze periode
+                        </span>
+                      ) : null}
+                    </div>
+                    {line.note ? (
+                      <p className="mt-0.5 text-xs italic text-vtk-body">{line.note}</p>
                     ) : null}
                   </li>
                 );
@@ -293,7 +299,7 @@ export default async function BeheerAanvraagDetailPage({
             <AdminReservationEditor
               reservationId={reservation.id}
               catalog={catalog}
-              groups={groups.map((g) => ({ id: g.id, name: g.nameNl }))}
+              groups={requesterOptions(groups, 'nl')}
               showRentPrices={settings.showRentPrices}
               initial={{
                 event: {
@@ -313,6 +319,9 @@ export default async function BeheerAanvraagDetailPage({
                 returnDate: toDateInputValue(reservation.returnDate),
                 note: reservation.memberNote ?? '',
                 quantities: Object.fromEntries(reservation.lines.map((l) => [l.itemId, l.quantity])),
+                lineNotes: Object.fromEntries(
+                  reservation.lines.flatMap((l) => (l.note ? [[l.itemId, l.note] as const] : []))
+                ),
                 flesserkeQuantities: Object.fromEntries(
                   reservation.flesserkeLines.map((l) => [l.flesserkeItemId, l.quantity])
                 ),

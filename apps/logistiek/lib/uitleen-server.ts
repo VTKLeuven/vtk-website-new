@@ -3,7 +3,7 @@ import 'server-only';
 import { prisma } from '@vtk/db';
 import type { Prisma } from '@prisma/client';
 import { currentWorkingYear } from '@vtk/auth';
-import { STOCK_CONSUMING_STATUSES } from './uitleen';
+import { DEFAULT_LAST_MINUTE_DAYS, STOCK_CONSUMING_STATUSES } from './uitleen';
 
 export type CatalogItem = {
   id: string;
@@ -15,6 +15,10 @@ export type CatalogItem = {
   photoKey: string | null;
   photoKeys: string[];
   isSet: boolean;
+  /** Inhoud van een set, beschrijvend; leeg voor een gewoon item. */
+  setContents: Array<{ label: string; quantity: number }>;
+  /** Items die het team als alternatief aanduidde; zie UitleenItemAlternative. */
+  alternativeIds: string[];
 };
 
 export type CatalogCategory = {
@@ -33,6 +37,8 @@ type ItemRow = {
   photoKey: string | null;
   photos?: Array<{ key: string }>;
   isSet: boolean;
+  setContents?: Array<{ label: string; quantity: number }>;
+  alternatives?: Array<{ alternativeId: string }>;
   categoryId: string | null;
 };
 
@@ -47,8 +53,35 @@ function toCatalogItem(item: ItemRow): CatalogItem {
     photoKey: item.photoKey,
     photoKeys: item.photos?.map((photo) => photo.key) ?? [],
     isSet: item.isSet,
+    setContents: item.setContents ?? [],
+    alternativeIds: (item.alternatives ?? []).map((a) => a.alternativeId),
   };
 }
+
+/**
+ * Wat een gewoon lid van een item mag zien. Expliciet een `select` en geen
+ * `include`: waar iets in de loods ligt (`locationShelf`/`locationRack`) en wat
+ * het team erover noteerde (`condition`/`conditionNote`) gaat enkel Logistiek
+ * aan, en een weglating in de weergave is geen bescherming; de velden zaten dan
+ * nog altijd in de payload en zouden bij de eerstvolgende `{...item}` opnieuw
+ * meeliften.
+ */
+const memberItemSelect = {
+  id: true,
+  categoryId: true,
+  name: true,
+  description: true,
+  quantity: true,
+  depositCents: true,
+  priceCents: true,
+  photoKey: true,
+  isSet: true,
+  photos: { orderBy: { sortIndex: 'asc' as const }, select: { key: true } },
+  // De inhoud van een set hoort in de catalogus zelf: anders moet je naar de
+  // detailpagina om te weten of de cantusset de vaten bevat of niet.
+  setContents: { orderBy: { sortIndex: 'asc' as const }, select: { label: true, quantity: true } },
+  alternatives: { select: { alternativeId: true } },
+} satisfies Prisma.UitleenItemSelect;
 
 /** Actieve catalogus, gegroepeerd per categorie; itemloze categorieën vallen weg. */
 export async function getCatalog(): Promise<CatalogCategory[]> {
@@ -60,7 +93,7 @@ export async function getCatalog(): Promise<CatalogCategory[]> {
     prisma.uitleenItem.findMany({
       where: { active: true },
       orderBy: { name: 'asc' },
-      include: { photos: { orderBy: { sortIndex: 'asc' } } },
+      select: memberItemSelect,
     }),
   ]);
 
@@ -178,13 +211,25 @@ export type AdminFlesserkeItem = Awaited<ReturnType<typeof adminFlesserke>>['ite
 export async function itemDetail(id: string) {
   return prisma.uitleenItem.findFirst({
     where: { id, active: true },
-    include: {
+    select: {
+      ...memberItemSelect,
       category: { select: { name: true } },
-      setContents: { orderBy: { sortIndex: 'asc' } },
-      photos: { orderBy: { sortIndex: 'asc' } },
-      properties: { orderBy: { sortIndex: 'asc' } },
-      downloads: { orderBy: { sortIndex: 'asc' } },
+      properties: { orderBy: { sortIndex: 'asc' as const } },
+      downloads: { orderBy: { sortIndex: 'asc' as const } },
     },
+  });
+}
+
+/**
+ * De loodsgegevens van een item: waar het ligt en wat het team over de staat
+ * noteerde. Een aparte query in plaats van een vlag op `itemDetail`, zodat de
+ * kolommen enkel opgehaald worden wanneer de aanroeper `logistiek.manage` heeft
+ * en er geen pad bestaat waarlangs ze per ongeluk in de ledenrespons belanden.
+ */
+export async function itemTeamDetails(id: string) {
+  return prisma.uitleenItem.findUnique({
+    where: { id },
+    select: { locationShelf: true, locationRack: true, condition: true, conditionNote: true },
   });
 }
 
@@ -212,7 +257,7 @@ export async function frequentlyRequestedWith(itemId: string, take = 4): Promise
 
   const items = await prisma.uitleenItem.findMany({
     where: { id: { in: grouped.map((g) => g.itemId) }, active: true },
-    include: { photos: { orderBy: { sortIndex: 'asc' } } },
+    select: memberItemSelect,
   });
   const byId = new Map(items.map((i) => [i.id, i]));
   return grouped
@@ -300,13 +345,25 @@ export async function adminVehicles() {
 
 const LOGISTIEK_SETTINGS_KEY = 'logistiek.settings';
 
-export type LogistiekSettings = { showRentPrices: boolean };
+export type LogistiekSettings = { showRentPrices: boolean; lastMinuteDays: number };
 
-/** Kringinstellingen (bv. huurprijzen tonen). Default: huurprijzen verbergen. */
+/**
+ * Kringinstellingen, als één JSON-blob in `Setting`. Defaults: huurprijzen
+ * verbergen en zeven dagen last minute. Een ontbrekende of onzinnige waarde valt
+ * terug op de default in plaats van de pagina te doen falen; dit is een
+ * instelling, geen invoer.
+ */
 export async function getLogistiekSettings(): Promise<LogistiekSettings> {
   const row = await prisma.setting.findUnique({ where: { key: LOGISTIEK_SETTINGS_KEY } });
-  const value = (row?.value ?? null) as { showRentPrices?: boolean } | null;
-  return { showRentPrices: Boolean(value?.showRentPrices) };
+  const value = (row?.value ?? null) as {
+    showRentPrices?: boolean;
+    lastMinuteDays?: number;
+  } | null;
+  const days = Number(value?.lastMinuteDays);
+  return {
+    showRentPrices: Boolean(value?.showRentPrices),
+    lastMinuteDays: Number.isFinite(days) && days > 0 ? Math.floor(days) : DEFAULT_LAST_MINUTE_DAYS,
+  };
 }
 
 export async function reservationForUser(id: string, userId: string) {
@@ -487,11 +544,15 @@ export async function transportWeekPublic(from: Date, to: Date) {
   });
 }
 
-/** Alle actieve posten, voor de INTERN-keuze door het team bij het bewerken. */
+/**
+ * Alle actieve groepen, voor de aanvragerkeuze door het team bij het bewerken.
+ * Werkgroepen zitten er mee in; `type` laat het formulier ze apart zetten in
+ * plaats van ze als post aan te bieden.
+ */
 export async function activeGroups() {
   return prisma.group.findMany({
     where: { active: true },
-    select: { id: true, nameNl: true, nameEn: true },
+    select: { id: true, nameNl: true, nameEn: true, type: true },
     orderBy: { orderInPraesidium: 'asc' },
   });
 }
@@ -715,6 +776,7 @@ export async function adminInventory() {
         photos: { orderBy: { sortIndex: 'asc' } },
         properties: { orderBy: { sortIndex: 'asc' } },
         downloads: { orderBy: { sortIndex: 'asc' } },
+        alternatives: { select: { alternativeId: true } },
       },
     }),
   ]);

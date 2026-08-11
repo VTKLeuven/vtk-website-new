@@ -2,7 +2,11 @@ import Link from 'next/link';
 import { ReservationStatusBadge } from '@/components/status-badge';
 import { requireManage } from '@/lib/session';
 import { formatDateOnly, formatEuro, isLastMinute, requesterLabel } from '@/lib/uitleen';
-import { adminReservations, type AdminReservation } from '@/lib/uitleen-server';
+import {
+  adminReservations,
+  getLogistiekSettings,
+  type AdminReservation,
+} from '@/lib/uitleen-server';
 
 const TABS: Array<{ value: string; label: string }> = [
   { value: 'all', label: 'Alle' },
@@ -81,7 +85,7 @@ export default async function BeheerAanvragenPage({
   const activeSort: SortKey = chosenSort ?? 'pickup';
   const activeDir: SortDir = chosenDir ?? SORTS[activeSort].defaultDir;
 
-  const all = await adminReservations();
+  const [all, settings] = await Promise.all([adminReservations(), getLogistiekSettings()]);
   const reservations = activeTab === 'all' ? all : all.filter((r) => r.requesterType === activeTab);
 
   const open = reservations.filter((r) => r.status === 'REQUESTED');
@@ -109,7 +113,8 @@ export default async function BeheerAanvragenPage({
 
   function ReservationRow({ reservation }: { reservation: AdminReservation }) {
     const lastMinute =
-      reservation.status === 'REQUESTED' && isLastMinute(reservation.pickupDate, reservation.createdAt);
+      reservation.status === 'REQUESTED' &&
+      isLastMinute(reservation.pickupDate, reservation.createdAt, settings.lastMinuteDays);
     return (
       <li>
         {/* Vaste twee kolommen: met flex-wrap sprong de badge naar een eigen

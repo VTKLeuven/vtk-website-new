@@ -2,8 +2,8 @@ import { LoginGate } from '@/components/login-gate';
 import { PageShell } from '@/components/page-shell';
 import { getSession } from '@/lib/session';
 import { getLocale } from '@/lib/i18n';
-import { emptyEventValues } from '@/app/materiaal/event-values';
-import { getFlesserkeCatalog } from '@/lib/uitleen-server';
+import { emptyEventValues, requesterOptions } from '@/app/materiaal/event-values';
+import { getFlesserkeCatalog, getLogistiekSettings } from '@/lib/uitleen-server';
 import { FlesserkeForm } from './request-form';
 
 export default async function FlesserkePage() {
@@ -26,8 +26,8 @@ export default async function FlesserkePage() {
     );
   }
 
-  const catalog = await getFlesserkeCatalog();
-  const groups = session.groups.map((g) => ({ id: g.id, name: en ? g.nameEn : g.nameNl }));
+  const [catalog, settings] = await Promise.all([getFlesserkeCatalog(), getLogistiekSettings()]);
+  const groups = requesterOptions(session.groups, locale);
 
   return (
     <PageShell
@@ -51,6 +51,7 @@ export default async function FlesserkePage() {
         <FlesserkeForm
           catalog={catalog}
           groups={groups}
+          lastMinuteDays={settings.lastMinuteDays}
           locale={locale}
           mode={{ kind: 'create' }}
           initial={{

@@ -1089,6 +1089,31 @@ Daarom schrijft elke beheeractie een regel in `UitleenAuditLog`, in dezelfde
 transactie als de wijziging: zo staat er nooit een regel voor iets dat niet
 gebeurd is, en zie je op de detailpagina wie wat wanneer deed.
 
+### Een alternatief is een suggestie, geen automatische vervanging
+
+Items kunnen elkaars alternatief zijn ("geen actieve box meer? de passieve kan
+ook"). Staat een item op nul beschikbaar in de gevraagde periode, dan toont de
+catalogus die alternatieven onder de kaart; klikken zet er één in de aanvraag.
+
+Wat daarbij vastligt:
+
+- **De aanvrager kiest.** De app vervangt nooit zelf een item, ook niet wanneer
+  er precies één alternatief vrij is. Wie een aanvraag indient, moet weten wat er
+  in staat; een stille omwisseling merk je pas aan de balie.
+- **De koppeling is wederzijds.** De actieve en de passieve box zijn elkaars
+  alternatief, dus schrijft `saveItemAction` per paar twee rijen weg en ruimt hij
+  ook de tegenrichting op. Een eenrichtingsrelatie blijkt in de praktijk altijd
+  te weinig: wie A instelt, verwacht dat B het ook weet.
+- **Alternatieven verschijnen enkel wanneer het gevraagde niet kan.** Anders
+  staat er bij elk item een suggestie die niemand nodig heeft, en wordt het ruis.
+
+Los daarvan draagt elke materiaallijn een eigen opmerking (`note`), in te vullen
+door het lid ("liefst de zwarte") én door het team ("zie vorig event"). Eén veld
+voor beide: wie het schreef blijkt uit de tekst, en twee notitievelden per lijn
+worden in de praktijk allebei half ingevuld. De opmerking staat bij de lijn en
+niet bij de algemene info onderaan, want daar vindt het team ze pas nadat het al
+iets anders klaarzette.
+
 ### Feedbackronde augustus 2026: negen keuzes
 
 Na een half werkingsjaar gaf het team Logistiek feedback op de app. Negen punten

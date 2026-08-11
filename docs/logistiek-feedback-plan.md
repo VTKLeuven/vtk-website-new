@@ -30,7 +30,7 @@ verbetering, **P3** = groter of "ooit".
 | 1 | Kleine bugs en ergernissen | A3, M8, M9, M10, M11, M14, V4, V10, V11, F1, F4 | ✅ af 10 aug 2026 |
 | 2 | Beheer-overzichten (kalender, lijsten) | A1, A2, V3, V7 | ✅ af 10 aug 2026 |
 | 3 | Statussen terugdraaien en historiek | A5, A6 | ✅ af 10 aug 2026 |
-| 4 | Materiaal: catalogus en aanvragen | M3, M4, M5, M6, M13, M15 | 2,5 werkdagen |
+| 4 | Materiaal: catalogus en aanvragen | M3, M4, M5, M6, M13, M15 | ✅ af 11 aug 2026 |
 | 5 | Vervoer | V2, V5, V8, V9, V12, V13 | 2,5 werkdagen |
 | 6 | Flesserke | F2, F3, F5, F6, F7 | 1,5 werkdag |
 | 7 | Grote stukken | A7, A8, A9, M1, M2, M12, M17, M18, V1 | meerdere weken |
@@ -450,9 +450,33 @@ Wat er tijdens het werk bijkwam:
 
 ---
 
-# Fase 4: materiaal
+# Fase 4: materiaal ✅ af op 11 augustus 2026
 
-### M3. Last minute op 7 dagen, instelbaar en zichtbaar voor het lid
+Wat er tijdens het werk bijkwam:
+
+- **`AuthGroup` draagt nu een `type`**, en dat raakt beide apps: de
+  preview-sessie in `apps/web/lib/authorization-preview.ts` bouwt ook een
+  `SessionPayload` en moest mee. De sessie komt bij logistiek over de lijn van
+  de hoofdsite, dus `requesterOptions` behandelt een ontbrekend type als post:
+  tijdens een deploy waarin enkel logistiek al nieuw is, blijft de keuzelijst
+  dan werken zoals voordien.
+- **Er was geen testgebruiker met een post én een werkgroep**, dus de gegroepeerde
+  keuzelijst was niet te zien. Persona `beide` (Frank: post Cultuur + werkgroep
+  Revue) is erbij gekomen; met enkel één groep toont het formulier sowieso geen
+  keuze.
+- **De ledencatalogus haalt de loodsvelden niet meer op** in plaats van ze weg te
+  laten uit de weergave (`memberItemSelect`). De staat (`condition`) hoort daar
+  ook bij: zolang M1 niet af is, telt een kapot exemplaar nog gewoon mee voor de
+  beschikbaarheid, en dan is "Kapot" tonen aan een lid dat het toch kan
+  aanvragen enkel verwarrend.
+- **Alternatieven staan onder de beschikbaarheidsregel**, niet erboven: eerst
+  lezen dat het niet kan, dan wat wel kan. Andersom las de kaart als een
+  aanbeveling voor iets wat je niet gevraagd had.
+- **De datalist van de alternatieven-editor krijgt een `useId()`**: het
+  toevoegformulier en een geopende bewerkrij staan tegelijk op de pagina, en twee
+  datalists met dezelfde id laten er één winnen.
+
+### M3. Last minute op 7 dagen, instelbaar en zichtbaar voor het lid ✅
 **P2 · code · beslist: B5**
 
 - **Raakt:** `apps/logistiek/lib/uitleen.ts` (`isLastMinute`, nu 14 dagen hard),
@@ -470,7 +494,7 @@ Wat er tijdens het werk bijkwam:
   4. Beheerveld op `/beheer/instellingen` naast de voertuigtarieven.
 - **Klaar wanneer:** het team past de termijn zelf aan zonder deploy.
 
-### M4. Werkgroepen staan niet meer onder "posten"
+### M4. Werkgroepen staan niet meer onder "posten" ✅
 **P1 · code**
 
 - **Raakt:** `apps/logistiek/app/materiaal/event-fields.tsx`,
@@ -492,7 +516,7 @@ Wat er tijdens het werk bijkwam:
      met enkel een werkgroep-membership zijn, anders test je dit nooit.
 - **Klaar wanneer:** een werkgroeplid ziet zijn werkgroep als werkgroep staan.
 
-### M5. Items "uit de catalogus" bewerken en doorzoeken
+### M5. Items "uit de catalogus" bewerken en doorzoeken ✅
 **P2 · code**
 
 - **Raakt:** `apps/logistiek/app/beheer/materiaal/inventory-manager.tsx`
@@ -510,7 +534,7 @@ Wat er tijdens het werk bijkwam:
 - **Klaar wanneer:** je vindt een gearchiveerd item via de zoekbalk en kan het
   bewerken zonder het eerst terug te zetten.
 
-### M13. Set-inhoud uitklappen in de catalogus
+### M13. Set-inhoud uitklappen in de catalogus ✅
 **P2 · code**
 
 - **Raakt:** `apps/logistiek/app/materiaal/reservation-form.tsx` (de itemkaart),
@@ -526,7 +550,7 @@ Wat er tijdens het werk bijkwam:
 - **Klaar wanneer:** je hoeft niet naar de detailpagina om te weten wat er in de
   cantusset zit.
 
-### M6. Locatie van een item enkel voor Logistiek
+### M6. Locatie van een item enkel voor Logistiek ✅
 **P2 · code · beslist: B3**
 
 - **Raakt:** `apps/logistiek/lib/uitleen-server.ts` (`getCatalog`, `itemDetail`),
@@ -545,7 +569,7 @@ Wat er tijdens het werk bijkwam:
 - **Klaar wanneer:** een gewoon lid krijgt nergens, ook niet in de netwerkrespons,
   het schap of rek van een item te zien.
 
-### M15. Alternatief item ("is dit ook ok?") en opmerking per materiaallijn
+### M15. Alternatief item ("is dit ook ok?") en opmerking per materiaallijn ✅
 **P2 · 🗄️ · code · 📝**
 
 - **Raakt:** `packages/db/prisma/schema.prisma` (`UitleenItem`,

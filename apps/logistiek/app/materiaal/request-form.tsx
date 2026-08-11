@@ -12,6 +12,7 @@ export function MaterialRequestForm({
   locale,
   showRentPrices = false,
   paymentNote,
+  lastMinuteDays,
 }: {
   catalog: CatalogCategory[];
   groups: RequesterOption[];
@@ -19,6 +20,7 @@ export function MaterialRequestForm({
   showRentPrices?: boolean;
   /** Beheerbare waarborg-/betaalnota uit /beheer/teksten (getPublicCopy). */
   paymentNote?: string;
+  lastMinuteDays: number;
 }) {
   const en = locale === 'en';
   const router = useRouter();
@@ -30,6 +32,7 @@ export function MaterialRequestForm({
       locale={locale}
       showRentPrices={showRentPrices}
       paymentNote={paymentNote}
+      lastMinuteDays={lastMinuteDays}
       initial={{
         event: emptyEventValues(groups),
         pickupDate: '',

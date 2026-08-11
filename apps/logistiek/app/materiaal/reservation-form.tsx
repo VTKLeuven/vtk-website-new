@@ -8,7 +8,9 @@ import type { ReservationFormInput } from '@/lib/reservation-form';
 import { formatEuro } from '@/lib/uitleen';
 import type { CatalogCategory } from '@/lib/uitleen-server';
 import { CategoryThumb } from '@/components/category-thumb';
+import { LastMinuteNotice } from '@/components/last-minute-notice';
 import { QuantityInput } from '@/components/quantity-input';
+import { SetContents } from '@/components/set-contents';
 import {
   EventRequesterFields,
   type EventReservationValues,
@@ -21,6 +23,8 @@ export type ReservationFormInitial = {
   returnDate: string;
   note: string;
   quantities: Record<string, number>;
+  /** Opmerking per gekozen item, op itemId. */
+  lineNotes?: Record<string, string>;
   flesserkeQuantities?: Record<string, number>;
 };
 
@@ -40,6 +44,7 @@ export function ReservationForm({
   cancelLabel,
   showRentPrices = false,
   paymentNote,
+  lastMinuteDays,
   mode = 'member',
 }: {
   catalog: CatalogCategory[];
@@ -54,6 +59,11 @@ export function ReservationForm({
   showRentPrices?: boolean;
   /** Beheerbare waarborg-/betaalnota (getPublicCopy); valt terug op de vaste zin. */
   paymentNote?: string;
+  /**
+   * Termijn voor de last-minute-waarschuwing. Weggelaten in team-modus: het team
+   * bepaalt die termijn zelf en hoeft er niet aan herinnerd te worden.
+   */
+  lastMinuteDays?: number;
   mode?: 'member' | 'team';
 }) {
   const en = locale === 'en';
@@ -62,6 +72,7 @@ export function ReservationForm({
   const [returnDate, setReturnDate] = useState(initial.returnDate);
   const [note, setNote] = useState(initial.note);
   const [quantities, setQuantities] = useState<Record<string, number>>(initial.quantities);
+  const [lineNotes, setLineNotes] = useState<Record<string, string>>(initial.lineNotes ?? {});
   const [availability, setAvailability] = useState<Record<string, number> | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
@@ -70,6 +81,7 @@ export function ReservationForm({
   const [activeCategory, setActiveCategory] = useState<string>('all');
 
   const items = useMemo(() => catalog.flatMap((category) => category.items), [catalog]);
+  const itemsById = useMemo(() => new Map(items.map((item) => [item.id, item])), [items]);
 
   // Gefilterde weergave: op categorie en op een vrije zoekterm (naam/omschrijving).
   const shownCatalog = useMemo(() => {
@@ -142,7 +154,11 @@ export function ReservationForm({
         pickupDate,
         returnDate,
         note,
-        lines: Object.entries(quantities).map(([itemId, quantity]) => ({ itemId, quantity })),
+        lines: Object.entries(quantities).map(([itemId, quantity]) => ({
+          itemId,
+          quantity,
+          note: lineNotes[itemId],
+        })),
       });
       if (!result.ok) setError(result.error);
     });
@@ -266,6 +282,7 @@ export function ReservationForm({
                         {item.description ? (
                           <p className="mt-1 line-clamp-2 text-sm text-vtk-muted">{item.description}</p>
                         ) : null}
+                        <SetContents contents={item.setContents} locale={locale} />
                         <p className="mt-0.5 text-xs text-vtk-muted">
                           {item.depositCents > 0
                             ? `${formatEuro(item.depositCents)} ${en ? 'deposit' : 'waarborg'}`
@@ -291,6 +308,31 @@ export function ReservationForm({
                             </span>
                           )}
                         </p>
+                        {/* Alternatieven tonen we pas wanneer het gevraagde item
+                            écht niet kan in deze periode: anders staat er bij elk
+                            item een suggestie die niemand nodig heeft. */}
+                        {available === 0 ? (
+                          <p className="mt-1.5 text-xs text-vtk-body">
+                            {item.alternativeIds
+                              .map((id) => itemsById.get(id))
+                              .filter(
+                                (alt): alt is (typeof items)[number] =>
+                                  Boolean(alt) && (availability?.[alt!.id] ?? alt!.quantity) > 0
+                              )
+                              .map((alt, index) => (
+                                <span key={alt.id}>
+                                  {index === 0 ? (en ? 'Also possible: ' : 'Ook mogelijk: ') : ', '}
+                                  <button
+                                    type="button"
+                                    onClick={() => setQuantity(alt.id, (quantities[alt.id] ?? 0) + 1)}
+                                    className="font-semibold text-vtk-navy underline underline-offset-2"
+                                  >
+                                    {alt.name}
+                                  </button>
+                                </span>
+                              ))}
+                          </p>
+                        ) : null}
                         {/* Altijd onderaan de kaart, ongeacht de lengte van de beschrijving. */}
                         <div className="mt-auto flex items-center justify-between gap-2 pt-4">
                           <button
@@ -354,6 +396,9 @@ export function ReservationForm({
                 className="h-10 rounded-lg border border-vtk-navy/15 bg-white px-3 text-vtk-ink"
               />
             </label>
+            {lastMinuteDays !== undefined ? (
+              <LastMinuteNotice pickupDate={pickupDate} days={lastMinuteDays} locale={locale} />
+            ) : null}
             <label className="grid gap-1 text-sm">
               <span className="font-medium text-vtk-ink">{en ? 'Extra info (optional)' : 'Extra info (optioneel)'}</span>
               <textarea
@@ -369,8 +414,41 @@ export function ReservationForm({
           <dl className="mt-5 space-y-1 border-t border-vtk-navy/10 pt-4 text-sm">
             {/* Eigen scroll: bij een aanvraag van twintig items duwde deze lijst
                 de indienknop voorbij de onderkant van het scherm. */}
-            <div className="max-h-64 space-y-1 overflow-y-auto">
-              {items.filter((item) => quantities[item.id]).map((item) => <div key={item.id} className="flex items-center justify-between gap-3"><dt className="truncate text-vtk-muted">{item.name} × {quantities[item.id]}</dt><dd><button type="button" onClick={() => setQuantity(item.id, 0)} aria-label={`${en ? 'Remove' : 'Verwijderen'}: ${item.name}`} className="grid h-6 w-6 shrink-0 place-items-center rounded-full text-base font-semibold text-red-600 transition hover:bg-red-50 hover:text-red-700">×</button></dd></div>)}
+            <div className="max-h-64 space-y-2 overflow-y-auto">
+              {items
+                .filter((item) => quantities[item.id])
+                .map((item) => (
+                  <div key={item.id}>
+                    <div className="flex items-center justify-between gap-3">
+                      <dt className="truncate text-vtk-muted">
+                        {item.name} × {quantities[item.id]}
+                      </dt>
+                      <dd>
+                        <button
+                          type="button"
+                          onClick={() => setQuantity(item.id, 0)}
+                          aria-label={`${en ? 'Remove' : 'Verwijderen'}: ${item.name}`}
+                          className="grid h-6 w-6 shrink-0 place-items-center rounded-full text-base font-semibold text-red-600 transition hover:bg-red-50 hover:text-red-700"
+                        >
+                          ×
+                        </button>
+                      </dd>
+                    </div>
+                    {/* Opmerking per lijn: "liefst de zwarte" hoort bij dít item en
+                        niet onderaan bij de algemene info, waar het team het pas
+                        vindt als het al iets anders klaarzette. */}
+                    <input
+                      type="text"
+                      value={lineNotes[item.id] ?? ''}
+                      onChange={(e) =>
+                        setLineNotes((prev) => ({ ...prev, [item.id]: e.target.value }))
+                      }
+                      placeholder={en ? 'Note (optional)' : 'Opmerking (optioneel)'}
+                      aria-label={`${en ? 'Note' : 'Opmerking'}: ${item.name}`}
+                      className="mt-0.5 h-8 w-full rounded-lg border border-vtk-navy/15 bg-white px-2 text-xs text-vtk-ink"
+                    />
+                  </div>
+                ))}
             </div>
             <div className="flex justify-between">
               <dt className="text-vtk-muted">Items</dt>

@@ -124,6 +124,19 @@ function parseCatalogRows(raw: FormDataEntryValue | null, fields: readonly strin
   }
 }
 
+/** JSON-array van id's uit een hidden input, ontdubbeld. */
+function parseIdList(raw: FormDataEntryValue | null): string[] {
+  const text = String(raw ?? '').trim();
+  if (!text) return [];
+  try {
+    const parsed: unknown = JSON.parse(text);
+    if (!Array.isArray(parsed)) return [];
+    return [...new Set(parsed.map((value) => String(value ?? '').trim()).filter(Boolean))];
+  } catch {
+    return [];
+  }
+}
+
 export async function saveItemAction(_prev: SaveState, formData: FormData): Promise<SaveState> {
   await requireManage();
 
@@ -147,6 +160,7 @@ export async function saveItemAction(_prev: SaveState, formData: FormData): Prom
   const photos = parseCatalogRows(formData.get('photos'), ['key']);
   const properties = parseCatalogRows(formData.get('properties'), ['label', 'value']);
   const downloads = parseCatalogRows(formData.get('downloads'), ['label', 'key']);
+  const alternativeIds = parseIdList(formData.get('alternativeIds'));
 
   if (!name) return saveError('NAME_REQUIRED');
   if (!Number.isInteger(quantity) || quantity < 1) return saveError('QUANTITY_INVALID');
@@ -195,11 +209,12 @@ export async function saveItemAction(_prev: SaveState, formData: FormData): Prom
       if (photos.length) await tx.uitleenItemPhoto.createMany({ data: photos.map((row, sortIndex) => ({ itemId: id, key: row.key, sortIndex })) });
       if (properties.length) await tx.uitleenItemProperty.createMany({ data: properties.map((row, sortIndex) => ({ itemId: id, label: row.label, value: row.value, sortIndex })) });
       if (downloads.length) await tx.uitleenItemDownload.createMany({ data: downloads.map((row, sortIndex) => ({ itemId: id, label: row.label, key: row.key, sortIndex })) });
+      await writeAlternatives(tx, id, alternativeIds);
       return false;
     });
     if (stale) return saveError('STALE');
   } else {
-    await prisma.uitleenItem.create({
+    const created = await prisma.uitleenItem.create({
       data: {
         ...data,
         setContents: {
@@ -213,11 +228,47 @@ export async function saveItemAction(_prev: SaveState, formData: FormData): Prom
         properties: { create: properties.map((row, sortIndex) => ({ label: row.label, value: row.value, sortIndex })) },
         downloads: { create: downloads.map((row, sortIndex) => ({ label: row.label, key: row.key, sortIndex })) },
       },
+      select: { id: true },
     });
+    await writeAlternatives(prisma, created.id, alternativeIds);
   }
 
   revalidateBeheer();
+  // Ook de ledencatalogus: alternatieven en set-inhoud worden daar getoond.
+  revalidatePath('/materiaal');
   return saveOk();
+}
+
+/**
+ * Zet de alternatieven van één item, in beide richtingen. De koppeling is
+ * wederzijds bedoeld (de actieve en de passieve box zijn elkaars alternatief),
+ * dus schrijven we per paar twee rijen en ruimen we ook de tegenrichting op.
+ * Zonder dat laatste blijft B naar A wijzen nadat je A's lijst leegmaakte, en
+ * ziet niemand waarom die suggestie nog opduikt.
+ */
+async function writeAlternatives(
+  tx: Prisma.TransactionClient | typeof prisma,
+  itemId: string,
+  alternativeIds: string[]
+): Promise<void> {
+  const chosen = alternativeIds.filter((id) => id !== itemId);
+  await tx.uitleenItemAlternative.deleteMany({
+    where: { OR: [{ itemId }, { alternativeId: itemId }] },
+  });
+  if (chosen.length === 0) return;
+  // Alleen bestaande items; een id uit een verouderd formulier laat de hele
+  // opslag anders falen op een foreign key.
+  const existing = await tx.uitleenItem.findMany({
+    where: { id: { in: chosen } },
+    select: { id: true },
+  });
+  await tx.uitleenItemAlternative.createMany({
+    data: existing.flatMap((other) => [
+      { itemId, alternativeId: other.id },
+      { itemId: other.id, alternativeId: itemId },
+    ]),
+    skipDuplicates: true,
+  });
 }
 
 /** Snelle voorraadbijstelling per item, zonder het hele item te bewerken. */
@@ -1335,12 +1386,21 @@ const LOGISTIEK_SETTINGS_KEY = 'logistiek.settings';
 export async function saveLogistiekSettingsAction(_prev: SaveState, formData: FormData): Promise<SaveState> {
   await requireManage();
   const showRentPrices = String(formData.get('showRentPrices') ?? '') === 'on';
+  const lastMinuteDays = Number.parseInt(String(formData.get('lastMinuteDays') ?? ''), 10);
+  // Een bovengrens omdat "last minute" anders alles wordt en de badge niets meer zegt.
+  if (!Number.isFinite(lastMinuteDays) || lastMinuteDays < 1 || lastMinuteDays > 90) {
+    return saveError('LAST_MINUTE_INVALID');
+  }
+  const value = { showRentPrices, lastMinuteDays };
   await prisma.setting.upsert({
     where: { key: LOGISTIEK_SETTINGS_KEY },
-    update: { value: { showRentPrices } },
-    create: { key: LOGISTIEK_SETTINGS_KEY, value: { showRentPrices } },
+    update: { value },
+    create: { key: LOGISTIEK_SETTINGS_KEY, value },
   });
   revalidateBeheer();
+  // Ook de ledenkant: de waarschuwing bij het aanvragen komt uit dezelfde instelling.
+  revalidatePath('/materiaal');
+  revalidatePath('/flesserke');
   return saveOk();
 }
 

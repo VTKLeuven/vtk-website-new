@@ -259,11 +259,34 @@ export function requesterLabel(request: {
   return request.requesterName ?? REQUESTER_TYPE_LABELS[request.requesterType];
 }
 
-/** Deadline-signaal: de opbouw start binnen de 14 dagen na de aanvraag. */
-export function isLastMinute(pickupDate: Date, requestedAt: Date = new Date()): boolean {
-  const days = (pickupDate.getTime() - requestedAt.getTime()) / (24 * 60 * 60 * 1000);
-  return days < 14;
+/**
+ * Termijn waarbinnen een aanvraag "last minute" heet. Zeven dagen: met veertien
+ * kreeg bijna elke aanvraag de badge, en een signaal dat overal staat is geen
+ * signaal meer. Het team past dit zelf aan op /beheer/instellingen.
+ */
+export const DEFAULT_LAST_MINUTE_DAYS = 7;
+
+/** Deadline-signaal: de afhaaldag valt binnen `days` na het moment van aanvragen. */
+export function isLastMinute(
+  pickupDate: Date,
+  requestedAt: Date = new Date(),
+  days: number = DEFAULT_LAST_MINUTE_DAYS
+): boolean {
+  const elapsed = (pickupDate.getTime() - requestedAt.getTime()) / (24 * 60 * 60 * 1000);
+  return elapsed < days;
 }
+
+/**
+ * De staat van een exemplaar, zoals het team ze noteert. Interne informatie: ze
+ * staat in het beheer en op de detailpagina enkel voor `logistiek.manage`, want
+ * ze zegt iets over onderhoud en niet over wat je kan aanvragen.
+ */
+export const ITEM_CONDITION_LABELS: Record<string, string> = {
+  WERKT: 'Werkt',
+  TESTEN: 'Nog testen',
+  ONVOLLEDIG: 'Onvolledig',
+  KAPOT: 'Kapot / vervangen',
+};
 
 export const RESERVATION_STATUS_LABELS: Record<UitleenReservationStatus, string> = {
   REQUESTED: 'Aangevraagd',
@@ -316,7 +339,12 @@ export function vanStatusLabel(
 /** Statussen die voorraad innemen bij de beschikbaarheidsberekening. */
 export const STOCK_CONSUMING_STATUSES: UitleenReservationStatus[] = ['APPROVED', 'PICKED_UP'];
 
-export type ReservationLineInput = { itemId: string; quantity: number };
+export type ReservationLineInput = {
+  itemId: string;
+  quantity: number;
+  /** Opmerking bij deze lijn ("liefst de zwarte"); optioneel. */
+  note?: string;
+};
 
 export class UitleenValidationError extends Error {
   readonly code: string;
