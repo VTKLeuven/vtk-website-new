@@ -18,7 +18,7 @@ import { extensionOf } from "@/lib/forms/uploadToken";
 import { logFormAudit } from "@/lib/forms/audit";
 import { answerLines } from "@/lib/forms/outbox";
 import { fillPlaceholders } from "@/lib/forms/mail";
-import { sendMail, smtpConfigured } from "@/lib/mail";
+import { sendMail, smtpConfigured } from "@vtk/mail";
 import { saveError, saveOk, type SaveState } from "@/lib/saveState";
 
 const localeSchema = z.enum(["nl", "en"]);
