@@ -14,6 +14,7 @@ import { FlesserkeItemName } from '@/components/flesserke-item-name';
 import { ConfirmActionButton } from '@/components/ui/confirm-action-button';
 import { SaveForm } from '@/components/ui/save-form';
 import { SortHeader, compareText, useSort } from '@/app/beheer/sortable-header';
+import { CONTENT_UNITS, formatContentAmount } from '@/lib/uitleen';
 import type { AdminFlesserkeItem } from '@/lib/uitleen-server';
 
 type FlesserkeSortKey = 'name' | 'category';
@@ -102,8 +103,23 @@ function ItemFields({
           Aantal<input type="number" name="quantity" min={0} defaultValue={0} className={inputClass} />
         </label>
       )}
+      {/* Getal en eenheid apart. De Excel-import gaf enkel het getal ("0.14"),
+          en dan is een pot tomatenpuree van 140 g niet te onderscheiden van
+          140 ml. De eenheid blijft optioneel: borden en dweilen hebben er geen. */}
       <label className="grid gap-1 text-xs font-medium text-vtk-muted">
-        Hoeveelheid<input type="text" name="contentAmount" defaultValue={item?.contentAmount ?? ''} placeholder="Bv. 0,5 L" className={inputClass} />
+        Hoeveelheid
+        <input type="text" name="contentAmount" defaultValue={item?.contentAmount ?? ''} placeholder="Bv. 0,5" className={inputClass} />
+      </label>
+      <label className="grid gap-1 text-xs font-medium text-vtk-muted">
+        Eenheid
+        <select name="contentUnit" defaultValue={item?.contentUnit ?? ''} className={inputClass}>
+          <option value="">Geen</option>
+          {CONTENT_UNITS.map((unit) => (
+            <option key={unit} value={unit}>
+              {unit}
+            </option>
+          ))}
+        </select>
       </label>
       {item ? null : (
         <label className="grid gap-1 text-xs font-medium text-vtk-muted">
@@ -263,7 +279,7 @@ export function FlesserkeManager({
           !needle ||
           item.name.toLowerCase().includes(needle) ||
           (item.brand ?? '').toLowerCase().includes(needle) ||
-          (item.contentAmount ?? '').toLowerCase().includes(needle)
+          formatContentAmount(item.contentAmount, item.contentUnit).toLowerCase().includes(needle)
       );
     return [...filtered].sort((a, b) => {
       if (sort.key === 'category') return compareText(nameOf(a.categoryId), nameOf(b.categoryId), sort.dir);
@@ -420,7 +436,9 @@ export function FlesserkeManager({
                         <FlesserkeItemName name={item.name} colruytUrl={item.colruytUrl} />
                         {item.brand ? <span className="text-vtk-muted"> · {item.brand}</span> : null}
                       </td>
-                      <td className="py-2 pr-3 text-vtk-muted">{item.contentAmount}</td>
+                      <td className="py-2 pr-3 text-vtk-muted">
+                        {formatContentAmount(item.contentAmount, item.contentUnit)}
+                      </td>
                       <td className="py-2 pr-3 text-vtk-muted">{categoryName}</td>
                       <td className={`py-2 pr-3 ${soon ? 'font-semibold text-red-700' : 'text-vtk-muted'}`}>
                         {/* Bij meerdere ladingen is dit de eerstvolgende datum; het

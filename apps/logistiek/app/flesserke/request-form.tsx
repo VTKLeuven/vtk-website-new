@@ -13,7 +13,7 @@ import { FlesserkeItemName } from '@/components/flesserke-item-name';
 import { DayPartSelect } from '@/components/day-part-select';
 import { EventPicker, type SelectableEvent } from '@/components/event-picker';
 import { useFormDraft } from '@/lib/use-form-draft';
-import { formatDateTime } from '@/lib/uitleen';
+import { formatContentAmount, formatDateTime } from '@/lib/uitleen';
 import { LastMinuteNotice } from '@/components/last-minute-notice';
 import { QuantityInput } from '@/components/quantity-input';
 import type { ReservationFormInput } from '@/lib/reservation-form';
@@ -268,7 +268,9 @@ export function FlesserkeForm({
                           {item.brand ? <span className="text-vtk-muted"> · {item.brand}</span> : null}
                         </p>
                         <p className="text-xs text-vtk-muted">
-                          {item.contentAmount ? `${item.contentAmount} · ` : ''}
+                          {formatContentAmount(item.contentAmount, item.contentUnit)
+                            ? `${formatContentAmount(item.contentAmount, item.contentUnit)} · `
+                            : ''}
                           {item.quantity} {en ? 'in stock' : 'in voorraad'}
                         </p>
                       </div>

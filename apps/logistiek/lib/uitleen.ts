@@ -502,3 +502,30 @@ export class UitleenValidationError extends Error {
     this.code = code;
   }
 }
+
+/**
+ * Eenheden die in de keuzelijst bij een flesserke-item staan.
+ *
+ * Bewust kort en bewust vrije tekst in de database: dit dekt alles wat er na de
+ * Excel-import in stond (drank in liter, voeding in kilo, wegwerp per stuk), en
+ * een item dat er niet in past mag gewoon niets hebben. Een enum zou een
+ * migratie vragen voor elk product dat het team er anders bij zet.
+ */
+export const CONTENT_UNITS = ['L', 'cl', 'ml', 'kg', 'g', 'stuks', 'pak', 'rol', 'zakjes'] as const;
+
+/**
+ * "0,5 L" uit `contentAmount` en `contentUnit`.
+ *
+ * De getallen komen uit een Excel met een punt als decimaalteken; hier lezen we
+ * Nederlands, dus wordt het een komma. Zonder eenheid blijft het getal alleen
+ * staan: beter een kaal "0,5" dan een verzonnen eenheid.
+ */
+export function formatContentAmount(
+  amount: string | null | undefined,
+  unit: string | null | undefined
+): string {
+  const value = amount?.trim().replace('.', ',') ?? '';
+  const suffix = unit?.trim() ?? '';
+  if (!value) return suffix;
+  return suffix ? `${value} ${suffix}` : value;
+}

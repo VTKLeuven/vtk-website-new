@@ -2724,7 +2724,13 @@ model UitleenFlesserkeItem {
   categoryId    String?
   name          String
   brand         String?
-  contentAmount String? // "Hoeveelheid [kg of L]"
+  // Inhoud per stuk, gesplitst in getal en eenheid. De Excel-kolom heette
+  // "Hoeveelheid [kg of L]" en gaf enkel het getal, dus stond er "0.14" bij een
+  // pot tomatenpuree van 140 g en moest je de eenheid zelf raden. De eenheid is
+  // vrije tekst met een keuzelijst ervoor (`CONTENT_UNITS`) en blijft optioneel:
+  // borden en dweilen hebben er geen.
+  contentAmount String?
+  contentUnit   String?
   // Eerstvolgende vervaldatum over alle ladingen heen, en de totale fysieke
   // voorraad. Allebei afgeleid uit `batches`: de acties houden ze bij zodat de
   // beschikbaarheidsberekening (`quantity` min gereserveerd) en de zoek- en

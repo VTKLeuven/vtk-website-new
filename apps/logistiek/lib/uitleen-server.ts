@@ -125,6 +125,7 @@ export type FlesserkeCatalogItem = {
   name: string;
   brand: string | null;
   contentAmount: string | null;
+  contentUnit: string | null;
   colruytUrl: string | null;
   quantity: number;
 };
@@ -145,6 +146,7 @@ export async function getFlesserkeCatalog(): Promise<FlesserkeCatalogCategory[]>
     name: i.name,
     brand: i.brand,
     contentAmount: i.contentAmount,
+    contentUnit: i.contentUnit,
     colruytUrl: i.colruytUrl,
     quantity: i.quantity,
   });

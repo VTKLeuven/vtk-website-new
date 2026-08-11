@@ -2264,6 +2264,7 @@ export async function saveFlesserkeItemAction(_prev: SaveState, formData: FormDa
   const name = String(formData.get('name') ?? '').trim();
   const brand = String(formData.get('brand') ?? '').trim();
   const contentAmount = String(formData.get('contentAmount') ?? '').trim();
+  const contentUnit = String(formData.get('contentUnit') ?? '').trim();
   const categoryId = String(formData.get('categoryId') ?? '').trim();
   const quantity = Number.parseInt(String(formData.get('quantity') ?? ''), 10);
   const colruytUrl = String(formData.get('colruytUrl') ?? '').trim();
@@ -2289,6 +2290,7 @@ export async function saveFlesserkeItemAction(_prev: SaveState, formData: FormDa
     name,
     brand: brand || null,
     contentAmount: contentAmount || null,
+    contentUnit: contentUnit || null,
     categoryId: categoryId || null,
     colruytUrl: colruytUrl || null,
     note: note || null,
