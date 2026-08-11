@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import { LoginGate } from '@/components/login-gate';
 import { PageShell } from '@/components/page-shell';
 import { getSession } from '@/lib/session';
@@ -63,6 +64,12 @@ export default async function VervoerPage() {
               </li>
             ))}
           </ul>
+          <Link
+            href="/vervoer/bezetting"
+            className="mt-5 inline-flex font-semibold text-vtk-navy underline decoration-vtk-yellow underline-offset-4"
+          >
+            {en ? 'When is a vehicle free?' : 'Wanneer is een voertuig vrij?'}
+          </Link>
         </aside>
       </div>
     </PageShell>

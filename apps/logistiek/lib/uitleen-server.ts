@@ -567,7 +567,13 @@ export async function activeGroups() {
  */
 export type DriverSource = 'POST' | 'EXTRA';
 
-export type DriverOption = { id: string; name: string; source: DriverSource };
+export type DriverOption = {
+  id: string;
+  name: string;
+  source: DriverSource;
+  /** Rijdt ook met de aanhangwagen; zie `UitleenDriver.canDriveTrailer`. */
+  canDriveTrailer: boolean;
+};
 
 /** Leden van de post Logistiek dit werkingsjaar. */
 async function logistiekTeamMembers() {
@@ -592,15 +598,32 @@ export async function driverOptions(): Promise<DriverOption[]> {
     logistiekTeamMembers(),
     prisma.uitleenDriver.findMany({
       where: { user: { active: true, deletedAt: null } },
-      select: { user: { select: { id: true, name: true } } },
+      select: { canDriveTrailer: true, user: { select: { id: true, name: true } } },
     }),
   ]);
 
+  // Een postlid kan óók een rij hier hebben: die wordt aangemaakt zodra iemand de
+  // karvlag zet. De bron blijft dan POST (die verdwijnt vanzelf op 15 juli), maar
+  // de vlag komt uit de rij.
+  const trailer = new Map(extra.map((row) => [row.user.id, row.canDriveTrailer]));
+
   const byId = new Map<string, DriverOption>();
-  for (const member of team) byId.set(member.id, { id: member.id, name: member.name, source: 'POST' });
+  for (const member of team) {
+    byId.set(member.id, {
+      id: member.id,
+      name: member.name,
+      source: 'POST',
+      canDriveTrailer: trailer.get(member.id) ?? false,
+    });
+  }
   for (const row of extra) {
     if (byId.has(row.user.id)) continue;
-    byId.set(row.user.id, { id: row.user.id, name: row.user.name, source: 'EXTRA' });
+    byId.set(row.user.id, {
+      id: row.user.id,
+      name: row.user.name,
+      source: 'EXTRA',
+      canDriveTrailer: row.canDriveTrailer,
+    });
   }
 
   return [...byId.values()].sort((a, b) => a.name.localeCompare(b.name, 'nl'));
@@ -631,6 +654,7 @@ export async function driverPool(): Promise<DriverPoolEntry[]> {
       select: {
         id: true,
         note: true,
+        canDriveTrailer: true,
         user: { select: { id: true, name: true, email: true, active: true } },
       },
     }),
@@ -659,14 +683,21 @@ export async function driverPool(): Promise<DriverPoolEntry[]> {
     });
   };
 
+  const rowByUser = new Map(extra.map((row) => [row.user.id, row]));
+
   for (const member of team) {
+    // `driverRowId` blijft null: een postlid haal je niet uit de lijst met de
+    // knop hier, ook niet wanneer het een rij heeft voor de karvlag. Die rij
+    // levert enkel de notitie en de vlag.
+    const row = rowByUser.get(member.id);
     put({
       id: member.id,
       name: member.name,
       email: member.email,
       source: 'POST',
       driverRowId: null,
-      note: null,
+      note: row?.note ?? null,
+      canDriveTrailer: row?.canDriveTrailer ?? false,
       inactive: false,
     });
   }
@@ -678,6 +709,7 @@ export async function driverPool(): Promise<DriverPoolEntry[]> {
       source: 'EXTRA',
       driverRowId: row.id,
       note: row.note,
+      canDriveTrailer: row.canDriveTrailer,
       inactive: !row.user.active,
     });
   }

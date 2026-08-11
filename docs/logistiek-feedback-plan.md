@@ -31,7 +31,7 @@ verbetering, **P3** = groter of "ooit".
 | 2 | Beheer-overzichten (kalender, lijsten) | A1, A2, V3, V7 | ✅ af 10 aug 2026 |
 | 3 | Statussen terugdraaien en historiek | A5, A6 | ✅ af 10 aug 2026 |
 | 4 | Materiaal: catalogus en aanvragen | M3, M4, M5, M6, M13, M15 | ✅ af 11 aug 2026 |
-| 5 | Vervoer | V2, V5, V8, V9, V12, V13 | 2,5 werkdagen |
+| 5 | Vervoer | V2, V5, V8, V9, V12, V13 | ✅ af 11 aug 2026 |
 | 6 | Flesserke | F2, F3, F5, F6, F7 | 1,5 werkdag |
 | 7 | Grote stukken | A7, A8, A9, M1, M2, M12, M17, M18, V1 | meerdere weken |
 
@@ -594,9 +594,29 @@ Wat er tijdens het werk bijkwam:
 
 ---
 
-# Fase 5: vervoer
+# Fase 5: vervoer ✅ af op 11 augustus 2026
 
-### V2. Chauffeurs toevoegen is vindbaar
+Wat er tijdens het werk bijkwam:
+
+- **`SaveState` heeft er een optionele `detail` bij gekregen**, in beide apps
+  tegelijk (de twee bestanden waren identiek en horen dat te blijven). Zonder dat
+  veld kon de conflictmelding de botsende rit niet noemen: `saveError(code)` mapt
+  clientside op een vaste zin, en een onbekende code valt terug op "er ging iets
+  mis". Een clientvertaling voor dezelfde code blijft voorgaan.
+- **Goedkeuren en afwijzen werken op de hele aanvraag** (`tripGroupId`), en het
+  goedkeurformulier draagt de uren van elke helft apart. Zo blijft V5 (schuiven)
+  werken zonder dat V12 de conflictcheck moest leren omgaan met twee vensters per
+  rij.
+- **De karvlag staat op de chauffeur én op het voertuig.** Een check op
+  `code == "kar"` zou een tweede aanhangwagen stil buiten de regel laten vallen.
+  Postleden krijgen pas een `UitleenDriver`-rij zodra je die vlag zet; het gevolg
+  (ze blijven na de post in de lijst staan) staat in `docs/design-decisions.md`.
+- **De beheernavigatie is gegroepeerd** (Uitleen / Vervoer / Overig). "Chauffeurs"
+  stond al in de nav, maar tussen negen losse tegels; het toevoegformulier stond
+  bovendien onderaan de pagina achter een uitklapper, en dát was de eigenlijke
+  vindbaarheidsklacht.
+
+### V2. Chauffeurs toevoegen is vindbaar ✅
 **P2 · code · klein**
 
 - **Raakt:** `apps/logistiek/app/beheer/beheer-nav.tsx`,
@@ -614,7 +634,7 @@ Wat er tijdens het werk bijkwam:
 - **Klaar wanneer:** iemand die "Jos is vanaf nu chauffeur" wil regelen, vindt
   het scherm zonder te vragen.
 
-### V5. Twee aanvragen voor hetzelfde voertuig: uren verschuiven bij goedkeuring
+### V5. Twee aanvragen voor hetzelfde voertuig: uren verschuiven bij goedkeuring ✅
 **P2 · code**
 
 - **Raakt:** `apps/logistiek/app/actions/beheer.ts` (`approveTransportAction`,
@@ -637,7 +657,7 @@ Wat er tijdens het werk bijkwam:
 - **Klaar wanneer:** twee kar-aanvragen op dezelfde dag kunnen allebei
   goedgekeurd worden zonder database-ingreep.
 
-### V8. Telefoonnummer van de bijrijder
+### V8. Telefoonnummer van de bijrijder ✅
 **P2 · 🗄️ · code · klein**
 
 - **Raakt:** `packages/db/prisma/schema.prisma` (`UitleenTransportBooking`),
@@ -653,7 +673,7 @@ Wat er tijdens het werk bijkwam:
 - **Klaar wanneer:** de chauffeur bereikt de bijrijder zonder in de mail te
   zoeken.
 
-### V9. Chauffeurs: auto of kar
+### V9. Chauffeurs: auto of kar ✅
 **P2 · 🗄️ · code**
 
 - **Raakt:** `packages/db/prisma/schema.prisma` (`UitleenDriver`),
@@ -675,7 +695,7 @@ Wat er tijdens het werk bijkwam:
 - **Klaar wanneer:** je kan niet per ongeluk een autochauffeur op een karrit
   zetten zonder het te merken.
 
-### V12. Heen- en terugrit in één aanvraag
+### V12. Heen- en terugrit in één aanvraag ✅
 **P3 · 🗄️ · code · 📝**
 
 - **Raakt:** `UitleenTransportBooking`, `app/vervoer/request-form.tsx`,
@@ -704,7 +724,7 @@ Wat er tijdens het werk bijkwam:
   hetzelfde `tripGroupId` (zie V12). Bouw dit dus **na** V12, want het deelt de
   groepering. Komt zelden voor: laag in de lijst.
 
-### V13. Publiek transportoverzicht zonder login
+### V13. Publiek transportoverzicht zonder login ✅
 **P2 · code · beslist: B7**
 
 - **Raakt:** nieuwe publieke route in `apps/logistiek`, `lib/uitleen-server.ts`.

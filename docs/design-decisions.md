@@ -1114,6 +1114,68 @@ worden in de praktijk allebei half ingevuld. De opmerking staat bij de lijn en
 niet bij de algemene info onderaan, want daar vindt het team ze pas nadat het al
 iets anders klaarzette.
 
+### Heen en terug zijn twee ritten in één aanvraag
+
+Wie de kar 's ochtends nodig heeft om op te bouwen en 's avonds om af te breken,
+vult één formulier in met een tweede tijdvenster. Dat wordt in de database
+**twee** `UitleenTransportBooking`-rijen met dezelfde `tripGroupId` en een
+`tripLeg` (HEEN/TERUG).
+
+Waarom niet één boeking met twee tijdvensters: tussen opbouw en afbraak is het
+voertuig gewoon vrij, en iemand anders mag het dan gebruiken. Eén rij met
+`returnStartAt`/`returnEndAt` zou betekenen dat élke query over "wanneer is dit
+voertuig bezet" twee vensters moet kennen: de conflictcheck bij het goedkeuren,
+de kalender, het weekoverzicht en het publieke overzicht. Eén ervan vergeten
+levert een dubbel geboekte kar op, en dat merk je pas op de dag zelf.
+
+Wat daarbij vastligt:
+
+- **Beslissen gebeurt op de hele aanvraag.** Goedkeuren en afwijzen doen beide
+  helften tegelijk; de heenrit goedkeuren en de terugrit laten hangen, levert een
+  aanvrager op die niet meer thuisgeraakt. Annuleren door het lid werkt ook op de
+  groep.
+- **De uren blijven per helft.** In het goedkeurformulier staan beide
+  tijdvensters apart, dus Logistiek kan de terugrit een uur opschuiven zonder de
+  heenrit te raken.
+- **De prijs is de som van beide ritten.** Ze worden apart aangerekend, want het
+  voertuig staat er tussenin niet op.
+
+### Uren verschuiven hoort bij het goedkeuren
+
+Twee aanvragen voor dezelfde kar op dezelfde dag passen vaak samen na een
+halfuur schuiven. Voordien kon het team enkel goedkeuren of afwijzen, en werd
+dat schuiven een mailtje plus een ingreep in de database. Het goedkeurformulier
+draagt nu de uren zelf: wat je daar invult, wordt de rit.
+
+- De conflictcheck loopt in dezelfde Serializable-transactie als het opslaan, dus
+  twee beheerders die tegelijk schuiven kunnen elkaar niet overschrijven.
+- Botst het toch, dan noemt de melding de rit waarmee het botst ("Botst met de
+  rit van Feest op za 12 sep 14:00 tot 18:00"), en staan de andere ritten van dat
+  voertuig die dag al boven het formulier. "Voertuig bezet" zegt niet waarheen je
+  moet schuiven.
+- Verschoven uren komen apart in de historiek (`UitleenAuditLog`), want de nieuwe
+  uren staan daarna als "de" uren op de rit; zonder die regel is niet meer te
+  zien dat er iets veranderd is aan wat het lid vroeg.
+
+### Karchauffeurs: één vlag, geen aparte soort
+
+Een voertuig kan aangeduid staan als "vraagt een karchauffeur"
+(`UitleenVehicle.needsTrailerDriver`), en een chauffeur als "rijdt met de kar"
+(`UitleenDriver.canDriveTrailer`). Bij een rit met zo'n voertuig staan de
+karchauffeurs bovenaan in de keuzelijst en de rest onder "Niet met de kar".
+
+- **Eén vlag en geen enum AUTO/KAR:** elke karchauffeur rijdt ook gewoon met de
+  auto, dus die twee sluiten elkaar niet uit.
+- **De rest blijft kiesbaar,** uitgegrijsd noch geblokkeerd: het team beslist wie
+  rijdt, de app zorgt er enkel voor dat je het niet per ongeluk doet.
+- **Een vlag per voertuig en geen check op `code == "kar"`:** het team voert zelf
+  voertuigen in, en een tweede aanhangwagen zou anders stil buiten de regel
+  vallen.
+- Leden van de post Logistiek hebben pas een `UitleenDriver`-rij zodra iemand die
+  vlag bij hen zet. Gevolg om te kennen: verlaten ze later de post, dan blijven ze
+  via die rij in de chauffeurslijst staan (onder "zelf toegevoegd", waar je ze kan
+  weghalen).
+
 ### Feedbackronde augustus 2026: negen keuzes
 
 Na een half werkingsjaar gaf het team Logistiek feedback op de app. Negen punten

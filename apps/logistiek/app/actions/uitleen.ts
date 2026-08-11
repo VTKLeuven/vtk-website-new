@@ -1,5 +1,6 @@
 'use server';
 
+import { randomUUID } from 'node:crypto';
 import { revalidatePath } from 'next/cache';
 import { prisma } from '@vtk/db';
 import { requireSession } from '@/lib/session';
@@ -238,6 +239,38 @@ export async function checkAvailabilityAction(input: {
  */
 const MAX_VAN_BOOKING_DAYS = 30;
 
+/**
+ * Eén tijdvenster van een rit, gevalideerd. `label` komt in de foutmelding
+ * terecht, zodat je bij een heen-en-terugaanvraag weet welke helft fout staat.
+ */
+function parseTripWindow(
+  startRaw: string,
+  endRaw: string,
+  label: string
+): { ok: true; startAt: Date; endAt: Date } | { ok: false; error: string } {
+  const startAt = parseBrusselsDateTime(startRaw);
+  const endAt = parseBrusselsDateTime(endRaw);
+  if (!startAt || !endAt) return { ok: false, error: `Kies een start- en eindmoment${label}.` };
+  if (startAt <= new Date()) return { ok: false, error: `Het startmoment${label} ligt in het verleden.` };
+  if (endAt <= startAt) {
+    return { ok: false, error: `Het eindmoment${label} ligt voor het startmoment.` };
+  }
+  if (!isOnQuarterHour(startAt) || !isOnQuarterHour(endAt)) {
+    return {
+      ok: false,
+      error: `Kies een begin- en einduur op het kwartier (bv. 14:00, 14:15)${label}.`,
+    };
+  }
+  const days = (endAt.getTime() - startAt.getTime()) / (24 * 60 * 60 * 1000);
+  if (days > MAX_VAN_BOOKING_DAYS) {
+    return {
+      ok: false,
+      error: `Een rit kan maximaal ${MAX_VAN_BOOKING_DAYS} dagen duren; controleer de datums${label}.`,
+    };
+  }
+  return { ok: true, startAt, endAt };
+}
+
 export async function createVanBookingAction(input: {
   startAt: string; // datetime-local, Belgische wall-clock
   endAt: string;
@@ -248,23 +281,27 @@ export async function createVanBookingAction(input: {
   vehicleId?: string;
   eventName?: string;
   helpersNote?: string;
+  helpersPhone?: string;
+  contactPhone?: string;
+  /** Tweede tijdvenster: dan wordt dit een heen-en-terugaanvraag (twee ritten). */
+  returnStartAt?: string;
+  returnEndAt?: string;
 }): Promise<ActionResult> {
   const session = await requireSession();
 
-  const startAt = parseBrusselsDateTime(input.startAt);
-  const endAt = parseBrusselsDateTime(input.endAt);
-  if (!startAt || !endAt) return { ok: false, error: 'Kies een start- en eindmoment.' };
-  if (startAt <= new Date()) return { ok: false, error: 'Het startmoment ligt in het verleden.' };
-  if (endAt <= startAt) return { ok: false, error: 'Het eindmoment ligt voor het startmoment.' };
-  if (!isOnQuarterHour(startAt) || !isOnQuarterHour(endAt)) {
-    return { ok: false, error: 'Kies een begin- en einduur op het kwartier (bv. 14:00, 14:15).' };
-  }
-  const days = (endAt.getTime() - startAt.getTime()) / (24 * 60 * 60 * 1000);
-  if (days > MAX_VAN_BOOKING_DAYS) {
-    return {
-      ok: false,
-      error: `Een rit kan maximaal ${MAX_VAN_BOOKING_DAYS} dagen duren; controleer de datums.`,
-    };
+  const wantsReturn = Boolean(input.returnStartAt && input.returnEndAt);
+  const outbound = parseTripWindow(input.startAt, input.endAt, wantsReturn ? ' van de heenrit' : '');
+  if (!outbound.ok) return { ok: false, error: outbound.error };
+  const { startAt, endAt } = outbound;
+
+  let inbound: { startAt: Date; endAt: Date } | null = null;
+  if (wantsReturn) {
+    const parsed = parseTripWindow(input.returnStartAt!, input.returnEndAt!, ' van de terugrit');
+    if (!parsed.ok) return { ok: false, error: parsed.error };
+    if (parsed.startAt < endAt) {
+      return { ok: false, error: 'De terugrit start voor de heenrit gedaan is.' };
+    }
+    inbound = { startAt: parsed.startAt, endAt: parsed.endAt };
   }
 
   const purpose = input.purpose.trim();
@@ -275,30 +312,57 @@ export async function createVanBookingAction(input: {
     : await prisma.uitleenVehicle.findFirst({ where: { active: true }, orderBy: { sortIndex: 'asc' } });
   if (!vehicle) return { ok: false, error: 'Kies een voertuig.' };
 
-  // Tarief snapshotten; prijs is null wanneer ze pas na de rit gekend is (per km).
-  const priceCents = transportPriceCents({
+  // Gedeelde velden van beide helften; enkel het tijdvenster verschilt.
+  const shared = {
+    userId: session.user.id,
+    vehicleId: vehicle.id,
+    purpose: purpose.slice(0, MAX_NOTE_LENGTH),
+    eventName: input.eventName?.trim().slice(0, 300) || null,
+    pickupAddress: input.pickupAddress.trim().slice(0, 300) || null,
+    destination: input.destination.trim().slice(0, 300) || null,
+    helpersNote: input.helpersNote?.trim().slice(0, 300) || null,
+    helpersPhone: input.helpersPhone?.trim().slice(0, 60) || null,
+    contactPhone: input.contactPhone?.trim().slice(0, 60) || null,
+    memberNote: input.note.trim().slice(0, MAX_NOTE_LENGTH) || null,
+    // Tarief snapshotten; prijs is null wanneer ze pas na de rit gekend is (per km).
     pricingMode: vehicle.pricingMode,
     rateCents: vehicle.rateCents,
-    startAt,
-    endAt,
-  });
-
-  await prisma.uitleenTransportBooking.create({
-    data: {
-      userId: session.user.id,
-      vehicleId: vehicle.id,
-      startAt,
-      endAt,
-      purpose: purpose.slice(0, MAX_NOTE_LENGTH),
-      eventName: input.eventName?.trim().slice(0, 300) || null,
-      pickupAddress: input.pickupAddress.trim().slice(0, 300) || null,
-      destination: input.destination.trim().slice(0, 300) || null,
-      helpersNote: input.helpersNote?.trim().slice(0, 300) || null,
-      memberNote: input.note.trim().slice(0, MAX_NOTE_LENGTH) || null,
+  };
+  const priceFor = (from: Date, to: Date) =>
+    transportPriceCents({
       pricingMode: vehicle.pricingMode,
       rateCents: vehicle.rateCents,
-      priceCents,
-    },
+      startAt: from,
+      endAt: to,
+    });
+
+  if (inbound) {
+    // Twee boekingen met één `tripGroupId`: tussen heen en terug is het voertuig
+    // vrij, en één boeking met twee vensters zou elke bezettingsquery moeten
+    // aanpassen. Zie docs/design-decisions.md.
+    const tripGroupId = randomUUID();
+    await prisma.uitleenTransportBooking.createMany({
+      data: [
+        { ...shared, tripGroupId, tripLeg: 'HEEN', startAt, endAt, priceCents: priceFor(startAt, endAt) },
+        {
+          ...shared,
+          tripGroupId,
+          tripLeg: 'TERUG',
+          startAt: inbound.startAt,
+          endAt: inbound.endAt,
+          priceCents: priceFor(inbound.startAt, inbound.endAt),
+        },
+      ],
+    });
+    revalidateMember();
+    return {
+      ok: true,
+      message: 'Heen- en terugrit aangevraagd. Je vindt de status bij Mijn aanvragen.',
+    };
+  }
+
+  await prisma.uitleenTransportBooking.create({
+    data: { ...shared, startAt, endAt, priceCents: priceFor(startAt, endAt) },
   });
 
   revalidateMember();
@@ -324,9 +388,11 @@ export async function cancelVanBookingAction(bookingId: string): Promise<ActionR
     return { ok: false, error: 'Deze rit is al betaald; mail logistiek@vtk.be om ze te annuleren.' };
   }
 
+  // Een heen-en-terugaanvraag annuleer je in haar geheel: enkel de heenrit
+  // annuleren laat een terugrit staan die niemand meer gaat rijden.
   const cancelled = await prisma.uitleenTransportBooking.updateMany({
     where: {
-      id: booking.id,
+      ...(booking.tripGroupId ? { tripGroupId: booking.tripGroupId } : { id: booking.id }),
       userId: session.user.id,
       status: { in: ['REQUESTED', 'APPROVED'] },
       payments: { none: { status: 'SUCCEEDED' } },
@@ -338,7 +404,10 @@ export async function cancelVanBookingAction(bookingId: string): Promise<ActionR
   }
 
   revalidateMember();
-  return { ok: true, message: 'Rit geannuleerd.' };
+  return {
+    ok: true,
+    message: cancelled.count > 1 ? 'Heen- en terugrit geannuleerd.' : 'Rit geannuleerd.',
+  };
 }
 
 // ---------------------------------------------------------------------------

@@ -7,7 +7,12 @@ import { currentWorkingYear } from '@vtk/auth';
 import { requireManage } from '@/lib/session';
 import { writeAudit } from '@/lib/audit';
 import { saveError, saveOk, type SaveState } from '@/lib/saveState';
-import { rangesOverlap, transportPriceCents } from '@/lib/uitleen';
+import {
+  formatDateTime,
+  isOnQuarterHour,
+  rangesOverlap,
+  transportPriceCents,
+} from '@/lib/uitleen';
 import {
   flesserkeReserved,
   isDriver,
@@ -15,7 +20,11 @@ import {
   searchDriverCandidates,
   type DriverCandidate,
 } from '@/lib/uitleen-server';
-import { buildReservationData, type ReservationFormInput } from '@/lib/reservation-form';
+import {
+  buildReservationData,
+  parseBrusselsDateTime,
+  type ReservationFormInput,
+} from '@/lib/reservation-form';
 import { runSerializable } from '@/lib/tx';
 import type { ActionResult } from './uitleen';
 
@@ -857,21 +866,48 @@ export async function adminEditReservationAction(
 // Vervoer (kar / auto / bakfiets)
 // ---------------------------------------------------------------------------
 
-/** Overlapt deze rit met een andere goedgekeurde rit van hetzelfde voertuig? */
-async function vehicleHasOverlap(
+/**
+ * De goedgekeurde rit van hetzelfde voertuig waarmee dit tijdvenster botst, of
+ * null. Geeft de rit zelf terug en niet enkel een boolean: "voertuig bezet"
+ * zegt niet waarheen je moet schuiven, en dat is precies wat het team wil weten.
+ */
+async function overlappingBooking(
   tx: Prisma.TransactionClient,
   vehicleId: string,
   startAt: Date,
   endAt: Date,
-  excludeId: string
-): Promise<boolean> {
+  excludeIds: string[]
+) {
   const others = await tx.uitleenTransportBooking.findMany({
-    where: { vehicleId, status: 'APPROVED', id: { not: excludeId } },
-    select: { startAt: true, endAt: true },
+    where: { vehicleId, status: 'APPROVED', id: { notIn: excludeIds } },
+    select: { id: true, startAt: true, endAt: true, eventName: true, purpose: true },
   });
-  return others.some((other) => rangesOverlap(startAt, endAt, other.startAt, other.endAt));
+  return others.find((other) => rangesOverlap(startAt, endAt, other.startAt, other.endAt)) ?? null;
 }
 
+/** "de rit van Feest op za 12 sep 14:00-18:00", voor in een foutmelding. */
+function bookingLabel(booking: {
+  eventName: string | null;
+  purpose: string;
+  startAt: Date;
+  endAt: Date;
+}): string {
+  const what = booking.eventName?.trim() || booking.purpose;
+  return `de rit van ${what} op ${formatDateTime(booking.startAt)} tot ${formatDateTime(booking.endAt)}`;
+}
+
+/**
+ * Goedkeuren, met de mogelijkheid de uren te verschuiven.
+ *
+ * Twee aanvragen voor dezelfde kar op dezelfde dag passen vaak samen na een
+ * halfuur schuiven; voordien kon het team enkel goedkeuren of afwijzen. Het
+ * formulier draagt per rit een `startAt-<id>` en `endAt-<id>`; wat er niet in
+ * staat, blijft zoals aangevraagd.
+ *
+ * Een heen-en-terugaanvraag (`tripGroupId`) wordt in haar geheel beslist: de
+ * heenrit goedkeuren en de terugrit laten hangen, levert een aanvrager op die
+ * niet meer thuisgeraakt.
+ */
 export async function approveTransportAction(
   _prev: SaveState,
   formData: FormData
@@ -889,50 +925,107 @@ export async function approveTransportAction(
 
   const outcome = await runSerializable(
     async (tx) => {
-      const booking = await tx.uitleenTransportBooking.findUnique({
-        where: { id: bookingId },
-      });
+      const booking = await tx.uitleenTransportBooking.findUnique({ where: { id: bookingId } });
       if (!booking) return { error: 'NOT_FOUND' as const };
-      if (booking.status !== 'REQUESTED') return { error: 'NOT_REQUESTED' as const };
 
-      // Per voertuig: geen twee goedgekeurde ritten op hetzelfde moment.
-      if (await vehicleHasOverlap(tx, booking.vehicleId, booking.startAt, booking.endAt, booking.id)) {
-        return { error: 'OVERLAP' as const };
+      const legs = booking.tripGroupId
+        ? await tx.uitleenTransportBooking.findMany({
+            where: { tripGroupId: booking.tripGroupId },
+            orderBy: { startAt: 'asc' },
+          })
+        : [booking];
+      if (legs.some((leg) => leg.status !== 'REQUESTED')) return { error: 'NOT_REQUESTED' as const };
+
+      const groupIds = legs.map((leg) => leg.id);
+      const planned: Array<{ leg: (typeof legs)[number]; startAt: Date; endAt: Date }> = [];
+
+      for (const leg of legs) {
+        const startRaw = String(formData.get(`startAt-${leg.id}`) ?? '').trim();
+        const endRaw = String(formData.get(`endAt-${leg.id}`) ?? '').trim();
+        const startAt = startRaw ? parseBrusselsDateTime(startRaw) : leg.startAt;
+        const endAt = endRaw ? parseBrusselsDateTime(endRaw) : leg.endAt;
+        if (!startAt || !endAt) return { error: 'TIME_INVALID' as const };
+        if (endAt <= startAt) return { error: 'TIME_ORDER' as const };
+        if (!isOnQuarterHour(startAt) || !isOnQuarterHour(endAt)) {
+          return { error: 'TIME_QUARTER' as const };
+        }
+        planned.push({ leg, startAt, endAt });
       }
 
-      await tx.uitleenTransportBooking.update({
-        where: { id: booking.id },
-        data: {
-          status: 'APPROVED',
-          paymentMode,
-          driverId: driverId || null,
-          adminNote: adminNote || null,
-          // Prijs definitief maken volgens de gesnapshotte tariefmodus. Blijft null
-          // voor per-km-ritten: die prijs wordt pas bij afronden gekend.
-          priceCents: transportPriceCents({
-            pricingMode: booking.pricingMode,
-            rateCents: booking.rateCents,
-            startAt: booking.startAt,
-            endAt: booking.endAt,
-          }),
-          decidedAt: new Date(),
-          decidedById: session.user.id,
-        },
-      });
-      await writeAudit(tx, { transportBookingId: booking.id }, {
-        kind: 'STATUS_CHANGED',
-        fromStatus: booking.status,
-        toStatus: 'APPROVED',
-        note: paymentMode === 'ONLINE' ? 'online betalen' : 'betalen aan de balie',
-        actorId: session.user.id,
-      });
+      // Per voertuig: geen twee goedgekeurde ritten op hetzelfde moment. De
+      // andere helft van dezelfde aanvraag telt niet mee als conflict met
+      // zichzelf, maar mag wel niet over de eigen heenrit vallen.
+      for (const [index, entry] of planned.entries()) {
+        const clash = await overlappingBooking(
+          tx,
+          entry.leg.vehicleId,
+          entry.startAt,
+          entry.endAt,
+          groupIds
+        );
+        if (clash) return { error: 'OVERLAP' as const, detail: bookingLabel(clash) };
+        const sibling = planned.find(
+          (other, otherIndex) =>
+            otherIndex !== index &&
+            other.leg.vehicleId === entry.leg.vehicleId &&
+            rangesOverlap(entry.startAt, entry.endAt, other.startAt, other.endAt)
+        );
+        if (sibling) return { error: 'SELF_OVERLAP' as const };
+      }
+
+      for (const { leg, startAt, endAt } of planned) {
+        const shifted = startAt.getTime() !== leg.startAt.getTime() || endAt.getTime() !== leg.endAt.getTime();
+        await tx.uitleenTransportBooking.update({
+          where: { id: leg.id },
+          data: {
+            status: 'APPROVED',
+            startAt,
+            endAt,
+            paymentMode,
+            driverId: driverId || null,
+            adminNote: adminNote || null,
+            // Prijs definitief maken volgens de gesnapshotte tariefmodus. Blijft null
+            // voor per-km-ritten: die prijs wordt pas bij afronden gekend.
+            priceCents: transportPriceCents({
+              pricingMode: leg.pricingMode,
+              rateCents: leg.rateCents,
+              startAt,
+              endAt,
+            }),
+            decidedAt: new Date(),
+            decidedById: session.user.id,
+          },
+        });
+        await writeAudit(tx, { transportBookingId: leg.id }, {
+          kind: 'STATUS_CHANGED',
+          fromStatus: leg.status,
+          toStatus: 'APPROVED',
+          note: paymentMode === 'ONLINE' ? 'online betalen' : 'betalen aan de balie',
+          actorId: session.user.id,
+        });
+        // Verschoven uren zijn een wijziging aan de aanvraag: die hoort apart in
+        // de historiek, want de nieuwe uren staan straks als "de" uren op de rit.
+        if (shifted) {
+          await writeAudit(tx, { transportBookingId: leg.id }, {
+            kind: 'EDITED',
+            note: `Uren verschoven bij goedkeuring: ${formatDateTime(leg.startAt)} tot ${formatDateTime(leg.endAt)} werd ${formatDateTime(startAt)} tot ${formatDateTime(endAt)}`,
+            actorId: session.user.id,
+          });
+        }
+      }
       return { error: null };
     }
   );
 
   if (outcome.error === 'NOT_FOUND') return saveError('NOT_FOUND');
   if (outcome.error === 'NOT_REQUESTED') return saveError('NOT_REQUESTED');
-  if (outcome.error === 'OVERLAP') return saveError('OVERLAP');
+  if (outcome.error === 'TIME_INVALID') return saveError('TIME_INVALID');
+  if (outcome.error === 'TIME_ORDER') return saveError('TIME_ORDER');
+  if (outcome.error === 'TIME_QUARTER') return saveError('TIME_QUARTER');
+  if (outcome.error === 'SELF_OVERLAP') return saveError('SELF_OVERLAP');
+  if (outcome.error === 'OVERLAP') {
+    return saveError('OVERLAP', `Botst met ${outcome.detail}. Verschuif de uren of wijs af.`);
+  }
 
   revalidateBeheer();
   return saveOk();
@@ -947,19 +1040,26 @@ export async function rejectTransportAction(_prev: SaveState, formData: FormData
 
   const booking = await prisma.uitleenTransportBooking.findUnique({ where: { id: bookingId } });
   if (!booking) return saveError('NOT_FOUND');
-  if (booking.status !== 'REQUESTED') return saveError('NOT_REQUESTED');
 
-  await prisma.uitleenTransportBooking.update({
-    where: { id: bookingId },
-    data: { status: 'REJECTED', adminNote, decidedAt: new Date(), decidedById: session.user.id },
-  });
-  await writeAudit(prisma, { transportBookingId: bookingId }, {
-    kind: 'STATUS_CHANGED',
-    fromStatus: booking.status,
-    toStatus: 'REJECTED',
-    note: `reden: ${adminNote}`,
-    actorId: session.user.id,
-  });
+  // Net als bij goedkeuren: een heen-en-terugaanvraag wijs je in haar geheel af.
+  const legs = booking.tripGroupId
+    ? await prisma.uitleenTransportBooking.findMany({ where: { tripGroupId: booking.tripGroupId } })
+    : [booking];
+  if (legs.some((leg) => leg.status !== 'REQUESTED')) return saveError('NOT_REQUESTED');
+
+  for (const leg of legs) {
+    await prisma.uitleenTransportBooking.update({
+      where: { id: leg.id },
+      data: { status: 'REJECTED', adminNote, decidedAt: new Date(), decidedById: session.user.id },
+    });
+    await writeAudit(prisma, { transportBookingId: leg.id }, {
+      kind: 'STATUS_CHANGED',
+      fromStatus: leg.status,
+      toStatus: 'REJECTED',
+      note: `reden: ${adminNote}`,
+      actorId: session.user.id,
+    });
+  }
 
   revalidateBeheer();
   return saveOk();
@@ -1023,7 +1123,7 @@ export async function changeVehicleAction(bookingId: string, vehicleId: string):
 
       if (
         booking.status === 'APPROVED' &&
-        (await vehicleHasOverlap(tx, vehicle.id, booking.startAt, booking.endAt, booking.id))
+        (await overlappingBooking(tx, vehicle.id, booking.startAt, booking.endAt, [booking.id]))
       ) {
         return { error: 'OVERLAP' as const };
       }
@@ -1313,6 +1413,40 @@ export async function saveDriverNoteAction(_prev: SaveState, formData: FormData)
 }
 
 /**
+ * Zet of wist de karvlag van een chauffeur.
+ *
+ * Werkt op `userId` en niet op de rij, want iemand uit de post Logistiek heeft
+ * pas een `UitleenDriver`-rij zodra je hier iets aanvinkt; die rij wordt dan
+ * aangemaakt. Gevolg om te kennen: verlaat die persoon later de post, dan blijft
+ * hij via die rij in de chauffeurslijst staan (en verschijnt hij onder "zelf
+ * toegevoegd", waar je hem kan weghalen).
+ */
+export async function setDriverTrailerAction(
+  userId: string,
+  canDriveTrailer: boolean
+): Promise<ActionResult> {
+  await requireManage();
+
+  const user = await prisma.user.findFirst({
+    where: { id: userId, deletedAt: null },
+    select: { id: true },
+  });
+  if (!user) return { ok: false, error: 'Dit lid bestaat niet (meer) op vtk.be.' };
+
+  await prisma.uitleenDriver.upsert({
+    where: { userId },
+    update: { canDriveTrailer },
+    create: { userId, canDriveTrailer },
+  });
+
+  revalidateBeheer();
+  return {
+    ok: true,
+    message: canDriveTrailer ? 'Rijdt ook met de kar.' : 'Rijdt niet met de kar.',
+  };
+}
+
+/**
  * Chauffeur uit de pool halen. Ritten die al aan deze persoon toegewezen zijn
  * blijven bewust staan: de rit is gereden of gepland, en de naam wissen zou de
  * historiek en de planning stukmaken. Wel verdwijnt de keuze voor nieuwe ritten,
@@ -1356,6 +1490,7 @@ export async function saveVehicleAction(_prev: SaveState, formData: FormData): P
     description: description || null,
     pricingMode,
     rateCents: pricingMode === 'FREE' ? 0 : rateCents,
+    needsTrailerDriver: String(formData.get('needsTrailerDriver') ?? '') === 'on',
   };
   if (id) {
     await prisma.uitleenVehicle.update({ where: { id }, data });

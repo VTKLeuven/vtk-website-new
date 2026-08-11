@@ -60,6 +60,21 @@ function VehicleFields({ vehicle }: { vehicle?: UitleenVehicle }) {
         Omschrijving (optioneel)
         <input type="text" name="description" defaultValue={vehicle?.description ?? ''} className={inputClass} />
       </label>
+      <label className="flex items-start gap-2 text-sm text-vtk-ink sm:col-span-2">
+        <input
+          type="checkbox"
+          name="needsTrailerDriver"
+          defaultChecked={vehicle?.needsTrailerDriver ?? false}
+          className="mt-0.5 h-4 w-4"
+        />
+        <span>
+          Vraagt een karchauffeur
+          <span className="mt-0.5 block text-xs font-normal text-vtk-muted">
+            Bij een rit met dit voertuig staan de chauffeurs die met de kar rijden bovenaan in de
+            keuzelijst, de rest onder &quot;Niet met de kar&quot;. Wie dat is, zet je bij Chauffeurs.
+          </span>
+        </span>
+      </label>
     </div>
   );
 }

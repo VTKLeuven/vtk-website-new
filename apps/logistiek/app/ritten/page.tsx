@@ -1,5 +1,6 @@
 import { LoginGate } from '@/components/login-gate';
 import { PageShell } from '@/components/page-shell';
+import { PhoneLink } from '@/components/phone-link';
 import { copy, getLocale } from '@/lib/i18n';
 import { getSession } from '@/lib/session';
 import { formatDateTime } from '@/lib/uitleen';
@@ -56,6 +57,14 @@ function TripCard({ trip, locale, past }: { trip: DriverTrip; locale: LogistiekL
             <a href={`mailto:${trip.user.email}`} className="font-normal text-vtk-navy underline underline-offset-4">
               {trip.user.email}
             </a>
+            {trip.contactPhone ? (
+              <>
+                <br />
+                <span className="font-normal">
+                  <PhoneLink number={trip.contactPhone} />
+                </span>
+              </>
+            ) : null}
           </dd>
         </div>
         {trip.eventName ? (
@@ -64,10 +73,18 @@ function TripCard({ trip, locale, past }: { trip: DriverTrip; locale: LogistiekL
             <dd className="font-medium text-vtk-ink">{trip.eventName}</dd>
           </div>
         ) : null}
-        {trip.helpersNote ? (
+        {trip.helpersNote || trip.helpersPhone ? (
           <div className="sm:col-span-2">
             <dt className="text-vtk-muted">{en ? 'Helpers' : 'Bijrijders'}</dt>
-            <dd className="font-medium text-vtk-ink">{trip.helpersNote}</dd>
+            <dd className="font-medium text-vtk-ink">
+              {trip.helpersNote}
+              {trip.helpersPhone ? (
+                <span className="font-normal">
+                  {trip.helpersNote ? ' · ' : ''}
+                  <PhoneLink number={trip.helpersPhone} />
+                </span>
+              ) : null}
+            </dd>
           </div>
         ) : null}
       </dl>

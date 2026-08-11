@@ -1,8 +1,14 @@
 import Link from 'next/link';
 import { VanStatusBadge } from '@/components/status-badge';
 import { requireManage } from '@/lib/session';
-import { formatDateTime, formatPriceCents, requesterLabel } from '@/lib/uitleen';
+import {
+  formatDateTime,
+  formatPriceCents,
+  requesterLabel,
+  toDatetimeLocalValue,
+} from '@/lib/uitleen';
 import { AuditTimeline } from '@/components/audit-timeline';
+import { PhoneLink } from '@/components/phone-link';
 import {
   adminVanBookings,
   adminVehicles,
@@ -53,9 +59,44 @@ export default async function BeheerVervoerPage() {
   ]);
   const activeVehicleOptions = vehicles
     .filter((v) => v.active)
-    .map((v) => ({ id: v.id, name: v.nameNl }));
+    .map((v) => ({ id: v.id, name: v.nameNl, needsTrailerDriver: v.needsTrailerDriver }));
 
   const open = bookings.filter((booking) => booking.status === 'REQUESTED');
+  // Heen en terug zijn twee boekingen maar één aanvraag: het team beslist er in
+  // één keer over, dus staan ze onder één kaart met één beslisformulier.
+  const openGroups: AdminTransportBooking[][] = [];
+  const seenGroups = new Set<string>();
+  for (const booking of open) {
+    if (!booking.tripGroupId) {
+      openGroups.push([booking]);
+      continue;
+    }
+    if (seenGroups.has(booking.tripGroupId)) continue;
+    seenGroups.add(booking.tripGroupId);
+    openGroups.push(
+      open
+        .filter((other) => other.tripGroupId === booking.tripGroupId)
+        .sort((a, b) => a.startAt.getTime() - b.startAt.getTime())
+    );
+  }
+
+  /**
+   * Wat er die dag al vaststaat met datzelfde voertuig, zodat je bij het
+   * verschuiven meteen ziet waar plaats is. Enkel goedgekeurde ritten: een
+   * andere aanvraag is nog geen bezetting.
+   */
+  function sameDayLines(booking: AdminTransportBooking): string[] {
+    const day = dayKeyFormatter.format(booking.startAt);
+    return bookings
+      .filter(
+        (other) =>
+          other.status === 'APPROVED' &&
+          other.vehicleId === booking.vehicleId &&
+          dayKeyFormatter.format(other.startAt) === day
+      )
+      .sort((a, b) => a.startAt.getTime() - b.startAt.getTime())
+      .map((other) => `${hoursLabel(other)} · ${other.eventName?.trim() || other.purpose}`);
+  }
   const approved = bookings
     .filter((booking) => booking.status === 'APPROVED')
     .sort((a, b) => a.startAt.getTime() - b.startAt.getTime());
@@ -90,6 +131,11 @@ export default async function BeheerVervoerPage() {
                 {requesterLabel(booking)}
               </span>
               {booking.user.name}
+              {booking.tripLeg ? (
+                <span className="rounded-full bg-vtk-yellow/25 px-2 py-0.5 text-[11px] font-semibold text-vtk-ink">
+                  {booking.tripLeg === 'HEEN' ? 'Heenrit' : 'Terugrit'}
+                </span>
+              ) : null}
               <span className="text-sm font-normal text-vtk-muted">{booking.purpose}</span>
             </p>
             <p className="mt-0.5 text-sm text-vtk-muted">
@@ -123,11 +169,17 @@ export default async function BeheerVervoerPage() {
     booking: AdminTransportBooking;
     children?: React.ReactNode;
   }) {
-    const lines: Array<[string, string]> = [];
+    const lines: Array<[string, React.ReactNode]> = [];
     if (booking.eventName) lines.push(['Evenement', booking.eventName]);
     if (booking.pickupAddress) lines.push(['Laadadres', booking.pickupAddress]);
     if (booking.destination) lines.push(['Bestemming', booking.destination]);
+    if (booking.contactPhone) {
+      lines.push(['Aanvrager bellen', <PhoneLink key="contact" number={booking.contactPhone} />]);
+    }
     if (booking.helpersNote) lines.push(['Bijrijders', booking.helpersNote]);
+    if (booking.helpersPhone) {
+      lines.push(['Bijrijder bellen', <PhoneLink key="helpers" number={booking.helpersPhone} />]);
+    }
     if (booking.memberNote) lines.push(['Nota van het lid', booking.memberNote]);
     if (booking.adminNote) lines.push(['Nota van Logistiek', booking.adminNote]);
     if (booking.kilometers !== null) lines.push(['Gereden', `${booking.kilometers} km`]);
@@ -184,22 +236,43 @@ export default async function BeheerVervoerPage() {
       </div>
 
       <section>
-        <h2 className="text-lg font-semibold tracking-tight text-vtk-ink">Te beslissen ({open.length})</h2>
+        <h2 className="text-lg font-semibold tracking-tight text-vtk-ink">
+          Te beslissen ({openGroups.length})
+        </h2>
         {open.length === 0 ? (
           <p className="mt-3 text-sm text-vtk-muted">Geen open ritaanvragen.</p>
         ) : (
           <ul className="mt-4 grid gap-4">
-            {open.map((booking) => (
-              <BookingCard key={booking.id} booking={booking}>
-                <div className="mt-4">
-                  <TransportDecisionForms
-                    bookingId={booking.id}
-                    drivers={drivers}
-                    pricingIsPerKm={booking.pricingMode === 'PER_KM'}
-                  />
-                </div>
-              </BookingCard>
-            ))}
+            {openGroups.map((group) => {
+              const [first] = group;
+              return (
+                <BookingCard key={first.id} booking={first}>
+                  {group.length > 1 ? (
+                    <p className="mt-2 text-sm text-vtk-muted">
+                      Terugrit: {dateFormatter.format(group[1].startAt)} · {hoursLabel(group[1])}
+                    </p>
+                  ) : null}
+                  <div className="mt-4">
+                    <TransportDecisionForms
+                      bookingId={first.id}
+                      legs={group.map((leg) => ({
+                        id: leg.id,
+                        startAt: toDatetimeLocalValue(leg.startAt),
+                        endAt: toDatetimeLocalValue(leg.endAt),
+                        label:
+                          group.length > 1 ? (leg.tripLeg === 'TERUG' ? 'Terugrit' : 'Heenrit') : null,
+                      }))}
+                      drivers={drivers}
+                      pricingIsPerKm={first.pricingMode === 'PER_KM'}
+                      needsTrailerDriver={
+                        vehicles.find((v) => v.id === first.vehicleId)?.needsTrailerDriver ?? false
+                      }
+                      sameDayBookings={sameDayLines(first)}
+                    />
+                  </div>
+                </BookingCard>
+              );
+            })}
           </ul>
         )}
       </section>

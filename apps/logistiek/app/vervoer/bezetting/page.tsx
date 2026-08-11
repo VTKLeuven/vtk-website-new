@@ -1,15 +1,29 @@
 import Link from 'next/link';
-import { requireManage } from '@/lib/session';
+import type { Metadata } from 'next';
+import { PageShell } from '@/components/page-shell';
+import { getLocale } from '@/lib/i18n';
 import {
   formatDateRange,
   isoWeekNumber,
   parseDateOnly,
-  requesterLabel,
   startOfWeek,
   toDateInputValue,
   todayDateOnly,
 } from '@/lib/uitleen';
-import { activeVehicles, transportWeek, type TransportWeekBooking } from '@/lib/uitleen-server';
+import { activeVehicles, transportWeekPublic } from '@/lib/uitleen-server';
+
+/**
+ * Publieke bezetting van de voertuigen, zonder login.
+ *
+ * Enkel voertuig, dag en tijdvenster: geen namen, geen doel, geen adressen, geen
+ * chauffeurs. De query (`transportWeekPublic`) haalt die velden niet eens op, en
+ * de pagina staat op noindex; ze is bedoeld om door te sturen ("kan ik zaterdag
+ * de kar hebben?"), niet om gevonden te worden.
+ */
+export const metadata: Metadata = {
+  title: 'Wanneer is de kar vrij?',
+  robots: { index: false, follow: false },
+};
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -18,7 +32,6 @@ const timeFormatter = new Intl.DateTimeFormat('nl-BE', {
   hour: '2-digit',
   minute: '2-digit',
 });
-
 const weekdayFormatter = new Intl.DateTimeFormat('nl-BE', { timeZone: 'UTC', weekday: 'short' });
 const dayNumberFormatter = new Intl.DateTimeFormat('nl-BE', {
   timeZone: 'UTC',
@@ -26,11 +39,7 @@ const dayNumberFormatter = new Intl.DateTimeFormat('nl-BE', {
   month: 'short',
 });
 
-/**
- * Welk stuk van de rit op deze dag valt. Een rit kan meerdere dagen duren (de
- * limiet van 12 uur is er niet meer), dus ze verschijnt op elke dag die ze
- * raakt, met een label dat zegt of ze die dag begint, eindigt of doorloopt.
- */
+/** Welk stuk van de rit op deze dag valt; een rit kan meerdere dagen duren. */
 function dayLabel(booking: { startAt: Date; endAt: Date }, dayStart: Date, dayEnd: Date): string {
   const startsToday = booking.startAt >= dayStart;
   const endsToday = booking.endAt <= dayEnd;
@@ -42,120 +51,86 @@ function dayLabel(booking: { startAt: Date; endAt: Date }, dayStart: Date, dayEn
   return 'hele dag';
 }
 
-/**
- * Goedgekeurde ritten van hetzelfde voertuig die elkaar overlappen. Dat hoort
- * niet te kunnen (de goedkeuring checkt het), maar een voertuigwissel of een
- * handmatige ingreep kan het alsnog veroorzaken, en dan wil je het zien.
- */
-function conflictingIds(bookings: TransportWeekBooking[]): Set<string> {
-  const conflicts = new Set<string>();
-  const approved = bookings.filter((booking) => booking.status === 'APPROVED');
-  for (let i = 0; i < approved.length; i++) {
-    for (let j = i + 1; j < approved.length; j++) {
-      const a = approved[i];
-      const b = approved[j];
-      if (a.vehicleId !== b.vehicleId) continue;
-      if (a.startAt < b.endAt && b.startAt < a.endAt) {
-        conflicts.add(a.id);
-        conflicts.add(b.id);
-      }
-    }
-  }
-  return conflicts;
-}
-
-export default async function VervoerWeekPage({
+export default async function VervoerBezettingPage({
   searchParams,
 }: {
   searchParams: Promise<{ week?: string }>;
 }) {
-  await requireManage();
-  const { week } = await searchParams;
+  const [{ week }, locale] = await Promise.all([searchParams, getLocale()]);
+  const en = locale === 'en';
 
   const monday = startOfWeek((week && parseDateOnly(week)) || new Date());
   const nextMonday = new Date(monday.getTime() + 7 * DAY_MS);
   const days = Array.from({ length: 7 }, (_, index) => new Date(monday.getTime() + index * DAY_MS));
 
   const [bookings, vehicles] = await Promise.all([
-    transportWeek(monday, nextMonday),
+    transportWeekPublic(monday, nextMonday),
     activeVehicles(),
   ]);
 
-  const conflicts = conflictingIds(bookings);
   const today = todayDateOnly();
   const thisWeek = startOfWeek(new Date());
+  const previousHref = `/vervoer/bezetting?week=${toDateInputValue(new Date(monday.getTime() - 7 * DAY_MS))}`;
+  const nextHref = `/vervoer/bezetting?week=${toDateInputValue(nextMonday)}`;
 
-  const previousHref = `/beheer/vervoer/week?week=${toDateInputValue(new Date(monday.getTime() - 7 * DAY_MS))}`;
-  const nextHref = `/beheer/vervoer/week?week=${toDateInputValue(nextMonday)}`;
-
-  /** Ritten van dit voertuig die deze dag raken. */
-  function bookingsFor(vehicleId: string, day: Date): TransportWeekBooking[] {
+  function bookingsFor(vehicleId: string, day: Date) {
     const dayEnd = new Date(day.getTime() + DAY_MS);
     return bookings.filter(
-      (booking) =>
-        booking.vehicleId === vehicleId && booking.startAt < dayEnd && booking.endAt > day
+      (booking) => booking.vehicleId === vehicleId && booking.startAt < dayEnd && booking.endAt > day
     );
   }
 
-  function blockTitle(booking: TransportWeekBooking): string {
-    return [
-      booking.eventName ?? booking.purpose,
-      requesterLabel(booking),
-      booking.user.name,
-      booking.driver ? `chauffeur: ${booking.driver.name}` : 'nog geen chauffeur',
-      booking.status === 'REQUESTED' ? 'nog te beslissen' : null,
-    ]
-      .filter(Boolean)
-      .join(' · ');
-  }
-
-  function Block({ booking, day }: { booking: TransportWeekBooking; day: Date }) {
-    const conflict = conflicts.has(booking.id);
+  function Block({
+    booking,
+    day,
+  }: {
+    booking: (typeof bookings)[number];
+    day: Date;
+  }) {
     const requested = booking.status === 'REQUESTED';
     return (
-      <Link
-        href="/beheer/vervoer"
-        title={blockTitle(booking)}
-        className={`block rounded-[10px] px-2 py-1.5 text-left text-[11px] leading-tight transition ${
-          conflict
-            ? 'border border-red-300 bg-red-50 text-red-800'
-            : requested
-              ? 'border border-dashed border-vtk-navy/30 bg-vtk-paper text-vtk-body'
-              : 'border border-transparent bg-vtk-navy text-white'
+      <span
+        className={`block rounded-[10px] px-2 py-1.5 text-[11px] font-semibold leading-tight tabular-nums ${
+          requested
+            ? 'border border-dashed border-vtk-navy/30 bg-vtk-paper text-vtk-body'
+            : 'bg-vtk-navy text-white'
         }`}
       >
-        <span className="block font-semibold tabular-nums">
-          {dayLabel(booking, day, new Date(day.getTime() + DAY_MS))}
+        {dayLabel(booking, day, new Date(day.getTime() + DAY_MS))}
+        <span className="block font-normal">
+          {requested ? (en ? 'requested' : 'aangevraagd') : en ? 'booked' : 'bezet'}
         </span>
-        <span className="block truncate">{requesterLabel(booking)}</span>
-        {conflict ? <span className="block font-semibold">conflict</span> : null}
-        {!booking.driver && !requested ? (
-          <span className={`block ${conflict ? '' : 'text-vtk-yellow'}`}>geen chauffeur</span>
-        ) : null}
-      </Link>
+      </span>
     );
   }
 
   return (
-    <div className="grid gap-5">
+    <PageShell
+      title={en ? 'When is a vehicle free?' : 'Wanneer is een voertuig vrij?'}
+      intro={
+        en
+          ? 'Vehicle, day and time only. Log in to request a trip; who is driving and what for is not shown here.'
+          : 'Enkel voertuig, dag en uur. Log in om een rit aan te vragen; wie rijdt en waarvoor staat hier niet bij.'
+      }
+    >
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h2 className="text-lg font-semibold tracking-tight text-vtk-ink">
-            Week {isoWeekNumber(monday)}
+            {en ? 'Week' : 'Week'} {isoWeekNumber(monday)}
           </h2>
           <p className="text-sm text-vtk-muted">
-            {formatDateRange(monday, new Date(nextMonday.getTime() - DAY_MS))}
+            {formatDateRange(monday, new Date(nextMonday.getTime() - DAY_MS), locale)}
           </p>
         </div>
-        <nav className="flex flex-wrap items-center gap-2 text-sm" aria-label="Week kiezen">
+        <nav className="flex flex-wrap items-center gap-2 text-sm" aria-label={en ? 'Pick a week' : 'Week kiezen'}>
           <Link
             href={previousHref}
             className="rounded-full border border-vtk-navy/15 px-3 py-1.5 font-medium text-vtk-ink transition hover:border-vtk-navy/40"
           >
-            ← Vorige
+            ← {en ? 'Previous' : 'Vorige'}
           </Link>
           <Link
-            href="/beheer/vervoer/week"
+            href="/vervoer/bezetting"
             aria-current={monday.getTime() === thisWeek.getTime() ? 'true' : undefined}
             className={
               monday.getTime() === thisWeek.getTime()
@@ -163,40 +138,35 @@ export default async function VervoerWeekPage({
                 : 'rounded-full border border-vtk-navy/15 px-3 py-1.5 font-medium text-vtk-ink transition hover:border-vtk-navy/40'
             }
           >
-            Deze week
+            {en ? 'This week' : 'Deze week'}
           </Link>
           <Link
             href={nextHref}
             className="rounded-full border border-vtk-navy/15 px-3 py-1.5 font-medium text-vtk-ink transition hover:border-vtk-navy/40"
           >
-            Volgende →
+            {en ? 'Next' : 'Volgende'} →
           </Link>
           <Link
-            href="/beheer/vervoer"
+            href="/vervoer"
             className="ml-2 font-semibold text-vtk-navy underline decoration-vtk-yellow underline-offset-4"
           >
-            Lijst
-          </Link>
-          <Link
-            href="/vervoer/bezetting"
-            className="font-semibold text-vtk-navy underline decoration-vtk-yellow underline-offset-4"
-          >
-            Publieke bezetting
+            {en ? 'Request a trip' : 'Rit aanvragen'}
           </Link>
         </nav>
       </div>
 
       {vehicles.length === 0 ? (
-        <p className="text-sm text-vtk-muted">Er staan nog geen voertuigen in de instellingen.</p>
+        <p className="mt-5 text-sm text-vtk-muted">
+          {en ? 'No vehicles yet.' : 'Er staan nog geen voertuigen klaar.'}
+        </p>
       ) : (
         <>
-          {/* Raster: voertuigen als rijen, de zeven dagen als kolommen. Onder lg
-              wordt dit een daglijst; een horizontale scroller met zeven kolommen
-              verbergt meer dan hij toont. */}
-          <div className="hidden overflow-hidden rounded-[16px] border border-vtk-navy/10 bg-vtk-surface lg:block">
+          {/* Raster op breed scherm, daglijst eronder: zeven kolommen in een
+              horizontale scroller verbergen meer dan ze tonen. */}
+          <div className="mt-5 hidden overflow-hidden rounded-[16px] border border-vtk-navy/10 bg-vtk-surface lg:block">
             <div className="grid grid-cols-[9rem_repeat(7,minmax(0,1fr))]">
               <div className="border-b border-vtk-navy/10 px-3 py-2 text-xs font-semibold text-vtk-muted">
-                Voertuig
+                {en ? 'Vehicle' : 'Voertuig'}
               </div>
               {days.map((day) => {
                 const isToday = day.getTime() === today.getTime();
@@ -216,21 +186,18 @@ export default async function VervoerWeekPage({
               {vehicles.map((vehicle) => (
                 <div key={vehicle.id} className="contents">
                   <div className="border-b border-vtk-navy/5 px-3 py-2 text-sm font-medium text-vtk-ink">
-                    {vehicle.nameNl}
+                    {en ? vehicle.nameEn : vehicle.nameNl}
                   </div>
                   {days.map((day) => {
-                    const dayBookings = bookingsFor(vehicle.id, day);
                     const isToday = day.getTime() === today.getTime();
                     return (
                       <div
                         key={day.toISOString()}
-                        // content-start: een rit houdt haar eigen hoogte en rekt
-                        // niet uit tot de hoogte van de drukste dag van de week.
                         className={`grid content-start gap-1 border-b border-l border-vtk-navy/5 p-1.5 ${
                           isToday ? 'bg-vtk-yellow/10' : ''
                         }`}
                       >
-                        {dayBookings.map((booking) => (
+                        {bookingsFor(vehicle.id, day).map((booking) => (
                           <Block key={booking.id} booking={booking} day={day} />
                         ))}
                       </div>
@@ -241,8 +208,7 @@ export default async function VervoerWeekPage({
             </div>
           </div>
 
-          {/* Smal scherm: dezelfde week als daglijst. */}
-          <div className="grid gap-4 lg:hidden">
+          <div className="mt-5 grid gap-4 lg:hidden">
             {days.map((day) => {
               const dayBookings = vehicles.flatMap((vehicle) =>
                 bookingsFor(vehicle.id, day).map((booking) => ({ booking, vehicle }))
@@ -258,37 +224,34 @@ export default async function VervoerWeekPage({
                     {dayBookings.map(({ booking, vehicle }) => (
                       <li
                         key={booking.id}
-                        className="rounded-[12px] border border-vtk-navy/10 bg-vtk-surface px-3 py-2 text-sm"
+                        className="flex flex-wrap items-center justify-between gap-2 rounded-[12px] border border-vtk-navy/10 bg-vtk-surface px-3 py-2 text-sm"
                       >
-                        <p className="flex flex-wrap items-center gap-2 font-medium text-vtk-ink">
-                          <span className="rounded-full bg-vtk-paper-2 px-2 py-0.5 text-[11px] font-semibold text-vtk-navy">
-                            {vehicle.nameNl}
-                          </span>
+                        <span className="font-medium text-vtk-ink">
+                          {en ? vehicle.nameEn : vehicle.nameNl}
+                        </span>
+                        <span className="tabular-nums text-vtk-muted">
                           {dayLabel(booking, day, new Date(day.getTime() + DAY_MS))}
-                          {conflicts.has(booking.id) ? (
-                            <span className="rounded-full bg-red-50 px-2 py-0.5 text-[11px] font-semibold text-red-700">
-                              Conflict
-                            </span>
-                          ) : null}
-                        </p>
-                        <p className="mt-0.5 truncate text-vtk-muted">{blockTitle(booking)}</p>
+                          {booking.status === 'REQUESTED'
+                            ? en
+                              ? ' · requested'
+                              : ' · aangevraagd'
+                            : ''}
+                        </span>
                       </li>
                     ))}
                   </ul>
                 </section>
               );
             })}
-            {bookings.length === 0 ? (
-              <p className="text-sm text-vtk-muted">Geen ritten deze week.</p>
-            ) : null}
           </div>
 
-          <p className="text-xs text-vtk-muted">
-            Vol vlak = goedgekeurd, streepjeslijn = nog te beslissen, rood = twee goedgekeurde
-            ritten met hetzelfde voertuig op hetzelfde moment.
+          <p className="mt-5 text-xs text-vtk-muted">
+            {en
+              ? 'Dashed means requested but not yet decided; the vehicle may still become free.'
+              : 'Gestreept is aangevraagd maar nog niet beslist; dat moment kan dus nog vrijkomen.'}
           </p>
         </>
       )}
-    </div>
+    </PageShell>
   );
 }

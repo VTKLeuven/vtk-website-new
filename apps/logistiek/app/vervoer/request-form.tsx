@@ -29,31 +29,45 @@ export function VanRequestForm({
   const [pickupAddress, setPickupAddress] = useState('');
   const [destination, setDestination] = useState('');
   const [helpersNote, setHelpersNote] = useState('');
+  const [helpersPhone, setHelpersPhone] = useState('');
+  const [contactPhone, setContactPhone] = useState('');
+  const [roundTrip, setRoundTrip] = useState(false);
+  const [returnStartAt, setReturnStartAt] = useState('');
+  const [returnEndAt, setReturnEndAt] = useState('');
   const [note, setNote] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
   const vehicle = vehicles.find((v) => v.id === vehicleId);
 
-  // Prijsindicatie volgens de tariefmodus van het gekozen voertuig.
+  // Prijsindicatie volgens de tariefmodus van het gekozen voertuig. Bij heen en
+  // terug is het de som van beide ritten: ze worden apart aangerekend, want het
+  // voertuig staat er tussenin niet op.
   const estimate = useMemo(() => {
     if (!vehicle) return { label: '-', tbd: false };
     if (vehicle.pricingMode === 'PER_KM') {
       return { label: `${formatEuro(vehicle.rateCents)} ${en ? 'per km' : 'per km'}`, tbd: true };
     }
-    const start = new Date(startAt);
-    const end = new Date(endAt);
-    if (!startAt || !endAt || Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || end <= start) {
-      return { label: '-', tbd: false };
-    }
-    const cents = transportPriceCents({
-      pricingMode: vehicle.pricingMode,
-      rateCents: vehicle.rateCents,
-      startAt: start,
-      endAt: end,
-    });
-    return { label: formatPriceCents(cents), tbd: false };
-  }, [vehicle, startAt, endAt, en]);
+    const legCents = (from: string, to: string): number | null => {
+      const start = new Date(from);
+      const end = new Date(to);
+      if (!from || !to || Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || end <= start) {
+        return null;
+      }
+      return transportPriceCents({
+        pricingMode: vehicle.pricingMode,
+        rateCents: vehicle.rateCents,
+        startAt: start,
+        endAt: end,
+      });
+    };
+    const outbound = legCents(startAt, endAt);
+    if (outbound === null) return { label: '-', tbd: false };
+    if (!roundTrip) return { label: formatPriceCents(outbound), tbd: false };
+    const inbound = legCents(returnStartAt, returnEndAt);
+    if (inbound === null) return { label: '-', tbd: false };
+    return { label: formatPriceCents(outbound + inbound), tbd: false };
+  }, [vehicle, startAt, endAt, roundTrip, returnStartAt, returnEndAt, en]);
 
   function submit() {
     setError(null);
@@ -67,7 +81,11 @@ export function VanRequestForm({
         pickupAddress,
         destination,
         helpersNote,
+        helpersPhone,
+        contactPhone,
         note,
+        returnStartAt: roundTrip ? returnStartAt : undefined,
+        returnEndAt: roundTrip ? returnEndAt : undefined,
       });
       if (result.ok) {
         router.push('/reservaties?aangevraagd=1');
@@ -135,6 +153,48 @@ export function VanRequestForm({
             className={inputClass}
           />
         </label>
+        <label className="flex items-center gap-2 text-sm sm:col-span-2">
+          <input
+            type="checkbox"
+            checked={roundTrip}
+            onChange={(e) => setRoundTrip(e.target.checked)}
+            className="h-4 w-4"
+          />
+          <span className="font-medium text-vtk-ink">
+            {en ? 'I also need a return trip' : 'Ik heb ook een terugrit nodig'}
+          </span>
+        </label>
+        {roundTrip ? (
+          <>
+            <label className="grid gap-1 text-sm">
+              <span className="font-medium text-vtk-ink">{en ? 'Back: from' : 'Terug: van'}</span>
+              <input
+                type="datetime-local"
+                step={900}
+                value={returnStartAt}
+                min={endAt || undefined}
+                onChange={(e) => setReturnStartAt(e.target.value)}
+                className={inputClass}
+              />
+            </label>
+            <label className="grid gap-1 text-sm">
+              <span className="font-medium text-vtk-ink">{en ? 'Back: until' : 'Terug: tot'}</span>
+              <input
+                type="datetime-local"
+                step={900}
+                value={returnEndAt}
+                min={returnStartAt || undefined}
+                onChange={(e) => setReturnEndAt(e.target.value)}
+                className={inputClass}
+              />
+            </label>
+            <p className="text-xs text-vtk-muted sm:col-span-2">
+              {en
+                ? 'The vehicle is free in between, so this becomes two trips in one request. Logistics decides on both at once.'
+                : 'Tussenin is het voertuig vrij, dus dit worden twee ritten in één aanvraag. Logistiek beslist over allebei tegelijk.'}
+            </p>
+          </>
+        ) : null}
         <label className="grid gap-1 text-sm sm:col-span-2">
           <span className="font-medium text-vtk-ink">{en ? 'What is the trip for?' : 'Waarvoor dient de rit?'}</span>
           <input
@@ -157,7 +217,7 @@ export function VanRequestForm({
           <span className="font-medium text-vtk-ink">{en ? 'Destination (optional)' : 'Bestemming (optioneel)'}</span>
           <input type="text" value={destination} onChange={(e) => setDestination(e.target.value)} className={inputClass} />
         </label>
-        <label className="grid gap-1 text-sm sm:col-span-2">
+        <label className="grid gap-1 text-sm">
           <span className="font-medium text-vtk-ink">
             {en ? 'Co-drivers you provide (optional)' : 'Bijrijders die je voorziet (optioneel)'}
           </span>
@@ -168,6 +228,35 @@ export function VanRequestForm({
             placeholder={en ? 'E.g. two helpers from our team' : 'Bv. twee helpers van onze werkgroep'}
             className={inputClass}
           />
+        </label>
+        <label className="grid gap-1 text-sm">
+          <span className="font-medium text-vtk-ink">
+            {en ? 'Co-driver phone (optional)' : 'Telefoon bijrijder (optioneel)'}
+          </span>
+          <input
+            type="tel"
+            value={helpersPhone}
+            onChange={(e) => setHelpersPhone(e.target.value)}
+            placeholder="+32 4.."
+            className={inputClass}
+          />
+        </label>
+        <label className="grid gap-1 text-sm sm:col-span-2">
+          <span className="font-medium text-vtk-ink">
+            {en ? 'Your phone number' : 'Jouw telefoonnummer'}
+          </span>
+          <input
+            type="tel"
+            value={contactPhone}
+            onChange={(e) => setContactPhone(e.target.value)}
+            placeholder="+32 4.."
+            className={inputClass}
+          />
+          <span className="text-xs text-vtk-muted">
+            {en
+              ? 'The driver calls this number if something changes on the road.'
+              : 'De chauffeur belt dit nummer wanneer er onderweg iets wijzigt.'}
+          </span>
         </label>
         <label className="grid gap-1 text-sm sm:col-span-2">
           <span className="font-medium text-vtk-ink">{en ? 'Extra information (optional)' : 'Extra info (optioneel)'}</span>
@@ -204,7 +293,14 @@ export function VanRequestForm({
         size="lg"
         className="mt-5"
         onClick={submit}
-        disabled={pending || !vehicleId || !startAt || !endAt || !purpose.trim()}
+        disabled={
+          pending ||
+          !vehicleId ||
+          !startAt ||
+          !endAt ||
+          !purpose.trim() ||
+          (roundTrip && (!returnStartAt || !returnEndAt))
+        }
       >
         {pending ? (en ? 'Submitting...' : 'Indienen...') : en ? 'Request trip' : 'Rit aanvragen'}
       </Button>
