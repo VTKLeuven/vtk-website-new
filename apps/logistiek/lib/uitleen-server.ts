@@ -454,11 +454,35 @@ export async function availabilityForRange(
   }));
 }
 
-export async function myReservations(userId: string) {
+/**
+ * De aanvragen die dit lid mag zien: die van hemzelf, plus de materiaal- en
+ * flesserke-aanvragen van zijn posten.
+ *
+ * Een post bestelt als post: wie op maandag materiaal aanvroeg en op woensdag
+ * ziek is, laat de rest van de post anders in het ongewisse over wat er al
+ * geregeld is, en dan wordt hetzelfde twee keer aangevraagd. Enkel INTERN
+ * hangt aan een post; een werkgroepaanvraag bewaart geen `groupId` (zie
+ * `deriveMemberRequester`) en blijft dus persoonlijk.
+ *
+ * Wie een aanvraag van een collega opent, ziet ze; aanpassen en annuleren blijft
+ * aan de aanvrager (zie `reservationForMember`).
+ */
+export async function myReservations(userId: string, groupIds: string[] = []) {
   return prisma.uitleenReservation.findMany({
-    where: { userId },
+    where:
+      groupIds.length > 0
+        ? { OR: [{ userId }, { requesterType: 'INTERN', groupId: { in: groupIds } }] }
+        : { userId },
     orderBy: { createdAt: 'desc' },
-    include: { lines: true, payments: { where: { status: 'SUCCEEDED' }, select: { id: true, status: true } } },
+    include: {
+      lines: true,
+      // Om materiaal en flesserke uit elkaar te houden in het overzicht: een
+      // aanvraag kan allebei bevatten.
+      flesserkeLines: { select: { id: true, quantity: true, itemName: true } },
+      user: { select: { id: true, name: true } },
+      group: { select: { nameNl: true, nameEn: true } },
+      payments: { where: { status: 'SUCCEEDED' }, select: { id: true, status: true } },
+    },
   });
 }
 
@@ -508,15 +532,42 @@ export async function getLogistiekSettings(): Promise<LogistiekSettings> {
   };
 }
 
+const memberReservationInclude = {
+  lines: true,
+  flesserkeLines: true,
+  payments: { orderBy: { createdAt: 'desc' as const } },
+  group: { select: { nameNl: true, nameEn: true } },
+  user: { select: { id: true, name: true } },
+};
+
 export async function reservationForUser(id: string, userId: string) {
   return prisma.uitleenReservation.findFirst({
     where: { id, userId },
-    include: {
-      lines: true,
-      flesserkeLines: true,
-      payments: { orderBy: { createdAt: 'desc' } },
-      group: { select: { nameNl: true, nameEn: true } },
+    include: memberReservationInclude,
+  });
+}
+
+/**
+ * Een aanvraag die dit lid mag openen: die van hemzelf, of een interne aanvraag
+ * van een van zijn posten.
+ *
+ * Alleen lezen in dat tweede geval. Zien wat de post besteld heeft, voorkomt dat
+ * hetzelfde twee keer aangevraagd wordt; ze kunnen aanpassen of annuleren is
+ * iets anders, want dan haalt iemand materiaal weg onder de aanvrager zonder dat
+ * die het merkt. De pagina zet die knoppen daarom uit voor een collega.
+ */
+export async function reservationForMember(id: string, userId: string, groupIds: string[]) {
+  return prisma.uitleenReservation.findFirst({
+    where: {
+      id,
+      OR: [
+        { userId },
+        ...(groupIds.length > 0
+          ? [{ requesterType: 'INTERN' as const, groupId: { in: groupIds } }]
+          : []),
+      ],
     },
+    include: memberReservationInclude,
   });
 }
 

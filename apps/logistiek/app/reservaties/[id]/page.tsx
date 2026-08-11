@@ -25,7 +25,7 @@ import {
   getFlesserkeCatalog,
   getLogistiekSettings,
   hasSucceededPayment,
-  reservationForUser,
+  reservationForMember,
 } from '@/lib/uitleen-server';
 import { ReservationEditor } from './edit-form';
 import { FlesserkeEditor } from '@/app/flesserke/edit-form';
@@ -45,21 +45,25 @@ export default async function ReservatieDetailPage({
 
   const { id } = await params;
   const { betaling } = await searchParams;
-  let reservation = await reservationForUser(id, session.user.id);
+  // Ook de aanvragen van je eigen post, zodat je ziet wat er al geregeld is.
+  // Alleen lezen: aanpassen en annuleren blijft aan de aanvrager zelf.
+  const postIds = session.groups.filter((group) => group.type === 'PRAESIDIUM').map((g) => g.id);
+  let reservation = await reservationForMember(id, session.user.id, postIds);
   if (!reservation) notFound();
+  const isOwner = reservation.user.id === session.user.id;
 
   // Terug van de checkout: haal de status meteen bij de provider op, want in
   // dev bereikt de webhook localhost niet en ook live kan hij nog onderweg zijn.
   if (betaling && reservation.payments.some((payment) => payment.status === 'PENDING')) {
     if ((await reconcilePayments(reservation.payments)) > 0) {
-      reservation = (await reservationForUser(id, session.user.id))!;
+      reservation = (await reservationForMember(id, session.user.id, postIds))!;
     }
   }
 
   const paid = hasSucceededPayment(reservation.payments) || reservation.paidOfflineAt !== null;
   const cancellable =
-    (reservation.status === 'REQUESTED' || reservation.status === 'APPROVED') && !paid;
-  const editable = reservation.status === 'REQUESTED';
+    isOwner && (reservation.status === 'REQUESTED' || reservation.status === 'APPROVED') && !paid;
+  const editable = isOwner && reservation.status === 'REQUESTED';
   // Een aanvraag is materiaal- of flesserke-type; de juiste editor volgt daaruit.
   const isFlesserke = reservation.flesserkeLines.length > 0 && reservation.lines.length === 0;
 
@@ -303,11 +307,21 @@ export default async function ReservatieDetailPage({
             ) : null}
           </dl>
 
-          {reservation.status === 'REQUESTED' ? (
+          {reservation.status === 'REQUESTED' && isOwner ? (
             <p className="mt-4 text-sm leading-6 text-vtk-muted">
               {en
                 ? 'The Logistics team is reviewing your request. You will see here as soon as it is decided.'
                 : 'Het team van Logistiek bekijkt je aanvraag. Je ziet hier meteen wanneer ze beslist is.'}
+            </p>
+          ) : null}
+
+          {/* Een aanvraag van een collega uit je post: zichtbaar zodat je weet
+              wat er al geregeld is, maar niet van jou om aan te passen. */}
+          {!isOwner ? (
+            <p className="mt-4 rounded-lg border border-vtk-navy/10 bg-vtk-paper px-3 py-2 text-sm leading-6 text-vtk-body">
+              {en
+                ? `Requested by ${reservation.user.name} for your post. You can see it; changing or cancelling stays with the requester.`
+                : `Aangevraagd door ${reservation.user.name} voor jouw post. Je kan ze bekijken; aanpassen of annuleren blijft bij de aanvrager.`}
             </p>
           ) : null}
 
@@ -317,7 +331,8 @@ export default async function ReservatieDetailPage({
             </p>
           ) : null}
 
-          {reservation.status === 'APPROVED' &&
+          {isOwner &&
+          reservation.status === 'APPROVED' &&
           reservation.paymentMode === 'ONLINE' &&
           !paid &&
           reservation.totalPriceCents > 0 ? (

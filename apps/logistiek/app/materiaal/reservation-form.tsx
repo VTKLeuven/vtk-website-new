@@ -97,6 +97,20 @@ export function ReservationForm({
   const [availability, setAvailability] = useState<Record<string, number> | null>(null);
   const [acceptConflicts, setAcceptConflicts] = useState(false);
   const [eventLink, setEventLink] = useState({ eventId: '', createEvent: false });
+
+  /**
+   * Een gekozen evenement vult de naam in plaats van dat je ze opnieuw typt: ze
+   * staat dan twee keer in het formulier en gaat scheef zodra er één van de twee
+   * aangepast wordt. Loskoppelen geeft het veld weer vrij, met de naam die er
+   * stond als vertrekpunt.
+   */
+  const linkedEvent = events?.find((entry) => entry.id === eventLink.eventId) ?? null;
+  function chooseEvent(next: { eventId: string; createEvent: boolean }) {
+    setEventLink(next);
+    const picked = events?.find((entry) => entry.id === next.eventId);
+    if (picked) setEvent((current) => ({ ...current, eventName: picked.name }));
+  }
+
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
@@ -286,7 +300,14 @@ export function ReservationForm({
         </div>
       ) : null}
 
-      <EventRequesterFields value={event} onChange={setEvent} groups={groups} locale={locale} mode={mode} />
+      <EventRequesterFields
+        value={event}
+        onChange={setEvent}
+        groups={groups}
+        locale={locale}
+        mode={mode}
+        linkedEventName={linkedEvent?.name ?? null}
+      />
 
       {/* Enkel bij een nieuwe aanvraag: een bestaande koppel je vanuit het beheer,
           waar je ziet wat er al onder het evenement hangt. */}
@@ -295,7 +316,7 @@ export function ReservationForm({
           events={events}
           eventId={eventLink.eventId}
           createEvent={eventLink.createEvent}
-          onChange={setEventLink}
+          onChange={chooseEvent}
           locale={locale}
           newEventName={event.eventName}
         />

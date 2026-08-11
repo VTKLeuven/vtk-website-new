@@ -48,6 +48,7 @@ export function EventRequesterFields({
   groups,
   locale,
   mode = 'member',
+  linkedEventName = null,
 }: {
   value: EventReservationValues;
   onChange: (next: EventReservationValues) => void;
@@ -55,6 +56,12 @@ export function EventRequesterFields({
   locale: 'nl' | 'en';
   /** 'member' leidt het aanvragertype automatisch af; 'team' laat het manueel kiezen. */
   mode?: 'member' | 'team';
+  /**
+   * Naam van het evenement waaraan deze aanvraag gekoppeld is. Dan is de naam
+   * geen vraag meer maar een gegeven: het veld toont ze en je typt ze niet
+   * opnieuw. Loskoppelen in de kiezer maakt het weer een gewoon veld.
+   */
+  linkedEventName?: string | null;
 }) {
   const en = locale === 'en';
   const set = <K extends keyof EventReservationValues>(key: K, v: EventReservationValues[K]) =>
@@ -162,16 +169,34 @@ export function EventRequesterFields({
           </label>
         ) : null}
 
-        <label className="grid gap-1 text-sm sm:col-span-2">
-          <span className="font-medium text-vtk-ink">{en ? 'Event / activity' : 'Evenement / activiteit'}</span>
-          <input
-            type="text"
-            value={value.eventName}
-            onChange={(e) => set('eventName', e.target.value)}
-            placeholder={en ? 'E.g. 24-hour run' : 'Bv. 24 urenloop'}
-            className={inputClass}
-          />
-        </label>
+        {linkedEventName ? (
+          <div className="grid gap-1 text-sm sm:col-span-2">
+            <span className="font-medium text-vtk-ink">
+              {en ? 'Event / activity' : 'Evenement / activiteit'}
+            </span>
+            {/* Onderbroken rand en doffe vulling: dit vult zichzelf in, je kan er
+                niet in typen. Loskoppelen doe je in de kiezer hieronder. */}
+            <p className="flex h-10 items-center rounded-lg border border-dashed border-vtk-navy/20 bg-vtk-paper px-3 text-sm text-vtk-muted">
+              {linkedEventName}
+            </p>
+            <span className="text-xs text-vtk-muted">
+              {en
+                ? 'Comes from the event you picked below.'
+                : 'Volgt uit het evenement dat je hieronder koos.'}
+            </span>
+          </div>
+        ) : (
+          <label className="grid gap-1 text-sm sm:col-span-2">
+            <span className="font-medium text-vtk-ink">{en ? 'Event / activity' : 'Evenement / activiteit'}</span>
+            <input
+              type="text"
+              value={value.eventName}
+              onChange={(e) => set('eventName', e.target.value)}
+              placeholder={en ? 'E.g. 24-hour run' : 'Bv. 24 urenloop'}
+              className={inputClass}
+            />
+          </label>
+        )}
         <label className="grid gap-1 text-sm">
           <span className="font-medium text-vtk-ink">{en ? 'Location' : 'Locatie'}</span>
           <input

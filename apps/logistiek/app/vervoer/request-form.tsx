@@ -53,6 +53,16 @@ export function VanRequestForm({
   const [returnEndAt, setReturnEndAt] = useState('');
   const [note, setNote] = useState('');
   const [eventLink, setEventLink] = useState({ eventId: '', createEvent: false });
+  /**
+   * Een gekozen evenement vult de naam in plaats van dat je ze opnieuw typt; zie
+   * het materiaalformulier. Loskoppelen geeft het veld weer vrij.
+   */
+  const linkedEvent = events?.find((entry) => entry.id === eventLink.eventId) ?? null;
+  function chooseEvent(next: { eventId: string; createEvent: boolean }) {
+    setEventLink(next);
+    const picked = events?.find((entry) => entry.id === next.eventId);
+    if (picked) setEventName(picked.name);
+  }
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
@@ -244,7 +254,7 @@ export function VanRequestForm({
             events={events}
             eventId={eventLink.eventId}
             createEvent={eventLink.createEvent}
-            onChange={setEventLink}
+            onChange={chooseEvent}
             locale={locale}
             newEventName={eventName}
           />
@@ -360,10 +370,22 @@ export function VanRequestForm({
             className={inputClass}
           />
         </label>
-        <label className="grid gap-1 text-sm sm:col-span-2">
-          <span className="font-medium text-vtk-ink">{en ? 'Event (optional)' : 'Evenement (optioneel)'}</span>
-          <input type="text" value={eventName} onChange={(e) => setEventName(e.target.value)} className={inputClass} />
-        </label>
+        {linkedEvent ? (
+          <div className="grid gap-1 text-sm sm:col-span-2">
+            <span className="font-medium text-vtk-ink">{en ? 'Event' : 'Evenement'}</span>
+            <p className="flex h-10 items-center rounded-lg border border-dashed border-vtk-navy/20 bg-vtk-paper px-3 text-vtk-muted">
+              {linkedEvent.name}
+            </p>
+            <span className="text-xs text-vtk-muted">
+              {en ? 'Comes from the event you picked above.' : 'Volgt uit het evenement dat je hierboven koos.'}
+            </span>
+          </div>
+        ) : (
+          <label className="grid gap-1 text-sm sm:col-span-2">
+            <span className="font-medium text-vtk-ink">{en ? 'Event (optional)' : 'Evenement (optioneel)'}</span>
+            <input type="text" value={eventName} onChange={(e) => setEventName(e.target.value)} className={inputClass} />
+          </label>
+        )}
         <label className="grid gap-1 text-sm">
           <span className="font-medium text-vtk-ink">{en ? 'Loading address (optional)' : 'Laadadres (optioneel)'}</span>
           <input type="text" value={pickupAddress} onChange={(e) => setPickupAddress(e.target.value)} className={inputClass} />

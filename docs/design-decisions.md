@@ -1523,6 +1523,42 @@ onderscheid nodig heeft, splitst het item in exemplaren (`UitleenItemUnit`).
   van het itemformulier (JSON in een hidden input) in plaats van formuliertjes
   in een formulier.
 
+### Mijn reservaties: drie soorten, en materiaal is van de post
+
+"Mijn reservaties" had twee kopjes: Materiaal en Vervoer. Een flesserke-aanvraag
+bevat geen enkel materiaalitem maar stond wel onder Materiaal, met een lege
+itemopsomming.
+
+- **Drie secties: materiaal, flesserke, vervoer.** Een aanvraag met allebei hoort
+  bij materiaal (daar zit het werk) en zegt in haar samenvatting dat er ook drank
+  bij zit; ze twee keer tonen zou lijken op twee aanvragen.
+- **Materiaal toont de aanvragen van je hele post**, met eronder in het klein wie
+  ze deed. Een post bestelt als post: wie op maandag materiaal aanvroeg en op
+  woensdag ziek is, laat de rest anders in het ongewisse, en dan wordt hetzelfde
+  twee keer aangevraagd.
+- **Zien is niet wijzigen.** Een aanvraag van een collega opent leesalleen: geen
+  aanpassen, geen annuleren, geen betaalknop. Anders haalt iemand materiaal weg
+  onder de aanvrager zonder dat die het merkt.
+- **Enkel posten delen, geen werkgroepen.** Een werkgroepaanvraag bewaart geen
+  `groupId` (zie `deriveMemberRequester`), enkel een vrije naam; er is dus niets
+  om op te groeperen zonder daar eerst een echte koppeling van te maken.
+- **Flesserke en vervoer blijven persoonlijk.** Enkel materiaal wordt gedeeld.
+
+### Een gekozen evenement vult de naam in
+
+Het aanvraagformulier vroeg de naam van het evenement in een tekstveld, en
+verderop kon je de aanvraag aan een bestaand evenement hangen. Wie dat deed,
+had de naam twee keer ingevuld, en de twee liepen uit elkaar zodra er één
+aangepast werd.
+
+- **Koppel je aan een evenement, dan is de naam een gegeven.** Het veld toont ze
+  met een onderbroken rand en je typt niets meer. Loskoppelen maakt er weer een
+  gewoon veld van, met die naam als vertrekpunt.
+- **Enkel de naam.** Locatie, startuur, opkomst, contact en de extra info blijven
+  gewone velden: die verschillen per aanvraag, ook binnen hetzelfde evenement.
+- Geldt in de drie formulieren (materiaal, flesserke, vervoer), want de
+  dubbelinvoer zat in alle drie.
+
 ### "Levering nodig" wordt een echte rit
 
 Het vinkje op de materiaalaanvraag zette enkel `delivery` en `deliveryNote` op de

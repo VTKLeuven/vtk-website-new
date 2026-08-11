@@ -75,6 +75,20 @@ export function FlesserkeForm({
   const [note, setNote] = useState(initial.note);
   const [quantities, setQuantities] = useState<Record<string, number>>(initial.quantities);
   const [eventLink, setEventLink] = useState({ eventId: '', createEvent: false });
+
+  /**
+   * Een gekozen evenement vult de naam in plaats van dat je ze opnieuw typt: ze
+   * staat dan twee keer in het formulier en gaat scheef zodra er één van de twee
+   * aangepast wordt. Loskoppelen geeft het veld weer vrij, met de naam die er
+   * stond als vertrekpunt.
+   */
+  const linkedEvent = events?.find((entry) => entry.id === eventLink.eventId) ?? null;
+  function chooseEvent(next: { eventId: string; createEvent: boolean }) {
+    setEventLink(next);
+    const picked = events?.find((entry) => entry.id === next.eventId);
+    if (picked) setEvent((current) => ({ ...current, eventName: picked.name }));
+  }
+
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
@@ -199,6 +213,7 @@ export function FlesserkeForm({
         groups={groups}
         locale={locale}
         mode={mode.kind === 'admin-edit' ? 'team' : 'member'}
+        linkedEventName={linkedEvent?.name ?? null}
       />
 
       {events ? (
@@ -206,7 +221,7 @@ export function FlesserkeForm({
           events={events}
           eventId={eventLink.eventId}
           createEvent={eventLink.createEvent}
-          onChange={setEventLink}
+          onChange={chooseEvent}
           locale={locale}
           newEventName={event.eventName}
         />
