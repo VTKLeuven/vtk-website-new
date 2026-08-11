@@ -141,6 +141,11 @@ export default async function BeheerVervoerPage() {
                   {booking.tripLeg === 'HEEN' ? 'Heenrit' : 'Terugrit'}
                 </span>
               ) : null}
+              {booking.reservation ? (
+                <span className="rounded-full bg-vtk-paper-2 px-2 py-0.5 text-[11px] font-semibold text-vtk-navy">
+                  Levering
+                </span>
+              ) : null}
               <span className="text-sm font-normal text-vtk-muted">{booking.purpose}</span>
             </p>
             <p className="mt-0.5 text-sm text-vtk-muted">
@@ -175,6 +180,18 @@ export default async function BeheerVervoerPage() {
     children?: React.ReactNode;
   }) {
     const lines: Array<[string, React.ReactNode]> = [];
+    if (booking.reservation) {
+      lines.push([
+        'Levering voor',
+        <Link
+          key="reservation"
+          href={`/beheer/aanvragen/${booking.reservation.id}`}
+          className="font-medium text-vtk-navy underline underline-offset-2"
+        >
+          {booking.reservation.eventName}
+        </Link>,
+      ]);
+    }
     if (booking.eventName) lines.push(['Evenement', booking.eventName]);
     if (booking.pickupAddress) lines.push(['Laadadres', booking.pickupAddress]);
     if (booking.destination) lines.push(['Bestemming', booking.destination]);

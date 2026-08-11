@@ -553,6 +553,9 @@ const adminReservationInclude = {
   group: { select: { nameNl: true, nameEn: true } },
   event: { select: { id: true, name: true } },
   payments: { orderBy: { createdAt: 'desc' as const } },
+  // Enkel het aantal: de lijst wil weten of een gevraagde levering al een rit
+  // geworden is, niet welke. De ritten zelf haalt de detailpagina op.
+  _count: { select: { transports: true } },
 } satisfies Prisma.UitleenReservationInclude;
 
 export type AdminReservation = Awaited<ReturnType<typeof adminReservations>>[number];
@@ -779,6 +782,19 @@ export async function adminReservation(id: string) {
       ...adminReservationInclude,
       lines: adminReservationLinesDetail,
       auditLogs: auditLogInclude,
+      // De ritten die als levering bij deze aanvraag horen. Enkel hier en niet in
+      // de lijst: die haalt tweehonderd aanvragen op.
+      transports: {
+        orderBy: { startAt: 'asc' },
+        select: {
+          id: true,
+          status: true,
+          startAt: true,
+          endAt: true,
+          tripLeg: true,
+          vehicle: { select: { nameNl: true } },
+        },
+      },
     },
   });
 }
@@ -827,6 +843,9 @@ export async function adminVanBookings() {
       group: { select: { nameNl: true, nameEn: true } },
       event: { select: { id: true, name: true } },
       payments: { orderBy: { createdAt: 'desc' } },
+      // De materiaalaanvraag waarvan dit de levering is, zodat de chauffeur ziet
+      // wat er mee moet en het team van hieruit naar die aanvraag kan.
+      reservation: { select: { id: true, eventName: true } },
     },
     take: 200,
   });

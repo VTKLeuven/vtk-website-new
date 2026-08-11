@@ -1,16 +1,9 @@
 'use server';
 
-import { randomUUID } from 'node:crypto';
 import { revalidatePath } from 'next/cache';
 import { prisma } from '@vtk/db';
 import { requireSession } from '@/lib/session';
-import {
-  isEmailish,
-  isOnQuarterHour,
-  parseDateOnly,
-  todayDateOnly,
-  transportPriceCents,
-} from '@/lib/uitleen';
+import { isEmailish, parseDateOnly, todayDateOnly } from '@/lib/uitleen';
 import { availabilityForRange } from '@/lib/uitleen-server';
 import {
   buildReservationData,
@@ -18,6 +11,7 @@ import {
   MAX_NOTE_LENGTH,
   type ReservationFormInput,
 } from '@/lib/reservation-form';
+import { buildTransportBookings, type TransportFormInput } from '@/lib/transport-form';
 import { expireOpenPayments, logistiekBaseUrl, paymentGateway } from '@/lib/payments';
 import { runSerializable } from '@/lib/tx';
 
@@ -300,173 +294,24 @@ export async function checkAvailabilityAction(input: {
   return { ok: true, availability: await availabilityForRange(pickupDate, returnDate) };
 }
 
-/**
- * Bovengrens tegen tikfouten, geen beleid. Er stond ooit 12 uur op, maar een
- * praesidiumweekend of een karroadtrip duurt langer; die aanvragen werden zo
- * naar de mail geduwd. Dit vangt enkel nog een verkeerd getypt jaartal.
- */
-const MAX_VAN_BOOKING_DAYS = 30;
-
-/**
- * Eén tijdvenster van een rit, gevalideerd. `label` komt in de foutmelding
- * terecht, zodat je bij een heen-en-terugaanvraag weet welke helft fout staat.
- */
-function parseTripWindow(
-  startRaw: string,
-  endRaw: string,
-  label: string
-): { ok: true; startAt: Date; endAt: Date } | { ok: false; error: string } {
-  const startAt = parseBrusselsDateTime(startRaw);
-  const endAt = parseBrusselsDateTime(endRaw);
-  if (!startAt || !endAt) return { ok: false, error: `Kies een start- en eindmoment${label}.` };
-  if (startAt <= new Date()) return { ok: false, error: `Het startmoment${label} ligt in het verleden.` };
-  if (endAt <= startAt) {
-    return { ok: false, error: `Het eindmoment${label} ligt voor het startmoment.` };
-  }
-  if (!isOnQuarterHour(startAt) || !isOnQuarterHour(endAt)) {
-    return {
-      ok: false,
-      error: `Kies een begin- en einduur op het kwartier (bv. 14:00, 14:15)${label}.`,
-    };
-  }
-  const days = (endAt.getTime() - startAt.getTime()) / (24 * 60 * 60 * 1000);
-  if (days > MAX_VAN_BOOKING_DAYS) {
-    return {
-      ok: false,
-      error: `Een rit kan maximaal ${MAX_VAN_BOOKING_DAYS} dagen duren; controleer de datums${label}.`,
-    };
-  }
-  return { ok: true, startAt, endAt };
-}
-
-export async function createVanBookingAction(input: {
-  startAt: string; // datetime-local, Belgische wall-clock
-  endAt: string;
-  purpose: string;
-  pickupAddress: string;
-  destination: string;
-  note: string;
+export async function createVanBookingAction(input: TransportFormInput & {
   /** Koepel-evenement (A8), of `createEvent` om er een te maken van `eventName`. */
   eventId?: string | null;
   createEvent?: boolean;
-  /** Eén of meer voertuigen; `vehicleId` blijft aanvaard voor één voertuig. */
-  vehicleIds?: string[];
-  vehicleId?: string;
-  eventName?: string;
-  helpersNote?: string;
-  helpersPhone?: string;
-  contactPhone?: string;
-  /** Meelezend adres, zoals op een materiaalaanvraag. */
-  notifyEmail?: string;
-  /** Tweede tijdvenster: dan wordt dit een heen-en-terugaanvraag (twee ritten). */
-  returnStartAt?: string;
-  returnEndAt?: string;
 }): Promise<ActionResult> {
   const session = await requireSession();
 
-  const wantsReturn = Boolean(input.returnStartAt && input.returnEndAt);
-  const outbound = parseTripWindow(input.startAt, input.endAt, wantsReturn ? ' van de heenrit' : '');
-  if (!outbound.ok) return { ok: false, error: outbound.error };
-  const { startAt, endAt } = outbound;
+  const eventId = await resolveEventId(session, { ...input, eventStart: undefined }, null);
+  const built = await buildTransportBookings(input, { userId: session.user.id, eventId });
+  if (!built.ok) return { ok: false, error: built.error };
 
-  let inbound: { startAt: Date; endAt: Date } | null = null;
-  if (wantsReturn) {
-    const parsed = parseTripWindow(input.returnStartAt!, input.returnEndAt!, ' van de terugrit');
-    if (!parsed.ok) return { ok: false, error: parsed.error };
-    if (parsed.startAt < endAt) {
-      return { ok: false, error: 'De terugrit start voor de heenrit gedaan is.' };
-    }
-    inbound = { startAt: parsed.startAt, endAt: parsed.endAt };
-  }
-
-  const purpose = input.purpose.trim();
-  if (!purpose) return { ok: false, error: 'Beschrijf waarvoor je het voertuig nodig hebt.' };
-
-  const notifyEmail = input.notifyEmail?.trim() ?? '';
-  if (notifyEmail && !isEmailish(notifyEmail)) {
-    return { ok: false, error: 'Het extra e-mailadres ziet er niet uit als een adres.' };
-  }
-
-  // Eén of meerdere voertuigen: een verhuis met de kar én de auto is één vraag,
-  // en die als twee aanvragen laten indienen betekent dat het team ze ook los kan
-  // beslissen. Ze delen daarom één `tripGroupId`, net als heen en terug (V12).
-  const chosenIds = (input.vehicleIds ?? (input.vehicleId ? [input.vehicleId] : [])).filter(Boolean);
-  const vehicles = chosenIds.length
-    ? await prisma.uitleenVehicle.findMany({ where: { id: { in: chosenIds }, active: true } })
-    : await prisma.uitleenVehicle
-        .findFirst({ where: { active: true }, orderBy: { sortIndex: 'asc' } })
-        .then((found) => (found ? [found] : []));
-  if (vehicles.length === 0) return { ok: false, error: 'Kies een voertuig.' };
-  if (vehicles.length !== new Set(chosenIds).size && chosenIds.length > 0) {
-    return { ok: false, error: 'Een van de gekozen voertuigen bestaat niet meer; herlaad de pagina.' };
-  }
-
-  // Gedeelde velden van elke boeking; voertuig, tarief en tijdvenster verschillen.
-  const eventId = await resolveEventId(
-    session,
-    { ...input, eventStart: undefined },
-    null
-  );
-  const shared = {
-    userId: session.user.id,
-    eventId,
-    purpose: purpose.slice(0, MAX_NOTE_LENGTH),
-    eventName: input.eventName?.trim().slice(0, 300) || null,
-    pickupAddress: input.pickupAddress.trim().slice(0, 300) || null,
-    destination: input.destination.trim().slice(0, 300) || null,
-    helpersNote: input.helpersNote?.trim().slice(0, 300) || null,
-    helpersPhone: input.helpersPhone?.trim().slice(0, 60) || null,
-    contactPhone: input.contactPhone?.trim().slice(0, 60) || null,
-    notifyEmail: notifyEmail.slice(0, 300) || null,
-    memberNote: input.note.trim().slice(0, MAX_NOTE_LENGTH) || null,
-  };
-  /** Tarief per voertuig gesnapshot; per km blijft de prijs null tot na de rit. */
-  const bookingFor = (
-    vehicle: (typeof vehicles)[number],
-    from: Date,
-    to: Date,
-    leg: 'HEEN' | 'TERUG' | null,
-    tripGroupId: string | null
-  ) => ({
-    ...shared,
-    vehicleId: vehicle.id,
-    pricingMode: vehicle.pricingMode,
-    rateCents: vehicle.rateCents,
-    tripGroupId,
-    tripLeg: leg,
-    startAt: from,
-    endAt: to,
-    priceCents: transportPriceCents({
-      pricingMode: vehicle.pricingMode,
-      rateCents: vehicle.rateCents,
-      startAt: from,
-      endAt: to,
-    }),
-  });
-
-  // Eén boeking per voertuig en per rit. Ze horen bij elkaar zodra het er meer dan
-  // één is: het team beslist, annuleert en verschuift ze in hun geheel. Bij één
-  // enkele rit met één voertuig blijft `tripGroupId` null, zoals voordien.
-  const legs: Array<{ from: Date; to: Date; leg: 'HEEN' | 'TERUG' | null }> = inbound
-    ? [
-        { from: startAt, to: endAt, leg: 'HEEN' },
-        { from: inbound.startAt, to: inbound.endAt, leg: 'TERUG' },
-      ]
-    : [{ from: startAt, to: endAt, leg: null }];
-  const grouped = vehicles.length > 1 || legs.length > 1;
-  const tripGroupId = grouped ? randomUUID() : null;
-
-  await prisma.uitleenTransportBooking.createMany({
-    data: vehicles.flatMap((vehicle) =>
-      legs.map((leg) => bookingFor(vehicle, leg.from, leg.to, leg.leg, tripGroupId))
-    ),
-  });
+  await prisma.uitleenTransportBooking.createMany({ data: built.bookings });
 
   revalidateMember();
   const what =
-    vehicles.length > 1
-      ? `${vehicles.length} voertuigen aangevraagd`
-      : inbound
+    built.vehicleCount > 1
+      ? `${built.vehicleCount} voertuigen aangevraagd`
+      : built.roundTrip
         ? 'Heen- en terugrit aangevraagd'
         : 'Rit aangevraagd';
   return { ok: true, message: `${what}. Je vindt de status bij Mijn aanvragen.` };

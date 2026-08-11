@@ -1523,6 +1523,33 @@ onderscheid nodig heeft, splitst het item in exemplaren (`UitleenItemUnit`).
   van het itemformulier (JSON in een hidden input) in plaats van formuliertjes
   in een formulier.
 
+### "Levering nodig" wordt een echte rit
+
+Het vinkje op de materiaalaanvraag zette enkel `delivery` en `deliveryNote` op de
+aanvraag. Het maakte geen boeking aan, stond niet in de aanvragenlijst en niet in
+de mail, en `/beheer/vervoer` toont enkel `UitleenTransportBooking`: een gevraagde
+levering kwam daar dus nooit terecht. Wie die ene regel op de detailpagina niet
+opmerkte, wist van niets.
+
+- **Logistiek schuift ze door, het lid niet.** Een lid dat materiaal aanvraagt
+  weet niet welk voertuig vrij is, en het laadadres is de loods. Het vinkje blijft
+  dus een vraag; de knop "Rit aanmaken" op de aanvraag maakt er de rit van, met
+  het evenement, de dagen, de bestemming en het telefoonnummer al ingevuld.
+- **De rit komt op naam van de aanvrager**, niet van wie ze aanmaakt. Zo staat ze
+  bij "Mijn aanvragen" van het lid en gaan de mails erover naar hem, net als bij
+  een rit die hij zelf aanvroeg.
+- **Ze wordt AANGEVRAAGD en niet meteen goedgekeurd.** De goedkeuring doet de
+  botsingscontrole per voertuig, kiest de betaalwijze en wijst de chauffeur toe;
+  die overslaan zou een tweede, zwakkere beslisweg maken. Eén klik extra, in ruil
+  voor dezelfde controle als elke andere rit.
+- **Heen én terug staat voorgevuld aan.** Wat geleverd wordt, moet ook weer
+  opgehaald worden; de terugrit vertrekt van de terugbrengdag van de aanvraag.
+- **`reservationId` is SET NULL, geen cascade.** Verdwijnt de aanvraag, dan blijft
+  de rit bestaan: het voertuig is die dag nog altijd bezet, en een boeking laten
+  verdampen omdat iemand een aanvraag opruimt slaat een gat in de planning.
+- **De badge in de aanvragenlijst is geel tot de rit bestaat**, daarna "Levering
+  gepland". Zonder die badge blijft de knop onvindbaar voor wie de lijst scant.
+
 ### De beheerbalk is een tabbalk, geen rij losse tegels
 
 Twaalf beheerpagina's naast elkaar lezen als een opsomming waarin je

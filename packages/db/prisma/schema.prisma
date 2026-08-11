@@ -2466,6 +2466,8 @@ model UitleenReservation {
   flesserkeLines UitleenFlesserkeLine[]
   payments       UitleenPayment[]
   auditLogs      UitleenAuditLog[]
+  /// Ritten die Logistiek voor de levering van deze aanvraag aanmaakte.
+  transports     UitleenTransportBooking[]
 
   @@index([userId])
   @@index([status, pickupDate])
@@ -2585,6 +2587,10 @@ model UitleenTransportBooking {
 
   eventId       String? // optionele koepel (A8)
   eventName     String? // momentopname van wat het lid intikte
+  /// Materiaalaanvraag waarvan dit de levering is. Enkel gezet wanneer Logistiek
+  /// de rit vanaf die aanvraag aanmaakt ("Levering nodig"); een rit die een lid
+  /// zelf aanvraagt heeft geen aanvraag om aan te hangen.
+  reservationId String?
   purpose       String // waarvoor de rit dient
   pickupAddress String?
   destination   String?
@@ -2628,6 +2634,9 @@ model UitleenTransportBooking {
   user        User           @relation("UitleenTransportUser", fields: [userId], references: [id], onDelete: Cascade)
   vehicle     UitleenVehicle @relation(fields: [vehicleId], references: [id], onDelete: Restrict)
   event       UitleenEvent?  @relation(fields: [eventId], references: [id], onDelete: SetNull)
+  // Verdwijnt de aanvraag, dan blijft de rit bestaan: ze is dan gewoon een rit
+  // zonder levering eraan, en het voertuig is die dag nog altijd bezet.
+  reservation UitleenReservation? @relation(fields: [reservationId], references: [id], onDelete: SetNull)
   group       Group?         @relation(fields: [groupId], references: [id], onDelete: SetNull)
   driver      User?          @relation("UitleenTransportDriver", fields: [driverId], references: [id], onDelete: SetNull)
   decidedBy   User?          @relation("UitleenTransportDecidedBy", fields: [decidedById], references: [id], onDelete: SetNull)
@@ -2642,6 +2651,7 @@ model UitleenTransportBooking {
   @@index([vehicleId, status])
   @@index([requesterType, status])
   @@index([eventId])
+  @@index([reservationId])
   @@index([tripGroupId])
   // "Mijn ritten" voor een chauffeur, en de rittentelling per chauffeur in het
   // chauffeursbeheer.

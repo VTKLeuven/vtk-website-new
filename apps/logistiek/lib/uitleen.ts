@@ -429,6 +429,36 @@ export function formatDateWithPart(
   return label ? `${formatDateOnly(date, locale)} (${label})` : formatDateOnly(date, locale);
 }
 
+/**
+ * Uren waarmee een dagdeel voorgevuld wordt wanneer er een rit van gemaakt
+ * wordt. Een afspraak, geen boeking: het dagdeel zelf blijft grof (zie
+ * docs/design-decisions.md), maar een rit heeft wel een begin- en einduur nodig,
+ * en dan is het midden van dat dagdeel de minst verkeerde gok.
+ */
+const DAY_PART_HOURS: Record<string, { from: string; to: string }> = {
+  VOORMIDDAG: { from: '09:00', to: '11:00' },
+  NAMIDDAG: { from: '13:00', to: '15:00' },
+  AVOND: { from: '18:00', to: '20:00' },
+};
+
+/**
+ * Een afhaal- of terugbrengdag plus dagdeel omzetten naar de twee
+ * `datetime-local`-waarden waarmee het ritformulier voorgevuld wordt.
+ *
+ * De dagkolommen zijn `@db.Date` en komen als middernacht UTC terug, terwijl de
+ * uren Belgische wall-clock zijn. Daarom lezen we de dag in UTC en plakken we er
+ * een lokaal uur aan in plaats van de `Date` om te rekenen: dat laatste zou in
+ * de winter een dag terugvallen.
+ */
+export function tripWindowFor(
+  date: Date,
+  part: string | null | undefined
+): { startAt: string; endAt: string } {
+  const day = date.toISOString().slice(0, 10);
+  const hours = DAY_PART_HOURS[part ?? ''] ?? DAY_PART_HOURS.VOORMIDDAG;
+  return { startAt: `${day}T${hours.from}`, endAt: `${day}T${hours.to}` };
+}
+
 export const ITEM_CONDITION_LABELS: Record<string, string> = {
   WERKT: 'Werkt',
   TESTEN: 'Nog testen',

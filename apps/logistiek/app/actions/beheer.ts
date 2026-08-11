@@ -33,6 +33,7 @@ import {
   parseBrusselsDateTime,
   type ReservationFormInput,
 } from '@/lib/reservation-form';
+import { buildTransportBookings, type TransportFormInput } from '@/lib/transport-form';
 import { runSerializable } from '@/lib/tx';
 import type { ActionResult } from './uitleen';
 
@@ -1599,6 +1600,75 @@ export async function adminEditReservationAction(
 // ---------------------------------------------------------------------------
 // Vervoer (kar / auto / bakfiets)
 // ---------------------------------------------------------------------------
+
+/**
+ * De rit aanmaken die de levering van een materiaalaanvraag is.
+ *
+ * "Levering nodig" was tot nu toe enkel een vinkje op de aanvraag. Het maakte
+ * geen rit aan, stond niet in de aanvragenlijst en niet in de mail, en kwam dus
+ * nooit in het vervoerbeheer terecht: wie die ene regel op de detailpagina niet
+ * opmerkte, wist van niets. Nu zet Logistiek ze hier door.
+ *
+ * Drie keuzes die niet vanzelf spreken:
+ *
+ * - **De rit komt op naam van de aanvrager**, niet van wie ze aanmaakt. Zo ziet
+ *   het lid ze bij "Mijn aanvragen" staan en gaan de mails erover naar hem, net
+ *   als bij een rit die hij zelf aanvroeg.
+ * - **Ze wordt AANGEVRAAGD en niet meteen goedgekeurd.** De goedkeuring doet de
+ *   botsingscontrole per voertuig, kiest de betaalwijze en wijst de chauffeur
+ *   toe; die overslaan zou een tweede, zwakkere beslisweg maken. Het is dus één
+ *   klik extra, in ruil voor dezelfde controle als elke andere rit.
+ * - **Het evenement volgt de aanvraag.** Hangt de aanvraag onder een koepel (A8),
+ *   dan hangt de rit daar ook onder, zodat beide op de evenementpagina staan.
+ */
+export async function createTransportForReservationAction(
+  reservationId: string,
+  input: TransportFormInput
+): Promise<ActionResult> {
+  const session = await requireManage();
+
+  const reservation = await prisma.uitleenReservation.findUnique({
+    where: { id: reservationId },
+    select: {
+      id: true,
+      userId: true,
+      eventId: true,
+      requesterType: true,
+      groupId: true,
+      requesterName: true,
+    },
+  });
+  if (!reservation) return { ok: false, error: 'Aanvraag niet gevonden.' };
+
+  const built = await buildTransportBookings(input, {
+    userId: reservation.userId,
+    eventId: reservation.eventId,
+    requesterType: reservation.requesterType,
+    groupId: reservation.groupId,
+    requesterName: reservation.requesterName,
+    reservationId: reservation.id,
+  });
+  if (!built.ok) return { ok: false, error: built.error };
+
+  await prisma.$transaction(async (tx) => {
+    await tx.uitleenTransportBooking.createMany({ data: built.bookings });
+    await writeAudit(tx, { reservationId: reservation.id }, {
+      kind: 'NOTE',
+      note: built.roundTrip
+        ? 'Levering: heen- en terugrit aangemaakt bij vervoer.'
+        : 'Levering: rit aangemaakt bij vervoer.',
+      actorId: session.user.id,
+    });
+  });
+
+  revalidateBeheer();
+  return {
+    ok: true,
+    message: built.roundTrip
+      ? 'Heen- en terugrit aangemaakt. Keur ze goed bij Vervoer.'
+      : 'Rit aangemaakt. Keur ze goed bij Vervoer.',
+  };
+}
 
 /**
  * De goedgekeurde rit van hetzelfde voertuig waarmee dit tijdvenster botst, of

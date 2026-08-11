@@ -29,10 +29,12 @@ import {
   REQUESTER_TYPE_LABELS,
   toDateInputValue,
   toDatetimeLocalValue,
+  tripWindowFor,
 } from '@/lib/uitleen';
 import {
   activeGroups,
   adminReservation,
+  adminVehicles,
   reservationConflicts,
   selectableEvents,
   getCatalog,
@@ -46,6 +48,7 @@ import { AdminReservationEditor } from './admin-edit-form';
 import { DecisionForms } from './decision-forms';
 import { ConflictPanel, type ConflictParty } from './conflict-panel';
 import { PrepareList } from './prepare-list';
+import { DeliveryPanel } from './delivery-panel';
 import { SaveTemplateForm } from './save-template-form';
 import { ReturnForm } from './return-form';
 
@@ -73,6 +76,31 @@ export default async function BeheerAanvraagDetailPage({
     reservation.status === 'REQUESTED' ? await reservationConflicts(reservation.id) : [];
 
   const events = await selectableEvents();
+
+  // Enkel bij een gevraagde levering: de voertuigen zijn er alleen om het
+  // ritformulier te vullen, en die query is voor elke andere aanvraag verspild.
+  const vehicles = reservation.delivery
+    ? (await adminVehicles())
+        .filter((vehicle) => vehicle.active)
+        .map((vehicle) => ({ id: vehicle.id, name: vehicle.nameNl }))
+    : [];
+
+  // De rit voorgevuld met wat de aanvraag al weet: heen op de afhaaldag, terug
+  // op de terugbrengdag, in het dagdeel dat het lid koos.
+  const outbound = tripWindowFor(reservation.pickupDate, reservation.pickupPart);
+  const inbound = tripWindowFor(reservation.returnDate, reservation.returnPart);
+  const deliveryInitial = {
+    startAt: outbound.startAt,
+    endAt: outbound.endAt,
+    returnStartAt: inbound.startAt,
+    returnEndAt: inbound.endAt,
+    purpose: `Levering voor ${reservation.eventName}`,
+    eventName: reservation.eventName,
+    destination: reservation.eventLocation ?? '',
+    contactPhone: reservation.contactPhone ?? '',
+    notifyEmail: reservation.notifyEmail ?? '',
+    note: reservation.deliveryNote ?? '',
+  };
 
   // Een aanvraag is materiaal- of flesserke-type; elk heeft zijn eigen editor,
   // want de lijnen en de voorraadcheck verschillen.
@@ -496,6 +524,18 @@ export default async function BeheerAanvraagDetailPage({
       <aside className="grid h-fit gap-4">
         {reservation.status === 'REQUESTED' ? (
           <DecisionForms reservationId={reservation.id} totalCents={reservation.totalPriceCents} />
+        ) : null}
+
+        {/* Een gevraagde levering stond enkel als regel tussen de gegevens en
+            werd nooit een rit; hier schuif je ze door naar vervoer. */}
+        {reservation.delivery ? (
+          <DeliveryPanel
+            reservationId={reservation.id}
+            deliveryNote={reservation.deliveryNote}
+            trips={reservation.transports}
+            vehicles={vehicles}
+            initial={deliveryInitial}
+          />
         ) : null}
 
         {reservation.status === 'APPROVED' ? (

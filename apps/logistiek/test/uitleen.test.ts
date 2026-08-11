@@ -23,6 +23,7 @@ import {
   toDatetimeLocalValue,
   todayDateOnly,
   transportPriceCents,
+  tripWindowFor,
   vanStatusLabel,
 } from '@/lib/uitleen';
 
@@ -101,6 +102,35 @@ describe('toDatetimeLocalValue', () => {
     // 2026-01-20 12:00 UTC is 13:00 in Brussels (CET).
     const utc = new Date('2026-01-20T12:00:00.000Z');
     expect(toDatetimeLocalValue(utc)).toBe('2026-01-20T13:00');
+  });
+});
+
+describe('tripWindowFor', () => {
+  // De dagkolommen zijn @db.Date en komen als middernacht UTC terug. Omrekenen
+  // naar Brusselse tijd zou in de winter een dag terugvallen; deze test bewaakt
+  // dat we de dag in UTC lezen en er enkel een lokaal uur aan plakken.
+  it('keeps the calendar day in winter', () => {
+    const day = new Date('2026-01-20T00:00:00.000Z');
+    expect(tripWindowFor(day, 'NAMIDDAG')).toEqual({
+      startAt: '2026-01-20T13:00',
+      endAt: '2026-01-20T15:00',
+    });
+  });
+
+  it('keeps the calendar day in summer', () => {
+    const day = new Date('2026-07-20T00:00:00.000Z');
+    expect(tripWindowFor(day, 'AVOND')).toEqual({
+      startAt: '2026-07-20T18:00',
+      endAt: '2026-07-20T20:00',
+    });
+  });
+
+  it('falls back to the morning without a day part', () => {
+    const day = new Date('2026-07-20T00:00:00.000Z');
+    expect(tripWindowFor(day, null)).toEqual({
+      startAt: '2026-07-20T09:00',
+      endAt: '2026-07-20T11:00',
+    });
   });
 });
 

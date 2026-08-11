@@ -152,6 +152,20 @@ export default async function BeheerAanvragenPage({
                   Conflict
                 </span>
               ) : null}
+              {/* Een gevraagde levering stond nergens in deze lijst, dus ze werd
+                  pas opgemerkt door wie de aanvraag toevallig opende. Geel
+                  zolang er nog geen rit van gemaakt is. */}
+              {reservation.delivery ? (
+                <span
+                  className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${
+                    reservation._count.transports > 0
+                      ? 'bg-vtk-paper-2 text-vtk-navy'
+                      : 'bg-vtk-yellow text-vtk-ink'
+                  }`}
+                >
+                  {reservation._count.transports > 0 ? 'Levering gepland' : 'Levering'}
+                </span>
+              ) : null}
             </p>
             <p className="mt-0.5 truncate text-sm text-vtk-muted">
               {reservation.user.name} · {itemSummary(reservation.lines)}
