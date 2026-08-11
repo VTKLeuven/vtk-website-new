@@ -12,10 +12,9 @@ import {
   setItemQuantityAction,
 } from '@/app/actions/beheer';
 import { ConfirmActionButton } from '@/components/ui/confirm-action-button';
-import { PhotoUpload } from '@/components/photo-upload';
 import { SetContents } from '@/components/set-contents';
 import { AlternativesEditor } from '@/components/alternatives-editor';
-import { DownloadsEditor, GalleryEditor, PropertiesEditor } from '@/components/catalogue-editors';
+import { DownloadsEditor, PhotosEditor, PropertiesEditor } from '@/components/catalogue-editors';
 import { SaveForm } from '@/components/ui/save-form';
 import { useToast } from '@/components/ui/toast';
 import { SortHeader, compareText, useSort } from '@/app/beheer/sortable-header';
@@ -32,6 +31,8 @@ const ITEM_ERRORS = {
   QUANTITY_INVALID: 'Het aantal moet minstens 1 zijn.',
   VOLUME_INVALID: 'Het volume moet een heel getal in liter zijn.',
   AMOUNT_INVALID: 'Prijs en waarborg moeten bedragen zijn, bv. 2,50.',
+  UNIT_LABEL_REQUIRED: 'Geef elk exemplaar een naam, bv. "Box 3".',
+  UNIT_LABEL_TOO_LONG: 'De naam van een exemplaar is te lang.',
   STALE: STALE_MESSAGE,
 };
 
@@ -40,6 +41,14 @@ const CONDITIONS = Object.entries(ITEM_CONDITION_LABELS).map(([value, label]) =>
 const CONDITION_LABEL = ITEM_CONDITION_LABELS;
 
 const inputClass = 'h-10 min-w-0 rounded-lg border border-vtk-navy/15 bg-white px-3 text-sm text-vtk-ink';
+
+/**
+ * Een veld dat de app zelf invult. Onderbroken rand, doffe vulling en een
+ * niet-toegestane cursor: een gewoon ogend invoervak waar je niets in kan typen
+ * leest als een kapot vak.
+ */
+const readOnlyInputClass =
+  'h-10 min-w-0 cursor-not-allowed rounded-lg border border-dashed border-vtk-navy/20 bg-vtk-paper px-3 text-sm text-vtk-muted';
 
 function centsToEuroInput(cents: number): string {
   return cents === 0 ? '' : (cents / 100).toFixed(2).replace('.', ',');
@@ -110,12 +119,14 @@ function ItemFields({
       {item ? <input type="hidden" name="expectedUpdatedAt" value={item.updatedAt.toISOString()} /> : null}
       <div className="@container">
       <div className="grid gap-3 @lg:grid-cols-2 @3xl:grid-cols-6">
-        <div className="col-span-full">
-          <PhotoUpload name="photoKey" initialKey={item?.photoKey ?? null} />
-        </div>
         <div className="col-span-full grid gap-1 text-xs font-medium text-vtk-muted">
-          Extra foto’s
-          <GalleryEditor initial={item?.photos ?? []} />
+          Foto’s
+          <PhotosEditor
+            initial={[
+              ...(item?.photoKey ? [{ key: item.photoKey }] : []),
+              ...(item?.photos ?? []).map((photo) => ({ key: photo.key })),
+            ]}
+          />
         </div>
         <label className="grid gap-1 text-xs font-medium text-vtk-muted @3xl:col-span-2">
           Naam<input type="text" name="name" defaultValue={item?.name ?? ''} className={inputClass} />
@@ -134,21 +145,18 @@ function ItemFields({
         <label className="grid gap-1 text-xs font-medium text-vtk-muted">
           Aantal
           {/* Houdt dit item exemplaren bij, dan is dit hun telling en niet iets
-              om in te typen; de actie zet het toch terug. */}
+              om in te typen; de actie zet het toch terug. De uitleg staat in de
+              tooltip en niet eronder: een regel tekst onder één veld van een
+              rasterrij duwt dat veld uit de lijn met zijn buren. */}
           <input
             type="number"
             name="quantity"
             min={1}
             defaultValue={item?.quantity ?? 1}
             readOnly={hasUnits}
-            aria-describedby={hasUnits ? `${item!.id}-quantity-hint` : undefined}
-            className={hasUnits ? `${inputClass} bg-vtk-paper text-vtk-muted` : inputClass}
+            title={hasUnits ? 'Volgt uit de exemplaren onderaan; pas die aan.' : undefined}
+            className={hasUnits ? readOnlyInputClass : inputClass}
           />
-          {hasUnits ? (
-            <span id={`${item!.id}-quantity-hint`} className="font-normal">
-              Volgt uit de exemplaren hieronder.
-            </span>
-          ) : null}
         </label>
         <label className="grid gap-1 text-xs font-medium text-vtk-muted">
           Huurprijs (€)
@@ -236,6 +244,11 @@ function ItemFields({
           </div>
         ) : null}
       </div>
+
+      {/* Als laatste blok, zodat de opslaan-knop van SaveForm er meteen onder
+          staat: dat is de enige knop die de exemplaren bewaart. Enkel bij een
+          bestaand item; iets opsplitsen dat nog niet bestaat, heeft geen zin. */}
+      {item ? <UnitsEditor item={item} /> : null}
     </>
   );
 }
@@ -276,7 +289,7 @@ function QuantityQuickEdit({
   if (locked) {
     return (
       <span
-        className="inline-flex h-9 w-20 items-center px-1 tabular-nums text-vtk-muted"
+        className="inline-flex h-9 w-20 cursor-not-allowed items-center rounded-lg border border-dashed border-vtk-navy/20 bg-vtk-paper px-3 tabular-nums text-vtk-muted"
         title="Volgt uit de exemplaren; pas ze aan onder Bewerken."
       >
         {quantity}
@@ -435,11 +448,6 @@ function ItemTable({
                       >
                         <ItemFields item={item} categories={categories} items={allItems} />
                       </SaveForm>
-                      {/* Buiten het formulier: elk exemplaar bewaart apart, en
-                          een formulier in een formulier bestaat niet in HTML. */}
-                      <div className="mt-4">
-                        <UnitsEditor item={item} />
-                      </div>
                     </td>
                   </tr>
                 ) : null}

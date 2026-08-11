@@ -1490,11 +1490,44 @@ onderscheid nodig heeft, splitst het item in exemplaren (`UitleenItemUnit`).
   een kapotte rij bleef gewoon uitleenbaar. Bij een item met exemplaren telt
   KAPOT niet meer mee voor de beschikbaarheid.
 - **Alleen KAPOT is hard.** TESTEN en ONVOLLEDIG tellen wel mee: een onvolledige
-  set is nog altijd uitleenbaar, en wie ze niet wil uitlenen zet het exemplaar op
-  "niet in roulatie".
+  set is nog altijd uitleenbaar, en wie ze niet wil uitlenen zet het vinkje
+  "telt mee" van dat exemplaar uit. Dat vinkje (`active`) is voor een exemplaar
+  dat bestaat maar er niet is: kwijt, in herstelling, of voor lang uitgeleend.
+  Het heette "in roulatie", tot bleek dat niemand wist wat dat betekende.
 - **Reserveren blijft op itemniveau.** Een lid vraagt "twee boxen", geen "box 3".
   Welk exemplaar iemand meekrijgt, blijkt bij het klaarzetten (A7); dat in het
   aanvraagformulier leggen zou elke aanvraag een inventarisoefening maken.
+- **Staan ze allemaal weer op dezelfde staat, dan verdwijnen de exemplaren.** De
+  opsplitsing bestaat om een verschil bij te houden; is dat verschil weg (de
+  kapotte box is hersteld), dan zou de inventaris anders volblijven staan met
+  opsplitsingen van vroeger, elk met hun eigen namenlijst. Het opslaan voegt ze
+  weer samen tot één rij en zegt dat in de toast; de editor waarschuwt vooraf,
+  want de namen van de exemplaren gaan daarbij verloren.
+- **Behalve wanneer alles kapot staat.** Bij een item met exemplaren telt KAPOT
+  niet mee voor de voorraad, bij een item zonder exemplaren wel. Vier kapotte
+  frigo's samenvoegen zou de voorraad dus stil van 0 naar 4 tillen.
+- **Eén opslaan-knop voor het hele item, exemplaren inbegrepen.** Elk exemplaar
+  had een eigen "Bewaren", wat twee dingen brak: wie meerdere rijen aanpaste en
+  één keer opsloeg, verloor de rest, en React 19 reset na een form action elk
+  uncontrolled veld van dat formulier, dus de niet-bewaarde rijen sprongen terug
+  naar de waarde waarmee de pagina geladen was. De exemplaren zijn nu een veld
+  van het itemformulier (JSON in een hidden input) in plaats van formuliertjes
+  in een formulier.
+
+### Itemfoto's: de eerste is de thumbnail
+
+Een item heeft een thumbnail (`photoKey`, de foto in de catalogus en in het
+aanvraagformulier) en een galerij (`UitleenItemPhoto`, de rest van de
+detailpagina). In het beheerscherm stonden daar twee aparte uploadknoppen voor,
+en wie zijn eerste foto in het verkeerde vak zette, kreeg geen beeld in de
+catalogus zonder te zien waarom.
+
+- **Eén lijst in de editor.** De eerste foto is de thumbnail; de rest is de
+  galerij. Wie een andere thumbnail wil, schuift die met "Thumbnail maken" naar
+  voren. Het onderscheid bestaat dus nog in de database, maar het is geen keuze
+  meer die je vooraf moet maken.
+- **Geen apart "verwijderen" voor de thumbnail.** Ze weghalen promoveert gewoon
+  de volgende foto, en een item zonder foto's heeft geen thumbnail.
 
 ### Klaarzetten: het scherm is de waarheid, het papier de werkkopie
 

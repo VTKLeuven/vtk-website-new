@@ -13,7 +13,17 @@ async function upload(file: File): Promise<Upload> {
   return response.json() as Promise<Upload>;
 }
 
-export function GalleryEditor({ initial }: { initial: Array<{ key: string }> }) {
+/**
+ * De foto's van één item, als één lijst.
+ *
+ * Er stonden hier twee uploadknoppen naast elkaar: één voor "de foto"
+ * (`photoKey`) en één voor "extra foto's" (`photos`). Wie een eerste foto
+ * uploadde moest dus raden in welk van de twee vakken ze hoorde, en wie de
+ * verkeerde koos, kreeg geen beeld in de catalogus. Het onderscheid is er nog
+ * wel in de database, maar het is hier geen keuze meer: de eerste foto is de
+ * thumbnail, en met "Thumbnail maken" schuif je een andere naar voren.
+ */
+export function PhotosEditor({ initial }: { initial: Array<{ key: string }> }) {
   const [photos, setPhotos] = useState(initial);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -29,22 +39,37 @@ export function GalleryEditor({ initial }: { initial: Array<{ key: string }> }) 
     finally { setBusy(false); }
   }
 
+  /** Naar voren schuiven in plaats van omwisselen: de volgorde van de rest blijft. */
+  const makeCover = (key: string) =>
+    setPhotos((all) => [...all.filter((photo) => photo.key === key), ...all.filter((photo) => photo.key !== key)]);
+
   return <div className="grid gap-2">
-    <input type="hidden" name="photos" value={JSON.stringify(photos)} />
+    {/* De eerste is de thumbnail, de rest is de galerij. */}
+    <input type="hidden" name="photoKey" value={photos[0]?.key ?? ''} />
+    <input type="hidden" name="photos" value={JSON.stringify(photos.slice(1))} />
     <div className="flex flex-wrap gap-2">
       {photos.map((photo, index) => (
-        <div key={photo.key} className="group relative h-20 w-20 overflow-hidden rounded-lg border border-vtk-navy/15 bg-vtk-paper-2">
+        <figure key={photo.key} className={`relative h-24 w-24 overflow-hidden rounded-lg border bg-vtk-paper-2 ${index === 0 ? 'border-vtk-yellow' : 'border-vtk-navy/15'}`}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={mediaUrl(photo.key)} alt={`Foto ${index + 1}`} className="h-full w-full object-cover" />
           <button type="button" onClick={() => setPhotos((all) => all.filter((p) => p.key !== photo.key))} className="absolute right-1 top-1 grid h-6 w-6 place-items-center rounded-full bg-vtk-ink/80 text-white" aria-label={`Foto ${index + 1} verwijderen`}>×</button>
-        </div>
+          {index === 0 ? (
+            <figcaption className="absolute inset-x-0 bottom-0 bg-vtk-yellow py-0.5 text-center text-[10px] font-semibold text-vtk-ink">Thumbnail</figcaption>
+          ) : (
+            // Altijd zichtbaar en niet enkel bij hoveren: op een tablet in de
+            // loods bestaat hoveren niet.
+            <button type="button" onClick={() => makeCover(photo.key)} className="absolute inset-x-0 bottom-0 bg-vtk-ink/75 py-0.5 text-center text-[10px] font-semibold text-white transition hover:bg-vtk-ink">
+              Thumbnail maken
+            </button>
+          )}
+        </figure>
       ))}
-      <button type="button" onClick={() => inputRef.current?.click()} disabled={busy} className="h-20 rounded-lg border border-dashed border-vtk-navy/30 px-3 text-xs font-medium text-vtk-ink hover:border-vtk-navy/60">
+      <button type="button" onClick={() => inputRef.current?.click()} disabled={busy} className="h-24 rounded-lg border border-dashed border-vtk-navy/30 px-3 text-xs font-medium text-vtk-ink hover:border-vtk-navy/60 disabled:opacity-50">
         {busy ? 'Uploaden…' : '+ Foto’s'}
       </button>
     </div>
     <input ref={inputRef} type="file" accept="image/*" multiple className="hidden" onChange={(e) => { add(e.target.files); e.target.value = ''; }} />
-    <p className="text-xs text-vtk-muted">Voeg extra beelden toe; sleep de belangrijkste foto in het afzonderlijke veld hierboven.</p>
+    <p className="text-xs font-normal text-vtk-muted">De eerste foto is de thumbnail in de catalogus; de rest staat op de detailpagina.</p>
     {error ? <p className="text-xs text-red-700">{error}</p> : null}
   </div>;
 }

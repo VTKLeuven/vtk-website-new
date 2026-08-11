@@ -11,7 +11,7 @@
  */
 export type SaveState =
   | { status: "idle" }
-  | { status: "success"; nonce: number }
+  | { status: "success"; nonce: number; message?: string }
   | { status: "error"; code: string; nonce: number; detail?: string };
 
 /** Beginwaarde voor `useActionState`. */
@@ -20,8 +20,13 @@ export const SAVE_IDLE: SaveState = { status: "idle" };
 /** Handtekening die `SaveForm` van een opslaan-actie verwacht. */
 export type SaveAction = (prev: SaveState, formData: FormData) => Promise<SaveState>;
 
-export function saveOk(): SaveState {
-  return { status: "success", nonce: Date.now() };
+/**
+ * `message` vervangt de vaste succesmelding van het formulier, voor het geval de
+ * actie meer deed dan het formulier kon voorzien ("de exemplaren zijn weer één
+ * rij"). Laat ze weg wanneer "Item opgeslagen." het hele verhaal is.
+ */
+export function saveOk(message?: string): SaveState {
+  return { status: "success", nonce: Date.now(), message };
 }
 
 /**
