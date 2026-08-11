@@ -1215,6 +1215,26 @@ aan geen enkele groep. Dat is ledenbeheer op vtk.be (`/admin/werkgroepen`) en ge
 zaak van de uitleendienst; de gate opzetten zou het verbergen in plaats van het
 oplossen.
 
+### Concept: lokaal in de browser, niet in de database
+
+Een half ingevulde aanvraag overleeft nu een gesloten tabblad. Ze staat in
+`localStorage` van de browser, niet als `DRAFT` op `UitleenReservation`.
+
+- **Een concept in de database raakt alles.** Elke query die vandaag "alle
+  reservaties" zegt zou `DRAFT` moeten uitsluiten: de voorraad, de kalender, de
+  beheerlijsten, mijn reservaties, de conflictberekening. Eén vergeten query en
+  een half ingevuld formulier reserveert materiaal.
+- **Dit dekt het geval waar het om gaat**: de tab viel dicht, de laptop ging toe,
+  de aanvrager ging eerst nog eens kijken wat er in de loods lag. Wie op een ander
+  toestel wil verder werken, is de uitzondering; komt die vraag terug, dan pas is
+  een echte `DRAFT`-status de moeite.
+- **Terugzetten gebeurt op een klik, nooit vanzelf.** Een formulier dat zichzelf
+  invult met iets van vorige week is verwarrender dan een leeg formulier. Er staat
+  een balk met "verder werken" of "weggooien", en het tijdstip erbij.
+- **Per lid gesleuteld** (`draftKey`), want de pc in het logikot is gedeeld. Een
+  leeg formulier wordt niet bewaard, en na twee weken vervalt het concept: dan is
+  het geen aanvraag in opbouw meer maar iets dat blijven hangen is.
+
 ### Dagdeel is een afspraak, geen boekingseenheid
 
 Een aanvraag kan nu "dinsdagnamiddag" zeggen (`pickupPart`/`returnPart`,

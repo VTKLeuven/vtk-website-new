@@ -11,6 +11,8 @@ import {
 import { adminEditFlesserkeReservationAction } from '@/app/actions/beheer';
 import { FlesserkeItemName } from '@/components/flesserke-item-name';
 import { DayPartSelect } from '@/components/day-part-select';
+import { useFormDraft } from '@/lib/use-form-draft';
+import { formatDateTime } from '@/lib/uitleen';
 import { LastMinuteNotice } from '@/components/last-minute-notice';
 import { QuantityInput } from '@/components/quantity-input';
 import type { ReservationFormInput } from '@/lib/reservation-form';
@@ -39,6 +41,7 @@ export function FlesserkeForm({
   mode,
   onCancel,
   lastMinuteDays,
+  draftKey,
 }: {
   catalog: FlesserkeCatalogCategory[];
   groups: RequesterOption[];
@@ -56,6 +59,8 @@ export function FlesserkeForm({
     | { kind: 'edit'; reservationId: string }
     | { kind: 'admin-edit'; reservationId: string };
   onCancel?: () => void;
+  /** Zie ReservationForm: lokaal concept, enkel bij een nieuwe aanvraag. */
+  draftKey?: string;
 }) {
   const en = locale === 'en';
   const router = useRouter();
@@ -70,6 +75,31 @@ export function FlesserkeForm({
 
   const [search, setSearch] = useState('');
   const [activeCategory, setActiveCategory] = useState<string>('all');
+
+  const draftValue = useMemo(
+    () => ({ event, pickupDate, pickupPart, returnDate, note, quantities }),
+    [event, pickupDate, pickupPart, returnDate, note, quantities]
+  );
+  const draft = useFormDraft<typeof draftValue>(
+    draftKey ?? null,
+    draftValue,
+    Boolean(draftKey),
+    (value) =>
+      value.event.eventName.trim() === '' &&
+      value.pickupDate === '' &&
+      Object.keys(value.quantities).length === 0
+  );
+
+  function restoreDraft() {
+    const saved = draft.restore();
+    if (!saved) return;
+    setEvent(saved.event);
+    setPickupDate(saved.pickupDate);
+    setPickupPart(saved.pickupPart ?? '');
+    setReturnDate(saved.returnDate);
+    setNote(saved.note);
+    setQuantities(saved.quantities);
+  }
 
   const count = useMemo(() => Object.values(quantities).reduce((s, q) => s + q, 0), [quantities]);
 
@@ -118,6 +148,7 @@ export function FlesserkeForm({
             ? await adminEditFlesserkeReservationAction(mode.reservationId, payload)
             : await editFlesserkeReservationAction(mode.reservationId, payload);
       if (result.ok) {
+        draft.clear();
         if (mode.kind === 'create') router.push('/reservaties?aangevraagd=1');
         else {
           onCancel?.();
@@ -131,6 +162,30 @@ export function FlesserkeForm({
 
   return (
     <div className="space-y-6">
+      {draft.found ? (
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-[14px] border border-vtk-navy/15 bg-vtk-paper px-4 py-3 text-sm">
+          <p className="text-vtk-body">
+            <span className="font-semibold text-vtk-ink">
+              {en ? 'You had a request in progress' : 'Je had een aanvraag in opbouw'}
+            </span>
+            {draft.savedAt ? (
+              <span className="text-vtk-muted">
+                {' '}
+                · {en ? 'saved' : 'bewaard'} {formatDateTime(draft.savedAt, locale)}
+              </span>
+            ) : null}
+          </p>
+          <div className="flex items-center gap-2">
+            <Button type="button" size="sm" onClick={restoreDraft}>
+              {en ? 'Continue' : 'Verder werken'}
+            </Button>
+            <Button type="button" size="sm" variant="ghost" onClick={draft.discard}>
+              {en ? 'Discard' : 'Weggooien'}
+            </Button>
+          </div>
+        </div>
+      ) : null}
+
       <EventRequesterFields
         value={event}
         onChange={setEvent}

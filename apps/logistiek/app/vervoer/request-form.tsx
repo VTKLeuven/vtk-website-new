@@ -5,7 +5,8 @@ import { useRouter } from 'next/navigation';
 import { Button } from '@vtk/ui';
 import type { UitleenPricingMode } from '@prisma/client';
 import { createVanBookingAction } from '@/app/actions/uitleen';
-import { formatEuro, formatPriceCents, transportPriceCents } from '@/lib/uitleen';
+import { formatDateTime, formatEuro, formatPriceCents, transportPriceCents } from '@/lib/uitleen';
+import { useFormDraft } from '@/lib/use-form-draft';
 import type { RequesterOption } from '@/app/materiaal/event-fields';
 
 type VehicleOption = { id: string; name: string; pricingMode: UitleenPricingMode; rateCents: number };
@@ -14,10 +15,13 @@ export function VanRequestForm({
   locale,
   vehicles,
   groups: _groups,
+  draftKey,
 }: {
   locale: 'nl' | 'en';
   vehicles: VehicleOption[];
   groups: RequesterOption[];
+  /** Zie ReservationForm: lokaal concept, per lid. */
+  draftKey?: string;
 }) {
   const en = locale === 'en';
   const router = useRouter();
@@ -40,6 +44,71 @@ export function VanRequestForm({
   const [pending, startTransition] = useTransition();
 
   const vehicle = vehicles.find((v) => v.id === vehicleId);
+
+  // Zelfde lokale concept als bij materiaal: een rit aanvragen is korter, maar
+  // een dichtgevallen tab kost evengoed alles.
+  const draftValue = useMemo(
+    () => ({
+      vehicleId,
+      startAt,
+      endAt,
+      purpose,
+      eventName,
+      pickupAddress,
+      destination,
+      helpersNote,
+      helpersPhone,
+      contactPhone,
+      notifyEmail,
+      roundTrip,
+      returnStartAt,
+      returnEndAt,
+      note,
+    }),
+    [
+      vehicleId,
+      startAt,
+      endAt,
+      purpose,
+      eventName,
+      pickupAddress,
+      destination,
+      helpersNote,
+      helpersPhone,
+      contactPhone,
+      notifyEmail,
+      roundTrip,
+      returnStartAt,
+      returnEndAt,
+      note,
+    ]
+  );
+  const draft = useFormDraft<typeof draftValue>(
+    draftKey ?? null,
+    draftValue,
+    Boolean(draftKey),
+    (value) => value.purpose.trim() === '' && value.startAt === '' && value.endAt === ''
+  );
+
+  function restoreDraft() {
+    const saved = draft.restore();
+    if (!saved) return;
+    setVehicleId(saved.vehicleId);
+    setStartAt(saved.startAt);
+    setEndAt(saved.endAt);
+    setPurpose(saved.purpose);
+    setEventName(saved.eventName);
+    setPickupAddress(saved.pickupAddress);
+    setDestination(saved.destination);
+    setHelpersNote(saved.helpersNote);
+    setHelpersPhone(saved.helpersPhone);
+    setContactPhone(saved.contactPhone);
+    setNotifyEmail(saved.notifyEmail);
+    setRoundTrip(saved.roundTrip);
+    setReturnStartAt(saved.returnStartAt);
+    setReturnEndAt(saved.returnEndAt);
+    setNote(saved.note);
+  }
 
   // Prijsindicatie volgens de tariefmodus van het gekozen voertuig. Bij heen en
   // terug is het de som van beide ritten: ze worden apart aangerekend, want het
@@ -90,6 +159,7 @@ export function VanRequestForm({
         returnEndAt: roundTrip ? returnEndAt : undefined,
       });
       if (result.ok) {
+        draft.clear();
         router.push('/reservaties?aangevraagd=1');
       } else {
         setError(result.error);
@@ -104,6 +174,30 @@ export function VanRequestForm({
       <h2 className="text-lg font-semibold tracking-tight text-vtk-ink">
         {en ? 'Request a trip' : 'Rit aanvragen'}
       </h2>
+
+      {draft.found ? (
+        <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-[14px] border border-vtk-navy/15 bg-vtk-paper px-4 py-3 text-sm">
+          <p className="text-vtk-body">
+            <span className="font-semibold text-vtk-ink">
+              {en ? 'You had a trip in progress' : 'Je had een rit in opbouw'}
+            </span>
+            {draft.savedAt ? (
+              <span className="text-vtk-muted">
+                {' '}
+                · {en ? 'saved' : 'bewaard'} {formatDateTime(draft.savedAt, locale)}
+              </span>
+            ) : null}
+          </p>
+          <div className="flex items-center gap-2">
+            <Button type="button" size="sm" onClick={restoreDraft}>
+              {en ? 'Continue' : 'Verder werken'}
+            </Button>
+            <Button type="button" size="sm" variant="ghost" onClick={draft.discard}>
+              {en ? 'Discard' : 'Weggooien'}
+            </Button>
+          </div>
+        </div>
+      ) : null}
 
       <fieldset className="mt-4">
         <legend className="text-sm font-medium text-vtk-ink">{en ? 'Vehicle' : 'Voertuig'}</legend>

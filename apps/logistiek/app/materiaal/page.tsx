@@ -45,6 +45,7 @@ export default async function MateriaalPage() {
           showRentPrices={settings.showRentPrices}
           lastMinuteDays={settings.lastMinuteDays}
           paymentNote={content.materialPaymentNote}
+          userId={session.user.id}
         />
       )}
     </PageShell>

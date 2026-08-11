@@ -57,6 +57,7 @@ export default async function FlesserkePage() {
           lastMinuteDays={settings.lastMinuteDays}
           locale={locale}
           mode={{ kind: 'create' }}
+          draftKey={`flesserke:${session.user.id}`}
           initial={{
             event: emptyEventValues(groups),
             pickupDate: '',

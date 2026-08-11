@@ -5,10 +5,11 @@ import Link from 'next/link';
 import { Button } from '@vtk/ui';
 import { checkAvailabilityAction, type ActionResult } from '@/app/actions/uitleen';
 import type { ReservationFormInput } from '@/lib/reservation-form';
-import { formatEuro } from '@/lib/uitleen';
+import { formatDateTime, formatEuro } from '@/lib/uitleen';
 import type { CatalogCategory } from '@/lib/uitleen-server';
 import { CategoryThumb } from '@/components/category-thumb';
 import { DayPartSelect } from '@/components/day-part-select';
+import { useFormDraft } from '@/lib/use-form-draft';
 import { LastMinuteNotice } from '@/components/last-minute-notice';
 import { QuantityInput } from '@/components/quantity-input';
 import { SetContents } from '@/components/set-contents';
@@ -49,6 +50,7 @@ export function ReservationForm({
   paymentNote,
   lastMinuteDays,
   mode = 'member',
+  draftKey,
 }: {
   catalog: CatalogCategory[];
   groups: RequesterOption[];
@@ -68,6 +70,12 @@ export function ReservationForm({
    */
   lastMinuteDays?: number;
   mode?: 'member' | 'team';
+  /**
+   * Sleutel om een half ingevulde aanvraag lokaal te bewaren, uniek per lid.
+   * Weglaten bij het bewerken van een bestaande aanvraag: die heeft de server als
+   * bron, en een concept eroverheen zou stil oude waarden terugzetten.
+   */
+  draftKey?: string;
 }) {
   const en = locale === 'en';
   const [event, setEvent] = useState<EventReservationValues>(initial.event);
@@ -85,6 +93,36 @@ export function ReservationForm({
 
   const [search, setSearch] = useState('');
   const [activeCategory, setActiveCategory] = useState<string>('all');
+
+  // Alles wat het invullen van een aanvraag kost; de zoekterm en de gekozen
+  // categorie horen er niet bij, dat is navigatie en geen invoer.
+  const draftValue = useMemo(
+    () => ({ event, pickupDate, returnDate, pickupPart, returnPart, note, quantities, lineNotes }),
+    [event, pickupDate, returnDate, pickupPart, returnPart, note, quantities, lineNotes]
+  );
+  const draft = useFormDraft<typeof draftValue>(
+    draftKey ?? null,
+    draftValue,
+    Boolean(draftKey),
+    (value) =>
+      value.event.eventName.trim() === '' &&
+      value.pickupDate === '' &&
+      value.returnDate === '' &&
+      Object.keys(value.quantities).length === 0
+  );
+
+  function restoreDraft() {
+    const saved = draft.restore();
+    if (!saved) return;
+    setEvent(saved.event);
+    setPickupDate(saved.pickupDate);
+    setReturnDate(saved.returnDate);
+    setPickupPart(saved.pickupPart ?? '');
+    setReturnPart(saved.returnPart ?? '');
+    setNote(saved.note);
+    setQuantities(saved.quantities);
+    setLineNotes(saved.lineNotes ?? {});
+  }
 
   const items = useMemo(() => catalog.flatMap((category) => category.items), [catalog]);
   const itemsById = useMemo(() => new Map(items.map((item) => [item.id, item])), [items]);
@@ -179,12 +217,44 @@ export function ReservationForm({
           note: lineNotes[itemId],
         })),
       });
-      if (!result.ok) setError(result.error);
+      if (!result.ok) {
+        setError(result.error);
+        return;
+      }
+      // Ingediend: het concept is geen concept meer.
+      draft.clear();
     });
   }
 
   return (
     <div className="space-y-6">
+      {/* Bewust een balk met een keuze en geen automatisch herstel: een formulier
+          dat zichzelf invult met iets van vorige week is verwarrender dan een
+          leeg formulier. */}
+      {draft.found ? (
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-[14px] border border-vtk-navy/15 bg-vtk-paper px-4 py-3 text-sm">
+          <p className="text-vtk-body">
+            <span className="font-semibold text-vtk-ink">
+              {en ? 'You had a request in progress' : 'Je had een aanvraag in opbouw'}
+            </span>
+            {draft.savedAt ? (
+              <span className="text-vtk-muted">
+                {' '}
+                · {en ? 'saved' : 'bewaard'} {formatDateTime(draft.savedAt, locale)}
+              </span>
+            ) : null}
+          </p>
+          <div className="flex items-center gap-2">
+            <Button type="button" size="sm" onClick={restoreDraft}>
+              {en ? 'Continue' : 'Verder werken'}
+            </Button>
+            <Button type="button" size="sm" variant="ghost" onClick={draft.discard}>
+              {en ? 'Discard' : 'Weggooien'}
+            </Button>
+          </div>
+        </div>
+      ) : null}
+
       <EventRequesterFields value={event} onChange={setEvent} groups={groups} locale={locale} mode={mode} />
 
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">

@@ -38,6 +38,7 @@ export default async function VervoerPage() {
             pricingMode: v.pricingMode,
             rateCents: v.rateCents,
           }))}
+          draftKey={`vervoer:${session.user.id}`}
         />
 
         <aside className="h-fit rounded-[18px] border border-vtk-navy/10 bg-vtk-surface p-6">

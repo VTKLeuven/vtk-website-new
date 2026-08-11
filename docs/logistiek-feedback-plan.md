@@ -33,7 +33,7 @@ verbetering, **P3** = groter of "ooit".
 | 4 | Materiaal: catalogus en aanvragen | M3, M4, M5, M6, M13, M15 | ✅ af 11 aug 2026 |
 | 5 | Vervoer | V2, V5, V8, V9, V12, V13 | ✅ af 11 aug 2026 |
 | 6 | Flesserke | F2, F3, F5, F6, F7 | ✅ af 11 aug 2026 |
-| 7 | Grote stukken | ~~A7~~, A8, ~~A9~~, ~~M1~~, ~~M2~~, ~~M12~~, M17, M18, V1 | bezig; A7, A9, M1, M2, M12 af 11 aug 2026 |
+| 7 | Grote stukken | ~~A7~~, A8, ~~A9~~, ~~M1~~, ~~M2~~, ~~M12~~, M17, ~~M18~~, V1 | bezig; A7, A9, M1, M2, M12, M18 af 11 aug 2026 |
 
 Vervallen: **M7** (gas wordt een gewoon catalogusitem, dus geen code) en **M16**
 (geen barcodes). Zie fase 0.
@@ -1103,8 +1103,22 @@ Wat er tijdens het werk bijkwam:
   3. Vanuit een bestaande aanvraag "Bewaar als sjabloon" in het beheer.
 - **Klaar wanneer:** een cantus aanvragen is één keuze plus wat bijstellen.
 
-### M18. Aanvraag later afwerken (concept)
-**P2 · 🗄️ · code**
+### M18. Aanvraag later afwerken (concept) ✅
+**P2 · 🗄️ · code** · af op 11 augustus 2026 (stap 1; geen migratie nodig)
+
+Wat er tijdens het werk bijkwam:
+
+- **Stap 2 (een echte `DRAFT`-status) is bewust niet gebouwd**, zoals het plan
+  voorstelde. De localStorage-versie dekt het geval waar het om gaat; een status
+  in de database zou élke query die "alle reservaties" zegt moeten aanpassen.
+- **Alle drie de aanvraagformulieren** kregen het, niet enkel materiaal: een
+  dichtgevallen tab kost bij vervoer en flesserke evengoed alles, en "waarom
+  onthoudt materiaal het wel en vervoer niet" is een terechte vraag.
+- **Een leeg formulier wordt niet bewaard.** Zonder die regel schrijft het
+  formulier na "weggooien" meteen een leeg concept terug, en dan staat de balk er
+  bij het volgende bezoek opnieuw met niets erin.
+- **Terugzetten gebeurt op een klik**, niet vanzelf; en het concept vervalt na
+  twee weken.
 
 - **Nu:** verlaat je het formulier, dan ben je alles kwijt.
 - **Doen:**

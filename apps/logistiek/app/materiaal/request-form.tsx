@@ -13,6 +13,7 @@ export function MaterialRequestForm({
   showRentPrices = false,
   paymentNote,
   lastMinuteDays,
+  userId,
 }: {
   catalog: CatalogCategory[];
   groups: RequesterOption[];
@@ -21,6 +22,8 @@ export function MaterialRequestForm({
   /** Beheerbare waarborg-/betaalnota uit /beheer/teksten (getPublicCopy). */
   paymentNote?: string;
   lastMinuteDays: number;
+  /** Voor het lokale concept: per lid, want de logikot-pc is gedeeld. */
+  userId: string;
 }) {
   const en = locale === 'en';
   const router = useRouter();
@@ -33,6 +36,7 @@ export function MaterialRequestForm({
       showRentPrices={showRentPrices}
       paymentNote={paymentNote}
       lastMinuteDays={lastMinuteDays}
+      draftKey={`materiaal:${userId}`}
       initial={{
         event: emptyEventValues(groups),
         pickupDate: '',
