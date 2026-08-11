@@ -1,4 +1,9 @@
-import { formatDateOnly, formatDateTime, itemLocation, REQUESTER_TYPE_LABELS } from '@/lib/uitleen';
+import {
+  formatDateTime,
+  formatDateWithPart,
+  itemLocation,
+  REQUESTER_TYPE_LABELS,
+} from '@/lib/uitleen';
 import type { UitleenRequesterType } from '@prisma/client';
 
 /**
@@ -26,6 +31,8 @@ export type PrintSheetReservation = {
   contactPhone: string | null;
   pickupDate: Date;
   returnDate: Date;
+  pickupPart: string | null;
+  returnPart: string | null;
   memberNote: string | null;
   adminNote: string | null;
   delivery: boolean;
@@ -60,10 +67,10 @@ export function PrintSheet({ reservation }: { reservation: PrintSheetReservation
         </div>
         <p className="text-right text-sm">
           <span className="block font-semibold">
-            Afhalen {formatDateOnly(reservation.pickupDate)}
+            Afhalen {formatDateWithPart(reservation.pickupDate, reservation.pickupPart)}
           </span>
           <span className="block text-vtk-muted">
-            Terug {formatDateOnly(reservation.returnDate)}
+            Terug {formatDateWithPart(reservation.returnDate, reservation.returnPart)}
           </span>
         </p>
       </header>
@@ -202,6 +209,8 @@ export const printSheetSelect = {
   contactPhone: true,
   pickupDate: true,
   returnDate: true,
+  pickupPart: true,
+  returnPart: true,
   memberNote: true,
   adminNote: true,
   delivery: true,

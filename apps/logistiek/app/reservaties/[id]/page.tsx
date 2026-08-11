@@ -13,6 +13,7 @@ import { requesterOptions } from '@/app/materiaal/event-values';
 import {
   DEFAULT_LAST_MINUTE_DAYS,
   formatDateOnly,
+  formatDateWithPart,
   formatDateTime,
   formatEuro,
   requesterTypeLabel,
@@ -220,6 +221,7 @@ export default async function ReservatieDetailPage({
                     },
                     pickupDate: toDateInputValue(reservation.pickupDate),
                     returnDate: toDateInputValue(reservation.returnDate),
+                    pickupPart: reservation.pickupPart ?? '',
                     note: reservation.memberNote ?? '',
                     quantities: Object.fromEntries(
                       reservation.flesserkeLines.map((l) => [l.flesserkeItemId, l.quantity])
@@ -250,6 +252,7 @@ export default async function ReservatieDetailPage({
                     },
                     pickupDate: toDateInputValue(reservation.pickupDate),
                     returnDate: toDateInputValue(reservation.returnDate),
+                    pickupPart: reservation.pickupPart ?? '',
                     note: reservation.memberNote ?? '',
                     quantities: Object.fromEntries(reservation.lines.map((l) => [l.itemId, l.quantity])),
                     lineNotes: Object.fromEntries(
@@ -267,13 +270,13 @@ export default async function ReservatieDetailPage({
             <div className="flex justify-between gap-4">
               <dt className="text-vtk-muted">{en ? 'Collect' : 'Afhalen'}</dt>
               <dd className="text-right font-medium text-vtk-ink">
-                {formatDateOnly(reservation.pickupDate, locale)}
+                {formatDateWithPart(reservation.pickupDate, reservation.pickupPart, locale)}
               </dd>
             </div>
             <div className="flex justify-between gap-4">
               <dt className="text-vtk-muted">{en ? 'Return' : 'Terugbrengen'}</dt>
               <dd className="text-right font-medium text-vtk-ink">
-                {formatDateOnly(reservation.returnDate, locale)}
+                {formatDateWithPart(reservation.returnDate, reservation.returnPart, locale)}
               </dd>
             </div>
             <div className="flex justify-between gap-4">

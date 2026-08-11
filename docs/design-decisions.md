@@ -1215,6 +1215,22 @@ aan geen enkele groep. Dat is ledenbeheer op vtk.be (`/admin/werkgroepen`) en ge
 zaak van de uitleendienst; de gate opzetten zou het verbergen in plaats van het
 oplossen.
 
+### Dagdeel is een afspraak, geen boekingseenheid
+
+Een aanvraag kan nu "dinsdagnamiddag" zeggen (`pickupPart`/`returnPart`,
+optioneel). Dat stond tot nu toe in een mail naast het systeem.
+
+- **De voorraadberekening blijft op hele dagen.** Halve dagen zouden élke
+  overlapquery moeten herschrijven (de beschikbaarheid, de conflictcheck, de
+  kalender), en niemand wint daarbij: twee posten die dezelfde dag dezelfde tafel
+  willen, lossen dat op met een woord, niet met een halve boeking.
+- **Geen uurveld.** Het uur spreekt het team af; een uurveld zou doen alsof de app
+  openingsuren kent die ze niet kent.
+- **Het dagdeel staat waar de datum staat**: in de kalender als tag (op een dag
+  met acht afhalingen sorteer je daarop met je ogen), op het printblad, in de
+  aanvraaglijst en in de wijzigingsmail. Enkel het dagdeel wijzigen telt als een
+  wijziging: daar plant iemand zijn shift op.
+
 ### Conflicten: aanvragen mag, goedkeuren niet
 
 Wie materiaal wil dat al volledig geboekt is, kon zijn vraag niet kwijt: de

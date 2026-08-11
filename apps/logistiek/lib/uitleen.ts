@@ -116,6 +116,9 @@ export function formatDateOnly(date: Date, locale: LogistiekLocale = 'nl'): stri
 export type ChangeSnapshot = {
   pickupDate: Date;
   returnDate: Date;
+  /** Dagdeel, wanneer de aanvraag er een heeft; zie M12. */
+  pickupPart?: string | null;
+  returnPart?: string | null;
   lines: Array<{ itemName: string; quantity: number }>;
 };
 
@@ -138,15 +141,19 @@ export function describeReservationChanges(
   const en = locale === 'en';
   const changes: string[] = [];
 
-  const sameDay = (a: Date, b: Date) => a.getTime() === b.getTime();
-  if (!sameDay(before.pickupDate, after.pickupDate)) {
+  // Datum en dagdeel samen: "za 12 september 2026 (namiddag) → zo 13 september
+  // 2026 (voormiddag)". Enkel het dagdeel wijzigen is ook een wijziging, want
+  // daar plant iemand zijn shift op.
+  const sameMoment = (a: Date, b: Date, partA?: string | null, partB?: string | null) =>
+    a.getTime() === b.getTime() && (partA ?? null) === (partB ?? null);
+  if (!sameMoment(before.pickupDate, after.pickupDate, before.pickupPart, after.pickupPart)) {
     changes.push(
-      `${en ? 'Pickup' : 'Afhalen'}: ${formatDateOnly(before.pickupDate, locale)} → ${formatDateOnly(after.pickupDate, locale)}`
+      `${en ? 'Pickup' : 'Afhalen'}: ${formatDateWithPart(before.pickupDate, before.pickupPart, locale)} → ${formatDateWithPart(after.pickupDate, after.pickupPart, locale)}`
     );
   }
-  if (!sameDay(before.returnDate, after.returnDate)) {
+  if (!sameMoment(before.returnDate, after.returnDate, before.returnPart, after.returnPart)) {
     changes.push(
-      `${en ? 'Return' : 'Terugbrengen'}: ${formatDateOnly(before.returnDate, locale)} → ${formatDateOnly(after.returnDate, locale)}`
+      `${en ? 'Return' : 'Terugbrengen'}: ${formatDateWithPart(before.returnDate, before.returnPart, locale)} → ${formatDateWithPart(after.returnDate, after.returnPart, locale)}`
     );
   }
 
@@ -367,6 +374,43 @@ export function isLastMinute(
  * staat in het beheer en op de detailpagina enkel voor `logistiek.manage`, want
  * ze zegt iets over onderhoud en niet over wat je kan aanvragen.
  */
+/**
+ * Dagdelen, in de volgorde van de dag. Enkel voor de mensen: de
+ * voorraadberekening blijft op hele dagen rekenen (zie docs/design-decisions.md),
+ * dus dit label staat naast de datum en niet in een query.
+ */
+export const DAY_PART_LABELS: Record<string, string> = {
+  VOORMIDDAG: 'voormiddag',
+  NAMIDDAG: 'namiddag',
+  AVOND: 'avond',
+};
+
+const DAY_PART_LABELS_EN: Record<string, string> = {
+  VOORMIDDAG: 'morning',
+  NAMIDDAG: 'afternoon',
+  AVOND: 'evening',
+};
+
+export const DAY_PARTS = ['VOORMIDDAG', 'NAMIDDAG', 'AVOND'] as const;
+
+export function dayPartLabel(
+  part: string | null | undefined,
+  locale: LogistiekLocale = 'nl'
+): string | null {
+  if (!part) return null;
+  return (locale === 'en' ? DAY_PART_LABELS_EN : DAY_PART_LABELS)[part] ?? null;
+}
+
+/** "za 12 september 2026 (namiddag)", of gewoon de datum zonder dagdeel. */
+export function formatDateWithPart(
+  date: Date,
+  part: string | null | undefined,
+  locale: LogistiekLocale = 'nl'
+): string {
+  const label = dayPartLabel(part, locale);
+  return label ? `${formatDateOnly(date, locale)} (${label})` : formatDateOnly(date, locale);
+}
+
 export const ITEM_CONDITION_LABELS: Record<string, string> = {
   WERKT: 'Werkt',
   TESTEN: 'Nog testen',

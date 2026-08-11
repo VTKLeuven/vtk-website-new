@@ -10,6 +10,7 @@ import {
 } from '@/app/actions/uitleen';
 import { adminEditFlesserkeReservationAction } from '@/app/actions/beheer';
 import { FlesserkeItemName } from '@/components/flesserke-item-name';
+import { DayPartSelect } from '@/components/day-part-select';
 import { LastMinuteNotice } from '@/components/last-minute-notice';
 import { QuantityInput } from '@/components/quantity-input';
 import type { ReservationFormInput } from '@/lib/reservation-form';
@@ -23,6 +24,7 @@ import {
 export type FlesserkeInitial = {
   event: EventReservationValues;
   pickupDate: string;
+  pickupPart?: string;
   returnDate: string;
   note: string;
   quantities: Record<string, number>;
@@ -59,6 +61,7 @@ export function FlesserkeForm({
   const router = useRouter();
   const [event, setEvent] = useState<EventReservationValues>(initial.event);
   const [pickupDate, setPickupDate] = useState(initial.pickupDate);
+  const [pickupPart, setPickupPart] = useState(initial.pickupPart ?? '');
   const [returnDate, setReturnDate] = useState(initial.returnDate);
   const [note, setNote] = useState(initial.note);
   const [quantities, setQuantities] = useState<Record<string, number>>(initial.quantities);
@@ -103,6 +106,7 @@ export function FlesserkeForm({
         ...event,
         pickupDate,
         returnDate: returnDate || pickupDate,
+        pickupPart,
         note,
         lines: [],
         flesserkeLines: Object.entries(quantities).map(([itemId, quantity]) => ({ itemId, quantity })),
@@ -236,12 +240,20 @@ export function FlesserkeForm({
               <span className="font-medium text-vtk-ink">
                 {en ? 'Ready by' : 'Klaarzetten tegen'}
               </span>
-              <input
-                type="date"
-                value={pickupDate}
-                onChange={(e) => setPickupDate(e.target.value)}
-                className="h-10 rounded-lg border border-vtk-navy/15 bg-white px-3 text-vtk-ink"
-              />
+              <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2">
+                <input
+                  type="date"
+                  value={pickupDate}
+                  onChange={(e) => setPickupDate(e.target.value)}
+                  className="h-10 min-w-0 rounded-lg border border-vtk-navy/15 bg-white px-3 text-vtk-ink"
+                />
+                <DayPartSelect
+                  value={pickupPart}
+                  onChange={setPickupPart}
+                  locale={locale}
+                  label={en ? 'Part of day' : 'Dagdeel'}
+                />
+              </div>
             </label>
             {/* Flesserke is verbruiksgoed: wat geopend is, komt niet terug. Enkel
                 het gesloten deel gaat terug naar de kelder, en meestal dezelfde

@@ -8,6 +8,7 @@ import type { ReservationFormInput } from '@/lib/reservation-form';
 import { formatEuro } from '@/lib/uitleen';
 import type { CatalogCategory } from '@/lib/uitleen-server';
 import { CategoryThumb } from '@/components/category-thumb';
+import { DayPartSelect } from '@/components/day-part-select';
 import { LastMinuteNotice } from '@/components/last-minute-notice';
 import { QuantityInput } from '@/components/quantity-input';
 import { SetContents } from '@/components/set-contents';
@@ -20,6 +21,8 @@ import {
 export type ReservationFormInitial = {
   event: EventReservationValues;
   pickupDate: string;
+  pickupPart?: string;
+  returnPart?: string;
   returnDate: string;
   note: string;
   quantities: Record<string, number>;
@@ -69,6 +72,8 @@ export function ReservationForm({
   const en = locale === 'en';
   const [event, setEvent] = useState<EventReservationValues>(initial.event);
   const [pickupDate, setPickupDate] = useState(initial.pickupDate);
+  const [pickupPart, setPickupPart] = useState(initial.pickupPart ?? '');
+  const [returnPart, setReturnPart] = useState(initial.returnPart ?? '');
   const [returnDate, setReturnDate] = useState(initial.returnDate);
   const [note, setNote] = useState(initial.note);
   const [quantities, setQuantities] = useState<Record<string, number>>(initial.quantities);
@@ -165,6 +170,8 @@ export function ReservationForm({
         ...event,
         pickupDate,
         returnDate,
+        pickupPart,
+        returnPart,
         note,
         lines: Object.entries(quantities).map(([itemId, quantity]) => ({
           itemId,
@@ -400,24 +407,43 @@ export function ReservationForm({
           </h2>
 
           <div className="mt-4 grid gap-3">
+            {/* Dagdeel naast de datum: "dinsdagnamiddag" stond tot nu toe in een
+                mail. Het is een afspraak tussen mensen, geen boekingseenheid; de
+                voorraad blijft op hele dagen rekenen. */}
             <label className="grid gap-1 text-sm">
               <span className="font-medium text-vtk-ink">{en ? 'Collect on' : 'Afhalen op'}</span>
-              <input
-                type="date"
-                value={pickupDate}
-                onChange={(e) => setPickupDate(e.target.value)}
-                className="h-10 rounded-lg border border-vtk-navy/15 bg-white px-3 text-vtk-ink"
-              />
+              <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2">
+                <input
+                  type="date"
+                  value={pickupDate}
+                  onChange={(e) => setPickupDate(e.target.value)}
+                  className="h-10 min-w-0 rounded-lg border border-vtk-navy/15 bg-white px-3 text-vtk-ink"
+                />
+                <DayPartSelect
+                  value={pickupPart}
+                  onChange={setPickupPart}
+                  locale={locale}
+                  label={en ? 'Part of day for collecting' : 'Dagdeel afhalen'}
+                />
+              </div>
             </label>
             <label className="grid gap-1 text-sm">
               <span className="font-medium text-vtk-ink">{en ? 'Return on' : 'Terugbrengen op'}</span>
-              <input
-                type="date"
-                value={returnDate}
-                min={pickupDate || undefined}
-                onChange={(e) => setReturnDate(e.target.value)}
-                className="h-10 rounded-lg border border-vtk-navy/15 bg-white px-3 text-vtk-ink"
-              />
+              <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2">
+                <input
+                  type="date"
+                  value={returnDate}
+                  min={pickupDate || undefined}
+                  onChange={(e) => setReturnDate(e.target.value)}
+                  className="h-10 min-w-0 rounded-lg border border-vtk-navy/15 bg-white px-3 text-vtk-ink"
+                />
+                <DayPartSelect
+                  value={returnPart}
+                  onChange={setReturnPart}
+                  locale={locale}
+                  label={en ? 'Part of day for returning' : 'Dagdeel terugbrengen'}
+                />
+              </div>
             </label>
             {lastMinuteDays !== undefined ? (
               <LastMinuteNotice pickupDate={pickupDate} days={lastMinuteDays} locale={locale} />

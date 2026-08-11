@@ -995,6 +995,8 @@ export async function adminEditFlesserkeReservationAction(
           paidOfflineAt: true,
           pickupDate: true,
           returnDate: true,
+          pickupPart: true,
+          returnPart: true,
           payments: { select: { status: true } },
           flesserkeLines: { select: { returnedQuantity: true, itemName: true, quantity: true } },
         },
@@ -1042,11 +1044,15 @@ export async function adminEditFlesserkeReservationAction(
         {
           pickupDate: existing.pickupDate,
           returnDate: existing.returnDate,
+          pickupPart: existing.pickupPart,
+          returnPart: existing.returnPart,
           lines: existing.flesserkeLines,
         },
         {
           pickupDate: built.scalars.pickupDate,
           returnDate: built.scalars.returnDate,
+          pickupPart: built.scalars.pickupPart,
+          returnPart: built.scalars.returnPart,
           lines: built.flesserkeLineCreates,
         }
       );
@@ -1228,6 +1234,8 @@ export async function adminEditReservationAction(
           paidOfflineAt: true,
           pickupDate: true,
           returnDate: true,
+          pickupPart: true,
+          returnPart: true,
           payments: { select: { status: true } },
           lines: {
             select: {
@@ -1299,10 +1307,18 @@ export async function adminEditReservationAction(
       // Wat er veranderde, niet hoeveel lijnen er overblijven: dit gaat zowel naar
       // de historiek als naar de mail aan de aanvrager.
       const changes = describeReservationChanges(
-        { pickupDate: existing.pickupDate, returnDate: existing.returnDate, lines: existing.lines },
+        {
+          pickupDate: existing.pickupDate,
+          returnDate: existing.returnDate,
+          pickupPart: existing.pickupPart,
+          returnPart: existing.returnPart,
+          lines: existing.lines,
+        },
         {
           pickupDate: built.scalars.pickupDate,
           returnDate: built.scalars.returnDate,
+          pickupPart: built.scalars.pickupPart,
+          returnPart: built.scalars.returnPart,
           lines: built.lineCreates,
         }
       );

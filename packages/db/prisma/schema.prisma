@@ -196,6 +196,14 @@ enum UitleenPricingMode {
 
 // Staat van een materiaalstuk. Puur informatief (badge in het beheer); muteert
 // nooit automatisch de beschikbaarheid.
+/// Grofweg wanneer op een dag. Geen uren: die spreekt het team af, en een
+/// uurveld zou doen alsof de app een openingsuur kent dat ze niet kent.
+enum UitleenDayPart {
+  VOORMIDDAG
+  NAMIDDAG
+  AVOND
+}
+
 enum UitleenItemCondition {
   WERKT
   KAPOT
@@ -2040,6 +2048,13 @@ model UitleenReservation {
   // Afhaal- en terugbrengdag (hele dagen; de concrete uren spreekt het team af).
   pickupDate DateTime @db.Date
   returnDate DateTime @db.Date
+
+  // Grofweg wanneer op die dag. Bewust géén boekingseenheid: de
+  // voorraadberekening blijft op hele dagen rekenen (zie docs/design-decisions.md).
+  // Een afspraak tussen mensen dus, die nu in het systeem staat in plaats van in
+  // een mail.
+  pickupPart UitleenDayPart?
+  returnPart UitleenDayPart?
 
   memberNote String? // extra info van het lid
   adminNote  String? // nota van het team (bv. reden van afwijzing)

@@ -21,6 +21,7 @@ import {
   DEFAULT_LAST_MINUTE_DAYS,
   formatDateOnly,
   formatDateTime,
+  formatDateWithPart,
   formatEuro,
   itemLocation,
   REQUESTER_TYPE_LABELS,
@@ -257,11 +258,15 @@ export default async function BeheerAanvraagDetailPage({
           ) : null}
           <div className="flex justify-between gap-4">
             <dt className="text-vtk-muted">Afhalen</dt>
-            <dd className="font-medium text-vtk-ink">{formatDateOnly(reservation.pickupDate)}</dd>
+            <dd className="font-medium text-vtk-ink">
+              {formatDateWithPart(reservation.pickupDate, reservation.pickupPart)}
+            </dd>
           </div>
           <div className="flex justify-between gap-4">
             <dt className="text-vtk-muted">Terugbrengen</dt>
-            <dd className="font-medium text-vtk-ink">{formatDateOnly(reservation.returnDate)}</dd>
+            <dd className="font-medium text-vtk-ink">
+              {formatDateWithPart(reservation.returnDate, reservation.returnPart)}
+            </dd>
           </div>
           {settings.showRentPrices ? (
             <div className="flex justify-between gap-4">
@@ -416,6 +421,7 @@ export default async function BeheerAanvraagDetailPage({
                 },
                 pickupDate: toDateInputValue(reservation.pickupDate),
                 returnDate: toDateInputValue(reservation.returnDate),
+                pickupPart: reservation.pickupPart ?? '',
                 note: reservation.memberNote ?? '',
                 quantities: Object.fromEntries(
                   reservation.flesserkeLines.map((l) => [l.flesserkeItemId, l.quantity])
@@ -449,6 +455,8 @@ export default async function BeheerAanvraagDetailPage({
                 },
                 pickupDate: toDateInputValue(reservation.pickupDate),
                 returnDate: toDateInputValue(reservation.returnDate),
+                pickupPart: reservation.pickupPart ?? '',
+                returnPart: reservation.returnPart ?? '',
                 note: reservation.memberNote ?? '',
                 quantities: Object.fromEntries(reservation.lines.map((l) => [l.itemId, l.quantity])),
                 lineNotes: Object.fromEntries(

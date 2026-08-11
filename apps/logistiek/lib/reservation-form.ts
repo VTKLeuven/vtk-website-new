@@ -1,7 +1,15 @@
 import 'server-only';
 
 import { prisma } from '@vtk/db';
-import { isEmailish, parseDateOnly, todayDateOnly, type ReservationLineInput } from './uitleen';
+import { DAY_PARTS, isEmailish, parseDateOnly, todayDateOnly, type ReservationLineInput } from './uitleen';
+
+type DayPart = (typeof DAY_PARTS)[number];
+
+/** Een dagdeel uit het formulier, of null wanneer het leeg of onzin is. */
+function parseDayPart(value: string | undefined): DayPart | null {
+  const trimmed = (value ?? '').trim();
+  return DAY_PARTS.includes(trimmed as DayPart) ? (trimmed as DayPart) : null;
+}
 
 /** Max lengte van een uitleenperiode; langere aanvragen verlopen via e-mail. */
 export const MAX_RESERVATION_DAYS = 14;
@@ -22,6 +30,8 @@ export type ReservationFormInput = {
   deliveryNote?: string;
   pickupDate: string;
   returnDate: string;
+  pickupPart?: string;
+  returnPart?: string;
   notifyEmail?: string;
   note?: string;
   lines: ReservationLineInput[];
@@ -53,6 +63,8 @@ export type ReservationScalars = {
   deliveryNote: string | null;
   pickupDate: Date;
   returnDate: Date;
+  pickupPart: DayPart | null;
+  returnPart: DayPart | null;
   notifyEmail: string | null;
   memberNote: string | null;
   totalPriceCents: number;
@@ -255,6 +267,8 @@ export async function buildReservationData(
       deliveryNote: Boolean(input.delivery) ? trim(input.deliveryNote) : null,
       pickupDate,
       returnDate,
+      pickupPart: parseDayPart(input.pickupPart),
+      returnPart: parseDayPart(input.returnPart),
       notifyEmail: notifyEmail ? notifyEmail.slice(0, FIELD_MAX) : null,
       memberNote: input.note && input.note.trim() ? input.note.trim().slice(0, MAX_NOTE_LENGTH) : null,
       totalPriceCents,

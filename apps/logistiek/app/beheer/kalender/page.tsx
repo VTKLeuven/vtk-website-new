@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { requireManage } from '@/lib/session';
 import {
+  dayPartLabel,
   formatDateOnly,
   formatDateRange,
   parseDateOnly,
@@ -90,10 +91,17 @@ export default async function BeheerKalenderPage({
   const itemSummary = (lines: Array<{ quantity: number; itemName: string }>) =>
     lines.map((line) => `${line.quantity}× ${line.itemName}`).join(', ');
 
+  // Het dagdeel hoort bij de tags en niet in de detailregel: op een dag met acht
+  // afhalingen is "namiddag" het eerste waarop je sorteert met je ogen.
+  const partTag = (part: string | null) => {
+    const label = dayPartLabel(part);
+    return label ? [label] : [];
+  };
+
   for (const reservation of agenda.pickups) {
     push(reservation.pickupDate, {
       kind: 'afhaling',
-      tags: [requesterLabel(reservation)],
+      tags: [requesterLabel(reservation), ...partTag(reservation.pickupPart)],
       title: reservation.eventName,
       detail: `${reservation.user.name}: ${itemSummary(reservation.lines)}`,
       href: `/beheer/aanvragen/${reservation.id}`,
@@ -102,7 +110,7 @@ export default async function BeheerKalenderPage({
   for (const reservation of agenda.returns) {
     push(reservation.returnDate, {
       kind: 'terugbrengen',
-      tags: [requesterLabel(reservation)],
+      tags: [requesterLabel(reservation), ...partTag(reservation.returnPart)],
       title: reservation.eventName,
       detail: `${reservation.user.name}: ${itemSummary(reservation.lines)}`,
       href: `/beheer/aanvragen/${reservation.id}`,

@@ -3,7 +3,13 @@ import { LoginGate } from '@/components/login-gate';
 import { PageShell } from '@/components/page-shell';
 import { ReservationStatusBadge, VanStatusBadge } from '@/components/status-badge';
 import { getSession } from '@/lib/session';
-import { formatDateOnly, formatDateTime, formatEuro, formatPriceCents } from '@/lib/uitleen';
+import {
+  formatDateOnly,
+  formatDateTime,
+  formatDateWithPart,
+  formatEuro,
+  formatPriceCents,
+} from '@/lib/uitleen';
 import { myReservations, myVanBookings } from '@/lib/uitleen-server';
 import { copy, getLocale } from '@/lib/i18n';
 
@@ -79,8 +85,9 @@ export default async function ReservatiesPage({
                         {itemSummary(reservation.lines, en)}
                       </p>
                       <p className="mt-0.5 text-sm text-vtk-muted">
-                        {formatDateOnly(reservation.pickupDate, locale)} {en ? 'to' : 'tot'}{' '}
-                        {formatDateOnly(reservation.returnDate, locale)}
+                        {formatDateWithPart(reservation.pickupDate, reservation.pickupPart, locale)}{' '}
+                        {en ? 'to' : 'tot'}{' '}
+                        {formatDateWithPart(reservation.returnDate, reservation.returnPart, locale)}
                         {reservation.totalDepositCents > 0
                           ? ` · ${formatEuro(reservation.totalDepositCents)} ${en ? 'deposit' : 'waarborg'}`
                           : ''}

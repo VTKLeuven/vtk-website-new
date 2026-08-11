@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import {
   billedHours,
+  dayPartLabel,
   describeReservationChanges,
   formatDateOnly,
+  formatDateWithPart,
   formatDateRange,
   formatDateTime,
   formatEuro,
@@ -393,5 +395,32 @@ describe('describeReservationChanges', () => {
     const before = snapshot('2026-09-12', '2026-09-14', [['Tafel', 2], ['Tafel', 3]]);
     const after = snapshot('2026-09-12', '2026-09-14', [['Tafel', 5]]);
     expect(describeReservationChanges(before, after)).toEqual([]);
+  });
+});
+
+describe('dagdelen', () => {
+  const day = parseDateOnly('2026-09-12')!;
+
+  it('vertaalt de dagdelen', () => {
+    expect(dayPartLabel('NAMIDDAG')).toBe('namiddag');
+    expect(dayPartLabel('NAMIDDAG', 'en')).toBe('afternoon');
+    expect(dayPartLabel(null)).toBeNull();
+    expect(dayPartLabel('MIDDERNACHT')).toBeNull();
+  });
+
+  it('hangt het dagdeel achter de datum, en laat het weg als het er niet is', () => {
+    expect(formatDateWithPart(day, 'VOORMIDDAG')).toContain('(voormiddag)');
+    expect(formatDateWithPart(day, null)).toBe(formatDateOnly(day));
+  });
+
+  it('telt een gewijzigd dagdeel als een wijziging, ook op dezelfde dag', () => {
+    const lines = [{ itemName: 'Tafel', quantity: 2 }];
+    const changes = describeReservationChanges(
+      { pickupDate: day, returnDate: day, pickupPart: 'VOORMIDDAG', lines },
+      { pickupDate: day, returnDate: day, pickupPart: 'AVOND', lines }
+    );
+    expect(changes).toHaveLength(1);
+    expect(changes[0]).toContain('voormiddag');
+    expect(changes[0]).toContain('avond');
   });
 });

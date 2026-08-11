@@ -33,7 +33,7 @@ verbetering, **P3** = groter of "ooit".
 | 4 | Materiaal: catalogus en aanvragen | M3, M4, M5, M6, M13, M15 | ✅ af 11 aug 2026 |
 | 5 | Vervoer | V2, V5, V8, V9, V12, V13 | ✅ af 11 aug 2026 |
 | 6 | Flesserke | F2, F3, F5, F6, F7 | ✅ af 11 aug 2026 |
-| 7 | Grote stukken | ~~A7~~, A8, ~~A9~~, ~~M1~~, ~~M2~~, M12, M17, M18, V1 | bezig; A7, A9, M1, M2 af 11 aug 2026 |
+| 7 | Grote stukken | ~~A7~~, A8, ~~A9~~, ~~M1~~, ~~M2~~, ~~M12~~, M17, M18, V1 | bezig; A7, A9, M1, M2, M12 af 11 aug 2026 |
 
 Vervallen: **M7** (gas wordt een gewoon catalogusitem, dus geen code) en **M16**
 (geen barcodes). Zie fase 0.
@@ -1065,8 +1065,18 @@ Wat er tijdens het werk bijkwam:
 - **Klaar wanneer:** een tweede aanvrager kan zijn vraag kwijt, en Logistiek kan
   de twee periodes uit elkaar schuiven zonder de tweede af te wijzen.
 
-### M12. Reserveren per dagdeel
-**P2 · 🗄️ · code · beslist: B9**
+### M12. Reserveren per dagdeel ✅
+**P2 · 🗄️ · code · beslist: B9** · af op 11 augustus 2026
+
+Wat er tijdens het werk bijkwam:
+
+- **Het dagdeel telt mee in de wijzigingsbeschrijving.** Enkel het dagdeel
+  verzetten (zelfde dag, van voormiddag naar avond) is een wijziging waar iemand
+  zijn shift op plant, dus die hoort in de historiek en in de mail.
+- **In de kalender is het een tag en geen tekst in de detailregel**: op een dag
+  met acht afhalingen is dat het eerste waarop je met je ogen sorteert.
+- **Flesserke kreeg enkel een dagdeel bij "klaarzetten tegen"**, niet bij de
+  optionele terugbrengdatum; die staat er al als "laat staan voor dezelfde dag".
 
 - **Nu:** `pickupDate`/`returnDate` zijn hele dagen (`@db.Date`); de uren spreekt
   het team af. De feedback wil "starten op de middag" kunnen aangeven.

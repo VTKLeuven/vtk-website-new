@@ -1,7 +1,13 @@
 import Link from 'next/link';
 import { ReservationStatusBadge } from '@/components/status-badge';
 import { requireManage } from '@/lib/session';
-import { formatDateOnly, formatEuro, isLastMinute, requesterLabel } from '@/lib/uitleen';
+import {
+  formatDateOnly,
+  formatDateWithPart,
+  formatEuro,
+  isLastMinute,
+  requesterLabel,
+} from '@/lib/uitleen';
 import {
   adminReservations,
   conflictingReservationIds,
@@ -151,7 +157,8 @@ export default async function BeheerAanvragenPage({
               {reservation.user.name} · {itemSummary(reservation.lines)}
             </p>
             <p className="mt-0.5 truncate text-sm text-vtk-muted">
-              {formatDateOnly(reservation.pickupDate)} tot {formatDateOnly(reservation.returnDate)}
+              {formatDateWithPart(reservation.pickupDate, reservation.pickupPart)} tot{' '}
+              {formatDateWithPart(reservation.returnDate, reservation.returnPart)}
               {reservation.totalDepositCents > 0
                 ? ` · ${formatEuro(reservation.totalDepositCents)} waarborg`
                 : ''}
