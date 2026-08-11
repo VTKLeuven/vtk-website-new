@@ -32,7 +32,7 @@ verbetering, **P3** = groter of "ooit".
 | 3 | Statussen terugdraaien en historiek | A5, A6 | ✅ af 10 aug 2026 |
 | 4 | Materiaal: catalogus en aanvragen | M3, M4, M5, M6, M13, M15 | ✅ af 11 aug 2026 |
 | 5 | Vervoer | V2, V5, V8, V9, V12, V13 | ✅ af 11 aug 2026 |
-| 6 | Flesserke | F2, F3, F5, F6, F7 | 1,5 werkdag |
+| 6 | Flesserke | F2, F3, F5, F6, F7 | ✅ af 11 aug 2026 |
 | 7 | Grote stukken | A7, A8, A9, M1, M2, M12, M17, M18, V1 | meerdere weken |
 
 Vervallen: **M7** (gas wordt een gewoon catalogusitem, dus geen code) en **M16**
@@ -738,9 +738,30 @@ Wat er tijdens het werk bijkwam:
 
 ---
 
-# Fase 6: flesserke
+# Fase 6: flesserke ✅ af op 11 augustus 2026
 
-### F2. Bestaande flesserke-items bewerken
+Wat er tijdens het werk bijkwam:
+
+- **F5 was geen bug.** Een werkgrooplid komt gewoon door de gate: nagekeken met de
+  personas mechanix, post en student, en enkel die laatste (zonder groep) wordt
+  tegengehouden. Wat wél fout stond, waren de teksten: "enkel voor het
+  praesidium" op de pagina, in de foutmeldingen en in `docs/uitleendienst.md`.
+  Die zijn rechtgezet. Ziet een werkgrooplid de tab toch niet, dan hangt zijn
+  account dit werkingsjaar aan geen enkele groep; dat is ledenbeheer op vtk.be.
+- **De aanname in F7 klopte niet:** het gedeelde `ReservationForm` heeft géén
+  flesserke-sectie. De team-editor gebruikt daarom `FlesserkeForm` met een derde
+  modus (`admin-edit`) en een eigen actie, want de voorraadcheck van flesserke is
+  een andere dan die van materiaal (niet per periode, maar in zijn geheel tot het
+  terugkomt).
+- **De migratie draagt een backfill mee:** elk bestaand item werd één lading met
+  het aantal en de datum die het had. Zonder die stap zou elk item op nul komen
+  te staan zodra de app de som van de ladingen als voorraad neemt.
+- **Aantal en vervaldatum staan niet meer op het itemformulier bij het bewerken.**
+  Twee plaatsen om hetzelfde getal te zetten is een uitnodiging om ze uit elkaar
+  te laten lopen; bij het aanmaken vraagt het formulier ze wel, want dat wordt de
+  eerste lading.
+
+### F2. Bestaande flesserke-items bewerken ✅
 **P1 · code**
 
 - **Raakt:** `apps/logistiek/app/beheer/flesserke/flesserke-manager.tsx`,
@@ -758,7 +779,7 @@ Wat er tijdens het werk bijkwam:
 - **Klaar wanneer:** een tikfout in een merk of vervaldatum is ter plekke recht
   te zetten.
 
-### F3. Identieke items met verschillende vervaldata
+### F3. Identieke items met verschillende vervaldata ✅
 **P2 · 🗄️ · code · 📝**
 
 - **Raakt:** `UitleenFlesserkeItem` (nu één `expiryDate` en één `quantity`),
@@ -782,7 +803,7 @@ Wat er tijdens het werk bijkwam:
 - **Klaar wanneer:** twee ladingen van hetzelfde product met verschillende
   vervaldata staan correct in de voorraad.
 
-### F5. Werkgroepen en jaarwerkingen kunnen flesserke aanvragen
+### F5. Werkgroepen en jaarwerkingen kunnen flesserke aanvragen ✅
 **P1 · code**
 
 - **Raakt:** `apps/logistiek/app/flesserke/page.tsx` (regel 18: de gate
@@ -805,7 +826,7 @@ Wat er tijdens het werk bijkwam:
   4. Werk `docs/uitleendienst.md` bij: daar staat nu "enkel praesidium".
 - **Klaar wanneer:** een werkgroeplid ziet de flesserke-tab en kan indienen.
 
-### F6. "Van tot" bij flesserke
+### F6. "Van tot" bij flesserke ✅
 **P3 · code**
 
 - **Raakt:** `app/flesserke/request-form.tsx`, `lib/reservation-form.ts`.
@@ -817,7 +838,7 @@ Wat er tijdens het werk bijkwam:
   `returnDate` blijft nodig voor het afboeken van het verbruik.
 - **Klaar wanneer:** het formulier leest zoals het werkt.
 
-### F7. Flesserke-aanvraag bewerken als logistieker
+### F7. Flesserke-aanvraag bewerken als logistieker ✅
 **P2 · code**
 
 - **Raakt:** `app/beheer/aanvragen/[id]/admin-edit-form.tsx` (materiaal kan het

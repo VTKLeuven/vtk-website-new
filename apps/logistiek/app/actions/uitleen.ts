@@ -121,11 +121,15 @@ function revalidateFlesserke() {
   revalidatePath('/flesserke');
 }
 
-/** Flesserke-aanvraag (enkel praesidium). Aparte reservatie met enkel flesserke-lijnen. */
+/**
+ * Flesserke-aanvraag: aparte reservatie met enkel flesserke-lijnen. Voor de
+ * interne werking, dus elk lid van een post, werkgroep of jaarwerking
+ * (`FLESSERKE_REQUESTER_TYPES`); externen kunnen dit niet aanvragen.
+ */
 export async function createFlesserkeReservationAction(input: ReservationFormInput): Promise<ActionResult> {
   const session = await requireSession();
   if (session.groups.length === 0) {
-    return { ok: false, error: 'Flesserke is enkel voor het praesidium.' };
+    return { ok: false, error: 'Flesserke is enkel voor de interne werking van VTK.' };
   }
   const requester = await deriveMemberRequester(session, input.groupId ?? undefined);
   const built = await buildReservationData(
@@ -147,7 +151,9 @@ export async function editFlesserkeReservationAction(
   input: ReservationFormInput
 ): Promise<ActionResult> {
   const session = await requireSession();
-  if (session.groups.length === 0) return { ok: false, error: 'Flesserke is enkel voor het praesidium.' };
+  if (session.groups.length === 0) {
+    return { ok: false, error: 'Flesserke is enkel voor de interne werking van VTK.' };
+  }
 
   const requester = await deriveMemberRequester(session, input.groupId ?? undefined);
   const built = await buildReservationData(

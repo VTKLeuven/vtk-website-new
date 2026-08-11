@@ -54,8 +54,14 @@ e-mailproces (zie "How to logi"). Productkeuzes: `docs/design-decisions.md`
 
 - **Leden**: elk ingelogd vtk.be-lid (`requireSession`) voor materiaal en vervoer;
   het aanvragertype wordt automatisch afgeleid (`deriveMemberRequester`). De
-  **flesserke-tab** is enkel zichtbaar en bruikbaar voor het praesidium (leden met
-  een post, `session.groups.length > 0`), server-side afgedwongen.
+  **flesserke-tab** is zichtbaar en bruikbaar voor wie tot de interne werking
+  behoort: een post, een werkgroep of een jaarwerking
+  (`session.groups.length > 0`), server-side afgedwongen. Werkgroepen horen daar
+  dus uitdrukkelijk bij; de teksten zeiden ooit "enkel praesidium" en dat is
+  hersteld, want werkgroepen concludeerden daaruit dat het niets voor hen was.
+  Ziet een werkgrooplid de tab toch niet, dan hangt zijn account dit werkingsjaar
+  aan geen enkele groep: dat is ledenbeheer op vtk.be (`/admin/werkgroepen`), niet
+  de uitleendienst.
 - **Beheer**: `hasPermission(session, "logistiek.manage")` (`requireManage`). Rol
   `logistiek` (seed) hangt aan de post `LOGISTIEK` (DEFAULT).
 - **Chauffeurs**: geen permissie, maar data. De keuzelijst (`driverOptions()` in

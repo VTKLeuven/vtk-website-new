@@ -8,6 +8,7 @@ import {
   editFlesserkeReservationAction,
   type ActionResult,
 } from '@/app/actions/uitleen';
+import { adminEditFlesserkeReservationAction } from '@/app/actions/beheer';
 import { FlesserkeItemName } from '@/components/flesserke-item-name';
 import { LastMinuteNotice } from '@/components/last-minute-notice';
 import { QuantityInput } from '@/components/quantity-input';
@@ -27,7 +28,7 @@ export type FlesserkeInitial = {
   quantities: Record<string, number>;
 };
 
-/** Flesserke-aanvraagformulier (praesidium). Aparte flow van het materiaal. */
+/** Flesserke-aanvraagformulier (interne werking). Aparte flow van het materiaal. */
 export function FlesserkeForm({
   catalog,
   groups,
@@ -43,8 +44,15 @@ export function FlesserkeForm({
   initial: FlesserkeInitial;
   /** Termijn voor de last-minute-waarschuwing; zie /beheer/instellingen. */
   lastMinuteDays: number;
-  /** 'create' of een reservatie-id om te bewerken. */
-  mode: { kind: 'create' } | { kind: 'edit'; reservationId: string };
+  /**
+   * 'create' of een reservatie-id om te bewerken. 'admin-edit' is dezelfde
+   * bewerking door het team: die mag elke post kiezen en ook een goedgekeurde
+   * aanvraag nog aanpassen.
+   */
+  mode:
+    | { kind: 'create' }
+    | { kind: 'edit'; reservationId: string }
+    | { kind: 'admin-edit'; reservationId: string };
   onCancel?: () => void;
 }) {
   const en = locale === 'en';
@@ -94,7 +102,7 @@ export function FlesserkeForm({
       const payload: ReservationFormInput = {
         ...event,
         pickupDate,
-        returnDate,
+        returnDate: returnDate || pickupDate,
         note,
         lines: [],
         flesserkeLines: Object.entries(quantities).map(([itemId, quantity]) => ({ itemId, quantity })),
@@ -102,7 +110,9 @@ export function FlesserkeForm({
       const result: ActionResult =
         mode.kind === 'create'
           ? await createFlesserkeReservationAction(payload)
-          : await editFlesserkeReservationAction(mode.reservationId, payload);
+          : mode.kind === 'admin-edit'
+            ? await adminEditFlesserkeReservationAction(mode.reservationId, payload)
+            : await editFlesserkeReservationAction(mode.reservationId, payload);
       if (result.ok) {
         if (mode.kind === 'create') router.push('/reservaties?aangevraagd=1');
         else {
@@ -117,7 +127,13 @@ export function FlesserkeForm({
 
   return (
     <div className="space-y-6">
-      <EventRequesterFields value={event} onChange={setEvent} groups={groups} locale={locale} mode="member" />
+      <EventRequesterFields
+        value={event}
+        onChange={setEvent}
+        groups={groups}
+        locale={locale}
+        mode={mode.kind === 'admin-edit' ? 'team' : 'member'}
+      />
 
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
         <div className="space-y-6">
@@ -217,7 +233,9 @@ export function FlesserkeForm({
           <h2 className="text-lg font-semibold tracking-tight text-vtk-ink">{en ? 'Your request' : 'Jouw aanvraag'}</h2>
           <div className="mt-4 grid gap-3">
             <label className="grid gap-1 text-sm">
-              <span className="font-medium text-vtk-ink">{en ? 'Needed from' : 'Nodig vanaf'}</span>
+              <span className="font-medium text-vtk-ink">
+                {en ? 'Ready by' : 'Klaarzetten tegen'}
+              </span>
               <input
                 type="date"
                 value={pickupDate}
@@ -225,15 +243,25 @@ export function FlesserkeForm({
                 className="h-10 rounded-lg border border-vtk-navy/15 bg-white px-3 text-vtk-ink"
               />
             </label>
+            {/* Flesserke is verbruiksgoed: wat geopend is, komt niet terug. Enkel
+                het gesloten deel gaat terug naar de kelder, en meestal dezelfde
+                dag; vandaar de default en het optionele karakter. */}
             <label className="grid gap-1 text-sm">
-              <span className="font-medium text-vtk-ink">{en ? 'Until' : 'Tot'}</span>
+              <span className="font-medium text-vtk-ink">
+                {en ? 'Rest back by (optional)' : 'Rest terug tegen (optioneel)'}
+              </span>
               <input
                 type="date"
-                value={returnDate}
+                value={returnDate || pickupDate}
                 min={pickupDate || undefined}
                 onChange={(e) => setReturnDate(e.target.value)}
                 className="h-10 rounded-lg border border-vtk-navy/15 bg-white px-3 text-vtk-ink"
               />
+              <span className="text-xs text-vtk-muted">
+                {en
+                  ? 'Leave as is for the same day. Only unopened items come back.'
+                  : 'Laat staan voor dezelfde dag. Enkel wat ongeopend blijft, komt terug.'}
+              </span>
             </label>
             <LastMinuteNotice pickupDate={pickupDate} days={lastMinuteDays} locale={locale} />
             <label className="grid gap-1 text-sm">
@@ -262,7 +290,7 @@ export function FlesserkeForm({
             size="lg"
             className="mt-5 w-full"
             onClick={submit}
-            disabled={pending || count === 0 || !pickupDate || !returnDate || !event.eventName.trim()}
+            disabled={pending || count === 0 || !pickupDate || !event.eventName.trim()}
           >
             {pending
               ? en

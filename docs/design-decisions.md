@@ -1176,6 +1176,45 @@ karchauffeurs bovenaan in de keuzelijst en de rest onder "Niet met de kar".
   via die rij in de chauffeurslijst staan (onder "zelf toegevoegd", waar je ze kan
   weghalen).
 
+### Flesserke: ladingen met een eigen vervaldatum
+
+Een flesserke-item (`UitleenFlesserkeItem`) is het product; wat er ligt, staat in
+**ladingen** (`UitleenFlesserkeBatch`), elk met een eigen aantal en vervaldatum.
+Twee bakken cola die je op verschillende momenten kocht, vervallen op
+verschillende dagen; met één datum per item sloeg de rode markering "vervalt
+binnen 3 weken" op de hele stapel, ook op de bakken die nog maanden goed waren.
+
+Wat daarbij vastligt:
+
+- **De ladingen zijn de waarheid.** `item.quantity` en `item.expiryDate` zijn een
+  bijgehouden samenvatting (de som en de eerstvolgende datum); de acties zetten
+  ze bij elke wijziging opnieuw via `syncFlesserkeItemTotals`. Zo blijft de
+  beschikbaarheidsberekening (`quantity` min gereserveerd), de zoekfilter en de
+  sortering op één rij lezen, zonder join.
+- **Verbruik gaat van de oudste lading eerst.** Dat is wat er in de kelder
+  gebeurt: je neemt de bak die het eerst vervalt.
+- **Een lege lading telt niet mee voor de vervaldatum.** Een leeggedronken bak van
+  vorige maand mag het item niet rood houden.
+- **Terugdraaien zet alles op de oudste lading.** Welke lading precies verbruikt
+  werd, houden we niet bij; dat zou een koppeltabel per lijn vragen voor een
+  correctie die zelden gebeurt. Het totaal klopt hoe dan ook, en bij één lading
+  (het gewone geval) is het exact het spiegelbeeld.
+- **De snelle voorraadbijstelling werkt enkel bij één lading.** Liggen er
+  meerdere, dan is niet te weten van welke er twee bij of af moeten, en zou de app
+  die keuze verzinnen; je past ze dan per lading aan in de bewerkrij.
+
+### Flesserke is voor de hele interne werking, niet enkel het praesidium
+
+De toegangsregel was altijd "heeft een groep" (`session.groups.length > 0`), dus
+werkgroepen en jaarwerkingen konden flesserke gewoon aanvragen. De teksten zeiden
+"enkel voor het praesidium", en werkgroepen concludeerden daaruit dat het niets
+voor hen was. Dat is rechtgezet in de app en in `docs/uitleendienst.md`.
+
+Ziet een werkgrooplid de tab toch niet, dan hangt zijn account dit werkingsjaar
+aan geen enkele groep. Dat is ledenbeheer op vtk.be (`/admin/werkgroepen`) en geen
+zaak van de uitleendienst; de gate opzetten zou het verbergen in plaats van het
+oplossen.
+
 ### Feedbackronde augustus 2026: negen keuzes
 
 Na een half werkingsjaar gaf het team Logistiek feedback op de app. Negen punten

@@ -14,10 +14,13 @@ import {
   transportPriceCents,
 } from '@/lib/uitleen';
 import {
+  consumeFlesserkeStock,
   flesserkeReserved,
   isDriver,
   reservedQuantities,
+  restoreFlesserkeStock,
   searchDriverCandidates,
+  syncFlesserkeItemTotals,
   type DriverCandidate,
 } from '@/lib/uitleen-server';
 import {
@@ -468,12 +471,8 @@ export async function markReturnedAction(
       const returned = Number.isInteger(raw) ? Math.max(0, Math.min(line.quantity, raw as number)) : 0;
       const consumed = line.quantity - returned;
       await tx.uitleenFlesserkeLine.update({ where: { id: line.id }, data: { returnedQuantity: returned } });
-      if (consumed > 0) {
-        await tx.uitleenFlesserkeItem.update({
-          where: { id: line.flesserkeItemId },
-          data: { quantity: { decrement: consumed } },
-        });
-      }
+      // Oudste lading eerst; het item houdt de som en de eerstvolgende datum bij.
+      if (consumed > 0) await consumeFlesserkeStock(tx, line.flesserkeItemId, consumed);
     }
     await writeAudit(tx, { reservationId }, {
       kind: 'STATUS_CHANGED',
@@ -688,12 +687,8 @@ export async function undoReturnedAction(reservationId: string): Promise<ActionR
         where: { id: line.id },
         data: { returnedQuantity: null },
       });
-      if (consumed > 0) {
-        await tx.uitleenFlesserkeItem.update({
-          where: { id: line.flesserkeItemId },
-          data: { quantity: { increment: consumed } },
-        });
-      }
+      // Terug op de oudste lading: het spiegelbeeld van het afboeken hierboven.
+      if (consumed > 0) await restoreFlesserkeStock(tx, line.flesserkeItemId, consumed);
     }
     await writeAudit(tx, { reservationId }, {
       kind: 'STATUS_CHANGED',
@@ -782,6 +777,102 @@ export async function undoDepositReturnedAction(reservationId: string): Promise<
  * goedkeuren en wordt de voorraad opnieuw gecheckt, zodat een APPROVED aanvraag
  * altijd door voorraad gedekt blijft.
  */
+/**
+ * Team-bewerking van een flesserke-aanvraag.
+ *
+ * Apart van {@link adminEditReservationAction}, want een flesserke-aanvraag heeft
+ * geen materiaallijnen en de voorraadcheck is een andere: verbruiksgoed wordt
+ * niet per periode gereserveerd maar in zijn geheel, tot het terugkomt.
+ */
+export async function adminEditFlesserkeReservationAction(
+  reservationId: string,
+  input: ReservationFormInput
+): Promise<ActionResult> {
+  const session = await requireManage();
+
+  const built = await buildReservationData({ ...input, lines: [] }, null);
+  if (!built.ok) return built;
+
+  const outcome = await runSerializable(async (tx) => {
+    const existing = await tx.uitleenReservation.findUnique({
+      where: { id: reservationId },
+      select: {
+        status: true,
+        paidOfflineAt: true,
+        payments: { select: { status: true } },
+        flesserkeLines: { select: { returnedQuantity: true, itemName: true } },
+      },
+    });
+    if (!existing) return { error: 'NOT_FOUND' as const };
+    if (existing.status !== 'REQUESTED' && existing.status !== 'APPROVED') {
+      return { error: 'LOCKED' as const };
+    }
+    if (
+      existing.paidOfflineAt ||
+      existing.payments.some((payment) => ['CREATED', 'PENDING', 'SUCCEEDED'].includes(payment.status))
+    ) {
+      return { error: 'PAYMENT_LOCKED' as const };
+    }
+    // Een lijn waarvan het verbruik al afgeboekt is, mag je niet in aantal
+    // wijzigen: de voorraad is dan al aangepast en het nieuwe aantal zou daar
+    // niet meer bij passen. Draai eerst het terugbrengen terug.
+    const settled = existing.flesserkeLines.find((line) => line.returnedQuantity !== null);
+    if (settled) return { error: `SETTLED:${settled.itemName}` as const };
+
+    // Enkel bij een goedgekeurde aanvraag neemt flesserke voorraad in; bij een
+    // aanvraag die nog beslist moet worden, telt ze nog niet mee.
+    if (existing.status === 'APPROVED') {
+      const reserved = await flesserkeReserved(tx, { excludeReservationId: reservationId });
+      const items = await tx.uitleenFlesserkeItem.findMany({
+        where: { id: { in: built.flesserkeLineCreates.map((l) => l.flesserkeItemId) } },
+        select: { id: true, quantity: true, name: true },
+      });
+      const byId = new Map(items.map((item) => [item.id, item]));
+      for (const line of built.flesserkeLineCreates) {
+        const item = byId.get(line.flesserkeItemId);
+        const available = (item?.quantity ?? 0) - (reserved.get(line.flesserkeItemId) ?? 0);
+        if (line.quantity > available) {
+          return { error: `STOCK:${item?.name ?? line.itemName}` as const };
+        }
+      }
+    }
+
+    await tx.uitleenFlesserkeLine.deleteMany({ where: { reservationId } });
+    await tx.uitleenReservation.update({
+      where: { id: reservationId },
+      data: { ...built.scalars, flesserkeLines: { create: built.flesserkeLineCreates } },
+    });
+    await writeAudit(tx, { reservationId }, {
+      kind: 'EDITED',
+      note: `${built.flesserkeLineCreates.length} flesserke-lijn${built.flesserkeLineCreates.length === 1 ? '' : 'en'} na de wijziging`,
+      actorId: session.user.id,
+    });
+    return { error: null };
+  });
+
+  if (outcome.error === 'NOT_FOUND') return { ok: false, error: 'Aanvraag niet gevonden.' };
+  if (outcome.error === 'LOCKED') return { ok: false, error: 'Deze aanvraag kan niet meer bewerkt worden.' };
+  if (outcome.error === 'PAYMENT_LOCKED') {
+    return {
+      ok: false,
+      error: 'Deze aanvraag heeft een actieve of voltooide betaling en kan niet meer gewijzigd worden.',
+    };
+  }
+  if (outcome.error?.startsWith('SETTLED:')) {
+    return {
+      ok: false,
+      error: `"${outcome.error.slice(8)}" is al afgeboekt bij het terugbrengen. Draai het terugbrengen eerst terug.`,
+    };
+  }
+  if (outcome.error?.startsWith('STOCK:')) {
+    return { ok: false, error: `Onvoldoende voorraad voor "${outcome.error.slice(6)}".` };
+  }
+
+  revalidateBeheer();
+  revalidatePath('/flesserke');
+  return { ok: true, message: 'Flesserke-aanvraag bijgewerkt.' };
+}
+
 export async function adminEditReservationAction(
   reservationId: string,
   input: ReservationFormInput
@@ -1578,24 +1669,27 @@ export async function saveFlesserkeItemAction(_prev: SaveState, formData: FormDa
   const expiryRaw = String(formData.get('expiryDate') ?? '').trim();
 
   if (!name) return saveError('NAME_REQUIRED');
-  if (!Number.isInteger(quantity) || quantity < 0) return saveError('QUANTITY_INVALID');
+  // Aantal en datum horen bij de eerste lading en staan enkel in het
+  // toevoegformulier; bij het bewerken komen ze niet mee.
+  if (!id && (!Number.isInteger(quantity) || quantity < 0)) return saveError('QUANTITY_INVALID');
   let expiryDate: Date | null = null;
   if (expiryRaw) {
     if (!/^\d{4}-\d{2}-\d{2}$/.test(expiryRaw)) return saveError('DATE_INVALID');
     expiryDate = new Date(`${expiryRaw}T00:00:00.000Z`);
   }
 
+  // Aantal en vervaldatum staan op de ladingen, niet op het item: bij het
+  // bewerken komen die velden dan ook niet mee, en de samenvatting op het item
+  // wordt uit de batches herrekend.
   const data = {
     name,
     brand: brand || null,
     contentAmount: contentAmount || null,
     categoryId: categoryId || null,
-    quantity,
     colruytUrl: colruytUrl || null,
     note: note || null,
     locationShelf: locationShelf || null,
     locationRack: locationRack || null,
-    expiryDate,
   };
   if (id) {
     const expected = parseExpectedVersion(formData.get('expectedUpdatedAt'));
@@ -1605,17 +1699,105 @@ export async function saveFlesserkeItemAction(_prev: SaveState, formData: FormDa
     });
     if (updated.count === 0) return saveError('STALE');
   } else {
-    await prisma.uitleenFlesserkeItem.create({ data });
+    // Een nieuw item begint met één lading: het aantal en de datum uit het
+    // toevoegformulier. Verdere ladingen voeg je per item toe.
+    await prisma.$transaction(async (tx) => {
+      const created = await tx.uitleenFlesserkeItem.create({ data: { ...data, quantity: 0 } });
+      await tx.uitleenFlesserkeBatch.create({
+        data: { itemId: created.id, quantity, expiryDate },
+      });
+      await syncFlesserkeItemTotals(tx, created.id);
+    });
   }
   revalidateBeheer();
   return saveOk();
 }
 
-/** Snelle voorraadbijstelling (wekelijkse upkeep) zonder het hele item te bewerken. */
+/**
+ * Eén lading opslaan (nieuw of bestaand). De voorraad van het item volgt daaruit.
+ */
+export async function saveFlesserkeBatchAction(_prev: SaveState, formData: FormData): Promise<SaveState> {
+  await requireManage();
+  const id = String(formData.get('batchId') ?? '').trim();
+  const itemId = String(formData.get('itemId') ?? '').trim();
+  const quantity = Number.parseInt(String(formData.get('quantity') ?? ''), 10);
+  const note = String(formData.get('note') ?? '').trim();
+  const expiryRaw = String(formData.get('expiryDate') ?? '').trim();
+
+  if (!itemId) return saveError('NOT_FOUND');
+  if (!Number.isInteger(quantity) || quantity < 0) return saveError('QUANTITY_INVALID');
+  let expiryDate: Date | null = null;
+  if (expiryRaw) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(expiryRaw)) return saveError('DATE_INVALID');
+    expiryDate = new Date(`${expiryRaw}T00:00:00.000Z`);
+  }
+
+  await prisma.$transaction(async (tx) => {
+    if (id) {
+      await tx.uitleenFlesserkeBatch.update({
+        where: { id },
+        data: { quantity, expiryDate, note: note || null },
+      });
+    } else {
+      await tx.uitleenFlesserkeBatch.create({
+        data: { itemId, quantity, expiryDate, note: note || null },
+      });
+    }
+    await syncFlesserkeItemTotals(tx, itemId);
+  });
+
+  revalidateBeheer();
+  return saveOk();
+}
+
+/** Een lading verwijderen; de voorraad van het item zakt met dat aantal. */
+export async function deleteFlesserkeBatchAction(batchId: string): Promise<ActionResult> {
+  await requireManage();
+  const batch = await prisma.uitleenFlesserkeBatch.findUnique({
+    where: { id: batchId },
+    select: { itemId: true },
+  });
+  if (!batch) return { ok: false, error: 'Deze lading bestaat niet meer.' };
+
+  await prisma.$transaction(async (tx) => {
+    await tx.uitleenFlesserkeBatch.delete({ where: { id: batchId } });
+    await syncFlesserkeItemTotals(tx, batch.itemId);
+  });
+
+  revalidateBeheer();
+  return { ok: true, message: 'Lading verwijderd.' };
+}
+
+/**
+ * Snelle voorraadbijstelling (wekelijkse upkeep) zonder het hele item te openen.
+ *
+ * Werkt enkel wanneer er één lading is; liggen er meerdere, dan is niet te weten
+ * van welke er twee bij of af moeten, en zou de app die keuze verzinnen.
+ */
 export async function setFlesserkeQuantityAction(itemId: string, quantity: number): Promise<ActionResult> {
   await requireManage();
   if (!Number.isInteger(quantity) || quantity < 0) return { ok: false, error: 'Ongeldig aantal.' };
-  await prisma.uitleenFlesserkeItem.update({ where: { id: itemId }, data: { quantity } });
+
+  const batches = await prisma.uitleenFlesserkeBatch.findMany({
+    where: { itemId },
+    select: { id: true },
+  });
+  if (batches.length > 1) {
+    return {
+      ok: false,
+      error: 'Dit item heeft meerdere ladingen; pas het aantal per lading aan in de bewerkrij.',
+    };
+  }
+
+  await prisma.$transaction(async (tx) => {
+    if (batches.length === 1) {
+      await tx.uitleenFlesserkeBatch.update({ where: { id: batches[0].id }, data: { quantity } });
+    } else {
+      await tx.uitleenFlesserkeBatch.create({ data: { itemId, quantity } });
+    }
+    await syncFlesserkeItemTotals(tx, itemId);
+  });
+
   revalidateBeheer();
   return { ok: true, message: 'Voorraad bijgewerkt.' };
 }

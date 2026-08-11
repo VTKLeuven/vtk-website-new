@@ -1,10 +1,12 @@
 'use client';
 
-import { useMemo, useState, useTransition } from 'react';
+import { Fragment, useMemo, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import type { UitleenFlesserkeCategory } from '@prisma/client';
 import {
   deactivateFlesserkeCategoryAction,
+  deleteFlesserkeBatchAction,
+  saveFlesserkeBatchAction,
   saveFlesserkeCategoryAction,
   saveFlesserkeItemAction,
   setFlesserkeItemActiveAction,
@@ -27,6 +29,34 @@ const ITEM_ERRORS = {
   STALE: STALE_MESSAGE,
 };
 const CATEGORY_ERRORS = { NAME_REQUIRED: 'Geef de categorie een naam.', STALE: STALE_MESSAGE };
+const BATCH_ERRORS = {
+  NOT_FOUND: 'Dit item bestaat niet meer.',
+  QUANTITY_INVALID: 'Het aantal moet 0 of meer zijn.',
+  DATE_INVALID: 'De vervaldatum is ongeldig.',
+};
+
+/** "YYYY-MM-DD" voor een date-input; leeg wanneer er geen datum is. */
+function dateInputValue(date: Date | null): string {
+  return date
+    ? new Intl.DateTimeFormat('en-CA', {
+        timeZone: 'UTC',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+      }).format(date)
+    : '';
+}
+
+function dateLabel(date: Date | null): string {
+  return date
+    ? new Intl.DateTimeFormat('nl-BE', {
+        timeZone: 'UTC',
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+      }).format(date)
+    : 'geen datum';
+}
 
 const inputClass = 'h-9 min-w-0 rounded-lg border border-vtk-navy/15 bg-white px-3 text-sm text-vtk-ink';
 
@@ -77,12 +107,18 @@ function QuantityQuickEdit({ itemId, quantity }: { itemId: string; quantity: num
   );
 }
 
-function ItemFields({ item, categories }: { item?: AdminFlesserkeItem; categories: UitleenFlesserkeCategory[] }) {
-  const expiryValue = item?.expiryDate
-    ? new Intl.DateTimeFormat('en-CA', { timeZone: 'UTC', year: 'numeric', month: '2-digit', day: '2-digit' }).format(
-        item.expiryDate
-      )
-    : '';
+/**
+ * De velden van een flesserke-item. Aantal en vervaldatum horen bij een lading en
+ * niet bij het item; bij het aanmaken vraagt het formulier ze wel, want dat wordt
+ * meteen de eerste lading.
+ */
+function ItemFields({
+  item,
+  categories,
+}: {
+  item?: AdminFlesserkeItem;
+  categories: UitleenFlesserkeCategory[];
+}) {
   return (
     <div className="@container">
     <div className="grid gap-3 @lg:grid-cols-2 @2xl:grid-cols-4">
@@ -105,15 +141,19 @@ function ItemFields({ item, categories }: { item?: AdminFlesserkeItem; categorie
           ))}
         </select>
       </label>
-      <label className="grid gap-1 text-xs font-medium text-vtk-muted">
-        Aantal<input type="number" name="quantity" min={0} defaultValue={item?.quantity ?? 0} className={inputClass} />
-      </label>
+      {item ? null : (
+        <label className="grid gap-1 text-xs font-medium text-vtk-muted">
+          Aantal<input type="number" name="quantity" min={0} defaultValue={0} className={inputClass} />
+        </label>
+      )}
       <label className="grid gap-1 text-xs font-medium text-vtk-muted">
         Hoeveelheid<input type="text" name="contentAmount" defaultValue={item?.contentAmount ?? ''} placeholder="Bv. 0,5 L" className={inputClass} />
       </label>
-      <label className="grid gap-1 text-xs font-medium text-vtk-muted">
-        Vervaldatum<input type="date" name="expiryDate" defaultValue={expiryValue} className={inputClass} />
-      </label>
+      {item ? null : (
+        <label className="grid gap-1 text-xs font-medium text-vtk-muted">
+          Vervaldatum<input type="date" name="expiryDate" className={inputClass} />
+        </label>
+      )}
       <label className="grid gap-1 text-xs font-medium text-vtk-muted">
         Schap<input type="text" name="locationShelf" defaultValue={item?.locationShelf ?? ''} className={inputClass} />
       </label>
@@ -131,6 +171,108 @@ function ItemFields({ item, categories }: { item?: AdminFlesserkeItem; categorie
   );
 }
 
+/** De ladingen van één item, elk met een eigen aantal en vervaldatum. */
+function BatchEditor({ item }: { item: AdminFlesserkeItem }) {
+  return (
+    <div className="grid gap-3">
+      <div>
+        <p className="text-sm font-semibold text-vtk-ink">Ladingen ({item.batches.length})</p>
+        <p className="mt-1 text-xs text-vtk-muted">
+          Twee bakken van hetzelfde product die je apart kocht, vervallen apart. De voorraad van het item
+          is de som; verbruik gaat van de lading die het eerst vervalt.
+        </p>
+      </div>
+
+      <ul className="grid gap-2">
+        {item.batches.map((batch) => (
+          <li key={batch.id} className="rounded-[12px] border border-vtk-navy/10 bg-white p-3">
+            <SaveForm
+              action={saveFlesserkeBatchAction}
+              submitLabel="Opslaan"
+              savingLabel="Opslaan..."
+              savedMessage="Lading opgeslagen."
+              errorMessages={BATCH_ERRORS}
+              className="grid gap-2"
+            >
+              <input type="hidden" name="batchId" value={batch.id} />
+              <input type="hidden" name="itemId" value={item.id} />
+              <div className="grid gap-2 sm:grid-cols-[6rem_10rem_minmax(0,1fr)]">
+                <label className="grid gap-1 text-xs font-medium text-vtk-muted">
+                  Aantal
+                  <input
+                    type="number"
+                    name="quantity"
+                    min={0}
+                    defaultValue={batch.quantity}
+                    className={inputClass}
+                  />
+                </label>
+                <label className="grid gap-1 text-xs font-medium text-vtk-muted">
+                  Vervaldatum
+                  <input
+                    type="date"
+                    name="expiryDate"
+                    defaultValue={dateInputValue(batch.expiryDate)}
+                    className={inputClass}
+                  />
+                </label>
+                <label className="grid gap-1 text-xs font-medium text-vtk-muted">
+                  Notitie
+                  <input
+                    type="text"
+                    name="note"
+                    defaultValue={batch.note ?? ''}
+                    placeholder="Bv. gekocht bij Colruyt Heverlee"
+                    className={inputClass}
+                  />
+                </label>
+              </div>
+            </SaveForm>
+            <div className="mt-2">
+              <ConfirmActionButton
+                label={`Lading verwijderen: ${item.name}, ${dateLabel(batch.expiryDate)}`}
+                confirmLabel="Lading verwijderen"
+                successMessage="Lading verwijderd."
+                action={deleteFlesserkeBatchAction.bind(null, batch.id)}
+                destructive
+                dialogTitle="Deze lading verwijderen?"
+                dialogDescription={`De voorraad van ${item.name} zakt met ${batch.quantity}. De andere ladingen en de historiek blijven staan.`}
+              />
+            </div>
+          </li>
+        ))}
+      </ul>
+
+      <details className="rounded-[12px] border border-dashed border-vtk-navy/25 p-3">
+        <summary className="cursor-pointer text-sm font-semibold text-vtk-ink">+ Lading toevoegen</summary>
+        <div className="mt-3">
+          <SaveForm
+            action={saveFlesserkeBatchAction}
+            submitLabel="Lading toevoegen"
+            savingLabel="Toevoegen..."
+            savedMessage="Lading toegevoegd."
+            errorMessages={BATCH_ERRORS}
+            className="grid gap-2"
+          >
+            <input type="hidden" name="itemId" value={item.id} />
+            <div className="grid gap-2 sm:grid-cols-[6rem_10rem_minmax(0,1fr)]">
+              <label className="grid gap-1 text-xs font-medium text-vtk-muted">
+                Aantal<input type="number" name="quantity" min={0} defaultValue={0} className={inputClass} />
+              </label>
+              <label className="grid gap-1 text-xs font-medium text-vtk-muted">
+                Vervaldatum<input type="date" name="expiryDate" className={inputClass} />
+              </label>
+              <label className="grid gap-1 text-xs font-medium text-vtk-muted">
+                Notitie<input type="text" name="note" className={inputClass} />
+              </label>
+            </div>
+          </SaveForm>
+        </div>
+      </details>
+    </div>
+  );
+}
+
 export function FlesserkeManager({
   categories,
   items,
@@ -140,6 +282,7 @@ export function FlesserkeManager({
 }) {
   const [search, setSearch] = useState('');
   const [activeCategory, setActiveCategory] = useState<string>('all');
+  const [editingId, setEditingId] = useState<string | null>(null);
   const sort = useSort<FlesserkeSortKey>('name');
 
   const active = items.filter((i) => i.active);
@@ -307,37 +450,80 @@ export function FlesserkeManager({
                 const available = item.quantity - item.reserved;
                 const soon = isExpiringSoon(item.expiryDate);
                 const categoryName = categoryNameOf(item.categoryId);
+                const editing = editingId === item.id;
+                const multiBatch = item.batches.length > 1;
                 return (
-                  <tr key={item.id} className="border-b border-vtk-navy/5">
-                    <td className="py-2 pr-3 text-vtk-ink">
-                      <FlesserkeItemName name={item.name} colruytUrl={item.colruytUrl} />
-                      {item.brand ? <span className="text-vtk-muted"> · {item.brand}</span> : null}
-                    </td>
-                    <td className="py-2 pr-3 text-vtk-muted">{item.contentAmount}</td>
-                    <td className="py-2 pr-3 text-vtk-muted">{categoryName}</td>
-                    <td className={`py-2 pr-3 ${soon ? 'font-semibold text-red-700' : 'text-vtk-muted'}`}>
-                      {item.expiryDate
-                        ? new Intl.DateTimeFormat('nl-BE', { timeZone: 'UTC', day: '2-digit', month: '2-digit', year: 'numeric' }).format(item.expiryDate)
-                        : '—'}
-                    </td>
-                    <td className="py-2 pr-3 text-vtk-muted">{item.reserved}</td>
-                    <td className={`py-2 pr-3 font-semibold ${available <= 0 ? 'text-red-700' : 'text-vtk-ink'}`}>
-                      {available}
-                    </td>
-                    <td className="py-2 pr-3">
-                      <QuantityQuickEdit itemId={item.id} quantity={item.quantity} />
-                    </td>
-                    <td className="py-2">
-                      <ConfirmActionButton
-                        label="Uit lijst"
-                        successMessage="Uit de lijst gehaald."
-                        action={setFlesserkeItemActiveAction.bind(null, item.id, false)}
-                        destructive
-                        dialogTitle="Uit de flesserke-lijst halen?"
-                        dialogDescription="Leden kunnen dit niet meer aanvragen; de historiek blijft bewaard."
-                      />
-                    </td>
-                  </tr>
+                  <Fragment key={item.id}>
+                    <tr className="border-b border-vtk-navy/5">
+                      <td className="py-2 pr-3 text-vtk-ink">
+                        <FlesserkeItemName name={item.name} colruytUrl={item.colruytUrl} />
+                        {item.brand ? <span className="text-vtk-muted"> · {item.brand}</span> : null}
+                      </td>
+                      <td className="py-2 pr-3 text-vtk-muted">{item.contentAmount}</td>
+                      <td className="py-2 pr-3 text-vtk-muted">{categoryName}</td>
+                      <td className={`py-2 pr-3 ${soon ? 'font-semibold text-red-700' : 'text-vtk-muted'}`}>
+                        {/* Bij meerdere ladingen is dit de eerstvolgende datum; het
+                            aantal erbij, anders lijkt de hele stapel te vervallen. */}
+                        {item.expiryDate ? dateLabel(item.expiryDate) : '—'}
+                        {multiBatch ? (
+                          <span className="block text-[11px] font-normal text-vtk-muted">
+                            {item.batches.length} ladingen
+                          </span>
+                        ) : null}
+                      </td>
+                      <td className="py-2 pr-3 text-vtk-muted">{item.reserved}</td>
+                      <td className={`py-2 pr-3 font-semibold ${available <= 0 ? 'text-red-700' : 'text-vtk-ink'}`}>
+                        {available}
+                      </td>
+                      <td className="py-2 pr-3">
+                        {multiBatch ? (
+                          <span className="text-vtk-ink">{item.quantity}</span>
+                        ) : (
+                          <QuantityQuickEdit itemId={item.id} quantity={item.quantity} />
+                        )}
+                      </td>
+                      <td className="py-2">
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => setEditingId(editing ? null : item.id)}
+                            className="rounded-full border border-vtk-navy/15 px-3 py-1.5 text-sm font-semibold text-vtk-ink transition hover:border-vtk-navy/40 hover:bg-vtk-paper"
+                            aria-expanded={editing}
+                          >
+                            {editing ? 'Sluiten' : 'Bewerken'}
+                          </button>
+                          <ConfirmActionButton
+                            label="Uit lijst"
+                            successMessage="Uit de lijst gehaald."
+                            action={setFlesserkeItemActiveAction.bind(null, item.id, false)}
+                            destructive
+                            dialogTitle="Uit de flesserke-lijst halen?"
+                            dialogDescription="Leden kunnen dit niet meer aanvragen; de historiek blijft bewaard."
+                          />
+                        </div>
+                      </td>
+                    </tr>
+                    {editing ? (
+                      <tr>
+                        <td colSpan={8} className="border-b border-vtk-navy/10 bg-vtk-paper/55 px-4 py-5">
+                          <p className="mb-4 text-sm font-semibold text-vtk-ink">Item aanpassen</p>
+                          <SaveForm
+                            action={saveFlesserkeItemAction}
+                            submitLabel="Wijzigingen opslaan"
+                            savingLabel="Opslaan..."
+                            savedMessage="Item opgeslagen."
+                            errorMessages={ITEM_ERRORS}
+                            className="grid gap-4"
+                          >
+                            <ItemFields item={item} categories={categories} />
+                          </SaveForm>
+                          <div className="mt-5 border-t border-vtk-navy/10 pt-4">
+                            <BatchEditor item={item} />
+                          </div>
+                        </td>
+                      </tr>
+                    ) : null}
+                  </Fragment>
                 );
               })}
             </tbody>

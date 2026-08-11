@@ -13,14 +13,17 @@ export default async function FlesserkePage() {
   }
   const en = locale === 'en';
 
-  // Flesserke is enkel voor het praesidium (leden met een post).
+  // Flesserke is voor de interne werking: elk lid van een post, een werkgroep of
+  // een jaarwerking. De gate is "heeft een groep", niet "heeft een post"; de
+  // tekst zei het omgekeerde en werkgroepen concludeerden dat het niets voor hen
+  // was terwijl de knop gewoon werkte.
   if (session.groups.length === 0) {
     return (
       <PageShell title="Flesserke">
         <p className="rounded-[18px] border border-vtk-navy/10 bg-vtk-surface p-7 text-vtk-body">
           {en
-            ? 'Flesserke is only available to praesidium members.'
-            : 'Flesserke is enkel beschikbaar voor het praesidium.'}
+            ? 'Flesserke is for VTK\u2019s own activities: posts, work groups and year committees. Your account is not linked to any of those this working year; mail logistiek@vtk.be if that is wrong.'
+            : 'Flesserke is voor de eigen werking van VTK: posten, werkgroepen en jaarwerkingen. Aan jouw account hangt dit werkingsjaar geen van die drie; mail logistiek@vtk.be als dat niet klopt.'}
         </p>
       </PageShell>
     );
@@ -39,8 +42,8 @@ export default async function FlesserkePage() {
       }
       intro={
         en
-          ? 'Consumables (food, drinks, cleaning) prepared per event for internal use. Closed items come back; opened ones are consumed.'
-          : 'Verbruiksgoederen (voeding, drank, kuis) die per event worden klaargezet voor interne werking. Gesloten komt terug; geopend is verbruik.'
+          ? 'Consumables (food, drinks, cleaning) prepared per event for VTK\u2019s own activities: posts, work groups and year committees alike. Closed items come back; opened ones are consumed.'
+          : 'Verbruiksgoederen (voeding, drank, kuis) die per event worden klaargezet voor de eigen werking: posten, werkgroepen en jaarwerkingen evengoed. Gesloten komt terug; geopend is verbruik.'
       }
     >
       {catalog.length === 0 ? (

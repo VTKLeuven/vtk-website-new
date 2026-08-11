@@ -2272,9 +2272,13 @@ model UitleenFlesserkeItem {
   name          String
   brand         String?
   contentAmount String? // "Hoeveelheid [kg of L]"
-  expiryDate    DateTime? @db.Date // eerste vervaldatum
+  // Eerstvolgende vervaldatum over alle ladingen heen, en de totale fysieke
+  // voorraad. Allebei afgeleid uit `batches`: de acties houden ze bij zodat de
+  // beschikbaarheidsberekening (`quantity` min gereserveerd) en de zoek- en
+  // sorteervelden op één rij blijven staan. Schrijf ze nooit los bij.
+  expiryDate    DateTime? @db.Date
   colruytUrl    String?
-  quantity      Int       @default(0) // fysieke voorraad; beschikbaar = quantity - gereserveerd
+  quantity      Int       @default(0) // som van de batches; beschikbaar = quantity - gereserveerd
   locationShelf String?
   locationRack  String?
   note          String?
@@ -2285,8 +2289,34 @@ model UitleenFlesserkeItem {
 
   category UitleenFlesserkeCategory? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
   lines    UitleenFlesserkeLine[]
+  batches  UitleenFlesserkeBatch[]
 
   @@index([categoryId, active])
+}
+
+/// Eén lading van een flesserke-item, met een eigen vervaldatum.
+///
+/// Twee bakken cola die je op verschillende momenten kocht, vervallen op
+/// verschillende dagen. Met één datum per item sloeg de rode markering "vervalt
+/// binnen 3 weken" op de hele stapel, ook op de bakken die nog maanden goed zijn.
+///
+/// De batches zijn de waarheid; `UitleenFlesserkeItem.quantity` en `.expiryDate`
+/// zijn een bijgehouden samenvatting ervan (som en eerstvolgende datum). Verbruik
+/// gaat van de oudste lading eerst; zie docs/design-decisions.md.
+model UitleenFlesserkeBatch {
+  id         String    @id @default(cuid())
+  itemId     String
+  quantity   Int       @default(0)
+  // Null = geen houdbaarheidsdatum (bv. kuisgerief); die lading gaat als laatste op.
+  expiryDate DateTime? @db.Date
+  note       String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  item UitleenFlesserkeItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
+
+  @@index([itemId, expiryDate])
 }
 
 model UitleenFlesserkeLine {

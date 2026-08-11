@@ -184,6 +184,101 @@ export async function flesserkeReserved(
   return reserved;
 }
 
+/**
+ * Zet `quantity` en `expiryDate` van een flesserke-item gelijk aan zijn
+ * ladingen: de som en de eerstvolgende datum. De batches zijn de waarheid, maar
+ * de beschikbaarheidsberekening, de zoekfilter en de sortering lezen die twee
+ * velden op de itemrij; ze zelf bijhouden scheelt een join in elke query.
+ *
+ * Roep dit aan binnen dezelfde transactie als elke wijziging aan de batches.
+ */
+export async function syncFlesserkeItemTotals(
+  tx: Prisma.TransactionClient,
+  itemId: string
+): Promise<void> {
+  const batches = await tx.uitleenFlesserkeBatch.findMany({
+    where: { itemId },
+    select: { quantity: true, expiryDate: true },
+  });
+  const quantity = batches.reduce((total, batch) => total + batch.quantity, 0);
+  // Enkel ladingen die er nog liggen tellen mee voor "vervalt binnenkort": een
+  // leeggedronken bak van vorige maand mag het item niet rood houden. Een lading
+  // zonder datum telt evenmin mee: die heeft geen houdbaarheid, en null als
+  // kleinste waarde nemen zou elk item rood maken.
+  const dates = batches
+    .filter((batch) => batch.quantity > 0)
+    .map((batch) => batch.expiryDate)
+    .filter((date): date is Date => date !== null);
+  const expiryDate = dates.length > 0 ? new Date(Math.min(...dates.map((d) => d.getTime()))) : null;
+  await tx.uitleenFlesserkeItem.update({ where: { id: itemId }, data: { quantity, expiryDate } });
+}
+
+/**
+ * Boekt `amount` stuks af van de ladingen van een item, oudste vervaldatum
+ * eerst; ladingen zonder datum gaan als laatste. Geeft terug hoeveel er niet
+ * meer af te boeken viel (0 in het normale geval).
+ *
+ * FIFO omdat dat is wat er in de kelder gebeurt: je neemt de bak die het eerst
+ * vervalt. De rest van de app rekent met het totaal, dus die verdeling is enkel
+ * hier zichtbaar.
+ */
+export async function consumeFlesserkeStock(
+  tx: Prisma.TransactionClient,
+  itemId: string,
+  amount: number
+): Promise<number> {
+  if (amount <= 0) return 0;
+  const batches = await tx.uitleenFlesserkeBatch.findMany({
+    where: { itemId, quantity: { gt: 0 } },
+    orderBy: [{ expiryDate: { sort: 'asc', nulls: 'last' } }, { createdAt: 'asc' }],
+    select: { id: true, quantity: true },
+  });
+  let left = amount;
+  for (const batch of batches) {
+    if (left <= 0) break;
+    const take = Math.min(batch.quantity, left);
+    await tx.uitleenFlesserkeBatch.update({
+      where: { id: batch.id },
+      data: { quantity: batch.quantity - take },
+    });
+    left -= take;
+  }
+  await syncFlesserkeItemTotals(tx, itemId);
+  return left;
+}
+
+/**
+ * Zet `amount` stuks terug op de voorraad, op de oudste lading.
+ *
+ * Dat is het spiegelbeeld van {@link consumeFlesserkeStock} en dus exact juist
+ * zolang er tussen afboeken en terugdraaien niets anders gebeurde. Welke lading
+ * precies verbruikt werd, houden we niet bij: dat zou een koppeltabel per lijn
+ * vragen voor een correctie die zelden gebeurt, en het totaal klopt hoe dan ook.
+ */
+export async function restoreFlesserkeStock(
+  tx: Prisma.TransactionClient,
+  itemId: string,
+  amount: number
+): Promise<void> {
+  if (amount <= 0) return;
+  const oldest = await tx.uitleenFlesserkeBatch.findFirst({
+    where: { itemId },
+    orderBy: [{ expiryDate: { sort: 'asc', nulls: 'last' } }, { createdAt: 'asc' }],
+    select: { id: true },
+  });
+  if (oldest) {
+    await tx.uitleenFlesserkeBatch.update({
+      where: { id: oldest.id },
+      data: { quantity: { increment: amount } },
+    });
+  } else {
+    // Alle ladingen zijn intussen verwijderd: maak er weer een, anders zou de
+    // voorraad stil verdwijnen bij het terugdraaien.
+    await tx.uitleenFlesserkeBatch.create({ data: { itemId, quantity: amount } });
+  }
+  await syncFlesserkeItemTotals(tx, itemId);
+}
+
 /** Beschikbaarheid per flesserke-item (voorraad min gereserveerd). */
 export async function flesserkeAvailability(): Promise<Array<{ itemId: string; available: number }>> {
   const [items, reserved] = await Promise.all([
@@ -196,7 +291,14 @@ export async function flesserkeAvailability(): Promise<Array<{ itemId: string; a
 export async function adminFlesserke() {
   const [categories, items] = await Promise.all([
     prisma.uitleenFlesserkeCategory.findMany({ orderBy: [{ sortIndex: 'asc' }, { name: 'asc' }] }),
-    prisma.uitleenFlesserkeItem.findMany({ orderBy: [{ name: 'asc' }] }),
+    prisma.uitleenFlesserkeItem.findMany({
+      orderBy: [{ name: 'asc' }],
+      include: {
+        batches: {
+          orderBy: [{ expiryDate: { sort: 'asc', nulls: 'last' } }, { createdAt: 'asc' }],
+        },
+      },
+    }),
   ]);
   const reserved = await flesserkeReserved(prisma);
   return {

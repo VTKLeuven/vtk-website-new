@@ -18,6 +18,7 @@ import { ConfirmActionButton } from '@/components/ui/confirm-action-button';
 import { ReservationStatusBadge } from '@/components/status-badge';
 import { requireManage } from '@/lib/session';
 import {
+  DEFAULT_LAST_MINUTE_DAYS,
   formatDateOnly,
   formatDateTime,
   formatEuro,
@@ -29,10 +30,12 @@ import {
   activeGroups,
   adminReservation,
   getCatalog,
+  getFlesserkeCatalog,
   getLogistiekSettings,
   hasSucceededPayment,
   reservedQuantities,
 } from '@/lib/uitleen-server';
+import { AdminFlesserkeEditor } from './admin-flesserke-form';
 import { AdminReservationEditor } from './admin-edit-form';
 import { DecisionForms } from './decision-forms';
 import { ReturnForm } from './return-form';
@@ -55,13 +58,18 @@ export default async function BeheerAanvraagDetailPage({
         })
       : null;
 
-  // Flesserke-aanvragen bewerkt het team niet inline (aparte flow); de team-editor
-  // toont enkel voor materiaalaanvragen.
+  // Een aanvraag is materiaal- of flesserke-type; elk heeft zijn eigen editor,
+  // want de lijnen en de voorraadcheck verschillen.
   const isFlesserke = reservation.flesserkeLines.length > 0 && reservation.lines.length === 0;
-  const editable = (reservation.status === 'REQUESTED' || reservation.status === 'APPROVED') && !isFlesserke;
-  const [catalog, groups, settings] = editable
-    ? await Promise.all([getCatalog(), activeGroups(), getLogistiekSettings()])
-    : [[], [], { showRentPrices: false }];
+  const editable = reservation.status === 'REQUESTED' || reservation.status === 'APPROVED';
+  const [catalog, flesserkeCatalog, groups, settings] = editable
+    ? await Promise.all([
+        isFlesserke ? Promise.resolve([]) : getCatalog(),
+        isFlesserke ? getFlesserkeCatalog() : Promise.resolve([]),
+        activeGroups(),
+        getLogistiekSettings(),
+      ])
+    : [[], [], [], { showRentPrices: false, lastMinuteDays: DEFAULT_LAST_MINUTE_DAYS }];
 
   const paidOnline = hasSucceededPayment(reservation.payments);
   const paid = paidOnline || reservation.paidOfflineAt !== null;
@@ -294,7 +302,39 @@ export default async function BeheerAanvraagDetailPage({
           </p>
         ) : null}
 
-        {editable ? (
+        {editable && isFlesserke ? (
+          <div className="mt-5 border-t border-vtk-navy/10 pt-4">
+            <AdminFlesserkeEditor
+              reservationId={reservation.id}
+              catalog={flesserkeCatalog}
+              groups={requesterOptions(groups, 'nl')}
+              lastMinuteDays={settings.lastMinuteDays}
+              initial={{
+                event: {
+                  requesterType: reservation.requesterType,
+                  groupId: reservation.groupId ?? '',
+                  requesterName: reservation.requesterName ?? '',
+                  eventName: reservation.eventName,
+                  eventLocation: reservation.eventLocation ?? '',
+                  eventStart: reservation.eventStart ? toDatetimeLocalValue(reservation.eventStart) : '',
+                  expectedAttendance: reservation.expectedAttendance?.toString() ?? '',
+                  contactName: reservation.contactName ?? '',
+                  contactPhone: reservation.contactPhone ?? '',
+                  delivery: reservation.delivery,
+                  deliveryNote: reservation.deliveryNote ?? '',
+                },
+                pickupDate: toDateInputValue(reservation.pickupDate),
+                returnDate: toDateInputValue(reservation.returnDate),
+                note: reservation.memberNote ?? '',
+                quantities: Object.fromEntries(
+                  reservation.flesserkeLines.map((l) => [l.flesserkeItemId, l.quantity])
+                ),
+              }}
+            />
+          </div>
+        ) : null}
+
+        {editable && !isFlesserke ? (
           <div className="mt-5 border-t border-vtk-navy/10 pt-4">
             <AdminReservationEditor
               reservationId={reservation.id}
