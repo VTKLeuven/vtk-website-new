@@ -1,7 +1,7 @@
 import 'server-only';
 
 import { prisma } from '@vtk/db';
-import { parseDateOnly, todayDateOnly, type ReservationLineInput } from './uitleen';
+import { isEmailish, parseDateOnly, todayDateOnly, type ReservationLineInput } from './uitleen';
 
 /** Max lengte van een uitleenperiode; langere aanvragen verlopen via e-mail. */
 export const MAX_RESERVATION_DAYS = 14;
@@ -22,6 +22,7 @@ export type ReservationFormInput = {
   deliveryNote?: string;
   pickupDate: string;
   returnDate: string;
+  notifyEmail?: string;
   note?: string;
   lines: ReservationLineInput[];
   flesserkeLines?: ReservationLineInput[];
@@ -52,6 +53,7 @@ export type ReservationScalars = {
   deliveryNote: string | null;
   pickupDate: Date;
   returnDate: Date;
+  notifyEmail: string | null;
   memberNote: string | null;
   totalPriceCents: number;
   totalDepositCents: number;
@@ -158,6 +160,11 @@ export async function buildReservationData(
     return { ok: false, error: 'Het startmoment van het evenement is ongeldig.' };
   }
 
+  const notifyEmail = (input.notifyEmail ?? '').trim();
+  if (notifyEmail && !isEmailish(notifyEmail)) {
+    return { ok: false, error: 'Het extra e-mailadres ziet er niet uit als een adres.' };
+  }
+
   const lines = input.lines.filter((line) => Number.isInteger(line.quantity) && line.quantity > 0);
   const itemIds = lines.map((line) => line.itemId);
   if (new Set(itemIds).size !== itemIds.length) {
@@ -248,6 +255,7 @@ export async function buildReservationData(
       deliveryNote: Boolean(input.delivery) ? trim(input.deliveryNote) : null,
       pickupDate,
       returnDate,
+      notifyEmail: notifyEmail ? notifyEmail.slice(0, FIELD_MAX) : null,
       memberNote: input.note && input.note.trim() ? input.note.trim().slice(0, MAX_NOTE_LENGTH) : null,
       totalPriceCents,
       totalDepositCents,

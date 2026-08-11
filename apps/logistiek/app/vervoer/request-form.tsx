@@ -31,6 +31,7 @@ export function VanRequestForm({
   const [helpersNote, setHelpersNote] = useState('');
   const [helpersPhone, setHelpersPhone] = useState('');
   const [contactPhone, setContactPhone] = useState('');
+  const [notifyEmail, setNotifyEmail] = useState('');
   const [roundTrip, setRoundTrip] = useState(false);
   const [returnStartAt, setReturnStartAt] = useState('');
   const [returnEndAt, setReturnEndAt] = useState('');
@@ -83,6 +84,7 @@ export function VanRequestForm({
         helpersNote,
         helpersPhone,
         contactPhone,
+        notifyEmail,
         note,
         returnStartAt: roundTrip ? returnStartAt : undefined,
         returnEndAt: roundTrip ? returnEndAt : undefined,
@@ -256,6 +258,23 @@ export function VanRequestForm({
             {en
               ? 'The driver calls this number if something changes on the road.'
               : 'De chauffeur belt dit nummer wanneer er onderweg iets wijzigt.'}
+          </span>
+        </label>
+        <label className="grid gap-1 text-sm sm:col-span-2">
+          <span className="font-medium text-vtk-ink">
+            {en ? 'Extra address to keep posted' : 'Extra adres dat op de hoogte blijft'}
+          </span>
+          <input
+            type="email"
+            value={notifyEmail}
+            onChange={(e) => setNotifyEmail(e.target.value)}
+            placeholder="bv. logistiek.existenz@vtk.be"
+            className={inputClass}
+          />
+          <span className="text-xs text-vtk-muted">
+            {en
+              ? 'Optional. Gets a copy of every mail about this trip.'
+              : 'Optioneel. Krijgt elke mail over deze rit in kopie.'}
           </span>
         </label>
         <label className="grid gap-1 text-sm sm:col-span-2">

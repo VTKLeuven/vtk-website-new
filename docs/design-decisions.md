@@ -1215,6 +1215,35 @@ aan geen enkele groep. Dat is ledenbeheer op vtk.be (`/admin/werkgroepen`) en ge
 zaak van de uitleendienst; de gate opzetten zou het verbergen in plaats van het
 oplossen.
 
+### Mail: vier momenten, en een meelezend adres
+
+De uitleendienst startte bewust zonder mails ("geen mails in v1"). Dat hield geen
+stand zodra het team beslissingen kon terugdraaien, uren verschuiven en de inhoud
+van een aanvraag aanpassen: de aanvrager merkte zo'n wijziging pas wanneer hij
+toevallig opnieuw inlogde, meestal bij het afhalen.
+
+Wat vastligt:
+
+- **Vier momenten mailen: goedgekeurd, afgewezen, gewijzigd, teruggedraaid.** Niet
+  "afgehaald", niet "betaald", niet elke statusstap in het beheer. Wie voor elke
+  klik een mail krijgt, leest er geen enkele meer, en dan mist hij ook die ene
+  die telde.
+- **De mail zegt wát er veranderde.** "Tafel: 5 → 3", "Afhalen: za 12 → zo 13
+  september", "Uren verschoven bij goedkeuring". Diezelfde regels staan in de
+  historiek (A6): één beschrijving, twee bestemmingen. "Je aanvraag is gewijzigd"
+  zonder meer stuurt de aanvrager terug naar het scherm om te gaan zoeken wat.
+- **Een tweede adres leest mee** (`notifyEmail`, optioneel op een aanvraag en op
+  een rit). Een aanvraag hoort bij een post of werkgroep, maar de mails komen bij
+  één persoon toe; wie volgend jaar die post overneemt, vindt niets terug. Het
+  adres van de werkgroep in kopie overleeft de wissel van aanvrager.
+- **Een mislukte verzending draait de actie niet terug.** Een mailserver die er
+  even niet is, mag geen goedkeuring ongedaan maken: er wordt gelogd en
+  doorgegaan. Daarom vertrekt de mail ook ná de transactie en niet erin, anders
+  gaat er een bericht de deur uit over een wijziging die door een rollback nooit
+  gebeurd is.
+- **Naar het voorkeursadres van het lid**, dezelfde regel als de hoofdsite: wie
+  een persoonlijk adres instelde, leest zijn universiteitsmail niet.
+
 ### Feedbackronde augustus 2026: negen keuzes
 
 Na een half werkingsjaar gaf het team Logistiek feedback op de app. Negen punten

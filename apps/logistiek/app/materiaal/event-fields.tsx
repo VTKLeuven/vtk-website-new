@@ -209,7 +209,7 @@ export function EventRequesterFields({
             className={inputClass}
           />
         </label>
-        <label className="grid gap-1 text-sm sm:col-span-2">
+        <label className="grid gap-1 text-sm">
           <span className="font-medium text-vtk-ink">{en ? 'Contact phone' : 'Telefoon contactpersoon'}</span>
           <input
             type="tel"
@@ -217,6 +217,26 @@ export function EventRequesterFields({
             onChange={(e) => set('contactPhone', e.target.value)}
             className={inputClass}
           />
+        </label>
+        {/* Meelezend adres. Een aanvraag hoort bij een post of werkgroep, maar de
+            mails komen bij één persoon toe; wie volgend jaar die post overneemt,
+            vindt niets terug. Een mailbox van de werkgroep in kopie lost dat op. */}
+        <label className="grid gap-1 text-sm">
+          <span className="font-medium text-vtk-ink">
+            {en ? 'Extra address to keep posted' : 'Extra adres dat op de hoogte blijft'}
+          </span>
+          <input
+            type="email"
+            value={value.notifyEmail}
+            onChange={(e) => set('notifyEmail', e.target.value)}
+            placeholder="bv. logistiek.existenz@vtk.be"
+            className={inputClass}
+          />
+          <span className="text-xs text-vtk-muted">
+            {en
+              ? 'Optional. Gets a copy of every mail about this request.'
+              : 'Optioneel. Krijgt elke mail over deze aanvraag in kopie.'}
+          </span>
         </label>
 
         <label className="flex items-center gap-2 text-sm sm:col-span-2">

@@ -1,11 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import {
   billedHours,
+  describeReservationChanges,
   formatDateOnly,
   formatDateRange,
   formatDateTime,
   formatEuro,
   formatPriceCents,
+  isEmailish,
   isLastMinute,
   isOnQuarterHour,
   isoWeekNumber,
@@ -334,5 +336,62 @@ describe('date formatting locale', () => {
     const dt = new Date('2026-07-20T12:00:00Z');
     expect(formatDateTime(dt, 'nl')).toContain('juli');
     expect(formatDateTime(dt, 'en')).toContain('July');
+  });
+});
+
+describe('isEmailish', () => {
+  it('accepteert gewone adressen', () => {
+    expect(isEmailish('logistiek.existenz@vtk.be')).toBe(true);
+    expect(isEmailish('  jan@example.com  ')).toBe(true);
+  });
+
+  it('weigert wat duidelijk geen adres is', () => {
+    expect(isEmailish('logistiek')).toBe(false);
+    expect(isEmailish('logistiek@vtk')).toBe(false);
+    expect(isEmailish('jan @vtk.be')).toBe(false);
+    expect(isEmailish('')).toBe(false);
+  });
+});
+
+describe('describeReservationChanges', () => {
+  const snapshot = (
+    pickup: string,
+    ret: string,
+    lines: Array<[string, number]>
+  ) => ({
+    pickupDate: parseDateOnly(pickup)!,
+    returnDate: parseDateOnly(ret)!,
+    lines: lines.map(([itemName, quantity]) => ({ itemName, quantity })),
+  });
+
+  it('geeft niets terug wanneer er niets veranderde', () => {
+    const before = snapshot('2026-09-12', '2026-09-14', [['Tafel', 5]]);
+    const after = snapshot('2026-09-12', '2026-09-14', [['Tafel', 5]]);
+    expect(describeReservationChanges(before, after)).toEqual([]);
+  });
+
+  it('benoemt een gewijzigd aantal, een toevoeging en een verwijdering', () => {
+    const before = snapshot('2026-09-12', '2026-09-14', [['Tafel', 5], ['Frigo', 1]]);
+    const after = snapshot('2026-09-12', '2026-09-14', [['Tafel', 3], ['Stoel', 10]]);
+    expect(describeReservationChanges(before, after)).toEqual([
+      'Tafel: 5 → 3',
+      'Stoel: toegevoegd (10)',
+      'Frigo: verwijderd',
+    ]);
+  });
+
+  it('benoemt verschoven datums', () => {
+    const before = snapshot('2026-09-12', '2026-09-14', [['Tafel', 5]]);
+    const after = snapshot('2026-09-13', '2026-09-14', [['Tafel', 5]]);
+    const changes = describeReservationChanges(before, after);
+    expect(changes).toHaveLength(1);
+    expect(changes[0]).toContain('Afhalen');
+    expect(changes[0]).toContain('→');
+  });
+
+  it('telt dezelfde naam op twee lijnen samen', () => {
+    const before = snapshot('2026-09-12', '2026-09-14', [['Tafel', 2], ['Tafel', 3]]);
+    const after = snapshot('2026-09-12', '2026-09-14', [['Tafel', 5]]);
+    expect(describeReservationChanges(before, after)).toEqual([]);
   });
 });

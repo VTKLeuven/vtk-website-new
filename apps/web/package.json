@@ -20,6 +20,7 @@
     "@vtk/auth": "*",
     "@vtk/db": "*",
     "@vtk/i18n": "*",
+    "@vtk/mail": "*",
     "@vtk/payments": "*",
     "@vtk/storage": "*",
     "@vtk/ui": "*",

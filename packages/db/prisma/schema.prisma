@@ -2003,6 +2003,11 @@ model UitleenReservation {
   memberNote String? // extra info van het lid
   adminNote  String? // nota van het team (bv. reden van afwijzing)
 
+  // Extra adres dat mee op de hoogte blijft, naast de aanvrager zelf. Bedoeld
+  // voor de mailbox van een werkgroep (logistiek.existenz@vtk.be): die overleeft
+  // de wissel van aanvrager, een persoonlijk adres niet.
+  notifyEmail String?
+
   // Totalen gesnapshot bij de aanvraag.
   totalPriceCents   Int
   totalDepositCents Int
@@ -2165,6 +2170,9 @@ model UitleenTransportBooking {
 
   memberNote String?
   adminNote  String?
+
+  /// Zoals op UitleenReservation: een meelezend adres naast de aanvrager.
+  notifyEmail String?
 
   decidedAt     DateTime?
   decidedById   String?

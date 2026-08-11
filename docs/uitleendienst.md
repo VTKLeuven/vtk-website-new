@@ -84,6 +84,30 @@ Webhook `app/api/uitleen/mollie/webhook`, mock `.../mock/complete`, maintenance
 compose). Returnpagina reconciliëert bij `?betaling=1` (webhook wordt op
 localhost weggelaten).
 
+## Mails: @vtk/mail
+
+De SMTP-helper is gehoist van `apps/web/lib/mail.ts` naar `packages/mail`; beide
+apps gebruiken hem, inclusief de EHLO- en STARTTLS-lessen die erin zitten.
+`apps/web/lib/mail.ts` houdt enkel nog de Theokot-berichten over.
+
+`lib/uitleen-mail.ts` stuurt bij vier momenten: goedgekeurd, afgewezen, gewijzigd
+en teruggedraaid (`notifyReservation` / `notifyTransport`). Drie regels, alle drie
+met een reden (zie `docs/design-decisions.md`):
+
+1. **Ná de transactie aanroepen**, nooit erin: anders vertrekt er een mail over
+   een wijziging die door een rollback niet gebeurd is.
+2. **Falen mag de actie niet doen falen**: beide functies vangen zelf en loggen.
+3. **De mail draagt de diff** die ook in de historiek staat
+   (`describeReservationChanges` in `lib/uitleen.ts`).
+
+`notifyEmail` op `UitleenReservation`/`UitleenTransportBooking` gaat in kopie; het
+lid zelf krijgt de mail op zijn voorkeursadres (`emailPreference`).
+
+Zonder `SMTP_HOST` wordt de mail gelogd in plaats van verstuurd. Draait er lokaal
+een mailcatcher zonder STARTTLS (bv. op `127.0.0.1:1025`), dan mislukt de
+verzending met `502 Command not implemented`: `requireTLS` staat bewust aan.
+Zet `SMTP_HOST` leeg om de mails in de dev-log te lezen.
+
 ## Foto's: @vtk/storage
 
 `instrumentation.ts` registreert de S3-resolver (leest de `s3.config`-`Setting`
@@ -110,12 +134,13 @@ de same-origin `publicUrl`.
 - **Actions**: `app/actions/uitleen.ts` (leden), `app/actions/beheer.ts` (team).
 - **Lib**: `lib/uitleen.ts` (helpers), `lib/uitleen-server.ts` (queries +
   voorraad), `lib/reservation-form.ts` (`buildReservationData`, gedeeld),
-  `lib/payments.ts`, `lib/runtime-config.ts`, `lib/storage.ts`, `lib/session.ts`.
+  `lib/uitleen-mail.ts` (mails naar de aanvrager), `lib/payments.ts`,
+  `lib/runtime-config.ts`, `lib/storage.ts`, `lib/session.ts`.
 - **Scripts**: `scripts/import-inventaris.ts` (materiaal + flesserke uit de xlsx).
 
 ## Env & infra
 
-- `LOGISTIEK_PUBLIC_URL`, `LOGISTIEK_PAYMENT_PROVIDER`,
+- `LOGISTIEK_PUBLIC_URL`, `LOGISTIEK_PAYMENT_PROVIDER`, `LOGISTIEK_MAIL_FROM`,
   `LOGISTIEK_MAINTENANCE_SECRET` (`.env.example`); `MOLLIE_API_KEY` gedeeld;
   `BETTER_AUTH_SECRET` nodig voor S3-secret. Logistiek-container krijgt
   `DATABASE_URL` (directe Prisma) + `depends_on: postgres`.

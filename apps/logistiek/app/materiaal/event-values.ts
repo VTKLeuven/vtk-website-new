@@ -51,6 +51,7 @@ export type EventReservationValues = {
   expectedAttendance: string;
   contactName: string;
   contactPhone: string;
+  notifyEmail: string;
   delivery: boolean;
   deliveryNote: string;
 };
@@ -70,6 +71,7 @@ export function emptyEventValues(groups: RequesterOption[]): EventReservationVal
     expectedAttendance: '',
     contactName: '',
     contactPhone: '',
+    notifyEmail: '',
     delivery: false,
     deliveryNote: '',
   };

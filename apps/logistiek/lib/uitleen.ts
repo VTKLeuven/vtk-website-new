@@ -23,6 +23,15 @@ export function formatPriceCents(
 }
 
 /**
+ * Ziet dit eruit als een e-mailadres? Bewust minimaal: het adres wordt enkel in
+ * kopie gezet, en een strengere regex weigert vroeg of laat een geldig adres.
+ * Of het bestaat, weten we pas als de mailserver het aanneemt.
+ */
+export function isEmailish(value: string): boolean {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
+}
+
+/**
  * "YYYY-MM-DD" uit een date-input naar een Date op UTC-middernacht, zoals
  * Prisma `@db.Date`-kolommen ze bewaart. Ongeldige input geeft null.
  */
@@ -87,6 +96,68 @@ export function formatDateOnly(date: Date, locale: LogistiekLocale = 'nl'): stri
     month: 'long',
     year: 'numeric',
   }).format(date);
+}
+
+export type ChangeSnapshot = {
+  pickupDate: Date;
+  returnDate: Date;
+  lines: Array<{ itemName: string; quantity: number }>;
+};
+
+/**
+ * Wat er precies veranderde aan een aanvraag, in mensentaal.
+ *
+ * "3 materiaallijnen na de wijziging" staat in de historiek maar zegt de
+ * aanvrager niets: hij weet niet wat er stond. Deze regels gaan zowel naar de
+ * historiek (A6) als naar de mail (A9), en zijn de reden dat die mail bruikbaar
+ * is: "Tafel: 5 → 3" is een bericht, "aanvraag gewijzigd" is een raadsel.
+ *
+ * Bewust op naam en niet op item-id: de lijnen bewaren de naam op het moment van
+ * aanvragen (`itemName`), en dat is ook wat de aanvrager gelezen heeft.
+ */
+export function describeReservationChanges(
+  before: ChangeSnapshot,
+  after: ChangeSnapshot,
+  locale: LogistiekLocale = 'nl'
+): string[] {
+  const en = locale === 'en';
+  const changes: string[] = [];
+
+  const sameDay = (a: Date, b: Date) => a.getTime() === b.getTime();
+  if (!sameDay(before.pickupDate, after.pickupDate)) {
+    changes.push(
+      `${en ? 'Pickup' : 'Afhalen'}: ${formatDateOnly(before.pickupDate, locale)} → ${formatDateOnly(after.pickupDate, locale)}`
+    );
+  }
+  if (!sameDay(before.returnDate, after.returnDate)) {
+    changes.push(
+      `${en ? 'Return' : 'Terugbrengen'}: ${formatDateOnly(before.returnDate, locale)} → ${formatDateOnly(after.returnDate, locale)}`
+    );
+  }
+
+  const sum = (lines: ChangeSnapshot['lines']) => {
+    const totals = new Map<string, number>();
+    for (const line of lines) {
+      totals.set(line.itemName, (totals.get(line.itemName) ?? 0) + line.quantity);
+    }
+    return totals;
+  };
+  const oldLines = sum(before.lines);
+  const newLines = sum(after.lines);
+
+  for (const [name, quantity] of newLines) {
+    const previous = oldLines.get(name);
+    if (previous === undefined) {
+      changes.push(`${name}: ${en ? 'added' : 'toegevoegd'} (${quantity})`);
+    } else if (previous !== quantity) {
+      changes.push(`${name}: ${previous} → ${quantity}`);
+    }
+  }
+  for (const [name] of oldLines) {
+    if (!newLines.has(name)) changes.push(`${name}: ${en ? 'removed' : 'verwijderd'}`);
+  }
+
+  return changes;
 }
 
 /**

@@ -2,7 +2,7 @@ import "server-only";
 
 import nodemailer from "nodemailer";
 
-import { smtpEhloName } from "@/lib/mail";
+import { smtpEhloName } from "@vtk/mail";
 
 export type MailAttachment = {
   filename: string;

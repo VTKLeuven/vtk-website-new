@@ -33,7 +33,7 @@ verbetering, **P3** = groter of "ooit".
 | 4 | Materiaal: catalogus en aanvragen | M3, M4, M5, M6, M13, M15 | ✅ af 11 aug 2026 |
 | 5 | Vervoer | V2, V5, V8, V9, V12, V13 | ✅ af 11 aug 2026 |
 | 6 | Flesserke | F2, F3, F5, F6, F7 | ✅ af 11 aug 2026 |
-| 7 | Grote stukken | A7, A8, A9, M1, M2, M12, M17, M18, V1 | meerdere weken |
+| 7 | Grote stukken | A7, A8, ~~A9~~, M1, M2, M12, M17, M18, V1 | bezig; A9 af 11 aug 2026 |
 
 Vervallen: **M7** (gas wordt een gewoon catalogusitem, dus geen code) en **M16**
 (geen barcodes). Zie fase 0.
@@ -863,8 +863,27 @@ Wat er tijdens het werk bijkwam:
 Deze veranderen het model of de werking. Doe ze één per één, elk met een eigen
 sectie in `docs/design-decisions.md`.
 
-### A9. Communiceren wanneer Logistiek een aanvraag wijzigt
-**P1 in belang, groot in werk · 🗄️ · code · 📝**
+### A9. Communiceren wanneer Logistiek een aanvraag wijzigt ✅
+**P1 in belang, groot in werk · 🗄️ · code · 📝** · af op 11 augustus 2026
+
+Wat er tijdens het werk bijkwam:
+
+- **De diff kwam in `lib/uitleen.ts` terecht, niet in de mailmodule.**
+  `describeReservationChanges` is puur en getest, en de historiek gebruikt hem
+  net zo goed als de mail: de auditregel bij een team-edit was "3 materiaallijnen
+  na de wijziging" en zegt nu "Tafel: 5 → 3; Afhalen: za 12 → zo 13 september".
+  Eén beschrijving, twee bestemmingen.
+- **Een heen-en-terugaanvraag krijgt één mail, geen twee.** `notifyTransport`
+  neemt een lijst id's: beide ritten worden samen beslist (V12), dus twee mails
+  vlak na elkaar over dezelfde aanvraag zouden lezen als een fout.
+- **`SaveState` kreeg geen nieuw veld nodig**, maar `sendMail` wel: `cc` voor het
+  meelezende adres. Dat zit nu in `packages/mail` en is dus ook voor de hoofdsite
+  beschikbaar.
+- **Lokaal met een mailcatcher zonder STARTTLS zie je niets.** `requireTLS` staat
+  bewust aan (juli 2026), dus een catcher op `127.0.0.1:1025` antwoordt met
+  `502 Command not implemented` en er vertrekt niets; de actie zelf gaat wel door,
+  wat precies de bedoeling is. Zet `SMTP_HOST` leeg om de mails in de dev-log te
+  lezen. Staat in `docs/uitleendienst.md`.
 
 - **Raakt:** nieuw gedeeld mailpakket, `apps/logistiek/app/actions/beheer.ts`
   (alle beslis- en bewerkacties), `packages/db/prisma/schema.prisma`.

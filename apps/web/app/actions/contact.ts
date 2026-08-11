@@ -2,7 +2,7 @@
 
 import * as Sentry from "@sentry/nextjs";
 import { headers } from "next/headers";
-import { sendMail } from "@/lib/mail";
+import { sendMail } from "@vtk/mail";
 import { saveError, saveOk, type SaveState } from "@/lib/saveState";
 import {
   CONTACT_RATE_LIMIT,

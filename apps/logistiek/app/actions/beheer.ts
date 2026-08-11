@@ -8,11 +8,13 @@ import { requireManage } from '@/lib/session';
 import { writeAudit } from '@/lib/audit';
 import { saveError, saveOk, type SaveState } from '@/lib/saveState';
 import {
+  describeReservationChanges,
   formatDateTime,
   isOnQuarterHour,
   rangesOverlap,
   transportPriceCents,
 } from '@/lib/uitleen';
+import { notifyReservation, notifyTransport } from '@/lib/uitleen-mail';
 import {
   consumeFlesserkeStock,
   flesserkeReserved,
@@ -376,6 +378,16 @@ export async function approveReservationAction(
   if (outcome.error === 'NOT_REQUESTED') return saveError('NOT_REQUESTED');
   if (outcome.error === 'NO_STOCK') return saveError('NO_STOCK');
 
+  // Pas na de transactie: een mail over een goedkeuring die door een rollback
+  // niet doorging, is erger dan geen mail.
+  await notifyReservation(
+    reservationId,
+    'APPROVED',
+    paymentMode === 'ONLINE'
+      ? 'Betalen gebeurt online; je vindt de betaalknop bij je aanvraag.'
+      : 'Betalen gebeurt aan de balie bij het afhalen.'
+  );
+
   revalidateBeheer();
   return saveOk();
 }
@@ -410,6 +422,7 @@ export async function rejectReservationAction(
     note: `reden: ${adminNote}`,
     actorId: session.user.id,
   });
+  await notifyReservation(reservationId, 'REJECTED', adminNote);
 
   revalidateBeheer();
   return saveOk();
@@ -590,6 +603,13 @@ export async function reopenReservationAction(reservationId: string): Promise<Ac
     note: 'beslissing teruggedraaid',
     actorId: session.user.id,
   });
+  await notifyReservation(
+    reservationId,
+    'REOPENED',
+    reservation.status === 'APPROVED'
+      ? 'De goedkeuring is ingetrokken; je aanvraag wacht opnieuw op een beslissing.'
+      : 'De afwijzing is ingetrokken; je aanvraag wacht opnieuw op een beslissing.'
+  );
 
   revalidateBeheer();
   return { ok: true, message: 'De aanvraag staat terug op "aangevraagd".' };
@@ -793,62 +813,78 @@ export async function adminEditFlesserkeReservationAction(
   const built = await buildReservationData({ ...input, lines: [] }, null);
   if (!built.ok) return built;
 
-  const outcome = await runSerializable(async (tx) => {
-    const existing = await tx.uitleenReservation.findUnique({
-      where: { id: reservationId },
-      select: {
-        status: true,
-        paidOfflineAt: true,
-        payments: { select: { status: true } },
-        flesserkeLines: { select: { returnedQuantity: true, itemName: true } },
-      },
-    });
-    if (!existing) return { error: 'NOT_FOUND' as const };
-    if (existing.status !== 'REQUESTED' && existing.status !== 'APPROVED') {
-      return { error: 'LOCKED' as const };
-    }
-    if (
-      existing.paidOfflineAt ||
-      existing.payments.some((payment) => ['CREATED', 'PENDING', 'SUCCEEDED'].includes(payment.status))
-    ) {
-      return { error: 'PAYMENT_LOCKED' as const };
-    }
-    // Een lijn waarvan het verbruik al afgeboekt is, mag je niet in aantal
-    // wijzigen: de voorraad is dan al aangepast en het nieuwe aantal zou daar
-    // niet meer bij passen. Draai eerst het terugbrengen terug.
-    const settled = existing.flesserkeLines.find((line) => line.returnedQuantity !== null);
-    if (settled) return { error: `SETTLED:${settled.itemName}` as const };
-
-    // Enkel bij een goedgekeurde aanvraag neemt flesserke voorraad in; bij een
-    // aanvraag die nog beslist moet worden, telt ze nog niet mee.
-    if (existing.status === 'APPROVED') {
-      const reserved = await flesserkeReserved(tx, { excludeReservationId: reservationId });
-      const items = await tx.uitleenFlesserkeItem.findMany({
-        where: { id: { in: built.flesserkeLineCreates.map((l) => l.flesserkeItemId) } },
-        select: { id: true, quantity: true, name: true },
+  const outcome = await runSerializable(
+    async (tx): Promise<{ error: string | null; changes?: string[] }> => {
+      const existing = await tx.uitleenReservation.findUnique({
+        where: { id: reservationId },
+        select: {
+          status: true,
+          paidOfflineAt: true,
+          pickupDate: true,
+          returnDate: true,
+          payments: { select: { status: true } },
+          flesserkeLines: { select: { returnedQuantity: true, itemName: true, quantity: true } },
+        },
       });
-      const byId = new Map(items.map((item) => [item.id, item]));
-      for (const line of built.flesserkeLineCreates) {
-        const item = byId.get(line.flesserkeItemId);
-        const available = (item?.quantity ?? 0) - (reserved.get(line.flesserkeItemId) ?? 0);
-        if (line.quantity > available) {
-          return { error: `STOCK:${item?.name ?? line.itemName}` as const };
+      if (!existing) return { error: 'NOT_FOUND' as const };
+      if (existing.status !== 'REQUESTED' && existing.status !== 'APPROVED') {
+        return { error: 'LOCKED' as const };
+      }
+      if (
+        existing.paidOfflineAt ||
+        existing.payments.some((payment) => ['CREATED', 'PENDING', 'SUCCEEDED'].includes(payment.status))
+      ) {
+        return { error: 'PAYMENT_LOCKED' as const };
+      }
+      // Een lijn waarvan het verbruik al afgeboekt is, mag je niet in aantal
+      // wijzigen: de voorraad is dan al aangepast en het nieuwe aantal zou daar
+      // niet meer bij passen. Draai eerst het terugbrengen terug.
+      const settled = existing.flesserkeLines.find((line) => line.returnedQuantity !== null);
+      if (settled) return { error: `SETTLED:${settled.itemName}` as const };
+
+      // Enkel bij een goedgekeurde aanvraag neemt flesserke voorraad in; bij een
+      // aanvraag die nog beslist moet worden, telt ze nog niet mee.
+      if (existing.status === 'APPROVED') {
+        const reserved = await flesserkeReserved(tx, { excludeReservationId: reservationId });
+        const items = await tx.uitleenFlesserkeItem.findMany({
+          where: { id: { in: built.flesserkeLineCreates.map((l) => l.flesserkeItemId) } },
+          select: { id: true, quantity: true, name: true },
+        });
+        const byId = new Map(items.map((item) => [item.id, item]));
+        for (const line of built.flesserkeLineCreates) {
+          const item = byId.get(line.flesserkeItemId);
+          const available = (item?.quantity ?? 0) - (reserved.get(line.flesserkeItemId) ?? 0);
+          if (line.quantity > available) {
+            return { error: `STOCK:${item?.name ?? line.itemName}` as const };
+          }
         }
       }
-    }
 
-    await tx.uitleenFlesserkeLine.deleteMany({ where: { reservationId } });
-    await tx.uitleenReservation.update({
-      where: { id: reservationId },
-      data: { ...built.scalars, flesserkeLines: { create: built.flesserkeLineCreates } },
-    });
-    await writeAudit(tx, { reservationId }, {
-      kind: 'EDITED',
-      note: `${built.flesserkeLineCreates.length} flesserke-lijn${built.flesserkeLineCreates.length === 1 ? '' : 'en'} na de wijziging`,
-      actorId: session.user.id,
-    });
-    return { error: null };
-  });
+      await tx.uitleenFlesserkeLine.deleteMany({ where: { reservationId } });
+      await tx.uitleenReservation.update({
+        where: { id: reservationId },
+        data: { ...built.scalars, flesserkeLines: { create: built.flesserkeLineCreates } },
+      });
+      const changes = describeReservationChanges(
+        {
+          pickupDate: existing.pickupDate,
+          returnDate: existing.returnDate,
+          lines: existing.flesserkeLines,
+        },
+        {
+          pickupDate: built.scalars.pickupDate,
+          returnDate: built.scalars.returnDate,
+          lines: built.flesserkeLineCreates,
+        }
+      );
+      await writeAudit(tx, { reservationId }, {
+        kind: 'EDITED',
+        note: changes.length > 0 ? changes.join('; ') : 'aanvraagdetails aangepast',
+        actorId: session.user.id,
+      });
+      return { error: null, changes };
+    }
+  );
 
   if (outcome.error === 'NOT_FOUND') return { ok: false, error: 'Aanvraag niet gevonden.' };
   if (outcome.error === 'LOCKED') return { ok: false, error: 'Deze aanvraag kan niet meer bewerkt worden.' };
@@ -868,6 +904,7 @@ export async function adminEditFlesserkeReservationAction(
     return { ok: false, error: `Onvoldoende voorraad voor "${outcome.error.slice(6)}".` };
   }
 
+  await notifyReservation(reservationId, 'EDITED', outcome.changes?.join('\n'));
   revalidateBeheer();
   revalidatePath('/flesserke');
   return { ok: true, message: 'Flesserke-aanvraag bijgewerkt.' };
@@ -886,58 +923,73 @@ export async function adminEditReservationAction(
   // Status, betaalstatus, voorraadcontrole en write gebeuren in één serializable
   // transactie. Zo kan een gelijktijdige goedkeuring/betaling nooit tussen de
   // controle en de edit komen, en een validatiefout commit geen halve edit.
-  const outcome = await runSerializable(async (tx) => {
-    const existing = await tx.uitleenReservation.findUnique({
-      where: { id: reservationId },
-      select: {
-        status: true,
-        paidOfflineAt: true,
-        payments: { select: { status: true } },
-      },
-    });
-    if (!existing) return { error: 'NOT_FOUND' };
-    if (existing.status !== 'REQUESTED' && existing.status !== 'APPROVED') {
-      return { error: 'LOCKED' };
-    }
-    if (
-      existing.paidOfflineAt ||
-      existing.payments.some((payment) =>
-        ['CREATED', 'PENDING', 'SUCCEEDED'].includes(payment.status),
-      )
-    ) {
-      return { error: 'PAYMENT_LOCKED' };
-    }
+  const outcome = await runSerializable(
+    async (tx): Promise<{ error: string | null; changes?: string[] }> => {
+      const existing = await tx.uitleenReservation.findUnique({
+        where: { id: reservationId },
+        select: {
+          status: true,
+          paidOfflineAt: true,
+          pickupDate: true,
+          returnDate: true,
+          payments: { select: { status: true } },
+          lines: { select: { itemName: true, quantity: true } },
+        },
+      });
+      if (!existing) return { error: 'NOT_FOUND' };
+      if (existing.status !== 'REQUESTED' && existing.status !== 'APPROVED') {
+        return { error: 'LOCKED' };
+      }
+      if (
+        existing.paidOfflineAt ||
+        existing.payments.some((payment) =>
+          ['CREATED', 'PENDING', 'SUCCEEDED'].includes(payment.status),
+        )
+      ) {
+        return { error: 'PAYMENT_LOCKED' };
+      }
 
-    if (existing.status === 'APPROVED') {
-      const reserved = await reservedQuantities(tx, built.scalars.pickupDate, built.scalars.returnDate, {
-        excludeReservationId: reservationId,
-      });
-      const items = await tx.uitleenItem.findMany({
-        where: { id: { in: built.lineCreates.map((l) => l.itemId) } },
-        select: { id: true, quantity: true, name: true },
-      });
-      const byId = new Map(items.map((i) => [i.id, i]));
-      for (const line of built.lineCreates) {
-        const item = byId.get(line.itemId);
-        const available = (item?.quantity ?? 0) - (reserved.get(line.itemId) ?? 0);
-        if (line.quantity > available) {
-          return { error: `STOCK:${item?.name ?? line.itemName}` };
+      if (existing.status === 'APPROVED') {
+        const reserved = await reservedQuantities(tx, built.scalars.pickupDate, built.scalars.returnDate, {
+          excludeReservationId: reservationId,
+        });
+        const items = await tx.uitleenItem.findMany({
+          where: { id: { in: built.lineCreates.map((l) => l.itemId) } },
+          select: { id: true, quantity: true, name: true },
+        });
+        const byId = new Map(items.map((i) => [i.id, i]));
+        for (const line of built.lineCreates) {
+          const item = byId.get(line.itemId);
+          const available = (item?.quantity ?? 0) - (reserved.get(line.itemId) ?? 0);
+          if (line.quantity > available) {
+            return { error: `STOCK:${item?.name ?? line.itemName}` };
+          }
         }
       }
-    }
 
-    await tx.uitleenReservationLine.deleteMany({ where: { reservationId } });
-    await tx.uitleenReservation.update({
-      where: { id: reservationId },
-      data: { ...built.scalars, lines: { create: built.lineCreates } },
-    });
-    await writeAudit(tx, { reservationId }, {
-      kind: 'EDITED',
-      note: `${built.lineCreates.length} materiaallijn${built.lineCreates.length === 1 ? '' : 'en'} na de wijziging`,
-      actorId: session.user.id,
-    });
-    return { error: null };
-  });
+      await tx.uitleenReservationLine.deleteMany({ where: { reservationId } });
+      await tx.uitleenReservation.update({
+        where: { id: reservationId },
+        data: { ...built.scalars, lines: { create: built.lineCreates } },
+      });
+      // Wat er veranderde, niet hoeveel lijnen er overblijven: dit gaat zowel naar
+      // de historiek als naar de mail aan de aanvrager.
+      const changes = describeReservationChanges(
+        { pickupDate: existing.pickupDate, returnDate: existing.returnDate, lines: existing.lines },
+        {
+          pickupDate: built.scalars.pickupDate,
+          returnDate: built.scalars.returnDate,
+          lines: built.lineCreates,
+        }
+      );
+      await writeAudit(tx, { reservationId }, {
+        kind: 'EDITED',
+        note: changes.length > 0 ? changes.join('; ') : 'aanvraagdetails aangepast',
+        actorId: session.user.id,
+      });
+      return { error: null, changes };
+    }
+  );
 
   if (outcome.error === 'NOT_FOUND') return { ok: false, error: 'Reservatie niet gevonden.' };
   if (outcome.error === 'LOCKED') {
@@ -949,6 +1001,7 @@ export async function adminEditReservationAction(
   if (outcome.error?.startsWith('STOCK:')) {
     return { ok: false, error: `Onvoldoende voorraad voor "${outcome.error.slice(6)}".` };
   }
+  await notifyReservation(reservationId, 'EDITED', outcome.changes?.join('\n'));
   revalidateBeheer();
   return { ok: true, message: 'Aanvraag bijgewerkt.' };
 }
@@ -1015,7 +1068,9 @@ export async function approveTransportAction(
   if (driverId && !(await isDriver(driverId))) return saveError('NOT_A_DRIVER');
 
   const outcome = await runSerializable(
-    async (tx) => {
+    async (
+      tx
+    ): Promise<{ error: string | null; detail?: string; legIds?: string[]; shifts?: string[] }> => {
       const booking = await tx.uitleenTransportBooking.findUnique({ where: { id: bookingId } });
       if (!booking) return { error: 'NOT_FOUND' as const };
 
@@ -1064,6 +1119,7 @@ export async function approveTransportAction(
         if (sibling) return { error: 'SELF_OVERLAP' as const };
       }
 
+      const shifts: string[] = [];
       for (const { leg, startAt, endAt } of planned) {
         const shifted = startAt.getTime() !== leg.startAt.getTime() || endAt.getTime() !== leg.endAt.getTime();
         await tx.uitleenTransportBooking.update({
@@ -1097,14 +1153,16 @@ export async function approveTransportAction(
         // Verschoven uren zijn een wijziging aan de aanvraag: die hoort apart in
         // de historiek, want de nieuwe uren staan straks als "de" uren op de rit.
         if (shifted) {
+          const shift = `Uren verschoven bij goedkeuring: ${formatDateTime(leg.startAt)} tot ${formatDateTime(leg.endAt)} werd ${formatDateTime(startAt)} tot ${formatDateTime(endAt)}`;
+          shifts.push(shift);
           await writeAudit(tx, { transportBookingId: leg.id }, {
             kind: 'EDITED',
-            note: `Uren verschoven bij goedkeuring: ${formatDateTime(leg.startAt)} tot ${formatDateTime(leg.endAt)} werd ${formatDateTime(startAt)} tot ${formatDateTime(endAt)}`,
+            note: shift,
             actorId: session.user.id,
           });
         }
       }
-      return { error: null };
+      return { error: null, legIds: groupIds, shifts };
     }
   );
 
@@ -1117,6 +1175,17 @@ export async function approveTransportAction(
   if (outcome.error === 'OVERLAP') {
     return saveError('OVERLAP', `Botst met ${outcome.detail}. Verschuif de uren of wijs af.`);
   }
+
+  // Zijn de uren verschoven, dan is dat het nieuws; anders volstaat de betaalwijze.
+  await notifyTransport(
+    outcome.legIds ?? [bookingId],
+    'APPROVED',
+    outcome.shifts && outcome.shifts.length > 0
+      ? outcome.shifts.join('\n')
+      : paymentMode === 'ONLINE'
+        ? 'Betalen gebeurt online; je vindt de betaalknop bij je rit.'
+        : 'Betalen gebeurt aan de balie.'
+  );
 
   revalidateBeheer();
   return saveOk();
@@ -1151,6 +1220,11 @@ export async function rejectTransportAction(_prev: SaveState, formData: FormData
       actorId: session.user.id,
     });
   }
+  await notifyTransport(
+    legs.map((leg) => leg.id),
+    'REJECTED',
+    adminNote
+  );
 
   revalidateBeheer();
   return saveOk();
@@ -1192,7 +1266,7 @@ export async function changeVehicleAction(bookingId: string, vehicleId: string):
   const session = await requireManage();
 
   const outcome = await runSerializable(
-    async (tx) => {
+    async (tx): Promise<{ error: string | null; vehicleName?: string }> => {
       const booking = await tx.uitleenTransportBooking.findUnique({
         where: { id: bookingId },
         include: { payments: { select: { status: true } } },
@@ -1238,7 +1312,7 @@ export async function changeVehicleAction(bookingId: string, vehicleId: string):
         note: `voertuig: ${vehicle.nameNl}`,
         actorId: session.user.id,
       });
-      return { error: null };
+      return { error: null, vehicleName: vehicle.nameNl };
     }
   );
 
@@ -1250,6 +1324,7 @@ export async function changeVehicleAction(bookingId: string, vehicleId: string):
     return { ok: false, error: 'Deze rit heeft een actieve of voltooide betaling en kan niet meer gewijzigd worden.' };
   }
 
+  await notifyTransport([bookingId], 'EDITED', `Voertuig gewijzigd naar ${outcome.vehicleName}.`);
   revalidateBeheer();
   return { ok: true, message: 'Voertuig gewijzigd.' };
 }
@@ -1359,6 +1434,13 @@ export async function reopenTransportAction(bookingId: string): Promise<ActionRe
     note: 'beslissing teruggedraaid',
     actorId: session.user.id,
   });
+  await notifyTransport(
+    [bookingId],
+    'REOPENED',
+    booking.status === 'APPROVED'
+      ? 'De goedkeuring is ingetrokken; je rit wacht opnieuw op een beslissing.'
+      : 'De afwijzing is ingetrokken; je rit wacht opnieuw op een beslissing.'
+  );
 
   revalidateBeheer();
   return { ok: true, message: 'De rit staat terug op "aangevraagd".' };

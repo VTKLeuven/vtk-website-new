@@ -4,7 +4,13 @@ import { randomUUID } from 'node:crypto';
 import { revalidatePath } from 'next/cache';
 import { prisma } from '@vtk/db';
 import { requireSession } from '@/lib/session';
-import { isOnQuarterHour, parseDateOnly, todayDateOnly, transportPriceCents } from '@/lib/uitleen';
+import {
+  isEmailish,
+  isOnQuarterHour,
+  parseDateOnly,
+  todayDateOnly,
+  transportPriceCents,
+} from '@/lib/uitleen';
 import { availabilityForRange } from '@/lib/uitleen-server';
 import {
   buildReservationData,
@@ -289,6 +295,8 @@ export async function createVanBookingAction(input: {
   helpersNote?: string;
   helpersPhone?: string;
   contactPhone?: string;
+  /** Meelezend adres, zoals op een materiaalaanvraag. */
+  notifyEmail?: string;
   /** Tweede tijdvenster: dan wordt dit een heen-en-terugaanvraag (twee ritten). */
   returnStartAt?: string;
   returnEndAt?: string;
@@ -313,6 +321,11 @@ export async function createVanBookingAction(input: {
   const purpose = input.purpose.trim();
   if (!purpose) return { ok: false, error: 'Beschrijf waarvoor je het voertuig nodig hebt.' };
 
+  const notifyEmail = input.notifyEmail?.trim() ?? '';
+  if (notifyEmail && !isEmailish(notifyEmail)) {
+    return { ok: false, error: 'Het extra e-mailadres ziet er niet uit als een adres.' };
+  }
+
   const vehicle = input.vehicleId
     ? await prisma.uitleenVehicle.findFirst({ where: { id: input.vehicleId, active: true } })
     : await prisma.uitleenVehicle.findFirst({ where: { active: true }, orderBy: { sortIndex: 'asc' } });
@@ -329,6 +342,7 @@ export async function createVanBookingAction(input: {
     helpersNote: input.helpersNote?.trim().slice(0, 300) || null,
     helpersPhone: input.helpersPhone?.trim().slice(0, 60) || null,
     contactPhone: input.contactPhone?.trim().slice(0, 60) || null,
+    notifyEmail: notifyEmail.slice(0, 300) || null,
     memberNote: input.note.trim().slice(0, MAX_NOTE_LENGTH) || null,
     // Tarief snapshotten; prijs is null wanneer ze pas na de rit gekend is (per km).
     pricingMode: vehicle.pricingMode,
