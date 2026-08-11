@@ -1,0 +1,290 @@
+import 'server-only';
+
+import { prisma } from '@vtk/db';
+import { sendMail } from '@vtk/mail';
+import { formatDateOnly, formatDateTime } from './uitleen';
+import type { LogistiekLocale } from './i18n-shared';
+import { logistiekBaseUrl } from './payments';
+
+/**
+ * Mails naar de aanvrager wanneer Logistiek iets aan zijn aanvraag doet.
+ *
+ * Waarom dit bestaat: het beheer kan sinds fase 3 en 5 beslissingen terugdraaien,
+ * uren verschuiven en de inhoud van een aanvraag aanpassen. Zonder mail merkt de
+ * aanvrager dat pas wanneer hij toevallig opnieuw inlogt, en dat is meestal bij
+ * het afhalen. Te laat dus.
+ *
+ * Drie regels die hier bewust ingebakken zitten:
+ *
+ * 1. **Versturen mag de actie nooit doen falen.** Een mailserver die er even niet
+ *    is, mag geen goedkeuring terugdraaien. Elke functie hier vangt dus zelf en
+ *    logt; de aanroeper krijgt geen fout.
+ * 2. **Roep ze aan ná de transactie**, niet erin. Anders vertrekt er een mail
+ *    over een wijziging die door een rollback nooit gebeurd is.
+ * 3. **Niet elke statusstap mailt.** Goedgekeurd, afgewezen, gewijzigd en
+ *    teruggedraaid; niet "afgehaald" of "betaald". Wie voor elke klik een mail
+ *    krijgt, leest ze geen van alle nog.
+ */
+
+export type UitleenMailEvent = 'APPROVED' | 'REJECTED' | 'EDITED' | 'REOPENED';
+
+type Recipient = { to: string; cc: string | undefined; name: string; locale: LogistiekLocale };
+
+/**
+ * Naar welk adres. Dezelfde regel als de hoofdsite (`preferredEmail`): wie een
+ * persoonlijk adres als voorkeur zette, leest zijn universiteitsmail niet.
+ */
+function recipientOf(
+  user: { name: string; email: string; personalEmail: string | null; emailPreference: string; locale: string },
+  notifyEmail: string | null
+): Recipient {
+  const to =
+    user.emailPreference === 'PERSONAL' && user.personalEmail ? user.personalEmail : user.email;
+  const cc = notifyEmail?.trim() || undefined;
+  return {
+    to,
+    // Een cc naar hetzelfde adres levert de aanvrager twee keer dezelfde mail.
+    cc: cc && cc.toLowerCase() !== to.toLowerCase() ? cc : undefined,
+    name: user.name,
+    locale: user.locale === 'EN' ? 'en' : 'nl',
+  };
+}
+
+const SUBJECT_PREFIX = 'VTK Logistiek';
+
+/** Waar de mail over gaat; bepaalt of we "je aanvraag" of "je rit" schrijven. */
+type MailSubject = 'reservation' | 'trip';
+
+function eventWords(event: UitleenMailEvent, subject: MailSubject, locale: LogistiekLocale) {
+  const nl = locale !== 'en';
+  const thing = nl
+    ? subject === 'trip'
+      ? 'je rit'
+      : 'je aanvraag'
+    : subject === 'trip'
+      ? 'your trip'
+      : 'your request';
+  const Thing = thing.charAt(0).toUpperCase() + thing.slice(1);
+  switch (event) {
+    case 'APPROVED':
+      return nl
+        ? { subject: 'goedgekeurd', lead: `${Thing} is goedgekeurd.` }
+        : { subject: 'approved', lead: `${Thing} has been approved.` };
+    case 'REJECTED':
+      return nl
+        ? { subject: 'afgewezen', lead: `${Thing} is afgewezen.` }
+        : { subject: 'rejected', lead: `${Thing} has been rejected.` };
+    case 'EDITED':
+      return nl
+        ? { subject: 'aangepast', lead: `Logistiek heeft ${thing} aangepast.` }
+        : { subject: 'changed', lead: `Logistics changed ${thing}.` };
+    case 'REOPENED':
+      return nl
+        ? {
+            subject: 'terug open',
+            lead: `Logistiek heeft de beslissing over ${thing} teruggedraaid; ze staat weer open.`,
+          }
+        : {
+            subject: 'reopened',
+            lead: `Logistics undid the decision on ${thing}; it is open again.`,
+          };
+  }
+}
+
+/** Ondertekening plus de link naar het overzicht van het lid zelf. */
+function footer(subject: MailSubject, locale: LogistiekLocale): string {
+  const nl = locale !== 'en';
+  const url = `${logistiekBaseUrl()}${subject === 'trip' ? '/ritten' : '/reservaties'}`;
+  if (nl) {
+    const what = subject === 'trip' ? 'Je rit bekijken' : 'Je aanvraag bekijken';
+    return `${what}: ${url}\n\nGroeten,\nLogistiek VTK`;
+  }
+  const what = subject === 'trip' ? 'View your trip' : 'View your request';
+  return `${what}: ${url}\n\nRegards,\nLogistics VTK`;
+}
+
+/**
+ * Blokken aan elkaar met een lege regel ertussen. Een blok dat er niet is, valt
+ * weg zonder een dubbele witregel achter te laten; daarom `null` en niet `''`
+ * als "geen blok" (een lege string is hier een bewuste lege regel).
+ */
+function joinBlocks(blocks: Array<string | null>): string {
+  return blocks.filter((block): block is string => block !== null).join('\n\n');
+}
+
+/**
+ * De toelichting van het team, indien er een is. Bij een wijziging is dit de
+ * historiekregel uit A6 ("Tafel: 5 → 3", "Uren verschoven naar 14:30"): zeggen
+ * wát er veranderd is, niet enkel dát er iets veranderd is. Bij een afwijzing is
+ * het de reden, en bij de rest een gewone zin die geen kopje nodig heeft.
+ */
+function detailBlock(
+  note: string | null | undefined,
+  event: UitleenMailEvent,
+  locale: LogistiekLocale
+): string | null {
+  const text = note?.trim();
+  if (!text) return null;
+  const nl = locale !== 'en';
+  if (event === 'EDITED') return `${nl ? 'Wat er veranderde:' : 'What changed:'}\n${text}`;
+  if (event === 'REJECTED') return `${nl ? 'Reden:' : 'Reason:'} ${text}`;
+  return text;
+}
+
+async function deliver(recipient: Recipient, subject: string, text: string): Promise<void> {
+  try {
+    await sendMail({
+      to: recipient.to,
+      cc: recipient.cc,
+      subject,
+      text,
+      from: process.env.LOGISTIEK_MAIL_FROM || 'Logistiek VTK <logistiek@vtk.be>',
+    });
+  } catch (err) {
+    // sendMail vangt zelf al; dit is de vangnetlaag voor alles ervoor.
+    console.error('[uitleen-mail] versturen mislukt:', err);
+  }
+}
+
+/**
+ * Mail over een materiaal- of flesserke-aanvraag.
+ *
+ * `note` is de toelichting die ook in de historiek staat. Faalt het ophalen of
+ * versturen, dan blijft het bij een logregel.
+ */
+export async function notifyReservation(
+  reservationId: string,
+  event: UitleenMailEvent,
+  note?: string | null
+): Promise<void> {
+  try {
+    const reservation = await prisma.uitleenReservation.findUnique({
+      where: { id: reservationId },
+      select: {
+        eventName: true,
+        pickupDate: true,
+        returnDate: true,
+        adminNote: true,
+        notifyEmail: true,
+        user: {
+          select: {
+            name: true,
+            email: true,
+            personalEmail: true,
+            emailPreference: true,
+            locale: true,
+          },
+        },
+        lines: { select: { itemName: true, quantity: true } },
+        flesserkeLines: { select: { itemName: true, quantity: true } },
+      },
+    });
+    if (!reservation) return;
+
+    const recipient = recipientOf(reservation.user, reservation.notifyEmail);
+    const nl = recipient.locale !== 'en';
+    const words = eventWords(event, 'reservation', recipient.locale);
+
+    const items = [...reservation.lines, ...reservation.flesserkeLines]
+      .map((line) => `- ${line.quantity} x ${line.itemName}`)
+      .join('\n');
+    const period = `${formatDateOnly(reservation.pickupDate, recipient.locale)} - ${formatDateOnly(
+      reservation.returnDate,
+      recipient.locale
+    )}`;
+
+    // Bij een afwijzing is de nota van het team de reden; die hoort in de mail,
+    // anders is "afgewezen" alles wat de aanvrager weet.
+    const reason = event === 'REJECTED' ? note ?? reservation.adminNote : note;
+
+    const text = joinBlocks([
+      nl ? `Dag ${recipient.name},` : `Hi ${recipient.name},`,
+      words.lead,
+      `${nl ? 'Aanvraag' : 'Request'}: ${reservation.eventName}\n${nl ? 'Periode' : 'Period'}: ${period}`,
+      items ? `${nl ? 'Materiaal' : 'Items'}:\n${items}` : null,
+      detailBlock(reason, event, recipient.locale),
+      footer('reservation', recipient.locale),
+    ]);
+
+    await deliver(
+      recipient,
+      `${SUBJECT_PREFIX}: ${reservation.eventName} ${words.subject}`,
+      text
+    );
+  } catch (err) {
+    console.error('[uitleen-mail] reservatiemail mislukt:', err);
+  }
+}
+
+/**
+ * Mail over een rit. Neemt een lijst id's omdat een heen- en terugrit samen
+ * beslist worden (V12): dat is één mail met beide ritten, geen twee mails vlak
+ * na elkaar over dezelfde aanvraag.
+ */
+export async function notifyTransport(
+  bookingIds: string[],
+  event: UitleenMailEvent,
+  note?: string | null
+): Promise<void> {
+  try {
+    if (bookingIds.length === 0) return;
+    const bookings = await prisma.uitleenTransportBooking.findMany({
+      where: { id: { in: bookingIds } },
+      orderBy: { startAt: 'asc' },
+      select: {
+        purpose: true,
+        startAt: true,
+        endAt: true,
+        tripLeg: true,
+        adminNote: true,
+        notifyEmail: true,
+        vehicle: { select: { nameNl: true, nameEn: true } },
+        user: {
+          select: {
+            name: true,
+            email: true,
+            personalEmail: true,
+            emailPreference: true,
+            locale: true,
+          },
+        },
+      },
+    });
+    if (bookings.length === 0) return;
+
+    const first = bookings[0];
+    const recipient = recipientOf(first.user, first.notifyEmail);
+    const nl = recipient.locale !== 'en';
+    const words = eventWords(event, 'trip', recipient.locale);
+
+    const legLabel = (leg: string | null) => {
+      if (leg === 'HEEN') return nl ? 'Heenrit' : 'Outbound';
+      if (leg === 'TERUG') return nl ? 'Terugrit' : 'Return';
+      return nl ? 'Rit' : 'Trip';
+    };
+    const trips = bookings
+      .map(
+        (booking) =>
+          `- ${legLabel(booking.tripLeg)}: ${formatDateTime(booking.startAt, recipient.locale)} - ${formatDateTime(
+            booking.endAt,
+            recipient.locale
+          )} (${nl ? booking.vehicle.nameNl : booking.vehicle.nameEn})`
+      )
+      .join('\n');
+
+    const reason = event === 'REJECTED' ? note ?? first.adminNote : note;
+
+    const text = joinBlocks([
+      nl ? `Dag ${recipient.name},` : `Hi ${recipient.name},`,
+      words.lead,
+      `${nl ? 'Rit' : 'Trip'}: ${first.purpose}`,
+      trips,
+      detailBlock(reason, event, recipient.locale),
+      footer('trip', recipient.locale),
+    ]);
+
+    await deliver(recipient, `${SUBJECT_PREFIX}: ${first.purpose} ${words.subject}`, text);
+  } catch (err) {
+    console.error('[uitleen-mail] ritmail mislukt:', err);
+  }
+}

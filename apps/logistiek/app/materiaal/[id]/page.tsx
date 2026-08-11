@@ -2,10 +2,10 @@ import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import { LoginGate } from '@/components/login-gate';
 import { PageShell } from '@/components/page-shell';
-import { getSession } from '@/lib/session';
+import { canManage, getSession } from '@/lib/session';
 import { getLocale } from '@/lib/i18n';
-import { formatEuro } from '@/lib/uitleen';
-import { frequentlyRequestedWith, itemDetail } from '@/lib/uitleen-server';
+import { formatEuro, ITEM_CONDITION_LABELS } from '@/lib/uitleen';
+import { frequentlyRequestedWith, itemDetail, itemTeamDetails } from '@/lib/uitleen-server';
 import { ItemGallery } from './item-gallery';
 
 export default async function ItemDetailPage({ params }: { params: Promise<{ id: string }> }) {
@@ -19,7 +19,12 @@ export default async function ItemDetailPage({ params }: { params: Promise<{ id:
   const item = await itemDetail(id);
   if (!item) notFound();
 
-  const related = await frequentlyRequestedWith(item.id);
+  // Enkel voor Logistiek: waar het ligt en wat er over de staat genoteerd staat.
+  // Voor een gewoon lid wordt dit niet eens opgehaald.
+  const [related, team] = await Promise.all([
+    frequentlyRequestedWith(item.id),
+    canManage(session) ? itemTeamDetails(item.id) : Promise.resolve(null),
+  ]);
   const photos = [...(item.photoKey ? [item.photoKey] : []), ...item.photos.map((photo) => photo.key)];
 
   return (
@@ -77,7 +82,7 @@ export default async function ItemDetailPage({ params }: { params: Promise<{ id:
               </h2>
               <ul className="mt-3 divide-y divide-vtk-navy/10">
                 {item.setContents.map((content) => (
-                  <li key={content.id} className="flex items-center justify-between gap-4 py-2 text-sm">
+                  <li key={content.label} className="flex items-center justify-between gap-4 py-2 text-sm">
                     <span className="text-vtk-ink">{content.label}</span>
                     <span className="text-vtk-muted">{content.quantity}×</span>
                   </li>
@@ -123,6 +128,46 @@ export default async function ItemDetailPage({ params }: { params: Promise<{ id:
               </dd>
             </div>
           </dl>
+          {team ? (
+            <div className="mt-4 rounded-[14px] border border-dashed border-vtk-navy/25 bg-vtk-paper/60 p-4">
+              <p className="text-xs font-semibold text-vtk-muted">Enkel voor Logistiek</p>
+              <dl className="mt-2 space-y-1.5 text-sm">
+                <div className="flex justify-between gap-4">
+                  <dt className="text-vtk-muted">Locatie</dt>
+                  <dd className="text-right font-medium text-vtk-ink">
+                    {[team.locationShelf, team.locationRack].filter(Boolean).join(' · ') ||
+                      'Niet ingevuld'}
+                  </dd>
+                </div>
+                <div className="flex justify-between gap-4">
+                  <dt className="text-vtk-muted">Staat</dt>
+                  <dd className="text-right font-medium text-vtk-ink">
+                    {team.units.length > 0
+                      ? `${team.units.filter((unit) => unit.condition !== 'KAPOT').length} bruikbaar van ${team.units.length}`
+                      : (ITEM_CONDITION_LABELS[team.condition] ?? team.condition)}
+                  </dd>
+                </div>
+                {/* Houdt dit item exemplaren bij, dan hoort hier per exemplaar te
+                    staan wat eraan scheelt; "Werkt" op de rij zegt niets over die
+                    ene kapotte box. */}
+                {team.units
+                  .filter((unit) => unit.condition !== 'WERKT')
+                  .map((unit) => (
+                    <div key={unit.label} className="flex justify-between gap-4">
+                      <dt className="text-vtk-muted">{unit.label}</dt>
+                      <dd className="text-right text-vtk-body">
+                        {ITEM_CONDITION_LABELS[unit.condition] ?? unit.condition}
+                        {unit.conditionNote ? ` · ${unit.conditionNote}` : ''}
+                      </dd>
+                    </div>
+                  ))}
+                {team.conditionNote && team.units.length === 0 ? (
+                  <div className="pt-1 text-vtk-body">{team.conditionNote}</div>
+                ) : null}
+              </dl>
+            </div>
+          ) : null}
+
           <p className="mt-4 text-sm leading-6 text-vtk-muted">
             {en
               ? 'Add this and other items to a request from the catalogue; availability is checked for your dates.'

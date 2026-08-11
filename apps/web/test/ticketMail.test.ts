@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { smtpEhloName } from "@/lib/mail";
+import { smtpEhloName } from "@vtk/mail";
 import { attachmentLine, orderConfirmationMail } from "@/lib/ticketing/mail";
 import {
   MAX_ATTACHMENT_BYTES,

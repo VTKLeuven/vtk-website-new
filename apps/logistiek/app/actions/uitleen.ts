@@ -1,9 +1,16 @@
 'use server';
 
+import { randomUUID } from 'node:crypto';
 import { revalidatePath } from 'next/cache';
 import { prisma } from '@vtk/db';
 import { requireSession } from '@/lib/session';
-import { parseDateOnly, todayDateOnly, transportPriceCents } from '@/lib/uitleen';
+import {
+  isEmailish,
+  isOnQuarterHour,
+  parseDateOnly,
+  todayDateOnly,
+  transportPriceCents,
+} from '@/lib/uitleen';
 import { availabilityForRange } from '@/lib/uitleen-server';
 import {
   buildReservationData,
@@ -59,6 +66,50 @@ async function deriveMemberRequester(
   return { requesterType: 'EXTERN', groupId: null, requesterName: session.user.name };
 }
 
+/**
+ * Het evenement waaraan deze aanvraag hangt, of null.
+ *
+ * `eventId` is wat het lid koos; `createEvent` betekent "maak er een van met de
+ * gegevens die ik net invulde", zodat de volgende aanvraag (het vervoer) eraan
+ * kan hangen zonder op het team te wachten. Een onbekend id negeren we stil: dan
+ * is het evenement intussen verwijderd, en de aanvraag zelf is belangrijker.
+ */
+async function resolveEventId(
+  session: SessionLike,
+  input: {
+    eventId?: string | null;
+    createEvent?: boolean;
+    eventName?: string;
+    eventLocation?: string;
+    eventStart?: string;
+  },
+  groupId: string | null
+): Promise<string | null> {
+  const chosen = (input.eventId ?? '').trim();
+  if (chosen) {
+    const found = await prisma.uitleenEvent.findUnique({
+      where: { id: chosen },
+      select: { id: true },
+    });
+    return found?.id ?? null;
+  }
+  if (!input.createEvent) return null;
+
+  const name = (input.eventName ?? '').trim();
+  if (!name) return null;
+  const created = await prisma.uitleenEvent.create({
+    data: {
+      name: name.slice(0, 200),
+      location: (input.eventLocation ?? '').trim().slice(0, 300) || null,
+      startAt: input.eventStart ? parseBrusselsDateTime(input.eventStart) : null,
+      groupId,
+      createdById: session.user.id,
+    },
+    select: { id: true },
+  });
+  return created.id;
+}
+
 export async function createReservationAction(input: ReservationFormInput): Promise<ActionResult> {
   const session = await requireSession();
   const requester = await deriveMemberRequester(session, input.groupId ?? undefined);
@@ -68,8 +119,14 @@ export async function createReservationAction(input: ReservationFormInput): Prom
   );
   if (!built.ok) return built;
 
+  const eventId = await resolveEventId(session, input, built.scalars.groupId);
   await prisma.uitleenReservation.create({
-    data: { userId: session.user.id, ...built.scalars, lines: { create: built.lineCreates } },
+    data: {
+      userId: session.user.id,
+      ...built.scalars,
+      eventId,
+      lines: { create: built.lineCreates },
+    },
   });
 
   revalidateMember();
@@ -120,11 +177,15 @@ function revalidateFlesserke() {
   revalidatePath('/flesserke');
 }
 
-/** Flesserke-aanvraag (enkel praesidium). Aparte reservatie met enkel flesserke-lijnen. */
+/**
+ * Flesserke-aanvraag: aparte reservatie met enkel flesserke-lijnen. Voor de
+ * interne werking, dus elk lid van een post, werkgroep of jaarwerking
+ * (`FLESSERKE_REQUESTER_TYPES`); externen kunnen dit niet aanvragen.
+ */
 export async function createFlesserkeReservationAction(input: ReservationFormInput): Promise<ActionResult> {
   const session = await requireSession();
   if (session.groups.length === 0) {
-    return { ok: false, error: 'Flesserke is enkel voor het praesidium.' };
+    return { ok: false, error: 'Flesserke is enkel voor de interne werking van VTK.' };
   }
   const requester = await deriveMemberRequester(session, input.groupId ?? undefined);
   const built = await buildReservationData(
@@ -133,8 +194,14 @@ export async function createFlesserkeReservationAction(input: ReservationFormInp
   );
   if (!built.ok) return built;
 
+  const eventId = await resolveEventId(session, input, built.scalars.groupId);
   await prisma.uitleenReservation.create({
-    data: { userId: session.user.id, ...built.scalars, flesserkeLines: { create: built.flesserkeLineCreates } },
+    data: {
+      userId: session.user.id,
+      ...built.scalars,
+      eventId,
+      flesserkeLines: { create: built.flesserkeLineCreates },
+    },
   });
 
   revalidateFlesserke();
@@ -146,7 +213,9 @@ export async function editFlesserkeReservationAction(
   input: ReservationFormInput
 ): Promise<ActionResult> {
   const session = await requireSession();
-  if (session.groups.length === 0) return { ok: false, error: 'Flesserke is enkel voor het praesidium.' };
+  if (session.groups.length === 0) {
+    return { ok: false, error: 'Flesserke is enkel voor de interne werking van VTK.' };
+  }
 
   const requester = await deriveMemberRequester(session, input.groupId ?? undefined);
   const built = await buildReservationData(
@@ -231,7 +300,44 @@ export async function checkAvailabilityAction(input: {
   return { ok: true, availability: await availabilityForRange(pickupDate, returnDate) };
 }
 
-const MAX_VAN_BOOKING_HOURS = 12;
+/**
+ * Bovengrens tegen tikfouten, geen beleid. Er stond ooit 12 uur op, maar een
+ * praesidiumweekend of een karroadtrip duurt langer; die aanvragen werden zo
+ * naar de mail geduwd. Dit vangt enkel nog een verkeerd getypt jaartal.
+ */
+const MAX_VAN_BOOKING_DAYS = 30;
+
+/**
+ * Eén tijdvenster van een rit, gevalideerd. `label` komt in de foutmelding
+ * terecht, zodat je bij een heen-en-terugaanvraag weet welke helft fout staat.
+ */
+function parseTripWindow(
+  startRaw: string,
+  endRaw: string,
+  label: string
+): { ok: true; startAt: Date; endAt: Date } | { ok: false; error: string } {
+  const startAt = parseBrusselsDateTime(startRaw);
+  const endAt = parseBrusselsDateTime(endRaw);
+  if (!startAt || !endAt) return { ok: false, error: `Kies een start- en eindmoment${label}.` };
+  if (startAt <= new Date()) return { ok: false, error: `Het startmoment${label} ligt in het verleden.` };
+  if (endAt <= startAt) {
+    return { ok: false, error: `Het eindmoment${label} ligt voor het startmoment.` };
+  }
+  if (!isOnQuarterHour(startAt) || !isOnQuarterHour(endAt)) {
+    return {
+      ok: false,
+      error: `Kies een begin- en einduur op het kwartier (bv. 14:00, 14:15)${label}.`,
+    };
+  }
+  const days = (endAt.getTime() - startAt.getTime()) / (24 * 60 * 60 * 1000);
+  if (days > MAX_VAN_BOOKING_DAYS) {
+    return {
+      ok: false,
+      error: `Een rit kan maximaal ${MAX_VAN_BOOKING_DAYS} dagen duren; controleer de datums${label}.`,
+    };
+  }
+  return { ok: true, startAt, endAt };
+}
 
 export async function createVanBookingAction(input: {
   startAt: string; // datetime-local, Belgische wall-clock
@@ -240,61 +346,130 @@ export async function createVanBookingAction(input: {
   pickupAddress: string;
   destination: string;
   note: string;
+  /** Koepel-evenement (A8), of `createEvent` om er een te maken van `eventName`. */
+  eventId?: string | null;
+  createEvent?: boolean;
+  /** Eén of meer voertuigen; `vehicleId` blijft aanvaard voor één voertuig. */
+  vehicleIds?: string[];
   vehicleId?: string;
   eventName?: string;
   helpersNote?: string;
+  helpersPhone?: string;
+  contactPhone?: string;
+  /** Meelezend adres, zoals op een materiaalaanvraag. */
+  notifyEmail?: string;
+  /** Tweede tijdvenster: dan wordt dit een heen-en-terugaanvraag (twee ritten). */
+  returnStartAt?: string;
+  returnEndAt?: string;
 }): Promise<ActionResult> {
   const session = await requireSession();
 
-  const startAt = parseBrusselsDateTime(input.startAt);
-  const endAt = parseBrusselsDateTime(input.endAt);
-  if (!startAt || !endAt) return { ok: false, error: 'Kies een start- en eindmoment.' };
-  if (startAt <= new Date()) return { ok: false, error: 'Het startmoment ligt in het verleden.' };
-  if (endAt <= startAt) return { ok: false, error: 'Het eindmoment ligt voor het startmoment.' };
-  const hours = (endAt.getTime() - startAt.getTime()) / (60 * 60 * 1000);
-  if (hours > MAX_VAN_BOOKING_HOURS) {
-    return {
-      ok: false,
-      error: `Een rit kan maximaal ${MAX_VAN_BOOKING_HOURS} uur duren; mail logistiek@vtk.be voor langere ritten.`,
-    };
+  const wantsReturn = Boolean(input.returnStartAt && input.returnEndAt);
+  const outbound = parseTripWindow(input.startAt, input.endAt, wantsReturn ? ' van de heenrit' : '');
+  if (!outbound.ok) return { ok: false, error: outbound.error };
+  const { startAt, endAt } = outbound;
+
+  let inbound: { startAt: Date; endAt: Date } | null = null;
+  if (wantsReturn) {
+    const parsed = parseTripWindow(input.returnStartAt!, input.returnEndAt!, ' van de terugrit');
+    if (!parsed.ok) return { ok: false, error: parsed.error };
+    if (parsed.startAt < endAt) {
+      return { ok: false, error: 'De terugrit start voor de heenrit gedaan is.' };
+    }
+    inbound = { startAt: parsed.startAt, endAt: parsed.endAt };
   }
 
   const purpose = input.purpose.trim();
   if (!purpose) return { ok: false, error: 'Beschrijf waarvoor je het voertuig nodig hebt.' };
 
-  const vehicle = input.vehicleId
-    ? await prisma.uitleenVehicle.findFirst({ where: { id: input.vehicleId, active: true } })
-    : await prisma.uitleenVehicle.findFirst({ where: { active: true }, orderBy: { sortIndex: 'asc' } });
-  if (!vehicle) return { ok: false, error: 'Kies een voertuig.' };
+  const notifyEmail = input.notifyEmail?.trim() ?? '';
+  if (notifyEmail && !isEmailish(notifyEmail)) {
+    return { ok: false, error: 'Het extra e-mailadres ziet er niet uit als een adres.' };
+  }
 
-  // Tarief snapshotten; prijs is null wanneer ze pas na de rit gekend is (per km).
-  const priceCents = transportPriceCents({
+  // Eén of meerdere voertuigen: een verhuis met de kar én de auto is één vraag,
+  // en die als twee aanvragen laten indienen betekent dat het team ze ook los kan
+  // beslissen. Ze delen daarom één `tripGroupId`, net als heen en terug (V12).
+  const chosenIds = (input.vehicleIds ?? (input.vehicleId ? [input.vehicleId] : [])).filter(Boolean);
+  const vehicles = chosenIds.length
+    ? await prisma.uitleenVehicle.findMany({ where: { id: { in: chosenIds }, active: true } })
+    : await prisma.uitleenVehicle
+        .findFirst({ where: { active: true }, orderBy: { sortIndex: 'asc' } })
+        .then((found) => (found ? [found] : []));
+  if (vehicles.length === 0) return { ok: false, error: 'Kies een voertuig.' };
+  if (vehicles.length !== new Set(chosenIds).size && chosenIds.length > 0) {
+    return { ok: false, error: 'Een van de gekozen voertuigen bestaat niet meer; herlaad de pagina.' };
+  }
+
+  // Gedeelde velden van elke boeking; voertuig, tarief en tijdvenster verschillen.
+  const eventId = await resolveEventId(
+    session,
+    { ...input, eventStart: undefined },
+    null
+  );
+  const shared = {
+    userId: session.user.id,
+    eventId,
+    purpose: purpose.slice(0, MAX_NOTE_LENGTH),
+    eventName: input.eventName?.trim().slice(0, 300) || null,
+    pickupAddress: input.pickupAddress.trim().slice(0, 300) || null,
+    destination: input.destination.trim().slice(0, 300) || null,
+    helpersNote: input.helpersNote?.trim().slice(0, 300) || null,
+    helpersPhone: input.helpersPhone?.trim().slice(0, 60) || null,
+    contactPhone: input.contactPhone?.trim().slice(0, 60) || null,
+    notifyEmail: notifyEmail.slice(0, 300) || null,
+    memberNote: input.note.trim().slice(0, MAX_NOTE_LENGTH) || null,
+  };
+  /** Tarief per voertuig gesnapshot; per km blijft de prijs null tot na de rit. */
+  const bookingFor = (
+    vehicle: (typeof vehicles)[number],
+    from: Date,
+    to: Date,
+    leg: 'HEEN' | 'TERUG' | null,
+    tripGroupId: string | null
+  ) => ({
+    ...shared,
+    vehicleId: vehicle.id,
     pricingMode: vehicle.pricingMode,
     rateCents: vehicle.rateCents,
-    startAt,
-    endAt,
-  });
-
-  await prisma.uitleenTransportBooking.create({
-    data: {
-      userId: session.user.id,
-      vehicleId: vehicle.id,
-      startAt,
-      endAt,
-      purpose: purpose.slice(0, MAX_NOTE_LENGTH),
-      eventName: input.eventName?.trim().slice(0, 300) || null,
-      pickupAddress: input.pickupAddress.trim().slice(0, 300) || null,
-      destination: input.destination.trim().slice(0, 300) || null,
-      helpersNote: input.helpersNote?.trim().slice(0, 300) || null,
-      memberNote: input.note.trim().slice(0, MAX_NOTE_LENGTH) || null,
+    tripGroupId,
+    tripLeg: leg,
+    startAt: from,
+    endAt: to,
+    priceCents: transportPriceCents({
       pricingMode: vehicle.pricingMode,
       rateCents: vehicle.rateCents,
-      priceCents,
-    },
+      startAt: from,
+      endAt: to,
+    }),
+  });
+
+  // Eén boeking per voertuig en per rit. Ze horen bij elkaar zodra het er meer dan
+  // één is: het team beslist, annuleert en verschuift ze in hun geheel. Bij één
+  // enkele rit met één voertuig blijft `tripGroupId` null, zoals voordien.
+  const legs: Array<{ from: Date; to: Date; leg: 'HEEN' | 'TERUG' | null }> = inbound
+    ? [
+        { from: startAt, to: endAt, leg: 'HEEN' },
+        { from: inbound.startAt, to: inbound.endAt, leg: 'TERUG' },
+      ]
+    : [{ from: startAt, to: endAt, leg: null }];
+  const grouped = vehicles.length > 1 || legs.length > 1;
+  const tripGroupId = grouped ? randomUUID() : null;
+
+  await prisma.uitleenTransportBooking.createMany({
+    data: vehicles.flatMap((vehicle) =>
+      legs.map((leg) => bookingFor(vehicle, leg.from, leg.to, leg.leg, tripGroupId))
+    ),
   });
 
   revalidateMember();
-  return { ok: true, message: 'Rit aangevraagd. Je vindt de status bij Mijn aanvragen.' };
+  const what =
+    vehicles.length > 1
+      ? `${vehicles.length} voertuigen aangevraagd`
+      : inbound
+        ? 'Heen- en terugrit aangevraagd'
+        : 'Rit aangevraagd';
+  return { ok: true, message: `${what}. Je vindt de status bij Mijn aanvragen.` };
 }
 
 export async function cancelVanBookingAction(bookingId: string): Promise<ActionResult> {
@@ -316,9 +491,11 @@ export async function cancelVanBookingAction(bookingId: string): Promise<ActionR
     return { ok: false, error: 'Deze rit is al betaald; mail logistiek@vtk.be om ze te annuleren.' };
   }
 
+  // Een heen-en-terugaanvraag annuleer je in haar geheel: enkel de heenrit
+  // annuleren laat een terugrit staan die niemand meer gaat rijden.
   const cancelled = await prisma.uitleenTransportBooking.updateMany({
     where: {
-      id: booking.id,
+      ...(booking.tripGroupId ? { tripGroupId: booking.tripGroupId } : { id: booking.id }),
       userId: session.user.id,
       status: { in: ['REQUESTED', 'APPROVED'] },
       payments: { none: { status: 'SUCCEEDED' } },
@@ -330,7 +507,10 @@ export async function cancelVanBookingAction(bookingId: string): Promise<ActionR
   }
 
   revalidateMember();
-  return { ok: true, message: 'Rit geannuleerd.' };
+  return {
+    ok: true,
+    message: cancelled.count > 1 ? 'Heen- en terugrit geannuleerd.' : 'Rit geannuleerd.',
+  };
 }
 
 // ---------------------------------------------------------------------------

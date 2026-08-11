@@ -9,8 +9,11 @@ import { ReservationStatusBadge } from '@/components/status-badge';
 import { reconcilePayments } from '@/lib/payments';
 import { getLocale } from '@/lib/i18n';
 import { getSession } from '@/lib/session';
+import { requesterOptions } from '@/app/materiaal/event-values';
 import {
+  DEFAULT_LAST_MINUTE_DAYS,
   formatDateOnly,
+  formatDateWithPart,
   formatDateTime,
   formatEuro,
   requesterTypeLabel,
@@ -20,6 +23,7 @@ import {
 import {
   getCatalog,
   getFlesserkeCatalog,
+  getLogistiekSettings,
   hasSucceededPayment,
   reservationForUser,
 } from '@/lib/uitleen-server';
@@ -68,12 +72,13 @@ export default async function ReservatieDetailPage({
         : requesterTypeLabel('INTERN', locale)
       : (reservation.requesterName ?? requesterTypeLabel(reservation.requesterType, locale));
 
-  const [catalog, flesserkeCatalog] = editable
+  const [catalog, flesserkeCatalog, settings] = editable
     ? await Promise.all([
         isFlesserke ? Promise.resolve([]) : getCatalog(),
         isFlesserke ? getFlesserkeCatalog() : Promise.resolve([]),
+        getLogistiekSettings(),
       ])
-    : [[], []];
+    : [[], [], { showRentPrices: false, lastMinuteDays: DEFAULT_LAST_MINUTE_DAYS }];
 
   return (
     <PageShell
@@ -145,15 +150,20 @@ export default async function ReservatieDetailPage({
               <h3 className="mt-6 text-sm font-semibold text-vtk-ink">{en ? 'Equipment' : 'Materiaal'}</h3>
               <ul className="mt-2 divide-y divide-vtk-navy/10">
                 {reservation.lines.map((line) => (
-                  <li key={line.id} className="flex items-center justify-between gap-4 py-2.5">
-                    <span className="text-vtk-ink">
-                      {line.quantity}× {line.itemName}
-                    </span>
-                    <span className="text-sm text-vtk-muted">
-                      {line.unitDepositCents > 0
-                        ? `${formatEuro(line.unitDepositCents * line.quantity)} ${en ? 'deposit' : 'waarborg'}`
-                        : en ? 'No deposit' : 'Geen waarborg'}
-                    </span>
+                  <li key={line.id} className="py-2.5">
+                    <div className="flex items-center justify-between gap-4">
+                      <span className="text-vtk-ink">
+                        {line.quantity}× {line.itemName}
+                      </span>
+                      <span className="text-sm text-vtk-muted">
+                        {line.unitDepositCents > 0
+                          ? `${formatEuro(line.unitDepositCents * line.quantity)} ${en ? 'deposit' : 'waarborg'}`
+                          : en ? 'No deposit' : 'Geen waarborg'}
+                      </span>
+                    </div>
+                    {line.note ? (
+                      <p className="mt-0.5 text-xs italic text-vtk-body">{line.note}</p>
+                    ) : null}
                   </li>
                 ))}
               </ul>
@@ -191,7 +201,8 @@ export default async function ReservatieDetailPage({
                 <FlesserkeEditor
                   reservationId={reservation.id}
                   catalog={flesserkeCatalog}
-                  groups={session.groups.map((g) => ({ id: g.id, name: locale === 'en' ? g.nameEn : g.nameNl }))}
+                  groups={requesterOptions(session.groups, locale)}
+                  lastMinuteDays={settings.lastMinuteDays}
                   locale={locale}
                   initial={{
                     event: {
@@ -204,11 +215,13 @@ export default async function ReservatieDetailPage({
                       expectedAttendance: reservation.expectedAttendance?.toString() ?? '',
                       contactName: reservation.contactName ?? '',
                       contactPhone: reservation.contactPhone ?? '',
+                      notifyEmail: reservation.notifyEmail ?? '',
                       delivery: reservation.delivery,
                       deliveryNote: reservation.deliveryNote ?? '',
                     },
                     pickupDate: toDateInputValue(reservation.pickupDate),
                     returnDate: toDateInputValue(reservation.returnDate),
+                    pickupPart: reservation.pickupPart ?? '',
                     note: reservation.memberNote ?? '',
                     quantities: Object.fromEntries(
                       reservation.flesserkeLines.map((l) => [l.flesserkeItemId, l.quantity])
@@ -219,10 +232,8 @@ export default async function ReservatieDetailPage({
                 <ReservationEditor
                   reservationId={reservation.id}
                   catalog={catalog}
-                  groups={session.groups.map((g) => ({
-                    id: g.id,
-                    name: locale === 'en' ? g.nameEn : g.nameNl,
-                  }))}
+                  groups={requesterOptions(session.groups, locale)}
+                  lastMinuteDays={settings.lastMinuteDays}
                   locale={locale}
                   initial={{
                     event: {
@@ -235,13 +246,18 @@ export default async function ReservatieDetailPage({
                       expectedAttendance: reservation.expectedAttendance?.toString() ?? '',
                       contactName: reservation.contactName ?? '',
                       contactPhone: reservation.contactPhone ?? '',
+                      notifyEmail: reservation.notifyEmail ?? '',
                       delivery: reservation.delivery,
                       deliveryNote: reservation.deliveryNote ?? '',
                     },
                     pickupDate: toDateInputValue(reservation.pickupDate),
                     returnDate: toDateInputValue(reservation.returnDate),
+                    pickupPart: reservation.pickupPart ?? '',
                     note: reservation.memberNote ?? '',
                     quantities: Object.fromEntries(reservation.lines.map((l) => [l.itemId, l.quantity])),
+                    lineNotes: Object.fromEntries(
+                      reservation.lines.flatMap((l) => (l.note ? [[l.itemId, l.note] as const] : []))
+                    ),
                   }}
                 />
               )}
@@ -254,13 +270,13 @@ export default async function ReservatieDetailPage({
             <div className="flex justify-between gap-4">
               <dt className="text-vtk-muted">{en ? 'Collect' : 'Afhalen'}</dt>
               <dd className="text-right font-medium text-vtk-ink">
-                {formatDateOnly(reservation.pickupDate, locale)}
+                {formatDateWithPart(reservation.pickupDate, reservation.pickupPart, locale)}
               </dd>
             </div>
             <div className="flex justify-between gap-4">
               <dt className="text-vtk-muted">{en ? 'Return' : 'Terugbrengen'}</dt>
               <dd className="text-right font-medium text-vtk-ink">
-                {formatDateOnly(reservation.returnDate, locale)}
+                {formatDateWithPart(reservation.returnDate, reservation.returnPart, locale)}
               </dd>
             </div>
             <div className="flex justify-between gap-4">

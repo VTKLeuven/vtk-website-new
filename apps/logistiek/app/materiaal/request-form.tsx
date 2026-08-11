@@ -2,7 +2,8 @@
 
 import { useRouter } from 'next/navigation';
 import { createReservationAction } from '@/app/actions/uitleen';
-import type { CatalogCategory } from '@/lib/uitleen-server';
+import type { CatalogCategory, RequestTemplate } from '@/lib/uitleen-server';
+import type { SelectableEvent } from '@/components/event-picker';
 import { emptyEventValues, type RequesterOption } from './event-fields';
 import { ReservationForm } from './reservation-form';
 
@@ -12,6 +13,10 @@ export function MaterialRequestForm({
   locale,
   showRentPrices = false,
   paymentNote,
+  lastMinuteDays,
+  userId,
+  templates,
+  events,
 }: {
   catalog: CatalogCategory[];
   groups: RequesterOption[];
@@ -19,6 +24,11 @@ export function MaterialRequestForm({
   showRentPrices?: boolean;
   /** Beheerbare waarborg-/betaalnota uit /beheer/teksten (getPublicCopy). */
   paymentNote?: string;
+  lastMinuteDays: number;
+  /** Voor het lokale concept: per lid, want de logikot-pc is gedeeld. */
+  userId: string;
+  templates: RequestTemplate[];
+  events: SelectableEvent[];
 }) {
   const en = locale === 'en';
   const router = useRouter();
@@ -30,6 +40,10 @@ export function MaterialRequestForm({
       locale={locale}
       showRentPrices={showRentPrices}
       paymentNote={paymentNote}
+      lastMinuteDays={lastMinuteDays}
+      draftKey={`materiaal:${userId}`}
+      templates={templates}
+      events={events}
       initial={{
         event: emptyEventValues(groups),
         pickupDate: '',

@@ -15,7 +15,7 @@ const nextConfig: NextConfig = {
   typescript: {
     tsconfigPath: process.env.NODE_ENV === "production" ? "tsconfig.build.json" : "tsconfig.json",
   },
-  transpilePackages: ["@vtk/auth", "@vtk/ui", "@vtk/db", "@vtk/payments", "@vtk/storage"],
+  transpilePackages: ["@vtk/auth", "@vtk/ui", "@vtk/db", "@vtk/mail", "@vtk/payments", "@vtk/storage"],
   // Keep the generated Prisma client and native image lib out of the bundler
   // module graph; see apps/web/next.config.ts for the full rationale.
   serverExternalPackages: ["@prisma/client", ".prisma/client", "sharp"],

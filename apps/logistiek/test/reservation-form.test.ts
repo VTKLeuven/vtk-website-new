@@ -83,8 +83,24 @@ describe('buildReservationData — requester validation', () => {
     expect(result.scalars.totalPriceCents).toBe(200);
     expect(result.scalars.totalDepositCents).toBe(1000);
     expect(result.lineCreates).toEqual([
-      { itemId: 'i1', itemName: 'Item i1', quantity: 2, unitPriceCents: 100, unitDepositCents: 500 },
+      { itemId: 'i1', itemName: 'Item i1', quantity: 2, unitPriceCents: 100, unitDepositCents: 500, note: null },
     ]);
+  });
+
+  it('keeps a trimmed note per line and drops an empty one', async () => {
+    findItems.mockResolvedValue([item('i1'), item('i2')]);
+    const result = await buildReservationData(
+      baseInput({
+        lines: [
+          { itemId: 'i1', quantity: 1, note: '  liefst de zwarte  ' },
+          { itemId: 'i2', quantity: 1, note: '   ' },
+        ],
+      }),
+      ALLOWED
+    );
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.lineCreates.map((line) => line.note)).toEqual(['liefst de zwarte', null]);
   });
 
   it('rejects a missing event name', async () => {

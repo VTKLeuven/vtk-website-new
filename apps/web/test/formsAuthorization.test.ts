@@ -27,7 +27,9 @@ function session(overrides: Partial<SessionPayload> = {}): SessionPayload {
 }
 
 function group(id: string, role: 'MEMBER' | 'LEAD') {
-  return { id, code: id, slug: id, nameNl: id, nameEn: id, role };
+  // `type` onderscheidt een praesidiumpost van een werkgroep; voor deze tests
+  // maakt het niet uit, maar `AuthGroup` vraagt het.
+  return { id, code: id, slug: id, nameNl: id, nameEn: id, role, type: 'PRAESIDIUM' as const };
 }
 
 describe('formulierrollen', () => {

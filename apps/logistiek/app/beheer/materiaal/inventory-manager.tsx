@@ -13,10 +13,14 @@ import {
 } from '@/app/actions/beheer';
 import { ConfirmActionButton } from '@/components/ui/confirm-action-button';
 import { PhotoUpload } from '@/components/photo-upload';
+import { SetContents } from '@/components/set-contents';
+import { AlternativesEditor } from '@/components/alternatives-editor';
 import { DownloadsEditor, GalleryEditor, PropertiesEditor } from '@/components/catalogue-editors';
 import { SaveForm } from '@/components/ui/save-form';
 import { useToast } from '@/components/ui/toast';
 import { SortHeader, compareText, useSort } from '@/app/beheer/sortable-header';
+import { UnitsEditor } from './units-editor';
+import { ITEM_CONDITION_LABELS } from '@/lib/uitleen';
 import type { AdminInventoryItem } from '@/lib/uitleen-server';
 
 type InventorySortKey = 'name' | 'category' | 'condition';
@@ -26,18 +30,14 @@ const CATEGORY_ERRORS = { NAME_REQUIRED: 'Geef de categorie een naam.', STALE: S
 const ITEM_ERRORS = {
   NAME_REQUIRED: 'Geef het item een naam.',
   QUANTITY_INVALID: 'Het aantal moet minstens 1 zijn.',
+  VOLUME_INVALID: 'Het volume moet een heel getal in liter zijn.',
   AMOUNT_INVALID: 'Prijs en waarborg moeten bedragen zijn, bv. 2,50.',
   STALE: STALE_MESSAGE,
 };
 
-const CONDITIONS: Array<{ value: string; label: string }> = [
-  { value: 'WERKT', label: 'Werkt' },
-  { value: 'TESTEN', label: 'Nog testen' },
-  { value: 'ONVOLLEDIG', label: 'Onvolledig' },
-  { value: 'KAPOT', label: 'Kapot / vervangen' },
-];
+const CONDITIONS = Object.entries(ITEM_CONDITION_LABELS).map(([value, label]) => ({ value, label }));
 
-const CONDITION_LABEL: Record<string, string> = Object.fromEntries(CONDITIONS.map((c) => [c.value, c.label]));
+const CONDITION_LABEL = ITEM_CONDITION_LABELS;
 
 const inputClass = 'h-10 min-w-0 rounded-lg border border-vtk-navy/15 bg-white px-3 text-sm text-vtk-ink';
 
@@ -92,8 +92,18 @@ function SetContentsEditor({ initial }: { initial: SetRow[] }) {
   );
 }
 
-function ItemFields({ item, categories }: { item?: AdminInventoryItem; categories: UitleenCategory[] }) {
+function ItemFields({
+  item,
+  categories,
+  items,
+}: {
+  item?: AdminInventoryItem;
+  categories: UitleenCategory[];
+  /** Alle items, om alternatieven uit te kiezen. */
+  items: AdminInventoryItem[];
+}) {
   const [isSet, setIsSet] = useState(item?.isSet ?? false);
+  const hasUnits = (item?.units.length ?? 0) > 0;
   return (
     <>
       {item ? <input type="hidden" name="id" value={item.id} /> : null}
@@ -122,7 +132,23 @@ function ItemFields({ item, categories }: { item?: AdminInventoryItem; categorie
           </select>
         </label>
         <label className="grid gap-1 text-xs font-medium text-vtk-muted">
-          Aantal<input type="number" name="quantity" min={1} defaultValue={item?.quantity ?? 1} className={inputClass} />
+          Aantal
+          {/* Houdt dit item exemplaren bij, dan is dit hun telling en niet iets
+              om in te typen; de actie zet het toch terug. */}
+          <input
+            type="number"
+            name="quantity"
+            min={1}
+            defaultValue={item?.quantity ?? 1}
+            readOnly={hasUnits}
+            aria-describedby={hasUnits ? `${item!.id}-quantity-hint` : undefined}
+            className={hasUnits ? `${inputClass} bg-vtk-paper text-vtk-muted` : inputClass}
+          />
+          {hasUnits ? (
+            <span id={`${item!.id}-quantity-hint`} className="font-normal">
+              Volgt uit de exemplaren hieronder.
+            </span>
+          ) : null}
         </label>
         <label className="grid gap-1 text-xs font-medium text-vtk-muted">
           Huurprijs (€)
@@ -131,6 +157,19 @@ function ItemFields({ item, categories }: { item?: AdminInventoryItem; categorie
         <label className="grid gap-1 text-xs font-medium text-vtk-muted">
           Waarborg (€)
           <input type="text" name="deposit" inputMode="decimal" placeholder="0,00" defaultValue={item ? centsToEuroInput(item.depositCents) : ''} className={inputClass} />
+        </label>
+        <label className="grid gap-1 text-xs font-medium text-vtk-muted">
+          Volume (liter)
+          {/* Optioneel: enkel om per evenement de lading in te schatten (A8). Geen
+              inventarisplicht; wat niet ingevuld is, telt daar als onbekend. */}
+          <input
+            type="number"
+            name="volumeLiters"
+            min={0}
+            defaultValue={item?.volumeLiters ?? ''}
+            placeholder="Optioneel"
+            className={inputClass}
+          />
         </label>
         <label className="grid gap-1 text-xs font-medium text-vtk-muted">
           Schap<input type="text" name="locationShelf" defaultValue={item?.locationShelf ?? ''} placeholder="Bv. 2R" className={inputClass} />
@@ -159,6 +198,23 @@ function ItemFields({ item, categories }: { item?: AdminInventoryItem; categorie
       </div>
       </div>
 
+      <div className="grid gap-3 rounded-[14px] border border-vtk-navy/10 bg-vtk-paper/50 p-4">
+        <div>
+          <p className="text-sm font-medium text-vtk-ink">Alternatieven</p>
+          <p className="mt-1 text-xs text-vtk-muted">
+            Items die evengoed kunnen. Staat dit item op nul beschikbaar in de gevraagde periode, dan
+            krijgt het lid ze te zien als suggestie; het blijft zijn keuze. De koppeling geldt in twee
+            richtingen.
+          </p>
+        </div>
+        <AlternativesEditor
+          initial={(item?.alternatives ?? []).map((a) => a.alternativeId)}
+          options={items
+            .filter((other) => other.id !== item?.id)
+            .map((other) => ({ id: other.id, name: other.name }))}
+        />
+      </div>
+
       <div className="grid gap-4 rounded-[14px] border border-vtk-navy/10 bg-vtk-paper/50 p-4">
         <div><p className="text-sm font-medium text-vtk-ink">Eigenschappen</p><p className="mt-1 text-xs text-vtk-muted">Technische kenmerken die leden op de detailpagina zien.</p></div>
         <PropertiesEditor initial={item?.properties ?? []} />
@@ -184,7 +240,16 @@ function ItemFields({ item, categories }: { item?: AdminInventoryItem; categorie
   );
 }
 
-function QuantityQuickEdit({ itemId, quantity }: { itemId: string; quantity: number }) {
+function QuantityQuickEdit({
+  itemId,
+  quantity,
+  locked = false,
+}: {
+  itemId: string;
+  quantity: number;
+  /** Item met exemplaren: de voorraad is hun telling, niet iets om in te typen. */
+  locked?: boolean;
+}) {
   const router = useRouter();
   const showToast = useToast();
   const [value, setValue] = useState(String(quantity));
@@ -206,6 +271,17 @@ function QuantityQuickEdit({ itemId, quantity }: { itemId: string; quantity: num
     } else {
       showToast({ message: result.error ?? 'Er ging iets mis.', variant: 'error', duration: 0 });
     }
+  }
+
+  if (locked) {
+    return (
+      <span
+        className="inline-flex h-9 w-20 items-center px-1 tabular-nums text-vtk-muted"
+        title="Volgt uit de exemplaren; pas ze aan onder Bewerken."
+      >
+        {quantity}
+      </span>
+    );
   }
 
   return (
@@ -232,6 +308,150 @@ const CONDITION_TONE: Record<string, string> = {
   KAPOT: 'font-semibold text-red-700',
 };
 
+/**
+ * De itemtabel, voor zowel de catalogus als het archief. Eén component omdat een
+ * gearchiveerd item dezelfde velden heeft en even goed fout kan staan: je wil het
+ * kunnen corrigeren vóór je het terugzet, niet erna.
+ */
+function ItemTable({
+  items,
+  allItems,
+  categories,
+  categoryName,
+  sort,
+  editingId,
+  onToggleEdit,
+  archived = false,
+}: {
+  items: AdminInventoryItem[];
+  /** De volledige inventaris, om alternatieven uit te kiezen. */
+  allItems: AdminInventoryItem[];
+  categories: UitleenCategory[];
+  categoryName: (id: string | null) => string;
+  sort: ReturnType<typeof useSort<InventorySortKey>>;
+  editingId: string | null;
+  onToggleEdit: (id: string | null) => void;
+  archived?: boolean;
+}) {
+  return (
+    <div className="overflow-x-auto">
+      <table className="w-full min-w-[760px] border-collapse text-sm">
+        <thead>
+          <tr className="border-b border-vtk-navy/10 text-left text-xs text-vtk-muted">
+            <SortHeader label="Item" sortKey="name" activeKey={sort.key} dir={sort.dir} onSort={sort.toggle} />
+            <SortHeader label="Categorie" sortKey="category" activeKey={sort.key} dir={sort.dir} onSort={sort.toggle} />
+            <SortHeader label="Staat" sortKey="condition" activeKey={sort.key} dir={sort.dir} onSort={sort.toggle} />
+            <th className="py-2 pr-3 font-medium">Locatie</th>
+            <th className="py-2 pr-3 font-medium">Voorraad</th>
+            <th className="py-2 font-medium"></th>
+          </tr>
+        </thead>
+        <tbody>
+          {items.map((item) => {
+            const editing = editingId === item.id;
+            const location = [item.locationShelf, item.locationRack].filter(Boolean).join(' · ') || '—';
+            const broken = item.units.filter((unit) => unit.condition === 'KAPOT').length;
+            return (
+              <Fragment key={item.id}>
+                <tr className={`border-b border-vtk-navy/5 align-top ${archived ? 'opacity-70' : ''}`}>
+                  <td className="py-2 pr-3 text-vtk-ink">
+                    <span className="font-medium">{item.name}</span>
+                    {item.isSet ? (
+                      <span className="ml-2 rounded-full bg-vtk-yellow/25 px-2 py-0.5 text-[11px] font-semibold text-vtk-ink">Set</span>
+                    ) : null}
+                    {archived ? (
+                      <span className="ml-2 rounded-full bg-vtk-navy/10 px-2 py-0.5 text-[11px] font-semibold text-vtk-muted">
+                        uit de catalogus
+                      </span>
+                    ) : null}
+                    {item.description ? <p className="text-xs text-vtk-muted">{item.description}</p> : null}
+                    {/* Ook hier de inhoud: bij het klaarzetten wil je zien wat er
+                        in de set hoort te zitten zonder het item te openen. */}
+                    <SetContents contents={item.setContents} locale="nl" />
+                  </td>
+                  <td className="py-2 pr-3 text-vtk-muted">{categoryName(item.categoryId)}</td>
+                  {/* Bij exemplaren zegt de staat van de rij niets: dan telt de
+                      staat per exemplaar, en is het aantal kapotte stuks het
+                      nieuws. */}
+                  {item.units.length > 0 ? (
+                    <td className={`py-2 pr-3 ${broken > 0 ? 'font-semibold text-red-700' : 'text-vtk-muted'}`}>
+                      {broken > 0 ? `${broken} kapot van ${item.units.length}` : 'Per exemplaar'}
+                    </td>
+                  ) : (
+                    <td className={`py-2 pr-3 ${CONDITION_TONE[item.condition] ?? 'text-vtk-muted'}`}>
+                      {CONDITION_LABEL[item.condition] ?? item.condition}
+                    </td>
+                  )}
+                  <td className="py-2 pr-3 text-vtk-muted">{location}</td>
+                  <td className="py-2 pr-3">
+                    <QuantityQuickEdit
+                      itemId={item.id}
+                      quantity={item.quantity}
+                      locked={item.units.length > 0}
+                    />
+                  </td>
+                  <td className="py-2">
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => onToggleEdit(editing ? null : item.id)}
+                        className="rounded-full border border-vtk-navy/15 px-3 py-1.5 text-sm font-semibold text-vtk-ink transition hover:border-vtk-navy/40 hover:bg-vtk-paper"
+                        aria-expanded={editing}
+                      >
+                        {editing ? 'Sluiten' : 'Bewerken'}
+                      </button>
+                      {archived ? (
+                        <ConfirmActionButton
+                          label="Terugzetten"
+                          successMessage="Item terug in de catalogus gezet."
+                          action={activateItemAction.bind(null, item.id)}
+                          confirm={false}
+                        />
+                      ) : (
+                        <ConfirmActionButton
+                          label="Uit catalogus"
+                          successMessage="Item uit de catalogus gehaald."
+                          action={deactivateItemAction.bind(null, item.id)}
+                          destructive
+                          dialogTitle="Item uit de catalogus halen?"
+                          dialogDescription="Leden kunnen dit item niet meer aanvragen. Bestaande reservaties en de historiek blijven bewaard; je kan het item later terugzetten."
+                        />
+                      )}
+                    </div>
+                  </td>
+                </tr>
+                {editing ? (
+                  <tr>
+                    <td colSpan={6} className="border-b border-vtk-navy/10 bg-vtk-paper/55 px-4 py-5">
+                      <p className="mb-4 text-sm font-semibold text-vtk-ink">Item aanpassen</p>
+                      <SaveForm
+                        action={saveItemAction}
+                        submitLabel="Wijzigingen opslaan"
+                        savingLabel="Opslaan..."
+                        savedMessage="Item opgeslagen."
+                        errorMessages={ITEM_ERRORS}
+                        onSuccess={() => onToggleEdit(null)}
+                        className="grid gap-4"
+                      >
+                        <ItemFields item={item} categories={categories} items={allItems} />
+                      </SaveForm>
+                      {/* Buiten het formulier: elk exemplaar bewaart apart, en
+                          een formulier in een formulier bestaat niet in HTML. */}
+                      <div className="mt-4">
+                        <UnitsEditor item={item} />
+                      </div>
+                    </td>
+                  </tr>
+                ) : null}
+              </Fragment>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
 export function InventoryManager({
   categories,
   items,
@@ -251,25 +471,35 @@ export function InventoryManager({
   const stockCount = activeItems.reduce((total, item) => total + item.quantity, 0);
   const categoryName = (id: string | null) => categories.find((c) => c.id === id)?.name ?? 'Overig';
 
-  const shown = useMemo(() => {
+  // Dezelfde filter en sortering voor de catalogus en het archief: een item dat
+  // je zoekt, is soms net het item dat iemand uit de catalogus haalde, en dan
+  // moet de zoekbalk daar ook iets doen.
+  const { shown, shownInactive } = useMemo(() => {
     const needle = search.trim().toLowerCase();
     const nameOf = (id: string | null) => categories.find((c) => c.id === id)?.name ?? 'Overig';
-    const filtered = activeItems
-      .filter((item) => activeCategory === 'all' || (item.categoryId ?? 'overig') === activeCategory)
-      .filter(
-        (item) =>
-          !needle ||
-          item.name.toLowerCase().includes(needle) ||
-          (item.description ?? '').toLowerCase().includes(needle)
-      );
-    return [...filtered].sort((a, b) => {
-      if (sort.key === 'category') return compareText(nameOf(a.categoryId), nameOf(b.categoryId), sort.dir);
-      if (sort.key === 'condition') {
-        return compareText(CONDITION_LABEL[a.condition] ?? a.condition, CONDITION_LABEL[b.condition] ?? b.condition, sort.dir);
-      }
-      return compareText(a.name, b.name, sort.dir);
-    });
-  }, [activeItems, categories, search, activeCategory, sort.key, sort.dir]);
+    const apply = (list: AdminInventoryItem[]) =>
+      list
+        .filter((item) => activeCategory === 'all' || (item.categoryId ?? 'overig') === activeCategory)
+        .filter(
+          (item) =>
+            !needle ||
+            item.name.toLowerCase().includes(needle) ||
+            (item.description ?? '').toLowerCase().includes(needle)
+        )
+        .sort((a, b) => {
+          if (sort.key === 'category') return compareText(nameOf(a.categoryId), nameOf(b.categoryId), sort.dir);
+          if (sort.key === 'condition') {
+            return compareText(CONDITION_LABEL[a.condition] ?? a.condition, CONDITION_LABEL[b.condition] ?? b.condition, sort.dir);
+          }
+          return compareText(a.name, b.name, sort.dir);
+        });
+    return {
+      shown: apply(items.filter((item) => item.active)),
+      shownInactive: apply(items.filter((item) => !item.active)),
+    };
+  }, [items, categories, search, activeCategory, sort.key, sort.dir]);
+
+  const filtersActive = search.trim() !== '' || activeCategory !== 'all';
 
   return (
     <div className="grid gap-8">
@@ -299,7 +529,7 @@ export function InventoryManager({
           </summary>
           <div className="mt-4">
             <SaveForm action={saveItemAction} submitLabel="Item toevoegen" savingLabel="Toevoegen..." savedMessage="Item toegevoegd." errorMessages={ITEM_ERRORS} className="grid gap-4">
-              <ItemFields categories={categories} />
+              <ItemFields categories={categories} items={items} />
             </SaveForm>
           </div>
         </details>
@@ -370,6 +600,18 @@ export function InventoryManager({
           ))}
           <option value="overig">Overig</option>
         </select>
+        {filtersActive ? (
+          <button
+            type="button"
+            onClick={() => {
+              setSearch('');
+              setActiveCategory('all');
+            }}
+            className="h-10 rounded-lg border border-vtk-navy/15 px-3 text-sm font-medium text-vtk-ink transition hover:border-vtk-navy/40"
+          >
+            Filters wissen
+          </button>
+        ) : null}
       </div>
 
       <section>
@@ -379,99 +621,44 @@ export function InventoryManager({
             Niets gevonden.
           </p>
         ) : (
-          <div className="mt-4 overflow-x-auto">
-            <table className="w-full min-w-[760px] border-collapse text-sm">
-              <thead>
-                <tr className="border-b border-vtk-navy/10 text-left text-xs text-vtk-muted">
-                  <SortHeader label="Item" sortKey="name" activeKey={sort.key} dir={sort.dir} onSort={sort.toggle} />
-                  <SortHeader label="Categorie" sortKey="category" activeKey={sort.key} dir={sort.dir} onSort={sort.toggle} />
-                  <SortHeader label="Staat" sortKey="condition" activeKey={sort.key} dir={sort.dir} onSort={sort.toggle} />
-                  <th className="py-2 pr-3 font-medium">Locatie</th>
-                  <th className="py-2 pr-3 font-medium">Voorraad</th>
-                  <th className="py-2 font-medium"></th>
-                </tr>
-              </thead>
-              <tbody>
-                {shown.map((item) => {
-                  const editing = editingId === item.id;
-                  const location = [item.locationShelf, item.locationRack].filter(Boolean).join(' · ') || '—';
-                  return (
-                    <Fragment key={item.id}>
-                      <tr className="border-b border-vtk-navy/5 align-top">
-                        <td className="py-2 pr-3 text-vtk-ink">
-                          <span className="font-medium">{item.name}</span>
-                          {item.isSet ? (
-                            <span className="ml-2 rounded-full bg-vtk-yellow/25 px-2 py-0.5 text-[11px] font-semibold text-vtk-ink">Set</span>
-                          ) : null}
-                          {item.description ? <p className="text-xs text-vtk-muted">{item.description}</p> : null}
-                        </td>
-                        <td className="py-2 pr-3 text-vtk-muted">{categoryName(item.categoryId)}</td>
-                        <td className={`py-2 pr-3 ${CONDITION_TONE[item.condition] ?? 'text-vtk-muted'}`}>
-                          {CONDITION_LABEL[item.condition] ?? item.condition}
-                        </td>
-                        <td className="py-2 pr-3 text-vtk-muted">{location}</td>
-                        <td className="py-2 pr-3">
-                          <QuantityQuickEdit itemId={item.id} quantity={item.quantity} />
-                        </td>
-                        <td className="py-2">
-                          <div className="flex items-center gap-2">
-                            <button
-                              type="button"
-                              onClick={() => setEditingId(editing ? null : item.id)}
-                              className="rounded-full border border-vtk-navy/15 px-3 py-1.5 text-sm font-semibold text-vtk-ink transition hover:border-vtk-navy/40 hover:bg-vtk-paper"
-                              aria-expanded={editing}
-                            >
-                              {editing ? 'Sluiten' : 'Bewerken'}
-                            </button>
-                            <ConfirmActionButton
-                              label="Uit catalogus"
-                              successMessage="Item uit de catalogus gehaald."
-                              action={deactivateItemAction.bind(null, item.id)}
-                              destructive
-                              dialogTitle="Item uit de catalogus halen?"
-                              dialogDescription="Leden kunnen dit item niet meer aanvragen. Bestaande reservaties en de historiek blijven bewaard; je kan het item later terugzetten."
-                            />
-                          </div>
-                        </td>
-                      </tr>
-                      {editing ? (
-                        <tr>
-                          <td colSpan={6} className="border-b border-vtk-navy/10 bg-vtk-paper/55 px-4 py-5">
-                            <p className="mb-4 text-sm font-semibold text-vtk-ink">Item aanpassen</p>
-                            <SaveForm
-                              action={saveItemAction}
-                              submitLabel="Wijzigingen opslaan"
-                              savingLabel="Opslaan..."
-                              savedMessage="Item opgeslagen."
-                              errorMessages={ITEM_ERRORS}
-                              onSuccess={() => setEditingId(null)}
-                              className="grid gap-4"
-                            >
-                              <ItemFields item={item} categories={categories} />
-                            </SaveForm>
-                          </td>
-                        </tr>
-                      ) : null}
-                    </Fragment>
-                  );
-                })}
-              </tbody>
-            </table>
+          <div className="mt-4">
+            <ItemTable
+              items={shown}
+              allItems={items}
+              categories={categories}
+              categoryName={categoryName}
+              sort={sort}
+              editingId={editingId}
+              onToggleEdit={setEditingId}
+            />
           </div>
         )}
       </section>
 
       {inactiveItems.length > 0 ? (
         <details className="rounded-[16px] border border-vtk-navy/10 bg-vtk-paper/60">
-          <summary className="cursor-pointer px-5 py-4 text-sm font-semibold text-vtk-ink">Uit de catalogus ({inactiveItems.length})</summary>
-          <ul className="grid gap-2 border-t border-vtk-navy/10 px-4 py-4">
-            {inactiveItems.map((item) => (
-              <li key={item.id} className="flex flex-wrap items-center justify-between gap-3 rounded-[12px] bg-vtk-surface px-3 py-2.5 text-sm">
-                <span className="text-vtk-muted">{item.name}</span>
-                <ConfirmActionButton label="Terugzetten" successMessage="Item terug in de catalogus gezet." action={activateItemAction.bind(null, item.id)} confirm={false} />
-              </li>
-            ))}
-          </ul>
+          <summary className="cursor-pointer px-5 py-4 text-sm font-semibold text-vtk-ink">
+            {/* Het aantal treffers erbij, anders lijkt een zoekterm die enkel in
+                het archief iets raakt op "niets gevonden". */}
+            Uit de catalogus (
+            {filtersActive ? `${shownInactive.length} van ${inactiveItems.length}` : inactiveItems.length})
+          </summary>
+          <div className="border-t border-vtk-navy/10 px-4 py-4">
+            {shownInactive.length === 0 ? (
+              <p className="text-sm text-vtk-muted">Geen gearchiveerd item voldoet aan je filters.</p>
+            ) : (
+              <ItemTable
+                items={shownInactive}
+                allItems={items}
+                categories={categories}
+                categoryName={categoryName}
+                sort={sort}
+                editingId={editingId}
+                onToggleEdit={setEditingId}
+                archived
+              />
+            )}
+          </div>
         </details>
       ) : null}
     </div>

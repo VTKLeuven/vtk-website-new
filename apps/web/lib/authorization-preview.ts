@@ -60,6 +60,7 @@ export async function resolveAuthorizationPreview(
         slug: true,
         nameNl: true,
         nameEn: true,
+        type: true,
         roleGrants: {
           select: {
             kind: true,
@@ -105,6 +106,7 @@ export async function resolveAuthorizationPreview(
         nameNl: group.nameNl,
         nameEn: group.nameEn,
         role: selectedGroupRole.get(group.id) ?? "MEMBER",
+        type: group.type,
       })),
       permissions: [...permissions],
       roleIds: [...effectiveRoles.keys()],

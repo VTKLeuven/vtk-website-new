@@ -1087,9 +1087,12 @@ feedback van de groepscoordinator. De onderliggende werking:
   nooit zelf.** Een praesidiumlid (in een post) vraagt aan als INTERN namens die
   post; wie geen post heeft, is EXTERN met de eigen naam. De server dwingt dit af
   en negeert wat de client meestuurt (niet te vervalsen). Enkel wanneer een lid
-  in meerdere posten zit, kiest het nog *welke* post (geen type). Werkgroepen
-  zitten niet in de DB en worden dus niet automatisch afgeleid; in het beheer kan
-  het team het type wel manueel zetten (het is daar zichtbaar en duidelijk).
+  in meerdere posten zit, kiest het nog *welke* post (geen type). In het beheer
+  kan het team het type wel manueel zetten (het is daar zichtbaar en duidelijk).
+  *Achterhaald sinds augustus 2026:* werkgroepen zitten intussen wél in de DB
+  (`GroupType.WERKGROEP`, `WERKGROEP_SEEDS` in `packages/db/src/groups.ts`) en
+  `deriveMemberRequester` leidt ze automatisch af. Enkel de keuzelijst in de UI
+  noemt ze nog "post"; dat is taak M4 in het feedbackplan.
 - **Flesserke is een aparte tab**, enkel zichtbaar en bruikbaar voor het
   praesidium (leden met een post). Het is een eigen aanvraagflow (aparte
   reservatie met enkel flesserke-lijnen), los van materiaal. Materiaal- en
@@ -1158,6 +1161,444 @@ praesidiumfunctie. Logistiek beheert nu zelf een chauffeurslijst in
   dan eerst aan een andere chauffeur toe. In het beheer blijft een verwijderde
   chauffeur zichtbaar in de keuzelijst van zijn eigen rit, onder "Niet meer in de
   chauffeurslijst".
+
+### Terugdraaien: één stap terug, behalve bij een online betaling
+
+Elke stap in de flow kan één stap terug: goedkeuren en afwijzen naar
+"aangevraagd", afgehaald naar goedgekeurd, teruggebracht naar afgehaald, en de
+markeringen "betaald aan de balie" en "waarborg terug" kunnen gewist worden.
+Bij vervoer geldt hetzelfde, plus het terugdraaien van een afronding. Zonder dit
+betekende één verkeerde klik een ingreep in de database, en dat is net wat deze
+app kwam vervangen.
+
+Wat daarbij vastligt:
+
+- **Voorraad wordt hercheckt zodra terugdraaien ze opnieuw inneemt.**
+  "Teruggebracht" terugdraaien zet het materiaal weer buiten en zet het
+  flesserke-verbruik terug op de plank; dat loopt in dezelfde
+  Serializable-transactie en met dezelfde check als het goedkeuren. Is de
+  periode intussen aan iemand anders toegewezen, dan gaat er niets door.
+  Voorraad *vrijgeven* (een goedkeuring terugdraaien) is altijd veilig.
+- **Een geslaagde online betaling draai je hier niet terug.** Dat vraagt een
+  terugbetaling bij de betaalprovider, en een knop die enkel de markering wist,
+  zou doen alsof het geld terug is. De actie weigert en zegt waarom. "Betaling
+  terugdraaien" wist enkel de markering *aan de balie*.
+- **Een goedkeuring terugdraaien kan niet zolang er betaald is.** Eerst de
+  betaling terugdraaien, dan de goedkeuring; anders zou een aanvraag zonder
+  betaalwijze toch als betaald blijven staan.
+- **Een afronding terugdraaien wist de kilometers** bij een voertuig dat per
+  kilometer rekent. Wie een afronding terugdraait, doet dat meestal net omdat de
+  kilometers fout stonden, en het afrondformulier vraagt ze dan opnieuw.
+- **Terugdraaien staat apart in de interface**, onder een eigen kopje
+  "Rechtzetten", en nooit in de rij knoppen waar je normaal op klikt.
+
+De velden op de aanvraag (`decidedAt`, `pickedUpAt`, ...) bewaren enkel de
+laatste toestand, dus ze zijn geen historiek meer zodra je kan terugdraaien.
+Daarom schrijft elke beheeractie een regel in `UitleenAuditLog`, in dezelfde
+transactie als de wijziging: zo staat er nooit een regel voor iets dat niet
+gebeurd is, en zie je op de detailpagina wie wat wanneer deed.
+
+### Een alternatief is een suggestie, geen automatische vervanging
+
+Items kunnen elkaars alternatief zijn ("geen actieve box meer? de passieve kan
+ook"). Staat een item op nul beschikbaar in de gevraagde periode, dan toont de
+catalogus die alternatieven onder de kaart; klikken zet er één in de aanvraag.
+
+Wat daarbij vastligt:
+
+- **De aanvrager kiest.** De app vervangt nooit zelf een item, ook niet wanneer
+  er precies één alternatief vrij is. Wie een aanvraag indient, moet weten wat er
+  in staat; een stille omwisseling merk je pas aan de balie.
+- **De koppeling is wederzijds.** De actieve en de passieve box zijn elkaars
+  alternatief, dus schrijft `saveItemAction` per paar twee rijen weg en ruimt hij
+  ook de tegenrichting op. Een eenrichtingsrelatie blijkt in de praktijk altijd
+  te weinig: wie A instelt, verwacht dat B het ook weet.
+- **Alternatieven verschijnen enkel wanneer het gevraagde niet kan.** Anders
+  staat er bij elk item een suggestie die niemand nodig heeft, en wordt het ruis.
+
+Los daarvan draagt elke materiaallijn een eigen opmerking (`note`), in te vullen
+door het lid ("liefst de zwarte") én door het team ("zie vorig event"). Eén veld
+voor beide: wie het schreef blijkt uit de tekst, en twee notitievelden per lijn
+worden in de praktijk allebei half ingevuld. De opmerking staat bij de lijn en
+niet bij de algemene info onderaan, want daar vindt het team ze pas nadat het al
+iets anders klaarzette.
+
+### Heen en terug zijn twee ritten in één aanvraag
+
+Wie de kar 's ochtends nodig heeft om op te bouwen en 's avonds om af te breken,
+vult één formulier in met een tweede tijdvenster. Dat wordt in de database
+**twee** `UitleenTransportBooking`-rijen met dezelfde `tripGroupId` en een
+`tripLeg` (HEEN/TERUG).
+
+Waarom niet één boeking met twee tijdvensters: tussen opbouw en afbraak is het
+voertuig gewoon vrij, en iemand anders mag het dan gebruiken. Eén rij met
+`returnStartAt`/`returnEndAt` zou betekenen dat élke query over "wanneer is dit
+voertuig bezet" twee vensters moet kennen: de conflictcheck bij het goedkeuren,
+de kalender, het weekoverzicht en het publieke overzicht. Eén ervan vergeten
+levert een dubbel geboekte kar op, en dat merk je pas op de dag zelf.
+
+Wat daarbij vastligt:
+
+- **Beslissen gebeurt op de hele aanvraag.** Goedkeuren en afwijzen doen beide
+  helften tegelijk; de heenrit goedkeuren en de terugrit laten hangen, levert een
+  aanvrager op die niet meer thuisgeraakt. Annuleren door het lid werkt ook op de
+  groep.
+- **De uren blijven per helft.** In het goedkeurformulier staan beide
+  tijdvensters apart, dus Logistiek kan de terugrit een uur opschuiven zonder de
+  heenrit te raken.
+- **De prijs is de som van beide ritten.** Ze worden apart aangerekend, want het
+  voertuig staat er tussenin niet op.
+
+### Uren verschuiven hoort bij het goedkeuren
+
+Twee aanvragen voor dezelfde kar op dezelfde dag passen vaak samen na een
+halfuur schuiven. Voordien kon het team enkel goedkeuren of afwijzen, en werd
+dat schuiven een mailtje plus een ingreep in de database. Het goedkeurformulier
+draagt nu de uren zelf: wat je daar invult, wordt de rit.
+
+- De conflictcheck loopt in dezelfde Serializable-transactie als het opslaan, dus
+  twee beheerders die tegelijk schuiven kunnen elkaar niet overschrijven.
+- Botst het toch, dan noemt de melding de rit waarmee het botst ("Botst met de
+  rit van Feest op za 12 sep 14:00 tot 18:00"), en staan de andere ritten van dat
+  voertuig die dag al boven het formulier. "Voertuig bezet" zegt niet waarheen je
+  moet schuiven.
+- Verschoven uren komen apart in de historiek (`UitleenAuditLog`), want de nieuwe
+  uren staan daarna als "de" uren op de rit; zonder die regel is niet meer te
+  zien dat er iets veranderd is aan wat het lid vroeg.
+
+### Karchauffeurs: één vlag, geen aparte soort
+
+Een voertuig kan aangeduid staan als "vraagt een karchauffeur"
+(`UitleenVehicle.needsTrailerDriver`), en een chauffeur als "rijdt met de kar"
+(`UitleenDriver.canDriveTrailer`). Bij een rit met zo'n voertuig staan de
+karchauffeurs bovenaan in de keuzelijst en de rest onder "Niet met de kar".
+
+- **Eén vlag en geen enum AUTO/KAR:** elke karchauffeur rijdt ook gewoon met de
+  auto, dus die twee sluiten elkaar niet uit.
+- **De rest blijft kiesbaar,** uitgegrijsd noch geblokkeerd: het team beslist wie
+  rijdt, de app zorgt er enkel voor dat je het niet per ongeluk doet.
+- **Een vlag per voertuig en geen check op `code == "kar"`:** het team voert zelf
+  voertuigen in, en een tweede aanhangwagen zou anders stil buiten de regel
+  vallen.
+- Leden van de post Logistiek hebben pas een `UitleenDriver`-rij zodra iemand die
+  vlag bij hen zet. Gevolg om te kennen: verlaten ze later de post, dan blijven ze
+  via die rij in de chauffeurslijst staan (onder "zelf toegevoegd", waar je ze kan
+  weghalen).
+
+### Flesserke: ladingen met een eigen vervaldatum
+
+Een flesserke-item (`UitleenFlesserkeItem`) is het product; wat er ligt, staat in
+**ladingen** (`UitleenFlesserkeBatch`), elk met een eigen aantal en vervaldatum.
+Twee bakken cola die je op verschillende momenten kocht, vervallen op
+verschillende dagen; met één datum per item sloeg de rode markering "vervalt
+binnen 3 weken" op de hele stapel, ook op de bakken die nog maanden goed waren.
+
+Wat daarbij vastligt:
+
+- **De ladingen zijn de waarheid.** `item.quantity` en `item.expiryDate` zijn een
+  bijgehouden samenvatting (de som en de eerstvolgende datum); de acties zetten
+  ze bij elke wijziging opnieuw via `syncFlesserkeItemTotals`. Zo blijft de
+  beschikbaarheidsberekening (`quantity` min gereserveerd), de zoekfilter en de
+  sortering op één rij lezen, zonder join.
+- **Verbruik gaat van de oudste lading eerst.** Dat is wat er in de kelder
+  gebeurt: je neemt de bak die het eerst vervalt.
+- **Een lege lading telt niet mee voor de vervaldatum.** Een leeggedronken bak van
+  vorige maand mag het item niet rood houden.
+- **Terugdraaien zet alles op de oudste lading.** Welke lading precies verbruikt
+  werd, houden we niet bij; dat zou een koppeltabel per lijn vragen voor een
+  correctie die zelden gebeurt. Het totaal klopt hoe dan ook, en bij één lading
+  (het gewone geval) is het exact het spiegelbeeld.
+- **De snelle voorraadbijstelling werkt enkel bij één lading.** Liggen er
+  meerdere, dan is niet te weten van welke er twee bij of af moeten, en zou de app
+  die keuze verzinnen; je past ze dan per lading aan in de bewerkrij.
+
+### Flesserke is voor de hele interne werking, niet enkel het praesidium
+
+De toegangsregel was altijd "heeft een groep" (`session.groups.length > 0`), dus
+werkgroepen en jaarwerkingen konden flesserke gewoon aanvragen. De teksten zeiden
+"enkel voor het praesidium", en werkgroepen concludeerden daaruit dat het niets
+voor hen was. Dat is rechtgezet in de app en in `docs/uitleendienst.md`.
+
+Ziet een werkgrooplid de tab toch niet, dan hangt zijn account dit werkingsjaar
+aan geen enkele groep. Dat is ledenbeheer op vtk.be (`/admin/werkgroepen`) en geen
+zaak van de uitleendienst; de gate opzetten zou het verbergen in plaats van het
+oplossen.
+
+### Evenement: een koepel die je zelf opzet, niet een die vanzelf ontstaat
+
+Materiaal, flesserke en vervoer van hetzelfde evenement kunnen onder één
+`UitleenEvent` hangen. Het beantwoordt één vraag die nergens anders te stellen
+was: "is voor dit evenement alles aangevraagd?".
+
+- **Een evenement ontstaat niet vanzelf.** Het plan stelde voor "nieuw evenement"
+  de default te maken in het aanvraagformulier. Dat is bewust niet gebeurd: dan
+  krijgt elke uitlening van twee tafels een evenement, wordt het evenementscherm
+  een tweede aanvraaglijst, en gaat de waarschuwing "nog geen vervoer
+  aangevraagd" af op alles. Er ontstaat er een wanneer iemand er een maakt: het
+  lid in het formulier ("maak hier een nieuw evenement van"), het team op
+  /beheer/evenementen, of het groeperingsscript voor de historiek.
+- **Het lid kan er zelf een maken**, en dat is nodig: de eerste aanvraag van een
+  evenement heeft nog niets om aan te hangen. Wachten tot het team er een aanmaakt
+  zou betekenen dat niemand het ooit gebruikt.
+- **De koepel is geen eigenaar.** De aanvragen houden hun eigen `eventName`,
+  datums en status; verwijder je het evenement, dan blijven ze bestaan
+  (`onDelete: SetNull`). Ze zijn het werk, de koepel is een groepering.
+- **Geen filter op post.** Elk evenement staat in de keuzelijst van elk lid: twee
+  posten die samen een evenement doen, moeten er allebei aan kunnen hangen, en dat
+  is precies waarvoor de koepel dient.
+- **De ladingsinschatting zegt wat ze niet weet.** `volumeLiters` is optioneel per
+  item, dus het scherm toont het gekende volume én hoeveel stuks er geen volume
+  hebben. Een half volume als "het totaal" tonen zou de transportverantwoordelijke
+  een te kleine kar laten kiezen.
+- **De historiek groepeert enkel wat samenhoort.** Het script
+  (`npm run group:events -w @vtk/logistiek`) clustert op genormaliseerde naam +
+  post + week, en laat clusters van één aanvraag met rust. Het draait standaard
+  als dry-run: een verkeerde groepering hangt aanvragen van twee posten onder één
+  naam, en dat is vervelender dan geen groepering.
+- **De losse overzichten blijven.** `/beheer/aanvragen` en `/beheer/vervoer` zijn
+  waar je beslist; het evenementscherm komt erbij en vervangt niets.
+
+### Sjablonen maakt Logistiek, niet de posten
+
+Een vaste set materiaal (een cantus, een BBQ) staat als sjabloon in het
+aanvraagformulier en vult daar de aantallen in.
+
+- **Enkel Logistiek maakt ze aan.** Lieten we elke post zijn eigen sjablonen
+  maken, dan staan er na één werkingsjaar dertig varianten van "cantus" in de
+  keuzelijst en weet niemand nog welke de juiste is.
+- **Aanmaken gebeurt vanaf een bestaande aanvraag**, niet in een leeg
+  invulscherm. Een cantus bestaat al voor iemand er een sjabloon van wil, en de
+  lijst opnieuw intikken is precies het werk dat een sjabloon moet uitsparen.
+- **Een sjabloon telt op bij wat er al staat**, en vervangt niet. Wie eerst iets
+  koos en dan een sjabloon neemt, is zijn keuze anders kwijt zonder waarschuwing.
+- **De post op een sjabloon is een label, geen filter.** Een sjabloon van Cultuur
+  kan even goed voor een andere post passen; verbergen zou het onvindbaar maken
+  voor wie het net nodig heeft.
+- **Een item dat uit de catalogus verdwijnt, valt uit het sjabloon** maar de lijn
+  blijft staan: komt het item terug, dan is het sjabloon weer compleet. Het
+  beheerscherm zegt hoeveel lijnen overgeslagen worden.
+
+### Meerdere voertuigen: één aanvraag, N boekingen
+
+Een verhuis met de kar én de auto is één vraag. Ze komt binnen als één aanvraag
+en wordt N boekingen met hetzelfde `tripGroupId`, dezelfde groepering als heen en
+terug (V12). Bij twee voertuigen én een terugrit zijn dat er vier.
+
+- **Waarom niet één boeking met een lijst voertuigen:** elke query over "wanneer
+  is dit voertuig bezet" (de conflictcheck, de kalender, het weekoverzicht, het
+  publieke bezettingsraster) leest één rij per voertuig per tijdvenster. Een lijst
+  zou al die queries moeten aanpassen.
+- **Ze worden altijd samen beslist.** Eén voertuig goedkeuren en het andere laten
+  hangen, levert een verhuis op die half kan doorgaan. Goedkeuren, afwijzen en
+  annuleren werken al op de hele groep.
+- **Tarief per voertuig gesnapshot.** De kar is gratis en de auto per kilometer;
+  de prijsindicatie telt de vaste tarieven op en zegt van de per-km-voertuigen dat
+  ze pas na de rit gekend zijn.
+
+### Concept: lokaal in de browser, niet in de database
+
+Een half ingevulde aanvraag overleeft nu een gesloten tabblad. Ze staat in
+`localStorage` van de browser, niet als `DRAFT` op `UitleenReservation`.
+
+- **Een concept in de database raakt alles.** Elke query die vandaag "alle
+  reservaties" zegt zou `DRAFT` moeten uitsluiten: de voorraad, de kalender, de
+  beheerlijsten, mijn reservaties, de conflictberekening. Eén vergeten query en
+  een half ingevuld formulier reserveert materiaal.
+- **Dit dekt het geval waar het om gaat**: de tab viel dicht, de laptop ging toe,
+  de aanvrager ging eerst nog eens kijken wat er in de loods lag. Wie op een ander
+  toestel wil verder werken, is de uitzondering; komt die vraag terug, dan pas is
+  een echte `DRAFT`-status de moeite.
+- **Terugzetten gebeurt op een klik, nooit vanzelf.** Een formulier dat zichzelf
+  invult met iets van vorige week is verwarrender dan een leeg formulier. Er staat
+  een balk met "verder werken" of "weggooien", en het tijdstip erbij.
+- **Per lid gesleuteld** (`draftKey`), want de pc in het logikot is gedeeld. Een
+  leeg formulier wordt niet bewaard, en na twee weken vervalt het concept: dan is
+  het geen aanvraag in opbouw meer maar iets dat blijven hangen is.
+
+### Dagdeel is een afspraak, geen boekingseenheid
+
+Een aanvraag kan nu "dinsdagnamiddag" zeggen (`pickupPart`/`returnPart`,
+optioneel). Dat stond tot nu toe in een mail naast het systeem.
+
+- **De voorraadberekening blijft op hele dagen.** Halve dagen zouden élke
+  overlapquery moeten herschrijven (de beschikbaarheid, de conflictcheck, de
+  kalender), en niemand wint daarbij: twee posten die dezelfde dag dezelfde tafel
+  willen, lossen dat op met een woord, niet met een halve boeking.
+- **Geen uurveld.** Het uur spreekt het team af; een uurveld zou doen alsof de app
+  openingsuren kent die ze niet kent.
+- **Het dagdeel staat waar de datum staat**: in de kalender als tag (op een dag
+  met acht afhalingen sorteer je daarop met je ogen), op het printblad, in de
+  aanvraaglijst en in de wijzigingsmail. Enkel het dagdeel wijzigen telt als een
+  wijziging: daar plant iemand zijn shift op.
+
+### Conflicten: aanvragen mag, goedkeuren niet
+
+Wie materiaal wil dat al volledig geboekt is, kon zijn vraag niet kwijt: de
+knoppen stonden op nul en daarmee hield het op. Logistiek wist dan niet dat er
+een tweede gegadigde was, en die tweede wist niet dat schuiven een optie was.
+
+- **Indienen mag, met een expliciete bevestiging.** Het lid ziet per item wat er
+  niet past en vinkt aan dat hij het tóch indient. Zonder die stap belandt het
+  conflict bij Logistiek zonder dat de aanvrager het doorhad; met die stap is het
+  een bewuste vraag om te bemiddelen.
+- **Goedkeuren blijft hard geblokkeerd.** De voorraadcheck bij goedkeuring is
+  ongewijzigd. Zo kan de voorraad nooit in de min gaan; het conflict leeft enkel
+  in de wachtrij.
+- **Het conflict wordt altijd opnieuw berekend, nooit opgeslagen.** Annuleert de
+  eerste partij, dan is het conflict weg zonder dat iemand iets moet aanraken.
+  Een opgeslagen vlag zou blijven staan tot ze toevallig herberekend werd.
+- **Schuiven in plaats van afwijzen.** Vanaf de detailpagina kan het team de
+  datums van beide aanvragen aanpassen, met een "past dit?"-knop die doorrekent
+  zonder op te slaan. Twee aanvragen passen vaak samen na een dag schuiven, en
+  dan is de tweede afwijzen te grof.
+- **Schuiven mailt de aanvrager** (via A9). Er is dus geen aparte "voorstel
+  mailen"-knop: een voorstel dat de app niet kan opvolgen, zou een onderhandeling
+  starten die nergens bijgehouden wordt. Het team schuift, beide aanvragers
+  krijgen bericht over hun eigen aanvraag, en wie niet akkoord is, antwoordt op
+  de mail.
+- **Een goedgekeurde aanvraag mag niet in een conflict geschoven worden.** Dan
+  verplaats je het probleem naar een derde aanvraag. Een aanvraag die nog beslist
+  moet worden, mag wel in een conflict blijven staan.
+
+### Staat per exemplaar: kapot telt niet meer mee
+
+`UitleenItem.condition` geldt voor de hele rij: van vier frigo's kon er geen
+enkele als kapot gemarkeerd worden zonder ze alle vier te markeren. Wie dat
+onderscheid nodig heeft, splitst het item in exemplaren (`UitleenItemUnit`).
+
+- **Optioneel, per item.** Zonder exemplaren blijft `quantity` het getal dat het
+  team invulde en verandert er niets. De inventaris hoeft dus niet in één keer
+  opgesplitst te worden; 405 items in exemplaren splitsen is werk dat niemand
+  doet, en dan blijft de hele functie ongebruikt.
+- **`quantity` wordt de bijgehouden telling** van de bruikbare exemplaren, net
+  zoals bij de flesserke-ladingen. Zo blijft elke beschikbaarheidsberekening één
+  kolom lezen in plaats van te moeten weten of dit item exemplaren heeft. De
+  keerzijde: `quantity` betekent dan "bruikbaar", niet "hoeveel er staan"; de
+  editor zegt daarom "3 bruikbaar van 4".
+- **Dit is een gedragswijziging.** Tot nu toe was `condition` puur informatief:
+  een kapotte rij bleef gewoon uitleenbaar. Bij een item met exemplaren telt
+  KAPOT niet meer mee voor de beschikbaarheid.
+- **Alleen KAPOT is hard.** TESTEN en ONVOLLEDIG tellen wel mee: een onvolledige
+  set is nog altijd uitleenbaar, en wie ze niet wil uitlenen zet het exemplaar op
+  "niet in roulatie".
+- **Reserveren blijft op itemniveau.** Een lid vraagt "twee boxen", geen "box 3".
+  Welk exemplaar iemand meekrijgt, blijkt bij het klaarzetten (A7); dat in het
+  aanvraagformulier leggen zou elke aanvraag een inventarisoefening maken.
+
+### Klaarzetten: het scherm is de waarheid, het papier de werkkopie
+
+Klaarzetten gebeurt per lijn (`preparedAt`/`preparedById` op
+`UitleenReservationLine`), tussen de goedkeuring en de afhaling. Waarom niet één
+knop "aanvraag klaargezet": een shift raakt zelden in één keer door een aanvraag,
+en de volgende shift moet zien hoever de vorige geraakte.
+
+- **Enkel materiaal, niet flesserke.** Een bak cola nemen is geen zoekwerk in de
+  loods, en flesserke wordt bij het terugbrengen afgerekend in plaats van
+  klaargezet. De teller ("7 van 12") telt dus de materiaallijnen.
+- **Het vinkje schrijft geen historiekregel.** Twaalf regels "lijn afgevinkt"
+  zouden de historiek van de aanvraag onleesbaar maken; wie wat klaarzette staat
+  al op de lijn zelf.
+- **Een team-edit behoudt het vinkje van een ongewijzigde lijn** (zelfde item,
+  zelfde aantal). De lijnen worden bij een edit vervangen, dus zonder dit zou het
+  team dat enkel de datum verschoof de halve loods opnieuw moeten afvinken.
+  Wijzigt het aantal wel, dan klopt het vinkje niet meer en valt het weg.
+- **Het printblad is een werkkopie.** Papier laat geen spoor na van wie wat
+  klaarzette, dus het scherm blijft de waarheid; het blad is er voor aan het rek.
+  Puur CSS `@media print`, geen PDF-generator: het is een afdruk van wat op het
+  scherm staat en geen document dat bewaard moet worden.
+
+### Mail: vier momenten, en een meelezend adres
+
+De uitleendienst startte bewust zonder mails ("geen mails in v1"). Dat hield geen
+stand zodra het team beslissingen kon terugdraaien, uren verschuiven en de inhoud
+van een aanvraag aanpassen: de aanvrager merkte zo'n wijziging pas wanneer hij
+toevallig opnieuw inlogde, meestal bij het afhalen.
+
+Wat vastligt:
+
+- **Vier momenten mailen: goedgekeurd, afgewezen, gewijzigd, teruggedraaid.** Niet
+  "afgehaald", niet "betaald", niet elke statusstap in het beheer. Wie voor elke
+  klik een mail krijgt, leest er geen enkele meer, en dan mist hij ook die ene
+  die telde.
+- **De mail zegt wát er veranderde.** "Tafel: 5 → 3", "Afhalen: za 12 → zo 13
+  september", "Uren verschoven bij goedkeuring". Diezelfde regels staan in de
+  historiek (A6): één beschrijving, twee bestemmingen. "Je aanvraag is gewijzigd"
+  zonder meer stuurt de aanvrager terug naar het scherm om te gaan zoeken wat.
+- **Een tweede adres leest mee** (`notifyEmail`, optioneel op een aanvraag en op
+  een rit). Een aanvraag hoort bij een post of werkgroep, maar de mails komen bij
+  één persoon toe; wie volgend jaar die post overneemt, vindt niets terug. Het
+  adres van de werkgroep in kopie overleeft de wissel van aanvrager.
+- **Een mislukte verzending draait de actie niet terug.** Een mailserver die er
+  even niet is, mag geen goedkeuring ongedaan maken: er wordt gelogd en
+  doorgegaan. Daarom vertrekt de mail ook ná de transactie en niet erin, anders
+  gaat er een bericht de deur uit over een wijziging die door een rollback nooit
+  gebeurd is.
+- **Naar het voorkeursadres van het lid**, dezelfde regel als de hoofdsite: wie
+  een persoonlijk adres instelde, leest zijn universiteitsmail niet.
+
+### Feedbackronde augustus 2026: negen keuzes
+
+Na een half werkingsjaar gaf het team Logistiek feedback op de app. Negen punten
+daaruit waren geen bug maar een werkingskeuze; hieronder wat beslist is en
+waarom. Het werkplan dat eruit volgt staat in `docs/logistiek-feedback-plan.md`.
+
+- **Klaarzetten gebeurt online én op papier.** Per aanvraag vinkt het team elk
+  item af (met een opmerking per lijn, bv. "zie vorig event"), en dezelfde
+  aanvraag is afdrukbaar als A4 om aan het rek te hangen. Het papier alleen laat
+  geen spoor na van wie wat klaarzette; het scherm alleen werkt niet aan een rek
+  in de loods. Daarom beide, met het scherm als bron van waarheid.
+- **Eén evenement wordt de koepel, maar blijft optioneel.** Materiaal,
+  flesserke en transport van hetzelfde evenement komen onder één
+  `UitleenEvent` te hangen, zodat je ziet dat er bijvoorbeeld nog geen transport
+  aangevraagd is en de transportverantwoordelijke de lading kan inschatten. Het
+  blijft optioneel: een losse aanvraag zonder evenement moet mogelijk blijven,
+  anders wordt "snel twee tafels lenen" een formulier van drie schermen.
+- **De catalogus blijft achter de login; schap en rek enkel voor Logistiek.**
+  Wat we hebben mag elk lid zien, waar het ligt niet. Zo blijft de catalogus
+  bruikbaar zonder dat een uitgelekte pagina een plattegrond van de loods is.
+  Dit is de eerste keer dat een veld in deze module op permissie verborgen
+  wordt; `logistiek.manage` is de grens.
+- **Gas is een gewoon catalogusitem.** Geen aparte flow en geen verplichte
+  waarschuwingstekst: het is materiaal zoals de rest, en een uitzonderingsflow
+  voor één productgroep is onderhoud dat niemand later nog begrijpt. Moet er
+  toch iets bij staan, dan hoort dat in de omschrijving van het item.
+- **Last minute begint op 7 dagen, en het team stelt het zelf in.** De grens
+  stond hardcoded op 14 dagen en dat bleek te ruim: bijna elke aanvraag kreeg de
+  badge, en een badge die altijd oplicht leest niemand nog. Zeven dagen houdt ze
+  betekenisvol. De waarde zit in de `logistiek.settings`-`Setting`, dus
+  bijstellen vraagt geen deploy.
+- **Een conflicterende aanvraag mag ingediend worden.** Wie materiaal vraagt dat
+  in die periode al volledig geboekt is, kan dat voortaan tóch indienen, met
+  zichtbaar wat er niet past. Anders heeft de tweede aanvrager geen enkel kanaal
+  en verdwijnt het gesprek naar mail. **Goedkeuren blijft wel hard geblokkeerd
+  zolang de voorraad niet klopt**: het conflict is een signaal, geen
+  overboeking. Logistiek kan van daaruit beide aanvragers mailen en met de
+  periodes schuiven, zodat de twee aanvragen samen wél passen; dat schuiven is
+  de bedoeling van de functie, niet het afwijzen van de tweede.
+- **Het publieke transportoverzicht toont bezet, niet wie.** Het weekraster mag
+  zonder login te bekijken zijn, maar dan enkel voertuig, dag en tijdvenster:
+  geen namen, doelen of adressen, en `noindex`. Zo kan iemand zien of de kar
+  vrij is zonder dat de werking van de kring op straat ligt. Bouw dat op een
+  eigen, geanonimiseerde projectie en niet op de beheerquery met een filter
+  erover: dat laatste lekt vroeg of laat een veld mee.
+- **Geen barcodes.** Het afvinken bij het klaarzetten levert dezelfde vraag
+  ("wanneer is dit stuk laatst gezien") zonder labels, scanners of een extra
+  model per exemplaar. De vraag komt terug als dat te weinig blijkt.
+- **Dagdelen zijn een afspraak, geen boekingseenheid.** Afhalen en terugbrengen
+  krijgen naast de dag een dagdeel (voormiddag / namiddag / avond), zodat
+  "dinsdagnamiddag" in het systeem staat in plaats van in een mail. De
+  **voorraadberekening blijft op hele dagen**. Halve dagen in de beschikbaarheid
+  zouden élke overlapquery raken (aanvragen, goedkeuren, kalender, bewerken) en
+  dubbele boekingen op dezelfde dag mogelijk maken; de winst daarvan weegt niet
+  op tegen dat risico.
+
+Twee dingen hierboven halen een eerdere keuze onderuit. **"Geen mails in v1"**
+(zie § Kleinere keuzes) vervalt: wanneer Logistiek een aanvraag wijzigt, moet de
+aanvrager dat weten zonder in te loggen, en een aanvraag kan een extra
+mailadres meekrijgen (bv. logistiek.existenz@vtk.be) zodat een werkgroepmailbox
+meeleest. En **`condition` is niet langer puur informatief** zodra de staat per
+exemplaar bijgehouden wordt: een kapot exemplaar telt dan niet meer mee voor de
+beschikbaarheid.
 
 ---
 

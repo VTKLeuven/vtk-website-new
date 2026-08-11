@@ -12,7 +12,7 @@
 export type SaveState =
   | { status: "idle" }
   | { status: "success"; nonce: number }
-  | { status: "error"; code: string; nonce: number };
+  | { status: "error"; code: string; nonce: number; detail?: string };
 
 /** Beginwaarde voor `useActionState`. */
 export const SAVE_IDLE: SaveState = { status: "idle" };
@@ -24,7 +24,15 @@ export function saveOk(): SaveState {
   return { status: "success", nonce: Date.now() };
 }
 
-/** `code` wordt clientside op een vertaalde melding gemapt; onbekende codes vallen terug. */
-export function saveError(code: string): SaveState {
-  return { status: "error", code, nonce: Date.now() };
+/**
+ * `code` wordt clientside op een vertaalde melding gemapt; onbekende codes vallen
+ * terug op de standaardmelding.
+ *
+ * `detail` is voor het geval de melding een gegeven bevat dat de client niet kan
+ * kennen ("botst met de rit van Feest op za 12 sep 14:00-18:00"). Het vervangt de
+ * standaardmelding, maar niet een vertaling die de client zelf voor die code
+ * heeft: die blijft voorgaan. Schrijf hier dus een volledige, leesbare zin.
+ */
+export function saveError(code: string, detail?: string): SaveState {
+  return { status: "error", code, nonce: Date.now(), detail };
 }

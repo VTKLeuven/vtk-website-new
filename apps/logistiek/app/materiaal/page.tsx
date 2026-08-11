@@ -1,9 +1,16 @@
 import { LoginGate } from '@/components/login-gate';
 import { PageShell } from '@/components/page-shell';
 import { getSession } from '@/lib/session';
-import { getCatalog, getLogistiekSettings } from '@/lib/uitleen-server';
+import {
+  getCatalog,
+  getLogistiekSettings,
+  requestTemplates,
+  selectableEvents,
+} from '@/lib/uitleen-server';
+import { eventOptions } from '@/lib/uitleen';
 import { copy, getLocale } from '@/lib/i18n';
 import { getPublicCopy } from '@/lib/public-copy';
+import { requesterOptions } from './event-values';
 import { MaterialRequestForm } from './request-form';
 
 export default async function MateriaalPage() {
@@ -13,10 +20,12 @@ export default async function MateriaalPage() {
     return <LoginGate variant="material" />;
   }
 
-  const [catalog, settings, content] = await Promise.all([
+  const [catalog, settings, content, templates, events] = await Promise.all([
     getCatalog(),
     getLogistiekSettings(),
     getPublicCopy(locale),
+    requestTemplates(),
+    selectableEvents(),
   ]);
 
   return (
@@ -39,10 +48,14 @@ export default async function MateriaalPage() {
       ) : (
         <MaterialRequestForm
           catalog={catalog}
-          groups={session.groups.map((g) => ({ id: g.id, name: locale === 'en' ? g.nameEn : g.nameNl }))}
+          groups={requesterOptions(session.groups, locale)}
           locale={locale}
           showRentPrices={settings.showRentPrices}
+          lastMinuteDays={settings.lastMinuteDays}
           paymentNote={content.materialPaymentNote}
+          userId={session.user.id}
+          templates={templates}
+          events={eventOptions(events, locale)}
         />
       )}
     </PageShell>

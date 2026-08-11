@@ -8,7 +8,10 @@ type IconName =
   | 'edit'
   | 'close'
   | 'hide'
-  | 'show';
+  | 'show'
+  | 'external'
+  | 'chevron'
+  | 'trailer';
 
 export function LogisticsIcon({ name, className, ...props }: SVGProps<SVGSVGElement> & { name: IconName }) {
   const paths = {
@@ -22,6 +25,14 @@ export function LogisticsIcon({ name, className, ...props }: SVGProps<SVGSVGElem
       <>
         <path d="M3 7.5h11v9H3zM14 10h3.4L21 13.6v2.9h-7z" />
         <path d="M6.5 18.5a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3ZM17.5 18.5a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3Z" />
+      </>
+    ),
+    // Auto met aanhangwagen: de karvlag bij een chauffeur.
+    trailer: (
+      <>
+        <path d="M2 8.5h7.5v6H2zM9.5 10.5h2.2l2.3 2.6v1.4H9.5z" />
+        <path d="M4.5 17a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3ZM12.5 17a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3Z" />
+        <path d="M14 12.5h1.5M16.5 8h5.5v6.5h-5.5zM18 17a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3Z" />
       </>
     ),
     reservation: (
@@ -49,6 +60,14 @@ export function LogisticsIcon({ name, className, ...props }: SVGProps<SVGSVGElem
       <>
         <path d="M3 12s3.5-5.5 9-5.5 9 5.5 9 5.5-3.5 5.5-9 5.5S3 12 3 12Z" />
         <circle cx="12" cy="12" r="2.5" />
+      </>
+    ),
+    chevron: <path d="m7 10 5 5 5-5" />,
+    external: (
+      <>
+        <path d="M14 4h6v6" />
+        <path d="M20 4 11 13" />
+        <path d="M18 14v4.5a1.5 1.5 0 0 1-1.5 1.5h-11A1.5 1.5 0 0 1 4 18.5v-11A1.5 1.5 0 0 1 5.5 6H10" />
       </>
     ),
   } satisfies Record<IconName, ReactNode>;

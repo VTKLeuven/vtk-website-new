@@ -2,6 +2,8 @@
 
 import {
   emptyEventValues,
+  isWerkgroep,
+  splitRequesterOptions,
   type EventReservationValues,
   type RequesterOption,
 } from './event-values';
@@ -10,6 +12,34 @@ export { emptyEventValues };
 export type { EventReservationValues, RequesterOption };
 
 const inputClass = 'h-10 rounded-lg border border-vtk-navy/15 bg-white px-3 text-sm text-vtk-ink';
+
+/**
+ * De groepen van het lid als keuzelijst. Posten en werkgroepen staan onder een
+ * eigen kopje zodra het lid van beide iets heeft: een werkgroep is geen post, en
+ * ze samen onder "post" zetten laat de keuzelijst iets anders beweren dan wat de
+ * server ervan maakt (`deriveMemberRequester` leidt WERKGROEP wél correct af).
+ * Heeft het lid maar één soort, dan is een kopje enkel ruis.
+ */
+function RequesterOptions({ groups, en }: { groups: RequesterOption[]; en: boolean }) {
+  const { posten, werkgroepen } = splitRequesterOptions(groups);
+  const options = (list: RequesterOption[]) =>
+    list.map((group) => (
+      <option key={group.id} value={group.id}>
+        {group.name}
+      </option>
+    ));
+
+  if (posten.length === 0 || werkgroepen.length === 0) return <>{options(groups)}</>;
+
+  return (
+    <>
+      <optgroup label={en ? 'Posts' : 'Posten'}>{options(posten)}</optgroup>
+      <optgroup label={en ? 'Work groups and year committees' : 'Werkgroepen en jaarwerkingen'}>
+        {options(werkgroepen)}
+      </optgroup>
+    </>
+  );
+}
 
 /** Gedeelde event- en aanvragervelden voor het aanmaken en bewerken van een aanvraag. */
 export function EventRequesterFields({
@@ -81,8 +111,10 @@ export function EventRequesterFields({
         {mode === 'team' && value.requesterType === 'INTERN' ? (
           <label className="grid gap-1 text-sm sm:col-span-2">
             <span className="font-medium text-vtk-ink">Post</span>
+            {/* Enkel echte posten: een werkgroep hoort onder het WERKGROEP-type,
+                niet als post op een interne aanvraag. */}
             <select value={value.groupId} onChange={(e) => set('groupId', e.target.value)} className={inputClass}>
-              {groups.map((group) => (
+              {splitRequesterOptions(groups).posten.map((group) => (
                 <option key={group.id} value={group.id}>
                   {group.name}
                 </option>
@@ -111,13 +143,21 @@ export function EventRequesterFields({
         ) : null}
         {mode === 'member' && groups.length > 1 ? (
           <label className="grid gap-1 text-sm sm:col-span-2">
-            <span className="font-medium text-vtk-ink">{en ? 'On behalf of which post?' : 'Namens welke post?'}</span>
-            <select value={value.groupId} onChange={(e) => set('groupId', e.target.value)} className={inputClass}>
-              {groups.map((group) => (
-                <option key={group.id} value={group.id}>
-                  {group.name}
-                </option>
-              ))}
+            <span className="font-medium text-vtk-ink">{en ? 'On behalf of' : 'Namens'}</span>
+            <select
+              value={value.groupId}
+              onChange={(e) => {
+                const chosen = groups.find((group) => group.id === e.target.value);
+                onChange({
+                  ...value,
+                  groupId: e.target.value,
+                  // Volg het type van de gekozen groep, zoals de server dat ook doet.
+                  requesterType: chosen && isWerkgroep(chosen) ? 'WERKGROEP' : 'INTERN',
+                });
+              }}
+              className={inputClass}
+            >
+              <RequesterOptions groups={groups} en={en} />
             </select>
           </label>
         ) : null}
@@ -169,7 +209,7 @@ export function EventRequesterFields({
             className={inputClass}
           />
         </label>
-        <label className="grid gap-1 text-sm sm:col-span-2">
+        <label className="grid gap-1 text-sm">
           <span className="font-medium text-vtk-ink">{en ? 'Contact phone' : 'Telefoon contactpersoon'}</span>
           <input
             type="tel"
@@ -177,6 +217,26 @@ export function EventRequesterFields({
             onChange={(e) => set('contactPhone', e.target.value)}
             className={inputClass}
           />
+        </label>
+        {/* Meelezend adres. Een aanvraag hoort bij een post of werkgroep, maar de
+            mails komen bij één persoon toe; wie volgend jaar die post overneemt,
+            vindt niets terug. Een mailbox van de werkgroep in kopie lost dat op. */}
+        <label className="grid gap-1 text-sm">
+          <span className="font-medium text-vtk-ink">
+            {en ? 'Extra address to keep posted' : 'Extra adres dat op de hoogte blijft'}
+          </span>
+          <input
+            type="email"
+            value={value.notifyEmail}
+            onChange={(e) => set('notifyEmail', e.target.value)}
+            placeholder="bv. logistiek.existenz@vtk.be"
+            className={inputClass}
+          />
+          <span className="text-xs text-vtk-muted">
+            {en
+              ? 'Optional. Gets a copy of every mail about this request.'
+              : 'Optioneel. Krijgt elke mail over deze aanvraag in kopie.'}
+          </span>
         </label>
 
         <label className="flex items-center gap-2 text-sm sm:col-span-2">

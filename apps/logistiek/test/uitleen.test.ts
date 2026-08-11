@@ -1,12 +1,20 @@
 import { describe, expect, it } from 'vitest';
 import {
   billedHours,
+  dayPartLabel,
+  describeReservationChanges,
   formatDateOnly,
+  formatDateWithPart,
+  formatDateRange,
   formatDateTime,
   formatEuro,
   formatPriceCents,
+  isEmailish,
   isLastMinute,
+  isOnQuarterHour,
+  isoWeekNumber,
   parseDateOnly,
+  startOfWeek,
   pricingModeLabel,
   rangesOverlap,
   requesterTypeLabel,
@@ -132,6 +140,90 @@ describe('rangesOverlap', () => {
   });
 });
 
+describe('startOfWeek', () => {
+  it('gives the Monday of that week', () => {
+    // 2026-09-16 is een woensdag.
+    expect(startOfWeek(new Date('2026-09-16T12:00:00Z')).toISOString()).toBe(
+      '2026-09-14T00:00:00.000Z'
+    );
+  });
+
+  it('keeps a Monday on itself', () => {
+    expect(startOfWeek(new Date('2026-09-14T08:00:00Z')).toISOString()).toBe(
+      '2026-09-14T00:00:00.000Z'
+    );
+  });
+
+  it('counts Sunday as the end of its week, not the start of the next', () => {
+    expect(startOfWeek(new Date('2026-09-20T21:00:00Z')).toISOString()).toBe(
+      '2026-09-14T00:00:00.000Z'
+    );
+  });
+
+  it('uses the Brussels day, so late Sunday evening stays in that week', () => {
+    // 23:30 UTC op zondag is maandag 01:30 in Brussel (zomertijd).
+    expect(startOfWeek(new Date('2026-09-20T23:30:00Z')).toISOString()).toBe(
+      '2026-09-21T00:00:00.000Z'
+    );
+  });
+});
+
+describe('isoWeekNumber', () => {
+  it('numbers an ordinary week', () => {
+    expect(isoWeekNumber(new Date('2026-09-14T00:00:00Z'))).toBe(38);
+  });
+
+  it('puts 4 January in week 1', () => {
+    expect(isoWeekNumber(new Date('2026-01-04T00:00:00Z'))).toBe(1);
+  });
+
+  it('gives the last days of a year the week of the following year when ISO says so', () => {
+    // 31 december 2025 is een woensdag en hoort bij week 1 van 2026.
+    expect(isoWeekNumber(new Date('2025-12-31T00:00:00Z'))).toBe(1);
+    // 1 januari 2027 is een vrijdag en hoort nog bij week 53 van 2026.
+    expect(isoWeekNumber(new Date('2027-01-01T00:00:00Z'))).toBe(53);
+  });
+});
+
+describe('formatDateRange', () => {
+  it('mentions the month once when both dates share it', () => {
+    expect(
+      formatDateRange(new Date('2026-08-01T00:00:00Z'), new Date('2026-08-30T00:00:00Z'))
+    ).toBe('1 tot 30 augustus 2026');
+  });
+
+  it('names both months within one year', () => {
+    expect(
+      formatDateRange(new Date('2026-08-01T00:00:00Z'), new Date('2026-09-03T00:00:00Z'))
+    ).toBe('1 augustus tot 3 september 2026');
+  });
+
+  it('spells out both years when they differ', () => {
+    expect(
+      formatDateRange(new Date('2026-12-28T00:00:00Z'), new Date('2027-01-03T00:00:00Z'))
+    ).toBe('28 december 2026 tot 3 januari 2027');
+  });
+});
+
+describe('isOnQuarterHour', () => {
+  it('accepts the four quarters of an hour', () => {
+    expect(isOnQuarterHour(new Date('2026-09-12T14:00:00Z'))).toBe(true);
+    expect(isOnQuarterHour(new Date('2026-09-12T14:15:00Z'))).toBe(true);
+    expect(isOnQuarterHour(new Date('2026-09-12T14:30:00Z'))).toBe(true);
+    expect(isOnQuarterHour(new Date('2026-09-12T14:45:00Z'))).toBe(true);
+  });
+
+  it('rejects anything in between', () => {
+    expect(isOnQuarterHour(new Date('2026-09-12T14:07:00Z'))).toBe(false);
+    expect(isOnQuarterHour(new Date('2026-09-12T14:20:00Z'))).toBe(false);
+  });
+
+  it('rejects stray seconds and milliseconds on a whole quarter', () => {
+    expect(isOnQuarterHour(new Date('2026-09-12T14:15:30Z'))).toBe(false);
+    expect(isOnQuarterHour(new Date('2026-09-12T14:15:00.500Z'))).toBe(false);
+  });
+});
+
 describe('billedHours', () => {
   it('rounds a partial hour up to a whole hour', () => {
     const start = new Date('2026-07-20T10:00:00Z');
@@ -174,12 +266,18 @@ describe('transportPriceCents', () => {
 describe('isLastMinute', () => {
   const requestedAt = new Date('2026-07-20T10:00:00Z');
 
-  it('flags a pickup within 14 days', () => {
+  it('flags a pickup within the default 7 days', () => {
     expect(isLastMinute(new Date('2026-07-25T10:00:00Z'), requestedAt)).toBe(true);
   });
 
-  it('does not flag a pickup 14+ days out', () => {
-    expect(isLastMinute(new Date('2026-08-10T10:00:00Z'), requestedAt)).toBe(false);
+  it('does not flag a pickup beyond the default 7 days', () => {
+    expect(isLastMinute(new Date('2026-07-28T10:00:00Z'), requestedAt)).toBe(false);
+  });
+
+  it('follows the configured term', () => {
+    const pickup = new Date('2026-07-28T10:00:00Z'); // acht dagen later
+    expect(isLastMinute(pickup, requestedAt, 14)).toBe(true);
+    expect(isLastMinute(pickup, requestedAt, 3)).toBe(false);
   });
 });
 
@@ -240,5 +338,89 @@ describe('date formatting locale', () => {
     const dt = new Date('2026-07-20T12:00:00Z');
     expect(formatDateTime(dt, 'nl')).toContain('juli');
     expect(formatDateTime(dt, 'en')).toContain('July');
+  });
+});
+
+describe('isEmailish', () => {
+  it('accepteert gewone adressen', () => {
+    expect(isEmailish('logistiek.existenz@vtk.be')).toBe(true);
+    expect(isEmailish('  jan@example.com  ')).toBe(true);
+  });
+
+  it('weigert wat duidelijk geen adres is', () => {
+    expect(isEmailish('logistiek')).toBe(false);
+    expect(isEmailish('logistiek@vtk')).toBe(false);
+    expect(isEmailish('jan @vtk.be')).toBe(false);
+    expect(isEmailish('')).toBe(false);
+  });
+});
+
+describe('describeReservationChanges', () => {
+  const snapshot = (
+    pickup: string,
+    ret: string,
+    lines: Array<[string, number]>
+  ) => ({
+    pickupDate: parseDateOnly(pickup)!,
+    returnDate: parseDateOnly(ret)!,
+    lines: lines.map(([itemName, quantity]) => ({ itemName, quantity })),
+  });
+
+  it('geeft niets terug wanneer er niets veranderde', () => {
+    const before = snapshot('2026-09-12', '2026-09-14', [['Tafel', 5]]);
+    const after = snapshot('2026-09-12', '2026-09-14', [['Tafel', 5]]);
+    expect(describeReservationChanges(before, after)).toEqual([]);
+  });
+
+  it('benoemt een gewijzigd aantal, een toevoeging en een verwijdering', () => {
+    const before = snapshot('2026-09-12', '2026-09-14', [['Tafel', 5], ['Frigo', 1]]);
+    const after = snapshot('2026-09-12', '2026-09-14', [['Tafel', 3], ['Stoel', 10]]);
+    expect(describeReservationChanges(before, after)).toEqual([
+      'Tafel: 5 → 3',
+      'Stoel: toegevoegd (10)',
+      'Frigo: verwijderd',
+    ]);
+  });
+
+  it('benoemt verschoven datums', () => {
+    const before = snapshot('2026-09-12', '2026-09-14', [['Tafel', 5]]);
+    const after = snapshot('2026-09-13', '2026-09-14', [['Tafel', 5]]);
+    const changes = describeReservationChanges(before, after);
+    expect(changes).toHaveLength(1);
+    expect(changes[0]).toContain('Afhalen');
+    expect(changes[0]).toContain('→');
+  });
+
+  it('telt dezelfde naam op twee lijnen samen', () => {
+    const before = snapshot('2026-09-12', '2026-09-14', [['Tafel', 2], ['Tafel', 3]]);
+    const after = snapshot('2026-09-12', '2026-09-14', [['Tafel', 5]]);
+    expect(describeReservationChanges(before, after)).toEqual([]);
+  });
+});
+
+describe('dagdelen', () => {
+  const day = parseDateOnly('2026-09-12')!;
+
+  it('vertaalt de dagdelen', () => {
+    expect(dayPartLabel('NAMIDDAG')).toBe('namiddag');
+    expect(dayPartLabel('NAMIDDAG', 'en')).toBe('afternoon');
+    expect(dayPartLabel(null)).toBeNull();
+    expect(dayPartLabel('MIDDERNACHT')).toBeNull();
+  });
+
+  it('hangt het dagdeel achter de datum, en laat het weg als het er niet is', () => {
+    expect(formatDateWithPart(day, 'VOORMIDDAG')).toContain('(voormiddag)');
+    expect(formatDateWithPart(day, null)).toBe(formatDateOnly(day));
+  });
+
+  it('telt een gewijzigd dagdeel als een wijziging, ook op dezelfde dag', () => {
+    const lines = [{ itemName: 'Tafel', quantity: 2 }];
+    const changes = describeReservationChanges(
+      { pickupDate: day, returnDate: day, pickupPart: 'VOORMIDDAG', lines },
+      { pickupDate: day, returnDate: day, pickupPart: 'AVOND', lines }
+    );
+    expect(changes).toHaveLength(1);
+    expect(changes[0]).toContain('voormiddag');
+    expect(changes[0]).toContain('avond');
   });
 });

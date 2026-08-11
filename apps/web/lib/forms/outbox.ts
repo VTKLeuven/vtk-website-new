@@ -3,7 +3,7 @@ import "server-only";
 import { randomUUID } from "node:crypto";
 import { prisma } from "@vtk/db";
 import type { Prisma } from "@prisma/client";
-import { sendMail, smtpConfigured } from "@/lib/mail";
+import { sendMail, smtpConfigured } from "@vtk/mail";
 import {
   confirmationMail,
   digestMail,

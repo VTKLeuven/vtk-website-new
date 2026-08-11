@@ -53,6 +53,19 @@ export async function LoginGate({ variant = 'default' }: { variant?: LoginVarian
         <Link href={loginHref} className="logistics-login-button mt-7">
           {t.loginAction} <span aria-hidden>→</span>
         </Link>
+        {/* De bezetting van de voertuigen mag je zonder login zien; dat is net
+            waarvoor die pagina bestaat, dus hoort de weg erheen hier te staan. */}
+        {variant === 'van' ? (
+          <p className="mt-4 text-sm text-vtk-muted">
+            <Link
+              href="/vervoer/bezetting"
+              className="font-semibold text-vtk-navy underline decoration-vtk-yellow underline-offset-4"
+            >
+              {locale === 'en' ? 'When is a vehicle free?' : 'Wanneer is een voertuig vrij?'}
+            </Link>{' '}
+            {locale === 'en' ? 'can be viewed without logging in.' : 'kan je zonder login bekijken.'}
+          </p>
+        ) : null}
       </section>
     </main>
   );

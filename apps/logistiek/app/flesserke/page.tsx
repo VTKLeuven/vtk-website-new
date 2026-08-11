@@ -2,8 +2,13 @@ import { LoginGate } from '@/components/login-gate';
 import { PageShell } from '@/components/page-shell';
 import { getSession } from '@/lib/session';
 import { getLocale } from '@/lib/i18n';
-import { emptyEventValues } from '@/app/materiaal/event-values';
-import { getFlesserkeCatalog } from '@/lib/uitleen-server';
+import { emptyEventValues, requesterOptions } from '@/app/materiaal/event-values';
+import {
+  getFlesserkeCatalog,
+  getLogistiekSettings,
+  selectableEvents,
+} from '@/lib/uitleen-server';
+import { eventOptions } from '@/lib/uitleen';
 import { FlesserkeForm } from './request-form';
 
 export default async function FlesserkePage() {
@@ -13,21 +18,28 @@ export default async function FlesserkePage() {
   }
   const en = locale === 'en';
 
-  // Flesserke is enkel voor het praesidium (leden met een post).
+  // Flesserke is voor de interne werking: elk lid van een post, een werkgroep of
+  // een jaarwerking. De gate is "heeft een groep", niet "heeft een post"; de
+  // tekst zei het omgekeerde en werkgroepen concludeerden dat het niets voor hen
+  // was terwijl de knop gewoon werkte.
   if (session.groups.length === 0) {
     return (
       <PageShell title="Flesserke">
         <p className="rounded-[18px] border border-vtk-navy/10 bg-vtk-surface p-7 text-vtk-body">
           {en
-            ? 'Flesserke is only available to praesidium members.'
-            : 'Flesserke is enkel beschikbaar voor het praesidium.'}
+            ? 'Flesserke is for VTK\u2019s own activities: posts, work groups and year committees. Your account is not linked to any of those this working year; mail logistiek@vtk.be if that is wrong.'
+            : 'Flesserke is voor de eigen werking van VTK: posten, werkgroepen en jaarwerkingen. Aan jouw account hangt dit werkingsjaar geen van die drie; mail logistiek@vtk.be als dat niet klopt.'}
         </p>
       </PageShell>
     );
   }
 
-  const catalog = await getFlesserkeCatalog();
-  const groups = session.groups.map((g) => ({ id: g.id, name: en ? g.nameEn : g.nameNl }));
+  const [catalog, settings, events] = await Promise.all([
+    getFlesserkeCatalog(),
+    getLogistiekSettings(),
+    selectableEvents(),
+  ]);
+  const groups = requesterOptions(session.groups, locale);
 
   return (
     <PageShell
@@ -39,8 +51,8 @@ export default async function FlesserkePage() {
       }
       intro={
         en
-          ? 'Consumables (food, drinks, cleaning) prepared per event for internal use. Closed items come back; opened ones are consumed.'
-          : 'Verbruiksgoederen (voeding, drank, kuis) die per event worden klaargezet voor interne werking. Gesloten komt terug; geopend is verbruik.'
+          ? 'Consumables (food, drinks, cleaning) prepared per event for VTK\u2019s own activities: posts, work groups and year committees alike. Closed items come back; opened ones are consumed.'
+          : 'Verbruiksgoederen (voeding, drank, kuis) die per event worden klaargezet voor de eigen werking: posten, werkgroepen en jaarwerkingen evengoed. Gesloten komt terug; geopend is verbruik.'
       }
     >
       {catalog.length === 0 ? (
@@ -51,8 +63,11 @@ export default async function FlesserkePage() {
         <FlesserkeForm
           catalog={catalog}
           groups={groups}
+          lastMinuteDays={settings.lastMinuteDays}
           locale={locale}
           mode={{ kind: 'create' }}
+          draftKey={`flesserke:${session.user.id}`}
+          events={eventOptions(events, locale)}
           initial={{
             event: emptyEventValues(groups),
             pickupDate: '',

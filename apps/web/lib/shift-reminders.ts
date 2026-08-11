@@ -1,5 +1,5 @@
 import { prisma } from '@vtk/db';
-import { sendMail, smtpConfigured } from '@/lib/mail';
+import { sendMail, smtpConfigured } from '@vtk/mail';
 import { preferredEmail } from '@/lib/brevo/contacts';
 
 /**

@@ -18,12 +18,14 @@ export function ReservationEditor({
   groups,
   locale,
   initial,
+  lastMinuteDays,
 }: {
   reservationId: string;
   catalog: CatalogCategory[];
   groups: RequesterOption[];
   locale: 'nl' | 'en';
   initial: ReservationFormInitial;
+  lastMinuteDays: number;
 }) {
   const en = locale === 'en';
   const router = useRouter();
@@ -44,6 +46,7 @@ export function ReservationEditor({
         groups={groups}
         locale={locale}
         initial={initial}
+        lastMinuteDays={lastMinuteDays}
         mode="member"
         submitLabel={en ? 'Save changes' : 'Wijzigingen opslaan'}
         submittingLabel={en ? 'Saving...' : 'Opslaan...'}

@@ -3,9 +3,26 @@ import { LoginGate } from '@/components/login-gate';
 import { PageShell } from '@/components/page-shell';
 import { ReservationStatusBadge, VanStatusBadge } from '@/components/status-badge';
 import { getSession } from '@/lib/session';
-import { formatDateOnly, formatDateTime, formatEuro, formatPriceCents } from '@/lib/uitleen';
+import {
+  formatDateOnly,
+  formatDateTime,
+  formatDateWithPart,
+  formatEuro,
+  formatPriceCents,
+} from '@/lib/uitleen';
 import { myReservations, myVanBookings } from '@/lib/uitleen-server';
 import { copy, getLocale } from '@/lib/i18n';
+
+/**
+ * Drie items en de rest geteld. Een volledige opsomming van een grote aanvraag
+ * duwde de rij uit haar vorm; de detailpagina toont wel alles.
+ */
+function itemSummary(lines: Array<{ quantity: number; itemName: string }>, en: boolean): string {
+  const shown = lines.slice(0, 3).map((line) => `${line.quantity}× ${line.itemName}`);
+  const rest = lines.length - shown.length;
+  if (rest === 0) return shown.join(', ');
+  return `${shown.join(', ')} ${en ? `and ${rest} more` : `en ${rest} andere`}`;
+}
 
 export default async function ReservatiesPage({
   searchParams,
@@ -56,18 +73,21 @@ export default async function ReservatiesPage({
             <ul className="mt-4 grid gap-3">
               {reservations.map((reservation) => (
                 <li key={reservation.id}>
+                  {/* Vaste twee kolommen: met flex-wrap sprong de statusbadge naar
+                      een eigen lijn zodra de itemopsomming lang werd. */}
                   <Link
                     href={`/reservaties/${reservation.id}`}
-                    className="flex flex-wrap items-center gap-x-5 gap-y-2 rounded-[16px] border border-vtk-navy/10 bg-vtk-surface px-5 py-4 transition hover:border-vtk-navy/25"
+                    className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-5 gap-y-2 rounded-[16px] border border-vtk-navy/10 bg-vtk-surface px-5 py-4 transition hover:border-vtk-navy/25"
                   >
-                    <div className="min-w-0 flex-1">
+                    <div className="min-w-0">
                       <p className="font-medium text-vtk-ink">{reservation.eventName}</p>
                       <p className="mt-0.5 truncate text-sm text-vtk-muted">
-                        {reservation.lines.map((line) => `${line.quantity}× ${line.itemName}`).join(', ')}
+                        {itemSummary(reservation.lines, en)}
                       </p>
                       <p className="mt-0.5 text-sm text-vtk-muted">
-                        {formatDateOnly(reservation.pickupDate, locale)} {en ? 'to' : 'tot'}{' '}
-                        {formatDateOnly(reservation.returnDate, locale)}
+                        {formatDateWithPart(reservation.pickupDate, reservation.pickupPart, locale)}{' '}
+                        {en ? 'to' : 'tot'}{' '}
+                        {formatDateWithPart(reservation.returnDate, reservation.returnPart, locale)}
                         {reservation.totalDepositCents > 0
                           ? ` · ${formatEuro(reservation.totalDepositCents)} ${en ? 'deposit' : 'waarborg'}`
                           : ''}
@@ -97,10 +117,15 @@ export default async function ReservatiesPage({
                 <li key={booking.id}>
                   <Link
                     href={`/vervoer/${booking.id}`}
-                    className="flex flex-wrap items-center gap-x-5 gap-y-2 rounded-[16px] border border-vtk-navy/10 bg-vtk-surface px-5 py-4 transition hover:border-vtk-navy/25"
+                    className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-5 gap-y-2 rounded-[16px] border border-vtk-navy/10 bg-vtk-surface px-5 py-4 transition hover:border-vtk-navy/25"
                   >
-                    <div className="min-w-0 flex-1">
-                      <p className="font-medium text-vtk-ink">{booking.purpose}</p>
+                    <div className="min-w-0">
+                      <p className="flex flex-wrap items-center gap-2 font-medium text-vtk-ink">
+                        <span className="rounded-full bg-vtk-paper-2 px-2.5 py-0.5 text-xs font-semibold text-vtk-navy">
+                          {en ? booking.vehicle.nameEn : booking.vehicle.nameNl}
+                        </span>
+                        {booking.purpose}
+                      </p>
                       <p className="mt-0.5 text-sm text-vtk-muted">
                         {formatDateTime(booking.startAt, locale)} {en ? 'to' : 'tot'} {formatDateTime(booking.endAt, locale)} ·{' '}
                         {formatPriceCents(booking.priceCents, locale)}

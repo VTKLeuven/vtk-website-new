@@ -9,11 +9,13 @@
     "start": "next start -p 3100",
     "test": "vitest run",
     "test:watch": "vitest",
-    "import:inventaris": "dotenv -e ../../.env -- tsx scripts/import-inventaris.ts"
+    "import:inventaris": "dotenv -e ../../.env -- tsx scripts/import-inventaris.ts",
+    "group:events": "dotenv -e ../../.env -- tsx scripts/group-events.ts"
   },
   "dependencies": {
     "@vtk/auth": "*",
     "@vtk/db": "*",
+    "@vtk/mail": "*",
     "@vtk/payments": "*",
     "@vtk/storage": "*",
     "@vtk/ui": "*",

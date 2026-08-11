@@ -58,7 +58,7 @@ export function SaveForm({
       // Blijft staan tot ze weggeklikt wordt: een foutmelding die vanzelf
       // verdwijnt kan je net missen.
       showToast({
-        message: errorMessages?.[state.code] ?? fallbackErrorMessage,
+        message: errorMessages?.[state.code] ?? state.detail ?? fallbackErrorMessage,
         variant: 'error',
         duration: 0,
       });
