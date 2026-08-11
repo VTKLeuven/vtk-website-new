@@ -25,7 +25,15 @@ export function VanRequestForm({
 }) {
   const en = locale === 'en';
   const router = useRouter();
-  const [vehicleId, setVehicleId] = useState(vehicles[0]?.id ?? '');
+  // Meerkeuze: een verhuis met de kar én de auto is één vraag. De eerste staat
+  // aangevinkt, zodat de gewone aanvraag (één voertuig) even snel blijft.
+  const [vehicleIds, setVehicleIds] = useState<string[]>(
+    vehicles[0] ? [vehicles[0].id] : []
+  );
+  const toggleVehicle = (id: string) =>
+    setVehicleIds((current) =>
+      current.includes(id) ? current.filter((other) => other !== id) : [...current, id]
+    );
   const [startAt, setStartAt] = useState('');
   const [endAt, setEndAt] = useState('');
   const [purpose, setPurpose] = useState('');
@@ -43,13 +51,13 @@ export function VanRequestForm({
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
-  const vehicle = vehicles.find((v) => v.id === vehicleId);
+  const chosen = vehicles.filter((v) => vehicleIds.includes(v.id));
 
   // Zelfde lokale concept als bij materiaal: een rit aanvragen is korter, maar
   // een dichtgevallen tab kost evengoed alles.
   const draftValue = useMemo(
     () => ({
-      vehicleId,
+      vehicleIds,
       startAt,
       endAt,
       purpose,
@@ -66,7 +74,7 @@ export function VanRequestForm({
       note,
     }),
     [
-      vehicleId,
+      vehicleIds,
       startAt,
       endAt,
       purpose,
@@ -93,7 +101,7 @@ export function VanRequestForm({
   function restoreDraft() {
     const saved = draft.restore();
     if (!saved) return;
-    setVehicleId(saved.vehicleId);
+    setVehicleIds(saved.vehicleIds);
     setStartAt(saved.startAt);
     setEndAt(saved.endAt);
     setPurpose(saved.purpose);
@@ -110,40 +118,64 @@ export function VanRequestForm({
     setNote(saved.note);
   }
 
-  // Prijsindicatie volgens de tariefmodus van het gekozen voertuig. Bij heen en
-  // terug is het de som van beide ritten: ze worden apart aangerekend, want het
-  // voertuig staat er tussenin niet op.
+  // Prijsindicatie: som over de gekozen voertuigen, en bij heen en terug over
+  // beide ritten. Ze worden apart aangerekend, want het voertuig staat er
+  // tussenin niet op. Zit er een per-km-voertuig bij, dan is het totaal pas na de
+  // rit gekend en zeggen we dat ook.
   const estimate = useMemo(() => {
-    if (!vehicle) return { label: '-', tbd: false };
-    if (vehicle.pricingMode === 'PER_KM') {
-      return { label: `${formatEuro(vehicle.rateCents)} ${en ? 'per km' : 'per km'}`, tbd: true };
-    }
-    const legCents = (from: string, to: string): number | null => {
+    if (chosen.length === 0) return { label: '-', tbd: false };
+    const window = (from: string, to: string): { start: Date; end: Date } | null => {
       const start = new Date(from);
       const end = new Date(to);
       if (!from || !to || Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || end <= start) {
         return null;
       }
-      return transportPriceCents({
-        pricingMode: vehicle.pricingMode,
-        rateCents: vehicle.rateCents,
-        startAt: start,
-        endAt: end,
-      });
+      return { start, end };
     };
-    const outbound = legCents(startAt, endAt);
-    if (outbound === null) return { label: '-', tbd: false };
-    if (!roundTrip) return { label: formatPriceCents(outbound), tbd: false };
-    const inbound = legCents(returnStartAt, returnEndAt);
-    if (inbound === null) return { label: '-', tbd: false };
-    return { label: formatPriceCents(outbound + inbound), tbd: false };
-  }, [vehicle, startAt, endAt, roundTrip, returnStartAt, returnEndAt, en]);
+    const windows: Array<{ start: Date; end: Date }> = [];
+    for (const entry of [
+      window(startAt, endAt),
+      ...(roundTrip ? [window(returnStartAt, returnEndAt)] : []),
+    ]) {
+      if (!entry) return { label: '-', tbd: false };
+      windows.push(entry);
+    }
+
+    const perKm = chosen.filter((v) => v.pricingMode === 'PER_KM');
+    const fixed = chosen.filter((v) => v.pricingMode !== 'PER_KM');
+    const total = fixed.reduce(
+      (sum, v) =>
+        sum +
+        windows.reduce(
+          (legs, entry) =>
+            legs +
+            // Null betekent "pas na de rit gekend", en dat kan hier niet: de
+            // per-km-voertuigen zitten in `perKm` en niet in `fixed`.
+            (transportPriceCents({
+              pricingMode: v.pricingMode,
+              rateCents: v.rateCents,
+              startAt: entry.start,
+              endAt: entry.end,
+            }) ?? 0),
+          0
+        ),
+      0
+    );
+    if (perKm.length === 0) return { label: formatPriceCents(total), tbd: false };
+    const kmPart = perKm
+      .map((v) => `${formatEuro(v.rateCents)} ${en ? 'per km' : 'per km'} (${v.name})`)
+      .join(' + ');
+    return {
+      label: fixed.length > 0 ? `${formatPriceCents(total)} + ${kmPart}` : kmPart,
+      tbd: true,
+    };
+  }, [chosen, startAt, endAt, roundTrip, returnStartAt, returnEndAt, en]);
 
   function submit() {
     setError(null);
     startTransition(async () => {
       const result = await createVanBookingAction({
-        vehicleId,
+        vehicleIds,
         startAt,
         endAt,
         purpose,
@@ -200,29 +232,36 @@ export function VanRequestForm({
       ) : null}
 
       <fieldset className="mt-4">
-        <legend className="text-sm font-medium text-vtk-ink">{en ? 'Vehicle' : 'Voertuig'}</legend>
+        <legend className="text-sm font-medium text-vtk-ink">
+          {en ? 'Vehicle' : 'Voertuig'}
+        </legend>
         <div className="mt-2 flex flex-wrap gap-2">
           {vehicles.map((v) => (
             <label
               key={v.id}
               className={`cursor-pointer rounded-full border px-3.5 py-1.5 text-sm font-medium transition ${
-                vehicleId === v.id
+                vehicleIds.includes(v.id)
                   ? 'border-vtk-navy bg-vtk-navy text-white'
                   : 'border-vtk-navy/15 text-vtk-ink hover:border-vtk-navy/40'
               }`}
             >
               <input
-                type="radio"
+                type="checkbox"
                 name="vehicle"
                 value={v.id}
-                checked={vehicleId === v.id}
-                onChange={() => setVehicleId(v.id)}
+                checked={vehicleIds.includes(v.id)}
+                onChange={() => toggleVehicle(v.id)}
                 className="sr-only"
               />
               {v.name}
             </label>
           ))}
         </div>
+        <p className="mt-1.5 text-xs text-vtk-muted">
+          {en
+            ? 'You can pick more than one; they are decided together.'
+            : 'Je kan er meerdere kiezen; ze worden samen beslist.'}
+        </p>
       </fieldset>
 
       <div className="mt-4 grid gap-3 sm:grid-cols-2">
@@ -408,7 +447,7 @@ export function VanRequestForm({
         onClick={submit}
         disabled={
           pending ||
-          !vehicleId ||
+          vehicleIds.length === 0 ||
           !startAt ||
           !endAt ||
           !purpose.trim() ||

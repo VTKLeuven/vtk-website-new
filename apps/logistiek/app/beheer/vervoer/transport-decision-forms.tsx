@@ -51,15 +51,17 @@ export function TransportDecisionForms({
   /** Andere goedgekeurde ritten met datzelfde voertuig die dag, om naar te schuiven. */
   sameDayBookings?: string[];
 }) {
-  const isRoundTrip = legs.length > 1;
+  // Meerdere ritten in één aanvraag: heen en terug (V12), meerdere voertuigen
+  // (V1), of allebei. Ze worden altijd samen beslist.
+  const multiple = legs.length > 1;
 
   return (
     <div className="grid gap-4">
       <SaveForm
         action={approveTransportAction}
-        submitLabel={isRoundTrip ? 'Beide ritten goedkeuren' : 'Goedkeuren'}
+        submitLabel={multiple ? `Alle ${legs.length} ritten goedkeuren` : 'Goedkeuren'}
         savingLabel="Goedkeuren..."
-        savedMessage={isRoundTrip ? 'Heen- en terugrit goedgekeurd.' : 'Rit goedgekeurd.'}
+        savedMessage={multiple ? 'Alle ritten van deze aanvraag goedgekeurd.' : 'Rit goedgekeurd.'}
         errorMessages={APPROVE_ERRORS}
         className="grid gap-3 rounded-[14px] border border-vtk-navy/10 bg-vtk-paper p-4"
       >
@@ -151,9 +153,9 @@ export function TransportDecisionForms({
 
       <SaveForm
         action={rejectTransportAction}
-        submitLabel={isRoundTrip ? 'Beide ritten afwijzen' : 'Afwijzen'}
+        submitLabel={multiple ? `Alle ${legs.length} ritten afwijzen` : 'Afwijzen'}
         savingLabel="Afwijzen..."
-        savedMessage={isRoundTrip ? 'Heen- en terugrit afgewezen.' : 'Rit afgewezen.'}
+        savedMessage={multiple ? 'Alle ritten van deze aanvraag afgewezen.' : 'Rit afgewezen.'}
         errorMessages={REJECT_ERRORS}
         submitVariant="danger"
         className="grid gap-3 rounded-[14px] border border-vtk-navy/10 bg-vtk-paper p-4"

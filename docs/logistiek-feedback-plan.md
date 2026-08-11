@@ -33,7 +33,7 @@ verbetering, **P3** = groter of "ooit".
 | 4 | Materiaal: catalogus en aanvragen | M3, M4, M5, M6, M13, M15 | ✅ af 11 aug 2026 |
 | 5 | Vervoer | V2, V5, V8, V9, V12, V13 | ✅ af 11 aug 2026 |
 | 6 | Flesserke | F2, F3, F5, F6, F7 | ✅ af 11 aug 2026 |
-| 7 | Grote stukken | ~~A7~~, A8, ~~A9~~, ~~M1~~, ~~M2~~, ~~M12~~, M17, ~~M18~~, V1 | bezig; A7, A9, M1, M2, M12, M18 af 11 aug 2026 |
+| 7 | Grote stukken | ~~A7~~, A8, ~~A9~~, ~~M1~~, ~~M2~~, ~~M12~~, M17, ~~M18~~, ~~V1~~ | enkel A8 + M17 rest; de rest af 11 aug 2026 |
 
 Vervallen: **M7** (gas wordt een gewoon catalogusitem, dus geen code) en **M16**
 (geen barcodes). Zie fase 0.
@@ -715,8 +715,21 @@ Wat er tijdens het werk bijkwam:
 - **Klaar wanneer:** een aanvrager hoeft niet twee keer hetzelfde formulier in
   te vullen voor een gewone heen-en-terug.
 
-### V1. Meerdere voertuigen tegelijk aanvragen
-**P3 · code**
+### V1. Meerdere voertuigen tegelijk aanvragen ✅
+**P3 · code** · af op 11 augustus 2026
+
+Wat er tijdens het werk bijkwam:
+
+- **De prijsindicatie moest herschreven worden.** Met de kar (gratis) én de auto
+  (per km) is er geen enkel getal: ze toont nu de som van de vaste tarieven plus
+  "€ 0,35 per km (Auto)".
+- **De beheerkaart noemde de tweede rit "Terugrit"**, wat bij een tweede voertuig
+  onzin is. Ze toont nu per extra rit waarom die apart staat: de terugrit of de
+  naam van het voertuig. Ook de knop zegt niet meer "beide ritten" maar "alle n
+  ritten".
+- **`transportPriceCents` geeft `number | null`** (null bij per km); dat viel pas
+  op toen de som over meerdere voertuigen liep. De per-km-voertuigen zitten in een
+  eigen lijst, dus de null kan daar niet voorkomen.
 
 - **Raakt:** `app/vervoer/request-form.tsx`, `app/actions/uitleen.ts`.
 - **Nu:** de voertuigkeuze is een radio; per voertuig een aparte aanvraag.

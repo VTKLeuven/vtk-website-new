@@ -1215,6 +1215,23 @@ aan geen enkele groep. Dat is ledenbeheer op vtk.be (`/admin/werkgroepen`) en ge
 zaak van de uitleendienst; de gate opzetten zou het verbergen in plaats van het
 oplossen.
 
+### Meerdere voertuigen: één aanvraag, N boekingen
+
+Een verhuis met de kar én de auto is één vraag. Ze komt binnen als één aanvraag
+en wordt N boekingen met hetzelfde `tripGroupId`, dezelfde groepering als heen en
+terug (V12). Bij twee voertuigen én een terugrit zijn dat er vier.
+
+- **Waarom niet één boeking met een lijst voertuigen:** elke query over "wanneer
+  is dit voertuig bezet" (de conflictcheck, de kalender, het weekoverzicht, het
+  publieke bezettingsraster) leest één rij per voertuig per tijdvenster. Een lijst
+  zou al die queries moeten aanpassen.
+- **Ze worden altijd samen beslist.** Eén voertuig goedkeuren en het andere laten
+  hangen, levert een verhuis op die half kan doorgaan. Goedkeuren, afwijzen en
+  annuleren werken al op de hele groep.
+- **Tarief per voertuig gesnapshot.** De kar is gratis en de auto per kilometer;
+  de prijsindicatie telt de vaste tarieven op en zegt van de per-km-voertuigen dat
+  ze pas na de rit gekend zijn.
+
 ### Concept: lokaal in de browser, niet in de database
 
 Een half ingevulde aanvraag overleeft nu een gesloten tabblad. Ze staat in

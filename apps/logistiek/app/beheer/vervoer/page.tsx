@@ -247,10 +247,20 @@ export default async function BeheerVervoerPage() {
               const [first] = group;
               return (
                 <BookingCard key={first.id} booking={first}>
+                  {/* De rest van de aanvraag: de terugrit, een tweede voertuig,
+                      of allebei. De kaart toont enkel de eerste rit. */}
                   {group.length > 1 ? (
-                    <p className="mt-2 text-sm text-vtk-muted">
-                      Terugrit: {dateFormatter.format(group[1].startAt)} · {hoursLabel(group[1])}
-                    </p>
+                    <ul className="mt-2 grid gap-0.5 text-sm text-vtk-muted">
+                      {group.slice(1).map((leg) => (
+                        <li key={leg.id}>
+                          {leg.tripLeg === 'TERUG' ? 'Terugrit' : leg.vehicle.nameNl}:{' '}
+                          {dateFormatter.format(leg.startAt)} · {hoursLabel(leg)}
+                          {leg.tripLeg === 'TERUG' && leg.vehicleId !== first.vehicleId
+                            ? ` (${leg.vehicle.nameNl})`
+                            : ''}
+                        </li>
+                      ))}
+                    </ul>
                   ) : null}
                   <div className="mt-4">
                     <TransportDecisionForms
@@ -259,8 +269,24 @@ export default async function BeheerVervoerPage() {
                         id: leg.id,
                         startAt: toDatetimeLocalValue(leg.startAt),
                         endAt: toDatetimeLocalValue(leg.endAt),
+                        // Waarom deze rit apart staat: heen/terug (V12), een
+                        // tweede voertuig (V1), of allebei. Zonder dat opschrift
+                        // staan er twee identieke urenblokken onder elkaar.
                         label:
-                          group.length > 1 ? (leg.tripLeg === 'TERUG' ? 'Terugrit' : 'Heenrit') : null,
+                          group.length > 1
+                            ? [
+                                leg.tripLeg === 'TERUG'
+                                  ? 'Terugrit'
+                                  : leg.tripLeg === 'HEEN'
+                                    ? 'Heenrit'
+                                    : null,
+                                new Set(group.map((other) => other.vehicleId)).size > 1
+                                  ? leg.vehicle.nameNl
+                                  : null,
+                              ]
+                                .filter(Boolean)
+                                .join(' · ') || 'Rit'
+                            : null,
                       }))}
                       drivers={drivers}
                       pricingIsPerKm={first.pricingMode === 'PER_KM'}

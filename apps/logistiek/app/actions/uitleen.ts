@@ -290,6 +290,8 @@ export async function createVanBookingAction(input: {
   pickupAddress: string;
   destination: string;
   note: string;
+  /** Eén of meer voertuigen; `vehicleId` blijft aanvaard voor één voertuig. */
+  vehicleIds?: string[];
   vehicleId?: string;
   eventName?: string;
   helpersNote?: string;
@@ -326,15 +328,23 @@ export async function createVanBookingAction(input: {
     return { ok: false, error: 'Het extra e-mailadres ziet er niet uit als een adres.' };
   }
 
-  const vehicle = input.vehicleId
-    ? await prisma.uitleenVehicle.findFirst({ where: { id: input.vehicleId, active: true } })
-    : await prisma.uitleenVehicle.findFirst({ where: { active: true }, orderBy: { sortIndex: 'asc' } });
-  if (!vehicle) return { ok: false, error: 'Kies een voertuig.' };
+  // Eén of meerdere voertuigen: een verhuis met de kar én de auto is één vraag,
+  // en die als twee aanvragen laten indienen betekent dat het team ze ook los kan
+  // beslissen. Ze delen daarom één `tripGroupId`, net als heen en terug (V12).
+  const chosenIds = (input.vehicleIds ?? (input.vehicleId ? [input.vehicleId] : [])).filter(Boolean);
+  const vehicles = chosenIds.length
+    ? await prisma.uitleenVehicle.findMany({ where: { id: { in: chosenIds }, active: true } })
+    : await prisma.uitleenVehicle
+        .findFirst({ where: { active: true }, orderBy: { sortIndex: 'asc' } })
+        .then((found) => (found ? [found] : []));
+  if (vehicles.length === 0) return { ok: false, error: 'Kies een voertuig.' };
+  if (vehicles.length !== new Set(chosenIds).size && chosenIds.length > 0) {
+    return { ok: false, error: 'Een van de gekozen voertuigen bestaat niet meer; herlaad de pagina.' };
+  }
 
-  // Gedeelde velden van beide helften; enkel het tijdvenster verschilt.
+  // Gedeelde velden van elke boeking; voertuig, tarief en tijdvenster verschillen.
   const shared = {
     userId: session.user.id,
-    vehicleId: vehicle.id,
     purpose: purpose.slice(0, MAX_NOTE_LENGTH),
     eventName: input.eventName?.trim().slice(0, 300) || null,
     pickupAddress: input.pickupAddress.trim().slice(0, 300) || null,
@@ -344,49 +354,57 @@ export async function createVanBookingAction(input: {
     contactPhone: input.contactPhone?.trim().slice(0, 60) || null,
     notifyEmail: notifyEmail.slice(0, 300) || null,
     memberNote: input.note.trim().slice(0, MAX_NOTE_LENGTH) || null,
-    // Tarief snapshotten; prijs is null wanneer ze pas na de rit gekend is (per km).
+  };
+  /** Tarief per voertuig gesnapshot; per km blijft de prijs null tot na de rit. */
+  const bookingFor = (
+    vehicle: (typeof vehicles)[number],
+    from: Date,
+    to: Date,
+    leg: 'HEEN' | 'TERUG' | null,
+    tripGroupId: string | null
+  ) => ({
+    ...shared,
+    vehicleId: vehicle.id,
     pricingMode: vehicle.pricingMode,
     rateCents: vehicle.rateCents,
-  };
-  const priceFor = (from: Date, to: Date) =>
-    transportPriceCents({
+    tripGroupId,
+    tripLeg: leg,
+    startAt: from,
+    endAt: to,
+    priceCents: transportPriceCents({
       pricingMode: vehicle.pricingMode,
       rateCents: vehicle.rateCents,
       startAt: from,
       endAt: to,
-    });
+    }),
+  });
 
-  if (inbound) {
-    // Twee boekingen met één `tripGroupId`: tussen heen en terug is het voertuig
-    // vrij, en één boeking met twee vensters zou elke bezettingsquery moeten
-    // aanpassen. Zie docs/design-decisions.md.
-    const tripGroupId = randomUUID();
-    await prisma.uitleenTransportBooking.createMany({
-      data: [
-        { ...shared, tripGroupId, tripLeg: 'HEEN', startAt, endAt, priceCents: priceFor(startAt, endAt) },
-        {
-          ...shared,
-          tripGroupId,
-          tripLeg: 'TERUG',
-          startAt: inbound.startAt,
-          endAt: inbound.endAt,
-          priceCents: priceFor(inbound.startAt, inbound.endAt),
-        },
-      ],
-    });
-    revalidateMember();
-    return {
-      ok: true,
-      message: 'Heen- en terugrit aangevraagd. Je vindt de status bij Mijn aanvragen.',
-    };
-  }
+  // Eén boeking per voertuig en per rit. Ze horen bij elkaar zodra het er meer dan
+  // één is: het team beslist, annuleert en verschuift ze in hun geheel. Bij één
+  // enkele rit met één voertuig blijft `tripGroupId` null, zoals voordien.
+  const legs: Array<{ from: Date; to: Date; leg: 'HEEN' | 'TERUG' | null }> = inbound
+    ? [
+        { from: startAt, to: endAt, leg: 'HEEN' },
+        { from: inbound.startAt, to: inbound.endAt, leg: 'TERUG' },
+      ]
+    : [{ from: startAt, to: endAt, leg: null }];
+  const grouped = vehicles.length > 1 || legs.length > 1;
+  const tripGroupId = grouped ? randomUUID() : null;
 
-  await prisma.uitleenTransportBooking.create({
-    data: { ...shared, startAt, endAt, priceCents: priceFor(startAt, endAt) },
+  await prisma.uitleenTransportBooking.createMany({
+    data: vehicles.flatMap((vehicle) =>
+      legs.map((leg) => bookingFor(vehicle, leg.from, leg.to, leg.leg, tripGroupId))
+    ),
   });
 
   revalidateMember();
-  return { ok: true, message: 'Rit aangevraagd. Je vindt de status bij Mijn aanvragen.' };
+  const what =
+    vehicles.length > 1
+      ? `${vehicles.length} voertuigen aangevraagd`
+      : inbound
+        ? 'Heen- en terugrit aangevraagd'
+        : 'Rit aangevraagd';
+  return { ok: true, message: `${what}. Je vindt de status bij Mijn aanvragen.` };
 }
 
 export async function cancelVanBookingAction(bookingId: string): Promise<ActionResult> {
