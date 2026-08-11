@@ -2116,9 +2116,9 @@ export async function saveDriverNoteAction(_prev: SaveState, formData: FormData)
  * hij via die rij in de chauffeurslijst staan (en verschijnt hij onder "zelf
  * toegevoegd", waar je hem kan weghalen).
  */
-export async function setDriverTrailerAction(
+export async function setDriverVanAction(
   userId: string,
-  canDriveTrailer: boolean
+  canDriveVan: boolean
 ): Promise<ActionResult> {
   await requireManage();
 
@@ -2130,14 +2130,14 @@ export async function setDriverTrailerAction(
 
   await prisma.uitleenDriver.upsert({
     where: { userId },
-    update: { canDriveTrailer },
-    create: { userId, canDriveTrailer },
+    update: { canDriveVan },
+    create: { userId, canDriveVan },
   });
 
   revalidateBeheer();
   return {
     ok: true,
-    message: canDriveTrailer ? 'Rijdt ook met de kar.' : 'Rijdt niet met de kar.',
+    message: canDriveVan ? 'Rijdt ook met de kar.' : 'Rijdt niet met de kar.',
   };
 }
 
@@ -2185,7 +2185,7 @@ export async function saveVehicleAction(_prev: SaveState, formData: FormData): P
     description: description || null,
     pricingMode,
     rateCents: pricingMode === 'FREE' ? 0 : rateCents,
-    needsTrailerDriver: String(formData.get('needsTrailerDriver') ?? '') === 'on',
+    needsVanDriver: String(formData.get('needsVanDriver') ?? '') === 'on',
   };
   if (id) {
     await prisma.uitleenVehicle.update({ where: { id }, data });

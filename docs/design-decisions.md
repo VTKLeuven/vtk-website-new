@@ -1268,18 +1268,29 @@ draagt nu de uren zelf: wat je daar invult, wordt de rit.
 
 ### Karchauffeurs: één vlag, geen aparte soort
 
-Een voertuig kan aangeduid staan als "vraagt een karchauffeur"
-(`UitleenVehicle.needsTrailerDriver`), en een chauffeur als "rijdt met de kar"
-(`UitleenDriver.canDriveTrailer`). Bij een rit met zo'n voertuig staan de
+Een voertuig kan aangeduid staan als "vraagt een chauffeur die de kar mag
+rijden" (`UitleenVehicle.needsVanDriver`), en een chauffeur als "rijdt met de
+kar" (`UitleenDriver.canDriveVan`). Bij een rit met zo'n voertuig staan de
 karchauffeurs bovenaan in de keuzelijst en de rest onder "Niet met de kar".
+
+**"De kar" is bij VTK de bestelwagen (Angela), geen aanhangwagen; die heeft de
+kring niet.** De velden heetten tot augustus 2026 `needsTrailerDriver` en
+`canDriveTrailer`, het icoon bij een chauffeur was een auto met aanhangwagen, en
+het voertuig "kar" had `nameEn: "Trailer"`. Dat was een leesfout van "met de kar
+rijden" die tot in de Engelse UI doorliep. Hernoemd via een `RENAME COLUMN`, dus
+de vlaggen die al gezet waren, staan er nog.
 
 - **Eén vlag en geen enum AUTO/KAR:** elke karchauffeur rijdt ook gewoon met de
   auto, dus die twee sluiten elkaar niet uit.
 - **De rest blijft kiesbaar,** uitgegrijsd noch geblokkeerd: het team beslist wie
   rijdt, de app zorgt er enkel voor dat je het niet per ongeluk doet.
 - **Een vlag per voertuig en geen check op `code == "kar"`:** het team voert zelf
-  voertuigen in, en een tweede aanhangwagen zou anders stil buiten de regel
+  voertuigen in, en een tweede bestelwagen zou anders stil buiten de regel
   vallen.
+- **De knop is tekst en geen icoon,** anders dan de rij-acties ernaast: dit is
+  een instelling met twee toestanden, niet een actie. Een icoon toont de
+  uit-stand enkel als "hetzelfde, maar vager", en dat las niemand als een
+  toestand. Nu staat er "Rijdt met de kar" (geel) of "Niet met de kar" (omrand).
 - Leden van de post Logistiek hebben pas een `UitleenDriver`-rij zodra iemand die
   vlag bij hen zet. Gevolg om te kennen: verlaten ze later de post, dan blijven ze
   via die rij in de chauffeurslijst staan (onder "zelf toegevoegd", waar je ze kan

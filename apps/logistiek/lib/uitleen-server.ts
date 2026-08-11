@@ -921,8 +921,8 @@ export type DriverOption = {
   id: string;
   name: string;
   source: DriverSource;
-  /** Rijdt ook met de aanhangwagen; zie `UitleenDriver.canDriveTrailer`. */
-  canDriveTrailer: boolean;
+  /** Mag met de kar rijden, de bestelwagen; zie `UitleenDriver.canDriveVan`. */
+  canDriveVan: boolean;
 };
 
 /** Leden van de post Logistiek dit werkingsjaar. */
@@ -948,14 +948,14 @@ export async function driverOptions(): Promise<DriverOption[]> {
     logistiekTeamMembers(),
     prisma.uitleenDriver.findMany({
       where: { user: { active: true, deletedAt: null } },
-      select: { canDriveTrailer: true, user: { select: { id: true, name: true } } },
+      select: { canDriveVan: true, user: { select: { id: true, name: true } } },
     }),
   ]);
 
   // Een postlid kan óók een rij hier hebben: die wordt aangemaakt zodra iemand de
   // karvlag zet. De bron blijft dan POST (die verdwijnt vanzelf op 15 juli), maar
   // de vlag komt uit de rij.
-  const trailer = new Map(extra.map((row) => [row.user.id, row.canDriveTrailer]));
+  const vanFlag = new Map(extra.map((row) => [row.user.id, row.canDriveVan]));
 
   const byId = new Map<string, DriverOption>();
   for (const member of team) {
@@ -963,7 +963,7 @@ export async function driverOptions(): Promise<DriverOption[]> {
       id: member.id,
       name: member.name,
       source: 'POST',
-      canDriveTrailer: trailer.get(member.id) ?? false,
+      canDriveVan: vanFlag.get(member.id) ?? false,
     });
   }
   for (const row of extra) {
@@ -972,7 +972,7 @@ export async function driverOptions(): Promise<DriverOption[]> {
       id: row.user.id,
       name: row.user.name,
       source: 'EXTRA',
-      canDriveTrailer: row.canDriveTrailer,
+      canDriveVan: row.canDriveVan,
     });
   }
 
@@ -1004,7 +1004,7 @@ export async function driverPool(): Promise<DriverPoolEntry[]> {
       select: {
         id: true,
         note: true,
-        canDriveTrailer: true,
+        canDriveVan: true,
         user: { select: { id: true, name: true, email: true, active: true } },
       },
     }),
@@ -1047,7 +1047,7 @@ export async function driverPool(): Promise<DriverPoolEntry[]> {
       source: 'POST',
       driverRowId: null,
       note: row?.note ?? null,
-      canDriveTrailer: row?.canDriveTrailer ?? false,
+      canDriveVan: row?.canDriveVan ?? false,
       inactive: false,
     });
   }
@@ -1059,7 +1059,7 @@ export async function driverPool(): Promise<DriverPoolEntry[]> {
       source: 'EXTRA',
       driverRowId: row.id,
       note: row.note,
-      canDriveTrailer: row.canDriveTrailer,
+      canDriveVan: row.canDriveVan,
       inactive: !row.user.active,
     });
   }

@@ -34,7 +34,7 @@ export function TransportControls({
   pricingMode: UitleenPricingMode;
   paid: boolean;
   drivers: DriverOption[];
-  vehicles: Array<{ id: string; name: string; needsTrailerDriver: boolean }>;
+  vehicles: Array<{ id: string; name: string; needsVanDriver: boolean }>;
 }) {
   const router = useRouter();
   const showToast = useToast();
@@ -83,8 +83,8 @@ export function TransportControls({
             <DriverOptions
               drivers={drivers}
               current={driver}
-              needsTrailerDriver={
-                vehicles.find((v) => v.id === vehicleId)?.needsTrailerDriver ?? false
+              needsVanDriver={
+                vehicles.find((v) => v.id === vehicleId)?.needsVanDriver ?? false
               }
             />
           </select>

@@ -610,7 +610,7 @@ Wat er tijdens het werk bijkwam:
   werken zonder dat V12 de conflictcheck moest leren omgaan met twee vensters per
   rij.
 - **De karvlag staat op de chauffeur én op het voertuig.** Een check op
-  `code == "kar"` zou een tweede aanhangwagen stil buiten de regel laten vallen.
+  `code == "kar"` zou een tweede bestelwagen stil buiten de regel laten vallen.
   Postleden krijgen pas een `UitleenDriver`-rij zodra je die vlag zet; het gevolg
   (ze blijven na de post in de lijst staan) staat in `docs/design-decisions.md`.
 - **De beheernavigatie is gegroepeerd** (Uitleen / Vervoer / Overig). "Chauffeurs"
@@ -682,7 +682,7 @@ Wat er tijdens het werk bijkwam:
   `lib/uitleen-server.ts` (`driverOptions`, `driverPool`),
   `app/beheer/chauffeurs/driver-list.tsx`, `app/beheer/vervoer/driver-select.tsx`.
 - **Doen:**
-  1. Veld op `UitleenDriver`: `canDriveTrailer Boolean @default(false)` (elke
+  1. Veld op `UitleenDriver`: `canDriveVan Boolean @default(false)` (elke
      karchauffeur is ook autochauffeur, dus één vlag volstaat; een enum met
      AUTO/KAR suggereert ten onrechte dat het elkaar uitsluit).
   2. Chauffeurs uit de post Logistiek hebben geen `UitleenDriver`-rij. Kies:

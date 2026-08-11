@@ -64,7 +64,7 @@ export default async function BeheerVervoerPage() {
   const eventChoices = eventOptions(events);
   const activeVehicleOptions = vehicles
     .filter((v) => v.active)
-    .map((v) => ({ id: v.id, name: v.nameNl, needsTrailerDriver: v.needsTrailerDriver }));
+    .map((v) => ({ id: v.id, name: v.nameNl, needsVanDriver: v.needsVanDriver }));
 
   const open = bookings.filter((booking) => booking.status === 'REQUESTED');
   // Heen en terug zijn twee boekingen maar één aanvraag: het team beslist er in
@@ -304,8 +304,8 @@ export default async function BeheerVervoerPage() {
                       }))}
                       drivers={drivers}
                       pricingIsPerKm={first.pricingMode === 'PER_KM'}
-                      needsTrailerDriver={
-                        vehicles.find((v) => v.id === first.vehicleId)?.needsTrailerDriver ?? false
+                      needsVanDriver={
+                        vehicles.find((v) => v.id === first.vehicleId)?.needsVanDriver ?? false
                       }
                       sameDayBookings={sameDayLines(first)}
                     />

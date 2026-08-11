@@ -39,7 +39,7 @@ export function TransportDecisionForms({
   legs,
   drivers,
   pricingIsPerKm,
-  needsTrailerDriver = false,
+  needsVanDriver = false,
   sameDayBookings = [],
 }: {
   bookingId: string;
@@ -47,7 +47,7 @@ export function TransportDecisionForms({
   legs: DecisionLeg[];
   drivers: DriverOption[];
   pricingIsPerKm: boolean;
-  needsTrailerDriver?: boolean;
+  needsVanDriver?: boolean;
   /** Andere goedgekeurde ritten met datzelfde voertuig die dag, om naar te schuiven. */
   sameDayBookings?: string[];
 }) {
@@ -122,7 +122,7 @@ export function TransportDecisionForms({
             defaultValue=""
           >
             <option value="">Nog geen chauffeur</option>
-            <DriverOptions drivers={drivers} needsTrailerDriver={needsTrailerDriver} />
+            <DriverOptions drivers={drivers} needsVanDriver={needsVanDriver} />
           </select>
         </label>
         <fieldset className="grid gap-2 text-sm">

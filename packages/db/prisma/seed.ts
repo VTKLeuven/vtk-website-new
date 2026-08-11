@@ -1500,7 +1500,7 @@ async function main() {
     pricingMode: "FREE" | "PER_HOUR" | "PER_KM" | "FLAT";
     rateCents: number;
   }> = [
-    { code: "kar", nameNl: "Kar", nameEn: "Trailer", pricingMode: "FREE", rateCents: 0 },
+    { code: "kar", nameNl: "Kar", nameEn: "Van", pricingMode: "FREE", rateCents: 0 },
     { code: "auto", nameNl: "Auto", nameEn: "Car", pricingMode: "PER_KM", rateCents: 35 },
     { code: "bakfiets", nameNl: "Bakfiets", nameEn: "Cargo bike", pricingMode: "FREE", rateCents: 0 },
   ];

@@ -2518,10 +2518,14 @@ model UitleenVehicle {
   rateCents          Int                @default(0) // per uur / per km / vast, naargelang pricingMode
   sortIndex          Int                @default(0)
   active             Boolean            @default(true)
-  // Rijden met dit voertuig vraagt ervaring met de aanhangwagen. Een vlag per
-  // voertuig en geen check op `code == "kar"`: het team voert zelf voertuigen in,
-  // en een tweede kar zou anders stil buiten de regel vallen.
-  needsTrailerDriver Boolean            @default(false)
+  // Rijden met dit voertuig vraagt een chauffeur die het aankan: bij VTK is dat
+  // "de kar", de bestelwagen. Een vlag per voertuig en geen check op
+  // `code == "kar"`: het team voert zelf voertuigen in, en een tweede
+  // bestelwagen zou anders stil buiten de regel vallen.
+  //
+  // Heette tot augustus 2026 `needsTrailerDriver`. Dat was een leesfout van
+  // "met de kar rijden": VTK heeft geen aanhangwagen.
+  needsVanDriver     Boolean            @default(false)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -2544,11 +2548,11 @@ model UitleenDriver {
   // Vrije notitie van het team, bv. "rijbewijs B sinds 2023, rijdt niet met de kar".
   note            String?
   addedById       String?
-  // Rijdt ook met de aanhangwagen. Eén vlag en geen enum AUTO/KAR: elke
-  // karchauffeur rijdt ook gewoon met de auto, dus die twee sluiten elkaar niet
+  // Mag met de kar rijden (de bestelwagen). Eén vlag en geen enum AUTO/KAR: wie
+  // de kar rijdt, rijdt ook gewoon met de auto, dus die twee sluiten elkaar niet
   // uit. Leden van de post Logistiek hebben pas een rij hier zodra iemand deze
   // vlag zet; tot dan gelden ze als autochauffeur.
-  canDriveTrailer Boolean @default(false)
+  canDriveVan Boolean @default(false)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

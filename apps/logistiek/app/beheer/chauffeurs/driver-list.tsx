@@ -1,6 +1,6 @@
 'use client';
 
-import { removeDriverAction, saveDriverNoteAction, setDriverTrailerAction } from '@/app/actions/beheer';
+import { removeDriverAction, saveDriverNoteAction, setDriverVanAction } from '@/app/actions/beheer';
 import { ConfirmActionButton } from '@/components/ui/confirm-action-button';
 import { LogisticsIcon } from '@/components/logistics-icon';
 import { SaveForm } from '@/components/ui/save-form';
@@ -41,11 +41,6 @@ function DriverRow({ entry }: { entry: DriverPoolEntry }) {
                 Gedeactiveerd
               </span>
             ) : null}
-            {entry.canDriveTrailer ? (
-              <span className="rounded-full bg-vtk-yellow/25 px-2.5 py-0.5 text-xs font-semibold text-vtk-ink">
-                Rijdt met de kar
-              </span>
-            ) : null}
           </p>
           <p className="mt-0.5 truncate text-sm text-vtk-muted">
             {entry.email} · {tripsLabel(entry)}
@@ -54,21 +49,22 @@ function DriverRow({ entry }: { entry: DriverPoolEntry }) {
         </div>
 
         {/* De karvlag staat naast de naam en niet in de notitie: de keuzelijst
-            bij een rit met de kar splitst hierop, en vrije tekst kan dat niet. */}
+            bij een rit met de kar splitst hierop, en vrije tekst kan dat niet.
+            Bewust tekst en geen icoon, in tegenstelling tot de knoppen ernaast:
+            dit is geen actie op de rij maar een instelling met twee toestanden,
+            en een icoon toont de uit-stand enkel als "hetzelfde, maar vager".
+            Het eerdere aanhangwagen-icoon las bovendien als een auto, terwijl
+            "de kar" bij VTK de bestelwagen is. */}
         <ConfirmActionButton
-          label={
-            entry.canDriveTrailer
-              ? `Rijdt niet meer met de kar: ${entry.name}`
-              : `Rijdt ook met de kar: ${entry.name}`
+          label={entry.canDriveVan ? 'Rijdt met de kar' : 'Niet met de kar'}
+          srLabel={
+            entry.canDriveVan
+              ? `${entry.name} rijdt met de kar; klik om dat weg te halen`
+              : `${entry.name} rijdt niet met de kar; klik om dat aan te zetten`
           }
-          icon={
-            <LogisticsIcon
-              name="trailer"
-              className={entry.canDriveTrailer ? 'h-4 w-4 text-vtk-ink' : 'h-4 w-4 opacity-35'}
-            />
-          }
-          successMessage={entry.canDriveTrailer ? 'Rijdt niet met de kar.' : 'Rijdt ook met de kar.'}
-          action={setDriverTrailerAction.bind(null, entry.id, !entry.canDriveTrailer)}
+          variant={entry.canDriveVan ? 'secondary' : 'ghost'}
+          successMessage={entry.canDriveVan ? 'Rijdt niet met de kar.' : 'Rijdt ook met de kar.'}
+          action={setDriverVanAction.bind(null, entry.id, !entry.canDriveVan)}
           confirm={false}
         />
 
