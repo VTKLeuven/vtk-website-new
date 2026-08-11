@@ -7,6 +7,7 @@ import type { UitleenPricingMode } from '@prisma/client';
 import { createVanBookingAction } from '@/app/actions/uitleen';
 import { formatDateTime, formatEuro, formatPriceCents, transportPriceCents } from '@/lib/uitleen';
 import { useFormDraft } from '@/lib/use-form-draft';
+import { EventPicker, type SelectableEvent } from '@/components/event-picker';
 import type { RequesterOption } from '@/app/materiaal/event-fields';
 
 type VehicleOption = { id: string; name: string; pricingMode: UitleenPricingMode; rateCents: number };
@@ -16,12 +17,15 @@ export function VanRequestForm({
   vehicles,
   groups: _groups,
   draftKey,
+  events,
 }: {
   locale: 'nl' | 'en';
   vehicles: VehicleOption[];
   groups: RequesterOption[];
   /** Zie ReservationForm: lokaal concept, per lid. */
   draftKey?: string;
+  /** Evenementen om deze rit onder te hangen (A8). */
+  events?: SelectableEvent[];
 }) {
   const en = locale === 'en';
   const router = useRouter();
@@ -48,6 +52,7 @@ export function VanRequestForm({
   const [returnStartAt, setReturnStartAt] = useState('');
   const [returnEndAt, setReturnEndAt] = useState('');
   const [note, setNote] = useState('');
+  const [eventLink, setEventLink] = useState({ eventId: '', createEvent: false });
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
@@ -186,6 +191,8 @@ export function VanRequestForm({
         helpersPhone,
         contactPhone,
         notifyEmail,
+        eventId: eventLink.eventId || null,
+        createEvent: eventLink.createEvent,
         note,
         returnStartAt: roundTrip ? returnStartAt : undefined,
         returnEndAt: roundTrip ? returnEndAt : undefined,
@@ -228,6 +235,19 @@ export function VanRequestForm({
               {en ? 'Discard' : 'Weggooien'}
             </Button>
           </div>
+        </div>
+      ) : null}
+
+      {events ? (
+        <div className="mt-4">
+          <EventPicker
+            events={events}
+            eventId={eventLink.eventId}
+            createEvent={eventLink.createEvent}
+            onChange={setEventLink}
+            locale={locale}
+            newEventName={eventName}
+          />
         </div>
       ) : null}
 

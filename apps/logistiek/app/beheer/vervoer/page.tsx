@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { VanStatusBadge } from '@/components/status-badge';
 import { requireManage } from '@/lib/session';
 import {
+  eventOptions,
   formatDateTime,
   formatPriceCents,
   requesterLabel,
@@ -9,10 +10,12 @@ import {
 } from '@/lib/uitleen';
 import { AuditTimeline } from '@/components/audit-timeline';
 import { PhoneLink } from '@/components/phone-link';
+import { EventLink } from '@/components/event-link';
 import {
   adminVanBookings,
   adminVehicles,
   driverOptions,
+  selectableEvents,
   hasSucceededPayment,
   transportAuditLogsByBooking,
   type AdminTransportBooking,
@@ -52,11 +55,13 @@ function hoursLabel(booking: AdminTransportBooking): string {
 export default async function BeheerVervoerPage() {
   await requireManage();
 
-  const [bookings, drivers, vehicles] = await Promise.all([
+  const [bookings, drivers, vehicles, events] = await Promise.all([
     adminVanBookings(),
     driverOptions(),
     adminVehicles(),
+    selectableEvents(),
   ]);
+  const eventChoices = eventOptions(events);
   const activeVehicleOptions = vehicles
     .filter((v) => v.active)
     .map((v) => ({ id: v.id, name: v.nameNl, needsTrailerDriver: v.needsTrailerDriver }));
@@ -183,6 +188,15 @@ export default async function BeheerVervoerPage() {
     if (booking.memberNote) lines.push(['Nota van het lid', booking.memberNote]);
     if (booking.adminNote) lines.push(['Nota van Logistiek', booking.adminNote]);
     if (booking.kilometers !== null) lines.push(['Gereden', `${booking.kilometers} km`]);
+    lines.push([
+      'Evenement',
+      <EventLink
+        key="event"
+        target={{ kind: 'transport', id: booking.id }}
+        events={eventChoices}
+        current={booking.event}
+      />,
+    ]);
 
     return (
       <div className="rounded-[14px] bg-vtk-paper px-4 py-3">

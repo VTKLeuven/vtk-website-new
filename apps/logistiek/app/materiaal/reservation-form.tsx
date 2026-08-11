@@ -10,6 +10,7 @@ import { formatDateTime, formatEuro } from '@/lib/uitleen';
 import type { CatalogCategory } from '@/lib/uitleen-server';
 import { CategoryThumb } from '@/components/category-thumb';
 import { DayPartSelect } from '@/components/day-part-select';
+import { EventPicker, type SelectableEvent } from '@/components/event-picker';
 import { useFormDraft } from '@/lib/use-form-draft';
 import { LastMinuteNotice } from '@/components/last-minute-notice';
 import { QuantityInput } from '@/components/quantity-input';
@@ -53,6 +54,7 @@ export function ReservationForm({
   mode = 'member',
   draftKey,
   templates = [],
+  events,
 }: {
   catalog: CatalogCategory[];
   groups: RequesterOption[];
@@ -80,6 +82,8 @@ export function ReservationForm({
   draftKey?: string;
   /** Vaste sets die het formulier in één klik invullen (M17). */
   templates?: RequestTemplate[];
+  /** Evenementen om deze aanvraag onder te hangen (A8). */
+  events?: SelectableEvent[];
 }) {
   const en = locale === 'en';
   const [event, setEvent] = useState<EventReservationValues>(initial.event);
@@ -92,6 +96,7 @@ export function ReservationForm({
   const [lineNotes, setLineNotes] = useState<Record<string, string>>(initial.lineNotes ?? {});
   const [availability, setAvailability] = useState<Record<string, number> | null>(null);
   const [acceptConflicts, setAcceptConflicts] = useState(false);
+  const [eventLink, setEventLink] = useState({ eventId: '', createEvent: false });
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
@@ -234,6 +239,8 @@ export function ReservationForm({
         returnDate,
         pickupPart,
         returnPart,
+        eventId: eventLink.eventId || null,
+        createEvent: eventLink.createEvent,
         note,
         lines: Object.entries(quantities).map(([itemId, quantity]) => ({
           itemId,
@@ -280,6 +287,19 @@ export function ReservationForm({
       ) : null}
 
       <EventRequesterFields value={event} onChange={setEvent} groups={groups} locale={locale} mode={mode} />
+
+      {/* Enkel bij een nieuwe aanvraag: een bestaande koppel je vanuit het beheer,
+          waar je ziet wat er al onder het evenement hangt. */}
+      {events ? (
+        <EventPicker
+          events={events}
+          eventId={eventLink.eventId}
+          createEvent={eventLink.createEvent}
+          onChange={setEventLink}
+          locale={locale}
+          newEventName={event.eventName}
+        />
+      ) : null}
 
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
         <div className="space-y-6">

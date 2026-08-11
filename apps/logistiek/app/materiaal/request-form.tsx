@@ -3,6 +3,7 @@
 import { useRouter } from 'next/navigation';
 import { createReservationAction } from '@/app/actions/uitleen';
 import type { CatalogCategory, RequestTemplate } from '@/lib/uitleen-server';
+import type { SelectableEvent } from '@/components/event-picker';
 import { emptyEventValues, type RequesterOption } from './event-fields';
 import { ReservationForm } from './reservation-form';
 
@@ -15,6 +16,7 @@ export function MaterialRequestForm({
   lastMinuteDays,
   userId,
   templates,
+  events,
 }: {
   catalog: CatalogCategory[];
   groups: RequesterOption[];
@@ -26,6 +28,7 @@ export function MaterialRequestForm({
   /** Voor het lokale concept: per lid, want de logikot-pc is gedeeld. */
   userId: string;
   templates: RequestTemplate[];
+  events: SelectableEvent[];
 }) {
   const en = locale === 'en';
   const router = useRouter();
@@ -40,6 +43,7 @@ export function MaterialRequestForm({
       lastMinuteDays={lastMinuteDays}
       draftKey={`materiaal:${userId}`}
       templates={templates}
+      events={events}
       initial={{
         event: emptyEventValues(groups),
         pickupDate: '',

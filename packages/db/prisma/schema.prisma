@@ -304,29 +304,29 @@ enum StudyProgramme {
 // -----------------------------------------------------------------------------
 
 model User {
-  id             String  @id @default(cuid())
+  id                   String    @id @default(cuid())
   // `name` blijft de weergavenaam (en het veld dat better-auth zelf zet bij een
   // SSO-login). `firstName`/`lastName` zijn de gestructureerde variant die de
   // mailinglijst-exports nodig hebben; ze worden ingevuld tijdens de onboarding
   // en in het gebruikersbeheer, en `name` wordt daaruit samengesteld.
-  name           String
-  firstName      String?
-  lastName       String?
-  email          String  @unique
-  rNumber        String? @unique // KU Leuven studentennummer (bvb r0123456), voor zoeken
+  name                 String
+  firstName            String?
+  lastName             String?
+  email                String    @unique
+  rNumber              String?   @unique // KU Leuven studentennummer (bvb r0123456), voor zoeken
   // `true` als het r-nummer van de KU Leuven-authenticator komt (bij SSO gezet,
   // zie packages/auth/src/logins/kul.ts). Dan staat het veld read-only in het
   // profielformulier, net als de e-mail; een zelf ingevuld r-nummer (flag false)
   // blijft aanpasbaar.
-  rNumberFromKul Boolean @default(false)
+  rNumberFromKul       Boolean   @default(false)
   // Autoritatieve faculteitsstatus uit KU Leuven OIDC. Bij elke geslaagde
   // userinfo-call wordt 50000486 in eduPersonOrgUnitDN gecontroleerd. De datum
   // wordt enkel bij de eerste controle of een echte booleanwijziging aangepast.
   firwStudent          Boolean   @default(false)
   firwStudentChangedAt DateTime?
-  emailVerified  Boolean @default(false)
-  avatarKey      String?
-  image          String?
+  emailVerified        Boolean   @default(false)
+  avatarKey            String?
+  image                String?
 
   locale       Locale  @default(NL)
   active       Boolean @default(true)
@@ -337,69 +337,69 @@ model User {
   // wordt ze geanonimiseerd tot een tombstone. Dat is bewust iets anders dan
   // `active: false`, wat een gewoon gedeactiveerd lid is dat je in het beheer nog
   // wil zien. Filter `deletedAt: null` in elke lijst die gebruikers toont.
-  deletedAt    DateTime?
+  deletedAt DateTime?
 
   // Onboarding-profiel (ingevuld bij de eerste KUL SSO-login). Zolang
   // onboardedAt null is, wordt het lid naar de onboarding-flow gestuurd.
-  onboardedAt        DateTime?
+  onboardedAt            DateTime?
   // Kotadres
-  street             String?
-  houseNumber        String?
-  bus                String? // busnummer, optioneel
-  postalCode         String?
-  city               String?
-  birthDate          DateTime?
+  street                 String?
+  houseNumber            String?
+  bus                    String? // busnummer, optioneel
+  postalCode             String?
+  city                   String?
+  birthDate              DateTime?
   // Contact: `email` is de login-/universiteitsmail (via SSO). Persoonlijke
   // mail en de voorkeur voor communicatie komen erbij.
-  personalEmail      String?
-  emailPreference    EmailPreference  @default(UNIVERSITY)
+  personalEmail          String?
+  emailPreference        EmailPreference  @default(UNIVERSITY)
   // Opt-in mailinglijsten: enkel de aangeduide categorieën zitten in de array.
-  mailCategories     MailCategory[]   @default([])
+  mailCategories         MailCategory[]   @default([])
   // Herinneringen voor een shift waarvoor je jezelf inschreef. Bewust geen
   // `MailCategory`: dat zijn opt-in nieuwsbrieven, dit is transactioneel. Wel
   // uitzetbaar, want niet iedereen wil twee mails per shift.
-  shiftReminderDayBefore Boolean       @default(true)
-  shiftReminderSoon      Boolean       @default(true)
+  shiftReminderDayBefore Boolean          @default(true)
+  shiftReminderSoon      Boolean          @default(true)
   // Studie: meerdere studiejaren en richtingen mogelijk (iemand kan bv. deels in
   // 2de en deels in 3de bachelor zitten).
-  studyYears         StudyYear[]      @default([])
-  studyProgrammes    StudyProgramme[] @default([])
+  studyYears             StudyYear[]      @default([])
+  studyProgrammes        StudyProgramme[] @default([])
   // Lid dat niet aan de faculteit Ingenieurswetenschappen studeert. Bewust geen
   // `StudyProgramme`-waarde: het is geen richting, en als enum-waarde zou het
   // overal opduiken waar richtingen opgelijst worden (o.a. de career-export).
-  notAtFaculty       Boolean          @default(false)
+  notAtFaculty           Boolean          @default(false)
   // Lid dat niet (meer) studeert: afgestudeerd of gestopt. Bewust los van
   // `notAtFaculty` (dat is "studeert wél, maar elders"): wie dit aanduidt valt
   // uit élke studiegerichte mailinglijst (zie lib/mailinglists.ts). Blijft een
   // aparte boolean om dezelfde reden als notAtFaculty.
-  notStudying        Boolean          @default(false)
+  notStudying            Boolean          @default(false)
   // Internationale of uitwisselingsstudent. Bewust een eigen veld en geen
   // afleiding uit `locale`: de sitetaal zegt welke taal je leest, niet of je een
   // exchange-student bent. Stuurt welke evenementen vanzelf in de kalender
   // opduiken (zie CalendarAudience).
-  internationalStudent Boolean        @default(false)
+  internationalStudent   Boolean          @default(false)
   // Werkingsjaar waarin het lid zijn studieprofiel laatst bevestigde (2026 =
   // "26-27"). Loopt dat achter op het huidige werkingsjaar, dan is het profiel
   // verlopen: de bevestigingsgate vraagt het opnieuw en het lid valt zolang uit
   // de mailinglijsten. Zo blijft "actief student" een jaarlijks vers signaal
   // zonder koppeling met de cursusdienst.
-  studyConfirmedYear Int?
+  studyConfirmedYear     Int?
 
   sessions  Session[]
   accounts  Account[]
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
 
-  memberships         GroupMembership[]
-  roles               UserRole[]
-  pocRepresentative   PocRepresentative[]
-  createdPages        Page[]                  @relation("PageCreatedBy")
-  createdAnnouncements Announcement[]         @relation("AnnouncementCreatedBy")
-  createdEvents       CalendarEvent[]         @relation("EventCreatedBy")
-  dashboardTiles      DashboardTile[]
-  dashboardTilePrefs  UserDashboardTilePref[]
-  participatingShifts ShiftParticipant[]
-  createdShortLinks   ShortLink[]             @relation("ShortLinkCreatedBy")
+  memberships          GroupMembership[]
+  roles                UserRole[]
+  pocRepresentative    PocRepresentative[]
+  createdPages         Page[]                  @relation("PageCreatedBy")
+  createdAnnouncements Announcement[]          @relation("AnnouncementCreatedBy")
+  createdEvents        CalendarEvent[]         @relation("EventCreatedBy")
+  dashboardTiles       DashboardTile[]
+  dashboardTilePrefs   UserDashboardTilePref[]
+  participatingShifts  ShiftParticipant[]
+  createdShortLinks    ShortLink[]             @relation("ShortLinkCreatedBy")
 
   theokotOrders             TheokotOrder[]             @relation("TheokotOrderUser")
   theokotPickedUp           TheokotOrder[]             @relation("TheokotPickedUpBy")
@@ -415,6 +415,7 @@ model User {
   uitleenReturned         UitleenReservation[]      @relation("UitleenReturnedBy")
   uitleenLinesPrepared    UitleenReservationLine[]  @relation("UitleenLinePreparedBy")
   uitleenTemplates        UitleenRequestTemplate[]  @relation("UitleenTemplateCreatedBy")
+  uitleenEvents           UitleenEvent[]            @relation("UitleenEventCreatedBy")
   uitleenTransport        UitleenTransportBooking[] @relation("UitleenTransportUser")
   uitleenTransportDriven  UitleenTransportBooking[] @relation("UitleenTransportDriver")
   uitleenTransportDecided UitleenTransportBooking[] @relation("UitleenTransportDecidedBy")
@@ -441,12 +442,12 @@ model User {
   checkedInTickets         Ticket[]                @relation("TicketCheckedInBy")
 
   //Oauth / SSO fields
-  oauthClients             OauthClient[]
-  oauthRefreshTokens       OauthRefreshToken[]
-  oauthAccessTokens        OauthAccessToken[]
-  oauthConsents            OauthConsent[]
-  ssoAuditLogs             SsoAuditLog[]
-  ssoClientPermissions     SsoUserClientPermission[]
+  oauthClients         OauthClient[]
+  oauthRefreshTokens   OauthRefreshToken[]
+  oauthAccessTokens    OauthAccessToken[]
+  oauthConsents        OauthConsent[]
+  ssoAuditLogs         SsoAuditLog[]
+  ssoClientPermissions SsoUserClientPermission[]
 
   @@index([deletedAt])
 }
@@ -478,13 +479,14 @@ model Group {
   roleGrants        GroupRole[]
   events            CalendarEvent[]
   dashboardTiles    DashboardTile[]
-  ownedTicketEvents TicketEvent[]           @relation("TicketEventOwnerGroup")
+  ownedTicketEvents TicketEvent[]              @relation("TicketEventOwnerGroup")
   ticketEventGrants TicketEventGroupGrant[]
   ssoGrants         SsoGroupClientPermission[]
 
   uitleenReservations UitleenReservation[]
   uitleenTransport    UitleenTransportBooking[]
   uitleenTemplates    UitleenRequestTemplate[]
+  uitleenEventsGroup  UitleenEvent[]
 }
 
 model GroupMembership {
@@ -645,7 +647,6 @@ model HeaderTabLink {
 
 /**
  * Aankondiging: het bericht dat als modal op de homepage verschijnt.
- *
  * Meerdere aankondigingen mogen naast elkaar bestaan (elk met hun eigen
  * venster), zodat je ze vooraf kan klaarzetten; de homepage toont er hoogstens
  * één, en oude rijen blijven staan als historiek.
@@ -654,7 +655,9 @@ model Announcement {
   id      String @id @default(cuid())
   titleNl String
   titleEn String
-  /** Markdown, bewerkt met de gedeelde MarkdownEditor. */
+  /**
+   * Markdown, bewerkt met de gedeelde MarkdownEditor.
+   */
   bodyNl  String
   bodyEn  String
 
@@ -662,12 +665,18 @@ model Announcement {
   ctaLabelEn String?
   ctaUrl     String?
 
-  /** Leeg = meteen zichtbaar / blijft zichtbaar. */
+  /**
+   * Leeg = meteen zichtbaar / blijft zichtbaar.
+   */
   startsAt DateTime?
   endsAt   DateTime?
-  /** Uit = nooit tonen, ongeacht het venster. */
-  active   Boolean   @default(true)
-  /** Waar ze mag verschijnen: enkel de homepage, of elke publieke pagina. */
+  /**
+   * Uit = nooit tonen, ongeacht het venster.
+   */
+  active   Boolean           @default(true)
+  /**
+   * Waar ze mag verschijnen: enkel de homepage, of elke publieke pagina.
+   */
   scope    AnnouncementScope @default(HOME)
 
   createdById String?
@@ -722,8 +731,8 @@ model Page {
   // bij (zie de migratie `search_vectors`); Prisma schrijft ze nooit zelf en
   // kent het type niet, dus ze staan hier enkel zodat schema en database niet
   // uiteenlopen. Bevraagd wordt er via ruwe SQL in `lib/search-server.ts`.
-  searchNl        Unsupported("tsvector")?
-  searchEn        Unsupported("tsvector")?
+  searchNl Unsupported("tsvector")?
+  searchEn Unsupported("tsvector")?
 
   headerTab   HeaderTab?       @relation(fields: [headerTabId], references: [id], onDelete: SetNull)
   createdBy   User?            @relation("PageCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
@@ -790,11 +799,11 @@ model CalendarEvent {
 
   // Zie de gelijknamige velden op `Page`: door een trigger onderhouden
   // zoekvectoren, enkel via ruwe SQL bevraagd.
-  searchNl      Unsupported("tsvector")?
-  searchEn      Unsupported("tsvector")?
+  searchNl Unsupported("tsvector")?
+  searchEn Unsupported("tsvector")?
 
-  group       Group        @relation(fields: [groupId], references: [id], onDelete: Cascade)
-  createdBy   User?        @relation("EventCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  group       Group                   @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  createdBy   User?                   @relation("EventCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
   ticketEvent TicketEvent?
   categories  CalendarEventCategory[]
 
@@ -825,23 +834,23 @@ enum CalendarAudience {
 }
 
 model CalendarCategory {
-  id            String  @id @default(cuid())
+  id                 String            @id @default(cuid())
   // Zit in de publieke URL en in de feed-URL, dus wijzigen breekt bestaande
   // abonnementen; daarom niet vrij bewerkbaar zodra hij in gebruik is.
-  slug          String  @unique
-  nameNl        String
-  nameEn        String
+  slug               String            @unique
+  nameNl             String
+  nameEn             String
   // Introtekst bovenaan de categoriepagina (Markdown), optioneel.
-  descriptionNl String?
-  descriptionEn String?
+  descriptionNl      String?
+  descriptionEn      String?
   // Hexkleur van het bolletje in de legende en van de eventpil in het raster.
-  colour        String  @default("#5C667F")
-  order         Int     @default(0)
+  colour             String            @default("#5C667F")
+  order              Int               @default(0)
   // NULL = gewoon thema. Anders: doelgroepcategorie, zie de enum hierboven.
-  audience      CalendarAudience?
+  audience           CalendarAudience?
   // Uit = de categorie bestaat nog (feed en pagina blijven werken) maar staat
   // niet meer tussen de filterchips op /kalender.
-  showOnCalendarPage Boolean @default(true)
+  showOnCalendarPage Boolean           @default(true)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1495,11 +1504,11 @@ model Setting {
 // -----------------------------------------------------------------------------
 
 model DashboardTile {
-  id    String @id @default(cuid())
-  label String
-  url   String
-  icon  String @default("link") // key into curated icon set
-  color String @default("navy") // key into color palette
+  id        String             @id @default(cuid())
+  label     String
+  url       String
+  icon      String             @default("link") // key into curated icon set
+  color     String             @default("navy") // key into color palette
   // Eigen logo in plaats van een pictogram (bv. het GitHub-logo). Wanneer dit
   // gezet is, wint het van `icon`; `icon` blijft staan zodat het terugvalt op
   // het gekozen pictogram wanneer de afbeelding verwijderd wordt.
@@ -1523,14 +1532,14 @@ model DashboardTile {
 // Per-user override of a shared (GLOBAL/GROUP) tile: hide it, reorder it, or
 // override its display fields. Personal (USER) tiles are edited directly.
 model UserDashboardTilePref {
-  userId String
-  tileId String
-  hidden Boolean @default(false)
-  order  Int?
-  label  String? // null = inherit from the default tile
-  url    String?
-  icon   String?
-  color  String?
+  userId       String
+  tileId       String
+  hidden       Boolean @default(false)
+  order        Int?
+  label        String? // null = inherit from the default tile
+  url          String?
+  icon         String?
+  color        String?
   // Eigen logo bovenop een gedeelde tegel. `imageCleared` onderscheidt "erf de
   // afbeelding van de standaardtegel" (null + false) van "ik wil hier bewust
   // geen afbeelding maar een pictogram" (null + true).
@@ -1705,16 +1714,16 @@ model TheokotSessionItem {
 
 /// Eén bestelling per persoon per sessie.
 model TheokotOrder {
-  id           String             @id @default(cuid())
-  sessionId    String
-  userId       String
-  status       TheokotOrderStatus @default(RESERVED)
-  totalCents   Int
-  statusNote   String? // vrije notitie bij correcties
-  createdAt    DateTime           @default(now())
-  updatedAt    DateTime           @updatedAt
-  pickedUpAt   DateTime?
-  pickedUpById String? // wie aan de balie op "opgehaald" drukte
+  id                String             @id @default(cuid())
+  sessionId         String
+  userId            String
+  status            TheokotOrderStatus @default(RESERVED)
+  totalCents        Int
+  statusNote        String? // vrije notitie bij correcties
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+  pickedUpAt        DateTime?
+  pickedUpById      String? // wie aan de balie op "opgehaald" drukte
   noShowProcessedAt DateTime? // mail + eventuele ban voor deze order afgewerkt
 
   session           TheokotSession            @relation(fields: [sessionId], references: [id], onDelete: Cascade)
@@ -1797,7 +1806,7 @@ model PianoWindow {
   labelEn String?
 
   /// ISO-weekdagen waarop dit venster geldt: 1 = maandag ... 7 = zondag.
-  weekdays Int[]
+  weekdays    Int[]
   /// Begin en einde als minuten sinds middernacht (Brussel-wandklok), zodat het
   /// venster in zomer- én winteruur op hetzelfde uur op de klok staat.
   startMinute Int
@@ -1885,6 +1894,12 @@ model UitleenItem {
   // (setContents) is louter beschrijvend en koppelt niet aan andere items.
   isSet Boolean @default(false)
 
+  /// Ruwe omvang, voor de ladingsinschatting per evenement (A8). Optioneel: het
+  /// is een hulpmiddel voor de transportverantwoordelijke, geen inventarisplicht.
+  /// Staat het niet ingevuld, dan toont het evenementscherm een itemtelling en
+  /// zegt het er expliciet bij dat het volume onvolledig is.
+  volumeLiters Int?
+
   // Locatie in de loods (schap/rek) en staat.
   //
   // `condition` geldt voor de hele rij en is informatief, behalve wanneer er
@@ -1898,17 +1913,17 @@ model UitleenItem {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  category    UitleenCategory?         @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  category      UitleenCategory?             @relation(fields: [categoryId], references: [id], onDelete: SetNull)
   lines         UitleenReservationLine[]
   templateLines UitleenRequestTemplateLine[]
   units         UitleenItemUnit[]
-  setContents UitleenSetContent[]
-  photos      UitleenItemPhoto[]
-  properties  UitleenItemProperty[]
-  downloads   UitleenItemDownload[]
+  setContents   UitleenSetContent[]
+  photos        UitleenItemPhoto[]
+  properties    UitleenItemProperty[]
+  downloads     UitleenItemDownload[]
   // Beide richtingen van de alternatieven-koppeling; zie UitleenItemAlternative.
-  alternatives  UitleenItemAlternative[] @relation("UitleenItemAlternatives")
-  alternativeOf UitleenItemAlternative[] @relation("UitleenItemAlternativeOf")
+  alternatives  UitleenItemAlternative[]     @relation("UitleenItemAlternatives")
+  alternativeOf UitleenItemAlternative[]     @relation("UitleenItemAlternativeOf")
 
   /// Zoekvector voor /zoeken, door een trigger bijgehouden (naam + omschrijving,
   /// dutch). Eén kolom: dit model heeft geen Engelse velden.
@@ -1990,6 +2005,44 @@ model UitleenSetContent {
   item UitleenItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
 
   @@index([itemId, sortIndex])
+}
+
+/// Koepel boven de aanvragen van hetzelfde evenement: materiaal, flesserke en
+/// vervoer hangen eronder.
+///
+/// **Optioneel, en bewust niet automatisch.** Elke aanvraag een evenement geven
+/// zou dit scherm een tweede aanvraaglijst maken, en de waarschuwing "nog geen
+/// vervoer aangevraagd" zou afgaan op elke uitlening van twee tafels. Een
+/// evenement ontstaat wanneer iemand er een maakt: het lid in het
+/// aanvraagformulier, het team op /beheer/evenementen, of het groeperingsscript
+/// voor de historiek. Zie docs/design-decisions.md.
+///
+/// De aanvragen houden hun eigen `eventName` als momentopname; die van het
+/// evenement wint in de weergave zodra ze eraan hangen.
+model UitleenEvent {
+  id       String    @id @default(cuid())
+  name     String
+  location String?
+  startAt  DateTime? @db.Timestamptz(3)
+
+  /// Post of werkgroep achter het evenement, en wie het aanmaakte.
+  groupId     String?
+  createdById String?
+
+  /// Vrije nota van het team ("materiaal blijft staan tot maandag").
+  note String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  group     Group? @relation(fields: [groupId], references: [id], onDelete: SetNull)
+  createdBy User?  @relation("UitleenEventCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+
+  reservations UitleenReservation[]
+  transport    UitleenTransportBooking[]
+
+  @@index([startAt])
+  @@index([groupId])
 }
 
 /// Een vaste set materiaal die vaak samen gevraagd wordt (een cantus, een BBQ).
@@ -2083,6 +2136,10 @@ model UitleenReservation {
   requesterName String?
 
   // Evenement-context (de Logi-werking vraagt aan per evenement).
+  //
+  // `eventId` is de optionele koepel (A8); `eventName` blijft de momentopname van
+  // wat het lid intikte, ook wanneer het evenement later hernoemd wordt.
+  eventId            String?
   eventName          String // verplicht: waarvoor het materiaal dient
   eventLocation      String?
   eventStart         DateTime? @db.Timestamptz(3) // startuur (opbouw) van het evenement
@@ -2129,11 +2186,14 @@ model UitleenReservation {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  user       User   @relation("UitleenReservationUser", fields: [userId], references: [id], onDelete: Cascade)
-  group      Group? @relation(fields: [groupId], references: [id], onDelete: SetNull)
-  decidedBy  User?  @relation("UitleenDecidedBy", fields: [decidedById], references: [id], onDelete: SetNull)
-  pickedUpBy User?  @relation("UitleenPickedUpBy", fields: [pickedUpById], references: [id], onDelete: SetNull)
-  returnedBy User?  @relation("UitleenReturnedBy", fields: [returnedById], references: [id], onDelete: SetNull)
+  user       User          @relation("UitleenReservationUser", fields: [userId], references: [id], onDelete: Cascade)
+  group      Group?        @relation(fields: [groupId], references: [id], onDelete: SetNull)
+  // Verdwijnt het evenement, dan blijven de aanvragen bestaan: ze zijn het echte
+  // werk, de koepel is enkel een groepering.
+  event      UitleenEvent? @relation(fields: [eventId], references: [id], onDelete: SetNull)
+  decidedBy  User?         @relation("UitleenDecidedBy", fields: [decidedById], references: [id], onDelete: SetNull)
+  pickedUpBy User?         @relation("UitleenPickedUpBy", fields: [pickedUpById], references: [id], onDelete: SetNull)
+  returnedBy User?         @relation("UitleenReturnedBy", fields: [returnedById], references: [id], onDelete: SetNull)
 
   lines          UitleenReservationLine[]
   flesserkeLines UitleenFlesserkeLine[]
@@ -2144,6 +2204,7 @@ model UitleenReservation {
   @@index([status, pickupDate])
   @@index([pickupDate, returnDate])
   @@index([requesterType, status])
+  @@index([eventId])
 }
 
 model UitleenReservationLine {
@@ -2181,19 +2242,19 @@ model UitleenReservationLine {
 /// Een voertuig van de transportdienst (kar, auto, bakfiets). Tarieven zijn
 /// team-configureerbaar, daarom DB-rijen i.p.v. een enum.
 model UitleenVehicle {
-  id          String             @id @default(cuid())
-  code        String             @unique // kar | auto | bakfiets
-  nameNl      String
-  nameEn      String
-  description String?
-  pricingMode UitleenPricingMode @default(FREE)
-  rateCents   Int                @default(0) // per uur / per km / vast, naargelang pricingMode
-  sortIndex   Int                @default(0)
-  active      Boolean            @default(true)
+  id                 String             @id @default(cuid())
+  code               String             @unique // kar | auto | bakfiets
+  nameNl             String
+  nameEn             String
+  description        String?
+  pricingMode        UitleenPricingMode @default(FREE)
+  rateCents          Int                @default(0) // per uur / per km / vast, naargelang pricingMode
+  sortIndex          Int                @default(0)
+  active             Boolean            @default(true)
   // Rijden met dit voertuig vraagt ervaring met de aanhangwagen. Een vlag per
   // voertuig en geen check op `code == "kar"`: het team voert zelf voertuigen in,
   // en een tweede kar zou anders stil buiten de regel vallen.
-  needsTrailerDriver Boolean @default(false)
+  needsTrailerDriver Boolean            @default(false)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -2211,11 +2272,11 @@ model UitleenVehicle {
 /// werkingsjaar-gescoped: hij wordt met de hand beheerd en resetten op 15 juli
 /// zou de ritten van de zomer zonder chauffeurs zetten.
 model UitleenDriver {
-  id        String  @id @default(cuid())
-  userId    String  @unique
+  id              String  @id @default(cuid())
+  userId          String  @unique
   // Vrije notitie van het team, bv. "rijbewijs B sinds 2023, rijdt niet met de kar".
-  note      String?
-  addedById String?
+  note            String?
+  addedById       String?
   // Rijdt ook met de aanhangwagen. Eén vlag en geen enum AUTO/KAR: elke
   // karchauffeur rijdt ook gewoon met de auto, dus die twee sluiten elkaar niet
   // uit. Leden van de post Logistiek hebben pas een rij hier zodra iemand deze
@@ -2251,7 +2312,8 @@ model UitleenTransportBooking {
   startAt DateTime @db.Timestamptz(3)
   endAt   DateTime @db.Timestamptz(3)
 
-  eventName     String? // vrije koppeling aan het evenement (geen FK)
+  eventId       String? // optionele koepel (A8)
+  eventName     String? // momentopname van wat het lid intikte
   purpose       String // waarvoor de rit dient
   pickupAddress String?
   destination   String?
@@ -2294,6 +2356,7 @@ model UitleenTransportBooking {
 
   user        User           @relation("UitleenTransportUser", fields: [userId], references: [id], onDelete: Cascade)
   vehicle     UitleenVehicle @relation(fields: [vehicleId], references: [id], onDelete: Restrict)
+  event       UitleenEvent?  @relation(fields: [eventId], references: [id], onDelete: SetNull)
   group       Group?         @relation(fields: [groupId], references: [id], onDelete: SetNull)
   driver      User?          @relation("UitleenTransportDriver", fields: [driverId], references: [id], onDelete: SetNull)
   decidedBy   User?          @relation("UitleenTransportDecidedBy", fields: [decidedById], references: [id], onDelete: SetNull)
@@ -2307,6 +2370,7 @@ model UitleenTransportBooking {
   @@index([startAt, endAt])
   @@index([vehicleId, status])
   @@index([requesterType, status])
+  @@index([eventId])
   @@index([tripGroupId])
   // "Mijn ritten" voor een chauffeur, en de rittentelling per chauffeur in het
   // chauffeursbeheer.
@@ -2638,19 +2702,19 @@ model Jwks {
 
 //SSO-provider
 model OauthClient {
-  id                      String              @id
-  clientId                String              @unique
+  id                      String    @id
+  clientId                String    @unique
   clientSecret            String?
   disabled                Boolean?
   skipConsent             Boolean?
   enableEndSession        Boolean?
   subjectType             String?
   scopes                  String[]
-  user                    User?               @relation(fields: [userId], references: [id])
+  user                    User?     @relation(fields: [userId], references: [id])
   userId                  String?
   referenceId             String?
-  createdAt               DateTime?           @db.Timestamptz(3)
-  updatedAt               DateTime?           @db.Timestamptz(3)
+  createdAt               DateTime? @db.Timestamptz(3)
+  updatedAt               DateTime? @db.Timestamptz(3)
   name                    String?
   uri                     String?
   icon                    String?
@@ -2674,15 +2738,15 @@ model OauthClient {
   /// niet in een aparte VTK-tabel: de poort draait op het hete pad van élke
   /// autorisatie en moet zonder join te beantwoorden zijn. De plugin negeert
   /// kolommen die ze niet kent.
-  accessMode              SsoAccessMode       @default(OPEN)
+  accessMode          SsoAccessMode @default(OPEN)
   /// Prefix waarop de permissiecodes van deze client gevalideerd worden
   /// ("wiki" -> wiki.read, wiki.access). Null zolang er geen vocabulaire is.
-  permissionNamespace     String?
+  permissionNamespace String?
 
-  oauthRefreshTokens      OauthRefreshToken[]
-  oauthAccessTokens       OauthAccessToken[]
-  oauthConsents           OauthConsent[]
-  clientPermissions       SsoClientPermission[]
+  oauthRefreshTokens OauthRefreshToken[]
+  oauthAccessTokens  OauthAccessToken[]
+  oauthConsents      OauthConsent[]
+  clientPermissions  SsoClientPermission[]
 
   @@map("oauthClient")
 }
@@ -2704,7 +2768,7 @@ model SsoClientPermission {
   /// De `<namespace>.access`-rij die toegang verleent tot een RESTRICTED client.
   /// Wordt automatisch aangemaakt en mag niet verwijderd worden zolang de client
   /// beperkt is: ze weghalen sluit iedereen buiten.
-  system Boolean @default(false)
+  system     Boolean @default(false)
   /// Verbergt de code in toekenningsformulieren maar laat bestaande
   /// toekenningen werken. Veiliger dan verwijderen; zie ontwerp 9.7.
   deprecated Boolean @default(false)
@@ -2863,8 +2927,8 @@ model SsoAuditLog {
   id        String   @id @default(cuid())
   createdAt DateTime @default(now()) @db.Timestamptz(3)
 
-  actor   User?   @relation(fields: [actorId], references: [id], onDelete: SetNull)
-  actorId String?
+  actor     User?   @relation(fields: [actorId], references: [id], onDelete: SetNull)
+  actorId   String?
   /// Naam op het moment van de actie. Los van de relatie, zodat de regel
   /// leesbaar blijft nadat het lid verwijderd is.
   actorName String
@@ -2876,7 +2940,7 @@ model SsoAuditLog {
   clientName String
 
   /// create | update | rotate-secret | enable | disable | delete | revoke-tokens
-  action String
+  action  String
   /// Korte, leesbare samenvatting, bv. "redirect-URI's gewijzigd".
   summary String?
 

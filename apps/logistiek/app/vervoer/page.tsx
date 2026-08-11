@@ -3,8 +3,8 @@ import { LoginGate } from '@/components/login-gate';
 import { PageShell } from '@/components/page-shell';
 import { getSession } from '@/lib/session';
 import { copy, getLocale } from '@/lib/i18n';
-import { pricingModeLabel, formatEuro } from '@/lib/uitleen';
-import { activeVehicles } from '@/lib/uitleen-server';
+import { eventOptions, pricingModeLabel, formatEuro } from '@/lib/uitleen';
+import { activeVehicles, selectableEvents } from '@/lib/uitleen-server';
 import { getPublicCopy } from '@/lib/public-copy';
 import { requesterOptions } from '@/app/materiaal/event-values';
 import { VanRequestForm } from './request-form';
@@ -17,7 +17,11 @@ export default async function VervoerPage() {
   }
   const en = locale === 'en';
 
-  const [vehicles, content] = await Promise.all([activeVehicles(), getPublicCopy(locale)]);
+  const [vehicles, content, events] = await Promise.all([
+    activeVehicles(),
+    getPublicCopy(locale),
+    selectableEvents(),
+  ]);
 
   return (
     <PageShell
@@ -39,6 +43,7 @@ export default async function VervoerPage() {
             rateCents: v.rateCents,
           }))}
           draftKey={`vervoer:${session.user.id}`}
+          events={eventOptions(events, locale)}
         />
 
         <aside className="h-fit rounded-[18px] border border-vtk-navy/10 bg-vtk-surface p-6">

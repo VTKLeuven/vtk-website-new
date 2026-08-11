@@ -43,6 +43,7 @@ e-mailproces (zie "How to logi"). Productkeuzes: `docs/design-decisions.md`
 | Model | Wat |
 | --- | --- |
 | `UitleenCategory` / `UitleenItem` | Catalogus. `isSet` + `UitleenSetContent` (vrije-tekst inhoud, telt niet apart mee), `photoKey`, locatie (`locationShelf`/`Rack`), `condition` (informatief zolang het item geen exemplaren heeft). Soft-delete via `active`. |
+| `UitleenEvent` | Optionele koepel boven materiaal-, flesserke- en vervoeraanvragen van hetzelfde evenement (A8). `onDelete: SetNull`: verwijderen is loskoppelen. |
 | `UitleenRequestTemplate` / `...Line` | Vaste set materiaal die het aanvraagformulier invult (M17). Beheerd door Logistiek; aanmaken gebeurt vanaf een bestaande aanvraag. |
 | `UitleenItemUnit` | Eén fysiek exemplaar met een eigen staat, optioneel per item. Bestaan er exemplaren, dan is `item.quantity` de telling van de bruikbare (actief en niet KAPOT), bijgehouden door `syncItemQuantityFromUnits`. |
 | `UitleenReservation` + `UitleenReservationLine` | Aanvraag met event-context + `requesterType` (+ `groupId`/`requesterName`), dagbereik, snapshots. Statusmachine `REQUESTED → APPROVED/REJECTED/CANCELLED → PICKED_UP → RETURNED`. Per lijn: `note` (M15) en `preparedAt`/`preparedById` (klaarzetten, A7). `pickupPart`/`returnPart` zijn een afspraak tussen mensen: de voorraad rekent op hele dagen. |
@@ -139,7 +140,9 @@ de same-origin `publicUrl`.
   voorraad), `lib/reservation-form.ts` (`buildReservationData`, gedeeld),
   `lib/uitleen-mail.ts` (mails naar de aanvrager), `lib/payments.ts`,
   `lib/runtime-config.ts`, `lib/storage.ts`, `lib/session.ts`.
-- **Scripts**: `scripts/import-inventaris.ts` (materiaal + flesserke uit de xlsx).
+- **Scripts**: `scripts/import-inventaris.ts` (materiaal + flesserke uit de xlsx),
+  `scripts/group-events.ts` (historische aanvragen onder een evenement groeperen;
+  dry-run tenzij `--apply`, via `npm run group:events -w @vtk/logistiek`).
 
 ## Env & infra
 

@@ -113,6 +113,24 @@ export function formatDateOnly(date: Date, locale: LogistiekLocale = 'nl'): stri
   }).format(date);
 }
 
+/**
+ * Evenementen klaarmaken voor de keuzelijst in het aanvraagformulier: de datum
+ * wordt hier al tekst. De picker is een client component, en een `Date` die de
+ * grens over gaat, komt daar als string aan; ze dan pas formatteren zou de
+ * server-timezone gebruiken in plaats van de Belgische.
+ */
+export function eventOptions(
+  events: Array<{ id: string; name: string; startAt: Date | null; groupName: string | null }>,
+  locale: LogistiekLocale = 'nl'
+): Array<{ id: string; name: string; startAt: string | null; groupName: string | null }> {
+  return events.map((event) => ({
+    id: event.id,
+    name: event.name,
+    groupName: event.groupName,
+    startAt: event.startAt ? formatDateOnly(event.startAt, locale) : null,
+  }));
+}
+
 export type ChangeSnapshot = {
   pickupDate: Date;
   returnDate: Date;

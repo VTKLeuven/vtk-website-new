@@ -3,7 +3,12 @@ import { PageShell } from '@/components/page-shell';
 import { getSession } from '@/lib/session';
 import { getLocale } from '@/lib/i18n';
 import { emptyEventValues, requesterOptions } from '@/app/materiaal/event-values';
-import { getFlesserkeCatalog, getLogistiekSettings } from '@/lib/uitleen-server';
+import {
+  getFlesserkeCatalog,
+  getLogistiekSettings,
+  selectableEvents,
+} from '@/lib/uitleen-server';
+import { eventOptions } from '@/lib/uitleen';
 import { FlesserkeForm } from './request-form';
 
 export default async function FlesserkePage() {
@@ -29,7 +34,11 @@ export default async function FlesserkePage() {
     );
   }
 
-  const [catalog, settings] = await Promise.all([getFlesserkeCatalog(), getLogistiekSettings()]);
+  const [catalog, settings, events] = await Promise.all([
+    getFlesserkeCatalog(),
+    getLogistiekSettings(),
+    selectableEvents(),
+  ]);
   const groups = requesterOptions(session.groups, locale);
 
   return (
@@ -58,6 +67,7 @@ export default async function FlesserkePage() {
           locale={locale}
           mode={{ kind: 'create' }}
           draftKey={`flesserke:${session.user.id}`}
+          events={eventOptions(events, locale)}
           initial={{
             event: emptyEventValues(groups),
             pickupDate: '',

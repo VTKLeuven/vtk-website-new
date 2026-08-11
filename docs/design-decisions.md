@@ -1215,6 +1215,40 @@ aan geen enkele groep. Dat is ledenbeheer op vtk.be (`/admin/werkgroepen`) en ge
 zaak van de uitleendienst; de gate opzetten zou het verbergen in plaats van het
 oplossen.
 
+### Evenement: een koepel die je zelf opzet, niet een die vanzelf ontstaat
+
+Materiaal, flesserke en vervoer van hetzelfde evenement kunnen onder één
+`UitleenEvent` hangen. Het beantwoordt één vraag die nergens anders te stellen
+was: "is voor dit evenement alles aangevraagd?".
+
+- **Een evenement ontstaat niet vanzelf.** Het plan stelde voor "nieuw evenement"
+  de default te maken in het aanvraagformulier. Dat is bewust niet gebeurd: dan
+  krijgt elke uitlening van twee tafels een evenement, wordt het evenementscherm
+  een tweede aanvraaglijst, en gaat de waarschuwing "nog geen vervoer
+  aangevraagd" af op alles. Er ontstaat er een wanneer iemand er een maakt: het
+  lid in het formulier ("maak hier een nieuw evenement van"), het team op
+  /beheer/evenementen, of het groeperingsscript voor de historiek.
+- **Het lid kan er zelf een maken**, en dat is nodig: de eerste aanvraag van een
+  evenement heeft nog niets om aan te hangen. Wachten tot het team er een aanmaakt
+  zou betekenen dat niemand het ooit gebruikt.
+- **De koepel is geen eigenaar.** De aanvragen houden hun eigen `eventName`,
+  datums en status; verwijder je het evenement, dan blijven ze bestaan
+  (`onDelete: SetNull`). Ze zijn het werk, de koepel is een groepering.
+- **Geen filter op post.** Elk evenement staat in de keuzelijst van elk lid: twee
+  posten die samen een evenement doen, moeten er allebei aan kunnen hangen, en dat
+  is precies waarvoor de koepel dient.
+- **De ladingsinschatting zegt wat ze niet weet.** `volumeLiters` is optioneel per
+  item, dus het scherm toont het gekende volume én hoeveel stuks er geen volume
+  hebben. Een half volume als "het totaal" tonen zou de transportverantwoordelijke
+  een te kleine kar laten kiezen.
+- **De historiek groepeert enkel wat samenhoort.** Het script
+  (`npm run group:events -w @vtk/logistiek`) clustert op genormaliseerde naam +
+  post + week, en laat clusters van één aanvraag met rust. Het draait standaard
+  als dry-run: een verkeerde groepering hangt aanvragen van twee posten onder één
+  naam, en dat is vervelender dan geen groepering.
+- **De losse overzichten blijven.** `/beheer/aanvragen` en `/beheer/vervoer` zijn
+  waar je beslist; het evenementscherm komt erbij en vervangt niets.
+
 ### Sjablonen maakt Logistiek, niet de posten
 
 Een vaste set materiaal (een cantus, een BBQ) staat als sjabloon in het

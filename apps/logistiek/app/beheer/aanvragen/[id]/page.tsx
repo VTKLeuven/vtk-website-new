@@ -14,6 +14,7 @@ import {
 import type { ActionResult } from '@/app/actions/uitleen';
 import { requesterOptions } from '@/app/materiaal/event-values';
 import { AuditTimeline } from '@/components/audit-timeline';
+import { EventLink } from '@/components/event-link';
 import { ConfirmActionButton } from '@/components/ui/confirm-action-button';
 import { ReservationStatusBadge } from '@/components/status-badge';
 import { requireManage } from '@/lib/session';
@@ -23,6 +24,7 @@ import {
   formatDateTime,
   formatDateWithPart,
   formatEuro,
+  eventOptions,
   itemLocation,
   REQUESTER_TYPE_LABELS,
   toDateInputValue,
@@ -32,6 +34,7 @@ import {
   activeGroups,
   adminReservation,
   reservationConflicts,
+  selectableEvents,
   getCatalog,
   getFlesserkeCatalog,
   getLogistiekSettings,
@@ -68,6 +71,8 @@ export default async function BeheerAanvraagDetailPage({
   // een goedgekeurde aanvraag is de voorraad al voor haar gereserveerd.
   const conflicts =
     reservation.status === 'REQUESTED' ? await reservationConflicts(reservation.id) : [];
+
+  const events = await selectableEvents();
 
   // Een aanvraag is materiaal- of flesserke-type; elk heeft zijn eigen editor,
   // want de lijnen en de voorraadcheck verschillen.
@@ -216,6 +221,14 @@ export default async function BeheerAanvraagDetailPage({
             ) : null}
             <ReservationStatusBadge status={reservation.status} />
           </div>
+        </div>
+
+        <div className="mt-4">
+          <EventLink
+            target={{ kind: 'reservation', id: reservation.id }}
+            events={eventOptions(events)}
+            current={reservation.event}
+          />
         </div>
 
         <dl className="mt-5 grid gap-x-8 gap-y-2 text-sm sm:grid-cols-2">

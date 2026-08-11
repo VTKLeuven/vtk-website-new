@@ -11,6 +11,7 @@ import {
 import { adminEditFlesserkeReservationAction } from '@/app/actions/beheer';
 import { FlesserkeItemName } from '@/components/flesserke-item-name';
 import { DayPartSelect } from '@/components/day-part-select';
+import { EventPicker, type SelectableEvent } from '@/components/event-picker';
 import { useFormDraft } from '@/lib/use-form-draft';
 import { formatDateTime } from '@/lib/uitleen';
 import { LastMinuteNotice } from '@/components/last-minute-notice';
@@ -42,6 +43,7 @@ export function FlesserkeForm({
   onCancel,
   lastMinuteDays,
   draftKey,
+  events,
 }: {
   catalog: FlesserkeCatalogCategory[];
   groups: RequesterOption[];
@@ -61,6 +63,8 @@ export function FlesserkeForm({
   onCancel?: () => void;
   /** Zie ReservationForm: lokaal concept, enkel bij een nieuwe aanvraag. */
   draftKey?: string;
+  /** Evenementen om deze aanvraag onder te hangen (A8). */
+  events?: SelectableEvent[];
 }) {
   const en = locale === 'en';
   const router = useRouter();
@@ -70,6 +74,7 @@ export function FlesserkeForm({
   const [returnDate, setReturnDate] = useState(initial.returnDate);
   const [note, setNote] = useState(initial.note);
   const [quantities, setQuantities] = useState<Record<string, number>>(initial.quantities);
+  const [eventLink, setEventLink] = useState({ eventId: '', createEvent: false });
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
@@ -137,6 +142,8 @@ export function FlesserkeForm({
         pickupDate,
         returnDate: returnDate || pickupDate,
         pickupPart,
+        eventId: eventLink.eventId || null,
+        createEvent: eventLink.createEvent,
         note,
         lines: [],
         flesserkeLines: Object.entries(quantities).map(([itemId, quantity]) => ({ itemId, quantity })),
@@ -193,6 +200,17 @@ export function FlesserkeForm({
         locale={locale}
         mode={mode.kind === 'admin-edit' ? 'team' : 'member'}
       />
+
+      {events ? (
+        <EventPicker
+          events={events}
+          eventId={eventLink.eventId}
+          createEvent={eventLink.createEvent}
+          onChange={setEventLink}
+          locale={locale}
+          newEventName={event.eventName}
+        />
+      ) : null}
 
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
         <div className="space-y-6">

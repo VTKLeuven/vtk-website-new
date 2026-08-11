@@ -15,6 +15,7 @@ const NAV_GROUPS: Array<{ label: string | null; items: Array<{ href: string; lab
     label: 'Uitleen',
     items: [
       { href: '/beheer/aanvragen', label: 'Aanvragen' },
+      { href: '/beheer/evenementen', label: 'Evenementen' },
       { href: '/beheer/materiaal', label: 'Inventaris' },
       { href: '/beheer/flesserke', label: 'Flesserke' },
     ],

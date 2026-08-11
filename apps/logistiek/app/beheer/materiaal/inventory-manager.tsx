@@ -30,6 +30,7 @@ const CATEGORY_ERRORS = { NAME_REQUIRED: 'Geef de categorie een naam.', STALE: S
 const ITEM_ERRORS = {
   NAME_REQUIRED: 'Geef het item een naam.',
   QUANTITY_INVALID: 'Het aantal moet minstens 1 zijn.',
+  VOLUME_INVALID: 'Het volume moet een heel getal in liter zijn.',
   AMOUNT_INVALID: 'Prijs en waarborg moeten bedragen zijn, bv. 2,50.',
   STALE: STALE_MESSAGE,
 };
@@ -156,6 +157,19 @@ function ItemFields({
         <label className="grid gap-1 text-xs font-medium text-vtk-muted">
           Waarborg (€)
           <input type="text" name="deposit" inputMode="decimal" placeholder="0,00" defaultValue={item ? centsToEuroInput(item.depositCents) : ''} className={inputClass} />
+        </label>
+        <label className="grid gap-1 text-xs font-medium text-vtk-muted">
+          Volume (liter)
+          {/* Optioneel: enkel om per evenement de lading in te schatten (A8). Geen
+              inventarisplicht; wat niet ingevuld is, telt daar als onbekend. */}
+          <input
+            type="number"
+            name="volumeLiters"
+            min={0}
+            defaultValue={item?.volumeLiters ?? ''}
+            placeholder="Optioneel"
+            className={inputClass}
+          />
         </label>
         <label className="grid gap-1 text-xs font-medium text-vtk-muted">
           Schap<input type="text" name="locationShelf" defaultValue={item?.locationShelf ?? ''} placeholder="Bv. 2R" className={inputClass} />

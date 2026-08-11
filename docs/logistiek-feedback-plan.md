@@ -33,7 +33,7 @@ verbetering, **P3** = groter of "ooit".
 | 4 | Materiaal: catalogus en aanvragen | M3, M4, M5, M6, M13, M15 | ✅ af 11 aug 2026 |
 | 5 | Vervoer | V2, V5, V8, V9, V12, V13 | ✅ af 11 aug 2026 |
 | 6 | Flesserke | F2, F3, F5, F6, F7 | ✅ af 11 aug 2026 |
-| 7 | Grote stukken | ~~A7~~, A8, ~~A9~~, ~~M1~~, ~~M2~~, ~~M12~~, ~~M17~~, ~~M18~~, ~~V1~~ | enkel A8 rest; de rest af 11 aug 2026 |
+| 7 | Grote stukken | A7, A8, A9, M1, M2, M12, M17, M18, V1 | ✅ af 11 aug 2026 |
 
 Vervallen: **M7** (gas wordt een gewoon catalogusitem, dus geen code) en **M16**
 (geen barcodes). Zie fase 0.
@@ -967,8 +967,30 @@ Wat er tijdens het werk bijkwam:
 - **Klaar wanneer:** een logikot-shift kan met de printjes werken én online
   afvinken, zonder dubbel werk.
 
-### A8. Alles onder één evenement
-**P3 · 🗄️ · code · beslist: B2 · grootste stuk**
+### A8. Alles onder één evenement ✅
+**P3 · 🗄️ · code · beslist: B2 · grootste stuk** · af op 11 augustus 2026
+
+Wat er tijdens het werk bijkwam:
+
+- **"Nieuw evenement" is niet de default geworden** (punt 5 van het plan). Elke
+  aanvraag een evenement geven maakt het evenementscherm een tweede
+  aanvraaglijst en laat de waarschuwing "nog geen vervoer aangevraagd" op elke
+  uitlening van twee tafels afgaan. Een evenement ontstaat nu wanneer iemand er
+  een maakt; het lid kan dat zelf in het formulier, want de eerste aanvraag heeft
+  anders niets om aan te hangen.
+- **Het groeperingsscript laat clusters van één aanvraag met rust**, om dezelfde
+  reden. Dry-run is de standaard, `--apply` schrijft.
+- **`volumeLiters` is optioneel gebleven** en het scherm zegt hoeveel stuks het
+  volume missen. Een half volume als totaal tonen is erger dan geen volume: dan
+  kiest de transportverantwoordelijke een te kleine kar.
+- **De aanvragen houden hun eigen `eventName`.** De koepel kan hernoemd of
+  verwijderd worden zonder dat de aanvraag verandert; `onDelete: SetNull` maakt
+  van verwijderen een loskoppeling.
+- **Koppelen vanuit het beheer staat op de detailpagina van de aanvraag**, niet op
+  het evenementscherm: daar zou je een lijst van alle losse aanvragen moeten tonen
+  om er een te vinden.
+- **Bij een rit gaat de hele groep mee** (heen en terug, meerdere voertuigen): die
+  horen sowieso bij elkaar.
 
 - **Nu:** `UitleenReservation` (materiaal + flesserke) en
   `UitleenTransportBooking` dragen elk hun eigen `eventName` als vrije tekst.

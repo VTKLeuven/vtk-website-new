@@ -549,6 +549,7 @@ const adminReservationInclude = {
   flesserkeLines: { include: { item: { select: { quantity: true } } } },
   user: { select: { id: true, name: true, email: true } },
   group: { select: { nameNl: true, nameEn: true } },
+  event: { select: { id: true, name: true } },
   payments: { orderBy: { createdAt: 'desc' as const } },
 } satisfies Prisma.UitleenReservationInclude;
 
@@ -822,6 +823,7 @@ export async function adminVanBookings() {
       driver: { select: { id: true, name: true } },
       vehicle: { select: { nameNl: true, nameEn: true } },
       group: { select: { nameNl: true, nameEn: true } },
+      event: { select: { id: true, name: true } },
       payments: { orderBy: { createdAt: 'desc' } },
     },
     take: 200,
@@ -1221,6 +1223,121 @@ export async function adminRequestTemplates() {
 }
 
 export type AdminRequestTemplate = Awaited<ReturnType<typeof adminRequestTemplates>>[number];
+
+// ---------------------------------------------------------------------------
+// Evenementen (A8): de optionele koepel boven materiaal, flesserke en vervoer
+// ---------------------------------------------------------------------------
+
+/** Wat een evenement bindt, met alles wat eronder hangt. */
+const eventInclude = {
+  group: { select: { nameNl: true } },
+  createdBy: { select: { name: true } },
+  reservations: {
+    orderBy: { pickupDate: 'asc' as const },
+    select: {
+      id: true,
+      status: true,
+      eventName: true,
+      pickupDate: true,
+      returnDate: true,
+      pickupPart: true,
+      returnPart: true,
+      user: { select: { name: true } },
+      lines: {
+        select: {
+          quantity: true,
+          itemName: true,
+          item: { select: { volumeLiters: true } },
+        },
+      },
+      flesserkeLines: { select: { quantity: true, itemName: true } },
+    },
+  },
+  transport: {
+    orderBy: { startAt: 'asc' as const },
+    select: {
+      id: true,
+      status: true,
+      purpose: true,
+      startAt: true,
+      endAt: true,
+      tripLeg: true,
+      vehicle: { select: { nameNl: true } },
+      driver: { select: { name: true } },
+    },
+  },
+} satisfies Prisma.UitleenEventInclude;
+
+export type AdminEvent = Prisma.UitleenEventGetPayload<{ include: typeof eventInclude }>;
+
+/**
+ * De evenementen, recentste startdatum eerst; evenementen zonder startdatum
+ * sorteren op aanmaakmoment. Bewust alles in één query: het scherm toont per
+ * evenement drie soorten aanvragen naast elkaar, en dat per rij ophalen zou
+ * tientallen queries kosten.
+ */
+export async function adminEvents(): Promise<AdminEvent[]> {
+  return prisma.uitleenEvent.findMany({
+    orderBy: [{ startAt: 'desc' }, { createdAt: 'desc' }],
+    include: eventInclude,
+    take: 200,
+  });
+}
+
+export async function adminEvent(id: string): Promise<AdminEvent | null> {
+  return prisma.uitleenEvent.findUnique({ where: { id }, include: eventInclude });
+}
+
+/**
+ * De ladingsinschatting van een evenement.
+ *
+ * `volumeLiters` is optioneel per item, dus het totaal is bijna altijd
+ * onvolledig. Daarom geven we allebei terug: het volume dat we kennen én het
+ * aantal stuks waarvan we het niet weten. Een half volume als "het totaal" tonen
+ * zou de transportverantwoordelijke een te kleine kar laten kiezen.
+ */
+export function eventLoad(event: AdminEvent): {
+  items: number;
+  liters: number;
+  unknownItems: number;
+} {
+  let items = 0;
+  let liters = 0;
+  let unknownItems = 0;
+  for (const reservation of event.reservations) {
+    // Een afgewezen of geannuleerde aanvraag gaat niet mee op de kar.
+    if (reservation.status === 'REJECTED' || reservation.status === 'CANCELLED') continue;
+    for (const line of reservation.lines) {
+      items += line.quantity;
+      if (line.item.volumeLiters === null) unknownItems += line.quantity;
+      else liters += line.item.volumeLiters * line.quantity;
+    }
+  }
+  return { items, liters, unknownItems };
+}
+
+/**
+ * Evenementen om een aanvraag aan te hangen: wat nog moet komen of net geweest
+ * is. Geen filter op post: twee posten die samen een evenement doen, moeten er
+ * allebei aan kunnen hangen, en dat is precies waarvoor de koepel dient.
+ */
+export async function selectableEvents(): Promise<
+  Array<{ id: string; name: string; startAt: Date | null; groupName: string | null }>
+> {
+  const horizon = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+  const events = await prisma.uitleenEvent.findMany({
+    where: { OR: [{ startAt: null }, { startAt: { gte: horizon } }] },
+    orderBy: [{ startAt: 'asc' }, { createdAt: 'desc' }],
+    take: 100,
+    select: { id: true, name: true, startAt: true, group: { select: { nameNl: true } } },
+  });
+  return events.map((event) => ({
+    id: event.id,
+    name: event.name,
+    startAt: event.startAt,
+    groupName: event.group?.nameNl ?? null,
+  }));
+}
 
 /**
  * Afhalingen, terugbrengmomenten en ritten in een periode, voor de daglijst.

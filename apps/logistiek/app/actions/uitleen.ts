@@ -66,6 +66,50 @@ async function deriveMemberRequester(
   return { requesterType: 'EXTERN', groupId: null, requesterName: session.user.name };
 }
 
+/**
+ * Het evenement waaraan deze aanvraag hangt, of null.
+ *
+ * `eventId` is wat het lid koos; `createEvent` betekent "maak er een van met de
+ * gegevens die ik net invulde", zodat de volgende aanvraag (het vervoer) eraan
+ * kan hangen zonder op het team te wachten. Een onbekend id negeren we stil: dan
+ * is het evenement intussen verwijderd, en de aanvraag zelf is belangrijker.
+ */
+async function resolveEventId(
+  session: SessionLike,
+  input: {
+    eventId?: string | null;
+    createEvent?: boolean;
+    eventName?: string;
+    eventLocation?: string;
+    eventStart?: string;
+  },
+  groupId: string | null
+): Promise<string | null> {
+  const chosen = (input.eventId ?? '').trim();
+  if (chosen) {
+    const found = await prisma.uitleenEvent.findUnique({
+      where: { id: chosen },
+      select: { id: true },
+    });
+    return found?.id ?? null;
+  }
+  if (!input.createEvent) return null;
+
+  const name = (input.eventName ?? '').trim();
+  if (!name) return null;
+  const created = await prisma.uitleenEvent.create({
+    data: {
+      name: name.slice(0, 200),
+      location: (input.eventLocation ?? '').trim().slice(0, 300) || null,
+      startAt: input.eventStart ? parseBrusselsDateTime(input.eventStart) : null,
+      groupId,
+      createdById: session.user.id,
+    },
+    select: { id: true },
+  });
+  return created.id;
+}
+
 export async function createReservationAction(input: ReservationFormInput): Promise<ActionResult> {
   const session = await requireSession();
   const requester = await deriveMemberRequester(session, input.groupId ?? undefined);
@@ -75,8 +119,14 @@ export async function createReservationAction(input: ReservationFormInput): Prom
   );
   if (!built.ok) return built;
 
+  const eventId = await resolveEventId(session, input, built.scalars.groupId);
   await prisma.uitleenReservation.create({
-    data: { userId: session.user.id, ...built.scalars, lines: { create: built.lineCreates } },
+    data: {
+      userId: session.user.id,
+      ...built.scalars,
+      eventId,
+      lines: { create: built.lineCreates },
+    },
   });
 
   revalidateMember();
@@ -144,8 +194,14 @@ export async function createFlesserkeReservationAction(input: ReservationFormInp
   );
   if (!built.ok) return built;
 
+  const eventId = await resolveEventId(session, input, built.scalars.groupId);
   await prisma.uitleenReservation.create({
-    data: { userId: session.user.id, ...built.scalars, flesserkeLines: { create: built.flesserkeLineCreates } },
+    data: {
+      userId: session.user.id,
+      ...built.scalars,
+      eventId,
+      flesserkeLines: { create: built.flesserkeLineCreates },
+    },
   });
 
   revalidateFlesserke();
@@ -290,6 +346,9 @@ export async function createVanBookingAction(input: {
   pickupAddress: string;
   destination: string;
   note: string;
+  /** Koepel-evenement (A8), of `createEvent` om er een te maken van `eventName`. */
+  eventId?: string | null;
+  createEvent?: boolean;
   /** Eén of meer voertuigen; `vehicleId` blijft aanvaard voor één voertuig. */
   vehicleIds?: string[];
   vehicleId?: string;
@@ -343,8 +402,14 @@ export async function createVanBookingAction(input: {
   }
 
   // Gedeelde velden van elke boeking; voertuig, tarief en tijdvenster verschillen.
+  const eventId = await resolveEventId(
+    session,
+    { ...input, eventStart: undefined },
+    null
+  );
   const shared = {
     userId: session.user.id,
+    eventId,
     purpose: purpose.slice(0, MAX_NOTE_LENGTH),
     eventName: input.eventName?.trim().slice(0, 300) || null,
     pickupAddress: input.pickupAddress.trim().slice(0, 300) || null,

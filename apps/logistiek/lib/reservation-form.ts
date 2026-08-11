@@ -32,6 +32,9 @@ export type ReservationFormInput = {
   returnDate: string;
   pickupPart?: string;
   returnPart?: string;
+  /** Koepel-evenement (A8); `createEvent` maakt er een van de eventvelden. */
+  eventId?: string | null;
+  createEvent?: boolean;
   notifyEmail?: string;
   note?: string;
   lines: ReservationLineInput[];

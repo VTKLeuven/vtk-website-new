@@ -172,6 +172,11 @@ export async function saveItemAction(_prev: SaveState, formData: FormData): Prom
     ? (conditionRaw as ItemCondition)
     : 'WERKT';
   const conditionNote = String(formData.get('conditionNote') ?? '').trim();
+  const volumeRaw = String(formData.get('volumeLiters') ?? '').trim();
+  const volumeLiters = volumeRaw === '' ? null : Number.parseInt(volumeRaw, 10);
+  if (volumeLiters !== null && (!Number.isInteger(volumeLiters) || volumeLiters < 0)) {
+    return saveError('VOLUME_INVALID');
+  }
   const isSet = String(formData.get('isSet') ?? '') === 'on';
   const setContents = isSet ? parseSetContents(formData.get('setContents')) : [];
   const photos = parseCatalogRows(formData.get('photos'), ['key']);
@@ -195,6 +200,7 @@ export async function saveItemAction(_prev: SaveState, formData: FormData): Prom
     locationRack: locationRack || null,
     condition,
     conditionNote: conditionNote || null,
+    volumeLiters,
     isSet,
   };
 
@@ -442,6 +448,100 @@ export async function activateItemAction(itemId: string): Promise<ActionResult> 
   await prisma.uitleenItem.update({ where: { id: itemId }, data: { active: true } });
   revalidateBeheer();
   return { ok: true, message: 'Item terug in de catalogus gezet.' };
+}
+
+// ---------------------------------------------------------------------------
+// Evenementen (A8)
+// ---------------------------------------------------------------------------
+
+function revalidateEvents() {
+  revalidatePath('/beheer/evenementen');
+  revalidatePath('/materiaal');
+  revalidatePath('/vervoer');
+  revalidatePath('/flesserke');
+}
+
+export async function saveEventAction(_prev: SaveState, formData: FormData): Promise<SaveState> {
+  const session = await requireManage();
+
+  const id = String(formData.get('eventId') ?? '').trim();
+  const name = String(formData.get('name') ?? '').trim();
+  const location = String(formData.get('location') ?? '').trim();
+  const startRaw = String(formData.get('startAt') ?? '').trim();
+  const note = String(formData.get('note') ?? '').trim();
+  if (!name) return saveError('NAME_REQUIRED');
+
+  const startAt = startRaw ? parseBrusselsDateTime(startRaw) : null;
+  if (startRaw && !startAt) return saveError('START_INVALID');
+
+  const data = {
+    name: name.slice(0, 200),
+    location: location.slice(0, 300) || null,
+    startAt,
+    note: note.slice(0, 1000) || null,
+  };
+
+  if (id) await prisma.uitleenEvent.update({ where: { id }, data });
+  else await prisma.uitleenEvent.create({ data: { ...data, createdById: session.user.id } });
+
+  revalidateBeheer();
+  revalidateEvents();
+  return saveOk();
+}
+
+/**
+ * Een aanvraag onder een evenement hangen, of ervan losmaken (`eventId` leeg).
+ *
+ * Werkt op materiaal-, flesserke- en vervoeraanvragen; bij een heen-en-terugrit
+ * of meerdere voertuigen gaat de hele groep mee, want die horen sowieso bij
+ * elkaar.
+ */
+export async function linkToEventAction(
+  target: { kind: 'reservation' | 'transport'; id: string },
+  eventId: string | null
+): Promise<ActionResult> {
+  await requireManage();
+
+  if (eventId) {
+    const exists = await prisma.uitleenEvent.findUnique({ where: { id: eventId }, select: { id: true } });
+    if (!exists) return { ok: false, error: 'Evenement niet gevonden.' };
+  }
+
+  if (target.kind === 'reservation') {
+    const updated = await prisma.uitleenReservation.updateMany({
+      where: { id: target.id },
+      data: { eventId },
+    });
+    if (updated.count === 0) return { ok: false, error: 'Aanvraag niet gevonden.' };
+  } else {
+    const booking = await prisma.uitleenTransportBooking.findUnique({
+      where: { id: target.id },
+      select: { tripGroupId: true },
+    });
+    if (!booking) return { ok: false, error: 'Rit niet gevonden.' };
+    await prisma.uitleenTransportBooking.updateMany({
+      where: booking.tripGroupId ? { tripGroupId: booking.tripGroupId } : { id: target.id },
+      data: { eventId },
+    });
+  }
+
+  revalidateBeheer();
+  revalidateEvents();
+  return { ok: true, message: eventId ? 'Aan het evenement gekoppeld.' : 'Losgekoppeld.' };
+}
+
+/**
+ * Het evenement verwijderen, niet wat eronder hangt.
+ *
+ * De aanvragen zijn het echte werk; de koepel is een groepering. `onDelete:
+ * SetNull` laat ze staan, en dat is ook wat de bevestigingstekst belooft.
+ */
+export async function deleteEventAction(eventId: string): Promise<ActionResult> {
+  await requireManage();
+  await prisma.uitleenEvent.delete({ where: { id: eventId } });
+  revalidateBeheer();
+  revalidateEvents();
+  return { ok: true, message: 'Evenement verwijderd; de aanvragen blijven bestaan.' };
 }
 
 // ---------------------------------------------------------------------------
