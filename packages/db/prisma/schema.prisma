@@ -405,6 +405,7 @@ model User {
   uitleenDecided          UitleenReservation[]      @relation("UitleenDecidedBy")
   uitleenPickedUp         UitleenReservation[]      @relation("UitleenPickedUpBy")
   uitleenReturned         UitleenReservation[]      @relation("UitleenReturnedBy")
+  uitleenLinesPrepared    UitleenReservationLine[]  @relation("UitleenLinePreparedBy")
   uitleenTransport        UitleenTransportBooking[] @relation("UitleenTransportUser")
   uitleenTransportDriven  UitleenTransportBooking[] @relation("UitleenTransportDriver")
   uitleenTransportDecided UitleenTransportBooking[] @relation("UitleenTransportDecidedBy")
@@ -2059,10 +2060,17 @@ model UitleenReservationLine {
   // notitievelden per lijn worden in de praktijk allebei half ingevuld.
   note String?
 
+  // Klaarzetten: afgevinkt door een shift in de loods, vóór het lid langskomt.
+  // Los van de status van de aanvraag: een aanvraag is pas afgehaald wanneer het
+  // lid er is, terwijl het klaarzetten daarvoor gebeurt en per lijn vordert.
+  preparedAt   DateTime?
+  preparedById String?
+
   reservation UitleenReservation @relation(fields: [reservationId], references: [id], onDelete: Cascade)
   // Items worden soft-deleted (active=false), nooit hard verwijderd zolang er
   // reservaties aan hangen.
   item        UitleenItem        @relation(fields: [itemId], references: [id], onDelete: Restrict)
+  preparedBy  User?              @relation("UitleenLinePreparedBy", fields: [preparedById], references: [id], onDelete: SetNull)
 
   @@index([reservationId])
   @@index([itemId])

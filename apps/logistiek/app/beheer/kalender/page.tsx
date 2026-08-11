@@ -180,9 +180,21 @@ export default async function BeheerKalenderPage({
         <div className="grid gap-5">
           {days.map(([key, entries]) => (
             <section key={key}>
-              <h3 className="text-sm font-semibold text-vtk-ink">
-                {formatDateOnly(new Date(`${key}T00:00:00.000Z`))}
-              </h3>
+              <div className="flex flex-wrap items-baseline justify-between gap-3">
+                <h3 className="text-sm font-semibold text-vtk-ink">
+                  {formatDateOnly(new Date(`${key}T00:00:00.000Z`))}
+                </h3>
+                {/* De hele shift op één stapel papier; enkel waar die dag ook
+                    echt iets af te halen valt. */}
+                {entries.some((entry) => entry.kind === 'afhaling') ? (
+                  <Link
+                    href={`/beheer/aanvragen/print?datum=${key}`}
+                    className="text-xs font-semibold text-vtk-navy underline decoration-vtk-yellow underline-offset-4"
+                  >
+                    Print alle afhalingen van deze dag
+                  </Link>
+                ) : null}
+              </div>
               <ul className="mt-2 grid gap-2">
                 {entries.map((entry, index) => (
                   <li key={index}>

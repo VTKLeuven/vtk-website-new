@@ -428,6 +428,43 @@ export async function rejectReservationAction(
   return saveOk();
 }
 
+/**
+ * Eén lijn af- of terug aanvinken bij het klaarzetten.
+ *
+ * Bewust per lijn en niet per aanvraag: een shift zet een aanvraag zelden in één
+ * keer klaar, en de volgende shift moet zien hoever de vorige raakte. Het schrijft
+ * geen historiekregel; twaalf regels "lijn afgevinkt" zouden de historiek van de
+ * aanvraag onleesbaar maken, en wie wat klaarzette staat al op de lijn zelf.
+ */
+export async function setLinePreparedAction(
+  lineId: string,
+  prepared: boolean
+): Promise<ActionResult> {
+  const session = await requireManage();
+
+  const line = await prisma.uitleenReservationLine.findUnique({
+    where: { id: lineId },
+    select: { reservation: { select: { id: true, status: true } } },
+  });
+  if (!line) return { ok: false, error: 'Lijn niet gevonden.' };
+  // Klaarzetten hoort bij een aanvraag die nog moet vertrekken. Na het
+  // terugbrengen is het vinkje geschiedenis, niet iets om nog te wijzigen.
+  if (line.reservation.status !== 'APPROVED' && line.reservation.status !== 'PICKED_UP') {
+    return { ok: false, error: 'Klaarzetten kan enkel bij een goedgekeurde aanvraag.' };
+  }
+
+  await prisma.uitleenReservationLine.update({
+    where: { id: lineId },
+    data: prepared
+      ? { preparedAt: new Date(), preparedById: session.user.id }
+      : { preparedAt: null, preparedById: null },
+  });
+
+  revalidatePath(`/beheer/aanvragen/${line.reservation.id}`);
+  revalidatePath('/beheer/aanvragen');
+  return { ok: true };
+}
+
 export async function markPickedUpAction(reservationId: string): Promise<ActionResult> {
   const session = await requireManage();
 
@@ -933,7 +970,15 @@ export async function adminEditReservationAction(
           pickupDate: true,
           returnDate: true,
           payments: { select: { status: true } },
-          lines: { select: { itemName: true, quantity: true } },
+          lines: {
+            select: {
+              itemId: true,
+              itemName: true,
+              quantity: true,
+              preparedAt: true,
+              preparedById: true,
+            },
+          },
         },
       });
       if (!existing) return { error: 'NOT_FOUND' };
@@ -967,10 +1012,30 @@ export async function adminEditReservationAction(
         }
       }
 
+      // De lijnen worden vervangen, dus ook een vinkje van het klaarzetten zou
+      // verdwijnen. Bij een lijn die niet veranderde (zelfde item, zelfde aantal)
+      // is dat verkeerd: het team dat enkel de datum verschoof, zou de halve
+      // loods opnieuw moeten afvinken. Wijzigt het aantal wél, dan klopt het
+      // vinkje niet meer en valt het bewust weg.
+      const preparedBefore = new Map(
+        existing.lines
+          .filter((line) => line.preparedAt !== null)
+          .map((line) => [`${line.itemId}:${line.quantity}`, line])
+      );
       await tx.uitleenReservationLine.deleteMany({ where: { reservationId } });
       await tx.uitleenReservation.update({
         where: { id: reservationId },
-        data: { ...built.scalars, lines: { create: built.lineCreates } },
+        data: {
+          ...built.scalars,
+          lines: {
+            create: built.lineCreates.map((line) => {
+              const kept = preparedBefore.get(`${line.itemId}:${line.quantity}`);
+              return kept
+                ? { ...line, preparedAt: kept.preparedAt, preparedById: kept.preparedById }
+                : line;
+            }),
+          },
+        },
       });
       // Wat er veranderde, niet hoeveel lijnen er overblijven: dit gaat zowel naar
       // de historiek als naar de mail aan de aanvrager.

@@ -1215,6 +1215,28 @@ aan geen enkele groep. Dat is ledenbeheer op vtk.be (`/admin/werkgroepen`) en ge
 zaak van de uitleendienst; de gate opzetten zou het verbergen in plaats van het
 oplossen.
 
+### Klaarzetten: het scherm is de waarheid, het papier de werkkopie
+
+Klaarzetten gebeurt per lijn (`preparedAt`/`preparedById` op
+`UitleenReservationLine`), tussen de goedkeuring en de afhaling. Waarom niet één
+knop "aanvraag klaargezet": een shift raakt zelden in één keer door een aanvraag,
+en de volgende shift moet zien hoever de vorige geraakte.
+
+- **Enkel materiaal, niet flesserke.** Een bak cola nemen is geen zoekwerk in de
+  loods, en flesserke wordt bij het terugbrengen afgerekend in plaats van
+  klaargezet. De teller ("7 van 12") telt dus de materiaallijnen.
+- **Het vinkje schrijft geen historiekregel.** Twaalf regels "lijn afgevinkt"
+  zouden de historiek van de aanvraag onleesbaar maken; wie wat klaarzette staat
+  al op de lijn zelf.
+- **Een team-edit behoudt het vinkje van een ongewijzigde lijn** (zelfde item,
+  zelfde aantal). De lijnen worden bij een edit vervangen, dus zonder dit zou het
+  team dat enkel de datum verschoof de halve loods opnieuw moeten afvinken.
+  Wijzigt het aantal wel, dan klopt het vinkje niet meer en valt het weg.
+- **Het printblad is een werkkopie.** Papier laat geen spoor na van wie wat
+  klaarzette, dus het scherm blijft de waarheid; het blad is er voor aan het rek.
+  Puur CSS `@media print`, geen PDF-generator: het is een afdruk van wat op het
+  scherm staat en geen document dat bewaard moet worden.
+
 ### Mail: vier momenten, en een meelezend adres
 
 De uitleendienst startte bewust zonder mails ("geen mails in v1"). Dat hield geen

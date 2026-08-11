@@ -500,7 +500,14 @@ export function hasSucceededPayment(payments: Array<{ status: string }>): boolea
 // ---------------------------------------------------------------------------
 
 const adminReservationInclude = {
-  lines: { include: { item: { select: { quantity: true, active: true } } } },
+  // Op naam, en niet in de volgorde die Postgres toevallig teruggeeft: zonder
+  // `orderBy` verspringt een lijn zodra ze aangepast wordt (de rij verhuist in de
+  // heap), en dan schuift de klaarzetlijst onder je handen weg terwijl je aan het
+  // afvinken bent.
+  lines: {
+    include: { item: { select: { quantity: true, active: true } } },
+    orderBy: { itemName: 'asc' as const },
+  },
   flesserkeLines: { include: { item: { select: { quantity: true } } } },
   user: { select: { id: true, name: true, email: true } },
   group: { select: { nameNl: true, nameEn: true } },
@@ -527,10 +534,35 @@ const auditLogInclude = {
   include: { actor: { select: { name: true } } },
 };
 
+/**
+ * De detailpagina heeft per lijn meer nodig dan de lijst: waar het item ligt (de
+ * klaarzetlijst en het printblad) en wie het al klaarzette. Dat hangt hier en
+ * niet in `adminReservationInclude`, want die haalt tweehonderd aanvragen op en
+ * betaalt die extra kolommen dan tweehonderd keer voor niets.
+ */
+const adminReservationLinesDetail = {
+  include: {
+    item: {
+      select: {
+        quantity: true,
+        active: true,
+        locationShelf: true,
+        locationRack: true,
+      },
+    },
+    preparedBy: { select: { name: true } },
+  },
+  orderBy: { itemName: 'asc' as const },
+} satisfies Prisma.UitleenReservation$linesArgs;
+
 export async function adminReservation(id: string) {
   return prisma.uitleenReservation.findUnique({
     where: { id },
-    include: { ...adminReservationInclude, auditLogs: auditLogInclude },
+    include: {
+      ...adminReservationInclude,
+      lines: adminReservationLinesDetail,
+      auditLogs: auditLogInclude,
+    },
   });
 }
 

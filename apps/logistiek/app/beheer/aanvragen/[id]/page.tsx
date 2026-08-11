@@ -22,6 +22,7 @@ import {
   formatDateOnly,
   formatDateTime,
   formatEuro,
+  itemLocation,
   REQUESTER_TYPE_LABELS,
   toDateInputValue,
   toDatetimeLocalValue,
@@ -38,6 +39,7 @@ import {
 import { AdminFlesserkeEditor } from './admin-flesserke-form';
 import { AdminReservationEditor } from './admin-edit-form';
 import { DecisionForms } from './decision-forms';
+import { PrepareList } from './prepare-list';
 import { ReturnForm } from './return-form';
 
 export default async function BeheerAanvraagDetailPage({
@@ -70,6 +72,13 @@ export default async function BeheerAanvraagDetailPage({
         getLogistiekSettings(),
       ])
     : [[], [], [], { showRentPrices: false, lastMinuteDays: DEFAULT_LAST_MINUTE_DAYS }];
+
+  // Klaarzetten gebeurt tussen goedkeuring en afhaling. Bij een aanvraag die nog
+  // beslist moet worden is er niets om klaar te zetten, en na het terugbrengen is
+  // het vinkje geschiedenis.
+  const preparable =
+    reservation.lines.length > 0 &&
+    (reservation.status === 'APPROVED' || reservation.status === 'PICKED_UP');
 
   const paidOnline = hasSucceededPayment(reservation.payments);
   const paid = paidOnline || reservation.paidOfflineAt !== null;
@@ -155,7 +164,17 @@ export default async function BeheerAanvraagDetailPage({
               {reservation.user.name} · {reservation.user.email}
             </p>
           </div>
-          <ReservationStatusBadge status={reservation.status} />
+          <div className="flex items-center gap-3">
+            {reservation.lines.length > 0 || reservation.flesserkeLines.length > 0 ? (
+              <Link
+                href={`/beheer/aanvragen/${reservation.id}/print`}
+                className="rounded-full border border-vtk-navy/15 px-3.5 py-1.5 text-sm font-medium text-vtk-ink transition hover:border-vtk-navy/40"
+              >
+                Printblad
+              </Link>
+            ) : null}
+            <ReservationStatusBadge status={reservation.status} />
+          </div>
         </div>
 
         <dl className="mt-5 grid gap-x-8 gap-y-2 text-sm sm:grid-cols-2">
@@ -237,7 +256,9 @@ export default async function BeheerAanvraagDetailPage({
           ) : null}
         </dl>
 
-        {reservation.lines.length > 0 ? (
+        {/* Zodra er klaargezet kan worden, is de klaarzetlijst hieronder dezelfde
+            lijst met vinkjes erbij; ze twee keer tonen leest als twee lijsten. */}
+        {reservation.lines.length > 0 && !preparable ? (
           <>
             <h3 className="mt-6 text-sm font-semibold text-vtk-ink">Materiaal</h3>
             <ul className="mt-2 divide-y divide-vtk-navy/10">
@@ -267,6 +288,25 @@ export default async function BeheerAanvraagDetailPage({
               })}
             </ul>
           </>
+        ) : null}
+
+        {/* Klaarzetten hoort bij een aanvraag die goedgekeurd is en nog moet
+            vertrekken; daarna is de lijst geschiedenis en staat ze hierboven. */}
+        {preparable ? (
+          <PrepareList
+            lines={reservation.lines.map((line) => ({
+              id: line.id,
+              itemName: line.itemName,
+              quantity: line.quantity,
+              note: line.note,
+              location: itemLocation(line.item),
+              preparedLabel: line.preparedAt
+                ? `Klaargezet op ${formatDateTime(line.preparedAt)}${
+                    line.preparedBy ? ` door ${line.preparedBy.name}` : ''
+                  }`
+                : null,
+            }))}
+          />
         ) : null}
 
         {reservation.flesserkeLines.length > 0 ? (

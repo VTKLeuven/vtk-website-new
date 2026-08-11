@@ -33,7 +33,7 @@ verbetering, **P3** = groter of "ooit".
 | 4 | Materiaal: catalogus en aanvragen | M3, M4, M5, M6, M13, M15 | ✅ af 11 aug 2026 |
 | 5 | Vervoer | V2, V5, V8, V9, V12, V13 | ✅ af 11 aug 2026 |
 | 6 | Flesserke | F2, F3, F5, F6, F7 | ✅ af 11 aug 2026 |
-| 7 | Grote stukken | A7, A8, ~~A9~~, M1, M2, M12, M17, M18, V1 | bezig; A9 af 11 aug 2026 |
+| 7 | Grote stukken | ~~A7~~, A8, ~~A9~~, M1, M2, M12, M17, M18, V1 | bezig; A7 + A9 af 11 aug 2026 |
 
 Vervallen: **M7** (gas wordt een gewoon catalogusitem, dus geen code) en **M16**
 (geen barcodes). Zie fase 0.
@@ -914,8 +914,28 @@ Wat er tijdens het werk bijkwam:
 - **Klaar wanneer:** een aanvrager weet zonder in te loggen dat zijn aanvraag
   gewijzigd is, en de werkgroepmailbox weet het mee.
 
-### A7. Materiaal klaarzetten: afvinken en afdrukken
-**P2 · 🗄️ · code · beslist: B1**
+### A7. Materiaal klaarzetten: afvinken en afdrukken ✅
+**P2 · 🗄️ · code · beslist: B1** · af op 11 augustus 2026
+
+Wat er tijdens het werk bijkwam:
+
+- **`prepareNote` is er niet gekomen.** De lijn-nota uit M15 dekt het volledig, en
+  het plan gaf zelf al aan dat de twee overlappen; twee notitievelden per lijn
+  worden in de praktijk allebei half ingevuld.
+- **Twee bugs die pas bij het klikken zichtbaar werden.** De lijnen hadden geen
+  `orderBy`, dus een afgevinkte lijn sprong naar onderen (de rij verhuist in de
+  heap na een update): dat schuift de lijst weg onder de handen van wie staat af
+  te vinken. En de doorhaling van een klaargezette lijn erfde door naar de
+  plaatscode, wat leest als een plaats die niet meer klopt.
+- **Een team-edit wist de vinkjes.** De edit vervangt de lijnen, dus wie enkel de
+  datum verschoof, mocht opnieuw beginnen. Een lijn die niet veranderde (zelfde
+  item, zelfde aantal) behoudt nu haar vinkje.
+- **De gewone materiaallijst verdwijnt zodra er klaargezet kan worden**, want de
+  klaarzetlijst is diezelfde lijst met vinkjes erbij; twee keer tonen leest als
+  twee lijsten.
+- **De print-CSS staat in `globals.css`, niet als `print:hidden` per component.**
+  Header, voetnoot en beheernavigatie horen op geen enkele afdruk thuis, van welke
+  pagina ook.
 
 - **Raakt:** `packages/db/prisma/schema.prisma`
   (`UitleenReservationLine`), `app/beheer/aanvragen/[id]/`, nieuwe printroute.

@@ -43,7 +43,7 @@ e-mailproces (zie "How to logi"). Productkeuzes: `docs/design-decisions.md`
 | Model | Wat |
 | --- | --- |
 | `UitleenCategory` / `UitleenItem` | Catalogus. `isSet` + `UitleenSetContent` (vrije-tekst inhoud, telt niet apart mee), `photoKey`, locatie (`locationShelf`/`Rack`), `condition` (informatief). Soft-delete via `active`. |
-| `UitleenReservation` + `UitleenReservationLine` | Aanvraag met event-context + `requesterType` (+ `groupId`/`requesterName`), dagbereik, snapshots. Statusmachine `REQUESTED → APPROVED/REJECTED/CANCELLED → PICKED_UP → RETURNED`. |
+| `UitleenReservation` + `UitleenReservationLine` | Aanvraag met event-context + `requesterType` (+ `groupId`/`requesterName`), dagbereik, snapshots. Statusmachine `REQUESTED → APPROVED/REJECTED/CANCELLED → PICKED_UP → RETURNED`. Per lijn: `note` (M15) en `preparedAt`/`preparedById` (klaarzetten, A7). |
 | `UitleenVehicle` | Voertuig (kar/auto/bakfiets); `pricingMode` (FREE/PER_HOUR/PER_KM/FLAT) + `rateCents`, team-configureerbaar. |
 | `UitleenTransportBooking` | Rit met voertuig, tijdvenster, chauffeur, tarief-snapshot, `kilometers`/`priceCents` (nullable). |
 | `UitleenDriver` | Chauffeur die het team zelf toevoegt (uniek per `userId`, met notitie en `addedById`). Niet werkingsjaar-gescoped; verwijderen laat toegewezen ritten staan. |
@@ -125,7 +125,8 @@ de same-origin `publicUrl`.
   ("Mijn ritten" voor een chauffeur; link in de header en een banner op de hub,
   enkel voor wie chauffeur is of nog een rit heeft staan).
 - **Beheer** (`app/beheer/`): `aanvragen/` (tabs, last-minute, decision/edit/
-  return-forms), `vervoer/` (decision + controls: chauffeur, voertuigwissel, km;
+  return-forms, klaarzetlijst per lijn + printblad `[id]/print` en dag-afdruk
+  `print?datum=`), `vervoer/` (decision + controls: chauffeur, voertuigwissel, km;
   `driver-select.tsx` groepeert de chauffeurs per bron), `chauffeurs/`
   (chauffeurslijst + user-picker op vtk.be-leden), `materiaal/` (inventaris +
   set-editor + foto-upload), `flesserke/` (stockscherm met inline voorraad +

@@ -23,6 +23,21 @@ export function formatPriceCents(
 }
 
 /**
+ * Waar een item in de loods ligt, als één regel ("2R · A1"). Enkel voor het team:
+ * schap en rek zijn achter `logistiek.manage` verborgen (zie M6 en
+ * docs/design-decisions.md).
+ */
+export function itemLocation(item: {
+  locationShelf: string | null;
+  locationRack: string | null;
+}): string | null {
+  const parts = [item.locationShelf, item.locationRack]
+    .map((part) => part?.trim())
+    .filter((part): part is string => Boolean(part));
+  return parts.length > 0 ? parts.join(' · ') : null;
+}
+
+/**
  * Ziet dit eruit als een e-mailadres? Bewust minimaal: het adres wordt enkel in
  * kopie gezet, en een strengere regex weigert vroeg of laat een geldig adres.
  * Of het bestaat, weten we pas als de mailserver het aanneemt.
