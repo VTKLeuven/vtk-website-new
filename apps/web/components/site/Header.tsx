@@ -6,6 +6,8 @@ import { getDictionary, pick, type Locale } from '@vtk/i18n';
 import { entryForDate, isClosedHours } from '@/components/editorial/hoursUtils';
 import { getVisibleHeaderTabsForNav } from '@/lib/headerTabs';
 import { getCurrentSession } from '@/lib/session';
+import { hasPermission } from '@vtk/auth';
+import { hasPendingMeetingNotice } from '@/lib/meetings-server';
 import { EditorialNavLinks } from './EditorialNavLinks';
 import { LocaleSwitcher } from './LocaleSwitcher';
 import { ProfileMenu } from './ProfileMenu';
@@ -46,6 +48,14 @@ export async function Header({ locale }: { locale: Locale }) {
   const dict = getDictionary(locale);
   const base = locale === 'nl' ? '' : '/en';
   const loginLabel = dict.header.login;
+
+  // De grocomeet-ingang hangt in het profielmenu en niet in de navigatie: ze
+  // geldt maar voor de postverantwoordelijken en Groep 5. De stip erbij verschijnt
+  // enkel wanneer een reservatie ongeldig werd en er opnieuw gekozen moet worden.
+  const canReserveGrocomeet = hasPermission(session, 'grocomeet.reserve');
+  const grocomeetNeedsAttention = canReserveGrocomeet
+    ? await hasPendingMeetingNotice(session!.user.id, now)
+    : false;
 
   const theokot = theokotRow?.value as OpeningHoursSetting | undefined;
   const theoToday = theokot ? entryForDate(theokot.entries, now, locale) : undefined;
@@ -139,9 +149,13 @@ export async function Header({ locale }: { locale: Locale }) {
             <ProfileMenu
               name={session.user.name}
               isAdmin={session.user.isSuperAdmin || session.permissions.length > 0}
+              canReserveGrocomeet={canReserveGrocomeet}
+              grocomeetNeedsAttention={grocomeetNeedsAttention}
               labels={{
                 myAccount: dict.header.myAccount,
                 admin: dict.header.admin,
+                grocomeet: dict.header.grocomeet,
+                grocomeetAttention: dict.header.grocomeetAttention,
                 logout: dict.header.logout,
               }}
               base={base}

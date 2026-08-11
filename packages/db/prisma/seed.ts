@@ -268,6 +268,51 @@ async function main() {
   await setRolePermissions(theokotRole.id, ["theokot.manage", "theokot.pickup"]);
   await grantRoleToGroup("THEOKOT", theokotRole.id, "DEFAULT");
 
+  // grocomeet-deelnemer: wie een broodje mag reserveren voor de GM. Dat zijn de
+  // verantwoordelijken van elke post (LEADER-grant, dus niet elk postlid) plus
+  // elk lid van Groep 5. Het reserveren hangt bewust aan een rol en niet aan een
+  // harde check op "is lead van een praesidiumpost": zo kan het beheer er iemand
+  // los bij zetten (een medeverantwoordelijke) zonder code te wijzigen.
+  const grocomeetRole = await upsertRole(
+    "grocomeet-deelnemer",
+    "Grocomeet",
+    "Grocomeet",
+    6,
+    "Een broodje en drankje reserveren voor de grocomeet.",
+    "Reserve a sandwich and a drink for the grocomeet.",
+  );
+  await setRolePermissions(grocomeetRole.id, ["grocomeet.reserve"]);
+  for (const g of GROUP_SEEDS) {
+    await grantRoleToGroup(g.code, grocomeetRole.id, "LEADER");
+  }
+  await grantRoleToGroup("GROEP5", grocomeetRole.id, "DEFAULT");
+
+  // De planning en het geldoverzicht van de GM horen bij Groep 5; Groep 5 heeft
+  // via de admin-rol al alle rechten, dus dit is enkel de expliciete rol voor wie
+  // ze later los wil toekennen (bv. de penningmeester van een werkgroep).
+  const grocomeetManageRole = await upsertRole(
+    "grocomeet-beheer",
+    "Grocomeet-beheer",
+    "Grocomeet management",
+    7,
+    "Grocomeets plannen en bijhouden wie wat verschuldigd is.",
+    "Plan grocomeets and keep track of who owes what.",
+  );
+  await setRolePermissions(grocomeetManageRole.id, ["grocomeet.manage", "grocomeet.reserve"]);
+  await grantRoleToGroup("GROEP5", grocomeetManageRole.id, "DEFAULT");
+
+  // bureau: de tweewekelijkse onderwijsvergadering, beheerd door Onderwijs.
+  const bureauRole = await upsertRole(
+    "bureau",
+    "Bureau",
+    "Bureau",
+    8,
+    "VTK Bureaus plannen, het aanbod instellen en de totalen opvolgen.",
+    "Plan VTK Bureaus, set the offering and follow up the totals.",
+  );
+  await setRolePermissions(bureauRole.id, ["bureau.manage"]);
+  await grantRoleToGroup("ONDERWIJS", bureauRole.id, "DEFAULT");
+
   // logistiek: de uitleendienst op logistiek.vtk.be beheren.
   const logistiekRole = await upsertRole(
     "logistiek",

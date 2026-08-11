@@ -138,7 +138,35 @@ export async function sendMail(
   }
 }
 
-type NoShowMailUser = { name: string; email: string; locale: 'NL' | 'EN' };
+type MailUser = { name: string; email: string; locale: 'NL' | 'EN' };
+
+/**
+ * Bericht dat een gereserveerd broodje voor een grocomeet of bureau niet meer
+ * kan: het aanbod van die verkoopdag is gewijzigd of Theokot is dicht. Vertelt
+ * meteen waar er opnieuw gekozen kan worden, want een melding zonder uitweg
+ * laat iemand met lege handen achter.
+ */
+export async function sendMeetingReservationInvalidated(
+  user: MailUser,
+  meeting: { meetingLabel: string; dateLabel: string; reason: string; path: string },
+): Promise<void> {
+  const nl = user.locale !== 'EN';
+  const base = (
+    process.env.TICKETING_PUBLIC_URL?.trim() ||
+    process.env.VTK_MAIN_URL?.trim() ||
+    'https://vtk.be'
+  ).replace(/\/$/, '');
+  const url = `${base}${meeting.path}`;
+  const subject = nl
+    ? `${meeting.meetingLabel}: je broodje van ${meeting.dateLabel} kan niet meer`
+    : `${meeting.meetingLabel}: your sandwich for ${meeting.dateLabel} is no longer available`;
+  const text = nl
+    ? `Dag ${user.name},\n\nJe reserveerde een broodje voor de ${meeting.meetingLabel} van ${meeting.dateLabel}, maar dat kan niet meer: ${meeting.reason}\n\nKies een ander broodje (of enkel een drankje) op ${url}\n\nGroeten,\nVTK`
+    : `Hi ${user.name},\n\nYou reserved a sandwich for the ${meeting.meetingLabel} of ${meeting.dateLabel}, but it is no longer possible: ${meeting.reason}\n\nPick another sandwich (or just a drink) at ${url}\n\nRegards,\nVTK`;
+  await sendMail({ to: user.email, subject, text }, { throwOnError: true });
+}
+
+type NoShowMailUser = MailUser;
 
 /** Waarschuwingsmail wanneer iemand zijn broodje(s) niet is komen ophalen. */
 export async function sendNoShowWarning(

@@ -39,9 +39,11 @@ export default async function TurflijstPage({
 
   const selected = allSessions.find((s) => ymd(s.date) === date) ?? allSessions[0];
 
-  let items: Array<{ name: string; reserved: number }> = [];
+  type TurfRow = { name: string; students: number; grocomeet: number; bureau: number };
+  let items: TurfRow[] = [];
   let totalOrders = 0;
   let sessionDate: Date | null = null;
+  const meetingDrinks: Array<{ label: string; drinks: Array<{ name: string; count: number }> }> = [];
 
   if (selected) {
     const full = await prisma.theokotSession.findUnique({
@@ -54,17 +56,66 @@ export default async function TurflijstPage({
     if (full) {
       sessionDate = full.date;
       totalOrders = full._count.orders;
-      const used = await prisma.theokotOrderLine.groupBy({
-        by: ["sessionItemId"],
-        where: { sessionItem: { sessionId: full.id } },
-        _sum: { quantity: true },
-      });
+
+      // De broodjes van de grocomeet en het bureau gaan in een aparte doos, dus
+      // ze krijgen hun eigen kolom in plaats van in het studentenaantal te
+      // verdwijnen. Ze hangen aan hetzelfde aanbod-item.
+      const dayStart = new Date(full.date);
+      const dayEnd = new Date(dayStart.getTime() + 86400000);
+      const [used, reservations] = await Promise.all([
+        prisma.theokotOrderLine.groupBy({
+          by: ["sessionItemId"],
+          where: { sessionItem: { sessionId: full.id } },
+          _sum: { quantity: true },
+        }),
+        prisma.meetingReservation.findMany({
+          where: {
+            status: "ACTIVE",
+            meeting: { startsAt: { gte: dayStart, lt: dayEnd } },
+          },
+          include: { meeting: { select: { kind: true, startsAt: true } } },
+        }),
+      ]);
+
       const usedMap = new Map(used.map((u) => [u.sessionItemId, u._sum.quantity ?? 0]));
+      const meetingCounts = new Map<string, { grocomeet: number; bureau: number }>();
+      for (const reservation of reservations) {
+        if (!reservation.sessionItemId) continue;
+        const row = meetingCounts.get(reservation.sessionItemId) ?? { grocomeet: 0, bureau: 0 };
+        if (reservation.meeting.kind === "GROCOMEET") row.grocomeet += 1;
+        else row.bureau += 1;
+        meetingCounts.set(reservation.sessionItemId, row);
+      }
+
       items = full.items
-        .map((i) => ({ name: nl ? i.nameNl : i.nameEn ?? i.nameNl, reserved: usedMap.get(i.id) ?? 0 }))
-        .filter((i) => i.reserved > 0);
+        .map((i) => ({
+          name: nl ? i.nameNl : i.nameEn ?? i.nameNl,
+          students: usedMap.get(i.id) ?? 0,
+          grocomeet: meetingCounts.get(i.id)?.grocomeet ?? 0,
+          bureau: meetingCounts.get(i.id)?.bureau ?? 0,
+        }))
+        .filter((i) => i.students + i.grocomeet + i.bureau > 0);
+
+      // De drankjes horen in dezelfde doos, dus ze staan op hetzelfde blad.
+      for (const kind of ["GROCOMEET", "BUREAU"] as const) {
+        const drinks = new Map<string, number>();
+        for (const reservation of reservations) {
+          if (reservation.meeting.kind !== kind || !reservation.drinkName) continue;
+          drinks.set(reservation.drinkName, (drinks.get(reservation.drinkName) ?? 0) + 1);
+        }
+        if (drinks.size === 0) continue;
+        meetingDrinks.push({
+          label: kind === "GROCOMEET" ? "Grocomeet" : "VTK Bureau",
+          drinks: [...drinks.entries()]
+            .map(([name, count]) => ({ name, count }))
+            .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name)),
+        });
+      }
     }
   }
+
+  const hasGrocomeet = items.some((i) => i.grocomeet > 0);
+  const hasBureau = items.some((i) => i.bureau > 0);
 
   return (
     <div className="space-y-5">
@@ -133,7 +184,10 @@ export default async function TurflijstPage({
               <thead>
                 <tr>
                   <th>{nl ? "Broodje" : "Sandwich"}</th>
-                  <th className="num">{nl ? "Gereserveerd" : "Reserved"}</th>
+                  <th className="num">{nl ? "Studenten" : "Students"}</th>
+                  {hasGrocomeet && <th className="num">GM</th>}
+                  {hasBureau && <th className="num">{nl ? "Bureau" : "Bureau"}</th>}
+                  <th className="num">{nl ? "Totaal" : "Total"}</th>
                   <th className="tally">{nl ? "Gemaakt (turven)" : "Made (tally)"}</th>
                   <th className="check">✓</th>
                 </tr>
@@ -142,7 +196,10 @@ export default async function TurflijstPage({
                 {items.map((i) => (
                   <tr key={i.name}>
                     <td>{i.name}</td>
-                    <td className="num">{i.reserved}</td>
+                    <td className="num">{i.students}</td>
+                    {hasGrocomeet && <td className="num">{i.grocomeet || ""}</td>}
+                    {hasBureau && <td className="num">{i.bureau || ""}</td>}
+                    <td className="num">{i.students + i.grocomeet + i.bureau}</td>
                     <td className="tally">&nbsp;</td>
                     <td className="check">&nbsp;</td>
                   </tr>
@@ -150,6 +207,21 @@ export default async function TurflijstPage({
               </tbody>
             </table>
           )}
+
+          {(hasGrocomeet || hasBureau) && (
+            <p style={{ marginTop: 10, fontSize: 13 }}>
+              {nl
+                ? "De kolommen GM en Bureau gaan in een aparte doos."
+                : "The GM and Bureau columns go in a separate box."}
+            </p>
+          )}
+
+          {meetingDrinks.map((group) => (
+            <div key={group.label} style={{ marginTop: 12, fontSize: 13 }}>
+              <strong>{group.label} · {nl ? "drankjes" : "drinks"}:</strong>{" "}
+              {group.drinks.map((drink) => `${drink.count}× ${drink.name}`).join(", ")}
+            </div>
+          ))}
         </div>
       )}
     </div>

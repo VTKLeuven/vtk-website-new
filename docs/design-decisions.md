@@ -247,6 +247,90 @@ halen ze af aan de balie en betalen daar. Post **Theokot** beheert het systeem.
 
 ---
 
+## Grocomeet en VTK Bureau — broodjes voor een vergadering
+
+Twee terugkerende vergaderingen waar vooraf een broodje en een drankje voor besteld
+wordt. Ze staan in de code als één model (`Meeting`, met `kind`), want de werking is
+identiek; enkel het publiek en de beheerder verschillen.
+
+|  | Grocomeet (GM) | VTK Bureau |
+|---|---|---|
+| Wie | verantwoordelijken van de posten + Groep 5 | elke student |
+| Ritme (default) | wekelijks, vrijdag 12:45 | tweewekelijks, donderdag 12:40 |
+| Ingang | tabje in het profielmenu (`/grocomeet`) | gedeelde link per bureau (`/bureau/<slug>`) |
+| Opent | meteen; grocos bestellen weken vooruit | instelbaar per bureau (`opensAt`) |
+| Geld | per persoon bijgehouden en af te vinken | enkel totalen, Onderwijs betaalt |
+| Beheer | Groep 5 (`grocomeet.manage`) | Onderwijs (`bureau.manage`) |
+
+### Waarom dit geen formulier uit de formulierenmodule is
+
+Het lijkt een form met twee keuzevragen, maar de bestelling moet dingen doen die een
+generieke `FormEntry` niet kan: broodjes van de **Theokot-voorraad** afromen, de
+**prijs op het moment van bestellen** vastklikken, in een **aparte kolom op de
+turflijst** verschijnen (de doos voor de vergadering), en **ongeldig worden** wanneer
+het aanbod van die dag wijzigt. Dat is domeinlogica, geen formulierveld.
+
+### Aanbod en het uitlijnen met de verkoopdag
+
+- Er kan **één broodje en één drankje** per persoon per vergadering besteld worden,
+  allebei optioneel: enkel een drankje (of niets) kan ook.
+- Het **broodje van de week** staat er nooit bij: dat blijft voor de studenten.
+- Een reservatie wordt vaak **weken vooraf** gemaakt, terwijl Theokot het aanbod van
+  die week pas een week op voorhand vastlegt. Zolang die verkoopdag niet bestaat,
+  komen de keuzes uit de **catalogus** (`TheokotProduct`); bestaat ze wel, dan uit het
+  **aanbod van die dag**, met de resterende voorraad erbij.
+- Bij elke wijziging die dat aanbod raakt (week aanmaken, aanbod van een dag
+  bewerken, dag sluiten, vergadering verzetten) lijnt `syncMeetingReservations` de
+  reservaties opnieuw uit. Koppelen gebeurt **op naam** (`offeringNameKey`), want de
+  catalogus en het aanbod van die dag hebben verschillende id's; de naam is wat ze
+  gemeen hebben en waarop een mens ze ook vergelijkt.
+- Wat niet meer kan, wordt **ongeldig**: die persoon krijgt een mail én ziet het op de
+  reservatiepagina en op `/account`. Er wordt niets stil geschrapt en niets stil
+  vervangen door een ander broodje.
+- Blijft Theokot die dag helemaal weg (geen verkoopdag aangemaakt), dan blijft de
+  reservatie staan en zegt het beheerscherm dat er geen verkoopdag is. Er draait
+  bewust geen wachter op "de dag nadert en er is nog steeds niets": dat zou een tweede
+  scheduler vragen voor iets wat het beheer sowieso op zijn scherm ziet.
+
+### Eigen aanbod (bureau zonder Theokot)
+
+Een bureau gaat altijd door, ook wanneer Theokot geen broodjes kan voorzien. Daarom kan
+het aanbod per vergadering **losgekoppeld** worden van Theokot (`useTheokot = false`):
+je zet dan zelf de keuzes met hun prijs (lasagne, broodjes van een bakker). Zo'n
+vergadering raakt de Theokot-voorraad niet en krijgt geen kolom op de turflijst. Een GM
+kan dat ook; het is dezelfde knop.
+
+### Deadline
+
+Aanpassen of annuleren kan tot **dezelfde deadline als voor studenten**: het moment
+waarop de turflijst geprint wordt (`TheokotSession.orderCloseAt` van die dag). Is er
+geen verkoopdag, dan geldt het begin van de vergadering. Er is bewust geen aparte
+deadline per vergadering: twee deadlines voor hetzelfde broodje is één te veel.
+
+### Geld
+
+- Prijzen zijn **snapshots** op het moment van bestellen (broodje + drankje), zodat een
+  prijswijziging in de catalogus een openstaande schuld niet met terugwerkende kracht
+  verandert.
+- Het **drankje** kost standaard €1; de lijst en de prijs staan in één setting
+  (`meetings.drinks`) en gelden voor allebei de vergaderingen, want het is dezelfde koelkast.
+- Bij de **GM** kan per bestelling afgevinkt worden dat er betaald is; het beheerscherm
+  toont per persoon het totaal, het betaalde en het openstaande bedrag over het werkingsjaar.
+- Bij het **bureau** betaalt de student niets: daar staan enkel totalen per bureau, per
+  werkingsjaar en over alle bureaus heen, voor de boekhouding van Onderwijs.
+
+### Plannen per semester
+
+De kalender wordt **per semester** ingevuld: bij het begin van het academiejaar voor
+semester 1 en vanaf januari voor semester 2 (`semesterToPlan`). Het beheerscherm toont
+die kalender vanzelf zolang er voor dat semester nog geen plan is (`MeetingPlan`); daarna
+blijft ze staan om aan te passen. De voorgestelde dagen volgen het gewone ritme, maar het
+is een voorstel: feestdagen, blok en verplaatsingen klik je gewoon weg. Een dag met
+bestellingen kan **niet** via de kalender verdwijnen; die verwijder je bewust bij de
+vergadering zelf, waar de bevestiging zegt hoeveel bestellingen eraan hangen.
+
+---
+
 ## Piano (lokaal 01.52 in het kasteel)
 
 VTK heeft een eigen piano in lokaal 01.52 van het kasteel, naast de promotiezaal.

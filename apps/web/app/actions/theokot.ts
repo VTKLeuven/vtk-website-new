@@ -16,6 +16,11 @@ import {
 } from "@/lib/theokot";
 import { readImageField, resolveImageKey, type ImageFieldValue } from "@/lib/imageField";
 import { activeBanFor, getTheokotConfig } from "@/lib/theokot-server";
+import {
+  syncMeetingsForSession,
+  syncMeetingsOnDay,
+  usageForSessionItemsTx,
+} from "@/lib/meetings-server";
 import { verifyStudentCard } from "@/lib/kul-card";
 import {
   allocateUserShiftReward,
@@ -52,6 +57,12 @@ function parseDayToBrusselsMidnight(value: string | null | undefined): Date | nu
 
 function revalidateTheokot() {
   revalidatePath(ADMIN_PATH);
+  // Een gewijzigd aanbod verandert wat een vergadering nog kan bestellen.
+  revalidatePath("/grocomeet");
+  revalidatePath("/en/grocomeet");
+  revalidatePath("/admin/grocomeet");
+  revalidatePath("/admin/bureau");
+  revalidatePath("/admin/theokot/turflijst");
   revalidatePath("/admin/theokot/afhalen");
   revalidatePath("/en/admin/theokot/afhalen");
   revalidatePath("/theokot");
@@ -213,6 +224,11 @@ export async function createWeekSessionsAction(formData: FormData): Promise<void
         },
       },
     });
+
+    // Reservaties voor een grocomeet of bureau op deze dag zijn weken geleden
+    // uit de catalogus gekozen. Nu het aanbod van die dag bestaat, koppelen we
+    // ze eraan; wat er niet op staat, wordt ongeldig en de persoon krijgt een mail.
+    await syncMeetingsOnDay(dayMidnight);
   }
 
   revalidateTheokot();
@@ -249,6 +265,8 @@ export async function updateSessionAction(
   }
 
   await prisma.theokotSession.update({ where: { id }, data });
+  // Een dag dichtzetten of verplaatsen raakt ook de vergaderingen van die dag.
+  await syncMeetingsForSession(id);
   revalidateTheokot();
   return saveOk();
 }
@@ -298,6 +316,11 @@ export async function updateSessionItemsAction(
       await prisma.theokotSessionItem.delete({ where: { id: item.id } });
     }
   }
+
+  // Dit is precies het geval waarvoor het uitlijnen bestaat: een week met een
+  // ander aanbod dan de catalogus. Wie een broodje reserveerde dat er nu niet
+  // meer is, krijgt een mail en een melding om opnieuw te kiezen.
+  await syncMeetingsForSession(sessionId);
 
   revalidateTheokot();
   return saveOk();
@@ -801,13 +824,9 @@ export async function placeOrderAction(sessionId: string, lines: OrderLineInput[
       });
       if (existing) throw new TheokotValidationError(["Je hebt al een bestelling voor deze dag."]);
 
-      // Resterende voorraad = sessievoorraad − reeds bestelde aantallen.
-      const used = await tx.theokotOrderLine.groupBy({
-        by: ["sessionItemId"],
-        where: { sessionItem: { sessionId } },
-        _sum: { quantity: true },
-      });
-      const usedMap = new Map(used.map((u) => [u.sessionItemId, u._sum.quantity ?? 0]));
+      // Resterende voorraad = sessievoorraad − reeds bestelde aantallen − wat er
+      // voor een grocomeet of bureau opzijgezet is (zelfde voorraad, aparte doos).
+      const usedMap = await usageForSessionItemsTx(tx, sessionId);
       const items = sess.items.map((i) => ({
         id: i.id,
         priceCents: i.priceCents,

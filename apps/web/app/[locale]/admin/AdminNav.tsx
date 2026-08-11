@@ -461,6 +461,24 @@ const icons: Record<string, ReactNode> = {
       <path d="M16 8a1 1 0 0 1 1 1v8a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4V9a1 1 0 0 1 1-1h14a4 4 0 1 1 0 8h-1" />
     </Svg>
   ),
+  // grocomeet: vergaderen -> mensen rond een tafel
+  grocomeet: (
+    <Svg>
+      <path d="M3 12h18" />
+      <path d="M6 12v6" />
+      <path d="M18 12v6" />
+      <circle cx="8" cy="6" r="2" />
+      <circle cx="16" cy="6" r="2" />
+    </Svg>
+  ),
+  // bureau: spreekbeurt/feedback -> tekstballon
+  bureau: (
+    <Svg>
+      <path d="M21 15a2 2 0 0 1-2 2H8l-4 4V5a2 2 0 0 1 2-2h13a2 2 0 0 1 2 2Z" />
+      <path d="M8 9h8" />
+      <path d="M8 13h5" />
+    </Svg>
+  ),
   // piano: toetsen van een klavier
   piano: (
     <Svg>

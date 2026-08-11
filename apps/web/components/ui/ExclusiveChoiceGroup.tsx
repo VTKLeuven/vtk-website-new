@@ -4,6 +4,8 @@ export type ExclusiveChoice = {
   value: string;
   label: string;
   description?: string;
+  /** Zichtbaar maar niet te kiezen (bv. uitverkocht). Weglaten leest als verdwenen. */
+  disabled?: boolean;
 };
 
 /** Eén keuze uit enkele duidelijke kaarten, als leesbaar alternatief voor een dropdown. */
@@ -30,12 +32,17 @@ export function ExclusiveChoiceGroup({
       aria-label={ariaLabel}
     >
       {options.map((option) => (
-        <label key={option.value} data-selected={value === option.value || undefined}>
+        <label
+          key={option.value}
+          data-selected={value === option.value || undefined}
+          data-disabled={option.disabled || undefined}
+        >
           <input
             type="radio"
             name={name}
             value={option.value}
             checked={value === option.value}
+            disabled={option.disabled}
             onChange={() => onChange(option.value)}
           />
           <span>

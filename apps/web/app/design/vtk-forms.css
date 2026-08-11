@@ -205,6 +205,17 @@
   box-shadow: inset 3px 0 0 var(--yellow);
 }
 
+/* Uitverkocht blijft staan: een keuze die zomaar uit de lijst verdwijnt, laat
+   iemand zoeken naar een broodje dat er gisteren nog was. */
+.vtk-exclusive-choices > label[data-disabled='true'] {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.vtk-exclusive-choices > label[data-disabled='true']:hover {
+  background: var(--surface);
+}
+
 .vtk-exclusive-choices input {
   width: 16px;
   height: 16px;

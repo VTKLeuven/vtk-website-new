@@ -255,6 +255,19 @@ enum TheokotOrderStatus {
   CANCELLED // door de student geannuleerd voor de deadline
 }
 
+/// Terugkerende vergadering waarvoor vooraf een broodje en een drankje besteld
+/// kan worden. De twee soorten verschillen enkel in publiek en beheer, niet in
+/// werking (zie `Meeting`).
+enum MeetingKind {
+  GROCOMEET // wekelijks, enkel postverantwoordelijken + Groep 5
+  BUREAU // tweewekelijks, elke student via een gedeelde link
+}
+
+enum MeetingReservationStatus {
+  ACTIVE
+  INVALIDATED // het gekozen broodje staat niet (meer) op het aanbod van die dag
+}
+
 enum UitleenReservationStatus {
   REQUESTED // aangevraagd, wacht op beslissing van Logistiek
   APPROVED // goedgekeurd; telt mee voor de voorraad
@@ -480,6 +493,10 @@ model User {
   participatingShifts  ShiftParticipant[]
   createdShortLinks    ShortLink[]             @relation("ShortLinkCreatedBy")
 
+  meetingsCreated           Meeting[]                  @relation("MeetingCreatedBy")
+  meetingReservations       MeetingReservation[]       @relation("MeetingReservationUser")
+  meetingPaymentsProcessed  MeetingReservation[]       @relation("MeetingReservationPaidBy")
+  meetingPlans              MeetingPlan[]              @relation("MeetingPlanBy")
   theokotOrders             TheokotOrder[]             @relation("TheokotOrderUser")
   theokotPickedUp           TheokotOrder[]             @relation("TheokotPickedUpBy")
   theokotVoucherRedemptions TheokotVoucherRedemption[] @relation("TheokotVoucherUser")
@@ -1796,8 +1813,11 @@ model TheokotSessionItem {
   ingredientsEn   String?
   order           Int     @default(0)
 
-  session TheokotSession     @relation(fields: [sessionId], references: [id], onDelete: Cascade)
-  lines   TheokotOrderLine[]
+  session             TheokotSession       @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  lines               TheokotOrderLine[]
+  /// Broodjes die voor een vergadering (GM/Bureau) op dit item gereserveerd zijn.
+  /// Ze gaan van dezelfde voorraad af en staan apart op de turflijst.
+  meetingReservations MeetingReservation[]
 
   @@index([sessionId])
 }
@@ -1858,6 +1878,141 @@ model TheokotOrderLine {
 
   @@index([orderId])
   @@index([sessionItemId])
+}
+
+// -----------------------------------------------------------------------------
+// Broodjesmomenten: grocomeet (GM) en VTK Bureau
+//
+// Twee vergaderingen met dezelfde werking: er wordt vooraf een broodje en een
+// drankje besteld, die broodjes gaan van de Theokot-voorraad af en komen in een
+// aparte doos. Ze delen daarom één model; `kind` bepaalt het publiek (GM: enkel
+// postverantwoordelijken en Groep 5, via het profielmenu; Bureau: elke student,
+// via een gedeelde link) en wie het beheert. Zie docs/design-decisions.md.
+// -----------------------------------------------------------------------------
+
+/// Eén vergadering. `startsAt` is het moment zelf; het bestelvenster hangt aan de
+/// Theokot-verkoopdag van diezelfde dag (dezelfde deadline als voor studenten).
+model Meeting {
+  id String @id @default(cuid())
+
+  kind MeetingKind
+  /// Werkingsjaar + semester waarin dit moment valt. Enkel voor de
+  /// planningskalender: die vraagt per semester welke dagen er een moment is.
+  year     Int
+  semester Int
+  /// Deelbare link voor een bureau (`/bureau/<slug>`). Ook een GM krijgt er een,
+  /// zodat een mail naar één moment kan verwijzen.
+  slug     String @unique
+
+  startsAt DateTime  @db.Timestamptz(3)
+  location String?
+  /// Vanaf wanneer studenten dit bureau kunnen invullen. Leeg = meteen open.
+  /// Een GM staat altijd open: de grocos bestellen weken op voorhand.
+  opensAt  DateTime? @db.Timestamptz(3)
+
+  /// Aanbod uit Theokot (standaard), of een eigen lijst wanneer Theokot die dag
+  /// niets kan voorzien (lasagne, broodjes van een bakker). Een eigen aanbod
+  /// raakt de Theokot-voorraad en de turflijst niet.
+  useTheokot Boolean @default(true)
+
+  /// Vrije toelichting boven het reservatieformulier.
+  noteNl String?
+  noteEn String?
+
+  createdById String?
+  createdAt   DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt   DateTime @updatedAt @db.Timestamptz(3)
+
+  createdBy    User?                @relation("MeetingCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  options      MeetingOption[]
+  reservations MeetingReservation[]
+
+  @@index([kind, startsAt])
+  @@index([year, semester, kind])
+}
+
+/// Eén keuze uit het eigen aanbod van een moment (enkel bij `useTheokot=false`).
+model MeetingOption {
+  id         String  @id @default(cuid())
+  meetingId  String
+  nameNl     String
+  nameEn     String?
+  priceCents Int     @default(0)
+  order      Int     @default(0)
+
+  meeting      Meeting              @relation(fields: [meetingId], references: [id], onDelete: Cascade)
+  reservations MeetingReservation[]
+
+  @@index([meetingId])
+}
+
+/// Eén bestelling per persoon per moment. Naam en prijs van het broodje en het
+/// drankje zijn snapshots van het moment van bestellen: prijzen in de catalogus
+/// mogen een openstaande schuld niet met terugwerkende kracht veranderen.
+model MeetingReservation {
+  id        String                   @id @default(cuid())
+  meetingId String
+  userId    String
+  status    MeetingReservationStatus @default(ACTIVE)
+
+  /// Leeg = enkel een drankje besteld.
+  itemNameNl     String?
+  itemNameEn     String?
+  itemPriceCents Int     @default(0)
+  /// Herkomst van het gekozen broodje: catalogusitem (`TheokotProduct`) of een
+  /// eigen optie van dit moment. Puur informatief; de naam is wat telt bij het
+  /// koppelen aan de verkoopdag.
+  productId      String?
+  optionId       String?
+  /// Het aanbod-item van die verkoopdag, zodra het gekoppeld kon worden. Dit is
+  /// wat de voorraad afroomt en op de turflijst verschijnt.
+  sessionItemId  String?
+
+  /// Leeg = geen drankje.
+  drinkName       String?
+  drinkPriceCents Int     @default(0)
+
+  /// Opmerking bij een bureau (onderwijsfeedback vooraf).
+  comment String?
+
+  /// Ongeldig gemaakt omdat het gekozen broodje die dag niet bestaat. De persoon
+  /// kreeg er een mail over en ziet het op de reservatiepagina.
+  invalidatedAt     DateTime? @db.Timestamptz(3)
+  invalidatedReason String?
+
+  /// Betaald (enkel gebruikt voor de GM; een bureau betaalt Onderwijs zelf).
+  paidAt   DateTime? @db.Timestamptz(3)
+  paidById String?
+
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+
+  meeting     Meeting             @relation(fields: [meetingId], references: [id], onDelete: Cascade)
+  user        User                @relation("MeetingReservationUser", fields: [userId], references: [id], onDelete: Cascade)
+  paidBy      User?               @relation("MeetingReservationPaidBy", fields: [paidById], references: [id], onDelete: SetNull)
+  option      MeetingOption?      @relation(fields: [optionId], references: [id], onDelete: SetNull)
+  sessionItem TheokotSessionItem? @relation(fields: [sessionItemId], references: [id], onDelete: SetNull)
+
+  @@unique([meetingId, userId])
+  @@index([userId, status])
+  @@index([sessionItemId])
+  @@index([status, paidAt])
+}
+
+/// Onthoudt dat de kalender voor dit semester al ingevuld is, zodat het beheer
+/// er maar één keer per semester ongevraagd naar vraagt.
+model MeetingPlan {
+  id          String   @id @default(cuid())
+  kind        MeetingKind
+  year        Int
+  semester    Int
+  plannedById String?
+  createdAt   DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt   DateTime @updatedAt @db.Timestamptz(3)
+
+  plannedBy User? @relation("MeetingPlanBy", fields: [plannedById], references: [id], onDelete: SetNull)
+
+  @@unique([kind, year, semester])
 }
 
 /// Tijdelijke ban na te veel no-shows. Historiek blijft bewaard; een ban
