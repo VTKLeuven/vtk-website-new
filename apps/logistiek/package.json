@@ -10,7 +10,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "import:inventaris": "dotenv -e ../../.env -- tsx scripts/import-inventaris.ts",
-    "group:events": "dotenv -e ../../.env -- tsx scripts/group-events.ts"
+    "group:events": "dotenv -e ../../.env -- tsx scripts/group-events.ts",
+    "mail:test": "dotenv -e ../../.env -- tsx scripts/test-mail.ts"
   },
   "dependencies": {
     "@vtk/auth": "*",

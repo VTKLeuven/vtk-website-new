@@ -123,10 +123,25 @@ Op volgorde van risico. Bij elk punt staat wat er tijdens de bouw al nagekeken i
 zodat je weet waar de blinde vlekken zitten.
 
 1. **De mails (A9).** Het enige stuk dat nooit echt vertrokken is: lokaal ging het
-   naar de log of botste het op een mailcatcher zonder STARTTLS. Test goedkeuren,
-   afwijzen, wijzigen en terugdraaien; kijk of het meelezende adres in kopie
-   meekomt en of de link klopt. *Nagekeken: de inhoud van alle vier de mails in de
-   dev-log, en dat een mislukte verzending de actie niet doet falen.*
+   naar de log of botste het op een mailcatcher zonder STARTTLS.
+
+   Begin met de rooktest; die raakt de database niet aan en stuurt naar één adres
+   dat je zelf kiest:
+
+   ```
+   npm run mail:test -w @vtk/logistiek -- jouw.adres@vtk.be
+   ```
+
+   Op de server draai je hem in de container, zodat hij dezelfde omgeving ziet als
+   de app: `docker compose exec logistiek npm run mail:test -- jouw.adres@vtk.be`.
+   Hij print eerst de host, de EHLO-naam, de afzender en of er ingelogd wordt; komt
+   daar "SMTP_HOST is leeg" uit, dan leest de container de root-`.env` niet en heeft
+   verder testen geen zin.
+
+   Werkt dat, test dan pas goedkeuren, afwijzen, wijzigen en terugdraaien; kijk of
+   het meelezende adres in kopie meekomt en of de link onderaan klopt. *Nagekeken:
+   de inhoud van alle vier de mails in de dev-log, en dat een mislukte verzending
+   de actie niet doet falen.*
 2. **Flesserke-voorraad (F3).** Terugbrengen, ongedaan maken, en kijken of het
    totaal blijft kloppen. *Nagekeken: FIFO over twee ladingen en het terugdraaien,
    maar met verzonnen data.*
