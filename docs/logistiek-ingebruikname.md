@@ -34,24 +34,33 @@ meldt dat niet aan de gebruiker.
 
 ### In de Google Workspace-admin
 
-Onder **Apps > Google Workspace > Gmail > Routing > SMTP relay service**, in de
-regel die de site al gebruikt:
+**Er moet niets bij.** De regel "SMTP liv.vtk.be" onder **Apps > Google Workspace >
+Gmail > Routing > SMTP relay service** dekt de uitleendienst al:
 
-- **Allowed senders.** Staat die op "Only registered Apps users", dan moet
-  `logistiek@vtk.be` als gebruiker, alias of groep bestaan, én moet het account in
-  `SMTP_USER` ervan mogen afzenden ("Send as"). Bestaat het adres niet, dan
-  weigert de relay per bericht; dat zie je enkel in de logs van de container.
-- **Authentication.** Ofwel staat het publieke IP van de server in de lijst, ofwel
-  logt de site in met een Workspace-account plus app-wachtwoord in `SMTP_USER` /
-  `SMTP_PASSWORD`. Dat is al zo voor ticketing; er verandert niets.
-- **Encryption:** "Require TLS" mag aan blijven; `packages/mail` zet
-  `requireTLS` op poort 587.
-- SPF en DKIM van `vtk.be` staan al goed voor de ticketmails en gelden voor het
-  hele domein, dus daar hoeft niets bij.
+- **Toegestane afzenders: "Alleen adressen in mijn domeinen".** Dat is de ruime
+  variant: elk `@vtk.be`-adres wordt aanvaard als afzender, ook eentje dat als
+  account niet bestaat. `logistiek@vtk.be` hoeft dus niet aangemaakt te worden om
+  te kúnnen versturen. Zie hieronder waarom je dat toch wil.
+- **Alleen e-mails van de opgegeven IP-adressen (IPv4 + IPv6 van liv.vtk.be),
+  SMTP-verificatie uit.** Daarom moeten `SMTP_USER` en `SMTP_PASSWORD` **leeg
+  blijven**. Vul je ze in, dan probeert nodemailer te authenticeren op een relay
+  die geen login aanvaardt en vertrekt er niets meer, ook de ticketmails niet.
+  De IPv6-regel is geen luxe: het compose-netwerk staat op `enable_ipv6`, dus
+  uitgaand verkeer kan er die kant uit gaan.
+- **TLS-versleuteling vereisen: uit.** Dat is de eis van Google, niet de onze;
+  `packages/mail` zet zelf `requireTLS` op poort 587 en doet dus hoe dan ook
+  STARTTLS.
+- SPF en DKIM van `vtk.be` gelden voor het hele domein en staan al goed.
+
+**Maak `logistiek@vtk.be` wel aan als groep of alias**, ook al eist de relay het
+niet. De mails zetten geen reply-to, dus "Beantwoorden" gaat naar de afzender; is
+dat een adres dat niet bestaat, dan bounct het antwoord van een aanvrager of
+verdwijnt het. Bestaat het adres niet en wil je er geen, zet dan een adres in
+`LOGISTIEK_MAIL_FROM` dat wél gelezen wordt.
 
 Het meelezende adres van de werkgroep (`logistiek.existenz@vtk.be` en dergelijke)
-komt in **kopie**, niet in de afzender. Dat mag dus een gewone groep zijn en heeft
-geen relay-rechten nodig.
+komt in **kopie**, niet in de afzender. Dat is een veld dat de aanvrager zelf
+invult en het heeft geen relay-rechten nodig.
 
 ### `/beheer/instellingen`
 
