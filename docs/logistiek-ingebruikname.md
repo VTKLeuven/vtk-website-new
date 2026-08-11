@@ -32,6 +32,20 @@ Controleer ook `SMTP_EHLO_NAME`: leeg is goed (dan wordt het `vtk.be`), maar
 **Zonder `SMTP_HOST` worden de mails enkel gelogd**, niet verstuurd, en de app
 meldt dat niet aan de gebruiker.
 
+Drie dingen die op 11 augustus 2026 op liv nog leeg of verkeerd stonden, los van
+de mail:
+
+- **`MOLLIE_API_KEY` is leeg terwijl `LOGISTIEK_PAYMENT_PROVIDER` op `mollie`
+  staat.** Zolang er niets te betalen valt, merk je dat niet; de eerste aanvraag
+  met een huurprijs loopt erop vast. De sleutel is dezelfde als die van ticketing.
+- **`LOGISTIEK_MAINTENANCE_SECRET` is leeg**, dus `logistiek-worker` schakelt
+  zichzelf uit ("Logistiek worker disabled") en staat daarom op `unhealthy`. Die
+  worker is het vangnet voor de betalingen: hij verzoent openstaande Mollie-betalingen
+  en ruimt verlopen checkouts op. Genereer er een met `openssl rand -base64 48`.
+- **`LOGISTIEK_TEST_LOGIN` staat op `true`.** Dat is nu ongevaarlijk, want
+  `testLoginEnabled()` eist óók `NODE_ENV !== 'production'` en `/test-login` geeft
+  404 op de server. Het blijft een geladen wapen in de `.env`: zet het leeg.
+
 ### In de Google Workspace-admin
 
 **Er moet niets bij.** De regel "SMTP liv.vtk.be" onder **Apps > Google Workspace >
@@ -133,15 +147,27 @@ zodat je weet waar de blinde vlekken zitten.
    ```
 
    Op de server draai je hem in de container, zodat hij dezelfde omgeving ziet als
-   de app: `docker compose exec logistiek npm run mail:test -- jouw.adres@vtk.be`.
+   de app. Daar niet via `npm run`: de npm-scripts zetten er `dotenv -e ../../.env`
+   voor, en dat bestand zit niet in de container.
+
+   ```
+   docker compose -f infra/docker-compose.yml exec -w /app/apps/logistiek \
+     logistiek npx tsx scripts/test-mail.ts jouw.adres@vtk.be
+   ```
+
    Hij print eerst de host, de EHLO-naam, de afzender en of er ingelogd wordt; komt
    daar "SMTP_HOST is leeg" uit, dan leest de container de root-`.env` niet en heeft
    verder testen geen zin.
 
-   Werkt dat, test dan pas goedkeuren, afwijzen, wijzigen en terugdraaien; kijk of
-   het meelezende adres in kopie meekomt en of de link onderaan klopt. *Nagekeken:
-   de inhoud van alle vier de mails in de dev-log, en dat een mislukte verzending
-   de actie niet doet falen.*
+   *Op 11 augustus 2026 op liv gedraaid: de relay aanvaardde het bericht, met
+   `smtp-relay.gmail.com:587`, EHLO `vtk.be`, zonder login en als
+   `Logistiek VTK <logistiek@vtk.be>`. De transportlaag staat dus goed; wat nog
+   niet nagekeken is, zijn de vier échte mails vanuit een goedkeuring.*
+
+   Test daarom nog goedkeuren, afwijzen, wijzigen en terugdraaien; kijk of het
+   meelezende adres in kopie meekomt en of de link onderaan klopt. *Nagekeken: de
+   inhoud van alle vier de mails in de dev-log, en dat een mislukte verzending de
+   actie niet doet falen.*
 2. **Flesserke-voorraad (F3).** Terugbrengen, ongedaan maken, en kijken of het
    totaal blijft kloppen. *Nagekeken: FIFO over twee ladingen en het terugdraaien,
    maar met verzonnen data.*

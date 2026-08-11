@@ -28,6 +28,16 @@ COPY --from=builder /repo/apps/logistiek/.next ./apps/logistiek/.next
 COPY --from=builder /repo/apps/logistiek/public ./apps/logistiek/public
 COPY --from=builder /repo/apps/logistiek/next.config.ts ./apps/logistiek/next.config.ts
 COPY --from=builder /repo/apps/logistiek/package.json ./apps/logistiek/package.json
+# De beheerscripts horen mee in de image, want ze worden op de server gedraaid en
+# nergens anders: `group-events.ts` groepeert de bestaande historiek, `test-mail.ts`
+# controleert de SMTP-config, `import-inventaris.ts` leest de Excel in. Zonder deze
+# regel staat er in de docs een commando dat op de server niet bestaat.
+#
+# Draai ze met tsx en niet via `npm run`: die scripts zetten `dotenv -e ../../.env`
+# ervoor voor lokaal gebruik, en dat bestand zit niet in de container (de omgeving
+# komt van compose). Dus:
+#   docker compose exec -w /app/apps/logistiek logistiek npx tsx scripts/test-mail.ts adres@vtk.be
+COPY --from=builder /repo/apps/logistiek/scripts ./apps/logistiek/scripts
 COPY --from=builder /repo/packages ./packages
 COPY --from=builder /repo/package.json ./package.json
 COPY --from=builder /repo/node_modules ./node_modules
