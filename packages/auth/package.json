@@ -11,16 +11,16 @@
     "./client": "./src/client.ts"
   },
   "dependencies": {
-    "@better-auth/oauth-provider": "^1.6.23",
+    "@better-auth/oauth-provider": "^1.6.26",
     "@node-rs/argon2": "^2.0.2",
     "@vtk/db": "*",
-    "better-auth": "^1.6.19",
+    "better-auth": "^1.6.26",
     "server-only": "^0.0.1"
   },
   "devDependencies": {
     "@types/node": "^20.19.43",
     "@vtk/tsconfig": "*",
-    "auth": "^1.6.19",
+    "auth": "^1.6.26",
     "typescript": "^5"
   }
 }

@@ -1,13 +1,29 @@
+import type { Metadata } from "next";
+import { cache } from "react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getDictionary, type Locale } from "@vtk/i18n";
 import { hasLocale } from "@/lib/locale";
 import { getImmichFaceSearchPublicConfig } from "@/lib/immich-face-search";
 import { getImmichGalleryAlbum } from "@/lib/immich-gallery";
+import { buildMetadata } from "@/lib/seo";
 import { AlbumViewer } from "./AlbumViewer";
 import { FaceSearchPanel } from "./FaceSearchPanel";
 
 export const dynamic = "force-dynamic";
+
+/**
+ * Immich mag onbereikbaar zijn zonder dat de route stukloopt; dat gebeurt in de
+ * praktijk (de proxy staat achter een aparte container). `cache` zorgt dat de
+ * metadata en de pagina hetzelfde antwoord delen.
+ */
+const loadAlbum = cache(async (slug: string) => {
+  try {
+    return await getImmichGalleryAlbum(slug);
+  } catch {
+    return null;
+  }
+});
 
 function formatAlbumDate(value: string | null, locale: Locale) {
   if (!value) return null;
@@ -20,23 +36,41 @@ function formatAlbumDate(value: string | null, locale: Locale) {
   }).format(date);
 }
 
-export default async function MediaAlbumPage({
-  params,
-}: {
-  params: Promise<{ locale: string; albumSlug: string }>;
-}) {
+type Params = Promise<{ locale: string; albumSlug: string }>;
+
+export async function generateMetadata({ params }: { params: Params }): Promise<Metadata> {
+  const { locale, albumSlug } = await params;
+  if (!hasLocale(locale)) return {};
+
+  const album = await loadAlbum(albumSlug);
+  if (!album) return {};
+
+  const dict = getDictionary(locale);
+  const date = formatAlbumDate(album.date, locale);
+  const count = `${album.photos.length} ${album.photos.length === 1 ? dict.photos.photo : dict.photos.photos}`;
+  return buildMetadata({
+    title: album.title,
+    description: album.description || [count, date].filter(Boolean).join(" · "),
+    path: `/media/${album.slug}`,
+    locale,
+    // De cover van het album is het deelbeeld; een fotoalbum zonder foto's krijgt
+    // het standaardbeeld van de site.
+    image: album.coverPhoto?.previewUrl ?? null,
+    imageAlt: album.title,
+    type: "article",
+    publishedTime: album.date,
+    modifiedTime: album.updatedAt,
+  });
+}
+
+export default async function MediaAlbumPage({ params }: { params: Params }) {
   const { locale: localeParam, albumSlug } = await params;
   if (!hasLocale(localeParam)) notFound();
   const locale: Locale = localeParam;
   const dict = getDictionary(locale);
   const base = locale === "nl" ? "" : "/en";
 
-  let album: Awaited<ReturnType<typeof getImmichGalleryAlbum>>;
-  try {
-    album = await getImmichGalleryAlbum(albumSlug);
-  } catch {
-    album = null;
-  }
+  const album = await loadAlbum(albumSlug);
   if (!album) notFound();
 
   const date = formatAlbumDate(album.date, locale);

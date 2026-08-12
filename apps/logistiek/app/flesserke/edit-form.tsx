@@ -13,12 +13,14 @@ export function FlesserkeEditor({
   groups,
   locale,
   initial,
+  lastMinuteDays,
 }: {
   reservationId: string;
   catalog: FlesserkeCatalogCategory[];
   groups: RequesterOption[];
   locale: 'nl' | 'en';
   initial: FlesserkeInitial;
+  lastMinuteDays: number;
 }) {
   const en = locale === 'en';
   const [open, setOpen] = useState(false);
@@ -38,6 +40,7 @@ export function FlesserkeEditor({
         groups={groups}
         locale={locale}
         initial={initial}
+        lastMinuteDays={lastMinuteDays}
         mode={{ kind: 'edit', reservationId }}
         onCancel={() => setOpen(false)}
       />

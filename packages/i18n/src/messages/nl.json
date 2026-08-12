@@ -4,8 +4,9 @@
     "login": "Inloggen",
     "profile": "Profiel",
     "myAccount": "Mijn account",
-    "myTickets": "Mijn tickets",
     "admin": "Admin",
+    "grocomeet": "Broodje grocomeet",
+    "grocomeetAttention": "kies opnieuw",
     "logout": "Uitloggen",
     "language": "Taal"
   },
@@ -31,7 +32,6 @@
     "linkMedia": "Media",
     "linkAbout": "Over VTK",
     "linkPraesidium": "Praesidium",
-    "linkWerkgroepen": "Werkgroepen",
     "linkInstagram": "Instagram",
     "linkFacebook": "Facebook",
     "linkLinkedIn": "LinkedIn",
@@ -39,7 +39,11 @@
     "linkSlots": "Tijdsloten Cudi",
     "linkPrivacy": "Privacy",
     "linkCookies": "Cookies",
-    "linkCookieSettings": "Cookiekeuze"
+    "linkCookieSettings": "Cookiekeuze",
+    "linkRental": "Uitleendienst",
+    "linkWerkgroepenCircles": "Werkgroepen & bevriende kringen",
+    "linkYouTube": "YouTube",
+    "linkTikTok": "TikTok"
   },
   "home": {
     "welcome": "Welkom bij VTK",
@@ -185,7 +189,8 @@
   "pages": {
     "empty": "Nog geen pagina's",
     "overview": "Overzicht",
-    "downloads": "Downloads"
+    "downloads": "Downloads",
+    "onThisPage": "Op deze pagina"
   },
   "auth": {
     "signInLead": "Ledenportaal",
@@ -201,6 +206,7 @@
     "newPassword": "Nieuw wachtwoord",
     "saved": "Opgeslagen",
     "signInWithKul": "Inloggen met KU Leuven",
+    "kulSignInFailed": "Inloggen via KU Leuven is mislukt. Probeer het later opnieuw.",
     "loginRequiredKicker": "Inloggen vereist",
     "loginRequiredTitle": "Log in om deze pagina te bekijken",
     "loginRequiredBody": "Je moet ingelogd zijn voordat je de inhoud van deze pagina kan bekijken.",
@@ -236,6 +242,10 @@
     "preferencePersonal": "Persoonlijke mail",
     "mailHeading": "Mailinglijsten",
     "mailIntro": "Van welke categorieën wil je mails ontvangen? Je kan er zoveel of zo weinig aanduiden als je wil.",
+    "shiftRemindersHeading": "Herinneringen voor je shift",
+    "shiftRemindersHint": "Een mailtje voor een shift waarvoor je jezelf inschreef. Dit staat los van de mailinglijsten hierboven.",
+    "shiftReminderDayBefore": "Een dag op voorhand",
+    "shiftReminderSoon": "Twee uur op voorhand",
     "photoHeading": "Profielfoto",
     "photoHint": "Optioneel. Als je op het praesidium of bij een POC zit, verschijnt deze foto op de betreffende pagina.",
     "photoChoose": "Kies een foto",
@@ -246,6 +256,8 @@
     "programmesHint": "Duid alle richtingen aan die op jou van toepassing zijn.",
     "notAtFaculty": "Ik studeer niet aan de faculteit",
     "notAtFacultyHint": "Duid dit aan als je geen ingenieursopleiding aan de faculteit volgt. Je krijgt dan geen Career-mails, want die zijn op faculteitsstudenten gericht.",
+    "internationalStudent": "Ik ben een internationale of uitwisselingsstudent",
+    "internationalStudentHint": "Duid dit aan als je via een uitwisseling of als internationale student aan de faculteit zit. Evenementen voor internationals verschijnen dan vanzelf in je kalender.",
     "notStudying": "Ik studeer niet (meer)",
     "notStudyingHint": "Duid dit aan als je afgestudeerd bent of gestopt. Je blijft lid, maar valt uit de studiegerichte mailinglijsten.",
     "submit": "Registratie voltooien",
@@ -301,16 +313,20 @@
     "groups": "Posten",
     "werkgroepen": "Werkgroepen",
     "roles": "Rollen",
-    "albums": "Albums",
     "media": "Media",
     "pocs": "POC's",
     "partners": "Partners",
     "home": "Homepagina",
+    "announcements": "Aankondigingen",
     "dashboardTiles": "Dashboardtegels",
     "tickets": "Tickets",
+    "forms": "Forms",
     "shortlinks": "Verkorte links",
     "shift": "Shiften",
     "theokot": "Theokot",
+    "grocomeet": "Grocomeet",
+    "bureau": "VTK Bureau",
+    "piano": "Piano",
     "door": "Deur",
     "mailinglists": "Mailinglijsten",
     "it": "IT",
@@ -324,6 +340,7 @@
     "back": "Terug",
     "noAccess": "Geen toegang",
     "ledenbeheer": "Ledenbeheer",
+    "evenementen": "Evenementen",
     "website": "Website",
     "sso": "SSO & apps"
   },
@@ -362,7 +379,8 @@
     "no": "Nee",
     "saving": "Bezig met opslaan...",
     "saved": "Opgeslagen",
-    "saveError": "Er ging iets mis bij het opslaan."
+    "saveError": "Er ging iets mis bij het opslaan.",
+    "close": "Sluiten"
   },
   "info": {
     "kicker": "VTK · KU Leuven",
@@ -433,32 +451,67 @@
   },
   "shift": {
     "shifts": "Shiften",
+    "subtitle": "Help mee achter de toog of op een evenement. Elke shift levert bonnetjes op.",
     "available": "Beschikbare shiften",
     "registered": "Mijn shiften",
-    "columns": {
-      "shift": "Shift",
-      "date": "Datum",
-      "time": "Tijd",
-      "where": "Locatie",
-      "action": "Actie"
+    "view": {
+      "label": "Weergave",
+      "week": "Week",
+      "list": "Lijst"
+    },
+    "week": {
+      "prev": "Vorige week",
+      "next": "Volgende week",
+      "today": "Vandaag",
+      "range": "{from} tot {to}"
     },
     "filter": {
       "post": "Post",
-      "allPosts": "Alle posten",
-      "from": "Vanaf",
-      "sortAsc": "↑ Oplopend",
-      "sortDesc": "↓ Aflopend"
+      "allPosts": "Alle posten"
     },
-    "register": "Registreer",
+    "register": "Schrijf in",
     "unregister": "Uitschrijven",
-    "week": {
-      "prev": "← Vorige",
-      "today": "Vandaag",
-      "next": "Volgende →",
-      "startDate": "Startdatum"
+    "isRegistered": "Ingeschreven",
+    "locked": "Vast binnen 24u",
+    "until": "tot {time}",
+    "intl": {
+      "badge": "Ook voor internationals",
+      "hint": "Je hoeft geen Nederlands te spreken voor deze shift."
     },
-    "emptyAvailable": "Er zijn geen beschikbare shiften in deze periode.",
-    "emptyRegistered": "Je bent nog niet ingeschreven voor een shift.",
+    "instructions": "Wat houdt deze shift in?",
+    "dialog": {
+      "close": "Sluiten",
+      "cancel": "Annuleren",
+      "open": "Bekijk details"
+    },
+    "spots": {
+      "full": "Vol",
+      "one": "Nog 1 plaats",
+      "few": "Nog {n} plaatsen",
+      "taken": "{taken} van {max} plaatsen bezet"
+    },
+    "reward": {
+      "one": "1 bonnetje",
+      "many": "{n} bonnetjes"
+    },
+    "rel": {
+      "today": "Vandaag",
+      "tomorrow": "Morgen",
+      "inDays": "Over {n} dagen"
+    },
+    "empty": {
+      "week": "Geen shiften deze week",
+      "next": "De eerstvolgende shift is {name} op {date}.",
+      "jump": "Ga naar {date}",
+      "none": "Er staan voorlopig geen shiften gepland."
+    },
+    "rail": {
+      "emptyTitle": "Nog niets ingepland",
+      "emptyText": "Kies een shift in het overzicht; je inschrijving verschijnt hier meteen.",
+      "year": "Academiejaar {year}",
+      "shiftsDone": "shiften gedaan",
+      "vouchers": "bonnetjes verdiend"
+    },
     "detail": {
       "start": "Start",
       "end": "Einde",
@@ -466,7 +519,9 @@
       "post": "Post",
       "reward": "Beloning",
       "spots": "Plaatsen",
-      "description": "Beschrijving"
+      "description": "Beschrijving",
+      "open": "Toon details",
+      "close": "Verberg details"
     },
     "toast": {
       "registered": "Je bent ingeschreven voor deze shift.",
@@ -492,6 +547,249 @@
       "count": "Aantal",
       "noPost": "Geen post",
       "empty": "Je hebt nog geen shiften gedaan."
+    }
+  },
+  "piano": {
+    "title": "Piano reserveren",
+    "subtitle": "Lokaal 01.52 in het kasteel, naast de promotiezaal",
+    "practical": "Praktisch",
+    "facts": {
+      "location": "Waar",
+      "locationValue": "Lokaal 01.52, kasteel Arenberg",
+      "price": "Prijs",
+      "priceValue": "Gratis voor studenten",
+      "letter": "Begeleidende brief",
+      "letterValue": "Af te halen bij de vice in Blok 6 (Studentenwijk Arenberg). Hou ze bij tijdens het spelen.",
+      "limit": "Limiet",
+      "limitOne": "Eén tijdslot per week",
+      "limitMany": "{count} tijdsloten per week",
+      "horizon": "Reserveren kan tot {days} dagen vooruit."
+    },
+    "agenda": {
+      "title": "Kies een tijdslot",
+      "intro": "Klik op een vrij uur om het te reserveren.",
+      "week": "Week van {from} tot {to}",
+      "prev": "← Vorige week",
+      "next": "Volgende week →",
+      "thisWeek": "Deze week",
+      "empty": "Deze week staat de piano niet open.",
+      "emptyHint": "Blader naar een volgende week, of kijk hierboven wanneer de piano vrij is."
+    },
+    "slot": {
+      "taken": "Bezet",
+      "mine": "Jouw slot",
+      "past": "Voorbij",
+      "book": "Reserveer {time}",
+      "booking": "Bezig..."
+    },
+    "mine": {
+      "title": "Jouw reservaties",
+      "empty": "Je hebt nog geen tijdslot gereserveerd.",
+      "cancel": "Annuleren",
+      "confirmTitle": "Reservatie annuleren?",
+      "confirmBody": "Je tijdslot komt weer vrij voor andere studenten. Je kan daarna zelf een ander moment kiezen.",
+      "confirmYes": "Ja, annuleren",
+      "confirmNo": "Behouden",
+      "cancelled": "Je reservatie is geannuleerd."
+    },
+    "login": {
+      "title": "Aanmelden om te reserveren",
+      "body": "Gelieve aan te melden om een tijdslot te reserveren. De uren hieronder zie je ook zonder account."
+    },
+    "toast": {
+      "reserved": "Je tijdslot is gereserveerd."
+    },
+    "error": {
+      "notLoggedIn": "Meld je eerst aan om te reserveren.",
+      "notFound": "Dit tijdslot bestaat niet (meer).",
+      "past": "Dit tijdslot is al begonnen.",
+      "beyondHorizon": "Dit tijdslot ligt te ver in de toekomst.",
+      "taken": "Iemand was je net voor: dit tijdslot is intussen bezet.",
+      "weekLimit": "Je hebt deze week al een tijdslot. Annuleer dat eerst, of kies een volgende week.",
+      "fallback": "Reserveren mislukt. Probeer later opnieuw.",
+      "cancelFailed": "Annuleren mislukt. Probeer later opnieuw."
+    }
+  },
+  "notFound": {
+    "kicker": "404",
+    "title": "Deze pagina bestaat niet",
+    "lead": "Het adres klopt niet, of de pagina is verhuisd bij de overstap naar de nieuwe site.",
+    "body": "Kwam je hier via een oude link of een bladwijzer? Onderstaande wegen brengen je terug. Blijft er iets kapot, laat het weten via",
+    "homeTitle": "Naar de homepage",
+    "homeLead": "Het nieuws, de openingsuren en wat er de komende dagen te doen is.",
+    "infoTitle": "Info",
+    "infoLead": "De praktische pagina's: diensten, voorzieningen en hoe je ze gebruikt.",
+    "calendarTitle": "Kalender",
+    "calendarLead": "Alle activiteiten, van cantus tot infosessie."
+  },
+  "search": {
+    "title": "Zoeken",
+    "subtitle": "Doorzoek de pagina's van de site, de activiteiten in de kalender, de fotoalbums en het materiaal van de uitleendienst.",
+    "description": "Doorzoek de pagina's, activiteiten en foto's van VTK.",
+    "formLabel": "Zoeken op de site",
+    "inputLabel": "Zoekterm",
+    "placeholder": "Zoek op de site",
+    "submit": "Zoeken",
+    "prompt": "Typ hierboven waar je naar op zoek bent.",
+    "tooShort": "Typ minstens twee letters: met één letter valt er niets zinnigs te vinden.",
+    "resultsOne": "1 resultaat voor “{query}”.",
+    "resultsMany": "{count} resultaten voor “{query}”.",
+    "limited": "Enkel de eerste {count} resultaten staan hieronder. Voeg een woord toe om te verfijnen.",
+    "emptyTitle": "Geen resultaten voor “{query}”",
+    "emptyBody": "Probeer een korter of ander woord en kijk de spelling na. Zoek je een activiteit, blader dan door de kalender; praktische uitleg staat onder Info.",
+    "emptyCalendar": "Naar de kalender",
+    "emptyInfo": "Naar Info",
+    "kindPage": "Pagina",
+    "kindEvent": "Activiteit",
+    "kindLink": "Andere site",
+    "kindMaterial": "Materiaal",
+    "kindAlbum": "Fotoalbum"
+  },
+  "seo": {
+    "home": {
+      "title": "Vlaamse Technische Kring",
+      "description": "VTK is de studentenvereniging van de faculteit Ingenieurswetenschappen aan de KU Leuven: activiteiten, cursussen, Theokot en meer."
+    },
+    "kalender": {
+      "title": "Kalender",
+      "description": "Alle activiteiten van VTK: cantussen, infosessies, sport, cultuur en de jaarlijkse klassiekers."
+    },
+    "tickets": {
+      "title": "Tickets",
+      "description": "Tickets voor cantussen, galabals en andere VTK-events, rechtstreeks en veilig betaald."
+    },
+    "media": {
+      "title": "Media",
+      "description": "Foto's, aftermovies en VTK-publicaties, overzichtelijk samengebracht op een plek."
+    },
+    "praesidium": {
+      "title": "Praesidium",
+      "description": "Het praesidium van VTK, per werkingsjaar: wie welke post opneemt en hoe je hen bereikt."
+    },
+    "werkgroepen": {
+      "title": "Werkgroepen",
+      "description": "De werkgroepen van VTK, elk met hun eigen ploeg en hun eigen werking."
+    },
+    "pocs": {
+      "title": "POC's",
+      "description": "De permanente onderwijscommissies en de studenten die jouw opleiding daar vertegenwoordigen."
+    },
+    "theokot": {
+      "title": "Theokot",
+      "description": "Bestel je broodje bij het Theokot en haal het af tijdens de openingsuren."
+    },
+    "shift": {
+      "title": "Shiften",
+      "description": "Help mee achter de toog of op een evenement. Elke shift levert bonnetjes op."
+    },
+    "piano": {
+      "title": "Piano reserveren",
+      "description": "Reserveer een tijdslot op de VTK-piano in lokaal 01.52 in het kasteel Arenberg."
+    },
+    "privacy": {
+      "title": "Privacyverklaring",
+      "description": "Welke persoonsgegevens VTK verwerkt op de website, in het ledenportaal en bij tickets en reservaties."
+    },
+    "cookies": {
+      "title": "Cookiebeleid",
+      "description": "Welke browseropslag VTK gebruikt, waarvoor ze dient en hoe je jouw keuze aanpast."
+    },
+    "ledenportaal": {
+      "title": "Over het ledenportaal",
+      "description": "Wat het ledenportaal is, wie er binnen kan en wat je er als lid of praesidiumlid doet."
+    },
+    "account": {
+      "title": "Mijn account",
+      "description": "Je profiel, je tickets, je shiften en je gekoppelde toepassingen."
+    },
+    "connectedApps": {
+      "title": "Verbonden apps",
+      "description": "De toepassingen waaraan je toegang gaf met je VTK-account."
+    },
+    "login": {
+      "title": "Aanmelden",
+      "description": "Meld je aan met je VTK-account of via KU Leuven."
+    },
+    "consent": {
+      "title": "Toestemming geven",
+      "description": "Een toepassing vraagt toegang tot je VTK-gegevens."
+    },
+    "noAccess": {
+      "title": "Geen toegang",
+      "description": "Je account heeft geen toegang tot deze toepassing."
+    },
+    "onboarding": {
+      "title": "Profiel vervolledigen",
+      "description": "Vul je profiel aan om je VTK-account in gebruik te nemen."
+    },
+    "confirmStudy": {
+      "title": "Studie bevestigen",
+      "description": "Bevestig je opleiding voor dit werkingsjaar."
+    },
+    "ticketOrder": {
+      "title": "Mijn bestelling",
+      "description": "De status van je ticketbestelling en je tickets."
+    },
+    "ticketAccess": {
+      "title": "Toegang tot je tickets",
+      "description": "Open je bestelling met de link uit je bevestigingsmail."
+    },
+    "theokotCounter": {
+      "title": "Theokot-afhaalbalie",
+      "description": "Bestellingen afvinken tijdens een Theokot-shift."
+    },
+    "shiftHistory": {
+      "title": "Mijn shiftgeschiedenis",
+      "description": "De shiften die je eerder deed en de bonnetjes die ze opleverden."
+    },
+    "ssoMetadata": {
+      "title": "SSO-metadata",
+      "description": "Interne referentiepagina voor de KU Leuven-koppeling."
+    },
+    "sample": {
+      "title": "Ontwerpvoorbeelden",
+      "description": "Interne referentiepagina met de bouwstenen van de VTK-huisstijl."
+    }
+  },
+  "contact": {
+    "title": "Contact",
+    "subtitle": "Een vraag, een voorstel of iets dat niet werkt? Laat het hier achter, dan komt het bij de juiste persoon terecht.",
+    "description": "Stel je vraag aan VTK via het contactformulier, of mail rechtstreeks naar info@vtk.be.",
+    "formTitle": "Stuur een bericht",
+    "formIntro": "Elk bericht komt binnen op info@vtk.be en wordt van daar intern doorgegeven. We proberen binnen enkele werkdagen te antwoorden.",
+    "nameLabel": "Naam",
+    "namePlaceholder": "Je voor- en achternaam",
+    "emailLabel": "E-mail",
+    "emailPlaceholder": "jij@voorbeeld.be",
+    "emailHelp": "Op dit adres antwoorden we; kijk het even na.",
+    "subjectLabel": "Onderwerp",
+    "subjectPlaceholder": "Waar gaat het over?",
+    "messageLabel": "Bericht",
+    "messagePlaceholder": "Vertel wat we voor je kunnen doen.",
+    "messageHelp": "Maximaal {max} tekens. Grote bijlagen stuur je best rechtstreeks per mail.",
+    "honeypotLabel": "Laat dit veld leeg",
+    "submit": "Bericht versturen",
+    "submitting": "Bezig met versturen...",
+    "sent": "Bedankt, je bericht is verstuurd. We antwoorden op het adres dat je opgaf.",
+    "directTitle": "Liever rechtstreeks mailen?",
+    "directBody": "Dat mag ook, op hetzelfde adres:",
+    "privacyTitle": "Wat gebeurt er met je gegevens?",
+    "privacyBody": "We gebruiken je naam, je adres en je bericht enkel om je vraag te beantwoorden. Er vertrekt geen automatische bevestigingsmail.",
+    "privacyLink": "Privacyverklaring",
+    "pagesTitle": "Meer contactinfo",
+    "errors": {
+      "fallback": "Je bericht is niet verstuurd. Probeer het opnieuw of mail rechtstreeks naar info@vtk.be.",
+      "nameRequired": "Niet verstuurd: vul je naam in.",
+      "nameTooLong": "Niet verstuurd: je naam is te lang (maximaal {max} tekens).",
+      "emailRequired": "Niet verstuurd: vul je e-mailadres in, anders kunnen we niet antwoorden.",
+      "emailInvalid": "Niet verstuurd: dat e-mailadres klopt niet. Kijk het na, want daar sturen we het antwoord naartoe.",
+      "emailTooLong": "Niet verstuurd: dat e-mailadres is te lang.",
+      "subjectRequired": "Niet verstuurd: vul een onderwerp in.",
+      "subjectTooLong": "Niet verstuurd: het onderwerp is te lang (maximaal {max} tekens).",
+      "messageRequired": "Niet verstuurd: schrijf eerst een bericht.",
+      "messageTooLong": "Niet verstuurd: je bericht is te lang (maximaal {max} tekens). Kort het in of mail rechtstreeks naar info@vtk.be.",
+      "rateLimited": "Niet verstuurd: je stuurde net al enkele berichten. Wacht een kwartier of mail rechtstreeks naar info@vtk.be.",
+      "mailFailed": "Je bericht raakte niet weg door een probleem aan onze kant. Probeer het straks opnieuw of mail rechtstreeks naar info@vtk.be."
     }
   }
 }

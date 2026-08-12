@@ -1,3 +1,5 @@
+import type { Metadata } from 'next';
+import { staticMetadata } from '@/lib/pageMetadata';
 import { headers } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { notFound } from 'next/navigation';
@@ -7,6 +9,16 @@ import { getSession, isKulEnabled } from '@vtk/auth/server';
 import { hasPrompt, isOAuthRequest, resumeAuthorizeUrl, type RawSearchParams } from '@/lib/oauthFlow';
 import { LoginForm } from './LoginForm';
 import { KulSignInButton } from './KulSignInButton';
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ locale: string }>;
+}): Promise<Metadata> {
+  const { locale } = await params;
+  if (!hasLocale(locale)) return {};
+  return staticMetadata('login', '/inloggen', locale, { noIndex: true });
+}
 
 export default async function LoginPage({
   params,
@@ -22,6 +34,10 @@ export default async function LoginPage({
 
   const nextRaw = Array.isArray(sp.next) ? sp.next[0] : sp.next;
   const error = Array.isArray(sp.error) ? sp.error[0] : sp.error;
+  const source = Array.isArray(sp.source) ? sp.source[0] : sp.source;
+  // `error=kul` ondersteunt callbacks die vóór de nieuwe `source`-parameter
+  // gestart zijn. Nieuwe callbacks behouden Better Auths eigen foutcode.
+  const hasKulError = source === 'kul' || error === 'kul';
 
   // Bij een OAuth-flow is de bestemming na login het authorize-endpoint, niet
   // een pagina.
@@ -34,7 +50,8 @@ export default async function LoginPage({
 
   const session = await getSession(await headers());
   if (session && !mustReauthenticate) {
-    redirect(oauth ? next : nextRaw && nextRaw.startsWith('/') ? nextRaw : '/');
+    const safeNext = nextRaw?.startsWith('/') && !nextRaw.startsWith('//') ? nextRaw : '/';
+    redirect(oauth ? next : safeNext);
   }
 
   const dict = getDictionary(locale);
@@ -45,7 +62,7 @@ export default async function LoginPage({
       <div className="vtk-auth-panel">
         <p className="vtk-auth-kicker">{dict.auth.signInLead}</p>
         <h1 className="vtk-auth-title">{dict.auth.signIn}</h1>
-        {error === 'kul' && <p className="vtk-auth-error">{dict.auth.invalidCredentials}</p>}
+        {hasKulError && <p className="vtk-auth-error">{dict.auth.kulSignInFailed}</p>}
         <LoginForm
           nextParam={next}
           hardRedirect={oauth}

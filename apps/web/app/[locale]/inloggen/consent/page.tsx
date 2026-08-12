@@ -1,3 +1,5 @@
+import type { Metadata } from 'next';
+import { staticMetadata } from '@/lib/pageMetadata';
 /**
  * ⚠ DIT IS GEEN VTK-LOGINSCHERM.
  *
@@ -14,7 +16,7 @@
 import { headers } from 'next/headers';
 import { notFound, redirect } from 'next/navigation';
 import { prisma } from '@vtk/db';
-import { getSession } from '@vtk/auth/server';
+import { getSession, verifySignedOAuthQuery } from '@vtk/auth/server';
 import { SCOPE_CODES, describeScope, isSensitiveScope } from '@vtk/auth';
 import { hasLocale } from '@/lib/locale';
 import { signedOAuthQuery, type RawSearchParams } from '@/lib/oauthFlow';
@@ -38,6 +40,16 @@ function one(value: string | string[] | undefined): string | undefined {
   return Array.isArray(value) ? value[0] : value;
 }
 
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ locale: string }>;
+}): Promise<Metadata> {
+  const { locale } = await params;
+  if (!hasLocale(locale)) return {};
+  return staticMetadata('consent', '/inloggen/consent', locale, { noIndex: true });
+}
+
 export default async function ConsentPage({
   params,
   searchParams,
@@ -53,11 +65,12 @@ export default async function ConsentPage({
   // Zonder ondertekend verzoek is er geen client en geen scopes.
   const oauthQuery = signedOAuthQuery(sp);
   if (!oauthQuery) notFound();
+  if (!(await verifySignedOAuthQuery(oauthQuery))) notFound();
 
   // Eerst vervallen controleren, nog voor de sessie: een verlopen aanvraag is
   // toch niet meer te redden, en iemand daarvoor eerst door de login sturen is
-  // verspilde moeite. De handtekening zelf verifieert de plugin bij het
-  // verzenden; `exp` staat gewoon in de query.
+  // verspilde moeite. De query is hierboven al geverifieerd, zodat ook dit
+  // scherm nooit informatie uit een door de bezoeker gewijzigde flow toont.
   const exp = Number(one(sp.exp));
   if (Number.isFinite(exp) && exp > 0 && new Date(exp * 1000) <= new Date()) {
     return <ConsentError nl={nl} kind="expired" />;

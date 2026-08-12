@@ -23,13 +23,46 @@ export function formatPriceCents(
 }
 
 /**
+ * Waar een item in de loods ligt, als één regel ("2R · A1"). Enkel voor het team:
+ * schap en rek zijn achter `logistiek.manage` verborgen (zie M6 en
+ * docs/design-decisions.md).
+ */
+export function itemLocation(item: {
+  locationShelf: string | null;
+  locationRack: string | null;
+}): string | null {
+  const parts = [item.locationShelf, item.locationRack]
+    .map((part) => part?.trim())
+    .filter((part): part is string => Boolean(part));
+  return parts.length > 0 ? parts.join(' · ') : null;
+}
+
+/**
+ * Ziet dit eruit als een e-mailadres? Bewust minimaal: het adres wordt enkel in
+ * kopie gezet, en een strengere regex weigert vroeg of laat een geldig adres.
+ * Of het bestaat, weten we pas als de mailserver het aanneemt.
+ */
+export function isEmailish(value: string): boolean {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
+}
+
+/**
  * "YYYY-MM-DD" uit een date-input naar een Date op UTC-middernacht, zoals
  * Prisma `@db.Date`-kolommen ze bewaart. Ongeldige input geeft null.
  */
 export function parseDateOnly(value: string): Date | null {
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return null;
-  const date = new Date(`${value}T00:00:00.000Z`);
-  return Number.isNaN(date.getTime()) ? null : date;
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  if (!match) return null;
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  const date = new Date(Date.UTC(year, month - 1, day));
+  if (
+    date.getUTCFullYear() !== year ||
+    date.getUTCMonth() !== month - 1 ||
+    date.getUTCDate() !== day
+  ) return null;
+  return date;
 }
 
 /** Vandaag als date-only (UTC-middernacht), voor vergelijkingen met @db.Date. */
@@ -44,6 +77,32 @@ export function todayDateOnly(now: Date = new Date()): Date {
   return new Date(`${formatter.format(now)}T00:00:00.000Z`);
 }
 
+/**
+ * De maandag van de week waarin dit moment valt, als date-only (UTC-middernacht,
+ * zoals `todayDateOnly`). Belgische wall-clock, dus een rit van zondagavond
+ * 23:00 hoort nog bij die week en niet bij de volgende.
+ */
+export function startOfWeek(date: Date = new Date()): Date {
+  const day = todayDateOnly(date);
+  const weekday = (day.getUTCDay() + 6) % 7; // maandag = 0
+  return new Date(day.getTime() - weekday * 24 * 60 * 60 * 1000);
+}
+
+/**
+ * ISO-weeknummer (maandag als eerste dag, week 1 bevat 4 januari). Voor de titel
+ * van het weekoverzicht: "week 38" zegt Logistiek meer dan een datumbereik.
+ */
+export function isoWeekNumber(date: Date): number {
+  const thursday = new Date(
+    Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate())
+  );
+  // Naar de donderdag van deze week: die bepaalt in welk jaar de week valt.
+  thursday.setUTCDate(thursday.getUTCDate() - ((thursday.getUTCDay() + 6) % 7) + 3);
+  const firstThursday = new Date(Date.UTC(thursday.getUTCFullYear(), 0, 4));
+  firstThursday.setUTCDate(firstThursday.getUTCDate() - ((firstThursday.getUTCDay() + 6) % 7) + 3);
+  return 1 + Math.round((thursday.getTime() - firstThursday.getTime()) / (7 * 24 * 60 * 60 * 1000));
+}
+
 export function formatDateOnly(date: Date, locale: LogistiekLocale = 'nl'): string {
   return new Intl.DateTimeFormat(locale === 'en' ? 'en-GB' : 'nl-BE', {
     timeZone: 'UTC',
@@ -52,6 +111,117 @@ export function formatDateOnly(date: Date, locale: LogistiekLocale = 'nl'): stri
     month: 'long',
     year: 'numeric',
   }).format(date);
+}
+
+/**
+ * Evenementen klaarmaken voor de keuzelijst in het aanvraagformulier: de datum
+ * wordt hier al tekst. De picker is een client component, en een `Date` die de
+ * grens over gaat, komt daar als string aan; ze dan pas formatteren zou de
+ * server-timezone gebruiken in plaats van de Belgische.
+ */
+export function eventOptions(
+  events: Array<{ id: string; name: string; startAt: Date | null; groupName: string | null }>,
+  locale: LogistiekLocale = 'nl'
+): Array<{ id: string; name: string; startAt: string | null; groupName: string | null }> {
+  return events.map((event) => ({
+    id: event.id,
+    name: event.name,
+    groupName: event.groupName,
+    startAt: event.startAt ? formatDateOnly(event.startAt, locale) : null,
+  }));
+}
+
+export type ChangeSnapshot = {
+  pickupDate: Date;
+  returnDate: Date;
+  /** Dagdeel, wanneer de aanvraag er een heeft; zie M12. */
+  pickupPart?: string | null;
+  returnPart?: string | null;
+  lines: Array<{ itemName: string; quantity: number }>;
+};
+
+/**
+ * Wat er precies veranderde aan een aanvraag, in mensentaal.
+ *
+ * "3 materiaallijnen na de wijziging" staat in de historiek maar zegt de
+ * aanvrager niets: hij weet niet wat er stond. Deze regels gaan zowel naar de
+ * historiek (A6) als naar de mail (A9), en zijn de reden dat die mail bruikbaar
+ * is: "Tafel: 5 → 3" is een bericht, "aanvraag gewijzigd" is een raadsel.
+ *
+ * Bewust op naam en niet op item-id: de lijnen bewaren de naam op het moment van
+ * aanvragen (`itemName`), en dat is ook wat de aanvrager gelezen heeft.
+ */
+export function describeReservationChanges(
+  before: ChangeSnapshot,
+  after: ChangeSnapshot,
+  locale: LogistiekLocale = 'nl'
+): string[] {
+  const en = locale === 'en';
+  const changes: string[] = [];
+
+  // Datum en dagdeel samen: "za 12 september 2026 (namiddag) → zo 13 september
+  // 2026 (voormiddag)". Enkel het dagdeel wijzigen is ook een wijziging, want
+  // daar plant iemand zijn shift op.
+  const sameMoment = (a: Date, b: Date, partA?: string | null, partB?: string | null) =>
+    a.getTime() === b.getTime() && (partA ?? null) === (partB ?? null);
+  if (!sameMoment(before.pickupDate, after.pickupDate, before.pickupPart, after.pickupPart)) {
+    changes.push(
+      `${en ? 'Pickup' : 'Afhalen'}: ${formatDateWithPart(before.pickupDate, before.pickupPart, locale)} → ${formatDateWithPart(after.pickupDate, after.pickupPart, locale)}`
+    );
+  }
+  if (!sameMoment(before.returnDate, after.returnDate, before.returnPart, after.returnPart)) {
+    changes.push(
+      `${en ? 'Return' : 'Terugbrengen'}: ${formatDateWithPart(before.returnDate, before.returnPart, locale)} → ${formatDateWithPart(after.returnDate, after.returnPart, locale)}`
+    );
+  }
+
+  const sum = (lines: ChangeSnapshot['lines']) => {
+    const totals = new Map<string, number>();
+    for (const line of lines) {
+      totals.set(line.itemName, (totals.get(line.itemName) ?? 0) + line.quantity);
+    }
+    return totals;
+  };
+  const oldLines = sum(before.lines);
+  const newLines = sum(after.lines);
+
+  for (const [name, quantity] of newLines) {
+    const previous = oldLines.get(name);
+    if (previous === undefined) {
+      changes.push(`${name}: ${en ? 'added' : 'toegevoegd'} (${quantity})`);
+    } else if (previous !== quantity) {
+      changes.push(`${name}: ${previous} → ${quantity}`);
+    }
+  }
+  for (const [name] of oldLines) {
+    if (!newLines.has(name)) changes.push(`${name}: ${en ? 'removed' : 'verwijderd'}`);
+  }
+
+  return changes;
+}
+
+/**
+ * Compacte periode: "1 tot 30 augustus 2026", "1 augustus tot 3 september 2026"
+ * of twee volledige datums wanneer het jaar verschilt. Voor koppen boven een
+ * lijst, waar twee volledige datums naast elkaar te veel ruis geven.
+ */
+export function formatDateRange(from: Date, to: Date, locale: LogistiekLocale = 'nl'): string {
+  const tag = locale === 'en' ? 'en-GB' : 'nl-BE';
+  const part = (date: Date, opts: Intl.DateTimeFormatOptions) =>
+    new Intl.DateTimeFormat(tag, { timeZone: 'UTC', ...opts }).format(date);
+  const joiner = locale === 'en' ? 'to' : 'tot';
+
+  const sameYear = from.getUTCFullYear() === to.getUTCFullYear();
+  const sameMonth = sameYear && from.getUTCMonth() === to.getUTCMonth();
+
+  if (sameMonth) {
+    return `${part(from, { day: 'numeric' })} ${joiner} ${part(to, { day: 'numeric', month: 'long', year: 'numeric' })}`;
+  }
+  if (sameYear) {
+    return `${part(from, { day: 'numeric', month: 'long' })} ${joiner} ${part(to, { day: 'numeric', month: 'long', year: 'numeric' })}`;
+  }
+  const full = { day: 'numeric', month: 'long', year: 'numeric' } as const;
+  return `${part(from, full)} ${joiner} ${part(to, full)}`;
 }
 
 /** Date (@db.Date, UTC-middernacht) naar de "YYYY-MM-DD"-waarde van een date-input. */
@@ -95,6 +265,24 @@ export function formatDateTime(date: Date, locale: LogistiekLocale = 'nl'): stri
 /** Twee gesloten datumbereiken overlappen. */
 export function rangesOverlap(aFrom: Date, aTo: Date, bFrom: Date, bTo: Date): boolean {
   return aFrom <= bTo && aTo >= bFrom;
+}
+
+/**
+ * Ligt dit moment op een kwartier?
+ *
+ * Ritten worden op het kwartier gepland: zo plant Logistiek de kar in, en uren
+ * als 14:07 maken het weekoverzicht onleesbaar. De server weigert een ander
+ * tijdstip in plaats van stil af te ronden, want afronden verschuift een rit
+ * zonder dat de aanvrager het ziet.
+ *
+ * In UTC gerekend zodat de server-timezone niet meespeelt; elke echte
+ * tijdzone-offset is een veelvoud van een kwartier, dus het antwoord verandert
+ * niet met de zone.
+ */
+export function isOnQuarterHour(date: Date): boolean {
+  return (
+    date.getUTCMinutes() % 15 === 0 && date.getUTCSeconds() === 0 && date.getUTCMilliseconds() === 0
+  );
 }
 
 /** Aantal begonnen uren tussen twee momenten, met één uur als minimum. */
@@ -166,11 +354,117 @@ export function requesterTypeLabel(type: UitleenRequesterType, locale: Logistiek
   return (locale === 'en' ? REQUESTER_TYPE_LABELS_EN : REQUESTER_TYPE_LABELS)[type];
 }
 
-/** Deadline-signaal: de opbouw start binnen de 14 dagen na de aanvraag. */
-export function isLastMinute(pickupDate: Date, requestedAt: Date = new Date()): boolean {
-  const days = (pickupDate.getTime() - requestedAt.getTime()) / (24 * 60 * 60 * 1000);
-  return days < 14;
+/**
+ * Namens wie een aanvraag gebeurt, als één label: de post bij INTERN, anders de
+ * bewaarde naam van de werkgroep of de externe. Gedeeld door de aanvragenlijst
+ * en de kalender, zodat beide schermen dezelfde naam tonen.
+ */
+export function requesterLabel(request: {
+  requesterType: UitleenRequesterType;
+  requesterName: string | null;
+  group: { nameNl: string } | null;
+}): string {
+  if (request.requesterType === 'INTERN') {
+    return request.group?.nameNl ?? REQUESTER_TYPE_LABELS.INTERN;
+  }
+  return request.requesterName ?? REQUESTER_TYPE_LABELS[request.requesterType];
 }
+
+/**
+ * Termijn waarbinnen een aanvraag "last minute" heet. Zeven dagen: met veertien
+ * kreeg bijna elke aanvraag de badge, en een signaal dat overal staat is geen
+ * signaal meer. Het team past dit zelf aan op /beheer/instellingen.
+ */
+export const DEFAULT_LAST_MINUTE_DAYS = 7;
+
+/** Deadline-signaal: de afhaaldag valt binnen `days` na het moment van aanvragen. */
+export function isLastMinute(
+  pickupDate: Date,
+  requestedAt: Date = new Date(),
+  days: number = DEFAULT_LAST_MINUTE_DAYS
+): boolean {
+  const elapsed = (pickupDate.getTime() - requestedAt.getTime()) / (24 * 60 * 60 * 1000);
+  return elapsed < days;
+}
+
+/**
+ * De staat van een exemplaar, zoals het team ze noteert. Interne informatie: ze
+ * staat in het beheer en op de detailpagina enkel voor `logistiek.manage`, want
+ * ze zegt iets over onderhoud en niet over wat je kan aanvragen.
+ */
+/**
+ * Dagdelen, in de volgorde van de dag. Enkel voor de mensen: de
+ * voorraadberekening blijft op hele dagen rekenen (zie docs/design-decisions.md),
+ * dus dit label staat naast de datum en niet in een query.
+ */
+export const DAY_PART_LABELS: Record<string, string> = {
+  VOORMIDDAG: 'voormiddag',
+  NAMIDDAG: 'namiddag',
+  AVOND: 'avond',
+};
+
+const DAY_PART_LABELS_EN: Record<string, string> = {
+  VOORMIDDAG: 'morning',
+  NAMIDDAG: 'afternoon',
+  AVOND: 'evening',
+};
+
+export const DAY_PARTS = ['VOORMIDDAG', 'NAMIDDAG', 'AVOND'] as const;
+
+export function dayPartLabel(
+  part: string | null | undefined,
+  locale: LogistiekLocale = 'nl'
+): string | null {
+  if (!part) return null;
+  return (locale === 'en' ? DAY_PART_LABELS_EN : DAY_PART_LABELS)[part] ?? null;
+}
+
+/** "za 12 september 2026 (namiddag)", of gewoon de datum zonder dagdeel. */
+export function formatDateWithPart(
+  date: Date,
+  part: string | null | undefined,
+  locale: LogistiekLocale = 'nl'
+): string {
+  const label = dayPartLabel(part, locale);
+  return label ? `${formatDateOnly(date, locale)} (${label})` : formatDateOnly(date, locale);
+}
+
+/**
+ * Uren waarmee een dagdeel voorgevuld wordt wanneer er een rit van gemaakt
+ * wordt. Een afspraak, geen boeking: het dagdeel zelf blijft grof (zie
+ * docs/design-decisions.md), maar een rit heeft wel een begin- en einduur nodig,
+ * en dan is het midden van dat dagdeel de minst verkeerde gok.
+ */
+const DAY_PART_HOURS: Record<string, { from: string; to: string }> = {
+  VOORMIDDAG: { from: '09:00', to: '11:00' },
+  NAMIDDAG: { from: '13:00', to: '15:00' },
+  AVOND: { from: '18:00', to: '20:00' },
+};
+
+/**
+ * Een afhaal- of terugbrengdag plus dagdeel omzetten naar de twee
+ * `datetime-local`-waarden waarmee het ritformulier voorgevuld wordt.
+ *
+ * De dagkolommen zijn `@db.Date` en komen als middernacht UTC terug, terwijl de
+ * uren Belgische wall-clock zijn. Daarom lezen we de dag in UTC en plakken we er
+ * een lokaal uur aan in plaats van de `Date` om te rekenen: dat laatste zou in
+ * de winter een dag terugvallen.
+ */
+export function tripWindowFor(
+  date: Date,
+  part: string | null | undefined
+): { startAt: string; endAt: string } {
+  const day = date.toISOString().slice(0, 10);
+  const hours = DAY_PART_HOURS[part ?? ''] ?? DAY_PART_HOURS.VOORMIDDAG;
+  return { startAt: `${day}T${hours.from}`, endAt: `${day}T${hours.to}` };
+}
+
+export const ITEM_CONDITION_LABELS: Record<string, string> = {
+  WERKT: 'Werkt',
+  TESTEN: 'Nog testen',
+  ONVOLLEDIG: 'Onvolledig',
+  KAPOT: 'Kapot / vervangen',
+};
 
 export const RESERVATION_STATUS_LABELS: Record<UitleenReservationStatus, string> = {
   REQUESTED: 'Aangevraagd',
@@ -223,7 +517,12 @@ export function vanStatusLabel(
 /** Statussen die voorraad innemen bij de beschikbaarheidsberekening. */
 export const STOCK_CONSUMING_STATUSES: UitleenReservationStatus[] = ['APPROVED', 'PICKED_UP'];
 
-export type ReservationLineInput = { itemId: string; quantity: number };
+export type ReservationLineInput = {
+  itemId: string;
+  quantity: number;
+  /** Opmerking bij deze lijn ("liefst de zwarte"); optioneel. */
+  note?: string;
+};
 
 export class UitleenValidationError extends Error {
   readonly code: string;
@@ -232,4 +531,31 @@ export class UitleenValidationError extends Error {
     this.name = 'UitleenValidationError';
     this.code = code;
   }
+}
+
+/**
+ * Eenheden die in de keuzelijst bij een flesserke-item staan.
+ *
+ * Bewust kort en bewust vrije tekst in de database: dit dekt alles wat er na de
+ * Excel-import in stond (drank in liter, voeding in kilo, wegwerp per stuk), en
+ * een item dat er niet in past mag gewoon niets hebben. Een enum zou een
+ * migratie vragen voor elk product dat het team er anders bij zet.
+ */
+export const CONTENT_UNITS = ['L', 'cl', 'ml', 'kg', 'g', 'stuks', 'pak', 'rol', 'zakjes'] as const;
+
+/**
+ * "0,5 L" uit `contentAmount` en `contentUnit`.
+ *
+ * De getallen komen uit een Excel met een punt als decimaalteken; hier lezen we
+ * Nederlands, dus wordt het een komma. Zonder eenheid blijft het getal alleen
+ * staan: beter een kaal "0,5" dan een verzonnen eenheid.
+ */
+export function formatContentAmount(
+  amount: string | null | undefined,
+  unit: string | null | undefined
+): string {
+  const value = amount?.trim().replace('.', ',') ?? '';
+  const suffix = unit?.trim() ?? '';
+  if (!value) return suffix;
+  return suffix ? `${value} ${suffix}` : value;
 }

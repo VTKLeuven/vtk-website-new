@@ -1,14 +1,15 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useRef, useState, useTransition } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { ConfirmDialog } from "@vtk/ui";
+import { TileVisualPicker } from "@/components/admin/TileVisualPicker";
 import {
   TILE_COLORS,
-  TILE_ICONS,
-  TileIcon,
-  tileColor,
+  TileChip,
+  groupTilesBySource,
   type EffectiveTile,
+  type TileSection,
 } from "@/lib/dashboard-tiles";
 import {
   addPersonalTileAction,
@@ -25,6 +26,7 @@ type Loc = "nl" | "en";
 
 const T = {
   nl: {
+    shortcuts: "Snelkoppelingen",
     customize: "Aanpassen",
     done: "Klaar",
     addTile: "Tegel toevoegen",
@@ -36,19 +38,26 @@ const T = {
     reset: "Herstellen",
     label: "Naam",
     url: "URL",
-    icon: "Pictogram",
     color: "Kleur",
     save: "Opslaan",
     cancel: "Annuleren",
     empty: "Nog geen tegels. Voeg er een toe of vraag een beheerder om standaardtegels.",
-    hidden: "verborgen",
     resetConfirm: "Jouw persoonlijke indeling herstellen naar de standaard?",
     overrideNote: "Dit overschrijft de standaardtegel alleen voor jou.",
     newTile: "Nieuwe tegel",
     editTile: "Tegel bewerken",
-    dragHint: "Sleep om te herschikken",
+    dragHint: "Sleep om te herschikken binnen een groep",
+    secGlobal: "Voor iedereen",
+    secGlobalSub: "door beheerders ingesteld",
+    secGroupSub: "jouw post",
+    secOwn: "Van jou",
+    secOwnSub: "alleen jij ziet deze",
+    ownEmpty: "Nog geen eigen tegels.",
+    overridden: "aangepast",
+    hiddenCount: (n: number) => (n === 1 ? "1 verborgen" : `${n} verborgen`),
   },
   en: {
+    shortcuts: "Shortcuts",
     customize: "Customize",
     done: "Done",
     addTile: "Add tile",
@@ -60,17 +69,23 @@ const T = {
     reset: "Reset",
     label: "Name",
     url: "URL",
-    icon: "Icon",
     color: "Color",
     save: "Save",
     cancel: "Cancel",
     empty: "No tiles yet. Add one, or ask an admin to set up default tiles.",
-    hidden: "hidden",
     resetConfirm: "Reset your personal layout back to the defaults?",
     overrideNote: "This overrides the default tile for you only.",
     newTile: "New tile",
     editTile: "Edit tile",
-    dragHint: "Drag to rearrange",
+    dragHint: "Drag to rearrange within a group",
+    secGlobal: "For everyone",
+    secGlobalSub: "set by admins",
+    secGroupSub: "your post",
+    secOwn: "Yours",
+    secOwnSub: "only you see these",
+    ownEmpty: "No tiles of your own yet.",
+    overridden: "customised",
+    hiddenCount: (n: number) => (n === 1 ? "1 hidden" : `${n} hidden`),
   },
 } as const;
 
@@ -78,6 +93,14 @@ type EditorState =
   | { mode: "add" }
   | { mode: "edit"; tile: EffectiveTile }
   | null;
+
+type TileDraft = {
+  label: string;
+  url: string;
+  icon: string;
+  color: string;
+  imageKey: string | null;
+};
 
 function buildLayout(list: EffectiveTile[]): LayoutItem[] {
   return list.map((t, i) => ({
@@ -107,7 +130,9 @@ export function DashboardTiles({
   // Re-sync from the server whenever the props change (after a revalidation),
   // unless the user is mid-drag.
   const dragging = useRef<string | null>(null);
-  const signature = tiles.map((x) => `${x.key}:${x.order}:${x.hidden}:${x.label}:${x.icon}:${x.color}:${x.url}`).join("|");
+  const signature = tiles
+    .map((x) => `${x.key}:${x.order}:${x.hidden}:${x.label}:${x.icon}:${x.color}:${x.imageKey}:${x.url}`)
+    .join("|");
   useEffect(() => {
     if (!dragging.current) setList(tiles);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -117,6 +142,30 @@ export function DashboardTiles({
   useEffect(() => {
     listRef.current = list;
   }, [list]);
+
+  // In kijkmodus verdwijnen verborgen tegels, en daarmee ook een sectie die
+  // volledig verborgen is; in aanpasmodus zie je alles, zodat je het weer aan
+  // kan zetten.
+  const sections = useMemo<TileSection[]>(() => {
+    const visible = editing ? list : list.filter((x) => !x.hidden);
+    const built = groupTilesBySource(visible);
+    // Tijdens het aanpassen hoort de eigen sectie er altijd te staan: het is de
+    // plek waar een nieuwe tegel belandt.
+    if (editing && !built.some((s) => s.kind === "own")) {
+      built.push({ key: "own", kind: "own", tiles: [] });
+    }
+    return built;
+  }, [list, editing]);
+
+  // Slepen mag alleen binnen één sectie: een volgorde tussen jouw tegels en die
+  // van IT bestaat niet, en de secties worden toch opnieuw gegroepeerd.
+  const sectionOf = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const section of sections) {
+      for (const tile of section.tiles) map.set(tile.key, section.key);
+    }
+    return map;
+  }, [sections]);
 
   function persistLayout(next: EffectiveTile[]) {
     startTransition(() => saveDashboardLayoutAction(buildLayout(next)));
@@ -129,6 +178,7 @@ export function DashboardTiles({
   function onDragEnter(targetKey: string) {
     const fromKey = dragging.current;
     if (!fromKey || fromKey === targetKey) return;
+    if (sectionOf.get(fromKey) !== sectionOf.get(targetKey)) return;
     setList((cur) => {
       const from = cur.findIndex((x) => x.key === fromKey);
       const to = cur.findIndex((x) => x.key === targetKey);
@@ -165,11 +215,15 @@ export function DashboardTiles({
     });
   }
 
-  const visible = editing ? list : list.filter((x) => !x.hidden);
+  const nothingToShow = sections.every((s) => s.tiles.length === 0);
 
   return (
     <div className="vtk-tiles">
+      {/* De knop hoort bij de tegels, niet bij de pagina: hij staat daarom op
+          dezelfde regel als de sectiekop en niet los boven het raster te
+          zweven. */}
       <div className="vtk-tiles-bar">
+        <h2 className="vtk-tiles-title">{t.shortcuts}</h2>
         <div className="vtk-tiles-actions">
           {editing && (
             <>
@@ -186,89 +240,118 @@ export function DashboardTiles({
               )}
             </>
           )}
+          <button
+            type="button"
+            className={
+              "vtk-tile-btn" +
+              (editing ? " vtk-tile-btn-primary" : "") +
+              (pending ? " is-pending" : "")
+            }
+            onClick={() => setEditing((v) => !v)}
+          >
+            {editing ? t.done : t.customize}
+          </button>
         </div>
-        <button
-          type="button"
-          className={"vtk-tile-btn vtk-tile-btn-primary" + (pending ? " is-pending" : "")}
-          onClick={() => setEditing((v) => !v)}
-        >
-          {editing ? t.done : t.customize}
-        </button>
       </div>
 
       {editing && <p className="vtk-tiles-hint">{t.dragHint}</p>}
 
-      {visible.length === 0 ? (
+      {nothingToShow ? (
         <p className="vtk-tiles-empty">{t.empty}</p>
       ) : (
-        <div className="vtk-tile-grid">
-          {visible.map((tile) => {
-            const c = tileColor(tile.color);
-            const inner = (
-              <>
-                <span className="vtk-tile-chip" style={{ background: c.chipBg, color: c.chipFg }}>
-                  <TileIcon name={tile.icon} />
+        sections.map((section) => {
+          const hidden = section.tiles.filter((x) => x.hidden).length;
+          const title =
+            section.kind === "global"
+              ? t.secGlobal
+              : section.kind === "own"
+                ? t.secOwn
+                : (section.groupLabel ?? t.secGroupSub);
+          const sub =
+            section.kind === "global"
+              ? t.secGlobalSub
+              : section.kind === "own"
+                ? t.secOwnSub
+                : t.secGroupSub;
+          return (
+            <section key={section.key} className="vtk-tiles-lane">
+              <div className="vtk-tiles-lane-head">
+                <span className={`vtk-tiles-lane-dot is-${section.kind}`} aria-hidden="true" />
+                <h3 className="vtk-tiles-lane-title">{title}</h3>
+                <span className="vtk-tiles-lane-sub">{sub}</span>
+                <span className="vtk-tiles-lane-count">
+                  {editing && hidden > 0 ? `${t.hiddenCount(hidden)} · ` : ""}
+                  {section.tiles.length}
                 </span>
-                <span className="vtk-tile-label">{tile.label}</span>
-                <span className="vtk-tile-host">{hostOf(tile.url)}</span>
-              </>
-            );
-            if (!editing) {
-              return (
-                <a
-                  key={tile.key}
-                  href={tile.url}
-                  target="_blank"
-                  rel="noreferrer noopener"
-                  className="vtk-tile"
-                >
-                  {inner}
-                </a>
-              );
-            }
-            return (
-              <div
-                key={tile.key}
-                className={"vtk-tile vtk-tile-editing" + (tile.hidden ? " is-hidden" : "")}
-                draggable
-                onDragStart={() => onDragStart(tile.key)}
-                onDragEnter={() => onDragEnter(tile.key)}
-                onDragOver={(e) => e.preventDefault()}
-                onDragEnd={onDragEnd}
-              >
-                <span className="vtk-tile-handle" title={t.dragHint}>⠿</span>
-                {inner}
-                {tile.source !== "personal" && (
-                  <span className="vtk-tile-source">
-                    {tile.source === "group" ? tile.groupLabel : locale === "nl" ? "globaal" : "global"}
-                    {tile.overridden ? " ·✎" : ""}
-                  </span>
-                )}
-                <div className="vtk-tile-controls">
-                  <button type="button" title={t.edit} onClick={() => setEditor({ mode: "edit", tile })}>
-                    ✎
-                  </button>
-                  {tile.source === "personal" ? (
-                    <button type="button" title={t.remove} onClick={() => removeTile(tile)}>
-                      🗑
-                    </button>
-                  ) : (
-                    <>
-                      <button type="button" title={tile.hidden ? t.show : t.hide} onClick={() => toggleHidden(tile)}>
-                        {tile.hidden ? "🙈" : "👁"}
-                      </button>
-                      {(tile.overridden || tile.hidden) && (
-                        <button type="button" title={t.reset} onClick={() => resetTile(tile)}>
-                          ↺
-                        </button>
-                      )}
-                    </>
-                  )}
-                </div>
               </div>
-            );
-          })}
-        </div>
+
+              {section.tiles.length === 0 ? (
+                <p className="vtk-tiles-hint">{t.ownEmpty}</p>
+              ) : (
+                <div className="vtk-tile-grid">
+                  {section.tiles.map((tile) => {
+                    const inner = (
+                      <>
+                        <TileChip icon={tile.icon} imageKey={tile.imageKey} color={tile.color} />
+                        <span className="vtk-tile-label">{tile.label}</span>
+                        <span className="vtk-tile-host">{hostOf(tile.url)}</span>
+                      </>
+                    );
+                    if (!editing) {
+                      return (
+                        <a
+                          key={tile.key}
+                          href={tile.url}
+                          target="_blank"
+                          rel="noreferrer noopener"
+                          className="vtk-tile"
+                        >
+                          {inner}
+                        </a>
+                      );
+                    }
+                    return (
+                      <div
+                        key={tile.key}
+                        className={"vtk-tile vtk-tile-editing" + (tile.hidden ? " is-hidden" : "")}
+                        draggable
+                        onDragStart={() => onDragStart(tile.key)}
+                        onDragEnter={() => onDragEnter(tile.key)}
+                        onDragOver={(e) => e.preventDefault()}
+                        onDragEnd={onDragEnd}
+                      >
+                        <span className="vtk-tile-handle" title={t.dragHint}>⠿</span>
+                        {inner}
+                        {tile.overridden && <span className="vtk-tile-source">{t.overridden}</span>}
+                        <div className="vtk-tile-controls">
+                          <button type="button" title={t.edit} onClick={() => setEditor({ mode: "edit", tile })}>
+                            ✎
+                          </button>
+                          {tile.source === "personal" ? (
+                            <button type="button" title={t.remove} onClick={() => removeTile(tile)}>
+                              🗑
+                            </button>
+                          ) : (
+                            <>
+                              <button type="button" title={tile.hidden ? t.show : t.hide} onClick={() => toggleHidden(tile)}>
+                                {tile.hidden ? "🙈" : "👁"}
+                              </button>
+                              {(tile.overridden || tile.hidden) && (
+                                <button type="button" title={t.reset} onClick={() => resetTile(tile)}>
+                                  ↺
+                                </button>
+                              )}
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </section>
+          );
+        })
       )}
 
       {editor && (
@@ -325,7 +408,7 @@ function TileEditor({
   state: { mode: "add" } | { mode: "edit"; tile: EffectiveTile };
   pending: boolean;
   onClose: () => void;
-  onSubmit: (data: { label: string; url: string; icon: string; color: string }) => void;
+  onSubmit: (data: TileDraft) => void;
 }) {
   const t = T[locale];
   const initial = state.mode === "edit" ? state.tile : null;
@@ -333,7 +416,7 @@ function TileEditor({
   const [url, setUrl] = useState(initial?.url ?? "");
   const [icon, setIcon] = useState(initial?.icon ?? "link");
   const [color, setColor] = useState(initial?.color ?? "navy");
-  const c = tileColor(color);
+  const [imageKey, setImageKey] = useState<string | null>(initial?.imageKey ?? null);
   const isSharedEdit = state.mode === "edit" && state.tile.source !== "personal";
 
   return (
@@ -342,9 +425,7 @@ function TileEditor({
         <h3>{state.mode === "add" ? t.newTile : t.editTile}</h3>
 
         <div className="vtk-tile-preview">
-          <span className="vtk-tile-chip" style={{ background: c.chipBg, color: c.chipFg }}>
-            <TileIcon name={icon} />
-          </span>
+          <TileChip icon={icon} imageKey={imageKey} color={color} />
           <span className="vtk-tile-label">{label || "—"}</span>
         </div>
 
@@ -357,22 +438,13 @@ function TileEditor({
           <input value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://…" />
         </label>
 
-        <div className="vtk-tile-field">
-          <span>{t.icon}</span>
-          <div className="vtk-icon-grid">
-            {TILE_ICONS.map((i) => (
-              <button
-                key={i.key}
-                type="button"
-                className={"vtk-icon-opt" + (icon === i.key ? " is-active" : "")}
-                title={locale === "nl" ? i.labelNl : i.labelEn}
-                onClick={() => setIcon(i.key)}
-              >
-                <TileIcon name={i.key} size={20} />
-              </button>
-            ))}
-          </div>
-        </div>
+        <TileVisualPicker
+          locale={locale}
+          icon={icon}
+          imageKey={imageKey}
+          onIconChange={setIcon}
+          onImageChange={setImageKey}
+        />
 
         <div className="vtk-tile-field">
           <span>{t.color}</span>
@@ -383,6 +455,8 @@ function TileEditor({
                 type="button"
                 className={"vtk-color-opt" + (color === col.key ? " is-active" : "")}
                 title={locale === "nl" ? col.labelNl : col.labelEn}
+                aria-label={locale === "nl" ? col.labelNl : col.labelEn}
+                aria-pressed={color === col.key}
                 style={{ background: col.chipBg, color: col.chipFg }}
                 onClick={() => setColor(col.key)}
               >
@@ -402,7 +476,7 @@ function TileEditor({
             type="button"
             className="vtk-tile-btn vtk-tile-btn-primary"
             disabled={pending || !label.trim() || !url.trim()}
-            onClick={() => onSubmit({ label, url, icon, color })}
+            onClick={() => onSubmit({ label, url, icon, color, imageKey })}
           >
             {t.save}
           </button>

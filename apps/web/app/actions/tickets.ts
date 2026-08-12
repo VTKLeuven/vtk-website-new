@@ -4,6 +4,7 @@ import { randomBytes } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { redirect, unstable_rethrow } from "next/navigation";
 import { prisma } from "@vtk/db";
+import type { Prisma } from "@prisma/client";
 import { z } from "zod";
 import { requireSession } from "@/lib/session";
 import {
@@ -12,7 +13,16 @@ import {
 } from "@/lib/ticketing/authorization";
 import { parseEuroAmount } from "@/lib/ticketing/money";
 import { requestTicketRefund } from "@/lib/ticketing/refunds";
+import { slugify } from "@/lib/ticketing/slug";
+import { geocodeAddress } from "@/lib/ticketing/geocode";
 import { localDateTimeToUtc } from "@/lib/ticketing/time";
+import { withSerializableTransaction } from "@/lib/ticketing/transactions";
+import {
+  parseTicketDesignDraft,
+  readTicketDesignSettings,
+  ticketDesignSettingsWith,
+  type TicketDesignDraft,
+} from "@/lib/ticketing/design";
 
 const localeSchema = z.enum(["nl", "en"]);
 const roleSchema = z.enum(["OWNER", "MANAGER", "FINANCE", "SCANNER", "REPORTER"]);
@@ -115,16 +125,6 @@ function boundedIntegerValue(
   return parsed;
 }
 
-function slugify(input: string): string {
-  return input
-    .normalize("NFKD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "")
-    .slice(0, 80);
-}
-
 function codeFrom(input: string): string {
   return slugify(input).replace(/-/g, "_").toUpperCase().slice(0, 48) || randomBytes(4).toString("hex").toUpperCase();
 }
@@ -133,10 +133,125 @@ function localePath(locale: "nl" | "en", path: string): string {
   return `${locale === "en" ? "/en" : ""}${path}`;
 }
 
+function coordinateValue(formData: FormData, field: string, bound: number): number | null {
+  const parsed = Number.parseFloat(String(formData.get(field) ?? ""));
+  return Number.isFinite(parsed) && Math.abs(parsed) <= bound ? parsed : null;
+}
+
+/** Het adresveld is optioneel en dient enkel om coördinaten te krijgen voor de
+ * geofence op een walletticket; de zichtbare locatienaam blijft vrije tekst
+ * ("Theokot"). Mislukt het opzoeken, dan bewaren we het adres zonder
+ * coördinaten (geen geofence) in plaats van de opslag te laten falen. */
+async function resolveLocationGeo(
+  formData: FormData,
+  event: { locationAddress: string | null; locationLatitude: number | null; locationLongitude: number | null }
+): Promise<{ locationAddress: string | null; locationLatitude: number | null; locationLongitude: number | null }> {
+  const next = limitedOptionalValue(formData, "locationAddress", 300)?.trim() || null;
+  if (!next) return { locationAddress: null, locationLatitude: null, locationLongitude: null };
+
+  // De adreskiezer stuurt de coördinaten van het aangeklikte adres mee; die
+  // komen van dezelfde geocoder en zijn al door de beheerder bevestigd, dus we
+  // zoeken niet nog eens op.
+  const latitude = coordinateValue(formData, "locationLatitude", 90);
+  const longitude = coordinateValue(formData, "locationLongitude", 180);
+  if (latitude !== null && longitude !== null) {
+    return { locationAddress: next, locationLatitude: latitude, locationLongitude: longitude };
+  }
+
+  if (next === event.locationAddress && event.locationLatitude !== null && event.locationLongitude !== null) {
+    return {
+      locationAddress: next,
+      locationLatitude: event.locationLatitude,
+      locationLongitude: event.locationLongitude,
+    };
+  }
+  // Vrij ingetypt adres zonder keuze uit de lijst: alsnog proberen op te zoeken.
+  const found = await geocodeAddress(next);
+  return {
+    locationAddress: next,
+    locationLatitude: found?.latitude ?? null,
+    locationLongitude: found?.longitude ?? null,
+  };
+}
+
 function refreshTicketEvent(locale: "nl" | "en", eventId: string) {
   revalidatePath(localePath(locale, "/admin/tickets"));
   revalidatePath(localePath(locale, `/admin/tickets/${eventId}`));
   revalidatePath(localePath(locale, "/tickets"));
+}
+
+/** Save a non-live ticket layout. The current published layout remains the one
+ * copied into newly issued tickets until this draft is explicitly published. */
+export async function saveTicketDesignDraftAction(
+  eventId: string,
+  locale: "nl" | "en",
+  rawDesign: unknown
+): Promise<{ revision: number | null }> {
+  const { session } = await requireTicketEventCapability(eventId, "MANAGE_EVENT");
+  const draft = parseTicketDesignDraft(rawDesign, eventId);
+  const revision = await withSerializableTransaction(async (tx) => {
+    const current = await tx.ticketEvent.findUniqueOrThrow({
+      where: { id: eventId },
+      select: { settings: true },
+    });
+    const existing = readTicketDesignSettings(current.settings, eventId);
+    await tx.ticketEvent.update({
+      where: { id: eventId },
+      data: { settings: ticketDesignSettingsWith(current.settings, { ...existing, draft }) as Prisma.InputJsonValue },
+    });
+    await tx.ticketAuditLog.create({
+      data: {
+        eventId,
+        actorUserId: session.user.id,
+        action: "TICKET_DESIGN_DRAFT_SAVED",
+        entityType: "TicketEvent",
+        entityId: eventId,
+      },
+    });
+    return existing.published?.revision ?? null;
+  });
+  refreshTicketEvent(locale, eventId);
+  return { revision };
+}
+
+/** Publishing is atomic with saving the draft, and advances the immutable
+ * revision that is copied onto tickets at payment fulfilment. */
+export async function publishTicketDesignAction(
+  eventId: string,
+  locale: "nl" | "en",
+  rawDesign: unknown
+): Promise<{ revision: number }> {
+  const { session } = await requireTicketEventCapability(eventId, "MANAGE_EVENT");
+  const draft: TicketDesignDraft = parseTicketDesignDraft(rawDesign, eventId);
+  const revision = await withSerializableTransaction(async (tx) => {
+    const current = await tx.ticketEvent.findUniqueOrThrow({
+      where: { id: eventId },
+      select: { settings: true },
+    });
+    const existing = readTicketDesignSettings(current.settings, eventId);
+    const published = {
+      ...draft,
+      revision: (existing.published?.revision ?? 0) + 1,
+      publishedAt: new Date().toISOString(),
+    };
+    await tx.ticketEvent.update({
+      where: { id: eventId },
+      data: { settings: ticketDesignSettingsWith(current.settings, { draft, published }) as Prisma.InputJsonValue },
+    });
+    await tx.ticketAuditLog.create({
+      data: {
+        eventId,
+        actorUserId: session.user.id,
+        action: "TICKET_DESIGN_PUBLISHED",
+        entityType: "TicketEvent",
+        entityId: eventId,
+        metadata: { revision: published.revision },
+      },
+    });
+    return published.revision;
+  });
+  refreshTicketEvent(locale, eventId);
+  return { revision };
 }
 
 export async function submitTicketEventFormAction(
@@ -184,6 +299,12 @@ export async function createTicketEventAction(formData: FormData): Promise<void>
   const endsAt = dateValue(formData, "endsAt") ?? calendarEvent?.end ?? null;
   if (!startsAt || !endsAt || endsAt <= startsAt) throw new Error("INVALID_EVENT_DATES");
   const capacity = boundedIntegerValue(formData, "capacity", 100, 1, 1_000_000);
+  // Naam en prijs van het eerste tickettype. Een prijs van 0 is geldig: gratis
+  // tickets bestaan (inschrijvingen, ledenactiviteiten).
+  const firstTicketName =
+    limitedValue(formData, "firstTicketName", 160) || (locale === "nl" ? "Standaardticket" : "Standard ticket");
+  const firstTicketPriceCents = parseEuroAmount(formData.get("firstTicketPrice") ?? "0");
+  if (firstTicketPriceCents > 99_999_999) throw new Error("INVALID_AMOUNT");
   const salesStartAt = dateValue(formData, "salesStartAt");
   const salesEndAt = dateValue(formData, "salesEndAt");
   if (salesStartAt && salesEndAt && salesEndAt <= salesStartAt) {
@@ -192,6 +313,7 @@ export async function createTicketEventAction(formData: FormData): Promise<void>
   const requestedSlug = slugify(value(formData, "slug") || titleNl) || `event-${randomBytes(4).toString("hex")}`;
   const slugExists = await prisma.ticketEvent.findUnique({ where: { slug: requestedSlug } });
   const slug = slugExists ? `${requestedSlug}-${randomBytes(3).toString("hex")}` : requestedSlug;
+  const createdLocationGeo = await resolveLocationGeo(formData, { locationAddress: null, locationLatitude: null, locationLongitude: null });
 
   const event = await prisma.$transaction(async (tx) => {
     const created = await tx.ticketEvent.create({
@@ -204,6 +326,7 @@ export async function createTicketEventAction(formData: FormData): Promise<void>
         descriptionNl: limitedOptionalValue(formData, "descriptionNl", 20_000) ?? calendarEvent?.descriptionNl,
         descriptionEn: limitedOptionalValue(formData, "descriptionEn", 20_000) ?? calendarEvent?.descriptionEn,
         location: limitedOptionalValue(formData, "location", 300) ?? calendarEvent?.location,
+        ...createdLocationGeo,
         startsAt,
         endsAt,
         salesStartAt,
@@ -215,13 +338,26 @@ export async function createTicketEventAction(formData: FormData): Promise<void>
         createdById: session.user.id,
       },
     });
-    await tx.ticketInventoryPool.create({
+    const pool = await tx.ticketInventoryPool.create({
       data: {
         eventId: created.id,
         code: "GENERAL",
         nameNl: "Algemene capaciteit",
         nameEn: "General capacity",
         capacity,
+      },
+    });
+    // Het eerste tickettype hoort bij het aanmaken, niet bij een tweede ronde in
+    // de instellingen: een event met een voorraadpot maar zonder tickettype is
+    // niet publiceerbaar en verkoopt niets, dus dat is geen zinvolle tussenstand.
+    await tx.ticketType.create({
+      data: {
+        eventId: created.id,
+        inventoryPoolId: pool.id,
+        code: "STANDARD",
+        nameNl: firstTicketName,
+        unitPriceCents: firstTicketPriceCents,
+        maxPerOrder: boundedIntegerValue(formData, "maxTicketsPerOrder", 8, 1, 50),
       },
     });
     await tx.ticketEventUserGrant.create({
@@ -270,8 +406,15 @@ export async function updateTicketEventAction(formData: FormData): Promise<void>
     if (activeTypes === 0) throw new Error("TICKET_TYPE_REQUIRED_TO_PUBLISH");
   }
 
-  const startsAt = dateValue(formData, "startsAt") ?? event.startsAt;
-  const endsAt = dateValue(formData, "endsAt") ?? event.endsAt;
+  // Hangt er een kalenderevent aan, dan zijn titel, beschrijving, locatie en
+  // datums daarvan; het formulier toont ze dan als overgenomen en stuurt ze niet
+  // mee. Zonder deze uitzondering zou opslaan ze op null zetten.
+  const linked = event.calendarEventId
+    ? await prisma.calendarEvent.findUnique({ where: { id: event.calendarEventId } })
+    : null;
+
+  const startsAt = linked?.start ?? dateValue(formData, "startsAt") ?? event.startsAt;
+  const endsAt = linked?.end ?? dateValue(formData, "endsAt") ?? event.endsAt;
   if (endsAt <= startsAt) throw new Error("INVALID_EVENT_DATES");
   const maxTicketsPerOrder = boundedIntegerValue(
     formData,
@@ -292,17 +435,23 @@ export async function updateTicketEventAction(formData: FormData): Promise<void>
   if (salesStartAt && salesEndAt && salesEndAt <= salesStartAt) {
     throw new Error("INVALID_SALES_DATES");
   }
+  const locationGeo = await resolveLocationGeo(formData, event);
 
   await prisma.$transaction(async (tx) => {
     await tx.ticketEvent.update({
       where: { id: eventId },
       data: {
         slug: nextSlug,
-        titleNl: limitedValue(formData, "titleNl", 200) || event.titleNl,
-        titleEn: limitedOptionalValue(formData, "titleEn", 200),
-        descriptionNl: limitedOptionalValue(formData, "descriptionNl", 20_000),
-        descriptionEn: limitedOptionalValue(formData, "descriptionEn", 20_000),
-        location: limitedOptionalValue(formData, "location", 300),
+        titleNl: linked?.titleNl ?? (limitedValue(formData, "titleNl", 200) || event.titleNl),
+        titleEn: linked ? linked.titleEn : limitedOptionalValue(formData, "titleEn", 200),
+        descriptionNl: linked
+          ? linked.descriptionNl
+          : limitedOptionalValue(formData, "descriptionNl", 20_000),
+        descriptionEn: linked
+          ? linked.descriptionEn
+          : limitedOptionalValue(formData, "descriptionEn", 20_000),
+        location: linked ? linked.location : limitedOptionalValue(formData, "location", 300),
+        ...locationGeo,
         startsAt,
         endsAt,
         salesStartAt,
@@ -330,6 +479,53 @@ export async function updateTicketEventAction(formData: FormData): Promise<void>
     });
   });
   refreshTicketEvent(locale, eventId);
+}
+
+export type PublishTicketEventResult = { ok: true } | { ok: false; error: string };
+
+/**
+ * Zet een ticketevent live.
+ *
+ * Bestond eerst niet: publiceren betekende de status in een keuzelijst ergens
+ * halverwege een lang formulier omzetten en dan onderaan opslaan, waarbij je de
+ * blokkade ("er is nog geen actief tickettype") pas ná het opslaan te zien kreeg.
+ * Als eigen actie kan de knop vooraf zeggen waarom ze niet kan.
+ */
+export async function publishTicketEventAction(
+  formData: FormData,
+): Promise<PublishTicketEventResult> {
+  const eventId = value(formData, "eventId");
+  const locale = localeSchema.parse(value(formData, "locale") || "nl");
+  try {
+    const { session, event } = await requireTicketEventCapability(eventId, "MANAGE_EVENT");
+    const activeTypes = await prisma.ticketType.count({ where: { eventId, active: true } });
+    if (activeTypes === 0) return { ok: false, error: "TICKET_TYPE_REQUIRED_TO_PUBLISH" };
+
+    await prisma.$transaction(async (tx) => {
+      await tx.ticketEvent.update({
+        where: { id: eventId },
+        data: { status: "PUBLISHED", publishedAt: event.publishedAt ?? new Date() },
+      });
+      await tx.ticketAuditLog.create({
+        data: {
+          eventId,
+          actorUserId: session.user.id,
+          action: "EVENT_UPDATED",
+          entityType: "TicketEvent",
+          entityId: eventId,
+          metadata: { status: "PUBLISHED" },
+        },
+      });
+    });
+    refreshTicketEvent(locale, eventId);
+    return { ok: true };
+  } catch (error) {
+    unstable_rethrow(error);
+    const code = error instanceof Error ? error.message : "";
+    if (code === "FORBIDDEN") return { ok: false, error: code };
+    console.error("Publishing ticket event failed", error);
+    throw error;
+  }
 }
 
 export async function updateInventoryPoolAction(formData: FormData): Promise<void> {

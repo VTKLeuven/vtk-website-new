@@ -1,3 +1,5 @@
+import type { Metadata } from "next";
+import { staticMetadata } from "@/lib/pageMetadata";
 import { prisma } from "@vtk/db";
 import { notFound } from "next/navigation";
 import { hasLocale } from "@/lib/locale";
@@ -6,9 +8,21 @@ import { pick, type Locale } from "@vtk/i18n";
 import { PleaseLogin } from "@/components/site/pleaseLogin";
 import { canCancel, canOrderNow } from "@/lib/theokot";
 import { activeBanFor, getTheokotConfig } from "@/lib/theokot-server";
+import { usageForSessionItems } from "@/lib/meetings-server";
+import { publicUrl } from "@/lib/storage";
 import { TheokotOrderClient, type OrderSession, type OrderMessage } from "./TheokotOrderClient";
 
 import "@/app/design/vtk-basic.css";
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ locale: string }>;
+}): Promise<Metadata> {
+  const { locale } = await params;
+  if (!hasLocale(locale)) return {};
+  return staticMetadata("theokot", "/theokot", locale);
+}
 
 export default async function TheokotOrderPage({ params }: { params: Promise<{ locale: string }> }) {
   const { locale: localeParam } = await params;
@@ -44,17 +58,9 @@ export default async function TheokotOrderPage({ params }: { params: Promise<{ l
     prisma.setting.findUnique({ where: { key: "theokot.orderMessage" } }),
   ]);
 
-  // Reeds bestelde aantallen per sessie-item, om resterende voorraad te tonen.
-  const allItemIds = sessions.flatMap((s) => s.items.map((i) => i.id));
-  const used =
-    allItemIds.length > 0
-      ? await prisma.theokotOrderLine.groupBy({
-          by: ["sessionItemId"],
-          where: { sessionItemId: { in: allItemIds } },
-          _sum: { quantity: true },
-        })
-      : [];
-  const usedMap = new Map(used.map((u) => [u.sessionItemId, u._sum.quantity ?? 0]));
+  // Reeds weg per sessie-item: bestellingen van studenten plus de broodjes die
+  // voor een grocomeet of bureau opzijgezet zijn.
+  const usedMap = await usageForSessionItems(sessions.flatMap((s) => s.items.map((i) => i.id)));
 
   const dayFmt = new Intl.DateTimeFormat(nl ? "nl-BE" : "en-GB", {
     timeZone: "Europe/Brussels",
@@ -77,7 +83,10 @@ export default async function TheokotOrderPage({ params }: { params: Promise<{ l
       id: s.id,
       dateLabel: dayFmt.format(s.date),
       pickupLabel: `${timeFmt.format(s.pickupStart)} – ${timeFmt.format(s.pickupEnd)}`,
+      orderOpenLabel: `${dayFmt.format(s.orderOpenAt)}, ${timeFmt.format(s.orderOpenAt)}`,
       orderCloseLabel: `${dayFmt.format(s.orderCloseAt)}, ${timeFmt.format(s.orderCloseAt)}`,
+      orderWindowState:
+        now < s.orderOpenAt ? "UPCOMING" : now >= s.orderCloseAt ? "CLOSED" : "OPEN",
       weeklySpecialLabel: special ? (pick(special.nameNl, special.nameEn, locale) ?? special.nameNl) : null,
       canOrder: canOrderNow(s, now),
       items: s.items.map((i) => ({
@@ -86,6 +95,9 @@ export default async function TheokotOrderPage({ params }: { params: Promise<{ l
         priceCents: i.priceCents,
         remaining: Math.max(0, i.quantity - (usedMap.get(i.id) ?? 0)),
         isWeeklySpecial: i.isWeeklySpecial,
+        imageUrl: publicUrl(i.imageKey),
+        // Beide talen leeg = geen ingrediënten, dus ook geen info-icoontje.
+        ingredients: pick(i.ingredientsNl, i.ingredientsEn, locale)?.trim() || null,
       })),
       existingOrder: existing
         ? {
@@ -112,7 +124,6 @@ export default async function TheokotOrderPage({ params }: { params: Promise<{ l
     <div className="vtk-page">
       <header className="vtk-page-head">
         <div>
-          <div className="vtk-page-kicker">VTK · Theokot</div>
           <h1 className="vtk-page-title">{nl ? "Broodjes reserveren" : "Reserve sandwiches"}</h1>
         </div>
       </header>
@@ -124,6 +135,7 @@ export default async function TheokotOrderPage({ params }: { params: Promise<{ l
           message={message}
           maxItems={config.maxItemsPerOrder}
           maxWeeklySpecial={config.maxWeeklySpecialPerOrder}
+          layout={config.itemLayout}
           ban={
             ban
               ? {

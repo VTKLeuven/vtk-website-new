@@ -91,6 +91,7 @@ describe('authorization preview', () => {
           nameNl: 'A',
           nameEn: 'A',
           role: 'LEAD',
+          type: 'PRAESIDIUM',
         },
         {
           id: 'group-b',
@@ -99,6 +100,7 @@ describe('authorization preview', () => {
           nameNl: 'B',
           nameEn: 'B',
           role: 'MEMBER',
+          type: 'PRAESIDIUM',
         },
       ],
     });

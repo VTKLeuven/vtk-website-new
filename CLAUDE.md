@@ -121,7 +121,7 @@ the design language into the application instead of copying mockup content.
   `apps/web/app/globals.css` (`--color-vtk-surface`, `--color-vtk-blue-soft`,
   `--color-vtk-blue-muted`) mirror these neutrals for `bg-vtk-*` utilities; keep
   them in sync when you retune.
-- Layout: use generous max-width containers around 1320px, the cool `--paper`
+- Layout: use generous max-width containers around 1240px (`--max`), the cool `--paper`
   page ground, thin navy-tinted `--line` borders, and clear horizontal rhythm.
 - Shape: cards and panels should be softly rounded, usually 16-22px. Small
   controls can be pill-shaped when they are CTAs or filters.
@@ -199,6 +199,13 @@ the design language into the application instead of copying mockup content.
   bookend (the old translucent paper bar was reviewed and replaced). The text is
   light in every state; on the homepage only the background goes transparent
   over the dark hero and fades back to solid navy on scroll.
+  - A tab with pages under it (or extra `HeaderTabLink` items) shows a chevron
+    and drops a white panel on hover and `:focus-within`; that is CSS only, so
+    keep `.nav-links` free of `overflow` or the panel gets clipped.
+  - Below 1181px the tabs are replaced by one menu button that opens a navy
+    panel under the header, with the pages per category behind a chevron. Do not
+    reintroduce the horizontal scroller: eleven tabs in a scroll strip read as a
+    mistake and hide most of the navigation.
 - Buttons: primary is dark ink/navy with paper text; secondary/ghost is bordered
   on paper; yellow is reserved for accents and active states. Over the dark hero,
   the primary button inverts to a `--surface` fill with ink text.
@@ -208,11 +215,40 @@ the design language into the application instead of copying mockup content.
 - Footer: a dark `--navy` band on every page (light text, the same `vtk-logo.png`
   brand mark as the header rather than a separate yellow badge), the same navy as
   the header; it bookends the dark hero, so do not lighten it per page.
+- Page head: every non-home page opens with the same dark band
+  (`.vtk-page-head` in `apps/web/app/design/vtk-base.css`): full-bleed `--navy`,
+  its own crop of the technical pattern, a yellow bottom rule, light title and
+  `--on-dark-muted` subtitle. `/tickets`, the category pages and the content
+  pages all use it, so do not build a second kind of page opener. The classes
+  `.vtk-page-title`/`.vtk-page-subtitle`/`.vtk-page-kicker` keep dark text
+  outside that band (they are also used on light backgrounds); only inside
+  `.vtk-page-head` do they invert.
+- Content pages (`PageView`): dark head with a breadcrumb to the category, then
+  the text column with an optional rail beside it holding the page outline (H2
+  and H3, anchors from `lib/pageOutline.ts`) and the downloads. The rail only
+  appears when there are at least two headings or a download, sticks on desktop,
+  and moves above the text on narrow screens.
 - Lists and calendars: favor agenda/list layouts, tabular times, compact day
   labels, and small yellow status pins.
 - Admin: keep pages operationally dense. Forms, tables, and upload/editor
   surfaces should use the same palette and rounded panels without becoming
   decorative.
+  - Below 860px the left column collapses into one button naming the tab you are
+    on, which opens the full grouped list as a panel underneath
+    (`AdminNav` + `vtk-admin.css`). Do not reintroduce the horizontal scroller
+    that was there: fifteen tabs in a scroll strip hide most of the navigation.
+  - **A wide table inside a horizontal scroller must have a positioned wrapper.**
+    `sr-only` is `position: absolute`; without a positioned ancestor it anchors
+    on the page instead of on the table, lands at the x of its column, and a
+    phone zooms the whole page out to show that one invisible pixel. This is why
+    `.vtk-admin-main .overflow-x-auto` and `.ticket-admin-table-wrap` carry
+    `position: relative`. It cost an afternoon on /admin/tickets and the
+    bonnetjes tab.
+  - Below `sm` the admin CSS puts every field of a `flex flex-wrap items-end`
+    filter row on its own full-width line: the fixed widths (`w-44`, `w-56`) and
+    the `ml-auto` button are meant for a wide column. Rows of unlabelled inputs
+    (the Theokot offering editor) need a per-field label on narrow screens; the
+    column headings above the table are hidden there.
 
 ## Implementation Constraints
 

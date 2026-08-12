@@ -1,31 +1,43 @@
+import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { prisma } from "@vtk/db";
 import { getDictionary, type Locale } from "@vtk/i18n";
 import { hasLocale } from "@/lib/locale";
+import { contentPageMetadata } from "@/lib/pageMetadata";
+import { loadHeaderTab, loadPageBySlug } from "@/lib/pageQueries";
+import { pagePath } from "@/lib/sitemap";
 import { PageView } from "@/components/site/PageView";
 
-export default async function HeaderPage({
-  params,
-}: {
-  params: Promise<{ locale: string; headerSlug: string; pageSlug: string }>;
-}) {
+type Params = Promise<{ locale: string; headerSlug: string; pageSlug: string }>;
+
+export async function generateMetadata({ params }: { params: Params }): Promise<Metadata> {
+  const { locale, headerSlug, pageSlug } = await params;
+  if (!hasLocale(locale)) return {};
+
+  const [tab, page] = await Promise.all([loadHeaderTab(headerSlug), loadPageBySlug(pageSlug)]);
+  if (!tab || !page || page.headerTabId !== tab.id || !page.publishedAt) return {};
+
+  return contentPageMetadata(page, locale, pagePath({ slug: page.slug, headerTabSlug: tab.slug }));
+}
+
+export default async function HeaderPage({ params }: { params: Params }) {
   const { locale: localeParam, headerSlug, pageSlug } = await params;
   if (!hasLocale(localeParam)) notFound();
   const locale: Locale = localeParam;
   const dict = getDictionary(locale);
 
-  const tab = await prisma.headerTab.findUnique({ where: { slug: headerSlug } });
+  const tab = await loadHeaderTab(headerSlug);
   if (!tab) notFound();
 
-  const page = await prisma.page.findUnique({
-    where: { slug: pageSlug },
-    include: {
-      assets: { orderBy: { order: "asc" } },
-      headerTab: true,
-    },
-  });
+  const page = await loadPageBySlug(pageSlug);
 
   if (!page || page.headerTabId !== tab.id || !page.publishedAt) notFound();
 
-  return <PageView page={page} locale={locale} downloadsLabel={dict.pages.downloads} />;
+  return (
+    <PageView
+      page={page}
+      locale={locale}
+      downloadsLabel={dict.pages.downloads}
+      onThisPageLabel={dict.pages.onThisPage}
+    />
+  );
 }

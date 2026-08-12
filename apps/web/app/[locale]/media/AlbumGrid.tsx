@@ -38,7 +38,10 @@ export function AlbumGrid({ albums, labels }: { albums: AlbumItem[]; labels: Alb
             <Link href={album.href} className="vtk-immich-album-card">
               <span className="vtk-immich-album-cover">
                 {album.thumbnailUrl ? (
-                  // Immich thumbnails are served through its authenticated proxy and have no fixed host.
+                  // Immich Public Proxy levert deze duimnagel al op maat, op een
+                  // aparte host uit GALLERY_PUBLIC_PROXY_URL. Zie next.config.ts:
+                  // die host past niet in remotePatterns en wordt lokaal door de
+                  // optimizer geweigerd. Vandaar <img>.
                   // eslint-disable-next-line @next/next/no-img-element
                   <img src={album.thumbnailUrl} alt="" loading="lazy" decoding="async" />
                 ) : (

@@ -1,63 +1,48 @@
 /**
- * Minimale mail-helper op basis van nodemailer + SMTP uit de omgeving.
+ * Theokot-specifieke mails.
  *
- * Is `SMTP_HOST` niet gezet, dan wordt de mail gelogd i.p.v. verstuurd. Zo werkt
- * lokale ontwikkeling zonder mailserver, terwijl in productie een echte SMTP-config
- * (`SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_SECURE`, `MAIL_FROM`)
- * volstaat. nodemailer wordt lui geladen zodat de module ook laadt zonder de dep
- * of zonder SMTP-config.
- *
- * Enkel server-side gebruiken (server actions, instrumentation).
+ * De transportlaag zelf (SMTP, EHLO, STARTTLS) staat sinds augustus 2026 in
+ * `@vtk/mail`, omdat `apps/logistiek` ze ook nodig heeft. Importeer `sendMail`,
+ * `smtpConfigured` en `smtpEhloName` daar rechtstreeks; dit bestand houdt enkel
+ * de berichten over die over broodjes gaan.
  */
+import { sendMail } from '@vtk/mail';
 
-export type MailInput = {
-  to: string;
-  subject: string;
-  text: string;
-  html?: string;
-};
+type MailUser = { name: string; email: string; locale: 'NL' | 'EN' };
 
-const FROM = process.env.MAIL_FROM || 'Theokot VTK <theokot@vtk.be>';
-
-/** Verstuurt een mail, of logt ze wanneer SMTP niet geconfigureerd is. */
-export async function sendMail(input: MailInput): Promise<void> {
-  const host = process.env.SMTP_HOST;
-  if (!host) {
-    console.info(
-      `[mail] SMTP niet geconfigureerd — mail niet verstuurd.\n  to: ${input.to}\n  subject: ${input.subject}\n  ${input.text.replace(/\n/g, '\n  ')}`,
-    );
-    return;
-  }
-
-  try {
-    const nodemailer = await import('nodemailer');
-    const transport = nodemailer.createTransport({
-      host,
-      port: Number(process.env.SMTP_PORT) || 587,
-      secure: process.env.SMTP_SECURE === 'true',
-      auth: process.env.SMTP_USER
-        ? { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS }
-        : undefined,
-    });
-    await transport.sendMail({
-      from: FROM,
-      to: input.to,
-      subject: input.subject,
-      text: input.text,
-      html: input.html,
-    });
-  } catch (err) {
-    // Mail-fouten mogen de aanroeper (bvb no-show-verwerking) niet doen falen.
-    console.error('[mail] versturen mislukt:', err);
-  }
+/**
+ * Bericht dat een gereserveerd broodje voor een grocomeet of bureau niet meer
+ * kan: het aanbod van die verkoopdag is gewijzigd of Theokot is dicht. Vertelt
+ * meteen waar er opnieuw gekozen kan worden, want een melding zonder uitweg
+ * laat iemand met lege handen achter.
+ */
+export async function sendMeetingReservationInvalidated(
+  user: MailUser,
+  meeting: { meetingLabel: string; dateLabel: string; reason: string; path: string },
+): Promise<void> {
+  const nl = user.locale !== 'EN';
+  const base = (
+    process.env.TICKETING_PUBLIC_URL?.trim() ||
+    process.env.VTK_MAIN_URL?.trim() ||
+    'https://vtk.be'
+  ).replace(/\/$/, '');
+  const url = `${base}${meeting.path}`;
+  const subject = nl
+    ? `${meeting.meetingLabel}: je broodje van ${meeting.dateLabel} kan niet meer`
+    : `${meeting.meetingLabel}: your sandwich for ${meeting.dateLabel} is no longer available`;
+  const text = nl
+    ? `Dag ${user.name},\n\nJe reserveerde een broodje voor de ${meeting.meetingLabel} van ${meeting.dateLabel}, maar dat kan niet meer: ${meeting.reason}\n\nKies een ander broodje (of enkel een drankje) op ${url}\n\nGroeten,\nVTK`
+    : `Hi ${user.name},\n\nYou reserved a sandwich for the ${meeting.meetingLabel} of ${meeting.dateLabel}, but it is no longer possible: ${meeting.reason}\n\nPick another sandwich (or just a drink) at ${url}\n\nRegards,\nVTK`;
+  await sendMail({ to: user.email, subject, text }, { throwOnError: true });
 }
 
-type NoShowMailUser = { name: string; email: string; locale: 'NL' | 'EN' };
+type NoShowMailUser = MailUser;
 
 /** Waarschuwingsmail wanneer iemand zijn broodje(s) niet is komen ophalen. */
 export async function sendNoShowWarning(
   user: NoShowMailUser,
   sessionDateLabel: string,
+  orderId: string,
 ): Promise<void> {
   const nl = user.locale !== 'EN';
   const subject = nl
@@ -66,5 +51,8 @@ export async function sendNoShowWarning(
   const text = nl
     ? `Dag ${user.name},\n\nJe hebt broodjes gereserveerd bij Theokot voor ${sessionDateLabel}, maar deze werden niet opgehaald.\n\nGereserveerde broodjes die niet worden afgehaald, gaan verloren. Herhaaldelijk niet komen opdagen kan leiden tot een tijdelijke schorsing van het reservatiesysteem.\n\nGroeten,\nTheokot VTK`
     : `Hi ${user.name},\n\nYou reserved sandwiches at Theokot for ${sessionDateLabel}, but they were not picked up.\n\nReserved sandwiches that are not collected go to waste. Repeatedly not showing up can lead to a temporary suspension from the reservation system.\n\nRegards,\nTheokot VTK`;
-  await sendMail({ to: user.email, subject, text });
+  await sendMail(
+    { to: user.email, subject, text, messageId: `<theokot-no-show-${orderId}@vtk.be>` },
+    { throwOnError: true },
+  );
 }

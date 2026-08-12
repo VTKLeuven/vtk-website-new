@@ -9,11 +9,15 @@ import { getMediaContent } from "@/lib/media-content";
 import { videoEmbed } from "@/lib/videoEmbed";
 import { getCurrentSession } from "@/lib/session";
 import { getCursusdienstHours } from "@/lib/cursusdienstHours";
+import { ELIXIR_OPEN_DAYS, openingWindowPhase } from "@/lib/elixir/openingWindow";
+import { readBarStatus } from "@/lib/elixir/status";
 import { publicUrl } from "@/lib/storage";
 import { BUILTIN_DEFAULT_EVENT_IMAGE, DEFAULT_EVENT_IMAGE_SETTING } from "@/lib/defaultEventImage";
 import { PartnerLogo } from "@/components/site/PartnerLogo";
+import { audienceFilter, viewerAudiences } from "@/lib/calendar/audience";
 import { AftermovieGrid, type AftermovieGridItem } from "./AftermovieGrid";
 import {
+  DUTCH_FULL_DAYS,
   dutchDayNameForDate,
   entryForDate,
   isClosedHours,
@@ -21,6 +25,12 @@ import {
 } from "./hoursUtils";
 
 import "@/app/design/vtk-home.css";
+import {
+  HOME_LINK_EVENT,
+  OUTBOUND_EVENT,
+  outboundHost,
+  umamiEvent,
+} from "@/lib/analytics";
 
 type OpeningHoursSetting = {
   titleNl: string;
@@ -40,6 +50,15 @@ type CareerSetting = {
   ctaLabelEn?: string;
   ctaUrl?: string;
 };
+
+/**
+ * 't ElixIr opent zondag tot en met donderdag om 22u en sluit op een uur dat per
+ * avond verschilt. Die uren staan hard in `lib/elixir/openingWindow.ts`: ze
+ * wijzigen niet per week, en anders dan het Theokot heeft de bar geen
+ * beheerscherm. Komt daar ooit een beheerscherm, dan hoort dit een
+ * `home.openingHours.elixir`-setting te worden.
+ */
+const ELIXIR_NAME = "'t ElixIr";
 
 /** "2026-27" voor het werkingsjaar dat op 15 juli begint (zie @vtk/auth). */
 function workingYearLabel(d: Date): string {
@@ -82,25 +101,28 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
   const now = new Date();
   const nl = locale === "nl";
 
-  const [settings, upcomingEvents, tabs, partners, media, session, cursusEntries] = await Promise.all([
+  const [settings, upcomingEvents, tabs, partners, media, session, cursusEntries, barStatus] = await Promise.all([
     prisma.setting.findMany({
       where: {
         key: {
           in: [
             "home.openingHours.theokot",
-            "home.featuredAlbums",
             "home.career",
             DEFAULT_EVENT_IMAGE_SETTING,
           ],
         },
       },
     }),
-    prisma.calendarEvent.findMany({
-      where: { start: { gte: now }, visibility: "PUBLIC" },
-      orderBy: { start: "asc" },
-      take: 8,
-      include: { group: true },
-    }),
+    // Dezelfde doelgroepfilter als /kalender: een eerstejaarsevent hoort niet bij
+    // iedereen op de homepage te staan terwijl het uit de kalender gefilterd is.
+    viewerAudiences().then((audiences) =>
+      prisma.calendarEvent.findMany({
+        where: { start: { gte: now }, visibility: "PUBLIC", ...audienceFilter(audiences) },
+        orderBy: { start: "asc" },
+        take: 8,
+        include: { group: true },
+      }),
+    ),
     getVisibleHeaderTabsForNav(),
     prisma.partner.findMany({
       where: { active: true },
@@ -116,6 +138,10 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
     // Cursusdienst-uren komen live van cudi.vtk.be; deze lezing valt terug op de
     // laatst gecachte waarde en anders op null (kaart toont "niet beschikbaar").
     getCursusdienstHours(locale),
+    // Live geluidsstatus van 't ElixIr: enkel een lezing uit de cache (geheugen,
+    // of één Setting-rij vlak na een herstart). De worker praat met Munisense,
+    // niet deze render. Zie lib/elixir/status.ts.
+    readBarStatus(now),
   ]);
 
   // Aftermovies: `media.aftermovies` is dezelfde instelling als op /media, te
@@ -185,6 +211,28 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
     ? pick(theokot.titleNl, theokot.titleEn, locale).replace(/^Openingsuren\s+/i, "")
     : "";
   const cursusName = "Cursusdienst";
+
+  // De geluidsmeting is de bron zodra ze vers is; het uurrooster is de fallback
+  // wanneer de meting ontbreekt of te oud is (worker plat, integratie niet
+  // geconfigureerd, of gewoon de eerste render na een deploy). De meting zelf
+  // spreekt enkel binnen de openingsuren, dus buiten het venster zeggen beide
+  // hetzelfde.
+  const elixirLive = barStatus && !barStatus.stale ? barStatus : null;
+  const elixirPhase = openingWindowPhase(now);
+  const elixirOpen = elixirLive ? elixirLive.isOpen : elixirPhase === "evening";
+  // Zonder meting weten we na middernacht niet of ze al toe is: dan "mogelijk
+  // nog open" in plaats van een harde bewering.
+  const elixirMaybeOpen = !elixirLive && elixirPhase === "after-midnight";
+  const elixirEntries = DUTCH_FULL_DAYS.map((dayNl, i) => ({
+    dayNl,
+    hours: ELIXIR_OPEN_DAYS.includes(i)
+      ? nl
+        ? "vanaf 22:00"
+        : "from 22:00"
+      : nl
+        ? "Gesloten"
+        : "Closed",
+  }));
 
   const eventGroups = upcomingEvents.slice(0, 5).reduce<Array<{ key: string; date: Date; events: typeof upcomingEvents }>>(
     (acc, event) => {
@@ -307,7 +355,7 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
                 : "Events, courses, careers, sandwiches and everything that makes your day on campus more practical. Run by students, since 1920."}
             </p>
             <div className="hero-cta">
-              <Link href={`${base}/aanbod`} className="btn btn-primary arrow">
+              <Link href={`${base}/info`} className="btn btn-primary arrow">
                 {nl ? "Ontdek wat we doen" : "Discover what we do"}
               </Link>
               <Link href={`${base}/eerstejaars`} className="btn btn-ghost">
@@ -332,8 +380,8 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
             </div>
           </div>
 
-          <aside className="cal">
-            <div className="cal-head">
+          <aside className="hero-cal">
+            <div className="hero-cal-head">
               <div>
                 <h3>{nl ? "Aankomende events" : "Upcoming events"}</h3>
                 <div className="sub">
@@ -348,18 +396,18 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
                 {nl ? "Volledige kalender" : "Full calendar"}
               </Link>
             </div>
-            <div className="agenda">
+            <div className="hero-agenda">
               {eventGroups.length === 0 ? (
-                <div className="day-group">
-                  <div className="day-label">
+                <div className="hero-day">
+                  <div className="hero-day-label">
                     <span className="num">—</span>
                     <span className="dow">{nl ? "Geen data" : "No data"}</span>
                   </div>
                 </div>
               ) : (
                 eventGroups.map((group, groupIndex) => (
-                  <div className="day-group" key={group.key}>
-                    <div className="day-label">
+                  <div className="hero-day" key={group.key}>
+                    <div className="hero-day-label">
                       <span className="num">{String(group.date.getDate()).padStart(2, "0")}</span>
                       <span className="mon">{monthLabel(group.date, now, locale)}</span>
                       <span className="dow">
@@ -394,7 +442,7 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
                         <Link
                           key={event.id}
                           href={`${base}/kalender/${event.id}`}
-                          className={`ev${groupIndex === 0 && eventIndex === 0 ? " featured" : ""}`}
+                          className={`hero-ev${groupIndex === 0 && eventIndex === 0 ? " featured" : ""}`}
                         >
                           {content}
                         </Link>
@@ -417,12 +465,20 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
                   <span className="m">{item.m}</span>
                 </>
               );
+              // Welke quicklink gebruikt wordt, zegt of de volgorde hier klopt
+              // met waar mensen voor komen.
+              const tracking = item.href.startsWith("http")
+                ? umamiEvent(OUTBOUND_EVENT, {
+                    bestemming: outboundHost(item.href),
+                    vanaf: "quicklink",
+                  })
+                : umamiEvent(HOME_LINK_EVENT, { soort: "quicklink", naar: item.href });
               return item.href.startsWith("http") ? (
-                <a key={item.k} className="ql" href={item.href}>
+                <a key={item.k} className="ql" href={item.href} {...tracking}>
                   {body}
                 </a>
               ) : (
-                <Link key={item.k} className="ql" href={item.href}>
+                <Link key={item.k} className="ql" href={item.href} {...tracking}>
                   {body}
                 </Link>
               );
@@ -497,6 +553,39 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
                 </div>
               )}
             </div>
+            <div className="hours-col">
+              <h3>{ELIXIR_NAME}</h3>
+              <div className="sub">{nl ? "Faculteitsbar Ingenieurswetenschappen" : "Faculty Bar Engineering Science"}</div>
+              <div
+                className={`status${elixirOpen ? "" : elixirMaybeOpen ? " maybe" : " closed"}`}
+              >
+                {elixirOpen
+                  ? nl
+                    ? "Nu open"
+                    : "Open now"
+                  : elixirMaybeOpen
+                    ? nl
+                      ? "Mogelijk nog open"
+                      : "Possibly still open"
+                    : closedLabel(ELIXIR_NAME, nl)}
+              </div>
+              <dl className="hours-list">
+                {elixirEntries.map((row, i) => {
+                  const todayCls = row.dayNl === dutchDayNameForDate(now) ? "today" : "";
+                  return (
+                    <div key={i} style={{ display: "contents" }}>
+                      <dt className={todayCls}>{row.dayNl.slice(0, 2).toUpperCase()}</dt>
+                      <dd className={todayCls}>{row.hours}</dd>
+                    </div>
+                  );
+                })}
+              </dl>
+              <p className="hours-note">
+                {nl
+                  ? "Het sluitingsuur varieert per avond."
+                  : "The closing time varies from night to night."}
+              </p>
+            </div>
           </div>
         </section>
       )}
@@ -505,7 +594,7 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
         <div className="sec-head">
           <h2>{nl ? "Wat we doen." : "What we do."}</h2>
           <div className="meta">
-            <Link href={`${base}/aanbod`}>{nl ? "bekijk alles" : "see all"}</Link>
+            <Link href={`${base}/info`}>{nl ? "bekijk alles" : "see all"}</Link>
           </div>
         </div>
         <div className="aanbod">
@@ -514,7 +603,12 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
             // Alle aanbod-kaarten zijn identiek: een fotokop onder navy scrim met
             // witte body. Geen enkele kaart krijgt een aparte featured-stijl.
             return (
-              <Link key={card.href} href={card.href} className="acard">
+              <Link
+                key={card.href}
+                href={card.href}
+                className="acard"
+                {...umamiEvent(HOME_LINK_EVENT, { soort: "aanbodkaart", naar: card.href })}
+              >
                 <div className="acard-body">
                   <span
                     className={`acard-media${photo ? "" : " acard-media-ph"}`}
@@ -641,14 +735,26 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
                 <div className="k">{nl ? "Studenten" : "Students"}</div>
                 <div className="v">3000+</div>
               </div>
-              <div className="meta">
-                <div className="k">{nl ? "Platform" : "Platform"}</div>
-                <div className="v">career</div>
-              </div>
             </div>
-            <a href="https://career.vtk.be" className="btn btn-primary arrow" style={{ marginTop: 24 }}>
-              {nl ? "Naar VTK Career" : "Open VTK Career"}
-            </a>
+            <div className="career-actions">
+              <a
+                href="https://career.vtk.be"
+                className="btn btn-primary arrow"
+                {...umamiEvent(OUTBOUND_EVENT, { bestemming: "career.vtk.be", vanaf: "homepage" })}
+              >
+                {nl ? "Naar VTK Career" : "Open VTK Career"}
+              </a>
+              <a
+                href="https://www.career.vtk.be/contact"
+                className="btn btn-ghost arrow"
+                {...umamiEvent(OUTBOUND_EVENT, {
+                  bestemming: "www.career.vtk.be",
+                  vanaf: "homepage",
+                })}
+              >
+                {nl ? "Contact voor bedrijven" : "Contact for companies"}
+              </a>
+            </div>
           </div>
           <figure className="career-photo">
             <Image
@@ -702,10 +808,9 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
                       <li key={rep.id}>
                         <span className="poc-face">
                           {avatar ? (
-                            // Avatars staan achter /api/media; die route streamt uit
-                            // object storage en next/image hoeft er niet tussen.
-                            // eslint-disable-next-line @next/next/no-img-element
-                            <img src={avatar} alt="" loading="lazy" />
+                            // .poc-face is 64x64 (vtk-home.css); die maat meegeven
+                            // scheelt het verschil met de volledige profielfoto.
+                            <Image src={avatar} alt="" width={64} height={64} />
                           ) : (
                             <span className="poc-initial" aria-hidden="true">
                               {rep.user.name.slice(0, 1).toUpperCase()}

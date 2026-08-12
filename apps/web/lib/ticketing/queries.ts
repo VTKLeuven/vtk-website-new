@@ -6,6 +6,7 @@ import { getSession } from "@vtk/auth/server";
 import { prisma } from "@vtk/db";
 import { createTicketCredential, secureTokenHash, verifyOrderAccessToken } from "./crypto";
 import { orderAccessCookieName } from "./access";
+import { isAppleWalletAvailable, isGoogleWalletAvailable } from "./wallet";
 
 type PublicLocale = "nl" | "en";
 
@@ -221,6 +222,8 @@ function orderDto(order: OrderRecord, authenticatedOwner: boolean) {
       checkedInAt: item.ticket.checkedInAt,
       credential: createTicketCredential(item.ticket.publicCode, item.ticket.credentialVersion),
       pdfUrl: `/api/tickets/${item.ticket.id}/pdf`,
+      walletAppleUrl: isAppleWalletAvailable() ? `/api/tickets/${item.ticket.id}/wallet/apple` : null,
+      walletGoogleUrl: isGoogleWalletAvailable() ? `/api/tickets/${item.ticket.id}/wallet/google` : null,
     })),
   };
 }

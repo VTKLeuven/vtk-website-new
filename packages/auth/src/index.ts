@@ -56,6 +56,8 @@ export const OAUTH_CLIENT_OWNER = 'vtk';
 /** */
 export type Locale = 'NL' | 'EN';
 export type AuthGroupRole = 'MEMBER' | 'LEAD';
+/** Spiegelt `GroupType` in het schema; los getypeerd zodat @vtk/auth geen Prisma-types lekt. */
+export type AuthGroupType = 'PRAESIDIUM' | 'WERKGROEP';
 
 export type AuthUser = {
   id: string;
@@ -82,6 +84,13 @@ export type AuthGroup = {
   nameNl: string;
   nameEn: string;
   role: AuthGroupRole;
+  /**
+   * Praesidiumpost of werkgroep. De submodules tonen die twee apart (een
+   * werkgroep is geen post), en `deriveMemberRequester` in de uitleendienst
+   * leidde dit voordien server-side opnieuw af uit de DB terwijl de UI ze op
+   * één hoop gooide.
+   */
+  type: AuthGroupType;
 };
 
 // ==============================
@@ -134,7 +143,13 @@ export function isMemberOfGroup(session: SessionPayload | null | undefined, grou
 // ==============================
 
 export type AuthErrorCode =
-  'UNAUTHENTICATED' | 'FORBIDDEN' | 'INACTIVE_USER' | 'INVALID_INPUT' | 'REMOTE_AUTH_UNAVAILABLE';
+  | 'UNAUTHENTICATED'
+  | 'FORBIDDEN'
+  | 'INACTIVE_USER'
+  | 'INVALID_INPUT'
+  | 'NOT_FOUND'
+  | 'PASSWORD_TOO_SHORT'
+  | 'REMOTE_AUTH_UNAVAILABLE';
 
 export class AuthError extends Error {
   constructor(

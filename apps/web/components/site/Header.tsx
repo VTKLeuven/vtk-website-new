@@ -1,14 +1,18 @@
 import Image from 'next/image';
 import Link from 'next/link';
+import { Search } from 'lucide-react';
 import { prisma } from '@vtk/db';
 import { getDictionary, pick, type Locale } from '@vtk/i18n';
 import { entryForDate, isClosedHours } from '@/components/editorial/hoursUtils';
 import { getVisibleHeaderTabsForNav } from '@/lib/headerTabs';
 import { getCurrentSession } from '@/lib/session';
+import { hasPermission } from '@vtk/auth';
+import { hasPendingMeetingNotice } from '@/lib/meetings-server';
 import { EditorialNavLinks } from './EditorialNavLinks';
 import { LocaleSwitcher } from './LocaleSwitcher';
 import { ProfileMenu } from './ProfileMenu';
 import { SiteHeaderShell } from './SiteHeaderShell';
+import { SiteSearchForm } from './SiteSearchForm';
 
 type OpeningHoursSetting = {
   titleNl: string;
@@ -44,6 +48,14 @@ export async function Header({ locale }: { locale: Locale }) {
   const dict = getDictionary(locale);
   const base = locale === 'nl' ? '' : '/en';
   const loginLabel = dict.header.login;
+
+  // De grocomeet-ingang hangt in het profielmenu en niet in de navigatie: ze
+  // geldt maar voor de postverantwoordelijken en Groep 5. De stip erbij verschijnt
+  // enkel wanneer een reservatie ongeldig werd en er opnieuw gekozen moet worden.
+  const canReserveGrocomeet = hasPermission(session, 'grocomeet.reserve');
+  const grocomeetNeedsAttention = canReserveGrocomeet
+    ? await hasPendingMeetingNotice(session!.user.id, now)
+    : false;
 
   const theokot = theokotRow?.value as OpeningHoursSetting | undefined;
   const theoToday = theokot ? entryForDate(theokot.entries, now, locale) : undefined;
@@ -98,6 +110,11 @@ export async function Header({ locale }: { locale: Locale }) {
             alt=""
             width={1152}
             height={650}
+            // Het merkteken staat op 38px hoog met een max van 190px breed (zie
+            // .brand-logo-img). Zonder `sizes` leidt Next de srcset af uit de
+            // `width` hierboven en haalt de browser 1152px op voor iets van 67px,
+            // op elke pagina van de site.
+            sizes="190px"
             className="brand-logo-img"
             priority
           />
@@ -108,18 +125,37 @@ export async function Header({ locale }: { locale: Locale }) {
           base={base}
           locale={locale}
           ariaLabel={locale === 'nl' ? 'Hoofdnavigatie' : 'Main navigation'}
+          // Smal scherm: de tabs zijn dan één menuknop, en het zoekveld hoort in
+          // datzelfde paneel.
+          search={<SiteSearchForm locale={locale} />}
         />
 
         <div className="nav-right">
+          {/* Breed scherm: een knop naar /zoeken en geen invoerveld in de balk.
+              De elf tabs vullen de navigatie tot op ~40px na, en `.nav-inner`
+              stopt met groeien op --max (1320px), dus er komt geen ruimte bij op
+              een breder scherm. Een veld ernaast zou de tabs eroverheen duwen.
+              Op /zoeken staat de cursor meteen in het veld. */}
+          <Link
+            href={`${base}/zoeken`}
+            aria-label={dict.search.title}
+            title={dict.search.title}
+            className="nav-search"
+          >
+            <Search aria-hidden="true" size={18} />
+          </Link>
           <LocaleSwitcher locale={locale} variant="editorial" />
           {session ? (
             <ProfileMenu
               name={session.user.name}
               isAdmin={session.user.isSuperAdmin || session.permissions.length > 0}
+              canReserveGrocomeet={canReserveGrocomeet}
+              grocomeetNeedsAttention={grocomeetNeedsAttention}
               labels={{
                 myAccount: dict.header.myAccount,
-                myTickets: dict.header.myTickets,
                 admin: dict.header.admin,
+                grocomeet: dict.header.grocomeet,
+                grocomeetAttention: dict.header.grocomeetAttention,
                 logout: dict.header.logout,
               }}
               base={base}

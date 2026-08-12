@@ -50,17 +50,56 @@
   text-transform: uppercase;
 }
 
-.vtk-admin-nav {
+/* Smal scherm: de nav is een uitklapbaar paneel achter één knop. */
+.vtk-admin-nav-toggle {
+  appearance: none;
+  width: 100%;
   display: flex;
-  gap: 6px;
-  overflow-x: auto;
-  padding-bottom: 6px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 11px 16px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--ink);
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.vtk-admin-nav-toggle-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.vtk-admin-nav {
+  display: none;
+  flex-direction: column;
+  gap: 2px;
+  margin-top: 8px;
+  padding: 8px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: var(--surface);
+}
+
+.vtk-admin-nav.is-open {
+  display: flex;
 }
 
 @media (min-width: 860px) {
+  .vtk-admin-nav-toggle {
+    display: none;
+  }
+
   .vtk-admin-nav {
     display: flex;
     flex-direction: column;
+    gap: 6px;
+    margin-top: 0;
     /* Bewust geen `overflow-y`/`max-height`: de nav mag hoger zijn dan het
      * scherm, useSmartSticky zorgt dat je alles bereikt zonder tweede
      * scrollbalk. */
@@ -94,16 +133,10 @@
   font-weight: 600;
 }
 
-/* Ledenbeheer-groep.
-   Smal scherm: de sub-items vallen terug op losse pillen in de horizontale
-   scroller (`.vtk-admin-nav-flat` = display:contents), het groepsblok is
-   verborgen. Breed scherm: omgekeerd (inklapbare groep in de kolom-nav). */
-.vtk-admin-nav-flat {
-  display: contents;
-}
-
+/* Groep (Ledenbeheer, Website, ...): inklapbare kop met de tabs eronder. Dit
+   werkt op elke schermbreedte; smal zit het gewoon in het uitklappaneel. */
 .vtk-admin-nav-group {
-  display: none;
+  display: block;
 }
 
 .vtk-admin-nav-group-toggle {
@@ -159,13 +192,16 @@
   font-size: 12.5px;
 }
 
-@media (min-width: 860px) {
-  .vtk-admin-nav-flat {
-    display: none;
+/* In het uitklappaneel op een telefoon zijn dit aanraakdoelen, geen muispillen. */
+@media (max-width: 859px) {
+  .vtk-admin-nav a,
+  .vtk-admin-nav-group-toggle {
+    padding: 11px 12px;
+    font-size: 14px;
   }
 
-  .vtk-admin-nav-group {
-    display: block;
+  .vtk-admin-nav a.vtk-admin-nav-sublink {
+    font-size: 13.5px;
   }
 }
 
@@ -195,7 +231,12 @@
 .vtk-admin-main p,
 .vtk-admin-main .text-zinc-500,
 .vtk-admin-main .text-zinc-600,
-.vtk-admin-main .text-zinc-700 {
+.vtk-admin-main .text-zinc-700,
+/* `text-vtk-blue-muted` is de papierkleur (#EFF2F8), bedoeld als achtergrond.
+   Op een witte kaart is die tekst onzichtbaar: "0 evenementen", de feed-link en
+   "Nog niets gekozen" stonden er wel, maar je zag ze niet. Op een <p> viel dat
+   niet op omdat de regel hierboven die toch al overschreef. */
+.vtk-admin-main .text-vtk-blue-muted {
   color: var(--muted) !important;
 }
 
@@ -214,6 +255,15 @@
   width: 100%;
   border-collapse: collapse;
   font-size: 14px;
+}
+
+/* Een zijwaartse scrollcontainer is zelf het positie-anker. Tabellen erin
+   dragen `sr-only`-labels, en die zijn absoluut gepositioneerd: zonder
+   gepositioneerde ouder ankeren ze op de pagina i.p.v. op de tabel, landen ze
+   op de x van hun kolom (ver buiten het scherm), en zoomt een telefoon de hele
+   pagina uit om die ene onzichtbare pixel te tonen. */
+.vtk-admin-main .overflow-x-auto {
+  position: relative;
 }
 
 .vtk-admin-main thead,
@@ -340,6 +390,52 @@
 }
 
 /* -----------------------------------------------------------------------------
+   Telefoon (< sm). Enkel hier: de brede layout blijft ongemoeid.
+   -------------------------------------------------------------------------- */
+
+@media (max-width: 639px) {
+  /* Filter- en actierijen (`flex flex-wrap items-end`) zijn ontworpen voor een
+     brede kolom: vaste veldbreedtes (w-44, w-56, ...) en een `ml-auto`-knop
+     rechts. Op een telefoon past er geen tweede veld naast een eerste, dus
+     krijgt elk veld zijn eigen regel over de volle breedte in plaats van een
+     halve zoekbalk naast een half afgesneden knop. */
+  .vtk-admin-main .flex.flex-wrap.items-end > * {
+    flex: 1 1 100%;
+    min-width: 0;
+    margin-left: 0;
+  }
+
+  .vtk-admin-main
+    .flex.flex-wrap.items-end
+    :is(
+      input:not([type="checkbox"]):not([type="radio"]):not([type="date"]):not([type="time"]):not(
+          [type="datetime-local"]
+        ),
+      select
+    ) {
+    width: 100%;
+  }
+
+  /* Kopregel van een beheerpagina: titel en knoppen onder elkaar in plaats van
+     de knop half buiten het scherm. */
+  .vtk-admin-main .flex.items-center.justify-between:has(> h1) {
+    flex-wrap: wrap;
+  }
+
+  /* `Input` (packages/ui/src/form.tsx) geeft elk veld `w-full` mee, terecht voor
+     tekst en e-mail maar niet voor een datum/tijdveld: "dd/mm/jjjj, --:--" past
+     ruim in een paar honderd pixel. Vol uitgerekt tot de kolombreedte (of, in een
+     filterrij, tot de breedte van de zoekbalk ernaast) oogt dat overdreven breed,
+     met een grote lege vlakte tussen de tekst en het kalender-icoon helemaal
+     rechts. Laat de browser zijn eigen, compacte breedte kiezen in plaats daarvan. */
+  .vtk-admin-main :is(input[type="date"], input[type="time"], input[type="datetime-local"]) {
+    width: auto;
+    max-width: 100%;
+    min-width: 0;
+  }
+}
+
+/* -----------------------------------------------------------------------------
    Dashboard tiles (configurable launchpad)
    -------------------------------------------------------------------------- */
 
@@ -357,10 +453,19 @@
   flex-wrap: wrap;
 }
 
+.vtk-tiles-title {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
 .vtk-tiles-actions {
   display: flex;
+  align-items: center;
   gap: 8px;
   flex-wrap: wrap;
+  margin-left: auto;
 }
 
 .vtk-tile-btn {
@@ -416,6 +521,60 @@
   text-align: center;
 }
 
+/* Secties per herkomst. Wie in drie posten zit, zag in één plat raster niet
+   welke snelkoppeling van wie kwam; de kop zegt het nu letterlijk. */
+.vtk-tiles-lane {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.vtk-tiles-lane-head {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--line);
+}
+
+.vtk-tiles-lane-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 2px;
+  flex: none;
+  align-self: center;
+  background: var(--muted);
+}
+
+.vtk-tiles-lane-dot.is-global {
+  background: var(--navy);
+}
+
+.vtk-tiles-lane-dot.is-group {
+  background: var(--yellow);
+}
+
+.vtk-tiles-lane-title {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink);
+}
+
+.vtk-tiles-lane-sub {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.vtk-tiles-lane-count {
+  margin-left: auto;
+  font-size: 12px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
 .vtk-tile-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
@@ -457,6 +616,13 @@ a.vtk-tile:hover {
   width: 32px;
   height: 32px;
   border-radius: 10px;
+}
+
+/* Een geüpload logo staat op dezelfde gekleurde chip als een pictogram, dus
+   `contain`: een logo mag niet bijgesneden worden zoals een foto. */
+.vtk-tile-chip-img {
+  object-fit: contain;
+  display: block;
 }
 
 .vtk-tile-label {
@@ -593,10 +759,90 @@ a.vtk-tile:hover {
   border-color: var(--navy);
 }
 
+/* Beeldkiezer: pictogram of eigen logo, op aparte tabbladen. */
+.vtk-tile-seg {
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--paper);
+  align-self: flex-start;
+}
+
+.vtk-tile-seg button {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--muted);
+  padding: 6px 14px;
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.vtk-tile-seg button[aria-selected="true"] {
+  background: var(--navy);
+  color: var(--paper);
+}
+
+.vtk-icon-picker {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.vtk-icon-search {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 8px 11px;
+  font-size: 13.5px;
+  font-family: inherit;
+  background: var(--surface);
+  color: var(--ink);
+  width: 100%;
+}
+
+.vtk-icon-search:focus {
+  outline: none;
+  border-color: var(--navy);
+}
+
+.vtk-icon-cats {
+  display: flex;
+  gap: 5px;
+  flex-wrap: wrap;
+}
+
+.vtk-icon-cats button {
+  appearance: none;
+  font: inherit;
+  font-size: 11.5px;
+  font-weight: 600;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--muted);
+  border-radius: 999px;
+  padding: 4px 10px;
+  cursor: pointer;
+}
+
+.vtk-icon-cats button[aria-pressed="true"] {
+  background: var(--paper-2);
+  color: var(--ink);
+}
+
 .vtk-icon-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(40px, 1fr));
   gap: 6px;
+  /* De set telt bijna negentig pictogrammen: laat het rooster scrollen in
+     plaats van de modal tot buiten het scherm te duwen. */
+  max-height: 210px;
+  overflow-y: auto;
+  padding: 2px;
 }
 
 .vtk-icon-opt {
@@ -619,6 +865,62 @@ a.vtk-tile:hover {
 .vtk-icon-opt.is-active {
   border-color: var(--navy);
   box-shadow: inset 0 0 0 1px var(--navy);
+}
+
+.vtk-tile-upload {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px;
+  border: 1px dashed var(--line);
+  border-radius: 14px;
+  background: var(--paper);
+}
+
+.vtk-tile-upload-thumb {
+  width: 56px;
+  height: 56px;
+  border-radius: 14px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--muted);
+  display: grid;
+  place-items: center;
+  flex: none;
+  overflow: hidden;
+}
+
+.vtk-tile-upload-thumb img {
+  width: 34px;
+  height: 34px;
+  object-fit: contain;
+}
+
+.vtk-tile-upload-body {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.vtk-tile-upload-actions {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+/* De uploadknop is een <label> om een verborgen file-input: hij moet zich als
+   knop gedragen, niet als tekst. */
+.vtk-tile-upload-actions label.vtk-tile-btn {
+  display: inline-flex;
+  align-items: center;
+  cursor: pointer;
+}
+
+.vtk-tile-error {
+  font-size: 12px;
+  color: #a31f1f;
+  margin: 0;
 }
 
 .vtk-color-grid {

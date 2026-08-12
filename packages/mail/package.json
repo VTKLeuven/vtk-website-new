@@ -1,0 +1,20 @@
+{
+  "name": "@vtk/mail",
+  "version": "0.1.0",
+  "private": true,
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "nodemailer": "^9.0.3",
+    "server-only": "^0.0.1"
+  },
+  "devDependencies": {
+    "@types/node": "^20.19.43",
+    "@types/nodemailer": "^8.0.1",
+    "@vtk/tsconfig": "*",
+    "typescript": "^5"
+  }
+}

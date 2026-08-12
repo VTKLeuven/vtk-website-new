@@ -58,6 +58,14 @@ export const HEADER_TABS: Array<{
   order: number;
   introNl?: string;
   introEn?: string;
+  /** Externe site waar de headerknop naartoe gaat in plaats van naar /<slug>. */
+  externalUrl?: string;
+  /**
+   * Extra items in het uitklapmenu van deze tab. Voor werkingen met een eigen
+   * site: daar hangen geen pagina's onder deze tab, maar leden moeten er wel
+   * naartoe kunnen.
+   */
+  links?: Array<{ labelNl: string; labelEn: string; url: string }>;
   ctaLabelNl?: string;
   ctaLabelEn?: string;
   ctaUrl?: string;
@@ -74,6 +82,24 @@ export const HEADER_TABS: Array<{
       "Praktische diensten, campusvoorzieningen en tools die je semester vlotter maken.",
     introEn:
       "Practical services, campus facilities and tools that make your semester smoother.",
+    // De kalender was buiten de homepage enkel via de footer te vinden. Ze staat
+    // hier in het menu i.p.v. als twaalfde headertab: elf tabs is al de grens
+    // waarop de header naar een menuknop overschakelt (zie CLAUDE.md).
+    links: [
+      {
+        labelNl: "Kalender",
+        labelEn: "Calendar",
+        url: "/kalender",
+      },
+      // Intern pad: de pianopagina is een eigen route, geen contentpagina onder
+      // deze tab, dus ze komt er niet vanzelf in het uitklapmenu bij.
+      { labelNl: "Piano reserveren", labelEn: "Reserve the piano", url: "/piano" },
+      // De uitleendienst (apps/logistiek) staat hier bewust NIET als los
+      // menu-item. Ze heeft een eigen pagina onder deze tab (/info/uitleendienst)
+      // die de voorwaarden uitlegt en met een knop naar de app gaat; een tweede
+      // kale link ernaast maakte hetzelfde ding twee keer zichtbaar onder een
+      // andere naam.
+    ],
   },
   { code: "THEOKOT", slug: "theokot", labelNl: "Theokot", labelEn: "Theokot", order: 1 },
   { code: "SHIFTEN", slug: "shift", labelNl: "Shiften", labelEn: "Shifts", order: 2 },
@@ -84,6 +110,21 @@ export const HEADER_TABS: Array<{
     labelNl: "Career",
     labelEn: "Career",
     order: 4,
+    // Career heeft een eigen site; de headerknop gaat er rechtstreeks naartoe
+    // in plaats van naar de categoriepagina.
+    externalUrl: "https://career.vtk.be",
+    links: [
+      {
+        labelNl: "Jobfair",
+        labelEn: "Job fair",
+        url: "https://www.career.vtk.be/event/vtk-jobfair",
+      },
+      {
+        labelNl: "Contact voor bedrijven",
+        labelEn: "Contact for companies",
+        url: "https://www.career.vtk.be/contact",
+      },
+    ],
     ctaLabelNl: "Meer info op career.vtk.be",
     ctaLabelEn: "More info on career.vtk.be",
     ctaUrl: "https://career.vtk.be",
@@ -94,12 +135,27 @@ export const HEADER_TABS: Array<{
     labelNl: "Cursusdienst",
     labelEn: "Course Shop",
     order: 5,
+    links: [
+      { labelNl: "Bestel boeken", labelEn: "Order books", url: "https://cudi.vtk.be/vtk/shop" },
+      { labelNl: "Tweedehands", labelEn: "Second-hand", url: "https://cudi.vtk.be/vtk/secondhand" },
+      { labelNl: "Printer", labelEn: "Printer", url: "https://cudi.vtk.be/vtk/printer" },
+      { labelNl: "Subsidies", labelEn: "Subsidies", url: "https://cudi.vtk.be/vtk/subsidies" },
+    ],
     ctaLabelNl: "Bestel cursussen op cudi.vtk.be",
     ctaLabelEn: "Order courses on cudi.vtk.be",
     ctaUrl: "https://cudi.vtk.be",
   },
   { code: "INTERNATIONAAL", slug: "internationaal", labelNl: "Internationaal", labelEn: "International", order: 6 },
-  { code: "STUDIES", slug: "studies", labelNl: "Studies", labelEn: "Studies", order: 7 },
+  {
+    code: "STUDIES",
+    slug: "studies",
+    labelNl: "Studies",
+    labelEn: "Studies",
+    order: 7,
+    links: [
+      { labelNl: "Burgieclan", labelEn: "Burgieclan", url: "https://burgieclan.vtk.be" },
+    ],
+  },
   { code: "MEDIA", slug: "media", labelNl: "Media", labelEn: "Media", order: 8 },
   { code: "OVER_VTK", slug: "over-vtk", labelNl: "Over-VTK", labelEn: "About VTK", order: 9 },
   { code: "CONTACT", slug: "contact", labelNl: "Contact", labelEn: "Contact", order: 10 },

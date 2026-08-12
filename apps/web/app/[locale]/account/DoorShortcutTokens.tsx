@@ -141,7 +141,7 @@ export function DoorShortcutTokens({
   return (
     <div className="space-y-5">
       <div>
-        <h2 className="text-lg font-semibold text-vtk-ink">{t.title}</h2>
+        <h3 className="text-lg font-semibold text-vtk-ink">{t.title}</h3>
         <p className="mt-2 text-sm leading-6 text-[#5c667f]">{t.intro}</p>
       </div>
 

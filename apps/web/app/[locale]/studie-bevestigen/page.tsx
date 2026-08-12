@@ -1,3 +1,5 @@
+import type { Metadata } from "next";
+import { staticMetadata } from "@/lib/pageMetadata";
 import { notFound, redirect } from "next/navigation";
 import { prisma } from "@vtk/db";
 import { Card, Button } from "@vtk/ui";
@@ -8,6 +10,16 @@ import { currentWorkingYear, formatWorkingYear } from "@/lib/workingYear";
 import { logoutAction } from "@/app/actions/auth";
 import { confirmStudyAction } from "@/app/actions/onboarding";
 import { StudyFieldset } from "@/components/profile/StudyFieldset";
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ locale: string }>;
+}): Promise<Metadata> {
+  const { locale } = await params;
+  if (!hasLocale(locale)) return {};
+  return staticMetadata("confirmStudy", "/studie-bevestigen", locale, { noIndex: true });
+}
 
 /**
  * Jaarlijkse bevestiging van het studieprofiel. De gate in `[locale]/layout.tsx`
@@ -42,6 +54,7 @@ export default async function ConfirmStudyPage({
       studyProgrammes: true,
       notAtFaculty: true,
       notStudying: true,
+      internationalStudent: true,
     },
   });
 
@@ -64,6 +77,7 @@ export default async function ConfirmStudyPage({
             studyProgrammes={user.studyProgrammes}
             notAtFaculty={user.notAtFaculty}
             notStudying={user.notStudying}
+            internationalStudent={user.internationalStudent}
           />
           <div className="flex flex-wrap items-center gap-3">
             <Button type="submit">{t.submit}</Button>

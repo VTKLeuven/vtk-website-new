@@ -1,35 +1,41 @@
 "use client";
 
-import { useId, useState } from "react";
+import { useId, useState, useTransition } from "react";
 import Link from "next/link";
-import { Card, Input, Label, Select, Textarea } from "@vtk/ui";
+import { Button, Card, ConfirmDialog, Input, Label, Select, Textarea } from "@vtk/ui";
 import { getDictionary, type Locale } from "@vtk/i18n";
 import { SaveForm } from "@/components/ui/SaveForm";
 import { SlugField } from "@/components/ui/SlugField";
-import { savePageAction } from "@/app/actions/pages";
+import { useToast } from "@/components/ui/toast";
+import { SAVE_IDLE } from "@/lib/saveState";
+import { deletePageAction, savePageAction } from "@/app/actions/pages";
 import { contentErrorMessages } from "./messages";
 import { InspectorHead } from "./TabInspector";
 import type { PageNode, RoleOption, TabNode } from "./ContentManager";
 
 /**
  * Instellingen van een pagina in de rechterkolom: titels, slug, categorie,
- * publicatie, bewerkrollen en excerpts.
+ * publicatie, bewerkrollen, excerpts en de knop naast de titel, plus
+ * verwijderen onderaan.
  *
- * De INHOUD, de bijlagen en het verwijderen van een pagina horen hier niet:
- * die zitten in de editor (`/admin/paginas/[id]`, knop bovenaan). Dit scherm
- * gaat enkel over waar een pagina hangt en hoe ze heet.
+ * De INHOUD en de bijlagen horen hier niet: die zitten in de editor
+ * (`/admin/paginas/[id]`, knop bovenaan). Dit scherm gaat over waar een pagina
+ * hangt, hoe ze heet, en of ze nog moet bestaan.
  */
 export function PageInspector({
   locale,
   page,
   tabs,
   roles,
+  canDelete,
   onClose,
 }: {
   locale: Locale;
   page: PageNode;
   tabs: TabNode[];
   roles: RoleOption[];
+  /** `pages.delete`; zonder dat recht is er geen verwijderknop. */
+  canDelete: boolean;
   onClose: () => void;
 }) {
   const nl = locale === "nl";
@@ -132,8 +138,102 @@ export function PageInspector({
             <Textarea id={`${uid}-excerptEn`} name="excerptEn" rows={2} defaultValue={page.excerptEn ?? ""} />
           </div>
         </div>
+
+        <div className="grid grid-cols-1 gap-4 border-t border-vtk-blue/10 pt-5 sm:grid-cols-3">
+          <div>
+            <Label htmlFor={`${uid}-ctaLabelNl`}>{nl ? "Knoptekst (NL)" : "Button label (NL)"}</Label>
+            <Input id={`${uid}-ctaLabelNl`} name="ctaLabelNl" defaultValue={page.ctaLabelNl ?? ""} />
+            <p className="mt-1 text-xs text-[#5c667f]">
+              {nl
+                ? "Knop naast de titel, voor de app of het formulier waar deze pagina over gaat. Leeg laten geeft geen knop."
+                : "Button next to the title, for the app or form this page is about. Leave empty for no button."}
+            </p>
+          </div>
+          <div>
+            <Label htmlFor={`${uid}-ctaLabelEn`}>{nl ? "Knoptekst (EN)" : "Button label (EN)"}</Label>
+            <Input id={`${uid}-ctaLabelEn`} name="ctaLabelEn" defaultValue={page.ctaLabelEn ?? ""} />
+          </div>
+          <div>
+            <Label htmlFor={`${uid}-ctaUrl`}>{nl ? "Knopadres" : "Button URL"}</Label>
+            <Input id={`${uid}-ctaUrl`} name="ctaUrl" defaultValue={page.ctaUrl ?? ""} />
+            <p className="mt-1 text-xs text-[#5c667f]">
+              {nl
+                ? "Een pad op deze site (/shift) of een volledig adres (https://...)."
+                : "A path on this site (/shift) or a full address (https://...)."}
+            </p>
+          </div>
+        </div>
       </SaveForm>
+
+      {canDelete && (
+        <div className="mt-5 border-t border-vtk-blue/10 pt-5">
+          <DeletePageButton locale={locale} page={page} onDeleted={onClose} />
+        </div>
+      )}
     </Card>
+  );
+}
+
+/**
+ * Pagina verwijderen vanuit de boom. De inspector sluit daarna, want het
+ * geselecteerde item bestaat niet meer.
+ */
+function DeletePageButton({
+  locale,
+  page,
+  onDeleted,
+}: {
+  locale: Locale;
+  page: PageNode;
+  onDeleted: () => void;
+}) {
+  const nl = locale === "nl";
+  const dict = getDictionary(locale);
+  const showToast = useToast();
+  const [confirming, setConfirming] = useState(false);
+  const [pending, startTransition] = useTransition();
+
+  function onConfirm() {
+    const form = new FormData();
+    form.append("id", page.id);
+    startTransition(async () => {
+      const result = await deletePageAction(SAVE_IDLE, form);
+      setConfirming(false);
+      if (result.status === "error") {
+        // Bv. een pagina die iemand anders intussen verwijderde: melden, niet
+        // stilzwijgend sluiten alsof het gelukt is.
+        showToast({
+          message: contentErrorMessages(locale)[result.code] ?? dict.common.saveError,
+          variant: "error",
+          duration: 0,
+        });
+        return;
+      }
+      showToast({ message: nl ? "Pagina verwijderd" : "Page deleted", variant: "success" });
+      onDeleted();
+    });
+  }
+
+  return (
+    <>
+      <Button variant="ghost" size="sm" type="button" onClick={() => setConfirming(true)}>
+        {nl ? "Pagina verwijderen" : "Delete page"}
+      </Button>
+      <ConfirmDialog
+        open={confirming}
+        title={nl ? "Pagina verwijderen?" : "Delete page?"}
+        description={
+          nl
+            ? `"${page.titleNl}" (/${page.slug}) wordt permanent verwijderd, samen met de inhoud en de bijlagen. Wie de link nog heeft, krijgt een 404. Dit kan niet ongedaan gemaakt worden.`
+            : `"${page.titleNl}" (/${page.slug}) will be permanently deleted, along with its content and attachments. Anyone with the link will get a 404. This cannot be undone.`
+        }
+        confirmLabel={nl ? "Verwijderen" : "Delete"}
+        cancelLabel={nl ? "Annuleren" : "Cancel"}
+        pending={pending}
+        onConfirm={onConfirm}
+        onCancel={() => setConfirming(false)}
+      />
+    </>
   );
 }
 

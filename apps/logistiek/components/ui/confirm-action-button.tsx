@@ -14,6 +14,8 @@ import type { ActionResult } from '@/app/actions/uitleen';
  */
 export function ConfirmActionButton({
   label,
+  srLabel,
+  confirmLabel,
   action,
   successMessage,
   dialogTitle,
@@ -23,7 +25,17 @@ export function ConfirmActionButton({
   variant = 'ghost',
   icon,
 }: {
+  /** Tooltip en aria-label van de knop; geef hier de context mee ("Verwijderen: Career Fair"). */
   label: string;
+  /**
+   * Context voor een screenreader wanneer de knop tekst toont in plaats van een
+   * icoon. Bij een icoon is `label` al de aria-label; bij tekst is de zichtbare
+   * tekst kort gehouden ("Niet met de kar") en hoort er nog bij wiens knop het
+   * is, anders hoort een screenreader tien keer dezelfde zin.
+   */
+  srLabel?: string;
+  /** Korte knoptekst in de bevestigingsdialoog; standaard `label`. */
+  confirmLabel?: string;
   action: () => Promise<ActionResult>;
   successMessage: string;
   dialogTitle?: string;
@@ -60,7 +72,7 @@ export function ConfirmActionButton({
         disabled={pending}
         onClick={() => (confirm ? setOpen(true) : run())}
         className={icon ? 'w-8 !px-0' : undefined}
-        aria-label={icon ? label : undefined}
+        aria-label={icon ? label : srLabel}
         title={icon ? label : undefined}
       >
         {icon ?? label}
@@ -70,7 +82,7 @@ export function ConfirmActionButton({
           open={open}
           title={dialogTitle ?? `${label}?`}
           description={dialogDescription}
-          confirmLabel={label}
+          confirmLabel={confirmLabel ?? label}
           cancelLabel="Annuleren"
           destructive={destructive}
           pending={pending}

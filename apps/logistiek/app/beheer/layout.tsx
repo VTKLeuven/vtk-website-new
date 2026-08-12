@@ -27,7 +27,10 @@ export default async function BeheerLayout({ children }: { children: React.React
   return (
     <ToastProvider>
       <main className="mx-auto w-full max-w-[1320px] flex-1 px-5 py-10 sm:px-9">
-        <div className="flex flex-wrap items-end justify-between gap-4 border-b border-vtk-navy/10 pb-5">
+        {/* Schermnavigatie; op papier hoort enkel het blad zelf (zie globals.css). */}
+        {/* De navigatie onder de titel en niet ernaast: ze is twee rijen hoog
+            zodra een tab openstaat, en dan trekt ze de titel scheef. */}
+        <div data-print="hide" className="grid gap-4 border-b border-vtk-navy/10 pb-5">
           <div>
             <p className="flex items-center gap-2 text-sm text-vtk-muted">
               <span className="h-1.5 w-1.5 rounded-full bg-vtk-yellow" aria-hidden />

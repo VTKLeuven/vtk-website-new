@@ -10,6 +10,7 @@ import {
 } from '@/lib/shift';
 import { authErrorResponse } from '@/lib/session';
 import { withCors, corsPreflight } from '@/lib/cors';
+import { handledLeadFields } from '@/lib/shift-reminders';
 
 /**
  * Get de huidige shiften (waar een user zich voor kan registreren)
@@ -123,6 +124,8 @@ const SHIFT_FIELD_KEYS = [
   'maxParticipants',
   'reward',
   'post',
+  'openToInternationals',
+  'instructions',
 ];
 
 const isStringArray = (value: unknown): value is string[] =>
@@ -229,16 +232,41 @@ async function patchHandler(request: Request) {
     }
   }
 
+  // Een verplaatste shift moet opnieuw waarschuwen: `Shift` heeft geen
+  // geannuleerd-status, dus de herinnering is het enige bericht dat een
+  // deelnemer over de nieuwe tijd te zien krijgt. De markeringen gaan leeg en
+  // krijgen meteen weer de vensters die tegen de nieuwe starttijd al voorbij zijn.
+  const now = new Date();
+  const startTime = patch.startTime ?? existing.startTime;
+  const startMoved = Boolean(patch.startTime) && startTime.getTime() !== existing.startTime.getTime();
+
   try {
     await prisma.$transaction([
       ...(hasFieldChanges ? [prisma.shift.update({ where: { id }, data: patch })] : []),
+      ...(startMoved
+        ? [
+            prisma.shiftParticipant.updateMany({
+              where: { shiftId: id },
+              data: {
+                reminderDayBeforeAt: null,
+                reminderSoonAt: null,
+                ...handledLeadFields(startTime, now),
+              },
+            }),
+          ]
+        : []),
       ...(toRemove.length
         ? [prisma.shiftParticipant.deleteMany({ where: { shiftId: id, userId: { in: toRemove } } })]
         : []),
       ...(toAdd.length
         ? [
             prisma.shiftParticipant.createMany({
-              data: toAdd.map((userId) => ({ shiftId: id, userId, payedOut: false })),
+              data: toAdd.map((userId) => ({
+                shiftId: id,
+                userId,
+                payedOut: false,
+                ...handledLeadFields(startTime, now),
+              })),
               skipDuplicates: true,
             }),
           ]

@@ -4,6 +4,7 @@
 // beheertabellen (Rollen, Posten, ...). Eén rij per item; klikken klapt een
 // detailpaneel open met categorieën die elk apart bewerkbaar zijn.
 
+import Image from "next/image";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 
 export type SortDir = "asc" | "desc";
@@ -169,11 +170,13 @@ export function Panel({
 /** Profielfoto of initiaal. */
 export function Avatar({ name, avatarUrl, sm }: { name: string; avatarUrl: string | null; sm?: boolean }) {
   const size = sm ? "h-7 w-7" : "h-8 w-8";
+  const px = sm ? 28 : 32;
   return (
     <div className={`${size} shrink-0 overflow-hidden rounded-full border border-vtk-blue/10 bg-vtk-blue-soft`}>
       {avatarUrl ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img src={avatarUrl} alt="" className="h-full w-full object-cover" />
+        // Een ledenlijst toont tientallen van deze bolletjes tegelijk. Op 28-32px
+        // is de volledige profielfoto pure verspilling, dus vraag die maat op.
+        <Image src={avatarUrl} alt="" width={px} height={px} className="h-full w-full object-cover" />
       ) : (
         <div className="grid h-full w-full place-items-center text-xs font-semibold text-[#5c667f]">
           {name.slice(0, 1).toUpperCase()}

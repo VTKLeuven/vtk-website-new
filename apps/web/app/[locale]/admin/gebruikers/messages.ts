@@ -15,5 +15,8 @@ export function userErrorMessages(locale: Locale): Record<string, string> {
     PASSWORD_REQUIRED: nl
       ? "Niet opgeslagen: een nieuwe gebruiker heeft een wachtwoord nodig."
       : "Not saved: a new user needs a password.",
+    PASSWORD_TOO_SHORT: nl
+      ? "Niet opgeslagen: een wachtwoord moet minstens 8 tekens bevatten."
+      : "Not saved: a password must contain at least 8 characters.",
   };
 }

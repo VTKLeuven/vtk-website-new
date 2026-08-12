@@ -3,7 +3,7 @@
 import { revalidatePath } from 'next/cache';
 import { prisma } from '@vtk/db';
 import { requireSession } from '@/lib/session';
-import { parseDateOnly, todayDateOnly, transportPriceCents } from '@/lib/uitleen';
+import { isEmailish, parseDateOnly, todayDateOnly } from '@/lib/uitleen';
 import { availabilityForRange } from '@/lib/uitleen-server';
 import {
   buildReservationData,
@@ -11,7 +11,9 @@ import {
   MAX_NOTE_LENGTH,
   type ReservationFormInput,
 } from '@/lib/reservation-form';
-import { logistiekBaseUrl, paymentGateway } from '@/lib/payments';
+import { buildTransportBookings, type TransportFormInput } from '@/lib/transport-form';
+import { expireOpenPayments, logistiekBaseUrl, paymentGateway } from '@/lib/payments';
+import { runSerializable } from '@/lib/tx';
 
 export type ActionResult = { ok: true; message?: string } | { ok: false; error: string };
 // `ReservationFormInput` NIET her-exporteren vanuit dit `'use server'`-bestand:
@@ -29,35 +31,96 @@ function revalidateMember() {
 type SessionLike = { user: { id: string; name: string }; groups: Array<{ id: string }> };
 
 /**
- * Leidt het aanvragertype automatisch af uit de login: een praesidiumlid (in een
- * post) vraagt aan als INTERN namens die post; wie geen post heeft, is EXTERN met
- * de eigen naam. Het lid kiest dit dus nooit zelf; de client-waarde wordt
- * genegeerd. (Werkgroepen zitten niet in de DB en worden hier niet afgeleid.)
+ * Leidt het aanvragertype automatisch af uit de gekozen groep in de login. Een
+ * praesidiumpost wordt INTERN; een werkgroep behoudt het aparte WERKGROEP-type;
+ * wie geen groep heeft vraagt EXTERN aan met de eigen naam.
  */
-function deriveMemberRequester(
+async function deriveMemberRequester(
   session: SessionLike,
   chosenGroupId?: string
-): { requesterType: 'INTERN' | 'EXTERN'; groupId: string | null; requesterName?: string } {
+): Promise<{
+  requesterType: 'INTERN' | 'WERKGROEP' | 'EXTERN';
+  groupId: string | null;
+  requesterName?: string;
+}> {
   if (session.groups.length > 0) {
     const groupId = session.groups.some((g) => g.id === chosenGroupId)
       ? chosenGroupId!
       : session.groups[0].id;
+    const group = await prisma.group.findFirst({
+      where: { id: groupId },
+      select: { type: true, nameNl: true },
+    });
+    if (!group) return { requesterType: 'EXTERN', groupId: null, requesterName: session.user.name };
+    if (group.type === 'WERKGROEP') {
+      return { requesterType: 'WERKGROEP', groupId: null, requesterName: group.nameNl };
+    }
     return { requesterType: 'INTERN', groupId, requesterName: undefined };
   }
   return { requesterType: 'EXTERN', groupId: null, requesterName: session.user.name };
 }
 
+/**
+ * Het evenement waaraan deze aanvraag hangt, of null.
+ *
+ * `eventId` is wat het lid koos; `createEvent` betekent "maak er een van met de
+ * gegevens die ik net invulde", zodat de volgende aanvraag (het vervoer) eraan
+ * kan hangen zonder op het team te wachten. Een onbekend id negeren we stil: dan
+ * is het evenement intussen verwijderd, en de aanvraag zelf is belangrijker.
+ */
+async function resolveEventId(
+  session: SessionLike,
+  input: {
+    eventId?: string | null;
+    createEvent?: boolean;
+    eventName?: string;
+    eventLocation?: string;
+    eventStart?: string;
+  },
+  groupId: string | null
+): Promise<string | null> {
+  const chosen = (input.eventId ?? '').trim();
+  if (chosen) {
+    const found = await prisma.uitleenEvent.findUnique({
+      where: { id: chosen },
+      select: { id: true },
+    });
+    return found?.id ?? null;
+  }
+  if (!input.createEvent) return null;
+
+  const name = (input.eventName ?? '').trim();
+  if (!name) return null;
+  const created = await prisma.uitleenEvent.create({
+    data: {
+      name: name.slice(0, 200),
+      location: (input.eventLocation ?? '').trim().slice(0, 300) || null,
+      startAt: input.eventStart ? parseBrusselsDateTime(input.eventStart) : null,
+      groupId,
+      createdById: session.user.id,
+    },
+    select: { id: true },
+  });
+  return created.id;
+}
+
 export async function createReservationAction(input: ReservationFormInput): Promise<ActionResult> {
   const session = await requireSession();
-  const requester = deriveMemberRequester(session, input.groupId ?? undefined);
+  const requester = await deriveMemberRequester(session, input.groupId ?? undefined);
   const built = await buildReservationData(
     { ...input, ...requester, flesserkeLines: [] },
     session.groups.map((g) => g.id)
   );
   if (!built.ok) return built;
 
+  const eventId = await resolveEventId(session, input, built.scalars.groupId);
   await prisma.uitleenReservation.create({
-    data: { userId: session.user.id, ...built.scalars, lines: { create: built.lineCreates } },
+    data: {
+      userId: session.user.id,
+      ...built.scalars,
+      eventId,
+      lines: { create: built.lineCreates },
+    },
   });
 
   revalidateMember();
@@ -71,30 +134,33 @@ export async function editReservationAction(
 ): Promise<ActionResult> {
   const session = await requireSession();
 
-  const existing = await prisma.uitleenReservation.findFirst({
-    where: { id: reservationId, userId: session.user.id },
-    select: { id: true, status: true },
-  });
-  if (!existing) return { ok: false, error: 'Reservatie niet gevonden.' };
-  if (existing.status !== 'REQUESTED') {
-    return { ok: false, error: 'Deze aanvraag is al beslist; bewerken kan niet meer. Neem contact op met Logistiek.' };
-  }
-
-  const requester = deriveMemberRequester(session, input.groupId ?? undefined);
+  const requester = await deriveMemberRequester(session, input.groupId ?? undefined);
   const built = await buildReservationData(
     { ...input, ...requester, flesserkeLines: [] },
     session.groups.map((g) => g.id)
   );
   if (!built.ok) return built;
 
-  // Enkel de materiaallijnen vervangen; flesserke loopt via een aparte flow.
-  await prisma.$transaction([
-    prisma.uitleenReservationLine.deleteMany({ where: { reservationId } }),
-    prisma.uitleenReservation.update({
+  // Statusguard en writes horen bij elkaar: een gelijktijdige goedkeuring mag
+  // nooit gevolgd worden door een ongecontroleerde ledenedit.
+  const outcome = await runSerializable(async (tx) => {
+    const existing = await tx.uitleenReservation.findFirst({
+      where: { id: reservationId, userId: session.user.id },
+      select: { status: true },
+    });
+    if (!existing) return 'NOT_FOUND' as const;
+    if (existing.status !== 'REQUESTED') return 'LOCKED' as const;
+    await tx.uitleenReservationLine.deleteMany({ where: { reservationId } });
+    await tx.uitleenReservation.update({
       where: { id: reservationId },
       data: { ...built.scalars, lines: { create: built.lineCreates } },
-    }),
-  ]);
+    });
+    return 'OK' as const;
+  });
+  if (outcome === 'NOT_FOUND') return { ok: false, error: 'Reservatie niet gevonden.' };
+  if (outcome === 'LOCKED') {
+    return { ok: false, error: 'Deze aanvraag is al beslist; bewerken kan niet meer. Neem contact op met Logistiek.' };
+  }
 
   revalidateMember();
   return { ok: true, message: 'Aanvraag bijgewerkt.' };
@@ -105,21 +171,31 @@ function revalidateFlesserke() {
   revalidatePath('/flesserke');
 }
 
-/** Flesserke-aanvraag (enkel praesidium). Aparte reservatie met enkel flesserke-lijnen. */
+/**
+ * Flesserke-aanvraag: aparte reservatie met enkel flesserke-lijnen. Voor de
+ * interne werking, dus elk lid van een post, werkgroep of jaarwerking
+ * (`FLESSERKE_REQUESTER_TYPES`); externen kunnen dit niet aanvragen.
+ */
 export async function createFlesserkeReservationAction(input: ReservationFormInput): Promise<ActionResult> {
   const session = await requireSession();
   if (session.groups.length === 0) {
-    return { ok: false, error: 'Flesserke is enkel voor het praesidium.' };
+    return { ok: false, error: 'Flesserke is enkel voor de interne werking van VTK.' };
   }
-  const requester = deriveMemberRequester(session, input.groupId ?? undefined);
+  const requester = await deriveMemberRequester(session, input.groupId ?? undefined);
   const built = await buildReservationData(
     { ...input, ...requester, lines: [] },
     session.groups.map((g) => g.id)
   );
   if (!built.ok) return built;
 
+  const eventId = await resolveEventId(session, input, built.scalars.groupId);
   await prisma.uitleenReservation.create({
-    data: { userId: session.user.id, ...built.scalars, flesserkeLines: { create: built.flesserkeLineCreates } },
+    data: {
+      userId: session.user.id,
+      ...built.scalars,
+      eventId,
+      flesserkeLines: { create: built.flesserkeLineCreates },
+    },
   });
 
   revalidateFlesserke();
@@ -131,31 +207,35 @@ export async function editFlesserkeReservationAction(
   input: ReservationFormInput
 ): Promise<ActionResult> {
   const session = await requireSession();
-  if (session.groups.length === 0) return { ok: false, error: 'Flesserke is enkel voor het praesidium.' };
-
-  const existing = await prisma.uitleenReservation.findFirst({
-    where: { id: reservationId, userId: session.user.id },
-    select: { id: true, status: true },
-  });
-  if (!existing) return { ok: false, error: 'Aanvraag niet gevonden.' };
-  if (existing.status !== 'REQUESTED') {
-    return { ok: false, error: 'Deze aanvraag is al beslist; bewerken kan niet meer.' };
+  if (session.groups.length === 0) {
+    return { ok: false, error: 'Flesserke is enkel voor de interne werking van VTK.' };
   }
 
-  const requester = deriveMemberRequester(session, input.groupId ?? undefined);
+  const requester = await deriveMemberRequester(session, input.groupId ?? undefined);
   const built = await buildReservationData(
     { ...input, ...requester, lines: [] },
     session.groups.map((g) => g.id)
   );
   if (!built.ok) return built;
 
-  await prisma.$transaction([
-    prisma.uitleenFlesserkeLine.deleteMany({ where: { reservationId } }),
-    prisma.uitleenReservation.update({
+  const outcome = await runSerializable(async (tx) => {
+    const existing = await tx.uitleenReservation.findFirst({
+      where: { id: reservationId, userId: session.user.id },
+      select: { status: true },
+    });
+    if (!existing) return 'NOT_FOUND' as const;
+    if (existing.status !== 'REQUESTED') return 'LOCKED' as const;
+    await tx.uitleenFlesserkeLine.deleteMany({ where: { reservationId } });
+    await tx.uitleenReservation.update({
       where: { id: reservationId },
       data: { ...built.scalars, flesserkeLines: { create: built.flesserkeLineCreates } },
-    }),
-  ]);
+    });
+    return 'OK' as const;
+  });
+  if (outcome === 'NOT_FOUND') return { ok: false, error: 'Aanvraag niet gevonden.' };
+  if (outcome === 'LOCKED') {
+    return { ok: false, error: 'Deze aanvraag is al beslist; bewerken kan niet meer.' };
+  }
 
   revalidateFlesserke();
   return { ok: true, message: 'Flesserke-aanvraag bijgewerkt.' };
@@ -166,23 +246,37 @@ export async function cancelReservationAction(reservationId: string): Promise<Ac
 
   const reservation = await prisma.uitleenReservation.findFirst({
     where: { id: reservationId, userId: session.user.id },
-    include: { payments: { where: { status: 'SUCCEEDED' }, select: { id: true } } },
+    include: { payments: true },
   });
   if (!reservation) return { ok: false, error: 'Reservatie niet gevonden.' };
   if (reservation.status !== 'REQUESTED' && reservation.status !== 'APPROVED') {
     return { ok: false, error: 'Deze reservatie kan je niet meer annuleren.' };
   }
   if (reservation.payments.length > 0) {
+    if (!reservation.payments.some((payment) => payment.status === 'SUCCEEDED')) {
+      const expired = await expireOpenPayments(reservation.payments);
+      if (!expired.ok) return { ok: false, error: expired.error };
+    }
+  }
+  if (reservation.payments.some((payment) => payment.status === 'SUCCEEDED')) {
     return {
       ok: false,
       error: 'Deze reservatie is al betaald; mail logistiek@vtk.be om ze te annuleren.',
     };
   }
 
-  await prisma.uitleenReservation.update({
-    where: { id: reservation.id },
+  const cancelled = await prisma.uitleenReservation.updateMany({
+    where: {
+      id: reservation.id,
+      userId: session.user.id,
+      status: { in: ['REQUESTED', 'APPROVED'] },
+      payments: { none: { status: 'SUCCEEDED' } },
+    },
     data: { status: 'CANCELLED' },
   });
+  if (cancelled.count === 0) {
+    return { ok: false, error: 'Deze reservatie kan niet meer veilig geannuleerd worden.' };
+  }
 
   revalidateMember();
   return { ok: true, message: 'Reservatie geannuleerd.' };
@@ -200,70 +294,39 @@ export async function checkAvailabilityAction(input: {
   return { ok: true, availability: await availabilityForRange(pickupDate, returnDate) };
 }
 
-const MAX_VAN_BOOKING_HOURS = 12;
-
-export async function createVanBookingAction(input: {
-  startAt: string; // datetime-local, Belgische wall-clock
-  endAt: string;
-  purpose: string;
-  pickupAddress: string;
-  destination: string;
-  note: string;
-  vehicleId?: string;
-  eventName?: string;
-  helpersNote?: string;
+export async function createVanBookingAction(input: TransportFormInput & {
+  /** Koepel-evenement (A8), of `createEvent` om er een te maken van `eventName`. */
+  eventId?: string | null;
+  createEvent?: boolean;
+  /** Post of werkgroep waarvoor de rit dient; leeg = de eerste van het lid. */
+  groupId?: string | null;
 }): Promise<ActionResult> {
   const session = await requireSession();
 
-  const startAt = parseBrusselsDateTime(input.startAt);
-  const endAt = parseBrusselsDateTime(input.endAt);
-  if (!startAt || !endAt) return { ok: false, error: 'Kies een start- en eindmoment.' };
-  if (startAt <= new Date()) return { ok: false, error: 'Het startmoment ligt in het verleden.' };
-  if (endAt <= startAt) return { ok: false, error: 'Het eindmoment ligt voor het startmoment.' };
-  const hours = (endAt.getTime() - startAt.getTime()) / (60 * 60 * 1000);
-  if (hours > MAX_VAN_BOOKING_HOURS) {
-    return {
-      ok: false,
-      error: `Een rit kan maximaal ${MAX_VAN_BOOKING_HOURS} uur duren; mail logistiek@vtk.be voor langere ritten.`,
-    };
-  }
-
-  const purpose = input.purpose.trim();
-  if (!purpose) return { ok: false, error: 'Beschrijf waarvoor je het voertuig nodig hebt.' };
-
-  const vehicle = input.vehicleId
-    ? await prisma.uitleenVehicle.findFirst({ where: { id: input.vehicleId, active: true } })
-    : await prisma.uitleenVehicle.findFirst({ where: { active: true }, orderBy: { sortIndex: 'asc' } });
-  if (!vehicle) return { ok: false, error: 'Kies een voertuig.' };
-
-  // Tarief snapshotten; prijs is null wanneer ze pas na de rit gekend is (per km).
-  const priceCents = transportPriceCents({
-    pricingMode: vehicle.pricingMode,
-    rateCents: vehicle.rateCents,
-    startAt,
-    endAt,
+  // Zoals bij een materiaalaanvraag: de rit hangt aan de post waarvoor ze dient.
+  // Dat stond hier niet, waardoor elke rit van een lid als "Interne post" zonder
+  // naam in het beheer stond en de post ze onderling niet kon zien.
+  const requester = await deriveMemberRequester(session, input.groupId ?? undefined);
+  const eventId = await resolveEventId(session, { ...input, eventStart: undefined }, requester.groupId);
+  const built = await buildTransportBookings(input, {
+    userId: session.user.id,
+    eventId,
+    requesterType: requester.requesterType,
+    groupId: requester.groupId,
+    requesterName: requester.requesterName ?? null,
   });
+  if (!built.ok) return { ok: false, error: built.error };
 
-  await prisma.uitleenTransportBooking.create({
-    data: {
-      userId: session.user.id,
-      vehicleId: vehicle.id,
-      startAt,
-      endAt,
-      purpose: purpose.slice(0, MAX_NOTE_LENGTH),
-      eventName: input.eventName?.trim().slice(0, 300) || null,
-      pickupAddress: input.pickupAddress.trim().slice(0, 300) || null,
-      destination: input.destination.trim().slice(0, 300) || null,
-      helpersNote: input.helpersNote?.trim().slice(0, 300) || null,
-      memberNote: input.note.trim().slice(0, MAX_NOTE_LENGTH) || null,
-      pricingMode: vehicle.pricingMode,
-      rateCents: vehicle.rateCents,
-      priceCents,
-    },
-  });
+  await prisma.uitleenTransportBooking.createMany({ data: built.bookings });
 
   revalidateMember();
-  return { ok: true, message: 'Rit aangevraagd. Je vindt de status bij Mijn aanvragen.' };
+  const what =
+    built.vehicleCount > 1
+      ? `${built.vehicleCount} voertuigen aangevraagd`
+      : built.roundTrip
+        ? 'Heen- en terugrit aangevraagd'
+        : 'Rit aangevraagd';
+  return { ok: true, message: `${what}. Je vindt de status bij Mijn aanvragen.` };
 }
 
 export async function cancelVanBookingAction(bookingId: string): Promise<ActionResult> {
@@ -271,23 +334,40 @@ export async function cancelVanBookingAction(bookingId: string): Promise<ActionR
 
   const booking = await prisma.uitleenTransportBooking.findFirst({
     where: { id: bookingId, userId: session.user.id },
-    include: { payments: { where: { status: 'SUCCEEDED' }, select: { id: true } } },
+    include: { payments: true },
   });
   if (!booking) return { ok: false, error: 'Rit niet gevonden.' };
   if (booking.status !== 'REQUESTED' && booking.status !== 'APPROVED') {
     return { ok: false, error: 'Deze rit kan je niet meer annuleren.' };
   }
-  if (booking.payments.length > 0) {
+  if (booking.payments.length > 0 && !booking.payments.some((payment) => payment.status === 'SUCCEEDED')) {
+    const expired = await expireOpenPayments(booking.payments);
+    if (!expired.ok) return { ok: false, error: expired.error };
+  }
+  if (booking.payments.some((payment) => payment.status === 'SUCCEEDED')) {
     return { ok: false, error: 'Deze rit is al betaald; mail logistiek@vtk.be om ze te annuleren.' };
   }
 
-  await prisma.uitleenTransportBooking.update({
-    where: { id: booking.id },
+  // Een heen-en-terugaanvraag annuleer je in haar geheel: enkel de heenrit
+  // annuleren laat een terugrit staan die niemand meer gaat rijden.
+  const cancelled = await prisma.uitleenTransportBooking.updateMany({
+    where: {
+      ...(booking.tripGroupId ? { tripGroupId: booking.tripGroupId } : { id: booking.id }),
+      userId: session.user.id,
+      status: { in: ['REQUESTED', 'APPROVED'] },
+      payments: { none: { status: 'SUCCEEDED' } },
+    },
     data: { status: 'CANCELLED' },
   });
+  if (cancelled.count === 0) {
+    return { ok: false, error: 'Deze rit kan niet meer veilig geannuleerd worden.' };
+  }
 
   revalidateMember();
-  return { ok: true, message: 'Rit geannuleerd.' };
+  return {
+    ok: true,
+    message: cancelled.count > 1 ? 'Heen- en terugrit geannuleerd.' : 'Rit geannuleerd.',
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -321,7 +401,10 @@ export async function startPaymentAction(
         });
 
   if (!record) return { ok: false, error: 'Niet gevonden.' };
-  if (record.status !== 'APPROVED') {
+  const payableStatus =
+    record.status === 'APPROVED' ||
+    (target === 'van' && record.status === 'COMPLETED');
+  if (!payableStatus) {
     return { ok: false, error: 'Betalen kan pas nadat de aanvraag goedgekeurd is.' };
   }
   if (record.paymentMode !== 'ONLINE') {
@@ -339,11 +422,13 @@ export async function startPaymentAction(
   // Een nog lopende checkout hergebruiken we in plaats van er een tweede te starten.
   const pending = record.payments.find(
     (payment) =>
-      payment.status === 'PENDING' &&
-      payment.checkoutUrl &&
+      (payment.status === 'CREATED' || payment.status === 'PENDING') &&
       (!payment.expiresAt || payment.expiresAt > new Date())
   );
   if (pending?.checkoutUrl) return { ok: true, url: pending.checkoutUrl };
+  if (pending) {
+    return { ok: false, error: 'Je betaling wordt klaargezet. Probeer over enkele seconden opnieuw.' };
+  }
 
   const gateway = paymentGateway();
   const attempt = record.payments.length + 1;
@@ -352,16 +437,30 @@ export async function startPaymentAction(
   const base = logistiekBaseUrl();
   const detailPath = target === 'reservation' ? `/reservaties/${record.id}` : `/vervoer/${record.id}`;
 
-  const payment = await prisma.uitleenPayment.create({
-    data: {
-      reservationId: target === 'reservation' ? record.id : null,
-      transportBookingId: target === 'van' ? record.id : null,
-      provider: gateway.name,
-      idempotencyKey,
-      amountCents,
-      expiresAt,
-    },
-  });
+  let payment;
+  try {
+    payment = await prisma.uitleenPayment.create({
+      data: {
+        reservationId: target === 'reservation' ? record.id : null,
+        transportBookingId: target === 'van' ? record.id : null,
+        provider: gateway.name,
+        idempotencyKey,
+        amountCents,
+        expiresAt,
+      },
+    });
+  } catch (error) {
+    // Twee gelijktijdige klikken gebruiken dezelfde attempt/idempotency key. De
+    // winnaar maakt de checkout; de andere request maakt nooit een tweede aan.
+    const concurrent = await prisma.uitleenPayment.findUnique({
+      where: { provider_idempotencyKey: { provider: gateway.name, idempotencyKey } },
+    });
+    if (concurrent?.checkoutUrl) return { ok: true, url: concurrent.checkoutUrl };
+    if (concurrent) {
+      return { ok: false, error: 'Je betaling wordt klaargezet. Probeer over enkele seconden opnieuw.' };
+    }
+    throw error;
+  }
 
   try {
     const checkout = await gateway.createCheckout({

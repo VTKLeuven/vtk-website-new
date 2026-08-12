@@ -20,7 +20,10 @@ export async function GET() {
 
   const participations = await prisma.shiftParticipant.findMany({
     where: { userId: session.user.id },
-    select: { payedOut: true, shift: { select: { post: true, endTime: true } } },
+    select: {
+      rewardPaid: true,
+      shift: { select: { post: true, endTime: true, reward: true } },
+    },
   });
 
   const { start, end } = academicYearRange();
@@ -28,12 +31,12 @@ export async function GET() {
   let total = 0;
   let unpaidCurrentYear = 0;
 
-  for (const { payedOut, shift } of participations) {
+  for (const { rewardPaid, shift } of participations) {
     const key = shift.post ?? 'GEEN';
     perPost[key] = (perPost[key] ?? 0) + 1;
     total += 1;
 
-    if (!payedOut && shift.endTime >= start && shift.endTime < end) {
+    if (rewardPaid < shift.reward && shift.endTime >= start && shift.endTime < end) {
       unpaidCurrentYear += 1;
     }
   }

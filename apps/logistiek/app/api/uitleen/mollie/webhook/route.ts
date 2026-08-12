@@ -1,7 +1,7 @@
 import { Prisma } from '@prisma/client';
 import { prisma } from '@vtk/db';
-import { mapPaymentStatus } from '@vtk/payments';
 import { applyPaymentStatus, newMollieGateway } from '@/lib/payments';
+import { readLimitedText, RequestBodyTooLargeError } from '@/lib/http';
 
 export const runtime = 'nodejs';
 
@@ -15,9 +15,12 @@ export const runtime = 'nodejs';
 export async function POST(request: Request): Promise<Response> {
   let paymentId: string | null = null;
   try {
-    const body = await request.text();
+    const body = await readLimitedText(request, 64 * 1024);
     paymentId = new URLSearchParams(body).get('id');
-  } catch {
+  } catch (error) {
+    if (error instanceof RequestBodyTooLargeError) {
+      return new Response('payload too large', { status: 413 });
+    }
     return new Response('bad request', { status: 400 });
   }
   if (!paymentId || !paymentId.startsWith('tr_')) {
@@ -31,37 +34,56 @@ export async function POST(request: Request): Promise<Response> {
   if (!payment) return new Response('unknown payment', { status: 200 });
 
   const gateway = newMollieGateway();
-  const molliePayment = await gateway.fetchPayment(paymentId);
-  const status = mapPaymentStatus(molliePayment.status);
-
-  const externalEventId = `${paymentId}:${molliePayment.status}`;
+  let result;
   try {
-    await prisma.uitleenPaymentWebhook.create({
+    result = await gateway.getCheckoutStatus(paymentId);
+  } catch {
+    return new Response('provider unavailable', { status: 502 });
+  }
+
+  const externalEventId = `${paymentId}:${result.status}`;
+  let webhook = await prisma.uitleenPaymentWebhook.findUnique({
+    where: { provider_externalEventId: { provider: 'mollie', externalEventId } },
+  });
+  try {
+    webhook ??= await prisma.uitleenPaymentWebhook.create({
       data: {
         provider: 'mollie',
         externalEventId,
         paymentId: payment.id,
         signatureValid: true,
-        payload: molliePayment as unknown as Prisma.InputJsonValue,
+        payload: result as unknown as Prisma.InputJsonValue,
       },
     });
   } catch (error) {
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
-      // Al verwerkt; Mollie retryt soms.
-      return new Response('ok', { status: 200 });
+      webhook = await prisma.uitleenPaymentWebhook.findUnique({
+        where: { provider_externalEventId: { provider: 'mollie', externalEventId } },
+      });
+    } else {
+      throw error;
     }
-    throw error;
   }
+  if (!webhook) return new Response('webhook persistence failed', { status: 500 });
+  if (webhook.processedAt) return new Response('ok', { status: 200 });
 
-  await applyPaymentStatus(
-    payment.id,
-    { status, paymentId: molliePayment.id },
-    molliePayment.status
-  );
-  await prisma.uitleenPaymentWebhook.updateMany({
-    where: { provider: 'mollie', externalEventId },
-    data: { processedAt: new Date() },
+  await prisma.uitleenPaymentWebhook.update({
+    where: { id: webhook.id },
+    data: { processingAttempts: { increment: 1 }, lastError: null },
   });
+  try {
+    await applyPaymentStatus(payment.id, result, result.status);
+    await prisma.uitleenPaymentWebhook.update({
+      where: { id: webhook.id },
+      data: { processedAt: new Date(), lastError: null },
+    });
+  } catch (error) {
+    await prisma.uitleenPaymentWebhook.update({
+      where: { id: webhook.id },
+      data: { lastError: error instanceof Error ? error.message.slice(0, 500) : 'unknown error' },
+    });
+    return new Response('processing failed', { status: 500 });
+  }
 
   return new Response('ok', { status: 200 });
 }

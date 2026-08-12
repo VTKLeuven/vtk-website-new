@@ -1,0 +1,828 @@
+/*
+ * Formulierenadmin.
+ *
+ * De algemene panelen, tabellen, knoppen en velden komen uit
+ * `vtk-ticket-admin.css`: dat is een volwaardige adminskin die toevallig voor
+ * ticketing geschreven is, en er een tweede kopie van maken zou binnen een jaar
+ * uiteenlopen. Vandaar ook `.ticket-admin` op de root van deze schermen: de
+ * kleurtokens van die skin staan op die klasse. Hier staat enkel wat echt eigen
+ * is aan formulieren.
+ */
+
+.form-admin-lang {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+}
+
+/* Een taal die nog leeg is, verdient een cue in de editor zelf: anders ontdek
+   je pas na publiceren dat de helft van het formulier Nederlands blijft. */
+.form-admin-lang-flag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--line, rgba(14, 26, 54, 0.12));
+  background: var(--paper-2, #e6ecf5);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted, #5c667f);
+}
+
+.form-admin-lang-flag[data-missing='true'] {
+  background: var(--yellow, #ffd23f);
+  border-color: rgba(14, 26, 54, 0.18);
+  color: var(--ink, #0a0f1f);
+}
+
+.form-admin-hint {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--muted, #5c667f);
+}
+
+.form-admin-fieldset {
+  border: 1px solid var(--line, rgba(14, 26, 54, 0.12));
+  border-radius: 16px;
+  padding: 16px;
+  margin: 0;
+  display: grid;
+  gap: 14px;
+}
+
+.form-admin-fieldset > legend {
+  padding: 0 6px;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--muted, #5c667f);
+}
+
+.form-admin-language-grid,
+.form-admin-toggle-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 12px;
+}
+
+.form-admin-align-fields {
+  align-items: start;
+}
+
+.form-admin-toggle {
+  min-width: 0;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 13px;
+  border: 1px solid var(--line);
+  border-radius: 13px;
+  background: var(--surface);
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.form-admin-toggle:hover {
+  background: var(--paper-2);
+}
+
+.form-admin-toggle:has(input:checked) {
+  border-color: var(--ink);
+  box-shadow: inset 3px 0 0 var(--yellow);
+}
+
+.form-admin-toggle > input {
+  width: 17px;
+  height: 17px;
+  flex: none;
+  margin-top: 2px;
+  accent-color: var(--ink);
+}
+
+.form-admin-toggle > span {
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+}
+
+.form-admin-toggle strong {
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.form-admin-toggle small {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.form-admin-nested-settings {
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--paper-2);
+}
+
+.form-admin-short-field {
+  max-width: 520px;
+}
+
+/* Overzicht ----------------------------------------------------------------- */
+
+/* Eén raster voor de cijfers én de kenmerken van een form. Losse tegels in
+   plaats van één kaart met scheidingslijnen: het aantal kenmerken verschilt per
+   form (een evenement is optioneel), en een half gevulde rij laat bij die
+   kaartvorm een leeg vak achter. */
+.form-admin-facts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 10px;
+  margin: 0;
+}
+
+.form-admin-facts > div {
+  min-width: 0;
+  padding: 14px 16px;
+  border: 1px solid var(--line);
+  border-radius: 13px;
+  background: var(--surface);
+}
+
+.form-admin-facts dt {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.045em;
+  text-transform: uppercase;
+}
+
+.form-admin-facts dt svg {
+  flex: none;
+}
+
+.form-admin-facts dd {
+  margin: 8px 0 0;
+  color: var(--ink);
+  font-size: 15px;
+  font-weight: 650;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+.form-admin-facts > div[data-metric='true'] dd {
+  font-size: 25px;
+  font-weight: 600;
+  line-height: 1;
+}
+
+.form-admin-facts > div[data-tone='warning'] dt {
+  color: var(--ticket-amber, #74520d);
+}
+
+/* `span 2` in een raster dat op deze breedte maar één kolom heeft, maakt een
+   impliciete tweede kolom aan en duwt de tegel buiten het scherm; vandaar pas
+   vanaf een breedte waar er zeker twee kolommen zijn. */
+@media (min-width: 640px) {
+  .form-admin-facts > div[data-wide='true'] {
+    grid-column: span 2;
+  }
+}
+
+.form-admin-facts a {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+/* Twee kenmerken in één tegel, zodat ze naast elkaar blijven staan hoe het
+   raster er ook uitziet. `nth-of-type` telt per elementsoort, dus dit koppelt
+   elke dt aan haar eigen dd. */
+.form-admin-fact-pair {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-content: start;
+  column-gap: 14px;
+}
+
+.form-admin-fact-pair > dt:nth-of-type(1),
+.form-admin-fact-pair > dd:nth-of-type(1) {
+  grid-column: 1;
+}
+
+.form-admin-fact-pair > dt:nth-of-type(2),
+.form-admin-fact-pair > dd:nth-of-type(2) {
+  grid-column: 2;
+}
+
+.form-admin-fact-pair > dt {
+  grid-row: 1;
+}
+
+.form-admin-fact-pair > dd {
+  grid-row: 2;
+}
+
+/* Status wisselen zonder de form te openen. De pil is dezelfde als het label
+   (.ticket-admin-status), met een native keuzelijst erin. */
+.form-admin-status-select {
+  gap: 5px;
+  padding-right: 5px;
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, currentColor 22%, transparent);
+  cursor: pointer;
+}
+
+.form-admin-status-select:hover {
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, currentColor 55%, transparent);
+}
+
+.form-admin-status-select:has(> select:focus-visible) {
+  outline: 3px solid rgba(14, 26, 54, 0.14);
+  outline-offset: 2px;
+}
+
+.form-admin-status-select > svg {
+  flex: none;
+  opacity: 0.7;
+}
+
+/* De adminskin dwingt op elke select een eigen achtergrond en rand af, met
+   !important; die hoort hier niet, want de pil eromheen is de rand al. */
+.vtk-admin-main .form-admin-status-select > select {
+  min-height: 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  color: inherit !important;
+  font: inherit !important;
+  line-height: 1 !important;
+  appearance: none;
+  cursor: pointer;
+}
+
+.vtk-admin-main .form-admin-status-select > select:disabled {
+  cursor: progress;
+  opacity: 0.6;
+}
+
+.form-admin-autosave {
+  position: sticky;
+  z-index: 20;
+  top: 12px;
+  justify-self: end;
+  min-height: 36px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 11px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--muted);
+  box-shadow: 0 6px 18px color-mix(in srgb, var(--ink) 10%, transparent);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.form-admin-autosave[data-state='saved'] {
+  color: var(--ink);
+}
+
+.form-admin-autosave[data-state='error'] {
+  border-color: var(--ticket-red);
+  color: var(--ticket-red);
+}
+
+.form-admin-autosave > button {
+  padding: 0;
+  border: 0;
+  border-bottom: 1px solid currentColor;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.form-admin-autosave-spinner {
+  animation: form-admin-spin 800ms linear infinite;
+}
+
+@keyframes form-admin-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (min-width: 760px) {
+  .form-admin-language-grid,
+  .form-admin-toggle-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/* Veldeditor ---------------------------------------------------------------- */
+
+.form-admin-field-list > li[data-dragging='true'] {
+  opacity: 0.5;
+}
+
+/* Een lijn op de plek waar de vraag terechtkomt, niet enkel een gekleurde rij:
+   je wil zien tússen welke twee vragen ze valt. */
+.form-admin-field-list > li[data-over='true'] {
+  box-shadow: inset 0 3px 0 -1px var(--yellow, #ffd23f);
+}
+
+.form-admin-field-title {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  min-width: 0;
+}
+
+.form-admin-field-title .ticket-admin-code {
+  margin-top: 7px;
+}
+
+.form-admin-grip {
+  margin-top: 2px;
+  color: var(--muted, #5c667f);
+  cursor: grab;
+  flex: none;
+}
+
+/* Opbouw: secties met hun vragen erin ---------------------------------------- */
+
+.form-admin-structure {
+  display: grid;
+  gap: 14px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.form-admin-structure-group {
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--surface);
+}
+
+/* Het deel boven de eerste sectie is geen sectie: het krijgt een gestippelde
+   rand, zodat je niet gaat zoeken naar de kop die het niet heeft. */
+.form-admin-structure-group[data-kind='loose'] {
+  border-style: dashed;
+  background: transparent;
+}
+
+.form-admin-structure-group[data-dragging='true'] {
+  opacity: 0.5;
+}
+
+.form-admin-structure-group[data-over='true'] {
+  border-color: var(--ink);
+  border-style: solid;
+}
+
+.form-admin-structure-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--line);
+  background: var(--paper-2);
+}
+
+.form-admin-structure-head[draggable='true'] {
+  cursor: grab;
+}
+
+.form-admin-structure-group[data-kind='loose'] .form-admin-structure-head {
+  background: transparent;
+  border-bottom-style: dashed;
+}
+
+.form-admin-structure-title {
+  display: flex;
+  min-width: 0;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.form-admin-structure-title > div {
+  min-width: 0;
+}
+
+.form-admin-structure-icon {
+  margin-top: 2px;
+  flex: none;
+  color: var(--muted);
+}
+
+.form-admin-structure-body {
+  padding: 14px;
+}
+
+.form-admin-structure-body > .ticket-admin-empty {
+  padding: 6px 0 10px;
+  text-align: left;
+}
+
+.form-admin-structure-body > .form-admin-hint {
+  margin-bottom: 12px;
+}
+
+.form-admin-structure-foot {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.form-admin-structure-body > .ticket-admin-empty + .form-admin-structure-foot {
+  margin-top: 0;
+}
+
+/* Een landingsplaats onderaan elk blok: zonder deze kan je een vraag enkel vóór
+   een andere laten vallen, en dus nooit als laatste. */
+.form-admin-structure-drop {
+  margin-top: 12px;
+  padding: 11px;
+  border: 1px dashed var(--line-2);
+  border-radius: 11px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+  text-align: center;
+}
+
+.form-admin-structure-drop[data-over='true'] {
+  border-color: var(--ink);
+  border-style: solid;
+  background: var(--paper-2);
+  color: var(--ink);
+}
+
+/* Persoon zoeken ------------------------------------------------------------ */
+
+.form-admin-person-picker {
+  position: relative;
+}
+
+.form-admin-person-results {
+  position: absolute;
+  z-index: 30;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  max-height: 260px;
+  overflow-y: auto;
+  margin: 0;
+  padding: 5px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface);
+  box-shadow: 0 12px 28px color-mix(in srgb, var(--ink) 14%, transparent);
+  list-style: none;
+}
+
+.form-admin-person-results button {
+  width: 100%;
+  display: grid;
+  gap: 2px;
+  padding: 9px 10px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.form-admin-person-results button:hover {
+  background: var(--paper-2);
+}
+
+.form-admin-person-results button strong {
+  font-size: 13px;
+}
+
+.form-admin-person-results button span,
+.form-admin-person-empty {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.form-admin-person-empty {
+  padding: 9px 10px;
+}
+
+.form-admin-selected-person {
+  display: grid;
+  gap: 2px;
+  margin: 0;
+  padding: 10px 12px;
+  border-left: 3px solid var(--yellow);
+  background: var(--paper-2);
+}
+
+.form-admin-selected-person strong {
+  color: var(--ink);
+  font-size: 13px;
+}
+
+.form-admin-selected-person span {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.form-admin-field-settings,
+.form-admin-new-field {
+  display: grid;
+  gap: 14px;
+  margin-top: 12px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line, rgba(14, 26, 54, 0.12));
+}
+
+.form-admin-type-grid {
+  display: grid;
+  gap: 16px;
+}
+
+.form-admin-type-grid h3 {
+  margin: 0 0 8px;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--muted, #5c667f);
+}
+
+.form-admin-type-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.form-admin-option-list,
+.form-admin-condition-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.form-admin-option-list > li,
+.form-admin-condition-list > li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.form-admin-option-label {
+  flex: 1 1 160px;
+  min-width: 0;
+}
+
+.form-admin-option-quota {
+  flex: 0 0 110px;
+}
+
+.form-admin-option-used {
+  font-size: 12px;
+  color: var(--muted, #5c667f);
+}
+
+.form-admin-condition-list .vtk-themed-select {
+  width: auto;
+  flex: 1 1 150px;
+}
+
+/* Onder sm staat elk veld van een rij op zijn eigen regel; de vaste breedtes
+   hierboven zijn voor een brede kolom bedoeld. */
+@media (max-width: 640px) {
+  .form-admin-option-list > li,
+  .form-admin-condition-list > li {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    align-items: start;
+  }
+
+  .form-admin-option-label,
+  .form-admin-option-quota {
+    flex: none;
+    width: 100%;
+  }
+}
+
+/* Inzendingen ---------------------------------------------------------------- */
+
+.form-admin-entry-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.form-admin-entry-stats > div {
+  display: grid;
+  grid-template-columns: auto auto;
+  align-items: center;
+  column-gap: 7px;
+  min-width: 145px;
+  padding: 9px 12px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface);
+}
+
+.form-admin-entry-stats svg {
+  grid-row: 1 / 3;
+  color: var(--muted);
+}
+
+.form-admin-entry-stats strong {
+  color: var(--ink);
+  font-size: 16px;
+  line-height: 1.2;
+}
+
+.form-admin-entry-stats span {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.form-admin-summary-details > summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.form-admin-summary-details > summary > span {
+  margin-left: auto;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.form-admin-summary {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
+.form-admin-summary h3 {
+  margin: 0 0 8px;
+  font-size: 15px;
+}
+
+.form-admin-summary ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+}
+
+.form-admin-summary li {
+  display: grid;
+  grid-template-columns: minmax(80px, 1fr) 2fr auto;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+}
+
+.form-admin-summary-bar {
+  height: 8px;
+  border-radius: 999px;
+  background: var(--paper-2, #e6ecf5);
+  overflow: hidden;
+}
+
+.form-admin-summary-bar > span {
+  display: block;
+  height: 100%;
+  background: var(--yellow, #ffd23f);
+}
+
+.form-admin-summary-count {
+  font-weight: 700;
+}
+
+.form-admin-mail-preview {
+  padding: 14px 16px;
+  border: 1px solid var(--line, rgba(14, 26, 54, 0.12));
+  border-radius: 14px;
+  background: var(--paper, #eff2f8);
+  display: grid;
+  gap: 8px;
+}
+
+.form-admin-mail-preview pre {
+  margin: 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+/* Delen en vertaalstatus ------------------------------------------------------ */
+
+.form-admin-share {
+  display: grid;
+  gap: 20px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+}
+
+.form-admin-share > div {
+  display: grid;
+  gap: 12px;
+}
+
+.form-admin-share-url {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  word-break: break-all;
+}
+
+.form-admin-qr {
+  margin: 0;
+  display: grid;
+  gap: 6px;
+  justify-items: center;
+}
+
+.form-admin-qr img {
+  width: 160px;
+  height: 160px;
+  border: 1px solid var(--line, rgba(14, 26, 54, 0.12));
+  border-radius: 12px;
+  background: #fff;
+}
+
+.form-admin-qr figcaption {
+  font-size: 12px;
+}
+
+.form-admin-gaps {
+  margin: 8px 0;
+  padding-left: 20px;
+  display: grid;
+  gap: 2px;
+  font-size: 14px;
+  color: var(--body, #34405e);
+}
+
+@media (max-width: 640px) {
+  .form-admin-share {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* Wachtlijst en sprongen per optie ------------------------------------------- */
+
+.form-admin-option-extras {
+  flex-basis: 100%;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 14px;
+  padding-left: 4px;
+  font-size: 13px;
+}
+
+.form-admin-option-jump {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--muted, #5c667f);
+}
+
+.form-admin-option-jump .vtk-themed-select {
+  width: 260px;
+  max-width: 260px;
+}
+
+@media (max-width: 640px) {
+  .form-admin-option-extras {
+    grid-column: 1 / -1;
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .form-admin-option-jump .vtk-themed-select {
+    width: 100%;
+    max-width: none;
+  }
+}

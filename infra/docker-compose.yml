@@ -39,6 +39,10 @@ services:
       DATABASE_URL: postgresql://${POSTGRES_USER:-vtk}:${POSTGRES_PASSWORD:-vtk}@postgres:5432/${POSTGRES_DB:-vtk}?schema=public
       SESSION_COOKIE_DOMAIN: ${SESSION_COOKIE_DOMAIN:-.vtk.be}
       VTK_MAIN_URL: ${VTK_MAIN_URL:-https://vtk.be}
+      # Waar de logistiek-app woont. De website heeft dat nodig om vanuit de
+      # zoekresultaten naar een materiaalfiche te linken; zonder deze waarde
+      # toont ze gewoon geen materiaal.
+      LOGISTIEK_PUBLIC_URL: ${LOGISTIEK_PUBLIC_URL:-https://logistiek.vtk.be}
       # The website talks to Immich over the private Compose network.
       GALLERY_IMMICH_API_URL: http://immich-server:2283/api
       GALLERY_DATABASE_HOST: immich-database
@@ -52,6 +56,20 @@ services:
       context: ..
       dockerfile: infra/docker/logistiek.Dockerfile
     restart: unless-stopped
+    # Dezelfde root-`.env` als de website. Dit stond er lang niet, en dat viel
+    # niet op zolang de app enkel de vier variabelen hieronder nodig had. Sinds
+    # de uitleendienst mailt (`packages/mail`) is het wel nodig: SMTP_HOST c.s.
+    # staan enkel in de root-`.env`, en zonder SMTP_HOST logt `sendMail` het
+    # bericht in plaats van het te versturen. Zonder klacht, zonder foutmelding.
+    #
+    # Let op het verschil tussen de twee bronnen: `${VAR}` hieronder interpoleert
+    # compose uit zijn éigen env-bestand (`infra/.env`), niet uit deze. Wat hier
+    # met een lege standaard stond (MOLLIE_API_KEY, LOGISTIEK_MAINTENANCE_SECRET,
+    # LOGISTIEK_TEST_LOGIN) overschreef dus stil de waarde uit de root-`.env`
+    # met een lege string; die regels zijn daarom weg. Wat blijft staan, heeft
+    # een echte productiewaarde als standaard.
+    env_file:
+      - ../.env
     depends_on:
       web:
         condition: service_started
@@ -63,9 +81,10 @@ services:
       SESSION_COOKIE_DOMAIN: ${SESSION_COOKIE_DOMAIN:-.vtk.be}
       VTK_MAIN_URL: ${VTK_MAIN_URL:-https://vtk.be}
       LOGISTIEK_PUBLIC_URL: ${LOGISTIEK_PUBLIC_URL:-https://logistiek.vtk.be}
+      # Blijft expliciet staan: `mock` gooit in productie een fout, en de
+      # standaard in `.env.example` is `mock` (voor lokaal). Zou de root-`.env`
+      # hier winnen, dan legt één vergeten regel de betaalflow plat.
       LOGISTIEK_PAYMENT_PROVIDER: ${LOGISTIEK_PAYMENT_PROVIDER:-mollie}
-      LOGISTIEK_MAINTENANCE_SECRET: ${LOGISTIEK_MAINTENANCE_SECRET:-}
-      MOLLIE_API_KEY: ${MOLLIE_API_KEY:-}
     ports:
       - "127.0.0.1:3100:3000"
 
@@ -139,6 +158,228 @@ services:
       retries: 1
       start_period: 45s
 
+  # Leegt de mailwachtrij van de formulierenmodule en zet de dagelijkse
+  # samenvattingen en de herinneringen voor onafgewerkte concepten klaar. Een
+  # eigen worker en niet mee in die van ticketing: die draait elke vijftien
+  # seconden voor een betaling die de bezoeker staat af te wachten, terwijl
+  # formuliermail gerust een minuut mag wachten.
+  forms-worker:
+    image: curlimages/curl:8.10.1
+    restart: unless-stopped
+    depends_on:
+      web:
+        condition: service_started
+    env_file:
+      - ../.env
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        SECRET="$${FORMS_MAINTENANCE_SECRET:-$${TICKETING_MAINTENANCE_SECRET:-}}"
+        if [ -z "$$SECRET" ]; then
+          echo "Forms worker disabled: FORMS_MAINTENANCE_SECRET is empty"
+          while true; do sleep 3600; done
+        fi
+        while true; do
+          if curl --fail --silent --show-error \
+            -X POST \
+            -H "Authorization: Bearer $$SECRET" \
+            http://web:3000/api/forms/maintenance; then
+            date +%s > /tmp/forms-worker-heartbeat
+          fi
+          sleep 60
+        done
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - >-
+          test -f /tmp/forms-worker-heartbeat &&
+          [ "$$(($$(date +%s) - $$(cat /tmp/forms-worker-heartbeat)))" -lt 300 ]
+      interval: 60s
+      timeout: 5s
+      retries: 1
+      start_period: 60s
+
+  # Haalt elke 3 minuten de geluidsmeting van 't ElixIr op bij Munisense en
+  # cachet de barstatus. Dit is de enige plek die Munisense aanspreekt: de
+  # website leest enkel de cache, hoeveel bezoekers er ook zijn.
+  elixir-worker:
+    image: curlimages/curl:8.10.1
+    restart: unless-stopped
+    depends_on:
+      web:
+        condition: service_started
+    env_file:
+      - ../.env
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        if [ -z "$${ELIXIR_MAINTENANCE_SECRET:-}" ]; then
+          echo "Elixir worker disabled: ELIXIR_MAINTENANCE_SECRET is empty"
+          while true; do sleep 3600; done
+        fi
+        while true; do
+          if curl --fail --silent --show-error \
+            -X POST \
+            -H "Authorization: Bearer $${ELIXIR_MAINTENANCE_SECRET}" \
+            http://web:3000/api/elixir/maintenance; then
+            date +%s > /tmp/elixir-worker-heartbeat
+          fi
+          sleep 180
+        done
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - >-
+          test -n "$${ELIXIR_MAINTENANCE_SECRET:-}" &&
+          test -f /tmp/elixir-worker-heartbeat &&
+          [ "$$(($$(date +%s) - $$(cat /tmp/elixir-worker-heartbeat)))" -lt 600 ]
+      interval: 60s
+      timeout: 5s
+      retries: 2
+      start_period: 90s
+
+  # Verstuurt de herinneringen voor shiften: een dag vooraf en twee uur vooraf,
+  # per lid uitzetbaar in het profiel. Elke vijf minuten is ruim genoeg voor een
+  # bericht dat uren op voorhand vertrekt, en houdt de mailserver rustig.
+  shift-worker:
+    image: curlimages/curl:8.10.1
+    restart: unless-stopped
+    depends_on:
+      web:
+        condition: service_started
+    env_file:
+      - ../.env
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        if [ -z "$${SHIFT_MAINTENANCE_SECRET:-}" ]; then
+          echo "Shift worker disabled: SHIFT_MAINTENANCE_SECRET is empty"
+          while true; do sleep 3600; done
+        fi
+        while true; do
+          if curl --fail --silent --show-error \
+            -X POST \
+            -H "Authorization: Bearer $${SHIFT_MAINTENANCE_SECRET}" \
+            http://web:3000/api/shift/maintenance; then
+            date +%s > /tmp/shift-worker-heartbeat
+          fi
+          sleep 300
+        done
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - >-
+          test -n "$${SHIFT_MAINTENANCE_SECRET:-}" &&
+          test -f /tmp/shift-worker-heartbeat &&
+          [ "$$(($$(date +%s) - $$(cat /tmp/shift-worker-heartbeat)))" -lt 900 ]
+      interval: 60s
+      timeout: 5s
+      retries: 2
+      start_period: 90s
+
+  # Umami deelt de bestaande Postgres en krijgt daar een eigen database. Die
+  # verschijnt niet vanzelf: `POSTGRES_DB` geldt enkel bij een leeg volume, en
+  # dat van de productieserver bestaat al. Deze eenmalige stap maakt de database
+  # aan wanneer ze ontbreekt en doet verder niets; de tabellen erin zet Umami
+  # zelf klaar met zijn eigen migraties.
+  # Umami staat achter een compose-profiel en draait dus NIET mee met een gewone
+  # deploy. Dat is geen luxe: `docker compose up` haalt de image op van elke
+  # dienst die in het project zit, ook wanneer die zichzelf meteen zou
+  # uitschakelen. Het "leeg secret = uit"-patroon van de workers hierboven werkt
+  # daar wel, want die draaien op images die de server toch al heeft; Umami is
+  # een verse pull van ghcr.io en liet de deploy struikelen op
+  # `denied: denied` terwijl de dienst niet eens aan stond.
+  #
+  # Aanzetten doe je bewust, en dat is meer dan een secret invullen (database,
+  # dashboardaccount, website-ID, Caddy ervoor). Zie docs/design-decisions.md.
+  # Kort: zet `UMAMI_APP_SECRET`, `UMAMI_PUBLIC_URL` en `UMAMI_WEBSITE_ID` in de
+  # root-`.env`, en `COMPOSE_PROFILES=umami` in `infra/.env` (dat is het
+  # env-bestand dat compose zelf leest; de root-`.env` gaat enkel naar de
+  # containers).
+  #
+  # Loopt de pull dan alsnog op `denied`, dan zit er een verlopen ghcr-login in
+  # `~/.docker/config.json` op de server: ghcr gebruikt die credentials en
+  # weigert, in plaats van terug te vallen op anonieme toegang. `docker logout
+  # ghcr.io` volstaat, want de image is publiek.
+  umami-db-init:
+    image: postgres:16
+    profiles: ["umami"]
+    restart: "no"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    # Het secret komt uit de root-`.env`, net als bij de workers. Bewust niet via
+    # `${UMAMI_APP_SECRET}`: compose interpoleert dat uit zijn eigen env-bestand
+    # (`infra/.env`), niet uit de root-`.env`, en het viel dus altijd leeg.
+    env_file:
+      - ../.env
+    environment:
+      PGHOST: postgres
+      PGUSER: ${POSTGRES_USER:-vtk}
+      PGPASSWORD: ${POSTGRES_PASSWORD:-vtk}
+      PGDATABASE: ${POSTGRES_DB:-vtk}
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        if [ -z "$${UMAMI_APP_SECRET:-}" ]; then
+          echo "Umami disabled: UMAMI_APP_SECRET is empty"
+          exit 0
+        fi
+        if psql -tAc "SELECT 1 FROM pg_database WHERE datname = 'umami'" | grep -q 1; then
+          echo "Umami database already present"
+        else
+          createdb umami
+        fi
+
+  # Bezoekersstatistieken op onze eigen infrastructuur: cookieloos, geen
+  # persoonsgegevens, en het script laadt pas na toestemming (zie
+  # apps/web/lib/analytics.ts). Het lege secret blijft als vangnet: staat het
+  # profiel aan maar het secret niet, dan draait de container leeg in plaats van
+  # in een herstartlus te vallen.
+  umami:
+    image: ghcr.io/umami-software/umami:3.2.0
+    profiles: ["umami"]
+    restart: unless-stopped
+    init: true
+    depends_on:
+      umami-db-init:
+        condition: service_completed_successfully
+    env_file:
+      - ../.env
+    environment:
+      DATABASE_TYPE: postgresql
+      # Staat expliciet hier en wint daarmee van wat er in de root-`.env` zit:
+      # Umami hoort in zijn eigen database, niet in die van de website.
+      DATABASE_URL: postgresql://${POSTGRES_USER:-vtk}:${POSTGRES_PASSWORD:-vtk}@postgres:5432/umami
+      # Umami meldt zich anders bij elke start bij zijn eigen telemetriedienst.
+      # Dat is precies de derde partij die we hier niet willen.
+      DISABLE_TELEMETRY: "1"
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        if [ -z "$${UMAMI_APP_SECRET:-}" ]; then
+          echo "Umami disabled: UMAMI_APP_SECRET is empty"
+          while true; do sleep 3600; done
+        fi
+        export APP_SECRET="$${UMAMI_APP_SECRET}"
+        exec npm run start-docker
+    ports:
+      # Caddy is de publieke rand; Umami zelf is enkel vanaf de host bereikbaar.
+      # 3013 en 3014 zijn op liv al door de cursusdienst bezet; dat is buiten
+      # deze compose om, dus `docker compose up` zou daar stilvallen op een poort
+      # die al in gebruik is.
+      - "127.0.0.1:3016:3000"
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - >-
+          test -n "$${UMAMI_APP_SECRET:-}" &&
+          curl -fsS http://localhost:3000/api/heartbeat -o /dev/null
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
+
   immich-server:
     image: ghcr.io/immich-app/immich-server:v3.0.1
     restart: unless-stopped
@@ -208,6 +449,13 @@ services:
       test: ["CMD-SHELL", "curl -fsS http://localhost:3000/share/healthcheck -o /dev/null || exit 1"]
       start_period: 10s
       timeout: 5s
+
+# KU Leuvens IdP is vanaf de productieserver enkel via IPv6 bereikbaar.
+# Docker kent voor een IPv6-enabled custom bridge automatisch een ULA-subnet
+# toe en NAT dat via de IPv6-route van de host.
+networks:
+  default:
+    enable_ipv6: true
 
 volumes:
   postgres-data:

@@ -4,6 +4,7 @@ import { randomUUID } from "node:crypto";
 import { prisma } from "@vtk/db";
 import { createOrderAccessToken } from "./crypto";
 import { orderConfirmationMail, sendMail } from "./mail";
+import { orderMailBundle } from "./mailBundle";
 import { ticketingBaseUrl } from "./config";
 
 type ClaimedMessage = {
@@ -57,6 +58,7 @@ async function deliver(message: ClaimedMessage): Promise<string> {
   const access = createOrderAccessToken(order.id, order.accessExpiresAt);
   const prefix = locale === "en" ? "/en" : "";
   const orderUrl = `${ticketingBaseUrl()}${prefix}/tickets/toegang?orderId=${encodeURIComponent(order.id)}#access=${encodeURIComponent(access)}`;
+  const { attachments, contents } = await orderMailBundle(order);
   const mail = orderConfirmationMail({
     locale,
     buyerName: order.buyerName,
@@ -66,6 +68,8 @@ async function deliver(message: ClaimedMessage): Promise<string> {
     ticketCount: order.items.filter((item) => item.ticket).length,
     orderUrl,
     replyTo: order.event.contactEmail,
+    contents,
+    attachments,
   });
   return sendMail(mail);
 }

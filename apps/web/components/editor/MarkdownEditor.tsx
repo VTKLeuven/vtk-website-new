@@ -22,6 +22,7 @@ export function MarkdownEditor({
   rows = 18,
   allowImages = true,
   textareaId,
+  maxLength,
 }: {
   value: string;
   onChange: (value: string) => void;
@@ -30,6 +31,7 @@ export function MarkdownEditor({
   allowImages?: boolean;
   /** Optioneel id voor het textarea, zodat een <Label htmlFor> eraan kan hangen. */
   textareaId?: string;
+  maxLength?: number;
 }) {
   const nl = locale === "nl";
   const uid = useId();
@@ -280,12 +282,17 @@ export function MarkdownEditor({
           value={value}
           onChange={(e) => onChange(e.target.value)}
           rows={rows}
+          maxLength={maxLength}
           spellCheck={false}
           className="block w-full resize-y bg-white p-4 font-mono text-sm leading-relaxed text-vtk-ink outline-none"
           placeholder={
-            nl
-              ? "Schrijf hier in markdown. Gebruik de knoppen hierboven voor koppen, vet, links en afbeeldingen."
-              : "Write markdown here. Use the buttons above for headings, bold, links and images."
+            allowImages
+              ? nl
+                ? "Schrijf hier in markdown. Gebruik de knoppen hierboven voor koppen, vet, links en afbeeldingen."
+                : "Write markdown here. Use the buttons above for headings, bold, links and images."
+              : nl
+                ? "Schrijf hier in markdown. Gebruik de knoppen hierboven voor koppen, vet en links."
+                : "Write markdown here. Use the buttons above for headings, bold and links."
           }
         />
       ) : (
@@ -316,13 +323,24 @@ export function MarkdownEditorField({
   rows?: number;
   allowImages?: boolean;
   textareaId?: string;
+  maxLength?: number;
 }) {
   const [value, setValue] = useState(defaultValue ?? "");
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  function changeValue(next: string) {
+    setValue(next);
+    // Ook werkbalkacties wijzigen Markdown zonder een native textarea-event.
+    // Meld dit expliciet aan een eventuele autosave-schil.
+    requestAnimationFrame(() => {
+      inputRef.current?.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+  }
 
   return (
     <>
-      <input type="hidden" name={name} value={value} />
-      <MarkdownEditor {...editorProps} value={value} onChange={setValue} />
+      <input ref={inputRef} type="hidden" name={name} value={value} />
+      <MarkdownEditor {...editorProps} value={value} onChange={changeValue} />
     </>
   );
 }

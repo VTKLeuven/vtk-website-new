@@ -38,7 +38,9 @@ export default async function AdminAuthorizationPreview({
         nameEn: true,
         type: true,
         roleGrants: {
-          select: { kind: true, role: { select: { nameNl: true, nameEn: true } } },
+          // Het rol-id erbij: daarmee rekent het paneel uit welke rechten een
+          // selectie oplevert, zonder de permissies per post opnieuw te laden.
+          select: { kind: true, role: { select: { id: true, nameNl: true, nameEn: true } } },
         },
       },
     }),

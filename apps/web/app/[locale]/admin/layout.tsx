@@ -1,19 +1,21 @@
+import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { prisma } from '@vtk/db';
 import { hasLocale } from '@/lib/locale';
 import { requireSession } from '@/lib/session';
 import { getDictionary, type Locale } from '@vtk/i18n';
 import { canAccessAnyTicketEvent } from '@/lib/ticketing/authorization';
+import { canAccessAnyForm } from '@/lib/forms/authorization';
 import { AdminNav, type NavItem, type NavNode } from './AdminNav';
 
 import '@/app/design/vtk-admin.css';
 
 // -----------------------------------------------------------------------------
-// Admin-navigatie. De volgorde hieronder is exact de volgorde in de linkerkolom.
+// Admin-navigatie. Op het scherm staat alles alfabetisch (dashboard bovenaan);
+// deze lijst bepaalt dus enkel wat er is en wat bij elkaar hoort.
 //
-//   Item toevoegen     -> voeg een `item(...)`-regel toe waar je het wil zien.
+//   Item toevoegen     -> voeg een `item(...)`-regel toe.
 //   Groep toevoegen    -> voeg een `group("<key>", [ item(...), ... ])`-blok toe.
-//   Volgorde wijzigen  -> versleep de regels/blokken (bovenaan = bovenaan).
 //
 // `key` heeft een label nodig in de i18n-dictionaries (`admin.<key>`, in
 // packages/i18n) en mag een icoon hebben in AdminNav.tsx. Zichtbaarheid regel je
@@ -28,6 +30,8 @@ type NavGuard = {
   superAdminOnly?: boolean;
   /** Ticketing-tab: zichtbaar bij een eigen event-grant of een globale ticket-permissie. */
   ticketing?: boolean;
+  /** Formulieren-tab: zichtbaar bij een eigen formulier-grant of een globale formulier-permissie. */
+  forms?: boolean;
   /** Werkgroepen-tab: zichtbaar voor beheerders (werkgroepen.manage) en voor leden
    *  van een werkgroep (die zien enkel hun eigen werkgroep, enkel de infotekst). */
   werkgroep?: boolean;
@@ -55,16 +59,28 @@ const NAV: NavEntry[] = [
   ]),
   group('website', [
     item('home', '/home', { perm: 'home.edit' }),
+    item('announcements', '/aankondigingen', { perm: 'home.edit' }),
     item('content', '/inhoud', { perm: 'pages.manage' }),
     item('pages', '/paginas', { anyPerm: ['pages.edit', 'pages.editAll'] }),
     item('partners', '/partners', { perm: 'partners.manage' }),
   ]),
-  item('calendar', '/kalender', { perm: 'calendar.create' }),
-  item('tickets', '/tickets', { ticketing: true }),
-  item('albums', '/albums', { perm: 'photos.manageAlbums' }),
-  item('media', '/media', { perm: 'media.manage' }),
+  // Eén evenement is één ding voor wie het organiseert: je plant het in en je
+  // verkoopt er tickets voor. Die twee schermen hoorden daarom onder één tab.
+  group('evenementen', [
+    item('calendar', '/kalender', { perm: 'calendar.create' }),
+    item('tickets', '/tickets', { ticketing: true }),
+  ]),
+  item('forms', '/formulieren', { forms: true }),
+  // Fotoalbums hebben één ingang: /admin/media. Daar staat de Immich-galerij,
+  // en dat is de enige bron die de publieke mediapagina leest. De oude
+  // /admin/albums beheerde een tweede, lokale albumopslag die nergens meer
+  // getoond werd.
+  item('media', '/media', { anyPerm: ['media.manage', 'photos.manageAlbums'] }),
   item('shift', '/shiften', { anyPerm: ['shift.edit', 'shift.reward', 'shift.ranking'] }),
   item('theokot', '/theokot', { anyPerm: ['theokot.manage', 'theokot.pickup'] }),
+  item('grocomeet', '/grocomeet', { perm: 'grocomeet.manage' }),
+  item('bureau', '/bureau', { perm: 'bureau.manage' }),
+  item('piano', '/piano', { perm: 'piano.manage' }),
   item('mailinglists', '/mailinglijsten', { perm: 'mailinglists.export' }),
   item('shortlinks', '/links', { perm: 'shortlinks.manage' }),
   item('dashboardTiles', '/dashboard-tiles', { perm: 'dashboard.manage' }),
@@ -79,6 +95,15 @@ const NAV: NavEntry[] = [
 ];
 
 type DictAdmin = ReturnType<typeof getDictionary>['admin'];
+
+/**
+ * Eén keer op de layout, niet per pagina: alles onder /admin staat achter een
+ * login en hoort in geen enkele zoekmachine. De admin-schermen krijgen bewust
+ * geen verdere metadata; ze worden nooit gedeeld als link.
+ */
+export const metadata: Metadata = {
+  robots: { index: false, follow: false },
+};
 
 export default async function AdminLayout({
   children,
@@ -102,6 +127,9 @@ export default async function AdminLayout({
     session.permissions.includes('tickets.create') ||
     session.permissions.includes('tickets.manageAll') ||
     (await canAccessAnyTicketEvent());
+  // Zelfde redenering als bij ticketing: een grant op één formulier is genoeg om
+  // de tab te zien, ook zonder een van de globale formulierpermissies.
+  const canAccessForms = session.user.isSuperAdmin || (await canAccessAnyForm());
 
   // Is de gebruiker lid van minstens één werkgroep (huidig werkingsjaar)? Zij
   // krijgen de Werkgroepen-tab om enkel hun eigen infotekst te bewerken.
@@ -118,6 +146,7 @@ export default async function AdminLayout({
     // Ticketing-tab hangt af van ticket-toegang (eigen grant of globale perm),
     // niet van de gewone admin-permissies. canAccessTickets dekt superadmins al.
     if (guard.ticketing) return canAccessTickets;
+    if (guard.forms) return canAccessForms;
     // Werkgroepen-tab: beheerders óf gewone werkgroepleden.
     if (guard.werkgroep) return session.permissions.includes('werkgroepen.manage') || werkgroepMember;
     if (guard.anyPerm) return guard.anyPerm.some((p) => session.permissions.includes(p));
@@ -132,14 +161,21 @@ export default async function AdminLayout({
     exact: leaf.exact,
   });
 
-  // Bouw de zichtbare nav. De volgorde is exact die van NAV hierboven: dat is de
-  // plek waar je ze aanpast, dus we sorteren hier bewust niet (een alfabetische
-  // sortering op het gelokaliseerde label maakte de array-volgorde betekenisloos
-  // en gaf nl en en een andere volgorde).
+  // Bouw de zichtbare nav. De volgorde in NAV hierboven bepaalt enkel nog welke
+  // items bij elkaar staan; op het scherm staat alles alfabetisch, met het
+  // dashboard vastgepind bovenaan. Zoeken in een lijst van vijftien tabs gaat zo
+  // sneller dan onthouden waar iemand ze ooit gezet heeft. Gevolg: nl en en
+  // hebben een andere volgorde, want er wordt op het vertaalde label gesorteerd.
+  const collator = new Intl.Collator(locale === 'nl' ? 'nl-BE' : 'en-GB', {
+    sensitivity: 'base',
+  });
+  const byLabel = (a: { label: string }, b: { label: string }) =>
+    collator.compare(a.label, b.label);
+
   const nodes: NavNode[] = [];
   for (const entry of NAV) {
     if ('group' in entry) {
-      const items = entry.items.filter(canSee).map(toItem);
+      const items = entry.items.filter(canSee).map(toItem).sort(byLabel);
       if (items.length > 0) {
         nodes.push({ type: 'group', key: entry.group, label: adminDict[entry.group], items });
       }
@@ -147,6 +183,15 @@ export default async function AdminLayout({
       nodes.push({ type: 'item', item: toItem(entry) });
     }
   }
+
+  const isDashboard = (node: NavNode) => node.type === 'item' && node.item.key === 'dashboard';
+  nodes.sort((a, b) => {
+    if (isDashboard(a) !== isDashboard(b)) return isDashboard(a) ? -1 : 1;
+    return collator.compare(
+      a.type === 'group' ? a.label : a.item.label,
+      b.type === 'group' ? b.label : b.item.label,
+    );
+  });
 
   return (
     <div className="vtk-admin-surface">

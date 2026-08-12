@@ -1,9 +1,10 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import Image from "next/image";
+import { useEffect, useId, useMemo, useRef, useState, useTransition } from "react";
 import { Button, Card } from "@vtk/ui";
 import type { TheokotOrderStatus } from "@prisma/client";
-import { formatEuro } from "@/lib/theokot";
+import { formatEuro, type TheokotItemLayout } from "@/lib/theokot";
 import { cancelOrderAction, placeOrderAction } from "@/app/actions/theokot";
 
 export type OrderItem = {
@@ -12,6 +13,10 @@ export type OrderItem = {
   priceCents: number;
   remaining: number;
   isWeeklySpecial: boolean;
+  /** Optionele foto; zonder foto verschijnt het gestreepte patroon. */
+  imageUrl: string | null;
+  /** Optionele ingrediënten; enkel dan staat er een info-icoontje bij. */
+  ingredients: string | null;
 };
 
 export type ExistingOrder = {
@@ -26,7 +31,9 @@ export type OrderSession = {
   id: string;
   dateLabel: string;
   pickupLabel: string;
+  orderOpenLabel: string;
   orderCloseLabel: string;
+  orderWindowState: "UPCOMING" | "OPEN" | "CLOSED";
   weeklySpecialLabel: string | null;
   canOrder: boolean;
   items: OrderItem[];
@@ -48,6 +55,7 @@ export function TheokotOrderClient({
   message,
   maxItems,
   maxWeeklySpecial,
+  layout,
   ban,
 }: {
   nl: boolean;
@@ -55,6 +63,8 @@ export function TheokotOrderClient({
   message: OrderMessage;
   maxItems: number;
   maxWeeklySpecial: number;
+  /** Lijst of raster; ingesteld door Theokot onder Admin → Instellingen. */
+  layout: TheokotItemLayout;
   ban: { until: string } | null;
 }) {
   return (
@@ -102,6 +112,7 @@ export function TheokotOrderClient({
           session={s}
           maxItems={maxItems}
           maxWeeklySpecial={maxWeeklySpecial}
+          layout={layout}
           disabled={ban !== null}
         />
       ))}
@@ -114,12 +125,14 @@ function SessionCard({
   session,
   maxItems,
   maxWeeklySpecial,
+  layout,
   disabled,
 }: {
   nl: boolean;
   session: OrderSession;
   maxItems: number;
   maxWeeklySpecial: number;
+  layout: TheokotItemLayout;
   disabled: boolean;
 }) {
   const [qty, setQty] = useState<Record<string, number>>({});
@@ -141,6 +154,9 @@ function SessionCard({
 
   const overLimit = totals.items > maxItems;
   const overWeekly = totals.weekly > maxWeeklySpecial;
+  // In de lijst verschijnt de duimnagelkolom pas zodra er iets te tonen valt;
+  // anders krijgt een aanbod zonder foto's een kolom lege vierkantjes.
+  const hasPhotos = session.items.some((item) => item.imageUrl !== null);
 
   function setItemQty(item: OrderItem, next: number) {
     const clamped = Math.max(0, Math.min(next, item.remaining));
@@ -180,54 +196,25 @@ function SessionCard({
 
       {!existing && session.canOrder && !disabled && (
         <>
-          <ul className="divide-y divide-vtk-blue/10">
-            {session.items.map((item) => {
-              const n = qty[item.id] ?? 0;
-              const soldOut = item.remaining <= 0;
-              return (
-                <li key={item.id} className="flex items-center gap-3 py-2">
-                  <div className="min-w-0 flex-1">
-                    <div className="truncate text-sm font-medium text-vtk-ink">
-                      {item.name}
-                      {item.isWeeklySpecial && (
-                        <span className="ml-2 align-middle text-[10px] uppercase tracking-wide text-vtk-yellow-dark">
-                          ★ {nl ? "vd week" : "of the week"}
-                        </span>
-                      )}
-                    </div>
-                    <div className="text-xs text-[#5c667f]">
-                      {formatEuro(item.priceCents)} ·{" "}
-                      {soldOut
-                        ? nl
-                          ? "uitverkocht"
-                          : "sold out"
-                        : `${item.remaining} ${nl ? "beschikbaar" : "available"}`}
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      className="h-7 w-7 rounded-full border border-vtk-blue/20 text-vtk-ink disabled:opacity-40"
-                      onClick={() => setItemQty(item, n - 1)}
-                      disabled={n <= 0}
-                      aria-label="-"
-                    >
-                      −
-                    </button>
-                    <span className="w-6 text-center text-sm tabular-nums">{n}</span>
-                    <button
-                      type="button"
-                      className="h-7 w-7 rounded-full border border-vtk-blue/20 text-vtk-ink disabled:opacity-40"
-                      onClick={() => setItemQty(item, n + 1)}
-                      disabled={soldOut || totals.items >= maxItems}
-                      aria-label="+"
-                    >
-                      +
-                    </button>
-                  </div>
-                </li>
-              );
-            })}
+          <ul
+            className={
+              layout === "grid"
+                ? "grid gap-3 [grid-template-columns:repeat(auto-fill,minmax(150px,1fr))] sm:gap-4 sm:[grid-template-columns:repeat(auto-fill,minmax(210px,1fr))]"
+                : "divide-y divide-vtk-blue/10"
+            }
+          >
+            {session.items.map((item) => (
+              <OfferItem
+                key={item.id}
+                nl={nl}
+                item={item}
+                layout={layout}
+                showThumb={hasPhotos}
+                quantity={qty[item.id] ?? 0}
+                atMax={totals.items >= maxItems}
+                onChange={(next) => setItemQty(item, next)}
+              />
+            ))}
           </ul>
 
           <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
@@ -255,9 +242,13 @@ function SessionCard({
 
       {!existing && !session.canOrder && !disabled && (
         <p className="text-sm text-[#5c667f]">
-          {nl
-            ? "Reserveren voor deze dag is (nog) niet open."
-            : "Ordering for this day is not open (yet)."}
+          {session.orderWindowState === "UPCOMING"
+            ? nl
+              ? `Reserveren opent op ${session.orderOpenLabel} en sluit op ${session.orderCloseLabel}.`
+              : `Ordering opens on ${session.orderOpenLabel} and closes on ${session.orderCloseLabel}.`
+            : nl
+              ? `Reserveren is gesloten sinds ${session.orderCloseLabel}. Reservaties waren open vanaf ${session.orderOpenLabel}.`
+              : `Ordering has been closed since ${session.orderCloseLabel}. Reservations were open from ${session.orderOpenLabel}.`}
         </p>
       )}
 
@@ -265,6 +256,223 @@ function SessionCard({
         <p className={`mt-3 text-sm ${feedback.ok ? "text-emerald-700" : "text-red-600"}`}>{feedback.text}</p>
       )}
     </Card>
+  );
+}
+
+/**
+ * Eén broodje in het aanbod, in de weergave die Theokot instelde.
+ *
+ * Raster: een fotokaart (16:10 onder een lichte scrim) met naam, prijs en de
+ * plusknop eronder; zonder foto komt daar het gestreepte patroon van de site,
+ * zodat een half ingevuld aanbod geen gaten toont. Lijst: dezelfde rij als
+ * vroeger, met de foto als duimnagel ervoor.
+ */
+function OfferItem({
+  nl,
+  item,
+  layout,
+  showThumb,
+  quantity,
+  atMax,
+  onChange,
+}: {
+  nl: boolean;
+  item: OrderItem;
+  layout: TheokotItemLayout;
+  /** Toont de lijstweergave een duimnagelkolom? (Enkel als er foto's zijn.) */
+  showThumb: boolean;
+  quantity: number;
+  /** Het maximum aantal broodjes is bereikt: enkel minder kan nog. */
+  atMax: boolean;
+  onChange: (next: number) => void;
+}) {
+  const [showInfo, setShowInfo] = useState(false);
+  const infoId = useId();
+  const rootRef = useRef<HTMLLIElement>(null);
+  const soldOut = item.remaining <= 0;
+  const stock = soldOut
+    ? nl
+      ? "uitverkocht"
+      : "sold out"
+    : `${item.remaining} ${nl ? "beschikbaar" : "available"}`;
+
+  // Escape en een klik ernaast sluiten de ingrediënten, zoals bij elk ander
+  // paneel op de site. Enkel luisteren wanneer er iets open staat.
+  useEffect(() => {
+    if (!showInfo) return;
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") setShowInfo(false);
+    }
+    function onPointerDown(event: PointerEvent) {
+      if (!rootRef.current?.contains(event.target as Node)) setShowInfo(false);
+    }
+    document.addEventListener("keydown", onKeyDown);
+    document.addEventListener("pointerdown", onPointerDown);
+    return () => {
+      document.removeEventListener("keydown", onKeyDown);
+      document.removeEventListener("pointerdown", onPointerDown);
+    };
+  }, [showInfo]);
+
+  const infoButton = item.ingredients ? (
+    <button
+      type="button"
+      onClick={() => setShowInfo((open) => !open)}
+      aria-expanded={showInfo}
+      aria-controls={infoId}
+      // `relative`: het sr-only label is absoluut gepositioneerd en moet aan deze
+      // knop hangen, niet aan een voorouder ergens hoger op de pagina.
+      className="relative mt-0.5 grid h-[18px] w-[18px] shrink-0 place-items-center rounded-full border-[1.5px] border-vtk-blue/25 text-[11px] font-bold leading-none text-[#5c667f] transition-colors hover:border-vtk-ink hover:text-vtk-ink"
+    >
+      <span aria-hidden="true">i</span>
+      <span className="sr-only">
+        {nl ? `Ingrediënten van ${item.name}` : `Ingredients of ${item.name}`}
+      </span>
+    </button>
+  ) : null;
+
+  const stepper = (
+    <div className="flex items-center gap-2">
+      <button
+        type="button"
+        className="h-7 w-7 rounded-full border border-vtk-blue/20 text-vtk-ink disabled:opacity-40"
+        onClick={() => onChange(quantity - 1)}
+        disabled={quantity <= 0}
+        aria-label={nl ? `Eén ${item.name} minder` : `One ${item.name} less`}
+      >
+        −
+      </button>
+      <span className="w-6 text-center text-sm tabular-nums">{quantity}</span>
+      <button
+        type="button"
+        className="h-7 w-7 rounded-full border border-vtk-blue/20 text-vtk-ink disabled:opacity-40"
+        onClick={() => onChange(quantity + 1)}
+        disabled={soldOut || atMax}
+        aria-label={nl ? `Eén ${item.name} meer` : `One more ${item.name}`}
+      >
+        +
+      </button>
+    </div>
+  );
+
+  if (layout === "list") {
+    return (
+      <li ref={rootRef} className="flex items-center gap-3 py-2">
+        {showThumb && <Thumb item={item} className="h-14 w-14 shrink-0 rounded-xl" sizes="56px" />}
+        <div className="min-w-0 flex-1">
+          <div className="flex items-start gap-1.5">
+            <span className="text-sm font-medium text-vtk-ink">
+              {item.name}
+              {item.isWeeklySpecial && (
+                <span className="ml-2 align-middle text-[10px] uppercase tracking-wide text-vtk-yellow-dark">
+                  ★ {nl ? "vd week" : "of the week"}
+                </span>
+              )}
+            </span>
+            {infoButton}
+          </div>
+          <div className="text-xs text-[#5c667f]">
+            {formatEuro(item.priceCents)} · {stock}
+          </div>
+          {showInfo && item.ingredients && (
+            <p
+              id={infoId}
+              className="mt-1.5 rounded-lg border border-vtk-blue/10 bg-vtk-blue-soft/50 px-2.5 py-1.5 text-xs leading-relaxed text-[#34405e]"
+            >
+              <span className="font-semibold">{nl ? "Ingrediënten" : "Ingredients"}:</span>{" "}
+              {item.ingredients}
+            </p>
+          )}
+        </div>
+        {stepper}
+      </li>
+    );
+  }
+
+  return (
+    <li ref={rootRef} className="relative flex flex-col rounded-2xl border border-vtk-blue/12 bg-white">
+      <div className="relative aspect-[16/10] w-full overflow-hidden rounded-t-2xl bg-[repeating-linear-gradient(-45deg,var(--paper-2)_0_8px,var(--paper)_8px_16px)]">
+        {item.imageUrl && (
+          <>
+            <Image
+              src={item.imageUrl}
+              alt=""
+              fill
+              sizes="(max-width: 640px) 50vw, 220px"
+              className="object-cover"
+            />
+            <span className="pointer-events-none absolute inset-0 bg-[linear-gradient(115deg,rgba(14,26,54,0.22),rgba(14,26,54,0)_62%)]" />
+          </>
+        )}
+        {item.isWeeklySpecial && (
+          <span className="absolute left-2 top-2 rounded-full bg-vtk-yellow px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-vtk-ink">
+            ★ {nl ? "vd week" : "of the week"}
+          </span>
+        )}
+      </div>
+
+      <div className="flex flex-1 flex-col p-3">
+        <div className="flex items-start gap-1.5">
+          <span className="text-sm font-medium leading-snug text-vtk-ink">{item.name}</span>
+          {infoButton}
+        </div>
+        <div className="mt-1 text-xs text-[#5c667f]">{stock}</div>
+        <div className="mt-3 flex items-center justify-between gap-2">
+          <span className="text-sm font-semibold tabular-nums text-vtk-ink">
+            {formatEuro(item.priceCents)}
+          </span>
+          {stepper}
+        </div>
+      </div>
+
+      {/* Over de kaart heen in plaats van eronder: een uitklap zou de hele rij
+          hoger maken, en een zwevend kadertje valt in de buitenste kolom buiten
+          het scherm. */}
+      {showInfo && item.ingredients && (
+        <div
+          id={infoId}
+          className="absolute inset-0 z-10 flex flex-col rounded-2xl border border-vtk-blue/15 bg-white/95 p-3 backdrop-blur-[2px]"
+        >
+          <div className="flex items-start justify-between gap-2">
+            <span className="text-[10px] font-bold uppercase tracking-[0.1em] text-[#5c667f]">
+              {nl ? "Ingrediënten" : "Ingredients"}
+            </span>
+            <button
+              type="button"
+              onClick={() => setShowInfo(false)}
+              className="relative -mr-1 -mt-1 shrink-0 px-1 text-sm leading-none text-[#5c667f] hover:text-vtk-ink"
+            >
+              <span aria-hidden="true">✕</span>
+              <span className="sr-only">{nl ? "Ingrediënten sluiten" : "Close ingredients"}</span>
+            </button>
+          </div>
+          <p className="mt-1 overflow-auto text-xs leading-relaxed text-[#34405e]">
+            {item.ingredients}
+          </p>
+        </div>
+      )}
+    </li>
+  );
+}
+
+/** Duimnagel in de lijstweergave; zonder foto het gestreepte patroon. */
+function Thumb({
+  item,
+  className,
+  sizes,
+}: {
+  item: OrderItem;
+  className: string;
+  sizes: string;
+}) {
+  return (
+    <div
+      className={`relative overflow-hidden border border-vtk-blue/10 bg-[repeating-linear-gradient(-45deg,var(--paper-2)_0_8px,var(--paper)_8px_16px)] ${className}`}
+    >
+      {item.imageUrl && (
+        <Image src={item.imageUrl} alt="" fill sizes={sizes} className="object-cover" />
+      )}
+    </div>
   );
 }
 

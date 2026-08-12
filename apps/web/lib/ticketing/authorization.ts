@@ -1,8 +1,12 @@
 import "server-only";
 
 import { prisma } from "@vtk/db";
+// Rechtstreeks uit @prisma/client, niet via @vtk/db: dat package exporteert
+// bewust enkel `prisma` (zie AGENTS.md).
+import type { TicketEventStatus, TicketGrantRole } from "@prisma/client";
 import { currentWorkingYear, hasPermission, type SessionPayload } from "@vtk/auth";
 import { getAuthorizationPreview, requireSession } from "@/lib/session";
+import { hasLivePermission } from "@/lib/livePermissions";
 
 export const TICKET_CAPABILITIES = [
   "VIEW_EVENT",
@@ -52,52 +56,6 @@ export function capabilitiesForTicketRoles(roles: readonly TicketRole[]): Ticket
     ROLE_CAPABILITIES[role].forEach((capability) => capabilities.add(capability));
   }
   return [...capabilities];
-}
-
-// Live (uit de DB, niet uit de sessie-snapshot) checken of een gebruiker een
-// permissie heeft voor het huidige werkingsjaar. Spiegelt de resolver in
-// packages/auth/src/server/session.ts: rechten komen uit rollen, direct
-// toegewezen (UserRole) of via een post (GroupRole; DEFAULT voor elk lid,
-// LEADER enkel voor de lead).
-async function hasLivePermission(userId: string, code: string): Promise<boolean> {
-  const year = currentWorkingYear();
-
-  const directRole = await prisma.userRole.findFirst({
-    where: {
-      userId,
-      year,
-      role: { permissions: { some: { permission: { code } } } },
-    },
-    select: { roleId: true },
-  });
-  if (directRole) return true;
-
-  // Post-granted: DEFAULT telt voor elk lid, LEADER enkel wanneer je de lead bent.
-  const memberships = await prisma.groupMembership.findMany({
-    where: {
-      userId,
-      year,
-      group: {
-        roleGrants: {
-          some: { role: { permissions: { some: { permission: { code } } } } },
-        },
-      },
-    },
-    select: {
-      role: true,
-      group: {
-        select: {
-          roleGrants: {
-            where: { role: { permissions: { some: { permission: { code } } } } },
-            select: { kind: true },
-          },
-        },
-      },
-    },
-  });
-  return memberships.some((m) =>
-    m.group.roleGrants.some((grant) => grant.kind === "DEFAULT" || m.role === "LEAD")
-  );
 }
 
 export async function hasLiveTicketManageAll(
@@ -195,6 +153,69 @@ export async function requireTicketEventCapability(
   if (!access) throw new Error("TICKET_EVENT_NOT_FOUND");
   if (!access.capabilities.includes(capability)) throw new Error("FORBIDDEN");
   return access;
+}
+
+/**
+ * De events die deze gebruiker mag scannen, voor het keuzescherm op `/scan`.
+ *
+ * Dat scherm bestaat omdat de scanner op het beginscherm van een telefoon kan
+ * staan: dat icoon moet ergens landen dat volgende maand nog klopt, en een
+ * scanner-URL van één event is dat niet.
+ *
+ * Het venster loopt van twaalf uur geleden tot een maand vooruit. Twaalf uur
+ * terug, want een cantus die om 3u eindigt scan je nog om 2u; een maand vooruit,
+ * zodat de lijst niet volloopt met wat pas in het tweede semester doorgaat.
+ */
+export async function listScannableTicketEvents() {
+  const session = await requireSession();
+  const now = new Date();
+  const hidden: TicketEventStatus[] = ["DRAFT", "CANCELLED", "ARCHIVED"];
+  const window = {
+    endsAt: { gte: new Date(now.getTime() - 12 * 60 * 60 * 1000) },
+    startsAt: { lte: new Date(now.getTime() + 31 * 24 * 60 * 60 * 1000) },
+    archivedAt: null,
+    status: { notIn: hidden },
+  };
+
+  if (hasPermission(session, "tickets.manageAll")) {
+    return prisma.ticketEvent.findMany({
+      where: window,
+      orderBy: { startsAt: "asc" },
+      select: { id: true, titleNl: true, titleEn: true, startsAt: true, location: true },
+    });
+  }
+
+  const preview = await getAuthorizationPreview();
+  const allGroupIds = session.groups.map((group) => group.id);
+  const leadGroupIds = session.groups
+    .filter((group) => group.role === "LEAD")
+    .map((group) => group.id);
+  // FINANCE en REPORTER dragen geen SCAN, dus die grants horen hier niet bij.
+  const scanRoles: TicketGrantRole[] = ["OWNER", "MANAGER", "SCANNER"];
+
+  return prisma.ticketEvent.findMany({
+    where: {
+      ...window,
+      OR: [
+        ...(preview
+          ? []
+          : [{ userGrants: { some: { userId: session.user.id, role: { in: scanRoles } } } }]),
+        {
+          groupGrants: {
+            some: {
+              role: { in: scanRoles },
+              OR: [
+                { scope: "ALL_MEMBERS" as const, groupId: { in: allGroupIds } },
+                { scope: "LEADS_ONLY" as const, groupId: { in: leadGroupIds } },
+              ],
+            },
+          },
+        },
+      ],
+    },
+    orderBy: { startsAt: "asc" },
+    select: { id: true, titleNl: true, titleEn: true, startsAt: true, location: true },
+  });
 }
 
 export async function canAccessAnyTicketEvent(): Promise<boolean> {

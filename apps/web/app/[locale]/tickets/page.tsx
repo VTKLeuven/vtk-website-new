@@ -1,3 +1,5 @@
+import type { Metadata } from "next";
+import { staticMetadata } from "@/lib/pageMetadata";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowRight, CalendarDays, TicketCheck } from "lucide-react";
@@ -8,6 +10,16 @@ import type { PublicTicketEvent } from "@/components/ticketing/public/types";
 
 import "@/app/design/vtk-tickets.css";
 
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ locale: string }>;
+}): Promise<Metadata> {
+  const { locale } = await params;
+  if (!hasLocale(locale)) return {};
+  return staticMetadata("tickets", "/tickets", locale);
+}
+
 export default async function TicketsPage({ params }: { params: Promise<{ locale: string }> }) {
   const { locale: localeParam } = await params;
   if (!hasLocale(localeParam)) notFound();
@@ -17,29 +29,22 @@ export default async function TicketsPage({ params }: { params: Promise<{ locale
 
   return (
     <div className="vtk-page vtk-tickets-page">
-      <header className="ticket-catalog-head">
-        <div className="ticket-catalog-head-inner">
-          <div>
-            <span className="ticket-eyebrow"><span /> VTK Tickets</span>
-            <h1>
-              {locale === "nl" ? (
-                <>
-                  Tickets voor <em>VTK-events</em>.
-                </>
-              ) : (
-                <>
-                  Tickets for <em>VTK events</em>.
-                </>
-              )}
-            </h1>
-            <p>{locale === "nl" ? "Tickets voor cantussen, galabals en andere VTK-events." : "Tickets for cantuses, galas and other VTK events."}</p>
-          </div>
-          <Link href={`${base}/mijn-tickets`} className="ticket-my-link">
-            <TicketCheck size={19} aria-hidden="true" />
-            {locale === "nl" ? "Mijn tickets" : "My tickets"}
-            <ArrowRight size={17} aria-hidden="true" />
-          </Link>
+      {/* Dezelfde paginakop als de categorie- en contentpagina's (vtk-base.css),
+          zodat /tickets geen eigen aanhef meer heeft. */}
+      <header className="vtk-page-head">
+        <div>
+          <h1 className="vtk-page-title">Tickets</h1>
+          <p className="vtk-page-subtitle">
+            {locale === "nl"
+              ? "Tickets voor cantussen, galabals en andere VTK-events."
+              : "Tickets for cantuses, galas and other VTK events."}
+          </p>
         </div>
+        <Link href={`${base}/account#mijn-vtk-tickets`} className="ticket-my-link">
+          <TicketCheck size={19} aria-hidden="true" />
+          {locale === "nl" ? "Mijn tickets" : "My tickets"}
+          <ArrowRight size={17} aria-hidden="true" />
+        </Link>
       </header>
 
       <main className="ticket-catalog-shell">

@@ -9,7 +9,10 @@ export default async function BeheerInstellingenPage() {
   return (
     <div className="grid gap-6">
       <VehicleSettings vehicles={vehicles} />
-      <GeneralSettings showRentPrices={settings.showRentPrices} />
+      <GeneralSettings
+        showRentPrices={settings.showRentPrices}
+        lastMinuteDays={settings.lastMinuteDays}
+      />
     </div>
   );
 }

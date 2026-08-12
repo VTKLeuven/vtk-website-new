@@ -52,13 +52,15 @@ export function SaveForm({
     handled.current = state.nonce;
 
     if (state.status === 'success') {
-      showToast({ message: savedMessage, variant: 'success' });
+      // De actie mag een eigen melding meegeven wanneer ze iets deed dat het
+      // formulier niet kon voorzien; anders blijft het de vaste tekst.
+      showToast({ message: state.message ?? savedMessage, variant: 'success' });
       onSuccess?.();
     } else {
       // Blijft staan tot ze weggeklikt wordt: een foutmelding die vanzelf
       // verdwijnt kan je net missen.
       showToast({
-        message: errorMessages?.[state.code] ?? fallbackErrorMessage,
+        message: errorMessages?.[state.code] ?? state.detail ?? fallbackErrorMessage,
         variant: 'error',
         duration: 0,
       });

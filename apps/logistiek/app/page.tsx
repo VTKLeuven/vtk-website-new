@@ -4,6 +4,7 @@ import { LogisticsIcon } from '@/components/logistics-icon';
 import { getSession } from '@/lib/session';
 import { copy, getLocale } from '@/lib/i18n';
 import { getPublicCopy } from '@/lib/public-copy';
+import { driverStatus, showsMyTrips } from '@/lib/uitleen-server';
 
 function CtaCard({
   href,
@@ -50,7 +51,8 @@ export default async function LogistiekHome() {
   if (!session) {
     return <LoginGate />;
   }
-  const content = await getPublicCopy(locale);
+  const en = locale === 'en';
+  const [content, driver] = await Promise.all([getPublicCopy(locale), driverStatus(session.user.id)]);
 
   return (
     <main className="flex-1">
@@ -61,7 +63,9 @@ export default async function LogistiekHome() {
               <span className="h-1.5 w-1.5 rounded-full bg-vtk-yellow" aria-hidden />
               {t.homeEyebrow}
             </p>
-            <h1>{t.homeTitle}</h1>
+            <h1>
+              <em className="font-serif font-normal italic text-vtk-yellow">{t.homeAccent}</em> {t.homeTitle}
+            </h1>
             <p className="logistics-hero-sub">
               {content.homeLead}
             </p>
@@ -117,6 +121,34 @@ export default async function LogistiekHome() {
           index="03"
         />
       </section>
+
+      {/* Enkel voor chauffeurs; staat onder de kaarten, want die overlappen bewust
+          de hero en zouden een blok ertussen bedekken. */}
+      {showsMyTrips(driver) ? (
+        <section className="mx-auto w-full max-w-[1320px] px-5 pb-14 sm:px-9">
+          <Link
+            href="/ritten"
+            className="flex flex-wrap items-center justify-between gap-3 rounded-[16px] border border-vtk-navy/10 bg-vtk-surface px-5 py-4 transition hover:border-vtk-navy/25"
+          >
+            <span className="flex items-center gap-3 text-vtk-ink">
+              <LogisticsIcon name="van" className="h-5 w-5 shrink-0 text-vtk-navy" />
+              <span className="font-medium">{t.navTrips}</span>
+              <span className="text-sm text-vtk-muted">
+                {driver.upcomingTrips === 0
+                  ? en
+                    ? 'no trips assigned to you'
+                    : 'geen ritten op jouw naam'
+                  : en
+                    ? `${driver.upcomingTrips} upcoming trip${driver.upcomingTrips === 1 ? '' : 's'}`
+                    : `${driver.upcomingTrips} komende rit${driver.upcomingTrips === 1 ? '' : 'ten'}`}
+              </span>
+            </span>
+            <span aria-hidden className="text-sm font-semibold text-vtk-navy">
+              →
+            </span>
+          </Link>
+        </section>
+      ) : null}
 
       <section className="logistics-info-band">
         <div className="mx-auto grid w-full max-w-[1320px] gap-8 px-5 py-10 sm:px-9 lg:grid-cols-[minmax(0,1fr)_minmax(420px,0.9fr)] lg:py-14">

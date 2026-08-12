@@ -13,6 +13,9 @@ node_modules
 # testing
 coverage
 playwright-report/
+# Snapshots en consolelogs die de Playwright-MCP-server tijdens een sessie
+# wegschrijft; wegwerpmateriaal, geen broncode.
+.playwright-mcp/
 test-results/
 
 # next.js

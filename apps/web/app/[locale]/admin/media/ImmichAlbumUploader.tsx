@@ -3,6 +3,7 @@
 import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Button, Input, Label } from "@vtk/ui";
+import { FileField } from "@/components/ui/FileField";
 import {
   createImmichAlbumAction,
   finalizeImmichAlbumAction,
@@ -126,12 +127,13 @@ export function ImmichAlbumUploader({ locale }: { locale: "nl" | "en" }) {
       </div>
       <div className="md:col-span-2">
         <Label>{nl ? "Foto's" : "Photos"}</Label>
-        <input
-          type="file"
+        <FileField
           accept="image/*,video/*"
           multiple
-          className="block w-full text-sm"
-          onChange={(e) => selectFiles(e.target.files)}
+          locale={locale}
+          chooseLabel={nl ? "Foto's kiezen" : "Choose photos"}
+          hint={nl ? "Afbeeldingen en video's." : "Images and videos."}
+          onChange={(files) => selectFiles(files)}
         />
       </div>
       {files.length > 0 ? (

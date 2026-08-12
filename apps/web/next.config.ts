@@ -2,6 +2,7 @@ import path from "node:path";
 import { loadEnvConfig } from "@next/env";
 import { withSentryConfig } from "@sentry/nextjs";
 import type { NextConfig } from "next";
+import { LEGACY_REDIRECTS } from "./lib/legacyRedirects";
 
 const monorepoRoot = path.resolve(process.cwd(), "../..");
 
@@ -21,8 +22,13 @@ loadEnvConfig(monorepoRoot);
 //   (single shot, no leak), which is fine.
 
 const nextConfig: NextConfig = {
+  // Do not let stale declarations from a previous dev server break a clean
+  // production build (Next 16 stores them separately in .next/dev/types).
+  typescript: {
+    tsconfigPath: process.env.NODE_ENV === "production" ? "tsconfig.build.json" : "tsconfig.json",
+  },
   allowedDevOrigins: ["192.168.9.206", "192.168.9.226", "127.0.0.1", "*.trycloudflare.com"],
-  transpilePackages: ["@vtk/ui", "@vtk/auth", "@vtk/db", "@vtk/i18n", "@vtk/storage", "@vtk/payments"],
+  transpilePackages: ["@vtk/ui", "@vtk/auth", "@vtk/db", "@vtk/i18n", "@vtk/mail", "@vtk/storage", "@vtk/payments"],
   // Keep heavy, native, or generated server-only packages OUT of the
   // bundler module graph. Without this, the bundler tries to fully
   // resolve the generated Prisma client (which is huge) across every
@@ -48,6 +54,67 @@ const nextConfig: NextConfig = {
     serverActions: {
       bodySizeLimit: "50mb",
     },
+  },
+  // Er staat hier bewust géén `images`-sleutel. Alles wat via next/image gaat is
+  // een pad op deze host (`/api/media/...` en de statische bestanden onder
+  // `public/`), en daar heeft de optimizer geen `remotePatterns` voor nodig.
+  //
+  // De fotogalerij is de reden dat je hier misschien naar zoekt: die haalt haar
+  // beelden bij Immich Public Proxy, een aparte host uit `GALLERY_PUBLIC_PROXY_URL`.
+  // Die kan hier niet in `remotePatterns`, want de hostname komt uit de omgeving en
+  // verschilt per installatie. Bovendien wijst ze lokaal naar localhost, en Next 16
+  // weigert een upstream die naar een privé-IP resolvet ("resolved to private ip",
+  // 400) tenzij je `dangerouslyAllowLocalIP` aanzet. De galerij houdt dus `<img>`;
+  // Immich levert daar al thumbnails en previews op maat aan.
+  async redirects() {
+    return [
+      {
+        source: "/mijn-tickets",
+        destination: "/account#mijn-vtk-tickets",
+        permanent: true,
+      },
+      {
+        source: "/mijn-tickets/:orderId",
+        destination: "/tickets/bestelling/:orderId",
+        permanent: true,
+      },
+      {
+        source: "/nl/mijn-tickets",
+        destination: "/account#mijn-vtk-tickets",
+        permanent: true,
+      },
+      {
+        source: "/nl/mijn-tickets/:orderId",
+        destination: "/tickets/bestelling/:orderId",
+        permanent: true,
+      },
+      {
+        source: "/en/mijn-tickets",
+        destination: "/en/account#mijn-vtk-tickets",
+        permanent: true,
+      },
+      {
+        source: "/en/mijn-tickets/:orderId",
+        destination: "/en/tickets/bestelling/:orderId",
+        permanent: true,
+      },
+      // De uitleendienstpagina heette hier eerst "reservaties-en-logistiek".
+      // Die naam heeft in de sitemap gestaan, dus ze mag niet doodlopen.
+      {
+        source: "/info/reservaties-en-logistiek",
+        destination: "/info/uitleendienst",
+        permanent: true,
+      },
+      {
+        source: "/en/info/reservaties-en-logistiek",
+        destination: "/en/info/uitleendienst",
+        permanent: true,
+      },
+      // De adressen van de oude vtk.be. De map zelf staat in
+      // lib/legacyRedirects.ts, zodat ze getest kan worden; hier rollen we ze
+      // enkel uit.
+      ...LEGACY_REDIRECTS,
+    ];
   },
   async headers() {
     return [

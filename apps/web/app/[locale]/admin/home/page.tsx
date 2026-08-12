@@ -14,7 +14,6 @@ import {
   saveHomepageCardImageAction,
   saveCareerAction,
   saveAftermoviesAction,
-  saveFeaturedAlbumsAction,
 } from "@/app/actions/home";
 
 type Career = { titleNl: string; titleEn: string; bodyNl: string; bodyEn: string; ctaLabelNl?: string; ctaLabelEn?: string; ctaUrl?: string };
@@ -31,7 +30,6 @@ type Aftermovies = {
     publishedAt?: string;
   }>;
 };
-type Featured = { albumSlugs: string[] };
 
 function readAftermoviesSetting(value: unknown): Aftermovies | null {
   if (typeof value !== "object" || value === null || Array.isArray(value)) return null;
@@ -80,7 +78,6 @@ export default async function AdminHome({
             "home.career",
             "media.aftermovies",
             "home.aftermovies",
-            "home.featuredAlbums",
             DEFAULT_EVENT_IMAGE_SETTING,
           ],
         },
@@ -103,7 +100,6 @@ export default async function AdminHome({
   const after = readAftermoviesSetting(map.get("media.aftermovies"))
     ?? readAftermoviesSetting(map.get("home.aftermovies"))
     ?? { titleNl: "", titleEn: "", items: [] };
-  const featured = (map.get("home.featuredAlbums") as Featured | undefined) ?? { albumSlugs: [] };
   const defaultEventImageKey =
     (map.get(DEFAULT_EVENT_IMAGE_SETTING) as { imageKey?: string | null } | undefined)?.imageKey ?? null;
 
@@ -147,7 +143,7 @@ export default async function AdminHome({
                   helpText={
                     AANBOD_PHOTOS[tab.slug]
                       ? locale === "nl"
-                        ? "Zonder upload gebruikt deze kaart de standaardfoto hiernaast."
+                        ? "Zonder upload gebruikt deze kaart de standaardfoto uit de preview."
                         : "Without an upload, this card uses the default photo shown here."
                       : locale === "nl"
                         ? "Deze kaart heeft geen standaardfoto: zonder upload toont ze het gestreepte patroon."
@@ -190,7 +186,7 @@ export default async function AdminHome({
             srContext={locale === "nl" ? "Standaardfoto evenementen" : "Default event photo"}
             helpText={
               locale === "nl"
-                ? "Zonder upload gebruiken evenementen de meegeleverde foto hiernaast."
+                ? "Zonder upload gebruiken evenementen de meegeleverde foto uit de preview."
                 : "Without an upload, events use the bundled photo shown here."
             }
           />
@@ -315,22 +311,6 @@ export default async function AdminHome({
         </SaveForm>
       </Card>
 
-      <Card className="p-5">
-        <h2 className="font-semibold mb-3">
-          {locale === "nl" ? "Uitgelichte albums" : "Featured albums"}
-        </h2>
-        <SaveForm
-          action={saveFeaturedAlbumsAction}
-          className="space-y-2"
-          submitLabel={dict.admin.save}
-          savingLabel={dict.common.saving}
-          savedMessage={dict.common.saved}
-          fallbackErrorMessage={dict.common.saveError}
-        >
-          <Label>{locale === "nl" ? "Slugs (komma-gescheiden)" : "Slugs (comma-separated)"}</Label>
-          <Input name="albumSlugs" defaultValue={featured.albumSlugs.join(", ")} placeholder="galabal-2026, cantus-2026" />
-        </SaveForm>
-      </Card>
     </div>
   );
 }

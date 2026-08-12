@@ -36,6 +36,95 @@ De volgorde en labels zijn dus een kringkeuze, geen technische:
   aangepast worden.
 - **Tweedehands en tijdsloten draaien op Cudi**, niet op deze site. De footer en de
   homepage-quicklinks linken daarom extern naar `cudi.vtk.be`.
+- De **uitleendienst** (`logistiek.vtk.be`) hangt als menu-item onder Info, naast
+  Kalender en Piano, en niet als twaalfde tab: elf tabs is al de grens waarop de
+  header naar een menuknop overschakelt. Ze staat ook in de footerkolom Service,
+  want ze is een dienst en geen categoriepagina.
+- **Een hernoeming van een tab bereikt een bestaande database enkel via een
+  migratie.** De seed doet `headerTab.upsert(... update: {} ...)` en werkt een
+  bestaande rij bewust niet bij (labels, slug en volgorde zijn admin-beheerd).
+  Toen "Aanbod" naar "Info" ging, is dat blijven liggen: elke database van voor de
+  hernoeming stond nog op slug `aanbod`, dus `/info` gaf daar 404 terwijl de
+  footer en de redirects van de oude vtk.be-adressen er wel naartoe wezen. De
+  migratie `20260808150000_header_tab_aanbod_to_info` zet dat recht. Doe dit
+  voortaan meteen mee: verander je een default in `HEADER_TABS`, schrijf er dan de
+  migratie bij.
+
+---
+
+## Fotoalbums leven in Immich, en nergens anders
+
+De publieke mediapagina (`/media`, met `/fotos` als redirect) leest haar albums
+uitsluitend uit **Immich**: albums met de markering `[gallery]` in hun
+beschrijving verschijnen op de site. Beheer gebeurt op één plek, `/admin/media`:
+daar maak je een album aan, upload je de foto's en zie je meteen welke albums
+publiek staan.
+
+Daarnaast bestond er lang een tweede, lokale albumopslag (`PhotoAlbum` +
+`PhotoPhoto`, beheerd via een eigen `/admin/albums`-scherm met uploads naar onze
+eigen S3). Die kwam op geen enkele publieke pagina nog terecht: twee plaatsen om
+een album te maken, waarvan er één niets deed. Het adminscherm en de bijhorende
+acties zijn daarom verwijderd.
+
+- De **tabellen en de bestaande rijen blijven staan**, samen met de publieke
+  download-route `/api/albums/[slug]/download`. Er gaat dus geen data verloren en
+  oude links blijven werken; er is enkel geen scherm meer om ze te beheren.
+- `photos.manageAlbums` blijft de permissie voor fotoalbums: ze geeft nu toegang
+  tot het albumgedeelte van `/admin/media`. `media.manage` blijft over voor
+  magazines en promovideo's, zodat Communicatie en de fotografen apart bediend
+  kunnen worden.
+- De homepage-instelling **"Uitgelichte albums"** is mee verdwenen. Ze schreef
+  `home.featuredAlbums` weg met vrij getypte slugs, maar de homepage toonde die
+  albums nergens. Wil je later toch uitgelichte albums op de homepage, bouw dan
+  eerst de sectie en kies de albums met een keuzelijst uit Immich.
+
+---
+
+## Aankondigingen op de homepage
+
+Een aankondiging is een bericht dat als venster over de homepage komt, beheerd
+via **Admin → Website → Aankondigingen** (recht: `home.edit`, want het is
+homepage-inhoud).
+
+- **Meerdere aankondigingen mogen naast elkaar bestaan**, elk met hun eigen
+  venster (`startsAt`/`endsAt`, allebei optioneel) en een aan/uit-schakelaar. Zo
+  kan je er een op voorhand klaarzetten zonder dat ze al verschijnt.
+- **De homepage toont er hoogstens één**: twee berichten tegelijk over dezelfde
+  pagina leest niemand. Staan er meerdere klaar, dan wint de meest recente.
+- **Wie ze wegklikt, ziet ze niet opnieuw.** Dat onthoudt de browser per id in
+  localStorage (de laatste tien), niet de server: het gaat om een venster
+  wegklikken, niet om iets dat we per lid willen bijhouden. Een nieuwe
+  aankondiging verschijnt dus wel weer, ook bij wie de vorige wegklikte.
+- **Oude aankondigingen blijven staan** als historiek in het beheerscherm. Uit
+  zetten haalt ze van de site; verwijderen wist ze ook uit die historiek.
+
+---
+
+## Headertabs kunnen naar een externe site linken
+
+`HeaderTab.externalUrl` maakt van een tab een gewone link naar buiten: staat er
+een URL in, dan opent de headerknop die site in een nieuw tabblad in plaats van
+de categoriepagina `/<slug>` te tonen. **Career** gebruikt dit en gaat
+rechtstreeks naar `career.vtk.be`, omdat Career daar zijn eigen site heeft; de
+categoriepagina `/career` blijft bestaan voor wie ze via een directe link opent.
+
+Dit is bewust een veld en geen uitzondering in de code: Cursusdienst (cudi) en
+toekomstige werkingen met een eigen site kunnen hetzelfde doen zonder release.
+Je stelt het in bij Admin → Website → Inhoud, op de tab zelf.
+
+Elke tab klapt in de header ook uit. Wat erin staat:
+
+- **De pagina's onder die categorie**, dezelfde selectie als de categoriepagina
+  toont (zichtbaar in de header en gepubliceerd). Daar hoef je niets voor te
+  doen; een nieuwe pagina staat meteen in het menu.
+- **Extra items uit `HeaderTabLink`**, voor bestemmingen op een andere site.
+  Career heeft zo *Jobfair* en *Contact voor bedrijven* op career.vtk.be;
+  Cursusdienst heeft *Bestel boeken*, *Tweedehands*, *Printer* en *Subsidies* op
+  cudi.vtk.be. Ook die beheer je op de tab in Admin → Website → Inhoud.
+
+De seed zet die items create-only per (tab, URL): een hernoemd label blijft dus
+staan, en een item dat de admin verwijderde komt bij een reseed niet terug zolang
+de URL dezelfde blijft.
 
 ---
 
@@ -57,6 +146,21 @@ halen ze af aan de balie en betalen daar. Post **Theokot** beheert het systeem.
   ('Afhalen vanaf/tot', 'Besteldeadline', 'Bestellen opent') in die voor álle gekozen
   dagen gelden. Dat scheelt werk in weken met een volledig ander aanbod. **Nadien** kan
   je nog steeds per dag bijsturen (uren, open/dicht, aanbod).
+- **Foto en ingrediënten per broodje zijn optioneel.** Beheer ze in dezelfde
+  aanbod-editor (uitklap "Foto & ingrediënten" per rij), zowel op het standaardaanbod
+  als per verkoopdag. Een broodje zonder foto toont het gestreepte placeholder-patroon
+  van de site in plaats van een gat, want het aanbod raakt in de praktijk maar
+  geleidelijk gefotografeerd. Ingrediënten verschijnen achter een **info-icoontje**
+  naast het broodje; ze staan bewust niet altijd uitgeschreven, anders wordt een lijst
+  van tien broodjes onleesbaar.
+- **De weergave van het aanbod (lijst of raster) is een instelling**, geen vaste keuze
+  in de code: een raster geeft de foto's ruimte, een lijst blijft compacter zolang er
+  weinig foto's zijn. Ze staat bij de overige Theokot-instellingen en geldt voor de
+  hele bestelpagina (`itemLayout`). De standaard is een lijst, zodat een aanbod zonder
+  foto's er niet leger uitziet dan vroeger.
+- **Een foto in de catalogus vervangen verwijdert het oude bestand niet.** De
+  storage-key wordt mee gekopieerd naar de sessie-items van elke week die er al mee
+  aangemaakt is; opruimen zou de foto weghalen bij verkoopdagen die ze nog tonen.
 - **"Broodje van de week"** is gewoon het aanbod-item dat als _weekly special_
   gemarkeerd is (checkbox "V/d week" in de aanbod-editor). De **naam** van dat item is
   wat het die week concreet is (bv. hernoem "Broodje van de week" naar "Broodje kip
@@ -140,6 +244,174 @@ halen ze af aan de balie en betalen daar. Post **Theokot** beheert het systeem.
 - `theokot.manage` — sessies/aanbod, config, bericht, openingsuren, bans, historiek.
 - `theokot.pickup` — afhaalbalie + turf-lijst.
 - Beide worden in de seed toegekend aan groep **THEOKOT**.
+
+---
+
+## Grocomeet en VTK Bureau — broodjes voor een vergadering
+
+Twee terugkerende vergaderingen waar vooraf een broodje en een drankje voor besteld
+wordt. Ze staan in de code als één model (`Meeting`, met `kind`), want de werking is
+identiek; enkel het publiek en de beheerder verschillen.
+
+|  | Grocomeet (GM) | VTK Bureau |
+|---|---|---|
+| Wie | verantwoordelijken van de posten + Groep 5 | elke student |
+| Ritme (default) | wekelijks, vrijdag 12:45 | tweewekelijks, donderdag 12:40 |
+| Ingang | tabje in het profielmenu (`/grocomeet`) | gedeelde link per bureau (`/bureau/<slug>`) |
+| Opent | meteen; grocos bestellen weken vooruit | instelbaar per bureau (`opensAt`) |
+| Geld | per persoon bijgehouden en af te vinken | enkel totalen, Onderwijs betaalt |
+| Beheer | Groep 5 (`grocomeet.manage`) | Onderwijs (`bureau.manage`) |
+
+### Waarom dit geen formulier uit de formulierenmodule is
+
+Het lijkt een form met twee keuzevragen, maar de bestelling moet dingen doen die een
+generieke `FormEntry` niet kan: broodjes van de **Theokot-voorraad** afromen, de
+**prijs op het moment van bestellen** vastklikken, in een **aparte kolom op de
+turflijst** verschijnen (de doos voor de vergadering), en **ongeldig worden** wanneer
+het aanbod van die dag wijzigt. Dat is domeinlogica, geen formulierveld.
+
+### Aanbod en het uitlijnen met de verkoopdag
+
+- Er kan **één broodje en één drankje** per persoon per vergadering besteld worden,
+  allebei optioneel: enkel een drankje (of niets) kan ook.
+- Het **broodje van de week** staat er nooit bij: dat blijft voor de studenten.
+- Een reservatie wordt vaak **weken vooraf** gemaakt, terwijl Theokot het aanbod van
+  die week pas een week op voorhand vastlegt. Zolang die verkoopdag niet bestaat,
+  komen de keuzes uit de **catalogus** (`TheokotProduct`); bestaat ze wel, dan uit het
+  **aanbod van die dag**, met de resterende voorraad erbij.
+- Bij elke wijziging die dat aanbod raakt (week aanmaken, aanbod van een dag
+  bewerken, dag sluiten, vergadering verzetten) lijnt `syncMeetingReservations` de
+  reservaties opnieuw uit. Koppelen gebeurt **op naam** (`offeringNameKey`), want de
+  catalogus en het aanbod van die dag hebben verschillende id's; de naam is wat ze
+  gemeen hebben en waarop een mens ze ook vergelijkt.
+- Wat niet meer kan, wordt **ongeldig**: die persoon krijgt een mail én ziet het op de
+  reservatiepagina en op `/account`. Er wordt niets stil geschrapt en niets stil
+  vervangen door een ander broodje.
+- Blijft Theokot die dag helemaal weg (geen verkoopdag aangemaakt), dan blijft de
+  reservatie staan en zegt het beheerscherm dat er geen verkoopdag is. Er draait
+  bewust geen wachter op "de dag nadert en er is nog steeds niets": dat zou een tweede
+  scheduler vragen voor iets wat het beheer sowieso op zijn scherm ziet.
+
+### Eigen aanbod (bureau zonder Theokot)
+
+Een bureau gaat altijd door, ook wanneer Theokot geen broodjes kan voorzien. Daarom kan
+het aanbod per vergadering **losgekoppeld** worden van Theokot (`useTheokot = false`):
+je zet dan zelf de keuzes met hun prijs (lasagne, broodjes van een bakker). Zo'n
+vergadering raakt de Theokot-voorraad niet en krijgt geen kolom op de turflijst. Een GM
+kan dat ook; het is dezelfde knop.
+
+### Deadline
+
+Aanpassen of annuleren kan tot **dezelfde deadline als voor studenten**: het moment
+waarop de turflijst geprint wordt (`TheokotSession.orderCloseAt` van die dag). Is er
+geen verkoopdag, dan geldt het begin van de vergadering. Er is bewust geen aparte
+deadline per vergadering: twee deadlines voor hetzelfde broodje is één te veel.
+
+### Geld
+
+- Prijzen zijn **snapshots** op het moment van bestellen (broodje + drankje), zodat een
+  prijswijziging in de catalogus een openstaande schuld niet met terugwerkende kracht
+  verandert.
+- Het **drankje** kost standaard €1; de lijst en de prijs staan in één setting
+  (`meetings.drinks`) en gelden voor allebei de vergaderingen, want het is dezelfde koelkast.
+- Bij de **GM** kan per bestelling afgevinkt worden dat er betaald is; het beheerscherm
+  toont per persoon het totaal, het betaalde en het openstaande bedrag over het werkingsjaar.
+- Bij het **bureau** betaalt de student niets: daar staan enkel totalen per bureau, per
+  werkingsjaar en over alle bureaus heen, voor de boekhouding van Onderwijs.
+
+### Plannen per semester
+
+De kalender wordt **per semester** ingevuld: bij het begin van het academiejaar voor
+semester 1 en vanaf januari voor semester 2 (`semesterToPlan`). Het beheerscherm toont
+die kalender vanzelf zolang er voor dat semester nog geen plan is (`MeetingPlan`); daarna
+blijft ze staan om aan te passen. Een dag met bestellingen kan **niet** via de kalender
+verdwijnen; die verwijder je bewust bij de vergadering zelf, waar de bevestiging zegt
+hoeveel bestellingen eraan hangen.
+
+- **Uur en plaats staan per dag**, niet één keer bovenaan. Een vergadering verhuist
+  geregeld naar een ander lokaal of een ander uur, en dan hoort de kalender dat te
+  kunnen zeggen in plaats van je twintig keer naar het detailscherm te sturen. De twee
+  velden bovenaan zijn enkel het startpunt voor de volgende dag die je aanduidt.
+- **Het voorstel hangt aan de pariteit van het ISO-weeknummer** (`WeekParity`), niet aan
+  "elke tweede vanaf de start van het semester". Zo blijft een tweewekelijkse vergadering
+  kloppen over de kerstvakantie heen, en het is ook hoe een agenda erover praat. Met
+  "Elke week / Even weken / Oneven weken" zet je het voorstel in één klik om wanneer het
+  semester net verkeerd uitkomt; welke helft het juiste is, verschilt per jaar. Dagen
+  waarvoor al besteld is, blijven bij zo'n omschakeling staan.
+
+---
+
+## Piano (lokaal 01.52 in het kasteel)
+
+VTK heeft een eigen piano in lokaal 01.52 van het kasteel, naast de promotiezaal.
+Studenten mogen er gratis op spelen en reserveren daarvoor zelf een tijdslot op
+`/piano`. Op de oude site stond dit op `/reservations/piano`; de afspraken
+(gratis, wekelijks, begeleidende brief) zijn overgenomen, de manier waarop ze
+afgedwongen worden niet helemaal. Zie hieronder.
+
+### Slots bestaan niet als rijen
+
+De uren volgen uit een handvol **terugkerende vensters** (`PianoWindow`, bv. "elke
+ma/di/do 19u-22u van eind september tot eind mei") min de **sluitingsdagen**
+(`PianoClosure`, in de praktijk de sluitingsdagen van de KU Leuven). De concrete
+tijdsloten worden per keer berekend voor de week die op het scherm staat.
+
+- Een academiejaar aan avondslots zou anders duizend rijen zijn die iemand elk
+  jaar opnieuw moet aanmaken. Nu is dat één rij met een begin- en einddatum.
+- De **slotlengte staat in de instellingen**, niet per venster: één piano, één
+  ritme. Wijzig je ze, dan verschuiven de uren op de pagina; reeds gemaakte
+  reservaties blijven op hun oorspronkelijke uur staan.
+- Enkel een **geboekt** slot krijgt een rij (`PianoReservation`), met een unieke
+  index op `startsAt`. De piano is er maar één, dus dubbel boeken hoort in de
+  database te falen en niet enkel in de check vooraf.
+- Annuleren **verwijdert** de rij. Er hangt geen geld en geen sanctie aan een
+  pianoreservatie, dus historiek zou hier enkel ruis zijn (anders dan bij Theokot,
+  waar no-shows tot een ban leiden).
+
+### De weeklimiet is hard, de oude site was zachter
+
+Op vtk.be stond: "One reservation each week will be assigned to you, if you want
+to play more times a week, other students are given priority." Dat veronderstelt
+iemand die de aanvragen manueel verdeelt. Hier is het een **harde limiet**
+(`maxPerWeek`, standaard 1, per ISO-week van maandag tot zondag): een tweede slot
+in dezelfde week wordt geweigerd met de uitleg dat je eerst moet annuleren.
+
+- Bewuste keuze: automatisch toewijzen vraagt een aanvraag-en-verdeel-flow die
+  niemand wil bedienen voor een piano. Wie er echt meer wil op, kan altijd de
+  vice aanspreken; die kan een slot vrijmaken in het beheer.
+- Enkel slots die **nog moeten komen** tellen mee. Een slot dat al gespeeld is
+  blokkeert je week niet meer, want dan zou een annulering achteraf nooit meer
+  helpen.
+- Er is ook een **horizon** (`horizonDays`, standaard 28 dagen): zonder die grens
+  zou één iemand het hele jaar kunnen volboeken.
+
+### De begeleidende brief blijft mensenwerk
+
+De brief die je bij de vice in Blok 6 haalt en aan de bewaking moet kunnen tonen,
+staat in de tekst boven de agenda (`Setting` `piano.info`, Markdown, beheerd via
+`/admin/piano`) en niet in de flow. We controleren niet of iemand ze heeft: dat
+is een afspraak tussen het lid en de vice, geen toestand die de site kent.
+
+### Uren zichtbaar zonder account, reserveren niet
+
+De agenda staat er ook voor wie niet aangemeld is, met een melding erboven; enkel
+het effectief boeken vraagt een aanmelding. Zo kan je nakijken wanneer de piano
+vrij is zonder eerst door de KUL-login te moeten. Dat volgt de oude site
+("Gelieve aan te melden om een slot te reserveren").
+
+### Een sluitingsdag schrapt de reservaties die erin vielen
+
+Wie al geboekt had binnen een periode die achteraf gesloten wordt, houdt anders
+een reservatie over voor een slot dat niet meer bestaat. Het beheerscherm zegt dat
+vooraf; er vertrekt **geen mail**, dus de vice verwittigt die leden zelf.
+
+### Permissies & navigatie
+
+- `piano.manage` — vensters, sluitingsdagen, instellingen, infotekst en het
+  schrappen van andermans reservatie. Hoort bij de vice.
+- De pagina hangt als menu-item onder de **Info**-tab (`HeaderTabLink` naar
+  `/piano`), zoals ze op de oude site onder "Aanbod" stond. Het is een eigen route
+  en geen contentpagina, dus ze komt er niet vanzelf in.
 
 ---
 
@@ -485,6 +757,136 @@ bijgewerkt. De Brevo-sync (`apps/web/lib/brevo/`) haalt de tussenpersoon weg.
   aan waarvoor het mails wil. Bewuste keuze i.p.v. opt-out, om te stroken met de
   verwachting dat je zelf kiest waarvoor je ingeschreven wordt.
 
+## Kalender: categorieën en agenda-feeds
+
+### De site is de enige bron; geen koppeling met de Google-agenda
+
+VTK had een gedeelde Google Workspace-agenda. Die wordt **niet** gekoppeld: niet
+geïmporteerd, niet gespiegeld, niet gesynchroniseerd. De reden is dat
+`CalendarEvent` dingen draagt waar een Google-agenda geen plaats voor heeft: een
+Nederlandse én Engelse titel en beschrijving, `visibility` (publiek vs. enkel
+leden), `groupId` (dat bepaalt wie het event mag bewerken), een foto, en een 1:1-
+koppeling met `TicketEvent`. Zou Google de bron zijn, dan verlies je dat allemaal
+of moet je het in de eventbeschrijving proppen.
+
+Daar komt bij dat enkel praesidium en posten een `@vtk.be`-account hebben. Een
+agenda "gedeeld met alle VTK-leden" bereikt de gewone leden dus sowieso niet;
+daarvoor dient de persoonlijke feed hieronder.
+
+Two-way sync is bewust nooit overwogen: event-ids, verwijderingen, herhalingen en
+conflictresolutie leveren permanent onderhoud op voor iets wat een kring niet
+nodig heeft.
+
+### Categorieën staan naast de post, niet erin
+
+`CalendarEvent.groupId` zegt **wie** het evenement organiseert. `CalendarCategory`
+zegt **waarover het gaat** of **voor wie het is**. Dat zijn twee assen: een
+fakbar-cantus kan een eerstejaarsevent zijn, en een evenement van de post
+Internationaal hoeft niet op de internationale kalender te staan.
+
+Vóór deze feature stonden de filterchips en de legende hardgecodeerd in de client
+en mapten ze op groepscodes (gala=CULTUUR, career=BEDRIJVENRELATIES,
+cantus=FAKBAR). Dat klopte inhoudelijk niet en vereiste een release voor elke
+wijziging. Categorieën zijn nu GUI-beheerd (`/admin/kalender/categorieen`,
+`calendar.manageAll`), inclusief hun kleur: die komt als `--cat` op het element
+terecht, zodat er geen lijst CSS-klassen meer per categorie hoeft te bestaan.
+
+Een categorie verwijderen laat de evenementen zelf staan; enkel de koppeling en
+dus haar pagina en feed verdwijnen.
+
+### Doelgroepen filteren vanzelf, en zijn geen filterknop
+
+Een categorie kan een **doelgroep** dragen (`CalendarCategory.audience`:
+`FIRST_YEARS` of `INTERNATIONALS`). Zo'n categorie gedraagt zich anders dan een
+gewoon thema:
+
+- **Geen filterchip.** Een eerstejaars hoort niet op "Eerstejaars" te moeten
+  klikken om zijn eigen programma te zien; dat is precies de stap die niemand
+  zet. De kalender kijkt naar het profiel en toont die evenementen vanzelf.
+- **Wie er niet bij hoort, ziet ze standaard niet.** Dat is een standaard en geen
+  slot: één schakelaar ("ook andere doelgroepen") en alles staat er. Er wordt
+  dus niets afgeschermd; de kalender is enkel meteen relevant. De categoriepagina
+  `/kalender/eerstejaars` en haar feed blijven ook zonder die schakelaar gewoon
+  bereikbaar.
+- **Altijd zichtbaar gelabeld.** In het maandraster, in de agendalijst én op de
+  eventpagina draagt zo'n evenement de naam van zijn doelgroep in de kleur van de
+  categorie. Een evenement dat maar voor een deel van de leden bedoeld is, mag er
+  nooit uitzien als een gewoon evenement.
+
+De doelgroep is een enum en geen vrij veld, omdat er bij elke waarde code hoort
+die bepaalt wie erbij hoort (`lib/calendar/audience.ts`): eerstejaars zijn leden
+met `BACHELOR_1` in `studyYears`, internationals leden met
+`User.internationalStudent`. Een doelgroep toevoegen is dus bewust geen
+GUI-actie.
+
+**`internationalStudent` is een eigen profielveld**, gevraagd in de onboarding en
+te wijzigen op `/account`. De sitetaal (`locale`) leek een gratis alternatief,
+maar die zegt welke taal je leest, niet of je een uitwisselingsstudent bent: een
+Vlaming die de site op Engels zet zou dan internationale events krijgen en een
+Erasmusstudent die het in het Nederlands probeert niet. Vergelijk
+`Shift.openToInternationals`, dat om dezelfde reden over de taal van de shift
+gaat en niet over wie de persoon is.
+
+De homepage ("Opkomende evenementen") past dezelfde filter toe. Anders zou een
+eerstejaarsevent bij iedereen op de homepage staan terwijl het uit de kalender
+gefilterd is.
+
+### Eén dynamisch segment onder `/kalender`
+
+`/kalender/<slug>` (categorie) en `/kalender/<id>` (evenement) delen hetzelfde
+routesegment `[slugOrId]`, dat eerst een categorieslug probeert en anders een
+event-id. Twee dynamische segmenten naast elkaar kan Next.js niet, en de
+alternatieven waren slechter: `/kalender/c/<slug>` geeft een lelijke URL voor iets
+wat je aan een eerstejaars wil kunnen doorgeven, en de events verhuizen naar
+`/kalender/event/<id>` zou de bestaande links vanaf de homepage breken. Een
+botsing is uitgesloten omdat een slug beheerd wordt en alleen kleine letters,
+cijfers en koppeltekens mag bevatten, terwijl event-ids cuids zijn.
+
+### Twee weergaven: Agenda en Lijst
+
+`/kalender` had drie knoppen (Agenda, Maand, Lijst), maar Agenda en Lijst toonden
+allebei dezelfde lijst van de **komende 14 dagen**, ongeacht welke maand je
+bekeek; ze verschilden enkel in of de legende ernaast stond en of de lijst op
+acht items werd afgekapt. Bladeren met de maandpijlen deed er niets aan, en in een
+rustige periode waren beide leeg. Dat las als een defect.
+
+Nu zijn er twee: **Agenda** is het maandraster (de standaard; het raster *is* de
+agenda, dus "Maand" was een rare naam ernaast), met daaronder het blok
+"Eerstvolgend · komende 14 dagen". **Lijst** is dezelfde maand chronologisch, dus
+de pijlen werken in beide weergaven. Alleen het "eerstvolgend"-blok negeert
+bewust de gekozen maand: dat is precies waarvoor het dient.
+
+Een lege lijst zegt nu ook dát ze leeg is ("Geen evenementen deze maand"), in
+plaats van een leeg vlak te tonen.
+
+### Wat er in welke feed zit
+
+- Publieke feeds (`/api/calendar/feed`, `.../feed/c/<slug>`, `.../feed/g/<slug>`)
+  bevatten **enkel** `PUBLIC`-events. Een feed-URL is per definitie deelbaar, dus
+  ledenexclusieve evenementen horen daar niet in.
+- De algemene feed en de postfeeds laten **doelgroepevents weg**: dat is het
+  algemene programma. Wie enkel de eerstejaarskalender wil, abonneert zich op
+  `/feed/c/eerstejaars`.
+- De persoonlijke feed (`/api/calendar/feed/me/<token>`) is de enige met
+  `MEMBERS`-events, voegt de shiften toe waarvoor het lid is ingeschreven, en
+  volgt de doelgroepen van dat lid; een eerstejaars hoeft zich dus niet apart op
+  de eerstejaarsfeed te abonneren.
+- Elke feed draagt een venster van 12 maanden terug tot 24 vooruit. Clients halen
+  het bestand elk paar uur opnieuw op; de volledige historiek meesturen kost enkel
+  bandbreedte.
+- Feeds zijn abonnementen, geen downloads. Enkel op de detailpagina van één
+  evenement staat een echte `.ics`-download: dat ene event verandert zelden nog.
+
+### Feedtokens verlopen niet, deur-tokens wel
+
+`CalendarFeedToken` heeft bewust géén `expiresAt`, anders dan
+`DoorShortcutToken`. Een agenda-abonnement dat na 90 dagen stilletjes ophoudt met
+verversen, is erger dan geen abonnement: de agenda blijft verouderde evenementen
+tonen en niemand merkt dat er iets stuk is. Intrekken gebeurt expliciet vanuit
+`/account`. Een ingetrokken token geeft dezelfde 404 als een verzonnen token, en
+`lastUsedAt` wordt hoogstens één keer per uur weggeschreven; anders is elke poll
+van elke client een database-write.
+
 ## Homepage-secties & bandenritme
 
 De homepage is opgebouwd uit volle-breedte banden die bewust van kleur
@@ -583,6 +985,37 @@ onderste helft is een ontwerpkeuze, geen toeval:
   openingsuren zijn momenteel niet beschikbaar". Zo breekt de homepage nooit,
   ook niet bij een koude cache terwijl cudi plat ligt.
 
+### Snelle knoppen staan op mobiel vóór de eventkaart
+
+Op een breed scherm staan de hero-tekst en de eventkaart naast elkaar, en ligt de
+rij snelle knoppen (Theokot, Cursusdienst, Tweedehands, Tijdsloten, Shiften,
+Kalender) er meteen onder: allemaal in één blik, klikbaar zonder te scrollen.
+
+Zodra de hero stapelt (**≤980px**) valt die volgorde uit elkaar. De eventkaart
+gaat dan onder de tekst staan, en de knoppen kwamen daarachter: op een scherm van
+390×844 begon de eerste knop pas op **1287px**, dus anderhalf scherm naar
+beneden, met een kaart van ruim 500px ertussen. De knoppen zijn juist het
+utilitaire deel van de homepage (waar eet ik, is de cursusdienst open), dus dat
+is precies de verkeerde volgorde voor een telefoon.
+
+- **Keuze:** onder 980px schuiven de knoppen tussen de hero-tekst en de
+  eventkaart. Onder 640px staan ze bovendien in **twee kolommen** in plaats van
+  zes onder elkaar. Resultaat op 390×844: eerste knop op **700px**, vier van de
+  zes binnen het eerste scherm, en het blok krimpt van 682px naar 311px.
+- **De eventkaart schuift dus naar beneden op mobiel.** Dat is bewust: hij blijft
+  één korte scroll ver, terwijl de knoppen de bestemming zijn waar mensen
+  meerdere keren per week naartoe gaan.
+- **Desktop verandert niet.** Alles zit in `@media (max-width: 980px)` en
+  `@media (max-width: 640px)` in `vtk-home.css`.
+- **Hoe:** `.home-dark-zone` wordt een flex-kolom en `.home-hero` krijgt
+  `display: contents`, zodat de twee hero-kinderen broers worden van de
+  quick-sectie en met `order` te herschikken zijn. Enkel de box van de hero
+  verdwijnt, niet het element, dus descendant-selectors (`.home-hero .hero-cal`)
+  en `body:has(.home-hero)` in de header-CSS blijven werken. De padding van de
+  hero verhuist wel mee naar zijn kinderen. Let op: `.quick` staat op
+  `margin: 0 auto`, en een auto-marge in de dwarsrichting zet de stretch van een
+  flex-kind uit; die marges moeten in dat blok expliciet op 0.
+
 ---
 
 ## Uitleendienst (logistiek.vtk.be)
@@ -654,9 +1087,12 @@ feedback van de groepscoordinator. De onderliggende werking:
   nooit zelf.** Een praesidiumlid (in een post) vraagt aan als INTERN namens die
   post; wie geen post heeft, is EXTERN met de eigen naam. De server dwingt dit af
   en negeert wat de client meestuurt (niet te vervalsen). Enkel wanneer een lid
-  in meerdere posten zit, kiest het nog *welke* post (geen type). Werkgroepen
-  zitten niet in de DB en worden dus niet automatisch afgeleid; in het beheer kan
-  het team het type wel manueel zetten (het is daar zichtbaar en duidelijk).
+  in meerdere posten zit, kiest het nog *welke* post (geen type). In het beheer
+  kan het team het type wel manueel zetten (het is daar zichtbaar en duidelijk).
+  *Achterhaald sinds augustus 2026:* werkgroepen zitten intussen wél in de DB
+  (`GroupType.WERKGROEP`, `WERKGROEP_SEEDS` in `packages/db/src/groups.ts`) en
+  `deriveMemberRequester` leidt ze automatisch af. Enkel de keuzelijst in de UI
+  noemt ze nog "post"; dat is taak M4 in het feedbackplan.
 - **Flesserke is een aparte tab**, enkel zichtbaar en bruikbaar voor het
   praesidium (leden met een post). Het is een eigen aanvraagflow (aparte
   reservatie met enkel flesserke-lijnen), los van materiaal. Materiaal- en
@@ -691,6 +1127,691 @@ feedback van de groepscoordinator. De onderliggende werking:
 - **NL-only DB-inhoud**; de UI-chrome is NL/EN via een eigen cookie-copysysteem.
 - De import van de bestaande "Inventaris Loods.xlsx" is eenmalig en idempotent;
   ze deletet nooit, zodat een herimport na een sheet-correctie veilig is.
+
+### Chauffeurs: een eigen lijst naast de post Logistiek
+
+Wie mag rijden was tot nu een afgeleide: iedereen met een lidmaatschap van de post
+`LOGISTIEK` in het huidige werkingsjaar stond in de chauffeurskeuze. Dat koppelt
+twee dingen die niet samenhoren: rijden vraagt een rijbewijs en goodwill, niet een
+praesidiumfunctie. Logistiek beheert nu zelf een chauffeurslijst in
+`/beheer/chauffeurs`.
+
+- **Unie van twee bronnen, geen vervanging.** De keuzelijst is de post Logistiek
+  (automatisch, per werkingsjaar) plus de handmatig toegevoegde chauffeurs
+  (`UitleenDriver`). De post blijft er automatisch bij: die lijst onderhoudt
+  zichzelf al op vtk.be en rolt op 15 juli vanzelf mee. Het beheerscherm toont
+  beide groepen apart, zodat zichtbaar is wat je waar aanpast.
+- **Chauffeur zijn geeft geen beheerrechten.** Een toegevoegde chauffeur krijgt
+  geen `logistiek.manage` (die hangt aan de rol van de post, niet aan deze lijst).
+  Die persoon ziet enkel "Mijn ritten" (`/ritten`): de ritten met zijn eigen
+  `driverId`, met laadadres, bestemming, contactpersoon en bijrijders, en zonder
+  prijs of betaalstatus. Dat laatste is bewust: de prijs is een zaak tussen de
+  aanvrager en Logistiek, en een chauffeur die een openstaande betaling ziet, gaat
+  zich daar ter plaatse mee moeien.
+- **De chauffeur is altijd een echte vtk.be-gebruiker**, gekozen via een
+  zoekpicker, nooit een vrije naam. Enkel zo kan de app die persoon zijn ritten
+  tonen na het inloggen, en enkel zo blijft de historiek ("wie reed die rit")
+  betrouwbaar. Wie geen account heeft, logt eerst één keer in op vtk.be.
+- **De lijst is niet werkingsjaar-gescoped.** Anders zou de 15-juli-reset de
+  chauffeurs midden in de zomer wegvegen, net wanneer er verhuisd en gesjouwd
+  wordt. Het team haalt iemand er zelf uit.
+- **Iemand uit de lijst halen laat toegewezen ritten staan.** De rit is gepland of
+  gereden; de naam wissen zou de planning en de historiek stukmaken. Die persoon
+  blijft die ritten dus ook zien tot ze voorbij zijn. Wil je dat niet, wijs de rit
+  dan eerst aan een andere chauffeur toe. In het beheer blijft een verwijderde
+  chauffeur zichtbaar in de keuzelijst van zijn eigen rit, onder "Niet meer in de
+  chauffeurslijst".
+
+### Terugdraaien: één stap terug, behalve bij een online betaling
+
+Elke stap in de flow kan één stap terug: goedkeuren en afwijzen naar
+"aangevraagd", afgehaald naar goedgekeurd, teruggebracht naar afgehaald, en de
+markeringen "betaald aan de balie" en "waarborg terug" kunnen gewist worden.
+Bij vervoer geldt hetzelfde, plus het terugdraaien van een afronding. Zonder dit
+betekende één verkeerde klik een ingreep in de database, en dat is net wat deze
+app kwam vervangen.
+
+Wat daarbij vastligt:
+
+- **Voorraad wordt hercheckt zodra terugdraaien ze opnieuw inneemt.**
+  "Teruggebracht" terugdraaien zet het materiaal weer buiten en zet het
+  flesserke-verbruik terug op de plank; dat loopt in dezelfde
+  Serializable-transactie en met dezelfde check als het goedkeuren. Is de
+  periode intussen aan iemand anders toegewezen, dan gaat er niets door.
+  Voorraad *vrijgeven* (een goedkeuring terugdraaien) is altijd veilig.
+- **Een geslaagde online betaling draai je hier niet terug.** Dat vraagt een
+  terugbetaling bij de betaalprovider, en een knop die enkel de markering wist,
+  zou doen alsof het geld terug is. De actie weigert en zegt waarom. "Betaling
+  terugdraaien" wist enkel de markering *aan de balie*.
+- **Een goedkeuring terugdraaien kan niet zolang er betaald is.** Eerst de
+  betaling terugdraaien, dan de goedkeuring; anders zou een aanvraag zonder
+  betaalwijze toch als betaald blijven staan.
+- **Een afronding terugdraaien wist de kilometers** bij een voertuig dat per
+  kilometer rekent. Wie een afronding terugdraait, doet dat meestal net omdat de
+  kilometers fout stonden, en het afrondformulier vraagt ze dan opnieuw.
+- **Terugdraaien staat apart in de interface**, onder een eigen kopje
+  "Rechtzetten", en nooit in de rij knoppen waar je normaal op klikt.
+
+De velden op de aanvraag (`decidedAt`, `pickedUpAt`, ...) bewaren enkel de
+laatste toestand, dus ze zijn geen historiek meer zodra je kan terugdraaien.
+Daarom schrijft elke beheeractie een regel in `UitleenAuditLog`, in dezelfde
+transactie als de wijziging: zo staat er nooit een regel voor iets dat niet
+gebeurd is, en zie je op de detailpagina wie wat wanneer deed.
+
+### Een alternatief is een suggestie, geen automatische vervanging
+
+Items kunnen elkaars alternatief zijn ("geen actieve box meer? de passieve kan
+ook"). Staat een item op nul beschikbaar in de gevraagde periode, dan toont de
+catalogus die alternatieven onder de kaart; klikken zet er één in de aanvraag.
+
+Wat daarbij vastligt:
+
+- **De aanvrager kiest.** De app vervangt nooit zelf een item, ook niet wanneer
+  er precies één alternatief vrij is. Wie een aanvraag indient, moet weten wat er
+  in staat; een stille omwisseling merk je pas aan de balie.
+- **De koppeling is wederzijds.** De actieve en de passieve box zijn elkaars
+  alternatief, dus schrijft `saveItemAction` per paar twee rijen weg en ruimt hij
+  ook de tegenrichting op. Een eenrichtingsrelatie blijkt in de praktijk altijd
+  te weinig: wie A instelt, verwacht dat B het ook weet.
+- **Alternatieven verschijnen enkel wanneer het gevraagde niet kan.** Anders
+  staat er bij elk item een suggestie die niemand nodig heeft, en wordt het ruis.
+
+Los daarvan draagt elke materiaallijn een eigen opmerking (`note`), in te vullen
+door het lid ("liefst de zwarte") én door het team ("zie vorig event"). Eén veld
+voor beide: wie het schreef blijkt uit de tekst, en twee notitievelden per lijn
+worden in de praktijk allebei half ingevuld. De opmerking staat bij de lijn en
+niet bij de algemene info onderaan, want daar vindt het team ze pas nadat het al
+iets anders klaarzette.
+
+### Heen en terug zijn twee ritten in één aanvraag
+
+Wie de kar 's ochtends nodig heeft om op te bouwen en 's avonds om af te breken,
+vult één formulier in met een tweede tijdvenster. Dat wordt in de database
+**twee** `UitleenTransportBooking`-rijen met dezelfde `tripGroupId` en een
+`tripLeg` (HEEN/TERUG).
+
+Waarom niet één boeking met twee tijdvensters: tussen opbouw en afbraak is het
+voertuig gewoon vrij, en iemand anders mag het dan gebruiken. Eén rij met
+`returnStartAt`/`returnEndAt` zou betekenen dat élke query over "wanneer is dit
+voertuig bezet" twee vensters moet kennen: de conflictcheck bij het goedkeuren,
+de kalender, het weekoverzicht en het publieke overzicht. Eén ervan vergeten
+levert een dubbel geboekte kar op, en dat merk je pas op de dag zelf.
+
+Wat daarbij vastligt:
+
+- **Beslissen gebeurt op de hele aanvraag.** Goedkeuren en afwijzen doen beide
+  helften tegelijk; de heenrit goedkeuren en de terugrit laten hangen, levert een
+  aanvrager op die niet meer thuisgeraakt. Annuleren door het lid werkt ook op de
+  groep.
+- **De uren blijven per helft.** In het goedkeurformulier staan beide
+  tijdvensters apart, dus Logistiek kan de terugrit een uur opschuiven zonder de
+  heenrit te raken.
+- **De prijs is de som van beide ritten.** Ze worden apart aangerekend, want het
+  voertuig staat er tussenin niet op.
+
+### Uren verschuiven hoort bij het goedkeuren
+
+Twee aanvragen voor dezelfde kar op dezelfde dag passen vaak samen na een
+halfuur schuiven. Voordien kon het team enkel goedkeuren of afwijzen, en werd
+dat schuiven een mailtje plus een ingreep in de database. Het goedkeurformulier
+draagt nu de uren zelf: wat je daar invult, wordt de rit.
+
+- De conflictcheck loopt in dezelfde Serializable-transactie als het opslaan, dus
+  twee beheerders die tegelijk schuiven kunnen elkaar niet overschrijven.
+- Botst het toch, dan noemt de melding de rit waarmee het botst ("Botst met de
+  rit van Feest op za 12 sep 14:00 tot 18:00"), en staan de andere ritten van dat
+  voertuig die dag al boven het formulier. "Voertuig bezet" zegt niet waarheen je
+  moet schuiven.
+- Verschoven uren komen apart in de historiek (`UitleenAuditLog`), want de nieuwe
+  uren staan daarna als "de" uren op de rit; zonder die regel is niet meer te
+  zien dat er iets veranderd is aan wat het lid vroeg.
+
+### Karchauffeurs: één vlag, geen aparte soort
+
+Een voertuig kan aangeduid staan als "vraagt een chauffeur die de kar mag
+rijden" (`UitleenVehicle.needsVanDriver`), en een chauffeur als "rijdt met de
+kar" (`UitleenDriver.canDriveVan`). Bij een rit met zo'n voertuig staan de
+karchauffeurs bovenaan in de keuzelijst en de rest onder "Niet met de kar".
+
+**"De kar" is bij VTK de bestelwagen (Angela), geen aanhangwagen; die heeft de
+kring niet.** De velden heetten tot augustus 2026 `needsTrailerDriver` en
+`canDriveTrailer`, het icoon bij een chauffeur was een auto met aanhangwagen, en
+het voertuig "kar" had `nameEn: "Trailer"`. Dat was een leesfout van "met de kar
+rijden" die tot in de Engelse UI doorliep. Hernoemd via een `RENAME COLUMN`, dus
+de vlaggen die al gezet waren, staan er nog.
+
+- **Eén vlag en geen enum AUTO/KAR:** elke karchauffeur rijdt ook gewoon met de
+  auto, dus die twee sluiten elkaar niet uit.
+- **De rest blijft kiesbaar,** uitgegrijsd noch geblokkeerd: het team beslist wie
+  rijdt, de app zorgt er enkel voor dat je het niet per ongeluk doet.
+- **Een vlag per voertuig en geen check op `code == "kar"`:** het team voert zelf
+  voertuigen in, en een tweede bestelwagen zou anders stil buiten de regel
+  vallen.
+- **De knop is tekst en geen icoon,** anders dan de rij-acties ernaast: dit is
+  een instelling met twee toestanden, niet een actie. Een icoon toont de
+  uit-stand enkel als "hetzelfde, maar vager", en dat las niemand als een
+  toestand. Nu staat er "Rijdt met de kar" (geel) of "Niet met de kar" (omrand).
+- Leden van de post Logistiek hebben pas een `UitleenDriver`-rij zodra iemand die
+  vlag bij hen zet. Gevolg om te kennen: verlaten ze later de post, dan blijven ze
+  via die rij in de chauffeurslijst staan (onder "zelf toegevoegd", waar je ze kan
+  weghalen).
+
+### Flesserke: ladingen met een eigen vervaldatum
+
+Een flesserke-item (`UitleenFlesserkeItem`) is het product; wat er ligt, staat in
+**ladingen** (`UitleenFlesserkeBatch`), elk met een eigen aantal en vervaldatum.
+Twee bakken cola die je op verschillende momenten kocht, vervallen op
+verschillende dagen; met één datum per item sloeg de rode markering "vervalt
+binnen 3 weken" op de hele stapel, ook op de bakken die nog maanden goed waren.
+
+Wat daarbij vastligt:
+
+- **De ladingen zijn de waarheid.** `item.quantity` en `item.expiryDate` zijn een
+  bijgehouden samenvatting (de som en de eerstvolgende datum); de acties zetten
+  ze bij elke wijziging opnieuw via `syncFlesserkeItemTotals`. Zo blijft de
+  beschikbaarheidsberekening (`quantity` min gereserveerd), de zoekfilter en de
+  sortering op één rij lezen, zonder join.
+- **Verbruik gaat van de oudste lading eerst.** Dat is wat er in de kelder
+  gebeurt: je neemt de bak die het eerst vervalt.
+- **Een lege lading telt niet mee voor de vervaldatum.** Een leeggedronken bak van
+  vorige maand mag het item niet rood houden.
+- **Terugdraaien zet alles op de oudste lading.** Welke lading precies verbruikt
+  werd, houden we niet bij; dat zou een koppeltabel per lijn vragen voor een
+  correctie die zelden gebeurt. Het totaal klopt hoe dan ook, en bij één lading
+  (het gewone geval) is het exact het spiegelbeeld.
+- **De snelle voorraadbijstelling werkt enkel bij één lading.** Liggen er
+  meerdere, dan is niet te weten van welke er twee bij of af moeten, en zou de app
+  die keuze verzinnen; je past ze dan per lading aan in de bewerkrij.
+
+### Flesserke is voor de hele interne werking, niet enkel het praesidium
+
+De toegangsregel was altijd "heeft een groep" (`session.groups.length > 0`), dus
+werkgroepen en jaarwerkingen konden flesserke gewoon aanvragen. De teksten zeiden
+"enkel voor het praesidium", en werkgroepen concludeerden daaruit dat het niets
+voor hen was. Dat is rechtgezet in de app en in `docs/uitleendienst.md`.
+
+Ziet een werkgrooplid de tab toch niet, dan hangt zijn account dit werkingsjaar
+aan geen enkele groep. Dat is ledenbeheer op vtk.be (`/admin/werkgroepen`) en geen
+zaak van de uitleendienst; de gate opzetten zou het verbergen in plaats van het
+oplossen.
+
+### Evenement: een koepel die je zelf opzet, niet een die vanzelf ontstaat
+
+Materiaal, flesserke en vervoer van hetzelfde evenement kunnen onder één
+`UitleenEvent` hangen. Het beantwoordt één vraag die nergens anders te stellen
+was: "is voor dit evenement alles aangevraagd?".
+
+- **Een evenement ontstaat niet vanzelf.** Het plan stelde voor "nieuw evenement"
+  de default te maken in het aanvraagformulier. Dat is bewust niet gebeurd: dan
+  krijgt elke uitlening van twee tafels een evenement, wordt het evenementscherm
+  een tweede aanvraaglijst, en gaat de waarschuwing "nog geen vervoer
+  aangevraagd" af op alles. Er ontstaat er een wanneer iemand er een maakt: het
+  lid in het formulier ("maak hier een nieuw evenement van"), het team op
+  /beheer/evenementen, of het groeperingsscript voor de historiek.
+- **Het lid kan er zelf een maken**, en dat is nodig: de eerste aanvraag van een
+  evenement heeft nog niets om aan te hangen. Wachten tot het team er een aanmaakt
+  zou betekenen dat niemand het ooit gebruikt.
+- **De koepel is geen eigenaar.** De aanvragen houden hun eigen `eventName`,
+  datums en status; verwijder je het evenement, dan blijven ze bestaan
+  (`onDelete: SetNull`). Ze zijn het werk, de koepel is een groepering.
+- **Geen filter op post.** Elk evenement staat in de keuzelijst van elk lid: twee
+  posten die samen een evenement doen, moeten er allebei aan kunnen hangen, en dat
+  is precies waarvoor de koepel dient.
+- **De ladingsinschatting zegt wat ze niet weet.** `volumeLiters` is optioneel per
+  item, dus het scherm toont het gekende volume én hoeveel stuks er geen volume
+  hebben. Een half volume als "het totaal" tonen zou de transportverantwoordelijke
+  een te kleine kar laten kiezen.
+- **De historiek groepeert enkel wat samenhoort.** Het script
+  (`npm run group:events -w @vtk/logistiek`) clustert op genormaliseerde naam +
+  post + week, en laat clusters van één aanvraag met rust. Het draait standaard
+  als dry-run: een verkeerde groepering hangt aanvragen van twee posten onder één
+  naam, en dat is vervelender dan geen groepering.
+- **De losse overzichten blijven.** `/beheer/aanvragen` en `/beheer/vervoer` zijn
+  waar je beslist; het evenementscherm komt erbij en vervangt niets.
+
+### Sjablonen maakt Logistiek, niet de posten
+
+Een vaste set materiaal (een cantus, een BBQ) staat als sjabloon in het
+aanvraagformulier en vult daar de aantallen in.
+
+- **Enkel Logistiek maakt ze aan.** Lieten we elke post zijn eigen sjablonen
+  maken, dan staan er na één werkingsjaar dertig varianten van "cantus" in de
+  keuzelijst en weet niemand nog welke de juiste is.
+- **Twee wegen om er een te maken, met opzet.** Vanaf een bestaande aanvraag
+  ("Bewaar als sjabloon") is de gewone: een cantus bestaat al voor iemand er een
+  sjabloon van wil, en de lijst opnieuw intikken is precies het werk dat een
+  sjabloon moet uitsparen. Met de hand (/beheer/sjablonen) is voor het opzetten
+  van nul: dan bestaat die aanvraag nog niet, en drie nepaanvragen indienen en
+  weer opruimen om aan drie sjablonen te geraken is geen manier van werken.
+- **De handmatige kiezer is dezelfde catalogusbrowser als het
+  aanvraagformulier**, min de datums, het evenement en de contactvelden. Wie een
+  sjabloon opstelt zoekt op precies dezelfde manier als wie een aanvraag indient;
+  een tweede, kalere itemkiezer leren kennen is werk zonder opbrengst.
+- **Een handgemaakt sjabloon krijgt geen post.** Dat label kwam van de aanvraag
+  waaruit het gemaakt werd; verzinnen welke post erbij hoort maakt het een gok.
+- **Een sjabloon telt op bij wat er al staat**, en vervangt niet. Wie eerst iets
+  koos en dan een sjabloon neemt, is zijn keuze anders kwijt zonder waarschuwing.
+- **De post op een sjabloon is een label, geen filter.** Een sjabloon van Cultuur
+  kan even goed voor een andere post passen; verbergen zou het onvindbaar maken
+  voor wie het net nodig heeft.
+- **Een item dat uit de catalogus verdwijnt, valt uit het sjabloon** maar de lijn
+  blijft staan: komt het item terug, dan is het sjabloon weer compleet. Het
+  beheerscherm zegt hoeveel lijnen overgeslagen worden.
+
+### Meerdere voertuigen: één aanvraag, N boekingen
+
+Een verhuis met de kar én de auto is één vraag. Ze komt binnen als één aanvraag
+en wordt N boekingen met hetzelfde `tripGroupId`, dezelfde groepering als heen en
+terug (V12). Bij twee voertuigen én een terugrit zijn dat er vier.
+
+- **Waarom niet één boeking met een lijst voertuigen:** elke query over "wanneer
+  is dit voertuig bezet" (de conflictcheck, de kalender, het weekoverzicht, het
+  publieke bezettingsraster) leest één rij per voertuig per tijdvenster. Een lijst
+  zou al die queries moeten aanpassen.
+- **Ze worden altijd samen beslist.** Eén voertuig goedkeuren en het andere laten
+  hangen, levert een verhuis op die half kan doorgaan. Goedkeuren, afwijzen en
+  annuleren werken al op de hele groep.
+- **Tarief per voertuig gesnapshot.** De kar is gratis en de auto per kilometer;
+  de prijsindicatie telt de vaste tarieven op en zegt van de per-km-voertuigen dat
+  ze pas na de rit gekend zijn.
+
+### Concept: lokaal in de browser, niet in de database
+
+Een half ingevulde aanvraag overleeft nu een gesloten tabblad. Ze staat in
+`localStorage` van de browser, niet als `DRAFT` op `UitleenReservation`.
+
+- **Een concept in de database raakt alles.** Elke query die vandaag "alle
+  reservaties" zegt zou `DRAFT` moeten uitsluiten: de voorraad, de kalender, de
+  beheerlijsten, mijn reservaties, de conflictberekening. Eén vergeten query en
+  een half ingevuld formulier reserveert materiaal.
+- **Dit dekt het geval waar het om gaat**: de tab viel dicht, de laptop ging toe,
+  de aanvrager ging eerst nog eens kijken wat er in de loods lag. Wie op een ander
+  toestel wil verder werken, is de uitzondering; komt die vraag terug, dan pas is
+  een echte `DRAFT`-status de moeite.
+- **Terugzetten gebeurt op een klik, nooit vanzelf.** Een formulier dat zichzelf
+  invult met iets van vorige week is verwarrender dan een leeg formulier. Er staat
+  een balk met "verder werken" of "weggooien", en het tijdstip erbij.
+- **Per lid gesleuteld** (`draftKey`), want de pc in het logikot is gedeeld. Een
+  leeg formulier wordt niet bewaard, en na twee weken vervalt het concept: dan is
+  het geen aanvraag in opbouw meer maar iets dat blijven hangen is.
+
+### Dagdeel is een afspraak, geen boekingseenheid
+
+Een aanvraag kan nu "dinsdagnamiddag" zeggen (`pickupPart`/`returnPart`,
+optioneel). Dat stond tot nu toe in een mail naast het systeem.
+
+- **De voorraadberekening blijft op hele dagen.** Halve dagen zouden élke
+  overlapquery moeten herschrijven (de beschikbaarheid, de conflictcheck, de
+  kalender), en niemand wint daarbij: twee posten die dezelfde dag dezelfde tafel
+  willen, lossen dat op met een woord, niet met een halve boeking.
+- **Geen uurveld.** Het uur spreekt het team af; een uurveld zou doen alsof de app
+  openingsuren kent die ze niet kent.
+- **Het dagdeel staat waar de datum staat**: in de kalender als tag (op een dag
+  met acht afhalingen sorteer je daarop met je ogen), op het printblad, in de
+  aanvraaglijst en in de wijzigingsmail. Enkel het dagdeel wijzigen telt als een
+  wijziging: daar plant iemand zijn shift op.
+
+### Conflicten: aanvragen mag, goedkeuren niet
+
+Wie materiaal wil dat al volledig geboekt is, kon zijn vraag niet kwijt: de
+knoppen stonden op nul en daarmee hield het op. Logistiek wist dan niet dat er
+een tweede gegadigde was, en die tweede wist niet dat schuiven een optie was.
+
+- **Indienen mag, met een expliciete bevestiging.** Het lid ziet per item wat er
+  niet past en vinkt aan dat hij het tóch indient. Zonder die stap belandt het
+  conflict bij Logistiek zonder dat de aanvrager het doorhad; met die stap is het
+  een bewuste vraag om te bemiddelen.
+- **Goedkeuren blijft hard geblokkeerd.** De voorraadcheck bij goedkeuring is
+  ongewijzigd. Zo kan de voorraad nooit in de min gaan; het conflict leeft enkel
+  in de wachtrij.
+- **Het conflict wordt altijd opnieuw berekend, nooit opgeslagen.** Annuleert de
+  eerste partij, dan is het conflict weg zonder dat iemand iets moet aanraken.
+  Een opgeslagen vlag zou blijven staan tot ze toevallig herberekend werd.
+- **Schuiven in plaats van afwijzen.** Vanaf de detailpagina kan het team de
+  datums van beide aanvragen aanpassen, met een "past dit?"-knop die doorrekent
+  zonder op te slaan. Twee aanvragen passen vaak samen na een dag schuiven, en
+  dan is de tweede afwijzen te grof.
+- **Schuiven mailt de aanvrager** (via A9). Er is dus geen aparte "voorstel
+  mailen"-knop: een voorstel dat de app niet kan opvolgen, zou een onderhandeling
+  starten die nergens bijgehouden wordt. Het team schuift, beide aanvragers
+  krijgen bericht over hun eigen aanvraag, en wie niet akkoord is, antwoordt op
+  de mail.
+- **Een goedgekeurde aanvraag mag niet in een conflict geschoven worden.** Dan
+  verplaats je het probleem naar een derde aanvraag. Een aanvraag die nog beslist
+  moet worden, mag wel in een conflict blijven staan.
+
+### Staat per exemplaar: kapot telt niet meer mee
+
+`UitleenItem.condition` geldt voor de hele rij: van vier frigo's kon er geen
+enkele als kapot gemarkeerd worden zonder ze alle vier te markeren. Wie dat
+onderscheid nodig heeft, splitst het item in exemplaren (`UitleenItemUnit`).
+
+- **Optioneel, per item.** Zonder exemplaren blijft `quantity` het getal dat het
+  team invulde en verandert er niets. De inventaris hoeft dus niet in één keer
+  opgesplitst te worden; 405 items in exemplaren splitsen is werk dat niemand
+  doet, en dan blijft de hele functie ongebruikt.
+- **`quantity` wordt de bijgehouden telling** van de bruikbare exemplaren, net
+  zoals bij de flesserke-ladingen. Zo blijft elke beschikbaarheidsberekening één
+  kolom lezen in plaats van te moeten weten of dit item exemplaren heeft. De
+  keerzijde: `quantity` betekent dan "bruikbaar", niet "hoeveel er staan"; de
+  editor zegt daarom "3 bruikbaar van 4".
+- **Dit is een gedragswijziging.** Tot nu toe was `condition` puur informatief:
+  een kapotte rij bleef gewoon uitleenbaar. Bij een item met exemplaren telt
+  KAPOT niet meer mee voor de beschikbaarheid.
+- **Alleen KAPOT is hard.** TESTEN en ONVOLLEDIG tellen wel mee: een onvolledige
+  set is nog altijd uitleenbaar, en wie ze niet wil uitlenen zet het vinkje
+  "telt mee" van dat exemplaar uit. Dat vinkje (`active`) is voor een exemplaar
+  dat bestaat maar er niet is: kwijt, in herstelling, of voor lang uitgeleend.
+  Het heette "in roulatie", tot bleek dat niemand wist wat dat betekende.
+- **Reserveren blijft op itemniveau.** Een lid vraagt "twee boxen", geen "box 3".
+  Welk exemplaar iemand meekrijgt, blijkt bij het klaarzetten (A7); dat in het
+  aanvraagformulier leggen zou elke aanvraag een inventarisoefening maken.
+- **Staan ze allemaal weer op dezelfde staat, dan verdwijnen de exemplaren.** De
+  opsplitsing bestaat om een verschil bij te houden; is dat verschil weg (de
+  kapotte box is hersteld), dan zou de inventaris anders volblijven staan met
+  opsplitsingen van vroeger, elk met hun eigen namenlijst. Het opslaan voegt ze
+  weer samen tot één rij en zegt dat in de toast; de editor waarschuwt vooraf,
+  want de namen van de exemplaren gaan daarbij verloren.
+- **Behalve wanneer alles kapot staat.** Bij een item met exemplaren telt KAPOT
+  niet mee voor de voorraad, bij een item zonder exemplaren wel. Vier kapotte
+  frigo's samenvoegen zou de voorraad dus stil van 0 naar 4 tillen.
+- **Eén opslaan-knop voor het hele item, exemplaren inbegrepen.** Elk exemplaar
+  had een eigen "Bewaren", wat twee dingen brak: wie meerdere rijen aanpaste en
+  één keer opsloeg, verloor de rest, en React 19 reset na een form action elk
+  uncontrolled veld van dat formulier, dus de niet-bewaarde rijen sprongen terug
+  naar de waarde waarmee de pagina geladen was. De exemplaren zijn nu een veld
+  van het itemformulier (JSON in een hidden input) in plaats van formuliertjes
+  in een formulier.
+
+### Mijn reservaties: drie soorten, en materiaal is van de post
+
+"Mijn reservaties" had twee kopjes: Materiaal en Vervoer. Een flesserke-aanvraag
+bevat geen enkel materiaalitem maar stond wel onder Materiaal, met een lege
+itemopsomming.
+
+- **Drie secties: materiaal, flesserke, vervoer.** Een aanvraag met allebei hoort
+  bij materiaal (daar zit het werk) en zegt in haar samenvatting dat er ook drank
+  bij zit; ze twee keer tonen zou lijken op twee aanvragen.
+- **Alle drie tonen de aanvragen van je hele post**, met eronder in het klein wie
+  ze deed. Een post bestelt als post: wie op maandag materiaal aanvroeg en op
+  woensdag ziek is, laat de rest anders in het ongewisse, en dan wordt hetzelfde
+  twee keer aangevraagd. Dat geldt even hard voor een bak cola en voor de kar.
+- **Zien is niet wijzigen.** Een aanvraag van een collega opent leesalleen: geen
+  aanpassen, geen annuleren, geen betaalknop. Anders haalt iemand materiaal weg
+  onder de aanvrager zonder dat die het merkt.
+- **Enkel posten delen, geen werkgroepen.** Een werkgroepaanvraag bewaart geen
+  `groupId` (zie `deriveMemberRequester`), enkel een vrije naam; er is dus niets
+  om op te groeperen zonder daar eerst een echte koppeling van te maken.
+- **Een rit hangt sinds dit ook aan zijn post.** `createVanBookingAction` zette
+  `requesterType`/`groupId` niet, in tegenstelling tot de materiaal- en
+  flesserke-aanvragen: elke rit van een lid stond in het beheer als "Interne
+  post" zonder naam. Het vervoerformulier vraagt nu "Namens" wanneer het lid meer
+  dan één post heeft, net als de andere twee. Ritten van voor deze wijziging
+  hebben geen post en worden dus niet gedeeld.
+
+### Een gekozen evenement vult de naam in
+
+Het aanvraagformulier vroeg de naam van het evenement in een tekstveld, en
+verderop kon je de aanvraag aan een bestaand evenement hangen. Wie dat deed,
+had de naam twee keer ingevuld, en de twee liepen uit elkaar zodra er één
+aangepast werd.
+
+- **Koppel je aan een evenement, dan is de naam een gegeven.** Het veld toont ze
+  met een onderbroken rand en je typt niets meer. Loskoppelen maakt er weer een
+  gewoon veld van, met die naam als vertrekpunt.
+- **Enkel de naam.** Locatie, startuur, opkomst, contact en de extra info blijven
+  gewone velden: die verschillen per aanvraag, ook binnen hetzelfde evenement.
+- Geldt in de drie formulieren (materiaal, flesserke, vervoer), want de
+  dubbelinvoer zat in alle drie.
+
+### "Levering nodig" wordt een echte rit
+
+Het vinkje op de materiaalaanvraag zette enkel `delivery` en `deliveryNote` op de
+aanvraag. Het maakte geen boeking aan, stond niet in de aanvragenlijst en niet in
+de mail, en `/beheer/vervoer` toont enkel `UitleenTransportBooking`: een gevraagde
+levering kwam daar dus nooit terecht. Wie die ene regel op de detailpagina niet
+opmerkte, wist van niets.
+
+- **Logistiek schuift ze door, het lid niet.** Een lid dat materiaal aanvraagt
+  weet niet welk voertuig vrij is, en het laadadres is de loods. Het vinkje blijft
+  dus een vraag; de knop "Rit aanmaken" op de aanvraag maakt er de rit van, met
+  het evenement, de dagen, de bestemming en het telefoonnummer al ingevuld.
+- **De rit komt op naam van de aanvrager**, niet van wie ze aanmaakt. Zo staat ze
+  bij "Mijn aanvragen" van het lid en gaan de mails erover naar hem, net als bij
+  een rit die hij zelf aanvroeg.
+- **Ze wordt AANGEVRAAGD en niet meteen goedgekeurd.** De goedkeuring doet de
+  botsingscontrole per voertuig, kiest de betaalwijze en wijst de chauffeur toe;
+  die overslaan zou een tweede, zwakkere beslisweg maken. Eén klik extra, in ruil
+  voor dezelfde controle als elke andere rit.
+- **Heen én terug staat voorgevuld aan.** Wat geleverd wordt, moet ook weer
+  opgehaald worden; de terugrit vertrekt van de terugbrengdag van de aanvraag.
+- **`reservationId` is SET NULL, geen cascade.** Verdwijnt de aanvraag, dan blijft
+  de rit bestaan: het voertuig is die dag nog altijd bezet, en een boeking laten
+  verdampen omdat iemand een aanvraag opruimt slaat een gat in de planning.
+- **De badge in de aanvragenlijst is geel tot de rit bestaat**, daarna "Levering
+  gepland". Zonder die badge blijft de knop onvindbaar voor wie de lijst scant.
+
+### De beheerbalk is een tabbalk, geen rij losse tegels
+
+Twaalf beheerpagina's naast elkaar lezen als een opsomming waarin je
+"Chauffeurs" alleen vindt als je al weet dat het bestaat. Ze groeperen hielp,
+maar de kopjes stonden als losse woordjes ("UITLEEN", "VERVOER", "OVERIG")
+tussen de knoppen en zagen eruit als kapotte knoppen.
+
+- **Vier tabs, met de pagina's op een tweede rij eronder.** De tab waar je in
+  zit staat open, dus elke pagina blijft op één klik.
+- **Een tab openen navigeert niet.** Het wisselt enkel de onderste rij, zodat je
+  kan rondkijken zonder de pagina te verlaten waar je aan bezig bent. Navigeer je
+  wel, dan volgt de balk mee naar de afdeling waar je terechtkomt.
+- Zet de groepslabels niet terug tussen de knoppen.
+
+### Itemfoto's: de eerste is de thumbnail
+
+Een item heeft een thumbnail (`photoKey`, de foto in de catalogus en in het
+aanvraagformulier) en een galerij (`UitleenItemPhoto`, de rest van de
+detailpagina). In het beheerscherm stonden daar twee aparte uploadknoppen voor,
+en wie zijn eerste foto in het verkeerde vak zette, kreeg geen beeld in de
+catalogus zonder te zien waarom.
+
+- **Eén lijst in de editor.** De eerste foto is de thumbnail; de rest is de
+  galerij. Wie een andere thumbnail wil, schuift die met "Thumbnail maken" naar
+  voren. Het onderscheid bestaat dus nog in de database, maar het is geen keuze
+  meer die je vooraf moet maken.
+- **Geen apart "verwijderen" voor de thumbnail.** Ze weghalen promoveert gewoon
+  de volgende foto, en een item zonder foto's heeft geen thumbnail.
+
+### Klaarzetten: het scherm is de waarheid, het papier de werkkopie
+
+Klaarzetten gebeurt per lijn (`preparedAt`/`preparedById` op
+`UitleenReservationLine`), tussen de goedkeuring en de afhaling. Waarom niet één
+knop "aanvraag klaargezet": een shift raakt zelden in één keer door een aanvraag,
+en de volgende shift moet zien hoever de vorige geraakte.
+
+- **Enkel materiaal, niet flesserke.** Een bak cola nemen is geen zoekwerk in de
+  loods, en flesserke wordt bij het terugbrengen afgerekend in plaats van
+  klaargezet. De teller ("7 van 12") telt dus de materiaallijnen.
+- **Het vinkje schrijft geen historiekregel.** Twaalf regels "lijn afgevinkt"
+  zouden de historiek van de aanvraag onleesbaar maken; wie wat klaarzette staat
+  al op de lijn zelf.
+- **Een team-edit behoudt het vinkje van een ongewijzigde lijn** (zelfde item,
+  zelfde aantal). De lijnen worden bij een edit vervangen, dus zonder dit zou het
+  team dat enkel de datum verschoof de halve loods opnieuw moeten afvinken.
+  Wijzigt het aantal wel, dan klopt het vinkje niet meer en valt het weg.
+- **Het printblad is een werkkopie.** Papier laat geen spoor na van wie wat
+  klaarzette, dus het scherm blijft de waarheid; het blad is er voor aan het rek.
+  Puur CSS `@media print`, geen PDF-generator: het is een afdruk van wat op het
+  scherm staat en geen document dat bewaard moet worden.
+
+### Mail: vier momenten, en een meelezend adres
+
+De uitleendienst startte bewust zonder mails ("geen mails in v1"). Dat hield geen
+stand zodra het team beslissingen kon terugdraaien, uren verschuiven en de inhoud
+van een aanvraag aanpassen: de aanvrager merkte zo'n wijziging pas wanneer hij
+toevallig opnieuw inlogde, meestal bij het afhalen.
+
+Wat vastligt:
+
+- **Vier momenten mailen: goedgekeurd, afgewezen, gewijzigd, teruggedraaid.** Niet
+  "afgehaald", niet "betaald", niet elke statusstap in het beheer. Wie voor elke
+  klik een mail krijgt, leest er geen enkele meer, en dan mist hij ook die ene
+  die telde.
+- **De mail zegt wát er veranderde.** "Tafel: 5 → 3", "Afhalen: za 12 → zo 13
+  september", "Uren verschoven bij goedkeuring". Diezelfde regels staan in de
+  historiek (A6): één beschrijving, twee bestemmingen. "Je aanvraag is gewijzigd"
+  zonder meer stuurt de aanvrager terug naar het scherm om te gaan zoeken wat.
+- **Een tweede adres leest mee** (`notifyEmail`, optioneel op een aanvraag en op
+  een rit). Een aanvraag hoort bij een post of werkgroep, maar de mails komen bij
+  één persoon toe; wie volgend jaar die post overneemt, vindt niets terug. Het
+  adres van de werkgroep in kopie overleeft de wissel van aanvrager.
+- **Een mislukte verzending draait de actie niet terug.** Een mailserver die er
+  even niet is, mag geen goedkeuring ongedaan maken: er wordt gelogd en
+  doorgegaan. Daarom vertrekt de mail ook ná de transactie en niet erin, anders
+  gaat er een bericht de deur uit over een wijziging die door een rollback nooit
+  gebeurd is.
+- **Naar het voorkeursadres van het lid**, dezelfde regel als de hoofdsite: wie
+  een persoonlijk adres instelde, leest zijn universiteitsmail niet.
+
+### Feedbackronde augustus 2026: negen keuzes
+
+Na een half werkingsjaar gaf het team Logistiek feedback op de app. Negen punten
+daaruit waren geen bug maar een werkingskeuze; hieronder wat beslist is en
+waarom. Het werkplan dat eruit volgt staat in `docs/logistiek-feedback-plan.md`.
+
+- **Klaarzetten gebeurt online én op papier.** Per aanvraag vinkt het team elk
+  item af (met een opmerking per lijn, bv. "zie vorig event"), en dezelfde
+  aanvraag is afdrukbaar als A4 om aan het rek te hangen. Het papier alleen laat
+  geen spoor na van wie wat klaarzette; het scherm alleen werkt niet aan een rek
+  in de loods. Daarom beide, met het scherm als bron van waarheid.
+- **Eén evenement wordt de koepel, maar blijft optioneel.** Materiaal,
+  flesserke en transport van hetzelfde evenement komen onder één
+  `UitleenEvent` te hangen, zodat je ziet dat er bijvoorbeeld nog geen transport
+  aangevraagd is en de transportverantwoordelijke de lading kan inschatten. Het
+  blijft optioneel: een losse aanvraag zonder evenement moet mogelijk blijven,
+  anders wordt "snel twee tafels lenen" een formulier van drie schermen.
+- **De catalogus blijft achter de login; schap en rek enkel voor Logistiek.**
+  Wat we hebben mag elk lid zien, waar het ligt niet. Zo blijft de catalogus
+  bruikbaar zonder dat een uitgelekte pagina een plattegrond van de loods is.
+  Dit is de eerste keer dat een veld in deze module op permissie verborgen
+  wordt; `logistiek.manage` is de grens.
+- **Gas is een gewoon catalogusitem.** Geen aparte flow en geen verplichte
+  waarschuwingstekst: het is materiaal zoals de rest, en een uitzonderingsflow
+  voor één productgroep is onderhoud dat niemand later nog begrijpt. Moet er
+  toch iets bij staan, dan hoort dat in de omschrijving van het item.
+- **Last minute begint op 7 dagen, en het team stelt het zelf in.** De grens
+  stond hardcoded op 14 dagen en dat bleek te ruim: bijna elke aanvraag kreeg de
+  badge, en een badge die altijd oplicht leest niemand nog. Zeven dagen houdt ze
+  betekenisvol. De waarde zit in de `logistiek.settings`-`Setting`, dus
+  bijstellen vraagt geen deploy.
+- **Een conflicterende aanvraag mag ingediend worden.** Wie materiaal vraagt dat
+  in die periode al volledig geboekt is, kan dat voortaan tóch indienen, met
+  zichtbaar wat er niet past. Anders heeft de tweede aanvrager geen enkel kanaal
+  en verdwijnt het gesprek naar mail. **Goedkeuren blijft wel hard geblokkeerd
+  zolang de voorraad niet klopt**: het conflict is een signaal, geen
+  overboeking. Logistiek kan van daaruit beide aanvragers mailen en met de
+  periodes schuiven, zodat de twee aanvragen samen wél passen; dat schuiven is
+  de bedoeling van de functie, niet het afwijzen van de tweede.
+- **Het publieke transportoverzicht toont bezet, niet wie.** Het weekraster mag
+  zonder login te bekijken zijn, maar dan enkel voertuig, dag en tijdvenster:
+  geen namen, doelen of adressen, en `noindex`. Zo kan iemand zien of de kar
+  vrij is zonder dat de werking van de kring op straat ligt. Bouw dat op een
+  eigen, geanonimiseerde projectie en niet op de beheerquery met een filter
+  erover: dat laatste lekt vroeg of laat een veld mee.
+- **Geen barcodes.** Het afvinken bij het klaarzetten levert dezelfde vraag
+  ("wanneer is dit stuk laatst gezien") zonder labels, scanners of een extra
+  model per exemplaar. De vraag komt terug als dat te weinig blijkt.
+- **Dagdelen zijn een afspraak, geen boekingseenheid.** Afhalen en terugbrengen
+  krijgen naast de dag een dagdeel (voormiddag / namiddag / avond), zodat
+  "dinsdagnamiddag" in het systeem staat in plaats van in een mail. De
+  **voorraadberekening blijft op hele dagen**. Halve dagen in de beschikbaarheid
+  zouden élke overlapquery raken (aanvragen, goedkeuren, kalender, bewerken) en
+  dubbele boekingen op dezelfde dag mogelijk maken; de winst daarvan weegt niet
+  op tegen dat risico.
+
+Twee dingen hierboven halen een eerdere keuze onderuit. **"Geen mails in v1"**
+(zie § Kleinere keuzes) vervalt: wanneer Logistiek een aanvraag wijzigt, moet de
+aanvrager dat weten zonder in te loggen, en een aanvraag kan een extra
+mailadres meekrijgen (bv. logistiek.existenz@vtk.be) zodat een werkgroepmailbox
+meeleest. En **`condition` is niet langer puur informatief** zodra de staat per
+exemplaar bijgehouden wordt: een kapot exemplaar telt dan niet meer mee voor de
+beschikbaarheid.
+
+---
+
+## Shiftpagina: week is de standaard, lijst is de tweede weergave
+
+`/shift` toont **één week tegelijk** (maandag tot zondag), in twee weergaven die
+naar diezelfde week en dezelfde postfilter kijken:
+
+- **Weekrooster (standaard).** Een shift is in de eerste plaats een blok in je
+  agenda: je wil zien of ze botst met je les of met een andere shift, en dat leest
+  een raster meteen. Overlappende shiften komen naast elkaar in kolommen.
+- **Lijst.** Dezelfde week per dag onder elkaar, met de details uitklapbaar. Beter
+  wanneer de namen lang zijn of het scherm smal is, want daar wordt een raster
+  onleesbaar. De lijst blijft dus bestaan; ze is geen restant van de oude tabel.
+
+Verder vastgelegd:
+
+- **Je eigen shiften staan in een rail náást het overzicht**, niet als een tweede
+  tabel erboven. Ze blijven zo in beeld terwijl je door de week scrolt, en een
+  lege "Mijn shiften" kost geen halve pagina meer. Op smal scherm gaat de rail
+  bóven het overzicht staan: wat jij vandaag moet doen, hoort niet onder andermans
+  shiften te liggen.
+- **Je eigen shiften staan óók in het overzicht zelf** (geel randje,
+  "Ingeschreven"). De rail is je persoonlijke lijstje, het overzicht is de
+  volledige week; een week met een gat waar jouw shift hoort te staan, klopt niet.
+- **De rail toont de stand van het academiejaar** (voltooide shiften + bonnetjes,
+  zelfde telling als de admin-ranglijst: enkel shiften die al voorbij zijn). Dat
+  geeft de shiftranking eindelijk een plek op de publieke pagina en maakt van
+  `/shift/history` een logische doorklik i.p.v. een badge in de paginakop.
+- **Een lege week is een boodschap met een volgende stap**, niet een lege tabel:
+  ze noemt de eerstvolgende geplande shift en heeft een knop die naar die week
+  springt. In het rooster blijft het raster staan onder de boodschap, zodat een
+  rustige week er niet uitziet als een stuk pagina.
+- **De postfilter zijn chips met tellers**, en enkel voor posten die deze week
+  effectief voorkomen. De oude `<select>` + datumveld + sorteerknop zijn weg: de
+  weeknavigatie vertelt al waar je zit, en chronologisch is de enige zinnige
+  volgorde voor een week.
+- **Plaatsen lezen als "Nog 1 plaats" of "Vol"**, niet als `5/6`. De exacte
+  verhouding blijft in de tooltip en in het detailvenster staan.
+
+### Klikken op een shift opent een detailvenster
+
+Een klik op een blok in het rooster, op een rij in de lijst of op een kaart in de
+rail opent hetzelfde venster met alles over die shift, mét de knop Schrijf in /
+Uitschrijven erin. Inschrijven kost dus twee klikken. Dat is bewust: sinds een
+shift een langere uitleg kan dragen (zie hieronder) valt er iets te lezen vóór je
+intekent, en een blok dat je met één misklik inschrijft is daar te gevoelig voor.
+Het venster sluit enkel wanneer de actie lukte; faalt ze (vol, overlap), dan blijft
+het staan met de foutmelding als toast. In de lijst blijft de knop in de rij zelf
+bestaan als snelle weg voor wie de shift al kent.
+
+### `openToInternationals`: over de taal, niet over wie welkom is
+
+De markering **"Ook voor internationals"** (EN: "No Dutch required") betekent: je
+kan deze shift doen zónder Nederlands. Ze zegt niets over wie mag inschrijven,
+want dat mag iedereen. Zo blijft ze bruikbaar voor de vraag die een international
+zich effectief stelt, en leest een Nederlandstalige ze niet als "niet voor mij".
+
+De markering krijgt een eigen, blauwe pil. Geel, groen en rood zijn op deze pagina
+gereserveerd voor de vrije plaatsen; een taalmarkering in diezelfde kleuren zou
+als een capaciteitsstatus lezen. In een roosterblok is er enkel plaats voor het
+wereldbol-icoon; de volledige tekst zit in de tooltip, het aria-label en het
+detailvenster.
+
+### `instructions`: de lange uitleg, apart van `description`
+
+Een shift heeft twee teksten met een verschillende rol:
+
+- `description` blijft de **korte regel** ("Tapshift donderdagavond"), bovenaan het
+  detailvenster.
+- `instructions` is de **lange uitleg in Markdown**: wat je moet doen, waar je je
+  meldt, wat je mag verwachten. Niet ingevuld betekent dat het blok gewoon niet
+  verschijnt; er komt dus nooit een leeg kopje op de pagina.
+
+Cudi-shiften krijgen deze twee velden niet mee uit de spiegeling: cudi kent ze
+niet, en de mirror-update raakt enkel de velden die ze zelf stuurt. Een
+verantwoordelijke die de uitleg op de main site invult, ziet die dus niet
+overschreven worden bij de volgende sync.
 
 ---
 
@@ -738,9 +1859,13 @@ Een cursusdienst-shift is **1 bonnetje per begonnen uur** waard, dus
 
 Deze regel wordt **berekend bij het spiegelen** (de producer zet `Shift.reward`);
 centraliseer hem in één helper zodat hij op één plek aanpasbaar is. De reward
-wordt **verbruikt** in `apps/web/app/api/shift/reward/route.ts` (sommeert
-`shift.reward` over voltooide, niet-uitbetaalde deelnames). Wil je de waardering
-wijzigen, pas dan die helper aan; de rest van het reward-systeem blijft gelijk.
+wordt **verbruikt** in `apps/web/app/api/shift/reward/route.ts`. Per deelname
+houdt `ShiftParticipant.rewardPaid` exact bij hoeveel bonnetjes al toegekend of
+digitaal gebruikt zijn; daardoor kan een beheerder bijvoorbeeld 10 van 12
+openstaande bonnetjes uitbetalen. De afhaalbalie kan twee openstaande bonnetjes
+atomair afboeken voor een broodje en schrijft daarvoor een auditrij in
+`TheokotVoucherRedemption`. Wil je de waardering wijzigen, pas dan de
+spiegel-helper aan; de saldo- en auditlogica blijft gelijk.
 
 ### Post: "Cursusdienst"
 
@@ -851,3 +1976,649 @@ sluit iedereen buiten, inclusief degene die de knop omzette. Daarom drie
 vangnetten: de permissie wordt automatisch aangemaakt, het scherm waarschuwt
 vooraf wanneer nog niemand ze heeft, en zo'n applicatie komt in "Aandacht
 vereist" op /admin/sso.
+
+## Dashboardtegels (snelkoppelingen op /admin)
+
+Het dashboard opent met een raster snelkoppelingen naar de externe tools die een
+post dagelijks nodig heeft: de drive, de wiki, een repository, de printbestellingen.
+Er zijn drie soorten, en dat onderscheid is de kern van de feature.
+
+- **Voor iedereen (GLOBAL).** Beheerders met `dashboard.manage` zetten deze op
+  /admin/dashboard-tiles; elk ingelogd lid ziet ze.
+- **Per post of werkgroep (GROUP).** Enkel leden van die groep zien ze. Wie in
+  drie posten zit, krijgt dus drie extra reeksen.
+- **Van jou (USER).** Elk lid mag eigen tegels maken. Die zijn persoonlijk en
+  komen op niemand anders zijn dashboard.
+
+Vastgelegde keuzes:
+
+- **De tegels staan gegroepeerd onder een kop per herkomst**, niet in één plat
+  raster. In één raster kon je niet zien welke snelkoppeling van welke post kwam,
+  en dat is precies wat je wil weten voor je ze aan een collega doorgeeft ("die
+  staat er alleen voor IT"). De kop noemt de post bij naam; een post zonder
+  tegels krijgt geen lege sectie.
+- **Slepen herschikt binnen één sectie.** Een volgorde tussen jouw tegel en die
+  van IT bestaat niet: de secties worden toch opnieuw gegroepeerd, dus een tegel
+  naar een andere sectie slepen zou terugspringen.
+- **Een lid mag een gedeelde tegel voor zichzelf aanpassen of verbergen**, maar
+  ze nooit voor anderen wijzigen. De aanpassing leeft in `UserDashboardTilePref`
+  en is met één klik terug te zetten. Verbergen is geen verwijderen: zet een
+  beheerder er later een andere URL op, dan krijg je die wel.
+- **Een tegel toont een pictogram uit een gecureerde set, of een eigen logo.**
+  Het logo is er voor tools met een sterk merk (een GitHub- of Notion-logo herken
+  je sneller dan een generiek icoon). Het pictogram blijft bewaard zolang er een
+  logo staat: haal je het logo weg, dan valt de tegel terug op het pictogram in
+  plaats van leeg te worden.
+- **Elk lid mag een tegellogo uploaden**, ook zonder uploadpermissie. Wie een
+  persoonlijke tegel mag maken, moet ze ook kunnen afwerken. De upload is daarom
+  apart gehouden (`kind=tile`): maximaal 2 MB, herschaald naar 128px, en onder een
+  eigen `tiles/`-prefix zodat de tegel-actions een key van elders weigeren.
+
+## Apple/Google Wallet-tickets
+
+Naast de A4-PDF (`apps/web/lib/ticketing/pdf.ts`) kan een ticket ook als Apple- of
+Google Wallet-pass gedownload worden, in hetzelfde ontwerp (kleuren, logo) als de
+PDF. Code in `apps/web/lib/ticketing/wallet/`.
+
+- **Twee providers naast elkaar: "direct" en walletwallet.dev.** Een geldige Apple
+  Wallet-pass moet ondertekend zijn met een certificaat dat uiteindelijk naar Apple
+  herleidt; daar is geen weg omheen. "Direct" betekent: VTK's eigen Apple Developer
+  Program-account (99$/jaar) en Pass Type ID-certificaat, zelf ondertekend met
+  `passkit-generator`. Zolang dat er niet is (of bewust niet de moeite waard wordt
+  geacht), kan `WALLET_WALLETWALLET_API_KEY` gezet worden: een third-party API die
+  zelf al zo'n certificaat heeft en passes namens hen uitgeeft. Dat kost geen eigen
+  Apple-account, maar wel een terugkerend SaaS-abonnement (gratis tot 1000
+  passes/maand, nadien betalend) en de pass wordt technisch uitgegeven via hún
+  identiteit, niet die van VTK. Staat een direct-config voor een platform (Apple of
+  Google) klaar, dan wint die per platform altijd van walletwallet.dev
+  (`apps/web/lib/ticketing/wallet/index.ts`): vol eigenaarschap gaat voor wanneer het
+  er is.
+- **Elke knop verschijnt pas als de bijhorende config compleet is** (zie
+  `.env.example`). Geen halfwerkende "Voeg toe aan Wallet"-knop die daarna een
+  foutmelding geeft: ontbreekt de configuratie, dan bestaat de knop gewoon niet, net
+  als de ticketmail die in dev stil wegvalt zonder `SMTP_HOST`.
+- **Wat er van het ticketontwerp meegaat: kleuren, logo, footer en de hero-foto.**
+  Het *sjabloon* (Classic / Poster / Gesplitst) gaat bewust niet mee: een walletpas
+  heeft een vaste, door iOS/Android opgelegde indeling, dus "foto bovenaan" versus
+  "foto ernaast" bestaat daar niet. De foto zelf heeft wel een vaste plek in beide
+  formaten (Apple's strip-afbeelding, Google's `heroImage`) en wordt daar gebruikt.
+  Op de directe Apple-weg snijden we de foto zelf bij naar 375x144pt (de
+  strip-verhouding voor een eventticket met vierkante barcode) rond hetzelfde
+  focuspunt dat de PDF gebruikt, zodat een staande foto niet blind gecentreerd
+  wordt. walletwallet.dev neemt enkel een URL en stuurt de afbeelding ongesneden
+  door; daar bepaalt het besturingssysteem de uitsnede. Wil je dat gelijktrekken,
+  dan is daar een eigen publieke route nodig die een bijgesneden variant serveert.
+- **Geen push-update-service.** Een pass wordt bij elke download vers opgebouwd uit
+  de actuele ticket- en ontwerpgegevens (zoals de PDF), maar er is geen Apple
+  Push/webservice-stuk dat een al toegevoegde pass op iemands telefoon achteraf
+  bijwerkt als het event verandert. Dat is een apart, optioneel stuk Apple
+  Wallet-infrastructuur (APNs + een update-webservice) dat bewust buiten deze eerste
+  versie valt: het voegt reële complexiteit toe voor een randgeval (een gewijzigd
+  event terwijl iemands pass al op hun telefoon staat) dat bij VTK's schaal zelden
+  voorkomt.
+- **Geen wallet-knoppen in de bevestigingsmail zelf.** De mail linkt (zoals
+  voorheen) naar de ticketpagina, waar de wallet-knoppen naast de PDF-knop staan.
+  Bij een bestelling met meerdere tickets zouden meerdere sets wallet-knoppen in de
+  mail rommelig ogen en zijn ze bovendien pas na de eerste keer openen van de
+  ticketpagina bruikbaar (dezelfde toegangscookie als de bestaande PDF-link vereist
+  dat). "Ook via mail" is zo gelezen als: bereikbaar via de link die de mail al
+  stuurt, niet letterlijk als knoppen in de mail-HTML.
+
+---
+
+## Wat er in Google mag staan (canonicals, sitemap, robots)
+
+De site draait op twee URL-vormen voor dezelfde pagina: Nederlands leeft op de root
+(`/kalender`), maar `/nl/kalender` rendert exact dezelfde inhoud omdat `proxy.ts`
+een pad met taalvoorvoegsel gewoon doorlaat. De keuze die daaruit volgt is
+product- en niet puur technisch:
+
+- **De voorvoegselloze NL-URL is de echte URL.** Elke canonical wijst daarheen, en
+  `x-default` in de hreflang-tabel ook: wie zonder taalvoorkeur binnenkomt, hoort
+  op het Nederlands te landen. Engels leeft onder `/en/...`. Alles hiervoor loopt
+  via `buildMetadata()` in `apps/web/lib/seo.ts`; schrijf geen losse `metadata` met
+  een handgeschreven titel, want dan lopen canonical en hreflang uiteen.
+- **`/nl/...` staat bewust niet op disallow in robots.txt.** Een crawler die een
+  URL niet mag ophalen ziet de canonical erop ook niet en kan hem alsnog kaal
+  indexeren. Duplicate content los je op met de canonical, niet met robots.txt.
+- **Hreflang gebruikt `nl` en `en`, het `<html lang>`-attribuut `nl-BE` en `en`.**
+  Dat lijkt inconsistent maar is het niet: `hreflang="nl-BE"` betekent voor een
+  zoekmachine "enkel Nederlandstaligen in België", waardoor een zoeker uit
+  Nederland buiten de match valt. Voor de taal van het document is de Belgische
+  variant wel de juiste (spelling, uitspraak in een screenreader).
+- **Wat in de sitemap komt**: de vaste publieke routes (expliciete lijst in
+  `apps/web/lib/sitemap.ts`, geen scan van de bestandsboom, want `app/[locale]`
+  bevat ook account- en bestelschermen), de zichtbare categorieën die een eigen
+  pagina hebben, elke gepubliceerde infopagina, en enkel `PUBLIC`-evenementen. Een
+  concept en een ledenexclusief evenement horen er niet in, ook niet als losse
+  titel: dat zou het bestaan ervan alsnog verklappen.
+- **Een pagina onder een categorie is canoniek `/<categorie>/<slug>`**, niet
+  `/p/<slug>`, hoewel beide werken. De categorievorm is de weg die de navigatie
+  aanbiedt, dus dat is de URL die gedeeld hoort te worden.
+- **Het standaard deelbeeld is het Arenbergkasteel onder een navy scrim met het
+  VTK-wordmerk** (`apps/web/app/opengraph-image.jpg`, gebouwd uit
+  `public/hero-arenberg.jpg`). Eén beeld voor de hele site; een pagina met een
+  echte eigen foto geeft die mee aan `buildMetadata()`.
+
+---
+
+## Zoeken: wat er in de resultaten mag staan
+
+De zoekfunctie (`/zoeken`) doorzoekt **de pagina's van de site**, **de activiteiten
+in de kalender**, **de fotoalbums** en **het materiaal van de uitleendienst**. Wat er
+per soort in mag, is een zichtbaarheidskeuze en geen technische:
+
+- **Enkel gepubliceerde pagina's.** Een concept (`publishedAt` leeg) staat niet in de
+  resultaten, ook niet als losse titel: dat zou verklappen dat er iets in de maak is
+  en waarover het gaat. Een gepubliceerde pagina die niet aan een headertab hangt,
+  komt wél in de resultaten. Ze is niet via de navigatie bereikbaar, maar ze staat
+  ook in de sitemap en is gewoon publiek; zoeken is dan vaak de enige manier om ze
+  terug te vinden.
+- **Enkel publieke evenementen, en enkel die van jouw doelgroep.** Een
+  ledenexclusief of intern evenement hoort er niet in, en een evenement met een
+  doelgroepcategorie (eerstejaars, internationals) verschijnt enkel bij wie erbij
+  hoort; wie niet ingelogd is, ziet die dus niet. Dat is dezelfde regel als op de
+  kalender zelf, waar een doelgroepevent ook pas opduikt bij het juiste profiel.
+- **Die regels worden hergebruikt en niet nagebouwd.** De zoekopdracht haalt eerst
+  kandidaten op met Postgres (rang en fragment), maar de rijen zelf komen via Prisma
+  binnen met exact dezelfde `where` als de rest van de site: `publishedAt` voor een
+  pagina, `visibility: "PUBLIC"` plus `audienceFilter()` uit
+  `apps/web/lib/calendar/audience.ts` voor een evenement, precies zoals
+  `/api/calendar/events` en de ics-feeds. Een tweede, met de hand geschreven
+  zichtbaarheidsregel in SQL loopt vroeg of laat uiteen met de eerste, en dan lekt er
+  een intern evenement in de zoekresultaten. Verandert de kalenderzichtbaarheid, dan
+  verandert het zoekresultaat mee, zonder dat iemand daaraan hoeft te denken.
+- **Uitleenmateriaal enkel voor wie ingelogd is.** "Hebben jullie een beamer" is
+  precies het soort vraag waarmee iemand op de site landt, dus materiaal hoort
+  vindbaar te zijn. Maar de catalogus zelf zit in de logistiek-app achter een login
+  (zie `docs/uitleendienst.md`), en materiaalnamen in een publieke resultatenlijst
+  zetten zou die keuze langs de achterdeur ongedaan maken. Een uitgelogde bezoeker
+  zou bovendien op een loginscherm landen, wat een zoekresultaat is dat niets
+  oplevert. Daarom draait die zoekpas enkel met een sessie, en het resultaat linkt
+  naar `LOGISTIEK_PUBLIC_URL`; zonder die instelling toont de site geen materiaal,
+  want dan valt er nergens naartoe te linken.
+- **Fotoalbums volgen wat er op /media staat.** Ze komen niet uit de database maar
+  uit Immich, en enkel albums met de `[gallery]`-markering zitten in die snapshot.
+  Zichtbaarheid is dus gratis: wat niet publiek op /media staat, kan ook niet
+  gevonden worden. Het matchen gebeurt in het geheugen (er valt niets te indexeren),
+  en de aanroep zit in een try/catch: Immich is af en toe onbereikbaar, en dat mag
+  een zoekopdracht hoogstens albums kosten, niet de hele resultatenlijst.
+- **Wat er niet doorzocht wordt**: tickets, bestellingen, praesidiumleden en alles
+  achter een login. Die schermen staan om dezelfde reden niet in de sitemap.
+- **De resultatenpagina staat zelf op `noIndex`.** Elke zoekterm is een eigen URL, en
+  die horen niet als duizenden dunne pagina's in Google te belanden.
+- **In de sitekop staat op breed scherm een knop en geen invoerveld.** De elf tabs
+  vullen de navigatiebalk tot op negen pixels na, en `.nav-inner` stopt met groeien
+  op `--max` (1320px), dus een breder scherm levert geen ruimte op. Een zoekveld
+  ernaast zou over de laatste tab vallen. De knop (vanaf 1280px, waar hij past)
+  brengt je naar `/zoeken`, waar de cursor meteen in het veld staat. Onder 1211px
+  zijn de tabs één menuknop en staat het echte veld bovenaan dat paneel. In de
+  strook tussen 1211 en 1280px is er geen ingang in de balk; wil je die er wel,
+  verklein dan eerst de navigatie zelf.
+- **Zoeken is een gewoon GET-formulier.** De zoekterm staat in de URL, de pagina
+  rendert op de server, en er is geen client-state. Zo is een zoekresultaat
+  deelbaar en herlaadbaar en werkt de terugknop; een veld met eigen state en
+  live-resultaten maakt die drie kapot en voegt bij tientallen pagina's weinig toe.
+
+---
+
+## De 404-pagina
+
+- Er is er één, in de huisstijl: dezelfde donkere `.vtk-page-head`-band als elke
+  andere pagina, en daaronder drie wegen terug (home, Info, kalender). Geen vierde
+  of vijfde: dat zijn de drie plekken waar verdwaald verkeer op uitkomt.
+- **Twee bestanden, één scherm.** `app/[locale]/not-found.tsx` vangt elke
+  `notFound()` in een segment onder de taal (het gros: een onbekende
+  `/[headerSlug]` valt gewoon binnen de routeboom); `app/not-found.tsx` vangt een
+  adres dat op geen enkele route valt en staat buiten `[locale]/layout.tsx`, dus
+  dat bestand haalt zelf de sitekop, de sitevoet en de ontwerp-CSS binnen. Beide
+  renderen `components/site/NotFoundView.tsx`.
+- Een not-found-component krijgt geen props, ook geen `params`. De taal komt daar
+  uit de `x-pathname`-header die `proxy.ts` zet, net als in de root layout. De
+  canonical wijst naar het adres dat niet bestond en de pagina staat op `noIndex`.
+
+---
+
+## Footer: welke socials, en de bevriende kringen
+
+- **De socials in de footer zijn Instagram, Facebook, LinkedIn, YouTube en
+  TikTok.** YouTube (`youtube.com/@VTKLeuven`) en TikTok
+  (`tiktok.com/@vtkleuven`) stonden wel op de oude site en op de officiële
+  linktree, maar niet in deze footer. De oude site linkte YouTube nog via de
+  verouderde `youtube.com/user/...`-vorm; we gebruiken de handle-URL.
+  Er bestaat ook een X/Twitter-account (`x.com/vtkleuven`), maar dat staat niet op
+  de linktree die communicatie zelf onderhoudt en is van buitenaf niet te
+  controleren op activiteit; het is dus niet toegevoegd. Wil VTK het er wel bij,
+  voeg het dan toe zoals de andere vijf.
+- **De bevriende kringen krijgen geen eigen lijst.** BEST, Biomedix, Chemix,
+  Existenz, Mechanix, Revue en Statix staan al als `WERKGROEP` in de database
+  (`WERKGROEP_SEEDS`) en dus op `/werkgroepen`, met hun ploeg per werkingsjaar en
+  hun eigen website. De footerlink noemt ze daarom bij naam
+  ("Werkgroepen & bevriende kringen") en wijst naar die ene pagina; een tweede,
+  handgeschreven lijst zou binnen het jaar uit elkaar lopen met de eerste. De
+  oude sleutel `footer.linkWerkgroepen` blijft ongebruikt achter in de
+  i18n-bestanden: die mochten tijdens deze werkstroom enkel aangevuld worden.
+
+---
+
+## Contactformulier: één bestemming, geen bevestigingsmail
+
+- **Alles gaat naar `info@vtk.be`.** Eén bestemming, geen keuzelijst met
+  onderwerpen die elk naar een ander adres routeren en geen tabel met
+  postadressen in de database. Beslist voor de uitvoering begon. De reden is
+  onderhoud: zo'n tabel loopt binnen een werkingsjaar achter op de werkelijkheid,
+  want posten wisselen elk jaar en een verkeerd gerouteerd bericht valt in een
+  mailbox die niemand meer leest. Nu ziet altijd dezelfde mailbox alles binnenkomen
+  en gaat het van daar intern verder; dat is één menselijke stap in ruil voor de
+  garantie dat er niets verdwijnt. Het onderwerp dat de bezoeker zelf typt, komt in
+  de titel van de mail met een `[Website]`-voorvoegsel ervoor, zodat er een filter
+  of label op kan staan.
+- **Er vertrekt geen automatische bevestigingsmail naar de verzender.** Iedereen
+  kan om het even welk adres in het formulier typen, dus zo'n mail is te misbruiken
+  als spamversterker: een bot vult het adres van zijn slachtoffer in en onze server
+  levert de mail af, met onze reputatie eronder. De bevestiging staat daarom op het
+  scherm (een groene toast plus een leeggelopen formulier). Wie wél een spoor wil,
+  ziet ons antwoord vanzelf: `replyTo` staat op de bezoeker, dus "Beantwoorden"
+  komt rechtstreeks bij hem terecht.
+- **De afzender is een VTK-adres, niet dat van de bezoeker.** Mailen namens
+  `@gmail.com` mag onze server niet ondertekenen; SPF en DKIM gooien zo'n bericht
+  in de spam. De bezoeker zit in `replyTo`, en naam en adres staan ook in de tekst
+  van de mail zelf, zodat doorsturen het antwoordadres niet verliest. De afzender
+  staat los van `MAIL_FROM` (`MAIL_FROM_CONTACT`): die eerste is de ticket-
+  afzender, en een contactvraag hoort niet als "VTK Tickets" binnen te komen.
+- **Spam wordt tegengehouden met een honeypot en een limiet per IP, niet met een
+  captcha.** Een captcha kost elke echte bezoeker moeite (en zet vaak een derde
+  partij op de pagina) om een handvol scripts tegen te houden. Het verborgen veld
+  levert bij invulling een **groene** toast op en er vertrekt niets: een bot die een
+  foutmelding krijgt, weet dat hij ontdekt is en past zijn volgende poging aan. De
+  limiet staat op drie berichten per kwartier per IP en telt in het geheugen van het
+  proces; bij een herstart begint ze opnieuw. Dat is bewust: dit hoeft geen
+  boekhouding te zijn, enkel een drempel, en het scheelt een tabel en een opkuistaak.
+- **De inhoud van een bericht gaat nooit naar Sentry.** Mislukt het versturen, dan
+  loggen we dát, niet wat er in stond. Het is de post van een bezoeker.
+- **`/contact` is een eigen route en geen speciaal geval in het
+  categorie-overzicht.** Contact is in de database een gewone `HeaderTab` (code
+  `CONTACT`) met pagina's eronder, dus zonder eigen map zou `/contact` de generieke
+  categorieweergave tonen. Een `if (slug === "contact")` daarin zou elke andere
+  categorie meeslepen. Het statische segment `app/[locale]/contact` wint van
+  `[headerSlug]` en neemt enkel `/contact` over; de pagina's eronder blijven op
+  `/contact/<pagina>` bij de generieke weergave, en het formulierscherm herhaalt hun
+  lijst onderaan zodat er niets onbereikbaar wordt. De titel en de intro komen nog
+  altijd uit de categorie in `/admin/inhoud`; enkel het formulier is code. Wordt de
+  slug van die categorie ooit hernoemd, dan blijft het formulier op `/contact` staan
+  terwijl de navigatie naar de nieuwe slug wijst; die pagina laadt de categorie
+  daarom op `code` en niet op slug.
+
+---
+
+## Bezoekersstatistieken: Umami op onze eigen server, enkel na toestemming
+
+- **We meten zelf, of we meten niet.** De keuze was van bij het begin
+  self-hosted: het verkeer van bezoekers van een studentenkring hoort niet bij een
+  analytics-bedrijf terecht te komen, en zolang de meting op onze eigen server
+  draait komt er geen verwerker bij in `docs/privacy-processors.md`. Een gehoste
+  variant (Umami Cloud, Plausible Cloud) is dus geen terugvaloptie: dan meten we
+  liever niets.
+- **Umami, en niet Plausible.** De eerste keuze was Plausible Community Edition.
+  Dat is afgevoerd tijdens de uitvoering, om één reden: Plausible slaat zijn
+  events op in ClickHouse en sleept dus naast zijn eigen Postgres ook een
+  ClickHouse-container mee. ClickHouse vraagt in de praktijk 1 tot 2 GB geheugen,
+  en op deze server draaien al de website, de logistiekapp, drie workers en de
+  volledige Immich-stack. Twee zware containers erbij voor het tellen van
+  paginaweergaves staat niet in verhouding. Umami is een Node-app met enkel
+  Postgres, en Postgres staat er al.
+- **Umami deelt de bestaande Postgres.** Het krijgt daar een eigen database
+  (`umami`), geen tweede Postgres-container zoals Immich die heeft. Dat scheelt een
+  instantie om te back-uppen, te upgraden en in de gaten te houden, en de
+  statistiekendata is klein. Gevolg: er is geen apart volume voor Umami; zijn
+  gegevens zitten in `postgres-data`, dus in de bestaande back-up van die database.
+  `POSTGRES_DB` maakt enkel bij een leeg volume een database aan en het volume op
+  de productieserver bestaat al, dus maakt een eenmalige `umami-db-init`-stap in
+  Compose de database aan wanneer ze ontbreekt.
+- **Leeg `UMAMI_APP_SECRET` betekent uit.** Zelfde patroon als de workers: de
+  container draait dan leeg in plaats van in een herstartlus te vallen, en de
+  website laadt geen script zolang `UMAMI_PUBLIC_URL` of `UMAMI_WEBSITE_ID` leeg
+  is. Zo blijft een omgeving zonder statistieken (lokaal, dev) gewoon werken.
+- **Umami staat daarbovenop achter het compose-profiel `umami`**, en dat is geen
+  dubbelop. Het "leeg secret = uit"-patroon schakelt een dienst uit *nadat* de
+  container bestaat, en om die te maken haalt `docker compose up` eerst de image
+  op. Voor de workers valt dat niet op (ze draaien op images die de server toch
+  al heeft), maar Umami is een verse pull van ghcr.io, en die liet de deploy
+  falen op `denied: denied` terwijl de dienst niet eens aan stond. Een profiel
+  houdt de dienst helemaal buiten het project tot je hem bewust aanzet.
+  - Aanzetten raakt daardoor **twee** bestanden: de sleutels in de root-`.env`
+    (die gaat naar de containers) en `COMPOSE_PROFILES=umami` in `infra/.env`
+    (dat leest compose zelf, voor zijn eigen interpolatie en profielen). Dat
+    onderscheid kostte tijd: `${UMAMI_APP_SECRET}` in de compose-file resolveerde
+    altijd naar leeg, want compose kijkt daarvoor niet in de root-`.env`. Het
+    secret komt nu via `env_file`, precies zoals bij de workers.
+  - Komt de pull daarna alsnog op `denied` terecht, kijk dan naar
+    `~/.docker/config.json` op de server: een verlopen ghcr-login laat ghcr die
+    credentials gebruiken en weigeren in plaats van anoniem door te laten. De
+    image is publiek, dus `docker logout ghcr.io` volstaat.
+- **Het script laadt pas na een expliciete keuze**, ook al plaatst Umami geen
+  cookies. Dezelfde keuze als voor Sentry en dezelfde knop in de cookiebanner:
+  er is geen tweede schakelaar bijgekomen. Omdat de beslissing server-side valt,
+  herlaadt de banner de pagina na een wijziging; dat deed ze voor Sentry al.
+  De banner en het cookiebeleid noemen nu allebei de statistieken, want een
+  scherm dat enkel over monitoring spreekt terwijl er ook geteld wordt, liegt.
+  De privacyverklaring hoefde niet aangepast: "met wie delen we je gegevens"
+  blijft kloppen, er komt niemand bij.
+- **Paginaweergaves, geen personen.** Geen custom events met persoonsgegevens,
+  geen identificatie van aangemelde leden. Querystrings en fragmenten gaan er niet
+  in mee (`data-exclude-search`, `data-exclude-hash`), want daar zitten tokens en
+  zoektermen in. Umami zelf bewaart geen IP-adres, maar leidt er samen met de
+  user-agent en een dagelijks wisselend zout een hash uit af om een herhaalde
+  weergave binnen dezelfde dag te herkennen; dat staat zo in het cookiebeleid.
+- **`/admin`, `/scan` en `/tickets/bestelling/...` worden niet gemeten.** De eerste
+  twee zijn interne schermen waar bezoekersaantallen niets betekenen; het derde
+  draagt een bestelnummer in het pad, en dat is een persoonsgegeven dat niet in een
+  statistiekendatabase hoort. Dat gebeurt op twee plaatsen tegelijk, want één
+  volstaat niet: de server rendert het script niet op zo'n pagina, en het script
+  krijgt daarnaast een filter mee (`data-before-send`) voor de navigaties die
+  daarna nog in de browser gebeuren. De App Router navigeert immers client-side,
+  dus zonder die filter zou een klik van de homepage naar `/admin` alsnog een
+  paginaweergave opleveren. Beide lagen lezen dezelfde lijst uit
+  `apps/web/lib/analytics.ts`, zodat ze niet uiteen kunnen lopen.
+- **Wat niet vanzelf een paginaweergave is, meten we apart.** Een deel van de
+  site leeft binnen een pagina: de magazines openen in een leesvenster op
+  `/media`, een aftermovie speelt daar af, en een klik naar career.vtk.be of de
+  cudi-webshop verlaat de site zonder spoor. Zonder extra meting ziet een
+  redactie enkel dat `/media` bezocht is, en dat is geen cijfer waar iemand iets
+  aan heeft.
+  - **Een geopend magazinenummer is een paginaweergave**, met een verzonnen adres
+    per nummer (`/media/bakske/2025-2026-s2w6`), en geen los event. Zo staan de
+    nummers gewoon naast elkaar in het Pages-overzicht; een redactie moet niet
+    eerst leren waar de gebeurtenissenrapporten zitten om haar eigen cijfers te
+    vinden. Downloaden en openen in een nieuw tabblad zijn wél events: dat zijn
+    andere handelingen dan lezen en ze horen niet als weergave mee te tellen.
+  - **Klikken naar buiten en downloads lopen via `data-umami-event`-attributen**
+    en niet via klikafhandelaars. Umami vangt die zelf op met `closest()` en
+    verstuurt met `keepalive`, dus het werkt op een link die meteen wegnavigeert,
+    en het vraagt geen `use client` rond een server component. De helper
+    `umamiEvent()` in `lib/analytics.ts` bouwt die attributen, want de sleutels
+    moeten aan `[\w-_]+` voldoen: een sleutel met een accent wordt stil genegeerd
+    en dan ontbreekt het cijfer zonder dat iets kapot lijkt.
+  - **Bij een externe klik gaat enkel de hostnaam mee**, niet de volledige URL.
+    Dat houdt het rapport leesbaar (`career.vtk.be` in plaats van twintig
+    varianten) en voorkomt dat er per ongeluk een token in een querystring
+    meegaat.
+  - **De ticketmeting stopt bij "afrekenen gestart".** Dat getal zegt of de
+    koopstroom werkt; het bestelnummer hoort bij een persoon en gaat dus niet
+    mee, net zoals `/tickets/bestelling/...` niet gemeten wordt.
+- **Eén uitzondering op "geen zoektermen": een zoekopdracht zonder resultaat.**
+  De regel hierboven blijft staan; querystrings gaan nog altijd niet mee, dus
+  een geslaagde zoekopdracht laat geen term achter. Maar een zoekopdracht die
+  niets oplevert is het scherpste signaal dat er inhoud ontbreekt of anders heet
+  dan mensen denken, en dat signaal is waardeloos zonder de term. Daarom stuurt
+  enkel het lege resultaat een event `zoeken-zonder-resultaat` met de zoekterm.
+  De afweging: de term kan een naam bevatten die niemand op de site kon vinden.
+  Dat is bewust aanvaard omdat het om de mislukte gevallen gaat en het aantal
+  klein is; wil je dat niet, dan haal je `zoekterm` uit `trackEmptySearch()` in
+  `lib/analytics-client.ts` en blijft het aantal mislukte zoekopdrachten over.
+- **De cijfers komen terug naar het beheer, niet naar de publieke site.** Bovenaan
+  `/admin/media` staat per nummer hoe vaak het geopend is. Dat is waar de redactie
+  toch al komt om een nummer te uploaden, en het spaart haar een Umami-login.
+  Publiek zetten ("3.412 keer gelezen" op /media) is bewust niet gedaan: dat is een
+  ander soort claim, en een tegenvallend cijfer naast een nummer is geen prettige
+  plek om een jaargang mee af te sluiten.
+  - **De toegang loopt via een share-token, niet via een wachtwoord.** In Umami zet
+    je voor de website een Share URL aan; het id daaruit staat als `UMAMI_SHARE_ID`
+    in de omgeving en geeft enkel leesrecht. Zo staat er geen beheerderswachtwoord
+    in de `.env` van de website, en trek je de toegang met één klik in Umami weer
+    in. Self-hosted Umami 3.x kent geen API-key (die is er enkel in Umami Cloud), en
+    de andere weg (`/api/auth/login` met de beheerder) zou dat wachtwoord wél in de
+    omgeving zetten.
+  - **De koppeling nummer → adres gebeurt met dezelfde functie als bij het meten**
+    (`magazineViewUrl` in `lib/analytics.ts`). Zou het beheer dat adres zelf
+    opnieuw samenstellen, dan staat er bij de eerste wijziging aan het formaat
+    overal nul terwijl er wel degelijk gemeten wordt.
+  - **Geen cijfer is geen fout.** Ontbreekt de configuratie of antwoordt de
+    statistiekserver niet, dan staat er één regel uitleg en werkt de rest van het
+    mediabeheer gewoon. Downloads per nummer zijn best effort: lukt die tweede
+    bevraging niet, dan tonen we de weergaven zonder downloads in plaats van
+    helemaal niets.
+
+---
+
+## Herinnering voor een shift
+
+Wie zich inschrijft voor een shift, krijgt standaard **twee** mails: een dag vooraf
+en twee uur vooraf. Beide zijn per lid uitzetbaar in het profiel.
+
+- **Waarom een dag vooraf.** Dat is exact het moment waarop je jezelf niet meer kan
+  uitschrijven (`UNREGISTER_LOCK_MS` in `apps/web/lib/shift.ts`). De mail zegt dat er
+  dus meteen bij: één bericht dat zowel herinnert als aankondigt dat het nu vastligt.
+  Wie echt niet kan, weet dat op dat moment nog vroeg genoeg om iemand te zoeken.
+- **Waarom twee uur vooraf erbovenop.** Een mail van gisteren is tegen vanavond weer
+  vergeten. Deze tweede is het vangnet, en hij is kort: waar, hoe laat, en zeg het
+  als je niet kan.
+- **Waarom het uitzetbaar is.** Twee mails per shift is voor iemand die er vijftien
+  per jaar doet veel post. De keuze staat in het profiel naast de mailvoorkeuren,
+  maar bewust *niet* als `MailCategory`: die array is opt-in nieuwsbrieven, en dit is
+  transactionele post over iets waarvoor je je zelf hebt ingeschreven. Daarom is er
+  ook geen toestemming voor nodig en staat ze standaard aan.
+- **Nooit twee mails vlak na elkaar.** Wie zich drie uur voor de start inschrijft,
+  hoort geen bericht te krijgen dat begint met "morgen sta je ingepland". Bij het
+  inschrijven worden de vensters die al voorbij zijn meteen als afgehandeld
+  gemarkeerd (`handledLeadFields`), dus die persoon krijgt enkel de mail van twee uur
+  vooraf. Hetzelfde geldt wanneer een admin iemand aan een shift toevoegt.
+- **Een verplaatste shift waarschuwt opnieuw.** `Shift` heeft geen `updatedAt` en
+  geen geannuleerd-status, dus de herinnering is het enige bericht dat een deelnemer
+  over een nieuwe tijd te zien krijgt. Wijzigt `startTime` via de admin-PATCH, dan
+  gaan beide markeringen leeg en beginnen de vensters opnieuw te lopen.
+- **Bij twijfel geen mail in plaats van twee.** De markering wordt met een
+  voorwaardelijke `updateMany` gezet *voor* er verstuurd wordt, en een mislukte
+  verzending zet ze niet terug. Dezelfde afweging als bij de no-show-mails van
+  Theokot: een dubbele herinnering is vervelender dan een gemiste.
+- **Geen mailserver betekent niets versturen, niet alles afvinken.** `sendMail`
+  logt zonder `SMTP_HOST` naar de console en meldt "gelukt"; dat is juist voor lokaal
+  werk, maar hier staat de markering dan al. In productie zouden alle herinneringen
+  dus als verstuurd afgevinkt worden zonder dat er ooit iets aankwam, en niemand zou
+  dat merken. De verwerking stopt daarom meteen wanneer er in productie geen SMTP
+  is, en de route antwoordt 503 zodat de healthcheck het ziet. Buiten productie
+  blijft loggen wél de bedoeling; dezelfde grens als bij de ticketmailer, die enkel
+  in productie gooit.
+- **Eén SMTP-blok voor de hele site.** `.env.example` declareerde het ooit twee keer,
+  met `SMTP_PASS` in het ene en `SMTP_PASSWORD` in het andere. In een plat `.env`
+  wint de laatste, dus wie er één invulde kreeg stil een helft van de mails die niet
+  authenticeerde. Er staat nu één blok; `lib/mail.ts` aanvaardt allebei de namen,
+  zodat een omgeving die `SMTP_PASS` al gezet had blijft werken.
+- **Een eigen worker.** `shift-worker` in `infra/docker-compose.yml` klopt elke vijf
+  minuten aan bij `/api/shift/maintenance`. Bewust niet meeliftend op de
+  `ticket-worker`: een klemgelopen mailserver mag de ticketbevestigingen niet
+  meesleuren. Leeg `SHIFT_MAINTENANCE_SECRET` = geen herinneringen, de rest van de
+  shiften werkt gewoon door.
+
+---
+
+## Aankondigingen: homepage of de hele site
+
+Een aankondiging is het venster dat over de site verschijnt, beheerd op
+`/admin/aankondigingen`. Er is één keuze per bericht: **enkel de homepage** of **elke
+pagina**.
+
+- **Waarom die keuze er is.** Het venster hing eerst alleen aan de homepage, en dat
+  is de pagina waar het minst volk binnenkomt: wie via Google, een gedeelde link of
+  een QR-code arriveert, landt op een infopagina of een activiteit en zag een
+  afgelasting dus nooit. Altijd-overal was het alternatief, maar dan is er geen
+  ontsnapping meer voor een bericht dat echt enkel bij de homepage hoort (een
+  welkomstboodschap bij de start van het jaar). Standaard blijft `HOME`, zodat
+  bestaande aankondigingen zich gedragen zoals ze bedoeld waren.
+- **Nooit op `/admin`, `/scan` of tijdens het afrekenen.** Een reclamevenster over
+  een lopende betaling is geen aankondiging maar een storing, en de ticketscanner
+  draait op een gsm aan de deur. Die lijst staat los van de lijst met paden die niet
+  gemeten worden, ook al is ze vandaag dezelfde: het ene gaat over wat we niet meten,
+  het andere over waar we de bezoeker niet onderbreken.
+- **Wegklikken geldt voor de hele site.** Dat zat al zo: de modal onthoudt in
+  `localStorage` welke id's weggeklikt zijn. Nu ze op elke pagina kan verschijnen, is
+  dat het verschil tussen één venster en een venster bij elke klik.
+- **Het venster hangt in de gedeelde layout.** Die is toch al dynamisch (de header
+  leest de sessie), dus het kost één query per render en geen omslag in caching. Wel
+  belangrijk: de save-action revalideert daarom `revalidatePath("/", "layout")` en
+  niet enkel `"/"`, anders blijft een site-brede aankondiging overal onzichtbaar tot
+  ze vanzelf verloopt.
+
+---
+
+## Praesidiumlijst (CSV-export op /admin/groepen)
+
+De knop "Download praesidiumlijst" op Ledenbeheer → Posten levert één CSV met twee
+kolommen: naam en r-nummer. Het is de lijst die je aan de universiteit of aan een
+externe partij doorgeeft wanneer die wil weten wie dit jaar praesidium is, dus de
+inhoud is bewust een lijst van *personen*, niet van posten.
+
+- **De export volgt het werkingsjaar dat op het scherm geselecteerd staat**, niet
+  altijd het huidige. Wie op het tabje 25-26 staat en downloadt, krijgt 25-26.
+  Anders zou de knop iets anders exporteren dan wat eronder in de tabel staat.
+- **Eén rij per persoon.** Wie twee posten heeft (bv. een werkgroep en het
+  praesidium) staat één keer in de lijst; welke post iemand heeft, staat er niet
+  in. De vraag die deze lijst beantwoordt is "wie hoort erbij", niet "wie doet wat".
+- **Ook leden van een inactieve post tellen mee.** Een post op inactief zetten
+  verbergt ze in de shift-keuzes, maar dat jaar hingen er wel degelijk mensen aan;
+  de historiek van een werkingsjaar mag niet veranderen doordat een post later
+  gearchiveerd wordt.
+- **Ook leden met een gedeactiveerd account tellen mee.** Een account deactiveren
+  is een login-kwestie; het haalt iemand niet uit de post waaraan die dat jaar hing.
+  Gewiste accounts (de geanonimiseerde tombstones) vallen er wel uit.
+- **Het r-nummer mag leeg zijn.** Niet elk lid heeft er een (bv. een alumnus of
+  een extern bestuurslid); die persoon hoort wel in de lijst, met een lege cel,
+  zodat wie de lijst nakijkt zelf ziet dat er iets ontbreekt.
+
+---
+
+## De tickets zitten in de bevestigingsmail
+
+De bevestigingsmail bevat naast de link naar de ticketpagina ook de tickets zelf:
+één pdf met alle tickets van de bestelling, en per ticket een pas voor Apple
+Wallet. Google Wallet kan geen bijlage zijn (een pas komt daar altijd via een
+save-link binnen), dus die staat als knop in de mail.
+
+- **De link blijft de hoofdweg, de bijlage is het vangnet.** De ticketpagina toont
+  de laatste stand van zaken (ingetrokken, terugbetaald, een nieuwe qr na een
+  reset); een bijlage is de toestand van het moment van versturen. De bijlage is er
+  voor aan de deur: geen bereik, een lege batterij, of iemand die zijn ticket
+  liever afdrukt. Daarom verdwijnt de knop "Bekijk je tickets" niet uit de mail.
+- **Enkel geldige tickets gaan mee.** Bij een terugbetaalde of ingetrokken
+  bestelling zit er geen pdf en geen pas in de mail. Een geweigerd ticket dat wel
+  als bijlage in een mailbox staat, belooft iets dat aan de deur niet waar is.
+- **De mail zegt enkel wat er echt bij zit.** Loopt de pdf-generator of de
+  wallet-provider stuk, dan vertrekt de bevestiging toch, zonder die bijlage en
+  zonder ze te noemen. De omgekeerde keuze (de mail laten mislukken) is al eens
+  fout gelopen: dan blijft de outbox proberen, gaat de rij uiteindelijk op DEAD,
+  en krijgt de koper helemaal niets.
+- **Boven acht tickets vallen de wallet-passen weg.** Zo'n bestelling is er een
+  voor een groep: die persoon deelt de tickets door via de link en heeft geen
+  twintig passen in zijn eigen wallet nodig. De pdf gaat wel gewoon mee.
+- **Er zit een grens van 8 MB op de bijlagen samen.** Mailservers weigeren een te
+  grote boodschap in haar geheel; dan zou een bestelling met een zwaar
+  ticketontwerp helemaal geen bevestiging opleveren. Boven de grens vallen de
+  passen weg, de pdf eerst.
+- **De Google Wallet-links staan enkel in de html-versie.** Zo'n save-link is een
+  jwt van enkele kilobytes; in platte tekst is dat per ticket een onleesbaar blok
+  dat mailclients afkappen, waarna de link stuk is. De tekstversie verwijst naar
+  de ticketpagina, waar dezelfde knop staat.
+- **Let op het verbruik bij walletwallet.dev.** Vroeger vertrok er pas een aanroep
+  wanneer een koper op een wallet-knop klikte; nu gebeurt dat voor elk ticket van
+  elke betaalde bestelling. Eén aanroep levert de Apple- en de Google-pas samen
+  (de tweede komt uit de cache van tien minuten), dus reken op één aanroep per
+  ticket. Op het gratis plan zijn dat er 1000 per maand.
+
+---
+
+## De mailserver wil weten wie er belt (EHLO)
+
+Beide mailers zetten expliciet de naam waarmee de site zich voorstelt bij de
+mailserver (`smtpEhloName()`, standaard `vtk.be`, te overschrijven met
+`SMTP_EHLO_NAME`). Laat dat niet weg.
+
+Zonder die instelling vult nodemailer zelf iets in, en in een container werd dat
+`EHLO [127.0.0.1]`. De relay van Google antwoordt daarop met
+`421 4.7.0 Try again later, closing connection. (EHLO)` en verbreekt de
+verbinding voor er ook maar een afzender genoemd is. Dezelfde container, dezelfde
+verbinding, met `EHLO vtk.be` krijgt gewoon `250`.
+
+Waarom dit een avond kostte: de foutmelding leest als een tijdelijke storing bij
+Google, dus de outbox blijft braaf herproberen met een oplopende wachttijd en
+niemand denkt aan een configuratiefout. Bovendien werkte een test met `curl`
+vanaf dezelfde machine wel, want die stuurt een andere EHLO-naam. Het lijkt dan
+alsof de mailserver het ene moment wel en het andere niet doet.
+
+---
+
+## Formulieren: wat de kring ermee wil, en wat we bewust niet doen
+
+De formulierenmodule (`docs/forms.md` legt uit waar wat staat) heeft een paar
+keuzes die niet uit de code volgen.
+
+- **Anonieme inzenders kunnen hun antwoord niet bewerken.** Bewerken en concepten
+  gelden enkel voor wie ingelogd is. De alternatieve weg is een bewerklink met een
+  token in de bevestigingsmail, en die hebben we bewust niet gebouwd: zo'n link is
+  een sleutel naar persoonsgegevens die per mail rondgaat en doorgestuurd wordt.
+  Wie zijn inzending wil kunnen aanpassen, logt in; de rest dient één keer in.
+- **Een formulier dat vol zit, blijft leesbaar.** Een keuzeoptie met een quotum
+  verdwijnt niet wanneer ze vol is, maar staat er grijs bij met "volzet". Anders
+  denkt iemand die de affiche zag dat hij op het verkeerde formulier zit. Wie de
+  optie al koos vóór ze vollliep, houdt ze bij het bewerken.
+- **Dubbels waarschuwen, ze blokkeren niet.** Twee inzendingen met hetzelfde
+  e-mailadres kunnen legitiem zijn (iemand schrijft zijn kotgenoot mee in), en een
+  harde blokkade op e-mail is toch te omzeilen met een plusadres. De tweede
+  inzending komt binnen; de bevestigingspagina zegt dat er al een was.
+- **Een formulier staat niet automatisch in het overzicht.** `listed` bepaalt of
+  het op `/formulieren` verschijnt. Een sollicitatie- of evaluatieformulier deel
+  je gericht; het blijft wel gewoon bereikbaar via zijn link, want een verborgen
+  formulier is geen beveiligd formulier.
+- **Formulieren horen niet in Google.** Alle formulierpagina's staan op
+  `noindex`. Een formulier is een actie met een deadline, geen inhoud om te
+  vinden; een verlopen inschrijving in de zoekresultaten helpt niemand.
+- **De bewaartermijn staat standaard uit.** Een beheerder kan er een instellen
+  (`retentionDays`), maar zonder die keuze verdwijnt er niets vanzelf. Stil
+  verdwijnende inzendingen zijn erger dan een volle tabel; wie een formulier met
+  gevoelige antwoorden maakt, zet de termijn zelf.
+- **Bij een gewist account verdwijnen de inzendingen echt.** Bij een
+  ticketbestelling volstaat het de identiteit te strippen, want die rij is een
+  financieel record. Een formulierantwoord is dat niet: de persoonsgegevens zitten
+  juist in de antwoorden, en een vrije tekst met een naam erin blijft anders
+  gewoon staan. De quota die de inzending innam, komen weer vrij.
+- **Half vertaald publiceren mag, maar niet ongemerkt.** Een beheerder mag een
+  formulier bewust in één taal aanbieden; dan krijgt de andere taal een eigen
+  bericht ("Sorry, dit formulier is enkel voor internationals") in plaats van een
+  halfleeg formulier of een 404. Staat het formulier op beide talen terwijl er
+  stukken ontbreken, dan somt het overzicht op wélke, want een waarschuwing zonder
+  lijstje leidt enkel tot zoeken.
+- **Voorinvullen gebeurt enkel waar de beheerder het vraagt.** Het veldtype "uit
+  het profiel" vult naam, e-mail, r-nummer, studierichting of jaar in. Raden op
+  basis van de veldnaam is geprobeerd en meteen fout gegaan: de vraag "Naam van je
+  partner" kreeg de naam van de ingelogde bezoeker. Enkel het eerste e-mailveld
+  vult zichzelf nog automatisch in.
+- **Geen captcha.** Zoals bij het contactformulier: een honeypot, een limiet per
+  IP en een minimale invultijd. Een captcha kost elke echte bezoeker moeite en zet
+  vaak een derde partij op de pagina, voor een handvol scripts.
+- **Een inzending namens iemand stuurt geen bevestiging.** Wanneer een beheerder
+  een inschrijving intikt die per mail of telefoon binnenkwam, krijgt die persoon
+  geen "bedankt voor je inzending"-mail: hij heeft niets ingevuld en zou zich
+  afvragen wat er gebeurd is. Het formulier hoeft daarvoor ook niet open te staan.
+
+### Springen en wachtlijsten (aanvulling op de formulierenmodule)
+
+- **Springen kan enkel wanneer de secties stap voor stap komen.** Naar een
+  sectie verderop springen heeft geen betekenis wanneer alles toch al op één
+  pagina staat, dus `stepBySections` is een aparte instelling en geen automatisme.
+  Zo blijft een kort formulier ook gewoon één pagina, want dat leest sneller.
+- **Een sprong die het formulier beëindigt, is een volwaardige uitkomst.** "Kom
+  je? Nee" hoort niet door te gaan naar de vragen over het menu. De bezoeker
+  krijgt dan meteen de verzendknop, en de vragen die hij oversloeg zijn ook
+  serverside niet verplicht.
+- **Een wachtlijst claimt geen plaats.** Dat is het hele punt: de teller blijft
+  kloppen met wie er echt binnen mag. Een beheerder haalt iemand er handmatig
+  bij, en die actie probeert het quotum op dat moment alsnog te nemen; is het nog
+  vol, dan blijft de inzending staan waar ze stond.
+- **Automatisch opschuiven doen we niet.** Zodra een plaats vrijkomt de eerste
+  van de wachtlijst binnenlaten klinkt logisch, maar dan hoort er ook een mail
+  bij, een termijn om te bevestigen, en een regel voor wie niet reageert. Dat is
+  een eigen systeem; handmatig opschuiven met een knop is voor een kring van deze
+  grootte genoeg.
+- **Zit één keuze vol, dan claimt de hele inzending niets.** Wie drie shiften
+  aanduidt waarvan de tweede vol zit, komt volledig op de wachtlijst in plaats van
+  twee plaatsen te bezetten en voor de derde te wachten. Half ingeschreven zijn is
+  voor niemand bruikbaar.

@@ -89,6 +89,7 @@ export default async function EditUserPage({
             <Input
               name="password"
               type="text"
+              minLength={8}
               placeholder={
                 locale === 'nl' ? 'Leeg laten om niet te wijzigen' : 'Leave blank to keep'
               }
@@ -143,7 +144,13 @@ export default async function EditUserPage({
               />
             </li>
           ))}
-          {user.memberships.length === 0 && <li className="py-2 text-sm text-zinc-500">—</li>}
+          {user.memberships.length === 0 && (
+            <li className="py-2 text-sm text-zinc-500">
+              {locale === 'nl'
+                ? 'Deze gebruiker zit in geen enkele post of werkgroep.'
+                : 'This user is not in any post or working group.'}
+            </li>
+          )}
         </ul>
         <form
           action={addMembershipAction}
@@ -154,7 +161,7 @@ export default async function EditUserPage({
             <Label>Group</Label>
             <Select name="groupId" required defaultValue="">
               <option value="" disabled>
-                —
+                {locale === 'nl' ? 'Kies een post of werkgroep' : 'Choose a post or working group'}
               </option>
               {groups.map((g) => (
                 <option key={g.id} value={g.id}>
@@ -222,7 +229,13 @@ export default async function EditUserPage({
                 />
               </li>
             ))}
-            {user.roles.length === 0 && <li className="py-2 text-sm text-zinc-500">—</li>}
+            {user.roles.length === 0 && (
+              <li className="py-2 text-sm text-zinc-500">
+                {locale === 'nl'
+                  ? 'Geen rechtstreeks toegewezen rollen voor dit werkingsjaar.'
+                  : 'No directly assigned roles for this working year.'}
+              </li>
+            )}
           </ul>
           {assignableRoles.length > 0 && (
             <form action={assignUserRoleAction} className="flex flex-wrap items-end gap-3">
@@ -231,7 +244,7 @@ export default async function EditUserPage({
                 <Label>{locale === 'nl' ? 'Rol toevoegen' : 'Add role'}</Label>
                 <Select name="roleId" required defaultValue="">
                   <option value="" disabled>
-                    —
+                    {locale === 'nl' ? 'Kies een rol' : 'Choose a role'}
                   </option>
                   {assignableRoles.map((r) => (
                     <option key={r.id} value={r.id}>

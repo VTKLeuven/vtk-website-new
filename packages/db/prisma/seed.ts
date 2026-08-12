@@ -1,6 +1,7 @@
 import { hash } from "@node-rs/argon2";
 import { PrismaClient } from "@prisma/client";
 import { GROUP_SEEDS, WERKGROEP_SEEDS, HEADER_TABS } from "../src/groups";
+import { SHIFTEN_PAGE, UITLEENDIENST_PAGE } from "../src/infoPages";
 import { PERMISSIONS } from "../src/permissions";
 
 const prisma = new PrismaClient();
@@ -91,12 +92,28 @@ async function main() {
   // terugdraaien. Daarom enkel ontbrekende tabs aanmaken en bestaande rijen NIET
   // overschrijven. Een verse of gereset DB krijgt nog steeds alle defaults via
   // `create`; nieuwe standaardtabs (nieuw `code`) worden nog wel toegevoegd.
-  for (const tab of HEADER_TABS) {
-    await prisma.headerTab.upsert({
+  for (const { links, ...tab } of HEADER_TABS) {
+    const row = await prisma.headerTab.upsert({
       where: { code: tab.code },
       update: {},
       create: tab,
     });
+    // Menu-items van werkingen met een eigen site (Career, Cursusdienst).
+    // Create-only op (tab, url), zodat een hernoemd label blijft staan en een
+    // door de admin verwijderd item niet terugkomt zolang de URL dezelfde is.
+    for (const [index, link] of (links ?? []).entries()) {
+      await prisma.headerTabLink.upsert({
+        where: { tabId_url: { tabId: row.id, url: link.url } },
+        update: {},
+        create: {
+          tabId: row.id,
+          labelNl: link.labelNl,
+          labelEn: link.labelEn,
+          url: link.url,
+          order: index,
+        },
+      });
+    }
   }
 
   console.log("Seeding permissions...");
@@ -144,7 +161,7 @@ async function main() {
   // (GroupRole, kind DEFAULT = elk lid). De geseede rolset:
   //   - admin (alle rechten, systeemrol)                 -> IT + Groep 5
   //   - praesidium (calendar.create + photos.upload +    -> elke post
-  //       tickets.create + users.search)
+  //       tickets.create + forms.create + users.search)
   //   - werkgroep, medewerker                            -> beschikbaar, nog niet toegekend
   //   - theokot (theokot.manage + theokot.pickup)        -> Theokot
   //   - één rol per post, met de postnaam                -> die post zelf
@@ -207,13 +224,14 @@ async function main() {
     "Praesidium",
     "Praesidium",
     1,
-    "Basisrol voor elk praesidiumlid: evenementen (incl. ticketevents) voor de eigen groep aanmaken, foto's uploaden en gebruikers opzoeken.",
-    "Base role for every praesidium member: create events (incl. ticket events) for the own group, upload photos and search users.",
+    "Basisrol voor elk praesidiumlid: evenementen (incl. ticketevents) en formulieren voor de eigen groep aanmaken, foto's uploaden en gebruikers opzoeken.",
+    "Base role for every praesidium member: create events (incl. ticket events) and forms for the own group, upload photos and search users.",
   );
   await setRolePermissions(praesidiumRole.id, [
     "calendar.create",
     "photos.upload",
     "tickets.create",
+    "forms.create",
     "users.search",
   ]);
   for (const g of GROUP_SEEDS) {
@@ -249,6 +267,51 @@ async function main() {
   );
   await setRolePermissions(theokotRole.id, ["theokot.manage", "theokot.pickup"]);
   await grantRoleToGroup("THEOKOT", theokotRole.id, "DEFAULT");
+
+  // grocomeet-deelnemer: wie een broodje mag reserveren voor de GM. Dat zijn de
+  // verantwoordelijken van elke post (LEADER-grant, dus niet elk postlid) plus
+  // elk lid van Groep 5. Het reserveren hangt bewust aan een rol en niet aan een
+  // harde check op "is lead van een praesidiumpost": zo kan het beheer er iemand
+  // los bij zetten (een medeverantwoordelijke) zonder code te wijzigen.
+  const grocomeetRole = await upsertRole(
+    "grocomeet-deelnemer",
+    "Grocomeet",
+    "Grocomeet",
+    6,
+    "Een broodje en drankje reserveren voor de grocomeet.",
+    "Reserve a sandwich and a drink for the grocomeet.",
+  );
+  await setRolePermissions(grocomeetRole.id, ["grocomeet.reserve"]);
+  for (const g of GROUP_SEEDS) {
+    await grantRoleToGroup(g.code, grocomeetRole.id, "LEADER");
+  }
+  await grantRoleToGroup("GROEP5", grocomeetRole.id, "DEFAULT");
+
+  // De planning en het geldoverzicht van de GM horen bij Groep 5; Groep 5 heeft
+  // via de admin-rol al alle rechten, dus dit is enkel de expliciete rol voor wie
+  // ze later los wil toekennen (bv. de penningmeester van een werkgroep).
+  const grocomeetManageRole = await upsertRole(
+    "grocomeet-beheer",
+    "Grocomeet-beheer",
+    "Grocomeet management",
+    7,
+    "Grocomeets plannen en bijhouden wie wat verschuldigd is.",
+    "Plan grocomeets and keep track of who owes what.",
+  );
+  await setRolePermissions(grocomeetManageRole.id, ["grocomeet.manage", "grocomeet.reserve"]);
+  await grantRoleToGroup("GROEP5", grocomeetManageRole.id, "DEFAULT");
+
+  // bureau: de tweewekelijkse onderwijsvergadering, beheerd door Onderwijs.
+  const bureauRole = await upsertRole(
+    "bureau",
+    "Bureau",
+    "Bureau",
+    8,
+    "VTK Bureaus plannen, het aanbod instellen en de totalen opvolgen.",
+    "Plan VTK Bureaus, set the offering and follow up the totals.",
+  );
+  await setRolePermissions(bureauRole.id, ["bureau.manage"]);
+  await grantRoleToGroup("ONDERWIJS", bureauRole.id, "DEFAULT");
 
   // logistiek: de uitleendienst op logistiek.vtk.be beheren.
   const logistiekRole = await upsertRole(
@@ -367,9 +430,6 @@ async function main() {
         ] as Array<{ type: "video" | "image"; url: string; titleNl?: string; titleEn?: string }>,
       },
     },
-    // `home.featuredAlbums` staat hier bewust niet: die wordt na het seeden van de
-    // albums create-only gezet (zie verderop), zodat een verse DB de seed-albums
-    // krijgt maar een admin-selectie niet overschreven wordt.
     // Theokot-configuratie: waarden die niet elke week wijzigen. maxItemsPerOrder = X,
     // maxWeeklySpecialPerOrder = Y (X > Y). Tijden zijn "HH:mm" in Brussel-tijd.
     {
@@ -807,36 +867,39 @@ async function main() {
     {
       headerCode: "AANBOD",
       slug: "shiften",
-      titleNl: "Shiften",
-      titleEn: "Shifts",
-      excerptNl: "Help mee achter de schermen bij VTK-diensten en events.",
-      excerptEn: "Help behind the scenes at VTK services and events.",
+      titleNl: SHIFTEN_PAGE.titleNl,
+      titleEn: SHIFTEN_PAGE.titleEn,
+      excerptNl: SHIFTEN_PAGE.excerptNl,
+      excerptEn: SHIFTEN_PAGE.excerptEn,
       order: 1,
-      contentNl: richText([
-        "Vrijwilligers houden Theokot, events en praktische werkingen draaiende.",
-        "Voor het prototype verwijzen we naar het aparte shiftenplatform. Later kan deze pagina de belangrijkste uitleg, voorwaarden en contactinfo tonen.",
-      ]),
-      contentEn: richText([
-        "Volunteers keep Theokot, events and practical services running.",
-        "For the prototype, this page points towards the separate shifts platform. Later, it can contain the main explanation, conditions and contact details.",
-      ]),
+      // Echte inhoud, geen prototypetekst: deze twee pagina's beschrijven een
+      // werking die vandaag al draait. Markdown wint van de tiptap-JSON zodra
+      // ze gezet is, dus die JSON is hier enkel nog de terugval.
+      contentMdNl: SHIFTEN_PAGE.contentMdNl,
+      contentMdEn: SHIFTEN_PAGE.contentMdEn,
+      ctaLabelNl: SHIFTEN_PAGE.ctaLabelNl,
+      ctaLabelEn: SHIFTEN_PAGE.ctaLabelEn,
+      ctaUrl: SHIFTEN_PAGE.ctaUrl,
+      needsYearlyEdit: true,
+      contentNl: richText([SHIFTEN_PAGE.excerptNl]),
+      contentEn: richText([SHIFTEN_PAGE.excerptEn]),
     },
     {
       headerCode: "AANBOD",
-      slug: "reservaties-en-logistiek",
-      titleNl: "Reservaties en logistiek",
-      titleEn: "Reservations and logistics",
-      excerptNl: "Praktische ondersteuning, materiaal en logistieke aanvragen.",
-      excerptEn: "Practical support, materials and logistics requests.",
+      slug: "uitleendienst",
+      titleNl: UITLEENDIENST_PAGE.titleNl,
+      titleEn: UITLEENDIENST_PAGE.titleEn,
+      excerptNl: UITLEENDIENST_PAGE.excerptNl,
+      excerptEn: UITLEENDIENST_PAGE.excerptEn,
       order: 2,
-      contentNl: richText([
-        "VTK ondersteunt werkgroepen met materiaal, lokalen, transport en praktische voorbereiding.",
-        "Deze prototypepagina toont hoe het aanbod als gewone CMS-categorie kan groeien zonder aparte layout.",
-      ]),
-      contentEn: richText([
-        "VTK supports work groups with materials, rooms, transport and practical preparation.",
-        "This prototype page shows how the offer section can grow as a normal CMS category without a separate layout.",
-      ]),
+      contentMdNl: UITLEENDIENST_PAGE.contentMdNl,
+      contentMdEn: UITLEENDIENST_PAGE.contentMdEn,
+      ctaLabelNl: UITLEENDIENST_PAGE.ctaLabelNl,
+      ctaLabelEn: UITLEENDIENST_PAGE.ctaLabelEn,
+      ctaUrl: UITLEENDIENST_PAGE.ctaUrl,
+      needsYearlyEdit: true,
+      contentNl: richText([UITLEENDIENST_PAGE.excerptNl]),
+      contentEn: richText([UITLEENDIENST_PAGE.excerptEn]),
     },
     {
       headerCode: "EERSTEJAARS",
@@ -963,77 +1026,17 @@ async function main() {
         excerptEn: page.excerptEn,
         contentJsonNl: page.contentNl,
         contentJsonEn: page.contentEn,
+        contentMdNl: "contentMdNl" in page ? page.contentMdNl : null,
+        contentMdEn: "contentMdEn" in page ? page.contentMdEn : null,
+        ctaLabelNl: "ctaLabelNl" in page ? page.ctaLabelNl : null,
+        ctaLabelEn: "ctaLabelEn" in page ? page.ctaLabelEn : null,
+        ctaUrl: "ctaUrl" in page ? page.ctaUrl : null,
+        needsYearlyEdit: "needsYearlyEdit" in page ? page.needsYearlyEdit : false,
         publishedAt: new Date("2026-05-18T00:00:00+02:00"),
         order: page.order,
       },
     });
   }
-
-  console.log("Seeding prototype photo albums...");
-  const albumSeeds = [
-    {
-      slug: "galabal-2026",
-      titleNl: "Galabal 2026",
-      titleEn: "Gala 2026",
-      descriptionNl: "Prototype-album voor de fotopagina. Upload echte beelden via het adminpaneel.",
-      descriptionEn: "Prototype album for the photo page. Upload real images through the admin panel.",
-      eventDate: "2026-03-14T20:00:00+01:00",
-      publishedAt: "2026-05-18T00:00:00+02:00",
-    },
-    {
-      slug: "vtk-ski-2026",
-      titleNl: "Skireis 2026",
-      titleEn: "Ski trip 2026",
-      descriptionNl: "Sfeerbeelden van de jaarlijkse VTK-skireis.",
-      descriptionEn: "Atmosphere shots from the yearly VTK ski trip.",
-      eventDate: "2026-02-08T08:00:00+01:00",
-      publishedAt: "2026-05-18T00:00:00+02:00",
-    },
-    {
-      slug: "cantus-lente-2026",
-      titleNl: "Lentecantus 2026",
-      titleEn: "Spring cantus 2026",
-      descriptionNl: "Een lege prototypecollectie zodat albumlijsten gevuld zijn voor review.",
-      descriptionEn: "An empty prototype collection so album lists are populated for review.",
-      eventDate: "2026-04-24T20:00:00+02:00",
-      publishedAt: "2026-05-18T00:00:00+02:00",
-    },
-    {
-      slug: "career-fair-2026",
-      titleNl: "Career Fair 2026",
-      titleEn: "Career Fair 2026",
-      descriptionNl: "Prototype-album voor partner- en careercontent.",
-      descriptionEn: "Prototype album for partner and career content.",
-      eventDate: "2026-03-04T10:00:00+01:00",
-      publishedAt: "2026-05-18T00:00:00+02:00",
-    },
-  ];
-  // Create-only: bestaande albums (titel, beschrijving, datums) niet overschrijven.
-  for (const album of albumSeeds) {
-    await prisma.photoAlbum.upsert({
-      where: { slug: album.slug },
-      update: {},
-      create: {
-        slug: album.slug,
-        titleNl: album.titleNl,
-        titleEn: album.titleEn,
-        descriptionNl: album.descriptionNl,
-        descriptionEn: album.descriptionEn,
-        eventDate: new Date(album.eventDate),
-        publishedAt: new Date(album.publishedAt),
-      },
-    });
-  }
-
-  // Create-only: op een verse DB de featured-albums vullen met de seed-albums;
-  // een bestaande (admin-gekozen) selectie niet overschrijven. Deze key staat
-  // daarom bewust NIET in `defaultSettings` hierboven (die zou hem eerst leeg
-  // aanmaken en deze create-branch nooit laten vuren).
-  await prisma.setting.upsert({
-    where: { key: "home.featuredAlbums" },
-    update: {},
-    create: { key: "home.featuredAlbums", value: { albumSlugs: albumSeeds.map((a) => a.slug) } },
-  });
 
   console.log("Seeding calendar events...");
   // Pulled from the vtk.be /nl/calendar iCal feed. Times are Europe/Brussels
@@ -1323,13 +1326,41 @@ async function main() {
     maxParticipants: number;
     reward: number;
     post: string | null;
+    openToInternationals?: boolean;
+    instructions?: string;
   }> = [
-    { id: "seed-shift-1", name: "Tapshift", dayOffset: 1, startHour: 20, endHour: 23, location: "Fakbar", description: "Tapshift donderdagavond", maxParticipants: 4, reward: 2, post: "FAKBAR" },
+    {
+      id: "seed-shift-1",
+      name: "Tapshift",
+      dayOffset: 1,
+      startHour: 20,
+      endHour: 23,
+      location: "Fakbar",
+      description: "Tapshift donderdagavond",
+      maxParticipants: 4,
+      reward: 2,
+      post: "FAKBAR",
+      openToInternationals: true,
+      instructions: [
+        "Je staat achter de toog: tappen, afrekenen en tussendoor de bar proper houden.",
+        "",
+        "## Wat je doet",
+        "",
+        "- Meld je tien minuten voor je shift bij de barverantwoordelijke.",
+        "- Tappen en afrekenen aan de kassa; de prijzen hangen naast de tap.",
+        "- Op het einde: glazen binnen, koelkasten bijvullen, toog afkuisen.",
+        "",
+        "## Goed om weten",
+        "",
+        "Ervaring is niet nodig, er staat altijd iemand ervaren bij je. Draag schoenen",
+        "die tegen een plas bier kunnen.",
+      ].join("\n"),
+    },
     { id: "seed-shift-2", name: "Cursusverkoop", dayOffset: 2, startHour: 9, endHour: 12, location: "Cursusdienst", description: "Cursussen verkopen tijdens de ochtend", maxParticipants: 3, reward: 1, post: "CURSUSDIENST" },
     { id: "seed-shift-3", name: "Quiz opbouw", dayOffset: 3, startHour: 18, endHour: 22, location: "Aula Q", description: "Opbouw quiz-avond", maxParticipants: 6, reward: 3, post: "ACTIVITEITEN" },
     { id: "seed-shift-4", name: "Sporttoernooi", dayOffset: 4, startHour: 13, endHour: 17, location: "Sporthal", description: "Begeleiding sporttoernooi", maxParticipants: 5, reward: 2, post: "SPORT" },
     { id: "seed-shift-5", name: "Cantus laden", dayOffset: 5, startHour: 8, endHour: 11, location: "Loods", description: "Materiaal laden voor cantus", maxParticipants: 4, reward: 3, post: "LOGISTIEK" },
-    { id: "seed-shift-6", name: "Galabal onthaal", dayOffset: 6, startHour: 19, endHour: 23, location: "Onthaal", description: "Onthaal en kaartcontrole galabal", maxParticipants: 8, reward: 2, post: null },
+    { id: "seed-shift-6", name: "Galabal onthaal", dayOffset: 6, startHour: 19, endHour: 23, location: "Onthaal", description: "Onthaal en kaartcontrole galabal", maxParticipants: 8, reward: 2, post: null, openToInternationals: true },
   ];
   for (const s of shiftSeeds) {
     const data = {
@@ -1341,6 +1372,8 @@ async function main() {
       maxParticipants: s.maxParticipants,
       reward: s.reward,
       post: s.post,
+      openToInternationals: s.openToInternationals ?? false,
+      instructions: s.instructions ?? null,
     };
     await prisma.shift.upsert({
       where: { id: s.id },
@@ -1351,7 +1384,7 @@ async function main() {
 
   console.log("Seeding completed shifts + participants...");
   // Voltooide (verleden) shiften met deelnemers, gemengd betaald/onbetaald, zodat
-  // de admin-ranglijst en -vergoedingen data hebben. Negatieve dayOffsets houden ze
+  // de admin-ranglijst en -bonnetjesdata hebben. Negatieve dayOffsets houden ze
   // relatief in het verleden; de laatste twee vallen in het vorige academiejaar.
   const pastShiftSeeds: Array<{
     id: string;
@@ -1404,7 +1437,12 @@ async function main() {
       await prisma.shiftParticipant.upsert({
         where: { shiftId_userId: { shiftId: s.id, userId: user.id } },
         update: {},
-        create: { shiftId: s.id, userId: user.id, payedOut: p.payedOut },
+        create: {
+          shiftId: s.id,
+          userId: user.id,
+          payedOut: p.payedOut,
+          rewardPaid: p.payedOut ? s.reward : 0,
+        },
       });
     }
   }
@@ -1462,7 +1500,7 @@ async function main() {
     pricingMode: "FREE" | "PER_HOUR" | "PER_KM" | "FLAT";
     rateCents: number;
   }> = [
-    { code: "kar", nameNl: "Kar", nameEn: "Trailer", pricingMode: "FREE", rateCents: 0 },
+    { code: "kar", nameNl: "Kar", nameEn: "Van", pricingMode: "FREE", rateCents: 0 },
     { code: "auto", nameNl: "Auto", nameEn: "Car", pricingMode: "PER_KM", rateCents: 35 },
     { code: "bakfiets", nameNl: "Bakfiets", nameEn: "Cargo bike", pricingMode: "FREE", rateCents: 0 },
   ];
@@ -1479,6 +1517,46 @@ async function main() {
         rateCents: v.rateCents,
         sortIndex: i,
       },
+    });
+  }
+
+  // Kalendercategorieën: de doelgroep van een evenement, los van de post die het
+  // organiseert. Elke categorie krijgt een pagina (/kalender/<slug>) en een eigen
+  // ICS-feed. Naam, kleur en volgorde zijn daarna GUI-beheerd, dus we raken bij
+  // een herseed enkel de slug aan (`update: {}`); enkel nieuwe categorieën komen
+  // erbij.
+  // De eerste twee zijn doelgroepen: hun evenementen duiken vanzelf op bij wie
+  // erbij hoort en staan niet tussen de filterchips. De rest zijn gewone thema's.
+  const calendarCategories = [
+    {
+      slug: "eerstejaars",
+      nameNl: "Eerstejaars",
+      nameEn: "First years",
+      colour: "#EC4899",
+      audience: "FIRST_YEARS" as const,
+    },
+    {
+      slug: "internationaal",
+      nameNl: "Internationaal",
+      nameEn: "International",
+      colour: "#14B8A6",
+      audience: "INTERNATIONALS" as const,
+    },
+    { slug: "career", nameNl: "Career", nameEn: "Career", colour: "#0EA5E9", audience: null },
+    { slug: "cantus", nameNl: "Cantus", nameEn: "Cantus", colour: "#E11D48", audience: null },
+    { slug: "cultuur", nameNl: "Cultuur", nameEn: "Culture", colour: "#D946EF", audience: null },
+    { slug: "sport", nameNl: "Sport", nameEn: "Sports", colour: "#16A34A", audience: null },
+    { slug: "service", nameNl: "Service", nameEn: "Service", colour: "#F59E0B", audience: null },
+    { slug: "studie", nameNl: "Studie", nameEn: "Studies", colour: "#8B5CF6", audience: null },
+  ];
+  for (let i = 0; i < calendarCategories.length; i += 1) {
+    const c = calendarCategories[i];
+    await prisma.calendarCategory.upsert({
+      where: { slug: c.slug },
+      // Naam, kleur en volgorde zijn GUI-beheerd en blijven staan, maar `audience`
+      // hangt aan code (welk lid hoort erbij) en wordt dus wél bijgewerkt.
+      update: { audience: c.audience },
+      create: { ...c, order: i },
     });
   }
 

@@ -4,6 +4,8 @@ import { useState, useTransition } from "react";
 import { Button, Card, ConfirmDialog, Input, Label, Textarea } from "@vtk/ui";
 import { getDictionary, type Locale } from "@vtk/i18n";
 import { SaveForm } from "@/components/ui/SaveForm";
+import { IconButton } from "@/components/ui/IconButton";
+import { TrashIcon } from "@/components/ui/icons";
 import { deleteHeaderTabAction, saveHeaderTabAction } from "@/app/actions/pages";
 import { SAVE_IDLE } from "@/lib/saveState";
 import { contentErrorMessages } from "./messages";
@@ -92,6 +94,36 @@ export function TabInspector({
           <input type="checkbox" name="visible" defaultChecked={tab?.visible ?? true} />
           {nl ? "Zichtbaar in de header" : "Visible in the header"}
         </label>
+
+        <div>
+          <Label htmlFor="externalUrl">
+            {nl ? "Linkt naar externe site" : "Links to an external site"}
+          </Label>
+          <Input
+            id="externalUrl"
+            name="externalUrl"
+            type="url"
+            placeholder="https://career.vtk.be"
+            defaultValue={tab?.externalUrl ?? ""}
+          />
+          <p className="mt-1 text-xs text-[#5c667f]">
+            {nl
+              ? "Laat leeg voor een gewone tab. Vul je iets in, dan opent de headerknop die site in een nieuw tabblad en gaat hij niet naar de categoriepagina."
+              : "Leave empty for a normal tab. When filled in, the header button opens that site in a new tab instead of the category page."}
+          </p>
+        </div>
+
+        <fieldset className="space-y-3 border-t border-vtk-blue/10 pt-5">
+          <legend className="text-sm font-semibold text-vtk-ink">
+            {nl ? "Extra items in het menu" : "Extra items in the menu"}
+          </legend>
+          <p className="text-xs text-[#5c667f]">
+            {nl
+              ? "De pagina's onder deze categorie staan automatisch in het uitklapmenu. Hier voeg je bestemmingen op een andere site toe, zoals cudi.vtk.be of career.vtk.be."
+              : "The pages under this category are listed in the dropdown automatically. Add destinations on another site here, such as cudi.vtk.be or career.vtk.be."}
+          </p>
+          <MenuLinkRows nl={nl} initial={tab?.links ?? []} />
+        </fieldset>
 
         <fieldset className="space-y-4 border-t border-vtk-blue/10 pt-5">
           <legend className="text-sm font-semibold text-vtk-ink">
@@ -223,6 +255,73 @@ export function InspectorHead({
       >
         ✕
       </button>
+    </div>
+  );
+}
+
+
+/**
+ * Extra menu-items van een categorie. Rijen posten als `link-<i>-{labelNl,labelEn,url}`
+ * plus een `linkCount`; de action vervangt de volledige lijst in die volgorde.
+ */
+function MenuLinkRows({
+  nl,
+  initial,
+}: {
+  nl: boolean;
+  initial: Array<{ labelNl: string; labelEn: string; url: string }>;
+}) {
+  const [rows, setRows] = useState(initial);
+
+  function update(index: number, patch: Partial<{ labelNl: string; labelEn: string; url: string }>) {
+    setRows((current) => current.map((row, i) => (i === index ? { ...row, ...patch } : row)));
+  }
+
+  return (
+    <div className="space-y-2">
+      <input type="hidden" name="linkCount" value={rows.length} />
+      {rows.map((row, index) => (
+        <div key={index} className="grid gap-2 sm:grid-cols-[1fr_1fr_1.4fr_auto] sm:items-center">
+          <Input
+            name={`link-${index}-labelNl`}
+            value={row.labelNl}
+            onChange={(event) => update(index, { labelNl: event.target.value })}
+            placeholder={nl ? "Label (NL)" : "Label (NL)"}
+            required
+          />
+          <Input
+            name={`link-${index}-labelEn`}
+            value={row.labelEn}
+            onChange={(event) => update(index, { labelEn: event.target.value })}
+            placeholder={nl ? "Label (EN)" : "Label (EN)"}
+            required
+          />
+          <Input
+            name={`link-${index}-url`}
+            type="url"
+            value={row.url}
+            onChange={(event) => update(index, { url: event.target.value })}
+            placeholder="https://..."
+            required
+          />
+          <IconButton
+            label={nl ? "Verwijderen" : "Remove"}
+            srLabel={`${nl ? "Verwijderen" : "Remove"}: ${row.labelNl || row.url}`}
+            tone="danger"
+            onClick={() => setRows((current) => current.filter((_, i) => i !== index))}
+          >
+            <TrashIcon />
+          </IconButton>
+        </div>
+      ))}
+      <Button
+        type="button"
+        variant="ghost"
+        size="sm"
+        onClick={() => setRows((current) => [...current, { labelNl: "", labelEn: "", url: "" }])}
+      >
+        + {nl ? "Item toevoegen" : "Add item"}
+      </Button>
     </div>
   );
 }

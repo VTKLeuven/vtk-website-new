@@ -1,5 +1,6 @@
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import { headingId, headingText } from "@/lib/pageOutline";
 
 /**
  * Gedeelde markdown-renderer: dezelfde uitvoer op de publieke pagina's (server
@@ -14,6 +15,14 @@ export function Markdown({ children }: { children: string }) {
     <ReactMarkdown
       remarkPlugins={[remarkGfm]}
       components={{
+        // Kopjes krijgen een anker, zodat de "Op deze pagina"-rail ernaartoe kan
+        // linken. De id komt uit dezelfde helper als die rail (pageOutline).
+        h2: ({ children: headingChildren }) => (
+          <h2 id={headingId(headingText(headingChildren))}>{headingChildren}</h2>
+        ),
+        h3: ({ children: headingChildren }) => (
+          <h3 id={headingId(headingText(headingChildren))}>{headingChildren}</h3>
+        ),
         // Zelfde gedrag als de oude tiptap-renderer: links openen in een nieuw
         // tabblad. Interne ankers (#...) blijven in dezelfde pagina.
         a: ({ href, children: linkChildren }) => {

@@ -1,10 +1,11 @@
 "use client";
 
 import { useRef, useState, useTransition } from "react";
-import { Button, ConfirmDialog, Input, Label } from "@vtk/ui";
+import { Input, Label } from "@vtk/ui";
 import { getDictionary } from "@vtk/i18n";
 import { PartnerLogo } from "@/components/site/PartnerLogo";
 import { SaveForm } from "@/components/ui/SaveForm";
+import { DeleteButton } from "@/components/ui/DeleteIconButton";
 import { saveErrorMessages } from "@/lib/saveMessages";
 import {
   deletePartnerAction,
@@ -249,6 +250,11 @@ function EditPartnerModal({
   );
 }
 
+/**
+ * Verwijderen hoort bij het geopende partnerformulier en is dus een
+ * formulierknop, geen rij-actie: tekst mag (zie CLAUDE.md). `DeleteButton`
+ * brengt wel de bevestiging en de toast mee, die hier eerst ontbrak.
+ */
 function DeletePartnerButton({
   locale,
   id,
@@ -259,34 +265,21 @@ function DeletePartnerButton({
   name: string;
 }) {
   const nl = locale === "nl";
-  const [confirming, setConfirming] = useState(false);
-  const [pending, startTransition] = useTransition();
-
-  function onConfirm() {
-    const form = new FormData();
-    form.append("id", id);
-    startTransition(() => void deletePartnerAction(form));
-  }
-
   return (
-    <>
-      <Button type="button" variant="ghost" size="sm" onClick={() => setConfirming(true)}>
-        {nl ? "Verwijderen" : "Delete"}
-      </Button>
-      <ConfirmDialog
-        open={confirming}
-        title={nl ? "Partner verwijderen?" : "Delete partner?"}
-        description={
-          nl
-            ? `"${name}" wordt permanent verwijderd, inclusief het logo. Dit kan niet ongedaan gemaakt worden.`
-            : `"${name}" will be permanently deleted, including its logo. This cannot be undone.`
-        }
-        confirmLabel={nl ? "Verwijderen" : "Delete"}
-        cancelLabel={nl ? "Annuleren" : "Cancel"}
-        pending={pending}
-        onConfirm={onConfirm}
-        onCancel={() => setConfirming(false)}
-      />
-    </>
+    <DeleteButton
+      action={deletePartnerAction}
+      fields={{ id }}
+      title={nl ? "Partner verwijderen?" : "Delete partner?"}
+      description={
+        nl
+          ? `"${name}" wordt permanent verwijderd, inclusief het logo. Dit kan niet ongedaan gemaakt worden.`
+          : `"${name}" will be permanently deleted, including its logo. This cannot be undone.`
+      }
+      confirmLabel={nl ? "Verwijderen" : "Delete"}
+      cancelLabel={nl ? "Annuleren" : "Cancel"}
+      successMessage={nl ? "Partner verwijderd" : "Partner deleted"}
+    >
+      {nl ? "Verwijderen" : "Delete"}
+    </DeleteButton>
   );
 }

@@ -116,6 +116,7 @@ export async function getSession(headers: Headers): Promise<SessionPayload | nul
       nameNl: membership.group.nameNl,
       nameEn: membership.group.nameEn,
       role: membership.role,
+      type: membership.group.type,
     })),
     permissions: [...permissions],
     roleIds: [...roleIds],

@@ -244,7 +244,16 @@ every member of the post gets the role):
 | `werkgroep` | none (fill in the GUI) | — |
 | `medewerker` | none (fill in the GUI) | — |
 | `theokot` | `theokot.manage`, `theokot.pickup` | Theokot |
+| `grocomeet-deelnemer` | `grocomeet.reserve` | **LEADER** of every post, plus Groep 5 (DEFAULT) |
+| `grocomeet-beheer` | `grocomeet.manage`, `grocomeet.reserve` | Groep 5 |
+| `bureau` | `bureau.manage` | Onderwijs |
 | `post-<code>` (one per post) | none (container to fill in the GUI) | its own post |
+
+`grocomeet-deelnemer` is the one seeded role granted with **`LEADER`** instead of `DEFAULT`: the
+grocomeet is a meeting of the people responsible for a post, not of every post member. Group 5 gets
+it as `DEFAULT` because all five of them attend. Whoever holds it sees the "Broodje grocomeet" entry
+in the profile menu; that entry is gated on the permission, not on a hard-coded "is lead of a
+praesidium post" check, so the board can add someone (a co-responsible) without a code change.
 
 The per-post roles (`post-it`, `post-cursusdienst`, …) are empty containers so you can hang
 post-specific permissions off each werkgroep over time. `werkgroep`/`medewerker` are seeded as

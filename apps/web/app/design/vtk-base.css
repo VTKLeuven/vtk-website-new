@@ -26,7 +26,10 @@
   --sans: var(--font-vtk-sans), Inter, ui-sans-serif, system-ui, sans-serif;
   --serif: var(--font-vtk-serif), "Instrument Serif", Georgia, serif;
   --mono: var(--font-geist-mono), ui-monospace, SFMono-Regular, monospace;
-  --max: 1320px;
+  /* 1240 en niet 1320: op een gewone laptop plakte de inhoud bijna tegen de
+     schermranden, waardoor de pagina voller aanvoelde dan ze is. De zijmarge die
+     dit teruggeeft, is dezelfde die je kreeg door één keer uit te zoomen. */
+  --max: 1240px;
 }
 
 .vtk-design,
@@ -54,6 +57,26 @@
   background: none;
   border: 0;
   cursor: pointer;
+}
+
+/* De reset hierboven (0,1,1) is specifieker dan `.btn-primary` (0,1,0), dus een
+   primaire knop die een <button> is verloor binnen `.vtk-design` zijn vulling en
+   werd lichte tekst op papier: onzichtbaar. Ankers met dezelfde klasse hadden dat
+   niet, waardoor het alleen opviel bij knoppen die geen link zijn. */
+.vtk-design button.btn-primary,
+.vtk-design button.vtk-button-primary {
+  background: var(--ink);
+  border: 1px solid var(--ink);
+}
+
+.vtk-design button.btn-primary:hover,
+.vtk-design button.vtk-button-primary:hover {
+  background: var(--navy);
+}
+
+.vtk-design button.btn-ghost,
+.vtk-design button.vtk-button-ghost {
+  border: 1px solid var(--line-2);
 }
 
 .serif,
@@ -195,18 +218,280 @@
   max-width: 820px;
 }
 
+/* Contentpagina: tekstkolom met een optionele rail ernaast (inhoudsopgave en
+   downloads). Zonder rail blijft het één kolom van leesbare breedte; de rail
+   verschijnt pas wanneer er iets in staat. */
+.vtk-page-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: clamp(28px, 4vw, 48px);
+}
+
+.vtk-page-body > article {
+  min-width: 0;
+  max-width: 74ch;
+}
+
+@media (min-width: 980px) {
+  .vtk-page-body.has-rail {
+    grid-template-columns: minmax(0, 1fr) 244px;
+    align-items: start;
+  }
+}
+
+.vtk-page-rail {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+
+/* Smal scherm: de rail staat boven de tekst. Een inhoudsopgave onderaan, na de
+   inhoud die ze zou moeten ontsluiten, helpt niemand meer. */
+@media (max-width: 979px) {
+  .vtk-page-body.has-rail > .vtk-page-rail {
+    order: -1;
+  }
+}
+
+@media (min-width: 980px) {
+  /* Schuift mee, maar blijft onder de sticky sitekop staan. */
+  .vtk-page-rail {
+    position: sticky;
+    top: 96px;
+  }
+}
+
+.vtk-rail-box {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px 16px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--surface);
+}
+
+.vtk-rail-box h2 {
+  margin: 0;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+
+.vtk-rail-box ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.vtk-rail-box a {
+  color: var(--ink);
+  font-size: 14px;
+  line-height: 1.35;
+  text-decoration: none;
+}
+
+.vtk-rail-box a:hover {
+  text-decoration: underline;
+}
+
+/* Een H3 hangt onder zijn H2: inspringen plus een dunne lijn als geleider. */
+.vtk-rail-box a.is-sub {
+  display: block;
+  padding-left: 10px;
+  border-left: 1px solid var(--line);
+  color: var(--body);
+  font-size: 13px;
+}
+
+.vtk-rail-meta {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+/* Het kruimelpad staat in de donkere kop; de link mag daar niet wegvallen. */
+.vtk-crumb {
+  color: inherit;
+  text-decoration: none;
+}
+
+.vtk-crumb:hover {
+  color: var(--paper);
+  text-decoration: underline;
+}
+
+/* Aankondigingsvenster op de homepage (AnnouncementModal). Rustige witte kaart
+   op een navy waas: hetzelfde materiaal als de rest van de site, niet een
+   pop-up die eruit springt met eigen kleuren. */
+.vtk-announcement-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: grid;
+  place-items: center;
+  padding: clamp(16px, 5vw, 40px);
+  background: rgba(10, 15, 31, 0.55);
+  animation: vtk-announcement-fade 180ms ease-out;
+}
+
+.vtk-announcement {
+  width: min(100%, 520px);
+  max-height: min(80dvh, 720px);
+  overflow-y: auto;
+  padding: clamp(20px, 3vw, 28px);
+  border: 1px solid var(--line);
+  border-radius: 22px;
+  background: var(--surface);
+  color: var(--ink);
+  box-shadow: 0 30px 70px rgba(10, 15, 31, 0.35);
+  animation: vtk-announcement-rise 200ms ease-out;
+}
+
+.vtk-announcement-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.vtk-announcement-head h2 {
+  margin: 0;
+  font-size: clamp(20px, 2.4vw, 24px);
+  line-height: 1.15;
+  letter-spacing: -0.02em;
+  font-weight: 600;
+  text-wrap: balance;
+}
+
+.vtk-announcement-close {
+  display: inline-grid;
+  width: 32px;
+  height: 32px;
+  flex: none;
+  place-items: center;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.vtk-announcement-close:hover {
+  border-color: var(--line-2);
+  background: var(--paper-2);
+  color: var(--ink);
+}
+
+.vtk-announcement-body {
+  margin-top: 12px;
+  color: var(--body);
+  font-size: 15px;
+}
+
+.vtk-announcement-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 20px;
+}
+
+@keyframes vtk-announcement-fade {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes vtk-announcement-rise {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .vtk-announcement-backdrop,
+  .vtk-announcement {
+    animation: none;
+  }
+}
+
+/* Ankers uit de rail mogen niet onder de sticky sitekop landen. */
+.prose-vtk :is(h2, h3) {
+  scroll-margin-top: 96px;
+}
+
+/* Paginakop: een donkere band die het navy van de header doorzet, met het
+   technische patroon en een gele onderlijn als afsluiting. Dit is dezelfde kop
+   voor /tickets, de categoriepagina's en de contentpagina's, zodat de site één
+   systeem blijft in plaats van per rubriek een eigen aanhef. */
 .vtk-page-head,
 .vtk-design .page-head {
+  position: relative;
+  z-index: 0;
   max-width: var(--max);
   margin: 0 auto;
-  padding: clamp(28px, 3.5vw, 48px) clamp(20px, 3vw, 36px) clamp(18px, 2vw, 28px);
+  padding: clamp(44px, 5vw, 68px) clamp(20px, 3vw, 36px) clamp(40px, 4.5vw, 56px);
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   gap: 32px;
   align-items: end;
-  border-bottom: 1px solid var(--line);
+  color: var(--paper);
 }
 
+/* De band loopt van rand tot rand; de inhoud blijft binnen --max staan. */
+.vtk-page-head::before,
+.vtk-design .page-head::before {
+  content: "";
+  position: absolute;
+  z-index: -2;
+  top: 0;
+  bottom: 0;
+  left: calc(50% - 50vw);
+  right: calc(50% - 50vw);
+  background: var(--navy);
+  box-shadow: inset 0 -5px 0 var(--yellow);
+}
+
+.vtk-page-head::after,
+.vtk-design .page-head::after {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  top: 0;
+  bottom: 0;
+  left: calc(50% - 50vw);
+  right: calc(50% - 50vw);
+  pointer-events: none;
+  background-image: url("/technisch-pattern.svg");
+  background-size: 880px 880px;
+  background-repeat: repeat;
+  background-position: calc(50% + 340px) -160px;
+  opacity: 0.34;
+  -webkit-mask-image: linear-gradient(
+    to bottom,
+    transparent 0,
+    #000 56px,
+    #000 calc(100% - 40px),
+    transparent 100%
+  );
+  mask-image: linear-gradient(
+    to bottom,
+    transparent 0,
+    #000 56px,
+    #000 calc(100% - 40px),
+    transparent 100%
+  );
+}
+
+/* Deze drie klassen worden ook buiten de donkere band gebruikt (bv. de titel
+   van een contentpagina in PageView). Ze houden daarom hun donkere tekstkleur;
+   de lichte variant hangt aan `.vtk-page-head` hieronder. */
 .vtk-page-kicker,
 .vtk-design .page-head .crumbs,
 .vtk-design .aanbod-wrap .crumbs {
@@ -221,19 +506,21 @@
 .vtk-design .page-head h1 {
   margin: 0;
   max-width: 900px;
-  font-size: clamp(30px, 4vw, 52px);
-  line-height: 1.05;
-  letter-spacing: -0.025em;
+  font-size: clamp(32px, 4.4vw, 56px);
+  line-height: 1.04;
+  letter-spacing: -0.03em;
   font-weight: 600;
   color: var(--ink);
 }
 
+/* Accent binnen een paginatitel: dezelfde schreefloze letter als de rest. Het
+   serif-italic accent hoort op de homepage-hero en niet in elke kop. */
 .vtk-page-title em,
 .vtk-design .page-head h1 em {
   color: var(--navy);
-  font-family: var(--serif);
-  font-style: italic;
-  font-weight: 400;
+  font-family: inherit;
+  font-style: normal;
+  font-weight: 600;
 }
 
 .vtk-page-subtitle {
@@ -244,9 +531,39 @@
   line-height: 1.6;
 }
 
+/* In de donkere band draait de tekst om. */
+.vtk-page-head .vtk-page-kicker,
+.vtk-design .page-head .crumbs {
+  color: var(--on-dark-muted);
+}
+
+.vtk-page-head .vtk-page-title,
+.vtk-design .page-head h1 {
+  color: var(--paper);
+}
+
+.vtk-page-head .vtk-page-title em,
+.vtk-design .page-head h1 em {
+  color: var(--yellow);
+}
+
+.vtk-page-head .vtk-page-subtitle {
+  color: var(--on-dark-muted);
+}
+
+/* `.vtk-link` is navy, en dus onzichtbaar op de navy paginakop. Binnen de donkere
+   band draait hij mee met de rest van de tekst; het gele onderstreepje blijft. */
+.vtk-page-head .vtk-link {
+  color: var(--paper);
+}
+
+.vtk-page-head .vtk-link:hover {
+  color: var(--yellow);
+}
+
 .page-head-meta,
 .vtk-design .page-head-meta {
-  color: var(--muted);
+  color: var(--on-dark-muted);
   font-size: 12px;
   line-height: 1.8;
   text-align: right;
@@ -256,8 +573,106 @@
 
 .page-head-meta b,
 .vtk-design .page-head-meta b {
-  color: var(--ink);
+  color: var(--paper);
   font-weight: 600;
+}
+
+/* Knoppen in de donkere kop draaien om, net als op de homepage-hero. */
+.vtk-page-head .vtk-button-primary,
+.vtk-design .page-head .vtk-button-primary {
+  background: var(--surface);
+  border-color: var(--surface);
+  color: var(--ink) !important;
+}
+
+.vtk-page-head .vtk-button-primary:hover,
+.vtk-design .page-head .vtk-button-primary:hover {
+  background: var(--paper-2);
+}
+
+.vtk-page-head .vtk-button-ghost,
+.vtk-design .page-head .vtk-button-ghost {
+  border-color: rgba(255, 255, 255, 0.3);
+  color: var(--paper) !important;
+}
+
+.vtk-page-head .vtk-button-ghost:hover,
+.vtk-design .page-head .vtk-button-ghost:hover {
+  border-color: var(--yellow);
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--yellow) !important;
+}
+
+/* Zoekveld. Het staat op een donkere ondergrond (het uitklapmenu van de sitekop
+   en de paginakop van /zoeken), dus één licht-op-donker behandeling volstaat.
+   In de balk zelf staat geen veld maar een knop naar /zoeken: de elf tabs vullen
+   de navigatie tot op ~40px na en `.nav-inner` groeit niet voorbij --max. */
+.vtk-search-form {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  max-width: 560px;
+  padding: 0 5px 0 14px;
+  border: 1px solid rgba(250, 250, 247, 0.34);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.12);
+  color: var(--paper);
+  transition: background 160ms ease, border-color 160ms ease;
+}
+
+.vtk-search-form:focus-within {
+  border-color: var(--paper);
+  background: rgba(255, 255, 255, 0.22);
+}
+
+.vtk-search-icon {
+  flex: 0 0 auto;
+  color: rgba(250, 250, 247, 0.7);
+}
+
+.vtk-search-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 12px 0;
+  border: 0;
+  background: none;
+  color: var(--paper);
+  font: inherit;
+  /* 16px en niet kleiner: iOS zoomt anders in bij het focussen op het veld. */
+  font-size: 16px;
+  outline: none;
+}
+
+.vtk-search-input::placeholder {
+  color: rgba(250, 250, 247, 0.6);
+}
+
+/* Het wisknopje dat WebKit in een `type=search` zet is donkergrijs, en dus
+   onzichtbaar op navy. */
+.vtk-search-input::-webkit-search-cancel-button {
+  filter: invert(1);
+  opacity: 0.6;
+}
+
+/* De knop draait om naar een lichte vulling, net als elke primaire knop op een
+   donkere band. */
+.vtk-search-submit {
+  flex: 0 0 auto;
+  padding: 9px 18px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--ink);
+  cursor: pointer;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  transition: background 160ms ease;
+}
+
+.vtk-search-submit:hover {
+  background: var(--paper-2);
 }
 
 .vtk-panel,

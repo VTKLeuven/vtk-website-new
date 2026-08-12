@@ -583,3 +583,49 @@ select:focus {
     min-height: 0;
   }
 }
+
+/*
+ * Afdrukken (klaarzetlijst, A7).
+ *
+ * De chrome van de site hoort niet op papier: de header, de voetnoot en de
+ * beheernavigatie verdwijnen, en elk blad krijgt zijn eigen pagina. Alles staat
+ * hier bij elkaar in plaats van als print:hidden-klasse op elk van die
+ * componenten, want het geldt voor élke pagina die iemand afdrukt.
+ */
+@media print {
+  body > header,
+  body > footer,
+  nav[aria-label='Beheernavigatie'] {
+    display: none !important;
+  }
+
+  /* De kop van het beheer ("Beheer uitleendienst") is schermnavigatie, geen
+     onderdeel van het blad. */
+  [data-print='hide'] {
+    display: none !important;
+  }
+
+  body {
+    background: #fff;
+  }
+
+  main {
+    max-width: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+
+  @page {
+    size: A4;
+    margin: 14mm;
+  }
+
+  .print-sheet {
+    break-inside: avoid;
+  }
+
+  /* Eén aanvraag per blad; het laatste blad krijgt er geen lege pagina bij. */
+  .print-sheet + .print-sheet {
+    break-before: page;
+  }
+}

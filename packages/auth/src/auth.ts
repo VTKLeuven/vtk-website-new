@@ -88,11 +88,25 @@ export const auth = betterAuth({
       // 10.6). Dat is het antwoord op "hoe lang blijft een ingetrokken
       // permissie werken": tien minuten, altijd, zonder dat de client iets moet
       // doen. Een gewoon `openid profile`-token houdt zijn volle uur.
-      scopeExpirations: { entitlements: 600 },
+      //
+      // LET OP: dit moet een duurstring zijn, geen getal. De plugin duwt deze
+      // waarde door `toExpJWT()`, en dat behandelt een getal als een absolute
+      // epoch-seconde (`600` = 1 januari 1970, 00:10 UTC), niet als "over 600
+      // seconden". Met een getal krijgt elke client die `entitlements` vraagt
+      // een token dat al verlopen is; UserInfo antwoordt dan met het misleidende
+      // `invalid_scope` / "Missing required scope".
+      scopeExpirations: { entitlements: '10m' },
       // De scope-registry (lib/scopes.ts) is de bron; zonder deze regel staat de
       // plugin enkel haar vier standaardscopes toe en faalt het aanmaken van een
       // client met bv. `vtk:study_programme` op `invalid_scope`.
       scopes: [...SCOPE_CODES],
+
+      // We publiceren geen losse RFC 8707 resource servers. De upstream plugin
+      // bindt toegelaten `resource`-audiences momenteel niet per OAuth-client
+      // (GHSA-p2fr-6hmx-4528). Een lege expliciete lijst schakelt die globale
+      // resource-indicatorroute uit; enkel de door de plugin afgeleide UserInfo-
+      // audience blijft beschikbaar voor normale OpenID Connect-clients.
+      validAudiences: [],
 
       // Welke claims onder welke scope vrijkomen, staat in lib/claims.ts. De
       // meeste zitten enkel in UserInfo en niet in het ID token: dat wordt één
@@ -100,16 +114,21 @@ export const auth = betterAuth({
       customIdTokenClaims: async ({ user, scopes }) =>
         resolveClaims({ destination: 'id_token', userId: user.id, scopes: [...scopes] }),
 
-      // `jwt` is de payload van het access token waarmee UserInfo opgehaald
-      // wordt; `azp` is de client die het kreeg. Dat is de enige plek waar de
-      // client bekend is, en dus de enige plek waar de `permissions`-claim
-      // opgelost kan worden.
+      // `jwt` is de payload van het access token waarmee UserInfo opgehaald wordt,
+      // en de enige plek waar de client bekend is. Onze access tokens zijn opaque,
+      // dus die payload draagt `client_id`; `azp` bestaat enkel op een JWT access
+      // token. Lees allebei, anders valt de `permissions`-claim stil weg.
       customUserInfoClaims: async ({ user, scopes, jwt }) =>
         resolveClaims({
           destination: 'userinfo',
           userId: user.id,
           scopes: [...scopes],
-          clientId: typeof jwt?.azp === 'string' ? jwt.azp : undefined,
+          clientId:
+            typeof jwt?.client_id === 'string'
+              ? jwt.client_id
+              : typeof jwt?.azp === 'string'
+                ? jwt.azp
+                : undefined,
         }),
 
       customAccessTokenClaims: async ({ user, scopes }) =>
@@ -179,6 +198,20 @@ export const auth = betterAuth({
   },
 
   databaseHooks: {
+    user: {
+      update: {
+        // Deze velden zijn enkel `input: true` zodat de KU Leuven-provider ze
+        // bij een nieuw OAuth-account kan initialiseren. Gewone better-auth
+        // update-user-calls mogen de autoritatieve waarden nooit overschrijven;
+        // latere SSO-syncs schrijven rechtstreeks en conditioneel via Prisma.
+        before: async (user) => {
+          if ("firwStudent" in user || "firwStudentChangedAt" in user) {
+            throw new APIError("BAD_REQUEST", { message: "FIRW_STATUS_READ_ONLY" });
+          }
+          return { data: user };
+        },
+      },
+    },
     session: {
       // Mirror the `active` gate the password flow enforces in loginAction, so
       // deactivated members cannot obtain a session via SSO either.
@@ -233,6 +266,19 @@ export const auth = betterAuth({
         type: "boolean",
         required: false,
         defaultValue: false,
+      },
+      // Autoritatieve faculteitsstatus uit KU Leuven eduPersonOrgUnitDN. Beide
+      // velden moeten input aanvaarden zodat ze op de eerste OAuth-login mee in
+      // de nieuwe User-rij landen. De user.update-hook hierboven voorkomt dat
+      // een gewone client ze nadien zelf kan wijzigen.
+      firwStudent: {
+        type: "boolean",
+        required: false,
+        defaultValue: false,
+      },
+      firwStudentChangedAt: {
+        type: "date",
+        required: false,
       },
       avatarKey: {
         type: 'string',

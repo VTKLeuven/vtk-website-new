@@ -142,8 +142,12 @@ met enkel wachtwoord-login (`isKulEnabled()`).
   providerId: "kuleuven",
   clientId: KUL_OIDC_CLIENT_ID,           // = de Entity ID die ICTS registreerde (bv. dev.vtk.be)
   clientSecret: KUL_OIDC_CLIENT_SECRET,   // backend-only, uit de aparte ICTS-mail
-  discoveryUrl: KUL_OIDC_DISCOVERY_URL,   // https://idp.kuleuven.be/.well-known/openid-configuration
-  scopes: ["openid", "profile", "email"],
+  issuer: "https://idp.kuleuven.be",
+  authorizationUrl: "https://idp.kuleuven.be/idp/profile/oidc/authorize",
+  tokenUrl: "https://idp.kuleuven.be/idp/profile/oidc/token",
+  userInfoUrl: "https://idp.kuleuven.be/idp/profile/oidc/userinfo",
+  scopes: ["openid", "profile", "email", "allattributes"],
+  getUserInfo: getKulUserInfo,             // haalt userinfo altijd op en voegt ID-tokenclaims samen
   pkce: true,
   authentication: "post",                 // client_secret_post (matcht ICTS-registratie)
   mapProfileToUser: (profile) => ({ email, name, emailVerified: true, rNumber? }),
@@ -155,6 +159,13 @@ met enkel wachtwoord-login (`isKulEnabled()`).
   `<BETTER_AUTH_URL>/api/auth/better/oauth2/callback/kuleuven`. Die moet exact
   matchen met wat bij ICTS geregistreerd staat. `KUL_OIDC_REDIRECT_URI` overschrijft
   dit enkel indien nodig; normaal leeg laten.
+- **Endpoints zijn expliciet geconfigureerd.** Ze komen overeen met KU Leuvens
+  officiële discoverydocument, maar Better Auth krijgt bewust geen
+  `discoveryUrl`: anders haalt de plugin dat document op vóór elke redirect en
+  nogmaals vóór elke callback. Een tijdelijke timeout van de metadata-URL zou
+  dan zelfs het openen van de KU Leuven-login blokkeren. De
+  `KUL_OIDC_DISCOVERY_URL`-env blijft voorlopig de feature-toggle, zodat bestaande
+  omgevingsconfiguratie compatibel blijft.
 - **`mapProfileToUser`** vertaalt de KU Leuven-claims naar de velden waarmee
   better-auth een User zoekt/aanmaakt:
   - **`email`**: stuurt account-linking aan (zie hieronder), dus moet matchen met
@@ -191,13 +202,31 @@ Om te controleren welke attributen ICTS effectief vrijgeeft (bv. of
 - **Privacy**: die claims bevatten persoonsgegevens (naam, e-mail, r-nummer,
   faculteit). Daarom staat het standaard uit, bewaren we enkel de laatste
   `KUL_LOG_KEEP` (50) logins, en is er een "Clear logs"-knop.
-- **Belangrijke kanttekening**: better-auth leest eerst de **ID-token**-claims en
-  roept de userinfo-endpoint alleen aan wanneer `sub` of `email` daar ontbreekt
-  (`getUserInfo` in de generic-oauth-plugin). Attributen die KU Leuven enkel op de
-  userinfo-endpoint vrijgeeft, verschijnen dus mogelijk niet in de log ook al
-  geeft ICTS ze vrij. Ontbreekt de faculteit terwijl ze wel verwacht wordt, dan is
-  een custom `getUserInfo` (die de userinfo-endpoint altijd aanroept of samenvoegt)
-  de volgende stap.
+- **Userinfo wordt altijd opgehaald**: better-auth zou standaard meteen de
+  **ID-token**-claims gebruiken zodra die `sub` en `email` bevatten. Daardoor
+  ontbraken attributen die ICTS enkel via userinfo vrijgeeft. Onze custom
+  `getKulUserInfo` (`packages/auth/src/logins/kul-userinfo.ts`) haalt daarom bij
+  elke login `https://idp.kuleuven.be/idp/profile/oidc/userinfo` op en voegt die
+  claims samen met het ID-token. Bij een tijdelijke userinfo-fout blijft de login
+  werken met de ID-tokenclaims; een afwijkende `sub` wordt om veiligheidsredenen
+  geweigerd.
+- **`allattributes`-scope**: KU Leuvens eigen OIDC-testclient vraagt naast
+  `openid profile email` ook deze KU Leuven-specifieke scope aan. Ze staat niet
+  in `scopes_supported` van het discoverydocument, maar activeert de
+  client-specifieke attributen die ICTS voor VTK vrijgeeft. Zonder die scope én
+  zonder de expliciete userinfo-call zagen we alleen de 15 standaardclaims uit
+  het ID-token.
+- **Faculteit Ingenieurswetenschappen**: voor studenten bevat
+  `eduPersonOrgUnitDN` de faculteitseenheid. De adminweergave herkent
+  `KULouNumber=50000486,...` expliciet als de faculteit Ingenieurswetenschappen en
+  licht daarnaast `KULemployeeType`, `KULdipl` en `KULopl` uit als die door ICTS
+  worden vrijgegeven.
+- **Opgeslagen FirW-status**: na elke geslaagde userinfo-call wordt
+  `User.firwStudent` afgeleid uit nummer `50000486` in `eduPersonOrgUnitDN`.
+  `User.firwStudentChangedAt` wordt bij de eerste geldige controle ingevuld en
+  daarna alleen aangepast als de boolean effectief wijzigt. Een tijdelijke
+  userinfo-fout wijzigt geen van beide velden. De update is atomair, zodat ook
+  gelijktijdige logins de wijzigingsdatum niet onnodig verschuiven.
 
 ### Account-linking & self-provisioning
 
@@ -310,6 +339,25 @@ De submodule-apps draaien geen better-auth. Ze hergebruiken de gedeelde
 Belangrijk: een remote app importeert **`@vtk/auth/remote`**, nooit
 `@vtk/auth/server` (dat zou better-auth + Prisma mee de submodule in trekken).
 
+### Test-login (enkel testomgeving)
+
+Op een testomgeving (lokaal, `logistiek.dev.vtk.be`) is inloggen via de echte KU
+Leuven-SSO lastig, en logistiek heeft zelf geen auth. De toggle
+`LOGISTIEK_TEST_LOGIN=true` schakelt daarom een **test-login** in: via
+`/test-login` kies je een vast profiel en `getSession` fabriceert een
+`SessionPayload` voor die persoon (cookie `logistiek-test-user`). Zonder geldige
+cookie valt hij terug op de echte `fetchSession`, dus de gewone website-login
+blijft ernaast werken.
+
+- De profielen (`apps/logistiek/lib/test-users.ts`) dekken elk toegangsniveau:
+  `logistiek` (post Logistiek, `logistiek.manage` -> beheer), `it` (superadmin),
+  `post` (gewoon praesidiumlid), `mechanix` (werkgrooplid), `student` (extern).
+- **Nooit aanzetten in productie:** de profielen geven echte permissies (incl.
+  superadmin) zonder wachtwoord. Staat de toggle uit, dan geeft `/test-login`
+  404 en wordt de cookie volledig genegeerd; enkel de gewone website-login werkt.
+- Bekabeling: `LOGISTIEK_TEST_LOGIN` in `.env` -> de logistiek-service in
+  `infra/docker-compose.yml` geeft ze door aan de container.
+
 ## Gebruikersbeheer (`src/server/users.ts`)
 
 Admin-CRUD op accounts, allemaal achter de `users.edit`-permissie
@@ -357,6 +405,23 @@ deploys heen, dus de secrets horen daar en komen nooit in de repo. Na een
 wijziging: `docker compose -f infra/docker-compose.yml up -d --force-recreate web`
 (een kale `restart` herleest env-file-wijzigingen niet). Controleer met
 `docker compose ... exec web env | grep KUL`.
+
+Het default Compose-netwerk heeft IPv6 aanstaan. Dat is nodig omdat
+`idp.kuleuven.be` vanaf de productieserver niet via IPv4 bereikbaar is, terwijl
+de host wel een werkende IPv6-route heeft. Bij de eerste deploy van deze
+netwerkwijziging bouwt de workflow de images vooraf en voert ze daarna een
+eenmalige `docker compose down` uit voor het oude IPv4-only `infra_default`
+netwerk. De named volumes (waaronder PostgreSQL) worden daarbij niet verwijderd.
+
+Een `ETIMEDOUT` uit Better Auth vóór er een regel in **Admin -> IT -> KU Leuven
+SSO** verschijnt, betekent dat de token- of userinfo-call de IdP niet bereikte:
+het adminlog wordt pas in `mapProfileToUser` geschreven nadat beide calls
+geslaagd zijn. Controleer vanuit de web-container:
+
+```bash
+docker compose -f infra/docker-compose.yml exec web \
+  node -e 'fetch("https://idp.kuleuven.be/.well-known/openid-configuration").then(r => console.log(r.status))'
+```
 
 ## Niet-verwarren: KU Leuven-kaartverificatie
 

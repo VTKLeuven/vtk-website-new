@@ -19,6 +19,9 @@ export async function Footer({ locale }: { locale: Locale }) {
                 alt="VTK"
                 width={1152}
                 height={650}
+                // Zie de header: zonder `sizes` haalt de browser het volledige
+                // bestand op voor een merkteken van 38px hoog.
+                sizes="190px"
                 className="vtk-site-footer-logo"
               />
               {f.tagline}
@@ -60,6 +63,13 @@ export async function Footer({ locale }: { locale: Locale }) {
               <li>
                 <Link href={`${base}/shift`}>{f.linkShifts}</Link>
               </li>
+              <li>
+                {/* Eigen app op een eigen host (apps/logistiek), net als de cudi-links
+                    hierboven. Ze staat ook in het menu onder Info. */}
+                <a href="https://logistiek.vtk.be" rel="noopener noreferrer" target="_blank">
+                  {f.linkRental}
+                </a>
+              </li>
             </ul>
           </div>
           <div>
@@ -78,7 +88,11 @@ export async function Footer({ locale }: { locale: Locale }) {
                 <Link href={`${base}/praesidium`}>{f.linkPraesidium}</Link>
               </li>
               <li>
-                <Link href={`${base}/werkgroepen`}>{f.linkWerkgroepen}</Link>
+                {/* De bevriende kringen (BEST, Biomedix, Chemix, Existenz, Mechanix,
+                    Revue, Statix) staan als werkgroep in de database en dus al op
+                    /werkgroepen. Daarom noemt deze ene link ze allebei, in plaats van
+                    een tweede handgeschreven lijst naast dezelfde pagina te zetten. */}
+                <Link href={`${base}/werkgroepen`}>{f.linkWerkgroepenCircles}</Link>
               </li>
               <li>
                 <Link href={`${base}/over-vtk`}>{f.linkAbout}</Link>
@@ -104,6 +118,16 @@ export async function Footer({ locale }: { locale: Locale }) {
               <li>
                 <a href="https://www.linkedin.com/company/vtk-leuven" rel="noopener noreferrer" target="_blank">
                   {f.linkLinkedIn}
+                </a>
+              </li>
+              <li>
+                <a href="https://www.youtube.com/@VTKLeuven" rel="noopener noreferrer" target="_blank">
+                  {f.linkYouTube}
+                </a>
+              </li>
+              <li>
+                <a href="https://www.tiktok.com/@vtkleuven" rel="noopener noreferrer" target="_blank">
+                  {f.linkTikTok}
                 </a>
               </li>
             </ul>

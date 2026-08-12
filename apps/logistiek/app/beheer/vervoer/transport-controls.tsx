@@ -11,6 +11,8 @@ import {
   markTransportPaidOfflineAction,
 } from '@/app/actions/beheer';
 import { useToast } from '@/components/ui/toast';
+import type { DriverOption } from '@/lib/uitleen-server';
+import { DriverOptions } from './driver-select';
 
 const selectClass = 'h-9 rounded-lg border border-vtk-navy/15 bg-white px-3 text-sm text-vtk-ink';
 
@@ -19,6 +21,7 @@ export function TransportControls({
   bookingId,
   vehicleId,
   driverId,
+  driver,
   pricingMode,
   paid,
   drivers,
@@ -27,10 +30,11 @@ export function TransportControls({
   bookingId: string;
   vehicleId: string;
   driverId: string | null;
+  driver: { id: string; name: string } | null;
   pricingMode: UitleenPricingMode;
   paid: boolean;
-  drivers: Array<{ id: string; name: string }>;
-  vehicles: Array<{ id: string; name: string }>;
+  drivers: DriverOption[];
+  vehicles: Array<{ id: string; name: string; needsVanDriver: boolean }>;
 }) {
   const router = useRouter();
   const showToast = useToast();
@@ -76,11 +80,13 @@ export function TransportControls({
             className={selectClass}
           >
             <option value="">Nog geen</option>
-            {drivers.map((d) => (
-              <option key={d.id} value={d.id}>
-                {d.name}
-              </option>
-            ))}
+            <DriverOptions
+              drivers={drivers}
+              current={driver}
+              needsVanDriver={
+                vehicles.find((v) => v.id === vehicleId)?.needsVanDriver ?? false
+              }
+            />
           </select>
         </label>
       </div>

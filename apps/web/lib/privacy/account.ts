@@ -17,6 +17,8 @@ export async function exportUserData(userId: string) {
       email: true,
       rNumber: true,
       rNumberFromKul: true,
+      firwStudent: true,
+      firwStudentChangedAt: true,
       emailVerified: true,
       avatarKey: true,
       locale: true,
@@ -56,6 +58,7 @@ export async function exportUserData(userId: string) {
       participatingShifts: {
         select: {
           payedOut: true,
+          rewardPaid: true,
           shift: {
             select: { name: true, startTime: true, endTime: true, location: true },
           },
@@ -67,6 +70,7 @@ export async function exportUserData(userId: string) {
           totalCents: true,
           createdAt: true,
           session: { select: { date: true } },
+          voucherRedemption: { select: { amount: true, createdAt: true } },
           lines: {
             select: {
               quantity: true,
@@ -157,6 +161,33 @@ export async function exportUserData(userId: string) {
           },
         },
       },
+      // Inzendingen op formulieren zijn persoonsgegevens, dus ze horen in de
+      // export. Enkel de eigen antwoorden: de interne notitie en de beoordelaar
+      // zijn werkinformatie van de kring, geen gegevens van de betrokkene.
+      formEntries: {
+        select: {
+          status: true,
+          locale: true,
+          submitterName: true,
+          submitterEmail: true,
+          submittedAt: true,
+          createdAt: true,
+          form: { select: { slug: true, titleNl: true, titleEn: true } },
+          answers: {
+            select: {
+              fieldCode: true,
+              valueText: true,
+              valueNumber: true,
+              valueDate: true,
+              valueBool: true,
+              valueOptions: true,
+              field: { select: { labelNl: true, labelEn: true } },
+            },
+          },
+          uploads: { select: { originalName: true, sizeBytes: true, createdAt: true } },
+        },
+        orderBy: { createdAt: "desc" },
+      },
       doorLogs: {
         select: {
           at: true,
@@ -224,6 +255,17 @@ export async function eraseUserData(userId: string) {
   // request can be retried and the object key is not lost in a tombstone.
   if (user.avatarKey) await deleteObject(user.avatarKey);
 
+  // Formulierinzendingen gaan volledig weg in plaats van geanonimiseerd te
+  // worden. Bij een ticketbestelling volstaat het de identiteit te strippen,
+  // want de rij zelf is een financieel record; bij een formulier zitten de
+  // persoonsgegevens juist in de antwoorden, en een vrije tekst met een naam
+  // erin blijft dan gewoon staan. Zie docs/design-decisions.md.
+  const formUploads = await prisma.formFileUpload.findMany({
+    where: { entry: { submittedById: userId } },
+    select: { storageKey: true },
+  });
+  for (const upload of formUploads) await deleteObject(upload.storageKey);
+
   await prisma.$transaction(async (tx) => {
     const orders = await tx.ticketOrder.findMany({
       where: { buyerUserId: userId },
@@ -241,10 +283,36 @@ export async function eraseUserData(userId: string) {
     await tx.dashboardTile.deleteMany({ where: { userId } });
     await tx.shiftParticipant.deleteMany({ where: { userId } });
     await tx.ticketEventUserGrant.deleteMany({ where: { userId } });
+    await tx.formUserGrant.deleteMany({ where: { userId } });
+
+    // De quota van geschrapte inzendingen komen weer vrij; anders blijft een
+    // gewist account een plaats bezetten die niemand meer kan innemen.
+    const ownEntries = await tx.formEntry.findMany({
+      where: { submittedById: userId },
+      select: { id: true, formId: true, status: true, answers: { select: { valueOptions: true } } },
+    });
+    for (const entry of ownEntries) {
+      if (entry.status !== "SUBMITTED") continue;
+      for (const code of entry.answers.flatMap((answer) => answer.valueOptions)) {
+        await tx.formFieldOption.updateMany({
+          where: { formId: entry.formId, code, quotaUsed: { gt: 0 } },
+          data: { quotaUsed: { decrement: 1 }, version: { increment: 1 } },
+        });
+      }
+    }
+    await tx.formEntry.deleteMany({ where: { submittedById: userId } });
+    await tx.formEntry.updateMany({ where: { reviewerId: userId }, data: { reviewerId: null } });
+    await tx.formAuditLog.updateMany({
+      where: { actorUserId: userId },
+      data: { actorUserId: null, ipAddress: null, metadata: { purged: true } },
+    });
     await tx.doorAccessGrant.deleteMany({ where: { userId } });
     // De User-rij blijft als anonieme tombstone bestaan, dus een FK-cascade zou
     // deze credentials niet opruimen. Verwijder ze expliciet vóór anonimisering.
     await tx.doorShortcutToken.deleteMany({ where: { userId } });
+    // Om dezelfde reden: een persoonlijke feed-URL blijft anders werken en zou de
+    // agenda van een gewist account aan de houder van de link blijven tonen.
+    await tx.calendarFeedToken.deleteMany({ where: { userId } });
 
     await tx.doorAccessLog.updateMany({
       where: { userId },
@@ -314,6 +382,8 @@ export async function eraseUserData(userId: string) {
         email: deletedEmail,
         rNumber: null,
         rNumberFromKul: false,
+        firwStudent: false,
+        firwStudentChangedAt: null,
         emailVerified: false,
         // Markeert de rij als tombstone in plaats van als gedeactiveerd lid, zodat
         // gebruikerslijsten hem kunnen wegfilteren zonder ook echte inactieve

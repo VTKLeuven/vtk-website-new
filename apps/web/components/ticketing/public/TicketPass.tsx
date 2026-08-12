@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import QRCode from "qrcode";
-import { CheckCircle2, Clock3, Download, QrCode, UserRound, XCircle } from "lucide-react";
+import { CheckCircle2, Clock3, Download, QrCode, UserRound, Wallet, XCircle } from "lucide-react";
 import type { PublicTicket } from "./types";
 
 export function TicketPass({ ticket, locale }: { ticket: PublicTicket; locale: "nl" | "en" }) {
@@ -30,7 +30,8 @@ export function TicketPass({ ticket, locale }: { ticket: PublicTicket; locale: "
     <article className={`ticket-pass${checkedIn ? " is-used" : ""}${!valid && !checkedIn ? " is-invalid" : ""}`}>
       <div className="ticket-pass-stub">
         {qrDataUrl ? (
-          // Generated locally from the signed, PII-free ticket credential.
+          // Een data-URL die hier in de browser getekend wordt uit de ondertekende,
+          // PII-vrije ticketcredential. Er is geen bestand om te optimaliseren.
           // eslint-disable-next-line @next/next/no-img-element
           <img src={qrDataUrl} alt={locale === "nl" ? "QR-code van ticket" : "Ticket QR code"} />
         ) : (
@@ -59,6 +60,22 @@ export function TicketPass({ ticket, locale }: { ticket: PublicTicket; locale: "
               <Download size={17} aria-hidden="true" />
               {locale === "nl" ? "Open ticket" : "Open ticket"}
             </a>
+          ) : null}
+          {(ticket.walletAppleUrl || ticket.walletGoogleUrl) && (valid || checkedIn) ? (
+            <div className="ticket-wallet-buttons">
+              {ticket.walletAppleUrl ? (
+                <a className="ticket-wallet-button" href={ticket.walletAppleUrl}>
+                  <Wallet size={15} aria-hidden="true" />
+                  {locale === "nl" ? "Apple Wallet" : "Apple Wallet"}
+                </a>
+              ) : null}
+              {ticket.walletGoogleUrl ? (
+                <a className="ticket-wallet-button" href={ticket.walletGoogleUrl} target="_blank" rel="noreferrer">
+                  <Wallet size={15} aria-hidden="true" />
+                  {locale === "nl" ? "Google Wallet" : "Google Wallet"}
+                </a>
+              ) : null}
+            </div>
           ) : null}
         </div>
       </div>

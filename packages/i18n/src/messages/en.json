@@ -4,8 +4,9 @@
     "login": "Sign in",
     "profile": "Profile",
     "myAccount": "My account",
-    "myTickets": "My tickets",
     "admin": "Admin",
+    "grocomeet": "Grocomeet sandwich",
+    "grocomeetAttention": "pick again",
     "logout": "Sign out",
     "language": "Language"
   },
@@ -31,7 +32,6 @@
     "linkMedia": "Media",
     "linkAbout": "About VTK",
     "linkPraesidium": "Praesidium",
-    "linkWerkgroepen": "Werkgroepen",
     "linkInstagram": "Instagram",
     "linkFacebook": "Facebook",
     "linkLinkedIn": "LinkedIn",
@@ -39,7 +39,11 @@
     "linkSlots": "Cudi Time Slots",
     "linkPrivacy": "Privacy",
     "linkCookies": "Cookies",
-    "linkCookieSettings": "Cookie choices"
+    "linkCookieSettings": "Cookie choices",
+    "linkRental": "Equipment service",
+    "linkWerkgroepenCircles": "Working groups & partner societies",
+    "linkYouTube": "YouTube",
+    "linkTikTok": "TikTok"
   },
   "home": {
     "welcome": "Welcome to VTK",
@@ -185,7 +189,8 @@
   "pages": {
     "empty": "No pages yet",
     "overview": "Overview",
-    "downloads": "Downloads"
+    "downloads": "Downloads",
+    "onThisPage": "On this page"
   },
   "auth": {
     "signInLead": "Member sign-in",
@@ -201,6 +206,7 @@
     "newPassword": "New password",
     "saved": "Saved",
     "signInWithKul": "Sign in with KU Leuven",
+    "kulSignInFailed": "Signing in through KU Leuven failed. Please try again later.",
     "loginRequiredKicker": "Login required",
     "loginRequiredTitle": "Please log in to view this page",
     "loginRequiredBody": "You must be logged in before you can view the content on this page.",
@@ -236,6 +242,10 @@
     "preferencePersonal": "Personal email",
     "mailHeading": "Mailing lists",
     "mailIntro": "Which categories would you like to receive emails about? Pick as many or as few as you like.",
+    "shiftRemindersHeading": "Shift reminders",
+    "shiftRemindersHint": "An email about a shift you signed up for yourself. This is separate from the mailing lists above.",
+    "shiftReminderDayBefore": "A day in advance",
+    "shiftReminderSoon": "Two hours in advance",
     "photoHeading": "Profile picture",
     "photoHint": "Optional. If you are on the praesidium or a POC, this picture appears on the relevant page.",
     "photoChoose": "Choose a picture",
@@ -246,6 +256,8 @@
     "programmesHint": "Select every programme that applies to you.",
     "notAtFaculty": "I am not studying at the faculty",
     "notAtFacultyHint": "Tick this if you are not enrolled in an engineering programme at the faculty. You will not receive Career emails, as those target faculty students.",
+    "internationalStudent": "I am an international or exchange student",
+    "internationalStudentHint": "Tick this if you are at the faculty on an exchange or as an international student. Events for internationals then show up in your calendar automatically.",
     "notStudying": "I am not studying (anymore)",
     "notStudyingHint": "Tick this if you have graduated or stopped studying. You stay a member, but drop out of the study-related mailing lists.",
     "submit": "Complete registration",
@@ -301,16 +313,20 @@
     "groups": "Posts",
     "werkgroepen": "Werkgroepen",
     "roles": "Roles",
-    "albums": "Albums",
     "media": "Media",
     "pocs": "POCs",
     "partners": "Partners",
     "home": "Homepage",
+    "announcements": "Announcements",
     "dashboardTiles": "Dashboard tiles",
     "tickets": "Tickets",
+    "forms": "Forms",
     "shortlinks": "Short links",
     "shift": "Shifts",
     "theokot": "Theokot",
+    "grocomeet": "Grocomeet",
+    "bureau": "VTK Bureau",
+    "piano": "Piano",
     "door": "Door",
     "mailinglists": "Mailing lists",
     "it": "IT",
@@ -324,6 +340,7 @@
     "back": "Back",
     "noAccess": "No access",
     "ledenbeheer": "Members",
+    "evenementen": "Events",
     "website": "Website",
     "sso": "SSO & apps"
   },
@@ -362,7 +379,8 @@
     "no": "No",
     "saving": "Saving...",
     "saved": "Saved",
-    "saveError": "Something went wrong while saving."
+    "saveError": "Something went wrong while saving.",
+    "close": "Close"
   },
   "info": {
     "kicker": "VTK · KU Leuven",
@@ -433,32 +451,67 @@
   },
   "shift": {
     "shifts": "Shifts",
+    "subtitle": "Lend a hand behind the bar or at an event. Every shift earns vouchers.",
     "available": "Available shifts",
     "registered": "My shifts",
-    "columns": {
-      "shift": "Shift",
-      "date": "Date",
-      "time": "Time",
-      "where": "Location",
-      "action": "Action"
+    "view": {
+      "label": "View",
+      "week": "Week",
+      "list": "List"
+    },
+    "week": {
+      "prev": "Previous week",
+      "next": "Next week",
+      "today": "Today",
+      "range": "{from} to {to}"
     },
     "filter": {
       "post": "Group",
-      "allPosts": "All groups",
-      "from": "From",
-      "sortAsc": "↑ Ascending",
-      "sortDesc": "↓ Descending"
+      "allPosts": "All groups"
     },
-    "register": "Register",
+    "register": "Sign up",
     "unregister": "Unregister",
-    "week": {
-      "prev": "← Previous",
-      "today": "Today",
-      "next": "Next →",
-      "startDate": "Start date"
+    "isRegistered": "Registered",
+    "locked": "Locked within 24h",
+    "until": "until {time}",
+    "intl": {
+      "badge": "No Dutch required",
+      "hint": "You do not need to speak Dutch for this shift."
     },
-    "emptyAvailable": "There are no available shifts in this period.",
-    "emptyRegistered": "You are not registered for any shift yet.",
+    "instructions": "What does this shift involve?",
+    "dialog": {
+      "close": "Close",
+      "cancel": "Cancel",
+      "open": "View details"
+    },
+    "spots": {
+      "full": "Full",
+      "one": "1 spot left",
+      "few": "{n} spots left",
+      "taken": "{taken} of {max} spots taken"
+    },
+    "reward": {
+      "one": "1 voucher",
+      "many": "{n} vouchers"
+    },
+    "rel": {
+      "today": "Today",
+      "tomorrow": "Tomorrow",
+      "inDays": "In {n} days"
+    },
+    "empty": {
+      "week": "No shifts this week",
+      "next": "The next shift is {name} on {date}.",
+      "jump": "Go to {date}",
+      "none": "No shifts are scheduled at the moment."
+    },
+    "rail": {
+      "emptyTitle": "Nothing planned yet",
+      "emptyText": "Pick a shift from the overview; your registration shows up here right away.",
+      "year": "Academic year {year}",
+      "shiftsDone": "shifts done",
+      "vouchers": "vouchers earned"
+    },
     "detail": {
       "start": "Start",
       "end": "End",
@@ -466,7 +519,9 @@
       "post": "Group",
       "reward": "Reward",
       "spots": "Spots",
-      "description": "Description"
+      "description": "Description",
+      "open": "Show details",
+      "close": "Hide details"
     },
     "toast": {
       "registered": "You are registered for this shift.",
@@ -492,6 +547,249 @@
       "count": "Count",
       "noPost": "No group",
       "empty": "You have not done any shifts yet."
+    }
+  },
+  "piano": {
+    "title": "Reserve the piano",
+    "subtitle": "Room 01.52 in the castle, next to the proclamation hall",
+    "practical": "Practical",
+    "facts": {
+      "location": "Where",
+      "locationValue": "Room 01.52, Arenberg castle",
+      "price": "Price",
+      "priceValue": "Free for students",
+      "letter": "Accompanying letter",
+      "letterValue": "Pick it up from the vice in Blok 6 (Studentenwijk Arenberg). Carry it with you while you play.",
+      "limit": "Limit",
+      "limitOne": "One time slot per week",
+      "limitMany": "{count} time slots per week",
+      "horizon": "You can book up to {days} days ahead."
+    },
+    "agenda": {
+      "title": "Pick a time slot",
+      "intro": "Click a free hour to reserve it.",
+      "week": "Week of {from} to {to}",
+      "prev": "← Previous week",
+      "next": "Next week →",
+      "thisWeek": "This week",
+      "empty": "The piano is not available this week.",
+      "emptyHint": "Browse to a later week, or check above when the piano is free."
+    },
+    "slot": {
+      "taken": "Taken",
+      "mine": "Your slot",
+      "past": "Past",
+      "book": "Reserve {time}",
+      "booking": "Working..."
+    },
+    "mine": {
+      "title": "Your reservations",
+      "empty": "You have not reserved a time slot yet.",
+      "cancel": "Cancel",
+      "confirmTitle": "Cancel this reservation?",
+      "confirmBody": "Your time slot becomes available to other students again. You can pick another moment afterwards.",
+      "confirmYes": "Yes, cancel",
+      "confirmNo": "Keep it",
+      "cancelled": "Your reservation has been cancelled."
+    },
+    "login": {
+      "title": "Sign in to reserve",
+      "body": "Please sign in to reserve a time slot. The hours below are visible without an account too."
+    },
+    "toast": {
+      "reserved": "Your time slot is reserved."
+    },
+    "error": {
+      "notLoggedIn": "Sign in first to reserve.",
+      "notFound": "This time slot no longer exists.",
+      "past": "This time slot has already started.",
+      "beyondHorizon": "This time slot is too far in the future.",
+      "taken": "Someone beat you to it: this time slot is taken.",
+      "weekLimit": "You already have a time slot this week. Cancel it first, or pick a later week.",
+      "fallback": "Reserving failed. Please try again later.",
+      "cancelFailed": "Cancelling failed. Please try again later."
+    }
+  },
+  "notFound": {
+    "kicker": "404",
+    "title": "This page does not exist",
+    "lead": "The address is wrong, or the page moved when we rebuilt the site.",
+    "body": "Did you get here from an old link or a bookmark? The routes below take you back. If something stays broken, let us know at",
+    "homeTitle": "Go to the homepage",
+    "homeLead": "News, opening hours and what is coming up in the next few days.",
+    "infoTitle": "Info",
+    "infoLead": "The practical pages: services, facilities and how to use them.",
+    "calendarTitle": "Calendar",
+    "calendarLead": "Every activity, from cantus to info session."
+  },
+  "search": {
+    "title": "Search",
+    "subtitle": "Search the pages of this site, the activities in the calendar, the photo albums and the equipment of the lending service.",
+    "description": "Search the pages, activities and photos of VTK.",
+    "formLabel": "Search this site",
+    "inputLabel": "Search term",
+    "placeholder": "Search this site",
+    "submit": "Search",
+    "prompt": "Type what you are looking for above.",
+    "tooShort": "Type at least two letters: a single letter matches almost everything.",
+    "resultsOne": "1 result for “{query}”.",
+    "resultsMany": "{count} results for “{query}”.",
+    "limited": "Only the first {count} results are shown. Add a word to narrow them down.",
+    "emptyTitle": "No results for “{query}”",
+    "emptyBody": "Try a shorter or different word and check the spelling. Looking for an activity? Browse the calendar; practical explanations live under Info.",
+    "emptyCalendar": "Go to the calendar",
+    "emptyInfo": "Go to Info",
+    "kindPage": "Page",
+    "kindEvent": "Activity",
+    "kindLink": "Other site",
+    "kindMaterial": "Equipment",
+    "kindAlbum": "Photo album"
+  },
+  "seo": {
+    "home": {
+      "title": "Vlaamse Technische Kring",
+      "description": "VTK is the student association of the Faculty of Engineering Science at KU Leuven: activities, course notes, Theokot and more."
+    },
+    "kalender": {
+      "title": "Calendar",
+      "description": "Every VTK activity: cantuses, info sessions, sports, culture and the yearly classics."
+    },
+    "tickets": {
+      "title": "Tickets",
+      "description": "Tickets for cantuses, galas and other VTK events, paid safely and directly."
+    },
+    "media": {
+      "title": "Media",
+      "description": "Photos, aftermovies and VTK publications, gathered in one place."
+    },
+    "praesidium": {
+      "title": "Praesidium",
+      "description": "The VTK praesidium per working year: who holds which position and how to reach them."
+    },
+    "werkgroepen": {
+      "title": "Work groups",
+      "description": "The VTK work groups, each with their own team and their own programme."
+    },
+    "pocs": {
+      "title": "Programme committees",
+      "description": "The permanent education committees and the students representing your programme there."
+    },
+    "theokot": {
+      "title": "Theokot",
+      "description": "Order your sandwich at the Theokot and pick it up during opening hours."
+    },
+    "shift": {
+      "title": "Shifts",
+      "description": "Lend a hand behind the bar or at an event. Every shift earns you vouchers."
+    },
+    "piano": {
+      "title": "Book the piano",
+      "description": "Book a slot on the VTK piano in room 01.52 in Arenberg castle."
+    },
+    "privacy": {
+      "title": "Privacy statement",
+      "description": "Which personal data VTK processes on the website, in the member portal and for tickets and bookings."
+    },
+    "cookies": {
+      "title": "Cookie policy",
+      "description": "Which browser storage VTK uses, what it is for and how to change your choice."
+    },
+    "ledenportaal": {
+      "title": "About the member portal",
+      "description": "What the member portal is, who can get in and what you do there as a member."
+    },
+    "account": {
+      "title": "My account",
+      "description": "Your profile, your tickets, your shifts and your connected apps."
+    },
+    "connectedApps": {
+      "title": "Connected apps",
+      "description": "The applications you granted access with your VTK account."
+    },
+    "login": {
+      "title": "Sign in",
+      "description": "Sign in with your VTK account or through KU Leuven."
+    },
+    "consent": {
+      "title": "Grant access",
+      "description": "An application is asking for access to your VTK data."
+    },
+    "noAccess": {
+      "title": "No access",
+      "description": "Your account has no access to this application."
+    },
+    "onboarding": {
+      "title": "Complete your profile",
+      "description": "Fill in your profile to start using your VTK account."
+    },
+    "confirmStudy": {
+      "title": "Confirm your studies",
+      "description": "Confirm your programme for this working year."
+    },
+    "ticketOrder": {
+      "title": "My order",
+      "description": "The status of your ticket order and your tickets."
+    },
+    "ticketAccess": {
+      "title": "Access your tickets",
+      "description": "Open your order with the link from your confirmation e-mail."
+    },
+    "theokotCounter": {
+      "title": "Theokot pickup counter",
+      "description": "Tick off orders during a Theokot shift."
+    },
+    "shiftHistory": {
+      "title": "My shift history",
+      "description": "The shifts you did before and the vouchers they earned."
+    },
+    "ssoMetadata": {
+      "title": "SSO metadata",
+      "description": "Internal reference page for the KU Leuven connection."
+    },
+    "sample": {
+      "title": "Design samples",
+      "description": "Internal reference page with the building blocks of the VTK house style."
+    }
+  },
+  "contact": {
+    "title": "Contact",
+    "subtitle": "A question, a suggestion or something that is broken? Leave it here and it reaches the right person.",
+    "description": "Ask VTK a question through the contact form, or mail info@vtk.be directly.",
+    "formTitle": "Send a message",
+    "formIntro": "Every message arrives at info@vtk.be and is passed on internally from there. We aim to reply within a few working days.",
+    "nameLabel": "Name",
+    "namePlaceholder": "Your first and last name",
+    "emailLabel": "Email",
+    "emailPlaceholder": "you@example.com",
+    "emailHelp": "We reply to this address, so double-check it.",
+    "subjectLabel": "Subject",
+    "subjectPlaceholder": "What is it about?",
+    "messageLabel": "Message",
+    "messagePlaceholder": "Tell us what we can do for you.",
+    "messageHelp": "At most {max} characters. Send large attachments by mail instead.",
+    "honeypotLabel": "Leave this field empty",
+    "submit": "Send message",
+    "submitting": "Sending...",
+    "sent": "Thanks, your message has been sent. We will reply to the address you gave us.",
+    "directTitle": "Prefer to mail us directly?",
+    "directBody": "That works too, at the same address:",
+    "privacyTitle": "What happens with your details?",
+    "privacyBody": "We use your name, address and message only to answer your question. No automatic confirmation mail is sent.",
+    "privacyLink": "Privacy statement",
+    "pagesTitle": "More contact details",
+    "errors": {
+      "fallback": "Your message was not sent. Try again or mail info@vtk.be directly.",
+      "nameRequired": "Not sent: fill in your name.",
+      "nameTooLong": "Not sent: your name is too long (at most {max} characters).",
+      "emailRequired": "Not sent: fill in your email address, otherwise we cannot reply.",
+      "emailInvalid": "Not sent: that email address is not valid. Check it, because that is where the reply goes.",
+      "emailTooLong": "Not sent: that email address is too long.",
+      "subjectRequired": "Not sent: fill in a subject.",
+      "subjectTooLong": "Not sent: the subject is too long (at most {max} characters).",
+      "messageRequired": "Not sent: write a message first.",
+      "messageTooLong": "Not sent: your message is too long (at most {max} characters). Shorten it or mail info@vtk.be directly.",
+      "rateLimited": "Not sent: you just sent a few messages. Wait fifteen minutes or mail info@vtk.be directly.",
+      "mailFailed": "Your message did not go out because of a problem on our side. Try again later or mail info@vtk.be directly."
     }
   }
 }

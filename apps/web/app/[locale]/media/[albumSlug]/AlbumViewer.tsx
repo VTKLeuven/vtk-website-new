@@ -90,6 +90,10 @@ export function AlbumViewer({ photos, labels }: { photos: Photo[]; labels: Label
               onClick={() => setLightboxIndex(index)}
               aria-label={`${labels.openPhoto}: ${photo.title}`}
             >
+              {/* Immich Public Proxy levert deze duimnagel al op maat, op een aparte
+                  host uit GALLERY_PUBLIC_PROXY_URL. Zie next.config.ts: die host past
+                  niet in remotePatterns en wordt lokaal door de optimizer geweigerd. */}
+              {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={photo.thumbnailUrl} alt={photo.title} loading="lazy" />
             </button>
             <a
@@ -156,6 +160,9 @@ export function AlbumViewer({ photos, labels }: { photos: Photo[]; labels: Label
           >
             ‹
           </button>
+          {/* Zelfde reden als de duimnagel hierboven: de preview komt van de
+              Immich-proxy, al geschaald, op een host die de optimizer niet kent. */}
+          {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             className="vtk-immich-lightbox-image"
             src={activePhoto.previewUrl}

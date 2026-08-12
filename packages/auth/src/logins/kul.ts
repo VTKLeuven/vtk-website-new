@@ -3,8 +3,11 @@
  *
  * KU Leuven runs a Shibboleth OIDC OP at https://idp.kuleuven.be, which speaks
  * OIDC natively. We register this as a better-auth `genericOAuth` provider and
- * let better-auth handle the authorization-code + PKCE flow and the userinfo
- * call. ICTS onboards the client under the Authorization Code Flow with a
+ * let better-auth handle the authorization-code + PKCE flow. A custom
+ * `getUserInfo` always calls KU Leuven's userinfo endpoint because better-auth's
+ * default skips it when the ID token already has `sub` and `email`; KU Leuven
+ * can release client-specific attributes such as eduPersonOrgUnitDN only from
+ * userinfo. ICTS onboards the client under the Authorization Code Flow with a
  * confidential (server-side) client secret; better-auth keeps that secret on
  * the backend and authenticates the token request with `client_secret_post`.
  *
@@ -24,9 +27,22 @@
  *   <BETTER_AUTH_URL>/api/auth/better/oauth2/callback/kuleuven
  */
 
+import { prisma } from "@vtk/db";
+
 import { recordKulProfile } from "./kul-debug";
+import { firwStudentFromProfile, syncFirwStudent } from "./kul-firw";
+import {
+  getKulUserInfo,
+  KUL_USERINFO_URL,
+  wasKulUserInfoFetched,
+} from "./kul-userinfo";
 
 export const KUL_PROVIDER_ID = "kuleuven";
+export const KUL_OIDC_ISSUER = "https://idp.kuleuven.be";
+export const KUL_OIDC_AUTHORIZATION_URL =
+  `${KUL_OIDC_ISSUER}/idp/profile/oidc/authorize`;
+export const KUL_OIDC_TOKEN_URL =
+  `${KUL_OIDC_ISSUER}/idp/profile/oidc/token`;
 
 // KU Leuven releases claims under SAML-style names (displayName, givenName,
 // surname). We also accept the standard OIDC spellings (name, given_name,
@@ -82,6 +98,64 @@ function profileRNumber(profile: ProfileLike): string | undefined {
   return undefined;
 }
 
+/**
+ * Resolve the e-mail better-auth should link this KU Leuven login to.
+ *
+ * better-auth only links an OAuth login to an existing user when the profile
+ * e-mail matches that user's e-mail (or an already-linked KUL account). But an
+ * account can already carry this r-number under a *different* address: an admin
+ * pre-provisioned the member, or the member typed their r-number during
+ * onboarding, under a personal or bestuur e-mail; KU Leuven now authenticates
+ * the same person under their student e-mail. Without reconciliation better-auth
+ * takes the create path and Prisma rejects it on the unique `rNumber`, so the
+ * login fails instead of linking.
+ *
+ * The r-number is KU Leuven-verified and `User.rNumber` is unique, so a match
+ * reliably means the same person; only that person can authenticate as that
+ * r-number. When such an account exists we return its e-mail, which makes
+ * better-auth find it and link the KUL account to it (the account keeps its
+ * existing e-mail; better-auth does not override it on link).
+ *
+ * An exact e-mail match must always win, so we only redirect the link when no
+ * account already owns the KUL e-mail. Returns `undefined` to leave the KUL
+ * e-mail untouched (no match, same account, or the KUL e-mail is already taken).
+ */
+async function linkEmailForRNumber(
+  rNumber: string,
+  kulEmail: string,
+): Promise<string | undefined> {
+  const byRNumber = await prisma.user.findUnique({
+    where: { rNumber },
+    select: { email: true },
+  });
+  if (!byRNumber || byRNumber.email.toLowerCase() === kulEmail.toLowerCase()) {
+    return undefined;
+  }
+  const byEmail = await prisma.user.findUnique({
+    where: { email: kulEmail },
+    select: { id: true },
+  });
+  return byEmail ? undefined : byRNumber.email;
+}
+
+/**
+ * KU Leuven releases an OIDC `locale` claim as a lower-case BCP47 language tag
+ * (e.g. "nl", "en", "nl-BE"). Our `User.locale` is a Prisma enum whose only
+ * values are `NL` and `EN`, so the raw claim must be normalized. If we don't,
+ * better-auth spreads the raw profile (`...userInfo`) into the create payload
+ * and the claim survives, because `locale` is a declared additionalField that
+ * `mapProfileToUser` otherwise leaves untouched; Prisma then rejects "nl" with
+ * `Expected Locale` and the whole sign-up fails. Anything that clearly reads as
+ * English maps to `EN`; everything else falls back to `NL` (the site default).
+ */
+function profileLocale(profile: ProfileLike): "NL" | "EN" {
+  const raw = profile.locale;
+  if (typeof raw === "string" && raw.trim().toLowerCase().startsWith("en")) {
+    return "EN";
+  }
+  return "NL";
+}
+
 /** `true` when all required env vars for KU Leuven OIDC are present. */
 export function isKulEnabled(): boolean {
   return Boolean(
@@ -102,11 +176,27 @@ export function kulOAuthConfig() {
     providerId: KUL_PROVIDER_ID,
     clientId: process.env.KUL_OIDC_CLIENT_ID!,
     clientSecret: process.env.KUL_OIDC_CLIENT_SECRET!,
-    discoveryUrl: process.env.KUL_OIDC_DISCOVERY_URL!,
+    // Deze waarden komen uit KU Leuvens discoverydocument, maar staan hier
+    // expliciet zodat Better Auth niet vóór elke redirect én callback opnieuw
+    // het discoverydocument moet ophalen. Een tijdelijke storing van die
+    // metadata-URL maakte anders zelfs het openen van de KU Leuven-login
+    // onmogelijk.
+    issuer: KUL_OIDC_ISSUER,
+    authorizationUrl: KUL_OIDC_AUTHORIZATION_URL,
+    tokenUrl: KUL_OIDC_TOKEN_URL,
+    userInfoUrl: KUL_USERINFO_URL,
     ...(process.env.KUL_OIDC_REDIRECT_URI
       ? { redirectURI: process.env.KUL_OIDC_REDIRECT_URI }
       : {}),
-    scopes: ["openid", "profile", "email"],
+    // KU Leuven's own OIDC test client requests `allattributes` in addition to
+    // the standard scopes. It is not advertised in discovery, but it is the
+    // scope that makes the client-specific ICTS attribute release available.
+    scopes: ["openid", "profile", "email", "allattributes"],
+    // The default generic-oauth implementation returns the ID-token claims
+    // immediately when `sub` and `email` are present. Always fetch userinfo so
+    // ICTS-released attributes (eduPersonOrgUnitDN, KULdipl, KULopl, ...) reach
+    // mapProfileToUser and the opt-in admin debug log.
+    getUserInfo: getKulUserInfo,
     pkce: true,
     // ICTS registered the client with token_endpoint_auth_method
     // `client_secret_post`, so send the secret in the token request body. This
@@ -126,15 +216,40 @@ export function kulOAuthConfig() {
     mapProfileToUser: async (profile: ProfileLike) => {
       const email = profileEmail(profile);
       const rNumber = profileRNumber(profile);
+      const hasUserInfo = wasKulUserInfoFetched(profile);
+      const firwStudent = hasUserInfo ? firwStudentFromProfile(profile) : undefined;
+      const firwStudentChangedAt = firwStudent === undefined ? undefined : new Date();
+
+      // Bestaande accounts worden bij elke geslaagde KU Leuven-userinfo-call
+      // atomair bijgewerkt. De WHERE-clausule schrijft alleen bij een echte
+      // statuswijziging of bij de eerste controle van een bestaand account.
+      if (email && firwStudent !== undefined && firwStudentChangedAt) {
+        await syncFirwStudent(email, firwStudent, firwStudentChangedAt);
+      }
+
+      // Link naar een bestaand account dat dit (KU Leuven-geverifieerde)
+      // r-nummer al onder een ander e-mailadres draagt, in plaats van een
+      // duplicaat te maken dat op de unieke `rNumber` botst. Zie
+      // linkEmailForRNumber.
+      const linkEmail =
+        email && rNumber ? await linkEmailForRNumber(rNumber, email) : undefined;
+
       // Opt-in debuglog (Admin -> IT): bewaart de ruwe claims zodat een superadmin
       // ziet welke attributen ICTS vrijgeeft. Doet niets als de toggle uit staat en
       // gooit nooit, dus deze await kan de login niet breken.
       await recordKulProfile(profile, { email, rNumber });
       return {
-        email,
+        email: linkEmail ?? email,
         name: profileName(profile),
         emailVerified: true,
+        // Normalize KU Leuven's `locale` claim ("nl") to our enum; the raw
+        // claim would otherwise leak through better-auth's `...userInfo` spread
+        // and break sign-up with `Expected Locale` (see profileLocale above).
+        locale: profileLocale(profile),
         ...(rNumber ? { rNumber, rNumberFromKul: true } : {}),
+        ...(firwStudent !== undefined && firwStudentChangedAt
+          ? { firwStudent, firwStudentChangedAt }
+          : {}),
       };
     },
   };

@@ -5,6 +5,11 @@ on:
     branches: ['main']
   pull_request:
     branches: ['main']
+  # Handmatig te starten vanaf het Actions-tabblad. Nodig wanneer GitHub voor een
+  # push geen run heeft aangemaakt: bij een Actions-storing worden pushes die
+  # tijdens de storing binnenkomen niet ingehaald, en dan staat main wel vooruit
+  # maar draait de server nog op de vorige commit.
+  workflow_dispatch:
 
 jobs:
   verify:
@@ -54,12 +59,16 @@ jobs:
           npm run db:generate
 
       - name: Run web unit tests
-        run: npm run test --workspace=@vtk/web
+        run: |
+          npm run test --workspace=@vtk/web
+          npm run test --workspace=@vtk/logistiek
 
       - name: Validate types and lint
         run: |
           npm exec --workspace=@vtk/web -- next typegen
-          npx tsc --noEmit -p apps/web/tsconfig.json
+          npm exec --workspace=@vtk/logistiek -- next typegen
+          npx tsc --noEmit -p apps/web/tsconfig.build.json
+          npx tsc --noEmit -p apps/logistiek/tsconfig.build.json
           npm run lint --workspace=@vtk/web
 
       - name: Apply migrations and run database integration tests
@@ -68,7 +77,9 @@ jobs:
           npm run test:integration --workspace=@vtk/web
 
       - name: Build production application
-        run: npm run build --workspace=@vtk/web
+        run: |
+          npm run build --workspace=@vtk/web
+          npm run build --workspace=@vtk/logistiek
 
       - name: Install Playwright Chromium
         run: npx playwright install --with-deps chromium
@@ -77,7 +88,8 @@ jobs:
         run: npm run test:e2e:tickets --workspace=@vtk/web
 
   deploy:
-    if: github.event_name == 'push'
+    # Ook bij een handmatige start deployen; enkel een pull_request mag niet.
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
     needs: verify
     runs-on: ubuntu-latest
 
@@ -102,7 +114,38 @@ jobs:
             timeout 30 stat /mnt/immich/.immich-storage-ready >/dev/null 2>&1 &&
             findmnt -rn -M /mnt/immich -t nfs4 >/dev/null &&
 
-            # Validate, build, restart, and remove services deleted from Compose.
+            # Build while the current containers are still serving traffic.
             docker compose -f infra/docker-compose.yml config --quiet &&
-            docker compose -f infra/docker-compose.yml up -d --build --remove-orphans
+            docker compose -f infra/docker-compose.yml build &&
+
+            # One-time migration of the existing IPv4-only default network.
+            # Doing this explicitly avoids Compose reusing a container that
+            # still references the removed network ID. Named volumes survive.
+            if docker network inspect infra_default --format '{{.EnableIPv6}}' 2>/dev/null |
+              grep -qx false; then
+              docker compose -f infra/docker-compose.yml down --remove-orphans
+            fi &&
+
+            docker compose -f infra/docker-compose.yml up -d --remove-orphans &&
+
+            # Opruimen na de switch, want pas nu draaien de containers op de
+            # nieuwe images en is de vorige versie echt ongebruikt. Elke deploy
+            # bouwt een nieuwe image: de oude verliest daarbij haar tag en blijft
+            # anders als naamloze laag op de schijf staan, met de BuildKit-cache
+            # er bovenop. Dat is wat de schijf deed vollopen en waarvoor er af en
+            # toe handmatig 'docker system prune -a' aan te pas kwam.
+            #
+            # Bewust NIET 'prune -a': dat gooit ook getagde images weg die op dat
+            # moment geen draaiende container hebben (Immich, de deur-stack), en
+            # die moeten dan opnieuw gepulld worden. Naamloze images zijn altijd
+            # afval; getagde niet.
+            #
+            # De haakjes met '|| true' houden dit in dezelfde &&-ketting (een
+            # afgebroken deploy hierboven mag nog steeds rood zijn) zonder dat een
+            # mislukte opruiming de run doet falen.
+            { docker image prune -f || true; } &&
+
+            # Buildcache ouder dan een week. Recente lagen blijven staan, zodat de
+            # volgende build ze nog kan hergebruiken.
+            { docker builder prune -f --filter until=168h || true; }
           "

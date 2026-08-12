@@ -46,6 +46,7 @@ export default async function AdminDashboard({
       url: t.url,
       icon: t.icon,
       color: t.color,
+      imageKey: t.imageKey,
       order: t.order,
       scope: t.scope,
       groupId: t.groupId,
@@ -59,6 +60,8 @@ export default async function AdminDashboard({
       url: p.url,
       icon: p.icon,
       color: p.color,
+      imageKey: p.imageKey,
+      imageCleared: p.imageCleared,
     })),
     personalRows.map((t) => ({
       id: t.id,
@@ -66,6 +69,7 @@ export default async function AdminDashboard({
       url: t.url,
       icon: t.icon,
       color: t.color,
+      imageKey: t.imageKey,
       order: t.order,
     }))
   );
@@ -96,12 +100,14 @@ export default async function AdminDashboard({
           <h2 className="font-semibold mb-2">{locale === "nl" ? "Jouw rechten" : "Your permissions"}</h2>
           {session.user.isSuperAdmin ? (
             <p className="text-sm">
-              {locale === "nl" ? "Superadmin – alle rechten." : "Super admin – all permissions."}
+              {locale === "nl" ? "Superadmin: alle rechten." : "Super admin: all permissions."}
             </p>
           ) : (
             <ul className="flex flex-wrap gap-2 text-xs">
               {session.permissions.length === 0 ? (
-                <li className="text-zinc-500">—</li>
+                <li className="text-zinc-500">
+                  {locale === "nl" ? "Je hebt nog geen rechten." : "You have no permissions yet."}
+                </li>
               ) : (
                 session.permissions.map((p) => (
                   <li key={p} className="rounded bg-vtk-blue-soft px-2 py-1">
@@ -114,7 +120,11 @@ export default async function AdminDashboard({
           <h2 className="font-semibold mb-2 mt-4">{locale === "nl" ? "Posten" : "Posts"}</h2>
           <ul className="flex flex-wrap gap-2 text-xs">
             {session.groups.length === 0 ? (
-              <li className="text-zinc-500">—</li>
+              <li className="text-zinc-500">
+                {locale === "nl"
+                  ? "Je zit in geen enkele post of werkgroep."
+                  : "You are not in any post or working group."}
+              </li>
             ) : (
               session.groups.map((g) => (
                 <li key={g.id} className="rounded bg-vtk-blue/10 text-vtk-blue px-2 py-1">

@@ -2,8 +2,7 @@
    separate layout rules so the camera route never inherits site chrome. */
 
 .vtk-tickets-page,
-.ticket-order-page,
-.my-tickets-page {
+.ticket-order-page {
   --ticket-green: #147a54;
   --ticket-green-soft: #e8f4ee;
   --ticket-red: #b4233c;
@@ -17,7 +16,6 @@
 
 .vtk-tickets-page *,
 .ticket-order-page *,
-.my-tickets-page *,
 .scanner-route-shell * {
   box-sizing: border-box;
   letter-spacing: 0;
@@ -44,7 +42,8 @@
 .ticket-secondary-button,
 .ticket-my-link,
 .ticket-checkout-button,
-.ticket-download-button {
+.ticket-download-button,
+.ticket-wallet-button {
   display: inline-flex;
   min-height: 42px;
   align-items: center;
@@ -87,7 +86,6 @@
 /* Navy band met het technisch patroon, zelfde recept als de banden op de
    homepage en de media/albumpagina's; elke kop een eigen uitsnede van de
    tekening. De gele rand onderaan is het bestaande tickets-accent en blijft. */
-.ticket-catalog-head,
 .ticket-shop-head {
   position: relative;
   z-index: 0;
@@ -97,8 +95,7 @@
   color: white;
 }
 
-.ticket-shop-head::after,
-.ticket-catalog-head::after {
+.ticket-shop-head::after {
   content: "";
   position: absolute;
   z-index: -1;
@@ -129,49 +126,6 @@
   background-position: calc(50% - 380px) -520px;
 }
 
-.ticket-catalog-head-inner {
-  position: relative;
-  z-index: 1;
-  display: flex;
-  max-width: var(--max);
-  min-height: 286px;
-  margin: 0 auto;
-  padding: 62px clamp(20px, 3vw, 36px) 56px;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: 32px;
-}
-
-.ticket-catalog-head .ticket-eyebrow {
-  color: rgba(255, 255, 255, 0.68);
-}
-
-.ticket-catalog-head h1 {
-  max-width: 760px;
-  margin: 14px 0 0;
-  color: var(--paper);
-  font-size: clamp(38px, 4.6vw, 64px);
-  font-weight: 600;
-  letter-spacing: -0.035em;
-  line-height: 1.02;
-}
-
-/* Zelfde geel serif-accent als "ingenieurs" op de homepage. */
-.ticket-catalog-head h1 em {
-  color: var(--yellow);
-  font-family: var(--serif);
-  font-style: italic;
-  font-weight: 400;
-}
-
-.ticket-catalog-head p {
-  max-width: 580px;
-  margin: 17px 0 0;
-  color: rgba(255, 255, 255, 0.72);
-  font-size: 16px;
-  line-height: 1.6;
-}
-
 .ticket-my-link {
   flex: 0 0 auto;
   border: 1px solid rgba(255, 255, 255, 0.3);
@@ -185,8 +139,7 @@
   color: var(--yellow);
 }
 
-.ticket-catalog-shell,
-.my-tickets-shell {
+.ticket-catalog-shell {
   width: min(100%, var(--max));
   margin: 0 auto;
   padding: 48px clamp(20px, 3vw, 36px) 96px;
@@ -315,8 +268,7 @@
 
 .ticket-event-facts span,
 .ticket-shop-facts span,
-.ticket-order-event p,
-.my-ticket-order-copy p {
+.ticket-order-event p {
   display: inline-flex;
   min-width: 0;
   align-items: center;
@@ -325,8 +277,7 @@
 
 .ticket-event-facts svg,
 .ticket-shop-facts svg,
-.ticket-order-event svg,
-.my-ticket-order-copy svg {
+.ticket-order-event svg {
   flex: 0 0 auto;
   color: var(--muted);
 }
@@ -376,8 +327,7 @@
   transform: translateX(3px);
 }
 
-.ticket-empty-state,
-.ticket-auth-state {
+.ticket-empty-state {
   display: flex;
   min-height: 330px;
   flex-direction: column;
@@ -391,19 +341,16 @@
   text-align: center;
 }
 
-.ticket-empty-state > svg,
-.ticket-auth-state > svg {
+.ticket-empty-state > svg {
   color: var(--muted);
 }
 
-.ticket-empty-state h2,
-.ticket-auth-state h1 {
+.ticket-empty-state h2 {
   margin: 16px 0 0;
   font-size: 24px;
 }
 
-.ticket-empty-state p,
-.ticket-auth-state p {
+.ticket-empty-state p {
   max-width: 440px;
   margin: 8px 0 20px;
   color: var(--muted);
@@ -1308,6 +1255,26 @@
   background: var(--paper-2);
 }
 
+.ticket-wallet-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.ticket-wallet-button {
+  min-height: 30px;
+  padding: 6px 11px;
+  border: 1px solid var(--line-2);
+  color: var(--ink);
+  font-size: 12px;
+}
+
+.ticket-wallet-button:hover {
+  border-color: var(--ink);
+  background: var(--paper-2);
+}
+
 .ticket-mail-note {
   margin-top: 13px;
   padding: 11px 13px;
@@ -1331,159 +1298,6 @@
 
 .ticket-order-actions button {
   cursor: pointer;
-}
-
-/* My tickets */
-
-.my-tickets-head {
-  display: flex;
-  width: min(100%, var(--max));
-  margin: 0 auto;
-  padding: 58px clamp(20px, 3vw, 36px) 35px;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: 25px;
-  border-bottom: 1px solid var(--line);
-}
-
-/* Zoals de rest van de site: sans, strak gespatieerd. De serif is enkel een
-   accent in de hero-titel op de homepage, niet voor gewone paginakoppen. */
-.my-tickets-head h1 {
-  margin: 10px 0 0;
-  font-size: clamp(34px, 4vw, 46px);
-  font-weight: 600;
-  letter-spacing: -0.035em;
-  line-height: 1.05;
-}
-
-.my-tickets-head p {
-  margin: 12px 0 0;
-  color: var(--muted);
-  font-size: 13px;
-}
-
-.my-ticket-orders {
-  display: grid;
-  gap: 14px;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-/* Zelfde kaartvorm als op de homepage: witte kaart, dunne navy lijn, ruime
-   afronding en een ingehouden hover. */
-.my-ticket-orders > li {
-  border: 1px solid var(--line);
-  border-radius: 18px;
-  background: var(--surface);
-  transition:
-    border-color 150ms ease,
-    box-shadow 150ms ease,
-    transform 150ms ease;
-}
-
-.my-ticket-orders > li:hover {
-  border-color: var(--line-2);
-  box-shadow: 0 10px 28px rgba(10, 15, 31, 0.08);
-  transform: translateY(-2px);
-}
-
-.my-ticket-order-link {
-  display: grid;
-  grid-template-columns: 70px minmax(0, 1fr) auto 24px;
-  min-height: 125px;
-  align-items: center;
-  gap: 23px;
-  padding: 18px 22px;
-  color: inherit;
-  text-decoration: none;
-}
-
-.my-ticket-order-date {
-  display: flex;
-  width: 62px;
-  height: 70px;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  border-radius: 14px;
-  background: var(--navy);
-  color: var(--paper);
-}
-
-.my-ticket-order-date strong {
-  font-family: var(--mono);
-  font-size: 25px;
-  line-height: 1;
-}
-
-.my-ticket-order-date span {
-  margin-top: 4px;
-  color: var(--yellow);
-  font-size: 10px;
-  font-weight: 800;
-  text-transform: uppercase;
-}
-
-.my-ticket-order-copy > div {
-  display: flex;
-  align-items: center;
-  gap: 9px;
-}
-
-.my-ticket-order-copy > div > span:last-child {
-  color: var(--muted);
-  font-family: var(--mono);
-  font-size: 10px;
-}
-
-.my-ticket-state {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  color: var(--ticket-amber);
-  font-size: 10px;
-  font-weight: 800;
-  text-transform: uppercase;
-}
-
-.my-ticket-state.is-ready {
-  color: var(--ticket-green);
-}
-
-.my-ticket-order-copy h2 {
-  margin: 7px 0 8px;
-  font-size: 20px;
-  font-weight: 600;
-  letter-spacing: -0.02em;
-}
-
-.my-ticket-order-copy p {
-  margin: 4px 0;
-  color: var(--muted);
-  font-size: 12px;
-}
-
-.my-ticket-order-meta {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 4px;
-}
-
-.my-ticket-order-meta span {
-  color: var(--muted);
-  font-size: 11px;
-}
-
-.my-ticket-order-meta strong {
-  font-size: 17px;
-}
-
-.ticket-auth-state {
-  width: min(calc(100% - 40px), 700px);
-  min-height: 420px;
-  margin: 60px auto 90px;
 }
 
 /* Scanner */
@@ -1617,6 +1431,80 @@
   color: white;
   font-size: 12px;
   font-weight: 700;
+}
+
+/* Offline scannen is geen storing meer maar een werkmodus: de banner is
+   informatief in plaats van alarmerend rood. */
+.scanner-offline-banner {
+  background: #74520d;
+}
+
+/* Hoeveel scans nog naar de server moeten, met een knop om het nu te proberen. */
+.scanner-queue-banner {
+  display: flex;
+  min-height: 42px;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 8px 15px;
+  background: #0e1a36;
+  color: white;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.scanner-queue-banner button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 11px;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  border-radius: 999px;
+  background: none;
+  color: inherit;
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.scanner-queue-banner button:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.scanner-queue-banner button:disabled {
+  cursor: default;
+  opacity: 0.55;
+}
+
+/* Offline aanvaard, achteraf toch geweigerd. Blijft staan tot iemand ze wegklikt:
+   dit is precies het geval waar de deurploeg iets mee moet. */
+.scanner-conflict-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 15px;
+  background: #fbecee;
+  color: #7c2430;
+  font-size: 13px;
+}
+
+.scanner-conflict-banner > div {
+  flex: 1;
+  min-width: 0;
+}
+
+.scanner-conflict-banner ul {
+  margin: 4px 0 0;
+  padding-left: 18px;
+}
+
+.scanner-conflict-banner button {
+  flex: none;
+  padding: 4px;
+  border: 0;
+  background: none;
+  color: inherit;
+  cursor: pointer;
 }
 
 .scanner-workspace {
@@ -2195,18 +2083,7 @@
 }
 
 @media (max-width: 760px) {
-  .ticket-catalog-head-inner {
-    min-height: 250px;
-    flex-direction: column;
-    align-items: flex-start;
-    justify-content: flex-end;
-    padding-top: 42px;
-    padding-bottom: 34px;
-  }
-
-  .ticket-catalog-head h1,
-  .ticket-shop-head h1,
-  .my-tickets-head h1 {
+  .ticket-shop-head h1 {
     font-size: 42px;
   }
 
@@ -2214,8 +2091,7 @@
     width: 100%;
   }
 
-  .ticket-catalog-shell,
-  .my-tickets-shell {
+  .ticket-catalog-shell {
     padding-top: 34px;
     padding-bottom: 70px;
   }
@@ -2330,30 +2206,6 @@
 
   .ticket-pass-state {
     width: 100%;
-    flex-direction: row;
-    align-items: center;
-    justify-content: space-between;
-  }
-
-  .my-tickets-head {
-    flex-direction: column;
-    align-items: flex-start;
-    padding-top: 40px;
-  }
-
-  .my-ticket-order-link {
-    grid-template-columns: 58px minmax(0, 1fr) 20px;
-    gap: 13px;
-    padding: 15px;
-  }
-
-  .my-ticket-order-date {
-    width: 54px;
-    height: 64px;
-  }
-
-  .my-ticket-order-meta {
-    grid-column: 2 / -1;
     flex-direction: row;
     align-items: center;
     justify-content: space-between;
@@ -2557,18 +2409,6 @@
     margin-top: 8px;
   }
 
-  .my-ticket-order-link {
-    grid-template-columns: 1fr 20px;
-  }
-
-  .my-ticket-order-date {
-    display: none;
-  }
-
-  .my-ticket-order-meta {
-    grid-column: 1 / -1;
-  }
-
   .scanner-manual-form > div {
     grid-template-columns: 1fr;
   }
@@ -2583,4 +2423,261 @@
     animation: none;
     transition: none;
   }
+}
+
+/* ---------------------------------------------------------------------------
+   Deelnemers zoeken op naam.
+
+   Voor wie zijn QR kwijt is: je zoekt de naam en checkt die persoon rechtstreeks
+   in. De lijst komt uit het offline-manifest, dus dit werkt ook zonder netwerk.
+   Donker zoals de rest van de scanner, en met rijen die groot genoeg zijn om met
+   een duim te raken.
+   --------------------------------------------------------------------------- */
+
+.scanner-name-list {
+  margin-top: 10px;
+  padding: 13px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  background: #1a1d22;
+}
+
+.scanner-name-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 11px;
+  border: 1px solid rgba(255, 255, 255, 0.17);
+  border-radius: 6px;
+  background: #101216;
+  color: #aeb3bd;
+}
+
+.scanner-name-search input {
+  min-width: 0;
+  flex: 1;
+  min-height: 44px;
+  border: 0;
+  outline: 0;
+  background: none;
+  color: white;
+  font: inherit;
+  font-size: 16px; /* onder 16px zoomt iOS in bij focus */
+}
+
+.scanner-name-search button {
+  flex: none;
+  padding: 6px;
+  border: 0;
+  background: none;
+  color: inherit;
+  cursor: pointer;
+}
+
+.scanner-name-count {
+  margin: 9px 0 0;
+  color: #aeb3bd;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.scanner-name-empty {
+  margin: 14px 0 4px;
+  color: #aeb3bd;
+  font-size: 13px;
+  text-align: center;
+}
+
+.scanner-name-list ul {
+  /* Begrensde hoogte: de lijst mag de camera niet van het scherm duwen. */
+  max-height: 46vh;
+  margin: 8px 0 0;
+  padding: 0;
+  overflow-y: auto;
+  list-style: none;
+  -webkit-overflow-scrolling: touch;
+}
+
+.scanner-name-list li + li {
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.scanner-name-list li > button {
+  display: flex;
+  width: 100%;
+  min-height: 54px;
+  align-items: center;
+  gap: 11px;
+  padding: 9px 4px;
+  border: 0;
+  background: none;
+  color: white;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.scanner-name-list li > button:disabled {
+  cursor: default;
+  opacity: 0.55;
+}
+
+.scanner-name-state {
+  display: grid;
+  width: 30px;
+  height: 30px;
+  flex: none;
+  place-items: center;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.09);
+  color: #aeb3bd;
+}
+
+.scanner-name-list li.is-in .scanner-name-state {
+  background: rgba(23, 107, 77, 0.28);
+  color: #6fd3a6;
+}
+
+.scanner-name-who {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+}
+
+.scanner-name-who strong {
+  overflow: hidden;
+  font-size: 15px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.scanner-name-who small {
+  color: #aeb3bd;
+  font-size: 12px;
+}
+
+.scanner-name-action {
+  flex: none;
+  padding: 5px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.scanner-name-list li.is-in .scanner-name-action {
+  border-color: transparent;
+  color: #6fd3a6;
+}
+
+/* ---------------------------------------------------------------------------
+   Op het beginscherm zetten. Verdwijnt zodra de app geïnstalleerd is of de
+   gebruiker ze wegklikt.
+   --------------------------------------------------------------------------- */
+
+.scanner-install {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 15px;
+  background: #1a1d22;
+  color: #dfe3ea;
+  font-size: 13px;
+}
+
+.scanner-install > span {
+  flex: 1;
+  min-width: 0;
+}
+
+.scanner-install > span svg {
+  display: inline;
+  vertical-align: -2px;
+}
+
+.scanner-install > button {
+  flex: none;
+  padding: 7px 13px;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  border-radius: 999px;
+  background: none;
+  color: inherit;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.scanner-install > button:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.scanner-install-close {
+  border-color: transparent !important;
+  padding: 6px !important;
+  color: #aeb3bd;
+}
+
+/* Keuzescherm van de scanner (/scan): waar het icoon op het beginscherm landt. */
+.scanner-picker-list {
+  list-style: none;
+  margin: 0;
+  padding: 14px;
+  display: grid;
+  gap: 10px;
+}
+
+.scanner-picker-list a {
+  display: grid;
+  gap: 5px;
+  padding: 15px 16px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 14px;
+  background: #16191f;
+  color: #e7eaf0;
+  text-decoration: none;
+}
+
+.scanner-picker-list a:hover,
+.scanner-picker-list a:focus-visible {
+  border-color: rgba(255, 210, 63, 0.5);
+}
+
+.scanner-picker-list strong {
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.scanner-picker-list span {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  color: #a6adbb;
+  font-size: 13px;
+}
+
+.scanner-picker-empty {
+  display: grid;
+  justify-items: center;
+  gap: 9px;
+  margin: 14px;
+  padding: 32px 22px;
+  border: 1px dashed rgba(255, 255, 255, 0.18);
+  border-radius: 16px;
+  color: #a6adbb;
+  text-align: center;
+}
+
+.scanner-picker-empty strong {
+  color: #e7eaf0;
+  font-size: 16px;
+}
+
+.scanner-picker-empty p {
+  max-width: 40ch;
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.55;
 }

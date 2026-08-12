@@ -15,21 +15,21 @@ function copy() {
   return english
     ? {
         title: "Your cookie choices",
-        body: "VTK uses essential cookies for sign-in, security, language and ticket access. With your permission, Sentry may also collect error diagnostics, performance traces and masked session replays.",
+        body: "VTK uses essential cookies for sign-in, security, language and ticket access. With your permission we also count page views with Umami, which runs on VTK's own server and sets no cookies, and Sentry may collect error diagnostics, performance traces and masked session replays.",
         privacy: "Read the cookie policy",
-        accept: "Allow diagnostics",
+        accept: "Allow statistics and diagnostics",
         reject: "Essential only",
         save: "Save choice",
-        analytics: "Optional diagnostics and masked session replay",
+        analytics: "Optional: cookieless visitor statistics and technical diagnostics",
       }
     : {
         title: "Jouw cookiekeuze",
-        body: "VTK gebruikt noodzakelijke cookies voor aanmelden, beveiliging, taal en tickettoegang. Met jouw toestemming mag Sentry ook technische monitoringgegevens verzamelen: browser errors, performance traces and masked session replays.",
+        body: "VTK gebruikt noodzakelijke cookies voor aanmelden, beveiliging, taal en tickettoegang. Met jouw toestemming tellen we ook paginaweergaves met Umami, dat op onze eigen server draait en geen cookies plaatst, en mag Sentry technische monitoringgegevens verzamelen: browserfouten, prestatiemetingen en gemaskeerde sessieopnames.",
         privacy: "Lees het cookiebeleid",
-        accept: "Optionele cookies toestaan",
+        accept: "Statistieken en monitoring toestaan",
         reject: "Enkel noodzakelijk",
         save: "Keuze opslaan",
-        analytics: "Optional monitoring: browser errors, performance traces and masked session replays",
+        analytics: "Optioneel: bezoekersstatistieken zonder cookies en technische monitoring",
       };
 }
 
@@ -67,8 +67,9 @@ export function CookieConsent() {
   const save = (next: CookieConsentChoice) => {
     setConsent(next);
     setPreferencesOpen(false);
-    // instrumentation-client runs before hydration. Reload so a newly granted
-    // choice can initialize Sentry, or a withdrawn choice stops it immediately.
+    // instrumentation-client runs before hydration and the analytics script is
+    // rendered server-side. Reload so a newly granted choice can start Sentry
+    // and Umami, or a withdrawn choice stops both immediately.
     window.location.reload();
   };
 

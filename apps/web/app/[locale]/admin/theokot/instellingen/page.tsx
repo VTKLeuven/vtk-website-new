@@ -3,11 +3,14 @@ import { notFound } from "next/navigation";
 import { hasLocale } from "@/lib/locale";
 import { requireSession } from "@/lib/session";
 import type { Locale } from "@vtk/i18n";
-import { Button, Card, Input, Label, Textarea } from "@vtk/ui";
+import { Card, Input, Label, Textarea } from "@vtk/ui";
 import { parseTheokotConfig } from "@/lib/theokot";
 import { saveConfigAction, saveOrderMessageAction } from "@/app/actions/theokot";
+import { SaveForm } from "@/components/ui/SaveForm";
+import { ThemedSelect } from "@/components/ui/ThemedSelect";
 import { TheokotAdminNav } from "../TheokotAdminNav";
-import { ProductCatalogManager, type CatalogItem } from "../ProductCatalogManager";
+import { ProductCatalogManager } from "../ProductCatalogManager";
+import type { OfferingRow } from "../OfferingRows";
 
 export default async function TheokotSettingsPage({ params }: { params: Promise<{ locale: string }> }) {
   const { locale: localeParam } = await params;
@@ -27,13 +30,17 @@ export default async function TheokotSettingsPage({ params }: { params: Promise<
   ]);
   const config = parseTheokotConfig(configRow?.value);
   const message = (messageRow?.value as { bodyNl?: string; bodyEn?: string }) ?? {};
-  const catalog: CatalogItem[] = products.map((p) => ({
+  const catalog: OfferingRow[] = products.map((p) => ({
     id: p.id,
     nameNl: p.nameNl,
     nameEn: p.nameEn ?? "",
     priceEuro: (p.priceCents / 100).toFixed(2),
     quantity: p.defaultQuantity,
     isWeeklySpecial: p.isWeeklySpecialSlot,
+    imageKey: p.imageKey,
+    ingredientsNl: p.ingredientsNl ?? "",
+    ingredientsEn: p.ingredientsEn ?? "",
+    hasLines: false,
   }));
 
   const numField = (name: string, labelNl: string, labelEn: string, value: number, min = 0) => (
@@ -62,7 +69,14 @@ export default async function TheokotSettingsPage({ params }: { params: Promise<
             ? "Deze waarden gelden voor nieuwe verkoopweken en het bestelgedrag. Ze hoeven niet elke week aangepast te worden."
             : "These values apply to new sale weeks and ordering behaviour. They need not be changed weekly."}
         </p>
-        <form action={saveConfigAction} className="grid gap-4 sm:grid-cols-3">
+        <SaveForm
+          action={saveConfigAction}
+          className="grid gap-4 sm:grid-cols-3"
+          submitLabel={nl ? "Configuratie opslaan" : "Save configuration"}
+          savingLabel={nl ? "Bezig met opslaan..." : "Saving..."}
+          savedMessage={nl ? "Configuratie opgeslagen" : "Configuration saved"}
+          fallbackErrorMessage={nl ? "Opslaan van de configuratie mislukt." : "Saving the configuration failed."}
+        >
           {numField("maxItemsPerOrder", "Max broodjes / bestelling (X)", "Max sandwiches / order (X)", config.maxItemsPerOrder, 1)}
           {numField("maxWeeklySpecialPerOrder", "Max v/d week / bestelling (Y)", "Max weekly special / order (Y)", config.maxWeeklySpecialPerOrder, 0)}
           {numField("orderLeadDays", "Dagen vooraf bestellen", "Order lead days", config.orderLeadDays, 0)}
@@ -74,9 +88,25 @@ export default async function TheokotSettingsPage({ params }: { params: Promise<
           {numField("noShowThreshold", "No-shows voor ban", "No-shows before ban", config.noShowThreshold, 1)}
           {numField("banDurationDays", "Ban-duur (dagen)", "Ban duration (days)", config.banDurationDays, 1)}
           <div className="sm:col-span-3">
-            <Button type="submit">{nl ? "Configuratie opslaan" : "Save configuration"}</Button>
+            <Label htmlFor="itemLayout">{nl ? "Weergave van de broodjes" : "Sandwich display"}</Label>
+            <div className="max-w-xs">
+              <ThemedSelect
+                id="itemLayout"
+                name="itemLayout"
+                defaultValue={config.itemLayout}
+                options={[
+                  { value: "list", label: nl ? "Lijst" : "List" },
+                  { value: "grid", label: nl ? "Raster met foto's" : "Grid with photos" },
+                ]}
+              />
+            </div>
+            <p className="mt-1.5 text-sm text-[#5c667f]">
+              {nl
+                ? "Zo staan de broodjes op de bestelpagina. Een raster geeft de foto's ruimte; een lijst blijft compacter wanneer er weinig foto's zijn."
+                : "How the sandwiches appear on the order page. A grid gives the photos room; a list stays more compact when there are few photos."}
+            </p>
           </div>
-        </form>
+        </SaveForm>
       </Card>
 
       {/* Standaardaanbod (catalogus) */}
@@ -84,8 +114,8 @@ export default async function TheokotSettingsPage({ params }: { params: Promise<
         <h2 className="mb-1 text-lg font-semibold">{nl ? "Standaardaanbod" : "Default offering"}</h2>
         <p className="mb-4 text-sm text-[#5c667f]">
           {nl
-            ? "De default namen, prijzen en aantallen die als startpunt getoond worden bij “Verkoopweek aanmaken”. Per week kan je nadien nog afwijken; wijzigingen hier raken bestaande weken niet."
-            : "The default names, prices and quantities shown as a starting point when creating a sale week. You can still deviate per week afterwards; changes here don't affect existing weeks."}
+            ? "De default namen, prijzen, aantallen, foto's en ingrediënten die als startpunt getoond worden bij “Verkoopweek aanmaken”. Per week kan je nadien nog afwijken; wijzigingen hier raken bestaande weken niet."
+            : "The default names, prices, quantities, photos and ingredients shown as a starting point when creating a sale week. You can still deviate per week afterwards; changes here don't affect existing weeks."}
         </p>
         <ProductCatalogManager nl={nl} initial={catalog} />
       </Card>
@@ -96,7 +126,14 @@ export default async function TheokotSettingsPage({ params }: { params: Promise<
         <p className="mb-4 text-sm text-[#5c667f]">
           {nl ? "Laat leeg om geen bericht te tonen." : "Leave empty to show no message."}
         </p>
-        <form action={saveOrderMessageAction} className="space-y-4">
+        <SaveForm
+          action={saveOrderMessageAction}
+          className="space-y-4"
+          submitLabel={nl ? "Bericht opslaan" : "Save message"}
+          savingLabel={nl ? "Bezig met opslaan..." : "Saving..."}
+          savedMessage={nl ? "Bericht opgeslagen" : "Message saved"}
+          fallbackErrorMessage={nl ? "Opslaan van het bericht mislukt." : "Saving the message failed."}
+        >
           <div>
             <Label>{nl ? "Bericht (NL)" : "Message (NL)"}</Label>
             <Textarea name="bodyNl" defaultValue={message.bodyNl ?? ""} />
@@ -105,8 +142,7 @@ export default async function TheokotSettingsPage({ params }: { params: Promise<
             <Label>{nl ? "Bericht (EN)" : "Message (EN)"}</Label>
             <Textarea name="bodyEn" defaultValue={message.bodyEn ?? ""} />
           </div>
-          <Button type="submit">{nl ? "Bericht opslaan" : "Save message"}</Button>
-        </form>
+        </SaveForm>
       </Card>
     </div>
   );

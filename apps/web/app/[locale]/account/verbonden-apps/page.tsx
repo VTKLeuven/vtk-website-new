@@ -1,3 +1,5 @@
+import type { Metadata } from 'next';
+import { staticMetadata } from '@/lib/pageMetadata';
 import { headers } from 'next/headers';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
@@ -16,6 +18,16 @@ function hostOf(uri: string): string | null {
   } catch {
     return null;
   }
+}
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ locale: string }>;
+}): Promise<Metadata> {
+  const { locale } = await params;
+  if (!hasLocale(locale)) return {};
+  return staticMetadata('connectedApps', '/account/verbonden-apps', locale, { noIndex: true });
 }
 
 export default async function ConnectedAppsPage({ params }: { params: Promise<{ locale: string }> }) {
@@ -62,6 +74,8 @@ export default async function ConnectedAppsPage({ params }: { params: Promise<{ 
               <Card key={app.clientId} className="overflow-hidden">
                 <div className="flex items-start gap-4 p-6">
                   {app.logoUri ? (
+                    // Zelfde reden als op het toestemmingsscherm: het logo van een
+                    // OAuth-client is een vrije URL van een host die we niet kennen.
                     // eslint-disable-next-line @next/next/no-img-element
                     <img
                       src={app.logoUri}

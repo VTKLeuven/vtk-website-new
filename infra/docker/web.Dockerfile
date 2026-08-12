@@ -23,14 +23,23 @@ RUN npx --yes prisma generate --schema packages/db/prisma/schema.prisma
 RUN npm run build --workspace=@vtk/web
 
 FROM node:${NODE_VERSION}-alpine AS runner
-RUN apk add --no-cache libc6-compat openssl tini
+RUN apk add --no-cache libc6-compat openssl tini tzdata
 WORKDIR /app
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
+ENV TZ=Europe/Brussels
 
 COPY --from=builder /repo/apps/web/.next ./apps/web/.next
 COPY --from=builder /repo/apps/web/public ./apps/web/public
 COPY --from=builder /repo/apps/web/next.config.ts ./apps/web/next.config.ts
+# next.config.ts wordt bij ELKE start opnieuw getranspileerd (Next 16 doet dat
+# los van de build, zie next/dist/build/next-config-ts/transpile-config.js). Dat
+# gebeurt per bestand: relatieve imports worden geen bundel maar blijven een
+# `require()` naar de bron. De config moet dus haar eigen imports naast zich
+# hebben in de image, anders start de container niet ("Cannot find module
+# './lib/...'"), en dat merk je pas op de server want tijdens het builden staat
+# de volledige repo er nog wel. Zie test/nextConfigRuntimeDeps.test.ts.
+COPY --from=builder /repo/apps/web/lib ./apps/web/lib
 COPY --from=builder /repo/apps/web/package.json ./apps/web/package.json
 COPY --from=builder /repo/packages ./packages
 COPY --from=builder /repo/package.json ./package.json

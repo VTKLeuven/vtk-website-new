@@ -8,7 +8,9 @@ type IconName =
   | 'edit'
   | 'close'
   | 'hide'
-  | 'show';
+  | 'show'
+  | 'external'
+  | 'chevron';
 
 export function LogisticsIcon({ name, className, ...props }: SVGProps<SVGSVGElement> & { name: IconName }) {
   const paths = {
@@ -49,6 +51,14 @@ export function LogisticsIcon({ name, className, ...props }: SVGProps<SVGSVGElem
       <>
         <path d="M3 12s3.5-5.5 9-5.5 9 5.5 9 5.5-3.5 5.5-9 5.5S3 12 3 12Z" />
         <circle cx="12" cy="12" r="2.5" />
+      </>
+    ),
+    chevron: <path d="m7 10 5 5 5-5" />,
+    external: (
+      <>
+        <path d="M14 4h6v6" />
+        <path d="M20 4 11 13" />
+        <path d="M18 14v4.5a1.5 1.5 0 0 1-1.5 1.5h-11A1.5 1.5 0 0 1 4 18.5v-11A1.5 1.5 0 0 1 5.5 6H10" />
       </>
     ),
   } satisfies Record<IconName, ReactNode>;

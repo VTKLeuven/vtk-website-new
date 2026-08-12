@@ -1,18 +1,32 @@
 /**
  * Zuivere domeinlogica voor het Theokot-reservatiesysteem: configuratie,
- * Brussel-tijd, bestelvensters en order-validatie.
+ * bestelvensters en order-validatie.
  *
  * Dit bestand bevat GEEN server-only imports (geen prisma/mail), zodat het —
  * net als `lib/shift.ts` — zowel in server- als clientcomponenten bruikbaar is.
  * De DB- en mail-afhankelijke logica (config lezen, no-shows verwerken, bans)
- * staat in `lib/theokot-server.ts`.
+ * staat in `lib/theokot-server.ts`; de Brussel-tijdhelpers in `lib/brussels.ts`.
  *
  * Zie docs/design-decisions.md voor het waarom achter de vensters en limieten.
  */
 
+import { brusselsWallClock, brusselsYMD, shiftYMD } from './brussels';
+
+// De tijdhelpers zaten hier oorspronkelijk; ze staan nu in lib/brussels.ts omdat
+// ook de pianoreservaties ze nodig hebben. Blijven doorexporteren, zodat de
+// bestaande imports uit `@/lib/theokot` blijven werken.
+export { brusselsTimeOnDay, brusselsYMD } from './brussels';
+
 // -----------------------------------------------------------------------------
 // Configuratie
 // -----------------------------------------------------------------------------
+
+/**
+ * Hoe de broodjes op de bestelpagina getoond worden. Een raster geeft de foto's
+ * ruimte; een lijst blijft compacter wanneer er (nog) geen foto's zijn. De keuze
+ * hoort daarom bij de beheerder en niet bij de code.
+ */
+export type TheokotItemLayout = 'list' | 'grid';
 
 export type TheokotConfig = {
   /** X: maximaal aantal items per bestelling. */
@@ -35,6 +49,8 @@ export type TheokotConfig = {
   noShowThreshold: number;
   /** Duur van een ban in dagen. */
   banDurationDays: number;
+  /** Weergave van het aanbod op de bestelpagina. */
+  itemLayout: TheokotItemLayout;
 };
 
 export const DEFAULT_THEOKOT_CONFIG: TheokotConfig = {
@@ -48,6 +64,7 @@ export const DEFAULT_THEOKOT_CONFIG: TheokotConfig = {
   noShowGraceMinutes: 15,
   noShowThreshold: 3,
   banDurationDays: 14,
+  itemLayout: 'list',
 };
 
 const HHMM = /^([01]\d|2[0-3]):([0-5]\d)$/;
@@ -59,6 +76,11 @@ function coerceInt(value: unknown, fallback: number, min = 0): number {
 
 function coerceTime(value: unknown, fallback: string): string {
   return typeof value === 'string' && HHMM.test(value) ? value : fallback;
+}
+
+/** Leest de weergavekeuze; alles wat geen geldige waarde is valt terug op de default. */
+export function coerceItemLayout(value: unknown, fallback: TheokotItemLayout = 'list'): TheokotItemLayout {
+  return value === 'grid' || value === 'list' ? value : fallback;
 }
 
 /** Leest een (mogelijk gedeeltelijke of ongeldige) Setting-waarde uit en vult aan met defaults. */
@@ -76,6 +98,7 @@ export function parseTheokotConfig(value: unknown): TheokotConfig {
     noShowGraceMinutes: coerceInt(src.noShowGraceMinutes, d.noShowGraceMinutes, 0),
     noShowThreshold: coerceInt(src.noShowThreshold, d.noShowThreshold, 1),
     banDurationDays: coerceInt(src.banDurationDays, d.banDurationDays, 1),
+    itemLayout: coerceItemLayout(src.itemLayout, d.itemLayout),
   };
 }
 
@@ -86,72 +109,6 @@ export function parseTheokotConfig(value: unknown): TheokotConfig {
 /** Eurocent → "€2,60" (Belgische notatie met komma). */
 export function formatEuro(cents: number): string {
   return `€${(cents / 100).toFixed(2).replace('.', ',')}`;
-}
-
-// -----------------------------------------------------------------------------
-// Brussel-tijd (correct in zomer- én winteruur)
-// -----------------------------------------------------------------------------
-
-const BRUSSELS_TZ = 'Europe/Brussels';
-
-/**
- * Offset (minuten toe te voegen aan UTC om Brussel-lokaaltijd te krijgen) op het
- * gegeven instant. Afgeleid via Intl zodat DST automatisch klopt.
- */
-function brusselsOffsetMinutes(instant: Date): number {
-  const dtf = new Intl.DateTimeFormat('en-US', {
-    timeZone: BRUSSELS_TZ,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
-    hour12: false,
-  });
-  const parts = dtf.formatToParts(instant);
-  const get = (t: string) => Number(parts.find((p) => p.type === t)?.value);
-  let hour = get('hour');
-  if (hour === 24) hour = 0; // sommige runtimes geven 24 voor middernacht
-  const asUtc = Date.UTC(get('year'), get('month') - 1, get('day'), hour, get('minute'), get('second'));
-  return Math.round((asUtc - instant.getTime()) / 60000);
-}
-
-/** De Brussel-kalenderdatum (jaar/maand/dag) van een instant. */
-export function brusselsYMD(date: Date): { year: number; month: number; day: number } {
-  const dtf = new Intl.DateTimeFormat('en-CA', {
-    timeZone: BRUSSELS_TZ,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  });
-  const [year, month, day] = dtf.format(date).split('-').map(Number);
-  return { year, month, day };
-}
-
-/** Instant voor een wandkloktijd (jaar/maand/dag + "HH:mm") in Europe/Brussels. */
-function brusselsWallClock(year: number, month: number, day: number, hhmm: string): Date {
-  const [h, m] = hhmm.split(':').map(Number);
-  // Eerste gok: behandel de wandklok alsof ze UTC is, corrigeer daarna met de
-  // offset op dat (ongeveer) instant. Voldoende nauwkeurig buiten DST-overgangen.
-  const guess = Date.UTC(year, month - 1, day, h, m);
-  const offset = brusselsOffsetMinutes(new Date(guess));
-  return new Date(guess - offset * 60000);
-}
-
-/** Instant voor "HH:mm" Brussel-tijd op de Brussel-kalenderdag van `day`. */
-export function brusselsTimeOnDay(day: Date, hhmm: string): Date {
-  const { year, month, day: d } = brusselsYMD(day);
-  return brusselsWallClock(year, month, d, hhmm);
-}
-
-/** `n` dagen bij een kalenderdatum optellen/aftrekken (blijft correct rond DST). */
-function shiftYMD(ymd: { year: number; month: number; day: number }, deltaDays: number) {
-  // Middag-UTC gebruiken zodat het optellen van dagen nooit over een DST-grens
-  // naar een verkeerde kalenderdag springt.
-  const base = Date.UTC(ymd.year, ymd.month - 1, ymd.day, 12) + deltaDays * 86400000;
-  const dt = new Date(base);
-  return { year: dt.getUTCFullYear(), month: dt.getUTCMonth() + 1, day: dt.getUTCDate() };
 }
 
 // -----------------------------------------------------------------------------

@@ -1,3 +1,5 @@
+import { storageKeyPath } from "./storageKeyPath";
+
 export * from "@vtk/storage";
 
 /**
@@ -9,6 +11,5 @@ export * from "@vtk/storage";
  */
 export function publicUrl(key: string | null | undefined): string | null {
   if (!key) return null;
-  const path = key.split("/").map(encodeURIComponent).join("/");
-  return `/api/media/${path}`;
+  return `/api/media/${storageKeyPath(key)}`;
 }

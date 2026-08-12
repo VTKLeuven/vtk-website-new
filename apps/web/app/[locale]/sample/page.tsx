@@ -1,3 +1,5 @@
+import type { Metadata } from "next";
+import { staticMetadata } from "@/lib/pageMetadata";
 import { notFound } from "next/navigation";
 import { hasLocale } from "@/lib/locale";
 import type { Locale } from "@vtk/i18n";
@@ -26,6 +28,16 @@ const eventPills = [
   ["service", "12:30", "Theokot"],
   ["more", "+3", "Meer events"],
 ];
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ locale: string }>;
+}): Promise<Metadata> {
+  const { locale } = await params;
+  if (!hasLocale(locale)) return {};
+  return staticMetadata("sample", "/sample", locale, { noIndex: true });
+}
 
 export default async function SamplePage({
   params,

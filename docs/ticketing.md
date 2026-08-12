@@ -21,10 +21,16 @@ setup (env, webhook, SMTP).
 3. **Pay** — Mollie hosted checkout. On completion Mollie calls the webhook,
    which re-fetches the payment and calls `fulfillPaidOrder` → tickets issued,
    confirmation mail enqueued in the same transaction.
-4. **Ticket** — buyer views the order at `/mijn-tickets/<orderId>` (or
-   `/tickets/bestelling/<orderId>`); each ticket renders a QR from a signed,
+4. **Mail** — the confirmation carries the tickets themselves: one PDF with every
+   valid ticket of the order, one Apple Wallet pass per ticket, and a Google
+   Wallet save button per ticket (Google passes can only be links). The link to
+   the ticket page stays the primary route; the attachments are the fallback at
+   the door. See `docs/design-decisions.md` for the limits and the failure mode.
+5. **Ticket** — buyer finds paid orders in the "Mijn VTK" section at
+   `/account#mijn-vtk-tickets` and opens an order at
+   `/tickets/bestelling/<orderId>`; each ticket renders a QR from a signed,
    PII-free credential.
-5. **Scan** — an operator with `SCAN` capability opens `/scan/<eventId>` on a
+6. **Scan** — an operator with `SCAN` capability opens `/scan/<eventId>` on a
    phone, scans the QR, and the server validates + marks it used (with duplicate
    detection and reversal).
 
@@ -69,7 +75,8 @@ provider-agnostic and keys off the `provider` string stored on each row
 ### Routes — public (`apps/web/app/[locale]/...`)
 - `tickets/page.tsx` — public shop list (`/tickets`)
 - `tickets/[slug]/page.tsx` — event + purchase page
-- `mijn-tickets/[orderId]/page.tsx`, `tickets/bestelling/[orderId]` — order + QR
+- `account/page.tsx` — personal ticket overview in the "Mijn VTK" section
+- `tickets/bestelling/[orderId]` — order + QR
 
 ### Routes — admin (`apps/web/app/[locale]/admin/tickets/...`)
 - `page.tsx` — event list / management
@@ -82,12 +89,82 @@ provider-agnostic and keys off the `provider` string stored on each row
   prefix). Requires session + `SCAN` capability. Needs HTTPS or localhost for
   camera access.
 
+### Offline scannen
+
+Een deur zonder bereik (kelder, tent, hal) is de regel, niet de uitzondering.
+Voorheen weigerde de scanner elke scan zolang `navigator.onLine` false was; nu
+werkt hij door.
+
+**Hoe het werkt.** Bij het laden haalt het toestel een *manifest* op: de lijst
+geldige tickets van dit event (`code`, `version`, `checkedIn`, naam, type). Valt
+het netwerk weg, dan beslist het toestel daarmee zelf en gaat de scan in een
+wachtrij in localStorage. Zodra er weer verbinding is, wordt die wachtrij in
+blokken van honderd naar `scan/batch` gestuurd.
+
+**Waarom geen handtekeningcontrole op het toestel.** De QR is een HMAC-token
+(`createTicketCredential`). Dat op het toestel verifiëren vraagt
+`TICKETING_TOKEN_SECRET`, en wie die telefoon uitleest kan dan zelf tickets
+maken. Offline controleren we dus op lidmaatschap van het manifest plus het
+versienummer. Gevolg: wie een geldige code van iemand anders kent, geraakt
+offline binnen. Dat conflict komt bij het synchroniseren alsnog boven, want de
+server doet de volledige controle en meldt de tweede scan als `ALREADY_USED`; de
+scanner toont die gevallen in een balk die blijft staan tot iemand ze wegklikt.
+
+**Waarom opnieuw versturen veilig is.** Elke scan draagt een `clientScanId` en
+`TicketScanLog.clientScanId` is uniek: een synchronisatie die halverwege afbreekt
+kan gewoon opnieuw. Ook een offline *geweigerde* scan gaat mee, zodat het
+scanlogboek compleet blijft.
+
+**Grenzen.** Boven de 5000 geldige tickets (`MANIFEST_LIMIT` in `scanner.ts`)
+krijgt het toestel geen manifest en scant het enkel online; met een halve lijst
+zou het geldige tickets weigeren. Dubbels *aan dezelfde deur* worden offline
+herkend, dubbels *tussen deuren* pas bij het synchroniseren: daarvoor is
+communicatie tussen de toestellen nodig. Wil je dat live, zet dan een lokale
+router of hotspot aan de ingang; LoRa-mesh (Meshtastic) haalt de EU-duty-cycle
+niet bij de toeloop van een galabal, en Web Bluetooth bestaat niet op iOS.
+
+### Zoeken op naam
+
+Naast de camera en het handmatige codeveld heeft de scanner een knop **Op naam**:
+die opent de deelnemerslijst uit hetzelfde manifest, met een zoekveld op naam of
+code. Inchecken vanuit de lijst loopt door exact dezelfde `processCredential` als
+een gescande QR, dus de dedup, de wachtrij en het scanlogboek gelden onverkort.
+Werkt dus ook offline. Wie al binnen is, staat als "Binnen" met een uitgeschakelde
+knop; dat komt uit `checkedIn` in het manifest plus wat dit toestel zelf scande.
+
+### Op het beginscherm zetten
+
+De scanner is installeerbaar als aparte app ("VTK Scanner"), zodat er geen
+browserbalk over het camerabeeld staat en de deurploeg met één tik start. Drie
+stukken horen bij elkaar:
+
+- `app/manifest.ts` — `id`/`scope`/`start_url` op `/scan`. Die `scope` doet meer
+  dan het lijkt: buiten `/scan` is de pagina niet installeerbaar, dus de browser
+  biedt dit nooit aan op de publieke site. Eén manifest op de conventionele plek
+  volstaat daardoor; een tweede op een geneste route werkt trouwens niet, want de
+  bestandsconventie wint van `metadata.manifest` in een geneste layout.
+- `public/sw.js` — een smalle service worker. Nodig omdat Chrome zonder
+  geregistreerde worker met fetch-handler nooit `beforeinstallprompt` vuurt, én
+  omdat de scanner anders offline niet eens opstart. Cachet enkel `/scan*` en de
+  gehashte build-assets; API-antwoorden nooit (een hergebruikt scan-antwoord zou
+  iemand een tweede keer binnenlaten). Registratie gebeurt enkel in productie:
+  in dev zou hij hot-reloadchunks vasthouden.
+- `components/ticketing/scanner/InstallButton.tsx` — vangt `beforeinstallprompt`
+  op (Android/Chrome) of toont de Deel-instructie (iOS/Safari, waar dat event
+  niet bestaat), en verdwijnt zodra de app in `display-mode: standalone` draait.
+
+`/scan` zelf is het keuzescherm met de evenementen waarvoor je scanrechten hebt
+(`listScannableTicketEvents`, van twaalf uur na afloop tot een maand vooruit).
+Dat scherm bestaat omdat het icoon ergens moet landen dat volgende maand nog
+klopt; een scanner-URL van één event is dat niet.
+
 ### API (`apps/web/app/api/tickets/...`)
 - `checkout/route.ts` — start an order + checkout
 - `mollie/webhook/route.ts` — Mollie payment/refund callback
 - `mock/complete/route.ts` — dev-only instant "payment complete"
 - `maintenance/route.ts` — reconciliation + outbox flush (Bearer `TICKETING_MAINTENANCE_SECRET`)
-- `events/[eventId]/scan`, `.../scan/reverse`, `.../scanner/bootstrap` — scanning
+- `events/[eventId]/scan`, `.../scan/batch`, `.../scan/reverse`,
+  `.../scanner/bootstrap` — scanning (`scan/batch` leegt de offline wachtrij)
 - `events/[eventId]/{stats,exports/*}`, `orders/[orderId]/{status,access}`,
   `[ticketId]/pdf` — supporting endpoints
 
@@ -102,6 +179,9 @@ provider-agnostic and keys off the `provider` string stored on each row
 - `config.ts` — env-driven config (provider, base URL, secrets, reservation window)
 - `crypto.ts` — signed ticket credentials + order access tokens
 - `mail.ts`, `outbox.ts` — durable confirmation-mail queue
+- `mailBundle.ts` — the ticket PDF and the Apple Wallet passes that ride along
+  with that mail, plus the Google Wallet save links (best effort: a failing
+  generator or provider never blocks the confirmation itself)
 - `money.ts`, `time.ts`, `pdf.ts`, `csv.ts`, `http.ts`, `access.ts`, `queries.ts` — helpers
 
 ### Components (`apps/web/components/ticketing/`)

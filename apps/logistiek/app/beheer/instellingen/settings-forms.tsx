@@ -60,6 +60,22 @@ function VehicleFields({ vehicle }: { vehicle?: UitleenVehicle }) {
         Omschrijving (optioneel)
         <input type="text" name="description" defaultValue={vehicle?.description ?? ''} className={inputClass} />
       </label>
+      <label className="flex items-start gap-2 text-sm text-vtk-ink sm:col-span-2">
+        <input
+          type="checkbox"
+          name="needsVanDriver"
+          defaultChecked={vehicle?.needsVanDriver ?? false}
+          className="mt-0.5 h-4 w-4"
+        />
+        <span>
+          Vraagt een chauffeur die de kar mag rijden
+          <span className="mt-0.5 block text-xs font-normal text-vtk-muted">
+            Voor de bestelwagen. Bij een rit met dit voertuig staan de chauffeurs die met de kar
+            rijden bovenaan in de keuzelijst, de rest onder &quot;Niet met de kar&quot;. Wie dat is,
+            zet je bij Chauffeurs.
+          </span>
+        </span>
+      </label>
     </div>
   );
 }
@@ -144,7 +160,17 @@ export function VehicleSettings({ vehicles }: { vehicles: UitleenVehicle[] }) {
   );
 }
 
-export function GeneralSettings({ showRentPrices }: { showRentPrices: boolean }) {
+const GENERAL_ERRORS = {
+  LAST_MINUTE_INVALID: 'De last-minute-termijn moet een aantal dagen tussen 1 en 90 zijn.',
+};
+
+export function GeneralSettings({
+  showRentPrices,
+  lastMinuteDays,
+}: {
+  showRentPrices: boolean;
+  lastMinuteDays: number;
+}) {
   return (
     <section className="rounded-[18px] border border-vtk-navy/10 bg-vtk-surface p-6">
       <h2 className="text-lg font-semibold tracking-tight text-vtk-ink">Algemeen</h2>
@@ -153,6 +179,7 @@ export function GeneralSettings({ showRentPrices }: { showRentPrices: boolean })
         submitLabel="Opslaan"
         savingLabel="Opslaan..."
         savedMessage="Instellingen opgeslagen."
+        errorMessages={GENERAL_ERRORS}
         className="mt-4 grid gap-3"
       >
         <label className="flex items-center gap-2 text-sm text-vtk-ink">
@@ -162,6 +189,23 @@ export function GeneralSettings({ showRentPrices }: { showRentPrices: boolean })
         <p className="text-xs text-vtk-muted">
           Standaard uit: de uitleendienst rekent doorgaans enkel waarborg aan. Zet dit aan als je materiaal
           met een huurprijs aanbiedt.
+        </p>
+
+        <label className="mt-2 grid gap-1 text-xs font-medium text-vtk-muted sm:max-w-[14rem]">
+          Last minute vanaf (dagen voor de afhaaldag)
+          <input
+            type="number"
+            name="lastMinuteDays"
+            min={1}
+            max={90}
+            defaultValue={lastMinuteDays}
+            className={inputClass}
+          />
+        </label>
+        <p className="text-xs text-vtk-muted">
+          Aanvragen die binnen deze termijn afgehaald worden, krijgen de badge &quot;last minute&quot; in de
+          aanvragenlijst. Het lid ziet de waarschuwing al bij het invullen, dus dit is ook wat je belooft:
+          korter dan dit mag je weigeren.
         </p>
       </SaveForm>
     </section>

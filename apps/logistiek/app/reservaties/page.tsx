@@ -3,9 +3,26 @@ import { LoginGate } from '@/components/login-gate';
 import { PageShell } from '@/components/page-shell';
 import { ReservationStatusBadge, VanStatusBadge } from '@/components/status-badge';
 import { getSession } from '@/lib/session';
-import { formatDateOnly, formatDateTime, formatEuro, formatPriceCents } from '@/lib/uitleen';
+import {
+  formatDateOnly,
+  formatDateTime,
+  formatDateWithPart,
+  formatEuro,
+  formatPriceCents,
+} from '@/lib/uitleen';
 import { myReservations, myVanBookings } from '@/lib/uitleen-server';
 import { copy, getLocale } from '@/lib/i18n';
+
+/**
+ * Drie items en de rest geteld. Een volledige opsomming van een grote aanvraag
+ * duwde de rij uit haar vorm; de detailpagina toont wel alles.
+ */
+function itemSummary(lines: Array<{ quantity: number; itemName: string }>, en: boolean): string {
+  const shown = lines.slice(0, 3).map((line) => `${line.quantity}× ${line.itemName}`);
+  const rest = lines.length - shown.length;
+  if (rest === 0) return shown.join(', ');
+  return `${shown.join(', ')} ${en ? `and ${rest} more` : `en ${rest} andere`}`;
+}
 
 export default async function ReservatiesPage({
   searchParams,
@@ -20,13 +37,43 @@ export default async function ReservatiesPage({
 
   const en = locale === 'en';
   const { aangevraagd } = await searchParams;
+  // Enkel echte posten delen: een werkgroepaanvraag bewaart geen groupId en
+  // blijft dus persoonlijk (zie deriveMemberRequester).
+  const postIds = session.groups.filter((group) => group.type === 'PRAESIDIUM').map((g) => g.id);
   const [reservations, vanBookings] = await Promise.all([
-    myReservations(session.user.id),
-    myVanBookings(session.user.id),
+    myReservations(session.user.id, postIds),
+    myVanBookings(session.user.id, postIds),
   ]);
 
+  // Materiaal en flesserke stonden onder één kopje "Materiaal", terwijl een
+  // flesserke-aanvraag geen enkel materiaalitem bevat. Een aanvraag met allebei
+  // hoort bij materiaal (daar staat het zwaarste werk) en zegt in haar
+  // samenvatting dat er ook drank bij zit.
+  const materialRequests = reservations.filter((reservation) => reservation.lines.length > 0);
+  const drinkRequests = reservations.filter(
+    (reservation) => reservation.lines.length === 0 && reservation.flesserkeLines.length > 0
+  );
+
+  /** "Door jou aangevraagd" of de naam van de collega, klein onder de rij. */
+  const requestedBy = (user: { id: string; name: string }) =>
+    user.id === session.user.id
+      ? en
+        ? 'Requested by you'
+        : 'Door jou aangevraagd'
+      : `${en ? 'Requested by' : 'Aangevraagd door'} ${user.name}`;
+
+  const postNote = en
+    ? 'Also shows what the rest of your post requested, so the same thing is not booked twice.'
+    : 'Toont ook wat de rest van je post aanvroeg, zodat hetzelfde niet twee keer geboekt wordt.';
+
   return (
-    <PageShell title={t.pageReservationsTitle}>
+    <PageShell
+      title={
+        <>
+          {t.pageReservationsTitle} <em className="font-serif font-normal italic text-vtk-navy">{t.pageReservationsAccent}</em>
+        </>
+      }
+    >
       {aangevraagd ? (
         <p className="mb-6 rounded-[14px] border border-vtk-yellow-dark/40 bg-vtk-yellow/20 px-4 py-3 text-sm font-medium text-vtk-ink">
           {en
@@ -38,7 +85,8 @@ export default async function ReservatiesPage({
       <div className="grid gap-8">
         <section>
           <h2 className="text-lg font-semibold tracking-tight text-vtk-ink">{en ? 'Equipment' : 'Materiaal'}</h2>
-          {reservations.length === 0 ? (
+          {postIds.length > 0 ? <p className="mt-1 text-sm text-vtk-muted">{postNote}</p> : null}
+          {materialRequests.length === 0 ? (
             <p className="mt-3 text-sm text-vtk-muted">
               {en ? 'No requests yet. ' : 'Nog geen aanvragen. '}
               <Link href="/materiaal" className="font-medium text-vtk-navy underline underline-offset-4">
@@ -48,24 +96,72 @@ export default async function ReservatiesPage({
             </p>
           ) : (
             <ul className="mt-4 grid gap-3">
-              {reservations.map((reservation) => (
+              {materialRequests.map((reservation) => (
                 <li key={reservation.id}>
+                  {/* Vaste twee kolommen: met flex-wrap sprong de statusbadge naar
+                      een eigen lijn zodra de itemopsomming lang werd. */}
                   <Link
                     href={`/reservaties/${reservation.id}`}
-                    className="flex flex-wrap items-center gap-x-5 gap-y-2 rounded-[16px] border border-vtk-navy/10 bg-vtk-surface px-5 py-4 transition hover:border-vtk-navy/25"
+                    className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-5 gap-y-2 rounded-[16px] border border-vtk-navy/10 bg-vtk-surface px-5 py-4 transition hover:border-vtk-navy/25"
                   >
-                    <div className="min-w-0 flex-1">
+                    <div className="min-w-0">
                       <p className="font-medium text-vtk-ink">{reservation.eventName}</p>
                       <p className="mt-0.5 truncate text-sm text-vtk-muted">
-                        {reservation.lines.map((line) => `${line.quantity}× ${line.itemName}`).join(', ')}
+                        {itemSummary(reservation.lines, en)}
+                        {reservation.flesserkeLines.length > 0
+                          ? ` · ${en ? 'and drinks' : 'en flesserke'}`
+                          : ''}
                       </p>
                       <p className="mt-0.5 text-sm text-vtk-muted">
-                        {formatDateOnly(reservation.pickupDate, locale)} {en ? 'to' : 'tot'}{' '}
-                        {formatDateOnly(reservation.returnDate, locale)}
+                        {formatDateWithPart(reservation.pickupDate, reservation.pickupPart, locale)}{' '}
+                        {en ? 'to' : 'tot'}{' '}
+                        {formatDateWithPart(reservation.returnDate, reservation.returnPart, locale)}
                         {reservation.totalDepositCents > 0
                           ? ` · ${formatEuro(reservation.totalDepositCents)} ${en ? 'deposit' : 'waarborg'}`
                           : ''}
                       </p>
+                      {/* Wie ze aanvroeg, klein eronder. Bij je eigen aanvraag is
+                          dat overbodig; bij die van een collega is het het punt. */}
+                      <p className="mt-1 text-xs text-vtk-muted">{requestedBy(reservation.user)}</p>
+                    </div>
+                    <ReservationStatusBadge status={reservation.status} locale={locale} />
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+
+        <section>
+          <h2 className="text-lg font-semibold tracking-tight text-vtk-ink">
+            {en ? 'Drinks' : 'Flesserke'}
+          </h2>
+          {postIds.length > 0 ? <p className="mt-1 text-sm text-vtk-muted">{postNote}</p> : null}
+          {drinkRequests.length === 0 ? (
+            <p className="mt-3 text-sm text-vtk-muted">
+              {en ? 'No requests yet. ' : 'Nog geen aanvragen. '}
+              <Link href="/flesserke" className="font-medium text-vtk-navy underline underline-offset-4">
+                {en ? 'Browse the drinks' : 'Bekijk het aanbod'}
+              </Link>
+              .
+            </p>
+          ) : (
+            <ul className="mt-4 grid gap-3">
+              {drinkRequests.map((reservation) => (
+                <li key={reservation.id}>
+                  <Link
+                    href={`/reservaties/${reservation.id}`}
+                    className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-5 gap-y-2 rounded-[16px] border border-vtk-navy/10 bg-vtk-surface px-5 py-4 transition hover:border-vtk-navy/25"
+                  >
+                    <div className="min-w-0">
+                      <p className="font-medium text-vtk-ink">{reservation.eventName}</p>
+                      <p className="mt-0.5 truncate text-sm text-vtk-muted">
+                        {itemSummary(reservation.flesserkeLines, en)}
+                      </p>
+                      <p className="mt-0.5 text-sm text-vtk-muted">
+                        {formatDateWithPart(reservation.pickupDate, reservation.pickupPart, locale)}
+                      </p>
+                      <p className="mt-1 text-xs text-vtk-muted">{requestedBy(reservation.user)}</p>
                     </div>
                     <ReservationStatusBadge status={reservation.status} locale={locale} />
                   </Link>
@@ -77,6 +173,7 @@ export default async function ReservatiesPage({
 
         <section>
           <h2 className="text-lg font-semibold tracking-tight text-vtk-ink">{en ? 'Transport' : 'Vervoer'}</h2>
+          {postIds.length > 0 ? <p className="mt-1 text-sm text-vtk-muted">{postNote}</p> : null}
           {vanBookings.length === 0 ? (
             <p className="mt-3 text-sm text-vtk-muted">
               {en ? 'No trips yet. ' : 'Nog geen ritten. '}
@@ -91,14 +188,20 @@ export default async function ReservatiesPage({
                 <li key={booking.id}>
                   <Link
                     href={`/vervoer/${booking.id}`}
-                    className="flex flex-wrap items-center gap-x-5 gap-y-2 rounded-[16px] border border-vtk-navy/10 bg-vtk-surface px-5 py-4 transition hover:border-vtk-navy/25"
+                    className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-5 gap-y-2 rounded-[16px] border border-vtk-navy/10 bg-vtk-surface px-5 py-4 transition hover:border-vtk-navy/25"
                   >
-                    <div className="min-w-0 flex-1">
-                      <p className="font-medium text-vtk-ink">{booking.purpose}</p>
+                    <div className="min-w-0">
+                      <p className="flex flex-wrap items-center gap-2 font-medium text-vtk-ink">
+                        <span className="rounded-full bg-vtk-paper-2 px-2.5 py-0.5 text-xs font-semibold text-vtk-navy">
+                          {en ? booking.vehicle.nameEn : booking.vehicle.nameNl}
+                        </span>
+                        {booking.purpose}
+                      </p>
                       <p className="mt-0.5 text-sm text-vtk-muted">
                         {formatDateTime(booking.startAt, locale)} {en ? 'to' : 'tot'} {formatDateTime(booking.endAt, locale)} ·{' '}
                         {formatPriceCents(booking.priceCents, locale)}
                       </p>
+                      <p className="mt-1 text-xs text-vtk-muted">{requestedBy(booking.user)}</p>
                     </div>
                     <VanStatusBadge status={booking.status} locale={locale} />
                   </Link>

@@ -2,14 +2,15 @@ import { notFound } from "next/navigation";
 import { prisma } from "@vtk/db";
 import { hasLocale } from "@/lib/locale";
 import { requirePermission } from "@/lib/session";
+import { hasPermission } from "@vtk/auth";
 import type { Locale } from "@vtk/i18n";
 import { ContentManager, type TabNode, type PageNode, type RoleOption } from "./ContentManager";
 
 /**
  * Beheer van de navigatiestructuur: welke categorieën in de header staan, welke
  * pagina's daaronder hangen, en de metadata van die pagina's (titels, slug,
- * publicatie, bewerkrollen). De INHOUD, de bijlagen en het verwijderen van een
- * pagina horen in /admin/paginas; elke pagina heeft daarvoor een snelkoppeling.
+ * publicatie, bewerkrollen, verwijderen). De INHOUD en de bijlagen horen in
+ * /admin/paginas; elke pagina heeft daarvoor een snelkoppeling.
  */
 export default async function AdminContent({
   params,
@@ -20,10 +21,14 @@ export default async function AdminContent({
   if (!hasLocale(localeParam)) notFound();
   const locale: Locale = localeParam;
 
-  await requirePermission("pages.manage");
+  const session = await requirePermission("pages.manage");
+  const canDeletePages = hasPermission(session, "pages.delete");
 
   const [tabs, pages, roles] = await Promise.all([
-    prisma.headerTab.findMany({ orderBy: { order: "asc" } }),
+    prisma.headerTab.findMany({
+      orderBy: { order: "asc" },
+      include: { links: { orderBy: { order: "asc" } } },
+    }),
     // Enkel de pagina's die in de boom staan (losse pagina's hangen per definitie
     // nergens onder), en enkel de velden die de inspector toont. De markdown en
     // de bijlagen blijven bewust ongelezen: die zijn groot en worden hier niet
@@ -39,6 +44,9 @@ export default async function AdminContent({
         titleEn: true,
         excerptNl: true,
         excerptEn: true,
+        ctaLabelNl: true,
+        ctaLabelEn: true,
+        ctaUrl: true,
         publishedAt: true,
         needsYearlyEdit: true,
         order: true,
@@ -63,6 +71,9 @@ export default async function AdminContent({
     titleEn: p.titleEn,
     excerptNl: p.excerptNl,
     excerptEn: p.excerptEn,
+    ctaLabelNl: p.ctaLabelNl,
+    ctaLabelEn: p.ctaLabelEn,
+    ctaUrl: p.ctaUrl,
     published: Boolean(p.publishedAt),
     needsYearlyEdit: p.needsYearlyEdit,
     editorRoleIds: p.editorRoles.map((r) => r.roleId),
@@ -76,6 +87,12 @@ export default async function AdminContent({
     labelNl: t.labelNl,
     labelEn: t.labelEn,
     visible: t.visible,
+    externalUrl: t.externalUrl,
+    links: t.links.map((link) => ({
+      labelNl: link.labelNl,
+      labelEn: link.labelEn,
+      url: link.url,
+    })),
     introNl: t.introNl,
     introEn: t.introEn,
     ctaLabelNl: t.ctaLabelNl,
@@ -90,6 +107,7 @@ export default async function AdminContent({
       tabs={tabNodes}
       roles={roleOptions}
       usingDefaults={tabs.length === 0}
+      canDeletePages={canDeletePages}
     />
   );
 }

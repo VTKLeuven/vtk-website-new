@@ -1,3 +1,6 @@
+import type { Metadata } from "next";
+import { staticMetadata } from "@/lib/pageMetadata";
+import Image from "next/image";
 import Link from "next/link";
 import { prisma } from "@vtk/db";
 import { notFound } from "next/navigation";
@@ -6,6 +9,16 @@ import { Markdown } from "@/components/ui/Markdown";
 import { hasLocale } from "@/lib/locale";
 import { publicUrl } from "@/lib/storage";
 import { formatWorkingYear, parseWorkingYear, workingYearTabs } from "@/lib/workingYear";
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ locale: string }>;
+}): Promise<Metadata> {
+  const { locale } = await params;
+  if (!hasLocale(locale)) return {};
+  return staticMetadata("werkgroepen", "/werkgroepen", locale);
+}
 
 export default async function WerkgroepenPage({
   params,
@@ -117,8 +130,15 @@ export default async function WerkgroepenPage({
                           <li key={m.id} className="text-center">
                             <div className="mx-auto h-28 w-28 overflow-hidden rounded-[20px] border border-vtk-blue/10 bg-vtk-blue-soft">
                               {src ? (
-                                // eslint-disable-next-line @next/next/no-img-element
-                                <img src={src} alt={m.user.name} className="h-full w-full object-cover" />
+                                // De tegel is 112x112; een profielfoto uit storage is dat
+                                // zelden, dus laat next/image ze op maat snijden.
+                                <Image
+                                  src={src}
+                                  alt={m.user.name}
+                                  width={112}
+                                  height={112}
+                                  className="h-full w-full object-cover"
+                                />
                               ) : (
                                 <div className="grid h-full w-full place-items-center text-3xl font-semibold text-[#5c667f]">
                                   {m.user.name.slice(0, 1).toUpperCase()}

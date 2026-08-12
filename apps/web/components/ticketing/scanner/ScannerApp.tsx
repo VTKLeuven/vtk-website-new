@@ -7,6 +7,7 @@ import {
   CameraOff,
   Check,
   ChevronDown,
+  CloudUpload,
   CircleGauge,
   Flashlight,
   History,
@@ -16,10 +17,12 @@ import {
   RefreshCw,
   RotateCcw,
   ScanLine,
+  Search,
   Signal,
   SignalZero,
   TicketCheck,
   UserRound,
+  Users,
   WifiOff,
   X,
   XCircle,
@@ -27,14 +30,31 @@ import {
 import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 import type { IScannerControls } from "@zxing/browser";
 import type {
+  QueuedScan,
   ScanApiResponse,
+  ScanBatchResponse,
+  ScanConflict,
   ScanHistoryItem,
   ScanKind,
   ScannerBootstrap,
+  ScannerManifest,
 } from "./types";
+import { loadManifest, loadQueue, saveManifest, saveQueue, verifyOffline } from "./offline";
+import { InstallButton } from "./InstallButton";
 
 const ACCEPTED_RESULTS = new Set(["ACCEPTED", "CHECKED_IN", "SUCCESS", "VALID"]);
 const DUPLICATE_RESULTS = new Set(["DUPLICATE", "ALREADY_CHECKED_IN", "ALREADY_USED"]);
+
+/** Een gequeuede scan omzetten naar wat het scan-endpoint verwacht. */
+function toScanRequest(item: QueuedScan) {
+  return {
+    credential: item.credential,
+    clientScanId: item.clientScanId,
+    gateId: item.gateId,
+    deviceId: item.deviceId,
+    clientScannedAt: item.clientScannedAt,
+  };
+}
 
 function createId() {
   return globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(36).slice(2)}`;
@@ -65,6 +85,23 @@ function fallbackMessage(kind: ScanKind) {
   return "Scan kon niet worden gecontroleerd";
 }
 
+/**
+ * Een minimale bootstrap wanneer de server onbereikbaar is maar er nog een
+ * manifest op het toestel staat. Zonder dit bleef de scanner hangen op "Scanner
+ * niet beschikbaar" terwijl hij prima offline kon werken.
+ */
+function offlineBootstrap(manifest: ScannerManifest): ScannerBootstrap {
+  return {
+    event: { id: "", title: "Offline scannen" },
+    gates: [],
+    stats: {
+      total: manifest.ticketCount,
+      checkedIn: manifest.tickets.filter((ticket) => ticket.checkedIn).length,
+    },
+    manifest,
+  };
+}
+
 function ScannerFeedback({ item }: { item: ScanHistoryItem }) {
   return (
     <div className={`scanner-feedback is-${item.kind}`} role="status" aria-live="assertive">
@@ -87,6 +124,7 @@ export function ScannerApp({ eventId }: { eventId: string }) {
   const lastCredentialRef = useRef<{ value: string; at: number } | null>(null);
   const processRef = useRef<(value: string) => void>(() => undefined);
   const feedbackTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const syncingRef = useRef(false);
 
   const [bootstrap, setBootstrap] = useState<ScannerBootstrap | null>(null);
   const [bootstrapError, setBootstrapError] = useState<string | null>(null);
@@ -106,6 +144,17 @@ export function ScannerApp({ eventId }: { eventId: string }) {
   const [feedback, setFeedback] = useState<ScanHistoryItem | null>(null);
   const [sessionCounts, setSessionCounts] = useState({ accepted: 0, duplicate: 0, rejected: 0 });
   const [serverStats, setServerStats] = useState<{ checkedIn?: number; total?: number }>({});
+  const [manifest, setManifest] = useState<ScannerManifest | null>(null);
+  const [queueSize, setQueueSize] = useState(0);
+  const [syncing, setSyncing] = useState(false);
+  const [conflicts, setConflicts] = useState<ScanConflict[]>([]);
+  // De codes die dit toestel deze sessie al aanvaardde. Dubbels aan dezelfde deur
+  // vangen we daarmee ook offline af; dubbels tussen deuren pas bij het
+  // synchroniseren, want daar is netwerk voor nodig. State en geen ref, want de
+  // namenlijst moet meteen zien wie er net binnen is.
+  const [scannedCodes, setScannedCodes] = useState<Set<string>>(new Set());
+  const [listOpen, setListOpen] = useState(false);
+  const [listQuery, setListQuery] = useState("");
 
   const loadBootstrap = useCallback(async () => {
     setLoading(true);
@@ -121,8 +170,20 @@ export function ScannerApp({ eventId }: { eventId: string }) {
       setBootstrap(payload);
       setServerStats(payload.stats ?? {});
       setGateId((current) => current || payload.gates[0]?.id || "");
+      if (payload.manifest?.complete) {
+        setManifest(payload.manifest);
+        saveManifest(eventId, payload.manifest);
+      }
     } catch (error) {
-      setBootstrapError(error instanceof Error ? error.message : "Scanner kon niet worden geladen");
+      // Zonder netwerk is een eerder bewaard manifest genoeg om te blijven
+      // scannen; enkel wie nog nooit online was, kan hier niets.
+      const cached = loadManifest(eventId);
+      if (cached) {
+        setManifest(cached);
+        setBootstrap((current) => current ?? offlineBootstrap(cached));
+      } else {
+        setBootstrapError(error instanceof Error ? error.message : "Scanner kon niet worden geladen");
+      }
     } finally {
       setLoading(false);
     }
@@ -135,6 +196,9 @@ export function ScannerApp({ eventId }: { eventId: string }) {
       const savedDeviceId = localStorage.getItem(deviceStorageKey) ?? createId();
       localStorage.setItem(deviceStorageKey, savedDeviceId);
       setDeviceId(savedDeviceId);
+      // Nog niet verstuurde scans van een vorige sessie: die telling hoort er
+      // meteen te staan, ook voor de bootstrap klaar is.
+      setQueueSize(loadQueue(eventId).length);
       void loadBootstrap();
     }, 0);
 
@@ -149,6 +213,86 @@ export function ScannerApp({ eventId }: { eventId: string }) {
     };
   }, [eventId, loadBootstrap]);
 
+  /**
+   * Stuurt de wachtrij in blokken naar de server. Veilig om op elk moment te
+   * draaien: elke scan draagt haar `clientScanId` en de server dedupliceert
+   * daarop, dus een halve synchronisatie kan gewoon opnieuw.
+   */
+  const flushQueue = useCallback(async () => {
+    if (syncingRef.current || !navigator.onLine) return;
+    let pending = loadQueue(eventId);
+    if (pending.length === 0) return;
+
+    syncingRef.current = true;
+    setSyncing(true);
+    try {
+      while (pending.length > 0 && navigator.onLine) {
+        const batch = pending.slice(0, 100);
+        const response = await fetch(`/api/tickets/events/${eventId}/scan/batch`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ scans: batch.map(toScanRequest) }),
+        });
+        if (!response.ok) break;
+        const payload = (await response.json()) as ScanBatchResponse;
+
+        // Alles wat de server verwerkt heeft, mag uit de wachtrij. Enkel items die
+        // een fout gaven blijven staan voor een volgende poging.
+        const failed = new Set(
+          payload.results.filter((r) => r.result === "ERROR").map((r) => r.clientScanId),
+        );
+        const handled = new Set(batch.map((item) => item.clientScanId));
+        pending = pending.filter(
+          (item) => !handled.has(item.clientScanId) || failed.has(item.clientScanId),
+        );
+        saveQueue(eventId, pending);
+        setQueueSize(pending.length);
+        if (payload.stats) setServerStats(payload.stats);
+
+        // Offline aanvaard, maar de server zegt iets anders: dat is precies het
+        // geval waar de deurploeg achteraf naar moet kunnen kijken.
+        const byId = new Map(batch.map((item) => [item.clientScanId, item]));
+        const fresh = payload.results
+          .filter((r) => r.result !== "ERROR" && !ACCEPTED_RESULTS.has(r.result.toUpperCase()))
+          .flatMap<ScanConflict>((r) => {
+            const queued = byId.get(r.clientScanId);
+            if (!queued || queued.offlineKind !== "accepted") return [];
+            return [
+              {
+                clientScanId: r.clientScanId,
+                code: queued.code,
+                attendeeName: queued.attendeeName,
+                result: r.result,
+                scannedAt: queued.clientScannedAt,
+              },
+            ];
+          });
+        if (fresh.length > 0) setConflicts((current) => [...fresh, ...current].slice(0, 50));
+
+        if (failed.size === batch.length) break;
+      }
+    } catch {
+      // Netwerk viel weg tijdens het synchroniseren; de wachtrij blijft staan.
+    } finally {
+      syncingRef.current = false;
+      setSyncing(false);
+    }
+  }, [eventId]);
+
+  // Synchroniseren zodra er weer verbinding is, en daarna geregeld opnieuw: een
+  // telefoon meldt zich soms "online" terwijl het netwerk nog niet bruikbaar is.
+  // De eerste poging loopt via een timeout, want `flushQueue` zet meteen state en
+  // dat mag niet synchroon in een effect.
+  useEffect(() => {
+    if (!online) return;
+    const first = window.setTimeout(() => void flushQueue(), 0);
+    const timer = window.setInterval(() => void flushQueue(), 20_000);
+    return () => {
+      window.clearTimeout(first);
+      window.clearInterval(timer);
+    };
+  }, [online, flushQueue]);
+
   const processCredential = useCallback(async (rawValue: string) => {
     const credential = credentialFromScan(rawValue);
     if (!credential || busyRef.current) return;
@@ -157,19 +301,79 @@ export function ScannerApp({ eventId }: { eventId: string }) {
     if (previous?.value === credential && Date.now() - previous.at < 2500) return;
     lastCredentialRef.current = { value: credential, at: Date.now() };
 
+    if (!deviceId) return;
+
+    // Zonder netwerk beslist het toestel zelf, op basis van het manifest, en gaat
+    // de scan de wachtrij in. Voorheen werd hier gewoon geweigerd, waardoor de
+    // scanner aan een deur zonder bereik onbruikbaar was.
     if (!navigator.onLine) {
+      const scannedAt = new Date().toISOString();
+      if (!manifest) {
+        const item: ScanHistoryItem = {
+          id: createId(),
+          scannedAt,
+          kind: "error",
+          code: credential.slice(-10),
+          message: "Geen netwerk en geen ticketlijst op dit toestel",
+        };
+        setFeedback(item);
+        setHistory((items) => [item, ...items].slice(0, 50));
+        return;
+      }
+
+      const verdict = verifyOffline(manifest, credential, scannedCodes);
+      const clientScanId = createId();
+      const entry = "entry" in verdict ? verdict.entry : undefined;
       const item: ScanHistoryItem = {
-        id: createId(),
-        scannedAt: new Date().toISOString(),
-        kind: "error",
-        code: credential.slice(-10),
-        message: "Geen netwerkverbinding",
+        id: clientScanId,
+        scannedAt,
+        kind: verdict.kind,
+        code: entry?.code ?? credential.slice(-10),
+        attendeeName: entry?.name,
+        typeName: entry?.type,
+        pending: true,
+        message:
+          verdict.kind === "accepted"
+            ? "Aanvaard (offline)"
+            : verdict.kind === "duplicate"
+              ? "Al gescand"
+              : verdict.reason === "unknown"
+                ? "Onbekend ticket"
+                : verdict.reason === "version"
+                  ? "Verouderde ticketcode"
+                  : "Code niet leesbaar",
       };
+
+      if (verdict.kind === "accepted") {
+        const code = verdict.entry.code;
+        setScannedCodes((current) => new Set(current).add(code));
+      }
+
+      // Ook een offline geweigerde scan gaat mee: de server doet de volledige
+      // controle en het scanlogboek hoort compleet te zijn.
+      const queued: QueuedScan = {
+        clientScanId,
+        credential,
+        gateId: gateId || null,
+        deviceId,
+        clientScannedAt: scannedAt,
+        offlineKind: verdict.kind,
+        code: item.code,
+        attendeeName: item.attendeeName,
+        typeName: item.typeName,
+      };
+      const next = [...loadQueue(eventId), queued];
+      saveQueue(eventId, next);
+      setQueueSize(next.length);
+
       setFeedback(item);
       setHistory((items) => [item, ...items].slice(0, 50));
+      setSessionCounts((counts) => ({ ...counts, [verdict.kind]: counts[verdict.kind] + 1 }));
+      if (navigator.vibrate) navigator.vibrate(verdict.kind === "accepted" ? 60 : [90, 50, 90]);
+      if (feedbackTimerRef.current) clearTimeout(feedbackTimerRef.current);
+      feedbackTimerRef.current = setTimeout(() => setFeedback(null), 1800);
       return;
     }
-    if (!deviceId) return;
 
     busyRef.current = true;
     const clientScanId = createId();
@@ -193,6 +397,10 @@ export function ScannerApp({ eventId }: { eventId: string }) {
       };
       setFeedback(item);
       setHistory((items) => [item, ...items].slice(0, 50));
+      if (kind === "accepted" && payload.ticket?.publicId) {
+        const code = payload.ticket.publicId;
+        setScannedCodes((current) => new Set(current).add(code));
+      }
       if (payload.stats) setServerStats(payload.stats);
       if (kind !== "error") {
         setSessionCounts((counts) => ({
@@ -216,7 +424,7 @@ export function ScannerApp({ eventId }: { eventId: string }) {
       if (feedbackTimerRef.current) clearTimeout(feedbackTimerRef.current);
       feedbackTimerRef.current = setTimeout(() => setFeedback(null), 1800);
     }
-  }, [deviceId, eventId, gateId]);
+  }, [deviceId, eventId, gateId, manifest, scannedCodes]);
 
   useEffect(() => {
     processRef.current = (value) => void processCredential(value);
@@ -288,6 +496,31 @@ export function ScannerApp({ eventId }: { eventId: string }) {
     void processCredential(manualCode);
     setManualCode("");
   }
+
+  /**
+   * De deelnemerslijst, gefilterd op naam of ticketcode.
+   *
+   * Voor wie zijn QR kwijt is of een telefoon zonder batterij heeft: je zoekt de
+   * naam op en checkt die persoon rechtstreeks in. Werkt ook offline, want de
+   * lijst is het manifest dat al op het toestel staat.
+   *
+   * Bewust afgekapt op vijftig rijen: een galabal telt er meer dan duizend, en
+   * die allemaal tekenen maakt het scrollen op een telefoon stroperig. Wie iemand
+   * zoekt, typt toch een paar letters.
+   */
+  const listResults = (() => {
+    if (!manifest) return { rows: [], total: 0 };
+    const query = listQuery.trim().toLowerCase();
+    const matches = manifest.tickets
+      .filter(
+        (ticket) =>
+          !query ||
+          ticket.name.toLowerCase().includes(query) ||
+          ticket.code.toLowerCase().includes(query),
+      )
+      .sort((a, b) => a.name.localeCompare(b.name, "nl"));
+    return { rows: matches.slice(0, 50), total: matches.length };
+  })();
 
   async function reverseScan(item: ScanHistoryItem) {
     if (!item.scanId || reversingScanId) return;
@@ -367,7 +600,51 @@ export function ScannerApp({ eventId }: { eventId: string }) {
         <Link href="/tickets" className="scanner-close" aria-label="Scanner sluiten" title="Scanner sluiten"><X aria-hidden="true" /></Link>
       </header>
 
-      {!online ? <div className="scanner-offline-banner"><WifiOff size={18} aria-hidden="true" /> Scannen gepauzeerd tot de verbinding hersteld is</div> : null}
+      {!online ? (
+        <div className="scanner-offline-banner">
+          <WifiOff size={18} aria-hidden="true" />
+          {manifest
+            ? `Offline scannen op de lijst van ${new Date(manifest.generatedAt).toLocaleTimeString("nl-BE", { hour: "2-digit", minute: "2-digit" })}. Scans worden bewaard.`
+            : "Geen netwerk en geen ticketlijst op dit toestel"}
+        </div>
+      ) : null}
+
+      {queueSize > 0 ? (
+        <div className="scanner-queue-banner">
+          <CloudUpload size={18} aria-hidden="true" />
+          <span>
+            {queueSize} {queueSize === 1 ? "scan wacht" : "scans wachten"} op synchronisatie
+          </span>
+          <button type="button" onClick={() => void flushQueue()} disabled={syncing || !online}>
+            {syncing ? <LoaderCircle className="is-spinning" size={15} aria-hidden="true" /> : <RefreshCw size={15} aria-hidden="true" />}
+            {syncing ? "Bezig" : "Nu synchroniseren"}
+          </button>
+        </div>
+      ) : null}
+
+      {/* Offline aanvaard, achteraf toch geweigerd: meestal iemand die aan een
+          tweede deur nog eens binnen probeerde. Blijft staan tot de deurploeg ze
+          wegklikt. */}
+      {conflicts.length > 0 ? (
+        <div className="scanner-conflict-banner" role="alert">
+          <AlertCircle size={18} aria-hidden="true" />
+          <div>
+            <strong>{conflicts.length} offline aanvaarde {conflicts.length === 1 ? "scan bleek" : "scans bleken"} toch niet geldig</strong>
+            <ul>
+              {conflicts.slice(0, 5).map((conflict) => (
+                <li key={conflict.clientScanId}>
+                  {conflict.attendeeName ?? conflict.code} · {conflict.result === "ALREADY_USED" ? "was al binnen" : conflict.result.toLowerCase()}
+                </li>
+              ))}
+            </ul>
+          </div>
+          <button type="button" onClick={() => setConflicts([])} aria-label="Meldingen wissen">
+            <X size={16} aria-hidden="true" />
+          </button>
+        </div>
+      ) : null}
+
+      <InstallButton />
 
       <div className="scanner-workspace">
         <section className="scanner-camera-panel">
@@ -416,7 +693,80 @@ export function ScannerApp({ eventId }: { eventId: string }) {
             >
               <Keyboard size={19} aria-hidden="true" /> Handmatig
             </button>
+            <button
+              type="button"
+              className={listOpen ? "is-active" : ""}
+              aria-expanded={listOpen}
+              aria-controls="scanner-name-list"
+              disabled={!manifest}
+              title={manifest ? undefined : "Deelnemerslijst niet beschikbaar voor dit event"}
+              onClick={() => setListOpen((current) => !current)}
+            >
+              <Users size={19} aria-hidden="true" /> Op naam
+            </button>
           </div>
+
+          {/* Zoeken op naam. De lijst komt uit het manifest, dus dit werkt ook
+              zonder netwerk; aantikken checkt die persoon in via hetzelfde pad
+              als een handmatig ingetikte code. */}
+          {listOpen && manifest ? (
+            <section className="scanner-name-list" id="scanner-name-list" aria-label="Deelnemers zoeken">
+              <div className="scanner-name-search">
+                <Search size={17} aria-hidden="true" />
+                <input
+                  value={listQuery}
+                  onChange={(event) => setListQuery(event.target.value)}
+                  placeholder="Zoek een naam"
+                  aria-label="Zoek een deelnemer op naam"
+                  autoComplete="off"
+                  autoCapitalize="off"
+                  spellCheck={false}
+                />
+                {listQuery ? (
+                  <button type="button" onClick={() => setListQuery("")} aria-label="Zoekopdracht wissen">
+                    <X size={16} aria-hidden="true" />
+                  </button>
+                ) : null}
+              </div>
+
+              <p className="scanner-name-count">
+                {listResults.total} van {manifest.tickets.length} deelnemers
+                {listResults.total > listResults.rows.length
+                  ? ` · eerste ${listResults.rows.length} getoond`
+                  : ""}
+              </p>
+
+              {listResults.rows.length === 0 ? (
+                <p className="scanner-name-empty">Geen deelnemer gevonden.</p>
+              ) : (
+                <ul>
+                  {listResults.rows.map((ticket) => {
+                    const binnen = ticket.checkedIn || scannedCodes.has(ticket.code);
+                    return (
+                      <li key={ticket.code} className={binnen ? "is-in" : ""}>
+                        <button
+                          type="button"
+                          onClick={() => void processCredential(ticket.code)}
+                          disabled={binnen}
+                        >
+                          <span className="scanner-name-state" aria-hidden="true">
+                            {binnen ? <Check size={16} /> : <UserRound size={16} />}
+                          </span>
+                          <span className="scanner-name-who">
+                            <strong>{ticket.name}</strong>
+                            <small>{ticket.type}</small>
+                          </span>
+                          <span className="scanner-name-action">
+                            {binnen ? "Binnen" : "Inchecken"}
+                          </span>
+                        </button>
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+            </section>
+          ) : null}
 
           {manualOpen ? (
             <form className="scanner-manual-form" id="scanner-manual-entry" onSubmit={submitManual}>

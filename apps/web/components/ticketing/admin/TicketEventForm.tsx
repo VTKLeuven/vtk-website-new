@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import {
   submitTicketEventFormAction,
   type TicketEventFormActionState,
@@ -13,9 +14,11 @@ import {
   LoaderCircle,
   Plus,
   Save,
+  Ticket,
 } from "lucide-react";
 import { useActionState } from "react";
 import { toDatetimeLocal, type AdminLocale } from "./format";
+import { AddressPicker } from "./AddressPicker";
 
 const initialState: TicketEventFormActionState = { status: "idle" };
 
@@ -48,6 +51,9 @@ type TicketEventFormValue = {
   descriptionNl?: string | null;
   descriptionEn?: string | null;
   location?: string | null;
+  locationAddress?: string | null;
+  locationLatitude?: number | null;
+  locationLongitude?: number | null;
   startsAt?: Date;
   endsAt?: Date;
   salesStartAt?: Date | null;
@@ -69,17 +75,85 @@ type CalendarOption = {
   start: Date;
 };
 
+/** Het gekoppelde kalenderevent waar dit ticketevent zijn gegevens van erft. */
+export type LinkedCalendarEvent = {
+  id: string;
+  titleNl: string;
+  titleEn: string | null;
+  location: string | null;
+  start: Date;
+  end: Date;
+};
+
+/**
+ * Toont wat het ticketevent overneemt van zijn kalenderevent, in plaats van
+ * dezelfde velden een tweede keer te laten intikken. Eén bron van waarheid: pas
+ * je de datum aan in de kalender, dan verschuift de ticketverkoop mee, en kan
+ * /tickets nooit een andere datum tonen dan /kalender.
+ */
+function InheritedFromCalendar({
+  event,
+  locale,
+}: {
+  event: LinkedCalendarEvent;
+  locale: AdminLocale;
+}) {
+  const nl = locale === "nl";
+  const base = nl ? "" : "/en";
+  const fmt = new Intl.DateTimeFormat(nl ? "nl-BE" : "en-GB", {
+    timeZone: "Europe/Brussels",
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+
+  return (
+    <div className="ticket-admin-inherited">
+      <div className="ticket-admin-inherited-head">
+        <strong>{nl ? "Overgenomen van het kalenderevent" : "Inherited from the calendar event"}</strong>
+        <Link href={`${base}/admin/kalender/${event.id}`}>
+          {nl ? "Aanpassen in de kalender" : "Edit in the calendar"}
+        </Link>
+      </div>
+      <dl className="ticket-admin-inherited-list">
+        <div>
+          <dt>{nl ? "Titel" : "Title"}</dt>
+          <dd>{nl ? event.titleNl : (event.titleEn ?? event.titleNl)}</dd>
+        </div>
+        <div>
+          <dt>{nl ? "Wanneer" : "When"}</dt>
+          <dd>
+            {fmt.format(event.start)} – {fmt.format(event.end)}
+          </dd>
+        </div>
+        <div>
+          <dt>{nl ? "Locatie" : "Location"}</dt>
+          <dd>{event.location || (nl ? "Nog te bevestigen" : "To be confirmed")}</dd>
+        </div>
+      </dl>
+    </div>
+  );
+}
+
 export function TicketEventForm({
   event = {},
   groups,
   calendarEvents,
   hasActiveTicketType = false,
+  linkedCalendarEvent,
   locale,
 }: {
   event?: TicketEventFormValue;
   groups: GroupOption[];
   calendarEvents: CalendarOption[];
   hasActiveTicketType?: boolean;
+  /**
+   * Gezet wanneer dit ticketevent aan een kalenderevent hangt. Titel,
+   * beschrijving, locatie en datums worden dan niet gevraagd maar overgenomen.
+   */
+  linkedCalendarEvent?: LinkedCalendarEvent | null;
   locale: AdminLocale;
 }) {
   const isEdit = Boolean(event.id);
@@ -107,15 +181,22 @@ export function TicketEventForm({
             </div>
           </div>
         </div>
+        {linkedCalendarEvent ? (
+          <InheritedFromCalendar event={linkedCalendarEvent} locale={locale} />
+        ) : null}
         <div className="ticket-admin-form-grid">
-          <div className="ticket-admin-field">
-            <label htmlFor="ticket-title-nl">Titel (NL)</label>
-            <input id="ticket-title-nl" name="titleNl" defaultValue={event.titleNl ?? ""} required />
-          </div>
-          <div className="ticket-admin-field">
-            <label htmlFor="ticket-title-en">Titel (EN)</label>
-            <input id="ticket-title-en" name="titleEn" defaultValue={event.titleEn ?? ""} />
-          </div>
+          {linkedCalendarEvent ? null : (
+            <>
+              <div className="ticket-admin-field">
+                <label htmlFor="ticket-title-nl">Titel (NL)</label>
+                <input id="ticket-title-nl" name="titleNl" defaultValue={event.titleNl ?? ""} required />
+              </div>
+              <div className="ticket-admin-field">
+                <label htmlFor="ticket-title-en">Titel (EN)</label>
+                <input id="ticket-title-en" name="titleEn" defaultValue={event.titleEn ?? ""} />
+              </div>
+            </>
+          )}
           <div className="ticket-admin-field">
             <label htmlFor="ticket-slug">URL-naam</label>
             <input
@@ -148,48 +229,76 @@ export function TicketEventForm({
               ))}
             </select>
           </div>
-          <div className="ticket-admin-field">
-            <label htmlFor="ticket-calendar-event">
-              {locale === "nl" ? "Gekoppeld kalenderevent" : "Linked calendar event"}
-            </label>
-            <select
-              id="ticket-calendar-event"
-              name="calendarEventId"
-              defaultValue={event.calendarEventId ?? ""}
-              disabled={isEdit}
-            >
-              <option value="">{locale === "nl" ? "Niet gekoppeld" : "Not linked"}</option>
-              {calendarEvents.map((calendarEvent) => (
-                <option key={calendarEvent.id} value={calendarEvent.id}>
-                  {locale === "en" && calendarEvent.titleEn
-                    ? calendarEvent.titleEn
-                    : calendarEvent.titleNl}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div className="ticket-admin-field">
-            <label htmlFor="ticket-location">{locale === "nl" ? "Locatie" : "Location"}</label>
-            <input id="ticket-location" name="location" defaultValue={event.location ?? ""} />
-          </div>
-          <div className="ticket-admin-field" data-span="2">
-            <label htmlFor="ticket-description-nl">Beschrijving (NL)</label>
-            <textarea
-              id="ticket-description-nl"
-              name="descriptionNl"
-              defaultValue={event.descriptionNl ?? ""}
-              rows={4}
-            />
-          </div>
-          <div className="ticket-admin-field" data-span="2">
-            <label htmlFor="ticket-description-en">Beschrijving (EN)</label>
-            <textarea
-              id="ticket-description-en"
-              name="descriptionEn"
-              defaultValue={event.descriptionEn ?? ""}
-              rows={4}
-            />
-          </div>
+          {linkedCalendarEvent ? (
+            // De koppeling zelf gaat als hidden mee; wisselen doe je door te
+            // ontkoppelen, niet door hier een ander evenement te kiezen.
+            <input type="hidden" name="calendarEventId" value={linkedCalendarEvent.id} />
+          ) : (
+            <div className="ticket-admin-field">
+              <label htmlFor="ticket-calendar-event">
+                {locale === "nl" ? "Gekoppeld kalenderevent" : "Linked calendar event"}
+              </label>
+              <select
+                id="ticket-calendar-event"
+                name="calendarEventId"
+                defaultValue={event.calendarEventId ?? ""}
+                disabled={isEdit}
+              >
+                <option value="">{locale === "nl" ? "Niet gekoppeld" : "Not linked"}</option>
+                {calendarEvents.map((calendarEvent) => (
+                  <option key={calendarEvent.id} value={calendarEvent.id}>
+                    {locale === "en" && calendarEvent.titleEn
+                      ? calendarEvent.titleEn
+                      : calendarEvent.titleNl}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+          {linkedCalendarEvent ? null : (
+            <div className="ticket-admin-field">
+              <label htmlFor="ticket-location">{locale === "nl" ? "Locatie" : "Location"}</label>
+              <input id="ticket-location" name="location" defaultValue={event.location ?? ""} />
+              <small>
+                {locale === "nl"
+                  ? "De naam die bezoekers zien. Een vrije naam zoals \"Theokot\" mag."
+                  : "The name buyers see. A free-form name such as \"Theokot\" is fine."}
+              </small>
+            </div>
+          )}
+          {/* Het adres hoort bij het ticketevent, niet bij het kalenderevent:
+              het bestaat enkel om de geofence op de walletpas te voeden. Het
+              blijft dus ook staan wanneer titel, locatie en beschrijving van de
+              kalender overgenomen worden; anders was het veld onbereikbaar voor
+              precies de events die aan de kalender hangen. */}
+          <AddressPicker
+            defaultAddress={event.locationAddress}
+            defaultLatitude={event.locationLatitude}
+            defaultLongitude={event.locationLongitude}
+            locale={locale}
+          />
+          {linkedCalendarEvent ? null : (
+            <>
+              <div className="ticket-admin-field" data-span="2">
+                <label htmlFor="ticket-description-nl">Beschrijving (NL)</label>
+                <textarea
+                  id="ticket-description-nl"
+                  name="descriptionNl"
+                  defaultValue={event.descriptionNl ?? ""}
+                  rows={4}
+                />
+              </div>
+              <div className="ticket-admin-field" data-span="2">
+                <label htmlFor="ticket-description-en">Beschrijving (EN)</label>
+                <textarea
+                  id="ticket-description-en"
+                  name="descriptionEn"
+                  defaultValue={event.descriptionEn ?? ""}
+                  rows={4}
+                />
+              </div>
+            </>
+          )}
         </div>
       </section>
 
@@ -208,26 +317,30 @@ export function TicketEventForm({
           </div>
         </div>
         <div className="ticket-admin-form-grid">
-          <div className="ticket-admin-field">
-            <label htmlFor="ticket-starts-at">{locale === "nl" ? "Start evenement" : "Event start"}</label>
-            <input
-              id="ticket-starts-at"
-              name="startsAt"
-              type="datetime-local"
-              defaultValue={toDatetimeLocal(event.startsAt)}
-              required
-            />
-          </div>
-          <div className="ticket-admin-field">
-            <label htmlFor="ticket-ends-at">{locale === "nl" ? "Einde evenement" : "Event end"}</label>
-            <input
-              id="ticket-ends-at"
-              name="endsAt"
-              type="datetime-local"
-              defaultValue={toDatetimeLocal(event.endsAt)}
-              required
-            />
-          </div>
+          {linkedCalendarEvent ? null : (
+            <>
+              <div className="ticket-admin-field">
+                <label htmlFor="ticket-starts-at">{locale === "nl" ? "Start evenement" : "Event start"}</label>
+                <input
+                  id="ticket-starts-at"
+                  name="startsAt"
+                  type="datetime-local"
+                  defaultValue={toDatetimeLocal(event.startsAt)}
+                  required
+                />
+              </div>
+              <div className="ticket-admin-field">
+                <label htmlFor="ticket-ends-at">{locale === "nl" ? "Einde evenement" : "Event end"}</label>
+                <input
+                  id="ticket-ends-at"
+                  name="endsAt"
+                  type="datetime-local"
+                  defaultValue={toDatetimeLocal(event.endsAt)}
+                  required
+                />
+              </div>
+            </>
+          )}
           <div className="ticket-admin-field">
             <label htmlFor="ticket-sales-start">{locale === "nl" ? "Start verkoop" : "Sales start"}</label>
             <input
@@ -298,10 +411,60 @@ export function TicketEventForm({
               required
             />
           </div>
-          {!isEdit ? (
+        </div>
+      </section>
+
+      {/* Alleen bij aanmaken. Voorheen vroeg dit formulier enkel een capaciteit,
+          waarmee je een voorraadpot kreeg maar nog geen verkoopbaar ticket; je
+          moest daarna alsnog naar de instellingen om een tickettype met een prijs
+          aan te maken. Nu staat dat eerste ticket hier, en is het event na één
+          keer opslaan te publiceren. Extra types (vroegboek, alumni, ...) voeg je
+          nadien toe. */}
+      {!isEdit ? (
+        <section className="ticket-admin-section">
+          <div className="ticket-admin-section-head">
+            <div className="ticket-admin-section-heading">
+              <span className="ticket-admin-section-icon"><Ticket aria-hidden="true" size={17} /></span>
+              <div>
+                <h2>{locale === "nl" ? "Eerste ticket" : "First ticket"}</h2>
+                <p>
+                  {locale === "nl"
+                    ? "Het ticket dat kopers meteen kunnen kiezen. Zonder dit valt er niets te verkopen."
+                    : "The ticket buyers can pick straight away. Without it there is nothing to sell."}
+                </p>
+              </div>
+            </div>
+          </div>
+          <div className="ticket-admin-form-grid">
+            <div className="ticket-admin-field">
+              <label htmlFor="ticket-first-name">{locale === "nl" ? "Naam" : "Name"}</label>
+              <input
+                id="ticket-first-name"
+                name="firstTicketName"
+                defaultValue={locale === "nl" ? "Standaardticket" : "Standard ticket"}
+                required
+              />
+            </div>
+            <div className="ticket-admin-field">
+              <label htmlFor="ticket-first-price">
+                {locale === "nl" ? "Prijs (EUR)" : "Price (EUR)"}
+              </label>
+              <input
+                id="ticket-first-price"
+                name="firstTicketPrice"
+                type="number"
+                min="0"
+                step="0.01"
+                defaultValue="0"
+                required
+              />
+              <span className="ticket-admin-help">
+                {locale === "nl" ? "0 voor een gratis ticket." : "0 for a free ticket."}
+              </span>
+            </div>
             <div className="ticket-admin-field">
               <label htmlFor="ticket-capacity">
-                {locale === "nl" ? "Initiële capaciteit" : "Initial capacity"}
+                {locale === "nl" ? "Aantal beschikbaar" : "Available quantity"}
               </label>
               <input
                 id="ticket-capacity"
@@ -312,9 +475,9 @@ export function TicketEventForm({
                 required
               />
             </div>
-          ) : null}
-        </div>
-      </section>
+          </div>
+        </section>
+      ) : null}
 
       <section className="ticket-admin-section">
         <div className="ticket-admin-section-head">

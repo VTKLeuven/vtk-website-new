@@ -153,11 +153,119 @@ enum TicketOutboxStatus {
   DEAD
 }
 
+// -----------------------------------------------------------------------------
+// Formulieren (zie de modellen onderaan en docs/forms.md)
+// -----------------------------------------------------------------------------
+
+// Geen aparte "actief"-boolean ernaast: twee waarheden over "staat dit open"
+// lopen gegarandeerd uiteen. PUBLISHED plus opensAt/closesAt beslist het.
+enum FormStatus {
+  DRAFT
+  PUBLISHED
+  CLOSED
+  ARCHIVED
+}
+
+enum FormAudience {
+  PUBLIC
+  MEMBERS
+}
+
+/// Welke talen dit formulier bewust aanbiedt. Wie een formulier maar in één taal
+/// invult, toont in de andere taal een eigen bericht ("enkel voor
+/// internationals") in plaats van een halfleeg formulier of een 404.
+enum FormLocaleMode {
+  BOTH
+  NL_ONLY
+  EN_ONLY
+}
+
+enum FormFieldType {
+  SHORT_TEXT
+  LONG_TEXT
+  SINGLE_CHOICE
+  MULTIPLE_CHOICE
+  DROPDOWN
+  BOOLEAN
+  EMAIL
+  NUMBER
+  DATE
+  TIME
+  PHONE
+  URL
+  // Lineaire schaal. Sterren zijn dezelfde schaal met een andere weergave
+  // (`display` in de config), geen apart type.
+  SCALE
+  FILE
+  CONSENT
+  // Komt uit het profiel van het ingelogde lid (r-nummer, studierichting, jaar);
+  // welk veld precies staat in de config.
+  PROFILE
+}
+
+enum FormFieldConditionOperator {
+  EQUALS
+  NOT_EQUALS
+  INCLUDES
+  IS_ANSWERED
+}
+
+enum FormGrantRole {
+  VIEWER
+  EDITOR
+  MANAGER
+}
+
+enum FormGroupGrantScope {
+  ALL_MEMBERS
+  LEADS_ONLY
+}
+
+enum FormEntryStatus {
+  DRAFT
+  SUBMITTED
+}
+
+/// Opvolging van een inzending, los van haar levenscyclus: een sollicitatie is
+/// ingediend (status) én nog niet beoordeeld (reviewStatus).
+enum FormReviewStatus {
+  NEW
+  ACCEPTED
+  REJECTED
+}
+
+enum FormNotifyMode {
+  NONE
+  EACH
+  DAILY
+}
+
+enum FormOutboxStatus {
+  PENDING
+  PROCESSING
+  SENT
+  FAILED
+  DEAD
+}
+
 enum TheokotOrderStatus {
   RESERVED // gereserveerd, nog niet opgehaald
   PICKED_UP // afgehaald aan de balie
   NO_SHOW // niet opgehaald na sluitingstijd + grace
   CANCELLED // door de student geannuleerd voor de deadline
+}
+
+/// Terugkerende vergadering waarvoor vooraf een broodje en een drankje besteld
+/// kan worden. De twee soorten verschillen enkel in publiek en beheer, niet in
+/// werking (zie `Meeting`).
+enum MeetingKind {
+  GROCOMEET // wekelijks, enkel postverantwoordelijken + Groep 5
+  BUREAU // tweewekelijks, elke student via een gedeelde link
+}
+
+enum MeetingReservationStatus {
+  ACTIVE
+  INVALIDATED // het gekozen broodje staat niet (meer) op het aanbod van die dag
 }
 
 enum UitleenReservationStatus {
@@ -196,6 +304,14 @@ enum UitleenPricingMode {
 
 // Staat van een materiaalstuk. Puur informatief (badge in het beheer); muteert
 // nooit automatisch de beschikbaarheid.
+/// Grofweg wanneer op een dag. Geen uren: die spreekt het team af, en een
+/// uurveld zou doen alsof de app een openingsuur kent dat ze niet kent.
+enum UitleenDayPart {
+  VOORMIDDAG
+  NAMIDDAG
+  AVOND
+}
+
 enum UitleenItemCondition {
   WERKT
   KAPOT
@@ -209,6 +325,14 @@ enum UitleenItemCondition {
 enum UitleenPaymentMode {
   ONLINE
   OFFLINE
+}
+
+/// Soort gebeurtenis in de historiek van een aanvraag of rit.
+enum UitleenAuditKind {
+  STATUS_CHANGED // goedgekeurd, afgehaald, teruggebracht, en het terugdraaien daarvan
+  PAYMENT_MARKED // betaald aan de balie gezet of teruggedraaid, waarborg terug
+  EDITED // het team paste de inhoud van de aanvraag aan
+  NOTE // vrije notitie
 }
 
 enum UitleenPaymentStatus {
@@ -288,24 +412,29 @@ enum StudyProgramme {
 // -----------------------------------------------------------------------------
 
 model User {
-  id             String  @id @default(cuid())
+  id                   String    @id @default(cuid())
   // `name` blijft de weergavenaam (en het veld dat better-auth zelf zet bij een
   // SSO-login). `firstName`/`lastName` zijn de gestructureerde variant die de
   // mailinglijst-exports nodig hebben; ze worden ingevuld tijdens de onboarding
   // en in het gebruikersbeheer, en `name` wordt daaruit samengesteld.
-  name           String
-  firstName      String?
-  lastName       String?
-  email          String  @unique
-  rNumber        String? @unique // KU Leuven studentennummer (bvb r0123456), voor zoeken
+  name                 String
+  firstName            String?
+  lastName             String?
+  email                String    @unique
+  rNumber              String?   @unique // KU Leuven studentennummer (bvb r0123456), voor zoeken
   // `true` als het r-nummer van de KU Leuven-authenticator komt (bij SSO gezet,
   // zie packages/auth/src/logins/kul.ts). Dan staat het veld read-only in het
   // profielformulier, net als de e-mail; een zelf ingevuld r-nummer (flag false)
   // blijft aanpasbaar.
-  rNumberFromKul Boolean @default(false)
-  emailVerified  Boolean @default(false)
-  avatarKey      String?
-  image          String?
+  rNumberFromKul       Boolean   @default(false)
+  // Autoritatieve faculteitsstatus uit KU Leuven OIDC. Bij elke geslaagde
+  // userinfo-call wordt 50000486 in eduPersonOrgUnitDN gecontroleerd. De datum
+  // wordt enkel bij de eerste controle of een echte booleanwijziging aangepast.
+  firwStudent          Boolean   @default(false)
+  firwStudentChangedAt DateTime?
+  emailVerified        Boolean   @default(false)
+  avatarKey            String?
+  image                String?
 
   locale       Locale  @default(NL)
   active       Boolean @default(true)
@@ -316,75 +445,102 @@ model User {
   // wordt ze geanonimiseerd tot een tombstone. Dat is bewust iets anders dan
   // `active: false`, wat een gewoon gedeactiveerd lid is dat je in het beheer nog
   // wil zien. Filter `deletedAt: null` in elke lijst die gebruikers toont.
-  deletedAt    DateTime?
+  deletedAt DateTime?
 
   // Onboarding-profiel (ingevuld bij de eerste KUL SSO-login). Zolang
   // onboardedAt null is, wordt het lid naar de onboarding-flow gestuurd.
-  onboardedAt        DateTime?
+  onboardedAt            DateTime?
   // Kotadres
-  street             String?
-  houseNumber        String?
-  bus                String? // busnummer, optioneel
-  postalCode         String?
-  city               String?
-  birthDate          DateTime?
+  street                 String?
+  houseNumber            String?
+  bus                    String? // busnummer, optioneel
+  postalCode             String?
+  city                   String?
+  birthDate              DateTime?
   // Contact: `email` is de login-/universiteitsmail (via SSO). Persoonlijke
   // mail en de voorkeur voor communicatie komen erbij.
-  personalEmail      String?
-  emailPreference    EmailPreference  @default(UNIVERSITY)
+  personalEmail          String?
+  emailPreference        EmailPreference  @default(UNIVERSITY)
   // Opt-in mailinglijsten: enkel de aangeduide categorieën zitten in de array.
-  mailCategories     MailCategory[]   @default([])
+  mailCategories         MailCategory[]   @default([])
+  // Herinneringen voor een shift waarvoor je jezelf inschreef. Bewust geen
+  // `MailCategory`: dat zijn opt-in nieuwsbrieven, dit is transactioneel. Wel
+  // uitzetbaar, want niet iedereen wil twee mails per shift.
+  shiftReminderDayBefore Boolean          @default(true)
+  shiftReminderSoon      Boolean          @default(true)
   // Studie: meerdere studiejaren en richtingen mogelijk (iemand kan bv. deels in
   // 2de en deels in 3de bachelor zitten).
-  studyYears         StudyYear[]      @default([])
-  studyProgrammes    StudyProgramme[] @default([])
+  studyYears             StudyYear[]      @default([])
+  studyProgrammes        StudyProgramme[] @default([])
   // Lid dat niet aan de faculteit Ingenieurswetenschappen studeert. Bewust geen
   // `StudyProgramme`-waarde: het is geen richting, en als enum-waarde zou het
   // overal opduiken waar richtingen opgelijst worden (o.a. de career-export).
-  notAtFaculty       Boolean          @default(false)
+  notAtFaculty           Boolean          @default(false)
   // Lid dat niet (meer) studeert: afgestudeerd of gestopt. Bewust los van
   // `notAtFaculty` (dat is "studeert wél, maar elders"): wie dit aanduidt valt
   // uit élke studiegerichte mailinglijst (zie lib/mailinglists.ts). Blijft een
   // aparte boolean om dezelfde reden als notAtFaculty.
-  notStudying        Boolean          @default(false)
+  notStudying            Boolean          @default(false)
+  // Internationale of uitwisselingsstudent. Bewust een eigen veld en geen
+  // afleiding uit `locale`: de sitetaal zegt welke taal je leest, niet of je een
+  // exchange-student bent. Stuurt welke evenementen vanzelf in de kalender
+  // opduiken (zie CalendarAudience).
+  internationalStudent   Boolean          @default(false)
   // Werkingsjaar waarin het lid zijn studieprofiel laatst bevestigde (2026 =
   // "26-27"). Loopt dat achter op het huidige werkingsjaar, dan is het profiel
   // verlopen: de bevestigingsgate vraagt het opnieuw en het lid valt zolang uit
   // de mailinglijsten. Zo blijft "actief student" een jaarlijks vers signaal
   // zonder koppeling met de cursusdienst.
-  studyConfirmedYear Int?
+  studyConfirmedYear     Int?
 
   sessions  Session[]
   accounts  Account[]
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
 
-  memberships         GroupMembership[]
-  roles               UserRole[]
-  pocRepresentative   PocRepresentative[]
-  createdPages        Page[]                  @relation("PageCreatedBy")
-  createdEvents       CalendarEvent[]         @relation("EventCreatedBy")
-  dashboardTiles      DashboardTile[]
-  dashboardTilePrefs  UserDashboardTilePref[]
-  participatingShifts ShiftParticipant[]
-  createdShortLinks   ShortLink[]             @relation("ShortLinkCreatedBy")
+  memberships          GroupMembership[]
+  roles                UserRole[]
+  pocRepresentative    PocRepresentative[]
+  createdPages         Page[]                  @relation("PageCreatedBy")
+  createdAnnouncements Announcement[]          @relation("AnnouncementCreatedBy")
+  createdEvents        CalendarEvent[]         @relation("EventCreatedBy")
+  dashboardTiles       DashboardTile[]
+  dashboardTilePrefs   UserDashboardTilePref[]
+  participatingShifts  ShiftParticipant[]
+  createdShortLinks    ShortLink[]             @relation("ShortLinkCreatedBy")
 
-  theokotOrders   TheokotOrder[] @relation("TheokotOrderUser")
-  theokotPickedUp TheokotOrder[] @relation("TheokotPickedUpBy")
-  theokotBans     TheokotBan[]
+  meetingsCreated           Meeting[]                  @relation("MeetingCreatedBy")
+  meetingReservations       MeetingReservation[]       @relation("MeetingReservationUser")
+  meetingPaymentsProcessed  MeetingReservation[]       @relation("MeetingReservationPaidBy")
+  meetingPlans              MeetingPlan[]              @relation("MeetingPlanBy")
+  theokotOrders             TheokotOrder[]             @relation("TheokotOrderUser")
+  theokotPickedUp           TheokotOrder[]             @relation("TheokotPickedUpBy")
+  theokotVoucherRedemptions TheokotVoucherRedemption[] @relation("TheokotVoucherUser")
+  theokotVouchersProcessed  TheokotVoucherRedemption[] @relation("TheokotVoucherProcessedBy")
+  theokotBans               TheokotBan[]
+
+  pianoReservations PianoReservation[]
 
   uitleenReservations     UitleenReservation[]      @relation("UitleenReservationUser")
   uitleenDecided          UitleenReservation[]      @relation("UitleenDecidedBy")
   uitleenPickedUp         UitleenReservation[]      @relation("UitleenPickedUpBy")
   uitleenReturned         UitleenReservation[]      @relation("UitleenReturnedBy")
+  uitleenLinesPrepared    UitleenReservationLine[]  @relation("UitleenLinePreparedBy")
+  uitleenTemplates        UitleenRequestTemplate[]  @relation("UitleenTemplateCreatedBy")
+  uitleenEvents           UitleenEvent[]            @relation("UitleenEventCreatedBy")
   uitleenTransport        UitleenTransportBooking[] @relation("UitleenTransportUser")
   uitleenTransportDriven  UitleenTransportBooking[] @relation("UitleenTransportDriver")
   uitleenTransportDecided UitleenTransportBooking[] @relation("UitleenTransportDecidedBy")
   uitleenTransportDone    UitleenTransportBooking[] @relation("UitleenTransportCompletedBy")
+  uitleenDriver           UitleenDriver?            @relation("UitleenDriverUser")
+  uitleenDriversAdded     UitleenDriver[]           @relation("UitleenDriverAddedBy")
+  uitleenAuditLogs        UitleenAuditLog[]         @relation("UitleenAuditActor")
 
   doorGrants         DoorAccessGrant[]
   doorLogs           DoorAccessLog[]
   doorShortcutTokens DoorShortcutToken[]
+
+  calendarFeedTokens CalendarFeedToken[]
 
   createdTicketEvents      TicketEvent[]           @relation("TicketEventCreatedBy")
   ticketEventGrants        TicketEventUserGrant[]  @relation("TicketEventGrantUser")
@@ -397,13 +553,21 @@ model User {
   ticketAuditLogs          TicketAuditLog[]        @relation("TicketAuditActor")
   checkedInTickets         Ticket[]                @relation("TicketCheckedInBy")
 
+  createdForms         Form[]           @relation("FormCreatedBy")
+  formGrants           FormUserGrant[]  @relation("FormGrantUser")
+  formGrantsGiven      FormUserGrant[]  @relation("FormGrantGrantedBy")
+  formGroupGrantsGiven FormGroupGrant[] @relation("FormGroupGrantGrantedBy")
+  formEntries          FormEntry[]      @relation("FormEntrySubmittedBy")
+  reviewedFormEntries  FormEntry[]      @relation("FormEntryReviewer")
+  formAuditLogs        FormAuditLog[]   @relation("FormAuditActor")
+
   //Oauth / SSO fields
-  oauthClients             OauthClient[]
-  oauthRefreshTokens       OauthRefreshToken[]
-  oauthAccessTokens        OauthAccessToken[]
-  oauthConsents            OauthConsent[]
-  ssoAuditLogs             SsoAuditLog[]
-  ssoClientPermissions     SsoUserClientPermission[]
+  oauthClients         OauthClient[]
+  oauthRefreshTokens   OauthRefreshToken[]
+  oauthAccessTokens    OauthAccessToken[]
+  oauthConsents        OauthConsent[]
+  ssoAuditLogs         SsoAuditLog[]
+  ssoClientPermissions SsoUserClientPermission[]
 
   @@index([deletedAt])
 }
@@ -435,12 +599,16 @@ model Group {
   roleGrants        GroupRole[]
   events            CalendarEvent[]
   dashboardTiles    DashboardTile[]
-  ownedTicketEvents TicketEvent[]           @relation("TicketEventOwnerGroup")
+  ownedTicketEvents TicketEvent[]              @relation("TicketEventOwnerGroup")
   ticketEventGrants TicketEventGroupGrant[]
+  ownedForms        Form[]                     @relation("FormOwnerGroup")
+  formGrants        FormGroupGrant[]
   ssoGrants         SsoGroupClientPermission[]
 
   uitleenReservations UitleenReservation[]
   uitleenTransport    UitleenTransportBooking[]
+  uitleenTemplates    UitleenRequestTemplate[]
+  uitleenEventsGroup  UitleenEvent[]
 }
 
 model GroupMembership {
@@ -562,6 +730,11 @@ model HeaderTab {
   // gestreepte placeholder-patroon of de statische default in HomeEditorial.
   imageKey String?
 
+  // Externe bestemming voor deze tab. Staat die ingevuld, dan linkt de header
+  // rechtstreeks naar die site (in een nieuw tabblad) in plaats van naar de
+  // categoriepagina /<slug>. Bv. Career -> career.vtk.be.
+  externalUrl String?
+
   // Inhoud van de categoriepagina zelf, bewerkbaar via /admin/inhoud.
   introNl    String?
   introEn    String?
@@ -571,6 +744,74 @@ model HeaderTab {
   ctaUrl     String?
 
   pages Page[]
+  links HeaderTabLink[]
+}
+
+/**
+ * Extra items in het uitklapmenu van een headertab, naast de pagina's die onder
+ * die tab hangen. Bedoeld voor werkingen met een eigen site: Career en
+ * Cursusdienst hebben geen pagina's hier, maar wel bestemmingen waar leden
+ * naartoe moeten (jobfair, boeken bestellen, ...).
+ */
+model HeaderTabLink {
+  id      String @id @default(cuid())
+  tabId   String
+  labelNl String
+  labelEn String
+  url     String
+  order   Int    @default(0)
+
+  tab HeaderTab @relation(fields: [tabId], references: [id], onDelete: Cascade)
+
+  @@unique([tabId, url])
+  @@index([tabId])
+}
+
+/**
+ * Aankondiging: het bericht dat als modal op de homepage verschijnt.
+ * Meerdere aankondigingen mogen naast elkaar bestaan (elk met hun eigen
+ * venster), zodat je ze vooraf kan klaarzetten; de homepage toont er hoogstens
+ * één, en oude rijen blijven staan als historiek.
+ */
+model Announcement {
+  id      String @id @default(cuid())
+  titleNl String
+  titleEn String
+  /**
+   * Markdown, bewerkt met de gedeelde MarkdownEditor.
+   */
+  bodyNl  String
+  bodyEn  String
+
+  ctaLabelNl String?
+  ctaLabelEn String?
+  ctaUrl     String?
+
+  /**
+   * Leeg = meteen zichtbaar / blijft zichtbaar.
+   */
+  startsAt DateTime?
+  endsAt   DateTime?
+  /**
+   * Uit = nooit tonen, ongeacht het venster.
+   */
+  active   Boolean           @default(true)
+  /**
+   * Waar ze mag verschijnen: enkel de homepage, of elke publieke pagina.
+   */
+  scope    AnnouncementScope @default(HOME)
+
+  createdById String?
+  createdBy   User?    @relation("AnnouncementCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([active, startsAt, endsAt])
+}
+
+enum AnnouncementScope {
+  HOME
+  SITE
 }
 
 model Page {
@@ -589,6 +830,13 @@ model Page {
   contentMdEn     String?
   excerptNl       String?
   excerptEn       String?
+  // Optionele knop naast de titel, dezelfde velden als op HeaderTab. Voor een
+  // pagina die een aparte app beschrijft (Uitleendienst -> logistiek, Shiften ->
+  // de shiftenlijst) hoort die app één klik ver te staan en niet ergens
+  // halverwege de tekst.
+  ctaLabelNl      String?
+  ctaLabelEn      String?
+  ctaUrl          String?
   // Jaarlijks na te kijken pagina (namen, telefoonnummers, ...): komt bovenaan
   // het paginabeheer te staan zolang ze dit werkingsjaar niet bewerkt is.
   needsYearlyEdit Boolean   @default(false)
@@ -601,12 +849,21 @@ model Page {
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
 
+  // Zoekvectoren voor /zoeken, één per taalconfiguratie. Een trigger houdt ze
+  // bij (zie de migratie `search_vectors`); Prisma schrijft ze nooit zelf en
+  // kent het type niet, dus ze staan hier enkel zodat schema en database niet
+  // uiteenlopen. Bevraagd wordt er via ruwe SQL in `lib/search-server.ts`.
+  searchNl Unsupported("tsvector")?
+  searchEn Unsupported("tsvector")?
+
   headerTab   HeaderTab?       @relation(fields: [headerTabId], references: [id], onDelete: SetNull)
   createdBy   User?            @relation("PageCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
   assets      PageAsset[]
   editorRoles PageEditorRole[]
 
   @@index([headerTabId])
+  @@index([searchNl], type: Gin)
+  @@index([searchEn], type: Gin)
 }
 
 // Rollen die de inhoud van een pagina mogen bewerken (naast superadmin en
@@ -662,12 +919,102 @@ model CalendarEvent {
   createdAt     DateTime        @default(now())
   updatedAt     DateTime        @updatedAt
 
-  group       Group        @relation(fields: [groupId], references: [id], onDelete: Cascade)
-  createdBy   User?        @relation("EventCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  // Zie de gelijknamige velden op `Page`: door een trigger onderhouden
+  // zoekvectoren, enkel via ruwe SQL bevraagd.
+  searchNl Unsupported("tsvector")?
+  searchEn Unsupported("tsvector")?
+
+  group       Group                   @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  createdBy   User?                   @relation("EventCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
   ticketEvent TicketEvent?
+  form        Form?
+  categories  CalendarEventCategory[]
 
   @@index([start])
   @@index([groupId])
+  @@index([searchNl], type: Gin)
+  @@index([searchEn], type: Gin)
+}
+
+// Doelgroep van een evenement ("Internationaal", "Eerstejaars", "Career", ...).
+// Bewust een eigen as naast `CalendarEvent.groupId`: de groep zegt wie het event
+// organiseert, de categorie voor wie het bedoeld is. Een fakbar-cantus kan een
+// eerstejaarsevent zijn, en een event van de post Internationaal hoeft niet op de
+// internationale kalender te staan. Elke categorie krijgt een eigen pagina
+// (/kalender/<slug>) en een eigen ICS-feed.
+// Doelgroep waar een categorie voor staat. Een categorie zonder `audience` is een
+// gewoon thema (Career, Sport, ...) dat iedereen ziet en dat als filterchip op
+// /kalender staat. Een categorie mét `audience` verschijnt niet als chip: haar
+// evenementen komen vanzelf bovendrijven bij wie tot die doelgroep hoort, en
+// blijven voor de rest standaard verborgen (zichtbaar te maken met "alles tonen").
+//
+// De waarde is een enum en geen vrij veld, want bij elke waarde hoort code die
+// bepaalt of een lid erbij hoort (zie lib/calendar/audience.ts). Een nieuwe
+// doelgroep toevoegen is dus bewust geen GUI-actie.
+enum CalendarAudience {
+  FIRST_YEARS
+  INTERNATIONALS
+}
+
+model CalendarCategory {
+  id                 String            @id @default(cuid())
+  // Zit in de publieke URL en in de feed-URL, dus wijzigen breekt bestaande
+  // abonnementen; daarom niet vrij bewerkbaar zodra hij in gebruik is.
+  slug               String            @unique
+  nameNl             String
+  nameEn             String
+  // Introtekst bovenaan de categoriepagina (Markdown), optioneel.
+  descriptionNl      String?
+  descriptionEn      String?
+  // Hexkleur van het bolletje in de legende en van de eventpil in het raster.
+  colour             String            @default("#5C667F")
+  order              Int               @default(0)
+  // NULL = gewoon thema. Anders: doelgroepcategorie, zie de enum hierboven.
+  audience           CalendarAudience?
+  // Uit = de categorie bestaat nog (feed en pagina blijven werken) maar staat
+  // niet meer tussen de filterchips op /kalender.
+  showOnCalendarPage Boolean           @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  events CalendarEventCategory[]
+
+  @@index([order])
+}
+
+model CalendarEventCategory {
+  eventId    String
+  categoryId String
+
+  event    CalendarEvent    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  category CalendarCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  @@id([eventId, categoryId])
+  @@index([categoryId])
+}
+
+// Persoonlijke ICS-feed van één lid: ledenexclusieve events, zijn shiften en de
+// events waarvoor hij een ticket heeft. Een agenda-client stuurt geen cookies,
+// dus de URL draagt zelf het geheim; we bewaren enkel de hash.
+//
+// Bewust **zonder `expiresAt`**, anders dan DoorShortcutToken: een abonnement dat
+// na 90 dagen stil ophoudt met verversen is erger dan geen abonnement, want de
+// agenda blijft dan verouderde events tonen zonder dat iemand het merkt.
+// Intrekken gebeurt expliciet vanuit /account.
+model CalendarFeedToken {
+  id         String    @id @default(cuid())
+  userId     String
+  label      String
+  tokenHash  String    @unique
+  lastUsedAt DateTime? @db.Timestamptz(3)
+  revokedAt  DateTime? @db.Timestamptz(3)
+  createdAt  DateTime  @default(now()) @db.Timestamptz(3)
+  updatedAt  DateTime  @updatedAt @db.Timestamptz(3)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, revokedAt])
 }
 
 // -----------------------------------------------------------------------------
@@ -683,7 +1030,14 @@ model TicketEvent {
   titleEn               String?
   descriptionNl         String?
   descriptionEn         String?
+  // `location` blijft de vrije naam die bezoekers zien ("Theokot"). Het adres
+  // is optioneel en dient om coördinaten op te zoeken; enkel wanneer die
+  // gevonden zijn, krijgt een walletticket een geofence en komt het vanzelf op
+  // het vergrendelscherm bij aankomst.
   location              String?
+  locationAddress       String?
+  locationLatitude      Float?
+  locationLongitude     Float?
   startsAt              DateTime          @db.Timestamptz(3)
   endsAt                DateTime          @db.Timestamptz(3)
   timeZone              String            @default("Europe/Brussels")
@@ -994,6 +1348,9 @@ model Ticket {
   checkedInById     String?
   voidedAt          DateTime?    @db.Timestamptz(3)
   refundedAt        DateTime?    @db.Timestamptz(3)
+  // Immutable copy of the published ticket design at issue time. Existing
+  // tickets deliberately remain null and use the Classic renderer fallback.
+  designSnapshot    Json?
 
   event       TicketEvent     @relation(fields: [eventId], references: [id], onDelete: Restrict)
   orderItem   TicketOrderItem @relation(fields: [orderItemId, eventId], references: [id, eventId], onDelete: Restrict)
@@ -1275,6 +1632,10 @@ model DashboardTile {
   url       String
   icon      String             @default("link") // key into curated icon set
   color     String             @default("navy") // key into color palette
+  // Eigen logo in plaats van een pictogram (bv. het GitHub-logo). Wanneer dit
+  // gezet is, wint het van `icon`; `icon` blijft staan zodat het terugvalt op
+  // het gekozen pictogram wanneer de afbeelding verwijderd wordt.
+  imageKey  String?
   scope     DashboardTileScope
   groupId   String? // set when scope = GROUP
   userId    String? // set when scope = USER (personal tile)
@@ -1294,14 +1655,19 @@ model DashboardTile {
 // Per-user override of a shared (GLOBAL/GROUP) tile: hide it, reorder it, or
 // override its display fields. Personal (USER) tiles are edited directly.
 model UserDashboardTilePref {
-  userId String
-  tileId String
-  hidden Boolean @default(false)
-  order  Int?
-  label  String? // null = inherit from the default tile
-  url    String?
-  icon   String?
-  color  String?
+  userId       String
+  tileId       String
+  hidden       Boolean @default(false)
+  order        Int?
+  label        String? // null = inherit from the default tile
+  url          String?
+  icon         String?
+  color        String?
+  // Eigen logo bovenop een gedeelde tegel. `imageCleared` onderscheidt "erf de
+  // afbeelding van de standaardtegel" (null + false) van "ik wil hier bewust
+  // geen afbeelding maar een pictogram" (null + true).
+  imageKey     String?
+  imageCleared Boolean @default(false)
 
   user User          @relation(fields: [userId], references: [id], onDelete: Cascade)
   tile DashboardTile @relation(fields: [tileId], references: [id], onDelete: Cascade)
@@ -1328,6 +1694,15 @@ model Shift {
   maxParticipants Int
   reward          Int
 
+  // Kan je deze shift doen zonder Nederlands? Dan krijgt ze de markering "Ook
+  // voor internationals" op /shift. Het gaat over de taal, niet over wie welkom
+  // is: iedereen mag inschrijven.
+  openToInternationals Boolean @default(false)
+
+  // Langere uitleg (Markdown) over wat de shift concreet inhoudt, los van de
+  // korte `description`. Leeg (NULL of "") = de frontend toont het blok niet.
+  instructions String?
+
   // Postcode (Group.code) waarvoor deze shift telt; los tekstveld i.p.v. een
   // relatie, zodat een oude postcode behouden blijft ook als de post later
   // gedeactiveerd of hernoemd wordt.
@@ -1353,11 +1728,22 @@ model ShiftParticipant {
   userId String
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  payedOut Boolean
+  // `payedOut` blijft de compatibele "volledig uitbetaald"-vlag voor bestaande
+  // API-consumers. `rewardPaid` bewaart het exacte aantal toegekende bonnetjes,
+  // zodat een shift ook gedeeltelijk kan worden uitbetaald.
+  payedOut   Boolean
+  rewardPaid Int     @default(0)
 
   /// Moment van inschrijven: binnen een korte bedenktijd mag je je nog
   /// uitschrijven, ook wanneer de shift al binnen 24 uur begint.
   registeredAt DateTime @default(now())
+
+  /// Wanneer de herinnering afgehandeld is: verstuurd, of bewust overgeslagen
+  /// (wie zich twee uur op voorhand inschrijft, hoeft geen mail van een dag
+  /// vooraf meer). Leeg = staat nog te wachten. De samengestelde sleutel
+  /// hieronder maakt dat er per persoon per shift maar één van elk kan bestaan.
+  reminderDayBeforeAt DateTime?
+  reminderSoonAt      DateTime?
 
   @@id([shiftId, userId])
 }
@@ -1398,6 +1784,9 @@ model TheokotProduct {
   priceCents          Int
   defaultQuantity     Int      @default(0)
   isWeeklySpecialSlot Boolean  @default(false) // "broodje van de week"-slot
+  imageKey            String? // optionele foto; NULL = gestreept patroon
+  ingredientsNl       String? // optionele ingrediëntenlijst (info-icoontje)
+  ingredientsEn       String?
   order               Int      @default(0)
   active              Boolean  @default(true)
   createdAt           DateTime @default(now())
@@ -1419,6 +1808,7 @@ model TheokotSession {
   weeklySpecialLabelNl String? // welk broodje deze week "van de week" is
   weeklySpecialLabelEn String?
   processedAt          DateTime? // wanneer no-shows verwerkt zijn (idempotentie)
+  processingStartedAt  DateTime? // lease/claim voor een actieve no-show-worker
   createdById          String?
   createdAt            DateTime  @default(now())
   updatedAt            DateTime  @updatedAt
@@ -1427,6 +1817,7 @@ model TheokotSession {
   orders TheokotOrder[]
 
   @@index([date])
+  @@index([processedAt, isOpen, pickupEnd])
 }
 
 /// Aanbod van één sessie (snapshot van een product op het moment van aanmaken).
@@ -1439,35 +1830,62 @@ model TheokotSessionItem {
   priceCents      Int
   quantity        Int // beschikbare voorraad voor deze sessie
   isWeeklySpecial Boolean @default(false)
+  imageKey        String? // meegekopieerd uit de catalogus, per dag aanpasbaar
+  ingredientsNl   String?
+  ingredientsEn   String?
   order           Int     @default(0)
 
-  session TheokotSession     @relation(fields: [sessionId], references: [id], onDelete: Cascade)
-  lines   TheokotOrderLine[]
+  session             TheokotSession       @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  lines               TheokotOrderLine[]
+  /// Broodjes die voor een vergadering (GM/Bureau) op dit item gereserveerd zijn.
+  /// Ze gaan van dezelfde voorraad af en staan apart op de turflijst.
+  meetingReservations MeetingReservation[]
 
   @@index([sessionId])
 }
 
 /// Eén bestelling per persoon per sessie.
 model TheokotOrder {
-  id           String             @id @default(cuid())
-  sessionId    String
-  userId       String
-  status       TheokotOrderStatus @default(RESERVED)
-  totalCents   Int
-  statusNote   String? // vrije notitie bij correcties
-  createdAt    DateTime           @default(now())
-  updatedAt    DateTime           @updatedAt
-  pickedUpAt   DateTime?
-  pickedUpById String? // wie aan de balie op "opgehaald" drukte
+  id                String             @id @default(cuid())
+  sessionId         String
+  userId            String
+  status            TheokotOrderStatus @default(RESERVED)
+  totalCents        Int
+  statusNote        String? // vrije notitie bij correcties
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+  pickedUpAt        DateTime?
+  pickedUpById      String? // wie aan de balie op "opgehaald" drukte
+  noShowProcessedAt DateTime? // mail + eventuele ban voor deze order afgewerkt
 
-  session    TheokotSession     @relation(fields: [sessionId], references: [id], onDelete: Cascade)
-  user       User               @relation("TheokotOrderUser", fields: [userId], references: [id], onDelete: Cascade)
-  pickedUpBy User?              @relation("TheokotPickedUpBy", fields: [pickedUpById], references: [id], onDelete: SetNull)
-  lines      TheokotOrderLine[]
+  session           TheokotSession            @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  user              User                      @relation("TheokotOrderUser", fields: [userId], references: [id], onDelete: Cascade)
+  pickedUpBy        User?                     @relation("TheokotPickedUpBy", fields: [pickedUpById], references: [id], onDelete: SetNull)
+  lines             TheokotOrderLine[]
+  voucherRedemption TheokotVoucherRedemption?
 
   @@unique([sessionId, userId])
   @@index([userId])
   @@index([status])
+  @@index([status, noShowProcessedAt])
+}
+
+/// Auditrij wanneer een student aan de afhaalbalie twee nog openstaande
+/// medewerkersbonnetjes gebruikt voor een broodje.
+model TheokotVoucherRedemption {
+  id            String   @id @default(cuid())
+  orderId       String   @unique
+  userId        String
+  processedById String?
+  amount        Int      @default(2)
+  createdAt     DateTime @default(now())
+
+  order       TheokotOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  user        User         @relation("TheokotVoucherUser", fields: [userId], references: [id], onDelete: Cascade)
+  processedBy User?        @relation("TheokotVoucherProcessedBy", fields: [processedById], references: [id], onDelete: SetNull)
+
+  @@index([userId, createdAt])
+  @@index([createdAt])
 }
 
 model TheokotOrderLine {
@@ -1482,6 +1900,141 @@ model TheokotOrderLine {
 
   @@index([orderId])
   @@index([sessionItemId])
+}
+
+// -----------------------------------------------------------------------------
+// Broodjesmomenten: grocomeet (GM) en VTK Bureau
+//
+// Twee vergaderingen met dezelfde werking: er wordt vooraf een broodje en een
+// drankje besteld, die broodjes gaan van de Theokot-voorraad af en komen in een
+// aparte doos. Ze delen daarom één model; `kind` bepaalt het publiek (GM: enkel
+// postverantwoordelijken en Groep 5, via het profielmenu; Bureau: elke student,
+// via een gedeelde link) en wie het beheert. Zie docs/design-decisions.md.
+// -----------------------------------------------------------------------------
+
+/// Eén vergadering. `startsAt` is het moment zelf; het bestelvenster hangt aan de
+/// Theokot-verkoopdag van diezelfde dag (dezelfde deadline als voor studenten).
+model Meeting {
+  id String @id @default(cuid())
+
+  kind MeetingKind
+  /// Werkingsjaar + semester waarin dit moment valt. Enkel voor de
+  /// planningskalender: die vraagt per semester welke dagen er een moment is.
+  year     Int
+  semester Int
+  /// Deelbare link voor een bureau (`/bureau/<slug>`). Ook een GM krijgt er een,
+  /// zodat een mail naar één moment kan verwijzen.
+  slug     String @unique
+
+  startsAt DateTime  @db.Timestamptz(3)
+  location String?
+  /// Vanaf wanneer studenten dit bureau kunnen invullen. Leeg = meteen open.
+  /// Een GM staat altijd open: de grocos bestellen weken op voorhand.
+  opensAt  DateTime? @db.Timestamptz(3)
+
+  /// Aanbod uit Theokot (standaard), of een eigen lijst wanneer Theokot die dag
+  /// niets kan voorzien (lasagne, broodjes van een bakker). Een eigen aanbod
+  /// raakt de Theokot-voorraad en de turflijst niet.
+  useTheokot Boolean @default(true)
+
+  /// Vrije toelichting boven het reservatieformulier.
+  noteNl String?
+  noteEn String?
+
+  createdById String?
+  createdAt   DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt   DateTime @updatedAt @db.Timestamptz(3)
+
+  createdBy    User?                @relation("MeetingCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  options      MeetingOption[]
+  reservations MeetingReservation[]
+
+  @@index([kind, startsAt])
+  @@index([year, semester, kind])
+}
+
+/// Eén keuze uit het eigen aanbod van een moment (enkel bij `useTheokot=false`).
+model MeetingOption {
+  id         String  @id @default(cuid())
+  meetingId  String
+  nameNl     String
+  nameEn     String?
+  priceCents Int     @default(0)
+  order      Int     @default(0)
+
+  meeting      Meeting              @relation(fields: [meetingId], references: [id], onDelete: Cascade)
+  reservations MeetingReservation[]
+
+  @@index([meetingId])
+}
+
+/// Eén bestelling per persoon per moment. Naam en prijs van het broodje en het
+/// drankje zijn snapshots van het moment van bestellen: prijzen in de catalogus
+/// mogen een openstaande schuld niet met terugwerkende kracht veranderen.
+model MeetingReservation {
+  id        String                   @id @default(cuid())
+  meetingId String
+  userId    String
+  status    MeetingReservationStatus @default(ACTIVE)
+
+  /// Leeg = enkel een drankje besteld.
+  itemNameNl     String?
+  itemNameEn     String?
+  itemPriceCents Int     @default(0)
+  /// Herkomst van het gekozen broodje: catalogusitem (`TheokotProduct`) of een
+  /// eigen optie van dit moment. Puur informatief; de naam is wat telt bij het
+  /// koppelen aan de verkoopdag.
+  productId      String?
+  optionId       String?
+  /// Het aanbod-item van die verkoopdag, zodra het gekoppeld kon worden. Dit is
+  /// wat de voorraad afroomt en op de turflijst verschijnt.
+  sessionItemId  String?
+
+  /// Leeg = geen drankje.
+  drinkName       String?
+  drinkPriceCents Int     @default(0)
+
+  /// Opmerking bij een bureau (onderwijsfeedback vooraf).
+  comment String?
+
+  /// Ongeldig gemaakt omdat het gekozen broodje die dag niet bestaat. De persoon
+  /// kreeg er een mail over en ziet het op de reservatiepagina.
+  invalidatedAt     DateTime? @db.Timestamptz(3)
+  invalidatedReason String?
+
+  /// Betaald (enkel gebruikt voor de GM; een bureau betaalt Onderwijs zelf).
+  paidAt   DateTime? @db.Timestamptz(3)
+  paidById String?
+
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+
+  meeting     Meeting             @relation(fields: [meetingId], references: [id], onDelete: Cascade)
+  user        User                @relation("MeetingReservationUser", fields: [userId], references: [id], onDelete: Cascade)
+  paidBy      User?               @relation("MeetingReservationPaidBy", fields: [paidById], references: [id], onDelete: SetNull)
+  option      MeetingOption?      @relation(fields: [optionId], references: [id], onDelete: SetNull)
+  sessionItem TheokotSessionItem? @relation(fields: [sessionItemId], references: [id], onDelete: SetNull)
+
+  @@unique([meetingId, userId])
+  @@index([userId, status])
+  @@index([sessionItemId])
+  @@index([status, paidAt])
+}
+
+/// Onthoudt dat de kalender voor dit semester al ingevuld is, zodat het beheer
+/// er maar één keer per semester ongevraagd naar vraagt.
+model MeetingPlan {
+  id          String   @id @default(cuid())
+  kind        MeetingKind
+  year        Int
+  semester    Int
+  plannedById String?
+  createdAt   DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt   DateTime @updatedAt @db.Timestamptz(3)
+
+  plannedBy User? @relation("MeetingPlanBy", fields: [plannedById], references: [id], onDelete: SetNull)
+
+  @@unique([kind, year, semester])
 }
 
 /// Tijdelijke ban na te veel no-shows. Historiek blijft bewaard; een ban
@@ -1501,6 +2054,74 @@ model TheokotBan {
 
   @@index([userId])
   @@index([active])
+}
+
+// -----------------------------------------------------------------------------
+// Piano (lokaal 01.52 in het kasteel). Leden reserveren zelf een tijdslot. De
+// slots bestaan niet als rijen: ze worden berekend uit de terugkerende vensters
+// (`PianoWindow`) min de sluitingsdagen (`PianoClosure`), zodat een venster van
+// een heel academiejaar één rij is in plaats van duizend. Enkel een geboekt slot
+// krijgt een rij (`PianoReservation`). Zie docs/design-decisions.md.
+// -----------------------------------------------------------------------------
+
+/// Terugkerend venster waarin de piano vrij is, bv. "elke ma/di/do 19u-22u van
+/// week 39 t.e.m. week 21". Meerdere vensters mogen naast elkaar bestaan; de
+/// slotgenerator neemt hun unie.
+model PianoWindow {
+  id      String  @id @default(cuid())
+  labelNl String
+  labelEn String?
+
+  /// ISO-weekdagen waarop dit venster geldt: 1 = maandag ... 7 = zondag.
+  weekdays    Int[]
+  /// Begin en einde als minuten sinds middernacht (Brussel-wandklok), zodat het
+  /// venster in zomer- én winteruur op hetzelfde uur op de klok staat.
+  startMinute Int
+  endMinute   Int
+
+  /// Geldigheidsperiode als lokale middernacht, beide grenzen inclusief.
+  /// NULL = geen ondergrens respectievelijk geen bovengrens.
+  startDate DateTime?
+  endDate   DateTime?
+
+  active    Boolean  @default(true)
+  order     Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([active])
+}
+
+/// Dagen waarop er niets te reserveren valt, ook al valt er een venster over:
+/// sluitingsdagen van de KU Leuven, of de piano die in herstelling is.
+model PianoClosure {
+  id String @id @default(cuid())
+
+  /// Lokale middernacht, beide grenzen inclusief (één dag = start == eind).
+  startDate DateTime
+  endDate   DateTime
+  reasonNl  String
+  reasonEn  String?
+  createdAt DateTime @default(now())
+
+  @@index([startDate, endDate])
+}
+
+/// Eén geboekt slot. `startsAt` is uniek: de piano is er maar één, dus een slot
+/// is bezet of vrij. Annuleren verwijdert de rij; er is bewust geen historiek,
+/// want er hangt geen geld of sanctie aan een pianoreservatie.
+model PianoReservation {
+  id        String   @id @default(cuid())
+  userId    String
+  startsAt  DateTime
+  endsAt    DateTime
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([startsAt])
+  @@index([startsAt])
+  @@index([userId, startsAt])
 }
 
 // -----------------------------------------------------------------------------
@@ -1540,7 +2161,17 @@ model UitleenItem {
   // (setContents) is louter beschrijvend en koppelt niet aan andere items.
   isSet Boolean @default(false)
 
-  // Locatie in de loods (schap/rek) en staat; puur informatief voor het team.
+  /// Ruwe omvang, voor de ladingsinschatting per evenement (A8). Optioneel: het
+  /// is een hulpmiddel voor de transportverantwoordelijke, geen inventarisplicht.
+  /// Staat het niet ingevuld, dan toont het evenementscherm een itemtelling en
+  /// zegt het er expliciet bij dat het volume onvolledig is.
+  volumeLiters Int?
+
+  // Locatie in de loods (schap/rek) en staat.
+  //
+  // `condition` geldt voor de hele rij en is informatief, behalve wanneer er
+  // exemplaren (`units`) bijgehouden worden: dan telt de staat per exemplaar en
+  // is `quantity` de som van de bruikbare exemplaren. Zie UitleenItemUnit.
   locationShelf String? // bv. "2R"
   locationRack  String? // bv. "A1"
   condition     UitleenItemCondition @default(WERKT)
@@ -1549,11 +2180,84 @@ model UitleenItem {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  category    UitleenCategory?         @relation(fields: [categoryId], references: [id], onDelete: SetNull)
-  lines       UitleenReservationLine[]
-  setContents UitleenSetContent[]
+  category      UitleenCategory?             @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  lines         UitleenReservationLine[]
+  templateLines UitleenRequestTemplateLine[]
+  units         UitleenItemUnit[]
+  setContents   UitleenSetContent[]
+  photos        UitleenItemPhoto[]
+  properties    UitleenItemProperty[]
+  downloads     UitleenItemDownload[]
+  // Beide richtingen van de alternatieven-koppeling; zie UitleenItemAlternative.
+  alternatives  UitleenItemAlternative[]     @relation("UitleenItemAlternatives")
+  alternativeOf UitleenItemAlternative[]     @relation("UitleenItemAlternativeOf")
+
+  /// Zoekvector voor /zoeken, door een trigger bijgehouden (naam + omschrijving,
+  /// dutch). Eén kolom: dit model heeft geen Engelse velden.
+  search Unsupported("tsvector")?
 
   @@index([categoryId, active])
+  @@index([search], type: Gin)
+}
+
+/// "Dit kan ook": een alternatief item dat de aanvrager kan overwegen wanneer
+/// het gevraagde in zijn periode op is. Een suggestie, geen automatische
+/// vervanging; de aanvrager kiest zelf (zie docs/design-decisions.md).
+///
+/// De koppeling is wederzijds: de actieve en de passieve box zijn elkaars
+/// alternatief. Beide richtingen staan als eigen rij, zodat één query per item
+/// volstaat; `saveItemAction` houdt de twee rijen samen.
+model UitleenItemAlternative {
+  itemId        String
+  alternativeId String
+  createdAt     DateTime @default(now())
+
+  item        UitleenItem @relation("UitleenItemAlternatives", fields: [itemId], references: [id], onDelete: Cascade)
+  alternative UitleenItem @relation("UitleenItemAlternativeOf", fields: [alternativeId], references: [id], onDelete: Cascade)
+
+  @@id([itemId, alternativeId])
+  @@index([alternativeId])
+}
+
+/// Extra productbeelden. `photoKey` op UitleenItem blijft de oudere hoofdfoto;
+/// de catalogus gebruikt het eerste beeld hieronder wanneer het bestaat.
+model UitleenItemPhoto {
+  id        String @id @default(cuid())
+  itemId    String
+  key       String
+  sortIndex Int    @default(0)
+
+  item UitleenItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
+
+  @@index([itemId, sortIndex])
+}
+
+/// Vrije technische eigenschappen, zodat Logistiek geen schemawijziging nodig
+/// heeft voor bijvoorbeeld afmetingen, vermogen of aansluitingen.
+model UitleenItemProperty {
+  id        String @id @default(cuid())
+  itemId    String
+  label     String
+  value     String
+  sortIndex Int    @default(0)
+
+  item UitleenItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
+
+  @@index([itemId, sortIndex])
+}
+
+/// Handleidingen, fiches en andere documenten die leden bij een item kunnen
+/// downloaden. De bestanden staan net als foto's in de bestaande opslag.
+model UitleenItemDownload {
+  id        String @id @default(cuid())
+  itemId    String
+  label     String
+  key       String
+  sortIndex Int    @default(0)
+
+  item UitleenItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
+
+  @@index([itemId, sortIndex])
 }
 
 /// Beschrijvende inhoud van een set (vrije tekst, geen koppeling aan andere
@@ -1564,6 +2268,123 @@ model UitleenSetContent {
   label     String
   quantity  Int    @default(1)
   sortIndex Int    @default(0)
+
+  item UitleenItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
+
+  @@index([itemId, sortIndex])
+}
+
+/// Koepel boven de aanvragen van hetzelfde evenement: materiaal, flesserke en
+/// vervoer hangen eronder.
+///
+/// **Optioneel, en bewust niet automatisch.** Elke aanvraag een evenement geven
+/// zou dit scherm een tweede aanvraaglijst maken, en de waarschuwing "nog geen
+/// vervoer aangevraagd" zou afgaan op elke uitlening van twee tafels. Een
+/// evenement ontstaat wanneer iemand er een maakt: het lid in het
+/// aanvraagformulier, het team op /beheer/evenementen, of het groeperingsscript
+/// voor de historiek. Zie docs/design-decisions.md.
+///
+/// De aanvragen houden hun eigen `eventName` als momentopname; die van het
+/// evenement wint in de weergave zodra ze eraan hangen.
+model UitleenEvent {
+  id       String    @id @default(cuid())
+  name     String
+  location String?
+  startAt  DateTime? @db.Timestamptz(3)
+
+  /// Post of werkgroep achter het evenement, en wie het aanmaakte.
+  groupId     String?
+  createdById String?
+
+  /// Vrije nota van het team ("materiaal blijft staan tot maandag").
+  note String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  group     Group? @relation(fields: [groupId], references: [id], onDelete: SetNull)
+  createdBy User?  @relation("UitleenEventCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+
+  reservations UitleenReservation[]
+  transport    UitleenTransportBooking[]
+
+  @@index([startAt])
+  @@index([groupId])
+}
+
+/// Een vaste set materiaal die vaak samen gevraagd wordt (een cantus, een BBQ).
+///
+/// Beheerd door Logistiek zelf: posten maken hun eigen sjablonen niet aan. Anders
+/// staan er na één jaar dertig varianten van "cantus" in de keuzelijst en weet
+/// niemand nog welke de juiste is. Een sjabloon vult het aanvraagformulier in;
+/// wat er daarna mee gebeurt, is een gewone aanvraag.
+model UitleenRequestTemplate {
+  id          String  @id @default(cuid())
+  name        String
+  description String?
+
+  /// Post waarvoor dit sjabloon typisch dient, enkel als toelichting in de lijst.
+  /// Filtert niet: een sjabloon van Cultuur kan even goed voor een andere post
+  /// passen, en verbergen zou het onvindbaar maken voor wie het nodig heeft.
+  groupId     String?
+  createdById String?
+
+  active    Boolean  @default(true)
+  sortIndex Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  group     Group?                       @relation(fields: [groupId], references: [id], onDelete: SetNull)
+  createdBy User?                        @relation("UitleenTemplateCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  lines     UitleenRequestTemplateLine[]
+
+  @@index([active, sortIndex])
+}
+
+model UitleenRequestTemplateLine {
+  id         String @id @default(cuid())
+  templateId String
+  itemId     String
+  quantity   Int    @default(1)
+
+  template UitleenRequestTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  /// Verdwijnt het item uit de catalogus (soft-delete), dan blijft de lijn staan;
+  /// het formulier slaat ze over. Hard verwijderen kan niet zolang er lijnen zijn.
+  item     UitleenItem            @relation(fields: [itemId], references: [id], onDelete: Restrict)
+
+  @@unique([templateId, itemId])
+  @@index([itemId])
+}
+
+/// Eén fysiek exemplaar van een item, met een eigen staat.
+///
+/// `UitleenItem.condition` geldt voor de hele rij: van vier frigo's kan er geen
+/// enkele als kapot gemarkeerd worden zonder ze alle vier te markeren. Wie dat
+/// onderscheid nodig heeft, splitst het item in exemplaren; wie het niet nodig
+/// heeft, laat het staan en houdt het huidige gedrag (`quantity` als getal).
+///
+/// Bestaan er exemplaren, dan is `UitleenItem.quantity` de bijgehouden telling
+/// van de bruikbare exemplaren (actief en niet KAPOT), zoals
+/// `UitleenFlesserkeBatch` dat voor flesserke doet. Zo blijft elke
+/// beschikbaarheidsberekening één kolom lezen in plaats van te moeten weten of
+/// dit item exemplaren heeft.
+model UitleenItemUnit {
+  id     String @id @default(cuid())
+  itemId String
+
+  /// Hoe het team dit exemplaar noemt: "Box 3", "de blauwe", een serienummer.
+  label String
+
+  condition     UitleenItemCondition @default(WERKT)
+  conditionNote String?
+
+  /// Uit roulatie zonder de historiek te verliezen (weggegooid, uitgeleend aan
+  /// een andere kring). Telt niet mee voor de voorraad.
+  active Boolean @default(true)
+
+  sortIndex Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   item UitleenItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
 
@@ -1582,6 +2403,10 @@ model UitleenReservation {
   requesterName String?
 
   // Evenement-context (de Logi-werking vraagt aan per evenement).
+  //
+  // `eventId` is de optionele koepel (A8); `eventName` blijft de momentopname van
+  // wat het lid intikte, ook wanneer het evenement later hernoemd wordt.
+  eventId            String?
   eventName          String // verplicht: waarvoor het materiaal dient
   eventLocation      String?
   eventStart         DateTime? @db.Timestamptz(3) // startuur (opbouw) van het evenement
@@ -1595,8 +2420,20 @@ model UitleenReservation {
   pickupDate DateTime @db.Date
   returnDate DateTime @db.Date
 
+  // Grofweg wanneer op die dag. Bewust géén boekingseenheid: de
+  // voorraadberekening blijft op hele dagen rekenen (zie docs/design-decisions.md).
+  // Een afspraak tussen mensen dus, die nu in het systeem staat in plaats van in
+  // een mail.
+  pickupPart UitleenDayPart?
+  returnPart UitleenDayPart?
+
   memberNote String? // extra info van het lid
   adminNote  String? // nota van het team (bv. reden van afwijzing)
+
+  // Extra adres dat mee op de hoogte blijft, naast de aanvrager zelf. Bedoeld
+  // voor de mailbox van een werkgroep (logistiek.existenz@vtk.be): die overleeft
+  // de wissel van aanvrager, een persoonlijk adres niet.
+  notifyEmail String?
 
   // Totalen gesnapshot bij de aanvraag.
   totalPriceCents   Int
@@ -1616,20 +2453,27 @@ model UitleenReservation {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  user       User   @relation("UitleenReservationUser", fields: [userId], references: [id], onDelete: Cascade)
-  group      Group? @relation(fields: [groupId], references: [id], onDelete: SetNull)
-  decidedBy  User?  @relation("UitleenDecidedBy", fields: [decidedById], references: [id], onDelete: SetNull)
-  pickedUpBy User?  @relation("UitleenPickedUpBy", fields: [pickedUpById], references: [id], onDelete: SetNull)
-  returnedBy User?  @relation("UitleenReturnedBy", fields: [returnedById], references: [id], onDelete: SetNull)
+  user       User          @relation("UitleenReservationUser", fields: [userId], references: [id], onDelete: Cascade)
+  group      Group?        @relation(fields: [groupId], references: [id], onDelete: SetNull)
+  // Verdwijnt het evenement, dan blijven de aanvragen bestaan: ze zijn het echte
+  // werk, de koepel is enkel een groepering.
+  event      UitleenEvent? @relation(fields: [eventId], references: [id], onDelete: SetNull)
+  decidedBy  User?         @relation("UitleenDecidedBy", fields: [decidedById], references: [id], onDelete: SetNull)
+  pickedUpBy User?         @relation("UitleenPickedUpBy", fields: [pickedUpById], references: [id], onDelete: SetNull)
+  returnedBy User?         @relation("UitleenReturnedBy", fields: [returnedById], references: [id], onDelete: SetNull)
 
   lines          UitleenReservationLine[]
   flesserkeLines UitleenFlesserkeLine[]
   payments       UitleenPayment[]
+  auditLogs      UitleenAuditLog[]
+  /// Ritten die Logistiek voor de levering van deze aanvraag aanmaakte.
+  transports     UitleenTransportBooking[]
 
   @@index([userId])
   @@index([status, pickupDate])
   @@index([pickupDate, returnDate])
   @@index([requesterType, status])
+  @@index([eventId])
 }
 
 model UitleenReservationLine {
@@ -1643,10 +2487,22 @@ model UitleenReservationLine {
   unitPriceCents   Int
   unitDepositCents Int
 
+  // Opmerking bij deze lijn, van het lid ("liefst de zwarte") of van het team
+  // ("zie vorig event"). Eén veld: wie ze schreef blijkt uit de tekst, en twee
+  // notitievelden per lijn worden in de praktijk allebei half ingevuld.
+  note String?
+
+  // Klaarzetten: afgevinkt door een shift in de loods, vóór het lid langskomt.
+  // Los van de status van de aanvraag: een aanvraag is pas afgehaald wanneer het
+  // lid er is, terwijl het klaarzetten daarvoor gebeurt en per lijn vordert.
+  preparedAt   DateTime?
+  preparedById String?
+
   reservation UitleenReservation @relation(fields: [reservationId], references: [id], onDelete: Cascade)
   // Items worden soft-deleted (active=false), nooit hard verwijderd zolang er
   // reservaties aan hangen.
   item        UitleenItem        @relation(fields: [itemId], references: [id], onDelete: Restrict)
+  preparedBy  User?              @relation("UitleenLinePreparedBy", fields: [preparedById], references: [id], onDelete: SetNull)
 
   @@index([reservationId])
   @@index([itemId])
@@ -1655,20 +2511,62 @@ model UitleenReservationLine {
 /// Een voertuig van de transportdienst (kar, auto, bakfiets). Tarieven zijn
 /// team-configureerbaar, daarom DB-rijen i.p.v. een enum.
 model UitleenVehicle {
-  id          String             @id @default(cuid())
-  code        String             @unique // kar | auto | bakfiets
-  nameNl      String
-  nameEn      String
-  description String?
-  pricingMode UitleenPricingMode @default(FREE)
-  rateCents   Int                @default(0) // per uur / per km / vast, naargelang pricingMode
-  sortIndex   Int                @default(0)
-  active      Boolean            @default(true)
+  id                 String             @id @default(cuid())
+  code               String             @unique // kar | auto | bakfiets
+  nameNl             String
+  nameEn             String
+  description        String?
+  pricingMode        UitleenPricingMode @default(FREE)
+  rateCents          Int                @default(0) // per uur / per km / vast, naargelang pricingMode
+  sortIndex          Int                @default(0)
+  active             Boolean            @default(true)
+  // Rijden met dit voertuig vraagt een chauffeur die het aankan: bij VTK is dat
+  // "de kar", de bestelwagen. Een vlag per voertuig en geen check op
+  // `code == "kar"`: het team voert zelf voertuigen in, en een tweede
+  // bestelwagen zou anders stil buiten de regel vallen.
+  //
+  // Heette tot augustus 2026 `needsTrailerDriver`. Dat was een leesfout van
+  // "met de kar rijden": VTK heeft geen aanhangwagen.
+  needsVanDriver     Boolean            @default(false)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   bookings UitleenTransportBooking[]
+}
+
+/// Chauffeur die Logistiek zelf toevoegt, buiten de post om.
+///
+/// De chauffeurskeuze bij een rit is de unie van twee bronnen: de leden van de
+/// post Logistiek in het huidige werkingsjaar (automatisch, via
+/// GroupMembership) en de rijen hier. Zo kan iemand met een rijbewijs rijden
+/// zonder praesidiumlid te worden (en dus zonder `logistiek.manage`, want die
+/// permissie hangt aan de post en niet aan deze tabel). De pool is bewust niet
+/// werkingsjaar-gescoped: hij wordt met de hand beheerd en resetten op 15 juli
+/// zou de ritten van de zomer zonder chauffeurs zetten.
+model UitleenDriver {
+  id              String  @id @default(cuid())
+  userId          String  @unique
+  // Vrije notitie van het team, bv. "rijbewijs B sinds 2023, rijdt niet met de kar".
+  note            String?
+  addedById       String?
+  // Mag met de kar rijden (de bestelwagen). Eén vlag en geen enum AUTO/KAR: wie
+  // de kar rijdt, rijdt ook gewoon met de auto, dus die twee sluiten elkaar niet
+  // uit. Leden van de post Logistiek hebben pas een rij hier zodra iemand deze
+  // vlag zet; tot dan gelden ze als autochauffeur.
+  canDriveVan Boolean @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user    User  @relation("UitleenDriverUser", fields: [userId], references: [id], onDelete: Cascade)
+  addedBy User? @relation("UitleenDriverAddedBy", fields: [addedById], references: [id], onDelete: SetNull)
+}
+
+/// Heen of terug binnen één heen-en-terugaanvraag (`tripGroupId`).
+enum UitleenTripLeg {
+  HEEN
+  TERUG
 }
 
 /// Transportaanvraag met een voertuig, een tijdvenster en (later) een chauffeur.
@@ -1687,11 +2585,26 @@ model UitleenTransportBooking {
   startAt DateTime @db.Timestamptz(3)
   endAt   DateTime @db.Timestamptz(3)
 
-  eventName     String? // vrije koppeling aan het evenement (geen FK)
+  eventId       String? // optionele koepel (A8)
+  eventName     String? // momentopname van wat het lid intikte
+  /// Materiaalaanvraag waarvan dit de levering is. Enkel gezet wanneer Logistiek
+  /// de rit vanaf die aanvraag aanmaakt ("Levering nodig"); een rit die een lid
+  /// zelf aanvraagt heeft geen aanvraag om aan te hangen.
+  reservationId String?
   purpose       String // waarvoor de rit dient
   pickupAddress String?
   destination   String?
   helpersNote   String? // bijrijders die de aanvrager zelf voorziet
+  helpersPhone  String? // nummer van de bijrijder, voor de chauffeur onderweg
+  contactPhone  String? // nummer van de aanvrager zelf, zoals UitleenReservation dat heeft
+
+  // Heen- en terugrit horen bij elkaar maar zijn twee boekingen: de kar is
+  // tussendoor vrij, en één boeking met twee tijdvensters zou elke query over
+  // "wanneer is dit voertuig bezet" twee vensters moeten laten kennen (de
+  // conflictcheck, de kalender, het weekoverzicht). Zie docs/design-decisions.md.
+  tripGroupId String?
+  // Welke rit van het paar dit is; null bij een gewone enkele rit.
+  tripLeg     UitleenTripLeg?
 
   driverId String? // pas het weekend ervoor toegewezen; blijft optioneel bij goedkeuring
 
@@ -1707,6 +2620,9 @@ model UitleenTransportBooking {
   memberNote String?
   adminNote  String?
 
+  /// Zoals op UitleenReservation: een meelezend adres naast de aanvrager.
+  notifyEmail String?
+
   decidedAt     DateTime?
   decidedById   String?
   completedAt   DateTime?
@@ -1717,18 +2633,29 @@ model UitleenTransportBooking {
 
   user        User           @relation("UitleenTransportUser", fields: [userId], references: [id], onDelete: Cascade)
   vehicle     UitleenVehicle @relation(fields: [vehicleId], references: [id], onDelete: Restrict)
+  event       UitleenEvent?  @relation(fields: [eventId], references: [id], onDelete: SetNull)
+  // Verdwijnt de aanvraag, dan blijft de rit bestaan: ze is dan gewoon een rit
+  // zonder levering eraan, en het voertuig is die dag nog altijd bezet.
+  reservation UitleenReservation? @relation(fields: [reservationId], references: [id], onDelete: SetNull)
   group       Group?         @relation(fields: [groupId], references: [id], onDelete: SetNull)
   driver      User?          @relation("UitleenTransportDriver", fields: [driverId], references: [id], onDelete: SetNull)
   decidedBy   User?          @relation("UitleenTransportDecidedBy", fields: [decidedById], references: [id], onDelete: SetNull)
   completedBy User?          @relation("UitleenTransportCompletedBy", fields: [completedById], references: [id], onDelete: SetNull)
 
-  payments UitleenPayment[]
+  payments  UitleenPayment[]
+  auditLogs UitleenAuditLog[]
 
   @@index([userId])
   @@index([status, startAt])
   @@index([startAt, endAt])
   @@index([vehicleId, status])
   @@index([requesterType, status])
+  @@index([eventId])
+  @@index([reservationId])
+  @@index([tripGroupId])
+  // "Mijn ritten" voor een chauffeur, en de rittentelling per chauffeur in het
+  // chauffeursbeheer.
+  @@index([driverId, startAt])
 }
 
 /// Spiegel van TicketPayment (zonder refunds): provider is een vrije string
@@ -1807,10 +2734,20 @@ model UitleenFlesserkeItem {
   categoryId    String?
   name          String
   brand         String?
-  contentAmount String? // "Hoeveelheid [kg of L]"
-  expiryDate    DateTime? @db.Date // eerste vervaldatum
+  // Inhoud per stuk, gesplitst in getal en eenheid. De Excel-kolom heette
+  // "Hoeveelheid [kg of L]" en gaf enkel het getal, dus stond er "0.14" bij een
+  // pot tomatenpuree van 140 g en moest je de eenheid zelf raden. De eenheid is
+  // vrije tekst met een keuzelijst ervoor (`CONTENT_UNITS`) en blijft optioneel:
+  // borden en dweilen hebben er geen.
+  contentAmount String?
+  contentUnit   String?
+  // Eerstvolgende vervaldatum over alle ladingen heen, en de totale fysieke
+  // voorraad. Allebei afgeleid uit `batches`: de acties houden ze bij zodat de
+  // beschikbaarheidsberekening (`quantity` min gereserveerd) en de zoek- en
+  // sorteervelden op één rij blijven staan. Schrijf ze nooit los bij.
+  expiryDate    DateTime? @db.Date
   colruytUrl    String?
-  quantity      Int       @default(0) // fysieke voorraad; beschikbaar = quantity - gereserveerd
+  quantity      Int       @default(0) // som van de batches; beschikbaar = quantity - gereserveerd
   locationShelf String?
   locationRack  String?
   note          String?
@@ -1821,8 +2758,34 @@ model UitleenFlesserkeItem {
 
   category UitleenFlesserkeCategory? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
   lines    UitleenFlesserkeLine[]
+  batches  UitleenFlesserkeBatch[]
 
   @@index([categoryId, active])
+}
+
+/// Eén lading van een flesserke-item, met een eigen vervaldatum.
+///
+/// Twee bakken cola die je op verschillende momenten kocht, vervallen op
+/// verschillende dagen. Met één datum per item sloeg de rode markering "vervalt
+/// binnen 3 weken" op de hele stapel, ook op de bakken die nog maanden goed zijn.
+///
+/// De batches zijn de waarheid; `UitleenFlesserkeItem.quantity` en `.expiryDate`
+/// zijn een bijgehouden samenvatting ervan (som en eerstvolgende datum). Verbruik
+/// gaat van de oudste lading eerst; zie docs/design-decisions.md.
+model UitleenFlesserkeBatch {
+  id         String    @id @default(cuid())
+  itemId     String
+  quantity   Int       @default(0)
+  // Null = geen houdbaarheidsdatum (bv. kuisgerief); die lading gaat als laatste op.
+  expiryDate DateTime? @db.Date
+  note       String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  item UitleenFlesserkeItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
+
+  @@index([itemId, expiryDate])
 }
 
 model UitleenFlesserkeLine {
@@ -1839,6 +2802,40 @@ model UitleenFlesserkeLine {
 
   @@index([reservationId])
   @@index([flesserkeItemId])
+}
+
+/// Wat er met een aanvraag of een rit gebeurd is, in volgorde.
+///
+/// De velden op de aanvraag zelf (`decidedAt`, `pickedUpAt`, ...) bewaren enkel
+/// de laatste toestand. Sinds het team een beslissing kan terugdraaien, is dat
+/// te weinig: een terugdraaiing overschreef die velden en er bleef niets van
+/// over. Hier staat elke stap, met wie ze zette.
+///
+/// `fromStatus`/`toStatus` zijn `String` en geen enum: materiaalaanvragen en
+/// ritten hebben elk hun eigen statusenum, en één gedeelde tabel weegt zwaarder
+/// dan typeveiligheid op een veld dat enkel getoond wordt.
+model UitleenAuditLog {
+  id String @id @default(cuid())
+
+  /// Precies één van beide is gezet, zoals bij UitleenPayment.
+  reservationId      String?
+  transportBookingId String?
+
+  kind       UitleenAuditKind
+  fromStatus String?
+  toStatus   String?
+  /// Vrije toelichting, bv. de reden van een afwijzing of wat er gewijzigd is.
+  note       String?
+
+  actorId   String?
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+
+  reservation      UitleenReservation?      @relation(fields: [reservationId], references: [id], onDelete: Cascade)
+  transportBooking UitleenTransportBooking? @relation(fields: [transportBookingId], references: [id], onDelete: Cascade)
+  actor            User?                    @relation("UitleenAuditActor", fields: [actorId], references: [id], onDelete: SetNull)
+
+  @@index([reservationId, createdAt])
+  @@index([transportBookingId, createdAt])
 }
 
 // -----------------------------------------------------------------------------
@@ -1992,19 +2989,19 @@ model Jwks {
 
 //SSO-provider
 model OauthClient {
-  id                      String              @id
-  clientId                String              @unique
+  id                      String    @id
+  clientId                String    @unique
   clientSecret            String?
   disabled                Boolean?
   skipConsent             Boolean?
   enableEndSession        Boolean?
   subjectType             String?
   scopes                  String[]
-  user                    User?               @relation(fields: [userId], references: [id])
+  user                    User?     @relation(fields: [userId], references: [id])
   userId                  String?
   referenceId             String?
-  createdAt               DateTime?           @db.Timestamptz(3)
-  updatedAt               DateTime?           @db.Timestamptz(3)
+  createdAt               DateTime? @db.Timestamptz(3)
+  updatedAt               DateTime? @db.Timestamptz(3)
   name                    String?
   uri                     String?
   icon                    String?
@@ -2028,15 +3025,15 @@ model OauthClient {
   /// niet in een aparte VTK-tabel: de poort draait op het hete pad van élke
   /// autorisatie en moet zonder join te beantwoorden zijn. De plugin negeert
   /// kolommen die ze niet kent.
-  accessMode              SsoAccessMode       @default(OPEN)
+  accessMode          SsoAccessMode @default(OPEN)
   /// Prefix waarop de permissiecodes van deze client gevalideerd worden
   /// ("wiki" -> wiki.read, wiki.access). Null zolang er geen vocabulaire is.
-  permissionNamespace     String?
+  permissionNamespace String?
 
-  oauthRefreshTokens      OauthRefreshToken[]
-  oauthAccessTokens       OauthAccessToken[]
-  oauthConsents           OauthConsent[]
-  clientPermissions       SsoClientPermission[]
+  oauthRefreshTokens OauthRefreshToken[]
+  oauthAccessTokens  OauthAccessToken[]
+  oauthConsents      OauthConsent[]
+  clientPermissions  SsoClientPermission[]
 
   @@map("oauthClient")
 }
@@ -2058,7 +3055,7 @@ model SsoClientPermission {
   /// De `<namespace>.access`-rij die toegang verleent tot een RESTRICTED client.
   /// Wordt automatisch aangemaakt en mag niet verwijderd worden zolang de client
   /// beperkt is: ze weghalen sluit iedereen buiten.
-  system Boolean @default(false)
+  system     Boolean @default(false)
   /// Verbergt de code in toekenningsformulieren maar laat bestaande
   /// toekenningen werken. Veiliger dan verwijderen; zie ontwerp 9.7.
   deprecated Boolean @default(false)
@@ -2217,8 +3214,8 @@ model SsoAuditLog {
   id        String   @id @default(cuid())
   createdAt DateTime @default(now()) @db.Timestamptz(3)
 
-  actor   User?   @relation(fields: [actorId], references: [id], onDelete: SetNull)
-  actorId String?
+  actor     User?   @relation(fields: [actorId], references: [id], onDelete: SetNull)
+  actorId   String?
   /// Naam op het moment van de actie. Los van de relatie, zodat de regel
   /// leesbaar blijft nadat het lid verwijderd is.
   actorName String
@@ -2230,11 +3227,443 @@ model SsoAuditLog {
   clientName String
 
   /// create | update | rotate-secret | enable | disable | delete | revoke-tokens
-  action String
+  action  String
   /// Korte, leesbare samenvatting, bv. "redirect-URI's gewijzigd".
   summary String?
 
   @@index([createdAt])
   @@index([clientId])
   @@map("ssoAuditLog")
+}
+
+// -----------------------------------------------------------------------------
+// Formulieren
+//
+// Leden beheren formulieren in de admin, bezoekers vullen ze in op de publieke
+// site, beheerders bekijken en exporteren de inzendingen. De structuur volgt
+// bewust die van ticketing: grants per formulier (persoon én post), NL/EN-
+// kolomparen in plaats van een JSON-blob met vertalingen, een auditlog en een
+// outbox voor mail. Zie docs/forms.md voor de end-to-end flow en
+// docs/design-decisions.md voor de kringkeuzes.
+// -----------------------------------------------------------------------------
+
+model Form {
+  id              String  @id @default(cuid())
+  slug            String  @unique
+  /// Optionele koppeling aan een kalenderevenement: het formulier verschijnt dan
+  /// bij dat evenement en de bevestigingsmail kan er een .ics bij steken.
+  calendarEventId String? @unique
+  ownerGroupId    String
+  createdById     String?
+
+  titleNl String
+  titleEn String?
+  /// Markdown, bewerkt met MarkdownEditor en gerenderd in een prose-vtk container.
+  introNl String?
+  introEn String?
+
+  status        FormStatus     @default(DRAFT)
+  audience      FormAudience   @default(PUBLIC)
+  /// Staat dit formulier in de publieke lijst op /formulieren? Uit betekent enkel
+  /// dat het er niet in staat; wie de link heeft, geraakt er gewoon op. Een
+  /// sollicitatieformulier hoort meestal niet in een overzicht.
+  listed        Boolean        @default(true)
+  localeMode    FormLocaleMode @default(BOTH)
+  /// Wat een bezoeker in de niet-aangeboden taal te zien krijgt.
+  unavailableNl String?
+  unavailableEn String?
+
+  opensAt  DateTime? @db.Timestamptz(3)
+  closesAt DateTime? @db.Timestamptz(3)
+  timeZone String    @default("Europe/Brussels")
+
+  maxEntries               Int?
+  /// Vol, maar toch invulbaar: inzendingen komen dan op de wachtlijst.
+  allowWaitlist            Boolean @default(false)
+  /// Secties één voor één tonen in plaats van onder elkaar. Nodig om te kunnen
+  /// springen: naar een sectie verderop springen heeft geen betekenis wanneer
+  /// alles toch al op één pagina staat.
+  stepBySections           Boolean @default(false)
+  allowMultipleSubmissions Boolean @default(false)
+  /// Enkel ingelogde leden kunnen bewerken: een anonieme inzending heeft geen
+  /// eigenaar om ze aan terug te geven, en een bewerklink per mail zou
+  /// persoonsgegevens ontsluiten aan wie hem doorgestuurd krijgt.
+  allowEditAfterSubmit     Boolean @default(false)
+  /// Concept opslaan en later verdergaan. Om dezelfde reden alleen voor leden.
+  allowDrafts              Boolean @default(false)
+
+  confirmationEnabled        Boolean @default(false)
+  confirmationSubjectNl      String?
+  confirmationSubjectEn      String?
+  confirmationBodyNl         String?
+  confirmationBodyEn         String?
+  confirmationIncludeAnswers Boolean @default(true)
+  confirmationIncludeIcs     Boolean @default(false)
+
+  /// Wie verwittigd wordt bij een inzending, en hoe vaak.
+  notifyMode   FormNotifyMode @default(NONE)
+  notifyEmails String[]       @default([])
+
+  thankYouNl String?
+  thankYouEn String?
+
+  /// Verplichte toestemmingsvraag bovenop de velden, met de link naar het
+  /// privacybeleid erbij.
+  requireConsent Boolean @default(false)
+  consentTextNl  String?
+  consentTextEn  String?
+
+  /// Leeg = niet automatisch opruimen; dat is bewust de standaard, want stil
+  /// verdwijnende inzendingen zijn erger dan een volle tabel.
+  retentionDays Int?
+
+  settings Json @default("{}")
+
+  publishedAt DateTime? @db.Timestamptz(3)
+  archivedAt  DateTime? @db.Timestamptz(3)
+  createdAt   DateTime  @default(now()) @db.Timestamptz(3)
+  updatedAt   DateTime  @updatedAt @db.Timestamptz(3)
+
+  calendarEvent CalendarEvent? @relation(fields: [calendarEventId], references: [id], onDelete: SetNull)
+  ownerGroup    Group          @relation("FormOwnerGroup", fields: [ownerGroupId], references: [id], onDelete: Restrict)
+  createdBy     User?          @relation("FormCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+
+  sections       FormSection[]
+  fields         FormField[]
+  options        FormFieldOption[]
+  conditions     FormFieldCondition[]
+  entries        FormEntry[]
+  answers        FormAnswer[]
+  uploads        FormFileUpload[]
+  userGrants     FormUserGrant[]
+  groupGrants    FormGroupGrant[]
+  auditLogs      FormAuditLog[]
+  outboxMessages FormOutboxMessage[]
+
+  @@index([ownerGroupId])
+  @@index([status, opensAt, closesAt])
+}
+
+/// Secties maken een lang formulier leesbaar en geven de voortgangsbalk haar
+/// stappen. Velden zonder sectie horen bovenaan, vóór de eerste sectie.
+model FormSection {
+  id            String  @id @default(cuid())
+  formId        String
+  sortOrder     Int     @default(0)
+  titleNl       String
+  titleEn       String?
+  descriptionNl String?
+  descriptionEn String?
+
+  /// Waar de bezoeker na deze sectie belandt wanneer geen enkel antwoord iets
+  /// anders zegt. Leeg = gewoon de volgende sectie in volgorde.
+  nextSectionId String?
+  /// Het formulier eindigt na deze sectie, ook al volgen er nog secties.
+  endsForm      Boolean @default(false)
+
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+
+  form         Form              @relation(fields: [formId], references: [id], onDelete: Cascade)
+  fields       FormField[]
+  /// Zelfverwijzing voor de standaardsprong. SetNull: wie de doelsectie
+  /// verwijdert, laat de bezoeker gewoon weer naar de volgende sectie gaan in
+  /// plaats van naar een sectie die niet meer bestaat.
+  nextSection  FormSection?      @relation("FormSectionNext", fields: [nextSectionId], references: [id], onDelete: SetNull)
+  previousOf   FormSection[]     @relation("FormSectionNext")
+  optionRoutes FormFieldOption[] @relation("FormOptionNextSection")
+
+  @@unique([id, formId])
+  @@index([formId, sortOrder])
+  @@index([nextSectionId])
+}
+
+model FormField {
+  id        String        @id @default(cuid())
+  formId    String
+  sectionId String?
+  /// Stabiele sleutel: de kolomnaam in de CSV en de sleutel in een prefill-link.
+  /// Het label hernoemen laat deze ongemoeid, zodat een export nooit van kolom
+  /// verspringt en een oud antwoord bij zijn eigen vraag blijft horen.
+  code      String
+  type      FormFieldType
+  sortOrder Int           @default(0)
+
+  labelNl String
+  labelEn String?
+  helpNl  String?
+  helpEn  String?
+
+  required Boolean @default(false)
+  /// Typespecifiek: maxLength, multiline, min/max, pattern met eigen
+  /// foutmelding, minChecked/maxChecked, maxFiles, toegelaten extensies,
+  /// schaalbereik, "Andere, namelijk", husselen, imageKey. Wordt door
+  /// lib/forms/schema.ts gevalideerd en nooit rauw vertrouwd.
+  config   Json    @default("{}")
+
+  /// Soft delete. Een veld met antwoorden verdwijnt van het formulier maar houdt
+  /// zijn kolom in de export; hard verwijderen zou bestaande inzendingen
+  /// uithollen.
+  archivedAt DateTime? @db.Timestamptz(3)
+  createdAt  DateTime  @default(now()) @db.Timestamptz(3)
+  updatedAt  DateTime  @updatedAt @db.Timestamptz(3)
+
+  form             Form                 @relation(fields: [formId], references: [id], onDelete: Cascade)
+  section          FormSection?         @relation(fields: [sectionId, formId], references: [id, formId], onDelete: Restrict)
+  options          FormFieldOption[]
+  answers          FormAnswer[]
+  uploads          FormFileUpload[]
+  conditions       FormFieldCondition[] @relation("FormFieldConditionTarget")
+  conditionSources FormFieldCondition[] @relation("FormFieldConditionSource")
+
+  @@unique([formId, code])
+  @@unique([id, formId])
+  @@index([formId, sortOrder])
+  @@index([sectionId])
+}
+
+/// Keuzeopties zijn rijen en geen JSON-lijst: een quotum per optie moet
+/// race-veilig afgeteld kunnen worden (zoals TicketInventoryPool doet), en een
+/// geschrapte optie moet zichtbaar blijven zolang iemand ze aangeduid heeft.
+model FormFieldOption {
+  id        String  @id @default(cuid())
+  formId    String
+  fieldId   String
+  /// Stabiel, net als FormField.code: dit is wat er in het antwoord belandt.
+  code      String
+  labelNl   String
+  labelEn   String?
+  sortOrder Int     @default(0)
+
+  /// Leeg = onbeperkt. `quotaUsed` en `version` maken het aftellen race-veilig.
+  quotaLimit    Int?
+  quotaUsed     Int     @default(0)
+  version       Int     @default(0)
+  /// Vol, maar toch kiesbaar: de inzending komt dan op de wachtlijst in plaats
+  /// van geweigerd te worden.
+  allowWaitlist Boolean @default(false)
+
+  /// Springt naar deze sectie wanneer de bezoeker deze optie kiest.
+  nextSectionId String?
+  /// Beëindigt het formulier meteen bij deze keuze.
+  endsForm      Boolean @default(false)
+
+  archivedAt DateTime? @db.Timestamptz(3)
+  createdAt  DateTime  @default(now()) @db.Timestamptz(3)
+  updatedAt  DateTime  @updatedAt @db.Timestamptz(3)
+
+  form        Form         @relation(fields: [formId], references: [id], onDelete: Cascade)
+  field       FormField    @relation(fields: [fieldId, formId], references: [id, formId], onDelete: Cascade)
+  nextSection FormSection? @relation("FormOptionNextSection", fields: [nextSectionId], references: [id], onDelete: SetNull)
+
+  @@unique([fieldId, code])
+  @@unique([id, formId])
+  @@index([formId])
+  @@index([fieldId, sortOrder])
+}
+
+/// Veld X is enkel zichtbaar wanneer veld Y een bepaald antwoord heeft. Meerdere
+/// condities op hetzelfde veld gelden samen (AND). De server herberekent dit bij
+/// het indienen: een onzichtbaar veld is nooit verplicht en aanvaardt geen
+/// antwoord, ongeacht wat de client opstuurt.
+model FormFieldCondition {
+  id            String                     @id @default(cuid())
+  formId        String
+  /// Het veld dat getoond of verborgen wordt.
+  fieldId       String
+  /// Het veld waarvan het antwoord beslist.
+  sourceFieldId String
+  operator      FormFieldConditionOperator @default(EQUALS)
+  /// Optiecode of vrije waarde; leeg bij IS_ANSWERED.
+  value         String?
+  sortOrder     Int                        @default(0)
+  createdAt     DateTime                   @default(now()) @db.Timestamptz(3)
+
+  form        Form      @relation(fields: [formId], references: [id], onDelete: Cascade)
+  field       FormField @relation("FormFieldConditionTarget", fields: [fieldId, formId], references: [id, formId], onDelete: Cascade)
+  sourceField FormField @relation("FormFieldConditionSource", fields: [sourceFieldId, formId], references: [id, formId], onDelete: Cascade)
+
+  @@index([formId])
+  @@index([fieldId])
+  @@index([sourceFieldId])
+}
+
+model FormEntry {
+  id     String @id @default(cuid())
+  formId String
+
+  status       FormEntryStatus  @default(DRAFT)
+  reviewStatus FormReviewStatus @default(NEW)
+  reviewerId   String?
+  internalNote String?
+
+  submittedById  String?
+  /// Naam en e-mail zoals ingevuld of overgenomen uit het profiel. Apart bewaard
+  /// zodat mailen en ontdubbelen niet elke keer door de antwoorden moet lopen.
+  submitterName  String?
+  submitterEmail String?
+  locale         Locale  @default(NL)
+
+  /// Testinzending: telt niet mee in tellingen, quota of export tenzij expliciet
+  /// gevraagd, zodat een beheerder zijn eigen formulier kan uitproberen.
+  isTest Boolean @default(false)
+
+  /// Op de wachtlijst: wel ingediend, maar zonder plaats. Zo'n inzending claimt
+  /// geen quotum; een beheerder haalt ze erbij wanneer er iets vrijkomt.
+  waitlisted   Boolean   @default(false)
+  waitlistedAt DateTime? @db.Timestamptz(3)
+
+  /// Enkel om misbruik te herkennen; de retentie kuist dit op.
+  requestFingerprint String?
+
+  submittedAt DateTime? @db.Timestamptz(3)
+  createdAt   DateTime  @default(now()) @db.Timestamptz(3)
+  updatedAt   DateTime  @updatedAt @db.Timestamptz(3)
+
+  form        Form  @relation(fields: [formId], references: [id], onDelete: Cascade)
+  submittedBy User? @relation("FormEntrySubmittedBy", fields: [submittedById], references: [id], onDelete: SetNull)
+  reviewer    User? @relation("FormEntryReviewer", fields: [reviewerId], references: [id], onDelete: SetNull)
+
+  answers FormAnswer[]
+  uploads FormFileUpload[]
+
+  @@unique([id, formId])
+  @@index([formId, status, submittedAt])
+  @@index([formId, submittedById])
+  @@index([submittedById])
+  @@index([reviewerId])
+  @@index([submitterEmail])
+}
+
+model FormAnswer {
+  id        String @id @default(cuid())
+  formId    String
+  entryId   String
+  fieldId   String
+  /// Momentopname van FormField.code. De export leest deze en niet de huidige
+  /// code, zodat een hernoemd of gearchiveerd veld zijn kolom houdt.
+  fieldCode String
+
+  valueText    String?
+  valueNumber  Float?
+  valueDate    DateTime? @db.Timestamptz(3)
+  valueBool    Boolean?
+  /// Optiecodes bij een keuzeveld.
+  valueOptions String[]  @default([])
+  /// De vrije tekst bij "Andere, namelijk ...".
+  otherText    String?
+
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+
+  form  Form      @relation(fields: [formId], references: [id], onDelete: Cascade)
+  entry FormEntry @relation(fields: [entryId, formId], references: [id, formId], onDelete: Cascade)
+  field FormField @relation(fields: [fieldId, formId], references: [id, formId], onDelete: Cascade)
+
+  @@unique([entryId, fieldId])
+  @@index([formId, fieldId])
+  @@index([entryId])
+}
+
+/// Bestanden landen in de objectopslag (packages/storage), nooit op het
+/// filesystem. Downloaden loopt door een route die de grants checkt.
+model FormFileUpload {
+  id           String   @id @default(cuid())
+  formId       String
+  entryId      String
+  fieldId      String
+  storageKey   String
+  originalName String
+  contentType  String?
+  sizeBytes    Int
+  createdAt    DateTime @default(now()) @db.Timestamptz(3)
+
+  form  Form      @relation(fields: [formId], references: [id], onDelete: Cascade)
+  entry FormEntry @relation(fields: [entryId, formId], references: [id, formId], onDelete: Cascade)
+  field FormField @relation(fields: [fieldId, formId], references: [id, formId], onDelete: Cascade)
+
+  @@index([entryId])
+  @@index([formId, fieldId])
+}
+
+model FormUserGrant {
+  id          String        @id @default(cuid())
+  formId      String
+  userId      String
+  role        FormGrantRole
+  grantedById String?
+  createdAt   DateTime      @default(now()) @db.Timestamptz(3)
+
+  form      Form  @relation(fields: [formId], references: [id], onDelete: Cascade)
+  user      User  @relation("FormGrantUser", fields: [userId], references: [id], onDelete: Cascade)
+  grantedBy User? @relation("FormGrantGrantedBy", fields: [grantedById], references: [id], onDelete: SetNull)
+
+  @@unique([formId, userId])
+  @@index([userId])
+}
+
+model FormGroupGrant {
+  id          String              @id @default(cuid())
+  formId      String
+  groupId     String
+  role        FormGrantRole
+  scope       FormGroupGrantScope @default(ALL_MEMBERS)
+  grantedById String?
+  createdAt   DateTime            @default(now()) @db.Timestamptz(3)
+
+  form      Form  @relation(fields: [formId], references: [id], onDelete: Cascade)
+  group     Group @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  grantedBy User? @relation("FormGroupGrantGrantedBy", fields: [grantedById], references: [id], onDelete: SetNull)
+
+  @@unique([formId, groupId])
+  @@index([groupId])
+}
+
+/// Wie wijzigde welk formulier, wie verwijderde welke inzending. In de stijl van
+/// TicketAuditLog; de retentie wist het IP-adres en de ruwe metadata.
+model FormAuditLog {
+  id          String   @id @default(cuid())
+  formId      String
+  actorUserId String?
+  action      String
+  entityType  String
+  entityId    String?
+  ipAddress   String?
+  metadata    Json?
+  createdAt   DateTime @default(now()) @db.Timestamptz(3)
+
+  form      Form  @relation(fields: [formId], references: [id], onDelete: Cascade)
+  actorUser User? @relation("FormAuditActor", fields: [actorUserId], references: [id], onDelete: SetNull)
+
+  @@index([formId, createdAt])
+  @@index([formId, entityType, entityId])
+  @@index([actorUserId])
+}
+
+/// Eigen outbox naast die van ticketing, en bewust geen gedeelde tabel: die
+/// hangt met verplichte FK's aan TicketEvent en TicketOrder, en die
+/// generaliseren zou de ticketmodule moeten migreren. Het patroon is identiek:
+/// een unieke dedupeKey, herpogingen met uitstel, en een status per bericht.
+model FormOutboxMessage {
+  id          String           @id @default(cuid())
+  formId      String?
+  entryId     String?
+  type        String
+  dedupeKey   String           @unique
+  recipient   String?
+  payload     Json
+  status      FormOutboxStatus @default(PENDING)
+  attempts    Int              @default(0)
+  availableAt DateTime         @default(now()) @db.Timestamptz(3)
+  lockedAt    DateTime?        @db.Timestamptz(3)
+  lockedBy    String?
+  lastError   String?
+  sentAt      DateTime?        @db.Timestamptz(3)
+  createdAt   DateTime         @default(now()) @db.Timestamptz(3)
+  updatedAt   DateTime         @updatedAt @db.Timestamptz(3)
+
+  form Form? @relation(fields: [formId], references: [id], onDelete: Cascade)
+
+  @@index([status, availableAt])
+  @@index([formId])
 }

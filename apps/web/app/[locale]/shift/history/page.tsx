@@ -1,3 +1,5 @@
+import type { Metadata } from 'next';
+import { staticMetadata } from '@/lib/pageMetadata';
 import Link from 'next/link';
 import { hasLocale } from '@/lib/locale';
 import { Locale, getDictionary } from '@vtk/i18n';
@@ -7,6 +9,16 @@ import { PleaseLogin } from '@/components/site/pleaseLogin';
 import { prisma } from '@vtk/db';
 
 import '@/app/design/vtk-basic.css';
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ locale: string }>;
+}): Promise<Metadata> {
+  const { locale } = await params;
+  if (!hasLocale(locale)) return {};
+  return staticMetadata('shiftHistory', '/shift/history', locale, { noIndex: true });
+}
 
 export default async function ShiftHistoryPage({
   params,
@@ -44,7 +56,6 @@ export default async function ShiftHistoryPage({
     <div className="vtk-page">
       <header className="vtk-page-head">
         <div>
-          <div className="vtk-page-kicker">VTK · {t.shifts}</div>
           <h1 className="vtk-page-title">{t.history.title}</h1>
         </div>
       </header>

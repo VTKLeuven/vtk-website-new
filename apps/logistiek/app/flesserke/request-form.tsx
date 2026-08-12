@@ -8,6 +8,14 @@ import {
   editFlesserkeReservationAction,
   type ActionResult,
 } from '@/app/actions/uitleen';
+import { adminEditFlesserkeReservationAction } from '@/app/actions/beheer';
+import { FlesserkeItemName } from '@/components/flesserke-item-name';
+import { DayPartSelect } from '@/components/day-part-select';
+import { EventPicker, type SelectableEvent } from '@/components/event-picker';
+import { useFormDraft } from '@/lib/use-form-draft';
+import { formatContentAmount, formatDateTime } from '@/lib/uitleen';
+import { LastMinuteNotice } from '@/components/last-minute-notice';
+import { QuantityInput } from '@/components/quantity-input';
 import type { ReservationFormInput } from '@/lib/reservation-form';
 import type { FlesserkeCatalogCategory } from '@/lib/uitleen-server';
 import {
@@ -19,12 +27,13 @@ import {
 export type FlesserkeInitial = {
   event: EventReservationValues;
   pickupDate: string;
+  pickupPart?: string;
   returnDate: string;
   note: string;
   quantities: Record<string, number>;
 };
 
-/** Flesserke-aanvraagformulier (praesidium). Aparte flow van het materiaal. */
+/** Flesserke-aanvraagformulier (interne werking). Aparte flow van het materiaal. */
 export function FlesserkeForm({
   catalog,
   groups,
@@ -32,27 +41,84 @@ export function FlesserkeForm({
   initial,
   mode,
   onCancel,
+  lastMinuteDays,
+  draftKey,
+  events,
 }: {
   catalog: FlesserkeCatalogCategory[];
   groups: RequesterOption[];
   locale: 'nl' | 'en';
   initial: FlesserkeInitial;
-  /** 'create' of een reservatie-id om te bewerken. */
-  mode: { kind: 'create' } | { kind: 'edit'; reservationId: string };
+  /** Termijn voor de last-minute-waarschuwing; zie /beheer/instellingen. */
+  lastMinuteDays: number;
+  /**
+   * 'create' of een reservatie-id om te bewerken. 'admin-edit' is dezelfde
+   * bewerking door het team: die mag elke post kiezen en ook een goedgekeurde
+   * aanvraag nog aanpassen.
+   */
+  mode:
+    | { kind: 'create' }
+    | { kind: 'edit'; reservationId: string }
+    | { kind: 'admin-edit'; reservationId: string };
   onCancel?: () => void;
+  /** Zie ReservationForm: lokaal concept, enkel bij een nieuwe aanvraag. */
+  draftKey?: string;
+  /** Evenementen om deze aanvraag onder te hangen (A8). */
+  events?: SelectableEvent[];
 }) {
   const en = locale === 'en';
   const router = useRouter();
   const [event, setEvent] = useState<EventReservationValues>(initial.event);
   const [pickupDate, setPickupDate] = useState(initial.pickupDate);
+  const [pickupPart, setPickupPart] = useState(initial.pickupPart ?? '');
   const [returnDate, setReturnDate] = useState(initial.returnDate);
   const [note, setNote] = useState(initial.note);
   const [quantities, setQuantities] = useState<Record<string, number>>(initial.quantities);
+  const [eventLink, setEventLink] = useState({ eventId: '', createEvent: false });
+
+  /**
+   * Een gekozen evenement vult de naam in plaats van dat je ze opnieuw typt: ze
+   * staat dan twee keer in het formulier en gaat scheef zodra er één van de twee
+   * aangepast wordt. Loskoppelen geeft het veld weer vrij, met de naam die er
+   * stond als vertrekpunt.
+   */
+  const linkedEvent = events?.find((entry) => entry.id === eventLink.eventId) ?? null;
+  function chooseEvent(next: { eventId: string; createEvent: boolean }) {
+    setEventLink(next);
+    const picked = events?.find((entry) => entry.id === next.eventId);
+    if (picked) setEvent((current) => ({ ...current, eventName: picked.name }));
+  }
+
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
   const [search, setSearch] = useState('');
   const [activeCategory, setActiveCategory] = useState<string>('all');
+
+  const draftValue = useMemo(
+    () => ({ event, pickupDate, pickupPart, returnDate, note, quantities }),
+    [event, pickupDate, pickupPart, returnDate, note, quantities]
+  );
+  const draft = useFormDraft<typeof draftValue>(
+    draftKey ?? null,
+    draftValue,
+    Boolean(draftKey),
+    (value) =>
+      value.event.eventName.trim() === '' &&
+      value.pickupDate === '' &&
+      Object.keys(value.quantities).length === 0
+  );
+
+  function restoreDraft() {
+    const saved = draft.restore();
+    if (!saved) return;
+    setEvent(saved.event);
+    setPickupDate(saved.pickupDate);
+    setPickupPart(saved.pickupPart ?? '');
+    setReturnDate(saved.returnDate);
+    setNote(saved.note);
+    setQuantities(saved.quantities);
+  }
 
   const count = useMemo(() => Object.values(quantities).reduce((s, q) => s + q, 0), [quantities]);
 
@@ -88,7 +154,10 @@ export function FlesserkeForm({
       const payload: ReservationFormInput = {
         ...event,
         pickupDate,
-        returnDate,
+        returnDate: returnDate || pickupDate,
+        pickupPart,
+        eventId: eventLink.eventId || null,
+        createEvent: eventLink.createEvent,
         note,
         lines: [],
         flesserkeLines: Object.entries(quantities).map(([itemId, quantity]) => ({ itemId, quantity })),
@@ -96,8 +165,11 @@ export function FlesserkeForm({
       const result: ActionResult =
         mode.kind === 'create'
           ? await createFlesserkeReservationAction(payload)
-          : await editFlesserkeReservationAction(mode.reservationId, payload);
+          : mode.kind === 'admin-edit'
+            ? await adminEditFlesserkeReservationAction(mode.reservationId, payload)
+            : await editFlesserkeReservationAction(mode.reservationId, payload);
       if (result.ok) {
+        draft.clear();
         if (mode.kind === 'create') router.push('/reservaties?aangevraagd=1');
         else {
           onCancel?.();
@@ -111,7 +183,49 @@ export function FlesserkeForm({
 
   return (
     <div className="space-y-6">
-      <EventRequesterFields value={event} onChange={setEvent} groups={groups} locale={locale} mode="member" />
+      {draft.found ? (
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-[14px] border border-vtk-navy/15 bg-vtk-paper px-4 py-3 text-sm">
+          <p className="text-vtk-body">
+            <span className="font-semibold text-vtk-ink">
+              {en ? 'You had a request in progress' : 'Je had een aanvraag in opbouw'}
+            </span>
+            {draft.savedAt ? (
+              <span className="text-vtk-muted">
+                {' '}
+                · {en ? 'saved' : 'bewaard'} {formatDateTime(draft.savedAt, locale)}
+              </span>
+            ) : null}
+          </p>
+          <div className="flex items-center gap-2">
+            <Button type="button" size="sm" onClick={restoreDraft}>
+              {en ? 'Continue' : 'Verder werken'}
+            </Button>
+            <Button type="button" size="sm" variant="ghost" onClick={draft.discard}>
+              {en ? 'Discard' : 'Weggooien'}
+            </Button>
+          </div>
+        </div>
+      ) : null}
+
+      <EventRequesterFields
+        value={event}
+        onChange={setEvent}
+        groups={groups}
+        locale={locale}
+        mode={mode.kind === 'admin-edit' ? 'team' : 'member'}
+        linkedEventName={linkedEvent?.name ?? null}
+      />
+
+      {events ? (
+        <EventPicker
+          events={events}
+          eventId={eventLink.eventId}
+          createEvent={eventLink.createEvent}
+          onChange={chooseEvent}
+          locale={locale}
+          newEventName={event.eventName}
+        />
+      ) : null}
 
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
         <div className="space-y-6">
@@ -135,6 +249,18 @@ export function FlesserkeForm({
                 </option>
               ))}
             </select>
+            {search.trim() !== '' || activeCategory !== 'all' ? (
+              <button
+                type="button"
+                onClick={() => {
+                  setSearch('');
+                  setActiveCategory('all');
+                }}
+                className="h-10 rounded-lg border border-vtk-navy/15 px-3 text-sm font-medium text-vtk-ink transition hover:border-vtk-navy/40"
+              >
+                {en ? 'Clear filters' : 'Filters wissen'}
+              </button>
+            ) : null}
           </div>
 
           {shownCatalog.length === 0 ? (
@@ -153,11 +279,13 @@ export function FlesserkeForm({
                     <li key={item.id} className="flex flex-wrap items-center gap-3 py-2.5">
                       <div className="min-w-0 flex-1">
                         <p className="text-sm font-medium text-vtk-ink">
-                          {item.name}
+                          <FlesserkeItemName name={item.name} colruytUrl={item.colruytUrl} />
                           {item.brand ? <span className="text-vtk-muted"> · {item.brand}</span> : null}
                         </p>
                         <p className="text-xs text-vtk-muted">
-                          {item.contentAmount ? `${item.contentAmount} · ` : ''}
+                          {formatContentAmount(item.contentAmount, item.contentUnit)
+                            ? `${formatContentAmount(item.contentAmount, item.contentUnit)} · `
+                            : ''}
                           {item.quantity} {en ? 'in stock' : 'in voorraad'}
                         </p>
                       </div>
@@ -167,17 +295,22 @@ export function FlesserkeForm({
                           onClick={() => setQty(item.id, qty - 1)}
                           disabled={qty <= 0}
                           aria-label={`${en ? 'Fewer' : 'Minder'}: ${item.name}`}
-                          className="grid h-8 w-8 place-items-center rounded-full border border-vtk-navy/15 text-vtk-ink transition hover:border-vtk-navy/40 disabled:opacity-30"
+                          className="grid h-8 w-8 shrink-0 place-items-center rounded-full border border-vtk-navy/15 text-vtk-ink transition hover:border-vtk-navy/40 disabled:opacity-30"
                         >
                           −
                         </button>
-                        <span className="w-6 text-center text-sm font-semibold text-vtk-ink">{qty}</span>
+                        <QuantityInput
+                          value={qty}
+                          max={item.quantity}
+                          onChange={(next) => setQty(item.id, next)}
+                          label={`${en ? 'Number' : 'Aantal'}: ${item.name}`}
+                        />
                         <button
                           type="button"
                           onClick={() => setQty(item.id, qty + 1)}
                           disabled={qty >= item.quantity}
                           aria-label={`${en ? 'More' : 'Meer'}: ${item.name}`}
-                          className="grid h-8 w-8 place-items-center rounded-full border border-vtk-navy/15 text-vtk-ink transition hover:border-vtk-navy/40 disabled:opacity-30"
+                          className="grid h-8 w-8 shrink-0 place-items-center rounded-full border border-vtk-navy/15 text-vtk-ink transition hover:border-vtk-navy/40 disabled:opacity-30"
                         >
                           +
                         </button>
@@ -194,24 +327,45 @@ export function FlesserkeForm({
           <h2 className="text-lg font-semibold tracking-tight text-vtk-ink">{en ? 'Your request' : 'Jouw aanvraag'}</h2>
           <div className="mt-4 grid gap-3">
             <label className="grid gap-1 text-sm">
-              <span className="font-medium text-vtk-ink">{en ? 'Needed from' : 'Nodig vanaf'}</span>
-              <input
-                type="date"
-                value={pickupDate}
-                onChange={(e) => setPickupDate(e.target.value)}
-                className="h-10 rounded-lg border border-vtk-navy/15 bg-white px-3 text-vtk-ink"
-              />
+              <span className="font-medium text-vtk-ink">
+                {en ? 'Ready by' : 'Klaarzetten tegen'}
+              </span>
+              <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2">
+                <input
+                  type="date"
+                  value={pickupDate}
+                  onChange={(e) => setPickupDate(e.target.value)}
+                  className="h-10 min-w-0 rounded-lg border border-vtk-navy/15 bg-white px-3 text-vtk-ink"
+                />
+                <DayPartSelect
+                  value={pickupPart}
+                  onChange={setPickupPart}
+                  locale={locale}
+                  label={en ? 'Part of day' : 'Dagdeel'}
+                />
+              </div>
             </label>
+            {/* Flesserke is verbruiksgoed: wat geopend is, komt niet terug. Enkel
+                het gesloten deel gaat terug naar de kelder, en meestal dezelfde
+                dag; vandaar de default en het optionele karakter. */}
             <label className="grid gap-1 text-sm">
-              <span className="font-medium text-vtk-ink">{en ? 'Until' : 'Tot'}</span>
+              <span className="font-medium text-vtk-ink">
+                {en ? 'Rest back by (optional)' : 'Rest terug tegen (optioneel)'}
+              </span>
               <input
                 type="date"
-                value={returnDate}
+                value={returnDate || pickupDate}
                 min={pickupDate || undefined}
                 onChange={(e) => setReturnDate(e.target.value)}
                 className="h-10 rounded-lg border border-vtk-navy/15 bg-white px-3 text-vtk-ink"
               />
+              <span className="text-xs text-vtk-muted">
+                {en
+                  ? 'Leave as is for the same day. Only unopened items come back.'
+                  : 'Laat staan voor dezelfde dag. Enkel wat ongeopend blijft, komt terug.'}
+              </span>
             </label>
+            <LastMinuteNotice pickupDate={pickupDate} days={lastMinuteDays} locale={locale} />
             <label className="grid gap-1 text-sm">
               <span className="font-medium text-vtk-ink">{en ? 'Extra info (optional)' : 'Extra info (optioneel)'}</span>
               <textarea
@@ -238,7 +392,7 @@ export function FlesserkeForm({
             size="lg"
             className="mt-5 w-full"
             onClick={submit}
-            disabled={pending || count === 0 || !pickupDate || !returnDate || !event.eventName.trim()}
+            disabled={pending || count === 0 || !pickupDate || !event.eventName.trim()}
           >
             {pending
               ? en

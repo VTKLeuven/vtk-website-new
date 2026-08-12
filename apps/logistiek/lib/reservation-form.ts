@@ -1,7 +1,15 @@
 import 'server-only';
 
 import { prisma } from '@vtk/db';
-import { parseDateOnly, todayDateOnly, type ReservationLineInput } from './uitleen';
+import { DAY_PARTS, isEmailish, parseDateOnly, todayDateOnly, type ReservationLineInput } from './uitleen';
+
+type DayPart = (typeof DAY_PARTS)[number];
+
+/** Een dagdeel uit het formulier, of null wanneer het leeg of onzin is. */
+function parseDayPart(value: string | undefined): DayPart | null {
+  const trimmed = (value ?? '').trim();
+  return DAY_PARTS.includes(trimmed as DayPart) ? (trimmed as DayPart) : null;
+}
 
 /** Max lengte van een uitleenperiode; langere aanvragen verlopen via e-mail. */
 export const MAX_RESERVATION_DAYS = 14;
@@ -22,6 +30,12 @@ export type ReservationFormInput = {
   deliveryNote?: string;
   pickupDate: string;
   returnDate: string;
+  pickupPart?: string;
+  returnPart?: string;
+  /** Koepel-evenement (A8); `createEvent` maakt er een van de eventvelden. */
+  eventId?: string | null;
+  createEvent?: boolean;
+  notifyEmail?: string;
   note?: string;
   lines: ReservationLineInput[];
   flesserkeLines?: ReservationLineInput[];
@@ -33,6 +47,7 @@ export type ReservationLineCreate = {
   quantity: number;
   unitPriceCents: number;
   unitDepositCents: number;
+  note: string | null;
 };
 
 export type FlesserkeLineCreate = { flesserkeItemId: string; itemName: string; quantity: number };
@@ -51,6 +66,9 @@ export type ReservationScalars = {
   deliveryNote: string | null;
   pickupDate: Date;
   returnDate: Date;
+  pickupPart: DayPart | null;
+  returnPart: DayPart | null;
+  notifyEmail: string | null;
   memberNote: string | null;
   totalPriceCents: number;
   totalDepositCents: number;
@@ -157,6 +175,11 @@ export async function buildReservationData(
     return { ok: false, error: 'Het startmoment van het evenement is ongeldig.' };
   }
 
+  const notifyEmail = (input.notifyEmail ?? '').trim();
+  if (notifyEmail && !isEmailish(notifyEmail)) {
+    return { ok: false, error: 'Het extra e-mailadres ziet er niet uit als een adres.' };
+  }
+
   const lines = input.lines.filter((line) => Number.isInteger(line.quantity) && line.quantity > 0);
   const itemIds = lines.map((line) => line.itemId);
   if (new Set(itemIds).size !== itemIds.length) {
@@ -219,6 +242,7 @@ export async function buildReservationData(
       quantity: line.quantity,
       unitPriceCents: item.priceCents,
       unitDepositCents: item.depositCents,
+      note: line.note && line.note.trim() ? line.note.trim().slice(0, FIELD_MAX) : null,
     };
   });
 
@@ -246,6 +270,9 @@ export async function buildReservationData(
       deliveryNote: Boolean(input.delivery) ? trim(input.deliveryNote) : null,
       pickupDate,
       returnDate,
+      pickupPart: parseDayPart(input.pickupPart),
+      returnPart: parseDayPart(input.returnPart),
+      notifyEmail: notifyEmail ? notifyEmail.slice(0, FIELD_MAX) : null,
       memberNote: input.note && input.note.trim() ? input.note.trim().slice(0, MAX_NOTE_LENGTH) : null,
       totalPriceCents,
       totalDepositCents,

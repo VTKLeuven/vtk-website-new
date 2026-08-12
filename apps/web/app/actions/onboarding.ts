@@ -34,6 +34,7 @@ const studySchema = {
   studyProgrammes: z.array(z.enum(STUDY_PROGRAMMES)).default([]),
   notAtFaculty: z.boolean().default(false),
   notStudying: z.boolean().default(false),
+  internationalStudent: z.boolean().default(false),
 };
 
 /**
@@ -54,6 +55,7 @@ function studyFields(formData: FormData) {
     // Niet-aangevinkte checkbox zit niet in de FormData.
     notAtFaculty: formData.get("notAtFaculty") === "on",
     notStudying: formData.get("notStudying") === "on",
+    internationalStudent: formData.get("internationalStudent") === "on",
   };
 }
 
@@ -85,6 +87,8 @@ const profileSchema = z.object({
     .default(""),
   emailPreference: z.enum(EMAIL_PREFERENCES),
   mailCategories: z.array(z.enum(MAIL_CATEGORIES)).default([]),
+  shiftReminderDayBefore: z.boolean(),
+  shiftReminderSoon: z.boolean(),
   ...studySchema,
 });
 
@@ -146,6 +150,8 @@ export async function saveProfileAction(
     personalEmail: formData.get("personalEmail") ?? "",
     emailPreference: formData.get("emailPreference") ?? "UNIVERSITY",
     mailCategories: formData.getAll("mailCategories"),
+    shiftReminderDayBefore: formData.get("shiftReminderDayBefore") !== null,
+    shiftReminderSoon: formData.get("shiftReminderSoon") !== null,
     ...studyFields(formData),
   });
 
@@ -197,10 +203,13 @@ export async function saveProfileAction(
         personalEmail: data.personalEmail || null,
         emailPreference: data.emailPreference,
         mailCategories: { set: data.mailCategories },
+        shiftReminderDayBefore: data.shiftReminderDayBefore,
+        shiftReminderSoon: data.shiftReminderSoon,
         studyYears: { set: data.studyYears },
         studyProgrammes: { set: data.studyProgrammes },
         notAtFaculty: data.notAtFaculty,
         notStudying: data.notStudying,
+        internationalStudent: data.internationalStudent,
         // Wie dit formulier invult, declareert daarmee zijn studie voor dit
         // werkingsjaar; de bevestigingsgate hoeft er dan niet meer op te vallen.
         studyConfirmedYear: currentWorkingYear(),
@@ -270,6 +279,7 @@ export async function confirmStudyAction(formData: FormData): Promise<void> {
       studyProgrammes: { set: parsed.data.studyProgrammes },
       notAtFaculty: parsed.data.notAtFaculty,
       notStudying: parsed.data.notStudying,
+      internationalStudent: parsed.data.internationalStudent,
       studyConfirmedYear: currentWorkingYear(),
     },
   });

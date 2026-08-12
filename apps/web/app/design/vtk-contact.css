@@ -1,0 +1,127 @@
+/* Contactpagina (/contact). Het formulier zelf gebruikt de gedeelde
+   veldcomponenten uit @vtk/ui; hier staat enkel de indeling eromheen. */
+
+.vtk-contact-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: clamp(18px, 2.5vw, 28px);
+  align-items: start;
+}
+
+/* Vanaf tabletbreedte staat het formulier links en de korte uitleg rechts. Het
+   formulier krijgt bewust het leeuwendeel: de rail ernaast is bijzaak. */
+@media (min-width: 900px) {
+  .vtk-contact-grid {
+    grid-template-columns: minmax(0, 1.9fr) minmax(240px, 1fr);
+  }
+}
+
+.vtk-contact-main {
+  padding: clamp(22px, 3vw, 32px);
+}
+
+.vtk-contact-main h2 {
+  margin: 0;
+  font-size: 22px;
+  line-height: 1.25;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--ink);
+}
+
+.vtk-contact-lead {
+  margin: 10px 0 0;
+  color: var(--body);
+  font-size: 15px;
+  line-height: 1.6;
+}
+
+.vtk-contact-form {
+  /* Positioneerd, zodat het weggeschoven honeypot-veld hieronder aan het
+     formulier hangt en niet aan de pagina; zie de les in CLAUDE.md over
+     absoluut gepositioneerde, onzichtbare elementen zonder anker. */
+  position: relative;
+  margin-top: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+/* Naam en e-mail delen een regel zodra er plaats is; op smal scherm niet, want
+   twee halve velden naast elkaar zijn daar onbruikbaar. */
+.vtk-contact-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 18px;
+}
+
+@media (min-width: 640px) {
+  .vtk-contact-row {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.vtk-contact-field {
+  min-width: 0;
+}
+
+.vtk-contact-help {
+  margin: 6px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+/* Het honeypot-veld staat uit beeld, maar blijft in de layout en in de
+   toegankelijkheidsboom onzichtbaar (`aria-hidden` + `tabindex="-1"` in de
+   markup). Bewust geen `display: none`: sommige bots slaan zo'n veld over. */
+.vtk-contact-honeypot {
+  position: absolute;
+  left: -9999px;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+}
+
+.vtk-contact-aside {
+  display: flex;
+  flex-direction: column;
+  gap: clamp(14px, 2vw, 18px);
+}
+
+.vtk-contact-side {
+  padding: clamp(18px, 2.4vw, 24px);
+}
+
+.vtk-contact-side h2 {
+  margin: 0;
+  font-size: 16px;
+  line-height: 1.3;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.vtk-contact-side p {
+  margin: 8px 0 0;
+  color: var(--body);
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.vtk-contact-side a {
+  display: inline-block;
+  margin-top: 4px;
+}
+
+.vtk-contact-pages {
+  margin-top: clamp(40px, 5vw, 64px);
+}
+
+.vtk-contact-pages h2 {
+  margin: 0 0 16px;
+  font-size: 20px;
+  line-height: 1.25;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--ink);
+}

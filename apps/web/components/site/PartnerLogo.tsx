@@ -25,6 +25,10 @@ export function PartnerLogo({
   if (!src || failedSrc === src) return <>{fallback ?? name}</>;
 
   return (
+    // Geen next/image: we kennen de echte afmetingen van een partnerlogo niet.
+    // De upload schaalt ze enkel tot binnen 600x200 (`fit: inside`), dus elke
+    // verhouding komt voor en elke width/height die we hier zouden invullen is
+    // een gok. SVG-logo's laat next/image sowieso ongewijzigd door.
     // eslint-disable-next-line @next/next/no-img-element
     <img src={src} alt={name} className={className} onError={() => setFailedSrc(src)} />
   );

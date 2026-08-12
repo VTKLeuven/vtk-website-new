@@ -7,14 +7,18 @@ export function ProfileMenu({
   name,
   canManage,
   mainUrl,
+  testLoginHref,
   labels,
 }: {
   name: string;
   canManage: boolean;
   mainUrl: string;
+  /** Enkel op een testomgeving gezet: link naar de test-login picker. */
+  testLoginHref?: string;
   labels: {
     mainSite: string;
     manage: string;
+    testLogin: string;
   };
 }) {
   const [open, setOpen] = useState(false);
@@ -86,6 +90,11 @@ export function ProfileMenu({
           <a href={mainUrl} className="profile-menu-item" role="menuitem">
             {labels.mainSite}
           </a>
+          {testLoginHref ? (
+            <Link href={testLoginHref} className="profile-menu-item" role="menuitem">
+              {labels.testLogin}
+            </Link>
+          ) : null}
         </div>
       ) : null}
     </div>

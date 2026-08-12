@@ -22,6 +22,11 @@
 .ticket-admin-page,
 .ticket-admin-event {
   display: grid;
+  /* Zonder een expliciete kolom is een grid-kolom `auto`: die groeit mee met
+     het breedste kind i.p.v. de container te volgen, en dan schuift de hele
+     pagina op een telefoon horizontaal weg. `min-width: 0` op de grid zelf
+     helpt daar niet tegen; de kolom moet het zeggen. */
+  grid-template-columns: minmax(0, 1fr);
   min-width: 0;
   gap: 24px;
 }
@@ -49,25 +54,17 @@
 .ticket-admin-event-title h1 {
   margin: 0;
   color: var(--ink);
-  font-size: 32px;
-  font-weight: 650;
-  line-height: 1.08;
+  font-size: 24px;
+  font-weight: 600;
+  line-height: 1.15;
 }
 
-.ticket-admin-page-head p:not(.ticket-admin-eyebrow),
+.ticket-admin-page-head p,
 .ticket-admin-event-title p,
 .ticket-admin-section-head p {
   margin: 5px 0 0;
   color: var(--muted);
   font-size: 13px;
-}
-
-.ticket-admin-eyebrow {
-  margin: 0 0 7px;
-  color: var(--muted);
-  font-size: 11px;
-  font-weight: 750;
-  text-transform: uppercase;
 }
 
 .ticket-admin-event-head {
@@ -84,7 +81,7 @@
   margin-bottom: 8px;
   color: var(--muted) !important;
   font-size: 12px;
-  font-weight: 650;
+  font-weight: 600;
   text-decoration: none;
 }
 
@@ -104,17 +101,18 @@
   padding-bottom: 10px;
 }
 
+/* Zelfde pil als de admin-zijnavigatie (.vtk-admin-nav a). */
 .ticket-admin-tabs a,
 .ticket-admin-subnav a {
   display: inline-flex;
   min-height: 36px;
   align-items: center;
   gap: 7px;
-  padding: 9px 11px;
-  border-radius: 6px;
-  color: var(--muted);
+  padding: 9px 13px;
+  border-radius: 999px;
+  color: rgba(10, 15, 31, 0.72);
   font-size: 13px;
-  font-weight: 650;
+  font-weight: 500;
   line-height: 1;
   text-decoration: none;
   white-space: nowrap;
@@ -129,8 +127,8 @@
 .ticket-admin-tabs a.is-active,
 .ticket-admin-tabs a[aria-current="page"] {
   background: var(--paper-2);
-  box-shadow: inset 0 -2px 0 var(--yellow);
   color: var(--ink);
+  font-weight: 600;
 }
 
 .ticket-admin-subnav {
@@ -138,7 +136,7 @@
   max-width: 100%;
   padding: 4px;
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: 14px;
   background: rgba(255, 255, 255, 0.6);
 }
 
@@ -153,13 +151,13 @@
   align-items: center;
   justify-content: center;
   gap: 7px;
-  border: 1px solid var(--line-2);
-  border-radius: 6px;
-  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface);
   color: var(--ink) !important;
   font: inherit;
   font-size: 13px;
-  font-weight: 650;
+  font-weight: 600;
   line-height: 1;
   text-decoration: none;
   cursor: pointer;
@@ -183,7 +181,6 @@
 
 .ticket-admin-button:hover,
 .ticket-admin-icon-button:hover {
-  border-color: var(--ink);
   background: var(--paper-2);
 }
 
@@ -196,13 +193,13 @@
 }
 
 .ticket-admin-button[data-variant="primary"] {
-  border-color: var(--ink);
-  background: var(--ink);
-  color: #fff !important;
+  border-color: var(--navy);
+  background: var(--navy);
+  color: var(--paper) !important;
 }
 
 .ticket-admin-button[data-variant="primary"]:hover {
-  background: var(--navy);
+  background: var(--ink);
 }
 
 .ticket-admin-button[data-variant="danger"],
@@ -227,7 +224,7 @@
   background: var(--paper-2);
   color: var(--muted);
   font-size: 11px;
-  font-weight: 700;
+  font-weight: 600;
   line-height: 1;
   white-space: nowrap;
 }
@@ -261,8 +258,9 @@
   grid-template-columns: repeat(2, minmax(0, 1fr));
   overflow: hidden;
   border: 1px solid var(--line);
-  border-radius: 8px;
-  background: #fff;
+  border-radius: 18px;
+  background: var(--surface);
+  box-shadow: 0 10px 30px -24px rgba(10, 15, 31, 0.35);
 }
 
 .ticket-admin-metric {
@@ -293,7 +291,7 @@
 .ticket-admin-metric-label span {
   overflow: hidden;
   font-size: 11px;
-  font-weight: 700;
+  font-weight: 600;
   text-overflow: ellipsis;
   text-transform: uppercase;
   white-space: nowrap;
@@ -317,7 +315,7 @@
   margin-top: 10px;
   color: var(--ink);
   font-size: 25px;
-  font-weight: 650;
+  font-weight: 600;
   line-height: 1;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -348,6 +346,16 @@
   min-width: 0;
   padding: 22px 0 2px;
   border-top: 1px solid var(--line);
+}
+
+/* De lijn boven een sectie scheidt haar van wat erboven staat. Staat er niets
+   boven, of sluit de kop erboven al af met een eigen lijn, dan zou het een
+   tweede lijn op een handbreedte van de eerste zijn. */
+.ticket-admin-page > .ticket-admin-section:first-child,
+.ticket-admin-page-head + .ticket-admin-section,
+.ticket-admin-page > .ticket-admin-grid:first-child > .ticket-admin-section:first-child {
+  padding-top: 0;
+  border-top: 0;
 }
 
 .ticket-admin-section-compact {
@@ -384,7 +392,7 @@
   align-items: center;
   justify-content: center;
   border: 1px solid var(--line);
-  border-radius: 6px;
+  border-radius: 10px;
   background: #fff;
   color: var(--ink);
 }
@@ -398,7 +406,7 @@
   margin: 0;
   color: var(--ink);
   font-size: 15px;
-  font-weight: 700;
+  font-weight: 600;
 }
 
 .ticket-admin-section-actions {
@@ -430,7 +438,7 @@
   margin: 0;
   color: var(--ink);
   font-size: 14px;
-  font-weight: 650;
+  font-weight: 600;
 }
 
 .ticket-admin-row-meta,
@@ -446,7 +454,7 @@
 .ticket-admin-alert-link,
 .ticket-admin-setup-link {
   color: inherit;
-  font-weight: 700;
+  font-weight: 600;
   text-decoration: underline;
   text-underline-offset: 3px;
 }
@@ -487,7 +495,7 @@
 .ticket-admin-checkin {
   color: var(--ticket-green);
   font-size: 12px;
-  font-weight: 650;
+  font-weight: 600;
 }
 
 .ticket-admin-empty {
@@ -502,7 +510,7 @@
   align-content: center;
   padding: 24px;
   border: 1px dashed var(--line-2);
-  border-radius: 8px;
+  border-radius: 18px;
   color: var(--muted);
   text-align: center;
 }
@@ -511,7 +519,7 @@
   margin: 9px 0 0;
   color: var(--ink);
   font-size: 14px;
-  font-weight: 650;
+  font-weight: 600;
 }
 
 .ticket-admin-empty-copy {
@@ -530,7 +538,7 @@
   padding: 26px;
   border: 1px solid var(--line);
   border-left: 4px solid var(--ticket-red);
-  border-radius: 8px;
+  border-radius: 18px;
   background: #fff;
 }
 
@@ -577,6 +585,10 @@
   grid-template-columns: minmax(0, 1fr);
   align-items: end;
   gap: 12px;
+  /* De filterbalk houdt zelf afstand tot wat ze filtert. Zonder deze marge plakt
+     de resultatenlijst eronder, wat vooral opvalt bij de lege staat: die heeft
+     een streepjesrand die dan tegen de invoervelden aan komt te liggen. */
+  margin-bottom: 18px;
 }
 
 .ticket-admin-field {
@@ -595,7 +607,7 @@
 .ticket-admin-label {
   color: var(--ink);
   font-size: 12px;
-  font-weight: 650;
+  font-weight: 600;
 }
 
 .ticket-admin-field legend {
@@ -608,7 +620,7 @@
   min-height: 40px;
   padding: 9px 11px;
   border: 1px solid var(--line-2) !important;
-  border-radius: 6px !important;
+  border-radius: 10px !important;
   background: #fff !important;
   color: var(--ink) !important;
   font: inherit;
@@ -631,6 +643,312 @@
 .ticket-admin-field :is(input, select, textarea):disabled {
   cursor: not-allowed;
   opacity: 0.64;
+}
+
+/* Geen eigen kolomregel hier: `.ticket-admin-form-grid` staat op één kolom en
+   gaat pas vanaf 680px naar twee (zie de media query onderaan). Een
+   onvoorwaardelijke twee-kolomsregel perste het ticketontwerp op een telefoon
+   naast elkaar, want een kleurveld is een 44px-staal plus een invoerveld en
+   past daar niet in de helft van een schermbreedte. */
+
+.ticket-design-templates {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.ticket-design-templates label {
+  display: grid;
+  min-height: 100px;
+  gap: 5px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  cursor: pointer;
+}
+
+.ticket-design-templates label.is-selected {
+  border-color: var(--ink);
+  background: var(--paper-2);
+}
+
+.ticket-design-templates input,
+.ticket-design-asset input[type="file"] {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+}
+
+.ticket-design-templates span,
+.ticket-design-asset small {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+/* Adreskiezer: het suggestielijstje hangt onder het invoerveld, dus de
+   container is het positioneringsanker. */
+.ticket-address-picker {
+  position: relative;
+}
+
+.ticket-address-input {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.ticket-address-input input {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.ticket-address-input > button {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: none;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.ticket-address-input > button:hover {
+  background: var(--paper-2);
+  color: var(--ink);
+}
+
+.ticket-address-suggestions {
+  position: absolute;
+  z-index: 20;
+  top: 100%;
+  right: 0;
+  left: 0;
+  margin: 4px 0 0;
+  padding: 4px;
+  list-style: none;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface);
+  box-shadow: 0 12px 28px rgba(14, 26, 54, 0.14);
+}
+
+.ticket-address-suggestions button {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  color: var(--ink);
+  font: inherit;
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.ticket-address-suggestions button:hover,
+.ticket-address-suggestions button:focus-visible {
+  background: var(--paper-2);
+}
+
+.ticket-address-suggestions svg {
+  flex: none;
+  color: var(--muted);
+}
+
+.ticket-address-confirmed {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--ticket-green);
+}
+
+.ticket-design-colour-head {
+  display: flex;
+  min-height: 20px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.ticket-design-colour-head > label {
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.ticket-design-colour-reset {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--muted);
+  font: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.ticket-design-colour-reset:hover {
+  color: var(--ink);
+}
+
+.ticket-design-colour-reset:focus-visible {
+  outline: 3px solid rgba(14, 26, 54, 0.14);
+  outline-offset: 2px;
+}
+
+.ticket-design-colour {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr);
+  gap: 8px;
+}
+
+.ticket-admin-field .ticket-design-colour input[type="color"] {
+  min-height: 40px;
+  padding: 3px;
+}
+
+.ticket-design-asset > div {
+  display: flex;
+  min-height: 72px;
+  align-items: center;
+  gap: 12px;
+  padding: 8px;
+  border: 1px dashed var(--line-2);
+  border-radius: 10px;
+}
+
+.ticket-design-asset img {
+  width: 72px;
+  height: 52px;
+  object-fit: contain;
+}
+
+.ticket-design-message {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin: 14px 0 0;
+  color: var(--ticket-green);
+  font-size: 13px;
+}
+
+.ticket-design-message.is-error { color: var(--ticket-red); }
+
+@media (max-width: 680px) {
+  .ticket-design-templates { grid-template-columns: 1fr; }
+}
+
+/* Vorm + live voorbeeld naast elkaar vanaf een brede admin-kolom; op smal
+   scherm staat het voorbeeld gewoon onder het formulier (bewerken komt eerst,
+   het voorbeeld is ondersteunend, niet de hoofdtaak). */
+.ticket-design-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 24px;
+  align-items: start;
+}
+
+@media (min-width: 980px) {
+  .ticket-design-layout {
+    grid-template-columns: minmax(0, 1fr) 260px;
+  }
+
+  .ticket-design-preview {
+    position: sticky;
+    top: 20px;
+  }
+}
+
+.ticket-design-layout-form {
+  min-width: 0;
+}
+
+.ticket-design-preview {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--surface);
+}
+
+.ticket-design-preview-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
+.ticket-design-preview-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.ticket-design-preview-head .ticket-admin-button {
+  min-height: 28px;
+  padding: 4px 10px;
+  font-size: 11px;
+  text-transform: none;
+  letter-spacing: normal;
+}
+
+.ticket-design-preview-frame {
+  position: relative;
+  overflow: hidden;
+  aspect-ratio: 595.28 / 841.89;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--paper-2);
+}
+
+.ticket-design-preview-frame iframe {
+  width: 100%;
+  height: 100%;
+  border: 0;
+}
+
+.ticket-design-preview-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 12px;
+  background: rgba(255, 255, 255, 0.7);
+  text-align: center;
+}
+
+.ticket-design-preview-note {
+  margin: 0;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.5;
 }
 
 .ticket-admin-input-icon {
@@ -657,7 +975,7 @@
   align-items: center;
   padding: 9px 11px;
   border: 1px solid var(--line);
-  border-radius: 6px;
+  border-radius: 12px;
   background: var(--paper-2);
   color: var(--muted);
   font-size: 13px;
@@ -690,7 +1008,7 @@
   margin: -8px 0 0;
   color: var(--ticket-red);
   font-size: 12px;
-  font-weight: 650;
+  font-weight: 600;
   line-height: 1.4;
 }
 
@@ -700,10 +1018,16 @@
 }
 
 .ticket-admin-table-wrap {
+  /* Zelf het positie-anker. In de kop staat een `sr-only`-span; die is absoluut
+     gepositioneerd en zou zonder gepositioneerde ouder op de pagina ankeren
+     i.p.v. op de tabel. Ze landt dan op de x van haar kolom (~500px), waardoor
+     het document breder wordt dan het scherm en een telefoon de hele pagina
+     uitzoomt om die ene onzichtbare pixel te tonen. */
+  position: relative;
   width: 100%;
   overflow-x: auto;
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: 18px;
   background: #fff;
 }
 
@@ -727,7 +1051,42 @@
 
 .ticket-admin-table td strong {
   color: var(--ink);
-  font-weight: 650;
+  font-weight: 600;
+}
+
+/* Een rij die naar één plek leidt, hoort in haar geheel klikbaar te zijn: op een
+   pijltje van 36px mikken is werk dat de rij zelf kan doen. De link blijft één
+   tabstop en één screenreader-doel; het vlak eronder is enkel een muisdoel. */
+.ticket-admin-linked-row {
+  position: relative;
+  cursor: pointer;
+}
+
+.ticket-admin-row-link {
+  text-decoration: none;
+}
+
+.ticket-admin-row-link::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+}
+
+.ticket-admin-linked-row:focus-within {
+  background: var(--paper-2);
+}
+
+.ticket-admin-row-chevron {
+  display: block;
+  margin-left: auto;
+  color: var(--muted);
+}
+
+/* Bedieningselementen in zo'n rij moeten bóven het kliksvlak liggen, anders
+   vangt de rijlink de klik en navigeer je weg i.p.v. de knop te gebruiken. */
+.ticket-admin-linked-row :is(button, select, a:not(.ticket-admin-row-link), label) {
+  position: relative;
+  z-index: 1;
 }
 
 .ticket-admin-orders-table,
@@ -800,7 +1159,7 @@
   margin: 0 12px 14px;
   padding: 18px;
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: 18px;
   background: var(--paper);
 }
 
@@ -852,7 +1211,7 @@
 .ticket-admin-spec dt {
   color: var(--muted);
   font-size: 11px;
-  font-weight: 650;
+  font-weight: 600;
   text-transform: uppercase;
 }
 
@@ -890,19 +1249,57 @@
   border-top: 0;
 }
 
+/* De uitklappers ("Capaciteit aanpassen", "Tickettype toevoegen", "Vraag
+   toevoegen") zagen eruit als vetgedrukte tekst en niet als iets waar je op kan
+   klikken. Ze krijgen dezelfde pilvorm als de andere knoppen op dit scherm, met
+   een plusteken dat naar een kruisje kantelt zodra het blok openstaat. */
 .ticket-admin-details > summary {
-  display: flex;
+  display: inline-flex;
   align-items: center;
   gap: 7px;
-  padding: 14px 0;
+  margin: 14px 0;
+  padding: 9px 13px;
+  min-height: 38px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface);
   color: var(--ink);
   font-size: 13px;
-  font-weight: 650;
+  font-weight: 600;
+  line-height: 1;
   cursor: pointer;
+  transition: background 120ms;
+}
+
+/* Het standaard driehoekje weg; we tekenen zelf een plusteken. */
+.ticket-admin-details > summary::marker,
+.ticket-admin-details > summary::-webkit-details-marker {
+  display: none;
+  content: "";
+}
+
+.ticket-admin-details > summary::before {
+  content: "+";
+  font-size: 15px;
+  line-height: 1;
+  transition: transform 140ms ease;
+}
+
+.ticket-admin-details[open] > summary::before {
+  transform: rotate(45deg);
+}
+
+.ticket-admin-details > summary:hover {
+  background: var(--paper-2);
+}
+
+.ticket-admin-details > summary:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
 }
 
 .ticket-admin-details[open] > summary {
-  padding-bottom: 10px;
+  margin-bottom: 10px;
 }
 
 .ticket-admin-details-body {
@@ -992,7 +1389,7 @@
   margin-top: 15px;
   color: var(--ink) !important;
   font-size: 12px;
-  font-weight: 700;
+  font-weight: 600;
   text-decoration: underline;
   text-underline-offset: 3px;
 }
@@ -1019,7 +1416,7 @@
   background: var(--ticket-blue-soft);
   color: var(--ink);
   font-size: 12px;
-  font-weight: 750;
+  font-weight: 600;
 }
 
 .ticket-admin-device-icon {
@@ -1030,7 +1427,7 @@
   align-items: center;
   justify-content: center;
   border: 1px solid var(--line);
-  border-radius: 6px;
+  border-radius: 10px;
   background: #fff;
   color: var(--ink);
 }
@@ -1039,14 +1436,15 @@
   align-self: start;
   padding: 16px;
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: 18px;
   background: #fff;
 }
 
 @media (min-width: 680px) {
   .ticket-admin-form-grid,
   .ticket-admin-detail-grid,
-  .ticket-admin-access-groups {
+  .ticket-admin-access-groups,
+  .ticket-design-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
@@ -1078,6 +1476,13 @@
 @media (min-width: 1000px) {
   .ticket-admin-grid[data-columns="2"] {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  /* Naast elkaar staat de tweede kolom niet ónder de eerste, dus scheidt haar
+     lijn niets; gestapeld (smaller dan dit) heeft ze die wel nodig. */
+  .ticket-admin-page > .ticket-admin-grid[data-columns="2"]:first-child > .ticket-admin-section {
+    padding-top: 0;
+    border-top: 0;
   }
 
   .ticket-admin-grid[data-columns="access"] {
@@ -1215,4 +1620,183 @@
   .ticket-admin-person {
     align-items: flex-start;
   }
+}
+
+/* ---------------------------------------------------------------------------
+   Overgenomen van het kalenderevent.
+
+   Hangt een ticketevent aan een kalenderevent, dan worden titel, beschrijving,
+   locatie en datums niet meer gevraagd: ze komen daarvandaan. Dit blok toont wat
+   je krijgt, met een link naar de plek waar je het wél wijzigt. Zo staat er geen
+   invoerveld dat bij opslaan toch overschreven wordt.
+   --------------------------------------------------------------------------- */
+
+.ticket-admin-inherited {
+  margin-bottom: 18px;
+  padding: 16px 18px;
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--yellow);
+  border-radius: 14px;
+  background: var(--paper-2);
+}
+
+.ticket-admin-inherited-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 12px;
+  font-size: 13px;
+}
+
+.ticket-admin-inherited-head a {
+  color: var(--muted);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.ticket-admin-inherited-head a:hover {
+  color: var(--ink);
+}
+
+.ticket-admin-inherited-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px 24px;
+  margin: 0;
+}
+
+.ticket-admin-inherited-list dt {
+  color: var(--muted);
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.ticket-admin-inherited-list dd {
+  margin: 2px 0 0;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+/* ---------------------------------------------------------------------------
+   Publiceren als losse actie.
+
+   Publiceren zat vroeger als keuzelijst halverwege het instellingenformulier,
+   waarna je onderaan nog moest opslaan; de blokkade ("nog geen actief
+   tickettype") kreeg je pas ná dat opslaan te zien. Deze balk zegt het vooraf en
+   maakt er één knop van.
+   --------------------------------------------------------------------------- */
+
+.ticket-admin-publish-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 18px;
+  padding: 16px 18px;
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--yellow);
+  border-radius: 14px;
+  background: var(--paper-2);
+}
+
+.ticket-admin-publish-text {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 13px;
+}
+
+.ticket-admin-publish-text strong {
+  font-size: 14px;
+}
+
+.ticket-admin-publish-text span {
+  color: var(--muted);
+}
+
+.ticket-admin-publish-error {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: #b42318;
+}
+
+/* ---------------------------------------------------------------------------
+   Soort antwoord bij een deelnemersvraag.
+
+   Was een keuzelijst met vijf regels waaruit je zelf moest afleiden dat twee
+   ervan een lijst opties nodig hadden; het optieveld stond er intussen altijd,
+   met een voetnoot dat het meestal niet van toepassing was. Nu kies je eerst
+   het soort, en verschijnt enkel wat daarbij hoort.
+   --------------------------------------------------------------------------- */
+
+.ticket-admin-choice-set {
+  margin: 4px 0 2px;
+  padding: 0;
+  border: 0;
+}
+
+.ticket-admin-choice-set > legend {
+  padding: 0;
+  margin-bottom: 8px;
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.ticket-admin-choice-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 10px;
+}
+
+.ticket-admin-choice {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--surface);
+  cursor: pointer;
+  transition: border-color 120ms, background 120ms;
+}
+
+.ticket-admin-choice:hover {
+  background: var(--paper-2);
+}
+
+/* De gekozen kaart krijgt dezelfde gele accentrand als de andere "let hier
+   op"-blokken op dit scherm, in plaats van een eigen kleur. */
+.ticket-admin-choice[data-selected="true"] {
+  border-color: var(--ink);
+  box-shadow: inset 3px 0 0 var(--yellow);
+}
+
+.ticket-admin-choice input {
+  margin-top: 2px;
+  flex: none;
+}
+
+.ticket-admin-choice span {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.ticket-admin-choice strong {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.ticket-admin-choice small {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.4;
 }

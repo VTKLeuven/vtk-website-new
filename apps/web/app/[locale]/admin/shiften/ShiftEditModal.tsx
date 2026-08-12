@@ -1,14 +1,15 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
-import { format } from "date-fns";
 import type { Locale } from "@vtk/i18n";
 import { Button, Card, FormError, Input, Label, Select, Textarea } from "@vtk/ui";
 import { useToast } from "@/components/ui/toast";
+import { MarkdownEditor } from "@/components/editor/MarkdownEditor";
+import { utcToLocalDateTime } from "@/lib/ticketing/time";
 import type { AdminParticipant, AdminShift } from "./ShiftAdmin";
 
 type SearchUser = { id: string; name: string; email: string; rNumber: string | null };
 
-const toLocalInput = (d: Date) => format(d, "yyyy-MM-dd'T'HH:mm");
+const toLocalInput = (date: Date) => utcToLocalDateTime(date);
 
 export function ShiftEditModal({
   locale,
@@ -38,6 +39,10 @@ export function ShiftEditModal({
   const [maxParticipants, setMaxParticipants] = useState(String(shift?.maxParticipants ?? 1));
   const [reward, setReward] = useState(String(shift?.reward ?? 0));
   const [post, setPost] = useState(shift?.post ?? "");
+  const [openToInternationals, setOpenToInternationals] = useState(
+    shift?.openToInternationals ?? false,
+  );
+  const [instructions, setInstructions] = useState(shift?.instructions ?? "");
   const [participants, setParticipants] = useState<AdminParticipant[]>(shift?.participants ?? []);
   const [addSearch, setAddSearch] = useState("");
   const [results, setResults] = useState<SearchUser[]>([]);
@@ -102,6 +107,8 @@ export function ShiftEditModal({
       maxParticipants: Number(maxParticipants),
       reward: Number(reward),
       post: post === "" ? null : post,
+      openToInternationals,
+      instructions: instructions.trim() === "" ? null : instructions,
     };
 
     try {
@@ -148,7 +155,7 @@ export function ShiftEditModal({
       className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/40 p-4"
       onClick={onClose}
     >
-      <Card className="my-8 w-full max-w-lg p-5" onClick={(e) => e.stopPropagation()}>
+      <Card className="my-8 w-full max-w-2xl p-5" onClick={(e) => e.stopPropagation()}>
         <div className="mb-4 flex items-center justify-between">
           <h2 className="text-lg font-semibold">
             {isEdit ? (nl ? "Shift bewerken" : "Edit shift") : nl ? "Nieuwe shift" : "New shift"}
@@ -202,6 +209,48 @@ export function ShiftEditModal({
           <div className="sm:col-span-2">
             <Label>{nl ? "Beschrijving" : "Description"}</Label>
             <Textarea value={description} onChange={(e) => setDescription(e.target.value)} />
+            <p className="mt-1 text-xs text-zinc-400">
+              {nl
+                ? "Eén korte regel; staat bovenaan het detailvenster op de shiftpagina."
+                : "One short line; shown at the top of the detail dialog on the shift page."}
+            </p>
+          </div>
+
+          <div className="sm:col-span-2">
+            <label className="flex items-start gap-2">
+              <input
+                type="checkbox"
+                className="mt-1"
+                checked={openToInternationals}
+                onChange={(e) => setOpenToInternationals(e.target.checked)}
+              />
+              <span>
+                <span className="text-sm font-medium">
+                  {nl ? "Ook voor internationals" : "Open to internationals"}
+                </span>
+                <span className="block text-xs text-zinc-400">
+                  {nl
+                    ? "Aanvinken wanneer je deze shift kan doen zonder Nederlands. De shift krijgt dan die markering op de shiftpagina."
+                    : "Tick when this shift can be done without speaking Dutch. The shift then carries that marker on the shift page."}
+                </span>
+              </span>
+            </label>
+          </div>
+
+          <div className="sm:col-span-2">
+            <Label>{nl ? "Uitleg: wat houdt de shift in?" : "Explanation: what does the shift involve?"}</Label>
+            <MarkdownEditor
+              locale={locale}
+              value={instructions}
+              onChange={setInstructions}
+              rows={8}
+              allowImages={false}
+            />
+            <p className="mt-1 text-xs text-zinc-400">
+              {nl
+                ? "Optioneel: wat moet je doen, waar meld je je, wat mag je verwachten. Leeg laten verbergt dit blok op de shiftpagina."
+                : "Optional: what to do, where to report, what to expect. Leaving it empty hides this block on the shift page."}
+            </p>
           </div>
         </div>
 

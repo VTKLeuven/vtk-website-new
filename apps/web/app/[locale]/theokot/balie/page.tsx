@@ -1,3 +1,5 @@
+import type { Metadata } from "next";
+import { staticMetadata } from "@/lib/pageMetadata";
 import { notFound } from "next/navigation";
 import { hasLocale } from "@/lib/locale";
 import { requireSession } from "@/lib/session";
@@ -6,6 +8,16 @@ import { PleaseLogin } from "@/components/site/pleaseLogin";
 import { PickupCounter } from "@/components/theokot/PickupCounter";
 
 import "@/app/design/vtk-basic.css";
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ locale: string }>;
+}): Promise<Metadata> {
+  const { locale } = await params;
+  if (!hasLocale(locale)) return {};
+  return staticMetadata("theokotCounter", "/theokot/balie", locale, { noIndex: true });
+}
 
 /**
  * Losstaande afhaalbalie buiten het admin-paneel, zodat shifters met enkel
@@ -42,7 +54,6 @@ export default async function TheokotBaliePage({ params }: { params: Promise<{ l
     <div className="vtk-page">
       <header className="vtk-page-head">
         <div>
-          <div className="vtk-page-kicker">VTK · Theokot</div>
           <h1 className="vtk-page-title">{nl ? "Afhaalbalie" : "Pickup counter"}</h1>
         </div>
       </header>

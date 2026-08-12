@@ -3,8 +3,9 @@ import { notFound } from "next/navigation";
 import { hasLocale } from "@/lib/locale";
 import { requireSession } from "@/lib/session";
 import type { Locale } from "@vtk/i18n";
-import { Button, Card, Input, Label } from "@vtk/ui";
+import { Card, Input, Label } from "@vtk/ui";
 import { saveTheokotOpeningHoursAction } from "@/app/actions/theokot";
+import { SaveForm } from "@/components/ui/SaveForm";
 import { TheokotAdminNav } from "../TheokotAdminNav";
 
 type Hours = {
@@ -41,7 +42,16 @@ export default async function TheokotOpeningHoursPage({ params }: { params: Prom
             ? "Deze uren verschijnen op de startpagina van de website. Dit zijn NIET de afhaaluren van de reservaties (die stel je per verkoopdag in)."
             : "These hours appear on the website homepage. These are NOT the reservation pickup hours (set those per sale day)."}
         </p>
-        <form action={saveTheokotOpeningHoursAction} className="space-y-3">
+        <SaveForm
+          action={saveTheokotOpeningHoursAction}
+          className="space-y-3"
+          submitLabel={nl ? "Openingsuren opslaan" : "Save opening hours"}
+          savingLabel={nl ? "Bezig met opslaan..." : "Saving..."}
+          savedMessage={nl ? "Openingsuren opgeslagen" : "Opening hours saved"}
+          fallbackErrorMessage={
+            nl ? "Opslaan van de openingsuren mislukt." : "Saving the opening hours failed."
+          }
+        >
           <div className="grid gap-3 sm:grid-cols-2">
             <div>
               <Label>{nl ? "Titel (NL)" : "Title (NL)"}</Label>
@@ -77,8 +87,7 @@ export default async function TheokotOpeningHoursPage({ params }: { params: Prom
               );
             })}
           </div>
-          <Button type="submit">{nl ? "Openingsuren opslaan" : "Save opening hours"}</Button>
-        </form>
+        </SaveForm>
       </Card>
     </div>
   );

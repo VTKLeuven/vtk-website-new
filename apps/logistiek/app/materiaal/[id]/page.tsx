@@ -2,11 +2,11 @@ import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import { LoginGate } from '@/components/login-gate';
 import { PageShell } from '@/components/page-shell';
-import { getSession } from '@/lib/session';
+import { canManage, getSession } from '@/lib/session';
 import { getLocale } from '@/lib/i18n';
-import { formatEuro } from '@/lib/uitleen';
-import { publicUrl } from '@/lib/storage';
-import { frequentlyRequestedWith, itemDetail } from '@/lib/uitleen-server';
+import { formatEuro, ITEM_CONDITION_LABELS } from '@/lib/uitleen';
+import { frequentlyRequestedWith, itemDetail, itemTeamDetails } from '@/lib/uitleen-server';
+import { ItemGallery } from './item-gallery';
 
 export default async function ItemDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const [session, locale] = await Promise.all([getSession(), getLocale()]);
@@ -19,8 +19,13 @@ export default async function ItemDetailPage({ params }: { params: Promise<{ id:
   const item = await itemDetail(id);
   if (!item) notFound();
 
-  const related = await frequentlyRequestedWith(item.id);
-  const photo = publicUrl(item.photoKey);
+  // Enkel voor Logistiek: waar het ligt en wat er over de staat genoteerd staat.
+  // Voor een gewoon lid wordt dit niet eens opgehaald.
+  const [related, team] = await Promise.all([
+    frequentlyRequestedWith(item.id),
+    canManage(session) ? itemTeamDetails(item.id) : Promise.resolve(null),
+  ]);
+  const photos = [...(item.photoKey ? [item.photoKey] : []), ...item.photos.map((photo) => photo.key)];
 
   return (
     <PageShell
@@ -34,14 +39,7 @@ export default async function ItemDetailPage({ params }: { params: Promise<{ id:
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
         <div className="space-y-6">
           <section className="overflow-hidden rounded-[18px] border border-vtk-navy/10 bg-vtk-surface">
-            {photo ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={photo} alt={item.name} className="aspect-[16/9] w-full object-cover" />
-            ) : (
-              <div className="grid aspect-[16/9] w-full place-items-center bg-vtk-paper-2 text-sm text-vtk-muted">
-                {en ? 'No photo yet' : 'Nog geen foto'}
-              </div>
-            )}
+            <ItemGallery name={item.name} keys={photos} categoryName={item.category?.name} />
             <div className="p-6">
               <div className="flex flex-wrap items-center gap-2">
                 {item.category ? (
@@ -61,6 +59,22 @@ export default async function ItemDetailPage({ params }: { params: Promise<{ id:
             </div>
           </section>
 
+          {item.properties.length > 0 ? (
+            <section className="rounded-[18px] border border-vtk-navy/10 bg-vtk-surface p-6">
+              <h2 className="text-lg font-semibold tracking-tight text-vtk-ink">{en ? 'Properties' : 'Eigenschappen'}</h2>
+              <dl className="mt-3 divide-y divide-vtk-navy/10">
+                {item.properties.map((property) => <div key={property.id} className="grid gap-1 py-2.5 sm:grid-cols-2"><dt className="text-sm text-vtk-muted">{property.label}</dt><dd className="text-sm font-medium text-vtk-ink">{property.value}</dd></div>)}
+              </dl>
+            </section>
+          ) : null}
+
+          {item.downloads.length > 0 ? (
+            <section className="rounded-[18px] border border-vtk-navy/10 bg-vtk-surface p-6">
+              <h2 className="text-lg font-semibold tracking-tight text-vtk-ink">{en ? 'Downloads' : 'Downloads'}</h2>
+              <ul className="mt-3 grid gap-2 sm:grid-cols-2">{item.downloads.map((download) => <li key={download.id}><a href={`/api/media/${download.key.split('/').map(encodeURIComponent).join('/')}`} target="_blank" rel="noreferrer" className="flex items-center justify-between rounded-[14px] border border-vtk-navy/10 px-4 py-3 text-sm font-medium text-vtk-ink transition hover:border-vtk-navy/30"><span>{download.label}</span><span aria-hidden>↓</span></a></li>)}</ul>
+            </section>
+          ) : null}
+
           {item.isSet && item.setContents.length > 0 ? (
             <section className="rounded-[18px] border border-vtk-navy/10 bg-vtk-surface p-6">
               <h2 className="text-lg font-semibold tracking-tight text-vtk-ink">
@@ -68,7 +82,7 @@ export default async function ItemDetailPage({ params }: { params: Promise<{ id:
               </h2>
               <ul className="mt-3 divide-y divide-vtk-navy/10">
                 {item.setContents.map((content) => (
-                  <li key={content.id} className="flex items-center justify-between gap-4 py-2 text-sm">
+                  <li key={content.label} className="flex items-center justify-between gap-4 py-2 text-sm">
                     <span className="text-vtk-ink">{content.label}</span>
                     <span className="text-vtk-muted">{content.quantity}×</span>
                   </li>
@@ -114,6 +128,46 @@ export default async function ItemDetailPage({ params }: { params: Promise<{ id:
               </dd>
             </div>
           </dl>
+          {team ? (
+            <div className="mt-4 rounded-[14px] border border-dashed border-vtk-navy/25 bg-vtk-paper/60 p-4">
+              <p className="text-xs font-semibold text-vtk-muted">Enkel voor Logistiek</p>
+              <dl className="mt-2 space-y-1.5 text-sm">
+                <div className="flex justify-between gap-4">
+                  <dt className="text-vtk-muted">Locatie</dt>
+                  <dd className="text-right font-medium text-vtk-ink">
+                    {[team.locationShelf, team.locationRack].filter(Boolean).join(' · ') ||
+                      'Niet ingevuld'}
+                  </dd>
+                </div>
+                <div className="flex justify-between gap-4">
+                  <dt className="text-vtk-muted">Staat</dt>
+                  <dd className="text-right font-medium text-vtk-ink">
+                    {team.units.length > 0
+                      ? `${team.units.filter((unit) => unit.condition !== 'KAPOT').length} bruikbaar van ${team.units.length}`
+                      : (ITEM_CONDITION_LABELS[team.condition] ?? team.condition)}
+                  </dd>
+                </div>
+                {/* Houdt dit item exemplaren bij, dan hoort hier per exemplaar te
+                    staan wat eraan scheelt; "Werkt" op de rij zegt niets over die
+                    ene kapotte box. */}
+                {team.units
+                  .filter((unit) => unit.condition !== 'WERKT')
+                  .map((unit) => (
+                    <div key={unit.label} className="flex justify-between gap-4">
+                      <dt className="text-vtk-muted">{unit.label}</dt>
+                      <dd className="text-right text-vtk-body">
+                        {ITEM_CONDITION_LABELS[unit.condition] ?? unit.condition}
+                        {unit.conditionNote ? ` · ${unit.conditionNote}` : ''}
+                      </dd>
+                    </div>
+                  ))}
+                {team.conditionNote && team.units.length === 0 ? (
+                  <div className="pt-1 text-vtk-body">{team.conditionNote}</div>
+                ) : null}
+              </dl>
+            </div>
+          ) : null}
+
           <p className="mt-4 text-sm leading-6 text-vtk-muted">
             {en
               ? 'Add this and other items to a request from the catalogue; availability is checked for your dates.'
