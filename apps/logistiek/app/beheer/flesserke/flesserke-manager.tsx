@@ -408,7 +408,101 @@ export function FlesserkeManager({
 
       <section>
         <h3 className="text-lg font-semibold tracking-tight text-vtk-ink">Voorraad ({shown.length})</h3>
-        <div className="mt-4 overflow-x-auto">
+
+        {/* Kaartjesweergave: zichtbaar op mobile, verborgen op md+ */}
+        <ul className="mt-4 grid gap-3 md:hidden">
+          {shown.map((item) => {
+            const available = item.quantity - item.reserved;
+            const soon = isExpiringSoon(item.expiryDate);
+            const categoryName = categoryNameOf(item.categoryId);
+            const editing = editingId === item.id;
+            return (
+              <Fragment key={item.id}>
+                <li className="rounded-[14px] border border-vtk-navy/10 bg-vtk-surface p-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="font-medium text-vtk-ink">
+                        <FlesserkeItemName name={item.name} colruytUrl={item.colruytUrl} />
+                        {item.brand ? <span className="text-vtk-muted"> · {item.brand}</span> : null}
+                      </p>
+                      <p className="mt-0.5 text-xs text-vtk-muted">
+                        {formatContentAmount(item.contentAmount, item.contentUnit)}
+                        {categoryName ? ` · ${categoryName}` : ''}
+                      </p>
+                      <dl className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
+                        <div>
+                          <dt className="text-vtk-muted">Vervalt</dt>
+                          <dd className={soon ? 'font-semibold text-red-700' : 'text-vtk-body'}>
+                            {item.expiryDate ? dateLabel(item.expiryDate) : '—'}
+                            {item.batches.length > 1 ? (
+                              <span className="block font-normal text-vtk-muted">{item.batches.length} ladingen</span>
+                            ) : null}
+                          </dd>
+                        </div>
+                        <div>
+                          <dt className="text-vtk-muted">Gereserveerd</dt>
+                          <dd className="text-vtk-body">{item.reserved}</dd>
+                        </div>
+                        <div>
+                          <dt className="text-vtk-muted">Beschikbaar</dt>
+                          <dd className={`font-semibold ${available <= 0 ? 'text-red-700' : 'text-vtk-ink'}`}>{available}</dd>
+                        </div>
+                        <div>
+                          <dt className="text-vtk-muted">Voorraad</dt>
+                          <dd className="font-semibold text-vtk-ink">
+                            {item.quantity}
+                            {item.batches.length === 0 ? (
+                              <span className="block font-normal text-vtk-muted">geen lading</span>
+                            ) : null}
+                          </dd>
+                        </div>
+                      </dl>
+                    </div>
+                  </div>
+                  <div className="mt-3 flex flex-wrap items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setEditingId(editing ? null : item.id)}
+                      className="rounded-full border border-vtk-navy/15 px-3 py-1.5 text-sm font-semibold text-vtk-ink transition hover:border-vtk-navy/40 hover:bg-vtk-paper"
+                      aria-expanded={editing}
+                    >
+                      {editing ? 'Sluiten' : 'Bewerken'}
+                    </button>
+                    <ConfirmActionButton
+                      label="Uit lijst"
+                      successMessage="Uit de lijst gehaald."
+                      action={setFlesserkeItemActiveAction.bind(null, item.id, false)}
+                      destructive
+                      dialogTitle="Uit de flesserke-lijst halen?"
+                      dialogDescription="Leden kunnen dit niet meer aanvragen; de historiek blijft bewaard."
+                    />
+                  </div>
+                  {editing ? (
+                    <div className="mt-4 border-t border-vtk-navy/10 pt-4">
+                      <p className="mb-4 text-sm font-semibold text-vtk-ink">Item aanpassen</p>
+                      <SaveForm
+                        action={saveFlesserkeItemAction}
+                        submitLabel="Wijzigingen opslaan"
+                        savingLabel="Opslaan..."
+                        savedMessage="Item opgeslagen."
+                        errorMessages={ITEM_ERRORS}
+                        className="grid gap-4"
+                      >
+                        <ItemFields item={item} categories={categories} />
+                      </SaveForm>
+                      <div className="mt-5 border-t border-vtk-navy/10 pt-4">
+                        <BatchEditor item={item} />
+                      </div>
+                    </div>
+                  ) : null}
+                </li>
+              </Fragment>
+            );
+          })}
+        </ul>
+
+        {/* Tabelweergave: verborgen op mobile, zichtbaar op md+ */}
+        <div className="mt-4 hidden overflow-x-auto md:block">
           <table className="w-full min-w-[720px] border-collapse text-sm">
             <thead>
               <tr className="border-b border-vtk-navy/10 text-left text-xs text-vtk-muted">
@@ -441,8 +535,6 @@ export function FlesserkeManager({
                       </td>
                       <td className="py-2 pr-3 text-vtk-muted">{categoryName}</td>
                       <td className={`py-2 pr-3 ${soon ? 'font-semibold text-red-700' : 'text-vtk-muted'}`}>
-                        {/* Bij meerdere ladingen is dit de eerstvolgende datum; het
-                            aantal erbij, anders lijkt de hele stapel te vervallen. */}
                         {item.expiryDate ? dateLabel(item.expiryDate) : '—'}
                         {multiBatch ? (
                           <span className="block text-[11px] font-normal text-vtk-muted">
@@ -454,14 +546,6 @@ export function FlesserkeManager({
                       <td className={`py-2 pr-3 font-semibold ${available <= 0 ? 'text-red-700' : 'text-vtk-ink'}`}>
                         {available}
                       </td>
-                      {/* Alleen lezen. De voorraad is de som van de ladingen en
-                          heeft dus maar één plek waar ze veranderd wordt: de
-                          ladingen zelf, onder "Bewerken". Hier stond ooit een
-                          invulveld dat bij één lading die lading aanpaste en bij
-                          nul ladingen er stil eentje aanmaakte, zonder
-                          vervaldatum; en het hield zijn eigen waarde bij, dus na
-                          een wijziging hieronder schreef het bij het verlaten
-                          van het veld het oude getal terug. */}
                       <td className="py-2 pr-3 font-semibold text-vtk-ink">
                         {item.quantity}
                         {item.batches.length === 0 ? (

@@ -341,30 +341,183 @@ export default async function BeheerVervoerPage() {
         {approved.length === 0 ? (
           <p className="mt-3 text-sm text-vtk-muted">Geen goedgekeurde ritten.</p>
         ) : (
-          /* position: relative, want een sr-only in een scroller zonder
-             gepositioneerde ouder trekt de pagina uit (zie CLAUDE.md). */
-          <div className="relative mt-4 overflow-x-auto">
-            <table className="w-full min-w-[860px] border-collapse text-sm">
-              <thead>
-                <tr className="border-b border-vtk-navy/10 text-left text-xs text-vtk-muted">
-                  <th className={headerClass}>Wanneer</th>
-                  <th className={headerClass}>Uren</th>
-                  <th className={headerClass}>Voertuig</th>
-                  <th className={headerClass}>Aanvrager</th>
-                  <th className={headerClass}>Chauffeur</th>
-                  <th className={headerClass}>Prijs</th>
-                  <th className={headerClass}>Betaald</th>
-                  <th className="py-2 pl-2"></th>
-                </tr>
-              </thead>
+          <>
+            {/* Kaartjesweergave: zichtbaar op mobile, verborgen op md+ */}
+            <ul className="mt-4 grid gap-3 md:hidden">
               {approved.map((booking) => {
                 const paid = paidOf(booking);
                 return (
+                  <li
+                    key={booking.id}
+                    className={`rounded-[16px] border bg-vtk-surface p-4 ${
+                      !booking.driver ? 'border-amber-300 bg-amber-50/30' : 'border-vtk-navy/10'
+                    }`}
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="font-medium text-vtk-ink">
+                          {booking.vehicle.nameNl}
+                          <span className="ml-2 text-sm font-normal text-vtk-muted">{requesterLabel(booking)}</span>
+                        </p>
+                        <p className="mt-0.5 text-sm text-vtk-muted">{booking.user.name}</p>
+                        <dl className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
+                          <div><dt className="text-vtk-muted">Wanneer</dt><dd className="text-vtk-body">{dateFormatter.format(booking.startAt)}</dd></div>
+                          <div><dt className="text-vtk-muted">Uren</dt><dd className="tabular-nums text-vtk-body">{hoursLabel(booking)}</dd></div>
+                          <div><dt className="text-vtk-muted">Chauffeur</dt><dd className={booking.driver ? 'text-vtk-body' : 'font-semibold text-vtk-ink'}>{booking.driver?.name ?? 'nog geen'}</dd></div>
+                          <div><dt className="text-vtk-muted">Prijs</dt><dd className="tabular-nums text-vtk-body">{formatPriceCents(booking.priceCents)}</dd></div>
+                          {booking.paymentMode ? (
+                            <div><dt className="text-vtk-muted">Betaald</dt><dd className="text-vtk-body">{paid ? 'ja' : 'nog niet'}</dd></div>
+                          ) : null}
+                        </dl>
+                      </div>
+                      <VanStatusBadge status={booking.status} />
+                    </div>
+                    <BookingDetails booking={booking}>
+                      <TransportControls
+                        bookingId={booking.id}
+                        vehicleId={booking.vehicleId}
+                        driverId={booking.driverId}
+                        driver={booking.driver}
+                        pricingMode={booking.pricingMode}
+                        paid={paid}
+                        drivers={drivers}
+                        vehicles={activeVehicleOptions}
+                      />
+                    </BookingDetails>
+                  </li>
+                );
+              })}
+            </ul>
+
+            {/* Tabelweergave: verborgen op mobile, zichtbaar op md+ */}
+            <div className="relative mt-4 hidden overflow-x-auto md:block">
+              <table className="w-full min-w-[860px] border-collapse text-sm">
+                <thead>
+                  <tr className="border-b border-vtk-navy/10 text-left text-xs text-vtk-muted">
+                    <th className={headerClass}>Wanneer</th>
+                    <th className={headerClass}>Uren</th>
+                    <th className={headerClass}>Voertuig</th>
+                    <th className={headerClass}>Aanvrager</th>
+                    <th className={headerClass}>Chauffeur</th>
+                    <th className={headerClass}>Prijs</th>
+                    <th className={headerClass}>Betaald</th>
+                    <th className="py-2 pl-2"></th>
+                  </tr>
+                </thead>
+                {approved.map((booking) => {
+                  const paid = paidOf(booking);
+                  return (
+                    <BookingRow
+                      key={booking.id}
+                      columns={7}
+                      label={`${booking.vehicle.nameNl}, ${requesterLabel(booking)}, ${dateFormatter.format(booking.startAt)}`}
+                      highlight={!booking.driver}
+                      summary={
+                        <>
+                          <td className="py-2 pr-3 text-vtk-ink">{dateFormatter.format(booking.startAt)}</td>
+                          <td className="py-2 pr-3 tabular-nums text-vtk-body">{hoursLabel(booking)}</td>
+                          <td className="py-2 pr-3 text-vtk-body">{booking.vehicle.nameNl}</td>
+                          <td className="py-2 pr-3 text-vtk-body">
+                            {requesterLabel(booking)}
+                            <span className="block text-xs text-vtk-muted">{booking.user.name}</span>
+                          </td>
+                          <td className="py-2 pr-3">
+                            {booking.driver ? (
+                              <span className="text-vtk-body">{booking.driver.name}</span>
+                            ) : (
+                              <span className="font-semibold text-vtk-ink">nog geen</span>
+                            )}
+                          </td>
+                          <td className="py-2 pr-3 tabular-nums text-vtk-body">
+                            {formatPriceCents(booking.priceCents)}
+                          </td>
+                          <td className="py-2 pr-3 text-vtk-body">
+                            {!booking.paymentMode ? '' : paid ? 'ja' : 'nog niet'}
+                          </td>
+                        </>
+                      }
+                      details={
+                        <BookingDetails booking={booking}>
+                          <TransportControls
+                            bookingId={booking.id}
+                            vehicleId={booking.vehicleId}
+                            driverId={booking.driverId}
+                            driver={booking.driver}
+                            pricingMode={booking.pricingMode}
+                            paid={paid}
+                            drivers={drivers}
+                            vehicles={activeVehicleOptions}
+                          />
+                        </BookingDetails>
+                      }
+                    />
+                  );
+                })}
+              </table>
+            </div>
+            {approved.some((booking) => !booking.driver) ? (
+              <p className="mt-2 text-xs text-vtk-muted">
+                Geel gemarkeerd: er is nog geen chauffeur toegewezen.
+              </p>
+            ) : null}
+          </>
+        )}
+      </section>
+
+      <section>
+        <h2 className="text-lg font-semibold tracking-tight text-vtk-ink">Historiek ({rest.length})</h2>
+        {rest.length === 0 ? (
+          <p className="mt-3 text-sm text-vtk-muted">Nog geen afgeronde of afgewezen ritten.</p>
+        ) : (
+          <>
+            {/* Kaartjesweergave: zichtbaar op mobile, verborgen op md+ */}
+            <ul className="mt-4 grid gap-3 md:hidden">
+              {rest.map((booking) => (
+                <li
+                  key={booking.id}
+                  className="rounded-[16px] border border-vtk-navy/10 bg-vtk-surface p-4"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="font-medium text-vtk-ink">
+                        {booking.vehicle.nameNl}
+                        <span className="ml-2 text-sm font-normal text-vtk-muted">{requesterLabel(booking)}</span>
+                      </p>
+                      <p className="mt-0.5 text-sm text-vtk-muted">{booking.user.name}</p>
+                      <dl className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
+                        <div><dt className="text-vtk-muted">Wanneer</dt><dd className="text-vtk-body">{dateFormatter.format(booking.startAt)}</dd></div>
+                        <div><dt className="text-vtk-muted">Uren</dt><dd className="tabular-nums text-vtk-body">{hoursLabel(booking)}</dd></div>
+                        {booking.driver ? <div><dt className="text-vtk-muted">Chauffeur</dt><dd className="text-vtk-body">{booking.driver.name}</dd></div> : null}
+                        <div><dt className="text-vtk-muted">Prijs</dt><dd className="tabular-nums text-vtk-body">{formatPriceCents(booking.priceCents)}</dd></div>
+                      </dl>
+                    </div>
+                    <VanStatusBadge status={booking.status} />
+                  </div>
+                  <BookingDetails booking={booking} />
+                </li>
+              ))}
+            </ul>
+
+            {/* Tabelweergave: verborgen op mobile, zichtbaar op md+ */}
+            <div className="relative mt-4 hidden overflow-x-auto md:block">
+              <table className="w-full min-w-[860px] border-collapse text-sm">
+                <thead>
+                  <tr className="border-b border-vtk-navy/10 text-left text-xs text-vtk-muted">
+                    <th className={headerClass}>Wanneer</th>
+                    <th className={headerClass}>Uren</th>
+                    <th className={headerClass}>Voertuig</th>
+                    <th className={headerClass}>Aanvrager</th>
+                    <th className={headerClass}>Chauffeur</th>
+                    <th className={headerClass}>Prijs</th>
+                    <th className={headerClass}>Status</th>
+                    <th className="py-2 pl-2"></th>
+                  </tr>
+                </thead>
+                {rest.map((booking) => (
                   <BookingRow
                     key={booking.id}
                     columns={7}
                     label={`${booking.vehicle.nameNl}, ${requesterLabel(booking)}, ${dateFormatter.format(booking.startAt)}`}
-                    highlight={!booking.driver}
                     summary={
                       <>
                         <td className="py-2 pr-3 text-vtk-ink">{dateFormatter.format(booking.startAt)}</td>
@@ -374,95 +527,21 @@ export default async function BeheerVervoerPage() {
                           {requesterLabel(booking)}
                           <span className="block text-xs text-vtk-muted">{booking.user.name}</span>
                         </td>
-                        <td className="py-2 pr-3">
-                          {booking.driver ? (
-                            <span className="text-vtk-body">{booking.driver.name}</span>
-                          ) : (
-                            <span className="font-semibold text-vtk-ink">nog geen</span>
-                          )}
-                        </td>
+                        <td className="py-2 pr-3 text-vtk-body">{booking.driver?.name ?? ''}</td>
                         <td className="py-2 pr-3 tabular-nums text-vtk-body">
                           {formatPriceCents(booking.priceCents)}
                         </td>
-                        <td className="py-2 pr-3 text-vtk-body">
-                          {!booking.paymentMode ? '' : paid ? 'ja' : 'nog niet'}
+                        <td className="py-2 pr-3">
+                          <VanStatusBadge status={booking.status} />
                         </td>
                       </>
                     }
-                    details={
-                      <BookingDetails booking={booking}>
-                        <TransportControls
-                          bookingId={booking.id}
-                          vehicleId={booking.vehicleId}
-                          driverId={booking.driverId}
-                          driver={booking.driver}
-                          pricingMode={booking.pricingMode}
-                          paid={paid}
-                          drivers={drivers}
-                          vehicles={activeVehicleOptions}
-                        />
-                      </BookingDetails>
-                    }
+                    details={<BookingDetails booking={booking} />}
                   />
-                );
-              })}
-            </table>
-          </div>
-        )}
-        {approved.some((booking) => !booking.driver) ? (
-          <p className="mt-2 text-xs text-vtk-muted">
-            Geel gemarkeerd: er is nog geen chauffeur toegewezen.
-          </p>
-        ) : null}
-      </section>
-
-      <section>
-        <h2 className="text-lg font-semibold tracking-tight text-vtk-ink">Historiek ({rest.length})</h2>
-        {rest.length === 0 ? (
-          <p className="mt-3 text-sm text-vtk-muted">Nog geen afgeronde of afgewezen ritten.</p>
-        ) : (
-          <div className="relative mt-4 overflow-x-auto">
-            <table className="w-full min-w-[860px] border-collapse text-sm">
-              <thead>
-                <tr className="border-b border-vtk-navy/10 text-left text-xs text-vtk-muted">
-                  <th className={headerClass}>Wanneer</th>
-                  <th className={headerClass}>Uren</th>
-                  <th className={headerClass}>Voertuig</th>
-                  <th className={headerClass}>Aanvrager</th>
-                  <th className={headerClass}>Chauffeur</th>
-                  <th className={headerClass}>Prijs</th>
-                  <th className={headerClass}>Status</th>
-                  <th className="py-2 pl-2"></th>
-                </tr>
-              </thead>
-              {rest.map((booking) => (
-                <BookingRow
-                  key={booking.id}
-                  columns={7}
-                  label={`${booking.vehicle.nameNl}, ${requesterLabel(booking)}, ${dateFormatter.format(booking.startAt)}`}
-                  summary={
-                    <>
-                      <td className="py-2 pr-3 text-vtk-ink">{dateFormatter.format(booking.startAt)}</td>
-                      <td className="py-2 pr-3 tabular-nums text-vtk-body">{hoursLabel(booking)}</td>
-                      <td className="py-2 pr-3 text-vtk-body">{booking.vehicle.nameNl}</td>
-                      <td className="py-2 pr-3 text-vtk-body">
-                        {requesterLabel(booking)}
-                        <span className="block text-xs text-vtk-muted">{booking.user.name}</span>
-                      </td>
-                      <td className="py-2 pr-3 text-vtk-body">{booking.driver?.name ?? ''}</td>
-                      <td className="py-2 pr-3 tabular-nums text-vtk-body">
-                        {formatPriceCents(booking.priceCents)}
-                      </td>
-                      <td className="py-2 pr-3">
-                        <VanStatusBadge status={booking.status} />
-                      </td>
-                    </>
-                  }
-                  details={<BookingDetails booking={booking} />}
-                />
-              ))}
-            </table>
-          </div>
+                ))}
+              </table>
+            </div>
+          </>
         )}
       </section>
     </div>

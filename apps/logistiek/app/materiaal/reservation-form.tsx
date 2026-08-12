@@ -395,16 +395,16 @@ export function ReservationForm({
           {!search.trim() && activeCategory === 'all' ? (
             <section aria-label={en ? 'Categories' : 'Categorieën'}>
               <h2 className="mb-3 text-lg font-semibold text-vtk-ink">{en ? 'Choose a category' : 'Kies een categorie'}</h2>
-              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+              <div className="grid grid-cols-2 gap-2 sm:gap-3 xl:grid-cols-3">
                 {catalog.map((category) => (
                   <button
                     key={category.id ?? 'overig'}
                     type="button"
                     onClick={() => setActiveCategory(category.id ?? 'overig')}
-                    className="min-h-24 rounded-[16px] border border-vtk-navy/10 bg-vtk-surface p-4 text-left transition hover:border-vtk-navy/35"
+                    className="rounded-[14px] border border-vtk-navy/10 bg-vtk-surface p-3 text-left transition hover:border-vtk-navy/35 sm:p-4"
                   >
                     <span className="block text-sm font-semibold text-vtk-ink">{category.name}</span>
-                    <span className="mt-1 block text-xs text-vtk-muted">{category.items.length} {en ? 'items' : 'items'}</span>
+                    <span className="mt-0.5 block text-xs text-vtk-muted">{category.items.length} {en ? 'items' : 'items'}</span>
                   </button>
                 ))}
               </div>

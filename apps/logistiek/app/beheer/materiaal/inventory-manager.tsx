@@ -347,116 +347,210 @@ function ItemTable({
   archived?: boolean;
 }) {
   return (
-    <div className="overflow-x-auto">
-      <table className="w-full min-w-[760px] border-collapse text-sm">
-        <thead>
-          <tr className="border-b border-vtk-navy/10 text-left text-xs text-vtk-muted">
-            <SortHeader label="Item" sortKey="name" activeKey={sort.key} dir={sort.dir} onSort={sort.toggle} />
-            <SortHeader label="Categorie" sortKey="category" activeKey={sort.key} dir={sort.dir} onSort={sort.toggle} />
-            <SortHeader label="Staat" sortKey="condition" activeKey={sort.key} dir={sort.dir} onSort={sort.toggle} />
-            <th className="py-2 pr-3 font-medium">Locatie</th>
-            <th className="py-2 pr-3 font-medium">Voorraad</th>
-            <th className="py-2 font-medium"></th>
-          </tr>
-        </thead>
-        <tbody>
-          {items.map((item) => {
-            const editing = editingId === item.id;
-            const location = [item.locationShelf, item.locationRack].filter(Boolean).join(' · ') || '—';
-            const broken = item.units.filter((unit) => unit.condition === 'KAPOT').length;
-            return (
-              <Fragment key={item.id}>
-                <tr className={`border-b border-vtk-navy/5 align-top ${archived ? 'opacity-70' : ''}`}>
-                  <td className="py-2 pr-3 text-vtk-ink">
-                    <span className="font-medium">{item.name}</span>
-                    {item.isSet ? (
-                      <span className="ml-2 rounded-full bg-vtk-yellow/25 px-2 py-0.5 text-[11px] font-semibold text-vtk-ink">Set</span>
-                    ) : null}
-                    {archived ? (
-                      <span className="ml-2 rounded-full bg-vtk-navy/10 px-2 py-0.5 text-[11px] font-semibold text-vtk-muted">
-                        uit de catalogus
-                      </span>
-                    ) : null}
-                    {item.description ? <p className="text-xs text-vtk-muted">{item.description}</p> : null}
-                    {/* Ook hier de inhoud: bij het klaarzetten wil je zien wat er
-                        in de set hoort te zitten zonder het item te openen. */}
-                    <SetContents contents={item.setContents} locale="nl" />
-                  </td>
-                  <td className="py-2 pr-3 text-vtk-muted">{categoryName(item.categoryId)}</td>
-                  {/* Bij exemplaren zegt de staat van de rij niets: dan telt de
-                      staat per exemplaar, en is het aantal kapotte stuks het
-                      nieuws. */}
-                  {item.units.length > 0 ? (
-                    <td className={`py-2 pr-3 ${broken > 0 ? 'font-semibold text-red-700' : 'text-vtk-muted'}`}>
-                      {broken > 0 ? `${broken} kapot van ${item.units.length}` : 'Per exemplaar'}
-                    </td>
-                  ) : (
-                    <td className={`py-2 pr-3 ${CONDITION_TONE[item.condition] ?? 'text-vtk-muted'}`}>
-                      {CONDITION_LABEL[item.condition] ?? item.condition}
-                    </td>
-                  )}
-                  <td className="py-2 pr-3 text-vtk-muted">{location}</td>
-                  <td className="py-2 pr-3">
-                    <QuantityQuickEdit
-                      itemId={item.id}
-                      quantity={item.quantity}
-                      locked={item.units.length > 0}
-                    />
-                  </td>
-                  <td className="py-2">
-                    <div className="flex items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={() => onToggleEdit(editing ? null : item.id)}
-                        className="rounded-full border border-vtk-navy/15 px-3 py-1.5 text-sm font-semibold text-vtk-ink transition hover:border-vtk-navy/40 hover:bg-vtk-paper"
-                        aria-expanded={editing}
-                      >
-                        {editing ? 'Sluiten' : 'Bewerken'}
-                      </button>
+    <>
+      {/* Kaartjesweergave: zichtbaar op mobile, verborgen op md+ */}
+      <ul className="grid gap-3 md:hidden">
+        {items.map((item) => {
+          const editing = editingId === item.id;
+          const location = [item.locationShelf, item.locationRack].filter(Boolean).join(' · ') || '—';
+          const broken = item.units.filter((unit) => unit.condition === 'KAPOT').length;
+          const conditionLabel =
+            item.units.length > 0
+              ? broken > 0
+                ? `${broken} kapot van ${item.units.length}`
+                : 'Per exemplaar'
+              : (CONDITION_LABEL[item.condition] ?? item.condition);
+          const conditionClass =
+            item.units.length > 0
+              ? broken > 0
+                ? 'font-semibold text-red-700'
+                : 'text-vtk-muted'
+              : (CONDITION_TONE[item.condition] ?? 'text-vtk-muted');
+          return (
+            <Fragment key={item.id}>
+              <li className={`rounded-[14px] border border-vtk-navy/10 bg-vtk-surface p-4 ${archived ? 'opacity-70' : ''}`}>
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="font-medium text-vtk-ink">
+                      {item.name}
+                      {item.isSet ? (
+                        <span className="ml-2 rounded-full bg-vtk-yellow/25 px-2 py-0.5 text-[11px] font-semibold text-vtk-ink">Set</span>
+                      ) : null}
                       {archived ? (
-                        <ConfirmActionButton
-                          label="Terugzetten"
-                          successMessage="Item terug in de catalogus gezet."
-                          action={activateItemAction.bind(null, item.id)}
-                          confirm={false}
-                        />
-                      ) : (
-                        <ConfirmActionButton
-                          label="Uit catalogus"
-                          successMessage="Item uit de catalogus gehaald."
-                          action={deactivateItemAction.bind(null, item.id)}
-                          destructive
-                          dialogTitle="Item uit de catalogus halen?"
-                          dialogDescription="Leden kunnen dit item niet meer aanvragen. Bestaande reservaties en de historiek blijven bewaard; je kan het item later terugzetten."
-                        />
-                      )}
-                    </div>
-                  </td>
-                </tr>
+                        <span className="ml-2 rounded-full bg-vtk-navy/10 px-2 py-0.5 text-[11px] font-semibold text-vtk-muted">uit de catalogus</span>
+                      ) : null}
+                    </p>
+                    {item.description ? <p className="mt-0.5 text-xs text-vtk-muted">{item.description}</p> : null}
+                    <SetContents contents={item.setContents} locale="nl" />
+                    <dl className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
+                      <div><dt className="text-vtk-muted">Categorie</dt><dd className="text-vtk-body">{categoryName(item.categoryId)}</dd></div>
+                      <div><dt className="text-vtk-muted">Staat</dt><dd className={conditionClass}>{conditionLabel}</dd></div>
+                      <div><dt className="text-vtk-muted">Locatie</dt><dd className="text-vtk-body">{location}</dd></div>
+                      <div>
+                        <dt className="text-vtk-muted">Voorraad</dt>
+                        <dd className="mt-0.5">
+                          <QuantityQuickEdit itemId={item.id} quantity={item.quantity} locked={item.units.length > 0} />
+                        </dd>
+                      </div>
+                    </dl>
+                  </div>
+                </div>
+                <div className="mt-3 flex flex-wrap items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => onToggleEdit(editing ? null : item.id)}
+                    className="rounded-full border border-vtk-navy/15 px-3 py-1.5 text-sm font-semibold text-vtk-ink transition hover:border-vtk-navy/40 hover:bg-vtk-paper"
+                    aria-expanded={editing}
+                  >
+                    {editing ? 'Sluiten' : 'Bewerken'}
+                  </button>
+                  {archived ? (
+                    <ConfirmActionButton
+                      label="Terugzetten"
+                      successMessage="Item terug in de catalogus gezet."
+                      action={activateItemAction.bind(null, item.id)}
+                      confirm={false}
+                    />
+                  ) : (
+                    <ConfirmActionButton
+                      label="Uit catalogus"
+                      successMessage="Item uit de catalogus gehaald."
+                      action={deactivateItemAction.bind(null, item.id)}
+                      destructive
+                      dialogTitle="Item uit de catalogus halen?"
+                      dialogDescription="Leden kunnen dit item niet meer aanvragen. Bestaande reservaties en de historiek blijven bewaard; je kan het item later terugzetten."
+                    />
+                  )}
+                </div>
                 {editing ? (
-                  <tr>
-                    <td colSpan={6} className="border-b border-vtk-navy/10 bg-vtk-paper/55 px-4 py-5">
-                      <p className="mb-4 text-sm font-semibold text-vtk-ink">Item aanpassen</p>
-                      <SaveForm
-                        action={saveItemAction}
-                        submitLabel="Wijzigingen opslaan"
-                        savingLabel="Opslaan..."
-                        savedMessage="Item opgeslagen."
-                        errorMessages={ITEM_ERRORS}
-                        onSuccess={() => onToggleEdit(null)}
-                        className="grid gap-4"
-                      >
-                        <ItemFields item={item} categories={categories} items={allItems} />
-                      </SaveForm>
+                  <div className="mt-4 border-t border-vtk-navy/10 pt-4">
+                    <p className="mb-4 text-sm font-semibold text-vtk-ink">Item aanpassen</p>
+                    <SaveForm
+                      action={saveItemAction}
+                      submitLabel="Wijzigingen opslaan"
+                      savingLabel="Opslaan..."
+                      savedMessage="Item opgeslagen."
+                      errorMessages={ITEM_ERRORS}
+                      onSuccess={() => onToggleEdit(null)}
+                      className="grid gap-4"
+                    >
+                      <ItemFields item={item} categories={categories} items={allItems} />
+                    </SaveForm>
+                  </div>
+                ) : null}
+              </li>
+            </Fragment>
+          );
+        })}
+      </ul>
+
+      {/* Tabelweergave: verborgen op mobile, zichtbaar op md+ */}
+      <div className="hidden overflow-x-auto md:block">
+        <table className="w-full min-w-[760px] border-collapse text-sm">
+          <thead>
+            <tr className="border-b border-vtk-navy/10 text-left text-xs text-vtk-muted">
+              <SortHeader label="Item" sortKey="name" activeKey={sort.key} dir={sort.dir} onSort={sort.toggle} />
+              <SortHeader label="Categorie" sortKey="category" activeKey={sort.key} dir={sort.dir} onSort={sort.toggle} />
+              <SortHeader label="Staat" sortKey="condition" activeKey={sort.key} dir={sort.dir} onSort={sort.toggle} />
+              <th className="py-2 pr-3 font-medium">Locatie</th>
+              <th className="py-2 pr-3 font-medium">Voorraad</th>
+              <th className="py-2 font-medium"></th>
+            </tr>
+          </thead>
+          <tbody>
+            {items.map((item) => {
+              const editing = editingId === item.id;
+              const location = [item.locationShelf, item.locationRack].filter(Boolean).join(' · ') || '—';
+              const broken = item.units.filter((unit) => unit.condition === 'KAPOT').length;
+              return (
+                <Fragment key={item.id}>
+                  <tr className={`border-b border-vtk-navy/5 align-top ${archived ? 'opacity-70' : ''}`}>
+                    <td className="py-2 pr-3 text-vtk-ink">
+                      <span className="font-medium">{item.name}</span>
+                      {item.isSet ? (
+                        <span className="ml-2 rounded-full bg-vtk-yellow/25 px-2 py-0.5 text-[11px] font-semibold text-vtk-ink">Set</span>
+                      ) : null}
+                      {archived ? (
+                        <span className="ml-2 rounded-full bg-vtk-navy/10 px-2 py-0.5 text-[11px] font-semibold text-vtk-muted">
+                          uit de catalogus
+                        </span>
+                      ) : null}
+                      {item.description ? <p className="text-xs text-vtk-muted">{item.description}</p> : null}
+                      <SetContents contents={item.setContents} locale="nl" />
+                    </td>
+                    <td className="py-2 pr-3 text-vtk-muted">{categoryName(item.categoryId)}</td>
+                    {item.units.length > 0 ? (
+                      <td className={`py-2 pr-3 ${broken > 0 ? 'font-semibold text-red-700' : 'text-vtk-muted'}`}>
+                        {broken > 0 ? `${broken} kapot van ${item.units.length}` : 'Per exemplaar'}
+                      </td>
+                    ) : (
+                      <td className={`py-2 pr-3 ${CONDITION_TONE[item.condition] ?? 'text-vtk-muted'}`}>
+                        {CONDITION_LABEL[item.condition] ?? item.condition}
+                      </td>
+                    )}
+                    <td className="py-2 pr-3 text-vtk-muted">{location}</td>
+                    <td className="py-2 pr-3">
+                      <QuantityQuickEdit
+                        itemId={item.id}
+                        quantity={item.quantity}
+                        locked={item.units.length > 0}
+                      />
+                    </td>
+                    <td className="py-2">
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => onToggleEdit(editing ? null : item.id)}
+                          className="rounded-full border border-vtk-navy/15 px-3 py-1.5 text-sm font-semibold text-vtk-ink transition hover:border-vtk-navy/40 hover:bg-vtk-paper"
+                          aria-expanded={editing}
+                        >
+                          {editing ? 'Sluiten' : 'Bewerken'}
+                        </button>
+                        {archived ? (
+                          <ConfirmActionButton
+                            label="Terugzetten"
+                            successMessage="Item terug in de catalogus gezet."
+                            action={activateItemAction.bind(null, item.id)}
+                            confirm={false}
+                          />
+                        ) : (
+                          <ConfirmActionButton
+                            label="Uit catalogus"
+                            successMessage="Item uit de catalogus gehaald."
+                            action={deactivateItemAction.bind(null, item.id)}
+                            destructive
+                            dialogTitle="Item uit de catalogus halen?"
+                            dialogDescription="Leden kunnen dit item niet meer aanvragen. Bestaande reservaties en de historiek blijven bewaard; je kan het item later terugzetten."
+                          />
+                        )}
+                      </div>
                     </td>
                   </tr>
-                ) : null}
-              </Fragment>
-            );
-          })}
-        </tbody>
-      </table>
-    </div>
+                  {editing ? (
+                    <tr>
+                      <td colSpan={6} className="border-b border-vtk-navy/10 bg-vtk-paper/55 px-4 py-5">
+                        <p className="mb-4 text-sm font-semibold text-vtk-ink">Item aanpassen</p>
+                        <SaveForm
+                          action={saveItemAction}
+                          submitLabel="Wijzigingen opslaan"
+                          savingLabel="Opslaan..."
+                          savedMessage="Item opgeslagen."
+                          errorMessages={ITEM_ERRORS}
+                          onSuccess={() => onToggleEdit(null)}
+                          className="grid gap-4"
+                        >
+                          <ItemFields item={item} categories={categories} items={allItems} />
+                        </SaveForm>
+                      </td>
+                    </tr>
+                  ) : null}
+                </Fragment>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </>
   );
 }
 
