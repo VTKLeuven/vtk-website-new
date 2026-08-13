@@ -36,8 +36,20 @@ export async function GET(request: Request) {
   const like = { contains: q, mode: "insensitive" } as const;
   const pages = await prisma.page.findMany({
     where: {
-      OR: [{ titleNl: like }, { titleEn: like }, { slug: like }],
-      ...(exclude ? { NOT: { headerTabId: exclude } } : {}),
+      AND: [
+        { OR: [{ titleNl: like }, { titleEn: like }, { slug: like }] },
+        // De uitsluiting moet expliciet "of helemaal geen categorie" bevatten.
+        // `NOT: { headerTabId: exclude }` wordt in SQL `headerTabId <> $1`, en
+        // daar valt NULL buiten (NULL <> 'x' is NULL, niet true). Precies de
+        // pagina's die je hier zoekt zijn nog niet gekoppeld: een nieuwe pagina
+        // start zonder categorie, en de Litus-import zette de meeste pagina's
+        // los. Zonder deze OR verschijnen die nooit in de picker en is een
+        // pagina aan een categorie hangen onmogelijk. De regel "niet gekoppeld"
+        // in de resultatenlijst was dus onbereikbaar.
+        ...(exclude
+          ? [{ OR: [{ headerTabId: null }, { headerTabId: { not: exclude } }] }]
+          : []),
+      ],
     },
     orderBy: { titleNl: "asc" },
     take: 20,
