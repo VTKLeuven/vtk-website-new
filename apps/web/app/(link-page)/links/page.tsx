@@ -27,6 +27,15 @@ const loadConfig = cache(async () => {
   }
 });
 
+/** Het adres onderaan de plaat; komt uit dezelfde bron als de canonical URL. */
+function linkPageHost(): string {
+  try {
+    return new URL(siteUrl()).host;
+  } catch {
+    return "vtk.be";
+  }
+}
+
 export async function generateMetadata(): Promise<Metadata> {
   const config = await loadConfig();
   const description = truncateDescription(config.description || DEFAULT_LINK_PAGE_CONFIG.description);
@@ -66,40 +75,46 @@ export default async function LinksPage() {
       <section className="vtk-link-page-shell" aria-labelledby="link-page-title">
         <ShareButton title={config.title} />
 
-        <div className="vtk-link-page-profile">
-          <Image
-            src="/VTK.png"
-            alt="VTK-schild"
-            width={660}
-            height={777}
-            sizes="96px"
-            preload
-            className="vtk-link-page-logo"
-          />
-          <h1 id="link-page-title">{config.title}</h1>
-          {config.description ? <p>{config.description}</p> : null}
-        </div>
+        <div className="vtk-link-page-head">
+          <div className="vtk-link-page-profile">
+            <Image
+              src="/vtk-logo.png"
+              // De titel eronder noemt de kring al; een tweede keer "VTK" laten
+              // voorlezen voegt niets toe.
+              alt=""
+              width={1152}
+              height={650}
+              // Het merkteken staat op 58px hoog, dus zo'n 103px breed. Zonder
+              // `sizes` haalt de browser het volledige bestand van 1152px op.
+              sizes="120px"
+              preload
+              className="vtk-link-page-logo"
+            />
+            <h1 id="link-page-title">{config.title}</h1>
+            {config.description ? <p>{config.description}</p> : null}
+          </div>
 
-        {socials.length > 0 ? (
-          <nav className="vtk-link-page-socials" aria-label="Sociale media en contact">
-            {socials.map((platform) => {
-              const href = socialHref(platform, config.socials[platform]);
-              const external = platform !== "email";
-              return (
-                <a
-                  key={platform}
-                  href={href}
-                  aria-label={SOCIAL_LABELS[platform]}
-                  title={SOCIAL_LABELS[platform]}
-                  target={external ? "_blank" : undefined}
-                  rel={external ? "noopener noreferrer" : undefined}
-                >
-                  <SocialIcon platform={platform} />
-                </a>
-              );
-            })}
-          </nav>
-        ) : null}
+          {socials.length > 0 ? (
+            <nav className="vtk-link-page-socials" aria-label="Sociale media en contact">
+              {socials.map((platform) => {
+                const href = socialHref(platform, config.socials[platform]);
+                const external = platform !== "email";
+                return (
+                  <a
+                    key={platform}
+                    href={href}
+                    aria-label={SOCIAL_LABELS[platform]}
+                    title={SOCIAL_LABELS[platform]}
+                    target={external ? "_blank" : undefined}
+                    rel={external ? "noopener noreferrer" : undefined}
+                  >
+                    <SocialIcon platform={platform} />
+                  </a>
+                );
+              })}
+            </nav>
+          ) : null}
+        </div>
 
         {links.length > 0 ? (
           <ul className="vtk-link-page-links">
@@ -120,6 +135,8 @@ export default async function LinksPage() {
             })}
           </ul>
         ) : null}
+
+        <p className="vtk-link-page-foot">{linkPageHost()}/links</p>
       </section>
     </main>
   );
