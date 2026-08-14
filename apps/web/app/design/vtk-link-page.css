@@ -2,7 +2,13 @@
    patroon van de huisstijl erop, een gele scheidingslijn onder de kop en platte
    witte linkkaarten. Bewust geen verloop: de huisstijl kent er geen, en het
    patroon is enkel leesbaar op een effen ondergrond. De kleuren komen uit
-   vtk-base.css; hier staan geen eigen hexes. */
+   vtk-base.css; hier staan geen eigen hexes.
+
+   Deze opmaak draait op twee plaatsen: de publieke pagina en het live voorbeeld
+   in /admin/linkpagina. Vandaar klassen in plaats van elementselectors (het
+   voorbeeld toont geen echte links en geen tweede h1) en container queries in
+   plaats van media queries (het voorbeeld staat in een kolom van ~320px op een
+   breed scherm en moet dus de telefoonvariant tonen). */
 
 .vtk-link-page,
 .vtk-link-page * {
@@ -11,6 +17,7 @@
 
 .vtk-link-page {
   position: relative;
+  container-type: inline-size;
   isolation: isolate;
   display: flex;
   flex: 1 0 auto;
@@ -65,8 +72,8 @@
 }
 
 .vtk-link-page-share:focus-visible,
-.vtk-link-page-socials a:focus-visible,
-.vtk-link-page-links a:focus-visible {
+.vtk-link-page-social:focus-visible,
+.vtk-link-page-link:focus-visible {
   outline: 3px solid var(--yellow);
   outline-offset: 3px;
 }
@@ -106,19 +113,19 @@
   display: block;
   width: auto;
   height: 54px;
-  max-width: min(240px, 62vw);
+  max-width: min(240px, 62cqw);
   object-fit: contain;
 }
 
-.vtk-link-page-profile h1 {
+.vtk-link-page-title {
   margin: 20px 0 0;
-  font-size: clamp(1.75rem, 8vw, 2.15rem);
+  font-size: clamp(1.75rem, 8cqw, 2.15rem);
   font-weight: 700;
   line-height: 1.05;
   letter-spacing: -0.035em;
 }
 
-.vtk-link-page-profile p {
+.vtk-link-page-tagline {
   max-width: 42ch;
   margin: 12px 0 0;
   color: var(--on-dark-muted);
@@ -135,7 +142,7 @@
   margin-top: 25px;
 }
 
-.vtk-link-page-socials a {
+.vtk-link-page-social {
   display: grid;
   width: 44px;
   height: 44px;
@@ -147,13 +154,13 @@
   transition: color 160ms ease, background 160ms ease, transform 160ms ease;
 }
 
-.vtk-link-page-socials a:hover {
+.vtk-link-page-social:hover {
   color: var(--ink);
   background: var(--yellow);
   transform: translateY(-2px);
 }
 
-.vtk-link-page-socials svg {
+.vtk-link-page-social svg {
   width: 21px;
   height: 21px;
 }
@@ -167,7 +174,7 @@
   list-style: none;
 }
 
-.vtk-link-page-links a {
+.vtk-link-page-link {
   display: flex;
   align-items: center;
   gap: 12px;
@@ -181,7 +188,7 @@
   transition: border-color 160ms ease, transform 160ms ease;
 }
 
-.vtk-link-page-links a::before {
+.vtk-link-page-link::before {
   flex: none;
   width: 6px;
   height: 6px;
@@ -190,12 +197,12 @@
   background: var(--yellow);
 }
 
-.vtk-link-page-links a:hover {
+.vtk-link-page-link:hover {
   border-color: var(--yellow);
   transform: translateY(-2px);
 }
 
-.vtk-link-page-links span {
+.vtk-link-page-link-label {
   flex: 1;
   min-width: 0;
   overflow: hidden;
@@ -205,7 +212,7 @@
   text-overflow: ellipsis;
 }
 
-.vtk-link-page-links svg {
+.vtk-link-page-link svg {
   width: 16px;
   height: 16px;
   flex: none;
@@ -223,7 +230,15 @@
   opacity: 0.7;
 }
 
-@media (min-width: 640px) {
+/* Het live voorbeeld in /admin/linkpagina toont deze opmaak in een
+   telefoonkader. Daar mag de plaat niet de volledige schermhoogte claimen, en
+   is niets aanklikbaar: het voorbeeld toont de knoppen, het opent ze niet. */
+.vtk-link-page-preview {
+  min-height: 560px;
+  pointer-events: none;
+}
+
+@container (min-width: 640px) {
   .vtk-link-page-pattern {
     background-position: calc(50% + 260px) -90px;
     background-size: 620px 620px;
@@ -243,7 +258,7 @@
     height: 58px;
   }
 
-  .vtk-link-page-links a {
+  .vtk-link-page-link {
     min-height: 66px;
     border-radius: 16px;
   }
@@ -251,8 +266,8 @@
 
 @media (prefers-reduced-motion: reduce) {
   .vtk-link-page-share,
-  .vtk-link-page-socials a,
-  .vtk-link-page-links a {
+  .vtk-link-page-social,
+  .vtk-link-page-link {
     transition: none;
   }
 }

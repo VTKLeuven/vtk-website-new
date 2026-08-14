@@ -90,8 +90,12 @@ export default async function LinksPage() {
               preload
               className="vtk-link-page-logo"
             />
-            <h1 id="link-page-title">{config.title}</h1>
-            {config.description ? <p>{config.description}</p> : null}
+            <h1 id="link-page-title" className="vtk-link-page-title">
+              {config.title}
+            </h1>
+            {config.description ? (
+              <p className="vtk-link-page-tagline">{config.description}</p>
+            ) : null}
           </div>
 
           {socials.length > 0 ? (
@@ -103,6 +107,7 @@ export default async function LinksPage() {
                   <a
                     key={platform}
                     href={href}
+                    className="vtk-link-page-social"
                     aria-label={SOCIAL_LABELS[platform]}
                     title={SOCIAL_LABELS[platform]}
                     target={external ? "_blank" : undefined}
@@ -124,10 +129,11 @@ export default async function LinksPage() {
                 <li key={link.id}>
                   <a
                     href={link.url}
+                    className="vtk-link-page-link"
                     target={external ? "_blank" : undefined}
                     rel={external ? "noopener noreferrer" : undefined}
                   >
-                    <span>{link.title}</span>
+                    <span className="vtk-link-page-link-label">{link.title}</span>
                     <ExternalLink aria-hidden="true" />
                   </a>
                 </li>

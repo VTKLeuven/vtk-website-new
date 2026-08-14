@@ -2,12 +2,13 @@
 
 import Image from "next/image";
 import { useState } from "react";
-import { ArrowDown, ArrowUp, ExternalLink, Plus, Trash2 } from "lucide-react";
+import { ArrowDown, ArrowUp, ExternalLink, Plus, Share2, Trash2 } from "lucide-react";
 import { Card, Input, Label, Textarea } from "@vtk/ui";
 import type { Locale } from "@vtk/i18n";
 import { SaveForm } from "@/components/ui/SaveForm";
 import { SocialIcon } from "@/components/link-page/SocialIcon";
 import { saveLinkPageAction } from "@/app/actions/link-page";
+import "@/app/design/vtk-link-page.css";
 import {
   SOCIAL_LABELS,
   SOCIAL_PLATFORMS,
@@ -26,43 +27,71 @@ function newLink(): LinkPageLink {
   };
 }
 
+/**
+ * Het voorbeeld gebruikt bewust de klassen van de publieke pagina
+ * (`vtk-link-page.css`) in plaats van een eigen nabouw in Tailwind: die nabouw
+ * liep achter zodra het ontwerp veranderde, en dat is precies wat een "live
+ * voorbeeld" niet mag doen. De opmaak schaalt mee met de breedte van deze kolom
+ * (container query), dus dit toont de telefoonvariant.
+ */
 function AdminPreview({ config, nl }: { config: LinkPageConfig; nl: boolean }) {
   const socials = SOCIAL_PLATFORMS.filter((platform) => config.socials[platform].trim());
+  const links = config.links.filter((link) => link.enabled && link.title.trim());
 
   return (
     <div className="sticky top-6 hidden xl:block">
       <p className="mb-2 text-xs font-semibold uppercase tracking-[0.08em] text-[#5c667f]">
         {nl ? "Live voorbeeld" : "Live preview"}
       </p>
-      <div className="overflow-hidden rounded-[32px] border-[7px] border-[#0a0f1f] bg-[#0e1a36] shadow-2xl">
-        <div className="relative min-h-[620px] overflow-hidden px-5 pb-8 pt-10 text-center text-white">
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_15%_0%,rgba(255,210,63,0.3),transparent_35%),radial-gradient(circle_at_85%_70%,rgba(65,82,130,0.55),transparent_45%)]" />
-          <div className="absolute inset-0 bg-[url('/technisch-pattern.svg')] bg-[length:360px_360px] opacity-[0.07]" />
-          <div className="relative">
-            <Image src="/VTK.png" alt="VTK" width={660} height={777} sizes="72px" className="mx-auto h-auto w-[72px]" />
-            <h2 className="mt-4 text-xl font-semibold tracking-tight">{config.title || "VTK Leuven"}</h2>
-            {config.description ? (
-              <p className="mx-auto mt-2 max-w-[28ch] text-xs leading-5 text-white/70">
-                {config.description}
-              </p>
-            ) : null}
-            {socials.length > 0 ? (
-              <div className="mt-5 flex flex-wrap justify-center gap-2">
-                {socials.map((platform) => (
-                  <span key={platform} className="grid size-8 place-items-center rounded-full bg-white/10 text-white">
-                    <SocialIcon platform={platform} className="size-4" />
-                  </span>
-                ))}
+      <div className="overflow-hidden rounded-[32px] border-[7px] border-[#0a0f1f] shadow-2xl">
+        <div className="vtk-link-page vtk-link-page-preview">
+          <div className="vtk-link-page-pattern" aria-hidden="true" />
+          <div className="vtk-link-page-shell">
+            <span className="vtk-link-page-share" aria-hidden="true">
+              <Share2 />
+            </span>
+
+            <div className="vtk-link-page-head">
+              <div className="vtk-link-page-profile">
+                <Image
+                  src="/vtk-logo.png"
+                  alt=""
+                  width={1152}
+                  height={650}
+                  sizes="120px"
+                  className="vtk-link-page-logo"
+                />
+                <div className="vtk-link-page-title">{config.title || "VTK Leuven"}</div>
+                {config.description ? (
+                  <p className="vtk-link-page-tagline">{config.description}</p>
+                ) : null}
               </div>
-            ) : null}
-            <div className="mt-7 space-y-2.5 text-left">
-              {config.links.filter((link) => link.enabled && link.title).map((link) => (
-                <div key={link.id} className="flex min-h-12 items-center justify-between rounded-xl bg-white px-4 text-sm font-semibold text-[#0a0f1f] shadow-lg">
-                  <span className="truncate">{link.title}</span>
-                  <ExternalLink className="size-3.5 shrink-0 opacity-45" aria-hidden="true" />
+
+              {socials.length > 0 ? (
+                <div className="vtk-link-page-socials">
+                  {socials.map((platform) => (
+                    <span key={platform} className="vtk-link-page-social">
+                      <SocialIcon platform={platform} />
+                    </span>
+                  ))}
                 </div>
-              ))}
+              ) : null}
             </div>
+
+            {links.length > 0 ? (
+              <ul className="vtk-link-page-links">
+                {links.map((link) => (
+                  <li key={link.id}>
+                    <span className="vtk-link-page-link">
+                      <span className="vtk-link-page-link-label">{link.title}</span>
+                      <ExternalLink aria-hidden="true" />
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            ) : null}
+
+            <p className="vtk-link-page-foot">vtk.be/links</p>
           </div>
         </div>
       </div>
@@ -126,8 +155,8 @@ export function LinkPageManager({
           <h2 className="font-semibold">{nl ? "Profiel" : "Profile"}</h2>
           <p className="mb-5 mt-1 text-sm text-[#5c667f]">
             {nl
-              ? "Het VTK-schild wordt automatisch boven deze tekst getoond."
-              : "The VTK shield is displayed above this text automatically."}
+              ? "Het VTK-logo staat automatisch boven deze tekst."
+              : "The VTK logo is shown above this text automatically."}
           </p>
           <div className="space-y-4">
             <div>
