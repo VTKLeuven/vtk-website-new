@@ -368,8 +368,8 @@ function QrModal({
 
         <p className="mt-4 text-sm leading-6 text-zinc-600">
           {nl
-            ? "PNG van 1200 × 1200 px met afgeronde VTK-blauwe vormgeving en het VTK-schild. Test voor drukwerk altijd één proefscan op het uiteindelijke formaat."
-            : "1200 × 1200 px PNG with rounded VTK blue styling and the VTK shield. Always test-scan one proof at its final print size."}
+            ? "PNG van 1200 × 1200 px met afgeronde VTK-blauwe vormgeving en het VTK-logo. Test voor drukwerk altijd één proefscan op het uiteindelijke formaat."
+            : "1200 × 1200 px PNG with rounded VTK blue styling and the VTK logo. Always test-scan one proof at its final print size."}
         </p>
 
         {inactive ? (

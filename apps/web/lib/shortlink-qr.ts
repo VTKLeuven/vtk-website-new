@@ -6,8 +6,10 @@ import QRCode from "qrcode";
 import sharp from "sharp";
 
 const OUTPUT_SIZE = 1200;
-const QR_EXTENT = 1000;
-const QUIET_ZONE_MODULES = 4;
+const FRAME_OUTER_INSET = 20;
+const FRAME_INNER_INSET = 42;
+const QR_EXTENT = OUTPUT_SIZE - FRAME_INNER_INSET * 2;
+const QUIET_ZONE_MODULES = 3;
 const VTK_NAVY = [14, 26, 54] as const;
 const WHITE = [255, 255, 255] as const;
 
@@ -91,24 +93,25 @@ function drawFinderPattern(canvas: Buffer, x: number, y: number, moduleSize: num
   );
 }
 
-let shieldBytes: Buffer | null = null;
-const resizedShieldCache = new Map<number, Promise<RawImage | null>>();
+let headerLogoBytes: Buffer | null = null;
+const resizedLogoCache = new Map<string, Promise<RawImage | null>>();
 
-function vtkShieldBytes(): Buffer {
-  if (!shieldBytes) {
-    shieldBytes = readFileSync(join(process.cwd(), "public", "vtk-shield-favicon.png"));
+function vtkHeaderLogoBytes(): Buffer {
+  if (!headerLogoBytes) {
+    headerLogoBytes = readFileSync(join(process.cwd(), "public", "vtk-logo.png"));
   }
-  return shieldBytes;
+  return headerLogoBytes;
 }
 
-function resizedShield(size: number): Promise<RawImage | null> {
-  const cached = resizedShieldCache.get(size);
+function resizedHeaderLogo(width: number, height: number): Promise<RawImage | null> {
+  const key = `${width}x${height}`;
+  const cached = resizedLogoCache.get(key);
   if (cached) return cached;
 
   const rendering = (async () => {
     try {
-      const { data, info } = await sharp(vtkShieldBytes())
-        .resize(size, size, {
+      const { data, info } = await sharp(vtkHeaderLogoBytes())
+        .resize(width, height, {
           fit: "contain",
           background: { r: 0, g: 0, b: 0, alpha: 0 },
         })
@@ -118,12 +121,12 @@ function resizedShield(size: number): Promise<RawImage | null> {
       return { data, width: info.width, height: info.height, channels: info.channels };
     } catch (error) {
       // Een ontbrekende/ongeldige huisstijlasset mag nooit de scanbare QR zelf
-      // breken. De witte middenplaat blijft dan gewoon zonder schild staan.
-      console.error("Short-link QR shield could not be rendered", error);
+      // breken. De blauwe middenplaat blijft dan gewoon zonder woordmerk staan.
+      console.error("Short-link QR header logo could not be rendered", error);
       return null;
     }
   })();
-  resizedShieldCache.set(size, rendering);
+  resizedLogoCache.set(key, rendering);
   return rendering;
 }
 
@@ -164,17 +167,36 @@ export async function createStyledShortlinkQrPng(content: string): Promise<Buffe
   const dotSize = moduleSize - dotInset * 2;
   const canvas = Buffer.alloc(OUTPUT_SIZE * OUTPUT_SIZE * 4, 255);
 
-  // Afgeronde VTK-kader met voldoende witte marge voor betrouwbare detectie.
-  drawRoundedRect(canvas, 24, 24, 1152, 1152, 96, VTK_NAVY);
-  drawRoundedRect(canvas, 56, 56, 1088, 1088, 70, WHITE);
+  // De binnenzijde van de kader valt exact samen met de compacte stille zone;
+  // zo blijft er geen extra wit vlak tussen kader en QR-matrix over.
+  drawRoundedRect(
+    canvas,
+    FRAME_OUTER_INSET,
+    FRAME_OUTER_INSET,
+    OUTPUT_SIZE - FRAME_OUTER_INSET * 2,
+    OUTPUT_SIZE - FRAME_OUTER_INSET * 2,
+    88,
+    VTK_NAVY,
+  );
+  drawRoundedRect(
+    canvas,
+    FRAME_INNER_INSET,
+    FRAME_INNER_INSET,
+    QR_EXTENT,
+    QR_EXTENT,
+    66,
+    WHITE,
+  );
 
-  let logoModules = Math.max(7, Math.floor(matrixSize * 0.21));
-  if (logoModules % 2 === 0) logoModules += 1;
-  logoModules = Math.min(logoModules, 9);
+  // Het horizontale woordmerk uit de header past in een 9 × 5-moduleplaat. Dat
+  // maskeert minder QR-data dan het vroegere vierkante schildvlak.
+  const logoWidthModules = 9;
+  const logoHeightModules = 5;
   const center = Math.floor(matrixSize / 2);
-  const logoRadius = Math.floor(logoModules / 2);
+  const logoRadiusX = Math.floor(logoWidthModules / 2);
+  const logoRadiusY = Math.floor(logoHeightModules / 2);
   const insideLogoPlate = (row: number, column: number) =>
-    Math.abs(row - center) <= logoRadius && Math.abs(column - center) <= logoRadius;
+    Math.abs(row - center) <= logoRadiusY && Math.abs(column - center) <= logoRadiusX;
 
   for (let row = 0; row < matrixSize; row += 1) {
     for (let column = 0; column < matrixSize; column += 1) {
@@ -201,27 +223,31 @@ export async function createStyledShortlinkQrPng(content: string): Promise<Buffe
   drawFinderPattern(canvas, gridOrigin + (matrixSize - 7) * moduleSize, gridOrigin, moduleSize);
   drawFinderPattern(canvas, gridOrigin, gridOrigin + (matrixSize - 7) * moduleSize, moduleSize);
 
-  const logoPlateSize = logoModules * moduleSize;
-  const logoPlateOrigin = gridOrigin + (center - logoRadius) * moduleSize;
-  const logoInset = logoPlateSize * 0.12;
+  const logoPlateWidth = logoWidthModules * moduleSize;
+  const logoPlateHeight = logoHeightModules * moduleSize;
+  const logoPlateX = gridOrigin + (center - logoRadiusX) * moduleSize;
+  const logoPlateY = gridOrigin + (center - logoRadiusY) * moduleSize;
   drawRoundedRect(
     canvas,
-    logoPlateOrigin,
-    logoPlateOrigin,
-    logoPlateSize,
-    logoPlateSize,
-    moduleSize * 1.15,
-    WHITE,
+    logoPlateX,
+    logoPlateY,
+    logoPlateWidth,
+    logoPlateHeight,
+    moduleSize * 0.9,
+    VTK_NAVY,
   );
 
-  const logoSize = Math.max(1, Math.round(logoPlateSize - logoInset * 2));
-  const logo = await resizedShield(logoSize);
+  const logoInsetX = logoPlateWidth * 0.1;
+  const logoInsetY = logoPlateHeight * 0.1;
+  const logoWidth = Math.max(1, Math.round(logoPlateWidth - logoInsetX * 2));
+  const logoHeight = Math.max(1, Math.round(logoPlateHeight - logoInsetY * 2));
+  const logo = await resizedHeaderLogo(logoWidth, logoHeight);
   if (logo) {
     compositeRawImage(
       canvas,
       logo,
-      Math.round(logoPlateOrigin + logoInset),
-      Math.round(logoPlateOrigin + logoInset),
+      Math.round(logoPlateX + logoInsetX),
+      Math.round(logoPlateY + logoInsetY),
     );
   }
 
