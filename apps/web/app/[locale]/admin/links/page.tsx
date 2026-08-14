@@ -3,25 +3,9 @@ import { headers } from "next/headers";
 import { notFound } from "next/navigation";
 import { hasLocale } from "@/lib/locale";
 import { requirePermission } from "@/lib/session";
+import { shortlinkDisplayHost } from "@/lib/shortlinks";
 import type { Locale } from "@vtk/i18n";
 import { ShortLinksManager, type LinkRow } from "./ShortLinksManager";
-
-// Short-link host shown in the UI, derived from the host the admin panel is
-// being viewed on so it always matches the environment: vtk.be -> on.vtk.be,
-// main-dev.vtk.be -> on.main-dev.vtk.be. Mirrors the "on." convention in proxy.ts.
-function shortlinkDisplayHost(requestHost: string): string {
-  const [hostname, port] = requestHost.split(":");
-  const labels = hostname.split(".");
-  let target: string;
-  if (labels[0] === "on") target = hostname;
-  else if (labels[0] === "www") {
-    labels[0] = "on";
-    target = labels.join(".");
-  } else {
-    target = `on.${hostname}`;
-  }
-  return port ? `${target}:${port}` : target;
-}
 
 export default async function AdminShortLinks({
   params,

@@ -61,6 +61,7 @@ const NAV: NavEntry[] = [
     item('home', '/home', { perm: 'home.edit' }),
     item('announcements', '/aankondigingen', { perm: 'home.edit' }),
     item('linkPage', '/linkpagina', { perm: 'home.edit' }),
+    item('shortlinks', '/links', { perm: 'shortlinks.manage' }),
     item('content', '/inhoud', { perm: 'pages.manage' }),
     item('pages', '/paginas', { anyPerm: ['pages.edit', 'pages.editAll'] }),
     item('partners', '/partners', { perm: 'partners.manage' }),
@@ -83,7 +84,6 @@ const NAV: NavEntry[] = [
   item('bureau', '/bureau', { perm: 'bureau.manage' }),
   item('piano', '/piano', { perm: 'piano.manage' }),
   item('mailinglists', '/mailinglijsten', { perm: 'mailinglists.export' }),
-  item('shortlinks', '/links', { perm: 'shortlinks.manage' }),
   item('dashboardTiles', '/dashboard-tiles', { perm: 'dashboard.manage' }),
   group('it', [
     // `exact`, anders licht Configuratie (/admin/it) ook op wanneer je op de

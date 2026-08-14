@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { Download, QrCode } from "lucide-react";
 import { Button, Card, Input, Label } from "@vtk/ui";
 import { IconButton, RowActions } from "@/components/ui/IconButton";
 import { CheckIcon, CopyIcon, PencilIcon, TrashIcon } from "@/components/ui/icons";
@@ -34,6 +35,7 @@ export function ShortLinksManager({
   const [showInactive, setShowInactive] = useState(false);
   const [editing, setEditing] = useState<Editing>(null);
   const [deleting, setDeleting] = useState<LinkRow | null>(null);
+  const [qrLink, setQrLink] = useState<LinkRow | null>(null);
   const [copied, setCopied] = useState<string | null>(null);
 
   // A save/delete revalidates the route, so `links` arrives as a new array only
@@ -46,6 +48,7 @@ export function ShortLinksManager({
     setPrevLinks(links);
     setEditing(null);
     setDeleting(null);
+    setQrLink(null);
   }
 
   const inactiveCount = links.filter((l) => !l.enabled || l.expired).length;
@@ -133,6 +136,13 @@ export function ShortLinksManager({
                   {copied === l.slug ? <CheckIcon /> : <CopyIcon />}
                 </IconButton>
                 <IconButton
+                  label={nl ? "QR-code maken" : "Create QR code"}
+                  srLabel={`${nl ? "QR-code maken" : "Create QR code"}: /${l.slug}`}
+                  onClick={() => setQrLink(l)}
+                >
+                  <QrCode size={16} aria-hidden="true" />
+                </IconButton>
+                <IconButton
                   label={nl ? "Bewerken" : "Edit"}
                   srLabel={`${nl ? "Bewerken" : "Edit"}: /${l.slug}`}
                   onClick={() => setEditing(l)}
@@ -175,6 +185,10 @@ export function ShortLinksManager({
 
       {deleting !== null && (
         <DeleteModal host={host} nl={nl} link={deleting} onClose={() => setDeleting(null)} />
+      )}
+
+      {qrLink !== null && (
+        <QrModal host={host} nl={nl} link={qrLink} onClose={() => setQrLink(null)} />
       )}
     </>
   );
@@ -267,6 +281,94 @@ function EditModal({
             </Button>
           </div>
         </form>
+      </Card>
+    </div>
+  );
+}
+
+function QrModal({
+  host,
+  nl,
+  link,
+  onClose,
+}: {
+  host: string;
+  nl: boolean;
+  link: LinkRow;
+  onClose: () => void;
+}) {
+  const endpoint = `/api/admin/shortlinks/${encodeURIComponent(link.id)}/qr`;
+  const filename = `vtk-${link.slug}-qr.png`;
+  const inactive = !link.enabled || link.expired;
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/40 p-4"
+      onClick={onClose}
+    >
+      <Card
+        className="my-8 w-full max-w-md p-5"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="shortlink-qr-title"
+        onClick={(event) => event.stopPropagation()}
+      >
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <h2 id="shortlink-qr-title" className="text-lg font-semibold">
+              {nl ? "QR-code" : "QR code"}
+            </h2>
+            <p className="mt-1 break-all text-sm text-zinc-500">
+              https://{host}/{link.slug}
+            </p>
+          </div>
+          <button
+            type="button"
+            className="shrink-0 text-zinc-400 hover:text-zinc-700"
+            onClick={onClose}
+            aria-label={nl ? "Sluiten" : "Close"}
+          >
+            ✕
+          </button>
+        </div>
+
+        <figure className="mx-auto mt-5 max-w-[340px] overflow-hidden rounded-[28px] border border-vtk-blue/10 bg-white p-2 shadow-sm">
+          {/* Beveiligde, dynamisch gegenereerde PNG; de image-optimizer kan hier niets winnen. */}
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={endpoint}
+            alt={nl ? `QR-code voor ${host}/${link.slug}` : `QR code for ${host}/${link.slug}`}
+            className="aspect-square h-auto w-full rounded-[22px]"
+          />
+        </figure>
+
+        <p className="mt-4 text-sm leading-6 text-zinc-600">
+          {nl
+            ? "PNG van 1200 × 1200 px met afgeronde VTK-blauwe vormgeving en het VTK-schild. Test voor drukwerk altijd één proefscan op het uiteindelijke formaat."
+            : "1200 × 1200 px PNG with rounded VTK blue styling and the VTK shield. Always test-scan one proof at its final print size."}
+        </p>
+
+        {inactive ? (
+          <p className="mt-3 rounded-xl bg-amber-50 px-3 py-2 text-sm text-amber-800">
+            {nl
+              ? "Let op: deze verkorte link is momenteel niet actief. De QR-code werkt pas wanneer de link actief en niet verlopen is."
+              : "Note: this short link is currently inactive. The QR code only works while the link is active and has not expired."}
+          </p>
+        ) : null}
+
+        <div className="mt-5 flex flex-wrap justify-end gap-2">
+          <Button type="button" variant="ghost" onClick={onClose}>
+            {nl ? "Sluiten" : "Close"}
+          </Button>
+          <a
+            href={`${endpoint}?download=1`}
+            download={filename}
+            className="inline-flex h-10 items-center justify-center gap-2 whitespace-nowrap rounded-full border border-vtk-ink bg-vtk-ink px-4 text-sm font-medium text-vtk-surface shadow-sm transition-colors hover:bg-vtk-navy focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-vtk-ink"
+          >
+            <Download size={16} aria-hidden="true" />
+            {nl ? "PNG downloaden" : "Download PNG"}
+          </a>
+        </div>
       </Card>
     </div>
   );
