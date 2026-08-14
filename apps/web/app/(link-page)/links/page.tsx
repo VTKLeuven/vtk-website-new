@@ -1,0 +1,126 @@
+import { cache } from "react";
+import Image from "next/image";
+import type { Metadata } from "next";
+import { ExternalLink } from "lucide-react";
+import { prisma } from "@vtk/db";
+import { SocialIcon } from "@/components/link-page/SocialIcon";
+import {
+  DEFAULT_LINK_PAGE_CONFIG,
+  LINK_PAGE_SETTING_KEY,
+  SOCIAL_LABELS,
+  SOCIAL_PLATFORMS,
+  parseLinkPageConfig,
+  socialHref,
+} from "@/lib/link-page";
+import { DEFAULT_OG_IMAGE, siteUrl, truncateDescription } from "@/lib/seo";
+import { ShareButton } from "./ShareButton";
+
+const loadConfig = cache(async () => {
+  try {
+    const setting = await prisma.setting.findUnique({ where: { key: LINK_PAGE_SETTING_KEY } });
+    return parseLinkPageConfig(setting?.value);
+  } catch {
+    // Deze URL staat in social-media-bio's en moet ook tijdens een korte
+    // databaseonderbreking bruikbaar blijven. De vaste defaults wijzen naar de
+    // hoofdsite en de bestaande officiële kanalen.
+    return DEFAULT_LINK_PAGE_CONFIG;
+  }
+});
+
+export async function generateMetadata(): Promise<Metadata> {
+  const config = await loadConfig();
+  const description = truncateDescription(config.description || DEFAULT_LINK_PAGE_CONFIG.description);
+  const url = `${siteUrl()}/links`;
+  const image = `${siteUrl()}${DEFAULT_OG_IMAGE}`;
+
+  return {
+    title: config.title,
+    description,
+    alternates: { canonical: url },
+    openGraph: {
+      type: "website",
+      title: config.title,
+      description,
+      url,
+      siteName: "VTK",
+      locale: "nl_BE",
+      images: [{ url: image, width: 1200, height: 630, alt: config.title }],
+    },
+    twitter: {
+      card: "summary_large_image",
+      title: config.title,
+      description,
+      images: [image],
+    },
+  };
+}
+
+export default async function LinksPage() {
+  const config = await loadConfig();
+  const socials = SOCIAL_PLATFORMS.filter((platform) => config.socials[platform]);
+  const links = config.links.filter((link) => link.enabled);
+
+  return (
+    <main className="vtk-link-page">
+      <div className="vtk-link-page-pattern" aria-hidden="true" />
+      <section className="vtk-link-page-shell" aria-labelledby="link-page-title">
+        <ShareButton title={config.title} />
+
+        <div className="vtk-link-page-profile">
+          <Image
+            src="/VTK.png"
+            alt="VTK-schild"
+            width={660}
+            height={777}
+            sizes="96px"
+            preload
+            className="vtk-link-page-logo"
+          />
+          <h1 id="link-page-title">{config.title}</h1>
+          {config.description ? <p>{config.description}</p> : null}
+        </div>
+
+        {socials.length > 0 ? (
+          <nav className="vtk-link-page-socials" aria-label="Sociale media en contact">
+            {socials.map((platform) => {
+              const href = socialHref(platform, config.socials[platform]);
+              const external = platform !== "email";
+              return (
+                <a
+                  key={platform}
+                  href={href}
+                  aria-label={SOCIAL_LABELS[platform]}
+                  title={SOCIAL_LABELS[platform]}
+                  target={external ? "_blank" : undefined}
+                  rel={external ? "noopener noreferrer" : undefined}
+                >
+                  <SocialIcon platform={platform} />
+                </a>
+              );
+            })}
+          </nav>
+        ) : null}
+
+        {links.length > 0 ? (
+          <ul className="vtk-link-page-links">
+            {links.map((link) => {
+              const external = /^https?:\/\//i.test(link.url);
+              return (
+                <li key={link.id}>
+                  <a
+                    href={link.url}
+                    target={external ? "_blank" : undefined}
+                    rel={external ? "noopener noreferrer" : undefined}
+                  >
+                    <span>{link.title}</span>
+                    <ExternalLink aria-hidden="true" />
+                  </a>
+                </li>
+              );
+            })}
+          </ul>
+        ) : null}
+      </section>
+    </main>
+  );
+}

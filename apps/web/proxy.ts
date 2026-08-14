@@ -151,10 +151,17 @@ export async function proxy(request: NextRequest) {
     return NextResponse.rewrite(url);
   }
 
-  // The scanner has its own full-screen route group and must not receive a
-  // locale rewrite to /nl/scan.
-  if (pathname === '/scan' || pathname.startsWith('/scan/')) {
-    return NextResponse.next();
+  // De scanner en Linktree hebben elk hun eigen full-screen route group en
+  // mogen dus niet naar `[locale]` herschreven worden (daar zit de site-header).
+  if (
+    pathname === '/scan' ||
+    pathname.startsWith('/scan/') ||
+    pathname === '/links' ||
+    pathname === '/links/'
+  ) {
+    const requestHeaders = new Headers(request.headers);
+    requestHeaders.set('x-pathname', `/${DEFAULT_LOCALE}${pathname}`);
+    return NextResponse.next({ request: { headers: requestHeaders } });
   }
 
   const segments = pathname.split('/');
