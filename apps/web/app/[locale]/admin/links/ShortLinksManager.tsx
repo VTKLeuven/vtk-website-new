@@ -297,7 +297,10 @@ function QrModal({
   link: LinkRow;
   onClose: () => void;
 }) {
-  const endpoint = `/api/admin/shortlinks/${encodeURIComponent(link.id)}/qr`;
+  const [retry, setRetry] = useState(0);
+  const [imageFailed, setImageFailed] = useState(false);
+  const endpoint = `/api/shortlinks/${encodeURIComponent(link.slug)}/qr`;
+  const previewEndpoint = `${endpoint}?preview=${retry}`;
   const filename = `vtk-${link.slug}-qr.png`;
   const inactive = !link.enabled || link.expired;
 
@@ -332,14 +335,35 @@ function QrModal({
           </button>
         </div>
 
-        <figure className="mx-auto mt-5 max-w-[340px] overflow-hidden rounded-[28px] border border-vtk-blue/10 bg-white p-2 shadow-sm">
-          {/* Beveiligde, dynamisch gegenereerde PNG; de image-optimizer kan hier niets winnen. */}
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={endpoint}
-            alt={nl ? `QR-code voor ${host}/${link.slug}` : `QR code for ${host}/${link.slug}`}
-            className="aspect-square h-auto w-full rounded-[22px]"
-          />
+        <figure className="mx-auto mt-5 grid aspect-square w-full max-w-[340px] place-items-center overflow-hidden rounded-[28px] border border-vtk-blue/10 bg-white p-2 shadow-sm">
+          {imageFailed ? (
+            <div className="px-6 text-center">
+              <p className="text-sm text-red-700">
+                {nl ? "De QR-code kon niet geladen worden." : "The QR code could not be loaded."}
+              </p>
+              <button
+                type="button"
+                className="mt-3 text-sm font-medium text-vtk-ink underline underline-offset-4"
+                onClick={() => {
+                  setImageFailed(false);
+                  setRetry((value) => value + 1);
+                }}
+              >
+                {nl ? "Opnieuw proberen" : "Try again"}
+              </button>
+            </div>
+          ) : (
+            <>
+              {/* Dynamisch gegenereerde PNG; de image-optimizer kan hier niets winnen. */}
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={previewEndpoint}
+                alt={nl ? `QR-code voor ${host}/${link.slug}` : `QR code for ${host}/${link.slug}`}
+                className="aspect-square h-auto w-full rounded-[22px]"
+                onError={() => setImageFailed(true)}
+              />
+            </>
+          )}
         </figure>
 
         <p className="mt-4 text-sm leading-6 text-zinc-600">
