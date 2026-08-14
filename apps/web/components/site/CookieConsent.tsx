@@ -1,12 +1,14 @@
 "use client";
 
 import { useEffect, useState, useSyncExternalStore } from "react";
+import { usePathname } from "next/navigation";
 import {
   COOKIE_CONSENT_EVENT,
   COOKIE_CONSENT_MAX_AGE_SECONDS,
   COOKIE_CONSENT_NAME,
   OPEN_COOKIE_PREFERENCES_EVENT,
   browserCookieConsent,
+  hidesCookieBanner,
   type CookieConsentChoice,
 } from "@/lib/cookie-consent";
 
@@ -40,6 +42,11 @@ function setConsent(choice: CookieConsentChoice) {
 }
 
 export function CookieConsent() {
+  // Bewust het pad uit de router en niet uit de root-layout: die layout wordt
+  // bij een client-side navigatie niet opnieuw gerenderd, dus een server-side
+  // controle zou de banner op de linkpagina alsnog laten staan wanneer je er
+  // vanaf een andere pagina naartoe navigeert.
+  const pathname = usePathname();
   const current = useSyncExternalStore<CookieConsentChoice | null | "server">(
     (onChange) => {
       window.addEventListener(COOKIE_CONSENT_EVENT, onChange);
@@ -60,6 +67,7 @@ export function CookieConsent() {
     return () => window.removeEventListener(OPEN_COOKIE_PREFERENCES_EVENT, showPreferences);
   }, []);
 
+  if (hidesCookieBanner(pathname)) return null;
   if (current === "server" || (!preferencesOpen && current !== null)) return null;
   const labels = copy();
   const base = window.location.pathname === "/en" || window.location.pathname.startsWith("/en/") ? "/en" : "";
