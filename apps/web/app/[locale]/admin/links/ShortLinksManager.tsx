@@ -7,6 +7,9 @@ import { IconButton, RowActions } from "@/components/ui/IconButton";
 import { CheckIcon, CopyIcon, PencilIcon, TrashIcon } from "@/components/ui/icons";
 import { deleteShortLinkAction, saveShortLinkAction } from "@/app/actions/shortlinks";
 
+// Omzeilt nog aanwezige browser/CDN-responses van vóór de no-store-header.
+const SHORTLINK_QR_CACHE_BUSTER = "uncached-v1";
+
 export type LinkRow = {
   id: string;
   slug: string;
@@ -300,7 +303,8 @@ function QrModal({
   const [retry, setRetry] = useState(0);
   const [imageFailed, setImageFailed] = useState(false);
   const endpoint = `/api/shortlinks/${encodeURIComponent(link.slug)}/qr`;
-  const previewEndpoint = `${endpoint}?preview=${retry}`;
+  const freshEndpoint = `${endpoint}?v=${SHORTLINK_QR_CACHE_BUSTER}`;
+  const previewEndpoint = `${freshEndpoint}&preview=${retry}`;
   const filename = `vtk-${link.slug}-qr.png`;
   const inactive = !link.enabled || link.expired;
 
@@ -385,7 +389,7 @@ function QrModal({
             {nl ? "Sluiten" : "Close"}
           </Button>
           <a
-            href={`${endpoint}?download=1`}
+            href={`${freshEndpoint}&download=1`}
             download={filename}
             className="inline-flex h-10 items-center justify-center gap-2 whitespace-nowrap rounded-full border border-vtk-ink bg-vtk-ink px-4 text-sm font-medium text-vtk-surface shadow-sm transition-colors hover:bg-vtk-navy focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-vtk-ink"
           >

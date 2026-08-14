@@ -40,6 +40,7 @@ describe("GET /api/shortlinks/[slug]/qr", () => {
     expect(response.headers.get("content-disposition")).toBe(
       'inline; filename="vtk-test-qr.png"',
     );
+    expect(response.headers.get("cache-control")).toBe("no-store, max-age=0");
     expect(mocks.createPng).toHaveBeenCalledWith("https://on.dev.vtk.be/test");
     expect(Buffer.from(await response.arrayBuffer()).toString()).toBe("png-bytes");
   });

@@ -32,7 +32,9 @@ export async function GET(
     headers: {
       "Content-Type": "image/png",
       "Content-Disposition": `${download ? "attachment" : "inline"}; filename="${filename}"`,
-      "Cache-Control": "public, max-age=3600, stale-while-revalidate=86400",
+      // De QR is goedkoop en enkel in de admin zichtbaar. Niet cachen voorkomt
+      // dat een browser of CDN na een ontwerpwijziging een oude PNG blijft tonen.
+      "Cache-Control": "no-store, max-age=0",
       "X-Content-Type-Options": "nosniff",
     },
   });

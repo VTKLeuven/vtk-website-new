@@ -45,29 +45,32 @@ describe("styled short-link QR code", () => {
     expect(pixel(28, 600)).toEqual([14, 26, 54]);
     expect(pixel(50, 600)).toEqual([255, 255, 255]);
 
-    // Het lichte headerwoordmerk staat herkenbaar op de blauwe middenplaat.
+    // Het headerwoordmerk gebruikt hetzelfde blauw als de QR, zonder gekleurde
+    // plaat of omlijning erachter.
     let logoPixels = 0;
     for (let y = 500; y < 700; y += 1) {
       for (let x = 500; x < 700; x += 1) {
         const [red, green, blue] = pixel(x, y);
-        if (
-          red >= 190 &&
-          red < 250 &&
-          Math.abs(red - green) < 8 &&
-          Math.abs(green - blue) < 8
-        ) {
+        if (red === 14 && green === 26 && blue === 54) {
           logoPixels += 1;
         }
       }
     }
     expect(logoPixels).toBeGreaterThan(100);
+    expect(pixel(500, 550)).toEqual([255, 255, 255]);
+
+    // Met slechts één stille module ligt de eerste finder veel dichter tegen
+    // de kader dan in de vroegere opmaak met drie stille modules.
+    expect(pixel(80, 180)).toEqual([14, 26, 54]);
   });
 
   it("still decodes at full and compact preview sizes", async () => {
     const png = await createStyledShortlinkQrPng(publicUrl);
     const compact = await sharp(png).resize(320, 320).png().toBuffer();
+    const small = await sharp(png).resize(240, 240).png().toBuffer();
 
     expect(await decode(png)).toBe(publicUrl);
     expect(await decode(compact)).toBe(publicUrl);
+    expect(await decode(small)).toBe(publicUrl);
   });
 });

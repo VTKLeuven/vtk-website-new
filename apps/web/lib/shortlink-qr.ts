@@ -9,7 +9,9 @@ const OUTPUT_SIZE = 1200;
 const FRAME_OUTER_INSET = 20;
 const FRAME_INNER_INSET = 42;
 const QR_EXTENT = OUTPUT_SIZE - FRAME_INNER_INSET * 2;
-const QUIET_ZONE_MODULES = 3;
+// Eén stille module houdt de donkere kader visueel los van de matrix, maar
+// vermijdt de brede witte boord van de standaard QR-opmaak.
+const QUIET_ZONE_MODULES = 1;
 const VTK_NAVY = [14, 26, 54] as const;
 const WHITE = [255, 255, 255] as const;
 
@@ -118,10 +120,19 @@ function resizedHeaderLogo(width: number, height: number): Promise<RawImage | nu
         .ensureAlpha()
         .raw()
         .toBuffer({ resolveWithObject: true });
+
+      // Het headerbestand is lichtgrijs voor gebruik op de donkere navigatie.
+      // In de QR gebruiken we uitsluitend het alfakanaal als masker, zodat het
+      // woordmerk exact hetzelfde VTK-blauw krijgt als de QR-modules.
+      for (let offset = 0; offset < data.length; offset += info.channels) {
+        data[offset] = VTK_NAVY[0];
+        data[offset + 1] = VTK_NAVY[1];
+        data[offset + 2] = VTK_NAVY[2];
+      }
       return { data, width: info.width, height: info.height, channels: info.channels };
     } catch (error) {
       // Een ontbrekende/ongeldige huisstijlasset mag nooit de scanbare QR zelf
-      // breken. De blauwe middenplaat blijft dan gewoon zonder woordmerk staan.
+      // breken. Het midden blijft dan gewoon als stille witte zone staan.
       console.error("Short-link QR header logo could not be rendered", error);
       return null;
     }
@@ -188,8 +199,9 @@ export async function createStyledShortlinkQrPng(content: string): Promise<Buffe
     WHITE,
   );
 
-  // Het horizontale woordmerk uit de header past in een 9 × 5-moduleplaat. Dat
-  // maskeert minder QR-data dan het vroegere vierkante schildvlak.
+  // Het horizontale woordmerk uit de header past in een compacte 9 × 5-zone.
+  // Die witte zone hoort bij de bestaande QR-achtergrond; er wordt geen aparte
+  // plaat of omlijning rond het logo getekend.
   const logoWidthModules = 9;
   const logoHeightModules = 5;
   const center = Math.floor(matrixSize / 2);
@@ -223,31 +235,21 @@ export async function createStyledShortlinkQrPng(content: string): Promise<Buffe
   drawFinderPattern(canvas, gridOrigin + (matrixSize - 7) * moduleSize, gridOrigin, moduleSize);
   drawFinderPattern(canvas, gridOrigin, gridOrigin + (matrixSize - 7) * moduleSize, moduleSize);
 
-  const logoPlateWidth = logoWidthModules * moduleSize;
-  const logoPlateHeight = logoHeightModules * moduleSize;
-  const logoPlateX = gridOrigin + (center - logoRadiusX) * moduleSize;
-  const logoPlateY = gridOrigin + (center - logoRadiusY) * moduleSize;
-  drawRoundedRect(
-    canvas,
-    logoPlateX,
-    logoPlateY,
-    logoPlateWidth,
-    logoPlateHeight,
-    moduleSize * 0.9,
-    VTK_NAVY,
-  );
-
-  const logoInsetX = logoPlateWidth * 0.1;
-  const logoInsetY = logoPlateHeight * 0.1;
-  const logoWidth = Math.max(1, Math.round(logoPlateWidth - logoInsetX * 2));
-  const logoHeight = Math.max(1, Math.round(logoPlateHeight - logoInsetY * 2));
+  const logoZoneWidth = logoWidthModules * moduleSize;
+  const logoZoneHeight = logoHeightModules * moduleSize;
+  const logoZoneX = gridOrigin + (center - logoRadiusX) * moduleSize;
+  const logoZoneY = gridOrigin + (center - logoRadiusY) * moduleSize;
+  const logoInsetX = logoZoneWidth * 0.06;
+  const logoInsetY = logoZoneHeight * 0.06;
+  const logoWidth = Math.max(1, Math.round(logoZoneWidth - logoInsetX * 2));
+  const logoHeight = Math.max(1, Math.round(logoZoneHeight - logoInsetY * 2));
   const logo = await resizedHeaderLogo(logoWidth, logoHeight);
   if (logo) {
     compositeRawImage(
       canvas,
       logo,
-      Math.round(logoPlateX + logoInsetX),
-      Math.round(logoPlateY + logoInsetY),
+      Math.round(logoZoneX + logoInsetX),
+      Math.round(logoZoneY + logoInsetY),
     );
   }
 
