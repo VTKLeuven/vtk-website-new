@@ -82,6 +82,9 @@ export const PERMISSIONS = [
   { code: "door.remoteOpen", labelNl: "Deur openen vanaf het dashboard", labelEn: "Open the door from the dashboard", category: "door" },
   { code: "door.manage", labelNl: "Deurtoegang beheren (logs, tijdelijke toegang)", labelEn: "Manage door access (logs, temporary access)", category: "door" },
 
+  // Fakscanner (kaartlezer aan de bar: check-ins en gratis pinten)
+  { code: "fakscanner.manage", labelNl: "Fakscanner beheren (ranglijst, log, instellingen)", labelEn: "Manage the fakscanner (ranking, log, settings)", category: "fakbar" },
+
   // Module access flags (gate submodules via group permissions)
   { code: "modules.logistiek.access", labelNl: "Toegang tot Logistiek module", labelEn: "Access to Logistics module", category: "modules" },
   { code: "modules.cursusdienst.access", labelNl: "Toegang tot Cursusdienst module", labelEn: "Access to Course Shop module", category: "modules" },

@@ -1,5 +1,5 @@
 import { prisma } from "@vtk/db";
-import { verifyStudentCard } from "@/lib/kul-card";
+import { cardDisplayName, resolveStudentCard } from "@/lib/student-card";
 import { getDoorConfig, isDoorDeviceRequest } from "@/lib/door-config";
 import { logDoorAccess, userMayOpenDoor } from "@/lib/door-server";
 
@@ -8,8 +8,9 @@ export const dynamic = "force-dynamic";
 
 /**
  * Fysieke kaartscan aan de deur. De Raspberry Pi POST't de ruwe scan
- * (`serial;cardAppId`) met het device-secret als Bearer; wij verifiëren de kaart
- * bij KU Leuven, zoeken de gebruiker op via het r-nummer, beslissen allow/deny en
+ * (`serial;cardAppId`) met het device-secret als Bearer; wij herleiden de kaart tot
+ * een r-nummer (eigen kaarttabel, anders KU Leuven), zoeken de gebruiker op,
+ * beslissen allow/deny en
  * loggen elke uitkomst. De Pi opent zelf de GPIO-lock wanneer `allowed` true is.
  *
  * Respons: `{ allowed, person?, reason?, unlockSeconds }`.
@@ -33,15 +34,15 @@ export async function POST(request: Request) {
     return Response.json({ allowed: false, reason: "no_card", unlockSeconds }, { status: 400 });
   }
 
-  const verified = await verifyStudentCard(card);
-  if (!verified.ok) {
+  const resolved = await resolveStudentCard(card);
+  if (!resolved.ok) {
     // Ongeldige scan of KU Leuven onbereikbaar: geen persoon om aan te koppelen.
-    await logDoorAccess({ method: "CARD", result: "ERROR", reason: verified.error });
+    await logDoorAccess({ method: "CARD", result: "ERROR", reason: resolved.error });
     return Response.json({ allowed: false, reason: "verify_failed", unlockSeconds });
   }
 
-  const rNumber = verified.rNumber.trim().toLowerCase();
-  const cardName = [verified.firstName, verified.lastName].filter(Boolean).join(" ") || null;
+  const rNumber = resolved.rNumber.trim().toLowerCase();
+  const cardName = cardDisplayName(resolved);
 
   const user = await prisma.user.findUnique({
     where: { rNumber },

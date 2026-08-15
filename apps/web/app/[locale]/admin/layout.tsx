@@ -83,6 +83,7 @@ const NAV: NavEntry[] = [
   item('grocomeet', '/grocomeet', { perm: 'grocomeet.manage' }),
   item('bureau', '/bureau', { perm: 'bureau.manage' }),
   item('piano', '/piano', { perm: 'piano.manage' }),
+  item('fakscanner', '/fakscanner', { perm: 'fakscanner.manage' }),
   item('mailinglists', '/mailinglijsten', { perm: 'mailinglists.export' }),
   item('dashboardTiles', '/dashboard-tiles', { perm: 'dashboard.manage' }),
   group('it', [
