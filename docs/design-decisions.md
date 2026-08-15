@@ -468,6 +468,119 @@ een env-fallback.
 
 ---
 
+## Fakscanner (kaartlezer aan de bar)
+
+Aan de bar hangt een SpringCard Prox'n'Roll-kaartlezer op een Raspberry Pi. Een lid
+scant zijn studentenkaart, krijgt punten, en om de zoveel punten een gratis pint.
+De Pi stuurt enkel de ruwe scan door (`POST /api/fakscanner/scan`); het opzoeken,
+tellen en beslissen gebeurt server-side. Website-kant:
+`apps/web/app/api/fakscanner/`, `apps/web/lib/fakscanner*.ts` en
+`/admin/fakscanner`; Pi-kant: `scripts/fakscanner.py`.
+
+### Eén stand per persoon, geen lijst van avonden
+
+`FakTally` houdt **één rij per r-nummer per werkingsjaar** bij: punten, aantal
+check-ins en het moment van de laatste. Bewust geen rij per scan. De kring heeft
+de stand nodig; een reconstrueerbare lijst van wie op welke avond aan de bar stond
+heeft ze niet nodig, en die zouden we met een rij per check-in wel bijhouden.
+Hetzelfde geldt voor de log: daar gaan enkel de **mislukte** scans in (zie
+onderaan). Wat je dus niet uit deze database haalt, is wie er donderdag was.
+
+### Eén check-in per **bardag**, niet per kalenderdag
+
+Een fakavond loopt over middernacht. Met een kalenderdag als grens zou wie om 23u50
+en om 00u10 scant twee check-ins hebben, en dat is precies één avond. De teller
+gebruikt daarom een bardag die om een instelbaar uur begint (standaard 6u): alles
+daarvoor telt nog bij de avond ervoor.
+
+Zonder rij per dag doet de voorwaarde in de `UPDATE` het werk: enkel een rij
+waarvan `lastCheckinAt` vóór het begin van deze bardag ligt, wordt opgehoogd.
+Postgres voert dat atomair uit, dus van twee gelijktijdige scans raakt er precies
+één binnen. Bestaat de rij nog niet, dan maken we ze aan; botst dat op de primaire
+sleutel, dan was een gelijktijdige scan ons voor en is het dus ook "al gescand".
+
+### De bardag hangt aan de wandklok, niet aan een aantal uren
+
+De bar is soms open wanneer de klok verspringt. `fakDayStart` rekent daarom via de
+Brusselse wandklok (`brusselsWallClockMinutes`) en niet met een vast aantal uren:
+de nacht van de wissel duurt 23 of 25 uur, maar de bardag begint even goed om 6u op
+de klok, en 02:30 dat twee keer voorkomt hoort beide keren bij dezelfde bardag. Om
+dezelfde reden is het dubbeltelvenster een wandklokvenster. Eén randgeval: zet de
+rollover niet tussen 02:00 en 03:00, want bij de overgang naar zomertijd bestaat
+dat uur niet. Met de standaard 06:00 speelt dat nooit.
+
+### Punten, niet check-ins
+
+De ranglijst telt **punten**. Buiten het dubbeltelvenster is dat hetzelfde als
+check-ins, binnen dat venster telt een scan voor twee. Het venster (standaard 22u
+tot 23u) staat in de instellingen en niet in de code, want het is een middel om
+volk naar de bar te krijgen op een moment dat de praeses kiest; dat verschuift van
+jaar tot jaar en soms van avond tot avond. Het mag over middernacht lopen.
+
+De pint valt bij het **passeren** van een veelvoud en niet bij `totaal % 10 == 0`.
+Een dubbeltelling kan van 9 naar 11 springen, en die pint hoort niet verloren te
+gaan omdat de teller toevallig nooit exact op 10 stond.
+
+### Een VTK-account is niet nodig
+
+De stand hangt aan het **r-nummer** en niet aan een `User`. Wie geen account heeft
+spaart gewoon mee en krijgt zijn pinten; aan de toog is dat ook niemands vraag. Het
+account dient enkel om er een naam bij te kunnen zetten: in het beheerscherm staat
+wie geen account heeft met zijn r-nummer in de lijst, niet met de naam die op de
+kaart stond. Het schermpje aan de bar begroet die persoon wél gewoon met zijn
+voornaam, want die staat daar voor hemzelf.
+
+### De stand reset mee met het werkingsjaar
+
+Het werkingsjaar staat in de sleutel van de rij, dus op 15 juli begint iedereen
+weer op nul, net als de rollen en de posten. De oude standen blijven staan: in
+`/admin/fakscanner` kies je een ouder werkingsjaar en zie je de ranglijst van toen.
+Een avond die over de cutover loopt telt in haar geheel bij het jaar waarin ze
+begon, om dezelfde reden als de bardag hierboven.
+
+De ranglijst toont dertig mensen per pagina. Op een goed jaar staan daar honderden
+namen in, en dan is de vraag "wie staat er bovenaan" nog steeds de eerste die
+iemand stelt.
+
+### We tellen verdiende pinten, we volgen ze niet op
+
+De site zegt hoeveel pinten iemand verdiend heeft; ze houdt niet bij of die pint
+effectief getapt is. Dat gebeurt aan de toog, tussen de tapper en het lid, op het
+moment dat de lezer oplicht. Een afhaalsysteem bovenop zou betekenen dat de tapper
+tijdens een drukke avond nog een scherm moet bedienen, en dat gaat mis op de enige
+momenten waarop het ertoe doet.
+
+### De kaart-naar-r-nummer-map is gedeeld met de andere lezers
+
+Wat de lezer typt (`serial;cardAppId`) hoort bij precies één r-nummer, en dat
+verandert niet meer zolang de kaart bestaat. Na de eerste geslaagde verificatie
+bewaren we die koppeling in `StudentCard`, en elke lezer bij ons (bar, deur,
+Theokot-balie) kijkt daar eerst. Dat scheelt niet enkel een KU Leuven-call per
+scan: het houdt de lezers ook werkend wanneer `account.kuleuven.be` er even uit
+ligt, zolang de kaart al eens gescand is. Zie `apps/web/lib/student-card.ts`; die
+vervangt het rechtstreekse gebruik van `verifyStudentCard` overal.
+
+### Het token van de scanner staat enkel in de omgeving
+
+`FAKSCANNER_TOKEN` (32 hex-tekens, `openssl rand -hex 16`) is het enige dat tussen
+"iemand aan de bar" en "iedereen met een browser" staat. Het staat daarom bewust
+**niet** in de DB en niet in een beheerscherm, anders dan het deur-secret: er is
+hier geen tweede richting die configuratie nodig heeft, en een gecompromitteerd
+adminaccount hoort geen check-ins te kunnen vervalsen. Leeg = het endpoint weigert
+alles.
+
+### Enkel de mislukte scans gaan naar de log
+
+`FakScanLog` bevat wat misging: een onleesbare kaart of een KU Leuven dat niet
+antwoordt (`CARD_ERROR`), en onze eigen kant die stukging nadat de kaart wel gelezen
+was (`SERVER_ERROR`). Geslaagde check-ins loggen we niet, want dat zou precies de
+aanwezigheidslijst zijn die `FakTally` hierboven vermijdt. Wat de beheerder wél moet
+kunnen zien is of de lezer of KU Leuven het laat afweten: zonder die rijen is een
+stille storing aan de bar pas zichtbaar wanneer iemand komt klagen dat zijn punten
+ontbreken.
+
+---
+
 ## Ledenregistratie & onboarding (KUL SSO)
 
 Studenten **registreren zichzelf** door voor het eerst in te loggen met KU Leuven

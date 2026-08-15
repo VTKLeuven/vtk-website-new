@@ -2905,6 +2905,79 @@ model DoorShortcutToken {
 }
 
 // -----------------------------------------------------------------------------
+// Studentenkaarten: de kaart-naar-r-nummer-map, gedeeld door elke kaartlezer
+// -----------------------------------------------------------------------------
+
+// Wat de lezer "typt" (`serial;cardAppId`) hoort bij precies één r-nummer, en dat
+// verandert niet meer zolang de kaart bestaat. We bewaren die koppeling dus na de
+// eerste geslaagde verificatie, zodat elke volgende scan van dezelfde kaart geen
+// KU Leuven-call meer nodig heeft (zie `apps/web/lib/student-card.ts`). Bewust
+// géén relatie naar `User`: een kaart kan gekend zijn zonder dat er een account
+// bij hoort, en het r-nummer is de sleutel waarop we die opzoeken.
+model StudentCard {
+  serial      String
+  cardAppId   String
+  rNumber     String
+  firstName   String?
+  lastName    String?
+  firstSeenAt DateTime @default(now())
+  lastSeenAt  DateTime @default(now())
+
+  @@id([serial, cardAppId])
+  @@index([rNumber])
+}
+
+// -----------------------------------------------------------------------------
+// Fakscanner (kaartlezer aan de bar: één check-in per bardag, pint per 10 punten)
+// -----------------------------------------------------------------------------
+
+// **Eén rij per lid per werkingsjaar, en bewust geen rij per scan.** De stand is
+// het enige dat de kring nodig heeft; een lijst van wie wanneer aan de bar stond
+// is dat niet, en die zouden we dan wel bijhouden. Er valt hier dus ook niets uit
+// te reconstrueren: we weten hoeveel iemand dit jaar scande en wanneer voor het
+// laatst, niet op welke avonden.
+//
+// `lastCheckinAt` doet meteen dienst als "al gescand vandaag"-check: ligt het na
+// het begin van de huidige bardag, dan telt een nieuwe scan niet. Zie
+// `registerCheckin` voor hoe dat racevrij blijft zonder rij per dag.
+//
+// De sleutel is het **r-nummer** en niet een `User`: ook studenten zonder
+// VTK-account scannen aan de bar en sparen gewoon mee.
+model FakTally {
+  rNumber       String
+  year          Int // werkingsjaar, zodat de ranglijst op 15 juli mee reset
+  points        Int      @default(0) // telt dubbel binnen het dubbeltelvenster
+  checkins      Int      @default(0) // aantal keer gescand (los van de punten)
+  lastCheckinAt DateTime
+
+  @@id([rNumber, year])
+  @@index([year, points])
+}
+
+// Waar een mislukte scan aan lag.
+enum FakScanResult {
+  CARD_ERROR // onleesbare kaart, of KU Leuven weigerde/antwoordde niet
+  SERVER_ERROR // onze kant ging stuk nadat de kaart wel gelezen was
+}
+
+// **Enkel de mislukte scans.** Een log van elke geslaagde check-in zou precies de
+// aanwezigheidslijst zijn die `FakTally` hierboven vermijdt. Wat de beheerder wél
+// moet kunnen zien is of de lezer of KU Leuven het laat afweten, want anders is
+// een stille storing pas zichtbaar wanneer iemand komt klagen dat zijn punten
+// ontbreken.
+model FakScanLog {
+  id      String        @id @default(cuid())
+  at      DateTime      @default(now())
+  result  FakScanResult
+  // Enkel gevuld wanneer de kaart wél gelezen raakte en het daarna misging; bij
+  // een onleesbare kaart weten we per definitie niet van wie ze was.
+  rNumber String?
+  reason  String?
+
+  @@index([at])
+}
+
+// -----------------------------------------------------------------------------
 // KU Leuven SSO (OIDC) debug log
 // -----------------------------------------------------------------------------
 // Opt-in via Admin -> IT (Setting-sleutel "kul.debug"). Eén rij per KU Leuven-

@@ -217,6 +217,7 @@ table whose rows expand into per-category editors, with create/import in modals.
 | `/admin/paginas/[id]` (`PageContentEditor`) | `canEditPageContent` | Markdown content (NL/EN) + attachments, plus a settings card for the page's slug, editor roles and yearly flag (same check, not `pages.manage`), and Delete (`pages.delete` **and** `canEditPageContent`). |
 | `/admin/inhoud` (`ContentManager`) | `pages.manage` | Structure only: header categories, which page hangs where, titles, slug, publish, excerpts, editor roles + yearly flag. The tree lists only pages that hang under a category. "Pagina toevoegen" links an **existing** page (search via `/api/admin/pages/search`, `pages.manage`); creating, content, attachments and delete all live in `/admin/paginas`. |
 | `/admin/deur` (door access) | `door.manage` | Usage stats (1/7/30 d), temporary access grants (`DoorAccessGrant`, user typeahead + window), and the full access log (`DoorAccessLog`, incl. denied/unknown scans). |
+| `/admin/fakscanner` (bar check-ins) | `fakscanner.manage` | Per working year (`?jaar=`): the points ranking (`FakTally`, 30 per page via `?rang=`), the settings (double-count window, points per free beer, bar-day rollover) and the log of **failed** scans only (`FakScanLog`). Rows are keyed on r-number, so people without a VTK account appear too, by r-number rather than name. |
 
 User pickers everywhere use the server-side typeahead `GET /api/users/search` (capped results), not
 a full user load, so they scale. That endpoint is gated on its own permission, **`users.search`**,
@@ -231,6 +232,13 @@ dashboard — deliberately *not* implied by `door.open`), and `door.manage` (the
 device endpoints `POST /api/door/scan` + `/api/door/logs` are for the Raspberry Pi and authenticate
 on a shared Bearer secret (`getDoorConfig`), not a session; see `docs/design-decisions.md`
 ("Deurtoegang") and `infra/door/`.
+
+**`fakscanner.manage`** is one permission for both viewing and changing: the people who read
+the ranking at the bar are the same people who set the double-count window, and splitting that
+would only mean handing out two roles to the same person. Its device endpoint
+`POST /api/fakscanner/scan` authenticates on `FAKSCANNER_TOKEN` from the environment (never from
+the DB, unlike the door secret); see `docs/design-decisions.md` ("Fakscanner") and
+`scripts/fakscanner.py`.
 
 ## Seeded baseline
 

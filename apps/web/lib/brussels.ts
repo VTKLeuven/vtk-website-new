@@ -49,6 +49,20 @@ export function brusselsYMD(date: Date): YMD {
   return { year, month, day };
 }
 
+/** Minuten sinds middernacht op de Brusselse klok, 0 t/m 1439. */
+export function brusselsMinutesOfDay(date: Date): number {
+  const dtf = new Intl.DateTimeFormat('en-GB', {
+    timeZone: BRUSSELS_TZ,
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  });
+  const parts = dtf.formatToParts(date);
+  const get = (t: string) => Number(parts.find((p) => p.type === t)?.value);
+  const hour = get('hour');
+  return (hour === 24 ? 0 : hour) * 60 + get('minute');
+}
+
 /**
  * Instant voor een wandklokmoment (kalenderdag + minuten sinds middernacht) in
  * Europe/Brussels.

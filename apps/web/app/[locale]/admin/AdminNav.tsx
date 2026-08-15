@@ -522,6 +522,16 @@ const icons: Record<string, ReactNode> = {
       <path d="m14.5 8.5 2.5 2.5" />
     </Svg>
   ),
+  // fakscanner: pint met schuim, de kaartlezer aan de bar
+  fakscanner: (
+    <Svg>
+      <path d="M6 9h9v10a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2Z" />
+      <path d="M15 12h2a2 2 0 0 1 0 4h-2" />
+      <path d="M6 9a2.5 2.5 0 0 1 1.7-2.4 2.5 2.5 0 0 1 4.2-1A2.5 2.5 0 0 1 15 9" />
+      <path d="M9.5 13v4" />
+      <path d="M12 13v4" />
+    </Svg>
+  ),
   // door: deur met klink
   door: (
     <Svg>

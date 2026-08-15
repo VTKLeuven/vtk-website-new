@@ -21,7 +21,7 @@ import {
   syncMeetingsOnDay,
   usageForSessionItemsTx,
 } from "@/lib/meetings-server";
-import { verifyStudentCard } from "@/lib/kul-card";
+import { resolveStudentCard } from "@/lib/student-card";
 import {
   allocateUserShiftReward,
   ShiftRewardConflictError,
@@ -691,14 +691,15 @@ export async function lookupPickupByRNumberAction(rNumber: string): Promise<Pick
 
 /**
  * Zoekt de bestelling(en) op via een gescande studentenkaart. De scanner tikt
- * `serial;cardAppId`; die string wordt bij KU Leuven geverifieerd tot een r-nummer
- * (zie {@link verifyStudentCard}) waarna de gewone afhaal-lookup volgt.
+ * `serial;cardAppId`; die string wordt tot een r-nummer herleid (zie
+ * {@link resolveStudentCard}: eerst onze eigen kaarttabel, anders KU Leuven)
+ * waarna de gewone afhaal-lookup volgt.
  */
 export async function lookupPickupByCardAction(scanned: string): Promise<PickupLookupResult> {
   await requirePermission("theokot.pickup");
-  const verified = await verifyStudentCard(scanned);
-  if (!verified.ok) return { ok: false, error: verified.error };
-  return pickupByRNumber(verified.rNumber);
+  const resolved = await resolveStudentCard(scanned);
+  if (!resolved.ok) return { ok: false, error: resolved.error };
+  return pickupByRNumber(resolved.rNumber);
 }
 
 /** Markeert een bestelling als opgehaald. Faalt als ze al opgehaald/geannuleerd is. */
