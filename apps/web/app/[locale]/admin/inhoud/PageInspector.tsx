@@ -8,7 +8,11 @@ import { SaveForm } from "@/components/ui/SaveForm";
 import { SlugField } from "@/components/ui/SlugField";
 import { useToast } from "@/components/ui/toast";
 import { SAVE_IDLE } from "@/lib/saveState";
-import { deletePageAction, savePageAction } from "@/app/actions/pages";
+import {
+  deletePageAction,
+  savePageAction,
+  unlinkPageFromTabAction,
+} from "@/app/actions/pages";
 import { contentErrorMessages } from "./messages";
 import { InspectorHead } from "./TabInspector";
 import type { PageNode, RoleOption, TabNode } from "./ContentManager";
@@ -165,12 +169,72 @@ export function PageInspector({
         </div>
       </SaveForm>
 
+      <div className="mt-5 border-t border-vtk-blue/10 pt-5">
+        <UnlinkPageButton locale={locale} page={page} onUnlinked={onClose} />
+      </div>
+
       {canDelete && (
         <div className="mt-5 border-t border-vtk-blue/10 pt-5">
           <DeletePageButton locale={locale} page={page} onDeleted={onClose} />
         </div>
       )}
     </Card>
+  );
+}
+
+/** Verwijdert alleen de categorie-koppeling; de pagina zelf blijft bestaan. */
+function UnlinkPageButton({
+  locale,
+  page,
+  onUnlinked,
+}: {
+  locale: Locale;
+  page: PageNode;
+  onUnlinked: () => void;
+}) {
+  const nl = locale === "nl";
+  const dict = getDictionary(locale);
+  const showToast = useToast();
+  const [pending, startTransition] = useTransition();
+
+  function unlink() {
+    const form = new FormData();
+    form.append("id", page.id);
+    startTransition(async () => {
+      const result = await unlinkPageFromTabAction(SAVE_IDLE, form);
+      if (result.status === "error") {
+        showToast({
+          message: contentErrorMessages(locale)[result.code] ?? dict.common.saveError,
+          variant: "error",
+          duration: 0,
+        });
+        return;
+      }
+      showToast({
+        message: nl ? "Pagina uit categorie verwijderd" : "Page removed from category",
+        variant: "success",
+      });
+      onUnlinked();
+    });
+  }
+
+  return (
+    <div className="flex flex-wrap items-center justify-between gap-3">
+      <p className="max-w-xl text-xs text-[#5c667f]">
+        {nl
+          ? "Haal de pagina uit deze categorie zonder de pagina of inhoud te verwijderen. Ze blijft bereikbaar op /p/<slug> en kan later opnieuw aan een categorie worden toegevoegd."
+          : "Remove the page from this category without deleting the page or its content. It remains available at /p/<slug> and can be added to a category again later."}
+      </p>
+      <Button variant="secondary" size="sm" type="button" disabled={pending} onClick={unlink}>
+        {pending
+          ? nl
+            ? "Losmaken…"
+            : "Unlinking…"
+          : nl
+            ? "Uit categorie verwijderen"
+            : "Remove from category"}
+      </Button>
+    </div>
   );
 }
 

@@ -184,6 +184,33 @@ export async function movePageToTabAction(
   revalidatePath('/', 'layout');
 }
 
+/**
+ * Een bestaande pagina expliciet uit haar categorie halen. Alleen de koppeling
+ * en het categoriegebonden volgnummer wijzigen; de pagina en al haar inhoud,
+ * bijlagen en bewerkrollen blijven bestaan.
+ */
+export async function unlinkPageFromTabAction(
+  _prev: SaveState,
+  formData: FormData
+): Promise<SaveState> {
+  await requirePermission('pages.manage');
+  const id = formData.get('id');
+  if (typeof id !== 'string' || !id) {
+    return saveError('INVALID_INPUT' satisfies ContentErrorCode);
+  }
+
+  const result = await prisma.page.updateMany({
+    where: { id, headerTabId: { not: null } },
+    data: { headerTabId: null, order: 0 },
+  });
+  if (result.count !== 1) {
+    return saveError('INVALID_INPUT' satisfies ContentErrorCode);
+  }
+
+  revalidatePath('/', 'layout');
+  return saveOk();
+}
+
 // ---- Pagina's: inhoud (pages.edit + paginarol, /admin/paginas) --------------
 
 const contentSchema = z.object({
