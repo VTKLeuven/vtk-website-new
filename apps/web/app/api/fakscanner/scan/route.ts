@@ -1,10 +1,6 @@
 import { prisma } from "@vtk/db";
 import { cardDisplayName, resolveStudentCard } from "@/lib/student-card";
-import {
-  isFakscannerRequest,
-  logFakScan,
-  registerCheckin,
-} from "@/lib/fakscanner-server";
+import { isFakscannerRequest, logFakScan, registerCheckin } from "@/lib/fakscanner-server";
 import { rewardProgress } from "@/lib/fakscanner";
 
 export const runtime = "nodejs";
@@ -14,21 +10,24 @@ export const dynamic = "force-dynamic";
  * Check-in aan de bar. De Raspberry Pi met de kaartlezer POST't de ruwe scan
  * (`serial;cardAppId`) met `Authorization: Bearer $FAKSCANNER_TOKEN`; wij zoeken
  * het r-nummer op (eigen kaarttabel, anders KU Leuven), tellen één check-in per
- * bardag en zeggen terug hoeveel punten het lid staat en of er een pint bij hoort.
+ * bardag en zeggen terug hoeveel punten er staan en of er een pint bij hoort.
  *
- * Elke uitkomst gaat naar `FakScanLog`, ook de mislukte, zodat /admin/fakscanner
- * toont wanneer de lezer of KU Leuven het liet afweten.
+ * **Een VTK-account is niet nodig.** De stand hangt aan het r-nummer, dus wie geen
+ * lid is spaart gewoon mee. Het account dient enkel om er een naam bij te kunnen
+ * tonen; ontbreekt het, dan valt dat terug op de naam van de kaart.
+ *
+ * Enkel **mislukte** scans gaan naar `FakScanLog`; een log van elke geslaagde
+ * check-in zou een aanwezigheidslijst zijn (zie docs/design-decisions.md).
  *
  * Antwoord (200): `{ ok, counted, rNumber, name, total, points, double, freeBeer,
- * message }`. Bij een fout: `{ ok: false, error }` met een korte, tonbare zin;
- * het schermpje op de Pi is twee regels van zestien tekens breed.
+ * toNextBeer, message }`. Bij een fout: `{ ok: false, error }` met een korte,
+ * tonbare zin; het schermpje op de Pi is twee regels van zestien tekens breed.
  */
 
 /** Kort genoeg voor het schermpje aan de bar. */
 const MESSAGES = {
   noCard: "Geen kaart gelezen",
   unreadable: "Kaart niet gelezen",
-  unknownUser: "Geen VTK-account",
   alreadyToday: "Al ingecheckt",
   serverError: "Serverfout",
 } as const;
@@ -51,60 +50,39 @@ export async function POST(request: Request) {
 
   const resolved = await resolveStudentCard(card);
   if (!resolved.ok) {
-    // Ongeldige scan of KU Leuven onbereikbaar: er is geen persoon om aan te
-    // koppelen, dus de reden gaat mee naar de log en niet naar de bar.
-    await logFakScan({ result: "ERROR", reason: resolved.error });
+    // Ongeldige scan of KU Leuven onbereikbaar: we weten niet eens van wie de
+    // kaart was, dus de reden gaat naar de log en niet naar de bar.
+    await logFakScan({ result: "CARD_ERROR", reason: resolved.error });
     return Response.json({ ok: false, error: MESSAGES.unreadable });
   }
 
   const rNumber = resolved.rNumber;
-  const cardName = cardDisplayName(resolved);
 
-  const user = await prisma.user.findUnique({
-    where: { rNumber },
-    select: { id: true, name: true, active: true },
-  });
-  if (!user || !user.active) {
-    await logFakScan({
-      result: "UNKNOWN_CARD",
-      rNumber,
-      cardName,
-      reason: user ? "inactive_user" : "no_user",
-    });
-    return Response.json({ ok: false, rNumber, name: cardName, error: MESSAGES.unknownUser });
-  }
+  // Enkel om een naam te kunnen tonen; wie geen account heeft, telt gewoon mee.
+  const user = await prisma.user
+    .findUnique({ where: { rNumber }, select: { name: true } })
+    .catch(() => null);
+  const name = user?.name ?? cardDisplayName(resolved);
 
   let outcome;
   try {
-    outcome = await registerCheckin(user.id);
+    outcome = await registerCheckin(rNumber);
   } catch (err) {
     console.error("[fakscanner] check-in mislukt:", err);
     await logFakScan({
-      result: "ERROR",
-      userId: user.id,
+      result: "SERVER_ERROR",
       rNumber,
-      cardName,
       reason: err instanceof Error ? err.message : String(err),
     });
-    return Response.json({ ok: false, rNumber, name: user.name, error: MESSAGES.serverError });
+    return Response.json({ ok: false, rNumber, name, error: MESSAGES.serverError });
   }
 
   const { toNext } = rewardProgress(outcome.config, outcome.total);
-  await logFakScan({
-    result: outcome.counted ? "COUNTED" : "ALREADY_TODAY",
-    userId: user.id,
-    rNumber,
-    cardName,
-    points: outcome.counted ? outcome.points : null,
-    total: outcome.total,
-    reward: outcome.reward,
-  });
-
   return Response.json({
     ok: true,
     counted: outcome.counted,
     rNumber,
-    name: user.name,
+    name,
     total: outcome.total,
     points: outcome.points,
     double: outcome.double,

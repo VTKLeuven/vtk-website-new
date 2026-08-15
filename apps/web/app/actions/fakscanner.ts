@@ -32,7 +32,7 @@ export async function saveFakscannerConfigAction(
   const doubleEnd = String(formData.get("doubleEnd") ?? "").trim();
   const doubleEnabled = formData.get("doubleEnabled") === "on";
   const rewardEvery = Number(formData.get("rewardEvery"));
-  const dayRolloverHour = Number(formData.get("dayRolloverHour"));
+  const dayRolloverTime = String(formData.get("dayRolloverTime") ?? "").trim();
 
   if (!HHMM.test(doubleStart) || !HHMM.test(doubleEnd)) return saveError("bad_time");
   // Een venster van 22:00 tot 22:00 zou "de klok rond" kunnen betekenen of "nooit";
@@ -41,16 +41,14 @@ export async function saveFakscannerConfigAction(
   if (!Number.isInteger(rewardEvery) || rewardEvery < 1 || rewardEvery > 1000) {
     return saveError("bad_reward");
   }
-  if (!Number.isInteger(dayRolloverHour) || dayRolloverHour < 0 || dayRolloverHour > 23) {
-    return saveError("bad_rollover");
-  }
+  if (!HHMM.test(dayRolloverTime)) return saveError("bad_rollover");
 
   const value = {
     rewardEvery,
     doubleEnabled,
     doubleStart,
     doubleEnd,
-    dayRolloverHour,
+    dayRolloverTime,
   } satisfies typeof DEFAULT_FAKSCANNER_CONFIG;
 
   await prisma.setting.upsert({

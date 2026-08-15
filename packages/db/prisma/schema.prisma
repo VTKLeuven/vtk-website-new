@@ -540,9 +540,6 @@ model User {
   doorLogs           DoorAccessLog[]
   doorShortcutTokens DoorShortcutToken[]
 
-  fakCheckins FakCheckin[]
-  fakScanLogs FakScanLog[]
-
   calendarFeedTokens CalendarFeedToken[]
 
   createdTicketEvents      TicketEvent[]           @relation("TicketEventCreatedBy")
@@ -2934,58 +2931,50 @@ model StudentCard {
 // Fakscanner (kaartlezer aan de bar: één check-in per bardag, pint per 10 punten)
 // -----------------------------------------------------------------------------
 
-// Eén rij per geldige check-in. `day` is de **bardag** (`YYYY-MM-DD`, Brussel, met
-// de rollover uit de instellingen) en niet de kalenderdag: een avond die over
-// middernacht loopt blijft zo één check-in. De unieke index op (userId, day) is
-// wat "één keer per dag" afdwingt; twee gelijktijdige scans laten de tweede op
-// een P2002 stuklopen in plaats van dubbel te tellen.
-model FakCheckin {
-  id     String   @id @default(cuid())
-  userId String
-  year   Int // werkingsjaar, zodat de ranglijst op 15 juli mee reset
-  day    String   @db.VarChar(10)
-  at     DateTime @default(now())
-  points Int      @default(1) // 2 tijdens het dubbeltelvenster
-  double Boolean  @default(false)
-  reward Boolean  @default(false) // deze scan maakte een gratis pint vol
+// **Eén rij per lid per werkingsjaar, en bewust geen rij per scan.** De stand is
+// het enige dat de kring nodig heeft; een lijst van wie wanneer aan de bar stond
+// is dat niet, en die zouden we dan wel bijhouden. Er valt hier dus ook niets uit
+// te reconstrueren: we weten hoeveel iemand dit jaar scande en wanneer voor het
+// laatst, niet op welke avonden.
+//
+// `lastCheckinAt` doet meteen dienst als "al gescand vandaag"-check: ligt het na
+// het begin van de huidige bardag, dan telt een nieuwe scan niet. Zie
+// `registerCheckin` voor hoe dat racevrij blijft zonder rij per dag.
+//
+// De sleutel is het **r-nummer** en niet een `User`: ook studenten zonder
+// VTK-account scannen aan de bar en sparen gewoon mee.
+model FakTally {
+  rNumber       String
+  year          Int // werkingsjaar, zodat de ranglijst op 15 juli mee reset
+  points        Int      @default(0) // telt dubbel binnen het dubbeltelvenster
+  checkins      Int      @default(0) // aantal keer gescand (los van de punten)
+  lastCheckinAt DateTime
 
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@unique([userId, day])
-  @@index([year, userId])
-  @@index([at])
+  @@id([rNumber, year])
+  @@index([year, points])
 }
 
-// De uitkomst van een scan aan de bar.
+// Waar een mislukte scan aan lag.
 enum FakScanResult {
-  COUNTED // geteld, punten toegekend
-  ALREADY_TODAY // gekend lid dat vandaag al scande
-  UNKNOWN_CARD // kaart geverifieerd maar niet aan een gebruiker gekoppeld
-  ERROR // verificatie/lookup mislukt
+  CARD_ERROR // onleesbare kaart, of KU Leuven weigerde/antwoordde niet
+  SERVER_ERROR // onze kant ging stuk nadat de kaart wel gelezen was
 }
 
-// Eén rij per scan aan de bar, ook de mislukte. Dit is wat de beheerder in
-// /admin/fakscanner onder de ranglijst ziet: geteld, al gescand, onbekende kaart
-// en fouten staan door elkaar in één chronologische lijst, zodat een kapotte
-// lezer of een KU Leuven-storing daar zichtbaar wordt en niet enkel in de logs
-// van de Pi.
+// **Enkel de mislukte scans.** Een log van elke geslaagde check-in zou precies de
+// aanwezigheidslijst zijn die `FakTally` hierboven vermijdt. Wat de beheerder wél
+// moet kunnen zien is of de lezer of KU Leuven het laat afweten, want anders is
+// een stille storing pas zichtbaar wanneer iemand komt klagen dat zijn punten
+// ontbreken.
 model FakScanLog {
-  id       String        @id @default(cuid())
-  at       DateTime      @default(now())
-  result   FakScanResult
-  userId   String?
-  rNumber  String?
-  cardName String?
-  points   Int? // wat deze scan opleverde (null bij een fout)
-  total    Int? // stand na deze scan
-  reward   Boolean       @default(false)
-  reason   String?
-
-  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+  id      String        @id @default(cuid())
+  at      DateTime      @default(now())
+  result  FakScanResult
+  // Enkel gevuld wanneer de kaart wél gelezen raakte en het daarna misging; bij
+  // een onleesbare kaart weten we per definitie niet van wie ze was.
+  rNumber String?
+  reason  String?
 
   @@index([at])
-  @@index([result])
-  @@index([userId])
 }
 
 // -----------------------------------------------------------------------------

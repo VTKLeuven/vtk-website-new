@@ -47,6 +47,10 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
+# python (de scanner-scripts voor de Pi)
+__pycache__/
+*.py[cod]
+
 # prisma generated client
 packages/db/node_modules/.prisma
 

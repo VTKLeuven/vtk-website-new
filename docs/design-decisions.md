@@ -477,15 +477,37 @@ tellen en beslissen gebeurt server-side. Website-kant:
 `apps/web/app/api/fakscanner/`, `apps/web/lib/fakscanner*.ts` en
 `/admin/fakscanner`; Pi-kant: `scripts/fakscanner.py`.
 
+### Eén stand per persoon, geen lijst van avonden
+
+`FakTally` houdt **één rij per r-nummer per werkingsjaar** bij: punten, aantal
+check-ins en het moment van de laatste. Bewust geen rij per scan. De kring heeft
+de stand nodig; een reconstrueerbare lijst van wie op welke avond aan de bar stond
+heeft ze niet nodig, en die zouden we met een rij per check-in wel bijhouden.
+Hetzelfde geldt voor de log: daar gaan enkel de **mislukte** scans in (zie
+onderaan). Wat je dus niet uit deze database haalt, is wie er donderdag was.
+
 ### Eén check-in per **bardag**, niet per kalenderdag
 
 Een fakavond loopt over middernacht. Met een kalenderdag als grens zou wie om 23u50
 en om 00u10 scant twee check-ins hebben, en dat is precies één avond. De teller
 gebruikt daarom een bardag die om een instelbaar uur begint (standaard 6u): alles
-daarvoor telt nog bij de avond ervoor. De unieke index `(userId, day)` op
-`FakCheckin` is wat dit afdwingt, niet een check in de code: twee scans vlak na
-elkaar laten de tweede op een unieke-constraint stuklopen in plaats van dubbel te
-tellen.
+daarvoor telt nog bij de avond ervoor.
+
+Zonder rij per dag doet de voorwaarde in de `UPDATE` het werk: enkel een rij
+waarvan `lastCheckinAt` vóór het begin van deze bardag ligt, wordt opgehoogd.
+Postgres voert dat atomair uit, dus van twee gelijktijdige scans raakt er precies
+één binnen. Bestaat de rij nog niet, dan maken we ze aan; botst dat op de primaire
+sleutel, dan was een gelijktijdige scan ons voor en is het dus ook "al gescand".
+
+### De bardag hangt aan de wandklok, niet aan een aantal uren
+
+De bar is soms open wanneer de klok verspringt. `fakDayStart` rekent daarom via de
+Brusselse wandklok (`brusselsWallClockMinutes`) en niet met een vast aantal uren:
+de nacht van de wissel duurt 23 of 25 uur, maar de bardag begint even goed om 6u op
+de klok, en 02:30 dat twee keer voorkomt hoort beide keren bij dezelfde bardag. Om
+dezelfde reden is het dubbeltelvenster een wandklokvenster. Eén randgeval: zet de
+rollover niet tussen 02:00 en 03:00, want bij de overgang naar zomertijd bestaat
+dat uur niet. Met de standaard 06:00 speelt dat nooit.
 
 ### Punten, niet check-ins
 
@@ -499,13 +521,26 @@ De pint valt bij het **passeren** van een veelvoud en niet bij `totaal % 10 == 0
 Een dubbeltelling kan van 9 naar 11 springen, en die pint hoort niet verloren te
 gaan omdat de teller toevallig nooit exact op 10 stond.
 
+### Een VTK-account is niet nodig
+
+De stand hangt aan het **r-nummer** en niet aan een `User`. Wie geen account heeft
+spaart gewoon mee en krijgt zijn pinten; aan de toog is dat ook niemands vraag. Het
+account dient enkel om er een naam bij te kunnen zetten: in het beheerscherm staat
+wie geen account heeft met zijn r-nummer in de lijst, niet met de naam die op de
+kaart stond. Het schermpje aan de bar begroet die persoon wél gewoon met zijn
+voornaam, want die staat daar voor hemzelf.
+
 ### De stand reset mee met het werkingsjaar
 
-Elke check-in draagt zijn werkingsjaar, en de ranglijst is per jaar. Op 15 juli
-begint iedereen dus weer op nul, net als de rollen en de posten, maar de historiek
-blijft staan: in `/admin/fakscanner` kies je een ouder werkingsjaar en zie je de
-ranglijst van toen. Een avond die over de cutover loopt telt in haar geheel bij het
-jaar waarin ze begon, om dezelfde reden als de bardag hierboven.
+Het werkingsjaar staat in de sleutel van de rij, dus op 15 juli begint iedereen
+weer op nul, net als de rollen en de posten. De oude standen blijven staan: in
+`/admin/fakscanner` kies je een ouder werkingsjaar en zie je de ranglijst van toen.
+Een avond die over de cutover loopt telt in haar geheel bij het jaar waarin ze
+begon, om dezelfde reden als de bardag hierboven.
+
+De ranglijst toont dertig mensen per pagina. Op een goed jaar staan daar honderden
+namen in, en dan is de vraag "wie staat er bovenaan" nog steeds de eerste die
+iemand stelt.
 
 ### We tellen verdiende pinten, we volgen ze niet op
 
@@ -534,12 +569,14 @@ hier geen tweede richting die configuratie nodig heeft, en een gecompromitteerd
 adminaccount hoort geen check-ins te kunnen vervalsen. Leeg = het endpoint weigert
 alles.
 
-### Alles wordt gelogd, ook wat niet telde
+### Enkel de mislukte scans gaan naar de log
 
-Elke scan is één `FakScanLog`-rij: geteld, al gescand vandaag, onbekende kaart en
-fouten. Zo zie je in `/admin/fakscanner` onder de ranglijst niet enkel wie kwam,
-maar ook of de lezer of KU Leuven het liet afweten. Zonder die rijen is een stille
-storing aan de bar pas zichtbaar wanneer iemand komt klagen dat zijn punten
+`FakScanLog` bevat wat misging: een onleesbare kaart of een KU Leuven dat niet
+antwoordt (`CARD_ERROR`), en onze eigen kant die stukging nadat de kaart wel gelezen
+was (`SERVER_ERROR`). Geslaagde check-ins loggen we niet, want dat zou precies de
+aanwezigheidslijst zijn die `FakTally` hierboven vermijdt. Wat de beheerder wél moet
+kunnen zien is of de lezer of KU Leuven het laat afweten: zonder die rijen is een
+stille storing aan de bar pas zichtbaar wanneer iemand komt klagen dat zijn punten
 ontbreken.
 
 ---

@@ -7,7 +7,7 @@ import { currentWorkingYear } from "@vtk/auth";
 import {
   DEFAULT_FAKSCANNER_CONFIG,
   earnedReward,
-  fakDayKey,
+  fakDayStart,
   isDoublePeriod,
   parseFakscannerConfig,
   pointsForScan,
@@ -16,9 +16,9 @@ import {
 
 /**
  * Server-only kant van de fakscanner: de instellingen uit `Setting`, het
- * device-token uit de omgeving, het wegschrijven van een check-in en de
- * ranglijst voor /admin/fakscanner. De rekenregels zelf (bardag,
- * dubbeltelvenster, gratis pint) staan in {@link ./fakscanner}.
+ * device-token uit de omgeving, het bijwerken van de stand en de ranglijst voor
+ * /admin/fakscanner. De rekenregels zelf (bardag, dubbeltelvenster, gratis pint)
+ * staan in {@link ./fakscanner}.
  */
 
 export const FAKSCANNER_SETTING_KEY = "fakscanner.config";
@@ -56,15 +56,13 @@ export function isFakscannerRequest(request: Request): boolean {
   return expected.length === actual.length && timingSafeEqual(expected, actual);
 }
 
-/** Schrijft één scan-gebeurtenis naar de log (ook de mislukte). */
+/**
+ * Schrijft één **mislukte** scan naar de log. Geslaagde check-ins loggen we niet:
+ * dat zou de aanwezigheidslijst zijn die we net niet willen bijhouden.
+ */
 export async function logFakScan(entry: {
   result: FakScanResult;
-  userId?: string | null;
   rNumber?: string | null;
-  cardName?: string | null;
-  points?: number | null;
-  total?: number | null;
-  reward?: boolean;
   reason?: string | null;
 }): Promise<void> {
   // De lezer aan de bar mag niet blijven hangen omdat de log niet weggeschreven
@@ -73,25 +71,11 @@ export async function logFakScan(entry: {
     .create({
       data: {
         result: entry.result,
-        userId: entry.userId ?? null,
         rNumber: entry.rNumber ?? null,
-        cardName: entry.cardName ?? null,
-        points: entry.points ?? null,
-        total: entry.total ?? null,
-        reward: entry.reward ?? false,
         reason: entry.reason ?? null,
       },
     })
     .catch(() => null);
-}
-
-/** Puntentotaal van een lid in een werkingsjaar. */
-export async function totalPoints(userId: string, year: number): Promise<number> {
-  const agg = await prisma.fakCheckin.aggregate({
-    where: { userId, year },
-    _sum: { points: true },
-  });
-  return agg._sum.points ?? 0;
 }
 
 export type CheckinOutcome = {
@@ -107,87 +91,126 @@ export type CheckinOutcome = {
 };
 
 /**
- * Registreert één check-in voor een lid, of stelt vast dat het er vandaag al één
- * had. De unieke index op (userId, day) is wat "één keer per dag" afdwingt: twee
- * scans vlak na elkaar laten de tweede op een P2002 stuklopen in plaats van
- * dubbel te tellen, dus dat is hier een gewone uitkomst en geen fout.
+ * Telt één check-in bij de stand van een r-nummer, of stelt vast dat er vandaag al
+ * één was.
+ *
+ * Er is geen rij per dag om de dubbele scan tegen te houden, dus doet de
+ * voorwaarde in de `UPDATE` dat werk: enkel een rij waarvan `lastCheckinAt` vóór
+ * het begin van deze bardag ligt, wordt opgehoogd. Postgres voert die update
+ * atomair uit, dus van twee gelijktijdige scans raakt er precies één binnen en
+ * krijgt de andere `count: 0`. Bestaat de rij nog niet, dan is dit de eerste scan
+ * van het jaar en maken we ze aan; botst dat op de primaire sleutel, dan was een
+ * gelijktijdige scan ons net voor en is het dus ook "al gescand".
  */
-export async function registerCheckin(userId: string, at: Date = new Date()): Promise<CheckinOutcome> {
+export async function registerCheckin(
+  rNumber: string,
+  at: Date = new Date(),
+): Promise<CheckinOutcome> {
   const config = await getFakscannerConfig();
-  const day = fakDayKey(config, at);
+  const dayStart = fakDayStart(config, at);
+  // Het werkingsjaar hoort bij de bardag: een avond die over de 15-julicutover
+  // loopt, telt in haar geheel bij het jaar waarin ze begon.
+  const year = currentWorkingYear(dayStart);
   const double = isDoublePeriod(config, at);
   const points = pointsForScan(config, at);
-  // Het werkingsjaar hoort bij de bardag: een avond die over de 15-julicutover
-  // loopt, telt in zijn geheel bij het jaar waarin ze begon.
-  const year = currentWorkingYear(new Date(`${day}T12:00:00Z`));
 
-  let checkinId: string;
-  try {
-    const created = await prisma.fakCheckin.create({
-      data: { userId, year, day, at, points, double },
-      select: { id: true },
+  const updated = await prisma.fakTally.updateMany({
+    where: { rNumber, year, lastCheckinAt: { lt: dayStart } },
+    data: {
+      points: { increment: points },
+      checkins: { increment: 1 },
+      lastCheckinAt: at,
+    },
+  });
+
+  if (updated.count === 1) {
+    const row = await prisma.fakTally.findUnique({
+      where: { rNumber_year: { rNumber, year } },
+      select: { points: true },
     });
-    checkinId = created.id;
-  } catch (err) {
-    if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002") {
-      return { counted: false, points: 0, double, total: await totalPoints(userId, year), reward: false, config };
-    }
-    throw err;
+    const total = row?.points ?? points;
+    return { counted: true, points, double, total, reward: earnedReward(config, total - points, total), config };
   }
 
-  const total = await totalPoints(userId, year);
-  const reward = earnedReward(config, total - points, total);
-  if (reward) {
-    await prisma.fakCheckin.update({ where: { id: checkinId }, data: { reward: true } });
+  try {
+    const created = await prisma.fakTally.create({
+      data: { rNumber, year, points, checkins: 1, lastCheckinAt: at },
+      select: { points: true },
+    });
+    return {
+      counted: true,
+      points,
+      double,
+      total: created.points,
+      reward: earnedReward(config, 0, created.points),
+      config,
+    };
+  } catch (err) {
+    if (!(err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002")) throw err;
   }
-  return { counted: true, points, double, total, reward, config };
+
+  const existing = await prisma.fakTally.findUnique({
+    where: { rNumber_year: { rNumber, year } },
+    select: { points: true },
+  });
+  return { counted: false, points: 0, double, total: existing?.points ?? 0, reward: false, config };
 }
 
 export type FakRankingRow = {
-  userId: string;
-  name: string;
-  rNumber: string | null;
-  total: number;
+  rNumber: string;
+  /** De naam uit ons ledenbestand, of null voor wie geen VTK-account heeft. */
+  name: string | null;
+  points: number;
   checkins: number;
   beers: number;
-  lastAt: Date;
+  lastCheckinAt: Date;
+};
+
+export type FakRanking = {
+  rows: FakRankingRow[];
+  /** Aantal mensen met een stand dit werkingsjaar (voor de paginering). */
+  total: number;
 };
 
 /**
- * De ranglijst van een werkingsjaar: iedereen met minstens één check-in, van veel
- * naar weinig punten. Bewust een groepering op de check-ins en geen scan over alle
- * gebruikers: enkel wie effectief aan de bar geweest is hoort in de lijst.
+ * Een pagina uit de ranglijst van een werkingsjaar, van veel naar weinig punten.
+ * De naam komt uit `User` wanneer er een account bij het r-nummer hoort; wie
+ * zonder account meespaart, blijft in het beheerscherm gewoon zijn r-nummer.
  */
 export async function getFakRanking(
   year: number = currentWorkingYear(),
   rewardEvery: number = DEFAULT_FAKSCANNER_CONFIG.rewardEvery,
-): Promise<FakRankingRow[]> {
-  const grouped = await prisma.fakCheckin.groupBy({
-    by: ["userId"],
-    where: { year },
-    _sum: { points: true },
-    _count: { _all: true },
-    _max: { at: true },
-    orderBy: { _sum: { points: "desc" } },
-  });
-  if (grouped.length === 0) return [];
+  skip = 0,
+  take = 30,
+): Promise<FakRanking> {
+  const [total, tallies] = await Promise.all([
+    prisma.fakTally.count({ where: { year } }),
+    prisma.fakTally.findMany({
+      where: { year },
+      // Gelijke standen krijgen een vaste volgorde, anders verspringt de lijst
+      // tussen twee pagina's door.
+      orderBy: [{ points: "desc" }, { lastCheckinAt: "asc" }, { rNumber: "asc" }],
+      skip,
+      take,
+    }),
+  ]);
+  if (tallies.length === 0) return { rows: [], total };
 
   const users = await prisma.user.findMany({
-    where: { id: { in: grouped.map((g) => g.userId) } },
-    select: { id: true, name: true, rNumber: true },
+    where: { rNumber: { in: tallies.map((t) => t.rNumber) } },
+    select: { rNumber: true, name: true },
   });
-  const byId = new Map(users.map((u) => [u.id, u]));
+  const nameByRNumber = new Map(users.map((u) => [u.rNumber, u.name]));
 
-  return grouped.map((g) => {
-    const total = g._sum.points ?? 0;
-    return {
-      userId: g.userId,
-      name: byId.get(g.userId)?.name ?? g.userId,
-      rNumber: byId.get(g.userId)?.rNumber ?? null,
-      total,
-      checkins: g._count._all,
-      beers: Math.floor(total / rewardEvery),
-      lastAt: g._max.at ?? new Date(0),
-    };
-  });
+  return {
+    total,
+    rows: tallies.map((t) => ({
+      rNumber: t.rNumber,
+      name: nameByRNumber.get(t.rNumber) ?? null,
+      points: t.points,
+      checkins: t.checkins,
+      beers: Math.floor(t.points / rewardEvery),
+      lastCheckinAt: t.lastCheckinAt,
+    })),
+  };
 }
