@@ -1,0 +1,49 @@
+[
+  {
+    "slug": "computerwetenschappen",
+    "nameNl": "Computerwetenschappen",
+    "nameEn": "Computer Science",
+    "descriptionNl": "Aanspreekpunt voor major-keuzes, ISP-vragen en feedback over softwarevakken.",
+    "descriptionEn": "Point of contact for major choices, ISP questions and feedback on software courses.",
+    "order": 0,
+    "studyProgrammes": [
+      "COMPUTER_SCIENCE"
+    ]
+  },
+  {
+    "slug": "werktuigkunde",
+    "nameNl": "Werktuigkunde",
+    "nameEn": "Mechanical Engineering",
+    "descriptionNl": "Voor labo's, projectwerk, uurroosters en opleidingsfeedback.",
+    "descriptionEn": "For labs, project work, schedules and programme feedback.",
+    "order": 1,
+    "studyProgrammes": []
+  },
+  {
+    "slug": "elektrotechniek",
+    "nameNl": "Elektrotechniek",
+    "nameEn": "Electrical Engineering",
+    "descriptionNl": "Bundelt opmerkingen rond practica, examens en communicatie met professoren.",
+    "descriptionEn": "Collects remarks about practicals, exams and communication with professors.",
+    "order": 2,
+    "studyProgrammes": []
+  },
+  {
+    "slug": "chemische-technologie",
+    "nameNl": "Chemische technologie",
+    "nameEn": "Chemical Engineering",
+    "descriptionNl": "Contactpunt voor practica, stages en facultaire overlegmomenten.",
+    "descriptionEn": "Contact point for labs, internships and faculty consultations.",
+    "order": 3,
+    "studyProgrammes": []
+  },
+  {
+    "slug": "energie",
+    "nameNl": "Energie",
+    "nameEn": "Energy",
+    "order": 4,
+    "studyProgrammes": [
+      "ENERGY"
+    ]
+  }
+]

@@ -1,0 +1,65 @@
+[
+  {
+    "name": "Deloitte",
+    "logoKey": "logos/ed75953183c6fcd30cc9ffbf.png",
+    "url": "https://mycareer.deloitte.com",
+    "order": 0,
+    "active": true
+  },
+  {
+    "name": "Renotec",
+    "logoKey": "logos/3c56936b679265139ef039c7.png",
+    "url": "https://renotec.be",
+    "order": 1,
+    "active": true
+  },
+  {
+    "name": "DEME Group",
+    "logoKey": "logos/b3aee4f97ac242ef638089ab.png",
+    "url": "https://deme-group.com",
+    "order": 2,
+    "active": true
+  },
+  {
+    "name": "ExxonMobil",
+    "logoKey": "logos/a0f66059a24205504ad61fe5.png",
+    "url": "https://corporate.exxonmobil.com/locations/belgium",
+    "order": 3,
+    "active": true
+  },
+  {
+    "name": "Eiffage Construction Belux",
+    "logoKey": "logos/db2ab70d249ca7b436eb916d.png",
+    "url": "https://eiffageconstructionbelux.be",
+    "order": 4,
+    "active": true
+  },
+  {
+    "name": "Sweco Belgium",
+    "logoKey": "logos/d3ab01fa463d3307a09c09e0.png",
+    "url": "https://swecobelgium.be",
+    "order": 5,
+    "active": true
+  },
+  {
+    "name": "Devoteam",
+    "logoKey": "logos/a0bafd96b1e00421ee08897d.png",
+    "url": "https://devoteam.com/nl",
+    "order": 6,
+    "active": true
+  },
+  {
+    "name": "Revolut",
+    "logoKey": "logos/96039e77ad21b9cd780ca9d7.png",
+    "url": "https://revolut.com/en-BE/metal",
+    "order": 7,
+    "active": true
+  },
+  {
+    "name": "McKinsey",
+    "logoKey": "logos/fa00a91dfc967537ea810eff.png",
+    "url": "https://mckinsey.com/be/careers",
+    "order": 8,
+    "active": true
+  }
+]

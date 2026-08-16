@@ -1,0 +1,405 @@
+[
+  {
+    "slug": "24-urenloop",
+    "visibleInHeader": false,
+    "titleNl": "24 urenloop",
+    "titleEn": "24 Hour Run",
+    "needsYearlyEdit": true,
+    "publishedAt": "2026-08-13T13:46:37.600Z",
+    "order": 0
+  },
+  {
+    "slug": "alumni",
+    "visibleInHeader": true,
+    "titleNl": "Alumni",
+    "titleEn": "Alumni",
+    "needsYearlyEdit": false,
+    "publishedAt": "2026-08-13T13:46:37.600Z",
+    "order": 0
+  },
+  {
+    "slug": "archie-faq",
+    "visibleInHeader": true,
+    "titleNl": "Archie faq",
+    "needsYearlyEdit": false,
+    "publishedAt": "2026-08-13T13:46:37.600Z",
+    "order": 0
+  },
+  {
+    "slug": "blokken",
+    "visibleInHeader": true,
+    "titleNl": "Blokken",
+    "needsYearlyEdit": false,
+    "publishedAt": "2026-08-13T13:46:37.600Z",
+    "order": 0
+  },
+  {
+    "slug": "cultuur",
+    "visibleInHeader": true,
+    "titleNl": "Cultuur",
+    "titleEn": "Culture",
+    "needsYearlyEdit": false,
+    "publishedAt": "2026-08-13T13:46:37.600Z",
+    "order": 0
+  },
+  {
+    "slug": "cultuur-in-leuven",
+    "visibleInHeader": true,
+    "titleNl": "Cultuur in leuven",
+    "titleEn": "Culture in Leuven",
+    "needsYearlyEdit": false,
+    "publishedAt": "2026-08-13T13:46:37.600Z",
+    "order": 0
+  },
+  {
+    "slug": "docentenevaluatie",
+    "visibleInHeader": true,
+    "titleNl": "Docentenevaluatie",
+    "titleEn": "Teacher Evaluation",
+    "needsYearlyEdit": false,
+    "publishedAt": "2026-08-13T13:46:37.600Z",
+    "order": 0
+  },
+  {
+    "slug": "eerstejaarsverantwoordelijke",
+    "headerTabCode": "EERSTEJAARS",
+    "visibleInHeader": true,
+    "titleNl": "Eerstejaarsverantwoordelijke",
+    "titleEn": "First-Year Representative",
+    "needsYearlyEdit": true,
+    "publishedAt": "2026-08-13T13:46:37.600Z",
+    "order": 0
+  },
+  {
+    "slug": "eerstejaarswerking",
+    "headerTabCode": "EERSTEJAARS",
+    "visibleInHeader": true,
+    "titleNl": "Eerstejaarswerking",
+    "titleEn": "Eerstejaarswerking",
+    "needsYearlyEdit": true,
+    "publishedAt": "2026-08-13T13:46:37.600Z",
+    "order": 0
+  },
+  {
+    "slug": "erelidmaatschap",
+    "visibleInHeader": true,
+    "titleNl": "Erelidmaatschap",
+    "titleEn": "Honorary Membership",
+    "needsYearlyEdit": false,
+    "publishedAt": "2026-08-13T13:46:37.600Z",
+    "order": 0
+  },
+  {
+    "slug": "examens",
+    "visibleInHeader": true,
+    "titleNl": "Examens",
+    "needsYearlyEdit": false,
+    "publishedAt": "2026-08-13T13:46:37.600Z",
+    "order": 0
+  },
+  {
+    "slug": "exchange-buddies",
+    "headerTabCode": "EVENTS",
+    "visibleInHeader": true,
+    "titleNl": "Exchange & buddies",
+    "titleEn": "Exchange & buddies",
+    "needsYearlyEdit": false,
+    "publishedAt": "2026-05-17T22:00:00.000Z",
+    "order": 0
+  },
+  {
+    "slug": "fakbar",
+    "visibleInHeader": true,
+    "titleNl": "Fakbar",
+    "titleEn": "Fakbar",
+    "needsYearlyEdit": true,
+    "publishedAt": "2026-08-13T13:46:37.600Z",
+    "order": 0
+  },
+  {
+    "slug": "info-contact",
+    "visibleInHeader": true,
+    "titleNl": "Info contact",
+    "titleEn": "Info & Contact",
+    "needsYearlyEdit": true,
+    "publishedAt": "2026-08-13T13:46:37.600Z",
+    "order": 0
+  },
+  {
+    "slug": "interfacultaire-rockrally",
+    "visibleInHeader": true,
+    "titleNl": "Interfacultaire rockrally",
+    "titleEn": "Interfaculty Rockrally",
+    "needsYearlyEdit": true,
+    "publishedAt": "2026-08-13T13:46:37.600Z",
+    "order": 0
+  },
+  {
+    "slug": "internationaal-kalender",
+    "visibleInHeader": true,
+    "titleNl": "Internationaal kalender",
+    "titleEn": "International Calendar",
+    "needsYearlyEdit": true,
+    "publishedAt": "2026-08-13T13:46:37.600Z",
+    "order": 0
+  },
+  {
+    "slug": "internationale-mogelijkheden",
+    "visibleInHeader": true,
+    "titleNl": "Internationale mogelijkheden",
+    "titleEn": "International possibilities",
+    "needsYearlyEdit": true,
+    "publishedAt": "2026-08-13T13:46:37.600Z",
+    "order": 0
+  },
+  {
+    "slug": "it",
+    "visibleInHeader": true,
+    "titleNl": "It",
+    "titleEn": "IT",
+    "needsYearlyEdit": false,
+    "publishedAt": "2026-08-13T13:46:37.600Z",
+    "order": 0
+  },
+  {
+    "slug": "jaarwerkingen",
+    "headerTabCode": "OVER_VTK",
+    "visibleInHeader": true,
+    "titleNl": "Jaarwerkingen",
+    "needsYearlyEdit": false,
+    "publishedAt": "2026-08-13T13:46:37.600Z",
+    "order": 0
+  },
+  {
+    "slug": "kanweek",
+    "visibleInHeader": true,
+    "titleNl": "Kanweek",
+    "titleEn": "Kanweek",
+    "needsYearlyEdit": true,
+    "publishedAt": "2026-08-13T13:46:37.600Z",
+    "order": 0
+  },
+  {
+    "slug": "lessen",
+    "visibleInHeader": true,
+    "titleNl": "Lessen",
+    "needsYearlyEdit": false,
+    "publishedAt": "2026-08-13T13:46:37.600Z",
+    "order": 0
+  },
+  {
+    "slug": "onderwijs",
+    "headerTabCode": "STUDIES",
+    "visibleInHeader": true,
+    "titleNl": "Onderwijs",
+    "titleEn": "Education",
+    "needsYearlyEdit": false,
+    "publishedAt": "2026-08-13T13:46:37.600Z",
+    "order": 0
+  },
+  {
+    "slug": "onthaaldagen-2026-2027",
+    "headerTabCode": "EERSTEJAARS",
+    "visibleInHeader": true,
+    "titleNl": "Onthaaldagen 2026 2027",
+    "titleEn": "Welcome days 2025-2026",
+    "needsYearlyEdit": true,
+    "publishedAt": "2026-08-13T13:46:37.600Z",
+    "order": 0
+  },
+  {
+    "slug": "pal",
+    "headerTabCode": "STUDIES",
+    "visibleInHeader": true,
+    "titleNl": "Pal",
+    "titleEn": "Peer Assisted Learning",
+    "needsYearlyEdit": false,
+    "publishedAt": "2026-08-13T13:46:37.600Z",
+    "order": 0
+  },
+  {
+    "slug": "peter-en-meter-werking",
+    "headerTabCode": "EERSTEJAARS",
+    "visibleInHeader": true,
+    "titleNl": "Peter en meter werking",
+    "titleEn": "PEME",
+    "needsYearlyEdit": true,
+    "publishedAt": "2026-08-13T13:46:37.600Z",
+    "order": 0
+  },
+  {
+    "slug": "revue",
+    "visibleInHeader": true,
+    "titleNl": "Revue",
+    "titleEn": "Revue",
+    "needsYearlyEdit": false,
+    "publishedAt": "2026-08-13T13:46:37.600Z",
+    "order": 0
+  },
+  {
+    "slug": "sport",
+    "headerTabCode": "AANBOD",
+    "visibleInHeader": true,
+    "titleNl": "Sport",
+    "titleEn": "Sport",
+    "needsYearlyEdit": true,
+    "publishedAt": "2026-08-13T13:46:37.600Z",
+    "order": 0
+  },
+  {
+    "slug": "startdagen",
+    "visibleInHeader": true,
+    "titleNl": "Startdagen",
+    "titleEn": "Starter days",
+    "needsYearlyEdit": true,
+    "publishedAt": "2026-08-13T13:46:37.600Z",
+    "order": 0
+  },
+  {
+    "slug": "tickets-faq",
+    "visibleInHeader": true,
+    "titleNl": "Wanneer worden niet-betaalde tickets terug vrijgegeven?",
+    "titleEn": "Cantustickets FAQ",
+    "needsYearlyEdit": false,
+    "publishedAt": "2026-08-13T13:46:37.600Z",
+    "order": 0
+  },
+  {
+    "slug": "verkiezingen",
+    "headerTabCode": "OVER_VTK",
+    "visibleInHeader": true,
+    "titleNl": "Verkiezingen",
+    "titleEn": "Elections",
+    "needsYearlyEdit": true,
+    "publishedAt": "2026-08-13T13:46:37.600Z",
+    "order": 0
+  },
+  {
+    "slug": "verklarende-woordenlijst",
+    "visibleInHeader": true,
+    "titleNl": "Verklarende woordenlijst",
+    "titleEn": "Glossary",
+    "needsYearlyEdit": false,
+    "publishedAt": "2026-08-13T13:46:37.600Z",
+    "order": 0
+  },
+  {
+    "slug": "vice-praeses",
+    "visibleInHeader": true,
+    "titleNl": "Wie is dat? Wat doet die?",
+    "titleEn": "Vice-President",
+    "needsYearlyEdit": false,
+    "publishedAt": "2026-08-13T13:46:37.600Z",
+    "order": 0
+  },
+  {
+    "slug": "vtk",
+    "visibleInHeader": true,
+    "titleNl": "Vtk",
+    "titleEn": "VTK?",
+    "needsYearlyEdit": false,
+    "publishedAt": "2026-08-13T13:46:37.600Z",
+    "order": 0
+  },
+  {
+    "slug": "vtk-bureau",
+    "visibleInHeader": true,
+    "titleNl": "Vtk bureau",
+    "titleEn": "VTK Bureau",
+    "needsYearlyEdit": false,
+    "publishedAt": "2026-08-13T13:46:37.600Z",
+    "order": 0
+  },
+  {
+    "slug": "vtk-kringlied",
+    "visibleInHeader": true,
+    "titleNl": "Vtk kringlied",
+    "needsYearlyEdit": false,
+    "publishedAt": "2026-08-13T13:46:37.600Z",
+    "order": 0
+  },
+  {
+    "slug": "werkgroepen",
+    "headerTabCode": "OVER_VTK",
+    "visibleInHeader": true,
+    "titleNl": "Werkgroepen",
+    "titleEn": "Workgroups",
+    "needsYearlyEdit": false,
+    "publishedAt": "2026-08-13T13:46:37.600Z",
+    "order": 0
+  },
+  {
+    "slug": "woordenlijst",
+    "visibleInHeader": true,
+    "titleNl": "Woordenlijst",
+    "titleEn": "Glossary",
+    "needsYearlyEdit": false,
+    "publishedAt": "2026-08-13T13:46:37.600Z",
+    "order": 0
+  },
+  {
+    "slug": "cantussen",
+    "headerTabCode": "EVENTS",
+    "visibleInHeader": true,
+    "titleNl": "Cantussen",
+    "titleEn": "Cantus",
+    "needsYearlyEdit": false,
+    "publishedAt": "2026-08-13T13:46:37.600Z",
+    "order": 1
+  },
+  {
+    "slug": "contact",
+    "headerTabCode": "OVER_VTK",
+    "visibleInHeader": true,
+    "titleNl": "Contact",
+    "titleEn": "Contact",
+    "needsYearlyEdit": false,
+    "publishedAt": "2026-05-17T22:00:00.000Z",
+    "order": 1
+  },
+  {
+    "slug": "shiften",
+    "headerTabCode": "AANBOD",
+    "visibleInHeader": true,
+    "titleNl": "Shiften",
+    "titleEn": "Shifts",
+    "ctaLabelNl": "Naar de shiftenlijst",
+    "ctaLabelEn": "Go to the shift list",
+    "ctaUrl": "/shift",
+    "needsYearlyEdit": true,
+    "publishedAt": "2026-05-17T22:00:00.000Z",
+    "order": 1
+  },
+  {
+    "slug": "uitleendienst",
+    "headerTabCode": "AANBOD",
+    "visibleInHeader": true,
+    "titleNl": "Uitleendienst",
+    "titleEn": "Equipment service",
+    "ctaLabelNl": "Reserveren",
+    "ctaLabelEn": "Make a reservation",
+    "ctaUrl": "https://logistiek.dev.vtk.be",
+    "needsYearlyEdit": false,
+    "publishedAt": "2026-05-17T22:00:00.000Z",
+    "order": 2
+  },
+  {
+    "slug": "faq",
+    "headerTabCode": "AANBOD",
+    "visibleInHeader": true,
+    "titleNl": "Veel gestelde vragen",
+    "needsYearlyEdit": false,
+    "publishedAt": "2026-08-13T13:46:37.600Z",
+    "order": 3
+  },
+  {
+    "slug": "internationale-studenten",
+    "headerTabCode": "AANBOD",
+    "visibleInHeader": true,
+    "titleNl": "Internationale studenten",
+    "titleEn": "International students",
+    "needsYearlyEdit": true,
+    "publishedAt": "2026-08-13T13:46:37.600Z",
+    "order": 4
+  }
+]

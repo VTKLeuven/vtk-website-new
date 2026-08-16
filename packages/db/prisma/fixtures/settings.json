@@ -1,0 +1,105 @@
+[
+  {
+    "key": "home.aftermovies",
+    "value": {
+      "items": [
+        {
+          "url": "https://www.youtube.com/watch?v=WdGqhrVUJog",
+          "type": "video",
+          "titleEn": "Gala aftermovie",
+          "titleNl": "Galabal aftermovie"
+        },
+        {
+          "url": "https://www.youtube.com/watch?v=9CyqfzXWYME",
+          "type": "video",
+          "titleEn": "Job fair aftermovie",
+          "titleNl": "Jobfair aftermovie"
+        }
+      ],
+      "titleEn": "Aftermovies & photos",
+      "titleNl": "Aftermovies & sfeerbeelden"
+    }
+  },
+  {
+    "key": "home.career",
+    "value": {
+      "bodyEn": "Discover internships, jobs and corporate events through VTK Career, the bridge between students and industry.",
+      "bodyNl": "Ontdek stages, jobs en bedrijfsevents bij VTK Career, de brug tussen studenten en industrie.",
+      "ctaUrl": "https://career.vtk.be",
+      "titleEn": "VTK Career",
+      "titleNl": "VTK Career",
+      "ctaLabelEn": "Visit VTK Career",
+      "ctaLabelNl": "Bekijk VTK Career"
+    }
+  },
+  {
+    "key": "home.openingHours.cursusdienst",
+    "value": {
+      "entries": [
+        {
+          "dayEn": "Monday",
+          "dayNl": "Maandag",
+          "hours": "12:30 – 13:30"
+        },
+        {
+          "dayEn": "Tuesday",
+          "dayNl": "Dinsdag",
+          "hours": "12:30 – 13:30"
+        },
+        {
+          "dayEn": "Wednesday",
+          "dayNl": "Woensdag",
+          "hours": "12:30 – 13:30"
+        },
+        {
+          "dayEn": "Thursday",
+          "dayNl": "Donderdag",
+          "hours": "12:30 – 13:30"
+        },
+        {
+          "dayEn": "Friday",
+          "dayNl": "Vrijdag",
+          "hours": "Gesloten"
+        }
+      ],
+      "titleEn": "Course Shop opening hours",
+      "titleNl": "Openingsuren Cursusdienst"
+    }
+  },
+  {
+    "key": "home.openingHours.theokot",
+    "value": {
+      "entries": [
+        {
+          "dayEn": "Monday",
+          "dayNl": "Maandag",
+          "hours": "10:30 - 18:00"
+        },
+        {
+          "dayEn": "Tuesday",
+          "dayNl": "Dinsdag",
+          "hours": "10:30 - 18:00"
+        },
+        {
+          "dayEn": "Wednesday",
+          "dayNl": "Woensdag",
+          "hours": "10:30 - 18:00"
+        },
+        {
+          "dayEn": "Thursday",
+          "dayNl": "Donderdag",
+          "hours": "10:30 - 18:00"
+        },
+        {
+          "dayEn": "Friday",
+          "dayNl": "Vrijdag",
+          "hours": "10:30 - 18:00"
+        }
+      ],
+      "titleEn": "Theokot opening hours",
+      "titleNl": "Openingsuren Theokot",
+      "subtitleEn": "",
+      "subtitleNl": ""
+    }
+  }
+]

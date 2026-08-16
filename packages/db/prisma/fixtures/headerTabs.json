@@ -1,0 +1,155 @@
+[
+  {
+    "code": "AANBOD",
+    "slug": "info",
+    "labelNl": "Info",
+    "labelEn": "Recreation",
+    "order": 0,
+    "visible": true,
+    "introNl": "Praktische diensten, campusvoorzieningen en tools die je semester vlotter maken.",
+    "introEn": "Practical services, campus facilities and tools that make your semester smoother.",
+    "links": [
+      {
+        "labelNl": "Piano reserveren",
+        "labelEn": "Reserve the piano",
+        "url": "/piano",
+        "order": 0
+      }
+    ]
+  },
+  {
+    "code": "THEOKOT",
+    "slug": "theokot",
+    "labelNl": "Broodjes",
+    "labelEn": "Sandwiches",
+    "order": 1,
+    "visible": true,
+    "links": []
+  },
+  {
+    "code": "CAREER",
+    "slug": "career",
+    "labelNl": "Career",
+    "labelEn": "Career",
+    "order": 2,
+    "visible": true,
+    "externalUrl": "https://career.vtk.be",
+    "ctaLabelNl": "Meer info op career.vtk.be",
+    "ctaLabelEn": "More info on career.vtk.be",
+    "ctaUrl": "https://career.vtk.be",
+    "links": [
+      {
+        "labelNl": "Jobfair",
+        "labelEn": "Job fair",
+        "url": "https://www.career.vtk.be/event/vtk-jobfair",
+        "order": 0
+      },
+      {
+        "labelNl": "Contact voor bedrijven",
+        "labelEn": "Contact for companies",
+        "url": "https://www.career.vtk.be/contact",
+        "order": 1
+      }
+    ]
+  },
+  {
+    "code": "CURSUSDIENST",
+    "slug": "cursusdienst",
+    "labelNl": "Cursusdienst",
+    "labelEn": "Course Shop",
+    "order": 3,
+    "visible": true,
+    "ctaLabelNl": "Bestel cursussen op cudi.vtk.be",
+    "ctaLabelEn": "Order courses on cudi.vtk.be",
+    "ctaUrl": "https://cudi.vtk.be",
+    "links": [
+      {
+        "labelNl": "Bestel boeken",
+        "labelEn": "Order books",
+        "url": "https://cudi.vtk.be/vtk/shop",
+        "order": 0
+      },
+      {
+        "labelNl": "Tweedehands",
+        "labelEn": "Second-hand",
+        "url": "https://cudi.vtk.be/vtk/secondhand",
+        "order": 1
+      },
+      {
+        "labelNl": "Printer",
+        "labelEn": "Printer",
+        "url": "https://cudi.vtk.be/vtk/printer",
+        "order": 2
+      },
+      {
+        "labelNl": "Subsidies",
+        "labelEn": "Subsidies",
+        "url": "https://cudi.vtk.be/vtk/subsidies",
+        "order": 3
+      }
+    ]
+  },
+  {
+    "code": "EERSTEJAARS",
+    "slug": "eerstejaars",
+    "labelNl": "Eerstejaars",
+    "labelEn": "Freshmen",
+    "order": 4,
+    "visible": true,
+    "links": []
+  },
+  {
+    "code": "EVENTS",
+    "slug": "events",
+    "labelNl": "Evenementen",
+    "labelEn": "Events",
+    "order": 5,
+    "visible": true,
+    "ctaLabelNl": "Evenementen",
+    "ctaLabelEn": "Events",
+    "links": []
+  },
+  {
+    "code": "SHIFTEN",
+    "slug": "shift",
+    "labelNl": "Shiften",
+    "labelEn": "Shifts",
+    "order": 6,
+    "visible": false,
+    "links": []
+  },
+  {
+    "code": "STUDIES",
+    "slug": "studies",
+    "labelNl": "Studies",
+    "labelEn": "Studies",
+    "order": 7,
+    "visible": true,
+    "links": [
+      {
+        "labelNl": "Burgieclan",
+        "labelEn": "Burgieclan",
+        "url": "https://burgieclan.vtk.be",
+        "order": 0
+      }
+    ]
+  },
+  {
+    "code": "MEDIA",
+    "slug": "media",
+    "labelNl": "Media",
+    "labelEn": "Media",
+    "order": 8,
+    "visible": true,
+    "links": []
+  },
+  {
+    "code": "OVER_VTK",
+    "slug": "over-vtk",
+    "labelNl": "Over VTK",
+    "labelEn": "About VTK",
+    "order": 9,
+    "visible": true,
+    "links": []
+  }
+]
