@@ -1,0 +1,41 @@
+# The local development database, and nothing else.
+#
+# Deliberately a separate file from `docker-compose.yml`: that one is the deploy
+# stack. It builds the web and logistiek images and starts Immich, Umami and five
+# workers, none of which belong on a laptop. Bringing it up locally gives you a
+# second Postgres on the same data volume as your development database; that is
+# one data directory with two postmasters, which ends badly sooner or later.
+#
+# Own project name (`name:`) and own volume, so this database is independent of
+# the deploy stack. If you previously ran a manual `docker run --name
+# vtk-postgres`, that old volume is left untouched next to this one; you lose
+# nothing, but this database does start empty. `make db` fills it.
+name: vtk-dev
+
+services:
+  postgres:
+    image: postgres:16
+    container_name: vtk-dev-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-vtk}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-vtk}
+      POSTGRES_DB: ${POSTGRES_DB:-vtk}
+    ports:
+      # 5433 rather than 5432: plenty of laptops already run their own Postgres
+      # on the default port. `.env.example` points here.
+      #
+      # Explicitly bound to 127.0.0.1. Without that address the port listens on
+      # every interface, leaving a database whose password is `vtk` open to
+      # everyone on the same wifi network.
+      - "127.0.0.1:5433:5432"
+    volumes:
+      - dev-postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER:-vtk}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  dev-postgres-data:

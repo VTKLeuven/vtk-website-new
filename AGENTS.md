@@ -4,6 +4,46 @@
 This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` before writing any code. Heed deprecation notices.
 <!-- END:nextjs-agent-rules -->
 
+# Local setup: `make up && make db && make dev`
+
+The root `Makefile` is a thin layer over the npm scripts; `make help` lists
+everything. The npm scripts stay the source of truth (CI runs those), so never
+put logic in a make target that exists only through `make`.
+
+- **The local database lives in `infra/compose.dev.yml`**, not in
+  `infra/docker-compose.yml`. That second file is the **deploy stack**: it builds
+  the web and logistiek images and starts Immich, Umami and five workers. Bring
+  it up on your laptop and you get two Postgres containers on the same data
+  volume; that is one data directory with two postmasters, with everything that
+  follows from it. Locally, run only `make up`.
+- Postgres listens on **127.0.0.1:5433**, deliberately not on every interface:
+  otherwise a database with password `vtk` is open to the whole wifi network.
+
+# Seed: content comes from fixtures, not from constants
+
+`packages/db/prisma/fixtures/*.json` holds the editorial content of the dev site
+(navigation, CMS pages, calendar categories, POCs, partners, some homepage
+settings). `prisma/seed.ts` uses them; if they are missing it falls back to the constants in
+`packages/db/src/groups.ts`.
+
+That split exists because the seed is **create-only**: a reseed must not
+overwrite work done in the admin. As a result the constants drift away from the
+real site from their first use onwards. That once cost half an evening chasing a
+"bug" in the site header that only existed locally: local had eleven tabs, the
+site had nine, and the navigation therefore ran over the search button.
+
+- Updating is done by someone with access to the dev database:
+  `FIXTURES_SOURCE_DATABASE_URL="postgresql://..." make fixtures`, and they
+  commit the result.
+- **Never `pg_dump`.** That database carries member data, orders, payments, door
+  logs and mailing lists, `Setting` holds `s3.config`, `sentry.config`,
+  `door.config` and `brevo.lists`, and `OauthClient.clientSecret` is stored in
+  plaintext. `scripts/export-fixtures.ts` therefore exports per table, from a
+  fixed list and with a per-key allowlist for settings.
+- If you add a table to that export, two rules hold without exception: no
+  personal data, and key on the natural key (`code`, `slug`) instead of the
+  `cuid`, or the fixtures can only be imported into an empty database.
+
 # Dev server: do NOT use Turbopack
 
 `apps/web` and `apps/logistiek` both run `next dev --webpack` in their `dev`

@@ -3,6 +3,7 @@ import { PrismaClient } from "@prisma/client";
 import { GROUP_SEEDS, WERKGROEP_SEEDS, HEADER_TABS } from "../src/groups";
 import { SHIFTEN_PAGE, UITLEENDIENST_PAGE } from "../src/infoPages";
 import { PERMISSIONS } from "../src/permissions";
+import { loadFixtures } from "../src/fixtures";
 
 const prisma = new PrismaClient();
 
@@ -73,6 +74,17 @@ function mergeSettingItemsById(existingValue: unknown, defaultValue: unknown): o
 }
 
 async function main() {
+  // Content exported from the dev site (`make fixtures`). When present it wins
+  // over the constants below: those are create-only and therefore drift away
+  // from what admins have made of them from their first use onwards. See
+  // packages/db/src/fixtures.ts.
+  const fixtures = loadFixtures();
+  const fromFixtures = (name: string, rows: unknown[] | undefined): boolean => {
+    if (!rows) return false;
+    console.log(`  (${rows.length} ${name} from fixtures)`);
+    return true;
+  };
+
   console.log("Seeding groups...");
   // Create-only: een reseed op een DB met data mag bestaande groepen (naam,
   // slug, volgorde) niet overschrijven. Nieuwe codes worden nog wel aangemaakt.
@@ -92,7 +104,10 @@ async function main() {
   // terugdraaien. Daarom enkel ontbrekende tabs aanmaken en bestaande rijen NIET
   // overschrijven. Een verse of gereset DB krijgt nog steeds alle defaults via
   // `create`; nieuwe standaardtabs (nieuw `code`) worden nog wel toegevoegd.
-  for (const { links, ...tab } of HEADER_TABS) {
+  const headerTabSeeds = fromFixtures("header tabs", fixtures.headerTabs)
+    ? fixtures.headerTabs!
+    : HEADER_TABS;
+  for (const { links, ...tab } of headerTabSeeds) {
     const row = await prisma.headerTab.upsert({
       where: { code: tab.code },
       update: {},
@@ -576,6 +591,16 @@ async function main() {
   // ontbrekende keys aanmaken en bestaande niet overschrijven, zodat ook een
   // handmatige reseed die aanpassingen niet terugdraait naar de defaults.
   // Een verse of gereset DB krijgt nog steeds alle defaults via `create`.
+  // An exported value replaces the default for the same key. The create-only
+  // rule below still applies: this only decides what an empty database gets, not
+  // what overwrites an existing one.
+  if (fromFixtures("settings", fixtures.settings)) {
+    for (const fixture of fixtures.settings!) {
+      const target = defaultSettings.find((s) => s.key === fixture.key);
+      if (target) target.value = fixture.value;
+      else defaultSettings.push({ key: fixture.key, value: fixture.value });
+    }
+  }
   for (const s of defaultSettings) {
     if (s.mergeItemsById) {
       const existing = await prisma.setting.findUnique({ where: { key: s.key } });
@@ -613,11 +638,20 @@ async function main() {
     { name: "Revolut",                     url: "https://revolut.com/en-BE/metal",                         logoKey: "partners/seed/revolut.svg",      order: 7 },
     { name: "McKinsey",                    url: "https://mckinsey.com/be/careers",                         logoKey: "partners/seed/mckinsey.svg",     order: 8 },
   ];
-  for (const p of partnerSeeds) {
+  const partners = fromFixtures("partners", fixtures.partners)
+    ? fixtures.partners!.map((p) => ({
+        name: p.name,
+        url: p.url ?? "",
+        logoKey: p.logoKey,
+        order: p.order,
+        active: p.active,
+      }))
+    : partnerSeeds.map((p) => ({ ...p, active: true }));
+  for (const p of partners) {
     const existing = await prisma.partner.findFirst({ where: { name: p.name } });
     if (existing) continue;
     await prisma.partner.create({
-      data: { name: p.name, url: p.url, logoKey: p.logoKey, order: p.order, active: true },
+      data: { name: p.name, url: p.url, logoKey: p.logoKey, order: p.order, active: p.active },
     });
   }
 
@@ -811,7 +845,25 @@ async function main() {
   // POC's en hun vertegenwoordigers zijn admin-beheerd (namen, beschrijvingen,
   // volgorde, wie welke rol heeft): enkel ontbrekende aanmaken en bestaande NIET
   // overschrijven, zodat een handmatige reseed die aanpassingen niet terugdraait.
-  for (const poc of pocSeeds) {
+  // The POCs themselves may come from the fixtures; their representatives may
+  // not, because those are real people. Representatives therefore stay the
+  // prototype users below, matched on slug: if a POC from the fixtures also
+  // appears in `pocSeeds`, it still gets faces locally and the POC band on the
+  // homepage is visible.
+  const pocs = fromFixtures("POCs", fixtures.pocs)
+    ? fixtures.pocs!.map((p) => ({
+        slug: p.slug,
+        nameNl: p.nameNl,
+        nameEn: p.nameEn ?? null,
+        email: p.email ?? null,
+        order: p.order,
+        studyProgrammes: p.studyProgrammes,
+        representatives:
+          pocSeeds.find((s) => s.slug === p.slug)?.representatives ??
+          ([] as ReadonlyArray<{ email: string; order: number }>),
+      }))
+    : pocSeeds;
+  for (const poc of pocs) {
     const row = await prisma.poc.upsert({
       where: { slug: poc.slug },
       update: {},
@@ -821,7 +873,7 @@ async function main() {
         nameEn: poc.nameEn,
         email: poc.email,
         order: poc.order,
-        studyProgrammes: [...poc.studyProgrammes],
+        studyProgrammes: [...poc.studyProgrammes] as never,
       },
     });
     // `studyProgrammes` is een nieuw veld: POC's die al bestonden hebben nog
@@ -831,7 +883,7 @@ async function main() {
     if (row.studyProgrammes.length === 0) {
       await prisma.poc.update({
         where: { id: row.id },
-        data: { studyProgrammes: [...poc.studyProgrammes] },
+        data: { studyProgrammes: [...poc.studyProgrammes] as never },
       });
     }
     for (const rep of poc.representatives) {
@@ -1010,15 +1062,54 @@ async function main() {
   // ontbrekende pagina's aanmaken en bestaande NIET overschrijven, zodat een
   // handmatige reseed die aanpassingen (bv. verplaatst, verborgen of herschikt)
   // niet terugdraait naar de defaults.
-  for (const page of pageSeeds) {
-    const tab = await prisma.headerTab.findUnique({ where: { code: page.headerCode } });
-    if (!tab) continue;
-    await prisma.page.upsert({
-      where: { slug: page.slug },
-      update: {},
-      create: {
+  // `contentJsonNl` is non-nullable in the schema, but for a page that lives in
+  // markdown there is nothing meaningful to put there. An empty document keeps
+  // the column satisfied without pretending there is legacy content.
+  const EMPTY_DOC = { type: "doc", content: [] };
+
+  type SeedPage = {
+    headerCode: string | null;
+    slug: string;
+    visibleInHeader: boolean;
+    titleNl: string;
+    titleEn: string | null;
+    excerptNl: string | null;
+    excerptEn: string | null;
+    contentJsonNl: unknown;
+    contentJsonEn: unknown;
+    contentMdNl: string | null;
+    contentMdEn: string | null;
+    ctaLabelNl: string | null;
+    ctaLabelEn: string | null;
+    ctaUrl: string | null;
+    needsYearlyEdit: boolean;
+    publishedAt: Date | null;
+    order: number;
+  };
+
+  const pages: SeedPage[] = fromFixtures("pages", fixtures.pages)
+    ? fixtures.pages!.map((p) => ({
+        headerCode: p.headerTabCode ?? null,
+        slug: p.slug,
+        visibleInHeader: p.visibleInHeader,
+        titleNl: p.titleNl,
+        titleEn: p.titleEn ?? null,
+        excerptNl: p.excerptNl ?? null,
+        excerptEn: p.excerptEn ?? null,
+        contentJsonNl: p.contentJsonNl ?? EMPTY_DOC,
+        contentJsonEn: p.contentJsonEn ?? null,
+        contentMdNl: p.contentMdNl ?? null,
+        contentMdEn: p.contentMdEn ?? null,
+        ctaLabelNl: p.ctaLabelNl ?? null,
+        ctaLabelEn: p.ctaLabelEn ?? null,
+        ctaUrl: p.ctaUrl ?? null,
+        needsYearlyEdit: p.needsYearlyEdit,
+        publishedAt: p.publishedAt ? new Date(p.publishedAt) : null,
+        order: p.order,
+      }))
+    : pageSeeds.map((page) => ({
+        headerCode: page.headerCode,
         slug: page.slug,
-        headerTabId: tab.id,
         visibleInHeader: true,
         titleNl: page.titleNl,
         titleEn: page.titleEn,
@@ -1026,13 +1117,45 @@ async function main() {
         excerptEn: page.excerptEn,
         contentJsonNl: page.contentNl,
         contentJsonEn: page.contentEn,
-        contentMdNl: "contentMdNl" in page ? page.contentMdNl : null,
-        contentMdEn: "contentMdEn" in page ? page.contentMdEn : null,
-        ctaLabelNl: "ctaLabelNl" in page ? page.ctaLabelNl : null,
-        ctaLabelEn: "ctaLabelEn" in page ? page.ctaLabelEn : null,
-        ctaUrl: "ctaUrl" in page ? page.ctaUrl : null,
-        needsYearlyEdit: "needsYearlyEdit" in page ? page.needsYearlyEdit : false,
+        contentMdNl: "contentMdNl" in page ? (page.contentMdNl as string) : null,
+        contentMdEn: "contentMdEn" in page ? (page.contentMdEn as string) : null,
+        ctaLabelNl: "ctaLabelNl" in page ? (page.ctaLabelNl as string) : null,
+        ctaLabelEn: "ctaLabelEn" in page ? (page.ctaLabelEn as string) : null,
+        ctaUrl: "ctaUrl" in page ? (page.ctaUrl as string) : null,
+        needsYearlyEdit: "needsYearlyEdit" in page ? (page.needsYearlyEdit as boolean) : false,
         publishedAt: new Date("2026-05-18T00:00:00+02:00"),
+        order: page.order,
+      }));
+
+  for (const page of pages) {
+    // A page whose category is missing is skipped rather than created without
+    // one: it would exist, be reachable by URL, and appear in no menu.
+    let headerTabId: string | null = null;
+    if (page.headerCode) {
+      const tab = await prisma.headerTab.findUnique({ where: { code: page.headerCode } });
+      if (!tab) continue;
+      headerTabId = tab.id;
+    }
+    await prisma.page.upsert({
+      where: { slug: page.slug },
+      update: {},
+      create: {
+        slug: page.slug,
+        headerTabId,
+        visibleInHeader: page.visibleInHeader,
+        titleNl: page.titleNl,
+        titleEn: page.titleEn,
+        excerptNl: page.excerptNl,
+        excerptEn: page.excerptEn,
+        contentJsonNl: page.contentJsonNl as never,
+        contentJsonEn: page.contentJsonEn as never,
+        contentMdNl: page.contentMdNl,
+        contentMdEn: page.contentMdEn,
+        ctaLabelNl: page.ctaLabelNl,
+        ctaLabelEn: page.ctaLabelEn,
+        ctaUrl: page.ctaUrl,
+        needsYearlyEdit: page.needsYearlyEdit,
+        publishedAt: page.publishedAt,
         order: page.order,
       },
     });
@@ -1549,8 +1672,17 @@ async function main() {
     { slug: "service", nameNl: "Service", nameEn: "Service", colour: "#F59E0B", audience: null },
     { slug: "studie", nameNl: "Studie", nameEn: "Studies", colour: "#8B5CF6", audience: null },
   ];
-  for (let i = 0; i < calendarCategories.length; i += 1) {
-    const c = calendarCategories[i];
+  const categories = fromFixtures("calendar categories", fixtures.calendarCategories)
+    ? fixtures.calendarCategories!.map((c) => ({
+        slug: c.slug,
+        nameNl: c.nameNl,
+        nameEn: c.nameEn,
+        colour: c.colour,
+        audience: (c.audience ?? null) as (typeof calendarCategories)[number]["audience"],
+      }))
+    : calendarCategories;
+  for (let i = 0; i < categories.length; i += 1) {
+    const c = categories[i];
     await prisma.calendarCategory.upsert({
       where: { slug: c.slug },
       // Naam, kleur en volgorde zijn GUI-beheerd en blijven staan, maar `audience`
