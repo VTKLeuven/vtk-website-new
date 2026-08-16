@@ -95,33 +95,36 @@ export type PocFixture = {
 
 /**
  * A CMS page: the editable content under a category, such as /theokot or
- * /career-fair. This is the bulk of the actual website text.
+ * /career-fair.
+ *
+ * ## Structure only, deliberately no body text
+ *
+ * The page bodies are **not** exported. They are written by members and name
+ * real people: an election page listing every candidate, a team roster, a
+ * first-year rep introducing herself by name, study programme and year. That
+ * text is public on vtk.be, but this repository is public on GitHub, and those
+ * are different bars: a page on the site can be edited and the name is gone,
+ * while a commit is permanent, mirrored, forked and code-searchable. Someone
+ * asking to be removed a year from now would mean rewriting history.
+ *
+ * Leaving the bodies out also makes that safe by construction rather than by
+ * vigilance: no reviewer has to catch a name in a page written next year.
+ *
+ * What is left is exactly what drifted and caused trouble: which pages exist,
+ * what they are called, which category they sit under, in what order, and
+ * whether they are published. The seed fills the body with a short placeholder.
  *
  * The category is stored as `headerTabCode`, the natural key of the `HeaderTab`,
  * rather than the `headerTabId` foreign key, for the same reason the other
- * fixtures avoid ids. The seed resolves it after the tabs are in place; a page
- * whose category is missing is skipped rather than silently landing outside the
- * navigation.
+ * fixtures avoid ids.
  */
 export type PageFixture = {
   slug: string;
-  /** Natural key of the category. Absent = a page without a category. */
+  /** Natural key of the category. Absent = a page that sits under /p/<slug>. */
   headerTabCode?: string | null;
   visibleInHeader: boolean;
   titleNl: string;
   titleEn?: string | null;
-  /** Markdown is the source of truth for page content. */
-  contentMdNl?: string | null;
-  contentMdEn?: string | null;
-  /**
-   * Legacy tiptap document. Only exported for pages that were never saved in the
-   * markdown editor, because for those it is still the only content there is;
-   * otherwise it is dead weight that would double the size of every fixture.
-   */
-  contentJsonNl?: unknown;
-  contentJsonEn?: unknown;
-  excerptNl?: string | null;
-  excerptEn?: string | null;
   ctaLabelNl?: string | null;
   ctaLabelEn?: string | null;
   ctaUrl?: string | null;

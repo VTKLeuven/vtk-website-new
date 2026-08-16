@@ -1087,6 +1087,13 @@ async function main() {
     order: number;
   };
 
+  // The fixtures carry no body text on purpose (see `PageFixture`). A blank page
+  // locally reads as a broken import, so say what it is instead.
+  const placeholderMd = (title: string, nl: boolean) =>
+    nl
+      ? `_De tekst van "${title}" staat enkel op de echte site._\n\nDeze pagina komt uit de fixtures, die bewust alleen de structuur bevatten: welke pagina's bestaan, hoe ze heten en onder welke categorie ze staan. Schrijf hier gerust iets om de opmaak te testen.\n`
+      : `_The text of "${title}" only lives on the real site._\n\nThis page comes from the fixtures, which deliberately carry structure only: which pages exist, what they are called and which category they sit under. Feel free to type something here to test the layout.\n`;
+
   const pages: SeedPage[] = fromFixtures("pages", fixtures.pages)
     ? fixtures.pages!.map((p) => ({
         headerCode: p.headerTabCode ?? null,
@@ -1094,12 +1101,12 @@ async function main() {
         visibleInHeader: p.visibleInHeader,
         titleNl: p.titleNl,
         titleEn: p.titleEn ?? null,
-        excerptNl: p.excerptNl ?? null,
-        excerptEn: p.excerptEn ?? null,
-        contentJsonNl: p.contentJsonNl ?? EMPTY_DOC,
-        contentJsonEn: p.contentJsonEn ?? null,
-        contentMdNl: p.contentMdNl ?? null,
-        contentMdEn: p.contentMdEn ?? null,
+        excerptNl: null,
+        excerptEn: null,
+        contentJsonNl: EMPTY_DOC,
+        contentJsonEn: null,
+        contentMdNl: placeholderMd(p.titleNl, true),
+        contentMdEn: placeholderMd(p.titleEn ?? p.titleNl, false),
         ctaLabelNl: p.ctaLabelNl ?? null,
         ctaLabelEn: p.ctaLabelEn ?? null,
         ctaUrl: p.ctaUrl ?? null,

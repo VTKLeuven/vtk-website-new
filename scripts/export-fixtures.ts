@@ -37,7 +37,7 @@
  * suspect by definition.
  */
 
-import { mkdirSync, writeFileSync } from "node:fs";
+import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { PrismaClient } from "@prisma/client";
 import { FIXTURE_DIR } from "../packages/db/src/fixtures";
@@ -67,6 +67,16 @@ const SETTING_DENYLIST = [/^s3\./, /^sentry\./, /^door\./, /^brevo\./, /^fakscan
 
 function write(name: string, rows: unknown[]): void {
   const file = join(FIXTURE_DIR, `${name}.json`);
+  // An empty table produces no file at all. The loader already treats an empty
+  // array as "no fixture" and falls back to the constants, so writing `[]` would
+  // commit two bytes that mean nothing and read like a failed export. Any stale
+  // file from a previous run is removed, otherwise a table that has since been
+  // emptied would keep seeding yesterday's rows.
+  if (rows.length === 0) {
+    rmSync(file, { force: true });
+    console.log(`     -  ${name}.json (empty, not written)`);
+    return;
+  }
   // Stable formatting: two spaces and a trailing newline, so an export that
   // changes nothing also produces no diff.
   writeFileSync(file, `${JSON.stringify(rows, null, 2)}\n`, "utf8");
@@ -152,23 +162,13 @@ async function main() {
     });
     write(
       "pages",
-      pages.map((page) => {
-        const hasMd = (md: string | null) => typeof md === "string" && md.trim() !== "";
-        return compact({
+      pages.map((page) =>
+        compact({
           slug: page.slug,
           headerTabCode: page.headerTab?.code ?? null,
           visibleInHeader: page.visibleInHeader,
           titleNl: page.titleNl,
           titleEn: page.titleEn,
-          contentMdNl: page.contentMdNl,
-          contentMdEn: page.contentMdEn,
-          // The legacy tiptap document only rides along while it is still the
-          // only content the page has. Once it has been saved in the markdown
-          // editor, markdown is the source of truth and this is dead weight.
-          contentJsonNl: hasMd(page.contentMdNl) ? null : page.contentJsonNl,
-          contentJsonEn: hasMd(page.contentMdEn) ? null : page.contentJsonEn,
-          excerptNl: page.excerptNl,
-          excerptEn: page.excerptEn,
           ctaLabelNl: page.ctaLabelNl,
           ctaLabelEn: page.ctaLabelEn,
           ctaUrl: page.ctaUrl,
@@ -177,12 +177,15 @@ async function main() {
           // should not be live locally either.
           publishedAt: page.publishedAt?.toISOString() ?? null,
           order: page.order,
-          // Deliberately absent: `createdById` and `contentEditedAt` (who did
-          // what, when), `assets` (downloads living in production object storage
-          // that a laptop cannot read), `editorRoles` (access control, not
-          // content) and the search vectors (a database trigger maintains those).
-        });
-      }),
+          // Deliberately absent, and this is the important part: `contentMd*`,
+          // `contentJson*` and `excerpt*`. Those are written by members and name
+          // real people; see the explanation on `PageFixture`. Also absent:
+          // `createdById` and `contentEditedAt` (who did what, when), `assets`
+          // (downloads in production object storage a laptop cannot read),
+          // `editorRoles` (access control, not content) and the search vectors
+          // (a database trigger maintains those).
+        }),
+      ),
     );
 
     const categories = await prisma.calendarCategory.findMany({ orderBy: { order: "asc" } });
