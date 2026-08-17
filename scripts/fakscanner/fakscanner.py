@@ -78,66 +78,6 @@ def show(line1, line2=""):
 def show_default():
     show("    Scan je", " studentenkaart")
 
-
-# ---------------------------------------------------------------------------
-# LED in de lezer
-# ---------------------------------------------------------------------------
-
-
-def _led_connection():
-    """Directe PC/SC-verbinding met de lezer, ook zonder kaart erop."""
-    from smartcard.scard import (  # type: ignore
-        SCARD_LEAVE_CARD,
-        SCARD_SHARE_DIRECT,
-    )
-    from smartcard.System import readers  # type: ignore
-
-    available = readers()
-    if not available:
-        raise RuntimeError("geen PC/SC-lezer gevonden")
-    connection = available[0].createConnection()
-    connection.connect(mode=SCARD_SHARE_DIRECT, disposition=SCARD_LEAVE_CARD)
-    return connection
-
-
-def _control_code():
-    if LED_CONTROL_CODE:
-        return LED_CONTROL_CODE
-    from smartcard.scard import SCARD_CTL_CODE  # type: ignore
-
-    # 1 is de escape-code van pcsc-lite (Linux); Windows gebruikt 2048/3500.
-    return SCARD_CTL_CODE(1)
-
-
-def led(color_name, seconds=0.0):
-    """
-    Zet de LED van de lezer in een kleur, optioneel voor een beperkte tijd.
-    Faalt dit (verkeerde modus, driver zonder escape, geen pyscard), dan loggen we
-    het en gaat de rest gewoon door: een kaartlezer die niet oplicht is vervelend,
-    een kaartlezer die niet meer telt is een probleem.
-    """
-    if not LED_ENABLED:
-        return
-    mask = LED_COLORS.get(color_name)
-    if mask is None:
-        log(f"Onbekende LED-kleur '{color_name}'; kies uit {', '.join(LED_COLORS)}.")
-        return
-    try:
-        connection = _led_connection()
-        try:
-            command = list(bytes.fromhex(LED_ESCAPE)) + [mask]
-            connection.control(_control_code(), command)
-            if seconds > 0:
-                time.sleep(seconds)
-                connection.control(_control_code(), list(bytes.fromhex(LED_ESCAPE)) + [LED_COLORS["uit"]])
-        finally:
-            connection.disconnect()
-    except Exception as exc:  # noqa: BLE001
-        log(f"LED aansturen mislukt: {exc}")
-        if seconds > 0:
-            time.sleep(seconds)
-
-
 # ---------------------------------------------------------------------------
 # Site
 # ---------------------------------------------------------------------------

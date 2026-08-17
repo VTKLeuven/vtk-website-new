@@ -3,8 +3,15 @@ import logging
 import os
 import sys
 import time
+import requests
 from logging.handlers import RotatingFileHandler
 from hardware import Screen, Scanner
+
+# env
+# ---
+API_BASE = os.environ.get("API_BASE", "https://dev.vtk.be").rstrip("/")
+LOG_FILE = os.environ.get("FAKSCANNER_LOG_FILE", "./fakscanner.log")
+TOKEN = os.environ.get("FAKSCANNER_TOKEN", "")
 
 # Logging
 # -------
@@ -21,24 +28,38 @@ _sh = logging.StreamHandler(sys.stdout)
 _sh.setFormatter(_fmt)
 logger.addHandler(_sh)
 
-def log(message):
-    logger.info(message)
-
 
 # hardware init
 # -------------
 screen = Screen(1, 0x27) # bus, addr
 screen.show("Starting ...")
-log("Initializing script")
+logger.info("Initializing script")
 
 try:
     scanner = Scanner()
-    log('Cardscanner founf: ${scanner.name}')
+    logger.info(f"Cardscanner found: ${scanner.name}")
 except:
     screen.show("Geen cardscanner", "gevonden")
-    log("Geen cardscanner gevonden")
+    logger.error("Geen cardscanner gevonden")
     exit()
 
+try:
+    requests.get(API_BASE)
+    logger.info(f"Verbonden met ${API_BASE}")
+except:
+    screen.show("Geen verbinding", f"met {API_BASE}")
+    logger.error("Geen cardscanner gevonden")
+    exit()
+
+# try connecting to internet (ping vtk.be)
+
+# start main loop
+#   wait for cardscan
+#   read and verify card
+#   send request to (dev.)vtk.be
+#   await response
+#   display information and scans
+#   repeat
 
 
 
