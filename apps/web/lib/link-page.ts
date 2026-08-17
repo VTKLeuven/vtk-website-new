@@ -116,3 +116,17 @@ export function parseLinkPageConfig(value: unknown): LinkPageConfig {
 export function socialHref(platform: SocialPlatform, value: string): string {
   return platform === "email" ? `mailto:${value}` : value;
 }
+
+/**
+ * Relatieve paden in de linktree (zoals `/shift` of `/`) wijzen naar de
+ * hoofdsite. Los ze hier op tegen de site-URL, zodat zo'n knop ook vanaf een
+ * andere host — linktree.vtk.be — naar vtk.be leidt in plaats van naar
+ * linktree.vtk.be zelf te verwijzen. Absolute URL's (http(s), mailto, tel, ...)
+ * blijven onveranderd.
+ */
+export function resolveLinkHref(url: string, baseUrl: string): string {
+  if (url.startsWith("/") && !url.startsWith("//")) {
+    return new URL(url, baseUrl).toString();
+  }
+  return url;
+}

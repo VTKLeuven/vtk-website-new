@@ -3,6 +3,7 @@ import {
   DEFAULT_LINK_PAGE_CONFIG,
   linkPageConfigSchema,
   parseLinkPageConfig,
+  resolveLinkHref,
   socialHref,
 } from "@/lib/link-page";
 
@@ -53,5 +54,20 @@ describe("Linktree-configuratie", () => {
     expect(socialHref("instagram", "https://instagram.com/vtk")).toBe(
       "https://instagram.com/vtk",
     );
+  });
+
+  it("lost relatieve paden op tegen de hoofdsite", () => {
+    const base = "https://vtk.be";
+    expect(resolveLinkHref("/", base)).toBe("https://vtk.be/");
+    expect(resolveLinkHref("/shift", base)).toBe("https://vtk.be/shift");
+    expect(resolveLinkHref("/en/kalender", base)).toBe("https://vtk.be/en/kalender");
+    expect(resolveLinkHref("/kalender?cat=foo", base)).toBe("https://vtk.be/kalender?cat=foo");
+  });
+
+  it("laat absolute URL's onveranderd", () => {
+    const base = "https://vtk.be";
+    expect(resolveLinkHref("https://example.com/x", base)).toBe("https://example.com/x");
+    expect(resolveLinkHref("mailto:info@vtk.be", base)).toBe("mailto:info@vtk.be");
+    expect(resolveLinkHref("tel:+3216000000", base)).toBe("tel:+3216000000");
   });
 });

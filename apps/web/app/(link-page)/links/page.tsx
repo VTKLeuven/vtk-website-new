@@ -10,6 +10,7 @@ import {
   SOCIAL_LABELS,
   SOCIAL_PLATFORMS,
   parseLinkPageConfig,
+  resolveLinkHref,
   socialHref,
 } from "@/lib/link-page";
 import { DEFAULT_OG_IMAGE, siteUrl, truncateDescription } from "@/lib/seo";
@@ -124,11 +125,14 @@ export default async function LinksPage() {
         {links.length > 0 ? (
           <ul className="vtk-link-page-links">
             {links.map((link) => {
+              // Relatieve paden verwijzen naar de hoofdsite; los ze op tegen de
+              // site-URL zodat ze ook vanaf linktree.vtk.be kloppen.
+              const href = resolveLinkHref(link.url, siteUrl());
               const external = /^https?:\/\//i.test(link.url);
               return (
                 <li key={link.id}>
                   <a
-                    href={link.url}
+                    href={href}
                     className="vtk-link-page-link"
                     target={external ? "_blank" : undefined}
                     rel={external ? "noopener noreferrer" : undefined}
