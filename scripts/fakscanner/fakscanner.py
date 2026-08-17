@@ -26,47 +26,6 @@ LOG_FILE = os.environ.get("FAKSCANNER_LOG_FILE", "./fakscanner.log")
 BEER_SECONDS = float(os.environ.get("FAKSCANNER_BEER_SECONDS", "6"))
 
 # ---------------------------------------------------------------------------
-# LED van de lezer (SpringCard Prox'n'Roll RFID, snr EX3066-AA)
-# ---------------------------------------------------------------------------
-#
-# De Prox'n'Roll heeft een meerkleurige LED die je via een PC/SC vendor escape
-# aanstuurt. Kleur en duur kies je hieronder; zet FAKSCANNER_LED_COLOR op een van
-# de namen in LED_COLORS.
-#
-# LET OP, twee dingen die je op de Pi moet nakijken voor dit werkt:
-#
-#   1. Escape-commando's zijn standaard uitgeschakeld in de CCID-driver. Zet in
-#      /etc/libccid_Info.plist de sleutel `ifdDriverOptions` op `0x0001` en
-#      herstart pcscd.
-#   2. Draait de lezer in toetsenbordmodus (HID), dan biedt hij mogelijk geen
-#      PC/SC-interface aan en faalt de LED-aansturing. Zet hem dan met de
-#      SpringCard-configuratietool in de gecombineerde modus, of gebruik enkel
-#      het GPIO-lampje hierboven.
-#
-# De bytes van het escape-commando komen uit de PC/SC vendor-documentatie van
-# SpringCard en verschillen per firmware. Werkt de default niet, probeer dan
-# `--test-led` met een andere FAKSCANNER_LED_ESCAPE (hex, zonder spaties).
-
-LED_ESCAPE = os.environ.get("FAKSCANNER_LED_ESCAPE", "581E")
-LED_CONTROL_CODE = int(os.environ.get("FAKSCANNER_LED_CONTROL_CODE", "0"), 0)
-LED_ENABLED = os.environ.get("FAKSCANNER_LED", "1").strip() not in ("", "0", "false", "False")
-
-# Bitmasker per kleur: bit 0 = rood, bit 1 = groen, bit 2 = blauw.
-LED_COLORS = {
-    "uit": 0b000,
-    "rood": 0b001,
-    "groen": 0b010,
-    "geel": 0b011,
-    "blauw": 0b100,
-    "paars": 0b101,
-    "cyaan": 0b110,
-    "wit": 0b111,
-}
-
-# Kleur waarin de lezer oplicht bij een gratis pint. Pas dit aan naar smaak.
-LED_COLOR = os.environ.get("FAKSCANNER_LED_COLOR", "paars").strip().lower()
-
-# ---------------------------------------------------------------------------
 # Logging
 # ---------------------------------------------------------------------------
 
