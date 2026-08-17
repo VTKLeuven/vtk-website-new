@@ -61,11 +61,14 @@ const NAV: NavEntry[] = [
     item('home', '/home', { perm: 'home.edit' }),
     item('announcements', '/aankondigingen', { perm: 'home.edit' }),
     item('linkPage', '/linkpagina', { perm: 'home.edit' }),
-    item('shortlinks', '/links', { perm: 'shortlinks.manage' }),
     item('content', '/inhoud', { perm: 'pages.manage' }),
     item('pages', '/paginas', { anyPerm: ['pages.edit', 'pages.editAll'] }),
     item('partners', '/partners', { perm: 'partners.manage' }),
   ]),
+  // Verkorte links zijn geen website-inhoud: ze leven op hun eigen domein
+  // (on.vtk.be) en verwijzen naar eender waar. Daarom geen onderdeel van de
+  // websitegroep, maar een eigen item.
+  item('shortlinks', '/links', { perm: 'shortlinks.manage' }),
   // Eén evenement is één ding voor wie het organiseert: je plant het in en je
   // verkoopt er tickets voor. Die twee schermen hoorden daarom onder één tab.
   group('evenementen', [
