@@ -2648,6 +2648,12 @@ de globale velden zetten, de shiften nakijken en aanmaken.
   shift die je deze keer niet nodig hebt, vink je uit in plaats van hem te
   verwijderen; hij staat er de volgende keer weer. Een shift die enkel bij een grote
   editie hoort, staat in het sjabloon al op `enabled: false`.
+- **Sommige shiften hangen aan een vaste plek, niet aan het evenement.**
+  "Bijrijden" vertrekt altijd aan de loods, waar de cantus zelf ook doorgaat.
+  Zo'n shift krijgt in het sjabloon een eigen `location` (of `post`) en volgt het
+  globale veld bovenaan dan niet meer. In het scherm blijft ze gewoon aanpasbaar,
+  met een lijntje eronder dat zegt dat ze vastgezet is: anders lijkt het een bug
+  dat die ene rij niet meeging toen je de locatie bovenaan wijzigde.
 - **Wat je zelf aanpast, wordt niet meer overschreven.** Verzet je daarna nog het
   globale startmoment of de locatie, dan schuiven enkel de velden mee die je nog niet
   aangeraakt hebt. Anders zou het corrigeren van één tikfout bovenaan al je
@@ -2667,6 +2673,11 @@ de globale velden zetten, de shiften nakijken en aanmaken.
 - **Bonnetjes zijn per deelnemer.** De samenvatting bovenaan telt daarom
   `bonnetjes × plaatsen` en noemt dat expliciet "bij volle bezetting": dat getal is
   wat de avond in het slechtste geval aan de Theokot-kassa kost.
+- **Het aantal bonnetjes staat per shift, niet per sjabloon.** Een inkomshift van
+  een half uur is niet hetzelfde waard als vier uur aan de vaten, dus `reward` is
+  een verplicht veld op elke shift in het sjabloon. Er is bewust geen sjabloonbrede
+  standaard: die maakt van "vergeten in te vullen" stil "wat het sjabloon toevallig
+  zei", en dat is net het getal waar leden achteraf op terugkomen.
 
 ---
 

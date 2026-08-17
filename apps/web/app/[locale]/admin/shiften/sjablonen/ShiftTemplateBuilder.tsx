@@ -1,13 +1,13 @@
-"use client";
+'use client';
 
-import { useMemo, useState } from "react";
-import Link from "next/link";
-import type { Locale } from "@vtk/i18n";
-import { Button, Card, ConfirmDialog, Input, Label, Select, Textarea } from "@vtk/ui";
-import { SaveForm } from "@/components/ui/SaveForm";
-import { IconButton } from "@/components/ui/IconButton";
-import { TrashIcon } from "@/components/ui/icons";
-import { createShiftsFromTemplateAction } from "@/app/actions/shifts";
+import { useMemo, useState } from 'react';
+import Link from 'next/link';
+import type { Locale } from '@vtk/i18n';
+import { Button, Card, ConfirmDialog, Input, Label, Select, Textarea } from '@vtk/ui';
+import { SaveForm } from '@/components/ui/SaveForm';
+import { IconButton } from '@/components/ui/IconButton';
+import { TrashIcon } from '@/components/ui/icons';
+import { createShiftsFromTemplateAction } from '@/app/actions/shifts';
 
 // -----------------------------------------------------------------------------
 // Types van de sjablonen. De sjablonen zelf staan bovenaan page.tsx.
@@ -22,8 +22,12 @@ export type ShiftTemplateEntry = {
   startOffsetMinutes: number;
   durationMinutes: number;
   maxParticipants: number;
-  /** Aantal bonnetjes; weglaten = `defaults.reward`. */
-  reward?: number;
+  /**
+   * Aantal bonnetjes per deelnemer. Verplicht per shift, en bewust geen waarde
+   * die het sjabloon centraal zet: een opbouw van een half uur is niet hetzelfde
+   * waard als vier uur aan de tap, dus die keuze hoort bij de shift zelf.
+   */
+  reward: number;
   description: string;
   instructions?: string;
   /** Enkel invullen wanneer deze shift van de globale locatie/post afwijkt. */
@@ -43,7 +47,6 @@ export type ShiftTemplate = {
     eventName: string;
     location: string;
     post?: string | null;
-    reward?: number;
     /** Suggestie voor het uur van de eerste shift, "HH:mm". */
     timeOfDay?: string;
   };
@@ -61,7 +64,7 @@ export type ShiftTemplate = {
 // -----------------------------------------------------------------------------
 
 const LOCAL = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/;
-const pad = (n: number) => String(n).padStart(2, "0");
+const pad = (n: number) => String(n).padStart(2, '0');
 
 function toParts(value: string): Date | null {
   const m = LOCAL.exec(value);
@@ -79,7 +82,7 @@ function fromParts(date: Date): string {
 /** `local` plus `minutes`, opnieuw als "YYYY-MM-DDTHH:mm". Leeg blijft leeg. */
 function addMinutes(local: string, minutes: number): string {
   const parsed = toParts(local);
-  if (!parsed) return "";
+  if (!parsed) return '';
   return fromParts(new Date(parsed.getTime() + minutes * 60_000));
 }
 
@@ -103,12 +106,12 @@ function formatDuration(minutes: number, nl: boolean): string {
 /** Compacte weergave van een wandkloktijd: "vr 12/09 20:00". */
 function formatMoment(local: string, locale: Locale): string {
   const parsed = toParts(local);
-  if (!parsed) return "—";
-  const day = new Intl.DateTimeFormat(locale === "nl" ? "nl-BE" : "en-GB", {
-    weekday: "short",
-    day: "2-digit",
-    month: "2-digit",
-    timeZone: "UTC",
+  if (!parsed) return '—';
+  const day = new Intl.DateTimeFormat(locale === 'nl' ? 'nl-BE' : 'en-GB', {
+    weekday: 'short',
+    day: '2-digit',
+    month: '2-digit',
+    timeZone: 'UTC',
   }).format(parsed);
   return `${day} ${local.slice(11, 16)}`;
 }
@@ -120,9 +123,9 @@ function formatMoment(local: string, locale: Locale): string {
  * kunnen verschillen (andere tijdzone, of net over middernacht).
  */
 function defaultStart(template: ShiftTemplate, today: string): string {
-  const time = /^\d{2}:\d{2}$/.test(template.defaults.timeOfDay ?? "")
+  const time = /^\d{2}:\d{2}$/.test(template.defaults.timeOfDay ?? '')
     ? (template.defaults.timeOfDay as string)
-    : "20:00";
+    : '20:00';
   return `${today}T${time}`;
 }
 
@@ -175,14 +178,14 @@ type Row = {
  * lijst van shiften zoekt, is wat je gaat doen; het evenement is de context erbij.
  */
 const composeName = (eventName: string, baseName: string) =>
-  eventName.trim() === "" ? baseName : `${baseName} - ${eventName.trim()}`;
+  eventName.trim() === '' ? baseName : `${baseName} - ${eventName.trim()}`;
 
 function initialGlobals(template: ShiftTemplate, start: string): Globals {
   return {
     eventName: template.defaults.eventName,
     start,
     location: template.defaults.location,
-    post: template.defaults.post ?? "",
+    post: template.defaults.post ?? '',
   };
 }
 
@@ -194,11 +197,13 @@ function buildRows(template: ShiftTemplate, globals: Globals): Row[] {
     start: addMinutes(globals.start, entry.startOffsetMinutes),
     end: addMinutes(globals.start, entry.startOffsetMinutes + entry.durationMinutes),
     maxParticipants: String(entry.maxParticipants),
-    reward: String(entry.reward ?? template.defaults.reward ?? 1),
+    reward: String(entry.reward),
     location: entry.location ?? globals.location,
-    post: entry.post ?? template.defaults.post ?? "",
+    // `post: null` in een sjabloon betekent "deze shift hoort bij geen post", en
+    // dat is iets anders dan het veld weglaten; enkel weglaten volgt het globale.
+    post: entry.post !== undefined ? (entry.post ?? '') : globals.post,
     description: entry.description,
-    instructions: entry.instructions ?? "",
+    instructions: entry.instructions ?? '',
     openToInternationals: entry.openToInternationals ?? false,
     offsetMinutes: entry.startOffsetMinutes,
     durationMinutes: entry.durationMinutes,
@@ -214,19 +219,19 @@ function blankRow(globals: Globals): Row {
   return {
     uid: `extra-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
     enabled: true,
-    name: composeName(globals.eventName, "Extra shift"),
+    name: composeName(globals.eventName, 'Extra shift'),
     start: globals.start,
     end: addMinutes(globals.start, 120),
-    maxParticipants: "2",
-    reward: "1",
+    maxParticipants: '2',
+    reward: '1',
     location: globals.location,
     post: globals.post,
-    description: "",
-    instructions: "",
+    description: '',
+    instructions: '',
     openToInternationals: false,
     offsetMinutes: 0,
     durationMinutes: 120,
-    baseName: "Extra shift",
+    baseName: 'Extra shift',
     ownLocation: false,
     ownPost: false,
     // Zelf toegevoegd: de globale velden mogen deze rij niet meer overschrijven.
@@ -248,18 +253,13 @@ export function ShiftTemplateBuilder({
   today: string;
   postOptions: string[];
 }) {
-  const nl = locale === "nl";
-  const base = nl ? "" : "/en";
+  const nl = locale === 'nl';
+  const base = nl ? '' : '/en';
 
-  const [templateId, setTemplateId] = useState(templates[0]?.id ?? "");
-  const template = useMemo(
-    () => templates.find((t) => t.id === templateId) ?? templates[0],
-    [templates, templateId]
-  );
+  const [templateId, setTemplateId] = useState(templates[0]?.id ?? '');
+  const template = useMemo(() => templates.find((t) => t.id === templateId) ?? templates[0], [templates, templateId]);
 
-  const [globals, setGlobals] = useState<Globals>(() =>
-    initialGlobals(template, defaultStart(template, today))
-  );
+  const [globals, setGlobals] = useState<Globals>(() => initialGlobals(template, defaultStart(template, today)));
   const [rows, setRows] = useState<Row[]>(() =>
     buildRows(template, initialGlobals(template, defaultStart(template, today)))
   );
@@ -289,24 +289,18 @@ export function ShiftTemplateBuilder({
     touchForm();
     setGlobals((cur) => ({ ...cur, [key]: value }));
 
-    if (key === "start") {
+    if (key === 'start') {
       setRows((cur) => applyStart(cur, value as string));
-    } else if (key === "eventName") {
+    } else if (key === 'eventName') {
       setRows((cur) =>
-        cur.map((row) =>
-          row.touched.name ? row : { ...row, name: composeName(value as string, row.baseName) }
-        )
+        cur.map((row) => (row.touched.name ? row : { ...row, name: composeName(value as string, row.baseName) }))
       );
-    } else if (key === "location") {
+    } else if (key === 'location') {
       setRows((cur) =>
-        cur.map((row) =>
-          row.touched.location || row.ownLocation ? row : { ...row, location: value as string }
-        )
+        cur.map((row) => (row.touched.location || row.ownLocation ? row : { ...row, location: value as string }))
       );
-    } else if (key === "post") {
-      setRows((cur) =>
-        cur.map((row) => (row.touched.post || row.ownPost ? row : { ...row, post: value as string }))
-      );
+    } else if (key === 'post') {
+      setRows((cur) => cur.map((row) => (row.touched.post || row.ownPost ? row : { ...row, post: value as string })));
     }
   }
 
@@ -323,30 +317,24 @@ export function ShiftTemplateBuilder({
     setCreated(null);
   }
 
-  function updateRow(uid: string, patch: Partial<Row>, touch?: keyof Row["touched"]) {
+  function updateRow(uid: string, patch: Partial<Row>, touch?: keyof Row['touched']) {
     touchForm();
     setRows((cur) =>
       cur.map((row) =>
-        row.uid === uid
-          ? { ...row, ...patch, touched: touch ? { ...row.touched, [touch]: true } : row.touched }
-          : row
+        row.uid === uid ? { ...row, ...patch, touched: touch ? { ...row.touched, [touch]: true } : row.touched } : row
       )
     );
   }
 
   /** Het einde schuift mee met het begin, zodat de lengte van de shift blijft. */
   function moveRowStart(row: Row, value: string) {
-    updateRow(row.uid, { start: value, end: addMinutes(value, row.durationMinutes) }, "time");
+    updateRow(row.uid, { start: value, end: addMinutes(value, row.durationMinutes) }, 'time');
   }
 
   /** Het einde verzetten is de lengte veranderen; die blijft daarna gelden. */
   function moveRowEnd(row: Row, value: string) {
     const length = minutesBetween(row.start, value);
-    updateRow(
-      row.uid,
-      { end: value, durationMinutes: length ?? row.durationMinutes },
-      "time"
-    );
+    updateRow(row.uid, { end: value, durationMinutes: length ?? row.durationMinutes }, 'time');
   }
 
   function removeRow(uid: string) {
@@ -360,20 +348,17 @@ export function ShiftTemplateBuilder({
     const map = new Map<string, string[]>();
     for (const row of enabledRows) {
       const errors: string[] = [];
-      if (row.name.trim() === "") errors.push(nl ? "Naam ontbreekt." : "Name is missing.");
-      if (row.location.trim() === "") errors.push(nl ? "Locatie ontbreekt." : "Location is missing.");
-      if (row.description.trim() === "")
-        errors.push(nl ? "Beschrijving ontbreekt." : "Description is missing.");
+      if (row.name.trim() === '') errors.push(nl ? 'Naam ontbreekt.' : 'Name is missing.');
+      if (row.location.trim() === '') errors.push(nl ? 'Locatie ontbreekt.' : 'Location is missing.');
+      if (row.description.trim() === '') errors.push(nl ? 'Beschrijving ontbreekt.' : 'Description is missing.');
       const length = minutesBetween(row.start, row.end);
-      if (length === null) errors.push(nl ? "Vul begin en einde in." : "Fill in start and end.");
-      else if (length <= 0)
-        errors.push(nl ? "Het einde ligt voor het begin." : "The end is before the start.");
+      if (length === null) errors.push(nl ? 'Vul begin en einde in.' : 'Fill in start and end.');
+      else if (length <= 0) errors.push(nl ? 'Het einde ligt voor het begin.' : 'The end is before the start.');
       const spots = Number(row.maxParticipants);
-      if (!Number.isInteger(spots) || spots < 1)
-        errors.push(nl ? "Minstens één plaats." : "At least one spot.");
+      if (!Number.isInteger(spots) || spots < 1) errors.push(nl ? 'Minstens één plaats.' : 'At least one spot.');
       const reward = Number(row.reward);
       if (!Number.isInteger(reward) || reward < 0)
-        errors.push(nl ? "Beloning kan niet negatief zijn." : "Reward cannot be negative.");
+        errors.push(nl ? 'Beloning kan niet negatief zijn.' : 'Reward cannot be negative.');
       if (errors.length > 0) map.set(row.uid, errors);
     }
     return map;
@@ -385,9 +370,15 @@ export function ShiftTemplateBuilder({
       (sum, row) => sum + (Number(row.reward) || 0) * (Number(row.maxParticipants) || 0),
       0
     );
-    const starts = enabledRows.map((row) => row.start).filter(Boolean).sort();
-    const ends = enabledRows.map((row) => row.end).filter(Boolean).sort();
-    return { spots, vouchers, first: starts[0] ?? "", last: ends[ends.length - 1] ?? "" };
+    const starts = enabledRows
+      .map((row) => row.start)
+      .filter(Boolean)
+      .sort();
+    const ends = enabledRows
+      .map((row) => row.end)
+      .filter(Boolean)
+      .sort();
+    return { spots, vouchers, first: starts[0] ?? '', last: ends[ends.length - 1] ?? '' };
   }, [enabledRows]);
 
   const payload = JSON.stringify({
@@ -400,9 +391,9 @@ export function ShiftTemplateBuilder({
       description: row.description.trim(),
       maxParticipants: Number(row.maxParticipants),
       reward: Number(row.reward),
-      post: row.post === "" ? null : row.post,
+      post: row.post === '' ? null : row.post,
       openToInternationals: row.openToInternationals,
-      instructions: row.instructions.trim() === "" ? null : row.instructions,
+      instructions: row.instructions.trim() === '' ? null : row.instructions,
     })),
   });
 
@@ -415,33 +406,31 @@ export function ShiftTemplateBuilder({
       submitLabel={
         enabledRows.length === 1
           ? nl
-            ? "1 shift aanmaken"
-            : "Create 1 shift"
+            ? '1 shift aanmaken'
+            : 'Create 1 shift'
           : nl
             ? `${enabledRows.length} shiften aanmaken`
             : `Create ${enabledRows.length} shifts`
       }
-      savingLabel={nl ? "Bezig met aanmaken..." : "Creating..."}
+      savingLabel={nl ? 'Bezig met aanmaken...' : 'Creating...'}
       savedMessage={
         nl
           ? `${enabledRows.length} shift(en) aangemaakt en gepubliceerd.`
           : `Created and published ${enabledRows.length} shift(s).`
       }
       errorMessages={{
-        empty: nl
-          ? "Er staat geen enkele shift aangevinkt."
-          : "No shift is ticked to be created.",
+        empty: nl ? 'Er staat geen enkele shift aangevinkt.' : 'No shift is ticked to be created.',
         tooMany: nl
-          ? "Meer dan honderd shiften in één keer: kijk de offsets in het sjabloon na."
-          : "More than a hundred shifts at once: check the template offsets.",
+          ? 'Meer dan honderd shiften in één keer: kijk de offsets in het sjabloon na.'
+          : 'More than a hundred shifts at once: check the template offsets.',
         badPayload: nl
-          ? "De gegevens raakten niet correct bij de server. Herlaad de pagina en probeer opnieuw."
-          : "The data did not reach the server correctly. Reload the page and try again.",
+          ? 'De gegevens raakten niet correct bij de server. Herlaad de pagina en probeer opnieuw.'
+          : 'The data did not reach the server correctly. Reload the page and try again.',
         // `invalid` staat hier bewust niet in: die fout komt met een `detail` dat
         // zegt wélke shift niet in orde is, en dat is bruikbaarder dan een
         // algemene zin.
       }}
-      fallbackErrorMessage={nl ? "Aanmaken mislukt." : "Creating failed."}
+      fallbackErrorMessage={nl ? 'Aanmaken mislukt.' : 'Creating failed.'}
       resetOnSuccess={false}
       submitDisabled={blocked}
       onSuccess={() => setCreated(enabledRows.length)}
@@ -450,10 +439,10 @@ export function ShiftTemplateBuilder({
 
       {/* Globale velden: wat per editie van het evenement verschilt. */}
       <Card className="p-5">
-        <h2 className="mb-4 text-lg font-semibold">{nl ? "Algemeen" : "General"}</h2>
+        <h2 className="mb-4 text-lg font-semibold">{nl ? 'Algemeen' : 'General'}</h2>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
           <div>
-            <Label htmlFor="template">{nl ? "Sjabloon" : "Template"}</Label>
+            <Label htmlFor="template">{nl ? 'Sjabloon' : 'Template'}</Label>
             <Select
               id="template"
               value={templateId}
@@ -471,44 +460,36 @@ export function ShiftTemplateBuilder({
             {template?.note && <p className="mt-1 text-xs text-zinc-400">{template.note}</p>}
           </div>
           <div>
-            <Label htmlFor="eventName">{nl ? "Naam van het evenement" : "Event name"}</Label>
-            <Input
-              id="eventName"
-              value={globals.eventName}
-              onChange={(e) => setGlobal("eventName", e.target.value)}
-            />
+            <Label htmlFor="eventName">{nl ? 'Naam van het evenement' : 'Event name'}</Label>
+            <Input id="eventName" value={globals.eventName} onChange={(e) => setGlobal('eventName', e.target.value)} />
             <p className="mt-1 text-xs text-zinc-400">
               {nl
-                ? "Komt achter elke shiftnaam te staan, bv. “Tap 1 - Cantus”."
-                : "Comes after every shift name, e.g. “Tap 1 - Cantus”."}
+                ? 'Komt achter elke shiftnaam te staan, bv. “Tap 1 - Cantus”.'
+                : 'Comes after every shift name, e.g. “Tap 1 - Cantus”.'}
             </p>
           </div>
           <div>
-            <Label htmlFor="start">{nl ? "Start van de eerste shift" : "Start of the first shift"}</Label>
+            <Label htmlFor="start">{nl ? 'Start van het evenement' : 'Start of the event'}</Label>
             <Input
               id="start"
               type="datetime-local"
               value={globals.start}
-              onChange={(e) => setGlobal("start", e.target.value)}
+              onChange={(e) => setGlobal('start', e.target.value)}
             />
             <p className="mt-1 text-xs text-zinc-400">
               {nl
-                ? "Alle tijden hieronder schuiven mee, behalve die je zelf aanpaste."
-                : "Every time below shifts along, except the ones you edited yourself."}
+                ? 'Alle tijden hieronder schuiven mee, behalve die je zelf aanpaste.'
+                : 'Every time below shifts along, except the ones you edited yourself.'}
             </p>
           </div>
           <div>
-            <Label htmlFor="location">{nl ? "Locatie" : "Location"}</Label>
-            <Input
-              id="location"
-              value={globals.location}
-              onChange={(e) => setGlobal("location", e.target.value)}
-            />
+            <Label htmlFor="location">{nl ? 'Locatie' : 'Location'}</Label>
+            <Input id="location" value={globals.location} onChange={(e) => setGlobal('location', e.target.value)} />
           </div>
           <div>
             <Label htmlFor="post">Post</Label>
-            <Select id="post" value={globals.post} onChange={(e) => setGlobal("post", e.target.value)}>
-              <option value="">{nl ? "Geen" : "None"}</option>
+            <Select id="post" value={globals.post} onChange={(e) => setGlobal('post', e.target.value)}>
+              <option value="">{nl ? 'Geen' : 'None'}</option>
               {postOptions.map((p) => (
                 <option key={p} value={p}>
                   {p}
@@ -522,14 +503,13 @@ export function ShiftTemplateBuilder({
       {/* Samenvatting van wat er straks aangemaakt wordt. */}
       <div className="flex flex-wrap gap-x-6 gap-y-1 rounded-2xl bg-vtk-blue-soft px-4 py-3 text-sm">
         <span>
-          <strong>{enabledRows.length}</strong> {nl ? "shift(en)" : "shift(s)"}
+          <strong>{enabledRows.length}</strong> {nl ? 'shift(en)' : 'shift(s)'}
         </span>
         <span>
-          <strong>{totals.spots}</strong> {nl ? "plaatsen" : "spots"}
+          <strong>{totals.spots}</strong> {nl ? 'plaatsen' : 'spots'}
         </span>
         <span>
-          <strong>{totals.vouchers}</strong>{" "}
-          {nl ? "bonnetjes bij volle bezetting" : "vouchers at full occupancy"}
+          <strong>{totals.vouchers}</strong> {nl ? 'bonnetjes bij volle bezetting' : 'vouchers at full occupancy'}
         </span>
         {totals.first && (
           <span className="text-zinc-500">
@@ -541,7 +521,7 @@ export function ShiftTemplateBuilder({
       {/* Per shift: nakijken en bijstellen. */}
       <div className="space-y-3">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <h2 className="text-lg font-semibold">{nl ? "De shiften" : "The shifts"}</h2>
+          <h2 className="text-lg font-semibold">{nl ? 'De shiften' : 'The shifts'}</h2>
           <Button
             type="button"
             variant="ghost"
@@ -551,13 +531,13 @@ export function ShiftTemplateBuilder({
               setRows((cur) => [...cur, blankRow(globals)]);
             }}
           >
-            {nl ? "Shift toevoegen" : "Add shift"}
+            {nl ? 'Shift toevoegen' : 'Add shift'}
           </Button>
         </div>
 
         {rows.length === 0 && (
           <Card className="p-6 text-center text-sm text-zinc-500">
-            {nl ? "Dit sjabloon heeft geen shiften." : "This template has no shifts."}
+            {nl ? 'Dit sjabloon heeft geen shiften.' : 'This template has no shifts.'}
           </Card>
         )}
 
@@ -567,9 +547,7 @@ export function ShiftTemplateBuilder({
           return (
             <Card
               key={row.uid}
-              className={`p-4 ${row.enabled ? "" : "opacity-60"} ${
-                errors.length > 0 ? "border-red-300" : ""
-              }`}
+              className={`p-4 ${row.enabled ? '' : 'opacity-60'} ${errors.length > 0 ? 'border-red-300' : ''}`}
             >
               <div className="mb-3 flex flex-wrap items-center gap-3">
                 <label className="flex items-center gap-2 text-sm font-medium">
@@ -588,14 +566,12 @@ export function ShiftTemplateBuilder({
                   </span>
                 )}
                 {!row.enabled && (
-                  <span className="text-xs text-zinc-400">
-                    {nl ? "Wordt niet aangemaakt" : "Will not be created"}
-                  </span>
+                  <span className="text-xs text-zinc-400">{nl ? 'Wordt niet aangemaakt' : 'Will not be created'}</span>
                 )}
                 <span className="ml-auto">
                   <IconButton
-                    label={nl ? "Rij verwijderen" : "Remove row"}
-                    srLabel={`${nl ? "Rij verwijderen" : "Remove row"}: ${row.name}`}
+                    label={nl ? 'Rij verwijderen' : 'Remove row'}
+                    srLabel={`${nl ? 'Rij verwijderen' : 'Remove row'}: ${row.name}`}
                     tone="danger"
                     onClick={() => removeRow(row.uid)}
                   >
@@ -606,15 +582,15 @@ export function ShiftTemplateBuilder({
 
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
                 <div className="sm:col-span-2">
-                  <Label>{nl ? "Naam" : "Name"}</Label>
+                  <Label>{nl ? 'Naam' : 'Name'}</Label>
                   <Input
                     value={row.name}
                     disabled={!row.enabled}
-                    onChange={(e) => updateRow(row.uid, { name: e.target.value }, "name")}
+                    onChange={(e) => updateRow(row.uid, { name: e.target.value }, 'name')}
                   />
                 </div>
                 <div>
-                  <Label>{nl ? "Begin" : "Start"}</Label>
+                  <Label>{nl ? 'Begin' : 'Start'}</Label>
                   <Input
                     type="datetime-local"
                     value={row.start}
@@ -623,7 +599,7 @@ export function ShiftTemplateBuilder({
                   />
                 </div>
                 <div>
-                  <Label>{nl ? "Einde" : "End"}</Label>
+                  <Label>{nl ? 'Einde' : 'End'}</Label>
                   <Input
                     type="datetime-local"
                     value={row.end}
@@ -632,7 +608,7 @@ export function ShiftTemplateBuilder({
                   />
                 </div>
                 <div>
-                  <Label>{nl ? "Plaatsen" : "Spots"}</Label>
+                  <Label>{nl ? 'Plaatsen' : 'Spots'}</Label>
                   <Input
                     type="number"
                     min={1}
@@ -642,7 +618,7 @@ export function ShiftTemplateBuilder({
                   />
                 </div>
                 <div>
-                  <Label>{nl ? "Bonnetjes" : "Vouchers"}</Label>
+                  <Label>{nl ? 'Bonnetjes' : 'Vouchers'}</Label>
                   <Input
                     type="number"
                     min={0}
@@ -652,34 +628,48 @@ export function ShiftTemplateBuilder({
                   />
                 </div>
                 <div>
-                  <Label>{nl ? "Locatie" : "Location"}</Label>
+                  <Label>{nl ? 'Locatie' : 'Location'}</Label>
                   <Input
                     value={row.location}
                     disabled={!row.enabled}
-                    onChange={(e) => updateRow(row.uid, { location: e.target.value }, "location")}
+                    onChange={(e) => updateRow(row.uid, { location: e.target.value }, 'location')}
                   />
+                  {/* Zonder dit lijntje lijkt het een bug dat deze ene rij niet
+                      meeging met de locatie bovenaan. */}
+                  {row.ownLocation && (
+                    <p className="mt-1 text-xs text-zinc-400">
+                      {nl
+                        ? 'Vaste plek uit het sjabloon; volgt de algemene locatie niet.'
+                        : 'Fixed spot from the template; does not follow the general location.'}
+                    </p>
+                  )}
                 </div>
                 <div>
                   <Label>Post</Label>
                   <Select
                     value={row.post}
                     disabled={!row.enabled}
-                    onChange={(e) => updateRow(row.uid, { post: e.target.value }, "post")}
+                    onChange={(e) => updateRow(row.uid, { post: e.target.value }, 'post')}
                   >
-                    <option value="">{nl ? "Geen" : "None"}</option>
+                    <option value="">{nl ? 'Geen' : 'None'}</option>
                     {postOptions.map((p) => (
                       <option key={p} value={p}>
                         {p}
                       </option>
                     ))}
                     {/* Een sjabloon kan een post noemen die intussen gedeactiveerd is. */}
-                    {row.post !== "" && !postOptions.includes(row.post) && (
-                      <option value={row.post}>{row.post}</option>
-                    )}
+                    {row.post !== '' && !postOptions.includes(row.post) && <option value={row.post}>{row.post}</option>}
                   </Select>
+                  {row.ownPost && (
+                    <p className="mt-1 text-xs text-zinc-400">
+                      {nl
+                        ? 'Vaste post uit het sjabloon; volgt de algemene post niet.'
+                        : 'Fixed group from the template; does not follow the general group.'}
+                    </p>
+                  )}
                 </div>
                 <div className="sm:col-span-2 lg:col-span-4">
-                  <Label>{nl ? "Beschrijving" : "Description"}</Label>
+                  <Label>{nl ? 'Beschrijving' : 'Description'}</Label>
                   <Input
                     value={row.description}
                     disabled={!row.enabled}
@@ -687,7 +677,7 @@ export function ShiftTemplateBuilder({
                   />
                 </div>
                 <div className="sm:col-span-2 lg:col-span-4">
-                  <Label>{nl ? "Uitleg (optioneel)" : "Explanation (optional)"}</Label>
+                  <Label>{nl ? 'Uitleg (optioneel)' : 'Explanation (optional)'}</Label>
                   <Textarea
                     value={row.instructions}
                     rows={3}
@@ -701,11 +691,9 @@ export function ShiftTemplateBuilder({
                       type="checkbox"
                       checked={row.openToInternationals}
                       disabled={!row.enabled}
-                      onChange={(e) =>
-                        updateRow(row.uid, { openToInternationals: e.target.checked })
-                      }
+                      onChange={(e) => updateRow(row.uid, { openToInternationals: e.target.checked })}
                     />
-                    <span>{nl ? "Ook voor internationals" : "Open to internationals"}</span>
+                    <span>{nl ? 'Ook voor internationals' : 'Open to internationals'}</span>
                   </label>
                 </div>
               </div>
@@ -726,20 +714,18 @@ export function ShiftTemplateBuilder({
         <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">
           {nl
             ? `${created} shift(en) aangemaakt. Ze staan meteen op de shiftpagina.`
-            : `${created} shift(s) created. They are on the shift page right away.`}{" "}
+            : `${created} shift(s) created. They are on the shift page right away.`}{' '}
           <Link href={`${base}/admin/shiften`} className="underline">
-            {nl ? "Naar het overzicht" : "To the overview"}
+            {nl ? 'Naar het overzicht' : 'To the overview'}
           </Link>
           {nl
-            ? " Pas iets aan hierboven om nog een reeks aan te maken."
-            : " Change something above to create another batch."}
+            ? ' Pas iets aan hierboven om nog een reeks aan te maken.'
+            : ' Change something above to create another batch.'}
         </div>
       )}
 
       {enabledRows.length === 0 && (
-        <p className="text-sm text-zinc-500">
-          {nl ? "Vink minstens één shift aan." : "Tick at least one shift."}
-        </p>
+        <p className="text-sm text-zinc-500">{nl ? 'Vink minstens één shift aan.' : 'Tick at least one shift.'}</p>
       )}
       {problems.size > 0 && (
         <p className="text-sm text-red-600">
@@ -751,15 +737,15 @@ export function ShiftTemplateBuilder({
 
       <ConfirmDialog
         open={pendingTemplate !== null}
-        title={nl ? "Ander sjabloon laden?" : "Load another template?"}
+        title={nl ? 'Ander sjabloon laden?' : 'Load another template?'}
         description={
           nl
-            ? "De shiften hieronder worden opnieuw opgebouwd uit het nieuwe sjabloon. Je aanpassingen aan tijden, aantallen en namen gaan daarbij verloren; er is nog niets aangemaakt, dus in de databank verandert er niets."
-            : "The shifts below are rebuilt from the new template. Your edits to times, counts and names are lost; nothing has been created yet, so nothing changes in the database."
+            ? 'De shiften hieronder worden opnieuw opgebouwd uit het nieuwe sjabloon. Je aanpassingen aan tijden, aantallen en namen gaan daarbij verloren; er is nog niets aangemaakt, dus in de databank verandert er niets.'
+            : 'The shifts below are rebuilt from the new template. Your edits to times, counts and names are lost; nothing has been created yet, so nothing changes in the database.'
         }
         destructive={false}
-        confirmLabel={nl ? "Sjabloon laden" : "Load template"}
-        cancelLabel={nl ? "Annuleren" : "Cancel"}
+        confirmLabel={nl ? 'Sjabloon laden' : 'Load template'}
+        cancelLabel={nl ? 'Annuleren' : 'Cancel'}
         onConfirm={() => {
           if (pendingTemplate) selectTemplate(pendingTemplate);
           setPendingTemplate(null);
