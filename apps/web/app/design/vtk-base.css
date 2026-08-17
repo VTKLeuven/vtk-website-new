@@ -684,6 +684,7 @@
 
 .vtk-card {
   padding: clamp(22px, 3vw, 28px);
+  overflow-wrap: break-word;
   transition:
     transform 180ms ease,
     border-color 180ms ease,
