@@ -10,6 +10,8 @@ from hardware import Screen, Scanner
 # env
 # ---
 API_BASE = os.environ.get("API_BASE", "https://dev.vtk.be").rstrip("/")
+SCAN_URL = f"{API_BASE}/api/fakscanner/scan"
+
 LOG_FILE = os.environ.get("FAKSCANNER_LOG_FILE", "./fakscanner.log")
 TOKEN = os.environ.get("FAKSCANNER_TOKEN", "")
 
@@ -37,7 +39,7 @@ logger.info("Initializing script")
 
 try:
     scanner = Scanner()
-    logger.info(f"Cardscanner found: ${scanner.name}")
+    logger.info(f"Cardscanner found: {scanner.name}")
 except:
     screen.show("Geen cardscanner", "gevonden")
     logger.error("Geen cardscanner gevonden")
@@ -45,13 +47,31 @@ except:
 
 try:
     requests.get(API_BASE)
-    logger.info(f"Verbonden met ${API_BASE}")
+    logger.info(f"Verbonden met {API_BASE}")
 except:
     screen.show("Geen verbinding", f"met {API_BASE}")
     logger.error("Geen cardscanner gevonden")
     exit()
 
-# try connecting to internet (ping vtk.be)
+while True:
+    screen.show("    Scan je     ", " Studentenkaart ")
+
+    card = scanner.read() # wacht op studentenkaart
+
+    try:
+        response = requests.post(
+            SCAN_URL,
+            json={"card": card},
+            headers={"Authorization": f"Bearer {TOKEN}"},
+            timeout=8,
+        )
+    except requests.exceptions.RequestException as exc:
+        screen.show("Geen verbinding", f"met {API_BASE}")
+        logger.info(f"Geen verbinding met de site: {exc}")
+        time.sleep(10)
+        
+    print(response)
+
 
 # start main loop
 #   wait for cardscan
