@@ -1,25 +1,7 @@
 #!/usr/bin/env python3
 #
-# VTK fakscanner (Raspberry Pi aan de bar)
+# VTK fakscanner
 # ----------------------------------------
-# De KU Leuven-kaartlezer gedraagt zich als een toetsenbord en "typt"
-# `serial;cardAppId` + Enter. Wij sturen die ruwe scan door naar de website
-# (`POST /api/fakscanner/scan`) en tonen het antwoord op het schermpje: hoeveel
-# punten het lid staat, en of er een gratis pint bij hoort.
-#
-# Verschil met de oude Litus-versie van dit script: de KU Leuven-verificatie
-# gebeurt niet meer hier maar op de server. De Pi heeft dus geen KU Leuven-
-# credentials meer nodig, enkel een token voor onze eigen site, en de site houdt
-# zelf een kaart-naar-r-nummer-map bij zodat een tweede scan van dezelfde kaart
-# niet opnieuw bij KU Leuven hoeft te passeren.
-#
-# Config gebeurt volledig via omgevingsvariabelen (zie het blok hieronder).
-# Afhankelijkheden: `requests`, en op een echte Pi optioneel `RPi.GPIO` (lampje),
-# `drivers` (het I2C-LCD uit de Litus-opstelling) en `pyscard` (de LED in de
-# lezer). Ontbreekt er een, dan valt dat stuk gewoon weg en blijft de rest werken.
-#
-#   FAKSCANNER_TOKEN=... python3 scripts/fakscanner.py
-#   python3 scripts/fakscanner.py --test-led     # enkel de LED uitproberen
 
 import argparse
 import logging
@@ -41,11 +23,6 @@ SCAN_URL = f"{API_BASE}/api/fakscanner/scan"
 REQUEST_TIMEOUT = float(os.environ.get("FAKSCANNER_REQUEST_TIMEOUT", "8"))
 LOG_FILE = os.environ.get("FAKSCANNER_LOG_FILE", "./fakscanner.log")
 
-# Lampje boven de bar (optioneel), aan zolang de gratis pint op het scherm staat.
-GPIO_PORT = int(os.environ.get("FAKSCANNER_GPIO_PORT", "26"))
-GPIO_ENABLED = os.environ.get("FAKSCANNER_GPIO", "1").strip() not in ("", "0", "false", "False")
-
-# Hoelang "GRATIS PINT" blijft staan (seconden).
 BEER_SECONDS = float(os.environ.get("FAKSCANNER_BEER_SECONDS", "6"))
 
 # ---------------------------------------------------------------------------
@@ -112,7 +89,7 @@ def log(message):
 
 
 # ---------------------------------------------------------------------------
-# LCD (16x2, optioneel)
+# LCD
 # ---------------------------------------------------------------------------
 
 display = None
@@ -141,34 +118,6 @@ def show(line1, line2=""):
 
 def show_default():
     show("    Scan je", " studentenkaart")
-
-
-# ---------------------------------------------------------------------------
-# GPIO-lampje (optioneel)
-# ---------------------------------------------------------------------------
-
-gpio = None
-if GPIO_ENABLED:
-    try:
-        import RPi.GPIO as GPIO  # type: ignore
-
-        GPIO.setwarnings(False)
-        GPIO.setmode(GPIO.BCM)
-        GPIO.setup(GPIO_PORT, GPIO.OUT)
-        GPIO.output(GPIO_PORT, 0)
-        gpio = GPIO
-    except Exception as exc:  # noqa: BLE001
-        log(f"Geen GPIO beschikbaar ({exc}); het lampje blijft uit.")
-        gpio = None
-
-
-def lamp(on):
-    if gpio is None:
-        return
-    try:
-        gpio.output(GPIO_PORT, 1 if on else 0)
-    except Exception as exc:  # noqa: BLE001
-        log(f"GPIO schakelen mislukt: {exc}")
 
 
 # ---------------------------------------------------------------------------
