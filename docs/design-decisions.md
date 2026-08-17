@@ -2545,6 +2545,57 @@ en twee uur vooraf. Beide zijn per lid uitzetbaar in het profiel.
 
 ---
 
+## Shiften uit een sjabloon (terugkerende evenementen)
+
+Een cantus, een fakbaravond en een TD hebben elke editie dezelfde reeks shiften.
+Enkel de datum, het uur en soms de locatie verschillen. Die reeks één voor één in
+het gewone shiftformulier intikken is een half uur werk waarin je gegarandeerd één
+shift vergeet. `/admin/shiften/sjablonen` doet het in drie stappen: sjabloon kiezen,
+de globale velden zetten, de shiften nakijken en aanmaken.
+
+- **De sjablonen staan in de code, bovenaan `page.tsx`.** Bewust geen beheerscherm
+  en geen tabel in de databank: de lijst verandert hooguit een paar keer per
+  werkingsjaar, en dan is een blok JSON dat mee door review gaat makkelijker te
+  lezen (en terug te draaien) dan een formulier met een formulier erin. Wie een
+  nieuw terugkerend evenement heeft, zet er een blok bij.
+- **Een sjabloon beschrijft tijden als offsets, niet als uren.** Elke shift heeft
+  `startOffsetMinutes` t.o.v. het startmoment dat je bovenaan invult (0 = de eerste
+  shift, negatief = opbouw ervoor) plus een `durationMinutes`. Zo blijft één veld
+  bovenaan genoeg om de hele avond te verzetten, en klopt de opbouw automatisch mee.
+  Het rekenwerk gebeurt op de **wandklok**: "twee uur later" is 20:00 → 22:00, ook in
+  de nacht dat de klok verzet wordt. De server leest die tijden als Belgische tijd,
+  net als het gewone shiftformulier.
+- **De shiftnaam komt eerst, het evenement erachter:** "Inkom - Cantus", niet
+  "Cantus - Inkom". In een lijst shiften is wát je gaat doen het onderscheidende
+  deel; het evenement is de context erbij. Zet je de evenementnaam leeg, dan blijft
+  enkel de shiftnaam over.
+- **Het sjabloon is een startpunt, geen keurslijf.** Onderaan staat elke shift
+  volledig open: tijden, aantal plaatsen, bonnetjes, locatie, post, beschrijving. Een
+  shift die je deze keer niet nodig hebt, vink je uit in plaats van hem te
+  verwijderen; hij staat er de volgende keer weer. Een shift die enkel bij een grote
+  editie hoort, staat in het sjabloon al op `enabled: false`.
+- **Wat je zelf aanpast, wordt niet meer overschreven.** Verzet je daarna nog het
+  globale startmoment of de locatie, dan schuiven enkel de velden mee die je nog niet
+  aangeraakt hebt. Anders zou het corrigeren van één tikfout bovenaan al je
+  fijnafstelling wissen; dat is precies het werk dat deze pagina moest besparen.
+- **Aanmaken is publiceren.** `/shift` toont gewoon alle toekomstige shiften, er is
+  geen aparte publicatiestap en dus ook geen concept-toestand. Daarom staat álle
+  nakijkwerk vóór de knop, en gaat de knop pas aan als elke aangevinkte shift
+  volledig is.
+- **Er blijft geen band met het sjabloon achter.** De aangemaakte shiften zijn gewone
+  shiften: geen `templateId` in de databank, geen "bijwerken vanuit sjabloon". Een
+  reeks aanpassen of verwijderen doe je in het gewone overzicht. Een tweede knop die
+  achteraf een hele reeks kan herschrijven, is een knop die op een avond met
+  ingeschreven leden veel schade doet.
+- **Na een geslaagde aanmaak gaat de knop op slot** tot je iets wijzigt. Dubbelklikken
+  of een herlaadde pagina mag geen tweede reeks van dezelfde avond neerzetten;
+  duplicaten zijn hier duur, want leden schrijven zich in op de verkeerde helft.
+- **Bonnetjes zijn per deelnemer.** De samenvatting bovenaan telt daarom
+  `bonnetjes × plaatsen` en noemt dat expliciet "bij volle bezetting": dat getal is
+  wat de avond in het slechtste geval aan de Theokot-kassa kost.
+
+---
+
 ## Aankondigingen: homepage of de hele site
 
 Een aankondiging is het venster dat over de site verschijnt, beheerd op
