@@ -17,7 +17,7 @@ import { currentWorkingYear, type SessionPayload } from '@vtk/auth';
 
 /** Aan als de env-toggle expliciet op "true" staat; anders uit. */
 export function testLoginEnabled(): boolean {
-  return process.env.NODE_ENV !== 'production' && process.env.LOGISTIEK_TEST_LOGIN === 'true';
+  return process.env.LOGISTIEK_TEST_LOGIN === 'true';
 }
 
 /** Cookie die onthoudt als welke test-gebruiker je bent ingelogd. */
