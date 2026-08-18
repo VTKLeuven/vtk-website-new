@@ -821,6 +821,371 @@
   }
 }
 
+/* Praesidium (`/praesidium`): een contactblad in plaats van een raster losse
+   kaarten. Negentien jaar historiek en tot negentig leden per jaar maakten de
+   oude opzet onbruikbaar: veertien secties met dezelfde gecentreerde kaart,
+   zonder enige manier om naar een post te springen. Hier draagt de foto zelf de
+   tegel (geen kaartchroom meer) en staat er links een rail met alle posten. */
+.vtk-roster {
+  display: grid;
+  grid-template-columns: 212px minmax(0, 1fr);
+  gap: 44px;
+  align-items: start;
+}
+
+/* De rail heeft een vaste breedte nodig om te blijven staan; onder dit punt
+   wordt ze het uitklappaneel hieronder en staat het rooster over de volle
+   breedte. Zelfde aanpak als de admin-nav, en bewust geen horizontale
+   scrollstrip: veertien posten in een scroller verstopt er tien. */
+@media (max-width: 900px) {
+  .vtk-roster {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 18px;
+  }
+}
+
+/* De <nav> eromheen is enkel de loopruimte: ze moet over de volle hoogte van de
+   rij uitrekken (`align-self` overschrijft de `align-items: start` hierboven).
+   Een `position: sticky` kind schuift namelijk alleen binnen zijn eigen ouder, en
+   zonder dit is die ouder even hoog als de rail zelf: nul speling, dus de rail
+   scrolde gewoon mee weg en de kolom stond leeg zodra je voorbij de eerste post
+   was. Dezelfde valstrik als bij de admin-nav. */
+.vtk-roster > nav {
+  align-self: stretch;
+}
+
+.vtk-roster-index {
+  position: sticky;
+  /* Zelfde marge als `.prose-vtk :is(h2, h3)` hierboven: de sticky sitekop. */
+  top: 96px;
+  /* Enkel wanneer veertien posten niet op een laag scherm passen krijgt de rail
+     haar eigen scrollbalk; anders staat er geen. */
+  max-height: calc(100vh - 120px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.vtk-roster-index-title {
+  padding-bottom: 9px;
+  border-bottom: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+
+.vtk-roster-index a {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--rule-soft);
+  color: var(--body);
+  font-size: 13.5px;
+  transition:
+    color 140ms ease,
+    padding 140ms ease;
+}
+
+.vtk-roster-index a:hover {
+  color: var(--ink);
+}
+
+.vtk-roster-index a span {
+  color: var(--muted);
+  font-size: 11.5px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* De post die je aan het lezen bent (scroll-spy in PraesidiumIndex). */
+.vtk-roster-index a[aria-current="true"] {
+  padding-left: 11px;
+  box-shadow: inset 3px 0 0 var(--yellow);
+  color: var(--ink);
+  font-weight: 600;
+}
+
+/* Smal scherm: de rail zit achter een knop, net als de admin-nav. */
+.vtk-roster-toggle {
+  appearance: none;
+  display: none;
+  width: 100%;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 11px 16px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--ink);
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+@media (max-width: 900px) {
+  .vtk-roster-toggle {
+    display: flex;
+  }
+
+  .vtk-roster-index {
+    display: none;
+    position: static;
+    max-height: none;
+    overflow: visible;
+    margin-top: 8px;
+    padding: 6px 14px 10px;
+    border: 1px solid var(--line);
+    border-radius: 18px;
+    background: var(--surface);
+  }
+
+  .vtk-roster-index.is-open {
+    display: block;
+  }
+}
+
+/* Jaarbalk: de vijf recentste jaren staan er los, de rest zit achter één
+   archiefknop. Alle negentien als pillen naast elkaar was een blok dat elk jaar
+   aangroeide en de pagina begon met ruis in plaats van met mensen. */
+.vtk-roster-years {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding-bottom: 18px;
+  margin-bottom: 30px;
+  border-bottom: 1px solid var(--line);
+}
+
+.vtk-roster-years-label {
+  margin-right: 6px;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+
+.vtk-roster-year {
+  padding: 5px 13px;
+  border: 1px solid var(--line-2);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--body);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  transition:
+    background 140ms ease,
+    border-color 140ms ease,
+    color 140ms ease;
+}
+
+.vtk-roster-year:hover {
+  border-color: var(--ink);
+  color: var(--ink);
+}
+
+.vtk-roster-year[aria-current="page"] {
+  border-color: var(--ink);
+  background: var(--ink);
+  color: var(--paper);
+  font-weight: 600;
+}
+
+.vtk-roster-archive {
+  position: relative;
+}
+
+.vtk-roster-archive > summary {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 5px 13px;
+  border: 1px dashed var(--line-2);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--muted);
+  font-size: 13px;
+  cursor: pointer;
+  list-style: none;
+}
+
+.vtk-roster-archive > summary::-webkit-details-marker {
+  display: none;
+}
+
+.vtk-roster-archive > summary:hover {
+  border-style: solid;
+  color: var(--ink);
+}
+
+.vtk-roster-archive-chevron {
+  transition: transform 160ms ease;
+}
+
+.vtk-roster-archive[open] > summary .vtk-roster-archive-chevron {
+  transform: rotate(180deg);
+}
+
+/* Het paneel zweeft over de pagina; zou het meelopen in de flexrij, dan
+   verspringt alles eronder bij elke klik. */
+.vtk-roster-archive-panel {
+  position: absolute;
+  z-index: 20;
+  top: calc(100% + 8px);
+  left: 0;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 4px;
+  min-width: 252px;
+  max-height: 320px;
+  overflow-y: auto;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--surface);
+  box-shadow: 0 24px 60px -30px rgba(14, 26, 54, 0.55);
+}
+
+.vtk-roster-archive-panel a {
+  padding: 6px 8px;
+  border-radius: 8px;
+  color: var(--body);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+
+.vtk-roster-archive-panel a:hover {
+  background: var(--paper-2);
+  color: var(--ink);
+}
+
+/* Rechts een post per keer: een klein kapitaal met een lijn tot aan het aantal,
+   in plaats van een kop die even zwaar weegt als de paginatitel. */
+.vtk-roster-post {
+  margin-top: 44px;
+  scroll-margin-top: 96px;
+}
+
+.vtk-roster-post:first-child {
+  margin-top: 0;
+}
+
+.vtk-roster-post-head {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 18px;
+}
+
+.vtk-roster-post-head h2 {
+  margin: 0;
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.vtk-roster-post-rule {
+  flex: 1;
+  height: 1px;
+  background: var(--line-2);
+}
+
+.vtk-roster-post-count {
+  color: var(--muted);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* Zes per rij op een volle kolom, en vanzelf minder naarmate het smaller wordt.
+   Op een telefoon blijven dat er twee, niet één: een lijst van negentig
+   volle-breedte foto's scrolt eindeloos. */
+.vtk-roster-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(130px, 100%), 1fr));
+  gap: 18px 14px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.vtk-roster-photo {
+  position: relative;
+  aspect-ratio: 1;
+  overflow: hidden;
+  border-radius: 10px;
+  background: var(--paper-2);
+  /* Een `box-shadow` en geen `border`: de haarlijn mag de vierkante verhouding
+     van de foto niet mee opblazen. */
+  box-shadow: 0 0 0 1px var(--line);
+}
+
+.vtk-roster-photo img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* Geen foto: de initiaal op de zachte tint. Bewust niet het gestreepte patroon
+   van de pagina-tegels; bij een persoon zegt een letter meer dan arcering. */
+.vtk-roster-initial {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  color: var(--muted);
+  font-size: 30px;
+  font-weight: 600;
+}
+
+/* De gele ring staat buiten de foto (`0 0 0 2px`) en niet inset: een inset
+   box-shadow tekent onder de <img> en is dan onzichtbaar. */
+.vtk-roster-cell.is-lead .vtk-roster-photo {
+  box-shadow: 0 0 0 2px var(--yellow);
+}
+
+.vtk-roster-flag {
+  position: absolute;
+  top: 0;
+  left: 0;
+  padding: 3px 7px;
+  border-bottom-right-radius: 8px;
+  background: var(--yellow);
+  color: var(--ink);
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.vtk-roster-name {
+  margin-top: 8px;
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.25;
+}
+
+.vtk-roster-title {
+  margin-top: 1px;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.3;
+  letter-spacing: -0.005em;
+  /* "Eerstejaarsverantwoordelijke" is breder dan een tegel; liever afbreken dan
+     over de buurkolom lopen. */
+  overflow-wrap: break-word;
+}
+
 .vtk-link {
   color: var(--navy);
   font-weight: 500;
@@ -890,6 +1255,7 @@
     grid-template-columns: 1fr;
   }
 
+  .page-head-meta,
   .vtk-design .page-head-meta {
     text-align: left;
   }

@@ -65,8 +65,15 @@
     "title": "Praesidium",
     "intro": "Het praesidium van VTK, per werkingsjaar.",
     "coordinator": "Groepscoördinator",
+    "coordinatorShort": "Coördinator",
     "member": "Lid",
-    "empty": "Voor dit werkingsjaar zijn er nog geen posten ingevuld."
+    "empty": "Voor dit werkingsjaar zijn er nog geen posten ingevuld.",
+    "posts": "Posten",
+    "year": "Jaar",
+    "archiveTo": "Archief tot {year}",
+    "memberCount": "{count} leden",
+    "memberCountOne": "1 lid",
+    "jumpToPost": "Ga naar post"
   },
   "werkgroepen": {
     "kicker": "VTK · Werkgroepen",
