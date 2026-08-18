@@ -569,6 +569,8 @@ model User {
   ssoAuditLogs         SsoAuditLog[]
   ssoClientPermissions SsoUserClientPermission[]
 
+  adminAuditLogs AdminAuditLog[] @relation("AdminAuditActor")
+
   @@index([deletedAt])
 }
 
@@ -2999,6 +3001,41 @@ model KulAuthLog {
   claims  Json
 
   @@index([at])
+}
+
+// -----------------------------------------------------------------------------
+// Adminlogboek: wie deed wat in de admin
+// -----------------------------------------------------------------------------
+// Eén rij per beheerdersactie (evenement aangemaakt, pagina bewerkt, deurtoegang
+// gegeven, ...), geschreven door `logAudit` in apps/web/lib/audit.ts. Enkel
+// wijzigende acties, geen leesacties en geen zelfbediening van leden.
+//
+// De rijen worden na AUDIT_RETENTION_DAYS gesnoeid: het is een logboek voor
+// "wie heeft dit gedaan", geen archief. Namen worden meegekopieerd (net als bij
+// SsoAuditLog) zodat de regel leesbaar blijft nadat het lid of het onderwerp
+// verdwenen is; een FK naar het onderwerp zou de regel mee weggooien.
+model AdminAuditLog {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+
+  actor   User?   @relation("AdminAuditActor", fields: [actorId], references: [id], onDelete: SetNull)
+  actorId String?
+  /// Naam van de handelende persoon op het moment van de actie.
+  actorName String
+
+  /// create | update | delete | grant | revoke | publish | ... (zie AUDIT_ACTIONS)
+  action String
+  /// Soort onderwerp, sleutel uit de registry in apps/web/lib/audit.ts.
+  entity   String
+  entityId String?
+  /// Naam van het onderwerp op het moment van de actie, bv. "Career Fair".
+  target String
+  /// Korte toelichting, bv. welke velden gewijzigd zijn.
+  summary String?
+
+  @@index([createdAt])
+  @@index([actorId, createdAt])
+  @@index([entity, createdAt])
 }
 
 // -----------------------------------------------------------------------------

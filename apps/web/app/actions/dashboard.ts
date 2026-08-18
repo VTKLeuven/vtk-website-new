@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@vtk/db";
 import { isTileImageKey } from "@/lib/dashboard-tiles";
 import { requirePermission, requireSession } from "@/lib/session";
+import { describeChanges, logAudit } from "@/lib/audit";
 
 function revalidateDashboard(): void {
   revalidatePath("/admin");
@@ -228,20 +229,57 @@ export async function saveDefaultTileAction(input: DefaultTileInput): Promise<vo
     groupId,
   };
   if (input.id) {
+    const existing = await prisma.dashboardTile.findUnique({ where: { id: input.id } });
     await prisma.dashboardTile.update({
       where: { id: input.id },
       data,
     });
+    await logAudit({
+      action: "update",
+      entity: "dashboardTile",
+      entityId: input.id,
+      target: label,
+      summary: existing
+        ? describeChanges(existing, data, {
+            label: "label",
+            url: "bestemming",
+            icon: "icoon",
+            color: "kleur",
+            imageKey: "afbeelding",
+            order: "volgorde",
+            scope: "bereik",
+            groupId: "post",
+          })
+        : null,
+    });
   } else {
-    await prisma.dashboardTile.create({ data });
+    const created = await prisma.dashboardTile.create({ data });
+    await logAudit({
+      action: "create",
+      entity: "dashboardTile",
+      entityId: created.id,
+      target: label,
+      summary:
+        data.scope === "GROUP" ? "standaardtegel voor één post" : "standaardtegel voor iedereen",
+    });
   }
   revalidateManager();
 }
 
 export async function deleteDefaultTileAction(id: string): Promise<void> {
   await requirePermission("dashboard.manage");
-  await prisma.dashboardTile.deleteMany({
+  const tile = await prisma.dashboardTile.findUnique({ where: { id }, select: { label: true } });
+  const { count } = await prisma.dashboardTile.deleteMany({
     where: { id, scope: { in: ["GLOBAL", "GROUP"] } },
   });
+  if (count > 0) {
+    await logAudit({
+      action: "delete",
+      entity: "dashboardTile",
+      entityId: id,
+      target: tile?.label ?? id,
+      summary: "standaardtegel verwijderd; persoonlijke tegels blijven staan",
+    });
+  }
   revalidateManager();
 }

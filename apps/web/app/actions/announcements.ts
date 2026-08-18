@@ -5,6 +5,7 @@ import { z } from "zod";
 import { prisma } from "@vtk/db";
 import { requirePermission } from "@/lib/session";
 import { saveError, saveOk, type SaveState } from "@/lib/saveState";
+import { describeChanges, logAudit } from "@/lib/audit";
 import { localDateTimeToUtc } from "@/lib/ticketing/time";
 
 /**
@@ -94,9 +95,39 @@ export async function saveAnnouncementAction(
   };
 
   if (input.id) {
+    const existing = await prisma.announcement.findUnique({ where: { id: input.id } });
     await prisma.announcement.update({ where: { id: input.id }, data });
+    await logAudit({
+      action: "update",
+      entity: "announcement",
+      entityId: input.id,
+      target: input.titleNl,
+      summary: existing
+        ? describeChanges(existing, data, {
+            titleNl: "titel",
+            titleEn: "Engelse titel",
+            bodyNl: "tekst",
+            bodyEn: "Engelse tekst",
+            ctaLabelNl: "knoptekst",
+            ctaLabelEn: "Engelse knoptekst",
+            ctaUrl: "knoplink",
+            startsAt: "startmoment",
+            endsAt: "eindmoment",
+            active: "actief",
+            scope: "bereik",
+          })
+        : null,
+    });
   } else {
-    await prisma.announcement.create({ data: { ...data, createdById: session.user.id } });
+    const created = await prisma.announcement.create({
+      data: { ...data, createdById: session.user.id },
+    });
+    await logAudit({
+      action: "create",
+      entity: "announcement",
+      entityId: created.id,
+      target: input.titleNl,
+    });
   }
 
   revalidate();
@@ -108,9 +139,17 @@ export async function setAnnouncementActiveAction(formData: FormData): Promise<v
   await requirePermission("home.edit");
   const id = formData.get("id") as string;
   if (!id) return;
-  await prisma.announcement.update({
+  const active = formData.get("active") === "1";
+  const announcement = await prisma.announcement.update({
     where: { id },
-    data: { active: formData.get("active") === "1" },
+    data: { active },
+  });
+  await logAudit({
+    action: "update",
+    entity: "announcement",
+    entityId: id,
+    target: announcement.titleNl,
+    summary: active ? "aangezet" : "uitgezet",
   });
   revalidate();
 }
@@ -119,6 +158,12 @@ export async function deleteAnnouncementAction(formData: FormData): Promise<void
   await requirePermission("home.edit");
   const id = formData.get("id") as string;
   if (!id) return;
-  await prisma.announcement.delete({ where: { id } });
+  const announcement = await prisma.announcement.delete({ where: { id } });
+  await logAudit({
+    action: "delete",
+    entity: "announcement",
+    entityId: id,
+    target: announcement.titleNl,
+  });
   revalidate();
 }

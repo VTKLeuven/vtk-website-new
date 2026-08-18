@@ -5,6 +5,7 @@ import { prisma } from "@vtk/db";
 import { requirePermission } from "@/lib/session";
 import { linkPageConfigSchema, LINK_PAGE_SETTING_KEY } from "@/lib/link-page";
 import { saveError, saveOk, type SaveState } from "@/lib/saveState";
+import { logAudit } from "@/lib/audit";
 
 export async function saveLinkPageAction(
   _previous: SaveState,
@@ -29,6 +30,13 @@ export async function saveLinkPageAction(
     where: { key: LINK_PAGE_SETTING_KEY },
     update: { value: parsed.data },
     create: { key: LINK_PAGE_SETTING_KEY, value: parsed.data },
+  });
+
+  await logAudit({
+    action: "update",
+    entity: "linkPage",
+    target: "Linktree",
+    summary: `${parsed.data.links.length} link(s) op de linkpagina`,
   });
 
   revalidatePath("/links");

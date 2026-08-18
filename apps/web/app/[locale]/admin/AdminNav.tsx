@@ -513,6 +513,16 @@ const icons: Record<string, ReactNode> = {
       <circle cx="12" cy="12" r="3" />
     </Svg>
   ),
+  // auditLog: lijstje met een klok, wie deed wat wanneer
+  auditLog: (
+    <Svg>
+      <path d="M4 5h10" />
+      <path d="M4 10h7" />
+      <path d="M4 15h5" />
+      <circle cx="16.5" cy="15.5" r="4.5" />
+      <path d="M16.5 13.5v2l1.5 1" />
+    </Svg>
+  ),
   // sso: sleutel, externe apps die met een VTK-account inloggen
   sso: (
     <Svg>

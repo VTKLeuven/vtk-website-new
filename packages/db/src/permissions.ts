@@ -92,6 +92,9 @@ export const PERMISSIONS = [
   // SSO / OAuth Authorization Server
   { code: "oauth.client.edit", labelNl: "OAuth-clients aanmaken en bewerken", labelEn: "Create and edit OAuth clients", category: "external" },
 
+  // Adminlogboek (wie deed wat in de admin)
+  { code: "audit.view", labelNl: "Adminlogboek bekijken", labelEn: "View the admin audit log", category: "it" },
+
 ] as const;
 
 export type PermissionCode = (typeof PERMISSIONS)[number]["code"];

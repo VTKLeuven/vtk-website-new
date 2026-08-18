@@ -22,6 +22,7 @@ const CATEGORY_LABELS: Record<string, { nl: string; en: string }> = {
   door: { nl: "Deurtoegang", en: "Door access" },
   modules: { nl: "Moduletoegang", en: "Module access" },
   external: { nl: "Externe apps", en: "External apps" },
+  it: { nl: "IT", en: "IT" },
 };
 
 export function permissionCategoryLabel(category: string, locale: "nl" | "en"): string {

@@ -3,15 +3,20 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({
   requirePermission: vi.fn(),
   updateMany: vi.fn(),
+  findUnique: vi.fn(),
   revalidatePath: vi.fn(),
+  logAudit: vi.fn(),
 }));
 
 vi.mock("next/cache", () => ({ revalidatePath: mocks.revalidatePath }));
 vi.mock("next/navigation", () => ({ redirect: vi.fn() }));
 vi.mock("@vtk/db", () => ({
   HEADER_TABS: [],
-  prisma: { page: { updateMany: mocks.updateMany } },
+  prisma: { page: { updateMany: mocks.updateMany, findUnique: mocks.findUnique } },
 }));
+// Het adminlogboek is een bijwerking van de actie, geen onderdeel van wat hier
+// getest wordt; met de echte helper zou elke test een logregel willen schrijven.
+vi.mock("@/lib/audit", () => ({ logAudit: mocks.logAudit, describeChanges: () => null }));
 vi.mock("@vtk/storage", () => ({ deleteObject: vi.fn() }));
 vi.mock("@/lib/session", () => ({
   requireAnyPermission: vi.fn(),
@@ -30,6 +35,7 @@ describe("unlinkPageFromTabAction", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.updateMany.mockResolvedValue({ count: 1 });
+    mocks.findUnique.mockResolvedValue({ titleNl: "Sportdag" });
   });
 
   it("maakt alleen de categorie-koppeling los en verwijdert de pagina niet", async () => {

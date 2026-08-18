@@ -9,6 +9,7 @@ const mocks = vi.hoisted(() => ({
   assetFindUnique: vi.fn(),
   assetDelete: vi.fn(),
   deleteObject: vi.fn(),
+  logAudit: vi.fn(),
 }));
 
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
@@ -21,6 +22,8 @@ vi.mock("@vtk/db", () => ({
   },
 }));
 vi.mock("@vtk/storage", () => ({ deleteObject: mocks.deleteObject }));
+// Zie pageCategoryActions.test.ts: het logboek hoort niet bij wat hier getest wordt.
+vi.mock("@/lib/audit", () => ({ logAudit: mocks.logAudit, describeChanges: () => null }));
 vi.mock("@/lib/session", () => ({
   requireAnyPermission: vi.fn(),
   requirePermission: mocks.requirePermission,
@@ -52,6 +55,8 @@ describe("opruimen van storage bij verwijderen", () => {
 
   it("verwijdert de kaartfoto en alle bijlagen van een verwijderde pagina", async () => {
     mocks.pageFindUnique.mockResolvedValue({
+      titleNl: "Sportdag",
+      slug: "sportdag",
       imageKey: "images/sport.jpg",
       assets: [{ storageKey: "docs/reglement.pdf" }, { storageKey: "docs/kalender.pdf" }],
       editorRoles: [],
@@ -71,7 +76,13 @@ describe("opruimen van storage bij verwijderen", () => {
   });
 
   it("raakt storage niet aan wanneer de pagina geen foto en geen bijlagen heeft", async () => {
-    mocks.pageFindUnique.mockResolvedValue({ imageKey: null, assets: [], editorRoles: [] });
+    mocks.pageFindUnique.mockResolvedValue({
+      titleNl: "Sportdag",
+      slug: "sportdag",
+      imageKey: null,
+      assets: [],
+      editorRoles: [],
+    });
     const form = new FormData();
     form.set("id", "page_1");
 
@@ -85,6 +96,8 @@ describe("opruimen van storage bij verwijderen", () => {
     // geen bestanden meenemen.
     mocks.canEditPageContent.mockReturnValue(false);
     mocks.pageFindUnique.mockResolvedValue({
+      titleNl: "Sportdag",
+      slug: "sportdag",
       imageKey: "images/sport.jpg",
       assets: [],
       editorRoles: [],
@@ -101,6 +114,8 @@ describe("opruimen van storage bij verwijderen", () => {
     mocks.assetFindUnique.mockResolvedValue({
       pageId: "page_1",
       storageKey: "docs/reglement.pdf",
+      labelNl: "Reglement",
+      page: { titleNl: "Sportdag" },
     });
     const form = new FormData();
     form.set("id", "asset_1");
@@ -115,6 +130,8 @@ describe("opruimen van storage bij verwijderen", () => {
     // De rij is al weg; een bucket die even niet meewerkt mag daar geen
     // serverfout van maken, hoogstens een wees achterlaten.
     mocks.pageFindUnique.mockResolvedValue({
+      titleNl: "Sportdag",
+      slug: "sportdag",
       imageKey: "images/sport.jpg",
       assets: [],
       editorRoles: [],

@@ -334,6 +334,7 @@
     "it": "IT",
     "itConfig": "Configuration",
     "authorizationPreview": "Authorization preview",
+    "auditLog": "Admin log",
     "create": "New",
     "save": "Save",
     "delete": "Delete",

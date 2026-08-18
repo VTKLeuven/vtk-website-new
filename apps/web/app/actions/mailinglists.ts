@@ -5,6 +5,7 @@ import { requirePermission } from "@/lib/session";
 import { saveError, saveOk, type SaveState } from "@/lib/saveState";
 import { brevoEnabled } from "@/lib/brevo/client";
 import { reconcileMailingLists } from "@/lib/brevo/sync";
+import { logAudit } from "@/lib/audit";
 
 /**
  * Manuele Brevo-sync vanuit de mailinglijst-tab. Draait dezelfde reconciliatie
@@ -19,6 +20,13 @@ export async function syncMailingListsAction(): Promise<SaveState> {
   const result = await reconcileMailingLists();
   if ("skipped" in result) return saveError("BREVO_DISABLED");
   if (result.failed > 0) return saveError("BREVO_PARTIAL");
+
+  await logAudit({
+    action: "sync",
+    entity: "mailinglists",
+    target: "Brevo-mailinglijsten",
+    summary: "handmatige synchronisatie van alle lijst-lidmaatschappen",
+  });
 
   revalidatePath("/admin/mailinglijsten");
   return saveOk();

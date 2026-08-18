@@ -6,6 +6,7 @@ import { requirePermission } from "@/lib/session";
 import { saveError, saveOk, type SaveState } from "@/lib/saveState";
 import { DEFAULT_FAKSCANNER_CONFIG } from "@/lib/fakscanner";
 import { FAKSCANNER_SETTING_KEY } from "@/lib/fakscanner-server";
+import { logAudit } from "@/lib/audit";
 
 const HHMM = /^([01]\d|2[0-3]):([0-5]\d)$/;
 
@@ -55,6 +56,15 @@ export async function saveFakscannerConfigAction(
     where: { key: FAKSCANNER_SETTING_KEY },
     update: { value },
     create: { key: FAKSCANNER_SETTING_KEY, value },
+  });
+
+  await logAudit({
+    action: "update",
+    entity: "fakscanner",
+    target: "Fakscanner-instellingen",
+    summary: `gratis pint per ${rewardEvery} scans, bardag start om ${dayRolloverTime}, dubbeltellen ${
+      doubleEnabled ? `van ${doubleStart} tot ${doubleEnd}` : "uit"
+    }`,
   });
 
   revalidateFakscannerAdmin();

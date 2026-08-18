@@ -5,6 +5,7 @@ import { prisma } from "@vtk/db";
 import type { MeetingKind } from "@prisma/client";
 import { requirePermission, requireSession } from "@/lib/session";
 import { saveError, saveOk, type SaveState } from "@/lib/saveState";
+import { logAudit } from "@/lib/audit";
 import { brusselsTimeOnDay, ymdKey } from "@/lib/brussels";
 import { withSerializableTransaction } from "@/lib/ticketing/transactions";
 import {
@@ -107,6 +108,19 @@ function dayParts(date: Date) {
 // Beheer: de kalender van een semester invullen
 // -----------------------------------------------------------------------------
 
+/** "Bureau van 12/03/2026 12:30" — genoeg om een moment te herkennen in het logboek. */
+function meetingLabel(kind: MeetingKind, startsAt: Date): string {
+  const when = new Intl.DateTimeFormat("nl-BE", {
+    timeZone: "Europe/Brussels",
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(startsAt);
+  return `${kind === "BUREAU" ? "Bureau" : "Grocomeet"} van ${when}`;
+}
+
 /**
  * Zet de momenten van één semester klaar vanuit de kalender: elke aangeduide dag
  * wordt een moment, met haar eigen uur en plaats. Die twee staan per dag, want
@@ -201,6 +215,17 @@ export async function planMeetingsAction(_prev: SaveState, formData: FormData): 
     create: { kind, year, semester, plannedById: session.user.id },
   });
 
+  await logAudit({
+    action: "update",
+    entity: "meeting",
+    target: `${kind === "BUREAU" ? "Bureau" : "Grocomeet"} ${year}, semester ${semester}`,
+    summary: `${days.length} moment(en) ingepland${
+      keptWithReservations > 0
+        ? `; ${keptWithReservations} dag(en) met reservaties bleven staan`
+        : ""
+    }`,
+  });
+
   revalidateMeeting(kind);
   // Geen stille afloop: wie een dag wegklikte waar al voor besteld is, moet weten
   // dat die dag er nog staat.
@@ -222,7 +247,7 @@ export async function createMeetingAction(_prev: SaveState, formData: FormData):
   const location = String(formData.get("location") ?? "").trim() || null;
   const year = Number(formData.get("year"));
 
-  await prisma.meeting.create({
+  const created = await prisma.meeting.create({
     data: {
       kind,
       year: Number.isInteger(year) ? year : dayParts(startsAt).year,
@@ -232,6 +257,14 @@ export async function createMeetingAction(_prev: SaveState, formData: FormData):
       location,
       createdById: session.user.id,
     },
+  });
+
+  await logAudit({
+    action: "create",
+    entity: "meeting",
+    entityId: created.id,
+    target: meetingLabel(kind, startsAt),
+    summary: location ? `in ${location}` : null,
   });
 
   revalidateMeeting(kind);
@@ -263,6 +296,17 @@ export async function saveMeetingAction(_prev: SaveState, formData: FormData): P
     },
   });
 
+  await logAudit({
+    action: "update",
+    entity: "meeting",
+    entityId: id,
+    target: meetingLabel(meeting.kind, startsAt),
+    summary:
+      meeting.startsAt.getTime() === startsAt.getTime()
+        ? "plaats, opening of toelichting gewijzigd"
+        : `verplaatst vanaf ${meetingLabel(meeting.kind, meeting.startsAt)}`,
+  });
+
   // Een ander uur betekent een andere verkoopdag, en een omgeschakeld aanbod
   // betekent een ander lijstje broodjes: allebei kunnen bestaande reservaties
   // onmogelijk maken.
@@ -279,6 +323,13 @@ export async function deleteMeetingAction(formData: FormData): Promise<void> {
   await requireMeetingManager(meeting.kind);
 
   await prisma.meeting.delete({ where: { id } });
+  await logAudit({
+    action: "delete",
+    entity: "meeting",
+    entityId: id,
+    target: meetingLabel(meeting.kind, meeting.startsAt),
+    summary: "het moment en alle reservaties erop zijn weg",
+  });
   revalidateMeeting(meeting.kind, meeting.slug);
 }
 
@@ -321,6 +372,14 @@ export async function saveMeetingOptionsAction(
     if (!keepIds.has(option.id)) await prisma.meetingOption.delete({ where: { id: option.id } });
   }
 
+  await logAudit({
+    action: "update",
+    entity: "meeting",
+    entityId: id,
+    target: meetingLabel(meeting.kind, meeting.startsAt),
+    summary: `aanbod aangepast naar ${keepIds.size} keuze(s)`,
+  });
+
   // Een geschrapte keuze maakt de reservaties die erop stonden ongeldig.
   await syncMeetingReservations(id);
   revalidateMeeting(meeting.kind, meeting.slug);
@@ -362,6 +421,13 @@ export async function saveMeetingDrinksAction(
     create: { key: "meetings.drinks", value },
   });
 
+  await logAudit({
+    action: "update",
+    entity: "meeting",
+    target: "Drankaanbod",
+    summary: `${items.length} drank(en) aan ${(priceCents / 100).toFixed(2)} euro`,
+  });
+
   revalidatePath(adminPath("GROCOMEET"));
   revalidatePath(adminPath("BUREAU"));
   revalidateMeeting(kind);
@@ -383,6 +449,18 @@ export async function toggleReservationPaidAction(formData: FormData): Promise<v
     data: reservation.paidAt
       ? { paidAt: null, paidById: null }
       : { paidAt: new Date(), paidById: session.user.id },
+  });
+
+  const buyer = await prisma.user.findUnique({
+    where: { id: reservation.userId },
+    select: { name: true },
+  });
+  await logAudit({
+    action: "update",
+    entity: "meetingReservation",
+    entityId: id,
+    target: buyer?.name ?? reservation.userId,
+    summary: reservation.paidAt ? "afgevinkt als niet betaald" : "afgevinkt als betaald",
   });
 
   revalidatePath(adminPath(reservation.meeting.kind));

@@ -6,6 +6,7 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "@vtk/db";
 import { requirePermission } from "@/lib/session";
 import { saveError, saveOk, type SaveState } from "@/lib/saveState";
+import { describeChanges, logAudit } from "@/lib/audit";
 import { STUDY_PROGRAMMES } from "@/lib/profile";
 import { deleteObject } from "@vtk/storage";
 
@@ -48,9 +49,32 @@ export async function savePocAction(_prev: SaveState, formData: FormData): Promi
 
   try {
     if (parsed.data.id) {
+      const existing = await prisma.poc.findUnique({ where: { id: parsed.data.id } });
       await prisma.poc.update({ where: { id: parsed.data.id }, data: parsed.data });
+      await logAudit({
+        action: "update",
+        entity: "poc",
+        entityId: parsed.data.id,
+        target: parsed.data.nameNl,
+        summary: existing
+          ? describeChanges(existing, parsed.data, {
+              slug: "slug",
+              nameNl: "naam",
+              nameEn: "Engelse naam",
+              email: "e-mailadres",
+              order: "volgorde",
+              studyProgrammes: "richtingen",
+            })
+          : null,
+      });
     } else {
-      await prisma.poc.create({ data: parsed.data });
+      const created = await prisma.poc.create({ data: parsed.data });
+      await logAudit({
+        action: "create",
+        entity: "poc",
+        entityId: created.id,
+        target: parsed.data.nameNl,
+      });
     }
   } catch (err) {
     if (isUniqueViolation(err, "slug")) return saveError("SLUG_TAKEN");
@@ -68,7 +92,10 @@ export async function savePocAction(_prev: SaveState, formData: FormData): Promi
 export async function deletePocAction(formData: FormData): Promise<void> {
   await requirePermission("pocs.manage");
   const id = formData.get("id") as string;
-  if (id) await prisma.poc.delete({ where: { id } });
+  if (id) {
+    const poc = await prisma.poc.delete({ where: { id } });
+    await logAudit({ action: "delete", entity: "poc", entityId: id, target: poc.nameNl });
+  }
   revalidatePath("/pocs");
   // Geen redirect: de lijst staat op deze pagina en ververst ter plaatse.
   revalidatePath("/admin/pocs");
@@ -93,6 +120,17 @@ export async function addPocRepresentativeAction(formData: FormData): Promise<vo
     update: { order: parsed.order },
     create: parsed,
   });
+  const [poc, user] = await Promise.all([
+    prisma.poc.findUnique({ where: { id: parsed.pocId }, select: { nameNl: true } }),
+    prisma.user.findUnique({ where: { id: parsed.userId }, select: { name: true } }),
+  ]);
+  await logAudit({
+    action: "create",
+    entity: "poc",
+    entityId: parsed.pocId,
+    target: poc?.nameNl ?? parsed.pocId,
+    summary: `${user?.name ?? parsed.userId} toegevoegd als vertegenwoordiger`,
+  });
   revalidatePath("/pocs");
   revalidatePath("/admin/pocs");
   revalidatePath("/", "layout");
@@ -101,7 +139,19 @@ export async function addPocRepresentativeAction(formData: FormData): Promise<vo
 export async function removePocRepresentativeAction(formData: FormData): Promise<void> {
   await requirePermission("pocs.manage");
   const id = formData.get("id") as string;
-  if (id) await prisma.pocRepresentative.delete({ where: { id } });
+  if (id) {
+    const rep = await prisma.pocRepresentative.delete({
+      where: { id },
+      include: { poc: { select: { nameNl: true } }, user: { select: { name: true } } },
+    });
+    await logAudit({
+      action: "delete",
+      entity: "poc",
+      entityId: rep.pocId,
+      target: rep.poc.nameNl,
+      summary: `${rep.user.name} verwijderd als vertegenwoordiger`,
+    });
+  }
   revalidatePath("/pocs");
   revalidatePath("/admin/pocs");
   revalidatePath("/", "layout");
@@ -139,6 +189,20 @@ export async function savePartnerAction(
       where: { id: data.id },
       data: { name: data.name, url: data.url, logoKey: data.logoKey, active: data.active },
     });
+    await logAudit({
+      action: "update",
+      entity: "partner",
+      entityId: data.id,
+      target: data.name,
+      summary: existing
+        ? describeChanges(existing, data, {
+            name: "naam",
+            url: "website",
+            logoKey: "logo",
+            active: "actief",
+          })
+        : null,
+    });
     if (existing && existing.logoKey && existing.logoKey !== data.logoKey) {
       try {
         await deleteObject(existing.logoKey);
@@ -149,7 +213,15 @@ export async function savePartnerAction(
   } else {
     // New partners are appended to the end of the current order.
     const last = await prisma.partner.findFirst({ orderBy: { order: "desc" }, select: { order: true } });
-    await prisma.partner.create({ data: { ...data, order: (last?.order ?? -1) + 1 } });
+    const created = await prisma.partner.create({
+      data: { ...data, order: (last?.order ?? -1) + 1 },
+    });
+    await logAudit({
+      action: "create",
+      entity: "partner",
+      entityId: created.id,
+      target: data.name,
+    });
   }
 
   revalidatePath("/", "layout");
@@ -162,6 +234,12 @@ export async function reorderPartnersAction(ids: string[]): Promise<void> {
   await prisma.$transaction(
     ids.map((id, index) => prisma.partner.update({ where: { id }, data: { order: index } })),
   );
+  await logAudit({
+    action: "reorder",
+    entity: "partner",
+    target: `${ids.length} partners`,
+    summary: "volgorde op de homepage gewijzigd",
+  });
   revalidatePath("/", "layout");
   revalidatePath("/admin/partners");
 }
@@ -178,6 +256,12 @@ export async function deletePartnerAction(formData: FormData): Promise<void> {
       /* ignore */
     }
     await prisma.partner.delete({ where: { id } });
+    await logAudit({
+      action: "delete",
+      entity: "partner",
+      entityId: id,
+      target: existing.name,
+    });
   }
   revalidatePath("/", "layout");
   // Geen redirect: het raster staat op deze pagina en ververst ter plaatse.

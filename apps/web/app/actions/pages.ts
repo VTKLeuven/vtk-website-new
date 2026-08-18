@@ -9,6 +9,7 @@ import { requireAnyPermission, requirePermission, requireSession } from '@/lib/s
 import { canEditPageContent, canPublishPages } from '@/lib/pageAccess';
 import { saveError, saveOk, type SaveState } from '@/lib/saveState';
 import { readImageField, resolveImageKey } from '@/lib/imageField';
+import { describeChanges, logAudit } from '@/lib/audit';
 import { deleteObject } from '@vtk/storage';
 
 /** Foutcodes die /admin/inhoud en /admin/paginas op vertaalde meldingen mappen. */
@@ -42,6 +43,23 @@ function isUniqueViolation(err: unknown, field: string): boolean {
     String(err.meta?.target ?? '').includes(field)
   );
 }
+
+/** Velden die het logboek bij naam noemt als iemand een pagina bewerkt. */
+const PAGE_FIELD_LABELS: Record<string, string> = {
+  slug: 'slug',
+  headerTabId: 'categorie',
+  visibleInHeader: 'zichtbaar in het menu',
+  titleNl: 'titel',
+  titleEn: 'Engelse titel',
+  excerptNl: 'samenvatting',
+  excerptEn: 'Engelse samenvatting',
+  ctaLabelNl: 'knoptekst',
+  ctaLabelEn: 'Engelse knoptekst',
+  ctaUrl: 'knoplink',
+  needsYearlyEdit: 'jaarlijks nakijken',
+  order: 'volgorde',
+  published: 'publicatie',
+};
 
 // ---- Pagina's: structuur & metadata (pages.manage, /admin/inhoud) -----------
 
@@ -104,7 +122,21 @@ export async function savePageAction(_prev: SaveState, formData: FormData): Prom
 
   const existing = await prisma.page.findUnique({
     where: { id: data.id },
-    select: { publishedAt: true },
+    select: {
+      publishedAt: true,
+      slug: true,
+      headerTabId: true,
+      visibleInHeader: true,
+      titleNl: true,
+      titleEn: true,
+      excerptNl: true,
+      excerptEn: true,
+      ctaLabelNl: true,
+      ctaLabelEn: true,
+      ctaUrl: true,
+      needsYearlyEdit: true,
+      order: true,
+    },
   });
   if (!existing) return saveError('INVALID_INPUT' satisfies ContentErrorCode);
 
@@ -141,6 +173,24 @@ export async function savePageAction(_prev: SaveState, formData: FormData): Prom
     throw err;
   }
 
+  await logAudit({
+    action: 'update',
+    entity: 'page',
+    entityId: data.id,
+    target: data.titleNl,
+    summary: describeChanges(
+      { ...existing, published: existing.publishedAt !== null },
+      {
+        ...data,
+        headerTabId: data.headerTabId || null,
+        ctaLabelNl: data.ctaLabelNl || null,
+        ctaLabelEn: data.ctaLabelEn || null,
+        ctaUrl: data.ctaUrl || null,
+      },
+      PAGE_FIELD_LABELS,
+    ),
+  });
+
   revalidatePath('/', 'layout');
   return saveOk();
 }
@@ -160,6 +210,8 @@ export async function deletePageAction(_prev: SaveState, formData: FormData): Pr
   const page = await prisma.page.findUnique({
     where: { id },
     select: {
+      titleNl: true,
+      slug: true,
       imageKey: true,
       assets: { select: { storageKey: true } },
       editorRoles: { select: { roleId: true } },
@@ -169,6 +221,14 @@ export async function deletePageAction(_prev: SaveState, formData: FormData): Pr
   if (!canEditPageContent(session, page)) throw new Error('FORBIDDEN');
 
   await prisma.page.delete({ where: { id } });
+
+  await logAudit({
+    action: 'delete',
+    entity: 'page',
+    entityId: id,
+    target: page.titleNl,
+    summary: `/${page.slug}, met ${page.assets.length} bijlage(n)`,
+  });
 
   // `PageAsset` cascadeert in de database, maar de bestanden zelf niet: zonder
   // dit blijft elke PDF en elke kaartfoto van een verwijderde pagina voorgoed in
@@ -185,6 +245,12 @@ export async function reorderPagesAction(ids: string[]): Promise<void> {
   await prisma.$transaction(
     ids.map((id, index) => prisma.page.update({ where: { id }, data: { order: index } }))
   );
+  await logAudit({
+    action: 'reorder',
+    entity: 'page',
+    target: `${ids.length} pagina's`,
+    summary: 'volgorde binnen een categorie gewijzigd',
+  });
   revalidatePath('/', 'layout');
 }
 
@@ -203,9 +269,20 @@ export async function movePageToTabAction(
     orderBy: { order: 'desc' },
     select: { order: true },
   });
-  await prisma.page.update({
+  const page = await prisma.page.update({
     where: { id: pageId },
     data: { headerTabId, order: (last?.order ?? -1) + 1 },
+    select: { titleNl: true },
+  });
+  const tab = headerTabId
+    ? await prisma.headerTab.findUnique({ where: { id: headerTabId }, select: { labelNl: true } })
+    : null;
+  await logAudit({
+    action: 'update',
+    entity: 'page',
+    entityId: pageId,
+    target: page.titleNl,
+    summary: tab ? `verplaatst naar categorie ${tab.labelNl}` : 'losgekoppeld van haar categorie',
   });
   revalidatePath('/', 'layout');
 }
@@ -232,6 +309,15 @@ export async function unlinkPageFromTabAction(
   if (result.count !== 1) {
     return saveError('INVALID_INPUT' satisfies ContentErrorCode);
   }
+
+  const unlinked = await prisma.page.findUnique({ where: { id }, select: { titleNl: true } });
+  await logAudit({
+    action: 'update',
+    entity: 'page',
+    entityId: id,
+    target: unlinked?.titleNl ?? id,
+    summary: 'losgekoppeld van haar categorie',
+  });
 
   revalidatePath('/', 'layout');
   return saveOk();
@@ -275,7 +361,13 @@ export async function savePageContentAction(
 
   const page = await prisma.page.findUnique({
     where: { id: data.id },
-    select: { editorRoles: { select: { roleId: true } } },
+    select: {
+      titleNl: true,
+      titleEn: true,
+      contentMdNl: true,
+      contentMdEn: true,
+      editorRoles: { select: { roleId: true } },
+    },
   });
   if (!page) return saveError('INVALID_INPUT' satisfies ContentErrorCode);
   if (!canEditPageContent(session, page)) throw new Error('FORBIDDEN');
@@ -291,6 +383,23 @@ export async function savePageContentAction(
       contentJsonEn: contentMdEn === null ? Prisma.DbNull : undefined,
       contentEditedAt: new Date(),
     },
+  });
+
+  await logAudit({
+    action: 'update',
+    entity: 'page',
+    entityId: data.id,
+    target: data.titleNl,
+    summary: describeChanges(
+      page,
+      { ...data, contentMdEn },
+      {
+        titleNl: 'titel',
+        titleEn: 'Engelse titel',
+        contentMdNl: 'inhoud',
+        contentMdEn: 'Engelse inhoud',
+      },
+    ),
   });
 
   revalidatePath('/', 'layout');
@@ -344,6 +453,14 @@ export async function createPageAction(_prev: SaveState, formData: FormData): Pr
     if (isUniqueViolation(err, 'slug')) return saveError('SLUG_TAKEN' satisfies ContentErrorCode);
     throw err;
   }
+
+  await logAudit({
+    action: 'create',
+    entity: 'page',
+    entityId: id,
+    target: data.titleNl,
+    summary: `/${data.slug}`,
+  });
 
   revalidatePath('/', 'layout');
   // Buiten de try/catch: redirect() werkt via een throw. De navigatie naar de
@@ -402,7 +519,13 @@ export async function savePageSettingsAction(
 
   const page = await prisma.page.findUnique({
     where: { id: data.id },
-    select: { publishedAt: true, editorRoles: { select: { roleId: true } } },
+    select: {
+      titleNl: true,
+      slug: true,
+      needsYearlyEdit: true,
+      publishedAt: true,
+      editorRoles: { select: { roleId: true } },
+    },
   });
   if (!page) return saveError('INVALID_INPUT' satisfies ContentErrorCode);
   if (!canEditPageContent(session, page)) throw new Error('FORBIDDEN');
@@ -447,6 +570,34 @@ export async function savePageSettingsAction(
     throw err;
   }
 
+  await logAudit({
+    action: 'update',
+    entity: 'page',
+    entityId: data.id,
+    target: page.titleNl,
+    summary:
+      describeChanges(
+        {
+          slug: page.slug,
+          needsYearlyEdit: page.needsYearlyEdit,
+          published: page.publishedAt !== null,
+          editorRoles: page.editorRoles.map((r) => r.roleId).sort(),
+        },
+        {
+          slug: data.slug,
+          needsYearlyEdit: data.needsYearlyEdit,
+          published: publishedAt === undefined ? page.publishedAt !== null : publishedAt !== null,
+          editorRoles: [...roleIds].sort(),
+        },
+        {
+          slug: 'slug',
+          needsYearlyEdit: 'jaarlijks nakijken',
+          published: 'publicatie',
+          editorRoles: 'bewerkrollen',
+        },
+      ) ?? 'instellingen opgeslagen',
+  });
+
   revalidatePath('/', 'layout');
   return saveOk();
 }
@@ -474,7 +625,7 @@ export async function savePageImageAction(
 
   const page = await prisma.page.findUnique({
     where: { id },
-    select: { imageKey: true, editorRoles: { select: { roleId: true } } },
+    select: { titleNl: true, imageKey: true, editorRoles: { select: { roleId: true } } },
   });
   if (!page) return saveError('INVALID_INPUT' satisfies ContentErrorCode);
   if (!canEditPageContent(session, page)) throw new Error('FORBIDDEN');
@@ -482,6 +633,16 @@ export async function savePageImageAction(
   const imageKey = resolveImageKey(image, page.imageKey);
 
   await prisma.page.update({ where: { id }, data: { imageKey } });
+
+  if (imageKey !== page.imageKey) {
+    await logAudit({
+      action: 'update',
+      entity: 'page',
+      entityId: id,
+      target: page.titleNl,
+      summary: imageKey ? 'foto van de pagina vervangen' : 'foto van de pagina verwijderd',
+    });
+  }
 
   // De vervangen foto uit storage halen.
   if (page.imageKey && page.imageKey !== imageKey) await deleteStoredObjects([page.imageKey]);
@@ -528,7 +689,18 @@ export async function addPageAssetAction(formData: FormData): Promise<void> {
     mimeType: formData.get('mimeType') || null,
   });
   await requirePageAssetAccess(parsed.pageId);
-  await prisma.pageAsset.create({ data: parsed });
+  const asset = await prisma.pageAsset.create({ data: parsed });
+  const page = await prisma.page.findUnique({
+    where: { id: parsed.pageId },
+    select: { titleNl: true },
+  });
+  await logAudit({
+    action: 'create',
+    entity: 'pageAsset',
+    entityId: asset.id,
+    target: parsed.labelNl,
+    summary: page ? `bijlage toegevoegd aan pagina ${page.titleNl}` : 'bijlage toegevoegd',
+  });
   revalidatePath('/admin/inhoud');
   revalidatePath('/admin/paginas');
   revalidatePath('/', 'layout');
@@ -541,12 +713,24 @@ export async function deletePageAssetAction(formData: FormData): Promise<void> {
   // client als pageId meestuurt.
   const asset = await prisma.pageAsset.findUnique({
     where: { id },
-    select: { pageId: true, storageKey: true },
+    select: {
+      pageId: true,
+      storageKey: true,
+      labelNl: true,
+      page: { select: { titleNl: true } },
+    },
   });
   if (!asset) return;
   await requirePageAssetAccess(asset.pageId);
   await prisma.pageAsset.delete({ where: { id } });
   await deleteStoredObjects([asset.storageKey]);
+  await logAudit({
+    action: 'delete',
+    entity: 'pageAsset',
+    entityId: id,
+    target: asset.labelNl,
+    summary: `bijlage verwijderd van pagina ${asset.page.titleNl}`,
+  });
   revalidatePath('/admin/inhoud');
   revalidatePath('/admin/paginas');
   revalidatePath('/', 'layout');
@@ -570,6 +754,20 @@ const headerSchema = z.object({
   ctaLabelEn: z.string().optional().nullable(),
   ctaUrl: z.string().url().optional().nullable().or(z.literal('')),
 });
+
+const HEADER_TAB_FIELD_LABELS: Record<string, string> = {
+  slug: 'slug',
+  labelNl: 'label',
+  labelEn: 'Engels label',
+  visible: 'zichtbaarheid',
+  externalUrl: 'externe link',
+  introNl: 'introtekst',
+  introEn: 'Engelse introtekst',
+  ctaLabelNl: 'knoptekst',
+  ctaLabelEn: 'Engelse knoptekst',
+  ctaUrl: 'knoplink',
+  links: 'menu-items',
+};
 
 export async function saveHeaderTabAction(
   _prev: SaveState,
@@ -626,11 +824,28 @@ export async function saveHeaderTabAction(
       // `code` bewust niet bijwerkbaar: het is de sleutel waarop de seed upsert
       // en waarop code als `code: "AANBOD"` filtert.
       const tabId = p.id;
+      const before = await prisma.headerTab.findUnique({
+        where: { id: tabId },
+        include: { links: { select: { labelNl: true, url: true }, orderBy: { order: 'asc' } } },
+      });
       await prisma.$transaction([
         prisma.headerTab.update({ where: { id: tabId }, data }),
         prisma.headerTabLink.deleteMany({ where: { tabId } }),
         ...links.map((link) => prisma.headerTabLink.create({ data: { ...link, tabId } })),
       ]);
+      await logAudit({
+        action: 'update',
+        entity: 'headerTab',
+        entityId: tabId,
+        target: p.labelNl,
+        summary: before
+          ? describeChanges(
+              { ...before, links: before.links.map((l) => `${l.labelNl}|${l.url}`) },
+              { ...data, links: links.map((l) => `${l.labelNl}|${l.url}`) },
+              HEADER_TAB_FIELD_LABELS,
+            )
+          : null,
+      });
     } else {
       const last = await prisma.headerTab.findFirst({
         orderBy: { order: 'desc' },
@@ -644,6 +859,13 @@ export async function saveHeaderTabAction(
           data: links.map((link) => ({ ...link, tabId: created.id })),
         });
       }
+      await logAudit({
+        action: 'create',
+        entity: 'headerTab',
+        entityId: created.id,
+        target: p.labelNl,
+        summary: `menucategorie /${p.slug}`,
+      });
     }
   } catch (err) {
     if (isUniqueViolation(err, 'slug')) return saveError('SLUG_TAKEN' satisfies ContentErrorCode);
@@ -666,10 +888,19 @@ export async function deleteHeaderTabAction(
   // onder "Niet gekoppeld" te staan.
   const existing = await prisma.headerTab.findUnique({
     where: { id },
-    select: { imageKey: true },
+    select: { imageKey: true, labelNl: true, _count: { select: { pages: true } } },
   });
   await prisma.headerTab.delete({ where: { id } });
   await deleteStoredObjects([existing?.imageKey]);
+  await logAudit({
+    action: 'delete',
+    entity: 'headerTab',
+    entityId: id,
+    target: existing?.labelNl ?? id,
+    summary: existing
+      ? `${existing._count.pages} pagina('s) losgekoppeld, die blijven bestaan`
+      : null,
+  });
   revalidatePath('/', 'layout');
   return saveOk();
 }
@@ -680,6 +911,12 @@ export async function reorderHeaderTabsAction(ids: string[]): Promise<void> {
   await prisma.$transaction(
     ids.map((id, index) => prisma.headerTab.update({ where: { id }, data: { order: index } }))
   );
+  await logAudit({
+    action: 'reorder',
+    entity: 'headerTab',
+    target: `${ids.length} menucategorieën`,
+    summary: 'volgorde in de hoofdnavigatie gewijzigd',
+  });
   revalidatePath('/', 'layout');
 }
 
@@ -706,6 +943,12 @@ export async function importDefaultHeaderTabsAction(): Promise<void> {
       ctaUrl: t.ctaUrl ?? null,
     })),
     skipDuplicates: true,
+  });
+  await logAudit({
+    action: 'import',
+    entity: 'headerTab',
+    target: 'standaardmenu',
+    summary: `${HEADER_TABS.length} standaardcategorieën geïmporteerd (bestaande overgeslagen)`,
   });
   revalidatePath('/', 'layout');
 }

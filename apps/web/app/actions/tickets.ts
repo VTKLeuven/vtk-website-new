@@ -23,6 +23,7 @@ import {
   ticketDesignSettingsWith,
   type TicketDesignDraft,
 } from "@/lib/ticketing/design";
+import { logAudit } from "@/lib/audit";
 
 const localeSchema = z.enum(["nl", "en"]);
 const roleSchema = z.enum(["OWNER", "MANAGER", "FINANCE", "SCANNER", "REPORTER"]);
@@ -180,6 +181,19 @@ function refreshTicketEvent(locale: "nl" | "en", eventId: string) {
   revalidatePath(localePath(locale, "/tickets"));
 }
 
+/**
+ * Titel van het ticketevent, voor een leesbare regel in het adminlogboek. De
+ * ticketmodule heeft haar eigen auditlog per event (TicketAuditLog); dit is de
+ * korte samenvatting die in het overzicht van álle admin-acties terechtkomt.
+ */
+async function ticketEventTitle(eventId: string): Promise<string> {
+  const event = await prisma.ticketEvent.findUnique({
+    where: { id: eventId },
+    select: { titleNl: true },
+  });
+  return event?.titleNl ?? eventId;
+}
+
 /** Save a non-live ticket layout. The current published layout remains the one
  * copied into newly issued tickets until this draft is explicitly published. */
 export async function saveTicketDesignDraftAction(
@@ -249,6 +263,13 @@ export async function publishTicketDesignAction(
       },
     });
     return published.revision;
+  });
+  await logAudit({
+    action: "publish",
+    entity: "ticketDesign",
+    entityId: eventId,
+    target: await ticketEventTitle(eventId),
+    summary: `ticketontwerp gepubliceerd (revisie ${revision})`,
   });
   refreshTicketEvent(locale, eventId);
   return { revision };
@@ -392,6 +413,14 @@ export async function createTicketEventAction(formData: FormData): Promise<void>
     return created;
   });
 
+  await logAudit({
+    action: "create",
+    entity: "ticketEvent",
+    entityId: event.id,
+    target: titleNl,
+    summary: `capaciteit ${capacity}, eerste tickettype "${firstTicketName}"`,
+  });
+
   refreshTicketEvent(locale, event.id);
   redirect(localePath(locale, `/admin/tickets/${event.id}/instellingen#tickettype-aanmaken`));
 }
@@ -478,6 +507,13 @@ export async function updateTicketEventAction(formData: FormData): Promise<void>
       },
     });
   });
+  await logAudit({
+    action: "update",
+    entity: "ticketEvent",
+    entityId: eventId,
+    target: await ticketEventTitle(eventId),
+    summary: status === event.status ? "instellingen bewerkt" : `status gezet op ${status}`,
+  });
   refreshTicketEvent(locale, eventId);
 }
 
@@ -516,6 +552,13 @@ export async function publishTicketEventAction(
           metadata: { status: "PUBLISHED" },
         },
       });
+    });
+    await logAudit({
+      action: "publish",
+      entity: "ticketEvent",
+      entityId: eventId,
+      target: event.titleNl,
+      summary: "ticketverkoop live gezet",
     });
     refreshTicketEvent(locale, eventId);
     return { ok: true };
@@ -558,6 +601,13 @@ export async function updateInventoryPoolAction(formData: FormData): Promise<voi
       },
     }),
   ]);
+  await logAudit({
+    action: "update",
+    entity: "ticketEvent",
+    entityId: eventId,
+    target: await ticketEventTitle(eventId),
+    summary: `voorraadpot "${pool.nameNl}" op capaciteit ${capacity}`,
+  });
   refreshTicketEvent(locale, eventId);
 }
 
@@ -630,6 +680,13 @@ export async function createTicketTypeAction(formData: FormData): Promise<void> 
       },
     });
   });
+  await logAudit({
+    action: "create",
+    entity: "ticketType",
+    entityId: eventId,
+    target: `${event.titleNl}: ${nameNl}`,
+    summary: `${(unitPriceCents / 100).toFixed(2)} euro per ticket`,
+  });
   refreshTicketEvent(locale, eventId);
 }
 
@@ -652,6 +709,13 @@ export async function archiveTicketTypeAction(formData: FormData): Promise<void>
       },
     }),
   ]);
+  await logAudit({
+    action: "delete",
+    entity: "ticketType",
+    entityId: eventId,
+    target: `${await ticketEventTitle(eventId)}: ${type.nameNl}`,
+    summary: "tickettype gearchiveerd; verkochte tickets blijven geldig",
+  });
   refreshTicketEvent(locale, eventId);
 }
 
@@ -703,6 +767,12 @@ export async function createTicketQuestionAction(formData: FormData): Promise<vo
       entityId: question.id,
     },
   });
+  await logAudit({
+    action: "create",
+    entity: "ticketQuestion",
+    entityId: eventId,
+    target: `${await ticketEventTitle(eventId)}: ${labelNl}`,
+  });
   refreshTicketEvent(locale, eventId);
 }
 
@@ -714,6 +784,13 @@ export async function archiveTicketQuestionAction(formData: FormData): Promise<v
   const question = await prisma.ticketQuestion.findFirst({ where: { id: questionId, eventId } });
   if (!question) throw new Error("QUESTION_NOT_FOUND");
   await prisma.ticketQuestion.update({ where: { id: question.id }, data: { active: false } });
+  await logAudit({
+    action: "delete",
+    entity: "ticketQuestion",
+    entityId: eventId,
+    target: `${await ticketEventTitle(eventId)}: ${question.labelNl}`,
+    summary: "vraag gearchiveerd; gegeven antwoorden blijven bewaard",
+  });
   refreshTicketEvent(locale, eventId);
 }
 
@@ -741,6 +818,19 @@ export async function addTicketUserGrantAction(formData: FormData): Promise<void
           metadata: { role, groupId, scope },
         },
       });
+    });
+    const group = await prisma.group.findUnique({
+      where: { id: groupId },
+      select: { nameNl: true },
+    });
+    await logAudit({
+      action: "grant",
+      entity: "ticketAccess",
+      entityId: eventId,
+      target: await ticketEventTitle(eventId),
+      summary: `post ${group?.nameNl ?? groupId} kreeg de rol ${role} (${
+        scope === "LEADS_ONLY" ? "enkel de verantwoordelijke" : "elk lid"
+      })`,
     });
   } else {
     const userId = optionalValue(formData, "userId");
@@ -775,6 +865,13 @@ export async function addTicketUserGrantAction(formData: FormData): Promise<void
           metadata: { role, userId: user.id },
         },
       });
+    });
+    await logAudit({
+      action: "grant",
+      entity: "ticketAccess",
+      entityId: eventId,
+      target: await ticketEventTitle(eventId),
+      summary: `${user.name} kreeg de rol ${role}`,
     });
   }
   refreshTicketEvent(locale, eventId);
@@ -811,6 +908,13 @@ export async function removeTicketUserGrantAction(formData: FormData): Promise<v
       },
     });
   });
+  await logAudit({
+    action: "revoke",
+    entity: "ticketAccess",
+    entityId: eventId,
+    target: await ticketEventTitle(eventId),
+    summary: isGroup ? "toegang van een post ingetrokken" : "toegang van een persoon ingetrokken",
+  });
   refreshTicketEvent(locale, eventId);
 }
 
@@ -835,6 +939,12 @@ export async function createTicketGateAction(formData: FormData): Promise<void> 
       entityType: "TicketGate",
       entityId: gate.id,
     },
+  });
+  await logAudit({
+    action: "create",
+    entity: "ticketGate",
+    entityId: eventId,
+    target: `${await ticketEventTitle(eventId)}: ${name}`,
   });
   refreshTicketEvent(locale, eventId);
 }
@@ -864,6 +974,13 @@ export async function setTicketGateActiveAction(formData: FormData): Promise<voi
       },
     });
   });
+  await logAudit({
+    action: "update",
+    entity: "ticketGate",
+    entityId: eventId,
+    target: await ticketEventTitle(eventId),
+    summary: active ? "scanpoort aangezet" : "scanpoort uitgezet",
+  });
   refreshTicketEvent(locale, eventId);
   revalidatePath(localePath(locale, `/admin/tickets/${eventId}/toegang`));
 }
@@ -888,6 +1005,13 @@ export async function revokeTicketScanDeviceAction(formData: FormData): Promise<
         },
       }),
     ]);
+    await logAudit({
+      action: "revoke",
+      entity: "ticketScanDevice",
+      entityId: eventId,
+      target: `${await ticketEventTitle(eventId)}: ${device.label}`,
+      summary: "scantoestel ingetrokken",
+    });
   }
   revalidatePath(localePath(locale, `/admin/tickets/${eventId}/toegang`));
 }
@@ -922,6 +1046,13 @@ export async function resendTicketOrderConfirmationAction(formData: FormData): P
       },
     }),
   ]);
+  await logAudit({
+    action: "send",
+    entity: "ticketOrder",
+    entityId: orderId,
+    target: order.buyerEmail,
+    summary: `bevestigingsmail opnieuw verstuurd voor ${await ticketEventTitle(eventId)}`,
+  });
   revalidatePath(localePath(locale, `/admin/tickets/${eventId}/bestellingen`));
 }
 
@@ -937,6 +1068,13 @@ export async function refundTicketsAction(formData: FormData): Promise<void> {
     orderItemIds,
     requestedById: session.user.id,
     reason: limitedOptionalValue(formData, "reason", 1_000),
+  });
+  await logAudit({
+    action: "refund",
+    entity: "ticketOrder",
+    entityId: orderId,
+    target: await ticketEventTitle(eventId),
+    summary: `${orderItemIds.length} ticket(s) terugbetaald`,
   });
   refreshTicketEvent(locale, eventId);
   revalidatePath(localePath(locale, `/admin/tickets/${eventId}/bestellingen`));

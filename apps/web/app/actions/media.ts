@@ -6,6 +6,7 @@ import { prisma } from "@vtk/db";
 import { newStorageKey, putObject } from "@vtk/storage";
 import { requirePermission } from "@/lib/session";
 import { saveOk, type SaveState } from "@/lib/saveState";
+import { logAudit } from "@/lib/audit";
 import {
   getMediaContent,
   type MediaPublication,
@@ -105,6 +106,13 @@ export async function saveMagazineAction(
   };
 
   await savePublications([entry, ...current]);
+  await logAudit({
+    action: "create",
+    entity: "media",
+    entityId: id,
+    target: `${titleNl} ${issueNl}`,
+    summary: `${kind === "bakske" ? "'t Bakske" : "Ir-Reëel"} toegevoegd aan de mediapagina`,
+  });
   return { ok: true };
 }
 
@@ -113,7 +121,15 @@ export async function deleteMagazineAction(formData: FormData): Promise<void> {
   const id = readField(formData, "id", 100);
   if (!id) return;
   const { publications: current } = await getMediaContent();
+  const removed = current.find((p) => p.id === id);
   await savePublications(current.filter((p) => p.id !== id));
+  await logAudit({
+    action: "delete",
+    entity: "media",
+    entityId: id,
+    target: removed ? `${removed.titleNl} ${removed.issueNl}` : id,
+    summary: "publicatie van de mediapagina gehaald",
+  });
   revalidatePath("/admin/media");
 }
 
@@ -165,6 +181,12 @@ export async function savePromoVideosAction(
       value: { titleNl: "Aftermovies", titleEn: "Aftermovies", items },
     },
   });
+  await logAudit({
+    action: "update",
+    entity: "media",
+    target: "Promovideo's",
+    summary: `${items.length} video('s) op de mediapagina`,
+  });
   revalidatePath("/");
   revalidatePath("/media");
   revalidatePath("/en/media");
@@ -181,6 +203,13 @@ export async function createImmichAlbumAction(
   if (!title) return { ok: false, error: "missing_title" };
   try {
     const album = await createImmichGalleryAlbum({ title, description });
+    await logAudit({
+      action: "create",
+      entity: "photoAlbum",
+      entityId: album.id,
+      target: title,
+      summary: "fotoalbum aangemaakt in Immich",
+    });
     return { ok: true, albumId: album.id };
   } catch (error) {
     console.error("Immich album creation failed", error);
@@ -229,6 +258,13 @@ export async function setImmichAlbumCoverAction(
   if (!albumId || !assetId) return { ok: false, error: "missing" };
   try {
     await setImmichAlbumCover(albumId, assetId);
+    await logAudit({
+      action: "update",
+      entity: "photoAlbum",
+      entityId: albumId,
+      target: albumId,
+      summary: "coverfoto van het album gewijzigd",
+    });
     return { ok: true };
   } catch (error) {
     console.error("Immich album cover update failed", error);

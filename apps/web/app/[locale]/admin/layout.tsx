@@ -94,6 +94,7 @@ const NAV: NavEntry[] = [
     // onderliggende /admin/it/preview staat.
     item('itConfig', '/it', { superAdminOnly: true, exact: true }),
     item('authorizationPreview', '/it/preview', { superAdminOnly: true }),
+    item('auditLog', '/it/logboek', { perm: 'audit.view' }),
     item('door', '/deur', { perm: 'door.manage' }),
     item('sso', '/sso', { perm: 'oauth.client.edit' }),
   ]),

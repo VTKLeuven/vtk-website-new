@@ -11,6 +11,7 @@ import {
 import { authErrorResponse } from '@/lib/session';
 import { withCors, corsPreflight } from '@/lib/cors';
 import { handledLeadFields } from '@/lib/shift-reminders';
+import { describeChanges, logAudit } from '@/lib/audit';
 
 /**
  * Get de huidige shiften (waar een user zich voor kan registreren)
@@ -82,6 +83,14 @@ async function postHandler(request: Request) {
 
   const shift = await prisma.shift.create({ data });
 
+  await logAudit({
+    action: 'create',
+    entity: 'shift',
+    entityId: shift.id,
+    target: shift.name,
+    summary: `${shift.maxParticipants} plaats(en), ${shift.reward} bonnetje(s)`,
+  });
+
   return NextResponse.json(shift, { status: 201 });
 }
 
@@ -102,14 +111,23 @@ async function deleteHandler(request: Request) {
     return NextResponse.json({ error: 'id query parameter is required' }, { status: 400 });
   }
 
+  let deleted;
   try {
-    await prisma.shift.delete({ where: { id } });
+    deleted = await prisma.shift.delete({ where: { id } });
   } catch (err) {
     if (isRecordNotFound(err)) {
       return NextResponse.json({ error: 'Shift not found' }, { status: 404 });
     }
     throw err;
   }
+
+  await logAudit({
+    action: 'delete',
+    entity: 'shift',
+    entityId: id,
+    target: deleted.name,
+    summary: 'shift verwijderd; ingeschreven leden staan er niet meer op',
+  });
 
   return NextResponse.json({ success: true });
 }
@@ -290,6 +308,32 @@ async function patchHandler(request: Request) {
         select: { userId: true, payedOut: true, user: { select: { id: true, name: true, email: true } } },
       },
     },
+  });
+
+  const changes = hasFieldChanges
+    ? describeChanges(existing, patch, {
+        name: 'naam',
+        startTime: 'starttijd',
+        endTime: 'eindtijd',
+        location: 'locatie',
+        description: 'beschrijving',
+        maxParticipants: 'aantal plaatsen',
+        reward: 'bonnetjes',
+        post: 'post',
+        openToInternationals: 'open voor internationals',
+        instructions: 'instructies',
+      })
+    : null;
+  const people = [
+    toAdd.length ? `${toAdd.length} deelnemer(s) toegevoegd` : null,
+    toRemove.length ? `${toRemove.length} deelnemer(s) verwijderd` : null,
+  ].filter(Boolean);
+  await logAudit({
+    action: 'update',
+    entity: 'shift',
+    entityId: id,
+    target: shift?.name ?? existing.name,
+    summary: [changes, ...people].filter(Boolean).join('; ') || null,
   });
 
   return NextResponse.json(shift);

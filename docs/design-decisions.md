@@ -2768,3 +2768,48 @@ keuzes die niet uit de code volgen.
   aanduidt waarvan de tweede vol zit, komt volledig op de wachtlijst in plaats van
   twee plaatsen te bezetten en voor de derde te wachten. Half ingeschreven zijn is
   voor niemand bruikbaar.
+
+## Adminlogboek: wie deed wat in het beheer
+
+Elke wijzigende beheerdersactie schrijft één regel in `AdminAuditLog`, te lezen op
+`/admin/it/logboek`. De helper staat in `apps/web/lib/audit.ts`; de call sites zitten
+in de server actions (`apps/web/app/actions/*`) en in de mutatie-endpoints van shiften
+(`apps/web/app/api/shift/*`).
+
+- **Het antwoord op "wie heeft dit gedaan" hoort op één plek te staan.** Er waren al
+  logboeken per module (`TicketAuditLog`, `FormAuditLog`, `SsoAuditLog`,
+  `UitleenAuditLog`, `DoorAccessLog`), maar die vertellen elk hun eigen verhaal en je
+  moet vooraf weten waar je moet kijken. Het adminlogboek is de dwarsdoorsnede: elke
+  tab, één tabel, één zoekbalk. De modulelogs blijven bestaan; ze staan dieper in
+  detail en hangen aan het event of het formulier zelf.
+- **Enkel wijzigende acties.** Aanmaken, wijzigen, verwijderen, publiceren, toegang
+  geven of afnemen, en versturen. Lezen, exporteren, zoeken en de testknoppen in de
+  IT-tab staan er niet in: die veranderen niets, en een logboek dat volloopt met
+  paginabezoeken beantwoordt de vraag waarvoor het bestaat niet meer.
+- **Zelfbediening van een lid staat er niet in.** Je eigen profiel, je eigen
+  dashboardtegels, je eigen piano- of broodjesreservatie, je eigen deur-snelkoppeling:
+  dat is geen beheer. Wat een beheerder mét dat lid doet (een reservatie schrappen, een
+  ban zetten, een bestelling corrigeren) staat er wel in.
+- **De balie van Theokot staat er bewust niet in.** Een broodje afvinken als opgehaald
+  gebeurt tientallen keren per middag en staat al op de bestelling zelf
+  (`pickedUpById`). In het logboek zou het al de rest wegdrukken. Correcties achteraf
+  (status rechtzetten, ban opheffen) staan er wél in: dat is precies het geval waarin
+  iemand achteraf vraagt wie dat deed.
+- **Dertig dagen, daarna weg.** Het is een logboek, geen archief. Zolang wordt de vraag
+  "wie heeft dat vorige week aangepast" gesteld; daarna is het vooral een verzameling
+  namen naast handelingen. `logAudit` snoeit hoogstens één keer per uur per proces en de
+  logboekpagina snoeit bij het openen, dus er is geen cron voor nodig.
+- **Namen worden meegekopieerd, niet opgezocht.** De regel bewaart de naam van de
+  handelende persoon én van het onderwerp zoals ze op dat moment waren. Een verwijderd
+  evenement of een uitgetreden lid mag een regel niet onleesbaar maken, en een
+  foreign key naar het onderwerp zou de regel mee weggooien.
+- **De echte actor, niet de gespeelde.** Staat een superadmin in
+  autorisatievoorbeeld-modus, dan noteert het logboek wie het écht deed. De vraag is
+  wie handelde, niet in wiens rechten die persoon aan het kijken was.
+- **Zichtbaar met `audit.view`, niet enkel voor superadmins.** Het staat onder de
+  IT-tab omdat IT de vraag krijgt, maar het is een gewone permissie zodat ze aan een
+  rol gehangen kan worden zonder iemand superadmin te maken. Het logboek toont geen
+  inhoud, enkel wie wat wanneer aanraakte.
+- **Een mislukte logregel breekt de actie niet.** `logAudit` vangt zijn eigen fouten op
+  (en meldt ze aan Sentry). Een opslaan dat lukt maar een logregel die faalt, mag geen
+  rode toast geven; andersom zou het logboek belangrijker worden dan het werk zelf.
