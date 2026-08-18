@@ -8,12 +8,13 @@ import { prisma, HEADER_TABS } from '@vtk/db';
 import { requireAnyPermission, requirePermission, requireSession } from '@/lib/session';
 import { canEditPageContent, canPublishPages } from '@/lib/pageAccess';
 import { saveError, saveOk, type SaveState } from '@/lib/saveState';
+import { isEditableDestination } from '@/lib/href';
 import { readImageField, resolveImageKey } from '@/lib/imageField';
 import { describeChanges, logAudit } from '@/lib/audit';
 import { deleteObject } from '@vtk/storage';
 
 /** Foutcodes die /admin/inhoud en /admin/paginas op vertaalde meldingen mappen. */
-export type ContentErrorCode = 'INVALID_INPUT' | 'SLUG_TAKEN' | 'CODE_TAKEN';
+export type ContentErrorCode = 'INVALID_INPUT' | 'SLUG_TAKEN' | 'CODE_TAKEN' | 'INVALID_URL';
 
 const SLUG_REGEX = /^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/;
 
@@ -33,6 +34,17 @@ const EMPTY_DOC = { type: 'doc', content: [{ type: 'paragraph' }] };
  */
 async function deleteStoredObjects(keys: (string | null | undefined)[]): Promise<void> {
   await Promise.allSettled(keys.filter((k): k is string => Boolean(k)).map((k) => deleteObject(k)));
+}
+
+/**
+ * Welke foutcode een mislukte zod-parse verdient. Een ongeldig knopadres is een
+ * typfout in één veld, geen kapot formulier: dat verdient een melding die zegt
+ * wat er mag staan, niet het generieke "controleer je invoer".
+ */
+function parseErrorCode(error: z.ZodError): ContentErrorCode {
+  return error.issues.some((issue) => issue.message === 'INVALID_URL')
+    ? 'INVALID_URL'
+    : 'INVALID_INPUT';
 }
 
 /** `P2002` op een bepaald veld: de unieke constraint die Prisma noemt. */
@@ -78,9 +90,7 @@ const saveSchema = z.object({
   // op Shiften wijst naar /shift, die op Uitleendienst naar een andere host.
   ctaUrl: z
     .string()
-    .refine((v) => v === '' || v.startsWith('/') || /^https?:\/\//i.test(v), {
-      message: 'Geef een pad op deze site (/shift) of een volledig adres (https://...).',
-    })
+    .refine((v) => v === '' || isEditableDestination(v), { message: 'INVALID_URL' })
     .optional()
     .nullable(),
   published: z.coerce.boolean().optional().default(false),
@@ -117,7 +127,7 @@ export async function savePageAction(_prev: SaveState, formData: FormData): Prom
     editorRoleIds: formData.getAll('editorRoleIds').map(String),
     order: formData.get('order') || 0,
   });
-  if (!parsed.success) return saveError('INVALID_INPUT' satisfies ContentErrorCode);
+  if (!parsed.success) return saveError(parseErrorCode(parsed.error));
   const data = parsed.data;
 
   const existing = await prisma.page.findUnique({
@@ -752,7 +762,12 @@ const headerSchema = z.object({
   introEn: z.string().optional().nullable(),
   ctaLabelNl: z.string().optional().nullable(),
   ctaLabelEn: z.string().optional().nullable(),
-  ctaUrl: z.string().url().optional().nullable().or(z.literal('')),
+  // Zelfde knop als op een pagina, dus ook hier mag een pad op deze site staan.
+  ctaUrl: z
+    .string()
+    .refine((v) => v === '' || isEditableDestination(v), { message: 'INVALID_URL' })
+    .optional()
+    .nullable(),
 });
 
 const HEADER_TAB_FIELD_LABELS: Record<string, string> = {
@@ -788,7 +803,7 @@ export async function saveHeaderTabAction(
     ctaLabelEn: formData.get('ctaLabelEn') || null,
     ctaUrl: formData.get('ctaUrl') || null,
   });
-  if (!parsed.success) return saveError('INVALID_INPUT' satisfies ContentErrorCode);
+  if (!parsed.success) return saveError(parseErrorCode(parsed.error));
   const p = parsed.data;
 
   const data = {
@@ -813,7 +828,7 @@ export async function saveHeaderTabAction(
     const labelEn = String(formData.get(`link-${i}-labelEn`) ?? '').trim();
     const url = String(formData.get(`link-${i}-url`) ?? '').trim();
     if (!labelNl || !url) continue;
-    if (!/^https?:\/\//i.test(url)) return saveError('INVALID_INPUT' satisfies ContentErrorCode);
+    if (!isEditableDestination(url)) return saveError('INVALID_URL' satisfies ContentErrorCode);
     // Twee items naar dezelfde URL kunnen niet (unieke index) en zeggen ook niets.
     if (links.some((link) => link.url === url)) continue;
     links.push({ labelNl, labelEn: labelEn || labelNl, url, order: links.length });

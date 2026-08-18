@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { isEditableDestination, isSameSitePath } from "@/lib/href";
 
 export const LINK_PAGE_SETTING_KEY = "site.linkPage";
 
@@ -22,22 +23,17 @@ export const SOCIAL_LABELS: Record<SocialPlatform, string> = {
   email: "E-mail",
 };
 
+// De linktree staat op een andere host, dus een pad wordt bij het renderen tegen
+// de site-URL opgelost (`resolveLinkHref`). Naast http(s) horen hier ook een
+// mailadres en een telefoonnummer thuis: dit is de knoppenlijst uit de bio.
 const linkUrlSchema = z
   .string()
   .trim()
   .min(1)
   .max(2048)
-  .refine(
-    (value) => {
-      if (value.startsWith("/") && !value.startsWith("//")) return true;
-      try {
-        return ["http:", "https:", "mailto:", "tel:"].includes(new URL(value).protocol);
-      } catch {
-        return false;
-      }
-    },
-    { message: "INVALID_URL" },
-  );
+  .refine((value) => isEditableDestination(value, ["mailto:", "tel:"]), {
+    message: "INVALID_URL",
+  });
 
 const socialUrlSchema = z.string().trim().max(2048).refine(
   (value) => {
@@ -125,8 +121,6 @@ export function socialHref(platform: SocialPlatform, value: string): string {
  * blijven onveranderd.
  */
 export function resolveLinkHref(url: string, baseUrl: string): string {
-  if (url.startsWith("/") && !url.startsWith("//")) {
-    return new URL(url, baseUrl).toString();
-  }
+  if (isSameSitePath(url)) return new URL(url, baseUrl).toString();
   return url;
 }

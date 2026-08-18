@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
+import { isExternalUrl } from "@/lib/href";
 
 /**
  * Aankondigingsvenster op de homepage.
@@ -109,8 +110,8 @@ export function AnnouncementModal({
             <a
               href={ctaUrl}
               className="vtk-button vtk-button-primary"
-              target={ctaUrl.startsWith("http") ? "_blank" : undefined}
-              rel={ctaUrl.startsWith("http") ? "noreferrer noopener" : undefined}
+              target={isExternalUrl(ctaUrl) ? "_blank" : undefined}
+              rel={isExternalUrl(ctaUrl) ? "noreferrer noopener" : undefined}
               onClick={dismiss}
             >
               {ctaLabel}

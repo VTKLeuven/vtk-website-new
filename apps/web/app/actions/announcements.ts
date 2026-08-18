@@ -7,6 +7,7 @@ import { requirePermission } from "@/lib/session";
 import { saveError, saveOk, type SaveState } from "@/lib/saveState";
 import { describeChanges, logAudit } from "@/lib/audit";
 import { localDateTimeToUtc } from "@/lib/ticketing/time";
+import { isEditableDestination } from "@/lib/href";
 
 /**
  * Aankondigingen: het bericht dat als modal verschijnt, op de homepage of op de
@@ -21,7 +22,14 @@ const schema = z.object({
   bodyEn: z.string().trim().min(1),
   ctaLabelNl: z.string().trim().optional(),
   ctaLabelEn: z.string().trim().optional(),
-  ctaUrl: z.string().trim().url().optional().or(z.literal("")),
+  // Mag een pad op deze site zijn: de modal opent enkel een nieuw tabblad voor
+  // een extern adres, dus een interne knop werd altijd al correct gerenderd.
+  ctaUrl: z
+    .string()
+    .trim()
+    .refine((v) => v === "" || isEditableDestination(v), { message: "INVALID_URL" })
+    .optional()
+    .or(z.literal("")),
   startsAt: z.string().optional(),
   endsAt: z.string().optional(),
   active: z.boolean(),
@@ -65,7 +73,10 @@ export async function saveAnnouncementAction(
     active: formData.get("active") === "on",
     scope: (formData.get("scope") as string) || "HOME",
   });
-  if (!parsed.success) return saveError("INVALID_INPUT");
+  if (!parsed.success) {
+    const badUrl = parsed.error.issues.some((issue) => issue.message === "INVALID_URL");
+    return saveError(badUrl ? "INVALID_URL" : "INVALID_INPUT");
+  }
 
   const input = parsed.data;
   const startsAt = parseMoment(input.startsAt);

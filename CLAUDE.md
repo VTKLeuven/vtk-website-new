@@ -177,6 +177,21 @@ the design language into the application instead of copying mockup content.
 
 ## Components
 
+- Adresvelden in de admin: een veld waar een redacteur een bestemming intikt,
+  valideer je met `isEditableDestination` uit `apps/web/lib/href.ts`, niet met
+  `z.string().url()` of een eigen regex. Die helper aanvaardt een pad op deze
+  site (`/praesidium`) naast een volledig http(s)-adres, en dat is precies wat de
+  renderkant al verwacht: `isExternalUrl` bepaalt of er een taalprefix voor moet
+  en of de link in een nieuw tabblad opent. Gebruik `type="url"` daar dus ook
+  niet op de input; de browser weigert een pad voor je server het ziet.
+  - Foutcode is `INVALID_URL`, met de melding in `lib/saveMessages.ts`.
+  - Enkel een veld dat per definitie naar een andere site wijst
+    (`HeaderTab.externalUrl`) blijft `.url()`. Machine-endpoints (SSO, deur,
+    monitoring) staan hier los van.
+  - Dit liep ooit uiteen: de menu-items en de aankondigingsknop eisten
+    `https://` terwijl hun eigen renderer een intern pad al correct afhandelde,
+    dus een werkende bestemming was niet op te slaan.
+
 - Markdown editing: gebruik
   `apps/web/components/editor/MarkdownEditor.tsx` voor alle langere,
   opgemaakte tekst die als Markdown wordt opgeslagen. Gebruik

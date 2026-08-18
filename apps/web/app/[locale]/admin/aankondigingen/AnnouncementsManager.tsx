@@ -8,6 +8,7 @@ import { DeleteIconButton } from "@/components/ui/DeleteIconButton";
 import { IconButton } from "@/components/ui/IconButton";
 import { PencilIcon } from "@/components/ui/icons";
 import { MarkdownEditorField } from "@/components/editor/MarkdownEditor";
+import { saveErrorMessages } from "@/lib/saveMessages";
 import {
   deleteAnnouncementAction,
   saveAnnouncementAction,
@@ -83,17 +84,22 @@ export function AnnouncementsManager({
   const statusLabels = STATUS_LABELS[nl ? "nl" : "en"];
   const [editing, setEditing] = useState<AnnouncementRow>(EMPTY);
 
-  const errorMessages = nl
-    ? {
-        INVALID_INPUT: "Vul minstens een titel en een bericht in, in beide talen.",
-        WINDOW_INVALID: "De einddatum ligt voor de startdatum.",
-        CTA_INCOMPLETE: "Een knop heeft zowel een tekst als een link nodig.",
-      }
-    : {
-        INVALID_INPUT: "Fill in at least a title and a message, in both languages.",
-        WINDOW_INVALID: "The end date is before the start date.",
-        CTA_INCOMPLETE: "A button needs both a label and a link.",
-      };
+  // De gedeelde meldingen (o.a. INVALID_URL voor het knopadres) plus wat enkel
+  // hier speelt; INVALID_INPUT is bewust specifieker dan de algemene tekst.
+  const errorMessages = {
+    ...saveErrorMessages(locale),
+    ...(nl
+      ? {
+          INVALID_INPUT: "Vul minstens een titel en een bericht in, in beide talen.",
+          WINDOW_INVALID: "De einddatum ligt voor de startdatum.",
+          CTA_INCOMPLETE: "Een knop heeft zowel een tekst als een link nodig.",
+        }
+      : {
+          INVALID_INPUT: "Fill in at least a title and a message, in both languages.",
+          WINDOW_INVALID: "The end date is before the start date.",
+          CTA_INCOMPLETE: "A button needs both a label and a link.",
+        }),
+  };
 
   const isNew = editing.id === "";
 
@@ -186,8 +192,7 @@ export function AnnouncementsManager({
               <Input
                 id="ctaUrl"
                 name="ctaUrl"
-                type="url"
-                placeholder="https://..."
+                placeholder={nl ? "/kalender of https://..." : "/kalender or https://..."}
                 defaultValue={editing.ctaUrl}
               />
             </div>

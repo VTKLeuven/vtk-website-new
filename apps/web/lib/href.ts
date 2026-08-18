@@ -25,3 +25,33 @@ export function withLocaleBase(url: string, base: string): string {
   if (isExternalUrl(url)) return url;
   return base === "" ? url : `${base}${url}`;
 }
+
+/**
+ * Mag dit adres in een veld dat een redacteur invult? Twee vormen zijn geldig:
+ * een pad op deze site (`/praesidium`, `/kalender`) en een volledig http(s)-adres
+ * naar ergens anders. `extraProtocols` laat een scherm er iets bij toestaan; de
+ * linkpagina aanvaardt ook `mailto:` en `tel:`, de rest niet.
+ *
+ * Dit bestond lang niet, en dan schrijft elk scherm zijn eigen regel. Het gevolg
+ * was dat `Page.ctaUrl` en de linkpagina een pad aanvaardden, terwijl de
+ * menu-items en de aankondigingsknop `https://` eisten; die laatste twee renderen
+ * een intern pad wél correct, je kon het alleen niet opslaan.
+ *
+ * Geweigerd: een protocol-relatief adres (`//host`) en `/\host`, want die zien
+ * eruit als een pad maar wijzen weg, en alles met een ander schema
+ * (`javascript:`) omdat dat niet in een redactievak thuishoort.
+ */
+export function isEditableDestination(url: string, extraProtocols: string[] = []): boolean {
+  if (isSameSitePath(url)) return true;
+  try {
+    const protocol = new URL(url).protocol;
+    return ["http:", "https:", ...extraProtocols].includes(protocol);
+  } catch {
+    return false;
+  }
+}
+
+/** Een pad op deze site: begint met één `/`, zonder host erachter verstopt. */
+export function isSameSitePath(url: string): boolean {
+  return url.startsWith("/") && !url.startsWith("//") && !url.startsWith("/\\");
+}
