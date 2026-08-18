@@ -18,6 +18,12 @@ put logic in a make target that exists only through `make`.
   follows from it. Locally, run only `make up`.
 - Postgres listens on **127.0.0.1:5433**, deliberately not on every interface:
   otherwise a database with password `vtk` is open to the whole wifi network.
+- **MinIO runs alongside it** on 9000 (console on 9001), because without object
+  storage every `/api/media/...` is a 404 and every upload field in the admin
+  fails, so no photo anywhere on the site can be tried out locally. The `S3_*`
+  block in `.env.example` points at it; those credentials are not secrets.
+  `make db` finishes with `npm run db:images`, which uploads placeholder partner
+  logos generated from `fixtures/partners.json`.
 
 # Seed: content comes from fixtures, not from constants
 

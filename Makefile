@@ -15,7 +15,7 @@ COMPOSE := docker compose -f infra/compose.dev.yml
 
 .DEFAULT_GOAL := help
 
-.PHONY: help up down db dev seed migrate reset fixtures verify psql logs status
+.PHONY: help up down db postgres admin dev seed migrate reset fixtures verify psql logs status
 
 ## help: show this list
 help:
@@ -29,21 +29,45 @@ help:
 		printf "  make %-10s %s\n", substr(line, 1, i - 1), substr(line, i + 2); \
 	}' $(MAKEFILE_LIST)
 	@echo
-	@echo "First time:  make up && make db && make dev"
+	@echo "First time:  make db && make up"
 
-## up: start the local database (Postgres on 127.0.0.1:5433)
-up:
-	$(COMPOSE) up -d
-	@echo "Waiting for Postgres to be ready..."
-	@until $(COMPOSE) exec -T postgres pg_isready -U vtk >/dev/null 2>&1; do sleep 1; done
-	@echo "Database is up. Next: make db"
+# Everything you need to work, in one command: the database in the background,
+# the website in the foreground. The website deliberately stays in the
+# foreground, so its compile output lands in your terminal; detaching it would
+# hide exactly the errors you are waiting for. Ctrl-C stops the website and
+# leaves the database running; `make down` stops that too.
+## up: start the database and the website (http://localhost:3000)
+up: postgres
+	@# An empty database produces a wall of Prisma errors that says nothing about
+	@# the actual problem, so check first and name it.
+	@if ! $(COMPOSE) exec -T postgres psql -U vtk -d vtk -tAc \
+		"select to_regclass('public.\"HeaderTab\"')" 2>/dev/null | grep -q HeaderTab; then \
+		echo; \
+		echo "The database is empty. Run 'make db' first, then 'make up' again."; \
+		exit 1; \
+	fi
+	npm run dev
 
-## down: stop the local database (data stays in the volume)
+## down: stop the database (its data stays in the volume)
 down:
 	$(COMPOSE) down
 
-## db: prepare the schema and fill the database (migrations + seed)
-db: migrate seed
+## db: start the database and prepare it (migrations + seed)
+db: postgres migrate seed
+	@echo
+	@echo "Database ready. Start the website with 'make up'."
+
+# Internal: bring the container up and wait until it accepts connections. No `##`
+# comment, so it stays out of `make help`; `up` and `db` both depend on it.
+postgres:
+	@$(COMPOSE) up -d
+	@until $(COMPOSE) exec -T postgres pg_isready -U vtk >/dev/null 2>&1; do sleep 1; done
+
+# Only ever the local database; the script refuses any other host. See the
+# explanation at the top of scripts/create-local-admin.ts.
+## admin: create a local superadmin so you can open /admin
+admin: postgres
+	npm run db:admin
 
 ## migrate: apply the migrations to the local database
 migrate:
@@ -53,7 +77,7 @@ migrate:
 seed:
 	npm run db:seed
 
-## dev: start the website on http://localhost:3000
+## dev: start only the website, assuming the database already runs
 dev:
 	npm run dev
 
@@ -85,5 +109,4 @@ reset:
 	@echo "This deletes the local database and everything in it."
 	@read -p "Type 'yes' to continue: " ok; [ "$$ok" = "yes" ] || { echo "Aborted."; exit 1; }
 	$(COMPOSE) down -v
-	$(MAKE) up
 	$(MAKE) db

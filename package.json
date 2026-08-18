@@ -19,6 +19,7 @@
     "db:push": "npm run push --workspace=@vtk/db",
     "db:migrate": "npm run migrate --workspace=@vtk/db",
     "db:seed": "npm run seed --workspace=@vtk/db",
+    "db:admin": "dotenv -e .env -- tsx scripts/create-local-admin.ts",
     "fixtures:export": "dotenv -e .env -- tsx scripts/export-fixtures.ts",
     "import:praesidium": "dotenv -e .env -- tsx scripts/import-praesidium-history.ts",
     "import:pages": "dotenv -e .env -- tsx scripts/import-pages.ts",

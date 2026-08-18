@@ -37,5 +37,53 @@ services:
       timeout: 5s
       retries: 10
 
+  # Object storage, so uploads work locally at all.
+  #
+  # Without a bucket every `/api/media/...` is a 404 and every upload field in
+  # the admin fails, which makes photos on the homepage, the front pages and the
+  # pages impossible to try out. `lib/storage.ts` already assumed something on
+  # :9000 lived here; it just was never in a compose file.
+  minio:
+    image: minio/minio:latest
+    container_name: vtk-dev-minio
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${S3_ACCESS_KEY:-vtkdev}
+      MINIO_ROOT_PASSWORD: ${S3_SECRET_KEY:-vtkdevsecret}
+    ports:
+      # 9000 is the S3 API, 9001 the web console. Loopback only, same reason as
+      # Postgres: these credentials are `vtkdev` and are not a secret.
+      - "127.0.0.1:9000:9000"
+      - "127.0.0.1:9001:9001"
+    volumes:
+      - dev-minio-data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "mc ready local || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  # Creates the bucket once and exits. MinIO does not make one on first start,
+  # and an upload into a missing bucket fails with an error that says nothing
+  # about the bucket.
+  minio-init:
+    image: minio/mc:latest
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        mc alias set local http://minio:9000 "$${MINIO_ROOT_USER}" "$${MINIO_ROOT_PASSWORD}" &&
+        mc mb --ignore-existing "local/$${BUCKET}" &&
+        echo "bucket $${BUCKET} ready"
+    environment:
+      MINIO_ROOT_USER: ${S3_ACCESS_KEY:-vtkdev}
+      MINIO_ROOT_PASSWORD: ${S3_SECRET_KEY:-vtkdevsecret}
+      BUCKET: ${S3_BUCKET:-vtk}
+    restart: "no"
+
 volumes:
   dev-postgres-data:
+  dev-minio-data:
