@@ -1,3 +1,7 @@
+# syntax=docker/dockerfile:1
+# De `RUN --mount=type=cache` hieronder heeft de BuildKit-frontend nodig; die
+# regel bovenaan pint ze expliciet in plaats van op de ingebouwde versie van de
+# daemon te vertrouwen.
 ARG NODE_VERSION=20
 FROM node:${NODE_VERSION}-alpine AS deps
 RUN apk add --no-cache libc6-compat
@@ -6,7 +10,11 @@ COPY package.json package-lock.json* ./
 COPY apps/logistiek/package.json apps/logistiek/package.json
 COPY packages ./packages
 COPY infra/docker/install-alpine-optional-natives.cjs infra/docker/install-alpine-optional-natives.cjs
-RUN npm install --no-audit --no-fund \
+# De npm-cache overleeft de build. Wijzigt er iets in packages/ (die hierboven
+# volledig gekopieerd wordt), dan draait deze laag opnieuw, maar downloadt ze
+# niets meer.
+RUN --mount=type=cache,target=/root/.npm,sharing=locked \
+  npm install --no-audit --no-fund \
   && node infra/docker/install-alpine-optional-natives.cjs
 
 FROM node:${NODE_VERSION}-alpine AS builder
@@ -16,7 +24,12 @@ COPY --from=deps /repo/node_modules ./node_modules
 COPY --from=deps /repo/packages ./packages
 COPY . .
 RUN npx --yes prisma generate --schema packages/db/prisma/schema.prisma
-RUN npm run build --workspace=@vtk/logistiek
+# Turbopack schrijft haar buildcache naar .next/cache. Als cache mount
+# overleeft die de build, dus een volgende deploy hercompileert enkel wat
+# echt veranderd is. De mount zit niet in de laag, dus de runner-image
+# krijgt de cache ook niet meer mee.
+RUN --mount=type=cache,target=/repo/apps/logistiek/.next/cache,sharing=locked \
+  npm run build --workspace=@vtk/logistiek
 
 FROM node:${NODE_VERSION}-alpine AS runner
 RUN apk add --no-cache libc6-compat tini tzdata
