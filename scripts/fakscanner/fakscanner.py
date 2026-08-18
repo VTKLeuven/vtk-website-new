@@ -110,7 +110,7 @@ while True:
     
     if response["counted"] == False:
         screen.show(center_text(response["message"]), f"  {response["total"]} CheckIns  ")
-        time.sleep(10)
+        time.sleep(5)
         continue
     
     if response["double"]:
