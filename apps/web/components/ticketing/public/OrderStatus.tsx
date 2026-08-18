@@ -93,7 +93,7 @@ export function OrderStatus({
     if (paid && !trackedRef.current) {
       trackedRef.current = true;
       trackTicketPurchased({
-        eventSlug: order.event.slug,
+        eventSlug: order.event.slug ?? "",
         ticketCount: order.tickets.length,
       });
     }

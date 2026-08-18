@@ -269,7 +269,7 @@ export function ReservationForm({
         return;
       }
       trackReservationSubmitted({
-        type: event.requesterGroupCode ? 'WERKGROEP' : 'INTERN',
+        type: event.requesterType ?? 'INTERN',
         itemCount: totals.count,
       });
       // Ingediend: het concept is geen concept meer.

@@ -77,6 +77,8 @@ export type PublicOrder = {
   totalCents: number;
   currency: string;
   event: {
+    id?: string;
+    slug?: string;
     title: string;
     startsAt: string | Date;
     location?: string | null;
