@@ -38,9 +38,13 @@ def center_text(text, width=16):
 
 # hardware init
 # -------------
-screen = Screen(1, 0x27) # bus, addr
-screen.show("Starting ...")
 logger.info("Initializing script")
+try:
+    screen = Screen(1, 0x27) # bus, addr
+    screen.show("Starting ...")
+except:
+    logger.error("Could not find LCD screen => check of pinnen correct verbonden zijn")
+    exit()
 
 try:
     scanner = Scanner()
@@ -63,7 +67,12 @@ except:
 while True:
     screen.show("    Scan je     ", " Studentenkaart ")
 
-    card = scanner.read() # wacht op studentenkaart
+    try:
+        card = scanner.read() # wacht op studentenkaart
+    except:
+        screen.show("  Kaartscanner  ", "      fout      ")
+        logger.error("Geen CardScanner gevonden")
+        exit()
 
     try:
         response = requests.post(
