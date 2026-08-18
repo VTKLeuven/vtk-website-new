@@ -1,6 +1,7 @@
 'use client';
 
 import { createContext, useCallback, useContext, useRef, useState, type ReactNode } from 'react';
+import { usePathname } from 'next/navigation';
 import './toast.css';
 
 export type ToastVariant = 'success' | 'error' | 'warning' | 'info';
@@ -40,6 +41,8 @@ export function useToast(): ShowToast {
 export function ToastProvider({ children }: { children: ReactNode }) {
   const [toasts, setToasts] = useState<Toast[]>([]);
   const nextId = useRef(0);
+  const pathname = usePathname();
+  const nl = !(pathname === '/en' || pathname?.startsWith('/en/'));
 
   const dismiss = useCallback((id: number) => {
     setToasts((cur) => cur.filter((t) => t.id !== id));
@@ -59,14 +62,19 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   return (
     <ToastContext.Provider value={showToast}>
       {children}
-      <div className="vtk-toast-viewport" role="region" aria-live="polite" aria-label="Meldingen">
+      <div
+        className="vtk-toast-viewport"
+        role="region"
+        aria-live="polite"
+        aria-label={nl ? 'Meldingen' : 'Notifications'}
+      >
         {toasts.map((toast) => (
           <div key={toast.id} className={`vtk-toast vtk-toast-${toast.variant}`} role="status">
             <span className="vtk-toast-message">{toast.message}</span>
             <button
               type="button"
               className="vtk-toast-close"
-              aria-label="Sluiten"
+              aria-label={nl ? 'Sluiten' : 'Close'}
               onClick={() => dismiss(toast.id)}
             >
               ×
