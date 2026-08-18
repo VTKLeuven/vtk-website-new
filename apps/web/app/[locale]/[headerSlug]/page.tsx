@@ -1,13 +1,14 @@
 import type { Metadata } from "next";
+import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getDictionary, pick, type Locale } from "@vtk/i18n";
-import { Card } from "@vtk/ui";
 import { OUTBOUND_EVENT, outboundHost, umamiEvent } from "@/lib/analytics";
 import { categoryTiles } from "@/lib/categoryTiles";
 import { hasLocale } from "@/lib/locale";
 import { loadHeaderTabWithPages } from "@/lib/pageQueries";
 import { buildMetadata } from "@/lib/seo";
+import { publicUrl } from "@/lib/storage";
 
 type Params = Promise<{ locale: string; headerSlug: string }>;
 
@@ -65,21 +66,28 @@ export default async function HeaderOverviewPage({ params }: { params: Params })
         {tiles.length === 0 ? (
           <p className="text-sm text-[#5c667f]">{dict.pages.empty}</p>
         ) : (
-          <ul className="vtk-card-grid">
+          <ul className="vtk-tile-grid">
             {tiles.map((tile) => {
               const excerpt = pick(tile.excerptNl ?? "", tile.excerptEn ?? "", locale);
+              const photo = publicUrl(tile.imageKey);
               const card = (
-                <Card className="vtk-card h-full">
-                  <h2 className="text-xl font-semibold tracking-tight text-vtk-ink">
-                    {pick(tile.labelNl, tile.labelEn, locale)}
-                  </h2>
-                  {excerpt && (
-                    <p className="mt-2 line-clamp-3 text-sm leading-6 text-[#34405e]">{excerpt}</p>
-                  )}
-                  <span className="mt-4 inline-block text-sm font-medium text-vtk-ink">
-                    {dict.home.readMore} →
+                <article className="vtk-tile">
+                  {/* Decoratief: de titel ernaast zegt al waar de kaart heen gaat,
+                      dus een alt-tekst zou de link enkel twee keer voorlezen. */}
+                  <span
+                    className={`vtk-tile-media${photo ? " has-photo" : ""}`}
+                    aria-hidden="true"
+                  >
+                    {photo && (
+                      <Image src={photo} alt="" fill sizes="(max-width: 520px) 104px, 148px" />
+                    )}
                   </span>
-                </Card>
+                  <div className="vtk-tile-body">
+                    <h2>{pick(tile.labelNl, tile.labelEn, locale)}</h2>
+                    {excerpt && <p className="line-clamp-3">{excerpt}</p>}
+                    <span className="vtk-tile-cta">{dict.home.readMore} →</span>
+                  </div>
+                </article>
               );
               return (
                 <li key={tile.key}>

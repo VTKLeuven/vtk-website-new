@@ -1000,6 +1000,39 @@ tonen en niemand merkt dat er iets stuk is. Intrekken gebeurt expliciet vanuit
 `lastUsedAt` wordt hoogstens één keer per uur weggeschreven; anders is elke poll
 van elke client een database-write.
 
+## Categoriepagina: een lijst met een foto per pagina
+
+De categoriepagina (`/info`, `/eerstejaars`, ...) toont de pagina's onder een
+headertab. Ze zag er lang uit als een raster van witte kaartjes met enkel een
+titel: op `/info` stonden zes kaarten waarvan er vier niets meer toonden dan hun
+naam, want lang niet elke pagina heeft een `excerpt`. De oude site had daar wel
+een foto per item, en die herkenbaarheid is precies wat een lijst van diensten
+nodig heeft.
+
+- **Elke pagina kan een eigen foto hebben** (`Page.imageKey`, een storage-key net
+  als `HeaderTab.imageKey`), uploadbaar in de pagina-editor
+  (`/admin/paginas/<id>`) met dezelfde `StorageImageField` als elders.
+- **De foto staat als vierkant links van de tekst, niet als kop erboven.** Een
+  categorie telt makkelijk tien items; in een lijst van brede kaarten (twee per
+  rij) scrol je minder, en er blijft plaats voor de volledige samenvatting naast
+  het beeld. Een fotokop bovenaan de kaart (zoals de aanbod-kaarten op de
+  homepage) en een volledige fotokaart onder een navy scrim zijn allebei
+  overwogen; de eerste maakt de pagina lang, de tweede dwingt elke kaart zonder
+  foto in het donker.
+- **Geen foto is een geldige toestand, geen fout.** De thumbnail toont dan het
+  gestreepte placeholder-patroon van de site: zichtbaar onaf, maar de kaart blijft
+  leesbaar en de rij blijft kloppen. In een lijst is dat een klein vlakje in
+  plaats van een gat, wat mee de reden was om voor de lijst te kiezen.
+- **Menu-items hebben nooit een foto.** Een categoriepagina toont ook de
+  `HeaderTabLink`-items (piano reserveren, de cudi-webshop): dat zijn geen
+  pagina's en er is dus niets om een foto aan te hangen. Ze houden het gestreepte
+  patroon. Een eigen `imageKey` op `HeaderTabLink` is bewust niet gebouwd zolang
+  niemand ernaar vraagt; het zou een tweede uploadscherm vragen voor items die
+  vooral doorverwijzen.
+- **Rechten volgen de inhoud, niet de structuur.** `savePageImageAction` checkt
+  `canEditPageContent`, dus wie de tekst van een pagina schrijft, kiest ook de
+  foto erbij; daar is geen `pages.manage` voor nodig.
+
 ## Homepage-secties & bandenritme
 
 De homepage is opgebouwd uit volle-breedte banden die bewust van kleur

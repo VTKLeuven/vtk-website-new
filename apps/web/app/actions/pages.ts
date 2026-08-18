@@ -8,6 +8,7 @@ import { prisma, HEADER_TABS } from '@vtk/db';
 import { requireAnyPermission, requirePermission, requireSession } from '@/lib/session';
 import { canEditPageContent, canPublishPages } from '@/lib/pageAccess';
 import { saveError, saveOk, type SaveState } from '@/lib/saveState';
+import { readImageField, resolveImageKey } from '@/lib/imageField';
 import { deleteObject } from '@vtk/storage';
 
 /** Foutcodes die /admin/inhoud en /admin/paginas op vertaalde meldingen mappen. */
@@ -419,6 +420,52 @@ export async function savePageSettingsAction(
   } catch (err) {
     if (isUniqueViolation(err, 'slug')) return saveError('SLUG_TAKEN' satisfies ContentErrorCode);
     throw err;
+  }
+
+  revalidatePath('/', 'layout');
+  return saveOk();
+}
+
+/**
+ * De foto van deze pagina: ze verschijnt als thumbnail op haar kaart op de
+ * categoriepagina (`/info`, ...). Staat bewust apart van de inhoud en van de
+ * instellingen: een foto vervangen is één handeling en hoort de markdown niet
+ * mee op te slaan.
+ *
+ * Rechten volgen de inhoud (`canEditPageContent`), niet `pages.manage`: wie de
+ * tekst van een pagina schrijft, kiest ook de foto erbij.
+ */
+export async function savePageImageAction(
+  _prev: SaveState,
+  formData: FormData
+): Promise<SaveState> {
+  const session = await requireSession();
+  const id = formData.get('id');
+  const image = readImageField(formData);
+
+  if (typeof id !== 'string' || !id || image.kind === 'invalid') {
+    return saveError('INVALID_INPUT' satisfies ContentErrorCode);
+  }
+
+  const page = await prisma.page.findUnique({
+    where: { id },
+    select: { imageKey: true, editorRoles: { select: { roleId: true } } },
+  });
+  if (!page) return saveError('INVALID_INPUT' satisfies ContentErrorCode);
+  if (!canEditPageContent(session, page)) throw new Error('FORBIDDEN');
+
+  const imageKey = resolveImageKey(image, page.imageKey);
+
+  await prisma.page.update({ where: { id }, data: { imageKey } });
+
+  // De vervangen foto uit storage halen; faalt dat, dan blijft de
+  // databasewijziging staan en hebben we hoogstens een wees in de bucket.
+  if (page.imageKey && page.imageKey !== imageKey) {
+    try {
+      await deleteObject(page.imageKey);
+    } catch {
+      /* opruimen mag de opslag niet doen mislukken */
+    }
   }
 
   revalidatePath('/', 'layout');

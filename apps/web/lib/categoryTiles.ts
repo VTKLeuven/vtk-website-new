@@ -26,6 +26,12 @@ export type CategoryTile = {
   /** Enkel pagina's hebben een korte beschrijving; menu-items niet. */
   excerptNl: string | null;
   excerptEn: string | null;
+  /**
+   * Storage-key van de foto op de kaart. Enkel pagina's kunnen er een hebben:
+   * een menu-item is geen pagina en heeft dus niets om een foto aan te hangen.
+   * Zonder foto toont de kaart het gestreepte placeholder-patroon.
+   */
+  imageKey: string | null;
 };
 
 type TilePage = {
@@ -35,6 +41,7 @@ type TilePage = {
   titleEn: string | null;
   excerptNl: string | null;
   excerptEn: string | null;
+  imageKey: string | null;
 };
 
 type TileLink = {
@@ -58,6 +65,7 @@ export function categoryTiles(tab: {
       external: false,
       excerptNl: page.excerptNl,
       excerptEn: page.excerptEn,
+      imageKey: page.imageKey,
     })),
     ...tab.links.map((link) => ({
       key: `link:${link.id}`,
@@ -67,6 +75,7 @@ export function categoryTiles(tab: {
       external: isExternalUrl(link.url),
       excerptNl: null,
       excerptEn: null,
+      imageKey: null,
     })),
   ];
 }

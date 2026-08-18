@@ -704,6 +704,122 @@
   padding: 0;
 }
 
+/* Categoriepagina (`/info`, ...): elke pagina is een brede kaart met haar eigen
+   foto als vierkant links en de tekst rechts. Bewust geen `.vtk-card-grid` met
+   een fotokop erboven: een categorie telt makkelijk tien items, en in een lijst
+   valt een pagina zonder foto ook nauwelijks op. Menu-items (piano,
+   uitleendienst) horen hier tussen en hebben nooit een foto; hun thumbnail
+   blijft het gestreepte patroon. */
+.vtk-tile-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(420px, 100%), 1fr));
+  gap: 18px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+/* De kaart zit in een <li> met een link eromheen; beide moeten meerekken,
+   anders volgt de kaart de rijhoogte van het raster niet en staan twee kaarten
+   naast elkaar ongelijk. */
+.vtk-tile-grid > li {
+  display: flex;
+}
+
+.vtk-tile-grid > li > a {
+  flex: 1;
+  min-width: 0;
+}
+
+.vtk-tile {
+  display: grid;
+  grid-template-columns: 148px minmax(0, 1fr);
+  align-items: stretch;
+  height: 100%;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: var(--surface);
+  transition:
+    transform 180ms ease,
+    border-color 180ms ease;
+}
+
+.vtk-tile:hover {
+  transform: translateY(-2px);
+  border-color: var(--line-2);
+}
+
+/* De foto zit in een `position: relative` blok omdat `next/image` met `fill`
+   absoluut positioneert; zonder dat vult ze de hele kaart. */
+.vtk-tile-media {
+  position: relative;
+  min-height: 128px;
+  overflow: hidden;
+  border-right: 1px solid var(--line);
+  background: repeating-linear-gradient(-45deg, var(--paper-2) 0 8px, var(--paper) 8px 16px);
+}
+
+.vtk-tile-media img {
+  object-fit: cover;
+}
+
+/* Lichte navy scrim, zoals op de fotokoppen van de aanbod-kaarten. Zwakker dan
+   daar: op een thumbnail van 148px maakt een zware scrim de foto enkel modderig.
+   Zonder foto blijft het patroon onaangeroerd. */
+.vtk-tile-media.has-photo::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(115deg, rgba(10, 15, 31, 0.28) 0%, rgba(14, 26, 54, 0) 70%);
+}
+
+.vtk-tile-body {
+  display: flex;
+  flex-direction: column;
+  padding: 18px 22px;
+}
+
+.vtk-tile-body h2 {
+  margin: 0;
+  color: var(--ink);
+  font-size: 20px;
+  line-height: 1.15;
+  letter-spacing: -0.02em;
+  font-weight: 600;
+}
+
+.vtk-tile-body p {
+  margin: 8px 0 0;
+  color: var(--body);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.vtk-tile-cta {
+  margin-top: auto;
+  padding-top: 16px;
+  color: var(--ink);
+  font-size: 14px;
+  font-weight: 500;
+}
+
+/* Op een telefoon staat er maar één kaart per rij en wordt de thumbnail
+   smaller; anders blijft er geen zinnige tekstkolom over. */
+@media (max-width: 520px) {
+  .vtk-tile {
+    grid-template-columns: 104px minmax(0, 1fr);
+  }
+
+  .vtk-tile-media {
+    min-height: 104px;
+  }
+
+  .vtk-tile-body {
+    padding: 14px 16px;
+  }
+}
+
 .vtk-link {
   color: var(--navy);
   font-weight: 500;

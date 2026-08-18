@@ -830,6 +830,12 @@ model Page {
   contentMdEn     String?
   excerptNl       String?
   excerptEn       String?
+  // Foto op de kaart van deze pagina op de categoriepagina (`/info`, ...),
+  // uploadbaar in de pagina-editor. Zelfde soort veld als `HeaderTab.imageKey`:
+  // een storage-key, geen URL. Zonder foto toont de kaart het gestreepte
+  // placeholder-patroon; menu-items (`HeaderTabLink`) hebben geen pagina en dus
+  // nooit een foto.
+  imageKey        String?
   // Optionele knop naast de titel, dezelfde velden als op HeaderTab. Voor een
   // pagina die een aparte app beschrijft (Uitleendienst -> logistiek, Shiften ->
   // de shiftenlijst) hoort die app één klik ver te staan en niet ergens

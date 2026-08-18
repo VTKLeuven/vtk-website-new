@@ -6,7 +6,8 @@ import { Card, Input, Label } from "@vtk/ui";
 import { getDictionary, type Locale } from "@vtk/i18n";
 import { MarkdownEditor } from "@/components/editor/MarkdownEditor";
 import { SaveForm } from "@/components/ui/SaveForm";
-import { savePageContentAction } from "@/app/actions/pages";
+import { StorageImageField } from "@/components/admin/StorageImageField";
+import { savePageContentAction, savePageImageAction } from "@/app/actions/pages";
 import { saveErrorMessages } from "@/lib/saveMessages";
 import { AssetList } from "../../inhoud/AssetList";
 import { FileUploader } from "../../inhoud/FileUploader";
@@ -19,6 +20,8 @@ type EditorPage = {
   titleNl: string;
   titleEn: string | null;
   category: { slug: string; label: string } | null;
+  /** Foto op de kaart van deze pagina op de categoriepagina. */
+  imageKey: string | null;
   published: boolean;
   needsYearlyEdit: boolean;
   needsReview: boolean;
@@ -58,6 +61,15 @@ export function PageContentEditor({
   const dict = getDictionary(locale);
   const uid = useId();
   const base = nl ? "" : "/en";
+
+  // Waar de kaart met deze foto komt te staan. Zonder categorie hangt de pagina
+  // nergens onder en verschijnt ze op geen enkele categoriepagina; dat is het
+  // zeggen waard voor je iemand een foto laat uploaden.
+  const categoryLabel = page.category
+    ? `/${page.category.slug}`
+    : nl
+      ? "de categoriepagina (deze pagina hangt nog onder geen enkele categorie)"
+      : "the category page (this page is not under any category yet)";
 
   const [lang, setLang] = useState<"nl" | "en">("nl");
   const [contentNl, setContentNl] = useState(initialNl);
@@ -161,6 +173,33 @@ export function PageContentEditor({
                 : "Leave empty to publish no English version; the site falls back to Dutch."}
             </p>
           </div>
+        </SaveForm>
+      </Card>
+
+      <Card className="p-5">
+        <h2 className="mb-1 text-sm font-semibold text-vtk-ink">
+          {nl ? "Foto op de categoriepagina" : "Photo on the category page"}
+        </h2>
+        <p className="mb-4 text-xs text-[#5c667f]">
+          {nl
+            ? `Deze foto staat naast de titel van deze pagina in de lijst op ${categoryLabel}. Zonder foto toont de kaart een gestreept patroon.`
+            : `This photo sits next to this page's title in the list on ${categoryLabel}. Without one, the card shows a striped pattern.`}
+        </p>
+        <SaveForm
+          action={savePageImageAction}
+          submitLabel={dict.admin.save}
+          savingLabel={dict.common.saving}
+          savedMessage={dict.common.saved}
+          errorMessages={saveErrorMessages(locale)}
+          fallbackErrorMessage={dict.common.saveError}
+        >
+          <input type="hidden" name="id" value={page.id} />
+          <StorageImageField
+            defaultKey={page.imageKey}
+            locale={locale}
+            label={nl ? "Kaartfoto" : "Card photo"}
+            srContext={page.titleNl}
+          />
         </SaveForm>
       </Card>
 
