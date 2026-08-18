@@ -1,3 +1,4 @@
+import Link from "next/link";
 import type { Locale } from "@vtk/i18n";
 import type { FieldValues } from "@/lib/frontpage/fields";
 
@@ -50,4 +51,39 @@ export function ctaFrom(
   if (/^https?:\/\//.test(url)) return { label, href: url, external: true };
   const path = url.startsWith("/") ? url : `/${url}`;
   return { label, href: `${base}${path}`, external: false };
+}
+
+/**
+ * One button, rendered the same way by every front page.
+ *
+ * Shared rather than repeated, because repeating it is how the front pages came
+ * to disagree: two of them sent an external URL through a plain `<a>` while the
+ * default handed everything to `<Link>`, which is meant for routes inside this
+ * app. Now that any of these links is admin-editable, whichever component
+ * someone copies next would have inherited whichever half they copied.
+ *
+ * No `target="_blank"`: the homepage's own external CTAs (the VTK Career
+ * buttons) stay in the tab, and a hero button is a main route through the site,
+ * not a footnote.
+ */
+export function Cta({
+  cta,
+  className,
+}: {
+  cta: { label: string; href: string; external: boolean } | null;
+  className: string;
+}) {
+  if (!cta) return null;
+  if (cta.external) {
+    return (
+      <a href={cta.href} className={className}>
+        {cta.label}
+      </a>
+    );
+  }
+  return (
+    <Link href={cta.href} className={className}>
+      {cta.label}
+    </Link>
+  );
 }

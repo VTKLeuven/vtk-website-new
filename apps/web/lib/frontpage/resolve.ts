@@ -40,16 +40,52 @@ export function frontpageStatus(
  * A row pointing at a layout that is no longer in the registry is ignored rather
  * than fatal: deleting a component should not take the homepage down with it.
  */
-export async function resolveFrontpage(now = new Date()): Promise<ResolvedFrontpage> {
-  const rows = await prisma.frontpage.findMany({
-    orderBy: [{ startsAt: "desc" }, { updatedAt: "desc" }],
-  });
+/** The bare minimum `pickActiveTakeover` needs, so the admin can pass its rows too. */
+export type FrontpageRow = {
+  layout: string;
+  startsAt: Date | null;
+  endsAt: Date | null;
+  active: boolean;
+  createdAt: Date;
+};
 
-  const takeover = rows.find((row) => {
-    if (row.layout === DEFAULT_FRONTPAGE_ID) return false;
-    if (!getFrontpageModule(row.layout)) return false;
-    return frontpageStatus(row, now) === "live";
-  });
+/**
+ * Which takeover is on screen, or `null` when the default is.
+ *
+ * The one place that decides this. It used to be decided twice, once here for
+ * the homepage and once in the admin to draw the "on the site right now" badge,
+ * and the two disagreed: this side ordered in the database, where Postgres puts
+ * NULL *first* on `ORDER BY ... DESC`, so a front page switched on by hand with
+ * no window beat a scheduled one; the admin mapped that same NULL to 0 and
+ * sorted it last. The homepage then showed one page while the admin pointed at
+ * another. Two implementations of one rule is the actual bug; this function is
+ * the fix.
+ *
+ * The tie-break is `startsAt ?? createdAt`, not `updatedAt`: editing a field
+ * should never quietly change which front page wins. A row with no window is
+ * therefore ranked by when it was made, which puts it below anything actively
+ * scheduled for today.
+ */
+export function pickActiveTakeover<T extends FrontpageRow>(rows: T[], now: Date): T | null {
+  const live = rows.filter(
+    (row) =>
+      row.layout !== DEFAULT_FRONTPAGE_ID &&
+      getFrontpageModule(row.layout) !== null &&
+      frontpageStatus(row, now) === "live",
+  );
+  if (live.length === 0) return null;
+  return live
+    .slice()
+    .sort(
+      (a, b) =>
+        (b.startsAt ?? b.createdAt).getTime() - (a.startsAt ?? a.createdAt).getTime(),
+    )[0];
+}
+
+export async function resolveFrontpage(now = new Date()): Promise<ResolvedFrontpage> {
+  const rows = await prisma.frontpage.findMany();
+
+  const takeover = pickActiveTakeover(rows, now);
 
   const chosen = takeover ?? rows.find((row) => row.layout === DEFAULT_FRONTPAGE_ID);
   const layoutModule =

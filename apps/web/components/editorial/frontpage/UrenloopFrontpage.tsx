@@ -1,7 +1,6 @@
-import Link from "next/link";
 import { countdownParts } from "@/lib/countdown";
 import { pickField } from "@/lib/frontpage/fields";
-import { ctaFrom, type FrontpageProps } from "./context";
+import { Cta, ctaFrom, type FrontpageProps } from "./context";
 import { Countdown } from "./Countdown";
 
 /**
@@ -100,28 +99,8 @@ export function UrenloopFrontpage({ values, locale, base, now }: FrontpageProps)
 
         {primary || secondary ? (
           <div className="hero-cta">
-            {primary ? (
-              primary.external ? (
-                <a href={primary.href} className="btn btn-primary arrow">
-                  {primary.label}
-                </a>
-              ) : (
-                <Link href={primary.href} className="btn btn-primary arrow">
-                  {primary.label}
-                </Link>
-              )
-            ) : null}
-            {secondary ? (
-              secondary.external ? (
-                <a href={secondary.href} className="btn btn-ghost">
-                  {secondary.label}
-                </a>
-              ) : (
-                <Link href={secondary.href} className="btn btn-ghost">
-                  {secondary.label}
-                </Link>
-              )
-            ) : null}
+            <Cta cta={primary} className="btn btn-primary arrow" />
+            <Cta cta={secondary} className="btn btn-ghost" />
           </div>
         ) : null}
       </div>

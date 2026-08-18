@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { pick } from "@vtk/i18n";
 import { pickField } from "@/lib/frontpage/fields";
-import { ctaFrom, type FrontpageProps } from "./context";
+import { Cta, ctaFrom, type FrontpageProps } from "./context";
 
 /**
  * The regular front page: copy on the left, the agenda card on the right.
@@ -97,16 +97,8 @@ export function DefaultFrontpage({
         </h1>
         <p className="hero-sub">{subtitle}</p>
         <div className="hero-cta">
-          {primary ? (
-            <Link href={primary.href} className="btn btn-primary arrow">
-              {primary.label}
-            </Link>
-          ) : null}
-          {secondary ? (
-            <Link href={secondary.href} className="btn btn-ghost">
-              {secondary.label}
-            </Link>
-          ) : null}
+          <Cta cta={primary} className="btn btn-primary arrow" />
+          <Cta cta={secondary} className="btn btn-ghost" />
         </div>
         <div className="hero-meta">
           <div className="meta">

@@ -118,14 +118,18 @@ export async function saveFrontpageAction(
 
 /** Switch a front page on or off without opening its form. */
 export async function setFrontpageActiveAction(formData: FormData): Promise<void> {
-  await requirePermission("home.edit");
+  const session = await requirePermission("home.edit");
   const layout = formData.get("layout");
   if (typeof layout !== "string" || layout === DEFAULT_FRONTPAGE_ID) return;
   if (!getFrontpageModule(layout)) return;
+  const active = formData.get("active") === "1";
+  // Attributed like a save. This button is the one that actually changes what
+  // the site shows, so "who put the jobfair live, and when" has to be
+  // answerable from this row alone.
   await prisma.frontpage.upsert({
     where: { layout },
-    update: { active: formData.get("active") === "1" },
-    create: { layout, values: {}, active: formData.get("active") === "1" },
+    update: { active, updatedById: session.user.id },
+    create: { layout, values: {}, active, updatedById: session.user.id },
   });
   revalidate();
 }

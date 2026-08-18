@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { FRONTPAGE_MODULES, getFrontpageModule } from '@/lib/frontpage/registry';
 import { pickField, readFieldValues } from '@/lib/frontpage/fields';
+import { pickActiveTakeover } from '@/lib/frontpage/resolve';
 
 /**
  * The admin form posts a front page's own fields under `field.<name>`, next to
@@ -83,5 +84,51 @@ describe('pickField', () => {
 
   it('geeft niets terug wanneer beide talen leeg zijn', () => {
     expect(pickField({}, 'title', 'nl')).toBeUndefined();
+  });
+});
+
+/**
+ * De keuze welke frontpage live staat, wordt op één plek gemaakt
+ * (`pickActiveTakeover`). Dat was ooit twee keer geïmplementeerd: de homepage
+ * sorteerde in de database, waar Postgres bij `ORDER BY ... DESC` NULL vóóraan
+ * zet, en het beheerscherm mapte diezelfde NULL op 0 en zette hem achteraan. Een
+ * handmatig aangezette frontpage zonder venster won dan op de site, terwijl het
+ * beheer bij de geplande zei dat die live stond.
+ */
+describe('pickActiveTakeover', () => {
+  const row = (over: Partial<Parameters<typeof pickActiveTakeover>[0][number]>) => ({
+    layout: 'urenloop',
+    startsAt: null as Date | null,
+    endsAt: null as Date | null,
+    active: true,
+    createdAt: new Date('2026-01-01T00:00:00Z'),
+    ...over,
+  });
+  const now = new Date('2026-10-21T21:00:00Z');
+
+  it('laat een geplande frontpage winnen van een handmatig aangezette zonder venster', () => {
+    const scheduled = row({ layout: 'jobfair', startsAt: new Date('2026-10-21T20:00:00Z') });
+    const manual = row({ layout: 'urenloop', startsAt: null });
+    // Beide volgordes moeten hetzelfde resultaat geven; anders bepaalt de
+    // databasevolgorde de uitkomst, en dat was precies de fout.
+    expect(pickActiveTakeover([manual, scheduled], now)?.layout).toBe('jobfair');
+    expect(pickActiveTakeover([scheduled, manual], now)?.layout).toBe('jobfair');
+  });
+
+  it('kiest bij twee geplande de laatst gestarte', () => {
+    const early = row({ layout: 'urenloop', startsAt: new Date('2026-10-01T00:00:00Z') });
+    const late = row({ layout: 'jobfair', startsAt: new Date('2026-10-20T00:00:00Z') });
+    expect(pickActiveTakeover([early, late], now)?.layout).toBe('jobfair');
+  });
+
+  it('negeert wat niet live is', () => {
+    expect(pickActiveTakeover([row({ active: false })], now)).toBeNull();
+    expect(pickActiveTakeover([row({ endsAt: new Date('2026-10-01T00:00:00Z') })], now)).toBeNull();
+    expect(pickActiveTakeover([row({ startsAt: new Date('2026-12-01T00:00:00Z') })], now)).toBeNull();
+  });
+
+  it('negeert de standaard en een layout die niet meer bestaat', () => {
+    expect(pickActiveTakeover([row({ layout: 'default' })], now)).toBeNull();
+    expect(pickActiveTakeover([row({ layout: 'weggehaald' })], now)).toBeNull();
   });
 });

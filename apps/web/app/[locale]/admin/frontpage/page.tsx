@@ -9,7 +9,7 @@ import {
   FRONTPAGE_MODULES,
   getFrontpageModule,
 } from "@/lib/frontpage/registry";
-import { frontpageStatus } from "@/lib/frontpage/resolve";
+import { frontpageStatus, pickActiveTakeover } from "@/lib/frontpage/resolve";
 import { utcToLocalDateTime } from "@/lib/ticketing/time";
 import { FrontpageEditor, type FrontpageCard } from "./FrontpageEditor";
 
@@ -37,15 +37,9 @@ export default async function AdminFrontpage({
     minute: "2-digit",
   });
 
-  // Same rule as the homepage: the most recently started live takeover wins, and
-  // the default steps in when there is none. Computed here too so the admin can
-  // point at the one a visitor actually sees, instead of showing three cards that
-  // all claim to be active.
-  const liveTakeover = FRONTPAGE_MODULES.filter((m) => m.id !== DEFAULT_FRONTPAGE_ID)
-    .map((m) => byLayout.get(m.id))
-    .filter((row) => row && frontpageStatus(row, now) === "live")
-    .sort((a, b) => (b!.startsAt?.getTime() ?? 0) - (a!.startsAt?.getTime() ?? 0))[0];
-  const showingLayout = liveTakeover?.layout ?? DEFAULT_FRONTPAGE_ID;
+  // Exactly the rule the homepage uses, from the same function, so the badge
+  // below can never point at a different page than the one a visitor sees.
+  const showingLayout = pickActiveTakeover(rows, now)?.layout ?? DEFAULT_FRONTPAGE_ID;
 
   const cards: FrontpageCard[] = FRONTPAGE_MODULES.map((module) => {
     const row = byLayout.get(module.id);

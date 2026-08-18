@@ -1,8 +1,7 @@
-import Link from "next/link";
 import { pickField } from "@/lib/frontpage/fields";
 import { PartnerLogo } from "@/components/site/PartnerLogo";
 import { publicUrl } from "@/lib/storage";
-import { ctaFrom, type FrontpageProps } from "./context";
+import { Cta, ctaFrom, type FrontpageProps } from "./context";
 
 /**
  * The jobfair front page.
@@ -68,28 +67,8 @@ export function JobfairFrontpage({ values, locale, base, partners }: FrontpagePr
 
         {register || list ? (
           <div className="hero-cta">
-            {register ? (
-              register.external ? (
-                <a href={register.href} className="btn btn-primary arrow">
-                  {register.label}
-                </a>
-              ) : (
-                <Link href={register.href} className="btn btn-primary arrow">
-                  {register.label}
-                </Link>
-              )
-            ) : null}
-            {list ? (
-              list.external ? (
-                <a href={list.href} className="btn btn-ghost">
-                  {list.label}
-                </a>
-              ) : (
-                <Link href={list.href} className="btn btn-ghost">
-                  {list.label}
-                </Link>
-              )
-            ) : null}
+            <Cta cta={register} className="btn btn-primary arrow" />
+            <Cta cta={list} className="btn btn-ghost" />
           </div>
         ) : null}
       </div>
