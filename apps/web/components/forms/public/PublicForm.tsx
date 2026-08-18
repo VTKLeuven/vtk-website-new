@@ -8,6 +8,7 @@ import { FormFieldBlock } from "@/components/forms/FormFieldBlock";
 import type { PublicFormField } from "@/components/forms/FormFieldInput";
 import { FormFileField, type UploadedFile } from "./FormFileField";
 import { submitFormAction } from "@/app/actions/formSubmission";
+import { trackFormSubmitted } from "@/lib/analytics-client";
 import { visibleFieldIds, type AnswerValue, type VisibilityCondition } from "@/lib/forms/visibility";
 import { steps as branchSteps, type BranchOption, type BranchSection } from "@/lib/forms/branching";
 import { DEFAULT_FILE_MAX_FILES } from "@/lib/forms/schema";
@@ -242,6 +243,7 @@ export function PublicForm({
       if (result.duplicate) flags.set("dubbel", "1");
       if (result.waitlisted) flags.set("wachtlijst", "1");
       const query = flags.toString();
+      trackFormSubmitted({ slug });
       const target = `${nl ? "" : "/en"}/formulieren/${slug}/bedankt${query ? `?${query}` : ""}`;
       router.push(target);
     });

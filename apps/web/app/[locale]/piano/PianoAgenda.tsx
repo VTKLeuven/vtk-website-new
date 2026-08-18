@@ -5,6 +5,7 @@ import { getDictionary, type Locale } from "@vtk/i18n";
 import { useToast } from "@/components/ui/toast";
 import { SAVE_IDLE } from "@/lib/saveState";
 import { reservePianoSlotAction } from "@/app/actions/piano";
+import { trackPianoReservation } from "@/lib/analytics-client";
 
 export type SlotState = "free" | "taken" | "mine" | "past";
 
@@ -96,6 +97,7 @@ function SlotButton({
       const result = await reservePianoSlotAction(SAVE_IDLE, formData);
       if (result.status === "success") {
         showToast({ message: t.toast.reserved, variant: "success" });
+        trackPianoReservation();
       } else if (result.status === "error") {
         const messages = t.error as Record<string, string>;
         showToast({

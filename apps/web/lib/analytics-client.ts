@@ -6,13 +6,14 @@ import {
   CHECKOUT_START_EVENT,
   EVENT_VIEW_EVENT,
   FACE_SEARCH_EVENT,
-  MAGAZINE_DOWNLOAD_EVENT,
-  MAGAZINE_NEW_TAB_EVENT,
-  MAGAZINE_VIEW_EVENT,
+  FORM_SUBMITTED_EVENT,
   PHOTO_DOWNLOAD_EVENT,
+  PIANO_RESERVATION_EVENT,
   SEARCH_EMPTY_EVENT,
+  SEARCH_QUERY_EVENT,
   SHIFT_SIGNUP_EVENT,
   TICKET_PURCHASED_EVENT,
+  magazineEventName,
   magazineViewTitle,
   magazineViewUrl,
 } from "@/lib/analytics";
@@ -36,7 +37,7 @@ import {
  */
 type UmamiTracker = {
   track: {
-    (payload: (props: Record<string, unknown>) => Record<string, unknown>): void;
+    (props: (props: Record<string, unknown>) => Record<string, unknown>): void;
     (eventName: string, eventData?: Record<string, unknown>): void;
   };
 };
@@ -54,7 +55,7 @@ export type TrackedIssue = {
   issueLabel: string;
 };
 
-/** Een geopend nummer: zendt zowel een virtuele paginaweergave als een custom event. */
+/** Een geopend nummer: zendt zowel een virtuele paginaweergave als een custom event (bakske-bekeken / irreel-bekeken). */
 export function trackMagazineView(issue: TrackedIssue): void {
   const tr = tracker();
   if (!tr) return;
@@ -64,20 +65,20 @@ export function trackMagazineView(issue: TrackedIssue): void {
     url: magazineViewUrl(issue),
     title: magazineViewTitle(issue),
   }));
-  // 2. Expliciet Umami Event voor rapportage in het Umami Dashboard
-  tr.track(MAGAZINE_VIEW_EVENT, {
+  // 2. Expliciet Umami Event met specifiek publicatietype (bakske-bekeken / irreel-bekeken)
+  tr.track(magazineEventName(issue.kind, "bekeken"), {
     ...magazineEventData(issue),
     titel: magazineViewTitle(issue),
   });
 }
 
-/** Downloaden en openen in een nieuw tabblad: wel gemeten, geen paginaweergave. */
+/** Downloaden en openen in een nieuw tabblad: wel gemeten met specifiek event, geen paginaweergave. */
 export function trackMagazineDownload(issue: TrackedIssue): void {
-  tracker()?.track(MAGAZINE_DOWNLOAD_EVENT, magazineEventData(issue));
+  tracker()?.track(magazineEventName(issue.kind, "download"), magazineEventData(issue));
 }
 
 export function trackMagazineNewTab(issue: TrackedIssue): void {
-  tracker()?.track(MAGAZINE_NEW_TAB_EVENT, magazineEventData(issue));
+  tracker()?.track(magazineEventName(issue.kind, "nieuw-tabblad"), magazineEventData(issue));
 }
 
 /**
@@ -157,4 +158,21 @@ export function trackCalendarFeedCopy(): void {
 /** Inschrijving voor een shift (bijv. tappen/kassa). */
 export function trackShiftSignup(shiftDetails: { title: string }): void {
   tracker()?.track(SHIFT_SIGNUP_EVENT, { titel: shiftDetails.title });
+}
+
+/** Ingediend dynamisch formulier. */
+export function trackFormSubmitted(form: { slug: string }): void {
+  tracker()?.track(FORM_SUBMITTED_EVENT, { formulier: form.slug });
+}
+
+/** Reservatie gemaakt voor het pianolokaal. */
+export function trackPianoReservation(): void {
+  tracker()?.track(PIANO_RESERVATION_EVENT);
+}
+
+/** Zoekopdracht uitgevoerd in de zoekbalk. */
+export function trackSearchQuery(query: string): void {
+  const term = query.trim();
+  if (!term) return;
+  tracker()?.track(SEARCH_QUERY_EVENT, { zoekterm: term });
 }

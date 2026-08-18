@@ -42,7 +42,7 @@ describe('meten zonder toestemming', () => {
 });
 
 describe('meten met toestemming', () => {
-  it('stuurt een paginaweergave met het adres van het nummer en het magazine-bekeken event', () => {
+  it('stuurt een paginaweergave met het adres van het nummer en het bakske-bekeken event voor het bakske', () => {
     const track = vi.fn();
     vi.stubGlobal('window', { umami: { track } });
 
@@ -57,14 +57,33 @@ describe('meten met toestemming', () => {
       url: '/media/bakske/2025-2026-s2w6',
       title: "'t Bakske - Semester 2, week 6",
     });
-    // 2. Custom event
+    // 2. Custom event (bakske-bekeken)
     expect(track.mock.calls[1]).toEqual([
-      'magazine-bekeken',
+      'bakske-bekeken',
       { publicatie: 'bakske', nummer: 'bakske-2025-2026-s2w6', titel: "'t Bakske - Semester 2, week 6" },
     ]);
   });
 
-  it('stuurt downloaden en een nieuw tabblad als gebeurtenis, niet als paginaweergave', () => {
+  it('stuurt irreel-bekeken event voor Ir.Reëel nummers', () => {
+    const track = vi.fn();
+    vi.stubGlobal('window', { umami: { track } });
+
+    const irreelIssue = {
+      id: 'ir-reeel-2025-2026-ed1',
+      kind: 'ir-reeel',
+      publicationTitle: 'Ir.Reëel',
+      issueLabel: 'Editie 1',
+    };
+
+    trackMagazineView(irreelIssue);
+
+    expect(track.mock.calls[1]).toEqual([
+      'irreel-bekeken',
+      { publicatie: 'ir-reeel', nummer: 'ir-reeel-2025-2026-ed1', titel: 'Ir.Reëel - Editie 1' },
+    ]);
+  });
+
+  it('stuurt downloaden en een nieuw tabblad met de specifieke publicatienaam', () => {
     const track = vi.fn();
     vi.stubGlobal('window', { umami: { track } });
 
@@ -72,11 +91,11 @@ describe('meten met toestemming', () => {
     trackMagazineNewTab(issue);
 
     expect(track.mock.calls[0]).toEqual([
-      'magazine-download',
+      'bakske-download',
       { publicatie: 'bakske', nummer: 'bakske-2025-2026-s2w6' },
     ]);
     expect(track.mock.calls[1]).toEqual([
-      'magazine-nieuw-tabblad',
+      'bakske-nieuw-tabblad',
       { publicatie: 'bakske', nummer: 'bakske-2025-2026-s2w6' },
     ]);
   });

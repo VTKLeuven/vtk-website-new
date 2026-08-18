@@ -156,10 +156,14 @@ export function analyticsScript(input: {
  * handelingen dan lezen, en ze horen niet als extra paginaweergave mee te tellen.
  */
 
-/** De gebeurtenissen die het leesvenster stuurt, zoals ze in Umami heten. */
-export const MAGAZINE_VIEW_EVENT = "magazine-bekeken";
-export const MAGAZINE_DOWNLOAD_EVENT = "magazine-download";
-export const MAGAZINE_NEW_TAB_EVENT = "magazine-nieuw-tabblad";
+/** De gebeurtenissen die het leesvenster stuurt, met onderscheid per publicatie (bakske / irreel). */
+export function magazineEventName(
+  kind: string,
+  action: "bekeken" | "download" | "nieuw-tabblad"
+): string {
+  const cleanKind = kind === "ir-reeel" ? "irreel" : kind.toLowerCase().replace(/[^a-z0-9]/g, "");
+  return `${cleanKind}-${action}`;
+}
 
 /** Gebeurtenissen voor de fotogalerij en media. */
 export const ALBUM_VIEW_EVENT = "album-bekeken";
@@ -172,6 +176,13 @@ export const TICKET_PURCHASED_EVENT = "ticket-gekocht";
 export const CALENDAR_ADD_EVENT = "toevoegen-aan-agenda";
 export const CALENDAR_FEED_EVENT = "ical-feed-gekopieerd";
 export const SHIFT_SIGNUP_EVENT = "shift-ingeschreven";
+
+/** Gebeurtenissen voor formulieren, cudi, piano, zoekbalk en openingsuren. */
+export const FORM_SUBMITTED_EVENT = "formulier-ingediend";
+export const PIANO_RESERVATION_EVENT = "pianoreservatie-gemaakt";
+export const OPENINGSUREN_VIEW_EVENT = "openingsuren-bekeken";
+export const CUDI_WEBSHOP_EVENT = "cudi-webshop-geklikt";
+export const SEARCH_QUERY_EVENT = "zoekopdracht-uitgevoerd";
 
 /**
  * Het adres waaronder een nummer in Umami verschijnt, bijvoorbeeld
