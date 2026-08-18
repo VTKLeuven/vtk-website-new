@@ -157,8 +157,21 @@ export function analyticsScript(input: {
  */
 
 /** De gebeurtenissen die het leesvenster stuurt, zoals ze in Umami heten. */
+export const MAGAZINE_VIEW_EVENT = "magazine-bekeken";
 export const MAGAZINE_DOWNLOAD_EVENT = "magazine-download";
 export const MAGAZINE_NEW_TAB_EVENT = "magazine-nieuw-tabblad";
+
+/** Gebeurtenissen voor de fotogalerij en media. */
+export const ALBUM_VIEW_EVENT = "album-bekeken";
+export const PHOTO_DOWNLOAD_EVENT = "foto-download";
+export const FACE_SEARCH_EVENT = "gezichtsherkenning-gebruikt";
+
+/** Gebeurtenissen voor tickets, kalender en shiften. */
+export const EVENT_VIEW_EVENT = "evenement-bekeken";
+export const TICKET_PURCHASED_EVENT = "ticket-gekocht";
+export const CALENDAR_ADD_EVENT = "toevoegen-aan-agenda";
+export const CALENDAR_FEED_EVENT = "ical-feed-gekopieerd";
+export const SHIFT_SIGNUP_EVENT = "shift-ingeschreven";
 
 /**
  * Het adres waaronder een nummer in Umami verschijnt, bijvoorbeeld

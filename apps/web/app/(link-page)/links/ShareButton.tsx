@@ -32,6 +32,7 @@ export function ShareButton({ title }: { title: string }) {
       type="button"
       onClick={share}
       className="vtk-link-page-share"
+      data-umami-event="linkpagina-gedeeld"
       aria-label={copied ? "Link gekopieerd" : "Deze pagina delen"}
       title={copied ? "Link gekopieerd" : "Delen"}
     >

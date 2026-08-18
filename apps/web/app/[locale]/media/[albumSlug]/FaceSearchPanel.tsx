@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { trackFaceSearch } from "@/lib/analytics-client";
 import { AlbumViewer } from "./AlbumViewer";
 
 type Photo = {
@@ -256,12 +257,12 @@ export function FaceSearchPanel({
         setMessage(resultMessage(result, labels));
         if (result.status !== "processing") {
           setStatus(result.status);
-          setMatches(
-            (result.matches || []).map((match) => ({
-              ...match.photo,
-              matchScore: match.score,
-            })),
-          );
+          const foundMatches = (result.matches || []).map((match) => ({
+            ...match.photo,
+            matchScore: match.score,
+          }));
+          setMatches(foundMatches);
+          trackFaceSearch(foundMatches.length);
           return;
         }
 

@@ -42,15 +42,14 @@ describe('meten zonder toestemming', () => {
 });
 
 describe('meten met toestemming', () => {
-  it('stuurt een paginaweergave met het adres van het nummer', () => {
+  it('stuurt een paginaweergave met het adres van het nummer en het magazine-bekeken event', () => {
     const track = vi.fn();
     vi.stubGlobal('window', { umami: { track } });
 
     trackMagazineView(issue);
 
-    expect(track).toHaveBeenCalledTimes(1);
-    // Umami geeft de standaard eigenschappen door aan onze functie; die moeten
-    // bewaard blijven, anders raakt het website-id kwijt en telt niets mee.
+    expect(track).toHaveBeenCalledTimes(2);
+    // 1. Virtuele paginaweergave
     const build = track.mock.calls[0][0] as (props: Record<string, unknown>) => unknown;
     expect(build({ website: 'abc', referrer: '/media' })).toEqual({
       website: 'abc',
@@ -58,6 +57,11 @@ describe('meten met toestemming', () => {
       url: '/media/bakske/2025-2026-s2w6',
       title: "'t Bakske - Semester 2, week 6",
     });
+    // 2. Custom event
+    expect(track.mock.calls[1]).toEqual([
+      'magazine-bekeken',
+      { publicatie: 'bakske', nummer: 'bakske-2025-2026-s2w6', titel: "'t Bakske - Semester 2, week 6" },
+    ]);
   });
 
   it('stuurt downloaden en een nieuw tabblad als gebeurtenis, niet als paginaweergave', () => {

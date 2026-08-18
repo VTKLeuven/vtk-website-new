@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { ChevronDown, ChevronUp } from 'lucide-react';
 import { useState } from 'react';
+import { trackAlbumView } from '@/lib/analytics-client';
 
 const INITIAL_ALBUM_COUNT = 8;
 
@@ -35,7 +36,11 @@ export function AlbumGrid({ albums, labels }: { albums: AlbumItem[]; labels: Alb
       <ul id="media-photo-albums" className="vtk-immich-album-grid">
         {visibleAlbums.map((album) => (
           <li key={album.id}>
-            <Link href={album.href} className="vtk-immich-album-card">
+            <Link
+              href={album.href}
+              className="vtk-immich-album-card"
+              onClick={() => trackAlbumView(album)}
+            >
               <span className="vtk-immich-album-cover">
                 {album.thumbnailUrl ? (
                   // Immich Public Proxy levert deze duimnagel al op maat, op een

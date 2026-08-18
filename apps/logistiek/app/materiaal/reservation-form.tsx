@@ -20,6 +20,7 @@ import {
   type EventReservationValues,
   type RequesterOption,
 } from './event-fields';
+import { trackReservationSubmitted, trackTemplateLoaded } from '@/lib/analytics-client';
 
 export type ReservationFormInitial = {
   event: EventReservationValues;
@@ -126,6 +127,7 @@ export function ReservationForm({
   function applyTemplate(templateId: string) {
     const template = templates.find((entry) => entry.id === templateId);
     if (!template) return;
+    trackTemplateLoaded(template.name);
     setQuantities((current) => {
       const next = { ...current };
       for (const line of template.lines) {
@@ -266,6 +268,10 @@ export function ReservationForm({
         setError(result.error);
         return;
       }
+      trackReservationSubmitted({
+        type: event.requesterGroupCode ? 'WERKGROEP' : 'INTERN',
+        itemCount: totals.count,
+      });
       // Ingediend: het concept is geen concept meer.
       draft.clear();
     });

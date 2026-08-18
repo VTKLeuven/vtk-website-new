@@ -1,9 +1,18 @@
 import {
   AFTERMOVIE_EVENT,
+  ALBUM_VIEW_EVENT,
+  CALENDAR_ADD_EVENT,
+  CALENDAR_FEED_EVENT,
   CHECKOUT_START_EVENT,
+  EVENT_VIEW_EVENT,
+  FACE_SEARCH_EVENT,
   MAGAZINE_DOWNLOAD_EVENT,
   MAGAZINE_NEW_TAB_EVENT,
+  MAGAZINE_VIEW_EVENT,
+  PHOTO_DOWNLOAD_EVENT,
   SEARCH_EMPTY_EVENT,
+  SHIFT_SIGNUP_EVENT,
+  TICKET_PURCHASED_EVENT,
   magazineViewTitle,
   magazineViewUrl,
 } from "@/lib/analytics";
@@ -45,13 +54,21 @@ export type TrackedIssue = {
   issueLabel: string;
 };
 
-/** Een geopend nummer, als eigen paginaweergave. */
+/** Een geopend nummer: zendt zowel een virtuele paginaweergave als een custom event. */
 export function trackMagazineView(issue: TrackedIssue): void {
-  tracker()?.track((props) => ({
+  const tr = tracker();
+  if (!tr) return;
+  // 1. Virtuele paginaweergave voor de admin-statistieken op de site
+  tr.track((props) => ({
     ...props,
     url: magazineViewUrl(issue),
     title: magazineViewTitle(issue),
   }));
+  // 2. Expliciet Umami Event voor rapportage in het Umami Dashboard
+  tr.track(MAGAZINE_VIEW_EVENT, {
+    ...magazineEventData(issue),
+    titel: magazineViewTitle(issue),
+  });
 }
 
 /** Downloaden en openen in een nieuw tabblad: wel gemeten, geen paginaweergave. */
@@ -97,4 +114,47 @@ export function trackAftermovie(video: { id: string; title: string }): void {
  */
 export function trackCheckoutStart(event: { slug: string; title: string }): void {
   tracker()?.track(CHECKOUT_START_EVENT, { evenement: event.slug, titel: event.title });
+}
+
+/** Een geopend fotogalerij-album op /media. */
+export function trackAlbumView(album: { id: string; title: string }): void {
+  tracker()?.track(ALBUM_VIEW_EVENT, { album_id: album.id, titel: album.title });
+}
+
+/** Downloaden van een foto uit de galerij. */
+export function trackPhotoDownload(photo: { id: string; albumId?: string }): void {
+  tracker()?.track(PHOTO_DOWNLOAD_EVENT, { foto_id: photo.id, album_id: photo.albumId ?? "" });
+}
+
+/** Gebruik van de AI gezichtsherkenning in de fotogalerij. */
+export function trackFaceSearch(matchCount: number): void {
+  tracker()?.track(FACE_SEARCH_EVENT, { aantal_matches: String(matchCount) });
+}
+
+/** Bekijken van een ticket-evenement. */
+export function trackEventView(event: { slug: string; title: string }): void {
+  tracker()?.track(EVENT_VIEW_EVENT, { evenement: event.slug, titel: event.title });
+}
+
+/** Voltooide ticketbestelling (geen persoonsgegevens, enkel evenement en aantal). */
+export function trackTicketPurchased(details: { eventSlug: string; ticketCount: number }): void {
+  tracker()?.track(TICKET_PURCHASED_EVENT, {
+    evenement: details.eventSlug,
+    aantal_tickets: String(details.ticketCount),
+  });
+}
+
+/** Toevoegen van een activiteit aan een persoonlijke agenda (iCal / Google Calendar). */
+export function trackCalendarAdd(eventTitle: string): void {
+  tracker()?.track(CALENDAR_ADD_EVENT, { titel: eventTitle });
+}
+
+/** Kopiëren van de persoonlijke iCal kalenderfeed. */
+export function trackCalendarFeedCopy(): void {
+  tracker()?.track(CALENDAR_FEED_EVENT);
+}
+
+/** Inschrijving voor een shift (bijv. tappen/kassa). */
+export function trackShiftSignup(shiftDetails: { title: string }): void {
+  tracker()?.track(SHIFT_SIGNUP_EVENT, { titel: shiftDetails.title });
 }

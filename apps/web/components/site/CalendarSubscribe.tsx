@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { CheckIcon, CopyIcon } from "@/components/ui/icons";
+import { trackCalendarFeedCopy } from "@/lib/analytics-client";
 
 /**
  * Abonneerblok bij een kalender. Bewust abonneren en niet downloaden: een
@@ -41,6 +42,7 @@ export function CalendarSubscribe({
     try {
       await navigator.clipboard.writeText(feedUrl);
       setCopied(true);
+      trackCalendarFeedCopy();
     } catch {
       // Clipboard geweigerd (geen https, of de gebruiker blokkeert het): dan
       // selecteert hij de link zelf maar, geen reden om iets te laten crashen.

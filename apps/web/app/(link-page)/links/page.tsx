@@ -14,6 +14,7 @@ import {
   socialHref,
 } from "@/lib/link-page";
 import { DEFAULT_OG_IMAGE, siteUrl, truncateDescription } from "@/lib/seo";
+import { umamiEvent } from "@/lib/analytics";
 import { ShareButton } from "./ShareButton";
 
 const loadConfig = cache(async () => {
@@ -136,6 +137,7 @@ export default async function LinksPage() {
                     className="vtk-link-page-link"
                     target={external ? "_blank" : undefined}
                     rel={external ? "noopener noreferrer" : undefined}
+                    {...umamiEvent("linkpagina-knop-geklikt", { titel: link.title })}
                   >
                     <span className="vtk-link-page-link-label">{link.title}</span>
                     <ExternalLink aria-hidden="true" />

@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { trackPhotoDownload } from "@/lib/analytics-client";
 
 type Photo = {
   id: string;
@@ -101,6 +102,7 @@ export function AlbumViewer({ photos, labels }: { photos: Photo[]; labels: Label
               href={photo.downloadUrl}
               title={labels.downloadPhoto}
               aria-label={`${labels.downloadPhoto}: ${photo.title}`}
+              onClick={() => trackPhotoDownload(photo)}
             >
               <DownloadIcon />
             </a>
@@ -135,6 +137,7 @@ export function AlbumViewer({ photos, labels }: { photos: Photo[]; labels: Label
                 href={activePhoto.downloadUrl}
                 title={labels.downloadPhoto}
                 aria-label={`${labels.downloadPhoto}: ${activePhoto.title}`}
+                onClick={() => trackPhotoDownload(activePhoto)}
               >
                 <DownloadIcon />
               </a>
