@@ -422,6 +422,14 @@ const icons: Record<string, ReactNode> = {
       <path d="M17 5a8 8 0 0 1 0 14" />
     </Svg>
   ),
+  // frontpage: het bovenste blok van een pagina -> venster met een gevulde kop
+  frontpage: (
+    <Svg>
+      <rect x="3" y="4" width="18" height="16" rx="2" />
+      <path d="M3 10h18" />
+      <path d="M7 7h4" />
+    </Svg>
+  ),
   // home: huis
   home: (
     <Svg>

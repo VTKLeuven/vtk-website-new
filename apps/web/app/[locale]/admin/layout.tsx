@@ -59,6 +59,7 @@ const NAV: NavEntry[] = [
   ]),
   group('website', [
     item('home', '/home', { perm: 'home.edit' }),
+    item('frontpage', '/frontpage', { perm: 'home.edit' }),
     item('announcements', '/aankondigingen', { perm: 'home.edit' }),
     item('linkPage', '/linkpagina', { perm: 'home.edit' }),
     item('shortlinks', '/links', { perm: 'shortlinks.manage' }),

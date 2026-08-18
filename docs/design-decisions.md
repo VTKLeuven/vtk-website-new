@@ -1017,6 +1017,47 @@ onderste helft is een ontwerpkeuze, geen toeval:
   ze weg, dan volgt Career (navy) gewoon op Partners (paper), precies zoals de
   pagina eruitzag vóór deze feature.
 
+### De frontpage: het donkere blok bovenaan
+
+De **frontpage** is het bovenste deel van de homepage: de donkere zone met de
+titel, de knoppen, de kaart ernaast en de rij snelle links, allemaal op één foto
+(`.home-dark-zone`). De rest van de homepage staat daar los van, en wordt beheerd
+onder Admin → Homepagina. De frontpage zelf heeft één eigen scherm: Admin →
+Frontpage.
+
+**Een frontpage is een component, geen ingevuld sjabloon.** Elke frontpage in
+`apps/web/lib/frontpage/registry.ts` is een eigen ontwerp met eigen JSX en eigen
+CSS, vrij om er totaal anders uit te zien dan de andere. Dat is een bewuste
+keuze, en de tweede poging: de eerste versie was één generieke event-layout met
+velden die je invulde.
+
+- **Waarom dat niet werkte.** Een 24-urenloop-frontpage en een
+  jobfair-frontpage zijn niet dezelfde pagina met andere woorden. De ene wil een
+  aftelklok en rondetellers, de andere een muur van bedrijfslogo's. Door beide
+  door één titel/subtitel/aftelklok-schema te duwen, kreeg elk evenement dezelfde
+  vorm, en precies dat maakte de feature waardeloos.
+- **Waarom het mag.** VTK heeft een handvol evenementen per jaar die een
+  overname verdienen. Elk daarvan wordt één keer ontworpen en daarna jaarlijks
+  hergebruikt met nieuwe datums. Een component per evenement is dus goedkoop; de
+  abstractie eromheen was duurder dan het werk dat ze bespaarde.
+
+**Velden staan per frontpage, niet gedeeld.** Elke module declareert zelf welke
+velden ze aanbiedt (`fields` in het register) en het beheerscherm bouwt daar zijn
+formulier uit. Een veld toevoegen is één regel in het register; er is geen
+admin-werk aan. Zo hoeft niet elke tekstwijziging langs een deploy, zonder dat er
+opnieuw een gedeeld schema ontstaat.
+
+**De standaard is er ook een.** Ze staat in hetzelfde register met dezelfde
+soort velden, zodat "de frontpage wijzigen" overal hetzelfde betekent. Ze heeft
+geen venster en kan niet uitgezet worden: ze is wat er staat zodra geen enkele
+andere frontpage actief is.
+
+**Vensters, geen schakelaar.** Dezelfde reden als bij de aankondigingen: je zet
+de jobfair weken vooraf klaar, ze gaat vanzelf live en verdwijnt vanzelf. Staan
+er meerdere tegelijk klaar, dan wint de laatst gestarte; er is maar één
+frontpage. Een rij die naar een verwijderde module wijst, wordt genegeerd (de
+homepage valt terug op de standaard) en in het beheer als onbekend gemeld.
+
 ### Aftermovies op de homepage
 
 - Dezelfde `media.aftermovies`-instelling als de /media-pagina, te beheren via

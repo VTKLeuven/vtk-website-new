@@ -157,7 +157,11 @@ export async function proxy(request: NextRequest) {
     pathname === '/scan' ||
     pathname.startsWith('/scan/') ||
     pathname === '/links' ||
-    pathname === '/links/'
+    pathname === '/links/' ||
+    // De frontpage-voorbeelden in /admin/frontpage. Ze staan bewust buiten
+    // `[locale]` zodat er geen sitekop en geen adminnavigatie omheen komt; ze
+    // dragen hun taal zelf in het pad (/frontpage-preview/<locale>/<layout>).
+    pathname.startsWith('/frontpage-preview/')
   ) {
     const requestHeaders = new Headers(request.headers);
     requestHeaders.set('x-pathname', `/${DEFAULT_LOCALE}${pathname}`);

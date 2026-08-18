@@ -503,6 +503,7 @@ model User {
   pocRepresentative    PocRepresentative[]
   createdPages         Page[]                  @relation("PageCreatedBy")
   createdAnnouncements Announcement[]          @relation("AnnouncementCreatedBy")
+  updatedFrontpages    Frontpage[]             @relation("FrontpageUpdatedBy")
   createdEvents        CalendarEvent[]         @relation("EventCreatedBy")
   dashboardTiles       DashboardTile[]
   dashboardTilePrefs   UserDashboardTilePref[]
@@ -812,6 +813,54 @@ model Announcement {
 enum AnnouncementScope {
   HOME
   SITE
+}
+
+/**
+ * One configurable front page: the dark block at the top of the homepage.
+ *
+ * Which front pages exist is decided in code, not here. Each one is its own
+ * component with its own layout, free to look nothing like the others; a
+ * 24-urenloop page wants lap counts, a jobfair page wants a wall of company
+ * logos, and squeezing both into one shared template only produces the same page
+ * with different words. See `apps/web/lib/frontpage/registry.ts`.
+ *
+ * This table only carries what an admin may change without a deploy: which front
+ * page is live and when, plus the values for the fields that that particular
+ * component chose to expose. Hence `values` as JSON: every front page declares
+ * its own fields, so there is no shared set of columns to model. A row whose
+ * `layout` is no longer in the registry is ignored.
+ *
+ * One row per front page (`layout` is unique). Scheduling the same event again
+ * next year is a matter of moving its window, not of making a second row.
+ */
+model Frontpage {
+  id String @id @default(cuid())
+
+  /** Registry id of the component this row configures ("default", "urenloop"). */
+  layout String @unique
+
+  /**
+   * Field values, keyed by the field names that this layout declares. Stored as
+   * strings: an image holds a storage key, a moment holds an ISO timestamp.
+   */
+  values Json @default("{}")
+
+  /**
+   * Window in which this front page takes over. Both empty means it only shows
+   * when switched on by hand. The "default" layout ignores these: it is the
+   * fallback whenever nothing else is live.
+   */
+  startsAt DateTime?
+  endsAt   DateTime?
+  /** Off = never show, whatever the window says. */
+  active   Boolean   @default(false)
+
+  updatedById String?
+  updatedBy   User?    @relation("FrontpageUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([active, startsAt, endsAt])
 }
 
 model Page {

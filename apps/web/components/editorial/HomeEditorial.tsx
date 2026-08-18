@@ -1,8 +1,8 @@
 import Image from "next/image";
 import Link from "next/link";
+import type { CSSProperties } from "react";
 import { prisma } from "@vtk/db";
 import { pick, type Locale } from "@vtk/i18n";
-import { currentWorkingYear } from "@/lib/workingYear";
 import { getVisibleHeaderTabsForNav } from "@/lib/headerTabs";
 import { AANBOD_PHOTOS } from "@/lib/aanbodPhotos";
 import { getMediaContent } from "@/lib/media-content";
@@ -15,6 +15,9 @@ import { publicUrl } from "@/lib/storage";
 import { BUILTIN_DEFAULT_EVENT_IMAGE, DEFAULT_EVENT_IMAGE_SETTING } from "@/lib/defaultEventImage";
 import { PartnerLogo } from "@/components/site/PartnerLogo";
 import { audienceFilter, viewerAudiences } from "@/lib/calendar/audience";
+import { resolveFrontpage } from "@/lib/frontpage/resolve";
+import { frontpagePhoto } from "@/lib/frontpage/registry";
+import { Frontpage } from "@/components/editorial/frontpage";
 import { AftermovieGrid, type AftermovieGridItem } from "./AftermovieGrid";
 import {
   DUTCH_FULL_DAYS,
@@ -25,6 +28,7 @@ import {
 } from "./hoursUtils";
 
 import "@/app/design/vtk-home.css";
+import "@/app/design/vtk-frontpage.css";
 import {
   HOME_LINK_EVENT,
   OUTBOUND_EVENT,
@@ -60,33 +64,9 @@ type CareerSetting = {
  */
 const ELIXIR_NAME = "'t ElixIr";
 
-/** "2026-27" voor het werkingsjaar dat op 15 juli begint (zie @vtk/auth). */
-function workingYearLabel(d: Date): string {
-  const y = currentWorkingYear(d);
-  return `${y}-${String(y + 1).slice(-2)}`;
-}
-
-/**
- * Maandlabel bij een dag in de agenda ("sep"), met jaartal zodra de dag in een
- * ander kalenderjaar valt dan vandaag ("jan '27"), anders staat er enkel een
- * dagnummer en weet je niet welke maand bedoeld wordt.
- */
-function monthLabel(d: Date, now: Date, locale: Locale): string {
-  const month = d.toLocaleDateString(locale === "nl" ? "nl-BE" : "en-GB", { month: "short" }).replace(".", "");
-  return d.getFullYear() === now.getFullYear() ? month : `${month} '${String(d.getFullYear()).slice(-2)}`;
-}
-
 /** Gesloten-melding op een openingsurenkaart, met de naam van de dienst erin. */
 function closedLabel(name: string, nl: boolean): string {
   return nl ? `${name} is momenteel gesloten :(` : `${name} is currently closed :(`;
-}
-
-function dayKey(d: Date, locale: Locale): string {
-  return d.toLocaleDateString(locale === "nl" ? "nl-BE" : "en-GB", {
-    weekday: "long",
-    day: "2-digit",
-    month: "short",
-  });
 }
 
 function formatTime(d: Date, locale: Locale): string {
@@ -101,7 +81,17 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
   const now = new Date();
   const nl = locale === "nl";
 
-  const [settings, upcomingEvents, tabs, partners, media, session, cursusEntries, barStatus] = await Promise.all([
+  const [
+    settings,
+    upcomingEvents,
+    tabs,
+    partners,
+    media,
+    session,
+    cursusEntries,
+    barStatus,
+    frontpage,
+  ] = await Promise.all([
     prisma.setting.findMany({
       where: {
         key: {
@@ -142,6 +132,8 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
     // of één Setting-rij vlak na een herstart). De worker praat met Munisense,
     // niet deze render. Zie lib/elixir/status.ts.
     readBarStatus(now),
+    // Which front page is live, and its field values. See lib/frontpage/.
+    resolveFrontpage(now),
   ]);
 
   // Aftermovies: `media.aftermovies` is dezelfde instelling als op /media, te
@@ -201,6 +193,13 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
     publicUrl((map.get(DEFAULT_EVENT_IMAGE_SETTING) as { imageKey?: string | null } | undefined)?.imageKey) ??
     BUILTIN_DEFAULT_EVENT_IMAGE;
 
+  // The front page carries its own background photo as a field. It goes into a
+  // custom property instead of the stylesheet so swapping it is an upload rather
+  // than a deploy. The value is an /api/media/... path or a path in public/;
+  // neither can contain a quote, because storageKeyPath percent-encodes.
+  const heroPhoto = frontpagePhoto(frontpage.module, publicUrl(frontpage.values.photo));
+  const heroPhotoStyle = { "--home-hero-photo": `url("${heroPhoto}")` } as CSSProperties;
+
   const theoToday = theokot ? entryForDate(theokot.entries, now, locale) : undefined;
   const theoOpen = theoToday && isOpenAt(theoToday.hours, now);
   const curToday = cursusEntries ? entryForDate(cursusEntries, now, locale) : undefined;
@@ -233,18 +232,6 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
         ? "Gesloten"
         : "Closed",
   }));
-
-  const eventGroups = upcomingEvents.slice(0, 5).reduce<Array<{ key: string; date: Date; events: typeof upcomingEvents }>>(
-    (acc, event) => {
-      const date = new Date(event.start);
-      const key = dayKey(date, locale);
-      const found = acc.find((g) => g.key === key);
-      if (found) found.events.push(event);
-      else acc.push({ key, date, events: [event] });
-      return acc;
-    },
-    []
-  );
 
   const aanbodTabs = tabs.filter((t) => t.slug !== "").slice(0, 6);
   const quickLinks = [
@@ -326,134 +313,20 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
   return (
     <div className="vtk-design">
       {/* De hero-foto en scrim lopen door tot en met de quick links; de zone
-          draagt de achtergrond zodat beide secties op hetzelfde donker zitten. */}
-      <div className="home-dark-zone">
-        <section className="home-hero">
-          <div>
-            <div className="eyebrow">
-              <span className="dot" />
-              Vlaamse Technische Kring · KU Leuven
-            </div>
-            <h1>
-              {nl ? (
-                <>
-                  De thuis voor <span className="serif">ingenieurs</span>
-                  <br />
-                  in Leuven.
-                </>
-              ) : (
-                <>
-                  The home for <span className="serif">engineers</span>
-                  <br />
-                  in Leuven.
-                </>
-              )}
-            </h1>
-            <p className="hero-sub">
-              {nl
-                ? "Events, cursussen, career, broodjes en alles wat je dag op de campus praktischer maakt. Gerund door studenten, sinds 1920."
-                : "Events, courses, careers, sandwiches and everything that makes your day on campus more practical. Run by students, since 1920."}
-            </p>
-            <div className="hero-cta">
-              <Link href={`${base}/info`} className="btn btn-primary arrow">
-                {nl ? "Ontdek wat we doen" : "Discover what we do"}
-              </Link>
-              <Link href={`${base}/eerstejaars`} className="btn btn-ghost">
-                {nl ? "Eerstejaars? Start hier" : "First-year? Start here"}
-              </Link>
-            </div>
-            <div className="hero-meta">
-              <div className="meta">
-                <div className="k">{nl ? "Werkingsjaar" : "Working year"}</div>
-                <div className="v">{workingYearLabel(now)}</div>
-              </div>
-              <div className="meta">
-                <div className="k">{nl ? "Binnenkort" : "This week"}</div>
-                <div className="v">
-                  {upcomingEvents.length} {nl ? "events" : "events"}
-                </div>
-              </div>
-              <div className="meta">
-                <div className="k">{nl ? "Sinds" : "Since"}</div>
-                <div className="v">1920</div>
-              </div>
-            </div>
-          </div>
+          draagt de achtergrond zodat beide secties op hetzelfde donker zitten.
 
-          <aside className="hero-cal">
-            <div className="hero-cal-head">
-              <div>
-                <h3>{nl ? "Aankomende events" : "Upcoming events"}</h3>
-                <div className="sub">
-                  {upcomingEvents[0]
-                    ? `${dayKey(new Date(upcomingEvents[0].start), locale)} → ${dayKey(new Date(upcomingEvents[Math.min(upcomingEvents.length - 1, 4)].start), locale)}`
-                    : nl
-                      ? "Geen geplande events"
-                      : "No planned events"}
-                </div>
-              </div>
-              <Link href={`${base}/kalender`} className="all">
-                {nl ? "Volledige kalender" : "Full calendar"}
-              </Link>
-            </div>
-            <div className="hero-agenda">
-              {eventGroups.length === 0 ? (
-                <div className="hero-day">
-                  <div className="hero-day-label">
-                    <span className="num">—</span>
-                    <span className="dow">{nl ? "Geen data" : "No data"}</span>
-                  </div>
-                </div>
-              ) : (
-                eventGroups.map((group, groupIndex) => (
-                  <div className="hero-day" key={group.key}>
-                    <div className="hero-day-label">
-                      <span className="num">{String(group.date.getDate()).padStart(2, "0")}</span>
-                      <span className="mon">{monthLabel(group.date, now, locale)}</span>
-                      <span className="dow">
-                        {group.date.toLocaleDateString(locale === "nl" ? "nl-BE" : "en-GB", { weekday: "long" })}
-                      </span>
-                      {group.date.toDateString() === now.toDateString() ? (
-                        <span className="today">{nl ? "vandaag" : "today"}</span>
-                      ) : null}
-                    </div>
-                    {group.events.map((event, eventIndex) => {
-                      const eventDate = new Date(event.start);
-                      const content = (
-                        <>
-                          <div className="t">{formatTime(eventDate, locale)}</div>
-                          <div className="n">
-                            {groupIndex === 0 && eventIndex === 0 ? <span className="pin" /> : null}
-                            {pick(event.titleNl, event.titleEn, locale)}
-                            <small>
-                              {[event.location, pick(event.group.nameNl, event.group.nameEn, locale)]
-                                .filter(Boolean)
-                                .join(" · ")}
-                            </small>
-                          </div>
-                          {/* Eigen klasse: de globale `.arrow` plakt er via ::after
-                              een tweede pijl achter. */}
-                          <span className="ev-go" aria-hidden="true">
-                            →
-                          </span>
-                        </>
-                      );
-                      return (
-                        <Link
-                          key={event.id}
-                          href={`${base}/kalender/${event.id}`}
-                          className={`hero-ev${groupIndex === 0 && eventIndex === 0 ? " featured" : ""}`}
-                        >
-                          {content}
-                        </Link>
-                      );
-                    })}
-                  </div>
-                ))
-              )}
-            </div>
-          </aside>
-        </section>
+          Loopt er een campagne, dan neemt haar layout de hero over; de quick
+          links eronder blijven in beide gevallen staan. Zie lib/frontpage.ts. */}
+      <div className="home-dark-zone" style={heroPhotoStyle}>
+        <Frontpage
+          id={frontpage.module.id}
+          values={frontpage.values}
+          locale={locale}
+          base={base}
+          now={now}
+          upcomingEvents={upcomingEvents}
+          partners={partners}
+        />
 
         <section className="quick">
           <div className="quick-row">
