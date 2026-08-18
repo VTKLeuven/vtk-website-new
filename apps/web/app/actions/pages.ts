@@ -19,6 +19,21 @@ const SLUG_REGEX = /^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/;
 /** Leeg tiptap-document voor de legacy JSON-kolom van nieuwe pagina's. */
 const EMPTY_DOC = { type: 'doc', content: [{ type: 'paragraph' }] };
 
+/**
+ * Verwijdert objecten uit storage nadat hun rij weg is. Best-effort en bewust
+ * na de databasewijziging: faalt de bucket even, dan blijft de verwijdering
+ * geldig en houden we hoogstens een wees over. Andersom (eerst storage) zou een
+ * mislukte delete een pagina met kapotte bijlagen opleveren.
+ *
+ * Enkel voor keys die één rij *bezit*: een bijlage en een kaartfoto horen bij
+ * precies één pagina. Afbeeldingen die in de markdown geplakt zijn, staan hier
+ * bewust niet bij; die zijn enkel als URL in tekst bekend en kunnen evengoed in
+ * de inhoud van iets anders staan.
+ */
+async function deleteStoredObjects(keys: (string | null | undefined)[]): Promise<void> {
+  await Promise.allSettled(keys.filter((k): k is string => Boolean(k)).map((k) => deleteObject(k)));
+}
+
 /** `P2002` op een bepaald veld: de unieke constraint die Prisma noemt. */
 function isUniqueViolation(err: unknown, field: string): boolean {
   return (
@@ -144,12 +159,22 @@ export async function deletePageAction(_prev: SaveState, formData: FormData): Pr
 
   const page = await prisma.page.findUnique({
     where: { id },
-    select: { editorRoles: { select: { roleId: true } } },
+    select: {
+      imageKey: true,
+      assets: { select: { storageKey: true } },
+      editorRoles: { select: { roleId: true } },
+    },
   });
   if (!page) return saveError('INVALID_INPUT' satisfies ContentErrorCode);
   if (!canEditPageContent(session, page)) throw new Error('FORBIDDEN');
 
   await prisma.page.delete({ where: { id } });
+
+  // `PageAsset` cascadeert in de database, maar de bestanden zelf niet: zonder
+  // dit blijft elke PDF en elke kaartfoto van een verwijderde pagina voorgoed in
+  // de bucket staan.
+  await deleteStoredObjects([page.imageKey, ...page.assets.map((a) => a.storageKey)]);
+
   revalidatePath('/', 'layout');
   return saveOk();
 }
@@ -458,15 +483,8 @@ export async function savePageImageAction(
 
   await prisma.page.update({ where: { id }, data: { imageKey } });
 
-  // De vervangen foto uit storage halen; faalt dat, dan blijft de
-  // databasewijziging staan en hebben we hoogstens een wees in de bucket.
-  if (page.imageKey && page.imageKey !== imageKey) {
-    try {
-      await deleteObject(page.imageKey);
-    } catch {
-      /* opruimen mag de opslag niet doen mislukken */
-    }
-  }
+  // De vervangen foto uit storage halen.
+  if (page.imageKey && page.imageKey !== imageKey) await deleteStoredObjects([page.imageKey]);
 
   revalidatePath('/', 'layout');
   return saveOk();
@@ -521,10 +539,14 @@ export async function deletePageAssetAction(formData: FormData): Promise<void> {
   if (!id) return;
   // De toegangscheck hangt aan de pagina van de bijlage zelf, niet aan wat de
   // client als pageId meestuurt.
-  const asset = await prisma.pageAsset.findUnique({ where: { id }, select: { pageId: true } });
+  const asset = await prisma.pageAsset.findUnique({
+    where: { id },
+    select: { pageId: true, storageKey: true },
+  });
   if (!asset) return;
   await requirePageAssetAccess(asset.pageId);
   await prisma.pageAsset.delete({ where: { id } });
+  await deleteStoredObjects([asset.storageKey]);
   revalidatePath('/admin/inhoud');
   revalidatePath('/admin/paginas');
   revalidatePath('/', 'layout');
@@ -647,13 +669,7 @@ export async function deleteHeaderTabAction(
     select: { imageKey: true },
   });
   await prisma.headerTab.delete({ where: { id } });
-  if (existing?.imageKey) {
-    try {
-      await deleteObject(existing.imageKey);
-    } catch {
-      /* ignore */
-    }
-  }
+  await deleteStoredObjects([existing?.imageKey]);
   revalidatePath('/', 'layout');
   return saveOk();
 }
