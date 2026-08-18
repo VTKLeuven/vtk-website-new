@@ -65,6 +65,16 @@ const SETTING_ALLOWLIST = [
  */
 const SETTING_DENYLIST = [/^s3\./, /^sentry\./, /^door\./, /^brevo\./, /^fakscanner\./];
 
+/** "Eiffage Construction Belux" -> "eiffage-construction-belux". */
+export function partnerSlug(name: string): string {
+  return name
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
 function write(name: string, rows: unknown[]): void {
   const file = join(FIXTURE_DIR, `${name}.json`);
   // An empty table produces no file at all. The loader already treats an empty
@@ -143,9 +153,11 @@ async function main() {
           ctaLabelNl: tab.ctaLabelNl,
           ctaLabelEn: tab.ctaLabelEn,
           ctaUrl: tab.ctaUrl,
-          // Deliberately without `imageKey`: it points at an object in the
-          // production object storage, which a local environment cannot read.
-          // The card falls back to the bundled photo locally.
+          // Deliberately no `imageKey`. The real photos live in the production
+          // bucket and are pictures of identifiable students, which this public
+          // repository is no place for. Locally the card then falls back to the
+          // striped pattern, which is the designed way of showing "no photo
+          // here" and is simply true: there is none.
           links: tab.links.map((link) => ({
             labelNl: link.labelNl,
             labelEn: link.labelEn,
@@ -231,10 +243,12 @@ async function main() {
       partners.map((p) =>
         compact({
           name: p.name,
-          // Kept, otherwise the partner strip is entirely empty locally: the
-          // component then shows the name as a text placeholder, which is
-          // exactly what a visitor without the image sees too.
-          logoKey: p.logoKey,
+          // Not the real key: that is a random `logos/<hash>.png` in the
+          // production bucket, which no laptop can read. A deterministic local
+          // key instead, so a developer who wants logos can upload them once
+          // under a predictable name; until then the strip falls back to the
+          // partner's name as text, which is the designed behaviour.
+          logoKey: `partners/seed/${partnerSlug(p.name)}.svg`,
           url: p.url,
           order: p.order,
           active: p.active,

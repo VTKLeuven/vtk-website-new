@@ -49,6 +49,11 @@ site had nine, and the navigation therefore ran over the search button.
 - If you add a table to that export, two rules hold without exception: no
   personal data, and key on the natural key (`code`, `slug`) instead of the
   `cuid`, or the fixtures can only be imported into an empty database.
+- **A storage key never travels into the fixtures.** Production keys are random
+  (`logos/<hash>.png`) and point at a bucket a laptop cannot read, so they would
+  all 404. The header tab photo is dropped entirely; the partner logo is rewritten
+  to a deterministic `partners/seed/<slug>.svg` that `npm run db:images` fills
+  with a placeholder.
 
 # Dev server: do NOT use Turbopack
 
