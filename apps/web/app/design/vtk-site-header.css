@@ -557,6 +557,10 @@
     padding: 8px 0 12px;
   }
 
+  .vtk-site-header .nav-mobile-search .vtk-search-form {
+    max-width: 100%;
+  }
+
   .vtk-site-header .nav-mobile-menu ul {
     margin: 0;
     padding: 0;
