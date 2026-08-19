@@ -1,0 +1,287 @@
+/* Downloadpagina van de 24urenloop-app (/24uur-app).
+ *
+ * De pagina stond op een kale `.vtk-panel`, en die klasse zet enkel rand, radius
+ * en vulkleur: de padding zit in `.vtk-card`. De tekst plakte dus tegen de rand,
+ * en de `h2` erin viel terug op body-grootte omdat Tailwind's preflight koppen
+ * reset. Vandaar dit bestand: de paneelindeling van deze pagina, in dezelfde
+ * geest als `vtk-contact.css`.
+ */
+
+.vtk-ulapp-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: clamp(16px, 2.4vw, 24px);
+  align-items: start;
+}
+
+/* Vanaf tabletbreedte staat het hoofdpaneel links en de rail rechts. Het paneel
+   krijgt het leeuwendeel; de rail draagt enkel de buildgegevens en het adres. */
+@media (min-width: 900px) {
+  .vtk-ulapp-grid {
+    grid-template-columns: minmax(0, 1.85fr) minmax(230px, 1fr);
+  }
+}
+
+.vtk-ulapp-main {
+  padding: clamp(22px, 3vw, 30px);
+}
+
+.vtk-ulapp-main h2 {
+  margin: 0;
+  font-size: 21px;
+  line-height: 1.25;
+  font-weight: 600;
+  letter-spacing: -0.015em;
+  color: var(--ink);
+}
+
+.vtk-ulapp-lead {
+  margin: 8px 0 0;
+  color: var(--body);
+  font-size: 15px;
+  line-height: 1.6;
+}
+
+.vtk-ulapp-note {
+  margin: 0;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+/* --- Downloads ---------------------------------------------------------- */
+
+.vtk-ulapp-list {
+  margin: 20px 0 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* Drie kolommen: platformtegel, naam met bestandsregel, downloadknop. De
+   middelste is `minmax(0, 1fr)` zodat een lange bestandsnaam de rij niet
+   breder maakt dan het paneel. */
+.vtk-ulapp-row {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 16px;
+  padding: 13px 16px 13px 13px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--surface);
+  text-decoration: none;
+  transition:
+    transform 160ms ease,
+    border-color 160ms ease,
+    background 160ms ease;
+}
+
+.vtk-ulapp-row:hover {
+  transform: translateY(-1px);
+  border-color: var(--line-2);
+}
+
+.vtk-ulapp-row:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
+}
+
+.vtk-ulapp-mark {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  background: var(--navy);
+  color: var(--paper);
+}
+
+.vtk-ulapp-row-name {
+  display: block;
+  color: var(--ink);
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+/* Bestandsnaam en formaat in de mono: het zijn machinegegevens, en de cijfers
+   lijnen zo uit tussen de rijen. `anywhere` omdat een bestandsnaam geen spaties
+   heeft en op een smal scherm anders buiten de kaart hangt. */
+.vtk-ulapp-row-meta {
+  display: block;
+  margin-top: 2px;
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 11.5px;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+
+.vtk-ulapp-row-go {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border: 1px solid var(--line-2);
+  border-radius: 999px;
+  color: var(--body);
+  transition:
+    background 160ms ease,
+    border-color 160ms ease,
+    color 160ms ease;
+}
+
+.vtk-ulapp-row:hover .vtk-ulapp-row-go,
+.vtk-ulapp-row:focus-visible .vtk-ulapp-row-go {
+  background: var(--ink);
+  border-color: var(--ink);
+  color: var(--paper);
+}
+
+/* De waarschuwing over de onbekende maker: geen kaal grijs blokje, maar de
+   accentrail uit de stijlgids (een gele rail op een inset, geen navy vulling). */
+.vtk-ulapp-inset {
+  margin-top: 20px;
+  padding: 14px 18px;
+  border-radius: 14px;
+  background: var(--paper-2);
+  box-shadow: inset 3px 0 0 var(--yellow);
+}
+
+.vtk-ulapp-inset h3 {
+  margin: 0;
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.vtk-ulapp-inset p {
+  margin: 5px 0 0;
+  color: var(--body);
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+/* --- Rail --------------------------------------------------------------- */
+
+.vtk-ulapp-aside {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.vtk-ulapp-box {
+  padding: 16px 18px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--surface);
+}
+
+.vtk-ulapp-box h2 {
+  margin: 0;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+
+.vtk-ulapp-box p {
+  margin: 8px 0 0;
+  color: var(--body);
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.vtk-ulapp-spec {
+  margin: 10px 0 0;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 6px 14px;
+  font-size: 12px;
+}
+
+.vtk-ulapp-spec dt {
+  color: var(--muted);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.vtk-ulapp-spec dd {
+  margin: 0;
+  color: var(--ink);
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+  font-weight: 500;
+  overflow-wrap: anywhere;
+}
+
+/* --- Toegang (vergrendeld) ---------------------------------------------- */
+
+/* Twee stappen, en welke je bezig bent. Zonder dit leest de tweede stap als een
+   ander formulier op een andere pagina, terwijl het dezelfde handeling is. */
+.vtk-ulapp-steps {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 18px;
+}
+
+.vtk-ulapp-step {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 12.5px;
+}
+
+.vtk-ulapp-step span {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border: 1px solid var(--line-2);
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.vtk-ulapp-step[aria-current="step"] {
+  color: var(--ink);
+  font-weight: 500;
+}
+
+.vtk-ulapp-step[aria-current="step"] span {
+  background: var(--ink);
+  border-color: var(--ink);
+  color: var(--paper);
+}
+
+.vtk-ulapp-step-line {
+  flex: 1 1 auto;
+  max-width: 44px;
+  height: 1px;
+  background: var(--line);
+}
+
+.vtk-ulapp-form {
+  margin-top: 18px;
+  max-width: 340px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+/* "Ander adres gebruiken" hangt onder het codeveld en is een gewone tekstknop:
+   het is een uitweg, geen tweede primaire actie naast "Openen". */
+.vtk-ulapp-again {
+  color: var(--navy);
+  font-weight: 500;
+  text-decoration: underline;
+  text-decoration-color: var(--yellow);
+  text-underline-offset: 4px;
+}

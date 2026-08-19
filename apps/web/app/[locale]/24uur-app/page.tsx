@@ -8,6 +8,8 @@ import { readAccessCookie } from "@/lib/urenloopApp/access";
 import { readReleaseManifest, formatBytes } from "@/lib/urenloopApp/release";
 import { PLATFORM_FILES, CODE_TTL_MINUTES } from "@/lib/urenloopApp/config";
 import { DownloadGate } from "./DownloadGate";
+import { PlatformMark, DownloadArrow } from "./PlatformMark";
+import "@/app/design/vtk-urenloop-app.css";
 
 /**
  * `/24uur-app`: waar andere kringen de 24urenloop-desktopapp ophalen.
@@ -41,6 +43,18 @@ export async function generateMetadata({ params }: { params: Params }): Promise<
   };
 }
 
+/** "2026-04-14T09:12:00Z" -> "14 apr 2026". Leeg bij een onbruikbare datum. */
+function formatBuildDate(value: string, locale: Locale): string {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  return new Intl.DateTimeFormat(locale === "nl" ? "nl-BE" : "en-GB", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  }).format(date);
+}
+
 export default async function UrenloopAppPage({ params }: { params: Params }) {
   const { locale: localeParam } = await params;
   if (!hasLocale(localeParam)) notFound();
@@ -56,6 +70,7 @@ export default async function UrenloopAppPage({ params }: { params: Params }) {
 
   const release = unlocked ? await readReleaseManifest() : null;
   const sizes = new Map((release?.files ?? []).map((f) => [f.name, f.bytes]));
+  const builtAt = formatBuildDate(release?.builtAt ?? "", locale);
 
   const platforms = [
     {
@@ -75,6 +90,12 @@ export default async function UrenloopAppPage({ params }: { params: Params }) {
     },
   ];
 
+  const mailLink = (
+    <a className="vtk-link" href="mailto:it@vtk.be">
+      it@vtk.be
+    </a>
+  );
+
   return (
     <>
       <header className="vtk-page-head">
@@ -86,69 +107,132 @@ export default async function UrenloopAppPage({ params }: { params: Params }) {
               : "The scoreboard and runner queue for the 24urenloop, as an app for your own computer."}
           </p>
         </div>
+        {/* Het rechtervak van de paginakop. Vergrendeld staat er geen versie in:
+            die kennen we pas na het inwisselen van een code. */}
+        <div className="page-head-meta">
+          {unlocked ? (
+            <>
+              {release ? (
+                <div>
+                  {nl ? "Versie" : "Version"} <b>{release.version}</b>
+                </div>
+              ) : null}
+              {builtAt ? (
+                <div>
+                  {nl ? "Gebouwd" : "Built"} <b>{builtAt}</b>
+                </div>
+              ) : null}
+            </>
+          ) : (
+            <div>
+              {nl ? "Toegang" : "Access"} <b>{nl ? "Op uitnodiging" : "By invitation"}</b>
+            </div>
+          )}
+        </div>
       </header>
 
       <div className="vtk-page-shell">
         {unlocked ? (
-          <section className="vtk-panel" aria-labelledby="downloads-title">
-            <h2 id="downloads-title">{nl ? "Downloaden" : "Downloads"}</h2>
-            <p className="mt-1 text-sm text-[#5c667f]">
-              {release
-                ? nl
-                  ? `Versie ${release.version}. Open het bestand na het downloaden; de app installeert en start zichzelf.`
-                  : `Version ${release.version}. Open the file once it has downloaded; the app installs and starts on its own.`
-                : nl
+          <div className="vtk-ulapp-grid">
+            <section className="vtk-panel vtk-ulapp-main" aria-labelledby="downloads-title">
+              <h2 id="downloads-title">{nl ? "Downloaden" : "Downloads"}</h2>
+              <p className="vtk-ulapp-lead">
+                {nl
                   ? "Open het bestand na het downloaden; de app installeert en start zichzelf."
                   : "Open the file once it has downloaded; the app installs and starts on its own."}
-            </p>
+              </p>
 
-            <ul className="mt-5 space-y-3">
-              {platforms.map((platform) => {
-                const bytes = sizes.get(PLATFORM_FILES[platform.id].filename);
-                const size = bytes ? formatBytes(bytes) : "";
-                return (
-                  <li key={platform.id}>
-                    <a
-                      className="flex items-center justify-between gap-4 rounded-2xl border border-[color:var(--line)] bg-[color:var(--surface)] px-5 py-4 no-underline transition hover:border-[color:var(--navy)]"
-                      href={`/api/24ul-app/download/${platform.id}`}
-                    >
-                      <span>
-                        <strong className="block text-[color:var(--ink)]">{platform.label}</strong>
-                        <span className="text-sm text-[#5c667f]">
-                          {PLATFORM_FILES[platform.id].filename}
-                          {size ? ` · ${size}` : ""} · {platform.hint}
+              <ul className="vtk-ulapp-list">
+                {platforms.map((platform) => {
+                  const { filename } = PLATFORM_FILES[platform.id];
+                  const bytes = sizes.get(filename);
+                  const size = bytes ? formatBytes(bytes) : "";
+                  return (
+                    <li key={platform.id}>
+                      <a className="vtk-ulapp-row" href={`/api/24ul-app/download/${platform.id}`}>
+                        <span className="vtk-ulapp-mark">
+                          <PlatformMark id={platform.id} />
                         </span>
-                      </span>
-                      <span aria-hidden className="text-[color:var(--muted)]">
-                        &darr;
-                      </span>
-                    </a>
-                  </li>
-                );
-              })}
-            </ul>
+                        <span>
+                          <span className="vtk-ulapp-row-name">{platform.label}</span>
+                          <span className="vtk-ulapp-row-meta">
+                            {filename}
+                            {size ? ` · ${size}` : ""} · {platform.hint}
+                          </span>
+                        </span>
+                        <span className="vtk-ulapp-row-go">
+                          <DownloadArrow />
+                        </span>
+                      </a>
+                    </li>
+                  );
+                })}
+              </ul>
 
-            <p className="mt-5 text-sm text-[#5c667f]">
-              {nl
-                ? "Windows en macOS waarschuwen dat de maker onbekend is; dat klopt, VTK heeft geen betaald ontwikkelaarscertificaat. Kies op Windows Meer info en dan Toch uitvoeren, en op Mac Systeeminstellingen > Privacy en beveiliging > Toch openen."
-                : "Windows and macOS warn that the publisher is unknown; that is expected, VTK has no paid developer certificate. On Windows choose More info and then Run anyway; on Mac use System Settings > Privacy & Security > Open Anyway."}
-            </p>
-            <p className="mt-2 text-sm text-[#5c667f]">
-              {nl
-                ? "Vragen of iets kapot? Mail it@vtk.be."
-                : "Questions, or something broken? Mail it@vtk.be."}
-            </p>
-          </section>
+              <div className="vtk-ulapp-inset">
+                <h3>
+                  {nl
+                    ? "Windows en macOS waarschuwen dat de maker onbekend is"
+                    : "Windows and macOS warn that the publisher is unknown"}
+                </h3>
+                <p>
+                  {nl
+                    ? "Dat klopt: VTK heeft geen betaald ontwikkelaarscertificaat. Kies op Windows Meer info en dan Toch uitvoeren; op Mac ga je naar Systeeminstellingen > Privacy en beveiliging > Toch openen."
+                    : "That is expected: VTK has no paid developer certificate. On Windows choose More info and then Run anyway; on Mac go to System Settings > Privacy & Security > Open Anyway."}
+                </p>
+              </div>
+            </section>
+
+            <aside className="vtk-ulapp-aside">
+              {release ? (
+                <div className="vtk-ulapp-box">
+                  <h2>{nl ? "Deze build" : "This build"}</h2>
+                  <dl className="vtk-ulapp-spec">
+                    <dt>{nl ? "Versie" : "Version"}</dt>
+                    <dd>{release.version}</dd>
+                    {release.commit ? (
+                      <>
+                        <dt>Commit</dt>
+                        <dd>{release.commit.slice(0, 7)}</dd>
+                      </>
+                    ) : null}
+                    {builtAt ? (
+                      <>
+                        <dt>{nl ? "Gebouwd" : "Built"}</dt>
+                        <dd>{builtAt}</dd>
+                      </>
+                    ) : null}
+                  </dl>
+                </div>
+              ) : null}
+              <div className="vtk-ulapp-box">
+                <h2>{nl ? "Hulp nodig" : "Need help"}</h2>
+                <p>
+                  {nl ? "Vragen, of iets kapot? Mail " : "Questions, or something broken? Mail "}
+                  {mailLink}.
+                </p>
+              </div>
+            </aside>
+          </div>
         ) : (
-          <section className="vtk-panel" aria-labelledby="access-title">
-            <h2 id="access-title">{nl ? "Toegang" : "Access"}</h2>
-            <p className="mt-1 text-sm text-[#5c667f]">
-              {nl
-                ? `De app is enkel voor kringen waarmee we ze delen. Vul het adres in waarmee je toegang kreeg; je krijgt er een code op, die ${CODE_TTL_MINUTES} minuten geldig is.`
-                : `The app is only for associations we share it with. Enter the address you were given access with; we mail a code to it that stays valid for ${CODE_TTL_MINUTES} minutes.`}
-            </p>
-            <DownloadGate locale={locale} />
-          </section>
+          <div className="vtk-ulapp-grid">
+            <section className="vtk-panel vtk-ulapp-main" aria-labelledby="access-title">
+              <DownloadGate locale={locale} ttlMinutes={CODE_TTL_MINUTES} />
+            </section>
+
+            <aside className="vtk-ulapp-aside">
+              <div className="vtk-ulapp-box">
+                <h2>{nl ? "Geen toegang" : "No access"}</h2>
+                <p>
+                  {nl
+                    ? "Staat jouw kring nog niet op de lijst? Mail "
+                    : "Is your association not on the list yet? Mail "}
+                  {mailLink}
+                  {nl ? " en we kijken ernaar." : " and we will look into it."}
+                </p>
+              </div>
+            </aside>
+          </div>
         )}
       </div>
     </>
