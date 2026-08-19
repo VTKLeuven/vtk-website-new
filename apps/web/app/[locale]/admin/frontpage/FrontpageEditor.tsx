@@ -6,6 +6,7 @@ import { SaveForm } from "@/components/ui/SaveForm";
 import { StorageImageField } from "@/components/admin/StorageImageField";
 import { saveFrontpageAction, setFrontpageActiveAction } from "@/app/actions/frontpage";
 import type { FieldDef } from "@/lib/frontpage/fields";
+import { saveErrorMessages } from "@/lib/saveMessages";
 
 export type FrontpageCard = {
   layout: string;
@@ -176,19 +177,20 @@ export function FrontpageEditor({
     ? { live: "Actief", scheduled: "Gepland", expired: "Afgelopen", off: "Uit" }
     : { live: "Active", scheduled: "Scheduled", expired: "Ended", off: "Off" };
 
-  const errorMessages = nl
-    ? {
-        INVALID_INPUT: "Er klopt iets niet aan de ingevulde waarden.",
-        UNKNOWN_LAYOUT: "Deze frontpage bestaat niet meer in de code.",
-        WINDOW_INVALID: "De einddatum ligt voor de startdatum.",
-        LINK_INVALID: "Een link moet met / beginnen of een volledige https-link zijn.",
-      }
-    : {
-        INVALID_INPUT: "Something is wrong with the values you filled in.",
-        UNKNOWN_LAYOUT: "This front page no longer exists in the code.",
-        WINDOW_INVALID: "The end date is before the start date.",
-        LINK_INVALID: "A link must start with / or be a full https link.",
-      };
+  // De gedeelde meldingen (o.a. INVALID_URL voor een knopadres) plus wat enkel
+  // hier speelt.
+  const errorMessages = {
+    ...saveErrorMessages(locale),
+    ...(nl
+      ? {
+          UNKNOWN_LAYOUT: "Deze frontpage bestaat niet meer in de code.",
+          WINDOW_INVALID: "De einddatum ligt voor de startdatum.",
+        }
+      : {
+          UNKNOWN_LAYOUT: "This front page no longer exists in the code.",
+          WINDOW_INVALID: "The end date is before the start date.",
+        }),
+  };
 
   return (
     <div className="space-y-6">

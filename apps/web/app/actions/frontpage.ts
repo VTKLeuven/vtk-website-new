@@ -7,6 +7,8 @@ import { requirePermission } from "@/lib/session";
 import { readImageField, resolveImageKey } from "@/lib/imageField";
 import { saveError, saveOk, type SaveState } from "@/lib/saveState";
 import { localDateTimeToUtc } from "@/lib/ticketing/time";
+import { describeChanges, logAudit } from "@/lib/audit";
+import { isEditableDestination } from "@/lib/href";
 import { readFieldValues } from "@/lib/frontpage/fields";
 import { DEFAULT_FRONTPAGE_ID, getFrontpageModule } from "@/lib/frontpage/registry";
 
@@ -77,8 +79,10 @@ export async function saveFrontpageAction(
     const trimmed = raw.trim();
     if (trimmed === "") continue;
 
-    if (def.type === "url" && !/^(https?:\/\/|\/)/.test(trimmed)) {
-      return saveError("LINK_INVALID");
+    // The shared check, not a regex of our own: it also rejects `//host` and
+    // `/\host`, which look like a path in the form and navigate off the site.
+    if (def.type === "url" && !isEditableDestination(trimmed)) {
+      return saveError("INVALID_URL");
     }
     if (def.type === "datetime") {
       const moment = parseMoment(trimmed);
@@ -102,6 +106,30 @@ export async function saveFrontpageAction(
     where: { layout },
     update: data,
     create: { layout, ...data },
+  });
+
+  // Which fields moved is worth more than "someone saved": the values live in a
+  // JSON column, so `describeChanges` cannot label them, and the field names are
+  // the closest thing to a label the registry gives us.
+  const changedFields = Object.keys(layoutModule.fields).filter(
+    (name) => (previous[name] ?? "") !== (values[name] ?? ""),
+  );
+  const rowChanges = existing
+    ? describeChanges(existing, data, {
+        startsAt: "startmoment",
+        endsAt: "eindmoment",
+        active: "actief",
+      })
+    : null;
+  await logAudit({
+    action: existing ? "update" : "create",
+    entity: "frontpage",
+    entityId: layout,
+    target: layoutModule.labelNl,
+    summary:
+      [changedFields.length > 0 ? `${changedFields.join(", ")} aangepast` : null, rowChanges]
+        .filter(Boolean)
+        .join("; ") || null,
   });
 
   for (const key of staleImages) {
@@ -130,6 +158,13 @@ export async function setFrontpageActiveAction(formData: FormData): Promise<void
     where: { layout },
     update: { active, updatedById: session.user.id },
     create: { layout, values: {}, active, updatedById: session.user.id },
+  });
+  await logAudit({
+    action: "update",
+    entity: "frontpage",
+    entityId: layout,
+    target: getFrontpageModule(layout)!.labelNl,
+    summary: active ? "aangezet" : "uitgezet",
   });
   revalidate();
 }
