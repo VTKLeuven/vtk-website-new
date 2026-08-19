@@ -16,7 +16,9 @@
  *   npm run import:praesidium -- scripts/data.json --dry-run
  *
  * Idempotent: users worden op e-mail geupsert, memberships op (user, post, jaar).
- * Een herrun dupliceert dus niets.
+ * Een herrun dupliceert dus niets en verwijdert niets. Titels worden bij een
+ * update enkel gezet, nooit gewist: een herrun met een JSON waarin een titel
+ * ontbreekt, laat de bestaande titel in de DB met rust.
  */
 
 import { readFileSync } from "node:fs";
@@ -119,6 +121,24 @@ type PostDef = z.infer<typeof postDefSchema>;
 // ---------------------------------------------------------------------------
 
 const norm = (s: string) => s.trim().toLowerCase();
+
+/**
+ * Titels die NIET als titleNl/titleEn mogen doorgaan: "Groepscoördinator"
+ * (de nieuwe site leidt die af van de LEAD-rol) en de bijnamen die de oude
+ * site in de titelplek toont (praesidia 2006-2009, plus de grap
+ * "Vroem vroem" uit 2024-2025). Genormaliseerd vergeleken.
+ */
+const SKIP_TITLES = new Set([
+  "groepscoordinator",
+  "timbo", "coelmoes", "vince", "freddi", "fil", "willie", "fre",
+  "bonas", "adel", "jelly", "gio", "morris", "vroem vroem",
+]);
+
+/** Geeft de titel terug, of undefined als die op de skip-lijst staat. */
+function cleanTitle(t: string | undefined): string | undefined {
+  if (!t) return undefined;
+  return SKIP_TITLES.has(norm(t)) ? undefined : t;
+}
 
 function slugify(s: string): string {
   return s
@@ -449,6 +469,10 @@ async function main() {
       // 3. Memberships per (post, jaar).
       for (const m of person.memberships) {
         const { id: groupId } = await resolve(m.post);
+        // "Groepscoördinator"-titels en bijnamen worden nooit als titel
+        // geschreven (de coordinator-pin komt van de LEAD-rol).
+        const titleNl = cleanTitle(m.titleNl);
+        const titleEn = cleanTitle(m.titleEn);
         if (!DRY_RUN) {
           await prisma.groupMembership.upsert({
             where: { userId_groupId_year: { userId, groupId, year: m.year } },
@@ -457,14 +481,16 @@ async function main() {
               groupId,
               year: m.year,
               role: m.role,
-              titleNl: m.titleNl ?? null,
-              titleEn: m.titleEn ?? null,
+              titleNl: titleNl ?? null,
+              titleEn: titleEn ?? null,
               displayOrder: m.order,
             },
+            // Bewust niet-destructief voor titels: een herrun met een JSON
+            // waarin een titel ontbreekt, wist een bestaande titel niet.
             update: {
               role: m.role,
-              titleNl: m.titleNl ?? null,
-              titleEn: m.titleEn ?? null,
+              ...(titleNl !== undefined ? { titleNl } : {}),
+              ...(titleEn !== undefined ? { titleEn } : {}),
               displayOrder: m.order,
             },
           });

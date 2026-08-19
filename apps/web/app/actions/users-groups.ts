@@ -14,6 +14,7 @@ import { requirePermission, requireSession } from "@/lib/session";
 import { saveError, saveOk, type SaveState } from "@/lib/saveState";
 import { currentWorkingYear } from "@/lib/workingYear";
 import { eraseUserData } from "@/lib/privacy/account";
+import { describeChanges, logAudit } from "@/lib/audit";
 
 /** `P2002` op een bepaald veld: de unieke constraint die Prisma noemt. */
 function isUniqueViolation(err: unknown, field: string): boolean {
@@ -59,6 +60,22 @@ export async function saveUserAction(_prev: SaveState, formData: FormData): Prom
     ? String(formData.get("rNumber") ?? "").trim() || null
     : undefined;
 
+  const before = parsed.id
+    ? await prisma.user.findUnique({
+        where: { id: parsed.id },
+        select: {
+          email: true,
+          name: true,
+          firstName: true,
+          lastName: true,
+          locale: true,
+          active: true,
+          isSuperAdmin: true,
+          rNumber: true,
+        },
+      })
+    : null;
+
   try {
     if (parsed.id) {
       await updateUser(session, parsed.id, {
@@ -92,6 +109,27 @@ export async function saveUserAction(_prev: SaveState, formData: FormData): Prom
     throw err;
   }
 
+  await logAudit({
+    action: parsed.id ? "update" : "create",
+    entity: "user",
+    entityId: parsed.id ?? null,
+    target: name,
+    summary: before
+      ? describeChanges(
+          before,
+          { ...parsed, name, rNumber: rNumber === undefined ? before.rNumber : rNumber },
+          {
+            email: "e-mail",
+            name: "naam",
+            locale: "taal",
+            active: "actief",
+            isSuperAdmin: "superadmin",
+            rNumber: "r-nummer",
+          },
+        )
+      : parsed.email,
+  });
+
   revalidatePath("/admin/gebruikers");
   if (parsed.id) revalidatePath(`/admin/gebruikers/${parsed.id}`);
   // Geen redirect: het formulier staat op de lijstpagina (nieuw) of op de
@@ -103,9 +141,21 @@ export async function deleteUserAction(formData: FormData): Promise<void> {
   const session = await requirePermission("users.edit");
   const id = formData.get("id") as string;
   if (id) {
-    const target = await prisma.user.findUnique({ where: { id }, select: { isSuperAdmin: true } });
+    const target = await prisma.user.findUnique({
+      where: { id },
+      select: { isSuperAdmin: true, name: true, email: true },
+    });
     if (target?.isSuperAdmin && !session.user.isSuperAdmin) throw new Error("forbidden");
     await eraseUserData(id);
+    await logAudit({
+      action: "delete",
+      entity: "user",
+      entityId: id,
+      target: target?.name ?? id,
+      // eraseUserData laat de rij als tombstone staan; zeg dat erbij, anders
+      // lijkt het logboek te beloven dat de gebruiker helemaal weg is.
+      summary: "persoonsgegevens gewist; de rij blijft als geanonimiseerde tombstone bestaan",
+    });
   }
   revalidatePath("/admin/gebruikers");
   redirect("/admin/gebruikers");
@@ -168,6 +218,19 @@ export async function addMembershipAction(formData: FormData): Promise<void> {
     update: { role: parsed.role, titleNl: parsed.titleNl, titleEn: parsed.titleEn },
     create: parsed,
   });
+  const [member, group] = await Promise.all([
+    prisma.user.findUnique({ where: { id: parsed.userId }, select: { name: true } }),
+    prisma.group.findUnique({ where: { id: parsed.groupId }, select: { nameNl: true } }),
+  ]);
+  await logAudit({
+    action: "create",
+    entity: "membership",
+    entityId: parsed.userId,
+    target: member?.name ?? parsed.userId,
+    summary: `${parsed.role === "LEAD" ? "verantwoordelijke" : "lid"} van ${
+      group?.nameNl ?? parsed.groupId
+    } in ${parsed.year}-${String(parsed.year + 1).slice(-2)}`,
+  });
   revalidateMembershipSurfaces(parsed.userId);
 }
 
@@ -175,10 +238,27 @@ export async function removeMembershipAction(formData: FormData): Promise<void> 
   const id = formData.get("id") as string;
   const userId = formData.get("userId") as string;
   if (id) {
-    const membership = await prisma.groupMembership.findUnique({ where: { id }, select: { groupId: true } });
+    const membership = await prisma.groupMembership.findUnique({
+      where: { id },
+      select: {
+        groupId: true,
+        year: true,
+        user: { select: { name: true } },
+        group: { select: { nameNl: true } },
+      },
+    });
     if (membership) {
       await requireMembershipManager(membership.groupId);
       await prisma.groupMembership.delete({ where: { id } });
+      await logAudit({
+        action: "delete",
+        entity: "membership",
+        entityId: userId || null,
+        target: membership.user.name,
+        summary: `niet langer lid van ${membership.group.nameNl} in ${membership.year}-${String(
+          membership.year + 1,
+        ).slice(-2)}`,
+      });
     }
   }
   revalidateMembershipSurfaces(userId || undefined);
@@ -272,6 +352,13 @@ export async function bulkImportUsersAction(formData: FormData): Promise<{ ok: b
     }
   }
 
+  await logAudit({
+    action: "import",
+    entity: "user",
+    target: `${added} gebruiker(s)`,
+    summary: `bulkimport uit CSV${errors.length ? `, ${errors.length} regel(s) met een fout` : ""}`,
+  });
+
   revalidatePath("/admin/gebruikers");
   return { ok: errors.length === 0, added, errors };
 }
@@ -341,6 +428,15 @@ const groupSchema = z.object({
   active: z.coerce.boolean().default(true),
 });
 
+const GROUP_FIELD_LABELS: Record<string, string> = {
+  nameNl: "naam",
+  nameEn: "Engelse naam",
+  descriptionNl: "beschrijving",
+  descriptionEn: "Engelse beschrijving",
+  orderInPraesidium: "volgorde",
+  active: "actief",
+};
+
 /**
  * Post aanmaken of bewerken. De `code` en `slug` staan enkel bij het aanmaken
  * vast (shiften en de sessie verwijzen naar `code`); bij bewerken wijzigen enkel
@@ -373,12 +469,27 @@ export async function saveGroupAction(_prev: SaveState, formData: FormData): Pro
 
   try {
     if (parsed.id) {
+      const existing = await prisma.group.findUnique({ where: { id: parsed.id } });
       await prisma.group.update({ where: { id: parsed.id }, data });
+      await logAudit({
+        action: "update",
+        entity: "post",
+        entityId: parsed.id,
+        target: parsed.nameNl,
+        summary: existing ? describeChanges(existing, data, GROUP_FIELD_LABELS) : null,
+      });
     } else {
       const code = codeify(parsed.code || parsed.nameNl);
       const slug = slugify(parsed.nameNl);
       if (!code || !slug) return saveError("INVALID_INPUT");
-      await prisma.group.create({ data: { ...data, code, slug } });
+      const created = await prisma.group.create({ data: { ...data, code, slug } });
+      await logAudit({
+        action: "create",
+        entity: "post",
+        entityId: created.id,
+        target: parsed.nameNl,
+        summary: `postcode ${code}`,
+      });
     }
   } catch (err) {
     if (isUniqueViolation(err, "code")) return saveError("GROUP_CODE_TAKEN");
@@ -389,6 +500,34 @@ export async function saveGroupAction(_prev: SaveState, formData: FormData): Pro
   revalidatePath("/admin/groepen");
   revalidatePath("/praesidium");
   return saveOk();
+}
+
+/**
+ * Eén logregel voor het rollenraster van een post of werkgroep. Dit geeft
+ * rechten weg, dus het hoort in het logboek te staan met de rol erbij; "post
+ * gewijzigd" zou hier te weinig zeggen.
+ */
+async function logGroupRoleChange(
+  entity: "post" | "werkgroep",
+  groupId: string,
+  roleId: string,
+  kind: "DEFAULT" | "LEADER",
+  enabled: boolean,
+): Promise<void> {
+  const [group, role] = await Promise.all([
+    prisma.group.findUnique({ where: { id: groupId }, select: { nameNl: true } }),
+    prisma.role.findUnique({ where: { id: roleId }, select: { nameNl: true } }),
+  ]);
+  const who = kind === "LEADER" ? "de verantwoordelijke" : "elk lid";
+  await logAudit({
+    action: enabled ? "grant" : "revoke",
+    entity,
+    entityId: groupId,
+    target: group?.nameNl ?? groupId,
+    summary: `rol ${role?.nameNl ?? roleId} ${
+      enabled ? "toegekend aan" : "afgenomen van"
+    } ${who}`,
+  });
 }
 
 /**
@@ -414,6 +553,7 @@ export async function setGroupRoleAction(formData: FormData): Promise<void> {
       .delete({ where: { groupId_roleId_kind: { groupId, roleId, kind } } })
       .catch(() => null);
   }
+  await logGroupRoleChange("post", groupId, roleId, kind, enabled);
   revalidatePath("/admin/groepen");
   revalidatePath("/praesidium");
 }
@@ -460,12 +600,29 @@ export async function saveWerkgroepAction(_prev: SaveState, formData: FormData):
 
   try {
     if (parsed.id) {
+      const existing = await prisma.group.findUnique({ where: { id: parsed.id } });
       await prisma.group.update({ where: { id: parsed.id }, data });
+      await logAudit({
+        action: "update",
+        entity: "werkgroep",
+        entityId: parsed.id,
+        target: parsed.nameNl,
+        summary: existing ? describeChanges(existing, data, GROUP_FIELD_LABELS) : null,
+      });
     } else {
       const code = codeify(parsed.code || parsed.nameNl);
       const slug = slugify(parsed.nameNl);
       if (!code || !slug) return saveError("INVALID_INPUT");
-      await prisma.group.create({ data: { ...data, code, slug, type: "WERKGROEP" } });
+      const created = await prisma.group.create({
+        data: { ...data, code, slug, type: "WERKGROEP" },
+      });
+      await logAudit({
+        action: "create",
+        entity: "werkgroep",
+        entityId: created.id,
+        target: parsed.nameNl,
+        summary: `code ${code}`,
+      });
     }
   } catch (err) {
     if (isUniqueViolation(err, "code")) return saveError("GROUP_CODE_TAKEN");
@@ -512,13 +669,21 @@ export async function saveWerkgroepInfoAction(_prev: SaveState, formData: FormDa
   let website = result.data.website?.trim() || null;
   if (website && !/^https?:\/\//i.test(website)) website = `https://${website}`;
 
-  await prisma.group.update({
+  const updated = await prisma.group.update({
     where: { id },
     data: {
       descriptionNl: result.data.descriptionNl || null,
       descriptionEn: result.data.descriptionEn || null,
       website,
     },
+  });
+
+  await logAudit({
+    action: "update",
+    entity: "werkgroep",
+    entityId: id,
+    target: updated.nameNl,
+    summary: "infotekst of website bewerkt",
   });
 
   revalidatePath("/admin/werkgroepen");
@@ -545,6 +710,7 @@ export async function setWerkgroepRoleAction(formData: FormData): Promise<void> 
       .delete({ where: { groupId_roleId_kind: { groupId, roleId, kind } } })
       .catch(() => null);
   }
+  await logGroupRoleChange("werkgroep", groupId, roleId, kind, enabled);
   revalidatePath("/admin/werkgroepen");
   revalidatePath("/werkgroepen");
 }

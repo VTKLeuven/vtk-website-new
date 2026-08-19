@@ -20,6 +20,7 @@ import { answerLines } from "@/lib/forms/outbox";
 import { fillPlaceholders } from "@/lib/forms/mail";
 import { sendMail, smtpConfigured } from "@vtk/mail";
 import { saveError, saveOk, type SaveState } from "@/lib/saveState";
+import { logAudit } from "@/lib/audit";
 
 const localeSchema = z.enum(["nl", "en"]);
 const reviewSchema = z.enum(["NEW", "ACCEPTED", "REJECTED"]);
@@ -58,6 +59,12 @@ function refresh(locale: "nl" | "en", formId: string, entryId?: string) {
   revalidatePath(`${prefix}/admin/formulieren/${formId}/inzendingen`);
   if (entryId) revalidatePath(`${prefix}/admin/formulieren/${formId}/inzendingen/${entryId}`);
   revalidatePath(`${prefix}/admin/formulieren/${formId}`);
+}
+
+/** Titel van het formulier, voor een leesbare regel in het adminlogboek. */
+async function formTitle(formId: string): Promise<string> {
+  const form = await prisma.form.findUnique({ where: { id: formId }, select: { titleNl: true } });
+  return form?.titleNl ?? formId;
 }
 
 /** Status, notitie en beoordelaar van één inzending. */
@@ -106,6 +113,14 @@ export async function saveEntryReviewAction(
       });
     });
 
+    await logAudit({
+      action: "update",
+      entity: "formEntry",
+      entityId: entryId,
+      target: await formTitle(formId),
+      summary: `inzending beoordeeld: ${entry.reviewStatus} naar ${reviewStatus}`,
+    });
+
     refresh(locale, formId, entryId);
   });
 }
@@ -146,6 +161,16 @@ export async function deleteFormEntryAction(formData: FormData): Promise<void> {
       entityId: entryId,
       metadata: { email: entry.submitterEmail },
     });
+  });
+
+  await logAudit({
+    action: "delete",
+    entity: "formEntry",
+    entityId: entryId,
+    target: entry.submitterEmail ?? (await formTitle(formId)),
+    summary: `inzending op ${await formTitle(formId)} verwijderd, met ${
+      entry.uploads.length
+    } bestand(en)`,
   });
 
   // Pas na de transactie: een mislukte verwijdering in de opslag mag de rij niet
@@ -265,6 +290,14 @@ export async function sendFormMailingAction(rawInput: unknown): Promise<SaveStat
       entityType: "Form",
       entityId: input.formId,
       metadata: { recipients: targets.length, sent, subject: input.subject },
+    });
+
+    await logAudit({
+      action: "send",
+      entity: "formMailing",
+      entityId: input.formId,
+      target: form.titleNl,
+      summary: `"${input.subject}" naar ${sent} van ${targets.length} deelnemer(s)`,
     });
 
     refresh(input.locale, input.formId);
@@ -487,6 +520,16 @@ async function saveManagedEntry(input: ManagedEntryInput): Promise<BehalfResult>
     metadata: { email: input.submitterEmail ?? null },
   });
 
+  await logAudit({
+    action: existing ? "update" : "create",
+    entity: "formEntry",
+    entityId: result.entryId,
+    target: input.submitterEmail ?? (await formTitle(input.formId)),
+    summary: existing
+      ? `antwoorden aangepast op ${await formTitle(input.formId)}`
+      : `inzending toegevoegd namens iemand op ${await formTitle(input.formId)}`,
+  });
+
   refresh(input.locale, input.formId, existing?.id);
   return { status: "ok", entryId: result.entryId };
 }
@@ -619,6 +662,14 @@ export async function promoteWaitlistedEntryAction(
         entityType: "FormEntry",
         entityId: entryId,
       });
+    });
+
+    await logAudit({
+      action: "update",
+      entity: "formEntry",
+      entityId: entryId,
+      target: entry.submitterEmail ?? form.titleNl,
+      summary: `van de wachtlijst gehaald op ${form.titleNl}`,
     });
 
     refresh(locale, formId, entryId);

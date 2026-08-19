@@ -65,8 +65,15 @@
     "title": "Praesidium",
     "intro": "The praesidium of VTK, per working year.",
     "coordinator": "Group coordinator",
+    "coordinatorShort": "Coordinator",
     "member": "Member",
-    "empty": "No posts have been filled in for this working year yet."
+    "empty": "No posts have been filled in for this working year yet.",
+    "posts": "Posts",
+    "year": "Year",
+    "archiveTo": "Archive back to {year}",
+    "memberCount": "{count} members",
+    "memberCountOne": "1 member",
+    "jumpToPost": "Jump to post"
   },
   "werkgroepen": {
     "kicker": "VTK · Werkgroepen",
@@ -335,6 +342,7 @@
     "it": "IT",
     "itConfig": "Configuration",
     "authorizationPreview": "Authorization preview",
+    "auditLog": "Admin log",
     "create": "New",
     "save": "Save",
     "delete": "Delete",

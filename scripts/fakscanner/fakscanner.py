@@ -38,9 +38,13 @@ def center_text(text, width=16):
 
 # hardware init
 # -------------
-screen = Screen(1, 0x27) # bus, addr
-screen.show("Starting ...")
 logger.info("Initializing script")
+try:
+    screen = Screen(1, 0x27) # bus, addr
+    screen.show("Starting ...")
+except:
+    logger.error("Could not find LCD screen => check of pinnen correct verbonden zijn")
+    exit()
 
 try:
     scanner = Scanner()
@@ -51,7 +55,7 @@ except:
     exit()
 
 try:
-    requests.get(API_BASE)
+    requests.get(API_BASE, timeout=15)
     logger.info(f"Verbonden met {API_BASE}")
 except:
     screen.show("Geen verbinding", f"met {API_BASE}")
@@ -63,7 +67,12 @@ except:
 while True:
     screen.show("    Scan je     ", " Studentenkaart ")
 
-    card = scanner.read() # wacht op studentenkaart
+    try:
+        card = scanner.read() # wacht op studentenkaart
+    except:
+        screen.show("  Kaartscanner  ", "      fout      ")
+        logger.error("Geen CardScanner gevonden")
+        exit()
 
     try:
         response = requests.post(
@@ -74,18 +83,18 @@ while True:
         )
     except requests.exceptions.RequestException as exc:
         screen.show("Geen verbinding", f"met {API_BASE}")
-        logger.info(f"Geen verbinding met de site: {exc}")
+        logger.error(f"Geen verbinding met de site: {exc}")
         time.sleep(10)
         continue
     
-    response = response.json()
-    # {'ok': True, 'counted': False, 'rNumber': 'r0939342', 'name': 'Witse Panneels', 'total': 1, 'points': 0, 'double': False, 'freeBeer': False, 'toNextBeer': 9, 'message': 'Al ingecheckt'}
-    
-    naam = ""
-    if response["name"]:
-        naam = response["name"]
-    else:
-        naam = response["rNumber"]
+    try:
+        response = response.json()
+        # {'ok': True, 'counted': False, 'rNumber': 'r0939342', 'name': 'Witse Panneels', 'total': 1, 'points': 0, 'double': False, 'freeBeer': False, 'toNextBeer': 9, 'message': 'Al ingecheckt'}
+    except:
+        screen.show("Website Error :(", " probeer opnieuw")
+        logger.error(f"Website error: {response}")
+        time.sleep(10)
+        continue
     
     if response["ok"] == False:
         logger.error(f"Scan failed: {response["error"]}")
@@ -93,17 +102,23 @@ while True:
         time.sleep(10)
         continue
     
+    naam = ""
+    if response["name"]:
+        naam = response["name"]
+    else:
+        naam = response["rNumber"]
+    
     if response["counted"] == False:
-        screen.show(response["message"], f"  {response["total"]} CheckIns  ")
-        time.sleep(10)
+        screen.show(center_text(response["message"]), f"  {response["total"]} CheckIns  ")
+        time.sleep(5)
         continue
     
     if response["double"]:
-        screen.show("Dubbele CheckIn!", center_text(response["name"]))
+        screen.show("Dubbele CheckIn!", center_text(naam))
         time.sleep(3)
     
     if response["freeBeer"]:
-        screen.show("  Gratis Pint!  ", center_text(response["name"]))
+        screen.show("  Gratis Pint!  ", center_text(naam))
         for i in range(3):
             for j in range(4):
                 time.sleep(0.1)
@@ -111,11 +126,11 @@ while True:
                 time.sleep(0.1)
                 screen.backlight(True)
             time.sleep(2)
-        time.sleep(7)
-        
-        
-        
-
+        time.sleep(10)
+        continue
+    
+    screen.show(center_text(naam), f"  {response["total"]} CheckIns  ")
+    time.sleep(7)
 
 # start main loop
 #   wait for cardscan

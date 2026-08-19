@@ -9,6 +9,7 @@ import { setRoleClientPermission } from "@vtk/auth/server";
 import { requirePermission } from "@/lib/session";
 import { saveError, saveOk, type SaveState } from "@/lib/saveState";
 import { currentWorkingYear } from "@/lib/workingYear";
+import { describeChanges, logAudit } from "@/lib/audit";
 
 /** `P2002` op `code`: de rolcode is al in gebruik. */
 function isCodeTaken(err: unknown): boolean {
@@ -76,8 +77,30 @@ export async function saveRoleAction(_prev: SaveState, formData: FormData): Prom
         where: { id: parsed.id },
         data: existing.system ? data : { ...data, code },
       });
+      await logAudit({
+        action: "update",
+        entity: "role",
+        entityId: parsed.id,
+        target: parsed.nameNl,
+        summary: describeChanges(existing, existing.system ? data : { ...data, code }, {
+          code: "code",
+          nameNl: "naam",
+          nameEn: "Engelse naam",
+          descriptionNl: "beschrijving",
+          descriptionEn: "Engelse beschrijving",
+          color: "kleur",
+          order: "volgorde",
+        }),
+      });
     } else {
-      await prisma.role.create({ data: { ...data, code } });
+      const created = await prisma.role.create({ data: { ...data, code } });
+      await logAudit({
+        action: "create",
+        entity: "role",
+        entityId: created.id,
+        target: parsed.nameNl,
+        summary: `rolcode ${code}`,
+      });
     }
   } catch (err) {
     if (isCodeTaken(err)) return saveError("ROLE_CODE_TAKEN");
@@ -96,6 +119,13 @@ export async function deleteRoleAction(formData: FormData): Promise<void> {
   // Systeemrollen zijn niet verwijderbaar via de GUI.
   if (!role || role.system) return;
   await prisma.role.delete({ where: { id } });
+  await logAudit({
+    action: "delete",
+    entity: "role",
+    entityId: id,
+    target: role.nameNl,
+    summary: "iedereen die deze rol droeg, verliest haar rechten",
+  });
   revalidatePath("/admin/roles");
 }
 
@@ -116,6 +146,17 @@ export async function setRolePermissionAction(formData: FormData): Promise<void>
       .delete({ where: { roleId_permissionId: { roleId, permissionId } } })
       .catch(() => null);
   }
+  const [role, permission] = await Promise.all([
+    prisma.role.findUnique({ where: { id: roleId }, select: { nameNl: true } }),
+    prisma.permission.findUnique({ where: { id: permissionId }, select: { code: true } }),
+  ]);
+  await logAudit({
+    action: enabled ? "grant" : "revoke",
+    entity: "rolePermission",
+    entityId: roleId,
+    target: role?.nameNl ?? roleId,
+    summary: `recht ${permission?.code ?? permissionId} ${enabled ? "toegevoegd" : "weggenomen"}`,
+  });
   revalidatePath("/admin/roles");
 }
 
@@ -136,6 +177,22 @@ export async function setRoleClientPermissionAction(formData: FormData): Promise
   if (!roleId || !permissionId) return;
 
   await setRoleClientPermission(await headers(), roleId, permissionId, enabled);
+  const [role, permission] = await Promise.all([
+    prisma.role.findUnique({ where: { id: roleId }, select: { nameNl: true } }),
+    prisma.ssoClientPermission.findUnique({
+      where: { id: permissionId },
+      select: { code: true, clientId: true },
+    }),
+  ]);
+  await logAudit({
+    action: enabled ? "grant" : "revoke",
+    entity: "rolePermission",
+    entityId: roleId,
+    target: role?.nameNl ?? roleId,
+    summary: `extern recht ${permission?.code ?? permissionId} (${
+      permission?.clientId ?? "onbekende app"
+    }) ${enabled ? "toegevoegd" : "weggenomen"}`,
+  });
   revalidatePath("/admin/roles");
   revalidatePath("/admin/sso");
 }
@@ -148,6 +205,28 @@ const assignSchema = z.object({
   userId: z.string().min(1),
   roleId: z.string().min(1),
 });
+
+/** Wie kreeg of verloor welke rol, en in welk werkingsjaar. */
+async function logRoleAssignment(
+  action: "grant" | "revoke",
+  userId: string,
+  roleId: string,
+  year: number,
+): Promise<void> {
+  const [user, role] = await Promise.all([
+    prisma.user.findUnique({ where: { id: userId }, select: { name: true } }),
+    prisma.role.findUnique({ where: { id: roleId }, select: { nameNl: true } }),
+  ]);
+  await logAudit({
+    action,
+    entity: "roleAssignment",
+    entityId: userId,
+    target: user?.name ?? userId,
+    summary: `rol ${role?.nameNl ?? roleId} ${
+      action === "grant" ? "toegekend" : "afgenomen"
+    } voor ${year}-${String(year + 1).slice(-2)}`,
+  });
+}
 
 export async function assignUserRoleAction(formData: FormData): Promise<void> {
   await requirePermission("roles.manage");
@@ -164,6 +243,7 @@ export async function assignUserRoleAction(formData: FormData): Promise<void> {
     update: {},
     create: { userId: parsed.data.userId, roleId: parsed.data.roleId, year },
   });
+  await logRoleAssignment("grant", parsed.data.userId, parsed.data.roleId, year);
   revalidatePath("/admin/roles");
   revalidatePath(`/admin/gebruikers/${parsed.data.userId}`);
 }
@@ -177,6 +257,7 @@ export async function removeUserRoleAction(formData: FormData): Promise<void> {
   await prisma.userRole
     .delete({ where: { userId_roleId_year: { userId, roleId, year } } })
     .catch(() => null);
+  await logRoleAssignment("revoke", userId, roleId, year);
   revalidatePath("/admin/roles");
   revalidatePath(`/admin/gebruikers/${userId}`);
 }

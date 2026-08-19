@@ -18,8 +18,10 @@ import {
   updateClientPermission,
   updateSsoClient,
 } from '@vtk/auth/server';
+import { prisma } from '@vtk/db';
 import { saveError, saveOk, type SaveState } from '@/lib/saveState';
 import { checkRedirectUris } from './redirectUris';
+import { logAudit } from '@/lib/audit';
 
 /**
  * Dunne schil rond de functies in @vtk/auth: hier staat alleen het uitpakken van
@@ -58,6 +60,28 @@ const createSchema = z.object({
 });
 
 /**
+ * Naam van de client voor in het adminlogboek. De SSO-tab houdt zelf een log per
+ * client bij (SsoAuditLog); dit is de regel die in het overzicht van álle
+ * admin-acties belandt.
+ */
+async function ssoClientName(clientId: string): Promise<string> {
+  const client = await prisma.oauthClient.findUnique({
+    where: { clientId },
+    select: { name: true },
+  });
+  return client?.name ?? clientId;
+}
+
+/** Code van een per-client permissie, voor in het adminlogboek. */
+async function ssoPermissionCode(permissionId: string): Promise<string> {
+  const permission = await prisma.ssoClientPermission.findUnique({
+    where: { id: permissionId },
+    select: { code: true },
+  });
+  return permission?.code ?? permissionId;
+}
+
+/**
  * Het secret komt maar één keer terug. We zetten het in de SaveState zodat het
  * scherm het meteen kan tonen; het staat nergens anders meer.
  */
@@ -87,6 +111,14 @@ export async function createClientAction(_prev: CreateClientState, formData: For
       clientUri: parsed.data.clientUri,
       contacts: parsed.data.contacts?.length ? parsed.data.contacts : undefined,
       scopes: parsed.data.scopes,
+    });
+
+    await logAudit({
+      action: 'create',
+      entity: 'ssoClient',
+      entityId: client.clientId,
+      target: parsed.data.name,
+      summary: `${parsed.data.type}-client met ${parsed.data.redirectUris.length} redirect-URI('s)`,
     });
 
     revalidatePath('/admin/sso');
@@ -142,6 +174,14 @@ export async function updateClientAction(_prev: SaveState, formData: FormData): 
     return saveError('SAVE_FAILED');
   }
 
+  await logAudit({
+    action: 'update',
+    entity: 'ssoClient',
+    entityId: parsed.data.clientId,
+    target: parsed.data.name,
+    summary: `${parsed.data.redirectUris.length} redirect-URI('s), scopes: ${parsed.data.scopes.join(', ')}`,
+  });
+
   revalidatePath('/admin/sso');
   revalidatePath(`/admin/sso/${parsed.data.clientId}`);
   return saveOk();
@@ -153,6 +193,13 @@ export async function toggleClientAction(formData: FormData): Promise<void> {
   if (!clientId) return;
 
   await setSsoClientDisabled(await headers(), clientId, disabled);
+  await logAudit({
+    action: 'update',
+    entity: 'ssoClient',
+    entityId: clientId,
+    target: await ssoClientName(clientId),
+    summary: disabled ? 'client uitgezet' : 'client aangezet',
+  });
   revalidatePath('/admin/sso');
   revalidatePath(`/admin/sso/${clientId}`);
 }
@@ -169,6 +216,13 @@ export async function rotateSecretAction(_prev: RotateState, formData: FormData)
 
   try {
     const { clientSecret } = await rotateSsoClientSecret(await headers(), clientId);
+    await logAudit({
+      action: 'update',
+      entity: 'ssoClient',
+      entityId: clientId,
+      target: await ssoClientName(clientId),
+      summary: 'client-secret geroteerd; de oude werkt niet meer',
+    });
     revalidatePath(`/admin/sso/${clientId}`);
     return { status: 'success', nonce: Date.now(), clientSecret };
   } catch {
@@ -179,14 +233,29 @@ export async function rotateSecretAction(_prev: RotateState, formData: FormData)
 export async function revokeTokensAction(formData: FormData): Promise<void> {
   const clientId = String(formData.get('clientId') || '');
   if (!clientId) return;
+  const name = await ssoClientName(clientId);
   await revokeSsoClientTokens(await headers(), clientId);
+  await logAudit({
+    action: 'revoke',
+    entity: 'ssoClient',
+    entityId: clientId,
+    target: name,
+    summary: 'alle tokens ingetrokken; iedereen moet opnieuw inloggen',
+  });
   revalidatePath(`/admin/sso/${clientId}`);
 }
 
 export async function deleteClientAction(formData: FormData): Promise<void> {
   const clientId = String(formData.get('clientId') || '');
   if (!clientId) return;
+  const name = await ssoClientName(clientId);
   await deleteSsoClient(await headers(), clientId);
+  await logAudit({
+    action: 'delete',
+    entity: 'ssoClient',
+    entityId: clientId,
+    target: name,
+  });
   revalidatePath('/admin/sso');
 
   // Terug naar de lijst: de detailpagina waar deze knop staat, bestaat nu niet
@@ -241,6 +310,17 @@ export async function setAccessModeAction(_prev: SaveState, formData: FormData):
     return saveError(permissionErrorCode(error));
   }
 
+  await logAudit({
+    action: 'update',
+    entity: 'ssoClient',
+    entityId: parsed.data.clientId,
+    target: await ssoClientName(parsed.data.clientId),
+    summary:
+      parsed.data.accessMode === 'OPEN'
+        ? 'toegang opengezet voor elk lid'
+        : `toegang beperkt tot houders van ${parsed.data.permissionNamespace ?? 'de access-permissie'}`,
+  });
+
   revalidateClient(parsed.data.clientId);
   return saveOk();
 }
@@ -273,6 +353,13 @@ export async function createPermissionAction(_prev: SaveState, formData: FormDat
     return saveError(permissionErrorCode(error));
   }
 
+  await logAudit({
+    action: 'create',
+    entity: 'ssoPermission',
+    entityId: clientId,
+    target: `${await ssoClientName(clientId)}: ${input.code}`,
+  });
+
   revalidateClient(clientId);
   return saveOk();
 }
@@ -297,6 +384,14 @@ export async function updatePermissionAction(_prev: SaveState, formData: FormDat
     return saveError(permissionErrorCode(error));
   }
 
+  await logAudit({
+    action: 'update',
+    entity: 'ssoPermission',
+    entityId: clientId,
+    target: `${await ssoClientName(clientId)}: ${labelNl}`,
+    summary: formData.get('deprecated') === '1' ? 'gemarkeerd als verouderd' : 'labels bewerkt',
+  });
+
   revalidateClient(clientId);
   return saveOk();
 }
@@ -305,7 +400,17 @@ export async function deletePermissionAction(formData: FormData): Promise<void> 
   const clientId = String(formData.get('clientId') || '');
   const permissionId = String(formData.get('permissionId') || '');
   if (!clientId || !permissionId) return;
+  const permission = await prisma.ssoClientPermission.findUnique({
+    where: { id: permissionId },
+    select: { code: true },
+  });
   await deleteClientPermission(await headers(), permissionId);
+  await logAudit({
+    action: 'delete',
+    entity: 'ssoPermission',
+    entityId: clientId,
+    target: `${await ssoClientName(clientId)}: ${permission?.code ?? permissionId}`,
+  });
   revalidateClient(clientId);
 }
 
@@ -345,6 +450,14 @@ export async function grantPermissionAction(_prev: SaveState, formData: FormData
     return saveError(permissionErrorCode(error));
   }
 
+  await logAudit({
+    action: 'grant',
+    entity: 'ssoPermission',
+    entityId: clientId,
+    target: `${await ssoClientName(clientId)}: ${await ssoPermissionCode(permissionId)}`,
+    summary: kind === 'role' ? 'toegekend aan een rol' : 'toegekend aan een post',
+  });
+
   revalidateClient(clientId);
   return saveOk();
 }
@@ -356,5 +469,12 @@ export async function revokePermissionAction(formData: FormData): Promise<void> 
   if (!clientId || !grantId || (kind !== 'role' && kind !== 'group')) return;
 
   await revokeClientPermission(await headers(), grantId, kind);
+  await logAudit({
+    action: 'revoke',
+    entity: 'ssoPermission',
+    entityId: clientId,
+    target: await ssoClientName(clientId),
+    summary: kind === 'role' ? 'afgenomen van een rol' : 'afgenomen van een post',
+  });
   revalidateClient(clientId);
 }

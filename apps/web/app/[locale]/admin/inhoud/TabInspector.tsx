@@ -119,8 +119,8 @@ export function TabInspector({
           </legend>
           <p className="text-xs text-[#5c667f]">
             {nl
-              ? "De pagina's onder deze categorie staan automatisch in het uitklapmenu. Hier voeg je bestemmingen op een andere site toe, zoals cudi.vtk.be of career.vtk.be."
-              : "The pages under this category are listed in the dropdown automatically. Add destinations on another site here, such as cudi.vtk.be or career.vtk.be."}
+              ? "De pagina's onder deze categorie staan automatisch in het uitklapmenu. Hier voeg je de rest toe: een andere site (cudi.vtk.be) of een vaste route op deze site die geen CMS-pagina is (/praesidium, /piano). Zo'n route vind je niet bij \"Pagina toevoegen\"."
+              : "The pages under this category are listed in the dropdown automatically. Add the rest here: another site (cudi.vtk.be) or a built-in route on this site that is not a CMS page (/praesidium, /piano). You will not find such a route under \"Add page\"."}
           </p>
           <MenuLinkRows nl={nl} initial={tab?.links ?? []} />
         </fieldset>
@@ -154,8 +154,7 @@ export function TabInspector({
               <Input
                 id="ctaUrl"
                 name="ctaUrl"
-                type="url"
-                placeholder="https://..."
+                placeholder={nl ? "/shift of https://..." : "/shift or https://..."}
                 defaultValue={tab?.ctaUrl ?? ""}
               />
             </div>
@@ -298,10 +297,14 @@ function MenuLinkRows({
           />
           <Input
             name={`link-${index}-url`}
-            type="url"
+            // Geen type="url": dat weigert een pad op deze site, en net die
+            // bestemmingen (/praesidium, /piano) kan je enkel zo in het menu
+            // krijgen; ze zijn geen CMS-pagina en staan dus niet in de picker.
+            type="text"
+            inputMode="url"
             value={row.url}
             onChange={(event) => update(index, { url: event.target.value })}
-            placeholder="https://..."
+            placeholder={nl ? "/praesidium of https://..." : "/praesidium or https://..."}
             required
           />
           <IconButton

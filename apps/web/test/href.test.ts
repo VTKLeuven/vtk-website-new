@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { isExternalUrl, withLocaleBase } from '@/lib/href';
+import { isEditableDestination, isExternalUrl, isSameSitePath, withLocaleBase } from '@/lib/href';
 
 describe('isExternalUrl', () => {
   it('herkent een pad op deze site', () => {
@@ -28,5 +28,40 @@ describe('withLocaleBase', () => {
     expect(withLocaleBase('https://logistiek.dev.vtk.be', '/en')).toBe(
       'https://logistiek.dev.vtk.be'
     );
+  });
+});
+
+describe('isEditableDestination', () => {
+  it('aanvaardt wat een redacteur bedoelt', () => {
+    // Vaste routes zonder CMS-pagina; enkel zo krijg je ze in een menu.
+    expect(isEditableDestination('/praesidium')).toBe(true);
+    expect(isEditableDestination('/piano')).toBe(true);
+    expect(isEditableDestination('https://cudi.vtk.be/vtk/shop')).toBe(true);
+    expect(isEditableDestination('http://localhost:3000/kalender')).toBe(true);
+  });
+
+  it('weigert wat niet in een redactievak hoort', () => {
+    // Ziet eruit als een pad, wijst naar een andere host.
+    expect(isEditableDestination('//cudi.vtk.be')).toBe(false);
+    expect(isEditableDestination('/\\evil.com')).toBe(false);
+    expect(isEditableDestination('javascript:alert(1)')).toBe(false);
+    expect(isEditableDestination('cudi.vtk.be')).toBe(false);
+    expect(isEditableDestination('')).toBe(false);
+  });
+
+  it('laat een scherm extra schemas toestaan', () => {
+    // De linkpagina is een knoppenlijst uit een bio: bellen en mailen hoort daar.
+    expect(isEditableDestination('mailto:it@vtk.be')).toBe(false);
+    expect(isEditableDestination('mailto:it@vtk.be', ['mailto:', 'tel:'])).toBe(true);
+    expect(isEditableDestination('tel:+3216000000', ['mailto:', 'tel:'])).toBe(true);
+  });
+
+  it('is het spiegelbeeld van isExternalUrl voor wat het toelaat', () => {
+    // Wat opslaanbaar is, moet ook correct gerenderd worden: intern zonder
+    // nieuw tabblad, extern met. Deze twee mogen dus niet uiteenlopen.
+    for (const url of ['/praesidium', 'https://cudi.vtk.be', '/info/uitleendienst']) {
+      expect(isEditableDestination(url)).toBe(true);
+      expect(isExternalUrl(url)).toBe(!isSameSitePath(url));
+    }
   });
 });

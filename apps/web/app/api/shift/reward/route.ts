@@ -7,6 +7,7 @@ import {
   ShiftRewardConflictError,
 } from "@/lib/shift-rewards.server";
 import { withSerializableTransaction } from "@/lib/ticketing/transactions";
+import { logAudit } from "@/lib/audit";
 
 /**
  * Geeft per gebruiker het aantal nog niet toegekende bonnetjes voor voltooide
@@ -116,6 +117,18 @@ export async function POST(request: Request) {
         shiftIds: shiftIds as string[],
       }),
     );
+
+    const recipient = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { name: true },
+    });
+    await logAudit({
+      action: "grant",
+      entity: "shiftReward",
+      entityId: userId,
+      target: recipient?.name ?? userId,
+      summary: `${amount} bonnetje(s) toegekend over ${result.allocations.length} shift(en)`,
+    });
 
     return NextResponse.json({
       awardedBonnetjes: amount,

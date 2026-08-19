@@ -19,6 +19,7 @@ import {
   PIANO_INFO_KEY,
 } from "@/lib/piano-server";
 import { saveError, saveOk, type SaveState } from "@/lib/saveState";
+import { logAudit } from "@/lib/audit";
 import { withSerializableTransaction } from "@/lib/ticketing/transactions";
 
 const PUBLIC_PATHS = ["/piano", "/en/piano"];
@@ -123,6 +124,32 @@ export async function cancelPianoReservationAction(formData: FormData): Promise<
 // Beheer: instellingen en infotekst
 // -----------------------------------------------------------------------------
 
+/** Dag in de tijdzone van het kasteel, voor in een logregel. */
+function formatDay(value: Date): string {
+  return new Intl.DateTimeFormat("nl-BE", {
+    timeZone: "Europe/Brussels",
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  }).format(value);
+}
+
+/** "ma, wo van 18:00 tot 22:00" — genoeg om een venster te herkennen. */
+function describeWindow(data: {
+  weekdays: number[];
+  startMinute: number;
+  endMinute: number;
+  active: boolean;
+}): string {
+  const names = ["ma", "di", "wo", "do", "vr", "za", "zo"];
+  const clock = (minutes: number) =>
+    `${String(Math.floor(minutes / 60)).padStart(2, "0")}:${String(minutes % 60).padStart(2, "0")}`;
+  const days = data.weekdays.map((d) => names[d - 1] ?? String(d)).join(", ");
+  return `${days} van ${clock(data.startMinute)} tot ${clock(data.endMinute)}${
+    data.active ? "" : " (niet actief)"
+  }`;
+}
+
 export async function savePianoConfigAction(
   _prev: SaveState,
   formData: FormData,
@@ -143,6 +170,12 @@ export async function savePianoConfigAction(
     update: { value: config },
     create: { key: PIANO_CONFIG_KEY, value: config },
   });
+  await logAudit({
+    action: "update",
+    entity: "piano",
+    target: "Piano-instellingen",
+    summary: `slot van ${config.slotMinutes} min, max ${config.maxPerWeek}/week, ${config.horizonDays} dagen vooruit`,
+  });
   revalidatePiano();
   return saveOk();
 }
@@ -161,6 +194,12 @@ export async function savePianoInfoAction(
     where: { key: PIANO_INFO_KEY },
     update: { value },
     create: { key: PIANO_INFO_KEY, value },
+  });
+  await logAudit({
+    action: "update",
+    entity: "piano",
+    target: "Piano-infotekst",
+    summary: "tekst op de pianopagina bewerkt",
   });
   revalidatePiano();
   return saveOk();
@@ -210,8 +249,22 @@ export async function savePianoWindowAction(
   const id = formData.get("id");
   if (typeof id === "string" && id) {
     await prisma.pianoWindow.update({ where: { id }, data });
+    await logAudit({
+      action: "update",
+      entity: "piano",
+      entityId: id,
+      target: `Beschikbaarheid: ${labelNl}`,
+      summary: describeWindow(data),
+    });
   } else {
-    await prisma.pianoWindow.create({ data });
+    const created = await prisma.pianoWindow.create({ data });
+    await logAudit({
+      action: "create",
+      entity: "piano",
+      entityId: created.id,
+      target: `Beschikbaarheid: ${labelNl}`,
+      summary: describeWindow(data),
+    });
   }
 
   revalidatePiano();
@@ -223,7 +276,13 @@ export async function deletePianoWindowAction(formData: FormData): Promise<void>
   const id = formData.get("id");
   if (typeof id !== "string") return;
 
-  await prisma.pianoWindow.delete({ where: { id } });
+  const window = await prisma.pianoWindow.delete({ where: { id } });
+  await logAudit({
+    action: "delete",
+    entity: "piano",
+    entityId: id,
+    target: `Beschikbaarheid: ${window.labelNl}`,
+  });
   revalidatePiano();
 }
 
@@ -267,6 +326,15 @@ export async function savePianoClosureAction(
     }),
   ]);
 
+  await logAudit({
+    action: "create",
+    entity: "piano",
+    target: `Sluiting: ${reasonNl}`,
+    summary: `van ${formatDay(startDate)} tot ${formatDay(
+      endDate,
+    )}; reservaties in die periode zijn geschrapt`,
+  });
+
   revalidatePiano();
   return saveOk();
 }
@@ -276,7 +344,14 @@ export async function deletePianoClosureAction(formData: FormData): Promise<void
   const id = formData.get("id");
   if (typeof id !== "string") return;
 
-  await prisma.pianoClosure.delete({ where: { id } });
+  const closure = await prisma.pianoClosure.delete({ where: { id } });
+  await logAudit({
+    action: "delete",
+    entity: "piano",
+    entityId: id,
+    target: `Sluiting: ${closure.reasonNl}`,
+    summary: "de piano is in die periode weer reserveerbaar",
+  });
   revalidatePiano();
 }
 
@@ -293,6 +368,16 @@ export async function deletePianoReservationAction(formData: FormData): Promise<
   const id = formData.get("id");
   if (typeof id !== "string") return;
 
-  await prisma.pianoReservation.delete({ where: { id } });
+  const reservation = await prisma.pianoReservation.delete({
+    where: { id },
+    include: { user: { select: { name: true } } },
+  });
+  await logAudit({
+    action: "delete",
+    entity: "pianoReservation",
+    entityId: id,
+    target: reservation.user.name,
+    summary: `reservatie van ${formatDay(reservation.startsAt)} geschrapt`,
+  });
   revalidatePiano();
 }

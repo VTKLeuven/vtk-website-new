@@ -5,7 +5,9 @@ import { z } from "zod";
 import { prisma } from "@vtk/db";
 import { requirePermission } from "@/lib/session";
 import { saveError, saveOk, type SaveState } from "@/lib/saveState";
+import { describeChanges, logAudit } from "@/lib/audit";
 import { localDateTimeToUtc } from "@/lib/ticketing/time";
+import { isEditableDestination } from "@/lib/href";
 
 /**
  * Aankondigingen: het bericht dat als modal verschijnt, op de homepage of op de
@@ -20,7 +22,14 @@ const schema = z.object({
   bodyEn: z.string().trim().min(1),
   ctaLabelNl: z.string().trim().optional(),
   ctaLabelEn: z.string().trim().optional(),
-  ctaUrl: z.string().trim().url().optional().or(z.literal("")),
+  // Mag een pad op deze site zijn: de modal opent enkel een nieuw tabblad voor
+  // een extern adres, dus een interne knop werd altijd al correct gerenderd.
+  ctaUrl: z
+    .string()
+    .trim()
+    .refine((v) => v === "" || isEditableDestination(v), { message: "INVALID_URL" })
+    .optional()
+    .or(z.literal("")),
   startsAt: z.string().optional(),
   endsAt: z.string().optional(),
   active: z.boolean(),
@@ -64,7 +73,10 @@ export async function saveAnnouncementAction(
     active: formData.get("active") === "on",
     scope: (formData.get("scope") as string) || "HOME",
   });
-  if (!parsed.success) return saveError("INVALID_INPUT");
+  if (!parsed.success) {
+    const badUrl = parsed.error.issues.some((issue) => issue.message === "INVALID_URL");
+    return saveError(badUrl ? "INVALID_URL" : "INVALID_INPUT");
+  }
 
   const input = parsed.data;
   const startsAt = parseMoment(input.startsAt);
@@ -94,9 +106,39 @@ export async function saveAnnouncementAction(
   };
 
   if (input.id) {
+    const existing = await prisma.announcement.findUnique({ where: { id: input.id } });
     await prisma.announcement.update({ where: { id: input.id }, data });
+    await logAudit({
+      action: "update",
+      entity: "announcement",
+      entityId: input.id,
+      target: input.titleNl,
+      summary: existing
+        ? describeChanges(existing, data, {
+            titleNl: "titel",
+            titleEn: "Engelse titel",
+            bodyNl: "tekst",
+            bodyEn: "Engelse tekst",
+            ctaLabelNl: "knoptekst",
+            ctaLabelEn: "Engelse knoptekst",
+            ctaUrl: "knoplink",
+            startsAt: "startmoment",
+            endsAt: "eindmoment",
+            active: "actief",
+            scope: "bereik",
+          })
+        : null,
+    });
   } else {
-    await prisma.announcement.create({ data: { ...data, createdById: session.user.id } });
+    const created = await prisma.announcement.create({
+      data: { ...data, createdById: session.user.id },
+    });
+    await logAudit({
+      action: "create",
+      entity: "announcement",
+      entityId: created.id,
+      target: input.titleNl,
+    });
   }
 
   revalidate();
@@ -108,9 +150,17 @@ export async function setAnnouncementActiveAction(formData: FormData): Promise<v
   await requirePermission("home.edit");
   const id = formData.get("id") as string;
   if (!id) return;
-  await prisma.announcement.update({
+  const active = formData.get("active") === "1";
+  const announcement = await prisma.announcement.update({
     where: { id },
-    data: { active: formData.get("active") === "1" },
+    data: { active },
+  });
+  await logAudit({
+    action: "update",
+    entity: "announcement",
+    entityId: id,
+    target: announcement.titleNl,
+    summary: active ? "aangezet" : "uitgezet",
   });
   revalidate();
 }
@@ -119,6 +169,12 @@ export async function deleteAnnouncementAction(formData: FormData): Promise<void
   await requirePermission("home.edit");
   const id = formData.get("id") as string;
   if (!id) return;
-  await prisma.announcement.delete({ where: { id } });
+  const announcement = await prisma.announcement.delete({ where: { id } });
+  await logAudit({
+    action: "delete",
+    entity: "announcement",
+    entityId: id,
+    target: announcement.titleNl,
+  });
   revalidate();
 }

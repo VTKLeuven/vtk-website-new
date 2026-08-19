@@ -7,6 +7,7 @@ import { requirePermission } from "@/lib/session";
 import { readImageField, resolveImageKey } from "@/lib/imageField";
 import { saveError, saveOk, type SaveState } from "@/lib/saveState";
 import { DEFAULT_EVENT_IMAGE_SETTING } from "@/lib/defaultEventImage";
+import { logAudit } from "@/lib/audit";
 
 /** Foto op één kaart in de homepage-sectie "Wat we doen". */
 export async function saveHomepageCardImageAction(
@@ -23,7 +24,7 @@ export async function saveHomepageCardImageAction(
 
   const existing = await prisma.headerTab.findUnique({
     where: { id },
-    select: { imageKey: true },
+    select: { imageKey: true, labelNl: true },
   });
   if (!existing) return saveError("INVALID_INPUT");
 
@@ -33,6 +34,16 @@ export async function saveHomepageCardImageAction(
     where: { id },
     data: { imageKey },
   });
+
+  if (imageKey !== existing.imageKey) {
+    await logAudit({
+      action: "update",
+      entity: "home",
+      entityId: id,
+      target: `Wat we doen: ${existing.labelNl}`,
+      summary: imageKey ? "foto van de kaart vervangen" : "foto van de kaart verwijderd",
+    });
+  }
 
   if (existing.imageKey && existing.imageKey !== imageKey) {
     try {
@@ -75,6 +86,15 @@ export async function saveDefaultEventImageAction(
     }
   }
 
+  if (imageKey !== existingKey) {
+    await logAudit({
+      action: "update",
+      entity: "home",
+      target: "Standaardfoto voor evenementen",
+      summary: imageKey ? "vervangen" : "verwijderd",
+    });
+  }
+
   // Elke eventpagina en de homepage kunnen deze foto tonen.
   revalidatePath("/", "layout");
   revalidatePath("/admin/home");
@@ -96,6 +116,12 @@ export async function saveCareerAction(_prev: SaveState, formData: FormData): Pr
     where: { key: "home.career" },
     update: { value },
     create: { key: "home.career", value },
+  });
+  await logAudit({
+    action: "update",
+    entity: "home",
+    target: "VTK Career-blok",
+    summary: "tekst of knop van het careerblok op de homepage bewerkt",
   });
   revalidatePath("/");
   revalidatePath("/admin/home");
@@ -139,6 +165,12 @@ export async function saveAftermoviesAction(_prev: SaveState, formData: FormData
     where: { key: "media.aftermovies" },
     update: { value: { titleNl, titleEn, items } },
     create: { key: "media.aftermovies", value: { titleNl, titleEn, items } },
+  });
+  await logAudit({
+    action: "update",
+    entity: "home",
+    target: "Aftermovies",
+    summary: `${items.length} item(s) in het aftermovieblok`,
   });
   revalidatePath("/");
   revalidatePath("/media");

@@ -52,7 +52,7 @@ export function SiteSearchForm({
         autoComplete="off"
         autoFocus={autoFocus}
       />
-      <button type="submit" className="vtk-search-submit">
+      <button type="submit" className="vtk-search-submit" data-umami-event="zoekopdracht-uitgevoerd">
         {t.submit}
       </button>
     </form>

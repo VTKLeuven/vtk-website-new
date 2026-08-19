@@ -8,6 +8,7 @@ import { getVisibleHeaderTabsForNav } from '@/lib/headerTabs';
 import { getCurrentSession } from '@/lib/session';
 import { hasPermission } from '@vtk/auth';
 import { hasPendingMeetingNotice } from '@/lib/meetings-server';
+import { umamiEvent } from '@/lib/analytics';
 import { EditorialNavLinks } from './EditorialNavLinks';
 import { LocaleSwitcher } from './LocaleSwitcher';
 import { ProfileMenu } from './ProfileMenu';
@@ -83,14 +84,25 @@ export async function Header({ locale }: { locale: Locale }) {
     <SiteHeaderShell>
       <div className="utility">
         <div className="utility-inner">
-          <div>
+          <Link href={`${base}/theokot`} className="flex items-center gap-1.5" {...umamiEvent("openingsuren-bekeken")}>
             <span className="dot" />
             {utilLeft}
-          </div>
+          </Link>
           <div className="utility-links">
             {quick.map((item, i) =>
               item.as === 'link' ? (
-                <Link key={i} href={item.href}>
+                <Link
+                  key={i}
+                  href={item.href}
+                  {...umamiEvent(
+                    item.href.includes("cursusdienst")
+                      ? "cudi-webshop-geklikt"
+                      : item.href.includes("theokot")
+                        ? "openingsuren-bekeken"
+                        : "homepage-link",
+                    { label: item.label }
+                  )}
+                >
                   {item.label}
                 </Link>
               ) : (

@@ -6,6 +6,7 @@ import {
   analyticsScript,
   excludedAnalyticsPaths,
   isExcludedFromAnalytics,
+  magazineEventName,
   magazineViewTitle,
   outboundHost,
   umamiEvent,
@@ -147,6 +148,13 @@ describe('magazines per nummer meten', () => {
     // Umami naast `/media/bakske` als een tweede regel gaan staan.
     expect(magazineViewUrl({ kind: 'bakske', id: 'bakske' })).toBe('/media/bakske/bakske');
     expect(magazineViewUrl({ kind: 'bakske', id: 'bakske-' })).not.toMatch(/\/$/);
+  });
+
+  it('geeft de juiste eventnaam voor bakske en ir-reeel', () => {
+    expect(magazineEventName('bakske', 'bekeken')).toBe('bakske-bekeken');
+    expect(magazineEventName('ir-reeel', 'bekeken')).toBe('irreel-bekeken');
+    expect(magazineEventName('bakske', 'download')).toBe('bakske-download');
+    expect(magazineEventName('ir-reeel', 'nieuw-tabblad')).toBe('irreel-nieuw-tabblad');
   });
 
   it('zet publicatie en nummer in de titel', () => {

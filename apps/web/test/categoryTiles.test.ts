@@ -1,13 +1,18 @@
 import { describe, expect, it } from 'vitest';
 import { categoryTiles } from '@/lib/categoryTiles';
 
-const page = (id: string, slug: string, extra: Partial<{ excerptNl: string | null }> = {}) => ({
+const page = (
+  id: string,
+  slug: string,
+  extra: Partial<{ excerptNl: string | null; imageKey: string | null }> = {}
+) => ({
   id,
   slug,
   titleNl: slug,
   titleEn: null,
   excerptNl: null,
   excerptEn: null,
+  imageKey: null,
   ...extra,
 });
 
@@ -60,6 +65,19 @@ describe('categoryTiles', () => {
 
     expect(tiles[0].excerptNl).toBe('Help mee achter de schermen.');
     expect(tiles[1].excerptNl).toBeNull();
+  });
+
+  it('geeft een menu-item geen foto', () => {
+    // Een menu-item is geen pagina en heeft dus geen `imageKey` om te tonen; de
+    // kaart valt terug op het gestreepte patroon i.p.v. de foto van de vorige.
+    const tiles = categoryTiles({
+      slug: 'info',
+      pages: [page('p1', 'shiften', { imageKey: 'pages/shiften.jpg' })],
+      links: [link('l1', '/piano')],
+    });
+
+    expect(tiles[0].imageKey).toBe('pages/shiften.jpg');
+    expect(tiles[1].imageKey).toBeNull();
   });
 
   it('valt terug op de Nederlandse titel wanneer een pagina geen Engelse heeft', () => {

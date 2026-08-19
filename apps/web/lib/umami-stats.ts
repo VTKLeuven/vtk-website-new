@@ -175,18 +175,37 @@ async function loadStats(period: UmamiPeriod, now: Date): Promise<UmamiStatsResu
 
   // `type=path` en niet `type=url`: Umami 3.x hernoemde die metriek, en de oude
   // naam geeft een 400 terug in plaats van een lege lijst.
-  const urls = await fetchJson(`${base}/metrics?${range}&type=path&limit=500`, share.token);
-  if (urls === null) return { ok: false, error: "umami_error" };
+  const [urls, bakskeDownloads, irreelDownloads, legacyDownloads, bakskeViews, irreelViews] = await Promise.all([
+    fetchJson(`${base}/metrics?${range}&type=path&limit=500`, share.token),
+    fetchJson(`${base}/event-data/values?${range}&eventName=bakske-download&propertyName=nummer`, share.token),
+    fetchJson(`${base}/event-data/values?${range}&eventName=irreel-download&propertyName=nummer`, share.token),
+    fetchJson(`${base}/event-data/values?${range}&eventName=magazine-download&propertyName=nummer`, share.token),
+    fetchJson(`${base}/event-data/values?${range}&eventName=bakske-bekeken&propertyName=nummer`, share.token),
+    fetchJson(`${base}/event-data/values?${range}&eventName=irreel-bekeken&propertyName=nummer`, share.token),
+  ]);
 
-  const events = await fetchJson(
-    `${base}/event-data/values?${range}&eventName=magazine-download&propertyName=nummer`,
-    share.token,
-  );
+  if (urls === null && bakskeViews === null && irreelViews === null) return { ok: false, error: "umami_error" };
+
+  const views: Record<string, number> = {
+    ...toCounts(urls, "x", "y"),
+  };
+
+  const bakskeViewCounts = toCounts(bakskeViews, "value", "total");
+  const irreelViewCounts = toCounts(irreelViews, "value", "total");
+  for (const [id, count] of Object.entries({ ...bakskeViewCounts, ...irreelViewCounts })) {
+    views[id] = (views[id] ?? 0) + count;
+  }
+
+  const downloads: Record<string, number> = {
+    ...toCounts(legacyDownloads, "value", "total"),
+    ...toCounts(bakskeDownloads, "value", "total"),
+    ...toCounts(irreelDownloads, "value", "total"),
+  };
 
   return {
     ok: true,
-    views: toCounts(urls, "x", "y"),
-    downloads: toCounts(events, "value", "total"),
+    views,
+    downloads,
     since,
   };
 }

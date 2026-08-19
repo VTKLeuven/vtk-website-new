@@ -29,8 +29,24 @@ import {
 import { outstandingShiftReward } from "@/lib/shift-rewards";
 import { withSerializableTransaction } from "@/lib/ticketing/transactions";
 import { saveError, saveOk, type SaveState } from "@/lib/saveState";
+import { logAudit } from "@/lib/audit";
 
 export type ActionResult = { ok: true; message?: string } | { ok: false; error: string };
+
+/** Dag als datum in Brussel, voor in een logregel. */
+function formatDay(date: Date): string {
+  return new Intl.DateTimeFormat("nl-BE", {
+    timeZone: "Europe/Brussels",
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  }).format(date);
+}
+
+/** Eén verkoopdag, zoals ze in het adminlogboek genoemd wordt. */
+function sessionLabel(date: Date): string {
+  return `Verkoopdag ${formatDay(date)}`;
+}
 
 const ADMIN_PATH = "/admin/theokot";
 
@@ -188,6 +204,7 @@ export async function createWeekSessionsAction(formData: FormData): Promise<void
   }
 
   const startYmd = brusselsYMD(weekStart);
+  let createdDays = 0;
   for (const offset of days) {
     const dayMidnight = brusselsTimeOnDay(
       new Date(Date.UTC(startYmd.year, startYmd.month - 1, startYmd.day, 12) + offset * 86400000),
@@ -229,7 +246,15 @@ export async function createWeekSessionsAction(formData: FormData): Promise<void
     // uit de catalogus gekozen. Nu het aanbod van die dag bestaat, koppelen we
     // ze eraan; wat er niet op staat, wordt ongeldig en de persoon krijgt een mail.
     await syncMeetingsOnDay(dayMidnight);
+    createdDays += 1;
   }
+
+  await logAudit({
+    action: "create",
+    entity: "theokotSession",
+    target: `Verkoopweek van ${formatDay(weekStart)}`,
+    summary: `${createdDays} nieuwe verkoopdag(en) met ${offering.length} broodje(s); bestaande dagen overgeslagen`,
+  });
 
   revalidateTheokot();
 }
@@ -265,6 +290,13 @@ export async function updateSessionAction(
   }
 
   await prisma.theokotSession.update({ where: { id }, data });
+  await logAudit({
+    action: "update",
+    entity: "theokotSession",
+    entityId: id,
+    target: sessionLabel(existing.date),
+    summary: existing.isOpen === isOpen ? "uren gewijzigd" : isOpen ? "opengezet" : "dichtgezet",
+  });
   // Een dag dichtzetten of verplaatsen raakt ook de vergaderingen van die dag.
   await syncMeetingsForSession(id);
   revalidateTheokot();
@@ -317,6 +349,14 @@ export async function updateSessionItemsAction(
     }
   }
 
+  await logAudit({
+    action: "update",
+    entity: "theokotSession",
+    entityId: sessionId,
+    target: sessionLabel(existing.date),
+    summary: `aanbod aangepast naar ${rows.length} broodje(s)`,
+  });
+
   // Dit is precies het geval waarvoor het uitlijnen bestaat: een week met een
   // ander aanbod dan de catalogus. Wie een broodje reserveerde dat er nu niet
   // meer is, krijgt een mail en een melding om opnieuw te kiezen.
@@ -357,6 +397,12 @@ export async function saveConfigAction(
     where: { key: "theokot.config" },
     update: { value },
     create: { key: "theokot.config", value },
+  });
+  await logAudit({
+    action: "update",
+    entity: "theokotSettings",
+    target: "Theokot-instellingen",
+    summary: `max ${value.maxItemsPerOrder} per bestelling, bestellen opent om ${value.orderOpenTime}, annuleren tot ${value.cancelDeadline}, ban van ${value.banDurationDays} dag(en)`,
   });
   revalidatePath(`${ADMIN_PATH}/instellingen`);
   revalidateTheokot();
@@ -418,9 +464,22 @@ export async function saveProductCatalogAction(
   }
 
   // Verwijder actieve producten die uit de lijst gehaald zijn.
+  let removed = 0;
   for (const p of active) {
-    if (!keepIds.has(p.id)) await prisma.theokotProduct.delete({ where: { id: p.id } });
+    if (!keepIds.has(p.id)) {
+      await prisma.theokotProduct.delete({ where: { id: p.id } });
+      removed += 1;
+    }
   }
+
+  await logAudit({
+    action: "update",
+    entity: "theokotProduct",
+    target: "Standaardcatalogus",
+    summary: `${rows.length} product(en) in de catalogus${
+      removed > 0 ? `, ${removed} verwijderd` : ""
+    }`,
+  });
 
   revalidatePath(`${ADMIN_PATH}/instellingen`);
   revalidateTheokot();
@@ -440,6 +499,12 @@ export async function saveOrderMessageAction(
     where: { key: "theokot.orderMessage" },
     update: { value },
     create: { key: "theokot.orderMessage", value },
+  });
+  await logAudit({
+    action: "update",
+    entity: "theokotSettings",
+    target: "Bericht bij een bestelling",
+    summary: value.bodyNl ? "tekst bewerkt" : "tekst leeggemaakt",
   });
   revalidatePath(`${ADMIN_PATH}/instellingen`);
   revalidateTheokot();
@@ -469,6 +534,12 @@ export async function saveTheokotOpeningHoursAction(
     where: { key: "home.openingHours.theokot" },
     update: { value },
     create: { key: "home.openingHours.theokot", value },
+  });
+  await logAudit({
+    action: "update",
+    entity: "theokotSettings",
+    target: "Openingsuren Theokot",
+    summary: `${entries.length} dag(en) op de homepage`,
   });
   revalidatePath("/");
   revalidatePath(`${ADMIN_PATH}/openingsuren`);
@@ -501,7 +572,7 @@ export async function createBanAction(
   }
   if (!userId) return saveError("USER_MISSING");
 
-  await prisma.theokotBan.create({
+  const ban = await prisma.theokotBan.create({
     data: {
       userId,
       reason,
@@ -509,6 +580,14 @@ export async function createBanAction(
       note,
       createdById: admin.user.id,
     },
+  });
+  const banned = await prisma.user.findUnique({ where: { id: userId }, select: { name: true } });
+  await logAudit({
+    action: "create",
+    entity: "theokotBan",
+    entityId: ban.id,
+    target: banned?.name ?? userId,
+    summary: `${days} dag(en) geband: ${reason}`,
   });
   revalidatePath(`${ADMIN_PATH}/bans`);
   revalidateTheokot();
@@ -527,7 +606,18 @@ export async function updateBanAction(
   const data: Prisma.TheokotBanUpdateInput = { active, note };
   const endsAt = new Date(endsAtRaw);
   if (!Number.isNaN(endsAt.getTime())) data.endsAt = endsAt;
-  await prisma.theokotBan.update({ where: { id }, data });
+  const ban = await prisma.theokotBan.update({
+    where: { id },
+    data,
+    include: { user: { select: { name: true } } },
+  });
+  await logAudit({
+    action: "update",
+    entity: "theokotBan",
+    entityId: id,
+    target: ban.user.name,
+    summary: active ? "ban blijft actief; einddatum of notitie gewijzigd" : "ban uitgezet",
+  });
   revalidatePath(`${ADMIN_PATH}/bans`);
   revalidateTheokot();
   return saveOk();
@@ -536,7 +626,18 @@ export async function updateBanAction(
 export async function liftBanAction(formData: FormData): Promise<void> {
   await requirePermission("theokot.manage");
   const id = formData.get("banId") as string;
-  await prisma.theokotBan.update({ where: { id }, data: { active: false } });
+  const ban = await prisma.theokotBan.update({
+    where: { id },
+    data: { active: false },
+    include: { user: { select: { name: true } } },
+  });
+  await logAudit({
+    action: "update",
+    entity: "theokotBan",
+    entityId: id,
+    target: ban.user.name,
+    summary: "ban opgeheven",
+  });
   revalidatePath(`${ADMIN_PATH}/bans`);
   revalidateTheokot();
 }
@@ -573,6 +674,20 @@ export async function correctOrderStatusAction(
       data: { active: false },
     });
   }
+
+  const buyer = await prisma.user.findUnique({
+    where: { id: order.userId },
+    select: { name: true },
+  });
+  await logAudit({
+    action: "update",
+    entity: "theokotOrder",
+    entityId: orderId,
+    target: buyer?.name ?? order.userId,
+    summary: `status gezet op ${status}${note ? ` (${note})` : ""}${
+      liftBan ? "; lopende ban opgeheven" : ""
+    }`,
+  });
 
   revalidatePath(`${ADMIN_PATH}/bans`);
   revalidateTheokot();

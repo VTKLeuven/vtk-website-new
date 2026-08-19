@@ -11,15 +11,30 @@ on:
   # maar draait de server nog op de vorige commit.
   workflow_dispatch:
 
+# Een tweede push op dezelfde PR maakt de vorige run overbodig; die wordt
+# afgebroken in plaats van een runner bezet te houden. Op main gebeurt dat
+# bewust NIET: daar hoort elke commit haar eigen verify en deploy te krijgen.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+# Testwaarden, geen echte secrets. Op jobniveau zou dit blok twee keer moeten
+# staan; bovenaan erft elke job het.
+env:
+  DATABASE_URL: postgresql://vtk:vtk@127.0.0.1:5432/vtk_test?schema=public
+  BETTER_AUTH_SECRET: 4tFQwV8Gq2YcX9nB6mR3kL7sP5uD1zH0jA8eC4vN2xM
+  BETTER_AUTH_URL: http://localhost:3000
+  TICKETING_TOKEN_SECRET: 7gK3wQ9cT2mV8xN4pR6yH1dF5sL0aJ7uB9eC3zX6qWk
+  TICKETING_MAINTENANCE_SECRET: 5nD8vL2qH7xM4cR9wT1sF6jK3pY0uA5eB8gN2zQ7mVc
+
+# De verify was één job van vier tot tien minuten, terwijl de twee dure stappen
+# (tsc + lint, en de productiebuild + smoke) niets van elkaar nodig hebben. Ze
+# staan nu naast elkaar, dus de wachttijd is de traagste van de twee in plaats
+# van de som. Beide moeten groen zijn voor de deploy start.
 jobs:
-  verify:
+  checks:
+    name: Types, lint and tests
     runs-on: ubuntu-latest
-    env:
-      DATABASE_URL: postgresql://vtk:vtk@127.0.0.1:5432/vtk_test?schema=public
-      BETTER_AUTH_SECRET: 4tFQwV8Gq2YcX9nB6mR3kL7sP5uD1zH0jA8eC4vN2xM
-      BETTER_AUTH_URL: http://localhost:3000
-      TICKETING_TOKEN_SECRET: 7gK3wQ9cT2mV8xN4pR6yH1dF5sL0aJ7uB9eC3zX6qWk
-      TICKETING_MAINTENANCE_SECRET: 5nD8vL2qH7xM4cR9wT1sF6jK3pY0uA5eB8gN2zQ7mVc
     services:
       postgres:
         image: postgres:16
@@ -58,7 +73,7 @@ jobs:
           cp .env.example .env
           npm run db:generate
 
-      - name: Run web unit tests
+      - name: Run unit tests
         run: |
           npm run test --workspace=@vtk/web
           npm run test --workspace=@vtk/logistiek
@@ -76,13 +91,73 @@ jobs:
           npx prisma migrate deploy --schema packages/db/prisma/schema.prisma
           npm run test:integration --workspace=@vtk/web
 
+  build:
+    name: Production build and browser smoke
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: vtk
+          POSTGRES_PASSWORD: vtk
+          POSTGRES_DB: vtk_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U vtk -d vtk_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Prepare Prisma client
+        run: |
+          cp .env.example .env
+          npm run db:generate
+
+      - name: Apply migrations
+        run: npx prisma migrate deploy --schema packages/db/prisma/schema.prisma
+
       - name: Build production application
         run: |
           npm run build --workspace=@vtk/web
           npm run build --workspace=@vtk/logistiek
 
+      - name: Resolve Playwright version
+        id: playwright
+        run: |
+          echo "version=$(node -p "require('./node_modules/@playwright/test/package.json').version")" >> "$GITHUB_OUTPUT"
+
+      # De browser downloaden duurde 30 seconden, maar `--with-deps` deed daar
+      # een apt-get update + install bovenop en dat schommelde tussen 30 seconden
+      # en zes minuten: het was veruit de traagste stap van de hele run. De
+      # runner-image van GitHub heeft Chrome al staan, dus die systeemlibs zijn
+      # er; enkel de browser van Playwright zelf moet erbij, en die komt uit de
+      # cache. Faalt Chromium ooit met een ontbrekende .so, zet dan hier
+      # `npx playwright install-deps chromium` bij in plaats van `--with-deps`
+      # terug te zetten op de installatiestap.
+      - name: Cache Playwright browsers
+        id: playwright-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ steps.playwright.outputs.version }}
+
       - name: Install Playwright Chromium
-        run: npx playwright install --with-deps chromium
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
+        run: npx playwright install chromium
 
       - name: Run browser security smoke
         run: npm run test:e2e:tickets --workspace=@vtk/web
@@ -90,7 +165,7 @@ jobs:
   deploy:
     # Ook bij een handmatige start deployen; enkel een pull_request mag niet.
     if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
-    needs: verify
+    needs: [checks, build]
     runs-on: ubuntu-latest
 
     steps:

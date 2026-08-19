@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type FormEvent } from "react";
 import { Download, QrCode } from "lucide-react";
 import { Button, Card, Input, Label } from "@vtk/ui";
 import { IconButton, RowActions } from "@/components/ui/IconButton";
@@ -40,6 +40,9 @@ export function ShortLinksManager({
   const [deleting, setDeleting] = useState<LinkRow | null>(null);
   const [qrLink, setQrLink] = useState<LinkRow | null>(null);
   const [copied, setCopied] = useState<string | null>(null);
+  // Slug van een zonet ingediende nieuwe link; blijft hangen tot de nieuwe rij
+  // binnenkomt, zodat we dan meteen haar QR-code kunnen tonen.
+  const [createdSlug, setCreatedSlug] = useState<string | null>(null);
 
   // A save/delete revalidates the route, so `links` arrives as a new array only
   // when the server data actually changed — close any open modal at that point.
@@ -51,7 +54,12 @@ export function ShortLinksManager({
     setPrevLinks(links);
     setEditing(null);
     setDeleting(null);
-    setQrLink(null);
+    // Net een link aangemaakt? Toon de QR-code van die nieuwe rij in plaats van
+    // alles te sluiten; in elk ander geval sluit de QR-modal zoals voorheen.
+    setQrLink(createdSlug === null ? null : (links.find((l) => l.slug === createdSlug) ?? null));
+    // Altijd wissen, ook wanneer geen enkele rij matchte: anders opent een
+    // latere, ongerelateerde prop-wijziging alsnog een QR-modal.
+    setCreatedSlug(null);
   }
 
   const inactiveCount = links.filter((l) => !l.enabled || l.expired).length;
@@ -182,7 +190,13 @@ export function ShortLinksManager({
           host={host}
           nl={nl}
           link={editing === "new" ? null : editing}
-          onClose={() => setEditing(null)}
+          onCreated={setCreatedSlug}
+          onClose={() => {
+            setEditing(null);
+            // Een mislukte save (bv. dubbele slug) laat `links` ongemoeid, dus
+            // ruim de openstaande slug hier op in plaats van hem te laten hangen.
+            setCreatedSlug(null);
+          }}
         />
       )}
 
@@ -228,15 +242,27 @@ function EditModal({
   host,
   nl,
   link,
+  onCreated,
   onClose,
 }: {
   host: string;
   nl: boolean;
   link: LinkRow | null;
+  onCreated: (slug: string) => void;
   onClose: () => void;
 }) {
   const [busy, setBusy] = useState(false);
   const isEdit = link !== null;
+
+  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    setBusy(true);
+    if (isEdit) return;
+    // Enkel bij een nieuwe link: geef de slug door zodat de manager de QR-code
+    // toont zodra de aangemaakte rij binnenkomt. De server action trimt de slug
+    // ook, dus doe dat hier eveneens; anders vindt de manager de rij niet terug.
+    const slug = String(new FormData(event.currentTarget).get("slug") ?? "").trim();
+    if (slug) onCreated(slug);
+  }
 
   return (
     <div
@@ -253,7 +279,7 @@ function EditModal({
           </button>
         </div>
 
-        <form action={saveShortLinkAction} onSubmit={() => setBusy(true)} className="space-y-4">
+        <form action={saveShortLinkAction} onSubmit={handleSubmit} className="space-y-4">
           {isEdit && <input type="hidden" name="id" value={link.id} />}
           <div>
             <Label>Slug</Label>

@@ -9,6 +9,7 @@ import { deleteObject } from "@vtk/storage";
 import { requireSession } from "@/lib/session";
 import { readImageField, resolveImageKey } from "@/lib/imageField";
 import { saveError, saveOk, type SaveState } from "@/lib/saveState";
+import { describeChanges, logAudit } from "@/lib/audit";
 import { localDateTimeToUtc } from "@/lib/ticketing/time";
 
 const eventSchema = z.object({
@@ -25,6 +26,22 @@ const eventSchema = z.object({
   visibility: z.enum(["PUBLIC", "MEMBERS"]).default("PUBLIC"),
   url: z.string().optional().nullable(),
 });
+
+/** Velden die in het logboek bij naam genoemd worden bij een bewerking. */
+const EVENT_FIELD_LABELS: Record<string, string> = {
+  titleNl: "titel",
+  titleEn: "Engelse titel",
+  descriptionNl: "beschrijving",
+  descriptionEn: "Engelse beschrijving",
+  location: "locatie",
+  groupId: "groep",
+  start: "startmoment",
+  end: "eindmoment",
+  allDay: "hele dag",
+  visibility: "zichtbaarheid",
+  url: "link",
+  imageKey: "afbeelding",
+};
 
 async function assertCanManageEvent(userGroups: string[], groupId: string, superOrAll: boolean) {
   if (superOrAll) return;
@@ -125,6 +142,13 @@ export async function saveEventAction(_prev: SaveState, formData: FormData): Pro
         endsAt: end,
       },
     });
+    await logAudit({
+      action: "update",
+      entity: "calendarEvent",
+      entityId: input.id,
+      target: input.titleNl,
+      summary: describeChanges(existing, { ...data, imageKey }, EVENT_FIELD_LABELS),
+    });
     // De vervangen (of gewiste) afbeelding opruimen, zodat losse objecten niet
     // in de bucket blijven staan. Mislukt dat, dan is dat geen opslaanfout.
     if (existing.imageKey && existing.imageKey !== imageKey) {
@@ -142,6 +166,12 @@ export async function saveEventAction(_prev: SaveState, formData: FormData): Pro
         categories: { create: categoryIds.map((categoryId) => ({ categoryId })) },
       },
       select: { id: true },
+    });
+    await logAudit({
+      action: "create",
+      entity: "calendarEvent",
+      entityId: created.id,
+      target: input.titleNl,
     });
   }
   revalidatePath("/kalender");
@@ -188,6 +218,18 @@ const categorySchema = z.object({
   audience: z.enum(["FIRST_YEARS", "INTERNATIONALS"]).nullable().default(null),
 });
 
+const CATEGORY_FIELD_LABELS: Record<string, string> = {
+  slug: "slug",
+  nameNl: "naam",
+  nameEn: "Engelse naam",
+  descriptionNl: "beschrijving",
+  descriptionEn: "Engelse beschrijving",
+  colour: "kleur",
+  order: "volgorde",
+  showOnCalendarPage: "tonen op de kalenderpagina",
+  audience: "doelgroep",
+};
+
 function revalidateCalendar() {
   revalidatePath("/kalender");
   revalidatePath("/en/kalender");
@@ -231,9 +273,23 @@ export async function saveCalendarCategoryAction(
   if (clash && clash.id !== id) return saveError("SLUG_TAKEN");
 
   if (id) {
+    const existing = await prisma.calendarCategory.findUnique({ where: { id } });
     await prisma.calendarCategory.update({ where: { id }, data });
+    await logAudit({
+      action: "update",
+      entity: "calendarCategory",
+      entityId: id,
+      target: data.nameNl,
+      summary: existing ? describeChanges(existing, data, CATEGORY_FIELD_LABELS) : null,
+    });
   } else {
-    await prisma.calendarCategory.create({ data });
+    const category = await prisma.calendarCategory.create({ data });
+    await logAudit({
+      action: "create",
+      entity: "calendarCategory",
+      entityId: category.id,
+      target: data.nameNl,
+    });
   }
 
   revalidateCalendar();
@@ -253,7 +309,14 @@ export async function deleteCalendarCategoryAction(formData: FormData): Promise<
   const id = formData.get("id") as string;
   if (!id) return;
 
-  await prisma.calendarCategory.delete({ where: { id } });
+  const category = await prisma.calendarCategory.delete({ where: { id } });
+  await logAudit({
+    action: "delete",
+    entity: "calendarCategory",
+    entityId: id,
+    target: category.nameNl,
+    summary: "de evenementen zelf blijven bestaan",
+  });
   revalidateCalendar();
 }
 
@@ -271,6 +334,12 @@ export async function deleteEventAction(formData: FormData): Promise<void> {
   const userGroupIds = session.groups.map((g) => g.id);
   await assertCanManageEvent(userGroupIds, evt.groupId, superOrAll);
   await prisma.calendarEvent.delete({ where: { id } });
+  await logAudit({
+    action: "delete",
+    entity: "calendarEvent",
+    entityId: id,
+    target: evt.titleNl,
+  });
   if (evt.imageKey) {
     try {
       await deleteObject(evt.imageKey);

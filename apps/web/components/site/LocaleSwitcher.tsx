@@ -29,13 +29,25 @@ export function LocaleSwitcher({
   if (variant === "editorial") {
     return (
       <div className="lang-toggle" role="group" aria-label="Taal / Language">
-        <button type="button" onClick={() => switchTo("nl")} aria-pressed={locale === "nl"}>
+        <button
+          type="button"
+          onClick={() => switchTo("nl")}
+          aria-pressed={locale === "nl"}
+          data-umami-event="taal-gewisseld"
+          data-umami-event-taal="nl"
+        >
           NL
         </button>
         <span className="lang-sep" aria-hidden>
           /
         </span>
-        <button type="button" onClick={() => switchTo("en")} aria-pressed={locale === "en"}>
+        <button
+          type="button"
+          onClick={() => switchTo("en")}
+          aria-pressed={locale === "en"}
+          data-umami-event="taal-gewisseld"
+          data-umami-event-taal="en"
+        >
           EN
         </button>
       </div>
@@ -49,6 +61,8 @@ export function LocaleSwitcher({
           key={code}
           type="button"
           onClick={() => switchTo(code)}
+          data-umami-event="taal-gewisseld"
+          data-umami-event-taal={code}
           className={
             "rounded-full px-2.5 py-1.5 uppercase tracking-wide transition " +
             (code === locale

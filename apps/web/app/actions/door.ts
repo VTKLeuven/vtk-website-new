@@ -11,9 +11,22 @@ import {
   MAX_ACTIVE_DOOR_SHORTCUT_TOKENS,
 } from "@/lib/door-shortcut";
 import { saveError, saveOk, type SaveState } from "@/lib/saveState";
+import { logAudit } from "@/lib/audit";
 import { localDateTimeToUtc } from "@/lib/ticketing/time";
 
 export type ActionResult = { ok: true } | { ok: false; error: string };
+
+/** Kort moment voor in een logregel, in de tijdzone waarin de deur staat. */
+function formatMoment(value: Date): string {
+  return new Intl.DateTimeFormat("nl-BE", {
+    timeZone: "Europe/Brussels",
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(value);
+}
 
 /** Revalidatie van de deur-adminpagina in beide locales na een grant-wijziging. */
 function revalidateDoorAdmin() {
@@ -115,11 +128,24 @@ export async function grantDoorAccessAction(_prev: SaveState, formData: FormData
   }
   if (endsAt <= startsAt) return saveError("bad_dates");
 
-  const user = await prisma.user.findUnique({ where: { id: userId }, select: { id: true } });
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { id: true, name: true },
+  });
   if (!user) return saveError("no_user");
 
-  await prisma.doorAccessGrant.create({
+  const grant = await prisma.doorAccessGrant.create({
     data: { userId, startsAt, endsAt, note: note || null, createdById: session.user.id },
+  });
+
+  await logAudit({
+    action: "grant",
+    entity: "doorAccess",
+    entityId: grant.id,
+    target: user.name,
+    summary: `tijdelijke deurtoegang van ${formatMoment(startsAt)} tot ${formatMoment(endsAt)}${
+      note ? ` (${note})` : ""
+    }`,
   });
 
   revalidateDoorAdmin();
@@ -131,6 +157,19 @@ export async function revokeDoorGrantAction(formData: FormData): Promise<void> {
   await requirePermission("door.manage");
   const id = String(formData.get("id") ?? "").trim();
   if (!id) return;
+  const grant = await prisma.doorAccessGrant.findUnique({
+    where: { id },
+    include: { user: { select: { name: true } } },
+  });
   await prisma.doorAccessGrant.deleteMany({ where: { id } });
+  if (grant) {
+    await logAudit({
+      action: "revoke",
+      entity: "doorAccess",
+      entityId: id,
+      target: grant.user.name,
+      summary: `tijdelijke deurtoegang tot ${formatMoment(grant.endsAt)} ingetrokken`,
+    });
+  }
   revalidateDoorAdmin();
 }

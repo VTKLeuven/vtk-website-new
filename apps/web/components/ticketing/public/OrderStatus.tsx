@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { trackTicketPurchased } from "@/lib/analytics-client";
 import {
   AlertTriangle,
   ArrowLeft,
@@ -86,6 +87,17 @@ export function OrderStatus({
 
   const paid = order.status === "PAID" || order.status === "PARTIALLY_REFUNDED";
   const failed = ["PAYMENT_FAILED", "CANCELLED", "EXPIRED", "REFUNDED"].includes(order.status);
+  const trackedRef = useRef(false);
+
+  useEffect(() => {
+    if (paid && !trackedRef.current) {
+      trackedRef.current = true;
+      trackTicketPurchased({
+        eventSlug: order.event.slug ?? "",
+        ticketCount: order.tickets.length,
+      });
+    }
+  }, [paid, order.event.slug, order.tickets.length]);
 
   return (
     <div className="ticket-order-status">

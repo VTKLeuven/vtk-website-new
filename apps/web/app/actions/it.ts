@@ -18,6 +18,7 @@ import {
 import { DOOR_SETTING_KEY, getDoorConfig, type StoredDoor } from "@/lib/door-config";
 import { KUL_DEBUG_SETTING_KEY, clearKulAuthLogs } from "@vtk/auth/server";
 import { saveError, saveOk, type SaveState } from "@/lib/saveState";
+import { logAudit } from "@/lib/audit";
 
 /** Alle IT-acties zijn superadmin-only, net als de IT-tab zelf. */
 async function requireSuperAdmin() {
@@ -112,6 +113,14 @@ export async function saveS3ConfigAction(
   });
 
   resetS3Client();
+  await logAudit({
+    action: "update",
+    entity: "itConfig",
+    target: "Objectopslag (S3)",
+    summary: `endpoint ${p.endpoint}, bucket ${p.bucket}${
+      p.secretAccessKey ? ", secret vervangen" : ""
+    }`,
+  });
   revalidatePath("/admin/it");
   return saveOk();
 }
@@ -172,6 +181,13 @@ export async function saveSentryConfigAction(
     update: { value: value as unknown as Prisma.InputJsonValue },
   });
 
+  await logAudit({
+    action: "update",
+    entity: "itConfig",
+    target: "Sentry",
+    summary: dsn ? "DSN vervangen" : "opgeslagen zonder de DSN te wijzigen",
+  });
+
   // Root-layout verversen zodat de nieuwe client-DSN ingespoten wordt.
   revalidatePath("/", "layout");
   revalidatePath("/admin/it");
@@ -222,6 +238,13 @@ export async function saveDoorConfigAction(
     where: { key: DOOR_SETTING_KEY },
     create: { key: DOOR_SETTING_KEY, value: value as unknown as Prisma.InputJsonValue },
     update: { value: value as unknown as Prisma.InputJsonValue },
+  });
+
+  await logAudit({
+    action: "update",
+    entity: "itConfig",
+    target: "Deurscanner",
+    summary: `Pi op ${value.piUrl ?? "geen adres"}${secret ? ", device-secret vervangen" : ""}`,
   });
 
   revalidatePath("/admin/it");
@@ -279,6 +302,15 @@ export async function saveKulDebugAction(
     update: { value: { enabled } as unknown as Prisma.InputJsonValue },
   });
 
+  await logAudit({
+    action: "update",
+    entity: "itConfig",
+    target: "KU Leuven-loginclaims loggen",
+    summary: enabled
+      ? "aangezet; claims met persoonsgegevens worden bewaard"
+      : "uitgezet",
+  });
+
   revalidatePath("/admin/it");
   return saveOk();
 }
@@ -291,5 +323,11 @@ export async function saveKulDebugAction(
 export async function clearKulAuthLogsAction(): Promise<void> {
   await requireSuperAdmin();
   await clearKulAuthLogs();
+  await logAudit({
+    action: "delete",
+    entity: "itConfig",
+    target: "KU Leuven-loginclaims",
+    summary: "alle bewaarde claims gewist",
+  });
   revalidatePath("/admin/it");
 }

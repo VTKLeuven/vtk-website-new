@@ -7,7 +7,11 @@ import { notFound } from "next/navigation";
 import { getDictionary, pick, type Locale } from "@vtk/i18n";
 import { hasLocale } from "@/lib/locale";
 import { publicUrl } from "@/lib/storage";
-import { currentWorkingYear, formatWorkingYear } from "@/lib/workingYear";
+import { currentWorkingYear, formatWorkingYear, splitYearBar } from "@/lib/workingYear";
+import PraesidiumIndex from "./PraesidiumIndex";
+
+/** Aantal jaren dat los in de jaarbalk staat; de rest zit achter "Archief". */
+const YEARS_IN_BAR = 5;
 
 export async function generateMetadata({
   params,
@@ -34,7 +38,7 @@ export default async function PraesidiumPage({
   const base = nl ? "" : "/en";
   const t = getDictionary(locale).praesidium;
 
-  // Werkingsjaren voor de tabjes. Anders dan werkgroepen mag /praesidium bewust
+  // Werkingsjaren voor de jaarbalk. Anders dan werkgroepen mag /praesidium bewust
   // ook jaren van vóór FIRST_WORKING_YEAR tonen: de historiek (tot ~20 jaar terug)
   // wordt geïmporteerd als losse memberships met inactieve leden. Daarom bouwen we
   // de jarenlijst uit de data zelf i.p.v. workingYearTabs()/parseWorkingYear() te
@@ -49,7 +53,7 @@ export default async function PraesidiumPage({
 
   const current = currentWorkingYear();
   const yearSet = new Set<number>([...distinctYears, current]);
-  const tabs = [...yearSet].sort((a, b) => b - a);
+  const allYears = [...yearSet].sort((a, b) => b - a);
 
   // Standaardjaar: het huidige werkingsjaar wanneer dat ingevuld is, anders het
   // nieuwste jaar met data (zodat een pas geïmporteerde historiek meteen zichtbaar
@@ -57,6 +61,9 @@ export default async function PraesidiumPage({
   const newestWithData = distinctYears.length ? Math.max(...distinctYears) : current;
   const requested = Number(jaar);
   const year = Number.isInteger(requested) && yearSet.has(requested) ? requested : newestWithData;
+
+  const { bar: barYears, archive: archiveYears } = splitYearBar(allYears, year, YEARS_IN_BAR);
+  const oldestArchived = archiveYears.at(-1);
 
   const groups = await prisma.group.findMany({
     where: { type: "PRAESIDIUM" },
@@ -80,6 +87,15 @@ export default async function PraesidiumPage({
       pick(a.nameNl, a.nameEn, locale).localeCompare(pick(b.nameNl, b.nameEn, locale), locale),
     );
 
+  const indexEntries = withMembers.map((g) => ({
+    slug: g.slug,
+    name: pick(g.nameNl, g.nameEn, locale),
+    count: g.memberships.length,
+  }));
+
+  const memberCount = (n: number) =>
+    n === 1 ? t.memberCountOne : t.memberCount.replace("{count}", String(n));
+
   return (
     <div className="vtk-page">
       <header className="vtk-page-head">
@@ -87,104 +103,107 @@ export default async function PraesidiumPage({
           <div className="vtk-page-kicker">{t.kicker}</div>
           <h1 className="vtk-page-title">{t.title}</h1>
         </div>
+        <div className="page-head-meta">
+          <div>{t.year}</div>
+          <div>
+            <b>{formatWorkingYear(year)}</b>
+          </div>
+        </div>
       </header>
-      <div className="vtk-page-shell space-y-10">
-        {/* Werkingsjaar-tabjes */}
-        <div className="flex flex-wrap gap-2">
-          {tabs.map((y) => {
-            const active = y === year;
-            return (
-              <Link
-                key={y}
-                href={`${base}/praesidium?jaar=${y}`}
-                className={
-                  "rounded-full border px-4 py-1.5 text-sm font-medium transition " +
-                  (active
-                    ? "border-vtk-ink bg-vtk-ink text-white"
-                    : "border-vtk-blue/20 bg-white text-vtk-ink hover:bg-vtk-blue-soft/50")
-                }
-              >
-                {formatWorkingYear(y)}
-              </Link>
-            );
-          })}
+      <div className="vtk-page-shell">
+        <div className="vtk-roster-years">
+          <span className="vtk-roster-years-label">{t.year}</span>
+          {barYears.map((y) => (
+            <Link
+              key={y}
+              href={`${base}/praesidium?jaar=${y}`}
+              className="vtk-roster-year"
+              aria-current={y === year ? "page" : undefined}
+            >
+              {formatWorkingYear(y)}
+            </Link>
+          ))}
+          {oldestArchived !== undefined && (
+            <details className="vtk-roster-archive">
+              <summary>
+                {t.archiveTo.replace("{year}", formatWorkingYear(oldestArchived))}
+                <span className="vtk-roster-archive-chevron" aria-hidden>
+                  ⌄
+                </span>
+              </summary>
+              <div className="vtk-roster-archive-panel">
+                {archiveYears.map((y) => (
+                  <Link key={y} href={`${base}/praesidium?jaar=${y}`}>
+                    {formatWorkingYear(y)}
+                  </Link>
+                ))}
+              </div>
+            </details>
+          )}
         </div>
 
         {withMembers.length === 0 ? (
-          <p className="text-[#5c667f]">{t.empty}</p>
+          <p className="vtk-muted">{t.empty}</p>
         ) : (
-          <div className="space-y-14">
-            {withMembers.map((group) => {
-              const sorted = [...group.memberships].sort((a, b) => {
-                // Groepscoördinator (LEAD) eerst, dan de door de import/beheer
-                // ingestelde displayOrder, dan alfabetisch op naam.
-                if (a.role !== b.role) return a.role === "LEAD" ? -1 : 1;
-                if (a.displayOrder !== b.displayOrder) return a.displayOrder - b.displayOrder;
-                return a.user.name.localeCompare(b.user.name, locale);
-              });
-              return (
-                <section key={group.id}>
-                  <div className="mb-5 flex items-baseline gap-3">
-                    <h2 className="text-2xl font-semibold tracking-tight text-vtk-ink">
-                      {pick(group.nameNl, group.nameEn, locale)}
-                    </h2>
-                    <span className="rounded-full bg-vtk-blue-soft px-2 py-0.5 text-xs font-semibold tabular-nums text-vtk-blue-muted">
-                      {sorted.length}
-                    </span>
-                  </div>
-                  <ul className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
-                    {sorted.map((m) => {
-                      const src = publicUrl(m.user.avatarKey);
-                      const isCoordinator = m.role === "LEAD";
-                      // Titel (bv. Praeses) en het groepscoördinator-schap staan los
-                      // van elkaar: iemand kan allebei zijn. De titel is de subtitel,
-                      // het coördinatorschap een aparte gele pin + accentrand.
-                      const title = pick(m.titleNl ?? "", m.titleEn ?? "", locale);
-                      return (
-                        <li key={m.id}>
-                          <div
-                            className={
-                              "flex h-full flex-col items-center rounded-2xl border border-vtk-blue/10 bg-white p-4 text-center transition duration-200 hover:-translate-y-0.5 hover:border-vtk-blue/20 hover:shadow-[0_10px_30px_-16px_rgba(14,26,54,0.45)] " +
-                              (isCoordinator ? "shadow-[inset_3px_0_0_var(--color-vtk-yellow)]" : "")
-                            }
+          <div className="vtk-roster">
+            <PraesidiumIndex entries={indexEntries} title={t.posts} toggleLabel={t.jumpToPost} />
+            <div>
+              {withMembers.map((group) => {
+                const sorted = [...group.memberships].sort((a, b) => {
+                  // Groepscoördinator (LEAD) eerst, dan de door de import/beheer
+                  // ingestelde displayOrder, dan alfabetisch op naam.
+                  if (a.role !== b.role) return a.role === "LEAD" ? -1 : 1;
+                  if (a.displayOrder !== b.displayOrder) return a.displayOrder - b.displayOrder;
+                  return a.user.name.localeCompare(b.user.name, locale);
+                });
+                return (
+                  <section key={group.id} id={`post-${group.slug}`} className="vtk-roster-post">
+                    <div className="vtk-roster-post-head">
+                      <h2>{pick(group.nameNl, group.nameEn, locale)}</h2>
+                      <span className="vtk-roster-post-rule" aria-hidden />
+                      <span className="vtk-roster-post-count">{memberCount(sorted.length)}</span>
+                    </div>
+                    <ul className="vtk-roster-grid">
+                      {sorted.map((m) => {
+                        const src = publicUrl(m.user.avatarKey);
+                        const isCoordinator = m.role === "LEAD";
+                        // Titel (bv. Praeses) en het groepscoördinator-schap staan los
+                        // van elkaar: iemand kan allebei zijn. De titel staat onder de
+                        // naam, het coördinatorschap is de gele vlag op de foto.
+                        const title = pick(m.titleNl ?? "", m.titleEn ?? "", locale);
+                        return (
+                          <li
+                            key={m.id}
+                            className={"vtk-roster-cell" + (isCoordinator ? " is-lead" : "")}
                           >
-                            <div className="h-24 w-24 overflow-hidden rounded-xl bg-vtk-blue-soft ring-1 ring-vtk-blue/10">
+                            <div className="vtk-roster-photo">
                               {src ? (
-                                // De tegel is 96x96; een profielfoto uit storage is dat
-                                // zelden, dus laat next/image ze op maat snijden.
-                                <Image
-                                  src={src}
-                                  alt={m.user.name}
-                                  width={96}
-                                  height={96}
-                                  className="h-full w-full object-cover"
-                                />
+                                // De tegel is ongeveer 150px breed en vierkant; een
+                                // profielfoto uit storage is dat zelden, dus laat
+                                // next/image ze op maat snijden.
+                                <Image src={src} alt={m.user.name} width={160} height={160} />
                               ) : (
-                                <div className="grid h-full w-full place-items-center text-3xl font-semibold text-vtk-blue-muted">
+                                <div className="vtk-roster-initial" aria-hidden>
                                   {m.user.name.slice(0, 1).toUpperCase()}
                                 </div>
                               )}
+                              {/* Kort op de vlag: "Groepscoördinator" is breder dan
+                                  een tegel en zou onder `overflow: hidden` afgesneden
+                                  worden. */}
+                              {isCoordinator && (
+                                <span className="vtk-roster-flag">{t.coordinatorShort}</span>
+                              )}
                             </div>
-                            <div className="mt-3 text-sm font-semibold leading-tight text-vtk-ink">
-                              {m.user.name}
-                            </div>
-                            {title && (
-                              <div className="mt-1 text-xs font-medium text-vtk-blue">{title}</div>
-                            )}
-                            {isCoordinator && (
-                              <span className="mt-2 inline-flex items-center gap-1 rounded-full bg-vtk-yellow px-2 py-0.5 text-[11px] font-semibold text-vtk-ink">
-                                <span className="h-1.5 w-1.5 rounded-full bg-vtk-ink/70" aria-hidden />
-                                {t.coordinator}
-                              </span>
-                            )}
-                          </div>
-                        </li>
-                      );
-                    })}
-                  </ul>
-                </section>
-              );
-            })}
+                            <div className="vtk-roster-name">{m.user.name}</div>
+                            {title && <div className="vtk-roster-title">{title}</div>}
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  </section>
+                );
+              })}
+            </div>
           </div>
         )}
       </div>

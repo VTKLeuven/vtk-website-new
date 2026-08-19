@@ -177,6 +177,21 @@ the design language into the application instead of copying mockup content.
 
 ## Components
 
+- Adresvelden in de admin: een veld waar een redacteur een bestemming intikt,
+  valideer je met `isEditableDestination` uit `apps/web/lib/href.ts`, niet met
+  `z.string().url()` of een eigen regex. Die helper aanvaardt een pad op deze
+  site (`/praesidium`) naast een volledig http(s)-adres, en dat is precies wat de
+  renderkant al verwacht: `isExternalUrl` bepaalt of er een taalprefix voor moet
+  en of de link in een nieuw tabblad opent. Gebruik `type="url"` daar dus ook
+  niet op de input; de browser weigert een pad voor je server het ziet.
+  - Foutcode is `INVALID_URL`, met de melding in `lib/saveMessages.ts`.
+  - Enkel een veld dat per definitie naar een andere site wijst
+    (`HeaderTab.externalUrl`) blijft `.url()`. Machine-endpoints (SSO, deur,
+    monitoring) staan hier los van.
+  - Dit liep ooit uiteen: de menu-items en de aankondigingsknop eisten
+    `https://` terwijl hun eigen renderer een intern pad al correct afhandelde,
+    dus een werkende bestemming was niet op te slaan.
+
 - Markdown editing: gebruik
   `apps/web/components/editor/MarkdownEditor.tsx` voor alle langere,
   opgemaakte tekst die als Markdown wordt opgeslagen. Gebruik
@@ -228,6 +243,15 @@ the design language into the application instead of copying mockup content.
   and H3, anchors from `lib/pageOutline.ts`) and the downloads. The rail only
   appears when there are at least two headings or a download, sticks on desktop,
   and moves above the text on narrow screens.
+- Category pages (`/[headerSlug]`): the pages under a header tab are a list of
+  wide cards, two per row (`.vtk-tile-grid`), each opening with its own photo as
+  a square on the left and the title, excerpt and "Lees meer" on the right. The
+  photo is uploaded per page in the page editor (`Page.imageKey`); a page without
+  one keeps the striped placeholder pattern, and the menu items on that page
+  (`HeaderTabLink`) never have a photo. Do not turn these back into the plain
+  `.vtk-card` grid: most pages have no excerpt, so a title-only card grid says
+  almost nothing. See `docs/design-decisions.md` for why the list won over a
+  photo header and a full photo card.
 - Lists and calendars: favor agenda/list layouts, tabular times, compact day
   labels, and small yellow status pins.
 - Admin: keep pages operationally dense. Forms, tables, and upload/editor

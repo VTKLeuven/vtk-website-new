@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 import { prisma } from "@vtk/db";
 import { requirePermission } from "@/lib/session";
+import { describeChanges, logAudit } from "@/lib/audit";
 
 const shortLinkSchema = z.object({
   id: z.string().optional(),
@@ -51,10 +52,33 @@ export async function saveShortLinkAction(formData: FormData): Promise<void> {
   };
 
   if (parsed.id) {
+    const existing = await prisma.shortLink.findUnique({ where: { id: parsed.id } });
     await prisma.shortLink.update({ where: { id: parsed.id }, data });
+    await logAudit({
+      action: "update",
+      entity: "shortLink",
+      entityId: parsed.id,
+      target: `on.vtk.be/${data.slug}`,
+      summary: existing
+        ? describeChanges(existing, data, {
+            slug: "slug",
+            url: "bestemming",
+            note: "notitie",
+            enabled: "actief",
+            expiresAt: "vervaldatum",
+          })
+        : null,
+    });
   } else {
-    await prisma.shortLink.create({
+    const created = await prisma.shortLink.create({
       data: { ...data, createdById: session.user.id },
+    });
+    await logAudit({
+      action: "create",
+      entity: "shortLink",
+      entityId: created.id,
+      target: `on.vtk.be/${data.slug}`,
+      summary: `verwijst naar ${data.url}`,
     });
   }
 
@@ -65,7 +89,16 @@ export async function saveShortLinkAction(formData: FormData): Promise<void> {
 export async function deleteShortLinkAction(formData: FormData): Promise<void> {
   await requirePermission("shortlinks.manage");
   const id = formData.get("id") as string;
-  if (id) await prisma.shortLink.delete({ where: { id } });
+  if (id) {
+    const link = await prisma.shortLink.delete({ where: { id } });
+    await logAudit({
+      action: "delete",
+      entity: "shortLink",
+      entityId: id,
+      target: `on.vtk.be/${link.slug}`,
+      summary: `verwees naar ${link.url}`,
+    });
+  }
   revalidatePath("/admin/links");
   redirect("/admin/links");
 }

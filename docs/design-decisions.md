@@ -1000,6 +1000,39 @@ tonen en niemand merkt dat er iets stuk is. Intrekken gebeurt expliciet vanuit
 `lastUsedAt` wordt hoogstens één keer per uur weggeschreven; anders is elke poll
 van elke client een database-write.
 
+## Categoriepagina: een lijst met een foto per pagina
+
+De categoriepagina (`/info`, `/eerstejaars`, ...) toont de pagina's onder een
+headertab. Ze zag er lang uit als een raster van witte kaartjes met enkel een
+titel: op `/info` stonden zes kaarten waarvan er vier niets meer toonden dan hun
+naam, want lang niet elke pagina heeft een `excerpt`. De oude site had daar wel
+een foto per item, en die herkenbaarheid is precies wat een lijst van diensten
+nodig heeft.
+
+- **Elke pagina kan een eigen foto hebben** (`Page.imageKey`, een storage-key net
+  als `HeaderTab.imageKey`), uploadbaar in de pagina-editor
+  (`/admin/paginas/<id>`) met dezelfde `StorageImageField` als elders.
+- **De foto staat als vierkant links van de tekst, niet als kop erboven.** Een
+  categorie telt makkelijk tien items; in een lijst van brede kaarten (twee per
+  rij) scrol je minder, en er blijft plaats voor de volledige samenvatting naast
+  het beeld. Een fotokop bovenaan de kaart (zoals de aanbod-kaarten op de
+  homepage) en een volledige fotokaart onder een navy scrim zijn allebei
+  overwogen; de eerste maakt de pagina lang, de tweede dwingt elke kaart zonder
+  foto in het donker.
+- **Geen foto is een geldige toestand, geen fout.** De thumbnail toont dan het
+  gestreepte placeholder-patroon van de site: zichtbaar onaf, maar de kaart blijft
+  leesbaar en de rij blijft kloppen. In een lijst is dat een klein vlakje in
+  plaats van een gat, wat mee de reden was om voor de lijst te kiezen.
+- **Menu-items hebben nooit een foto.** Een categoriepagina toont ook de
+  `HeaderTabLink`-items (piano reserveren, de cudi-webshop): dat zijn geen
+  pagina's en er is dus niets om een foto aan te hangen. Ze houden het gestreepte
+  patroon. Een eigen `imageKey` op `HeaderTabLink` is bewust niet gebouwd zolang
+  niemand ernaar vraagt; het zou een tweede uploadscherm vragen voor items die
+  vooral doorverwijzen.
+- **Rechten volgen de inhoud, niet de structuur.** `savePageImageAction` checkt
+  `canEditPageContent`, dus wie de tekst van een pagina schrijft, kiest ook de
+  foto erbij; daar is geen `pages.manage` voor nodig.
+
 ## Homepage-secties & bandenritme
 
 De homepage is opgebouwd uit volle-breedte banden die bewust van kleur
@@ -2776,3 +2809,48 @@ keuzes die niet uit de code volgen.
   aanduidt waarvan de tweede vol zit, komt volledig op de wachtlijst in plaats van
   twee plaatsen te bezetten en voor de derde te wachten. Half ingeschreven zijn is
   voor niemand bruikbaar.
+
+## Adminlogboek: wie deed wat in het beheer
+
+Elke wijzigende beheerdersactie schrijft één regel in `AdminAuditLog`, te lezen op
+`/admin/it/logboek`. De helper staat in `apps/web/lib/audit.ts`; de call sites zitten
+in de server actions (`apps/web/app/actions/*`) en in de mutatie-endpoints van shiften
+(`apps/web/app/api/shift/*`).
+
+- **Het antwoord op "wie heeft dit gedaan" hoort op één plek te staan.** Er waren al
+  logboeken per module (`TicketAuditLog`, `FormAuditLog`, `SsoAuditLog`,
+  `UitleenAuditLog`, `DoorAccessLog`), maar die vertellen elk hun eigen verhaal en je
+  moet vooraf weten waar je moet kijken. Het adminlogboek is de dwarsdoorsnede: elke
+  tab, één tabel, één zoekbalk. De modulelogs blijven bestaan; ze staan dieper in
+  detail en hangen aan het event of het formulier zelf.
+- **Enkel wijzigende acties.** Aanmaken, wijzigen, verwijderen, publiceren, toegang
+  geven of afnemen, en versturen. Lezen, exporteren, zoeken en de testknoppen in de
+  IT-tab staan er niet in: die veranderen niets, en een logboek dat volloopt met
+  paginabezoeken beantwoordt de vraag waarvoor het bestaat niet meer.
+- **Zelfbediening van een lid staat er niet in.** Je eigen profiel, je eigen
+  dashboardtegels, je eigen piano- of broodjesreservatie, je eigen deur-snelkoppeling:
+  dat is geen beheer. Wat een beheerder mét dat lid doet (een reservatie schrappen, een
+  ban zetten, een bestelling corrigeren) staat er wel in.
+- **De balie van Theokot staat er bewust niet in.** Een broodje afvinken als opgehaald
+  gebeurt tientallen keren per middag en staat al op de bestelling zelf
+  (`pickedUpById`). In het logboek zou het al de rest wegdrukken. Correcties achteraf
+  (status rechtzetten, ban opheffen) staan er wél in: dat is precies het geval waarin
+  iemand achteraf vraagt wie dat deed.
+- **Dertig dagen, daarna weg.** Het is een logboek, geen archief. Zolang wordt de vraag
+  "wie heeft dat vorige week aangepast" gesteld; daarna is het vooral een verzameling
+  namen naast handelingen. `logAudit` snoeit hoogstens één keer per uur per proces en de
+  logboekpagina snoeit bij het openen, dus er is geen cron voor nodig.
+- **Namen worden meegekopieerd, niet opgezocht.** De regel bewaart de naam van de
+  handelende persoon én van het onderwerp zoals ze op dat moment waren. Een verwijderd
+  evenement of een uitgetreden lid mag een regel niet onleesbaar maken, en een
+  foreign key naar het onderwerp zou de regel mee weggooien.
+- **De echte actor, niet de gespeelde.** Staat een superadmin in
+  autorisatievoorbeeld-modus, dan noteert het logboek wie het écht deed. De vraag is
+  wie handelde, niet in wiens rechten die persoon aan het kijken was.
+- **Zichtbaar met `audit.view`, niet enkel voor superadmins.** Het staat onder de
+  IT-tab omdat IT de vraag krijgt, maar het is een gewone permissie zodat ze aan een
+  rol gehangen kan worden zonder iemand superadmin te maken. Het logboek toont geen
+  inhoud, enkel wie wat wanneer aanraakte.
+- **Een mislukte logregel breekt de actie niet.** `logAudit` vangt zijn eigen fouten op
+  (en meldt ze aan Sentry). Een opslaan dat lukt maar een logregel die faalt, mag geen
+  rode toast geven; andersom zou het logboek belangrijker worden dan het werk zelf.

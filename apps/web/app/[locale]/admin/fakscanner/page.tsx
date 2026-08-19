@@ -9,7 +9,6 @@ import { getDictionary, type Locale } from '@vtk/i18n';
 import { SaveForm } from '@/components/ui/SaveForm';
 import { saveFakscannerConfigAction } from '@/app/actions/fakscanner';
 import { getFakRanking, getFakscannerConfig } from '@/lib/fakscanner-server';
-import { rewardProgress } from '@/lib/fakscanner';
 import {
   currentWorkingYear,
   formatWorkingYear,
@@ -142,8 +141,8 @@ export default async function FakscannerAdminPage({
         <h1 className="text-2xl font-semibold">{dict.admin.fakscanner}</h1>
         <p className="text-sm text-zinc-500">
           {nl
-            ? 'De kaartlezer aan de bar. Eén check-in per avond; om de zoveel punten is er een gratis pint. We bewaren per persoon enkel de stand, geen lijst van avonden.'
-            : 'The card reader at the bar. One check-in per evening; every so many points there is a free beer. We keep only a running total per person, not a list of evenings.'}
+            ? 'De kaartlezer aan de bar. Eén check-in per avond; om de zoveel check-ins is er een gratis pint. We bewaren per persoon enkel de stand, geen lijst van avonden.'
+            : 'The card reader at the bar. One check-in per evening; every so many check-ins there is a free beer. We keep only a running total per person, not a list of evenings.'}
         </p>
       </header>
 
@@ -165,8 +164,8 @@ export default async function FakscannerAdminPage({
           </h2>
           <p className="text-xs text-[#5c667f]">
             {nl
-              ? `Punten, niet check-ins: een scan tijdens het dubbeltelvenster telt voor twee. Een gratis pint per ${config.rewardEvery} punten.`
-              : `Points, not check-ins: a scan during the double window counts twice. One free beer per ${config.rewardEvery} points.`}
+              ? `Een scan tijdens het dubbeltelvenster telt voor twee check-ins. Een gratis pint per ${config.rewardEvery} check-ins.`
+              : `A scan during the double window counts as two check-ins. One free beer per ${config.rewardEvery} check-ins.`}
           </p>
         </div>
 
@@ -182,11 +181,8 @@ export default async function FakscannerAdminPage({
                   <tr className="text-left text-xs uppercase text-[#5c667f]">
                     <th className="w-10 py-2 pr-3">#</th>
                     <th className="py-2 pr-3">{nl ? 'Naam' : 'Name'}</th>
-                    <th className="py-2 pr-3 text-right">{nl ? 'Punten' : 'Points'}</th>
                     <th className="py-2 pr-3 text-right">{nl ? 'Check-ins' : 'Check-ins'}</th>
-                    <th className="py-2 pr-3 text-right">{nl ? 'Pinten' : 'Beers'}</th>
-                    <th className="py-2 pr-3 text-right">{nl ? 'Tot volgende' : 'To next'}</th>
-                    <th className="py-2">{nl ? 'Laatste scan' : 'Last scan'}</th>
+                    <th className="py-2">{nl ? 'Laatste check-in' : 'Last check-in'}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -204,11 +200,6 @@ export default async function FakscannerAdminPage({
                         )}
                       </td>
                       <td className="py-2 pr-3 text-right font-medium tabular-nums text-vtk-ink">{row.points}</td>
-                      <td className="py-2 pr-3 text-right tabular-nums text-[#34405e]">{row.checkins}</td>
-                      <td className="py-2 pr-3 text-right tabular-nums text-[#34405e]">{row.beers}</td>
-                      <td className="py-2 pr-3 text-right tabular-nums text-[#5c667f]">
-                        {rewardProgress(config, row.points).toNext}
-                      </td>
                       <td className="whitespace-nowrap py-2 tabular-nums text-[#5c667f]">
                         {dateTimeFmt.format(row.lastCheckinAt)}
                       </td>
@@ -240,8 +231,8 @@ export default async function FakscannerAdminPage({
               ? 'Begin en einde van het dubbeltelvenster mogen niet gelijk zijn.'
               : "The double window's start and end may not be the same.",
             bad_reward: nl
-              ? 'Punten per pint moet een geheel getal van minstens 1 zijn.'
-              : 'Points per beer must be a whole number of at least 1.',
+              ? 'Check-ins per pint moet een geheel getal van minstens 1 zijn.'
+              : 'Check-ins per beer must be a whole number of at least 1.',
             bad_rollover: nl
               ? 'Het startuur van de bardag moet als uu:mm ingevuld zijn.'
               : "The bar day's start time must be filled in as hh:mm.",
@@ -269,7 +260,7 @@ export default async function FakscannerAdminPage({
               <Input id="doubleEnd" name="doubleEnd" type="time" defaultValue={config.doubleEnd} />
             </div>
             <div>
-              <Label htmlFor="rewardEvery">{nl ? 'Punten per gratis pint' : 'Points per free beer'}</Label>
+              <Label htmlFor="rewardEvery">{nl ? 'Check-ins per gratis pint' : 'Check-ins per free beer'}</Label>
               <Input
                 id="rewardEvery"
                 name="rewardEvery"

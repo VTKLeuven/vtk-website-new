@@ -174,9 +174,8 @@ function groupRows(
     group.rows.push({
       id: publication.id,
       label: nl ? publication.issueNl : publication.issueEn || publication.issueNl,
-      // Hetzelfde adres als de tracker verstuurt; die functie is de enige bron,
-      // zodat meten en tonen niet uit elkaar kunnen lopen.
-      views: views[magazineViewUrl(publication)] ?? 0,
+      // Berekend op basis van de virtuele URL én het specifieke event (bakske-bekeken / irreel-bekeken).
+      views: Math.max(views[magazineViewUrl(publication)] ?? 0, views[publication.id] ?? 0),
       downloads: downloads[publication.id] ?? 0,
     });
     groups.set(publication.kind, group);

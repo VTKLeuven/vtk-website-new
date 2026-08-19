@@ -38,7 +38,7 @@ export function ShiftBoard({
   const available = useShiftList('/api/shift');
   const registered = useShiftList('/api/shift/register');
 
-  const [view, setView] = useState<View>('week');
+  const [view, setView] = useState<View>('list');
   const [weekStart, setWeekStart] = useState(() => mondayOf(new Date()));
   const [postFilter, setPostFilter] = useState<string>(ALL_POSTS);
   // De shift waarvan het detailvenster openstaat (null = geen venster).

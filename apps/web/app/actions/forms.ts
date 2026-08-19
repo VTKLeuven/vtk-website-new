@@ -11,6 +11,7 @@ import { logFormAudit } from "@/lib/forms/audit";
 import { slugify } from "@/lib/ticketing/slug";
 import { localDateTimeToUtc } from "@/lib/ticketing/time";
 import { saveError, saveOk, type SaveState } from "@/lib/saveState";
+import { logAudit } from "@/lib/audit";
 
 const localeSchema = z.enum(["nl", "en"]);
 const statusSchema = z.enum(["DRAFT", "PUBLISHED", "CLOSED", "ARCHIVED"]);
@@ -170,6 +171,19 @@ async function readCalendarEventId(
   return calendarEventId;
 }
 
+/**
+ * Titel van het formulier voor in het adminlogboek. Het formulier heeft ook zijn
+ * eigen auditlog (FormAuditLog); dit is de regel die in het overzicht van álle
+ * admin-acties belandt.
+ */
+async function formTitle(formId: string): Promise<string> {
+  const form = await prisma.form.findUnique({
+    where: { id: formId },
+    select: { titleNl: true },
+  });
+  return form?.titleNl ?? formId;
+}
+
 // -----------------------------------------------------------------------------
 // Formulier aanmaken
 // -----------------------------------------------------------------------------
@@ -237,6 +251,14 @@ export async function createFormAction(
         metadata: { slug: created.slug },
       });
       return created;
+    });
+
+    await logAudit({
+      action: "create",
+      entity: "form",
+      entityId: form.id,
+      target: titleNl,
+      summary: `/formulieren/${form.slug}`,
     });
 
     refreshForm(locale, form.id, form.slug);
@@ -334,6 +356,14 @@ export async function saveFormSettingsAction(
       });
     });
 
+    await logAudit({
+      action: "update",
+      entity: "form",
+      entityId: formId,
+      target: titleNl,
+      summary: form.slug === slug ? "instellingen bewerkt" : `slug van ${form.slug} naar ${slug}`,
+    });
+
     refreshForm(locale, formId, slug);
     if (form.slug !== slug) refreshForm(locale, formId, form.slug);
   });
@@ -391,6 +421,14 @@ export async function setFormStatusAction(
       });
     });
 
+    await logAudit({
+      action: status === "PUBLISHED" ? "publish" : "update",
+      entity: "form",
+      entityId: formId,
+      target: form.titleNl,
+      summary: `status van ${form.status} naar ${status}`,
+    });
+
     refreshForm(locale, formId, form.slug);
   });
 
@@ -411,6 +449,14 @@ export async function deleteFormAction(formData: FormData): Promise<void> {
     // verwijderd formulier heeft geen lezer meer, en bewaren zou betekenen dat
     // de inzendingen die erin genoemd worden er niet meer zijn.
     await tx.form.delete({ where: { id: formId } });
+  });
+
+  await logAudit({
+    action: "delete",
+    entity: "form",
+    entityId: formId,
+    target: form.titleNl,
+    summary: `/formulieren/${form.slug}, met alle inzendingen erop`,
   });
 
   console.info(`[forms] formulier ${form.slug} (${formId}) verwijderd door ${session.user.email}`);
@@ -580,6 +626,14 @@ export async function duplicateFormAction(formData: FormData): Promise<void> {
     return copy.id;
   });
 
+  await logAudit({
+    action: "create",
+    entity: "form",
+    entityId: copyId,
+    target: `${form.titleNl} (${suffix})`,
+    summary: `kopie van ${form.titleNl}, als concept`,
+  });
+
   refreshForm(locale, copyId, slug);
   redirect(localePath(locale, `/admin/formulieren/${copyId}/instellingen`));
 }
@@ -631,6 +685,14 @@ export async function addFormUserGrantAction(
       });
     });
 
+    await logAudit({
+      action: "grant",
+      entity: "formAccess",
+      entityId: formId,
+      target: await formTitle(formId),
+      summary: `${user.name} kreeg de rol ${role}`,
+    });
+
     refreshForm(locale, formId);
   });
 
@@ -665,6 +727,20 @@ export async function addFormGroupGrantAction(
         entityId: groupId,
         metadata: { role, scope },
       });
+    });
+
+    const group = await prisma.group.findUnique({
+      where: { id: groupId },
+      select: { nameNl: true },
+    });
+    await logAudit({
+      action: "grant",
+      entity: "formAccess",
+      entityId: formId,
+      target: await formTitle(formId),
+      summary: `post ${group?.nameNl ?? groupId} kreeg de rol ${role} (${
+        scope === "LEADS_ONLY" ? "enkel de verantwoordelijke" : "elk lid"
+      })`,
     });
 
     refreshForm(locale, formId);
@@ -703,6 +779,14 @@ export async function removeFormGrantAction(formData: FormData): Promise<void> {
       entityType: kind === "group" ? "FormGroupGrant" : "FormUserGrant",
       entityId: grantId,
     });
+  });
+
+  await logAudit({
+    action: "revoke",
+    entity: "formAccess",
+    entityId: formId,
+    target: await formTitle(formId),
+    summary: kind === "group" ? "toegang van een post ingetrokken" : "toegang van een persoon ingetrokken",
   });
 
   refreshForm(locale, formId);
@@ -773,6 +857,13 @@ export async function createFormShortLinkAction(
         entityId: formId,
         metadata: { slug },
       });
+    });
+
+    await logAudit({
+      action: "create",
+      entity: "shortLink",
+      target: `on.vtk.be/${slug}`,
+      summary: `verkorte link naar formulier ${form.titleNl}`,
     });
 
     refreshForm(locale, formId, form.slug);

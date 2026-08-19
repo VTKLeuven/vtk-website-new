@@ -18,6 +18,7 @@ import {
 import { wouldCreateCycle } from "@/lib/forms/visibility";
 import { wouldLoop } from "@/lib/forms/branching";
 import { saveError, saveOk, type SaveState } from "@/lib/saveState";
+import { logAudit } from "@/lib/audit";
 
 const fieldDraftSchema = z.object({
   id: z.string().nullish(),
@@ -93,6 +94,12 @@ function refresh(formId: string) {
     revalidatePath(`${base}/admin/formulieren/${formId}/velden`);
     revalidatePath(`${base}/admin/formulieren/${formId}`);
   }
+}
+
+/** Titel van het formulier, voor een leesbare regel in het adminlogboek. */
+async function formTitle(formId: string): Promise<string> {
+  const form = await prisma.form.findUnique({ where: { id: formId }, select: { titleNl: true } });
+  return form?.titleNl ?? formId;
 }
 
 /**
@@ -248,6 +255,13 @@ export async function saveFormFieldAction(
       });
     });
 
+    await logAudit({
+      action: existing ? "update" : "create",
+      entity: "formField",
+      entityId: formId,
+      target: `${await formTitle(formId)}: ${draft.labelNl}`,
+    });
+
     refresh(formId);
   });
 }
@@ -390,6 +404,14 @@ export async function reorderFormStructureAction(
       });
     });
 
+    await logAudit({
+      action: "reorder",
+      entity: "formField",
+      entityId: formId,
+      target: await formTitle(formId),
+      summary: "volgorde van vragen en secties gewijzigd",
+    });
+
     refresh(formId);
   });
 }
@@ -433,6 +455,16 @@ export async function removeFormFieldAction(formData: FormData): Promise<void> {
       entityId: fieldId,
       metadata: { code: field.code },
     });
+  });
+
+  await logAudit({
+    action: "delete",
+    entity: "formField",
+    entityId: formId,
+    target: `${await formTitle(formId)}: ${field.labelNl}`,
+    summary: hasAnswers
+      ? "vraag gearchiveerd; gegeven antwoorden blijven in de export staan"
+      : "vraag verwijderd",
   });
 
   refresh(formId);
@@ -503,6 +535,14 @@ export async function duplicateFormFieldAction(
         entityId: copy.id,
         metadata: { sourceFieldId: fieldId },
       });
+    });
+
+    await logAudit({
+      action: "create",
+      entity: "formField",
+      entityId: formId,
+      target: `${await formTitle(formId)}: ${field.labelNl}`,
+      summary: "vraag gedupliceerd",
     });
 
     refresh(formId);
@@ -580,6 +620,13 @@ export async function saveFormSectionAction(
       });
     });
 
+    await logAudit({
+      action: draft.id ? "update" : "create",
+      entity: "formSection",
+      entityId: formId,
+      target: `${await formTitle(formId)}: ${draft.titleNl}`,
+    });
+
     refresh(formId);
   });
 }
@@ -607,6 +654,14 @@ export async function deleteFormSectionAction(formData: FormData): Promise<void>
       entityType: "FormSection",
       entityId: sectionId,
     });
+  });
+
+  await logAudit({
+    action: "delete",
+    entity: "formSection",
+    entityId: formId,
+    target: `${await formTitle(formId)}: ${section.titleNl}`,
+    summary: "de vragen in de sectie blijven bestaan",
   });
 
   refresh(formId);

@@ -48,3 +48,25 @@ export function parseWorkingYear(raw: string | undefined, now: Date = new Date()
   }
   return currentWorkingYear(now);
 }
+
+/**
+ * Verdeel de werkingsjaren over de jaarbalk en het archief erachter: de `max`
+ * nieuwste jaren staan los, al de rest zit achter de archiefknop. Het gekozen
+ * jaar hoort altijd in de balk thuis, ook wanneer het uit het archief komt;
+ * anders kijk je naar 09-10 zonder dat ergens te zien.
+ *
+ * /praesidium toont bijna twintig jaar historiek. Alle jaren als pillen naast
+ * elkaar was een blok dat elk jaar aangroeide, en dan begint de pagina met ruis
+ * in plaats van met mensen.
+ */
+export function splitYearBar(
+  years: number[],
+  selected: number,
+  max: number,
+): { bar: number[]; archive: number[] } {
+  const sorted = [...years].sort((a, b) => b - a);
+  const bar = sorted.slice(0, max);
+  if (!bar.includes(selected) && sorted.includes(selected)) bar.push(selected);
+  const inBar = new Set(bar);
+  return { bar, archive: sorted.filter((y) => !inBar.has(y)) };
+}

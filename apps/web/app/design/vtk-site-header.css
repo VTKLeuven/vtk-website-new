@@ -434,7 +434,7 @@
   display: none;
 }
 
-@media (min-width: 1280px) {
+@media (min-width: 1211px) {
   .vtk-site-header .nav-search {
     display: inline-grid;
   }
@@ -555,6 +555,10 @@
 
   .vtk-site-header .nav-mobile-search {
     padding: 8px 0 12px;
+  }
+
+  .vtk-site-header .nav-mobile-search .vtk-search-form {
+    max-width: 100%;
   }
 
   .vtk-site-header .nav-mobile-menu ul {
