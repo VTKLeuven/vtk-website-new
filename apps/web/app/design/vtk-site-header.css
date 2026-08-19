@@ -16,7 +16,10 @@
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
   font-family: var(--sans);
   -webkit-font-smoothing: antialiased;
-  transition: background 220ms ease, border-color 220ms ease, color 220ms ease;
+  transition:
+    background 220ms ease,
+    border-color 220ms ease,
+    color 220ms ease;
 }
 
 .vtk-site-header .utility {
@@ -77,7 +80,7 @@
   width: 100%;
   align-items: center;
   /* De tabs met hun chevrons zijn samen ~725px breed. De tussenruimte groeit mee
-     met het scherm: 14px zodra de tabs verschijnen (1211px) tot 18px. Meer kan
+     met het scherm: 14px op de smalste breedte waar de tabs nog staan tot 18px. Meer kan
      niet: boven 1240px stopt de container met groeien (`--max`), dus de ruimte
      voor de nav ligt daar vast en elke extra pixel tussenruimte gaat af van de
      marge die er nog is voor een tab erbij. Het bovenste getal stond op 20px
@@ -103,7 +106,7 @@
    en is meteen de aanhechting van het uitklappaneel, dat daar begint. Dezelfde
    gele regel als onderaan de `.vtk-page-head`-band. */
 .vtk-site-header .nav-item::after {
-  content: "";
+  content: '';
   position: absolute;
   left: 0;
   right: 0;
@@ -127,7 +130,9 @@
   white-space: nowrap;
   font-size: 14px;
   font-weight: 500;
-  transition: color 160ms ease, opacity 160ms ease;
+  transition:
+    color 160ms ease,
+    opacity 160ms ease;
 }
 
 .vtk-site-header .nav-links a:hover,
@@ -155,7 +160,9 @@
 .vtk-site-header .nav-caret {
   flex: none;
   opacity: 0.45;
-  transition: transform 160ms ease, opacity 160ms ease;
+  transition:
+    transform 160ms ease,
+    opacity 160ms ease;
 }
 
 .vtk-site-header .nav-item.has-menu:not([data-suppressed]):hover .nav-caret,
@@ -195,7 +202,10 @@
   opacity: 0;
   visibility: hidden;
   transform: translateY(-8px);
-  transition: opacity 130ms ease, transform 130ms ease, visibility 0s linear 130ms;
+  transition:
+    opacity 130ms ease,
+    transform 130ms ease,
+    visibility 0s linear 130ms;
 }
 
 /* Linkerrand gelijk met de tab, zodat de gele naad de bovenkant van het paneel
@@ -216,7 +226,9 @@
   opacity: 1;
   visibility: visible;
   transform: none;
-  transition: opacity 160ms ease, transform 200ms cubic-bezier(0.22, 1, 0.36, 1),
+  transition:
+    opacity 160ms ease,
+    transform 200ms cubic-bezier(0.22, 1, 0.36, 1),
     visibility 0s;
 }
 
@@ -253,14 +265,16 @@
   font-weight: 500;
   white-space: normal;
   cursor: pointer;
-  transition: background 140ms ease, color 140ms ease;
+  transition:
+    background 140ms ease,
+    color 140ms ease;
 }
 
 /* Gele markering links, als los staafje in plaats van een inset box-shadow: die
    volgt de afronding van de knop en werd daar een gebogen sikkel. */
 .vtk-site-header .nav-menu a::before,
 .vtk-site-header .profile-menu-item::before {
-  content: "";
+  content: '';
   position: absolute;
   left: 8px;
   top: 9px;
@@ -270,14 +284,16 @@
   background: var(--yellow);
   opacity: 0;
   transform: scaleY(0.35);
-  transition: opacity 140ms ease, transform 160ms ease;
+  transition:
+    opacity 140ms ease,
+    transform 160ms ease;
 }
 
 /* Chevron met randen getekend in plaats van een pijlteken: puur decoratief, dus
    een screenreader hoort er niets van. */
 .vtk-site-header .nav-menu a::after,
 .vtk-site-header .profile-menu-item::after {
-  content: "";
+  content: '';
   flex: none;
   width: 6px;
   height: 6px;
@@ -285,7 +301,9 @@
   border-right: 1.5px solid var(--yellow);
   opacity: 0;
   transform: rotate(45deg) translate(-3px, 3px);
-  transition: opacity 140ms ease, transform 160ms ease;
+  transition:
+    opacity 140ms ease,
+    transform 160ms ease;
 }
 
 .vtk-site-header .nav-menu a:hover,
@@ -393,7 +411,7 @@
   text-transform: uppercase;
 }
 
-.vtk-site-header .lang-toggle button[aria-pressed="true"] {
+.vtk-site-header .lang-toggle button[aria-pressed='true'] {
   color: #fff;
   font-weight: 600;
 }
@@ -414,7 +432,9 @@
   background: rgba(255, 255, 255, 0.12);
   color: var(--paper);
   font-weight: 600;
-  transition: background 160ms ease, border-color 160ms ease;
+  transition:
+    background 160ms ease,
+    border-color 160ms ease;
 }
 
 .vtk-site-header .profile-menu-trigger:hover,
@@ -424,17 +444,15 @@
   background: rgba(255, 255, 255, 0.22);
 }
 
-/* De zoekknop verschijnt pas vanaf 1280px, en niet al vanaf 1211px waar de tabs
-   beginnen. Daartussen is de balk vol: de elf tabs eindigen daar op negen pixels
-   van de knoppenrij, dus een knop van 38px zou over de laatste tab vallen. Onder
-   1211px is er wel een oplossing, want daar staat het echte zoekveld in het
-   uitklapmenu. Blijft die smalle strook zonder ingang zitten, verklein dan eerst
-   de navigatie; niet deze knop, want dan botst hij gewoon. */
+/* De zoekknop hangt aan dezelfde grens als de tabs (zie het blok onderaan):
+   zolang de tabs staan, is dit de zoekingang, en zodra het uitklapmenu het
+   overneemt staat het echte zoekveld daarin. Verschuif je de ene grens, verschuif
+   dan ook de andere, anders valt er een strook zonder zoekingang tussen. */
 .vtk-site-header .nav-search {
   display: none;
 }
 
-@media (min-width: 1211px) {
+@media (min-width: 1000px) {
   .vtk-site-header .nav-search {
     display: inline-grid;
   }
@@ -451,7 +469,7 @@
 }
 
 .vtk-site-header .profile-shell::after {
-  content: "";
+  content: '';
   position: absolute;
   left: 0;
   right: 0;
@@ -478,18 +496,26 @@
   /* De proxy kan na login de onboardinginhoud onder het homepagepad renderen.
      Maak de header daarom alleen transparant wanneer de hero echt aanwezig is,
      niet enkel wanneer de client-router denkt dat dit de homepage is. */
-  body:has(.home-hero) .vtk-site-header[data-over-hero="true"] {
+  body:has(.home-hero) .vtk-site-header[data-over-hero='true'] {
     background: transparent;
     border-bottom-color: transparent;
   }
 }
 
-/* Smal en middelbreed scherm: één menuknop in plaats van elf tabs. De knop
-   staat rechts naast taal en account; het paneel klapt onder de header uit en
-   toont per categorie de pagina's die eronder hangen. De grens ligt op 1210px,
-   want daaronder passen de tabs met hun uitklapmenu's niet meer leesbaar naast
-   elkaar. */
-@media (max-width: 1210px) {
+/* Smal scherm: één menuknop in plaats van de tabs. De knop staat rechts naast
+   taal en account; het paneel klapt onder de header uit en toont per categorie
+   de pagina's die eronder hangen.
+
+   DE GRENS STAAT HIER: 849px hieronder, en 850px in de `min-width` van de
+   zoekknop verderop. Die twee horen bij elkaar; zet je ze uit elkaar, dan is er
+   een strook waar noch de zoekknop noch het uitklapmenu een zoekingang geeft.
+
+   Ze lag lang op 1210px, gemeten op elf tabs die samen ~725px breed zijn. Hoe
+   laag ze kan, hangt dus af van hoeveel tabs er zijn en hoe lang hun namen zijn:
+   dat is data, geen constante. Overlopen wordt niet afgeknipt (het uitklappaneel
+   mag niet geknipt worden), dus te laag zetten laat de tabs over de knoppen
+   rechts schuiven in plaats van netjes af te breken. */
+@media (max-width: 999px) {
   :root {
     --vtk-header-height: 65px;
   }
@@ -525,11 +551,13 @@
     background: rgba(255, 255, 255, 0.12);
     color: var(--paper);
     cursor: pointer;
-    transition: background 160ms ease, border-color 160ms ease;
+    transition:
+      background 160ms ease,
+      border-color 160ms ease;
   }
 
   .vtk-site-header .nav-menu-trigger:hover,
-  .vtk-site-header .nav-menu-trigger[aria-expanded="true"] {
+  .vtk-site-header .nav-menu-trigger[aria-expanded='true'] {
     border-color: var(--paper);
     background: rgba(255, 255, 255, 0.22);
   }
@@ -601,7 +629,9 @@
     background: none;
     color: rgba(250, 250, 247, 0.66);
     cursor: pointer;
-    transition: transform 160ms ease, color 160ms ease;
+    transition:
+      transform 160ms ease,
+      color 160ms ease;
   }
 
   .vtk-site-header .nav-mobile-expand.is-open {
