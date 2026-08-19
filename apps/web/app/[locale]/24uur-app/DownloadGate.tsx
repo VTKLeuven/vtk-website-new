@@ -53,6 +53,8 @@ export function DownloadGate({ locale, ttlMinutes }: { locale: Locale; ttlMinute
             : `The app is only for associations we share it with. Enter the address you were given access with; we mail a code to it that stays valid for ${ttlMinutes} minutes.`}
         </p>
         <SaveForm
+          // Zie de sleutel op het codeformulier hieronder.
+          key="email"
           action={requestCodeAction}
           submitLabel={nl ? "Stuur me een code" : "Send me a code"}
           savingLabel={nl ? "Versturen..." : "Sending..."}
@@ -96,6 +98,15 @@ export function DownloadGate({ locale, ttlMinutes }: { locale: Locale; ttlMinute
           : `If ${email} is on the list, a six digit code just arrived there. It stays valid for ${ttlMinutes} minutes.`}
       </p>
       <SaveForm
+        /**
+         * Een eigen sleutel per stap, anders hergebruikt React het `<input>` van
+         * stap 1 voor het codeveld: beide stappen renderen dezelfde vorm
+         * (SaveForm > form > div > Label + Input), dus reconciliatie ziet één
+         * component op dezelfde plek. Het e-mailveld is gecontroleerd en het
+         * codeveld niet, dus de DOM-node hield zijn waarde en je adres bleef in
+         * het vakje staan waar om de code gevraagd wordt.
+         */
+        key="code"
         action={verifyCodeAction}
         submitLabel={nl ? "Openen" : "Unlock"}
         savingLabel={nl ? "Controleren..." : "Checking..."}

@@ -276,6 +276,13 @@
   gap: 14px;
 }
 
+/* `SaveForm` zet zijn knoprij altijd achter de children, dus de uitweg hieronder
+   staat in de markup vóór "Openen". Met `order` komt ze eronder te staan, want
+   de primaire actie hoort direct onder het veld waar ze bij hoort. */
+.vtk-ulapp-form .vtk-ulapp-note {
+  order: 1;
+}
+
 /* "Ander adres gebruiken" hangt onder het codeveld en is een gewone tekstknop:
    het is een uitweg, geen tweede primaire actie naast "Openen". */
 .vtk-ulapp-again {
