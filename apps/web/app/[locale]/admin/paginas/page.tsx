@@ -182,8 +182,8 @@ export default async function AdminPages({
         <h1 className="text-2xl font-semibold">{nl ? "Pagina's" : "Pages"}</h1>
         <p className="mt-1 text-sm text-[#5c667f]">
           {nl
-            ? "De inhoud van deze pagina's mag jij bewerken. Slug, categorie en publicatie beheer je via Inhoud."
-            : "You can edit the content of these pages. Slug, category and publication are managed via Content."}
+            ? "De inhoud van deze pagina's mag jij bewerken. Slug, categorie en publicatie beheer je via Inhoud. De categorie van een pagina is gekoppeld aan de header; enkel groco's kunnen die aanpassen onder het tabblad Inhoud."
+            : "You can edit the content of these pages. Slug, category and publication are managed via Content. A page's category is linked to the header; only GroCos can change it under the Content tab."}
         </p>
       </div>
 

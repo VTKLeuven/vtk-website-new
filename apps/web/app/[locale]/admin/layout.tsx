@@ -97,7 +97,9 @@ const NAV: NavEntry[] = [
   item('piano', '/piano', { perm: 'piano.manage' }),
   item('fakscanner', '/fakscanner', { perm: 'fakscanner.manage' }),
   item('mailinglists', '/mailinglijsten', { perm: 'mailinglists.export' }),
-  item('dashboardTiles', '/dashboard-tiles', { perm: 'dashboard.manage' }),
+  item('dashboardTiles', '/dashboard-tiles', {
+    anyPerm: ['dashboard.manage', 'dashboard.manageOwn'],
+  }),
   group('it', [
     // `exact`, anders licht Configuratie (/admin/it) ook op wanneer je op de
     // onderliggende /admin/it/preview staat.

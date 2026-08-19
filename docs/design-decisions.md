@@ -2321,11 +2321,18 @@ post dagelijks nodig heeft: de drive, de wiki, een repository, de printbestellin
 Er zijn drie soorten, en dat onderscheid is de kern van de feature.
 
 - **Voor iedereen (GLOBAL).** Beheerders met `dashboard.manage` zetten deze op
-  /admin/dashboard-tiles; elk ingelogd lid ziet ze.
-- **Per post of werkgroep (GROUP).** Enkel leden van die groep zien ze. Wie in
-  drie posten zit, krijgt dus drie extra reeksen.
+  /admin/dashboard-tiles; elk ingelogd lid ziet ze. Dit recht geeft geen beheer
+  over posttegels.
+- **Per post of werkgroep (GROUP).** Leden met `dashboard.manageOwn` beheren
+  enkel de tegels van hun eigen post(en). Enkel leden van die groep zien ze. Wie
+  in drie posten zit, krijgt dus drie extra reeksen.
 - **Van jou (USER).** Elk lid mag eigen tegels maken. Die zijn persoonlijk en
   komen op niemand anders zijn dashboard.
+
+Bij de opsplitsing kregen rollen die het vroegere gecombineerde
+`dashboard.manage` hadden eenmalig ook `dashboard.manageOwn`. Zo behouden hun
+leden bij de uitrol het beheer over de eigen post; daarna zijn beide rechten
+onafhankelijk aan- en uitvinkbaar in het rollenbeheer.
 
 Vastgelegde keuzes:
 

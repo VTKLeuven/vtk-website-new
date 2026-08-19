@@ -6,6 +6,7 @@ import { requireSession } from "@/lib/session";
 import { hasPermission } from "@vtk/auth";
 import { Card } from "@vtk/ui";
 import { mergeTiles } from "@/lib/dashboard-tiles";
+import { canManageAnySharedDashboardTile } from "@/lib/dashboard-authorization";
 import { DashboardTiles } from "./DashboardTiles";
 import { DoorOpenButton } from "./DoorOpenButton";
 
@@ -74,7 +75,7 @@ export default async function AdminDashboard({
     }))
   );
 
-  const canManage = hasPermission(session, "dashboard.manage");
+  const canManage = canManageAnySharedDashboardTile(session);
   const canOpenDoor = hasPermission(session, "door.remoteOpen");
 
   return (

@@ -52,7 +52,8 @@ export const PERMISSIONS = [
   { code: "media.manage", labelNl: "Mediapagina beheren", labelEn: "Manage media page", category: "general" },
 
   // Dashboard tiles
-  { code: "dashboard.manage", labelNl: "Dashboardtegels beheren", labelEn: "Manage dashboard tiles", category: "general" },
+  { code: "dashboard.manage", labelNl: "Voor iedereen tegels beheren", labelEn: "Manage tiles for everyone", category: "general" },
+  { code: "dashboard.manageOwn", labelNl: "Tegels van eigen post beheren", labelEn: "Manage own post's tiles", category: "general" },
 
   // Short links
   { code: "shortlinks.manage", labelNl: "Verkorte links beheren", labelEn: "Manage short links", category: "general" },

@@ -65,14 +65,14 @@ describe('formulierrollen', () => {
 });
 
 describe('formulier aanmaken vanuit de sessie', () => {
-  it('vraagt forms.create én de leiding van die post', () => {
+  it('vraagt forms.create én lidmaatschap van die post', () => {
     const actor = session({
       permissions: ['forms.create'],
       groups: [group('group-a', 'LEAD'), group('group-b', 'MEMBER')],
     });
 
     expect(canSessionCreateFormForGroup(actor, 'group-a')).toBe(true);
-    expect(canSessionCreateFormForGroup(actor, 'group-b')).toBe(false);
+    expect(canSessionCreateFormForGroup(actor, 'group-b')).toBe(true);
     expect(canSessionCreateFormForGroup(actor, 'group-c')).toBe(false);
   });
 

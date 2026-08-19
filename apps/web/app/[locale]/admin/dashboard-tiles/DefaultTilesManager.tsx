@@ -81,10 +81,14 @@ type EditorState =
 
 export function DefaultTilesManager({
   locale,
+  canManageGlobal,
+  canManageGroups,
   globalTiles,
   groups,
 }: {
   locale: Loc;
+  canManageGlobal: boolean;
+  canManageGroups: boolean;
   globalTiles: SimpleTile[];
   groups: GroupSection[];
 }) {
@@ -102,44 +106,60 @@ export function DefaultTilesManager({
 
   return (
     <div className="space-y-6">
-      <section className="vtk-tiles-section">
-        <div className="vtk-tiles-section-head">
-          <div>
-            <h2 className="font-semibold">{t.global}</h2>
-            <p className="text-sm text-zinc-500">{t.globalHint}</p>
-          </div>
-          <button
-            type="button"
-            className="vtk-tile-btn vtk-tile-btn-primary"
-            onClick={() => setEditor({ scope: "GLOBAL", groupId: null, tile: null })}
-          >
-            + {t.addTile}
-          </button>
-        </div>
-        <TileList tiles={globalTiles} t={t} onEdit={(tile) => setEditor({ scope: "GLOBAL", groupId: null, tile })} onRemove={setRemoving} />
-      </section>
-
-      <section className="vtk-tiles-section">
-        <h2 className="font-semibold">{t.groups}</h2>
-        <p className="text-sm text-zinc-500">{t.groupHint}</p>
-        <div className="space-y-4 mt-3">
-          {groups.map((g) => (
-            <div key={g.id} className="vtk-tiles-group">
-              <div className="vtk-tiles-section-head">
-                <h3 className="font-semibold text-sm">{g.name}</h3>
-                <button
-                  type="button"
-                  className="vtk-tile-btn"
-                  onClick={() => setEditor({ scope: "GROUP", groupId: g.id, tile: null })}
-                >
-                  + {t.addTile}
-                </button>
-              </div>
-              <TileList tiles={g.tiles} t={t} onEdit={(tile) => setEditor({ scope: "GROUP", groupId: g.id, tile })} onRemove={setRemoving} />
+      {canManageGlobal ? (
+        <section className="vtk-tiles-section">
+          <div className="vtk-tiles-section-head">
+            <div>
+              <h2 className="font-semibold">{t.global}</h2>
+              <p className="text-sm text-zinc-500">{t.globalHint}</p>
             </div>
-          ))}
-        </div>
-      </section>
+            <button
+              type="button"
+              className="vtk-tile-btn vtk-tile-btn-primary"
+              onClick={() => setEditor({ scope: "GLOBAL", groupId: null, tile: null })}
+            >
+              + {t.addTile}
+            </button>
+          </div>
+          <TileList
+            tiles={globalTiles}
+            t={t}
+            onEdit={(tile) => setEditor({ scope: "GLOBAL", groupId: null, tile })}
+            onRemove={setRemoving}
+          />
+        </section>
+      ) : null}
+
+      {canManageGroups ? (
+        <section className="vtk-tiles-section">
+          <h2 className="font-semibold">{t.groups}</h2>
+          <p className="text-sm text-zinc-500">{t.groupHint}</p>
+          <div className="space-y-4 mt-3">
+            {groups.map((g) => (
+              <div key={g.id} className="vtk-tiles-group">
+                <div className="vtk-tiles-section-head">
+                  <h3 className="font-semibold text-sm">{g.name}</h3>
+                  <button
+                    type="button"
+                    className="vtk-tile-btn"
+                    onClick={() => setEditor({ scope: "GROUP", groupId: g.id, tile: null })}
+                  >
+                    + {t.addTile}
+                  </button>
+                </div>
+                <TileList
+                  tiles={g.tiles}
+                  t={t}
+                  onEdit={(tile) =>
+                    setEditor({ scope: "GROUP", groupId: g.id, tile })
+                  }
+                  onRemove={setRemoving}
+                />
+              </div>
+            ))}
+          </div>
+        </section>
+      ) : null}
 
       {editor && (
         <DefaultTileEditor

@@ -10,10 +10,11 @@ adminskin, hetzelfde outboxpatroon. Wie ticketing kent, herkent dit.
 
 ## End-to-end flow
 
-1. **Aanmaken** — een postlead met `forms.create` (of iemand met
+1. **Aanmaken** — een postlid met `forms.create` (of iemand met
    `forms.manageAll`) maakt een formulier op `/admin/formulieren/nieuw`. De maker
-   en de leiding van de eigenaarspost krijgen meteen een `MANAGER`-grant; anders
-   staat het formulier op slot voor iedereen behalve wie alles mag.
+   en de leiding van de eigenaarspost krijgen meteen een expliciete
+   `MANAGER`-grant. Daarnaast krijgt elk lid met `forms.create` automatisch
+   volledig beheer over alle formulieren van de eigen post.
 2. **Velden** — op `/admin/formulieren/<id>/velden` komen secties, velden,
    keuzeopties (met een eventueel quotum) en voorwaarden. Naast de editor staat
    een live preview die letterlijk dezelfde component gebruikt als de publieke
@@ -123,7 +124,8 @@ Dit is de reden dat verschillende keuzes eruitzien zoals ze eruitzien:
 ## Rechten
 
 - `forms.create` — formulieren aanmaken voor de eigen post (in de seed op de
-  rol `praesidium`, net als `tickets.create`). Vereist dat je **lead** bent.
+  rol `praesidium`, net als `tickets.create`). Geeft ook volledig beheer over de
+  bestaande formulieren waarvan die post eigenaar is.
 - `forms.manageAll` — alles beheren.
 - Per formulier: `VIEWER` (lezen en exporteren), `EDITOR` (ook inzendingen
   beheren en deelnemers mailen), `MANAGER` (ook het formulier zelf). Een

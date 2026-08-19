@@ -250,7 +250,7 @@ every member of the post gets the role):
 | Role | Permissions | Granted to (post → DEFAULT) |
 |------|-------------|-----------------------------|
 | `admin` (system) | all | IT, Groep 5 |
-| `praesidium` | `calendar.create`, `photos.upload`, `tickets.create`, `users.search` | every post |
+| `praesidium` | `calendar.create`, `photos.upload`, `tickets.create`, `forms.create`, `users.search` | every post |
 | `werkgroep` | none (fill in the GUI) | — |
 | `medewerker` | none (fill in the GUI) | — |
 | `theokot` | `theokot.manage`, `theokot.pickup` | Theokot |

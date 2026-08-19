@@ -115,8 +115,8 @@ export function FormCreateForm({
           />
           <span className="ticket-admin-help">
             {nl
-              ? "De post die dit formulier beheert. De leiding van die post krijgt meteen toegang."
-              : "The post that owns this form. Its leads get access straight away."}
+              ? "De post die dit formulier beheert. Leden met het formulierrecht en de leiding van die post krijgen meteen toegang."
+              : "The post that owns this form. Members with the forms permission and its leads get access straight away."}
           </span>
         </div>
 

@@ -42,8 +42,8 @@ export default async function NewFormPage({ params }: { params: Promise<{ locale
             <h1>{locale === "nl" ? "Nieuwe form" : "New form"}</h1>
             <p>
               {locale === "nl"
-                ? "Je hebt geen post waarvoor je forms mag aanmaken. Vraag de verantwoordelijke van je post of IT om het recht `forms.create`."
-                : "You have no post you can create forms for. Ask your post lead or IT for the `forms.create` permission."}
+                ? "Je hebt geen post waarvoor je forms mag aanmaken. Controleer je postlidmaatschap en het recht `forms.create`."
+                : "You have no post you can create forms for. Check your post membership and the `forms.create` permission."}
             </p>
           </div>
           <Link className="ticket-admin-button" href={`${base}/admin/formulieren`}>

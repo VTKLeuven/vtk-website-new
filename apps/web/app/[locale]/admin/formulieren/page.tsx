@@ -43,12 +43,11 @@ export default async function FormsAdminOverview({
     take: 500,
   });
 
-  // Aanmaken mag wie forms.create heeft en minstens één post leidt; welke post
+  // Aanmaken mag wie forms.create heeft en minstens één eigen post heeft; welke post
   // precies, kiest de aanmaakpagina zelf (die checkt het live opnieuw).
   const canCreate =
     hasPermission(session, "forms.manageAll") ||
-    (hasPermission(session, "forms.create") &&
-      session.groups.some((group) => group.role === "LEAD"));
+    (hasPermission(session, "forms.create") && session.groups.length > 0);
 
   const localeTag = locale === "nl" ? "nl-BE" : "en-GB";
   const query = filters.q?.trim().toLocaleLowerCase(localeTag) ?? "";

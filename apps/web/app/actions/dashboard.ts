@@ -3,7 +3,8 @@
 import { revalidatePath } from "next/cache";
 import { prisma } from "@vtk/db";
 import { isTileImageKey } from "@/lib/dashboard-tiles";
-import { requirePermission, requireSession } from "@/lib/session";
+import { canManageSharedDashboardTile } from "@/lib/dashboard-authorization";
+import { requireSession } from "@/lib/session";
 import { describeChanges, logAudit } from "@/lib/audit";
 
 function revalidateDashboard(): void {
@@ -201,7 +202,7 @@ export async function resetLayoutAction(): Promise<void> {
 }
 
 // -----------------------------------------------------------------------------
-// Admin management of shared defaults (requires dashboard.manage)
+// Beheer van gedeelde defaults (globaal en eigen post hebben aparte rechten)
 // -----------------------------------------------------------------------------
 
 export type DefaultTileInput = TileInput & {
@@ -212,12 +213,15 @@ export type DefaultTileInput = TileInput & {
 };
 
 export async function saveDefaultTileAction(input: DefaultTileInput): Promise<void> {
-  await requirePermission("dashboard.manage");
+  const session = await requireSession();
   const label = input.label.trim();
   const url = normalizeUrl(input.url);
   if (!label || !url) return;
   const groupId = input.scope === "GROUP" ? input.groupId || null : null;
   if (input.scope === "GROUP" && !groupId) return;
+  const target = { scope: input.scope, groupId };
+  if (!canManageSharedDashboardTile(session, target)) throw new Error("FORBIDDEN");
+
   const data = {
     label,
     url,
@@ -230,6 +234,9 @@ export async function saveDefaultTileAction(input: DefaultTileInput): Promise<vo
   };
   if (input.id) {
     const existing = await prisma.dashboardTile.findUnique({ where: { id: input.id } });
+    if (!existing || !canManageSharedDashboardTile(session, existing)) {
+      throw new Error("FORBIDDEN");
+    }
     await prisma.dashboardTile.update({
       where: { id: input.id },
       data,
@@ -239,18 +246,16 @@ export async function saveDefaultTileAction(input: DefaultTileInput): Promise<vo
       entity: "dashboardTile",
       entityId: input.id,
       target: label,
-      summary: existing
-        ? describeChanges(existing, data, {
-            label: "label",
-            url: "bestemming",
-            icon: "icoon",
-            color: "kleur",
-            imageKey: "afbeelding",
-            order: "volgorde",
-            scope: "bereik",
-            groupId: "post",
-          })
-        : null,
+      summary: describeChanges(existing, data, {
+        label: "label",
+        url: "bestemming",
+        icon: "icoon",
+        color: "kleur",
+        imageKey: "afbeelding",
+        order: "volgorde",
+        scope: "bereik",
+        groupId: "post",
+      }),
     });
   } else {
     const created = await prisma.dashboardTile.create({ data });
@@ -267,8 +272,11 @@ export async function saveDefaultTileAction(input: DefaultTileInput): Promise<vo
 }
 
 export async function deleteDefaultTileAction(id: string): Promise<void> {
-  await requirePermission("dashboard.manage");
-  const tile = await prisma.dashboardTile.findUnique({ where: { id }, select: { label: true } });
+  const session = await requireSession();
+  const tile = await prisma.dashboardTile.findUnique({ where: { id } });
+  if (!tile || !canManageSharedDashboardTile(session, tile)) {
+    throw new Error("FORBIDDEN");
+  }
   const { count } = await prisma.dashboardTile.deleteMany({
     where: { id, scope: { in: ["GLOBAL", "GROUP"] } },
   });
@@ -277,7 +285,7 @@ export async function deleteDefaultTileAction(id: string): Promise<void> {
       action: "delete",
       entity: "dashboardTile",
       entityId: id,
-      target: tile?.label ?? id,
+      target: tile.label,
       summary: "standaardtegel verwijderd; persoonlijke tegels blijven staan",
     });
   }

@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import type { SessionPayload } from '@vtk/auth';
 import {
   TILE_ICONS,
   TILE_ICON_CATEGORIES,
@@ -6,6 +7,10 @@ import {
   isTileImageKey,
   mergeTiles,
 } from '@/lib/dashboard-tiles';
+import {
+  canManageAnySharedDashboardTile,
+  canManageSharedDashboardTile,
+} from '@/lib/dashboard-authorization';
 
 type SharedArgs = Parameters<typeof mergeTiles>[0];
 type PrefArgs = Parameters<typeof mergeTiles>[1];
@@ -53,6 +58,59 @@ function personal(over: Partial<PersonalArgs[number]> = {}): PersonalArgs[number
     ...over,
   };
 }
+
+function session(overrides: Partial<SessionPayload> = {}): SessionPayload {
+  return {
+    token: 'token',
+    expiresAt: new Date(0).toISOString(),
+    user: {
+      id: 'user',
+      email: 'user@example.test',
+      name: 'User',
+      avatarKey: null,
+      locale: 'NL',
+      isSuperAdmin: false,
+      onboarded: true,
+      studyConfirmedYear: 2026,
+    },
+    permissions: [],
+    roleIds: [],
+    groups: [],
+    ...overrides,
+  };
+}
+
+const ownGroup = {
+  id: 'group-a',
+  code: 'A',
+  slug: 'a',
+  nameNl: 'Post A',
+  nameEn: 'Post A',
+  role: 'MEMBER' as const,
+  type: 'PRAESIDIUM' as const,
+};
+
+describe('beheerrechten voor gedeelde dashboardtegels', () => {
+  it('houdt globaal beheer beperkt tot tegels voor iedereen', () => {
+    const actor = session({ permissions: ['dashboard.manage'], groups: [ownGroup] });
+    expect(canManageSharedDashboardTile(actor, { scope: 'GLOBAL', groupId: null })).toBe(true);
+    expect(canManageSharedDashboardTile(actor, { scope: 'GROUP', groupId: ownGroup.id })).toBe(false);
+  });
+
+  it('houdt postbeheer beperkt tot de eigen post', () => {
+    const actor = session({ permissions: ['dashboard.manageOwn'], groups: [ownGroup] });
+    expect(canManageAnySharedDashboardTile(actor)).toBe(true);
+    expect(canManageSharedDashboardTile(actor, { scope: 'GLOBAL', groupId: null })).toBe(false);
+    expect(canManageSharedDashboardTile(actor, { scope: 'GROUP', groupId: ownGroup.id })).toBe(true);
+    expect(canManageSharedDashboardTile(actor, { scope: 'GROUP', groupId: 'group-b' })).toBe(false);
+  });
+
+  it('laat een superadmin beide bereiken beheren', () => {
+    const actor = session({ user: { ...session().user, isSuperAdmin: true } });
+    expect(canManageSharedDashboardTile(actor, { scope: 'GLOBAL', groupId: null })).toBe(true);
+    expect(canManageSharedDashboardTile(actor, { scope: 'GROUP', groupId: 'group-b' })).toBe(true);
+  });
+});
 
 describe('afbeelding op een dashboardtegel', () => {
   it('erft de afbeelding van de standaardtegel wanneer er geen override is', () => {

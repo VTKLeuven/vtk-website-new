@@ -1,7 +1,8 @@
 import { prisma } from "@vtk/db";
 import { notFound } from "next/navigation";
+import { hasPermission } from "@vtk/auth";
 import { hasLocale } from "@/lib/locale";
-import { requirePermission } from "@/lib/session";
+import { requireAnyPermission } from "@/lib/session";
 import type { Locale } from "@vtk/i18n";
 import { DefaultTilesManager, type GroupSection, type SimpleTile } from "./DefaultTilesManager";
 
@@ -13,14 +14,34 @@ export default async function AdminDashboardTiles({
   const { locale: localeParam } = await params;
   if (!hasLocale(localeParam)) notFound();
   const locale: Locale = localeParam;
-  await requirePermission("dashboard.manage");
+  const session = await requireAnyPermission(["dashboard.manage", "dashboard.manageOwn"]);
+  const canManageGlobal = hasPermission(session, "dashboard.manage");
+  const canManageGroups = hasPermission(session, "dashboard.manageOwn");
+  const ownGroupIds = session.groups.map((group) => group.id);
 
   const [tiles, groups] = await Promise.all([
     prisma.dashboardTile.findMany({
-      where: { scope: { in: ["GLOBAL", "GROUP"] } },
+      where: {
+        OR: [
+          ...(canManageGlobal ? [{ scope: "GLOBAL" as const }] : []),
+          ...(canManageGroups
+            ? [
+                {
+                  scope: "GROUP" as const,
+                  ...(session.user.isSuperAdmin ? {} : { groupId: { in: ownGroupIds } }),
+                },
+              ]
+            : []),
+        ],
+      },
       orderBy: { order: "asc" },
     }),
-    prisma.group.findMany({ orderBy: { orderInPraesidium: "asc" } }),
+    canManageGroups
+      ? prisma.group.findMany({
+          where: session.user.isSuperAdmin ? undefined : { id: { in: ownGroupIds } },
+          orderBy: { orderInPraesidium: "asc" },
+        })
+      : Promise.resolve([]),
   ]);
 
   const toSimple = (t: (typeof tiles)[number]): SimpleTile => ({
@@ -45,7 +66,13 @@ export default async function AdminDashboardTiles({
       <h1 className="text-2xl font-semibold">
         {locale === "nl" ? "Dashboardtegels" : "Dashboard tiles"}
       </h1>
-      <DefaultTilesManager locale={locale} globalTiles={globalTiles} groups={groupSections} />
+      <DefaultTilesManager
+        locale={locale}
+        canManageGlobal={canManageGlobal}
+        canManageGroups={canManageGroups}
+        globalTiles={globalTiles}
+        groups={groupSections}
+      />
     </div>
   );
 }

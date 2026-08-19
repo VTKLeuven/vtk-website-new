@@ -59,9 +59,9 @@ export async function hasLiveFormManageAll(
 }
 
 /**
- * De lead van een post mag formulieren aanmaken voor die post, mits de post een
- * rol toekent die `forms.create` bevat (praesidium in de seed). Live gecheckt,
- * want dit staat een mutatie toe.
+ * Wie `forms.create` heeft, mag formulieren aanmaken voor elke post waar die
+ * persoon dit werkingsjaar lid van is. Live gecheckt, want dit staat een
+ * mutatie toe.
  */
 export async function canCreateFormForGroup(
   userId: string,
@@ -70,19 +70,10 @@ export async function canCreateFormForGroup(
 ): Promise<boolean> {
   if (isSuperAdmin) return true;
   if (await hasLivePermission(userId, "forms.manageAll")) return true;
+  if (!(await hasLivePermission(userId, "forms.create"))) return false;
 
-  const membership = await prisma.groupMembership.findFirst({
-    where: {
-      userId,
-      groupId,
-      role: "LEAD",
-      year: currentWorkingYear(),
-      group: {
-        roleGrants: {
-          some: { role: { permissions: { some: { permission: { code: "forms.create" } } } } },
-        },
-      },
-    },
+  const membership = await prisma.groupMembership.findUnique({
+    where: { userId_groupId_year: { userId, groupId, year: currentWorkingYear() } },
     select: { id: true },
   });
   return Boolean(membership);
@@ -96,7 +87,7 @@ export function canSessionCreateFormForGroup(
   if (hasPermission(session, "forms.manageAll")) return true;
   return (
     hasPermission(session, "forms.create") &&
-    session.groups.some((group) => group.id === groupId && group.role === "LEAD")
+    session.groups.some((group) => group.id === groupId)
   );
 }
 
@@ -104,7 +95,8 @@ export type FormAccess = Awaited<ReturnType<typeof getFormAccess>>;
 
 /**
  * De rechten van de huidige gebruiker op één formulier: `forms.manageAll` geeft
- * alles, anders tellen de grants (persoonlijk en via een post) op.
+ * alles, `forms.create` geeft alles voor formulieren van de eigen posten, en
+ * anders tellen de expliciete grants (persoonlijk en via een post) op.
  */
 export async function getFormAccess(formId: string) {
   const session = await requireSession();
@@ -116,7 +108,10 @@ export async function getFormAccess(formId: string) {
 
   const capabilities = new Set<FormCapability>();
 
-  if (hasPermission(session, "forms.manageAll")) {
+  if (
+    hasPermission(session, "forms.manageAll") ||
+    canSessionCreateFormForGroup(session, form.ownerGroupId)
+  ) {
     FORM_CAPABILITIES.forEach((capability) => capabilities.add(capability));
   } else {
     // In previewmodus doet de superadmin alsof hij iemand anders is; zijn eigen
@@ -168,7 +163,16 @@ export async function formCapabilitiesByForm(
   // persoonlijke grants mogen dan niet meetellen (zoals in getFormAccess).
   const preview = await getAuthorizationPreview();
   const membershipByGroup = new Map(session.groups.map((group) => [group.id, group.role]));
-  const [userGrants, groupGrants] = await Promise.all([
+  const [ownForms, userGrants, groupGrants] = await Promise.all([
+    hasPermission(session, "forms.create")
+      ? prisma.form.findMany({
+          where: {
+            id: { in: [...formIds] },
+            ownerGroupId: { in: [...membershipByGroup.keys()] },
+          },
+          select: { id: true },
+        })
+      : Promise.resolve([]),
     preview
       ? Promise.resolve([])
       : prisma.formUserGrant.findMany({
@@ -181,6 +185,7 @@ export async function formCapabilitiesByForm(
     }),
   ]);
 
+  const ownFormIds = new Set(ownForms.map((form) => form.id));
   const rolesByForm = new Map<string, FormGrantRole[]>();
   function addRole(formId: string, role: FormGrantRole) {
     const current = rolesByForm.get(formId);
@@ -196,7 +201,12 @@ export async function formCapabilitiesByForm(
   }
 
   return new Map(
-    formIds.map((id) => [id, capabilitiesForFormRoles(rolesByForm.get(id) ?? [])])
+    formIds.map((id) => [
+      id,
+      ownFormIds.has(id)
+        ? [...FORM_CAPABILITIES]
+        : capabilitiesForFormRoles(rolesByForm.get(id) ?? []),
+    ])
   );
 }
 
@@ -223,6 +233,9 @@ export async function visibleFormsFilter() {
 
   return {
     OR: [
+      ...(hasPermission(session, "forms.create")
+        ? [{ ownerGroupId: { in: allGroupIds } }]
+        : []),
       ...(preview ? [] : [{ userGrants: { some: { userId: session.user.id } } }]),
       {
         groupGrants: {
