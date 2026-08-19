@@ -56,8 +56,8 @@ export function SessionsManager({
         <h2 className="mb-1 text-lg font-semibold">{nl ? "Verkoopweek aanmaken" : "Create a sale week"}</h2>
         <p className="mb-4 text-sm text-[#5c667f]">
           {nl
-            ? "Uren en aanbod gelden voor de hele week. Pas ze hier aan (bv. een week met een ander aanbod) en maak dan de week aan. Nadien kan je nog per dag bijsturen. Bestaande dagen worden overgeslagen."
-            : "Hours and offering apply to the whole week. Adjust them here (e.g. a week with a different offering), then create the week. You can still tweak individual days afterwards. Existing days are skipped."}
+            ? "Uren en aanbod gelden voor de hele week. Pas ze hier aan (bv. een week met een ander aanbod) en maak dan de week aan. Nadien kan je nog per dag bijsturen. Bestaande dagen worden overgeslagen. Elke dag die je hier aanmaakt, krijgt meteen ook zijn Theokot-shiften (smeren, middag, namiddag), gerekend vanaf het afhaaluur van die dag; staan er al Theokot-shiften op een dag, dan blijven die ongemoeid."
+            : "Hours and offering apply to the whole week. Adjust them here (e.g. a week with a different offering), then create the week. You can still tweak individual days afterwards. Existing days are skipped. Every day you create here also gets its Theokot shifts (spreading, midday, afternoon) right away, counted from that day's pickup time; days that already have Theokot shifts are left alone."}
         </p>
         <form action={createWeekSessionsAction} className="space-y-4">
           <div className="flex flex-wrap items-end gap-4">

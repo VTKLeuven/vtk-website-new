@@ -12,6 +12,7 @@ import { authErrorResponse } from '@/lib/session';
 import { withCors, corsPreflight } from '@/lib/cors';
 import { handledLeadFields } from '@/lib/shift-reminders';
 import { describeChanges, logAudit } from '@/lib/audit';
+import { createShift } from '@/lib/shift.server';
 
 /**
  * Get de huidige shiften (waar een user zich voor kan registreren)
@@ -81,15 +82,7 @@ async function postHandler(request: Request) {
     throw err;
   }
 
-  const shift = await prisma.shift.create({ data });
-
-  await logAudit({
-    action: 'create',
-    entity: 'shift',
-    entityId: shift.id,
-    target: shift.name,
-    summary: `${shift.maxParticipants} plaats(en), ${shift.reward} bonnetje(s)`,
-  });
+  const shift = await createShift(data);
 
   return NextResponse.json(shift, { status: 201 });
 }

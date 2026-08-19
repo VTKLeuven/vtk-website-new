@@ -7,50 +7,7 @@ import { Button, Card, ConfirmDialog, Input, Label, Select, Textarea } from '@vt
 import { useToast } from '@/components/ui/toast';
 import { IconButton } from '@/components/ui/IconButton';
 import { TrashIcon } from '@/components/ui/icons';
-
-// -----------------------------------------------------------------------------
-// Types van de sjablonen. De sjablonen zelf staan bovenaan page.tsx.
-// -----------------------------------------------------------------------------
-
-export type ShiftTemplateEntry = {
-  /** Stabiele sleutel binnen het sjabloon; enkel voor React-keys en leesbaarheid. */
-  key: string;
-  /** Naam van de shift, zonder de evenementnaam erachter ("Bar 1"). */
-  name: string;
-  /** Minuten t.o.v. het gekozen startmoment; negatief = ervoor (opbouw). */
-  startOffsetMinutes: number;
-  durationMinutes: number;
-  maxParticipants: number;
-  /**
-   * Aantal bonnetjes per deelnemer. Verplicht per shift, en bewust geen waarde
-   * die het sjabloon centraal zet: een opbouw van een half uur is niet hetzelfde
-   * waard als vier uur aan de tap, dus die keuze hoort bij de shift zelf.
-   */
-  reward: number;
-  description: string;
-  instructions?: string;
-  /** Enkel invullen wanneer deze shift van de globale locatie/post afwijkt. */
-  location?: string;
-  post?: string | null;
-  openToInternationals?: boolean;
-  /** `false` = staat standaard uitgevinkt. */
-  enabled?: boolean;
-};
-
-export type ShiftTemplate = {
-  id: string;
-  label: string;
-  /** Eén regel uitleg onder de keuzelijst. */
-  note?: string;
-  defaults: {
-    eventName: string;
-    location: string;
-    post?: string | null;
-    /** Suggestie voor het uur van de eerste shift, "HH:mm". */
-    timeOfDay?: string;
-  };
-  shifts: ShiftTemplateEntry[];
-};
+import { composeName, type ShiftTemplate } from '@/lib/shiftTemplates';
 
 // -----------------------------------------------------------------------------
 // Reken- en formatteerhulpjes.
@@ -171,13 +128,6 @@ type Row = {
   /** Velden die de gebruiker zelf aanpaste; die overschrijven we nooit meer. */
   touched: { name?: boolean; time?: boolean; location?: boolean; post?: boolean };
 };
-
-/**
- * De shiftnaam komt eerst, het evenement erachter: "Inkom - Cantus". Wat je in een
- * lijst van shiften zoekt, is wat je gaat doen; het evenement is de context erbij.
- */
-const composeName = (eventName: string, baseName: string) =>
-  eventName.trim() === '' ? baseName : `${baseName} - ${eventName.trim()}`;
 
 /**
  * Bovengrens op wat één klik verstuurt. Elke shift is een eigen request, dus een

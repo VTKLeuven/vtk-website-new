@@ -141,6 +141,23 @@ halen ze af aan de balie en betalen daar. Post **Theokot** beheert het systeem.
   aantallen en prijzen. Bij het aanmaken van een week wordt dit als **snapshot**
   naar `TheokotSessionItem` gekopieerd. Reden: latere catalogus- of prijswijzigingen
   mogen bestaande sessies en bestellingen niet met terugwerkende kracht veranderen.
+- **Een verkoopdag aanmaken zet meteen de shiften van die dag neer.** Wie de week
+  online zet, vinkt de dagen aan; voor elke dag die daadwerkelijk nieuw is, komen
+  ook de drie Theokot-shiften (smeren, middag, namiddag) op `/shift` te staan. Dat
+  was vroeger een tweede, losse handeling in het shiftscherm, en precies dát werd
+  vergeten: een verkoopdag zonder shifters is een dag waarop niemand de balie doet
+  terwijl de broodjes wel besteld zijn.
+  - **De uren volgen het afhaaluur van die dag**, niet een vast uur: zet je een dag
+    later open, dan schuiven de shiften mee. De reeks zelf (welke shiften, hoe lang,
+    hoeveel plaatsen, hoeveel bonnetjes) komt uit hetzelfde sjabloon als het scherm
+    "Shiften uit sjabloon", zodat een aangepaste Theokot-shift op beide plaatsen
+    tegelijk verandert.
+  - **Een dag waar al een Theokot-shift op staat, blijft ongemoeid.** Anders krijgt
+    wie de shiften al met de hand zette een tweede reeks bovenop de eerste, en
+    schrijven leden zich in op de verkeerde helft.
+  - **Wie de week aanmaakt heeft geen `shift.edit` nodig.** De shiften zijn hier een
+    gevolg van het openzetten van een verkoopdag, geen aparte bevoegdheid; een extra
+    recht eisen zou betekenen dat Theokot de week niet meer alleen online kan zetten.
 - **Week aanmaken doe je met aanbod + uren voor de hele week**: bij het aanmaken van
   een verkoopweek stel je één keer het aanbod (broodjes/prijzen/aantallen) en de uren
   ('Afhalen vanaf/tot', 'Besteldeadline', 'Bestellen opent') in die voor álle gekozen
@@ -2627,7 +2644,7 @@ het gewone shiftformulier intikken is een half uur werk waarin je gegarandeerd �
 shift vergeet. `/admin/shiften/sjablonen` doet het in drie stappen: sjabloon kiezen,
 de globale velden zetten, de shiften nakijken en aanmaken.
 
-- **De sjablonen staan in de code, bovenaan `page.tsx`.** Bewust geen beheerscherm
+- **De sjablonen staan in de code, in `apps/web/lib/shiftTemplates.ts`.** Bewust geen beheerscherm
   en geen tabel in de databank: de lijst verandert hooguit een paar keer per
   werkingsjaar, en dan is een blok JSON dat mee door review gaat makkelijker te
   lezen (en terug te draaien) dan een formulier met een formulier erin. Wie een
