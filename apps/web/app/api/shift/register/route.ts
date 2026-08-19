@@ -5,7 +5,7 @@ import { isRecordNotFound, isUniqueViolation } from '@/lib/shift';
 import { authErrorResponse } from '@/lib/session';
 import { CUDI_SHIFT_SOURCE } from '@/lib/cudiShiftMirror';
 import { pushCudiRegistration } from '@/lib/cudiRegistrationSync';
-import { handledLeadFields } from '@/lib/shift-reminders';
+import { handledLeadFields } from '@/lib/shift/reminders';
 import { withSerializableTransaction } from '@/lib/ticketing/transactions';
 
 /** Binnen dit venster voor de start kan een user zichzelf niet meer uitschrijven. */

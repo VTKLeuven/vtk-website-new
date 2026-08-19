@@ -25,13 +25,13 @@ import { resolveStudentCard } from "@/lib/student-card";
 import {
   allocateUserShiftReward,
   ShiftRewardConflictError,
-} from "@/lib/shift-rewards.server";
-import { outstandingShiftReward } from "@/lib/shift-rewards";
+} from "@/lib/shift/rewards.server";
+import { outstandingShiftReward } from "@/lib/shift/rewards";
 import { withSerializableTransaction } from "@/lib/ticketing/transactions";
 import { saveError, saveOk, type SaveState } from "@/lib/saveState";
 import { logAudit } from "@/lib/audit";
-import { createShift } from "@/lib/shift.server";
-import { theokotShiftsForDay, theokotShiftPost } from "@/lib/shiftTemplates";
+import { createShift } from "@/lib/shift/server";
+import { theokotShiftsForDay, theokotShiftPost } from "@/lib/shift/templates";
 import { shiftYMD } from "@/lib/brussels";
 
 export type ActionResult = { ok: true; message?: string } | { ok: false; error: string };

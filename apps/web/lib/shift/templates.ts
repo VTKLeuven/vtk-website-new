@@ -8,7 +8,8 @@
  * en in het andere niet meegaan.
  *
  * Alleen data en types: dit wordt zowel door een client component als door een
- * server action geïmporteerd.
+ * server action geïmporteerd. De rest van `lib/shift/` mag wél de databank en
+ * server-only code aanraken; hou dat hier buiten.
  */
 
 import { brusselsTimeOnDay } from '@/lib/brussels';

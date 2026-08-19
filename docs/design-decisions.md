@@ -2591,7 +2591,7 @@ Wie zich inschrijft voor een shift, krijgt standaard **twee** mails: een dag voo
 en twee uur vooraf. Beide zijn per lid uitzetbaar in het profiel.
 
 - **Waarom een dag vooraf.** Dat is exact het moment waarop je jezelf niet meer kan
-  uitschrijven (`UNREGISTER_LOCK_MS` in `apps/web/lib/shift.ts`). De mail zegt dat er
+  uitschrijven (`UNREGISTER_LOCK_MS` in `apps/web/lib/shift/index.ts`). De mail zegt dat er
   dus meteen bij: één bericht dat zowel herinnert als aankondigt dat het nu vastligt.
   Wie echt niet kan, weet dat op dat moment nog vroeg genoeg om iemand te zoeken.
 - **Waarom twee uur vooraf erbovenop.** Een mail van gisteren is tegen vanavond weer
@@ -2644,7 +2644,7 @@ het gewone shiftformulier intikken is een half uur werk waarin je gegarandeerd �
 shift vergeet. `/admin/shiften/sjablonen` doet het in drie stappen: sjabloon kiezen,
 de globale velden zetten, de shiften nakijken en aanmaken.
 
-- **De sjablonen staan in de code, in `apps/web/lib/shiftTemplates.ts`.** Bewust geen beheerscherm
+- **De sjablonen staan in de code, in `apps/web/lib/shift/templates.ts`.** Bewust geen beheerscherm
   en geen tabel in de databank: de lijst verandert hooguit een paar keer per
   werkingsjaar, en dan is een blok JSON dat mee door review gaat makkelijker te
   lezen (en terug te draaien) dan een formulier met een formulier erin. Wie een

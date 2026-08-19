@@ -1,7 +1,7 @@
 import "server-only";
 
 import type { Prisma } from "@prisma/client";
-import { allocateShiftReward } from "@/lib/shift-rewards";
+import { allocateShiftReward } from "@/lib/shift/rewards";
 
 export class ShiftRewardConflictError extends Error {
   constructor() {

@@ -7,7 +7,7 @@ import { Button, Card, ConfirmDialog, Input, Label, Select, Textarea } from '@vt
 import { useToast } from '@/components/ui/toast';
 import { IconButton } from '@/components/ui/IconButton';
 import { TrashIcon } from '@/components/ui/icons';
-import { composeName, type ShiftTemplate } from '@/lib/shiftTemplates';
+import { composeName, type ShiftTemplate } from '@/lib/shift/templates';
 
 // -----------------------------------------------------------------------------
 // Reken- en formatteerhulpjes.

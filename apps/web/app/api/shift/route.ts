@@ -10,9 +10,9 @@ import {
 } from '@/lib/shift';
 import { authErrorResponse } from '@/lib/session';
 import { withCors, corsPreflight } from '@/lib/cors';
-import { handledLeadFields } from '@/lib/shift-reminders';
+import { handledLeadFields } from '@/lib/shift/reminders';
 import { describeChanges, logAudit } from '@/lib/audit';
-import { createShift } from '@/lib/shift.server';
+import { createShift } from '@/lib/shift/server';
 
 /**
  * Get de huidige shiften (waar een user zich voor kan registreren)

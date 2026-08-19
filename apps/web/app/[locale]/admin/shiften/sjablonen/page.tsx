@@ -6,7 +6,7 @@ import { requirePermission } from '@/lib/session';
 import { utcToLocalDateTime } from '@/lib/ticketing/time';
 import type { Locale } from '@vtk/i18n';
 import { ShiftTemplateBuilder } from './ShiftTemplateBuilder';
-import { SHIFT_TEMPLATES } from '@/lib/shiftTemplates';
+import { SHIFT_TEMPLATES } from '@/lib/shift/templates';
 
 export default async function AdminShiftTemplates({ params }: { params: Promise<{ locale: string }> }) {
   const { locale: localeParam } = await params;
