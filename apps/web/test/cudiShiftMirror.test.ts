@@ -3,6 +3,7 @@ import {
   CURSUSDIENST_SHIFT_POST,
   bonnetjesForShift,
   mapCudiShift,
+  parseCudiShiftSync,
   parseCudiShiftSyncBody,
 } from "@/lib/cudiShiftMirror";
 
@@ -85,5 +86,37 @@ describe("parseCudiShiftSyncBody", () => {
         shifts: [{ ...validShift, maxShifters: "2" }],
       }),
     ).toBeNull();
+  });
+});
+
+describe("parseCudiShiftSync (reden bij afkeuring)", () => {
+  const validShift = {
+    sourceId: "cudi-1",
+    name: "Balie",
+    startTime: "2026-07-21T10:00:00.000Z",
+    endTime: "2026-07-21T12:00:00.000Z",
+    maxShifters: 2,
+  };
+
+  it("noemt het veld en de shift die niet klopt", () => {
+    const parsed = parseCudiShiftSync({
+      cutoff: "2026-07-21T00:00:00.000Z",
+      shifts: [validShift, { ...validShift, sourceId: "cudi-2", endTime: "nope" }],
+    });
+
+    expect(parsed.ok).toBe(false);
+    // De logregel moet zeggen wélke shift: enkel "ongeldige body" is niet na te trekken.
+    const reason = parsed.ok === false ? parsed.reason : "";
+    expect(reason).toContain("shifts[1]");
+    expect(reason).toContain("cudi-2");
+    expect(reason).toContain("endTime");
+  });
+
+  it("geeft dezelfde uitkomst als de variant zonder reden", () => {
+    const body = { cutoff: "2026-07-21T00:00:00.000Z", shifts: [validShift] };
+    expect(parseCudiShiftSync(body).ok).toBe(true);
+    expect(parseCudiShiftSyncBody(body)).not.toBeNull();
+    expect(parseCudiShiftSync(null).ok).toBe(false);
+    expect(parseCudiShiftSyncBody(null)).toBeNull();
   });
 });

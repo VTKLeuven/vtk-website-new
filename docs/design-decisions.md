@@ -2049,10 +2049,34 @@ echte `Shift`-rij op de main site is en de inschrijving een echte
   `ShiftRegistration` zodat de cursusdienst-verantwoordelijken hun roster op cudi
   houden.
 
-Identiteit tussen de twee auth-systemen (main = KUL OIDC, cudi = Better Auth)
-loopt via de **r-nummer** (`User.rNumber` is `@unique` in beide DBs). Een lid dat
-nog nooit op cudi kwam, krijgt bij de eerste inschrijving **automatisch** een
-cudi-gebruiker aangemaakt op basis van zijn KUL-profiel (r-nummer, naam, e-mail).
+### Wat een sync achterlaat
+
+De spiegeling schrijft naar het **adminlogboek** (`/admin/it/logboek`), op naam van
+"Systeem" onder `Cursusdienst-shiften (cudi)`. Bewust niet naar de containerlog:
+die is enkel via de server te bereiken en wordt nergens verzameld, dus wat daar in
+staat leest niemand op het moment dat het nodig is.
+
+- **Een afgekeurde payload zegt wát er scheelde**, tot op de shift:
+  `shifts[7] (cudi-412): startTime is geen geldige ISO-datum`. Die reden gaat ook
+  mee in het 400-antwoord, want cudi logt zijn eigen kant en heeft niets aan een
+  reden die enkel wij kennen.
+- **Bij een prune staat erbij wélke shiften verdwenen** (`sourceId@starttijd`,
+  afgekapt na twaalf). "Er zijn er zeven weg" volstaat niet om ze terug te zetten
+  wanneer cudi een halve set stuurde. Een lege set is geldig (er kunnen echt geen
+  komende shiften meer zijn) maar prunet alles vanaf de cutoff, en dat is ook net
+  hoe een half mislukte generatie aan de cudi-kant eruitziet; vandaar dat de regel
+  de namen bevat.
+- **Een geslaagde routine-sync komt er niet in.** Cudi stuurt de volledige set bij
+  élke wijziging aan zijn kant, dus één reeks gegenereerde shiften levert al
+  tientallen syncs op. Die zouden het logboek verzuipen, en na dertig dagen
+  (`AUDIT_RETENTION_DAYS`) staan ze er toch niet meer.
+- **Een geweigerd token evenmin.** Het endpoint is onbeschermd bereikbaar, dus wie
+  het adres kent zou het logboek kunnen volspammen. De aanroeper krijgt zijn 401.
+- Een **onverwachte fout** gaat naar Sentry met de stacktrace (`console.error` +
+  `captureException`, zoals overal); het logboek krijgt de leesbare versie en de
+  melding dat de transactie is teruggedraaid.
+- Er gaan **geen persoonsgegevens** in: een payload bevat enkel shiftdefinities.
+  Inschrijvingen lopen langs de gewone main-flow en staan hier los van.
 
 ### Reward: 1 bonnetje per begonnen uur
 

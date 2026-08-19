@@ -84,39 +84,77 @@ function isValidIso(value: unknown): value is string {
   return typeof value === "string" && !Number.isNaN(Date.parse(value));
 }
 
-function parseShift(value: unknown): CudiShiftInput | null {
-  if (typeof value !== "object" || value === null) return null;
+/**
+ * Uitkomst van de validatie. De reden bestaat omdat een sync die stilletjes met
+ * 400 terugkomt onmogelijk na te trekken is: "cudi stuurde iets fout" zegt niets,
+ * "shifts[7] (cudi-412): startTime is geen geldige ISO-datum" wel.
+ *
+ * De reden noemt enkel veldnamen en de `sourceId` van de shift; die staan al in
+ * de payload die cudi zelf verstuurde en zijn geen persoonsgegevens.
+ */
+export type CudiShiftSyncParse =
+  | { ok: true; body: CudiShiftSyncBody }
+  | { ok: false; reason: string };
+
+function parseShift(value: unknown): { ok: true; shift: CudiShiftInput } | { ok: false; reason: string } {
+  const bad = (reason: string) => ({ ok: false as const, reason });
+
+  if (typeof value !== "object" || value === null) return bad("is geen object");
   const v = value as Record<string, unknown>;
-  if (typeof v.sourceId !== "string" || v.sourceId.length === 0) return null;
-  if (typeof v.name !== "string") return null;
-  if (!isValidIso(v.startTime) || !isValidIso(v.endTime)) return null;
-  if (typeof v.maxShifters !== "number" || !Number.isFinite(v.maxShifters)) return null;
+  if (typeof v.sourceId !== "string" || v.sourceId.length === 0) return bad("sourceId ontbreekt of is leeg");
+  if (typeof v.name !== "string") return bad(`(${v.sourceId}) name ontbreekt of is geen string`);
+  if (!isValidIso(v.startTime)) return bad(`(${v.sourceId}) startTime is geen geldige ISO-datum`);
+  if (!isValidIso(v.endTime)) return bad(`(${v.sourceId}) endTime is geen geldige ISO-datum`);
+  if (typeof v.maxShifters !== "number" || !Number.isFinite(v.maxShifters))
+    return bad(`(${v.sourceId}) maxShifters is geen getal`);
   const location = v.location;
   const description = v.description;
-  if (location != null && typeof location !== "string") return null;
-  if (description != null && typeof description !== "string") return null;
+  if (location != null && typeof location !== "string") return bad(`(${v.sourceId}) location is geen string`);
+  if (description != null && typeof description !== "string")
+    return bad(`(${v.sourceId}) description is geen string`);
+
   return {
-    sourceId: v.sourceId,
-    name: v.name,
-    startTime: v.startTime,
-    endTime: v.endTime,
-    location: (location as string | null | undefined) ?? null,
-    description: (description as string | null | undefined) ?? null,
-    maxShifters: v.maxShifters,
+    ok: true,
+    shift: {
+      sourceId: v.sourceId,
+      name: v.name,
+      startTime: v.startTime,
+      endTime: v.endTime,
+      location: (location as string | null | undefined) ?? null,
+      description: (description as string | null | undefined) ?? null,
+      maxShifters: v.maxShifters,
+    },
   };
 }
 
-/** Valideer de volledige sync-payload; `null` = ongeldig (route antwoordt 400). */
-export function parseCudiShiftSyncBody(value: unknown): CudiShiftSyncBody | null {
-  if (typeof value !== "object" || value === null) return null;
+/**
+ * Valideer de volledige sync-payload en zeg erbij wat er scheelde. De route
+ * antwoordt 400 en logt de reden.
+ */
+export function parseCudiShiftSync(value: unknown): CudiShiftSyncParse {
+  const bad = (reason: string) => ({ ok: false as const, reason });
+
+  if (typeof value !== "object" || value === null) return bad("body is geen object");
   const v = value as Record<string, unknown>;
-  if (!isValidIso(v.cutoff)) return null;
-  if (!Array.isArray(v.shifts)) return null;
+  if (!isValidIso(v.cutoff)) return bad("cutoff ontbreekt of is geen geldige ISO-datum");
+  if (!Array.isArray(v.shifts)) return bad("shifts is geen array");
+
   const shifts: CudiShiftInput[] = [];
-  for (const raw of v.shifts) {
+  for (const [index, raw] of v.shifts.entries()) {
     const parsed = parseShift(raw);
-    if (!parsed) return null;
-    shifts.push(parsed);
+    if (!parsed.ok) return bad(`shifts[${index}] ${parsed.reason}`);
+    shifts.push(parsed.shift);
   }
-  return { cutoff: new Date(v.cutoff), shifts };
+
+  return { ok: true, body: { cutoff: new Date(v.cutoff), shifts } };
+}
+
+/**
+ * Zelfde validatie, zonder de reden; `null` = ongeldig. Eén implementatie met
+ * twee vensters erop, zodat de regels niet op twee plaatsen kunnen gaan
+ * verschillen.
+ */
+export function parseCudiShiftSyncBody(value: unknown): CudiShiftSyncBody | null {
+  const parsed = parseCudiShiftSync(value);
+  return parsed.ok ? parsed.body : null;
 }
