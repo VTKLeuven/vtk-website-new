@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   allocateShiftReward,
   outstandingShiftReward,
-} from "@/lib/shift-rewards";
+} from "@/lib/shift/rewards";
 
 describe("shift reward allocation", () => {
   it("allocates oldest balances first and can partially pay one shift", () => {

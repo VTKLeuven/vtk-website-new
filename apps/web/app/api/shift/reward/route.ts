@@ -1,11 +1,11 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@vtk/db";
 import { requirePermission, authErrorResponse } from "@/lib/session";
-import { outstandingShiftReward } from "@/lib/shift-rewards";
+import { outstandingShiftReward } from "@/lib/shift/rewards";
 import {
   allocateUserShiftReward,
   ShiftRewardConflictError,
-} from "@/lib/shift-rewards.server";
+} from "@/lib/shift/rewards.server";
 import { withSerializableTransaction } from "@/lib/ticketing/transactions";
 import { logAudit } from "@/lib/audit";
 

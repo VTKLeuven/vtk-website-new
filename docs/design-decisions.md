@@ -141,6 +141,23 @@ halen ze af aan de balie en betalen daar. Post **Theokot** beheert het systeem.
   aantallen en prijzen. Bij het aanmaken van een week wordt dit als **snapshot**
   naar `TheokotSessionItem` gekopieerd. Reden: latere catalogus- of prijswijzigingen
   mogen bestaande sessies en bestellingen niet met terugwerkende kracht veranderen.
+- **Een verkoopdag aanmaken zet meteen de shiften van die dag neer.** Wie de week
+  online zet, vinkt de dagen aan; voor elke dag die daadwerkelijk nieuw is, komen
+  ook de drie Theokot-shiften (smeren, middag, namiddag) op `/shift` te staan. Dat
+  was vroeger een tweede, losse handeling in het shiftscherm, en precies dát werd
+  vergeten: een verkoopdag zonder shifters is een dag waarop niemand de balie doet
+  terwijl de broodjes wel besteld zijn.
+  - **De uren volgen het afhaaluur van die dag**, niet een vast uur: zet je een dag
+    later open, dan schuiven de shiften mee. De reeks zelf (welke shiften, hoe lang,
+    hoeveel plaatsen, hoeveel bonnetjes) komt uit hetzelfde sjabloon als het scherm
+    "Shiften uit sjabloon", zodat een aangepaste Theokot-shift op beide plaatsen
+    tegelijk verandert.
+  - **Een dag waar al een Theokot-shift op staat, blijft ongemoeid.** Anders krijgt
+    wie de shiften al met de hand zette een tweede reeks bovenop de eerste, en
+    schrijven leden zich in op de verkeerde helft.
+  - **Wie de week aanmaakt heeft geen `shift.edit` nodig.** De shiften zijn hier een
+    gevolg van het openzetten van een verkoopdag, geen aparte bevoegdheid; een extra
+    recht eisen zou betekenen dat Theokot de week niet meer alleen online kan zetten.
 - **Week aanmaken doe je met aanbod + uren voor de hele week**: bij het aanmaken van
   een verkoopweek stel je één keer het aanbod (broodjes/prijzen/aantallen) en de uren
   ('Afhalen vanaf/tot', 'Besteldeadline', 'Bestellen opent') in die voor álle gekozen
@@ -2141,10 +2158,34 @@ echte `Shift`-rij op de main site is en de inschrijving een echte
   `ShiftRegistration` zodat de cursusdienst-verantwoordelijken hun roster op cudi
   houden.
 
-Identiteit tussen de twee auth-systemen (main = KUL OIDC, cudi = Better Auth)
-loopt via de **r-nummer** (`User.rNumber` is `@unique` in beide DBs). Een lid dat
-nog nooit op cudi kwam, krijgt bij de eerste inschrijving **automatisch** een
-cudi-gebruiker aangemaakt op basis van zijn KUL-profiel (r-nummer, naam, e-mail).
+### Wat een sync achterlaat
+
+De spiegeling schrijft naar het **adminlogboek** (`/admin/it/logboek`), op naam van
+"Systeem" onder `Cursusdienst-shiften (cudi)`. Bewust niet naar de containerlog:
+die is enkel via de server te bereiken en wordt nergens verzameld, dus wat daar in
+staat leest niemand op het moment dat het nodig is.
+
+- **Een afgekeurde payload zegt wát er scheelde**, tot op de shift:
+  `shifts[7] (cudi-412): startTime is geen geldige ISO-datum`. Die reden gaat ook
+  mee in het 400-antwoord, want cudi logt zijn eigen kant en heeft niets aan een
+  reden die enkel wij kennen.
+- **Bij een prune staat erbij wélke shiften verdwenen** (`sourceId@starttijd`,
+  afgekapt na twaalf). "Er zijn er zeven weg" volstaat niet om ze terug te zetten
+  wanneer cudi een halve set stuurde. Een lege set is geldig (er kunnen echt geen
+  komende shiften meer zijn) maar prunet alles vanaf de cutoff, en dat is ook net
+  hoe een half mislukte generatie aan de cudi-kant eruitziet; vandaar dat de regel
+  de namen bevat.
+- **Een geslaagde routine-sync komt er niet in.** Cudi stuurt de volledige set bij
+  élke wijziging aan zijn kant, dus één reeks gegenereerde shiften levert al
+  tientallen syncs op. Die zouden het logboek verzuipen, en na dertig dagen
+  (`AUDIT_RETENTION_DAYS`) staan ze er toch niet meer.
+- **Een geweigerd token evenmin.** Het endpoint is onbeschermd bereikbaar, dus wie
+  het adres kent zou het logboek kunnen volspammen. De aanroeper krijgt zijn 401.
+- Een **onverwachte fout** gaat naar Sentry met de stacktrace (`console.error` +
+  `captureException`, zoals overal); het logboek krijgt de leesbare versie en de
+  melding dat de transactie is teruggedraaid.
+- Er gaan **geen persoonsgegevens** in: een payload bevat enkel shiftdefinities.
+  Inschrijvingen lopen langs de gewone main-flow en staan hier los van.
 
 ### Reward: 1 bonnetje per begonnen uur
 
@@ -2683,7 +2724,7 @@ Wie zich inschrijft voor een shift, krijgt standaard **twee** mails: een dag voo
 en twee uur vooraf. Beide zijn per lid uitzetbaar in het profiel.
 
 - **Waarom een dag vooraf.** Dat is exact het moment waarop je jezelf niet meer kan
-  uitschrijven (`UNREGISTER_LOCK_MS` in `apps/web/lib/shift.ts`). De mail zegt dat er
+  uitschrijven (`UNREGISTER_LOCK_MS` in `apps/web/lib/shift/index.ts`). De mail zegt dat er
   dus meteen bij: één bericht dat zowel herinnert als aankondigt dat het nu vastligt.
   Wie echt niet kan, weet dat op dat moment nog vroeg genoeg om iemand te zoeken.
 - **Waarom twee uur vooraf erbovenop.** Een mail van gisteren is tegen vanavond weer
@@ -2725,6 +2766,82 @@ en twee uur vooraf. Beide zijn per lid uitzetbaar in het profiel.
   `ticket-worker`: een klemgelopen mailserver mag de ticketbevestigingen niet
   meesleuren. Leeg `SHIFT_MAINTENANCE_SECRET` = geen herinneringen, de rest van de
   shiften werkt gewoon door.
+
+---
+
+## Shiften uit een sjabloon (terugkerende evenementen)
+
+Een cantus, een fakbaravond en een TD hebben elke editie dezelfde reeks shiften.
+Enkel de datum, het uur en soms de locatie verschillen. Die reeks één voor één in
+het gewone shiftformulier intikken is een half uur werk waarin je gegarandeerd één
+shift vergeet. `/admin/shiften/sjablonen` doet het in drie stappen: sjabloon kiezen,
+de globale velden zetten, de shiften nakijken en aanmaken.
+
+- **De sjablonen staan in de code, in `apps/web/lib/shift/templates.ts`.** Bewust geen beheerscherm
+  en geen tabel in de databank: de lijst verandert hooguit een paar keer per
+  werkingsjaar, en dan is een blok JSON dat mee door review gaat makkelijker te
+  lezen (en terug te draaien) dan een formulier met een formulier erin. Wie een
+  nieuw terugkerend evenement heeft, zet er een blok bij.
+- **Een sjabloon beschrijft tijden als offsets, niet als uren.** Elke shift heeft
+  `startOffsetMinutes` t.o.v. het startmoment dat je bovenaan invult (0 = de eerste
+  shift, negatief = opbouw ervoor) plus een `durationMinutes`. Zo blijft één veld
+  bovenaan genoeg om de hele avond te verzetten, en klopt de opbouw automatisch mee.
+  Het rekenwerk gebeurt op de **wandklok**: "twee uur later" is 20:00 → 22:00, ook in
+  de nacht dat de klok verzet wordt. De server leest die tijden als Belgische tijd,
+  net als het gewone shiftformulier.
+- **De shiftnaam komt eerst, het evenement erachter:** "Inkom - Cantus", niet
+  "Cantus - Inkom". In een lijst shiften is wát je gaat doen het onderscheidende
+  deel; het evenement is de context erbij. Zet je de evenementnaam leeg, dan blijft
+  enkel de shiftnaam over.
+- **Het sjabloon is een startpunt, geen keurslijf.** Onderaan staat elke shift
+  volledig open: tijden, aantal plaatsen, bonnetjes, locatie, post, beschrijving. Een
+  shift die je deze keer niet nodig hebt, vink je uit in plaats van hem te
+  verwijderen; hij staat er de volgende keer weer. Een shift die enkel bij een grote
+  editie hoort, staat in het sjabloon al op `enabled: false`.
+- **Sommige shiften hangen aan een vaste plek, niet aan het evenement.**
+  "Bijrijden" vertrekt altijd aan de loods, waar de cantus zelf ook doorgaat.
+  Zo'n shift krijgt in het sjabloon een eigen `location` (of `post`) en volgt het
+  globale veld bovenaan dan niet meer. In het scherm blijft ze gewoon aanpasbaar,
+  met een lijntje eronder dat zegt dat ze vastgezet is: anders lijkt het een bug
+  dat die ene rij niet meeging toen je de locatie bovenaan wijzigde.
+- **Wat je zelf aanpast, wordt niet meer overschreven.** Verzet je daarna nog het
+  globale startmoment of de locatie, dan schuiven enkel de velden mee die je nog niet
+  aangeraakt hebt. Anders zou het corrigeren van één tikfout bovenaan al je
+  fijnafstelling wissen; dat is precies het werk dat deze pagina moest besparen.
+- **Aanmaken is publiceren.** `/shift` toont gewoon alle toekomstige shiften, er is
+  geen aparte publicatiestap en dus ook geen concept-toestand. Daarom staat álle
+  nakijkwerk vóór de knop, en gaat de knop pas aan als elke aangevinkte shift
+  volledig is.
+- **Er blijft geen band met het sjabloon achter.** De aangemaakte shiften zijn gewone
+  shiften: geen `templateId` in de databank, geen "bijwerken vanuit sjabloon". Een
+  reeks aanpassen of verwijderen doe je in het gewone overzicht. Een tweede knop die
+  achteraf een hele reeks kan herschrijven, is een knop die op een avond met
+  ingeschreven leden veel schade doet.
+- **De pagina is een sneltoets op het gewone shiftformulier, geen tweede manier om
+  shiften te maken.** Ze doet per shift dezelfde `POST /api/shift` als
+  `ShiftEditModal`, in plaats van via een eigen server action in één keer naar de
+  databank te schrijven. Dat is trager (een request per shift), maar het houdt
+  validatie, rechten en de regels in het adminlogboek op één plek: komt er ooit iets
+  bij het aanmaken van een shift (een melding, een sync), dan krijgt het sjabloon dat
+  vanzelf mee in plaats van er stilletjes van weg te groeien.
+  - De prijs is dat een reeks geen transactie is. Valt de verbinding halverwege weg,
+    dan staan de eerste shiften er wel en de rest niet. De pagina stopt daarom bij de
+    eerste fout, zegt hoeveel er aangemaakt zijn, en maakt bij de volgende klik enkel
+    de ontbrekende aan; wat er al staat, wordt nooit een tweede keer verstuurd.
+- **Een geslaagde reeks stuurt je terug naar het shiftoverzicht**, met een groene
+  toast die zegt hoeveel shiften er staan. Dat is meteen de bescherming tegen
+  duplicaten: je blijft niet achter op een ingevuld formulier waar een tweede klik
+  of een herlaadde pagina dezelfde avond nog eens neerzet. Duplicaten zijn hier duur,
+  want leden schrijven zich in op de verkeerde helft. Bij een fout blijf je wél
+  staan; daar heb je het formulier nog nodig om verder te kunnen.
+- **Bonnetjes zijn per deelnemer.** De samenvatting bovenaan telt daarom
+  `bonnetjes × plaatsen` en noemt dat expliciet "bij volle bezetting": dat getal is
+  wat de avond in het slechtste geval aan de Theokot-kassa kost.
+- **Het aantal bonnetjes staat per shift, niet per sjabloon.** Een inkomshift van
+  een half uur is niet hetzelfde waard als vier uur aan de vaten, dus `reward` is
+  een verplicht veld op elke shift in het sjabloon. Er is bewust geen sjabloonbrede
+  standaard: die maakt van "vergeten in te vullen" stil "wat het sjabloon toevallig
+  zei", en dat is net het getal waar leden achteraf op terugkomen.
 
 ---
 

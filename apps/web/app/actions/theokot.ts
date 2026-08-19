@@ -25,11 +25,14 @@ import { resolveStudentCard } from "@/lib/student-card";
 import {
   allocateUserShiftReward,
   ShiftRewardConflictError,
-} from "@/lib/shift-rewards.server";
-import { outstandingShiftReward } from "@/lib/shift-rewards";
+} from "@/lib/shift/rewards.server";
+import { outstandingShiftReward } from "@/lib/shift/rewards";
 import { withSerializableTransaction } from "@/lib/ticketing/transactions";
 import { saveError, saveOk, type SaveState } from "@/lib/saveState";
 import { logAudit } from "@/lib/audit";
+import { createShift } from "@/lib/shift/server";
+import { theokotShiftsForDay, theokotShiftPost } from "@/lib/shift/templates";
+import { shiftYMD } from "@/lib/brussels";
 
 export type ActionResult = { ok: true; message?: string } | { ok: false; error: string };
 
@@ -205,6 +208,7 @@ export async function createWeekSessionsAction(formData: FormData): Promise<void
 
   const startYmd = brusselsYMD(weekStart);
   let createdDays = 0;
+  let createdShifts = 0;
   for (const offset of days) {
     const dayMidnight = brusselsTimeOnDay(
       new Date(Date.UTC(startYmd.year, startYmd.month - 1, startYmd.day, 12) + offset * 86400000),
@@ -247,13 +251,44 @@ export async function createWeekSessionsAction(formData: FormData): Promise<void
     // ze eraan; wat er niet op staat, wordt ongeldig en de persoon krijgt een mail.
     await syncMeetingsOnDay(dayMidnight);
     createdDays += 1;
+
+    // Een verkoopdag moet ook bemand worden: smeren, middag en namiddag. Die
+    // shiften apart moeten aanmaken werd stelselmatig vergeten, en een
+    // verkoopdag zonder shifters is een dag waarop niemand de balie doet.
+    // De uren volgen het afhaaluur van déze dag, niet het vaste uur uit het
+    // sjabloon.
+    //
+    // Staat er al een Theokot-shift op die dag, dan blijft die met rust: iemand
+    // heeft ze dan met de hand of via het sjabloonscherm gezet, en er twee
+    // reeksen bovenop elkaar leggen kost inschrijvingen.
+    const nextDay = shiftYMD(brusselsYMD(dayMidnight), 1);
+    const alreadyStaffed = await prisma.shift.findFirst({
+      where: {
+        post: theokotShiftPost(),
+        startTime: {
+          gte: dayMidnight,
+          lt: brusselsTimeOnDay(new Date(Date.UTC(nextDay.year, nextDay.month - 1, nextDay.day, 12)), "00:00"),
+        },
+      },
+      select: { id: true },
+    });
+
+    if (!alreadyStaffed) {
+      for (const shift of theokotShiftsForDay(dayMidnight, pickupStart)) {
+        // Zonder eigen logregel: hieronder staat er één voor de hele week.
+        await createShift(shift, { audit: false });
+        createdShifts += 1;
+      }
+    }
   }
 
   await logAudit({
     action: "create",
     entity: "theokotSession",
     target: `Verkoopweek van ${formatDay(weekStart)}`,
-    summary: `${createdDays} nieuwe verkoopdag(en) met ${offering.length} broodje(s); bestaande dagen overgeslagen`,
+    summary:
+      `${createdDays} nieuwe verkoopdag(en) met ${offering.length} broodje(s); ` +
+      `${createdShifts} shift(en) aangemaakt; bestaande dagen overgeslagen`,
   });
 
   revalidateTheokot();

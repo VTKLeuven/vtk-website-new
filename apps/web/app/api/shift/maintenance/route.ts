@@ -1,5 +1,5 @@
 import { timingSafeEqual } from "node:crypto";
-import { processDueShiftReminders } from "@/lib/shift-reminders";
+import { processDueShiftReminders } from "@/lib/shift/reminders";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";

@@ -6,7 +6,7 @@ import {
   processDueShiftReminders,
   shiftReminderMail,
   windowFor,
-} from '@/lib/shift-reminders';
+} from '@/lib/shift/reminders';
 
 vi.mock('@vtk/db', () => ({
   prisma: {

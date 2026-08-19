@@ -1,5 +1,6 @@
 "use client";
 import { useMemo, useState } from "react";
+import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { format } from "date-fns";
 import type { Locale } from "@vtk/i18n";
@@ -127,7 +128,16 @@ export function ShiftManage({
             className="w-56"
           />
         </div>
-        <div className="ml-auto">
+        <div className="ml-auto flex flex-wrap items-center gap-2">
+          {/* Een terugkerend evenement (cantus, TD, fakbaravond) heeft telkens
+              dezelfde reeks shiften; die zet je sneller neer via een sjabloon
+              dan één voor één in het formulier hiernaast. */}
+          <Link
+            href={`${nl ? "" : "/en"}/admin/shiften/sjablonen`}
+            className="inline-flex h-10 items-center justify-center whitespace-nowrap rounded-full border border-vtk-blue/15 px-4 text-sm font-medium text-vtk-ink transition-colors hover:border-vtk-blue/30 hover:bg-vtk-blue-soft/70"
+          >
+            {nl ? "Uit sjabloon" : "From template"}
+          </Link>
           <Button onClick={() => setCreating(true)}>{nl ? "Nieuwe shift" : "New shift"}</Button>
         </div>
       </div>

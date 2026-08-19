@@ -217,7 +217,7 @@ the design language into the application instead of copying mockup content.
   - A tab with pages under it (or extra `HeaderTabLink` items) shows a chevron
     and drops a white panel on hover and `:focus-within`; that is CSS only, so
     keep `.nav-links` free of `overflow` or the panel gets clipped.
-  - Below 1181px the tabs are replaced by one menu button that opens a navy
+  - Below 850px the tabs are replaced by one menu button that opens a navy
     panel under the header, with the pages per category behind a chevron. Do not
     reintroduce the horizontal scroller: eleven tabs in a scroll strip read as a
     mistake and hide most of the navigation.
