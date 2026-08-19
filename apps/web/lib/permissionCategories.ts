@@ -17,6 +17,7 @@ const CATEGORY_LABELS: Record<string, { nl: string; en: string }> = {
   shift: { nl: "Shiften", en: "Shifts" },
   theokot: { nl: "Theokot", en: "Theokot" },
   meetings: { nl: "Grocomeet & Bureau", en: "Grocomeet & Bureau" },
+  lesbezoeken: { nl: "Lesbezoeken", en: "Classroom visits" },
   piano: { nl: "Piano", en: "Piano" },
   logistiek: { nl: "Logistiek", en: "Logistics" },
   door: { nl: "Deurtoegang", en: "Door access" },

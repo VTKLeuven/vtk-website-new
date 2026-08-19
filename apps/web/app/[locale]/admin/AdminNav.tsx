@@ -363,6 +363,23 @@ const icons: Record<string, ReactNode> = {
     </Svg>
   ),
   // pocs: studentenvertegenwoordigers -> studentenmuts
+  // onderwijs: de groep met POC's, bureau en lesbezoeken -> open boek
+  onderwijs: (
+    <Svg>
+      <path d="M12 7v14" />
+      <path d="M3 18a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3Z" />
+    </Svg>
+  ),
+  // lesbezoeken: iemand die voor een bord staat
+  lesbezoeken: (
+    <Svg>
+      <rect x="3" y="3" width="18" height="12" rx="2" />
+      <path d="M7 7h7" />
+      <path d="M7 11h4" />
+      <circle cx="12" cy="18.5" r="1.5" />
+      <path d="M9 22a3 3 0 0 1 6 0" />
+    </Svg>
+  ),
   pocs: (
     <Svg>
       <path d="M22 10 12 5 2 10l10 5 10-5Z" />

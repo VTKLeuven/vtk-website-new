@@ -1,0 +1,659 @@
+/* Lesbezoeken: het publieke aanvraagformulier (/lesbezoeken) en de kalender in
+   het beheer (/admin/lesbezoeken).
+   Eén bestand voor beide, want de statuskleuren en de blokjes van een bezoek
+   moeten aan de twee kanten hetzelfde lezen. Kleuren komen uit de tokens in
+   vtk-base.css; de kleur per organisatie komt uit de database en wordt als
+   `--org` op het element gezet. */
+
+/* -------------------------------------------------------------------------- */
+/* Publiek: het aanvraagformulier                                              */
+/* -------------------------------------------------------------------------- */
+
+.lb-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: clamp(18px, 2.5vw, 28px);
+  align-items: start;
+}
+
+/* Het formulier links, de spelregels rechts. Die uitleg is geen bijzaak: de
+   afspraken met de faculteit (twee weken op voorhand, één aanvraag per
+   doelgroep, professoren niet zelf mailen) stonden vroeger in een mail die
+   niemand terugvond. */
+@media (min-width: 960px) {
+  .lb-grid {
+    grid-template-columns: minmax(0, 1.9fr) minmax(260px, 1fr);
+  }
+}
+
+.lb-panel {
+  padding: clamp(22px, 3vw, 32px);
+}
+
+.lb-panel > h2 {
+  margin: 0;
+  font-size: 22px;
+  line-height: 1.25;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--ink);
+}
+
+.lb-lead {
+  margin: 10px 0 0;
+  color: var(--body);
+  font-size: 15px;
+  line-height: 1.6;
+}
+
+.lb-form {
+  /* Positioneerd, zodat het weggeschoven honeypot-veld hieronder aan het
+     formulier hangt en niet aan de pagina; zie de les in CLAUDE.md over
+     absoluut gepositioneerde, onzichtbare elementen zonder anker. */
+  position: relative;
+  margin-top: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.lb-fieldset {
+  border: 0;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+/* Een `legend` staat in een `display: flex`-fieldset buiten de flexstroom, dus
+   de `gap` hierboven raakt hem niet en hij plakt tegen het eerste veldlabel.
+   `float: left` zet hem terug in de gewone stroom; het lijntje eronder maakt van
+   de drie blokken van het formulier ook visueel drie blokken. */
+.lb-fieldset > legend {
+  float: left;
+  width: 100%;
+  padding: 0 0 8px;
+  margin-bottom: 16px;
+  border-bottom: 1px solid var(--line);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.lb-fieldset > legend + * {
+  clear: both;
+}
+
+.lb-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 18px;
+}
+
+@media (min-width: 640px) {
+  .lb-row {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.lb-field {
+  min-width: 0;
+}
+
+.lb-help {
+  margin: 6px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.lb-check {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--body);
+}
+
+.lb-check input {
+  margin-top: 3px;
+  accent-color: var(--navy);
+}
+
+/* Zie de opmerking bij `.vtk-contact-honeypot`: uit beeld, maar niet
+   `display: none`, want sommige bots slaan een verborgen veld over. */
+.lb-honeypot {
+  position: absolute;
+  left: -9999px;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+}
+
+.lb-aside {
+  display: flex;
+  flex-direction: column;
+  gap: clamp(14px, 2vw, 18px);
+}
+
+.lb-side {
+  padding: clamp(18px, 2.4vw, 24px);
+}
+
+.lb-side h2 {
+  margin: 0 0 8px;
+  font-size: 16px;
+  line-height: 1.3;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.lb-side p,
+.lb-side li {
+  color: var(--body);
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.lb-side ol,
+.lb-side ul {
+  margin: 0;
+  padding-left: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+/* -------------------------------------------------------------------------- */
+/* Statussen                                                                   */
+/* -------------------------------------------------------------------------- */
+
+.lb-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 10px;
+  border-radius: 999px;
+  border: 1px solid;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.lb-badge[data-tone="waiting"] {
+  background: #fff8e1;
+  border-color: #f5d98a;
+  color: #7a5300;
+}
+
+.lb-badge[data-tone="sent"] {
+  background: #eef2ff;
+  border-color: #c3ccf7;
+  color: #37409a;
+}
+
+.lb-badge[data-tone="ok"] {
+  background: #e9f7ef;
+  border-color: #a9dcbe;
+  color: #12633b;
+}
+
+.lb-badge[data-tone="no"] {
+  background: #fdecec;
+  border-color: #f3b8b8;
+  color: #97231f;
+}
+
+/* -------------------------------------------------------------------------- */
+/* Beheer: de balk boven de kalender                                           */
+/* -------------------------------------------------------------------------- */
+
+.lb-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.lb-toolbar-title {
+  font-size: 18px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--ink);
+  min-width: 12ch;
+}
+
+.lb-spacer {
+  margin-left: auto;
+}
+
+.lb-segment {
+  display: inline-flex;
+  padding: 3px;
+  gap: 2px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--paper-2);
+}
+
+.lb-segment button {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  border-radius: 999px;
+  padding: 5px 14px;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.lb-segment button[aria-pressed="true"] {
+  background: var(--surface);
+  color: var(--ink);
+  box-shadow: 0 1px 2px rgb(14 26 54 / 0.12);
+}
+
+.lb-step {
+  appearance: none;
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.lb-step:hover {
+  background: var(--paper-2);
+}
+
+/* -------------------------------------------------------------------------- */
+/* Beheer: maandraster                                                         */
+/* -------------------------------------------------------------------------- */
+
+.lb-month {
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  overflow: hidden;
+  background: var(--surface);
+}
+
+.lb-month-head,
+.lb-month-body {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+}
+
+.lb-month-head > div {
+  padding: 8px 6px;
+  text-align: center;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+  background: var(--paper-2);
+  border-bottom: 1px solid var(--line);
+}
+
+.lb-day {
+  min-height: 108px;
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  border-right: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+  min-width: 0;
+}
+
+.lb-day:nth-child(7n) {
+  border-right: 0;
+}
+
+.lb-day[data-outside="true"] {
+  background: var(--paper);
+}
+
+.lb-day[data-today="true"] {
+  background: #fffdf2;
+}
+
+.lb-daynum {
+  display: inline-grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--muted);
+}
+
+.lb-day[data-today="true"] .lb-daynum {
+  background: var(--navy);
+  color: var(--paper);
+}
+
+/* -------------------------------------------------------------------------- */
+/* Beheer: een bezoek als blokje                                               */
+/* -------------------------------------------------------------------------- */
+
+.lb-chip {
+  appearance: none;
+  display: block;
+  width: 100%;
+  text-align: left;
+  border: 0;
+  border-left: 3px solid var(--org, var(--navy));
+  border-radius: 6px;
+  padding: 2px 6px;
+  background: color-mix(in srgb, var(--org, var(--navy)) 12%, white);
+  color: var(--ink);
+  font: inherit;
+  font-size: 11.5px;
+  line-height: 1.35;
+  cursor: pointer;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.lb-chip:hover {
+  background: color-mix(in srgb, var(--org, var(--navy)) 20%, white);
+}
+
+.lb-chip strong {
+  font-weight: 700;
+  margin-right: 4px;
+}
+
+.lb-chip span {
+  display: block;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Een aanvraag die nog niet beslist is, krijgt een gestreepte rand: de kleur van
+   het blokje hoort bij de organisatie, dus de status moet met iets anders dan
+   kleur alleen te zien zijn. */
+.lb-chip[data-status="PENDING"] {
+  outline: 1px dashed #d9a400;
+  outline-offset: -1px;
+}
+
+.lb-chip[data-status="ASKED"] {
+  outline: 1px dashed #6672c9;
+  outline-offset: -1px;
+}
+
+.lb-chip[data-status="REJECTED"] span,
+.lb-chip[data-status="DECLINED"] span,
+.lb-chip[data-status="CANCELLED"] span {
+  text-decoration: line-through;
+}
+
+.lb-chip[data-status="REJECTED"],
+.lb-chip[data-status="DECLINED"],
+.lb-chip[data-status="CANCELLED"] {
+  opacity: 0.55;
+}
+
+.lb-chip[aria-current="true"] {
+  box-shadow: 0 0 0 2px var(--yellow);
+}
+
+/* -------------------------------------------------------------------------- */
+/* Beheer: week- en dagraster                                                  */
+/* -------------------------------------------------------------------------- */
+
+.lb-time {
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  overflow: hidden;
+  background: var(--surface);
+  display: flex;
+  flex-direction: column;
+  /* Hoogte van één uur; de blokjes rekenen hiermee, dus verander dit hier en
+     nergens anders. */
+  --hour: 52px;
+}
+
+.lb-time-head {
+  display: grid;
+  border-bottom: 1px solid var(--line);
+  background: var(--paper-2);
+}
+
+.lb-time-head > div {
+  padding: 7px 4px;
+  text-align: center;
+  border-left: 1px solid var(--line);
+}
+
+.lb-time-head > div:first-child {
+  border-left: 0;
+}
+
+.lb-time-head .lb-dow {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.lb-time-head .lb-dom {
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.lb-time-head > div[data-today="true"] .lb-dom {
+  color: var(--navy);
+}
+
+.lb-time-body {
+  display: grid;
+  overflow-y: auto;
+  max-height: 62vh;
+}
+
+.lb-hours {
+  border-right: 1px solid var(--line);
+  user-select: none;
+}
+
+/* Het uurlabel staat op de lijn en niet eronder, dus het schuift een halve
+   regel omhoog. Het eerste niet: dat zou boven de rand van het raster uitsteken
+   en daar weggeknipt worden. */
+.lb-hours > div {
+  height: var(--hour);
+  padding-right: 8px;
+  text-align: right;
+  font-size: 11px;
+  color: var(--muted);
+  transform: translateY(-6px);
+}
+
+.lb-hours > div:first-child {
+  transform: none;
+  padding-top: 3px;
+}
+
+.lb-col {
+  position: relative;
+  border-left: 1px solid var(--line);
+  min-width: 0;
+}
+
+.lb-col:first-of-type {
+  border-left: 0;
+}
+
+.lb-hourline {
+  position: absolute;
+  inset-inline: 0;
+  border-top: 1px solid var(--line);
+  opacity: 0.6;
+}
+
+.lb-now {
+  position: absolute;
+  inset-inline: 0;
+  border-top: 2px solid #dc2626;
+  z-index: 2;
+  pointer-events: none;
+}
+
+.lb-event {
+  position: absolute;
+  inset-inline: 2px;
+  /* Een lesbezoek duurt vijf minuten; op ware schaal is dat vier pixels. De
+     blokjes krijgen dus een leesbare minimumhoogte en mogen elkaar overlappen,
+     want overlap is hier informatie: twee organisaties in dezelfde les. */
+  min-height: 30px;
+  z-index: 1;
+}
+
+/* -------------------------------------------------------------------------- */
+/* Beheer: werklijst en detailpaneel                                           */
+/* -------------------------------------------------------------------------- */
+
+.lb-queue {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.lb-item {
+  display: grid;
+  grid-template-columns: 4px minmax(0, 1fr);
+  gap: 12px;
+  align-items: stretch;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--surface);
+  overflow: hidden;
+  text-align: left;
+  padding: 0;
+  font: inherit;
+  cursor: pointer;
+  appearance: none;
+}
+
+.lb-item:hover {
+  border-color: color-mix(in srgb, var(--navy) 30%, var(--line));
+}
+
+.lb-item[aria-current="true"] {
+  border-color: var(--navy);
+  box-shadow: 0 0 0 1px var(--navy);
+}
+
+.lb-item-rail {
+  background: var(--org, var(--navy));
+}
+
+.lb-item-body {
+  padding: 12px 14px 12px 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.lb-item-top {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.lb-item-title {
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.lb-item-meta {
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.lb-warn {
+  display: flex;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid #f5d98a;
+  background: #fff8e1;
+  color: #6b4a00;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.lb-warn strong {
+  font-weight: 700;
+}
+
+.lb-def {
+  display: grid;
+  grid-template-columns: minmax(9rem, auto) minmax(0, 1fr);
+  gap: 4px 14px;
+  margin: 0;
+  font-size: 14px;
+}
+
+.lb-def dt {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding-top: 2px;
+}
+
+.lb-def dd {
+  margin: 0;
+  color: var(--ink);
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.lb-quote {
+  margin: 0;
+  padding: 10px 12px;
+  border-left: 3px solid var(--line);
+  background: var(--paper);
+  border-radius: 0 10px 10px 0;
+  white-space: pre-wrap;
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--body);
+}
+
+@media (max-width: 640px) {
+  .lb-def {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 2px;
+  }
+
+  .lb-def dd {
+    margin-bottom: 8px;
+  }
+
+  .lb-day {
+    min-height: 76px;
+  }
+}

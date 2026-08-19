@@ -341,6 +341,115 @@ hoeveel bestellingen eraan hangen.
 
 ---
 
+## Lesbezoeken
+
+Een lesbezoek is een aankondiging van een paar minuten bij het begin (of einde) van een
+les: een kring, een werkgroep of een externe organisatie stelt zich kort voor aan een
+volle aula. Met de faculteit Ingenieurswetenschappen is afgesproken dat **VTK Onderwijs
+dit coördineert**: aanvragers contacteren professoren niet zelf. Dat is de kern van de
+hele werking, en de reden dat er een systeem voor bestaat in plaats van een adresboek.
+
+### Wat dit vervangt
+
+Vier losse dingen, die elk een stuk van hetzelfde proces droegen:
+
+| Was | Nu |
+|---|---|
+| Google Form | `/lesbezoeken`, publiek en zonder login |
+| Google Sheet met acht tabbladen | `Lesbezoek`, `LesbezoekOrganisation`, `LesbezoekPeculiarity` |
+| Word-sjablonen + mailmerge-extensie | mailsjablonen in `Setting`, versturen vanuit het beheer |
+| Aparte React-app met een eigen `users.json` | `/admin/lesbezoeken`, achter de gewone rollen |
+
+De statussen van de aanvraag zijn de rijkleuren van de Sheet, maar dan met een naam:
+groen was goedgekeurd, rood afgekeurd, wit nog te doen. Wat daar drie kleuren waren,
+zijn hier zes statussen, want "afgekeurd" betekende twee verschillende dingen (VTK
+stuurde het niet door, of de professor wilde niet) en dat verschil bepaalt wat de
+aanvrager te horen krijgt.
+
+### De weg van een aanvraag
+
+```
+publiek formulier (/lesbezoeken)
+  -> PENDING    VTK Onderwijs kijkt na: duplicaat? bijzonderheid? organisatie te gulzig?
+  -> REJECTED   niet doorgestuurd, met reden naar de aanvrager
+  -> ASKED      mail naar de professor; eventueel later een herinnering
+       -> APPROVED / DECLINED, telkens teruggekoppeld naar de aanvrager
+```
+
+### Waarom de aanvraag publiek is en niet achter een login
+
+De helft van de aanvragers is geen VTK-lid: andere kringen, studentenverenigingen en
+externe organisaties dienen hier evengoed in. Die een account laten aanmaken voor één
+vraag vervangt het formulier door een drempel, en de Google Form die dit vervangt had er
+ook geen. De bescherming is daarom dezelfde als bij het contactformulier: een honeypot en
+een snelheidslimiet per IP (ruimer dan bij contact, want één organisatie dient vaak
+meerdere doelgroepen na elkaar in). Elke aanvraag komt hoe dan ook als `PENDING` binnen
+en gaat nergens naartoe voor een mens ernaar gekeken heeft.
+
+Het formulier weigert wel een aanvraag die **minder dan twee weken** op voorhand komt.
+Dat is de afspraak met de faculteit, en het is een grens en geen suggestie: korter dan
+dat haalt het antwoord van de professor het moment niet meer, dus een aanvraag die toch
+doorgaat kost alleen maar een mail.
+
+### De professor krijgt geen account
+
+Hij antwoordt per mail, zoals altijd. Een professor een login geven om één keer per jaar
+op "ja" te klikken is een systeem bouwen voor iemand die het niet gevraagd heeft. Wie
+beoordeelt zet zijn antwoord daarom zelf om in een status; dat is één handeling, en het
+is exact wat er vroeger in het "Uitgevoerd"-tabblad met een kleurtje gebeurde.
+
+### Er zit altijd een mens tussen de sjabloon en de verzendknop
+
+Het scherm vult het sjabloon in, toont het in een bewerkbaar veld, en pas dan vertrekt
+het. Dat is bewust één stap trager dan de mailmerge die dit vervangt. Die stuurde rij per
+rij naar een professor zonder dat iemand de tekst nog zag, en een fout in het sjabloon
+vertrok dan honderd keer. De sjablonen zelf staan in `Setting` en niet in code, want het
+waren Word-documenten die elk jaar bijgeschaafd werden ("dit document is ook een work in
+progress"); wie de lesbezoeken doet moet de aanhef kunnen wijzigen zonder een deploy.
+
+De taalgok volgt de vuistregel uit de handleiding: bij een master is de professor
+doorgaans Engelstalig, bij een bachelor niet. Het is een gok, dus het scherm laat ze
+altijd overschrijven.
+
+### Bijzonderheden staan in de database, niet in een tabblad
+
+`LesbezoekPeculiarity` is het "Peculiarities"-tabblad: wat je van een professor, een vak
+of een faculteit moet weten vóór je iets doorstuurt ("keurt alles af", "enkel op het
+einde van de les", "spookvak", "enkel VTK"). Dat is precies de kennis die verdwijnt
+wanneer de verantwoordelijke van vorig jaar vertrekt, en ze is alleen nuttig op het
+moment van beslissen. Het beoordelingsscherm zoekt de regels dus zelf op en zet ze
+bovenaan, in plaats van te hopen dat iemand een ander bestand opent.
+
+Hetzelfde geldt voor de dubbelcheck (dezelfde professor, dezelfde dag) en voor de notitie
+bij een organisatie: dat waren respectievelijk een formule met een kolom ernaast en het
+"Shame"-tabblad, en ze staan nu allebei bij de aanvraag zelf.
+
+### Organisaties zijn een tabel, geen tekstveld
+
+Twee redenen. De kleur in de kalender moet bij dezelfde organisatie blijven horen; de app
+die dit vervangt deelde kleuren uit in de volgorde waarin de rijen binnenkwamen, uit een
+lijst van vijf, waardoor organisatie zes en verder allemaal hetzelfde rood werden en
+dezelfde organisatie na een herlaadbeurt een andere kleur kon hebben. En "VTK - Onderwijs"
+en "VTK Onderwijs" horen één lijn te zijn: een naam uit het publieke formulier wordt
+hoofdletter- en leestekenongevoelig tegen de bestaande namen gelegd voor er een nieuwe rij
+komt.
+
+Een organisatie verdwijnt niet, ze gaat op niet-actief: verwijderen kan enkel zolang er
+geen enkel bezoek aan hangt, want de kalender van vorig jaar mag niet halveren omdat
+iemand opruimt.
+
+### De werklijst is de standaard, niet de kalender
+
+De app die dit vervangt had enkel een kalender. Daardoor was "welke aanvraag ligt hier al
+een week te wachten?" net de vraag die je er niet aan kon stellen. De kalender blijft
+(hij beantwoordt "wat staat er gepland" en levert de `.ics`-export), maar het scherm opent
+op de openstaande aanvragen.
+
+De export bevat **enkel goedgekeurde** bezoeken en is een download, geen abonneerbare
+feed: de URL draagt geen geheim, en er staan namen van professoren in.
+
+---
+
 ## Piano (lokaal 01.52 in het kasteel)
 
 VTK heeft een eigen piano in lokaal 01.52 van het kasteel, naast de promotiezaal.

@@ -574,6 +574,9 @@ model User {
 
   urenloopDownloadEmails UrenloopDownloadEmail[] @relation("UrenloopDownloadEmailAddedBy")
 
+  createdLesbezoeken  Lesbezoek[] @relation("LesbezoekCreatedBy")
+  reviewedLesbezoeken Lesbezoek[] @relation("LesbezoekReviewedBy")
+
   @@index([deletedAt])
 }
 
@@ -821,26 +824,25 @@ enum AnnouncementScope {
 
 /**
  * One configurable front page: the dark block at the top of the homepage.
- *
  * Which front pages exist is decided in code, not here. Each one is its own
  * component with its own layout, free to look nothing like the others; a
  * 24-urenloop page wants lap counts, a jobfair page wants a wall of company
  * logos, and squeezing both into one shared template only produces the same page
  * with different words. See `apps/web/lib/frontpage/registry.ts`.
- *
  * This table only carries what an admin may change without a deploy: which front
  * page is live and when, plus the values for the fields that that particular
  * component chose to expose. Hence `values` as JSON: every front page declares
  * its own fields, so there is no shared set of columns to model. A row whose
  * `layout` is no longer in the registry is ignored.
- *
  * One row per front page (`layout` is unique). Scheduling the same event again
  * next year is a matter of moving its window, not of making a second row.
  */
 model Frontpage {
   id String @id @default(cuid())
 
-  /** Registry id of the component this row configures ("default", "urenloop"). */
+  /**
+   * Registry id of the component this row configures ("default", "urenloop").
+   */
   layout String @unique
 
   /**
@@ -856,7 +858,9 @@ model Frontpage {
    */
   startsAt DateTime?
   endsAt   DateTime?
-  /** Off = never show, whatever the window says. */
+  /**
+   * Off = never show, whatever the window says.
+   */
   active   Boolean   @default(false)
 
   updatedById String?
@@ -3900,4 +3904,164 @@ model UrenloopDownloadCode {
 
   @@index([email, createdAt])
   @@index([expiresAt])
+}
+
+// -----------------------------------------------------------------------------
+// Lesbezoeken: een organisatie komt bij het begin van een les kort iets
+// aankondigen. Met de faculteit is afgesproken dat VTK Onderwijs dit coördineert,
+// zodat professoren niet rechtstreeks aangeschreven worden.
+//
+// Vervangt de Google Form + Sheet + mailmerge. De weg van een aanvraag:
+//
+//   publiek formulier (/lesbezoeken, geen login)
+//     -> PENDING   VTK Onderwijs kijkt na op duplicaten en voorkeuren
+//     -> REJECTED  meteen geweigerd, met reden naar de aanvrager
+//     -> ASKED     mail naar de professor vertrokken, wachten op antwoord
+//          -> APPROVED / DECLINED, telkens teruggekoppeld naar de aanvrager
+//
+// De professor antwoordt per mail, niet in deze app: die kennen we niet en die
+// gaan we geen account geven. Wie beoordeelt, zet het antwoord hier zelf om in
+// een status. Zie docs/design-decisions.md ("Lesbezoeken").
+// -----------------------------------------------------------------------------
+
+enum LesbezoekStatus {
+  /// Net binnengekomen; VTK Onderwijs moet nog beslissen of de vraag doorgaat.
+  PENDING
+  /// De vraag staat bij de professor. `professorMailedAt` zegt sinds wanneer.
+  ASKED
+  /// De professor gaf groen licht.
+  APPROVED
+  /// De professor wil het niet.
+  DECLINED
+  /// VTK Onderwijs stuurde de vraag niet door (duplicaat, een professor die
+  /// nooit lesbezoeken toelaat, een organisatie die te veel aanvraagt).
+  REJECTED
+  /// De aanvrager trok de vraag in, of ze werd achteraf geannuleerd.
+  CANCELLED
+}
+
+/// Wie het lesbezoek komt geven: een post, een werkgroep, een andere kring, een
+/// externe organisatie.
+///
+/// Een eigen tabel en geen vrij tekstveld op het bezoek zelf, om twee redenen:
+/// de kleur in de kalender moet bij dezelfde organisatie blijven horen (en niet
+/// afhangen van de volgorde waarin de rijen toevallig binnenkomen), en
+/// "VTK Onderwijs" en "VTK - Onderwijs" horen één lijn in de kalender te zijn.
+model LesbezoekOrganisation {
+  id           String   @id @default(cuid())
+  name         String   @unique
+  /// Hex, zoals bij `CalendarCategory.colour`; de kalender zet ze als CSS-var.
+  colour       String   @default("#3B82F6")
+  /// Vast contactadres van de organisatie, als er een is. De aanvrager vult in
+  /// het formulier daarnaast altijd zijn eigen adres in.
+  contactEmail String?
+  /// Interne notitie, enkel zichtbaar in het beheer. Hier komt het
+  /// "Shame"-tabblad van de Sheet terecht ("kwam niet opdagen", "vraagt te veel
+  /// aan"): dat hoort bij de aanvraag te staan, zodat wie beoordeelt het ziet
+  /// zonder een ander bestand open te doen.
+  note         String?
+  /// Uit = verdwijnt uit de keuzelijst van het publieke formulier. Bestaande
+  /// bezoeken blijven staan, want de historiek mag niet mee veranderen.
+  active       Boolean  @default(true)
+  createdAt    DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt    DateTime @updatedAt @db.Timestamptz(3)
+
+  visits Lesbezoek[]
+
+  @@index([active, name])
+}
+
+/// Eén aangevraagd of ingepland lesbezoek. De velden volgen het formulier dat
+/// dit vervangt, zodat een aanvraag niet minder informatie draagt dan vroeger.
+model Lesbezoek {
+  id             String @id @default(cuid())
+  organisationId String
+
+  /// Instants; de weergave rekent naar Brussel-wandklok (lib/brussels.ts).
+  /// `endsAt` volgt uit `longVisit`, maar staat los opgeslagen zodat een
+  /// beheerder een afwijkende duur kan zetten (of het uur dat de professor
+  /// voorstelde) zonder de vraag zelf te herschrijven.
+  startsAt  DateTime @db.Timestamptz(3)
+  endsAt    DateTime @db.Timestamptz(3)
+  /// "Duurt het lesbezoek langer dan vijf minuten?" uit het formulier. Bepaalt
+  /// ook welke mailtemplate de professor krijgt (kort of lang bezoek).
+  longVisit Boolean  @default(false)
+
+  /// De les. `audience` is de doelgroep ("3e Bach, Computerwetenschappen"),
+  /// `course` het vak. Beide vrije tekst: het OPO-aanbod van de faculteit staat
+  /// nergens in deze database, en het formulier had niet voor niets een
+  /// "Anders"-optie.
+  audience String
+  course   String
+
+  /// Waar het bezoek over gaat, en de toelichting die letterlijk in de mail naar
+  /// de professor terechtkomt. Die tekst is er om de professor te overtuigen, dus
+  /// ze wordt niet samengevat of afgekapt.
+  subject     String
+  teacherNote String
+
+  /// De professor. Het adres is het beslissende gegeven (daar vertrekt de vraag
+  /// naartoe); de naam staat in de aanhef van de mail en in de kalender. De naam
+  /// wordt uit het adres afgeleid en is daarna handmatig te verbeteren, want
+  /// samengestelde voor- en achternamen lopen daar mis.
+  teacherEmail String
+  teacherName  String?
+
+  /// De aanvrager uit het publieke formulier. Blijft leeg wanneer een beheerder
+  /// een bezoek zelf inplant.
+  requesterName  String?
+  requesterEmail String?
+  requesterPhone String?
+
+  status LesbezoekStatus @default(PENDING)
+
+  /// Waarom geweigerd, of wat de professor antwoordde. Gaat mee in de mail naar
+  /// de aanvrager, dus schrijf hier een zin en geen code.
+  reviewNote   String?
+  reviewedById String?
+  reviewedAt   DateTime? @db.Timestamptz(3)
+
+  /// Wanneer de vraag naar de professor vertrok, wanneer er gepord werd, en
+  /// wanneer de aanvrager de uitkomst hoorde. Zonder deze drie is "heb ik dit al
+  /// gedaan?" niet te beantwoorden, en dat was in de Sheet een hulpkolom.
+  professorMailedAt   DateTime? @db.Timestamptz(3)
+  professorNudgedAt   DateTime? @db.Timestamptz(3)
+  requesterNotifiedAt DateTime? @db.Timestamptz(3)
+
+  createdById String?
+  createdAt   DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt   DateTime @updatedAt @db.Timestamptz(3)
+
+  organisation LesbezoekOrganisation @relation(fields: [organisationId], references: [id], onDelete: Restrict)
+  reviewedBy   User?                 @relation("LesbezoekReviewedBy", fields: [reviewedById], references: [id], onDelete: SetNull)
+  createdBy    User?                 @relation("LesbezoekCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@index([startsAt])
+  @@index([status, startsAt])
+  @@index([organisationId, startsAt])
+  /// Voedt de dubbelaanvraag-waarschuwing: dezelfde professor op dezelfde dag.
+  @@index([teacherEmail, startsAt])
+}
+
+/// Wat je van een professor, een vak of een faculteit moet weten vóór je een
+/// aanvraag doorstuurt: "keurt alles af", "enkel op het einde van de les",
+/// "spookvak", "één lesbezoek per organisatie", "enkel VTK".
+///
+/// Dit was het "Peculiarities"-tabblad van de Sheet, en het is precies de kennis
+/// die verdwijnt wanneer de verantwoordelijke van vorig jaar vertrekt. Het staat
+/// daarom in de database: bij het beoordelen zoekt het scherm zelf de regels op
+/// die bij deze aanvraag horen, in plaats van te hopen dat iemand een ander
+/// tabblad opent.
+model LesbezoekPeculiarity {
+  id      String @id @default(cuid())
+  /// Waar deze regel op slaat: een naam, een mailadres, een vak of een
+  /// faculteit. Wordt hoofdletterongevoelig vergeleken met de professor en het
+  /// vak van een aanvraag.
+  subject String
+  note    String
+
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+
+  @@index([subject])
 }

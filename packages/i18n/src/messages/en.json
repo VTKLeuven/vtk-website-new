@@ -354,7 +354,9 @@
     "evenementen": "Events",
     "website": "Website",
     "sso": "SSO & apps",
-    "urenloopApp": "24UL App Download"
+    "urenloopApp": "24UL App Download",
+    "lesbezoeken": "Classroom visits",
+    "onderwijs": "Education"
   },
   "confirmStudy": {
     "title": "Are your studies still up to date?",
@@ -761,6 +763,10 @@
     "sample": {
       "title": "Design samples",
       "description": "Internal reference page with the building blocks of the VTK house style."
+    },
+    "lesbezoeken": {
+      "title": "Request a class visit",
+      "description": "Request a class visit through VTK Education: we coordinate every request with the Faculty of Engineering Science."
     }
   },
   "contact": {
@@ -802,6 +808,56 @@
       "messageTooLong": "Not sent: your message is too long (at most {max} characters). Shorten it or mail info@vtk.be directly.",
       "rateLimited": "Not sent: you just sent a few messages. Wait fifteen minutes or mail info@vtk.be directly.",
       "mailFailed": "Your message did not go out because of a problem on our side. Try again later or mail info@vtk.be directly."
+    }
+  },
+  "lesbezoeken": {
+    "title": "Request a class visit",
+    "subtitle": "VTK Education coordinates class visits with the Faculty of Engineering Science. Submit your request here; we ask the lecturer and let you know the answer.",
+    "formTitle": "Your request",
+    "formIntro": "One request per target group. Everything marked with an asterisk is required.",
+    "sectionContact": "Contact",
+    "sectionVisit": "The visit",
+    "sectionClass": "The class",
+    "organisationLabel": "Organisation",
+    "organisationOther": "Another organisation…",
+    "organisationNameLabel": "Name of your organisation",
+    "nameLabel": "Your name",
+    "emailLabel": "Your email address",
+    "emailHelp": "This is where we send the lecturer's answer.",
+    "phoneLabel": "Phone number",
+    "subjectLabel": "Subject",
+    "subjectPlaceholder": "Class visit Revue",
+    "teacherNoteLabel": "Note for the lecturer",
+    "teacherNoteHelp": "This text goes into our email to the lecturer word for word. It is there to convince them, so write it carefully. The same text works for several requests.",
+    "longVisitLabel": "This visit takes longer than five minutes",
+    "audienceLabel": "Target group",
+    "audienceOtherOption": "Another target group…",
+    "audienceOtherLabel": "Which target group",
+    "courseLabel": "Course",
+    "coursePlaceholder": "H06U1a Artificial Intelligence",
+    "dateLabel": "Date",
+    "timeLabel": "Time you would like to come by",
+    "timeHelp": "Start, break or end of the class. The timetable is in the course's ECTS sheet.",
+    "teacherEmailLabel": "Lecturer's email address",
+    "teacherEmailHelp": "Listed in the course's ECTS sheet, under the coordinator.",
+    "honeypotLabel": "Leave this field empty",
+    "submit": "Submit request",
+    "submitting": "Sending…",
+    "sent": "Your request is in. We will let you know as soon as the lecturer has replied.",
+    "rulesTitle": "The ground rules",
+    "rules": [
+      "Submit at least two weeks in advance. We work first come, first serve.",
+      "Do not contact lecturers yourself: that is our arrangement with the faculty.",
+      "One request per target group. Do not submit several slots to pick from later.",
+      "An approved visit means somebody from your organisation shows up.",
+      "Not every lecturer welcomes class visits; a refusal is always possible."
+    ],
+    "coursesTitle": "Choosing a course",
+    "coursesBody": "The bachelor's and master's programmes are on the faculty website. A course's ECTS sheet holds the timetable and the coordinator's address.",
+    "contactTitle": "Questions?",
+    "contactBody": "Mail us at",
+    "errors": {
+      "fallback": "Something went wrong. Please try again."
     }
   }
 }

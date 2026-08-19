@@ -1699,6 +1699,65 @@ async function main() {
     });
   }
 
+  // ---------------------------------------------------------------------------
+  // Lesbezoeken: de organisaties die in het oude aanvraagformulier stonden.
+  //
+  // Create-only, zoals de rest van deze seed: de kleur en de notitie zijn
+  // GUI-beheerd, en een reseed mag ze niet terugzetten. Wie er niet bij staat,
+  // tikt zijn naam in het formulier en komt er vanzelf bij.
+  // ---------------------------------------------------------------------------
+  const lesbezoekOrganisations = [
+    "BEST",
+    "Biomedix",
+    "Chemix",
+    "Existenz",
+    "IAESTE",
+    "Mechanix",
+    "Statix",
+    "Revue",
+    "Groep 5",
+    "Kiesploeg",
+    "Lolploeg",
+    "Lustrum",
+    "VTK Activiteiten",
+    "VTK Bedrijvenrelaties",
+    "VTK Communicatie",
+    "VTK Cursusdienst",
+    "VTK Cultuur",
+    "VTK Development",
+    "VTK Fakbar",
+    "VTK Internationaal",
+    "VTK IT",
+    "VTK Logistiek",
+    "VTK Onderwijs",
+    "VTK Sport",
+    "VTK Theokot",
+  ];
+  // Hetzelfde palet als apps/web/lib/lesbezoeken.ts; roterend, want er zijn meer
+  // organisaties dan kleuren en dan is herhalen eerlijker dan alles blauw.
+  const lesbezoekColours = [
+    "#3B82F6",
+    "#0E9F6E",
+    "#7C3AED",
+    "#EA580C",
+    "#DB2777",
+    "#0891B2",
+    "#65A30D",
+    "#B45309",
+    "#4F46E5",
+    "#BE123C",
+  ];
+  for (let i = 0; i < lesbezoekOrganisations.length; i += 1) {
+    await prisma.lesbezoekOrganisation.upsert({
+      where: { name: lesbezoekOrganisations[i] },
+      update: {},
+      create: {
+        name: lesbezoekOrganisations[i],
+        colour: lesbezoekColours[i % lesbezoekColours.length],
+      },
+    });
+  }
+
   console.log("Seed complete.");
 }
 

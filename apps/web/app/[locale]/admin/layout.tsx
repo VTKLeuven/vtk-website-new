@@ -54,7 +54,6 @@ const NAV: NavEntry[] = [
     item('users', '/gebruikers', { perm: 'users.view' }),
     item('groups', '/groepen', { perm: 'groups.manage' }),
     item('werkgroepen', '/werkgroepen', { werkgroep: true }),
-    item('pocs', '/pocs', { perm: 'pocs.manage' }),
     item('roles', '/roles', { perm: 'roles.manage' }),
   ]),
   group('website', [
@@ -85,7 +84,16 @@ const NAV: NavEntry[] = [
   item('shift', '/shiften', { anyPerm: ['shift.edit', 'shift.reward', 'shift.ranking'] }),
   item('theokot', '/theokot', { anyPerm: ['theokot.manage', 'theokot.pickup'] }),
   item('grocomeet', '/grocomeet', { perm: 'grocomeet.manage' }),
-  item('bureau', '/bureau', { perm: 'bureau.manage' }),
+  // Wat VTK Onderwijs beheert hangt samen: de POC's zijn de studenten die de
+  // opleiding vertegenwoordigen, het bureau is hun vergadering, en de
+  // lesbezoeken lopen via dezelfde post.
+  group('onderwijs', [
+    item('pocs', '/pocs', { perm: 'pocs.manage' }),
+    item('bureau', '/bureau', { perm: 'bureau.manage' }),
+    item('lesbezoeken', '/lesbezoeken', {
+      anyPerm: ['lesbezoeken.view', 'lesbezoeken.manage'],
+    }),
+  ]),
   item('piano', '/piano', { perm: 'piano.manage' }),
   item('fakscanner', '/fakscanner', { perm: 'fakscanner.manage' }),
   item('mailinglists', '/mailinglijsten', { perm: 'mailinglists.export' }),

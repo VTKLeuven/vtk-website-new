@@ -187,7 +187,22 @@ export function Avatar({ name, avatarUrl, sm }: { name: string; avatarUrl: strin
 }
 
 /** Eenvoudige modal-schil (Escape + klik-buiten sluiten). */
-export function Modal({ title, onClose, children }: { title: string; onClose: () => void; children: ReactNode }) {
+/**
+ * `size` is er voor schermen die meer dan een formulier tonen: het detailpaneel
+ * van een lesbezoek zet de aanvraag, de waarschuwingen en een mailopsteller naast
+ * elkaar, en dat past niet in de standaardbreedte.
+ */
+export function Modal({
+  title,
+  onClose,
+  size = "md",
+  children,
+}: {
+  title: string;
+  onClose: () => void;
+  size?: "md" | "lg";
+  children: ReactNode;
+}) {
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
       if (e.key === "Escape") onClose();
@@ -204,7 +219,9 @@ export function Modal({ title, onClose, children }: { title: string; onClose: ()
       onClick={onClose}
     >
       <div
-        className="flex max-h-[calc(100dvh-2rem)] w-full max-w-xl flex-col rounded-2xl border border-vtk-blue/15 bg-white shadow-lg"
+        className={`flex max-h-[calc(100dvh-2rem)] w-full flex-col rounded-2xl border border-vtk-blue/15 bg-white shadow-lg ${
+          size === "lg" ? "max-w-3xl" : "max-w-xl"
+        }`}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex shrink-0 items-center justify-between gap-4 border-b border-vtk-blue/10 px-5 py-4">

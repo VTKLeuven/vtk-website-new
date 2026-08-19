@@ -71,6 +71,10 @@ export const PERMISSIONS = [
   { code: "grocomeet.manage", labelNl: "Grocomeets plannen en het geldoverzicht beheren", labelEn: "Plan grocomeets and manage the payment overview", category: "meetings" },
   { code: "bureau.manage", labelNl: "Bureaus plannen, aanbod en totalen beheren", labelEn: "Plan bureaus, manage offering and totals", category: "meetings" },
 
+  // Lesbezoeken (aankondiging bij het begin van een les)
+  { code: "lesbezoeken.view", labelNl: "Lesbezoekenkalender bekijken", labelEn: "View the classroom-visit calendar", category: "lesbezoeken" },
+  { code: "lesbezoeken.manage", labelNl: "Lesbezoeken goedkeuren, inplannen en organisaties beheren", labelEn: "Approve and schedule classroom visits, manage organisations", category: "lesbezoeken" },
+
   // Piano (reservaties voor het lokaal in het kasteel)
   { code: "piano.manage", labelNl: "Piano beheren (uren, sluitingsdagen, reservaties)", labelEn: "Manage the piano (hours, closures, reservations)", category: "piano" },
 

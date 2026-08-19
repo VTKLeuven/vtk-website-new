@@ -354,7 +354,9 @@
     "evenementen": "Evenementen",
     "website": "Website",
     "sso": "SSO & apps",
-    "urenloopApp": "24UL App Download"
+    "urenloopApp": "24UL App Download",
+    "lesbezoeken": "Lesbezoeken",
+    "onderwijs": "Onderwijs"
   },
   "confirmStudy": {
     "title": "Klopt je studie nog?",
@@ -761,6 +763,10 @@
     "sample": {
       "title": "Ontwerpvoorbeelden",
       "description": "Interne referentiepagina met de bouwstenen van de VTK-huisstijl."
+    },
+    "lesbezoeken": {
+      "title": "Lesbezoek aanvragen",
+      "description": "Vraag een lesbezoek aan bij VTK Onderwijs: wij coördineren de aanvragen met de faculteit Ingenieurswetenschappen."
     }
   },
   "contact": {
@@ -802,6 +808,56 @@
       "messageTooLong": "Niet verstuurd: je bericht is te lang (maximaal {max} tekens). Kort het in of mail rechtstreeks naar info@vtk.be.",
       "rateLimited": "Niet verstuurd: je stuurde net al enkele berichten. Wacht een kwartier of mail rechtstreeks naar info@vtk.be.",
       "mailFailed": "Je bericht raakte niet weg door een probleem aan onze kant. Probeer het straks opnieuw of mail rechtstreeks naar info@vtk.be."
+    }
+  },
+  "lesbezoeken": {
+    "title": "Lesbezoek aanvragen",
+    "subtitle": "VTK Onderwijs coördineert de lesbezoeken met de faculteit Ingenieurswetenschappen. Dien je aanvraag hier in; wij vragen het aan de docent en laten je het antwoord weten.",
+    "formTitle": "Je aanvraag",
+    "formIntro": "Eén aanvraag per doelgroep. Alles met een sterretje is verplicht.",
+    "sectionContact": "Contact",
+    "sectionVisit": "Het lesbezoek",
+    "sectionClass": "De les",
+    "organisationLabel": "Organisatie",
+    "organisationOther": "Andere organisatie…",
+    "organisationNameLabel": "Naam van je organisatie",
+    "nameLabel": "Jouw naam",
+    "emailLabel": "Jouw e-mailadres",
+    "emailHelp": "Hier laten we het antwoord van de docent weten.",
+    "phoneLabel": "Telefoonnummer",
+    "subjectLabel": "Onderwerp",
+    "subjectPlaceholder": "Lesbezoek Revue",
+    "teacherNoteLabel": "Toelichting voor de docent",
+    "teacherNoteHelp": "Deze tekst komt letterlijk in onze mail naar de docent. Ze is er om hem te overtuigen, dus schrijf ze zorgvuldig. Bij meerdere aanvragen volstaat dezelfde tekst.",
+    "longVisitLabel": "Dit lesbezoek duurt langer dan vijf minuten",
+    "audienceLabel": "Doelgroep",
+    "audienceOtherOption": "Andere doelgroep…",
+    "audienceOtherLabel": "Welke doelgroep",
+    "courseLabel": "Vak",
+    "coursePlaceholder": "H06U1a Artificiële intelligentie",
+    "dateLabel": "Datum",
+    "timeLabel": "Tijdstip waarop je wil langskomen",
+    "timeHelp": "Aanvang, pauze of einde van de les. Het uurrooster staat in de ECTS-fiche van het vak.",
+    "teacherEmailLabel": "Mailadres van de docent",
+    "teacherEmailHelp": "Staat in de ECTS-fiche van het vak, bij de coördinator.",
+    "honeypotLabel": "Laat dit veld leeg",
+    "submit": "Aanvraag indienen",
+    "submitting": "Versturen…",
+    "sent": "Je aanvraag is binnen. We laten je iets weten zodra de docent geantwoord heeft.",
+    "rulesTitle": "De spelregels",
+    "rules": [
+      "Dien minstens twee weken op voorhand in. We werken first come, first serve.",
+      "Contacteer professoren niet zelf: dat is afgesproken met de faculteit.",
+      "Eén aanvraag per doelgroep. Niet meerdere momenten indienen om achteraf te kiezen.",
+      "Een goedgekeurd lesbezoek betekent dat er iemand van jullie komt opdagen.",
+      "Niet elke docent ziet lesbezoeken graag komen; een weigering kan altijd."
+    ],
+    "coursesTitle": "Een vak kiezen",
+    "coursesBody": "De studieprogramma's van de bachelor en de masters staan op de site van de faculteit. In de ECTS-fiche van een vak vind je het uurrooster en het adres van de coördinator.",
+    "contactTitle": "Vragen?",
+    "contactBody": "Mail naar",
+    "errors": {
+      "fallback": "Er ging iets mis. Probeer het opnieuw."
     }
   }
 }
