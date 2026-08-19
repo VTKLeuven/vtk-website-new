@@ -3857,6 +3857,33 @@ model UrenloopDownloadEmail {
   @@index([email])
 }
 
+/// Per computer één token, waarmee de Windows-app zijn updates ophaalt.
+///
+/// De updater kan geen mail lezen en geen code intikken, dus koppelt de app zich
+/// één keer per computer: hetzelfde adres, dezelfde code, en daarna dit token in
+/// een `Authorization`-header (electron-updater `addAuthHeader`). Zo hangen de
+/// updates aan dezelfde lijst als de downloads, in plaats van aan een gedeeld
+/// geheim dat je niet per kring kan intrekken.
+///
+/// Enkel de SHA-256-hash wordt bewaard; het ruwe token bestaat na het koppelen
+/// alleen nog op die computer. 32 willekeurige bytes zijn niet te raden, dus een
+/// kale hash volstaat hier waar de code van zes cijfers HMAC nodig had.
+model UrenloopDeviceToken {
+  id         String    @id @default(cuid())
+  /// Het adres dat koppelde. Verdwijnt dat van de lijst, dan stopt dit token.
+  email      String
+  tokenHash  String    @unique
+  /// Computernaam, zodat de admin ziet welke laptop dit is.
+  label      String
+  /// Versie die deze computer bij de laatste controle draaide.
+  appVersion String?
+  lastUsedAt DateTime? @db.Timestamptz(3)
+  revokedAt  DateTime? @db.Timestamptz(3)
+  createdAt  DateTime  @default(now()) @db.Timestamptz(3)
+
+  @@index([email, revokedAt])
+}
+
 /// Eenmalige code per aanvraag. Enkel de SHA-256-hash wordt bewaard, zoals bij
 /// `DoorShortcutToken`: de code zelf staat in de mailbox van de ontvanger en
 /// hoort nergens anders te bestaan.

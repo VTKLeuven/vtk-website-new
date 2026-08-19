@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createAccessToken, readAccessToken } from '@/lib/urenloopApp/access';
-import { isPlatformId, updateKey, updatePathSecret } from '@/lib/urenloopApp/config';
+import { isPlatformId, updateKey } from '@/lib/urenloopApp/config';
+import { bearerFrom } from '@/lib/urenloopApp/devices';
 
 afterEach(() => vi.unstubAllEnvs());
 
@@ -53,11 +54,6 @@ describe('24UL update feed', () => {
     expect(updateKey('release.json')).toBeNull();
     expect(updateKey('../../etc/passwd')).toBeNull();
   });
-
-  it('treats an unset path as "feed off", not as "everything matches"', () => {
-    vi.stubEnv('URENLOOP_UPDATE_PATH', '');
-    expect(updatePathSecret()).toBe('');
-  });
 });
 
 describe('24UL platform ids', () => {
@@ -67,5 +63,22 @@ describe('24UL platform ids', () => {
     expect(isPlatformId('linux')).toBe(true);
     expect(isPlatformId('release.json')).toBe(false);
     expect(isPlatformId('')).toBe(false);
+  });
+});
+
+describe('24UL device token header', () => {
+  it('reads a bearer token, case-insensitively', () => {
+    expect(bearerFrom('Bearer abc123')).toBe('abc123');
+    expect(bearerFrom('bearer abc123')).toBe('abc123');
+    expect(bearerFrom('  Bearer   abc123  ')).toBe('abc123');
+  });
+
+  it('refuses anything that is not one bearer token', () => {
+    expect(bearerFrom(null)).toBeNull();
+    expect(bearerFrom('')).toBeNull();
+    expect(bearerFrom('abc123')).toBeNull();
+    expect(bearerFrom('Basic abc123')).toBeNull();
+    expect(bearerFrom('Bearer')).toBeNull();
+    expect(bearerFrom('Bearer a b')).toBeNull();
   });
 });

@@ -64,11 +64,47 @@ export async function removeDownloadEmailAction(formData: FormData): Promise<voi
   // gemailde code nog een uur werken voor iemand die je zojuist verwijderd hebt.
   await prisma.urenloopDownloadCode.deleteMany({ where: { email: removed.email } });
 
+  // De gekoppelde computers worden meteen ingetrokken. De feed-route controleert
+  // de lijst sowieso bij elke aanvraag, dus dit verandert niets aan wie er nog
+  // updates krijgt; het maakt in de lijst zichtbaar waarom ze stopten.
+  await prisma.urenloopDeviceToken.updateMany({
+    where: { email: removed.email, revokedAt: null },
+    data: { revokedAt: new Date() },
+  });
+
   await logAudit({
     action: "revoke",
     entity: "urenloopDownload",
     target: removed.email,
     summary: "van de lijst gehaald",
+  });
+  revalidatePath("/admin/it/24ul-app");
+  revalidatePath("/en/admin/it/24ul-app");
+}
+
+/**
+ * Trekt één gekoppelde computer in. De app blijft werken; enkel de updates
+ * stoppen, en de app zegt dan zelf dat er opnieuw gekoppeld moet worden.
+ *
+ * Bewust intrekken en niet verwijderen: de rij blijft staan zodat je in de lijst
+ * ziet dat die laptop ooit gekoppeld was en wanneer hij eruit ging.
+ */
+export async function revokeDeviceAction(formData: FormData): Promise<void> {
+  await requirePermission("urenloopApp.manage");
+
+  const id = String(formData.get("id") ?? "");
+  if (!id) return;
+
+  const device = await prisma.urenloopDeviceToken.update({
+    where: { id },
+    data: { revokedAt: new Date() },
+  });
+
+  await logAudit({
+    action: "revoke",
+    entity: "urenloopDownload",
+    target: device.email,
+    summary: `computer "${device.label}" losgekoppeld`,
   });
   revalidatePath("/admin/it/24ul-app");
   revalidatePath("/en/admin/it/24ul-app");

@@ -2892,9 +2892,24 @@ start, en dat is een app die tijdens een evenement zonder internet niet meer
 opstart; precies het scenario waar de app juist voor gebouwd is (hij draait
 volledig lokaal, inclusief zijn eigen database).
 
-Om dezelfde reden staat de **updater-feed** van de Windows-app niet achter de
-poort maar achter een onraadbaar pad: electron-updater kan geen mail lezen en
-geen code intikken. Dat pad staat leesbaar in elke geïnstalleerde Windows-app.
+De **Windows-app haalt zijn updates op met een eigen token**, want een updater
+kan geen mail lezen en geen code intikken. De app koppelt zich daarom één keer
+per computer: hetzelfde adres, dezelfde code, en daarna een token dat bij elke
+controle meegaat.
+
+Waarom niet gewoon één geheim in de app bakken, wat veel minder werk was? Omdat
+je dat niet per kring kan intrekken. Eén gedeeld geheim betekent dat een kring
+uitzetten iedereen uitzet, en dan is de knop in de admin een knop die je nooit
+durft te gebruiken. Een token per computer hangt aan één adres, dus intrekken
+doet precies wat het belooft.
+
+De prijs is een extra stap bij het installeren, en een computer die je vergeet te
+koppelen ziet er hetzelfde uit als een die werkt. Daarom noemt het menu-item zijn
+eigen toestand ("nog niet gekoppeld") en schrijft de app het bij elke start in
+zijn log. Koppelen is nooit verplicht: zonder token werkt alles behalve het
+automatisch bijwerken, en dat is bewust; een event-laptop mag niet afhangen van
+onze website om op te starten.
+
 Zie `DESKTOP_APP.md` in de app-repository voor de technische kant.
 
 **Eén versie tegelijk in de opslag.** De CI schrijft naar vaste sleutels onder

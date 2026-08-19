@@ -50,10 +50,10 @@ export type ReleaseManifest = {
 };
 
 /**
- * Bestanden die de Windows-updater ophaalt. Die kan nergens inloggen, dus deze
- * drie zitten niet achter de e-mailpoort maar achter een onraadbaar pad
- * (`URENLOOP_UPDATE_PATH`). Dat beschermt tegen gevonden worden, niet tegen wie
- * de app al heeft: het pad staat in `app-update.yml` in elke Windows-app.
+ * Bestanden die de Windows-updater ophaalt. Die kan nergens een code intikken,
+ * dus draagt hij een apparaat-token dat de app één keer per computer ophaalt;
+ * zie `devices.ts`. De lijst blijft kort met opzet: langs deze weg mogen de Mac-
+ * en Linux-downloads niet te bereiken zijn.
  */
 export const UPDATE_FILES = new Set([
   "latest.yml",
@@ -63,15 +63,6 @@ export const UPDATE_FILES = new Set([
 
 export function updateKey(filename: string): string | null {
   return UPDATE_FILES.has(filename) ? `${PREFIX}/${filename}` : null;
-}
-
-/**
- * Het geheime padsegment van de updater-feed. Leeg = de feed staat uit; dan
- * antwoordt de route 404 in plaats van alles vrij te geven, want een lege
- * vergelijking zou anders op elk pad kloppen.
- */
-export function updatePathSecret(): string {
-  return process.env.URENLOOP_UPDATE_PATH?.trim() || "";
 }
 
 /** Hoe lang een gemailde code bruikbaar blijft. */

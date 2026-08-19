@@ -3,10 +3,9 @@ import { Card } from "@vtk/ui";
 import { prisma } from "@vtk/db";
 import { hasLocale } from "@/lib/locale";
 import { requirePermission } from "@/lib/session";
-import { removeDownloadEmailAction } from "@/app/actions/urenloop-app";
+import { removeDownloadEmailAction, revokeDeviceAction } from "@/app/actions/urenloop-app";
 import { DeleteIconButton } from "@/components/ui/DeleteIconButton";
 import { readReleaseManifest, formatBytes } from "@/lib/urenloopApp/release";
-import { updatePathSecret } from "@/lib/urenloopApp/config";
 import { AddDownloadEmailForm } from "./AddDownloadEmailForm";
 
 // Internal IT tooling, so the copy stays English like the rest of the IT tab.
@@ -20,7 +19,7 @@ export default async function AdminUrenloopApp({
 
   await requirePermission("urenloopApp.manage");
 
-  const [emails, release, recentCodes] = await Promise.all([
+  const [emails, release, recentCodes, devices] = await Promise.all([
     prisma.urenloopDownloadEmail.findMany({
       orderBy: { createdAt: "desc" },
       include: { addedBy: { select: { name: true } } },
@@ -31,6 +30,10 @@ export default async function AdminUrenloopApp({
       take: 10,
       select: { email: true, createdAt: true, usedAt: true, expiresAt: true, attempts: true },
     }),
+    prisma.urenloopDeviceToken.findMany({
+      orderBy: [{ revokedAt: "asc" }, { lastUsedAt: "desc" }],
+      take: 50,
+    }),
   ]);
 
   const dateFmt = new Intl.DateTimeFormat("nl-BE", {
@@ -39,7 +42,6 @@ export default async function AdminUrenloopApp({
     timeZone: "Europe/Brussels",
   });
   const now = new Date();
-  const feedConfigured = Boolean(updatePathSecret());
 
   return (
     <div className="space-y-8">
@@ -94,13 +96,6 @@ export default async function AdminUrenloopApp({
               still works as soon as a build lands.
             </p>
           )}
-          {!feedConfigured ? (
-            <p className="mt-4 rounded-lg bg-amber-50 p-3 text-sm text-amber-900">
-              <strong>URENLOOP_UPDATE_PATH is not set.</strong> The Windows app updates
-              itself through that path; while it is empty the update feed answers 404 and
-              installed copies silently stop finding new versions.
-            </p>
-          ) : null}
         </Card>
       </section>
 
@@ -148,6 +143,72 @@ export default async function AdminUrenloopApp({
                           cancelLabel="Cancel"
                           successMessage="Address removed."
                         />
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+        </Card>
+      </section>
+
+      <section className="space-y-3">
+        <div>
+          <h2 className="text-lg font-semibold">Paired computers</h2>
+          <p className="mt-1 text-sm text-zinc-500">
+            The Windows app updates itself, and an updater cannot type a code, so each
+            computer pairs once and keeps a token. Revoking one stops its updates at the
+            next check; the app keeps working and says it needs pairing again. Removing an
+            address above revokes its computers along with it.
+          </p>
+        </div>
+        <Card className="p-5">
+          <div className="relative overflow-x-auto">
+            {devices.length === 0 ? (
+              <p className="text-sm text-zinc-500">
+                No computer has paired yet. Installed apps still work; they just do not
+                update themselves until somebody pairs them.
+              </p>
+            ) : (
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-vtk-blue/10 text-left text-xs uppercase text-zinc-500">
+                    <th className="py-2 pr-4 font-medium">Computer</th>
+                    <th className="py-2 pr-4 font-medium">Address</th>
+                    <th className="py-2 pr-4 font-medium">Version</th>
+                    <th className="py-2 pr-4 font-medium">Last check</th>
+                    <th className="py-2" />
+                  </tr>
+                </thead>
+                <tbody>
+                  {devices.map((device) => (
+                    <tr key={device.id} className="border-b border-vtk-blue/5">
+                      <td className="py-2 pr-4 font-medium">
+                        {device.label}
+                        {device.revokedAt ? (
+                          <span className="ml-2 text-xs font-normal text-zinc-500">revoked</span>
+                        ) : null}
+                      </td>
+                      <td className="py-2 pr-4 text-zinc-500">{device.email}</td>
+                      <td className="py-2 pr-4 text-zinc-500">{device.appVersion ?? ""}</td>
+                      <td className="py-2 pr-4 text-zinc-500">
+                        {device.lastUsedAt ? dateFmt.format(device.lastUsedAt) : "never"}
+                      </td>
+                      <td className="py-2 text-right">
+                        {device.revokedAt ? null : (
+                          <DeleteIconButton
+                            action={revokeDeviceAction}
+                            fields={{ id: device.id }}
+                            label="Revoke"
+                            srLabel={`Revoke: ${device.label}`}
+                            title="Revoke this computer?"
+                            description={`${device.label} stops receiving updates at its next check. The app itself keeps working and keeps all its data; somebody on that computer can pair it again with a new code.`}
+                            confirmLabel="Revoke"
+                            cancelLabel="Cancel"
+                            successMessage="Computer revoked."
+                          />
+                        )}
                       </td>
                     </tr>
                   ))}
