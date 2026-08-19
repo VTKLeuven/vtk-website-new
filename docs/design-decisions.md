@@ -2667,9 +2667,23 @@ de globale velden zetten, de shiften nakijken en aanmaken.
   reeks aanpassen of verwijderen doe je in het gewone overzicht. Een tweede knop die
   achteraf een hele reeks kan herschrijven, is een knop die op een avond met
   ingeschreven leden veel schade doet.
-- **Na een geslaagde aanmaak gaat de knop op slot** tot je iets wijzigt. Dubbelklikken
-  of een herlaadde pagina mag geen tweede reeks van dezelfde avond neerzetten;
-  duplicaten zijn hier duur, want leden schrijven zich in op de verkeerde helft.
+- **De pagina is een sneltoets op het gewone shiftformulier, geen tweede manier om
+  shiften te maken.** Ze doet per shift dezelfde `POST /api/shift` als
+  `ShiftEditModal`, in plaats van via een eigen server action in één keer naar de
+  databank te schrijven. Dat is trager (een request per shift), maar het houdt
+  validatie, rechten en de regels in het adminlogboek op één plek: komt er ooit iets
+  bij het aanmaken van een shift (een melding, een sync), dan krijgt het sjabloon dat
+  vanzelf mee in plaats van er stilletjes van weg te groeien.
+  - De prijs is dat een reeks geen transactie is. Valt de verbinding halverwege weg,
+    dan staan de eerste shiften er wel en de rest niet. De pagina stopt daarom bij de
+    eerste fout, zegt hoeveel er aangemaakt zijn, en maakt bij de volgende klik enkel
+    de ontbrekende aan; wat er al staat, wordt nooit een tweede keer verstuurd.
+- **Een geslaagde reeks stuurt je terug naar het shiftoverzicht**, met een groene
+  toast die zegt hoeveel shiften er staan. Dat is meteen de bescherming tegen
+  duplicaten: je blijft niet achter op een ingevuld formulier waar een tweede klik
+  of een herlaadde pagina dezelfde avond nog eens neerzet. Duplicaten zijn hier duur,
+  want leden schrijven zich in op de verkeerde helft. Bij een fout blijf je wél
+  staan; daar heb je het formulier nog nodig om verder te kunnen.
 - **Bonnetjes zijn per deelnemer.** De samenvatting bovenaan telt daarom
   `bonnetjes × plaatsen` en noemt dat expliciet "bij volle bezetting": dat getal is
   wat de avond in het slechtste geval aan de Theokot-kassa kost.

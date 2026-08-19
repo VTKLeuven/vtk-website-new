@@ -58,7 +58,6 @@ const SHIFT_TEMPLATES: ShiftTemplate[] = [
         // Bijrijden vertrekt altijd aan de loods, waar de cantus ook doorgaat.
         location: 'De Loods',
         description: 'All het materiaal van de loods naar de cantus brengen \n Adress loods: tervuursevest 238',
-        openToInternationals: true,
       },
       {
         key: 'opbouw',
@@ -68,7 +67,6 @@ const SHIFT_TEMPLATES: ShiftTemplate[] = [
         maxParticipants: 6,
         reward: 2,
         description: 'Zaal klaarzetten: tafels, stoelen, podia,...',
-        openToInternationals: true,
       },
       {
         key: 'inkom',
@@ -168,7 +166,6 @@ const SHIFT_TEMPLATES: ShiftTemplate[] = [
         maxParticipants: 5,
         reward: 2,
         description: 'Please help ons mee en zorg dat we na een half uurtje klaar kunnen zijn :))',
-        openToInternationals: true,
       },
       {
         key: 'bijrijden-2',
@@ -180,7 +177,49 @@ const SHIFT_TEMPLATES: ShiftTemplate[] = [
         // Bijrijden vertrekt altijd aan de loods, waar de cantus ook doorgaat.
         location: 'De Loods',
         description: 'All het materiaal terug naar de loods brengen \n Adress loods: tervuursevest 238',
+      },
+    ],
+  },
+  {
+    id: 'theokot',
+    label: 'Theokot opening',
+    note: 'Standaard template voor 1 dag in Theokot (smeren, middag, namiddag)',
+    defaults: {
+      eventName: '',
+      location: 'Theokot',
+      post: 'THEOKOT',
+      timeOfDay: '10:30',
+    },
+    shifts: [
+      {
+        key: 'smeren',
+        name: 'Broodjes Smeren',
+        startOffsetMinutes: 0,
+        durationMinutes: 120,
+        maxParticipants: 4,
+        reward: 2,
+        description:
+          'Kom gezellig mee broodjes smeren in het Theokot ;)) Als reward mag je ook zelf je eigen broodje samenstellen en smeren!',
         openToInternationals: true,
+      },
+      {
+        key: 'middag',
+        name: 'Broodjes verkopen',
+        startOffsetMinutes: 120,
+        durationMinutes: 90,
+        maxParticipants: 4,
+        reward: 2,
+        description: 'Broodjes en croques verkopen over de middag',
+        openToInternationals: false,
+      },
+      {
+        key: 'namiddag',
+        name: 'Namiddag verkoop',
+        startOffsetMinutes: 210,
+        durationMinutes: 120,
+        maxParticipants: 2,
+        reward: 2,
+        description: 'De namiddag verkoop voor theokot, kom gezellig wat chillen :))',
       },
     ],
   },

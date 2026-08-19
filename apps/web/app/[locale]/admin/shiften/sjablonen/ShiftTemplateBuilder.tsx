@@ -1,13 +1,12 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import type { Locale } from '@vtk/i18n';
 import { Button, Card, ConfirmDialog, Input, Label, Select, Textarea } from '@vtk/ui';
-import { SaveForm } from '@/components/ui/SaveForm';
+import { useToast } from '@/components/ui/toast';
 import { IconButton } from '@/components/ui/IconButton';
 import { TrashIcon } from '@/components/ui/icons';
-import { createShiftsFromTemplateAction } from '@/app/actions/shifts';
 
 // -----------------------------------------------------------------------------
 // Types van de sjablonen. De sjablonen zelf staan bovenaan page.tsx.
@@ -180,6 +179,43 @@ type Row = {
 const composeName = (eventName: string, baseName: string) =>
   eventName.trim() === '' ? baseName : `${baseName} - ${eventName.trim()}`;
 
+/**
+ * Bovengrens op wat één klik verstuurt. Elke shift is een eigen request, dus een
+ * per ongeluk uitgedijde lijst zou hier een stortvloed worden. Een cantus zet er
+ * een tiental neer; wie hier tegenaan loopt, heeft niet echt honderd shiften nodig.
+ */
+const MAX_SHIFTS_PER_RUN = 100;
+
+/**
+ * De body van `POST /api/shift`, identiek aan wat het losse shiftformulier
+ * (`ShiftEditModal`) verstuurt. Dit scherm is een sneltoets op dat formulier en
+ * geen tweede manier om shiften te maken: dezelfde route, dezelfde validatie,
+ * dezelfde logregels.
+ */
+function toShiftBody(row: Row) {
+  return {
+    name: row.name.trim(),
+    startTime: row.start,
+    endTime: row.end,
+    location: row.location.trim(),
+    description: row.description.trim(),
+    maxParticipants: Number(row.maxParticipants),
+    reward: Number(row.reward),
+    post: row.post === '' ? null : row.post,
+    openToInternationals: row.openToInternationals,
+    instructions: row.instructions.trim() === '' ? null : row.instructions,
+  };
+}
+
+/** Leest de foutuitleg uit een mislukt antwoord van `/api/shift`. */
+async function describeFailure(resp: Response): Promise<string> {
+  const data = (await resp.json().catch(() => null)) as
+    | { error?: string; details?: string[] }
+    | null;
+  if (data?.details?.length) return data.details.join('; ');
+  return data?.error ?? `HTTP ${resp.status}`;
+}
+
 function initialGlobals(template: ShiftTemplate, start: string): Globals {
   return {
     eventName: template.defaults.eventName,
@@ -264,12 +300,26 @@ export function ShiftTemplateBuilder({
     buildRows(template, initialGlobals(template, defaultStart(template, today)))
   );
   const [dirty, setDirty] = useState(false);
-  const [created, setCreated] = useState<number | null>(null);
   const [pendingTemplate, setPendingTemplate] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [failure, setFailure] = useState<string | null>(null);
+  /**
+   * De rijen die al aangemaakt zijn in een reeks die halverwege strandde. Elke
+   * shift is een apart request, dus een netwerkfout laat er een paar bestaan;
+   * zonder dit zou "opnieuw proberen" die eerste shiften een tweede keer
+   * aanmaken. Na een volledig geslaagde reeks gaat deze lijst weer leeg: dan is
+   * een volgende klik bewust een nieuwe reeks.
+   */
+  const [doneUids, setDoneUids] = useState<string[]>([]);
+  const showToast = useToast();
+  const router = useRouter();
+  const overview = `${base}/admin/shiften`;
 
-  /** Elke wijziging maakt de vorige aanmaak-melding irrelevant. */
+  /**
+   * Markeert het formulier als bewerkt, zodat het wisselen van sjabloon eerst
+   * vraagt of dat werk weg mag.
+   */
   function touchForm() {
-    setCreated(null);
     setDirty(true);
   }
 
@@ -307,14 +357,20 @@ export function ShiftTemplateBuilder({
   function selectTemplate(id: string) {
     const next = templates.find((t) => t.id === id);
     if (!next) return;
-    // Het gekozen moment blijft staan: je wisselt van sjabloon, niet van datum.
-    const start = globals.start || defaultStart(next, today);
+    // Je wisselt van sjabloon, niet van datum: de gekozen dág blijft staan. Het
+    // úúr komt van het nieuwe sjabloon, want dat hoort bij wat je gaat doen: een
+    // cantus begint 's avonds, een theokotopening 's ochtends. Het uur van het
+    // vorige sjabloon laten staan zet meteen de hele reeks op het verkeerde
+    // moment, inclusief de opbouwshiften die eromheen gerekend worden.
+    const day = globals.start.slice(0, 10) || today;
+    const start = defaultStart(next, day);
     const nextGlobals = initialGlobals(next, start);
     setTemplateId(id);
     setGlobals(nextGlobals);
     setRows(buildRows(next, nextGlobals));
     setDirty(false);
-    setCreated(null);
+    setFailure(null);
+    setDoneUids([]);
   }
 
   function updateRow(uid: string, patch: Partial<Row>, touch?: keyof Row['touched']) {
@@ -381,61 +437,89 @@ export function ShiftTemplateBuilder({
     return { spots, vouchers, first: starts[0] ?? '', last: ends[ends.length - 1] ?? '' };
   }, [enabledRows]);
 
-  const payload = JSON.stringify({
-    templateId,
-    shifts: enabledRows.map((row) => ({
-      name: row.name.trim(),
-      startTime: row.start,
-      endTime: row.end,
-      location: row.location.trim(),
-      description: row.description.trim(),
-      maxParticipants: Number(row.maxParticipants),
-      reward: Number(row.reward),
-      post: row.post === '' ? null : row.post,
-      openToInternationals: row.openToInternationals,
-      instructions: row.instructions.trim() === '' ? null : row.instructions,
-    })),
-  });
+  /** Wat er nog te doen is: na een halve reeks enkel de shiften die ontbreken. */
+  const todo = enabledRows.filter((row) => !doneUids.includes(row.uid));
+  const tooMany = todo.length > MAX_SHIFTS_PER_RUN;
+  const blocked = busy || todo.length === 0 || problems.size > 0 || tooMany;
 
-  const blocked = enabledRows.length === 0 || problems.size > 0 || created !== null;
+  /**
+   * Maakt de shiften aan, één `POST /api/shift` per shift.
+   *
+   * Bewust dezelfde route als het losse shiftformulier, en bewust geen eigen
+   * server action met een `createMany`: dan zou dit scherm een tweede manier
+   * worden om een shift te maken, die stilletjes uit elkaar groeit met de eerste
+   * zodra daar iets bijkomt.
+   *
+   * De prijs daarvan is dat de reeks niet één transactie is. Daarom stoppen we
+   * bij de eerste fout in plaats van door te duwen: wat er staat, staat er, en
+   * de volgende klik pikt de draad op bij de eerste die ontbreekt.
+   */
+  async function createAll() {
+    setBusy(true);
+    setFailure(null);
+
+    const done = [...doneUids];
+    let problem: string | null = null;
+
+    for (const row of todo) {
+      try {
+        const resp = await fetch('/api/shift', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(toShiftBody(row)),
+        });
+        if (!resp.ok) {
+          problem = `${row.name}: ${await describeFailure(resp)}`;
+          break;
+        }
+      } catch {
+        problem = `${row.name}: ${nl ? 'geen verbinding met de server' : 'no connection to the server'}`;
+        break;
+      }
+      done.push(row.uid);
+      setDoneUids([...done]);
+    }
+
+    if (problem) {
+      setBusy(false);
+      // Tegen de wachtrij van deze poging, niet tegen alle aangevinkte rijen:
+      // wie na een halve reeks iets uitvinkt, kreeg anders een negatief getal.
+      const left = todo.length - (done.length - doneUids.length);
+      const message = nl
+        ? `${done.length} van ${enabledRows.length} shift(en) aangemaakt. ${problem}. Klik opnieuw om enkel de overige ${left} aan te maken.`
+        : `Created ${done.length} of ${enabledRows.length} shift(s). ${problem}. Click again to create just the remaining ${left}.`;
+      setFailure(message);
+      // Blijft staan tot ze weggeklikt wordt: een halve reeks moet je zien.
+      showToast({ variant: 'error', message, duration: 0 });
+      return;
+    }
+
+    // Bewust in "bezig" blijven staan: we navigeren weg, en zolang dat loopt mag
+    // de knop niet opnieuw te klikken zijn.
+    showToast({
+      variant: 'success',
+      message: nl
+        ? `${done.length} shift(en) aangemaakt en gepubliceerd.`
+        : `Created and published ${done.length} shift(s).`,
+    });
+    // De toastprovider staat in de locale-layout, boven beide schermen, dus de
+    // melding overleeft deze navigatie en is op het overzicht nog te lezen.
+    router.push(overview);
+    // Het overzicht is een servercomponent die zelf uit de databank leest. De
+    // shiften zijn via een route handler aangemaakt en niet via een server
+    // action, dus niets heeft de clientrouter verteld dat zijn kopie verouderd
+    // is; zonder dit kan je op een lijst zonder je eigen shiften belanden.
+    router.refresh();
+  }
 
   return (
-    <SaveForm
-      action={createShiftsFromTemplateAction}
+    <form
       className="space-y-5"
-      submitLabel={
-        enabledRows.length === 1
-          ? nl
-            ? '1 shift aanmaken'
-            : 'Create 1 shift'
-          : nl
-            ? `${enabledRows.length} shiften aanmaken`
-            : `Create ${enabledRows.length} shifts`
-      }
-      savingLabel={nl ? 'Bezig met aanmaken...' : 'Creating...'}
-      savedMessage={
-        nl
-          ? `${enabledRows.length} shift(en) aangemaakt en gepubliceerd.`
-          : `Created and published ${enabledRows.length} shift(s).`
-      }
-      errorMessages={{
-        empty: nl ? 'Er staat geen enkele shift aangevinkt.' : 'No shift is ticked to be created.',
-        tooMany: nl
-          ? 'Meer dan honderd shiften in één keer: kijk de offsets in het sjabloon na.'
-          : 'More than a hundred shifts at once: check the template offsets.',
-        badPayload: nl
-          ? 'De gegevens raakten niet correct bij de server. Herlaad de pagina en probeer opnieuw.'
-          : 'The data did not reach the server correctly. Reload the page and try again.',
-        // `invalid` staat hier bewust niet in: die fout komt met een `detail` dat
-        // zegt wélke shift niet in orde is, en dat is bruikbaarder dan een
-        // algemene zin.
+      onSubmit={(e) => {
+        e.preventDefault();
+        if (!blocked) void createAll();
       }}
-      fallbackErrorMessage={nl ? 'Aanmaken mislukt.' : 'Creating failed.'}
-      resetOnSuccess={false}
-      submitDisabled={blocked}
-      onSuccess={() => setCreated(enabledRows.length)}
     >
-      <input type="hidden" name="payload" value={payload} />
 
       {/* Globale velden: wat per editie van het evenement verschilt. */}
       <Card className="p-5">
@@ -710,18 +794,8 @@ export function ShiftTemplateBuilder({
         })}
       </div>
 
-      {created !== null && (
-        <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">
-          {nl
-            ? `${created} shift(en) aangemaakt. Ze staan meteen op de shiftpagina.`
-            : `${created} shift(s) created. They are on the shift page right away.`}{' '}
-          <Link href={`${base}/admin/shiften`} className="underline">
-            {nl ? 'Naar het overzicht' : 'To the overview'}
-          </Link>
-          {nl
-            ? ' Pas iets aan hierboven om nog een reeks aan te maken.'
-            : ' Change something above to create another batch.'}
-        </div>
+      {failure !== null && (
+        <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">{failure}</div>
       )}
 
       {enabledRows.length === 0 && (
@@ -734,6 +808,29 @@ export function ShiftTemplateBuilder({
             : `${problems.size} shift(s) are not ready yet; check the red cards.`}
         </p>
       )}
+      {tooMany && (
+        <p className="text-sm text-red-600">
+          {nl
+            ? `Meer dan ${MAX_SHIFTS_PER_RUN} shiften in één keer; splits het op in twee reeksen.`
+            : `More than ${MAX_SHIFTS_PER_RUN} shifts at once; split it into two runs.`}
+        </p>
+      )}
+
+      <div className="flex flex-wrap items-center gap-3">
+        <Button type="submit" disabled={blocked}>
+          {busy
+            ? nl
+              ? `Bezig met aanmaken... (${doneUids.length}/${enabledRows.length})`
+              : `Creating... (${doneUids.length}/${enabledRows.length})`
+            : todo.length === 1
+              ? nl
+                ? '1 shift aanmaken'
+                : 'Create 1 shift'
+              : nl
+                ? `${todo.length} shiften aanmaken`
+                : `Create ${todo.length} shifts`}
+        </Button>
+      </div>
 
       <ConfirmDialog
         open={pendingTemplate !== null}
@@ -752,6 +849,6 @@ export function ShiftTemplateBuilder({
         }}
         onCancel={() => setPendingTemplate(null)}
       />
-    </SaveForm>
+    </form>
   );
 }
