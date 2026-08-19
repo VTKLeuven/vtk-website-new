@@ -94,6 +94,7 @@ export const PERMISSIONS = [
 
   // Adminlogboek (wie deed wat in de admin)
   { code: "audit.view", labelNl: "Adminlogboek bekijken", labelEn: "View the admin audit log", category: "it" },
+  { code: "urenloopApp.manage", labelNl: "24UL-app: downloadlijst beheren", labelEn: "24UL app: manage the download list", category: "it" },
 
 ] as const;
 

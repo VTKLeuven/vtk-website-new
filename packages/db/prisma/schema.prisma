@@ -572,6 +572,8 @@ model User {
 
   adminAuditLogs AdminAuditLog[] @relation("AdminAuditActor")
 
+  urenloopDownloadEmails UrenloopDownloadEmail[] @relation("UrenloopDownloadEmailAddedBy")
+
   @@index([deletedAt])
 }
 
@@ -1974,14 +1976,14 @@ model TheokotOrderLine {
 model Meeting {
   id String @id @default(cuid())
 
-  kind MeetingKind
+  kind     MeetingKind
   /// Werkingsjaar + semester waarin dit moment valt. Enkel voor de
   /// planningskalender: die vraagt per semester welke dagen er een moment is.
   year     Int
   semester Int
   /// Deelbare link voor een bureau (`/bureau/<slug>`). Ook een GM krijgt er een,
   /// zodat een mail naar één moment kan verwijzen.
-  slug     String @unique
+  slug     String      @unique
 
   startsAt DateTime  @db.Timestamptz(3)
   location String?
@@ -2081,13 +2083,13 @@ model MeetingReservation {
 /// Onthoudt dat de kalender voor dit semester al ingevuld is, zodat het beheer
 /// er maar één keer per semester ongevraagd naar vraagt.
 model MeetingPlan {
-  id          String   @id @default(cuid())
+  id          String      @id @default(cuid())
   kind        MeetingKind
   year        Int
   semester    Int
   plannedById String?
-  createdAt   DateTime @default(now()) @db.Timestamptz(3)
-  updatedAt   DateTime @updatedAt @db.Timestamptz(3)
+  createdAt   DateTime    @default(now()) @db.Timestamptz(3)
+  updatedAt   DateTime    @updatedAt @db.Timestamptz(3)
 
   plannedBy User? @relation("MeetingPlanBy", fields: [plannedById], references: [id], onDelete: SetNull)
 
@@ -2568,15 +2570,15 @@ model UitleenReservationLine {
 /// Een voertuig van de transportdienst (kar, auto, bakfiets). Tarieven zijn
 /// team-configureerbaar, daarom DB-rijen i.p.v. een enum.
 model UitleenVehicle {
-  id                 String             @id @default(cuid())
-  code               String             @unique // kar | auto | bakfiets
-  nameNl             String
-  nameEn             String
-  description        String?
-  pricingMode        UitleenPricingMode @default(FREE)
-  rateCents          Int                @default(0) // per uur / per km / vast, naargelang pricingMode
-  sortIndex          Int                @default(0)
-  active             Boolean            @default(true)
+  id             String             @id @default(cuid())
+  code           String             @unique // kar | auto | bakfiets
+  nameNl         String
+  nameEn         String
+  description    String?
+  pricingMode    UitleenPricingMode @default(FREE)
+  rateCents      Int                @default(0) // per uur / per km / vast, naargelang pricingMode
+  sortIndex      Int                @default(0)
+  active         Boolean            @default(true)
   // Rijden met dit voertuig vraagt een chauffeur die het aankan: bij VTK is dat
   // "de kar", de bestelwagen. Een vlag per voertuig en geen check op
   // `code == "kar"`: het team voert zelf voertuigen in, en een tweede
@@ -2584,7 +2586,7 @@ model UitleenVehicle {
   //
   // Heette tot augustus 2026 `needsTrailerDriver`. Dat was een leesfout van
   // "met de kar rijden": VTK heeft geen aanhangwagen.
-  needsVanDriver     Boolean            @default(false)
+  needsVanDriver Boolean            @default(false)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -2602,11 +2604,11 @@ model UitleenVehicle {
 /// werkingsjaar-gescoped: hij wordt met de hand beheerd en resetten op 15 juli
 /// zou de ritten van de zomer zonder chauffeurs zetten.
 model UitleenDriver {
-  id              String  @id @default(cuid())
-  userId          String  @unique
+  id          String  @id @default(cuid())
+  userId      String  @unique
   // Vrije notitie van het team, bv. "rijbewijs B sinds 2023, rijdt niet met de kar".
-  note            String?
-  addedById       String?
+  note        String?
+  addedById   String?
   // Mag met de kar rijden (de bestelwagen). Eén vlag en geen enum AUTO/KAR: wie
   // de kar rijdt, rijdt ook gewoon met de auto, dus die twee sluiten elkaar niet
   // uit. Leden van de post Logistiek hebben pas een rij hier zodra iemand deze
@@ -2688,16 +2690,16 @@ model UitleenTransportBooking {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  user        User           @relation("UitleenTransportUser", fields: [userId], references: [id], onDelete: Cascade)
-  vehicle     UitleenVehicle @relation(fields: [vehicleId], references: [id], onDelete: Restrict)
-  event       UitleenEvent?  @relation(fields: [eventId], references: [id], onDelete: SetNull)
+  user        User                @relation("UitleenTransportUser", fields: [userId], references: [id], onDelete: Cascade)
+  vehicle     UitleenVehicle      @relation(fields: [vehicleId], references: [id], onDelete: Restrict)
+  event       UitleenEvent?       @relation(fields: [eventId], references: [id], onDelete: SetNull)
   // Verdwijnt de aanvraag, dan blijft de rit bestaan: ze is dan gewoon een rit
   // zonder levering eraan, en het voertuig is die dag nog altijd bezet.
   reservation UitleenReservation? @relation(fields: [reservationId], references: [id], onDelete: SetNull)
-  group       Group?         @relation(fields: [groupId], references: [id], onDelete: SetNull)
-  driver      User?          @relation("UitleenTransportDriver", fields: [driverId], references: [id], onDelete: SetNull)
-  decidedBy   User?          @relation("UitleenTransportDecidedBy", fields: [decidedById], references: [id], onDelete: SetNull)
-  completedBy User?          @relation("UitleenTransportCompletedBy", fields: [completedById], references: [id], onDelete: SetNull)
+  group       Group?              @relation(fields: [groupId], references: [id], onDelete: SetNull)
+  driver      User?               @relation("UitleenTransportDriver", fields: [driverId], references: [id], onDelete: SetNull)
+  decidedBy   User?               @relation("UitleenTransportDecidedBy", fields: [decidedById], references: [id], onDelete: SetNull)
+  completedBy User?               @relation("UitleenTransportCompletedBy", fields: [completedById], references: [id], onDelete: SetNull)
 
   payments  UitleenPayment[]
   auditLogs UitleenAuditLog[]
@@ -3067,20 +3069,20 @@ model AdminAuditLog {
   id        String   @id @default(cuid())
   createdAt DateTime @default(now()) @db.Timestamptz(3)
 
-  actor   User?   @relation("AdminAuditActor", fields: [actorId], references: [id], onDelete: SetNull)
-  actorId String?
+  actor     User?   @relation("AdminAuditActor", fields: [actorId], references: [id], onDelete: SetNull)
+  actorId   String?
   /// Naam van de handelende persoon op het moment van de actie.
   actorName String
 
   /// create | update | delete | grant | revoke | publish | ... (zie AUDIT_ACTIONS)
-  action String
+  action   String
   /// Soort onderwerp, sleutel uit de registry in apps/web/lib/audit.ts.
   entity   String
   entityId String?
   /// Naam van het onderwerp op het moment van de actie, bv. "Career Fair".
-  target String
+  target   String
   /// Korte toelichting, bv. welke velden gewijzigd zijn.
-  summary String?
+  summary  String?
 
   @@index([createdAt])
   @@index([actorId, createdAt])
@@ -3831,4 +3833,44 @@ model FormOutboxMessage {
 
   @@index([status, availableAt])
   @@index([formId])
+}
+
+// -----------------------------------------------------------------------------
+// 24urenloop-app: wie de desktop-app mag downloaden
+// -----------------------------------------------------------------------------
+
+/// De app wordt gedeeld met andere kringen, niet met onze eigen leden, dus de
+/// toegang hangt aan een e-mailadres en niet aan een `User`. Beheerd in
+/// Admin -> IT -> 24UL App Download.
+model UrenloopDownloadEmail {
+  id        String   @id @default(cuid())
+  /// Altijd in kleine letters bewaard; het adres is de sleutel waarop de
+  /// codeaanvraag matcht en "Jan@..." en "jan@..." zijn dezelfde inbox.
+  email     String   @unique
+  /// Vrije notitie, bv. de kring waar het adres bij hoort.
+  note      String?
+  addedById String?
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+
+  addedBy User? @relation("UrenloopDownloadEmailAddedBy", fields: [addedById], references: [id], onDelete: SetNull)
+
+  @@index([email])
+}
+
+/// Eenmalige code per aanvraag. Enkel de SHA-256-hash wordt bewaard, zoals bij
+/// `DoorShortcutToken`: de code zelf staat in de mailbox van de ontvanger en
+/// hoort nergens anders te bestaan.
+model UrenloopDownloadCode {
+  id        String    @id @default(cuid())
+  email     String
+  codeHash  String
+  expiresAt DateTime  @db.Timestamptz(3)
+  usedAt    DateTime? @db.Timestamptz(3)
+  /// Aantal foute pogingen op deze code; na `URENLOOP_CODE_MAX_ATTEMPTS` is ze
+  /// verbrand, anders is een code van zes cijfers in een uur uit te proberen.
+  attempts  Int       @default(0)
+  createdAt DateTime  @default(now()) @db.Timestamptz(3)
+
+  @@index([email, createdAt])
+  @@index([expiresAt])
 }

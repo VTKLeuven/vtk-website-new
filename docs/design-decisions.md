@@ -2854,3 +2854,50 @@ in de server actions (`apps/web/app/actions/*`) en in de mutatie-endpoints van s
 - **Een mislukte logregel breekt de actie niet.** `logAudit` vangt zijn eigen fouten op
   (en meldt ze aan Sentry). Een opslaan dat lukt maar een logregel die faalt, mag geen
   rode toast geven; andersom zou het logboek belangrijker worden dan het werk zelf.
+
+## 24urenloop-app: gedeeld met kringen, niet met het internet
+
+De 24urenloop-app (scorebord en wisselaars, `VTKLeuven/24urenloop-new`) is
+gebouwd door VTK maar wordt gedeeld met andere kringen die aan de 24urenloop
+meedoen. De repository staat sinds augustus 2026 op privé omdat we niet willen
+dat concurrenten hem draaien, en daarmee waren de GitHub-downloadlinks meteen
+een 404 voor precies de mensen voor wie ze bedoeld waren.
+
+De keuze is dus: **wie de app krijgt, is een lijst die wij bijhouden**, en die
+lijst staat op onze eigen website in Admin -> IT -> 24UL App Download.
+
+- **Op e-mailadres, niet op `User`.** De gebruikers zijn andere kringen, geen
+  VTK-leden. Ze een account op onze site laten maken om een installatiebestand te
+  halen is een drempel voor iets wat ze één keer per jaar doen, en het zou ons
+  ledenbestand vervuilen met mensen die geen lid zijn.
+- **Een code per mail, geen wachtwoord.** Er is geen account om een wachtwoord bij
+  te bewaren, en een gedeeld wachtwoord lekt: dat wordt doorgestuurd en staat
+  binnen het jaar in een groepschat. Een code die één uur geldig is en één keer
+  werkt, bewijst dat iemand op dat moment bij die mailbox kan.
+- **De pagina zegt nooit of een adres op de lijst staat.** Zou ze dat wel doen,
+  dan is het formulier een manier om uit te zoeken welke kringen de app hebben.
+  Dat is precies de informatie die we niet publiek willen.
+- **Na de code een dag toegang.** Een kring zet de app op de laptop van de
+  wissel, van de tijdsopname en van de stand; drie keer een code aanvragen is
+  gedoe zonder dat het iets veiliger maakt.
+- **Iemand verwijderen werkt meteen.** Openstaande codes van dat adres worden mee
+  verwijderd, en de downloadroute kijkt bij elke klik opnieuw of het adres nog op
+  de lijst staat. Zonder dat zou een verwijderde kring nog een dag kunnen
+  downloaden.
+
+**Wat dit bewust niet oplost:** wie de app eenmaal heeft, kan het bestand
+doorsturen. De poort bepaalt wie hem een eerste keer krijgt, niet wie hem draait.
+Dat echt afdwingen zou betekenen dat de app zelf bij ons moet aankloppen voor hij
+start, en dat is een app die tijdens een evenement zonder internet niet meer
+opstart; precies het scenario waar de app juist voor gebouwd is (hij draait
+volledig lokaal, inclusief zijn eigen database).
+
+Om dezelfde reden staat de **updater-feed** van de Windows-app niet achter de
+poort maar achter een onraadbaar pad: electron-updater kan geen mail lezen en
+geen code intikken. Dat pad staat leesbaar in elke geïnstalleerde Windows-app.
+Zie `DESKTOP_APP.md` in de app-repository voor de technische kant.
+
+**Eén versie tegelijk in de opslag.** De CI schrijft naar vaste sleutels onder
+`24ul-app/`, dus elke build overschrijft de vorige. Er is geen archief van oude
+versies in de objectopslag: dat zou met elke push aangroeien met een halve
+gigabyte, en wie echt terug moet kan bij de GitHub-release van die versie.

@@ -110,6 +110,7 @@ export const AUDIT_ENTITIES = {
   ssoClient: { nl: "SSO-client", en: "SSO client", group: "sso" },
   ssoPermission: { nl: "SSO-recht", en: "SSO permission", group: "sso" },
   itConfig: { nl: "IT-configuratie", en: "IT configuration", group: "it" },
+  urenloopDownload: { nl: "24UL-app downloadlijst", en: "24UL app download list", group: "it" },
 } as const;
 
 export type AuditEntity = keyof typeof AUDIT_ENTITIES;
