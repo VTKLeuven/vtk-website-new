@@ -21,7 +21,9 @@ import { AccountTickets } from './AccountTickets';
 import { AccountShifts } from './AccountShifts';
 import { DoorShortcutTokens } from './DoorShortcutTokens';
 import { CalendarFeedTokens } from './CalendarFeedTokens';
+import { AccountSignature } from './AccountSignature';
 import { siteBaseUrl } from '@/lib/calendar/feeds';
+import { currentWorkingYear, formatWorkingYear } from '@/lib/workingYear';
 
 export async function generateMetadata({
   params,
@@ -50,6 +52,7 @@ export default async function AccountPage({ params }: { params: Promise<{ locale
     registeredShifts,
     calendarFeedTokens,
     meetingReservations,
+    memberships,
   ] = await Promise.all([
     // Volledig profiel voor het bewerkbare gegevensformulier (kotadres, mails, ...).
     prisma.user.findUniqueOrThrow({
@@ -135,7 +138,23 @@ export default async function AccountPage({ params }: { params: Promise<{ locale
       orderBy: { meeting: { startsAt: 'asc' } },
       include: { meeting: { select: { kind: true, slug: true, startsAt: true } } },
     }),
+    // Groepslidmaatschappen voor o.a. de handtekeninggenerator.
+    prisma.groupMembership.findMany({
+      where: { userId: session.user.id },
+      include: { group: { select: { nameNl: true, nameEn: true, code: true, type: true } } },
+      orderBy: [{ year: 'desc' }, { group: { orderInPraesidium: 'asc' } }],
+    }),
   ]);
+
+  const workingYear = currentWorkingYear(now);
+  const userMemberships = memberships.map((m) => ({
+    groupNameNl: m.group.nameNl,
+    groupNameEn: m.group.nameEn,
+    titleNl: m.titleNl,
+    titleEn: m.titleEn,
+    year: m.year,
+    yearCode: formatWorkingYear(m.year),
+  }));
 
   const dayFmt = new Intl.DateTimeFormat(nl ? 'nl-BE' : 'en-GB', {
     timeZone: 'Europe/Brussels',
@@ -347,6 +366,20 @@ export default async function AccountPage({ params }: { params: Promise<{ locale
                 />
               </Card>
             ) : null}
+
+            <Card className="p-6">
+              <AccountSignature
+                locale={locale}
+                user={{
+                  name: profile.name,
+                  firstName: profile.firstName,
+                  lastName: profile.lastName,
+                  email: profile.email,
+                }}
+                memberships={userMemberships}
+                currentYearCode={formatWorkingYear(workingYear)}
+              />
+            </Card>
 
             <Card className="p-6">
               <h3 className="mb-2 text-lg font-semibold text-vtk-ink">{nl ? 'Verbonden apps' : 'Connected apps'}</h3>
