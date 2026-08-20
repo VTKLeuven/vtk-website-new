@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { getDictionary, pick, type Locale } from "@vtk/i18n";
 import { OUTBOUND_EVENT, outboundHost, umamiEvent } from "@/lib/analytics";
 import { categoryTiles } from "@/lib/categoryTiles";
@@ -17,7 +17,7 @@ export async function generateMetadata({ params }: { params: Params }): Promise<
   if (!hasLocale(locale)) return {};
 
   const tab = await loadHeaderTabWithPages(headerSlug);
-  if (!tab || !tab.visible) return {};
+  if (!tab || !tab.visible || tab.externalUrl) return {};
 
   // De intro van de categorie is de beschrijving; zonder intro valt
   // `buildMetadata` terug op de sitebeschrijving.
@@ -39,6 +39,7 @@ export default async function HeaderOverviewPage({ params }: { params: Params })
   const tab = await loadHeaderTabWithPages(headerSlug);
 
   if (!tab || !tab.visible) notFound();
+  if (tab.externalUrl) redirect(tab.externalUrl);
 
   const tiles = categoryTiles(tab);
   const intro = pick(tab.introNl ?? "", tab.introEn ?? "", locale);

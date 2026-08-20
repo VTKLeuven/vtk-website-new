@@ -9,6 +9,9 @@ export type GroupSeed = {
   // Werkgroepen zetten dit op "WERKGROEP"; praesidiumposten laten het weg
   // (default in de DB is PRAESIDIUM).
   type?: "WERKGROEP";
+  descriptionNl?: string;
+  descriptionEn?: string;
+  website?: string;
 };
 
 export const GROUP_SEEDS: GroupSeed[] = [
@@ -36,13 +39,97 @@ export const GROUP_SEEDS: GroupSeed[] = [
  * dient hier gewoon als volgorde op die pagina.
  */
 export const WERKGROEP_SEEDS: GroupSeed[] = [
-  { code: "BEST", slug: "best", nameNl: "BEST", nameEn: "BEST", orderInPraesidium: 1, type: "WERKGROEP" },
-  { code: "BIOMEDIX", slug: "biomedix", nameNl: "Biomedix", nameEn: "Biomedix", orderInPraesidium: 2, type: "WERKGROEP" },
-  { code: "CHEMIX", slug: "chemix", nameNl: "Chemix", nameEn: "Chemix", orderInPraesidium: 3, type: "WERKGROEP" },
-  { code: "EXISTENZ", slug: "existenz", nameNl: "Existenz", nameEn: "Existenz", orderInPraesidium: 4, type: "WERKGROEP" },
-  { code: "MECHANIX", slug: "mechanix", nameNl: "Mechanix", nameEn: "Mechanix", orderInPraesidium: 5, type: "WERKGROEP" },
-  { code: "REVUE", slug: "revue", nameNl: "Revue", nameEn: "Revue", orderInPraesidium: 6, type: "WERKGROEP" },
-  { code: "STATIX", slug: "statix", nameNl: "Statix", nameEn: "Statix", orderInPraesidium: 7, type: "WERKGROEP" },
+  {
+    code: "BEST",
+    slug: "best",
+    nameNl: "BEST",
+    nameEn: "BEST",
+    orderInPraesidium: 1,
+    type: "WERKGROEP",
+    descriptionNl:
+      "BEST (Board of European Students of Technology) is een internationale organisatie bestaande uit technische, wetenschappelijke en ingenieursstudenten aan 96 universiteiten in 34 Europese landen. We organiseren academische competities, soft-skills workshops en internationale cursussen.",
+    descriptionEn:
+      "BEST (Board of European Students of Technology) is an international organisation of technology and engineering students across 96 universities in 34 European countries. We organise academic competitions, soft skills workshops and international engineering courses.",
+    website: "https://best.eu.org",
+  },
+  {
+    code: "BIOMEDIX",
+    slug: "biomedix",
+    nameNl: "Biomedix",
+    nameEn: "Biomedix",
+    orderInPraesidium: 2,
+    type: "WERKGROEP",
+    descriptionNl:
+      "Biomedix is de werkgroep binnen VTK speciaal voor studenten Biomedische Technologie en iedereen met interesse in medische technologie en innovatie. We organiseren workshops, netwerkevents, bedrijfsbezoeken en het jaarlijkse Biomedical Dinner.",
+    descriptionEn:
+      "Biomedix is the working group within VTK for Biomedical Engineering students and anyone passionate about medical technology and healthcare innovation. We host workshops, networking events, company visits and the annual Biomedical Dinner.",
+    website: "https://biomedix.vtk.be",
+  },
+  {
+    code: "CHEMIX",
+    slug: "chemix",
+    nameNl: "Chemix",
+    nameEn: "Chemix",
+    orderInPraesidium: 3,
+    type: "WERKGROEP",
+    descriptionNl:
+      "Chemix is het studententeam dat evenementen organiseert voor studenten met een passie voor Chemische Ingenieurstechnieken (CIT). We organiseren ludieke activiteiten, educatieve workshops en professionele events in samenwerking met chemische bedrijven.",
+    descriptionEn:
+      "Chemix organizes events for students with a passion for Chemical Engineering (CIT). We offer a mix of social gatherings, educational workshops and professional networking events with leading chemical companies.",
+    website: "https://chemix.vtk.be",
+  },
+  {
+    code: "EXISTENZ",
+    slug: "existenz",
+    nameNl: "Existenz",
+    nameEn: "Existenz",
+    orderInPraesidium: 4,
+    type: "WERKGROEP",
+    descriptionNl:
+      "Existenz is een gedreven collectief van studenten burgerlijk ingenieur-architect aan de KU Leuven. Existenz verbindt architectuurtheorie met de praktijk, artistieke creativiteit met techniek, met als jaarlijks hoogtepunt het tijdelijk transformeren van een leegstaand Leuvens pand tijdens de befaamde Existenzweek.",
+    descriptionEn:
+      "Existenz is a collective of engineering-architecture students at KU Leuven. Existenz bridges architectural theory and engineering practice, culminating every year in the transformation of an abandoned Leuven building during the renowned Existenz Week.",
+    website: "https://existenz.be",
+  },
+  {
+    code: "MECHANIX",
+    slug: "mechanix",
+    nameNl: "Mechanix",
+    nameEn: "Mechanix",
+    orderInPraesidium: 5,
+    type: "WERKGROEP",
+    descriptionNl:
+      "Mechanix is de werkgroep binnen VTK voor alles wat met werktuigkunde en mechanica te maken heeft. We organiseren lezingen, praktische workshops, bedrijfsbezoeken en ontspannende activiteiten voor ingenieursstudenten.",
+    descriptionEn:
+      "Mechanix is the VTK working group for everything related to mechanical engineering. We organise lectures, hands-on workshops, company visits and social activities for engineering students.",
+    website: "https://mechanix.vtk.be",
+  },
+  {
+    code: "REVUE",
+    slug: "revue",
+    nameNl: "Revue",
+    nameEn: "Revue",
+    orderInPraesidium: 6,
+    type: "WERKGROEP",
+    descriptionNl:
+      "Al meer dan 50 jaar brengt de VTK Revue een groots avondvullend satirisch theaterspektakel met live muziek, dans, humor en zelfgemaakte decors en kostuums waarin professoren en het ingenieursleven liefdevol op de korrel worden genomen.",
+    descriptionEn:
+      "For over 50 years, the VTK Revue has staged a full-length satirical theater spectacle complete with live music, dancing, humor, custom stage sets and costumes poking fun at engineering professors and student life.",
+    website: "https://revue.vtk.be",
+  },
+  {
+    code: "STATIX",
+    slug: "statix",
+    nameNl: "Statix",
+    nameEn: "Statix",
+    orderInPraesidium: 7,
+    type: "WERKGROEP",
+    descriptionNl:
+      "Statix is de studentenvereniging en werkgroep voor studenten burgerlijk ingenieur bouwkunde aan de KU Leuven. We slaan de brug tussen theorie en bouwpraktijk via werfbezoeken, gastlezingen, workshops en bedrijfscases.",
+    descriptionEn:
+      "Statix is the student association and working group for civil engineering students at KU Leuven. We bridge academic theory and construction practice through site visits, guest lectures, workshops and business cases.",
+    website: "https://statixleuven.be",
+  },
 ];
 
 /**
@@ -135,6 +222,7 @@ export const HEADER_TABS: Array<{
     labelNl: "Cursusdienst",
     labelEn: "Course Shop",
     order: 5,
+    externalUrl: "https://cudi.vtk.be",
     links: [
       { labelNl: "Bestel boeken", labelEn: "Order books", url: "https://cudi.vtk.be/vtk/shop" },
       { labelNl: "Tweedehands", labelEn: "Second-hand", url: "https://cudi.vtk.be/vtk/secondhand" },

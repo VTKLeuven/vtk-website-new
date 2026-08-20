@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { HEADER_TABS } from '@vtk/db/groups';
+import { HEADER_TABS, WERKGROEP_SEEDS } from '@vtk/db/groups';
+import { getDictionary } from '@vtk/i18n';
 
 // Rechtstreeks uit de seed-defaults, niet uit de database: dit test wat een
 // verse installatie krijgt en wat de fallback in `lib/headerTabs.ts` toont zolang
@@ -56,6 +57,13 @@ describe('HEADER_TABS', () => {
     }
   });
 
+  it('stuurt Cursusdienst en Career direct naar hun eigen site', () => {
+    const cudiTab = HEADER_TABS.find((tab) => tab.code === 'CURSUSDIENST');
+    const careerTab = HEADER_TABS.find((tab) => tab.code === 'CAREER');
+    expect(cudiTab?.externalUrl).toBe('https://cudi.vtk.be');
+    expect(careerTab?.externalUrl).toBe('https://career.vtk.be');
+  });
+
   it('gebruikt interne paden zonder taalvoorvoegsel', () => {
     // De header plakt zelf "/en" voor een intern pad. Staat het er al in, dan
     // wordt dat "/en/en/...".
@@ -64,5 +72,26 @@ describe('HEADER_TABS', () => {
         expect(link.url, `${tab.code}: ${link.url}`).not.toMatch(/^\/(nl|en)(\/|$)/);
       }
     }
+  });
+});
+
+describe('WERKGROEP_SEEDS', () => {
+  it('bevat alle 7 werkgroepen met infotekst en website', () => {
+    expect(WERKGROEP_SEEDS.length).toBe(7);
+    for (const g of WERKGROEP_SEEDS) {
+      expect(g.type).toBe('WERKGROEP');
+      expect(g.nameNl.trim().length).toBeGreaterThan(0);
+      expect(g.nameEn.trim().length).toBeGreaterThan(0);
+      expect(g.descriptionNl?.trim().length).toBeGreaterThan(10);
+      expect(g.descriptionEn?.trim().length).toBeGreaterThan(10);
+      expect(g.website).toMatch(/^https?:\/\//);
+    }
+  });
+
+  it('toont enkel "Werkgroepen" in de footer-linkvertaling', () => {
+    const nl = getDictionary('nl');
+    const en = getDictionary('en');
+    expect(nl.footer.linkWerkgroepenCircles).toBe('Werkgroepen');
+    expect(en.footer.linkWerkgroepenCircles).toBe('Working groups');
   });
 });

@@ -238,14 +238,14 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
     {
       k: nl ? "Eten" : "Eat",
       v: "Theokot",
-      m: theoToday && !isClosedHours(theoToday.hours) ? theoToday.hours : nl ? "Bekijk openingsuren" : "See hours",
+      m: nl ? "Bestel broodjes" : "Order sandwiches",
       href: `${base}/theokot`,
     },
     {
       k: nl ? "Boeken" : "Books",
       v: nl ? "Cursusdienst" : "Course shop",
       m: curToday && !isClosedHours(curToday.hours) ? curToday.hours : nl ? "Cursussen & tweedehands" : "Courses & second-hand",
-      href: `${base}/cursusdienst`,
+      href: "https://cudi.vtk.be",
     },
     {
       k: nl ? "Tweedehands" : "Second-hand",
@@ -526,7 +526,7 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
       {eventCards.length > 0 && (
         <section className="section band events-band">
           <div className="sec-head">
-            <h2>{nl ? "Opkomende evenementen." : "Upcoming events."}</h2>
+            <h2>{nl ? "Aankomende evenementen." : "Upcoming events."}</h2>
             <div className="meta">
               {eventCards.length} {nl ? "gepland" : "planned"} ·{" "}
               <Link href={`${base}/kalender`}>{nl ? "volledige kalender" : "full calendar"}</Link>
@@ -581,10 +581,6 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
         </div>
         <div className="career">
           <div>
-            <div className="eyebrow">
-              <span className="dot" />
-              VTK Career
-            </div>
             <h3>
               {career
                 ? pick(career.titleNl, career.titleEn, locale)

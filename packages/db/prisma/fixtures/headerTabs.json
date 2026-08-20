@@ -59,6 +59,7 @@
     "labelEn": "Course Shop",
     "order": 3,
     "visible": true,
+    "externalUrl": "https://cudi.vtk.be",
     "ctaLabelNl": "Bestel cursussen op cudi.vtk.be",
     "ctaLabelEn": "Order courses on cudi.vtk.be",
     "ctaUrl": "https://cudi.vtk.be",

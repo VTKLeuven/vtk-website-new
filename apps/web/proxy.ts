@@ -86,6 +86,12 @@ async function gateRedirect(request: NextRequest, internalPath: string): Promise
 
   const enPrefix = locale === 'en' ? '/en' : '';
 
+  // Pagina's die altijd leesbaar moeten zijn, zelfs tijdens onboarding of studiebevestiging
+  // (zoals de privacyverklaring waar het onboardingformulier zelf naar linkt).
+  if (segment === 'privacy' || segment === 'cookies') {
+    return null;
+  }
+
   // 1. Onboarding: profiel nog niet ingevuld -> eerst dat afwerken.
   if (!session.user.onboarded) {
     if (segment !== 'onboarding') {

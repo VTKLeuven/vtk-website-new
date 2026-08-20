@@ -20,13 +20,21 @@ export type UserMembershipInfo = {
   yearCode: string;
 };
 
+const STORAGE_KEY = 'vtk_signature_settings_v2';
 const STORAGE_PHONE_KEY = 'vtk_signature_phone';
+
+type StoredSignatureData = {
+  fullName?: string;
+  roleTitle?: string;
+  emailAddress?: string;
+  phoneDisplay?: string;
+};
 
 const T = {
   nl: {
     title: 'E-mailhandtekening',
     intro:
-      'Genereer je officiële VTK-handtekening voor je e-mails (Gmail, Outlook, Apple Mail). Pas eventueel je functie of telefoonnummer aan en kopieer ze met één klik.',
+      'Genereer je officiële VTK-handtekening voor je e-mails (Gmail, Outlook, Apple Mail). Pas eventueel je functie of telefoonnummer aan en sla je gegevens op voor een volgend bezoek.',
     fullNameLabel: 'Volledige naam',
     rolePresetLabel: 'Kies een functie of rol',
     roleCustomOption: 'Aangepaste functie...',
@@ -36,6 +44,11 @@ const T = {
     phoneLabel: 'Telefoonnummer (GSM)',
     phonePlaceholder: '+32 470 12 34 56',
     previewTitle: 'Voorbeeldweergave',
+    saveDetails: 'Gegevens opslaan',
+    savedDetails: 'Opgeslagen!',
+    saveSuccessToast: 'Handtekeninggegevens opgeslagen voor de volgende keer.',
+    resetDefaults: 'Standaard herstellen',
+    resetToast: 'Standaardgegevens hersteld.',
     copySignature: 'Handtekening kopiëren',
     copiedSignature: 'Gekopieerd!',
     copyHtml: 'HTML-code kopiëren',
@@ -52,7 +65,7 @@ const T = {
   en: {
     title: 'Email signature',
     intro:
-      'Generate your official VTK email signature for Gmail, Outlook, Apple Mail, etc. Adjust your function or phone number as needed and copy it in one click.',
+      'Generate your official VTK email signature for Gmail, Outlook, Apple Mail, etc. Adjust your function or phone number as needed and save your details for next time.',
     fullNameLabel: 'Full name',
     rolePresetLabel: 'Choose a function or role',
     roleCustomOption: 'Custom role...',
@@ -62,6 +75,11 @@ const T = {
     phoneLabel: 'Phone number (mobile)',
     phonePlaceholder: '+32 470 12 34 56',
     previewTitle: 'Live preview',
+    saveDetails: 'Save details',
+    savedDetails: 'Saved!',
+    saveSuccessToast: 'Signature details saved for next time.',
+    resetDefaults: 'Reset to defaults',
+    resetToast: 'Default values restored.',
     copySignature: 'Copy signature',
     copiedSignature: 'Copied!',
     copyHtml: 'Copy HTML code',
@@ -146,28 +164,125 @@ export function AccountSignature({
 
   const initialRole = rolePresets[0]?.value ?? fallbackRole;
 
-  const [fullName, setFullName] = useState(defaultFullName);
-  const [roleTitle, setRoleTitle] = useState(initialRole);
-  const [emailAddress, setEmailAddress] = useState(defaultEmail);
+  const [fullName, setFullName] = useState(() => {
+    if (typeof window === 'undefined') return defaultFullName;
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw) as StoredSignatureData;
+        if (parsed.fullName) return parsed.fullName;
+      }
+    } catch {
+      // Negeer
+    }
+    return defaultFullName;
+  });
+
+  const [roleTitle, setRoleTitle] = useState(() => {
+    if (typeof window === 'undefined') return initialRole;
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw) as StoredSignatureData;
+        if (parsed.roleTitle) return parsed.roleTitle;
+      }
+    } catch {
+      // Negeer
+    }
+    return initialRole;
+  });
+
+  const [emailAddress, setEmailAddress] = useState(() => {
+    if (typeof window === 'undefined') return defaultEmail;
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw) as StoredSignatureData;
+        if (parsed.emailAddress) return parsed.emailAddress;
+      }
+    } catch {
+      // Negeer
+    }
+    return defaultEmail;
+  });
+
   const [phoneDisplay, setPhoneDisplay] = useState(() => {
     if (typeof window === 'undefined') return '';
     try {
-      return localStorage.getItem(STORAGE_PHONE_KEY) ?? '';
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw) as StoredSignatureData;
+        if (parsed.phoneDisplay !== undefined) return parsed.phoneDisplay;
+      }
+      const legacyPhone = localStorage.getItem(STORAGE_PHONE_KEY);
+      if (legacyPhone) return legacyPhone;
     } catch {
-      return '';
+      // Negeer
     }
+    return '';
   });
+
+  const [savedSuccess, setSavedSuccess] = useState(false);
   const [copiedRich, setCopiedRich] = useState(false);
   const [copiedHtml, setCopiedHtml] = useState(false);
   const [showHowTo, setShowHowTo] = useState(false);
 
-  function handlePhoneChange(val: string) {
-    setPhoneDisplay(val);
+  function persistData(patch: Partial<StoredSignatureData>) {
+    const updated: StoredSignatureData = {
+      fullName: patch.fullName ?? fullName,
+      roleTitle: patch.roleTitle ?? roleTitle,
+      emailAddress: patch.emailAddress ?? emailAddress,
+      phoneDisplay: patch.phoneDisplay ?? phoneDisplay,
+    };
     try {
-      localStorage.setItem(STORAGE_PHONE_KEY, val);
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+      if (updated.phoneDisplay !== undefined) {
+        localStorage.setItem(STORAGE_PHONE_KEY, updated.phoneDisplay);
+      }
     } catch {
       // Negeer opslagfouten
     }
+  }
+
+  function handleFullNameChange(val: string) {
+    setFullName(val);
+    persistData({ fullName: val });
+  }
+
+  function handleRoleTitleChange(val: string) {
+    setRoleTitle(val);
+    persistData({ roleTitle: val });
+  }
+
+  function handleEmailChange(val: string) {
+    setEmailAddress(val);
+    persistData({ emailAddress: val });
+  }
+
+  function handlePhoneChange(val: string) {
+    setPhoneDisplay(val);
+    persistData({ phoneDisplay: val });
+  }
+
+  function handleSaveDetails() {
+    persistData({ fullName, roleTitle, emailAddress, phoneDisplay });
+    setSavedSuccess(true);
+    setTimeout(() => setSavedSuccess(false), 2500);
+    showToast({ message: t.saveSuccessToast, variant: 'success' });
+  }
+
+  function handleResetDefaults() {
+    setFullName(defaultFullName);
+    setRoleTitle(initialRole);
+    setEmailAddress(defaultEmail);
+    setPhoneDisplay('');
+    try {
+      localStorage.removeItem(STORAGE_KEY);
+      localStorage.removeItem(STORAGE_PHONE_KEY);
+    } catch {
+      // Negeer opslagfouten
+    }
+    showToast({ message: t.resetToast, variant: 'info' });
   }
 
   const signatureData = {
@@ -263,7 +378,7 @@ export function AccountSignature({
           <Input
             id="sig-fullname"
             value={fullName}
-            onChange={(e) => setFullName(e.target.value)}
+            onChange={(e) => handleFullNameChange(e.target.value)}
             placeholder="Voornaam Achternaam"
           />
         </div>
@@ -274,7 +389,7 @@ export function AccountSignature({
             id="sig-email"
             type="email"
             value={emailAddress}
-            onChange={(e) => setEmailAddress(e.target.value)}
+            onChange={(e) => handleEmailChange(e.target.value)}
             placeholder="voornaam.achternaam@vtk.be"
           />
         </div>
@@ -288,7 +403,7 @@ export function AccountSignature({
               onChange={(e) => {
                 const val = e.target.value;
                 if (val !== '__custom__') {
-                  setRoleTitle(val);
+                  handleRoleTitleChange(val);
                 }
               }}
             >
@@ -307,7 +422,7 @@ export function AccountSignature({
           <Input
             id="sig-role"
             value={roleTitle}
-            onChange={(e) => setRoleTitle(e.target.value)}
+            onChange={(e) => handleRoleTitleChange(e.target.value)}
             placeholder={t.rolePlaceholder}
           />
         </div>
@@ -532,9 +647,18 @@ export function AccountSignature({
           {copiedRich ? t.copiedSignature : t.copySignature}
         </Button>
 
+        <Button type="button" variant="ghost" onClick={handleSaveDetails} className="inline-flex items-center gap-2">
+          {savedSuccess ? <CheckIcon /> : null}
+          {savedSuccess ? t.savedDetails : t.saveDetails}
+        </Button>
+
         <Button type="button" variant="ghost" onClick={handleCopyHtml} className="inline-flex items-center gap-2">
           {copiedHtml ? <CheckIcon /> : <CopyIcon />}
           {copiedHtml ? t.copiedHtml : t.copyHtml}
+        </Button>
+
+        <Button type="button" variant="ghost" onClick={handleResetDefaults} className="text-xs text-[#5c667f] hover:text-vtk-ink">
+          {t.resetDefaults}
         </Button>
 
         <button
