@@ -41,10 +41,12 @@ site had nine, and the navigation therefore ran over the search button.
 - Updating is done by someone with access to the dev database:
   `FIXTURES_SOURCE_DATABASE_URL="postgresql://..." make fixtures`, and they
   commit the result.
-- **Never `pg_dump`.** That database carries member data, orders, payments, door
-  logs and mailing lists, `Setting` holds `s3.config`, `sentry.config`,
-  `door.config` and `brevo.lists`, and `OauthClient.clientSecret` is stored in
-  plaintext. `scripts/export-fixtures.ts` therefore exports per table, from a
+- **Never `pg_dump` for fixtures.** This rule is about what lands in the
+  repository; a real backup is the other story and dumps everything on purpose
+  (`make backup`, into a gitignored `backups/`). That database carries member
+  data, orders, payments, door logs and mailing lists, `Setting` holds
+  `s3.config`, `sentry.config`, `door.config` and `brevo.lists`, and
+  `OauthClient.clientSecret` is stored in plaintext. `scripts/export-fixtures.ts` therefore exports per table, from a
   fixed list and with a per-key allowlist for settings.
 - If you add a table to that export, two rules hold without exception: no
   personal data, and key on the natural key (`code`, `slug`) instead of the

@@ -15,7 +15,8 @@ COMPOSE := docker compose -f infra/compose.dev.yml
 
 .DEFAULT_GOAL := help
 
-.PHONY: help up down db postgres admin dev seed migrate reset fixtures verify psql logs status
+.PHONY: help up down db postgres admin dev logistiek seed migrate generate deps \
+        lint test verify psql logs status backup backups restore reset fixtures
 
 ## help: show this list
 help:
@@ -81,13 +82,39 @@ seed:
 dev:
 	npm run dev
 
-## fixtures: export the dev site's content (needs FIXTURES_SOURCE_DATABASE_URL)
-fixtures:
-	npm run fixtures:export
+## logistiek: start the uitleendienst app (http://localhost:3100)
+logistiek:
+	npm run dev --workspace=@vtk/logistiek
+
+## generate: regenerate the Prisma client after a schema change
+generate:
+	npm run db:generate
+
+# The one command in this file that is slow on purpose. An incremental
+# `npm install` drops the other platforms' native binaries from the lockfile
+# (npm/cli#4828), which keeps working here and breaks `npm ci` on Linux; see
+# AGENTS.md. So after touching dependencies you resolve from scratch.
+## deps: reinstall dependencies and regenerate the lockfile from scratch
+deps:
+	rm -rf node_modules package-lock.json
+	npm install
+
+## lint: run eslint on the website
+lint:
+	npm run lint
+
+## test: run the unit tests of both apps
+test:
+	npm run test --workspace=@vtk/web
+	npm run test --workspace=@vtk/logistiek
 
 ## verify: run what the pre-push hook and CI run
 verify:
 	npm run verify
+
+## fixtures: export the dev site's content (needs FIXTURES_SOURCE_DATABASE_URL)
+fixtures:
+	npm run fixtures:export
 
 ## psql: open a psql shell on the local database
 psql:
@@ -100,6 +127,27 @@ logs:
 ## status: show what is running
 status:
 	@$(COMPOSE) ps
+
+# Backups. The logic lives in `scripts/db-backup.sh` and `scripts/db-restore.sh`,
+# per the note at the top of this file: both have to keep working when they are
+# called straight from a shell or from the server's crontab, and the restore
+# confirmation has to protect that caller too, not only the one who types
+# `make restore`.
+#
+# Both take STACK=dev (the laptop, the default) or STACK=deploy (the server
+# stack from infra/docker-compose.yml). There is no autodetection on purpose:
+# guessing wrong is silent in both directions.
+## backup: dump every database to backups/ (STACK=deploy on the server)
+backup:
+	scripts/db-backup.sh
+
+## backups: list the backups on disk
+backups:
+	@scripts/db-backup.sh --list
+
+## restore: load a dump back in; FILE=backups/<run>/vtk.sql.gz (DESTRUCTIVE)
+restore:
+	scripts/db-restore.sh "$(FILE)"
 
 # `reset` throws the local database away, including anything you put in it
 # locally. Hence an explicit confirmation and no silent `-v`: this target sits

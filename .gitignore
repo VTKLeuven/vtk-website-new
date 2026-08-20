@@ -54,6 +54,10 @@ __pycache__/
 # prisma generated client
 packages/db/node_modules/.prisma
 
+# database dumps from `make backup`. Never committed: these hold member data,
+# orders, payments, door logs and the plaintext OAuth client secrets.
+/backups/
+
 # minio data (when running infra locally)
 infra/data
 infra/immich/.env

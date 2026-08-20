@@ -589,9 +589,26 @@ redeploy.
 
 ### 7. Backups
 
-- **Postgres:** `docker compose -f infra/docker-compose.yml exec -T postgres pg_dump -U vtk vtk > backup-$(date +%F).sql`
+- **Postgres:** `make backup STACK=deploy`. This dumps every database in the
+  application cluster (the site's own, plus `umami` where analytics is enabled)
+  to `backups/<timestamp>/<database>.sql.gz` and keeps the last `KEEP=30` runs.
+  `STACK=deploy` is not optional: without it the target looks for the local
+  development stack and fails. Point it elsewhere with `BACKUP_DIR=/var/backups/vtk`.
+  The directory and the dumps are mode 700; they hold member data, orders,
+  payments, door logs and the plaintext OAuth client secrets.
+  - Unattended, one line in the crontab of the deploy user:
+    `0 3 * * * cd /home/it/vtk-website-new && STACK=deploy make backup >>/var/log/vtk-backup.log 2>&1`
+  - Copy the dumps off the machine. A backup on the same disk as the database
+    survives a bad migration, not a dead server.
+  - Loading one back in: `make restore STACK=deploy FILE=backups/<run>/vtk.sql.gz`,
+    which asks for confirmation and loads in a single transaction, so a dump that
+    fails halfway changes nothing. Stop `web` and `logistiek` first. Onto a laptop
+    it is the same command with `STACK=dev`.
+  - **Test a restore now and then.** An untested backup is a hope, not a backup.
 - **Immich:** back up `infra/immich/data/library` and dump `immich-database`;
-  both the library and database are required for a complete restore.
+  both the library and database are required for a complete restore. `make backup`
+  does *not* include these: Immich runs its own Postgres, in its own container,
+  on an image with its own extensions.
 - **Hetzner S3:** enable provider-side protections and maintain a separate
   bucket backup according to the organisation's retention policy.
 
