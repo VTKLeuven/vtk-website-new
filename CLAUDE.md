@@ -157,7 +157,7 @@ the design language into the application instead of copying mockup content.
   (`rgba(255,255,255,.06)` fill, `.14` white border), headings go `--paper`,
   muted text uses `--on-dark-muted`, and the primary button inverts like on the
   hero. The **Jouw POC's** band is personal (only rendered for a logged-in member
-  with study programmes) and therefore sits *after* Career, never between two
+  with study programmes) and therefore sits _after_ Career, never between two
   navy bands: were it between them, the two navy bands would collide the moment it
   disappears. See `docs/design-decisions.md` for the section ordering rationale.
 - Photography: content cards open with a real photo under a navy scrim, never a
@@ -254,9 +254,49 @@ the design language into the application instead of copying mockup content.
   photo header and a full photo card.
 - Lists and calendars: favor agenda/list layouts, tabular times, compact day
   labels, and small yellow status pins.
+- Functional pages and modules, including Media and Logistiek, use the same
+  visual system as the main website. A separate subdomain or operational flow
+  is not a reason to invent another hero, type treatment, palette, container
+  width, or card language.
+  - Only the homepage may use a full-bleed photo hero and italic serif headline
+    accent. Every other public or functional landing page starts with the
+    canonical dark page head. Do not add a unique photo hero to Media,
+    Logistiek, Tickets, or a similar module.
+  - Do not use decorative step numbers, album counts, oversized statistics, or
+    shortcut navigation as section ornaments. Show a count only where it helps
+    someone make a decision, and keep it next to the control or result it
+    describes.
+  - Put the available tasks and primary choices above the fold. In a module
+    landing page, state what someone can do before explaining the process. In
+    an admin module, keep all capabilities visible in clearly named groups so a
+    user does not need to discover them by opening unrelated tabs.
+  - Related facts need labelled columns or a semantic `table`/`dl`. Never pack
+    fields such as item, brand, volume and stock, or event, contents, period and
+    status into one line separated by middots. On mobile, turn those column
+    headings into labels per value instead of removing the distinction.
+  - A control that changes a draft indirectly must provide immediate, local
+    feedback. Applying a template must say what was added and update the visible
+    request summary at once. Do not make the user navigate to another panel to
+    discover whether an action had an effect.
+  - Essential information may wrap but must not disappear behind truncation.
+    Check dense overview rows at desktop and mobile widths before considering a
+    redesign complete.
 - Admin: keep pages operationally dense. Forms, tables, and upload/editor
   surfaces should use the same palette and rounded panels without becoming
   decorative.
+  - Alle beheeromgevingen gebruiken `AdminNav` uit `@vtk/ui`: op desktop een
+    compacte, gegroepeerde zijbalk en op smalle schermen één uitklapknop die het
+    huidige onderdeel benoemt. Bouw voor Logistiek of een volgende module geen
+    bijna-kopie en zet de beheermogelijkheden niet in losse kaarten of in één
+    paginabrede linkstrip; beide varianten laten de navigatie meer aandacht
+    opeisen dan het werk zelf.
+  - Een operationeel dashboard groepeert statussen per workflow in compacte,
+    gelabelde rijen. Gebruik geen extra summary hero en herhaal niet onder elk
+    getal een zin wanneer de statusnaam de betekenis al duidelijk maakt.
+  - Lange beheerformulieren krijgen de volledige inhoudsbreedte en er staat
+    hoogstens één primaire bewerktaak tegelijk open. Open bij een lege dataset
+    niet automatisch een lang formulier naast een leeg tweede paneel; toon een
+    gerichte empty state met een duidelijke startactie.
   - Below 860px the left column collapses into one button naming the tab you are
     on, which opens the full grouped list as a panel underneath
     (`AdminNav` + `vtk-admin.css`). Do not reintroduce the horizontal scroller

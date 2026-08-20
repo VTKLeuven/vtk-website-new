@@ -688,9 +688,7 @@ export function downloadFilenameFromImmichResponse(response: Response, fallback:
 export function immichWebUrl(): string | null {
   const explicit = process.env.GALLERY_IMMICH_WEB_URL?.trim();
   if (explicit) return explicit.replace(/\/+$/, "");
-  const apiUrl = getConfig().apiUrl;
-  if (!apiUrl) return null;
-  return apiUrl.replace(/\/api\/?$/, "");
+  return "https://immich.vtk.be";
 }
 
 /**

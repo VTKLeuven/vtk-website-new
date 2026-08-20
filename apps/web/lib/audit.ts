@@ -80,6 +80,7 @@ export const AUDIT_ENTITIES = {
   ticketAccess: { nl: "Ticketbeheerder", en: "Ticket manager", group: "tickets" },
   ticketOrder: { nl: "Ticketbestelling", en: "Ticket order", group: "tickets" },
   ticketDesign: { nl: "Ticketontwerp", en: "Ticket design", group: "tickets" },
+  ticketTerms: { nl: "Ticketvoorwaarden", en: "Ticket terms", group: "tickets" },
   ticketScanDevice: { nl: "Scantoestel", en: "Scan device", group: "tickets" },
 
   // Formulieren

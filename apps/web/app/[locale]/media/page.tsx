@@ -51,48 +51,13 @@ export default async function MediaPage({ params }: { params: Promise<{ locale: 
   const publications = contentResult.status === 'fulfilled' ? contentResult.value.publications : [];
   const galleryFailed = galleryResult.status === 'rejected';
 
-  const sectionLinks = [
-    { href: '#photos', label: dict.media.photosTitle, count: albums.length },
-    { href: '#aftermovies', label: dict.media.aftermoviesTitle, count: videos.length },
-    { href: '#magazines', label: dict.media.magazinesTitle, count: publications.length },
-  ];
-
   return (
     <div className="vtk-page vtk-media-page">
-      <header className="vtk-media-hero">
-        <div className="vtk-media-hero-inner">
-          <div className="vtk-media-hero-copy">
-            <div className="vtk-media-hero-eyebrow">
-              <span className="vtk-dot" />
-              VTK · Media
-            </div>
-            <h1>
-              {locale === 'nl' ? (
-                <>
-                  {"Foto's, films en "}
-                  <em>magazines</em>.
-                </>
-              ) : (
-                <>
-                  Photos, films and <em>magazines</em>.
-                </>
-              )}
-            </h1>
-            <p>{dict.media.lead}</p>
-          </div>
-
-          <nav className="vtk-media-index" aria-label={dict.media.sectionNav}>
-            {sectionLinks.map((section, index) => (
-              <a key={section.href} href={section.href}>
-                <span className="vtk-media-index-num">{String(index + 1).padStart(2, '0')}</span>
-                <strong>{section.label}</strong>
-                <small>{section.count}</small>
-                <span className="vtk-media-index-arrow" aria-hidden="true">
-                  →
-                </span>
-              </a>
-            ))}
-          </nav>
+      <header className="vtk-page-head">
+        <div>
+          <div className="vtk-page-kicker">VTK · Media</div>
+          <h1 className="vtk-page-title">{locale === 'nl' ? 'Media' : 'Media'}</h1>
+          <p className="vtk-page-subtitle">{dict.media.lead}</p>
         </div>
       </header>
 
@@ -100,16 +65,9 @@ export default async function MediaPage({ params }: { params: Promise<{ locale: 
         <section id="photos" className="vtk-media-section vtk-media-photos-section">
           <div className="vtk-media-section-inner">
             <header className="vtk-media-section-head">
-              <div className="vtk-media-section-number" aria-hidden="true">
-                01
-              </div>
               <div>
                 <h2>{dict.media.photosTitle}</h2>
                 <p>{dict.media.photosLead}</p>
-              </div>
-              <div className="vtk-media-section-count">
-                <b>{albums.length}</b>
-                <span>{albums.length === 1 ? dict.photos.album : dict.photos.albums}</span>
               </div>
             </header>
 
@@ -149,16 +107,9 @@ export default async function MediaPage({ params }: { params: Promise<{ locale: 
         <section id="aftermovies" className="vtk-media-section vtk-media-video-section">
           <div className="vtk-media-section-inner">
             <header className="vtk-media-section-head">
-              <div className="vtk-media-section-number" aria-hidden="true">
-                02
-              </div>
               <div>
                 <h2>{dict.media.aftermoviesTitle}</h2>
                 <p>{dict.media.aftermoviesLead}</p>
-              </div>
-              <div className="vtk-media-section-count">
-                <b>{videos.length}</b>
-                <span>{videos.length === 1 ? dict.media.video : dict.media.videos}</span>
               </div>
             </header>
 
@@ -182,18 +133,9 @@ export default async function MediaPage({ params }: { params: Promise<{ locale: 
         <section id="magazines" className="vtk-media-section vtk-media-magazine-section">
           <div className="vtk-media-section-inner">
             <header className="vtk-media-section-head">
-              <div className="vtk-media-section-number" aria-hidden="true">
-                03
-              </div>
               <div>
                 <h2>{dict.media.magazinesTitle}</h2>
                 <p>{dict.media.magazinesLead}</p>
-              </div>
-              <div className="vtk-media-section-count">
-                <b>{publications.length}</b>
-                <span>
-                  {publications.length === 1 ? dict.media.publication : dict.media.publications}
-                </span>
               </div>
             </header>
 

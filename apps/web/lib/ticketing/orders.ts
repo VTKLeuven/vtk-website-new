@@ -24,6 +24,7 @@ import { paymentGateway, paymentGatewayFor, type CheckoutResult } from "./paymen
 import { orderAccessExpiry } from "./access";
 import { withSerializableTransaction } from "./transactions";
 import { publishedTicketDesign } from "./design";
+import { getTicketTerms } from "./terms";
 
 const answerValueSchema = z.union([
   z.string().max(2_000),
@@ -115,7 +116,7 @@ export async function createTicketCheckout(
 }> {
   const input = checkoutRequestSchema.parse(rawInput);
   const now = new Date();
-  const session = await getSession(await headers());
+  const [session, terms] = await Promise.all([getSession(await headers()), getTicketTerms()]);
 
   const event = await prisma.ticketEvent.findUnique({
     where: { id: input.eventId },
@@ -278,7 +279,7 @@ export async function createTicketCheckout(
             totalCents,
             reservationExpiresAt: expiresAt,
             termsAcceptedAt: now,
-            termsVersion: event.termsVersion,
+            termsVersion: terms.version,
             items: {
               create: normalizedItems.map((item) => ({
                 ticketTypeId: item.ticketTypeId,

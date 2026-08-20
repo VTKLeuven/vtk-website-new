@@ -61,8 +61,6 @@ type TicketEventFormValue = {
   status?: string;
   maxTicketsPerOrder?: number;
   contactEmail?: string | null;
-  termsUrl?: string | null;
-  termsVersion?: string | null;
   confirmationMessageNl?: string | null;
   confirmationMessageEn?: string | null;
 };
@@ -484,7 +482,12 @@ export function TicketEventForm({
           <div className="ticket-admin-section-heading">
             <span className="ticket-admin-section-icon"><FileText aria-hidden="true" size={17} /></span>
             <div>
-            <h2>{locale === "nl" ? "Communicatie en voorwaarden" : "Communication and terms"}</h2>
+            <h2>{locale === "nl" ? "Communicatie" : "Communication"}</h2>
+            <p>
+              {locale === "nl"
+                ? "De algemene voorwaarden worden centraal beheerd voor alle ticketevents."
+                : "The general terms are managed centrally for all ticket events."}
+            </p>
             </div>
           </div>
         </div>
@@ -499,23 +502,15 @@ export function TicketEventForm({
             />
           </div>
           <div className="ticket-admin-field">
-            <label htmlFor="ticket-terms-url">{locale === "nl" ? "URL voorwaarden" : "Terms URL"}</label>
-            <input
-              id="ticket-terms-url"
-              name="termsUrl"
-              type="url"
-              defaultValue={event.termsUrl ?? ""}
-              placeholder="https://"
-            />
-          </div>
-          <div className="ticket-admin-field">
-            <label htmlFor="ticket-terms-version">{locale === "nl" ? "Versie voorwaarden" : "Terms version"}</label>
-            <input
-              id="ticket-terms-version"
-              name="termsVersion"
-              defaultValue={event.termsVersion ?? ""}
-              placeholder="2027-01"
-            />
+            <span className="ticket-admin-help">
+              <Link
+                href={`${locale === "en" ? "/en" : ""}/tickets/voorwaarden`}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                {locale === "nl" ? "Algemene voorwaarden bekijken" : "View general terms"}
+              </Link>
+            </span>
           </div>
           {isEdit ? (
             <>

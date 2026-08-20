@@ -16,8 +16,8 @@ export default async function BeheerLayout({ children }: { children: React.React
         <section className="w-full max-w-xl rounded-[22px] border border-vtk-navy/10 bg-vtk-surface p-8">
           <h1 className="text-2xl font-semibold tracking-tight text-vtk-ink">{t.noAccess}</h1>
           <p className="mt-3 leading-7 text-vtk-body">
-            Het beheer van de uitleendienst is voorbehouden voor het team van Logistiek. Denk je
-            dat dit een vergissing is, mail dan logistiek@vtk.be.
+            Het beheer van de uitleendienst is voorbehouden voor het team van Logistiek. Denk je dat dit een vergissing
+            is, mail dan logistiek@vtk.be.
           </p>
         </section>
       </main>
@@ -26,23 +26,22 @@ export default async function BeheerLayout({ children }: { children: React.React
 
   return (
     <ToastProvider>
-      <main className="mx-auto w-full max-w-[1320px] flex-1 px-5 py-10 sm:px-9">
-        {/* Schermnavigatie; op papier hoort enkel het blad zelf (zie globals.css). */}
-        {/* De navigatie onder de titel en niet ernaast: ze is twee rijen hoog
-            zodra een tab openstaat, en dan trekt ze de titel scheef. */}
-        <div data-print="hide" className="grid gap-4 border-b border-vtk-navy/10 pb-5">
+      <main className="mx-auto w-full max-w-[1240px] flex-1 px-5 py-10 sm:px-9">
+        <div data-print="hide" className="border-b border-vtk-navy/10 pb-5">
           <div>
             <p className="flex items-center gap-2 text-sm text-vtk-muted">
               <span className="h-1.5 w-1.5 rounded-full bg-vtk-yellow" aria-hidden />
               {t.manageKicker}
             </p>
-            <h1 className="mt-1 text-2xl font-semibold tracking-[-0.03em] text-vtk-ink">
-              {t.manageTitle}
-            </h1>
+            <h1 className="mt-1 text-2xl font-semibold tracking-[-0.03em] text-vtk-ink">{t.manageTitle}</h1>
           </div>
-          <BeheerNav />
         </div>
-        <div className="mt-8">{children}</div>
+        <div className="logistics-admin-layout mt-8">
+          <aside data-print="hide">
+            <BeheerNav />
+          </aside>
+          <div className="min-w-0">{children}</div>
+        </div>
       </main>
     </ToastProvider>
   );

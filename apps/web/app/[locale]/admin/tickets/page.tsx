@@ -6,6 +6,7 @@ import {
   ArrowRight,
   CalendarClock,
   CalendarDays,
+  FileText,
   Filter,
   Plus,
   Radio,
@@ -159,12 +160,20 @@ export default async function TicketAdminOverview({
               : "Sales, attendees and access for each event."}
           </p>
         </div>
-        {canCreate ? (
-          <Link className="ticket-admin-button" data-variant="primary" href={`${base}/admin/tickets/new`}>
-            <Plus aria-hidden="true" size={16} />
-            {locale === "nl" ? "Nieuw event" : "New event"}
-          </Link>
-        ) : null}
+        <div className="ticket-admin-actions">
+          {canManageAll ? (
+            <Link className="ticket-admin-button" href={`${base}/admin/tickets/voorwaarden`}>
+              <FileText aria-hidden="true" size={16} />
+              {locale === "nl" ? "Voorwaarden" : "Terms"}
+            </Link>
+          ) : null}
+          {canCreate ? (
+            <Link className="ticket-admin-button" data-variant="primary" href={`${base}/admin/tickets/new`}>
+              <Plus aria-hidden="true" size={16} />
+              {locale === "nl" ? "Nieuw event" : "New event"}
+            </Link>
+          ) : null}
+        </div>
       </div>
 
       <div className="ticket-admin-metrics" aria-label={locale === "nl" ? "Samenvatting" : "Summary"}>

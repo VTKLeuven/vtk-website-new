@@ -134,7 +134,7 @@ export default async function RittenPage() {
       title={
         <>
           {t.pageTripsTitle}{' '}
-          <em className="font-serif font-normal italic text-vtk-navy">{t.pageTripsAccent}</em>
+          {t.pageTripsAccent}
         </>
       }
       intro={t.pageTripsLead}

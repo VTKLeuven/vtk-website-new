@@ -10,7 +10,7 @@ export async function SiteFooter() {
   const content = await getPublicCopy(locale);
   return (
     <footer className="logistics-footer mt-auto text-white">
-      <div className="mx-auto grid w-full max-w-[1320px] gap-8 px-5 py-10 sm:px-9 md:grid-cols-[minmax(0,1fr)_auto] md:items-end">
+      <div className="mx-auto grid w-full max-w-[1240px] gap-8 px-5 py-10 sm:px-9 md:grid-cols-[minmax(0,1fr)_auto] md:items-end">
         <div className="flex items-start gap-4">
           <Image src="/VTK.png" alt="" width={660} height={777} className="h-12 w-auto" />
           <div>

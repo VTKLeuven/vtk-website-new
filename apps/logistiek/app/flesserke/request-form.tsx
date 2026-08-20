@@ -272,24 +272,39 @@ export function FlesserkeForm({
           {shownCatalog.map((category) => (
             <section key={category.id ?? 'overig'} className="rounded-[18px] border border-vtk-navy/10 bg-vtk-surface p-6">
               <h2 className="text-lg font-semibold tracking-tight text-vtk-ink">{category.name}</h2>
-              <ul className="mt-4 divide-y divide-vtk-navy/10">
+              <div className="logistics-stock-table-head mt-4" aria-hidden="true">
+                <span>{en ? 'Item' : 'Item'}</span>
+                <span>{en ? 'Brand' : 'Merk'}</span>
+                <span>{en ? 'Volume' : 'Volume'}</span>
+                <span>{en ? 'Stock' : 'Voorraad'}</span>
+                <span>{en ? 'Quantity' : 'Aantal'}</span>
+              </div>
+              <ul className="logistics-stock-table">
                 {category.items.map((item) => {
                   const qty = quantities[item.id] ?? 0;
+                  const volume = formatContentAmount(item.contentAmount, item.contentUnit);
                   return (
-                    <li key={item.id} className="flex flex-wrap items-center gap-3 py-2.5">
-                      <div className="min-w-0 flex-1">
+                    <li key={item.id} className="logistics-stock-row">
+                      <div className="logistics-stock-name">
+                        <span className="logistics-mobile-label">{en ? 'Item' : 'Item'}</span>
                         <p className="text-sm font-medium text-vtk-ink">
                           <FlesserkeItemName name={item.name} colruytUrl={item.colruytUrl} />
-                          {item.brand ? <span className="text-vtk-muted"> · {item.brand}</span> : null}
-                        </p>
-                        <p className="text-xs text-vtk-muted">
-                          {formatContentAmount(item.contentAmount, item.contentUnit)
-                            ? `${formatContentAmount(item.contentAmount, item.contentUnit)} · `
-                            : ''}
-                          {item.quantity} {en ? 'in stock' : 'in voorraad'}
                         </p>
                       </div>
-                      <div className="flex items-center gap-2">
+                      <div className="logistics-stock-cell">
+                        <span className="logistics-mobile-label">{en ? 'Brand' : 'Merk'}</span>
+                        <span>{item.brand || '–'}</span>
+                      </div>
+                      <div className="logistics-stock-cell">
+                        <span className="logistics-mobile-label">{en ? 'Volume' : 'Volume'}</span>
+                        <span>{volume || '–'}</span>
+                      </div>
+                      <div className="logistics-stock-cell">
+                        <span className="logistics-mobile-label">{en ? 'Stock' : 'Voorraad'}</span>
+                        <span>{item.quantity}</span>
+                      </div>
+                      <div className="logistics-stock-quantity">
+                        <span className="logistics-mobile-label">{en ? 'Quantity' : 'Aantal'}</span>
                         <button
                           type="button"
                           onClick={() => setQty(item.id, qty - 1)}

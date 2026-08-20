@@ -6,6 +6,7 @@ import { requireSession } from '@/lib/session';
 import { getDictionary, type Locale } from '@vtk/i18n';
 import { canAccessAnyTicketEvent } from '@/lib/ticketing/authorization';
 import { canAccessAnyForm } from '@/lib/forms/authorization';
+import { isExternalUrl } from '@/lib/href';
 import { AdminNav, type NavItem, type NavNode } from './AdminNav';
 
 import '@/app/design/vtk-admin.css';
@@ -48,8 +49,17 @@ const item = (key: string, href: string, guard: NavGuard = {}): NavLeaf => ({
 });
 const group = (key: string, items: NavLeaf[]) => ({ group: key, items });
 
+function logisticsModuleUrl(): string {
+  const configured = process.env.LOGISTIEK_PUBLIC_URL?.trim();
+  if (configured) return configured.replace(/\/+$/, '');
+  return process.env.NODE_ENV === 'development' ? 'http://localhost:3100' : 'https://logistiek.vtk.be';
+}
+
 const NAV: NavEntry[] = [
   item('dashboard', '', { exact: true }),
+  // Iedereen die kan inloggen kan een materiaal- of vervoeraanvraag indienen.
+  // Daarom staat de ingang niet achter de beheerpermissie van de post.
+  item('logistics', logisticsModuleUrl()),
   group('ledenbeheer', [
     item('users', '/gebruikers', { perm: 'users.view' }),
     item('groups', '/groepen', { perm: 'groups.manage' }),
@@ -174,7 +184,7 @@ export default async function AdminLayout({
 
   const toItem = (leaf: NavLeaf): NavItem => ({
     key: leaf.key,
-    href: `${base}/admin${leaf.href}`,
+    href: isExternalUrl(leaf.href) ? leaf.href : `${base}/admin${leaf.href}`,
     label: adminDict[leaf.key],
     exact: leaf.exact,
   });

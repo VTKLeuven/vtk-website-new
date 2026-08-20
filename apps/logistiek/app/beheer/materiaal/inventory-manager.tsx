@@ -23,6 +23,7 @@ import { ITEM_CONDITION_LABELS } from '@/lib/uitleen';
 import type { AdminInventoryItem } from '@/lib/uitleen-server';
 
 type InventorySortKey = 'name' | 'category' | 'condition';
+type InventoryPanel = 'item' | 'categories' | null;
 
 const STALE_MESSAGE = 'Iemand anders paste dit net aan. Herlaad de pagina en probeer opnieuw.';
 const CATEGORY_ERRORS = { NAME_REQUIRED: 'Geef de categorie een naam.', STALE: STALE_MESSAGE };
@@ -118,121 +119,167 @@ function ItemFields({
       {item ? <input type="hidden" name="id" value={item.id} /> : null}
       {item ? <input type="hidden" name="expectedUpdatedAt" value={item.updatedAt.toISOString()} /> : null}
       <div className="@container">
-      <div className="grid gap-3 @lg:grid-cols-2 @3xl:grid-cols-6">
-        <div className="col-span-full grid gap-1 text-xs font-medium text-vtk-muted">
-          Foto’s
-          <PhotosEditor
-            initial={[
-              ...(item?.photoKey ? [{ key: item.photoKey }] : []),
-              ...(item?.photos ?? []).map((photo) => ({ key: photo.key })),
-            ]}
-          />
-        </div>
-        <label className="grid gap-1 text-xs font-medium text-vtk-muted @3xl:col-span-2">
-          Naam<input type="text" name="name" defaultValue={item?.name ?? ''} className={inputClass} />
-        </label>
-        <label className="grid gap-1 text-xs font-medium text-vtk-muted @3xl:col-span-2">
-          Categorie
-          <select name="categoryId" defaultValue={item?.categoryId ?? ''} className={inputClass}>
-            <option value="">Overig</option>
-            {categories.filter((c) => c.active).map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="grid gap-1 text-xs font-medium text-vtk-muted">
-          Aantal
-          {/* Houdt dit item exemplaren bij, dan is dit hun telling en niet iets
+        <div className="grid gap-3 @lg:grid-cols-2 @3xl:grid-cols-6">
+          <div className="col-span-full grid gap-1 text-xs font-medium text-vtk-muted">
+            Foto’s
+            <PhotosEditor
+              initial={[
+                ...(item?.photoKey ? [{ key: item.photoKey }] : []),
+                ...(item?.photos ?? []).map((photo) => ({ key: photo.key })),
+              ]}
+            />
+          </div>
+          <label className="grid gap-1 text-xs font-medium text-vtk-muted @3xl:col-span-2">
+            Naam
+            <input type="text" name="name" defaultValue={item?.name ?? ''} className={inputClass} />
+          </label>
+          <label className="grid gap-1 text-xs font-medium text-vtk-muted @3xl:col-span-2">
+            Categorie
+            <select name="categoryId" defaultValue={item?.categoryId ?? ''} className={inputClass}>
+              <option value="">Overig</option>
+              {categories
+                .filter((c) => c.active)
+                .map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name}
+                  </option>
+                ))}
+            </select>
+          </label>
+          <label className="grid gap-1 text-xs font-medium text-vtk-muted">
+            Aantal
+            {/* Houdt dit item exemplaren bij, dan is dit hun telling en niet iets
               om in te typen; de actie zet het toch terug. De uitleg staat in de
               tooltip en niet eronder: een regel tekst onder één veld van een
               rasterrij duwt dat veld uit de lijn met zijn buren. */}
-          <input
-            type="number"
-            name="quantity"
-            min={1}
-            defaultValue={item?.quantity ?? 1}
-            readOnly={hasUnits}
-            title={hasUnits ? 'Volgt uit de exemplaren onderaan; pas die aan.' : undefined}
-            className={hasUnits ? readOnlyInputClass : inputClass}
-          />
-        </label>
-        <label className="grid gap-1 text-xs font-medium text-vtk-muted">
-          Huurprijs (€)
-          <input type="text" name="price" inputMode="decimal" placeholder="0,00" defaultValue={item ? centsToEuroInput(item.priceCents) : ''} className={inputClass} />
-        </label>
-        <label className="grid gap-1 text-xs font-medium text-vtk-muted">
-          Waarborg (€)
-          <input type="text" name="deposit" inputMode="decimal" placeholder="0,00" defaultValue={item ? centsToEuroInput(item.depositCents) : ''} className={inputClass} />
-        </label>
-        <label className="grid gap-1 text-xs font-medium text-vtk-muted">
-          Volume (liter)
-          {/* Optioneel: enkel om per evenement de lading in te schatten (A8). Geen
+            <input
+              type="number"
+              name="quantity"
+              min={1}
+              defaultValue={item?.quantity ?? 1}
+              readOnly={hasUnits}
+              title={hasUnits ? 'Volgt uit de exemplaren onderaan; pas die aan.' : undefined}
+              className={hasUnits ? readOnlyInputClass : inputClass}
+            />
+          </label>
+          <label className="grid gap-1 text-xs font-medium text-vtk-muted">
+            Huurprijs (€)
+            <input
+              type="text"
+              name="price"
+              inputMode="decimal"
+              placeholder="0,00"
+              defaultValue={item ? centsToEuroInput(item.priceCents) : ''}
+              className={inputClass}
+            />
+          </label>
+          <label className="grid gap-1 text-xs font-medium text-vtk-muted">
+            Waarborg (€)
+            <input
+              type="text"
+              name="deposit"
+              inputMode="decimal"
+              placeholder="0,00"
+              defaultValue={item ? centsToEuroInput(item.depositCents) : ''}
+              className={inputClass}
+            />
+          </label>
+          <label className="grid gap-1 text-xs font-medium text-vtk-muted">
+            Volume (liter)
+            {/* Optioneel: enkel om per evenement de lading in te schatten (A8). Geen
               inventarisplicht; wat niet ingevuld is, telt daar als onbekend. */}
-          <input
-            type="number"
-            name="volumeLiters"
-            min={0}
-            defaultValue={item?.volumeLiters ?? ''}
-            placeholder="Optioneel"
-            className={inputClass}
-          />
-        </label>
-        <label className="grid gap-1 text-xs font-medium text-vtk-muted">
-          Schap<input type="text" name="locationShelf" defaultValue={item?.locationShelf ?? ''} placeholder="Bv. 2R" className={inputClass} />
-        </label>
-        <label className="grid gap-1 text-xs font-medium text-vtk-muted">
-          Rek<input type="text" name="locationRack" defaultValue={item?.locationRack ?? ''} placeholder="Bv. A1" className={inputClass} />
-        </label>
-        <label className="grid gap-1 text-xs font-medium text-vtk-muted">
-          Staat
-          <select name="condition" defaultValue={item?.condition ?? 'WERKT'} className={inputClass}>
-            {CONDITIONS.map((c) => (
-              <option key={c.value} value={c.value}>
-                {c.label}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="grid gap-1 text-xs font-medium text-vtk-muted @lg:col-span-2 @3xl:col-span-4">
-          Beschrijving <span className="font-normal">(optioneel)</span>
-          <textarea name="description" defaultValue={item?.description ?? ''} placeholder="Bv. inclusief statief en kabel" rows={3} className="min-w-0 rounded-lg border border-vtk-navy/15 bg-white px-3 py-2 text-sm text-vtk-ink" />
-        </label>
-        <label className="grid gap-1 text-xs font-medium text-vtk-muted col-span-full">
-          Notitie bij de staat <span className="font-normal">(optioneel)</span>
-          <input type="text" name="conditionNote" defaultValue={item?.conditionNote ?? ''} className={inputClass} />
-        </label>
-      </div>
+            <input
+              type="number"
+              name="volumeLiters"
+              min={0}
+              defaultValue={item?.volumeLiters ?? ''}
+              placeholder="Optioneel"
+              className={inputClass}
+            />
+          </label>
+          <label className="grid gap-1 text-xs font-medium text-vtk-muted">
+            Schap
+            <input
+              type="text"
+              name="locationShelf"
+              defaultValue={item?.locationShelf ?? ''}
+              placeholder="Bv. 2R"
+              className={inputClass}
+            />
+          </label>
+          <label className="grid gap-1 text-xs font-medium text-vtk-muted">
+            Rek
+            <input
+              type="text"
+              name="locationRack"
+              defaultValue={item?.locationRack ?? ''}
+              placeholder="Bv. A1"
+              className={inputClass}
+            />
+          </label>
+          <label className="grid gap-1 text-xs font-medium text-vtk-muted">
+            Staat
+            <select name="condition" defaultValue={item?.condition ?? 'WERKT'} className={inputClass}>
+              {CONDITIONS.map((c) => (
+                <option key={c.value} value={c.value}>
+                  {c.label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="grid gap-1 text-xs font-medium text-vtk-muted @lg:col-span-2 @3xl:col-span-4">
+            Beschrijving <span className="font-normal">(optioneel)</span>
+            <textarea
+              name="description"
+              defaultValue={item?.description ?? ''}
+              placeholder="Bv. inclusief statief en kabel"
+              rows={3}
+              className="min-w-0 rounded-lg border border-vtk-navy/15 bg-white px-3 py-2 text-sm text-vtk-ink"
+            />
+          </label>
+          <label className="grid gap-1 text-xs font-medium text-vtk-muted col-span-full">
+            Notitie bij de staat <span className="font-normal">(optioneel)</span>
+            <input type="text" name="conditionNote" defaultValue={item?.conditionNote ?? ''} className={inputClass} />
+          </label>
+        </div>
       </div>
 
       <div className="grid gap-3 rounded-[14px] border border-vtk-navy/10 bg-vtk-paper/50 p-4">
         <div>
           <p className="text-sm font-medium text-vtk-ink">Alternatieven</p>
           <p className="mt-1 text-xs text-vtk-muted">
-            Items die evengoed kunnen. Staat dit item op nul beschikbaar in de gevraagde periode, dan
-            krijgt het lid ze te zien als suggestie; het blijft zijn keuze. De koppeling geldt in twee
-            richtingen.
+            Items die evengoed kunnen. Staat dit item op nul beschikbaar in de gevraagde periode, dan krijgt het lid ze
+            te zien als suggestie; het blijft zijn keuze. De koppeling geldt in twee richtingen.
           </p>
         </div>
         <AlternativesEditor
           initial={(item?.alternatives ?? []).map((a) => a.alternativeId)}
-          options={items
-            .filter((other) => other.id !== item?.id)
-            .map((other) => ({ id: other.id, name: other.name }))}
+          options={items.filter((other) => other.id !== item?.id).map((other) => ({ id: other.id, name: other.name }))}
         />
       </div>
 
       <div className="grid gap-4 rounded-[14px] border border-vtk-navy/10 bg-vtk-paper/50 p-4">
-        <div><p className="text-sm font-medium text-vtk-ink">Eigenschappen</p><p className="mt-1 text-xs text-vtk-muted">Technische kenmerken die leden op de detailpagina zien.</p></div>
+        <div>
+          <p className="text-sm font-medium text-vtk-ink">Eigenschappen</p>
+          <p className="mt-1 text-xs text-vtk-muted">Technische kenmerken die leden op de detailpagina zien.</p>
+        </div>
         <PropertiesEditor initial={item?.properties ?? []} />
-        <div><p className="text-sm font-medium text-vtk-ink">Downloads</p><p className="mt-1 text-xs text-vtk-muted">Handleidingen of fiches in pdf-formaat.</p></div>
+        <div>
+          <p className="text-sm font-medium text-vtk-ink">Downloads</p>
+          <p className="mt-1 text-xs text-vtk-muted">Handleidingen of fiches in pdf-formaat.</p>
+        </div>
         <DownloadsEditor initial={item?.downloads ?? []} />
       </div>
 
       <div className="rounded-[14px] border border-vtk-navy/10 bg-vtk-paper/50 p-4">
         <label className="flex items-center gap-2 text-sm font-medium text-vtk-ink">
-          <input type="checkbox" name="isSet" checked={isSet} onChange={(e) => setIsSet(e.target.checked)} className="h-4 w-4" />
+          <input
+            type="checkbox"
+            name="isSet"
+            checked={isSet}
+            onChange={(e) => setIsSet(e.target.checked)}
+            className="h-4 w-4"
+          />
           Dit is een set (fysiek samengesteld pakket)
         </label>
         {isSet ? (
@@ -240,7 +287,9 @@ function ItemFields({
             <p className="mb-2 text-xs text-vtk-muted">
               Wat zit er in de set? De inhoud is beschrijvend en telt niet apart mee voor de voorraad.
             </p>
-            <SetContentsEditor initial={(item?.setContents ?? []).map((c) => ({ label: c.label, quantity: c.quantity }))} />
+            <SetContentsEditor
+              initial={(item?.setContents ?? []).map((c) => ({ label: c.label, quantity: c.quantity }))}
+            />
           </div>
         ) : null}
       </div>
@@ -352,7 +401,7 @@ function ItemTable({
       <ul className="grid gap-3 md:hidden">
         {items.map((item) => {
           const editing = editingId === item.id;
-          const location = [item.locationShelf, item.locationRack].filter(Boolean).join(' · ') || '—';
+          const location = [item.locationShelf, item.locationRack].filter(Boolean).join(' · ') || 'Niet ingesteld';
           const broken = item.units.filter((unit) => unit.condition === 'KAPOT').length;
           const conditionLabel =
             item.units.length > 0
@@ -368,24 +417,39 @@ function ItemTable({
               : (CONDITION_TONE[item.condition] ?? 'text-vtk-muted');
           return (
             <Fragment key={item.id}>
-              <li className={`rounded-[14px] border border-vtk-navy/10 bg-vtk-surface p-4 ${archived ? 'opacity-70' : ''}`}>
+              <li
+                className={`rounded-[14px] border border-vtk-navy/10 bg-vtk-surface p-4 ${archived ? 'opacity-70' : ''}`}
+              >
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
                     <p className="font-medium text-vtk-ink">
                       {item.name}
                       {item.isSet ? (
-                        <span className="ml-2 rounded-full bg-vtk-yellow/25 px-2 py-0.5 text-[11px] font-semibold text-vtk-ink">Set</span>
+                        <span className="ml-2 rounded-full bg-vtk-yellow/25 px-2 py-0.5 text-[11px] font-semibold text-vtk-ink">
+                          Set
+                        </span>
                       ) : null}
                       {archived ? (
-                        <span className="ml-2 rounded-full bg-vtk-navy/10 px-2 py-0.5 text-[11px] font-semibold text-vtk-muted">uit de catalogus</span>
+                        <span className="ml-2 rounded-full bg-vtk-navy/10 px-2 py-0.5 text-[11px] font-semibold text-vtk-muted">
+                          uit de catalogus
+                        </span>
                       ) : null}
                     </p>
                     {item.description ? <p className="mt-0.5 text-xs text-vtk-muted">{item.description}</p> : null}
                     <SetContents contents={item.setContents} locale="nl" />
                     <dl className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
-                      <div><dt className="text-vtk-muted">Categorie</dt><dd className="text-vtk-body">{categoryName(item.categoryId)}</dd></div>
-                      <div><dt className="text-vtk-muted">Staat</dt><dd className={conditionClass}>{conditionLabel}</dd></div>
-                      <div><dt className="text-vtk-muted">Locatie</dt><dd className="text-vtk-body">{location}</dd></div>
+                      <div>
+                        <dt className="text-vtk-muted">Categorie</dt>
+                        <dd className="text-vtk-body">{categoryName(item.categoryId)}</dd>
+                      </div>
+                      <div>
+                        <dt className="text-vtk-muted">Staat</dt>
+                        <dd className={conditionClass}>{conditionLabel}</dd>
+                      </div>
+                      <div>
+                        <dt className="text-vtk-muted">Locatie</dt>
+                        <dd className="text-vtk-body">{location}</dd>
+                      </div>
                       <div>
                         <dt className="text-vtk-muted">Voorraad</dt>
                         <dd className="mt-0.5">
@@ -450,7 +514,13 @@ function ItemTable({
           <thead>
             <tr className="border-b border-vtk-navy/10 text-left text-xs text-vtk-muted">
               <SortHeader label="Item" sortKey="name" activeKey={sort.key} dir={sort.dir} onSort={sort.toggle} />
-              <SortHeader label="Categorie" sortKey="category" activeKey={sort.key} dir={sort.dir} onSort={sort.toggle} />
+              <SortHeader
+                label="Categorie"
+                sortKey="category"
+                activeKey={sort.key}
+                dir={sort.dir}
+                onSort={sort.toggle}
+              />
               <SortHeader label="Staat" sortKey="condition" activeKey={sort.key} dir={sort.dir} onSort={sort.toggle} />
               <th className="py-2 pr-3 font-medium">Locatie</th>
               <th className="py-2 pr-3 font-medium">Voorraad</th>
@@ -460,7 +530,7 @@ function ItemTable({
           <tbody>
             {items.map((item) => {
               const editing = editingId === item.id;
-              const location = [item.locationShelf, item.locationRack].filter(Boolean).join(' · ') || '—';
+              const location = [item.locationShelf, item.locationRack].filter(Boolean).join(' · ') || 'Niet ingesteld';
               const broken = item.units.filter((unit) => unit.condition === 'KAPOT').length;
               return (
                 <Fragment key={item.id}>
@@ -468,7 +538,9 @@ function ItemTable({
                     <td className="py-2 pr-3 text-vtk-ink">
                       <span className="font-medium">{item.name}</span>
                       {item.isSet ? (
-                        <span className="ml-2 rounded-full bg-vtk-yellow/25 px-2 py-0.5 text-[11px] font-semibold text-vtk-ink">Set</span>
+                        <span className="ml-2 rounded-full bg-vtk-yellow/25 px-2 py-0.5 text-[11px] font-semibold text-vtk-ink">
+                          Set
+                        </span>
                       ) : null}
                       {archived ? (
                         <span className="ml-2 rounded-full bg-vtk-navy/10 px-2 py-0.5 text-[11px] font-semibold text-vtk-muted">
@@ -490,11 +562,7 @@ function ItemTable({
                     )}
                     <td className="py-2 pr-3 text-vtk-muted">{location}</td>
                     <td className="py-2 pr-3">
-                      <QuantityQuickEdit
-                        itemId={item.id}
-                        quantity={item.quantity}
-                        locked={item.units.length > 0}
-                      />
+                      <QuantityQuickEdit itemId={item.id} quantity={item.quantity} locked={item.units.length > 0} />
                     </td>
                     <td className="py-2">
                       <div className="flex items-center gap-2">
@@ -564,6 +632,7 @@ export function InventoryManager({
   const [search, setSearch] = useState('');
   const [activeCategory, setActiveCategory] = useState<string>('all');
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [openPanel, setOpenPanel] = useState<InventoryPanel>(null);
   const sort = useSort<InventorySortKey>('name');
 
   const activeCategories = categories.filter((c) => c.active);
@@ -591,7 +660,11 @@ export function InventoryManager({
         .sort((a, b) => {
           if (sort.key === 'category') return compareText(nameOf(a.categoryId), nameOf(b.categoryId), sort.dir);
           if (sort.key === 'condition') {
-            return compareText(CONDITION_LABEL[a.condition] ?? a.condition, CONDITION_LABEL[b.condition] ?? b.condition, sort.dir);
+            return compareText(
+              CONDITION_LABEL[a.condition] ?? a.condition,
+              CONDITION_LABEL[b.condition] ?? b.condition,
+              sort.dir
+            );
           }
           return compareText(a.name, b.name, sort.dir);
         });
@@ -610,118 +683,254 @@ export function InventoryManager({
           <div>
             <h2 className="text-2xl font-semibold tracking-[-0.03em] text-vtk-ink">Inventaris</h2>
             <p className="mt-2 max-w-2xl text-sm leading-6 text-vtk-body">
-              Beheer hier wat leden kunnen aanvragen. Pas het aantal aan voor de voorraad; open "Bewerken"
-              voor de volledige details.
+              Beheer hier wat leden kunnen aanvragen. Pas het aantal aan voor de voorraad; open "Bewerken" voor de
+              volledige details.
             </p>
           </div>
           <div className="grid grid-cols-3 divide-x divide-vtk-navy/10 overflow-hidden rounded-[14px] border border-vtk-navy/10 text-center">
-            <div className="px-3 py-2.5"><p className="text-lg font-semibold text-vtk-ink">{activeItems.length}</p><p className="text-[11px] text-vtk-muted">items</p></div>
-            <div className="px-3 py-2.5"><p className="text-lg font-semibold text-vtk-ink">{stockCount}</p><p className="text-[11px] text-vtk-muted">stuks</p></div>
-            <div className="px-3 py-2.5"><p className="text-lg font-semibold text-vtk-ink">{activeCategories.length}</p><p className="text-[11px] text-vtk-muted">categorieën</p></div>
+            <div className="px-3 py-2.5">
+              <p className="text-lg font-semibold text-vtk-ink">{activeItems.length}</p>
+              <p className="text-[11px] text-vtk-muted">items</p>
+            </div>
+            <div className="px-3 py-2.5">
+              <p className="text-lg font-semibold text-vtk-ink">{stockCount}</p>
+              <p className="text-[11px] text-vtk-muted">stuks</p>
+            </div>
+            <div className="px-3 py-2.5">
+              <p className="text-lg font-semibold text-vtk-ink">{activeCategories.length}</p>
+              <p className="text-[11px] text-vtk-muted">categorieën</p>
+            </div>
           </div>
         </div>
       </section>
 
-      {/* Toevoegen bovenaan zodat je niet hoeft te scrollen. */}
-      <div className="grid gap-3 sm:grid-cols-2">
-        <details className="rounded-[16px] border border-dashed border-vtk-navy/25 bg-vtk-surface p-5" open={activeItems.length === 0}>
-          <summary className="cursor-pointer list-none text-sm font-semibold text-vtk-ink [&::-webkit-details-marker]:hidden">
-            <span className="mr-2 inline-grid h-6 w-6 place-items-center rounded-full bg-vtk-yellow text-base leading-none">+</span>
-            Nieuw item toevoegen
-          </summary>
-          <div className="mt-4">
-            <SaveForm action={saveItemAction} submitLabel="Item toevoegen" savingLabel="Toevoegen..." savedMessage="Item toegevoegd." errorMessages={ITEM_ERRORS} className="grid gap-4">
+      {/* Eén expliciete bewerktaak tegelijk. Zo krijgt een lang itemformulier de
+          volledige werkbreedte en blijft de catalogus erbuiten scanbaar. */}
+      <section
+        id="inventory-actions"
+        className="overflow-hidden rounded-[18px] border border-vtk-navy/10 bg-vtk-surface"
+      >
+        <div className="flex flex-wrap items-center justify-between gap-4 px-5 py-4 sm:px-6">
+          <div>
+            <h3 className="text-base font-semibold text-vtk-ink">Inventaris bijwerken</h3>
+            <p className="mt-1 text-xs text-vtk-muted">Voeg een item toe of beheer de indeling van de catalogus.</p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              aria-expanded={openPanel === 'item'}
+              aria-controls="inventory-new-item-panel"
+              onClick={() => setOpenPanel((current) => (current === 'item' ? null : 'item'))}
+              className={`rounded-full px-4 py-2 text-sm font-semibold transition ${openPanel === 'item' ? 'bg-vtk-navy text-white' : 'border border-vtk-navy/15 text-vtk-ink hover:border-vtk-navy/40 hover:bg-vtk-paper'}`}
+            >
+              {openPanel === 'item' ? 'Formulier sluiten' : '+ Nieuw item'}
+            </button>
+            <button
+              type="button"
+              aria-expanded={openPanel === 'categories'}
+              aria-controls="inventory-categories-panel"
+              onClick={() => setOpenPanel((current) => (current === 'categories' ? null : 'categories'))}
+              className={`rounded-full px-4 py-2 text-sm font-semibold transition ${openPanel === 'categories' ? 'bg-vtk-navy text-white' : 'border border-vtk-navy/15 text-vtk-ink hover:border-vtk-navy/40 hover:bg-vtk-paper'}`}
+            >
+              Categorieën
+            </button>
+          </div>
+        </div>
+
+        {openPanel === 'item' ? (
+          <div id="inventory-new-item-panel" className="border-t border-vtk-navy/10 bg-vtk-paper/35 px-5 py-5 sm:px-6">
+            <div className="mb-5">
+              <h3 className="text-lg font-semibold text-vtk-ink">Nieuw item</h3>
+              <p className="mt-1 text-sm text-vtk-muted">
+                Vul de basisgegevens in. Extra details kunnen ook later nog.
+              </p>
+            </div>
+            <SaveForm
+              action={saveItemAction}
+              submitLabel="Item toevoegen"
+              savingLabel="Toevoegen..."
+              savedMessage="Item toegevoegd."
+              errorMessages={ITEM_ERRORS}
+              onSuccess={() => setOpenPanel(null)}
+              className="grid gap-4"
+            >
               <ItemFields categories={categories} items={items} />
             </SaveForm>
           </div>
-        </details>
+        ) : null}
 
-        <details className="rounded-[16px] border border-dashed border-vtk-navy/25 bg-vtk-surface p-5">
-          <summary className="cursor-pointer list-none text-sm font-semibold text-vtk-ink [&::-webkit-details-marker]:hidden">
-            <span className="mr-2 inline-grid h-6 w-6 place-items-center rounded-full bg-vtk-yellow text-base leading-none">+</span>
-            Categorieën beheren
-          </summary>
-          <div className="mt-4 grid gap-3">
-            <SaveForm action={saveCategoryAction} submitLabel="Categorie toevoegen" savingLabel="Toevoegen..." savedMessage="Categorie toegevoegd." errorMessages={CATEGORY_ERRORS} className="grid gap-3">
-              <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_7rem] sm:items-end">
-                <label className="grid gap-1 text-xs font-medium text-vtk-muted">Nieuwe categorie<input type="text" name="name" placeholder="Bv. Gereedschap" className={`${inputClass} w-full`} /></label>
-                <label className="grid gap-1 text-xs font-medium text-vtk-muted">Volgorde<input type="number" name="sortIndex" defaultValue={0} className={`${inputClass} w-full`} /></label>
+        {openPanel === 'categories' ? (
+          <div
+            id="inventory-categories-panel"
+            className="border-t border-vtk-navy/10 bg-vtk-paper/35 px-5 py-5 sm:px-6"
+          >
+            <div className="mb-5">
+              <h3 className="text-lg font-semibold text-vtk-ink">Categorieën</h3>
+              <p className="mt-1 text-sm text-vtk-muted">Maak de catalogus herkenbaar en bepaal de volgorde.</p>
+            </div>
+            <div className="grid gap-5 lg:grid-cols-[minmax(260px,0.7fr)_minmax(0,1.3fr)] lg:items-start">
+              <SaveForm
+                action={saveCategoryAction}
+                submitLabel="Categorie toevoegen"
+                savingLabel="Toevoegen..."
+                savedMessage="Categorie toegevoegd."
+                errorMessages={CATEGORY_ERRORS}
+                className="grid gap-3 rounded-[14px] border border-vtk-navy/10 bg-vtk-surface p-4"
+              >
+                <label className="grid gap-1 text-xs font-medium text-vtk-muted">
+                  Nieuwe categorie
+                  <input type="text" name="name" placeholder="Bv. Gereedschap" className={`${inputClass} w-full`} />
+                </label>
+                <label className="grid gap-1 text-xs font-medium text-vtk-muted">
+                  Volgorde
+                  <input type="number" name="sortIndex" defaultValue={0} className={`${inputClass} w-full`} />
+                </label>
+              </SaveForm>
+              <div>
+                <p className="mb-2 text-xs font-semibold uppercase tracking-[0.06em] text-vtk-muted">
+                  Bestaande categorieën
+                </p>
+                {activeCategories.length === 0 ? (
+                  <p className="rounded-[12px] border border-dashed border-vtk-navy/20 bg-vtk-surface px-4 py-4 text-sm text-vtk-muted">
+                    Er zijn nog geen categorieën.
+                  </p>
+                ) : (
+                  <ul className="grid gap-2">
+                    {activeCategories.map((category) => (
+                      <li key={category.id} className="rounded-[12px] border border-vtk-navy/10 bg-vtk-surface">
+                        <details>
+                          <summary className="flex cursor-pointer items-center justify-between gap-3 px-3 py-2 text-sm [&::-webkit-details-marker]:hidden">
+                            <span className="font-medium text-vtk-ink">{category.name}</span>
+                            <span className="text-xs text-vtk-muted">
+                              {activeItems.filter((item) => item.categoryId === category.id).length} items
+                            </span>
+                          </summary>
+                          <div className="border-t border-vtk-navy/10 px-3 py-3">
+                            <SaveForm
+                              action={saveCategoryAction}
+                              submitLabel="Opslaan"
+                              savingLabel="Opslaan..."
+                              savedMessage="Categorie opgeslagen."
+                              errorMessages={CATEGORY_ERRORS}
+                              className="grid gap-3"
+                            >
+                              <input type="hidden" name="id" value={category.id} />
+                              <input type="hidden" name="expectedUpdatedAt" value={category.updatedAt.toISOString()} />
+                              <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_7rem] sm:items-end">
+                                <label className="grid gap-1 text-xs font-medium text-vtk-muted">
+                                  Naam
+                                  <input
+                                    type="text"
+                                    name="name"
+                                    defaultValue={category.name}
+                                    className={`${inputClass} w-full`}
+                                  />
+                                </label>
+                                <label className="grid gap-1 text-xs font-medium text-vtk-muted">
+                                  Volgorde
+                                  <input
+                                    type="number"
+                                    name="sortIndex"
+                                    defaultValue={category.sortIndex}
+                                    className={`${inputClass} w-full`}
+                                  />
+                                </label>
+                              </div>
+                            </SaveForm>
+                            <div className="mt-2">
+                              <ConfirmActionButton
+                                label="Uit catalogus halen"
+                                successMessage="Categorie uit de catalogus gehaald."
+                                action={deactivateCategoryAction.bind(null, category.id)}
+                                destructive
+                                dialogTitle="Categorie uit de catalogus halen?"
+                                dialogDescription="De categorie verdwijnt; haar items blijven bestaan en verhuizen naar ‘Overig’."
+                              />
+                            </div>
+                          </div>
+                        </details>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                {inactiveCategories.length > 0 ? (
+                  <p className="mt-3 text-xs text-vtk-muted">
+                    {inactiveCategories.length} categorie(ën) niet meer in de catalogus.
+                  </p>
+                ) : null}
               </div>
-            </SaveForm>
-            <ul className="grid gap-2">
-              {activeCategories.map((category) => (
-                <li key={category.id} className="rounded-[12px] border border-vtk-navy/10 bg-vtk-paper/55">
-                  <details>
-                    <summary className="flex cursor-pointer items-center justify-between gap-3 px-3 py-2 text-sm [&::-webkit-details-marker]:hidden">
-                      <span className="font-medium text-vtk-ink">{category.name}</span>
-                      <span className="text-xs text-vtk-muted">{activeItems.filter((i) => i.categoryId === category.id).length} items</span>
-                    </summary>
-                    <div className="border-t border-vtk-navy/10 px-3 py-3">
-                      <SaveForm action={saveCategoryAction} submitLabel="Opslaan" savingLabel="Opslaan..." savedMessage="Categorie opgeslagen." errorMessages={CATEGORY_ERRORS} className="grid gap-3">
-                        <input type="hidden" name="id" value={category.id} />
-                        <input type="hidden" name="expectedUpdatedAt" value={category.updatedAt.toISOString()} />
-                        <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_7rem] sm:items-end">
-                          <label className="grid gap-1 text-xs font-medium text-vtk-muted">Naam<input type="text" name="name" defaultValue={category.name} className={`${inputClass} w-full`} /></label>
-                          <label className="grid gap-1 text-xs font-medium text-vtk-muted">Volgorde<input type="number" name="sortIndex" defaultValue={category.sortIndex} className={`${inputClass} w-full`} /></label>
-                        </div>
-                      </SaveForm>
-                      <div className="mt-2">
-                        <ConfirmActionButton label="Uit catalogus halen" successMessage="Categorie uit de catalogus gehaald." action={deactivateCategoryAction.bind(null, category.id)} destructive dialogTitle="Categorie uit de catalogus halen?" dialogDescription="De categorie verdwijnt; haar items blijven bestaan en verhuizen naar ‘Overig’." />
-                      </div>
-                    </div>
-                  </details>
-                </li>
-              ))}
-            </ul>
-            {inactiveCategories.length > 0 ? (
-              <p className="text-xs text-vtk-muted">{inactiveCategories.length} categorie(ën) niet meer in de catalogus.</p>
-            ) : null}
+            </div>
           </div>
-        </details>
-      </div>
+        ) : null}
+      </section>
 
       {/* Zoeken + filteren op categorie. */}
-      <div className="flex flex-wrap items-center gap-3">
-        <input
-          type="search"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder="Zoek een item..."
-          className="h-10 min-w-[200px] flex-1 rounded-lg border border-vtk-navy/15 bg-white px-3 text-sm text-vtk-ink"
-        />
-        <select
-          value={activeCategory}
-          onChange={(e) => setActiveCategory(e.target.value)}
-          className="h-10 rounded-lg border border-vtk-navy/15 bg-white px-3 text-sm text-vtk-ink"
-        >
-          <option value="all">Alle categorieën</option>
-          {activeCategories.map((c) => (
-            <option key={c.id} value={c.id}>
-              {c.name}
-            </option>
-          ))}
-          <option value="overig">Overig</option>
-        </select>
-        {filtersActive ? (
-          <button
-            type="button"
-            onClick={() => {
-              setSearch('');
-              setActiveCategory('all');
-            }}
-            className="h-10 rounded-lg border border-vtk-navy/15 px-3 text-sm font-medium text-vtk-ink transition hover:border-vtk-navy/40"
+      {items.length > 0 ? (
+        <div className="flex flex-wrap items-center gap-3">
+          <input
+            type="search"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Zoek een item..."
+            className="h-10 min-w-[200px] flex-1 rounded-lg border border-vtk-navy/15 bg-white px-3 text-sm text-vtk-ink"
+          />
+          <select
+            value={activeCategory}
+            onChange={(e) => setActiveCategory(e.target.value)}
+            className="h-10 rounded-lg border border-vtk-navy/15 bg-white px-3 text-sm text-vtk-ink"
           >
-            Filters wissen
-          </button>
-        ) : null}
-      </div>
+            <option value="all">Alle categorieën</option>
+            {activeCategories.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name}
+              </option>
+            ))}
+            <option value="overig">Overig</option>
+          </select>
+          {filtersActive ? (
+            <button
+              type="button"
+              onClick={() => {
+                setSearch('');
+                setActiveCategory('all');
+              }}
+              className="h-10 rounded-lg border border-vtk-navy/15 px-3 text-sm font-medium text-vtk-ink transition hover:border-vtk-navy/40"
+            >
+              Filters wissen
+            </button>
+          ) : null}
+        </div>
+      ) : null}
 
       <section>
         <h3 className="text-lg font-semibold tracking-tight text-vtk-ink">Items ({shown.length})</h3>
         {shown.length === 0 ? (
-          <p className="mt-3 rounded-[14px] border border-dashed border-vtk-navy/20 bg-vtk-surface px-4 py-4 text-sm text-vtk-muted">
-            Niets gevonden.
-          </p>
+          activeItems.length === 0 && !filtersActive ? (
+            <div className="mt-3 rounded-[16px] border border-dashed border-vtk-navy/20 bg-vtk-surface px-5 py-7 text-center">
+              <p className="font-semibold text-vtk-ink">De catalogus is nog leeg</p>
+              <p className="mx-auto mt-1 max-w-md text-sm text-vtk-muted">
+                Voeg eerst een item toe. Een categorie is optioneel en kan ook later ingesteld worden.
+              </p>
+              <button
+                type="button"
+                onClick={() => {
+                  setOpenPanel('item');
+                  window.requestAnimationFrame(() => {
+                    document
+                      .getElementById('inventory-actions')
+                      ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                  });
+                }}
+                className="mt-4 rounded-full bg-vtk-navy px-4 py-2 text-sm font-semibold text-white transition hover:bg-vtk-ink"
+              >
+                Eerste item toevoegen
+              </button>
+            </div>
+          ) : (
+            <p className="mt-3 rounded-[14px] border border-dashed border-vtk-navy/20 bg-vtk-surface px-4 py-4 text-sm text-vtk-muted">
+              Niets gevonden.
+            </p>
+          )
         ) : (
           <div className="mt-4">
             <ItemTable

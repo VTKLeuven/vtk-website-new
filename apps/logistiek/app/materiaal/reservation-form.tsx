@@ -117,6 +117,7 @@ export function ReservationForm({
 
   const [search, setSearch] = useState('');
   const [activeCategory, setActiveCategory] = useState<string>('all');
+  const [appliedTemplate, setAppliedTemplate] = useState<string | null>(null);
 
   /**
    * Een sjabloon vult de aantallen in en verdwijnt daarna uit beeld: wat er nu
@@ -128,6 +129,7 @@ export function ReservationForm({
     const template = templates.find((entry) => entry.id === templateId);
     if (!template) return;
     trackTemplateLoaded(template.name);
+    setAppliedTemplate(template.name);
     setQuantities((current) => {
       const next = { ...current };
       for (const line of template.lines) {
@@ -306,6 +308,48 @@ export function ReservationForm({
         </div>
       ) : null}
 
+      {templates.length > 0 ? (
+        <section className="logistics-template-picker" aria-labelledby="material-template-title">
+          <div>
+            <p className="logistics-form-kicker">{en ? 'Quick start' : 'Snel starten'}</p>
+            <h2 id="material-template-title">
+              {en ? 'Use a ready-made equipment list' : 'Gebruik een kant-en-klare materiaallijst'}
+            </h2>
+            <p>
+              {en
+                ? 'A template immediately adds its equipment to your request. You can still change every quantity.'
+                : 'Een sjabloon voegt het materiaal meteen toe aan je aanvraag. Je kan elk aantal daarna nog aanpassen.'}
+            </p>
+          </div>
+          <label>
+            <span>{en ? 'Template' : 'Sjabloon'}</span>
+            <select
+              value=""
+              onChange={(event) => {
+                applyTemplate(event.target.value);
+                event.target.value = '';
+              }}
+            >
+              <option value="">{en ? 'Choose a template...' : 'Kies een sjabloon...'}</option>
+              {templates.map((template) => (
+                <option key={template.id} value={template.id}>
+                  {template.name}
+                  {template.groupName ? ` (${template.groupName})` : ''}
+                </option>
+              ))}
+            </select>
+          </label>
+          {appliedTemplate ? (
+            <p className="logistics-template-feedback" role="status" aria-live="polite">
+              <span aria-hidden>✓</span>
+              {en
+                ? `${appliedTemplate} was added. Your request now contains ${totals.count} items.`
+                : `${appliedTemplate} is toegevoegd. Jouw aanvraag bevat nu ${totals.count} items.`}
+            </p>
+          ) : null}
+        </section>
+      ) : null}
+
       <EventRequesterFields
         value={event}
         onChange={setEvent}
@@ -330,40 +374,6 @@ export function ReservationForm({
 
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
         <div className="space-y-6">
-          {/* Een sjabloon is een vertrekpunt, geen keuze die vastligt: het vult de
-              aantallen in en daarna is het een gewone aanvraag. */}
-          {templates.length > 0 ? (
-            <div className="flex flex-wrap items-center gap-3 rounded-[14px] border border-vtk-navy/10 bg-vtk-surface px-4 py-3">
-              <label className="text-sm font-medium text-vtk-ink" htmlFor="template">
-                {en ? 'Start from a template' : 'Start van een sjabloon'}
-              </label>
-              <select
-                id="template"
-                value=""
-                onChange={(event) => {
-                  applyTemplate(event.target.value);
-                  // Terug naar de placeholder: het sjabloon is toegepast, niet
-                  // "gekozen", en de aantallen hieronder zijn nu de waarheid.
-                  event.target.value = '';
-                }}
-                className="h-10 min-w-[220px] rounded-lg border border-vtk-navy/15 bg-white px-3 text-sm text-vtk-ink"
-              >
-                <option value="">{en ? 'Pick a template...' : 'Kies een sjabloon...'}</option>
-                {templates.map((template) => (
-                  <option key={template.id} value={template.id}>
-                    {template.name}
-                    {template.groupName ? ` (${template.groupName})` : ''}
-                  </option>
-                ))}
-              </select>
-              <span className="text-xs text-vtk-muted">
-                {en
-                  ? 'Fills in the amounts; you can change everything afterwards.'
-                  : 'Vult de aantallen in; je kan daarna alles nog aanpassen.'}
-              </span>
-            </div>
-          ) : null}
-
           <div className="flex flex-wrap items-center gap-3">
             <input
               type="search"
@@ -481,31 +491,36 @@ export function ReservationForm({
                           <p className="mt-1 line-clamp-2 text-sm text-vtk-muted">{item.description}</p>
                         ) : null}
                         <SetContents contents={item.setContents} locale={locale} />
-                        <p className="mt-0.5 text-xs text-vtk-muted">
-                          {item.depositCents > 0
-                            ? `${formatEuro(item.depositCents)} ${en ? 'deposit' : 'waarborg'}`
-                            : en
-                              ? 'No deposit'
-                              : 'Geen waarborg'}
-                          {available !== undefined ? (
-                            available > 0 ? (
-                              <span>
-                                {' '}
-                                · {available} {en ? 'available for your dates' : 'beschikbaar in je periode'}
-                              </span>
-                            ) : (
-                              <span className="font-semibold text-red-700">
-                                {' '}
-                                · {en ? 'not available for your dates' : 'niet beschikbaar in je periode'}
-                              </span>
-                            )
-                          ) : (
-                            <span>
-                              {' '}
-                              · {item.quantity} {en ? 'in stock' : 'in voorraad'}
-                            </span>
-                          )}
-                        </p>
+                        <dl className="mt-3 grid grid-cols-2 gap-3 border-t border-vtk-navy/10 pt-3 text-xs">
+                          <div>
+                            <dt className="font-semibold text-vtk-muted">
+                              {en ? 'Deposit' : 'Waarborg'}
+                            </dt>
+                            <dd className="mt-0.5 text-vtk-ink">
+                              {item.depositCents > 0
+                                ? formatEuro(item.depositCents)
+                                : en
+                                  ? 'None'
+                                  : 'Geen'}
+                            </dd>
+                          </div>
+                          <div>
+                            <dt className="font-semibold text-vtk-muted">
+                              {available !== undefined
+                                ? en
+                                  ? 'Available for your dates'
+                                  : 'Beschikbaar in je periode'
+                                : en
+                                  ? 'Stock'
+                                  : 'Voorraad'}
+                            </dt>
+                            <dd
+                              className={`mt-0.5 font-semibold ${available === 0 ? 'text-red-700' : 'text-vtk-ink'}`}
+                            >
+                              {available !== undefined ? available : item.quantity}
+                            </dd>
+                          </div>
+                        </dl>
                         {short ? (
                           <p className="mt-1.5 rounded-lg bg-amber-50 px-2 py-1 text-xs text-amber-900">
                             {en

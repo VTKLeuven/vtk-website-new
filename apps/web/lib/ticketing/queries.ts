@@ -7,6 +7,7 @@ import { prisma } from "@vtk/db";
 import { createTicketCredential, secureTokenHash, verifyOrderAccessToken } from "./crypto";
 import { orderAccessCookieName } from "./access";
 import { isAppleWalletAvailable, isGoogleWalletAvailable } from "./wallet";
+import { ticketTermsPath } from "./terms";
 
 type PublicLocale = "nl" | "en";
 
@@ -71,7 +72,7 @@ function publicEventDto(event: PublicEventRecord, locale: PublicLocale) {
     maxTicketsPerOrder: event.maxTicketsPerOrder,
     currency: event.currency,
     contactEmail: event.contactEmail,
-    termsUrl: event.termsUrl,
+    termsUrl: ticketTermsPath(locale),
     ownerGroupName: localized(event.ownerGroup.nameNl, event.ownerGroup.nameEn, locale),
     ticketTypes: event.ticketTypes.map((type) => ({
       id: type.id,

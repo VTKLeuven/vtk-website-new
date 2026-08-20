@@ -60,11 +60,6 @@ function EventCard({ event }: { event: AdminEvent }) {
               </span>
             ) : null}
           </h3>
-          <p className="mt-0.5 text-sm text-vtk-muted">
-            {event.startAt ? formatDateTime(event.startAt) : 'Geen startuur'}
-            {event.location ? ` · ${event.location}` : ''}
-            {event.createdBy ? ` · aangemaakt door ${event.createdBy.name}` : ''}
-          </p>
         </div>
         <EventEditor
           event={{
@@ -77,6 +72,21 @@ function EventCard({ event }: { event: AdminEvent }) {
           attached={event.reservations.length + event.transport.length}
         />
       </div>
+
+      <dl className="logistics-fact-grid mt-4">
+        <div>
+          <dt>Start</dt>
+          <dd>{event.startAt ? formatDateTime(event.startAt) : 'Nog niet ingevuld'}</dd>
+        </div>
+        <div>
+          <dt>Locatie</dt>
+          <dd>{event.location || 'Nog niet ingevuld'}</dd>
+        </div>
+        <div>
+          <dt>Aangemaakt door</dt>
+          <dd>{event.createdBy?.name ?? 'Onbekend'}</dd>
+        </div>
+      </dl>
 
       {missing.length > 0 ? (
         <p className="mt-3 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900">

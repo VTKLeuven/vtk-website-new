@@ -128,18 +128,17 @@ export default async function BeheerAanvragenPage({
       isLastMinute(reservation.pickupDate, reservation.createdAt, settings.lastMinuteDays);
     return (
       <li>
-        {/* Vaste twee kolommen: met flex-wrap sprong de badge naar een eigen
-            lijn zodra de itemopsomming lang werd, en dan verspringt de hele rij. */}
         <Link
           href={`/beheer/aanvragen/${reservation.id}`}
-          className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-5 gap-y-2 rounded-[14px] border border-vtk-navy/10 bg-vtk-surface px-4 py-3 transition hover:border-vtk-navy/25"
+          className="logistics-admin-request-row"
         >
-          <div className="min-w-0">
-            <p className="flex flex-wrap items-center gap-2 font-medium text-vtk-ink">
+          <div className="logistics-reservation-cell logistics-reservation-subject">
+            <span>Aanvraag</span>
+            <strong>{reservation.eventName}</strong>
+            <p className="mt-1 flex flex-wrap items-center gap-2">
               <span className="rounded-full bg-vtk-paper-2 px-2 py-0.5 text-[11px] font-semibold text-vtk-navy">
                 {requesterLabel(reservation)}
               </span>
-              {reservation.eventName}
               {lastMinute ? (
                 <span className="rounded-full bg-red-50 px-2 py-0.5 text-[11px] font-semibold text-red-700">
                   Last minute
@@ -167,18 +166,29 @@ export default async function BeheerAanvragenPage({
                 </span>
               ) : null}
             </p>
-            <p className="mt-0.5 truncate text-sm text-vtk-muted">
-              {reservation.user.name} · {itemSummary(reservation.lines)}
-            </p>
-            <p className="mt-0.5 truncate text-sm text-vtk-muted">
+          </div>
+          <div className="logistics-reservation-cell">
+            <span>Aanvrager</span>
+            <p>{reservation.user.name}</p>
+          </div>
+          <div className="logistics-reservation-cell">
+            <span>Inhoud</span>
+            <p>{itemSummary(reservation.lines)}</p>
+          </div>
+          <div className="logistics-reservation-cell">
+            <span>Periode</span>
+            <p>
               {formatDateWithPart(reservation.pickupDate, reservation.pickupPart)} tot{' '}
               {formatDateWithPart(reservation.returnDate, reservation.returnPart)}
               {reservation.totalDepositCents > 0
-                ? ` · ${formatEuro(reservation.totalDepositCents)} waarborg`
+                ? `, ${formatEuro(reservation.totalDepositCents)} waarborg`
                 : ''}
             </p>
           </div>
-          <ReservationStatusBadge status={reservation.status} />
+          <div className="logistics-reservation-status">
+            <span>Status</span>
+            <ReservationStatusBadge status={reservation.status} />
+          </div>
         </Link>
       </li>
     );

@@ -42,9 +42,16 @@ function DriverRow({ entry }: { entry: DriverPoolEntry }) {
               </span>
             ) : null}
           </p>
-          <p className="mt-0.5 truncate text-sm text-vtk-muted">
-            {entry.email} · {tripsLabel(entry)}
-          </p>
+          <dl className="mt-2 grid gap-3 text-sm sm:grid-cols-2">
+            <div>
+              <dt className="text-[10px] font-semibold uppercase tracking-[0.08em] text-vtk-muted">E-mail</dt>
+              <dd className="mt-0.5 break-all text-vtk-body">{entry.email}</dd>
+            </div>
+            <div>
+              <dt className="text-[10px] font-semibold uppercase tracking-[0.08em] text-vtk-muted">Ritten</dt>
+              <dd className="mt-0.5 text-vtk-body">{tripsLabel(entry)}</dd>
+            </div>
+          </dl>
           {entry.note ? <p className="mt-1 text-sm text-vtk-body">{entry.note}</p> : null}
         </div>
 

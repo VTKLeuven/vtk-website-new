@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import type { ReactNode } from 'react';
 import { LoginGate } from '@/components/login-gate';
 import { PageShell } from '@/components/page-shell';
 import { ReservationStatusBadge, VanStatusBadge } from '@/components/status-badge';
@@ -22,6 +23,49 @@ function itemSummary(lines: Array<{ quantity: number; itemName: string }>, en: b
   const rest = lines.length - shown.length;
   if (rest === 0) return shown.join(', ');
   return `${shown.join(', ')} ${en ? `and ${rest} more` : `en ${rest} andere`}`;
+}
+
+function ReservationOverviewRow({
+  href,
+  subject,
+  contents,
+  period,
+  requester,
+  status,
+  labels,
+}: {
+  href: string;
+  subject: ReactNode;
+  contents: ReactNode;
+  period: ReactNode;
+  requester: ReactNode;
+  status: ReactNode;
+  labels: { subject: string; contents: string; period: string; requester: string; status: string };
+}) {
+  return (
+    <Link href={href} className="logistics-reservation-row">
+      <div className="logistics-reservation-cell logistics-reservation-subject">
+        <span>{labels.subject}</span>
+        <strong>{subject}</strong>
+      </div>
+      <div className="logistics-reservation-cell">
+        <span>{labels.contents}</span>
+        <p>{contents}</p>
+      </div>
+      <div className="logistics-reservation-cell">
+        <span>{labels.period}</span>
+        <p>{period}</p>
+      </div>
+      <div className="logistics-reservation-cell">
+        <span>{labels.requester}</span>
+        <p>{requester}</p>
+      </div>
+      <div className="logistics-reservation-status">
+        <span>{labels.status}</span>
+        {status}
+      </div>
+    </Link>
+  );
 }
 
 export default async function ReservatiesPage({
@@ -66,11 +110,19 @@ export default async function ReservatiesPage({
     ? 'Also shows what the rest of your post requested, so the same thing is not booked twice.'
     : 'Toont ook wat de rest van je post aanvroeg, zodat hetzelfde niet twee keer geboekt wordt.';
 
+  const rowLabels = {
+    subject: en ? 'Event' : 'Evenement',
+    contents: en ? 'Contents' : 'Inhoud',
+    period: en ? 'Period' : 'Periode',
+    requester: en ? 'Requested by' : 'Aangevraagd door',
+    status: 'Status',
+  };
+
   return (
     <PageShell
       title={
         <>
-          {t.pageReservationsTitle} <em className="font-serif font-normal italic text-vtk-navy">{t.pageReservationsAccent}</em>
+          {t.pageReservationsTitle} {t.pageReservationsAccent}
         </>
       }
     >
@@ -98,34 +150,31 @@ export default async function ReservatiesPage({
             <ul className="mt-4 grid gap-3">
               {materialRequests.map((reservation) => (
                 <li key={reservation.id}>
-                  {/* Vaste twee kolommen: met flex-wrap sprong de statusbadge naar
-                      een eigen lijn zodra de itemopsomming lang werd. */}
-                  <Link
+                  <ReservationOverviewRow
                     href={`/reservaties/${reservation.id}`}
-                    className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-5 gap-y-2 rounded-[16px] border border-vtk-navy/10 bg-vtk-surface px-5 py-4 transition hover:border-vtk-navy/25"
-                  >
-                    <div className="min-w-0">
-                      <p className="font-medium text-vtk-ink">{reservation.eventName}</p>
-                      <p className="mt-0.5 truncate text-sm text-vtk-muted">
+                    subject={reservation.eventName}
+                    contents={
+                      <>
                         {itemSummary(reservation.lines, en)}
                         {reservation.flesserkeLines.length > 0
-                          ? ` · ${en ? 'and drinks' : 'en flesserke'}`
+                          ? `, ${en ? 'including drinks' : 'inclusief flesserke'}`
                           : ''}
-                      </p>
-                      <p className="mt-0.5 text-sm text-vtk-muted">
+                      </>
+                    }
+                    period={
+                      <>
                         {formatDateWithPart(reservation.pickupDate, reservation.pickupPart, locale)}{' '}
                         {en ? 'to' : 'tot'}{' '}
                         {formatDateWithPart(reservation.returnDate, reservation.returnPart, locale)}
                         {reservation.totalDepositCents > 0
-                          ? ` · ${formatEuro(reservation.totalDepositCents)} ${en ? 'deposit' : 'waarborg'}`
+                          ? `, ${formatEuro(reservation.totalDepositCents)} ${en ? 'deposit' : 'waarborg'}`
                           : ''}
-                      </p>
-                      {/* Wie ze aanvroeg, klein eronder. Bij je eigen aanvraag is
-                          dat overbodig; bij die van een collega is het het punt. */}
-                      <p className="mt-1 text-xs text-vtk-muted">{requestedBy(reservation.user)}</p>
-                    </div>
-                    <ReservationStatusBadge status={reservation.status} locale={locale} />
-                  </Link>
+                      </>
+                    }
+                    requester={requestedBy(reservation.user)}
+                    status={<ReservationStatusBadge status={reservation.status} locale={locale} />}
+                    labels={rowLabels}
+                  />
                 </li>
               ))}
             </ul>
@@ -149,22 +198,15 @@ export default async function ReservatiesPage({
             <ul className="mt-4 grid gap-3">
               {drinkRequests.map((reservation) => (
                 <li key={reservation.id}>
-                  <Link
+                  <ReservationOverviewRow
                     href={`/reservaties/${reservation.id}`}
-                    className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-5 gap-y-2 rounded-[16px] border border-vtk-navy/10 bg-vtk-surface px-5 py-4 transition hover:border-vtk-navy/25"
-                  >
-                    <div className="min-w-0">
-                      <p className="font-medium text-vtk-ink">{reservation.eventName}</p>
-                      <p className="mt-0.5 truncate text-sm text-vtk-muted">
-                        {itemSummary(reservation.flesserkeLines, en)}
-                      </p>
-                      <p className="mt-0.5 text-sm text-vtk-muted">
-                        {formatDateWithPart(reservation.pickupDate, reservation.pickupPart, locale)}
-                      </p>
-                      <p className="mt-1 text-xs text-vtk-muted">{requestedBy(reservation.user)}</p>
-                    </div>
-                    <ReservationStatusBadge status={reservation.status} locale={locale} />
-                  </Link>
+                    subject={reservation.eventName}
+                    contents={itemSummary(reservation.flesserkeLines, en)}
+                    period={formatDateWithPart(reservation.pickupDate, reservation.pickupPart, locale)}
+                    requester={requestedBy(reservation.user)}
+                    status={<ReservationStatusBadge status={reservation.status} locale={locale} />}
+                    labels={rowLabels}
+                  />
                 </li>
               ))}
             </ul>
@@ -186,25 +228,28 @@ export default async function ReservatiesPage({
             <ul className="mt-4 grid gap-3">
               {vanBookings.map((booking) => (
                 <li key={booking.id}>
-                  <Link
+                  <ReservationOverviewRow
                     href={`/vervoer/${booking.id}`}
-                    className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-5 gap-y-2 rounded-[16px] border border-vtk-navy/10 bg-vtk-surface px-5 py-4 transition hover:border-vtk-navy/25"
-                  >
-                    <div className="min-w-0">
-                      <p className="flex flex-wrap items-center gap-2 font-medium text-vtk-ink">
+                    subject={
+                      <span className="flex flex-wrap items-center gap-2">
                         <span className="rounded-full bg-vtk-paper-2 px-2.5 py-0.5 text-xs font-semibold text-vtk-navy">
                           {en ? booking.vehicle.nameEn : booking.vehicle.nameNl}
                         </span>
                         {booking.purpose}
-                      </p>
-                      <p className="mt-0.5 text-sm text-vtk-muted">
-                        {formatDateTime(booking.startAt, locale)} {en ? 'to' : 'tot'} {formatDateTime(booking.endAt, locale)} ·{' '}
+                      </span>
+                    }
+                    contents={booking.destination || (en ? 'Transport request' : 'Vervoersaanvraag')}
+                    period={
+                      <>
+                        {formatDateTime(booking.startAt, locale)} {en ? 'to' : 'tot'}{' '}
+                        {formatDateTime(booking.endAt, locale)}, {' '}
                         {formatPriceCents(booking.priceCents, locale)}
-                      </p>
-                      <p className="mt-1 text-xs text-vtk-muted">{requestedBy(booking.user)}</p>
-                    </div>
-                    <VanStatusBadge status={booking.status} locale={locale} />
-                  </Link>
+                      </>
+                    }
+                    requester={requestedBy(booking.user)}
+                    status={<VanStatusBadge status={booking.status} locale={locale} />}
+                    labels={{ ...rowLabels, contents: en ? 'Destination' : 'Bestemming' }}
+                  />
                 </li>
               ))}
             </ul>

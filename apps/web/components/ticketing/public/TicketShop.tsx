@@ -30,7 +30,7 @@ import {
 } from "./types";
 import { trackCheckoutStart } from "@/lib/analytics-client";
 
-type Attendee = {
+export type Attendee = {
   attendeeName: string;
   attendeeEmail: string;
   answers: Record<string, string | string[] | boolean>;
@@ -45,8 +45,30 @@ type CheckoutResponse = {
   message?: string;
 };
 
-function emptyAttendee(): Attendee {
-  return { attendeeName: "", attendeeEmail: "", answers: {} };
+function emptyAttendee(viewer?: { name: string; email: string } | null): Attendee {
+  return {
+    attendeeName: viewer?.name ?? "",
+    attendeeEmail: viewer?.email ?? "",
+    answers: {},
+  };
+}
+
+export function attendeesForQuantity(
+  values: Record<string, Attendee[]>,
+  ticketTypeId: string,
+  quantity: number,
+  viewer?: { name: string; email: string } | null,
+): Attendee[] {
+  const currentAttendees = values[ticketTypeId] ?? [];
+  let prefillBuyer = Boolean(viewer) && Object.values(values).every((list) => list.length === 0);
+  return Array.from({ length: quantity }, (_, index) => {
+    if (currentAttendees[index]) return currentAttendees[index];
+    if (prefillBuyer) {
+      prefillBuyer = false;
+      return emptyAttendee(viewer);
+    }
+    return emptyAttendee();
+  });
 }
 
 function checkoutErrorMessage(code: string | undefined, locale: "nl" | "en"): string {
@@ -269,16 +291,10 @@ export function TicketShop({
       : Math.min(next, maximum);
 
     setQuantities((values) => ({ ...values, [ticketTypeId]: bounded }));
-    setAttendees((values) => {
-      const currentAttendees = values[ticketTypeId] ?? [];
-      return {
-        ...values,
-        [ticketTypeId]: Array.from(
-          { length: bounded },
-          (_, index) => currentAttendees[index] ?? emptyAttendee(),
-        ),
-      };
-    });
+    setAttendees((values) => ({
+      ...values,
+      [ticketTypeId]: attendeesForQuantity(values, ticketTypeId, bounded, event.viewer),
+    }));
     setError(null);
   }
 

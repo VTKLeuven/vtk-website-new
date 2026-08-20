@@ -27,7 +27,7 @@ export default async function VervoerPage() {
     <PageShell
       title={
         <>
-          {t.pageVanTitle} <em className="font-serif font-normal italic text-vtk-navy">{t.pageVanAccent}</em>
+          {t.pageVanTitle} {t.pageVanAccent}
         </>
       }
       intro={content.pageVanLead}

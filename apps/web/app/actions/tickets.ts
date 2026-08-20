@@ -6,7 +6,7 @@ import { redirect, unstable_rethrow } from "next/navigation";
 import { prisma } from "@vtk/db";
 import type { Prisma } from "@prisma/client";
 import { z } from "zod";
-import { requireSession } from "@/lib/session";
+import { requirePermission, requireSession } from "@/lib/session";
 import {
   canCreateTicketEventForGroup,
   requireTicketEventCapability,
@@ -24,6 +24,8 @@ import {
   type TicketDesignDraft,
 } from "@/lib/ticketing/design";
 import { logAudit } from "@/lib/audit";
+import { saveError, saveOk, type SaveState } from "@/lib/saveState";
+import { TICKET_TERMS_SETTING_KEY } from "@/lib/ticketing/terms";
 
 const localeSchema = z.enum(["nl", "en"]);
 const roleSchema = z.enum(["OWNER", "MANAGER", "FINANCE", "SCANNER", "REPORTER"]);
@@ -54,7 +56,6 @@ const EXPECTED_EVENT_FORM_ERRORS = new Set([
   "INVALID_MAXTICKETSPERORDER",
   "INVALID_CAPACITY",
   "INVALID_CONTACTEMAIL",
-  "INVALID_TERMSURL",
 ]);
 
 function value(formData: FormData, key: string): string {
@@ -79,19 +80,6 @@ function emailValue(formData: FormData, key: string): string | null {
   const raw = limitedOptionalValue(formData, key, 320);
   if (!raw) return null;
   return z.string().email().parse(raw.toLowerCase());
-}
-
-function urlValue(formData: FormData, key: string): string | null {
-  const raw = limitedOptionalValue(formData, key, 2_000);
-  if (!raw) return null;
-  if (raw.startsWith("/") && !raw.startsWith("//")) return raw;
-  try {
-    const parsed = new URL(raw);
-    if (parsed.protocol !== "https:" && parsed.protocol !== "http:") throw new Error();
-    return parsed.toString();
-  } catch {
-    throw new Error(`INVALID_${key.toUpperCase()}`);
-  }
 }
 
 function dateValue(formData: FormData, key: string, required = false): Date | null {
@@ -179,6 +167,40 @@ function refreshTicketEvent(locale: "nl" | "en", eventId: string) {
   revalidatePath(localePath(locale, "/admin/tickets"));
   revalidatePath(localePath(locale, `/admin/tickets/${eventId}`));
   revalidatePath(localePath(locale, "/tickets"));
+}
+
+export async function saveTicketTermsAction(
+  _previousState: SaveState,
+  formData: FormData,
+): Promise<SaveState> {
+  await requirePermission("tickets.manageAll");
+
+  const version = value(formData, "version");
+  const bodyNl = String(formData.get("bodyNl") ?? "").trim();
+  const bodyEn = String(formData.get("bodyEn") ?? "").trim();
+  if (!version || version.length > 80) return saveError("INVALID_VERSION");
+  if (!bodyNl || !bodyEn || bodyNl.length > 100_000 || bodyEn.length > 100_000) {
+    return saveError("INVALID_CONTENT");
+  }
+
+  const terms = { version, bodyNl, bodyEn } satisfies Prisma.InputJsonObject;
+  await prisma.setting.upsert({
+    where: { key: TICKET_TERMS_SETTING_KEY },
+    update: { value: terms },
+    create: { key: TICKET_TERMS_SETTING_KEY, value: terms },
+  });
+  await logAudit({
+    action: "update",
+    entity: "ticketTerms",
+    target: "Algemene ticketvoorwaarden",
+    summary: `versie ${version}`,
+  });
+
+  revalidatePath("/tickets/voorwaarden");
+  revalidatePath("/en/tickets/voorwaarden");
+  revalidatePath("/admin/tickets/voorwaarden");
+  revalidatePath("/en/admin/tickets/voorwaarden");
+  return saveOk();
 }
 
 /**
@@ -354,8 +376,6 @@ export async function createTicketEventAction(formData: FormData): Promise<void>
         salesEndAt,
         maxTicketsPerOrder: boundedIntegerValue(formData, "maxTicketsPerOrder", 8, 1, 50),
         contactEmail: emailValue(formData, "contactEmail"),
-        termsUrl: urlValue(formData, "termsUrl"),
-        termsVersion: limitedOptionalValue(formData, "termsVersion", 80) ?? "1",
         createdById: session.user.id,
       },
     });
@@ -488,8 +508,6 @@ export async function updateTicketEventAction(formData: FormData): Promise<void>
         status,
         maxTicketsPerOrder,
         contactEmail: emailValue(formData, "contactEmail"),
-        termsUrl: urlValue(formData, "termsUrl"),
-        termsVersion: limitedOptionalValue(formData, "termsVersion", 80),
         confirmationMessageNl: limitedOptionalValue(formData, "confirmationMessageNl", 5_000),
         confirmationMessageEn: limitedOptionalValue(formData, "confirmationMessageEn", 5_000),
         publishedAt: status === "PUBLISHED" ? event.publishedAt ?? new Date() : event.publishedAt,

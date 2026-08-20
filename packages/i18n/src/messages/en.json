@@ -313,6 +313,7 @@
   "admin": {
     "title": "Admin",
     "dashboard": "Dashboard",
+    "logistics": "Logistics",
     "pages": "Pages",
     "content": "Content",
     "calendar": "Calendar",

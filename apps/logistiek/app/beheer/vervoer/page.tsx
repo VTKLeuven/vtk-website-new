@@ -126,16 +126,12 @@ export default async function BeheerVervoerPage() {
     const paid = paidOf(booking);
     return (
       <li className="rounded-[16px] border border-vtk-navy/10 bg-vtk-surface p-5">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="min-w-0 flex-1">
-            <p className="flex flex-wrap items-center gap-2 font-medium text-vtk-ink">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="min-w-0">
+            <p className="flex flex-wrap items-center gap-2">
               <span className="rounded-full bg-vtk-paper-2 px-2.5 py-0.5 text-xs font-semibold text-vtk-navy">
                 {booking.vehicle.nameNl}
               </span>
-              <span className="rounded-full bg-vtk-paper-2 px-2.5 py-0.5 text-xs font-semibold text-vtk-navy">
-                {requesterLabel(booking)}
-              </span>
-              {booking.user.name}
               {booking.tripLeg ? (
                 <span className="rounded-full bg-vtk-yellow/25 px-2 py-0.5 text-[11px] font-semibold text-vtk-ink">
                   {booking.tripLeg === 'HEEN' ? 'Heenrit' : 'Terugrit'}
@@ -146,26 +142,50 @@ export default async function BeheerVervoerPage() {
                   Levering
                 </span>
               ) : null}
-              <span className="text-sm font-normal text-vtk-muted">{booking.purpose}</span>
             </p>
-            <p className="mt-0.5 text-sm text-vtk-muted">
-              {formatDateTime(booking.startAt)} tot {formatDateTime(booking.endAt)} ·{' '}
-              {formatPriceCents(booking.priceCents)}
-              {booking.driver ? ` · chauffeur: ${booking.driver.name}` : ' · nog geen chauffeur'}
-              {booking.paymentMode ? (paid ? ' · betaald' : ' · nog niet betaald') : ''}
-            </p>
-            {booking.pickupAddress || booking.destination ? (
-              <p className="mt-0.5 text-sm text-vtk-muted">
-                {[booking.pickupAddress, booking.destination].filter(Boolean).join(' → ')}
-              </p>
-            ) : null}
-            {booking.helpersNote ? (
-              <p className="mt-0.5 text-sm text-vtk-muted">Bijrijders: {booking.helpersNote}</p>
-            ) : null}
-            {booking.memberNote ? <p className="mt-1 text-sm text-vtk-body">{booking.memberNote}</p> : null}
+            <h3 className="mt-2 font-semibold text-vtk-ink">{booking.purpose}</h3>
           </div>
           <VanStatusBadge status={booking.status} />
         </div>
+        <dl className="logistics-fact-grid mt-4">
+          <div>
+            <dt>Aanvrager</dt>
+            <dd>{booking.user.name}<span>{requesterLabel(booking)}</span></dd>
+          </div>
+          <div>
+            <dt>Periode</dt>
+            <dd>{formatDateTime(booking.startAt)} tot {formatDateTime(booking.endAt)}</dd>
+          </div>
+          <div>
+            <dt>Prijs</dt>
+            <dd>
+              {formatPriceCents(booking.priceCents)}
+              {booking.paymentMode ? <span>{paid ? 'Betaald' : 'Nog niet betaald'}</span> : null}
+            </dd>
+          </div>
+          <div>
+            <dt>Chauffeur</dt>
+            <dd>{booking.driver?.name ?? 'Nog te kiezen'}</dd>
+          </div>
+          {booking.pickupAddress || booking.destination ? (
+            <div data-span="2">
+              <dt>Route</dt>
+              <dd>{[booking.pickupAddress, booking.destination].filter(Boolean).join(' → ')}</dd>
+            </div>
+          ) : null}
+          {booking.helpersNote ? (
+            <div>
+              <dt>Bijrijders</dt>
+              <dd>{booking.helpersNote}</dd>
+            </div>
+          ) : null}
+        </dl>
+        {booking.memberNote ? (
+          <p className="mt-4 rounded-lg bg-vtk-paper px-3 py-2 text-sm text-vtk-body">
+            <span className="font-semibold text-vtk-ink">Notitie aanvrager</span><br />
+            {booking.memberNote}
+          </p>
+        ) : null}
         {children}
       </li>
     );

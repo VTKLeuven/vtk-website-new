@@ -2398,6 +2398,31 @@ Vastgelegde keuzes:
   apart gehouden (`kind=tile`): maximaal 2 MB, herschaald naar 128px, en onder een
   eigen `tiles/`-prefix zodat de tegel-actions een key van elders weigeren.
 
+## Eén centrale pagina met ticketvoorwaarden
+
+De algemene verkoopvoorwaarden horen bij VTK als verkoper, niet bij één
+ticketevent. Elk evenement naar een eigen URL laten verwijzen leverde verschillende
+versies, dode links en vergeten velden op. Daarom gebruikt elke ticketshop dezelfde
+vaste publieke pagina op `/tickets/voorwaarden`.
+
+- **De inhoud staat in één `Setting` onder `tickets.terms`.** Een beheerder met
+  `tickets.manageAll` bewerkt de Nederlandse en Engelse Markdown en de versie via
+  Admin -> Tickets -> Voorwaarden. Eventbeheerders kunnen de pagina bekijken, maar
+  wijzigen niet stil de voorwaarden voor alle andere organisatoren.
+- **De fallback is de bestaande VTK-pagina.** Zolang niemand de nieuwe instelling
+  heeft opgeslagen, toont de route de voorwaarden uit de vroegere pagina
+  `algemene-voorwaarden-ticketverkoop`, inclusief de Engelse vertaling en
+  versiedatum 23 november 2025. De verhuis begint daardoor nooit met een lege
+  juridische pagina.
+- **Een bestelling bewaart de aanvaarde versie.** De order verwijst niet naar de
+  actuele tekst, want die kan later wijzigen. Bij checkout wordt de centrale
+  versiewaarde op `TicketOrder.termsVersion` gekopieerd, naast het tijdstip van
+  aanvaarding.
+- **De koper is standaard de eerste aanwezige.** Bij een ingelogde bestelling
+  worden naam en e-mail van het profiel in het eerste ticket ingevuld. Extra
+  tickets blijven leeg, zodat de gegevens van vrienden niet per ongeluk die van
+  de koper overnemen.
+
 ## Apple/Google Wallet-tickets
 
 Naast de A4-PDF (`apps/web/lib/ticketing/pdf.ts`) kan een ticket ook als Apple- of

@@ -32,7 +32,7 @@ export default async function MateriaalPage() {
     <PageShell
       title={
         <>
-          {t.pageMaterialTitle} <em className="font-serif font-normal italic text-vtk-navy">{t.pageMaterialAccent}</em>
+          {t.pageMaterialTitle} {t.pageMaterialAccent}
         </>
       }
       intro={content.pageMaterialLead}

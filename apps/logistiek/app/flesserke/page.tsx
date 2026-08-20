@@ -46,7 +46,7 @@ export default async function FlesserkePage() {
       title={
         <>
           {en ? 'Flesserke' : 'Flesserke'}{' '}
-          <em className="font-serif font-normal italic text-vtk-navy">{en ? 'internal' : 'intern'}</em>
+          {en ? 'internal' : 'intern'}
         </>
       }
       intro={
