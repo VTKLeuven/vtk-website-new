@@ -3,10 +3,13 @@
 import Link from "next/link";
 import { useState, useRef, useEffect } from "react";
 import { logoutAction } from "@/app/actions/auth";
+import { OUTBOUND_EVENT, outboundHost, umamiEvent } from "@/lib/analytics";
+import type { PostAdminLink } from "@/lib/postAdminLinks";
 
 export function ProfileMenu({
   name,
   isAdmin,
+  tools,
   canReserveGrocomeet,
   grocomeetNeedsAttention = false,
   labels,
@@ -15,6 +18,8 @@ export function ProfileMenu({
 }: {
   name: string;
   isAdmin: boolean;
+  /** Beheerschermen van een post op een andere site; leeg voor wie er geen heeft. */
+  tools: PostAdminLink[];
   /** Postverantwoordelijken en Groep 5 bestellen hier hun broodje voor de GM. */
   canReserveGrocomeet: boolean;
   /** Een reservatie werd ongeldig; er moet opnieuw gekozen worden. */
@@ -133,6 +138,25 @@ export function ProfileMenu({
               {labels.admin}
             </Link>
           )}
+          {/* De beheerschermen die elders wonen, meteen na /admin: ze horen bij
+              hetzelfde "waar beheer ik mijn post". Ze openen in een nieuw tabblad,
+              zoals elke externe bestemming in de header. */}
+          {tools.map((tool) => (
+            <a
+              key={tool.key}
+              href={tool.href}
+              target="_blank"
+              rel="noreferrer noopener"
+              className={itemClass}
+              role="menuitem"
+              {...umamiEvent(OUTBOUND_EVENT, {
+                bestemming: outboundHost(tool.href),
+                vanaf: "account",
+              })}
+            >
+              {tool.label}
+            </a>
+          ))}
           <form action={logoutAction}>
             <button type="submit" className={`${itemClass} text-left`} role="menuitem">
               {labels.logout}

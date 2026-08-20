@@ -2314,6 +2314,46 @@ vangnetten: de permissie wordt automatisch aangemaakt, het scherm waarschuwt
 vooraf wanneer nog niemand ze heeft, en zo'n applicatie komt in "Aandacht
 vereist" op /admin/sso.
 
+## Beheerschermen van een post in het accountmenu
+
+Drie posten beheren hun werking op een site die niet deze site is: Logistiek de
+uitleendienst, Bedrijvenrelaties de career-site, Cursusdienst de cudi-tool. Wie
+daar moet zijn, vond die adressen tot nu toe enkel door ze te kennen. Ze hangen
+daarom in het accountmenu onder de avatar, meteen na "Admin": dat is waar iemand
+kijkt die "naar het beheer" wil, en het is ook de enige plaats op de site die al
+per persoon verschilt.
+
+- **Ze staan niet in de publieke navigatie.** Het zijn interne ingangen voor een
+  handvol leden; een menu-item dat voor 99% van de bezoekers een 403 is, hoort
+  niet in de hoofdnavigatie.
+- **De namen blijven onvertaald**: "Logistiek Beheer", "Career Admin", "Cudi
+  Admin". Dat zijn de namen van de tools zelf, niet een stuk sitecopy.
+- **Alle drie hangen ze aan het lidmaatschap van de post**, niet aan een
+  permissie. Voor career en cudi kan het niet anders: die apps kennen onze
+  permissies niet en beslissen op hun eigen SSO-codes. Voor logistiek bestaat
+  `logistiek.manage` wél, en dat is exact wat het beheer daarginds controleert,
+  maar die permissie zit ook bij superadmins en bij rollen buiten de post. Die
+  mensen openen het uitleenbeheer nooit, en dan is het menu-item enkel ruimte die
+  iets nuttigers had kunnen tonen. Het accountmenu is kort: wat er staat, moet
+  ergens over gaan.
+- De prijs is dat het menu-item en de echte toegangscontrole uit elkaar kunnen
+  lopen. Iemand met `logistiek.manage` buiten de post moet het adres kennen (of
+  via /admin gaan), en een lid van Bedrijvenrelaties zonder beheerrechten op
+  career.vtk.be ziet de link wel en botst daar op hun scherm. Dat is bewust: het
+  alternatief is hun rechtenmodel bij ons dupliceren, en dat verloopt stil zodra
+  zij iets wijzigen.
+- **Enkel logistiek volgt de omgeving.** Die app is van ons en draait ook op
+  `logistiek.dev.vtk.be`, dus het adres komt uit `LOGISTIEK_PUBLIC_URL`, dezelfde
+  variabele die de zoekresultaten al gebruiken. Staat ze niet ingesteld, dan
+  verschijnt het item niet. Career en cudi hebben geen testomgeving en staan als
+  vast adres in de code.
+
+**Waarom geen dashboardtegel per post?** Die bestaan (zie hieronder) en zouden
+dit ook kunnen. Maar een dashboardtegel woont op /admin: je moet er al zijn om ze
+te zien, en precies dat is de stap die deze drie posten wilden overslaan. De
+tegels blijven voor wat een post zelf toevoegt; deze drie zijn vaste onderdelen
+van onze eigen werking.
+
 ## Dashboardtegels (snelkoppelingen op /admin)
 
 Het dashboard opent met een raster snelkoppelingen naar de externe tools die een

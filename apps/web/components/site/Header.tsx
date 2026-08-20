@@ -8,6 +8,7 @@ import { getVisibleHeaderTabsForNav } from '@/lib/headerTabs';
 import { getCurrentSession } from '@/lib/session';
 import { hasPermission } from '@vtk/auth';
 import { hasPendingMeetingNotice } from '@/lib/meetings-server';
+import { postAdminLinks } from '@/lib/postAdminLinks';
 import { umamiEvent } from '@/lib/analytics';
 import { EditorialNavLinks } from './EditorialNavLinks';
 import { LocaleSwitcher } from './LocaleSwitcher';
@@ -161,6 +162,7 @@ export async function Header({ locale }: { locale: Locale }) {
             <ProfileMenu
               name={session.user.name}
               isAdmin={session.user.isSuperAdmin || session.permissions.length > 0}
+              tools={postAdminLinks(session)}
               canReserveGrocomeet={canReserveGrocomeet}
               grocomeetNeedsAttention={grocomeetNeedsAttention}
               labels={{
