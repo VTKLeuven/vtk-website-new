@@ -243,6 +243,15 @@ the design language into the application instead of copying mockup content.
   and H3, anchors from `lib/pageOutline.ts`) and the downloads. The rail only
   appears when there are at least two headings or a download, sticks on desktop,
   and moves above the text on narrow screens.
+  - The rail is a register in the margin, not a card: a hairline guide down the
+    left, muted links with air between them, an uppercase ink label leading the
+    list, and a 2px yellow marker on the heading you are reading. `PageOutline`
+    sets `aria-current` from the same scroll-spy pattern as `PraesidiumIndex`
+    (reading line just under the sticky header, rAF-throttled). The white
+    `--surface` card that was there was reviewed and removed: it weighed more
+    than the handful of short lines inside it and left an empty white block
+    beside the text. Downloads keep that treatment and are separated by a rule
+    instead of by a second card.
 - Category pages (`/[headerSlug]`): the pages under a header tab are a list of
   wide cards, two per row (`.vtk-tile-grid`), each opening with its own photo as
   a square on the left and the title, excerpt and "Lees meer" on the right. The

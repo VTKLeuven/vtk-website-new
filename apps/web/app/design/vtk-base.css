@@ -262,22 +262,24 @@
   }
 }
 
+/* Geen kaart maar een register in de marge: een haarlijn als geleider met een
+   gele markering op het kopje dat je aan het lezen bent. Een witte kaart woog
+   hier zwaarder dan haar inhoud (rand, ronding en padding rond een handvol korte
+   regels) en liet een leeg wit vlak rechts van de tekst staan. */
 .vtk-rail-box {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  padding: 14px 16px;
-  border: 1px solid var(--line);
-  border-radius: 16px;
-  background: var(--surface);
+  gap: 12px;
 }
 
+/* Het label mag de lijst aanvoeren in plaats van erboven te zweven: donkerder en
+   zwaarder dan de regels eronder, en met lucht ertussen. */
 .vtk-rail-box h2 {
-  margin: 0;
-  color: var(--muted);
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.09em;
+  margin: 0 0 0 13px;
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
 }
 
@@ -285,29 +287,70 @@
   margin: 0;
   padding: 0;
   list-style: none;
-  display: flex;
-  flex-direction: column;
-  gap: 7px;
+  border-left: 1px solid var(--line-2);
 }
 
 .vtk-rail-box a {
-  color: var(--ink);
-  font-size: 14px;
-  line-height: 1.35;
+  position: relative;
+  display: block;
+  padding: 7px 0 7px 13px;
+  color: var(--muted);
+  font-size: 13.5px;
+  line-height: 1.4;
   text-decoration: none;
+  transition: color 0.14s ease;
+}
+
+/* De markering ligt over de haarlijn zelf, zodat de rail niet breder wordt en de
+   regels niet verspringen zodra er een oplicht. */
+.vtk-rail-box a::before {
+  content: "";
+  position: absolute;
+  left: -1px;
+  top: 6px;
+  bottom: 6px;
+  width: 2px;
+  border-radius: 2px;
+  background: transparent;
 }
 
 .vtk-rail-box a:hover {
-  text-decoration: underline;
+  color: var(--ink);
 }
 
-/* Een H3 hangt onder zijn H2: inspringen plus een dunne lijn als geleider. */
+.vtk-rail-box a[aria-current="true"] {
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.vtk-rail-box a[aria-current="true"]::before {
+  background: var(--yellow);
+}
+
+/* Een H3 hangt onder zijn H2: verder inspringen, zonder tweede lijn ernaast. */
 .vtk-rail-box a.is-sub {
-  display: block;
-  padding-left: 10px;
-  border-left: 1px solid var(--line);
-  color: var(--body);
+  padding-left: 26px;
   font-size: 13px;
+}
+
+/* Downloads staan onder de inhoudsopgave, gescheiden door een lijn in plaats van
+   door een tweede kaart. Staan ze er alleen (een pagina zonder kopjes), dan valt
+   die scheiding weg. */
+.vtk-rail-downloads ul {
+  border-left: 0;
+}
+
+.vtk-rail-box + .vtk-rail-downloads {
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+}
+
+.vtk-rail-downloads a {
+  color: var(--ink);
+}
+
+.vtk-rail-downloads a:hover {
+  text-decoration: underline;
 }
 
 .vtk-rail-meta {

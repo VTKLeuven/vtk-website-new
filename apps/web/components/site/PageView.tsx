@@ -10,6 +10,7 @@ import { isExternalUrl, withLocaleBase } from "@/lib/href";
 import { publicUrl } from "@/lib/storage";
 import { renderTiptap } from "@/lib/tiptap-render";
 import { Markdown } from "@/components/ui/Markdown";
+import { PageOutline } from "@/components/site/PageOutline";
 import { outlineFromMarkdown, outlineFromTiptap, type OutlineItem } from "@/lib/pageOutline";
 import { pick, type Locale } from "@vtk/i18n";
 import type { HeaderTab, Page, PageAsset } from "@prisma/client";
@@ -109,23 +110,10 @@ export function PageView({
 
         {showRail ? (
           <aside className="vtk-page-rail">
-            {showOutline ? (
-              <nav className="vtk-rail-box" aria-label={onThisPageLabel}>
-                <h2>{onThisPageLabel}</h2>
-                <ul>
-                  {headings.map((item) => (
-                    <li key={`${item.id}-${item.level}`}>
-                      <a href={`#${item.id}`} className={item.level === 3 ? "is-sub" : undefined}>
-                        {item.text}
-                      </a>
-                    </li>
-                  ))}
-                </ul>
-              </nav>
-            ) : null}
+            {showOutline ? <PageOutline items={headings} label={onThisPageLabel} /> : null}
 
             {downloads.length > 0 ? (
-              <section className="vtk-rail-box">
+              <section className="vtk-rail-box vtk-rail-downloads">
                 <h2>{downloadsLabel}</h2>
                 <ul>
                   {downloads.map((a) => {
