@@ -74,8 +74,8 @@ export function PagesToolbar({
         <Modal title={nl ? "Nieuwe pagina" : "New page"} onClose={() => setNewOpen(false)}>
           <p className="mb-4 text-sm text-[#5c667f]">
             {nl
-              ? "De pagina start als concept en krijgt jouw rollen als bewerkrollen. Categorie en publicatie regelt iemand met het recht op Inhoud; de rest bewerk je meteen hierna."
-              : "The page starts as a draft and gets your roles as its editor roles. Category and publication are handled by someone with the Content permission; you can edit the rest right after."}
+              ? "De pagina start als concept en krijgt jouw rollen als bewerkrollen. Categorie en publicatie regelt iemand met het recht op Header; de rest bewerk je meteen hierna."
+              : "The page starts as a draft and gets your roles as its editor roles. Category and publication are handled by someone with the Header permission; you can edit the rest right after."}
           </p>
           {/* Geen onSuccess/toast: de action redirect naar de verse editor, en
               die navigatie is zelf de bevestiging. */}

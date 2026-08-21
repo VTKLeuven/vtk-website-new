@@ -1,4 +1,5 @@
 import { HEADER_TABS, prisma } from "@vtk/db";
+import type { Locale } from "@vtk/i18n";
 import { isExternalUrl } from "@/lib/href";
 
 /** Eén item in het uitklapmenu van een tab. */
@@ -34,9 +35,13 @@ export type NavHeaderTab = {
  * Header tabs from the CMS. When the table is empty (e.g. production DB never
  * seeded), fall back to the static defaults so the main nav still renders.
  */
-export async function getVisibleHeaderTabsForNav(): Promise<NavHeaderTab[]> {
+export async function getVisibleHeaderTabsForNav(locale: Locale = "nl"): Promise<NavHeaderTab[]> {
+  const isEn = locale === "en";
   const tabs = await prisma.headerTab.findMany({
-    where: { visible: true },
+    where: {
+      visible: true,
+      ...(isEn ? { visibleEn: true } : { visibleNl: true }),
+    },
     orderBy: { order: "asc" },
     include: {
       // Dezelfde selectie als de categoriepagina toont, zodat het menu en die
@@ -77,7 +82,7 @@ export async function getVisibleHeaderTabsForNav(): Promise<NavHeaderTab[]> {
     }));
   }
 
-  return HEADER_TABS.map((t) => ({
+  return HEADER_TABS.filter((t) => (t.visible !== false) && (isEn ? (t.visibleEn !== false) : (t.visibleNl !== false))).map((t) => ({
     id: t.code,
     slug: t.slug,
     labelNl: t.labelNl,

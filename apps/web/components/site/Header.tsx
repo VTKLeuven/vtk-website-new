@@ -43,7 +43,7 @@ function AnonymousUserIcon({ className }: { className?: string }) {
 export async function Header({ locale }: { locale: Locale }) {
   const now = new Date();
   const [tabs, session, theokotRow] = await Promise.all([
-    getVisibleHeaderTabsForNav(),
+    getVisibleHeaderTabsForNav(locale),
     getCurrentSession(),
     prisma.setting.findUnique({ where: { key: 'home.openingHours.theokot' } }),
   ]);

@@ -143,6 +143,9 @@ export const HEADER_TABS: Array<{
   labelNl: string;
   labelEn: string;
   order: number;
+  visible?: boolean;
+  visibleNl?: boolean;
+  visibleEn?: boolean;
   introNl?: string;
   introEn?: string;
   /** Externe site waar de headerknop naartoe gaat in plaats van naar /<slug>. */
@@ -189,8 +192,8 @@ export const HEADER_TABS: Array<{
     ],
   },
   { code: "THEOKOT", slug: "theokot", labelNl: "Theokot", labelEn: "Theokot", order: 1 },
-  { code: "SHIFTEN", slug: "shift", labelNl: "Shiften", labelEn: "Shifts", order: 2 },
-  { code: "EERSTEJAARS", slug: "eerstejaars", labelNl: "Eerstejaars", labelEn: "Freshmen", order: 3 },
+  { code: "SHIFTEN", slug: "shift", labelNl: "Shiften", labelEn: "Shifts", order: 2, visible: false },
+  { code: "EERSTEJAARS", slug: "eerstejaars", labelNl: "Eerstejaars", labelEn: "Freshmen", order: 3, visibleNl: true, visibleEn: false },
   {
     code: "CAREER",
     slug: "career",
@@ -233,7 +236,7 @@ export const HEADER_TABS: Array<{
     ctaLabelEn: "Order courses on cudi.vtk.be",
     ctaUrl: "https://cudi.vtk.be",
   },
-  { code: "INTERNATIONAAL", slug: "internationaal", labelNl: "Internationaal", labelEn: "International", order: 6 },
+  { code: "INTERNATIONAAL", slug: "internationaal", labelNl: "Internationaal", labelEn: "International", order: 6, visibleNl: false, visibleEn: true },
   {
     code: "STUDIES",
     slug: "studies",

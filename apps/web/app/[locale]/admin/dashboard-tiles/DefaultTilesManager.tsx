@@ -279,7 +279,7 @@ function DefaultTileEditor({
 
         <div className="vtk-tile-preview">
           <TileChip icon={icon} imageKey={imageKey} color={color} />
-          <span className="vtk-tile-label">{label || "—"}</span>
+          <span className="vtk-shortcut-label">{label || "—"}</span>
         </div>
 
         <label className="vtk-tile-field">

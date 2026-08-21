@@ -731,7 +731,9 @@ model HeaderTab {
   labelNl String
   labelEn String
   order   Int     @default(0)
-  visible Boolean @default(true)
+  visible   Boolean @default(true)
+  visibleNl Boolean @default(true)
+  visibleEn Boolean @default(true)
 
   // Foto op de aanbod-kaart van deze werking op de homepage (storage-key,
   // uploadbaar via /admin/home). Zonder foto valt de kaart terug op het

@@ -409,13 +409,13 @@
   font-variant-numeric: tabular-nums;
 }
 
-.vtk-tile-grid {
+.vtk-shortcut-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
   gap: 14px;
 }
 
-.vtk-tile {
+.vtk-shortcut-tile {
   position: relative;
   display: flex;
   flex-direction: column;
@@ -434,7 +434,7 @@
   min-height: 120px;
 }
 
-a.vtk-tile:hover {
+a.vtk-shortcut-tile:hover {
   transform: translateY(-2px);
   border-color: rgba(14, 26, 54, 0.28);
   box-shadow: 0 16px 44px rgba(10, 15, 31, 0.08);
@@ -462,29 +462,29 @@ a.vtk-tile:hover {
   display: block;
 }
 
-.vtk-tile-label {
+.vtk-shortcut-label {
   font-weight: 600;
   font-size: 15px;
   letter-spacing: -0.01em;
   line-height: 1.2;
 }
 
-.vtk-tile-host {
+.vtk-shortcut-host {
   font-size: 12px;
   color: var(--muted);
   margin-top: auto;
   word-break: break-all;
 }
 
-.vtk-tile-editing {
+.vtk-shortcut-editing {
   cursor: grab;
 }
 
-.vtk-tile-editing.is-hidden {
+.vtk-shortcut-editing.is-hidden {
   opacity: 0.45;
 }
 
-.vtk-tile-handle {
+.vtk-shortcut-handle {
   position: absolute;
   top: 10px;
   right: 12px;
@@ -494,7 +494,7 @@ a.vtk-tile:hover {
   user-select: none;
 }
 
-.vtk-tile-source {
+.vtk-shortcut-source {
   font-size: 10px;
   font-weight: 600;
   text-transform: uppercase;
@@ -502,7 +502,7 @@ a.vtk-tile:hover {
   color: var(--muted);
 }
 
-.vtk-tile-controls {
+.vtk-shortcut-controls {
   display: flex;
   gap: 6px;
   margin-top: 4px;

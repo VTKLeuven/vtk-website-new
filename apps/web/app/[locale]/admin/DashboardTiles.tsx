@@ -288,13 +288,13 @@ export function DashboardTiles({
               {section.tiles.length === 0 ? (
                 <p className="vtk-tiles-hint">{t.ownEmpty}</p>
               ) : (
-                <div className="vtk-tile-grid">
+                <div className="vtk-shortcut-grid">
                   {section.tiles.map((tile) => {
                     const inner = (
                       <>
                         <TileChip icon={tile.icon} imageKey={tile.imageKey} color={tile.color} />
-                        <span className="vtk-tile-label">{tile.label}</span>
-                        <span className="vtk-tile-host">{hostOf(tile.url)}</span>
+                        <span className="vtk-shortcut-label">{tile.label}</span>
+                        <span className="vtk-shortcut-host">{hostOf(tile.url)}</span>
                       </>
                     );
                     if (!editing) {
@@ -304,7 +304,7 @@ export function DashboardTiles({
                           href={tile.url}
                           target="_blank"
                           rel="noreferrer noopener"
-                          className="vtk-tile"
+                          className="vtk-shortcut-tile"
                         >
                           {inner}
                         </a>
@@ -313,17 +313,17 @@ export function DashboardTiles({
                     return (
                       <div
                         key={tile.key}
-                        className={"vtk-tile vtk-tile-editing" + (tile.hidden ? " is-hidden" : "")}
+                        className={"vtk-shortcut-tile vtk-shortcut-editing" + (tile.hidden ? " is-hidden" : "")}
                         draggable
                         onDragStart={() => onDragStart(tile.key)}
                         onDragEnter={() => onDragEnter(tile.key)}
                         onDragOver={(e) => e.preventDefault()}
                         onDragEnd={onDragEnd}
                       >
-                        <span className="vtk-tile-handle" title={t.dragHint}>⠿</span>
+                        <span className="vtk-shortcut-handle" title={t.dragHint}>⠿</span>
                         {inner}
-                        {tile.overridden && <span className="vtk-tile-source">{t.overridden}</span>}
-                        <div className="vtk-tile-controls">
+                        {tile.overridden && <span className="vtk-shortcut-source">{t.overridden}</span>}
+                        <div className="vtk-shortcut-controls">
                           <button type="button" title={t.edit} onClick={() => setEditor({ mode: "edit", tile })}>
                             ✎
                           </button>
@@ -426,7 +426,7 @@ function TileEditor({
 
         <div className="vtk-tile-preview">
           <TileChip icon={icon} imageKey={imageKey} color={color} />
-          <span className="vtk-tile-label">{label || "—"}</span>
+          <span className="vtk-shortcut-label">{label || "—"}</span>
         </div>
 
         <label className="vtk-tile-field">

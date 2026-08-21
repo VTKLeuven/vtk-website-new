@@ -95,3 +95,20 @@ describe('WERKGROEP_SEEDS', () => {
     expect(en.footer.linkWerkgroepenCircles).toBe('Working groups');
   });
 });
+
+describe('HEADER_TABS locale visibility', () => {
+  it('filtert Eerstejaars en Internationaal afhankelijk van de taal', () => {
+    const nlTabs = HEADER_TABS.filter((t) => t.visible !== false && t.visibleNl !== false);
+    const enTabs = HEADER_TABS.filter((t) => t.visible !== false && t.visibleEn !== false);
+
+    const nlSlugs = nlTabs.map((t) => t.slug);
+    const enSlugs = enTabs.map((t) => t.slug);
+
+    expect(nlSlugs).toContain('eerstejaars');
+    expect(nlSlugs).not.toContain('internationaal');
+
+    expect(enSlugs).toContain('internationaal');
+    expect(enSlugs).not.toContain('eerstejaars');
+  });
+});
+

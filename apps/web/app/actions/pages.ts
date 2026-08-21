@@ -711,6 +711,7 @@ export async function addPageAssetAction(formData: FormData): Promise<void> {
     target: parsed.labelNl,
     summary: page ? `bijlage toegevoegd aan pagina ${page.titleNl}` : 'bijlage toegevoegd',
   });
+  revalidatePath('/admin/header');
   revalidatePath('/admin/inhoud');
   revalidatePath('/admin/paginas');
   revalidatePath('/', 'layout');
@@ -741,6 +742,7 @@ export async function deletePageAssetAction(formData: FormData): Promise<void> {
     target: asset.labelNl,
     summary: `bijlage verwijderd van pagina ${asset.page.titleNl}`,
   });
+  revalidatePath('/admin/header');
   revalidatePath('/admin/inhoud');
   revalidatePath('/admin/paginas');
   revalidatePath('/', 'layout');
@@ -757,6 +759,8 @@ const headerSchema = z.object({
   labelNl: z.string().min(1),
   labelEn: z.string().min(1),
   visible: z.coerce.boolean().default(true),
+  visibleNl: z.coerce.boolean().default(true),
+  visibleEn: z.coerce.boolean().default(true),
   externalUrl: z.string().url().optional().nullable().or(z.literal('')),
   introNl: z.string().optional().nullable(),
   introEn: z.string().optional().nullable(),
@@ -775,6 +779,8 @@ const HEADER_TAB_FIELD_LABELS: Record<string, string> = {
   labelNl: 'label',
   labelEn: 'Engels label',
   visible: 'zichtbaarheid',
+  visibleNl: 'zichtbaar in NL',
+  visibleEn: 'zichtbaar in EN',
   externalUrl: 'externe link',
   introNl: 'introtekst',
   introEn: 'Engelse introtekst',
@@ -789,13 +795,20 @@ export async function saveHeaderTabAction(
   formData: FormData
 ): Promise<SaveState> {
   await requireAnyPermission(['pages.manage', 'header.manage']);
+  const visibleNl = formData.get('visibleNl') === 'on';
+  const visibleEn = formData.get('visibleEn') === 'on';
+  // Als visible niet expliciet gepost is, is de tab zichtbaar zolang minstens 1 taal aanstaat
+  const visible = formData.has('visible') ? formData.get('visible') === 'on' : (visibleNl || visibleEn);
+
   const parsed = headerSchema.safeParse({
     id: (formData.get('id') as string) || undefined,
     code: formData.get('code'),
     slug: formData.get('slug'),
     labelNl: formData.get('labelNl'),
     labelEn: formData.get('labelEn'),
-    visible: formData.get('visible') === 'on',
+    visible,
+    visibleNl,
+    visibleEn,
     externalUrl: formData.get('externalUrl') || null,
     introNl: formData.get('introNl') || null,
     introEn: formData.get('introEn') || null,
@@ -811,6 +824,8 @@ export async function saveHeaderTabAction(
     labelNl: p.labelNl,
     labelEn: p.labelEn,
     visible: p.visible,
+    visibleNl: p.visibleNl,
+    visibleEn: p.visibleEn,
     externalUrl: p.externalUrl || null,
     introNl: p.introNl || null,
     introEn: p.introEn || null,
@@ -950,7 +965,9 @@ export async function importDefaultHeaderTabsAction(): Promise<void> {
       labelNl: t.labelNl,
       labelEn: t.labelEn,
       order: t.order,
-      visible: true,
+      visible: t.visible ?? true,
+      visibleNl: t.visibleNl ?? true,
+      visibleEn: t.visibleEn ?? true,
       introNl: t.introNl ?? null,
       introEn: t.introEn ?? null,
       ctaLabelNl: t.ctaLabelNl ?? null,
@@ -967,3 +984,83 @@ export async function importDefaultHeaderTabsAction(): Promise<void> {
   });
   revalidatePath('/', 'layout');
 }
+
+/**
+ * Voegt een vaste route of externe link toe aan een menucategorie.
+ */
+export async function addHeaderTabLinkAction(
+  tabId: string,
+  link: { labelNl: string; labelEn?: string | null; url: string }
+): Promise<SaveState> {
+  await requireAnyPermission(['pages.manage', 'header.manage']);
+  const labelNl = link.labelNl.trim();
+  const labelEn = (link.labelEn && link.labelEn.trim()) || labelNl;
+  const url = link.url.trim();
+  if (!labelNl || !url) return saveError('INVALID_INPUT' satisfies ContentErrorCode);
+  if (!isEditableDestination(url)) return saveError('INVALID_URL' satisfies ContentErrorCode);
+
+  const tab = await prisma.headerTab.findUnique({ where: { id: tabId } });
+  if (!tab) return saveError('INVALID_INPUT' satisfies ContentErrorCode);
+
+  const existing = await prisma.headerTabLink.findFirst({
+    where: { tabId, url },
+  });
+  if (existing) {
+    await prisma.headerTabLink.update({
+      where: { id: existing.id },
+      data: { labelNl, labelEn },
+    });
+  } else {
+    const last = await prisma.headerTabLink.findFirst({
+      where: { tabId },
+      orderBy: { order: 'desc' },
+      select: { order: true },
+    });
+    await prisma.headerTabLink.create({
+      data: {
+        tabId,
+        labelNl,
+        labelEn,
+        url,
+        order: (last?.order ?? -1) + 1,
+      },
+    });
+  }
+
+  await logAudit({
+    action: 'update',
+    entity: 'headerTab',
+    entityId: tabId,
+    target: tab.labelNl,
+    summary: `item "${labelNl}" (${url}) toegevoegd aan categorie ${tab.labelNl}`,
+  });
+
+  revalidatePath('/', 'layout');
+  return saveOk();
+}
+
+/**
+ * Verwijdert een menu-item (vaste route of externe link) uit een categorie.
+ */
+export async function deleteHeaderTabLinkAction(linkId: string): Promise<SaveState> {
+  await requireAnyPermission(['pages.manage', 'header.manage']);
+  const link = await prisma.headerTabLink.findUnique({
+    where: { id: linkId },
+    include: { tab: { select: { labelNl: true } } },
+  });
+  if (!link) return saveError('INVALID_INPUT' satisfies ContentErrorCode);
+
+  await prisma.headerTabLink.delete({ where: { id: linkId } });
+
+  await logAudit({
+    action: 'update',
+    entity: 'headerTab',
+    entityId: link.tabId,
+    target: link.tab.labelNl,
+    summary: `item "${link.labelNl}" (${link.url}) verwijderd uit categorie ${link.tab.labelNl}`,
+  });
+
+  revalidatePath('/', 'layout');
+  return saveOk();
+}
+

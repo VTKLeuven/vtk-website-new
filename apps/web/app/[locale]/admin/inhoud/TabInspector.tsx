@@ -7,6 +7,7 @@ import { SaveForm } from "@/components/ui/SaveForm";
 import { IconButton } from "@/components/ui/IconButton";
 import { TrashIcon } from "@/components/ui/icons";
 import { deleteHeaderTabAction, saveHeaderTabAction } from "@/app/actions/pages";
+import { BUILTIN_ROUTES } from "@/lib/builtinRoutes";
 import { SAVE_IDLE } from "@/lib/saveState";
 import { contentErrorMessages } from "./messages";
 import type { TabNode } from "./ContentManager";
@@ -90,10 +91,24 @@ export function TabInspector({
           </div>
         </div>
 
-        <label className="inline-flex items-center gap-2 text-sm">
-          <input type="checkbox" name="visible" defaultChecked={tab?.visible ?? true} />
-          {nl ? "Zichtbaar in de header" : "Visible in the header"}
-        </label>
+        <div className="space-y-2 rounded-xl border border-vtk-blue/10 bg-vtk-blue-soft/20 p-3">
+          <Label>{nl ? "Zichtbaarheid in de header" : "Visibility in header"}</Label>
+          <div className="space-y-1.5">
+            <label className="flex items-center gap-2 text-sm">
+              <input type="checkbox" name="visibleNl" defaultChecked={tab?.visibleNl ?? true} />
+              <span>{nl ? "Zichtbaar op Nederlandse site (NL)" : "Visible on Dutch site (NL)"}</span>
+            </label>
+            <label className="flex items-center gap-2 text-sm">
+              <input type="checkbox" name="visibleEn" defaultChecked={tab?.visibleEn ?? true} />
+              <span>{nl ? "Zichtbaar op Engelse site (EN)" : "Visible on English site (EN)"}</span>
+            </label>
+          </div>
+          <p className="text-xs text-[#5c667f]">
+            {nl
+              ? "Vink bv. enkel NL aan voor Eerstejaars en enkel EN voor Internationaal."
+              : "E.g. check only NL for Freshmen and only EN for International."}
+          </p>
+        </div>
 
         <div>
           <Label htmlFor="externalUrl">
@@ -115,12 +130,12 @@ export function TabInspector({
 
         <fieldset className="space-y-3 border-t border-vtk-blue/10 pt-5">
           <legend className="text-sm font-semibold text-vtk-ink">
-            {nl ? "Extra items in het menu" : "Extra items in the menu"}
+            {nl ? "Extra items & vaste routes" : "Extra items & built-in routes"}
           </legend>
           <p className="text-xs text-[#5c667f]">
             {nl
-              ? "De pagina's onder deze categorie staan automatisch in het uitklapmenu. Hier voeg je de rest toe: een andere site (cudi.vtk.be) of een vaste route op deze site die geen CMS-pagina is (/praesidium, /piano). Zo'n route vind je niet bij \"Pagina toevoegen\"."
-              : "The pages under this category are listed in the dropdown automatically. Add the rest here: another site (cudi.vtk.be) or a built-in route on this site that is not a CMS page (/praesidium, /piano). You will not find such a route under \"Add page\"."}
+              ? "Items die naast de CMS-pagina's in het menu en op de categoriepagina verschijnen: vaste routes (/werkgroepen, /kalender, /praesidium) of externe links."
+              : "Items that appear alongside CMS pages in the dropdown and on the category page: built-in routes (/werkgroepen, /kalender, /praesidium) or external links."}
           </p>
           <MenuLinkRows nl={nl} initial={tab?.links ?? []} />
         </fieldset>
@@ -276,6 +291,15 @@ function MenuLinkRows({
     setRows((current) => current.map((row, i) => (i === index ? { ...row, ...patch } : row)));
   }
 
+  function addBuiltin(routePath: string) {
+    const found = BUILTIN_ROUTES.find((r) => r.path === routePath);
+    if (!found) return;
+    setRows((current) => [
+      ...current,
+      { labelNl: found.labelNl, labelEn: found.labelEn, url: found.path },
+    ]);
+  }
+
   return (
     <div className="space-y-2">
       <input type="hidden" name="linkCount" value={rows.length} />
@@ -297,9 +321,6 @@ function MenuLinkRows({
           />
           <Input
             name={`link-${index}-url`}
-            // Geen type="url": dat weigert een pad op deze site, en net die
-            // bestemmingen (/praesidium, /piano) kan je enkel zo in het menu
-            // krijgen; ze zijn geen CMS-pagina en staan dus niet in de picker.
             type="text"
             inputMode="url"
             value={row.url}
@@ -317,14 +338,34 @@ function MenuLinkRows({
           </IconButton>
         </div>
       ))}
-      <Button
-        type="button"
-        variant="ghost"
-        size="sm"
-        onClick={() => setRows((current) => [...current, { labelNl: "", labelEn: "", url: "" }])}
-      >
-        + {nl ? "Item toevoegen" : "Add item"}
-      </Button>
+      <div className="flex flex-wrap items-center gap-2 pt-1">
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          onClick={() => setRows((current) => [...current, { labelNl: "", labelEn: "", url: "" }])}
+        >
+          + {nl ? "Item toevoegen" : "Add item"}
+        </Button>
+        <select
+          aria-label={nl ? "Vaste pagina toevoegen" : "Add built-in page"}
+          className="rounded-lg border border-vtk-blue/20 bg-white px-2.5 py-1 text-xs text-vtk-ink shadow-sm"
+          value=""
+          onChange={(e) => {
+            if (e.target.value) {
+              addBuiltin(e.target.value);
+              e.target.value = "";
+            }
+          }}
+        >
+          <option value="">+ {nl ? "Vaste pagina kiezen..." : "Choose built-in page..."}</option>
+          {BUILTIN_ROUTES.map((route) => (
+            <option key={route.path} value={route.path}>
+              {nl ? route.labelNl : route.labelEn} ({route.path})
+            </option>
+          ))}
+        </select>
+      </div>
     </div>
   );
 }

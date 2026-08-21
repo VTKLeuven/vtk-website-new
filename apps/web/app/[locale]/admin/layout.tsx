@@ -71,7 +71,7 @@ const NAV: NavEntry[] = [
     item('frontpage', '/frontpage', { perm: 'home.edit' }),
     item('announcements', '/aankondigingen', { perm: 'home.edit' }),
     item('linkPage', '/linkpagina', { perm: 'home.edit' }),
-    item('content', '/inhoud', { perm: 'pages.manage' }),
+    item('header', '/header', { perm: 'pages.manage' }),
     item('pages', '/paginas', { anyPerm: ['pages.edit', 'pages.editAll'] }),
     item('partners', '/partners', { perm: 'partners.manage' }),
   ]),

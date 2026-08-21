@@ -2,14 +2,17 @@
 
 import { useCallback, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Button, Card } from "@vtk/ui";
+import { Button, Card, ConfirmDialog } from "@vtk/ui";
 import type { Locale } from "@vtk/i18n";
 import {
+  deleteHeaderTabLinkAction,
   importDefaultHeaderTabsAction,
   movePageToTabAction,
   reorderHeaderTabsAction,
   reorderPagesAction,
 } from "@/app/actions/pages";
+import { isExternalUrl } from "@/lib/href";
+import { ExternalLinkIcon, LinkIcon, TrashIcon } from "@/components/ui/icons";
 import { TabInspector } from "./TabInspector";
 import { PageInspector } from "./PageInspector";
 import { AddPagePicker } from "./AddPagePicker";
@@ -41,6 +44,13 @@ export type PageNode = {
   order: number;
 };
 
+export type TabLinkNode = {
+  id: string;
+  labelNl: string;
+  labelEn: string;
+  url: string;
+};
+
 /** Rol-optie voor de bewerkrollen-checkboxes, naam al in de juiste taal. */
 export type RoleOption = { id: string; name: string };
 
@@ -51,10 +61,12 @@ export type TabNode = {
   labelNl: string;
   labelEn: string;
   visible: boolean;
+  visibleNl: boolean;
+  visibleEn: boolean;
   /** Externe bestemming voor de headerknop (bv. career.vtk.be). */
   externalUrl: string | null;
   /** Extra menu-items naast de pagina's onder deze categorie. */
-  links: Array<{ labelNl: string; labelEn: string; url: string }>;
+  links: TabLinkNode[];
   introNl: string | null;
   introEn: string | null;
   ctaLabelNl: string | null;
@@ -228,6 +240,58 @@ export function ContentManager({
     );
   }
 
+  function LinkRow({ link, tabId }: { link: TabLinkNode; tabId: string }) {
+    const isExt = isExternalUrl(link.url);
+    const [confirming, setConfirming] = useState(false);
+    const label = nl ? link.labelNl : link.labelEn;
+    return (
+      <div className="group flex w-full items-center gap-2 rounded-xl border border-transparent py-1.5 pl-8 pr-3 text-left text-sm transition-colors hover:bg-vtk-blue-soft/30">
+        <span
+          className="shrink-0 text-[#5c667f]"
+          title={isExt ? (nl ? "Externe link" : "External link") : (nl ? "Vaste route" : "Built-in route")}
+        >
+          {isExt ? <ExternalLinkIcon /> : <LinkIcon />}
+        </span>
+        <button
+          type="button"
+          onClick={() => select({ kind: "tab", id: tabId })}
+          className="min-w-0 flex-1 truncate text-left text-vtk-ink hover:underline"
+        >
+          {label}
+        </button>
+        <span className="min-w-0 max-w-[45%] truncate font-mono text-[11px] text-[#5c667f] sm:max-w-none sm:shrink-0">
+          {link.url}
+        </span>
+        <button
+          type="button"
+          title={nl ? "Link verwijderen" : "Remove link"}
+          onClick={() => setConfirming(true)}
+          className="ml-1 text-zinc-400 opacity-0 transition-opacity hover:text-red-600 group-hover:opacity-100"
+        >
+          <TrashIcon />
+        </button>
+        <ConfirmDialog
+          open={confirming}
+          title={nl ? "Link verwijderen?" : "Remove link?"}
+          description={
+            nl
+              ? `Weet je zeker dat je "${link.labelNl}" (${link.url}) wil verwijderen uit deze categorie?`
+              : `Are you sure you want to remove "${link.labelEn}" (${link.url}) from this category?`
+          }
+          confirmLabel={nl ? "Verwijderen" : "Remove"}
+          cancelLabel={nl ? "Annuleren" : "Cancel"}
+          onConfirm={() => {
+            startTransition(async () => {
+              await deleteHeaderTabLinkAction(link.id);
+              setConfirming(false);
+            });
+          }}
+          onCancel={() => setConfirming(false)}
+        />
+      </div>
+    );
+  }
+
   function TabGroup({ tab }: { tab: TabNode }) {
     const active = selection.kind === "tab" && selection.id === tab.id;
     return (
@@ -263,16 +327,35 @@ export function ContentManager({
           <span className="min-w-0 max-w-[45%] truncate font-mono text-[11px] text-[#5c667f] sm:max-w-none sm:shrink-0">
             /{tab.slug}
           </span>
-          <StatusDot
-            on={tab.visible}
-            title={tab.visible ? (nl ? "Zichtbaar" : "Visible") : nl ? "Verborgen" : "Hidden"}
-          />
+          {!tab.visible || (!tab.visibleNl && !tab.visibleEn) ? (
+            <span className="rounded bg-zinc-200 px-1.5 py-0.5 text-[10px] font-medium text-zinc-600">
+              {nl ? "Verborgen" : "Hidden"}
+            </span>
+          ) : tab.visibleNl && !tab.visibleEn ? (
+            <span className="rounded bg-blue-100 px-1.5 py-0.5 text-[10px] font-semibold text-blue-700">
+              NL
+            </span>
+          ) : !tab.visibleNl && tab.visibleEn ? (
+            <span className="rounded bg-purple-100 px-1.5 py-0.5 text-[10px] font-semibold text-purple-700">
+              EN
+            </span>
+          ) : (
+            <StatusDot
+              on={true}
+              title={nl ? "Zichtbaar (NL + EN)" : "Visible (NL + EN)"}
+            />
+          )}
         </button>
 
         <ul className="mt-0.5 space-y-0.5">
           {tab.pages.map((p) => (
             <li key={p.id}>
               <PageRow page={p} />
+            </li>
+          ))}
+          {tab.links.map((link) => (
+            <li key={link.id}>
+              <LinkRow link={link} tabId={tab.id} />
             </li>
           ))}
         </ul>
@@ -282,7 +365,7 @@ export function ContentManager({
           onClick={() => setAddingTo(tab)}
           className="mb-1 ml-8 mt-0.5 text-xs font-medium text-[#5c667f] hover:text-vtk-ink"
         >
-          + {nl ? "Pagina toevoegen" : "Add page"}
+          + {nl ? "Pagina of link toevoegen" : "Add page or link"}
         </button>
       </li>
     );
@@ -292,11 +375,11 @@ export function ContentManager({
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-3">
         <div className="min-w-0 flex-1 basis-64">
-          <h1 className="text-2xl font-semibold">{nl ? "Inhoud" : "Content"}</h1>
+          <h1 className="text-2xl font-semibold">{nl ? "Header" : "Header"}</h1>
           <p className="mt-1 text-sm text-[#5c667f]">
             {nl
-              ? "Sleep om de navigatie te herschikken of een pagina naar een andere categorie te verplaatsen. Klik om instellingen te bewerken; de inhoud zelf bewerk je onder Pagina's."
-              : "Drag to reorder the navigation or move a page to another category. Click to edit settings; the content itself is edited under Pages."}
+              ? "Beheer de categorieën en menu-items in de navigatiebalk. Sleep om de volgorde te wijzigen of een pagina naar een andere categorie te verplaatsen. De inhoud zelf bewerk je onder Pagina's."
+              : "Manage the categories and menu items in the main navigation. Drag to reorder or move a page to another category. The content itself is edited under Pages."}
           </p>
         </div>
         {!usingDefaults && (

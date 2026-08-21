@@ -97,6 +97,19 @@
     "labelEn": "Freshmen",
     "order": 4,
     "visible": true,
+    "visibleNl": true,
+    "visibleEn": false,
+    "links": []
+  },
+  {
+    "code": "INTERNATIONAAL",
+    "slug": "internationaal",
+    "labelNl": "Internationaal",
+    "labelEn": "International",
+    "order": 6,
+    "visible": true,
+    "visibleNl": false,
+    "visibleEn": true,
     "links": []
   },
   {
