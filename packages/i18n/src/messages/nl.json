@@ -480,6 +480,8 @@
       "today": "Vandaag",
       "range": "{from} tot {to}"
     },
+    "earlierShifts": "Vroegere shiften",
+    "laterShifts": "Latere shiften",
     "filter": {
       "post": "Post",
       "allPosts": "Alle posten"

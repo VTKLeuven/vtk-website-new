@@ -556,7 +556,11 @@
 
 .vtk-week-scroll {
   position: relative;
-  overflow-x: auto;
+  overflow: auto;
+  max-height: calc(12 * 44px + 39px);
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: var(--surface);
 }
 
 .vtk-week-grid {
@@ -565,18 +569,22 @@
   min-width: 720px;
   /* Ruimte onderaan zodat het laatste uurlabel niet tegen de rand plakt. */
   padding-bottom: 8px;
-  border: 1px solid var(--line);
-  border-radius: 18px;
   background: var(--surface);
-  overflow: hidden;
 }
 
 .vtk-week-corner {
+  position: sticky;
+  top: 0;
+  left: 0;
+  z-index: 15;
   border-bottom: 1px solid var(--line);
   background: var(--paper-2);
 }
 
 .vtk-week-head {
+  position: sticky;
+  top: 0;
+  z-index: 10;
   display: flex;
   align-items: baseline;
   justify-content: center;
@@ -611,7 +619,10 @@
 }
 
 .vtk-week-gutter {
-  position: relative;
+  position: sticky;
+  left: 0;
+  z-index: 5;
+  background: var(--surface);
 }
 
 .vtk-week-hour {
@@ -631,6 +642,57 @@
 
 .vtk-week-daycol[data-today='true'] {
   background-color: rgba(14, 26, 54, 0.022);
+}
+
+/* Indicatorknoppen voor shiften buiten het zichtbare 8h-20h-venster */
+.vtk-week-indicator {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 8;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  padding: 2px 7px;
+  border: 1px solid var(--line-2);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--ink);
+  font-family: inherit;
+  font-size: 10px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.2;
+  white-space: nowrap;
+  box-shadow: 0 2px 8px rgba(14, 26, 54, 0.12);
+  cursor: pointer;
+  pointer-events: auto;
+  transition:
+    transform 120ms ease,
+    background-color 120ms ease,
+    box-shadow 120ms ease;
+}
+
+.vtk-week-indicator:hover {
+  background: var(--paper-2);
+  transform: translateX(-50%) translateY(-1px);
+  box-shadow: 0 4px 12px rgba(14, 26, 54, 0.18);
+}
+
+.vtk-week-indicator-chevron {
+  width: 11px;
+  height: 11px;
+  stroke-width: 2.5;
+  color: var(--muted);
+}
+
+.vtk-week-indicator:hover .vtk-week-indicator-chevron {
+  color: var(--ink);
+}
+
+.vtk-week-indicator-label {
+  font-size: 10px;
 }
 
 /* De "nu"-lijn: enkel in de kolom van vandaag. */

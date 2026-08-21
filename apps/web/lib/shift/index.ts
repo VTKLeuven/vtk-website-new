@@ -1,5 +1,6 @@
 import type { Shift } from '@prisma/client';
 import { localDateTimeToUtc } from '@/lib/ticketing/time';
+import { currentWorkingYear, workingYearStart } from '@/lib/workingYear';
 
 /**
  * De velden die nodig zijn om een shift aan te maken/te valideren.
@@ -434,22 +435,20 @@ export function parsePartialShift(value: unknown): Partial<ShiftInput> {
 }
 
 /**
- * Geeft de start (incl.) en einde (excl.) van een academiejaar terug. Een
- * academiejaar loopt van 1 september tot 1 september. Standaard het academiejaar
- * waarin `reference` valt.
- */
-/**
- * Startjaar van het academiejaar waarin `reference` valt. Een academiejaar loopt
- * van 1 september tot 1 september, dus bvb 15 mei 2026 hoort bij startjaar 2025.
+ * Geeft de start (incl.) en einde (excl.) van een academiejaar/werkingsjaar terug.
+ * Net zoals overal op de site loopt dit vanaf 15 juli. Standaard het jaar waarin
+ * `reference` valt.
  */
 export function currentAcademicYear(reference: Date = new Date()): number {
-  // getMonth() is 0-based: september = 8.
-  return reference.getMonth() >= 8 ? reference.getFullYear() : reference.getFullYear() - 1;
+  return currentWorkingYear(reference);
 }
 
-/** Geeft [1 sep `startYear`, 1 sep `startYear + 1`) terug (einde exclusief). */
+/** Geeft [15 jul `startYear`, 15 jul `startYear + 1`) terug (einde exclusief). */
 export function academicYearRangeFor(startYear: number): { start: Date; end: Date } {
-  return { start: new Date(startYear, 8, 1), end: new Date(startYear + 1, 8, 1) };
+  return {
+    start: workingYearStart(startYear),
+    end: workingYearStart(startYear + 1),
+  };
 }
 
 /** Het academiejaar waarin `reference` valt (standaard nu). */

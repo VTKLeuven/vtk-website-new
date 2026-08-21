@@ -1,12 +1,17 @@
 'use client';
-import { useMemo, useState, useSyncExternalStore } from 'react';
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { addDays, format } from 'date-fns';
-import { Globe } from 'lucide-react';
+import { ChevronDown, ChevronUp, Globe } from 'lucide-react';
 import { getDictionary, type Locale } from '@vtk/i18n';
 import { fmtTime, freeSpots, spotsLabel, type MergedShift } from './shiftData';
 
 const HOUR_PX = 44;
+const TOTAL_HOURS = 24;
+const DEFAULT_START_HOUR = 8;
+const DEFAULT_END_HOUR = 20;
 const MS_PER_HOUR = 3_600_000;
+const HEADER_HEIGHT = 38;
+
 const subscribeToClient = () => () => undefined;
 // Weekdag-afkortingen per locale, geïndexeerd via Date.getDay() (0 = zondag).
 const DOW = {
@@ -26,8 +31,9 @@ type Segment = {
 
 /**
  * Google-Calendar-achtige weekweergave: 7 dagkolommen vanaf `weekStart`, met de
- * shiften als blokken op hun uren. Een klik opent het detailvenster; van daaruit
- * schrijf je in of uit.
+ * shiften als blokken op hun uren over het volledige 24u-bereik. Standaard
+ * gescrold naar 8h-20h, met scrollbare overige uren (0h-8h en 20h-24h) en
+ * indicatorknoppen voor shiften buiten het zichtbare deel.
  */
 export function ShiftWeekView({
   locale,
@@ -43,10 +49,14 @@ export function ShiftWeekView({
   onOpen: (entry: MergedShift) => void;
 }) {
   const t = getDictionary(locale).shift;
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const [scrollTop, setScrollTop] = useState(DEFAULT_START_HOUR * HOUR_PX);
+  const [viewportHeight, setViewportHeight] = useState(
+    (DEFAULT_END_HOUR - DEFAULT_START_HOUR) * HOUR_PX + HEADER_HEIGHT
+  );
+  const hasScrolledInitially = useRef(false);
 
   // De "nu"-lijn en de markering van vandaag horen bij de klok van de browser.
-  // Serverside blijven ze weg: een tijdstip dat bij hydratatie een paar pixels
-  // verschilt, geeft anders een mismatch.
   const isClient = useSyncExternalStore(
     subscribeToClient,
     () => true,
@@ -60,9 +70,30 @@ export function ShiftWeekView({
     [weekStart]
   );
 
-  // Split shiften in dag-segmenten (voor shiften over middernacht), bepaal de
-  // getoonde uren-range en leg overlappende shiften naast elkaar in kolommen.
-  const { segments, minHour, maxHour } = useMemo(() => {
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+
+    if (!hasScrolledInitially.current) {
+      el.scrollTop = DEFAULT_START_HOUR * HOUR_PX;
+      setScrollTop(DEFAULT_START_HOUR * HOUR_PX);
+      hasScrolledInitially.current = true;
+    }
+
+    const updateMetrics = () => {
+      setScrollTop(el.scrollTop);
+      setViewportHeight(el.clientHeight);
+    };
+
+    updateMetrics();
+    const observer = new ResizeObserver(updateMetrics);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+
+  // Split shiften in dag-segmenten (voor shiften over middernacht) en leg
+  // overlappende shiften naast elkaar in kolommen.
+  const segments = useMemo(() => {
     const raw: Omit<Segment, 'col' | 'cols'>[] = [];
     for (const m of shifts) {
       for (let d = 0; d < 7; d++) {
@@ -80,20 +111,6 @@ export function ShiftWeekView({
           });
         }
       }
-    }
-
-    let min = 24;
-    let max = 0;
-    for (const s of raw) {
-      min = Math.min(min, s.startFrac);
-      max = Math.max(max, s.endFrac);
-    }
-    if (raw.length === 0) {
-      min = 8;
-      max = 20;
-    } else {
-      min = Math.floor(min);
-      max = Math.ceil(max);
     }
 
     const withCols: Segment[] = [];
@@ -130,14 +147,13 @@ export function ShiftWeekView({
       flush();
     }
 
-    return { segments: withCols, minHour: min, maxHour: max };
+    return withCols;
   }, [shifts, weekStart]);
 
-  const gridHeight = (maxHour - minHour) * HOUR_PX;
-  const hours = Array.from({ length: maxHour - minHour + 1 }, (_, i) => minHour + i);
+  const gridHeight = TOTAL_HOURS * HOUR_PX;
+  const hours = Array.from({ length: TOTAL_HOURS + 1 }, (_, i) => i);
 
-  // Positie van de "nu"-lijn: enkel wanneer vandaag in de getoonde week valt en
-  // het huidige uur binnen het getoonde bereik ligt.
+  // Positie van de "nu"-lijn: enkel wanneer vandaag in de getoonde week valt.
   const nowLine = useMemo(() => {
     if (now === null) return null;
     const today = new Date(now);
@@ -149,13 +165,32 @@ export function ShiftWeekView({
     );
     if (index === -1) return null;
     const frac = today.getHours() + today.getMinutes() / 60;
-    if (frac < minHour || frac > maxHour) return { index, top: null };
-    return { index, top: (frac - minHour) * HOUR_PX };
-  }, [now, days, minHour, maxHour]);
+    return { index, top: frac * HOUR_PX };
+  }, [now, days]);
+
+  const effectiveVisibleHeight = Math.max(100, viewportHeight - HEADER_HEIGHT);
+  const visibleTopFrac = scrollTop / HOUR_PX;
+  const visibleBottomFrac = (scrollTop + effectiveVisibleHeight) / HOUR_PX;
+
+  const scrollToHour = (hourFrac: number, isBottom = false) => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const targetScroll = isBottom
+      ? Math.max(0, hourFrac * HOUR_PX - effectiveVisibleHeight + 12)
+      : Math.max(0, hourFrac * HOUR_PX - 12);
+    el.scrollTo({ top: targetScroll, behavior: 'smooth' });
+  };
 
   return (
     <div className="vtk-week">
-      <div className="vtk-week-scroll">
+      <div
+        className="vtk-week-scroll"
+        ref={scrollRef}
+        onScroll={(e) => {
+          setScrollTop(e.currentTarget.scrollTop);
+          setViewportHeight(e.currentTarget.clientHeight);
+        }}
+      >
         <div className="vtk-week-grid">
           <div className="vtk-week-corner" />
           {days.map((day, d) => (
@@ -171,29 +206,53 @@ export function ShiftWeekView({
 
           <div className="vtk-week-gutter" style={{ height: gridHeight }}>
             {hours.map((h) => (
-              <div key={h} className="vtk-week-hour" style={{ top: (h - minHour) * HOUR_PX }}>
+              <div key={h} className="vtk-week-hour" style={{ top: h * HOUR_PX }}>
                 {String(h % 24).padStart(2, '0')}:00
               </div>
             ))}
           </div>
 
-          {days.map((day, d) => (
-            <div
-              key={day.toISOString()}
-              className="vtk-week-daycol"
-              data-today={nowLine?.index === d ? 'true' : undefined}
-              style={{
-                height: gridHeight,
-                backgroundImage: `repeating-linear-gradient(var(--line) 0 1px, transparent 1px ${HOUR_PX}px)`,
-              }}
-            >
-              {nowLine && nowLine.index === d && nowLine.top !== null ? (
-                <span className="vtk-week-now" style={{ top: nowLine.top }} aria-hidden="true" />
-              ) : null}
+          {days.map((day, d) => {
+            const daySegs = segments.filter((s) => s.dayIndex === d);
+            const shiftsAbove = daySegs.filter((s) => s.startFrac < visibleTopFrac);
+            const shiftsBelow = daySegs.filter((s) => s.endFrac > visibleBottomFrac);
+            const earliestAbove = shiftsAbove.sort((a, b) => a.startFrac - b.startFrac)[0];
+            const latestBelow = shiftsBelow.sort((a, b) => b.endFrac - a.endFrac)[0];
 
-              {segments
-                .filter((s) => s.dayIndex === d)
-                .map((s) => {
+            return (
+              <div
+                key={day.toISOString()}
+                className="vtk-week-daycol"
+                data-today={nowLine?.index === d ? 'true' : undefined}
+                style={{
+                  height: gridHeight,
+                  backgroundImage: `repeating-linear-gradient(var(--line) 0 1px, transparent 1px ${HOUR_PX}px)`,
+                }}
+              >
+                {nowLine && nowLine.index === d && nowLine.top !== null ? (
+                  <span className="vtk-week-now" style={{ top: nowLine.top }} aria-hidden="true" />
+                ) : null}
+
+                {shiftsAbove.length > 0 && earliestAbove ? (
+                  <button
+                    type="button"
+                    className="vtk-week-indicator vtk-week-indicator-top"
+                    style={{ top: scrollTop + 4 }}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      scrollToHour(earliestAbove.startFrac, false);
+                    }}
+                    title={`${t.earlierShifts ?? 'Vroegere shiften'}: ${earliestAbove.merged.shift.name} (${fmtTime(earliestAbove.merged.shift.startTime)})`}
+                    aria-label={`${t.earlierShifts ?? 'Vroegere shiften op'} ${format(day, 'd/MM')}: ${earliestAbove.merged.shift.name}`}
+                  >
+                    <ChevronUp className="vtk-week-indicator-chevron" aria-hidden="true" />
+                    <span className="vtk-week-indicator-label">
+                      {fmtTime(earliestAbove.merged.shift.startTime)}
+                    </span>
+                  </button>
+                ) : null}
+
+                {daySegs.map((s) => {
                   const { shift, registered } = s.merged;
                   const isFull = !registered && freeSpots(shift) <= 0;
                   const variant = registered
@@ -215,7 +274,7 @@ export function ShiftWeekView({
                       aria-label={`${t.dialog.open}: ${shift.name}, ${fmtTime(shift.startTime)}-${fmtTime(shift.endTime)}, ${shift.location}, ${status}${intl}`}
                       onClick={() => onOpen(s.merged)}
                       style={{
-                        top: (s.startFrac - minHour) * HOUR_PX,
+                        top: s.startFrac * HOUR_PX,
                         height,
                         left: `calc(${(s.col / s.cols) * 100}% + 2px)`,
                         width: `calc(${(1 / s.cols) * 100}% - 4px)`,
@@ -232,8 +291,28 @@ export function ShiftWeekView({
                     </button>
                   );
                 })}
-            </div>
-          ))}
+
+                {shiftsBelow.length > 0 && latestBelow ? (
+                  <button
+                    type="button"
+                    className="vtk-week-indicator vtk-week-indicator-bottom"
+                    style={{ top: scrollTop + effectiveVisibleHeight - 28 }}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      scrollToHour(latestBelow.endFrac, true);
+                    }}
+                    title={`${t.laterShifts ?? 'Latere shiften'}: ${latestBelow.merged.shift.name} (${fmtTime(latestBelow.merged.shift.startTime)})`}
+                    aria-label={`${t.laterShifts ?? 'Latere shiften op'} ${format(day, 'd/MM')}: ${latestBelow.merged.shift.name}`}
+                  >
+                    <ChevronDown className="vtk-week-indicator-chevron" aria-hidden="true" />
+                    <span className="vtk-week-indicator-label">
+                      {fmtTime(latestBelow.merged.shift.startTime)}
+                    </span>
+                  </button>
+                ) : null}
+              </div>
+            );
+          })}
         </div>
 
         {segments.length === 0 ? <div className="vtk-week-empty">{emptyState}</div> : null}

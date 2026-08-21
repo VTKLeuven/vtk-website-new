@@ -480,6 +480,8 @@
       "today": "Today",
       "range": "{from} to {to}"
     },
+    "earlierShifts": "Earlier shifts",
+    "laterShifts": "Later shifts",
     "filter": {
       "post": "Group",
       "allPosts": "All groups"
