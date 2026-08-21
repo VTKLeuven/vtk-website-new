@@ -52,7 +52,7 @@ const group = (key: string, items: NavLeaf[]) => ({ group: key, items });
 function logisticsModuleUrl(): string {
   const configured = process.env.LOGISTIEK_PUBLIC_URL?.trim();
   if (configured) return configured.replace(/\/+$/, '');
-  return process.env.NODE_ENV === 'development' ? 'http://localhost:3100' : 'https://logistiek.vtk.be';
+  return process.env.NODE_ENV === 'development' ? 'http://localhost:3100' : 'https://logistiek.dev.vtk.be';
 }
 
 const NAV: NavEntry[] = [
