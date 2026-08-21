@@ -71,14 +71,20 @@ export function KulAuthLogViewer({ logs }: { logs: KulAuthLogEntry[] }) {
   }
 
   return (
-    <div className="rounded-xl border border-vtk-blue/15 bg-white shadow-xs overflow-hidden">
-      <table className="w-full text-left text-xs text-vtk-ink">
+    <div className="overflow-hidden rounded-xl border border-vtk-blue/15 bg-white shadow-xs">
+      <table className="w-full table-fixed text-left text-xs text-vtk-ink">
+        <colgroup>
+          <col className="w-[145px]" />
+          <col className="w-[210px]" />
+          <col />
+          <col className="w-[125px]" />
+        </colgroup>
         <thead className="border-b border-vtk-blue/10 bg-vtk-blue-soft/40 text-[11px] font-semibold uppercase tracking-wider text-[#5c667f]">
           <tr>
-            <th className="px-4 py-3 whitespace-nowrap w-[150px]">Timestamp</th>
-            <th className="px-4 py-3 w-[220px]">User</th>
-            <th className="px-4 py-3">Faculty & Roles</th>
-            <th className="px-4 py-3 text-right whitespace-nowrap w-[130px]">Claims</th>
+            <th className="px-3.5 py-2.5 whitespace-nowrap">Timestamp</th>
+            <th className="px-3.5 py-2.5">User</th>
+            <th className="px-3.5 py-2.5">Faculty & Roles</th>
+            <th className="px-3.5 py-2.5 text-right whitespace-nowrap">Claims</th>
           </tr>
         </thead>
         <tbody className="divide-y divide-vtk-blue/10">
@@ -93,12 +99,14 @@ export function KulAuthLogViewer({ logs }: { logs: KulAuthLogEntry[] }) {
             return (
               <Fragment key={log.id}>
                 <tr className="hover:bg-vtk-blue-soft/20 align-top transition">
-                  <td className="px-4 py-3 font-medium whitespace-nowrap text-vtk-ink">
+                  <td className="px-3.5 py-2.5 font-medium whitespace-nowrap text-vtk-ink">
                     {formatAt(log.at)}
                   </td>
-                  <td className="px-4 py-3 min-w-0 break-words">
+                  <td className="px-3.5 py-2.5 min-w-0">
                     {log.email ? (
-                      <div className="font-medium text-vtk-ink">{log.email}</div>
+                      <div className="font-medium text-vtk-ink truncate" title={log.email}>
+                        {log.email}
+                      </div>
                     ) : (
                       <span className="text-zinc-400">-</span>
                     )}
@@ -106,19 +114,20 @@ export function KulAuthLogViewer({ logs }: { logs: KulAuthLogEntry[] }) {
                       <div className="text-[11px] font-mono text-zinc-500">{log.rNumber}</div>
                     )}
                   </td>
-                  <td className="px-4 py-3 min-w-0">
-                    <div className="flex flex-wrap gap-1.5">
+                  <td className="px-3.5 py-2.5 min-w-0">
+                    <div className="flex flex-wrap gap-1.5 min-w-0">
                       {engineeringFaculty && (
-                        <span className="rounded-full border border-emerald-200 bg-emerald-100 px-2 py-0.5 text-xs text-emerald-900 font-medium">
+                        <span className="inline-flex shrink-0 rounded-full border border-emerald-200 bg-emerald-100 px-2 py-0.5 text-xs text-emerald-900 font-medium">
                           Engineering ({ENGINEERING_FACULTY_UNIT})
                         </span>
                       )}
                       {faculty.map(([key, value]) => (
                         <span
                           key={key}
-                          className="max-w-full break-words rounded-full border border-amber-200 bg-amber-100 px-2 py-0.5 text-xs text-amber-900"
+                          className="inline-block max-w-full truncate rounded-full border border-amber-200 bg-amber-100 px-2 py-0.5 text-xs text-amber-900"
+                          title={`${key}: ${toText(value)}`}
                         >
-                          {key}: {toText(value) || "(empty)"}
+                          <span className="font-medium">{key}:</span> {toText(value) || "(empty)"}
                         </span>
                       ))}
                       {!engineeringFaculty && faculty.length === 0 && (
@@ -126,20 +135,20 @@ export function KulAuthLogViewer({ logs }: { logs: KulAuthLogEntry[] }) {
                       )}
                     </div>
                   </td>
-                  <td className="px-4 py-3 text-right whitespace-nowrap">
+                  <td className="px-3.5 py-2.5 text-right whitespace-nowrap">
                     <button
                       type="button"
                       onClick={() => toggleLog(log.id)}
-                      className="cursor-pointer text-xs text-zinc-500 hover:text-vtk-ink inline-flex items-center gap-1 font-medium select-none"
+                      className="cursor-pointer text-xs text-zinc-600 hover:text-vtk-ink font-medium select-none"
                     >
-                      <span>{isOpen ? "▼" : "▶"} All {keys.length} claims</span>
+                      {isOpen ? "▼" : "▶"} {keys.length} claims
                     </button>
                   </td>
                 </tr>
                 {isOpen && (
                   <tr className="bg-zinc-50/50">
-                    <td colSpan={4} className="px-4 py-3 border-t border-vtk-blue/5">
-                      <pre className="overflow-x-auto rounded-lg border border-vtk-blue/10 bg-zinc-50 p-3 text-xs leading-relaxed text-vtk-ink">
+                    <td colSpan={4} className="px-4 py-3 border-t border-vtk-blue/10">
+                      <pre className="max-h-96 overflow-auto rounded-lg border border-vtk-blue/10 bg-zinc-50 p-3 text-xs leading-relaxed text-vtk-ink font-mono">
                         {JSON.stringify(log.claims, null, 2)}
                       </pre>
                     </td>
