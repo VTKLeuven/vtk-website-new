@@ -299,6 +299,14 @@ const icons: Record<string, ReactNode> = {
       <circle cx="12" cy="12" r="3" />
     </Svg>
   ),
+  // kulSso: KU Leuven OIDC / SSO koppeling
+  kulSso: (
+    <Svg>
+      <path d="M12 2 2 7l10 5 10-5-10-5Z" />
+      <path d="M6 9.5V16c0 3 6 4 6 4s6-1 6-4V9.5" />
+      <path d="M22 10v6" />
+    </Svg>
+  ),
   // auditLog: lijstje met een klok, wie deed wat wanneer
   auditLog: (
     <Svg>

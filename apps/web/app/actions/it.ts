@@ -311,6 +311,7 @@ export async function saveKulDebugAction(
       : "uitgezet",
   });
 
+  revalidatePath("/admin/it/kul-sso");
   revalidatePath("/admin/it");
   return saveOk();
 }
@@ -329,5 +330,6 @@ export async function clearKulAuthLogsAction(): Promise<void> {
     target: "KU Leuven-loginclaims",
     summary: "alle bewaarde claims gewist",
   });
+  revalidatePath("/admin/it/kul-sso");
   revalidatePath("/admin/it");
 }

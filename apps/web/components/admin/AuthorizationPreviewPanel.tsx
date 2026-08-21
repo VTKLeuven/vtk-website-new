@@ -164,26 +164,35 @@ export function AuthorizationPreviewPanel({
                   <option value="LEAD">{nl ? "Verantwoordelijke" : "Lead"}</option>
                 </select>
 
-                <div className="mt-2 space-y-1 text-xs text-[#5c667f]">
+                <div className="mt-2 text-xs text-[#5c667f]">
                   {group.roleGrants.length === 0 ? (
-                    <p>{nl ? "Deze post kent geen rollen toe." : "This post grants no roles."}</p>
+                    <span className="text-[#8a93ab]">{nl ? "Geen rollen" : "No roles"}</span>
                   ) : (
-                    <>
-                      {memberRoles.length > 0 && (
-                        <p>
-                          <span className="text-[#8a93ab]">{nl ? "Elk lid: " : "Every member: "}</span>
-                          {memberRoles.map((grant) => (nl ? grant.role.nameNl : grant.role.nameEn)).join(", ")}
-                        </p>
-                      )}
-                      {leadRoles.length > 0 && (
-                        <p className={choice.selected && !choice.lead ? "opacity-60" : undefined}>
-                          <span className="text-[#8a93ab]">
-                            {nl ? "Enkel de verantwoordelijke: " : "Lead only: "}
-                          </span>
-                          {leadRoles.map((grant) => (nl ? grant.role.nameNl : grant.role.nameEn)).join(", ")}
-                        </p>
-                      )}
-                    </>
+                    <details className="group/details">
+                      <summary className="cursor-pointer select-none text-xs text-[#5c667f] hover:text-vtk-ink">
+                        {nl ? "Toon rollen" : "Show roles"} ({group.roleGrants.length})
+                      </summary>
+                      <div className="mt-1.5 space-y-1 rounded-lg border border-vtk-blue/10 bg-vtk-blue-soft/30 p-2 text-xs">
+                        {memberRoles.length > 0 && (
+                          <p>
+                            <span className="font-medium text-[#8a93ab]">{nl ? "Elk lid: " : "Every member: "}</span>
+                            <span className="text-vtk-ink">
+                              {memberRoles.map((grant) => (nl ? grant.role.nameNl : grant.role.nameEn)).join(", ")}
+                            </span>
+                          </p>
+                        )}
+                        {leadRoles.length > 0 && (
+                          <p className={choice.selected && !choice.lead ? "opacity-60" : undefined}>
+                            <span className="font-medium text-[#8a93ab]">
+                              {nl ? "Enkel de verantwoordelijke: " : "Lead only: "}
+                            </span>
+                            <span className="text-vtk-ink">
+                              {leadRoles.map((grant) => (nl ? grant.role.nameNl : grant.role.nameEn)).join(", ")}
+                            </span>
+                          </p>
+                        )}
+                      </div>
+                    </details>
                   )}
                 </div>
               </div>
@@ -263,41 +272,40 @@ export function AuthorizationPreviewPanel({
                       </span>
                     </label>
 
-                    {/* De codes stonden hier vroeger als één komma-lijst; bij de
-                        admin-rol zijn dat er veertig en werd de kaart een muur.
-                        Nu: waar gaan de rechten over, en de details op vraag. */}
                     {codes.length > 0 && (
                       <div className="mt-2 pl-7">
-                        <div className="flex flex-wrap gap-1">
-                          {categories.map((category) => (
-                            <span
-                              key={category.category}
-                              className="rounded-full bg-vtk-blue/10 px-2 py-0.5 text-[11px] text-vtk-ink"
-                            >
-                              {category.categoryLabel}
-                              <span className="ml-1 text-[#5c667f]">{category.permissions.length}</span>
-                            </span>
-                          ))}
-                        </div>
-                        <details className="mt-2">
-                          <summary className="cursor-pointer text-xs text-[#5c667f] hover:text-vtk-ink">
-                            {nl ? "Toon alle rechten" : "Show all permissions"}
+                        <details className="group/details">
+                          <summary className="cursor-pointer select-none text-xs text-[#5c667f] hover:text-vtk-ink">
+                            {nl ? "Toon rechten" : "Show permissions"} ({codes.length})
                           </summary>
-                          <div className="mt-2 space-y-2">
-                            {categories.map((category) => (
-                              <div key={category.category}>
-                                <p className="text-[11px] font-semibold uppercase tracking-wide text-[#8a93ab]">
+                          <div className="mt-2 space-y-2 rounded-lg border border-vtk-blue/10 bg-vtk-blue-soft/20 p-2.5">
+                            <div className="flex flex-wrap gap-1">
+                              {categories.map((category) => (
+                                <span
+                                  key={category.category}
+                                  className="rounded-full bg-white px-2 py-0.5 text-[11px] text-vtk-ink shadow-2xs"
+                                >
                                   {category.categoryLabel}
-                                </p>
-                                <ul className="mt-0.5 space-y-0.5 text-xs text-[#34405e]">
-                                  {category.permissions.map((permission) => (
-                                    <li key={permission.code} title={permission.code}>
-                                      {permission.label}
-                                    </li>
-                                  ))}
-                                </ul>
-                              </div>
-                            ))}
+                                  <span className="ml-1 text-[#5c667f]">{category.permissions.length}</span>
+                                </span>
+                              ))}
+                            </div>
+                            <div className="space-y-2 border-t border-vtk-blue/10 pt-2">
+                              {categories.map((category) => (
+                                <div key={category.category}>
+                                  <p className="text-[11px] font-semibold uppercase tracking-wide text-[#8a93ab]">
+                                    {category.categoryLabel}
+                                  </p>
+                                  <ul className="mt-0.5 space-y-0.5 text-xs text-[#34405e]">
+                                    {category.permissions.map((permission) => (
+                                      <li key={permission.code} title={permission.code}>
+                                        {permission.label}
+                                      </li>
+                                    ))}
+                                  </ul>
+                                </div>
+                              ))}
+                            </div>
                           </div>
                         </details>
                       </div>
