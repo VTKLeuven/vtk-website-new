@@ -7,9 +7,15 @@ import type { KulAuthLogEntry } from "@vtk/auth/server";
 
 const ENGINEERING_FACULTY_UNIT = "50000486";
 
-function formatAt(at: Date): string {
+function formatDate(at: Date): string {
   return new Intl.DateTimeFormat("nl-BE", {
     dateStyle: "short",
+    timeZone: "Europe/Brussels",
+  }).format(at);
+}
+
+function formatTime(at: Date): string {
+  return new Intl.DateTimeFormat("nl-BE", {
     timeStyle: "medium",
     timeZone: "Europe/Brussels",
   }).format(at);
@@ -74,8 +80,8 @@ export function KulAuthLogViewer({ logs }: { logs: KulAuthLogEntry[] }) {
     <div className="overflow-hidden rounded-xl border border-vtk-blue/15 bg-white shadow-xs">
       <table className="w-full table-fixed text-left text-xs text-vtk-ink">
         <colgroup>
-          <col className="w-[145px]" />
-          <col className="w-[210px]" />
+          <col className="w-[110px]" />
+          <col className="w-[240px]" />
           <col />
           <col className="w-[125px]" />
         </colgroup>
@@ -84,7 +90,7 @@ export function KulAuthLogViewer({ logs }: { logs: KulAuthLogEntry[] }) {
             <th className="px-3.5 py-2.5 whitespace-nowrap">Timestamp</th>
             <th className="px-3.5 py-2.5">User</th>
             <th className="px-3.5 py-2.5">Faculty & Roles</th>
-            <th className="px-3.5 py-2.5 text-right whitespace-nowrap">Claims</th>
+            <th className="px-3.5 py-2.5 text-center whitespace-nowrap">Claims</th>
           </tr>
         </thead>
         <tbody className="divide-y divide-vtk-blue/10">
@@ -99,8 +105,9 @@ export function KulAuthLogViewer({ logs }: { logs: KulAuthLogEntry[] }) {
             return (
               <Fragment key={log.id}>
                 <tr className="hover:bg-vtk-blue-soft/20 align-top transition">
-                  <td className="px-3.5 py-2.5 font-medium whitespace-nowrap text-vtk-ink">
-                    {formatAt(log.at)}
+                  <td className="px-3.5 py-2.5 whitespace-nowrap">
+                    <div className="font-medium text-vtk-ink">{formatDate(log.at)}</div>
+                    <div className="text-[11px] font-mono text-zinc-500">{formatTime(log.at)}</div>
                   </td>
                   <td className="px-3.5 py-2.5 min-w-0">
                     {log.email ? (
@@ -135,11 +142,11 @@ export function KulAuthLogViewer({ logs }: { logs: KulAuthLogEntry[] }) {
                       )}
                     </div>
                   </td>
-                  <td className="px-3.5 py-2.5 text-right whitespace-nowrap">
+                  <td className="px-3.5 py-2.5 text-center whitespace-nowrap">
                     <button
                       type="button"
                       onClick={() => toggleLog(log.id)}
-                      className="cursor-pointer text-xs text-zinc-600 hover:text-vtk-ink font-medium select-none"
+                      className="cursor-pointer text-xs text-zinc-600 hover:text-vtk-ink font-medium select-none inline-flex items-center gap-1"
                     >
                       {isOpen ? "▼" : "▶"} {keys.length} claims
                     </button>
