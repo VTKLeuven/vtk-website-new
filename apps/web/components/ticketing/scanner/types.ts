@@ -48,6 +48,8 @@ export type ScannerBootstrap = {
     title: string;
     startsAt?: string;
     location?: string | null;
+    /** Staat de studentenkaart aan de deur aan voor dit event? */
+    cardCheckIn?: boolean;
   };
   gates: ScannerGate[];
   stats?: {
@@ -84,6 +86,8 @@ export type ScanApiResponse = {
   typeName?: string;
   typeColor?: string;
   checkedInAt?: string | null;
+  /** Waarom een kaartscan niets opleverde; enkel op het kaart-endpoint. */
+  reason?: string;
   stats?: {
     checkedIn?: number;
     total?: number;

@@ -1777,6 +1777,54 @@
   cursor: not-allowed;
 }
 
+/* Het leesveld voor de studentenkaart. Bewust hetzelfde kader als de handmatige
+   invoer ernaast: het is dezelfde soort actie, en twee verschillende panelen
+   onder elkaar zouden suggereren dat er iets anders gebeurt. */
+.scanner-card-reader {
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  margin-top: 10px;
+  padding: 13px;
+  background: #1a1d22;
+}
+
+.scanner-card-reader label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 7px;
+  color: #aeb3bd;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.scanner-card-reader input {
+  width: 100%;
+  min-width: 0;
+  min-height: 42px;
+  border: 1px solid rgba(255, 255, 255, 0.17);
+  border-radius: 6px;
+  padding: 9px 11px;
+  outline: 0;
+  background: #101216;
+  color: white;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+/* De gele rand is hier niet decoratief maar de statusmelding: ze zegt dat het
+   veld de scherpte heeft en dat de lezer dus ergens toekomt. */
+.scanner-card-reader input:focus {
+  border-color: #ffd23f;
+  box-shadow: 0 0 0 3px rgba(255, 210, 63, 0.14);
+}
+
+.scanner-card-reader p {
+  margin: 7px 0 0;
+  color: #8d939e;
+  font-size: 11px;
+  line-height: 1.5;
+}
+
 .scanner-manual-form {
   border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: 8px;

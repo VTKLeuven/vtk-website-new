@@ -3,6 +3,7 @@ import "server-only";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@vtk/db";
 import { z } from "zod";
+import { cardDisplayName, resolveStudentCard } from "@/lib/student-card";
 import { requireTicketEventCapability } from "./authorization";
 import { ticketColorKey } from "./ticketColors";
 import {
@@ -19,6 +20,18 @@ export const scanRequestSchema = z.object({
   deviceId: z.string().trim().min(8).max(160),
   clientScannedAt: z.string().datetime().nullable().optional(),
 });
+
+/**
+ * Waar een scan vandaan kwam, voor in het scanlogboek.
+ *
+ * Bewust zonder r-nummer of kaartnummer erin: die worden bij het archiveren van
+ * het event gewist, terwijl het logboek blijft staan. Een kopie in de metadata
+ * zou dat wissen stilletjes ongedaan maken.
+ */
+type ScanOrigin = {
+  via: "CARD";
+  source: "cache" | "kuleuven";
+};
 
 type ScannableTicket = Prisma.TicketGetPayload<{ include: typeof SCANNED_TICKET_INCLUDE }>;
 
@@ -107,6 +120,7 @@ export async function scannerBootstrap(eventId: string) {
       title: event.titleNl,
       startsAt: event.startsAt,
       location: event.location,
+      cardCheckIn: event.cardCheckIn,
     },
     gates,
     stats,
@@ -126,7 +140,7 @@ export async function scannerBootstrap(eventId: string) {
   };
 }
 
-export async function scanTicket(eventId: string, rawInput: unknown) {
+export async function scanTicket(eventId: string, rawInput: unknown, origin?: ScanOrigin) {
   const input = scanRequestSchema.parse(rawInput);
   const { session } = await requireTicketEventCapability(eventId, "SCAN");
   const existing = await prisma.ticketScanLog.findUnique({
@@ -251,6 +265,7 @@ export async function scanTicket(eventId: string, rawInput: unknown) {
         credentialFingerprint: credentialFingerprint(extracted),
         scannedAt: now,
         clientScannedAt: input.clientScannedAt ? new Date(input.clientScannedAt) : null,
+        metadata: origin ? { ...origin } : undefined,
       },
     });
       return { result, scanId: log.id, ticketId: sameEventTicket?.id ?? null };
@@ -281,6 +296,118 @@ export async function scanTicket(eventId: string, rawInput: unknown) {
     ticket: ticketDto(freshTicket),
     stats: await eventStats(eventId),
   };
+}
+
+export const cardScanRequestSchema = scanRequestSchema
+  .omit({ credential: true })
+  .extend({
+    /** Ruw wat de lezer typt: `serial;cardAppId`. */
+    card: z.string().trim().min(3).max(400),
+  });
+
+/** Waarom een kaart geen ticket opleverde. De scanner vertaalt deze codes. */
+export type CardScanReason = "CARD_UNREADABLE" | "NO_TICKET" | "CARD_CHECKIN_DISABLED";
+
+/**
+ * Een kaart die niets opleverde, hoort evengoed in het logboek: aan de deur is
+ * "die kaart deed niets" precies wat je achteraf wil kunnen terugvinden. Er hangt
+ * geen ticket aan, dus dit gaat als INVALID het logboek in met de reden in de
+ * metadata; een eigen enumwaarde zou een migratie kosten voor niets.
+ *
+ * `credentialFingerprint` blijft leeg. Een hash van het kaartnummer zou een
+ * stabiele verwijzing naar één persoon zijn die het archiveren overleeft, en dat
+ * is net wat het wissen van het r-nummer wil vermijden.
+ */
+async function logCardScanMiss(
+  eventId: string,
+  input: z.infer<typeof cardScanRequestSchema>,
+  scannerUserId: string,
+  reason: CardScanReason,
+  detail?: string,
+) {
+  const gate = input.gateId
+    ? await prisma.ticketGate.findFirst({ where: { id: input.gateId, eventId, active: true } })
+    : null;
+  const log = await prisma.ticketScanLog.create({
+    data: {
+      eventId,
+      scannerUserId,
+      gateId: gate?.id ?? null,
+      clientScanId: input.clientScanId,
+      result: "INVALID",
+      clientScannedAt: input.clientScannedAt ? new Date(input.clientScannedAt) : null,
+      metadata: { via: "CARD", reason, ...(detail ? { detail } : {}) },
+    },
+  });
+  return { result: "INVALID" as const, scanId: log.id, reason };
+}
+
+/**
+ * Inchecken met een studentenkaart.
+ *
+ * De lezer typt `serial;cardAppId` alsof het een toetsenbord is; die string
+ * herleiden we via {@link resolveStudentCard} tot een r-nummer, en dat r-nummer
+ * staat op hoogstens één bestelregel van dit event (`TicketOrderItem.rNumber`,
+ * uniek per event). Vanaf daar loopt alles door dezelfde `scanTicket` als een QR:
+ * dezelfde transactie, hetzelfde logboek, dezelfde uitkomsten voor een al
+ * gescand, geannuleerd of terugbetaald ticket. Enkel de handtekening ontbreekt,
+ * net als bij een handmatig ingetikte code; de kaart zelf is hier het bewijs.
+ */
+export async function scanTicketCard(eventId: string, rawInput: unknown) {
+  const input = cardScanRequestSchema.parse(rawInput);
+  const { event, session } = await requireTicketEventCapability(eventId, "SCAN");
+
+  // Eerst kijken of dit `clientScanId` al verwerkt is, nog voor er een
+  // kaartverificatie aan te pas komt: een lezer die twee keer stuurt, mag geen
+  // tweede call naar KU Leuven en geen tweede check-in veroorzaken.
+  const existing = await prisma.ticketScanLog.findUnique({
+    where: { clientScanId: input.clientScanId },
+    include: { ticket: { include: SCANNED_TICKET_INCLUDE } },
+  });
+  if (existing) {
+    return {
+      result: existing.eventId === eventId ? existing.result : ("INVALID" as const),
+      ticket: existing.ticket?.eventId === eventId ? ticketDto(existing.ticket) : undefined,
+      stats: await eventStats(eventId),
+      duplicateRequest: true,
+    };
+  }
+
+  if (!event.cardCheckIn) {
+    return {
+      ...(await logCardScanMiss(eventId, input, session.user.id, "CARD_CHECKIN_DISABLED")),
+      stats: await eventStats(eventId),
+    };
+  }
+
+  const resolved = await resolveStudentCard(input.card);
+  if (!resolved.ok) {
+    return {
+      ...(await logCardScanMiss(eventId, input, session.user.id, "CARD_UNREADABLE", resolved.error)),
+      stats: await eventStats(eventId),
+    };
+  }
+
+  const rNumber = resolved.rNumber.trim().toLowerCase();
+  const orderItem = await prisma.ticketOrderItem.findFirst({
+    where: { eventId, rNumber },
+    select: { ticket: { select: { publicCode: true } } },
+  });
+  if (!orderItem?.ticket) {
+    return {
+      ...(await logCardScanMiss(eventId, input, session.user.id, "NO_TICKET")),
+      // De naam van de kaart, zodat de deurploeg weet wie er staat en die persoon
+      // kan opzoeken in de namenlijst. Ze wordt niet bewaard.
+      attendeeName: cardDisplayName(resolved) ?? undefined,
+      stats: await eventStats(eventId),
+    };
+  }
+
+  return scanTicket(
+    eventId,
+    { ...input, credential: orderItem.ticket.publicCode },
+    { via: "CARD", source: resolved.source },
+  );
 }
 
 /** Hoeveel gequeuede scans één synchronisatie mag meesturen. */

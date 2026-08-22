@@ -11,6 +11,7 @@ import {
   CircleGauge,
   Flashlight,
   History,
+  IdCard,
   Keyboard,
   LoaderCircle,
   MapPin,
@@ -42,6 +43,8 @@ import type {
 import { ticketColorKey } from "@/lib/ticketing/ticketColors";
 import { loadManifest, loadQueue, saveManifest, saveQueue, verifyOffline } from "./offline";
 import { InstallButton } from "./InstallButton";
+
+const CARD_READER_KEY = "vtk-ticket-scanner-card-reader";
 
 const ACCEPTED_RESULTS = new Set(["ACCEPTED", "CHECKED_IN", "SUCCESS", "VALID"]);
 const DUPLICATE_RESULTS = new Set(["DUPLICATE", "ALREADY_CHECKED_IN", "ALREADY_USED"]);
@@ -84,6 +87,24 @@ function fallbackMessage(kind: ScanKind) {
   if (kind === "duplicate") return "Ticket al gescand";
   if (kind === "rejected") return "Ticket niet geldig";
   return "Scan kon niet worden gecontroleerd";
+}
+
+/**
+ * Wat de server terugstuurt wanneer een kaart geen ticket opleverde. "Ongeldig
+ * ticket" zou hier het verkeerde zeggen: er ís geen ticket, en het verschil
+ * tussen een onleesbare kaart en een kaart zonder ticket bepaalt wat de
+ * deurploeg doet.
+ */
+function cardMissMessage(reason: string | undefined) {
+  if (reason === "NO_TICKET") return "Geen ticket op deze kaart";
+  if (reason === "CARD_UNREADABLE") return "Kaart niet herkend";
+  if (reason === "CARD_CHECKIN_DISABLED") return "Kaartcheck-in staat uit voor dit event";
+  return "Kaart gaf geen ticket";
+}
+
+/** Een kaartlezer tikt `serial;cardAppId`; een ticketcode heeft nooit een puntkomma. */
+function looksLikeCard(value: string) {
+  return value.includes(";");
 }
 
 /**
@@ -160,6 +181,7 @@ export function ScannerApp({ eventId }: { eventId: string }) {
   const processRef = useRef<(value: string) => void>(() => undefined);
   const feedbackTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const syncingRef = useRef(false);
+  const cardInputRef = useRef<HTMLInputElement>(null);
 
   const [bootstrap, setBootstrap] = useState<ScannerBootstrap | null>(null);
   const [bootstrapError, setBootstrapError] = useState<string | null>(null);
@@ -174,6 +196,8 @@ export function ScannerApp({ eventId }: { eventId: string }) {
   const [torchAvailable, setTorchAvailable] = useState(false);
   const [manualOpen, setManualOpen] = useState(false);
   const [manualCode, setManualCode] = useState("");
+  const [cardReaderOn, setCardReaderOn] = useState(false);
+  const [cardValue, setCardValue] = useState("");
   const [history, setHistory] = useState<ScanHistoryItem[]>([]);
   const [reversingScanId, setReversingScanId] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<ScanHistoryItem | null>(null);
@@ -231,6 +255,10 @@ export function ScannerApp({ eventId }: { eventId: string }) {
       const savedDeviceId = localStorage.getItem(deviceStorageKey) ?? createId();
       localStorage.setItem(deviceStorageKey, savedDeviceId);
       setDeviceId(savedDeviceId);
+      // Of dit toestel een kaartlezer heeft, is een eigenschap van dat toestel en
+      // niet van het event: de laptop aan de deur heeft er een, de telefoon
+      // ernaast niet. Daarom per toestel bewaard en niet per event.
+      setCardReaderOn(localStorage.getItem(CARD_READER_KEY) === "1");
       // Nog niet verstuurde scans van een vorige sessie: die telling hoort er
       // meteen te staan, ook voor de bootstrap klaar is.
       setQueueSize(loadQueue(eventId).length);
@@ -464,9 +492,103 @@ export function ScannerApp({ eventId }: { eventId: string }) {
     }
   }, [deviceId, eventId, gateId, manifest, scannedCodes]);
 
+  /**
+   * Inchecken met een studentenkaart. De lezer gedraagt zich als een toetsenbord
+   * en tikt `serial;cardAppId`; die string gaat ongewijzigd naar de server, want
+   * enkel daar staat de kaarttabel en het contact met KU Leuven.
+   *
+   * Dit werkt bewust enkel online. Een kaart is geen ticketcode: het toestel kan
+   * er zelf niets mee, ook niet met het manifest in de hand.
+   */
+  const processCard = useCallback(
+    async (raw: string) => {
+      const card = raw.replace(/[\r\n]+/g, "").trim();
+      if (!card || busyRef.current || !deviceId) return;
+
+      const previous = lastCredentialRef.current;
+      if (previous?.value === card && Date.now() - previous.at < 2500) return;
+      lastCredentialRef.current = { value: card, at: Date.now() };
+
+      const scannedAt = new Date().toISOString();
+      const clientScanId = createId();
+
+      if (!navigator.onLine) {
+        const item: ScanHistoryItem = {
+          id: clientScanId,
+          scannedAt,
+          kind: "error",
+          code: "kaart",
+          message: "Kaartlezen kan niet zonder netwerk; scan de QR",
+        };
+        setFeedback(item);
+        setHistory((items) => [item, ...items].slice(0, 50));
+        if (feedbackTimerRef.current) clearTimeout(feedbackTimerRef.current);
+        feedbackTimerRef.current = setTimeout(() => setFeedback(null), 1800);
+        return;
+      }
+
+      busyRef.current = true;
+      try {
+        const response = await fetch(`/api/tickets/events/${eventId}/scan/card`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ card, clientScanId, gateId: gateId || null, deviceId }),
+        });
+        const payload = (await response.json().catch(() => ({}))) as ScanApiResponse;
+        const kind = resultKind(payload, response.ok);
+        const item: ScanHistoryItem = {
+          id: clientScanId,
+          scannedAt,
+          kind,
+          code: payload.ticket?.publicId ?? "kaart",
+          attendeeName: payload.ticket?.attendeeName ?? payload.attendeeName,
+          typeName: payload.ticket?.typeName ?? payload.ticket?.ticketTypeName ?? payload.typeName,
+          typeColor: ticketColorKey(payload.ticket?.typeColor ?? payload.typeColor),
+          message:
+            payload.message ??
+            (payload.reason ? cardMissMessage(payload.reason) : fallbackMessage(kind)),
+          scanId: kind === "accepted" ? payload.scanId : undefined,
+        };
+        setFeedback(item);
+        setHistory((items) => [item, ...items].slice(0, 50));
+        if (kind === "accepted" && payload.ticket?.publicId) {
+          const code = payload.ticket.publicId;
+          setScannedCodes((current) => new Set(current).add(code));
+        }
+        if (payload.stats) setServerStats(payload.stats);
+        if (kind !== "error") {
+          const bucket = kind === "accepted" ? "accepted" : kind === "duplicate" ? "duplicate" : "rejected";
+          setSessionCounts((counts) => ({ ...counts, [bucket]: counts[bucket] + 1 }));
+        }
+        if (navigator.vibrate) navigator.vibrate(kind === "accepted" ? 60 : [90, 50, 90]);
+      } catch {
+        const item: ScanHistoryItem = {
+          id: clientScanId,
+          scannedAt,
+          kind: "error",
+          code: "kaart",
+          message: "Netwerkfout tijdens het uitlezen van de kaart",
+        };
+        setFeedback(item);
+        setHistory((items) => [item, ...items].slice(0, 50));
+      } finally {
+        busyRef.current = false;
+        if (feedbackTimerRef.current) clearTimeout(feedbackTimerRef.current);
+        feedbackTimerRef.current = setTimeout(() => setFeedback(null), 1800);
+      }
+    },
+    [deviceId, eventId, gateId],
+  );
+
   useEffect(() => {
     processRef.current = (value) => void processCredential(value);
   }, [processCredential]);
+
+  // Het leesveld terug scherp zetten zodra de lezer aangaat: die tikt in wat
+  // focus heeft, en zonder focus verdwijnt de scan in het niets.
+  useEffect(() => {
+    if (cardReaderOn) cardInputRef.current?.focus();
+  }, [cardReaderOn]);
 
   useEffect(() => {
     if (!cameraEnabled || !videoRef.current) return;
@@ -533,6 +655,35 @@ export function ScannerApp({ eventId }: { eventId: string }) {
     if (!manualCode.trim()) return;
     void processCredential(manualCode);
     setManualCode("");
+  }
+
+  /**
+   * Wat er in het leesveld beland is, naar het juiste pad sturen.
+   *
+   * Een puntkomma betekent studentenkaart (`serial;cardAppId`); alles anders is
+   * een ticketcode, want dezelfde lezer wordt ook wel eens op een QR gericht.
+   */
+  function runReaderInput(raw: string) {
+    const cleaned = raw.replace(/[\r\n]+/g, "").trim();
+    setCardValue("");
+    if (!cleaned) return;
+    if (looksLikeCard(cleaned)) void processCard(cleaned);
+    else void processCredential(cleaned);
+  }
+
+  function onCardInput(event: React.ChangeEvent<HTMLInputElement>) {
+    const value = event.target.value;
+    // Sommige lezers sturen een newline in plaats van een Enter-toets.
+    if (value.includes("\n") || value.includes("\r")) runReaderInput(value);
+    else setCardValue(value);
+  }
+
+  function toggleCardReader() {
+    setCardReaderOn((current) => {
+      const next = !current;
+      localStorage.setItem(CARD_READER_KEY, next ? "1" : "0");
+      return next;
+    });
   }
 
   /**
@@ -731,6 +882,17 @@ export function ScannerApp({ eventId }: { eventId: string }) {
             >
               <Keyboard size={19} aria-hidden="true" /> Handmatig
             </button>
+            {bootstrap.event.cardCheckIn ? (
+              <button
+                type="button"
+                className={cardReaderOn ? "is-active" : ""}
+                aria-expanded={cardReaderOn}
+                aria-controls="scanner-card-reader"
+                onClick={toggleCardReader}
+              >
+                <IdCard size={19} aria-hidden="true" /> Kaartlezer
+              </button>
+            ) : null}
             <button
               type="button"
               className={listOpen ? "is-active" : ""}
@@ -810,6 +972,49 @@ export function ScannerApp({ eventId }: { eventId: string }) {
                   })}
                 </ul>
               )}
+            </section>
+          ) : null}
+
+          {/* Het leesveld staat er zichtbaar bij, met de cursor erin. Een
+              onzichtbaar veld dat stilletjes de focus opeist, is aan een deur om
+              middernacht niet te debuggen: nu zie je of de lezer nog "aan staat"
+              en kan je er zelf in klikken. */}
+          {cardReaderOn && bootstrap.event.cardCheckIn ? (
+            <section className="scanner-card-reader" id="scanner-card-reader" aria-label="Studentenkaart lezen">
+              <label htmlFor="scanner-card-input">
+                <IdCard size={17} aria-hidden="true" /> Studentenkaart
+              </label>
+              <input
+                id="scanner-card-input"
+                ref={cardInputRef}
+                value={cardValue}
+                onChange={onCardInput}
+                onKeyDown={(event) => {
+                  if (event.key !== "Enter") return;
+                  event.preventDefault();
+                  runReaderInput(event.currentTarget.value);
+                }}
+                onBlur={() => {
+                  // Enkel terugpakken wanneer de focus nergens heen ging; anders
+                  // steelt dit veld de cursor uit het zoekveld ernaast.
+                  requestAnimationFrame(() => {
+                    if (document.activeElement === document.body) cardInputRef.current?.focus();
+                  });
+                }}
+                // Onderdrukt het schermtoetsenbord op een tablet; de lezer stuurt
+                // gewone toetsaanslagen en heeft dat toetsenbord niet nodig.
+                inputMode="none"
+                autoComplete="off"
+                autoCapitalize="off"
+                spellCheck={false}
+                placeholder="Wachtend op een kaart"
+                aria-describedby="scanner-card-help"
+              />
+              <p id="scanner-card-help">
+                {online
+                  ? "Houd de kaart op de lezer. Werkt enkel met netwerk; zonder bereik scan je de QR."
+                  : "Geen netwerk: kaartlezen werkt nu niet, scan de QR van het ticket."}
+              </p>
             </section>
           ) : null}
 
