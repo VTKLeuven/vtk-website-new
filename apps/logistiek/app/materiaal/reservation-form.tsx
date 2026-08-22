@@ -27,6 +27,9 @@ import {
 } from './event-fields';
 import { trackReservationSubmitted, trackTemplateLoaded } from '@/lib/analytics-client';
 
+/** Waar de kijkvoorkeur voor de catalogus blijft staan (M7). */
+const CATALOGUE_VIEW_KEY = 'vtk-logistiek-catalogusweergave';
+
 export type ReservationFormInitial = {
   event: EventReservationValues;
   pickupDate: string;
@@ -123,6 +126,21 @@ export function ReservationForm({
 
   const [search, setSearch] = useState('');
   const [activeCategory, setActiveCategory] = useState<string>('all');
+  // Kaarten of een compacte lijst (M7). Wie weet wat hij wil, hoeft niet langs
+  // honderd foto's te scrollen. De voorkeur blijft plakken per browser; ze in de
+  // URL of de databank zetten zou betekenen dat een gedeelde link of een
+  // collega ze meeneemt, en dit is een kijkvoorkeur van deze persoon.
+  const [view, setView] = useState<'cards' | 'list'>('cards');
+  useEffect(() => {
+    // In een effect en niet als beginwaarde: op de server bestaat localStorage
+    // niet, en een andere eerste render dan de server geeft een hydratiefout.
+    const saved = window.localStorage.getItem(CATALOGUE_VIEW_KEY);
+    if (saved === 'list' || saved === 'cards') setView(saved);
+  }, []);
+  function chooseView(next: 'cards' | 'list') {
+    setView(next);
+    window.localStorage.setItem(CATALOGUE_VIEW_KEY, next);
+  }
   // Wat het laatst toegepaste sjabloon effectief toevoegde, per item. Nodig om
   // het weer weg te kunnen halen (M4): het aantal dat erbij kwam kan lager zijn
   // dan wat in het sjabloon stond, want we knippen af op de voorraad.
@@ -550,6 +568,27 @@ export function ReservationForm({
                 {en ? 'Clear filters' : 'Filters wissen'}
               </button>
             ) : null}
+            {/* Kaarten of lijst (M7). */}
+            <div className="ml-auto flex h-10 items-center gap-1 rounded-lg border border-vtk-navy/15 p-1">
+              {(
+                [
+                  ['cards', en ? 'Cards' : 'Kaarten'],
+                  ['list', en ? 'List' : 'Lijst'],
+                ] as Array<['cards' | 'list', string]>
+              ).map(([value, label]) => (
+                <button
+                  key={value}
+                  type="button"
+                  onClick={() => chooseView(value)}
+                  aria-pressed={view === value}
+                  className={`h-8 rounded-md px-2.5 text-sm font-medium transition ${
+                    view === value ? 'bg-vtk-navy text-white' : 'text-vtk-ink hover:bg-vtk-navy/5'
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
           </div>
 
           {/* Landing: enkel categorie-tegels; klik een categorie om de materialen te
@@ -600,7 +639,13 @@ export function ReservationForm({
               className="@container rounded-[18px] border border-vtk-navy/10 bg-vtk-surface p-6"
             >
               <h2 className="text-lg font-semibold tracking-tight text-vtk-ink">{category.name}</h2>
-              <ul className="mt-4 grid gap-4 @lg:grid-cols-2 @4xl:grid-cols-3">
+              <ul
+                className={
+                  view === 'list'
+                    ? 'mt-4 divide-y divide-vtk-navy/10'
+                    : 'mt-4 grid gap-4 @lg:grid-cols-2 @4xl:grid-cols-3'
+                }
+              >
                 {category.items.map((item) => {
                   const quantity = quantities[item.id] ?? 0;
                   const available = availability?.[item.id];
@@ -610,6 +655,74 @@ export function ReservationForm({
                   // dan er bestaat, kan nooit.
                   const atMax = quantity >= item.quantity;
                   const short = available !== undefined && quantity > available;
+
+                  // Lijstweergave (M7): één rij per item, zonder foto. Dezelfde
+                  // knoppen en dezelfde grenzen als op de kaart; enkel de
+                  // omhulling verschilt.
+                  if (view === 'list') {
+                    return (
+                      <li
+                        key={item.id}
+                        className="flex flex-wrap items-center gap-x-4 gap-y-2 py-2.5"
+                      >
+                        <span className="min-w-0 flex-1">
+                          <Link
+                            href={`/materiaal/${item.id}`}
+                            className="font-medium text-vtk-ink hover:underline"
+                          >
+                            {item.name}
+                          </Link>
+                          {item.isSet ? (
+                            <span className="ml-2 rounded-full bg-vtk-yellow/25 px-2 py-0.5 text-[11px] font-semibold text-vtk-ink">
+                              Set
+                            </span>
+                          ) : null}
+                          {short ? (
+                            <span className="ml-2 text-xs text-amber-900">
+                              {en
+                                ? `only ${available} free then`
+                                : `maar ${available} vrij in die periode`}
+                            </span>
+                          ) : null}
+                        </span>
+                        <span
+                          className={`shrink-0 text-sm tabular-nums ${
+                            available === 0 ? 'font-semibold text-red-700' : 'text-vtk-muted'
+                          }`}
+                        >
+                          {available !== undefined ? available : item.quantity}{' '}
+                          {en ? 'free' : 'vrij'}
+                        </span>
+                        <span className="flex shrink-0 items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => setQuantity(item.id, quantity - 1)}
+                            disabled={quantity <= 0}
+                            aria-label={`${en ? 'Fewer' : 'Minder'}: ${item.name}`}
+                            className="grid h-8 w-8 shrink-0 place-items-center rounded-full border border-vtk-navy/25 text-lg font-medium text-vtk-navy transition hover:bg-vtk-navy/5 disabled:opacity-30"
+                          >
+                            −
+                          </button>
+                          <QuantityInput
+                            value={quantity}
+                            max={item.quantity}
+                            onChange={(next) => setQuantity(item.id, next)}
+                            label={`${en ? 'Number' : 'Aantal'}: ${item.name}`}
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setQuantity(item.id, quantity + 1)}
+                            disabled={atMax}
+                            aria-label={`${en ? 'More' : 'Meer'}: ${item.name}`}
+                            className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-vtk-navy text-lg font-medium text-white transition hover:bg-vtk-ink disabled:opacity-30"
+                          >
+                            +
+                          </button>
+                        </span>
+                      </li>
+                    );
+                  }
+
                   return (
                     <li key={item.id} className="flex flex-col overflow-hidden rounded-[14px] border border-vtk-navy/10 bg-white">
                       <Link href={`/materiaal/${item.id}`} className="block aspect-[4/3] w-full bg-vtk-paper-2">
