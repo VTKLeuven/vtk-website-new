@@ -1,9 +1,20 @@
 import "server-only";
 
 import { cache } from "react";
-import type { CalendarAudience, Prisma } from "@prisma/client";
+import type { CalendarAudience, Prisma, StudyYear } from "@prisma/client";
 import { prisma } from "@vtk/db";
 import { getCurrentSession } from "@/lib/session";
+
+export function audiencesForStudyProfile(
+  studyYears: StudyYear[],
+  internationalStudent: boolean,
+): CalendarAudience[] {
+  const audiences: CalendarAudience[] = [];
+  if (studyYears.includes("BACHELOR_1")) audiences.push("FIRST_YEARS");
+  if (internationalStudent) audiences.push("INTERNATIONALS");
+  if (studyYears.includes("MASTER_2")) audiences.push("LAST_YEARS");
+  return audiences;
+}
 
 /**
  * De doelgroepen waar het ingelogde lid bij hoort.
@@ -34,10 +45,7 @@ export async function audiencesForUser(userId: string): Promise<CalendarAudience
   });
   if (!user) return [];
 
-  const audiences: CalendarAudience[] = [];
-  if (user.studyYears.includes("BACHELOR_1")) audiences.push("FIRST_YEARS");
-  if (user.internationalStudent) audiences.push("INTERNATIONALS");
-  return audiences;
+  return audiencesForStudyProfile(user.studyYears, user.internationalStudent);
 }
 
 /**

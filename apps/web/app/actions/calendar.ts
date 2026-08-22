@@ -220,9 +220,10 @@ const categorySchema = z.object({
     .regex(/^#[0-9a-fA-F]{6}$/),
   order: z.coerce.number().int().min(0).max(999),
   showOnCalendarPage: z.coerce.boolean().default(false),
-  // Leeg = gewoon thema. Bij elke doelgroepwaarde hoort code die bepaalt wie
-  // erbij hoort (lib/calendar/audience.ts), dus dit is een gesloten lijst.
-  audience: z.enum(["FIRST_YEARS", "INTERNATIONALS"]).nullable().default(null),
+  // Bij elke doelgroepwaarde hoort code die bepaalt wie erbij hoort
+  // (lib/calendar/audience.ts), dus dit is een gesloten lijst.
+  kind: z.enum(["category", "audience"]),
+  audience: z.enum(["FIRST_YEARS", "INTERNATIONALS", "LAST_YEARS"]).nullable().default(null),
 });
 
 const CATEGORY_FIELD_LABELS: Record<string, string> = {
@@ -269,10 +270,17 @@ export async function saveCalendarCategoryAction(
     colour: formData.get("colour"),
     order: formData.get("order") ?? 0,
     showOnCalendarPage: formData.get("showOnCalendarPage") === "on",
+    kind: formData.get("kind"),
     audience: formData.get("audience") || null,
   });
   if (!parsed.success) return saveError("INVALID_INPUT");
-  const { id, ...data } = parsed.data;
+  const { id, kind, ...parsedData } = parsed.data;
+  if (kind === "audience" && !parsedData.audience) return saveError("INVALID_INPUT");
+  const data = {
+    ...parsedData,
+    audience: kind === "category" ? null : parsedData.audience,
+    showOnCalendarPage: kind === "category" ? parsedData.showOnCalendarPage : false,
+  };
 
   // Een dubbele slug is gewone invoerfout, geen serverfout: hij hoort als rode
   // toast terug te komen in plaats van in de error boundary te belanden.

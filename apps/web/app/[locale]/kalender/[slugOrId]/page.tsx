@@ -21,6 +21,7 @@ import "@/app/design/vtk-event.css";
 function audienceLabel(audience: string | null, locale: Locale): string {
   const nl = locale === "nl";
   if (audience === "FIRST_YEARS") return nl ? "Voor eerstejaars" : "For first years";
+  if (audience === "LAST_YEARS") return nl ? "Voor laatstejaars" : "For last years";
   if (audience === "INTERNATIONALS") return nl ? "Voor internationals" : "For international students";
   return nl ? "Voor een specifieke doelgroep" : "For a specific audience";
 }
