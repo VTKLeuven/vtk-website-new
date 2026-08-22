@@ -1655,8 +1655,8 @@ export async function createTransportForReservationAction(
     await writeAudit(tx, { reservationId: reservation.id }, {
       kind: 'NOTE',
       note: built.roundTrip
-        ? 'Levering: heen- en terugrit aangemaakt bij vervoer.'
-        : 'Levering: rit aangemaakt bij vervoer.',
+        ? 'Levering: heen- en terugrit aangemaakt bij transport.'
+        : 'Levering: rit aangemaakt bij transport.',
       actorId: session.user.id,
     });
   });
@@ -1665,8 +1665,8 @@ export async function createTransportForReservationAction(
   return {
     ok: true,
     message: built.roundTrip
-      ? 'Heen- en terugrit aangemaakt. Keur ze goed bij Vervoer.'
-      : 'Rit aangemaakt. Keur ze goed bij Vervoer.',
+      ? 'Heen- en terugrit aangemaakt. Keur ze goed bij Transport.'
+      : 'Rit aangemaakt. Keur ze goed bij Transport.',
   };
 }
 

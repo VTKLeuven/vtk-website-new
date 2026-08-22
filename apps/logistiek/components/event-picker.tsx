@@ -58,7 +58,7 @@ export function EventPicker({
       <p className="mt-1 text-sm text-vtk-muted">
         {en
           ? 'Optional. Link material, drinks and transport of the same event so Logistics sees them together.'
-          : 'Optioneel. Hang materiaal, flesserke en vervoer van hetzelfde evenement samen, dan ziet Logistiek ze in één scherm.'}
+          : 'Optioneel. Hang materiaal, flesserke en transport van hetzelfde evenement samen, dan ziet Logistiek ze in één scherm.'}
       </p>
 
       {chosen ? (

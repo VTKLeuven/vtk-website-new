@@ -45,7 +45,7 @@ function EventCard({ event }: { event: AdminEvent }) {
   // materiaal maar zonder vervoer is bijna altijd een vergetelheid.
   const missing = [
     material.length === 0 ? 'materiaal' : null,
-    event.transport.length === 0 ? 'vervoer' : null,
+    event.transport.length === 0 ? 'transport' : null,
   ].filter(Boolean);
 
   return (
@@ -177,7 +177,7 @@ function EventCard({ event }: { event: AdminEvent }) {
         </section>
 
         <section>
-          <h4 className="text-sm font-semibold text-vtk-ink">Vervoer</h4>
+          <h4 className="text-sm font-semibold text-vtk-ink">Transport</h4>
           {event.transport.length === 0 ? (
             <p className="mt-1 text-sm text-vtk-muted">Niets aangevraagd.</p>
           ) : (
@@ -226,7 +226,7 @@ export default async function BeheerEvenementenPage() {
       <section className="rounded-[18px] border border-vtk-navy/10 bg-vtk-surface p-6">
         <h2 className="text-lg font-semibold tracking-tight text-vtk-ink">Evenementen</h2>
         <p className="mt-1 max-w-2xl text-sm text-vtk-muted">
-          De koepel boven materiaal, flesserke en vervoer van hetzelfde evenement. Optioneel: een
+          De koepel boven materiaal, flesserke en transport van hetzelfde evenement. Optioneel: een
           losse uitlening hoeft er niet onder. Leden hangen hun aanvraag er zelf aan; hier kan je er
           een aanmaken en aanvragen koppelen vanaf hun detailpagina.
         </p>

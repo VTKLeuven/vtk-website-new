@@ -175,7 +175,7 @@ export default async function BeheerKalenderPage({
           href="/beheer/vervoer/week"
           className="text-sm font-semibold text-vtk-navy underline decoration-vtk-yellow underline-offset-4"
         >
-          Weekoverzicht vervoer
+          Weekoverzicht transport
         </Link>
       </div>
 

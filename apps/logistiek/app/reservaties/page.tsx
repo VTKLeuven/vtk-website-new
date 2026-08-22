@@ -317,7 +317,7 @@ export default async function ReservatiesPage({
               vehicleTag
             )
           }
-          contents={booking.destination || (en ? 'Transport request' : 'Vervoersaanvraag')}
+          contents={booking.destination || (en ? 'Transport request' : 'Transportaanvraag')}
           period={
             <>
               {formatDateTime(booking.startAt, locale)} {en ? 'to' : 'tot'}{' '}
@@ -409,7 +409,7 @@ export default async function ReservatiesPage({
         </section>
 
         <section>
-          <h2 className="text-lg font-semibold tracking-tight text-vtk-ink">{en ? 'Transport' : 'Vervoer'}</h2>
+          <h2 className="text-lg font-semibold tracking-tight text-vtk-ink">{'Transport'}</h2>
           {postIds.length > 0 ? <p className="mt-1 text-sm text-vtk-muted">{postNote}</p> : null}
           {vanBookings.length === 0 ? (
             <p className="mt-3 text-sm text-vtk-muted">

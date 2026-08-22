@@ -149,7 +149,7 @@ export function DeliveryPanel({
                   href="/beheer/vervoer"
                   className="text-sm font-semibold text-vtk-navy underline underline-offset-2"
                 >
-                  Naar vervoer
+                  Naar transport
                 </Link>
               </span>
             </li>
@@ -294,7 +294,7 @@ export function DeliveryPanel({
 
           <p className="text-xs text-vtk-muted">
             De rit komt op naam van de aanvrager en staat op &ldquo;aangevraagd&rdquo;. Keur ze
-            daarna goed bij Vervoer: daar gebeurt de botsingscontrole per voertuig en kies je de
+            daarna goed bij Transport: daar gebeurt de botsingscontrole per voertuig en kies je de
             betaalwijze en de chauffeur.
           </p>
 

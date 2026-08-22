@@ -467,11 +467,11 @@ export async function startPaymentAction(
       orderId: record.id,
       orderNumber: record.id.slice(-8).toUpperCase(),
       buyerEmail: session.user.email,
-      eventName: target === 'reservation' ? 'VTK uitleendienst' : 'VTK vervoer',
+      eventName: target === 'reservation' ? 'VTK uitleendienst' : 'VTK transport',
       currency: 'EUR',
       lines: [
         {
-          name: target === 'reservation' ? 'Huur materiaal' : 'Vervoer',
+          name: target === 'reservation' ? 'Huur materiaal' : 'Transport',
           quantity: 1,
           unitAmountCents: amountCents,
         },

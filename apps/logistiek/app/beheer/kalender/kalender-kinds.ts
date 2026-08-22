@@ -13,5 +13,5 @@ export type CalendarKind = (typeof CALENDAR_KINDS)[number];
 export const KIND_LABELS: Record<CalendarKind, string> = {
   afhaling: 'Afhaling',
   terugbrengen: 'Terugbrengen',
-  vervoer: 'Vervoer',
+  vervoer: 'Transport',
 };

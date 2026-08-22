@@ -156,7 +156,7 @@ export default async function BeheerDashboardPage() {
             Werkvoorraad
           </p>
           <h2 className="mt-1 text-2xl font-semibold tracking-[-0.03em] text-vtk-ink">Acties en lopend werk</h2>
-          <p className="mt-1 text-sm text-vtk-muted">De actuele stand van materiaal en vervoer.</p>
+          <p className="mt-1 text-sm text-vtk-muted">De actuele stand van materiaal en transport.</p>
         </div>
         <div className="flex items-baseline gap-2 rounded-full border border-vtk-navy/10 bg-vtk-surface px-4 py-2">
           <strong className="text-lg tabular-nums text-vtk-ink">{pending}</strong>
@@ -172,7 +172,7 @@ export default async function BeheerDashboardPage() {
           counts={materialCounts}
         />
         <StatusGroup
-          title="Vervoer"
+          title="Transport"
           href="/beheer/vervoer"
           description="Ritaanvragen en geplande ritten"
           counts={vanCounts}
@@ -221,7 +221,7 @@ export default async function BeheerDashboardPage() {
             {agenda.vanBookings.map((booking) => (
               <AgendaRow
                 key={`v-${booking.id}`}
-                kind="Vervoer"
+                kind="Transport"
                 tone="rounded-full bg-vtk-navy px-2.5 py-1 text-xs font-semibold text-white"
                 requester={booking.user.name}
                 detailLabel="Rit"

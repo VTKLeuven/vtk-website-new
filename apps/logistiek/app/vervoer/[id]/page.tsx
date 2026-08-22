@@ -52,7 +52,7 @@ export default async function VanBookingDetailPage({
           ← {en ? 'My reservations' : 'Mijn reservaties'}
         </Link>
       }
-      title={en ? 'Transport' : 'Vervoer'}
+      title="Transport"
     >
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
         <section className="rounded-[18px] border border-vtk-navy/10 bg-vtk-surface p-6">
