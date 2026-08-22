@@ -148,7 +148,7 @@ export async function deleteVaultItemAction(formData: FormData): Promise<void> {
 export async function revealVaultItemAction(
   vaultPostId: string,
   itemId: string,
-): Promise<{ ok: true; password: string | null } | { ok: false; code: string }> {
+): Promise<{ ok: true; password: string | null; name: string } | { ok: false; code: string }> {
   const session = await requireAnyPermission(["vault.editOwn", "vault.manage"]);
   const cfg = await getVaultConfig();
   if (!cfg) return { ok: false, code: "NOT_CONFIGURED" };
@@ -164,7 +164,7 @@ export async function revealVaultItemAction(
       target: `${post.groupName}: ${item.name}`,
       summary: "Wachtwoord bekeken in de admin",
     });
-    return { ok: true, password: item.password };
+    return { ok: true, password: item.password, name: item.name };
   } catch (err) {
     return { ok: false, code: toCode(err) };
   }

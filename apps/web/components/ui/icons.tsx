@@ -93,3 +93,37 @@ export function UploadIcon() {
     </Icon>
   );
 }
+
+/**
+ * Persoon en sleutel: twee kopieerknoppen naast elkaar met hetzelfde
+ * kopieer-icoon zijn een raadsel, dus het icoon zegt wát je kopieert.
+ */
+export function UserIcon() {
+  return (
+    <Icon>
+      <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+      <circle cx="12" cy="7" r="4" />
+    </Icon>
+  );
+}
+
+export function KeyIcon() {
+  return (
+    <Icon>
+      <circle cx="7.5" cy="15.5" r="4.5" />
+      <path d="m10.7 12.3 8.3-8.3" />
+      <path d="m17 6 2.5 2.5" />
+      <path d="m14 9 2.5 2.5" />
+    </Icon>
+  );
+}
+
+export function InfoIcon() {
+  return (
+    <Icon>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M12 16v-4" />
+      <path d="M12 8h.01" />
+    </Icon>
+  );
+}
