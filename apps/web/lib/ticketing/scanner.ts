@@ -4,6 +4,7 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "@vtk/db";
 import { z } from "zod";
 import { requireTicketEventCapability } from "./authorization";
+import { ticketColorKey } from "./ticketColors";
 import {
   credentialFingerprint,
   extractTicketCredential,
@@ -19,7 +20,18 @@ export const scanRequestSchema = z.object({
   clientScannedAt: z.string().datetime().nullable().optional(),
 });
 
-type ScannableTicket = Prisma.TicketGetPayload<{ include: { orderItem: true } }>;
+type ScannableTicket = Prisma.TicketGetPayload<{ include: typeof SCANNED_TICKET_INCLUDE }>;
+
+/**
+ * Wat een scan van een ticket nodig heeft. De kleur komt van het tickettype zelf
+ * en niet uit een kopie op de bestelregel, anders dan `ticketTypeName`: die kopie
+ * bestaat om de geschiedenis vast te houden wanneer een type hernoemd wordt,
+ * terwijl je een kleur net wél wil kunnen bijsturen tot vlak voor de deur
+ * opengaat. De relatie is `Restrict`, dus ze staat er altijd.
+ */
+const SCANNED_TICKET_INCLUDE = {
+  orderItem: { include: { ticketType: { select: { color: true } } } },
+} satisfies Prisma.TicketInclude;
 
 function ticketDto(ticket: ScannableTicket | null) {
   return ticket
@@ -27,6 +39,7 @@ function ticketDto(ticket: ScannableTicket | null) {
         publicId: ticket.publicCode as string,
         attendeeName: ticket.orderItem.attendeeName as string,
         typeName: ticket.orderItem.ticketTypeName as string,
+        typeColor: ticketColorKey(ticket.orderItem.ticketType.color),
         checkedInAt: ticket.checkedInAt as Date | null,
       }
     : undefined;
@@ -77,7 +90,13 @@ export async function scannerBootstrap(eventId: string) {
           publicCode: true,
           credentialVersion: true,
           checkedInAt: true,
-          orderItem: { select: { attendeeName: true, ticketTypeName: true } },
+          orderItem: {
+            select: {
+              attendeeName: true,
+              ticketTypeName: true,
+              ticketType: { select: { color: true } },
+            },
+          },
         },
       })
     : [];
@@ -101,6 +120,7 @@ export async function scannerBootstrap(eventId: string) {
         checkedIn: ticket.checkedInAt !== null,
         name: ticket.orderItem.attendeeName,
         type: ticket.orderItem.ticketTypeName,
+        typeColor: ticketColorKey(ticket.orderItem.ticketType.color),
       })),
     },
   };
@@ -111,7 +131,7 @@ export async function scanTicket(eventId: string, rawInput: unknown) {
   const { session } = await requireTicketEventCapability(eventId, "SCAN");
   const existing = await prisma.ticketScanLog.findUnique({
     where: { clientScanId: input.clientScanId },
-    include: { ticket: { include: { orderItem: true } } },
+    include: { ticket: { include: SCANNED_TICKET_INCLUDE } },
   });
   if (existing) {
     if (existing.eventId !== eventId) {
@@ -167,7 +187,7 @@ export async function scanTicket(eventId: string, rawInput: unknown) {
   try {
     outcome = await prisma.$transaction(async (tx) => {
     const ticket = publicCode
-      ? await tx.ticket.findUnique({ where: { publicCode }, include: { orderItem: true } })
+      ? await tx.ticket.findUnique({ where: { publicCode }, include: SCANNED_TICKET_INCLUDE })
       : null;
     const sameEventTicket = ticket?.eventId === eventId ? ticket : null;
     const refundPending = sameEventTicket
@@ -239,7 +259,7 @@ export async function scanTicket(eventId: string, rawInput: unknown) {
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
       const duplicate = await prisma.ticketScanLog.findUnique({
         where: { clientScanId: input.clientScanId },
-        include: { ticket: { include: { orderItem: true } } },
+        include: { ticket: { include: SCANNED_TICKET_INCLUDE } },
       });
       if (duplicate?.eventId === eventId) {
         return {
@@ -253,7 +273,7 @@ export async function scanTicket(eventId: string, rawInput: unknown) {
     throw error;
   }
   const freshTicket = outcome.ticketId
-    ? await prisma.ticket.findUnique({ where: { id: outcome.ticketId }, include: { orderItem: true } })
+    ? await prisma.ticket.findUnique({ where: { id: outcome.ticketId }, include: SCANNED_TICKET_INCLUDE })
     : null;
   return {
     result: outcome.result,
@@ -318,7 +338,7 @@ export async function reverseTicketScan(
   const { session } = await requireTicketEventCapability(eventId, "SCAN");
   const existing = await prisma.ticketScanLog.findUnique({
     where: { clientScanId: input.clientScanId },
-    include: { ticket: { include: { orderItem: true } } },
+    include: { ticket: { include: SCANNED_TICKET_INCLUDE } },
   });
   if (existing) {
     if (
@@ -339,7 +359,7 @@ export async function reverseTicketScan(
   const ticket = await prisma.$transaction(async (tx) => {
     const scan = await tx.ticketScanLog.findFirst({
       where: { id: input.scanId, eventId, result: "ACCEPTED" },
-      include: { ticket: { include: { orderItem: true } }, reversedBy: true },
+      include: { ticket: { include: SCANNED_TICKET_INCLUDE }, reversedBy: true },
     });
     if (!scan?.ticket || scan.reversedBy) throw new Error("SCAN_NOT_REVERSIBLE");
 

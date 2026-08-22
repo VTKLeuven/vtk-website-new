@@ -981,6 +981,85 @@
   font-size: 13px;
 }
 
+/* Kleurkiezer voor een tickettype. De naam staat naast het vlakje en niet enkel
+   in de kleur: wie de vlakjes niet uit elkaar houdt, moet de keuze even goed
+   kunnen maken. */
+.ticket-admin-colors {
+  min-width: 0;
+  margin: 0;
+  border: 0;
+  padding: 0;
+}
+
+.ticket-admin-colors legend {
+  padding: 0;
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.ticket-admin-colors .ticket-admin-help {
+  margin: 3px 0 8px;
+}
+
+.ticket-admin-color-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.ticket-admin-color-options label {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 6px 12px 6px 8px;
+  background: var(--surface);
+  color: var(--body);
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.ticket-admin-color-options label > span {
+  width: 15px;
+  height: 15px;
+  flex: none;
+  border-radius: 50%;
+  box-shadow: inset 0 0 0 1px rgba(10, 15, 31, 0.14);
+}
+
+.ticket-admin-color-options input[type="radio"] {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.ticket-admin-color-options label:has(input:checked) {
+  border-color: var(--ink);
+  box-shadow: inset 0 0 0 1px var(--ink);
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.ticket-admin-color-options label:has(input:focus-visible) {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
+}
+
+/* Het bolletje voor de naam van een tickettype in de lijst. */
+.ticket-admin-color-dot {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  margin-right: 7px;
+  border-radius: 50%;
+  box-shadow: inset 0 0 0 1px rgba(10, 15, 31, 0.14);
+  vertical-align: baseline;
+}
+
 .ticket-admin-check {
   display: inline-flex;
   align-items: flex-start;

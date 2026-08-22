@@ -1254,6 +1254,11 @@ model TicketType {
   unitPriceCents  Int
   currency        String         @default("EUR")
   audience        TicketAudience @default(PUBLIC)
+  // Key uit het palet in `apps/web/lib/ticketing/ticketColors.ts`, geen vrije
+  // hexwaarde: de scanner kleurt hiermee een vlak van een halve telefoon groot
+  // en een zelfgekozen kleur is daar vroeg of laat onleesbaar op. Aan een cantus
+  // is dit het verschil tussen water, bier en eigen drank.
+  color           String         @default("navy")
   salesStartAt    DateTime?      @db.Timestamptz(3)
   salesEndAt      DateTime?      @db.Timestamptz(3)
   minPerOrder     Int            @default(1)

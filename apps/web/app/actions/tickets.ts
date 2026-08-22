@@ -14,6 +14,7 @@ import {
 import { parseEuroAmount } from "@/lib/ticketing/money";
 import { requestTicketRefund } from "@/lib/ticketing/refunds";
 import { slugify } from "@/lib/ticketing/slug";
+import { ticketColorKey } from "@/lib/ticketing/ticketColors";
 import { geocodeAddress } from "@/lib/ticketing/geocode";
 import { localDateTimeToUtc } from "@/lib/ticketing/time";
 import { withSerializableTransaction } from "@/lib/ticketing/transactions";
@@ -681,6 +682,7 @@ export async function createTicketTypeAction(formData: FormData): Promise<void> 
         unitPriceCents,
         currency: event.currency,
         audience: value(formData, "audience") === "MEMBERS" ? "MEMBERS" : "PUBLIC",
+        color: ticketColorKey(formData.get("color")),
         salesStartAt,
         salesEndAt,
         minPerOrder,
@@ -706,6 +708,50 @@ export async function createTicketTypeAction(formData: FormData): Promise<void> 
     summary: `${(unitPriceCents / 100).toFixed(2)} euro per ticket`,
   });
   refreshTicketEvent(locale, eventId);
+}
+
+/**
+ * De kleur van een bestaand tickettype. Apart van het aanmaken, want een
+ * tickettype is verder niet bewerkbaar en de kleur is precies het veld dat je
+ * pas wil kiezen wanneer de drie types naast elkaar staan (water, bier, eigen
+ * drank aan een cantus).
+ */
+export async function saveTicketTypeColorAction(
+  _previousState: SaveState,
+  formData: FormData,
+): Promise<SaveState> {
+  const eventId = value(formData, "eventId");
+  const ticketTypeId = value(formData, "ticketTypeId");
+  const locale = localeSchema.parse(value(formData, "locale") || "nl");
+  const { session } = await requireTicketEventCapability(eventId, "MANAGE_INVENTORY");
+  const type = await prisma.ticketType.findFirst({ where: { id: ticketTypeId, eventId } });
+  if (!type) return saveError("TICKET_TYPE_NOT_FOUND");
+
+  const color = ticketColorKey(formData.get("color"));
+  if (color === type.color) return saveOk();
+
+  await prisma.$transaction([
+    prisma.ticketType.update({ where: { id: type.id }, data: { color } }),
+    prisma.ticketAuditLog.create({
+      data: {
+        eventId,
+        actorUserId: session.user.id,
+        action: "TICKET_TYPE_UPDATED",
+        entityType: "TicketType",
+        entityId: type.id,
+        metadata: { color },
+      },
+    }),
+  ]);
+  await logAudit({
+    action: "update",
+    entity: "ticketType",
+    entityId: eventId,
+    target: `${await ticketEventTitle(eventId)}: ${type.nameNl}`,
+    summary: `kleur op ${color}`,
+  });
+  refreshTicketEvent(locale, eventId);
+  return saveOk();
 }
 
 export async function archiveTicketTypeAction(formData: FormData): Promise<void> {

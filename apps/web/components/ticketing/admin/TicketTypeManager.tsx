@@ -1,9 +1,13 @@
 import {
   archiveTicketTypeAction,
   createTicketTypeAction,
+  saveTicketTypeColorAction,
   updateInventoryPoolAction,
 } from "@/app/actions/tickets";
 import { Archive, Package, Plus, Save, Ticket, UsersRound } from "lucide-react";
+import { SaveForm } from "@/components/ui/SaveForm";
+import { ticketColorKey, ticketColorLabel } from "@/lib/ticketing/ticketColors";
+import { TicketColorChoice } from "./TicketColorChoice";
 import { formatMoney, type AdminLocale } from "./format";
 
 type InventoryPool = {
@@ -25,6 +29,7 @@ type TicketType = {
   unitPriceCents: number;
   currency: string;
   audience: string;
+  color: string;
   minPerOrder: number;
   maxPerOrder: number;
   active: boolean;
@@ -161,6 +166,11 @@ export function TicketTypeManager({
                 <div className="ticket-admin-row-head">
                   <div>
                     <p className="ticket-admin-row-title">
+                      <span
+                        className="ticket-admin-color-dot"
+                        style={{ background: `var(--ticket-color-${ticketColorKey(ticketType.color)})` }}
+                        aria-hidden="true"
+                      />
                       {locale === "en" && ticketType.nameEn ? ticketType.nameEn : ticketType.nameNl}
                     </p>
                     <p className="ticket-admin-row-meta">
@@ -188,6 +198,42 @@ export function TicketTypeManager({
                     </span>
                   )}
                 </div>
+                <details className="ticket-admin-details">
+                  <summary>
+                    {locale === "nl" ? "Kleur aanpassen" : "Change colour"}
+                    <span className="ticket-admin-row-meta">
+                      {ticketColorLabel(ticketType.color, locale)}
+                    </span>
+                  </summary>
+                  <div className="ticket-admin-details-body">
+                    <SaveForm
+                      action={saveTicketTypeColorAction}
+                      className="ticket-admin-form"
+                      resetOnSuccess={false}
+                      submitLabel={locale === "nl" ? "Kleur opslaan" : "Save colour"}
+                      savingLabel={locale === "nl" ? "Opslaan" : "Saving"}
+                      savedMessage={locale === "nl" ? "Kleur opgeslagen." : "Colour saved."}
+                      errorMessages={{
+                        TICKET_TYPE_NOT_FOUND:
+                          locale === "nl"
+                            ? "Niet opgeslagen: dit tickettype bestaat niet meer."
+                            : "Not saved: this ticket type no longer exists.",
+                      }}
+                      fallbackErrorMessage={
+                        locale === "nl" ? "Kleur niet opgeslagen." : "Colour was not saved."
+                      }
+                    >
+                      <input type="hidden" name="locale" value={locale} />
+                      <input type="hidden" name="eventId" value={eventId} />
+                      <input type="hidden" name="ticketTypeId" value={ticketType.id} />
+                      <TicketColorChoice
+                        idPrefix={`ticket-type-${ticketType.id}`}
+                        value={ticketType.color}
+                        locale={locale}
+                      />
+                    </SaveForm>
+                  </div>
+                </details>
               </li>
             ))}
           </ul>
@@ -245,6 +291,9 @@ export function TicketTypeManager({
                       <option value="PUBLIC">{locale === "nl" ? "Publiek" : "Public"}</option>
                       <option value="MEMBERS">{locale === "nl" ? "Alleen leden" : "Members only"}</option>
                     </select>
+                  </div>
+                  <div className="ticket-admin-field" data-span="2">
+                    <TicketColorChoice idPrefix="ticket-type-new" locale={locale} />
                   </div>
                   <div className="ticket-admin-field">
                     <label htmlFor="ticket-type-min">{locale === "nl" ? "Minimum per bestelling" : "Minimum per order"}</label>

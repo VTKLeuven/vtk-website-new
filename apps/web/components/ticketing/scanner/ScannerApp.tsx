@@ -39,6 +39,7 @@ import type {
   ScannerBootstrap,
   ScannerManifest,
 } from "./types";
+import { ticketColorKey } from "@/lib/ticketing/ticketColors";
 import { loadManifest, loadQueue, saveManifest, saveQueue, verifyOffline } from "./offline";
 import { InstallButton } from "./InstallButton";
 
@@ -102,16 +103,50 @@ function offlineBootstrap(manifest: ScannerManifest): ScannerBootstrap {
   };
 }
 
+/**
+ * Het volledige camerabeeld, overdekt met de uitkomst van de scan.
+ *
+ * Bij een **aanvaard** ticket krijgt het vlak de kleur van het tickettype en
+ * staat het type als grootste woord op het scherm: aan een cantus moet de tapper
+ * van drie meter zien of het water, bier of eigen drank is.
+ *
+ * Bij **dubbel** of **geweigerd** overrulen oranje en rood die typekleur
+ * volledig. Dat is de belangrijkste regel van dit scherm: een geweigerd
+ * bierticket dat geel oplicht, gaat binnen.
+ *
+ * De kleur is nooit het enige signaal. Zowel de naam van het type als het
+ * oordeel staan er als tekst bij, want een op de twaalf mannen ziet rood en
+ * groen niet uit elkaar, en die staat even goed aan de deur als in de rij.
+ */
 function ScannerFeedback({ item }: { item: ScanHistoryItem }) {
+  const accepted = item.kind === "accepted";
+  const showType = accepted && Boolean(item.typeName);
   return (
-    <div className={`scanner-feedback is-${item.kind}`} role="status" aria-live="assertive">
+    <div
+      className={`scanner-feedback is-${item.kind}`}
+      style={
+        accepted && item.typeColor
+          ? { background: `var(--ticket-color-${item.typeColor})` }
+          : undefined
+      }
+      role="status"
+      aria-live="assertive"
+    >
       <div className="scanner-feedback-icon">
         {item.kind === "accepted" ? <Check aria-hidden="true" /> : item.kind === "duplicate" || item.kind === "reversed" ? <RotateCcw aria-hidden="true" /> : <X aria-hidden="true" />}
       </div>
       <div>
-        <strong>{item.message}</strong>
+        <strong className={showType ? "scanner-feedback-type" : undefined}>
+          {showType ? item.typeName : item.message}
+        </strong>
         {item.attendeeName ? <span>{item.attendeeName}</span> : null}
-        {item.typeName ? <small>{item.typeName}</small> : null}
+        {showType ? (
+          <small className="scanner-feedback-verdict">
+            <Check size={13} aria-hidden="true" /> {item.message}
+          </small>
+        ) : item.typeName ? (
+          <small>{item.typeName}</small>
+        ) : null}
       </div>
     </div>
   );
@@ -331,6 +366,7 @@ export function ScannerApp({ eventId }: { eventId: string }) {
         code: entry?.code ?? credential.slice(-10),
         attendeeName: entry?.name,
         typeName: entry?.type,
+        typeColor: entry?.typeColor,
         pending: true,
         message:
           verdict.kind === "accepted"
@@ -361,6 +397,7 @@ export function ScannerApp({ eventId }: { eventId: string }) {
         code: item.code,
         attendeeName: item.attendeeName,
         typeName: item.typeName,
+        typeColor: item.typeColor,
       };
       const next = [...loadQueue(eventId), queued];
       saveQueue(eventId, next);
@@ -392,6 +429,7 @@ export function ScannerApp({ eventId }: { eventId: string }) {
         code: payload.ticket?.publicId ?? credential.slice(-10),
         attendeeName: payload.ticket?.attendeeName ?? payload.attendeeName,
         typeName: payload.ticket?.typeName ?? payload.ticket?.ticketTypeName ?? payload.typeName,
+        typeColor: ticketColorKey(payload.ticket?.typeColor ?? payload.typeColor),
         message: payload.message ?? fallbackMessage(kind),
         scanId: kind === "accepted" ? payload.scanId : undefined,
       };
@@ -754,7 +792,14 @@ export function ScannerApp({ eventId }: { eventId: string }) {
                           </span>
                           <span className="scanner-name-who">
                             <strong>{ticket.name}</strong>
-                            <small>{ticket.type}</small>
+                            <small>
+                              <span
+                                className="scanner-type-dot"
+                                style={{ background: `var(--ticket-color-${ticket.typeColor})` }}
+                                aria-hidden="true"
+                              />
+                              {ticket.type}
+                            </small>
                           </span>
                           <span className="scanner-name-action">
                             {binnen ? "Binnen" : "Inchecken"}
@@ -804,7 +849,16 @@ export function ScannerApp({ eventId }: { eventId: string }) {
                     <div className="scanner-history-state">{item.kind === "accepted" ? <Check aria-hidden="true" /> : item.kind === "duplicate" || item.kind === "reversed" ? <RotateCcw aria-hidden="true" /> : <X aria-hidden="true" />}</div>
                     <div>
                       <strong>{item.kind === "reversed" ? item.message : item.attendeeName ?? item.message}</strong>
-                      <span>{item.typeName ?? item.code}</span>
+                      <span>
+                        {item.typeName && item.typeColor ? (
+                          <span
+                            className="scanner-type-dot"
+                            style={{ background: `var(--ticket-color-${item.typeColor})` }}
+                            aria-hidden="true"
+                          />
+                        ) : null}
+                        {item.typeName ?? item.code}
+                      </span>
                     </div>
                     {item.kind === "accepted" && item.scanId ? (
                       <button

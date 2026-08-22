@@ -1,3 +1,5 @@
+import type { TicketColorKey } from "@/lib/ticketing/ticketColors";
+
 export type ScannerGate = {
   id: string;
   name: string;
@@ -10,6 +12,8 @@ export type ScannerManifestEntry = {
   checkedIn: boolean;
   name: string;
   type: string;
+  /** Key uit `lib/ticketing/ticketColors.ts`; moet mee, want offline is er geen tweede query. */
+  typeColor: TicketColorKey;
 };
 
 export type ScannerManifest = {
@@ -35,6 +39,7 @@ export type QueuedScan = {
   code: string;
   attendeeName?: string;
   typeName?: string;
+  typeColor?: TicketColorKey;
 };
 
 export type ScannerBootstrap = {
@@ -56,7 +61,7 @@ export type ScanBatchResponse = {
   results: Array<{
     clientScanId: string;
     result: string;
-    ticket?: { publicId?: string; attendeeName?: string; typeName?: string };
+    ticket?: { publicId?: string; attendeeName?: string; typeName?: string; typeColor?: string };
     error?: string;
   }>;
   stats?: { checkedIn?: number; total?: number };
@@ -72,10 +77,12 @@ export type ScanApiResponse = {
     attendeeName?: string;
     typeName?: string;
     ticketTypeName?: string;
+    typeColor?: string;
     checkedInAt?: string | null;
   };
   attendeeName?: string;
   typeName?: string;
+  typeColor?: string;
   checkedInAt?: string | null;
   stats?: {
     checkedIn?: number;
@@ -92,6 +99,7 @@ export type ScanHistoryItem = {
   code: string;
   attendeeName?: string;
   typeName?: string;
+  typeColor?: TicketColorKey;
   message: string;
   scanId?: string;
   /** Offline beslist en nog niet door de server bevestigd. */

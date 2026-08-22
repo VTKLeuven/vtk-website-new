@@ -7,9 +7,9 @@ const manifest: ScannerManifest = {
   generatedAt: "2026-08-07T18:00:00.000Z",
   ticketCount: 3,
   tickets: [
-    { code: "AAAAAAAAAAAA", version: 1, checkedIn: false, name: "Jonas", type: "Standaard" },
-    { code: "BBBBBBBBBBBB", version: 2, checkedIn: false, name: "Mila", type: "Vroegboek" },
-    { code: "CCCCCCCCCCCC", version: 1, checkedIn: true, name: "Sam", type: "Standaard" },
+    { code: "AAAAAAAAAAAA", version: 1, checkedIn: false, name: "Jonas", type: "Standaard", typeColor: "navy" },
+    { code: "BBBBBBBBBBBB", version: 2, checkedIn: false, name: "Mila", type: "Vroegboek", typeColor: "amber" },
+    { code: "CCCCCCCCCCCC", version: 1, checkedIn: true, name: "Sam", type: "Standaard", typeColor: "navy" },
   ],
 };
 

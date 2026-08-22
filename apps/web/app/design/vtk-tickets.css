@@ -1,6 +1,21 @@
 /* Public ticketing and the operational scanner share brand tokens, but keep
    separate layout rules so the camera route never inherits site chrome. */
 
+/* Het palet voor `TicketType.color`. Eén plek, zoals de rest van het
+   kleursysteem: retune hier en de admin, de scanner en de deelnemerslijst
+   volgen. De keys zelf staan in `lib/ticketing/ticketColors.ts`. Elke kleur is
+   donker genoeg om er witte tekst op te zetten, want het scannerscherm vult er
+   een vlak mee dat op armlengte in het donker leesbaar moet zijn. */
+:root {
+  --ticket-color-navy: #0e1a36;
+  --ticket-color-blue: #17558f;
+  --ticket-color-amber: #96590a;
+  --ticket-color-violet: #5b3699;
+  --ticket-color-green: #16663f;
+  --ticket-color-rose: #a32259;
+  --ticket-color-slate: #4a5468;
+}
+
 .vtk-tickets-page,
 .ticket-order-page {
   --ticket-green: #147a54;
@@ -1676,6 +1691,44 @@
   margin-top: 3px;
   color: rgba(255, 255, 255, 0.72);
   font-size: 12px;
+}
+
+/* Bij een aanvaard ticket is de naam van het tickettype het grootste woord op
+   het scherm; de kleur eronder is de bevestiging, niet het bericht. */
+.scanner-feedback strong.scanner-feedback-type {
+  font-size: 40px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+/* Het oordeel blijft groen, ook wanneer het vlak eromheen de kleur van het
+   tickettype heeft. Zonder deze pil zou "aanvaard" enkel uit de afwezigheid van
+   rood af te leiden zijn. */
+.scanner-feedback-verdict {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  align-self: flex-start;
+  margin-top: 8px;
+  border-radius: 999px;
+  padding: 3px 10px 3px 7px;
+  background: rgba(255, 255, 255, 0.92);
+  color: #0d784c;
+  font-weight: 700;
+}
+
+/* Hetzelfde kleurbolletje in de deelnemerslijst en in de scangeschiedenis, zodat
+   de kleurcode over het hele scherm hetzelfde betekent. */
+.scanner-type-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  margin-right: 6px;
+  flex: none;
+  border-radius: 50%;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.35);
+  vertical-align: baseline;
 }
 
 .scanner-camera-error {
