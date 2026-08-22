@@ -30,12 +30,12 @@ ook bij maar werd anders opgelost dan gevraagd; de reden staat bij de taak.
 | Fase | Inhoud | Taken | Status |
 | --- | --- | --- | --- |
 | 0 | Beslissingen die eerst moeten vallen | 4 vragen | ✅ beslist |
-| 1 | Kleine bugs, UI-fixes en ergernissen | R1–R8 | 🟡 R5, R6, R7 open |
-| 2 | Navigatie, lay-out en overzichten | N1–N5 | 🟡 N2, N3, N5 open |
-| 3 | Materiaal: opmerkingen, deelgoedkeuring, sjablonen | M1–M8 | 🟡 M1–M7 open |
-| 4 | Vervoer: terminologie, goedkeuring, weekoverzicht | T1–T13 | 🟡 T1, T2, T5, T7–T10, T12, T13 open |
-| 5 | Flesserke en kalender | F1–F3 | ⬜ open |
-| 6 | Evenementen: post-overzicht, materiaallijst, C&G | E1–E7 | ⬜ open |
+| 1 | Kleine bugs, UI-fixes en ergernissen | R1–R8 | 🟡 R5, R7 open |
+| 2 | Navigatie, lay-out en overzichten | N1–N5 | 🟡 N3, N5 open |
+| 3 | Materiaal: opmerkingen, deelgoedkeuring, sjablonen | M1–M8 | 🟡 M2, M4–M7 open |
+| 4 | Vervoer: terminologie, goedkeuring, weekoverzicht | T1–T13 | 🟡 T2, T5, T7–T10 open |
+| 5 | Flesserke en kalender | F1–F3 | 🟡 F1, F3 open |
+| 6 | Evenementen: post-overzicht, materiaallijst, C&G | E1–E7 | 🟡 E1–E5 open |
 
 ---
 
@@ -140,7 +140,7 @@ Alles hier is klein, zichtbaar en zonder (of met een minimale) migratie.
      met `updatedAt` vs `lastViewedAt`).
 - **Klaar wanneer:** een aanvrager ziet direct dat logi iets heeft aangepast.
 
-### R6. Historiek inklappen
+### ✅ R6. Historiek inklappen
 **P1 · code · klein**
 
 - **Raakt:** `apps/logistiek/app/beheer/aanvragen/[id]/page.tsx`,
@@ -211,7 +211,7 @@ Alles hier is klein, zichtbaar en zonder (of met een minimale) migratie.
   4. Op mobiel: hamburger of schuifbaar.
 - **Klaar wanneer:** de navigatie volgt de bovenstaande indeling.
 
-### N2. Terugknop naar evenementenoverzicht
+### ✅ N2. Terugknop naar evenementenoverzicht
 **P1 · code · klein**
 
 - **Raakt:** `apps/logistiek/app/beheer/aanvragen/[id]/page.tsx`,
@@ -278,7 +278,7 @@ Alles hier is klein, zichtbaar en zonder (of met een minimale) migratie.
 
 # Fase 3: materiaal — opmerkingen, deelgoedkeuring, sjablonen
 
-### M1. Logi-opmerking per materiaalitem
+### ✅ M1. Logi-opmerking per materiaalitem
 **P1 · code · 🗄️**
 
 - **Raakt:** `packages/db/prisma/schema.prisma` (`UitleenReservationLine`),
@@ -316,7 +316,7 @@ Alles hier is klein, zichtbaar en zonder (of met een minimale) migratie.
 - **Klaar wanneer:** een aanvrager kan na goedkeuring nog een tafel
   toevoegen, waarna logi opnieuw moet beslissen.
 
-### M3. Gedeeltelijke goedkeuring van materiaal
+### ✅ M3. Gedeeltelijke goedkeuring van materiaal
 **P2 · code · 🗄️ · 📝**
 
 - **Raakt:** `packages/db/prisma/schema.prisma` (`UitleenReservationLine`),
@@ -412,7 +412,7 @@ Alles hier is klein, zichtbaar en zonder (of met een minimale) migratie.
 
 # Fase 4: vervoer — terminologie, goedkeuring, weekoverzicht
 
-### T1. Terminologie: "transport" in plaats van "vervoer"
+### ✅ T1. Terminologie: "transport" in plaats van "vervoer"
 **P1 · code**
 
 - **Raakt:** alle vervoer-gerelateerde pagina's, labels, navigatie, i18n.
@@ -553,7 +553,7 @@ Alles hier is klein, zichtbaar en zonder (of met een minimale) migratie.
 - **Klaar wanneer:** je kan een conflicterende rit goedkeuren na het
   aanpassen van de uren.
 
-### T12. Voertuigselectie: automatisch deselecteren
+### ✅ T12. Voertuigselectie: automatisch deselecteren
 **P1 · code · klein**
 
 - **Raakt:** `apps/logistiek/app/vervoer/request-form.tsx`.
@@ -600,7 +600,7 @@ Alles hier is klein, zichtbaar en zonder (of met een minimale) migratie.
 - **Klaar wanneer:** je ziet in het flesserke-formulier een overzicht van
   je selectie.
 
-### F2. Tekst bij terugdraaien "teruggebracht" verduidelijken
+### ✅ F2. Tekst bij terugdraaien "teruggebracht" verduidelijken
 **P1 · code · klein**
 
 - **Raakt:** `apps/logistiek/app/actions/beheer.ts`,
@@ -721,7 +721,7 @@ Alles hier is klein, zichtbaar en zonder (of met een minimale) migratie.
 - **Klaar wanneer:** de materiaallijst bevat ook niet-logi materiaal en
   C&G-bestellingen.
 
-### E6. Materiaallijst in mail bij aanvraag
+### ✅ E6. Materiaallijst in mail bij aanvraag
 **P2 · code**
 
 - **Raakt:** de mailinfrastructuur uit ronde 1 (A9), `packages/mail`.
@@ -735,7 +735,7 @@ Alles hier is klein, zichtbaar en zonder (of met een minimale) migratie.
 - **Klaar wanneer:** de mail bevat alle relevante opmerkingen en
   afgewezen items zijn herkenbaar.
 
-### E7. Afgewezen materiaal zichtbaar houden in aanvraag
+### ✅ E7. Afgewezen materiaal zichtbaar houden in aanvraag
 **P1 · code**
 
 - **Raakt:** `apps/logistiek/app/reservaties/page.tsx`,

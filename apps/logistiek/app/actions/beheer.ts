@@ -720,10 +720,18 @@ export async function approveReservationAction(
     if (!reservation) return { error: 'NOT_FOUND' as const };
     if (reservation.status !== 'REQUESTED') return { error: 'NOT_REQUESTED' as const };
 
+    // Niet toegekende lijnen (M3) tellen niet mee: ze blijven op de aanvraag
+    // staan met de reden erbij, maar nemen geen voorraad in en hoeven dus ook
+    // geen beschikbaarheidscheck te doorstaan.
+    const grantedLines = reservation.lines.filter((line) => line.lineStatus !== 'REJECTED');
+    if (grantedLines.length === 0 && reservation.flesserkeLines.length === 0) {
+      return { error: 'ALL_REJECTED' as const };
+    }
+
     const reserved = await reservedQuantities(tx, reservation.pickupDate, reservation.returnDate, {
       excludeReservationId: reservation.id,
     });
-    for (const line of reservation.lines) {
+    for (const line of grantedLines) {
       const available = line.item.quantity - (reserved.get(line.itemId) ?? 0);
       if (line.quantity > available) {
         return { error: 'NO_STOCK' as const, itemName: line.itemName };
@@ -751,11 +759,23 @@ export async function approveReservationAction(
         decidedById: session.user.id,
       },
     });
+    // Wat nog open stond, is nu toegekend; wat het team eerder al weigerde,
+    // blijft geweigerd (M3).
+    await tx.uitleenReservationLine.updateMany({
+      where: { reservationId: reservation.id, lineStatus: 'REQUESTED' },
+      data: { lineStatus: 'APPROVED' },
+    });
+    const rejected = reservation.lines.length - grantedLines.length;
     await writeAudit(tx, { reservationId: reservation.id }, {
       kind: 'STATUS_CHANGED',
       fromStatus: reservation.status,
       toStatus: 'APPROVED',
-      note: paymentMode === 'ONLINE' ? 'online betalen' : 'betalen aan de balie',
+      note: [
+        paymentMode === 'ONLINE' ? 'online betalen' : 'betalen aan de balie',
+        rejected > 0 ? `${rejected} van de ${reservation.lines.length} items niet toegekend` : null,
+      ]
+        .filter(Boolean)
+        .join('; '),
       actorId: session.user.id,
     });
     return { error: null };
@@ -764,6 +784,7 @@ export async function approveReservationAction(
   if (outcome.error === 'NOT_FOUND') return saveError('NOT_FOUND');
   if (outcome.error === 'NOT_REQUESTED') return saveError('NOT_REQUESTED');
   if (outcome.error === 'NO_STOCK') return saveError('NO_STOCK');
+  if (outcome.error === 'ALL_REJECTED') return saveError('ALL_REJECTED');
 
   // Pas na de transactie: een mail over een goedkeuring die door een rollback
   // niet doorging, is erger dan geen mail.
@@ -850,6 +871,93 @@ export async function setLinePreparedAction(
   revalidatePath(`/beheer/aanvragen/${line.reservation.id}`);
   revalidatePath('/beheer/aanvragen');
   return { ok: true };
+}
+
+/**
+ * De beslissing en de teamnota van één materiaallijn (M1, M3).
+ *
+ * Goedkeuren werkte tot nu toe op de hele aanvraag: vijf items waarvan er één
+ * niet vrij is, betekende de hele aanvraag afwijzen of ze stilzwijgend uitkleden
+ * bij het bewerken. Nu kan het team één lijn niet toekennen; ze blijft staan met
+ * de reden erbij, zodat de aanvrager ziet wat er niet doorging en waarom.
+ *
+ * De nota is een tweede veld naast `note` van het lid. Eén gedeeld veld liet de
+ * tweede schrijver de eerste overschrijven zonder dat iemand zag dat er iets weg
+ * was.
+ *
+ * Een lijn opnieuw toekennen op een aanvraag die al goedgekeurd is, neemt
+ * voorraad in die intussen aan iemand anders kan zijn toegewezen; die stap doet
+ * daarom dezelfde harde check als het goedkeuren zelf.
+ */
+export async function saveLineDecisionAction(
+  lineId: string,
+  input: { lineStatus: 'REQUESTED' | 'APPROVED' | 'REJECTED'; adminNote: string }
+): Promise<ActionResult> {
+  const session = await requireManage();
+
+  const line = await prisma.uitleenReservationLine.findUnique({
+    where: { id: lineId },
+    include: { item: { select: { quantity: true } }, reservation: true },
+  });
+  if (!line) return { ok: false, error: 'Lijn niet gevonden.' };
+
+  const reservation = line.reservation;
+  if (reservation.status === 'RETURNED' || reservation.status === 'CANCELLED') {
+    return { ok: false, error: 'Deze aanvraag is afgehandeld; ze kan niet meer gewijzigd worden.' };
+  }
+
+  const adminNote = input.adminNote.trim().slice(0, 500);
+  // Een lijn op een aanvraag die nog niet beslist is, blijft REQUESTED tot de
+  // aanvraag goedgekeurd wordt; enkel "niet toekennen" is daar al een beslissing.
+  const decided = reservation.status !== 'REQUESTED';
+  const lineStatus =
+    input.lineStatus === 'REJECTED' ? 'REJECTED' : decided ? 'APPROVED' : 'REQUESTED';
+
+  const grantingAgain = lineStatus === 'APPROVED' && line.lineStatus === 'REJECTED';
+  if (grantingAgain) {
+    const outcome = await runSerializable(async (tx) => {
+      const reserved = await reservedQuantities(tx, reservation.pickupDate, reservation.returnDate, {
+        excludeReservationId: reservation.id,
+      });
+      const available = line.item.quantity - (reserved.get(line.itemId) ?? 0);
+      if (line.quantity > available) return { error: 'NO_STOCK' as const, available };
+      await tx.uitleenReservationLine.update({
+        where: { id: lineId },
+        data: { lineStatus, adminNote: adminNote || null },
+      });
+      return { error: null, available };
+    });
+    if (outcome.error === 'NO_STOCK') {
+      return {
+        ok: false,
+        error: `"${line.itemName}" past niet meer: er ${outcome.available === 1 ? 'is' : 'zijn'} er nog ${outcome.available} vrij in deze periode.`,
+      };
+    }
+  } else {
+    await prisma.uitleenReservationLine.update({
+      where: { id: lineId },
+      data: { lineStatus, adminNote: adminNote || null },
+    });
+  }
+
+  // Wel een historiekregel, in tegenstelling tot het klaarzetten: dit verandert
+  // wat het lid krijgt, en dat moet navolgbaar zijn.
+  if (lineStatus !== line.lineStatus) {
+    await writeAudit(prisma, { reservationId: reservation.id }, {
+      kind: 'EDITED',
+      note:
+        lineStatus === 'REJECTED'
+          ? `Niet toegekend: ${line.quantity}× ${line.itemName}${adminNote ? ` (${adminNote})` : ''}`
+          : `Toch toegekend: ${line.quantity}× ${line.itemName}`,
+      actorId: session.user.id,
+    });
+  }
+
+  revalidatePath(`/beheer/aanvragen/${reservation.id}`);
+  revalidatePath('/beheer/aanvragen');
+  revalidatePath(`/reservaties/${reservation.id}`);
+  revalidatePath('/reservaties');
+  return { ok: true, message: lineStatus === 'REJECTED' ? 'Lijn niet toegekend.' : 'Opgeslagen.' };
 }
 
 export async function markPickedUpAction(reservationId: string): Promise<ActionResult> {

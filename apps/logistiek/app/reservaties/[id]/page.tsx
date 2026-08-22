@@ -66,6 +66,10 @@ export default async function ReservatieDetailPage({
   // werkgroep ziet dus geen prijs, waarborg, betaalstatus of betaalknop. Dit staat
   // los van `showRentPrices`, dat over de catalogusprijzen gaat.
   const charged = chargesRequester(reservation.requesterType);
+  // Wat Logistiek wel en niet toekende (M3/E7). Beide blijven zichtbaar, in twee
+  // aparte lijsten.
+  const grantedLines = reservation.lines.filter((line) => line.lineStatus !== 'REJECTED');
+  const rejectedLines = reservation.lines.filter((line) => line.lineStatus === 'REJECTED');
   const cancellable =
     isOwner && (reservation.status === 'REQUESTED' || reservation.status === 'APPROVED') && !paid;
   const editable = isOwner && reservation.status === 'REQUESTED';
@@ -182,11 +186,11 @@ export default async function ReservatieDetailPage({
             </p>
           ) : null}
 
-          {reservation.lines.length > 0 ? (
+          {grantedLines.length > 0 ? (
             <>
               <h3 className="mt-6 text-sm font-semibold text-vtk-ink">{en ? 'Equipment' : 'Materiaal'}</h3>
               <ul className="mt-2 divide-y divide-vtk-navy/10">
-                {reservation.lines.map((line) => (
+                {grantedLines.map((line) => (
                   <li key={line.id} className="py-2.5">
                     <div className="flex items-center justify-between gap-4">
                       <span className="text-vtk-ink">
@@ -201,8 +205,44 @@ export default async function ReservatieDetailPage({
                       ) : null}
                     </div>
                     {line.note ? (
-                      <p className="mt-0.5 text-xs italic text-vtk-body">{line.note}</p>
+                      <p className="mt-0.5 text-xs italic text-vtk-body">
+                        <span className="font-semibold not-italic">{en ? 'You:' : 'Jij:'}</span>{' '}
+                        {line.note}
+                      </p>
                     ) : null}
+                    {line.adminNote ? (
+                      <p className="mt-0.5 text-xs italic text-vtk-body">
+                        <span className="font-semibold not-italic">Logistiek:</span> {line.adminNote}
+                      </p>
+                    ) : null}
+                  </li>
+                ))}
+              </ul>
+            </>
+          ) : null}
+
+          {/* Wat Logistiek niet kon toekennen, blijft zichtbaar (E7): apart van
+              wat je wel krijgt, doorstreept, met de reden erbij. Zomaar
+              verdwijnen liet je met een lijst waarin iets ontbrak zonder dat
+              ergens stond wat, of waarom. */}
+          {rejectedLines.length > 0 ? (
+            <>
+              <h3 className="mt-6 text-sm font-semibold text-vtk-ink">
+                {en ? 'Not granted' : 'Niet toegekend'}
+              </h3>
+              <ul className="mt-2 divide-y divide-vtk-navy/10">
+                {rejectedLines.map((line) => (
+                  <li key={line.id} className="py-2.5">
+                    <span className="text-vtk-muted line-through">
+                      {line.quantity}× {line.itemName}
+                    </span>
+                    <p className="mt-0.5 text-xs italic text-vtk-body">
+                      <span className="font-semibold not-italic">Logistiek:</span>{' '}
+                      {line.adminNote ??
+                        (en
+                          ? 'No reason given; ask logistiek@vtk.be.'
+                          : 'Geen reden opgegeven; vraag het na bij logistiek@vtk.be.')}
+                    </p>
                   </li>
                 ))}
               </ul>

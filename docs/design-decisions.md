@@ -2096,6 +2096,38 @@ exemplaar bijgehouden wordt: een kapot exemplaar telt dan niet meer mee voor de
 beschikbaarheid.
 
 
+### Goedkeuren gebeurt per lijn, en afgewezen materiaal blijft staan
+
+Logistiek kon een aanvraag enkel in haar geheel goedkeuren of afwijzen. Vijf
+items waarvan er één niet vrij is, werd daardoor ofwel volledig afgewezen ofwel
+stilzwijgend uitgekleed via het bewerkscherm. Elke lijn draagt nu een eigen
+beslissing (`UitleenReservationLine.lineStatus`).
+
+- **Geen "deels goedgekeurd"-status op de aanvraag zelf.** Dat is af te leiden
+  uit de lijnen, en een extra waarde in `UitleenReservationStatus` zou elke
+  query, elk filter en elke voorraadberekening die op status kijkt moeten
+  bijwerken, met één vergeten plek als prijs.
+- **Een niet toegekende lijn neemt geen voorraad in** maar blijft wel op de
+  aanvraag staan. De beschikbaarheidsquery filtert daarom op de lijn en niet
+  enkel op de aanvraag: anders zou één geweigerde tafel de rest van de week als
+  geboekt tellen.
+- **Ze verdwijnt nergens, ook niet voor de aanvrager.** Doorstreept, in een eigen
+  blokje "Niet toegekend", met de reden erbij; ook in de mail staat ze apart
+  onderaan en niet tussen de rest. Wat verdwijnt zonder spoor, wordt de dag zelf
+  alsnog verwacht.
+- **Wel op het scherm, niet op het printblad.** Het blad aan het rek is een
+  werklijst: wat niet meegaat, hoort daar niet op. De klaarzetlijst telt alleen
+  de toegekende lijnen.
+- **Een lijn opnieuw toekennen doet dezelfde harde voorraadcheck als het
+  goedkeuren zelf**, want intussen kan die tafel aan iemand anders toegewezen
+  zijn.
+- **Alles weigeren is geen goedkeuring.** Blijft er niets over, dan weigert de
+  actie; dan hoort de aanvraag afgewezen te worden, met een reden, in plaats van
+  goedgekeurd met een lege lijst.
+- **De teamnota staat naast die van het lid** (`adminNote` naast `note`), met een
+  label "Lid:" en "Logi:" ervoor. Zie ook § Feedbackronde 2, waar staat waarom
+  het gedeelde veld niet volstond.
+
 ### Een interne aanvraag toont geen bedragen
 
 Prijs, waarborg en betaalstatus verdwijnen volledig zodra de aanvrager een post

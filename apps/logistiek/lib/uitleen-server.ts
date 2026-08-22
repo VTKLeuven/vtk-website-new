@@ -422,6 +422,11 @@ export async function reservedQuantities(
 ): Promise<Map<string, number>> {
   const lines = await tx.uitleenReservationLine.findMany({
     where: {
+      // Een afgewezen lijn neemt geen voorraad in (M3). Ze blijft wel op de
+      // aanvraag staan, met de reden erbij, dus filteren op de aanvraag alleen
+      // volstaat niet: één afgewezen tafel op een verder goedgekeurde aanvraag
+      // zou anders de rest van de week als geboekt tellen.
+      lineStatus: { not: 'REJECTED' },
       reservation: {
         status: { in: STOCK_CONSUMING_STATUSES },
         pickupDate: { lte: returnDate },

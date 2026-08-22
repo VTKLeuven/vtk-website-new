@@ -8,6 +8,8 @@ const APPROVE_ERRORS = {
   NOT_FOUND: 'Aanvraag niet gevonden.',
   NOT_REQUESTED: 'Deze aanvraag is al beslist.',
   NO_STOCK: 'Onvoldoende voorraad in deze periode; er is intussen iets anders goedgekeurd.',
+  ALL_REJECTED:
+    'Er blijft niets over om goed te keuren: elk item staat op "niet toegekend". Wijs de aanvraag dan af, met een reden, in plaats van ze goed te keuren.',
 };
 
 const REJECT_ERRORS = {
@@ -16,7 +18,16 @@ const REJECT_ERRORS = {
   NOT_REQUESTED: 'Deze aanvraag is al beslist.',
 };
 
-export function DecisionForms({ reservationId, totalCents }: { reservationId: string; totalCents: number }) {
+export function DecisionForms({
+  reservationId,
+  totalCents,
+  charged,
+}: {
+  reservationId: string;
+  totalCents: number;
+  /** Betaalt deze aanvrager? Enkel externen; zie `chargesRequester`. */
+  charged: boolean;
+}) {
   return (
     <div className="grid gap-6">
       <SaveForm
@@ -29,17 +40,26 @@ export function DecisionForms({ reservationId, totalCents }: { reservationId: st
       >
         <input type="hidden" name="reservationId" value={reservationId} />
         <p className="text-sm font-semibold text-vtk-ink">Goedkeuren</p>
-        <fieldset className="grid gap-2 text-sm">
-          <legend className="sr-only">Betaalwijze</legend>
-          <label className="flex items-center gap-2">
-            <input type="radio" name="paymentMode" value="ONLINE" defaultChecked={totalCents > 0} />
-            <span>Online betalen (betaallink voor het lid)</span>
-          </label>
-          <label className="flex items-center gap-2">
-            <input type="radio" name="paymentMode" value="OFFLINE" defaultChecked={totalCents === 0} />
-            <span>Betalen bij afhaling (cash/Payconiq)</span>
-          </label>
-        </fieldset>
+        {charged ? (
+          <fieldset className="grid gap-2 text-sm">
+            <legend className="sr-only">Betaalwijze</legend>
+            <label className="flex items-center gap-2">
+              <input type="radio" name="paymentMode" value="ONLINE" defaultChecked={totalCents > 0} />
+              <span>Online betalen (betaallink voor het lid)</span>
+            </label>
+            <label className="flex items-center gap-2">
+              <input type="radio" name="paymentMode" value="OFFLINE" defaultChecked={totalCents === 0} />
+              <span>Betalen bij afhaling (cash/Payconiq)</span>
+            </label>
+          </fieldset>
+        ) : (
+          // De action eist een betaalwijze (MODE_REQUIRED). Enkel de keuze
+          // verbergen zou een interne aanvraag onbeslisbaar maken; OFFLINE is
+          // hier de betekenisloze maar veilige waarde, want er volgt geen
+          // betaallink en "betaald" wordt voor een interne aanvraag nergens
+          // gevraagd. Laat dit veld dus staan.
+          <input type="hidden" name="paymentMode" value="OFFLINE" />
+        )}
         <label className="grid gap-1 text-sm">
           <span className="text-vtk-muted">Nota voor het lid (optioneel)</span>
           <input

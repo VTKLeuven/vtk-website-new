@@ -42,6 +42,8 @@ export type PrintSheetReservation = {
     itemName: string;
     quantity: number;
     note: string | null;
+    adminNote: string | null;
+    lineStatus: 'REQUESTED' | 'APPROVED' | 'REJECTED';
     preparedAt: Date | null;
     item: { locationShelf: string | null; locationRack: string | null };
   }>;
@@ -56,6 +58,7 @@ function requesterLabel(reservation: PrintSheetReservation): string {
 }
 
 export function PrintSheet({ reservation }: { reservation: PrintSheetReservation }) {
+  const granted = reservation.lines.filter((line) => line.lineStatus !== 'REJECTED');
   return (
     <article className="print-sheet mx-auto w-full max-w-[820px] rounded-[18px] border border-vtk-navy/15 bg-white p-8 text-vtk-ink print:max-w-none print:rounded-none print:border-0 print:p-0">
       <header className="flex flex-wrap items-baseline justify-between gap-3 border-b border-vtk-navy/20 pb-3">
@@ -112,7 +115,10 @@ export function PrintSheet({ reservation }: { reservation: PrintSheetReservation
         ) : null}
       </dl>
 
-      {reservation.lines.length > 0 ? (
+      {/* Wat niet toegekend is, hoort niet op het blad aan het rek: het gaat
+          niet mee (M3). Het staat wel op het scherm bij de aanvraag, met de
+          reden erbij. */}
+      {granted.length > 0 ? (
         <table className="mt-5 w-full border-collapse text-sm">
           <thead>
             <tr className="border-b border-vtk-navy/20 text-left">
@@ -123,7 +129,7 @@ export function PrintSheet({ reservation }: { reservation: PrintSheetReservation
             </tr>
           </thead>
           <tbody>
-            {reservation.lines.map((line) => (
+            {granted.map((line) => (
               <tr key={line.id} className="border-b border-vtk-navy/10 align-top">
                 <td className="py-2">
                   <span
@@ -138,6 +144,11 @@ export function PrintSheet({ reservation }: { reservation: PrintSheetReservation
                   {line.itemName}
                   {line.note ? (
                     <span className="block text-xs italic text-vtk-body">{line.note}</span>
+                  ) : null}
+                  {line.adminNote ? (
+                    <span className="block text-xs italic text-vtk-body">
+                      Logi: {line.adminNote}
+                    </span>
                   ) : null}
                 </td>
                 <td className="py-2 tabular-nums">{itemLocation(line.item) ?? '—'}</td>
@@ -223,6 +234,8 @@ export const printSheetSelect = {
       itemName: true,
       quantity: true,
       note: true,
+      adminNote: true,
+      lineStatus: true,
       preparedAt: true,
       item: { select: { locationShelf: true, locationRack: true } },
     },

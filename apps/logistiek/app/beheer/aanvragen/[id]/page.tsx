@@ -19,6 +19,7 @@ import { ConfirmActionButton } from '@/components/ui/confirm-action-button';
 import { ReservationStatusBadge } from '@/components/status-badge';
 import { requireManage } from '@/lib/session';
 import {
+  chargesRequester,
   DEFAULT_LAST_MINUTE_DAYS,
   formatDateOnly,
   formatDateTime,
@@ -47,6 +48,7 @@ import { AdminFlesserkeEditor } from './admin-flesserke-form';
 import { AdminReservationEditor } from './admin-edit-form';
 import { DecisionForms } from './decision-forms';
 import { ConflictPanel, type ConflictParty } from './conflict-panel';
+import { LineDecisions } from './line-decisions';
 import { PrepareList } from './prepare-list';
 import { DeliveryPanel } from './delivery-panel';
 import { SaveTemplateForm } from './save-template-form';
@@ -122,9 +124,15 @@ export default async function BeheerAanvraagDetailPage({
     reservation.lines.length > 0 &&
     (reservation.status === 'APPROVED' || reservation.status === 'PICKED_UP');
 
+  // Wat wel en niet toegekend is (M3). Een niet toegekende lijn hoort niet in de
+  // klaarzetlijst thuis: ze gaat niet mee.
+  const grantedLines = reservation.lines.filter((line) => line.lineStatus !== 'REJECTED');
+  const rejectedLines = reservation.lines.filter((line) => line.lineStatus === 'REJECTED');
+
   const paidOnline = hasSucceededPayment(reservation.payments);
   const paid = paidOnline || reservation.paidOfflineAt !== null;
-  const owesMoney = reservation.totalPriceCents > 0;
+  const charged = chargesRequester(reservation.requesterType);
+  const owesMoney = charged && reservation.totalPriceCents > 0;
 
   const requesterLabel =
     reservation.requesterType === 'INTERN'
@@ -324,17 +332,22 @@ export default async function BeheerAanvraagDetailPage({
               {formatDateWithPart(reservation.returnDate, reservation.returnPart)}
             </dd>
           </div>
-          {settings.showRentPrices ? (
+          {/* Een post of werkgroep betaalt niet (R4): geen bedragen en geen
+              betaalstatus, ook niet in het beheer. Anders staat hier een
+              openstaand bedrag dat niemand ooit gaat innen. */}
+          {charged && settings.showRentPrices ? (
             <div className="flex justify-between gap-4">
               <dt className="text-vtk-muted">Huurprijs</dt>
               <dd className="font-medium text-vtk-ink">{formatEuro(reservation.totalPriceCents)}</dd>
             </div>
           ) : null}
-          <div className="flex justify-between gap-4">
-            <dt className="text-vtk-muted">Waarborg</dt>
-            <dd className="font-medium text-vtk-ink">{formatEuro(reservation.totalDepositCents)}</dd>
-          </div>
-          {reservation.paymentMode ? (
+          {charged ? (
+            <div className="flex justify-between gap-4">
+              <dt className="text-vtk-muted">Waarborg</dt>
+              <dd className="font-medium text-vtk-ink">{formatEuro(reservation.totalDepositCents)}</dd>
+            </div>
+          ) : null}
+          {charged && reservation.paymentMode ? (
             <div className="flex justify-between gap-4">
               <dt className="text-vtk-muted">Betaling</dt>
               <dd className="font-medium text-vtk-ink">
@@ -348,7 +361,7 @@ export default async function BeheerAanvraagDetailPage({
               </dd>
             </div>
           ) : null}
-          {reservation.depositReturnedAt ? (
+          {charged && reservation.depositReturnedAt ? (
             <div className="flex justify-between gap-4">
               <dt className="text-vtk-muted">Waarborg terug</dt>
               <dd className="font-medium text-vtk-ink">Ja</dd>
@@ -361,32 +374,21 @@ export default async function BeheerAanvraagDetailPage({
         {reservation.lines.length > 0 && !preparable ? (
           <>
             <h3 className="mt-6 text-sm font-semibold text-vtk-ink">Materiaal</h3>
-            <ul className="mt-2 divide-y divide-vtk-navy/10">
-              {reservation.lines.map((line) => {
-                const available = reserved ? line.item.quantity - (reserved.get(line.itemId) ?? 0) : null;
-                const short = available !== null && line.quantity > available;
-                return (
-                  <li key={line.id} className="py-2.5 text-sm">
-                    <div className="flex flex-wrap items-center justify-between gap-3">
-                      <span className="text-vtk-ink">
-                        {line.quantity}× {line.itemName}
-                        {!line.item.active ? (
-                          <span className="ml-2 text-xs text-vtk-muted">(niet meer in catalogus)</span>
-                        ) : null}
-                      </span>
-                      {available !== null ? (
-                        <span className={short ? 'font-semibold text-red-700' : 'text-vtk-muted'}>
-                          {available} beschikbaar in deze periode
-                        </span>
-                      ) : null}
-                    </div>
-                    {line.note ? (
-                      <p className="mt-0.5 text-xs italic text-vtk-body">{line.note}</p>
-                    ) : null}
-                  </li>
-                );
-              })}
-            </ul>
+            {/* Per lijn beslissen en een nota van het team achterlaten (M1, M3).
+                Enkel zolang de aanvraag nog loopt: na het terugbrengen is de
+                lijst geschiedenis. */}
+            <LineDecisions
+              lines={reservation.lines.map((line) => ({
+                id: line.id,
+                itemName: line.itemName,
+                quantity: line.quantity,
+                note: line.note,
+                adminNote: line.adminNote,
+                lineStatus: line.lineStatus,
+                inCatalogue: line.item.active,
+                available: reserved ? line.item.quantity - (reserved.get(line.itemId) ?? 0) : null,
+              }))}
+            />
           </>
         ) : null}
 
@@ -405,7 +407,7 @@ export default async function BeheerAanvraagDetailPage({
             vertrekken; daarna is de lijst geschiedenis en staat ze hierboven. */}
         {preparable ? (
           <PrepareList
-            lines={reservation.lines.map((line) => ({
+            lines={grantedLines.map((line) => ({
               id: line.id,
               itemName: line.itemName,
               quantity: line.quantity,
@@ -418,6 +420,28 @@ export default async function BeheerAanvraagDetailPage({
                 : null,
             }))}
           />
+        ) : null}
+
+        {/* Niet toegekend materiaal blijft staan (E7): apart van wat wél
+            meegaat, doorstreept, met de reden erbij en een weg terug. Het uit de
+            lijst laten verdwijnen liet de aanvrager achter met een aanvraag
+            waarin iets ontbrak zonder dat ergens stond wat, of waarom. */}
+        {preparable && rejectedLines.length > 0 ? (
+          <>
+            <h3 className="mt-6 text-sm font-semibold text-vtk-ink">Niet toegekend</h3>
+            <LineDecisions
+              lines={rejectedLines.map((line) => ({
+                id: line.id,
+                itemName: line.itemName,
+                quantity: line.quantity,
+                note: line.note,
+                adminNote: line.adminNote,
+                lineStatus: line.lineStatus,
+                inCatalogue: line.item.active,
+                available: null,
+              }))}
+            />
+          </>
         ) : null}
 
         {reservation.flesserkeLines.length > 0 ? (
@@ -537,7 +561,11 @@ export default async function BeheerAanvraagDetailPage({
 
       <aside className="grid h-fit gap-4">
         {reservation.status === 'REQUESTED' ? (
-          <DecisionForms reservationId={reservation.id} totalCents={reservation.totalPriceCents} />
+          <DecisionForms
+            reservationId={reservation.id}
+            totalCents={reservation.totalPriceCents}
+            charged={charged}
+          />
         ) : null}
 
         {/* Een gevraagde levering stond enkel als regel tussen de gegevens en
@@ -591,7 +619,8 @@ export default async function BeheerAanvraagDetailPage({
           />
         ) : null}
 
-        {reservation.status === 'RETURNED' &&
+        {charged &&
+        reservation.status === 'RETURNED' &&
         reservation.totalDepositCents > 0 &&
         !reservation.depositReturnedAt ? (
           <div className="grid gap-3 rounded-[14px] border border-vtk-navy/10 bg-vtk-surface p-4">

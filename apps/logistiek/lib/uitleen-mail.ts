@@ -178,7 +178,15 @@ export async function notifyReservation(
             locale: true,
           },
         },
-        lines: { select: { itemName: true, quantity: true } },
+        lines: {
+          select: {
+            itemName: true,
+            quantity: true,
+            note: true,
+            adminNote: true,
+            lineStatus: true,
+          },
+        },
         flesserkeLines: { select: { itemName: true, quantity: true } },
       },
     });
@@ -188,9 +196,33 @@ export async function notifyReservation(
     const nl = recipient.locale !== 'en';
     const words = eventWords(event, 'reservation', recipient.locale);
 
-    const items = [...reservation.lines, ...reservation.flesserkeLines]
-      .map((line) => `- ${line.quantity} x ${line.itemName}`)
-      .join('\n');
+    // De opmerkingen per item horen in de mail (E6): de aanvrager leest die mail
+    // en niet het scherm, en "zie vorig event" of "graag de zwarte" is precies
+    // de afspraak die daarna misloopt als ze er niet in staat.
+    const lineText = (line: {
+      itemName: string;
+      quantity: number;
+      note?: string | null;
+      adminNote?: string | null;
+    }) => {
+      const notes = [line.note, line.adminNote].filter(Boolean).join(' | ');
+      return `- ${line.quantity} x ${line.itemName}${notes ? ` (${notes})` : ''}`;
+    };
+
+    const granted = reservation.lines.filter((line) => line.lineStatus !== 'REJECTED');
+    const refused = reservation.lines.filter((line) => line.lineStatus === 'REJECTED');
+    const items = [...granted.map(lineText), ...reservation.flesserkeLines.map(lineText)].join('\n');
+    // Niet toegekende items staan apart onderaan, niet tussen de rest: tussen de
+    // goedgekeurde lijst gelezen worden ze meegenomen naar het evenement (E6).
+    const refusedBlock =
+      refused.length > 0
+        ? `\n\n${nl ? 'Niet toegekend:' : 'Not granted:'}\n${refused
+            .map(
+              (line) =>
+                `- ${line.quantity} x ${line.itemName}${line.adminNote ? ` (${line.adminNote})` : ''}`
+            )
+            .join('\n')}`
+        : '';
     const period = `${formatDateOnly(reservation.pickupDate, recipient.locale)} - ${formatDateOnly(
       reservation.returnDate,
       recipient.locale
@@ -204,7 +236,7 @@ export async function notifyReservation(
       nl ? `Dag ${recipient.name},` : `Hi ${recipient.name},`,
       words.lead,
       `${nl ? 'Aanvraag' : 'Request'}: ${reservation.eventName}\n${nl ? 'Periode' : 'Period'}: ${period}`,
-      items ? `${nl ? 'Materiaal' : 'Items'}:\n${items}` : null,
+      items ? `${nl ? 'Materiaal' : 'Items'}:\n${items}${refusedBlock}` : refusedBlock.trim() || null,
       detailBlock(reason, event, recipient.locale),
       footer('reservation', recipient.locale),
     ]);
