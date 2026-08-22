@@ -20,6 +20,8 @@ export type SelectableEvent = {
   name: string;
   startAt: string | null;
   groupName: string | null;
+  /** Van een post of werkgroep waar de aanvrager zelf bij hoort (N3). */
+  own: boolean;
 };
 
 export function EventPicker({
@@ -42,11 +44,21 @@ export function EventPicker({
   const [search, setSearch] = useState('');
   const listId = useId();
 
-  const shown = useMemo(() => {
+  // Geen limiet meer op acht, maar een lijst die scrollt (N3): bij dertig
+  // evenementen viel het gezochte anders buiten beeld zonder dat er iets zei
+  // dat er meer waren. Eigen evenementen staan bovenaan in een eigen groepje;
+  // die zoek je in negen van de tien gevallen.
+  const { own, other } = useMemo(() => {
     const needle = search.trim().toLowerCase();
-    if (!needle) return events.slice(0, 8);
-    return events.filter((event) => event.name.toLowerCase().includes(needle)).slice(0, 8);
+    const matching = needle
+      ? events.filter((event) => event.name.toLowerCase().includes(needle))
+      : events;
+    return {
+      own: matching.filter((event) => event.own),
+      other: matching.filter((event) => !event.own),
+    };
   }, [events, search]);
+  const shownCount = own.length + other.length;
 
   const chosen = events.find((event) => event.id === eventId) ?? null;
 
@@ -89,23 +101,24 @@ export function EventPicker({
                 aria-controls={listId}
                 className="h-10 rounded-lg border border-vtk-navy/15 bg-white px-3 text-sm text-vtk-ink"
               />
-              <ul id={listId} className="grid gap-1">
-                {shown.map((event) => (
-                  <li key={event.id}>
-                    <button
-                      type="button"
-                      onClick={() => onChange({ eventId: event.id, createEvent: false })}
-                      className="w-full rounded-[10px] border border-vtk-navy/10 px-3 py-2 text-left text-sm transition hover:border-vtk-navy/30 hover:bg-vtk-paper"
-                    >
-                      <span className="font-medium text-vtk-ink">{event.name}</span>
-                      <span className="text-vtk-muted">
-                        {event.groupName ? ` · ${event.groupName}` : ''}
-                        {event.startAt ? ` · ${event.startAt}` : ''}
-                      </span>
-                    </button>
+              <ul id={listId} className="grid max-h-64 gap-1 overflow-y-auto pr-1">
+                {own.length > 0 ? (
+                  <li className="pt-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-vtk-muted">
+                    {en ? 'Of your group' : 'Van jouw post of werkgroep'}
                   </li>
+                ) : null}
+                {own.map((event) => (
+                  <EventOption key={event.id} event={event} onPick={onChange} />
                 ))}
-                {shown.length === 0 ? (
+                {own.length > 0 && other.length > 0 ? (
+                  <li className="pt-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-vtk-muted">
+                    {en ? 'Other events' : 'Andere evenementen'}
+                  </li>
+                ) : null}
+                {other.map((event) => (
+                  <EventOption key={event.id} event={event} onPick={onChange} />
+                ))}
+                {shownCount === 0 ? (
                   <li className="text-sm text-vtk-muted">
                     {en ? 'Nothing found.' : 'Niets gevonden.'}
                   </li>
@@ -139,5 +152,33 @@ export function EventPicker({
         </div>
       )}
     </section>
+  );
+}
+
+function EventOption({
+  event,
+  onPick,
+}: {
+  event: SelectableEvent;
+  onPick: (next: { eventId: string; createEvent: boolean }) => void;
+}) {
+  return (
+    <li>
+      <button
+        type="button"
+        onClick={() => onPick({ eventId: event.id, createEvent: false })}
+        className={`w-full rounded-[10px] border px-3 py-2 text-left text-sm transition hover:border-vtk-navy/30 hover:bg-vtk-paper ${
+          event.own ? 'border-vtk-navy/25' : 'border-vtk-navy/10'
+        }`}
+      >
+        <span className={event.own ? 'font-semibold text-vtk-ink' : 'font-medium text-vtk-ink'}>
+          {event.name}
+        </span>
+        <span className="text-vtk-muted">
+          {event.groupName ? ` · ${event.groupName}` : ''}
+          {event.startAt ? ` · ${event.startAt}` : ''}
+        </span>
+      </button>
+    </li>
   );
 }

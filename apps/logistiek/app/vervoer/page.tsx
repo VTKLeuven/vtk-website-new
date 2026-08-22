@@ -23,7 +23,7 @@ export default async function VervoerPage() {
   const [vehicles, content, events] = await Promise.all([
     activeVehicles(),
     getPublicCopy(locale),
-    external ? Promise.resolve([]) : selectableEvents(),
+    external ? Promise.resolve([]) : selectableEvents(session.groups.map((g) => g.id)),
   ]);
 
   return (

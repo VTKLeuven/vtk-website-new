@@ -30,7 +30,7 @@ export default async function MateriaalPage() {
     getLogistiekSettings(),
     getPublicCopy(locale),
     external ? Promise.resolve([]) : requestTemplates(),
-    external ? Promise.resolve([]) : selectableEvents(),
+    external ? Promise.resolve([]) : selectableEvents(session.groups.map((g) => g.id)),
   ]);
 
   return (

@@ -122,6 +122,17 @@ export function FlesserkeForm({
 
   const count = useMemo(() => Object.values(quantities).reduce((s, q) => s + q, 0), [quantities]);
 
+  // Wat je gekozen hebt, op één plek (F1). Bij materiaal stond dat er al; hier
+  // moest je terugscrollen door de hele catalogus om te zien of die vier bakken
+  // er nu in zaten of niet.
+  const chosenLines = useMemo(() => {
+    const byId = new Map(catalog.flatMap((category) => category.items).map((item) => [item.id, item]));
+    return Object.entries(quantities)
+      .filter(([, quantity]) => quantity > 0)
+      .map(([itemId, quantity]) => ({ id: itemId, quantity, item: byId.get(itemId) ?? null }))
+      .sort((a, b) => (a.item?.name ?? '').localeCompare(b.item?.name ?? '', 'nl'));
+  }, [catalog, quantities]);
+
   // Gefilterde weergave: op categorie en op een vrije zoekterm (naam/merk).
   const shownCatalog = useMemo(() => {
     const needle = search.trim().toLowerCase();
@@ -392,7 +403,31 @@ export function FlesserkeForm({
             </label>
           </div>
 
-          <p className="mt-4 text-sm text-vtk-muted">
+          {/* De gekozen items zelf, niet enkel het aantal (F1). */}
+          <div className="mt-4 border-t border-vtk-navy/10 pt-3">
+            {chosenLines.length === 0 ? (
+              <p className="text-sm text-vtk-muted">
+                {en
+                  ? 'Nothing selected yet. Pick from the list on the left.'
+                  : 'Nog niets gekozen. Kies hiernaast uit de lijst.'}
+              </p>
+            ) : (
+              <ul className="grid gap-1 text-sm">
+                {chosenLines.map((line) => (
+                  <li key={line.id} className="flex items-baseline justify-between gap-3">
+                    <span className="min-w-0 text-vtk-body">
+                      {line.item?.name ?? (en ? 'Unknown item' : 'Onbekend item')}
+                    </span>
+                    <span className="shrink-0 font-medium tabular-nums text-vtk-ink">
+                      {line.quantity}×
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+
+          <p className="mt-3 text-sm text-vtk-muted">
             {count} {en ? 'items' : 'items'} · {en ? 'closed items come back, opened ones are consumed.' : 'gesloten komt terug, geopend is verbruik.'}
           </p>
 

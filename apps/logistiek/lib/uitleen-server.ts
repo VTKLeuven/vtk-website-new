@@ -1430,22 +1430,37 @@ export function eventLoad(event: AdminEvent): {
  * is. Geen filter op post: twee posten die samen een evenement doen, moeten er
  * allebei aan kunnen hangen, en dat is precies waarvoor de koepel dient.
  */
-export async function selectableEvents(): Promise<
-  Array<{ id: string; name: string; startAt: Date | null; groupName: string | null }>
+export async function selectableEvents(
+  groupIds: string[] = []
+): Promise<
+  Array<{ id: string; name: string; startAt: Date | null; groupName: string | null; own: boolean }>
 > {
   const horizon = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
   const events = await prisma.uitleenEvent.findMany({
     where: { OR: [{ startAt: null }, { startAt: { gte: horizon } }] },
     orderBy: [{ startAt: 'asc' }, { createdAt: 'desc' }],
     take: 100,
-    select: { id: true, name: true, startAt: true, group: { select: { nameNl: true } } },
+    select: {
+      id: true,
+      name: true,
+      startAt: true,
+      groupId: true,
+      group: { select: { nameNl: true } },
+    },
   });
-  return events.map((event) => ({
-    id: event.id,
-    name: event.name,
-    startAt: event.startAt,
-    groupName: event.group?.nameNl ?? null,
-  }));
+  // Evenementen van je eigen post of werkgroep eerst (N3). De rest blijft
+  // gewoon staan: twee posten die samen een evenement doen, moeten er allebei
+  // aan kunnen hangen, en dat is precies waarvoor de koepel dient.
+  const own = new Set(groupIds);
+  return events
+    .map((event) => ({
+      id: event.id,
+      name: event.name,
+      startAt: event.startAt,
+      groupName: event.group?.nameNl ?? null,
+      own: event.groupId !== null && own.has(event.groupId),
+    }))
+    .sort((a, b) => Number(b.own) - Number(a.own));
 }
 
 /**

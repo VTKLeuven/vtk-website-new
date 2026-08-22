@@ -37,7 +37,7 @@ export default async function FlesserkePage() {
   const [catalog, settings, events] = await Promise.all([
     getFlesserkeCatalog(),
     getLogistiekSettings(),
-    selectableEvents(),
+    selectableEvents(session.groups.map((g) => g.id)),
   ]);
   const groups = requesterOptions(session.groups, locale);
 

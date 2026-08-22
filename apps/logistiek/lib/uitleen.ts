@@ -150,14 +150,27 @@ export function formatDateOnly(date: Date, locale: LogistiekLocale = 'nl'): stri
  * server-timezone gebruiken in plaats van de Belgische.
  */
 export function eventOptions(
-  events: Array<{ id: string; name: string; startAt: Date | null; groupName: string | null }>,
+  events: Array<{
+    id: string;
+    name: string;
+    startAt: Date | null;
+    groupName: string | null;
+    own?: boolean;
+  }>,
   locale: LogistiekLocale = 'nl'
-): Array<{ id: string; name: string; startAt: string | null; groupName: string | null }> {
+): Array<{
+  id: string;
+  name: string;
+  startAt: string | null;
+  groupName: string | null;
+  own: boolean;
+}> {
   return events.map((event) => ({
     id: event.id,
     name: event.name,
     groupName: event.groupName,
     startAt: event.startAt ? formatDateOnly(event.startAt, locale) : null,
+    own: event.own ?? false,
   }));
 }
 

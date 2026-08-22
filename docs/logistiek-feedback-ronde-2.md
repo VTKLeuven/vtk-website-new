@@ -31,10 +31,10 @@ ook bij maar werd anders opgelost dan gevraagd; de reden staat bij de taak.
 | --- | --- | --- | --- |
 | 0 | Beslissingen die eerst moeten vallen | 4 vragen | ✅ beslist |
 | 1 | Kleine bugs, UI-fixes en ergernissen | R1–R8 | 🟡 R5, R7 open |
-| 2 | Navigatie, lay-out en overzichten | N1–N5 | 🟡 N3, N5 open |
+| 2 | Navigatie, lay-out en overzichten | N1–N5 | 🟡 N5 open |
 | 3 | Materiaal: opmerkingen, deelgoedkeuring, sjablonen | M1–M8 | 🟡 M2, M4–M7 open |
 | 4 | Vervoer: terminologie, goedkeuring, weekoverzicht | T1–T13 | 🟡 T2, T5, T7, T8 open |
-| 5 | Flesserke en kalender | F1–F3 | 🟡 F1 open |
+| 5 | Flesserke en kalender | F1–F3 | ✅ af |
 | 6 | Evenementen: post-overzicht, materiaallijst, C&G | E1–E7 | 🟡 E1, E2, E4, E5 open |
 
 ---
@@ -227,7 +227,7 @@ Alles hier is klein, zichtbaar en zonder (of met een minimale) migratie.
 - **Klaar wanneer:** je navigeert vlot heen en terug tussen evenement en
   aanvraag.
 
-### N3. Scrollbalk bij veel events en eigen events bovenaan
+### ✅ N3. Scrollbalk bij veel events en eigen events bovenaan
 **P2 · code**
 
 - **Raakt:** `apps/logistiek/app/materiaal/event-fields.tsx` (evenementselectie),
@@ -589,7 +589,7 @@ Alles hier is klein, zichtbaar en zonder (of met een minimale) migratie.
 
 # Fase 5: flesserke en kalender
 
-### F1. Overzicht aangevraagde flesserke-items
+### ✅ F1. Overzicht aangevraagde flesserke-items
 **P2 · code**
 
 - **Raakt:** `apps/logistiek/app/flesserke/request-form.tsx`.
