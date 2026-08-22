@@ -164,8 +164,12 @@ export default async function BeheerVervoerPage() {
     if (booking.memberNote) lines.push(['Nota van het lid', booking.memberNote]);
     if (booking.adminNote) lines.push(['Nota van Logistiek', booking.adminNote]);
     if (booking.kilometers !== null) lines.push(['Gereden', `${booking.kilometers} km`]);
+    // Twee verschillende dingen die allebei "Evenement" heetten: hierboven staat
+    // hoe de aanvrager zijn activiteit noemde, hier onder welke koepel de rit
+    // hangt. Twee rijen met hetzelfde opschrift in dezelfde lijst lezen als een
+    // fout, en React zag er twee kinderen met dezelfde key in.
     lines.push([
-      'Evenement',
+      'Hoort bij evenement',
       <EventLink
         key="event"
         target={{ kind: 'transport', id: booking.id }}
@@ -179,8 +183,8 @@ export default async function BeheerVervoerPage() {
         <p className="text-sm text-vtk-ink">{booking.purpose}</p>
         {lines.length > 0 ? (
           <dl className="mt-2 grid gap-x-6 gap-y-1 text-sm sm:grid-cols-2">
-            {lines.map(([term, value]) => (
-              <div key={term} className="flex gap-2">
+            {lines.map(([term, value], index) => (
+              <div key={`${term}-${index}`} className="flex gap-2">
                 <dt className="shrink-0 text-vtk-muted">{term}</dt>
                 <dd className="min-w-0 text-vtk-body">{value}</dd>
               </div>

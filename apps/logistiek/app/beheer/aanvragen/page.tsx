@@ -169,7 +169,11 @@ export default async function BeheerAanvragenPage({
     const row = (
       <Link
         href={`/beheer/aanvragen/${reservation.id}`}
-        className={selectable ? 'logistics-admin-request-row min-w-0 flex-1' : 'logistics-admin-request-row'}
+        className={
+          selectable
+            ? 'logistics-admin-request-row logistics-admin-request-row--selectable min-w-0 flex-1'
+            : 'logistics-admin-request-row'
+        }
       >
         <div className="logistics-reservation-cell logistics-reservation-subject">
           <span>Aanvraag</span>

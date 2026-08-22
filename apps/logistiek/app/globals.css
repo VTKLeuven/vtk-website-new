@@ -688,6 +688,18 @@ body {
     box-shadow 150ms ease;
 }
 
+/* Dezelfde rij, maar met een selectievakje ernaast voor de bulk-acties (N4).
+   Ze heeft dan een dertigtal pixels minder ruimte, en met de minima hierboven
+   loopt het raster over: de periode schuift dan onder de statusbadge in plaats
+   van te wrappen. Smallere minima, zodat de tekst afbreekt en niets verdwijnt. */
+.logistics-admin-request-row--selectable {
+  grid-template-columns:
+    minmax(140px, 1fr) minmax(95px, 0.65fr) minmax(160px, 1.1fr)
+    minmax(170px, 1fr) auto;
+  gap: 16px;
+  min-width: 0;
+}
+
 .logistics-admin-request-row:hover {
   border-color: rgba(0, 43, 73, 0.35);
   box-shadow: 0 8px 24px rgba(10, 15, 31, 0.06);

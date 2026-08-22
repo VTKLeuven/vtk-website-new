@@ -31,29 +31,45 @@ function itemSummary(lines: Array<{ quantity: number; itemName: string }>, en: b
 /**
  * "Afgelopen" voor een materiaal- of flesserke-aanvraag (R2).
  *
- * Een REJECTED of CANCELLED aanvraag is sowieso afgelopen, ook als de
- * afhaaldatum nog in de toekomst ligt: ze is beslist en komt niet meer terug,
- * dus "lopend" zou een dode aanvraag als actueel laten doorgaan. Een aanvraag
- * die nog niet beslist is (REQUESTED) blijft juist gewoon "lopend" zolang haar
- * periode niet al voorbij is: ze is nog actueel en kan nog goedgekeurd worden.
- * Verder telt enkel de datum: `returnDate` in het verleden betekent dat het
- * evenement al achter de rug is, ongeacht de status.
+ * Niet de datum beslist dit maar de status, met de datum als vangnet:
+ *
+ * - **Afgehaald materiaal is nooit afgelopen.** Het ligt nog bij het lid en moet
+ *   terug; dat de terugbrengdag intussen gepasseerd is, maakt het net
+ *   dringender. Precies die aanvraag in een dichtgeklapte lade stoppen zou het
+ *   enige scherm waar een lid ziet wat het nog moet terugbrengen, leegmaken.
+ * - **Beslist en afgehandeld is wel afgelopen**: afgewezen, geannuleerd of
+ *   teruggebracht, ook wanneer de datum nog in de toekomst ligt (wie vroeger
+ *   terugbrengt, is klaar).
+ * - **De datum is enkel het vangnet** voor wat nooit een eindpunt kreeg: een
+ *   aanvraag die nog wacht op een beslissing of goedgekeurd werd maar nooit
+ *   afgehaald, voor een activiteit die intussen voorbij is.
  */
 function isPastReservation(
   reservation: { status: string; returnDate: Date },
   today: Date
 ): boolean {
-  return (
+  if (reservation.status === 'PICKED_UP') return false;
+  if (
     reservation.status === 'REJECTED' ||
     reservation.status === 'CANCELLED' ||
-    reservation.returnDate < today
-  );
+    reservation.status === 'RETURNED'
+  ) {
+    return true;
+  }
+  return reservation.returnDate < today;
 }
 
-/** Zoals `isPastReservation`, maar voor een rit: `endAt` in plaats van `returnDate`. */
+/**
+ * Zoals `isPastReservation`, maar voor een rit: `endAt` in plaats van
+ * `returnDate`. Een rit heeft geen "ligt nog bij het lid"-toestand, dus hier is
+ * afgerond wel meteen afgelopen.
+ */
 function isPastBooking(booking: { status: string; endAt: Date }, today: Date): boolean {
   return (
-    booking.status === 'REJECTED' || booking.status === 'CANCELLED' || booking.endAt < today
+    booking.status === 'REJECTED' ||
+    booking.status === 'CANCELLED' ||
+    booking.status === 'COMPLETED' ||
+    booking.endAt < today
   );
 }
 
