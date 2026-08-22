@@ -11,6 +11,7 @@ import {
   formatPriceCents,
   isEmailish,
   isLastMinute,
+  isNightTrip,
   isOnQuarterHour,
   isoWeekNumber,
   parseDateOnly,
@@ -24,6 +25,7 @@ import {
   toDatetimeLocalValue,
   todayDateOnly,
   transportPriceCents,
+  tripHoursLabel,
   tripWindowFor,
   vanStatusLabel,
 } from '@/lib/uitleen';
@@ -369,6 +371,42 @@ describe('date formatting locale', () => {
     const dt = new Date('2026-07-20T12:00:00Z');
     expect(formatDateTime(dt, 'nl')).toContain('juli');
     expect(formatDateTime(dt, 'en')).toContain('July');
+  });
+});
+
+describe('tripHoursLabel', () => {
+  it('toont enkel de uren binnen dezelfde dag', () => {
+    const start = new Date('2026-09-12T08:00:00.000Z'); // 10:00 Brussel
+    const end = new Date('2026-09-12T12:00:00.000Z'); // 14:00 Brussel
+    expect(tripHoursLabel(start, end)).toBe('10:00-14:00');
+  });
+
+  it('zet de einddag erbij wanneer de rit over middernacht gaat', () => {
+    const start = new Date('2026-07-27T20:12:00.000Z'); // 22:12 Brussel
+    const end = new Date('2026-07-27T22:12:00.000Z'); // 00:12 de volgende dag
+    expect(tripHoursLabel(start, end)).toContain('22:12-00:12');
+    expect(tripHoursLabel(start, end)).toMatch(/28/);
+  });
+});
+
+describe('isNightTrip', () => {
+  it('een rit over middernacht is er sowieso een', () => {
+    expect(
+      isNightTrip(new Date('2026-07-27T20:12:00.000Z'), new Date('2026-07-27T22:12:00.000Z'))
+    ).toBe(true);
+  });
+
+  it('eindigen na 22:00 Belgische tijd telt mee', () => {
+    // 20:00 tot 22:30 Brussel.
+    expect(
+      isNightTrip(new Date('2026-07-27T18:00:00.000Z'), new Date('2026-07-27T20:30:00.000Z'))
+    ).toBe(true);
+  });
+
+  it('een rit overdag niet', () => {
+    expect(
+      isNightTrip(new Date('2026-07-27T08:00:00.000Z'), new Date('2026-07-27T12:00:00.000Z'))
+    ).toBe(false);
   });
 });
 

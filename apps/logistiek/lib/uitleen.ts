@@ -292,6 +292,54 @@ export function formatDateTime(date: Date, locale: LogistiekLocale = 'nl'): stri
   }).format(date);
 }
 
+/**
+ * De uren van een rit, met de einddag erbij wanneer ze over middernacht gaat.
+ * Gedeeld door het ritoverzicht en de chauffeurspagina, zodat "22:12-00:12 (di
+ * 28 jul)" er overal hetzelfde uitziet.
+ */
+export function tripHoursLabel(
+  startAt: Date,
+  endAt: Date,
+  locale: LogistiekLocale = 'nl'
+): string {
+  const tag = locale === 'en' ? 'en-GB' : 'nl-BE';
+  const time = new Intl.DateTimeFormat(tag, {
+    timeZone: 'Europe/Brussels',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+  const day = new Intl.DateTimeFormat(tag, {
+    timeZone: 'Europe/Brussels',
+    weekday: 'short',
+    day: 'numeric',
+    month: 'short',
+  });
+  const dayKey = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Brussels' });
+  const hours = `${time.format(startAt)}-${time.format(endAt)}`;
+  return dayKey.format(startAt) === dayKey.format(endAt) ? hours : `${hours} (${day.format(endAt)})`;
+}
+
+/**
+ * Eindigt deze rit 's nachts?
+ *
+ * Voor de vraag achter "hoeveel ritten heeft deze chauffeur gereden": krijgt niet
+ * altijd dezelfde persoon de late ritten? De grens ligt op 22:00 Belgische tijd,
+ * en een rit die over middernacht gaat telt sowieso mee.
+ */
+export function isNightTrip(startAt: Date, endAt: Date): boolean {
+  const hour = (moment: Date) =>
+    Number(
+      new Intl.DateTimeFormat('en-GB', {
+        timeZone: 'Europe/Brussels',
+        hour: '2-digit',
+        hour12: false,
+      }).format(moment)
+    ) % 24;
+  const dayKey = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Brussels' });
+  if (dayKey.format(startAt) !== dayKey.format(endAt)) return true;
+  return hour(endAt) >= 22 || hour(startAt) >= 22;
+}
+
 /** Twee gesloten datumbereiken overlappen. */
 export function rangesOverlap(aFrom: Date, aTo: Date, bFrom: Date, bTo: Date): boolean {
   return aFrom <= bTo && aTo >= bFrom;

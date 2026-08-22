@@ -33,7 +33,7 @@ ook bij maar werd anders opgelost dan gevraagd; de reden staat bij de taak.
 | 1 | Kleine bugs, UI-fixes en ergernissen | R1–R8 | 🟡 R5, R7 open |
 | 2 | Navigatie, lay-out en overzichten | N1–N5 | 🟡 N3, N5 open |
 | 3 | Materiaal: opmerkingen, deelgoedkeuring, sjablonen | M1–M8 | 🟡 M2, M4–M7 open |
-| 4 | Vervoer: terminologie, goedkeuring, weekoverzicht | T1–T13 | 🟡 T2, T5, T7–T10 open |
+| 4 | Vervoer: terminologie, goedkeuring, weekoverzicht | T1–T13 | 🟡 T2, T5, T7, T8 open |
 | 5 | Flesserke en kalender | F1–F3 | 🟡 F1, F3 open |
 | 6 | Evenementen: post-overzicht, materiaallijst, C&G | E1–E7 | 🟡 E1–E5 open |
 
@@ -515,7 +515,7 @@ Alles hier is klein, zichtbaar en zonder (of met een minimale) migratie.
 - **Klaar wanneer:** een praesidiumlid ziet hetzelfde overzicht als logi,
   minus de beslisknoppen.
 
-### T9. Chauffeurs: klik op "ritten gereden" voor overzicht
+### ✅ T9. Chauffeurs: klik op "ritten gereden" voor overzicht
 **P2 · code**
 
 - **Raakt:** `apps/logistiek/app/beheer/chauffeurs/driver-list.tsx`.
@@ -528,7 +528,7 @@ Alles hier is klein, zichtbaar en zonder (of met een minimale) migratie.
   3. Handig om te checken dat niet één iemand altijd de nachtritten krijgt.
 - **Klaar wanneer:** je ziet alle ritten van een chauffeur na een klik.
 
-### T10. Sorteren op functie bij chauffeurs
+### ✅ T10. Sorteren op functie bij chauffeurs
 **P2 · code · klein**
 
 - **Raakt:** `apps/logistiek/app/beheer/chauffeurs/driver-list.tsx`.

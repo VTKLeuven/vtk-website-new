@@ -1,9 +1,11 @@
 'use client';
 
+import Link from 'next/link';
 import { removeDriverAction, saveDriverNoteAction, setDriverVanAction } from '@/app/actions/beheer';
 import { ConfirmActionButton } from '@/components/ui/confirm-action-button';
 import { LogisticsIcon } from '@/components/logistics-icon';
 import { SaveForm } from '@/components/ui/save-form';
+import { compareText, useSort, type SortDir } from '@/app/beheer/sortable-header';
 import type { DriverPoolEntry } from '@/lib/uitleen-server';
 
 const inputClass = 'h-9 w-full rounded-lg border border-vtk-navy/15 bg-white px-3 text-sm text-vtk-ink';
@@ -49,7 +51,20 @@ function DriverRow({ entry }: { entry: DriverPoolEntry }) {
             </div>
             <div>
               <dt className="text-[10px] font-semibold uppercase tracking-[0.08em] text-vtk-muted">Ritten</dt>
-              <dd className="mt-0.5 text-vtk-body">{tripsLabel(entry)}</dd>
+              <dd className="mt-0.5 text-vtk-body">
+                {/* Klikbaar (T9): "2 ritten gereden" riep de vraag op wélke, en
+                    of niet altijd dezelfde persoon de late ritten krijgt. */}
+                {entry.totalTrips > 0 || entry.upcomingTrips > 0 ? (
+                  <Link
+                    href={`/beheer/chauffeurs/${entry.id}`}
+                    className="font-medium text-vtk-navy underline decoration-vtk-yellow underline-offset-4"
+                  >
+                    {tripsLabel(entry)}
+                  </Link>
+                ) : (
+                  tripsLabel(entry)
+                )}
+              </dd>
             </div>
           </dl>
           {entry.note ? <p className="mt-1 text-sm text-vtk-body">{entry.note}</p> : null}
@@ -122,12 +137,71 @@ function DriverRow({ entry }: { entry: DriverPoolEntry }) {
  * daarna wie het team zelf toevoegde. Beide groepen staan in dezelfde lijst,
  * want dit is precies de keuzelijst die je bij een rit te zien krijgt.
  */
+type DriverSortKey = 'name' | 'trips' | 'van';
+
+/** Sorteert binnen een groep; de groepen zelf blijven staan waar ze staan. */
+function sortDrivers(
+  drivers: DriverPoolEntry[],
+  key: DriverSortKey,
+  dir: SortDir
+): DriverPoolEntry[] {
+  const factor = dir === 'asc' ? 1 : -1;
+  return [...drivers].sort((a, b) => {
+    if (key === 'trips') {
+      const diff = a.totalTrips + a.upcomingTrips - (b.totalTrips + b.upcomingTrips);
+      return diff !== 0 ? diff * factor : compareText(a.name, b.name, 'asc');
+    }
+    if (key === 'van') {
+      const diff = Number(a.canDriveVan) - Number(b.canDriveVan);
+      return diff !== 0 ? diff * factor : compareText(a.name, b.name, 'asc');
+    }
+    return compareText(a.name, b.name, dir);
+  });
+}
+
 export function DriverList({ drivers }: { drivers: DriverPoolEntry[] }) {
-  const fromPost = drivers.filter((driver) => driver.source === 'POST');
-  const extra = drivers.filter((driver) => driver.source === 'EXTRA');
+  // Sorteren binnen de twee groepen (T10). De groepen zelf blijven gescheiden:
+  // wie via de post chauffeur is, beheer je op vtk.be en wie je zelf toevoegde
+  // hier, en die twee door elkaar husselen maakt niet duidelijker wie wat is.
+  const { key, dir, toggle } = useSort<DriverSortKey>('name');
+  const fromPost = sortDrivers(
+    drivers.filter((driver) => driver.source === 'POST'),
+    key,
+    dir
+  );
+  const extra = sortDrivers(
+    drivers.filter((driver) => driver.source === 'EXTRA'),
+    key,
+    dir
+  );
 
   return (
     <div className="grid gap-5">
+      <div className="flex flex-wrap items-center gap-2 text-xs">
+        <span className="text-vtk-muted">Sorteren op</span>
+        {(
+          [
+            ['name', 'Naam'],
+            ['trips', 'Aantal ritten'],
+            ['van', 'Rijdt met de kar'],
+          ] as Array<[DriverSortKey, string]>
+        ).map(([sortKey, label]) => (
+          <button
+            key={sortKey}
+            type="button"
+            onClick={() => toggle(sortKey)}
+            aria-pressed={key === sortKey}
+            className={`rounded-full border px-3 py-1 font-medium transition ${
+              key === sortKey
+                ? 'border-vtk-navy bg-vtk-navy text-white'
+                : 'border-vtk-navy/15 text-vtk-ink hover:border-vtk-navy/40'
+            }`}
+          >
+            {label}
+            {key === sortKey ? <span aria-hidden="true"> {dir === 'asc' ? '↑' : '↓'}</span> : null}
+          </button>
+        ))}
+      </div>
       <section>
         <div className="flex flex-wrap items-baseline justify-between gap-2">
           <h3 className="text-sm font-semibold text-vtk-ink">Post Logistiek ({fromPost.length})</h3>
