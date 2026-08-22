@@ -7,6 +7,7 @@ import {
   ChevronDown,
   Download,
   Filter,
+  IdCard,
   Mail,
   RotateCcw,
   ScanLine,
@@ -17,6 +18,8 @@ import {
 } from "lucide-react";
 import { hasLocale } from "@/lib/locale";
 import { requireTicketEventCapability } from "@/lib/ticketing/authorization";
+import { saveAttendeeRNumberAction } from "@/app/actions/tickets";
+import { SaveForm } from "@/components/ui/SaveForm";
 import { AdminEmptyState } from "@/components/ticketing/admin/AdminEmptyState";
 import { AdminMetric } from "@/components/ticketing/admin/AdminMetric";
 import { StatusBadge } from "@/components/ticketing/admin/StatusBadge";
@@ -48,7 +51,7 @@ export default async function TicketAttendeesPage({
   const [{ locale: localeParam, eventId }, filters] = await Promise.all([params, searchParams]);
   if (!hasLocale(localeParam)) notFound();
   const locale: AdminLocale = localeParam;
-  await requireTicketEventCapability(eventId, "VIEW_ATTENDEES");
+  const { event } = await requireTicketEventCapability(eventId, "VIEW_ATTENDEES");
 
   const query = filters.q?.trim() ?? "";
   const attendance = ["CHECKED_IN", "NOT_CHECKED_IN", ...TICKET_STATUSES].includes(filters.attendance ?? "")
@@ -77,6 +80,7 @@ export default async function TicketAttendeesPage({
         { order: { buyerName: { contains: query, mode: "insensitive" } } },
         { order: { buyerEmail: { contains: query, mode: "insensitive" } } },
         { ticket: { is: { publicCode: { contains: query, mode: "insensitive" } } } },
+        { rNumber: { contains: query.toLowerCase() } },
       ],
     });
   }
@@ -156,7 +160,15 @@ export default async function TicketAttendeesPage({
                 name="q"
                 type="search"
                 defaultValue={query}
-                placeholder={locale === "nl" ? "Naam, e-mail, code of order" : "Name, email, code or order"}
+                placeholder={
+                  event.cardCheckIn
+                    ? locale === "nl"
+                      ? "Naam, e-mail, r-nummer, code of order"
+                      : "Name, email, student number, code or order"
+                    : locale === "nl"
+                      ? "Naam, e-mail, code of order"
+                      : "Name, email, code or order"
+                }
               />
             </div>
           </div>
@@ -229,6 +241,14 @@ export default async function TicketAttendeesPage({
                           {item.attendeeEmail ?? item.order.buyerEmail}
                           {!item.attendeeEmail ? <span>({locale === "nl" ? "koper" : "buyer"})</span> : null}
                         </div>
+                        {event.cardCheckIn ? (
+                          <div className="ticket-admin-row-meta ticket-admin-inline-meta">
+                            <IdCard aria-hidden="true" size={13} />
+                            {item.rNumber ?? (
+                              <span>{locale === "nl" ? "geen kaartcheck-in" : "no card check-in"}</span>
+                            )}
+                          </div>
+                        ) : null}
                       </td>
                       <td data-wrap="true">
                         <strong>{item.ticketTypeName}</strong>
@@ -281,6 +301,54 @@ export default async function TicketAttendeesPage({
                                 ) : <p className="ticket-admin-empty-copy">{locale === "nl" ? "Nog geen scan geregistreerd." : "No scan registered yet."}</p>}
                               </div>
                             </div>
+                            {event.cardCheckIn ? (
+                              <div className="ticket-admin-detail-section">
+                                <h3>{locale === "nl" ? "Kaartcheck-in" : "Card check-in"}</h3>
+                                <SaveForm
+                                  action={saveAttendeeRNumberAction}
+                                  className="ticket-admin-form"
+                                  resetOnSuccess={false}
+                                  submitLabel={locale === "nl" ? "R-nummer opslaan" : "Save student number"}
+                                  savingLabel={locale === "nl" ? "Opslaan" : "Saving"}
+                                  savedMessage={locale === "nl" ? "R-nummer opgeslagen." : "Student number saved."}
+                                  errorMessages={{
+                                    INVALID_R_NUMBER:
+                                      locale === "nl"
+                                        ? "Niet opgeslagen: een r-nummer ziet eruit als r0123456."
+                                        : "Not saved: a student number looks like r0123456.",
+                                    ATTENDEE_NOT_FOUND:
+                                      locale === "nl"
+                                        ? "Niet opgeslagen: deze deelnemer bestaat niet meer."
+                                        : "Not saved: this attendee no longer exists.",
+                                  }}
+                                  fallbackErrorMessage={
+                                    locale === "nl" ? "R-nummer niet opgeslagen." : "Student number was not saved."
+                                  }
+                                >
+                                  <input type="hidden" name="locale" value={locale} />
+                                  <input type="hidden" name="eventId" value={eventId} />
+                                  <input type="hidden" name="orderItemId" value={item.id} />
+                                  <div className="ticket-admin-field">
+                                    <label htmlFor={`attendee-rnumber-${item.id}`}>
+                                      {locale === "nl" ? "KU Leuven-nummer" : "KU Leuven number"}
+                                    </label>
+                                    <input
+                                      id={`attendee-rnumber-${item.id}`}
+                                      name="rNumber"
+                                      defaultValue={item.rNumber ?? ""}
+                                      placeholder="r0123456"
+                                      autoComplete="off"
+                                      spellCheck={false}
+                                    />
+                                    <span className="ticket-admin-help">
+                                      {locale === "nl"
+                                        ? "Hierop landt de studentenkaart aan de deur. Leeg laten kan: die deelnemer gaat dan met de QR of via de naamlijst binnen."
+                                        : "This is what a student card lands on at the door. Leaving it empty is fine: that attendee gets in with the QR or via the name list."}
+                                    </span>
+                                  </div>
+                                </SaveForm>
+                              </div>
+                            ) : null}
                             {item.answers.length > 0 ? (
                               <div className="ticket-admin-detail-section">
                                 <h3>{locale === "nl" ? "Antwoorden" : "Answers"}</h3>

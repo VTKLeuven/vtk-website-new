@@ -60,6 +60,7 @@ type TicketEventFormValue = {
   salesEndAt?: Date | null;
   status?: string;
   maxTicketsPerOrder?: number;
+  cardCheckIn?: boolean;
   contactEmail?: string | null;
   confirmationMessageNl?: string | null;
   confirmationMessageEn?: string | null;
@@ -408,6 +409,26 @@ export function TicketEventForm({
               defaultValue={event.maxTicketsPerOrder ?? 8}
               required
             />
+          </div>
+          <div className="ticket-admin-field" data-span="2">
+            <label className="ticket-admin-check" htmlFor="ticket-card-checkin">
+              <input type="hidden" name="cardCheckIn" value="false" />
+              <input
+                id="ticket-card-checkin"
+                type="checkbox"
+                name="cardCheckIn"
+                value="true"
+                defaultChecked={event.cardCheckIn ?? false}
+              />
+              {locale === "nl"
+                ? "Aanmelden met de studentenkaart aan de deur"
+                : "Check in with a student card at the door"}
+            </label>
+            <span className="ticket-admin-help">
+              {locale === "nl"
+                ? "Voor een cantus of een ander event waar het snel moet gaan. Het KU Leuven-nummer van de ingelogde koper komt op zijn ticket te staan; wie voor meerdere mensen bestelt, vult de rest aan op de deelnemerspagina. De QR blijft voor iedereen werken."
+                : "For a cantus or another event where the queue has to move. The KU Leuven number of the logged-in buyer is stored on their ticket; anyone ordering for several people fills in the rest on the attendees page. The QR keeps working for everyone."}
+            </span>
           </div>
         </div>
       </section>

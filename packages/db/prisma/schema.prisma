@@ -1184,6 +1184,10 @@ model TicketEvent {
   status                TicketEventStatus @default(DRAFT)
   currency              String            @default("EUR")
   maxTicketsPerOrder    Int               @default(8)
+  // Aanmelden met de studentenkaart aan de deur (cantus). Staat dit aan, dan
+  // koppelt de kassa het r-nummer van de ingelogde koper aan zijn ticket en kan
+  // de scanner een gescande kaart tot een ticket herleiden.
+  cardCheckIn           Boolean           @default(false)
   contactEmail          String?
   termsUrl              String?
   termsVersion          String?
@@ -1395,6 +1399,10 @@ model TicketOrderItem {
   totalCents      Int
   attendeeName    String
   attendeeEmail   String?
+  // KU Leuven-nummer van de deelnemer, kleine letters, enkel gevuld wanneer het
+  // event `cardCheckIn` aan heeft staan. Hierop landt een gescande
+  // studentenkaart. Wordt gewist wanneer het event gearchiveerd wordt.
+  rNumber         String?
   createdAt       DateTime @default(now()) @db.Timestamptz(3)
 
   event         TicketEvent             @relation(fields: [eventId], references: [id], onDelete: Restrict)
@@ -1407,6 +1415,10 @@ model TicketOrderItem {
 
   @@unique([id, eventId])
   @@unique([id, orderId])
+  // Eén r-nummer kan per event maar aan één ticket hangen, anders weet een
+  // gescande kaart niet welk ticket ze bedoelt. Postgres telt NULL's als
+  // verschillend, dus tickets zonder r-nummer botsen hier niet.
+  @@unique([eventId, rNumber])
   @@index([orderId])
   @@index([eventId, ticketTypeId])
   @@index([inventoryPoolId])

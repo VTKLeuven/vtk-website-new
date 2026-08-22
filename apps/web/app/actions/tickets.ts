@@ -29,6 +29,15 @@ import { saveError, saveOk, type SaveState } from "@/lib/saveState";
 import { TICKET_TERMS_SETTING_KEY } from "@/lib/ticketing/terms";
 
 const localeSchema = z.enum(["nl", "en"]);
+
+/**
+ * Een checkbox uit een formulier. De verborgen "false" staat vóór de checkbox in
+ * de markup, zodat een uitgevinkt vakje toch een waarde meestuurt; daarom kijken
+ * we naar alle waarden en niet enkel naar de eerste.
+ */
+function checkboxValue(formData: FormData, name: string): boolean {
+  return formData.getAll(name).some((entry) => entry === "on" || entry === "true");
+}
 const roleSchema = z.enum(["OWNER", "MANAGER", "FINANCE", "SCANNER", "REPORTER"]);
 const statusSchema = z.enum([
   "DRAFT",
@@ -376,6 +385,7 @@ export async function createTicketEventAction(formData: FormData): Promise<void>
         salesStartAt,
         salesEndAt,
         maxTicketsPerOrder: boundedIntegerValue(formData, "maxTicketsPerOrder", 8, 1, 50),
+        cardCheckIn: checkboxValue(formData, "cardCheckIn"),
         contactEmail: emailValue(formData, "contactEmail"),
         createdById: session.user.id,
       },
@@ -508,6 +518,7 @@ export async function updateTicketEventAction(formData: FormData): Promise<void>
         salesEndAt,
         status,
         maxTicketsPerOrder,
+        cardCheckIn: checkboxValue(formData, "cardCheckIn"),
         contactEmail: emailValue(formData, "contactEmail"),
         confirmationMessageNl: limitedOptionalValue(formData, "confirmationMessageNl", 5_000),
         confirmationMessageEn: limitedOptionalValue(formData, "confirmationMessageEn", 5_000),
@@ -515,6 +526,16 @@ export async function updateTicketEventAction(formData: FormData): Promise<void>
         archivedAt: status === "ARCHIVED" ? new Date() : null,
       },
     });
+    // Een gearchiveerd event heeft de r-nummers niet meer nodig: ze dienden enkel
+    // om een gescande studentenkaart aan de deur tot een ticket te herleiden.
+    // Zonder deze opkuis blijft de deelnemerslijst van elke cantus onbeperkt een
+    // lijst KU Leuven-nummers. Zie docs/privacy-processors.md.
+    if (status === "ARCHIVED" && event.status !== "ARCHIVED") {
+      await tx.ticketOrderItem.updateMany({
+        where: { eventId, rNumber: { not: null } },
+        data: { rNumber: null },
+      });
+    }
     await tx.ticketAuditLog.create({
       data: {
         eventId,
@@ -781,6 +802,68 @@ export async function archiveTicketTypeAction(formData: FormData): Promise<void>
     summary: "tickettype gearchiveerd; verkochte tickets blijven geldig",
   });
   refreshTicketEvent(locale, eventId);
+}
+
+/**
+ * Het r-nummer van één deelnemer, vanuit de deelnemerspagina.
+ *
+ * De kassa vult enkel het nummer van de **ingelogde koper** in; wie voor vier man
+ * bestelt, laat er drie leeg. Dit is de plek waar die aangevuld worden, en waar
+ * een tikfout rechtgezet wordt. Leeg opslaan wist het nummer weer.
+ *
+ * Een dubbel r-nummer is een verwachte invoerfout en komt als foutcode terug, niet
+ * als een gegooide serverfout: twee tickets met hetzelfde nummer zouden een
+ * gescande kaart dubbelzinnig maken, maar dat is iets om te tonen en niet om de
+ * pagina op te laten crashen.
+ */
+export async function saveAttendeeRNumberAction(
+  _previousState: SaveState,
+  formData: FormData,
+): Promise<SaveState> {
+  const eventId = value(formData, "eventId");
+  const orderItemId = value(formData, "orderItemId");
+  const locale = localeSchema.parse(value(formData, "locale") || "nl");
+  const { session } = await requireTicketEventCapability(eventId, "MANAGE_EVENT");
+  const item = await prisma.ticketOrderItem.findFirst({ where: { id: orderItemId, eventId } });
+  if (!item) return saveError("ATTENDEE_NOT_FOUND");
+
+  const raw = value(formData, "rNumber").trim().toLowerCase();
+  if (raw && !/^[ru]\d{7}$/.test(raw)) return saveError("INVALID_R_NUMBER");
+  const rNumber = raw || null;
+  if (rNumber === item.rNumber) return saveOk();
+
+  if (rNumber) {
+    const taken = await prisma.ticketOrderItem.findFirst({
+      where: { eventId, rNumber, id: { not: orderItemId } },
+      select: { attendeeName: true },
+    });
+    if (taken) {
+      return saveError(
+        "R_NUMBER_TAKEN",
+        locale === "nl"
+          ? `Niet opgeslagen: ${rNumber} hangt al aan het ticket van ${taken.attendeeName}.`
+          : `Not saved: ${rNumber} is already on the ticket of ${taken.attendeeName}.`,
+      );
+    }
+  }
+
+  await prisma.$transaction([
+    prisma.ticketOrderItem.update({ where: { id: item.id }, data: { rNumber } }),
+    prisma.ticketAuditLog.create({
+      data: {
+        eventId,
+        actorUserId: session.user.id,
+        action: "ATTENDEE_UPDATED",
+        entityType: "TicketOrderItem",
+        entityId: item.id,
+        // Bewust niet het nummer zelf: het auditlogboek overleeft het archiveren
+        // van het event, en dan is de opkuis van de r-nummers zinloos.
+        metadata: { rNumber: rNumber ? "set" : "cleared" },
+      },
+    }),
+  ]);
+  revalidatePath(localePath(locale, `/admin/tickets/${eventId}/deelnemers`));
+  return saveOk();
 }
 
 export async function createTicketQuestionAction(formData: FormData): Promise<void> {

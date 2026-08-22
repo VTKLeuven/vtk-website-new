@@ -15,7 +15,6 @@ export type ItemRow = {
   username: string | null;
   uri: string | null;
   notes: string | null;
-  changedLabel: string | null;
 };
 
 /**
@@ -51,7 +50,6 @@ export function VaultItems({
         name: "Naam",
         username: "Gebruikersnaam",
         address: "Adres",
-        changed: "Gewijzigd",
         actions: "Acties",
         copyPassword: "Wachtwoord kopiëren",
         copyUsername: "Gebruikersnaam kopiëren",
@@ -72,7 +70,6 @@ export function VaultItems({
         name: "Name",
         username: "Username",
         address: "Address",
-        changed: "Changed",
         actions: "Actions",
         copyPassword: "Copy password",
         copyUsername: "Copy username",
@@ -128,20 +125,22 @@ export function VaultItems({
               wat bij het wisselen van post aanvoelt als een andere pagina. Nu is
               elke posttabel even breed en gedraagt de scroller zich overal
               hetzelfde; te lange waarden worden afgekapt in plaats van te duwen. */}
+          {/* Er staat bewust geen kolom "gewijzigd" meer: ze drong tegen de
+              icoonknoppen aan, en wanneer een wachtwoord veranderde is voor de
+              post zelf geen bruikbare informatie. Wie het toch nodig heeft, ziet
+              het in het adminlogboek of in de Bitwarden-client. */}
           <table className="w-full min-w-[52rem] table-fixed text-sm">
             <colgroup>
+              <col className="w-[27%]" />
               <col className="w-[24%]" />
               <col className="w-[24%]" />
-              <col className="w-[24%]" />
-              <col className="w-[12%]" />
-              <col className="w-[16%]" />
+              <col className="w-[25%]" />
             </colgroup>
             <thead className="border-b border-vtk-blue/10 text-left text-xs uppercase tracking-wide text-zinc-500">
               <tr>
                 <th className="px-4 py-3 font-medium">{t.name}</th>
                 <th className="px-4 py-3 font-medium">{t.username}</th>
                 <th className="px-4 py-3 font-medium">{t.address}</th>
-                <th className="px-4 py-3 font-medium">{t.changed}</th>
                 <th className="px-4 py-3 text-right font-medium">
                   <span className="sr-only">{t.actions}</span>
                 </th>
@@ -162,7 +161,6 @@ export function VaultItems({
                       <td className="truncate px-4 py-3 text-zinc-600" title={item.uri ?? undefined}>
                         {item.uri || "\u2014"}
                       </td>
-                      <td className="px-4 py-3 text-zinc-500">{item.changedLabel || "\u2014"}</td>
                       <td className="px-4 py-3">
                         <div className="flex items-center justify-end gap-1">
                           <CopyButton
@@ -236,7 +234,7 @@ export function VaultItems({
                         hoveren niet bestaat. */}
                     {notesOpen && item.notes && (
                       <tr className="border-b border-vtk-blue/5 last:border-0">
-                        <td colSpan={5} className="px-4 pb-3 text-sm text-zinc-600">
+                        <td colSpan={4} className="px-4 pb-3 text-sm text-zinc-600">
                           <p className="whitespace-pre-line rounded-xl bg-vtk-blue-soft/50 px-3 py-2">
                             {item.notes}
                           </p>

@@ -104,6 +104,31 @@ function localOrderUrl(locale: "nl" | "en", orderId: string): string {
   return `${ticketingBaseUrl()}${prefix}/tickets/bestelling/${orderId}`;
 }
 
+/**
+ * Het r-nummer dat aan dit ticket mag hangen, of null.
+ *
+ * Enkel voor een event met `cardCheckIn`, en enkel het nummer van de **ingelogde
+ * koper**: dat is wat we zeker weten. Wie voor vier man bestelt, krijgt dus één
+ * ticket met kaartcheck-in; de andere drie gaan met hun QR of via de naamlijst
+ * binnen, of een beheerder vult hun nummer achteraf aan op de deelnemerspagina.
+ *
+ * Heeft de koper al een ticket voor dit event, dan blijft het nieuwe leeg in
+ * plaats van te botsen op de unieke index: een tweede bestelling is er per
+ * definitie voor iemand anders, en een aankoop mag daar nooit op afspringen.
+ */
+async function buyerRNumberForCheckout(
+  eventId: string,
+  cardCheckIn: boolean,
+  userId: string | undefined,
+): Promise<string | null> {
+  if (!cardCheckIn || !userId) return null;
+  const user = await prisma.user.findUnique({ where: { id: userId }, select: { rNumber: true } });
+  const rNumber = user?.rNumber?.trim().toLowerCase();
+  if (!rNumber) return null;
+  const taken = await prisma.ticketOrderItem.count({ where: { eventId, rNumber } });
+  return taken > 0 ? null : rNumber;
+}
+
 export async function createTicketCheckout(
   rawInput: unknown,
   requestFingerprint: string | null
@@ -195,6 +220,10 @@ export async function createTicketCheckout(
     }
   }
 
+  // Enkel de eerste bestelregel draagt het r-nummer: het is dat van de koper, en
+  // een r-nummer kan per event maar aan één ticket hangen.
+  const buyerRNumber = await buyerRNumberForCheckout(event.id, event.cardCheckIn, session?.user.id);
+
   const pendingSince = new Date(now.getTime() - 60 * 60 * 1000);
   const abuseFilters: Prisma.TicketOrderWhereInput[] = [
     { buyerEmail: input.buyerEmail },
@@ -281,7 +310,7 @@ export async function createTicketCheckout(
             termsAcceptedAt: now,
             termsVersion: terms.version,
             items: {
-              create: normalizedItems.map((item) => ({
+              create: normalizedItems.map((item, index) => ({
                 ticketTypeId: item.ticketTypeId,
                 inventoryPoolId: item.inventoryPoolId,
                 ticketTypeCode: item.ticketTypeCode,
@@ -291,6 +320,7 @@ export async function createTicketCheckout(
                 totalCents: item.totalCents,
                 attendeeName: item.attendeeName,
                 attendeeEmail: item.attendeeEmail,
+                rNumber: index === 0 ? buyerRNumber : null,
                 answers: { create: item.answers },
               })),
             },

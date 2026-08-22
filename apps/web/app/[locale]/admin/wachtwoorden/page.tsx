@@ -38,11 +38,6 @@ export default async function AdminVault({
   let items: ItemRow[] = [];
   let loadError: string | null = null;
   if (cfg && selected?.collectionId) {
-    const dateFmt = new Intl.DateTimeFormat(nl ? "nl-BE" : "en-GB", {
-      day: "2-digit",
-      month: "2-digit",
-      year: "numeric",
-    });
     try {
       items = (await listVaultItems(cfg, selected.collectionId)).map((i) => ({
         id: i.id,
@@ -50,7 +45,6 @@ export default async function AdminVault({
         username: i.username,
         uri: i.uri,
         notes: i.notes,
-        changedLabel: i.revisionDate ? dateFmt.format(i.revisionDate) : null,
       }));
     } catch {
       loadError = nl
