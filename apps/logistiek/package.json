@@ -12,7 +12,8 @@
     "import:inventaris": "dotenv -e ../../.env -- tsx scripts/import-inventaris.ts",
     "group:events": "dotenv -e ../../.env -- tsx scripts/group-events.ts",
     "mail:test": "dotenv -e ../../.env -- tsx scripts/test-mail.ts",
-    "flesserke:units": "dotenv -e ../../.env -- tsx scripts/flesserke-units.ts"
+    "flesserke:units": "dotenv -e ../../.env -- tsx scripts/flesserke-units.ts",
+    "collectengo:poll": "dotenv -e ../../.env -- tsx scripts/collectengo-poll.ts"
   },
   "dependencies": {
     "@vtk/auth": "*",
@@ -21,6 +22,8 @@
     "@vtk/payments": "*",
     "@vtk/storage": "*",
     "@vtk/ui": "*",
+    "imapflow": "^1.7.2",
+    "mailparser": "^3.9.15",
     "next": "16.3.0",
     "react": "19.2.4",
     "react-dom": "19.2.4",
@@ -28,14 +31,15 @@
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
+    "@types/mailparser": "^3.4.6",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "@vtk/tsconfig": "*",
     "dotenv-cli": "^7.4.2",
+    "read-excel-file": "^9.3.8",
     "tailwindcss": "^4",
     "tsx": "^4.19.2",
-    "typescript": "^5",
-    "read-excel-file": "^9.3.8"
+    "typescript": "^5"
   }
 }

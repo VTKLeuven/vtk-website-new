@@ -1636,6 +1636,51 @@ Wat daarbij vastligt:
   meerdere, dan is niet te weten van welke er twee bij of af moeten, en zou de app
   die keuze verzinnen; je past ze dan per lading aan in de bewerkrij.
 
+### Collect&Go: de mail leest de bestelling, het team beslist waar ze landt
+
+Boodschappen voor de kring worden bij Colruyt Collect&Go besteld. De
+bevestigingsmail bevat alles wat de voorraad nodig heeft (product, aantal, prijs,
+reservatienummer), en dat werd tot nu met de hand overgetypt in het
+flesserke-scherm: bij zeventig lijnen een half uur werk, met dubbele items als
+resultaat. De app leest die mails nu zelf en zet ze per **reservatienummer** klaar.
+
+Wat daarbij vastligt:
+
+- **Een bestelling wordt nooit blind geïmporteerd.** De app stelt per lijn een
+  bestemming voor; het team bevestigt. Colruyt-namen ("BONI Choco Bubbles 750g")
+  en onze catalogusnamen ("Choco Bubbles", merk BONI, 750 g) lopen genoeg uiteen
+  dat automatisch inboeken vroeg of laat vijf bakken op het verkeerde item zet, en
+  een verkeerde voorraad merk je pas wanneer je voor een cantus te weinig hebt.
+  Wat het team kiest, wordt onthouden (`CollectEnGoProductMatch`), dus de tweede
+  bestelling is grotendeels al ingevuld.
+- **De vervaldatum wordt per lijn gevraagd.** Ze staat niet in de mail, en kebab
+  en ijsbergsla vervallen niet op dezelfde dag. Eén datum voor de hele bestelling
+  zou de rode "vervalt binnenkort"-markering weer waardeloos maken, precies het
+  probleem dat de ladingen moesten oplossen. Leeg blijft toegelaten (kuisgerief).
+  Er is één veld bovenaan om dezelfde datum snel op alle lijnen te zetten.
+- **Prijzen blijven bij de bestelling, niet op de lading.** Een lading heeft geen
+  prijs en krijgt er ook geen: wat een bak gekost heeft, is een vraag over een
+  aankoop, niet over de plank. De mail bewaart subtotaal, kortingen, leeggoed en
+  de prijs per lijn, dus de kost per acti is later te maken zonder migratie.
+- **De notitie van de besteller gaat mee.** In Collect&Go typt de besteller er
+  "Acti - livecantus" of "Ploeg - Cocktailworkshop - Theokot" bij. Dat is het enige
+  spoor van waarvoor iets gekocht is; het staat in het importscherm en in de
+  notitie van de lading.
+- **Een lijn per gewicht ("1,0 Kg") vraagt een aantal.** Losse groenten worden per
+  kilo verkocht en hebben geen stuksaantal. De app zet er een 1 en markeert de
+  lijn; ze zelf een aantal laten verzinnen zou een fout zijn die niemand nog ziet.
+- **Een tweede mail met hetzelfde reservatienummer vervangt de eerste, zolang die
+  niet geïmporteerd is.** Wijzigt de bestelling, dan stuurt Collect&Go een nieuwe
+  mail met datzelfde nummer; de oude lijst klopt dan niet meer. Is er al
+  geïmporteerd, dan blijft die historiek staan en komt de nieuwe mail ernaast, met
+  een waarschuwing in het scherm. Dedupe gebeurt op `Message-ID`, niet op het
+  reservatienummer.
+- **Lezen gebeurt met IMAP, en enkel voor mails van Collect&Go.** Er is nergens
+  anders inkomende mail in deze apps; `@vtk/mail` stuurt enkel. Zonder config is de
+  functie uit (zoals bij SMTP) en blijft het plakveld over. Mails van andere
+  afzenders in dezelfde mailbox worden niet gelezen en niet als gelezen gemarkeerd:
+  het is een mailbox van mensen, geen wachtrij van ons.
+
 ### Flesserke is voor de hele interne werking, niet enkel het praesidium
 
 De toegangsregel was altijd "heeft een groep" (`session.groups.length > 0`), dus

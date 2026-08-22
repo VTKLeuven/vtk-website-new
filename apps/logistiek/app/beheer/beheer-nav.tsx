@@ -18,6 +18,7 @@ const nodes: AdminNavNode[] = [
       { key: 'inventory', href: '/beheer/materiaal', label: 'Inventaris' },
       { key: 'templates', href: '/beheer/sjablonen', label: 'Sjablonen' },
       { key: 'drinks', href: '/beheer/flesserke', label: 'Flesserke' },
+      { key: 'collectengo', href: '/beheer/collectengo', label: 'Collect&Go' },
     ],
   },
   {
@@ -49,6 +50,7 @@ const icons = {
   inventory: <LogisticsIcon name="material" className="h-4 w-4 shrink-0" />,
   templates: <LogisticsIcon name="edit" className="h-4 w-4 shrink-0" />,
   drinks: <LogisticsIcon name="material" className="h-4 w-4 shrink-0" />,
+  collectengo: <LogisticsIcon name="van" className="h-4 w-4 shrink-0" />,
   transport: <LogisticsIcon name="van" className="h-4 w-4 shrink-0" />,
   trips: <LogisticsIcon name="van" className="h-4 w-4 shrink-0" />,
   drivers: <LogisticsIcon name="reservation" className="h-4 w-4 shrink-0" />,

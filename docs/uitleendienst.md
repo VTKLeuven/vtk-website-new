@@ -52,6 +52,7 @@ zelf doet staat in `docs/logistiek-ingebruikname.md`.
 | `UitleenTransportBooking` | Rit met voertuig, tijdvenster, chauffeur, tarief-snapshot, `kilometers`/`priceCents` (nullable). |
 | `UitleenDriver` | Chauffeur die het team zelf toevoegt (uniek per `userId`, met notitie en `addedById`). Niet werkingsjaar-gescoped; verwijderen laat toegewezen ritten staan. |
 | `UitleenFlesserkeCategory` / `UitleenFlesserkeItem` / `UitleenFlesserkeLine` | Verbruiksstock (vervaldatum, merk, Colruyt-link). Lijnen hangen aan `UitleenReservation`. Beschikbaar wordt berekend, nooit opgeslagen; `returnedQuantity` legt het verbruik vast. |
+| `CollectEnGoOrder` / `...Line` / `CollectEnGoProductMatch` | Een uitgelezen Collect&Go-bevestigingsmail, klaar om als ladingen in de flesserke-voorraad te zetten. Lijnen bewaren aantal, prijs, leeggoed en de notitie van de besteller ("Acti - livecantus"); `...ProductMatch` onthoudt naar welk item een Colruyt-product ging. Zie "Collect&Go-import" hieronder. |
 | `UitleenPayment` / `UitleenPaymentWebhook` | Spiegel van `TicketPayment`; `provider` vrije string; precies één van `reservationId`/`transportBookingId`. |
 
 ## Toegang & zichtbaarheid
@@ -134,16 +135,22 @@ de same-origin `publicUrl`.
   `driver-select.tsx` groepeert de chauffeurs per bron), `chauffeurs/`
   (chauffeurslijst + user-picker op vtk.be-leden), `materiaal/` (inventaris +
   set-editor + foto-upload), `flesserke/` (stockscherm met inline voorraad +
-  vervaldatum-highlight), `kalender/`, `instellingen/` (voertuigtarieven +
+  vervaldatum-highlight), `collectengo/` (klaarstaande Collect&Go-mails +
+  importscherm per bestelling), `kalender/`, `instellingen/` (voertuigtarieven +
   huurprijs-toggle).
-- **Actions**: `app/actions/uitleen.ts` (leden), `app/actions/beheer.ts` (team).
+- **Actions**: `app/actions/uitleen.ts` (leden), `app/actions/beheer.ts` (team),
+  `app/actions/collectengo.ts` (mails ophalen, plakken, importeren).
 - **Lib**: `lib/uitleen.ts` (helpers), `lib/uitleen-server.ts` (queries +
   voorraad), `lib/reservation-form.ts` (`buildReservationData`, gedeeld),
   `lib/uitleen-mail.ts` (mails naar de aanvrager), `lib/payments.ts`,
-  `lib/runtime-config.ts`, `lib/storage.ts`, `lib/session.ts`.
+  `lib/runtime-config.ts`, `lib/storage.ts`, `lib/session.ts`,
+  `lib/collectengo/` (`parse.ts` + `match.ts` zijn puur en getest; `imap.ts`,
+  `store.ts`, `server.ts` en `eml.ts` doen de rest).
 - **Scripts**: `scripts/import-inventaris.ts` (materiaal + flesserke uit de xlsx),
   `scripts/group-events.ts` (historische aanvragen onder een evenement groeperen;
-  dry-run tenzij `--apply`, via `npm run group:events -w @vtk/logistiek`).
+  dry-run tenzij `--apply`, via `npm run group:events -w @vtk/logistiek`),
+  `scripts/collectengo-poll.ts` (de mailbox één keer nakijken:
+  `npm run collectengo:poll -w @vtk/logistiek`).
 
 ## Env & infra
 
@@ -153,7 +160,12 @@ de same-origin `publicUrl`.
   `DATABASE_URL` (directe Prisma) + `depends_on: postgres`.
 - `infra/docker/logistiek.Dockerfile` draait `prisma generate`; web blijft
   eigenaar van `migrate deploy`.
+- `COLLECTENGO_IMAP_HOST/PORT/USER/PASSWORD/MAILBOX/FROM` voor de
+  Collect&Go-import; leeg = uit. De `collectengo-worker` in
+  `infra/docker-compose.yml` POST elke vijf minuten naar
+  `/api/uitleen/collectengo` met `LOGISTIEK_MAINTENANCE_SECRET`.
 - Deps `sharp` + `xlsx` toegevoegd: lockfile from scratch regenereren (AGENTS.md).
+  Idem voor `imapflow` + `mailparser` (Collect&Go).
 - Dev: `npm run dev -w @vtk/logistiek` (poort 3100, webpack; nooit Turbopack).
 
 ## Importscript
@@ -164,6 +176,38 @@ naam+categorie), deletet nooit, telt created/updated/skipped. Niet-numerieke
 hoeveelheden → aantal 1 + tekst in de beschrijving. Gereserveerd/Beschikbaar uit
 de sheet worden genegeerd (live berekend).
 
+## Collect&Go-import
+
+Boodschappen voor de kring worden bij Colruyt Collect&Go besteld. De
+bevestigingsmail bevat alle producten, aantallen en prijzen en een
+reservatienummer; die overtypen in `/beheer/flesserke` was een half uur per
+bestelling en leverde dubbele items op.
+
+1. **Binnenkomen.** `collectengo-worker` POST naar
+   `app/api/uitleen/collectengo/route.ts` (zelfde bearer-secret als de
+   maintenance-route). Die roept `pollCollectEnGoMailbox()` aan: ongelezen mails
+   **van de Collect&Go-afzender** worden geparsed, bewaard en als gelezen
+   gemarkeerd; andere post in dezelfde mailbox blijft ongemoeid. Staat de
+   IMAP-config niet in de omgeving, dan is alles uit en toont het beheer enkel
+   het plakveld. Vangnet: mail plakken of een `.eml` uploaden op
+   `/beheer/collectengo`.
+2. **Parsen** (`lib/collectengo/parse.ts`, puur, getest op de echte mail in
+   `test/fixtures/collectengo-mail.txt`). Let op de vier vormen die je niet mag
+   missen: een hoeveelheidsregel kan `12 stuk(s)€ 2,69/Kg` of `1,0 Kg€ 1,49/Kg`
+   zijn (die tweede heeft geen stuksaantal, `unit: WEIGHT`); een
+   `leeggoed`-regel hoort bij het product **erboven**; de prijs per lijn is die
+   ná promo terwijl het subtotaal ze nog niet aftrekt; en na tag-strippen kan de
+   eenheidsprijs op een eigen regel staan.
+3. **Voorstellen** (`lib/collectengo/match.ts`). "BONI Choco Bubbles 750g" wordt
+   gesplitst in merk, naam en inhoud en vergeleken met de catalogus; een eerdere
+   keuze (`CollectEnGoProductMatch`) wint altijd. Dezelfde naam met een andere
+   inhoud is een voorstel, geen match: 2 L hoort niet bij het item van 1,5 L.
+4. **Importeren.** `/beheer/collectengo/[id]` toont de lijnen per categorie met
+   bestemming, aantal en vervaldatum (de mail bevat geen houdbaarheidsdatums).
+   `importCollectEnGoOrderAction` maakt in één transactie per lijn een
+   `UitleenFlesserkeBatch` (met `syncFlesserkeItemTotals`), onthoudt de keuze en
+   zet de bestelling op `IMPORTED`. Een tweede poging geeft `ALREADY_IMPORTED`.
+
 ## Lokaal testen
 
 1. `npm run seed -w @vtk/db`. Login: team `logistiek@vtk.prototype` / `prototype`
@@ -173,5 +217,8 @@ de sheet worden genegeerd (live berekend).
    `VTK_MAIN_URL`/`LOGISTIEK_PUBLIC_URL` inline op de gekozen poorten.
 3. Betalingen: mock-provider (standaard in dev). Echte Mollie-test: zie
    `docs/ticketing.md` (tunnel), met `LOGISTIEK_PAYMENT_PROVIDER=mollie`.
+4. Collect&Go zonder mailbox: plak de mail uit
+   `apps/logistiek/test/fixtures/collectengo-mail.txt` op `/beheer/collectengo`.
+   Met een echte mailbox: `npm run collectengo:poll -w @vtk/logistiek`.
 - Server actions zonder browser aansturen: zie de memory
   `uitleendienst-module` voor de RSC-action-truc.

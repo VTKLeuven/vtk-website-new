@@ -344,6 +344,22 @@ enum UitleenPaymentStatus {
   EXPIRED
 }
 
+/// Waar een uit de mail gelezen Collect&Go-bestelling staat: klaar om te
+/// importeren, al in de flesserke-voorraad gezet, of terzijde geschoven.
+enum CollectEnGoOrderStatus {
+  NEW
+  IMPORTED
+  IGNORED
+}
+
+/// Hoe Collect&Go de hoeveelheid van een lijn uitdrukt. De meeste lijnen zijn
+/// "3 stuk(s)", maar losse groenten worden per gewicht verkocht ("1,0 Kg") en
+/// hebben dus geen stuksaantal in de mail.
+enum CollectEnGoUnit {
+  PIECE
+  WEIGHT
+}
+
 // Hoe een deurgebeurtenis tot stand kwam: een fysieke kaartscan aan de deur, of
 // een remote-open vanaf het dashboard.
 enum DoorMethod {
@@ -533,6 +549,7 @@ model User {
   uitleenTransportDriven  UitleenTransportBooking[] @relation("UitleenTransportDriver")
   uitleenTransportDecided UitleenTransportBooking[] @relation("UitleenTransportDecidedBy")
   uitleenTransportDone    UitleenTransportBooking[] @relation("UitleenTransportCompletedBy")
+  collectEnGoImported     CollectEnGoOrder[]        @relation("CollectEnGoImportedBy")
   uitleenDriver           UitleenDriver?            @relation("UitleenDriverUser")
   uitleenDriversAdded     UitleenDriver[]           @relation("UitleenDriverAddedBy")
   uitleenAuditLogs        UitleenAuditLog[]         @relation("UitleenAuditActor")
@@ -725,12 +742,12 @@ model GroupRole {
 // -----------------------------------------------------------------------------
 
 model HeaderTab {
-  id      String  @id @default(cuid())
-  code    String  @unique
-  slug    String  @unique
-  labelNl String
-  labelEn String
-  order   Int     @default(0)
+  id        String  @id @default(cuid())
+  code      String  @unique
+  slug      String  @unique
+  labelNl   String
+  labelEn   String
+  order     Int     @default(0)
   visible   Boolean @default(true)
   visibleNl Boolean @default(true)
   visibleEn Boolean @default(true)
@@ -2821,9 +2838,11 @@ model UitleenFlesserkeItem {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  category UitleenFlesserkeCategory? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
-  lines    UitleenFlesserkeLine[]
-  batches  UitleenFlesserkeBatch[]
+  category       UitleenFlesserkeCategory? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  lines          UitleenFlesserkeLine[]
+  batches        UitleenFlesserkeBatch[]
+  collectEnGo    CollectEnGoOrderLine[]
+  collectEnGoKey CollectEnGoProductMatch[]
 
   @@index([categoryId, active])
 }
@@ -2866,6 +2885,118 @@ model UitleenFlesserkeLine {
   item        UitleenFlesserkeItem @relation(fields: [flesserkeItemId], references: [id], onDelete: Restrict)
 
   @@index([reservationId])
+  @@index([flesserkeItemId])
+}
+
+/// Een Collect&Go-bevestigingsmail, uitgelezen en klaargezet om te importeren.
+///
+/// Wie voor de kring boodschappen bestelt bij Colruyt, krijgt een mail met alle
+/// producten, aantallen en prijzen en een reservatienummer. Die lijst met de hand
+/// overtypen in de flesserke-voorraad is een half uur werk per bestelling, en
+/// levert dubbele items op. De mail wordt hier bewaard zoals ze gelezen is; het
+/// importscherm zet ze per lijn om in ladingen (`UitleenFlesserkeBatch`).
+///
+/// `reservationNumber` is bewust **niet uniek**: bij een wijziging stuurt
+/// Collect&Go een tweede mail met hetzelfde nummer. Dedupe gebeurt op
+/// `messageId`; het beheer neemt de nieuwste niet-geïmporteerde mail.
+model CollectEnGoOrder {
+  id                String                 @id @default(cuid())
+  reservationNumber String
+  /// Message-ID van de mail. Voorkomt dat dezelfde mail bij een tweede
+  /// IMAP-ronde opnieuw binnenkomt. Leeg bij een geplakte mail.
+  messageId         String?                @unique
+  /// "IMAP" of "PASTE": kwam ze uit de mailbox of plakte iemand ze zelf?
+  source            String
+  status            CollectEnGoOrderStatus @default(NEW)
+
+  customerName String?
+  pickupPoint  String?
+  pickupFrom   DateTime? @db.Timestamptz(3)
+  pickupUntil  DateTime? @db.Timestamptz(3)
+  orderedAt    DateTime? @db.Timestamptz(3)
+
+  // De bedragen onderaan de mail. Ze gaan niet mee naar de voorraad (een lading
+  // heeft geen prijs), maar dienen als controle op het parsen en laten het team
+  // achteraf zien wat een bestelling gekost heeft.
+  subtotalCents    Int?
+  discountCents    Int?
+  serviceCostCents Int?
+  totalCents       Int?
+
+  /// De genormaliseerde tekst van de mail, om later opnieuw te kunnen parsen
+  /// wanneer Collect&Go zijn opmaak wijzigt.
+  rawText String
+
+  receivedAt   DateTime  @default(now()) @db.Timestamptz(3)
+  importedAt   DateTime? @db.Timestamptz(3)
+  importedById String?
+
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+
+  importedBy User?                  @relation("CollectEnGoImportedBy", fields: [importedById], references: [id], onDelete: SetNull)
+  lines      CollectEnGoOrderLine[]
+
+  @@index([status, receivedAt])
+  @@index([reservationNumber])
+}
+
+/// Eén productlijn uit de mail, met wat het importscherm ervan maakte.
+model CollectEnGoOrderLine {
+  id        String @id @default(cuid())
+  orderId   String
+  sortIndex Int
+
+  /// De categoriekop uit de mail ("Diepvries"). Puur van Colruyt; ze staat los
+  /// van `UitleenFlesserkeCategory`.
+  category    String?
+  productName String
+  /// De vrije notitie die de besteller in Collect&Go bij het product zette. In
+  /// de praktijk is dat de acti waarvoor het gekocht is ("Acti - livecantus").
+  note        String?
+
+  unit         CollectEnGoUnit @default(PIECE)
+  /// Aantal stuks. Bij `WEIGHT` staat het gewicht in `quantityText` en is dit
+  /// een naar boven afgerond werkgetal dat het team in het importscherm zet.
+  quantity     Int
+  quantityText String?
+
+  unitPriceCents    Int?
+  /// Waarop de eenheidsprijs slaat: "st" of "Kg".
+  unitPriceBasis    String?
+  totalPriceCents   Int?
+  /// Leeggoed en promo uit de `leeggoed`-regel onder een bak bier.
+  depositCents      Int?
+  lineDiscountCents Int?
+
+  /// Waar deze lijn naartoe ging bij het importeren; leeg zolang dat niet gebeurd
+  /// is of wanneer het team ze oversloeg.
+  flesserkeItemId  String?
+  importedQuantity Int?
+
+  order CollectEnGoOrder      @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  item  UitleenFlesserkeItem? @relation(fields: [flesserkeItemId], references: [id], onDelete: SetNull)
+
+  @@index([orderId, sortIndex])
+  @@index([flesserkeItemId])
+}
+
+/// Onthoudt naar welk flesserke-item een Collect&Go-product de vorige keer ging.
+///
+/// Zonder dit begint elke bestelling weer bij nul en moet het team dezelfde
+/// zeventig lijnen opnieuw aanduiden. `productKey` is de genormaliseerde
+/// productnaam uit de mail (zie lib/collectengo/match.ts).
+model CollectEnGoProductMatch {
+  id              String @id @default(cuid())
+  productKey      String @unique
+  productName     String
+  flesserkeItemId String
+
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+
+  item UitleenFlesserkeItem @relation(fields: [flesserkeItemId], references: [id], onDelete: Cascade)
+
   @@index([flesserkeItemId])
 }
 

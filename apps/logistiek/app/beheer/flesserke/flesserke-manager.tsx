@@ -1,6 +1,7 @@
 'use client';
 
 import { Fragment, useMemo, useState } from 'react';
+import Link from 'next/link';
 import type { UitleenFlesserkeCategory } from '@prisma/client';
 import {
   deactivateFlesserkeCategoryAction,
@@ -296,6 +297,13 @@ export function FlesserkeManager({
             <p className="mt-2 max-w-2xl text-sm leading-6 text-vtk-body">
               Verbruiksstock voor interne werking. Pas het aantal aan voor de wekelijkse upkeep; beschikbaar
               = voorraad min gereserveerd. Rood = vervalt binnen 3 weken.
+            </p>
+            <p className="mt-2 text-sm text-vtk-body">
+              Boodschappen bij Colruyt gedaan?{' '}
+              <Link href="/beheer/collectengo" className="font-medium text-vtk-ink underline underline-offset-2">
+                Importeer de Collect&Go-bestelling
+              </Link>{' '}
+              in plaats van elk product apart toe te voegen.
             </p>
           </div>
           <div className="grid grid-cols-3 divide-x divide-vtk-navy/10 overflow-hidden rounded-[14px] border border-vtk-navy/10 text-center">
