@@ -123,6 +123,79 @@ communicatie tussen de toestellen nodig. Wil je dat live, zet dan een lokale
 router of hotspot aan de ingang; LoRa-mesh (Meshtastic) haalt de EU-duty-cycle
 niet bij de toeloop van een galabal, en Web Bluetooth bestaat niet op iOS.
 
+### Kleur per tickettype
+
+Een tickettype draagt een `color`: een key uit het palet in
+`apps/web/lib/ticketing/ticketColors.ts`, geen vrije hexwaarde. De kleur reist mee
+tot in de scanner: bij een **aanvaard** ticket vult ze het volledige
+feedbackvlak en staat de naam van het type als grootste woord op het scherm. Aan
+een cantus is dat het verschil tussen water, bier en eigen drank, van drie meter
+zichtbaar voor wie tapt.
+
+**Twee regels die niet mogen schuiven.** Bij *dubbel* of *geweigerd* overrulen
+oranje en rood die typekleur volledig; een geweigerd bierticket dat geel oplicht,
+gaat binnen. En de kleur is nooit het enige signaal: type en oordeel staan er
+altijd als tekst bij, want een op de twaalf mannen ziet rood en groen niet uit
+elkaar en die staat even goed aan de deur.
+
+De kleur komt live van `TicketType`, niet van een kopie op de bestelregel zoals
+`ticketTypeName`. Die naamkopie bestaat om de geschiedenis vast te houden bij een
+hernoeming; een kleur wil je net kunnen bijsturen tot vlak voor de deur opengaat.
+De palet-keys zitten als CSS-variabelen (`--ticket-color-*`) in
+`apps/web/app/design/vtk-tickets.css`.
+
+### Kaartcheck-in met de studentenkaart
+
+Aan een cantus moet iedereen snel binnen, en een QR opzoeken op een telefoon in
+een rij van tweehonderd man is traag. Staat `TicketEvent.cardCheckIn` aan, dan kan
+de deurploeg de **studentenkaart** laten lezen in plaats van de QR te scannen.
+
+**Hoe de kaart aan een ticket raakt.** `TicketOrderItem.rNumber` (uniek per event)
+is het aanknopingspunt. Bij een aankoop vult `createTicketCheckout` daar het
+r-nummer van de **ingelogde koper** in, op de eerste bestelregel. Wie vier tickets
+koopt voor zijn vrienden, levert dus drie regels zonder r-nummer op: die gaan met
+de QR binnen, of iemand vult het nummer bij op
+`/admin/tickets/<event>/deelnemers`. Botst het r-nummer met een regel die er al is,
+dan blijft het veld leeg; een aankoop mag nooit stukvallen op deze index.
+
+**Online.** De lezer gedraagt zich als een toetsenbord en tikt `serial;cardAppId`.
+Dat gaat naar `POST /api/tickets/events/[eventId]/scan/card`, dat de kaart via de
+gedeelde `resolveStudentCard` (eigen `StudentCard`-tabel, anders KU Leuven) tot een
+r-nummer herleidt, daarmee de bestelregel opzoekt en vanaf de ticketcode door
+dezelfde `scanTicket` loopt als een QR. Zelfde transactie, zelfde logboek, zelfde
+uitkomsten voor een al gescand, geannuleerd of terugbetaald ticket. De
+handtekening ontbreekt, net als bij een handmatig ingetikte code; de kaart is hier
+het bewijs.
+
+**Offline.** Het manifest draagt een tabel `gehashte kaart -> ticketcode`, plus de
+salt waarmee ze gehasht is (`lib/ticketing/cardHash.ts`). Het toestel zoekt de
+kaart daarin op en gaat vanaf de gevonden ticketcode door de gewone offline-weg:
+manifestcontrole, wachtrij, `clientScanId`, synchroniseren. Er is dus geen tweede
+soort wachtrij en geen tweede soort conflict.
+
+- Enkel kaarten die bij ons al eens gelezen zijn (Theokot, deur, fakscanner)
+  staan in die tabel: alleen die kennen we zonder KU Leuven te bellen. Wie zijn
+  kaart nog nooit ergens liet lezen, moet zonder netwerk zijn QR bovenhalen.
+- De hash is pseudonimisering, geen geheimhouding: de salt staat in hetzelfde
+  bestand op hetzelfde toestel. Wat ze wél doet, is voorkomen dat er een lijst
+  echte kaartnummers van achthonderd mensen in de localStorage van een
+  ledentelefoon staat, en dat twee manifesten aan elkaar te leggen zijn.
+
+**Een kaart die niets oplevert** gaat evengoed het logboek in, als `INVALID` met de
+reden in `TicketScanLog.metadata` (`CARD_UNREADABLE`, `NO_TICKET`,
+`CARD_CHECKIN_DISABLED`) en zonder `credentialFingerprint`. Een hash van het
+kaartnummer zou een stabiele verwijzing naar één persoon zijn die het archiveren
+overleeft, en dat is net wat het wissen hieronder wil vermijden.
+
+**Bewaartermijn.** Bij het archiveren van een event wist `saveTicketEventStatusAction`
+alle `rNumber`-velden van dat event. Het logboek en de bestellingen blijven, het
+r-nummer verdwijnt: na de cantus heeft het geen functie meer.
+
+**Waarom een lezer en geen NFC in de browser.** De KU Leuven-kaart is MIFARE
+DESFire; Web NFC leest enkel NDEF en bestaat sowieso niet op iOS. Een
+keyboard-wedge lezer (USB of bluetooth) is de enige variant die in een browser
+werkt, en het is dezelfde lezer die al aan de Theokot-balie ligt.
+
 ### Zoeken op naam
 
 Naast de camera en het handmatige codeveld heeft de scanner een knop **Op naam**:
@@ -163,8 +236,9 @@ klopt; een scanner-URL van één event is dat niet.
 - `mollie/webhook/route.ts` — Mollie payment/refund callback
 - `mock/complete/route.ts` — dev-only instant "payment complete"
 - `maintenance/route.ts` — reconciliation + outbox flush (Bearer `TICKETING_MAINTENANCE_SECRET`)
-- `events/[eventId]/scan`, `.../scan/batch`, `.../scan/reverse`,
-  `.../scanner/bootstrap` — scanning (`scan/batch` leegt de offline wachtrij)
+- `events/[eventId]/scan`, `.../scan/batch`, `.../scan/card`, `.../scan/reverse`,
+  `.../scanner/bootstrap` — scanning (`scan/batch` leegt de offline wachtrij,
+  `scan/card` checkt in met een studentenkaart)
 - `events/[eventId]/{stats,exports/*}`, `orders/[orderId]/{status,access}`,
   `[ticketId]/pdf` — supporting endpoints
 
@@ -178,6 +252,9 @@ klopt; een scanner-URL van één event is dat niet.
 - `authorization.ts` — capability checks (`canCreateTicketEventForGroup`, `requireTicketEventCapability`)
 - `config.ts` — env-driven config (provider, base URL, secrets, reservation window)
 - `crypto.ts` — signed ticket credentials + order access tokens
+- `ticketColors.ts` — het palet per tickettype (key, geen hex)
+- `cardHash.ts` — het hashformaat van de studentenkaart in het offline-manifest;
+  draait bewust aan beide kanten
 - `mail.ts`, `outbox.ts` — durable confirmation-mail queue
 - `mailBundle.ts` — the ticket PDF and the Apple Wallet passes that ride along
   with that mail, plus the Google Wallet save links (best effort: a failing

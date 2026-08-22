@@ -40,6 +40,7 @@ import type {
   ScannerBootstrap,
   ScannerManifest,
 } from "./types";
+import { cardHashInBrowser } from "@/lib/ticketing/cardHash";
 import { ticketColorKey } from "@/lib/ticketing/ticketColors";
 import { loadManifest, loadQueue, saveManifest, saveQueue, verifyOffline } from "./offline";
 import { InstallButton } from "./InstallButton";
@@ -512,16 +513,32 @@ export function ScannerApp({ eventId }: { eventId: string }) {
       const scannedAt = new Date().toISOString();
       const clientScanId = createId();
 
+      // Zonder netwerk zoekt het toestel de kaart op in de tabel die met het
+      // manifest meekwam. Levert dat een ticketcode op, dan gaat die door
+      // dezelfde weg als een gescande QR: het manifest beslist, de scan gaat de
+      // wachtrij in, en de server doet de volledige controle bij het
+      // synchroniseren.
       if (!navigator.onLine) {
+        const code = manifest?.cardSalt && manifest.cards
+          ? manifest.cards[(await cardHashInBrowser(manifest.cardSalt, card)) ?? ""]
+          : undefined;
+        if (code) {
+          void processCredential(code);
+          return;
+        }
         const item: ScanHistoryItem = {
           id: clientScanId,
           scannedAt,
-          kind: "error",
+          kind: "rejected",
           code: "kaart",
-          message: "Kaartlezen kan niet zonder netwerk; scan de QR",
+          message: manifest?.cards
+            ? "Kaart niet in de lijst op dit toestel; scan de QR"
+            : "Kaartlezen kan niet zonder netwerk; scan de QR",
         };
         setFeedback(item);
         setHistory((items) => [item, ...items].slice(0, 50));
+        setSessionCounts((counts) => ({ ...counts, rejected: counts.rejected + 1 }));
+        if (navigator.vibrate) navigator.vibrate([90, 50, 90]);
         if (feedbackTimerRef.current) clearTimeout(feedbackTimerRef.current);
         feedbackTimerRef.current = setTimeout(() => setFeedback(null), 1800);
         return;
@@ -577,7 +594,7 @@ export function ScannerApp({ eventId }: { eventId: string }) {
         feedbackTimerRef.current = setTimeout(() => setFeedback(null), 1800);
       }
     },
-    [deviceId, eventId, gateId],
+    [deviceId, eventId, gateId, manifest, processCredential],
   );
 
   useEffect(() => {
@@ -1012,8 +1029,10 @@ export function ScannerApp({ eventId }: { eventId: string }) {
               />
               <p id="scanner-card-help">
                 {online
-                  ? "Houd de kaart op de lezer. Werkt enkel met netwerk; zonder bereik scan je de QR."
-                  : "Geen netwerk: kaartlezen werkt nu niet, scan de QR van het ticket."}
+                  ? "Houd de kaart op de lezer."
+                  : manifest?.cards
+                    ? "Geen netwerk: enkel kaarten die hier al eens gescand zijn, staan op dit toestel."
+                    : "Geen netwerk en geen kaartlijst op dit toestel; scan de QR van het ticket."}
               </p>
             </section>
           ) : null}

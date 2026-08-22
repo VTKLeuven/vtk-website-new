@@ -1,10 +1,12 @@
 import "server-only";
 
+import { createHash, randomBytes } from "node:crypto";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@vtk/db";
 import { z } from "zod";
 import { cardDisplayName, resolveStudentCard } from "@/lib/student-card";
 import { requireTicketEventCapability } from "./authorization";
+import { CARD_HASH_LENGTH, cardHashInput } from "./cardHash";
 import { ticketColorKey } from "./ticketColors";
 import {
   credentialFingerprint,
@@ -114,6 +116,8 @@ export async function scannerBootstrap(eventId: string) {
       })
     : [];
 
+  const cards = manifestComplete && event.cardCheckIn ? await manifestCardTable(eventId) : null;
+
   return {
     event: {
       id: event.id,
@@ -136,8 +140,51 @@ export async function scannerBootstrap(eventId: string) {
         type: ticket.orderItem.ticketTypeName,
         typeColor: ticketColorKey(ticket.orderItem.ticketType.color),
       })),
+      cardSalt: cards?.salt,
+      cards: cards?.table,
     },
   };
+}
+
+/**
+ * De kaarttabel die met het manifest meegaat: gehashte kaart -> ticketcode.
+ *
+ * Hiermee kan een toestel zonder netwerk een studentenkaart alsnog aan een
+ * ticket koppelen, en daarna gewoon de bestaande offline-weg volgen (wachtrij,
+ * `clientScanId`, synchroniseren). Enkel kaarten die bij ons al eens gescand
+ * zijn staan erin, want alleen die kennen we zonder KU Leuven te bellen; wie zijn
+ * kaart nog nooit ergens liet lezen, moet aan de deur zijn QR bovenhalen.
+ */
+async function manifestCardTable(eventId: string) {
+  const attendees = await prisma.ticketOrderItem.findMany({
+    where: { eventId, rNumber: { not: null }, ticket: { status: "VALID" } },
+    select: { rNumber: true, ticket: { select: { publicCode: true } } },
+  });
+  const codeByRNumber = new Map<string, string>();
+  for (const attendee of attendees) {
+    if (attendee.rNumber && attendee.ticket) {
+      codeByRNumber.set(attendee.rNumber.trim().toLowerCase(), attendee.ticket.publicCode);
+    }
+  }
+  if (codeByRNumber.size === 0) return { salt: randomBytes(16).toString("hex"), table: {} };
+
+  const knownCards = await prisma.studentCard.findMany({
+    where: { rNumber: { in: [...codeByRNumber.keys()] } },
+    select: { serial: true, cardAppId: true, rNumber: true },
+  });
+
+  const salt = randomBytes(16).toString("hex");
+  const table: Record<string, string> = {};
+  for (const card of knownCards) {
+    const code = codeByRNumber.get(card.rNumber.trim().toLowerCase());
+    if (!code) continue;
+    const hash = createHash("sha256")
+      .update(cardHashInput(salt, `${card.serial};${card.cardAppId}`))
+      .digest("hex")
+      .slice(0, CARD_HASH_LENGTH);
+    table[hash] = code;
+  }
+  return { salt, table };
 }
 
 export async function scanTicket(eventId: string, rawInput: unknown, origin?: ScanOrigin) {

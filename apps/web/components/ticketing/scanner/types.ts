@@ -25,6 +25,13 @@ export type ScannerManifest = {
   generatedAt: string;
   ticketCount: number;
   tickets: ScannerManifestEntry[];
+  /**
+   * Gehashte studentenkaart -> ticketcode, zodat een kaart ook zonder netwerk
+   * bij een ticket landt. Enkel aanwezig wanneer het event kaartcheck-in aan
+   * heeft staan; `cardSalt` hoort bij deze tabel (zie `lib/ticketing/cardHash.ts`).
+   */
+  cardSalt?: string;
+  cards?: Record<string, string>;
 };
 
 /** Een scan die nog naar de server moet; `clientScanId` maakt opnieuw sturen veilig. */

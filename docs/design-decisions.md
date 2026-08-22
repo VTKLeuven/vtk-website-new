@@ -3319,3 +3319,42 @@ bij. Het alternatief (Bitwarden Key Connector) is Enterprise en werkt niet op
 Vaultwarden.
 
 Technische kant: `docs/wachtwoorden.md`.
+
+## Kaartcheck-in aan een cantus
+
+Aan een cantus wil de deurploeg tweehonderd man binnen krijgen zonder dat
+iedereen zijn mail openzoekt op een telefoon met één streepje bereik. Daarom kan
+per event de **studentenkaart** de QR vervangen: dezelfde lezer als aan de
+Theokot-balie, dezelfde `resolveStudentCard`. Technische kant:
+`docs/ticketing.md`.
+
+**Het r-nummer komt enkel van de ingelogde koper.** Het alternatief was het per
+deelnemer verplicht te maken in het bestelformulier. Dat is bewust niet gekozen:
+het legt een extra verplicht veld op elke aankoop, ook bij de evenementen waar de
+kaart nooit gebruikt wordt, en wie voor vrienden koopt kent hun r-nummer zelden
+uit het hoofd. De prijs is bekend en aanvaard: wie vier tickets koopt, levert
+één regel met een r-nummer en drie zonder. Die drie gaan met de QR binnen of
+krijgen hun nummer bijgevuld op de deelnemerspagina. De kaart is dus een snelle
+weg naast de QR, geen vervanging ervan; een cantus met veel groepsbestellingen
+moet dat weten voor de deur opengaat.
+
+**Het r-nummer verdwijnt bij het archiveren.** Na het event heeft het geen
+functie meer, en een ticketdatabase is niet de plek voor een blijvende koppeling
+tussen een naam en een KU Leuven-nummer. Het archiveren van een event wist ze
+allemaal; bestellingen, tickets en het scanlogboek blijven staan. Om dezelfde
+reden staat er nooit een r-nummer of kaartnummer in `TicketScanLog`: dat logboek
+overleeft het archiveren en zou het wissen anders stilletjes ongedaan maken.
+
+**Kleur zegt welk ticket, niet of het geldig is.** Een cantus heeft drie
+standaardtypes (water, bier, eigen drank) en wie tapt moet dat van drie meter
+zien. Daarom kleurt een aanvaarde scan het scherm in de kleur van het tickettype,
+met de naam van het type als grootste woord. Maar de bestaande betekenis van
+kleur in de scanner (groen/oranje/rood = de uitkomst) blijft de baas: bij een
+dubbele of geweigerde scan overrulen oranje en rood de typekleur volledig. Een
+geweigerd bierticket dat geel oplicht, gaat binnen. En omdat een op de twaalf
+mannen rood en groen niet uit elkaar houdt, staat het oordeel er altijd ook als
+tekst.
+
+**De kleur is een keuze uit een palet, geen vrije kleurkiezer.** Dat vlak is een
+halve telefoon groot in een donkere zaal; een zelfgekozen pastel of een tweede
+tint groen naast het groen van "aanvaard" is daar vroeg of laat onleesbaar.

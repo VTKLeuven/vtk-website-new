@@ -21,16 +21,21 @@ Productkeuzes die hieruit volgen: `docs/design-decisions.md`.
 
 ## Statusoverzicht
 
-| Fase | Inhoud | Zwaarte | Hangt af van |
-| --- | --- | --- | --- |
-| 0 | Kringkeuzes vastleggen | klein | - |
-| 1 | Kleur per tickettype in de databank en de admin | klein 🗄️ | 0 |
-| 2 | Kleur tonen in scanner, deelnemerslijst en ticket | midden | 1 |
-| 3 | R-nummer per deelnemer verzamelen bij aankoop | midden 🗄️ | 0 |
-| 4 | Kaartcheck-in online | midden | 3 |
-| 5 | Kaartcheck-in offline (manifest + wachtrij) | groot | 4 |
-| 6 | Kaartlezer-invoer in de scanner-app | midden | 4 |
-| 7 | Tests, documentatie en droogloop | midden | 5, 6 |
+| Fase | Inhoud | Zwaarte | Hangt af van | Status |
+| --- | --- | --- | --- | --- |
+| 0 | Kringkeuzes vastleggen | klein | - | ✅ beslist |
+| 1 | Kleur per tickettype in de databank en de admin | klein 🗄️ | 0 | ✅ |
+| 2 | Kleur tonen in scanner, deelnemerslijst en ticket | midden | 1 | ✅ |
+| 3 | R-nummer per deelnemer verzamelen bij aankoop | midden 🗄️ | 0 | ✅ |
+| 4 | Kaartcheck-in online | midden | 3 | ✅ |
+| 5 | Kaartcheck-in offline (manifest + wachtrij) | groot | 4 | ✅ |
+| 6 | Kaartlezer-invoer in de scanner-app | midden | 4 | ✅ |
+| 7 | Tests, documentatie en droogloop | midden | 5, 6 | 🟡 droogloop open |
+
+**De twee migraties zijn geschreven maar nog niet gedraaid** (`20260822120000_ticket_type_color`
+en `20260822130000_ticket_card_checkin`). De droogloop met een echte lezer aan een
+echte deur staat ook nog open; dat is de enige manier om te zien of de lezer die
+we hebben, tikt wat we verwachten.
 
 ---
 
