@@ -28,21 +28,21 @@ backup meegaan.
 
 ## Waar wat staat
 
-| Bestand | Inhoud |
-|---|---|
-| `apps/web/lib/vault/crypto.ts` | Het Bitwarden-formaat in `node:crypto`: EncString, item-sleutels, RSA-wrap, de KDF |
-| `apps/web/lib/vault/client.ts` | De API: token, collections, groepen, leden, ciphers |
-| `apps/web/lib/vault/items.ts` | De grens tussen klare tekst en EncStrings |
-| `apps/web/lib/vault/sync.ts` | `reconcileVault()` en `pushVaultMembership()` |
-| `apps/web/lib/vault/config.ts` | `Setting`-sleutel `vault.config`, geheimen versleuteld |
-| `apps/web/lib/vault/access.ts` | Wie welke postkluis mag zien |
-| `apps/web/app/api/vault/maintenance/route.ts` | Wat de `vault-worker` elke 5 minuten aanroept |
+| Bestand                                       | Inhoud                                                                             |
+| --------------------------------------------- | ---------------------------------------------------------------------------------- |
+| `apps/web/lib/vault/crypto.ts`                | Het Bitwarden-formaat in `node:crypto`: EncString, item-sleutels, RSA-wrap, de KDF |
+| `apps/web/lib/vault/client.ts`                | De API: token, collections, groepen, leden, ciphers                                |
+| `apps/web/lib/vault/items.ts`                 | De grens tussen klare tekst en EncStrings                                          |
+| `apps/web/lib/vault/sync.ts`                  | `reconcileVault()` en `pushVaultMembership()`                                      |
+| `apps/web/lib/vault/config.ts`                | `Setting`-sleutel `vault.config`, geheimen versleuteld                             |
+| `apps/web/lib/vault/access.ts`                | Wie welke postkluis mag zien                                                       |
+| `apps/web/app/api/vault/maintenance/route.ts` | Wat de `vault-worker` elke 5 minuten aanroept                                      |
 
-| Route | Wat |
-|---|---|
-| `/admin/wachtwoorden` | De wachtwoorden van je eigen post(en) |
-| `/admin/wachtwoorden/beheer` | IT: posten koppelen, sync-status per post en per lid |
-| `/admin/it` | Superadmin: URL, organisatie, API-key en organisatiesleutel |
+| Route                        | Wat                                                         |
+| ---------------------------- | ----------------------------------------------------------- |
+| `/admin/wachtwoorden`        | De wachtwoorden van je eigen post(en)                       |
+| `/admin/wachtwoorden/beheer` | IT: posten koppelen, sync-status per post en per lid        |
+| `/admin/it`                  | Superadmin: URL, organisatie, API-key en organisatiesleutel |
 
 Permissies: `vault.access` (de SSO-poort), `vault.editOwn` (eigen post beheren),
 `vault.manage` (koppelen en synchroniseren).
@@ -101,22 +101,20 @@ dezelfde fout maken):
    Argon2id: anders is er een native binding nodig, en dat is in deze monorepo
    precies het soort dependency dat de lockfile stuk maakt (zie `AGENTS.md`).
 
-3. **API-key.** `POST /api/accounts/api-key` met de master password hash geeft de
-   `apiKey` terug. De client-id is `user.<uuid van het botaccount>`; die vorm
-   wordt gecontroleerd bij het opslaan.
+3. **API-key en organisatiesleutel.** In de webkluis: **Settings → Security →
+   Keys → View API key**. De persoonlijke `client_id` begint met `user.` en de
+   `client_secret` is de API-key. Haal daarna de organisatiesleutel lokaal op
+   met `npx tsx --conditions=react-server scripts/vault-bootstrap-org-key.ts`.
+   Het script vraagt de geheimen zonder echo, schrijft niets naar schijf en
+   print de organisatie-id en de 64-byte sleutel in base64 voor `/admin/it`.
 
-4. **Organisatiesleutel.** Login geeft `Key` (de user key, versleuteld met de
-   gestretchte master key) en `PrivateKey`. Ontsleutel in die volgorde en
-   ontsleutel daarmee `Organizations[].Key` uit `/api/sync`. Resultaat: 64 bytes,
-   base64 in `/admin/it`.
-
-5. **SSO.** Maak in `/admin/sso/nieuw` een client aan met redirect-URI
+4. **SSO.** Maak in `/admin/sso/nieuw` een client aan met redirect-URI
    `https://<kluis>/identity/connect/oidc-signin`, scopes
    `openid profile email offline_access`, toegangsmodus **RESTRICTED** met
    `vault.access`. Hang `vault.access` als DEFAULT-grant aan de rollen van de
    gekoppelde posten, dan beweegt de toegang mee met het werkingsjaar.
 
-6. **Posten koppelen** in `/admin/wachtwoorden/beheer`.
+5. **Posten koppelen** in `/admin/wachtwoorden/beheer`.
 
 ---
 
