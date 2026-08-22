@@ -24,7 +24,7 @@ verbetering, **P3** = groter of "ooit".
 
 | Fase | Inhoud | Taken | Status |
 | --- | --- | --- | --- |
-| 0 | Beslissingen die eerst moeten vallen | 4 vragen | ⬜ open |
+| 0 | Beslissingen die eerst moeten vallen | 4 vragen | ✅ beslist |
 | 1 | Kleine bugs, UI-fixes en ergernissen | R1–R8 | ⬜ open |
 | 2 | Navigatie, lay-out en overzichten | N1–N5 | ⬜ open |
 | 3 | Materiaal: opmerkingen, deelgoedkeuring, sjablonen | M1–M8 | ⬜ open |
@@ -38,6 +38,20 @@ verbetering, **P3** = groter of "ooit".
 
 Deze vragen komen uit de feedback en bepalen wat er gebouwd wordt. Leg de
 motivatie per keuze vast in `docs/design-decisions.md`.
+
+Alle vier beslist op 22 augustus 2026; de motivatie staat in
+`docs/design-decisions.md` § Feedbackronde 2 (augustus 2026): vier keuzes vooraf.
+
+- **B1 = koppelen.** De Collect&Go-import bestaat al (commit 2d05b60); E5 voegt
+  enkel de koppeling `CollectEnGoOrder` -> `UitleenEvent` toe, geen tweede
+  invoerweg.
+- **B2 = ja, voor iedereen, maar via de keuzelijst.** "Nieuw sjabloon" staat
+  onderaan de lijst met bestaande sjablonen, zodat je er eerst langs moet.
+  Iedereen ziet elk sjabloon; de post erop blijft een label, geen filter.
+- **B3 = strikt.** Externen zien geen evenementkeuze, geen sjabloonkeuze en
+  nooit de lijst van evenementen.
+- **B4 = vast, afgeleid van de chauffeur-id.** Hash op een vast palet van
+  tokens; geen kolom, geen kleurkiezer.
 
 | # | Vraag | Context |
 | --- | --- | --- |

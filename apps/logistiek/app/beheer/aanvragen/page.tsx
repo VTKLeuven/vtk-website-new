@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { ReservationStatusBadge } from '@/components/status-badge';
 import { requireManage } from '@/lib/session';
 import {
+  chargesRequester,
   formatDateOnly,
   formatDateWithPart,
   formatEuro,
@@ -14,6 +15,12 @@ import {
   getLogistiekSettings,
   type AdminReservation,
 } from '@/lib/uitleen-server';
+import {
+  BulkActionBar,
+  BulkSelectionProvider,
+  RowSelectCheckbox,
+  SelectAllCheckbox,
+} from './bulk-request-actions';
 
 const TABS: Array<{ value: string; label: string }> = [
   { value: 'all', label: 'Alle' },
@@ -76,6 +83,20 @@ function itemSummary(lines: AdminReservation['lines']): string {
   return rest > 0 ? `${shown.join(', ')} en ${rest} andere` : shown.join(', ');
 }
 
+/**
+ * "Materiaal", "Flesserke" of "Materiaal + Flesserke", op basis van welke
+ * lijnen de aanvraag heeft (R3). Bij "aangevraagd" etc. stond nergens welk
+ * type het was; dit maakt dat in één oogopslag duidelijk.
+ */
+function requestKindLabel(reservation: Pick<AdminReservation, 'lines' | 'flesserkeLines'>): string | null {
+  const hasMaterial = reservation.lines.length > 0;
+  const hasFlesserke = reservation.flesserkeLines.length > 0;
+  if (hasMaterial && hasFlesserke) return 'Materiaal + Flesserke';
+  if (hasMaterial) return 'Materiaal';
+  if (hasFlesserke) return 'Flesserke';
+  return null;
+}
+
 export default async function BeheerAanvragenPage({
   searchParams,
 }: {
@@ -103,6 +124,13 @@ export default async function BeheerAanvragenPage({
   const active = reservations.filter((r) => r.status === 'APPROVED' || r.status === 'PICKED_UP');
   const done = reservations.filter((r) => !['REQUESTED', 'APPROVED', 'PICKED_UP'].includes(r.status));
 
+  // "Lopend" krijgt de bulk-selectie (N4); "Afgelopen" (de afgesloten
+  // aanvragen: afgewezen, geannuleerd, teruggebracht) staat standaard
+  // ingeklapt (R2). Beide berekend vóór de render, zodat zowel de sectiekop
+  // als de rijen dezelfde volgorde gebruiken.
+  const sortedActive = chosenSort ? sortReservations(active, activeSort, activeDir) : byNextPickup(active);
+  const sortedDone = chosenSort ? sortReservations(done, activeSort, activeDir) : byLastTouched(done);
+
   function sortLink(key: SortKey): string {
     // Klikken op de actieve sortering draait de richting om.
     const nextDir: SortDir = activeSort === key && activeDir === 'asc' ? 'desc' : 'asc';
@@ -122,74 +150,114 @@ export default async function BeheerAanvragenPage({
     return query ? `/beheer/aanvragen?${query}` : '/beheer/aanvragen';
   }
 
-  function ReservationRow({ reservation }: { reservation: AdminReservation }) {
+  function ReservationRow({
+    reservation,
+    selectable = false,
+  }: {
+    reservation: AdminReservation;
+    /** Toont een checkbox voor de bulk-acties (N4); enkel in "Lopend". */
+    selectable?: boolean;
+  }) {
     const lastMinute =
       reservation.status === 'REQUESTED' &&
       isLastMinute(reservation.pickupDate, reservation.createdAt, settings.lastMinuteDays);
-    return (
-      <li>
-        <Link
-          href={`/beheer/aanvragen/${reservation.id}`}
-          className="logistics-admin-request-row"
-        >
-          <div className="logistics-reservation-cell logistics-reservation-subject">
-            <span>Aanvraag</span>
-            <strong>{reservation.eventName}</strong>
-            <p className="mt-1 flex flex-wrap items-center gap-2">
+    const kind = requestKindLabel(reservation);
+    // Enkel externen betalen (R4/chargesRequester): een post of werkgroep
+    // factureert niet aan zichzelf, dus waarborg en bedrag verdwijnen hier
+    // volledig in plaats van "€ 0,00" te tonen.
+    const showDeposit = chargesRequester(reservation.requesterType) && reservation.totalDepositCents > 0;
+    const row = (
+      <Link
+        href={`/beheer/aanvragen/${reservation.id}`}
+        className={selectable ? 'logistics-admin-request-row min-w-0 flex-1' : 'logistics-admin-request-row'}
+      >
+        <div className="logistics-reservation-cell logistics-reservation-subject">
+          <span>Aanvraag</span>
+          <strong>{reservation.eventName}</strong>
+          {/* `eventName` op de aanvraag is de momentopname die uit het gekozen
+              evenement voorgevuld werd, dus meestal staat hier exact dezelfde
+              naam als in de titel. Die regel op elke rij herhalen is ruis, en
+              ruis leert de lezer ze over te slaan op de ene rij waar ze wél
+              iets zegt. Vandaar enkel bij een hernoemd evenement (M8); dát het
+              onder een evenement hangt, zegt de pill hieronder. */}
+          {reservation.event && reservation.event.name !== reservation.eventName ? (
+            <p className="mt-0.5">Evenement: {reservation.event.name}</p>
+          ) : null}
+          <p className="mt-1 flex flex-wrap items-center gap-2">
+            <span className="rounded-full bg-vtk-paper-2 px-2 py-0.5 text-[11px] font-semibold text-vtk-navy">
+              {requesterLabel(reservation)}
+            </span>
+            {/* Hangt deze aanvraag onder een evenement? Dat was in deze lijst
+                nergens te zien, terwijl het bepaalt of er nog materiaal,
+                flesserke of transport bij hoort (M8). */}
+            {reservation.event ? (
               <span className="rounded-full bg-vtk-paper-2 px-2 py-0.5 text-[11px] font-semibold text-vtk-navy">
-                {requesterLabel(reservation)}
+                Evenement
               </span>
-              {lastMinute ? (
-                <span className="rounded-full bg-red-50 px-2 py-0.5 text-[11px] font-semibold text-red-700">
-                  Last minute
-                </span>
-              ) : null}
-              {/* Deze aanvraag past niet naast wat al goedgekeurd is. Altijd
-                  opnieuw berekend: annuleert de andere partij, dan is het weg. */}
-              {conflicting.has(reservation.id) ? (
-                <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-900">
-                  Conflict
-                </span>
-              ) : null}
-              {/* Een gevraagde levering stond nergens in deze lijst, dus ze werd
-                  pas opgemerkt door wie de aanvraag toevallig opende. Geel
-                  zolang er nog geen rit van gemaakt is. */}
-              {reservation.delivery ? (
-                <span
-                  className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${
-                    reservation._count.transports > 0
-                      ? 'bg-vtk-paper-2 text-vtk-navy'
-                      : 'bg-vtk-yellow text-vtk-ink'
-                  }`}
-                >
-                  {reservation._count.transports > 0 ? 'Levering gepland' : 'Levering'}
-                </span>
-              ) : null}
-            </p>
-          </div>
-          <div className="logistics-reservation-cell">
-            <span>Aanvrager</span>
-            <p>{reservation.user.name}</p>
-          </div>
-          <div className="logistics-reservation-cell">
-            <span>Inhoud</span>
-            <p>{itemSummary(reservation.lines)}</p>
-          </div>
-          <div className="logistics-reservation-cell">
-            <span>Periode</span>
-            <p>
-              {formatDateWithPart(reservation.pickupDate, reservation.pickupPart)} tot{' '}
-              {formatDateWithPart(reservation.returnDate, reservation.returnPart)}
-              {reservation.totalDepositCents > 0
-                ? `, ${formatEuro(reservation.totalDepositCents)} waarborg`
-                : ''}
-            </p>
-          </div>
-          <div className="logistics-reservation-status">
-            <span>Status</span>
-            <ReservationStatusBadge status={reservation.status} />
-          </div>
-        </Link>
+            ) : null}
+            {kind ? (
+              <span className="rounded-full bg-vtk-paper-2 px-2 py-0.5 text-[11px] font-semibold text-vtk-navy">
+                {kind}
+              </span>
+            ) : null}
+            {lastMinute ? (
+              <span className="rounded-full bg-red-50 px-2 py-0.5 text-[11px] font-semibold text-red-700">
+                Last minute
+              </span>
+            ) : null}
+            {/* Deze aanvraag past niet naast wat al goedgekeurd is. Altijd
+                opnieuw berekend: annuleert de andere partij, dan is het weg. */}
+            {conflicting.has(reservation.id) ? (
+              <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-900">
+                Conflict
+              </span>
+            ) : null}
+            {/* Een gevraagde levering stond nergens in deze lijst, dus ze werd
+                pas opgemerkt door wie de aanvraag toevallig opende. Geel
+                zolang er nog geen rit van gemaakt is. */}
+            {reservation.delivery ? (
+              <span
+                className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${
+                  reservation._count.transports > 0
+                    ? 'bg-vtk-paper-2 text-vtk-navy'
+                    : 'bg-vtk-yellow text-vtk-ink'
+                }`}
+              >
+                {reservation._count.transports > 0 ? 'Levering gepland' : 'Levering'}
+              </span>
+            ) : null}
+          </p>
+        </div>
+        <div className="logistics-reservation-cell">
+          <span>Aanvrager</span>
+          <p>{reservation.user.name}</p>
+        </div>
+        <div className="logistics-reservation-cell">
+          <span>Inhoud</span>
+          <p>{itemSummary(reservation.lines)}</p>
+        </div>
+        <div className="logistics-reservation-cell">
+          <span>Periode</span>
+          <p>
+            {formatDateWithPart(reservation.pickupDate, reservation.pickupPart)} tot{' '}
+            {formatDateWithPart(reservation.returnDate, reservation.returnPart)}
+            {/* Interne aanvragen (post/werkgroep) betalen niet: geen waarborg
+                tonen, niet "€ 0,00" (R4). */}
+            {showDeposit ? `, ${formatEuro(reservation.totalDepositCents)} waarborg` : ''}
+          </p>
+        </div>
+        <div className="logistics-reservation-status">
+          <span>Status</span>
+          <ReservationStatusBadge status={reservation.status} />
+        </div>
+      </Link>
+    );
+
+    if (!selectable) return <li>{row}</li>;
+    return (
+      <li className="flex items-center gap-3">
+        <RowSelectCheckbox id={reservation.id} label={`Selecteer aanvraag: ${reservation.eventName}`} />
+        {row}
       </li>
     );
   }
@@ -272,11 +340,64 @@ export default async function BeheerAanvragenPage({
       </div>
 
       {/* Wat nog moet gebeuren staat chronologisch vooruit: de eerstvolgende
-          afhaling bovenaan. Afgerond is historiek en gaat achterwaarts, op het
+          afhaling bovenaan. Afgelopen is historiek en gaat achterwaarts, op het
           moment waarop er nog iets aan veranderde (teruggebracht, afgewezen). */}
       <Section title="Te beslissen" list={open} fallback={byNextPickup} />
-      <Section title="Lopend" list={active} fallback={byNextPickup} />
-      <Section title="Afgerond" list={done} fallback={byLastTouched} />
+
+      {/* Bulk-acties (N4) horen enkel bij "Lopend": dat zijn de aanvragen die
+          nog een overgang (afgehaald/teruggebracht) kunnen maken. De selectie
+          leeft in een eigen provider, zodat ze niet per ongeluk rijen buiten
+          deze sectie raakt. */}
+      <BulkSelectionProvider
+        flesserkeIds={sortedActive
+          .filter((reservation) => reservation.flesserkeLines.length > 0)
+          .map((reservation) => reservation.id)}
+      >
+        <section>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <h2 className="text-lg font-semibold tracking-tight text-vtk-ink">
+              Lopend ({sortedActive.length})
+            </h2>
+            <SelectAllCheckbox ids={sortedActive.map((r) => r.id)} />
+          </div>
+          <div className="mt-3 empty:mt-0">
+            <BulkActionBar />
+          </div>
+          {sortedActive.length === 0 ? (
+            <p className="mt-3 text-sm text-vtk-muted">Niets hier.</p>
+          ) : (
+            <ul className="mt-4 grid gap-2">
+              {sortedActive.map((reservation) => (
+                <ReservationRow key={reservation.id} reservation={reservation} selectable />
+              ))}
+            </ul>
+          )}
+        </section>
+      </BulkSelectionProvider>
+
+      {/* Afgelopen (R2): de aanvragen die niets meer nodig hebben (afgewezen,
+          geannuleerd, teruggebracht) staan standaard ingeklapt zodat de
+          actieve lijsten hierboven het overzicht blijven. */}
+      <details className="group">
+        <summary className="flex cursor-pointer list-none items-center gap-2 text-lg font-semibold tracking-tight text-vtk-ink [&::-webkit-details-marker]:hidden">
+          <span
+            aria-hidden="true"
+            className="inline-block text-vtk-muted transition-transform group-open:rotate-90"
+          >
+            ▸
+          </span>
+          Afgelopen ({sortedDone.length})
+        </summary>
+        {sortedDone.length === 0 ? (
+          <p className="mt-3 text-sm text-vtk-muted">Niets hier.</p>
+        ) : (
+          <ul className="mt-4 grid gap-2">
+            {sortedDone.map((reservation) => (
+              <ReservationRow key={reservation.id} reservation={reservation} />
+            ))}
+          </ul>
+        )}
+      </details>
     </div>
   );
 }

@@ -371,6 +371,23 @@ export function requesterLabel(request: {
 }
 
 /**
+ * Rekent de uitleendienst deze aanvrager iets aan?
+ *
+ * Enkel externen betalen. Een post of een werkgroep is de kring zelf: die
+ * factureert niet aan zichzelf, en een bedrag naast een interne aanvraag zet
+ * mensen aan het rekenen over geld dat nooit van hand wisselt. Prijs, waarborg
+ * en betaalstatus verdwijnen daarom volledig bij een interne aanvraag, aan
+ * beide kanten van het scherm: wat de aanvrager niet ziet, mag het team ook
+ * niet als openstaand bedrag voorgeschoteld krijgen.
+ *
+ * Dit staat los van de instelling `showRentPrices`, die over de catalogus gaat
+ * (tonen we de dagprijs bij een item?) en niet over een concrete aanvraag.
+ */
+export function chargesRequester(requesterType: UitleenRequesterType): boolean {
+  return requesterType === 'EXTERN';
+}
+
+/**
  * Termijn waarbinnen een aanvraag "last minute" heet. Zeven dagen: met veertien
  * kreeg bijna elke aanvraag de badge, en een signaal dat overal staat is geen
  * signaal meer. Het team past dit zelf aan op /beheer/instellingen.

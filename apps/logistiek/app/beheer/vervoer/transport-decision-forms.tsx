@@ -1,6 +1,8 @@
 'use client';
 
+import type { UitleenRequesterType } from '@prisma/client';
 import { SaveForm } from '@/components/ui/save-form';
+import { chargesRequester } from '@/lib/uitleen';
 import { approveTransportAction, rejectTransportAction } from '@/app/actions/beheer';
 import type { DriverOption } from '@/lib/uitleen-server';
 import { DriverOptions } from './driver-select';
@@ -39,6 +41,7 @@ export function TransportDecisionForms({
   legs,
   drivers,
   pricingIsPerKm,
+  requesterType,
   needsVanDriver = false,
   sameDayBookings = [],
 }: {
@@ -47,6 +50,8 @@ export function TransportDecisionForms({
   legs: DecisionLeg[];
   drivers: DriverOption[];
   pricingIsPerKm: boolean;
+  /** R4: enkel externen betalen, dus enkel zij krijgen een betaalwijze. */
+  requesterType: UitleenRequesterType;
   needsVanDriver?: boolean;
   /** Andere goedgekeurde ritten met datzelfde voertuig die dag, om naar te schuiven. */
   sameDayBookings?: string[];
@@ -54,6 +59,9 @@ export function TransportDecisionForms({
   // Meerdere ritten in één aanvraag: heen en terug (V12), meerdere voertuigen
   // (V1), of allebei. Ze worden altijd samen beslist.
   const multiple = legs.length > 1;
+  // Een post of werkgroep betaalt niets (R4), dus de keuze tussen online en ter
+  // plaatse betalen is daar zinloos.
+  const charged = chargesRequester(requesterType);
 
   return (
     <div className="grid gap-4">
@@ -125,18 +133,27 @@ export function TransportDecisionForms({
             <DriverOptions drivers={drivers} needsVanDriver={needsVanDriver} />
           </select>
         </label>
-        <fieldset className="grid gap-2 text-sm">
-          <legend className="sr-only">Betaalwijze</legend>
-          <label className="flex items-center gap-2">
-            <input type="radio" name="paymentMode" value="ONLINE" defaultChecked={!pricingIsPerKm} />
-            <span>Online betalen (betaallink voor het lid)</span>
-          </label>
-          <label className="flex items-center gap-2">
-            <input type="radio" name="paymentMode" value="OFFLINE" defaultChecked={pricingIsPerKm} />
-            <span>Ter plaatse betalen (cash/Payconiq)</span>
-          </label>
-        </fieldset>
-        {pricingIsPerKm ? (
+        {charged ? (
+          <fieldset className="grid gap-2 text-sm">
+            <legend className="sr-only">Betaalwijze</legend>
+            <label className="flex items-center gap-2">
+              <input type="radio" name="paymentMode" value="ONLINE" defaultChecked={!pricingIsPerKm} />
+              <span>Online betalen (betaallink voor het lid)</span>
+            </label>
+            <label className="flex items-center gap-2">
+              <input type="radio" name="paymentMode" value="OFFLINE" defaultChecked={pricingIsPerKm} />
+              <span>Ter plaatse betalen (cash/Payconiq)</span>
+            </label>
+          </fieldset>
+        ) : (
+          // `approveTransportAction` weigert met MODE_REQUIRED zonder betaalwijze.
+          // Enkel de radiogroep verbergen zou een interne rit dus onbeslisbaar
+          // maken; OFFLINE is hier de betekenisloze maar veilige waarde, want er
+          // volgt geen betaallink en de knop "Markeer als betaald" is voor een
+          // interne aanvrager toch verborgen. Laat deze input dus staan.
+          <input type="hidden" name="paymentMode" value="OFFLINE" />
+        )}
+        {charged && pricingIsPerKm ? (
           <p className="text-xs text-vtk-muted">
             De prijs wordt pas bekend na de rit (per km); online betalen kan na het afronden.
           </p>

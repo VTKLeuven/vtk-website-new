@@ -3,7 +3,7 @@
 import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@vtk/ui';
-import type { UitleenPricingMode } from '@prisma/client';
+import type { UitleenPricingMode, UitleenRequesterType } from '@prisma/client';
 import {
   assignDriverAction,
   changeVehicleAction,
@@ -11,6 +11,7 @@ import {
   markTransportPaidOfflineAction,
 } from '@/app/actions/beheer';
 import { useToast } from '@/components/ui/toast';
+import { chargesRequester } from '@/lib/uitleen';
 import type { DriverOption } from '@/lib/uitleen-server';
 import { DriverOptions } from './driver-select';
 
@@ -24,6 +25,7 @@ export function TransportControls({
   driver,
   pricingMode,
   paid,
+  requesterType,
   drivers,
   vehicles,
 }: {
@@ -33,6 +35,8 @@ export function TransportControls({
   driver: { id: string; name: string } | null;
   pricingMode: UitleenPricingMode;
   paid: boolean;
+  /** R4: enkel externen betalen; bepaalt of "Markeer als betaald" hier zin heeft. */
+  requesterType: UitleenRequesterType;
   drivers: DriverOption[];
   vehicles: Array<{ id: string; name: string; needsVanDriver: boolean }>;
 }) {
@@ -112,7 +116,10 @@ export function TransportControls({
         >
           Rit afronden
         </Button>
-        {!paid ? (
+        {/* Een post of werkgroep betaalt niets (R4), dus "betaald" heeft daar
+            geen betekenis; de knop zou enkel een betaling in de historiek
+            zetten die nooit gebeurd is. */}
+        {!paid && chargesRequester(requesterType) ? (
           <Button
             type="button"
             size="sm"

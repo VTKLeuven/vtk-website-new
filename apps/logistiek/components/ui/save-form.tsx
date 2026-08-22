@@ -1,8 +1,9 @@
 'use client';
 
-import { useActionState, useEffect, useRef, type ReactNode } from 'react';
+import { useActionState, useCallback, useEffect, useRef, type ReactNode } from 'react';
 import { Button } from '@vtk/ui';
 import { useToast } from '@/components/ui/toast';
+import { restoreFormValues } from '@/lib/form-values';
 import { SAVE_IDLE, type SaveAction } from '@/lib/saveState';
 
 /**
@@ -41,7 +42,24 @@ export function SaveForm({
   className?: string;
   children?: ReactNode;
 }) {
-  const [state, formAction, pending] = useActionState(action, SAVE_IDLE);
+  const formRef = useRef<HTMLFormElement>(null);
+  // De FormData van de laatste submit, om terug te zetten na een fout (zie
+  // hieronder). Een ref, niet state: dit hoeft geen hertekening te triggeren.
+  const lastSubmitFormData = useRef<FormData | null>(null);
+
+  // Wikkelt de action enkel om de FormData te onthouden; de identiteit blijft
+  // stabiel zolang `action` dat is (in de praktijk altijd, want het is telkens
+  // een rechtstreekse server-actiereferentie), anders gooit useActionState bij
+  // elke hertekening zijn state weg.
+  const wrappedAction = useCallback<SaveAction>(
+    (prev, formData) => {
+      lastSubmitFormData.current = formData;
+      return action(prev, formData);
+    },
+    [action],
+  );
+
+  const [state, formAction, pending] = useActionState(wrappedAction, SAVE_IDLE);
   const showToast = useToast();
   // Per submit exact één toast, ook als de component om een andere reden
   // hertekent met dezelfde state.
@@ -57,6 +75,16 @@ export function SaveForm({
       showToast({ message: state.message ?? savedMessage, variant: 'success' });
       onSuccess?.();
     } else {
+      // React reset een `<form action={...}>` automatisch zodra de action
+      // klaar is, ook bij een foutresultaat: de ingetikte waarden springen
+      // terug naar hun defaultValue en het lijkt of de wijziging genegeerd
+      // werd (bv. nieuwe uren bij een conflicterende rit). Die reset gebeurt
+      // in de mutatiefase van de commit, vóór dit effect draait (een
+      // useEffect is een passief effect en loopt daarna), dus hier herstellen
+      // gebeurt gegarandeerd na de reset en niet ervoor.
+      if (formRef.current && lastSubmitFormData.current) {
+        restoreFormValues(formRef.current, lastSubmitFormData.current);
+      }
       // Blijft staan tot ze weggeklikt wordt: een foutmelding die vanzelf
       // verdwijnt kan je net missen.
       showToast({
@@ -68,7 +96,7 @@ export function SaveForm({
   }, [state, showToast, savedMessage, errorMessages, fallbackErrorMessage, onSuccess]);
 
   return (
-    <form action={formAction} className={className}>
+    <form ref={formRef} action={formAction} className={className}>
       {children}
       <Button type="submit" variant={submitVariant} disabled={pending || submitDisabled}>
         {pending ? savingLabel : submitLabel}

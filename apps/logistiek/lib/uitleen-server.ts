@@ -482,6 +482,10 @@ export async function myReservations(userId: string, groupIds: string[] = []) {
       user: { select: { id: true, name: true } },
       group: { select: { nameNl: true, nameEn: true } },
       payments: { where: { status: 'SUCCEEDED' }, select: { id: true, status: true } },
+      // Voor R8: of de gevraagde levering al een gekoppelde rit heeft. Enkel
+      // relevant wanneer `delivery` waar is; ongefilterd op status, net als de
+      // logi-badge in beheer/aanvragen die ook gewoon telt of er een rit bestaat.
+      transports: { orderBy: { startAt: 'asc' }, select: { id: true, startAt: true } },
     },
   });
 }
@@ -498,6 +502,9 @@ export async function myVanBookings(userId: string, groupIds: string[] = []) {
       vehicle: { select: { nameNl: true, nameEn: true } },
       user: { select: { id: true, name: true } },
       payments: { where: { status: 'SUCCEEDED' }, select: { id: true, status: true } },
+      // Voor R1: het evenement waar de rit bij hoort, zodat "Mijn reservaties"
+      // dezelfde koppeling toont als het materiaalgedeelte.
+      event: { select: { id: true, name: true } },
     },
   });
 }
@@ -543,6 +550,8 @@ const memberReservationInclude = {
   payments: { orderBy: { createdAt: 'desc' as const } },
   group: { select: { nameNl: true, nameEn: true } },
   user: { select: { id: true, name: true } },
+  // Voor R8: zie de gelijknamige select in `myReservations` hierboven.
+  transports: { orderBy: { startAt: 'asc' as const }, select: { id: true, startAt: true } },
 };
 
 export async function reservationForUser(id: string, userId: string) {

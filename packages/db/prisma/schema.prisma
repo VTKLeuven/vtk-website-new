@@ -277,6 +277,21 @@ enum UitleenReservationStatus {
   RETURNED // materiaal teruggebracht; reservatie afgerond
 }
 
+/// Beslissing per lijn van een materiaalaanvraag. Logistiek keurt drie van de
+/// vijf items goed en laat de andere twee vallen; dat kon vroeger enkel op de
+/// hele aanvraag, waardoor een aanvraag met één onbeschikbaar item volledig
+/// afgewezen werd of stilzwijgend uitgekleed.
+///
+/// De aanvraag zelf krijgt geen aparte "deels goedgekeurd"-status: dat is af te
+/// leiden uit de lijnen, en een extra waarde in `UitleenReservationStatus` zou
+/// elke query, filter en voorraadberekening die op status kijkt moeten
+/// bijwerken.
+enum UitleenLineStatus {
+  REQUESTED // gevraagd, nog niet beslist
+  APPROVED // toegekend
+  REJECTED // niet toegekend; blijft zichtbaar met de reden erbij
+}
+
 enum UitleenTransportBookingStatus {
   REQUESTED
   APPROVED
@@ -2642,10 +2657,19 @@ model UitleenReservationLine {
   unitPriceCents   Int
   unitDepositCents Int
 
-  // Opmerking bij deze lijn, van het lid ("liefst de zwarte") of van het team
-  // ("zie vorig event"). Eén veld: wie ze schreef blijkt uit de tekst, en twee
-  // notitievelden per lijn worden in de praktijk allebei half ingevuld.
+  // Opmerking van het lid bij deze lijn ("liefst de zwarte").
   note String?
+
+  // Opmerking van Logistiek bij deze lijn ("staat al klaar bij het rek", of de
+  // reden waarom ze niet toegekend is). Apart van `note`: één gedeeld veld liet
+  // de tweede schrijver de eerste overschrijven zonder dat iemand zag dat er
+  // iets weg was, en bij het item moet zichtbaar zijn wie wat schreef.
+  adminNote String?
+
+  // Beslissing over deze lijn. Bij het goedkeuren van de aanvraag gaan alle
+  // openstaande lijnen mee naar APPROVED; het team kan er eerst enkele op
+  // REJECTED zetten. Enkel APPROVED-lijnen nemen voorraad in.
+  lineStatus UitleenLineStatus @default(REQUESTED)
 
   // Klaarzetten: afgevinkt door een shift in de loods, vóór het lid langskomt.
   // Los van de status van de aanvraag: een aanvraag is pas afgehaald wanneer het

@@ -11,6 +11,7 @@ import { getLocale } from '@/lib/i18n';
 import { getSession } from '@/lib/session';
 import { requesterOptions } from '@/app/materiaal/event-values';
 import {
+  chargesRequester,
   DEFAULT_LAST_MINUTE_DAYS,
   formatDateOnly,
   formatDateWithPart,
@@ -61,6 +62,10 @@ export default async function ReservatieDetailPage({
   }
 
   const paid = hasSucceededPayment(reservation.payments) || reservation.paidOfflineAt !== null;
+  // R4: enkel EXTERN betaalt (zie chargesRequester in lib/uitleen.ts); een post of
+  // werkgroep ziet dus geen prijs, waarborg, betaalstatus of betaalknop. Dit staat
+  // los van `showRentPrices`, dat over de catalogusprijzen gaat.
+  const charged = chargesRequester(reservation.requesterType);
   const cancellable =
     isOwner && (reservation.status === 'REQUESTED' || reservation.status === 'APPROVED') && !paid;
   const editable = isOwner && reservation.status === 'REQUESTED';
@@ -149,6 +154,34 @@ export default async function ReservatieDetailPage({
             ) : null}
           </dl>
 
+          {/* R8: het lid vraagt zelf geen rit aan bij levering; Logistiek maakt
+              die achteraf aan via "Rit aanmaken" (design-decisions.md § "Levering
+              nodig" wordt een echte rit). Dit spiegelt de logi-badge "Levering" /
+              "Levering gepland", zonder link naar /vervoer: er is niets voor het
+              lid te doen zolang de rit er nog niet is. */}
+          {reservation.delivery ? (
+            <p className="mt-4 rounded-lg bg-vtk-paper px-4 py-3 text-sm text-vtk-body">
+              {reservation.transports.length > 0 ? (
+                <>
+                  <span className="font-medium text-vtk-ink">
+                    {en ? 'Delivery planned:' : 'Levering gepland:'}
+                  </span>{' '}
+                  {formatDateTime(reservation.transports[0].startAt, locale)}{' '}
+                  <Link
+                    href={`/vervoer/${reservation.transports[0].id}`}
+                    className="font-medium text-vtk-navy underline underline-offset-4"
+                  >
+                    {en ? 'View trip' : 'Bekijk de rit'}
+                  </Link>
+                </>
+              ) : en ? (
+                'Delivery requested; Logistics is planning the trip.'
+              ) : (
+                'Levering gevraagd; Logistiek plant de rit in.'
+              )}
+            </p>
+          ) : null}
+
           {reservation.lines.length > 0 ? (
             <>
               <h3 className="mt-6 text-sm font-semibold text-vtk-ink">{en ? 'Equipment' : 'Materiaal'}</h3>
@@ -159,11 +192,13 @@ export default async function ReservatieDetailPage({
                       <span className="text-vtk-ink">
                         {line.quantity}× {line.itemName}
                       </span>
-                      <span className="text-sm text-vtk-muted">
-                        {line.unitDepositCents > 0
-                          ? `${formatEuro(line.unitDepositCents * line.quantity)} ${en ? 'deposit' : 'waarborg'}`
-                          : en ? 'No deposit' : 'Geen waarborg'}
-                      </span>
+                      {charged ? (
+                        <span className="text-sm text-vtk-muted">
+                          {line.unitDepositCents > 0
+                            ? `${formatEuro(line.unitDepositCents * line.quantity)} ${en ? 'deposit' : 'waarborg'}`
+                            : en ? 'No deposit' : 'Geen waarborg'}
+                        </span>
+                      ) : null}
                     </div>
                     {line.note ? (
                       <p className="mt-0.5 text-xs italic text-vtk-body">{line.note}</p>
@@ -283,11 +318,13 @@ export default async function ReservatieDetailPage({
                 {formatDateWithPart(reservation.returnDate, reservation.returnPart, locale)}
               </dd>
             </div>
-            <div className="flex justify-between gap-4">
-              <dt className="text-vtk-muted">{en ? 'Deposit' : 'Waarborg'}</dt>
-              <dd className="font-medium text-vtk-ink">{formatEuro(reservation.totalDepositCents)}</dd>
-            </div>
-            {reservation.status !== 'REQUESTED' && reservation.paymentMode ? (
+            {charged ? (
+              <div className="flex justify-between gap-4">
+                <dt className="text-vtk-muted">{en ? 'Deposit' : 'Waarborg'}</dt>
+                <dd className="font-medium text-vtk-ink">{formatEuro(reservation.totalDepositCents)}</dd>
+              </div>
+            ) : null}
+            {charged && reservation.status !== 'REQUESTED' && reservation.paymentMode ? (
               <div className="flex justify-between gap-4">
                 <dt className="text-vtk-muted">{en ? 'Payment' : 'Betaling'}</dt>
                 <dd className="text-right font-medium text-vtk-ink">
@@ -299,7 +336,7 @@ export default async function ReservatieDetailPage({
                 </dd>
               </div>
             ) : null}
-            {reservation.depositReturnedAt ? (
+            {charged && reservation.depositReturnedAt ? (
               <div className="flex justify-between gap-4">
                 <dt className="text-vtk-muted">{en ? 'Deposit returned' : 'Waarborg terug'}</dt>
                 <dd className="font-medium text-vtk-ink">{en ? 'Yes' : 'Ja'}</dd>
@@ -331,7 +368,8 @@ export default async function ReservatieDetailPage({
             </p>
           ) : null}
 
-          {isOwner &&
+          {charged &&
+          isOwner &&
           reservation.status === 'APPROVED' &&
           reservation.paymentMode === 'ONLINE' &&
           !paid &&

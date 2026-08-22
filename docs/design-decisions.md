@@ -1734,7 +1734,9 @@ aanvraagformulier en vult daar de aantallen in.
 
 - **Enkel Logistiek maakt ze aan.** Lieten we elke post zijn eigen sjablonen
   maken, dan staan er na één werkingsjaar dertig varianten van "cantus" in de
-  keuzelijst en weet niemand nog welke de juiste is.
+  keuzelijst en weet niemand nog welke de juiste is. *Achterhaald sinds
+  feedbackronde 2: iedereen mag er een maken, maar de knop staat onderaan de
+  keuzelijst zelf. Zie § Feedbackronde 2 (augustus 2026): vier keuzes vooraf.*
 - **Twee wegen om er een te maken, met opzet.** Vanaf een bestaande aanvraag
   ("Bewaar als sjabloon") is de gewone: een cantus bestaat al voor iemand er een
   sjabloon van wil, en de lijst opnieuw intikken is precies het werk dat een
@@ -2092,6 +2094,70 @@ mailadres meekrijgen (bv. logistiek.existenz@vtk.be) zodat een werkgroepmailbox
 meeleest. En **`condition` is niet langer puur informatief** zodra de staat per
 exemplaar bijgehouden wordt: een kapot exemplaar telt dan niet meer mee voor de
 beschikbaarheid.
+
+
+### Een interne aanvraag toont geen bedragen
+
+Prijs, waarborg en betaalstatus verdwijnen volledig zodra de aanvrager een post
+of een werkgroep is (`chargesRequester` in `apps/logistiek/lib/uitleen.ts`);
+enkel `EXTERN` betaalt.
+
+- **De kring factureert niet aan zichzelf.** Een bedrag naast een interne
+  aanvraag zet mensen aan het rekenen over geld dat nooit van hand wisselt, en
+  een postverantwoordelijke die "45,00 EUR te betalen" ziet staan, mailt daarover.
+- **Aan beide kanten van het scherm.** Ook het team ziet het bedrag niet, en een
+  teller van openstaande betalingen telt interne aanvragen niet mee. Anders staat
+  er in het beheer een openstaand bedrag dat niemand ooit gaat innen.
+- **Verbergen, niet nullen.** "0,00 EUR" is een bewering over de prijs; een leeg
+  vak is de afwezigheid van de vraag. Het onderliggende bedrag blijft wel
+  berekend en opgeslagen: wordt een aanvraag alsnog naar extern omgezet, dan
+  klopt de prijs nog.
+- **Los van `showRentPrices`.** Die instelling gaat over de dagprijzen in de
+  catalogus (mag een lid zien wat een beamer kost?) en niet over een concrete
+  aanvraag. De twee combineren, de ene vervangt de andere niet.
+
+### Feedbackronde 2 (augustus 2026): vier keuzes vooraf
+
+De tweede feedbackronde (werkplan: `docs/logistiek-feedback-ronde-2.md`) begon
+met vier vragen die eerst moesten vallen, omdat er taken van afhingen.
+
+- **Een Collect&Go-bestelling wordt gekoppeld aan een evenement, niet opnieuw
+  gebouwd.** De mailimport bestaat al (zie § Collect&Go); wat ontbrak is dat de
+  bestelling bij het evenement hoort, zodat ze op de materiaallijst van dat
+  evenement staat. Een tweede, handmatig ingevoerde soort bestelling ernaast zou
+  betekenen dat dezelfde boodschappenlijst op twee plekken kan leven.
+- **Iedereen mag een sjabloon maken, maar pas nadat hij de bestaande gezien
+  heeft.** Dit draait § Sjablonen maakt Logistiek, niet de posten terug: de
+  posten vroegen er zelf om, en het argument daar (na één jaar dertig varianten
+  van "cantus") is een argument over de keuzelijst, niet over wie mag aanmaken.
+  Daarom zit "Nieuw sjabloon" **onderaan de keuzelijst zelf**, na de bestaande
+  sjablonen, en niet als eigen knop ernaast: wie er een wil maken, is dan
+  langsheen de lijst gepasseerd waar het antwoord misschien al stond. Dat is de
+  hele rem; er komt geen tweede in de vorm van rechten.
+- **Iedereen blijft elk sjabloon zien.** De post op een sjabloon blijft een
+  label en wordt geen filter (zie § Sjablonen maakt Logistiek, niet de posten):
+  een cantussjabloon van Feest past even goed voor Cultuur, en verbergen zou het
+  onvindbaar maken voor wie het net nodig heeft. Dat maakt de lijst ook langer,
+  en precies daarom staat de knop om er een bij te maken onderaan.
+- **Externen zien geen evenementen en geen sjablonen.** De evenementkeuze en de
+  sjabloonkeuze verdwijnen uit het formulier van een externe aanvrager, en de
+  lijst van evenementen wordt hem nooit getoond. Ze zijn voor hem toch niet
+  bruikbaar (hij hoort bij geen enkele groep), en de namen van de evenementen
+  zijn werking van de kring die een externe niet hoeft te kennen.
+- **De kleur van een chauffeur volgt uit zijn id, ze wordt niet ingesteld.** Het
+  weekoverzicht kleurt elke rit naar de toegewezen chauffeur. Een vaste hash op
+  een palet van tokens geeft dezelfde chauffeur altijd dezelfde kleur, zonder
+  migratie en zonder een beheerscherm waar iemand kleuren moet gaan zitten
+  kiezen. Het doel is onderscheiden wie wat rijdt, niet dat Jonas geel wil.
+
+Eén ding hierboven vraagt nog een tweede terugdraaiing. **Een reservatielijn
+krijgt toch een apart notitieveld voor het team** (`adminNote` naast `note`).
+`UitleenReservationLine.note` was met opzet één veld, met als argument dat twee
+notitievelden allebei half ingevuld raken. In de praktijk kwam het omgekeerde
+naar boven: de aanvrager schrijft "liefst de zwarte" en het team schrijft "staat
+al klaar bij het rek", en in één veld overschrijft de tweede de eerste zonder
+dat iemand ziet dat er iets weg is. Wie wat schreef, moet zichtbaar zijn bij het
+item; daarom twee velden met elk hun eigen label.
 
 ---
 

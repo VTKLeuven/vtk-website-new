@@ -2531,3 +2531,111 @@ export async function deactivateFlesserkeCategoryAction(categoryId: string): Pro
   revalidateBeheer();
   return { ok: true, message: 'Categorie uit de lijst gehaald.' };
 }
+
+// ---------------------------------------------------------------------------
+// Bulk-acties (N4): meerdere aanvragen tegelijk als afgehaald of teruggebracht
+// markeren vanuit /beheer/aanvragen, zonder ze één voor één te moeten openen.
+//
+// Elke aanvraag doorloopt hier exact dezelfde overgang als bij een individuele
+// aanvraag (`markPickedUpAction` / `markReturnedAction` hierboven): dezelfde
+// statusguard, dezelfde voorraadtransactie per aanvraag.
+//
+// Eén aanvraag die de overgang niet kan maken (verkeerde status, ondertussen
+// een conflict) is een verwachte invoerfout en blokkeert de rest van de batch
+// niet: we verwerken wat kan en melden hoeveel er gelukt zijn.
+// ---------------------------------------------------------------------------
+
+export type BulkActionResult = {
+  ok: boolean;
+  succeeded: number;
+  failed: number;
+  /** Overgeslagen omdat de bulk-actie ze niet veilig kan verwerken (zie `bulkMarkReturnedAction`). */
+  skipped: number;
+  message: string;
+};
+
+function bulkMessage(verb: string, succeeded: number, failed: number, skipped: number): string {
+  const total = succeeded + failed + skipped;
+  const parts: string[] = [];
+  parts.push(
+    failed === 0 && skipped === 0
+      ? succeeded === 1
+        ? `1 aanvraag gemarkeerd als ${verb}`
+        : `${succeeded} aanvragen gemarkeerd als ${verb}`
+      : `${succeeded} van ${total} aanvragen gemarkeerd als ${verb}`
+  );
+  if (skipped > 0) {
+    parts.push(
+      `${skipped} bevat${skipped === 1 ? '' : 'ten'} flesserke en moet${
+        skipped === 1 ? '' : 'en'
+      } apart afgerekend worden`
+    );
+  }
+  if (failed > 0) {
+    parts.push(
+      `${failed} kon${failed === 1 ? '' : 'den'} niet (verkeerde status of ondertussen gewijzigd)`
+    );
+  }
+  return `${parts.join('; ')}.`;
+}
+
+export async function bulkMarkPickedUpAction(reservationIds: string[]): Promise<BulkActionResult> {
+  await requireManage();
+  if (reservationIds.length === 0) {
+    return { ok: false, succeeded: 0, failed: 0, skipped: 0, message: 'Geen aanvragen geselecteerd.' };
+  }
+  let succeeded = 0;
+  let failed = 0;
+  for (const id of reservationIds) {
+    const result = await markPickedUpAction(id);
+    if (result.ok) succeeded += 1;
+    else failed += 1;
+  }
+  return {
+    ok: succeeded > 0,
+    succeeded,
+    failed,
+    skipped: 0,
+    message: bulkMessage('afgehaald', succeeded, failed, 0),
+  };
+}
+
+/**
+ * `markReturnedAction` zonder een `flesserkeReturned`-kaart boekt élke
+ * flesserke-lijn af als volledig verbruikt (zie de doc-comment daar): prima
+ * als bewuste keuze op één aanvraag, maar een stille voorraadfout wanneer het
+ * per ongeluk gebeurt op vijf aanvragen tegelijk, en terugdraaien is precies
+ * de bewerking waarvan het team zelf zegt dat de tekst erover onbegrijpelijk
+ * is (F2). Een aanvraag met flesserke-lijnen slaan we hier daarom over in
+ * plaats van te gokken: die blijft op "Afgehaald" staan en moet apart, via de
+ * individuele aanvraag, afgerekend worden.
+ */
+export async function bulkMarkReturnedAction(reservationIds: string[]): Promise<BulkActionResult> {
+  await requireManage();
+  if (reservationIds.length === 0) {
+    return { ok: false, succeeded: 0, failed: 0, skipped: 0, message: 'Geen aanvragen geselecteerd.' };
+  }
+
+  const withFlesserke = await prisma.uitleenReservation.findMany({
+    where: { id: { in: reservationIds }, flesserkeLines: { some: {} } },
+    select: { id: true },
+  });
+  const skipIds = new Set(withFlesserke.map((r) => r.id));
+  const skipped = skipIds.size;
+
+  let succeeded = 0;
+  let failed = 0;
+  for (const id of reservationIds) {
+    if (skipIds.has(id)) continue;
+    const result = await markReturnedAction(id);
+    if (result.ok) succeeded += 1;
+    else failed += 1;
+  }
+  return {
+    ok: succeeded > 0,
+    succeeded,
+    failed,
+    skipped,
+    message: bulkMessage('teruggebracht', succeeded, failed, skipped),
+  };
+}
