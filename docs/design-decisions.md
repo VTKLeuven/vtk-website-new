@@ -3259,3 +3259,63 @@ Zie `DESKTOP_APP.md` in de app-repository voor de technische kant.
 `24ul-app/`, dus elke build overschrijft de vorige. Er is geen archief van oude
 versies in de objectopslag: dat zou met elke push aangroeien met een halve
 gigabyte, en wie echt terug moet kan bij de GitHub-release van die versie.
+
+## Gedeelde wachtwoorden per post
+
+Elke post heeft wachtwoorden die het hele jaar in Drive-documenten en
+Messenger-berichten rondslingeren, en die bij de wissel op 15 juli niemand
+systematisch intrekt. De kluis lost dat op met precies dezelfde regel als de rest
+van de site: wie dit werkingsjaar in de post zit, ziet ze; wie eruit gaat, niet
+meer. Er is geen aparte administratie en geen cron die "het jaar omzet";
+`GroupMembership` staat per jaar en de synchronisatie leest enkel het huidige.
+
+**We hosten Vaultwarden, niet Passbolt.** Passbolt was de eerste vraag, maar de
+twee dingen die we nodig hadden, kosten daar samen het meest. SSO is er Pro-only
+(~EUR 4,5/gebruiker/maand), en de automatische toegang die we willen, kan
+Passbolt zelf niet: daar is elk wachtwoord apart versleuteld per gebruiker, dus
+elke lidmaatschapswijziging vereist het herversleutelen van alle secrets van die
+groep. Hun eigen LDAP- en SCIM-provisioning weigert dat expliciet ("group
+managers must manually share credentials"). Bij Vaultwarden zijn items versleuteld
+met één organisatiesleutel, is lidmaatschap dus gewone metadata, en zit OIDC-SSO
+gratis in upstream sinds 1.35.0.
+
+**De wachtwoorden worden in de VTK-admin beheerd én in de gewone
+Bitwarden-clients gebruikt.** Dat is geen compromis tussen twee opties maar een
+gevolg van dat crypto-model: de admin heeft de organisatiesleutel en schrijft
+daarmee in hetzelfde formaat dat de browser-extensie en de mobiele apps al lezen.
+Wij bouwen dus geen kluis en geen extensie; we schrijven items. Eén bron, twee
+ingangen.
+
+**De server kan elk gedeeld wachtwoord lezen.** Dat volgt onvermijdelijk uit de
+vorige twee keuzes: een admin-tab die wachtwoorden toont en een sync die zelf
+toegang uitdeelt, werkt alleen met de sleutel op de server. Persoonlijke kluizen
+blijven wel buiten bereik; die hangen aan het master password van het lid.
+
+Daarom hoort wat écht kritiek is (domeinregistrar, root-toegang, bankzaken) in
+een **tweede Vaultwarden-organisatie waar het botaccount geen lid van is**. Die
+sleutel staat dan nergens op onze server en die organisatie beheer je met de hand
+in de client. Die splitsing is nu goedkoop en later duur om te forceren.
+
+**Enkel gekoppelde posten.** Een post krijgt pas accounts wanneer IT hem koppelt
+in `/admin/wachtwoorden/beheer`. Niet elk lid met een post heeft een kluis nodig,
+en een uitnodiging naar iemand die nooit een wachtwoord zal zien is ruis.
+
+**Uitstroom haalt het organisatielidmaatschap weg, niet het account.** "Toegang
+verwijderen" en "account verwijderen" zijn hier niet hetzelfde: aan dat account
+hangt ook de persoonlijke kluis van dat lid, en die is van hen, niet van VTK. Het
+lidmaatschap verwijderen haalt élk VTK-wachtwoord bij hen weg, wat is wat we
+bedoelen. Komen ze het jaar daarop in een andere gekoppelde post, dan hoeven ze
+hun sleutelpaar niet opnieuw op te zetten.
+
+**Uitgenodigd is een wachtstand, geen fout.** Een lid dat nog nooit ingelogd
+heeft, heeft geen publieke sleutel en kan dus niet bevestigd worden: er is niets
+om de organisatiesleutel naartoe te versleutelen. De sync probeert het elke ronde
+opnieuw en het beheerscherm noemt dat met zoveel woorden ("wacht op eerste
+login"), zodat IT niet gaat zoeken naar een storing die er niet is.
+
+**Er blijft naast SSO een master password nodig.** Dat is geen tekortkoming van
+deze keuze: bij Passbolt is het net zo, en daar komt nog een sleutelpaar-setup
+bij. Het alternatief (Bitwarden Key Connector) is Enterprise en werkt niet op
+Vaultwarden.
+
+Technische kant: `docs/wachtwoorden.md`.

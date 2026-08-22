@@ -405,3 +405,18 @@ PRISMA_HIDE_UPDATE_MESSAGE=1 npx dotenv -e ../../.env -- npx prisma migrate depl
 # discovery bekijken
 curl -s http://localhost:3000/api/auth/better/.well-known/openid-configuration | jq
 ```
+
+## Vaultwarden als client
+
+De wachtwoordkluis is een gewone OAuth-client, aangemaakt via `/admin/sso/nieuw`:
+redirect-URI `https://<kluis>/identity/connect/oidc-signin`, scopes
+`openid profile email offline_access`, toegangsmodus **RESTRICTED** met
+`vault.access`.
+
+Die restrictie doet echt werk. Vaultwarden maakt bij een eerste SSO-login vanzelf
+een account aan op e-mailmatch, dus zonder poort zou elk lid met een VTK-account
+zich daar een kluis kunnen aanmaken. De poort staat aan onze kant, niet aan de
+hunne. En omdat Vaultwarden op de `email`-claim matcht, is dat het universitaire
+adres: de sync moet leden op datzelfde adres uitnodigen. Zie
+`docs/wachtwoorden.md`.
+

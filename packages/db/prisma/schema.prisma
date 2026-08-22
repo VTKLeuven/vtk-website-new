@@ -516,6 +516,7 @@ model User {
 
   memberships          GroupMembership[]
   roles                UserRole[]
+  vaultMember          VaultMember?
   pocRepresentative    PocRepresentative[]
   createdPages         Page[]                  @relation("PageCreatedBy")
   createdAnnouncements Announcement[]          @relation("AnnouncementCreatedBy")
@@ -620,6 +621,7 @@ model Group {
   active            Boolean   @default(true)
 
   memberships       GroupMembership[]
+  vaultPost         VaultPost?
   // Rollen die deze post toekent aan haar leden (DEFAULT) en verantwoordelijke (LEADER).
   roleGrants        GroupRole[]
   events            CalendarEvent[]
@@ -655,6 +657,60 @@ model GroupMembership {
   @@unique([userId, groupId, year])
   @@index([groupId])
   @@index([year])
+}
+
+// -----------------------------------------------------------------------------
+// Wachtwoordkluis (Vaultwarden)
+// -----------------------------------------------------------------------------
+// De kluis zelf bewaart de wachtwoorden; hier staat enkel de koppeling. Bewust
+// geen kopie van een wachtwoord in deze database: dan zou er een tweede bron
+// zijn die uit de pas kan lopen, en zou elke backup ze meenemen.
+// Zie docs/wachtwoorden.md.
+
+/// Een post waarvan de wachtwoorden via de kluis lopen. Een post zonder rij hier
+/// is niet gekoppeld: die leden krijgen geen account en geen collection.
+model VaultPost {
+  id           String    @id @default(cuid())
+  groupId      String    @unique
+  /// Uuid van de collection in Vaultwarden; leeg tot de eerste synchronisatie.
+  collectionId String?
+  /// Uuid van de groep in Vaultwarden.
+  vaultGroupId String?
+  enabled      Boolean   @default(true)
+  lastSyncAt   DateTime?
+  lastError    String?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  group Group @relation(fields: [groupId], references: [id], onDelete: Cascade)
+}
+
+/// Waar een lid staat in de uitnodigingsstroom van de kluis. Het pad is
+/// INVITED -> ACCEPTED -> CONFIRMED, en enkel een CONFIRMED lid kan iets lezen:
+/// pas bij het bevestigen krijgt het de organisatiesleutel.
+enum VaultMemberStatus {
+  /// Uitgenodigd, maar nog nooit ingelogd. Heeft nog geen sleutelpaar en kan dus
+  /// niet bevestigd worden. Een wachtstand, geen fout.
+  INVITED
+  /// Ingelogd en uitnodiging aanvaard; wacht op de eerstvolgende synchronisatie.
+  ACCEPTED
+  /// Bevestigd: heeft de organisatiesleutel en ziet de collections van zijn posten.
+  CONFIRMED
+}
+
+model VaultMember {
+  id          String            @id @default(cuid())
+  userId      String            @unique
+  /// Uuid van het organisatielidmaatschap in Vaultwarden.
+  memberId    String?
+  status      VaultMemberStatus @default(INVITED)
+  invitedAt   DateTime?
+  confirmedAt DateTime?
+  lastError   String?
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model Permission {

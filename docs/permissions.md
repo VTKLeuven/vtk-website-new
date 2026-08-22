@@ -290,3 +290,12 @@ available roles but not auto-assigned to any post. Your seeded admin account is 
   timeout.
 - Do **not** switch dev off `next dev --webpack`, and do **not** re-export Prisma client types from
   `@vtk/db` (import model types from `@prisma/client` at the call site). See `AGENTS.md`.
+
+## Wachtwoordkluis
+
+De kluis (`docs/wachtwoorden.md`) voegt drie permissies toe: `vault.access` is de
+toegangspoort van de OAuth-client, `vault.editOwn` laat je de wachtwoorden van je
+eigen post beheren, `vault.manage` is het IT-beheer. Hang `vault.access` als
+DEFAULT-grant aan de rollen van de gekoppelde posten: dan volgt de toegang tot de
+kluis vanzelf de 15-juli-reset, zonder aparte administratie.
+

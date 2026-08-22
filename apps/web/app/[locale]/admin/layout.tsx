@@ -107,6 +107,11 @@ const NAV: NavEntry[] = [
   item('piano', '/piano', { perm: 'piano.manage' }),
   item('fakscanner', '/fakscanner', { perm: 'fakscanner.manage' }),
   item('mailinglists', '/mailinglijsten', { perm: 'mailinglists.export' }),
+  // Wachtwoorden staat los van de IT-groep: een postverantwoordelijke beheert de
+  // wachtwoorden van zijn eigen post en hoort daarvoor niet in een IT-map te
+  // moeten zoeken. Het kluisbeheer zelf (posten koppelen, configuratie) staat wel
+  // onder IT.
+  item('vault', '/wachtwoorden', { anyPerm: ['vault.editOwn', 'vault.manage'] }),
   item('dashboardTiles', '/dashboard-tiles', {
     anyPerm: ['dashboard.manage', 'dashboard.manageOwn'],
   }),
@@ -116,6 +121,7 @@ const NAV: NavEntry[] = [
     item('itConfig', '/it', { superAdminOnly: true, exact: true }),
     item('authorizationPreview', '/it/preview', { superAdminOnly: true }),
     item('kulSso', '/it/kul-sso', { superAdminOnly: true }),
+    item('vaultAdmin', '/wachtwoorden/beheer', { perm: 'vault.manage' }),
     item('auditLog', '/it/logboek', { perm: 'audit.view' }),
     item('urenloopApp', '/it/24ul-app', { perm: 'urenloopApp.manage' }),
     item('door', '/deur', { perm: 'door.manage' }),

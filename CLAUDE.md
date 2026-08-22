@@ -97,6 +97,14 @@ zeker de sectie "Vallen waar we in gelopen zijn" voor je aan `packages/auth`, he
 toestemmingsscherm of de plugin-config komt; die punten hebben allemaal ooit tijd
 gekost en een paar ervan falen stil.
 
+# Wachtwoordkluis
+
+`docs/wachtwoorden.md` is de referentie voor de gedeelde wachtwoorden per post
+(Vaultwarden): het crypto-formaat dat we in `node:crypto` schrijven, hoe de sync
+het lidmaatschap volgt, en hoe je de koppeling opzet. Lees zeker "Vallen waar we
+in gelopen zijn" voor je aan `apps/web/lib/vault` komt; die punten falen
+grotendeels stil. De kringkeuzes staan in `docs/design-decisions.md`.
+
 # Styling Guidelines
 
 Use `design/new-design.html` as the visual source of truth for VTK surfaces.

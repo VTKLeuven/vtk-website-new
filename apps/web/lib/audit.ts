@@ -108,6 +108,9 @@ export const AUDIT_ENTITIES = {
   piano: { nl: "Piano", en: "Piano", group: "piano" },
   pianoReservation: { nl: "Pianoreservatie", en: "Piano reservation", group: "piano" },
   mailinglists: { nl: "Mailinglijsten", en: "Mailing lists", group: "mailinglists" },
+  vaultItem: { nl: "Kluiswachtwoord", en: "Vault password", group: "vault" },
+  vaultPost: { nl: "Kluiskoppeling", en: "Vault link", group: "vault" },
+  vaultAccess: { nl: "Kluistoegang", en: "Vault access", group: "vault" },
 
   // IT
   doorAccess: { nl: "Deurtoegang", en: "Door access", group: "door" },
@@ -139,6 +142,7 @@ export const AUDIT_GROUPS = {
   lesbezoeken: { nl: "Lesbezoeken", en: "Classroom visits" },
   piano: { nl: "Piano", en: "Piano" },
   mailinglists: { nl: "Mailinglijsten", en: "Mailing lists" },
+  vault: { nl: "Wachtwoordkluis", en: "Password vault" },
   door: { nl: "Deur", en: "Door" },
   fakscanner: { nl: "Fakscanner", en: "Fakscanner" },
   sso: { nl: "SSO", en: "SSO" },

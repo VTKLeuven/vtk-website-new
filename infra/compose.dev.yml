@@ -84,6 +84,43 @@ services:
       BUCKET: ${S3_BUCKET:-vtk}
     restart: "no"
 
+  # De wachtwoordkluis. Vaultwarden praat de Bitwarden-API, dus de gewone
+  # Bitwarden-clients (browser-extensie, mobiel, desktop) werken erop, en wij
+  # schrijven er vanuit de admin items in met de organisatiesleutel.
+  #
+  # Lokaal bewust zonder SSO: `SSO_ONLY` zou je buitensluiten zodra de
+  # OAuth-client nog niet bestaat, en dan kan je niet meer aan het botaccount.
+  # Zet SSO pas aan wanneer je die flow zelf wil testen; de deploy-stack in
+  # `docker-compose.yml` heeft ze wel aan.
+  vaultwarden:
+    image: vaultwarden/server:1.35.1
+    container_name: vtk-dev-vaultwarden
+    restart: unless-stopped
+    environment:
+      DOMAIN: http://localhost:8222
+      # Aanmelden staat lokaal open zodat je zelf het botaccount en een
+      # testlid kan aanmaken. In productie staat dit uit en komt iedereen
+      # binnen via SSO plus een uitnodiging.
+      SIGNUPS_ALLOWED: "true"
+      # Zonder dit bestaan groepen niet, en dan valt de koppeling post ->
+      # groep -> collection weg waar deze hele integratie op draait.
+      ORG_GROUPS_ENABLED: "true"
+      # Bespaart het lid een klik op een uitnodigingsmail: inloggen volstaat,
+      # de sync bevestigt daarna. Lokaal vertrekt er sowieso geen mail.
+      ORGANIZATION_INVITE_AUTO_ACCEPT: "true"
+      ROCKET_PORT: "80"
+    ports:
+      # Loopback only, net als Postgres en MinIO hierboven.
+      - "127.0.0.1:8222:80"
+    volumes:
+      - dev-vaultwarden-data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost/alive || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
 volumes:
   dev-postgres-data:
   dev-minio-data:
+  dev-vaultwarden-data:

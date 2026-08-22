@@ -97,6 +97,11 @@ export const PERMISSIONS = [
   // SSO / OAuth Authorization Server
   { code: "oauth.client.edit", labelNl: "OAuth-clients aanmaken en bewerken", labelEn: "Create and edit OAuth clients", category: "external" },
 
+  // Wachtwoordkluis (gedeelde wachtwoorden per post, in Vaultwarden)
+  { code: "vault.access", labelNl: "Toegang tot de wachtwoordkluis", labelEn: "Access to the password vault", category: "vault" },
+  { code: "vault.editOwn", labelNl: "Wachtwoorden van de eigen post beheren", labelEn: "Manage own post's passwords", category: "vault" },
+  { code: "vault.manage", labelNl: "Wachtwoordkluis beheren (posten koppelen, synchroniseren)", labelEn: "Manage the password vault (link posts, synchronise)", category: "vault" },
+
   // Adminlogboek (wie deed wat in de admin)
   { code: "audit.view", labelNl: "Adminlogboek bekijken", labelEn: "View the admin audit log", category: "it" },
   { code: "urenloopApp.manage", labelNl: "24UL-app: downloadlijst beheren", labelEn: "24UL app: manage the download list", category: "it" },

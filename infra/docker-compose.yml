@@ -492,6 +492,93 @@ services:
       start_period: 10s
       timeout: 5s
 
+  # De wachtwoordkluis. Vaultwarden praat de Bitwarden-API, dus leden gebruiken
+  # de gewone Bitwarden-clients (browser-extensie met autofill, mobiel, desktop)
+  # en de admin schrijft er items in met de organisatiesleutel.
+  #
+  # Aanmelden staat uit: binnenkomen gaat via VTK-SSO, en wie binnen mag wordt
+  # bepaald door de toegangspoort van de OAuth-client (permissie `vault.access`),
+  # niet door Vaultwarden. Zonder die twee samen zou elk lid met een VTK-account
+  # zich hier een kluis kunnen aanmaken.
+  vaultwarden:
+    image: vaultwarden/server:1.35.1
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-vtk}:${POSTGRES_PASSWORD:-vtk}@postgres:5432/${VAULT_DB:-vaultwarden}
+      DOMAIN: ${VAULT_PUBLIC_URL:-https://wachtwoorden.vtk.be}
+      SIGNUPS_ALLOWED: "false"
+      INVITATIONS_ALLOWED: "true"
+      # Groepen zijn de koppeling post -> groep -> collection waar deze hele
+      # integratie op draait; zonder dit bestaan ze niet.
+      ORG_GROUPS_ENABLED: "true"
+      # Bespaart het lid een klik op een uitnodigingsmail: eenmaal inloggen met
+      # VTK volstaat, de sync bevestigt daarna.
+      ORGANIZATION_INVITE_AUTO_ACCEPT: "true"
+      SSO_ENABLED: "true"
+      # Enkel SSO: een tweede aanmeldweg met een los wachtwoord zou de
+      # 15-juli-reset omzeilen, want die hangt aan het VTK-account.
+      SSO_ONLY: "true"
+      SSO_AUTHORITY: ${VAULT_SSO_AUTHORITY:-https://vtk.be/api/auth/better}
+      SSO_CLIENT_ID: ${VAULT_SSO_CLIENT_ID:-}
+      SSO_CLIENT_SECRET: ${VAULT_SSO_CLIENT_SECRET:-}
+      SSO_SCOPES: "openid profile email offline_access"
+      SSO_PKCE: "true"
+      ROCKET_PORT: "80"
+    volumes:
+      - vaultwarden-data:/data
+    ports:
+      # Zet de kluis-hostname in Caddy op deze loopback-poort.
+      - "127.0.0.1:3015:80"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost/alive -o /dev/null || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+
+  # Zet het lidmaatschap van de organisatie gelijk met de posten van dit
+  # werkingsjaar: uitnodigen, bevestigen, groepen vullen en wie geen gekoppelde
+  # post meer heeft eruit halen. Vijf minuten volstaat; de admin duwt een
+  # wijziging meteen door en dit is het vangnet (zelfde opzet als forms-worker).
+  vault-worker:
+    image: curlimages/curl:8.10.1
+    restart: unless-stopped
+    depends_on:
+      web:
+        condition: service_started
+    env_file:
+      - ../.env
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        if [ -z "$${VAULT_MAINTENANCE_SECRET:-}" ]; then
+          echo "Vault worker disabled: VAULT_MAINTENANCE_SECRET is empty"
+          while true; do sleep 3600; done
+        fi
+        while true; do
+          if curl --fail --silent --show-error \
+            -X POST \
+            -H "Authorization: Bearer $${VAULT_MAINTENANCE_SECRET}" \
+            http://web:3000/api/vault/maintenance; then
+            date +%s > /tmp/vault-worker-heartbeat
+          fi
+          sleep 300
+        done
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - >-
+          test -n "$${VAULT_MAINTENANCE_SECRET:-}" &&
+          test -f /tmp/vault-worker-heartbeat &&
+          [ "$$(($$(date +%s) - $$(cat /tmp/vault-worker-heartbeat)))" -lt 900 ]
+      interval: 120s
+      timeout: 5s
+      retries: 1
+      start_period: 60s
+
 # KU Leuvens IdP is vanaf de productieserver enkel via IPv6 bereikbaar.
 # Docker kent voor een IPv6-enabled custom bridge automatisch een ULA-subnet
 # toe en NAT dat via de IPv6-route van de host.
@@ -502,3 +589,4 @@ networks:
 volumes:
   postgres-data:
   immich-model-cache:
+  vaultwarden-data:

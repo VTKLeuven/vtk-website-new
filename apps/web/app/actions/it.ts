@@ -16,6 +16,7 @@ import {
   type StoredSentry,
 } from "@/lib/runtimeConfig";
 import { DOOR_SETTING_KEY, getDoorConfig, type StoredDoor } from "@/lib/door-config";
+import { VAULT_SETTING_KEY, type StoredVault } from "@/lib/vault/config";
 import { KUL_DEBUG_SETTING_KEY, clearKulAuthLogs } from "@vtk/auth/server";
 import { saveError, saveOk, type SaveState } from "@/lib/saveState";
 import { logAudit } from "@/lib/audit";
@@ -332,4 +333,89 @@ export async function clearKulAuthLogsAction(): Promise<void> {
   });
   revalidatePath("/admin/it/kul-sso");
   revalidatePath("/admin/it");
+}
+
+// -----------------------------------------------------------------------------
+// Wachtwoordkluis (Vaultwarden)
+// -----------------------------------------------------------------------------
+
+const vaultSchema = z.object({
+  url: z.string().trim().url(),
+  orgId: z.string().trim().min(1),
+  clientId: z.string().trim().min(1),
+  clientSecret: z.string().trim().optional(),
+  orgKey: z.string().trim().optional(),
+});
+
+/**
+ * Bewaart de koppeling met de kluis. De twee geheimen (de API-key van het
+ * botaccount en de organisatiesleutel) worden versleuteld weggeschreven en
+ * blijven staan wanneer je het veld leeg laat, zoals bij de S3-config.
+ *
+ * De organisatiesleutel wordt gecontroleerd op lengte: base64 van 64 bytes. Een
+ * verkeerd geplakte sleutel is de meest waarschijnlijke fout hier, en zonder deze
+ * controle merk je dat pas wanneer een item onleesbaar in iemands extensie staat.
+ */
+export async function saveVaultConfigAction(
+  _prev: SaveState,
+  formData: FormData,
+): Promise<SaveState> {
+  await requireSuperAdmin();
+
+  const parsed = vaultSchema.safeParse({
+    url: ((formData.get("url") as string) ?? "").trim(),
+    orgId: ((formData.get("orgId") as string) ?? "").trim(),
+    clientId: ((formData.get("clientId") as string) ?? "").trim(),
+    clientSecret: ((formData.get("clientSecret") as string) ?? "").trim() || undefined,
+    orgKey: ((formData.get("orgKey") as string) ?? "").trim() || undefined,
+  });
+  if (!parsed.success) return saveError("INVALID_INPUT");
+  const p = parsed.data;
+
+  if (!p.clientId.startsWith("user.")) return saveError("VAULT_CLIENT_ID");
+
+  const existingRow = await prisma.setting.findUnique({ where: { key: VAULT_SETTING_KEY } });
+  const existing = (existingRow?.value ?? null) as unknown as StoredVault | null;
+
+  let clientSecretEnc: string;
+  if (p.clientSecret) clientSecretEnc = encryptSecret(p.clientSecret);
+  else if (existing?.clientSecretEnc) clientSecretEnc = existing.clientSecretEnc;
+  else return saveError("VAULT_SECRET_REQUIRED");
+
+  let orgKeyEnc: string;
+  if (p.orgKey) {
+    const raw = Buffer.from(p.orgKey, "base64");
+    if (raw.length !== 64) return saveError("VAULT_ORG_KEY");
+    orgKeyEnc = encryptSecret(p.orgKey);
+  } else if (existing?.orgKeyEnc) {
+    orgKeyEnc = existing.orgKeyEnc;
+  } else {
+    return saveError("VAULT_ORG_KEY_REQUIRED");
+  }
+
+  const value: StoredVault = {
+    url: p.url.replace(/\/+$/, ""),
+    orgId: p.orgId,
+    clientId: p.clientId,
+    clientSecretEnc,
+    orgKeyEnc,
+  };
+
+  await prisma.setting.upsert({
+    where: { key: VAULT_SETTING_KEY },
+    create: { key: VAULT_SETTING_KEY, value: value as unknown as Prisma.InputJsonValue },
+    update: { value: value as unknown as Prisma.InputJsonValue },
+  });
+
+  await logAudit({
+    action: "update",
+    entity: "itConfig",
+    target: "Wachtwoordkluis",
+    // Nooit de sleutel of het secret zelf in het logboek; enkel dát er gewijzigd is.
+    summary: `kluisconfiguratie bijgewerkt (${value.url})`,
+  });
+
+  revalidatePath("/admin/it");
+  revalidatePath("/admin/wachtwoorden/beheer");
+  return saveOk();
 }
