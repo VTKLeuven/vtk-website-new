@@ -50,6 +50,7 @@ export default async function NewEventPage({
         categories={categories}
         locale={locale}
         canCreateTickets={canCreateTickets}
+        canManageCategories={canAll}
       />
     </div>
   );

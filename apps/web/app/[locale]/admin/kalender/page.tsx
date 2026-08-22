@@ -88,6 +88,7 @@ export default async function AdminCalendar({
             <tr>
               <th className="px-4 py-2">{nl ? "Titel" : "Title"}</th>
               <th className="px-4 py-2">{nl ? "Groep" : "Group"}</th>
+              <th className="px-4 py-2">Status</th>
               <th className="px-4 py-2">Start</th>
               <th className="px-4 py-2">{nl ? "Einde" : "End"}</th>
               <th className="px-4 py-2"></th>
@@ -98,6 +99,24 @@ export default async function AdminCalendar({
               <tr key={e.id} className="border-t border-zinc-200">
                 <td className="px-4 py-2 font-medium">{e.titleNl}</td>
                 <td className="px-4 py-2 text-zinc-500">{nl ? e.group.nameNl : e.group.nameEn}</td>
+                <td className="px-4 py-2">
+                  <span
+                    className={[
+                      "inline-flex rounded-full px-2 py-0.5 text-[11px] font-medium",
+                      e.publishedAt
+                        ? "bg-vtk-yellow/20 text-vtk-ink"
+                        : "border border-vtk-blue/15 text-vtk-blue-muted",
+                    ].join(" ")}
+                  >
+                    {e.publishedAt
+                      ? nl
+                        ? "Gepubliceerd"
+                        : "Published"
+                      : nl
+                        ? "Concept"
+                        : "Draft"}
+                  </span>
+                </td>
                 <td className="px-4 py-2 tabular-nums text-zinc-500">{dateFmt.format(e.start)}</td>
                 <td className="px-4 py-2 tabular-nums text-zinc-500">{dateFmt.format(e.end)}</td>
                 <td className="px-4 py-2 text-right">
@@ -107,7 +126,7 @@ export default async function AdminCalendar({
             ))}
             {events.length === 0 && (
               <tr>
-                <td colSpan={5} className="px-4 py-8 text-center text-zinc-500">
+                <td colSpan={6} className="px-4 py-8 text-center text-zinc-500">
                   {showPast
                     ? nl
                       ? "Geen evenementen in het verleden"

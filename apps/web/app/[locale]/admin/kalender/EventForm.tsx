@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { Card, Input, Label, Select } from "@vtk/ui";
 import { saveEventAction } from "@/app/actions/calendar";
 import { MarkdownEditorField } from "@/components/editor/MarkdownEditor";
@@ -20,6 +21,7 @@ type Event = {
   visibility?: "PUBLIC" | "MEMBERS";
   url?: string | null;
   imageKey?: string | null;
+  publishedAt?: Date | null;
   categoryIds?: string[];
 };
 
@@ -61,12 +63,42 @@ function CategoryCheckbox({
   );
 }
 
+function EmptyCategoryMessage({
+  audience,
+  nl,
+  canManageCategories,
+  base,
+}: {
+  audience: boolean;
+  nl: boolean;
+  canManageCategories: boolean;
+  base: string;
+}) {
+  return (
+    <p className="rounded-xl border border-vtk-blue/15 bg-vtk-blue-soft/50 px-3 py-2 text-sm text-vtk-blue-muted">
+      {audience
+        ? nl
+          ? "Er zijn nog geen doelgroepen ingesteld. Dit evenement is voorlopig voor iedereen."
+          : "No audiences have been configured yet. This event is for everyone for now."
+        : nl
+          ? "Er zijn nog geen categorieën ingesteld. Dit evenement wordt zonder categorie opgeslagen."
+          : "No categories have been configured yet. This event will be saved without a category."}{" "}
+      {canManageCategories ? (
+        <Link href={`${base}/admin/kalender/categorieen`} className="font-medium text-vtk-ink hover:underline">
+          {nl ? "Categorieën instellen" : "Configure categories"}
+        </Link>
+      ) : null}
+    </p>
+  );
+}
+
 export function EventForm({
   event,
   groups,
   categories,
   locale,
   canCreateTickets = false,
+  canManageCategories = false,
 }: {
   event: Event;
   groups: Group[];
@@ -78,16 +110,49 @@ export function EventForm({
    * niet.
    */
   canCreateTickets?: boolean;
+  /** Geeft bij een lege keuzelijst een rechtstreekse link naar categoriebeheer. */
+  canManageCategories?: boolean;
 }) {
   const nl = locale === "nl";
+  const base = nl ? "" : "/en";
   const selected = new Set(event.categoryIds ?? []);
   const audienceCategories = categories.filter((c) => c.audience !== null);
   const themeCategories = categories.filter((c) => c.audience === null);
+  const isDraft = Boolean(event.id) && !event.publishedAt;
+  const secondarySubmits = [
+    ...(!event.id || isDraft
+      ? [
+          {
+            name: "publication",
+            value: "draft",
+            label: nl ? "Opslaan als concept" : "Save as draft",
+          },
+        ]
+      : []),
+    ...(canCreateTickets && !event.id
+      ? [
+          {
+            name: "andThen",
+            value: "tickets",
+            label: nl ? "Publiceren en tickets toevoegen" : "Publish and add tickets",
+          },
+        ]
+      : []),
+  ];
+
   return (
     <SaveForm
       action={saveEventAction}
       className="space-y-4"
-      submitLabel={nl ? "Opslaan" : "Save"}
+      submitLabel={
+        !event.id || isDraft
+          ? nl
+            ? "Publiceren"
+            : "Publish"
+          : nl
+            ? "Wijzigingen opslaan"
+            : "Save changes"
+      }
       savingLabel={nl ? "Bezig met opslaan..." : "Saving..."}
       savedMessage={nl ? "Evenement opgeslagen" : "Event saved"}
       errorMessages={{
@@ -97,17 +162,20 @@ export function EventForm({
           : "Not saved: the end is before the start. Pick an end after the start date.",
       }}
       fallbackErrorMessage={nl ? "Er ging iets mis bij het opslaan." : "Something went wrong while saving."}
-      secondarySubmit={
-        canCreateTickets && !event.id
-          ? {
-              name: "andThen",
-              value: "tickets",
-              label: nl ? "Opslaan en tickets toevoegen" : "Save and add tickets",
-            }
-          : undefined
-      }
+      secondarySubmit={secondarySubmits.length > 0 ? secondarySubmits : undefined}
     >
       {event.id && <input type="hidden" name="id" value={event.id} />}
+      {isDraft ? (
+        <div
+          className="rounded-xl border border-vtk-blue/15 bg-vtk-blue-soft/60 px-4 py-3 text-sm text-vtk-ink"
+          role="status"
+        >
+          <strong>{nl ? "Dit evenement is een concept." : "This event is a draft."}</strong>{" "}
+          {nl
+            ? "Het staat nog nergens online. Klik op Publiceren wanneer het klaar is."
+            : "It is not visible anywhere online yet. Click Publish when it is ready."}
+        </div>
+      ) : null}
       <Card className="p-5 space-y-4">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
@@ -173,9 +241,18 @@ export function EventForm({
                 : "Leave empty for an event for everyone. Pick an audience and the event surfaces automatically for those members, while others only see it under “other audiences too”."}
             </p>
             <div className="flex flex-wrap gap-x-5 gap-y-2">
-              {audienceCategories.map((c) => (
-                <CategoryCheckbox key={c.id} category={c} checked={selected.has(c.id)} nl={nl} />
-              ))}
+              {audienceCategories.length > 0 ? (
+                audienceCategories.map((c) => (
+                  <CategoryCheckbox key={c.id} category={c} checked={selected.has(c.id)} nl={nl} />
+                ))
+              ) : (
+                <EmptyCategoryMessage
+                  audience
+                  nl={nl}
+                  canManageCategories={canManageCategories}
+                  base={base}
+                />
+              )}
             </div>
           </div>
           <div className="md:col-span-2">
@@ -186,9 +263,18 @@ export function EventForm({
                 : "The event's theme. Determines its colour in the calendar, the filter button and the per-category calendar feed."}
             </p>
             <div className="flex flex-wrap gap-x-5 gap-y-2">
-              {themeCategories.map((c) => (
-                <CategoryCheckbox key={c.id} category={c} checked={selected.has(c.id)} nl={nl} />
-              ))}
+              {themeCategories.length > 0 ? (
+                themeCategories.map((c) => (
+                  <CategoryCheckbox key={c.id} category={c} checked={selected.has(c.id)} nl={nl} />
+                ))
+              ) : (
+                <EmptyCategoryMessage
+                  audience={false}
+                  nl={nl}
+                  canManageCategories={canManageCategories}
+                  base={base}
+                />
+              )}
             </div>
           </div>
         </div>

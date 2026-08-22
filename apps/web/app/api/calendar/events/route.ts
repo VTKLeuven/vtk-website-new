@@ -20,6 +20,7 @@ export async function GET(request: Request) {
 
   const where: Prisma.CalendarEventWhereInput = {
     visibility: "PUBLIC",
+    publishedAt: { not: null },
   };
 
   if (start && end) {

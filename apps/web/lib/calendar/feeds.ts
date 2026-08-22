@@ -122,7 +122,12 @@ export async function buildFeed(
       // feed (/feed/c/eerstejaars) en horen niet ongevraagd in de agenda van wie
       // op "de VTK-kalender" klikte.
       const events = await prisma.calendarEvent.findMany({
-        where: { visibility: "PUBLIC", ...window, ...audienceFilter([]) },
+        where: {
+          visibility: "PUBLIC",
+          publishedAt: { not: null },
+          ...window,
+          ...audienceFilter([]),
+        },
         select: eventSelect,
         orderBy: { start: "asc" },
       });
@@ -142,7 +147,12 @@ export async function buildFeed(
       });
       if (!category) return null;
       const events = await prisma.calendarEvent.findMany({
-        where: { visibility: "PUBLIC", categories: { some: { category: { slug: scope.slug } } }, ...window },
+        where: {
+          visibility: "PUBLIC",
+          publishedAt: { not: null },
+          categories: { some: { category: { slug: scope.slug } } },
+          ...window,
+        },
         select: eventSelect,
         orderBy: { start: "asc" },
       });
@@ -166,7 +176,13 @@ export async function buildFeed(
       });
       if (!group) return null;
       const events = await prisma.calendarEvent.findMany({
-        where: { visibility: "PUBLIC", groupId: group.id, ...window, ...audienceFilter([]) },
+        where: {
+          visibility: "PUBLIC",
+          publishedAt: { not: null },
+          groupId: group.id,
+          ...window,
+          ...audienceFilter([]),
+        },
         select: eventSelect,
         orderBy: { start: "asc" },
       });
@@ -188,7 +204,7 @@ export async function buildFeed(
       const audiences = await audiencesForUser(scope.userId);
       const [events, shifts] = await Promise.all([
         prisma.calendarEvent.findMany({
-          where: { ...window, ...audienceFilter(audiences) },
+          where: { publishedAt: { not: null }, ...window, ...audienceFilter(audiences) },
           select: eventSelect,
           orderBy: { start: "asc" },
         }),
@@ -257,8 +273,11 @@ export async function buildEventIcs(
   locale: Locale,
   now = new Date(),
 ): Promise<{ body: string; slug: string } | null> {
-  const event = await prisma.calendarEvent.findUnique({ where: { id }, select: eventSelect });
-  if (!event || event.visibility !== "PUBLIC") return null;
+  const event = await prisma.calendarEvent.findFirst({
+    where: { id, visibility: "PUBLIC", publishedAt: { not: null } },
+    select: eventSelect,
+  });
+  if (!event) return null;
 
   const title = pick(event.titleNl, event.titleEn, locale);
   return {

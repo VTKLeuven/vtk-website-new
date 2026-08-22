@@ -1054,6 +1054,9 @@ model CalendarEvent {
   imageKey      String?
   groupId       String
   createdById   String?
+  // NULL = concept. Een concept blijft wel zichtbaar en bewerkbaar in de admin,
+  // maar verschijnt nergens op de publieke site of in een agenda-feed.
+  publishedAt   DateTime?       @db.Timestamptz(3)
   createdAt     DateTime        @default(now())
   updatedAt     DateTime        @updatedAt
 

@@ -13,6 +13,8 @@ import { useToast } from "@/components/ui/toast";
 import { FormBusyProvider, useFormBusy } from "@/components/ui/formBusy";
 import { SAVE_IDLE, type SaveAction } from "@/lib/saveState";
 
+type SecondarySubmit = { name: string; value: string; label: string };
+
 /**
  * Formulier dat de uitkomst van zijn opslaan-actie als toast meldt: groen bij
  * succes, rood bij een fout. Dit is de standaardmanier om iets op te slaan (zie
@@ -49,12 +51,13 @@ export function SaveForm({
   /** Extra voorwaarde bovenop "bezig met opslaan", bv. een verplichte upload. */
   submitDisabled?: boolean;
   /**
-   * Tweede opslaanknop die hetzelfde formulier verstuurt met een extra waarde
-   * mee, zodat de action daarna ergens anders naartoe kan (bv. "Opslaan en
-   * tickets toevoegen"). Bewust een submit en geen aparte link: het formulier
-   * moet eerst bewaard worden.
+   * Alternatieve opslaanknoppen die hetzelfde formulier versturen met een extra
+   * waarde mee, zodat de action een andere intentie kent (bv. als concept
+   * bewaren of na het opslaan tickets toevoegen). Bewust submits en geen aparte
+   * links: het formulier moet eerst bewaard worden.
    */
-  secondarySubmit?: { name: string; value: string; label: string };
+  /** Eén of meer alternatieve submitacties met elk hun eigen name/value. */
+  secondarySubmit?: SecondarySubmit | SecondarySubmit[];
   className?: string;
   children?: ReactNode;
 }) {
@@ -67,6 +70,11 @@ export function SaveForm({
   // hertekent met dezelfde state.
   const handled = useRef<number | null>(null);
   const formRef = useRef<HTMLFormElement>(null);
+  const secondarySubmits = secondarySubmit
+    ? Array.isArray(secondarySubmit)
+      ? secondarySubmit
+      : [secondarySubmit]
+    : [];
 
   /**
    * Zelf verzenden in plaats van `<form action={formAction}>`.
@@ -130,19 +138,20 @@ export function SaveForm({
         <Button type="submit" disabled={pending || submitDisabled || busy}>
           {pending ? savingLabel : submitLabel}
         </Button>
-        {secondarySubmit ? (
+        {secondarySubmits.map((submit) => (
           // `name`/`value` op de knop: die waarde komt enkel mee wanneer je op
           // déze knop klikt, zodat de action ziet welke van de twee je gebruikte.
           <Button
+            key={`${submit.name}:${submit.value}`}
             type="submit"
             variant="secondary"
-            name={secondarySubmit.name}
-            value={secondarySubmit.value}
+            name={submit.name}
+            value={submit.value}
             disabled={pending || submitDisabled || busy}
           >
-            {secondarySubmit.label}
+            {submit.label}
           </Button>
-        ) : null}
+        ))}
       </div>
     </form>
   );

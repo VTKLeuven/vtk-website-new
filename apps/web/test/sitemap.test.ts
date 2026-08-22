@@ -105,7 +105,10 @@ describe('categorieën', () => {
 });
 
 describe('evenementen', () => {
-  const base = { updatedAt: new Date('2026-06-06T00:00:00.000Z') };
+  const base = {
+    publishedAt: new Date('2026-06-01T00:00:00.000Z'),
+    updatedAt: new Date('2026-06-06T00:00:00.000Z'),
+  };
 
   it('laat een ledenexclusief evenement weg', () => {
     const entries = build({
@@ -116,6 +119,13 @@ describe('evenementen', () => {
     });
     expect(urls(entries)).toContain(`${BASE}/kalender/evt-publiek`);
     expect(urls(entries)).not.toContain(`${BASE}/kalender/evt-leden`);
+  });
+
+  it('laat een concept-evenement weg', () => {
+    const entries = build({
+      events: [{ id: 'evt-concept', visibility: 'PUBLIC', ...base, publishedAt: null }],
+    });
+    expect(urls(entries)).not.toContain(`${BASE}/kalender/evt-concept`);
   });
 });
 
@@ -133,7 +143,7 @@ describe('de sitemap als geheel', () => {
           },
         ],
         headerTabs: [{ slug: 'info', visible: true, externalUrl: null }],
-        events: [{ id: 'evt', visibility: 'PUBLIC', updatedAt: NOW }],
+        events: [{ id: 'evt', visibility: 'PUBLIC', publishedAt: NOW, updatedAt: NOW }],
       }),
     );
     expect(new Set(list).size).toBe(list.length);
