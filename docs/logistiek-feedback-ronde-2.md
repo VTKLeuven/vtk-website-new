@@ -32,7 +32,7 @@ ook bij maar werd anders opgelost dan gevraagd; de reden staat bij de taak.
 | 0 | Beslissingen die eerst moeten vallen | 4 vragen | ✅ beslist |
 | 1 | Kleine bugs, UI-fixes en ergernissen | R1–R8 | 🟡 R5, R7 open |
 | 2 | Navigatie, lay-out en overzichten | N1–N5 | 🟡 N5 open |
-| 3 | Materiaal: opmerkingen, deelgoedkeuring, sjablonen | M1–M8 | 🟡 M2, M4–M7 open |
+| 3 | Materiaal: opmerkingen, deelgoedkeuring, sjablonen | M1–M8 | 🟡 M2, M6, M7 open |
 | 4 | Vervoer: terminologie, goedkeuring, weekoverzicht | T1–T13 | 🟡 T2, T5, T7, T8 open |
 | 5 | Flesserke en kalender | F1–F3 | ✅ af |
 | 6 | Evenementen: post-overzicht, materiaallijst, C&G | E1–E7 | 🟡 E1, E2, E4, E5 open |
@@ -338,7 +338,7 @@ Alles hier is klein, zichtbaar en zonder (of met een minimale) migratie.
 - **Klaar wanneer:** logi kan 3 van 5 items goedkeuren en de andere 2 nog
   laten staan.
 
-### M4. Sjablonen bruikbaar en duidelijk selecteerbaar
+### ✅ M4. Sjablonen bruikbaar en duidelijk selecteerbaar
 **P1 · code**
 
 - **Raakt:** `apps/logistiek/app/materiaal/reservation-form.tsx`,
@@ -355,7 +355,7 @@ Alles hier is klein, zichtbaar en zonder (of met een minimale) migratie.
 - **Klaar wanneer:** iedereen kan een sjabloon selecteren en ziet duidelijk
   dat het is toegepast.
 
-### M5. Posten en werkgroepen mogen sjablonen aanmaken
+### ✅ M5. Posten en werkgroepen mogen sjablonen aanmaken
 **P3 · code · 📝 · beslist: B2**
 
 - **Raakt:** `apps/logistiek/app/beheer/sjablonen/`,

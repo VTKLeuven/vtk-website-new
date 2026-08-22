@@ -244,6 +244,84 @@ export async function editFlesserkeReservationAction(
   return { ok: true, message: 'Flesserke-aanvraag bijgewerkt.' };
 }
 
+/**
+ * Een sjabloon maken van wat er nu in het aanvraagformulier staat (M5).
+ *
+ * Elk lid mag dit, niet enkel Logistiek: de posten vroegen er zelf om, en het
+ * oude argument (na één jaar dertig varianten van "cantus") gaat over de
+ * keuzelijst en niet over wie mag aanmaken. De rem zit dan ook in de UI en niet
+ * in de rechten: "Nieuw sjabloon" staat onderaan de keuzelijst met de bestaande
+ * sjablonen, zodat je er eerst langs moet.
+ *
+ * De post is een label, geen filter: iedereen ziet elk sjabloon (zie
+ * `requestTemplates`). Hij komt uit de groep waarnamens je aanvraagt, en enkel
+ * als je daar echt bij hoort.
+ */
+export async function createTemplateFromSelectionAction(input: {
+  name: string;
+  description?: string;
+  groupId?: string | null;
+  lines: Array<{ itemId: string; quantity: number }>;
+}): Promise<ActionResult> {
+  const session = await requireSession();
+
+  const name = input.name.trim();
+  if (!name) return { ok: false, error: 'Geef het sjabloon een naam.' };
+
+  // Twee keer hetzelfde item in één sjabloon botst op de unieke index; optellen
+  // geeft een nette lijst in plaats van een databasefout.
+  const totals = new Map<string, number>();
+  for (const line of input.lines) {
+    if (!Number.isInteger(line.quantity) || line.quantity <= 0) continue;
+    totals.set(line.itemId, (totals.get(line.itemId) ?? 0) + line.quantity);
+  }
+  if (totals.size === 0) {
+    return { ok: false, error: 'Kies eerst materiaal; een leeg sjabloon heeft geen nut.' };
+  }
+
+  // Enkel bestaand, actief materiaal: een sjabloon dat naar een verwijderd item
+  // wijst, zou bij elk gebruik stilzwijgend een lijn overslaan.
+  const items = await prisma.uitleenItem.findMany({
+    where: { id: { in: [...totals.keys()] }, active: true },
+    select: { id: true },
+  });
+  const known = new Set(items.map((item) => item.id));
+  const lines = [...totals.entries()].filter(([itemId]) => known.has(itemId));
+  if (lines.length === 0) {
+    return { ok: false, error: 'Geen van de gekozen items staat nog in de catalogus.' };
+  }
+
+  const groupId =
+    input.groupId && session.groups.some((group) => group.id === input.groupId)
+      ? input.groupId
+      : null;
+
+  const existing = await prisma.uitleenRequestTemplate.findFirst({
+    where: { name, active: true },
+    select: { id: true },
+  });
+  if (existing) {
+    return {
+      ok: false,
+      error: `Er bestaat al een sjabloon met de naam "${name}". Kies een andere naam, of gebruik het bestaande.`,
+    };
+  }
+
+  await prisma.uitleenRequestTemplate.create({
+    data: {
+      name: name.slice(0, 120),
+      description: (input.description ?? '').trim().slice(0, 300) || null,
+      groupId,
+      createdById: session.user.id,
+      lines: { create: lines.map(([itemId, quantity]) => ({ itemId, quantity })) },
+    },
+  });
+
+  revalidatePath('/materiaal');
+  revalidatePath('/beheer/sjablonen');
+  return { ok: true, message: `Sjabloon "${name}" bewaard. Iedereen kan het nu kiezen.` };
+}
+
 export async function cancelReservationAction(reservationId: string): Promise<ActionResult> {
   const session = await requireSession();
 

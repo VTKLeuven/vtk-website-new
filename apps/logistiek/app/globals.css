@@ -552,6 +552,30 @@ body {
   color: var(--ink);
 }
 
+/* "Nieuw sjabloon maken", uitgeklapt onder de keuzelijst (M5). Over de volle
+   breedte, want het is een tweede stap en geen tweede kolom. */
+.logistics-template-new {
+  display: grid;
+  grid-column: 1 / -1;
+  gap: 12px;
+  padding-top: 14px;
+  border-top: 1px solid rgba(237, 189, 34, 0.45);
+}
+
+/* Uitkomst van "sjabloon bewaren": groen bij succes, rood bij een dubbele naam
+   of een lege selectie. Geen toast, want de ledenkant heeft er geen. */
+.logistics-template-note {
+  grid-column: 1 / -1;
+  margin: 0;
+  color: var(--success);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.logistics-template-note.is-error {
+  color: #b42318;
+}
+
 .logistics-template-feedback {
   display: flex;
   grid-column: 1 / -1;

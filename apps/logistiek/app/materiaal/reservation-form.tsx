@@ -2,8 +2,13 @@
 
 import { useCallback, useEffect, useMemo, useState, useTransition } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { Button } from '@vtk/ui';
-import { checkAvailabilityAction, type ActionResult } from '@/app/actions/uitleen';
+import {
+  checkAvailabilityAction,
+  createTemplateFromSelectionAction,
+  type ActionResult,
+} from '@/app/actions/uitleen';
 import type { ReservationFormInput } from '@/lib/reservation-form';
 import type { RequestTemplate } from '@/lib/uitleen-server';
 import { formatDateTime, formatEuro } from '@/lib/uitleen';
@@ -114,10 +119,24 @@ export function ReservationForm({
 
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+  const router = useRouter();
 
   const [search, setSearch] = useState('');
   const [activeCategory, setActiveCategory] = useState<string>('all');
-  const [appliedTemplate, setAppliedTemplate] = useState<string | null>(null);
+  // Wat het laatst toegepaste sjabloon effectief toevoegde, per item. Nodig om
+  // het weer weg te kunnen halen (M4): het aantal dat erbij kwam kan lager zijn
+  // dan wat in het sjabloon stond, want we knippen af op de voorraad.
+  const [appliedTemplate, setAppliedTemplate] = useState<
+    { name: string; added: Record<string, number> } | null
+  >(null);
+  const [newTemplate, setNewTemplate] = useState<{ name: string } | null>(null);
+  const [templatePending, startTemplateTransition] = useTransition();
+  // Eigen melding, geen toast: de ledenkant van de app heeft geen
+  // ToastProvider (die staat enkel rond /beheer), en de uitkomst hoort hier
+  // toch bij de knop te staan waar ze vandaan komt.
+  const [templateNotice, setTemplateNotice] = useState<
+    { kind: 'ok' | 'error'; text: string } | null
+  >(null);
 
   /**
    * Een sjabloon vult de aantallen in en verdwijnt daarna uit beeld: wat er nu
@@ -129,15 +148,62 @@ export function ReservationForm({
     const template = templates.find((entry) => entry.id === templateId);
     if (!template) return;
     trackTemplateLoaded(template.name);
-    setAppliedTemplate(template.name);
+    const added: Record<string, number> = {};
     setQuantities((current) => {
       const next = { ...current };
       for (const line of template.lines) {
         const item = itemsById.get(line.itemId);
         if (!item) continue;
-        next[line.itemId] = Math.min(item.quantity, (next[line.itemId] ?? 0) + line.quantity);
+        const before = next[line.itemId] ?? 0;
+        const after = Math.min(item.quantity, before + line.quantity);
+        if (after > before) added[line.itemId] = (added[line.itemId] ?? 0) + (after - before);
+        next[line.itemId] = after;
       }
       return next;
+    });
+    setAppliedTemplate({ name: template.name, added });
+  }
+
+  /** Het laatst toegepaste sjabloon weer weghalen (M4), zonder de rest te raken. */
+  function undoTemplate() {
+    const applied = appliedTemplate;
+    if (!applied) return;
+    setQuantities((current) => {
+      const next = { ...current };
+      for (const [itemId, quantity] of Object.entries(applied.added)) {
+        const left = (next[itemId] ?? 0) - quantity;
+        if (left > 0) next[itemId] = left;
+        else delete next[itemId];
+      }
+      return next;
+    });
+    setAppliedTemplate(null);
+  }
+
+  /** Wat er nu gekozen is, als sjabloonlijnen (M5). */
+  function selectedLines(): Array<{ itemId: string; quantity: number }> {
+    return Object.entries(quantities)
+      .filter(([, quantity]) => quantity > 0)
+      .map(([itemId, quantity]) => ({ itemId, quantity }));
+  }
+
+  function saveTemplate() {
+    const name = newTemplate?.name.trim() ?? '';
+    setTemplateNotice(null);
+    startTemplateTransition(async () => {
+      const result = await createTemplateFromSelectionAction({
+        name,
+        groupId: event.groupId || null,
+        lines: selectedLines(),
+      });
+      if (!result.ok) {
+        setTemplateNotice({ kind: 'error', text: result.error });
+        return;
+      }
+      setTemplateNotice({ kind: 'ok', text: result.message ?? 'Sjabloon bewaard.' });
+      setNewTemplate(null);
+      // Zodat het nieuwe sjabloon meteen in de keuzelijst staat.
+      router.refresh();
     });
   }
 
@@ -308,7 +374,12 @@ export function ReservationForm({
         </div>
       ) : null}
 
-      {templates.length > 0 ? (
+      {/* De keuzelijst met sjablonen, met "nieuw" als laatste optie erin (M5,
+          beslissing B2). Bewust geen aparte knop ernaast: wie er een wil maken,
+          is dan langs de bestaande gepasseerd waar het antwoord misschien al
+          stond. Dat is de hele rem op dertig varianten van "cantus"; rechten
+          staan er niet op, iedereen mag er een maken. */}
+      {templates.length > 0 || mode === 'member' ? (
         <section className="logistics-template-picker" aria-labelledby="material-template-title">
           <div>
             <p className="logistics-form-kicker">{en ? 'Quick start' : 'Snel starten'}</p>
@@ -326,8 +397,13 @@ export function ReservationForm({
             <select
               value=""
               onChange={(event) => {
-                applyTemplate(event.target.value);
+                const chosen = event.target.value;
                 event.target.value = '';
+                if (chosen === '__new__') {
+                  setNewTemplate({ name: '' });
+                  return;
+                }
+                applyTemplate(chosen);
               }}
             >
               <option value="">{en ? 'Choose a template...' : 'Kies een sjabloon...'}</option>
@@ -337,14 +413,85 @@ export function ReservationForm({
                   {template.groupName ? ` (${template.groupName})` : ''}
                 </option>
               ))}
+              <option value="__new__">
+                {en
+                  ? '+ Save my selection as a new template'
+                  : '+ Nieuw sjabloon maken van mijn selectie'}
+              </option>
             </select>
           </label>
           {appliedTemplate ? (
             <p className="logistics-template-feedback" role="status" aria-live="polite">
               <span aria-hidden>✓</span>
               {en
-                ? `${appliedTemplate} was added. Your request now contains ${totals.count} items.`
-                : `${appliedTemplate} is toegevoegd. Jouw aanvraag bevat nu ${totals.count} items.`}
+                ? `${appliedTemplate.name} was added. Your request now contains ${totals.count} items.`
+                : `${appliedTemplate.name} is toegevoegd. Jouw aanvraag bevat nu ${totals.count} items.`}{' '}
+              <button
+                type="button"
+                onClick={undoTemplate}
+                className="font-semibold underline underline-offset-2"
+              >
+                {en ? 'Undo' : 'Toch niet'}
+              </button>
+            </p>
+          ) : null}
+
+          {newTemplate ? (
+            <div className="logistics-template-new">
+              <label className="grid gap-1 text-sm">
+                <span className="font-medium text-vtk-ink">
+                  {en ? 'Name of the template' : 'Naam van het sjabloon'}
+                </span>
+                <input
+                  type="text"
+                  value={newTemplate.name}
+                  onChange={(field) => setNewTemplate({ name: field.target.value })}
+                  placeholder={en ? 'E.g. Cantus' : 'Bv. Cantus'}
+                  className="h-10 rounded-lg border border-vtk-navy/15 bg-white px-3 text-sm text-vtk-ink"
+                />
+                <span className="text-xs text-vtk-muted">
+                  {en
+                    ? `Saves the ${totals.count} items you selected. Everyone can use it afterwards.`
+                    : `Bewaart de ${totals.count} items die je nu koos. Iedereen kan het daarna gebruiken.`}
+                </span>
+              </label>
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  type="button"
+                  size="sm"
+                  onClick={saveTemplate}
+                  disabled={templatePending || totals.count === 0 || !newTemplate.name.trim()}
+                >
+                  {templatePending
+                    ? en
+                      ? 'Saving...'
+                      : 'Bewaren...'
+                    : en
+                      ? 'Save template'
+                      : 'Sjabloon bewaren'}
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => setNewTemplate(null)}
+                  disabled={templatePending}
+                >
+                  {en ? 'Cancel' : 'Annuleren'}
+                </Button>
+              </div>
+            </div>
+          ) : null}
+
+          {templateNotice ? (
+            <p
+              role="status"
+              aria-live="polite"
+              className={`logistics-template-note ${
+                templateNotice.kind === 'error' ? 'is-error' : ''
+              }`}
+            >
+              {templateNotice.text}
             </p>
           ) : null}
         </section>
