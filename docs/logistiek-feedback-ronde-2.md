@@ -20,15 +20,20 @@ Ingebruikname: `docs/logistiek-ingebruikname.md`.
 Prioriteiten: **P1** = bug of dagelijkse ergernis, **P2** = duidelijke
 verbetering, **P3** = groter of "ooit".
 
+## Afgevinkt
+
+Een ✅ voor de taaktitel betekent: af, met het commit-hashje erbij. R8 staat er
+ook bij maar werd anders opgelost dan gevraagd; de reden staat bij de taak.
+
 ## Statusoverzicht
 
 | Fase | Inhoud | Taken | Status |
 | --- | --- | --- | --- |
 | 0 | Beslissingen die eerst moeten vallen | 4 vragen | ✅ beslist |
-| 1 | Kleine bugs, UI-fixes en ergernissen | R1–R8 | ⬜ open |
-| 2 | Navigatie, lay-out en overzichten | N1–N5 | ⬜ open |
-| 3 | Materiaal: opmerkingen, deelgoedkeuring, sjablonen | M1–M8 | ⬜ open |
-| 4 | Vervoer: terminologie, goedkeuring, weekoverzicht | T1–T13 | ⬜ open |
+| 1 | Kleine bugs, UI-fixes en ergernissen | R1–R8 | 🟡 R5, R6, R7 open |
+| 2 | Navigatie, lay-out en overzichten | N1–N5 | 🟡 N2, N3, N5 open |
+| 3 | Materiaal: opmerkingen, deelgoedkeuring, sjablonen | M1–M8 | 🟡 M1–M7 open |
+| 4 | Vervoer: terminologie, goedkeuring, weekoverzicht | T1–T13 | 🟡 T1, T2, T5, T7–T10, T12, T13 open |
 | 5 | Flesserke en kalender | F1–F3 | ⬜ open |
 | 6 | Evenementen: post-overzicht, materiaallijst, C&G | E1–E7 | ⬜ open |
 
@@ -66,7 +71,7 @@ Alle vier beslist op 22 augustus 2026; de motivatie staat in
 
 Alles hier is klein, zichtbaar en zonder (of met een minimale) migratie.
 
-### R1. Evenementnaam tonen bij vervoer in "Mijn reservaties"
+### ✅ R1. Evenementnaam tonen bij vervoer in "Mijn reservaties"
 **P1 · code · klein**
 
 - **Raakt:** `apps/logistiek/app/reservaties/page.tsx` (transportsectie).
@@ -77,7 +82,7 @@ Alles hier is klein, zichtbaar en zonder (of met een minimale) migratie.
 - **Klaar wanneer:** je ziet bij je vervoerreservaties meteen voor welk
   evenement de rit is.
 
-### R2. Afgelopen reservaties verbergen met optie tot openklappen
+### ✅ R2. Afgelopen reservaties verbergen met optie tot openklappen
 **P1 · code**
 
 - **Raakt:** `apps/logistiek/app/reservaties/page.tsx`,
@@ -93,7 +98,7 @@ Alles hier is klein, zichtbaar en zonder (of met een minimale) migratie.
   3. Zelfde behandeling in de beheer-overzichten.
 - **Klaar wanneer:** je ziet bij het openen alleen je actieve reservaties.
 
-### R3. Soort aanvraag tonen in beheer aanvraaglijst
+### ✅ R3. Soort aanvraag tonen in beheer aanvraaglijst
 **P1 · code · klein**
 
 - **Raakt:** `apps/logistiek/app/beheer/aanvragen/page.tsx`,
@@ -104,7 +109,7 @@ Alles hier is klein, zichtbaar en zonder (of met een minimale) migratie.
   van of er `reservationLines` en/of `flesserkeLines` bestaan.
 - **Klaar wanneer:** je ziet in één oogopslag welk type aanvraag het is.
 
-### R4. Betaling verbergen voor interne posten en werkgroepen
+### ✅ R4. Betaling verbergen voor interne posten en werkgroepen
 **P2 · code · 📝**
 
 - **Raakt:** aanvraagformulieren, beheer-detailpagina's, "Mijn reservaties".
@@ -159,7 +164,7 @@ Alles hier is klein, zichtbaar en zonder (of met een minimale) migratie.
 - **Klaar wanneer:** een gebruiker ziet vóór indienen wat nog ingevuld moet
   worden.
 
-### R8. Waarschuwing als levering geselecteerd maar geen rit aangevraagd
+### ✅ R8. Waarschuwing als levering geselecteerd maar geen rit aangevraagd
 **P2 · code**
 
 - **Raakt:** `apps/logistiek/app/reservaties/page.tsx`,
@@ -175,12 +180,19 @@ Alles hier is klein, zichtbaar en zonder (of met een minimale) migratie.
   3. Zelfde waarschuwing voor de post/werkgroep op hun overzicht.
 - **Klaar wanneer:** je krijgt een signaal als je vergeten bent een rit te
   boeken.
+- **Anders opgelost (3a32181).** De premisse klopt niet meer sinds ronde 1: een
+  lid vraagt zelf nooit een leveringsrit aan, Logistiek maakt ze met "Rit
+  aanmaken" (zie `docs/design-decisions.md`, § "Levering nodig" wordt een echte
+  rit). De gevraagde waarschuwing zou het lid dus aanzetten tot een tweede,
+  overbodige rit. In de plaats zegt de aanvraag nu in welke toestand de levering
+  zit: "Levering gevraagd; Logistiek plant de rit in", of "Levering gepland" met
+  de datum en een link naar de rit.
 
 ---
 
 # Fase 2: navigatie, lay-out en overzichten
 
-### N1. Beheernavigatie herindelen
+### ✅ N1. Beheernavigatie herindelen
 **P2 · code**
 
 - **Raakt:** `apps/logistiek/app/beheer/beheer-nav.tsx`,
@@ -229,7 +241,7 @@ Alles hier is klein, zichtbaar en zonder (of met een minimale) migratie.
   3. Visueel onderscheid (bold of groepskop) voor eigen events.
 - **Klaar wanneer:** je vindt je eigen events snel, ook bij een lange lijst.
 
-### N4. Batch-acties: afgehaald en teruggebracht markeren vanuit overzicht
+### ✅ N4. Batch-acties: afgehaald en teruggebracht markeren vanuit overzicht
 **P2 · code**
 
 - **Raakt:** `apps/logistiek/app/beheer/aanvragen/page.tsx`,
@@ -385,7 +397,7 @@ Alles hier is klein, zichtbaar en zonder (of met een minimale) migratie.
 - **Klaar wanneer:** een aanvrager die weet wat hij wilt, hoeft niet door
   alle foto's te scrollen.
 
-### M8. Evenementnaam tonen bij aanvraagoverzicht
+### ✅ M8. Evenementnaam tonen bij aanvraagoverzicht
 **P1 · code · klein**
 
 - **Raakt:** `apps/logistiek/app/beheer/aanvragen/page.tsx`.
@@ -424,7 +436,7 @@ Alles hier is klein, zichtbaar en zonder (of met een minimale) migratie.
      elk individueel.
 - **Klaar wanneer:** je kan de heenrit goedkeuren en de terugrit aanpassen.
 
-### T3. "Te beslissen" ritten inklappen (zoals goedgekeurde)
+### ✅ T3. "Te beslissen" ritten inklappen (zoals goedgekeurde)
 **P1 · code · klein**
 
 - **Raakt:** `apps/logistiek/app/beheer/vervoer/page.tsx`.
@@ -434,7 +446,7 @@ Alles hier is klein, zichtbaar en zonder (of met een minimale) migratie.
   aanvragen het overzicht behoudt. Details pas bij uitklappen.
 - **Klaar wanneer:** je kan de lijst van te beslissen ritten inklappen.
 
-### T4. Evenementnaam bij dichtgeklapte ritten; prijs/betaald weg
+### ✅ T4. Evenementnaam bij dichtgeklapte ritten; prijs/betaald weg
 **P1 · code · klein**
 
 - **Raakt:** `apps/logistiek/app/beheer/vervoer/page.tsx`.
@@ -456,7 +468,7 @@ Alles hier is klein, zichtbaar en zonder (of met een minimale) migratie.
   genotificeerd.
 - **Klaar wanneer:** een aanvrager kan na goedkeuring een rit wijzigen.
 
-### T6. Snellere link naar bezettingsoverzicht
+### ✅ T6. Snellere link naar bezettingsoverzicht
 **P1 · code · klein**
 
 - **Raakt:** `apps/logistiek/app/beheer/vervoer/page.tsx`,
@@ -525,7 +537,7 @@ Alles hier is klein, zichtbaar en zonder (of met een minimale) migratie.
   bestaande `SortHeader`-component.
 - **Klaar wanneer:** je kan de chauffeurslijst sorteren.
 
-### T11. Conflicterende rit: gewijzigde uren opslaan
+### ✅ T11. Conflicterende rit: gewijzigde uren opslaan
 **P1 · code · bug**
 
 - **Raakt:** `apps/logistiek/app/beheer/vervoer/transport-decision-forms.tsx`,
