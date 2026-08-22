@@ -14,6 +14,7 @@ import {
   isOnQuarterHour,
   isoWeekNumber,
   parseDateOnly,
+  parseNotifyEmails,
   startOfWeek,
   pricingModeLabel,
   rangesOverlap,
@@ -368,6 +369,28 @@ describe('date formatting locale', () => {
     const dt = new Date('2026-07-20T12:00:00Z');
     expect(formatDateTime(dt, 'nl')).toContain('juli');
     expect(formatDateTime(dt, 'en')).toContain('July');
+  });
+});
+
+describe('parseNotifyEmails', () => {
+  it('splitst op komma en puntkomma en trimt', () => {
+    expect(parseNotifyEmails('a@vtk.be, b@vtk.be')).toEqual(['a@vtk.be', 'b@vtk.be']);
+    expect(parseNotifyEmails(' a@vtk.be ;b@vtk.be ')).toEqual(['a@vtk.be', 'b@vtk.be']);
+  });
+
+  it('een leeg veld is geen fout maar een lege lijst', () => {
+    expect(parseNotifyEmails('')).toEqual([]);
+    expect(parseNotifyEmails('  ,  ')).toEqual([]);
+  });
+
+  it('weigert de hele lijst zodra er één adres niet klopt', () => {
+    // Half verzenden en de rest stil laten vallen is erger dan een foutmelding:
+    // de aanvrager denkt dan dat iedereen meeleest.
+    expect(parseNotifyEmails('a@vtk.be, kapot')).toBeNull();
+  });
+
+  it('houdt hetzelfde adres maar één keer over', () => {
+    expect(parseNotifyEmails('a@vtk.be, A@VTK.BE')).toEqual(['a@vtk.be']);
   });
 });
 

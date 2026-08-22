@@ -42,6 +42,7 @@ export function TransportDecisionForms({
   drivers,
   pricingIsPerKm,
   requesterType,
+  needsDriver = true,
   needsVanDriver = false,
   sameDayBookings = [],
 }: {
@@ -52,6 +53,8 @@ export function TransportDecisionForms({
   pricingIsPerKm: boolean;
   /** R4: enkel externen betalen, dus enkel zij krijgen een betaalwijze. */
   requesterType: UitleenRequesterType;
+  /** Rijdt Logistiek dit voertuig? De bakfiets neemt de aanvrager zelf mee. */
+  needsDriver?: boolean;
   needsVanDriver?: boolean;
   /** Andere goedgekeurde ritten met datzelfde voertuig die dag, om naar te schuiven. */
   sameDayBookings?: string[];
@@ -122,14 +125,20 @@ export function TransportDecisionForms({
           </div>
         ) : null}
 
+        {/* Bij een voertuig dat de aanvrager zelf meeneemt, hoort geen
+            chauffeur; de keuzelijst helemaal weglaten zou het team wel het
+            recht ontnemen er alsnog iemand op te zetten, dus enkel het lege
+            antwoord verandert van betekenis (T13). */}
         <label className="grid gap-1 text-sm">
-          <span className="text-vtk-muted">Chauffeur (optioneel, kan later)</span>
+          <span className="text-vtk-muted">
+            {needsDriver ? 'Chauffeur (optioneel, kan later)' : 'Chauffeur (niet nodig voor dit voertuig)'}
+          </span>
           <select
             name="driverId"
             className="h-10 rounded-lg border border-vtk-navy/15 bg-white px-3 text-vtk-ink"
             defaultValue=""
           >
-            <option value="">Nog geen chauffeur</option>
+            <option value="">{needsDriver ? 'Nog geen chauffeur' : 'Geen chauffeur nodig'}</option>
             <DriverOptions drivers={drivers} needsVanDriver={needsVanDriver} />
           </select>
         </label>

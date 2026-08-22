@@ -286,32 +286,49 @@ export function VanRequestForm({
         <legend className="text-sm font-medium text-vtk-ink">
           {en ? 'Vehicle' : 'Voertuig'}
         </legend>
+        {/* Meerdere voertuigen kiezen is met opzet mogelijk (zie
+            docs/design-decisions.md, § Meerdere voertuigen: één aanvraag, N
+            boekingen), dus dit blijven checkboxen en geen radiogroep. Wat wel
+            ontbrak, is dat je zíet dat er twee aan staan: een donkere pil erbij
+            valt nauwelijks op wanneer de vorige ook al donker is. Vandaar een
+            vinkje in de pil zelf en, zodra het er meer dan één is, een regel die
+            ze bij naam opsomt. (T12) */}
         <div className="mt-2 flex flex-wrap gap-2">
-          {vehicles.map((v) => (
-            <label
-              key={v.id}
-              className={`cursor-pointer rounded-full border px-3.5 py-1.5 text-sm font-medium transition ${
-                vehicleIds.includes(v.id)
-                  ? 'border-vtk-navy bg-vtk-navy text-white'
-                  : 'border-vtk-navy/15 text-vtk-ink hover:border-vtk-navy/40'
-              }`}
-            >
-              <input
-                type="checkbox"
-                name="vehicle"
-                value={v.id}
-                checked={vehicleIds.includes(v.id)}
-                onChange={() => toggleVehicle(v.id)}
-                className="sr-only"
-              />
-              {v.name}
-            </label>
-          ))}
+          {vehicles.map((v) => {
+            const selected = vehicleIds.includes(v.id);
+            return (
+              <label
+                key={v.id}
+                className={`flex cursor-pointer items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-sm font-medium transition has-[:focus-visible]:outline has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-vtk-navy ${
+                  selected
+                    ? 'border-vtk-navy bg-vtk-navy text-white'
+                    : 'border-vtk-navy/15 text-vtk-ink hover:border-vtk-navy/40'
+                }`}
+              >
+                <input
+                  type="checkbox"
+                  name="vehicle"
+                  value={v.id}
+                  checked={selected}
+                  onChange={() => toggleVehicle(v.id)}
+                  className="sr-only"
+                />
+                <span aria-hidden="true" className={selected ? 'text-vtk-yellow' : 'text-vtk-muted'}>
+                  {selected ? '✓' : '+'}
+                </span>
+                {v.name}
+              </label>
+            );
+          })}
         </div>
-        <p className="mt-1.5 text-xs text-vtk-muted">
-          {en
-            ? 'You can pick more than one; they are decided together.'
-            : 'Je kan er meerdere kiezen; ze worden samen beslist.'}
+        <p className="mt-1.5 text-xs text-vtk-muted" aria-live="polite">
+          {chosen.length > 1
+            ? en
+              ? `${chosen.length} vehicles selected: ${chosen.map((v) => v.name).join(', ')}. They are decided together.`
+              : `${chosen.length} voertuigen geselecteerd: ${chosen.map((v) => v.name).join(', ')}. Ze worden samen beslist.`
+            : en
+              ? 'You can pick more than one; they are decided together.'
+              : 'Je kan er meerdere kiezen; ze worden samen beslist.'}
         </p>
       </fieldset>
 
@@ -460,17 +477,21 @@ export function VanRequestForm({
           <span className="font-medium text-vtk-ink">
             {en ? 'Extra address to keep posted' : 'Extra adres dat op de hoogte blijft'}
           </span>
+          {/* `multiple`: meerdere adressen mogen, gescheiden door een komma
+              (T13). Zonder dat attribuut weigert de browser de tweede al voor
+              de server ze ziet. */}
           <input
             type="email"
+            multiple
             value={notifyEmail}
             onChange={(e) => setNotifyEmail(e.target.value)}
-            placeholder="bv. logistiek.existenz@vtk.be"
+            placeholder="bv. logistiek.existenz@vtk.be, sarah@vtk.be"
             className={inputClass}
           />
           <span className="text-xs text-vtk-muted">
             {en
-              ? 'Optional. Gets a copy of every mail about this trip.'
-              : 'Optioneel. Krijgt elke mail over deze rit in kopie.'}
+              ? 'Optional. Gets a copy of every mail about this trip. Separate addresses with a comma.'
+              : 'Optioneel. Krijgt elke mail over deze rit in kopie. Splits meerdere adressen met een komma.'}
           </span>
         </label>
         <label className="grid gap-1 text-sm sm:col-span-2">

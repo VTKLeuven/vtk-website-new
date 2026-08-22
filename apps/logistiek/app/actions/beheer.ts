@@ -2324,6 +2324,7 @@ export async function saveVehicleAction(_prev: SaveState, formData: FormData): P
     pricingMode,
     rateCents: pricingMode === 'FREE' ? 0 : rateCents,
     needsVanDriver: String(formData.get('needsVanDriver') ?? '') === 'on',
+    needsDriver: String(formData.get('needsDriver') ?? '') === 'on',
   };
   if (id) {
     await prisma.uitleenVehicle.update({ where: { id }, data });

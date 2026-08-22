@@ -1629,10 +1629,19 @@ async function main() {
     nameEn: string;
     pricingMode: "FREE" | "PER_HOUR" | "PER_KM" | "FLAT";
     rateCents: number;
+    /** Rijdt Logistiek dit voertuig? De bakfiets neemt de aanvrager zelf mee. */
+    needsDriver?: boolean;
   }> = [
     { code: "kar", nameNl: "Kar", nameEn: "Van", pricingMode: "FREE", rateCents: 0 },
     { code: "auto", nameNl: "Auto", nameEn: "Car", pricingMode: "PER_KM", rateCents: 35 },
-    { code: "bakfiets", nameNl: "Bakfiets", nameEn: "Cargo bike", pricingMode: "FREE", rateCents: 0 },
+    {
+      code: "bakfiets",
+      nameNl: "Bakfiets",
+      nameEn: "Cargo bike",
+      pricingMode: "FREE",
+      rateCents: 0,
+      needsDriver: false,
+    },
   ];
   for (let i = 0; i < uitleenVehicles.length; i += 1) {
     const v = uitleenVehicles[i];
@@ -1645,6 +1654,7 @@ async function main() {
         nameEn: v.nameEn,
         pricingMode: v.pricingMode,
         rateCents: v.rateCents,
+        needsDriver: v.needsDriver ?? true,
         sortIndex: i,
       },
     });

@@ -49,7 +49,13 @@ function EventCard({ event }: { event: AdminEvent }) {
   ].filter(Boolean);
 
   return (
-    <li className="rounded-[16px] border border-vtk-navy/10 bg-vtk-surface p-5">
+    // Het id als anker: vanuit een aanvraag kan je zo terug naar het evenement
+    // waar je vandaan kwam (N2), in plaats van bovenaan een lange lijst te
+    // landen. `scroll-mt` houdt de kaart onder de vaste header.
+    <li
+      id={event.id}
+      className="scroll-mt-24 rounded-[16px] border border-vtk-navy/10 bg-vtk-surface p-5"
+    >
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
           <h3 className="flex flex-wrap items-center gap-2 text-lg font-semibold tracking-tight text-vtk-ink">

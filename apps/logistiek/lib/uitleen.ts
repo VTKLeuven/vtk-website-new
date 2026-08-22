@@ -47,6 +47,36 @@ export function isEmailish(value: string): boolean {
 }
 
 /**
+ * De adressen uit het veld "extra adres dat op de hoogte blijft", gesplitst op
+ * komma of puntkomma.
+ *
+ * Eén werkgroep heeft vaak meer dan één mailbox die moet meelezen (de
+ * werkgroepmailbox én de verantwoordelijke), en dat paste niet in één veld.
+ * Geeft `null` zodra er één adres tussen staat dat geen adres is: half
+ * verzenden en de rest stil laten vallen, is erger dan een foutmelding, want
+ * dan denkt de aanvrager dat iedereen meeleest.
+ *
+ * Dubbels vallen weg (hoofdletterongevoelig), zodat niemand twee keer dezelfde
+ * mail krijgt.
+ */
+export function parseNotifyEmails(value: string): string[] | null {
+  const parts = value
+    .split(/[,;]/)
+    .map((part) => part.trim())
+    .filter(Boolean);
+  if (parts.some((part) => !isEmailish(part))) return null;
+  const seen = new Set<string>();
+  const unique: string[] = [];
+  for (const part of parts) {
+    const key = part.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    unique.push(part);
+  }
+  return unique;
+}
+
+/**
  * "YYYY-MM-DD" uit een date-input naar een Date op UTC-middernacht, zoals
  * Prisma `@db.Date`-kolommen ze bewaart. Ongeldige input geeft null.
  */

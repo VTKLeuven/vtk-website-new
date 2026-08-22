@@ -1,7 +1,13 @@
 import 'server-only';
 
 import { prisma } from '@vtk/db';
-import { DAY_PARTS, isEmailish, parseDateOnly, todayDateOnly, type ReservationLineInput } from './uitleen';
+import {
+  DAY_PARTS,
+  parseDateOnly,
+  parseNotifyEmails,
+  todayDateOnly,
+  type ReservationLineInput,
+} from './uitleen';
 
 type DayPart = (typeof DAY_PARTS)[number];
 
@@ -175,10 +181,17 @@ export async function buildReservationData(
     return { ok: false, error: 'Het startmoment van het evenement is ongeldig.' };
   }
 
-  const notifyEmail = (input.notifyEmail ?? '').trim();
-  if (notifyEmail && !isEmailish(notifyEmail)) {
-    return { ok: false, error: 'Het extra e-mailadres ziet er niet uit als een adres.' };
+  // Meerdere adressen mogen, gescheiden door een komma: een werkgroep heeft
+  // vaak zowel een gedeelde mailbox als een verantwoordelijke die meeleest.
+  const notifyEmails = parseNotifyEmails(input.notifyEmail ?? '');
+  if (notifyEmails === null) {
+    return {
+      ok: false,
+      error:
+        'Een van de extra e-mailadressen ziet er niet uit als een adres. Splits meerdere adressen met een komma.',
+    };
   }
+  const notifyEmail = notifyEmails.join(', ');
 
   const lines = input.lines.filter((line) => Number.isInteger(line.quantity) && line.quantity > 0);
   const itemIds = lines.map((line) => line.itemId);

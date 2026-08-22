@@ -2,7 +2,7 @@ import 'server-only';
 
 import { prisma } from '@vtk/db';
 import { sendMail } from '@vtk/mail';
-import { formatDateOnly, formatDateTime } from './uitleen';
+import { formatDateOnly, formatDateTime, parseNotifyEmails } from './uitleen';
 import type { LogistiekLocale } from './i18n-shared';
 import { logistiekBaseUrl } from './payments';
 
@@ -28,7 +28,7 @@ import { logistiekBaseUrl } from './payments';
 
 export type UitleenMailEvent = 'APPROVED' | 'REJECTED' | 'EDITED' | 'REOPENED';
 
-type Recipient = { to: string; cc: string | undefined; name: string; locale: LogistiekLocale };
+type Recipient = { to: string; cc: string[] | undefined; name: string; locale: LogistiekLocale };
 
 /**
  * Naar welk adres. Dezelfde regel als de hoofdsite (`preferredEmail`): wie een
@@ -40,11 +40,14 @@ function recipientOf(
 ): Recipient {
   const to =
     user.emailPreference === 'PERSONAL' && user.personalEmail ? user.personalEmail : user.email;
-  const cc = notifyEmail?.trim() || undefined;
+  // Het veld kan meerdere adressen dragen, gescheiden door een komma.
+  const cc = (parseNotifyEmails(notifyEmail ?? '') ?? []).filter(
+    // Een cc naar hetzelfde adres levert de aanvrager twee keer dezelfde mail.
+    (address) => address.toLowerCase() !== to.toLowerCase()
+  );
   return {
     to,
-    // Een cc naar hetzelfde adres levert de aanvrager twee keer dezelfde mail.
-    cc: cc && cc.toLowerCase() !== to.toLowerCase() ? cc : undefined,
+    cc: cc.length > 0 ? cc : undefined,
     name: user.name,
     locale: user.locale === 'EN' ? 'en' : 'nl',
   };

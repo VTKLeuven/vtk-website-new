@@ -2707,6 +2707,12 @@ model UitleenVehicle {
   // Heette tot augustus 2026 `needsTrailerDriver`. Dat was een leesfout van
   // "met de kar rijden": VTK heeft geen aanhangwagen.
   needsVanDriver Boolean            @default(false)
+  /// Rijdt Logistiek dit voertuig, of neemt de aanvrager het zelf mee? De
+  /// bakfiets is het tweede geval: daar hoort geen chauffeur bij, en toch stond
+  /// die rit geel gemarkeerd als "nog geen chauffeur toegewezen", een taak die
+  /// nooit afgevinkt raakte. Een vlag per voertuig en geen check op
+  /// `code == "bakfiets"`, om dezelfde reden als bij `needsVanDriver`.
+  needsDriver    Boolean            @default(true)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

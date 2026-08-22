@@ -250,17 +250,21 @@ export function EventRequesterFields({
           <span className="font-medium text-vtk-ink">
             {en ? 'Extra address to keep posted' : 'Extra adres dat op de hoogte blijft'}
           </span>
+          {/* `multiple`: meerdere adressen mogen, gescheiden door een komma
+              (T13). Zonder dat attribuut weigert de browser de tweede al voor
+              de server ze ziet. */}
           <input
             type="email"
+            multiple
             value={value.notifyEmail}
             onChange={(e) => set('notifyEmail', e.target.value)}
-            placeholder="bv. logistiek.existenz@vtk.be"
+            placeholder="bv. logistiek.existenz@vtk.be, sarah@vtk.be"
             className={inputClass}
           />
           <span className="text-xs text-vtk-muted">
             {en
-              ? 'Optional. Gets a copy of every mail about this request.'
-              : 'Optioneel. Krijgt elke mail over deze aanvraag in kopie.'}
+              ? 'Optional. Gets a copy of every mail about this request. Separate addresses with a comma.'
+              : 'Optioneel. Krijgt elke mail over deze aanvraag in kopie. Splits meerdere adressen met een komma.'}
           </span>
         </label>
 

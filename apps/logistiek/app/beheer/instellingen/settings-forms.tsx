@@ -63,6 +63,21 @@ function VehicleFields({ vehicle }: { vehicle?: UitleenVehicle }) {
       <label className="flex items-start gap-2 text-sm text-vtk-ink sm:col-span-2">
         <input
           type="checkbox"
+          name="needsDriver"
+          defaultChecked={vehicle?.needsDriver ?? true}
+          className="mt-0.5 h-4 w-4"
+        />
+        <span>
+          Logistiek rijdt dit voertuig
+          <span className="mt-0.5 block text-xs font-normal text-vtk-muted">
+            Zet dit uit voor een voertuig dat de aanvrager zelf meeneemt, zoals de bakfiets. Dan
+            vraagt de app er geen chauffeur voor en blijft de rit niet als onafgewerkt staan.
+          </span>
+        </span>
+      </label>
+      <label className="flex items-start gap-2 text-sm text-vtk-ink sm:col-span-2">
+        <input
+          type="checkbox"
           name="needsVanDriver"
           defaultChecked={vehicle?.needsVanDriver ?? false}
           className="mt-0.5 h-4 w-4"

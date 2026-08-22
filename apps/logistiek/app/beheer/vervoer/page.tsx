@@ -52,6 +52,20 @@ function hoursLabel(booking: AdminTransportBooking): string {
   return sameDay ? hours : `${hours} (${dateFormatter.format(booking.endAt)})`;
 }
 
+/**
+ * Wacht deze rit nog op een chauffeur?
+ *
+ * Enkel wanneer Logistiek het voertuig ook rijdt. De bakfiets neemt de aanvrager
+ * zelf mee (`vehicle.needsDriver`), dus die rit geel markeren als "nog geen
+ * chauffeur" zet een taak op het scherm die niemand ooit kan afvinken. (T13)
+ */
+function awaitsDriver(booking: {
+  driverId: string | null;
+  vehicle: { needsDriver: boolean };
+}): boolean {
+  return booking.vehicle.needsDriver && booking.driverId === null;
+}
+
 export default async function BeheerVervoerPage() {
   await requireManage();
 
@@ -257,6 +271,7 @@ export default async function BeheerVervoerPage() {
             drivers={drivers}
             pricingIsPerKm={first.pricingMode === 'PER_KM'}
             requesterType={first.requesterType}
+            needsDriver={first.vehicle.needsDriver}
             needsVanDriver={
               vehicles.find((v) => v.id === first.vehicleId)?.needsVanDriver ?? false
             }
@@ -511,7 +526,7 @@ export default async function BeheerVervoerPage() {
                   <li
                     key={booking.id}
                     className={`rounded-[16px] border bg-vtk-surface p-4 ${
-                      !booking.driver ? 'border-amber-300 bg-amber-50/30' : 'border-vtk-navy/10'
+                      awaitsDriver(booking) ? 'border-amber-300 bg-amber-50/30' : 'border-vtk-navy/10'
                     }`}
                   >
                     <div className="flex items-start justify-between gap-3">
@@ -527,7 +542,7 @@ export default async function BeheerVervoerPage() {
                         <dl className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
                           <div><dt className="text-vtk-muted">Wanneer</dt><dd className="text-vtk-body">{dateFormatter.format(booking.startAt)}</dd></div>
                           <div><dt className="text-vtk-muted">Uren</dt><dd className="tabular-nums text-vtk-body">{hoursLabel(booking)}</dd></div>
-                          <div><dt className="text-vtk-muted">Chauffeur</dt><dd className={booking.driver ? 'text-vtk-body' : 'font-semibold text-vtk-ink'}>{booking.driver?.name ?? 'nog geen'}</dd></div>
+                          <div><dt className="text-vtk-muted">Chauffeur</dt><dd className={booking.driver || !booking.vehicle.needsDriver ? 'text-vtk-body' : 'font-semibold text-vtk-ink'}>{booking.driver?.name ?? (booking.vehicle.needsDriver ? 'nog geen' : 'niet nodig')}</dd></div>
                         </dl>
                       </div>
                       <VanStatusBadge status={booking.status} />
@@ -571,7 +586,7 @@ export default async function BeheerVervoerPage() {
                       key={booking.id}
                       columns={6}
                       label={`${booking.vehicle.nameNl}, ${requesterLabel(booking)}, ${dateFormatter.format(booking.startAt)}`}
-                      highlight={!booking.driver}
+                      highlight={awaitsDriver(booking)}
                       summary={
                         <>
                           <td className="py-2 pr-3 text-vtk-ink">{dateFormatter.format(booking.startAt)}</td>
@@ -584,8 +599,10 @@ export default async function BeheerVervoerPage() {
                           <td className="py-2 pr-3">
                             {booking.driver ? (
                               <span className="text-vtk-body">{booking.driver.name}</span>
-                            ) : (
+                            ) : booking.vehicle.needsDriver ? (
                               <span className="font-semibold text-vtk-ink">nog geen</span>
+                            ) : (
+                              <span className="text-vtk-muted">niet nodig</span>
                             )}
                           </td>
                           <td className="py-2 pr-3 text-vtk-body">{booking.eventName ?? ''}</td>
@@ -611,7 +628,7 @@ export default async function BeheerVervoerPage() {
                 })}
               </table>
             </div>
-            {approved.some((booking) => !booking.driver) ? (
+            {approved.some((booking) => awaitsDriver(booking)) ? (
               <p className="mt-2 text-xs text-vtk-muted">
                 Geel gemarkeerd: er is nog geen chauffeur toegewezen.
               </p>

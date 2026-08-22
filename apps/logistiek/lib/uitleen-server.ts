@@ -914,7 +914,9 @@ export async function adminVanBookings() {
     include: {
       user: { select: { id: true, name: true, email: true } },
       driver: { select: { id: true, name: true } },
-      vehicle: { select: { nameNl: true, nameEn: true } },
+      // `needsDriver`: bij de bakfiets hoort geen chauffeur, dus die rit mag ook
+      // niet als onafgewerkt aangeduid staan (T13).
+      vehicle: { select: { nameNl: true, nameEn: true, needsDriver: true } },
       group: { select: { nameNl: true, nameEn: true } },
       event: { select: { id: true, name: true } },
       payments: { orderBy: { createdAt: 'desc' } },

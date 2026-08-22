@@ -35,8 +35,20 @@ export function AuditTimeline({ entries }: { entries: UitleenAuditEntry[] }) {
   if (entries.length === 0) return null;
 
   return (
-    <section className="rounded-[14px] border border-vtk-navy/10 bg-vtk-surface p-4">
-      <h3 className="text-sm font-semibold text-vtk-ink">Historiek</h3>
+    // Ingeklapt (R6): de historiek is er voor wanneer je je afvraagt wie wat
+    // wanneer deed, niet voor elke keer dat je een aanvraag opent. Open stond ze
+    // de rest van het scherm naar beneden te duwen. Het aantal staat in de
+    // samenvatting, zodat je ziet dat er iets te lezen valt zonder te klikken.
+    <details className="group rounded-[14px] border border-vtk-navy/10 bg-vtk-surface p-4">
+      <summary className="flex cursor-pointer list-none items-center gap-2 text-sm font-semibold text-vtk-ink [&::-webkit-details-marker]:hidden">
+        <span
+          aria-hidden="true"
+          className="inline-block text-vtk-muted transition-transform group-open:rotate-90"
+        >
+          ▸
+        </span>
+        Historiek ({entries.length})
+      </summary>
       <ol className="mt-3 grid gap-2.5">
         {entries.map((entry) => (
           <li key={entry.id} className="grid grid-cols-[auto_minmax(0,1fr)] gap-3 text-sm">
@@ -52,6 +64,6 @@ export function AuditTimeline({ entries }: { entries: UitleenAuditEntry[] }) {
           </li>
         ))}
       </ol>
-    </section>
+    </details>
   );
 }

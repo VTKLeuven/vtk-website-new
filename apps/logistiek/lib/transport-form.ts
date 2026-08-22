@@ -3,7 +3,7 @@ import 'server-only';
 import { prisma } from '@vtk/db';
 import type { Prisma, UitleenRequesterType } from '@prisma/client';
 import { randomUUID } from 'node:crypto';
-import { isEmailish, isOnQuarterHour, transportPriceCents } from './uitleen';
+import { isOnQuarterHour, parseNotifyEmails, transportPriceCents } from './uitleen';
 import { parseBrusselsDateTime } from './reservation-form';
 
 /**
@@ -119,10 +119,16 @@ export async function buildTransportBookings(
   const purpose = input.purpose.trim();
   if (!purpose) return { ok: false, error: 'Beschrijf waarvoor je het voertuig nodig hebt.' };
 
-  const notifyEmail = input.notifyEmail?.trim() ?? '';
-  if (notifyEmail && !isEmailish(notifyEmail)) {
-    return { ok: false, error: 'Het extra e-mailadres ziet er niet uit als een adres.' };
+  // Meerdere adressen mogen, gescheiden door een komma; zie `parseNotifyEmails`.
+  const notifyEmails = parseNotifyEmails(input.notifyEmail ?? '');
+  if (notifyEmails === null) {
+    return {
+      ok: false,
+      error:
+        'Een van de extra e-mailadressen ziet er niet uit als een adres. Splits meerdere adressen met een komma.',
+    };
   }
+  const notifyEmail = notifyEmails.join(', ');
 
   // Eén of meerdere voertuigen: een verhuis met de kar én de auto is één vraag,
   // en die als twee aanvragen laten indienen betekent dat het team ze ook los kan

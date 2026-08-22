@@ -168,7 +168,7 @@ export default async function BeheerAanvraagDetailPage({
       label: 'Terugbrengen terugdraaien',
       success: 'Het terugbrengen is teruggedraaid.',
       description:
-        'De aanvraag gaat terug naar "afgehaald". Het materiaal staat dan weer uit, en het flesserke-verbruik dat bij het terugbrengen afgeboekt werd, komt terug in de voorraad. Is de periode intussen aan iemand anders toegewezen, dan gaat dit niet door.',
+        'De aanvraag gaat terug naar "afgehaald": het materiaal staat dan weer als uitgeleend. Let op de flesserke: de flessen en blikken die je bij het terugbrengen als verbruikt noteerde, worden weer bij de voorraad opgeteld. Tel dus na of de voorraad nog klopt. Is de periode intussen aan iemand anders toegewezen, dan gaat dit niet door.',
       action: undoReturnedAction.bind(null, reservation.id),
     });
   }
@@ -226,10 +226,24 @@ export default async function BeheerAanvraagDetailPage({
   return (
     <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_380px]">
       <section className="rounded-[18px] border border-vtk-navy/10 bg-vtk-surface p-6">
-        <p className="text-sm text-vtk-muted">
+        {/* N2: wie hier via een evenement belandde, wil terug naar dat
+            evenement en niet naar de volledige aanvragenlijst. Beide staan er,
+            zodat geen van de twee wegen doodloopt. */}
+        <p className="flex flex-wrap items-center gap-2 text-sm text-vtk-muted">
           <Link href="/beheer/aanvragen" className="hover:underline">
             ← Aanvragen
           </Link>
+          {reservation.event ? (
+            <>
+              <span aria-hidden="true">·</span>
+              <Link
+                href={`/beheer/evenementen#${reservation.event.id}`}
+                className="hover:underline"
+              >
+                ← {reservation.event.name}
+              </Link>
+            </>
+          ) : null}
         </p>
         <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
           <div>
