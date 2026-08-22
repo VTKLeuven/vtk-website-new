@@ -28,7 +28,8 @@ export function MaterialRequestForm({
   /** Voor het lokale concept: per lid, want de logikot-pc is gedeeld. */
   userId: string;
   templates: RequestTemplate[];
-  events: SelectableEvent[];
+  /** Weggelaten voor een externe aanvrager; zie `requestsAsExternal` (E3). */
+  events?: SelectableEvent[];
 }) {
   const en = locale === 'en';
   const router = useRouter();

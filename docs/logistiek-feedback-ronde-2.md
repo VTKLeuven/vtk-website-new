@@ -34,8 +34,8 @@ ook bij maar werd anders opgelost dan gevraagd; de reden staat bij de taak.
 | 2 | Navigatie, lay-out en overzichten | N1–N5 | 🟡 N3, N5 open |
 | 3 | Materiaal: opmerkingen, deelgoedkeuring, sjablonen | M1–M8 | 🟡 M2, M4–M7 open |
 | 4 | Vervoer: terminologie, goedkeuring, weekoverzicht | T1–T13 | 🟡 T2, T5, T7, T8 open |
-| 5 | Flesserke en kalender | F1–F3 | 🟡 F1, F3 open |
-| 6 | Evenementen: post-overzicht, materiaallijst, C&G | E1–E7 | 🟡 E1–E5 open |
+| 5 | Flesserke en kalender | F1–F3 | 🟡 F1 open |
+| 6 | Evenementen: post-overzicht, materiaallijst, C&G | E1–E7 | 🟡 E1, E2, E4, E5 open |
 
 ---
 
@@ -614,7 +614,7 @@ Alles hier is klein, zichtbaar en zonder (of met een minimale) migratie.
   voorraadtelling nog klopt."
 - **Klaar wanneer:** de bevestigingstekst is helder voor iedereen.
 
-### F3. Kalender: materiaal/flesserke onderscheiden met kleuren
+### ✅ F3. Kalender: materiaal/flesserke onderscheiden met kleuren
 **P2 · code**
 
 - **Raakt:** `apps/logistiek/app/beheer/kalender/page.tsx`,
@@ -662,7 +662,7 @@ Alles hier is klein, zichtbaar en zonder (of met een minimale) migratie.
 - **Klaar wanneer:** evenementen ondersteunen een einddatum en uur is
   optioneel.
 
-### E3. Evenementen: afscherming voor externen
+### ✅ E3. Evenementen: afscherming voor externen
 **P2 · code · beslist: B3**
 
 - **Raakt:** `apps/logistiek/app/materiaal/event-fields.tsx`,

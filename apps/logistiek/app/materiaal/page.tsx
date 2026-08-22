@@ -1,6 +1,6 @@
 import { LoginGate } from '@/components/login-gate';
 import { PageShell } from '@/components/page-shell';
-import { getSession } from '@/lib/session';
+import { getSession, requestsAsExternal } from '@/lib/session';
 import {
   getCatalog,
   getLogistiekSettings,
@@ -20,12 +20,17 @@ export default async function MateriaalPage() {
     return <LoginGate variant="material" />;
   }
 
+  // Een externe (geen enkele groep) ziet geen evenementen en geen sjablonen
+  // (B3/E3): hij kan er toch niet aan koppelen, en de namen van de evenementen
+  // zijn werking van de kring. Ze worden hier al niet opgehaald, zodat ze ook
+  // niet in de HTML van de pagina belanden.
+  const external = requestsAsExternal(session);
   const [catalog, settings, content, templates, events] = await Promise.all([
     getCatalog(),
     getLogistiekSettings(),
     getPublicCopy(locale),
-    requestTemplates(),
-    selectableEvents(),
+    external ? Promise.resolve([]) : requestTemplates(),
+    external ? Promise.resolve([]) : selectableEvents(),
   ]);
 
   return (
@@ -55,7 +60,7 @@ export default async function MateriaalPage() {
           paymentNote={content.materialPaymentNote}
           userId={session.user.id}
           templates={templates}
-          events={eventOptions(events, locale)}
+          events={external ? undefined : eventOptions(events, locale)}
         />
       )}
     </PageShell>

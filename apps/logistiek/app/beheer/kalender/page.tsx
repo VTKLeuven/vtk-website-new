@@ -11,7 +11,16 @@ import {
 } from '@/lib/uitleen';
 import { activeVehicles, adminAgenda } from '@/lib/uitleen-server';
 import { KalenderFilters } from './kalender-filters';
-import { CALENDAR_KINDS, KIND_LABELS, type CalendarKind } from './kalender-kinds';
+import {
+  CALENDAR_KINDS,
+  CONTENT_DOTS,
+  CONTENT_KINDS,
+  CONTENT_LABELS,
+  KIND_LABELS,
+  contentKind,
+  type CalendarKind,
+  type ContentKind,
+} from './kalender-kinds';
 
 const DEFAULT_DAYS = 30;
 const PRESET_DAYS = [7, 30, 90];
@@ -76,6 +85,8 @@ export default async function BeheerKalenderPage({
     title: string;
     /** Wie het is en wat er meegaat. */
     detail: string;
+    /** Materiaal, flesserke of allebei; null bij een rit (F3). */
+    content: ContentKind | null;
     href: string;
   };
   const byDay = new Map<string, Entry[]>();
@@ -91,6 +102,12 @@ export default async function BeheerKalenderPage({
   const itemSummary = (lines: Array<{ quantity: number; itemName: string }>) =>
     lines.map((line) => `${line.quantity}× ${line.itemName}`).join(', ');
 
+  // Wat niet toegekend is (M3), gaat die dag ook niet mee; het hoort dus niet in
+  // de daglijst waarmee een shift de loods in stapt.
+  const grantedOf = (reservation: {
+    lines: Array<{ quantity: number; itemName: string; lineStatus: string }>;
+  }) => reservation.lines.filter((line) => line.lineStatus !== 'REJECTED');
+
   // Het dagdeel hoort bij de tags en niet in de detailregel: op een dag met acht
   // afhalingen is "namiddag" het eerste waarop je sorteert met je ogen.
   const partTag = (part: string | null) => {
@@ -103,7 +120,11 @@ export default async function BeheerKalenderPage({
       kind: 'afhaling',
       tags: [requesterLabel(reservation), ...partTag(reservation.pickupPart)],
       title: reservation.eventName,
-      detail: `${reservation.user.name}: ${itemSummary(reservation.lines)}`,
+      detail: `${reservation.user.name}: ${itemSummary([
+        ...grantedOf(reservation),
+        ...reservation.flesserkeLines,
+      ])}`,
+      content: contentKind({ ...reservation, lines: grantedOf(reservation) }),
       href: `/beheer/aanvragen/${reservation.id}`,
     });
   }
@@ -112,7 +133,11 @@ export default async function BeheerKalenderPage({
       kind: 'terugbrengen',
       tags: [requesterLabel(reservation), ...partTag(reservation.returnPart)],
       title: reservation.eventName,
-      detail: `${reservation.user.name}: ${itemSummary(reservation.lines)}`,
+      detail: `${reservation.user.name}: ${itemSummary([
+        ...grantedOf(reservation),
+        ...reservation.flesserkeLines,
+      ])}`,
+      content: contentKind({ ...reservation, lines: grantedOf(reservation) }),
       href: `/beheer/aanvragen/${reservation.id}`,
     });
   }
@@ -126,6 +151,7 @@ export default async function BeheerKalenderPage({
       detail: `${timeFormatter.format(booking.startAt)}-${timeFormatter.format(booking.endAt)} · ${booking.user.name} · ${
         booking.driver ? `chauffeur: ${booking.driver.name}` : 'nog geen chauffeur'
       }`,
+      content: null,
       href: '/beheer/vervoer',
     });
   }
@@ -166,6 +192,26 @@ export default async function BeheerKalenderPage({
         to={toDateInputValue(to)}
         presetDays={presetDays}
       />
+
+      {/* Legende (F3): de kleuren zeggen niets zonder sleutel, en die sleutel
+          hoort bij de kalender en niet in iemands hoofd. */}
+      <p className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-vtk-muted">
+        {CONTENT_KINDS.map((kind) => (
+          <span key={kind} className="inline-flex items-center gap-1.5">
+            <span aria-hidden="true" className={`h-2 w-2 rounded-full ${CONTENT_DOTS[kind]}`} />
+            {CONTENT_LABELS[kind]}
+          </span>
+        ))}
+        <span className="inline-flex items-center gap-1.5">
+          <span
+            aria-hidden="true"
+            className="inline-block rounded-full bg-vtk-navy px-1.5 py-0.5 text-[9px] font-semibold text-white"
+          >
+            Transport
+          </span>
+          rit met een voertuig
+        </span>
+      </p>
 
       <div className="flex flex-wrap items-baseline justify-between gap-3">
         <h2 className="text-lg font-semibold tracking-tight text-vtk-ink">
@@ -217,6 +263,17 @@ export default async function BeheerKalenderPage({
                       </span>
                       <span className="min-w-0">
                         <span className="flex flex-wrap items-center gap-2 font-medium text-vtk-ink">
+                          {/* Materiaal of flesserke, met hetzelfde bolletje als in
+                              de legende hierboven (F3). */}
+                          {entry.content ? (
+                            <span className="inline-flex items-center gap-1.5 rounded-full bg-vtk-paper-2 px-2 py-0.5 text-[11px] font-semibold text-vtk-navy">
+                              <span
+                                aria-hidden="true"
+                                className={`h-2 w-2 rounded-full ${CONTENT_DOTS[entry.content]}`}
+                              />
+                              {CONTENT_LABELS[entry.content]}
+                            </span>
+                          ) : null}
                           {entry.tags.map((tag) => (
                             <span
                               key={tag}

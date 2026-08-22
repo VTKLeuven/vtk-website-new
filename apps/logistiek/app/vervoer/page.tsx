@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { LoginGate } from '@/components/login-gate';
 import { PageShell } from '@/components/page-shell';
-import { getSession } from '@/lib/session';
+import { getSession, requestsAsExternal } from '@/lib/session';
 import { copy, getLocale } from '@/lib/i18n';
 import { eventOptions, pricingModeLabel, formatEuro } from '@/lib/uitleen';
 import { activeVehicles, selectableEvents } from '@/lib/uitleen-server';
@@ -17,10 +17,13 @@ export default async function VervoerPage() {
   }
   const en = locale === 'en';
 
+  // Zelfde regel als bij materiaal (B3/E3): een externe krijgt de evenementen
+  // niet te zien, en ze worden hier dus ook niet opgehaald.
+  const external = requestsAsExternal(session);
   const [vehicles, content, events] = await Promise.all([
     activeVehicles(),
     getPublicCopy(locale),
-    selectableEvents(),
+    external ? Promise.resolve([]) : selectableEvents(),
   ]);
 
   return (
@@ -43,7 +46,7 @@ export default async function VervoerPage() {
             rateCents: v.rateCents,
           }))}
           draftKey={`vervoer:${session.user.id}`}
-          events={eventOptions(events, locale)}
+          events={external ? undefined : eventOptions(events, locale)}
         />
 
         <aside className="h-fit rounded-[18px] border border-vtk-navy/10 bg-vtk-surface p-6">

@@ -15,3 +15,39 @@ export const KIND_LABELS: Record<CalendarKind, string> = {
   terugbrengen: 'Terugbrengen',
   vervoer: 'Transport',
 };
+
+/**
+ * Waar de aanvraag over gaat: materiaal, flesserke of allebei (F3).
+ *
+ * Dit staat los van `CalendarKind`: dat zegt wát er die dag gebeurt (afhalen,
+ * terugbrengen, rijden), dit zegt waarover het gaat. Zes soorten maken van de
+ * kalender een kleurenwaaier; twee dimensies naast elkaar houden ze leesbaar.
+ */
+export const CONTENT_KINDS = ['materiaal', 'flesserke', 'beide'] as const;
+
+export type ContentKind = (typeof CONTENT_KINDS)[number];
+
+export const CONTENT_LABELS: Record<ContentKind, string> = {
+  materiaal: 'Materiaal',
+  flesserke: 'Flesserke',
+  beide: 'Materiaal + flesserke',
+};
+
+/** De kleur van het bolletje voor die inhoud; de legende gebruikt dezelfde. */
+export const CONTENT_DOTS: Record<ContentKind, string> = {
+  materiaal: 'bg-vtk-navy',
+  flesserke: 'bg-vtk-yellow',
+  beide: 'bg-gradient-to-r from-vtk-navy to-vtk-yellow',
+};
+
+export function contentKind(reservation: {
+  lines: Array<unknown>;
+  flesserkeLines: Array<unknown>;
+}): ContentKind | null {
+  const material = reservation.lines.length > 0;
+  const drinks = reservation.flesserkeLines.length > 0;
+  if (material && drinks) return 'beide';
+  if (material) return 'materiaal';
+  if (drinks) return 'flesserke';
+  return null;
+}

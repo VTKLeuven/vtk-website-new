@@ -34,6 +34,9 @@ type SessionLike = { user: { id: string; name: string }; groups: Array<{ id: str
  * Leidt het aanvragertype automatisch af uit de gekozen groep in de login. Een
  * praesidiumpost wordt INTERN; een werkgroep behoudt het aparte WERKGROEP-type;
  * wie geen groep heeft vraagt EXTERN aan met de eigen naam.
+ *
+ * `requestsAsExternal` in lib/session.ts volgt dezelfde regel, maar dan vooraf:
+ * wie extern aanvraagt, krijgt de evenementen en sjablonen niet te zien.
  */
 async function deriveMemberRequester(
   session: SessionLike,

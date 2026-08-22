@@ -1458,6 +1458,9 @@ export async function selectableEvents(): Promise<
 export async function adminAgenda(from: Date, to: Date) {
   const agendaReservationInclude = {
     lines: true,
+    // Voor de kalender moet zichtbaar zijn of het om materiaal, flesserke of
+    // allebei gaat (F3); dat blijkt enkel uit welke lijnen er zijn.
+    flesserkeLines: { select: { id: true, quantity: true, itemName: true } },
     user: { select: { name: true } },
     group: { select: { nameNl: true } },
   } satisfies Prisma.UitleenReservationInclude;
