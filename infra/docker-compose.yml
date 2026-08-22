@@ -509,7 +509,14 @@ services:
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER:-vtk}:${POSTGRES_PASSWORD:-vtk}@postgres:5432/${VAULT_DB:-vaultwarden}
       DOMAIN: ${VAULT_PUBLIC_URL:-https://wachtwoorden.vtk.be}
-      SIGNUPS_ALLOWED: "false"
+      # Beide staan bewust op een env-variabele met een veilige standaard: bij
+      # het opzetten moet je het botaccount kunnen aanmaken, en dat kan niet
+      # wanneer aanmelden uit staat en SSO_ONLY je naar een OAuth-client stuurt
+      # die nog niet bestaat. Zet in .env tijdelijk VAULT_SIGNUPS_ALLOWED=true en
+      # VAULT_SSO_ONLY=false, doorloop de opzet uit docs/wachtwoorden.md, en zet
+      # ze daarna terug. Dit hoort in .env en niet in dit bestand, want de deploy
+      # doet `git reset --hard` en gooit een lokale wijziging hier dus weg.
+      SIGNUPS_ALLOWED: ${VAULT_SIGNUPS_ALLOWED:-false}
       INVITATIONS_ALLOWED: "true"
       # Groepen zijn de koppeling post -> groep -> collection waar deze hele
       # integratie op draait; zonder dit bestaan ze niet.
@@ -517,10 +524,10 @@ services:
       # Bespaart het lid een klik op een uitnodigingsmail: eenmaal inloggen met
       # VTK volstaat, de sync bevestigt daarna.
       ORGANIZATION_INVITE_AUTO_ACCEPT: "true"
-      SSO_ENABLED: "true"
+      SSO_ENABLED: ${VAULT_SSO_ENABLED:-true}
       # Enkel SSO: een tweede aanmeldweg met een los wachtwoord zou de
       # 15-juli-reset omzeilen, want die hangt aan het VTK-account.
-      SSO_ONLY: "true"
+      SSO_ONLY: ${VAULT_SSO_ONLY:-true}
       SSO_AUTHORITY: ${VAULT_SSO_AUTHORITY:-https://vtk.be/api/auth/better}
       SSO_CLIENT_ID: ${VAULT_SSO_CLIENT_ID:-}
       SSO_CLIENT_SECRET: ${VAULT_SSO_CLIENT_SECRET:-}

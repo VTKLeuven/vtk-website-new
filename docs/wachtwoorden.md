@@ -80,10 +80,21 @@ dezelfde fout maken):
 
 ## Opzetten
 
+0. **Database.** Vaultwarden krijgt een eigen database op onze Postgres, en die
+   maakt Postgres niet vanzelf aan:
+   `docker exec infra-postgres-1 psql -U vtk -c 'CREATE DATABASE vaultwarden;'`
+   Zonder dit herstart de container in een lus.
+
 1. **Container.** `infra/docker-compose.yml` heeft de service en de
    `vault-worker`; `infra/compose.dev.yml` heeft een lokale variant op
    `http://localhost:8222` (zonder SSO, anders sluit `SSO_ONLY` je buiten voor de
    OAuth-client bestaat).
+
+   **Zet bij de allereerste start `VAULT_SIGNUPS_ALLOWED=true` en
+   `VAULT_SSO_ONLY=false` in `.env`.** Anders kan je stap 2 niet doen: aanmelden
+   staat uit en SSO stuurt je naar een client die nog niet bestaat. Zet ze leeg
+   zodra stap 5 werkt. Doe dat in `.env` en niet in de compose: de deploy doet
+   `git reset --hard origin/main` en gooit een wijziging daar weg.
 
 2. **Botaccount.** Maak één account aan (`vault-bot@vtk.be`) en laat het de
    organisatie aanmaken; het is dan eigenaar. **Zet het KDF op PBKDF2**, niet op
@@ -125,7 +136,19 @@ dezelfde fout maken):
   niets met de client-id te maken had.
 
 - **`SSO_ONLY` sluit ook jou buiten.** Zet het pas aan wanneer de OAuth-client
-  bestaat en werkt, anders raak je niet meer aan het botaccount.
+  bestaat en werkt, anders raak je niet meer aan het botaccount. Daarom staat het
+  op `${VAULT_SSO_ONLY:-true}` en niet hard in de compose: op de server wordt elke
+  lokale wijziging aan een getrackt bestand bij de volgende deploy weggegooid.
+
+- **Een uitnodiging is de echte poort, niet de OAuth-client.** Met
+  `SIGNUPS_ALLOWED=false` weigert Vaultwarden een SSO-login van wie nog geen
+  account heeft; er is geen zelfbediening. De RESTRICTED-client is het tweede
+  slot, en dat is geen overdaad: er zijn bugs geweest waarbij SSO-aanmeldingen
+  tóch doorgingen terwijl aanmelden uit stond.
+
+- **Blijf voorlopig op 1.35.1.** In 1.35.5/1.35.6 brak het automatisch aanmaken
+  en aanmelden via SSO (issue 7086). Test een upgrade eerst lokaal met de
+  compose-variant uit `compose.dev.yml`.
 
 - **Zonder `ORG_GROUPS_ENABLED=true` bestaan groepen niet**, en dan valt de hele
   koppeling post → groep → collection weg. De API geeft dan geen duidelijke fout.

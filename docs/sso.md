@@ -413,10 +413,16 @@ redirect-URI `https://<kluis>/identity/connect/oidc-signin`, scopes
 `openid profile email offline_access`, toegangsmodus **RESTRICTED** met
 `vault.access`.
 
-Die restrictie doet echt werk. Vaultwarden maakt bij een eerste SSO-login vanzelf
-een account aan op e-mailmatch, dus zonder poort zou elk lid met een VTK-account
-zich daar een kluis kunnen aanmaken. De poort staat aan onze kant, niet aan de
-hunne. En omdat Vaultwarden op de `email`-claim matcht, is dat het universitaire
-adres: de sync moet leden op datzelfde adres uitnodigen. Zie
-`docs/wachtwoorden.md`.
+De eerste rem is de uitnodiging, niet deze poort: met `SIGNUPS_ALLOWED=false`
+wordt een SSO-login van iemand die nog geen (uitgenodigd) account heeft, gewoon
+geweigerd. De sync nodigt uit, dus wie geen gekoppelde post heeft, raakt niet
+binnen.
+
+De RESTRICTED-poort staat er als tweede slot, en dat is geen overdaad: in
+Vaultwarden zijn er meermaals bugs geweest waarbij SSO-aanmeldingen tóch
+doorgingen terwijl aanmelden uit stond (issues 6604 en 6651). Eén van de twee
+sloten mag stukgaan zonder dat er een kluis openstaat.
+
+Omdat Vaultwarden op de `email`-claim matcht, is dat het universitaire adres: de
+sync moet leden op datzelfde adres uitnodigen. Zie `docs/wachtwoorden.md`.
 
