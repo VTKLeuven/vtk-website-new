@@ -293,9 +293,13 @@ available roles but not auto-assigned to any post. Your seeded admin account is 
 
 ## Wachtwoordkluis
 
-De kluis (`docs/wachtwoorden.md`) voegt drie permissies toe: `vault.access` is de
-toegangspoort van de OAuth-client, `vault.editOwn` laat je de wachtwoorden van je
-eigen post beheren, `vault.manage` is het IT-beheer. Hang `vault.access` als
-DEFAULT-grant aan de rollen van de gekoppelde posten: dan volgt de toegang tot de
-kluis vanzelf de 15-juli-reset, zonder aparte administratie.
+De kluis (`docs/wachtwoorden.md`) voegt twee permissies toe aan deze registry:
+`vault.editOwn` (de wachtwoorden van je eigen post beheren) en `vault.manage`
+(het IT-beheer).
+
+Wie de kluis mag **binnenlogen** staat hier bewust niet. Dat is `vault.access`,
+een **SSO-clientpermissie** uit het andere systeem (`SsoClientPermission`, zie
+`docs/sso.md`), toegekend per post of per rol in `/admin/sso/[clientId]`. Beide
+in de registry zetten zou twee dingen met dezelfde naam geven die elkaar niets
+aangaan; dan lijkt de toegang geregeld terwijl niemand binnen raakt.
 

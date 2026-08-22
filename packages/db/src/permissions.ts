@@ -97,8 +97,10 @@ export const PERMISSIONS = [
   // SSO / OAuth Authorization Server
   { code: "oauth.client.edit", labelNl: "OAuth-clients aanmaken en bewerken", labelEn: "Create and edit OAuth clients", category: "external" },
 
-  // Wachtwoordkluis (gedeelde wachtwoorden per post, in Vaultwarden)
-  { code: "vault.access", labelNl: "Toegang tot de wachtwoordkluis", labelEn: "Access to the password vault", category: "vault" },
+  // Wachtwoordkluis (gedeelde wachtwoorden per post, in Vaultwarden).
+  // Let op: wie de kluis mag binnenlogen staat NIET hier. Dat is een
+  // SSO-clientpermissie (`vault.access` in de namespace van de client), die je
+  // in /admin/roles onder "Externe apps" of per post toekent. Zie docs/sso.md.
   { code: "vault.editOwn", labelNl: "Wachtwoorden van de eigen post beheren", labelEn: "Manage own post's passwords", category: "vault" },
   { code: "vault.manage", labelNl: "Wachtwoordkluis beheren (posten koppelen, synchroniseren)", labelEn: "Manage the password vault (link posts, synchronise)", category: "vault" },
 

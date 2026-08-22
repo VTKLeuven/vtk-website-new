@@ -44,8 +44,20 @@ backup meegaan.
 | `/admin/wachtwoorden/beheer` | IT: posten koppelen, sync-status per post en per lid        |
 | `/admin/it`                  | Superadmin: URL, organisatie, API-key en organisatiesleutel |
 
-Permissies: `vault.access` (de SSO-poort), `vault.editOwn` (eigen post beheren),
-`vault.manage` (koppelen en synchroniseren).
+Permissies, en let op dat het er **twee soorten** zijn:
+
+| Waar | Code | Wat |
+|---|---|---|
+| Permissieregistry (`packages/db/src/permissions.ts`) | `vault.editOwn` | Eigen postkluis beheren in de admin |
+| Permissieregistry | `vault.manage` | Posten koppelen, synchroniseren, configuratie |
+| **SSO-clientpermissie** (`/admin/sso`, per client) | `vault.access` | Mag inloggen bij de kluis |
+
+`vault.access` staat bewust **niet** in de registry: de toegangspoort van een
+RESTRICTED client leest `SsoClientPermission`, een andere tabel en een ander
+systeem (zie `docs/sso.md`). Ze in de registry zetten geeft twee codes met
+dezelfde naam die niets met elkaar te maken hebben, en dan lijkt de toegang
+geregeld terwijl er niemand binnen raakt. Toekennen doe je per post of per rol in
+`/admin/sso/[clientId]`.
 
 ---
 
@@ -111,8 +123,14 @@ dezelfde fout maken):
 4. **SSO.** Maak in `/admin/sso/nieuw` een client aan met redirect-URI
    `https://<kluis>/identity/connect/oidc-signin`, scopes
    `openid profile email offline_access`, toegangsmodus **RESTRICTED** met
-   `vault.access`. Hang `vault.access` als DEFAULT-grant aan de rollen van de
-   gekoppelde posten, dan beweegt de toegang mee met het werkingsjaar.
+   namespace `vault`. Ken de clientpermissie `vault.access` daarna toe **per
+   post** (of per rol) in `/admin/sso/[clientId]`; die toekenning volgt het
+   werkingsjaar en reset dus mee op 15 juli.
+
+   Vergeet daarnaast `vault.editOwn` niet in `/admin/roles`, anders raakt een lid
+   wel binnen in de kluis maar ziet het `/admin/wachtwoorden` niet. Bij VTK dekt
+   één toekenning aan de rol **Praesidium** vijftien posten; werkgroepen hebben
+   hun eigen rol. Superadmins merken dit niet, want die passeren elke check.
 
 5. **Posten koppelen** in `/admin/wachtwoorden/beheer`.
 
