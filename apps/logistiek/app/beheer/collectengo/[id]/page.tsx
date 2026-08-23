@@ -2,6 +2,9 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { requireManage } from '@/lib/session';
 import { collectEnGoOrderForImport } from '@/lib/collectengo/server';
+import { EventLink } from '@/components/event-link';
+import { eventOptions } from '@/lib/uitleen';
+import { selectableEvents } from '@/lib/uitleen-server';
 import { ImportOrderForm } from './import-form';
 
 export default async function BeheerCollectEnGoOrderPage({
@@ -11,14 +14,23 @@ export default async function BeheerCollectEnGoOrderPage({
 }) {
   await requireManage();
   const { id } = await params;
-  const view = await collectEnGoOrderForImport(id);
+  const [view, events] = await Promise.all([collectEnGoOrderForImport(id), selectableEvents()]);
   if (!view) notFound();
 
   return (
     <div className="grid gap-6">
-      <Link href="/beheer/collectengo" className="text-sm text-vtk-muted underline-offset-2 hover:underline">
-        ← Alle Collect&Go-bestellingen
-      </Link>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <Link href="/beheer/collectengo" className="text-sm text-vtk-muted underline-offset-2 hover:underline">
+          ← Alle Collect&Go-bestellingen
+        </Link>
+        {/* Bij welk evenement de boodschappen horen (E5), zodat ze mee op de
+            materiaallijst van dat evenement staan. */}
+        <EventLink
+          target={{ kind: 'collectengo', id: view.order.id }}
+          events={eventOptions(events)}
+          current={view.order.event}
+        />
+      </div>
       <ImportOrderForm
         order={{
           id: view.order.id,

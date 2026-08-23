@@ -561,6 +561,7 @@ model User {
   uitleenLinesPrepared    UitleenReservationLine[]  @relation("UitleenLinePreparedBy")
   uitleenTemplates        UitleenRequestTemplate[]  @relation("UitleenTemplateCreatedBy")
   uitleenEvents           UitleenEvent[]            @relation("UitleenEventCreatedBy")
+  uitleenEventExtraItems  UitleenEventExtraItem[]   @relation("UitleenEventExtraItemCreatedBy")
   uitleenTransport        UitleenTransportBooking[] @relation("UitleenTransportUser")
   uitleenTransportDriven  UitleenTransportBooking[] @relation("UitleenTransportDriver")
   uitleenTransportDecided UitleenTransportBooking[] @relation("UitleenTransportDecidedBy")
@@ -2497,9 +2498,37 @@ model UitleenEvent {
 
   reservations UitleenReservation[]
   transport    UitleenTransportBooking[]
+  extraItems   UitleenEventExtraItem[]
+  groceryOrders CollectEnGoOrder[]
 
   @@index([startAt])
   @@index([groupId])
+}
+
+/// Materiaal dat niet van Logistiek komt: het theokot, de vicepraeses, iemands
+/// eigen boxen. Puur informatief, zonder voorraadberekening.
+///
+/// Waarom het toch in het systeem staat: de materiaallijst die de dag zelf
+/// meegaat, moet compleet zijn. Stond de helft ervan in een spreadsheet of in
+/// een kop, dan is het blad aan het rek een half blad, en gaat er iets mis met
+/// precies dat deel dat niemand kon nalezen.
+model UitleenEventExtraItem {
+  id      String @id @default(cuid())
+  eventId String
+
+  /// Waar het vandaan komt: "Theokot", "Vicepraeses", "Eigen materiaal".
+  source   String
+  itemName String
+  quantity Int     @default(1)
+  note     String?
+
+  createdAt   DateTime @default(now())
+  createdById String?
+
+  event     UitleenEvent @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  createdBy User?        @relation("UitleenEventExtraItemCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@index([eventId])
 }
 
 /// Een vaste set materiaal die vaak samen gevraagd wordt (een cantus, een BBQ).
@@ -3057,11 +3086,18 @@ model CollectEnGoOrder {
   createdAt DateTime @default(now()) @db.Timestamptz(3)
   updatedAt DateTime @updatedAt @db.Timestamptz(3)
 
+  /// Bij welk evenement deze boodschappen horen (B1/E5). Optioneel: een
+  /// bestelling voor de kelder hangt aan niets. SetNull en geen cascade, want
+  /// een verwijderd evenement mag de bestelhistoriek niet meenemen.
+  eventId String?
+
   importedBy User?                  @relation("CollectEnGoImportedBy", fields: [importedById], references: [id], onDelete: SetNull)
+  event      UitleenEvent?          @relation(fields: [eventId], references: [id], onDelete: SetNull)
   lines      CollectEnGoOrderLine[]
 
   @@index([status, receivedAt])
   @@index([reservationNumber])
+  @@index([eventId])
 }
 
 /// Eén productlijn uit de mail, met wat het importscherm ervan maakte.

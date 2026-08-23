@@ -197,6 +197,40 @@ export async function importCollectEnGoOrderAction(_prev: SaveState, formData: F
 }
 
 /** Terzijde schuiven: de bestelling blijft staan, maar wacht niet meer. */
+/**
+ * Een bestelling aan een evenement hangen, of ervan losmaken (B1/E5).
+ *
+ * De import zelf blijft ongewijzigd: de mail bepaalt wat er besteld is, dit
+ * bepaalt enkel waar het bij hoort. Zo staan de boodschappen mee op de
+ * materiaallijst van dat evenement, en dat is het hele punt: één blad met alles
+ * wat er die dag moet zijn.
+ */
+export async function linkCollectEnGoOrderToEventAction(
+  orderId: string,
+  eventId: string | null
+): Promise<ActionResult> {
+  await requireManage();
+
+  const order = await prisma.collectEnGoOrder.findUnique({
+    where: { id: orderId },
+    select: { id: true },
+  });
+  if (!order) return { ok: false, error: 'Bestelling niet gevonden.' };
+
+  if (eventId) {
+    const event = await prisma.uitleenEvent.findUnique({
+      where: { id: eventId },
+      select: { id: true },
+    });
+    if (!event) return { ok: false, error: 'Evenement niet gevonden.' };
+  }
+
+  await prisma.collectEnGoOrder.update({ where: { id: order.id }, data: { eventId } });
+  revalidateCollectEnGo(order.id);
+  revalidatePath('/beheer/evenementen');
+  return { ok: true, message: eventId ? 'Gekoppeld aan het evenement.' : 'Losgekoppeld.' };
+}
+
 export async function ignoreCollectEnGoOrderAction(orderId: string): Promise<ActionResult> {
   await requireManage();
   const order = await prisma.collectEnGoOrder.findUnique({ where: { id: orderId }, select: { status: true } });

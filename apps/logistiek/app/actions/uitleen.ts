@@ -392,6 +392,86 @@ export async function saveMemberEventAction(input: {
   return { ok: true, message: 'Evenement bijgewerkt.' };
 }
 
+/**
+ * Materiaal noteren dat niet van Logistiek komt (E5): het theokot, de
+ * vicepraeses, iemands eigen boxen.
+ *
+ * Puur informatief, zonder voorraad. Het staat er zodat de materiaallijst die de
+ * dag zelf meegaat compleet is; stond de helft in een spreadsheet, dan gaat er
+ * mis met precies dat deel dat niemand kon nalezen.
+ */
+export async function addEventExtraItemAction(input: {
+  eventId: string;
+  source: string;
+  itemName: string;
+  quantity: string;
+  note?: string;
+}): Promise<ActionResult> {
+  const session = await requireSession();
+  const groupIds = session.groups.map((group) => group.id);
+
+  const event = await prisma.uitleenEvent.findFirst({
+    where: {
+      id: input.eventId,
+      OR: [
+        ...(groupIds.length > 0 ? [{ groupId: { in: groupIds } }] : []),
+        { createdById: session.user.id },
+      ],
+    },
+    select: { id: true },
+  });
+  if (!event) return { ok: false, error: 'Dit evenement is niet van jou.' };
+
+  const itemName = input.itemName.trim();
+  const source = input.source.trim();
+  if (!itemName) return { ok: false, error: 'Geef aan over welk materiaal het gaat.' };
+  if (!source) return { ok: false, error: 'Geef aan waar het vandaan komt.' };
+  const quantity = Number(input.quantity.trim() || '1');
+  if (!Number.isInteger(quantity) || quantity <= 0) {
+    return { ok: false, error: 'Het aantal moet een getal groter dan nul zijn.' };
+  }
+
+  await prisma.uitleenEventExtraItem.create({
+    data: {
+      eventId: event.id,
+      source: source.slice(0, 120),
+      itemName: itemName.slice(0, 200),
+      quantity,
+      note: (input.note ?? '').trim().slice(0, 300) || null,
+      createdById: session.user.id,
+    },
+  });
+
+  revalidatePath(`/evenementen/${event.id}`);
+  revalidatePath('/beheer/evenementen');
+  return { ok: true, message: 'Toegevoegd aan de materiaallijst.' };
+}
+
+/** Zo'n genoteerd stuk materiaal weer weghalen (E5). */
+export async function removeEventExtraItemAction(itemId: string): Promise<ActionResult> {
+  const session = await requireSession();
+  const groupIds = session.groups.map((group) => group.id);
+
+  const item = await prisma.uitleenEventExtraItem.findFirst({
+    where: {
+      id: itemId,
+      event: {
+        OR: [
+          ...(groupIds.length > 0 ? [{ groupId: { in: groupIds } }] : []),
+          { createdById: session.user.id },
+        ],
+      },
+    },
+    select: { id: true, eventId: true },
+  });
+  if (!item) return { ok: false, error: 'Dit item is niet van jou.' };
+
+  await prisma.uitleenEventExtraItem.delete({ where: { id: item.id } });
+  revalidatePath(`/evenementen/${item.eventId}`);
+  revalidatePath('/beheer/evenementen');
+  return { ok: true, message: 'Van de lijst gehaald.' };
+}
+
 export async function cancelReservationAction(reservationId: string): Promise<ActionResult> {
   const session = await requireSession();
 

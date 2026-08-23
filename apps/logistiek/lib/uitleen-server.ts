@@ -1354,12 +1354,20 @@ const eventInclude = {
       user: { select: { name: true } },
       lines: {
         select: {
+          id: true,
           quantity: true,
           itemName: true,
-          item: { select: { volumeLiters: true } },
+          note: true,
+          adminNote: true,
+          lineStatus: true,
+          // `volumeLiters` voor de ladingberekening, de plaats voor het
+          // afdrukbare blad per evenement (E4).
+          item: {
+            select: { volumeLiters: true, locationShelf: true, locationRack: true },
+          },
         },
       },
-      flesserkeLines: { select: { quantity: true, itemName: true } },
+      flesserkeLines: { select: { id: true, quantity: true, itemName: true } },
     },
   },
   transport: {
@@ -1373,6 +1381,21 @@ const eventInclude = {
       tripLeg: true,
       vehicle: { select: { nameNl: true } },
       driver: { select: { name: true } },
+    },
+  },
+  // Materiaal dat niet van Logistiek komt, en de boodschappen (E5). Ze hangen
+  // aan het evenement en niet aan een aanvraag: er is geen aanvraag voor iets
+  // dat je zelf meebrengt.
+  extraItems: { orderBy: [{ source: 'asc' as const }, { itemName: 'asc' as const }] },
+  groceryOrders: {
+    orderBy: { receivedAt: 'desc' as const },
+    select: {
+      id: true,
+      reservationNumber: true,
+      status: true,
+      pickupFrom: true,
+      pickupPoint: true,
+      lines: { select: { productName: true, quantityText: true, quantity: true, unit: true } },
     },
   },
 } satisfies Prisma.UitleenEventInclude;

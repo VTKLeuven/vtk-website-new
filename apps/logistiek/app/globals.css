@@ -1008,6 +1008,18 @@ select:focus {
     margin: 14mm;
   }
 
+  /* De materiaallijst per evenement (E4) is liggend: staand knipt ze de
+     notakolom af, en die nota is precies waarvoor het blad bestaat. Een
+     `@page`-regel geldt per benoemde pagina, dus het blad claimt er zelf een. */
+  .print-landscape {
+    page: landscape;
+  }
+
+  @page landscape {
+    size: A4 landscape;
+    margin: 12mm;
+  }
+
   .print-sheet {
     break-inside: avoid;
   }

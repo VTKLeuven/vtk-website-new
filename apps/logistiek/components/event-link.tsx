@@ -4,6 +4,7 @@ import { useState, useTransition } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { linkToEventAction } from '@/app/actions/beheer';
+import { linkCollectEnGoOrderToEventAction } from '@/app/actions/collectengo';
 import { useToast } from '@/components/ui/toast';
 import type { SelectableEvent } from '@/components/event-picker';
 
@@ -19,7 +20,8 @@ export function EventLink({
   events,
   current,
 }: {
-  target: { kind: 'reservation' | 'transport'; id: string };
+  /** Een aanvraag, een rit, of een Collect&Go-bestelling (E5). */
+  target: { kind: 'reservation' | 'transport' | 'collectengo'; id: string };
   events: SelectableEvent[];
   current: { id: string; name: string } | null;
 }) {
@@ -30,7 +32,10 @@ export function EventLink({
 
   function apply(eventId: string | null) {
     startTransition(async () => {
-      const result = await linkToEventAction(target, eventId);
+      const result =
+        target.kind === 'collectengo'
+          ? await linkCollectEnGoOrderToEventAction(target.id, eventId)
+          : await linkToEventAction({ kind: target.kind, id: target.id }, eventId);
       if (result.ok) {
         showToast({ message: result.message ?? 'Bijgewerkt.', variant: 'success' });
         setOpen(false);

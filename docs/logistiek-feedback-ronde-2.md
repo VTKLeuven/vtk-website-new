@@ -35,7 +35,7 @@ ook bij maar werd anders opgelost dan gevraagd; de reden staat bij de taak.
 | 3 | Materiaal: opmerkingen, deelgoedkeuring, sjablonen | M1–M8 | 🟡 M2, M6 open |
 | 4 | Vervoer: terminologie, goedkeuring, weekoverzicht | T1–T13 | 🟡 T2, T5, T7, T8 open |
 | 5 | Flesserke en kalender | F1–F3 | ✅ af |
-| 6 | Evenementen: post-overzicht, materiaallijst, C&G | E1–E7 | 🟡 E4, E5 open |
+| 6 | Evenementen: post-overzicht, materiaallijst, C&G | E1–E7 | ✅ af |
 
 ---
 
@@ -675,7 +675,7 @@ Alles hier is klein, zichtbaar en zonder (of met een minimale) migratie.
   2. Toon niet de lijst van alle evenementen aan externen.
 - **Klaar wanneer:** een externe ziet een eenvoudiger formulier.
 
-### E4. Afdrukbare materiaallijst per evenement (alles-in-één)
+### ✅ E4. Afdrukbare materiaallijst per evenement (alles-in-één)
 **P1 · code · groter**
 
 - **Raakt:** `apps/logistiek/app/beheer/evenementen/[id]/`,
@@ -699,7 +699,7 @@ Alles hier is klein, zichtbaar en zonder (of met een minimale) migratie.
      vrij tekstveld of apart model, zie E5).
 - **Klaar wanneer:** je print één blad per evenement met alles erop.
 
-### E5. Niet-logi materiaal en C&G op de materiaallijst
+### ✅ E5. Niet-logi materiaal en C&G op de materiaallijst
 **P2 · code · 🗄️ · 📝 · beslist: B1**
 
 - **Raakt:** `packages/db/prisma/schema.prisma`,

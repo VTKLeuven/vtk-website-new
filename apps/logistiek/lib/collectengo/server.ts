@@ -26,7 +26,12 @@ export type CollectEnGoOrderRow = Awaited<ReturnType<typeof collectEnGoOrders>>[
 export async function collectEnGoOrderForImport(id: string) {
   const order = await prisma.collectEnGoOrder.findUnique({
     where: { id },
-    include: { lines: { orderBy: { sortIndex: 'asc' } }, importedBy: { select: { name: true } } },
+    include: {
+      lines: { orderBy: { sortIndex: 'asc' } },
+      importedBy: { select: { name: true } },
+      // Bij welk evenement deze boodschappen horen (E5).
+      event: { select: { id: true, name: true } },
+    },
   });
   if (!order) return null;
 

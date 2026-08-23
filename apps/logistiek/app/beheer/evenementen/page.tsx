@@ -69,6 +69,13 @@ function EventCard({ event }: { event: AdminEvent }) {
             ) : null}
           </h3>
         </div>
+        {/* Eén blad met alles wat er die dag moet zijn (E4). */}
+        <Link
+          href={`/beheer/evenementen/${event.id}/print`}
+          className="rounded-full border border-vtk-navy/15 px-3.5 py-1.5 text-sm font-semibold text-vtk-ink transition hover:border-vtk-navy/40 hover:bg-vtk-paper"
+        >
+          Materiaallijst
+        </Link>
         <EventEditor
           event={{
             id: event.id,

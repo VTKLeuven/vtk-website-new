@@ -13,6 +13,7 @@ import {
 } from '@/lib/uitleen';
 import { memberEvent } from '@/lib/uitleen-server';
 import { getLocale } from '@/lib/i18n';
+import { EventExtraItems } from './extra-items';
 import { MemberEventForm } from './event-form';
 
 /**
@@ -70,6 +71,18 @@ export default async function EvenementDetailPage({
             expectedAttendance:
               event.expectedAttendance === null ? '' : String(event.expectedAttendance),
           }}
+        />
+
+        <EventExtraItems
+          eventId={event.id}
+          en={en}
+          items={event.extraItems.map((item) => ({
+            id: item.id,
+            source: item.source,
+            itemName: item.itemName,
+            quantity: item.quantity,
+            note: item.note,
+          }))}
         />
 
         {/* De nota van het team hoort hier thuis en niet in het formulier: ze
