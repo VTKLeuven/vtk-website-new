@@ -3,7 +3,7 @@
 import { revalidatePath } from 'next/cache';
 import { prisma } from '@vtk/db';
 import { requireSession } from '@/lib/session';
-import { isEmailish, parseDateOnly, todayDateOnly } from '@/lib/uitleen';
+import { isEmailish, isOnQuarterHour, parseDateOnly, todayDateOnly } from '@/lib/uitleen';
 import { availabilityForRange } from '@/lib/uitleen-server';
 import {
   buildReservationData,
@@ -14,6 +14,8 @@ import {
 import { buildTransportBookings, type TransportFormInput } from '@/lib/transport-form';
 import { expireOpenPayments, logistiekBaseUrl, paymentGateway } from '@/lib/payments';
 import { runSerializable } from '@/lib/tx';
+import { writeAudit } from '@/lib/audit';
+import { notifyReservation, notifyTransport } from '@/lib/uitleen-mail';
 
 export type ActionResult = { ok: true; message?: string } | { ok: false; error: string };
 // `ReservationFormInput` NIET her-exporteren vanuit dit `'use server'`-bestand:
@@ -152,20 +154,66 @@ export async function editReservationAction(
       select: { status: true },
     });
     if (!existing) return 'NOT_FOUND' as const;
-    if (existing.status !== 'REQUESTED') return 'LOCKED' as const;
+    // Bewerken mag ook na goedkeuring (M2), maar dan valt de goedkeuring weg:
+    // wie er een tafel bij zet, verandert wat het team beloofd heeft, en dat
+    // moet opnieuw langs de voorraadcheck. Vanaf het afhalen is het te laat; dan
+    // staat het materiaal al buiten.
+    if (existing.status !== 'REQUESTED' && existing.status !== 'APPROVED') {
+      return 'LOCKED' as const;
+    }
+    const wasApproved = existing.status === 'APPROVED';
     await tx.uitleenReservationLine.deleteMany({ where: { reservationId } });
     await tx.uitleenReservation.update({
       where: { id: reservationId },
-      data: { ...built.scalars, lines: { create: built.lineCreates } },
+      data: {
+        ...built.scalars,
+        lines: { create: built.lineCreates },
+        ...(wasApproved
+          ? {
+              status: 'REQUESTED' as const,
+              // `decidedAt` blijft bewust staan: samen met de status REQUESTED is
+              // dat het teken dat deze aanvraag al eens beslist was en nu opnieuw
+              // in de wachtrij staat. Zo hoeft de aanvragenlijst daarvoor geen
+              // historiek te bevragen. Bij de volgende goedkeuring wordt hij
+              // gewoon overschreven.
+              // De betaalwijze hoorde wel bij de vorige beslissing; het team
+              // kiest ze opnieuw. Een al betaalde aanvraag komt hier niet: die is
+              // niet bewerkbaar (zie `editable` op de detailpagina).
+              paymentMode: null,
+            }
+          : {}),
+      },
     });
-    return 'OK' as const;
+    if (wasApproved) {
+      await writeAudit(tx, { reservationId }, {
+        kind: 'STATUS_CHANGED',
+        fromStatus: 'APPROVED',
+        toStatus: 'REQUESTED',
+        note: 'Aangepast door de aanvrager; opnieuw te beslissen',
+        actorId: session.user.id,
+      });
+    }
+    return wasApproved ? ('REOPENED' as const) : ('OK' as const);
   });
   if (outcome === 'NOT_FOUND') return { ok: false, error: 'Reservatie niet gevonden.' };
   if (outcome === 'LOCKED') {
-    return { ok: false, error: 'Deze aanvraag is al beslist; bewerken kan niet meer. Neem contact op met Logistiek.' };
+    return { ok: false, error: 'Deze aanvraag is al afgehaald; bewerken kan niet meer. Neem contact op met Logistiek.' };
   }
 
   revalidateMember();
+  if (outcome === 'REOPENED') {
+    // Buiten de transactie: een mail over een wijziging die door een rollback
+    // niet doorging, is erger dan geen mail.
+    await notifyReservation(
+      reservationId,
+      'EDITED',
+      'De aanvraag is aangepast na de goedkeuring en moet opnieuw beslist worden.'
+    );
+    return {
+      ok: true,
+      message: 'Aanvraag bijgewerkt. Logistiek moet ze opnieuw goedkeuren.',
+    };
+  }
   return { ok: true, message: 'Aanvraag bijgewerkt.' };
 }
 
@@ -558,6 +606,100 @@ export async function createVanBookingAction(input: TransportFormInput & {
         ? 'Heen- en terugrit aangevraagd'
         : 'Rit aangevraagd';
   return { ok: true, message: `${what}. Je vindt de status bij Mijn aanvragen.` };
+}
+
+/**
+ * Je eigen rit aanpassen, ook nadat ze goedgekeurd is (T5, T13).
+ *
+ * Wat je mag wijzigen, is wat je zelf het best weet: de uren, waarvoor de rit
+ * dient en waar ze heen gaat. Het voertuig en de chauffeur blijven van het team;
+ * die hangen aan de planning van de hele week.
+ *
+ * Was ze goedgekeurd, dan valt die goedkeuring weg. De botsingscontrole gebeurt
+ * bij het goedkeuren, dus verschoven uren zonder nieuwe beslissing zouden twee
+ * ritten op hetzelfde moment kunnen zetten. Vanaf het afronden kan er niets meer
+ * aan: die rit is gereden.
+ */
+export async function editVanBookingAction(
+  bookingId: string,
+  input: {
+    startAt: string;
+    endAt: string;
+    purpose: string;
+    destination: string;
+    pickupAddress: string;
+  }
+): Promise<ActionResult> {
+  const session = await requireSession();
+
+  const purpose = input.purpose.trim();
+  if (!purpose) return { ok: false, error: 'Beschrijf waarvoor je het voertuig nodig hebt.' };
+
+  const startAt = parseBrusselsDateTime(input.startAt);
+  const endAt = parseBrusselsDateTime(input.endAt);
+  if (!startAt || !endAt) return { ok: false, error: 'Vul een geldig begin- en einduur in.' };
+  if (endAt <= startAt) return { ok: false, error: 'Het einduur ligt voor het beginuur.' };
+  if (!isOnQuarterHour(startAt) || !isOnQuarterHour(endAt)) {
+    return { ok: false, error: 'Kies uren op het kwartier (bv. 14:00, 14:15).' };
+  }
+
+  const outcome = await runSerializable(async (tx) => {
+    const existing = await tx.uitleenTransportBooking.findFirst({
+      where: { id: bookingId, userId: session.user.id },
+      select: { status: true },
+    });
+    if (!existing) return 'NOT_FOUND' as const;
+    if (existing.status !== 'REQUESTED' && existing.status !== 'APPROVED') {
+      return 'LOCKED' as const;
+    }
+    const wasApproved = existing.status === 'APPROVED';
+    await tx.uitleenTransportBooking.update({
+      where: { id: bookingId },
+      data: {
+        startAt,
+        endAt,
+        purpose: purpose.slice(0, 300),
+        destination: input.destination.trim().slice(0, 300) || null,
+        pickupAddress: input.pickupAddress.trim().slice(0, 300) || null,
+        ...(wasApproved
+          ? {
+              // Zie `editReservationAction`: `decidedAt` blijft staan als teken
+              // dat deze rit al eens beslist was.
+              status: 'REQUESTED' as const,
+              paymentMode: null,
+            }
+          : {}),
+      },
+    });
+    await writeAudit(tx, { transportBookingId: bookingId }, {
+      kind: wasApproved ? 'STATUS_CHANGED' : 'EDITED',
+      fromStatus: wasApproved ? 'APPROVED' : null,
+      toStatus: wasApproved ? 'REQUESTED' : null,
+      note: wasApproved
+        ? 'Aangepast door de aanvrager; opnieuw te beslissen'
+        : 'Aangepast door de aanvrager',
+      actorId: session.user.id,
+    });
+    return wasApproved ? ('REOPENED' as const) : ('OK' as const);
+  });
+
+  if (outcome === 'NOT_FOUND') return { ok: false, error: 'Rit niet gevonden.' };
+  if (outcome === 'LOCKED') {
+    return { ok: false, error: 'Deze rit is afgerond of geannuleerd; aanpassen kan niet meer.' };
+  }
+
+  revalidateMember();
+  revalidatePath('/beheer/vervoer');
+  revalidatePath('/beheer/vervoer/week');
+  if (outcome === 'REOPENED') {
+    await notifyTransport(
+      [bookingId],
+      'EDITED',
+      'De rit is aangepast na de goedkeuring en moet opnieuw beslist worden.'
+    );
+    return { ok: true, message: 'Rit bijgewerkt. Logistiek moet ze opnieuw goedkeuren.' };
+  }
+  return { ok: true, message: 'Rit bijgewerkt.' };
 }
 
 export async function cancelVanBookingAction(bookingId: string): Promise<ActionResult> {

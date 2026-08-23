@@ -429,6 +429,14 @@ export default async function BeheerVervoerPage() {
                               Levering
                             </span>
                           ) : null}
+                          {/* Al eens goedgekeurd en daarna aangepast door de
+                              aanvrager (T5): de uren waarover je beslist had,
+                              zijn niet meer de uren die er nu staan. */}
+                          {first.decidedAt ? (
+                            <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-900">
+                              Gewijzigd, opnieuw beslissen
+                            </span>
+                          ) : null}
                         </p>
                         <p className="mt-0.5 text-sm text-vtk-muted">
                           {requesterLabel(first)}

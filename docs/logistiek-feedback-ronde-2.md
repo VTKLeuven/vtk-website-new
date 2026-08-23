@@ -32,8 +32,8 @@ ook bij maar werd anders opgelost dan gevraagd; de reden staat bij de taak.
 | 0 | Beslissingen die eerst moeten vallen | 4 vragen | ✅ beslist |
 | 1 | Kleine bugs, UI-fixes en ergernissen | R1–R8 | 🟡 R5, R7 open |
 | 2 | Navigatie, lay-out en overzichten | N1–N5 | ✅ af |
-| 3 | Materiaal: opmerkingen, deelgoedkeuring, sjablonen | M1–M8 | 🟡 M2, M6 open |
-| 4 | Vervoer: terminologie, goedkeuring, weekoverzicht | T1–T13 | 🟡 T2, T5 open |
+| 3 | Materiaal: opmerkingen, deelgoedkeuring, sjablonen | M1–M8 | 🟡 M6 open |
+| 4 | Vervoer: terminologie, goedkeuring, weekoverzicht | T1–T13 | 🟡 T2 open |
 | 5 | Flesserke en kalender | F1–F3 | ✅ af |
 | 6 | Evenementen: post-overzicht, materiaallijst, C&G | E1–E7 | ✅ af |
 
@@ -294,7 +294,7 @@ Alles hier is klein, zichtbaar en zonder (of met een minimale) migratie.
 - **Klaar wanneer:** logi kan bij elk item een opmerking achterlaten die de
   aanvrager onderscheidt van zijn eigen opmerking.
 
-### M2. Aanvraag bewerken na goedkeuring (met hergoedkeuring)
+### ✅ M2. Aanvraag bewerken na goedkeuring (met hergoedkeuring)
 **P2 · code · 📝**
 
 - **Raakt:** `apps/logistiek/app/materiaal/reservation-form.tsx`,
@@ -458,7 +458,7 @@ Alles hier is klein, zichtbaar en zonder (of met een minimale) migratie.
 - **Klaar wanneer:** je ziet het evenement zonder uit te klappen, en er staan
   geen irrelevante bedragen.
 
-### T5. Rit bewerken na goedkeuring (met hergoedkeuring)
+### ✅ T5. Rit bewerken na goedkeuring (met hergoedkeuring)
 **P2 · code**
 
 - **Raakt:** `apps/logistiek/app/vervoer/request-form.tsx`,

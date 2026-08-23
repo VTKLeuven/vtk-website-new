@@ -204,6 +204,14 @@ export default async function BeheerAanvragenPage({
                 {kind}
               </span>
             ) : null}
+            {/* Al eens goedgekeurd en daarna aangepast door de aanvrager (M2):
+                die staat weer in de wachtrij, maar met een andere inhoud dan
+                waarover het team beslist had. */}
+            {reservation.status === 'REQUESTED' && reservation.decidedAt ? (
+              <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-900">
+                Gewijzigd, opnieuw beslissen
+              </span>
+            ) : null}
             {lastMinute ? (
               <span className="rounded-full bg-red-50 px-2 py-0.5 text-[11px] font-semibold text-red-700">
                 Last minute

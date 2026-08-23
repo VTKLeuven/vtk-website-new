@@ -72,7 +72,13 @@ export default async function ReservatieDetailPage({
   const rejectedLines = reservation.lines.filter((line) => line.lineStatus === 'REJECTED');
   const cancellable =
     isOwner && (reservation.status === 'REQUESTED' || reservation.status === 'APPROVED') && !paid;
-  const editable = isOwner && reservation.status === 'REQUESTED';
+  // Bewerken mag ook na de goedkeuring (M2); de goedkeuring valt dan wel weg.
+  // Niet meer zodra het materiaal betaald of afgehaald is: dan is de afspraak
+  // rond en staat het al buiten.
+  const editable =
+    isOwner &&
+    !paid &&
+    (reservation.status === 'REQUESTED' || reservation.status === 'APPROVED');
   // Een aanvraag is materiaal- of flesserke-type; de juiste editor volgt daaruit.
   const isFlesserke = reservation.flesserkeLines.length > 0 && reservation.lines.length === 0;
 
@@ -276,6 +282,16 @@ export default async function ReservatieDetailPage({
 
           {editable ? (
             <div className="mt-5 border-t border-vtk-navy/10 pt-4">
+              {/* Zeggen wat bewerken kost, vóór de klik (M2): wie na de
+                  goedkeuring nog een tafel bijzet, verandert wat het team
+                  beloofd heeft, en dat moet opnieuw langs de voorraadcheck. */}
+              {reservation.status === 'APPROVED' ? (
+                <p className="mb-3 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+                  {en
+                    ? 'This request is already approved. If you change it, Logistics has to approve it again.'
+                    : 'Deze aanvraag is al goedgekeurd. Pas je ze aan, dan moet Logistiek ze opnieuw goedkeuren.'}
+                </p>
+              ) : null}
               {isFlesserke ? (
                 <FlesserkeEditor
                   reservationId={reservation.id}

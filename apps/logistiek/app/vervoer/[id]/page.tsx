@@ -1,6 +1,7 @@
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import { cancelVanBookingAction } from '@/app/actions/uitleen';
+import { EditTripForm } from './edit-trip-form';
 import { CancelButton } from '@/components/cancel-button';
 import { LoginGate } from '@/components/login-gate';
 import { PageShell } from '@/components/page-shell';
@@ -9,7 +10,7 @@ import { VanStatusBadge } from '@/components/status-badge';
 import { reconcilePayments } from '@/lib/payments';
 import { getLocale } from '@/lib/i18n';
 import { getSession } from '@/lib/session';
-import { formatDateTime, formatPriceCents } from '@/lib/uitleen';
+import { formatDateTime, formatPriceCents, toDatetimeLocalValue } from '@/lib/uitleen';
 import { hasSucceededPayment, vanBookingForMember } from '@/lib/uitleen-server';
 
 export default async function VanBookingDetailPage({
@@ -159,6 +160,27 @@ export default async function VanBookingDetailPage({
           !paid ? (
             <div className="mt-5 border-t border-vtk-navy/10 pt-4">
               <PayButton target="van" id={booking.id} amountLabel={formatPriceCents(booking.priceCents, locale)} locale={locale} />
+            </div>
+          ) : null}
+
+          {/* Aanpassen mag ook na de goedkeuring (T5); die valt dan wel weg. Niet
+              meer zodra er betaald is of de rit gereden werd. */}
+          {isOwner &&
+          !paid &&
+          (booking.status === 'REQUESTED' || booking.status === 'APPROVED') ? (
+            <div className="mt-5 border-t border-vtk-navy/10 pt-4">
+              <EditTripForm
+                bookingId={booking.id}
+                approved={booking.status === 'APPROVED'}
+                locale={locale}
+                initial={{
+                  startAt: toDatetimeLocalValue(booking.startAt),
+                  endAt: toDatetimeLocalValue(booking.endAt),
+                  purpose: booking.purpose,
+                  destination: booking.destination ?? '',
+                  pickupAddress: booking.pickupAddress ?? '',
+                }}
+              />
             </div>
           ) : null}
 

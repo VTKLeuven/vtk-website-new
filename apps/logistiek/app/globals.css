@@ -726,8 +726,15 @@ body {
 
 .logistics-admin-request-row {
   display: grid;
-  grid-template-columns: minmax(180px, 1fr) minmax(120px, 0.65fr) minmax(200px, 1.1fr) minmax(210px, 1fr) auto;
-  gap: 20px;
+  /* Krappe minima met opzet: bij bredere kolommen loopt het raster over zodra
+     de beheerkolom smaller wordt (een laptopscherm, of een rij met een
+     selectievakje ernaast), en dan schuift de periode onder de statusbadge in
+     plaats van te wrappen. Essentiële informatie mag afbreken, niet verdwijnen. */
+  grid-template-columns:
+    minmax(150px, 1fr) minmax(100px, 0.65fr) minmax(170px, 1.1fr)
+    minmax(180px, 1fr) auto;
+  gap: 16px;
+  min-width: 0;
   align-items: center;
   padding: 16px 18px;
   border: 1px solid var(--line-2);
@@ -738,16 +745,12 @@ body {
     box-shadow 150ms ease;
 }
 
-/* Dezelfde rij, maar met een selectievakje ernaast voor de bulk-acties (N4).
-   Ze heeft dan een dertigtal pixels minder ruimte, en met de minima hierboven
-   loopt het raster over: de periode schuift dan onder de statusbadge in plaats
-   van te wrappen. Smallere minima, zodat de tekst afbreekt en niets verdwijnt. */
+/* Dezelfde rij met een selectievakje ernaast voor de bulk-acties (N4): nog een
+   dertigtal pixels minder ruimte, dus nog iets krappere minima. */
 .logistics-admin-request-row--selectable {
   grid-template-columns:
-    minmax(140px, 1fr) minmax(95px, 0.65fr) minmax(160px, 1.1fr)
-    minmax(170px, 1fr) auto;
-  gap: 16px;
-  min-width: 0;
+    minmax(130px, 1fr) minmax(90px, 0.65fr) minmax(150px, 1.1fr)
+    minmax(160px, 1fr) auto;
 }
 
 .logistics-admin-request-row:hover {
