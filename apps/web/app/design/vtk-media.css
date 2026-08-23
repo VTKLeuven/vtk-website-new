@@ -329,6 +329,10 @@
   transition:
     border-color 160ms ease,
     transform 160ms ease;
+  /* Op hover schuift de "open"-knop omhoog binnen deze kaart en verschuift de
+     kaart zelf; in Safari verliest de doos daardoor haar afronding. Zie de
+     uitleg bij `.vtk-immich-album-cover` in `vtk-immich-gallery.css`. */
+  -webkit-mask-image: -webkit-radial-gradient(white, black);
 }
 
 .vtk-media-magazine-card:hover {

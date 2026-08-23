@@ -1,4 +1,5 @@
 import type {
+  CollectEnGoOrderStatus,
   UitleenPricingMode,
   UitleenRequesterType,
   UitleenReservationStatus,
@@ -675,6 +676,18 @@ export function vanStatusLabel(
 ): string {
   return (locale === 'en' ? VAN_STATUS_LABELS_EN : VAN_STATUS_LABELS)[status];
 }
+
+/**
+ * De status van een Collect&Go-bestelling.
+ *
+ * Geen Engelse tegenhanger zoals bij de reservatie- en ritstatussen: Collect&Go
+ * bestaat enkel in het beheer, en dat is Nederlandstalig.
+ */
+export const GROCERY_STATUS_LABELS: Record<CollectEnGoOrderStatus, string> = {
+  NEW: 'Klaar om te importeren',
+  IMPORTED: 'Geïmporteerd',
+  IGNORED: 'Terzijde',
+};
 
 /** Statussen die voorraad innemen bij de beschikbaarheidsberekening. */
 export const STOCK_CONSUMING_STATUSES: UitleenReservationStatus[] = ['APPROVED', 'PICKED_UP'];

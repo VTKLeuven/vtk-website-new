@@ -25,6 +25,10 @@
   border-radius: 16px;
   background: var(--ink, #0a0f1f);
   color: var(--paper, #eff2f8);
+  /* De afspeelknop erin is getransformeerd en beweegt op hover; in Safari valt
+     de afronding van deze doos dan weg. Zie de uitleg bij
+     `.vtk-immich-album-cover` in `app/design/vtk-immich-gallery.css`. */
+  -webkit-mask-image: -webkit-radial-gradient(white, black);
 }
 
 .vtk-media-aftermovie-media,

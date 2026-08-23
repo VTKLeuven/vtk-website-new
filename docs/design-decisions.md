@@ -1703,6 +1703,15 @@ Wat daarbij vastligt:
   prijs en krijgt er ook geen: wat een bak gekost heeft, is een vraag over een
   aankoop, niet over de plank. De mail bewaart subtotaal, kortingen, leeggoed en
   de prijs per lijn, dus de kost per acti is later te maken zonder migratie.
+- **Een gekoppelde bestelling is te zien op het evenement zelf.** De koppeling
+  (`CollectEnGoOrder.eventId`) zorgt ervoor dat de producten op de Materiaallijst
+  van dat evenement belanden, en die lijst is het punt van de koppeling. Ze stond
+  echter enkel daar: op `/beheer/evenementen` was niets te merken, dus je moest
+  afdrukken om te weten of de koppeling gelukt was. De evenementkaart toont nu een
+  vierde blok met reservatienummer, status, aantal producten en het afhaalmoment.
+  Enkel wanneer er een bestelling aan hangt, anders dan materiaal, flesserke en
+  transport: die drie zijn wat je voor een evenement aanvraagt en horen ook leeg
+  vermeld te staan, terwijl boodschappen bij de meeste evenementen niet horen.
 - **De notitie van de besteller gaat mee.** In Collect&Go typt de besteller er
   "Acti - livecantus" of "Ploeg - Cocktailworkshop - Theokot" bij. Dat is het enige
   spoor van waarvoor iets gekocht is; het staat in het importscherm en in de

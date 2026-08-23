@@ -11,7 +11,7 @@ import {
 import { ConfirmActionButton } from '@/components/ui/confirm-action-button';
 import { LogisticsIcon } from '@/components/logistics-icon';
 import { SaveForm } from '@/components/ui/save-form';
-import { formatEuro } from '@/lib/uitleen';
+import { GROCERY_STATUS_LABELS, formatEuro } from '@/lib/uitleen';
 
 export type InboxOrder = {
   id: string;
@@ -31,12 +31,6 @@ const PASTE_ERRORS = {
   EMPTY: 'Plak de mail of kies een .eml-bestand.',
   FILE_TOO_LARGE: 'Dat bestand is te groot; een mail blijft ruim onder 5 MB.',
   PARSE_FAILED: 'Deze mail kon niet gelezen worden als een Collect&Go-bevestiging.',
-};
-
-const STATUS_LABELS: Record<InboxOrder['status'], string> = {
-  NEW: 'Klaar om te importeren',
-  IMPORTED: 'Geïmporteerd',
-  IGNORED: 'Terzijde',
 };
 
 function dateTimeLabel(date: Date | null): string {
@@ -149,7 +143,7 @@ export function CollectEnGoInbox({
                   <Link href={`/beheer/collectengo/${order.id}`} className="text-base font-semibold text-vtk-ink underline-offset-2 hover:underline">
                     {order.reservationNumber}
                   </Link>
-                  <p className="text-xs text-vtk-muted">{STATUS_LABELS[order.status]}</p>
+                  <p className="text-xs text-vtk-muted">{GROCERY_STATUS_LABELS[order.status]}</p>
                 </div>
                 <p className="text-sm font-medium text-vtk-ink">{order.totalCents !== null ? formatEuro(order.totalCents) : '-'}</p>
               </div>
@@ -197,7 +191,7 @@ export function CollectEnGoInbox({
                   <td className="py-2.5 pr-3 tabular-nums text-vtk-body">{order.totalCents !== null ? formatEuro(order.totalCents) : '-'}</td>
                   <td className="py-2.5 pr-3 tabular-nums text-vtk-body">{dateTimeLabel(order.receivedAt)}</td>
                   <td className="py-2.5 pr-3">
-                    <span className="text-vtk-body">{STATUS_LABELS[order.status]}</span>
+                    <span className="text-vtk-body">{GROCERY_STATUS_LABELS[order.status]}</span>
                     {order.importedAt ? (
                       <span className="block text-xs text-vtk-muted">
                         {dateTimeLabel(order.importedAt)}{order.importedByName ? ` door ${order.importedByName}` : ''}

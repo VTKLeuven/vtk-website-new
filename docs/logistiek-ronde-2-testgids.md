@@ -81,7 +81,7 @@ Inloggen doe je op `/test-login` (werkt omdat `LOGISTIEK_TEST_LOGIN=true` in
 | **F3** Materiaal of flesserke in de kalender | `/beheer/kalender` | Bolletje en label per regel, met een legende erboven. Niet toegekend materiaal staat er niet meer bij. |
 | **E2** Evenement met einde, uur optioneel | `/beheer/evenementen` | Startdag en startuur staan apart; het uur mag leeg. Er is een einddag en einduur. Sorteren op datum, naam of post. |
 | **E4** Eén blad met alles | `/beheer/evenementen`, knop "Materiaallijst" | Liggend A4 met logi-materiaal (plaats, nota's, vinkvakjes), materiaal van elders, flesserke, de Collect&Go-bestelling en de ritten. |
-| **E5** Collect&Go aan een evenement hangen | `/beheer/collectengo/<id>`, rechtsboven | "Aan een evenement koppelen". De boodschappen staan daarna op de materiaallijst van dat evenement. |
+| **E5** Collect&Go aan een evenement hangen | `/beheer/collectengo/<id>`, rechtsboven | "Aan een evenement koppelen". De boodschappen staan daarna op de materiaallijst van dat evenement, en de bestelling verschijnt als vierde blok op de evenementkaart in `/beheer/evenementen`. |
 | **M6** Thumbnail bijsnijden | `/beheer/materiaal`, item met foto bewerken | Onder de thumbnail staat "Bijsnijden": sleep en zoom tot het juiste stuk in het 4:3-kader staat. De originele foto blijft in de galerij; het bijgesneden beeld wordt een nieuwe thumbnail. **Dit is het enige punt dat ik niet heb kunnen doorklikken** (de browserautomatisering bleef hangen op dat scherm), dus kijk hier zeker zelf naar. |
 
 ## 4. De transportplanning: `/beheer/vervoer/week`

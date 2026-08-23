@@ -1,5 +1,9 @@
 import Link from 'next/link';
-import { ReservationStatusBadge, VanStatusBadge } from '@/components/status-badge';
+import {
+  GroceryStatusBadge,
+  ReservationStatusBadge,
+  VanStatusBadge,
+} from '@/components/status-badge';
 import { requireManage } from '@/lib/session';
 import {
   formatDateOnly,
@@ -13,7 +17,8 @@ import { adminEvents, eventLoad, type AdminEvent } from '@/lib/uitleen-server';
 import { EventEditor } from './event-editor';
 
 /**
- * Alles van één evenement naast elkaar: materiaal, flesserke en vervoer.
+ * Alles van één evenement naast elkaar: materiaal, flesserke, vervoer en de
+ * boodschappen.
  *
  * Het vervangt niets. `/beheer/aanvragen` en `/beheer/vervoer` blijven de plek
  * waar je beslist; dit scherm beantwoordt één vraag die daar niet te stellen was:
@@ -225,6 +230,46 @@ function EventCard({ event }: { event: AdminEvent }) {
             </ul>
           )}
         </section>
+
+        {/* De boodschappen (E5). Enkel wanneer er een bestelling aan hangt, en
+            niet met een "Niets gekoppeld"-regel zoals de drie hierboven: die
+            drie zijn wat je voor een evenement aanvraagt, terwijl Collect&Go
+            uit een mail komt en bij de meeste evenementen niet hoort. Een vaste
+            vierde kolom die bijna altijd leeg is, zegt niets.
+
+            De koppeling was tot nu enkel op de Materiaallijst te zien, dus je
+            moest afdrukken om te weten of ze gelukt was. */}
+        {event.groceryOrders.length > 0 ? (
+          <section>
+            <h4 className="text-sm font-semibold text-vtk-ink">Collect&amp;Go</h4>
+            <ul className="mt-1 grid gap-2">
+              {event.groceryOrders.map((order) => (
+                <li key={order.id} className="text-sm">
+                  <Link
+                    href={`/beheer/collectengo/${order.id}`}
+                    className="flex flex-wrap items-center gap-2 hover:underline"
+                  >
+                    <GroceryStatusBadge status={order.status} />
+                    <span className="text-vtk-ink">{order.reservationNumber}</span>
+                  </Link>
+                  <p className="text-vtk-muted">
+                    {order.lines.length} {order.lines.length === 1 ? 'product' : 'producten'}
+                  </p>
+                  {/* Wanneer en waar af te halen: dat is het enige wat je op dit
+                      scherm over de bestelling moet weten. Zeventig productnamen
+                      uitschrijven zoals bij materiaal zou de kaart onleesbaar
+                      maken; daarvoor is de Materiaallijst er. */}
+                  <p className="text-vtk-muted">
+                    {order.pickupFrom
+                      ? `afhalen ${formatDateTime(order.pickupFrom)}`
+                      : 'afhaalmoment onbekend'}
+                    {order.pickupPoint ? ` · ${order.pickupPoint}` : ''}
+                  </p>
+                </li>
+              ))}
+            </ul>
+          </section>
+        ) : null}
       </div>
     </li>
   );

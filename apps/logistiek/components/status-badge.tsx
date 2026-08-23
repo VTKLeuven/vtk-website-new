@@ -1,5 +1,9 @@
-import type { UitleenReservationStatus, UitleenTransportBookingStatus } from '@prisma/client';
-import { reservationStatusLabel, vanStatusLabel } from '@/lib/uitleen';
+import type {
+  CollectEnGoOrderStatus,
+  UitleenReservationStatus,
+  UitleenTransportBookingStatus,
+} from '@prisma/client';
+import { GROCERY_STATUS_LABELS, reservationStatusLabel, vanStatusLabel } from '@/lib/uitleen';
 import type { LogistiekLocale } from '@/lib/i18n-shared';
 
 const STYLES: Record<string, string> = {
@@ -40,6 +44,26 @@ export function VanStatusBadge({
       className={`inline-flex items-center rounded-full border px-3 py-0.5 text-xs font-semibold ${STYLES[status]}`}
     >
       {vanStatusLabel(status, locale)}
+    </span>
+  );
+}
+
+/**
+ * Collect&Go kent maar één status die om werk vraagt; de andere twee zijn
+ * afgehandeld en krijgen daarom dezelfde ingetogen stijl als een afgeronde rit.
+ */
+const GROCERY_STYLES: Record<CollectEnGoOrderStatus, string> = {
+  NEW: STYLES.REQUESTED,
+  IMPORTED: STYLES.COMPLETED,
+  IGNORED: STYLES.CANCELLED,
+};
+
+export function GroceryStatusBadge({ status }: { status: CollectEnGoOrderStatus }) {
+  return (
+    <span
+      className={`inline-flex items-center rounded-full border px-3 py-0.5 text-xs font-semibold ${GROCERY_STYLES[status]}`}
+    >
+      {GROCERY_STATUS_LABELS[status]}
     </span>
   );
 }

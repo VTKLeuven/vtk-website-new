@@ -941,6 +941,10 @@
   border: 1px solid rgba(255, 255, 255, 0.14);
   border-radius: 16px;
   background: rgba(255, 255, 255, 0.06);
+  /* De poster schaalt op hover, en dan laat Safari de afronding van deze doos
+     vallen. Zie de uitleg bij `.vtk-immich-album-cover` in
+     `vtk-immich-gallery.css`. */
+  -webkit-mask-image: -webkit-radial-gradient(white, black);
 }
 
 .vtk-design .am-media {

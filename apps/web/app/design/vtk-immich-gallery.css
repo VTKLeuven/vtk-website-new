@@ -13,6 +13,19 @@
   text-decoration: none;
 }
 
+/*
+ * Safari knipt een afgeronde `overflow: hidden`-doos niet meer bij zodra er een
+ * getransformeerd kind in zit: dat kind krijgt een eigen compositielaag, en die
+ * laag erft de afronding niet. Zichtbaar gevolg: hier vliegen de ronde hoeken
+ * eruit op het moment dat je hovert (de foto schaalt dan), en enkel in Safari.
+ *
+ * Een dekkend masker legt de afronding alsnog op de laag. Het is alfa-gebaseerd
+ * en wit en zwart zijn allebei volledig ondoorzichtig, dus er verandert niets
+ * aan wat je ziet; het masker bestaat enkel om WebKit opnieuw te laten knippen.
+ *
+ * Zelfde recept in `vtk-media.css` bij de magazinekaart. Kom je dit elders
+ * tegen, kijk dan eerst of er op hover iets transformeert binnen de doos.
+ */
 .vtk-immich-album-cover {
   position: relative;
   display: block;
@@ -21,6 +34,7 @@
   border: 1px solid var(--line);
   border-radius: 18px;
   background: var(--paper-2);
+  -webkit-mask-image: -webkit-radial-gradient(white, black);
 }
 
 .vtk-immich-album-cover img {
@@ -455,6 +469,8 @@
   border-radius: 14px;
   background: var(--paper-2);
   cursor: zoom-in;
+  /* De foto schaalt op hover; zie de uitleg bij .vtk-immich-album-cover. */
+  -webkit-mask-image: -webkit-radial-gradient(white, black);
 }
 
 .vtk-immich-photo-button:focus-visible,
