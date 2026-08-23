@@ -1859,12 +1859,19 @@ export async function approveTransportAction(
       const booking = await tx.uitleenTransportBooking.findUnique({ where: { id: bookingId } });
       if (!booking) return { error: 'NOT_FOUND' as const };
 
-      const legs = booking.tripGroupId
-        ? await tx.uitleenTransportBooking.findMany({
-            where: { tripGroupId: booking.tripGroupId },
-            orderBy: { startAt: 'asc' },
-          })
-        : [booking];
+      // Standaard beslist het team over de hele aanvraag: heen zonder terug
+      // laat iemand ter plaatse staan. Maar soms kan de heenrit wel en moet de
+      // terugrit nog verschuiven, en dan is de heenrit alvast vastleggen beter
+      // dan allebei laten hangen (T2). Vandaar een expliciete keuze in het
+      // formulier in plaats van stilzwijgend één van de twee.
+      const separate = String(formData.get('scope') ?? '') === 'single';
+      const legs =
+        booking.tripGroupId && !separate
+          ? await tx.uitleenTransportBooking.findMany({
+              where: { tripGroupId: booking.tripGroupId },
+              orderBy: { startAt: 'asc' },
+            })
+          : [booking];
       if (legs.some((leg) => leg.status !== 'REQUESTED')) return { error: 'NOT_REQUESTED' as const };
 
       const groupIds = legs.map((leg) => leg.id);

@@ -1,5 +1,7 @@
 'use client';
 
+import { useState } from 'react';
+
 import type { UitleenRequesterType } from '@prisma/client';
 import { SaveForm } from '@/components/ui/save-form';
 import { chargesRequester } from '@/lib/uitleen';
@@ -60,8 +62,11 @@ export function TransportDecisionForms({
   sameDayBookings?: string[];
 }) {
   // Meerdere ritten in één aanvraag: heen en terug (V12), meerdere voertuigen
-  // (V1), of allebei. Ze worden altijd samen beslist.
+  // (V1), of allebei. Standaard beslist het team over alles samen; wie enkel
+  // deze rit wil vastleggen, zegt dat expliciet (T2).
   const multiple = legs.length > 1;
+  const [separate, setSeparate] = useState(false);
+  const decidingAll = multiple && !separate;
   // Een post of werkgroep betaalt niets (R4), dus de keuze tussen online en ter
   // plaatse betalen is daar zinloos.
   const charged = chargesRequester(requesterType);
@@ -70,18 +75,43 @@ export function TransportDecisionForms({
     <div className="grid gap-4">
       <SaveForm
         action={approveTransportAction}
-        submitLabel={multiple ? `Alle ${legs.length} ritten goedkeuren` : 'Goedkeuren'}
+        submitLabel={decidingAll ? `Alle ${legs.length} ritten goedkeuren` : 'Goedkeuren'}
         savingLabel="Goedkeuren..."
-        savedMessage={multiple ? 'Alle ritten van deze aanvraag goedgekeurd.' : 'Rit goedgekeurd.'}
+        savedMessage={
+          decidingAll ? 'Alle ritten van deze aanvraag goedgekeurd.' : 'Rit goedgekeurd.'
+        }
         errorMessages={APPROVE_ERRORS}
         className="grid gap-3 rounded-[14px] border border-vtk-navy/10 bg-vtk-paper p-4"
       >
         <input type="hidden" name="bookingId" value={bookingId} />
+        <input type="hidden" name="scope" value={separate ? 'single' : 'group'} />
         <p className="text-sm font-semibold text-vtk-ink">Goedkeuren</p>
+
+        {/* Heen en terug apart kunnen beslissen (T2): soms kan de heenrit wel en
+            moet de terugrit nog verschuiven. Standaard uit, want heen zonder
+            terug laat iemand ter plaatse staan. */}
+        {multiple ? (
+          <label className="flex items-start gap-2 text-sm">
+            <input
+              type="checkbox"
+              checked={separate}
+              onChange={(event) => setSeparate(event.target.checked)}
+              className="mt-0.5 h-4 w-4"
+            />
+            <span>
+              Enkel deze rit beslissen
+              <span className="mt-0.5 block text-xs text-vtk-muted">
+                De andere {legs.length - 1} rit{legs.length - 1 > 1 ? 'ten' : ''} van deze aanvraag
+                {legs.length - 1 > 1 ? ' blijven' : ' blijft'} openstaan. Let op dat de aanvrager
+                niet zonder terugrit valt.
+              </span>
+            </span>
+          </label>
+        ) : null}
 
         {/* De uren staan in het formulier, niet vast: twee aanvragen voor dezelfde
             kar passen vaak samen na een halfuur schuiven. */}
-        {legs.map((leg) => (
+        {(separate ? legs.filter((leg) => leg.id === bookingId) : legs).map((leg) => (
           <div key={leg.id} className="grid gap-2 sm:grid-cols-2">
             {leg.label ? (
               <p className="text-xs font-semibold uppercase tracking-wide text-vtk-muted sm:col-span-2">

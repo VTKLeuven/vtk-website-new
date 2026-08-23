@@ -1768,9 +1768,13 @@ terug (V12). Bij twee voertuigen én een terugrit zijn dat er vier.
   is dit voertuig bezet" (de conflictcheck, de kalender, het weekoverzicht, het
   publieke bezettingsraster) leest één rij per voertuig per tijdvenster. Een lijst
   zou al die queries moeten aanpassen.
-- **Ze worden altijd samen beslist.** Eén voertuig goedkeuren en het andere laten
-  hangen, levert een verhuis op die half kan doorgaan. Goedkeuren, afwijzen en
-  annuleren werken al op de hele groep.
+- **Ze worden standaard samen beslist.** Eén voertuig goedkeuren en het andere
+  laten hangen, levert een verhuis op die half kan doorgaan. Goedkeuren, afwijzen
+  en annuleren werken dus op de hele groep. *Sinds feedbackronde 2 kan het team
+  wel expliciet "enkel deze rit beslissen" aanvinken: soms kan de heenrit al
+  vast en moet de terugrit nog verschuiven, en dan is de heenrit vastleggen
+  beter dan allebei laten hangen. Het vinkje staat standaard uit en zegt erbij
+  dat de aanvrager anders zonder terugrit valt.*
 - **Tarief per voertuig gesnapshot.** De kar is gratis en de auto per kilometer;
   de prijsindicatie telt de vaste tarieven op en zegt van de per-km-voertuigen dat
   ze pas na de rit gekend zijn.

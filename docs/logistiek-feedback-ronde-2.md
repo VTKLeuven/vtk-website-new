@@ -33,7 +33,7 @@ ook bij maar werd anders opgelost dan gevraagd; de reden staat bij de taak.
 | 1 | Kleine bugs, UI-fixes en ergernissen | R1–R8 | 🟡 R5, R7 open |
 | 2 | Navigatie, lay-out en overzichten | N1–N5 | ✅ af |
 | 3 | Materiaal: opmerkingen, deelgoedkeuring, sjablonen | M1–M8 | 🟡 M6 open |
-| 4 | Vervoer: terminologie, goedkeuring, weekoverzicht | T1–T13 | 🟡 T2 open |
+| 4 | Vervoer: terminologie, goedkeuring, weekoverzicht | T1–T13 | ✅ af |
 | 5 | Flesserke en kalender | F1–F3 | ✅ af |
 | 6 | Evenementen: post-overzicht, materiaallijst, C&G | E1–E7 | ✅ af |
 
@@ -422,7 +422,7 @@ Alles hier is klein, zichtbaar en zonder (of met een minimale) migratie.
   tenzij er een goede reden is.
 - **Klaar wanneer:** de UI zegt overal "transport" waar het team dat verwacht.
 
-### T2. Heen- en terugrit apart goedkeuren
+### ✅ T2. Heen- en terugrit apart goedkeuren
 **P2 · code**
 
 - **Raakt:** `apps/logistiek/app/beheer/vervoer/transport-decision-forms.tsx`,
