@@ -105,6 +105,24 @@ het lidmaatschap volgt, en hoe je de koppeling opzet. Lees zeker "Vallen waar we
 in gelopen zijn" voor je aan `apps/web/lib/vault` komt; die punten falen
 grotendeels stil. De kringkeuzes staan in `docs/design-decisions.md`.
 
+# MCP-server voor agents
+
+`docs/mcp.md` is de referentie voor het MCP-endpoint op `/api/mcp`, waarmee een
+coding agent de site kan lezen en nieuwe records kan aanmaken. Lees dit voor je
+aan `apps/web/lib/mcp` komt. De grens is bewust hard: **enkel reads en expliciete
+create-kinds**, geen update, upsert, publish, delete, generieke Prisma-toegang of
+operationele neveneffecten (mail, betalingen, reservaties, deuren). Nieuwe records
+worden waar het model het toelaat geforceerd draft, verborgen, inactief, gesloten
+of uitgeschakeld aangemaakt.
+
+- Elke permissie uit `packages/db/src/permissions.ts` heeft een expliciete
+  policy in `lib/mcp/policy.ts`; de typecheck faalt zodra iemand een permissie
+  toevoegt zonder die MCP-beslissing te maken.
+- Een leesresource geeft **nooit** een geheim terug. Bouw een `Setting`-filter op
+  uit de allowlist in `lib/mcp/read.ts` in plaats van een `key` uit de request
+  over te nemen: die tabel bevat naast redactionele blokken ook `s3.config`,
+  `vault.config`, `door.config` en `brevo.lists`.
+
 # Styling Guidelines
 
 Use `design/new-design.html` as the visual source of truth for VTK surfaces.
