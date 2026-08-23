@@ -4,6 +4,7 @@ import { cancelVanBookingAction } from '@/app/actions/uitleen';
 import { EditTripForm } from './edit-trip-form';
 import { CancelButton } from '@/components/cancel-button';
 import { LoginGate } from '@/components/login-gate';
+import { MarkSeen } from '@/components/mark-seen';
 import { PageShell } from '@/components/page-shell';
 import { PayButton } from '@/components/pay-button';
 import { VanStatusBadge } from '@/components/status-badge';
@@ -55,6 +56,10 @@ export default async function VanBookingDetailPage({
       }
       title="Transport"
     >
+      {/* Zie de reservatiedetail: het merkteken "Gewijzigd" verdwijnt zodra je
+          de rit zelf bekeken hebt (R5). */}
+      {isOwner ? <MarkSeen target="transport" id={booking.id} /> : null}
+
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
         <section className="rounded-[18px] border border-vtk-navy/10 bg-vtk-surface p-6">
           <div className="flex flex-wrap items-center justify-between gap-3">

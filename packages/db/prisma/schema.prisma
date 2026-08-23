@@ -2669,6 +2669,14 @@ model UitleenReservation {
   returnedAt   DateTime?
   returnedById String?
 
+  /// Wanneer de aanvrager deze aanvraag zelf laatst open had staan.
+  ///
+  /// Voor het merkteken "Logistiek heeft hier iets aan gewijzigd" (R5): alles in
+  /// de historiek dat ná dit moment door iemand anders geschreven werd, heeft de
+  /// aanvrager nog niet gezien. Eén kolom op de aanvraag en geen tabel per
+  /// lezer: het gaat om de aanvrager, en die is er maar één.
+  requesterSeenAt DateTime?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -2861,6 +2869,9 @@ model UitleenTransportBooking {
   decidedById   String?
   completedAt   DateTime?
   completedById String?
+
+  /// Zie `UitleenReservation.requesterSeenAt` (R5).
+  requesterSeenAt DateTime?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

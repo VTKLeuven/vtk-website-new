@@ -13,7 +13,7 @@ import {
   formatPriceCents,
   todayDateOnly,
 } from '@/lib/uitleen';
-import { myReservations, myVanBookings } from '@/lib/uitleen-server';
+import { myReservations, myVanBookings, unseenChanges } from '@/lib/uitleen-server';
 import { copy, getLocale } from '@/lib/i18n';
 import type { LogistiekLocale } from '@/lib/i18n-shared';
 
@@ -159,6 +159,18 @@ function DeliveryNote({
   );
 }
 
+/**
+ * "Gewijzigd" (R5): Logistiek raakte deze aanvraag aan sinds jij ze laatst
+ * bekeek. Verdwijnt zodra je ze opent.
+ */
+function ChangedBadge({ en }: { en: boolean }) {
+  return (
+    <span className="rounded-full bg-vtk-yellow px-2 py-0.5 text-[11px] font-semibold text-vtk-ink">
+      {en ? 'Changed' : 'Gewijzigd'}
+    </span>
+  );
+}
+
 /** Ingeklapte "Afgelopen"-groep met een teller in de samenvatting (R2). */
 function PastGroup({ count, en, children }: { count: number; en: boolean; children: ReactNode }) {
   if (count === 0) return null;
@@ -208,6 +220,26 @@ export default async function ReservatiesPage({
   const materialRequests = reservations.filter((reservation) => reservation.lines.length > 0);
   const drinkRequests = reservations.filter(
     (reservation) => reservation.lines.length === 0 && reservation.flesserkeLines.length > 0
+  );
+
+  // Wat Logistiek wijzigde sinds jij het laatst bekeek (R5). Enkel voor je eigen
+  // aanvragen: een collega uit je post ziet zijn eigen merktekens.
+  const changed = await unseenChanges(
+    session.user.id,
+    {
+      reservationIds: reservations
+        .filter((reservation) => reservation.user.id === session.user.id)
+        .map((reservation) => reservation.id),
+      transportBookingIds: vanBookings
+        .filter((booking) => booking.user.id === session.user.id)
+        .map((booking) => booking.id),
+    },
+    new Map([
+      ...reservations.map(
+        (reservation) => [reservation.id, reservation.requesterSeenAt] as const
+      ),
+      ...vanBookings.map((booking) => [booking.id, booking.requesterSeenAt] as const),
+    ])
   );
 
   // R2: lopend versus afgelopen, per sectie. "Vandaag" telt nog als lopend.
@@ -268,7 +300,12 @@ export default async function ReservatiesPage({
           </>
         }
         requester={requestedBy(reservation.user)}
-        status={<ReservationStatusBadge status={reservation.status} locale={locale} />}
+        status={
+          <span className="flex flex-wrap items-center gap-1.5">
+            <ReservationStatusBadge status={reservation.status} locale={locale} />
+            {changed.has(reservation.id) ? <ChangedBadge en={en} /> : null}
+          </span>
+        }
         labels={rowLabels}
       />
       <DeliveryNote reservation={reservation} en={en} locale={locale} />
@@ -283,7 +320,12 @@ export default async function ReservatiesPage({
         contents={itemSummary(reservation.flesserkeLines, en)}
         period={formatDateWithPart(reservation.pickupDate, reservation.pickupPart, locale)}
         requester={requestedBy(reservation.user)}
-        status={<ReservationStatusBadge status={reservation.status} locale={locale} />}
+        status={
+          <span className="flex flex-wrap items-center gap-1.5">
+            <ReservationStatusBadge status={reservation.status} locale={locale} />
+            {changed.has(reservation.id) ? <ChangedBadge en={en} /> : null}
+          </span>
+        }
         labels={rowLabels}
       />
       <DeliveryNote reservation={reservation} en={en} locale={locale} />
@@ -328,7 +370,12 @@ export default async function ReservatiesPage({
             </>
           }
           requester={requestedBy(booking.user)}
-          status={<VanStatusBadge status={booking.status} locale={locale} />}
+          status={
+            <span className="flex flex-wrap items-center gap-1.5">
+              <VanStatusBadge status={booking.status} locale={locale} />
+              {changed.has(booking.id) ? <ChangedBadge en={en} /> : null}
+            </span>
+          }
           labels={{ ...rowLabels, contents: en ? 'Destination' : 'Bestemming' }}
         />
       </li>

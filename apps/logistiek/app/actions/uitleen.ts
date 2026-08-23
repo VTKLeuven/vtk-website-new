@@ -520,6 +520,35 @@ export async function removeEventExtraItemAction(itemId: string): Promise<Action
   return { ok: true, message: 'Van de lijst gehaald.' };
 }
 
+/**
+ * Onthouden dat de aanvrager deze aanvraag gezien heeft (R5).
+ *
+ * Loopt vanuit de detailpagina, niet vanuit een server component: een
+ * paginabezoek mag niets wegschrijven, en een GET die een kolom aanpast is
+ * precies wat een prefetch of een crawler ongewild kan doen.
+ *
+ * Alleen de aanvrager zelf: een collega uit dezelfde post die meekijkt, mag het
+ * merkteken niet voor hem wegnemen.
+ */
+export async function markReservationSeenAction(reservationId: string): Promise<void> {
+  const session = await requireSession();
+  await prisma.uitleenReservation.updateMany({
+    where: { id: reservationId, userId: session.user.id },
+    data: { requesterSeenAt: new Date() },
+  });
+  revalidatePath('/reservaties');
+}
+
+/** Zie {@link markReservationSeenAction}, maar dan voor een rit. */
+export async function markVanBookingSeenAction(bookingId: string): Promise<void> {
+  const session = await requireSession();
+  await prisma.uitleenTransportBooking.updateMany({
+    where: { id: bookingId, userId: session.user.id },
+    data: { requesterSeenAt: new Date() },
+  });
+  revalidatePath('/reservaties');
+}
+
 export async function cancelReservationAction(reservationId: string): Promise<ActionResult> {
   const session = await requireSession();
 

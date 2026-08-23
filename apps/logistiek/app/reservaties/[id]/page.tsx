@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { cancelReservationAction } from '@/app/actions/uitleen';
 import { CancelButton } from '@/components/cancel-button';
 import { LoginGate } from '@/components/login-gate';
+import { MarkSeen } from '@/components/mark-seen';
 import { PageShell } from '@/components/page-shell';
 import { PayButton } from '@/components/pay-button';
 import { ReservationStatusBadge } from '@/components/status-badge';
@@ -108,6 +109,10 @@ export default async function ReservatieDetailPage({
       }
       title={reservation.eventName}
     >
+      {/* Zodra je ze open hebt, is het merkteken "Gewijzigd" in de lijst
+          overbodig (R5). Enkel voor je eigen aanvraag. */}
+      {isOwner ? <MarkSeen target="reservation" id={reservation.id} /> : null}
+
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
         <section className="rounded-[18px] border border-vtk-navy/10 bg-vtk-surface p-6">
           <div className="flex flex-wrap items-center justify-between gap-3">

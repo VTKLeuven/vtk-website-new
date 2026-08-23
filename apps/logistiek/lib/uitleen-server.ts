@@ -496,6 +496,44 @@ export async function myReservations(userId: string, groupIds: string[] = []) {
 }
 
 /** Zoals `myReservations`: eigen ritten plus die van je posten. */
+/**
+ * Welke aanvragen en ritten iemand anders gewijzigd heeft sinds de aanvrager ze
+ * laatst bekeek (R5).
+ *
+ * De historiek is de bron: daar staat wie wat wanneer deed. Een vergelijking op
+ * `updatedAt` zou ook aanslaan op wat de aanvrager zelf net wijzigde, en op
+ * velden die niemand ziet.
+ */
+export async function unseenChanges(
+  userId: string,
+  targets: { reservationIds: string[]; transportBookingIds: string[] },
+  seenAt: Map<string, Date | null>
+): Promise<Set<string>> {
+  const ids = [...targets.reservationIds, ...targets.transportBookingIds];
+  if (ids.length === 0) return new Set();
+
+  const logs = await prisma.uitleenAuditLog.findMany({
+    where: {
+      OR: [
+        { reservationId: { in: targets.reservationIds } },
+        { transportBookingId: { in: targets.transportBookingIds } },
+      ],
+      // Wat het lid zelf deed, is geen nieuws voor hem.
+      NOT: { actorId: userId },
+    },
+    select: { reservationId: true, transportBookingId: true, createdAt: true },
+  });
+
+  const changed = new Set<string>();
+  for (const log of logs) {
+    const id = log.reservationId ?? log.transportBookingId;
+    if (!id) continue;
+    const seen = seenAt.get(id) ?? null;
+    if (seen === null || log.createdAt > seen) changed.add(id);
+  }
+  return changed;
+}
+
 export async function myVanBookings(userId: string, groupIds: string[] = []) {
   return prisma.uitleenTransportBooking.findMany({
     where:

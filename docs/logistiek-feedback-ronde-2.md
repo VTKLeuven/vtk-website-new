@@ -30,7 +30,7 @@ ook bij maar werd anders opgelost dan gevraagd; de reden staat bij de taak.
 | Fase | Inhoud | Taken | Status |
 | --- | --- | --- | --- |
 | 0 | Beslissingen die eerst moeten vallen | 4 vragen | ✅ beslist |
-| 1 | Kleine bugs, UI-fixes en ergernissen | R1–R8 | 🟡 R5 open |
+| 1 | Kleine bugs, UI-fixes en ergernissen | R1–R8 | ✅ af |
 | 2 | Navigatie, lay-out en overzichten | N1–N5 | ✅ af |
 | 3 | Materiaal: opmerkingen, deelgoedkeuring, sjablonen | M1–M8 | 🟡 M6 open |
 | 4 | Vervoer: terminologie, goedkeuring, weekoverzicht | T1–T13 | ✅ af |
@@ -122,7 +122,7 @@ Alles hier is klein, zichtbaar en zonder (of met een minimale) migratie.
   3. Leg de regel vast in `docs/design-decisions.md`: welke typen intern zijn.
 - **Klaar wanneer:** een postlid ziet bij zijn aanvraag geen bedrag.
 
-### R5. Wijzigingen door logi highlighten voor de aanvrager
+### ✅ R5. Wijzigingen door logi highlighten voor de aanvrager
 **P2 · code**
 
 - **Raakt:** `apps/logistiek/app/reservaties/page.tsx`,
