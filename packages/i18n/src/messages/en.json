@@ -344,6 +344,8 @@
     "door": "Door",
     "fakscanner": "Fakscanner",
     "mailinglists": "Mailing lists",
+    "mailGroups": "Group addresses",
+    "kiesploeg": "Kiesploeg",
     "vault": "Passwords",
     "vaultAdmin": "Vault management",
     "it": "IT",
@@ -749,6 +751,10 @@
     "confirmStudy": {
       "title": "Confirm your studies",
       "description": "Confirm your programme for this working year."
+    },
+    "linkVtkAccount": {
+      "title": "Link your VTK account",
+      "description": "Sign in once with your VTK account so you end up in your post's mailing lists."
     },
     "ticketOrder": {
       "title": "My order",

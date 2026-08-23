@@ -1,5 +1,6 @@
 "use server";
 
+import { after } from "next/server";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
@@ -15,6 +16,7 @@ import { saveError, saveOk, type SaveState } from "@/lib/saveState";
 import { currentWorkingYear } from "@/lib/workingYear";
 import { eraseUserData } from "@/lib/privacy/account";
 import { describeChanges, logAudit } from "@/lib/audit";
+import { pushMailGroupsForGroup } from "@/lib/google/sync";
 
 /** `P2002` op een bepaald veld: de unieke constraint die Prisma noemt. */
 function isUniqueViolation(err: unknown, field: string): boolean {
@@ -194,6 +196,17 @@ function revalidateMembershipSurfaces(userId?: string) {
   revalidatePath("/werkgroepen");
 }
 
+/**
+ * Duwt een lidmaatschapswijziging meteen door naar de groepsadressen in Google
+ * Workspace. Best-effort en enkel voor het huidige werkingsjaar: een vooruit
+ * ingevoerde postverdeling verandert nu nog niets aan wie er in de lijst hoort,
+ * en die kantelt op 15 juli vanzelf mee (zie lib/google/sync.ts).
+ */
+function pushGroupAddresses(groupId: string, year: number): void {
+  if (year !== currentWorkingYear()) return;
+  after(() => pushMailGroupsForGroup(groupId));
+}
+
 export async function addMembershipAction(formData: FormData): Promise<void> {
   const groupId = String(formData.get("groupId") ?? "");
   await requireMembershipManager(groupId);
@@ -232,6 +245,7 @@ export async function addMembershipAction(formData: FormData): Promise<void> {
     } in ${parsed.year}-${String(parsed.year + 1).slice(-2)}`,
   });
   revalidateMembershipSurfaces(parsed.userId);
+  pushGroupAddresses(parsed.groupId, parsed.year);
 }
 
 export async function removeMembershipAction(formData: FormData): Promise<void> {
@@ -259,6 +273,7 @@ export async function removeMembershipAction(formData: FormData): Promise<void> 
           membership.year + 1,
         ).slice(-2)}`,
       });
+      pushGroupAddresses(membership.groupId, membership.year);
     }
   }
   revalidateMembershipSurfaces(userId || undefined);
@@ -323,6 +338,9 @@ export async function bulkImportUsersAction(formData: FormData): Promise<{ ok: b
         if (!group) {
           errors.push(`Line ${i + 1}: unknown group ${groupCode}`);
         } else {
+          // Bewust geen push naar de groepsadressen per rij: bij een import van
+          // honderd leden zouden dat honderd rondjes naar Google zijn. De
+          // reconcile (elke vijf minuten) haalt het vanzelf in.
           // Leeg jaar in de CSV valt terug op het huidige werkingsjaar.
           const membershipYear = yearStr ? Number(yearStr) : currentWorkingYear();
           const membershipRole = (role?.toUpperCase() === "LEAD" ? "LEAD" : "MEMBER") as

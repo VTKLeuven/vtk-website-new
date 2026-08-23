@@ -344,6 +344,8 @@
     "door": "Deur",
     "fakscanner": "Fakscanner",
     "mailinglists": "Mailinglijsten",
+    "mailGroups": "Groepsadressen",
+    "kiesploeg": "Kiesploeg",
     "vault": "Wachtwoorden",
     "vaultAdmin": "Kluisbeheer",
     "it": "IT",
@@ -749,6 +751,10 @@
     "confirmStudy": {
       "title": "Studie bevestigen",
       "description": "Bevestig je opleiding voor dit werkingsjaar."
+    },
+    "linkVtkAccount": {
+      "title": "Koppel je VTK-account",
+      "description": "Meld je eenmalig aan met je VTK-account zodat je in de mailinglijsten van je post terechtkomt."
     },
     "ticketOrder": {
       "title": "Mijn bestelling",

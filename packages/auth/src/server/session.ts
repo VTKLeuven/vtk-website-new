@@ -108,6 +108,8 @@ export async function getSession(headers: Headers): Promise<SessionPayload | nul
       isSuperAdmin: user.isSuperAdmin,
       onboarded: user.onboardedAt !== null,
       studyConfirmedYear: user.studyConfirmedYear,
+      googleLinked: user.googleUserId !== null,
+      googleLinkDeferredAt: user.googleLinkDeferredAt?.toISOString() ?? null,
     },
     groups: user.memberships.map((membership) => ({
       id: membership.group.id,

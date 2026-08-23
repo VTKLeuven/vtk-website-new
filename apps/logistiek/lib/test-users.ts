@@ -203,6 +203,10 @@ export async function buildTestSession(key: TestUserKey): Promise<SessionPayload
       isSuperAdmin: p.isSuperAdmin,
       onboarded: true,
       studyConfirmedYear: currentWorkingYear(),
+      // Testgebruikers van de uitleendienst raken de Google-koppeling niet aan;
+      // "gekoppeld" houdt de koppelgate uit de weg.
+      googleLinked: true,
+      googleLinkDeferredAt: null,
     },
     groups: p.groups.flatMap((g) => {
       const row = byCode.get(g.code);
