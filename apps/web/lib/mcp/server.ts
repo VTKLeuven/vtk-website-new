@@ -139,8 +139,8 @@ const appReadSchema = schema<McpAdminReadInput>({
   type: "object",
   properties: {
     resource: { type: "string", enum: [...MCP_READ_RESOURCES] },
-    id: { type: "string", minLength: 1, maxLength: 160 },
-    search: { type: "string", minLength: 1, maxLength: 160 },
+    id: { type: "string", minLength: 1, maxLength: 160, description: "Eén record op id. Resources die meerdere collecties bundelen (theokot, piano, logistiek, door, fakscanner, module_access, vault_metadata, urenloop_app, mailing_lists) ondersteunen dit niet." },
+    search: { type: "string", minLength: 1, maxLength: 160, description: "Vrije zoekterm op de belangrijkste tekstvelden; niet beschikbaar op de gebundelde resources." },
     limit: { type: "integer", minimum: 1, maximum: 200, default: 100 },
     offset: { type: "integer", minimum: 0, maximum: 100000, default: 0 },
   },
@@ -154,7 +154,7 @@ const appCreateSchema = schema<McpCreateInput>({
     kind: { type: "string", enum: [...MCP_CREATE_KINDS] },
     data: {
       type: "object",
-      description: "Kind-specifieke velden. Roep eerst system_list_capabilities aan voor het exacte JSON Schema.",
+      description: "Kind-specifieke velden. Roep eerst system_list_capabilities aan: die geeft per kind de veldnamen, types, enumwaarden, grenzen en defaults.",
       additionalProperties: true,
     },
   },

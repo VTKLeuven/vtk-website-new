@@ -20,7 +20,9 @@ Configureer minstens `MCP_PERMISSIONS` of `MCP_ROLE_CODES`. Rechten van de
 bestaande databaserollen worden bij elke MCP-request opnieuw afgeleid en met de
 directe allowlist samengevoegd. `MCP_PERMISSIONS="*"` geeft bewust alle
 applicatiepermissies; gebruik dat alleen voor een afzonderlijke full-admin
-credential. `MCP_GROUP_CODES="*"` laat
+credential. `MCP_ROLE_CODES="*"` doet in de praktijk hetzelfde: het neemt de
+permissies van élke rol in de database over en koppelt élke rol als bewerkrol
+aan nieuwe pagina's. Noem de rollen dus liever op. `MCP_GROUP_CODES="*"` laat
 create-rechten voor elke groep toe; een corresponderend `*.manageAll`-recht
 omzeilt die groepsgrens sowieso.
 
@@ -53,12 +55,18 @@ een applicatiepermissie toevoegt zonder die MCP-beslissing te maken.
 Read-only:
 
 - `system_list_capabilities` toont de effectieve serviceaccount, elke canonieke
-  permissie, alle resources, alle create-kinds en hun invoervelden;
+  permissie, alle resources en alle create-kinds. Per veld komen ook het type,
+  de enumwaarden, de lengte- en getalgrenzen, het formaat en de default mee,
+  zodat een agent een create-call in één keer juist kan invullen;
 - `app_read` leest permission-scoped data over de volledige applicatie:
   gebruikers en groepen, CMS, kalender, tickets, formulieren, foto's, POC's,
   partners, dashboard, shortlinks, shiften, Theokot, vergaderingen,
   lesbezoeken, piano, logistiek, deur, fakscanner, OAuth, vaultmetadata,
-  auditlog, mailinglijsten en de 24UL-app;
+  auditlog, mailinglijsten en de 24UL-app. Resources die meerdere collecties in
+  één antwoord bundelen (`theokot`, `piano`, `logistiek`, `door`, `fakscanner`,
+  `module_access`, `vault_metadata`, `urenloop_app`, `mailing_lists`) hebben geen
+  `id`- of `search`-filter en antwoorden `FILTER_NOT_SUPPORTED` in plaats van
+  stilzwijgend alles terug te geven; blader daar met `limit` en `offset`;
 - de bestaande kalender- en site-readtools blijven als handige, getypeerde
   aliases bestaan wanneer de serviceaccount het betrokken domein mag lezen.
 
@@ -97,7 +105,10 @@ de minimale user-pickerdata, `shift.ranking` geen e-mailadressen, en
 formulierinzendingen, deurregistraties en gebruikersprofielen vereisen hun
 zwaardere beheerrechten. OAuth-secrets, sessie-/bearertokens, credential-hashes,
 Vaultwarden-wachtwoorden en gevoelige `Setting`-keys worden nooit teruggegeven,
-ook niet met `MCP_PERMISSIONS="*"`.
+ook niet met `MCP_PERMISSIONS="*"`. `editorial_settings` bouwt zijn sleutellijst
+op uit de allowlist in `lib/mcp/read.ts`; een `key` uit de request zou die
+allowlist overschrijven in plaats van ze te verfijnen, en `Setting` bevat ook
+`s3.config`, `vault.config`, `door.config` en `brevo.lists`.
 
 ## Netwerkbeveiliging
 
@@ -119,6 +130,26 @@ De bestaande VTK OAuth-provider wordt voorlopig niet als MCP-authorization
 server gebruikt. Hij schakelt RFC 8707 resource-audiences bewust uit wegens een
 upstream beveiligingsprobleem. Het MCP-token houdt die trust boundary apart in
 plaats van de OAuth-configuratie te versoepelen.
+
+## Vallen waar we in gelopen zijn
+
+- **Een `key` uit de request hoort nooit in het `Setting`-filter.** Het filter
+  stond als `{ key: { in: ALLOWLIST }, ...(id ? { key: id } : {}) }` geschreven;
+  door de spread wint de laatste `key` en verdween de allowlist. Een account met
+  enkel `openingHours.manageOwn` las daarmee `s3.config`. Bouw de sleutellijst
+  op uit de allowlist en filter erbinnen.
+- **Een menu-item mag naar een pad op deze site wijzen.** `header_link.url`
+  valideer je met `isEditableDestination` uit `lib/href.ts`, net als
+  `saveHeaderTabLink`. Met `z.string().url()` was `/praesidium` hier niet op te
+  slaan terwijl de renderer dat al aankan; dat liep in de admin ooit al eens uit
+  elkaar.
+- **Een filter dat niets doet, is erger dan geen filter.** De gebundelde
+  resources negeerden `search` stil en gaven een volledige lijst terug die er
+  gefilterd uitzag. Ze antwoorden nu `FILTER_NOT_SUPPORTED`.
+- **Validatiefouten uit gedeelde helpers moeten vertaald worden.**
+  `parseShift` gooit een eigen `ShiftValidationError`; zonder vertaling naar
+  `McpInputError` belandt een te vroege eindtijd als `INTERNAL_ERROR` in de
+  monitoring in plaats van als leesbare melding bij de agent.
 
 ## Uitbreiden
 

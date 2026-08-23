@@ -112,6 +112,19 @@ const SAFE_SETTING_KEYS = [
   "site.linkPage",
 ] as const;
 
+/** Resources die meerdere collecties samen teruggeven; `id` en `search` slaan er nergens op. */
+const UNFILTERABLE_RESOURCES: ReadonlySet<McpReadResource> = new Set([
+  "theokot",
+  "piano",
+  "logistiek",
+  "door",
+  "fakscanner",
+  "module_access",
+  "vault_metadata",
+  "urenloop_app",
+  "mailing_lists",
+]);
+
 function groupWhere(principal: McpPrincipal) {
   if (principal.allGroups) return undefined;
   return { code: { in: [...principal.groupCodes] } };
@@ -139,6 +152,15 @@ export async function adminRead(principal: McpPrincipal, raw: McpAdminReadInput)
   const input = inputSchema.parse(raw);
   if (!canReadMcpResource(principal, input.resource)) {
     throw new McpInputError("FORBIDDEN", `De MCP-serviceaccount mag ${input.resource} niet lezen.`);
+  }
+  if (UNFILTERABLE_RESOURCES.has(input.resource) && (input.id || input.search)) {
+    // Deze resources bundelen meerdere collecties in één antwoord. Een filter
+    // stilzwijgend negeren geeft een agent een volledige lijst terug die er
+    // uitziet als een gefilterd resultaat; zeg dus dat het filter niet bestaat.
+    throw new McpInputError(
+      "FILTER_NOT_SUPPORTED",
+      `${input.resource} bundelt meerdere collecties en ondersteunt geen id- of search-filter; blader met limit en offset.`,
+    );
   }
   const take = input.limit;
   const skip = input.offset;
@@ -357,11 +379,19 @@ export async function adminRead(principal: McpPrincipal, raw: McpAdminReadInput)
       return page(items, input);
     }
     case "editorial_settings": {
-      const items = await prisma.setting.findMany({
-        where: { key: { in: [...SAFE_SETTING_KEYS] }, ...(input.id ? { key: input.id } : {}), ...(contains ? { key: contains } : {}) },
-        take, skip, orderBy: { key: "asc" },
-      });
-      return page(items, input);
+      // De sleutellijst wordt hier opgebouwd, nooit uit de request overgenomen:
+      // `Setting` bevat naast redactionele blokken ook `s3.config`,
+      // `vault.config`, `door.config` en `brevo.lists`. Een `key`-filter uit de
+      // input zou de allowlist overschrijven in plaats van ze te verfijnen.
+      const requested = input.id ? [input.id] : [...SAFE_SETTING_KEYS];
+      const needle = input.search?.toLowerCase();
+      const keys = requested.filter((key): key is (typeof SAFE_SETTING_KEYS)[number] =>
+        (SAFE_SETTING_KEYS as readonly string[]).includes(key) && (!needle || key.toLowerCase().includes(needle)),
+      );
+      const items = keys.length
+        ? await prisma.setting.findMany({ where: { key: { in: keys } }, take, skip, orderBy: { key: "asc" } })
+        : [];
+      return { ...page(items, input), allowedKeys: [...SAFE_SETTING_KEYS] };
     }
     case "dashboard": {
       const items = await prisma.dashboardTile.findMany({
@@ -410,7 +440,7 @@ export async function adminRead(principal: McpPrincipal, raw: McpAdminReadInput)
       return { ...page([...totals.values()].sort((a, b) => b.earned - a.earned), input), partialAggregation: true };
     }
     case "theokot": {
-      const products = await prisma.theokotProduct.findMany({ where: input.id ? { id: input.id } : undefined, take, skip, orderBy: { order: "asc" } });
+      const products = await prisma.theokotProduct.findMany({ take, skip, orderBy: { order: "asc" } });
       const sessions = await prisma.theokotSession.findMany({ take, skip, orderBy: { date: "desc" }, include: { items: { orderBy: { order: "asc" } }, _count: { select: { orders: true } } } });
       const orders = await prisma.theokotOrder.findMany({ take, skip, orderBy: { createdAt: "desc" }, select: { id: true, sessionId: true, userId: true, status: true, totalCents: true, pickedUpAt: true, createdAt: true, updatedAt: true, user: { select: { name: true, email: true } }, lines: true } });
       const bans = await prisma.theokotBan.findMany({ take, skip, orderBy: { createdAt: "desc" }, include: { user: { select: { name: true, email: true } } } });

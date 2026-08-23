@@ -3,6 +3,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({
   roleFindMany: vi.fn(),
   pageCreate: vi.fn(),
+  tabFindUnique: vi.fn(),
+  linkCreate: vi.fn(),
   audit: vi.fn(),
 }));
 
@@ -10,12 +12,14 @@ vi.mock("@vtk/db", () => ({
   prisma: {
     role: { findMany: mocks.roleFindMany },
     page: { create: mocks.pageCreate },
+    headerTab: { findUnique: mocks.tabFindUnique },
+    headerTabLink: { create: mocks.linkCreate },
   },
 }));
 vi.mock("@/lib/audit", () => ({ logSystemAudit: mocks.audit }));
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 
-import { createMcpRecord } from "@/lib/mcp/create";
+import { createMcpRecord, listMcpCreateSchemas } from "@/lib/mcp/create";
 import { principalFromAuthInfo } from "@/lib/mcp/policy";
 
 function principal(permissions: string[]) {
@@ -74,5 +78,35 @@ describe("MCP brede create-catalogus", () => {
       data: { slug: "pagina", titleNl: "Pagina", publishedAt: new Date().toISOString() },
     })).rejects.toBeInstanceOf(Error);
     expect(mocks.pageCreate).not.toHaveBeenCalled();
+  });
+
+  it("aanvaardt een pad op deze site als bestemming voor een menu-item", async () => {
+    mocks.tabFindUnique.mockResolvedValue({ id: "tab-1", visible: false });
+    mocks.linkCreate.mockResolvedValue({ id: "link-1", url: "/praesidium" });
+
+    await createMcpRecord(principal(["header.manage"]), {
+      kind: "header_link",
+      data: { tabCode: "OVER", labelNl: "Praesidium", labelEn: "Board", url: "/praesidium" },
+    });
+    expect(mocks.linkCreate).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ url: "/praesidium" }),
+    }));
+
+    await expect(createMcpRecord(principal(["header.manage"]), {
+      kind: "header_link",
+      data: { tabCode: "OVER", labelNl: "Kwaad", labelEn: "Evil", url: "//evil.example" },
+    })).rejects.toBeInstanceOf(Error);
+  });
+
+  it("adverteert enumwaarden en grenzen zodat een agent niet moet gokken", () => {
+    const kinds = listMcpCreateSchemas(principal(["forms.create"]));
+    const field = kinds.find((kind) => kind.kind === "form_field")
+      ?.inputFields.find((entry) => entry.name === "type");
+    expect(field).toMatchObject({ type: "string", required: true });
+    expect(field?.enum).toContain("SHORT_TEXT");
+
+    const start = kinds.find((kind) => kind.kind === "calendar_event")
+      ?.inputFields.find((entry) => entry.name === "start");
+    expect(start).toMatchObject({ type: "string", format: "date-time" });
   });
 });

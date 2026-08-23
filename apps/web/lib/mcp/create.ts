@@ -7,7 +7,8 @@ import { prisma } from "@vtk/db";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { logSystemAudit, type AuditEntity } from "@/lib/audit";
-import { parseShift } from "@/lib/shift";
+import { isEditableDestination } from "@/lib/href";
+import { parseShift, ShiftValidationError } from "@/lib/shift";
 import {
   createCalendarCategory,
   createCalendarEvent,
@@ -104,11 +105,23 @@ const code = z.string().trim().min(1).max(80).regex(/^[a-zA-Z0-9](?:[a-zA-Z0-9._
 const isoMoment = z.string().datetime({ offset: true });
 const optionalText = (max: number) => z.string().trim().max(max).optional().nullable();
 const url = z.string().trim().url().max(2048);
+/**
+ * Een bestemming die een redacteur zelf intikt. `isEditableDestination` laat
+ * naast een volledig http(s)-adres ook een pad op deze site toe, precies zoals
+ * `saveHeaderTabLink` in `app/actions/pages.ts`. Met `z.string().url()` was een
+ * werkende bestemming als `/praesidium` hier niet op te slaan.
+ */
+const destination = z
+  .string()
+  .trim()
+  .min(1)
+  .max(2048)
+  .refine(isEditableDestination, "Gebruik een pad op deze site of een volledig http(s)-adres.");
 
 const schemas = {
   page: z.object({ slug, titleNl: z.string().trim().min(1).max(200), titleEn: optionalText(200) }).strict(),
   header_tab: z.object({ code, slug, labelNl: z.string().trim().min(1).max(100), labelEn: z.string().trim().min(1).max(100), externalUrl: url.optional().nullable() }).strict(),
-  header_link: z.object({ tabCode: code, labelNl: z.string().trim().min(1).max(160), labelEn: z.string().trim().min(1).max(160), url, order: z.number().int().min(0).max(999).default(0) }).strict(),
+  header_link: z.object({ tabCode: code, labelNl: z.string().trim().min(1).max(160), labelEn: z.string().trim().min(1).max(160), url: destination, order: z.number().int().min(0).max(999).default(0) }).strict(),
   announcement: z.object({ titleNl: z.string().trim().min(1).max(200), titleEn: z.string().trim().min(1).max(200), bodyNl: z.string().trim().min(1).max(20_000), bodyEn: z.string().trim().min(1).max(20_000), scope: z.enum(["HOME", "SITE"]).default("HOME") }).strict(),
   poc: z.object({ slug, nameNl: z.string().trim().min(1).max(160), nameEn: optionalText(160), email: z.string().email().optional().nullable(), descriptionNl: optionalText(10_000), descriptionEn: optionalText(10_000), studyProgrammes: z.array(z.enum(["ARCHITECTURE", "BIOMEDICAL", "COMMON_BACHELOR", "CIVIL", "CHEMICAL", "COMPUTER_SCIENCE", "CYBERSECURITY", "DIGITAL_HUMANITIES", "ELECTRICAL", "ENERGY", "ARTIFICIAL_INTELLIGENCE", "MATERIALS", "NANO", "URBANISM", "MATHEMATICAL", "MECHANICAL"])).default([]) }).strict(),
   partner: z.object({ name: z.string().trim().min(1).max(200), logoKey: z.string().trim().min(1).max(500), url: url.optional().nullable() }).strict(),
@@ -185,6 +198,88 @@ export function canCreateMcpKind(principal: McpPrincipal, kind: McpCreateKind): 
   return hasAnyMcpPermission(principal, CREATE_PERMISSIONS[kind]);
 }
 
+export type McpFieldShape = {
+  type: string;
+  enum?: readonly unknown[];
+  const?: unknown;
+  minLength?: number;
+  maxLength?: number;
+  minimum?: number;
+  maximum?: number;
+  integer?: true;
+  format?: string;
+  pattern?: string;
+  items?: McpFieldShape;
+};
+
+/**
+ * Beschrijft één veld zo dat een agent het in één keer juist kan invullen:
+ * enumwaarden, lengtes en formaten horen erbij. Enkel de naam en `ZodString`
+ * teruggeven laat de agent gokken naar bijvoorbeeld de toegelaten waarden van
+ * `form_field.type`, en dat kost telkens een mislukte create-call.
+ */
+function describeField(field: z.ZodTypeAny): McpFieldShape {
+  const def = field._def as Record<string, unknown> & { typeName?: string };
+  switch (def.typeName) {
+    case "ZodOptional":
+    case "ZodNullable":
+    case "ZodDefault":
+      return describeField(def.innerType as z.ZodTypeAny);
+    case "ZodEffects":
+      return describeField(def.schema as z.ZodTypeAny);
+    case "ZodEnum":
+      return { type: "string", enum: def.values as readonly string[] };
+    case "ZodNativeEnum":
+      return { type: "string", enum: Object.values(def.values as Record<string, unknown>) };
+    case "ZodLiteral":
+      return { type: typeof def.value, const: def.value };
+    case "ZodBoolean":
+      return { type: "boolean" };
+    case "ZodString": {
+      const shape: McpFieldShape = { type: "string" };
+      for (const check of (def.checks ?? []) as Array<Record<string, unknown>>) {
+        if (check.kind === "min") shape.minLength = check.value as number;
+        if (check.kind === "max") shape.maxLength = check.value as number;
+        if (check.kind === "regex") shape.pattern = String(check.regex);
+        if (check.kind === "email" || check.kind === "url") shape.format = check.kind;
+        if (check.kind === "datetime") shape.format = "date-time";
+      }
+      return shape;
+    }
+    case "ZodNumber": {
+      const shape: McpFieldShape = { type: "number" };
+      for (const check of (def.checks ?? []) as Array<Record<string, unknown>>) {
+        if (check.kind === "min") shape.minimum = check.value as number;
+        if (check.kind === "max") shape.maximum = check.value as number;
+        if (check.kind === "int") shape.integer = true;
+      }
+      return shape;
+    }
+    case "ZodArray": {
+      const shape: McpFieldShape = { type: "array", items: describeField(def.type as z.ZodTypeAny) };
+      const min = def.minLength as { value: number } | null;
+      const max = def.maxLength as { value: number } | null;
+      if (min) shape.minLength = min.value;
+      if (max) shape.maxLength = max.value;
+      return shape;
+    }
+    case "ZodObject":
+    case "ZodRecord":
+      return { type: "object" };
+    default:
+      return { type: "unknown" };
+  }
+}
+
+function defaultValue(field: z.ZodTypeAny): unknown {
+  const def = field._def as Record<string, unknown> & { typeName?: string };
+  if (def.typeName === "ZodDefault") return (def.defaultValue as () => unknown)();
+  if (def.typeName === "ZodOptional" || def.typeName === "ZodNullable") {
+    return defaultValue(def.innerType as z.ZodTypeAny);
+  }
+  return undefined;
+}
+
 export function listMcpCreateSchemas(principal: McpPrincipal) {
   return MCP_CREATE_KINDS.map((kind) => {
     const shape = (schemas[kind] as z.AnyZodObject).shape;
@@ -193,13 +288,17 @@ export function listMcpCreateSchemas(principal: McpPrincipal) {
       granted: canCreateMcpKind(principal, kind),
       requiredAnyPermission: CREATE_PERMISSIONS[kind],
       safety: kind === "calendar_event" ? "always draft through app_create" : "create-only; forced inactive, disabled, closed, unpublished or draft where the model supports it",
-      inputFields: Object.entries(shape).map(([name, field]) => ({
-        name,
-        required: !(field as z.ZodTypeAny).isOptional(),
-        nullable: (field as z.ZodTypeAny).isNullable(),
-        zodType: (field as z.ZodTypeAny)._def.typeName,
-        description: (field as z.ZodTypeAny).description ?? null,
-      })),
+      inputFields: Object.entries(shape).map(([name, value]) => {
+        const field = value as z.ZodTypeAny;
+        return {
+          name,
+          required: !field.isOptional(),
+          nullable: field.isNullable(),
+          default: defaultValue(field),
+          description: field.description ?? null,
+          ...describeField(field),
+        };
+      }),
     };
   });
 }
@@ -372,7 +471,17 @@ export async function createMcpRecord(principal: McpPrincipal, raw: McpCreateInp
       case "shift": {
         const input = schemas.shift.parse(data);
         if (input.post && !principal.allGroups && !canUseMcpGroup(principal, input.post)) throw new McpInputError("FORBIDDEN", `Geen toegang tot groep ${input.post}.`);
-        const parsed = parseShift(input); const row = await prisma.shift.create({ data: parsed });
+        // `parseShift` verzamelt de invoerfouten in een eigen error; zonder deze
+        // vertaling belandt een te vroege eindtijd als INTERNAL_ERROR in Sentry
+        // in plaats van als leesbare melding bij de agent.
+        let parsed;
+        try {
+          parsed = parseShift(input);
+        } catch (error) {
+          if (error instanceof ShiftValidationError) throw new McpInputError("INVALID_SHIFT", error.details.join("; "));
+          throw error;
+        }
+        const row = await prisma.shift.create({ data: parsed });
         await audit(principal, "shift", row.id, row.name, "shift aangemaakt via MCP");
         result = row; break;
       }
