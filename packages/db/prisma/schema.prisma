@@ -2462,6 +2462,20 @@ model UitleenEvent {
   location String?
   startAt  DateTime? @db.Timestamptz(3)
 
+  /// Is het uur van `startAt` echt ingevuld, of staat er enkel een dag?
+  ///
+  /// Bij het aanmaken is het uur vaak nog niet gekend ("ergens die zaterdag"),
+  /// en het dan verplicht maken levert een verzonnen uur op dat later niemand
+  /// meer durft te wijzigen. Zonder deze vlag valt "de fuif begint om
+  /// middernacht" niet te onderscheiden van "we weten het uur nog niet", want
+  /// allebei staan ze als 00:00 in de kolom.
+  startTimeKnown Boolean @default(true)
+
+  /// Wanneer het evenement gedaan is. Optioneel: een cantus is één avond, een
+  /// weekend duurt drie dagen, en het materiaal moet in dat tweede geval ook
+  /// drie dagen blijven staan.
+  endAt DateTime? @db.Timestamptz(3)
+
   /// Post of werkgroep achter het evenement, en wie het aanmaakte.
   groupId     String?
   createdById String?

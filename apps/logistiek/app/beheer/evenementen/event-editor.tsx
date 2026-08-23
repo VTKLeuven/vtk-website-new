@@ -13,13 +13,25 @@ import { SaveForm } from '@/components/ui/save-form';
 const ERRORS = {
   NAME_REQUIRED: 'Geef het evenement een naam.',
   START_INVALID: 'Het startmoment is ongeldig.',
+  END_INVALID: 'Het einde is ongeldig.',
+  END_BEFORE_START: 'Het einde ligt voor het begin.',
 };
 
 export function EventEditor({
   event,
   attached,
 }: {
-  event?: { id: string; name: string; location: string; startAt: string; note: string };
+  event?: {
+    id: string;
+    name: string;
+    location: string;
+    /** Dag en uur staan apart: het uur is optioneel (E2). */
+    startDate: string;
+    startTime: string;
+    endDate: string;
+    endTime: string;
+    note: string;
+  };
   /** Hoeveel aanvragen eraan hangen; staat in de bevestiging bij verwijderen. */
   attached: number;
 }) {
@@ -85,12 +97,42 @@ export function EventEditor({
           className="h-10 rounded-lg border border-vtk-navy/15 bg-white px-3 text-sm text-vtk-ink"
         />
       </label>
+      {/* Dag en uur apart, en het uur mag leeg blijven (E2): bij het aanmaken
+          weet je vaak enkel "die zaterdag", en een verplicht uur levert een
+          verzonnen uur op dat later niemand meer durft te wijzigen. */}
       <label className="grid gap-1 text-xs font-medium text-vtk-muted">
-        Startuur
+        Startdag
         <input
-          type="datetime-local"
-          name="startAt"
-          defaultValue={event?.startAt ?? ''}
+          type="date"
+          name="startDate"
+          defaultValue={event?.startDate ?? ''}
+          className="h-10 rounded-lg border border-vtk-navy/15 bg-white px-3 text-sm text-vtk-ink"
+        />
+      </label>
+      <label className="grid gap-1 text-xs font-medium text-vtk-muted">
+        Startuur (optioneel)
+        <input
+          type="time"
+          name="startTime"
+          defaultValue={event?.startTime ?? ''}
+          className="h-10 rounded-lg border border-vtk-navy/15 bg-white px-3 text-sm text-vtk-ink"
+        />
+      </label>
+      <label className="grid gap-1 text-xs font-medium text-vtk-muted">
+        Einddag (optioneel)
+        <input
+          type="date"
+          name="endDate"
+          defaultValue={event?.endDate ?? ''}
+          className="h-10 rounded-lg border border-vtk-navy/15 bg-white px-3 text-sm text-vtk-ink"
+        />
+      </label>
+      <label className="grid gap-1 text-xs font-medium text-vtk-muted">
+        Einduur (optioneel)
+        <input
+          type="time"
+          name="endTime"
+          defaultValue={event?.endTime ?? ''}
           className="h-10 rounded-lg border border-vtk-navy/15 bg-white px-3 text-sm text-vtk-ink"
         />
       </label>

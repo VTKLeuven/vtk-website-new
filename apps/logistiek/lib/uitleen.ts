@@ -293,6 +293,60 @@ export function toDatetimeLocalValue(date: Date): string {
   return `${get('year')}-${get('month')}-${get('day')}T${hour}:${get('minute')}`;
 }
 
+/** De "YYYY-MM-DD" van een moment in Belgische tijd, voor een `type="date"`. */
+export function toBrusselsDateValue(date: Date): string {
+  return toDatetimeLocalValue(date).slice(0, 10);
+}
+
+/** Het "HH:mm" van een moment in Belgische tijd, voor een `type="time"`. */
+export function toBrusselsTimeValue(date: Date): string {
+  return toDatetimeLocalValue(date).slice(11);
+}
+
+/**
+ * Het startmoment van een evenement in woorden, met of zonder uur (E2).
+ *
+ * Een evenement waarvan het uur nog niet gekend is, staat als middernacht in de
+ * databank; "om 00:00" tonen zou een uur beweren dat niemand ingaf.
+ */
+export function formatEventMoment(
+  event: { startAt: Date | null; startTimeKnown: boolean; endAt?: Date | null },
+  locale: LogistiekLocale = 'nl'
+): string | null {
+  if (!event.startAt) return null;
+  const start = event.startTimeKnown
+    ? formatDateTime(event.startAt, locale)
+    : formatBrusselsDay(event.startAt, locale);
+  if (!event.endAt) return start;
+  const sameDay = toBrusselsDateValue(event.startAt) === toBrusselsDateValue(event.endAt);
+  const end = sameDay
+    ? new Intl.DateTimeFormat(locale === 'en' ? 'en-GB' : 'nl-BE', {
+        timeZone: 'Europe/Brussels',
+        hour: '2-digit',
+        minute: '2-digit',
+      }).format(event.endAt)
+    : formatBrusselsDay(event.endAt, locale);
+  return `${start} ${locale === 'en' ? 'to' : 'tot'} ${end}`;
+}
+
+/**
+ * De dag van een echt tijdstip, in Belgische tijd.
+ *
+ * Niet `formatDateOnly`: die leest bewust in UTC, want ze dient voor
+ * `@db.Date`-kolommen die als UTC-middernacht bewaard worden. Een evenement dat
+ * op 15 oktober om 00:00 Brussel begint, staat als 14 oktober 22:00 UTC in de
+ * kolom en zou daar een dag te vroeg uitkomen.
+ */
+export function formatBrusselsDay(date: Date, locale: LogistiekLocale = 'nl'): string {
+  return new Intl.DateTimeFormat(locale === 'en' ? 'en-GB' : 'nl-BE', {
+    timeZone: 'Europe/Brussels',
+    weekday: 'short',
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+  }).format(date);
+}
+
 export function formatDateTime(date: Date, locale: LogistiekLocale = 'nl'): string {
   return new Intl.DateTimeFormat(locale === 'en' ? 'en-GB' : 'nl-BE', {
     timeZone: 'Europe/Brussels',

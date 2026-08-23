@@ -5,7 +5,9 @@ import {
   formatDateOnly,
   formatDateTime,
   formatDateWithPart,
-  toDatetimeLocalValue,
+  formatEventMoment,
+  toBrusselsDateValue,
+  toBrusselsTimeValue,
 } from '@/lib/uitleen';
 import { adminEvents, eventLoad, type AdminEvent } from '@/lib/uitleen-server';
 import { EventEditor } from './event-editor';
@@ -72,7 +74,11 @@ function EventCard({ event }: { event: AdminEvent }) {
             id: event.id,
             name: event.name,
             location: event.location ?? '',
-            startAt: event.startAt ? toDatetimeLocalValue(event.startAt) : '',
+            startDate: event.startAt ? toBrusselsDateValue(event.startAt) : '',
+            startTime:
+              event.startAt && event.startTimeKnown ? toBrusselsTimeValue(event.startAt) : '',
+            endDate: event.endAt ? toBrusselsDateValue(event.endAt) : '',
+            endTime: event.endAt ? toBrusselsTimeValue(event.endAt) : '',
             note: event.note ?? '',
           }}
           attached={event.reservations.length + event.transport.length}
@@ -81,8 +87,8 @@ function EventCard({ event }: { event: AdminEvent }) {
 
       <dl className="logistics-fact-grid mt-4">
         <div>
-          <dt>Start</dt>
-          <dd>{event.startAt ? formatDateTime(event.startAt) : 'Nog niet ingevuld'}</dd>
+          <dt>Wanneer</dt>
+          <dd>{formatEventMoment(event) ?? 'Nog niet ingevuld'}</dd>
         </div>
         <div>
           <dt>Locatie</dt>
@@ -212,14 +218,54 @@ function EventCard({ event }: { event: AdminEvent }) {
   );
 }
 
-export default async function BeheerEvenementenPage() {
+/** Sorteersleutels voor het evenementenoverzicht (E2). */
+const EVENT_SORTS = {
+  datum: 'Datum',
+  naam: 'Naam',
+  post: 'Post of werkgroep',
+} as const;
+
+type EventSort = keyof typeof EVENT_SORTS;
+
+function sortEvents(events: AdminEvent[], sort: EventSort): AdminEvent[] {
+  const byName = (a: AdminEvent, b: AdminEvent) =>
+    a.name.localeCompare(b.name, 'nl', { sensitivity: 'base' });
+  if (sort === 'naam') return [...events].sort(byName);
+  if (sort === 'post') {
+    // Zonder post achteraan: die vraag ("van wie is dit?") is precies waarom je
+    // hierop sorteert, en een leeg vak bovenaan helpt daar niet bij.
+    return [...events].sort((a, b) => {
+      const groupA = a.group?.nameNl ?? '\uffff';
+      const groupB = b.group?.nameNl ?? '\uffff';
+      const diff = groupA.localeCompare(groupB, 'nl', { sensitivity: 'base' });
+      return diff !== 0 ? diff : byName(a, b);
+    });
+  }
+  return events;
+}
+
+export default async function BeheerEvenementenPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ sorteer?: string }>;
+}) {
   await requireManage();
+  const { sorteer } = await searchParams;
+  const sort: EventSort = sorteer === 'naam' || sorteer === 'post' ? sorteer : 'datum';
   const events = await adminEvents();
 
-  const upcoming = events.filter(
-    (event) => !event.startAt || event.startAt.getTime() >= Date.now() - 24 * 60 * 60 * 1000
+  const upcoming = sortEvents(
+    events.filter(
+      (event) => !event.startAt || event.startAt.getTime() >= Date.now() - 24 * 60 * 60 * 1000
+    ),
+    sort
   );
-  const past = events.filter((event) => !upcoming.includes(event));
+  const past = sortEvents(
+    events.filter(
+      (event) => event.startAt !== null && event.startAt.getTime() < Date.now() - 24 * 60 * 60 * 1000
+    ),
+    sort
+  );
 
   return (
     <div className="grid gap-6">
@@ -238,6 +284,24 @@ export default async function BeheerEvenementenPage() {
             many="komende of zonder datum"
           />
         </div>
+        <div className="mt-4 flex flex-wrap items-center gap-2 text-xs">
+          <span className="text-vtk-muted">Sorteren op</span>
+          {(Object.keys(EVENT_SORTS) as EventSort[]).map((key) => (
+            <Link
+              key={key}
+              href={key === 'datum' ? '/beheer/evenementen' : `/beheer/evenementen?sorteer=${key}`}
+              aria-current={sort === key ? 'true' : undefined}
+              className={`rounded-full border px-3 py-1 font-medium transition ${
+                sort === key
+                  ? 'border-vtk-navy bg-vtk-navy text-white'
+                  : 'border-vtk-navy/15 text-vtk-ink hover:border-vtk-navy/40'
+              }`}
+            >
+              {EVENT_SORTS[key]}
+            </Link>
+          ))}
+        </div>
+
         <div className="mt-4">
           <EventEditor attached={0} />
         </div>

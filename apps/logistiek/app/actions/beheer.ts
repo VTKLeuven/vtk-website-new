@@ -469,17 +469,34 @@ export async function saveEventAction(_prev: SaveState, formData: FormData): Pro
   const id = String(formData.get('eventId') ?? '').trim();
   const name = String(formData.get('name') ?? '').trim();
   const location = String(formData.get('location') ?? '').trim();
-  const startRaw = String(formData.get('startAt') ?? '').trim();
+  // Dag en uur staan apart (E2): bij het aanmaken is het uur vaak nog niet
+  // gekend, en één datetime-veld dwingt je er dan een te verzinnen.
+  const startDateRaw = String(formData.get('startDate') ?? '').trim();
+  const startTimeRaw = String(formData.get('startTime') ?? '').trim();
+  const endDateRaw = String(formData.get('endDate') ?? '').trim();
+  const endTimeRaw = String(formData.get('endTime') ?? '').trim();
   const note = String(formData.get('note') ?? '').trim();
   if (!name) return saveError('NAME_REQUIRED');
 
-  const startAt = startRaw ? parseBrusselsDateTime(startRaw) : null;
-  if (startRaw && !startAt) return saveError('START_INVALID');
+  const startAt = startDateRaw
+    ? parseBrusselsDateTime(`${startDateRaw}T${startTimeRaw || '00:00'}`)
+    : null;
+  if (startDateRaw && !startAt) return saveError('START_INVALID');
+
+  const endAt = endDateRaw
+    ? parseBrusselsDateTime(`${endDateRaw}T${endTimeRaw || '23:59'}`)
+    : null;
+  if (endDateRaw && !endAt) return saveError('END_INVALID');
+  // Een evenement dat eindigt voor het begint, is een tikfout; het materiaal
+  // zou er anders "negatief lang" moeten staan.
+  if (startAt && endAt && endAt < startAt) return saveError('END_BEFORE_START');
 
   const data = {
     name: name.slice(0, 200),
     location: location.slice(0, 300) || null,
     startAt,
+    startTimeKnown: Boolean(startDateRaw && startTimeRaw),
+    endAt,
     note: note.slice(0, 1000) || null,
   };
 

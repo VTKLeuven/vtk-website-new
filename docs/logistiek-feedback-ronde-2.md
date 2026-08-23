@@ -35,7 +35,7 @@ ook bij maar werd anders opgelost dan gevraagd; de reden staat bij de taak.
 | 3 | Materiaal: opmerkingen, deelgoedkeuring, sjablonen | M1–M8 | 🟡 M2, M6 open |
 | 4 | Vervoer: terminologie, goedkeuring, weekoverzicht | T1–T13 | 🟡 T2, T5, T7, T8 open |
 | 5 | Flesserke en kalender | F1–F3 | ✅ af |
-| 6 | Evenementen: post-overzicht, materiaallijst, C&G | E1–E7 | 🟡 E1, E2, E4, E5 open |
+| 6 | Evenementen: post-overzicht, materiaallijst, C&G | E1–E7 | 🟡 E1, E4, E5 open |
 
 ---
 
@@ -649,7 +649,7 @@ Alles hier is klein, zichtbaar en zonder (of met een minimale) migratie.
 - **Klaar wanneer:** een postverantwoordelijke kan zijn evenement bekijken
   en de basisgegevens wijzigen.
 
-### E2. Evenement: extra velden en verbeteringen
+### ✅ E2. Evenement: extra velden en verbeteringen
 **P2 · code · 🗄️**
 
 - **Raakt:** `packages/db/prisma/schema.prisma` (`UitleenEvent`),

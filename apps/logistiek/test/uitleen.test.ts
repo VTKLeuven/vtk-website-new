@@ -8,6 +8,7 @@ import {
   formatDateRange,
   formatDateTime,
   formatEuro,
+  formatEventMoment,
   formatPriceCents,
   isEmailish,
   isLastMinute,
@@ -371,6 +372,27 @@ describe('date formatting locale', () => {
     const dt = new Date('2026-07-20T12:00:00Z');
     expect(formatDateTime(dt, 'nl')).toContain('juli');
     expect(formatDateTime(dt, 'en')).toContain('July');
+  });
+});
+
+describe('formatEventMoment', () => {
+  it('toont de Belgische dag, niet de UTC-dag', () => {
+    // 15 oktober 2026 om 00:00 in Brussel is 14 oktober 22:00 UTC. Een evenement
+    // zonder uur mag daar geen dag te vroeg uitkomen.
+    const startAt = new Date('2026-10-14T22:00:00.000Z');
+    const text = formatEventMoment({ startAt, startTimeKnown: false });
+    expect(text).toContain('15');
+    expect(text).toContain('oktober');
+    expect(text).not.toContain('00:00');
+  });
+
+  it('zet het uur erbij zodra het ingevuld is', () => {
+    const startAt = new Date('2026-10-15T18:00:00.000Z'); // 20:00 Brussel
+    expect(formatEventMoment({ startAt, startTimeKnown: true })).toContain('20:00');
+  });
+
+  it('zonder startmoment is er niets te tonen', () => {
+    expect(formatEventMoment({ startAt: null, startTimeKnown: false })).toBeNull();
   });
 });
 
