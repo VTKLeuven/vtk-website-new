@@ -187,12 +187,16 @@ export function EventRequesterFields({
           </div>
         ) : (
           <label className="grid gap-1 text-sm sm:col-span-2">
-            <span className="font-medium text-vtk-ink">{en ? 'Event / activity' : 'Evenement / activiteit'}</span>
+            <span className="font-medium text-vtk-ink">
+              {en ? 'Event / activity' : 'Evenement / activiteit'}
+              <span aria-hidden="true" className="text-red-600"> *</span>
+            </span>
             <input
               type="text"
               value={value.eventName}
               onChange={(e) => set('eventName', e.target.value)}
               placeholder={en ? 'E.g. 24-hour run' : 'Bv. 24 urenloop'}
+              data-field="eventName"
               className={inputClass}
             />
           </label>

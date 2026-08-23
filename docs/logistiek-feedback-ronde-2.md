@@ -30,7 +30,7 @@ ook bij maar werd anders opgelost dan gevraagd; de reden staat bij de taak.
 | Fase | Inhoud | Taken | Status |
 | --- | --- | --- | --- |
 | 0 | Beslissingen die eerst moeten vallen | 4 vragen | ✅ beslist |
-| 1 | Kleine bugs, UI-fixes en ergernissen | R1–R8 | 🟡 R5, R7 open |
+| 1 | Kleine bugs, UI-fixes en ergernissen | R1–R8 | 🟡 R5 open |
 | 2 | Navigatie, lay-out en overzichten | N1–N5 | ✅ af |
 | 3 | Materiaal: opmerkingen, deelgoedkeuring, sjablonen | M1–M8 | 🟡 M6 open |
 | 4 | Vervoer: terminologie, goedkeuring, weekoverzicht | T1–T13 | ✅ af |
@@ -150,7 +150,7 @@ Alles hier is klein, zichtbaar en zonder (of met een minimale) migratie.
   tenzij er ongelezen entries zijn.
 - **Klaar wanneer:** de historiek neemt geen plek in als je er niet naar kijkt.
 
-### R7. Verplichte velden markeren met sterretje en validatiefeedback
+### ✅ R7. Verplichte velden markeren met sterretje en validatiefeedback
 **P1 · code**
 
 - **Raakt:** alle formulieren in `apps/logistiek/app/materiaal/`,

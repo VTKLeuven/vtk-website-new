@@ -13,6 +13,7 @@ import { FlesserkeItemName } from '@/components/flesserke-item-name';
 import { DayPartSelect } from '@/components/day-part-select';
 import { EventPicker, type SelectableEvent } from '@/components/event-picker';
 import { useFormDraft } from '@/lib/use-form-draft';
+import { fieldClass, firstMissing, focusField, type MissingField } from '@/lib/required-fields';
 import { formatContentAmount, formatDateTime } from '@/lib/uitleen';
 import { LastMinuteNotice } from '@/components/last-minute-notice';
 import { QuantityInput } from '@/components/quantity-input';
@@ -90,6 +91,8 @@ export function FlesserkeForm({
   }
 
   const [error, setError] = useState<string | null>(null);
+  /** Het eerste verplichte veld dat nog leeg is (R7). */
+  const [missing, setMissing] = useState<MissingField | null>(null);
   const [pending, startTransition] = useTransition();
 
   const [search, setSearch] = useState('');
@@ -161,6 +164,30 @@ export function FlesserkeForm({
 
   function submit() {
     setError(null);
+    // Eerst zeggen wat er ontbreekt (R7).
+    const missingField = firstMissing([
+      {
+        name: 'eventName',
+        ok: Boolean(event.eventName.trim()),
+        message: en ? 'Name the activity.' : 'Geef je activiteit een naam.',
+      },
+      {
+        name: 'pickupDate',
+        ok: Boolean(pickupDate),
+        message: en ? 'Pick a date.' : 'Kies wanneer het klaar moet staan.',
+      },
+      {
+        name: 'items',
+        ok: count > 0,
+        message: en ? 'Pick at least one item.' : 'Kies minstens één item.',
+      },
+    ]);
+    setMissing(missingField);
+    if (missingField) {
+      setError(missingField.message);
+      focusField(missingField.name);
+      return;
+    }
     startTransition(async () => {
       const payload: ReservationFormInput = {
         ...event,
@@ -349,19 +376,30 @@ export function FlesserkeForm({
           ))}
         </div>
 
-        <aside className="h-fit rounded-[18px] border border-vtk-navy/10 bg-vtk-surface p-6 lg:sticky lg:top-6">
+        <aside
+          className="h-fit rounded-[18px] border border-vtk-navy/10 bg-vtk-surface p-6 lg:sticky lg:top-6"
+          data-field="items"
+          tabIndex={-1}
+        >
           <h2 className="text-lg font-semibold tracking-tight text-vtk-ink">{en ? 'Your request' : 'Jouw aanvraag'}</h2>
           <div className="mt-4 grid gap-3">
             <label className="grid gap-1 text-sm">
               <span className="font-medium text-vtk-ink">
                 {en ? 'Ready by' : 'Klaarzetten tegen'}
+                <span aria-hidden="true" className="text-red-600"> *</span>
               </span>
               <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2">
                 <input
                   type="date"
                   value={pickupDate}
                   onChange={(e) => setPickupDate(e.target.value)}
-                  className="h-10 min-w-0 rounded-lg border border-vtk-navy/15 bg-white px-3 text-vtk-ink"
+                  data-field="pickupDate"
+                  aria-invalid={missing?.name === 'pickupDate'}
+                  className={fieldClass(
+                    'h-10 min-w-0 rounded-lg border border-vtk-navy/15 bg-white px-3 text-vtk-ink',
+                    'pickupDate',
+                    missing
+                  )}
                 />
                 <DayPartSelect
                   value={pickupPart}
@@ -442,7 +480,7 @@ export function FlesserkeForm({
             size="lg"
             className="mt-5 w-full"
             onClick={submit}
-            disabled={pending || count === 0 || !pickupDate || !event.eventName.trim()}
+            disabled={pending}
           >
             {pending
               ? en

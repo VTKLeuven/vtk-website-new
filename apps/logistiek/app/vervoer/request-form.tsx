@@ -8,6 +8,12 @@ import { createVanBookingAction } from '@/app/actions/uitleen';
 import { formatDateTime, formatEuro, formatPriceCents, transportPriceCents } from '@/lib/uitleen';
 import { useFormDraft } from '@/lib/use-form-draft';
 import { EventPicker, type SelectableEvent } from '@/components/event-picker';
+import {
+  fieldClass,
+  firstMissing,
+  focusField,
+  type MissingField,
+} from '@/lib/required-fields';
 import type { RequesterOption } from '@/app/materiaal/event-fields';
 
 type VehicleOption = { id: string; name: string; pricingMode: UitleenPricingMode; rateCents: number };
@@ -67,6 +73,8 @@ export function VanRequestForm({
     if (picked) setEventName(picked.name);
   }
   const [error, setError] = useState<string | null>(null);
+  /** Het eerste verplichte veld dat nog leeg is (R7). */
+  const [missing, setMissing] = useState<MissingField | null>(null);
   const [pending, startTransition] = useTransition();
 
   const chosen = vehicles.filter((v) => vehicleIds.includes(v.id));
@@ -191,6 +199,38 @@ export function VanRequestForm({
 
   function submit() {
     setError(null);
+    // Eerst zeggen wat er ontbreekt (R7). De knop stond vroeger uitgeschakeld,
+    // en dat is geen feedback maar een raadsel.
+    const missingField = firstMissing([
+      {
+        name: 'vehicle',
+        ok: vehicleIds.length > 0,
+        message: en ? 'Pick a vehicle.' : 'Kies een voertuig.',
+      },
+      { name: 'startAt', ok: Boolean(startAt), message: en ? 'Fill in the start.' : 'Vul in wanneer de rit begint.' },
+      { name: 'endAt', ok: Boolean(endAt), message: en ? 'Fill in the end.' : 'Vul in wanneer de rit eindigt.' },
+      {
+        name: 'returnStartAt',
+        ok: !roundTrip || Boolean(returnStartAt),
+        message: en ? 'Fill in the return trip.' : 'Vul de terugrit in.',
+      },
+      {
+        name: 'returnEndAt',
+        ok: !roundTrip || Boolean(returnEndAt),
+        message: en ? 'Fill in the return trip.' : 'Vul de terugrit in.',
+      },
+      {
+        name: 'purpose',
+        ok: Boolean(purpose.trim()),
+        message: en ? 'Describe what the trip is for.' : 'Beschrijf waarvoor de rit dient.',
+      },
+    ]);
+    setMissing(missingField);
+    if (missingField) {
+      setError(missingField.message);
+      focusField(missingField.name);
+      return;
+    }
     startTransition(async () => {
       const result = await createVanBookingAction({
         vehicleIds,
@@ -221,6 +261,12 @@ export function VanRequestForm({
   }
 
   const inputClass = 'h-10 rounded-lg border border-vtk-navy/15 bg-white px-3 text-vtk-ink';
+  /* Rood sterretje bij wat verplicht is (R7). */
+  const required = (
+    <span aria-hidden="true" className="text-red-600">
+      {' '}*
+    </span>
+  );
 
   return (
     <section className="rounded-[18px] border border-vtk-navy/10 bg-vtk-surface p-6">
@@ -285,6 +331,7 @@ export function VanRequestForm({
       <fieldset className="mt-4">
         <legend className="text-sm font-medium text-vtk-ink">
           {en ? 'Vehicle' : 'Voertuig'}
+          {required}
         </legend>
         {/* Meerdere voertuigen kiezen is met opzet mogelijk (zie
             docs/design-decisions.md, § Meerdere voertuigen: één aanvraag, N
@@ -293,7 +340,7 @@ export function VanRequestForm({
             valt nauwelijks op wanneer de vorige ook al donker is. Vandaar een
             vinkje in de pil zelf en, zodra het er meer dan één is, een regel die
             ze bij naam opsomt. (T12) */}
-        <div className="mt-2 flex flex-wrap gap-2">
+        <div className="mt-2 flex flex-wrap gap-2" data-field="vehicle" tabIndex={-1}>
           {vehicles.map((v) => {
             const selected = vehicleIds.includes(v.id);
             return (
@@ -334,7 +381,10 @@ export function VanRequestForm({
 
       <div className="mt-4 grid gap-3 sm:grid-cols-2">
         <label className="grid gap-1 text-sm">
-          <span className="font-medium text-vtk-ink">{en ? 'From' : 'Van'}</span>
+          <span className="font-medium text-vtk-ink">
+            {en ? 'From' : 'Van'}
+            {required}
+          </span>
           {/* step=900: ritten worden op het kwartier gepland, en de server weigert
               een ander tijdstip. De picker springt zo mee in kwartieren. */}
           <input
@@ -342,18 +392,25 @@ export function VanRequestForm({
             step={900}
             value={startAt}
             onChange={(e) => setStartAt(e.target.value)}
-            className={inputClass}
+            data-field="startAt"
+            aria-invalid={missing?.name === 'startAt'}
+            className={fieldClass(inputClass, 'startAt', missing)}
           />
         </label>
         <label className="grid gap-1 text-sm">
-          <span className="font-medium text-vtk-ink">{en ? 'Until' : 'Tot'}</span>
+          <span className="font-medium text-vtk-ink">
+            {en ? 'Until' : 'Tot'}
+            {required}
+          </span>
           <input
             type="datetime-local"
             step={900}
             value={endAt}
             min={startAt || undefined}
             onChange={(e) => setEndAt(e.target.value)}
-            className={inputClass}
+            data-field="endAt"
+            aria-invalid={missing?.name === 'endAt'}
+            className={fieldClass(inputClass, 'endAt', missing)}
           />
         </label>
         <label className="flex items-center gap-2 text-sm sm:col-span-2">
@@ -375,6 +432,7 @@ export function VanRequestForm({
                 type="datetime-local"
                 step={900}
                 value={returnStartAt}
+                data-field="returnStartAt"
                 min={endAt || undefined}
                 onChange={(e) => setReturnStartAt(e.target.value)}
                 className={inputClass}
@@ -386,6 +444,7 @@ export function VanRequestForm({
                 type="datetime-local"
                 step={900}
                 value={returnEndAt}
+                data-field="returnEndAt"
                 min={returnStartAt || undefined}
                 onChange={(e) => setReturnEndAt(e.target.value)}
                 className={inputClass}
@@ -399,13 +458,18 @@ export function VanRequestForm({
           </>
         ) : null}
         <label className="grid gap-1 text-sm sm:col-span-2">
-          <span className="font-medium text-vtk-ink">{en ? 'What is the trip for?' : 'Waarvoor dient de rit?'}</span>
+          <span className="font-medium text-vtk-ink">
+            {en ? 'What is the trip for?' : 'Waarvoor dient de rit?'}
+            {required}
+          </span>
           <input
             type="text"
             value={purpose}
             onChange={(e) => setPurpose(e.target.value)}
             placeholder={en ? 'E.g. collect equipment for the 24-hour run' : 'Bv. materiaal ophalen voor de 24 urenloop'}
-            className={inputClass}
+            data-field="purpose"
+            aria-invalid={missing?.name === 'purpose'}
+            className={fieldClass(inputClass, 'purpose', missing)}
           />
         </label>
         {linkedEvent ? (
@@ -529,14 +593,7 @@ export function VanRequestForm({
         size="lg"
         className="mt-5"
         onClick={submit}
-        disabled={
-          pending ||
-          vehicleIds.length === 0 ||
-          !startAt ||
-          !endAt ||
-          !purpose.trim() ||
-          (roundTrip && (!returnStartAt || !returnEndAt))
-        }
+        disabled={pending}
       >
         {pending ? (en ? 'Submitting...' : 'Indienen...') : en ? 'Request trip' : 'Rit aanvragen'}
       </Button>

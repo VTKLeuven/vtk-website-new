@@ -17,6 +17,12 @@ import { CategoryThumb } from '@/components/category-thumb';
 import { DayPartSelect } from '@/components/day-part-select';
 import { EventPicker, type SelectableEvent } from '@/components/event-picker';
 import { useFormDraft } from '@/lib/use-form-draft';
+import {
+  fieldClass,
+  firstMissing,
+  focusField,
+  type MissingField,
+} from '@/lib/required-fields';
 import { LastMinuteNotice } from '@/components/last-minute-notice';
 import { QuantityInput } from '@/components/quantity-input';
 import { SetContents } from '@/components/set-contents';
@@ -121,6 +127,8 @@ export function ReservationForm({
   }
 
   const [error, setError] = useState<string | null>(null);
+  /** Het eerste verplichte veld dat nog leeg is (R7). */
+  const [missing, setMissing] = useState<MissingField | null>(null);
   const [pending, startTransition] = useTransition();
   const router = useRouter();
 
@@ -334,6 +342,43 @@ export function ReservationForm({
 
   function submit() {
     setError(null);
+    // Eerst zeggen wat er ontbreekt (R7): een uitgeschakelde knop zegt dat je
+    // niet verder kan, niet waarom.
+    const missingField = firstMissing([
+      {
+        name: 'eventName',
+        ok: Boolean(event.eventName.trim()),
+        message: en ? 'Name the activity.' : 'Geef je activiteit een naam.',
+      },
+      {
+        name: 'pickupDate',
+        ok: Boolean(pickupDate),
+        message: en ? 'Pick a collection date.' : 'Kies een afhaaldatum.',
+      },
+      {
+        name: 'returnDate',
+        ok: Boolean(returnDate),
+        message: en ? 'Pick a return date.' : 'Kies een terugbrengdatum.',
+      },
+      {
+        name: 'items',
+        ok: totals.count > 0,
+        message: en ? 'Pick at least one item.' : 'Kies minstens één stuk materiaal.',
+      },
+      {
+        name: 'conflicts',
+        ok: conflictLines.length === 0 || acceptConflicts,
+        message: en
+          ? 'Confirm that you are submitting despite the conflict.'
+          : 'Bevestig dat je toch indient ondanks het conflict.',
+      },
+    ]);
+    setMissing(missingField);
+    if (missingField) {
+      setError(missingField.message);
+      focusField(missingField.name);
+      return;
+    }
     startTransition(async () => {
       const result = await onSubmit({
         ...event,
@@ -851,7 +896,11 @@ export function ReservationForm({
           )}
         </div>
 
-        <aside className="h-fit rounded-[18px] border border-vtk-navy/10 bg-vtk-surface p-6 lg:sticky lg:top-6">
+        <aside
+          className="h-fit rounded-[18px] border border-vtk-navy/10 bg-vtk-surface p-6 lg:sticky lg:top-6"
+          data-field="items"
+          tabIndex={-1}
+        >
           <h2 className="text-lg font-semibold tracking-tight text-vtk-ink">
             {en ? 'Your request' : 'Jouw aanvraag'}
           </h2>
@@ -861,13 +910,22 @@ export function ReservationForm({
                 mail. Het is een afspraak tussen mensen, geen boekingseenheid; de
                 voorraad blijft op hele dagen rekenen. */}
             <label className="grid gap-1 text-sm">
-              <span className="font-medium text-vtk-ink">{en ? 'Collect on' : 'Afhalen op'}</span>
+              <span className="font-medium text-vtk-ink">
+                {en ? 'Collect on' : 'Afhalen op'}
+                <span aria-hidden="true" className="text-red-600"> *</span>
+              </span>
               <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2">
                 <input
                   type="date"
                   value={pickupDate}
                   onChange={(e) => setPickupDate(e.target.value)}
-                  className="h-10 min-w-0 rounded-lg border border-vtk-navy/15 bg-white px-3 text-vtk-ink"
+                  data-field="pickupDate"
+                  aria-invalid={missing?.name === 'pickupDate'}
+                  className={fieldClass(
+                    'h-10 min-w-0 rounded-lg border border-vtk-navy/15 bg-white px-3 text-vtk-ink',
+                    'pickupDate',
+                    missing
+                  )}
                 />
                 <DayPartSelect
                   value={pickupPart}
@@ -885,7 +943,13 @@ export function ReservationForm({
                   value={returnDate}
                   min={pickupDate || undefined}
                   onChange={(e) => setReturnDate(e.target.value)}
-                  className="h-10 min-w-0 rounded-lg border border-vtk-navy/15 bg-white px-3 text-vtk-ink"
+                  data-field="returnDate"
+                  aria-invalid={missing?.name === 'returnDate'}
+                  className={fieldClass(
+                    'h-10 min-w-0 rounded-lg border border-vtk-navy/15 bg-white px-3 text-vtk-ink',
+                    'returnDate',
+                    missing
+                  )}
                 />
                 <DayPartSelect
                   value={returnPart}
@@ -992,6 +1056,7 @@ export function ReservationForm({
                   type="checkbox"
                   checked={acceptConflicts}
                   onChange={(e) => setAcceptConflicts(e.target.checked)}
+                  data-field="conflicts"
                   className="mt-0.5 h-4 w-4"
                 />
                 <span>
@@ -1014,14 +1079,7 @@ export function ReservationForm({
             size="lg"
             className="mt-5 w-full"
             onClick={submit}
-            disabled={
-              pending ||
-              totals.count === 0 ||
-              !pickupDate ||
-              !returnDate ||
-              !event.eventName.trim() ||
-              (conflictLines.length > 0 && !acceptConflicts)
-            }
+            disabled={pending}
           >
             {pending ? submittingLabel : submitLabel}
           </Button>
