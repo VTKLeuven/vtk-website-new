@@ -33,7 +33,7 @@ ook bij maar werd anders opgelost dan gevraagd; de reden staat bij de taak.
 | 1 | Kleine bugs, UI-fixes en ergernissen | R1–R8 | 🟡 R5, R7 open |
 | 2 | Navigatie, lay-out en overzichten | N1–N5 | ✅ af |
 | 3 | Materiaal: opmerkingen, deelgoedkeuring, sjablonen | M1–M8 | 🟡 M2, M6 open |
-| 4 | Vervoer: terminologie, goedkeuring, weekoverzicht | T1–T13 | 🟡 T2, T5, T7, T8 open |
+| 4 | Vervoer: terminologie, goedkeuring, weekoverzicht | T1–T13 | 🟡 T2, T5 open |
 | 5 | Flesserke en kalender | F1–F3 | ✅ af |
 | 6 | Evenementen: post-overzicht, materiaallijst, C&G | E1–E7 | ✅ af |
 
@@ -478,7 +478,7 @@ Alles hier is klein, zichtbaar en zonder (of met een minimale) migratie.
   eventueel de beheernavigatie.
 - **Klaar wanneer:** je bereikt het bezettingsoverzicht in één klik.
 
-### T7. Weekoverzicht herwerken: moment → voertuig (Litus-stijl)
+### ✅ T7. Weekoverzicht herwerken: moment → voertuig (Litus-stijl)
 **P1 · code · groter**
 
 - **Raakt:** `apps/logistiek/app/beheer/vervoer/week/page.tsx`,
@@ -498,7 +498,7 @@ Alles hier is klein, zichtbaar en zonder (of met een minimale) migratie.
   6. De transportverantwoordelijke werkt primair vanuit dit overzicht.
 - **Klaar wanneer:** het weekoverzicht lijkt op de Litus met moment → voertuig.
 
-### T8. Publiek weekoverzicht: zelfde lay-out als logi, alleen goedgekeurde ritten
+### ✅ T8. Publiek weekoverzicht: zelfde lay-out als logi, alleen goedgekeurde ritten
 **P2 · code**
 
 - **Raakt:** `apps/logistiek/app/vervoer/bezetting/` (of de publieke route

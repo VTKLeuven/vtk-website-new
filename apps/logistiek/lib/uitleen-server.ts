@@ -952,12 +952,20 @@ const transportWindowWhere = (
   endAt: { gt: from },
 });
 
+/**
+ * De ritten van één week voor de transportplanning (T7).
+ *
+ * Meer velden dan het oude raster nodig had: sinds er vanuit dit scherm beslist
+ * en aangepast wordt, moet het venster dezelfde gegevens hebben als de lijst.
+ */
 export async function transportWeek(from: Date, to: Date) {
   return prisma.uitleenTransportBooking.findMany({
     where: transportWindowWhere(from, to),
     select: {
       id: true,
       vehicleId: true,
+      tripGroupId: true,
+      tripLeg: true,
       startAt: true,
       endAt: true,
       status: true,
@@ -965,6 +973,12 @@ export async function transportWeek(from: Date, to: Date) {
       eventName: true,
       requesterType: true,
       requesterName: true,
+      contactPhone: true,
+      pickupAddress: true,
+      destination: true,
+      pricingMode: true,
+      paidOfflineAt: true,
+      driverId: true,
       vehicle: { select: { nameNl: true } },
       user: { select: { name: true } },
       driver: { select: { name: true } },
@@ -983,6 +997,11 @@ export type TransportWeekBooking = Awaited<ReturnType<typeof transportWeek>>[num
  * wanneer iemand hierboven een relatie toevoegt. Voor het publieke overzicht
  * (zie docs/logistiek-feedback-plan.md, V13).
  */
+/**
+ * Hetzelfde weekvenster, maar geanonimiseerd: enkel voertuig, dag en
+ * tijdvenster. Een eigen projectie en geen filter over de beheerquery, want dat
+ * laatste lekt vroeg of laat een veld mee.
+ */
 export async function transportWeekPublic(from: Date, to: Date) {
   return prisma.uitleenTransportBooking.findMany({
     where: transportWindowWhere(from, to),
@@ -992,6 +1011,35 @@ export async function transportWeekPublic(from: Date, to: Date) {
       startAt: true,
       endAt: true,
       status: true,
+    },
+    orderBy: { startAt: 'asc' },
+  });
+}
+
+/**
+ * Het weekvenster voor een ingelogd lid (T8): dezelfde planning als het team
+ * ziet, met het evenement en de chauffeur erbij, maar zonder adressen,
+ * telefoonnummers en bedragen.
+ *
+ * Waarom een derde projectie naast de publieke en de beheerversie: wie zonder
+ * login kijkt, hoort de werking van de kring niet te zien (zie
+ * `transportWeekPublic`), terwijl een praesidiumlid net wél moet kunnen zien wie
+ * welk ritje doet. Die twee in één query met een vlag zou betekenen dat één
+ * vergeten `if` de namen aan de straatkant zet.
+ */
+export async function transportWeekForMembers(from: Date, to: Date) {
+  return prisma.uitleenTransportBooking.findMany({
+    where: { ...transportWindowWhere(from, to), status: { not: 'CANCELLED' } },
+    select: {
+      id: true,
+      vehicleId: true,
+      startAt: true,
+      endAt: true,
+      status: true,
+      purpose: true,
+      eventName: true,
+      driverId: true,
+      driver: { select: { name: true } },
     },
     orderBy: { startAt: 'asc' },
   });

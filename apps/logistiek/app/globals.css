@@ -47,6 +47,32 @@ body {
   --on-dark-muted: #b7c0dc;
   --success: #2f6f33;
   --success-soft: #eef8ea;
+
+  /* Chauffeurskleuren voor de transportplanning (B4, T7). Acht tinten die
+     naast elkaar te onderscheiden zijn en waarop donkere tekst leesbaar
+     blijft; de kleur volgt uit de id van de chauffeur, zie lib/driver-colors.ts.
+     `--driver-none` is voor een rit zonder chauffeur: die moet juist opvallen
+     als onafgewerkt, vandaar de gele accentkleur van het huis. */
+  --driver-1: #cfe0ff;
+  --driver-2: #d7f0d8;
+  --driver-3: #ffe0cc;
+  --driver-4: #e8dcff;
+  --driver-5: #cdefee;
+  --driver-6: #ffd9e6;
+  --driver-7: #e8ecc4;
+  --driver-8: #dcdfe8;
+  --driver-none: #fff0bf;
+}
+
+/* Nog te beslissen rit in de transportplanning: gestreept, zodat je ziet dat
+   dat moment nog kan vrijkomen (T7, T8). Een streeppatroon en geen kleur, want
+   de kleur is al bezet door de chauffeur. */
+.week-block-requested {
+  background-image: repeating-linear-gradient(
+    135deg,
+    rgba(14, 26, 54, 0.14) 0 5px,
+    transparent 5px 11px
+  );
 }
 
 /* De uitleendienst gebruikt dezelfde vaste headerstructuur als vtk.be. Enkel
