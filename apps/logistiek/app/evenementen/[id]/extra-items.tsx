@@ -20,7 +20,13 @@ export type ExtraItem = {
   note: string | null;
 };
 
-const inputClass = 'h-10 rounded-lg border border-vtk-navy/15 bg-white px-3 text-sm text-vtk-ink';
+/**
+ * `w-full` is hier niet decoratief: een grid-item heeft `min-width: auto`, dus
+ * zonder die breedte duwt een `type="number"` zich op zijn intrinsieke maat
+ * (±20 tekens plus spinner) en steekt het buiten zijn kolom en buiten de kaart.
+ */
+const inputClass =
+  'h-10 w-full rounded-lg border border-vtk-navy/15 bg-white px-3 text-sm text-vtk-ink';
 
 export function EventExtraItems({
   eventId,
@@ -99,8 +105,8 @@ export function EventExtraItems({
         </ul>
       ) : null}
 
-      <div className="mt-4 grid gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_5rem]">
-        <label className="grid gap-1 text-sm">
+      <div className="mt-4 grid gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_6rem]">
+        <label className="grid min-w-0 gap-1 text-sm">
           <span className="font-medium text-vtk-ink">{en ? 'What' : 'Wat'}</span>
           <input
             type="text"
@@ -110,7 +116,7 @@ export function EventExtraItems({
             className={inputClass}
           />
         </label>
-        <label className="grid gap-1 text-sm">
+        <label className="grid min-w-0 gap-1 text-sm">
           <span className="font-medium text-vtk-ink">{en ? 'From' : 'Van wie'}</span>
           <input
             type="text"
@@ -126,7 +132,10 @@ export function EventExtraItems({
             <option value="Eigen materiaal" />
           </datalist>
         </label>
-        <label className="grid gap-1 text-sm">
+        {/* Op één kolom (smal scherm) blijft een aantal een kort veld: een
+            invoervak zo breed als het scherm voor het cijfer 1 leest als een
+            fout. */}
+        <label className="grid min-w-0 max-w-[6rem] gap-1 text-sm sm:max-w-none">
           <span className="font-medium text-vtk-ink">{en ? 'How many' : 'Aantal'}</span>
           <input
             type="number"
