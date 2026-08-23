@@ -552,6 +552,8 @@ model User {
   theokotVouchersProcessed  TheokotVoucherRedemption[] @relation("TheokotVoucherProcessedBy")
   theokotBans               TheokotBan[]
 
+  appPushDevices AppPushDevice[] @relation("AppPushDeviceUser")
+
   pianoReservations PianoReservation[]
 
   uitleenReservations     UitleenReservation[]      @relation("UitleenReservationUser")
@@ -4371,4 +4373,47 @@ model LesbezoekPeculiarity {
   updatedAt DateTime @updatedAt @db.Timestamptz(3)
 
   @@index([subject])
+}
+
+// -----------------------------------------------------------------------------
+// VTK-app (Expo, iOS + Android)
+// -----------------------------------------------------------------------------
+
+/// Een toestel waarop de VTK-app geïnstalleerd staat en dat pushberichten wil.
+///
+/// De tabel bestaat al voordat er iets verstuurd wordt. Dat is met opzet: een
+/// pushtoken vraagt native code (`expo-notifications`), en die kan niet via een
+/// OTA-update bijgezet worden. Zou dit pas later komen, dan had iedereen op dat
+/// moment een nieuwe build uit de store nodig; nu registreert de app vanaf haar
+/// eerste versie en kan de verzendkant er later gewoon naast komen.
+///
+/// Het token is de sleutel en niet de gebruiker: één lid kan meerdere toestellen
+/// hebben, en Expo geeft na een herinstallatie een nieuw token voor hetzelfde
+/// toestel. Opruimen gebeurt bij het verzenden, wanneer Expo een token als
+/// `DeviceNotRegistered` afkeurt.
+model AppPushDevice {
+  id     String @id @default(cuid())
+  userId String
+  /// Het Expo-pushtoken, in de vorm `ExponentPushToken[...]`.
+  token  String @unique
+
+  platform   AppPushPlatform
+  /// Versie van de app die dit token registreerde; enkel om te kunnen zien wie
+  /// waarop zit wanneer er iets misgaat.
+  appVersion String?
+
+  createdAt  DateTime @default(now()) @db.Timestamptz(3)
+  /// Wordt bijgewerkt bij elke registratie, dus feitelijk bij elke start van de
+  /// app. Een toestel dat maanden niet meer opstartte, mag opgeruimd worden.
+  lastSeenAt DateTime @default(now()) @db.Timestamptz(3)
+
+  user User @relation("AppPushDeviceUser", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([lastSeenAt])
+}
+
+enum AppPushPlatform {
+  ios
+  android
 }
