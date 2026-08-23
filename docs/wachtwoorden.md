@@ -162,9 +162,13 @@ dezelfde fout maken):
   slot, en dat is geen overdaad: er zijn bugs geweest waarbij SSO-aanmeldingen
   tóch doorgingen terwijl aanmelden uit stond.
 
-- **Blijf voorlopig op 1.35.1.** In 1.35.5/1.35.6 brak het automatisch aanmaken
-  en aanmelden via SSO (issue 7086). Test een upgrade eerst lokaal met de
-  compose-variant uit `compose.dev.yml`.
+- **Test een versiesprong eerst lokaal**, met de compose-variant uit
+  `compose.dev.yml`; het is bij Vaultwarden al een keer net de SSO-flow geweest
+  die brak. In 1.35.5/1.35.6 werkte het automatisch aanmaken en aanmelden via
+  SSO niet meer (issue 7086); dat is opgelost sinds 1.35.8 en we staan nu op
+  1.37.2. Let bij zo'n sprong specifiek op de eerste SSO-login van iemand die
+  nog geen kluis heeft: dat is het stuk dat toen stilviel, en het valt buiten
+  onze eigen tests.
 
 - **Zonder `ORG_GROUPS_ENABLED=true` bestaan groepen niet**, en dan valt de hele
   koppeling post → groep → collection weg. De API geeft dan geen duidelijke fout.

@@ -488,7 +488,7 @@ services:
   # niet door Vaultwarden. Zonder die twee samen zou elk lid met een VTK-account
   # zich hier een kluis kunnen aanmaken.
   vaultwarden:
-    image: vaultwarden/server:1.35.2
+    image: vaultwarden/server:1.37.2
     restart: unless-stopped
     depends_on:
       postgres:
