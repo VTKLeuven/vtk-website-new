@@ -267,6 +267,13 @@ webscanner blijft staan als webweg en als vangnet.
 - `events/[eventId]/users/search` — iemand zoeken op naam, e-mail of r-nummer om
   als scanner toe te voegen; gescoped op de capability van het event en niet op de
   globale `users.search`-permissie
+- `events/[eventId]/scanners/invite` — een verse uitnodigings-QR (`MANAGE_SCANNERS`).
+  Het token (`vtks1.<base64url(eventId)>.<base36 vervaltijd>.<hmac>`, zie
+  `lib/ticketing/crypto.ts`) leeft 30 seconden en het paneel ververst om de 20;
+  daardoor is een doorgestuurde screenshot dood. De landingspagina is
+  `app/(scanner)/scan/uitnodiging/page.tsx`, die na het inloggen de rol `SCANNER`
+  toekent en doorverwijst naar `/scan/<eventId>` of naar de app
+  (`vtk-scanner://scan/<eventId>`)
 - `events/[eventId]/scan`, `.../scan/batch`, `.../scan/card`, `.../scan/reverse`,
   `.../scanner/bootstrap` — scanning (`scan/batch` leegt de offline wachtrij,
   `scan/card` checkt in met een studentenkaart)
@@ -312,6 +319,10 @@ webscanner blijft staan als webweg en als vangnet.
   `GROEP5` by the seed). `tickets.manageAll` — global ticket admin (explicit).
 - Per-event capabilities via grants: `OWNER`/`MANAGER` grants include `SCAN`.
   Superadmins bypass all checks.
+- `SCANNER` draagt **enkel `SCAN`**, bewust zonder `VIEW_EVENT`: die capability
+  bewaakt `admin/tickets/[eventId]/layout.tsx`, en wie aan de deur staat hoort niet
+  in het beheer. Om dezelfde reden telt scannen niet mee in
+  `canAccessAnyTicketEvent()`, dat de Tickets-tab in de adminnavigatie bepaalt.
 - `MANAGE_SCANNERS` — smaller than `MANAGE_ACCESS`: scanners toevoegen en
   weghalen, en niets anders. `OWNER` en `MANAGER` dragen ze, zodat de leads van
   de organiserende post een deurploeg kunnen samenstellen zonder het

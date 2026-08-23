@@ -2955,3 +2955,125 @@
   font-size: 0.85rem;
   color: #a7adba;
 }
+
+/* ── Landingspagina van een uitnodigings-QR ─────────────────────────────────
+   Wat iemand ziet die met zijn camera de QR aan de deur scant. Eén boodschap per
+   scherm: je kan nu scannen, hier klik je. */
+.scanner-invite {
+  display: flex;
+  min-height: 100dvh;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 32px 24px;
+  background: #111318;
+  color: #f7f7f4;
+  text-align: center;
+}
+
+.scanner-invite-check {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 58px;
+  height: 58px;
+  border-radius: 999px;
+  background: #0d784c;
+  color: #f7f7f4;
+}
+
+.scanner-invite-eyebrow {
+  color: #ffd23f;
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+}
+
+.scanner-invite h1 {
+  margin: 0;
+  font-size: 1.5rem;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.scanner-invite p {
+  max-width: 34ch;
+  margin: 0;
+  color: #a7adba;
+  font-size: 0.92rem;
+  line-height: 1.5;
+}
+
+.scanner-invite-primary,
+.scanner-invite-secondary {
+  display: inline-flex;
+  min-height: 50px;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 0 22px;
+  border-radius: 999px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.scanner-invite-primary {
+  margin-top: 14px;
+  background: #ffd23f;
+  color: #111318;
+}
+
+.scanner-invite-secondary {
+  background: #20242b;
+  color: #f7f7f4;
+}
+
+/* ── De uitnodigings-QR in het scannerspaneel ───────────────────────────────── */
+.scanner-sheet-qr {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 16px 0;
+}
+
+.scanner-sheet-qr img {
+  width: min(62vw, 260px);
+  height: auto;
+  border-radius: 14px;
+  background: #fff;
+}
+
+.scanner-sheet-qr p {
+  max-width: 34ch;
+  margin: 0;
+  color: #a7adba;
+  font-size: 0.8rem;
+  line-height: 1.45;
+  text-align: center;
+}
+
+.scanner-sheet-toggle {
+  display: inline-flex;
+  min-height: 44px;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 0 16px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 999px;
+  background: none;
+  color: #f7f7f4;
+  font: inherit;
+  font-size: 0.88rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.scanner-sheet-toggle[aria-pressed="true"] {
+  border-color: #ffd23f;
+  background: #ffd23f;
+  color: #111318;
+}

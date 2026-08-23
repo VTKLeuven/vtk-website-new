@@ -1,6 +1,6 @@
 "use client";
 
-import { LoaderCircle, Search, UserPlus, UserRoundX, X } from "lucide-react";
+import { LoaderCircle, QrCode, Search, UserPlus, UserRoundX, X } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { EventScanner, EventScannersResponse, ScannerCandidate } from "./types";
 
@@ -44,6 +44,8 @@ export function ScannerAccess({
   const [searching, setSearching] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [qrOpen, setQrOpen] = useState(false);
+  const [qrImage, setQrImage] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
 
   const load = useCallback(async () => {
@@ -98,6 +100,48 @@ export function ScannerAccess({
     return () => clearTimeout(timer);
   }, [eventId, query]);
 
+  /**
+   * De rollende uitnodigings-QR.
+   *
+   * Elke twintig seconden een verse code, want de vorige leeft er dertig. Dat is
+   * wat een screenshot waardeloos maakt: tegen dat iemand die doorstuurt, is de
+   * code al dood. De timer loopt enkel zolang het paneel de QR toont.
+   */
+  useEffect(() => {
+    if (!qrOpen) return;
+    let stopped = false;
+
+    async function refresh() {
+      try {
+        const response = await fetch(`/api/tickets/events/${eventId}/scanners/invite`, {
+          cache: "no-store",
+        });
+        if (!response.ok) throw new Error("FAILED");
+        const { url } = (await response.json()) as { url: string };
+        const QRCode = (await import("qrcode")).default;
+        const image = await QRCode.toDataURL(url, {
+          width: 520,
+          margin: 2,
+          errorCorrectionLevel: "M",
+          color: { dark: "#0A0F1F", light: "#FFFFFF" },
+        });
+        if (!stopped) setQrImage(image);
+      } catch {
+        if (!stopped) {
+          setQrImage(null);
+          setError("De QR kon niet worden geladen");
+        }
+      }
+    }
+
+    void refresh();
+    const timer = setInterval(() => void refresh(), 20_000);
+    return () => {
+      stopped = true;
+      clearInterval(timer);
+    };
+  }, [qrOpen, eventId]);
+
   async function mutate(body: { userId: string } | { grantId: string }, id: string) {
     setBusyId(id);
     setError(null);
@@ -149,6 +193,37 @@ export function ScannerAccess({
         />
         {searching ? <LoaderCircle className="is-spinning" size={16} aria-hidden="true" /> : null}
       </label>
+
+      <button
+        type="button"
+        className="scanner-sheet-toggle"
+        aria-pressed={qrOpen}
+        onClick={() => {
+          // De vorige code hier weggooien en niet in het effect: die is verlopen,
+          // en ze een tel laten staan bij het heropenen zou iemand een dode QR
+          // laten scannen.
+          setQrImage(null);
+          setQrOpen((current) => !current);
+        }}
+      >
+        <QrCode size={17} aria-hidden="true" />
+        {qrOpen ? "QR verbergen" : "Toon QR om te laten scannen"}
+      </button>
+
+      {qrOpen ? (
+        <div className="scanner-sheet-qr">
+          {qrImage ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={qrImage} alt="QR-code om jezelf als scanner toe te voegen" />
+          ) : (
+            <LoaderCircle className="is-spinning" size={22} aria-hidden="true" />
+          )}
+          <p>
+            Laat deze code scannen met de camera. De code vernieuwt om de paar tellen, dus een
+            screenshot of een doorgestuurde foto werkt niet.
+          </p>
+        </div>
+      ) : null}
 
       {error ? (
         <p className="scanner-sheet-error" role="alert">

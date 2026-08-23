@@ -3548,3 +3548,34 @@ leads van de post die het event organiseert, plus IT via `tickets.manageAll`. Ze
 bestaat apart van `MANAGE_ACCESS` omdat een MANAGER wél een deurploeg moet kunnen
 samenstellen maar niet het eigenaarschap of de financiële rollen van een event
 moet kunnen verzetten.
+
+### Scannen geeft niets in de admin
+
+De rol `SCANNER` droeg aanvankelijk ook `VIEW_EVENT`, en dat is net de capability
+die het event-dashboard in de admin bewaakt. Gevolg: iedereen die mocht scannen,
+kon `/admin/tickets/<event>` openen, en met de regel hierboven gold dat voor élk
+praesidiumlid op élk event. Dat is niet wat we bedoelden met "mag scannen".
+
+`SCANNER` draagt daarom enkel `SCAN`. De scanner zelf heeft `VIEW_EVENT` nergens
+nodig; enkel het beheer gebruikt ze. Om dezelfde reden telt kunnen scannen niet
+mee in `canAccessAnyTicketEvent()`, want die bepaalt of de **Tickets-tab** in de
+adminnavigatie verschijnt. Wie enkel scant, ziet `/scan` en verder niets.
+
+### De uitnodigings-QR
+
+Aan een deur is een naam intikken traag en een r-nummer vragen omslachtig. Wie
+`MANAGE_SCANNERS` heeft, kan daarom een **QR tonen** in de scanner (web en app).
+Wie ze scant, logt in met zijn eigen VTK-account en heeft daarna scanrechten op
+dat ene event; heeft hij de app, dan staat het event er vanzelf in, want dat volgt
+uit de toekenning.
+
+**De code rolt.** Het token leeft dertig seconden en het paneel haalt om de twintig
+seconden een nieuwe op. Dat maakt een screenshot of een foto in een groepschat
+waardeloos: tegen dat iemand ze doorstuurt, is de code dood. Wees eerlijk over de
+grens: wie de code *binnen* die seconden doorstuurt, geraakt er wel mee binnen.
+Dat geldt voor elke code die je aan een zaal toont, en de uitkomst is hoe dan ook
+niet erger dan wat de standaardregel al toelaat: scannen, en niets anders.
+
+Er is bewust geen tabel voor die uitnodigingen. Een token dat dertig seconden
+leeft, hoef je niet te kunnen intrekken; het formaat staat in
+`lib/ticketing/crypto.ts` naast de andere ondertekende tokens.

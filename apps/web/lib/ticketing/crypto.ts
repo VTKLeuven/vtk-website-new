@@ -10,6 +10,7 @@ import { ticketTokenSecret } from "./config";
 
 const ORDER_PREFIX = "vtko2";
 const TICKET_PREFIX = "vtkt1";
+const INVITE_PREFIX = "vtks1";
 
 function sign(value: string): string {
   return createHmac("sha256", ticketTokenSecret()).update(value).digest("base64url");
@@ -49,6 +50,48 @@ export function verifyOrderAccessToken(
     }
     if (!orderId || (expectedOrderId && orderId !== expectedOrderId)) return null;
     return orderId;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * De uitnodiging waarmee iemand aan de deur scanrechten krijgt.
+ *
+ * Zelfde vorm als het order-token hierboven, met een eigen prefix: de vervaltijd
+ * zit in de payload en wordt mee ondertekend. Bewust géén rij in de databank; dit
+ * token leeft enkele tellen, en wat je niet bewaart hoef je ook niet in te
+ * trekken.
+ *
+ * **Rollend.** Het paneel dat de QR toont, haalt om de twintig seconden een nieuw
+ * token op. Daardoor is een screenshot of een foto in een groepschat vrijwel
+ * altijd al dood. Wees eerlijk over de grens: wie de code binnen die seconden
+ * doorstuurt, geraakt er wel mee binnen. Dat geldt voor elke code die je aan een
+ * zaal toont.
+ */
+export function createScannerInviteToken(eventId: string, expiresAt: Date): string {
+  const encodedId = Buffer.from(eventId, "utf8").toString("base64url");
+  const expires = Math.floor(expiresAt.getTime() / 1000).toString(36);
+  const payload = `${INVITE_PREFIX}.${encodedId}.${expires}`;
+  return `${payload}.${sign(payload)}`;
+}
+
+/** Het event uit een uitnodiging, of `null` bij een verlopen of vervalst token. */
+export function verifyScannerInviteToken(token: string, now = new Date()): string | null {
+  const [prefix, encodedId, rawExpires, signature, ...rest] = token.split(".");
+  if (prefix !== INVITE_PREFIX || !encodedId || !rawExpires || !signature || rest.length > 0) {
+    return null;
+  }
+  const payload = `${prefix}.${encodedId}.${rawExpires}`;
+  if (!safeEqual(signature, sign(payload))) return null;
+
+  try {
+    const eventId = Buffer.from(encodedId, "base64url").toString("utf8");
+    const expiresAtSeconds = Number.parseInt(rawExpires, 36);
+    if (!Number.isSafeInteger(expiresAtSeconds) || expiresAtSeconds * 1000 <= now.getTime()) {
+      return null;
+    }
+    return eventId || null;
   } catch {
     return null;
   }

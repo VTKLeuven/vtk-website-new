@@ -39,12 +39,15 @@ function previewSession(overrides: Partial<SessionPayload> = {}): SessionPayload
 describe('event-scoped ticket roles', () => {
   it('keeps reporter and scanner data access narrow', () => {
     expect(capabilitiesForTicketRoles(['REPORTER'])).toEqual(['VIEW_EVENT', 'VIEW_REPORTS']);
-    expect(capabilitiesForTicketRoles(['SCANNER'])).toEqual(['VIEW_EVENT', 'SCAN']);
+    // SCANNER draagt bewust geen VIEW_EVENT: die capability bewaakt het
+    // event-dashboard in de admin, en wie aan de deur staat hoort daar niet.
+    expect(capabilitiesForTicketRoles(['SCANNER'])).toEqual(['SCAN']);
   });
 
   it('unions multiple roles without widening unrelated roles', () => {
     const capabilities = capabilitiesForTicketRoles(['REPORTER', 'SCANNER']);
     expect(capabilities).toEqual(expect.arrayContaining(['VIEW_EVENT', 'VIEW_REPORTS', 'SCAN']));
+    expect(capabilitiesForTicketRoles(['SCANNER'])).not.toContain('VIEW_EVENT');
     expect(capabilities).not.toContain('VIEW_ATTENDEES');
     expect(capabilities).not.toContain('VIEW_FINANCE');
   });

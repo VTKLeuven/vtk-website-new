@@ -1894,14 +1894,19 @@
   color: var(--muted);
 }
 
-.ticket-admin-person-search input {
+/* Specifiek genoeg om de generieke veldregel hierboven te verslaan: die is
+   `.ticket-admin-field :is(input:not(...):not(...))` en dus specifieker dan een
+   losse `.ticket-admin-person-search input`. Met enkel `!important` won ze
+   alsnog, en dan zie je een kader in een kader. */
+.ticket-admin-field .ticket-admin-person-search input:not([type="hidden"]) {
   border: 0 !important;
+  border-radius: 0 !important;
   background: none !important;
   padding-left: 0 !important;
   padding-right: 0 !important;
 }
 
-.ticket-admin-person-search input:focus {
+.ticket-admin-field .ticket-admin-person-search input:focus {
   outline: none;
 }
 

@@ -52,7 +52,10 @@ const ROLE_CAPABILITIES: Record<TicketRole, readonly TicketCapability[]> = {
     "VIEW_REPORTS",
     "VIEW_AUDIT",
   ],
-  SCANNER: ["VIEW_EVENT", "SCAN"],
+  // Bewust zonder VIEW_EVENT. Die capability bewaakt het event-dashboard in de
+  // admin (`admin/tickets/[eventId]/layout.tsx`), en wie aan de deur staat hoort
+  // daar niet te geraken; het scanpad zelf heeft ze nergens nodig.
+  SCANNER: ["SCAN"],
   REPORTER: ["VIEW_EVENT", "VIEW_REPORTS"],
 };
 
@@ -121,7 +124,8 @@ export function canSessionCreateTicketEventForGroup(
  * van de dagelijkse werking van de kring. Een post mag wel de events van een
  * werkgroep scannen, en dat volgt al uit de eerste tak.
  *
- * Wat dit geeft is de rol `SCANNER`, dus `VIEW_EVENT` + `SCAN` en niets meer.
+ * Wat dit geeft is de rol `SCANNER`, dus enkel `SCAN`: de scanner en niets in
+ * de admin.
  * Het gevolg dat je hiermee aanvaardt staat in `docs/design-decisions.md`: wie
  * kan scannen, ziet de namen van alle deelnemers, want het offline-manifest
  * draagt die lijst mee naar het toestel. `openScanning` is de uitweg voor een
@@ -278,6 +282,15 @@ export async function listScannableTicketEvents() {
   });
 }
 
+/**
+ * Of de **Tickets-tab** in de adminnavigatie mag verschijnen.
+ *
+ * Kunnen scannen telt hier bewust niet mee. De standaardregel geeft elk
+ * praesidiumlid `SCAN` op elk event, en een losse `SCANNER`-grant doet hetzelfde
+ * voor wie aan de deur komt helpen; zou dat de tab openzetten, dan zat het halve
+ * praesidium plots in het ticketbeheer. Wie enkel scant, hoort enkel `/scan` te
+ * zien.
+ */
 export async function canAccessAnyTicketEvent(): Promise<boolean> {
   const session = await requireSession();
   if (hasPermission(session, "tickets.manageAll")) return true;
@@ -285,17 +298,18 @@ export async function canAccessAnyTicketEvent(): Promise<boolean> {
   const preview = await getAuthorizationPreview();
   const allGroupIds = session.groups.map((group) => group.id);
   const leadGroupIds = session.groups.filter((group) => group.role === "LEAD").map((group) => group.id);
-
-  const openScanning = openScanningWhere(session);
+  const beyondScanning: TicketGrantRole[] = ["OWNER", "MANAGER", "FINANCE", "REPORTER"];
 
   const count = await prisma.ticketEvent.count({
     where: {
       OR: [
-        ...(openScanning ? [openScanning] : []),
-        ...(preview ? [] : [{ userGrants: { some: { userId: session.user.id } } }]),
+        ...(preview
+          ? []
+          : [{ userGrants: { some: { userId: session.user.id, role: { in: beyondScanning } } } }]),
         {
           groupGrants: {
             some: {
+              role: { in: beyondScanning },
               OR: [
                 { scope: "ALL_MEMBERS", groupId: { in: allGroupIds } },
                 { scope: "LEADS_ONLY", groupId: { in: leadGroupIds } },

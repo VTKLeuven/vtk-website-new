@@ -4,6 +4,8 @@ import { prisma } from "@vtk/db";
 import { z } from "zod";
 import { logAudit } from "@/lib/audit";
 import { requireTicketEventCapability } from "./authorization";
+import { ticketingBaseUrl } from "./config";
+import { createScannerInviteToken } from "./crypto";
 
 /**
  * Scanners toevoegen en weghalen vanuit de scanner zelf.
@@ -80,10 +82,40 @@ export async function listEventScanners(eventId: string) {
   };
 }
 
-export async function addEventScanner(eventId: string, rawInput: unknown) {
-  const { userId } = scannerUserSchema.parse(rawInput);
-  const { session } = await requireTicketEventCapability(eventId, "MANAGE_SCANNERS");
+/**
+ * Hoe lang een uitnodigings-QR geldig is, en hoe vaak het paneel er een nieuwe
+ * ophaalt. Kort genoeg dat een screenshot niets meer doet; de verversing zit
+ * ruim binnen de vervaltijd zodat de code op het scherm nooit even dood is.
+ */
+export const INVITE_TTL_SECONDS = 30;
+export const INVITE_REFRESH_SECONDS = 20;
 
+/** De URL die in de QR gaat: een uitnodiging voor dit ene event. */
+export async function createScannerInvite(eventId: string) {
+  await requireTicketEventCapability(eventId, "MANAGE_SCANNERS");
+  const expiresAt = new Date(Date.now() + INVITE_TTL_SECONDS * 1000);
+  const token = createScannerInviteToken(eventId, expiresAt);
+  return {
+    url: `${ticketingBaseUrl()}/scan/uitnodiging?code=${encodeURIComponent(token)}`,
+    expiresAt: expiresAt.toISOString(),
+    refreshSeconds: INVITE_REFRESH_SECONDS,
+  };
+}
+
+/**
+ * De schrijfkant van "maak deze persoon scanner", zonder toestemmingscontrole.
+ *
+ * Apart van `addEventScanner` omdat er twee wegen naartoe leiden met een andere
+ * toestemming: het paneel (`MANAGE_SCANNERS`) en een geldige uitnodiging, waar de
+ * scanner zichzelf toevoegt en die capability per definitie niet heeft. Het
+ * schrijven en het logboek horen wel identiek te zijn.
+ */
+export async function grantScannerRole(
+  eventId: string,
+  userId: string,
+  actorUserId: string,
+  via: "PANEL" | "INVITE",
+) {
   const user = await prisma.user.findFirst({
     where: { id: userId, active: true, deletedAt: null },
     select: { id: true, name: true },
@@ -102,15 +134,15 @@ export async function addEventScanner(eventId: string, rawInput: unknown) {
     if (existing) return;
 
     await tx.ticketEventUserGrant.create({
-      data: { eventId, userId: user.id, role: "SCANNER", grantedById: session.user.id },
+      data: { eventId, userId: user.id, role: "SCANNER", grantedById: actorUserId },
     });
     await tx.ticketAuditLog.create({
       data: {
         eventId,
-        actorUserId: session.user.id,
+        actorUserId,
         action: "ACCESS_GRANTED",
         entityType: "TicketEventUserGrant",
-        metadata: { role: "SCANNER", userId: user.id, via: "SCANNER_APP" },
+        metadata: { role: "SCANNER", userId: user.id, via },
       },
     });
   });
@@ -120,9 +152,17 @@ export async function addEventScanner(eventId: string, rawInput: unknown) {
     entity: "ticketAccess",
     entityId: eventId,
     target: user.name,
-    summary: `${user.name} kreeg de rol SCANNER via de scanner`,
+    summary:
+      via === "INVITE"
+        ? `${user.name} werd scanner via een uitnodigings-QR`
+        : `${user.name} kreeg de rol SCANNER via de scanner`,
   });
+}
 
+export async function addEventScanner(eventId: string, rawInput: unknown) {
+  const { userId } = scannerUserSchema.parse(rawInput);
+  const { session } = await requireTicketEventCapability(eventId, "MANAGE_SCANNERS");
+  await grantScannerRole(eventId, userId, session.user.id, "PANEL");
   return listEventScanners(eventId);
 }
 
