@@ -19,6 +19,11 @@ export const TICKET_CAPABILITIES = [
   "SCAN",
   "VIEW_REPORTS",
   "MANAGE_ACCESS",
+  // Smaller dan MANAGE_ACCESS: enkel scanners toevoegen en weghalen. Bestaat
+  // omdat de leads van de eigenaarspost MANAGER krijgen bij het aanmaken, en die
+  // rol geen MANAGE_ACCESS draagt; zonder deze capability kon net de post die
+  // het event organiseert niemand aan de deur zetten.
+  "MANAGE_SCANNERS",
   "VIEW_AUDIT",
 ] as const;
 
@@ -35,6 +40,7 @@ const ROLE_CAPABILITIES: Record<TicketRole, readonly TicketCapability[]> = {
     "MANAGE_ORDERS",
     "SCAN",
     "VIEW_REPORTS",
+    "MANAGE_SCANNERS",
     "VIEW_AUDIT",
   ],
   FINANCE: [
@@ -102,6 +108,53 @@ export function canSessionCreateTicketEventForGroup(
   );
 }
 
+/**
+ * De standaardregel: wie mag scannen zonder dat er een grant voor hem staat.
+ *
+ * Een deurploeg is zelden precies de post die het event aanmaakte. Iemand die om
+ * tien uur komt bijspringen moest vroeger eerst een OWNER vinden die op een
+ * adminpagina een grant toevoegde, en dat gebeurt niet; dan scant er gewoon
+ * iemand anders met zijn eigen account.
+ *
+ * Vandaar: **elke praesidiumpost mag elk event scannen.** Een werkgroep is
+ * smaller; die mag enkel de events van haar eigen werkgroep, want ze staat los
+ * van de dagelijkse werking van de kring. Een post mag wel de events van een
+ * werkgroep scannen, en dat volgt al uit de eerste tak.
+ *
+ * Wat dit geeft is de rol `SCANNER`, dus `VIEW_EVENT` + `SCAN` en niets meer.
+ * Het gevolg dat je hiermee aanvaardt staat in `docs/design-decisions.md`: wie
+ * kan scannen, ziet de namen van alle deelnemers, want het offline-manifest
+ * draagt die lijst mee naar het toestel. `openScanning` is de uitweg voor een
+ * event waar dat niet kan.
+ *
+ * Puur en zonder prisma, zodat de regel testbaar is en niet in drie vormen uit
+ * elkaar groeit; `openScanningWhere` is dezelfde regel voor de SQL-kant.
+ */
+export function hasOpenScanAccess(
+  session: SessionPayload,
+  event: { ownerGroupId: string; openScanning: boolean }
+): boolean {
+  if (!event.openScanning) return false;
+  return session.groups.some(
+    (group) => group.type === "PRAESIDIUM" || group.id === event.ownerGroupId
+  );
+}
+
+/**
+ * Dezelfde regel als `hasOpenScanAccess`, maar als filter op `TicketEvent`.
+ *
+ * `null` betekent "deze sessie krijgt langs deze weg niets", en dan hoort er ook
+ * geen tak in de `OR` bij te komen: een lege `{}` zou net alles doorlaten.
+ */
+export function openScanningWhere(session: SessionPayload) {
+  if (session.groups.some((group) => group.type === "PRAESIDIUM")) {
+    return { openScanning: true };
+  }
+  const groupIds = session.groups.map((group) => group.id);
+  if (groupIds.length === 0) return null;
+  return { openScanning: true, ownerGroupId: { in: groupIds } };
+}
+
 export async function getTicketEventAccess(eventId: string) {
   const session = await requireSession();
   const event = await prisma.ticketEvent.findUnique({
@@ -132,6 +185,9 @@ export async function getTicketEventAccess(eventId: string) {
     ]);
 
     const roles: TicketRole[] = [];
+    // De standaardregel staat naast de grants, niet in de plaats ervan: ze kan
+    // enkel SCANNER toevoegen, dus een grant geeft altijd evenveel of meer.
+    if (hasOpenScanAccess(session, event)) roles.push("SCANNER");
     if (userGrant) roles.push(userGrant.role as TicketRole);
     for (const grant of groupGrants) {
       const membershipRole = membershipByGroup.get(grant.groupId);
@@ -192,11 +248,15 @@ export async function listScannableTicketEvents() {
     .map((group) => group.id);
   // FINANCE en REPORTER dragen geen SCAN, dus die grants horen hier niet bij.
   const scanRoles: TicketGrantRole[] = ["OWNER", "MANAGER", "SCANNER"];
+  const openScanning = openScanningWhere(session);
 
   return prisma.ticketEvent.findMany({
     where: {
       ...window,
       OR: [
+        // De standaardregel; `null` betekent niets toevoegen, want een lege
+        // voorwaarde zou hier net alles doorlaten.
+        ...(openScanning ? [openScanning] : []),
         ...(preview
           ? []
           : [{ userGrants: { some: { userId: session.user.id, role: { in: scanRoles } } } }]),
@@ -226,9 +286,12 @@ export async function canAccessAnyTicketEvent(): Promise<boolean> {
   const allGroupIds = session.groups.map((group) => group.id);
   const leadGroupIds = session.groups.filter((group) => group.role === "LEAD").map((group) => group.id);
 
+  const openScanning = openScanningWhere(session);
+
   const count = await prisma.ticketEvent.count({
     where: {
       OR: [
+        ...(openScanning ? [openScanning] : []),
         ...(preview ? [] : [{ userGrants: { some: { userId: session.user.id } } }]),
         {
           groupGrants: {

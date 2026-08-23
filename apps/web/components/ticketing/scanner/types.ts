@@ -57,7 +57,11 @@ export type ScannerBootstrap = {
     location?: string | null;
     /** Staat de studentenkaart aan de deur aan voor dit event? */
     cardCheckIn?: boolean;
+    /** Mag elke praesidiumpost dit event scannen, of enkel wie een grant heeft? */
+    openScanning?: boolean;
   };
+  /** Mag deze gebruiker scanners toevoegen en weghalen (`MANAGE_SCANNERS`)? */
+  canManageScanners?: boolean;
   gates: ScannerGate[];
   stats?: {
     checkedIn?: number;
@@ -124,4 +128,27 @@ export type ScanConflict = {
   attendeeName?: string;
   result: string;
   scannedAt: string;
+};
+
+/** Iemand die als scanner toegevoegd is, los van de standaardregel. */
+export type EventScanner = {
+  grantId: string;
+  userId: string;
+  name: string;
+  email: string;
+  rNumber: string | null;
+  addedAt: string;
+};
+
+export type EventScannersResponse = {
+  openScanning: boolean;
+  scanners: EventScanner[];
+};
+
+/** Een zoekresultaat uit `/api/tickets/events/<id>/users/search`. */
+export type ScannerCandidate = {
+  id: string;
+  name: string;
+  email: string;
+  rNumber: string | null;
 };

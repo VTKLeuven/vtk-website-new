@@ -28,6 +28,8 @@ import { requireTicketEventCapability } from "@/lib/ticketing/authorization";
 import { AdminEmptyState } from "@/components/ticketing/admin/AdminEmptyState";
 import { AdminMetric } from "@/components/ticketing/admin/AdminMetric";
 import { StatusBadge } from "@/components/ticketing/admin/StatusBadge";
+import { PersonPicker } from "@/components/ticketing/admin/PersonPicker";
+import { OpenScanningToggle } from "@/components/ticketing/admin/OpenScanningToggle";
 import {
   formatDateTime,
   formatNumber,
@@ -55,7 +57,7 @@ export default async function TicketAccessPage({
   const { locale: localeParam, eventId } = await params;
   if (!hasLocale(localeParam)) notFound();
   const locale: AdminLocale = localeParam;
-  await requireTicketEventCapability(eventId, "MANAGE_ACCESS");
+  const { event } = await requireTicketEventCapability(eventId, "MANAGE_ACCESS");
 
   const [userGrants, groupGrants, groups, gates, scanDevices] = await Promise.all([
     prisma.ticketEventUserGrant.findMany({
@@ -75,7 +77,7 @@ export default async function TicketAccessPage({
       orderBy: [{ role: "asc" }, { createdAt: "asc" }],
     }),
     prisma.group.findMany({
-      select: { id: true, nameNl: true, nameEn: true },
+      select: { id: true, nameNl: true, nameEn: true, type: true },
       orderBy: { orderInPraesidium: "asc" },
     }),
     prisma.ticketGate.findMany({
@@ -124,6 +126,23 @@ export default async function TicketAccessPage({
         <AdminMetric icon={DoorOpen} label={locale === "nl" ? "Actieve poorten" : "Active gates"} value={formatNumber(activeGates, locale)} />
       </div>
 
+      <section className="ticket-admin-section" aria-labelledby="open-scanning-heading">
+        <div className="ticket-admin-section-head">
+          <div className="ticket-admin-section-heading">
+            <span className="ticket-admin-section-icon"><ScanLine aria-hidden="true" size={17} /></span>
+            <div>
+              <h2 id="open-scanning-heading">{locale === "nl" ? "Standaard scantoegang" : "Default scan access"}</h2>
+              <p>
+                {locale === "nl"
+                  ? "Wie mag scannen zonder dat er hieronder een toekenning voor hem staat."
+                  : "Who may scan without an explicit grant below."}
+              </p>
+            </div>
+          </div>
+        </div>
+        <OpenScanningToggle eventId={eventId} locale={locale} openScanning={event.openScanning} />
+      </section>
+
       <div className="ticket-admin-grid" data-columns="2">
         <section className="ticket-admin-section" aria-labelledby="person-access-heading">
           <div className="ticket-admin-section-head">
@@ -138,10 +157,7 @@ export default async function TicketAccessPage({
           <form action={addTicketUserGrantAction} className="ticket-admin-form">
             <input type="hidden" name="locale" value={locale} />
             <input type="hidden" name="eventId" value={eventId} />
-            <div className="ticket-admin-field">
-              <label htmlFor="grant-user-email">E-mail</label>
-              <input id="grant-user-email" name="email" type="email" autoComplete="off" required />
-            </div>
+            <PersonPicker eventId={eventId} locale={locale} inputId="grant-user-person" />
             <div className="ticket-admin-field">
               <label htmlFor="grant-user-role">{locale === "nl" ? "Rol" : "Role"}</label>
               <select id="grant-user-role" name="role" defaultValue="MANAGER">
@@ -171,10 +187,19 @@ export default async function TicketAccessPage({
             <div className="ticket-admin-form-grid">
               <div className="ticket-admin-field" data-span="2">
                 <label htmlFor="grant-group">{locale === "nl" ? "Groep" : "Group"}</label>
+                {/* Posten en werkgroepen apart: de standaardregel behandelt ze
+                    verschillend, dus je wil bij het toekennen zien wat je kiest. */}
                 <select id="grant-group" name="groupId" required>
-                  {groups.map((group) => (
-                    <option key={group.id} value={group.id}>{locale === "en" ? group.nameEn : group.nameNl}</option>
-                  ))}
+                  <optgroup label={locale === "nl" ? "Praesidiumposten" : "Praesidium posts"}>
+                    {groups.filter((group) => group.type === "PRAESIDIUM").map((group) => (
+                      <option key={group.id} value={group.id}>{locale === "en" ? group.nameEn : group.nameNl}</option>
+                    ))}
+                  </optgroup>
+                  <optgroup label={locale === "nl" ? "Werkgroepen" : "Working groups"}>
+                    {groups.filter((group) => group.type === "WERKGROEP").map((group) => (
+                      <option key={group.id} value={group.id}>{locale === "en" ? group.nameEn : group.nameNl}</option>
+                    ))}
+                  </optgroup>
                 </select>
               </div>
               <div className="ticket-admin-field">

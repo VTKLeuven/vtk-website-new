@@ -23,6 +23,7 @@ import {
   SignalZero,
   TicketCheck,
   UserRound,
+  UserRoundCog,
   Users,
   WifiOff,
   X,
@@ -44,6 +45,7 @@ import { cardHashInBrowser } from "@/lib/ticketing/cardHash";
 import { ticketColorKey } from "@/lib/ticketing/ticketColors";
 import { loadManifest, loadQueue, saveManifest, saveQueue, verifyOffline } from "./offline";
 import { InstallButton } from "./InstallButton";
+import { ScannerAccess } from "./ScannerAccess";
 
 const CARD_READER_KEY = "vtk-ticket-scanner-card-reader";
 
@@ -215,6 +217,7 @@ export function ScannerApp({ eventId }: { eventId: string }) {
   const [scannedCodes, setScannedCodes] = useState<Set<string>>(new Set());
   const [listOpen, setListOpen] = useState(false);
   const [listQuery, setListQuery] = useState("");
+  const [accessOpen, setAccessOpen] = useState(false);
 
   const loadBootstrap = useCallback(async () => {
     setLoading(true);
@@ -803,8 +806,28 @@ export function ScannerApp({ eventId }: { eventId: string }) {
           {online ? <Signal size={16} aria-hidden="true" /> : <SignalZero size={16} aria-hidden="true" />}
           {online ? "Online" : "Offline"}
         </div>
+        {bootstrap.canManageScanners ? (
+          <button
+            type="button"
+            className="scanner-close"
+            onClick={() => setAccessOpen(true)}
+            aria-label="Scanners beheren"
+            title="Scanners beheren"
+            disabled={!online}
+          >
+            <UserRoundCog aria-hidden="true" />
+          </button>
+        ) : null}
         <Link href="/tickets" className="scanner-close" aria-label="Scanner sluiten" title="Scanner sluiten"><X aria-hidden="true" /></Link>
       </header>
+
+      {accessOpen ? (
+        <ScannerAccess
+          eventId={eventId}
+          openScanning={bootstrap.event.openScanning ?? true}
+          onClose={() => setAccessOpen(false)}
+        />
+      ) : null}
 
       {!online ? (
         <div className="scanner-offline-banner">

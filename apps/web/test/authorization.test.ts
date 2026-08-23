@@ -3,6 +3,8 @@ import type { SessionPayload } from '@vtk/auth';
 import {
   canSessionCreateTicketEventForGroup,
   capabilitiesForTicketRoles,
+  hasOpenScanAccess,
+  openScanningWhere,
 } from '@/lib/ticketing/authorization';
 import {
   AUTHORIZATION_PREVIEW_STOP_PATH,
@@ -50,6 +52,50 @@ describe('event-scoped ticket roles', () => {
   it('gives owners every capability', () => {
     expect(capabilitiesForTicketRoles(['OWNER'])).toContain('MANAGE_ACCESS');
     expect(capabilitiesForTicketRoles(['OWNER'])).toContain('REFUND');
+  });
+});
+
+function group(
+  id: string,
+  type: 'PRAESIDIUM' | 'WERKGROEP',
+  role: 'MEMBER' | 'LEAD' = 'MEMBER',
+) {
+  return { id, code: id, slug: id, nameNl: id, nameEn: id, role, type };
+}
+
+describe('standaard scantoegang', () => {
+  const open = { ownerGroupId: 'onthaal', openScanning: true };
+
+  it('laat elke praesidiumpost een vreemd event scannen', () => {
+    const session = previewSession({ groups: [group('sport', 'PRAESIDIUM')] });
+    expect(hasOpenScanAccess(session, open)).toBe(true);
+  });
+
+  it('laat een werkgroep enkel haar eigen events scannen', () => {
+    const eigen = previewSession({ groups: [group('onthaal', 'WERKGROEP')] });
+    const andere = previewSession({ groups: [group('robotica', 'WERKGROEP')] });
+    expect(hasOpenScanAccess(eigen, open)).toBe(true);
+    expect(hasOpenScanAccess(andere, open)).toBe(false);
+  });
+
+  it('geeft niets aan wie in geen enkele groep zit', () => {
+    expect(hasOpenScanAccess(previewSession(), open)).toBe(false);
+    expect(openScanningWhere(previewSession())).toBeNull();
+  });
+
+  it('sluit iedereen buiten wanneer de schakelaar uit staat', () => {
+    const session = previewSession({ groups: [group('sport', 'PRAESIDIUM')] });
+    expect(hasOpenScanAccess(session, { ...open, openScanning: false })).toBe(false);
+  });
+
+  it('filtert in SQL op hetzelfde onderscheid', () => {
+    const post = previewSession({ groups: [group('sport', 'PRAESIDIUM')] });
+    const werkgroep = previewSession({ groups: [group('robotica', 'WERKGROEP')] });
+    expect(openScanningWhere(post)).toEqual({ openScanning: true });
+    expect(openScanningWhere(werkgroep)).toEqual({
+      openScanning: true,
+      ownerGroupId: { in: ['robotica'] },
+    });
   });
 });
 

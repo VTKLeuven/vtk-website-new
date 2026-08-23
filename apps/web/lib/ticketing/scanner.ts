@@ -79,7 +79,7 @@ async function eventStats(eventId: string) {
 const MANIFEST_LIMIT = 5_000;
 
 export async function scannerBootstrap(eventId: string) {
-  const { event } = await requireTicketEventCapability(eventId, "SCAN");
+  const { event, capabilities } = await requireTicketEventCapability(eventId, "SCAN");
   const [gates, stats, ticketCount] = await Promise.all([
     prisma.ticketGate.findMany({
       where: { eventId, active: true },
@@ -125,7 +125,12 @@ export async function scannerBootstrap(eventId: string) {
       startsAt: event.startsAt,
       location: event.location,
       cardCheckIn: event.cardCheckIn,
+      openScanning: event.openScanning,
     },
+    // Of dit toestel de knop "Scanners" mag tonen. Rijdt mee met de bootstrap
+    // omdat de scanner anders een tweede aanvraag zou moeten doen om te weten of
+    // hij een knop mag tekenen, en dat aan een deur soms zonder netwerk.
+    canManageScanners: capabilities.includes("MANAGE_SCANNERS"),
     gates,
     stats,
     manifest: {

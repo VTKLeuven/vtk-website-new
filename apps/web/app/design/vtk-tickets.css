@@ -2782,3 +2782,176 @@
   font-size: 13px;
   line-height: 1.55;
 }
+
+/* ── Scanners beheren vanuit de scanner ─────────────────────────────────────
+   Een paneel over de scanner in plaats van een aparte pagina: dit gebeurt aan
+   de deur, met de camera al open, en je wil er in twee tikken weer uit. */
+.scanner-sheet {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
+  overflow-y: auto;
+  background: #111318;
+  color: #f7f7f4;
+}
+
+.scanner-sheet header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.scanner-sheet h2 {
+  margin: 0;
+  font-size: 1.15rem;
+  font-weight: 700;
+}
+
+.scanner-sheet h3 {
+  margin: 6px 0 0;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: #a7adba;
+}
+
+.scanner-sheet header button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border: 0;
+  border-radius: 999px;
+  background: #20242b;
+  color: #f7f7f4;
+  cursor: pointer;
+}
+
+.scanner-sheet-note {
+  margin: 0;
+  font-size: 0.85rem;
+  line-height: 1.45;
+  color: #a7adba;
+}
+
+.scanner-sheet-error {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: rgba(239, 81, 100, 0.15);
+  color: #ff8493;
+  font-size: 0.85rem;
+}
+
+.scanner-sheet-search {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 14px;
+  border-radius: 14px;
+  background: #20242b;
+  color: #a7adba;
+}
+
+.scanner-sheet-search input {
+  flex: 1;
+  height: 50px;
+  border: 0;
+  background: none;
+  color: #f7f7f4;
+  font: inherit;
+  font-size: 1rem;
+}
+
+.scanner-sheet-search input:focus {
+  outline: none;
+}
+
+.scanner-sheet-results,
+.scanner-sheet-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.scanner-sheet-results > li,
+.scanner-sheet-list > li {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 11px 2px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.scanner-sheet-results > li > div,
+.scanner-sheet-list > li > div {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+}
+
+.scanner-sheet-results strong,
+.scanner-sheet-list strong {
+  overflow: hidden;
+  font-size: 0.95rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.scanner-sheet-results span,
+.scanner-sheet-list span {
+  font-size: 0.78rem;
+  color: #a7adba;
+}
+
+.scanner-sheet-results button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 40px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 999px;
+  background: #ffd23f;
+  color: #111318;
+  font: inherit;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.scanner-sheet-results button:disabled {
+  background: #20242b;
+  color: #a7adba;
+  cursor: default;
+}
+
+.scanner-sheet-list button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border: 0;
+  border-radius: 999px;
+  background: #20242b;
+  color: #ff8493;
+  cursor: pointer;
+}
+
+.scanner-sheet-empty {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  padding: 10px 2px;
+  font-size: 0.85rem;
+  color: #a7adba;
+}

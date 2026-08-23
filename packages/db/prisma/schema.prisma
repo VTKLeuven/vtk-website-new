@@ -1202,6 +1202,12 @@ model TicketEvent {
   // koppelt de kassa het r-nummer van de ingelogde koper aan zijn ticket en kan
   // de scanner een gescande kaart tot een ticket herleiden.
   cardCheckIn           Boolean           @default(false)
+  // Staat de scanlijst open voor elke praesidiumpost, en voor de leden van de
+  // eigenaarsgroep wanneer die een werkgroep is? Uit zetten voor een event met
+  // een gevoelige gastenlijst; dan telt enkel wie een expliciete grant heeft.
+  // Wie kan scannen, ziet namelijk de namen van alle deelnemers: het
+  // offline-manifest draagt die lijst mee naar het toestel.
+  openScanning          Boolean           @default(true)
   contactEmail          String?
   termsUrl              String?
   termsVersion          String?

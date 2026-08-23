@@ -261,6 +261,12 @@ webscanner blijft staan als webweg en als vangnet.
 - `mock/complete/route.ts` — dev-only instant "payment complete"
 - `maintenance/route.ts` — reconciliation + outbox flush (Bearer `TICKETING_MAINTENANCE_SECRET`)
 - `scanner/events/route.ts` — de evenementen waarvoor je scanrechten hebt, voor de native app
+- `events/[eventId]/scanners` — scanners van dit event opvragen (`GET`), toevoegen
+  (`POST {userId}`) of weghalen (`POST {grantId}`); enkel `MANAGE_SCANNERS`, en
+  enkel de rol `SCANNER`, zodat deze weg nooit een OWNER kan degraderen
+- `events/[eventId]/users/search` — iemand zoeken op naam, e-mail of r-nummer om
+  als scanner toe te voegen; gescoped op de capability van het event en niet op de
+  globale `users.search`-permissie
 - `events/[eventId]/scan`, `.../scan/batch`, `.../scan/card`, `.../scan/reverse`,
   `.../scanner/bootstrap` — scanning (`scan/batch` leegt de offline wachtrij,
   `scan/card` checkt in met een studentenkaart)
@@ -306,6 +312,25 @@ webscanner blijft staan als webweg en als vangnet.
   `GROEP5` by the seed). `tickets.manageAll` — global ticket admin (explicit).
 - Per-event capabilities via grants: `OWNER`/`MANAGER` grants include `SCAN`.
   Superadmins bypass all checks.
+- `MANAGE_SCANNERS` — smaller than `MANAGE_ACCESS`: scanners toevoegen en
+  weghalen, en niets anders. `OWNER` en `MANAGER` dragen ze, zodat de leads van
+  de organiserende post een deurploeg kunnen samenstellen zonder het
+  eigenaarschap of de financiële rollen te kunnen verzetten.
+
+### Standaard scantoegang
+
+Naast de grants staat één regel in code: **elke praesidiumpost mag elk event
+scannen, en een werkgroep enkel de events van haar eigen werkgroep.** Ze geeft de
+rol `SCANNER` (`VIEW_EVENT` + `SCAN`) en niets meer, en `TicketEvent.openScanning`
+zet ze per event uit voor een gevoelige gastenlijst. De kringkeuze en het gevolg
+(wie kan scannen, ziet alle deelnemersnamen, want het manifest reist mee) staan in
+`docs/design-decisions.md`.
+
+De regel staat als twee pure functies in `lib/ticketing/authorization.ts`:
+`hasOpenScanAccess` voor de capability-kant en `openScanningWhere` voor de twee
+SQL-kanten (`listScannableTicketEvents`, `canAccessAnyTicketEvent`). Ze zijn
+bewust puur, want dezelfde regel stond hier al drie keer in een eigen vorm en
+groeit anders uit elkaar; `apps/web/test/authorization.test.ts` legt ze vast.
 
 ## Local testing
 

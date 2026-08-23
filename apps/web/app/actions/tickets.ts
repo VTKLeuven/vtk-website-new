@@ -1024,6 +1024,49 @@ export async function addTicketUserGrantAction(formData: FormData): Promise<void
   refreshTicketEvent(locale, eventId);
 }
 
+/**
+ * De standaardregel per event aan- of uitzetten.
+ *
+ * Staat ze aan, dan kan elke praesidiumpost dit event scannen (en bij een event
+ * van een werkgroep ook die werkgroep zelf), zonder dat er een grant voor hen
+ * staat. Uit zetten doe je voor een gastenlijst die niet bij iedereen hoort te
+ * liggen: wie kan scannen, krijgt met het offline-manifest de namen van alle
+ * deelnemers op zijn toestel.
+ */
+export async function setTicketOpenScanningAction(
+  _previousState: SaveState,
+  formData: FormData,
+): Promise<SaveState> {
+  const eventId = value(formData, "eventId");
+  const locale = localeSchema.parse(value(formData, "locale") || "nl");
+  const open = value(formData, "openScanning") === "1";
+  const { session } = await requireTicketEventCapability(eventId, "MANAGE_ACCESS");
+
+  await prisma.ticketEvent.update({ where: { id: eventId }, data: { openScanning: open } });
+  await prisma.ticketAuditLog.create({
+    data: {
+      eventId,
+      actorUserId: session.user.id,
+      action: open ? "ACCESS_GRANTED" : "ACCESS_REVOKED",
+      entityType: "TicketEvent",
+      entityId: eventId,
+      metadata: { openScanning: open },
+    },
+  });
+  await logAudit({
+    action: "update",
+    entity: "ticketAccess",
+    entityId: eventId,
+    target: await ticketEventTitle(eventId),
+    summary: open
+      ? "elke post mag dit event scannen"
+      : "enkel wie een toekenning heeft, mag dit event scannen",
+  });
+
+  refreshTicketEvent(locale, eventId);
+  return saveOk();
+}
+
 export async function removeTicketUserGrantAction(formData: FormData): Promise<void> {
   const eventId = value(formData, "eventId");
   const grantId = value(formData, "grantId") || value(formData, "id");

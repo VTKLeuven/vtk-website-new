@@ -1879,3 +1879,106 @@
   font-size: 12px;
   line-height: 1.4;
 }
+
+/* ── Persoon zoeken bij een toekenning ──────────────────────────────────────
+   Vervangt het kale e-mailveld: je vindt iemand ook op naam of r-nummer, en dat
+   laatste staat op de studentenkaart van wie je aan de deur bijzet. */
+.ticket-admin-person-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 11px;
+  border: 1px solid var(--line-2);
+  border-radius: 10px;
+  background: #fff;
+  color: var(--muted);
+}
+
+.ticket-admin-person-search input {
+  border: 0 !important;
+  background: none !important;
+  padding-left: 0 !important;
+  padding-right: 0 !important;
+}
+
+.ticket-admin-person-search input:focus {
+  outline: none;
+}
+
+.ticket-admin-person-results {
+  margin: 6px 0 0;
+  padding: 0;
+  max-height: 220px;
+  overflow-y: auto;
+  list-style: none;
+  border: 1px solid var(--line-2);
+  border-radius: 10px;
+  background: #fff;
+}
+
+.ticket-admin-person-results > li + li {
+  border-top: 1px solid var(--line);
+}
+
+.ticket-admin-person-results button {
+  display: grid;
+  width: 100%;
+  gap: 1px;
+  padding: 9px 11px;
+  border: 0;
+  background: none;
+  text-align: left;
+  cursor: pointer;
+}
+
+.ticket-admin-person-results button:hover {
+  background: var(--paper-2);
+}
+
+.ticket-admin-person-results strong {
+  font-size: 14px;
+}
+
+.ticket-admin-person-results span,
+.ticket-admin-picked-person span {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.ticket-admin-picked-person {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 11px;
+  border: 1px solid var(--line-2);
+  border-radius: 10px;
+  background: #fff;
+}
+
+.ticket-admin-picked-person > div {
+  display: grid;
+  min-width: 0;
+  gap: 1px;
+  flex: 1;
+}
+
+.ticket-admin-picked-person button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: 1px solid var(--line-2);
+  border-radius: 999px;
+  background: #fff;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.ticket-admin-hint {
+  margin: 0;
+  grid-column: 1 / -1;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.5;
+}

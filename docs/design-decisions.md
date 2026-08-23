@@ -3510,3 +3510,41 @@ tekst.
 **De kleur is een keuze uit een palet, geen vrije kleurkiezer.** Dat vlak is een
 halve telefoon groot in een donkere zaal; een zelfgekozen pastel of een tweede
 tint groen naast het groen van "aanvaard" is daar vroeg of laat onleesbaar.
+
+## Wie mag scannen aan de deur
+
+Voorheen kon je een event enkel scannen wanneer er expliciet een toekenning voor
+je stond. Aan een deur klopt dat niet: de ploeg van een fuif is zelden precies de
+post die het event aanmaakte, en wie om tien uur komt bijspringen moest eerst
+iemand met OWNER vinden die op een adminpagina een grant toevoegde. Dat gebeurt
+niet; er scant dan gewoon iemand anders met zijn eigen account, en dan klopt het
+scanlogboek niet meer.
+
+**De regel nu.** Elke praesidiumpost kan elk event scannen. Een werkgroep is
+smaller: die kan enkel de events van haar eigen werkgroep. Een post mag dus wel
+de events van een werkgroep scannen, maar niet omgekeerd.
+
+Dat asymmetrische zit er bewust in. Een post is deel van de dagelijkse werking van
+de kring en staat sowieso al eens aan andermans deur; een werkgroep is een aparte
+ploeg rond één ding en heeft geen reden om bij de deelnemerslijst van een cantus
+te kunnen.
+
+**Wat je hiermee aanvaardt: wie kan scannen, ziet de namen van alle deelnemers.**
+Dat is geen slordigheid maar een gevolg van het offline scannen: het manifest met
+die lijst gaat mee naar het toestel, anders werkt de scanner niet in een kelder of
+een tent. Voor een gastenlijst die niet bij het hele praesidium hoort te liggen
+(een gala met externen, iets van alumni) zet je de schakelaar **Standaard
+scantoegang** op `/admin/tickets/<event>/toegang` uit; dan telt enkel wie een
+expliciete toekenning heeft.
+
+**Mensen van buiten het praesidium** voeg je toe met de knop *Scanners* in de
+scanner zelf, op het web en in de native app, door te zoeken op naam, e-mail of
+r-nummer. Dat r-nummer staat op hun studentenkaart, en dat is aan een deur het
+enige wat je van iemand zeker weet. Die weg kan enkel de rol `SCANNER` geven en
+weghalen; alle andere rollen blijven achter het toegangstabblad in het beheer.
+
+Wie dat mag, is de capability `MANAGE_SCANNERS`: `OWNER` en `MANAGER`, dus ook de
+leads van de post die het event organiseert, plus IT via `tickets.manageAll`. Ze
+bestaat apart van `MANAGE_ACCESS` omdat een MANAGER wél een deurploeg moet kunnen
+samenstellen maar niet het eigenaarschap of de financiële rollen van een event
+moet kunnen verzetten.
