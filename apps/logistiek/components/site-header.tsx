@@ -70,6 +70,13 @@ export async function SiteHeader() {
                 {t.navReservations}
               </Link>
             ) : null}
+            {/* Enkel voor wie bij een groep hoort: een externe heeft geen
+                evenementen en zou een leeg scherm openen (N5, E3). */}
+            {session && session.groups.length > 0 ? (
+              <Link href="/evenementen">
+                {t.navEvents}
+              </Link>
+            ) : null}
             {showTrips ? (
               <Link href="/ritten">
                 {t.navTrips}

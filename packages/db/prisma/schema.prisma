@@ -2480,6 +2480,12 @@ model UitleenEvent {
   groupId     String?
   createdById String?
 
+  /// Hoeveel volk er verwacht wordt. Stond tot nu toe enkel per aanvraag, en
+  /// dus drie keer met drie verschillende getallen wanneer materiaal, flesserke
+  /// en transport apart aangevraagd werden. De koepel is de plek waar het één
+  /// keer klopt; per aanvraag blijft het bestaan voor wie zonder evenement werkt.
+  expectedAttendance Int?
+
   /// Vrije nota van het team ("materiaal blijft staan tot maandag").
   note String?
 

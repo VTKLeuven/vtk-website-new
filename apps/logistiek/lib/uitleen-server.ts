@@ -1393,6 +1393,54 @@ export async function adminEvents(): Promise<AdminEvent[]> {
   });
 }
 
+/**
+ * De evenementen van dit lid: die van zijn posten en werkgroepen, plus wat hij
+ * zelf aanmaakte (N5).
+ *
+ * Waarom niet gewoon alles: een postverantwoordelijke wil weten wat er onder
+ * zijn evenement hangt, niet wat de rest van de kring doet. Logistiek heeft
+ * daarvoor /beheer/evenementen, met alles erin.
+ */
+export async function memberEvents(
+  userId: string,
+  groupIds: string[]
+): Promise<AdminEvent[]> {
+  if (groupIds.length === 0) {
+    // Een externe hoort bij geen enkele groep en heeft dus ook geen evenementen;
+    // wat hij zelf aanmaakte bij een aanvraag, blijft wel van hem.
+    return prisma.uitleenEvent.findMany({
+      where: { createdById: userId },
+      orderBy: [{ startAt: 'desc' }, { createdAt: 'desc' }],
+      include: eventInclude,
+      take: 100,
+    });
+  }
+  return prisma.uitleenEvent.findMany({
+    where: { OR: [{ groupId: { in: groupIds } }, { createdById: userId }] },
+    orderBy: [{ startAt: 'desc' }, { createdAt: 'desc' }],
+    include: eventInclude,
+    take: 100,
+  });
+}
+
+/** Eén evenement, maar enkel wanneer dit lid eraan mag (zie {@link memberEvents}). */
+export async function memberEvent(
+  id: string,
+  userId: string,
+  groupIds: string[]
+): Promise<AdminEvent | null> {
+  return prisma.uitleenEvent.findFirst({
+    where: {
+      id,
+      OR: [
+        ...(groupIds.length > 0 ? [{ groupId: { in: groupIds } }] : []),
+        { createdById: userId },
+      ],
+    },
+    include: eventInclude,
+  });
+}
+
 export async function adminEvent(id: string): Promise<AdminEvent | null> {
   return prisma.uitleenEvent.findUnique({ where: { id }, include: eventInclude });
 }

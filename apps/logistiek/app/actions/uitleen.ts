@@ -322,6 +322,76 @@ export async function createTemplateFromSelectionAction(input: {
   return { ok: true, message: `Sjabloon "${name}" bewaard. Iedereen kan het nu kiezen.` };
 }
 
+/**
+ * De basisgegevens van je eigen evenement bijwerken (E1).
+ *
+ * Wat de aanvrager mag wijzigen, is wat hij zelf het best weet: waar het
+ * doorgaat, wanneer het begint en eindigt, en hoeveel volk er komt. De nota
+ * blijft van het team ("materiaal blijft staan tot maandag") en de naam blijft
+ * staan, want daar hangen de aanvragen met hun eigen momentopname aan.
+ *
+ * Enkel voor een evenement van je eigen post of werkgroep, of een dat je zelf
+ * aanmaakte; dezelfde grens als `memberEvents`.
+ */
+export async function saveMemberEventAction(input: {
+  eventId: string;
+  location: string;
+  startDate: string;
+  startTime: string;
+  endDate: string;
+  endTime: string;
+  expectedAttendance: string;
+}): Promise<ActionResult> {
+  const session = await requireSession();
+  const groupIds = session.groups.map((group) => group.id);
+
+  const event = await prisma.uitleenEvent.findFirst({
+    where: {
+      id: input.eventId,
+      OR: [
+        ...(groupIds.length > 0 ? [{ groupId: { in: groupIds } }] : []),
+        { createdById: session.user.id },
+      ],
+    },
+    select: { id: true },
+  });
+  if (!event) return { ok: false, error: 'Dit evenement is niet van jou.' };
+
+  const startAt = input.startDate
+    ? parseBrusselsDateTime(`${input.startDate}T${input.startTime || '00:00'}`)
+    : null;
+  if (input.startDate && !startAt) return { ok: false, error: 'De startdag is ongeldig.' };
+  const endAt = input.endDate
+    ? parseBrusselsDateTime(`${input.endDate}T${input.endTime || '23:59'}`)
+    : null;
+  if (input.endDate && !endAt) return { ok: false, error: 'De einddag is ongeldig.' };
+  if (startAt && endAt && endAt < startAt) {
+    return { ok: false, error: 'Het einde ligt voor het begin.' };
+  }
+
+  const attendanceRaw = input.expectedAttendance.trim();
+  const attendance = attendanceRaw ? Number(attendanceRaw) : null;
+  if (attendance !== null && (!Number.isInteger(attendance) || attendance < 0)) {
+    return { ok: false, error: 'De verwachte opkomst moet een getal zijn.' };
+  }
+
+  await prisma.uitleenEvent.update({
+    where: { id: event.id },
+    data: {
+      location: input.location.trim().slice(0, 300) || null,
+      startAt,
+      startTimeKnown: Boolean(input.startDate && input.startTime),
+      endAt,
+      expectedAttendance: attendance,
+    },
+  });
+
+  revalidatePath('/evenementen');
+  revalidatePath(`/evenementen/${event.id}`);
+  revalidatePath('/beheer/evenementen');
+  return { ok: true, message: 'Evenement bijgewerkt.' };
+}
+
 export async function cancelReservationAction(reservationId: string): Promise<ActionResult> {
   const session = await requireSession();
 
