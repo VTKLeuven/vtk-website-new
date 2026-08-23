@@ -517,6 +517,10 @@ model User {
   // exchange-student bent. Stuurt welke evenementen vanzelf in de kalender
   // opduiken (zie CalendarAudience).
   internationalStudent   Boolean          @default(false)
+  // Afgestudeerde van de faculteit. Bewust los van `notStudying`: die laatste
+  // omvat ook wie stopte zonder af te studeren en is dus geen betrouwbare
+  // alumni-indicator. Stuurt de expliciete alumni-doelgroep in de kalender.
+  alumni                 Boolean          @default(false)
   // Werkingsjaar waarin het lid zijn studieprofiel laatst bevestigde (2026 =
   // "26-27"). Loopt dat achter op het huidige werkingsjaar, dan is het profiel
   // verlopen: de bevestigingsgate vraagt het opnieuw en het lid valt zolang uit
@@ -1095,9 +1099,9 @@ model CalendarEvent {
 
 // Doelgroep waar een categorie voor staat. Een categorie zonder `audience` is een
 // gewoon thema (Career, Sport, ...) dat iedereen ziet en dat als filterchip op
-// /kalender staat. Een categorie mét `audience` verschijnt niet als chip: haar
-// evenementen komen vanzelf bovendrijven bij wie tot die doelgroep hoort, en
-// blijven voor de rest standaard verborgen (zichtbaar te maken met "alles tonen").
+// /kalender staat. Een categorie mét `audience` verschijnt in de aparte rij met
+// doelgroepfilters. Alle evenementen zijn standaard zichtbaar; profielmatching
+// is een expliciete voorkeur van de bezoeker.
 //
 // De waarde is een enum en geen vrij veld, want bij elke waarde hoort code die
 // bepaalt of een lid erbij hoort (zie lib/calendar/audience.ts). Een nieuwe
@@ -1106,6 +1110,7 @@ enum CalendarAudience {
   FIRST_YEARS
   INTERNATIONALS
   LAST_YEARS
+  ALUMNI
 }
 
 model CalendarCategory {

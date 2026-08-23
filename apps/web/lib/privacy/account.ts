@@ -37,6 +37,8 @@ export async function exportUserData(userId: string) {
       studyProgrammes: true,
       notAtFaculty: true,
       notStudying: true,
+      internationalStudent: true,
+      alumni: true,
       studyConfirmedYear: true,
       createdAt: true,
       updatedAt: true,
@@ -408,6 +410,8 @@ export async function eraseUserData(userId: string) {
         studyProgrammes: { set: [] },
         notAtFaculty: false,
         notStudying: false,
+        internationalStudent: false,
+        alumni: false,
         studyConfirmedYear: null,
       },
     });

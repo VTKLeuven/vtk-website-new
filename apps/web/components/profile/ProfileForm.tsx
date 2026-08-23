@@ -53,6 +53,7 @@ export function ProfileForm({
     | "notAtFaculty"
     | "notStudying"
     | "internationalStudent"
+    | "alumni"
     | "rNumberFromKul"
   >;
   next?: string;
@@ -264,6 +265,7 @@ export function ProfileForm({
           notAtFaculty={user.notAtFaculty}
           notStudying={user.notStudying}
           internationalStudent={user.internationalStudent}
+          alumni={user.alumni}
         />
       </fieldset>
 

@@ -13,10 +13,9 @@ export async function GET(request: Request) {
   const end = url.searchParams.get("end");
   const groups = url.searchParams.getAll("group").filter(Boolean);
   const categories = url.searchParams.getAll("category").filter(Boolean);
-  // "Alles tonen" in de kalender: dan valt de doelgroepfilter weg. Het is een
-  // standaard, geen slot; er wordt hier dus niets afgeschermd dat een lid niet
-  // gewoon mag zien.
-  const showAllAudiences = url.searchParams.get("audience") === "all";
+  // Standaard toont de publieke kalender alles. Personalisatie is opt-in: met
+  // `audience=mine` blijven algemene events en doelgroepevents voor dit profiel.
+  const onlyMyAudiences = url.searchParams.get("audience") === "mine";
 
   const where: Prisma.CalendarEventWhereInput = {
     visibility: "PUBLIC",
@@ -38,9 +37,9 @@ export async function GET(request: Request) {
     where.categories = { some: { category: { slug: { in: categories } } } };
   }
 
-  // Wie expliciet om één categorie vraagt (de categoriepagina), krijgt ze ook als
-  // het een doelgroepcategorie is: die pagina ís de eerstejaarskalender.
-  if (!showAllAudiences && categories.length === 0) {
+  // Een expliciete doelgroepfilter (bv. alumni) is preciezer dan profielmatching:
+  // die pagina/filter moet ook bruikbaar zijn voor iemand buiten de doelgroep.
+  if (onlyMyAudiences && categories.length === 0) {
     Object.assign(where, audienceFilter(await viewerAudiences()));
   }
 

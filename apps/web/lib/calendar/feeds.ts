@@ -118,15 +118,13 @@ export async function buildFeed(
 
   switch (scope.kind) {
     case "all": {
-      // Het algemene programma, dus zonder doelgroepevents: die hebben hun eigen
-      // feed (/feed/c/eerstejaars) en horen niet ongevraagd in de agenda van wie
-      // op "de VTK-kalender" klikte.
+      // De hoofdkalender toont en publiceert standaard alle publieke events.
+      // Wie één doelgroep wil, gebruikt de categoriefeed van die doelgroep.
       const events = await prisma.calendarEvent.findMany({
         where: {
           visibility: "PUBLIC",
           publishedAt: { not: null },
           ...window,
-          ...audienceFilter([]),
         },
         select: eventSelect,
         orderBy: { start: "asc" },

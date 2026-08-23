@@ -14,7 +14,7 @@ export type CategoryRow = {
   colour: string;
   order: number;
   showOnCalendarPage: boolean;
-  audience: "FIRST_YEARS" | "INTERNATIONALS" | "LAST_YEARS" | null;
+  audience: "FIRST_YEARS" | "INTERNATIONALS" | "LAST_YEARS" | "ALUMNI" | null;
   eventCount: number;
 };
 
@@ -116,6 +116,7 @@ export function CategoryForm({
             <option value="FIRST_YEARS">{nl ? "Eerstejaars" : "First years"}</option>
             <option value="INTERNATIONALS">Internationals</option>
             <option value="LAST_YEARS">{nl ? "Laatstejaars" : "Last years"}</option>
+            <option value="ALUMNI">Alumni</option>
           </Select>
         </div>
       ) : (

@@ -21,6 +21,17 @@ export function monthGridCells(year: number, monthIndex: number): GridDay[] {
   return cells;
 }
 
+/** De zeven kalenderdagen van de week rond `anchor`, van maandag tot zondag. */
+export function weekGridDays(anchor: Date): Date[] {
+  const start = new Date(anchor.getFullYear(), anchor.getMonth(), anchor.getDate());
+  start.setDate(start.getDate() - mondayFirstWeekdayIndex(start));
+  return Array.from({ length: 7 }, (_, index) => {
+    const day = new Date(start);
+    day.setDate(start.getDate() + index);
+    return day;
+  });
+}
+
 function mondayFirstWeekdayIndex(d: Date): number {
   const js = d.getDay();
   return js === 0 ? 6 : js - 1;

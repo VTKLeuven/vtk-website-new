@@ -19,8 +19,8 @@ describe("calendar category management UI", () => {
     expect(pageSource).toContain('"Target audiences"');
     expect(pageSource).toContain("Career, Feest en Ontspanning");
     expect(pageSource).toContain("Career, Party and Recreation");
-    expect(pageSource).toContain("Eerstejaars, Internationals en Laatstejaars");
-    expect(pageSource).toContain("First years, Internationals and Last years");
+    expect(pageSource).toContain("Eerstejaars, Internationals, Laatstejaars en Alumni");
+    expect(pageSource).toContain("First years, Internationals, Last years and Alumni");
   });
 
   it("offers distinctly labelled creation forms for both concepts", () => {
@@ -31,5 +31,6 @@ describe("calendar category management UI", () => {
     expect(formSource).toContain('"Doelgroep toevoegen"');
     expect(formSource).toContain('"Add audience"');
     expect(formSource).toContain('<option value="LAST_YEARS">');
+    expect(formSource).toContain('<option value="ALUMNI">');
   });
 });

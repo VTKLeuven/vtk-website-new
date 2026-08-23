@@ -23,6 +23,7 @@ function audienceLabel(audience: string | null, locale: Locale): string {
   if (audience === "FIRST_YEARS") return nl ? "Voor eerstejaars" : "For first years";
   if (audience === "LAST_YEARS") return nl ? "Voor laatstejaars" : "For last years";
   if (audience === "INTERNATIONALS") return nl ? "Voor internationals" : "For international students";
+  if (audience === "ALUMNI") return nl ? "Voor alumni" : "For alumni";
   return nl ? "Voor een specifieke doelgroep" : "For a specific audience";
 }
 

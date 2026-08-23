@@ -128,8 +128,8 @@ export default async function AdminCalendarCategories({
         <h2 className="text-lg font-semibold">{nl ? "Doelgroepen" : "Target audiences"}</h2>
         <p className="mb-4 mt-1 text-sm text-vtk-blue-muted">
           {nl
-            ? "Doelgroepen beschrijven voor wie een evenement bedoeld is, bijvoorbeeld Eerstejaars, Internationals en Laatstejaars. Ze verschijnen niet als filter: passende evenementen worden automatisch getoond."
-            : "Target audiences describe who an event is intended for, for example First years, Internationals and Last years. They do not appear as filters: matching events are shown automatically."}
+            ? "Doelgroepen beschrijven voor wie een evenement bedoeld is, bijvoorbeeld Eerstejaars, Internationals, Laatstejaars en Alumni. Bezoekers kunnen erop filteren of de kalender op hun profiel afstemmen."
+            : "Target audiences describe who an event is intended for, for example First years, Internationals, Last years and Alumni. Visitors can filter by them or tailor the calendar to their profile."}
         </p>
         <h3 className="mb-3 font-medium">{nl ? "Nieuwe doelgroep" : "New target audience"}</h3>
         <CategoryForm locale={locale} kind="audience" />

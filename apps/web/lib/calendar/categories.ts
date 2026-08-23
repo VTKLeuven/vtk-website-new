@@ -6,13 +6,13 @@ import type { CalendarCategoryOption } from "@/components/editorial/KalenderEdit
 import { siteBaseUrl } from "./feeds";
 
 /**
- * De categorieën die de kalender kent, in beheerdersvolgorde. Doelgroepen zitten
- * er ook in: ze worden geen filterchip (dat filtert de weergave zelf op
- * `audience`), maar hun naam en kleur zijn nodig voor het label op een event.
+ * De categorieën die de kalender kent, in beheerdersvolgorde. Gewone categorieën
+ * volgen `showOnCalendarPage`; doelgroepen zijn altijd nodig voor hun eigen
+ * filterchip, badge, categoriepagina en feed.
  */
 export async function listCalendarCategories(): Promise<CalendarCategoryOption[]> {
   return prisma.calendarCategory.findMany({
-    where: { showOnCalendarPage: true },
+    where: { OR: [{ showOnCalendarPage: true }, { audience: { not: null } }] },
     select: { slug: true, nameNl: true, nameEn: true, colour: true, audience: true },
     orderBy: [{ order: "asc" }, { nameNl: "asc" }],
   });
@@ -24,7 +24,7 @@ export async function listCalendarCategories(): Promise<CalendarCategoryOption[]
  * doet daar niets.
  */
 export function feedUrlFor(locale: Locale, categorySlug?: string): string {
-  const path = categorySlug ? `/api/calendar/feed/c/${categorySlug}` : "/api/calendar/feed";
+  const path = categorySlug ? `/api/calendar/feed/c/${categorySlug}.ics` : "/api/calendar/feed.ics";
   return `${siteBaseUrl()}${path}${locale === "en" ? "?lang=en" : ""}`;
 }
 
@@ -52,15 +52,14 @@ export function calendarLabels(locale: Locale) {
     nextMonth: nl ? "Volgende maand" : "Next month",
     all: nl ? "Alle" : "All",
     uncategorised: nl ? "Zonder categorie" : "Uncategorised",
-    showAllAudiences: nl ? "Ook andere doelgroepen" : "Other audiences too",
-    showAllAudiencesHint: nl
-      ? "Toon ook evenementen die specifiek voor eerstejaars of internationals bedoeld zijn."
-      : "Also show events aimed specifically at first years or international students.",
-    // Twee weergaven, geen drie: het maandraster ís de agenda, en de lijst is
-    // dezelfde maand chronologisch. De vroegere derde weergave toonde dezelfde
-    // lijst als de tweede, enkel zonder legende.
+    audienceFilters: nl ? "Doelgroepen" : "Target audiences",
+    onlyMyAudiences: nl ? "Afstemmen op mijn profiel" : "Tailor to my profile",
+    onlyMyAudiencesHint: nl
+      ? "Toon algemene evenementen en enkel doelgroepactiviteiten die passen bij je profiel."
+      : "Show general events and only target-audience events that match your profile.",
     views: {
       agenda: nl ? "Agenda" : "Agenda",
+      week: nl ? "Week" : "Week",
       list: nl ? "Lijst" : "List",
     },
   };

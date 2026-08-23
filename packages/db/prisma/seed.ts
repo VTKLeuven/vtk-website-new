@@ -1682,8 +1682,8 @@ async function main() {
   // ICS-feed. Naam, kleur en volgorde zijn daarna GUI-beheerd, dus we raken bij
   // een herseed enkel de slug aan (`update: {}`); enkel nieuwe categorieën komen
   // erbij.
-  // De eerste twee zijn doelgroepen: hun evenementen duiken vanzelf op bij wie
-  // erbij hoort en staan niet tussen de filterchips. De rest zijn gewone thema's.
+  // De eerste vier zijn doelgroepen: ze krijgen aparte filterchips en kunnen via
+  // het profiel gepersonaliseerd worden. De rest zijn gewone thema's.
   const calendarCategories = [
     {
       slug: "eerstejaars",
@@ -1698,6 +1698,20 @@ async function main() {
       nameEn: "International",
       colour: "#14B8A6",
       audience: "INTERNATIONALS" as const,
+    },
+    {
+      slug: "laatstejaars",
+      nameNl: "Laatstejaars",
+      nameEn: "Last years",
+      colour: "#F97316",
+      audience: "LAST_YEARS" as const,
+    },
+    {
+      slug: "alumni",
+      nameNl: "Alumni",
+      nameEn: "Alumni",
+      colour: "#7C3AED",
+      audience: "ALUMNI" as const,
     },
     { slug: "career", nameNl: "Career", nameEn: "Career", colour: "#0EA5E9", audience: null },
     { slug: "cantus", nameNl: "Cantus", nameEn: "Cantus", colour: "#E11D48", audience: null },

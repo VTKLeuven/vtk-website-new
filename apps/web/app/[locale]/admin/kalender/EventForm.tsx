@@ -237,8 +237,8 @@ export function EventForm({
             <Label>{nl ? "Doelgroep" : "Audience"}</Label>
             <p className="mb-2 text-sm text-vtk-blue-muted">
               {nl
-                ? "Laat leeg voor een event voor iedereen. Duid je een doelgroep aan, dan verschijnt het event vanzelf bij die leden en staat het bij de anderen pas onder “ook andere doelgroepen”."
-                : "Leave empty for an event for everyone. Pick an audience and the event surfaces automatically for those members, while others only see it under “other audiences too”."}
+                ? "Laat leeg voor een algemeen event. Met een doelgroep blijft het event voor iedereen zichtbaar, maar bezoekers kunnen erop filteren of hun kalender op hun profiel afstemmen."
+                : "Leave empty for a general event. With a target audience it remains visible to everyone, while visitors can filter by it or tailor the calendar to their profile."}
             </p>
             <div className="flex flex-wrap gap-x-5 gap-y-2">
               {audienceCategories.length > 0 ? (

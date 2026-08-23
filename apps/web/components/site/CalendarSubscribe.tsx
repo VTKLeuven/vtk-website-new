@@ -25,23 +25,26 @@ export function CalendarSubscribe({
   labels: { title: string; sub: string };
 }) {
   const nl = locale === "nl";
-  const [copied, setCopied] = useState(false);
+  const [copied, setCopied] = useState<"link" | "google" | null>(null);
 
   // Het vinkje mag niet blijven staan: na een paar seconden is de knop weer een
   // gewone kopieerknop.
   useEffect(() => {
-    if (!copied) return;
-    const timer = setTimeout(() => setCopied(false), 2500);
+    if (copied === null) return;
+    const timer = setTimeout(() => setCopied(null), 3500);
     return () => clearTimeout(timer);
   }, [copied]);
 
   const webcalUrl = feedUrl.replace(/^https?:/, "webcal:");
-  const googleUrl = `https://calendar.google.com/calendar/r?cid=${encodeURIComponent(feedUrl)}`;
+  // Google ondersteunt "Via URL" officieel, maar niet een stabiele deeplink die
+  // een externe ICS-feed vooraf invult. Open daarom precies dat instellingenscherm
+  // en kopieer de URL bij de klik, in plaats van de foutgevoelige `?cid=`-route.
+  const googleUrl = "https://calendar.google.com/calendar/u/0/r/settings/addbyurl";
 
-  async function copy() {
+  async function copy(kind: "link" | "google" = "link") {
     try {
       await navigator.clipboard.writeText(feedUrl);
-      setCopied(true);
+      setCopied(kind);
       trackCalendarFeedCopy();
     } catch {
       // Clipboard geweigerd (geen https, of de gebruiker blokkeert het): dan
@@ -57,16 +60,34 @@ export function CalendarSubscribe({
         <a className="btn btn-ghost arrow" href={webcalUrl}>
           {nl ? "Agenda-app" : "Calendar app"}
         </a>
-        <a className="btn btn-ghost arrow" href={googleUrl} target="_blank" rel="noreferrer">
-          Google Calendar
+        <a
+          className="btn btn-ghost arrow"
+          href={googleUrl}
+          target="_blank"
+          rel="noreferrer"
+          onClick={() => void copy("google")}
+        >
+          {copied === "google"
+            ? nl
+              ? "Link gekopieerd — plak in Google"
+              : "Link copied — paste in Google"
+            : "Google Calendar"}
         </a>
         <button
           type="button"
           className="btn btn-ghost subscribe-copy"
-          onClick={copy}
-          title={copied ? (nl ? "Gekopieerd" : "Copied") : nl ? "Kopieer feed-link" : "Copy feed link"}
+          onClick={() => void copy("link")}
+          title={
+            copied === "link"
+              ? nl
+                ? "Gekopieerd"
+                : "Copied"
+              : nl
+                ? "Kopieer feed-link"
+                : "Copy feed link"
+          }
           aria-label={
-            copied
+            copied === "link"
               ? nl
                 ? "Feed-link gekopieerd"
                 : "Feed link copied"
@@ -75,10 +96,17 @@ export function CalendarSubscribe({
                 : "Copy feed link"
           }
         >
-          {copied ? <CheckIcon /> : <CopyIcon />}
-          <span>{copied ? (nl ? "Gekopieerd" : "Copied") : nl ? "Kopieer link" : "Copy link"}</span>
+          {copied === "link" ? <CheckIcon /> : <CopyIcon />}
+          <span>
+            {copied === "link" ? (nl ? "Gekopieerd" : "Copied") : nl ? "Kopieer link" : "Copy link"}
+          </span>
         </button>
       </div>
+      <p className="subscribe-hint">
+        {nl
+          ? "Google opent ‘Via URL’. Plak daar de feed-link die bij je klik wordt gekopieerd."
+          : "Google opens ‘From URL’. Paste the feed link copied when you click."}
+      </p>
     </div>
   );
 }

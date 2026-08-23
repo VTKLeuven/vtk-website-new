@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { markdownToPlainText } from "@/lib/markdown";
 import { CalendarSubscribe } from "@/components/site/CalendarSubscribe";
-import { monthGridCells, isSameCalendarDay } from "./calendarGrid";
+import { monthGridCells, weekGridDays, isSameCalendarDay } from "./calendarGrid";
 
 type ApiEvent = {
   id: string;
@@ -41,7 +41,7 @@ export type CalendarCategoryOption = {
   nameNl: string;
   nameEn: string;
   colour: string;
-  /** Niet-null = doelgroepcategorie: geen filterchip, maar een label op het event. */
+  /** Niet-null = doelgroepcategorie: aparte filterchip en een label op het event. */
   audience: string | null;
 };
 
@@ -71,11 +71,12 @@ export function KalenderEditorialView({
     nextMonth: string;
     all: string;
     uncategorised: string;
-    showAllAudiences: string;
-    showAllAudiencesHint: string;
+    audienceFilters: string;
+    onlyMyAudiences: string;
+    onlyMyAudiencesHint: string;
     emptyMonth: string;
     emptyUpcoming: string;
-    views: { agenda: string; list: string };
+    views: { agenda: string; week: string; list: string };
   };
   categories: CalendarCategoryOption[];
   /** Absolute URL van de ICS-feed die bij deze weergave hoort. */
@@ -94,12 +95,14 @@ export function KalenderEditorialView({
 }) {
   const base = locale === "nl" ? "" : "/en";
   const now = new Date();
-  const [cursor, setCursor] = useState(() => new Date(now.getFullYear(), now.getMonth(), 1));
+  const [cursor, setCursor] = useState(
+    () => new Date(now.getFullYear(), now.getMonth(), now.getDate()),
+  );
   const [filter, setFilter] = useState<string>(lockedCategory ?? "all");
-  const [view, setView] = useState<"agenda" | "list">("agenda");
-  // Standaard toont de kalender enkel de doelgroepevents die bij jou horen. Dit
-  // is een voorkeur, geen slot: één klik en alles staat er.
-  const [showAllAudiences, setShowAllAudiences] = useState(false);
+  const [view, setView] = useState<"agenda" | "week" | "list">("agenda");
+  // Alles is standaard zichtbaar. Personalisatie is een bewuste keuze en houdt
+  // algemene events plus de doelgroepevents die bij het profiel horen over.
+  const [onlyMyAudiences, setOnlyMyAudiences] = useState(false);
   // Enkel voor het smalle scherm: welke dag staat er open onder het raster. Op
   // een telefoon passen de eventpillen niet in een cel van 45 pixels, dus toont
   // het raster daar stippen en lees je de dag zelf hieronder.
@@ -110,11 +113,22 @@ export function KalenderEditorialView({
   const year = cursor.getFullYear();
   const month = cursor.getMonth();
   const cells = useMemo(() => monthGridCells(year, month), [year, month]);
+  const weekDays = useMemo(() => weekGridDays(cursor), [cursor]);
 
   const categoryName = useCallback(
     (c: { nameNl: string; nameEn: string }) => (locale === "nl" ? c.nameNl : c.nameEn),
     [locale],
   );
+  const themeCategories = categories.filter((c) => c.audience === null);
+  const audienceOptions = categories.filter((c) => c.audience !== null);
+  const selectedAudience = audienceOptions.some((c) => c.slug === filter);
+
+  const activeFeedUrl = useMemo(() => {
+    if (filter === "all") return feedUrl;
+    const url = new URL(feedUrl);
+    url.pathname = `/api/calendar/feed/c/${filter}.ics`;
+    return url.toString();
+  }, [feedUrl, filter]);
 
   const fetchForRange = useCallback(
     async (start: Date, end: Date) => {
@@ -122,12 +136,12 @@ export function KalenderEditorialView({
       url.searchParams.set("start", start.toISOString());
       url.searchParams.set("end", end.toISOString());
       if (filter !== "all") url.searchParams.set("category", filter);
-      if (showAllAudiences) url.searchParams.set("audience", "all");
+      if (onlyMyAudiences) url.searchParams.set("audience", "mine");
       const res = await fetch(url.toString());
       if (!res.ok) return [];
       return (await res.json()) as ApiEvent[];
     },
-    [filter, showAllAudiences],
+    [filter, onlyMyAudiences],
   );
 
   useEffect(() => {
@@ -176,6 +190,11 @@ export function KalenderEditorialView({
     return m;
   }, [monthEvents]);
 
+  const weekEvents = useMemo(
+    () => weekDays.flatMap((day) => eventsByDay.get(dayKey(day)) ?? []),
+    [eventsByDay, weekDays],
+  );
+
   /**
    * De legende telt per categorie hoeveel events er deze maand in zitten. Een
    * event met twee categorieën telt in beide; een event zonder categorie belandt
@@ -211,7 +230,12 @@ export function KalenderEditorialView({
     }
     const rows = categories
       .filter((c) => (counts.get(c.slug) ?? 0) > 0)
-      .map((c) => ({ key: c.slug, name: categoryName(c), colour: c.colour, count: counts.get(c.slug)! }));
+      .map((c) => ({
+        key: c.slug,
+        name: categoryName(c),
+        colour: c.colour,
+        count: counts.get(c.slug)!,
+      }));
     if (uncategorised > 0) {
       rows.push({ key: "__rest", name: labels.uncategorised, colour: "", count: uncategorised });
     }
@@ -231,7 +255,9 @@ export function KalenderEditorialView({
     const todayKey = dayKey(new Date());
     if (cells.some((c) => c.inMonth && dayKey(c.date) === todayKey)) return todayKey;
 
-    const firstWithEvents = cells.find((c) => c.inMonth && (eventsByDay.get(dayKey(c.date))?.length ?? 0) > 0);
+    const firstWithEvents = cells.find(
+      (c) => c.inMonth && (eventsByDay.get(dayKey(c.date))?.length ?? 0) > 0,
+    );
     if (firstWithEvents) return dayKey(firstWithEvents.date);
 
     const firstOfMonth = cells.find((c) => c.inMonth);
@@ -260,6 +286,16 @@ export function KalenderEditorialView({
       day: "2-digit",
       month: "short",
     });
+  const weekFrom = weekDays[0]!;
+  const weekTo = weekDays[6]!;
+  const weekLabel = `${weekFrom.toLocaleDateString(locale === "nl" ? "nl-BE" : "en-GB", {
+    day: "numeric",
+    month: "short",
+  })} – ${weekTo.toLocaleDateString(locale === "nl" ? "nl-BE" : "en-GB", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  })}`;
 
   function pickTitle(e: ApiEvent) {
     return locale === "nl" ? e.title : e.titleEn || e.title;
@@ -296,7 +332,13 @@ export function KalenderEditorialView({
     });
   }
 
-  function shiftMonth(delta: number) {
+  function shiftPeriod(delta: number) {
+    if (view === "week") {
+      const next = new Date(cursor);
+      next.setDate(next.getDate() + delta * 7);
+      setCursor(next);
+      return;
+    }
     setCursor(new Date(year, month + delta, 1));
   }
 
@@ -304,7 +346,8 @@ export function KalenderEditorialView({
     return `${base}/kalender/${e.id}`;
   }
 
-  const showGrid = view === "agenda";
+  const showMonthGrid = view === "agenda";
+  const periodCount = view === "week" ? weekEvents.length : monthOnlyEvents.length;
 
   /**
    * Eén rij in een evenementenlijst. Gedeeld door de "eerstvolgend"-lijst onder
@@ -345,7 +388,11 @@ export function KalenderEditorialView({
           className="ag-tag"
           style={
             cat
-              ? ({ background: cat.colour, borderColor: cat.colour, color: "#fff" } as React.CSSProperties)
+              ? ({
+                  background: cat.colour,
+                  borderColor: cat.colour,
+                  color: "#fff",
+                } as React.CSSProperties)
               : undefined
           }
         >
@@ -356,13 +403,21 @@ export function KalenderEditorialView({
     );
   }
 
-  const monthNav = (
-    <div style={{ display: "flex", justifyContent: "space-between", marginTop: 32, flexWrap: "wrap", gap: 12 }}>
-      <button type="button" className="btn btn-ghost arrow" onClick={() => shiftMonth(-1)}>
-        {labels.prevEvents}
+  const periodNav = (
+    <div
+      style={{
+        display: "flex",
+        justifyContent: "space-between",
+        marginTop: 32,
+        flexWrap: "wrap",
+        gap: 12,
+      }}
+    >
+      <button type="button" className="btn btn-ghost arrow" onClick={() => shiftPeriod(-1)}>
+        {view === "week" ? (locale === "nl" ? "Vorige week" : "Previous week") : labels.prevEvents}
       </button>
-      <button type="button" className="btn btn-primary arrow" onClick={() => shiftMonth(1)}>
-        {labels.nextMonth}
+      <button type="button" className="btn btn-primary arrow" onClick={() => shiftPeriod(1)}>
+        {view === "week" ? (locale === "nl" ? "Volgende week" : "Next week") : labels.nextMonth}
       </button>
     </div>
   );
@@ -391,7 +446,7 @@ export function KalenderEditorialView({
       </ul>
 
       <CalendarSubscribe
-        feedUrl={feedUrl}
+        feedUrl={activeFeedUrl}
         locale={locale}
         labels={{ title: labels.subscribeTitle, sub: labels.subscribeSub }}
       />
@@ -424,7 +479,12 @@ export function KalenderEditorialView({
           {intro ? <div className="page-head-intro">{intro}</div> : null}
         </div>
         <div className="page-head-meta">
-          <b>{monthEvents.length}</b> {labels.metaEvents}
+          <b>{periodCount}</b>{" "}
+          {view === "week"
+            ? locale === "nl"
+              ? "Evenementen (deze week)"
+              : "Events (this week)"
+            : labels.metaEvents}
         </div>
       </header>
 
@@ -434,18 +494,33 @@ export function KalenderEditorialView({
         <div className="toolbar">
           <div className="toolbar-top">
             <div className="nav-mo">
-              <button type="button" onClick={() => shiftMonth(-1)} aria-label="Previous month">
+              <button
+                type="button"
+                onClick={() => shiftPeriod(-1)}
+                aria-label={view === "week" ? "Previous week" : "Previous month"}
+              >
                 ←
               </button>
-              <button type="button" onClick={() => shiftMonth(1)} aria-label="Next month">
+              <button
+                type="button"
+                onClick={() => shiftPeriod(1)}
+                aria-label={view === "week" ? "Next week" : "Next month"}
+              >
                 →
               </button>
             </div>
             <div className="mo-label">
-              {monthLabel.charAt(0).toUpperCase() + monthLabel.slice(1)}
+              {view === "week"
+                ? weekLabel
+                : monthLabel.charAt(0).toUpperCase() + monthLabel.slice(1)}
               <small>
-                {labels.weekLine} {gridRange} · {monthEvents.length}{" "}
-                {monthEvents.length === 1
+                {view === "week"
+                  ? locale === "nl"
+                    ? "Weekoverzicht"
+                    : "Week overview"
+                  : `${labels.weekLine} ${gridRange}`}{" "}
+                · {periodCount}{" "}
+                {periodCount === 1
                   ? locale === "nl"
                     ? "evenement"
                     : "event"
@@ -454,7 +529,11 @@ export function KalenderEditorialView({
                     : "events"}
               </small>
             </div>
-            <div className="view-switch" role="group" aria-label={locale === "nl" ? "Weergave" : "View"}>
+            <div
+              className="view-switch"
+              role="group"
+              aria-label={locale === "nl" ? "Weergave" : "View"}
+            >
               <button
                 type="button"
                 className={view === "agenda" ? "on" : ""}
@@ -462,6 +541,14 @@ export function KalenderEditorialView({
                 onClick={() => setView("agenda")}
               >
                 {labels.views.agenda}
+              </button>
+              <button
+                type="button"
+                className={view === "week" ? "on" : ""}
+                aria-pressed={view === "week"}
+                onClick={() => setView("week")}
+              >
+                {labels.views.week}
               </button>
               <button
                 type="button"
@@ -484,34 +571,53 @@ export function KalenderEditorialView({
                 >
                   {labels.all}
                 </button>
-                {/* Enkel gewone thema's. Doelgroepen (eerstejaars, internationaal)
-                    zijn geen keuze maar volgen uit je profiel. */}
-                {categories
-                  .filter((c) => c.audience === null)
-                  .map((c) => (
+                {themeCategories.map((c) => (
+                  <button
+                    key={c.slug}
+                    type="button"
+                    className={`filter${filter === c.slug ? " on" : ""}`}
+                    onClick={() => setFilter(c.slug)}
+                  >
+                    {categoryName(c)}
+                  </button>
+                ))}
+              </div>
+              <label className="audience-toggle" title={labels.onlyMyAudiencesHint}>
+                <input
+                  type="checkbox"
+                  checked={onlyMyAudiences}
+                  onChange={(e) => {
+                    const checked = e.target.checked;
+                    setOnlyMyAudiences(checked);
+                    if (checked && selectedAudience) setFilter("all");
+                  }}
+                />
+                {labels.onlyMyAudiences}
+              </label>
+              {audienceOptions.length > 0 ? (
+                <div className="audience-filters" aria-label={labels.audienceFilters}>
+                  <span>{labels.audienceFilters}</span>
+                  {audienceOptions.map((c) => (
                     <button
                       key={c.slug}
                       type="button"
-                      className={`filter${filter === c.slug ? " on" : ""}`}
-                      onClick={() => setFilter(c.slug)}
+                      className={`filter audience-filter${filter === c.slug ? " on" : ""}`}
+                      style={{ "--cat": c.colour } as React.CSSProperties}
+                      onClick={() => {
+                        setFilter(c.slug);
+                        setOnlyMyAudiences(false);
+                      }}
                     >
                       {categoryName(c)}
                     </button>
                   ))}
-              </div>
-              <label className="audience-toggle" title={labels.showAllAudiencesHint}>
-                <input
-                  type="checkbox"
-                  checked={showAllAudiences}
-                  onChange={(e) => setShowAllAudiences(e.target.checked)}
-                />
-                {labels.showAllAudiences}
-              </label>
+                </div>
+              ) : null}
             </div>
           )}
         </div>
 
-        {showGrid && (
+        {showMonthGrid && (
           <div className="kal-main">
             <div className="cal">
               <div className="cal-header">
@@ -546,7 +652,9 @@ export function KalenderEditorialView({
                             <span
                               key={e.id}
                               className="cal-dot"
-                              style={cat ? ({ "--cat": cat.colour } as React.CSSProperties) : undefined}
+                              style={
+                                cat ? ({ "--cat": cat.colour } as React.CSSProperties) : undefined
+                              }
                             />
                           );
                         })}
@@ -599,7 +707,10 @@ export function KalenderEditorialView({
                       );
                     })}
                     {more > 0 ? (
-                      <div className="ev-pill more" title={list.map((e) => pickTitle(e)).join(", ")}>
+                      <div
+                        className="ev-pill more"
+                        title={list.map((e) => pickTitle(e)).join(", ")}
+                      >
                         +{more}
                       </div>
                     ) : null}
@@ -616,7 +727,11 @@ export function KalenderEditorialView({
                   ? (() => {
                       const text = selectedDate.toLocaleDateString(
                         locale === "nl" ? "nl-BE" : "en-GB",
-                        { weekday: "long", day: "numeric", month: "long" },
+                        {
+                          weekday: "long",
+                          day: "numeric",
+                          month: "long",
+                        },
                       );
                       return text.charAt(0).toUpperCase() + text.slice(1);
                     })()
@@ -662,6 +777,75 @@ export function KalenderEditorialView({
           </div>
         )}
 
+        {view === "week" && (
+          <div className="kal-main week-main">
+            <div>
+              <section
+                className="week-cal"
+                aria-label={locale === "nl" ? "Weekkalender" : "Week calendar"}
+              >
+                {weekDays.map((date) => {
+                  const events = eventsByDay.get(dayKey(date)) ?? [];
+                  const today = isSameCalendarDay(date, new Date());
+                  return (
+                    <div key={dayKey(date)} className={`week-day${today ? " today" : ""}`}>
+                      <header>
+                        <span>
+                          {date.toLocaleDateString(locale === "nl" ? "nl-BE" : "en-GB", {
+                            weekday: "short",
+                          })}
+                        </span>
+                        <b>{date.getDate()}</b>
+                        <small>
+                          {date.toLocaleDateString(locale === "nl" ? "nl-BE" : "en-GB", {
+                            month: "short",
+                          })}
+                        </small>
+                      </header>
+                      <div className="week-events">
+                        {events.length === 0 ? (
+                          <span className="week-empty">
+                            {locale === "nl" ? "Geen evenementen" : "No events"}
+                          </span>
+                        ) : (
+                          events.map((event) => {
+                            const cat = primaryCategory(event);
+                            return (
+                              <a
+                                key={event.id}
+                                href={eventHref(event)}
+                                className="week-event"
+                                style={
+                                  cat ? ({ "--cat": cat.colour } as React.CSSProperties) : undefined
+                                }
+                              >
+                                <span className="week-event-time">{eventTime(event)}</span>
+                                <b>{pickTitle(event)}</b>
+                                {event.location ? <small>{event.location}</small> : null}
+                                {audienceCategories(event).map((audience) => (
+                                  <span
+                                    key={audience.slug}
+                                    className="week-audience"
+                                    style={{ "--cat": audience.colour } as React.CSSProperties}
+                                  >
+                                    {categoryName(audience)}
+                                  </span>
+                                ))}
+                              </a>
+                            );
+                          })
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </section>
+              {periodNav}
+            </div>
+            {aside}
+          </div>
+        )}
+
         {/* Agenda: onder het raster staat wat er de komende twee weken op je
             afkomt. Dat is het enige blok dat bewust niet met de pijlen meegaat. */}
         {view === "agenda" && (
@@ -676,7 +860,7 @@ export function KalenderEditorialView({
               ) : (
                 <div className="agenda-list">{agendaEvents.slice(0, 8).map(renderRow)}</div>
               )}
-              {monthNav}
+              {periodNav}
             </div>
           </section>
         )}
@@ -705,7 +889,7 @@ export function KalenderEditorialView({
               ) : (
                 <div className="agenda-list">{monthOnlyEvents.map(renderRow)}</div>
               )}
-              {monthNav}
+              {periodNav}
             </div>
           </section>
         )}

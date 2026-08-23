@@ -35,6 +35,7 @@ const studySchema = {
   notAtFaculty: z.boolean().default(false),
   notStudying: z.boolean().default(false),
   internationalStudent: z.boolean().default(false),
+  alumni: z.boolean().default(false),
 };
 
 /**
@@ -56,6 +57,7 @@ function studyFields(formData: FormData) {
     notAtFaculty: formData.get("notAtFaculty") === "on",
     notStudying: formData.get("notStudying") === "on",
     internationalStudent: formData.get("internationalStudent") === "on",
+    alumni: formData.get("alumni") === "on",
   };
 }
 
@@ -210,6 +212,7 @@ export async function saveProfileAction(
         notAtFaculty: data.notAtFaculty,
         notStudying: data.notStudying,
         internationalStudent: data.internationalStudent,
+        alumni: data.alumni,
         // Wie dit formulier invult, declareert daarmee zijn studie voor dit
         // werkingsjaar; de bevestigingsgate hoeft er dan niet meer op te vallen.
         studyConfirmedYear: currentWorkingYear(),
@@ -280,6 +283,7 @@ export async function confirmStudyAction(formData: FormData): Promise<void> {
       notAtFaculty: parsed.data.notAtFaculty,
       notStudying: parsed.data.notStudying,
       internationalStudent: parsed.data.internationalStudent,
+      alumni: parsed.data.alumni,
       studyConfirmedYear: currentWorkingYear(),
     },
   });

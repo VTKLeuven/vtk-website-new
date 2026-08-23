@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { prisma } from "@vtk/db";
 import { audienceFilter, audiencesForUser } from "@/lib/calendar/audience";
+import { buildFeed } from "@/lib/calendar/feeds";
 
 /**
  * De doelgroepfilter tegen een echte database. Dit is precies het stuk dat een
@@ -15,16 +16,19 @@ describe.sequential("kalender-doelgroepen", () => {
     firstYearCat: randomUUID(),
     intlCat: randomUUID(),
     lastYearsCat: randomUUID(),
+    alumniCat: randomUUID(),
     themeCat: randomUUID(),
     plainEvent: randomUUID(),
     firstYearEvent: randomUUID(),
     intlEvent: randomUUID(),
     lastYearsEvent: randomUUID(),
+    alumniEvent: randomUUID(),
     bothEvent: randomUUID(),
     firstYearUser: randomUUID(),
     masterUser: randomUUID(),
     intlUser: randomUUID(),
     finalMasterUser: randomUUID(),
+    alumniUser: randomUUID(),
   };
 
   const start = new Date("2027-03-01T18:00:00.000Z");
@@ -44,15 +48,52 @@ describe.sequential("kalender-doelgroepen", () => {
 
   beforeAll(async () => {
     await prisma.group.create({
-      data: { id: ids.group, code: `aud-${ids.group}`, slug: `aud-${ids.group}`, nameNl: "T", nameEn: "T" },
+      data: {
+        id: ids.group,
+        code: `aud-${ids.group}`,
+        slug: `aud-${ids.group}`,
+        nameNl: "T",
+        nameEn: "T",
+      },
     });
 
     await prisma.calendarCategory.createMany({
       data: [
-        { id: ids.firstYearCat, slug: `ey-${ids.firstYearCat}`, nameNl: "EJ", nameEn: "FY", audience: "FIRST_YEARS" },
-        { id: ids.intlCat, slug: `in-${ids.intlCat}`, nameNl: "Int", nameEn: "Int", audience: "INTERNATIONALS" },
-        { id: ids.lastYearsCat, slug: `ly-${ids.lastYearsCat}`, nameNl: "Laatstejaars", nameEn: "Last years", audience: "LAST_YEARS" },
-        { id: ids.themeCat, slug: `th-${ids.themeCat}`, nameNl: "Thema", nameEn: "Theme", audience: null },
+        {
+          id: ids.firstYearCat,
+          slug: `ey-${ids.firstYearCat}`,
+          nameNl: "EJ",
+          nameEn: "FY",
+          audience: "FIRST_YEARS",
+        },
+        {
+          id: ids.intlCat,
+          slug: `in-${ids.intlCat}`,
+          nameNl: "Int",
+          nameEn: "Int",
+          audience: "INTERNATIONALS",
+        },
+        {
+          id: ids.lastYearsCat,
+          slug: `ly-${ids.lastYearsCat}`,
+          nameNl: "Laatstejaars",
+          nameEn: "Last years",
+          audience: "LAST_YEARS",
+        },
+        {
+          id: ids.alumniCat,
+          slug: `al-${ids.alumniCat}`,
+          nameNl: "Alumni",
+          nameEn: "Alumni",
+          audience: "ALUMNI",
+        },
+        {
+          id: ids.themeCat,
+          slug: `th-${ids.themeCat}`,
+          nameNl: "Thema",
+          nameEn: "Theme",
+          audience: null,
+        },
       ],
     });
 
@@ -63,6 +104,7 @@ describe.sequential("kalender-doelgroepen", () => {
       [ids.firstYearEvent, [ids.firstYearCat]],
       [ids.intlEvent, [ids.intlCat]],
       [ids.lastYearsEvent, [ids.lastYearsCat]],
+      [ids.alumniEvent, [ids.alumniCat]],
       [ids.bothEvent, [ids.firstYearCat, ids.intlCat]],
     ] as const) {
       await prisma.calendarEvent.create({
@@ -83,18 +125,42 @@ describe.sequential("kalender-doelgroepen", () => {
     await makeUser(ids.masterUser, { studyYears: ["MASTER_1"] });
     await makeUser(ids.intlUser, { studyYears: ["MASTER_1"], internationalStudent: true });
     await makeUser(ids.finalMasterUser, { studyYears: ["MASTER_2"] });
+    await makeUser(ids.alumniUser, { alumni: true });
   });
 
   afterAll(async () => {
     await prisma.calendarEvent.deleteMany({
-      where: { id: { in: [ids.plainEvent, ids.firstYearEvent, ids.intlEvent, ids.lastYearsEvent, ids.bothEvent] } },
+      where: {
+        id: {
+          in: [
+            ids.plainEvent,
+            ids.firstYearEvent,
+            ids.intlEvent,
+            ids.lastYearsEvent,
+            ids.alumniEvent,
+            ids.bothEvent,
+          ],
+        },
+      },
     });
     await prisma.calendarCategory.deleteMany({
-      where: { id: { in: [ids.firstYearCat, ids.intlCat, ids.lastYearsCat, ids.themeCat] } },
+      where: {
+        id: { in: [ids.firstYearCat, ids.intlCat, ids.lastYearsCat, ids.alumniCat, ids.themeCat] },
+      },
     });
     await prisma.group.delete({ where: { id: ids.group } });
     await prisma.user.deleteMany({
-      where: { id: { in: [ids.firstYearUser, ids.masterUser, ids.intlUser, ids.finalMasterUser] } },
+      where: {
+        id: {
+          in: [
+            ids.firstYearUser,
+            ids.masterUser,
+            ids.intlUser,
+            ids.finalMasterUser,
+            ids.alumniUser,
+          ],
+        },
+      },
     });
   });
 
@@ -102,7 +168,16 @@ describe.sequential("kalender-doelgroepen", () => {
   async function visible(audiences: Parameters<typeof audienceFilter>[0]) {
     const rows = await prisma.calendarEvent.findMany({
       where: {
-        id: { in: [ids.plainEvent, ids.firstYearEvent, ids.intlEvent, ids.lastYearsEvent, ids.bothEvent] },
+        id: {
+          in: [
+            ids.plainEvent,
+            ids.firstYearEvent,
+            ids.intlEvent,
+            ids.lastYearsEvent,
+            ids.alumniEvent,
+            ids.bothEvent,
+          ],
+        },
         ...audienceFilter(audiences),
       },
       select: { id: true },
@@ -115,6 +190,7 @@ describe.sequential("kalender-doelgroepen", () => {
     expect(await audiencesForUser(ids.masterUser)).toEqual([]);
     expect(await audiencesForUser(ids.intlUser)).toEqual(["INTERNATIONALS"]);
     expect(await audiencesForUser(ids.finalMasterUser)).toEqual(["LAST_YEARS"]);
+    expect(await audiencesForUser(ids.alumniUser)).toEqual(["ALUMNI"]);
   });
 
   it("toont zonder doelgroep enkel evenementen zonder doelgroep", async () => {
@@ -140,10 +216,29 @@ describe.sequential("kalender-doelgroepen", () => {
     expect(seen).toEqual(new Set([ids.plainEvent, ids.lastYearsEvent]));
   });
 
+  it("toont alumnievenementen in het alumni-profiel", async () => {
+    const seen = await visible(["ALUMNI"]);
+    expect(seen).toEqual(new Set([ids.plainEvent, ids.alumniEvent]));
+  });
+
   it("toont alles aan wie bij beide doelgroepen hoort", async () => {
     const seen = await visible(["FIRST_YEARS", "INTERNATIONALS"]);
     expect(seen).toEqual(
       new Set([ids.plainEvent, ids.firstYearEvent, ids.intlEvent, ids.bothEvent]),
     );
+  });
+
+  it("neemt alle doelgroepen op in de publieke hoofdagenda-feed", async () => {
+    const feed = await buildFeed({ kind: "all" }, "nl", new Date("2027-03-01T12:00:00.000Z"));
+    for (const eventId of [
+      ids.plainEvent,
+      ids.firstYearEvent,
+      ids.intlEvent,
+      ids.lastYearsEvent,
+      ids.alumniEvent,
+      ids.bothEvent,
+    ]) {
+      expect(feed).toContain(`SUMMARY:${eventId}`);
+    }
   });
 });
