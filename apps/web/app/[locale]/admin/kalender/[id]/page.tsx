@@ -54,6 +54,7 @@ export default async function EditEventPage({
         groups={groups}
         categories={categories}
         locale={locale}
+        canManageCategories={canAll}
       />
       <EventTicketsPanel
         eventId={event.id}

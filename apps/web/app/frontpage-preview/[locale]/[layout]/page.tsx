@@ -54,7 +54,12 @@ export default async function FrontpagePreview({
     prisma.frontpage.findUnique({ where: { layout } }),
     viewerAudiences().then((audiences) =>
       prisma.calendarEvent.findMany({
-        where: { start: { gte: now }, visibility: "PUBLIC", ...audienceFilter(audiences) },
+        where: {
+          start: { gte: now },
+          visibility: "PUBLIC",
+          publishedAt: { not: null },
+          ...audienceFilter(audiences),
+        },
         orderBy: { start: "asc" },
         take: 8,
         include: { group: true },

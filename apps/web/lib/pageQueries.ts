@@ -64,8 +64,8 @@ export const loadCalendarCategory = cache(
 
 /** Eén kalenderevenement, met alles wat de detailpagina toont. */
 export const loadCalendarEvent = cache(async (id: string) =>
-  prisma.calendarEvent.findUnique({
-    where: { id },
+  prisma.calendarEvent.findFirst({
+    where: { id, publishedAt: { not: null } },
     include: {
       group: true,
       ticketEvent: { select: { slug: true, status: true } },

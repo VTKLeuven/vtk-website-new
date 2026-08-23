@@ -107,7 +107,12 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
     // iedereen op de homepage te staan terwijl het uit de kalender gefilterd is.
     viewerAudiences().then((audiences) =>
       prisma.calendarEvent.findMany({
-        where: { start: { gte: now }, visibility: "PUBLIC", ...audienceFilter(audiences) },
+        where: {
+          start: { gte: now },
+          visibility: "PUBLIC",
+          publishedAt: { not: null },
+          ...audienceFilter(audiences),
+        },
         orderBy: { start: "asc" },
         take: 8,
         include: { group: true },

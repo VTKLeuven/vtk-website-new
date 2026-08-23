@@ -41,6 +41,7 @@ const EVENT_FIELD_LABELS: Record<string, string> = {
   visibility: "zichtbaarheid",
   url: "link",
   imageKey: "afbeelding",
+  publishedAt: "publicatiestatus",
 };
 
 async function assertCanManageEvent(userGroups: string[], groupId: string, superOrAll: boolean) {
@@ -70,6 +71,7 @@ export async function saveEventAction(_prev: SaveState, formData: FormData): Pro
   if (!parsed.success || image.kind === "invalid") return saveError("INVALID_INPUT");
   const input = parsed.data;
   const categoryIds = formData.getAll("categoryIds").map(String).filter(Boolean);
+  const saveAsDraft = formData.get("publication") === "draft";
 
   let start: Date;
   let end: Date;
@@ -122,9 +124,13 @@ export async function saveEventAction(_prev: SaveState, formData: FormData): Pro
     if (!existing) return saveError("INVALID_INPUT");
     await assertCanManageEvent(userGroupIds, existing.groupId, superOrAll);
     const imageKey = resolveImageKey(image, existing.imageKey);
+    // De gewone knop publiceert een bestaand concept en bewaart de status van
+    // een al gepubliceerd evenement. Alleen de expliciete conceptknop haalt het
+    // evenement offline.
+    const publishedAt = saveAsDraft ? null : (existing.publishedAt ?? new Date());
     await prisma.calendarEvent.update({
       where: { id: input.id },
-      data: { ...data, imageKey, categories: setCategories },
+      data: { ...data, imageKey, publishedAt, categories: setCategories },
     });
     // Een gekoppeld ticketevent erft deze velden. Zonder deze duw blijft de
     // ticketshop de oude datum of locatie tonen tot iemand daar toevallig ook
@@ -147,7 +153,7 @@ export async function saveEventAction(_prev: SaveState, formData: FormData): Pro
       entity: "calendarEvent",
       entityId: input.id,
       target: input.titleNl,
-      summary: describeChanges(existing, { ...data, imageKey }, EVENT_FIELD_LABELS),
+      summary: describeChanges(existing, { ...data, imageKey, publishedAt }, EVENT_FIELD_LABELS),
     });
     // De vervangen (of gewiste) afbeelding opruimen, zodat losse objecten niet
     // in de bucket blijven staan. Mislukt dat, dan is dat geen opslaanfout.
@@ -163,6 +169,7 @@ export async function saveEventAction(_prev: SaveState, formData: FormData): Pro
       data: {
         ...data,
         imageKey: resolveImageKey(image, null),
+        publishedAt: saveAsDraft ? null : new Date(),
         categories: { create: categoryIds.map((categoryId) => ({ categoryId })) },
       },
       select: { id: true },
@@ -213,9 +220,10 @@ const categorySchema = z.object({
     .regex(/^#[0-9a-fA-F]{6}$/),
   order: z.coerce.number().int().min(0).max(999),
   showOnCalendarPage: z.coerce.boolean().default(false),
-  // Leeg = gewoon thema. Bij elke doelgroepwaarde hoort code die bepaalt wie
-  // erbij hoort (lib/calendar/audience.ts), dus dit is een gesloten lijst.
-  audience: z.enum(["FIRST_YEARS", "INTERNATIONALS"]).nullable().default(null),
+  // Bij elke doelgroepwaarde hoort code die bepaalt wie erbij hoort
+  // (lib/calendar/audience.ts), dus dit is een gesloten lijst.
+  kind: z.enum(["category", "audience"]),
+  audience: z.enum(["FIRST_YEARS", "INTERNATIONALS", "LAST_YEARS"]).nullable().default(null),
 });
 
 const CATEGORY_FIELD_LABELS: Record<string, string> = {
@@ -262,10 +270,17 @@ export async function saveCalendarCategoryAction(
     colour: formData.get("colour"),
     order: formData.get("order") ?? 0,
     showOnCalendarPage: formData.get("showOnCalendarPage") === "on",
+    kind: formData.get("kind"),
     audience: formData.get("audience") || null,
   });
   if (!parsed.success) return saveError("INVALID_INPUT");
-  const { id, ...data } = parsed.data;
+  const { id, kind, ...parsedData } = parsed.data;
+  if (kind === "audience" && !parsedData.audience) return saveError("INVALID_INPUT");
+  const data = {
+    ...parsedData,
+    audience: kind === "category" ? null : parsedData.audience,
+    showOnCalendarPage: kind === "category" ? parsedData.showOnCalendarPage : false,
+  };
 
   // Een dubbele slug is gewone invoerfout, geen serverfout: hij hoort als rode
   // toast terug te komen in plaats van in de error boundary te belanden.

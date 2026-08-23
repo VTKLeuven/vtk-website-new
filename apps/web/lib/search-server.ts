@@ -34,8 +34,8 @@ import { listImmichGalleryAlbums } from "@/lib/immich-gallery";
  * 1. Postgres rangschikt met `websearch_to_tsquery` tegen de tsvector-kolom en
  *    levert kandidaat-ids met hun rang en hun fragment.
  * 2. Prisma haalt daaruit de rijen op **met dezelfde where-regels als de rest
- *    van de site**: `publishedAt` voor een pagina, en voor een evenement
- *    `visibility: "PUBLIC"` plus `audienceFilter()` uit
+ *    van de site**: `publishedAt` voor pagina's én evenementen, en voor een
+ *    evenement ook `visibility: "PUBLIC"` plus `audienceFilter()` uit
  *    `lib/calendar/audience.ts`, precies zoals `/api/calendar/events` en de
  *    ics-feeds die gebruiken.
  *
@@ -140,6 +140,7 @@ async function eventCandidates(
            ts_headline(${config}::regconfig, ${body}, q.query, ${HEADLINE_OPTIONS}) AS headline
     FROM "CalendarEvent" e, ${tsQuery(query, config, prefix)} AS q(query)
     WHERE e."visibility" = 'PUBLIC'
+      AND e."publishedAt" IS NOT NULL
       AND ${vector} @@ q.query
     ORDER BY "rank" DESC
     LIMIT ${CANDIDATE_LIMIT}
@@ -261,6 +262,7 @@ async function eventResults(
     where: {
       id: { in: [...candidates.keys()] },
       visibility: "PUBLIC",
+      publishedAt: { not: null },
       ...audienceFilter(audiences),
     },
     select: {

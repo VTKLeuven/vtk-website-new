@@ -50,6 +50,7 @@ export type SitemapHeaderTab = {
 export type SitemapEvent = {
   id: string;
   visibility: "PUBLIC" | "MEMBERS";
+  publishedAt: Date | null;
   updatedAt: Date;
 };
 
@@ -94,10 +95,10 @@ export function buildSitemapEntries(input: SitemapInput): MetadataRoute.Sitemap 
     .filter((page) => page.publishedAt !== null)
     .map((page) => entry(pagePath(page), page.contentEditedAt ?? page.updatedAt, 0.6));
 
-  // Ledenexclusieve evenementen staan achter een login; ze mogen niet eens als
-  // titel in een zoekresultaat opduiken.
+  // Concepten staan nog nergens online; ledenexclusieve evenementen staan achter
+  // een login. Geen van beide hoort een publiek adres in de sitemap te krijgen.
   const eventEntries = input.events
-    .filter((event) => event.visibility === "PUBLIC")
+    .filter((event) => event.publishedAt !== null && event.visibility === "PUBLIC")
     .map((event) => entry(`/kalender/${event.id}`, event.updatedAt, 0.5));
 
   // Ontdubbelen, want de lijsten overlappen elkaar echt: `/theokot`, `/shift` en

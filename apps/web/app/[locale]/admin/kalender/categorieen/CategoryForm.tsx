@@ -14,7 +14,7 @@ export type CategoryRow = {
   colour: string;
   order: number;
   showOnCalendarPage: boolean;
-  audience: "FIRST_YEARS" | "INTERNATIONALS" | null;
+  audience: "FIRST_YEARS" | "INTERNATIONALS" | "LAST_YEARS" | null;
   eventCount: number;
 };
 
@@ -26,9 +26,11 @@ export type CategoryRow = {
 export function CategoryForm({
   category,
   locale,
+  kind,
 }: {
   category?: CategoryRow;
   locale: "nl" | "en";
+  kind: "category" | "audience";
 }) {
   const nl = locale === "nl";
   const dict = getDictionary(locale);
@@ -37,7 +39,19 @@ export function CategoryForm({
     <SaveForm
       action={saveCalendarCategoryAction}
       className="grid grid-cols-1 items-end gap-3 md:grid-cols-[1fr_1fr_1fr_auto_5rem_10rem_auto] [&>button]:justify-self-start"
-      submitLabel={category ? (nl ? "Opslaan" : "Save") : nl ? "Toevoegen" : "Add"}
+      submitLabel={
+        category
+          ? nl
+            ? "Opslaan"
+            : "Save"
+          : kind === "category"
+            ? nl
+              ? "Categorie toevoegen"
+              : "Add category"
+            : nl
+              ? "Doelgroep toevoegen"
+              : "Add audience"
+      }
       savingLabel={dict.common.saving}
       savedMessage={
         category
@@ -57,6 +71,7 @@ export function CategoryForm({
       fallbackErrorMessage={dict.common.saveError}
     >
       {category && <input type="hidden" name="id" value={category.id} />}
+      <input type="hidden" name="kind" value={kind} />
       <div>
         <Label>{nl ? "Naam (NL)" : "Name (NL)"}</Label>
         <Input name="nameNl" defaultValue={category?.nameNl} required maxLength={60} />
@@ -94,30 +109,25 @@ export function CategoryForm({
         <Label>{nl ? "Volgorde" : "Order"}</Label>
         <Input name="order" type="number" min={0} max={999} defaultValue={category?.order ?? 0} />
       </div>
-      <div>
-        <Label>{nl ? "Doelgroep" : "Audience"}</Label>
-        <Select
-          name="audience"
-          defaultValue={category?.audience ?? ""}
-          title={
-            nl
-              ? "Een doelgroepcategorie verschijnt niet als filterknop: haar evenementen duiken vanzelf op bij de leden die erbij horen."
-              : "An audience category is not a filter button: its events surface automatically for the members it applies to."
-          }
-        >
-          <option value="">{nl ? "Gewoon thema" : "Regular theme"}</option>
-          <option value="FIRST_YEARS">{nl ? "Eerstejaars" : "First years"}</option>
-          <option value="INTERNATIONALS">{nl ? "Internationals" : "Internationals"}</option>
-        </Select>
-      </div>
-      <label className="inline-flex items-center gap-2 self-end pb-2 text-sm">
-        <input
-          type="checkbox"
-          name="showOnCalendarPage"
-          defaultChecked={category?.showOnCalendarPage ?? true}
-        />
-        {nl ? "Als filter tonen" : "Show as filter"}
-      </label>
+      {kind === "audience" ? (
+        <div>
+          <Label>{nl ? "Doelgroep" : "Audience"}</Label>
+          <Select name="audience" defaultValue={category?.audience ?? "FIRST_YEARS"} required>
+            <option value="FIRST_YEARS">{nl ? "Eerstejaars" : "First years"}</option>
+            <option value="INTERNATIONALS">Internationals</option>
+            <option value="LAST_YEARS">{nl ? "Laatstejaars" : "Last years"}</option>
+          </Select>
+        </div>
+      ) : (
+        <label className="inline-flex items-center gap-2 self-end pb-2 text-sm">
+          <input
+            type="checkbox"
+            name="showOnCalendarPage"
+            defaultChecked={category?.showOnCalendarPage ?? true}
+          />
+          {nl ? "Als filter tonen" : "Show as filter"}
+        </label>
+      )}
     </SaveForm>
   );
 }

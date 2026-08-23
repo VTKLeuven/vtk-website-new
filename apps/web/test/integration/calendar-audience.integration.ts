@@ -14,14 +14,17 @@ describe.sequential("kalender-doelgroepen", () => {
     group: randomUUID(),
     firstYearCat: randomUUID(),
     intlCat: randomUUID(),
+    lastYearsCat: randomUUID(),
     themeCat: randomUUID(),
     plainEvent: randomUUID(),
     firstYearEvent: randomUUID(),
     intlEvent: randomUUID(),
+    lastYearsEvent: randomUUID(),
     bothEvent: randomUUID(),
     firstYearUser: randomUUID(),
     masterUser: randomUUID(),
     intlUser: randomUUID(),
+    finalMasterUser: randomUUID(),
   };
 
   const start = new Date("2027-03-01T18:00:00.000Z");
@@ -48,6 +51,7 @@ describe.sequential("kalender-doelgroepen", () => {
       data: [
         { id: ids.firstYearCat, slug: `ey-${ids.firstYearCat}`, nameNl: "EJ", nameEn: "FY", audience: "FIRST_YEARS" },
         { id: ids.intlCat, slug: `in-${ids.intlCat}`, nameNl: "Int", nameEn: "Int", audience: "INTERNATIONALS" },
+        { id: ids.lastYearsCat, slug: `ly-${ids.lastYearsCat}`, nameNl: "Laatstejaars", nameEn: "Last years", audience: "LAST_YEARS" },
         { id: ids.themeCat, slug: `th-${ids.themeCat}`, nameNl: "Thema", nameEn: "Theme", audience: null },
       ],
     });
@@ -58,6 +62,7 @@ describe.sequential("kalender-doelgroepen", () => {
       [ids.plainEvent, [ids.themeCat]],
       [ids.firstYearEvent, [ids.firstYearCat]],
       [ids.intlEvent, [ids.intlCat]],
+      [ids.lastYearsEvent, [ids.lastYearsCat]],
       [ids.bothEvent, [ids.firstYearCat, ids.intlCat]],
     ] as const) {
       await prisma.calendarEvent.create({
@@ -68,6 +73,7 @@ describe.sequential("kalender-doelgroepen", () => {
           end,
           groupId: ids.group,
           visibility: "PUBLIC",
+          publishedAt: new Date(),
           categories: { create: categoryIds.map((categoryId) => ({ categoryId })) },
         },
       });
@@ -76,18 +82,19 @@ describe.sequential("kalender-doelgroepen", () => {
     await makeUser(ids.firstYearUser, { studyYears: ["BACHELOR_1"] });
     await makeUser(ids.masterUser, { studyYears: ["MASTER_1"] });
     await makeUser(ids.intlUser, { studyYears: ["MASTER_1"], internationalStudent: true });
+    await makeUser(ids.finalMasterUser, { studyYears: ["MASTER_2"] });
   });
 
   afterAll(async () => {
     await prisma.calendarEvent.deleteMany({
-      where: { id: { in: [ids.plainEvent, ids.firstYearEvent, ids.intlEvent, ids.bothEvent] } },
+      where: { id: { in: [ids.plainEvent, ids.firstYearEvent, ids.intlEvent, ids.lastYearsEvent, ids.bothEvent] } },
     });
     await prisma.calendarCategory.deleteMany({
-      where: { id: { in: [ids.firstYearCat, ids.intlCat, ids.themeCat] } },
+      where: { id: { in: [ids.firstYearCat, ids.intlCat, ids.lastYearsCat, ids.themeCat] } },
     });
     await prisma.group.delete({ where: { id: ids.group } });
     await prisma.user.deleteMany({
-      where: { id: { in: [ids.firstYearUser, ids.masterUser, ids.intlUser] } },
+      where: { id: { in: [ids.firstYearUser, ids.masterUser, ids.intlUser, ids.finalMasterUser] } },
     });
   });
 
@@ -95,7 +102,7 @@ describe.sequential("kalender-doelgroepen", () => {
   async function visible(audiences: Parameters<typeof audienceFilter>[0]) {
     const rows = await prisma.calendarEvent.findMany({
       where: {
-        id: { in: [ids.plainEvent, ids.firstYearEvent, ids.intlEvent, ids.bothEvent] },
+        id: { in: [ids.plainEvent, ids.firstYearEvent, ids.intlEvent, ids.lastYearsEvent, ids.bothEvent] },
         ...audienceFilter(audiences),
       },
       select: { id: true },
@@ -107,6 +114,7 @@ describe.sequential("kalender-doelgroepen", () => {
     expect(await audiencesForUser(ids.firstYearUser)).toEqual(["FIRST_YEARS"]);
     expect(await audiencesForUser(ids.masterUser)).toEqual([]);
     expect(await audiencesForUser(ids.intlUser)).toEqual(["INTERNATIONALS"]);
+    expect(await audiencesForUser(ids.finalMasterUser)).toEqual(["LAST_YEARS"]);
   });
 
   it("toont zonder doelgroep enkel evenementen zonder doelgroep", async () => {
@@ -127,8 +135,15 @@ describe.sequential("kalender-doelgroepen", () => {
     expect(seen.has(ids.firstYearEvent)).toBe(false);
   });
 
+  it("toont laatstejaarsevents enkel aan laatstejaars", async () => {
+    const seen = await visible(["LAST_YEARS"]);
+    expect(seen).toEqual(new Set([ids.plainEvent, ids.lastYearsEvent]));
+  });
+
   it("toont alles aan wie bij beide doelgroepen hoort", async () => {
     const seen = await visible(["FIRST_YEARS", "INTERNATIONALS"]);
-    expect(seen.size).toBe(4);
+    expect(seen).toEqual(
+      new Set([ids.plainEvent, ids.firstYearEvent, ids.intlEvent, ids.bothEvent]),
+    );
   });
 });

@@ -1070,6 +1070,9 @@ model CalendarEvent {
   imageKey      String?
   groupId       String
   createdById   String?
+  // NULL = concept. Een concept blijft wel zichtbaar en bewerkbaar in de admin,
+  // maar verschijnt nergens op de publieke site of in een agenda-feed.
+  publishedAt   DateTime?       @db.Timestamptz(3)
   createdAt     DateTime        @default(now())
   updatedAt     DateTime        @updatedAt
 
@@ -1090,12 +1093,6 @@ model CalendarEvent {
   @@index([searchEn], type: Gin)
 }
 
-// Doelgroep van een evenement ("Internationaal", "Eerstejaars", "Career", ...).
-// Bewust een eigen as naast `CalendarEvent.groupId`: de groep zegt wie het event
-// organiseert, de categorie voor wie het bedoeld is. Een fakbar-cantus kan een
-// eerstejaarsevent zijn, en een event van de post Internationaal hoeft niet op de
-// internationale kalender te staan. Elke categorie krijgt een eigen pagina
-// (/kalender/<slug>) en een eigen ICS-feed.
 // Doelgroep waar een categorie voor staat. Een categorie zonder `audience` is een
 // gewoon thema (Career, Sport, ...) dat iedereen ziet en dat als filterchip op
 // /kalender staat. Een categorie mét `audience` verschijnt niet als chip: haar
@@ -1108,6 +1105,7 @@ model CalendarEvent {
 enum CalendarAudience {
   FIRST_YEARS
   INTERNATIONALS
+  LAST_YEARS
 }
 
 model CalendarCategory {

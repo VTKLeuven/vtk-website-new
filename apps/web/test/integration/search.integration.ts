@@ -7,10 +7,10 @@ import { searchSite } from "@/lib/search-server";
  * Zoeken tegen een echte database.
  *
  * De rest van de zoekfunctie valt met unit tests te dekken; dit niet. Wat hier
- * bewezen moet worden is dat een **concept-pagina** en een evenement dat niet
- * voor deze bezoeker bestemd is, nergens in de uitkomst opduiken, ook niet als
- * fragment. Dat hangt aan de tsvector-trigger, aan de where-regels van beide
- * stappen en aan het samenspel ertussen; een mock zou precies dat wegnemen.
+ * bewezen moet worden is dat conceptinhoud en een evenement dat niet voor deze
+ * bezoeker bestemd is nergens in de uitkomst opduiken, ook niet als fragment.
+ * Dat hangt aan de tsvector-trigger, aan de where-regels van beide stappen en
+ * aan het samenspel ertussen; een mock zou precies dat wegnemen.
  */
 
 /** Verzonnen woord: het mag in geen enkele echte pagina of activiteit staan. */
@@ -49,6 +49,7 @@ describe.sequential("zoeken", () => {
     loosePage: randomUUID(),
     compoundPage: randomUUID(),
     publicEvent: randomUUID(),
+    draftEvent: randomUUID(),
     membersEvent: randomUUID(),
     audienceEvent: randomUUID(),
     material: randomUUID(),
@@ -93,6 +94,7 @@ describe.sequential("zoeken", () => {
     titleNl: string,
     visibility: "PUBLIC" | "MEMBERS",
     categoryIds: string[] = [],
+    published = true,
   ) {
     await prisma.calendarEvent.create({
       data: {
@@ -102,6 +104,7 @@ describe.sequential("zoeken", () => {
         start,
         end,
         visibility,
+        publishedAt: published ? new Date() : null,
         groupId: ids.group,
         categories: { create: categoryIds.map((categoryId) => ({ categoryId })) },
       },
@@ -151,6 +154,7 @@ describe.sequential("zoeken", () => {
     await makePage(ids.compoundPage, slugs.compoundPage, `Samenstelling: ${COMPOUND}`, true);
 
     await makeEvent(ids.publicEvent, `Publiek: ${TERM}`, "PUBLIC");
+    await makeEvent(ids.draftEvent, `Conceptactiviteit: ${TERM}`, "PUBLIC", [], false);
     await makeEvent(ids.membersEvent, `Intern: ${TERM}`, "MEMBERS");
     await makeEvent(ids.audienceEvent, `Eerstejaars: ${TERM}`, "PUBLIC", [ids.firstYearCat]);
 
@@ -177,7 +181,9 @@ describe.sequential("zoeken", () => {
       where: { id: { in: [ids.material, ids.inactiveMaterial] } },
     });
     await prisma.calendarEvent.deleteMany({
-      where: { id: { in: [ids.publicEvent, ids.membersEvent, ids.audienceEvent] } },
+      where: {
+        id: { in: [ids.publicEvent, ids.draftEvent, ids.membersEvent, ids.audienceEvent] },
+      },
     });
     await prisma.calendarCategory.delete({ where: { id: ids.firstYearCat } });
     await prisma.group.delete({ where: { id: ids.group } });
@@ -225,6 +231,12 @@ describe.sequential("zoeken", () => {
   it("laat een ledenexclusief evenement niet terugkomen", async () => {
     const { results } = await visitorSearch(TERM);
     expect(results.map((r) => r.id)).not.toContain(ids.membersEvent);
+  });
+
+  it("laat een concept-evenement nergens opduiken", async () => {
+    const { results } = await visitorSearch(TERM);
+    expect(results.map((r) => r.id)).not.toContain(ids.draftEvent);
+    expect(results.map((r) => r.title).join(" ")).not.toContain("Conceptactiviteit");
   });
 
   it("houdt een doelgroepevenement weg bij wie niet tot die doelgroep hoort", async () => {
