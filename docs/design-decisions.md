@@ -1002,7 +1002,8 @@ bijgewerkt. De Brevo-sync (`apps/web/lib/brevo/`) haalt de tussenpersoon weg.
 
 Dit gaat over de **eigen adressen van de kring** (`activiteiten@vtk.be`,
 `it@vtk.be`, `2027.g5@vtk.be`) en over de `@vtk.be`-accounts van de leden. De
-code staat in `apps/web/lib/google/`.
+code staat in `apps/web/lib/google/`; hoe je het opzet en draaiende houdt staat
+in `docs/google-workspace.md`.
 
 **Verwar dit niet met de Brevo-sync hierboven.** Dat zijn uitgaande
 nieuwsbrieven naar studenten, opt-in per `MailCategory`, met consent als

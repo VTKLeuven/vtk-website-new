@@ -38,6 +38,14 @@ export type StoredGoogle = {
   /** OU voor een volwaardig account. Leeg = de wortel van het domein. */
   fullOrgUnit?: string;
   /**
+   * Verplicht de koppelgate voor leden met een post of werkgroep. Standaard
+   * **uit**: de koppeling opzetten mag nooit ongemerkt een melding op het scherm
+   * van elk praesidiumlid zetten. Zet hem pas aan wanneer de OAuth-client werkt
+   * en de accounts bestaan, anders klikt iedereen "ik heb nog geen account" en
+   * heb je een week stilte gekocht zonder één koppeling.
+   */
+  linkGateEnabled?: boolean;
+  /**
    * OU voor een kiesploegaccount zonder verzendrecht. Op die OU staat de
    * routing-regel die uitgaande mail vanaf het primaire adres weigert; die
    * regel is handwerk in de Admin console, want er is geen API voor. Leeg =
@@ -69,6 +77,8 @@ export type GoogleStatus = {
   hasOauthSecret: boolean;
   /** Zonder OAuth-client kan een lid zichzelf niet koppelen. */
   linkingConfigured: boolean;
+  /** Staat de verplichte koppelgate aan? Los van of ze technisch kan. */
+  linkGateEnabled: boolean;
   fullOrgUnit: string | null;
   restrictedOrgUnit: string | null;
 };
@@ -155,7 +165,63 @@ export async function getGoogleStatus(): Promise<GoogleStatus> {
     oauthClientId: stored?.oauthClientId ?? null,
     hasOauthSecret: Boolean(stored?.oauthClientSecretEnc),
     linkingConfigured: Boolean(stored?.oauthClientId && stored.oauthClientSecretEnc),
+    linkGateEnabled: Boolean(stored?.linkGateEnabled),
     fullOrgUnit: stored?.fullOrgUnit ?? null,
     restrictedOrgUnit: stored?.restrictedOrgUnit ?? null,
   };
+}
+
+// -----------------------------------------------------------------------------
+// De koppelgate
+// -----------------------------------------------------------------------------
+
+type GateCache = { enabled: boolean; until: number };
+let gateCache: GateCache | null = null;
+
+/** Hoe lang de gate-stand gecachet blijft. Zie {@link googleLinkGateEnabled}. */
+const GATE_TTL_MS = 60_000;
+
+/**
+ * Mag de koppelgate leden tegenhouden?
+ *
+ * Drie voorwaarden, en alle drie om dezelfde reden: **een gate die iets vraagt
+ * wat niet kan, is een storing.** De integratie moet ingesteld zijn, er moet een
+ * OAuth-client zijn (anders is er geen knop om op te duwen), en iemand moet de
+ * gate bewust aangezet hebben.
+ *
+ * Dit draait in `proxy.ts` op elk verzoek van een ingelogd lid, dus het antwoord
+ * wordt een minuut gecachet. Zet je de schakelaar om, dan duurt het hoogstens
+ * zo lang voor iedereen het merkt; dat is ruim snel genoeg voor iets wat één
+ * keer per jaar verandert.
+ */
+export async function googleLinkGateEnabled(): Promise<boolean> {
+  const now = Date.now();
+  if (gateCache && gateCache.until > now) return gateCache.enabled;
+
+  let enabled = false;
+  try {
+    const row = await prisma.setting.findUnique({ where: { key: GOOGLE_SETTING_KEY } });
+    const stored = (row?.value ?? null) as unknown as StoredGoogle | null;
+    enabled = Boolean(
+      stored?.linkGateEnabled &&
+        stored.domain &&
+        stored.subject &&
+        stored.clientEmail &&
+        stored.privateKeyEnc &&
+        stored.oauthClientId &&
+        stored.oauthClientSecretEnc,
+    );
+  } catch {
+    // Geen database, geen gate. Een lid buitensluiten omdat wij niet konden
+    // lezen of de gate aan staat, is het slechtste van twee werelden.
+    enabled = false;
+  }
+
+  gateCache = { enabled, until: now + GATE_TTL_MS };
+  return enabled;
+}
+
+/** Gooit de cache weg; gebruikt nadat de configuratie opgeslagen is. */
+export function forgetGoogleGateState(): void {
+  gateCache = null;
 }

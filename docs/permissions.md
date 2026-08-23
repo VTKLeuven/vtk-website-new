@@ -293,9 +293,9 @@ available roles but not auto-assigned to any post. Your seeded admin account is 
 
 ## Groepsadressen (Google Workspace)
 
-De koppeling met Google Workspace (`docs/design-decisions.md`, "Google
-Workspace") voegt één permissie toe: `mailgroups.manage`, voor wie de lijsten
-opbouwt en de accounts koppelt.
+De koppeling met Google Workspace (opzet in `docs/google-workspace.md`, keuzes
+in `docs/design-decisions.md`) voegt één permissie toe: `mailgroups.manage`,
+voor wie de lijsten opbouwt en de accounts koppelt.
 
 Bewust los van `mailinglists.export`. Dat recht gaat over de opt-in
 nieuwsbrieven naar studenten (Brevo); dit gaat over de eigen adressen van de

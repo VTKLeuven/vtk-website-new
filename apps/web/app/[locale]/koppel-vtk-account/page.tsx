@@ -152,7 +152,10 @@ export default async function LinkVtkAccountPage({
           </>
         )}
 
-        {user.googleEmail ? (
+        {/* Uitstellen heeft enkel zin wanneer er iets te koppelen valt. Is de
+            koppeling nog niet ingesteld, dan is er ook geen gate en volstaat
+            een weg terug. */}
+        {user.googleEmail || !status.linkingConfigured ? (
           <Link href={home} className="vtk-link text-sm">
             {t.back}
           </Link>

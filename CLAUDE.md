@@ -105,6 +105,21 @@ het lidmaatschap volgt, en hoe je de koppeling opzet. Lees zeker "Vallen waar we
 in gelopen zijn" voor je aan `apps/web/lib/vault` komt; die punten falen
 grotendeels stil. De kringkeuzes staan in `docs/design-decisions.md`.
 
+# Google Workspace
+
+`docs/google-workspace.md` is de referentie voor de groepsadressen
+(`activiteiten@vtk.be`), de `@vtk.be`-accounts en de kiesploeg: hoe je de
+koppeling opzet (service-account, delegatie, organisatie-eenheden, OAuth-client),
+hoe de kiesploeg door het jaar loopt, en wat er handmatig in de Admin console
+blijft omdat er geen API voor is. Lees dit voor je aan `apps/web/lib/google`
+komt, en zeker de sectie "Vallen waar we in gelopen zijn": die punten falen
+grotendeels stil. De kringkeuzes staan in `docs/design-decisions.md`.
+
+**Dit is iets anders dan de mailinglijsten in `lib/brevo`.** Dat zijn opt-in
+nieuwsbrieven naar studenten; dit zijn de ontvangende adressen van de kring
+zelf, met de posten van het werkingsjaar als bron. Geen gedeelde regels, enkel
+een gedeeld sync-stramien.
+
 # MCP-server voor agents
 
 `docs/mcp.md` is de referentie voor het MCP-endpoint op `/api/mcp`, waarmee een

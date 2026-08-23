@@ -24,8 +24,8 @@ export function GoogleConfigForm({ status }: { status: GoogleStatus }) {
     <div className="space-y-4">
       <p className="text-sm text-zinc-500">
         {status.configured
-          ? "Configured. Group addresses are synchronised every five minutes."
-          : "Not configured yet; group addresses can be prepared but nothing is written to Google."}
+          ? `Configured. Group addresses are synchronised every five minutes. Link gate is ${status.linkGateEnabled ? "on" : "off"}.`
+          : "Not configured yet. Everything stays dormant: no synchronisation, no link gate, and the admin screens only let you prepare lists."}
       </p>
 
       <SaveForm
@@ -122,6 +122,25 @@ export function GoogleConfigForm({ status }: { status: GoogleStatus }) {
             </p>
           </div>
         </div>
+
+        <label className="flex items-start gap-2 text-sm text-zinc-700">
+          <input
+            type="checkbox"
+            name="linkGateEnabled"
+            defaultChecked={status.linkGateEnabled}
+            className="mt-1"
+          />
+          <span>
+            Require members with a post to link their VTK account
+            <span className="block text-xs text-zinc-500">
+              Off by default. With this on, every member holding a post or work group this
+              working year is redirected to /koppel-vtk-account until they link. Only turn it
+              on once the OAuth client works and the accounts exist, otherwise everybody just
+              clicks &quot;I do not have an account yet&quot;. Takes up to a minute to take
+              effect (the setting is cached).
+            </span>
+          </span>
+        </label>
       </SaveForm>
     </div>
   );

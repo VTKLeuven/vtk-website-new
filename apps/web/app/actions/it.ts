@@ -19,6 +19,7 @@ import { DOOR_SETTING_KEY, getDoorConfig, type StoredDoor } from "@/lib/door-con
 import { VAULT_SETTING_KEY, type StoredVault } from "@/lib/vault/config";
 import {
   GOOGLE_SETTING_KEY,
+  forgetGoogleGateState,
   normalisePrivateKey,
   type StoredGoogle,
 } from "@/lib/google/config";
@@ -435,6 +436,7 @@ const googleSchema = z.object({
   oauthClientSecret: z.string().trim().max(200).optional(),
   fullOrgUnit: z.string().trim().max(200).optional(),
   restrictedOrgUnit: z.string().trim().max(200).optional(),
+  linkGateEnabled: z.string().optional(),
 });
 
 /**
@@ -459,6 +461,7 @@ export async function saveGoogleConfigAction(
     oauthClientSecret: ((formData.get("oauthClientSecret") as string) ?? "").trim() || undefined,
     fullOrgUnit: ((formData.get("fullOrgUnit") as string) ?? "").trim() || undefined,
     restrictedOrgUnit: ((formData.get("restrictedOrgUnit") as string) ?? "").trim() || undefined,
+    linkGateEnabled: (formData.get("linkGateEnabled") as string) ?? undefined,
   });
   if (!parsed.success) return saveError("INVALID_INPUT");
   const p = parsed.data;
@@ -495,6 +498,10 @@ export async function saveGoogleConfigAction(
     oauthClientSecretEnc,
     fullOrgUnit: p.fullOrgUnit,
     restrictedOrgUnit: p.restrictedOrgUnit,
+    // Een uitgevinkte checkbox stuurt niets mee. Standaard dus uit, en dat is
+    // de bedoeling: de koppeling opzetten mag nooit vanzelf een melding op het
+    // scherm van elk praesidiumlid zetten.
+    linkGateEnabled: p.linkGateEnabled === "on",
   };
 
   await prisma.setting.upsert({
@@ -511,6 +518,7 @@ export async function saveGoogleConfigAction(
     summary: `Google-configuratie bijgewerkt (${value.domain})`,
   });
 
+  forgetGoogleGateState();
   revalidatePath("/admin/it");
   revalidatePath("/admin/groepsadressen");
   return saveOk();
