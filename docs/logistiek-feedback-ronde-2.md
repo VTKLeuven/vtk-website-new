@@ -22,8 +22,13 @@ verbetering, **P3** = groter of "ooit".
 
 ## Afgevinkt
 
-Een ✅ voor de taaktitel betekent: af, met het commit-hashje erbij. R8 staat er
-ook bij maar werd anders opgelost dan gevraagd; de reden staat bij de taak.
+**Alle zes de fases zijn afgewerkt** (23 augustus 2026). Een ✅ voor de taaktitel
+betekent: af. Twee taken werden anders opgelost dan gevraagd, met de reden bij de
+taak zelf: R8 (de premisse klopte niet meer) en T8 (namen enkel voor wie ingelogd
+is, zodat het publieke overzicht anoniem blijft).
+
+Nog manueel na te kijken: het bijsnijden van een itemfoto (M6) is gebouwd en
+compileert, maar kon niet in de browser doorgeklikt worden.
 
 ## Statusoverzicht
 
