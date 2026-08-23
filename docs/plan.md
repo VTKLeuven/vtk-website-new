@@ -362,13 +362,16 @@ App:
       `Loading`, `StaleNotice`, `WebFlow`, `ComingSoon`
 - [x] `src/storage.ts` (voorkeuren + leescache), `src/state/app.tsx`
 - [x] de vijf tabs, `app/inloggen.tsx`, `app/poort.tsx`, `app/instellingen.tsx`
-- [ ] EAS-project onder `vtk-it`, drie kanalen, eerste `eas update`
+- [x] EAS-project onder `vtk-it` (`2858ac35-...`), kanaal `preview` aangemaakt
+- [ ] eerste Android-build afgewacht en geinstalleerd
 - [ ] met de hand getest op een toestel tegen een cloudflared-tunnel
 
 | Datum | Commit | Wat |
 |---|---|---|
 | 2026-08-23 | `web: App-API v1: contract, bootstrap en pushregistratie` | De serverkant van fase 0: het contract, de bootstrap-route, `AppPushDevice` met migratie, de twee pushroutes en `docs/app-api.md`. `npm run verify` groen (936 tests). |
 | 2026-08-23 | `De schil: tabs, contract, weblogin en de twee poorten` | De app-repo staat er: Expo SDK 54, vijf tabs, de tokens van de site, de HTTP-laag met de gedeelde cookie, de weblogin en de onboarding-poorten, en de leescache. Info en Profiel tonen echte gegevens uit `bootstrap`; Kalender en Bestellen zijn nog `ComingSoon`. |
+| 2026-08-24 | `web: Zod uit het gekopieerde contract, naar schemas.ts ernaast` | Het contract dat naar deze repo gekopieerd wordt, heeft geen dependencies meer. |
+| 2026-08-24 | `EAS-project en de eerste Android-build` | Project `@vtk-it/vtk-app` aangemaakt, kanaal `preview`, keystore door Expo beheerd, eerste preview-build gestart. |
 
 ### Fase 1 - Home, Kalender, Bestellen
 
