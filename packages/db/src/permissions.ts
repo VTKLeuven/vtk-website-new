@@ -47,6 +47,7 @@ export const PERMISSIONS = [
 
   // Homepage
   { code: "home.edit", labelNl: "Homepagina bewerken", labelEn: "Edit homepage", category: "general" },
+  { code: "openingHours.manageOwn", labelNl: "Openingsuren van eigen post beheren", labelEn: "Manage own post's opening hours", category: "general" },
 
   // Media page (magazines, promo videos, gallery albums)
   { code: "media.manage", labelNl: "Mediapagina beheren", labelEn: "Manage media page", category: "general" },

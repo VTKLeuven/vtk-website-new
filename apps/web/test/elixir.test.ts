@@ -16,6 +16,8 @@ import {
 } from "@/lib/elixir/munisenseParse";
 import type { SoundEvent } from "@/lib/elixir/munisenseParse";
 import {
+  DEFAULT_ELIXIR_SCHEDULE,
+  elixirScheduleFromSetting,
   openingWindowPhase,
   withinOpeningWindow,
   type OpeningWindowPhase,
@@ -270,19 +272,41 @@ describe("openingWindowPhase", () => {
 
   for (const [label, iso, expected] of cases) {
     it(`${label} -> ${expected}`, () => {
-      expect(openingWindowPhase(new Date(iso))).toBe(expected);
+      expect(openingWindowPhase(new Date(iso), DEFAULT_ELIXIR_SCHEDULE)).toBe(expected);
     });
   }
 
   it("werkt ook in de winteruur-offset", () => {
     // 21:00 UTC is in januari 22:00 in Brussel, dus wel binnen het venster.
-    expect(openingWindowPhase(new Date("2027-01-06T21:00:00Z"))).toBe("evening");
-    expect(withinOpeningWindow(new Date("2027-01-06T20:59:00Z"))).toBe(false);
+    expect(openingWindowPhase(new Date("2027-01-06T21:00:00Z"), DEFAULT_ELIXIR_SCHEDULE)).toBe("evening");
+    expect(withinOpeningWindow(new Date("2027-01-06T20:59:00Z"), DEFAULT_ELIXIR_SCHEDULE)).toBe(false);
+  });
+
+  it("behandelt ontbrekende roosterdata als volledig gesloten", () => {
+    const schedule = elixirScheduleFromSetting(undefined);
+    expect(openingWindowPhase(new Date("2026-08-09T21:00:00Z"), schedule)).toBe("closed");
+  });
+
+  it("leest openingsdagen en -uren uit de beheerde instelling", () => {
+    const schedule = elixirScheduleFromSetting({
+      entries: [{ dayNl: "Zondag", dayEn: "Sunday", hours: "23:30" }],
+    });
+    expect(openingWindowPhase(new Date("2026-08-09T21:29:00Z"), schedule)).toBe("closed");
+    expect(openingWindowPhase(new Date("2026-08-09T21:30:00Z"), schedule)).toBe("evening");
+    expect(openingWindowPhase(new Date("2026-08-10T01:00:00Z"), schedule)).toBe("after-midnight");
+    expect(openingWindowPhase(new Date("2026-08-10T21:30:00Z"), schedule)).toBe("closed");
   });
 });
 
 describe("evaluateStatus", () => {
-  const base = { now: NOW, previous: null, thresholds: THRESHOLDS, sampledAt: NOW, meterActive: true };
+  const base = {
+    now: NOW,
+    previous: null,
+    thresholds: THRESHOLDS,
+    sampledAt: NOW,
+    meterActive: true,
+    schedule: DEFAULT_ELIXIR_SCHEDULE,
+  };
 
   it("is open bij een lopend event boven de drempel", () => {
     const state = evaluateStatus({ ...base, event: activeEvent(), decibels: 70 });

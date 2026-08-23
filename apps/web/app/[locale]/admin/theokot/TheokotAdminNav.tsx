@@ -9,7 +9,6 @@ const TABS: Tab[] = [
   { key: "afhalen", href: "/afhalen", labelNl: "Afhaalbalie", labelEn: "Pickup counter", cap: "pickup" },
   { key: "turflijst", href: "/turflijst", labelNl: "Lijst bestelde broodjes", labelEn: "Ordered sandwiches list", cap: "pickup" },
   { key: "bans", href: "/bans", labelNl: "Bans & no-shows", labelEn: "Bans & no-shows", cap: "manage" },
-  { key: "openingsuren", href: "/openingsuren", labelNl: "Openingsuren", labelEn: "Opening hours", cap: "manage" },
   { key: "instellingen", href: "/instellingen", labelNl: "Instellingen", labelEn: "Settings", cap: "manage" },
 ];
 

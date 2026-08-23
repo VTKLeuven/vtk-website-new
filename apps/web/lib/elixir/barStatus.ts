@@ -9,7 +9,7 @@
 
 import type { ElixirThresholds } from "./config";
 import type { SoundEvent } from "./munisenseParse";
-import { withinOpeningWindow } from "./openingWindow";
+import { withinOpeningWindow, type OpeningWindowSchedule } from "./openingWindow";
 
 export type BarStatusState = {
   isOpen: boolean;
@@ -43,6 +43,7 @@ export type EvaluateInput = {
   /** De vorige status, voor de hysterese. */
   previous: Pick<BarStatusState, "isOpen" | "quietCycles"> | null;
   thresholds: ElixirThresholds;
+  schedule?: OpeningWindowSchedule;
 };
 
 function closed(
@@ -66,7 +67,7 @@ export function evaluateStatus(input: EvaluateInput): BarStatusState {
 
   // Buiten de openingsuren beslist het rooster, niet de meter: lawaai op een
   // zaterdagmiddag is geen open bar. Zie openingWindow.ts.
-  if (!withinOpeningWindow(now)) return closed("outside-hours", null, event?.id ?? null, now);
+  if (!withinOpeningWindow(now, input.schedule)) return closed("outside-hours", null, event?.id ?? null, now);
 
   // Er hoort altijd een soundevent te lopen (Munisense maakt er elke dag een).
   // Is dat niet zo, dan klopt er iets niet aan de meter of aan onze query, en

@@ -9,7 +9,7 @@ import { getMediaContent } from "@/lib/media-content";
 import { videoEmbed } from "@/lib/videoEmbed";
 import { getCurrentSession } from "@/lib/session";
 import { getCursusdienstHours } from "@/lib/cursusdienstHours";
-import { ELIXIR_OPEN_DAYS, openingWindowPhase } from "@/lib/elixir/openingWindow";
+import { elixirScheduleFromSetting, openingWindowPhase } from "@/lib/elixir/openingWindow";
 import { readBarStatus } from "@/lib/elixir/status";
 import { publicUrl } from "@/lib/storage";
 import { BUILTIN_DEFAULT_EVENT_IMAGE, DEFAULT_EVENT_IMAGE_SETTING } from "@/lib/defaultEventImage";
@@ -20,12 +20,17 @@ import { frontpagePhoto } from "@/lib/frontpage/registry";
 import { Frontpage } from "@/components/editorial/frontpage";
 import { AftermovieGrid, type AftermovieGridItem } from "./AftermovieGrid";
 import {
-  DUTCH_FULL_DAYS,
   dutchDayNameForDate,
   entryForDate,
   isClosedHours,
   isOpenAt,
 } from "./hoursUtils";
+import {
+  entriesForService,
+  isBrusselsWeekend,
+  openingHoursNote,
+  readOpeningHoursSetting,
+} from "@/lib/openingHoursSettings";
 
 import "@/app/design/vtk-home.css";
 import "@/app/design/vtk-frontpage.css";
@@ -35,15 +40,6 @@ import {
   outboundHost,
   umamiEvent,
 } from "@/lib/analytics";
-
-type OpeningHoursSetting = {
-  titleNl: string;
-  titleEn: string;
-  /** Ondertitel op de homepage-kaart ("Broodjes & warme snacks"), via admin. */
-  subtitleNl?: string;
-  subtitleEn?: string;
-  entries: Array<{ dayNl: string; dayEn: string; hours: string }>;
-};
 
 type CareerSetting = {
   titleNl: string;
@@ -55,13 +51,6 @@ type CareerSetting = {
   ctaUrl?: string;
 };
 
-/**
- * 't ElixIr opent zondag tot en met donderdag om 22u en sluit op een uur dat per
- * avond verschilt. Die uren staan hard in `lib/elixir/openingWindow.ts`: ze
- * wijzigen niet per week, en anders dan het Theokot heeft de bar geen
- * beheerscherm. Komt daar ooit een beheerscherm, dan hoort dit een
- * `home.openingHours.elixir`-setting te worden.
- */
 const ELIXIR_NAME = "'t ElixIr";
 
 /** Gesloten-melding op een openingsurenkaart, met de naam van de dienst erin. */
@@ -97,6 +86,8 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
         key: {
           in: [
             "home.openingHours.theokot",
+            "home.openingHours.cursusdienst",
+            "home.openingHours.elixir",
             "home.career",
             DEFAULT_EVENT_IMAGE_SETTING,
           ],
@@ -191,7 +182,14 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
   const pocsWithPeople = myPocs.filter((poc) => poc.representatives.length > 0);
 
   const map = new Map(settings.map((s) => [s.key, s.value as unknown]));
-  const theokot = map.get("home.openingHours.theokot") as OpeningHoursSetting | undefined;
+  const theokot = readOpeningHoursSetting(map.get("home.openingHours.theokot"), "theokot");
+  const cursusdienst = readOpeningHoursSetting(
+    map.get("home.openingHours.cursusdienst"),
+    "cursusdienst",
+  );
+  const elixir = readOpeningHoursSetting(map.get("home.openingHours.elixir"), "elixir");
+  const theokotEntries = entriesForService(theokot, "theokot", locale);
+  const elixirHoursEntries = entriesForService(elixir, "elixir", locale);
   const cursusUnavailable = cursusEntries === null;
   const career = map.get("home.career") as CareerSetting | undefined;
   const defaultEventImage =
@@ -205,38 +203,42 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
   const heroPhoto = frontpagePhoto(frontpage.module, publicUrl(frontpage.values.photo));
   const heroPhotoStyle = { "--home-hero-photo": `url("${heroPhoto}")` } as CSSProperties;
 
-  const theoToday = theokot ? entryForDate(theokot.entries, now, locale) : undefined;
+  const theoToday = entryForDate(theokotEntries, now, locale);
   const theoOpen = theoToday && isOpenAt(theoToday.hours, now);
   const curToday = cursusEntries ? entryForDate(cursusEntries, now, locale) : undefined;
   const curOpen = curToday && !isClosedHours(curToday.hours) && isOpenAt(curToday.hours, now);
   // De titel is "Openingsuren Theokot"; de kaartkop en de gesloten-melding
   // gebruiken enkel de naam zelf.
-  const theokotName = theokot
-    ? pick(theokot.titleNl, theokot.titleEn, locale).replace(/^Openingsuren\s+/i, "")
-    : "";
-  const cursusName = "Cursusdienst";
+  const theokotName = pick(theokot.titleNl, theokot.titleEn, locale)
+    .replace(/^Openingsuren\s+/i, "")
+    .replace(/\s+opening hours$/i, "");
+  const cursusName = pick(cursusdienst.titleNl, cursusdienst.titleEn, locale)
+    .replace(/^Openingsuren\s+/i, "")
+    .replace(/\s+opening hours$/i, "");
 
   // De geluidsmeting is de bron zodra ze vers is; het uurrooster is de fallback
   // wanneer de meting ontbreekt of te oud is (worker plat, integratie niet
   // geconfigureerd, of gewoon de eerste render na een deploy). De meting zelf
   // spreekt enkel binnen de openingsuren, dus buiten het venster zeggen beide
   // hetzelfde.
-  const elixirLive = barStatus && !barStatus.stale ? barStatus : null;
-  const elixirPhase = openingWindowPhase(now);
+  const elixirSchedule = elixirScheduleFromSetting(map.get("home.openingHours.elixir"));
+  const elixirPhase = openingWindowPhase(now, elixirSchedule);
+  const elixirLive = barStatus && !barStatus.stale && elixirPhase !== "closed" ? barStatus : null;
   const elixirOpen = elixirLive ? elixirLive.isOpen : elixirPhase === "evening";
   // Zonder meting weten we na middernacht niet of ze al toe is: dan "mogelijk
   // nog open" in plaats van een harde bewering.
   const elixirMaybeOpen = !elixirLive && elixirPhase === "after-midnight";
-  const elixirEntries = DUTCH_FULL_DAYS.map((dayNl, i) => ({
-    dayNl,
-    hours: ELIXIR_OPEN_DAYS.includes(i)
-      ? nl
-        ? "vanaf 22:00"
-        : "from 22:00"
-      : nl
-        ? "Gesloten"
-        : "Closed",
+  const elixirEntries = elixirHoursEntries.map((entry) => ({
+    ...entry,
+    hours: isClosedHours(entry.hours)
+      ? entry.hours
+      : `${nl ? "vanaf" : "from"} ${entry.hours.match(/([01]\d|2[0-3]):[0-5]\d/)?.[0] ?? entry.hours}`,
   }));
+  const showingNextWeek = isBrusselsWeekend(now);
+  const nextWeekLabel = nl ? "Volgende week" : "Next week";
+  const theokotNote = openingHoursNote(theokot, locale);
+  const cursusNote = openingHoursNote(cursusdienst, locale);
+  const elixirNote = openingHoursNote(elixir, locale);
 
   const aanbodTabs = tabs.filter((t) => t.slug !== "").slice(0, 6);
   const quickLinks = [
@@ -380,37 +382,37 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
             </div>
           </div>
           <div className="hours-grid">
-            {theokot ? (
-              <div className="hours-col">
-                <h3>{theokotName}</h3>
-                <div className="sub">
-                  {pick(theokot.subtitleNl, theokot.subtitleEn, locale) ||
-                    (nl ? "Broodjes & warme snacks" : "Sandwiches & snacks")}
-                </div>
-                <div className={`status${theoOpen ? "" : " closed"}`}>
-                  {theoOpen ? (nl ? "Nu open" : "Open now") : closedLabel(theokotName, nl)}
-                </div>
-                <dl className="hours-list">
-                  {theokot.entries.map((row, i) => {
-                    const todayCls = row.dayNl === dutchDayNameForDate(now) ? "today" : "";
-                    return (
-                      <div key={i} style={{ display: "contents" }}>
-                        <dt className={todayCls}>{row.dayNl.slice(0, 2).toUpperCase()}</dt>
-                        <dd className={todayCls}>{row.hours}</dd>
-                      </div>
-                    );
-                  })}
-                </dl>
+            <div className="hours-col">
+              <h3>{theokotName}</h3>
+              <div className="sub">
+                {pick(theokot.subtitleNl, theokot.subtitleEn, locale)}
               </div>
-            ) : null}
+              <div className={`status${theoOpen ? "" : " closed"}`}>
+                {theoOpen ? (nl ? "Nu open" : "Open now") : closedLabel(theokotName, nl)}
+              </div>
+              {showingNextWeek ? <div className="hours-period">{nextWeekLabel}</div> : null}
+              <dl className="hours-list">
+                {theokotEntries.map((row, i) => {
+                  const todayCls = row.dayNl === dutchDayNameForDate(now) ? "today" : "";
+                  return (
+                    <div key={i} style={{ display: "contents" }}>
+                      <dt className={todayCls}>{row.dayNl.slice(0, 2).toUpperCase()}</dt>
+                      <dd className={todayCls}>{row.hours}</dd>
+                    </div>
+                  );
+                })}
+              </dl>
+              {theokotNote ? <p className="hours-note">{theokotNote}</p> : null}
+            </div>
             <div className="hours-col section-hours-bg">
               <h3>{cursusName}</h3>
               {cursusEntries ? (
                 <>
-                  <div className="sub">{nl ? "Cursussen & tweedehands" : "Courses & second-hand"}</div>
+                  <div className="sub">{pick(cursusdienst.subtitleNl, cursusdienst.subtitleEn, locale)}</div>
                   <div className={`status${curOpen ? "" : " closed"}`}>
                     {curOpen ? (nl ? "Nu open" : "Open now") : closedLabel(cursusName, nl)}
                   </div>
+                  {showingNextWeek ? <div className="hours-period">{nextWeekLabel}</div> : null}
                   <dl className="hours-list">
                     {cursusEntries.map((row, i) => {
                       const todayCls = row.dayNl === dutchDayNameForDate(now) ? "today" : "";
@@ -422,6 +424,7 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
                       );
                     })}
                   </dl>
+                  {cursusNote ? <p className="hours-note">{cursusNote}</p> : null}
                 </>
               ) : (
                 <div className="sub">
@@ -432,8 +435,8 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
               )}
             </div>
             <div className="hours-col">
-              <h3>{ELIXIR_NAME}</h3>
-              <div className="sub">{nl ? "Faculteitsbar Ingenieurswetenschappen" : "Faculty Bar Engineering Science"}</div>
+              <h3>{pick(elixir.titleNl, elixir.titleEn, locale) || ELIXIR_NAME}</h3>
+              <div className="sub">{pick(elixir.subtitleNl, elixir.subtitleEn, locale)}</div>
               <div
                 className={`status${elixirOpen ? "" : elixirMaybeOpen ? " maybe" : " closed"}`}
               >
@@ -458,11 +461,7 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
                   );
                 })}
               </dl>
-              <p className="hours-note">
-                {nl
-                  ? "Het sluitingsuur varieert per avond."
-                  : "The closing time varies from night to night."}
-              </p>
+              {elixirNote ? <p className="hours-note">{elixirNote}</p> : null}
             </div>
           </div>
         </section>

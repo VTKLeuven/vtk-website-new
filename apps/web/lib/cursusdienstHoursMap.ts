@@ -1,5 +1,4 @@
 import type { Locale } from "@vtk/i18n";
-import { DUTCH_FULL_DAYS } from "@/components/editorial/hoursUtils";
 
 /**
  * Pure mapping tussen de JSON van het cursusdienst-platform en de `entries`-vorm
@@ -11,15 +10,34 @@ export type Range = { start: string; end: string };
 export type WeekDay = { dayOfWeek: number; ranges: Range[] };
 export type HoursEntry = { dayNl: string; dayEn: string; hours: string };
 
+/** Maandag van de getoonde week; in het weekend is dat de volgende maandag. */
+export function cursusdienstWeekStartKey(now: Date): string {
+  const brusselsKey = now.toLocaleDateString("sv-SE", { timeZone: "Europe/Brussels" });
+  const [year, month, day] = brusselsKey.split("-").map(Number);
+  const calendarDay = new Date(Date.UTC(year, month - 1, day));
+  const weekday = calendarDay.getUTCDay();
+  const mondayOffset = weekday === 0 ? -6 : 1 - weekday;
+  const weekendAdvance = weekday === 0 || weekday === 6 ? 7 : 0;
+  calendarDay.setUTCDate(calendarDay.getUTCDate() + mondayOffset + weekendAdvance);
+  return calendarDay.toISOString().slice(0, 10);
+}
+
+export function parseWeekStart(value: unknown): string | null {
+  if (typeof value !== "object" || value === null) return null;
+  const weekStart = (value as Record<string, unknown>).weekStart;
+  return typeof weekStart === "string" && /^\d{4}-\d{2}-\d{2}$/.test(weekStart)
+    ? weekStart
+    : null;
+}
+
 /** Engelse dagnamen, maandag-eerst, parallel aan `DUTCH_FULL_DAYS`. */
-const ENGLISH_FULL_DAYS = [
+const DUTCH_WEEKDAYS = ["Maandag", "Dinsdag", "Woensdag", "Donderdag", "Vrijdag"] as const;
+const ENGLISH_WEEKDAYS = [
   "Monday",
   "Tuesday",
   "Wednesday",
   "Thursday",
   "Friday",
-  "Saturday",
-  "Sunday",
 ] as const;
 
 /** Maandag-eerste index (0..6) → JS-weekdag (zo=0..za=6), zoals cudi ze bewaart. */
@@ -49,15 +67,15 @@ export function parseWeek(value: unknown): WeekDay[] | null {
   return result;
 }
 
-/** Zeven entries (maandag → zondag); dagen zonder uren worden "Gesloten"/"Closed". */
+/** Vijf entries (maandag → vrijdag); dagen zonder uren worden "Gesloten"/"Closed". */
 export function weekToEntries(week: WeekDay[], locale: Locale): HoursEntry[] {
   const closed = locale === "nl" ? "Gesloten" : "Closed";
-  return DUTCH_FULL_DAYS.map((dayNl, index) => {
+  return DUTCH_WEEKDAYS.map((dayNl, index) => {
     const jsDay = jsDayForMondayIndex(index);
     const ranges = week.find((d) => d.dayOfWeek === jsDay)?.ranges ?? [];
     const hours = ranges.length
       ? ranges.map((r) => `${r.start} – ${r.end}`).join(", ")
       : closed;
-    return { dayNl, dayEn: ENGLISH_FULL_DAYS[index], hours };
+    return { dayNl, dayEn: ENGLISH_WEEKDAYS[index], hours };
   });
 }

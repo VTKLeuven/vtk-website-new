@@ -546,42 +546,6 @@ export async function saveOrderMessageAction(
   return saveOk();
 }
 
-/** Schrijft de frontpage-openingsuren van Theokot (gedeelde key `home.openingHours.theokot`). */
-export async function saveTheokotOpeningHoursAction(
-  _prev: SaveState,
-  formData: FormData,
-): Promise<SaveState> {
-  await requirePermission("theokot.manage");
-  const titleNl = (formData.get("titleNl") as string) || "Openingsuren Theokot";
-  const titleEn = (formData.get("titleEn") as string) || "Theokot opening hours";
-  const subtitleNl = ((formData.get("subtitleNl") as string) || "").trim();
-  const subtitleEn = ((formData.get("subtitleEn") as string) || "").trim();
-  const entries: Array<{ dayNl: string; dayEn: string; hours: string }> = [];
-  for (let i = 0; i < 7; i += 1) {
-    const dayNl = formData.get(`dayNl-${i}`) as string | null;
-    const dayEn = formData.get(`dayEn-${i}`) as string | null;
-    const hours = formData.get(`hours-${i}`) as string | null;
-    if (!dayNl && !hours) continue;
-    entries.push({ dayNl: dayNl ?? "", dayEn: dayEn ?? dayNl ?? "", hours: hours ?? "" });
-  }
-  const value = { titleNl, titleEn, subtitleNl, subtitleEn, entries };
-  await prisma.setting.upsert({
-    where: { key: "home.openingHours.theokot" },
-    update: { value },
-    create: { key: "home.openingHours.theokot", value },
-  });
-  await logAudit({
-    action: "update",
-    entity: "theokotSettings",
-    target: "Openingsuren Theokot",
-    summary: `${entries.length} dag(en) op de homepage`,
-  });
-  revalidatePath("/");
-  revalidatePath(`${ADMIN_PATH}/openingsuren`);
-  revalidateTheokot();
-  return saveOk();
-}
-
 // -----------------------------------------------------------------------------
 // Beheer: bans + no-show-correcties
 // -----------------------------------------------------------------------------

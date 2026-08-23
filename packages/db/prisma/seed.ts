@@ -346,6 +346,9 @@ async function main() {
   const postRolePerms: Record<string, string[]> = {
     // Communicatie beheert de publieke mediapagina (magazines, promovideo's, albums).
     COMMUNICATIE: ["media.manage"],
+    CURSUSDIENST: ["openingHours.manageOwn"],
+    FAKBAR: ["openingHours.manageOwn"],
+    THEOKOT: ["openingHours.manageOwn"],
   };
   for (const g of GROUP_SEEDS) {
     const postRole = await upsertRole(
@@ -387,13 +390,8 @@ async function main() {
       value: {
         titleNl: "Openingsuren Cursusdienst",
         titleEn: "Course Shop opening hours",
-        entries: [
-          { dayNl: "Maandag", dayEn: "Monday", hours: "12:30 – 13:30" },
-          { dayNl: "Dinsdag", dayEn: "Tuesday", hours: "12:30 – 13:30" },
-          { dayNl: "Woensdag", dayEn: "Wednesday", hours: "12:30 – 13:30" },
-          { dayNl: "Donderdag", dayEn: "Thursday", hours: "12:30 – 13:30" },
-          { dayNl: "Vrijdag", dayEn: "Friday", hours: "Gesloten" },
-        ],
+        subtitleNl: "Cursussen & tweedehands",
+        subtitleEn: "Courses & second-hand",
       },
     },
     {
@@ -407,6 +405,24 @@ async function main() {
           { dayNl: "Woensdag", dayEn: "Wednesday", hours: "10:30 – 18:00" },
           { dayNl: "Donderdag", dayEn: "Thursday", hours: "10:30 – 18:00" },
           { dayNl: "Vrijdag", dayEn: "Friday", hours: "10:30 – 18:00" },
+        ],
+      },
+    },
+    {
+      key: "home.openingHours.elixir",
+      value: {
+        titleNl: "'t ElixIr",
+        titleEn: "'t ElixIr",
+        subtitleNl: "Faculteitsbar Ingenieurswetenschappen",
+        subtitleEn: "Faculty Bar Engineering Science",
+        noteNl: "Het sluitingsuur varieert per avond.",
+        noteEn: "The closing time varies from night to night.",
+        entries: [
+          { dayNl: "Zondag", dayEn: "Sunday", hours: "22:00" },
+          { dayNl: "Maandag", dayEn: "Monday", hours: "22:00" },
+          { dayNl: "Dinsdag", dayEn: "Tuesday", hours: "22:00" },
+          { dayNl: "Woensdag", dayEn: "Wednesday", hours: "22:00" },
+          { dayNl: "Donderdag", dayEn: "Thursday", hours: "22:00" },
         ],
       },
     },

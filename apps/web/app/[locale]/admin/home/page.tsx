@@ -205,7 +205,7 @@ export default async function AdminHome({
                 cudi.vtk.be
               </a>
               , waar ze meteen ook shiften en tijdsloten genereren. Ze verschijnen
-              automatisch op de startpagina; hier valt niets in te stellen.
+              automatisch op de startpagina; de toelichting beheer je in de centrale Openingsuren-tab.
             </>
           ) : (
             <>
@@ -214,7 +214,7 @@ export default async function AdminHome({
                 cudi.vtk.be
               </a>
               , where they also generate shifts and time slots. They appear on the
-              homepage automatically; there is nothing to set here.
+              homepage automatically; edit the note in the central Opening hours tab.
             </>
           )}
         </p>
@@ -228,16 +228,16 @@ export default async function AdminHome({
           {locale === "nl" ? (
             <>
               De Theokot-openingsuren beheer je onder{" "}
-              <Link href={`${base}/admin/theokot/openingsuren`} className="underline">
-                Theokot · Openingsuren
+              <Link href={`${base}/admin/openingsuren`} className="underline">
+                Openingsuren
               </Link>
               . Ze verschijnen automatisch op de startpagina.
             </>
           ) : (
             <>
               Manage the Theokot opening hours under{" "}
-              <Link href={`${base}/admin/theokot/openingsuren`} className="underline">
-                Theokot · Opening hours
+              <Link href={`${base}/admin/openingsuren`} className="underline">
+                Opening hours
               </Link>
               . They appear on the homepage automatically.
             </>

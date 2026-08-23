@@ -1,7 +1,14 @@
 import { cache } from "react";
 import { prisma } from "@vtk/db";
 import type { Locale } from "@vtk/i18n";
-import { parseWeek, weekToEntries, type HoursEntry, type WeekDay } from "./cursusdienstHoursMap";
+import {
+  cursusdienstWeekStartKey,
+  parseWeek,
+  parseWeekStart,
+  weekToEntries,
+  type HoursEntry,
+  type WeekDay,
+} from "./cursusdienstHoursMap";
 
 /**
  * Cursusdienst-openingsuren komen live van het cursusdienst-platform
@@ -25,22 +32,33 @@ const CACHE_KEY = "cursusdienst.weekHoursCache";
 
 const CURSUSDIENST_ORIGIN = process.env.CURSUSDIENST_ORIGIN || "https://cudi.vtk.be";
 
-async function fetchWeek(): Promise<WeekDay[] | null> {
+type CachedWeek = { week: WeekDay[]; weekStart: string };
+
+async function fetchWeek(expectedWeekStart: string): Promise<CachedWeek | null> {
   try {
-    const res = await fetch(`${CURSUSDIENST_ORIGIN}/api/opening-hours?association=vtk`, {
+    const url = new URL("/api/opening-hours", CURSUSDIENST_ORIGIN);
+    url.searchParams.set("association", "vtk");
+    // De week in de URL voorkomt dat een CDN rond de weekendgrens nog een uur
+    // lang de voorbije week serveert. Cudi kiest de week zelf en echoot ze terug.
+    url.searchParams.set("week", expectedWeekStart);
+    const res = await fetch(url, {
       next: { revalidate: 3600, tags: ["cursusdienst-hours"] },
     });
     if (!res.ok) return null;
-    return parseWeek(await res.json());
+    const payload = await res.json();
+    const week = parseWeek(payload);
+    const weekStart = parseWeekStart(payload);
+    if (!week || weekStart !== expectedWeekStart) return null;
+    return { week, weekStart };
   } catch {
     return null;
   }
 }
 
 /** Schrijf de vers opgehaalde week naar de DB-cache, enkel als ze wijzigde. */
-async function persistCache(week: WeekDay[]): Promise<void> {
+async function persistCache(cached: CachedWeek): Promise<void> {
   try {
-    const value = { week };
+    const value = cached;
     const existing = await prisma.setting.findUnique({ where: { key: CACHE_KEY } });
     if (existing && JSON.stringify(existing.value) === JSON.stringify(value)) return;
     await prisma.setting.upsert({
@@ -53,17 +71,18 @@ async function persistCache(week: WeekDay[]): Promise<void> {
   }
 }
 
-async function readCache(): Promise<WeekDay[] | null> {
+async function readCache(expectedWeekStart: string): Promise<WeekDay[] | null> {
   try {
     const row = await prisma.setting.findUnique({ where: { key: CACHE_KEY } });
-    return row ? parseWeek(row.value) : null;
+    if (!row || parseWeekStart(row.value) !== expectedWeekStart) return null;
+    return parseWeek(row.value);
   } catch {
     return null;
   }
 }
 
 /**
- * De cursusdienst-openingsuren als 7 entries (maandag → zondag), of `null`
+ * De cursusdienst-openingsuren als 5 entries (maandag → vrijdag), of `null`
  * wanneer er geen live én geen gecachte waarde beschikbaar is.
  *
  * `cache()` dedupliceert binnen één render (Home en Aanbod kunnen dezelfde
@@ -71,12 +90,13 @@ async function readCache(): Promise<WeekDay[] | null> {
  * enkel wanneer de waarde effectief wijzigt.
  */
 export const getCursusdienstHours = cache(async (locale: Locale): Promise<HoursEntry[] | null> => {
-  const live = await fetchWeek();
+  const expectedWeekStart = cursusdienstWeekStartKey(new Date());
+  const live = await fetchWeek(expectedWeekStart);
   if (live) {
     await persistCache(live);
-    return weekToEntries(live, locale);
+    return weekToEntries(live.week, locale);
   }
-  const cached = await readCache();
+  const cached = await readCache(expectedWeekStart);
   if (cached) return weekToEntries(cached, locale);
   return null;
 });

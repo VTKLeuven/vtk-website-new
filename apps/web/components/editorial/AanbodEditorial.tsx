@@ -34,7 +34,9 @@ function HoursViz({
   const todayNl = dutchDayNameForDate(now);
   return (
     <div className="hours-viz">
-      {DUTCH_FULL_DAYS.map((full, dayIndex) => {
+      {entries.map((entry) => {
+        const full = entry.dayNl;
+        const dayIndex = Math.max(0, DUTCH_FULL_DAYS.indexOf(full as (typeof DUTCH_FULL_DAYS)[number]));
         const row = findEntryForFullDay(entries, full);
         const hours =
           row?.hours ?? (locale === "nl" ? "Gesloten" : "Closed");
@@ -43,7 +45,7 @@ function HoursViz({
         const isToday = full === todayNl;
         const abb = shortWeekdayNl(new Date(2020, 0, 6 + dayIndex));
         return (
-          <div key={full} style={{ display: "contents" }}>
+          <div key={entry.dayNl} style={{ display: "contents" }}>
             <div className={`day-lbl${isToday ? " today" : ""}`}>{abb}</div>
             <div className={`bar-track${closed ? " closed" : ""}${isToday ? " today-row" : ""}`}>
               {!closed && pct ? (

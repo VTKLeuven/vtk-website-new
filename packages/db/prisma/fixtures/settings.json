@@ -35,35 +35,48 @@
   {
     "key": "home.openingHours.cursusdienst",
     "value": {
+      "subtitleEn": "Courses & second-hand",
+      "subtitleNl": "Cursussen & tweedehands",
+      "titleEn": "Course Shop opening hours",
+      "titleNl": "Openingsuren Cursusdienst"
+    }
+  },
+  {
+    "key": "home.openingHours.elixir",
+    "value": {
       "entries": [
+        {
+          "dayEn": "Sunday",
+          "dayNl": "Zondag",
+          "hours": "22:00"
+        },
         {
           "dayEn": "Monday",
           "dayNl": "Maandag",
-          "hours": "12:30 – 13:30"
+          "hours": "22:00"
         },
         {
           "dayEn": "Tuesday",
           "dayNl": "Dinsdag",
-          "hours": "12:30 – 13:30"
+          "hours": "22:00"
         },
         {
           "dayEn": "Wednesday",
           "dayNl": "Woensdag",
-          "hours": "12:30 – 13:30"
+          "hours": "22:00"
         },
         {
           "dayEn": "Thursday",
           "dayNl": "Donderdag",
-          "hours": "12:30 – 13:30"
-        },
-        {
-          "dayEn": "Friday",
-          "dayNl": "Vrijdag",
-          "hours": "Gesloten"
+          "hours": "22:00"
         }
       ],
-      "titleEn": "Course Shop opening hours",
-      "titleNl": "Openingsuren Cursusdienst"
+      "noteEn": "The closing time varies from night to night.",
+      "noteNl": "Het sluitingsuur varieert per avond.",
+      "subtitleEn": "Faculty Bar Engineering Science",
+      "subtitleNl": "Faculteitsbar Ingenieurswetenschappen",
+      "titleEn": "'t ElixIr",
+      "titleNl": "'t ElixIr"
     }
   },
   {

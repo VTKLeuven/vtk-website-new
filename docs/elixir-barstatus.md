@@ -93,7 +93,8 @@ Wijzigt Munisense iets, leg dan `npm run probe:elixir` naast die fixtures.
 ## Wanneer is de bar "open"
 
 `lib/elixir/barStatus.ts`, zuiver en getest. Open betekent: we zitten **binnen de
-openingsuren** (zo t/m do 22:00-07:00, Brusselse tijd, zie `openingWindow.ts`),
+openingsuren** (door Fakbar beheerd via `/admin/openingsuren`, Brusselse tijd,
+zie `openingWindow.ts`),
 er loopt een soundevent, de meter staat op `is_active`, en de meting haalt de
 drempel. Alles daarbuiten is dicht; bij twijfel dicht.
 

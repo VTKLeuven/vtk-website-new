@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { parseWeek, weekToEntries } from "@/lib/cursusdienstHoursMap";
+import {
+  cursusdienstWeekStartKey,
+  parseWeek,
+  parseWeekStart,
+  weekToEntries,
+} from "@/lib/cursusdienstHoursMap";
 
 describe("parseWeek", () => {
   it("accepts a well-formed payload", () => {
@@ -23,9 +28,22 @@ describe("parseWeek", () => {
   });
 });
 
+describe("week selection", () => {
+  it("selects the current week on weekdays and next week during the weekend", () => {
+    expect(cursusdienstWeekStartKey(new Date("2026-08-21T12:00:00Z"))).toBe("2026-08-17");
+    expect(cursusdienstWeekStartKey(new Date("2026-08-22T12:00:00Z"))).toBe("2026-08-24");
+    expect(cursusdienstWeekStartKey(new Date("2026-08-23T12:00:00Z"))).toBe("2026-08-24");
+  });
+
+  it("only accepts an explicit ISO week start from Cudi", () => {
+    expect(parseWeekStart({ weekStart: "2026-08-24" })).toBe("2026-08-24");
+    expect(parseWeekStart({})).toBeNull();
+    expect(parseWeekStart({ weekStart: "24/08/2026" })).toBeNull();
+  });
+});
+
 describe("weekToEntries", () => {
-  it("maps cudi's Sunday=0 convention onto Monday-first entries", () => {
-    // Monday (jsDay 1) and Sunday (jsDay 0) have hours; the rest are closed.
+  it("maps cudi's weekday convention onto Monday-through-Friday entries", () => {
     const entries = weekToEntries(
       [
         { dayOfWeek: 1, ranges: [{ start: "10:30", end: "18:00" }] },
@@ -34,9 +52,9 @@ describe("weekToEntries", () => {
       "nl",
     );
 
-    expect(entries).toHaveLength(7);
+    expect(entries).toHaveLength(5);
     expect(entries[0]).toEqual({ dayNl: "Maandag", dayEn: "Monday", hours: "10:30 – 18:00" });
-    expect(entries[6]).toEqual({ dayNl: "Zondag", dayEn: "Sunday", hours: "13:00 – 17:00" });
+    expect(entries.some((entry) => entry.dayNl === "Zondag")).toBe(false);
     // Tuesday has no rows → closed.
     expect(entries[1]).toEqual({ dayNl: "Dinsdag", dayEn: "Tuesday", hours: "Gesloten" });
   });

@@ -315,7 +315,14 @@ export function ShiftWeekView({
           })}
         </div>
 
-        {segments.length === 0 ? <div className="vtk-week-empty">{emptyState}</div> : null}
+        {segments.length === 0 ? (
+          <div
+            className="vtk-week-empty"
+            style={{ top: scrollTop + HEADER_HEIGHT, height: effectiveVisibleHeight }}
+          >
+            {emptyState}
+          </div>
+        ) : null}
       </div>
     </div>
   );

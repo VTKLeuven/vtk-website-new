@@ -802,7 +802,8 @@
 /* Lege week: het rooster blijft staan, de boodschap komt erover. */
 .vtk-week-empty {
   position: absolute;
-  inset: 38px 1px 1px;
+  left: 1px;
+  right: 1px;
   display: grid;
   place-content: center;
   border-radius: 0 0 18px 18px;

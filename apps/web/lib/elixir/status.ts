@@ -10,7 +10,7 @@ import {
 } from "./barStatus";
 import { elixirStatusMaxAgeMs, elixirThresholds, munisenseEnabled } from "./config";
 import { fetchLiveSound } from "./munisenseClient";
-import { withinOpeningWindow } from "./openingWindow";
+import { elixirScheduleFromSetting, withinOpeningWindow } from "./openingWindow";
 
 /**
  * De cachelaag tussen Munisense en de bezoeker.
@@ -103,11 +103,13 @@ export async function refreshBarStatus(now = new Date()): Promise<RefreshResult>
   if (!munisenseEnabled()) return { ok: false, error: "NOT_CONFIGURED" };
 
   const previous = await readStored();
+  const scheduleRow = await prisma.setting.findUnique({ where: { key: "home.openingHours.elixir" } });
+  const schedule = elixirScheduleFromSetting(scheduleRow?.value);
 
   // Buiten de openingsuren bellen we Munisense niet: de status staat dan toch
   // op dicht. Dat scheelt het grootste deel van de calls en de logins, en houdt
   // `lastUpdated` toch fris zodat het endpoint niet als "stale" leest.
-  if (!withinOpeningWindow(now)) {
+  if (!withinOpeningWindow(now, schedule)) {
     const state = evaluateStatus({
       event: null,
       meterActive: false,
@@ -116,6 +118,7 @@ export async function refreshBarStatus(now = new Date()): Promise<RefreshResult>
       now,
       previous,
       thresholds: elixirThresholds(),
+      schedule,
     });
     await persist(state);
     return { ok: true, isOpen: false, decibels: null, reason: state.reason, eventId: null };
@@ -136,6 +139,7 @@ export async function refreshBarStatus(now = new Date()): Promise<RefreshResult>
     now,
     previous,
     thresholds: elixirThresholds(),
+    schedule,
   });
   await persist(state);
 

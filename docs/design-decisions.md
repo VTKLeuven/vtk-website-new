@@ -215,8 +215,8 @@ halen ze af aan de balie en betalen daar. Post **Theokot** beheert het systeem.
   admin-toegang).
 - De **studenten-reservatiepagina** leeft op `/theokot` (aliassen `/shop` en
   `/info/theokot` sturen ernaartoe) en heeft een eigen tab in de hoofdnavigatie.
-- **Openingsuren** (startpagina) hebben een eigen tab onder Admin → Theokot, los van de
-  overige instellingen.
+- **Openingsuren** (startpagina) staan samen onder Admin → Openingsuren. Theokot,
+  Cursusdienst en Fakbar zien daar elk alleen hun eigen kaart.
 - **Kaartscanner**: de scanner werkt als toetsenbord en tikt `serial;cardAppId` + Enter.
   Eén invoerveld verwerkt beide: bevat de invoer een `;` dan gaat ze naar de KU Leuven
   `idverification`-API (`lib/kul-card.ts`) die een r-nummer teruggeeft; anders wordt de
@@ -258,7 +258,9 @@ halen ze af aan de balie en betalen daar. Post **Theokot** beheert het systeem.
 
 ### Permissies
 
-- `theokot.manage` — sessies/aanbod, config, bericht, openingsuren, bans, historiek.
+- `theokot.manage` — sessies/aanbod, config, bericht, bans, historiek.
+- `openingHours.manageOwn` — openingsurenkaart van de eigen post; daarnaast wordt
+  de exacte post (THEOKOT, CURSUSDIENST of FAKBAR) server-side gecontroleerd.
 - `theokot.pickup` — afhaalbalie + turf-lijst.
 - Beide worden in de seed toegekend aan groep **THEOKOT**.
 
@@ -1285,8 +1287,12 @@ homepage valt terug op de standaard) en in het beheer als onbekend gemeld.
   ze hier nog eens met de hand overtypen zou onvermijdelijk uit elkaar lopen.
 - Daarom haalt de homepage (en `/aanbod`) ze **live** op via een publieke,
   read-only endpoint op cudi (`GET /api/opening-hours?association=vtk`), gemapt in
-  `lib/cursusdienstHours.ts` naar dezelfde `entries`-vorm als Theokot. De
-  admin-form voor deze uren is verdwenen; `/admin/home` verwijst enkel nog door.
+  `lib/cursusdienstHours.ts` naar dezelfde `entries`-vorm als Theokot. Het
+  endpoint leest concrete weekinstanties: een week zonder instanties is dicht,
+  niet het terugkerende sjabloon. Op zaterdag en zondag schuift het naar de
+  volgende week; de kaart toont alleen maandag tot en met vrijdag. In de centrale
+  Openingsuren-admin bewerkt Cursusdienst alleen de kaarttekst en linkt de kaart
+  voor de concrete uren door naar Cudi.
 - **Waarom pullen i.p.v. een gedeelde DB of een push-webhook:** de twee apps
   hebben elk hun eigen database en deployment. Een directe cross-DB-lezing koppelt
   hun schema's op rendertijd; een push zou een write-endpoint + secret vragen. Een

@@ -26,12 +26,21 @@ De homepage en `/aanbod` tonen de cursusdienst-openingsuren live van cudi.
 
 - **Bron:** `GET https://cudi.vtk.be/api/opening-hours?association=vtk` (publiek,
   geen auth; openingsuren staan sowieso publiek op de site).
+- Het endpoint leest de concrete `OpeningHoursInstance`-rijen van de gekozen
+  kalenderweek, niet de terugkerende templates. Geen instanties betekent dus
+  expliciet een gesloten week. Op zaterdag en zondag kiest het al de volgende
+  week; de website toont alleen maandag tot en met vrijdag.
 - **Consument:** `apps/web/lib/cursusdienstHours.ts`. Fallback in drie trappen:
-  live fetch → laatst gecachte waarde (DB-`Setting` `cursusdienst.weekHoursCache`)
+  live fetch → laatst gecachte waarde voor exact dezelfde gekozen week
+  (DB-`Setting` `cursusdienst.weekHoursCache`)
   → melding "De cursusdienst openingsuren zijn momenteel niet beschikbaar".
 
 **Opzet:** niets verplicht. Optioneel kan je de cudi-URL overriden met
 `CURSUSDIENST_ORIGIN` (zie tabel onderaan). Dit staat standaard aan.
+
+De tekst op de Cursusdienst-kaart staat wel in de main-site-admin onder
+`/admin/openingsuren`. Leden van Cursusdienst kunnen daar alleen hun eigen
+kaarttekst aanpassen; de concrete uren blijven via de link naar Cudi lopen.
 
 ---
 
