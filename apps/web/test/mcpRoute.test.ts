@@ -44,6 +44,8 @@ describe("POST /api/mcp", () => {
     vi.stubEnv("BETTER_AUTH_URL", "https://vtk.be");
     vi.stubEnv("VTK_MAIN_URL", "https://vtk.be");
     vi.stubEnv("MCP_API_TOKEN", TOKEN);
+    vi.stubEnv("MCP_PERMISSIONS", "*");
+    vi.stubEnv("MCP_GROUP_CODES", "*");
   });
 
   afterEach(() => vi.unstubAllEnvs());
@@ -77,5 +79,31 @@ describe("POST /api/mcp", () => {
     for (const tool of payload.result.tools) {
       expect(tool.annotations.destructiveHint).toBe(false);
     }
+  });
+
+  it("verbergt create-tools en domeinaliases die de serviceaccount niet mag gebruiken", async () => {
+    vi.stubEnv("MCP_PERMISSIONS", "shift.ranking");
+    vi.stubEnv("MCP_GROUP_CODES", "");
+
+    const listed = await POST(
+      mcpRequest({ jsonrpc: "2.0", id: 3, method: "tools/list", params: {} }),
+    );
+    const payload = await rpcPayload(listed);
+    expect(payload.result.tools.map((tool: { name: string }) => tool.name)).toEqual([
+      "system_list_capabilities",
+      "app_read",
+    ]);
+
+    const forbidden = await POST(
+      mcpRequest({
+        jsonrpc: "2.0",
+        id: 4,
+        method: "tools/call",
+        params: { name: "app_read", arguments: { resource: "door" } },
+      }),
+    );
+    expect(await rpcPayload(forbidden)).toMatchObject({
+      result: { isError: true, content: [{ text: expect.stringContaining("FORBIDDEN") }] },
+    });
   });
 });

@@ -2,6 +2,7 @@ import "server-only";
 
 import { createHash, timingSafeEqual } from "node:crypto";
 import type { AuthInfo } from "@modelcontextprotocol/server";
+import { principalAuthExtra } from "@/lib/mcp/policy";
 
 const MAX_REQUEST_BYTES = 256 * 1024;
 const RATE_WINDOW_MS = 60_000;
@@ -117,7 +118,7 @@ function validateNetworkBoundary(request: Request): Response | null {
   return null;
 }
 
-export function authenticateMcpRequest(request: Request): McpAuthentication | Response {
+export async function authenticateMcpRequest(request: Request): Promise<McpAuthentication | Response> {
   const boundaryError = validateNetworkBoundary(request);
   if (boundaryError) return boundaryError;
 
@@ -133,6 +134,11 @@ export function authenticateMcpRequest(request: Request): McpAuthentication | Re
     });
   }
 
+  const extra = await principalAuthExtra();
+  if (!extra) {
+    return jsonError(503, "MCP_PERMISSIONS_NOT_CONFIGURED");
+  }
+
   const rateLimitKey = createHash("sha256").update(configured).digest("hex");
   return {
     // De protocolhandler heeft de geheime bearerwaarde niet nodig. Geef alleen
@@ -142,6 +148,7 @@ export function authenticateMcpRequest(request: Request): McpAuthentication | Re
       token: "[redacted]",
       clientId: process.env.MCP_CLIENT_NAME?.trim() || "vtk-mcp-agent",
       scopes: ["mcp:read", "mcp:create"],
+      extra,
     },
     rateLimitKey,
   };

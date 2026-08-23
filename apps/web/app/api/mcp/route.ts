@@ -10,7 +10,7 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function POST(request: Request): Promise<Response> {
-  const authentication = authenticateMcpRequest(request);
+  const authentication = await authenticateMcpRequest(request);
   if (authentication instanceof Response) return authentication;
 
   const limited = enforceMcpRateLimit(authentication.rateLimitKey);

@@ -5,11 +5,10 @@ import {
   fromJsonSchema,
   McpServer,
   type JsonSchemaType,
+  type McpRequestContext,
 } from "@modelcontextprotocol/server";
 import { ZodError } from "zod";
 import {
-  createCalendarCategory,
-  createCalendarEvent,
   getCalendarCategory,
   getCalendarEvent,
   getPage,
@@ -26,8 +25,28 @@ import {
   type ListEventsInput,
   type ListPagesInput,
 } from "@/lib/mcp/data";
+import {
+  createMcpRecord,
+  listMcpCreateSchemas,
+  MCP_CREATE_KINDS,
+  type McpCreateInput,
+} from "@/lib/mcp/create";
+import {
+  hasAnyMcpPermission,
+  hasMcpPermission,
+  listMcpCapabilities,
+  principalFromAuthInfo,
+} from "@/lib/mcp/policy";
+import {
+  adminRead,
+  canReadMcpResource,
+  MCP_READ_RESOURCES,
+  type McpAdminReadInput,
+} from "@/lib/mcp/read";
 
 export const MCP_READ_TOOL_NAMES = [
+  "system_list_capabilities",
+  "app_read",
   "calendar_list_events",
   "calendar_get_event",
   "calendar_list_categories",
@@ -41,6 +60,7 @@ export const MCP_READ_TOOL_NAMES = [
 ] as const;
 
 export const MCP_CREATE_TOOL_NAMES = [
+  "app_create",
   "calendar_create_event",
   "calendar_create_category",
 ] as const;
@@ -115,6 +135,33 @@ const listPagesSchema = schema<ListPagesInput>({
   additionalProperties: false,
 });
 
+const appReadSchema = schema<McpAdminReadInput>({
+  type: "object",
+  properties: {
+    resource: { type: "string", enum: [...MCP_READ_RESOURCES] },
+    id: { type: "string", minLength: 1, maxLength: 160 },
+    search: { type: "string", minLength: 1, maxLength: 160 },
+    limit: { type: "integer", minimum: 1, maximum: 200, default: 100 },
+    offset: { type: "integer", minimum: 0, maximum: 100000, default: 0 },
+  },
+  required: ["resource"],
+  additionalProperties: false,
+});
+
+const appCreateSchema = schema<McpCreateInput>({
+  type: "object",
+  properties: {
+    kind: { type: "string", enum: [...MCP_CREATE_KINDS] },
+    data: {
+      type: "object",
+      description: "Kind-specifieke velden. Roep eerst system_list_capabilities aan voor het exacte JSON Schema.",
+      additionalProperties: true,
+    },
+  },
+  required: ["kind", "data"],
+  additionalProperties: false,
+});
+
 const nullableText = (maxLength: number) => ({
   anyOf: [{ type: "string", maxLength }, { type: "null" }],
 });
@@ -150,8 +197,9 @@ const createEventSchema = schema<CreateCalendarEventInput>({
     },
     publish: {
       type: "boolean",
+      const: false,
       default: false,
-      description: "False maakt een veilig concept; true publiceert meteen.",
+      description: "MCP maakt altijd een veilig concept; publiceren is niet beschikbaar.",
     },
   },
   required: ["titleNl", "groupCode", "start", "end"],
@@ -215,10 +263,42 @@ async function runTool(work: () => Promise<Record<string, unknown>>) {
   }
 }
 
-function createServer(): McpServer {
+function createServer(context: McpRequestContext): McpServer {
   const server = new McpServer({ name: "vtk-website", version: "1.0.0" });
+  const principal = principalFromAuthInfo(context.authInfo);
+  const readResources = MCP_READ_RESOURCES.map((resource) => ({
+    resource,
+    granted: canReadMcpResource(principal, resource),
+  }));
+  const createKinds = listMcpCreateSchemas(principal);
 
   server.registerTool(
+    "system_list_capabilities",
+    {
+      title: "MCP-capabilities en veiligheidsgrenzen lezen",
+      description: "Toont elke websitepermissie, de rechten van deze serviceaccount, alle leesresources, alle create-kinds en hun exacte inputschema's.",
+      inputSchema: emptyObjectSchema,
+      annotations: readAnnotations,
+    },
+    () => runTool(async () => ({
+      ...listMcpCapabilities(principal),
+      readResources,
+      createKinds,
+    })),
+  );
+
+  if (readResources.some(({ granted }) => granted)) server.registerTool(
+    "app_read",
+    {
+      title: "Applicatiedata lezen",
+      description: "Permission-scoped read-only toegang tot alle admin-domeinen. Secrets, bearerwaarden, hashes en operationele Setting-configuratie worden nooit teruggegeven.",
+      inputSchema: appReadSchema,
+      annotations: readAnnotations,
+    },
+    (input) => runTool(() => adminRead(principal, input)),
+  );
+
+  if (canReadMcpResource(principal, "calendar")) server.registerTool(
     "calendar_list_events",
     {
       title: "Kalenderevenementen lezen",
@@ -228,7 +308,7 @@ function createServer(): McpServer {
     },
     (input) => runTool(() => listCalendarEvents(input)),
   );
-  server.registerTool(
+  if (canReadMcpResource(principal, "calendar")) server.registerTool(
     "calendar_get_event",
     {
       title: "Kalenderevenement lezen",
@@ -238,7 +318,7 @@ function createServer(): McpServer {
     },
     (input) => runTool(() => getCalendarEvent(input)),
   );
-  server.registerTool(
+  if (canReadMcpResource(principal, "calendar")) server.registerTool(
     "calendar_list_categories",
     {
       title: "Kalendercategorieën lezen",
@@ -248,7 +328,7 @@ function createServer(): McpServer {
     },
     () => runTool(listCalendarCategories),
   );
-  server.registerTool(
+  if (canReadMcpResource(principal, "calendar")) server.registerTool(
     "calendar_get_category",
     {
       title: "Kalendercategorie lezen",
@@ -258,7 +338,7 @@ function createServer(): McpServer {
     },
     (input) => runTool(() => getCalendarCategory(input)),
   );
-  server.registerTool(
+  if (canReadMcpResource(principal, "calendar")) server.registerTool(
     "calendar_list_groups",
     {
       title: "Kalendergroepen lezen",
@@ -268,7 +348,7 @@ function createServer(): McpServer {
     },
     () => runTool(listCalendarGroups),
   );
-  server.registerTool(
+  if (canReadMcpResource(principal, "pages")) server.registerTool(
     "site_list_pages",
     {
       title: "CMS-pagina's lezen",
@@ -278,7 +358,7 @@ function createServer(): McpServer {
     },
     (input) => runTool(() => listPages(input)),
   );
-  server.registerTool(
+  if (canReadMcpResource(principal, "pages")) server.registerTool(
     "site_get_page",
     {
       title: "CMS-pagina lezen",
@@ -288,7 +368,7 @@ function createServer(): McpServer {
     },
     (input) => runTool(() => getPage(input)),
   );
-  server.registerTool(
+  if (canReadMcpResource(principal, "navigation")) server.registerTool(
     "site_list_navigation",
     {
       title: "Navigatie lezen",
@@ -298,7 +378,7 @@ function createServer(): McpServer {
     },
     () => runTool(listNavigation),
   );
-  server.registerTool(
+  if (canReadMcpResource(principal, "partners")) server.registerTool(
     "site_list_partners",
     {
       title: "Partners lezen",
@@ -308,7 +388,7 @@ function createServer(): McpServer {
     },
     () => runTool(listPartners),
   );
-  server.registerTool(
+  if (canReadMcpResource(principal, "announcements")) server.registerTool(
     "site_list_announcements",
     {
       title: "Aankondigingen lezen",
@@ -318,7 +398,17 @@ function createServer(): McpServer {
     },
     () => runTool(listAnnouncements),
   );
-  server.registerTool(
+  if (createKinds.some(({ granted }) => granted)) server.registerTool(
+    "app_create",
+    {
+      title: "Applicatierecord aanmaken",
+      description: "Maakt één expliciet ondersteund record aan. Waar mogelijk wordt het geforceerd draft, verborgen, inactief, gesloten, ongepubliceerd of uitgeschakeld aangemaakt. Wijzigen, verwijderen en operationele effecten bestaan niet.",
+      inputSchema: appCreateSchema,
+      annotations: createAnnotations,
+    },
+    (input) => runTool(() => createMcpRecord(principal, input)),
+  );
+  if (hasAnyMcpPermission(principal, ["calendar.create", "calendar.manageAll"])) server.registerTool(
     "calendar_create_event",
     {
       title: "Kalenderevenement aanmaken",
@@ -326,9 +416,12 @@ function createServer(): McpServer {
       inputSchema: createEventSchema,
       annotations: createAnnotations,
     },
-    (input) => runTool(() => createCalendarEvent(input)),
+    (input) => runTool(() => createMcpRecord(principal, {
+      kind: "calendar_event",
+      data: { ...input, publish: false },
+    })),
   );
-  server.registerTool(
+  if (hasMcpPermission(principal, "calendar.manageAll")) server.registerTool(
     "calendar_create_category",
     {
       title: "Kalendercategorie aanmaken",
@@ -336,7 +429,10 @@ function createServer(): McpServer {
       inputSchema: createCategorySchema,
       annotations: createAnnotations,
     },
-    (input) => runTool(() => createCalendarCategory(input)),
+    (input) => runTool(() => createMcpRecord(principal, {
+      kind: "calendar_category",
+      data: input,
+    })),
   );
 
   return server;
