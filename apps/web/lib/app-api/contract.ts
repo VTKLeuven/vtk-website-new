@@ -1,13 +1,12 @@
-import { z } from "zod";
-
 /**
  * Het contract tussen de site en de VTK-app (`~/vtk-app`).
  *
  * **Dit bestand wordt letterlijk gekopieerd naar `src/api/contract.ts` in de
- * app-repo.** Daarom staan er enkel types en zod-schema's in: geen prisma, geen
- * `server-only`, geen import uit `@/lib/...`. Zelfde afspraak als
- * `lib/theokot.ts` en `lib/shift.ts`, die ook aan beide kanten van de
- * server/client-grens gebruikt worden.
+ * app-repo.** Daarom staan er enkel types en pure helpers in: geen prisma, geen
+ * `server-only`, geen import uit `@/lib/...`, en zelfs geen zod. Dat laatste is
+ * geen principe maar rekenwerk: de app heeft geen enkele reden om een
+ * validatiebibliotheek mee te slepen voor een contract dat ze enkel leest. De
+ * zod-schema's staan daarom in `schemas.ts` ernaast, aan de serverkant.
  *
  * Twee regels die de moeite zijn om te onthouden:
  *
@@ -27,8 +26,6 @@ import { z } from "zod";
 export const APP_API_VERSION = 1;
 
 export type AppLocale = "nl" | "en";
-
-export const appLocaleSchema = z.enum(["nl", "en"]);
 
 /** Leest `?locale=` uit een URL; alles wat geen geldige taal is wordt Nederlands. */
 export function appLocaleFrom(value: string | null | undefined): AppLocale {
@@ -159,29 +156,22 @@ export type AppBootstrap = {
 // Push
 // -----------------------------------------------------------------------------
 
-export const appPushPlatformSchema = z.enum(["ios", "android"]);
+export type AppPushPlatform = "ios" | "android";
 
-export type AppPushPlatform = z.infer<typeof appPushPlatformSchema>;
+export type AppPushRegisterInput = {
+  token: string;
+  platform: AppPushPlatform;
+  /** De versie van de app, puur om later te kunnen zien wie waarop zit. */
+  appVersion?: string;
+};
 
 /**
  * Een Expo-pushtoken heeft de vorm `ExponentPushToken[...]` of `ExpoPushToken[...]`.
- * We controleren de vorm hier al: een token dat er niet zo uitziet, gaat sowieso
- * nergens heen en hoort niet in de tabel te belanden.
+ * De app controleert dit voor ze iets stuurt, de server nog eens voor ze iets
+ * bewaart; een token dat er niet zo uitziet gaat sowieso nergens heen.
  */
-export const appPushTokenSchema = z
-  .string()
-  .trim()
-  .min(10)
-  .max(256)
-  .regex(/^Expo(nent)?PushToken\[[^\]]+\]$/, "Geen geldig Expo-pushtoken");
+export const APP_PUSH_TOKEN_PATTERN = /^Expo(nent)?PushToken\[[^\]]+\]$/;
 
-export const appPushRegisterSchema = z.object({
-  token: appPushTokenSchema,
-  platform: appPushPlatformSchema,
-  /** De versie van de app, puur om later te kunnen zien wie waarop zit. */
-  appVersion: z.string().trim().max(32).optional(),
-});
-
-export const appPushUnregisterSchema = z.object({ token: appPushTokenSchema });
-
-export type AppPushRegisterInput = z.infer<typeof appPushRegisterSchema>;
+export function isAppPushToken(value: string): boolean {
+  return APP_PUSH_TOKEN_PATTERN.test(value.trim());
+}

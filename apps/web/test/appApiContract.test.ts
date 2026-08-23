@@ -1,11 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import {
-  APP_API_VERSION,
-  appLocaleFrom,
-  appPushRegisterSchema,
-  appPushUnregisterSchema,
-} from '@/lib/app-api/contract';
+import { APP_API_VERSION, appLocaleFrom, isAppPushToken } from '@/lib/app-api/contract';
+import { appPushRegisterSchema, appPushUnregisterSchema } from '@/lib/app-api/schemas';
 import { compareVersions, minimumAppVersion } from '@/lib/app-api/version';
 
 /**
@@ -36,6 +32,11 @@ describe('app-api contract', () => {
     expect(() => appPushRegisterSchema.parse({ ...valid, token: 'zomaar-een-string' })).toThrow();
     expect(() => appPushRegisterSchema.parse({ ...valid, platform: 'web' })).toThrow();
     expect(() => appPushUnregisterSchema.parse({ token: '' })).toThrow();
+
+    // Het patroon zelf zit in het contract, zodat de app hetzelfde oordeel velt
+    // voor ze iets stuurt.
+    expect(isAppPushToken('ExpoPushToken[xxxxxxxxxx]')).toBe(true);
+    expect(isAppPushToken('ExponentPushToken[]')).toBe(false);
   });
 
   it('vergelijkt versies op major, minor en patch', () => {

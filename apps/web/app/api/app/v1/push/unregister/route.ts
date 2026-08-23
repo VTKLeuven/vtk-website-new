@@ -2,7 +2,7 @@ import { prisma } from "@vtk/db";
 
 import { corsPreflight } from "@/lib/cors";
 import { requireSession } from "@/lib/session";
-import { appPushUnregisterSchema } from "@/lib/app-api/contract";
+import { appPushUnregisterSchema } from "@/lib/app-api/schemas";
 import { appErrorResponse, appJson, readAppJson } from "@/lib/app-api/respond";
 
 export const runtime = "nodejs";
