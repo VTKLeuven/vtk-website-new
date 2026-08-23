@@ -14,7 +14,11 @@ import {
   syncMailGroupsAction,
 } from "./actions";
 
-export type PostOption = { id: string; name: string; werkgroep: boolean };
+/** Eén groep in de bronkeuzelijst: "Posten", "Werkgroepen" of een kiesploeg. */
+export type SourceGroup = {
+  label: string;
+  options: { value: string; label: string }[];
+};
 
 export type MailGroupRow = {
   id: string;
@@ -26,7 +30,7 @@ export type MailGroupRow = {
   existsInGoogle: boolean;
   lastSyncLabel: string | null;
   lastError: string | null;
-  sources: { id: string; groupId: string; onlyLead: boolean; name: string }[];
+  sources: { id: string; onlyLead: boolean; name: string }[];
   extras: { id: string; email: string; kind: "INCLUDE" | "EXCLUDE"; note: string | null }[];
   /** Door ons berekend, niet uit Google gelezen. */
   memberCount: number;
@@ -37,7 +41,7 @@ export type MailGroupRow = {
 export function MailGroupsAdmin({
   nl,
   rows,
-  posts,
+  sourceOptions,
   configured,
   domain,
   linkedCount,
@@ -46,7 +50,7 @@ export function MailGroupsAdmin({
 }: {
   nl: boolean;
   rows: MailGroupRow[];
-  posts: PostOption[];
+  sourceOptions: SourceGroup[];
   configured: boolean;
   domain: string | null;
   linkedCount: number;
@@ -82,7 +86,7 @@ export function MailGroupsAdmin({
         save: "Opslaan",
         saving: "Bezig met opslaan...",
         saved: "Opgeslagen.",
-        addSource: "Post toevoegen",
+        addSource: "Bron toevoegen",
         onlyLead: "Enkel de verantwoordelijke",
         add: "Toevoegen",
         adding: "Bezig met toevoegen...",
@@ -110,13 +114,12 @@ export function MailGroupsAdmin({
         deleteConfirm: "Loskoppelen",
         cancel: "Annuleren",
         deleted: "Groepsadres losgekoppeld.",
-        removeSourceTitle: "Post als bron verwijderen?",
+        removeSourceTitle: "Bron verwijderen?",
         removeSourceDescription: (name: string, email: string) =>
           `De leden van ${name} vallen bij de volgende synchronisatie uit ${email}. Andere bronnen blijven.`,
         removeExtraTitle: "Adres verwijderen?",
         removeExtraDescription: (email: string) =>
           `${email} verdwijnt bij de volgende synchronisatie uit deze lijst.`,
-        werkgroep: "werkgroep",
         empty: "Nog geen groepsadressen.",
       }
     : {
@@ -147,7 +150,7 @@ export function MailGroupsAdmin({
         save: "Save",
         saving: "Saving...",
         saved: "Saved.",
-        addSource: "Add post",
+        addSource: "Add source",
         onlyLead: "Only the lead",
         add: "Add",
         adding: "Adding...",
@@ -174,13 +177,12 @@ export function MailGroupsAdmin({
         deleteConfirm: "Unlink",
         cancel: "Cancel",
         deleted: "Group address unlinked.",
-        removeSourceTitle: "Remove post as source?",
+        removeSourceTitle: "Remove source?",
         removeSourceDescription: (name: string, email: string) =>
           `The members of ${name} drop out of ${email} on the next synchronisation. Other sources stay.`,
         removeExtraTitle: "Remove address?",
         removeExtraDescription: (email: string) =>
           `${email} drops out of this list on the next synchronisation.`,
-        werkgroep: "work group",
         empty: "No group addresses yet.",
       };
 
@@ -350,17 +352,20 @@ export function MailGroupsAdmin({
                     className="flex flex-wrap items-end gap-3"
                   >
                     <input type="hidden" name="mailGroupId" value={row.id} />
-                    <div className="w-56">
+                    <div className="w-64">
                       <Label>{t.addSource}</Label>
-                      <Select name="groupId" required defaultValue="">
+                      <Select name="source" required defaultValue="">
                         <option value="" disabled>
                           ...
                         </option>
-                        {posts.map((post) => (
-                          <option key={post.id} value={post.id}>
-                            {post.name}
-                            {post.werkgroep ? ` (${t.werkgroep})` : ""}
-                          </option>
+                        {sourceOptions.map((group) => (
+                          <optgroup key={group.label} label={group.label}>
+                            {group.options.map((option) => (
+                              <option key={option.value} value={option.value}>
+                                {option.label}
+                              </option>
+                            ))}
+                          </optgroup>
                         ))}
                       </Select>
                     </div>

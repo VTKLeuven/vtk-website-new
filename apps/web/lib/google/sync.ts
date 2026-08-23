@@ -1,5 +1,6 @@
 import "server-only";
 
+import type { Prisma } from "@prisma/client";
 import { prisma } from "@vtk/db";
 import { currentWorkingYear } from "@vtk/auth";
 import { logAudit } from "@/lib/audit";
@@ -14,7 +15,14 @@ import {
   patchGroupSettings,
   removeMember,
 } from "./client";
-import { type MembershipRow, desiredMembers, normaliseEmail } from "./members";
+import {
+  type KiesploegMembershipRow,
+  type MembershipRow,
+  desiredMembers,
+  normaliseEmail,
+} from "./members";
+import { type AccountState, applyAccountState, desiredAccountState } from "./accountState";
+import { renderAddress } from "./addresses";
 
 /**
  * Zet de groepsadressen in Google Workspace gelijk met de posten van dit
@@ -49,6 +57,10 @@ export type ReconcileOutcome =
       /** Leden die in een lijst horen maar nog geen gekoppeld @vtk.be-adres hebben. */
       unlinked: number;
       failed: number;
+      /** Accounts waarvan de staat (beperkt/volwaardig) aangepast werd. */
+      accountsChanged: number;
+      /** Deelstappen die niet lukten, bv. een Gmail-instelling zonder scope. */
+      accountWarnings: string[];
     };
 
 type MailGroupRow = {
@@ -58,7 +70,12 @@ type MailGroupRow = {
   description: string | null;
   googleId: string | null;
   allowExternalSenders: boolean;
-  sources: { groupId: string; onlyLead: boolean }[];
+  sources: {
+    groupId: string | null;
+    kiesploegId: string | null;
+    kiesploegPostId: string | null;
+    onlyLead: boolean;
+  }[];
   extras: { email: string; kind: "INCLUDE" | "EXCLUDE" }[];
 };
 
@@ -69,7 +86,14 @@ const SELECT = {
   description: true,
   googleId: true,
   allowExternalSenders: true,
-  sources: { select: { groupId: true, onlyLead: true } },
+  sources: {
+    select: {
+      groupId: true,
+      kiesploegId: true,
+      kiesploegPostId: true,
+      onlyLead: true,
+    },
+  },
   extras: { select: { email: true, kind: true } },
 } as const;
 
@@ -131,31 +155,69 @@ async function ensureSettings(cfg: GoogleConfig, row: MailGroupRow): Promise<voi
   await patchGroupSettings(cfg, row.email, wanted);
 }
 
-/** Alle lidmaatschappen die de opgegeven lijsten samen nodig hebben, in één query. */
-async function loadMemberships(rows: MailGroupRow[]): Promise<MembershipRow[]> {
-  const groupIds = [...new Set(rows.flatMap((r) => r.sources.map((s) => s.groupId)))];
-  if (groupIds.length === 0) return [];
+type Memberships = {
+  posts: MembershipRow[];
+  kiesploeg: KiesploegMembershipRow[];
+};
 
-  const memberships = await prisma.groupMembership.findMany({
-    where: {
-      year: currentWorkingYear(),
-      groupId: { in: groupIds },
-      // Een gedeactiveerd of gewist account hoort in geen enkele lijst meer,
-      // ook niet wanneer het lidmaatschap van dit jaar nog in de tabel staat.
-      user: { active: true, deletedAt: null },
-    },
-    select: {
-      groupId: true,
-      role: true,
-      user: { select: { id: true, name: true, googleEmail: true } },
-    },
-  });
+/** Alle lidmaatschappen die de opgegeven lijsten samen nodig hebben, in twee queries. */
+async function loadMemberships(rows: MailGroupRow[]): Promise<Memberships> {
+  const groupIds = [
+    ...new Set(rows.flatMap((r) => r.sources.map((s) => s.groupId).filter(isId))),
+  ];
+  const kiesploegIds = [
+    ...new Set(rows.flatMap((r) => r.sources.map((s) => s.kiesploegId).filter(isId))),
+  ];
+  const postIds = [
+    ...new Set(rows.flatMap((r) => r.sources.map((s) => s.kiesploegPostId).filter(isId))),
+  ];
 
-  return memberships.map((m) => ({
-    groupId: m.groupId,
-    role: m.role,
-    user: m.user,
-  }));
+  const [posts, kiesploeg] = await Promise.all([
+    groupIds.length === 0
+      ? []
+      : prisma.groupMembership.findMany({
+          where: {
+            year: currentWorkingYear(),
+            groupId: { in: groupIds },
+            // Een gedeactiveerd of gewist account hoort in geen enkele lijst
+            // meer, ook niet wanneer het lidmaatschap van dit jaar nog bestaat.
+            user: { active: true, deletedAt: null },
+          },
+          select: {
+            groupId: true,
+            role: true,
+            user: { select: { id: true, name: true, googleEmail: true } },
+          },
+        }),
+    kiesploegIds.length === 0 && postIds.length === 0
+      ? []
+      : prisma.kiesploegMember.findMany({
+          where: {
+            OR: [{ kiesploegId: { in: kiesploegIds } }, { postId: { in: postIds } }],
+            user: { active: true, deletedAt: null },
+          },
+          select: {
+            kiesploegId: true,
+            postId: true,
+            role: true,
+            user: { select: { id: true, name: true, googleEmail: true } },
+          },
+        }),
+  ]);
+
+  return {
+    posts: posts.map((m) => ({ groupId: m.groupId, role: m.role, user: m.user })),
+    kiesploeg: kiesploeg.map((m) => ({
+      kiesploegId: m.kiesploegId,
+      postId: m.postId,
+      role: m.role,
+      user: m.user,
+    })),
+  };
+}
+
+function isId(value: string | null): value is string {
+  return value !== null;
 }
 
 type Counters = { added: number; removed: number; unlinked: number; failed: number };
@@ -163,7 +225,7 @@ type Counters = { added: number; removed: number; unlinked: number; failed: numb
 async function syncOne(
   cfg: GoogleConfig,
   row: MailGroupRow,
-  memberships: MembershipRow[],
+  memberships: Memberships,
   counters: Counters,
 ): Promise<void> {
   try {
@@ -172,7 +234,8 @@ async function syncOne(
 
     const desired = desiredMembers({
       sources: row.sources,
-      memberships,
+      memberships: memberships.posts,
+      kiesploegMemberships: memberships.kiesploeg,
       extras: row.extras,
     });
     counters.unlinked += desired.unlinked.length;
@@ -234,11 +297,33 @@ async function syncOne(
  * Het vangnet: herbereken alles uit de database en zet het in Google recht.
  * Bedoeld voor de worker (`/api/google/maintenance`) en voor de knop "Nu
  * synchroniseren" in de admin.
+ *
+ * Twee delen: de groepsadressen, en de staat van de accounts (beperkt versus
+ * volwaardig). Dat tweede deel is wat op 15 juli een kiesploeglid vanzelf een
+ * werkende mailbox geeft.
  */
-export async function reconcileMailGroups(): Promise<ReconcileOutcome> {
+export async function reconcileGoogle(): Promise<ReconcileOutcome> {
   const cfg = await getGoogleConfig();
   if (!cfg) return { skipped: true };
 
+  const groups = await syncGroups(cfg);
+  const accounts = await reconcileAccountStates(cfg);
+
+  return {
+    ...groups,
+    accountsChanged: accounts.changed,
+    accountWarnings: accounts.warnings,
+    failed: groups.failed + accounts.failed,
+  };
+}
+
+async function syncGroups(cfg: GoogleConfig): Promise<{
+  groups: number;
+  added: number;
+  removed: number;
+  unlinked: number;
+  failed: number;
+}> {
   const rows = (await prisma.mailGroup.findMany({
     where: { enabled: true },
     select: SELECT,
@@ -257,6 +342,91 @@ export async function reconcileMailGroups(): Promise<ReconcileOutcome> {
   return { groups: rows.length, ...counters };
 }
 
+export type AccountStateOutcome = { changed: number; warnings: string[]; failed: number };
+
+/**
+ * Zet de staat van elk gekoppeld account gelijk met wat de posten en de
+ * kiesploeg zeggen.
+ *
+ * Doet in de regel niets: enkel wanneer de gewenste staat verschilt van de
+ * laatst toegepaste, vertrekt er een aanroep. Zo kost deze ronde niets zolang
+ * er niets verandert, en wordt het op 16 juli in één keer wel wat werk.
+ *
+ * Degraderen gebeurt hier nooit; zie `applyAccountState`.
+ */
+export async function reconcileAccountStates(cfg: GoogleConfig): Promise<AccountStateOutcome> {
+  const year = currentWorkingYear();
+  const users = await prisma.user.findMany({
+    where: { googleUserId: { not: null }, googleEmail: { not: null }, deletedAt: null },
+    select: {
+      id: true,
+      name: true,
+      firstName: true,
+      lastName: true,
+      googleEmail: true,
+      googleAccountState: true,
+      memberships: { where: { year }, select: { id: true }, take: 1 },
+      kiesploegMemberships: {
+        where: { kiesploeg: { active: true } },
+        select: {
+          mailboxActive: true,
+          forwardTo: true,
+          kiesploeg: { select: { code: true, aliasTemplate: true } },
+        },
+        take: 1,
+      },
+    },
+  });
+
+  let changed = 0;
+  let failed = 0;
+  const warnings: string[] = [];
+
+  for (const user of users) {
+    const kiesploeg = user.kiesploegMemberships[0] ?? null;
+    const desired = desiredAccountState({
+      hasCurrentPost: user.memberships.length > 0,
+      kiesploeg: kiesploeg ? { mailboxActive: kiesploeg.mailboxActive } : null,
+    });
+    if (!desired) continue;
+
+    const alias =
+      kiesploeg && user.firstName && user.lastName
+        ? renderAddress(
+            kiesploeg.kiesploeg.aliasTemplate,
+            {
+              code: kiesploeg.kiesploeg.code,
+              voornaam: user.firstName,
+              achternaam: user.lastName,
+            },
+            cfg.domain,
+          )
+        : null;
+
+    try {
+      const outcome = await applyAccountState(
+        cfg,
+        {
+          userId: user.id,
+          name: user.name,
+          googleEmail: user.googleEmail as string,
+          current: user.googleAccountState as AccountState | null,
+          alias,
+          forwardTo: kiesploeg?.forwardTo ?? null,
+        },
+        desired,
+      );
+      if (outcome.changed) changed += 1;
+      for (const warning of outcome.warnings) warnings.push(`${user.name}: ${warning}`);
+    } catch (err) {
+      failed += 1;
+      warnings.push(`${user.name}: ${err instanceof Error ? err.message : String(err)}`);
+    }
+  }
+
+  return { changed, warnings, failed };
+}
+
 /**
  * Best-effort push na een wijziging aan één post: enkel de lijsten die deze
  * post als bron hebben. Gooit nooit; een hapering bij Google mag het opslaan
@@ -266,12 +436,26 @@ export async function reconcileMailGroups(): Promise<ReconcileOutcome> {
  * toevoegt op een round-trip naar Google.
  */
 export async function pushMailGroupsForGroup(groupId: string): Promise<void> {
+  await pushFor({ sources: { some: { groupId } } });
+}
+
+/** Idem, na een wijziging aan een kiesploeg of aan een van haar posten. */
+export async function pushMailGroupsForKiesploeg(kiesploegId: string): Promise<void> {
+  await pushFor({
+    OR: [
+      { sources: { some: { kiesploegId } } },
+      { sources: { some: { kiesploegPost: { kiesploegId } } } },
+    ],
+  });
+}
+
+async function pushFor(where: Prisma.MailGroupWhereInput): Promise<void> {
   try {
     const cfg = await getGoogleConfig();
     if (!cfg) return;
 
     const rows = (await prisma.mailGroup.findMany({
-      where: { enabled: true, sources: { some: { groupId } } },
+      where: { enabled: true, ...where },
       select: SELECT,
     })) as MailGroupRow[];
     if (rows.length === 0) return;
@@ -282,6 +466,6 @@ export async function pushMailGroupsForGroup(groupId: string): Promise<void> {
       await syncOne(cfg, row, memberships, counters);
     }
   } catch (err) {
-    console.error("[google] push na postwijziging mislukt", err);
+    console.error("[google] push na wijziging mislukt", err);
   }
 }

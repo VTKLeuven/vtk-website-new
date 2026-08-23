@@ -442,6 +442,15 @@ enum StudyProgramme {
 // Users, groups, permissions
 // -----------------------------------------------------------------------------
 
+/// Wat een `@vtk.be`-account mag. Afgeleid uit de posten en de kiesploeg, met
+/// een override per persoon; zie docs/design-decisions.md, "Google Workspace".
+enum GoogleAccountState {
+  /// Kiesploeglid: mailbox stuurt door, verzenden gebeurt via de kiesploegalias.
+  RESTRICTED
+  /// Volwaardig: eigen mailbox, mag mailen vanaf het eigen adres.
+  FULL
+}
+
 model User {
   id                   String    @id @default(cuid())
   // `name` blijft de weergavenaam (en het veld dat better-auth zelf zet bij een
@@ -499,6 +508,14 @@ model User {
   googleUserId           String?          @unique
   googleEmail            String?          @unique
   googleLinkedAt         DateTime?
+  // Wanneer het lid de verplichte koppeling uitstelde omdat het nog geen
+  // @vtk.be-account heeft. Zonder deze ontsnapping sluit de gate iemand buiten
+  // die niets kan doen aan wat de gate vraagt; de gate komt gewoon terug.
+  googleLinkDeferredAt   DateTime?
+  // Laatst toegepaste staat van het Google-account, zodat de sync niet elke
+  // ronde dezelfde OU-verhuizing opnieuw doet. Afgeleid uit de posten en de
+  // kiesploeg; zie lib/google/accountState.ts.
+  googleAccountState     GoogleAccountState?
   // Opt-in mailinglijsten: enkel de aangeduide categorieën zitten in de array.
   mailCategories         MailCategory[]   @default([])
   // Herinneringen voor een shift waarvoor je jezelf inschreef. Bewust geen
@@ -614,6 +631,8 @@ model User {
   adminAuditLogs AdminAuditLog[] @relation("AdminAuditActor")
 
   urenloopDownloadEmails UrenloopDownloadEmail[] @relation("UrenloopDownloadEmailAddedBy")
+
+  kiesploegMemberships KiesploegMember[]
 
   createdLesbezoeken  Lesbezoek[] @relation("LesbezoekCreatedBy")
   reviewedLesbezoeken Lesbezoek[] @relation("LesbezoekReviewedBy")
@@ -788,15 +807,112 @@ model MailGroup {
 model MailGroupSource {
   id          String  @id @default(cuid())
   mailGroupId String
-  groupId     String
-  /// Enkel de verantwoordelijke (`GroupMembership.role = LEAD`) i.p.v. elk lid.
+  /// Precies één van de drie is ingevuld: een post/werkgroep, een hele
+  /// kiesploeg, of één post binnen een kiesploeg. Bewust drie kolommen en geen
+  /// polymorfe `type` + `id`: zo blijft de foreign key echt, en verdwijnt een
+  /// bron vanzelf wanneer de post of de kiesploeg verdwijnt.
+  groupId         String?
+  kiesploegId     String?
+  kiesploegPostId String?
+  /// Enkel de verantwoordelijke (`role = LEAD`) i.p.v. elk lid.
   onlyLead    Boolean @default(false)
 
-  mailGroup MailGroup @relation(fields: [mailGroupId], references: [id], onDelete: Cascade)
-  group     Group     @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  mailGroup     MailGroup      @relation(fields: [mailGroupId], references: [id], onDelete: Cascade)
+  group         Group?         @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  kiesploeg     Kiesploeg?     @relation(fields: [kiesploegId], references: [id], onDelete: Cascade)
+  kiesploegPost KiesploegPost? @relation(fields: [kiesploegPostId], references: [id], onDelete: Cascade)
 
   @@unique([mailGroupId, groupId, onlyLead])
+  @@unique([mailGroupId, kiesploegId, onlyLead])
+  @@unique([mailGroupId, kiesploegPostId, onlyLead])
   @@index([groupId])
+  @@index([kiesploegId])
+  @@index([kiesploegPostId])
+}
+
+// -----------------------------------------------------------------------------
+// Kiesploeg
+// -----------------------------------------------------------------------------
+// Een opkomende ploeg met een eigen postverdeling, die maanden vóór haar
+// werkingsjaar al mailadressen nodig heeft. Bewust een eigen structuur en geen
+// derde waarde in `GroupType`: haar posten zijn andere posten dan die van het
+// praesidium, ze bestaat maar één jaar, en haar leden hebben een beperkt
+// account tot ze aantreden. Wat gedeeld wordt met de posten is enkel de
+// mailinglijst-machinerie (`MailGroupSource`).
+// Zie docs/design-decisions.md, "Google Workspace".
+
+model Kiesploeg {
+  id String @id @default(cuid())
+  /// Korte code die in elk adres terugkomt, bv. "2027".
+  code String @unique
+  /// Het werkingsjaar waarin ze aantreedt (2027 = "27-28"). Vanaf 15 juli van
+  /// dat jaar worden haar leden volwaardig, op voorwaarde dat ze dan effectief
+  /// in een post zitten.
+  workingYear Int
+  /// De naam die VTK kiest, bv. "Kiesploeg Delta".
+  formalName String
+  /// De naam die de ploeg zelf later kiest; mag lang leeg blijven. De adressen
+  /// hangen aan de code en niet aan de naam, dus dit breekt niets.
+  informalName String?
+
+  /// Sjablonen voor de adressen, met {code}, {voornaam}, {achternaam} en {post}.
+  /// Sjablonen en geen code, want de conventie verschilt nu al per ploeg.
+  accountTemplate String @default("{voornaam}.{achternaam}")
+  aliasTemplate   String @default("kiesploeg{code}.{voornaam}.{achternaam}")
+  listTemplate    String @default("{post}.{code}")
+
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  posts      KiesploegPost[]
+  members    KiesploegMember[]
+  mailGroups MailGroupSource[]
+}
+
+/// Een post binnen de kiesploeg. Dit zijn níét de praesidiumposten: ze hebben
+/// eigen namen en bestaan enkel voor deze ploeg.
+model KiesploegPost {
+  id          String  @id @default(cuid())
+  kiesploegId String
+  /// Gaat in het lijstadres, bv. "marketing" -> marketing.2027@vtk.be.
+  code        String
+  name        String
+  /// De g5 van de ploeg. Haar leden zitten in élke lijst van deze kiesploeg,
+  /// zoals Groep 5 in elke postenlijst van het praesidium zit.
+  isG5        Boolean @default(false)
+  order       Int     @default(0)
+
+  kiesploeg  Kiesploeg         @relation(fields: [kiesploegId], references: [id], onDelete: Cascade)
+  members    KiesploegMember[]
+  mailGroups MailGroupSource[]
+
+  @@unique([kiesploegId, code])
+  @@index([kiesploegId])
+}
+
+model KiesploegMember {
+  id          String         @id @default(cuid())
+  kiesploegId String
+  userId      String
+  /// Leeg zolang de postverdeling nog niet gemaakt is: in het begin is enkel
+  /// de g5 bekend.
+  postId      String?
+  role        MembershipRole @default(MEMBER)
+  /// Override: dit lid mag nu al mailen vanaf zijn eigen adres (de
+  /// marketingmensen). Wint van de afgeleide staat.
+  mailboxActive Boolean      @default(false)
+  /// Waar de mail naartoe gaat zolang de mailbox niet actief is.
+  forwardTo   String?
+  createdAt   DateTime       @default(now())
+
+  kiesploeg Kiesploeg      @relation(fields: [kiesploegId], references: [id], onDelete: Cascade)
+  user      User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  post      KiesploegPost? @relation(fields: [postId], references: [id], onDelete: SetNull)
+
+  @@unique([kiesploegId, userId])
+  @@index([userId])
+  @@index([postId])
 }
 
 /// Waarom een adres los toegevoegd of net weggehouden wordt.

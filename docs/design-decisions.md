@@ -1106,6 +1106,13 @@ Drie dingen die daar stil mislopen als je ze vergeet:
 - Wie het tóch met een privéadres probeert, krijgt geen vage fout maar: "Dit is
   `jarne@gmail.com`. Log opnieuw in met je VTK-adres."
 
+**De gate heeft een ontsnapping.** Wie nog geen `@vtk.be`-account heeft, kan
+niets doen aan wat de gate vraagt, en een gate die zo iemand van de hele site
+houdt is een storing en geen maatregel. De knop "ik heb nog geen VTK-account"
+zet `User.googleLinkDeferredAt` en laat het lid een week door; daarna staat de
+gate er weer. Dat veld is meteen ook de lijst voor IT van wie op een account
+wacht.
+
 **Een lid zonder koppeling wordt niet stil overgeslagen.** Het beheerscherm
 toont "3 leden nog niet gekoppeld" bij de lijst. Zijn privéadres in een intern
 postadres zetten kan, maar enkel met een bewuste klik: anders gaat interne mail
@@ -1149,13 +1156,25 @@ precies het soort afspraak dat volgend jaar anders is, dus de vormen staan als
 **sjabloon op de kiesploeg-rij** met `{code}`, `{voornaam}`, `{achternaam}` en
 `{post}`, met een voorbeeldregel eronder in de admin.
 
-**Aanmaken gaat altijd via een voorbeeldscherm.** Je ziet de volledige lijst
-voorgestelde adressen met een vinkje per persoon voor er iets naar Google gaat.
+**Aanmaken gaat altijd via een voorbeeldscherm**
+(`/admin/groepsadressen/accounts`, recht `googleAccounts.manage`). Je kiest een
+post of een kiesploeg, ziet de volledige lijst voorgestelde adressen met een
+vinkje per persoon, en pas dan gaat er iets naar Google. Het scherm herberekent
+het voorstel server-side bij het uitvoeren: een adres dat de browser meestuurt,
+is een adres dat de browser kan wijzigen.
 Een mailadres is achteraf lastig te veranderen, en namen met accenten,
 tussenvoegsels of naamgenoten (`jan.vandenbroeck` versus `jan.van.den.broeck`)
 los je beter met ogen op dan met een regel. De normalisatie zelf is: kleine
 letters, diacritics weg, niet-alfanumeriek weg, spaties in de achternaam
 samengeplakt, en bij een botsing een cijfer erachter.
+
+#### De standaardlijsten worden in één klik aangemaakt
+
+De knop "standaardlijsten aanmaken" maakt per kiesploegpost een groepsadres uit
+het lijstsjabloon, met **twee zichtbare bronrijen**: die post en de g5 van de
+ploeg. Dat de g5 in elke lijst zit, staat dus in de bronnenlijst en niet als
+regel in de sync, precies zoals bij Groep 5 en de praesidiumposten. Bestaande
+adressen worden overgeslagen, zodat de knop twee keer indrukken niets breekt.
 
 #### De accountstaat is afgeleid, met een override
 
@@ -1212,14 +1231,26 @@ vanzelf vanaf zijn kiesploegadres, en de OU-regel vangt op wie het omzeilt.
   nodig heeft. `admin.directory.user` komt er pas bij wanneer we effectief
   accounts aanmaken.
 
+#### Het wachtwoord wordt één keer getoond, nooit bewaard
+
+Het gegenereerde wachtwoord staat na het aanmaken in de resultatentabel en
+verdwijnt bij het herladen; het account staat op `changePasswordAtNextLogin`.
+Bewust niet gemaild vanuit de site: dan zou er een wachtwoord in een mailbox
+blijven liggen, en het adres waar we het naartoe zouden sturen is precies het
+adres dat we nog niet geverifieerd hebben. De g5 geeft het door.
+
+Dat is ook waarom het scherm er expliciet bij zegt dat de lijst na het verlaten
+weg is. Een ploeg die haar wachtwoorden kwijt is voor ze ze doorgaf, is een
+avond werk voor niets.
+
 ### Nog te beslissen
 
 - Wat er gebeurt met het account van iemand die de kring verlaat, en na hoeveel
   tijd (mail en Drive-bestanden hangen eraan). Tot dat beslist is, degradeert de
-  sync niemand automatisch.
-- Of we het wachtwoord van een nieuw account naar het opgegeven privéadres
-  mailen (met `changePasswordAtNextLogin`) of het in de admin tonen zodat de g5
-  het zelf doorgeeft.
+  sync niemand automatisch en suspendt ze niemand.
+- Of de kiesploegalias blijft staan als ontvangend adres nadat de ploeg
+  aantreedt. Nu blijft hij staan: hij verwijderen zou mail doen bouncen die naar
+  een adres uit die periode gestuurd wordt.
 
 ## Kalender: categorieën en agenda-feeds
 

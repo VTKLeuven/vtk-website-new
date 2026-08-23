@@ -302,8 +302,15 @@ nieuwsbrieven naar studenten (Brevo); dit gaat over de eigen adressen van de
 posten. Wie het ene mag, mag daarom niet vanzelf het andere: de export toont
 studentengegevens, dit scherm schrijft rechtstreeks in Google.
 
-De configuratie zelf (het service-account) staat niet achter deze permissie maar
-achter de superadmin-gate van Admin -> IT, net als de kluis en de deur.
+Er staan er twee naast: `googleAccounts.manage` (accounts aanmaken en tussen
+organisatie-eenheden verplaatsen) en `kiesploeg.manage` (de kiesploeg, haar
+posten en haar leden). Accounts aanmaken is bewust een ander recht dan lijsten
+beheren: het maakt echte Workspace-accounts aan en verplaatst mensen tussen OU's
+waar het verzendbeleid aan hangt.
+
+De configuratie zelf (het service-account en de OAuth-client voor de
+zelfbedieningskoppeling) staat niet achter deze permissies maar achter de
+superadmin-gate van Admin -> IT, net als de kluis en de deur.
 
 ## Wachtwoordkluis
 

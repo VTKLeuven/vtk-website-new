@@ -10,7 +10,11 @@ import { type SaveState, saveError, saveOk } from "@/lib/saveState";
 import { getGoogleConfig } from "@/lib/google/config";
 import { collectLinkCandidates } from "@/lib/google/link";
 import { normaliseEmail } from "@/lib/google/members";
-import { pushMailGroupsForGroup, reconcileMailGroups } from "@/lib/google/sync";
+import {
+  pushMailGroupsForGroup,
+  pushMailGroupsForKiesploeg,
+  reconcileGoogle,
+} from "@/lib/google/sync";
 
 /**
  * Server actions van de groepsadressen (Google Workspace).
@@ -115,40 +119,75 @@ export async function deleteMailGroupAction(formData: FormData): Promise<void> {
 
 const sourceSchema = z.object({
   mailGroupId: z.string().min(1),
-  groupId: z.string().min(1),
+  /** `group:<id>`, `kiesploeg:<id>` of `kiesploegPost:<id>`. */
+  source: z.string().min(3),
   onlyLead: z.string().optional(),
 });
+
+/** Splitst de gecombineerde keuzelijst in het juiste kolomveld. */
+function parseSource(raw: string):
+  | { kind: "group" | "kiesploeg" | "kiesploegPost"; id: string }
+  | null {
+  const [kind, id] = raw.split(":");
+  if (!id) return null;
+  if (kind !== "group" && kind !== "kiesploeg" && kind !== "kiesploegPost") return null;
+  return { kind, id };
+}
+
+/** Hoe de bron heet, voor het logboek. */
+async function sourceLabel(kind: string, id: string): Promise<string | null> {
+  if (kind === "group") {
+    return (await prisma.group.findUnique({ where: { id }, select: { nameNl: true } }))?.nameNl ?? null;
+  }
+  if (kind === "kiesploeg") {
+    const row = await prisma.kiesploeg.findUnique({ where: { id }, select: { formalName: true } });
+    return row?.formalName ?? null;
+  }
+  const row = await prisma.kiesploegPost.findUnique({
+    where: { id },
+    select: { name: true, kiesploeg: { select: { formalName: true } } },
+  });
+  return row ? `${row.name} (${row.kiesploeg.formalName})` : null;
+}
 
 export async function addSourceAction(_prev: SaveState, formData: FormData): Promise<SaveState> {
   await requirePermission("mailgroups.manage");
   const parsed = sourceSchema.safeParse(fields(formData));
   if (!parsed.success) return saveError("INVALID_INPUT");
-  const { mailGroupId, groupId } = parsed.data;
+  const { mailGroupId } = parsed.data;
   const onlyLead = parsed.data.onlyLead === "on";
+  const source = parseSource(parsed.data.source);
+  if (!source) return saveError("INVALID_INPUT");
 
-  const [mailGroup, group] = await Promise.all([
+  const [mailGroup, label] = await Promise.all([
     prisma.mailGroup.findUnique({ where: { id: mailGroupId }, select: { email: true } }),
-    prisma.group.findUnique({ where: { id: groupId }, select: { nameNl: true } }),
+    sourceLabel(source.kind, source.id),
   ]);
-  if (!mailGroup || !group) return saveError("INVALID_INPUT");
+  if (!mailGroup || !label) return saveError("INVALID_INPUT");
 
-  const existing = await prisma.mailGroupSource.findUnique({
-    where: { mailGroupId_groupId_onlyLead: { mailGroupId, groupId, onlyLead } },
+  const columns = {
+    groupId: source.kind === "group" ? source.id : null,
+    kiesploegId: source.kind === "kiesploeg" ? source.id : null,
+    kiesploegPostId: source.kind === "kiesploegPost" ? source.id : null,
+  };
+
+  const existing = await prisma.mailGroupSource.findFirst({
+    where: { mailGroupId, onlyLead, ...columns },
     select: { id: true },
   });
   if (existing) return saveError("DUPLICATE_SOURCE");
 
-  await prisma.mailGroupSource.create({ data: { mailGroupId, groupId, onlyLead } });
+  await prisma.mailGroupSource.create({ data: { mailGroupId, onlyLead, ...columns } });
   await logAudit({
     action: "update",
     entity: "mailGroup",
     entityId: mailGroupId,
     target: mailGroup.email,
-    summary: `bron toegevoegd: ${group.nameNl}${onlyLead ? " (enkel de verantwoordelijke)" : ""}`,
+    summary: `bron toegevoegd: ${label}${onlyLead ? " (enkel de verantwoordelijke)" : ""}`,
   });
 
   revalidatePath(ADMIN);
-  after(() => pushMailGroupsForGroup(groupId));
+  after(() => pushSource(columns));
   return saveOk();
 }
 
@@ -159,9 +198,21 @@ export async function removeSourceAction(formData: FormData): Promise<void> {
 
   const row = await prisma.mailGroupSource.findUnique({
     where: { id },
-    select: { groupId: true, mailGroupId: true, mailGroup: { select: { email: true } }, group: { select: { nameNl: true } } },
+    select: {
+      groupId: true,
+      kiesploegId: true,
+      kiesploegPostId: true,
+      mailGroupId: true,
+      mailGroup: { select: { email: true } },
+      group: { select: { nameNl: true } },
+      kiesploeg: { select: { formalName: true } },
+      kiesploegPost: { select: { name: true } },
+    },
   });
   if (!row) return;
+
+  const label =
+    row.group?.nameNl ?? row.kiesploeg?.formalName ?? row.kiesploegPost?.name ?? "bron";
 
   await prisma.mailGroupSource.delete({ where: { id } });
   await logAudit({
@@ -169,10 +220,33 @@ export async function removeSourceAction(formData: FormData): Promise<void> {
     entity: "mailGroup",
     entityId: row.mailGroupId,
     target: row.mailGroup.email,
-    summary: `bron verwijderd: ${row.group.nameNl}`,
+    summary: `bron verwijderd: ${label}`,
   });
   revalidatePath(ADMIN);
-  after(() => pushMailGroupsForGroup(row.groupId));
+  after(() =>
+    pushSource({
+      groupId: row.groupId,
+      kiesploegId: row.kiesploegId,
+      kiesploegPostId: row.kiesploegPostId,
+    }),
+  );
+}
+
+/** Duwt de lijsten die op deze bron staan meteen door naar Google. */
+async function pushSource(columns: {
+  groupId: string | null;
+  kiesploegId: string | null;
+  kiesploegPostId: string | null;
+}): Promise<void> {
+  if (columns.groupId) return pushMailGroupsForGroup(columns.groupId);
+  if (columns.kiesploegId) return pushMailGroupsForKiesploeg(columns.kiesploegId);
+  if (columns.kiesploegPostId) {
+    const post = await prisma.kiesploegPost.findUnique({
+      where: { id: columns.kiesploegPostId },
+      select: { kiesploegId: true },
+    });
+    if (post) return pushMailGroupsForKiesploeg(post.kiesploegId);
+  }
 }
 
 const extraSchema = z.object({
@@ -240,14 +314,14 @@ export async function removeExtraAction(formData: FormData): Promise<void> {
 
 export async function syncMailGroupsAction(): Promise<SaveState> {
   await requirePermission("mailgroups.manage");
-  const result = await reconcileMailGroups();
+  const result = await reconcileGoogle();
   if ("skipped" in result) return saveError("NOT_CONFIGURED");
 
   await logAudit({
     action: "sync",
     entity: "mailGroup",
     target: "Groepsadressen",
-    summary: `${result.groups} lijsten, ${result.added} toegevoegd, ${result.removed} verwijderd`,
+    summary: `${result.groups} lijsten, ${result.added} toegevoegd, ${result.removed} verwijderd, ${result.accountsChanged} accounts aangepast`,
   });
   revalidatePath(ADMIN);
   if (result.failed > 0) return saveError("SYNC_PARTIAL");

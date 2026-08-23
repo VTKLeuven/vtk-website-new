@@ -431,6 +431,10 @@ const googleSchema = z.object({
   subject: z.string().trim().email(),
   clientEmail: z.string().trim().email(),
   privateKey: z.string().trim().optional(),
+  oauthClientId: z.string().trim().max(200).optional(),
+  oauthClientSecret: z.string().trim().max(200).optional(),
+  fullOrgUnit: z.string().trim().max(200).optional(),
+  restrictedOrgUnit: z.string().trim().max(200).optional(),
 });
 
 /**
@@ -451,6 +455,10 @@ export async function saveGoogleConfigAction(
     subject: ((formData.get("subject") as string) ?? "").trim().toLowerCase(),
     clientEmail: ((formData.get("clientEmail") as string) ?? "").trim(),
     privateKey: ((formData.get("privateKey") as string) ?? "").trim() || undefined,
+    oauthClientId: ((formData.get("oauthClientId") as string) ?? "").trim() || undefined,
+    oauthClientSecret: ((formData.get("oauthClientSecret") as string) ?? "").trim() || undefined,
+    fullOrgUnit: ((formData.get("fullOrgUnit") as string) ?? "").trim() || undefined,
+    restrictedOrgUnit: ((formData.get("restrictedOrgUnit") as string) ?? "").trim() || undefined,
   });
   if (!parsed.success) return saveError("INVALID_INPUT");
   const p = parsed.data;
@@ -473,11 +481,20 @@ export async function saveGoogleConfigAction(
     return saveError("GOOGLE_KEY_REQUIRED");
   }
 
+  // Het secret van de OAuth-client volgt hetzelfde patroon als de private key:
+  // leeg laten houdt het bestaande. De client-id zelf is geen geheim.
+  let oauthClientSecretEnc = existing?.oauthClientSecretEnc;
+  if (p.oauthClientSecret) oauthClientSecretEnc = encryptSecret(p.oauthClientSecret);
+
   const value: StoredGoogle = {
     domain: p.domain,
     subject: p.subject,
     clientEmail: p.clientEmail,
     privateKeyEnc,
+    oauthClientId: p.oauthClientId ?? existing?.oauthClientId,
+    oauthClientSecretEnc,
+    fullOrgUnit: p.fullOrgUnit,
+    restrictedOrgUnit: p.restrictedOrgUnit,
   };
 
   await prisma.setting.upsert({

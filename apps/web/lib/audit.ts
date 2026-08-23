@@ -111,6 +111,7 @@ export const AUDIT_ENTITIES = {
   logistiek: { nl: "Uitleendienst", en: "Equipment rental", group: "logistiek" },
   vaultItem: { nl: "Kluiswachtwoord", en: "Vault password", group: "vault" },
   mailGroup: { nl: "Groepsadres", en: "Group address", group: "google" },
+  kiesploeg: { nl: "Kiesploeg", en: "Kiesploeg", group: "google" },
   vaultPost: { nl: "Kluiskoppeling", en: "Vault link", group: "vault" },
   vaultAccess: { nl: "Kluistoegang", en: "Vault access", group: "vault" },
 

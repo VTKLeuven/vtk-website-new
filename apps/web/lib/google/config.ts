@@ -28,6 +28,22 @@ export type StoredGoogle = {
   clientEmail?: string;
   /** `private_key` uit datzelfde bestand, versleuteld met `encryptSecret`. */
   privateKeyEnc?: string;
+  /**
+   * OAuth-client voor de zelfbedieningskoppeling ("Koppel je VTK-account").
+   * Los van het service-account: dat is server-to-server, dit is een gewone
+   * webclient waarmee een lid zich met zijn eigen account aanmeldt.
+   */
+  oauthClientId?: string;
+  oauthClientSecretEnc?: string;
+  /** OU voor een volwaardig account. Leeg = de wortel van het domein. */
+  fullOrgUnit?: string;
+  /**
+   * OU voor een kiesploegaccount zonder verzendrecht. Op die OU staat de
+   * routing-regel die uitgaande mail vanaf het primaire adres weigert; die
+   * regel is handwerk in de Admin console, want er is geen API voor. Leeg =
+   * de sync verplaatst niemand.
+   */
+  restrictedOrgUnit?: string;
 };
 
 export type GoogleConfig = {
@@ -36,6 +52,11 @@ export type GoogleConfig = {
   clientEmail: string;
   /** PEM, met echte newlines. */
   privateKey: string;
+  /** `null` wanneer de zelfbedieningskoppeling niet ingesteld is. */
+  oauth: { clientId: string; clientSecret: string } | null;
+  fullOrgUnit: string;
+  /** `null` = geen beperkte OU ingesteld; de sync verplaatst dan niemand. */
+  restrictedOrgUnit: string | null;
 };
 
 export type GoogleStatus = {
@@ -44,6 +65,12 @@ export type GoogleStatus = {
   subject: string | null;
   clientEmail: string | null;
   hasKey: boolean;
+  oauthClientId: string | null;
+  hasOauthSecret: boolean;
+  /** Zonder OAuth-client kan een lid zichzelf niet koppelen. */
+  linkingConfigured: boolean;
+  fullOrgUnit: string | null;
+  restrictedOrgUnit: string | null;
 };
 
 /**
@@ -84,11 +111,27 @@ export async function getGoogleConfig(): Promise<GoogleConfig | null> {
   }
   if (!privateKey.includes("BEGIN")) return null;
 
+  let oauth: GoogleConfig["oauth"] = null;
+  if (stored.oauthClientId && stored.oauthClientSecretEnc) {
+    try {
+      oauth = {
+        clientId: stored.oauthClientId,
+        clientSecret: decryptSecret(stored.oauthClientSecretEnc),
+      };
+    } catch {
+      // Onleesbaar geheim: dan is enkel de koppelknop stuk, niet de hele sync.
+      oauth = null;
+    }
+  }
+
   return {
     domain: stored.domain.toLowerCase(),
     subject: stored.subject.toLowerCase(),
     clientEmail: stored.clientEmail,
     privateKey,
+    oauth,
+    fullOrgUnit: stored.fullOrgUnit?.trim() || "/",
+    restrictedOrgUnit: stored.restrictedOrgUnit?.trim() || null,
   };
 }
 
@@ -109,5 +152,10 @@ export async function getGoogleStatus(): Promise<GoogleStatus> {
     subject: stored?.subject ?? null,
     clientEmail: stored?.clientEmail ?? null,
     hasKey: Boolean(stored?.privateKeyEnc),
+    oauthClientId: stored?.oauthClientId ?? null,
+    hasOauthSecret: Boolean(stored?.oauthClientSecretEnc),
+    linkingConfigured: Boolean(stored?.oauthClientId && stored.oauthClientSecretEnc),
+    fullOrgUnit: stored?.fullOrgUnit ?? null,
+    restrictedOrgUnit: stored?.restrictedOrgUnit ?? null,
   };
 }

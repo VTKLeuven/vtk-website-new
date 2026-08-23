@@ -1,4 +1,4 @@
-import { reconcileMailGroups } from "@/lib/google/sync";
+import { reconcileGoogle } from "@/lib/google/sync";
 
 export const runtime = "nodejs";
 
@@ -14,7 +14,8 @@ function secret(): string | null {
  * Geeft 503 zodra er iets blijft haperen, zodat de healthcheck van de worker het
  * merkt in plaats van stil te blijven draaien. `unlinked` telt daar niet in mee:
  * dat zijn leden zonder gekoppeld @vtk.be-adres, en daar wacht de sync terecht
- * op tot iemand ze koppelt.
+ * op tot iemand ze koppelt. `accountWarnings` evenmin: een doorstuuradres dat op
+ * zijn bevestigingsmail wacht, is geen storing.
  */
 export async function POST(request: Request) {
   const configured = secret();
@@ -22,7 +23,7 @@ export async function POST(request: Request) {
     return Response.json({ error: "UNAUTHORIZED" }, { status: 401 });
   }
 
-  const result = await reconcileMailGroups();
+  const result = await reconcileGoogle();
   if ("skipped" in result) {
     // Niet ingesteld is geen fout: de koppeling is optioneel, net als de kluis.
     return Response.json({ skipped: true }, { status: 200 });

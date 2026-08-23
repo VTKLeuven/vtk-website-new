@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   desiredMembers,
   normaliseEmail,
+  type KiesploegMembershipRow,
   type MembershipRow,
 } from "@/lib/google/members";
 
@@ -132,5 +133,84 @@ describe("desiredMembers", () => {
 describe("normaliseEmail", () => {
   it("maakt adressen vergelijkbaar", () => {
     expect(normaliseEmail("  Jan.Peeters@VTK.be ")).toBe("jan.peeters@vtk.be");
+  });
+});
+
+/** Een kiesploeg is een tweede soort bron, met eigen posten. */
+function kiesploegMember(
+  kiesploegId: string,
+  postId: string | null,
+  name: string,
+  role: "MEMBER" | "LEAD" = "MEMBER",
+): KiesploegMembershipRow {
+  return {
+    kiesploegId,
+    postId,
+    role,
+    user: { id: `k-${name}`, name, googleEmail: `${name.toLowerCase()}@vtk.be` },
+  };
+}
+
+describe("desiredMembers met een kiesploeg", () => {
+  const marketing = kiesploegMember("kp", "post-marketing", "Mia");
+  const g5 = kiesploegMember("kp", "post-g5", "Gus");
+  const zonderPost = kiesploegMember("kp", null, "Noa");
+
+  it("neemt de hele ploeg bij een kiesploegbron", () => {
+    const result = desiredMembers({
+      sources: [{ kiesploegId: "kp", onlyLead: false }],
+      memberships: [],
+      kiesploegMemberships: [marketing, g5, zonderPost],
+      extras: [],
+    });
+    expect(result.emails).toEqual(["gus@vtk.be", "mia@vtk.be", "noa@vtk.be"]);
+  });
+
+  it("neemt bij een postbron enkel die post", () => {
+    const result = desiredMembers({
+      sources: [{ kiesploegPostId: "post-marketing", onlyLead: false }],
+      memberships: [],
+      kiesploegMemberships: [marketing, g5, zonderPost],
+      extras: [],
+    });
+    expect(result.emails).toEqual(["mia@vtk.be"]);
+  });
+
+  it("zet de g5 erbij wanneer die als tweede bron staat", () => {
+    // Zo maakt `createKiesploegListsAction` de lijsten: de post plus de g5, als
+    // twee zichtbare rijen en niet als verstopte regel in de sync.
+    const result = desiredMembers({
+      sources: [
+        { kiesploegPostId: "post-marketing", onlyLead: false },
+        { kiesploegPostId: "post-g5", onlyLead: false },
+      ],
+      memberships: [],
+      kiesploegMemberships: [marketing, g5, zonderPost],
+      extras: [],
+    });
+    expect(result.emails).toEqual(["gus@vtk.be", "mia@vtk.be"]);
+  });
+
+  it("laat een lid zonder post buiten de postlijsten", () => {
+    const result = desiredMembers({
+      sources: [{ kiesploegPostId: "post-marketing", onlyLead: false }],
+      memberships: [],
+      kiesploegMemberships: [zonderPost],
+      extras: [],
+    });
+    expect(result.emails).toEqual([]);
+  });
+
+  it("combineert een gewone post met een kiesploegpost", () => {
+    const result = desiredMembers({
+      sources: [
+        { groupId: "activiteiten", onlyLead: false },
+        { kiesploegPostId: "post-marketing", onlyLead: false },
+      ],
+      memberships: [jan],
+      kiesploegMemberships: [marketing],
+      extras: [],
+    });
+    expect(result.emails).toEqual(["jan.peeters@vtk.be", "mia@vtk.be"]);
   });
 });

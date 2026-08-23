@@ -26,15 +26,29 @@ const DIRECTORY = "https://admin.googleapis.com/admin/directory/v1";
 const GROUPS_SETTINGS = "https://www.googleapis.com/groups/v1/groups";
 
 /**
- * Enkel wat we nodig hebben. `admin.directory.user.readonly` staat erbij voor
- * het koppelscherm; schrijven op gebruikers (accounts aanmaken) komt bewust pas
- * met de volgende fase, samen met de scope die daarbij hoort.
+ * Scopes voor het service-account, aangeroepen als de beheerder uit de config.
+ * `admin.directory.user` (schrijven) is nodig om accounts aan te maken en om
+ * iemand tussen organisatie-eenheden te verplaatsen.
  */
 export const GOOGLE_SCOPES = [
   "https://www.googleapis.com/auth/admin.directory.group",
   "https://www.googleapis.com/auth/admin.directory.group.member",
-  "https://www.googleapis.com/auth/admin.directory.user.readonly",
+  "https://www.googleapis.com/auth/admin.directory.user",
+  "https://www.googleapis.com/auth/admin.directory.user.alias",
   "https://www.googleapis.com/auth/apps.groups.settings",
+].join(" ");
+
+/**
+ * Scopes voor de Gmail-instellingen van één lid (afzenderadres, doorsturen).
+ *
+ * Die calls lopen **als dat lid**, niet als de beheerder: Gmail-instellingen
+ * bestaan per postbus. Daarom een aparte tokenaanvraag met een andere `sub`, en
+ * daarom moeten deze scopes ook los toegekend worden in de delegatie. Vergeet je
+ * dat, dan werkt de rest gewoon en falen enkel deze twee dingen.
+ */
+export const GMAIL_SCOPES = [
+  "https://www.googleapis.com/auth/gmail.settings.basic",
+  "https://www.googleapis.com/auth/gmail.settings.sharing",
 ].join(" ");
 
 export class GoogleError extends Error {
@@ -54,12 +68,16 @@ type TokenCache = { token: string; expiresAt: number };
 // per aanroep zou elke sync tientallen round-trips extra kosten.
 const tokens = new Map<string, TokenCache>();
 
-function cacheKey(cfg: GoogleConfig): string {
-  return `${cfg.clientEmail}|${cfg.subject}`;
+function cacheKey(cfg: GoogleConfig, subject: string, scope: string): string {
+  return `${cfg.clientEmail}|${subject}|${scope}`;
 }
 
-async function accessToken(cfg: GoogleConfig): Promise<string> {
-  const key = cacheKey(cfg);
+async function accessToken(
+  cfg: GoogleConfig,
+  subject: string = cfg.subject,
+  scope: string = GOOGLE_SCOPES,
+): Promise<string> {
+  const key = cacheKey(cfg, subject, scope);
   const cached = tokens.get(key);
   if (cached && cached.expiresAt > Date.now() + 60_000) return cached.token;
 
@@ -69,8 +87,8 @@ async function accessToken(cfg: GoogleConfig): Promise<string> {
     assertion = jwt.sign(
       {
         iss: cfg.clientEmail,
-        sub: cfg.subject,
-        scope: GOOGLE_SCOPES,
+        sub: subject,
+        scope,
         aud: TOKEN_URL,
         iat: now,
         exp: now + 3600,
@@ -117,21 +135,27 @@ async function accessToken(cfg: GoogleConfig): Promise<string> {
 }
 
 /** Gooit het gecachete token weg; gebruikt na een 401. */
-function forgetToken(cfg: GoogleConfig): void {
-  tokens.delete(cacheKey(cfg));
+function forgetToken(cfg: GoogleConfig, subject: string, scope: string): void {
+  tokens.delete(cacheKey(cfg, subject, scope));
 }
+
+/** Als welke gebruiker en met welke scopes een aanroep loopt. */
+type As = { subject?: string; scope?: string };
 
 async function request<T>(
   cfg: GoogleConfig,
   method: string,
   url: string,
   body?: unknown,
+  as: As = {},
   retry = true,
 ): Promise<T | null> {
+  const subject = as.subject ?? cfg.subject;
+  const scope = as.scope ?? GOOGLE_SCOPES;
   const res = await fetch(url, {
     method,
     headers: {
-      authorization: `Bearer ${await accessToken(cfg)}`,
+      authorization: `Bearer ${await accessToken(cfg, subject, scope)}`,
       ...(body === undefined ? {} : { "content-type": "application/json" }),
     },
     body: body === undefined ? undefined : JSON.stringify(body),
@@ -140,8 +164,8 @@ async function request<T>(
 
   if (res.status === 401 && retry) {
     // Token ingetrokken of verlopen: één keer opnieuw, dan pas opgeven.
-    forgetToken(cfg);
-    return request<T>(cfg, method, url, body, false);
+    forgetToken(cfg, subject, scope);
+    return request<T>(cfg, method, url, body, as, false);
   }
 
   // Een onbestaande groep of een lid dat er al niet meer in zit is geen storing.
@@ -316,6 +340,9 @@ export type GoogleUser = {
   primaryEmail: string;
   name?: { givenName?: string; familyName?: string; fullName?: string };
   suspended?: boolean;
+  orgUnitPath?: string;
+  /** Nodig om te weten of een voorgesteld adres al bezet is. */
+  aliases?: string[];
 };
 
 export async function listUsers(cfg: GoogleConfig): Promise<GoogleUser[]> {
@@ -326,7 +353,10 @@ export async function listUsers(cfg: GoogleConfig): Promise<GoogleUser[]> {
       domain: cfg.domain,
       maxResults: "200",
       orderBy: "email",
-      projection: "basic",
+      // `full` en niet `basic`: we hebben de aliassen nodig om te zien of een
+      // voorgesteld adres al bezet is. Een alias van iemand anders levert
+      // anders pas bij het aanmaken een 409 op.
+      projection: "full",
     });
     if (pageToken) params.set("pageToken", pageToken);
     const page = await request<{ users?: GoogleUser[]; nextPageToken?: string }>(
@@ -338,4 +368,180 @@ export async function listUsers(cfg: GoogleConfig): Promise<GoogleUser[]> {
     pageToken = page?.nextPageToken;
   } while (pageToken);
   return out;
+}
+
+
+export async function getUser(cfg: GoogleConfig, key: string): Promise<GoogleUser | null> {
+  return request<GoogleUser>(cfg, "GET", `${DIRECTORY}/users/${encodeURIComponent(key)}`);
+}
+
+/**
+ * Maakt een account aan.
+ *
+ * `changePasswordAtNextLogin` staat altijd aan: het wachtwoord dat wij genereren
+ * is een doorgeefwachtwoord, geen wachtwoord om mee te leven.
+ */
+export async function createUser(
+  cfg: GoogleConfig,
+  input: {
+    primaryEmail: string;
+    givenName: string;
+    familyName: string;
+    password: string;
+    orgUnitPath?: string;
+  },
+): Promise<GoogleUser> {
+  const created = await request<GoogleUser>(cfg, "POST", `${DIRECTORY}/users`, {
+    primaryEmail: input.primaryEmail,
+    name: { givenName: input.givenName, familyName: input.familyName },
+    password: input.password,
+    changePasswordAtNextLogin: true,
+    ...(input.orgUnitPath ? { orgUnitPath: input.orgUnitPath } : {}),
+  });
+  if (!created) {
+    throw new GoogleError("Google gaf geen account terug bij het aanmaken.", 0, null);
+  }
+  return created;
+}
+
+/** Verplaatst iemand naar een andere organisatie-eenheid. */
+export async function moveUser(
+  cfg: GoogleConfig,
+  key: string,
+  orgUnitPath: string,
+): Promise<void> {
+  await request(cfg, "PUT", `${DIRECTORY}/users/${encodeURIComponent(key)}`, { orgUnitPath });
+}
+
+export async function addAlias(cfg: GoogleConfig, key: string, alias: string): Promise<void> {
+  try {
+    await request(cfg, "POST", `${DIRECTORY}/users/${encodeURIComponent(key)}/aliases`, {
+      alias,
+    });
+  } catch (err) {
+    // 409 = die alias staat er al op; dat is de toestand die we wilden.
+    if (err instanceof GoogleError && err.status === 409) return;
+    throw err;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Gmail-instellingen van één lid
+// -----------------------------------------------------------------------------
+// Deze aanroepen lopen als dat lid (`subject`), niet als de beheerder.
+
+const GMAIL = "https://gmail.googleapis.com/gmail/v1/users";
+
+function asUser(email: string): As {
+  return { subject: email, scope: GMAIL_SCOPES };
+}
+
+export type SendAs = {
+  sendAsEmail: string;
+  isDefault?: boolean;
+  isPrimary?: boolean;
+  verificationStatus?: string;
+};
+
+export async function listSendAs(cfg: GoogleConfig, email: string): Promise<SendAs[]> {
+  const res = await request<{ sendAs?: SendAs[] }>(
+    cfg,
+    "GET",
+    `${GMAIL}/${encodeURIComponent(email)}/settings/sendAs`,
+    undefined,
+    asUser(email),
+  );
+  return res?.sendAs ?? [];
+}
+
+/**
+ * Zet een alias als afzenderadres en maakt hem de standaard.
+ *
+ * Dit is het enige wat we programmatisch kunnen doen aan "stuur vanaf je
+ * kiesploegadres". Verhinderen dat iemand tóch zijn primaire adres kiest, kan
+ * enkel met een routing-regel op de organisatie-eenheid; daar is geen API voor.
+ * Zie docs/design-decisions.md.
+ */
+export async function ensureDefaultSendAs(
+  cfg: GoogleConfig,
+  email: string,
+  alias: string,
+): Promise<void> {
+  const existing = await listSendAs(cfg, email);
+  const current = existing.find((s) => s.sendAsEmail.toLowerCase() === alias.toLowerCase());
+  if (!current) {
+    await request(
+      cfg,
+      "POST",
+      `${GMAIL}/${encodeURIComponent(email)}/settings/sendAs`,
+      { sendAsEmail: alias, isDefault: true, treatAsAlias: true },
+      asUser(email),
+    );
+    return;
+  }
+  if (current.isDefault) return;
+  await request(
+    cfg,
+    "PATCH",
+    `${GMAIL}/${encodeURIComponent(email)}/settings/sendAs/${encodeURIComponent(alias)}`,
+    { isDefault: true },
+    asUser(email),
+  );
+}
+
+/** Zet het primaire adres terug als standaardafzender. */
+export async function resetDefaultSendAs(cfg: GoogleConfig, email: string): Promise<void> {
+  const existing = await listSendAs(cfg, email);
+  const primary = existing.find((s) => s.isPrimary);
+  if (!primary || primary.isDefault) return;
+  await request(
+    cfg,
+    "PATCH",
+    `${GMAIL}/${encodeURIComponent(email)}/settings/sendAs/${encodeURIComponent(primary.sendAsEmail)}`,
+    { isDefault: true },
+    asUser(email),
+  );
+}
+
+/**
+ * Stuurt alle inkomende mail door naar `target` en houdt geen kopie.
+ *
+ * Google stuurt bij het aanmaken van een doorstuuradres een bevestigingsmail
+ * naar dat adres; zolang die niet aanvaard is, blijft de status `pending` en
+ * gebeurt er niets. Dat is hier geen probleem maar een kenmerk: die bevestiging
+ * is meteen het bewijs dat het adres van hen is.
+ */
+export async function enableForwarding(
+  cfg: GoogleConfig,
+  email: string,
+  target: string,
+): Promise<{ pending: boolean }> {
+  const created = await request<{ verificationStatus?: string }>(
+    cfg,
+    "POST",
+    `${GMAIL}/${encodeURIComponent(email)}/settings/forwardingAddresses`,
+    { forwardingEmail: target },
+    asUser(email),
+  );
+  const pending = (created?.verificationStatus ?? "accepted") !== "accepted";
+  if (pending) return { pending: true };
+
+  await request(
+    cfg,
+    "PUT",
+    `${GMAIL}/${encodeURIComponent(email)}/settings/autoForwarding`,
+    { enabled: true, emailAddress: target, disposition: "markRead" },
+    asUser(email),
+  );
+  return { pending: false };
+}
+
+export async function disableForwarding(cfg: GoogleConfig, email: string): Promise<void> {
+  await request(
+    cfg,
+    "PUT",
+    `${GMAIL}/${encodeURIComponent(email)}/settings/autoForwarding`,
+    { enabled: false },
+    asUser(email),
+  );
 }

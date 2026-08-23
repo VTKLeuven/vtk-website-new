@@ -63,6 +63,45 @@ export function GoogleConfigForm({ status }: { status: GoogleStatus }) {
               required
             />
           </div>
+          <div>
+            <Label>Full org unit</Label>
+            <Input name="fullOrgUnit" defaultValue={status.fullOrgUnit ?? ""} placeholder="/" />
+          </div>
+          <div>
+            <Label>Restricted org unit (kiesploeg)</Label>
+            <Input
+              name="restrictedOrgUnit"
+              defaultValue={status.restrictedOrgUnit ?? ""}
+              placeholder="/Kiesploeg/Beperkt"
+            />
+            <p className="mt-1 text-xs text-zinc-500">
+              The OU that carries the routing rule refusing outbound mail from the primary
+              address. That rule is Admin console work; there is no API for it. Leave empty and
+              nobody is moved, which also means nothing stops them from sending.
+            </p>
+          </div>
+          <div>
+            <Label>OAuth client ID (self-service linking)</Label>
+            <Input
+              name="oauthClientId"
+              defaultValue={status.oauthClientId ?? ""}
+              placeholder="....apps.googleusercontent.com"
+            />
+          </div>
+          <div>
+            <Label>OAuth client secret</Label>
+            <Input
+              name="oauthClientSecret"
+              type="password"
+              autoComplete="new-password"
+              placeholder={status.hasOauthSecret ? "Stored; leave empty to keep" : "Optional"}
+            />
+            <p className="mt-1 text-xs text-zinc-500">
+              A separate web client, not the service account. Redirect URI:{" "}
+              <code>&lt;site&gt;/api/google/link/callback</code>. Without it members cannot link
+              their own account and the link gate only shows an explanation.
+            </p>
+          </div>
           <div className="sm:col-span-2">
             <Label>Private key (PEM from the JSON key file)</Label>
             <Textarea

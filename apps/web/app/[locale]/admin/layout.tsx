@@ -113,6 +113,7 @@ const NAV: NavEntry[] = [
   // naar studenten (export + Brevo), hier de eigen adressen van de kring
   // (activiteiten@vtk.be) die de posten van dit werkingsjaar volgen.
   item('mailGroups', '/groepsadressen', { perm: 'mailgroups.manage' }),
+  item('kiesploeg', '/kiesploeg', { perm: 'kiesploeg.manage' }),
   // Wachtwoorden staat los van de IT-groep: een postverantwoordelijke beheert de
   // wachtwoorden van zijn eigen post en hoort daarvoor niet in een IT-map te
   // moeten zoeken. Het kluisbeheer zelf (posten koppelen, configuratie) staat wel

@@ -10,15 +10,29 @@
  */
 
 export type MailGroupSourceRow = {
-  groupId: string;
+  /** Precies één van de drie is ingevuld; zie het schema. */
+  groupId?: string | null;
+  kiesploegId?: string | null;
+  kiesploegPostId?: string | null;
   /** Enkel de verantwoordelijke van die post i.p.v. elk lid. */
   onlyLead: boolean;
 };
 
+export type MemberUser = { id: string; name: string; googleEmail: string | null };
+
+/** Lidmaatschap van een post of werkgroep, huidig werkingsjaar. */
 export type MembershipRow = {
   groupId: string;
   role: "MEMBER" | "LEAD";
-  user: { id: string; name: string; googleEmail: string | null };
+  user: MemberUser;
+};
+
+/** Lidmaatschap van een kiesploeg. `postId` is leeg tot de postverdeling er is. */
+export type KiesploegMembershipRow = {
+  kiesploegId: string;
+  postId: string | null;
+  role: "MEMBER" | "LEAD";
+  user: MemberUser;
 };
 
 export type ExtraRow = { email: string; kind: "INCLUDE" | "EXCLUDE" };
@@ -42,31 +56,48 @@ export function desiredMembers(input: {
   sources: MailGroupSourceRow[];
   /** Lidmaatschappen van het huidige werkingsjaar, van actieve leden. */
   memberships: MembershipRow[];
+  /** Kiesploeglidmaatschappen; leeg wanneer geen enkele bron een kiesploeg is. */
+  kiesploegMemberships?: KiesploegMembershipRow[];
   extras: ExtraRow[];
 }): DesiredMembers {
-  // Per post onthouden of we iedereen of enkel de verantwoordelijke willen. Een
-  // post kan twee keer als bron staan (één keer volledig, één keer enkel de
+  // Per bron onthouden of we iedereen of enkel de verantwoordelijke willen. Een
+  // bron kan twee keer staan (één keer volledig, één keer enkel de
   // verantwoordelijke); dan wint de ruimste, anders zou de tweede rij de eerste
   // stiekem beperken.
-  const wantAll = new Set<string>();
-  const wantLead = new Set<string>();
+  const wantAll = { group: new Set<string>(), kiesploeg: new Set<string>(), post: new Set<string>() };
+  const wantLead = { group: new Set<string>(), kiesploeg: new Set<string>(), post: new Set<string>() };
   for (const source of input.sources) {
-    if (source.onlyLead) wantLead.add(source.groupId);
-    else wantAll.add(source.groupId);
+    const target = source.onlyLead ? wantLead : wantAll;
+    if (source.groupId) target.group.add(source.groupId);
+    if (source.kiesploegId) target.kiesploeg.add(source.kiesploegId);
+    if (source.kiesploegPostId) target.post.add(source.kiesploegPostId);
   }
 
   const emails = new Set<string>();
   const unlinked = new Map<string, { id: string; name: string }>();
 
+  const take = (user: MemberUser) => {
+    const email = user.googleEmail ? normaliseEmail(user.googleEmail) : "";
+    if (email) emails.add(email);
+    else unlinked.set(user.id, { id: user.id, name: user.name });
+  };
+
   for (const membership of input.memberships) {
     const included =
-      wantAll.has(membership.groupId) ||
-      (wantLead.has(membership.groupId) && membership.role === "LEAD");
-    if (!included) continue;
+      wantAll.group.has(membership.groupId) ||
+      (wantLead.group.has(membership.groupId) && membership.role === "LEAD");
+    if (included) take(membership.user);
+  }
 
-    const email = membership.user.googleEmail ? normaliseEmail(membership.user.googleEmail) : "";
-    if (email) emails.add(email);
-    else unlinked.set(membership.user.id, { id: membership.user.id, name: membership.user.name });
+  for (const membership of input.kiesploegMemberships ?? []) {
+    const byKiesploeg =
+      wantAll.kiesploeg.has(membership.kiesploegId) ||
+      (wantLead.kiesploeg.has(membership.kiesploegId) && membership.role === "LEAD");
+    const byPost =
+      membership.postId !== null &&
+      (wantAll.post.has(membership.postId) ||
+        (wantLead.post.has(membership.postId) && membership.role === "LEAD"));
+    if (byKiesploeg || byPost) take(membership.user);
   }
 
   for (const extra of input.extras) {
