@@ -231,11 +231,36 @@ stukken horen bij elkaar:
 Dat scherm bestaat omdat het icoon ergens moet landen dat volgende maand nog
 klopt; een scanner-URL van één event is dat niet.
 
+### De native app
+
+Naast de PWA bestaat er een native scanner voor iOS en Android: **VTK Scanner**,
+een Expo-app in een eigen repo (`~/vtk-scanner-app`, op expo.dev onder het account
+`vtk-it`). Ze doet exact hetzelfde werk en praat met dezelfde endpoints; de
+webscanner blijft staan als webweg en als vangnet.
+
+- **Ze bevat geen tweede kopie van de regels.** De app roept `scanner/bootstrap`,
+  `scan`, `scan/batch`, `scan/card` en `scan/reverse` aan zoals `ScannerApp.tsx`
+  dat doet, met dezelfde `clientScanId` als idempotentiesleutel. De offline-
+  beslissing is een poort van `components/ticketing/scanner/offline.ts`.
+- **Ze meldt zich aan met een sessiecookie, niet met een token.** De app toont
+  `/inloggen` in een WebView; `fetch` deelt in React Native de cookie-opslag van
+  het toestel met die WebView, dus het better-auth cookie reist vanzelf mee. Dat
+  is bewust: er ís geen tokenpad naar deze endpoints (de OAuth-provider geeft
+  opaque tokens die enkel voor UserInfo gelden, en `TicketScanDevice.tokenHash`
+  authenticeert niets), en zo werkt een KU Leuven-login ook gewoon.
+- **`GET /api/tickets/scanner/events` bestaat enkel voor haar.** Het webkeuzescherm
+  is een server component en roept `listScannableTicketEvents()` rechtstreeks aan;
+  de app kan dat niet en heeft dezelfde lijst nodig.
+- Wijzig je hier het scan-contract, het manifestformaat of het hashformaat van
+  `cardHash.ts`, werk dan die repo mee bij. Het hashformaat faalt stil: de app
+  vindt dan offline geen enkele kaart meer.
+
 ### API (`apps/web/app/api/tickets/...`)
 - `checkout/route.ts` — start an order + checkout
 - `mollie/webhook/route.ts` — Mollie payment/refund callback
 - `mock/complete/route.ts` — dev-only instant "payment complete"
 - `maintenance/route.ts` — reconciliation + outbox flush (Bearer `TICKETING_MAINTENANCE_SECRET`)
+- `scanner/events/route.ts` — de evenementen waarvoor je scanrechten hebt, voor de native app
 - `events/[eventId]/scan`, `.../scan/batch`, `.../scan/card`, `.../scan/reverse`,
   `.../scanner/bootstrap` — scanning (`scan/batch` leegt de offline wachtrij,
   `scan/card` checkt in met een studentenkaart)
