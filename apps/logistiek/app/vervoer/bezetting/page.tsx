@@ -160,16 +160,18 @@ export default async function VervoerBezettingPage({
             vehicles={vehicles.map((vehicle) => ({
               id: vehicle.id,
               name: en ? vehicle.nameEn : vehicle.nameNl,
+              code: vehicle.code,
             }))}
             blocks={blocks}
             emptyLabel={en ? 'Nothing booked this week.' : 'Niets geboekt deze week.'}
+            showDriver={Boolean(session)}
           />
 
           <p className="text-xs text-vtk-muted">
             {session
               ? en
-                ? 'Every driver has their own colour; a trip without a driver is yellow. Striped means requested but not decided yet, so that slot may still become free.'
-                : 'Elke chauffeur heeft zijn eigen kleur; een rit zonder chauffeur is geel. Gestreept is aangevraagd maar nog niet beslist, dus dat moment kan nog vrijkomen.'
+                ? 'Every driver has their own colour; a trip without a driver is yellow, and the vehicle is in the block with its icon. Striped means requested but not decided yet, so that slot may still become free.'
+                : 'Elke chauffeur heeft zijn eigen kleur; een rit zonder chauffeur is geel, en het voertuig staat met zijn icoon in het blok. Gestreept is aangevraagd maar nog niet beslist, dus dat moment kan nog vrijkomen.'
               : en
                 ? 'Striped means requested but not yet decided; the vehicle may still become free.'
                 : 'Gestreept is aangevraagd maar nog niet beslist; dat moment kan dus nog vrijkomen.'}

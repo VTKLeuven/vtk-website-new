@@ -896,205 +896,224 @@ export function ReservationForm({
           )}
         </div>
 
+        {/* Het paneel past binnen het scherm en scrollt vanbinnen, met de knoppen
+            vast onderaan. `lg:sticky` alleen volstond niet: bij een aanvraag met
+            veel verschillende items wordt het paneel zelf hoger dan het venster,
+            en dan plakt de bovenkant vast terwijl "Wijzigingen opslaan" onder de
+            onderrand blijft hangen. Je moest dan de hele catalogus doorscrollen
+            om bij je eigen opslaanknop te raken. */}
         <aside
-          className="h-fit rounded-[18px] border border-vtk-navy/10 bg-vtk-surface p-6 lg:sticky lg:top-6"
+          className="h-fit rounded-[18px] border border-vtk-navy/10 bg-vtk-surface p-6 lg:sticky lg:top-6 lg:flex lg:max-h-[calc(100vh-3rem)] lg:flex-col lg:overflow-hidden"
           data-field="items"
           tabIndex={-1}
         >
-          <h2 className="text-lg font-semibold tracking-tight text-vtk-ink">
+          <h2 className="text-lg font-semibold tracking-tight text-vtk-ink lg:shrink-0">
             {en ? 'Your request' : 'Jouw aanvraag'}
           </h2>
 
-          <div className="mt-4 grid gap-3">
-            {/* Dagdeel naast de datum: "dinsdagnamiddag" stond tot nu toe in een
-                mail. Het is een afspraak tussen mensen, geen boekingseenheid; de
-                voorraad blijft op hele dagen rekenen. */}
-            <label className="grid gap-1 text-sm">
-              <span className="font-medium text-vtk-ink">
-                {en ? 'Collect on' : 'Afhalen op'}
-                <span aria-hidden="true" className="text-red-600"> *</span>
-              </span>
-              <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2">
-                <input
-                  type="date"
-                  value={pickupDate}
-                  onChange={(e) => setPickupDate(e.target.value)}
-                  data-field="pickupDate"
-                  aria-invalid={missing?.name === 'pickupDate'}
-                  className={fieldClass(
-                    'h-10 min-w-0 rounded-lg border border-vtk-navy/15 bg-white px-3 text-vtk-ink',
-                    'pickupDate',
-                    missing
-                  )}
-                />
-                <DayPartSelect
-                  value={pickupPart}
-                  onChange={setPickupPart}
-                  locale={locale}
-                  label={en ? 'Part of day for collecting' : 'Dagdeel afhalen'}
-                />
-              </div>
-            </label>
-            <label className="grid gap-1 text-sm">
-              <span className="font-medium text-vtk-ink">{en ? 'Return on' : 'Terugbrengen op'}</span>
-              <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2">
-                <input
-                  type="date"
-                  value={returnDate}
-                  min={pickupDate || undefined}
-                  onChange={(e) => setReturnDate(e.target.value)}
-                  data-field="returnDate"
-                  aria-invalid={missing?.name === 'returnDate'}
-                  className={fieldClass(
-                    'h-10 min-w-0 rounded-lg border border-vtk-navy/15 bg-white px-3 text-vtk-ink',
-                    'returnDate',
-                    missing
-                  )}
-                />
-                <DayPartSelect
-                  value={returnPart}
-                  onChange={setReturnPart}
-                  locale={locale}
-                  label={en ? 'Part of day for returning' : 'Dagdeel terugbrengen'}
-                />
-              </div>
-            </label>
-            {lastMinuteDays !== undefined ? (
-              <LastMinuteNotice pickupDate={pickupDate} days={lastMinuteDays} locale={locale} />
-            ) : null}
-            <label className="grid gap-1 text-sm">
-              <span className="font-medium text-vtk-ink">{en ? 'Extra info (optional)' : 'Extra info (optioneel)'}</span>
-              <textarea
-                value={note}
-                onChange={(e) => setNote(e.target.value)}
-                rows={3}
-                placeholder={en ? 'Anything the team should know' : 'Iets dat het team moet weten'}
-                className="rounded-lg border border-vtk-navy/15 bg-white px-3 py-2 text-vtk-ink"
-              />
-            </label>
-          </div>
-
-          <dl className="mt-5 space-y-1 border-t border-vtk-navy/10 pt-4 text-sm">
-            {/* Eigen scroll: bij een aanvraag van twintig items duwde deze lijst
-                de indienknop voorbij de onderkant van het scherm. */}
-            <div className="max-h-64 space-y-2 overflow-y-auto">
-              {items
-                .filter((item) => quantities[item.id])
-                .map((item) => (
-                  <div key={item.id}>
-                    <div className="flex items-center justify-between gap-3">
-                      <dt className="truncate text-vtk-muted">
-                        {item.name} × {quantities[item.id]}
-                      </dt>
-                      <dd>
-                        <button
-                          type="button"
-                          onClick={() => setQuantity(item.id, 0)}
-                          aria-label={`${en ? 'Remove' : 'Verwijderen'}: ${item.name}`}
-                          className="grid h-6 w-6 shrink-0 place-items-center rounded-full text-base font-semibold text-red-600 transition hover:bg-red-50 hover:text-red-700"
-                        >
-                          ×
-                        </button>
-                      </dd>
-                    </div>
-                    {/* Opmerking per lijn: "liefst de zwarte" hoort bij dít item en
-                        niet onderaan bij de algemene info, waar het team het pas
-                        vindt als het al iets anders klaarzette. */}
-                    <input
-                      type="text"
-                      value={lineNotes[item.id] ?? ''}
-                      onChange={(e) =>
-                        setLineNotes((prev) => ({ ...prev, [item.id]: e.target.value }))
-                      }
-                      placeholder={en ? 'Note (optional)' : 'Opmerking (optioneel)'}
-                      aria-label={`${en ? 'Note' : 'Opmerking'}: ${item.name}`}
-                      className="mt-0.5 h-8 w-full rounded-lg border border-vtk-navy/15 bg-white px-2 text-xs text-vtk-ink"
-                    />
-                  </div>
-                ))}
-            </div>
-            <div className="flex justify-between">
-              <dt className="text-vtk-muted">Items</dt>
-              <dd className="font-medium text-vtk-ink">{totals.count}</dd>
-            </div>
-            {showRentPrices ? (
-              <div className="flex justify-between">
-                <dt className="text-vtk-muted">{en ? 'Rental price' : 'Huurprijs'}</dt>
-                <dd className="font-medium text-vtk-ink">{formatEuro(totals.rent)}</dd>
-              </div>
-            ) : null}
-            <div className="flex justify-between">
-              <dt className="text-vtk-muted">{en ? 'Deposit' : 'Waarborg'}</dt>
-              <dd className="font-medium text-vtk-ink">{formatEuro(totals.deposit)}</dd>
-            </div>
-          </dl>
-          <p className="mt-2 text-xs leading-5 text-vtk-muted">
-            {paymentNote ??
-              (en
-                ? 'Your deposit is returned when everything comes back in good condition.'
-                : 'De waarborg krijg je terug wanneer alles in orde terugkomt.')}
-          </p>
-
-          {/* Indienen mag, maar niet per ongeluk: wie meer vraagt dan er vrij is,
-              zegt hier expliciet dat hij dat weet. Zonder die stap belandt het
-              conflict bij Logistiek zonder dat de aanvrager het doorhad. */}
-          {conflictLines.length > 0 ? (
-            <div className="mt-4 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2.5 text-sm text-amber-900">
-              <p className="font-semibold">
-                {en ? 'Not everything is free then' : 'Niet alles is vrij in je periode'}
-              </p>
-              <ul className="mt-1 space-y-0.5">
-                {conflictLines.map((line) => (
-                  <li key={line.item.id}>
-                    {line.item.name}: {en ? 'you ask' : 'je vraagt er'} {line.quantity},{' '}
-                    {en ? 'free' : 'vrij'} {line.free}
-                  </li>
-                ))}
-              </ul>
-              <label className="mt-2 flex items-start gap-2">
-                <input
-                  type="checkbox"
-                  checked={acceptConflicts}
-                  onChange={(e) => setAcceptConflicts(e.target.checked)}
-                  data-field="conflicts"
-                  className="mt-0.5 h-4 w-4"
-                />
-                <span>
-                  {en
-                    ? 'Send it anyway. Logistics will contact me to move the dates or find something else.'
-                    : 'Toch indienen. Logistiek neemt contact op om de datums te verschuiven of iets anders te zoeken.'}
+          {/* Het middenstuk scrollt. `min-h-0` hoort erbij: zonder dat weigert een
+              flex-item kleiner te worden dan zijn inhoud en scrollt hier niets. */}
+          <div className="lg:-mr-3 lg:min-h-0 lg:flex-1 lg:overflow-y-auto lg:pr-3">
+            <div className="mt-4 grid gap-3">
+              {/* Dagdeel naast de datum: "dinsdagnamiddag" stond tot nu toe in een
+                  mail. Het is een afspraak tussen mensen, geen boekingseenheid; de
+                  voorraad blijft op hele dagen rekenen. */}
+              <label className="grid gap-1 text-sm">
+                <span className="font-medium text-vtk-ink">
+                  {en ? 'Collect on' : 'Afhalen op'}
+                  <span aria-hidden="true" className="text-red-600"> *</span>
                 </span>
+                <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2">
+                  <input
+                    type="date"
+                    value={pickupDate}
+                    onChange={(e) => setPickupDate(e.target.value)}
+                    data-field="pickupDate"
+                    aria-invalid={missing?.name === 'pickupDate'}
+                    className={fieldClass(
+                      'h-10 min-w-0 rounded-lg border border-vtk-navy/15 bg-white px-3 text-vtk-ink',
+                      'pickupDate',
+                      missing
+                    )}
+                  />
+                  <DayPartSelect
+                    value={pickupPart}
+                    onChange={setPickupPart}
+                    locale={locale}
+                    label={en ? 'Part of day for collecting' : 'Dagdeel afhalen'}
+                  />
+                </div>
+              </label>
+              <label className="grid gap-1 text-sm">
+                <span className="font-medium text-vtk-ink">{en ? 'Return on' : 'Terugbrengen op'}</span>
+                <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2">
+                  <input
+                    type="date"
+                    value={returnDate}
+                    min={pickupDate || undefined}
+                    onChange={(e) => setReturnDate(e.target.value)}
+                    data-field="returnDate"
+                    aria-invalid={missing?.name === 'returnDate'}
+                    className={fieldClass(
+                      'h-10 min-w-0 rounded-lg border border-vtk-navy/15 bg-white px-3 text-vtk-ink',
+                      'returnDate',
+                      missing
+                    )}
+                  />
+                  <DayPartSelect
+                    value={returnPart}
+                    onChange={setReturnPart}
+                    locale={locale}
+                    label={en ? 'Part of day for returning' : 'Dagdeel terugbrengen'}
+                  />
+                </div>
+              </label>
+              {lastMinuteDays !== undefined ? (
+                <LastMinuteNotice pickupDate={pickupDate} days={lastMinuteDays} locale={locale} />
+              ) : null}
+              <label className="grid gap-1 text-sm">
+                <span className="font-medium text-vtk-ink">{en ? 'Extra info (optional)' : 'Extra info (optioneel)'}</span>
+                <textarea
+                  value={note}
+                  onChange={(e) => setNote(e.target.value)}
+                  rows={3}
+                  placeholder={en ? 'Anything the team should know' : 'Iets dat het team moet weten'}
+                  className="rounded-lg border border-vtk-navy/15 bg-white px-3 py-2 text-vtk-ink"
+                />
               </label>
             </div>
-          ) : null}
 
-          {error ? (
-            <p role="alert" className="mt-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
-              {error}
+            <dl className="mt-5 space-y-1 border-t border-vtk-navy/10 pt-4 text-sm">
+              {/* Eigen scroll, maar enkel op een smal scherm: daar staat het paneel
+                  onder de catalogus en scrollt de pagina zelf. Op een breed scherm
+                  scrollt het paneel al, en twee scrollers in elkaar maken het
+                  slepen van deze lijst een gokspel. */}
+              <div className="max-h-64 space-y-2 overflow-y-auto lg:max-h-none lg:overflow-visible">
+                {items
+                  .filter((item) => quantities[item.id])
+                  .map((item) => (
+                    <div key={item.id}>
+                      <div className="flex items-center justify-between gap-3">
+                        <dt className="truncate text-vtk-muted">
+                          {item.name} × {quantities[item.id]}
+                        </dt>
+                        <dd>
+                          <button
+                            type="button"
+                            onClick={() => setQuantity(item.id, 0)}
+                            aria-label={`${en ? 'Remove' : 'Verwijderen'}: ${item.name}`}
+                            className="grid h-6 w-6 shrink-0 place-items-center rounded-full text-base font-semibold text-red-600 transition hover:bg-red-50 hover:text-red-700"
+                          >
+                            ×
+                          </button>
+                        </dd>
+                      </div>
+                      {/* Opmerking per lijn: "liefst de zwarte" hoort bij dít item en
+                          niet onderaan bij de algemene info, waar het team het pas
+                          vindt als het al iets anders klaarzette. */}
+                      <input
+                        type="text"
+                        value={lineNotes[item.id] ?? ''}
+                        onChange={(e) =>
+                          setLineNotes((prev) => ({ ...prev, [item.id]: e.target.value }))
+                        }
+                        placeholder={en ? 'Note (optional)' : 'Opmerking (optioneel)'}
+                        aria-label={`${en ? 'Note' : 'Opmerking'}: ${item.name}`}
+                        className="mt-0.5 h-8 w-full rounded-lg border border-vtk-navy/15 bg-white px-2 text-xs text-vtk-ink"
+                      />
+                    </div>
+                  ))}
+              </div>
+            </dl>
+          </div>
+
+          {/* Vast onderaan: wat je nodig hebt om te beslissen of je mag indienen,
+              en de knop zelf. De waarborg hoort daarbij: dat is het bedrag waar je
+              ja op zegt, en die mag niet mee de itemlijst in scrollen. */}
+          <div className="pt-3 lg:shrink-0 lg:border-t lg:border-vtk-navy/10">
+            <dl className="space-y-1 text-sm">
+              <div className="flex justify-between">
+                <dt className="text-vtk-muted">Items</dt>
+                <dd className="font-medium text-vtk-ink">{totals.count}</dd>
+              </div>
+              {showRentPrices ? (
+                <div className="flex justify-between">
+                  <dt className="text-vtk-muted">{en ? 'Rental price' : 'Huurprijs'}</dt>
+                  <dd className="font-medium text-vtk-ink">{formatEuro(totals.rent)}</dd>
+                </div>
+              ) : null}
+              <div className="flex justify-between">
+                <dt className="text-vtk-muted">{en ? 'Deposit' : 'Waarborg'}</dt>
+                <dd className="font-medium text-vtk-ink">{formatEuro(totals.deposit)}</dd>
+              </div>
+            </dl>
+            <p className="mt-2 text-xs leading-5 text-vtk-muted">
+              {paymentNote ??
+                (en
+                  ? 'Your deposit is returned when everything comes back in good condition.'
+                  : 'De waarborg krijg je terug wanneer alles in orde terugkomt.')}
             </p>
-          ) : null}
+            {/* Indienen mag, maar niet per ongeluk: wie meer vraagt dan er vrij is,
+                zegt hier expliciet dat hij dat weet. Zonder die stap belandt het
+                conflict bij Logistiek zonder dat de aanvrager het doorhad. */}
+            {conflictLines.length > 0 ? (
+              <div className="mt-4 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2.5 text-sm text-amber-900">
+                <p className="font-semibold">
+                  {en ? 'Not everything is free then' : 'Niet alles is vrij in je periode'}
+                </p>
+                <ul className="mt-1 space-y-0.5">
+                  {conflictLines.map((line) => (
+                    <li key={line.item.id}>
+                      {line.item.name}: {en ? 'you ask' : 'je vraagt er'} {line.quantity},{' '}
+                      {en ? 'free' : 'vrij'} {line.free}
+                    </li>
+                  ))}
+                </ul>
+                <label className="mt-2 flex items-start gap-2">
+                  <input
+                    type="checkbox"
+                    checked={acceptConflicts}
+                    onChange={(e) => setAcceptConflicts(e.target.checked)}
+                    data-field="conflicts"
+                    className="mt-0.5 h-4 w-4"
+                  />
+                  <span>
+                    {en
+                      ? 'Send it anyway. Logistics will contact me to move the dates or find something else.'
+                      : 'Toch indienen. Logistiek neemt contact op om de datums te verschuiven of iets anders te zoeken.'}
+                  </span>
+                </label>
+              </div>
+            ) : null}
 
-          <Button
-            type="button"
-            size="lg"
-            className="mt-5 w-full"
-            onClick={submit}
-            disabled={pending}
-          >
-            {pending ? submittingLabel : submitLabel}
-          </Button>
-          {onCancel ? (
+            {error ? (
+              <p role="alert" className="mt-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+                {error}
+              </p>
+            ) : null}
+
             <Button
               type="button"
-              variant="ghost"
               size="lg"
-              className="mt-2 w-full"
-              onClick={onCancel}
+              className="mt-5 w-full"
+              onClick={submit}
               disabled={pending}
             >
-              {cancelLabel ?? (en ? 'Cancel' : 'Annuleren')}
+              {pending ? submittingLabel : submitLabel}
             </Button>
-          ) : null}
+            {onCancel ? (
+              <Button
+                type="button"
+                variant="ghost"
+                size="lg"
+                className="mt-2 w-full"
+                onClick={onCancel}
+                disabled={pending}
+              >
+                {cancelLabel ?? (en ? 'Cancel' : 'Annuleren')}
+              </Button>
+            ) : null}
+          </div>
         </aside>
       </div>
     </div>

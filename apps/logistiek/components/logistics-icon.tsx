@@ -3,7 +3,13 @@ import type { ReactNode, SVGProps } from 'react';
 type IconName =
   | 'material'
   | 'van'
+  | 'car'
+  | 'cargobike'
   | 'reservation'
+  | 'dashboard'
+  | 'event'
+  | 'request'
+  | 'driver'
   | 'check'
   | 'edit'
   | 'close'
@@ -26,10 +32,55 @@ export function LogisticsIcon({ name, className, ...props }: SVGProps<SVGSVGElem
         <path d="M6.5 18.5a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3ZM17.5 18.5a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3Z" />
       </>
     ),
+    car: (
+      <>
+        <path d="M4.5 16.5v-3l1.9-4.2A2 2 0 0 1 8.2 8h7.6a2 2 0 0 1 1.8 1.3l1.9 4.2v3" />
+        <path d="M4.5 13.5h15" />
+        <path d="M8.5 18a1.6 1.6 0 1 0 0-3.2 1.6 1.6 0 0 0 0 3.2ZM15.5 18a1.6 1.6 0 1 0 0-3.2 1.6 1.6 0 0 0 0 3.2Z" />
+      </>
+    ),
+    cargobike: (
+      <>
+        <path d="M5.5 19a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5ZM18.5 19a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5Z" />
+        <path d="M3 15.5V11a1 1 0 0 1 1-1h5.5v5" />
+        <path d="m9.5 10.5 6 6M13.5 9h3" />
+      </>
+    ),
     reservation: (
       <>
         <rect x="5" y="4" width="14" height="17" rx="2" />
         <path d="M8 2.5v3M16 2.5v3M5 9h14M8.5 13h2M13.5 13h2M8.5 17h2" />
+      </>
+    ),
+    // Overzicht, Evenementen en Aanvragen deelden tot nu het kalendericoon met
+    // Kalender. Vier identieke iconen naast elkaar in de zijbalk maken het
+    // icoon betekenisloos: je leest dan enkel nog het woord ernaast.
+    dashboard: (
+      <>
+        <rect x="3.5" y="3.5" width="7" height="7" rx="1.5" />
+        <rect x="13.5" y="3.5" width="7" height="7" rx="1.5" />
+        <rect x="3.5" y="13.5" width="7" height="7" rx="1.5" />
+        <rect x="13.5" y="13.5" width="7" height="7" rx="1.5" />
+      </>
+    ),
+    event: (
+      <>
+        <path d="M5.5 21.5V3" />
+        <path d="M5.5 4h11.5l-2.3 3.6L17 11.2H5.5" />
+      </>
+    ),
+    request: (
+      <>
+        <path d="M9.5 4.5H8A1.5 1.5 0 0 0 6.5 6v13.5A1.5 1.5 0 0 0 8 21h8a1.5 1.5 0 0 0 1.5-1.5V6A1.5 1.5 0 0 0 16 4.5h-1.5" />
+        <rect x="9.5" y="2.5" width="5" height="4" rx="1.2" />
+        <path d="M9.5 11.5h5M9.5 15.5h3" />
+      </>
+    ),
+    driver: (
+      <>
+        <circle cx="12" cy="12" r="8.5" />
+        <circle cx="12" cy="12" r="2.6" />
+        <path d="M4 10h16M12 14.6v6.9" />
       </>
     ),
     check: <path d="m5 12 4.25 4.25L19 6.5" />,

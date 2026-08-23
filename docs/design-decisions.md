@@ -1579,6 +1579,41 @@ draagt nu de uren zelf: wat je daar invult, wordt de rit.
   uren staan daarna als "de" uren op de rit; zonder die regel is niet meer te
   zien dat er iets veranderd is aan wat het lid vroeg.
 
+### De weekplanning is één kalender, geen raster per voertuig
+
+De transportplanning (`/beheer/vervoer/week`) en het publieke bezettingsoverzicht
+(`/vervoer/bezetting`) tonen de week zoals een agenda-app dat doet: zeven
+dagkolommen naast elkaar, de uren verticaal, elke rit een blok op zijn moment.
+
+Dat is de tweede vorm. De ronde-2-feedback (T7) vroeg "de Litus-lay-out: uren als
+rijen, voertuigen als kolommen", en zo is het eerst gebouwd: één raster per dag,
+met een kolom per voertuig, zeven rasters onder elkaar. In gebruik bleek dat geen
+weekoverzicht: "wat gebeurt er donderdag" stond pas na drie keer scrollen in
+beeld, en dezelfde uren stonden zeven keer opnieuw getekend.
+
+Wat daarbij vastligt:
+
+- **Het voertuig is een eigenschap van de rit, geen kolom.** Het staat met zijn
+  icoon in het blok (bestelwagen, auto, bakfiets), met een legende onder de
+  kalender. Zo blijft de kolombreedte voor de dag, en niet voor drie voertuigen
+  waarvan er meestal twee leegstaan.
+- **De kleur blijft van de chauffeur** (zie B4), niet van het voertuig. Wie rijdt
+  is de vraag bij het plannen; wat er rijdt lees je aan het icoon.
+- **Overlappende ritten komen naast elkaar, ook over voertuigen heen.** Anders
+  verbergt de auto de kar op precies het moment waarop je wil zien dat er twee
+  dingen tegelijk rijden. De breedte wordt per groep elkaar rakende ritten
+  gerekend en niet per dag: vier ritten die elkaar niet raken, staan alle vier
+  volledig breed.
+- **Staat een rit naast een andere, dan toont het blok enkel het beginuur.** Het
+  einduur is af te lezen aan de onderrand en staat voluit in de tooltip; een
+  afgekapt "08:0…" zegt niets.
+- **De dagrand is Belgisch, niet UTC.** De dagen komen als UTC-middernacht binnen
+  (zoals `todayDateOnly` ze maakt) terwijl de uren Belgisch zijn. Wie die twee
+  door elkaar gebruikt, knipt de dag twee uur te laat: een rit van 23:00 tot 01:00
+  kreeg dan een einduur vóór zijn beginuur (een blok met negatieve hoogte) en een
+  rit van 00:30 belandde op de dag ervoor. `lib/week-lanes.ts` rekent de dagrand
+  daarom om, en `test/week-lanes.test.ts` houdt dat vast.
+
 ### Karchauffeurs: één vlag, geen aparte soort
 
 Een voertuig kan aangeduid staan als "vraagt een chauffeur die de kar mag

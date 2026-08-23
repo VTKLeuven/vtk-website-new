@@ -88,9 +88,14 @@ Inloggen doe je op `/test-login` (werkt omdat `LOGISTIEK_TEST_LOGIN=true` in
 
 **T7** vroeg de Litus-lay-out, en dit is het grootste stuk van de ronde.
 
-- Per dag staan de **uren onder elkaar en de voertuigen naast elkaar**, niet meer
-  omgekeerd. De transportverantwoordelijke plant per moment, en "wie rijdt er
-  zaterdagavond en met wat" is nu één blik op een kolom.
+- De week is **één kalender**: zeven dagkolommen naast elkaar, de uren verticaal,
+  elke rit een blok op zijn moment. (Dit is de tweede vorm; de eerste zette de
+  voertuigen als kolommen en herhaalde het raster per dag, wat zeven losse
+  rasters onder elkaar gaf waarin "wat gebeurt er donderdag" pas na scrollen in
+  beeld kwam.)
+- Het **voertuig staat in het blok** met zijn icoon, met een legende onder de
+  kalender; de kolombreedte is dus voor de dag en niet voor drie voertuigen
+  waarvan er meestal twee leegstaan.
 - **Elke chauffeur heeft zijn eigen kleur**, afgeleid uit zijn id: dezelfde
   persoon is altijd dezelfde kleur, zonder beheerscherm. Een rit zonder chauffeur
   is geel, gestreept betekent nog te beslissen, doorzichtig is afgerond, rood is
@@ -98,8 +103,10 @@ Inloggen doe je op `/test-login` (werkt omdat `LOGISTIEK_TEST_LOGIN=true` in
 - **Klik een rit aan** en er opent een venster: is ze nog te beslissen, dan staan
   daar de uren, de chauffeur en goedkeuren/afwijzen; daarna het voertuig, de
   chauffeur en "rit afronden". Je hoeft de planning niet meer te verlaten.
-- Overlappende ritten op hetzelfde voertuig komen naast elkaar te staan in plaats
-  van elkaar te verbergen.
+- Overlappende ritten komen naast elkaar te staan in plaats van elkaar te
+  verbergen, ook wanneer het om verschillende voertuigen gaat. Staat een rit
+  naast een andere, dan toont het blok enkel het beginuur; het einduur lees je aan
+  de onderrand en in de tooltip.
 
 Testen: maak twee ritten op dezelfde dag met hetzelfde voertuig en verschillende
 chauffeurs, en één zonder chauffeur. Klik de onbesliste aan en keur ze goed; het

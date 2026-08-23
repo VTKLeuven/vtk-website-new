@@ -210,7 +210,11 @@ export default async function VervoerWeekPage({
         <>
           <TransportWeekPlanner
             days={days}
-            vehicles={vehicles.map((vehicle) => ({ id: vehicle.id, name: vehicle.nameNl }))}
+            vehicles={vehicles.map((vehicle) => ({
+              id: vehicle.id,
+              name: vehicle.nameNl,
+              code: vehicle.code,
+            }))}
             blocks={blocks}
             trips={trips}
             drivers={drivers}
@@ -222,9 +226,10 @@ export default async function VervoerWeekPage({
           />
 
           <p className="text-xs text-vtk-muted">
-            Elke chauffeur heeft zijn eigen kleur; een rit zonder chauffeur is geel. Gestreept =
-            nog te beslissen, doorzichtig = afgerond, rood = twee goedgekeurde ritten met hetzelfde
-            voertuig op hetzelfde moment. Klik een rit aan om ze te beslissen of aan te passen.
+            Elke chauffeur heeft zijn eigen kleur; een rit zonder chauffeur is geel. Het voertuig
+            staat met zijn icoon in het blok. Gestreept = nog te beslissen, doorzichtig = afgerond,
+            rood = twee goedgekeurde ritten met hetzelfde voertuig op hetzelfde moment. Klik een
+            rit aan om ze te beslissen of aan te passen.
           </p>
         </>
       )}
