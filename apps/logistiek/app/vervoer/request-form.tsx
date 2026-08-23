@@ -8,6 +8,7 @@ import { createVanBookingAction } from '@/app/actions/uitleen';
 import { formatDateTime, formatEuro, formatPriceCents, transportPriceCents } from '@/lib/uitleen';
 import { useFormDraft } from '@/lib/use-form-draft';
 import { EventPicker, type SelectableEvent } from '@/components/event-picker';
+import { QuarterDateTime } from '@/components/quarter-datetime';
 import {
   fieldClass,
   firstMissing,
@@ -385,15 +386,14 @@ export function VanRequestForm({
             {en ? 'From' : 'Van'}
             {required}
           </span>
-          {/* step=900: ritten worden op het kwartier gepland, en de server weigert
-              een ander tijdstip. De picker springt zo mee in kwartieren. */}
-          <input
-            type="datetime-local"
-            step={900}
+          {/* Ritten worden op het kwartier gepland en de server weigert een ander
+              tijdstip, dus staan er ook enkel kwartieren in de lijst. */}
+          <QuarterDateTime
             value={startAt}
-            onChange={(e) => setStartAt(e.target.value)}
-            data-field="startAt"
-            aria-invalid={missing?.name === 'startAt'}
+            onChange={setStartAt}
+            dataField="startAt"
+            timeLabel={en ? 'Start time' : 'Startuur'}
+            invalid={missing?.name === 'startAt'}
             className={fieldClass(inputClass, 'startAt', missing)}
           />
         </label>
@@ -402,14 +402,13 @@ export function VanRequestForm({
             {en ? 'Until' : 'Tot'}
             {required}
           </span>
-          <input
-            type="datetime-local"
-            step={900}
+          <QuarterDateTime
             value={endAt}
             min={startAt || undefined}
-            onChange={(e) => setEndAt(e.target.value)}
-            data-field="endAt"
-            aria-invalid={missing?.name === 'endAt'}
+            onChange={setEndAt}
+            dataField="endAt"
+            timeLabel={en ? 'End time' : 'Einduur'}
+            invalid={missing?.name === 'endAt'}
             className={fieldClass(inputClass, 'endAt', missing)}
           />
         </label>
@@ -428,25 +427,23 @@ export function VanRequestForm({
           <>
             <label className="grid gap-1 text-sm">
               <span className="font-medium text-vtk-ink">{en ? 'Back: from' : 'Terug: van'}</span>
-              <input
-                type="datetime-local"
-                step={900}
+              <QuarterDateTime
                 value={returnStartAt}
-                data-field="returnStartAt"
+                dataField="returnStartAt"
+                timeLabel={en ? 'Return start time' : 'Startuur terugrit'}
                 min={endAt || undefined}
-                onChange={(e) => setReturnStartAt(e.target.value)}
+                onChange={setReturnStartAt}
                 className={inputClass}
               />
             </label>
             <label className="grid gap-1 text-sm">
               <span className="font-medium text-vtk-ink">{en ? 'Back: until' : 'Terug: tot'}</span>
-              <input
-                type="datetime-local"
-                step={900}
+              <QuarterDateTime
                 value={returnEndAt}
-                data-field="returnEndAt"
+                dataField="returnEndAt"
+                timeLabel={en ? 'Return end time' : 'Einduur terugrit'}
                 min={returnStartAt || undefined}
-                onChange={(e) => setReturnEndAt(e.target.value)}
+                onChange={setReturnEndAt}
                 className={inputClass}
               />
             </label>

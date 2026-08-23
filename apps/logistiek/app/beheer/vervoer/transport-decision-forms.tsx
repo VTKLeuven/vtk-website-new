@@ -4,6 +4,7 @@ import { useState } from 'react';
 
 import type { UitleenRequesterType } from '@prisma/client';
 import { SaveForm } from '@/components/ui/save-form';
+import { QuarterDateTime } from '@/components/quarter-datetime';
 import { chargesRequester } from '@/lib/uitleen';
 import { approveTransportAction, rejectTransportAction } from '@/app/actions/beheer';
 import type { DriverOption } from '@/lib/uitleen-server';
@@ -120,21 +121,19 @@ export function TransportDecisionForms({
             ) : null}
             <label className="grid gap-1 text-sm">
               <span className="text-vtk-muted">Van</span>
-              <input
-                type="datetime-local"
-                step={900}
+              <QuarterDateTime
                 name={`startAt-${leg.id}`}
                 defaultValue={leg.startAt}
+                timeLabel="Startuur"
                 className={inputClass}
               />
             </label>
             <label className="grid gap-1 text-sm">
               <span className="text-vtk-muted">Tot</span>
-              <input
-                type="datetime-local"
-                step={900}
+              <QuarterDateTime
                 name={`endAt-${leg.id}`}
                 defaultValue={leg.endAt}
+                timeLabel="Einduur"
                 className={inputClass}
               />
             </label>

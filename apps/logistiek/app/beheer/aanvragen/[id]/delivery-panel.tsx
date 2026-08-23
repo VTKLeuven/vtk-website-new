@@ -8,6 +8,7 @@ import type { UitleenTransportBookingStatus } from '@prisma/client';
 import { createTransportForReservationAction } from '@/app/actions/beheer';
 import { useToast } from '@/components/ui/toast';
 import { VanStatusBadge } from '@/components/status-badge';
+import { QuarterDateTime } from '@/components/quarter-datetime';
 import { formatDateTime } from '@/lib/uitleen';
 
 /**
@@ -186,24 +187,22 @@ export function DeliveryPanel({
           <div className="grid gap-3 sm:grid-cols-2">
             <label className="grid gap-1 text-sm">
               <span className="font-medium text-vtk-ink">Heen: van</span>
-              {/* step=900: ritten worden op het kwartier gepland en de server
-                  weigert een ander tijdstip. */}
-              <input
-                type="datetime-local"
-                step={900}
+              {/* Ritten worden op het kwartier gepland en de server weigert een
+                  ander tijdstip, dus staan er ook enkel kwartieren in de lijst. */}
+              <QuarterDateTime
                 value={startAt}
-                onChange={(event) => setStartAt(event.target.value)}
+                onChange={setStartAt}
+                timeLabel="Heen: startuur"
                 className={inputClass}
               />
             </label>
             <label className="grid gap-1 text-sm">
               <span className="font-medium text-vtk-ink">Heen: tot</span>
-              <input
-                type="datetime-local"
-                step={900}
+              <QuarterDateTime
                 value={endAt}
                 min={startAt || undefined}
-                onChange={(event) => setEndAt(event.target.value)}
+                onChange={setEndAt}
+                timeLabel="Heen: einduur"
                 className={inputClass}
               />
             </label>
@@ -220,23 +219,21 @@ export function DeliveryPanel({
               <>
                 <label className="grid gap-1 text-sm">
                   <span className="font-medium text-vtk-ink">Terug: van</span>
-                  <input
-                    type="datetime-local"
-                    step={900}
+                  <QuarterDateTime
                     value={returnStartAt}
                     min={endAt || undefined}
-                    onChange={(event) => setReturnStartAt(event.target.value)}
+                    onChange={setReturnStartAt}
+                    timeLabel="Terug: startuur"
                     className={inputClass}
                   />
                 </label>
                 <label className="grid gap-1 text-sm">
                   <span className="font-medium text-vtk-ink">Terug: tot</span>
-                  <input
-                    type="datetime-local"
-                    step={900}
+                  <QuarterDateTime
                     value={returnEndAt}
                     min={returnStartAt || undefined}
-                    onChange={(event) => setReturnEndAt(event.target.value)}
+                    onChange={setReturnEndAt}
+                    timeLabel="Terug: einduur"
                     className={inputClass}
                   />
                 </label>

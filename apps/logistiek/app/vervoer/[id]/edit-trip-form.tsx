@@ -4,6 +4,7 @@ import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@vtk/ui';
 import { editVanBookingAction } from '@/app/actions/uitleen';
+import { QuarterDateTime } from '@/components/quarter-datetime';
 import type { LogistiekLocale } from '@/lib/i18n-shared';
 
 /**
@@ -76,21 +77,20 @@ export function EditTripForm({
       <div className="grid gap-3 sm:grid-cols-2">
         <label className="grid gap-1 text-sm">
           <span className="font-medium text-vtk-ink">{en ? 'From' : 'Van'}</span>
-          <input
-            type="datetime-local"
-            step={900}
+          <QuarterDateTime
             value={values.startAt}
-            onChange={(field) => setValues({ ...values, startAt: field.target.value })}
+            onChange={(next) => setValues({ ...values, startAt: next })}
+            timeLabel={en ? 'Start time' : 'Startuur'}
             className={inputClass}
           />
         </label>
         <label className="grid gap-1 text-sm">
           <span className="font-medium text-vtk-ink">{en ? 'To' : 'Tot'}</span>
-          <input
-            type="datetime-local"
-            step={900}
+          <QuarterDateTime
             value={values.endAt}
-            onChange={(field) => setValues({ ...values, endAt: field.target.value })}
+            min={values.startAt || undefined}
+            onChange={(next) => setValues({ ...values, endAt: next })}
+            timeLabel={en ? 'End time' : 'Einduur'}
             className={inputClass}
           />
         </label>
