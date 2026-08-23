@@ -1,6 +1,7 @@
 'use client';
 
 import { useRef, useState } from 'react';
+import { PhotoCropper } from '@/components/photo-cropper';
 
 type Upload = { key: string; label?: string };
 const mediaUrl = (key: string) => `/api/media/${key.split('/').map(encodeURIComponent).join('/')}`;
@@ -27,6 +28,8 @@ export function PhotosEditor({ initial }: { initial: Array<{ key: string }> }) {
   const [photos, setPhotos] = useState(initial);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  /** De foto waarvan het thumbnailgedeelte gekozen wordt (M6). */
+  const [cropping, setCropping] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   async function add(files: FileList | null) {
@@ -43,6 +46,25 @@ export function PhotosEditor({ initial }: { initial: Array<{ key: string }> }) {
   const makeCover = (key: string) =>
     setPhotos((all) => [...all.filter((photo) => photo.key === key), ...all.filter((photo) => photo.key !== key)]);
 
+  /**
+   * Het bijgesneden beeld wordt een nieuwe foto en gaat vooraan staan; de
+   * originele blijft in de galerij (M6). Zo verlies je nooit het volledige
+   * beeld door een keuze over de thumbnail.
+   */
+  async function useCropped(file: File) {
+    setCropping(null);
+    setBusy(true);
+    setError(null);
+    try {
+      const added = await upload(file);
+      setPhotos((all) => [{ key: added.key }, ...all.filter((photo) => photo.key !== added.key)]);
+    } catch {
+      setError('Bijsnijden mislukt. Probeer opnieuw.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
   return <div className="grid gap-2">
     {/* De eerste is de thumbnail, de rest is de galerij. */}
     <input type="hidden" name="photoKey" value={photos[0]?.key ?? ''} />
@@ -54,7 +76,16 @@ export function PhotosEditor({ initial }: { initial: Array<{ key: string }> }) {
           <img src={mediaUrl(photo.key)} alt={`Foto ${index + 1}`} className="h-full w-full object-cover" />
           <button type="button" onClick={() => setPhotos((all) => all.filter((p) => p.key !== photo.key))} className="absolute right-1 top-1 grid h-6 w-6 place-items-center rounded-full bg-vtk-ink/80 text-white" aria-label={`Foto ${index + 1} verwijderen`}>×</button>
           {index === 0 ? (
-            <figcaption className="absolute inset-x-0 bottom-0 bg-vtk-yellow py-0.5 text-center text-[10px] font-semibold text-vtk-ink">Thumbnail</figcaption>
+            <figcaption className="absolute inset-x-0 bottom-0 grid bg-vtk-yellow text-center text-[10px] font-semibold text-vtk-ink">
+              <span className="py-0.5">Thumbnail</span>
+              <button
+                type="button"
+                onClick={() => setCropping(photo.key)}
+                className="border-t border-vtk-ink/15 py-0.5 transition hover:bg-vtk-yellow-dark"
+              >
+                Bijsnijden
+              </button>
+            </figcaption>
           ) : (
             // Altijd zichtbaar en niet enkel bij hoveren: op een tablet in de
             // loods bestaat hoveren niet.
@@ -71,6 +102,13 @@ export function PhotosEditor({ initial }: { initial: Array<{ key: string }> }) {
     <input ref={inputRef} type="file" accept="image/*" multiple className="hidden" onChange={(e) => { add(e.target.files); e.target.value = ''; }} />
     <p className="text-xs font-normal text-vtk-muted">De eerste foto is de thumbnail in de catalogus; de rest staat op de detailpagina.</p>
     {error ? <p className="text-xs text-red-700">{error}</p> : null}
+    {cropping ? (
+      <PhotoCropper
+        src={mediaUrl(cropping)}
+        onCancel={() => setCropping(null)}
+        onCropped={useCropped}
+      />
+    ) : null}
   </div>;
 }
 

@@ -32,7 +32,7 @@ ook bij maar werd anders opgelost dan gevraagd; de reden staat bij de taak.
 | 0 | Beslissingen die eerst moeten vallen | 4 vragen | ✅ beslist |
 | 1 | Kleine bugs, UI-fixes en ergernissen | R1–R8 | ✅ af |
 | 2 | Navigatie, lay-out en overzichten | N1–N5 | ✅ af |
-| 3 | Materiaal: opmerkingen, deelgoedkeuring, sjablonen | M1–M8 | 🟡 M6 open |
+| 3 | Materiaal: opmerkingen, deelgoedkeuring, sjablonen | M1–M8 | ✅ af |
 | 4 | Vervoer: terminologie, goedkeuring, weekoverzicht | T1–T13 | ✅ af |
 | 5 | Flesserke en kalender | F1–F3 | ✅ af |
 | 6 | Evenementen: post-overzicht, materiaallijst, C&G | E1–E7 | ✅ af |
@@ -368,7 +368,7 @@ Alles hier is klein, zichtbaar en zonder (of met een minimale) migratie.
   3. Rechtenbeheer: wie mag aanmaken, bewerken, verwijderen?
 - **Klaar wanneer:** de post Feest kan hun eigen cantus-sjabloon beheren.
 
-### M6. Foto-thumbnail bijsnijden bij materiaal
+### ✅ M6. Foto-thumbnail bijsnijden bij materiaal
 **P2 · code**
 
 - **Raakt:** `apps/logistiek/app/beheer/materiaal/inventory-manager.tsx`
