@@ -363,8 +363,10 @@ App:
 - [x] `src/storage.ts` (voorkeuren + leescache), `src/state/app.tsx`
 - [x] de vijf tabs, `app/inloggen.tsx`, `app/poort.tsx`, `app/instellingen.tsx`
 - [x] EAS-project onder `vtk-it` (`2858ac35-...`), kanaal `preview` aangemaakt
-- [ ] eerste Android-build afgewacht en geinstalleerd
+- [x] eerste Android-build (APK) klaar
+- [x] eerste `eas update` op kanaal `preview`
 - [ ] met de hand getest op een toestel tegen een cloudflared-tunnel
+- [ ] pushroutes end-to-end nagekeken (zie noot hieronder)
 
 | Datum | Commit | Wat |
 |---|---|---|
@@ -372,6 +374,14 @@ App:
 | 2026-08-23 | `De schil: tabs, contract, weblogin en de twee poorten` | De app-repo staat er: Expo SDK 54, vijf tabs, de tokens van de site, de HTTP-laag met de gedeelde cookie, de weblogin en de onboarding-poorten, en de leescache. Info en Profiel tonen echte gegevens uit `bootstrap`; Kalender en Bestellen zijn nog `ComingSoon`. |
 | 2026-08-24 | `web: Zod uit het gekopieerde contract, naar schemas.ts ernaast` | Het contract dat naar deze repo gekopieerd wordt, heeft geen dependencies meer. |
 | 2026-08-24 | `EAS-project en de eerste Android-build` | Project `@vtk-it/vtk-app` aangemaakt, kanaal `preview`, keystore door Expo beheerd, eerste preview-build gestart. |
+| 2026-08-24 | (geen commit) | Build klaar als APK, en `eas update --branch preview` gepubliceerd. Fase 0 staat op een toestel te wachten. |
+
+**Nog open uit fase 0.** De twee pushroutes zijn niet end-to-end nagekeken tegen
+een draaiende server: de dev-server die hier stond, was gestart voordat de
+Prisma-client met `AppPushDevice` erin gegenereerd was, en gaf daarom 500. Het
+model, de migratie en dezelfde upsert zijn wel rechtstreeks tegen de database
+uitgevoerd en werkten. Na een herstart van de dev-server hoort dit gewoon te
+lukken; kijk het na voor je erop bouwt.
 
 ### Fase 1 - Home, Kalender, Bestellen
 
