@@ -14,6 +14,7 @@
     "test:watch": "vitest"
   },
   "dependencies": {
+    "@modelcontextprotocol/server": "^2.0.0",
     "@node-rs/argon2": "^2.0.2",
     "@sentry/nextjs": "^10.65.0",
     "@types/pg": "^8.20.0",
@@ -26,7 +27,7 @@
     "@vtk/ui": "*",
     "@zxing/browser": "^0.2.1",
     "archiver": "^7.0.1",
-    "better-auth": "^1.6.26",
+    "better-auth": "1.6.26",
     "jsonwebtoken": "^9.0.3",
     "lucide-react": "^1.24.0",
     "next": "16.3.0",

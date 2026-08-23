@@ -226,24 +226,47 @@ function trim(value: string, max: number): string {
 export async function logAudit(entry: AuditEntry): Promise<void> {
   try {
     const session = await getActualSession();
-
-    await prisma.adminAuditLog.create({
-      data: {
-        actorId: session?.user.id ?? null,
-        actorName: session?.user.name ?? "Systeem",
-        action: entry.action,
-        entity: entry.entity,
-        entityId: entry.entityId ?? null,
-        target: trim(entry.target || "—", 200),
-        summary: entry.summary ? trim(entry.summary, 500) : null,
-      },
+    await writeAudit(entry, {
+      actorId: session?.user.id ?? null,
+      actorName: session?.user.name ?? "Systeem",
     });
-
-    await maybePrune();
   } catch (err) {
     console.error("[audit] kon actie niet loggen", err);
     Sentry.captureException(err);
   }
+}
+
+/**
+ * Schrijft een auditregel voor een benoemde systeemintegratie zonder te doen
+ * alsof ze een ingelogd lid is. De naam komt uit serverconfiguratie, nooit uit
+ * request-input. Dit is onder meer de actor voor create-only MCP-tools.
+ */
+export async function logSystemAudit(entry: AuditEntry, actorName: string): Promise<void> {
+  try {
+    await writeAudit(entry, { actorId: null, actorName: actorName || "Systeem" });
+  } catch (err) {
+    console.error("[audit] kon systeemactie niet loggen", err);
+    Sentry.captureException(err);
+  }
+}
+
+async function writeAudit(
+  entry: AuditEntry,
+  actor: { actorId: string | null; actorName: string },
+): Promise<void> {
+  await prisma.adminAuditLog.create({
+    data: {
+      actorId: actor.actorId,
+      actorName: trim(actor.actorName, 200),
+      action: entry.action,
+      entity: entry.entity,
+      entityId: entry.entityId ?? null,
+      target: trim(entry.target || "—", 200),
+      summary: entry.summary ? trim(entry.summary, 500) : null,
+    },
+  });
+
+  await maybePrune();
 }
 
 /** Verwijdert regels ouder dan de bewaartermijn. Geeft het aantal terug. */
