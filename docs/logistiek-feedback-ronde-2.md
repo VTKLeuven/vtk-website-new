@@ -30,6 +30,8 @@ is, zodat het publieke overzicht anoniem blijft).
 Nog manueel na te kijken: het bijsnijden van een itemfoto (M6) is gebouwd en
 compileert, maar kon niet in de browser doorgeklikt worden.
 
+Hoe je alles uitprobeert, scherm per scherm: `docs/logistiek-ronde-2-testgids.md`.
+
 ## Statusoverzicht
 
 | Fase | Inhoud | Taken | Status |
