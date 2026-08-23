@@ -119,23 +119,29 @@ export async function deleteMailGroupAction(formData: FormData): Promise<void> {
 
 const sourceSchema = z.object({
   mailGroupId: z.string().min(1),
-  /** `group:<id>`, `kiesploeg:<id>` of `kiesploegPost:<id>`. */
+  /** `group:<id>`, `type:PRAESIDIUM`, `kiesploeg:<id>` of `kiesploegPost:<id>`. */
   source: z.string().min(3),
   onlyLead: z.string().optional(),
 });
 
 /** Splitst de gecombineerde keuzelijst in het juiste kolomveld. */
 function parseSource(raw: string):
-  | { kind: "group" | "kiesploeg" | "kiesploegPost"; id: string }
+  | { kind: "group" | "type" | "kiesploeg" | "kiesploegPost"; id: string }
   | null {
   const [kind, id] = raw.split(":");
   if (!id) return null;
+  if (kind === "type") {
+    return id === "PRAESIDIUM" || id === "WERKGROEP" ? { kind, id } : null;
+  }
   if (kind !== "group" && kind !== "kiesploeg" && kind !== "kiesploegPost") return null;
   return { kind, id };
 }
 
 /** Hoe de bron heet, voor het logboek. */
 async function sourceLabel(kind: string, id: string): Promise<string | null> {
+  if (kind === "type") {
+    return id === "PRAESIDIUM" ? "elke praesidiumpost" : "elke werkgroep";
+  }
   if (kind === "group") {
     return (await prisma.group.findUnique({ where: { id }, select: { nameNl: true } }))?.nameNl ?? null;
   }
@@ -167,6 +173,8 @@ export async function addSourceAction(_prev: SaveState, formData: FormData): Pro
 
   const columns = {
     groupId: source.kind === "group" ? source.id : null,
+    groupType:
+      source.kind === "type" ? (source.id as "PRAESIDIUM" | "WERKGROEP") : null,
     kiesploegId: source.kind === "kiesploeg" ? source.id : null,
     kiesploegPostId: source.kind === "kiesploegPost" ? source.id : null,
   };
@@ -200,6 +208,7 @@ export async function removeSourceAction(formData: FormData): Promise<void> {
     where: { id },
     select: {
       groupId: true,
+      groupType: true,
       kiesploegId: true,
       kiesploegPostId: true,
       mailGroupId: true,
@@ -212,7 +221,15 @@ export async function removeSourceAction(formData: FormData): Promise<void> {
   if (!row) return;
 
   const label =
-    row.group?.nameNl ?? row.kiesploeg?.formalName ?? row.kiesploegPost?.name ?? "bron";
+    row.group?.nameNl ??
+    (row.groupType === "PRAESIDIUM"
+      ? "elke praesidiumpost"
+      : row.groupType === "WERKGROEP"
+        ? "elke werkgroep"
+        : null) ??
+    row.kiesploeg?.formalName ??
+    row.kiesploegPost?.name ??
+    "bron";
 
   await prisma.mailGroupSource.delete({ where: { id } });
   await logAudit({
@@ -226,6 +243,7 @@ export async function removeSourceAction(formData: FormData): Promise<void> {
   after(() =>
     pushSource({
       groupId: row.groupId,
+      groupType: row.groupType,
       kiesploegId: row.kiesploegId,
       kiesploegPostId: row.kiesploegPostId,
     }),
@@ -235,10 +253,21 @@ export async function removeSourceAction(formData: FormData): Promise<void> {
 /** Duwt de lijsten die op deze bron staan meteen door naar Google. */
 async function pushSource(columns: {
   groupId: string | null;
+  groupType?: "PRAESIDIUM" | "WERKGROEP" | null;
   kiesploegId: string | null;
   kiesploegPostId: string | null;
 }): Promise<void> {
   if (columns.groupId) return pushMailGroupsForGroup(columns.groupId);
+  if (columns.groupType) {
+    // Eén willekeurige groep van dat soort volstaat: `pushMailGroupsForGroup`
+    // neemt de lijsten met dat brontype mee.
+    const any = await prisma.group.findFirst({
+      where: { type: columns.groupType, active: true },
+      select: { id: true },
+    });
+    if (any) return pushMailGroupsForGroup(any.id);
+    return;
+  }
   if (columns.kiesploegId) return pushMailGroupsForKiesploeg(columns.kiesploegId);
   if (columns.kiesploegPostId) {
     const post = await prisma.kiesploegPost.findUnique({

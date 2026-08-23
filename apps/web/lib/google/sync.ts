@@ -72,6 +72,7 @@ type MailGroupRow = {
   allowExternalSenders: boolean;
   sources: {
     groupId: string | null;
+    groupType: "PRAESIDIUM" | "WERKGROEP" | null;
     kiesploegId: string | null;
     kiesploegPostId: string | null;
     onlyLead: boolean;
@@ -89,6 +90,7 @@ const SELECT = {
   sources: {
     select: {
       groupId: true,
+      groupType: true,
       kiesploegId: true,
       kiesploegPostId: true,
       onlyLead: true,
@@ -165,6 +167,11 @@ async function loadMemberships(rows: MailGroupRow[]): Promise<Memberships> {
   const groupIds = [
     ...new Set(rows.flatMap((r) => r.sources.map((s) => s.groupId).filter(isId))),
   ];
+  // "Elke praesidiumpost" en "elke werkgroep": dan hangt de lijst niet aan
+  // vijftien id's die je moet aanvullen zodra er een post bijkomt.
+  const groupTypes = [
+    ...new Set(rows.flatMap((r) => r.sources.map((s) => s.groupType).filter(isKind))),
+  ];
   const kiesploegIds = [
     ...new Set(rows.flatMap((r) => r.sources.map((s) => s.kiesploegId).filter(isId))),
   ];
@@ -173,12 +180,17 @@ async function loadMemberships(rows: MailGroupRow[]): Promise<Memberships> {
   ];
 
   const [posts, kiesploeg] = await Promise.all([
-    groupIds.length === 0
+    groupIds.length === 0 && groupTypes.length === 0
       ? []
       : prisma.groupMembership.findMany({
           where: {
             year: currentWorkingYear(),
-            groupId: { in: groupIds },
+            OR: [
+              ...(groupIds.length ? [{ groupId: { in: groupIds } }] : []),
+              ...(groupTypes.length
+                ? [{ group: { type: { in: groupTypes }, active: true } }]
+                : []),
+            ],
             // Een gedeactiveerd of gewist account hoort in geen enkele lijst
             // meer, ook niet wanneer het lidmaatschap van dit jaar nog bestaat.
             user: { active: true, deletedAt: null },
@@ -186,6 +198,7 @@ async function loadMemberships(rows: MailGroupRow[]): Promise<Memberships> {
           select: {
             groupId: true,
             role: true,
+            group: { select: { type: true } },
             user: { select: { id: true, name: true, googleEmail: true } },
           },
         }),
@@ -206,7 +219,12 @@ async function loadMemberships(rows: MailGroupRow[]): Promise<Memberships> {
   ]);
 
   return {
-    posts: posts.map((m) => ({ groupId: m.groupId, role: m.role, user: m.user })),
+    posts: posts.map((m) => ({
+      groupId: m.groupId,
+      groupType: m.group.type,
+      role: m.role,
+      user: m.user,
+    })),
     kiesploeg: kiesploeg.map((m) => ({
       kiesploegId: m.kiesploegId,
       postId: m.postId,
@@ -217,6 +235,10 @@ async function loadMemberships(rows: MailGroupRow[]): Promise<Memberships> {
 }
 
 function isId(value: string | null): value is string {
+  return value !== null;
+}
+
+function isKind(value: "PRAESIDIUM" | "WERKGROEP" | null): value is "PRAESIDIUM" | "WERKGROEP" {
   return value !== null;
 }
 
@@ -436,7 +458,17 @@ export async function reconcileAccountStates(cfg: GoogleConfig): Promise<Account
  * toevoegt op een round-trip naar Google.
  */
 export async function pushMailGroupsForGroup(groupId: string): Promise<void> {
-  await pushFor({ sources: { some: { groupId } } });
+  const group = await prisma.group
+    .findUnique({ where: { id: groupId }, select: { type: true } })
+    .catch(() => null);
+  // Ook de lijsten die "elke praesidiumpost" als bron hebben: die veranderen
+  // mee wanneer er in één post iemand bijkomt.
+  await pushFor({
+    OR: [
+      { sources: { some: { groupId } } },
+      ...(group ? [{ sources: { some: { groupType: group.type } } }] : []),
+    ],
+  });
 }
 
 /** Idem, na een wijziging aan een kiesploeg of aan een van haar posten. */

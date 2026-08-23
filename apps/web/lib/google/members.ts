@@ -9,9 +9,13 @@
  * Geen `server-only`: deze module raakt niets aan wat serverbelast is.
  */
 
+export type GroupKind = "PRAESIDIUM" | "WERKGROEP";
+
 export type MailGroupSourceRow = {
-  /** Precies één van de drie is ingevuld; zie het schema. */
+  /** Precies één van de vier is ingevuld; zie het schema. */
   groupId?: string | null;
+  /** Elke actieve groep van dit soort, bv. elke praesidiumpost. */
+  groupType?: GroupKind | null;
   kiesploegId?: string | null;
   kiesploegPostId?: string | null;
   /** Enkel de verantwoordelijke van die post i.p.v. elk lid. */
@@ -23,6 +27,8 @@ export type MemberUser = { id: string; name: string; googleEmail: string | null 
 /** Lidmaatschap van een post of werkgroep, huidig werkingsjaar. */
 export type MembershipRow = {
   groupId: string;
+  /** Nodig voor een bron die "elke praesidiumpost" zegt. */
+  groupType: GroupKind;
   role: "MEMBER" | "LEAD";
   user: MemberUser;
 };
@@ -64,11 +70,18 @@ export function desiredMembers(input: {
   // bron kan twee keer staan (één keer volledig, één keer enkel de
   // verantwoordelijke); dan wint de ruimste, anders zou de tweede rij de eerste
   // stiekem beperken.
-  const wantAll = { group: new Set<string>(), kiesploeg: new Set<string>(), post: new Set<string>() };
-  const wantLead = { group: new Set<string>(), kiesploeg: new Set<string>(), post: new Set<string>() };
+  const empty = () => ({
+    group: new Set<string>(),
+    type: new Set<GroupKind>(),
+    kiesploeg: new Set<string>(),
+    post: new Set<string>(),
+  });
+  const wantAll = empty();
+  const wantLead = empty();
   for (const source of input.sources) {
     const target = source.onlyLead ? wantLead : wantAll;
     if (source.groupId) target.group.add(source.groupId);
+    if (source.groupType) target.type.add(source.groupType);
     if (source.kiesploegId) target.kiesploeg.add(source.kiesploegId);
     if (source.kiesploegPostId) target.post.add(source.kiesploegPostId);
   }
@@ -85,7 +98,9 @@ export function desiredMembers(input: {
   for (const membership of input.memberships) {
     const included =
       wantAll.group.has(membership.groupId) ||
-      (wantLead.group.has(membership.groupId) && membership.role === "LEAD");
+      wantAll.type.has(membership.groupType) ||
+      ((wantLead.group.has(membership.groupId) || wantLead.type.has(membership.groupType)) &&
+        membership.role === "LEAD");
     if (included) take(membership.user);
   }
 

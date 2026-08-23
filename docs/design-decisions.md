@@ -1076,6 +1076,37 @@ dat het nooit antwoord kreeg. "Wie mag posten" en "externe leden toegelaten"
 zitten in de **Groups Settings API**, een aparte API van Directory, en worden
 door de sync expliciet gezet in plaats van aan de default overgelaten.
 
+### Gedeelde drives volgen de groepen, niet de mensen
+
+Wie in het praesidium of in een kiesploeg komt, hoort ook bij de gedeelde drive
+te kunnen (`Praesidium`, `Kiesploegen`). Daar is **geen Drive-koppeling** voor
+gebouwd, en dat is een bewuste keuze: een gedeelde drive kan een **Google-groep**
+als lid hebben, en die groepen beheren we al.
+
+Zet de groep één keer met de hand op de drive, en de toegang volgt vanaf dan
+precies dezelfde regel als het mailadres. Iemand toevoegen aan een post geeft
+hem in één beweging de mailinglijst en de drive; iemand die de post verlaat,
+verliest allebei. De drives van VTK staan trouwens al zo ingesteld (`Praesidium`
+toont "3 groepen", `Kiesploegen` "1 groep").
+
+- **Daarom bestaat het brontype "elke praesidiumpost".** `praesidium@vtk.be` is
+  niet vijftien bronrijen die je moet aanvullen zodra er een post bijkomt, maar
+  één regel. Hetzelfde voor "elke werkgroep".
+- **We nemen de Drive-scope niet.** Die is breed, en wat ze zou opleveren is het
+  automatiseren van een handeling die je per drive één keer doet. Dat is de
+  verkeerde ruil.
+- **Val: een los adres in zo'n groep krijgt óók drive-toegang.** Een oud-lid dat
+  je met zijn privéadres aan `praesidium@vtk.be` toevoegt om mails te blijven
+  krijgen, kan dan bij de bestanden. Wil je dat scheiden, gebruik dan een aparte
+  groep voor de drive (zonder losse adressen) en hang de mailinglijst ergens
+  anders aan.
+- **De toegang volgt niet meteen.** Google cachet groepslidmaatschap voor Drive;
+  reken op minuten tot soms langer. Wie net toegevoegd is en "ik zie niets"
+  zegt, moet gewoon even wachten en opnieuw laden.
+- **Een lid weghalen wist geen bestanden.** In een gedeelde drive is de drive de
+  eigenaar, niet de persoon. Dat is precies waarom de kring gedeelde drives
+  gebruikt en niet iemands "Mijn Drive".
+
 ### Identiteit: het `@vtk.be`-adres staat op de gebruiker
 
 De site kent `jarne.plessers@student.kuleuven.be` (KU Leuven SSO), Google kent

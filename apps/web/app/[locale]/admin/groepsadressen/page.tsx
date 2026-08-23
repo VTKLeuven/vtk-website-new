@@ -53,6 +53,7 @@ export default async function AdminMailGroups({
           select: {
             id: true,
             groupId: true,
+            groupType: true,
             kiesploegId: true,
             kiesploegPostId: true,
             onlyLead: true,
@@ -103,24 +104,43 @@ export default async function AdminMailGroups({
   const sourceGroupIds = [
     ...new Set(allSources.map((src) => src.groupId).filter((id): id is string => id !== null)),
   ];
+  const sourceGroupTypes = [
+    ...new Set(
+      allSources
+        .map((src) => src.groupType)
+        .filter((type): type is "PRAESIDIUM" | "WERKGROEP" => type !== null),
+    ),
+  ];
   const usesKiesploeg = allSources.some((src) => src.kiesploegId || src.kiesploegPostId);
 
-  const memberships: MembershipRow[] = sourceGroupIds.length
-    ? (
-        await prisma.groupMembership.findMany({
-          where: {
-            year,
-            groupId: { in: sourceGroupIds },
-            user: { active: true, deletedAt: null },
-          },
-          select: {
-            groupId: true,
-            role: true,
-            user: { select: { id: true, name: true, googleEmail: true } },
-          },
-        })
-      ).map((m) => ({ groupId: m.groupId, role: m.role, user: m.user }))
-    : [];
+  const memberships: MembershipRow[] =
+    sourceGroupIds.length || sourceGroupTypes.length
+      ? (
+          await prisma.groupMembership.findMany({
+            where: {
+              year,
+              OR: [
+                ...(sourceGroupIds.length ? [{ groupId: { in: sourceGroupIds } }] : []),
+                ...(sourceGroupTypes.length
+                  ? [{ group: { type: { in: sourceGroupTypes }, active: true } }]
+                  : []),
+              ],
+              user: { active: true, deletedAt: null },
+            },
+            select: {
+              groupId: true,
+              role: true,
+              group: { select: { type: true } },
+              user: { select: { id: true, name: true, googleEmail: true } },
+            },
+          })
+        ).map((m) => ({
+          groupId: m.groupId,
+          groupType: m.group.type,
+          role: m.role,
+          user: m.user,
+        }))
+      : [];
 
   const kiesploegMemberships: KiesploegMembershipRow[] = usesKiesploeg
     ? (
@@ -186,6 +206,16 @@ export default async function AdminMailGroups({
   // zodat de action niet hoeft te raden in welke kolom ze hoort.
   const sourceOptions: SourceGroup[] = [
     {
+      label: nl ? "Alles" : "Everything",
+      options: [
+        {
+          value: "type:PRAESIDIUM",
+          label: nl ? "Elke praesidiumpost" : "Every praesidium post",
+        },
+        { value: "type:WERKGROEP", label: nl ? "Elke werkgroep" : "Every work group" },
+      ],
+    },
+    {
       label: nl ? "Posten" : "Posts",
       options: groups
         .filter((g) => g.type === "PRAESIDIUM")
@@ -224,12 +254,15 @@ export default async function AdminMailGroups({
 function sourceName(
   src: {
     group: { nameNl: string; nameEn: string } | null;
+    groupType: "PRAESIDIUM" | "WERKGROEP" | null;
     kiesploeg: { formalName: string } | null;
     kiesploegPost: { name: string; kiesploeg: { formalName: string } } | null;
   },
   nl: boolean,
 ): string {
   if (src.group) return nl ? src.group.nameNl : src.group.nameEn;
+  if (src.groupType === "PRAESIDIUM") return nl ? "Elke praesidiumpost" : "Every praesidium post";
+  if (src.groupType === "WERKGROEP") return nl ? "Elke werkgroep" : "Every work group";
   if (src.kiesploeg) return src.kiesploeg.formalName;
   if (src.kiesploegPost) {
     return `${src.kiesploegPost.name} (${src.kiesploegPost.kiesploeg.formalName})`;

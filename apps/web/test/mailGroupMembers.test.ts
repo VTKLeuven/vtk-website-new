@@ -17,8 +17,9 @@ function member(
   name: string,
   googleEmail: string | null,
   role: "MEMBER" | "LEAD" = "MEMBER",
+  groupType: "PRAESIDIUM" | "WERKGROEP" = "PRAESIDIUM",
 ): MembershipRow {
-  return { groupId, role, user: { id: `u-${name}`, name, googleEmail } };
+  return { groupId, groupType, role, user: { id: `u-${name}`, name, googleEmail } };
 }
 
 const jan = member("activiteiten", "Jan", "jan.peeters@vtk.be");
@@ -212,5 +213,38 @@ describe("desiredMembers met een kiesploeg", () => {
       extras: [],
     });
     expect(result.emails).toEqual(["jan.peeters@vtk.be", "mia@vtk.be"]);
+  });
+});
+
+describe("desiredMembers met een brontype", () => {
+  const revue = member("revue", "Rik", "rik@vtk.be", "MEMBER", "WERKGROEP");
+
+  it("neemt elke praesidiumpost bij een PRAESIDIUM-bron", () => {
+    // Dit is wat praesidium@vtk.be nodig heeft, en meteen ook de sleutel tot de
+    // gedeelde drive: één regel die blijft kloppen als er een post bijkomt.
+    const result = desiredMembers({
+      sources: [{ groupType: "PRAESIDIUM", onlyLead: false }],
+      memberships: [jan, bob, revue],
+      extras: [],
+    });
+    expect(result.emails).toEqual(["bob.mertens@vtk.be", "jan.peeters@vtk.be"]);
+  });
+
+  it("neemt bij onlyLead enkel de verantwoordelijken van elke post", () => {
+    const result = desiredMembers({
+      sources: [{ groupType: "PRAESIDIUM", onlyLead: true }],
+      memberships: [jan, ann],
+      extras: [],
+    });
+    expect(result.emails).toEqual(["ann.desmet@vtk.be"]);
+  });
+
+  it("houdt werkgroepen en posten uit elkaar", () => {
+    const result = desiredMembers({
+      sources: [{ groupType: "WERKGROEP", onlyLead: false }],
+      memberships: [jan, revue],
+      extras: [],
+    });
+    expect(result.emails).toEqual(["rik@vtk.be"]);
   });
 });

@@ -807,11 +807,18 @@ model MailGroup {
 model MailGroupSource {
   id          String  @id @default(cuid())
   mailGroupId String
-  /// Precies één van de drie is ingevuld: een post/werkgroep, een hele
-  /// kiesploeg, of één post binnen een kiesploeg. Bewust drie kolommen en geen
-  /// polymorfe `type` + `id`: zo blijft de foreign key echt, en verdwijnt een
-  /// bron vanzelf wanneer de post of de kiesploeg verdwijnt.
+  /// Precies één van de vier is ingevuld: een post/werkgroep, elke actieve
+  /// groep van een soort, een hele kiesploeg, of één post binnen een kiesploeg.
+  /// Bewust losse kolommen en geen polymorfe `type` + `id`: zo blijft de foreign
+  /// key echt, en verdwijnt een bron vanzelf wanneer de post of de kiesploeg
+  /// verdwijnt.
   groupId         String?
+  /// "Elke actieve praesidiumpost" of "elke actieve werkgroep", in plaats van
+  /// vijftien losse bronrijen. Dat is wat een adres als praesidium@vtk.be nodig
+  /// heeft: één regel die ook nog klopt nadat er een post bijkomt. Datzelfde
+  /// adres is meteen de sleutel tot de gedeelde drive; zie
+  /// docs/design-decisions.md, "Gedeelde drives volgen de groepen".
+  groupType       GroupType?
   kiesploegId     String?
   kiesploegPostId String?
   /// Enkel de verantwoordelijke (`role = LEAD`) i.p.v. elk lid.
@@ -823,6 +830,7 @@ model MailGroupSource {
   kiesploegPost KiesploegPost? @relation(fields: [kiesploegPostId], references: [id], onDelete: Cascade)
 
   @@unique([mailGroupId, groupId, onlyLead])
+  @@unique([mailGroupId, groupType, onlyLead])
   @@unique([mailGroupId, kiesploegId, onlyLead])
   @@unique([mailGroupId, kiesploegPostId, onlyLead])
   @@index([groupId])
