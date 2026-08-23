@@ -492,6 +492,13 @@ model User {
   // mail en de voorkeur voor communicatie komen erbij.
   personalEmail          String?
   emailPreference        EmailPreference  @default(UNIVERSITY)
+  // Het `@vtk.be`-account in Google Workspace. `googleUserId` is het immutable
+  // id van Google: dat blijft kloppen wanneer iemand van naam of adres wisselt.
+  // Op naam matchen doen we bewust nooit (naamgenoten, tussenvoegsels), dus dit
+  // veld is de enige koppeling. Zie docs/design-decisions.md, "Google Workspace".
+  googleUserId           String?          @unique
+  googleEmail            String?          @unique
+  googleLinkedAt         DateTime?
   // Opt-in mailinglijsten: enkel de aangeduide categorieën zitten in de array.
   mailCategories         MailCategory[]   @default([])
   // Herinneringen voor een shift waarvoor je jezelf inschreef. Bewust geen
@@ -652,6 +659,7 @@ model Group {
   uitleenTransport    UitleenTransportBooking[]
   uitleenTemplates    UitleenRequestTemplate[]
   uitleenEventsGroup  UitleenEvent[]
+  mailGroupSources    MailGroupSource[]
 }
 
 model GroupMembership {
@@ -727,6 +735,91 @@ model VaultMember {
   updatedAt   DateTime          @updatedAt
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// -----------------------------------------------------------------------------
+// Google Workspace: de eigen adressen van de kring (activiteiten@vtk.be, ...)
+// -----------------------------------------------------------------------------
+// Bewust iets anders dan de opt-in mailinglijsten van Brevo: dit zijn
+// ontvangende adressen van de vereniging zelf, en je staat erin omdat je in die
+// post zit. Een lijst beschrijft daarom *wie erin hoort* (bronnen + extra's) en
+// niet wie erin zit: de leden worden bij elke sync herberekend uit de posten van
+// het huidige werkingsjaar, waardoor de 15-juli-wissel vanzelf goed loopt.
+// Zie docs/design-decisions.md, "Google Workspace".
+
+model MailGroup {
+  id          String  @id @default(cuid())
+  /// Volledig adres in kleine letters, bv. "activiteiten@vtk.be".
+  email       String  @unique
+  name        String
+  description String?
+
+  /// Immutable groeps-id van Google; leeg tot de eerste geslaagde sync.
+  googleId String?
+
+  /// Uit = wij raken de groep in Google niet meer aan. Ze blijft wel bestaan:
+  /// aan een groepsadres hangt het archief en het staat op affiches en in
+  /// mailhandtekeningen, dus de sync verwijdert nooit een groep.
+  enabled Boolean @default(true)
+
+  /// Mag iemand van buiten vtk.be naar dit adres mailen? Standaard ja, want dat
+  /// is het punt van deze adressen. Met Google's default zou mail van een
+  /// bedrijf naar moderatie of naar de prullenbak gaan.
+  allowExternalSenders Boolean @default(true)
+
+  lastSyncAt      DateTime?
+  lastError       String?
+  /// Aantal leden dat de laatste geslaagde sync in Google zette.
+  lastMemberCount Int       @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  sources MailGroupSource[]
+  extras  MailGroupExtra[]
+
+  @@index([enabled])
+}
+
+/// Een post of werkgroep waarvan de leden van dit werkingsjaar in de lijst
+/// horen. Meerdere bronnen per lijst: `activiteiten@vtk.be` is "post
+/// Activiteiten + post Groep 5". Dat g5 overal in zit, staat hier dus als
+/// zichtbare rij en niet als verstopte regel in de code.
+model MailGroupSource {
+  id          String  @id @default(cuid())
+  mailGroupId String
+  groupId     String
+  /// Enkel de verantwoordelijke (`GroupMembership.role = LEAD`) i.p.v. elk lid.
+  onlyLead    Boolean @default(false)
+
+  mailGroup MailGroup @relation(fields: [mailGroupId], references: [id], onDelete: Cascade)
+  group     Group     @relation(fields: [groupId], references: [id], onDelete: Cascade)
+
+  @@unique([mailGroupId, groupId, onlyLead])
+  @@index([groupId])
+}
+
+/// Waarom een adres los toegevoegd of net weggehouden wordt.
+enum MailGroupExtraKind {
+  /// Hoort er sowieso bij, ook zonder lidmaatschap (een oud-lid, een externe).
+  INCLUDE
+  /// Moet eruit, ook al zit de persoon in een bronpost. De uitzondering die je
+  /// anders elk jaar opnieuw in Google zou moeten najagen.
+  EXCLUDE
+}
+
+model MailGroupExtra {
+  id          String             @id @default(cuid())
+  mailGroupId String
+  /// Kleine letters; een vrij adres, dus niet noodzakelijk van een lid.
+  email       String
+  kind        MailGroupExtraKind @default(INCLUDE)
+  note        String?
+  createdAt   DateTime           @default(now())
+
+  mailGroup MailGroup @relation(fields: [mailGroupId], references: [id], onDelete: Cascade)
+
+  @@unique([mailGroupId, email])
 }
 
 model Permission {

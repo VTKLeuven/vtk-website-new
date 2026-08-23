@@ -74,6 +74,9 @@ export const MCP_PERMISSION_POLICY = {
   "modules.logistiek.access": { reads: ["logistiek_catalog"], creates: [], blocked: ["change module access"] },
   "modules.cursusdienst.access": { reads: ["module_access"], creates: [], blocked: ["change module access"] },
   "oauth.client.edit": { reads: ["oauth_clients"], creates: ["app_create:oauth_client"], blocked: ["enable clients, reveal or rotate secrets, grant access or revoke tokens"] },
+  // Groepsadressen bevatten de mailadressen van elk lid van een post, en de sync
+  // schrijft rechtstreeks in Google. Niets van dit alles gaat via MCP.
+  "mailgroups.manage": { reads: [], creates: [], blocked: ["read or change group addresses, their members or the Google Workspace link"] },
   "vault.editOwn": { reads: ["vault_metadata"], creates: [], blocked: ["read or write passwords"] },
   "vault.manage": { reads: ["vault_metadata"], creates: [], blocked: ["read or write passwords, link posts or synchronize Vaultwarden"] },
   "audit.view": { reads: ["audit_log"], creates: [], blocked: [] },

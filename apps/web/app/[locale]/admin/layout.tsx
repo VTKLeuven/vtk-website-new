@@ -108,6 +108,11 @@ const NAV: NavEntry[] = [
   item('piano', '/piano', { perm: 'piano.manage' }),
   item('fakscanner', '/fakscanner', { perm: 'fakscanner.manage' }),
   item('mailinglists', '/mailinglijsten', { perm: 'mailinglists.export' }),
+  // Twee dingen die allebei "mailinglijst" heten, en bewust naast elkaar staan
+  // zodat wie het ene zoekt het andere ziet: hierboven de opt-in nieuwsbrieven
+  // naar studenten (export + Brevo), hier de eigen adressen van de kring
+  // (activiteiten@vtk.be) die de posten van dit werkingsjaar volgen.
+  item('mailGroups', '/groepsadressen', { perm: 'mailgroups.manage' }),
   // Wachtwoorden staat los van de IT-groep: een postverantwoordelijke beheert de
   // wachtwoorden van zijn eigen post en hoort daarvoor niet in een IT-map te
   // moeten zoeken. Het kluisbeheer zelf (posten koppelen, configuratie) staat wel
