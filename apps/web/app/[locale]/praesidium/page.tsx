@@ -8,7 +8,6 @@ import { getDictionary, pick, type Locale } from "@vtk/i18n";
 import { hasLocale } from "@/lib/locale";
 import { publicUrl } from "@/lib/storage";
 import { currentWorkingYear, formatWorkingYear, splitYearBar } from "@/lib/workingYear";
-import PraesidiumIndex from "./PraesidiumIndex";
 
 /** Aantal jaren dat los in de jaarbalk staat; de rest zit achter "Archief". */
 const YEARS_IN_BAR = 5;
@@ -87,12 +86,6 @@ export default async function PraesidiumPage({
       pick(a.nameNl, a.nameEn, locale).localeCompare(pick(b.nameNl, b.nameEn, locale), locale),
     );
 
-  const indexEntries = withMembers.map((g) => ({
-    slug: g.slug,
-    name: pick(g.nameNl, g.nameEn, locale),
-    count: g.memberships.length,
-  }));
-
   const memberCount = (n: number) =>
     n === 1 ? t.memberCountOne : t.memberCount.replace("{count}", String(n));
 
@@ -110,7 +103,9 @@ export default async function PraesidiumPage({
           </div>
         </div>
       </header>
-      <div className="vtk-page-shell">
+      {/* De jaarbalk staat in een eigen schil zonder onderpadding: haar onderlijn
+          is meteen de naad met de lichtblauwe band eronder. */}
+      <div className="vtk-page-shell vtk-roster-shell">
         <div className="vtk-roster-years">
           <span className="vtk-roster-years-label">{t.year}</span>
           {barYears.map((y) => (
@@ -141,72 +136,85 @@ export default async function PraesidiumPage({
             </details>
           )}
         </div>
-
-        {withMembers.length === 0 ? (
-          <p className="vtk-muted">{t.empty}</p>
-        ) : (
-          <div className="vtk-roster">
-            <PraesidiumIndex entries={indexEntries} title={t.posts} toggleLabel={t.jumpToPost} />
-            <div>
-              {withMembers.map((group) => {
-                const sorted = [...group.memberships].sort((a, b) => {
-                  // Groepscoördinator (LEAD) eerst, dan de door de import/beheer
-                  // ingestelde displayOrder, dan alfabetisch op naam.
-                  if (a.role !== b.role) return a.role === "LEAD" ? -1 : 1;
-                  if (a.displayOrder !== b.displayOrder) return a.displayOrder - b.displayOrder;
-                  return a.user.name.localeCompare(b.user.name, locale);
-                });
-                return (
-                  <section key={group.id} id={`post-${group.slug}`} className="vtk-roster-post">
-                    <div className="vtk-roster-post-head">
-                      <h2>{pick(group.nameNl, group.nameEn, locale)}</h2>
-                      <span className="vtk-roster-post-rule" aria-hidden />
-                      <span className="vtk-roster-post-count">{memberCount(sorted.length)}</span>
-                    </div>
-                    <ul className="vtk-roster-grid">
-                      {sorted.map((m) => {
-                        const src = publicUrl(m.user.avatarKey);
-                        const isCoordinator = m.role === "LEAD";
-                        // Titel (bv. Praeses) en het groepscoördinator-schap staan los
-                        // van elkaar: iemand kan allebei zijn. De titel staat onder de
-                        // naam, het coördinatorschap is de gele vlag op de foto.
-                        const title = pick(m.titleNl ?? "", m.titleEn ?? "", locale);
-                        return (
-                          <li
-                            key={m.id}
-                            className={"vtk-roster-cell" + (isCoordinator ? " is-lead" : "")}
-                          >
-                            <div className="vtk-roster-photo">
-                              {src ? (
-                                // De tegel is ongeveer 150px breed en vierkant; een
-                                // profielfoto uit storage is dat zelden, dus laat
-                                // next/image ze op maat snijden.
-                                <Image src={src} alt={m.user.name} width={160} height={160} />
-                              ) : (
-                                <div className="vtk-roster-initial" aria-hidden>
-                                  {m.user.name.slice(0, 1).toUpperCase()}
-                                </div>
-                              )}
-                              {/* Kort op de vlag: "Groepscoördinator" is breder dan
-                                  een tegel en zou onder `overflow: hidden` afgesneden
-                                  worden. */}
-                              {isCoordinator && (
-                                <span className="vtk-roster-flag">{t.coordinatorShort}</span>
-                              )}
-                            </div>
-                            <div className="vtk-roster-name">{m.user.name}</div>
-                            {title && <div className="vtk-roster-title">{title}</div>}
-                          </li>
-                        );
-                      })}
-                    </ul>
-                  </section>
-                );
-              })}
-            </div>
-          </div>
-        )}
       </div>
+
+      {withMembers.length === 0 ? (
+        <div className="vtk-page-shell">
+          <p className="vtk-muted">{t.empty}</p>
+        </div>
+      ) : (
+        <section className="vtk-wall">
+          <div className="vtk-wall-inner">
+            {/* Gewone ankers en geen <Link>: dit springt binnen dezelfde pagina,
+                daar hoeft geen navigatie voor te gebeuren. */}
+            <nav className="vtk-wall-jump" aria-label={t.posts}>
+              <span className="vtk-wall-jump-label">{t.posts}</span>
+              {withMembers.map((group) => (
+                <a key={group.id} href={`#post-${group.slug}`}>
+                  {pick(group.nameNl, group.nameEn, locale)}
+                </a>
+              ))}
+            </nav>
+
+            {withMembers.map((group) => {
+              const sorted = [...group.memberships].sort((a, b) => {
+                // Groepscoördinator (LEAD) eerst, dan de door de import/beheer
+                // ingestelde displayOrder, dan alfabetisch op naam.
+                if (a.role !== b.role) return a.role === "LEAD" ? -1 : 1;
+                if (a.displayOrder !== b.displayOrder) return a.displayOrder - b.displayOrder;
+                return a.user.name.localeCompare(b.user.name, locale);
+              });
+              return (
+                <div key={group.id} id={`post-${group.slug}`} className="vtk-wall-row">
+                  <div className="vtk-wall-label">
+                    <div className="vtk-wall-label-inner">
+                      <h2>{pick(group.nameNl, group.nameEn, locale)}</h2>
+                      <p>{memberCount(sorted.length)}</p>
+                    </div>
+                  </div>
+                  <ul className="vtk-wall-faces">
+                    {sorted.map((m) => {
+                      const src = publicUrl(m.user.avatarKey);
+                      const isCoordinator = m.role === "LEAD";
+                      // Titel (bv. Praeses) en het groepscoördinator-schap staan los
+                      // van elkaar: iemand kan allebei zijn. De titel staat onder de
+                      // naam, het coördinatorschap is de gele vlag op de foto.
+                      const title = pick(m.titleNl ?? "", m.titleEn ?? "", locale);
+                      return (
+                        <li
+                          key={m.id}
+                          className={"vtk-roster-cell" + (isCoordinator ? " is-lead" : "")}
+                        >
+                          <div className={"vtk-roster-photo" + (src ? "" : " is-blank")}>
+                            {src ? (
+                              // De tegel is hoogstens ongeveer 170px breed en
+                              // vierkant; een profielfoto uit storage is dat zelden,
+                              // dus laat next/image ze op maat snijden.
+                              <Image src={src} alt={m.user.name} width={192} height={192} />
+                            ) : (
+                              <div className="vtk-roster-initial" aria-hidden>
+                                {m.user.name.slice(0, 1).toUpperCase()}
+                              </div>
+                            )}
+                            {/* Kort op de vlag: "Groepscoördinator" is breder dan
+                                een tegel en zou onder `overflow: hidden` afgesneden
+                                worden. */}
+                            {isCoordinator && (
+                              <span className="vtk-roster-flag">{t.coordinatorShort}</span>
+                            )}
+                          </div>
+                          <div className="vtk-roster-name">{m.user.name}</div>
+                          {title && <div className="vtk-roster-title">{title}</div>}
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </div>
+              );
+            })}
+          </div>
+        </section>
+      )}
     </div>
   );
 }

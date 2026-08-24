@@ -287,8 +287,8 @@ the design language into the application instead of copying mockup content.
   - The rail is a register in the margin, not a card: a hairline guide down the
     left, muted links with air between them, an uppercase ink label leading the
     list, and a 2px yellow marker on the heading you are reading. `PageOutline`
-    sets `aria-current` from the same scroll-spy pattern as `PraesidiumIndex`
-    (reading line just under the sticky header, rAF-throttled). The white
+    sets `aria-current` from a scroll-spy: a reading line just under the sticky
+    header, measured in a rAF-throttled scroll listener. The white
     `--surface` card that was there was reviewed and removed: it weighed more
     than the handful of short lines inside it and left an empty white block
     beside the text. Downloads keep that treatment and are separated by a rule
@@ -302,6 +302,19 @@ the design language into the application instead of copying mockup content.
   `.vtk-card` grid: most pages have no excerpt, so a title-only card grid says
   almost nothing. See `docs/design-decisions.md` for why the list won over a
   photo header and a full photo card.
+- Praesidium (`/praesidium`): a wall of faces, not a contact sheet. One
+  full-bleed `--paper-2` band (`.vtk-wall`) carries every post below one another;
+  per post the name sits in the left margin and sticks there while you scroll
+  its members (`.vtk-wall-label-inner`), and the portraits carry themselves on
+  the band with a soft shadow instead of a hairline card. Above the band the
+  posts are jump chips (`.vtk-wall-jump`) with the "Posten" label on its own line
+  above them, which is what buys the fourteen chips a single row on a laptop; the
+  margin is thin, so a year with more or longer post names wraps, and it wraps
+  greedily on purpose. Do not put `text-wrap: balance` on that row: two half-full
+  lines were reviewed and read as messier than one full line with a remainder.
+  The sticky rail beside the roster that was there was reviewed and removed. Do
+  not reintroduce a card or border around a portrait: only the tile without a
+  photo gets an outline, or the initial floats loose on the band.
 - Lists and calendars: favor agenda/list layouts, tabular times, compact day
   labels, and small yellow status pins.
 - Functional pages and modules, including Media and Logistiek, use the same

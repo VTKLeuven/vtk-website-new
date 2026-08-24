@@ -72,8 +72,7 @@
     "year": "Jaar",
     "archiveTo": "Archief tot {year}",
     "memberCount": "{count} leden",
-    "memberCountOne": "1 lid",
-    "jumpToPost": "Ga naar post"
+    "memberCountOne": "1 lid"
   },
   "werkgroepen": {
     "kicker": "VTK · Werkgroepen",

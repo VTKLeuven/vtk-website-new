@@ -936,6 +936,27 @@ bijgewerkt. De Brevo-sync (`apps/web/lib/brevo/`) haalt de tussenpersoon weg.
     `user.active`: afgestudeerde leden wiens account later gedeactiveerd wordt,
     horen in de historiek thuis (mét foto). Tombstones (`deletedAt` na een
     account-verwijdering) worden wél weggelaten.
+  - **De pagina is een gezichtenmuur, geen contactblad.** Alle posten staan onder
+    elkaar op één lichtblauwe band; de postnaam loopt in de linkermarge mee zolang
+    je door haar leden scrolt, en de portretten staan zonder kader op de band.
+    Daarvoor stond er een vaste rail links met alle posten en een raster kleinere
+    foto's per post. Het onderwerp van deze pagina zijn de mensen, en negentig
+    gezichten achter elkaar zeggen wat de kring is; de rail liet de indeling meer
+    plaats innemen dan de mensen zelf. Wat dat kost, is bewust aanvaard: springen
+    naar een post gaat via de chips bovenaan in plaats van via een kolom die altijd
+    in beeld staat, en op een smal scherm valt de meelopende marge weg.
+    - Twee alternatieven zijn afgewogen en niet gekozen: **panelen per post** (twee
+      kolommen witte kaders, halveert de paginalengte maar verkleint de gezichten
+      en breekt de alfabetische leesvolgorde in twee kolommen) en een
+      **doorzoekbaar register** (tabel met naam, post en functie; het bruikbaarst
+      voor twintig jaar historiek, maar dan toont de pagina een databank en geen
+      kring meer). Het register blijft een zinnige aanvulling *naast* de muur, niet
+      in plaats ervan.
+    - Ook afgewogen: **het dagelijks bestuur als donkere band bovenaan**, zodat
+      Groep 5 niet alfabetisch tussen Fakbar en IT staat. Niet gekozen bij de muur,
+      maar het is een losse laag die er later bovenop kan; ze leunt wel op de
+      aanname dat Groep 5 de post met de titels is (in de historiek is dat elk jaar
+      sinds 06-07 zo).
 - **Historiek-import zonder aparte tabel.** De ~20 vorige praesidia worden
   geïmporteerd als **inactieve `User`-rijen** (enkel naam + foto reëel, de rest
   dummy) met per lid `GroupMembership`-rijen (`groupId`, `year`, `role`,
