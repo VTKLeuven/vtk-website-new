@@ -31,12 +31,22 @@ export function fetchHome(locale: AppLocale): Promise<AppHome> {
   return apiFetch<AppHome>(appApi('/home', { locale }));
 }
 
+/**
+ * De kalender. Zonder `van` vertrekt de lijst vanaf nu; de maandweergave geeft
+ * het zichtbare rooster mee, want die toont ook het verleden.
+ */
 export function fetchCalendar(
   locale: AppLocale,
-  options: { categorie?: string; audience?: 'all' } = {},
+  options: { categorie?: string; audience?: 'all'; van?: string; tot?: string } = {},
 ): Promise<AppCalendar> {
   return apiFetch<AppCalendar>(
-    appApi('/kalender', { locale, categorie: options.categorie, audience: options.audience }),
+    appApi('/kalender', {
+      locale,
+      categorie: options.categorie,
+      audience: options.audience,
+      van: options.van,
+      tot: options.tot,
+    }),
   );
 }
 

@@ -77,6 +77,11 @@ vtk-website-new achter een cloudflared-tunnel en vul die URL in bij
 - `src/api/useResource.ts` - het patroon van elk scherm dat gegevens ophaalt:
   cache tonen, ophalen, en het zeggen wanneer die verversing niet lukte.
 - `src/format.ts` - datums, uren en geld, altijd in `Europe/Brussels`.
+- `src/monthGrid.ts` - het maandrooster van de kalender. **Geen kopie van
+  `calendarGrid.ts` op de site**: die rekent met de lokale tijd van de machine,
+  en op een telefoon is dat niet noodzakelijk Brussel. Hier draait alles op
+  datumsleutels (`YYYY-MM-DD`) en op UTC-middag, zodat geen tijdzone en geen
+  zomertijdsprong een dag kan verschuiven.
 - `src/nativeRoute.ts` - vertaalt een pad uit het CMS naar een scherm in de app.
   Het CMS kent de app niet en zet "Piano reserveren" als link naar `/piano`;
   zonder deze tabel zou dat in een browser openen terwijl er een scherm voor

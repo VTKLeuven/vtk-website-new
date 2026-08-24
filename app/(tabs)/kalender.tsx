@@ -1,36 +1,73 @@
 import { useRouter } from 'expo-router';
-import { useState } from 'react';
-import { FlatList, Pressable, RefreshControl, ScrollView, StyleSheet, Text } from 'react-native';
+import { CalendarDays, List } from 'lucide-react-native';
+import { useMemo, useState } from 'react';
+import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { fetchCalendar } from '../../src/api/endpoints';
 import { messageFor, useResource } from '../../src/api/useResource';
 import { EventRow } from '../../src/components/EventRow';
+import { MonthView } from '../../src/components/MonthView';
 import { PageHead } from '../../src/components/PageHead';
 import { Empty, ErrorState, Loading, StaleNotice } from '../../src/components/ui';
+import { formatDay } from '../../src/format';
+import { anchorOf, dayKeyOf, gridRange, todayKey, type MonthAnchor } from '../../src/monthGrid';
+import { getPref, setPref } from '../../src/storage';
 import { useApp } from '../../src/state/app';
 import { COLORS, RADIUS, SPACING, TYPE } from '../../src/theme/tokens';
 
+type Weergave = 'lijst' | 'maand';
+
+const VIEW_KEY = 'kalender-weergave';
+
 /**
- * De kalender: alles wat er de komende tijd te doen is, als lijst.
+ * De kalender, in twee weergaven.
  *
- * Een maandraster zoals op de site zou hier niet werken. Op een telefoon is een
- * dag in zo'n raster een vakje van een halve centimeter; wat je wil weten is
- * "wat komt er nu", en dat is een lijst. De categoriechips bovenaan zijn de
- * filters die op de site links staan.
+ * **Lijst** is wat je meestal wil: wat komt er nu. **Maand** is wat je wil
+ * wanneer je een datum in gedachten hebt ("wanneer was die cantus ook weer") of
+ * wanneer je iets plant en wil zien welke avonden al vol zitten. Dat zijn twee
+ * verschillende vragen, en geen van beide weergaven beantwoordt ze allebei goed.
  *
- * Werkt zonder login. Wie ingelogd is, ziet de evenementen van zijn eigen
- * doelgroepen; dat vertelt het scherm er ook bij, want anders zoekt iemand
- * tevergeefs naar een eerstejaarsactiviteit die er voor hem uitgefilterd is.
+ * De keuze blijft bewaard. Wie de maandweergave verkiest, wil die niet elke keer
+ * opnieuw aanzetten.
+ *
+ * De twee halen ook andere gegevens op: de lijst vraagt alles vanaf nu, de
+ * maandweergave precies het zichtbare rooster, inclusief het verleden. Anders zou
+ * bladeren naar vorige maand een leeg rooster geven.
  */
 export default function KalenderScreen() {
   const router = useRouter();
   const { locale, viewer } = useApp();
+
+  const [view, setViewState] = useState<Weergave>(() =>
+    getPref(VIEW_KEY) === 'maand' ? 'maand' : 'lijst',
+  );
   const [category, setCategory] = useState<string | null>(null);
+  const [anchor, setAnchor] = useState<MonthAnchor>(() => anchorOf(todayKey()));
+  const [selectedDay, setSelectedDay] = useState<string | null>(null);
+
+  const setView = (next: Weergave) => {
+    setPref(VIEW_KEY, next);
+    setViewState(next);
+  };
+
+  const range = view === 'maand' ? gridRange(anchor) : null;
 
   const resource = useResource(
     'kalender',
-    () => fetchCalendar(locale, { categorie: category ?? undefined }),
-    `${locale}:${category ?? ''}`,
+    () =>
+      fetchCalendar(locale, {
+        categorie: category ?? undefined,
+        van: range?.from,
+        tot: range?.to,
+      }),
+    `${locale}:${category ?? ''}:${range ? `${range.from}-${range.to}` : 'nu'}`,
+  );
+
+  const events = useMemo(() => resource.data?.events ?? [], [resource.data]);
+
+  const dayEvents = useMemo(
+    () => (selectedDay ? events.filter((event) => dayKeyOf(event.start) === selectedDay) : []),
+    [events, selectedDay],
   );
 
   if (resource.loading) return <Loading label="Kalender ophalen" />;
@@ -40,11 +77,39 @@ export default function KalenderScreen() {
     );
   }
 
-  const { events, categories, filteredByAudience } = resource.data;
+  const { categories, filteredByAudience } = resource.data;
 
   return (
     <>
-      <PageHead title="Kalender" subtitle="Alles wat er te doen is" />
+      <PageHead
+        title="Kalender"
+        subtitle="Alles wat er te doen is"
+        right={
+          <View style={styles.toggle}>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityState={{ selected: view === 'lijst' }}
+              accessibilityLabel="Lijstweergave"
+              onPress={() => setView('lijst')}
+              style={[styles.toggleButton, view === 'lijst' && styles.toggleActive]}
+            >
+              <List color={view === 'lijst' ? COLORS.ink : COLORS.onDarkMuted} size={17} />
+            </Pressable>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityState={{ selected: view === 'maand' }}
+              accessibilityLabel="Maandweergave"
+              onPress={() => setView('maand')}
+              style={[styles.toggleButton, view === 'maand' && styles.toggleActive]}
+            >
+              <CalendarDays
+                color={view === 'maand' ? COLORS.ink : COLORS.onDarkMuted}
+                size={17}
+              />
+            </Pressable>
+          </View>
+        }
+      />
 
       {categories.length > 0 ? (
         <ScrollView
@@ -67,25 +132,55 @@ export default function KalenderScreen() {
 
       {resource.stale ? <StaleNotice onRetry={() => void resource.refresh()} /> : null}
 
-      <FlatList
-        data={events}
-        keyExtractor={(event) => event.id}
-        contentContainerStyle={styles.list}
+      <ScrollView
         style={styles.root}
+        contentContainerStyle={styles.content}
         refreshControl={
           <RefreshControl
             refreshing={resource.refreshing}
             onRefresh={() => void resource.refresh()}
           />
         }
-        renderItem={({ item }) => (
-          <EventRow
-            event={item}
-            locale={locale}
-            onPress={() => router.push(`/evenement/${item.id}`)}
-          />
-        )}
-        ListEmptyComponent={
+      >
+        {view === 'maand' ? (
+          <>
+            <MonthView
+              anchor={anchor}
+              onAnchorChange={(next) => {
+                setAnchor(next);
+                setSelectedDay(null);
+              }}
+              events={events}
+              locale={locale}
+              selected={selectedDay}
+              onSelect={setSelectedDay}
+            />
+
+            {selectedDay ? (
+              <>
+                <Text style={styles.dayTitle}>
+                  {formatDay(`${selectedDay}T12:00:00.000Z`, locale)}
+                </Text>
+                {dayEvents.length === 0 ? (
+                  <Text style={styles.hint}>Niets gepland op deze dag.</Text>
+                ) : (
+                  dayEvents.map((event) => (
+                    <EventRow
+                      key={event.id}
+                      event={event}
+                      locale={locale}
+                      onPress={() => router.push(`/evenement/${event.id}`)}
+                    />
+                  ))
+                )}
+              </>
+            ) : (
+              <Text style={styles.hint}>
+                Tik een dag aan om te zien wat er die dag te doen is.
+              </Text>
+            )}
+          </>
+        ) : events.length === 0 ? (
           <Empty
             title="Niets gevonden"
             hint={
@@ -95,16 +190,25 @@ export default function KalenderScreen() {
             }
             action={category ? { label: 'Toon alles', onPress: () => setCategory(null) } : undefined}
           />
-        }
-        ListFooterComponent={
-          viewer && filteredByAudience && events.length > 0 ? (
-            <Text style={styles.footer}>
-              Je ziet de evenementen die bij jouw studiejaar horen. Activiteiten voor een andere
-              doelgroep staan er niet tussen.
-            </Text>
-          ) : null
-        }
-      />
+        ) : (
+          <>
+            {events.map((event) => (
+              <EventRow
+                key={event.id}
+                event={event}
+                locale={locale}
+                onPress={() => router.push(`/evenement/${event.id}`)}
+              />
+            ))}
+            {viewer && filteredByAudience ? (
+              <Text style={styles.footer}>
+                Je ziet de evenementen die bij jouw studiejaar horen. Activiteiten voor een andere
+                doelgroep staan er niet tussen.
+              </Text>
+            ) : null}
+          </>
+        )}
+      </ScrollView>
     </>
   );
 }
@@ -133,6 +237,20 @@ function Chip({
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: COLORS.paper },
+  content: { padding: SPACING.lg, gap: SPACING.md, paddingBottom: SPACING.xxl },
+
+  // De schakelaar staat in de donkere paginakop, dus de inactieve kant gebruikt
+  // de gedempte kleur voor een donkere band.
+  toggle: {
+    flexDirection: 'row',
+    gap: 2,
+    backgroundColor: 'rgba(255,255,255,0.10)',
+    borderRadius: RADIUS.pill,
+    padding: 2,
+  },
+  toggleButton: { paddingHorizontal: SPACING.md, paddingVertical: 6, borderRadius: RADIUS.pill },
+  toggleActive: { backgroundColor: COLORS.yellow },
+
   chipBar: {
     flexGrow: 0,
     backgroundColor: COLORS.paper,
@@ -148,10 +266,11 @@ const styles = StyleSheet.create({
     paddingVertical: SPACING.sm,
     backgroundColor: COLORS.surface,
   },
-  // Geel is het accent voor wat actief is, precies zoals bij de filters op de site.
   chipActive: { backgroundColor: COLORS.yellow, borderColor: COLORS.yellow },
   chipLabel: { ...TYPE.small, color: COLORS.body },
   chipLabelActive: { color: COLORS.ink, fontFamily: TYPE.cardTitle.fontFamily },
-  list: { padding: SPACING.lg, gap: SPACING.md, paddingBottom: SPACING.xxl },
+
+  dayTitle: { ...TYPE.sectionTitle, color: COLORS.ink, marginTop: SPACING.sm },
+  hint: { ...TYPE.small, color: COLORS.muted },
   footer: { ...TYPE.small, color: COLORS.muted, paddingTop: SPACING.lg },
 });
