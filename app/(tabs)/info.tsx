@@ -8,6 +8,7 @@ import {
   Search,
   TicketCheck,
   Users,
+  Music,
   UsersRound,
   Wrench,
 } from 'lucide-react-native';
@@ -86,6 +87,11 @@ export default function InfoScreen() {
           icon={<Wrench color={COLORS.navy} size={20} />}
           label="Shiften"
           onPress={() => router.push('/shiften')}
+        />
+        <Shortcut
+          icon={<Music color={COLORS.navy} size={20} />}
+          label="Piano"
+          onPress={() => router.push('/piano')}
         />
         <Shortcut
           icon={<Users color={COLORS.navy} size={20} />}

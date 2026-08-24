@@ -447,9 +447,9 @@ heeft.
 - [x] shiften-, werkgroepen- en POC-scherm
 - [x] `lib/app-api/push.ts`: versturen over Expo, met opruimen van dode tokens
 - [x] `src/push.ts` in de app: toestemming via Profiel, tik opent het juiste scherm
-- [ ] automatische berichten (broodje klaar, shift begint, tickets open)
-- [ ] beheerscherm om met de hand een bericht te sturen
-- [ ] piano reserveren
+- [x] automatische berichten: broodje klaar, en de shift-herinnering bij de mail
+- [x] beheerscherm om met de hand een bericht te sturen (recht `app.push`)
+- [x] piano reserveren
 - [ ] met de hand getest op een toestel
 
 **Bewust niet gebouwd.** Formulieren, lesbezoeken, grocomeet, het
@@ -457,12 +457,27 @@ contactformulier en de accountformulieren blijven op de site. Dat zijn
 formulieren met eigen validatie en soms juridische gevolgen; ze in de app
 nabouwen betekent dezelfde regels op twee plaatsen. De app linkt ernaar.
 
-**Push staat klaar maar stuurt nog niets.** `sendPushToUsers` bestaat en is
-getest; er is nog geen code die hem aanroept. Dat is de volgende stap, en het is
-er bewust een apart: wanneer een bericht gestuurd wordt, is een kringkeuze en
-geen technische.
+**Push verstuurt nu wel.** Wanneer een bericht gerechtvaardigd is, staat als
+kringkeuze in `docs/design-decisions.md` van vtk-website-new, sectie "Wanneer de
+app een pushbericht stuurt". De korte versie: enkel wanneer je iets moet dóén en
+het anders misloopt. Tickets die in verkoop gaan, halen die drempel bewust niet.
 
 | Datum | Commit | Wat |
 |---|---|---|
 | 2026-08-24 | `web: App-API: shiften, werkgroepen, POC's en pushberichten versturen` | Drie leesendpoints plus de verzendlaag voor push, met zeven tests (970 in totaal). |
 | 2026-08-24 | `Shiften, werkgroepen, POC's en pushberichten` | Drie schermen erbij, de pushschakelaar in Profiel, en een tik op een bericht opent het juiste scherm. |
+
+### Fase 5 - Push die verstuurt, en piano
+
+- [x] `lib/app-api/notifications.ts`: broodje klaar + shift-herinnering, met claim
+- [x] `POST /api/app/v1/push/maintenance` voor de worker
+- [x] recht `app.push` + Admin -> Pushberichten
+- [x] `lib/piano-reservations.ts` uit de action; `/api/app/v1/piano` en `/reservatie`
+- [x] pianoscherm in de app
+- [ ] een worker inplannen die de maintenance-route aanroept
+- [ ] met de hand getest op een toestel
+
+| Datum | Commit | Wat |
+|---|---|---|
+| 2026-08-24 | `web: Pushberichten die vanzelf vertrekken, en piano in de app-API` | Broodje-klaar en de shift-herinnering, het beheerscherm, en piano-reservaties uit de action naar `lib/`. Vijf tests op de claim-volgorde (975 in totaal). |
+| 2026-08-24 | `Piano` | Het pianoscherm: een dag is een rij tijdsloten, geel voor wat van jou is, met de naam erbij van wie een uur heeft. |

@@ -80,6 +80,7 @@ export default function RootLayout() {
           <Stack.Screen name="shiften" />
           <Stack.Screen name="werkgroepen" />
           <Stack.Screen name="pocs" />
+          <Stack.Screen name="piano" />
           <Stack.Screen name="inloggen" options={{ presentation: 'modal' }} />
           <Stack.Screen name="poort" options={{ presentation: 'modal' }} />
           <Stack.Screen name="instellingen" options={{ presentation: 'modal' }} />

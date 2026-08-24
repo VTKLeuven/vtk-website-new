@@ -19,6 +19,7 @@ import type {
   AppGroups,
   AppPoc,
   AppShifts,
+  AppPiano,
 } from './contract';
 
 /**
@@ -166,4 +167,18 @@ export function fetchWerkgroepen(locale: AppLocale, year?: number): Promise<AppG
 
 export function fetchPocs(locale: AppLocale): Promise<AppPoc[]> {
   return apiFetch<AppPoc[]>(appApi('/pocs', { locale }));
+}
+
+// ── Piano ───────────────────────────────────────────────────────────────────
+
+export function fetchPiano(locale: AppLocale): Promise<AppPiano> {
+  return apiFetch<AppPiano>(appApi('/piano', { locale }));
+}
+
+export function reservePianoSlot(startsAt: string): Promise<{ startsAt: string; endsAt: string }> {
+  return apiFetch(appApi('/piano/reservatie'), { method: 'POST', body: { startsAt } });
+}
+
+export function cancelPianoSlot(id: string): Promise<{ ok: true }> {
+  return apiFetch(appApi('/piano/reservatie'), { method: 'DELETE', body: { id } });
 }
