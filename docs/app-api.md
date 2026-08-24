@@ -91,6 +91,52 @@ en die niet via een OTA-update bijgezet kan worden. Kwam dit pas later, dan had
 iedereen op dat moment een nieuwe build nodig. Opruimen gebeurt straks bij het
 verzenden, wanneer Expo een token als `DeviceNotRegistered` afkeurt.
 
+### `GET /api/app/v1/home`, `/kalender`, `/kalender/[id]`
+
+De homepage-inhoud, de agenda en één evenement. Alle drie bovenop de helpers die
+de site zelf gebruikt (`readOpeningHoursSetting`, `getCursusdienstHours`,
+`readBarStatus`, `resolveFrontpage`, `loadCalendarEvent`), zodat de openingsuren
+en de doelgroepfilter niet twee keer berekend worden.
+
+De kalender filtert op `end >= nu` en niet op `start`: anders verdwijnt een
+festival op zijn tweede dag. Zonder categorie geldt de doelgroepfilter; met een
+categorie niet, want wie om de eerstejaarskalender vraagt, wil ze zien.
+
+### `GET /api/app/v1/theokot` en `POST`/`DELETE /api/app/v1/theokot/order`
+
+Broodjes bij het Theokot. **De logica staat in `lib/theokot-orders.ts` en wordt
+gedeeld met de server-actions van de website**; deze routes vertalen alleen een
+`TheokotOrderError` naar een code die de app kent. Zie de vierde regel hierboven:
+de app mag hier niet soepeler zijn dan de site, en bans, bestelvensters en
+voorraad zijn precies waar dat zou mislopen.
+
+Annuleren is `DELETE` met het order-id in de **body** en niet in het pad: een id
+in een URL komt in server- en proxylogs terecht. "Bestaat niet" en "niet van jou"
+geven hetzelfde antwoord.
+
+### `GET /api/app/v1/tickets` en `/tickets/[slug]`
+
+De ticketverkoop, uit dezelfde `listPublishedTicketEvents` /
+`getPublishedTicketEventBySlug` als de webshop. De lijst draagt geen tickettypes;
+die zijn pas op het detailscherm nodig.
+
+**Afrekenen heeft geen eigen app-route.** De app post rechtstreeks naar het
+bestaande `POST /api/tickets/checkout` en opent de `checkoutUrl` die daaruit komt
+(Mollie, of de bestelpagina bij een gratis ticket) in een browser. Een wrapper
+zou hier niets doen dan doorgeven, en de bestaande route zet bovendien het
+order-toegangscookie dat de app daarna nodig heeft om
+`/api/tickets/orders/[orderId]/status` te mogen lezen. Dat cookie deelt `fetch`
+in React Native met de browser, dus dat werkt vanzelf.
+
+### `GET /api/app/v1/mijn/tickets` en `/mijn/profiel`
+
+Onder `/mijn/` en niet onder `/tickets/mijn`, zodat het nooit botst met een event
+met de slug "mijn".
+
+Een ticket draagt zijn `credential`: de **inhoud** van de QR-code, niet een
+afbeelding. De app tekent de code zelf. Dat scheelt een rondje, en belangrijker:
+een getekende QR werkt ook wanneer er net aan de ingang geen netwerk is.
+
 ## `APP_MINIMUM_VERSION`
 
 Optionele omgevingsvariabele, `major.minor.patch`. Staat een geïnstalleerde app
