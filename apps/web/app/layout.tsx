@@ -90,6 +90,10 @@ export default async function RootLayout({ children }: { children: React.ReactNo
     <html
       lang={HTML_LANG[locale]}
       className={`${geistSans.variable} ${geistMono.variable} ${vtkSans.variable} ${vtkSerif.variable} h-full antialiased`}
+      // Tijdelijk (branch test/hero-massief-paneel): het bootscript van de
+      // testknop zet `data-hero-panel` op <html> voor React hydrateert, wat
+      // anders een hydration-waarschuwing geeft. Weg samen met de test.
+      suppressHydrationWarning
     >
       <body className="min-h-full flex flex-col bg-vtk-surface text-vtk-ink antialiased selection:bg-vtk-yellow/40 selection:text-vtk-ink">
         {sentryDsn && (
