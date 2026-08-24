@@ -175,3 +175,230 @@ export const APP_PUSH_TOKEN_PATTERN = /^Expo(nent)?PushToken\[[^\]]+\]$/;
 export function isAppPushToken(value: string): boolean {
   return APP_PUSH_TOKEN_PATTERN.test(value.trim());
 }
+
+// -----------------------------------------------------------------------------
+// Theokot: broodjes bestellen
+// -----------------------------------------------------------------------------
+
+/**
+ * Waar het bestelvenster van een verkoopdag staat. `UPCOMING` is "opent nog",
+ * `CLOSED` is "deadline voorbij"; die twee zien er in de app anders uit, want
+ * bij het eerste kan je terugkomen en bij het tweede niet.
+ */
+export type AppTheokotWindow = "UPCOMING" | "OPEN" | "CLOSED";
+
+export type AppTheokotItem = {
+  id: string;
+  name: string;
+  priceCents: number;
+  /** Wat er nu nog van is, met de gereserveerde stukken er al af. */
+  remaining: number;
+  isWeeklySpecial: boolean;
+  imageUrl: string | null;
+  ingredients: string | null;
+};
+
+export type AppTheokotOrderLine = {
+  name: string;
+  quantity: number;
+  unitPriceCents: number;
+};
+
+export type AppTheokotOrder = {
+  orderId: string;
+  status: string;
+  totalCents: number;
+  canCancel: boolean;
+  lines: AppTheokotOrderLine[];
+};
+
+export type AppTheokotSession = {
+  id: string;
+  /** ISO-tijdstippen; de app maakt er zelf leesbare tijden van. */
+  date: string;
+  pickupStart: string;
+  pickupEnd: string;
+  orderOpenAt: string;
+  orderCloseAt: string;
+  window: AppTheokotWindow;
+  canOrder: boolean;
+  weeklySpecialName: string | null;
+  items: AppTheokotItem[];
+  /** Jouw bestelling voor deze dag, of `null`. Eén per dag. */
+  order: AppTheokotOrder | null;
+};
+
+export type AppTheokotBan = {
+  /** ISO. Tot dan kan je niet bestellen. */
+  until: string;
+};
+
+export type AppTheokot = {
+  sessions: AppTheokotSession[];
+  /** Bericht van de Theokot-ploeg, Markdown. Leeg wanneer er niets staat. */
+  message: string;
+  maxItemsPerOrder: number;
+  maxWeeklySpecialPerOrder: number;
+  ban: AppTheokotBan | null;
+};
+
+export type AppTheokotOrderInput = {
+  sessionId: string;
+  lines: { sessionItemId: string; quantity: number }[];
+};
+
+/**
+ * De weigeringen die de app zelf een zin bij maakt. Gelijk aan
+ * `TheokotOrderErrorCode` in `lib/theokot-orders.ts`; die lijst is het origineel.
+ * `INVALID_ORDER` komt van de lijncontrole en draagt de details mee in `fields`.
+ */
+export type AppTheokotErrorCode =
+  | "BANNED"
+  | "SESSION_NOT_FOUND"
+  | "ORDER_CLOSED"
+  | "ALREADY_ORDERED"
+  | "ORDER_NOT_FOUND"
+  | "NOT_CANCELABLE"
+  | "CANCEL_DEADLINE_PASSED"
+  | "INVALID_ORDER";
+
+// -----------------------------------------------------------------------------
+// Kalender
+// -----------------------------------------------------------------------------
+
+export type AppCalendarCategory = {
+  slug: string;
+  name: string;
+  colour: string | null;
+  /** Gezet = deze categorie hoort bij een doelgroep (eerstejaars, internationals). */
+  audience: string | null;
+};
+
+export type AppCalendarEvent = {
+  id: string;
+  title: string;
+  /** ISO. `allDay` bepaalt of de app een uur toont of enkel de dag. */
+  start: string;
+  end: string;
+  allDay: boolean;
+  location: string | null;
+  imageUrl: string | null;
+  groupName: string;
+  groupSlug: string;
+  categories: AppCalendarCategory[];
+};
+
+export type AppCalendarEventDetail = AppCalendarEvent & {
+  /** Markdown, net als op de site. */
+  description: string | null;
+  /** Externe link bij het evenement, indien ingevuld. */
+  url: string | null;
+  /** Slug van het ticketevent wanneer er tickets voor te koop staan. */
+  ticketSlug: string | null;
+  /** Slug van het inschrijvingsformulier wanneer dat openstaat. */
+  formSlug: string | null;
+};
+
+export type AppCalendar = {
+  events: AppCalendarEvent[];
+  categories: AppCalendarCategory[];
+  /**
+   * Of de doelgroepfilter meegespeeld heeft. De app zegt het erbij, zodat
+   * iemand die zijn eigen evenement mist, weet waar het aan ligt.
+   */
+  filteredByAudience: boolean;
+};
+
+// -----------------------------------------------------------------------------
+// Home
+// -----------------------------------------------------------------------------
+
+export type AppOpeningHoursEntry = {
+  day: string;
+  /** De uren zoals de beheerder ze intikte, of "Gesloten"/"Closed". */
+  hours: string;
+};
+
+export type AppOpeningHours = {
+  /** De naam van de dienst zelf ("Theokot"), zonder "Openingsuren" ervoor. */
+  name: string;
+  entries: AppOpeningHoursEntry[];
+  /** De regel van vandaag, of `null` op een dag die niet in het rooster staat. */
+  today: AppOpeningHoursEntry | null;
+  /** Of het op dit moment open is volgens het rooster. */
+  openNow: boolean;
+  note: string;
+  /**
+   * De cursusdienst-uren komen live van cudi.vtk.be. Lukt dat niet, dan staat dit
+   * op `true` en toont de app "niet beschikbaar" in plaats van een leeg rooster.
+   */
+  unavailable: boolean;
+};
+
+/**
+ * De live geluidsstatus van 't ElixIr. `null` wanneer er nooit gemeten is; dan
+ * geldt enkel het uurrooster. `stale` betekent dat de meting te oud is: dan
+ * zeggen we niet dat de bar open is, want een verouderde "open" is erger dan
+ * geen antwoord.
+ */
+export type AppBarStatus = {
+  isOpen: boolean;
+  decibels: number | null;
+  lastUpdated: string;
+  stale: boolean;
+};
+
+export type AppAftermovie = {
+  id: string;
+  title: string;
+  /** Waar de video staat (YouTube, Vimeo). De app opent die in de browser. */
+  externalUrl: string;
+  posterUrl: string | null;
+};
+
+export type AppCareer = {
+  title: string;
+  body: string;
+  ctaLabel: string | null;
+  ctaUrl: string | null;
+};
+
+export type AppPocPerson = {
+  name: string;
+  role: string | null;
+  avatarUrl: string | null;
+};
+
+export type AppPoc = {
+  id: string;
+  name: string;
+  email: string | null;
+  people: AppPocPerson[];
+};
+
+export type AppPartner = {
+  id: string;
+  name: string;
+  logoUrl: string | null;
+  url: string | null;
+};
+
+export type AppHome = {
+  /** De foto van de hero, beheerd via de voorpagina-instellingen. */
+  heroPhotoUrl: string | null;
+  openingHours: {
+    theokot: AppOpeningHours;
+    cursusdienst: AppOpeningHours;
+    elixir: AppOpeningHours;
+  };
+  barStatus: AppBarStatus | null;
+  upcomingEvents: AppCalendarEvent[];
+  aftermovies: AppAftermovie[];
+  career: AppCareer | null;
+  /**
+   * De POC's van jouw studierichtingen. Leeg voor wie niet ingelogd is of geen
+   * richting heeft: een lijst van alle POC's is hier niet wat gevraagd wordt.
+   */
+  pocs: AppPoc[];
+  partners: AppPartner[];
+};

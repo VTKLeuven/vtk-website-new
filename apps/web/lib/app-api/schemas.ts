@@ -28,3 +28,27 @@ export const appPushRegisterSchema = z.object({
 });
 
 export const appPushUnregisterSchema = z.object({ token: appPushTokenSchema });
+
+/**
+ * Een bestelling bij het Theokot.
+ *
+ * De grenzen hier zijn ruw en dienen enkel om onzin tegen te houden voor het de
+ * database raakt; de echte regels (hoeveel per bestelling, hoeveel broodjes van
+ * de week, wat er nog in voorraad is) staan in `validateOrderLines` en in de
+ * transactie van `placeOrder`. Die twee mogen niet uit elkaar lopen, dus wordt
+ * hier bewust niets van overgeschreven.
+ */
+export const appTheokotOrderSchema = z.object({
+  sessionId: z.string().min(1).max(64),
+  lines: z
+    .array(
+      z.object({
+        sessionItemId: z.string().min(1).max(64),
+        quantity: z.number().int().min(0).max(99),
+      }),
+    )
+    .min(1)
+    .max(50),
+});
+
+export const appTheokotCancelSchema = z.object({ orderId: z.string().min(1).max(64) });

@@ -1,14 +1,12 @@
 import type { Metadata } from "next";
 import { staticMetadata } from "@/lib/pageMetadata";
-import { prisma } from "@vtk/db";
 import { notFound } from "next/navigation";
 import { hasLocale } from "@/lib/locale";
 import { requireSession } from "@/lib/session";
 import { pick, type Locale } from "@vtk/i18n";
 import { PleaseLogin } from "@/components/site/pleaseLogin";
 import { canCancel, canOrderNow } from "@/lib/theokot";
-import { activeBanFor, getTheokotConfig } from "@/lib/theokot-server";
-import { usageForSessionItems } from "@/lib/meetings-server";
+import { loadOrderableSessions, remainingFor } from "@/lib/theokot-orders";
 import { publicUrl } from "@/lib/storage";
 import { TheokotOrderClient, type OrderSession, type OrderMessage } from "./TheokotOrderClient";
 
@@ -40,27 +38,10 @@ export default async function TheokotOrderPage({ params }: { params: Promise<{ l
 
   const userId = session.user.id;
   const now = new Date();
-  const config = await getTheokotConfig();
 
-  const [ban, sessions, messageRow] = await Promise.all([
-    activeBanFor(userId, now),
-    prisma.theokotSession.findMany({
-      where: { isOpen: true, pickupEnd: { gte: now } },
-      orderBy: { date: "asc" },
-      include: {
-        items: { orderBy: { order: "asc" } },
-        orders: {
-          where: { userId },
-          include: { lines: { include: { sessionItem: { select: { nameNl: true, nameEn: true } } } } },
-        },
-      },
-    }),
-    prisma.setting.findUnique({ where: { key: "theokot.orderMessage" } }),
-  ]);
-
-  // Reeds weg per sessie-item: bestellingen van studenten plus de broodjes die
-  // voor een grocomeet of bureau opzijgezet zijn.
-  const usedMap = await usageForSessionItems(sessions.flatMap((s) => s.items.map((i) => i.id)));
+  // Zelfde lezing als de VTK-app doet (`/api/app/v1/theokot`), zodat het aanbod,
+  // de voorraad en de ban niet op twee plaatsen berekend worden.
+  const { config, ban, sessions, used, message: msgValue } = await loadOrderableSessions(userId, now);
 
   const dayFmt = new Intl.DateTimeFormat(nl ? "nl-BE" : "en-GB", {
     timeZone: "Europe/Brussels",
@@ -93,7 +74,7 @@ export default async function TheokotOrderPage({ params }: { params: Promise<{ l
         id: i.id,
         name: pick(i.nameNl, i.nameEn, locale) ?? i.nameNl,
         priceCents: i.priceCents,
-        remaining: Math.max(0, i.quantity - (usedMap.get(i.id) ?? 0)),
+        remaining: remainingFor(i, used),
         isWeeklySpecial: i.isWeeklySpecial,
         imageUrl: publicUrl(i.imageKey),
         // Beide talen leeg = geen ingrediënten, dus ook geen info-icoontje.
@@ -115,7 +96,6 @@ export default async function TheokotOrderPage({ params }: { params: Promise<{ l
     };
   });
 
-  const msgValue = messageRow?.value as { bodyNl?: string; bodyEn?: string } | undefined;
   const message: OrderMessage = {
     body: (pick(msgValue?.bodyNl ?? "", msgValue?.bodyEn ?? "", locale) ?? "").trim(),
   };
