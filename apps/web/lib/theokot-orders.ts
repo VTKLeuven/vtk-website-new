@@ -62,17 +62,29 @@ export class TheokotOrderError extends Error {
  * De caches die op een bestelling reageren.
  *
  * Zowel de action als de app-route roept dit: bestelt iemand in de app, dan hoort
- * de website dat meteen te tonen. Dat was de val die hier makkelijk in te lopen
- * was, want zonder deze regel klopt de turflijst pas na de volgende revalidatie.
+ * de website dat meteen te tonen.
+ *
+ * **Deze lijst is bewust identiek aan `revalidateTheokot()` in
+ * `app/actions/theokot.ts`** en niet de kortere lijst die je bij een bestelling
+ * zou verwachten. Grocomeet en bureau putten uit dezelfde voorraad in een andere
+ * doos: een studentenbestelling verandert wat een vergadering nog kan nemen. En
+ * de homepage draagt de openingsuren met de voorraadstand erin. Kort je deze
+ * lijst in, dan blijven die schermen achter zonder dat iemand het merkt.
  */
 export function revalidateTheokotOrders(): void {
-  revalidatePath("/theokot");
-  revalidatePath("/en/theokot");
-  revalidatePath("/theokot/balie");
   revalidatePath("/admin/theokot");
+  revalidatePath("/grocomeet");
+  revalidatePath("/en/grocomeet");
+  revalidatePath("/admin/grocomeet");
+  revalidatePath("/admin/bureau");
   revalidatePath("/admin/theokot/turflijst");
   revalidatePath("/admin/theokot/afhalen");
   revalidatePath("/en/admin/theokot/afhalen");
+  revalidatePath("/theokot");
+  revalidatePath("/en/theokot");
+  revalidatePath("/theokot/balie");
+  revalidatePath("/en/theokot/balie");
+  revalidatePath("/");
 }
 
 // -----------------------------------------------------------------------------

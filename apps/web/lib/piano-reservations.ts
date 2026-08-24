@@ -35,8 +35,10 @@ export class PianoReservationError extends Error {
   }
 }
 
+// Gelijk aan de lijsten in `app/actions/piano.ts`; het Engelse adminpad hoort
+// erbij, anders blijft dat scherm na een reservatie op de oude stand staan.
 const PUBLIC_PATHS = ["/piano", "/en/piano"];
-const ADMIN_PATHS = ["/admin/piano"];
+const ADMIN_PATHS = ["/admin/piano", "/en/admin/piano"];
 
 export function revalidatePiano(): void {
   for (const path of [...PUBLIC_PATHS, ...ADMIN_PATHS]) revalidatePath(path);

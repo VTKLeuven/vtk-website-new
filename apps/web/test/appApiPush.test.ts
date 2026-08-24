@@ -109,6 +109,32 @@ describe("pushberichten versturen", () => {
     expect(await sendPushToUsers(["user-1"], MESSAGE)).toEqual({ sent: 0, removed: 0, failed: 1 });
   });
 
+  /**
+   * Regressie. Deze functie wordt aangeroepen naast de herinneringsmail voor een
+   * shift, binnen dezelfde claim. Sloeg een databankfout hier door, dan bleef de
+   * markering staan en vertrok die mail nooit meer; niemand zou dat merken.
+   */
+  it("gooit niet wanneer de databank de toestellen niet kan opzoeken", async () => {
+    mocks.findMany.mockRejectedValue(new Error("verbinding weg"));
+
+    expect(await sendPushToUsers(["user-1"], MESSAGE)).toEqual({ sent: 0, removed: 0, failed: 0 });
+  });
+
+  it("gooit niet wanneer het opruimen van een dood token mislukt", async () => {
+    mocks.findMany.mockResolvedValue(tokens("ExponentPushToken[dood]"));
+    mocks.deleteMany.mockRejectedValue(new Error("verbinding weg"));
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(
+        JSON.stringify({ data: [{ status: "error", details: { error: "DeviceNotRegistered" } }] }),
+        { status: 200 },
+      ),
+    );
+
+    // Niets opgeruimd, maar ook niets gebroken: de volgende beurt probeert het
+    // opnieuw.
+    expect(await sendPushToUsers(["user-1"], MESSAGE)).toEqual({ sent: 0, removed: 0, failed: 0 });
+  });
+
   it("splitst in stukken van honderd", async () => {
     mocks.findMany.mockResolvedValue(
       Array.from({ length: 150 }, (_, index) => ({ token: `ExponentPushToken[${index}]` })),

@@ -260,14 +260,6 @@ export async function processDueShiftReminders(now: Date = new Date()): Promise<
       });
       if (count === 0) continue;
 
-      // Push gaat binnen dezelfde claim als de mail: "de herinnering voor dit
-      // venster is afgehandeld" hoort één ding te betekenen. Wie de app niet
-      // heeft, krijgt gewoon enkel de mail; `sendShiftReminderPush` gooit niet.
-      await sendShiftReminderPush(candidate.userId, {
-        name: candidate.shift.name,
-        startsSoon: lead.key === 'soon',
-      });
-
       const mail = shiftReminderMail(lead.key, candidate.user, candidate.shift);
       const ok = await sendMail({
         to: preferredEmail(candidate.user),
@@ -278,6 +270,22 @@ export async function processDueShiftReminders(now: Date = new Date()): Promise<
       });
       if (ok) sent += 1;
       else failed += 1;
+
+      // De push gaat binnen dezelfde claim als de mail: "de herinnering voor dit
+      // venster is afgehandeld" hoort één ding te betekenen, niet twee die uit
+      // elkaar kunnen lopen. Wie de app niet heeft, krijgt enkel de mail.
+      //
+      // Bewust ná de mail, en met een vangnet errond. De markering is op dit punt
+      // al gezet, dus een fout hier mag de mail niet meesleuren; de mail is het
+      // kanaal waar iedereen op zit, de push is het extraatje.
+      try {
+        await sendShiftReminderPush(candidate.userId, {
+          name: candidate.shift.name,
+          startsSoon: lead.key === 'soon',
+        });
+      } catch (error) {
+        console.error('[shift] pushherinnering mislukt', error);
+      }
     }
   }
 

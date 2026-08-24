@@ -51,9 +51,11 @@ export type PushOutcome = {
 /**
  * Stuurt één bericht naar alle toestellen van deze gebruikers.
  *
- * Geeft een samenvatting terug en gooit niet: een pushbericht is nooit de kern
- * van wat de beller aan het doen was, en een bestelling mag niet mislukken omdat
- * Expo even onbereikbaar is.
+ * **Gooit nooit**, en dat is geen beleefdheid maar een voorwaarde. Deze functie
+ * wordt aangeroepen naast dingen die wél moeten lukken: de herinneringsmail voor
+ * een shift vertrekt binnen dezelfde claim, en zou een fout hier doorslaan, dan
+ * zou die mail nooit meer vertrekken terwijl de markering al gezet is. Ook de
+ * databank-aanroepen zitten daarom achter een vangnet.
  */
 export async function sendPushToUsers(
   userIds: string[],
@@ -62,10 +64,16 @@ export async function sendPushToUsers(
   const outcome: PushOutcome = { sent: 0, removed: 0, failed: 0 };
   if (userIds.length === 0) return outcome;
 
-  const devices = await prisma.appPushDevice.findMany({
-    where: { userId: { in: userIds } },
-    select: { token: true },
-  });
+  let devices: { token: string }[];
+  try {
+    devices = await prisma.appPushDevice.findMany({
+      where: { userId: { in: userIds } },
+      select: { token: true },
+    });
+  } catch (error) {
+    console.error("[push] toestellen opzoeken mislukt", error);
+    return outcome;
+  }
   if (devices.length === 0) return outcome;
 
   const tokens = devices.map((device) => device.token);
@@ -97,8 +105,14 @@ export async function sendPushToUsers(
     });
 
     if (dead.length > 0) {
-      await prisma.appPushDevice.deleteMany({ where: { token: { in: dead } } });
-      outcome.removed += dead.length;
+      try {
+        await prisma.appPushDevice.deleteMany({ where: { token: { in: dead } } });
+        outcome.removed += dead.length;
+      } catch (error) {
+        // Opruimen is onderhoud; het mag de verzending niet omver halen. De
+        // volgende beurt probeert het opnieuw.
+        console.error("[push] dode tokens opruimen mislukt", error);
+      }
     }
   }
 
