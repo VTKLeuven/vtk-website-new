@@ -11,7 +11,10 @@ import { useEffect, useState } from 'react';
  */
 export function SiteHeaderShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const isHome = pathname === '/' || pathname === '/en' || pathname === '/en/';
+  // De homepage is bereikbaar zonder voorvoegsel ("/") en met ("/nl", "/en").
+  // Enkel op "/" en "/en" kijken liet /nl achter met een dichte header terwijl
+  // daar wel degelijk de hero staat, dus de foto begon pas onder de balk.
+  const isHome = ['', '/nl', '/en'].includes((pathname ?? '/').replace(/\/+$/, ''));
 
   // Start transparent on the homepage so there is no flash of a solid header
   // over the hero before the observer attaches.
