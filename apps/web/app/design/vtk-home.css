@@ -1342,10 +1342,14 @@
 }
 
 .vtk-design .hours-col .hours-note {
-  margin: 14px 0 0;
+  margin: 34px 0 0;
   color: var(--on-dark-muted);
   font-size: 12px;
   line-height: 1.45;
+}
+
+.vtk-design .hours-col .hours-note + .hours-note {
+  margin-top: 10px;
 }
 
 .vtk-design .hours-col .hours-note a,
