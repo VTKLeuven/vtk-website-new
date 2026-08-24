@@ -582,18 +582,6 @@ export function KalenderEditorialView({
                   </button>
                 ))}
               </div>
-              <label className="audience-toggle" title={labels.onlyMyAudiencesHint}>
-                <input
-                  type="checkbox"
-                  checked={onlyMyAudiences}
-                  onChange={(e) => {
-                    const checked = e.target.checked;
-                    setOnlyMyAudiences(checked);
-                    if (checked && selectedAudience) setFilter("all");
-                  }}
-                />
-                {labels.onlyMyAudiences}
-              </label>
               {audienceOptions.length > 0 ? (
                 <div className="audience-filters" aria-label={labels.audienceFilters}>
                   <span>{labels.audienceFilters}</span>
@@ -611,6 +599,18 @@ export function KalenderEditorialView({
                       {categoryName(c)}
                     </button>
                   ))}
+                  <label className="audience-toggle" title={labels.onlyMyAudiencesHint}>
+                    <input
+                      type="checkbox"
+                      checked={onlyMyAudiences}
+                      onChange={(e) => {
+                        const checked = e.target.checked;
+                        setOnlyMyAudiences(checked);
+                        if (checked && selectedAudience) setFilter("all");
+                      }}
+                    />
+                    {labels.onlyMyAudiences}
+                  </label>
                 </div>
               ) : null}
             </div>
