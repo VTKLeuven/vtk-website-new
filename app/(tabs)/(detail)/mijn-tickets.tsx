@@ -5,15 +5,15 @@ import { useState } from 'react';
 import { RefreshControl, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import QRCode from 'react-native-qrcode-svg';
 
-import { baseUrl } from '../src/api/client';
-import type { AppMyTicket } from '../src/api/contract';
-import { fetchMyTickets } from '../src/api/endpoints';
-import { messageFor, useResource } from '../src/api/useResource';
-import { PageHead } from '../src/components/PageHead';
-import { Button, Card, Empty, ErrorState, Loading, StaleNotice } from '../src/components/ui';
-import { formatDay } from '../src/format';
-import { useApp } from '../src/state/app';
-import { COLORS, RADIUS, SPACING, TYPE } from '../src/theme/tokens';
+import { baseUrl } from '../../../src/api/client';
+import type { AppMyTicket } from '../../../src/api/contract';
+import { fetchMyTickets } from '../../../src/api/endpoints';
+import { messageFor, useResource } from '../../../src/api/useResource';
+import { PageHead } from '../../../src/components/PageHead';
+import { Button, Card, Empty, ErrorState, Loading, StaleNotice } from '../../../src/components/ui';
+import { formatDay } from '../../../src/format';
+import { useApp } from '../../../src/state/app';
+import { COLORS, RADIUS, SPACING, TYPE } from '../../../src/theme/tokens';
 
 /**
  * Mijn tickets.

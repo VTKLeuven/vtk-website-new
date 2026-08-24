@@ -5,14 +5,14 @@ import { ArrowLeft, CalendarDays, MapPin } from 'lucide-react-native';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { baseUrl } from '../../src/api/client';
-import { fetchCalendarEvent } from '../../src/api/endpoints';
-import { messageFor, useResource } from '../../src/api/useResource';
-import { Prose } from '../../src/components/Prose';
-import { Button, Card, ErrorState, Loading } from '../../src/components/ui';
-import { formatEventWhen } from '../../src/format';
-import { useApp } from '../../src/state/app';
-import { COLORS, SPACING, TYPE } from '../../src/theme/tokens';
+import { baseUrl } from '../../../../src/api/client';
+import { fetchCalendarEvent } from '../../../../src/api/endpoints';
+import { messageFor, useResource } from '../../../../src/api/useResource';
+import { Prose } from '../../../../src/components/Prose';
+import { Button, Card, ErrorState, Loading } from '../../../../src/components/ui';
+import { formatEventWhen } from '../../../../src/format';
+import { useApp } from '../../../../src/state/app';
+import { COLORS, SPACING, TYPE } from '../../../../src/theme/tokens';
 
 /**
  * Eén evenement.

@@ -5,13 +5,13 @@ import { useState } from 'react';
 import { FlatList, Modal, Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { fetchAlbum } from '../../src/api/endpoints';
-import { messageFor, useResource } from '../../src/api/useResource';
-import { PageHead } from '../../src/components/PageHead';
-import { Empty, ErrorState, Loading } from '../../src/components/ui';
-import { formatDate } from '../../src/format';
-import { useApp } from '../../src/state/app';
-import { COLORS, SPACING, TYPE } from '../../src/theme/tokens';
+import { fetchAlbum } from '../../../../src/api/endpoints';
+import { messageFor, useResource } from '../../../../src/api/useResource';
+import { PageHead } from '../../../../src/components/PageHead';
+import { Empty, ErrorState, Loading } from '../../../../src/components/ui';
+import { formatDate } from '../../../../src/format';
+import { useApp } from '../../../../src/state/app';
+import { COLORS, SPACING, TYPE } from '../../../../src/theme/tokens';
 
 /** Kolommen in het raster. Drie is wat op een telefoon nog herkenbaar blijft. */
 const COLUMNS = 3;

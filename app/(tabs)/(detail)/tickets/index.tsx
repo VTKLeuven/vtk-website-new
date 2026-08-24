@@ -2,13 +2,13 @@ import { useRouter } from 'expo-router';
 import { ChevronRight, TicketCheck } from 'lucide-react-native';
 import { FlatList, Pressable, RefreshControl, StyleSheet, Text, View } from 'react-native';
 
-import { fetchTicketEvents } from '../../src/api/endpoints';
-import { messageFor, useResource } from '../../src/api/useResource';
-import { PageHead } from '../../src/components/PageHead';
-import { Empty, ErrorState, Loading, StaleNotice } from '../../src/components/ui';
-import { formatDayShort, formatEuro } from '../../src/format';
-import { useApp } from '../../src/state/app';
-import { COLORS, RADIUS, SPACING, TYPE } from '../../src/theme/tokens';
+import { fetchTicketEvents } from '../../../../src/api/endpoints';
+import { messageFor, useResource } from '../../../../src/api/useResource';
+import { PageHead } from '../../../../src/components/PageHead';
+import { Empty, ErrorState, Loading, StaleNotice } from '../../../../src/components/ui';
+import { formatDayShort, formatEuro } from '../../../../src/format';
+import { useApp } from '../../../../src/state/app';
+import { COLORS, RADIUS, SPACING, TYPE } from '../../../../src/theme/tokens';
 
 /**
  * De events waarvoor er tickets te koop zijn.

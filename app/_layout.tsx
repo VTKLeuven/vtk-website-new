@@ -67,20 +67,8 @@ export default function RootLayout() {
           }}
         >
           <Stack.Screen name="(tabs)" />
-          <Stack.Screen name="evenement/[id]" />
-          <Stack.Screen name="tickets/index" />
-          <Stack.Screen name="tickets/[slug]" />
-          <Stack.Screen name="mijn-tickets" />
-          <Stack.Screen name="categorie/[slug]" />
-          <Stack.Screen name="pagina/[slug]" />
-          <Stack.Screen name="album/[slug]" />
-          <Stack.Screen name="media" />
-          <Stack.Screen name="praesidium" />
-          <Stack.Screen name="zoeken" />
-          <Stack.Screen name="shiften" />
-          <Stack.Screen name="werkgroepen" />
-          <Stack.Screen name="pocs" />
-          <Stack.Screen name="piano" />
+          {/* Enkel deze drie liggen bewust óver de tabbalk: het zijn modals, en
+              een modal die de navigatie eronder laat staan is geen modal. */}
           <Stack.Screen name="inloggen" options={{ presentation: 'modal' }} />
           <Stack.Screen name="poort" options={{ presentation: 'modal' }} />
           <Stack.Screen name="instellingen" options={{ presentation: 'modal' }} />

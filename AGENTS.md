@@ -57,8 +57,17 @@ vtk-website-new achter een cloudflared-tunnel en vul die URL in bij
 
 ## Structuur
 
-- `app/` - enkel expo-router routes. Elke route staat expliciet in de `<Stack>`
-  in `app/_layout.tsx`; de vijf tabs in `app/(tabs)/_layout.tsx`.
+- `app/` - enkel expo-router routes. De vijf tabs staan in
+  `app/(tabs)/_layout.tsx`.
+- `app/(tabs)/(detail)/` - **alle doorklikschermen**, in één gedeelde stack die
+  binnen de tabnavigator zit. Daardoor blijft de tabbalk zichtbaar zodra je
+  ergens op tikt; stonden ze in de stack van de wortel, dan schoof elk scherm
+  over de balk heen. `(detail)` is een routegroep, dus de haakjes staan niet in
+  het adres: `(tabs)/(detail)/piano.tsx` is gewoon `/piano`. **Een nieuw
+  doorklikscherm hoort hier**, niet in `app/`.
+- `app/_layout.tsx` draagt enkel nog de tabs plus drie modals (inloggen, de
+  onboardingpoort, de serverinstelling). Die liggen bewust wél over de balk: een
+  modal die de navigatie eronder laat staan, is geen modal.
 - `src/api/` - de HTTP-laag en het contract met de site.
 - `src/auth/` - wie er ingelogd is (er wordt geen token bewaard; zie
   `src/api/client.ts`) en de twee poorten uit `proxy.ts`.

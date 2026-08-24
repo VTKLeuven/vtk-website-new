@@ -54,6 +54,10 @@ export default function TabsLayout() {
         name="info"
         options={{ title: 'Info', tabBarIcon: ({ color, size }) => <Info color={color} size={size} /> }}
       />
+      {/* De gedeelde stack met alle doorklikschermen. Hij hoort bij de
+          tabnavigator zodat de balk zichtbaar blijft, maar hij is zelf geen tab
+          en staat dus niet in de balk. */}
+      <Tabs.Screen name="(detail)" options={{ href: null }} />
       <Tabs.Screen
         name="profiel"
         options={{

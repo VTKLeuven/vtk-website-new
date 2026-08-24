@@ -3,16 +3,16 @@ import { Globe, MapPin, Users } from 'lucide-react-native';
 import { useState } from 'react';
 import { Alert, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 
-import { ApiError } from '../src/api/client';
-import type { AppShift } from '../src/api/contract';
-import { fetchShifts, registerForShift, unregisterFromShift } from '../src/api/endpoints';
-import { messageFor, useResource } from '../src/api/useResource';
-import { PageHead } from '../src/components/PageHead';
-import { Prose } from '../src/components/Prose';
-import { Button, Card, Empty, ErrorState, Loading, SectionTitle, StaleNotice } from '../src/components/ui';
-import { formatDay, formatTimeRange } from '../src/format';
-import { useApp } from '../src/state/app';
-import { COLORS, SPACING, TYPE } from '../src/theme/tokens';
+import { ApiError } from '../../../src/api/client';
+import type { AppShift } from '../../../src/api/contract';
+import { fetchShifts, registerForShift, unregisterFromShift } from '../../../src/api/endpoints';
+import { messageFor, useResource } from '../../../src/api/useResource';
+import { PageHead } from '../../../src/components/PageHead';
+import { Prose } from '../../../src/components/Prose';
+import { Button, Card, Empty, ErrorState, Loading, SectionTitle, StaleNotice } from '../../../src/components/ui';
+import { formatDay, formatTimeRange } from '../../../src/format';
+import { useApp } from '../../../src/state/app';
+import { COLORS, SPACING, TYPE } from '../../../src/theme/tokens';
 
 /**
  * Shiften: waar je op staat, en waar je nog op kan.

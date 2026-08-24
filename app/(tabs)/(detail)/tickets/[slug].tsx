@@ -3,18 +3,18 @@ import * as WebBrowser from 'expo-web-browser';
 import { useMemo, useState } from 'react';
 import { Alert, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 
-import { ApiError, baseUrl } from '../../src/api/client';
-import type { AppTicketEventDetail, AppTicketType } from '../../src/api/contract';
-import { fetchOrderStatus, fetchTicketEvent, startTicketCheckout } from '../../src/api/endpoints';
-import { messageFor, useResource } from '../../src/api/useResource';
-import { PageHead } from '../../src/components/PageHead';
-import { QuestionField, type AnswerValue } from '../../src/components/QuestionField';
-import { Prose } from '../../src/components/Prose';
-import { Stepper } from '../../src/components/Stepper';
-import { Button, Card, Empty, ErrorState, Loading } from '../../src/components/ui';
-import { formatEventWhen, formatEuro } from '../../src/format';
-import { useApp } from '../../src/state/app';
-import { COLORS, RADIUS, SPACING, TYPE } from '../../src/theme/tokens';
+import { ApiError, baseUrl } from '../../../../src/api/client';
+import type { AppTicketEventDetail, AppTicketType } from '../../../../src/api/contract';
+import { fetchOrderStatus, fetchTicketEvent, startTicketCheckout } from '../../../../src/api/endpoints';
+import { messageFor, useResource } from '../../../../src/api/useResource';
+import { PageHead } from '../../../../src/components/PageHead';
+import { QuestionField, type AnswerValue } from '../../../../src/components/QuestionField';
+import { Prose } from '../../../../src/components/Prose';
+import { Stepper } from '../../../../src/components/Stepper';
+import { Button, Card, Empty, ErrorState, Loading } from '../../../../src/components/ui';
+import { formatEventWhen, formatEuro } from '../../../../src/format';
+import { useApp } from '../../../../src/state/app';
+import { COLORS, RADIUS, SPACING, TYPE } from '../../../../src/theme/tokens';
 
 /**
  * Tickets kopen.

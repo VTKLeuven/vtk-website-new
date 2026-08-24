@@ -4,13 +4,13 @@ import * as WebBrowser from 'expo-web-browser';
 import { ChevronRight, ExternalLink } from 'lucide-react-native';
 import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { baseUrl } from '../../src/api/client';
-import { fetchCategory } from '../../src/api/endpoints';
-import { messageFor, useResource } from '../../src/api/useResource';
-import { PageHead } from '../../src/components/PageHead';
-import { Empty, ErrorState, Loading } from '../../src/components/ui';
-import { useApp } from '../../src/state/app';
-import { COLORS, RADIUS, SPACING, TYPE } from '../../src/theme/tokens';
+import { baseUrl } from '../../../../src/api/client';
+import { fetchCategory } from '../../../../src/api/endpoints';
+import { messageFor, useResource } from '../../../../src/api/useResource';
+import { PageHead } from '../../../../src/components/PageHead';
+import { Empty, ErrorState, Loading } from '../../../../src/components/ui';
+import { useApp } from '../../../../src/state/app';
+import { COLORS, RADIUS, SPACING, TYPE } from '../../../../src/theme/tokens';
 
 /**
  * De pagina's onder één categorie.
