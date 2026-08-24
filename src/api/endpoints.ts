@@ -16,6 +16,9 @@ import type {
   AppPage,
   AppPraesidium,
   AppSearch,
+  AppGroups,
+  AppPoc,
+  AppShifts,
 } from './contract';
 
 /**
@@ -129,4 +132,38 @@ export function fetchPraesidium(locale: AppLocale, year?: number): Promise<AppPr
   return apiFetch<AppPraesidium>(
     appApi('/praesidium', { locale, jaar: year === undefined ? undefined : String(year) }),
   );
+}
+
+// ── Shiften ─────────────────────────────────────────────────────────────────
+
+export function fetchShifts(locale: AppLocale): Promise<AppShifts> {
+  return apiFetch<AppShifts>(appApi('/shiften', { locale }));
+}
+
+/**
+ * In- en uitschrijven gaan naar de bestaande route van de site.
+ *
+ * Die doet meer dan een rij wegschrijven: ze bewaakt overlappende shiften en de
+ * 24-uursgrens, en ze duwt een cursusdienst-shift door naar cudi. Dat hier
+ * overdoen zou betekenen dat een uitschrijving in de app op cudi kan blijven
+ * staan.
+ */
+export function registerForShift(shiftId: string): Promise<unknown> {
+  return apiFetch(`/api/shift/register?id=${encodeURIComponent(shiftId)}`, { method: 'POST' });
+}
+
+export function unregisterFromShift(shiftId: string): Promise<unknown> {
+  return apiFetch(`/api/shift/register?id=${encodeURIComponent(shiftId)}`, { method: 'DELETE' });
+}
+
+// ── Groepen ─────────────────────────────────────────────────────────────────
+
+export function fetchWerkgroepen(locale: AppLocale, year?: number): Promise<AppGroups> {
+  return apiFetch<AppGroups>(
+    appApi('/werkgroepen', { locale, jaar: year === undefined ? undefined : String(year) }),
+  );
+}
+
+export function fetchPocs(locale: AppLocale): Promise<AppPoc[]> {
+  return apiFetch<AppPoc[]>(appApi('/pocs', { locale }));
 }

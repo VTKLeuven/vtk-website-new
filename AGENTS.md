@@ -60,9 +60,28 @@ vtk-website-new achter een cloudflared-tunnel en vul die URL in bij
 - `src/auth/` - wie er ingelogd is (er wordt geen token bewaard; zie
   `src/api/client.ts`) en de twee poorten uit `proxy.ts`.
 - `src/state/` - `AppProvider`, de schil: viewer, tabs, aankondiging.
-- `src/components/`, `src/theme/tokens.ts` - UI en tokens.
+- `src/components/`, `src/theme/tokens.ts` - UI en tokens. `Prose` rendert alle
+  Markdown (pagina's, aankondigingen, evenement- en ticketbeschrijvingen).
+- `src/api/useResource.ts` - het patroon van elk scherm dat gegevens ophaalt:
+  cache tonen, ophalen, en het zeggen wanneer die verversing niet lukte.
+- `src/format.ts` - datums, uren en geld, altijd in `Europe/Brussels`.
+- `src/push.ts` - pushberichten. Toestemming wordt gevraagd via de knop in
+  Profiel en **nooit bij de eerste start**; op iOS krijg je maar één kans.
 - `src/storage.ts` - voorkeuren en de leescache. **Geen schrijfwachtrij**: dit is
   niet de scanner, en bestellen vraagt netwerk.
+
+## Wat bewust op de site blijft
+
+Geen achterstand maar een beslissing: je gegevens wijzigen, verbonden apps,
+privacygegevens, formulieren, lesbezoeken en het contactformulier. Dat zijn
+formulieren met eigen validatie en soms juridische gevolgen, en die op twee
+plaatsen hebben is twee keer kunnen mislopen.
+
+Drie schrijfwegen lopen ook bewust langs de bestaande routes van de site in plaats
+van langs `/api/app/v1`: **afrekenen** (`/api/tickets/checkout`, dat het
+order-toegangscookie zet) en **in- en uitschrijven op een shift**
+(`/api/shift/register`, dat overlap, de 24-uursgrens en de cudi-sync bewaakt). Een
+wrapper zou daar niets doen dan doorgeven, of erger, de helft vergeten.
 
 ## Gekopieerd uit vtk-website-new
 

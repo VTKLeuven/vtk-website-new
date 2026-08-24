@@ -6,7 +6,8 @@ import {
   useFonts,
 } from '@expo-google-fonts/inter';
 import { InstrumentSerif_400Regular_Italic } from '@expo-google-fonts/instrument-serif';
-import { Stack } from 'expo-router';
+import * as Notifications from 'expo-notifications';
+import { Stack, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import * as SplashScreen from 'expo-splash-screen';
 import { useEffect } from 'react';
@@ -22,6 +23,7 @@ void SplashScreen.preventAutoHideAsync();
  * vtk-scanner-app; zo is in één blik te zien welke schermen er zijn.
  */
 export default function RootLayout() {
+  const router = useRouter();
   const [fontsLoaded] = useFonts({
     Inter_400Regular,
     Inter_500Medium,
@@ -33,6 +35,23 @@ export default function RootLayout() {
   useEffect(() => {
     if (fontsLoaded) void SplashScreen.hideAsync();
   }, [fontsLoaded]);
+
+  /**
+   * Een tik op een pushbericht opent het scherm dat erbij hoort.
+   *
+   * De server zet dat pad in `data.path` (zie `lib/app-api/push.ts`). Er wordt
+   * bewust enkel een pad binnen de app gevolgd en geen URL: een bericht dat een
+   * willekeurig adres kan openen, is een open deur.
+   */
+  useEffect(() => {
+    const subscription = Notifications.addNotificationResponseReceivedListener((response) => {
+      const path = response.notification.request.content.data?.path;
+      if (typeof path === 'string' && path.startsWith('/')) {
+        router.push(path as never);
+      }
+    });
+    return () => subscription.remove();
+  }, [router]);
 
   if (!fontsLoaded) return null;
 
@@ -58,6 +77,9 @@ export default function RootLayout() {
           <Stack.Screen name="media" />
           <Stack.Screen name="praesidium" />
           <Stack.Screen name="zoeken" />
+          <Stack.Screen name="shiften" />
+          <Stack.Screen name="werkgroepen" />
+          <Stack.Screen name="pocs" />
           <Stack.Screen name="inloggen" options={{ presentation: 'modal' }} />
           <Stack.Screen name="poort" options={{ presentation: 'modal' }} />
           <Stack.Screen name="instellingen" options={{ presentation: 'modal' }} />

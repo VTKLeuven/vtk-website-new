@@ -442,6 +442,27 @@ heeft.
 
 ### Fase 4 - De rest, en push
 
-- [ ] shiften, piano, formulieren, lesbezoeken, grocomeet, contact, juridisch
-- [ ] de resterende WebView-schermen native maken
-- [ ] pushberichten versturen: beheerscherm en de automatische berichten
+- [x] `GET /api/app/v1/shiften`; in- en uitschrijven via `/api/shift/register`
+- [x] `GET /api/app/v1/werkgroepen` en `/pocs`
+- [x] shiften-, werkgroepen- en POC-scherm
+- [x] `lib/app-api/push.ts`: versturen over Expo, met opruimen van dode tokens
+- [x] `src/push.ts` in de app: toestemming via Profiel, tik opent het juiste scherm
+- [ ] automatische berichten (broodje klaar, shift begint, tickets open)
+- [ ] beheerscherm om met de hand een bericht te sturen
+- [ ] piano reserveren
+- [ ] met de hand getest op een toestel
+
+**Bewust niet gebouwd.** Formulieren, lesbezoeken, grocomeet, het
+contactformulier en de accountformulieren blijven op de site. Dat zijn
+formulieren met eigen validatie en soms juridische gevolgen; ze in de app
+nabouwen betekent dezelfde regels op twee plaatsen. De app linkt ernaar.
+
+**Push staat klaar maar stuurt nog niets.** `sendPushToUsers` bestaat en is
+getest; er is nog geen code die hem aanroept. Dat is de volgende stap, en het is
+er bewust een apart: wanneer een bericht gestuurd wordt, is een kringkeuze en
+geen technische.
+
+| Datum | Commit | Wat |
+|---|---|---|
+| 2026-08-24 | `web: App-API: shiften, werkgroepen, POC's en pushberichten versturen` | Drie leesendpoints plus de verzendlaag voor push, met zeven tests (970 in totaal). |
+| 2026-08-24 | `Shiften, werkgroepen, POC's en pushberichten` | Drie schermen erbij, de pushschakelaar in Profiel, en een tik op een bericht opent het juiste scherm. |

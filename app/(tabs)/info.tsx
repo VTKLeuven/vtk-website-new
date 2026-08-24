@@ -3,10 +3,13 @@ import * as WebBrowser from 'expo-web-browser';
 import {
   ChevronRight,
   ExternalLink,
+  GraduationCap,
   Images,
   Search,
   TicketCheck,
   Users,
+  UsersRound,
+  Wrench,
 } from 'lucide-react-native';
 import { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
@@ -80,9 +83,24 @@ export default function InfoScreen() {
           onPress={() => router.push('/media')}
         />
         <Shortcut
+          icon={<Wrench color={COLORS.navy} size={20} />}
+          label="Shiften"
+          onPress={() => router.push('/shiften')}
+        />
+        <Shortcut
           icon={<Users color={COLORS.navy} size={20} />}
           label="Praesidium"
           onPress={() => router.push('/praesidium')}
+        />
+        <Shortcut
+          icon={<UsersRound color={COLORS.navy} size={20} />}
+          label="Werkgroepen"
+          onPress={() => router.push('/werkgroepen')}
+        />
+        <Shortcut
+          icon={<GraduationCap color={COLORS.navy} size={20} />}
+          label="POC's"
+          onPress={() => router.push('/pocs')}
         />
 
         {bootstrap.tabs.map((tab) => (
