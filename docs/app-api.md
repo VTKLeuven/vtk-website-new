@@ -182,6 +182,43 @@ Het praesidium per werkingsjaar. De jarenlijst komt uit de data zelf en niet uit
 verder terug. Inactieve (afgestudeerde) leden horen erbij; tombstones van
 verwijderde accounts (`deletedAt`) niet.
 
+### `GET /api/app/v1/shiften`
+
+Waar je voor ingeschreven staat en waar je nog op kan, in één aanvraag.
+
+**In- en uitschrijven loopt hier niet langs.** Dat gaat naar het bestaande
+`/api/shift/register?id=`, en dat is geen gemakzucht: die route bewaakt
+overlappende shiften en de 24-uursgrens, en ze duwt een cursusdienst-shift door
+naar cudi. Een tweede implementatie zou betekenen dat een uitschrijving in de app
+op cudi kan blijven staan.
+
+`canUnregister` is de uitkomst van de 24-uursgrens plus de bedenktijd, berekend
+op de server zodat de app die twee regels niet nabouwt. De twee constanten staan
+wel op twee plaatsen; het ergste dat een verschil oplevert is een knop die de
+server weigert, en dat is een melding en geen fout in de data.
+
+### `GET /api/app/v1/werkgroepen` en `/pocs`
+
+De werkgroepen per werkingsjaar, en alle POC's. De jarenlijst van de werkgroepen
+loopt wél via `workingYearTabs()`, anders dan bij het praesidium: werkgroepen
+bestaan pas sinds `FIRST_WORKING_YEAR`, dus die klem doet daar geen kwaad.
+
+## Pushberichten versturen
+
+`lib/app-api/push.ts`, over Expo's push-dienst en niet rechtstreeks over APNs en
+FCM. Rechtstreeks zou een Apple-certificaat en een Google-servicesleutel op onze
+server betekenen, allebei met een vervaldatum en een eigen manier om stil te
+breken.
+
+- `sendPushToUsers(userIds, message)` **gooit niet.** Een pushbericht is nooit de
+  kern van wat de beller aan het doen was; een bestelling mag niet mislukken
+  omdat Expo even onbereikbaar is.
+- Een token dat Expo als `DeviceNotRegistered` afkeurt, wordt meteen gewist. Dat
+  is het enige moment waarop we horen dat de app van een toestel verdwenen is.
+- `pruneStalePushDevices()` ruimt toestellen op die maanden niet meer opstartten.
+- **Er zijn nog geen automatische berichten.** Dit bestand kent er geen; wie er
+  een wil, roept het aan vanuit de code die weet wanneer het zover is.
+
 ## `APP_MINIMUM_VERSION`
 
 Optionele omgevingsvariabele, `major.minor.patch`. Staat een geïnstalleerde app

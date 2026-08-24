@@ -677,3 +677,63 @@ export type AppPraesidium = {
   years: number[];
   groups: AppPraesidiumGroup[];
 };
+
+// -----------------------------------------------------------------------------
+// Shiften
+// -----------------------------------------------------------------------------
+
+export type AppShift = {
+  id: string;
+  name: string;
+  description: string;
+  /** Langere uitleg in Markdown, of `null`. */
+  instructions: string | null;
+  location: string;
+  start: string;
+  end: string;
+  /** De post waarvoor de shift telt, of `null`. */
+  post: string | null;
+  reward: number;
+  maxParticipants: number;
+  takenSpots: number;
+  /** Kan deze shift zonder Nederlands? Gaat over de taal, niet over wie welkom is. */
+  openToInternationals: boolean;
+  /** Sta jij ingeschreven? */
+  registered: boolean;
+  /**
+   * Mag je je nu nog uitschrijven? Binnen 24 uur voor de start niet meer, tenzij
+   * je net ingeschreven bent; die twee regels leven op de server en dit veld is
+   * hun uitkomst, zodat de app ze niet nabouwt.
+   */
+  canUnregister: boolean;
+  /** Vol, of al begonnen: dan kan je niet meer inschrijven. */
+  canRegister: boolean;
+};
+
+export type AppShifts = {
+  /** Waar je voor ingeschreven staat, eerst. */
+  mine: AppShift[];
+  available: AppShift[];
+};
+
+/** Waarom een inschrijving geweigerd werd. Codes van `/api/shift/register`. */
+export type AppShiftErrorCode = "FULL" | "STARTED" | "OVERLAP" | "NOT_FOUND" | "ALREADY";
+
+// -----------------------------------------------------------------------------
+// Groepen: werkgroepen, POC's en het bureau
+// -----------------------------------------------------------------------------
+
+export type AppGroup = {
+  slug: string;
+  name: string;
+  description: string | null;
+  imageUrl: string | null;
+  people: AppPerson[];
+};
+
+export type AppGroups = {
+  /** Het getoonde werkingsjaar, of `null` bij een lijst zonder jaren. */
+  year: number | null;
+  years: number[];
+  groups: AppGroup[];
+};
