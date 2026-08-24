@@ -531,3 +531,149 @@ export type AppProfile = {
   unpaidShiftsThisYear: number;
   totalShifts: number;
 };
+
+// -----------------------------------------------------------------------------
+// Inhoud: categorieën en pagina's
+// -----------------------------------------------------------------------------
+
+export type AppDownload = {
+  id: string;
+  label: string;
+  url: string;
+  sizeBytes: number | null;
+  mimeType: string | null;
+};
+
+export type AppOutlineItem = {
+  /** Anker, gelijk aan wat `headingId()` op de site berekent. */
+  id: string;
+  text: string;
+  level: 2 | 3;
+};
+
+export type AppPage = {
+  slug: string;
+  title: string;
+  excerpt: string | null;
+  imageUrl: string | null;
+  /**
+   * De inhoud als Markdown. Oudere pagina's staan als tiptap-JSON in de
+   * database; die worden serverside omgezet, zodat de app maar één formaat hoeft
+   * te kennen. Rauwe HTML staat uit, net als op de site.
+   */
+  content: string;
+  outline: AppOutlineItem[];
+  downloads: AppDownload[];
+  /** De categorie waar deze pagina onder hangt, of `null`. */
+  category: { slug: string; label: string } | null;
+  ctaLabel: string | null;
+  ctaUrl: string | null;
+};
+
+export type AppCategoryPage = {
+  slug: string;
+  title: string;
+  excerpt: string | null;
+  imageUrl: string | null;
+};
+
+export type AppCategory = {
+  slug: string;
+  label: string;
+  intro: string | null;
+  pages: AppCategoryPage[];
+  /** Menu-items die naar een andere site of app wijzen. */
+  links: AppNavChild[];
+};
+
+// -----------------------------------------------------------------------------
+// Zoeken
+// -----------------------------------------------------------------------------
+
+export type AppSearchResult = {
+  kind: "page" | "event" | "link" | "material" | "album";
+  id: string;
+  title: string;
+  /** Eén regel context: de categorie van een pagina, de datum van een evenement. */
+  meta: string | null;
+  /** Korte tekst rond de treffer, zonder opmaakmarkeringen. */
+  snippet: string;
+  /**
+   * Waar dit resultaat heen gaat. Een pad op de site, of een volledige URL bij
+   * een extern resultaat; `external` zegt welke van de twee.
+   */
+  href: string;
+  external: boolean;
+};
+
+export type AppSearch = {
+  query: string;
+  /** `false` wanneer er te weinig getypt is om mee te zoeken. */
+  searched: boolean;
+  results: AppSearchResult[];
+};
+
+// -----------------------------------------------------------------------------
+// Media
+// -----------------------------------------------------------------------------
+
+export type AppAlbum = {
+  slug: string;
+  title: string;
+  description: string | null;
+  /** ISO, of `null` wanneer het album geen datum draagt. */
+  date: string | null;
+  photoCount: number;
+  coverUrl: string | null;
+};
+
+export type AppPhoto = {
+  id: string;
+  /** Schermklare versie; de app toont die en haalt niet het origineel op. */
+  url: string;
+  thumbUrl: string;
+};
+
+export type AppAlbumDetail = AppAlbum & {
+  photos: AppPhoto[];
+};
+
+export type AppPublication = {
+  id: string;
+  title: string;
+  kind: "bakske" | "ir-reeel";
+  coverUrl: string | null;
+  /** De PDF. Absolute URL. */
+  url: string | null;
+};
+
+export type AppMedia = {
+  albums: AppAlbum[];
+  aftermovies: AppAftermovie[];
+  publications: AppPublication[];
+};
+
+// -----------------------------------------------------------------------------
+// Mensen
+// -----------------------------------------------------------------------------
+
+export type AppPerson = {
+  name: string;
+  role: string | null;
+  avatarUrl: string | null;
+};
+
+export type AppPraesidiumGroup = {
+  slug: string;
+  name: string;
+  description: string | null;
+  people: AppPerson[];
+};
+
+export type AppPraesidium = {
+  /** Het getoonde werkingsjaar; `2026` betekent 2026-2027. */
+  year: number;
+  /** Alle jaren waarvoor er gegevens zijn, nieuwste eerst. */
+  years: number[];
+  groups: AppPraesidiumGroup[];
+};

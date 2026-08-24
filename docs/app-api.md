@@ -137,6 +137,51 @@ Een ticket draagt zijn `credential`: de **inhoud** van de QR-code, niet een
 afbeelding. De app tekent de code zelf. Dat scheelt een rondje, en belangrijker:
 een getekende QR werkt ook wanneer er net aan de ingang geen netwerk is.
 
+### `GET /api/app/v1/categorie/[slug]` en `/paginas/[slug]`
+
+De inhoud uit het CMS. De categorie toont dezelfde selectie als het uitklapmenu
+in de header (zichtbaar én gepubliceerd), inclusief de menu-items die naar een
+andere site wijzen.
+
+Een pagina komt **altijd als Markdown**, ook wanneer ze in de database nog als
+tiptap-JSON staat; `lib/app-api/pageContent.ts` zet dat om, met exact dezelfde
+terugvalregels als `PageView`. Markdown is de bron van waarheid: zodra een taal
+een markdown-waarde heeft, ook een lege, telt het tiptap-JSON van die taal niet
+meer mee. Die lege-string-regel is de plek waar dit stil kan mislopen, en er
+staat een test op.
+
+De kop-index wordt uit diezelfde Markdown afgeleid en niet uit het JSON, zodat de
+ankers per definitie bij de getoonde tekst horen.
+
+### `GET /api/app/v1/zoeken`
+
+Bovenop `searchSite`, met de twee dingen die daar uit de sessie komen expliciet
+meegegeven: de doelgroepen van de kijker, en of hij ingelogd is. Dat tweede
+bepaalt of het uitleenmateriaal meezoekt; die catalogus zit achter een login, en
+materiaalnamen in een publieke resultatenlijst zetten zou die keuze langs de
+achterdeur ongedaan maken.
+
+Snippets gaan als platte tekst naar de app. De markeringstekens die Postgres rond
+een treffer zet, zouden hier een eigen opmaakformaat worden, en dat is meer
+machinerie dan een grijze regel onder een zoekresultaat waard is.
+
+### `GET /api/app/v1/media` en `/media/[slug]`
+
+Albums (uit Immich, en nergens anders), aftermovies en de magazines. Een foto
+komt in twee maten: een thumbnail en een schermklare versie. Het **origineel**
+zit er bewust niet bij; dat zijn bestanden van tien megabyte en meer, en op
+mobiele data is dat een galerij die niet laadt.
+
+Valt Immich weg, dan blijft de albumlijst leeg en gaan de aftermovies en
+magazines gewoon door; die staan er los van.
+
+### `GET /api/app/v1/praesidium`
+
+Het praesidium per werkingsjaar. De jarenlijst komt uit de data zelf en niet uit
+`workingYearTabs()`: die klemt op `FIRST_WORKING_YEAR`, en de historiek gaat
+verder terug. Inactieve (afgestudeerde) leden horen erbij; tombstones van
+verwijderde accounts (`deletedAt`) niet.
+
 ## `APP_MINIMUM_VERSION`
 
 Optionele omgevingsvariabele, `major.minor.patch`. Staat een geïnstalleerde app
