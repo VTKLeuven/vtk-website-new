@@ -21,23 +21,40 @@ export async function GET(request: Request) {
     return authErrorResponse(err);
   }
 
-  if (!session.user.isSuperAdmin && !session.permissions.includes("pages.manage")) {
+  if (
+    !session.user.isSuperAdmin &&
+    !session.permissions.includes("pages.manage") &&
+    !session.permissions.includes("header.manage")
+  ) {
     return NextResponse.json({ error: "FORBIDDEN" }, { status: 403 });
   }
 
   const url = new URL(request.url);
-  const q = (url.searchParams.get("q") ?? "").trim();
+  const rawQ = (url.searchParams.get("q") ?? "").trim();
   // Pagina's die al onder deze categorie hangen, zijn geen zinvol resultaat.
   const exclude = url.searchParams.get("exclude");
 
-  // Vermijd zware "match alles"-queries: pas zoeken vanaf 2 tekens.
-  if (q.length < 2) return NextResponse.json([]);
+  // Strip URLs, locale prefixes, en /p/ paden (bv. "https://vtk.be/p/shiften", "/p/shiften", "/shiften")
+  const strippedSlug = rawQ
+    .replace(/^https?:\/\/[^/]+/i, "")
+    .replace(/^\/?(nl|en)\//i, "")
+    .replace(/^\/?p\//i, "")
+    .replace(/^\/+/, "")
+    .replace(/\/+$/, "");
 
-  const like = { contains: q, mode: "insensitive" } as const;
+  const searchTerms = Array.from(new Set([rawQ, strippedSlug].filter((t) => t.length >= 2)));
+  // Vermijd zware "match alles"-queries: pas zoeken vanaf 2 tekens.
+  if (searchTerms.length === 0) return NextResponse.json([]);
+
+  const orConditions = searchTerms.flatMap((term) => {
+    const like = { contains: term, mode: "insensitive" } as const;
+    return [{ titleNl: like }, { titleEn: like }, { slug: like }];
+  });
+
   const pages = await prisma.page.findMany({
     where: {
       AND: [
-        { OR: [{ titleNl: like }, { titleEn: like }, { slug: like }] },
+        { OR: orConditions },
         // De uitsluiting moet expliciet "of helemaal geen categorie" bevatten.
         // `NOT: { headerTabId: exclude }` wordt in SQL `headerTabId <> $1`, en
         // daar valt NULL buiten (NULL <> 'x' is NULL, niet true). Precies de

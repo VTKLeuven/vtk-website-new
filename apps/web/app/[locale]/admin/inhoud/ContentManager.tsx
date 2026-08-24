@@ -93,12 +93,14 @@ type Drag =
 export function ContentManager({
   locale,
   tabs,
+  unlinkedPages = [],
   roles,
   usingDefaults,
   canDeletePages,
 }: {
   locale: Locale;
   tabs: TabNode[];
+  unlinkedPages?: PageNode[];
   roles: RoleOption[];
   usingDefaults: boolean;
   /** `pages.delete`; bepaalt of de inspector een verwijderknop toont. */
@@ -120,7 +122,10 @@ export function ContentManager({
   /** Categorie waarvoor de "pagina toevoegen"-picker openstaat. */
   const [addingTo, setAddingTo] = useState<TabNode | null>(null);
 
-  const allPages = useMemo(() => tabs.flatMap((t) => t.pages), [tabs]);
+  const allPages = useMemo(
+    () => tabs.flatMap((t) => t.pages).concat(unlinkedPages),
+    [tabs, unlinkedPages],
+  );
 
   const select = useCallback(
     (next: Selection) => {
@@ -139,6 +144,14 @@ export function ContentManager({
     selection.kind === "page" ? allPages.find((p) => p.id === selection.id) : undefined;
 
   // ---- Slepen ---------------------------------------------------------------
+
+  function onDropOnUnlinked() {
+    const d = drag.current;
+    drag.current = null;
+    setDropTarget(null);
+    if (!d || d.kind !== "page" || d.fromTabId === null) return;
+    startTransition(() => void movePageToTabAction(d.id, null));
+  }
 
   function onDropOnTab(tabId: string) {
     const d = drag.current;
@@ -461,6 +474,43 @@ export function ContentManager({
             <p className="px-3 py-6 text-center text-sm text-[#5c667f]">
               {nl ? "Nog geen categorieën." : "No categories yet."}
             </p>
+          )}
+
+          {unlinkedPages.length > 0 && (
+            <div
+              onDragOver={(e) => {
+                if (drag.current?.kind !== "page" || drag.current.fromTabId === null) return;
+                e.preventDefault();
+                if (dropTarget !== "unlinked") setDropTarget("unlinked");
+              }}
+              onDrop={(e) => {
+                if (drag.current?.kind !== "page" || drag.current.fromTabId === null) return;
+                e.preventDefault();
+                onDropOnUnlinked();
+              }}
+              className={[
+                "mt-4 border-t border-zinc-200/80 pt-3 transition-colors",
+                dropTarget === "unlinked" ? "rounded-xl ring-2 ring-vtk-yellow" : "",
+              ].join(" ")}
+            >
+              <div className="px-3 py-1">
+                <h2 className="text-xs font-semibold uppercase tracking-wider text-[#5c667f]">
+                  {nl ? "Niet-gekoppeld (/p/...)" : "Unlinked (/p/...)"}
+                </h2>
+                <p className="mt-0.5 text-[11px] text-[#838fa8]">
+                  {nl
+                    ? "Sleep naar een categorie om toe te voegen aan de header."
+                    : "Drag into a category to add to the header."}
+                </p>
+              </div>
+              <ul className="mt-1 space-y-0.5">
+                {unlinkedPages.map((p) => (
+                  <li key={p.id}>
+                    <PageRow page={p} />
+                  </li>
+                ))}
+              </ul>
+            </div>
           )}
         </Card>
 

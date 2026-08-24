@@ -34,12 +34,11 @@ export default async function AdminHeaderPage({
       orderBy: { order: "asc" },
       include: { links: { orderBy: { order: "asc" } } },
     }),
-    // Enkel de pagina's die in de boom staan (losse pagina's hangen per definitie
-    // nergens onder), en enkel de velden die de inspector toont. De markdown en
+    // Alle pagina's (zowel in categorieën als losse pagina's op /p/<slug>),
+    // en enkel de velden die de inspector toont. De markdown en
     // de bijlagen blijven bewust ongelezen: die zijn groot en worden hier niet
     // bewerkt.
     prisma.page.findMany({
-      where: { headerTabId: { not: null } },
       select: {
         id: true,
         slug: true,
@@ -110,10 +109,15 @@ export default async function AdminHeaderPage({
     pages: pages.filter((p) => p.headerTabId === t.id).map(toPageNode),
   }));
 
+  const unlinkedPages: PageNode[] = pages
+    .filter((p) => p.headerTabId === null)
+    .map(toPageNode);
+
   return (
     <ContentManager
       locale={locale}
       tabs={tabNodes}
+      unlinkedPages={unlinkedPages}
       roles={roleOptions}
       usingDefaults={tabs.length === 0}
       canDeletePages={canDeletePages}

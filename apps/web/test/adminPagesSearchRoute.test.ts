@@ -59,7 +59,7 @@ describe("GET /api/admin/pages/search", () => {
     expect(where.AND).toHaveLength(1);
   });
 
-  it("weigert wie pages.manage niet heeft", async () => {
+  it("weigert wie noch pages.manage noch header.manage heeft", async () => {
     mocks.requireSession.mockResolvedValue({
       user: { isSuperAdmin: false },
       permissions: [],
@@ -67,5 +67,25 @@ describe("GET /api/admin/pages/search", () => {
     const resp = await GET(request({ q: "bestuur" }));
     expect(resp.status).toBe(403);
     expect(mocks.findMany).not.toHaveBeenCalled();
+  });
+
+  it("laat gebruikers met header.manage toe", async () => {
+    mocks.requireSession.mockResolvedValue({
+      user: { isSuperAdmin: false },
+      permissions: ["header.manage"],
+    });
+    const resp = await GET(request({ q: "bestuur" }));
+    expect(resp.status).toBe(200);
+    expect(mocks.findMany).toHaveBeenCalled();
+  });
+
+  it("normaliseert /p/shiften en vindt de pagina op slug", async () => {
+    await GET(request({ q: "/p/shiften" }));
+
+    const where = mocks.findMany.mock.calls[0][0].where;
+    const or = where.AND[0].OR;
+    expect(or).toContainEqual({
+      slug: { contains: "shiften", mode: "insensitive" },
+    });
   });
 });
