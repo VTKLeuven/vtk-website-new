@@ -100,6 +100,7 @@ export default async function AdminHeaderPage({
       labelNl: link.labelNl,
       labelEn: link.labelEn,
       url: link.url,
+      order: link.order,
     })),
     introNl: t.introNl,
     introEn: t.introEn,

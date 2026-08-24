@@ -49,27 +49,22 @@ export async function getVisibleHeaderTabsForNav(locale: Locale = "nl"): Promise
       pages: {
         where: { visibleInHeader: true, publishedAt: { not: null } },
         orderBy: [{ order: "asc" }, { titleNl: "asc" }],
-        select: { id: true, slug: true, titleNl: true, titleEn: true },
+        select: { id: true, slug: true, titleNl: true, titleEn: true, order: true },
       },
       links: { orderBy: { order: "asc" } },
     },
   });
 
   if (tabs.length > 0) {
-    return tabs.map((tab) => ({
-      id: tab.id,
-      slug: tab.slug,
-      labelNl: tab.labelNl,
-      labelEn: tab.labelEn,
-      imageKey: tab.imageKey,
-      externalUrl: tab.externalUrl,
-      children: [
+    return tabs.map((tab) => {
+      const children: (NavHeaderTabChild & { order: number })[] = [
         ...tab.pages.map((page) => ({
           id: page.id,
           labelNl: page.titleNl,
           labelEn: page.titleEn ?? page.titleNl,
           href: `/${tab.slug}/${page.slug}`,
           external: false,
+          order: page.order,
         })),
         ...tab.links.map((link) => ({
           id: link.id,
@@ -77,9 +72,20 @@ export async function getVisibleHeaderTabsForNav(locale: Locale = "nl"): Promise
           labelEn: link.labelEn,
           href: link.url,
           external: isExternalUrl(link.url),
+          order: link.order,
         })),
-      ],
-    }));
+      ].sort((a, b) => a.order - b.order);
+
+      return {
+        id: tab.id,
+        slug: tab.slug,
+        labelNl: tab.labelNl,
+        labelEn: tab.labelEn,
+        imageKey: tab.imageKey,
+        externalUrl: tab.externalUrl,
+        children: children.map(({ order: _, ...child }) => child),
+      };
+    });
   }
 
   return HEADER_TABS.filter((t) => (t.visible !== false) && (isEn ? (t.visibleEn !== false) : (t.visibleNl !== false))).map((t) => ({

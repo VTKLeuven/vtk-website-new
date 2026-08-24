@@ -9,9 +9,8 @@ import {
   importDefaultHeaderTabsAction,
   moveHeaderTabLinkToTabAction,
   movePageToTabAction,
-  reorderHeaderTabLinksAction,
   reorderHeaderTabsAction,
-  reorderPagesAction,
+  reorderTabItemsAction,
 } from "@/app/actions/pages";
 import { isExternalUrl } from "@/lib/href";
 import { ExternalLinkIcon, LinkIcon, TrashIcon } from "@/components/ui/icons";
@@ -51,6 +50,7 @@ export type TabLinkNode = {
   labelNl: string;
   labelEn: string;
   url: string;
+  order: number;
 };
 
 /** Rol-optie voor de bewerkrollen-checkboxes, naam al in de juiste taal. */
@@ -168,65 +168,44 @@ export function ContentManager({
     }
   }
 
-  function onDropOnPage(target: PageNode) {
+  function onDropOnItem(targetId: string, targetTabId: string | null) {
     const d = drag.current;
     drag.current = null;
     setDropTarget(null);
-    if (!d) return;
+    if (!d || !targetTabId || d.kind === "tab") return;
+    if (d.id === targetId) return;
+
+    if (d.fromTabId === targetTabId) {
+      const targetTab = tabs.find((t) => t.id === targetTabId);
+      if (!targetTab) return;
+      const items: Array<{ id: string; kind: "page" | "link"; order: number }> = [
+        ...targetTab.pages.map((p) => ({ id: p.id, kind: "page" as const, order: p.order })),
+        ...targetTab.links.map((l) => ({ id: l.id, kind: "link" as const, order: l.order })),
+      ].sort((a, b) => a.order - b.order);
+
+      const from = items.findIndex((it) => it.id === d.id);
+      const to = items.findIndex((it) => it.id === targetId);
+      if (from === -1 || to === -1 || from === to) return;
+
+      const next = [...items];
+      const [moved] = next.splice(from, 1);
+      next.splice(to, 0, moved);
+      startTransition(() =>
+        void reorderTabItemsAction(
+          targetTabId,
+          next.map((it) => ({ id: it.id, kind: it.kind })),
+        ),
+      );
+      return;
+    }
 
     if (d.kind === "page") {
-      if (d.id === target.id) return;
-
-      if (d.fromTabId !== target.headerTabId) {
-        startTransition(() => void movePageToTabAction(d.id, target.headerTabId));
-        return;
-      }
-
-      const siblings = tabs.find((t) => t.id === target.headerTabId)?.pages ?? [];
-      const ids = siblings.map((p) => p.id);
-      const from = ids.indexOf(d.id);
-      const to = ids.indexOf(target.id);
-      if (from === -1 || to === -1 || from === to) return;
-      const next = [...ids];
-      next.splice(to, 0, next.splice(from, 1)[0]);
-      startTransition(() => void reorderPagesAction(next));
+      startTransition(() => void movePageToTabAction(d.id, targetTabId));
       return;
     }
-
-    if (d.kind === "link" && target.headerTabId && d.fromTabId !== target.headerTabId) {
-      const tabId = target.headerTabId;
-      startTransition(() => void moveHeaderTabLinkToTabAction(d.id, tabId));
-      return;
-    }
-  }
-
-  function onDropOnLink(target: TabLinkNode, targetTabId: string) {
-    const d = drag.current;
-    drag.current = null;
-    setDropTarget(null);
-    if (!d) return;
 
     if (d.kind === "link") {
-      if (d.id === target.id) return;
-
-      if (d.fromTabId !== targetTabId) {
-        startTransition(() => void moveHeaderTabLinkToTabAction(d.id, targetTabId));
-        return;
-      }
-
-      const siblings = tabs.find((t) => t.id === targetTabId)?.links ?? [];
-      const ids = siblings.map((l) => l.id);
-      const from = ids.indexOf(d.id);
-      const to = ids.indexOf(target.id);
-      if (from === -1 || to === -1 || from === to) return;
-      const next = [...ids];
-      next.splice(to, 0, next.splice(from, 1)[0]);
-      startTransition(() => void reorderHeaderTabLinksAction(next));
-      return;
-    }
-
-    if (d.kind === "page" && d.fromTabId !== targetTabId) {
-      startTransition(() => void movePageToTabAction(d.id, targetTabId));
+      startTransition(() => void moveHeaderTabLinkToTabAction(d.id, targetTabId));
       return;
     }
   }
@@ -259,7 +238,7 @@ export function ContentManager({
           if (drag.current?.kind === "tab") return;
           e.preventDefault();
           e.stopPropagation();
-          onDropOnPage(page);
+          onDropOnItem(page.id, page.headerTabId);
         }}
         onClick={() => select({ kind: "page", id: page.id })}
         className={[
@@ -314,7 +293,7 @@ export function ContentManager({
           if (drag.current?.kind === "tab") return;
           e.preventDefault();
           e.stopPropagation();
-          onDropOnLink(link, tabId);
+          onDropOnItem(link.id, tabId);
         }}
         className={[
           "group flex w-full items-center gap-2 rounded-xl border border-transparent py-1.5 pl-8 pr-3 text-left text-sm transition-colors hover:bg-vtk-blue-soft/30 cursor-grab active:cursor-grabbing",
@@ -369,6 +348,11 @@ export function ContentManager({
 
   function TabGroup({ tab }: { tab: TabNode }) {
     const active = selection.kind === "tab" && selection.id === tab.id;
+    const tabItems = [
+      ...tab.pages.map((p) => ({ kind: "page" as const, id: p.id, order: p.order, page: p })),
+      ...tab.links.map((l) => ({ kind: "link" as const, id: l.id, order: l.order, link: l })),
+    ].sort((a, b) => a.order - b.order);
+
     return (
       <li
         onDragOver={(e) => {
@@ -423,14 +407,13 @@ export function ContentManager({
         </button>
 
         <ul className="mt-0.5 space-y-0.5">
-          {tab.pages.map((p) => (
-            <li key={p.id}>
-              <PageRow page={p} />
-            </li>
-          ))}
-          {tab.links.map((link) => (
-            <li key={link.id}>
-              <LinkRow link={link} tabId={tab.id} />
+          {tabItems.map((item) => (
+            <li key={item.id}>
+              {item.kind === "page" ? (
+                <PageRow page={item.page} />
+              ) : (
+                <LinkRow link={item.link} tabId={tab.id} />
+              )}
             </li>
           ))}
         </ul>

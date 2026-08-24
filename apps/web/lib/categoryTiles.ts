@@ -42,6 +42,7 @@ type TilePage = {
   excerptNl: string | null;
   excerptEn: string | null;
   imageKey: string | null;
+  order?: number;
 };
 
 type TileLink = {
@@ -49,6 +50,7 @@ type TileLink = {
   labelNl: string;
   labelEn: string;
   url: string;
+  order?: number;
 };
 
 export function categoryTiles(tab: {
@@ -56,7 +58,7 @@ export function categoryTiles(tab: {
   pages: TilePage[];
   links: TileLink[];
 }): CategoryTile[] {
-  return [
+  const tiles: (CategoryTile & { order: number })[] = [
     ...tab.pages.map((page) => ({
       key: `page:${page.id}`,
       labelNl: page.titleNl,
@@ -66,6 +68,7 @@ export function categoryTiles(tab: {
       excerptNl: page.excerptNl,
       excerptEn: page.excerptEn,
       imageKey: page.imageKey,
+      order: page.order ?? 0,
     })),
     ...tab.links.map((link) => ({
       key: `link:${link.id}`,
@@ -76,6 +79,11 @@ export function categoryTiles(tab: {
       excerptNl: null,
       excerptEn: null,
       imageKey: null,
+      order: link.order ?? 0,
     })),
   ];
+
+  return tiles
+    .sort((a, b) => a.order - b.order)
+    .map(({ order: _, ...tile }) => tile);
 }

@@ -19,17 +19,17 @@ const page = (
 const link = (id: string, url: string) => ({ id, labelNl: id, labelEn: id, url });
 
 describe('categoryTiles', () => {
-  it('toont de menu-items naast de pagina’s, in die volgorde', () => {
-    // De Info-tab: twee pagina's plus de pianoreservatie als menu-item. Toonde
-    // de categoriepagina enkel pagina's, dan zag je er twee terwijl het menu er
-    // drie liet zien.
+  it('toont de menu-items en pagina’s volgens hun gecombineerde volgorde', () => {
     const tiles = categoryTiles({
       slug: 'info',
-      pages: [page('p1', 'shiften'), page('p2', 'uitleendienst')],
-      links: [link('l1', '/piano')],
+      pages: [
+        { ...page('p1', 'shiften'), order: 1 },
+        { ...page('p2', 'uitleendienst'), order: 2 },
+      ],
+      links: [{ ...link('l1', '/piano'), order: 0 }],
     });
 
-    expect(tiles.map((t) => t.href)).toEqual(['/info/shiften', '/info/uitleendienst', '/piano']);
+    expect(tiles.map((t) => t.href)).toEqual(['/piano', '/info/shiften', '/info/uitleendienst']);
   });
 
   it('markeert een andere site als extern en een pad op deze site niet', () => {

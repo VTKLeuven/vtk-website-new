@@ -274,14 +274,24 @@ export async function movePageToTabAction(
   headerTabId: string | null
 ): Promise<void> {
   await requirePermission('pages.manage');
-  const last = await prisma.page.findFirst({
-    where: { headerTabId },
-    orderBy: { order: 'desc' },
-    select: { order: true },
-  });
+  const [lastPage, lastLink] = await Promise.all([
+    prisma.page.findFirst({
+      where: { headerTabId },
+      orderBy: { order: 'desc' },
+      select: { order: true },
+    }),
+    headerTabId
+      ? prisma.headerTabLink.findFirst({
+          where: { tabId: headerTabId },
+          orderBy: { order: 'desc' },
+          select: { order: true },
+        })
+      : null,
+  ]);
+  const maxOrder = Math.max(lastPage?.order ?? -1, lastLink?.order ?? -1);
   const page = await prisma.page.update({
     where: { id: pageId },
-    data: { headerTabId, order: (last?.order ?? -1) + 1 },
+    data: { headerTabId, order: maxOrder + 1 },
     select: { titleNl: true },
   });
   const tab = headerTabId
@@ -1011,18 +1021,26 @@ export async function addHeaderTabLinkAction(
       data: { labelNl, labelEn },
     });
   } else {
-    const last = await prisma.headerTabLink.findFirst({
-      where: { tabId },
-      orderBy: { order: 'desc' },
-      select: { order: true },
-    });
+    const [lastPage, lastLink] = await Promise.all([
+      prisma.page.findFirst({
+        where: { headerTabId: tabId },
+        orderBy: { order: 'desc' },
+        select: { order: true },
+      }),
+      prisma.headerTabLink.findFirst({
+        where: { tabId },
+        orderBy: { order: 'desc' },
+        select: { order: true },
+      }),
+    ]);
+    const maxOrder = Math.max(lastPage?.order ?? -1, lastLink?.order ?? -1);
     await prisma.headerTabLink.create({
       data: {
         tabId,
         labelNl,
         labelEn,
         url,
-        order: (last?.order ?? -1) + 1,
+        order: maxOrder + 1,
       },
     });
   }
@@ -1082,6 +1100,32 @@ export async function reorderHeaderTabLinksAction(ids: string[]): Promise<void> 
 }
 
 /**
+ * Volgorde van gemengde items (pagina's én vaste links) binnen een categorie.
+ * `items` bevat alle items van die categorie in de gewenste gecombineerde volgorde.
+ */
+export async function reorderTabItemsAction(
+  tabId: string,
+  items: Array<{ id: string; kind: 'page' | 'link' }>
+): Promise<void> {
+  await requireAnyPermission(['pages.manage', 'header.manage']);
+  await prisma.$transaction(
+    items.map((item, index) =>
+      item.kind === 'page'
+        ? prisma.page.update({ where: { id: item.id }, data: { order: index } })
+        : prisma.headerTabLink.update({ where: { id: item.id }, data: { order: index } })
+    )
+  );
+  await logAudit({
+    action: 'reorder',
+    entity: 'headerTab',
+    entityId: tabId,
+    target: `${items.length} menu-items`,
+    summary: 'volgorde van menu-items binnen categorie gewijzigd',
+  });
+  revalidatePath('/', 'layout');
+}
+
+/**
  * Een vaste link naar een andere categorie verplaatsen.
  */
 export async function moveHeaderTabLinkToTabAction(
@@ -1100,15 +1144,23 @@ export async function moveHeaderTabLinkToTabAction(
   });
   if (conflict) return;
 
-  const last = await prisma.headerTabLink.findFirst({
-    where: { tabId },
-    orderBy: { order: 'desc' },
-    select: { order: true },
-  });
+  const [lastPage, lastLink] = await Promise.all([
+    prisma.page.findFirst({
+      where: { headerTabId: tabId },
+      orderBy: { order: 'desc' },
+      select: { order: true },
+    }),
+    prisma.headerTabLink.findFirst({
+      where: { tabId },
+      orderBy: { order: 'desc' },
+      select: { order: true },
+    }),
+  ]);
+  const maxOrder = Math.max(lastPage?.order ?? -1, lastLink?.order ?? -1);
 
   await prisma.headerTabLink.update({
     where: { id: linkId },
-    data: { tabId, order: (last?.order ?? -1) + 1 },
+    data: { tabId, order: maxOrder + 1 },
   });
 
   await logAudit({

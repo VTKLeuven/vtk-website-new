@@ -2,6 +2,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   requireAnyPermission: vi.fn(),
+  pageUpdate: vi.fn(),
+  pageFindFirst: vi.fn(),
   linkUpdate: vi.fn(),
   linkFindUnique: vi.fn(),
   linkFindFirst: vi.fn(),
@@ -15,6 +17,10 @@ vi.mock("next/navigation", () => ({ redirect: vi.fn() }));
 vi.mock("@vtk/db", () => ({
   HEADER_TABS: [],
   prisma: {
+    page: {
+      update: mocks.pageUpdate,
+      findFirst: mocks.pageFindFirst,
+    },
     headerTabLink: {
       update: mocks.linkUpdate,
       findUnique: mocks.linkFindUnique,
@@ -38,7 +44,39 @@ vi.mock("@/lib/pageAccess", () => ({
 import {
   moveHeaderTabLinkToTabAction,
   reorderHeaderTabLinksAction,
+  reorderTabItemsAction,
 } from "@/app/actions/pages";
+
+describe("reorderTabItemsAction", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mocks.transaction.mockImplementation(async (promises: Promise<unknown>[]) => Promise.all(promises));
+  });
+
+  it("werkt de volgorde van gemengde pagina's en vaste links bij", async () => {
+    await reorderTabItemsAction("tab_1", [
+      { id: "link_1", kind: "link" },
+      { id: "page_1", kind: "page" },
+      { id: "link_2", kind: "link" },
+    ]);
+
+    expect(mocks.requireAnyPermission).toHaveBeenCalledWith(["pages.manage", "header.manage"]);
+    expect(mocks.transaction).toHaveBeenCalled();
+    expect(mocks.linkUpdate).toHaveBeenCalledWith({
+      where: { id: "link_1" },
+      data: { order: 0 },
+    });
+    expect(mocks.pageUpdate).toHaveBeenCalledWith({
+      where: { id: "page_1" },
+      data: { order: 1 },
+    });
+    expect(mocks.linkUpdate).toHaveBeenCalledWith({
+      where: { id: "link_2" },
+      data: { order: 2 },
+    });
+    expect(mocks.revalidatePath).toHaveBeenCalledWith("/", "layout");
+  });
+});
 
 describe("reorderHeaderTabLinksAction", () => {
   beforeEach(() => {
