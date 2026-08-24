@@ -12,20 +12,9 @@ import { pick, type Locale } from "@vtk/i18n";
 
 import type { MeetingAdminView } from "@/components/meetings/MeetingAdminCard";
 import type { PlannedDay } from "@/components/meetings/MeetingPlanner";
-import { brusselsYMD, ymdKey } from "./brussels";
-import { semesterMonths, type Semester } from "./meetings";
+import { brusselsTimeOnDay, brusselsYMD, ymdKey } from "./brussels";
+import type { Semester } from "./meetings";
 import { siteUrl } from "./seo";
-
-/** Eerste en laatste dag van een semester, als instants. */
-function semesterRange(workingYear: number, semester: Semester): { from: Date; to: Date } {
-  const months = semesterMonths(workingYear, semester);
-  const first = months[0];
-  const last = months[months.length - 1];
-  return {
-    from: new Date(Date.UTC(first.year, first.month - 1, 1)),
-    to: new Date(Date.UTC(last.year, last.month, 1)),
-  };
-}
 
 function hhmm(date: Date): string {
   return new Intl.DateTimeFormat("en-GB", {
@@ -53,11 +42,10 @@ export async function loadMeetingAdmin(
 ): Promise<MeetingAdminData> {
   const { locale, workingYear, semester } = options;
   const nl = locale === "nl";
-  const { from, to } = semesterRange(workingYear, semester);
 
   const [meetings, plan] = await Promise.all([
     prisma.meeting.findMany({
-      where: { kind, startsAt: { gte: from, lt: to } },
+      where: { kind, year: workingYear, semester },
       orderBy: { startsAt: "asc" },
       include: {
         options: { orderBy: { order: "asc" } },
@@ -75,10 +63,14 @@ export async function loadMeetingAdmin(
 
   // De verkoopdagen van Theokot op die dagen, om te tonen of het aanbod van die
   // week al vastligt.
-  const sessions = await prisma.theokotSession.findMany({
-    where: { date: { gte: from, lt: to } },
-    select: { date: true, isOpen: true },
-  });
+  const meetingDays = meetings.map((meeting) => brusselsTimeOnDay(meeting.startsAt, "00:00"));
+  const sessions =
+    meetingDays.length > 0
+      ? await prisma.theokotSession.findMany({
+          where: { date: { in: meetingDays } },
+          select: { date: true, isOpen: true },
+        })
+      : [];
   const sessionByDay = new Map(sessions.map((session) => [ymdKey(brusselsYMD(session.date)), session]));
 
   const dateTime = new Intl.DateTimeFormat(nl ? "nl-BE" : "en-GB", {

@@ -36,6 +36,7 @@ describe("semesters", () => {
   });
 
   it("rekent augustus tot en met januari bij semester 1", () => {
+    expect(semesterForDate(new Date("2026-08-24T12:00:00Z"))).toBe(1);
     expect(semesterForDate(new Date("2026-10-16T12:00:00Z"))).toBe(1);
     expect(semesterForDate(new Date("2027-01-20T12:00:00Z"))).toBe(1);
     expect(semesterForDate(new Date("2027-02-04T12:00:00Z"))).toBe(2);

@@ -94,6 +94,13 @@ export const BUILTIN_ROUTES: BuiltinRoute[] = [
     descriptionEn: "Permanent Education Committees and student representatives.",
   },
   {
+    path: "/bureau-inschrijving",
+    labelNl: "Bureau inschrijving",
+    labelEn: "Education Board registration",
+    descriptionNl: "Inschrijven voor het eerstvolgende VTK Bureau.",
+    descriptionEn: "Register for the upcoming VTK Education Board meeting.",
+  },
+  {
     path: "/bureau",
     labelNl: "Onderwijsbureau",
     labelEn: "Education Board",

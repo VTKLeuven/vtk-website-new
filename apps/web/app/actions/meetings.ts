@@ -15,6 +15,7 @@ import {
   semesterForDate,
   type Semester,
 } from "@/lib/meetings";
+import { currentWorkingYear } from "@/lib/workingYear";
 import {
   getMeetingDrinks,
   offeringForMeeting,
@@ -45,9 +46,15 @@ function revalidateMeeting(kind: MeetingKind, slug?: string) {
   if (kind === "GROCOMEET") {
     revalidatePath("/grocomeet");
     revalidatePath("/en/grocomeet");
-  } else if (slug) {
-    revalidatePath(`/bureau/${slug}`);
-    revalidatePath(`/en/bureau/${slug}`);
+  } else {
+    revalidatePath("/bureau");
+    revalidatePath("/en/bureau");
+    revalidatePath("/bureau-inschrijving");
+    revalidatePath("/en/bureau-inschrijving");
+    if (slug) {
+      revalidatePath(`/bureau/${slug}`);
+      revalidatePath(`/en/bureau/${slug}`);
+    }
   }
   // De broodjes van een vergadering gaan van dezelfde voorraad af als die van de
   // studenten, dus de bestelpagina en de turflijst kloppen anders niet meer.
@@ -250,7 +257,7 @@ export async function createMeetingAction(_prev: SaveState, formData: FormData):
   const created = await prisma.meeting.create({
     data: {
       kind,
-      year: Number.isInteger(year) ? year : dayParts(startsAt).year,
+      year: Number.isInteger(year) ? year : currentWorkingYear(startsAt),
       semester: semesterForDate(startsAt),
       slug: await uniqueSlug(kind, startsAt),
       startsAt,
@@ -287,6 +294,7 @@ export async function saveMeetingAction(_prev: SaveState, formData: FormData): P
     where: { id },
     data: {
       startsAt,
+      year: currentWorkingYear(startsAt),
       semester: semesterForDate(startsAt),
       location: String(formData.get("location") ?? "").trim() || null,
       opensAt,
