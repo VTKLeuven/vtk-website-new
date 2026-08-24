@@ -38,8 +38,11 @@ vtk-website-new achter een cloudflared-tunnel en vul die URL in bij
    hier niet nagebouwd. De app mag nooit soepeler zijn dan de site.
 2. **Alles native, behalve identiteit en geld.** Een WebView is toegelaten voor
    inloggen, de onboarding-poorten en betalen (Mollie). Al de rest wordt een echt
-   scherm. Een `ComingSoon`-scherm is tijdelijk en hoort te verdwijnen in de fase
-   die het vervangt; laat er geen achter omdat het "ook werkt".
+   scherm. Een browser openen voor eigen inhoud is een bug, geen keuze; enkel
+   adressen op een andere site (cudi, Career, Burgieclan) horen daar.
+9. **Home is wat je wil doen, Info is waar alles staat.** De snelkoppelingen
+   staan op Home en niet in Info; anders komt de helft twee keer voor, één keer
+   als tegel en één keer als menu-item uit het CMS.
 3. **Geen admin.** Ook niet voor wie er rechten voor heeft.
 4. **iOS en Android doen hetzelfde.** Geen platformspecifieke schermen.
 5. **Geen dependency die de Expo SDK al dekt.**
@@ -65,6 +68,10 @@ vtk-website-new achter een cloudflared-tunnel en vul die URL in bij
 - `src/api/useResource.ts` - het patroon van elk scherm dat gegevens ophaalt:
   cache tonen, ophalen, en het zeggen wanneer die verversing niet lukte.
 - `src/format.ts` - datums, uren en geld, altijd in `Europe/Brussels`.
+- `src/nativeRoute.ts` - vertaalt een pad uit het CMS naar een scherm in de app.
+  Het CMS kent de app niet en zet "Piano reserveren" als link naar `/piano`;
+  zonder deze tabel zou dat in een browser openen terwijl er een scherm voor
+  bestaat. **Komt er een native scherm bij, voeg hier dan een regel toe.**
 - `src/push.ts` - pushberichten. Toestemming wordt gevraagd via de knop in
   Profiel en **nooit bij de eerste start**; op iOS krijg je maar één kans.
 - `src/storage.ts` - voorkeuren en de leescache. **Geen schrijfwachtrij**: dit is

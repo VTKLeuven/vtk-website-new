@@ -1,17 +1,6 @@
 import { useRouter } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
-import {
-  ChevronRight,
-  ExternalLink,
-  GraduationCap,
-  Images,
-  Search,
-  TicketCheck,
-  Users,
-  Music,
-  UsersRound,
-  Wrench,
-} from 'lucide-react-native';
+import { ChevronRight, ExternalLink, Search } from 'lucide-react-native';
 import { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
@@ -19,20 +8,27 @@ import { baseUrl } from '../../src/api/client';
 import type { AppNavTab } from '../../src/api/contract';
 import { PageHead } from '../../src/components/PageHead';
 import { Card, ErrorState, Loading, StaleNotice } from '../../src/components/ui';
+import { nativeRouteFor, pageSlugFor } from '../../src/nativeRoute';
 import { useApp } from '../../src/state/app';
 import { COLORS, RADIUS, SPACING, TYPE } from '../../src/theme/tokens';
 
 /**
- * De inhoud van de site, in de vorm die de header op de site heeft: de
- * categorieën uit het CMS, elk met de pagina's eronder.
+ * De inhoud van de site: de categorieën uit het CMS, elk met wat eronder hangt.
  *
- * De tabs komen uit `bootstrap` en dus uit `HeaderTab` in het beheer. Er staat
- * hier bewust geen vaste lijst in de app: wie in de admin een pagina publiceert,
- * hoort ze meteen in de app te zien zonder release.
+ * **Dit scherm is de boom, niet de snelkoppelingen.** Wat je vaak doet (broodjes,
+ * tickets, shiften, cursusdienst, tijdsloten) staat op Home; hier vind je alles
+ * terug, in dezelfde indeling als de header op de site. Die scheiding is er omdat
+ * het anders dubbel loopt: een tegel bovenaan én hetzelfde item verderop in de
+ * lijst.
  *
- * Bovenaan staan de vier bestemmingen die geen CMS-categorie zijn maar wel een
- * eigen scherm hebben. Ze zijn er te weinig voor een eigen tab en te belangrijk
- * om onderaan te verdwijnen.
+ * De structuur komt uit `bootstrap` en dus uit `HeaderTab` in het beheer. Er
+ * staat hier geen vaste lijst in de app: wie in de admin een pagina publiceert,
+ * ziet ze meteen.
+ *
+ * **Alles wat een eigen scherm heeft, opent native.** Het CMS kent de app niet,
+ * dus daar staat "Piano reserveren" als link naar `/piano`; `nativeRouteFor`
+ * vertaalt dat naar het pianoscherm in plaats van naar een browser. Een browser
+ * is de laatste optie, niet de eerste.
  */
 export default function InfoScreen() {
   const router = useRouter();
@@ -49,8 +45,8 @@ export default function InfoScreen() {
     );
   }
 
-  const openPath = (path: string) => {
-    const url = /^https?:\/\//i.test(path) ? path : `${baseUrl()}${path}`;
+  const openOnWeb = (href: string) => {
+    const url = /^https?:\/\//i.test(href) ? href : `${baseUrl()}${href}`;
     void WebBrowser.openBrowserAsync(url);
   };
 
@@ -73,50 +69,16 @@ export default function InfoScreen() {
       <ScrollView contentContainerStyle={styles.content} style={styles.root}>
         {stale ? <StaleNotice onRetry={() => void refresh()} /> : null}
 
-        <Shortcut
-          icon={<TicketCheck color={COLORS.navy} size={20} />}
-          label="Tickets"
-          onPress={() => router.push('/tickets')}
-        />
-        <Shortcut
-          icon={<Images color={COLORS.navy} size={20} />}
-          label="Media"
-          onPress={() => router.push('/media')}
-        />
-        <Shortcut
-          icon={<Wrench color={COLORS.navy} size={20} />}
-          label="Shiften"
-          onPress={() => router.push('/shiften')}
-        />
-        <Shortcut
-          icon={<Music color={COLORS.navy} size={20} />}
-          label="Piano"
-          onPress={() => router.push('/piano')}
-        />
-        <Shortcut
-          icon={<Users color={COLORS.navy} size={20} />}
-          label="Praesidium"
-          onPress={() => router.push('/praesidium')}
-        />
-        <Shortcut
-          icon={<UsersRound color={COLORS.navy} size={20} />}
-          label="Werkgroepen"
-          onPress={() => router.push('/werkgroepen')}
-        />
-        <Shortcut
-          icon={<GraduationCap color={COLORS.navy} size={20} />}
-          label="POC's"
-          onPress={() => router.push('/pocs')}
-        />
-
         {bootstrap.tabs.map((tab) => (
           <TabRow
             key={tab.id}
             tab={tab}
             expanded={open === tab.id}
             onToggle={() => setOpen(open === tab.id ? null : tab.id)}
-            onOpenCategory={() => router.push(`/categorie/${tab.slug}`)}
-            onOpenExternal={openPath}
+            onNative={(route) => router.push(route as never)}
+            onCategory={() => router.push(`/categorie/${tab.slug}`)}
+            onPage={(slug) => router.push(`/pagina/${slug}`)}
+            onWeb={openOnWeb}
           />
         ))}
 
@@ -130,61 +92,43 @@ export default function InfoScreen() {
   );
 }
 
-function Shortcut({
-  icon,
-  label,
-  onPress,
-}: {
-  icon: React.ReactNode;
-  label: string;
-  onPress: () => void;
-}) {
-  return (
-    <Card style={styles.tab}>
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel={label}
-        onPress={onPress}
-        style={styles.tabHeader}
-      >
-        {icon}
-        <Text style={styles.tabLabel}>{label}</Text>
-        <ChevronRight color={COLORS.muted} size={18} />
-      </Pressable>
-    </Card>
-  );
-}
-
 function TabRow({
   tab,
   expanded,
   onToggle,
-  onOpenCategory,
-  onOpenExternal,
+  onNative,
+  onCategory,
+  onPage,
+  onWeb,
 }: {
   tab: AppNavTab;
   expanded: boolean;
   onToggle: () => void;
-  onOpenCategory: () => void;
-  onOpenExternal: (path: string) => void;
+  onNative: (route: string) => void;
+  onCategory: () => void;
+  onPage: (slug: string) => void;
+  onWeb: (href: string) => void;
 }) {
-  const router = useRouter();
-  // Een tab met een externe site (bv. Career) is gewoon een link; die klapt niet
-  // uit, want er hangt niets van ons onder.
+  // De categorie zelf kan een eigen scherm hebben: "Broodjes" is het
+  // bestelscherm, "Media" de galerij. Dan is uitklappen zinloos.
+  const tabNative = tab.externalUrl ? null : nativeRouteFor(`/${tab.slug}`);
   const external = Boolean(tab.externalUrl);
-  const hasChildren = !external && tab.children.length > 0;
+  const expandable = !external && !tabNative && tab.children.length > 0;
+
+  const openTab = () => {
+    if (external) onWeb(tab.externalUrl as string);
+    else if (tabNative) onNative(tabNative);
+    else if (expandable) onToggle();
+    else onCategory();
+  };
 
   return (
     <Card style={styles.tab}>
       <Pressable
         accessibilityRole="button"
         accessibilityLabel={tab.label}
-        accessibilityState={{ expanded: hasChildren ? expanded : undefined }}
-        onPress={() => {
-          if (external) onOpenExternal(tab.externalUrl as string);
-          else if (hasChildren) onToggle();
-          else onOpenCategory();
-        }}
+        accessibilityState={{ expanded: expandable ? expanded : undefined }}
+        onPress={openTab}
         style={styles.tabHeader}
       >
         <Text style={styles.tabLabel}>{tab.label}</Text>
@@ -194,57 +138,54 @@ function TabRow({
           <ChevronRight
             color={COLORS.muted}
             size={18}
-            style={expanded ? styles.chevronOpen : undefined}
+            style={expandable && expanded ? styles.chevronOpen : undefined}
           />
         )}
       </Pressable>
 
-      {expanded && hasChildren ? (
+      {expandable && expanded ? (
         <View style={styles.children}>
           <Pressable
             accessibilityRole="button"
             accessibilityLabel={`Alles onder ${tab.label}`}
-            onPress={onOpenCategory}
+            onPress={onCategory}
             style={styles.child}
           >
             <Text style={styles.childLabel}>Overzicht</Text>
             <ChevronRight color={COLORS.muted} size={15} />
           </Pressable>
 
-          {tab.children.map((child) => (
-            <Pressable
-              key={child.id}
-              accessibilityRole="button"
-              accessibilityLabel={child.label}
-              onPress={() => {
-                // Een pagina onder deze categorie krijgt het native scherm; een
-                // menu-item wijst per definitie ergens anders heen.
-                const page = pageSlugFrom(child.href, tab.slug);
-                if (!child.external && page) router.push(`/pagina/${page}`);
-                else onOpenExternal(child.href);
-              }}
-              style={styles.child}
-            >
-              <Text style={styles.childLabel}>{child.label}</Text>
-              {child.external ? <ExternalLink color={COLORS.muted} size={15} /> : null}
-            </Pressable>
-          ))}
+          {tab.children.map((child) => {
+            const native = child.external ? null : nativeRouteFor(child.href);
+            const page = child.external ? null : pageSlugFor(child.href, tab.slug);
+
+            return (
+              <Pressable
+                key={child.id}
+                accessibilityRole="button"
+                accessibilityLabel={child.label}
+                onPress={() => {
+                  if (native) onNative(native);
+                  else if (page) onPage(page);
+                  else onWeb(child.href);
+                }}
+                style={styles.child}
+              >
+                <Text style={styles.childLabel}>{child.label}</Text>
+                {/* Enkel wat de app echt verlaat, krijgt het pijltje naar buiten.
+                    Een CMS-pagina en een native scherm blijven allebei binnen. */}
+                {native || page ? (
+                  <ChevronRight color={COLORS.muted} size={15} />
+                ) : (
+                  <ExternalLink color={COLORS.muted} size={15} />
+                )}
+              </Pressable>
+            );
+          })}
         </View>
       ) : null}
     </Card>
   );
-}
-
-/**
- * `/info/theokot` onder de tab `info` is de pagina `theokot`. Een pad dat daar
- * niet aan voldoet (`/piano`, `/kalender`) is een menu-item naar iets anders en
- * heeft hier geen contentpagina.
- */
-function pageSlugFrom(href: string, tabSlug: string): string | null {
-  const prefix = `/${tabSlug}/`;
-  if (!href.startsWith(prefix)) return null;
-  const slug = href.slice(prefix.length);
-  return slug.includes('/') || slug === '' ? null : slug;
 }
 
 const styles = StyleSheet.create({

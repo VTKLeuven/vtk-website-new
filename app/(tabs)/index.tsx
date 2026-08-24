@@ -1,7 +1,7 @@
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
-import { ChevronRight, Play, TicketCheck } from 'lucide-react-native';
+import { ChevronRight, Play } from 'lucide-react-native';
 import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -9,6 +9,7 @@ import type { AppOpeningHours } from '../../src/api/contract';
 import { fetchHome } from '../../src/api/endpoints';
 import { messageFor, useResource } from '../../src/api/useResource';
 import { EventRow } from '../../src/components/EventRow';
+import { Shortcuts } from '../../src/components/Shortcuts';
 import { Prose } from '../../src/components/Prose';
 import { Button, Card, ErrorState, Loading, StaleNotice } from '../../src/components/ui';
 import { useApp } from '../../src/state/app';
@@ -88,16 +89,7 @@ export default function HomeScreen() {
         ) : null}
 
         <View style={styles.paperBlock}>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Tickets"
-            onPress={() => router.push('/tickets')}
-            style={({ pressed }) => [styles.shortcut, pressed && styles.shortcutPressed]}
-          >
-            <TicketCheck color={COLORS.navy} size={20} />
-            <Text style={styles.shortcutLabel}>Tickets</Text>
-            <ChevronRight color={COLORS.muted} size={18} />
-          </Pressable>
+          <Shortcuts />
         </View>
 
         {bootstrap?.announcement ? (
@@ -210,7 +202,20 @@ export default function HomeScreen() {
 
         {home.pocs.length > 0 ? (
           <View style={styles.bandTint}>
-            <Text style={styles.bandTitle}>Jouw POC{"'"}s</Text>
+            <View style={styles.bandHead}>
+              <Text style={styles.bandTitle}>Jouw POC{"'"}s</Text>
+              {/* Dezelfde "bekijk alles" als op de site: wie de POC van een
+                  andere richting zoekt, geraakt er anders nergens. */}
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Alle POC's"
+                onPress={() => router.push('/pocs')}
+                style={styles.more}
+              >
+                <Text style={styles.moreText}>alles</Text>
+                <ChevronRight color={COLORS.muted} size={16} />
+              </Pressable>
+            </View>
             <View style={styles.list}>
               {home.pocs.map((poc) => (
                 <Card key={poc.id}>
@@ -396,19 +401,6 @@ const styles = StyleSheet.create({
     padding: SPACING.sm,
   },
   partnerLogo: { width: '100%', height: '100%' },
-
-  shortcut: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: SPACING.md,
-    backgroundColor: COLORS.surface,
-    borderRadius: RADIUS.md,
-    borderWidth: 1,
-    borderColor: COLORS.line,
-    padding: SPACING.lg,
-  },
-  shortcutPressed: { backgroundColor: COLORS.paper2 },
-  shortcutLabel: { ...TYPE.cardTitle, color: COLORS.ink, flex: 1 },
 
   kicker: { ...TYPE.kicker, color: COLORS.muted },
   cardTitle: { ...TYPE.cardTitle, color: COLORS.ink },
