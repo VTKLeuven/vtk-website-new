@@ -45,21 +45,16 @@ export default function HomeScreen() {
   const firstName = viewer?.name.split(' ')[0];
 
   return (
-    <ScrollView
-      style={styles.root}
-      contentContainerStyle={styles.content}
-      refreshControl={
-        <RefreshControl refreshing={resource.refreshing} onRefresh={() => void resource.refresh()} />
-      }
-    >
-      {resource.stale ? <StaleNotice onRetry={() => void resource.refresh()} /> : null}
-
+    <View style={styles.root}>
+      {/* De hero staat buiten de scroll, net als `PageHead` op elk ander scherm.
+          Zat hij erbinnen, dan kon je hem naar beneden trekken en verscheen er
+          een lege strook boven de foto; dat gebeurt nergens anders in de app. */}
       <View style={styles.hero}>
         {home.heroPhotoUrl ? (
           <Image source={{ uri: home.heroPhotoUrl }} style={styles.heroPhoto} contentFit="cover" />
         ) : null}
         <View style={styles.heroScrim} />
-        <View style={[styles.heroText, { paddingTop: insets.top + SPACING.xxl }]}>
+        <View style={[styles.heroText, { paddingTop: insets.top + SPACING.lg }]}>
           <Text style={styles.heroKicker}>VTK LEUVEN</Text>
           <Text style={styles.heroTitle}>
             {firstName ? `Dag ${firstName}, ` : ''}
@@ -68,6 +63,18 @@ export default function HomeScreen() {
         </View>
       </View>
 
+      {resource.stale ? <StaleNotice onRetry={() => void resource.refresh()} /> : null}
+
+      <ScrollView
+        style={styles.scroll}
+        contentContainerStyle={styles.content}
+        refreshControl={
+          <RefreshControl
+            refreshing={resource.refreshing}
+            onRefresh={() => void resource.refresh()}
+          />
+        }
+      >
       <View style={styles.stack}>
         {gate ? (
           <View style={styles.paperBlock}>
@@ -285,7 +292,8 @@ export default function HomeScreen() {
           </View>
         ) : null}
       </View>
-    </ScrollView>
+      </ScrollView>
+    </View>
   );
 }
 
@@ -324,9 +332,12 @@ function HoursPanel({ hours, live }: { hours: AppOpeningHours; live?: string | n
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: COLORS.paper },
+  scroll: { flex: 1 },
   content: { paddingBottom: SPACING.xxl },
 
-  hero: { backgroundColor: COLORS.navy, minHeight: 240, justifyContent: 'flex-end' },
+  // Lager dan toen hij meescrolde: een vaste kop neemt zijn hoogte permanent in,
+  // en 240 punten hero op een telefoon laat weinig over voor de inhoud.
+  hero: { backgroundColor: COLORS.navy, minHeight: 180, justifyContent: 'flex-end' },
   heroPhoto: { ...StyleSheet.absoluteFillObject },
   // Het scrim van de site: het zwaarst waar de tekst staat.
   heroScrim: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(14, 26, 54, 0.58)' },
