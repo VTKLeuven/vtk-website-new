@@ -385,11 +385,17 @@ lukken; kijk het na voor je erop bouwt.
 
 ### Fase 1 - Home, Kalender, Bestellen
 
-- [ ] `GET /api/app/v1/home`
-- [ ] `GET /api/app/v1/kalender` en `/kalender/[id]`
-- [ ] `lib/theokot/orders.ts` uit `app/actions/theokot.ts`, met unit tests
-- [ ] `GET/POST/DELETE /api/app/v1/theokot/*`
-- [ ] de drie schermen native, `ComingSoon` weg bij Kalender en Bestellen
+- [x] `GET /api/app/v1/home`
+- [x] `GET /api/app/v1/kalender` en `/kalender/[id]`
+- [x] `lib/theokot-orders.ts` uit `app/actions/theokot.ts`, met unit tests
+- [x] `POST/DELETE /api/app/v1/theokot/order` en `GET /api/app/v1/theokot`
+- [x] de drie schermen native, `ComingSoon` verwijderd
+- [ ] met de hand getest op een toestel
+
+| Datum | Commit | Wat |
+|---|---|---|
+| 2026-08-24 | `web: App-API: home, kalender en Theokot` | Bestellen en annuleren verhuisd naar `lib/theokot-orders.ts`; de Theokot-pagina op de site leest via dezelfde functie. Drie endpoints erbij, 20 nieuwe tests (956 in totaal). |
+| 2026-08-24 | `Home, Kalender en Bestellen` | De drie schermen native, met `useResource` (cache + "niet vernieuwd"), `EventRow`, `Stepper` en de datum- en geldformattering in `Europe/Brussels`. |
 
 ### Fase 2 - Tickets en Profiel
 
