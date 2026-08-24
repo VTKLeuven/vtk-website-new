@@ -109,7 +109,7 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
         include: { group: true },
       }),
     ),
-    getVisibleHeaderTabsForNav(),
+    getVisibleHeaderTabsForNav(locale),
     prisma.partner.findMany({
       where: { active: true },
       orderBy: [{ order: "asc" }, { name: "asc" }],
