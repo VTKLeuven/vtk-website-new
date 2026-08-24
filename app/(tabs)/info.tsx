@@ -111,6 +111,10 @@ function TabRow({
 }) {
   // De categorie zelf kan een eigen scherm hebben: "Broodjes" is het
   // bestelscherm, "Media" de galerij. Dan is uitklappen zinloos.
+  //
+  // Een categorie mét items klapt uit en toont die items rechtstreeks; er staat
+  // geen "Overzicht"-regel meer boven. Het categoriescherm blijft wel bestaan:
+  // het is waar een categorie zónder items op uitkomt.
   const tabNative = tab.externalUrl ? null : nativeRouteFor(`/${tab.slug}`);
   const external = Boolean(tab.externalUrl);
   const expandable = !external && !tabNative && tab.children.length > 0;
@@ -145,16 +149,6 @@ function TabRow({
 
       {expandable && expanded ? (
         <View style={styles.children}>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={`Alles onder ${tab.label}`}
-            onPress={onCategory}
-            style={styles.child}
-          >
-            <Text style={styles.childLabel}>Overzicht</Text>
-            <ChevronRight color={COLORS.muted} size={15} />
-          </Pressable>
-
           {tab.children.map((child) => {
             const native = child.external ? null : nativeRouteFor(child.href);
             const page = child.external ? null : pageSlugFor(child.href, tab.slug);

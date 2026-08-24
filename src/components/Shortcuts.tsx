@@ -4,6 +4,7 @@ import {
   BookOpen,
   CalendarClock,
   ExternalLink,
+  Images,
   Sandwich,
   TicketCheck,
   Wrench,
@@ -13,7 +14,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { COLORS, RADIUS, SPACING, TYPE } from '../theme/tokens';
 
 /**
- * De vijf dingen waarvoor iemand de app opent.
+ * De zes dingen waarvoor iemand de app opent.
  *
  * Ze staan op Home en niet in de Info-tab, en dat is de scheiding: **Home is wat
  * je wil doen, Info is waar alles staat.** Toen deze snelkoppelingen ook in Info
@@ -58,6 +59,12 @@ export function Shortcuts() {
       label: 'Shiften',
       icon: <Wrench color={COLORS.navy} size={22} />,
       to: '/shiften',
+    },
+    {
+      key: 'media',
+      label: "Foto's",
+      icon: <Images color={COLORS.navy} size={22} />,
+      to: '/media',
     },
     {
       key: 'cursusdienst',
@@ -106,8 +113,8 @@ export function Shortcuts() {
 
 const styles = StyleSheet.create({
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: SPACING.sm },
-  // Drie op een rij op een gewone telefoon. Bij vijf items betekent dat een
-  // volle rij en een halve; dat leest beter dan twee rijen van tweeënhalf.
+  // Drie op een rij op een gewone telefoon; bij zes items zijn dat twee volle
+  // rijen.
   tile: {
     width: '31.5%',
     aspectRatio: 1.15,
