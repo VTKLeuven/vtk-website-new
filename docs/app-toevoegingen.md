@@ -9,8 +9,10 @@ moet gebeuren voor dit naar productie kan. De werking van het contract zelf staa
 in [`app-api.md`](./app-api.md); de kringkeuzes staan in
 [`design-decisions.md`](./design-decisions.md).
 
-In cijfers: 58 bestanden, waarvan 46 nieuw. `npm run verify` staat groen op 975
+In cijfers: 60 bestanden, waarvan 46 nieuw. `npm run verify` staat groen op 975
 tests in `@vtk/web` (39 meer dan voor deze branch) en 155 in `@vtk/logistiek`.
+Daarnaast is elk endpoint met de hand tegen een draaiende server nagekeken; zie
+deel 8.
 
 ---
 
@@ -150,15 +152,13 @@ loopt over Expo's push-dienst, en die doet dat stuk.
 
 ### Een worker
 
-De onderhoudsroute wordt door niets aangeroepen. Er hoort een worker in
-`infra/docker-compose.yml` te komen die om de paar minuten
-`POST /api/app/v1/push/maintenance` doet met het secret, naast de bestaande
-`shift-worker`. **Dat staat nog niet in deze branch**; het is deploy-werk en het
-raakt jullie infrastructuur.
+`infra/docker-compose.yml` bevat een **`app-push-worker`** naast de bestaande
+`shift-worker`: dezelfde vorm (curl-image, elke vijf minuten, heartbeat-bestand
+voor de healthcheck) en hetzelfde "leeg secret = uit"-patroon. Zonder
+`APP_PUSH_MAINTENANCE_SECRET` blijft hij slapen en meldt hij dat in zijn logs.
 
-Zonder die worker gebeurt er niets ergs: de shift-herinneringen blijven wel
-vertrekken (die liften mee op de bestaande shift-worker), enkel het
-broodje-klaar-bericht blijft achterwege.
+Een eigen worker en niet meeliftend op `shift-worker`, om dezelfde reden als daar:
+een klemgelopen Expo mag de herinneringsmails niet meesleuren.
 
 ### De app zelf
 
@@ -177,6 +177,10 @@ tafel liggen:
   validatie en soms juridische gevolgen; ze nabouwen zet dezelfde regels op twee
   plaatsen. De app linkt ernaar.
 - **De admin komt niet in de app**, ook niet voor wie er rechten voor heeft.
+- **De bureau- en grocomeetformulieren** blijven op de site. Dat zijn geen
+  publieke pagina's maar bestelformulieren die je enkel via een gedeelde link
+  bereikt, bewust niet in de navigatie en niet geïndexeerd. Ze in de app zetten
+  zou van een besloten link een menu-item maken.
 - **Tickets die in verkoop gaan, sturen geen automatische push.** Dat is het
   duidelijkste geval van een bericht dat commercieel aanvoelt in plaats van
   behulpzaam. Met de hand kan het wel.
@@ -199,15 +203,33 @@ tafel liggen:
 | `test/appApiPush.test.ts` | Het opruimen van dode tokens, en dat een storing bij Expo niet doorgegooid wordt. |
 | `test/appApiNotifications.test.ts` | De claim-dan-versturen-volgorde. |
 
-**Wat er niet getest is, en dat is de belangrijkste zin van dit document:
-niets hiervan is tegen een draaiende server of op een toestel uitgeprobeerd.** De
-ontwikkelservers die tijdens dit werk draaiden, hielden een Prisma-client van vóór
-verschillende schemawijzigingen vast en gaven daardoor 500 op alles wat die velden
-raakte. De unit- en routetests dekken de vorm en de beslissingen; ze dekken niet
-of een broodje bestellen in de app ook echt op de turflijst belandt.
+### Wat er tegen een draaiende server nagekeken is
 
-De eerste doorloop die ik zou doen, met een herstarte ontwikkelserver en een
-telefoon aan een cloudflared-tunnel:
+Elk endpoint is met `curl` bevraagd tegen een verse ontwikkelserver, uitgelogd én
+ingelogd. Alle veertien geven wat ze horen te geven; de vijf die een login vragen
+(`/theokot`, `/shiften`, `/piano`, `/mijn/tickets`, `/mijn/profiel`) geven
+uitgelogd een nette 401 en ingelogd hun inhoud.
+
+De schrijfwegen zijn met echte gegevens doorlopen, met een tijdelijke verkoopdag
+en pianoreservaties die daarna weer opgeruimd zijn:
+
+| Wat | Uitkomst |
+|---|---|
+| Pushtoken aanmelden, afmelden, en een ongeldig token | 200 / 200 / 400, en de rij verschijnt en verdwijnt in `AppPushDevice` |
+| Bestellen met twee broodjes van de week (limiet is één) | 422 `INVALID_ORDER`, met de reden erbij |
+| Een geldige bestelling | 201, en de juiste twee lijnen en het juiste totaal in de databank |
+| Nog eens bestellen voor dezelfde dag | 409 `ALREADY_ORDERED` |
+| De voorraad na de bestelling | 5 → 3 en 3 → 2, en na het annuleren weer 5 en 3 |
+| Andermans bestelling annuleren | 409 `ORDER_NOT_FOUND`, hetzelfde antwoord als voor een onbestaande |
+| Een pianoslot nemen, en nog eens | 201 en dan 409 `TAKEN` |
+| Een verzonnen uur boeken dat geen echt slot is | 404 `NOT_FOUND` |
+| Een derde slot in dezelfde week (limiet is twee) | 409 `WEEK_LIMIT` |
+| De onderhoudsroute zonder secret | 401 |
+
+**Wat nog altijd niet nagekeken is:** de app zelf op een toestel. De API's
+kloppen, maar of de schermen die ze tekenen ook goed lezen op een telefoon, of de
+weblogin het sessiecookie doorgeeft op iOS, en of een Mollie-testbetaling van
+begin tot eind doorloopt, is niet gezien. Dat blijft de eerste avond werk:
 
 1. inloggen, en met een nieuw lid ook de onboardingpoort;
 2. een broodje bestellen in de app en het op `/admin/theokot/turflijst` zien staan;
