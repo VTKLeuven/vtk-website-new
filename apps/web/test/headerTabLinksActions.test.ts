@@ -7,6 +7,9 @@ const mocks = vi.hoisted(() => ({
   linkUpdate: vi.fn(),
   linkFindUnique: vi.fn(),
   linkFindFirst: vi.fn(),
+  tabCreate: vi.fn(),
+  tabFindUnique: vi.fn(),
+  tabFindFirst: vi.fn(),
   transaction: vi.fn(),
   revalidatePath: vi.fn(),
   logAudit: vi.fn(),
@@ -26,6 +29,11 @@ vi.mock("@vtk/db", () => ({
       findUnique: mocks.linkFindUnique,
       findFirst: mocks.linkFindFirst,
     },
+    headerTab: {
+      create: mocks.tabCreate,
+      findUnique: mocks.tabFindUnique,
+      findFirst: mocks.tabFindFirst,
+    },
     $transaction: mocks.transaction,
   },
 }));
@@ -42,10 +50,42 @@ vi.mock("@/lib/pageAccess", () => ({
 }));
 
 import {
+  addHeaderTabDirectAction,
   moveHeaderTabLinkToTabAction,
   reorderHeaderTabLinksAction,
   reorderTabItemsAction,
 } from "@/app/actions/pages";
+
+describe("addHeaderTabDirectAction", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("maakt een top-level header tab aan met directe link naar /p/shiften", async () => {
+    mocks.tabFindUnique.mockResolvedValue(null);
+    mocks.tabFindFirst.mockResolvedValue({ order: 3 });
+    mocks.tabCreate.mockResolvedValue({ id: "tab_new" });
+
+    const res = await addHeaderTabDirectAction({
+      labelNl: "Shiften",
+      labelEn: "Shifts",
+      url: "/p/shiften",
+    });
+
+    expect(res.status).toBe("success");
+    expect(mocks.requireAnyPermission).toHaveBeenCalledWith(["pages.manage", "header.manage"]);
+    expect(mocks.tabCreate).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        labelNl: "Shiften",
+        labelEn: "Shifts",
+        externalUrl: "/p/shiften",
+        slug: "shiften",
+        order: 4,
+      }),
+    });
+    expect(mocks.revalidatePath).toHaveBeenCalledWith("/", "layout");
+  });
+});
 
 describe("reorderTabItemsAction", () => {
   beforeEach(() => {

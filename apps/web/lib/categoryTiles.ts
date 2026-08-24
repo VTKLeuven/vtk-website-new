@@ -85,5 +85,14 @@ export function categoryTiles(tab: {
 
   return tiles
     .sort((a, b) => a.order - b.order)
-    .map(({ order: _, ...tile }) => tile);
+    .map(({ key, labelNl, labelEn, href, external, excerptNl, excerptEn, imageKey }) => ({
+      key,
+      labelNl,
+      labelEn,
+      href,
+      external,
+      excerptNl,
+      excerptEn,
+      imageKey,
+    }));
 }

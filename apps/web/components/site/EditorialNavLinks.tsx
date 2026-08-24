@@ -6,6 +6,7 @@ import { ChevronDown, Menu, X } from "lucide-react";
 import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import { pick, type Locale } from "@vtk/i18n";
 import { OUTBOUND_EVENT, outboundHost, umamiEvent } from "@/lib/analytics";
+import { isExternalUrl } from "@/lib/href";
 
 const subscribeToClient = () => () => undefined;
 
@@ -92,7 +93,10 @@ export function EditorialNavLinks({
   }, [menuOpen]);
 
   function tabHref(tab: NavTab): string {
-    if (tab.externalUrl) return tab.externalUrl;
+    if (tab.externalUrl) {
+      if (isExternalUrl(tab.externalUrl)) return tab.externalUrl;
+      return base === "" ? tab.externalUrl : `${base}${tab.externalUrl}`;
+    }
     return base === "" ? `/${tab.slug}` : `${base}/${tab.slug}`;
   }
 
@@ -102,8 +106,7 @@ export function EditorialNavLinks({
   }
 
   function isActive(tab: NavTab): boolean {
-    // Een externe tab is nooit "hier"; we staan per definitie niet op die site.
-    if (tab.externalUrl) return false;
+    if (tab.externalUrl && isExternalUrl(tab.externalUrl)) return false;
     const href = tabHref(tab);
     if (href === "/") return pathname === "/" || pathname === "";
     return pathname === href || pathname.startsWith(`${href}/`);
@@ -136,7 +139,7 @@ export function EditorialNavLinks({
   function renderTabLink(tab: NavTab, active: boolean, withCaret = false) {
     const label = pick(tab.labelNl, tab.labelEn, locale);
     const caret = withCaret ? <ChevronDown className="nav-caret" aria-hidden="true" size={14} /> : null;
-    if (tab.externalUrl) {
+    if (tab.externalUrl && isExternalUrl(tab.externalUrl)) {
       return (
         <a
           href={tab.externalUrl}

@@ -771,7 +771,11 @@ const headerSchema = z.object({
   visible: z.coerce.boolean().default(true),
   visibleNl: z.coerce.boolean().default(true),
   visibleEn: z.coerce.boolean().default(true),
-  externalUrl: z.string().url().optional().nullable().or(z.literal('')),
+  externalUrl: z
+    .string()
+    .refine((v) => v === '' || isEditableDestination(v), { message: 'INVALID_URL' })
+    .optional()
+    .nullable(),
   introNl: z.string().optional().nullable(),
   introEn: z.string().optional().nullable(),
   ctaLabelNl: z.string().optional().nullable(),
@@ -1172,5 +1176,80 @@ export async function moveHeaderTabLinkToTabAction(
   });
 
   revalidatePath('/', 'layout');
+}
+
+/**
+ * Maakt direct een top-level header item (tab) aan die rechtstreeks linkt
+ * naar een pagina (bv. /p/shiften), vaste route (/werkgroepen) of externe site.
+ */
+export async function addHeaderTabDirectAction(input: {
+  labelNl: string;
+  labelEn?: string | null;
+  slug?: string | null;
+  url: string;
+}): Promise<SaveState> {
+  await requireAnyPermission(['pages.manage', 'header.manage']);
+  const labelNl = input.labelNl.trim();
+  const labelEn = (input.labelEn && input.labelEn.trim()) || labelNl;
+  const url = input.url.trim();
+  if (!labelNl || !url) return saveError('INVALID_INPUT' satisfies ContentErrorCode);
+  if (!isEditableDestination(url)) return saveError('INVALID_URL' satisfies ContentErrorCode);
+
+  let rawSlug =
+    (input.slug && input.slug.trim()) ||
+    url
+      .replace(/^https?:\/\/[^/]+/i, '')
+      .replace(/^\/?(nl|en)\//i, '')
+      .replace(/^\/?p\//i, '')
+      .replace(/^\/+/, '')
+      .replace(/\/+$/, '')
+      .toLowerCase();
+  rawSlug = rawSlug.replace(/[^a-z0-9-]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
+  if (!rawSlug) rawSlug = `item-${Date.now()}`;
+
+  const baseCode = rawSlug.toUpperCase().replace(/[^A-Z0-9]/g, '_') || 'HEADER_ITEM';
+  let code = baseCode;
+  let counter = 1;
+  while (await prisma.headerTab.findUnique({ where: { code } })) {
+    counter += 1;
+    code = `${baseCode}_${counter}`;
+  }
+
+  let slug = rawSlug;
+  let slugCounter = 1;
+  while (await prisma.headerTab.findUnique({ where: { slug } })) {
+    slugCounter += 1;
+    slug = `${rawSlug}-${slugCounter}`;
+  }
+
+  const last = await prisma.headerTab.findFirst({
+    orderBy: { order: 'desc' },
+    select: { order: true },
+  });
+
+  const created = await prisma.headerTab.create({
+    data: {
+      code,
+      slug,
+      labelNl,
+      labelEn,
+      externalUrl: url,
+      visible: true,
+      visibleNl: true,
+      visibleEn: true,
+      order: (last?.order ?? -1) + 1,
+    },
+  });
+
+  await logAudit({
+    action: 'create',
+    entity: 'headerTab',
+    entityId: created.id,
+    target: labelNl,
+    summary: `header-item aangemaakt met directe link naar ${url}`,
+  });
+
+  revalidatePath('/', 'layout');
+  return saveOk();
 }
 

@@ -113,19 +113,19 @@ export function TabInspector({
 
         <div>
           <Label htmlFor="externalUrl">
-            {nl ? "Linkt naar externe site" : "Links to an external site"}
+            {nl ? "Linkt rechtstreeks naar (pagina of externe site)" : "Links directly to (page or external site)"}
           </Label>
           <Input
             id="externalUrl"
             name="externalUrl"
-            type="url"
-            placeholder="https://career.vtk.be"
+            type="text"
+            placeholder={nl ? "/p/shiften of https://..." : "/p/shiften or https://..."}
             defaultValue={tab?.externalUrl ?? ""}
           />
           <p className="mt-1 text-xs text-[#5c667f]">
             {nl
-              ? "Laat leeg voor een gewone tab. Vul je iets in, dan opent de headerknop die site in een nieuw tabblad en gaat hij niet naar de categoriepagina."
-              : "Leave empty for a normal tab. When filled in, the header button opens that site in a new tab instead of the category page."}
+              ? "Laat leeg voor een gewone categorie met dropdown. Vul je een intern pad (/p/shiften) of externe URL in, dan linkt de headerknop rechtstreeks daarnaartoe."
+              : "Leave empty for a normal category with dropdown. When filled in with an internal path (/p/shiften) or external URL, the header button links directly there."}
           </p>
         </div>
 

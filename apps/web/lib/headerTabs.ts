@@ -83,7 +83,13 @@ export async function getVisibleHeaderTabsForNav(locale: Locale = "nl"): Promise
         labelEn: tab.labelEn,
         imageKey: tab.imageKey,
         externalUrl: tab.externalUrl,
-        children: children.map(({ order: _, ...child }) => child),
+        children: children.map(({ id, labelNl, labelEn, href, external }) => ({
+          id,
+          labelNl,
+          labelEn,
+          href,
+          external,
+        })),
       };
     });
   }
