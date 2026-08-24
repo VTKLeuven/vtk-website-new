@@ -737,3 +737,47 @@ export type AppGroups = {
   years: number[];
   groups: AppGroup[];
 };
+
+// -----------------------------------------------------------------------------
+// Piano
+// -----------------------------------------------------------------------------
+
+export type AppPianoSlot = {
+  /** ISO. Meteen ook de sleutel waarmee je reserveert. */
+  startsAt: string;
+  endsAt: string;
+  /** Vrij, van jou, of van iemand anders. */
+  state: "FREE" | "MINE" | "TAKEN";
+  /**
+   * De naam van wie het slot heeft. Staat er ook bij een bezet slot van iemand
+   * anders, net als op de site: zo zie je met wie je kan ruilen.
+   */
+  takenByName: string | null;
+  /** Boekbaar op dit moment: vrij, en binnen het venster dat vooruit mag. */
+  bookable: boolean;
+};
+
+export type AppPianoDay = {
+  /** `yyyy-mm-dd` in de kalender van Brussel. */
+  date: string;
+  slots: AppPianoSlot[];
+};
+
+export type AppPiano = {
+  days: AppPianoDay[];
+  /** Uitleg van de beheerder, Markdown. */
+  info: string;
+  /** Hoeveel slots je per week mag hebben. */
+  maxPerWeek: number;
+  /** Hoeveel je er deze week al hebt, die nog moeten komen. */
+  usedThisWeek: number;
+  slotMinutes: number;
+};
+
+/** Waarom een reservatie geweigerd werd; gelijk aan `PianoErrorCode`. */
+export type AppPianoErrorCode =
+  | "NOT_FOUND"
+  | "PAST"
+  | "BEYOND_HORIZON"
+  | "WEEK_LIMIT"
+  | "TAKEN";

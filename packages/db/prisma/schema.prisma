@@ -2034,6 +2034,11 @@ model TheokotOrder {
   pickedUpAt        DateTime?
   pickedUpById      String? // wie aan de balie op "opgehaald" drukte
   noShowProcessedAt DateTime? // mail + eventuele ban voor deze order afgewerkt
+  /// Wanneer het pushbericht "je broodje ligt klaar" voor deze bestelling
+  /// verstuurd is. Dezelfde claim-dan-versturen-aanpak als bij de
+  /// shift-herinneringen: eerst de markering zetten in een voorwaardelijke
+  /// update, dan pas versturen. Bij twijfel liever geen bericht dan twee.
+  pickupPushedAt    DateTime?                 @db.Timestamptz(3)
 
   session           TheokotSession            @relation(fields: [sessionId], references: [id], onDelete: Cascade)
   user              User                      @relation("TheokotOrderUser", fields: [userId], references: [id], onDelete: Cascade)
@@ -2045,6 +2050,7 @@ model TheokotOrder {
   @@index([userId])
   @@index([status])
   @@index([status, noShowProcessedAt])
+  @@index([status, pickupPushedAt])
 }
 
 /// Auditrij wanneer een student aan de afhaalbalie twee nog openstaande

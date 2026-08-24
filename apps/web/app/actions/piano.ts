@@ -2,25 +2,17 @@
 
 import { revalidatePath } from "next/cache";
 import { prisma } from "@vtk/db";
-import { Prisma } from "@prisma/client";
 import { requirePermission, requireSession } from "@/lib/session";
 import { brusselsWallClockMinutes, brusselsYMD, parseYMD, shiftYMD } from "@/lib/brussels";
+import { parseMinutes, type PianoConfig } from "@/lib/piano";
+import { PIANO_CONFIG_KEY, PIANO_INFO_KEY } from "@/lib/piano-server";
 import {
-  findPianoSlot,
-  isPianoSlotBookable,
-  parseMinutes,
-  pianoWeekRange,
-  type PianoConfig,
-} from "@/lib/piano";
-import {
-  getPianoConfig,
-  getPianoRules,
-  PIANO_CONFIG_KEY,
-  PIANO_INFO_KEY,
-} from "@/lib/piano-server";
+  cancelPianoReservation,
+  PianoReservationError,
+  reservePianoSlot,
+} from "@/lib/piano-reservations";
 import { saveError, saveOk, type SaveState } from "@/lib/saveState";
 import { logAudit } from "@/lib/audit";
-import { withSerializableTransaction } from "@/lib/ticketing/transactions";
 
 const PUBLIC_PATHS = ["/piano", "/en/piano"];
 const ADMIN_PATHS = ["/admin/piano", "/en/admin/piano"];
@@ -45,14 +37,28 @@ function parseIntField(value: FormDataEntryValue | null, fallback: number): numb
 // Leden: reserveren en annuleren
 // -----------------------------------------------------------------------------
 
+/** De foutcode uit `lib/piano-reservations.ts` naar de melding van dit scherm. */
+function pianoErrorKey(error: PianoReservationError): string {
+  switch (error.code) {
+    case "NOT_FOUND":
+      return "notFound";
+    case "PAST":
+      return "past";
+    case "BEYOND_HORIZON":
+      return "beyondHorizon";
+    case "WEEK_LIMIT":
+      return "weekLimit";
+    case "TAKEN":
+      return "taken";
+  }
+}
+
 /**
  * Reserveert één tijdslot voor het ingelogde lid.
  *
- * De starttijd uit het formulier wordt niet vertrouwd: ze moet terugkomen uit
- * dezelfde slotberekening als degene die de pagina getekend heeft, anders kan je
- * met een zelfgemaakt formulier om het even welk uur boeken. De unieke index op
- * `startsAt` vangt daarnaast de race af waarin twee leden tegelijk hetzelfde slot
- * indrukken: de tweede krijgt een P2002 en dus een nette "al bezet"-melding.
+ * De werking staat in `lib/piano-reservations.ts`, want de VTK-app roept
+ * dezelfde functie aan. Wat hier blijft is wat bij een action hoort: de sessie
+ * en de vertaling naar een meldingssleutel.
  */
 export async function reservePianoSlotAction(
   _prev: SaveState,
@@ -67,44 +73,14 @@ export async function reservePianoSlotAction(
 
   const raw = formData.get("startsAt");
   const startsAt = typeof raw === "string" ? new Date(raw) : new Date(NaN);
-  if (Number.isNaN(startsAt.getTime())) return saveError("notFound");
 
-  const now = new Date();
-  const config = await getPianoConfig();
-  const { windows, closures } = await getPianoRules();
-
-  const slot = findPianoSlot(windows, closures, startsAt, config.slotMinutes);
-  if (!slot) return saveError("notFound");
-  if (startsAt.getTime() <= now.getTime()) return saveError("past");
-  if (!isPianoSlotBookable(startsAt, now, config)) return saveError("beyondHorizon");
-
-  // Weeklimiet: enkel slots die nog moeten komen tellen mee. Een slot dat al
-  // gespeeld is mag je week niet blokkeren.
-  const week = pianoWeekRange(startsAt);
   try {
-    const outcome = await withSerializableTransaction(async (tx) => {
-      const thisWeek = await tx.pianoReservation.count({
-        where: {
-          userId: session.user.id,
-          startsAt: { gte: week.from, lt: week.to },
-          endsAt: { gt: now },
-        },
-      });
-      if (thisWeek >= config.maxPerWeek) return "WEEK_LIMIT" as const;
-      await tx.pianoReservation.create({
-        data: { userId: session.user.id, startsAt: slot.startsAt, endsAt: slot.endsAt },
-      });
-      return "OK" as const;
-    });
-    if (outcome === "WEEK_LIMIT") return saveError("weekLimit");
-  } catch (err) {
-    if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002") {
-      return saveError("taken");
-    }
-    throw err;
+    await reservePianoSlot(session.user.id, startsAt);
+  } catch (error) {
+    if (error instanceof PianoReservationError) return saveError(pianoErrorKey(error));
+    throw error;
   }
 
-  revalidatePiano();
   return saveOk();
 }
 
@@ -113,11 +89,7 @@ export async function cancelPianoReservationAction(formData: FormData): Promise<
   const session = await requireSession();
   const id = formData.get("id");
   if (typeof id !== "string") return;
-
-  await prisma.pianoReservation.deleteMany({
-    where: { id, userId: session.user.id, startsAt: { gt: new Date() } },
-  });
-  revalidatePiano();
+  await cancelPianoReservation(session.user.id, id);
 }
 
 // -----------------------------------------------------------------------------

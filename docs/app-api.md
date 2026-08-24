@@ -216,8 +216,33 @@ breken.
 - Een token dat Expo als `DeviceNotRegistered` afkeurt, wordt meteen gewist. Dat
   is het enige moment waarop we horen dat de app van een toestel verdwenen is.
 - `pruneStalePushDevices()` ruimt toestellen op die maanden niet meer opstartten.
-- **Er zijn nog geen automatische berichten.** Dit bestand kent er geen; wie er
-  een wil, roept het aan vanuit de code die weet wanneer het zover is.
+De automatische berichten staan in `lib/app-api/notifications.ts`. **Wanneer een
+bericht gerechtvaardigd is, is een kringkeuze**; ze staat in
+`docs/design-decisions.md`, sectie "Wanneer de app een pushbericht stuurt".
+
+- **"Je broodje ligt klaar"** vertrekt uit
+  `POST /api/app/v1/push/maintenance` (worker, `APP_PUSH_MAINTENANCE_SECRET`).
+- **De shift-herinnering** vertrekt uit `processDueShiftReminders`, binnen
+  dezelfde claim als de mail. Twee wekkers voor één herinnering lopen vroeg of
+  laat uit elkaar.
+- **Met de hand** kan het via Admin -> Pushberichten, achter het recht
+  `app.push`. Elke verzending komt in het logboek met de tekst erbij.
+
+Beide automatische berichten claimen eerst en versturen dan: de markering gaat om
+in een voorwaardelijke `updateMany`, en enkel wie die wint verstuurt. Een mislukte
+verzending zet de markering niet terug. Iemand twee keer wakker maken voor
+hetzelfde broodje is erger dan het één keer missen.
+
+### `GET /api/app/v1/piano` en `POST`/`DELETE /piano/reservatie`
+
+De pianoagenda en het reserveren. De logica staat in
+`lib/piano-reservations.ts`, gedeeld met de server-actions. De belangrijkste
+regel daar: **de starttijd wordt niet vertrouwd** maar moet terugkomen uit
+dezelfde slotberekening die het scherm tekende, anders zou een zelfgemaakte
+aanvraag om het even welk uur kunnen boeken.
+
+De agenda vraagt een login en draagt de namen van wie een slot heeft, net als op
+de site: dat is er met opzet, zodat je weet met wie je kan ruilen.
 
 ## `APP_MINIMUM_VERSION`
 

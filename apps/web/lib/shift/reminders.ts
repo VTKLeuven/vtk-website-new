@@ -1,6 +1,7 @@
 import { prisma } from '@vtk/db';
 import { sendMail, smtpConfigured } from '@vtk/mail';
 import { preferredEmail } from '@/lib/brevo/contacts';
+import { sendShiftReminderPush } from '@/lib/app-api/notifications';
 
 /**
  * Herinneringen voor een shift.
@@ -258,6 +259,14 @@ export async function processDueShiftReminders(now: Date = new Date()): Promise<
           lead.key === 'dayBefore' ? { reminderDayBeforeAt: now } : { reminderSoonAt: now },
       });
       if (count === 0) continue;
+
+      // Push gaat binnen dezelfde claim als de mail: "de herinnering voor dit
+      // venster is afgehandeld" hoort één ding te betekenen. Wie de app niet
+      // heeft, krijgt gewoon enkel de mail; `sendShiftReminderPush` gooit niet.
+      await sendShiftReminderPush(candidate.userId, {
+        name: candidate.shift.name,
+        startsSoon: lead.key === 'soon',
+      });
 
       const mail = shiftReminderMail(lead.key, candidate.user, candidate.shift);
       const ok = await sendMail({

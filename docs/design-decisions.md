@@ -3579,3 +3579,53 @@ niet erger dan wat de standaardregel al toelaat: scannen, en niets anders.
 Er is bewust geen tabel voor die uitnodigingen. Een token dat dertig seconden
 leeft, hoef je niet te kunnen intrekken; het formaat staat in
 `lib/ticketing/crypto.ts` naast de andere ondertekende tokens.
+
+---
+
+## Wanneer de app een pushbericht stuurt
+
+De VTK-app kan pushberichten sturen. Dat is een kanaal dat rechtstreeks op de
+telefoon van een lid landt, ook 's avonds, en dat je niet kan terugnemen. De
+keuze wanneer dat gerechtvaardigd is, is een kringkeuze en geen technische; ze
+staat daarom hier en niet in de code. De implementatie zit in
+`apps/web/lib/app-api/notifications.ts`.
+
+**De regel: een pushbericht gaat over iets dat je moet dóén, en dat anders
+misloopt.** Nieuws is geen pushbericht. Een nieuwe fotoalbum, een aankondiging op
+de homepage of een nieuwe activiteit in de kalender halen die drempel niet: wie
+dat wil weten, opent de app. Een bericht dat niets van je vraagt, leert mensen
+alleen om berichten weg te swipen, en dan mist ook het bericht dat er wél toe
+doet.
+
+Wat er vandaag vanzelf vertrekt:
+
+- **"Je broodje ligt klaar"**, op het moment dat de afhaal bij het Theokot
+  opengaat. Dit is de duidelijkste: je hebt betaald noch opgehaald, de deadline
+  voor no-shows loopt, en drie no-shows leveren een schorsing op. Bewust op het
+  openen van de afhaal en niet 's ochtends: een bericht een uur te vroeg stuurt
+  iemand naar een gesloten deur.
+- **Een herinnering aan een shift**, een dag en twee uur vooraf. Die vertrekt
+  **samen met de bestaande herinneringsmail** en binnen dezelfde markering, niet
+  als een tweede systeem. "De herinnering voor dit venster is afgehandeld" hoort
+  één ding te betekenen; twee wekkers voor één herinnering lopen vroeg of laat
+  uit elkaar.
+
+Wat er bewust **niet** vanzelf vertrekt, en waarom:
+
+- **Tickets die in verkoop gaan.** Verleidelijk, maar het is het duidelijkste
+  voorbeeld van een bericht dat commercieel aanvoelt in plaats van behulpzaam.
+  Wil een post dat toch voor één groot event, dan kan dat met de hand via
+  Admin → Pushberichten.
+- **Een nieuwe aankondiging.** Die staat al als venster over de homepage en in de
+  app op het hoofdscherm; een push erbovenop is hetzelfde bericht een tweede keer.
+
+**Met de hand sturen kan, achter het recht `app.push`.** Dat scherm is klein
+gehouden met opzet: je kiest iedereen of één post, en de knop zegt naar hoeveel
+toestellen het gaat. Er is geen vrije selectie en er zijn geen segmenten; hoe
+fijner de knoppen, hoe makkelijker je de verkeerde indrukt. Elke verzending komt
+in het logboek met de tekst erbij.
+
+**Toestemming wordt in de app niet bij de eerste start gevraagd**, maar via een
+knop in Profiel met een zin erbij die zegt waarover het gaat. Een systeemvenster
+meteen na het installeren wordt weggeklikt, en op iOS is dat definitief: wie één
+keer weigert, moet daarna naar de systeeminstellingen van zijn telefoon.
