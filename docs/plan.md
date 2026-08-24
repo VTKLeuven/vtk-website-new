@@ -424,8 +424,12 @@ wrapper zou daar niets doen dan doorgeven.
 - [x] `Prose`: Markdown in de typografie van de site
 - [x] categorie-, pagina-, zoek-, media-, album- en praesidiumschermen
 - [x] werkgroepen en POC's als eigen scherm (in fase 4 gebouwd)
-- [ ] bureau als eigen scherm (nu enkel via de site)
 - [ ] met de hand getest op een toestel
+
+**Bureau hoort hier niet.** Dat stond in dit plan tussen praesidium, werkgroepen
+en POC's, maar het is geen ledenlijst: het is een bestelformulier voor één VTK
+Bureau, dat je enkel bereikt via een link die Onderwijs deelt, bewust niet in de
+navigatie en niet geïndexeerd. Het hoort bij grocomeet, en dat blijft op de site.
 
 **Twee dingen die afwijken van het plan.** De kop-index van een contentpagina
 wordt door de API meegestuurd maar door de app niet getoond: die rail is op de
@@ -475,8 +479,11 @@ het anders misloopt. Tickets die in verkoop gaan, halen die drempel bewust niet.
 - [x] recht `app.push` + Admin -> Pushberichten
 - [x] `lib/piano-reservations.ts` uit de action; `/api/app/v1/piano` en `/reservatie`
 - [x] pianoscherm in de app
-- [ ] een worker inplannen die de maintenance-route aanroept
-- [ ] met de hand getest op een toestel
+- [x] `app-push-worker` in `infra/docker-compose.yml`, plus de twee
+      omgevingsvariabelen in `.env.example`
+- [x] elk endpoint met de hand nagekeken tegen een draaiende server, inclusief de
+      schrijfwegen van Theokot en piano (zie `docs/app-toevoegingen.md`, deel 8)
+- [ ] de app zelf op een toestel getest
 
 | Datum | Commit | Wat |
 |---|---|---|
