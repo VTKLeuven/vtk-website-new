@@ -282,6 +282,35 @@ export async function AanbodEditorial({ locale }: { locale: Locale }) {
                   : "The course shop opening hours are currently unavailable."}
               </p>
             )}
+            <p style={{ margin: "14px 0", fontSize: 12, color: "var(--muted)", lineHeight: 1.45 }}>
+              {locale === "nl" ? (
+                <>
+                  Vergeet{" "}
+                  <a
+                    href="https://cudi.vtk.be/vtk/account/slots"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="vtk-link"
+                  >
+                    hier
+                  </a>{" "}
+                  geen tijdslot te boeken! Zonder een tijdslot kan je je boeken niet ophalen!
+                </>
+              ) : (
+                <>
+                  Don&apos;t forget to book a time slot{" "}
+                  <a
+                    href="https://cudi.vtk.be/vtk/account/slots"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="vtk-link"
+                  >
+                    here
+                  </a>
+                  ! Without a time slot you cannot pick up your books!
+                </>
+              )}
+            </p>
             <dl className="svc-meta">
               <dt>{locale === "nl" ? "LOCATIE" : "LOCATION"}</dt>
               <dd>Dozaal · −1</dd>

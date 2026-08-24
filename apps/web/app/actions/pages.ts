@@ -1064,3 +1064,61 @@ export async function deleteHeaderTabLinkAction(linkId: string): Promise<SaveSta
   return saveOk();
 }
 
+/**
+ * Volgorde van vaste links binnen een categorie; `ids` staat al in de gewenste volgorde.
+ */
+export async function reorderHeaderTabLinksAction(ids: string[]): Promise<void> {
+  await requireAnyPermission(['pages.manage', 'header.manage']);
+  await prisma.$transaction(
+    ids.map((id, index) => prisma.headerTabLink.update({ where: { id }, data: { order: index } }))
+  );
+  await logAudit({
+    action: 'reorder',
+    entity: 'headerTab',
+    target: `${ids.length} vaste links`,
+    summary: 'volgorde van menu-items binnen een categorie gewijzigd',
+  });
+  revalidatePath('/', 'layout');
+}
+
+/**
+ * Een vaste link naar een andere categorie verplaatsen.
+ */
+export async function moveHeaderTabLinkToTabAction(
+  linkId: string,
+  tabId: string
+): Promise<void> {
+  await requireAnyPermission(['pages.manage', 'header.manage']);
+  const link = await prisma.headerTabLink.findUnique({
+    where: { id: linkId },
+    select: { id: true, tabId: true, url: true, labelNl: true },
+  });
+  if (!link || link.tabId === tabId) return;
+
+  const conflict = await prisma.headerTabLink.findUnique({
+    where: { tabId_url: { tabId, url: link.url } },
+  });
+  if (conflict) return;
+
+  const last = await prisma.headerTabLink.findFirst({
+    where: { tabId },
+    orderBy: { order: 'desc' },
+    select: { order: true },
+  });
+
+  await prisma.headerTabLink.update({
+    where: { id: linkId },
+    data: { tabId, order: (last?.order ?? -1) + 1 },
+  });
+
+  await logAudit({
+    action: 'update',
+    entity: 'headerTab',
+    entityId: tabId,
+    target: link.labelNl,
+    summary: `vaste link verplaatst naar andere categorie`,
+  });
+
+  revalidatePath('/', 'layout');
+}
+

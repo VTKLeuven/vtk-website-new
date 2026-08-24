@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { ArrowDown, ArrowUp } from "lucide-react";
 import { Button, Card, ConfirmDialog, Input, Label, Textarea } from "@vtk/ui";
 import { getDictionary, type Locale } from "@vtk/i18n";
 import { SaveForm } from "@/components/ui/SaveForm";
@@ -291,6 +292,16 @@ function MenuLinkRows({
     setRows((current) => current.map((row, i) => (i === index ? { ...row, ...patch } : row)));
   }
 
+  function move(from: number, to: number) {
+    if (to < 0 || to >= rows.length) return;
+    setRows((current) => {
+      const next = [...current];
+      const [item] = next.splice(from, 1);
+      next.splice(to, 0, item);
+      return next;
+    });
+  }
+
   function addBuiltin(routePath: string) {
     const found = BUILTIN_ROUTES.find((r) => r.path === routePath);
     if (!found) return;
@@ -328,14 +339,34 @@ function MenuLinkRows({
             placeholder={nl ? "/praesidium of https://..." : "/praesidium or https://..."}
             required
           />
-          <IconButton
-            label={nl ? "Verwijderen" : "Remove"}
-            srLabel={`${nl ? "Verwijderen" : "Remove"}: ${row.labelNl || row.url}`}
-            tone="danger"
-            onClick={() => setRows((current) => current.filter((_, i) => i !== index))}
-          >
-            <TrashIcon />
-          </IconButton>
+          <div className="flex items-center gap-1">
+            <IconButton
+              type="button"
+              disabled={index === 0}
+              label={nl ? "Omhoog verplaatsen" : "Move up"}
+              srLabel={`${nl ? "Omhoog verplaatsen" : "Move up"}: ${row.labelNl || row.url}`}
+              onClick={() => move(index, index - 1)}
+            >
+              <ArrowUp className="size-4" aria-hidden="true" />
+            </IconButton>
+            <IconButton
+              type="button"
+              disabled={index === rows.length - 1}
+              label={nl ? "Omlaag verplaatsen" : "Move down"}
+              srLabel={`${nl ? "Omlaag verplaatsen" : "Move down"}: ${row.labelNl || row.url}`}
+              onClick={() => move(index, index + 1)}
+            >
+              <ArrowDown className="size-4" aria-hidden="true" />
+            </IconButton>
+            <IconButton
+              label={nl ? "Verwijderen" : "Remove"}
+              srLabel={`${nl ? "Verwijderen" : "Remove"}: ${row.labelNl || row.url}`}
+              tone="danger"
+              onClick={() => setRows((current) => current.filter((_, i) => i !== index))}
+            >
+              <TrashIcon />
+            </IconButton>
+          </div>
         </div>
       ))}
       <div className="flex flex-wrap items-center gap-2 pt-1">

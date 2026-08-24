@@ -7,7 +7,9 @@ import type { Locale } from "@vtk/i18n";
 import {
   deleteHeaderTabLinkAction,
   importDefaultHeaderTabsAction,
+  moveHeaderTabLinkToTabAction,
   movePageToTabAction,
+  reorderHeaderTabLinksAction,
   reorderHeaderTabsAction,
   reorderPagesAction,
 } from "@/app/actions/pages";
@@ -82,10 +84,11 @@ type Selection =
   | { kind: "page"; id: string }
   | { kind: "new-tab" };
 
-/** Sleepbron: een categorie of een pagina uit een bepaalde categorie. */
+/** Sleepbron: een categorie, een pagina of een vaste link. */
 type Drag =
   | { kind: "tab"; id: string }
-  | { kind: "page"; id: string; fromTabId: string | null };
+  | { kind: "page"; id: string; fromTabId: string | null }
+  | { kind: "link"; id: string; fromTabId: string };
 
 export function ContentManager({
   locale,
@@ -156,6 +159,12 @@ export function ContentManager({
 
     if (d.kind === "page" && d.fromTabId !== tabId) {
       startTransition(() => void movePageToTabAction(d.id, tabId));
+      return;
+    }
+
+    if (d.kind === "link" && d.fromTabId !== tabId) {
+      startTransition(() => void moveHeaderTabLinkToTabAction(d.id, tabId));
+      return;
     }
   }
 
@@ -163,22 +172,63 @@ export function ContentManager({
     const d = drag.current;
     drag.current = null;
     setDropTarget(null);
-    if (!d || d.kind !== "page") return;
-    if (d.id === target.id) return;
+    if (!d) return;
 
-    if (d.fromTabId !== target.headerTabId) {
-      startTransition(() => void movePageToTabAction(d.id, target.headerTabId));
+    if (d.kind === "page") {
+      if (d.id === target.id) return;
+
+      if (d.fromTabId !== target.headerTabId) {
+        startTransition(() => void movePageToTabAction(d.id, target.headerTabId));
+        return;
+      }
+
+      const siblings = tabs.find((t) => t.id === target.headerTabId)?.pages ?? [];
+      const ids = siblings.map((p) => p.id);
+      const from = ids.indexOf(d.id);
+      const to = ids.indexOf(target.id);
+      if (from === -1 || to === -1 || from === to) return;
+      const next = [...ids];
+      next.splice(to, 0, next.splice(from, 1)[0]);
+      startTransition(() => void reorderPagesAction(next));
       return;
     }
 
-    const siblings = tabs.find((t) => t.id === target.headerTabId)?.pages ?? [];
-    const ids = siblings.map((p) => p.id);
-    const from = ids.indexOf(d.id);
-    const to = ids.indexOf(target.id);
-    if (from === -1 || to === -1 || from === to) return;
-    const next = [...ids];
-    next.splice(to, 0, next.splice(from, 1)[0]);
-    startTransition(() => void reorderPagesAction(next));
+    if (d.kind === "link" && target.headerTabId && d.fromTabId !== target.headerTabId) {
+      const tabId = target.headerTabId;
+      startTransition(() => void moveHeaderTabLinkToTabAction(d.id, tabId));
+      return;
+    }
+  }
+
+  function onDropOnLink(target: TabLinkNode, targetTabId: string) {
+    const d = drag.current;
+    drag.current = null;
+    setDropTarget(null);
+    if (!d) return;
+
+    if (d.kind === "link") {
+      if (d.id === target.id) return;
+
+      if (d.fromTabId !== targetTabId) {
+        startTransition(() => void moveHeaderTabLinkToTabAction(d.id, targetTabId));
+        return;
+      }
+
+      const siblings = tabs.find((t) => t.id === targetTabId)?.links ?? [];
+      const ids = siblings.map((l) => l.id);
+      const from = ids.indexOf(d.id);
+      const to = ids.indexOf(target.id);
+      if (from === -1 || to === -1 || from === to) return;
+      const next = [...ids];
+      next.splice(to, 0, next.splice(from, 1)[0]);
+      startTransition(() => void reorderHeaderTabLinksAction(next));
+      return;
+    }
+
+    if (d.kind === "page" && d.fromTabId !== targetTabId) {
+      startTransition(() => void movePageToTabAction(d.id, targetTabId));
+      return;
+    }
   }
 
   // ---- Rijen ----------------------------------------------------------------
@@ -213,7 +263,7 @@ export function ContentManager({
         }}
         onClick={() => select({ kind: "page", id: page.id })}
         className={[
-          "flex w-full items-center gap-2 rounded-xl border py-2 pl-8 pr-3 text-left text-sm transition-colors",
+          "flex w-full items-center gap-2 rounded-xl border py-2 pl-8 pr-3 text-left text-sm transition-colors cursor-grab active:cursor-grabbing",
           active ? "border-vtk-ink bg-vtk-blue-soft/70" : "border-transparent hover:bg-vtk-blue-soft/40",
           dropTarget === page.id ? "ring-2 ring-vtk-yellow" : "",
         ].join(" ")}
@@ -245,7 +295,32 @@ export function ContentManager({
     const [confirming, setConfirming] = useState(false);
     const label = nl ? link.labelNl : link.labelEn;
     return (
-      <div className="group flex w-full items-center gap-2 rounded-xl border border-transparent py-1.5 pl-8 pr-3 text-left text-sm transition-colors hover:bg-vtk-blue-soft/30">
+      <div
+        draggable
+        onDragStart={() => {
+          drag.current = { kind: "link", id: link.id, fromTabId: tabId };
+        }}
+        onDragEnd={() => {
+          drag.current = null;
+          setDropTarget(null);
+        }}
+        onDragOver={(e) => {
+          if (drag.current?.kind === "tab") return;
+          e.preventDefault();
+          e.stopPropagation();
+          if (dropTarget !== link.id) setDropTarget(link.id);
+        }}
+        onDrop={(e) => {
+          if (drag.current?.kind === "tab") return;
+          e.preventDefault();
+          e.stopPropagation();
+          onDropOnLink(link, tabId);
+        }}
+        className={[
+          "group flex w-full items-center gap-2 rounded-xl border border-transparent py-1.5 pl-8 pr-3 text-left text-sm transition-colors hover:bg-vtk-blue-soft/30 cursor-grab active:cursor-grabbing",
+          dropTarget === link.id ? "ring-2 ring-vtk-yellow" : "",
+        ].join(" ")}
+      >
         <span
           className="shrink-0 text-[#5c667f]"
           title={isExt ? (nl ? "Externe link" : "External link") : (nl ? "Vaste route" : "Built-in route")}

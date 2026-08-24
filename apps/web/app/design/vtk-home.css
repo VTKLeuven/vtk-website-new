@@ -1346,6 +1346,20 @@
   line-height: 1.45;
 }
 
+.vtk-design .hours-col .hours-note a,
+.vtk-design .hours-col .hours-link {
+  color: var(--paper);
+  font-weight: 500;
+  text-decoration: underline;
+  text-decoration-color: var(--yellow);
+  text-underline-offset: 3px;
+}
+
+.vtk-design .hours-col .hours-note a:hover,
+.vtk-design .hours-col .hours-link:hover {
+  color: var(--yellow);
+}
+
 .vtk-design .hours-col .hours-period {
   margin: -3px 0 8px;
   color: var(--yellow);

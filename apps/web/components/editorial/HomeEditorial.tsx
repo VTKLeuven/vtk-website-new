@@ -433,6 +433,37 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
                     : "The course shop opening hours are currently unavailable."}
                 </div>
               )}
+              <p className="hours-note">
+                {nl ? (
+                  <>
+                    Vergeet{" "}
+                    <a
+                      href="https://cudi.vtk.be/vtk/account/slots"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="hours-link"
+                      {...umamiEvent(OUTBOUND_EVENT, { bestemming: "cudi.vtk.be", vanaf: "openingsuren" })}
+                    >
+                      hier
+                    </a>{" "}
+                    geen tijdslot te boeken! Zonder een tijdslot kan je je boeken niet ophalen!
+                  </>
+                ) : (
+                  <>
+                    Don&apos;t forget to book a time slot{" "}
+                    <a
+                      href="https://cudi.vtk.be/vtk/account/slots"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="hours-link"
+                      {...umamiEvent(OUTBOUND_EVENT, { bestemming: "cudi.vtk.be", vanaf: "openingsuren" })}
+                    >
+                      here
+                    </a>
+                    ! Without a time slot you cannot pick up your books!
+                  </>
+                )}
+              </p>
             </div>
             <div className="hours-col">
               <h3>{pick(elixir.titleNl, elixir.titleEn, locale) || ELIXIR_NAME}</h3>
