@@ -6,7 +6,7 @@ import {
 } from "@zxing/library";
 import sharp from "sharp";
 import { describe, expect, it } from "vitest";
-import { createStyledShortlinkQrPng } from "@/lib/shortlink-qr";
+import { createStyledShortlinkQrPng, createStyledVtkQrPng } from "@/lib/shortlink-qr";
 
 describe("styled short-link QR code", () => {
   const publicUrl = "https://on.vtk.be/welkom";
@@ -72,5 +72,13 @@ describe("styled short-link QR code", () => {
     expect(await decode(png)).toBe(publicUrl);
     expect(await decode(compact)).toBe(publicUrl);
     expect(await decode(small)).toBe(publicUrl);
+  });
+
+  it("also keeps a longer ticket credential scanable at ticket display sizes", async () => {
+    const credential = `vtkt1.ticket_7nrYQXe5az.1.${"a".repeat(43)}`;
+    const png = await createStyledVtkQrPng(credential);
+    const ticketCard = await sharp(png).resize(176, 176).png().toBuffer();
+
+    expect(await decode(ticketCard)).toBe(credential);
   });
 });

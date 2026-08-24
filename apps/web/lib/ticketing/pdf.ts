@@ -12,8 +12,8 @@ import {
   rectangle,
   rgb,
 } from "pdf-lib";
-import QRCode from "qrcode";
 import { getObjectBuffer } from "@vtk/storage";
+import { createStyledVtkQrPng } from "@/lib/shortlink-qr";
 import { createTicketCredential } from "./crypto";
 import { ticketDesignSnapshot, type TicketDesignSnapshot } from "./design";
 import { formatMoney } from "./money";
@@ -364,7 +364,7 @@ export async function generateTicketsPdf(input: TicketPdfInput): Promise<Uint8Ar
       timeZone: "Europe/Brussels",
     }).format(input.event.startsAt);
     const credential = createTicketCredential(ticket.publicId, ticket.qrVersion);
-    const qrPng = await QRCode.toBuffer(credential, { type: "png", width: 640, margin: 2, errorCorrectionLevel: "M", color: { dark: "#0A0F1F", light: "#FFFFFF" } });
+    const qrPng = await createStyledVtkQrPng(credential);
     const qr = await document.embedPng(qrPng);
     const content = {
       eventTitle: input.event.title,

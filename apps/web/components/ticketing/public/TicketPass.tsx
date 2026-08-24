@@ -1,39 +1,21 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import QRCode from "qrcode";
 import { CheckCircle2, Clock3, Download, QrCode, UserRound, Wallet, XCircle } from "lucide-react";
 import type { PublicTicket } from "./types";
 
 export function TicketPass({ ticket, locale }: { ticket: PublicTicket; locale: "nl" | "en" }) {
   const valid = ticket.status === "VALID" || ticket.status === "ISSUED";
   const checkedIn = Boolean(ticket.checkedInAt) || ticket.status === "CHECKED_IN";
-  const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
-
-  useEffect(() => {
-    let active = true;
-    if (!ticket.credential || (!valid && !checkedIn)) return;
-    QRCode.toDataURL(ticket.credential, {
-      width: 480,
-      margin: 2,
-      errorCorrectionLevel: "M",
-      color: { dark: "#0A0F1F", light: "#FFFFFF" },
-    }).then((url) => {
-      if (active) setQrDataUrl(url);
-    });
-    return () => {
-      active = false;
-    };
-  }, [checkedIn, ticket.credential, valid]);
+  const showQr = Boolean(ticket.credential) && (valid || checkedIn);
 
   return (
     <article className={`ticket-pass${checkedIn ? " is-used" : ""}${!valid && !checkedIn ? " is-invalid" : ""}`}>
       <div className="ticket-pass-stub">
-        {qrDataUrl ? (
-          // Een data-URL die hier in de browser getekend wordt uit de ondertekende,
-          // PII-vrije ticketcredential. Er is geen bestand om te optimaliseren.
+        {showQr ? (
+          // Deze beveiligde route gebruikt dezelfde rasterrenderer als de
+          // verkorte links. De ticketcredential komt zo niet in de afbeeldings-URL.
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={qrDataUrl} alt={locale === "nl" ? "QR-code van ticket" : "Ticket QR code"} />
+          <img src={`/api/tickets/${encodeURIComponent(ticket.id)}/qr`} alt={locale === "nl" ? "QR-code van ticket" : "Ticket QR code"} />
         ) : (
           <QrCode size={28} aria-hidden="true" />
         )}

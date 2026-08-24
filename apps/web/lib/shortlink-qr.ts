@@ -166,7 +166,7 @@ function compositeRawImage(canvas: Buffer, image: RawImage, left: number, top: n
  * SVG aan Sharp te pas: sommige Alpine/libvips-builds kunnen een SVG-buffer
  * niet decoderen en gaven daardoor in productie een 500.
  */
-export async function createStyledShortlinkQrPng(content: string): Promise<Buffer> {
+export async function createStyledVtkQrPng(content: string): Promise<Buffer> {
   if (!content || content.length > 512) throw new Error("INVALID_QR_CONTENT");
 
   const qr = QRCode.create(content, { errorCorrectionLevel: "H" });
@@ -259,3 +259,9 @@ export async function createStyledShortlinkQrPng(content: string): Promise<Buffe
     .png()
     .toBuffer();
 }
+
+/**
+ * Backwards-compatible naam voor de korte-linkroute. De renderer is bewust
+ * generiek: tickets gebruiken exact dezelfde VTK-opmaak en scanmarges.
+ */
+export const createStyledShortlinkQrPng = createStyledVtkQrPng;
