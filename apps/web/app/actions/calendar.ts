@@ -223,7 +223,10 @@ const categorySchema = z.object({
   // Bij elke doelgroepwaarde hoort code die bepaalt wie erbij hoort
   // (lib/calendar/audience.ts), dus dit is een gesloten lijst.
   kind: z.enum(["category", "audience"]),
-  audience: z.enum(["FIRST_YEARS", "INTERNATIONALS", "LAST_YEARS"]).nullable().default(null),
+  audience: z
+    .enum(["FIRST_YEARS", "INTERNATIONALS", "LAST_YEARS", "ALUMNI"])
+    .nullable()
+    .default(null),
 });
 
 const CATEGORY_FIELD_LABELS: Record<string, string> = {

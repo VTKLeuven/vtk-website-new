@@ -998,6 +998,292 @@ bijgewerkt. De Brevo-sync (`apps/web/lib/brevo/`) haalt de tussenpersoon weg.
   aan waarvoor het mails wil. Bewuste keuze i.p.v. opt-out, om te stroken met de
   verwachting dat je zelf kiest waarvoor je ingeschreven wordt.
 
+## Google Workspace: postadressen, accounts en de kiesploeg
+
+Dit gaat over de **eigen adressen van de kring** (`activiteiten@vtk.be`,
+`it@vtk.be`, `2027.g5@vtk.be`) en over de `@vtk.be`-accounts van de leden. De
+code staat in `apps/web/lib/google/`; hoe je het opzet en draaiende houdt staat
+in `docs/google-workspace.md`.
+
+**Verwar dit niet met de Brevo-sync hierboven.** Dat zijn uitgaande
+nieuwsbrieven naar studenten, opt-in per `MailCategory`, met consent als
+grondslag. Dit hier zijn ontvangende adressen van de vereniging zelf: je staat
+erin omdat je in die post zit, niet omdat je iets aanvinkte. Er is geen enkele
+gedeelde regel tussen de twee, enkel een gedeeld sync-stramien (push bij
+wijziging plus een reconcile als vangnet). Modelleer nieuwe code hier dus naar
+`lib/vault` en niet naar `lib/brevo`.
+
+### Waarom dit bestaat
+
+De samenstelling van de posten en de werkgroepen wisselt elk werkingsjaar, en
+tot nu toe werd die wissel **twee keer** ingevoerd: één keer in de admin van de
+site (waar ze sowieso moet staan, voor `/praesidium`, rollen en rechten) en één
+keer met de hand in de Google Admin console. Daar kwam het aanmaken van
+accounts voor de nieuwe kiesploeg bovenop, plus losse vragen ("mag ik van die
+lijst af", "wij willen een nieuwe lijst"). Die tweede invoer is wat hier
+verdwijnt.
+
+### Een lijst is een regel, geen ledenlijst
+
+Een `MailGroup` beschrijft **wie erin hoort**, niet wie erin zit:
+
+- **bronnen** (`MailGroupSource`): een post, een werkgroep, een kiesploegpost of
+  een hele kiesploeg. Optioneel enkel de verantwoordelijke (`membership.role =
+  LEAD`), zodat `verantwoordelijken@vtk.be` dezelfde machinerie gebruikt.
+- **extra's** (`MailGroupExtra`): losse adressen die er sowieso bij horen (een
+  oud-lid, een externe partner, iemand zonder website-account).
+- **uitsluitingen**: de uitzondering die je anders in Google zou moeten
+  najagen.
+
+`activiteiten@vtk.be` is dus de regel "post Activiteiten + post Groep 5". Dat
+g5 in élke postenlijst zit, staat als een **zichtbare bronrij** en niet als
+verstopte regel in de code: de volgende IT'er moet het kunnen zien en wijzigen
+zonder de code te lezen. Het aanmaakscherm zet die rij vanzelf klaar wanneer je
+een lijst uit een post maakt.
+
+### De 15-juli-wissel kost geen cron
+
+Precies zoals bij de wachtwoordkluis: omdat `GroupMembership` per werkingsjaar
+staat en de sync enkel het huidige jaar telt, loopt elke postgebonden lijst op
+15 juli vanzelf leeg en vult de eerste reconcile daarna hem met het nieuwe
+praesidium. Er is geen jaarwisselactie, en er hoort er ook geen te komen.
+
+Hetzelfde geldt voor "haal mij van die lijst": wie niet meer in een bronpost van
+dit jaar zit, verdwijnt bij de eerstvolgende reconcile. Enkel een handmatige
+extra vraagt een handeling, en dat is één rij verwijderen.
+
+### Wat de sync nooit doet
+
+Drie grenzen, om dezelfde reden als bij de kluis: een bug in een sync die alles
+mag, wist dingen die niemand kan terughalen.
+
+- **Enkel gekoppelde groepen.** Een Google-groep zonder `MailGroup`-rij wordt
+  niet gelezen en niet aangeraakt. IT kan dus lijsten met de hand blijven
+  beheren zonder dat wij ze leegmaken.
+- **Enkel gewone leden.** `OWNER` en `MANAGER` van een groep blijven staan, ook
+  als ze niet in onze berekening zitten. Daar zit het botaccount tussen, en een
+  sync die zichzelf uit de groep gooit kan nadien niets meer rechtzetten.
+- **Nooit een groep verwijderen.** Verdwijnt de bron (post opgeheven), dan
+  laten we de groep staan en beheren we ze niet meer. Aan een groepsadres hangt
+  het archief van de conversaties, en het adres staat op affiches, in
+  mailhandtekeningen en op de site van een bedrijf.
+
+### Deze adressen ontvangen mail van buiten
+
+Dat is het grote verschil met een nieuwsbrieflijst en het is de valkuil bij het
+aanmaken: een groep met Google's defaults kan mail van externe afzenders
+weigeren of naar moderatie sturen, en dat merk je pas wanneer een bedrijf klaagt
+dat het nooit antwoord kreeg. "Wie mag posten" en "externe leden toegelaten"
+zitten in de **Groups Settings API**, een aparte API van Directory, en worden
+door de sync expliciet gezet in plaats van aan de default overgelaten.
+
+### Gedeelde drives volgen de groepen, niet de mensen
+
+Wie in het praesidium of in een kiesploeg komt, hoort ook bij de gedeelde drive
+te kunnen (`Praesidium`, `Kiesploegen`). Daar is **geen Drive-koppeling** voor
+gebouwd, en dat is een bewuste keuze: een gedeelde drive kan een **Google-groep**
+als lid hebben, en die groepen beheren we al.
+
+Zet de groep één keer met de hand op de drive, en de toegang volgt vanaf dan
+precies dezelfde regel als het mailadres. Iemand toevoegen aan een post geeft
+hem in één beweging de mailinglijst en de drive; iemand die de post verlaat,
+verliest allebei. De drives van VTK staan trouwens al zo ingesteld (`Praesidium`
+toont "3 groepen", `Kiesploegen` "1 groep").
+
+- **Daarom bestaat het brontype "elke praesidiumpost".** `praesidium@vtk.be` is
+  niet vijftien bronrijen die je moet aanvullen zodra er een post bijkomt, maar
+  één regel. Hetzelfde voor "elke werkgroep".
+- **We nemen de Drive-scope niet.** Die is breed, en wat ze zou opleveren is het
+  automatiseren van een handeling die je per drive één keer doet. Dat is de
+  verkeerde ruil.
+- **Val: een los adres in zo'n groep krijgt óók drive-toegang.** Een oud-lid dat
+  je met zijn privéadres aan `praesidium@vtk.be` toevoegt om mails te blijven
+  krijgen, kan dan bij de bestanden. Wil je dat scheiden, gebruik dan een aparte
+  groep voor de drive (zonder losse adressen) en hang de mailinglijst ergens
+  anders aan.
+- **De toegang volgt niet meteen.** Google cachet groepslidmaatschap voor Drive;
+  reken op minuten tot soms langer. Wie net toegevoegd is en "ik zie niets"
+  zegt, moet gewoon even wachten en opnieuw laden.
+- **Een lid weghalen wist geen bestanden.** In een gedeelde drive is de drive de
+  eigenaar, niet de persoon. Dat is precies waarom de kring gedeelde drives
+  gebruikt en niet iemands "Mijn Drive".
+
+### Identiteit: het `@vtk.be`-adres staat op de gebruiker
+
+De site kent `jarne.plessers@student.kuleuven.be` (KU Leuven SSO), Google kent
+`jarne.plessers@vtk.be`. Die twee bij elke sync op naam matchen is vragen om
+ellende: naamgenoten, dubbele voornamen, tussenvoegsels. De koppeling staat
+daarom **één keer opgeslagen op de `User`-rij** (`googleUserId`, het immutable
+id van Google, plus `googleEmail`), en wordt op drie manieren gelegd:
+
+1. **De site maakt het account zelf aan** (kiesploeg-flow hieronder). Dan klopt
+   de koppeling per constructie.
+2. **Zelfbediening met Google-login**, beperkt tot `hd=vtk.be`. Het lid logt één
+   keer in met zijn VTK-account en de koppeling is geverifieerd.
+3. **Een koppelscherm in de admin** met kandidaten op naam, om de bestaande
+   accounts in te halen. Eenmalige kost.
+
+**Voor praesidium- en werkgroepleden is (2) verplicht.** De gate staat naast de
+onboarding en de studiebevestiging in `gateRedirect()` in `apps/web/proxy.ts`,
+en niet in een layout: zie `docs/onboarding-study-gate.md` voor de oneindige
+refetch-lus die dat oplevert.
+
+Drie dingen die daar stil mislopen als je ze vergeet:
+
+- `hd=vtk.be` op de autorisatie-URL is een **filter voor de gebruiker, geen
+  beveiliging**. Controleer server-side dat het adres op `@vtk.be` eindigt en dat
+  Google het als geverifieerd teruggeeft.
+- Zet `prompt=select_account`. Zonder dat pakt Google het account dat toevallig
+  in de browser ingelogd is, en dat is bij de helft van de leden hun privé-Gmail.
+- Wie het tóch met een privéadres probeert, krijgt geen vage fout maar: "Dit is
+  `jarne@gmail.com`. Log opnieuw in met je VTK-adres."
+
+**De gate heeft een ontsnapping.** Wie nog geen `@vtk.be`-account heeft, kan
+niets doen aan wat de gate vraagt, en een gate die zo iemand van de hele site
+houdt is een storing en geen maatregel. De knop "ik heb nog geen VTK-account"
+zet `User.googleLinkDeferredAt` en laat het lid een week door; daarna staat de
+gate er weer. Dat veld is meteen ook de lijst voor IT van wie op een account
+wacht.
+
+**Een lid zonder koppeling wordt niet stil overgeslagen.** Het beheerscherm
+toont "3 leden nog niet gekoppeld" bij de lijst. Zijn privéadres in een intern
+postadres zetten kan, maar enkel met een bewuste klik: anders gaat interne mail
+naar een gmail-adres zonder dat iemand die keuze maakte.
+
+### De kiesploeg is een aparte structuur
+
+Een kiesploeg heeft **eigen posten die niets met de praesidiumposten te maken
+hebben** (marketing, ...), bestaat al vóór het werkingsjaar waarin ze aantreedt,
+en verdwijnt daarna. Ze krijgt daarom een eigen model (`Kiesploeg` met jaar,
+code, formele naam zoals "Kiesploeg Delta" en een informele naam die pas later
+gekozen wordt) met eigen posten en leden, en **niet** een derde waarde in
+`GroupType`. Gedeeld wordt enkel de mailinglijst-machinerie: een kiesploegpost
+is gewoon een bron zoals een gewone post er een is.
+
+De informele naam mag leeg blijven: de adressen hangen aan de code, niet aan de
+naam.
+
+#### De levensloop
+
+1. **Enkel de g5 is bekend.** Zij krijgen `voornaam.achternaam@vtk.be` met een
+   alias `kiesploeg<code>.voornaam.achternaam@vtk.be`, plus de groepen
+   `<code>.g5@vtk.be` en `<code>.beheer@vtk.be` (de twee beheerders).
+2. **De volledige ploeg komt erbij.** Zelfde adresvorm, maar: **geen
+   verzendrecht** en **een mailbox die meteen doorstuurt** naar een adres dat ze
+   zelf opgeven. Per persoon kan een beheerder dat opheffen (de marketingmensen
+   moeten wel kunnen mailen).
+3. **Mensen vallen af of komen erbij.** Lidmaatschap aanpassen in de admin, de
+   reconcile zet Google recht.
+4. **Verkozen: de postverdeling voor volgend werkingsjaar wordt ingevoerd.** Dat
+   kan nu al: `workingYearTabs()` toont een vooruit aangemaakt jaar en
+   `parseWorkingYear()` aanvaardt tot vijf jaar vooruit. Op 15 juli kantelt
+   `currentWorkingYear()`, en de eerstvolgende reconcile zet de nieuwe mensen in
+   de postenlijsten, maakt hun mailbox vrij en geeft hun verzendrecht.
+
+#### Adressen zijn sjablonen, geen code
+
+In de bestaande conventie staat de code op drie verschillende plaatsen
+(`kiesploeg2027.voornaam.achternaam`, `2027.g5`, `marketing.2027`). Dat is
+precies het soort afspraak dat volgend jaar anders is, dus de vormen staan als
+**sjabloon op de kiesploeg-rij** met `{code}`, `{voornaam}`, `{achternaam}` en
+`{post}`, met een voorbeeldregel eronder in de admin.
+
+**Aanmaken gaat altijd via een voorbeeldscherm**
+(`/admin/groepsadressen/accounts`, recht `googleAccounts.manage`). Je kiest een
+post of een kiesploeg, ziet de volledige lijst voorgestelde adressen met een
+vinkje per persoon, en pas dan gaat er iets naar Google. Het scherm herberekent
+het voorstel server-side bij het uitvoeren: een adres dat de browser meestuurt,
+is een adres dat de browser kan wijzigen.
+Een mailadres is achteraf lastig te veranderen, en namen met accenten,
+tussenvoegsels of naamgenoten (`jan.vandenbroeck` versus `jan.van.den.broeck`)
+los je beter met ogen op dan met een regel. De normalisatie zelf is: kleine
+letters, diacritics weg, niet-alfanumeriek weg, spaties in de achternaam
+samengeplakt, en bij een botsing een cijfer erachter.
+
+#### De standaardlijsten worden in één klik aangemaakt
+
+De knop "standaardlijsten aanmaken" maakt per kiesploegpost een groepsadres uit
+het lijstsjabloon, met **twee zichtbare bronrijen**: die post en de g5 van de
+ploeg. Dat de g5 in elke lijst zit, staat dus in de bronnenlijst en niet als
+regel in de sync, precies zoals bij Groep 5 en de praesidiumposten. Bestaande
+adressen worden overgeslagen, zodat de knop twee keer indrukken niets breekt.
+
+#### De accountstaat is afgeleid, met een override
+
+Net als het groepslidmaatschap wordt de staat van een account **berekend** en
+niet als losse knoppen bijgehouden:
+
+- **beperkt**: zit enkel in een kiesploeg. Geen verzendrecht vanaf het primaire
+  adres, mailbox stuurt door, de kiesploeg-alias is de standaardafzender.
+- **volwaardig**: zit in een post of werkgroep van het huidige werkingsjaar.
+- **override per persoon**: wint van allebei, voor de marketingmensen uit stap 2.
+
+**Een afgeleide staat mag automatisch upgraden, nooit automatisch degraderen.**
+Zonder die regel verliest op 15 juli het hele vertrekkende praesidium in één
+reconcile zijn mailbox en zijn verzendrecht, want hun memberships van vorig jaar
+tellen dan niet meer mee. Afsluiten, suspenderen en verzendrecht intrekken zijn
+expliciete handelingen.
+
+### Wat handmatig in de Admin console blijft
+
+**Verhinderen dat iemand mailt vanaf zijn primaire adres kan niet via een API.**
+In Gmail staat het primaire adres altijd in "Verzenden als" en dat is niet weg te
+nemen; de enige afdwinging is een routing-/compliance-regel (Apps > Gmail >
+Routing, uitgaand, actie Reject), en daar is geen publieke API voor.
+
+De oplossing is dat die regel **eenmalig** op een **organisatie-eenheid** staat
+(bijvoorbeeld `/Kiesploeg/Beperkt`) en dat de sync mensen in en uit die OU
+verplaatst: `orgUnitPath` staat wél gewoon op de user in de Directory API.
+Diezelfde OU regelt meteen de Gmail-service en de licentie. Handwerk dat je één
+keer doet, lidmaatschap dat volledig geautomatiseerd is.
+
+Wat we wél programmatisch afdwingen, is dat de alias de **standaardafzender** is
+(`users.settings.sendAs` in de Gmail API). In de praktijk stuurt zo iemand dus
+vanzelf vanaf zijn kiesploegadres, en de OU-regel vangt op wie het omzeilt.
+
+### Vallen waar we in gaan lopen
+
+- **De Gmail API werkt per gebruiker.** `sendAs` en automatisch doorsturen
+  vragen domain-wide delegation waarbij je die ene gebruiker impersonateert, met
+  eigen scopes. Dat is iets anders dan de Directory API, die je als
+  admin-subject aanroept.
+- **Een doorstuuradres moet bevestigd worden.** Gmail stuurt daarvoor een mail
+  naar het doeladres. Dat is hier geen probleem maar een kenmerk: die bevestiging
+  is meteen het bewijs dat het adres van hen is.
+- **Een licentie kost geld vanaf dag één.** Elk kiesploeglid krijgt een
+  volwaardige licentie met mailbox (bewuste keuze: betrouwbaarder dan een
+  constructie zonder mailbox, en de omschakeling op 15 juli is één call). Bij een
+  ploeg van zestig mensen is dat een begrotingspost, geen detail.
+- **Het adres van een verwijderde gebruiker komt niet meteen vrij.** Dus geen
+  accounts verwijderen; suspenderen.
+- **De service-account-sleutel is een zwaar geheim.** Met domain-wide delegation
+  kan die in principe beheerders aanmaken. Ze staat versleuteld in `Setting`
+  (`google.config`, via `lib/secrets.ts`) achter een superadmin-scherm, precies
+  zoals de organisatiesleutel van de kluis, en krijgt enkel de scopes die ze
+  nodig heeft. `admin.directory.user` komt er pas bij wanneer we effectief
+  accounts aanmaken.
+
+#### Het wachtwoord wordt één keer getoond, nooit bewaard
+
+Het gegenereerde wachtwoord staat na het aanmaken in de resultatentabel en
+verdwijnt bij het herladen; het account staat op `changePasswordAtNextLogin`.
+Bewust niet gemaild vanuit de site: dan zou er een wachtwoord in een mailbox
+blijven liggen, en het adres waar we het naartoe zouden sturen is precies het
+adres dat we nog niet geverifieerd hebben. De g5 geeft het door.
+
+Dat is ook waarom het scherm er expliciet bij zegt dat de lijst na het verlaten
+weg is. Een ploeg die haar wachtwoorden kwijt is voor ze ze doorgaf, is een
+avond werk voor niets.
+
+### Nog te beslissen
+
+- Wat er gebeurt met het account van iemand die de kring verlaat, en na hoeveel
+  tijd (mail en Drive-bestanden hangen eraan). Tot dat beslist is, degradeert de
+  sync niemand automatisch en suspendt ze niemand.
+- Of de kiesploegalias blijft staan als ontvangend adres nadat de ploeg
+  aantreedt. Nu blijft hij staan: hij verwijderen zou mail doen bouncen die naar
+  een adres uit die periode gestuurd wordt.
+
 ## Kalender: categorieën en agenda-feeds
 
 ### De site is de enige bron; geen koppeling met de Google-agenda

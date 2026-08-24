@@ -291,6 +291,27 @@ available roles but not auto-assigned to any post. Your seeded admin account is 
 - Do **not** switch dev off `next dev --webpack`, and do **not** re-export Prisma client types from
   `@vtk/db` (import model types from `@prisma/client` at the call site). See `AGENTS.md`.
 
+## Groepsadressen (Google Workspace)
+
+De koppeling met Google Workspace (opzet in `docs/google-workspace.md`, keuzes
+in `docs/design-decisions.md`) voegt één permissie toe: `mailgroups.manage`,
+voor wie de lijsten opbouwt en de accounts koppelt.
+
+Bewust los van `mailinglists.export`. Dat recht gaat over de opt-in
+nieuwsbrieven naar studenten (Brevo); dit gaat over de eigen adressen van de
+posten. Wie het ene mag, mag daarom niet vanzelf het andere: de export toont
+studentengegevens, dit scherm schrijft rechtstreeks in Google.
+
+Er staan er twee naast: `googleAccounts.manage` (accounts aanmaken en tussen
+organisatie-eenheden verplaatsen) en `kiesploeg.manage` (de kiesploeg, haar
+posten en haar leden). Accounts aanmaken is bewust een ander recht dan lijsten
+beheren: het maakt echte Workspace-accounts aan en verplaatst mensen tussen OU's
+waar het verzendbeleid aan hangt.
+
+De configuratie zelf (het service-account en de OAuth-client voor de
+zelfbedieningskoppeling) staat niet achter deze permissies maar achter de
+superadmin-gate van Admin -> IT, net als de kluis en de deur.
+
 ## Wachtwoordkluis
 
 De kluis (`docs/wachtwoorden.md`) voegt twee permissies toe aan deze registry:

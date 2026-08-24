@@ -442,6 +442,15 @@ enum StudyProgramme {
 // Users, groups, permissions
 // -----------------------------------------------------------------------------
 
+/// Wat een `@vtk.be`-account mag. Afgeleid uit de posten en de kiesploeg, met
+/// een override per persoon; zie docs/design-decisions.md, "Google Workspace".
+enum GoogleAccountState {
+  /// Kiesploeglid: mailbox stuurt door, verzenden gebeurt via de kiesploegalias.
+  RESTRICTED
+  /// Volwaardig: eigen mailbox, mag mailen vanaf het eigen adres.
+  FULL
+}
+
 model User {
   id                   String    @id @default(cuid())
   // `name` blijft de weergavenaam (en het veld dat better-auth zelf zet bij een
@@ -492,6 +501,21 @@ model User {
   // mail en de voorkeur voor communicatie komen erbij.
   personalEmail          String?
   emailPreference        EmailPreference  @default(UNIVERSITY)
+  // Het `@vtk.be`-account in Google Workspace. `googleUserId` is het immutable
+  // id van Google: dat blijft kloppen wanneer iemand van naam of adres wisselt.
+  // Op naam matchen doen we bewust nooit (naamgenoten, tussenvoegsels), dus dit
+  // veld is de enige koppeling. Zie docs/design-decisions.md, "Google Workspace".
+  googleUserId           String?          @unique
+  googleEmail            String?          @unique
+  googleLinkedAt         DateTime?
+  // Wanneer het lid de verplichte koppeling uitstelde omdat het nog geen
+  // @vtk.be-account heeft. Zonder deze ontsnapping sluit de gate iemand buiten
+  // die niets kan doen aan wat de gate vraagt; de gate komt gewoon terug.
+  googleLinkDeferredAt   DateTime?
+  // Laatst toegepaste staat van het Google-account, zodat de sync niet elke
+  // ronde dezelfde OU-verhuizing opnieuw doet. Afgeleid uit de posten en de
+  // kiesploeg; zie lib/google/accountState.ts.
+  googleAccountState     GoogleAccountState?
   // Opt-in mailinglijsten: enkel de aangeduide categorieën zitten in de array.
   mailCategories         MailCategory[]   @default([])
   // Herinneringen voor een shift waarvoor je jezelf inschreef. Bewust geen
@@ -517,6 +541,10 @@ model User {
   // exchange-student bent. Stuurt welke evenementen vanzelf in de kalender
   // opduiken (zie CalendarAudience).
   internationalStudent   Boolean          @default(false)
+  // Afgestudeerde van de faculteit. Bewust los van `notStudying`: die laatste
+  // omvat ook wie stopte zonder af te studeren en is dus geen betrouwbare
+  // alumni-indicator. Stuurt de expliciete alumni-doelgroep in de kalender.
+  alumni                 Boolean          @default(false)
   // Werkingsjaar waarin het lid zijn studieprofiel laatst bevestigde (2026 =
   // "26-27"). Loopt dat achter op het huidige werkingsjaar, dan is het profiel
   // verlopen: de bevestigingsgate vraagt het opnieuw en het lid valt zolang uit
@@ -610,6 +638,8 @@ model User {
 
   urenloopDownloadEmails UrenloopDownloadEmail[] @relation("UrenloopDownloadEmailAddedBy")
 
+  kiesploegMemberships KiesploegMember[]
+
   createdLesbezoeken  Lesbezoek[] @relation("LesbezoekCreatedBy")
   reviewedLesbezoeken Lesbezoek[] @relation("LesbezoekReviewedBy")
 
@@ -654,6 +684,7 @@ model Group {
   uitleenTransport    UitleenTransportBooking[]
   uitleenTemplates    UitleenRequestTemplate[]
   uitleenEventsGroup  UitleenEvent[]
+  mailGroupSources    MailGroupSource[]
 }
 
 model GroupMembership {
@@ -729,6 +760,196 @@ model VaultMember {
   updatedAt   DateTime          @updatedAt
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// -----------------------------------------------------------------------------
+// Google Workspace: de eigen adressen van de kring (activiteiten@vtk.be, ...)
+// -----------------------------------------------------------------------------
+// Bewust iets anders dan de opt-in mailinglijsten van Brevo: dit zijn
+// ontvangende adressen van de vereniging zelf, en je staat erin omdat je in die
+// post zit. Een lijst beschrijft daarom *wie erin hoort* (bronnen + extra's) en
+// niet wie erin zit: de leden worden bij elke sync herberekend uit de posten van
+// het huidige werkingsjaar, waardoor de 15-juli-wissel vanzelf goed loopt.
+// Zie docs/design-decisions.md, "Google Workspace".
+
+model MailGroup {
+  id          String  @id @default(cuid())
+  /// Volledig adres in kleine letters, bv. "activiteiten@vtk.be".
+  email       String  @unique
+  name        String
+  description String?
+
+  /// Immutable groeps-id van Google; leeg tot de eerste geslaagde sync.
+  googleId String?
+
+  /// Uit = wij raken de groep in Google niet meer aan. Ze blijft wel bestaan:
+  /// aan een groepsadres hangt het archief en het staat op affiches en in
+  /// mailhandtekeningen, dus de sync verwijdert nooit een groep.
+  enabled Boolean @default(true)
+
+  /// Mag iemand van buiten vtk.be naar dit adres mailen? Standaard ja, want dat
+  /// is het punt van deze adressen. Met Google's default zou mail van een
+  /// bedrijf naar moderatie of naar de prullenbak gaan.
+  allowExternalSenders Boolean @default(true)
+
+  lastSyncAt      DateTime?
+  lastError       String?
+  /// Aantal leden dat de laatste geslaagde sync in Google zette.
+  lastMemberCount Int       @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  sources MailGroupSource[]
+  extras  MailGroupExtra[]
+
+  @@index([enabled])
+}
+
+/// Een post of werkgroep waarvan de leden van dit werkingsjaar in de lijst
+/// horen. Meerdere bronnen per lijst: `activiteiten@vtk.be` is "post
+/// Activiteiten + post Groep 5". Dat g5 overal in zit, staat hier dus als
+/// zichtbare rij en niet als verstopte regel in de code.
+model MailGroupSource {
+  id          String  @id @default(cuid())
+  mailGroupId String
+  /// Precies één van de vier is ingevuld: een post/werkgroep, elke actieve
+  /// groep van een soort, een hele kiesploeg, of één post binnen een kiesploeg.
+  /// Bewust losse kolommen en geen polymorfe `type` + `id`: zo blijft de foreign
+  /// key echt, en verdwijnt een bron vanzelf wanneer de post of de kiesploeg
+  /// verdwijnt.
+  groupId         String?
+  /// "Elke actieve praesidiumpost" of "elke actieve werkgroep", in plaats van
+  /// vijftien losse bronrijen. Dat is wat een adres als praesidium@vtk.be nodig
+  /// heeft: één regel die ook nog klopt nadat er een post bijkomt. Datzelfde
+  /// adres is meteen de sleutel tot de gedeelde drive; zie
+  /// docs/design-decisions.md, "Gedeelde drives volgen de groepen".
+  groupType       GroupType?
+  kiesploegId     String?
+  kiesploegPostId String?
+  /// Enkel de verantwoordelijke (`role = LEAD`) i.p.v. elk lid.
+  onlyLead    Boolean @default(false)
+
+  mailGroup     MailGroup      @relation(fields: [mailGroupId], references: [id], onDelete: Cascade)
+  group         Group?         @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  kiesploeg     Kiesploeg?     @relation(fields: [kiesploegId], references: [id], onDelete: Cascade)
+  kiesploegPost KiesploegPost? @relation(fields: [kiesploegPostId], references: [id], onDelete: Cascade)
+
+  @@unique([mailGroupId, groupId, onlyLead])
+  @@unique([mailGroupId, groupType, onlyLead])
+  @@unique([mailGroupId, kiesploegId, onlyLead])
+  @@unique([mailGroupId, kiesploegPostId, onlyLead])
+  @@index([groupId])
+  @@index([kiesploegId])
+  @@index([kiesploegPostId])
+}
+
+// -----------------------------------------------------------------------------
+// Kiesploeg
+// -----------------------------------------------------------------------------
+// Een opkomende ploeg met een eigen postverdeling, die maanden vóór haar
+// werkingsjaar al mailadressen nodig heeft. Bewust een eigen structuur en geen
+// derde waarde in `GroupType`: haar posten zijn andere posten dan die van het
+// praesidium, ze bestaat maar één jaar, en haar leden hebben een beperkt
+// account tot ze aantreden. Wat gedeeld wordt met de posten is enkel de
+// mailinglijst-machinerie (`MailGroupSource`).
+// Zie docs/design-decisions.md, "Google Workspace".
+
+model Kiesploeg {
+  id String @id @default(cuid())
+  /// Korte code die in elk adres terugkomt, bv. "2027".
+  code String @unique
+  /// Het werkingsjaar waarin ze aantreedt (2027 = "27-28"). Vanaf 15 juli van
+  /// dat jaar worden haar leden volwaardig, op voorwaarde dat ze dan effectief
+  /// in een post zitten.
+  workingYear Int
+  /// De naam die VTK kiest, bv. "Kiesploeg Delta".
+  formalName String
+  /// De naam die de ploeg zelf later kiest; mag lang leeg blijven. De adressen
+  /// hangen aan de code en niet aan de naam, dus dit breekt niets.
+  informalName String?
+
+  /// Sjablonen voor de adressen, met {code}, {voornaam}, {achternaam} en {post}.
+  /// Sjablonen en geen code, want de conventie verschilt nu al per ploeg.
+  accountTemplate String @default("{voornaam}.{achternaam}")
+  aliasTemplate   String @default("kiesploeg{code}.{voornaam}.{achternaam}")
+  listTemplate    String @default("{post}.{code}")
+
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  posts      KiesploegPost[]
+  members    KiesploegMember[]
+  mailGroups MailGroupSource[]
+}
+
+/// Een post binnen de kiesploeg. Dit zijn níét de praesidiumposten: ze hebben
+/// eigen namen en bestaan enkel voor deze ploeg.
+model KiesploegPost {
+  id          String  @id @default(cuid())
+  kiesploegId String
+  /// Gaat in het lijstadres, bv. "marketing" -> marketing.2027@vtk.be.
+  code        String
+  name        String
+  /// De g5 van de ploeg. Haar leden zitten in élke lijst van deze kiesploeg,
+  /// zoals Groep 5 in elke postenlijst van het praesidium zit.
+  isG5        Boolean @default(false)
+  order       Int     @default(0)
+
+  kiesploeg  Kiesploeg         @relation(fields: [kiesploegId], references: [id], onDelete: Cascade)
+  members    KiesploegMember[]
+  mailGroups MailGroupSource[]
+
+  @@unique([kiesploegId, code])
+  @@index([kiesploegId])
+}
+
+model KiesploegMember {
+  id          String         @id @default(cuid())
+  kiesploegId String
+  userId      String
+  /// Leeg zolang de postverdeling nog niet gemaakt is: in het begin is enkel
+  /// de g5 bekend.
+  postId      String?
+  role        MembershipRole @default(MEMBER)
+  /// Override: dit lid mag nu al mailen vanaf zijn eigen adres (de
+  /// marketingmensen). Wint van de afgeleide staat.
+  mailboxActive Boolean      @default(false)
+  /// Waar de mail naartoe gaat zolang de mailbox niet actief is.
+  forwardTo   String?
+  createdAt   DateTime       @default(now())
+
+  kiesploeg Kiesploeg      @relation(fields: [kiesploegId], references: [id], onDelete: Cascade)
+  user      User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  post      KiesploegPost? @relation(fields: [postId], references: [id], onDelete: SetNull)
+
+  @@unique([kiesploegId, userId])
+  @@index([userId])
+  @@index([postId])
+}
+
+/// Waarom een adres los toegevoegd of net weggehouden wordt.
+enum MailGroupExtraKind {
+  /// Hoort er sowieso bij, ook zonder lidmaatschap (een oud-lid, een externe).
+  INCLUDE
+  /// Moet eruit, ook al zit de persoon in een bronpost. De uitzondering die je
+  /// anders elk jaar opnieuw in Google zou moeten najagen.
+  EXCLUDE
+}
+
+model MailGroupExtra {
+  id          String             @id @default(cuid())
+  mailGroupId String
+  /// Kleine letters; een vrij adres, dus niet noodzakelijk van een lid.
+  email       String
+  kind        MailGroupExtraKind @default(INCLUDE)
+  note        String?
+  createdAt   DateTime           @default(now())
+
+  mailGroup MailGroup @relation(fields: [mailGroupId], references: [id], onDelete: Cascade)
+
+  @@unique([mailGroupId, email])
 }
 
 model Permission {
@@ -1097,9 +1318,9 @@ model CalendarEvent {
 
 // Doelgroep waar een categorie voor staat. Een categorie zonder `audience` is een
 // gewoon thema (Career, Sport, ...) dat iedereen ziet en dat als filterchip op
-// /kalender staat. Een categorie mét `audience` verschijnt niet als chip: haar
-// evenementen komen vanzelf bovendrijven bij wie tot die doelgroep hoort, en
-// blijven voor de rest standaard verborgen (zichtbaar te maken met "alles tonen").
+// /kalender staat. Een categorie mét `audience` verschijnt in de aparte rij met
+// doelgroepfilters. Alle evenementen zijn standaard zichtbaar; profielmatching
+// is een expliciete voorkeur van de bezoeker.
 //
 // De waarde is een enum en geen vrij veld, want bij elke waarde hoort code die
 // bepaalt of een lid erbij hoort (zie lib/calendar/audience.ts). Een nieuwe
@@ -1108,6 +1329,7 @@ enum CalendarAudience {
   FIRST_YEARS
   INTERNATIONALS
   LAST_YEARS
+  ALUMNI
 }
 
 model CalendarCategory {

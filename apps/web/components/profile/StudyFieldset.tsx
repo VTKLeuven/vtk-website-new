@@ -44,6 +44,7 @@ export function StudyFieldset({
   notAtFaculty,
   notStudying,
   internationalStudent,
+  alumni,
 }: {
   locale: Locale;
   studyYears: StudyYear[];
@@ -51,6 +52,7 @@ export function StudyFieldset({
   notAtFaculty: boolean;
   notStudying: boolean;
   internationalStudent: boolean;
+  alumni: boolean;
 }) {
   const t = getDictionary(locale).onboarding;
   const selectedYears = new Set(studyYears);
@@ -119,6 +121,10 @@ export function StudyFieldset({
           label={t.internationalStudent}
         />
         <p className="mt-1 text-xs text-[#5c667f]">{t.internationalStudentHint}</p>
+      </div>
+      <div>
+        <CheckboxChip name="alumni" value="on" defaultChecked={alumni} label={t.alumni} />
+        <p className="mt-1 text-xs text-[#5c667f]">{t.alumniHint}</p>
       </div>
     </div>
   );

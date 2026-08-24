@@ -110,6 +110,8 @@ export const AUDIT_ENTITIES = {
   mailinglists: { nl: "Mailinglijsten", en: "Mailing lists", group: "mailinglists" },
   logistiek: { nl: "Uitleendienst", en: "Equipment rental", group: "logistiek" },
   vaultItem: { nl: "Kluiswachtwoord", en: "Vault password", group: "vault" },
+  mailGroup: { nl: "Groepsadres", en: "Group address", group: "google" },
+  kiesploeg: { nl: "Kiesploeg", en: "Kiesploeg", group: "google" },
   vaultPost: { nl: "Kluiskoppeling", en: "Vault link", group: "vault" },
   vaultAccess: { nl: "Kluistoegang", en: "Vault access", group: "vault" },
 
@@ -145,6 +147,7 @@ export const AUDIT_GROUPS = {
   piano: { nl: "Piano", en: "Piano" },
   mailinglists: { nl: "Mailinglijsten", en: "Mailing lists" },
   logistiek: { nl: "Uitleendienst", en: "Equipment rental" },
+  google: { nl: "Google Workspace", en: "Google Workspace" },
   vault: { nl: "Wachtwoordkluis", en: "Password vault" },
   door: { nl: "Deur", en: "Door" },
   fakscanner: { nl: "Fakscanner", en: "Fakscanner" },

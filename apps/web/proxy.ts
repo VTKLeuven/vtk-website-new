@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { AUTH_BASE_PATH, currentWorkingYear } from '@vtk/auth';
+import { googleLinkGateEnabled } from '@/lib/google/config';
 import { getSession } from '@vtk/auth/server';
 import {
   AUTHORIZATION_PREVIEW_COOKIE,
@@ -71,6 +72,9 @@ function mainSiteUrl(host: string): string {
  *
  * @returns een redirect-response wanneer de gate moet ingrijpen, anders `null`.
  */
+/** Hoe lang "ik heb nog geen account" de koppelgate stilhoudt. */
+const GOOGLE_LINK_DEFER_MS = 7 * 24 * 60 * 60 * 1000;
+
 async function gateRedirect(request: NextRequest, internalPath: string): Promise<NextResponse | null> {
   // Prefetch-requests niet gaten: Next prefetcht elke <Link>, en een prefetch
   // omleiden naar de gate-pagina laat de router die redirect volgen in een lus.
@@ -106,6 +110,36 @@ async function gateRedirect(request: NextRequest, internalPath: string): Promise
   if (session.user.studyConfirmedYear !== currentWorkingYear()) {
     if (segment !== 'studie-bevestigen') {
       return NextResponse.redirect(new URL(`${enPrefix}/studie-bevestigen`, request.url));
+    }
+    return null;
+  }
+
+  // 3. VTK-account koppelen: wie dit werkingsjaar in een post of werkgroep zit,
+  //    hoort zijn @vtk.be-account te koppelen. Zonder die koppeling weet de
+  //    groepsadressen-sync geen adres en valt het lid stil uit elke lijst.
+  //
+  //    De hele Google-koppeling is optioneel en deze gate staat standaard uit
+  //    (`googleLinkGateEnabled`). Zou ze aanstaan zonder ingestelde koppeling,
+  //    dan kreeg elk praesidiumlid een scherm met een knop die niets doet en
+  //    klikte iedereen "ik heb nog geen account".
+  //
+  //    Er is bewust een ontsnapping (`googleLinkDeferredAt`, gezet door de
+  //    knop "ik heb nog geen account"): wie nog geen account heeft, kan niets
+  //    doen aan wat de gate vraagt, en een gate die zo iemand van de hele site
+  //    houdt is een storing. De gate komt na de uitsteltermijn gewoon terug.
+  if (
+    !session.user.googleLinked &&
+    session.groups.length > 0 &&
+    segment !== 'koppel-vtk-account' &&
+    // Als laatste gecheckt: dit leest de instellingen (een minuut gecachet), en
+    // die moeite is nutteloos voor iemand die toch niet gegate wordt.
+    (await googleLinkGateEnabled())
+  ) {
+    const deferred = session.user.googleLinkDeferredAt;
+    const stillDeferred =
+      deferred !== null && Date.now() - Date.parse(deferred) < GOOGLE_LINK_DEFER_MS;
+    if (!stillDeferred) {
+      return NextResponse.redirect(new URL(`${enPrefix}/koppel-vtk-account`, request.url));
     }
   }
 

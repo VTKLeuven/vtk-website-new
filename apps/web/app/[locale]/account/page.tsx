@@ -81,6 +81,7 @@ export default async function AccountPage({ params }: { params: Promise<{ locale
         notAtFaculty: true,
         notStudying: true,
         internationalStudent: true,
+        alumni: true,
       },
     }),
     // Aankomende reservaties (nog niet opgehaald, afhaalvenster nog niet voorbij).

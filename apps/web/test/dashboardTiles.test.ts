@@ -72,6 +72,8 @@ function session(overrides: Partial<SessionPayload> = {}): SessionPayload {
       isSuperAdmin: false,
       onboarded: true,
       studyConfirmedYear: 2026,
+      googleLinked: true,
+      googleLinkDeferredAt: null,
     },
     permissions: [],
     roleIds: [],

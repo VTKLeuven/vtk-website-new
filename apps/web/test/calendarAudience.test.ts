@@ -3,14 +3,18 @@ import { audienceFilter, audiencesForStudyProfile } from "@/lib/calendar/audienc
 
 describe("calendar audiences", () => {
   it("derives LAST_YEARS for a final-master-year student", () => {
-    expect(audiencesForStudyProfile(["MASTER_2"], false)).toEqual(["LAST_YEARS"]);
+    expect(audiencesForStudyProfile(["MASTER_2"], false, false)).toEqual(["LAST_YEARS"]);
   });
 
   it("keeps all applicable audiences for a final-year international student", () => {
-    expect(audiencesForStudyProfile(["MASTER_2"], true)).toEqual([
+    expect(audiencesForStudyProfile(["MASTER_2"], true, false)).toEqual([
       "INTERNATIONALS",
       "LAST_YEARS",
     ]);
+  });
+
+  it("uses the explicit alumni profile field", () => {
+    expect(audiencesForStudyProfile([], false, true)).toEqual(["ALUMNI"]);
   });
 
   it("preserves the any-matching-audience filter semantics", () => {

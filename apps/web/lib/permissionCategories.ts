@@ -21,6 +21,8 @@ const CATEGORY_LABELS: Record<string, { nl: string; en: string }> = {
   piano: { nl: "Piano", en: "Piano" },
   logistiek: { nl: "Logistiek", en: "Logistics" },
   door: { nl: "Deurtoegang", en: "Door access" },
+  vault: { nl: "Wachtwoordkluis", en: "Password vault" },
+  google: { nl: "Google Workspace", en: "Google Workspace" },
   modules: { nl: "Moduletoegang", en: "Module access" },
   external: { nl: "Externe apps", en: "External apps" },
   it: { nl: "IT", en: "IT" },

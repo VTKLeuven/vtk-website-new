@@ -75,6 +75,17 @@ export type AuthUser = {
    * die hier niet thuishoort.
    */
   studyConfirmedYear: number | null;
+  /**
+   * Heeft dit lid zijn `@vtk.be`-account gekoppeld? Praesidium- en
+   * werkgroepleden moeten dat; de gate in `apps/web/proxy.ts` gebruikt dit
+   * samen met `groups`.
+   */
+  googleLinked: boolean;
+  /**
+   * Wanneer het lid de koppeling uitstelde omdat het nog geen account heeft
+   * (ISO-string), of `null`. De gate laat hem dan even met rust.
+   */
+  googleLinkDeferredAt: string | null;
 };
 
 export type AuthGroup = {

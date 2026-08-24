@@ -108,6 +108,15 @@ export const PERMISSIONS = [
   { code: "vault.editOwn", labelNl: "Wachtwoorden van de eigen post beheren", labelEn: "Manage own post's passwords", category: "vault" },
   { code: "vault.manage", labelNl: "Wachtwoordkluis beheren (posten koppelen, synchroniseren)", labelEn: "Manage the password vault (link posts, synchronise)", category: "vault" },
 
+  // Google Workspace: de eigen adressen van de kring (activiteiten@vtk.be, ...).
+  // Bewust los van `mailinglists.export`: dat zijn de opt-in nieuwsbrieven naar
+  // studenten (Brevo), dit zijn de ontvangende adressen van de posten zelf.
+  { code: "mailgroups.manage", labelNl: "Groepsadressen beheren (Google Workspace)", labelEn: "Manage group addresses (Google Workspace)", category: "google" },
+  // Accounts aanmaken is zwaarder dan lijsten beheren: het maakt echte
+  // Workspace-accounts en verplaatst mensen tussen organisatie-eenheden.
+  { code: "googleAccounts.manage", labelNl: "Google-accounts aanmaken en beheren", labelEn: "Create and manage Google accounts", category: "google" },
+  { code: "kiesploeg.manage", labelNl: "Kiesploeg beheren (posten, leden, adressen)", labelEn: "Manage the kiesploeg (posts, members, addresses)", category: "google" },
+
   // Adminlogboek (wie deed wat in de admin)
   { code: "audit.view", labelNl: "Adminlogboek bekijken", labelEn: "View the admin audit log", category: "it" },
   { code: "urenloopApp.manage", labelNl: "24UL-app: downloadlijst beheren", labelEn: "24UL app: manage the download list", category: "it" },

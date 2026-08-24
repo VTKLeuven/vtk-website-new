@@ -17,6 +17,12 @@ import {
 } from "@/lib/runtimeConfig";
 import { DOOR_SETTING_KEY, getDoorConfig, type StoredDoor } from "@/lib/door-config";
 import { VAULT_SETTING_KEY, type StoredVault } from "@/lib/vault/config";
+import {
+  GOOGLE_SETTING_KEY,
+  forgetGoogleGateState,
+  normalisePrivateKey,
+  type StoredGoogle,
+} from "@/lib/google/config";
 import { KUL_DEBUG_SETTING_KEY, clearKulAuthLogs } from "@vtk/auth/server";
 import { saveError, saveOk, type SaveState } from "@/lib/saveState";
 import { logAudit } from "@/lib/audit";
@@ -417,5 +423,103 @@ export async function saveVaultConfigAction(
 
   revalidatePath("/admin/it");
   revalidatePath("/admin/wachtwoorden/beheer");
+  return saveOk();
+}
+
+
+const googleSchema = z.object({
+  domain: z.string().trim().min(3).max(120),
+  subject: z.string().trim().email(),
+  clientEmail: z.string().trim().email(),
+  privateKey: z.string().trim().optional(),
+  oauthClientId: z.string().trim().max(200).optional(),
+  oauthClientSecret: z.string().trim().max(200).optional(),
+  fullOrgUnit: z.string().trim().max(200).optional(),
+  restrictedOrgUnit: z.string().trim().max(200).optional(),
+  linkGateEnabled: z.string().optional(),
+});
+
+/**
+ * Bewaart de koppeling met Google Workspace (de groepsadressen).
+ *
+ * De private key wordt versleuteld weggeschreven en nooit teruggetoond; leeg
+ * laten betekent "hou de bestaande". Zelfde patroon als de kluis, en om dezelfde
+ * reden: met domain-wide delegation is dit een sleutel over het hele domein.
+ */
+export async function saveGoogleConfigAction(
+  _prev: SaveState,
+  formData: FormData,
+): Promise<SaveState> {
+  await requireSuperAdmin();
+
+  const parsed = googleSchema.safeParse({
+    domain: ((formData.get("domain") as string) ?? "").trim().toLowerCase(),
+    subject: ((formData.get("subject") as string) ?? "").trim().toLowerCase(),
+    clientEmail: ((formData.get("clientEmail") as string) ?? "").trim(),
+    privateKey: ((formData.get("privateKey") as string) ?? "").trim() || undefined,
+    oauthClientId: ((formData.get("oauthClientId") as string) ?? "").trim() || undefined,
+    oauthClientSecret: ((formData.get("oauthClientSecret") as string) ?? "").trim() || undefined,
+    fullOrgUnit: ((formData.get("fullOrgUnit") as string) ?? "").trim() || undefined,
+    restrictedOrgUnit: ((formData.get("restrictedOrgUnit") as string) ?? "").trim() || undefined,
+    linkGateEnabled: (formData.get("linkGateEnabled") as string) ?? undefined,
+  });
+  if (!parsed.success) return saveError("INVALID_INPUT");
+  const p = parsed.data;
+
+  const existingRow = await prisma.setting.findUnique({ where: { key: GOOGLE_SETTING_KEY } });
+  const existing = (existingRow?.value ?? null) as unknown as StoredGoogle | null;
+
+  let privateKeyEnc: string;
+  if (p.privateKey) {
+    const pem = normalisePrivateKey(p.privateKey);
+    // Vroeg falen op een geplakte JSON of een half gekopieerde sleutel: anders
+    // faalt pas de eerste sync, met een OpenSSL-melding die niets zegt.
+    if (!pem.includes("BEGIN") || !pem.includes("PRIVATE KEY")) {
+      return saveError("GOOGLE_KEY_INVALID");
+    }
+    privateKeyEnc = encryptSecret(pem);
+  } else if (existing?.privateKeyEnc) {
+    privateKeyEnc = existing.privateKeyEnc;
+  } else {
+    return saveError("GOOGLE_KEY_REQUIRED");
+  }
+
+  // Het secret van de OAuth-client volgt hetzelfde patroon als de private key:
+  // leeg laten houdt het bestaande. De client-id zelf is geen geheim.
+  let oauthClientSecretEnc = existing?.oauthClientSecretEnc;
+  if (p.oauthClientSecret) oauthClientSecretEnc = encryptSecret(p.oauthClientSecret);
+
+  const value: StoredGoogle = {
+    domain: p.domain,
+    subject: p.subject,
+    clientEmail: p.clientEmail,
+    privateKeyEnc,
+    oauthClientId: p.oauthClientId ?? existing?.oauthClientId,
+    oauthClientSecretEnc,
+    fullOrgUnit: p.fullOrgUnit,
+    restrictedOrgUnit: p.restrictedOrgUnit,
+    // Een uitgevinkte checkbox stuurt niets mee. Standaard dus uit, en dat is
+    // de bedoeling: de koppeling opzetten mag nooit vanzelf een melding op het
+    // scherm van elk praesidiumlid zetten.
+    linkGateEnabled: p.linkGateEnabled === "on",
+  };
+
+  await prisma.setting.upsert({
+    where: { key: GOOGLE_SETTING_KEY },
+    create: { key: GOOGLE_SETTING_KEY, value: value as unknown as Prisma.InputJsonValue },
+    update: { value: value as unknown as Prisma.InputJsonValue },
+  });
+
+  await logAudit({
+    action: "update",
+    entity: "itConfig",
+    target: "Google Workspace",
+    // Nooit de sleutel zelf in het logboek; enkel dát er gewijzigd is.
+    summary: `Google-configuratie bijgewerkt (${value.domain})`,
+  });
+
+  forgetGoogleGateState();
+  revalidatePath("/admin/it");
+  revalidatePath("/admin/groepsadressen");
   return saveOk();
 }

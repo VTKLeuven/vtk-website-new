@@ -8,11 +8,13 @@ import { getCurrentSession } from "@/lib/session";
 export function audiencesForStudyProfile(
   studyYears: StudyYear[],
   internationalStudent: boolean,
+  alumni: boolean,
 ): CalendarAudience[] {
   const audiences: CalendarAudience[] = [];
   if (studyYears.includes("BACHELOR_1")) audiences.push("FIRST_YEARS");
   if (internationalStudent) audiences.push("INTERNATIONALS");
   if (studyYears.includes("MASTER_2")) audiences.push("LAST_YEARS");
+  if (alumni) audiences.push("ALUMNI");
   return audiences;
 }
 
@@ -41,11 +43,11 @@ export const viewerAudiences = cache(async (): Promise<CalendarAudience[]> => {
 export async function audiencesForUser(userId: string): Promise<CalendarAudience[]> {
   const user = await prisma.user.findUnique({
     where: { id: userId },
-    select: { studyYears: true, internationalStudent: true },
+    select: { studyYears: true, internationalStudent: true, alumni: true },
   });
   if (!user) return [];
 
-  return audiencesForStudyProfile(user.studyYears, user.internationalStudent);
+  return audiencesForStudyProfile(user.studyYears, user.internationalStudent, user.alumni);
 }
 
 /**

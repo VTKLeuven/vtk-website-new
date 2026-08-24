@@ -711,6 +711,13 @@
   height: 16px;
 }
 
+.vtk-design .subscribe-hint {
+  margin-top: 10px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
 .vtk-design .agenda-head {
   display: flex;
   justify-content: space-between;
@@ -1008,8 +1015,8 @@
   border-top: 1px solid var(--line);
 }
 
-/* "Ook evenementen voor andere doelgroepen": een voorkeur, geen filterchip, dus
-   bewust een gewone checkbox en geen pil die op de chips ernaast lijkt. */
+/* Profielpersonalisatie is een voorkeur, geen categorie, en blijft daarom een
+   gewone checkbox. De concrete doelgroepen eronder zijn wel echte filters. */
 .vtk-design .audience-toggle {
   display: inline-flex;
   align-items: center;
@@ -1021,6 +1028,141 @@
 
 .vtk-design .audience-toggle:hover {
   color: var(--ink);
+}
+
+.vtk-design .audience-filters {
+  flex: 1 0 100%;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  padding-top: 12px;
+  border-top: 1px dashed var(--line);
+}
+
+.vtk-design .audience-filters > span {
+  margin-right: 4px;
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.vtk-design .audience-filter {
+  border-color: color-mix(in srgb, var(--cat) 55%, white);
+}
+
+.vtk-design .audience-filter:hover {
+  border-color: var(--cat);
+}
+
+.vtk-design .audience-filter.on {
+  background: var(--cat);
+  border-color: var(--cat);
+  color: #fff;
+}
+
+/* Weekweergave: zeven gelijkwaardige dagkolommen, met alle evenementen zichtbaar
+   in plaats van de twee compacte pillen uit het maandraster. */
+.vtk-design .week-cal {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(120px, 1fr));
+  overflow-x: auto;
+  border: 1px solid var(--rule);
+  background: var(--paper);
+}
+
+.vtk-design .week-day {
+  min-height: 430px;
+  border-right: 1px solid var(--rule);
+}
+
+.vtk-design .week-day:last-child {
+  border-right: 0;
+}
+
+.vtk-design .week-day > header {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 12px;
+  border-bottom: 1px solid var(--rule);
+  background: var(--paper-2);
+  font-family: var(--mono);
+  text-transform: uppercase;
+}
+
+.vtk-design .week-day > header span,
+.vtk-design .week-day > header small {
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+}
+
+.vtk-design .week-day > header b {
+  font-family: var(--sans);
+  font-size: 22px;
+  font-weight: 600;
+}
+
+.vtk-design .week-day.today > header b {
+  padding: 1px 6px;
+  background: var(--accent);
+}
+
+.vtk-design .week-events {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px;
+}
+
+.vtk-design .week-empty {
+  padding: 10px 2px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.vtk-design .week-event {
+  display: block;
+  padding: 10px;
+  border: 1px solid var(--rule);
+  border-left: 4px solid var(--cat, var(--ink));
+  color: inherit;
+  text-decoration: none;
+  transition: 120ms;
+}
+
+.vtk-design .week-event:hover {
+  background: var(--paper-2);
+  border-color: var(--cat, var(--ink));
+}
+
+.vtk-design .week-event-time,
+.vtk-design .week-event small {
+  display: block;
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--muted);
+}
+
+.vtk-design .week-event b {
+  display: block;
+  margin: 3px 0;
+  font-size: 13px;
+  line-height: 1.25;
+}
+
+.vtk-design .week-audience {
+  display: inline-block;
+  margin-top: 7px;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: var(--cat);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 600;
 }
 
 /* Doelgroeplabel op een eventpil in het maandraster. Staat boven de titel, want
@@ -1058,6 +1200,28 @@
   }
   .vtk-design .toolbar-filters {
     justify-content: flex-start;
+  }
+  .vtk-design .week-cal {
+    display: block;
+    min-width: 0;
+  }
+  .vtk-design .week-day {
+    display: grid;
+    grid-template-columns: 76px minmax(0, 1fr);
+    min-height: 0;
+    border-right: 0;
+    border-bottom: 1px solid var(--rule);
+  }
+  .vtk-design .week-day:last-child {
+    border-bottom: 0;
+  }
+  .vtk-design .week-day > header {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-start;
+    border-right: 1px solid var(--rule);
+    border-bottom: 0;
   }
 }
 
