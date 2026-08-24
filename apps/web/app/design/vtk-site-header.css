@@ -174,8 +174,9 @@
 /* Het paneel hangt aan de onderrand van de header, niet los eronder: effen
    dezelfde navy als de balk, vierkant bovenaan en enkel onderaan afgerond. Zo
    leest de uitklap als een verlenging van de header in plaats van een witte
-   kaart die toevallig in de buurt zweeft. Een lichte doorschijnendheid laat de
-   pagina eronder net meespelen zonder de tekst te hinderen.
+   kaart die toevallig in de buurt zweeft. Het paneel is vrijwel dekkend: een
+   zweem doorschijnendheid houdt de band met de pagina eronder, meer niet;
+   op een drukke hero-foto ging de leesbaarheid er anders aan.
 
    Eén set regels voor beide uitklappanelen in de header: de navigatietabs en
    het accountmenu. Ze hangen aan dezelfde rand, dus ze horen er ook hetzelfde
@@ -192,7 +193,7 @@
   border: 1px solid rgba(255, 255, 255, 0.14);
   border-top: 0;
   border-radius: 0 0 16px 16px;
-  background: color-mix(in srgb, var(--navy) 92%, transparent);
+  background: color-mix(in srgb, var(--navy) 97%, transparent);
   /* De blur hoort bij de doorschijnendheid: zonder hem las je de hero-titel en
      de paginakop dwars door het paneel heen, tussen de menu-items door. Nu
      schijnt de kleur eronder nog mee, maar zijn de vormen uitgesmeerd. */

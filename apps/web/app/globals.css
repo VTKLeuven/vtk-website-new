@@ -46,8 +46,16 @@
   --vtk-ring: rgba(14, 26, 54, 0.12);
 }
 
+/* `overflow-x: clip` hoort bij de volle-breedtebanden. Die bleeden met
+   `left/right: calc(50% - 50vw)`, en `100vw` telt de verticale scrollbalk mee
+   terwijl de pagina zelf die breedte niet heeft. Elke band stak daardoor een
+   halve scrollbalkbreedte (~8px) buiten de rechterrand en dat gaf op elk scherm
+   met een klassieke scrollbalk een horizontale scrollbalk onderaan. `clip`
+   en niet `hidden`: clip maakt geen scrollcontainer, dus de sticky header
+   blijft plakken. */
 html {
   height: 100%;
+  overflow-x: clip;
 }
 
 /* min-height, geen vaste height: met `height: 100%` is de body-box maar één
