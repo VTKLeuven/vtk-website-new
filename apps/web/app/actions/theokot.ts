@@ -7,20 +7,14 @@ import { requirePermission, requireSession } from "@/lib/session";
 import {
   brusselsTimeOnDay,
   brusselsYMD,
-  canCancel,
-  canOrderNow,
   coerceItemLayout,
-  validateOrderLines,
   TheokotValidationError,
   type OrderLineInput,
 } from "@/lib/theokot";
 import { readImageField, resolveImageKey, type ImageFieldValue } from "@/lib/imageField";
-import { activeBanFor, getTheokotConfig } from "@/lib/theokot-server";
-import {
-  syncMeetingsForSession,
-  syncMeetingsOnDay,
-  usageForSessionItemsTx,
-} from "@/lib/meetings-server";
+import { getTheokotConfig } from "@/lib/theokot-server";
+import { cancelOrder, placeOrder, TheokotOrderError } from "@/lib/theokot-orders";
+import { syncMeetingsForSession, syncMeetingsOnDay } from "@/lib/meetings-server";
 import { resolveStudentCard } from "@/lib/student-card";
 import {
   allocateUserShiftReward,
@@ -909,7 +903,39 @@ export async function redeemEmployeeVouchersAction(
 // Student: bestellen + annuleren
 // -----------------------------------------------------------------------------
 
-/** Plaatst een bestelling voor de ingelogde student. */
+/** De Nederlandse melding bij een weigering. De app maakt zijn eigen zinnen. */
+function orderErrorMessage(error: TheokotOrderError): string {
+  switch (error.code) {
+    case "BANNED": {
+      const until = error.bannedUntil
+        ? new Intl.DateTimeFormat("nl-BE", { timeZone: "Europe/Brussels", dateStyle: "long" }).format(
+            error.bannedUntil,
+          )
+        : "";
+      return `Je bent tijdelijk geschorst tot ${until} wegens niet-opgehaalde bestellingen.`;
+    }
+    case "SESSION_NOT_FOUND":
+      return "Verkoopsessie niet gevonden.";
+    case "ORDER_CLOSED":
+      return "Bestellen is niet mogelijk voor deze dag.";
+    case "ALREADY_ORDERED":
+      return "Je hebt al een bestelling voor deze dag.";
+    case "ORDER_NOT_FOUND":
+      return "Bestelling niet gevonden.";
+    case "NOT_CANCELABLE":
+      return "Deze bestelling kan niet meer geannuleerd worden.";
+    case "CANCEL_DEADLINE_PASSED":
+      return "De annulatiedeadline is verstreken.";
+  }
+}
+
+/**
+ * Plaatst een bestelling voor de ingelogde student.
+ *
+ * De werking zelf staat in `lib/theokot-orders.ts`, want de VTK-app roept
+ * dezelfde functie aan. Wat hier overblijft is wat bij een action hoort: de
+ * sessie en de melding in het Nederlands.
+ */
 export async function placeOrderAction(sessionId: string, lines: OrderLineInput[]): Promise<ActionResult> {
   let session;
   try {
@@ -917,62 +943,16 @@ export async function placeOrderAction(sessionId: string, lines: OrderLineInput[
   } catch {
     return { ok: false, error: "Je moet ingelogd zijn om te bestellen." };
   }
-  const userId = session.user.id;
-  const config = await getTheokotConfig();
-
-  const ban = await activeBanFor(userId);
-  if (ban) {
-    const until = new Intl.DateTimeFormat("nl-BE", { timeZone: "Europe/Brussels", dateStyle: "long" }).format(ban.endsAt);
-    return { ok: false, error: `Je bent tijdelijk geschorst tot ${until} wegens niet-opgehaalde bestellingen.` };
-  }
 
   try {
-    await withSerializableTransaction(async (tx) => {
-      const sess = await tx.theokotSession.findUnique({ where: { id: sessionId }, include: { items: true } });
-      if (!sess) throw new TheokotValidationError(["Verkoopsessie niet gevonden."]);
-      if (!canOrderNow(sess, new Date())) {
-        throw new TheokotValidationError(["Bestellen is niet mogelijk voor deze dag."]);
-      }
-
-      const existing = await tx.theokotOrder.findUnique({
-        where: { sessionId_userId: { sessionId, userId } },
-      });
-      if (existing) throw new TheokotValidationError(["Je hebt al een bestelling voor deze dag."]);
-
-      // Resterende voorraad = sessievoorraad − reeds bestelde aantallen − wat er
-      // voor een grocomeet of bureau opzijgezet is (zelfde voorraad, aparte doos).
-      const usedMap = await usageForSessionItemsTx(tx, sessionId);
-      const items = sess.items.map((i) => ({
-        id: i.id,
-        priceCents: i.priceCents,
-        quantity: Math.max(0, i.quantity - (usedMap.get(i.id) ?? 0)),
-        isWeeklySpecial: i.isWeeklySpecial,
-      }));
-
-      const normalized = validateOrderLines(lines, items, config);
-
-      await tx.theokotOrder.create({
-        data: {
-          sessionId,
-          userId,
-          totalCents: normalized.totalCents,
-          lines: {
-            create: normalized.lines.map((l) => ({
-              sessionItemId: l.sessionItemId,
-              quantity: l.quantity,
-              unitPriceCents: l.unitPriceCents,
-            })),
-          },
-        },
-      });
-    });
+    await placeOrder(session.user.id, sessionId, lines);
   } catch (err) {
+    if (err instanceof TheokotOrderError) return { ok: false, error: orderErrorMessage(err) };
     if (err instanceof TheokotValidationError) return { ok: false, error: err.details.join(" ") };
     console.error("[theokot] placeOrder mislukt:", err);
     return { ok: false, error: "Er ging iets mis bij het plaatsen van je bestelling." };
   }
 
-  revalidateTheokot();
   return { ok: true, message: "Je bestelling is geplaatst." };
 }
 
@@ -985,21 +965,13 @@ export async function cancelOrderAction(orderId: string): Promise<ActionResult> 
     return { ok: false, error: "Je moet ingelogd zijn." };
   }
 
-  const order = await prisma.theokotOrder.findUnique({
-    where: { id: orderId },
-    include: { session: { select: { orderCloseAt: true } } },
-  });
-  if (!order || order.userId !== session.user.id) {
-    return { ok: false, error: "Bestelling niet gevonden." };
-  }
-  if (order.status !== "RESERVED") {
-    return { ok: false, error: "Deze bestelling kan niet meer geannuleerd worden." };
-  }
-  if (!canCancel(order.session, new Date())) {
-    return { ok: false, error: "De annulatiedeadline is verstreken." };
+  try {
+    await cancelOrder(session.user.id, orderId);
+  } catch (err) {
+    if (err instanceof TheokotOrderError) return { ok: false, error: orderErrorMessage(err) };
+    console.error("[theokot] cancelOrder mislukt:", err);
+    return { ok: false, error: "Er ging iets mis bij het annuleren van je bestelling." };
   }
 
-  await prisma.theokotOrder.delete({ where: { id: orderId } });
-  revalidateTheokot();
   return { ok: true, message: "Je bestelling is geannuleerd." };
 }

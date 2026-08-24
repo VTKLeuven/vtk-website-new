@@ -50,6 +50,10 @@ export const MCP_PERMISSION_POLICY = {
   "pocs.manage": { reads: ["pocs"], creates: ["app_create:poc"], blocked: ["add representatives, update or delete POCs"] },
   "partners.manage": { reads: ["partners"], creates: ["app_create:partner"], blocked: ["upload logos, update or delete partners"] },
   "home.edit": { reads: ["announcements", "editorial_settings"], creates: ["app_create:announcement"], blocked: ["activate announcements or overwrite homepage settings"] },
+  // Een pushbericht gaat rechtstreeks naar de telefoons van de leden en is niet
+  // terug te nemen. Dat is geen `create` maar een operationeel neveneffect, dus
+  // MCP mag het onder geen enkele voorwaarde.
+  "app.push": { reads: [], creates: [], blocked: ["send push notifications"] },
   "openingHours.manageOwn": { reads: ["editorial_settings"], creates: [], blocked: ["overwrite opening hours"] },
   "media.manage": { reads: ["editorial_settings", "photos"], creates: ["app_create:photo_album"], blocked: ["upload or overwrite media settings"] },
   "dashboard.manage": { reads: ["dashboard"], creates: ["app_create:dashboard_tile"], blocked: ["update or delete dashboard tiles"] },

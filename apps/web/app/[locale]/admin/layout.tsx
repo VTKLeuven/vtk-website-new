@@ -131,6 +131,7 @@ const NAV: NavEntry[] = [
     item('vaultAdmin', '/wachtwoorden/beheer', { perm: 'vault.manage' }),
     item('auditLog', '/it/logboek', { perm: 'audit.view' }),
     item('urenloopApp', '/it/24ul-app', { perm: 'urenloopApp.manage' }),
+    item('appPush', '/app-push', { perm: 'app.push' }),
     item('door', '/deur', { perm: 'door.manage' }),
     item('sso', '/sso', { perm: 'oauth.client.edit' }),
   ]),
