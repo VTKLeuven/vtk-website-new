@@ -423,7 +423,8 @@ wrapper zou daar niets doen dan doorgeven.
 - [x] `GET /api/app/v1/zoeken`, `/media`, `/media/[slug]`, `/praesidium`
 - [x] `Prose`: Markdown in de typografie van de site
 - [x] categorie-, pagina-, zoek-, media-, album- en praesidiumschermen
-- [ ] werkgroepen, POC's en bureau als eigen scherm (nu enkel via de site)
+- [x] werkgroepen en POC's als eigen scherm (in fase 4 gebouwd)
+- [ ] bureau als eigen scherm (nu enkel via de site)
 - [ ] met de hand getest op een toestel
 
 **Twee dingen die afwijken van het plan.** De kop-index van een contentpagina
