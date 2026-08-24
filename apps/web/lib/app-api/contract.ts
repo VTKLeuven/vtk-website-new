@@ -755,6 +755,11 @@ export type AppPianoSlot = {
   takenByName: string | null;
   /** Boekbaar op dit moment: vrij, en binnen het venster dat vooruit mag. */
   bookable: boolean;
+  /**
+   * Het id van jouw reservatie, enkel bij `state: "MINE"`. Zonder dit veld kan de
+   * app een slot wel nemen maar niet meer loslaten.
+   */
+  reservationId: string | null;
 };
 
 export type AppPianoDay = {

@@ -43,13 +43,26 @@ export async function GET(request: Request) {
     });
 
     const week = pianoWeekRange(now);
-    const usedThisWeek = await prisma.pianoReservation.count({
-      where: {
-        userId: session.user.id,
-        startsAt: { gte: week.from, lt: week.to },
-        endsAt: { gt: now },
-      },
-    });
+
+    // De eigen reservaties apart opvragen om hun **id** te kennen.
+    // `loadPianoAgenda` geeft per slot enkel wie het heeft, want dat is alles wat
+    // de website nodig heeft; de app moet een slot ook weer kunnen loslaten, en
+    // daar hoort een id bij.
+    const [usedThisWeek, own] = await Promise.all([
+      prisma.pianoReservation.count({
+        where: {
+          userId: session.user.id,
+          startsAt: { gte: week.from, lt: week.to },
+          endsAt: { gt: now },
+        },
+      }),
+      prisma.pianoReservation.findMany({
+        where: { userId: session.user.id, startsAt: { gt: now } },
+        select: { id: true, startsAt: true },
+      }),
+    ]);
+
+    const ownById = new Map(own.map((row) => [row.startsAt.getTime(), row.id]));
 
     const payload: AppPiano = {
       info: pick(info.bodyNl, info.bodyEn, locale),
@@ -66,6 +79,7 @@ export async function GET(request: Request) {
             endsAt: slot.endsAt.toISOString(),
             state: mine ? ("MINE" as const) : taken ? ("TAKEN" as const) : ("FREE" as const),
             takenByName: taken?.name ?? null,
+            reservationId: mine ? (ownById.get(slot.startsAt.getTime()) ?? null) : null,
             bookable:
               !taken &&
               slot.startsAt > now &&
