@@ -1,8 +1,10 @@
 # De app-API (`/api/app/v1`)
 
 De JSON-API waar de **VTK-app** (Expo, iOS + Android, repo `~/vtk-app`) op draait.
-Dit document beschrijft het contract en de regels errond. Het plan van de app zelf
-staat in `~/vtk-app/docs/plan.md`.
+Dit document beschrijft het contract en de regels errond. Voor een inventaris van
+alles wat er voor de app aan deze site toegevoegd is (endpoints, migraties,
+rechten, wat er nog moet gebeuren), zie [`app-toevoegingen.md`](./app-toevoegingen.md).
+Het plan van de app zelf staat in `~/vtk-app/docs/plan.md`.
 
 Niet te verwarren met de scanner: `vtk-scanner-app` praat met `/api/tickets/...`
 en staat hier los van.
