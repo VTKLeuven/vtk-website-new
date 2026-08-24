@@ -8,6 +8,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { baseUrl } from '../../src/api/client';
 import { fetchCalendarEvent } from '../../src/api/endpoints';
 import { messageFor, useResource } from '../../src/api/useResource';
+import { Prose } from '../../src/components/Prose';
 import { Button, Card, ErrorState, Loading } from '../../src/components/ui';
 import { formatEventWhen } from '../../src/format';
 import { useApp } from '../../src/state/app';
@@ -85,10 +86,7 @@ export default function EventScreen() {
 
         {event.description ? (
           <Card>
-            {/* Markdown wordt in fase 3 gerenderd, samen met de CMS-pagina's. Tot
-                dan is dit de tekst zoals ze is; dat leest beter dan sterretjes,
-                maar het is niet af. */}
-            <Text style={styles.description}>{event.description}</Text>
+            <Prose>{event.description}</Prose>
           </Card>
         ) : null}
 
@@ -131,5 +129,4 @@ const styles = StyleSheet.create({
   body: { padding: SPACING.lg, gap: SPACING.md },
   fact: { flexDirection: 'row', alignItems: 'flex-start', gap: SPACING.md },
   factText: { ...TYPE.body, color: COLORS.ink, flex: 1 },
-  description: { ...TYPE.body, color: COLORS.body },
 });

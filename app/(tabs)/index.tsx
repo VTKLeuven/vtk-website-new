@@ -9,6 +9,7 @@ import type { AppOpeningHours } from '../../src/api/contract';
 import { fetchHome } from '../../src/api/endpoints';
 import { messageFor, useResource } from '../../src/api/useResource';
 import { EventRow } from '../../src/components/EventRow';
+import { Prose } from '../../src/components/Prose';
 import { Button, Card, ErrorState, Loading, StaleNotice } from '../../src/components/ui';
 import { useApp } from '../../src/state/app';
 import { COLORS, DARK_GLASS, FONTS, RADIUS, SPACING, TYPE } from '../../src/theme/tokens';
@@ -104,7 +105,7 @@ export default function HomeScreen() {
             <Card>
               <Text style={styles.kicker}>AANKONDIGING</Text>
               <Text style={styles.cardTitle}>{bootstrap.announcement.title}</Text>
-              <Text style={styles.cardBody}>{bootstrap.announcement.body}</Text>
+              <Prose>{bootstrap.announcement.body}</Prose>
             </Card>
           </View>
         ) : null}

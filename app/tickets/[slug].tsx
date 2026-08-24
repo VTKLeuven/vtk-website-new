@@ -9,6 +9,7 @@ import { fetchOrderStatus, fetchTicketEvent, startTicketCheckout } from '../../s
 import { messageFor, useResource } from '../../src/api/useResource';
 import { PageHead } from '../../src/components/PageHead';
 import { QuestionField, type AnswerValue } from '../../src/components/QuestionField';
+import { Prose } from '../../src/components/Prose';
 import { Stepper } from '../../src/components/Stepper';
 import { Button, Card, Empty, ErrorState, Loading } from '../../src/components/ui';
 import { formatEventWhen, formatEuro } from '../../src/format';
@@ -195,7 +196,7 @@ function Shop({
 
         {event.description ? (
           <Card>
-            <Text style={styles.body}>{event.description}</Text>
+            <Prose>{event.description}</Prose>
           </Card>
         ) : null}
 

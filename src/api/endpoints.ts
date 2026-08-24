@@ -10,6 +10,12 @@ import type {
   AppTheokotOrderInput,
   AppTicketEvent,
   AppTicketEventDetail,
+  AppAlbumDetail,
+  AppCategory,
+  AppMedia,
+  AppPage,
+  AppPraesidium,
+  AppSearch,
 } from './contract';
 
 /**
@@ -95,4 +101,32 @@ export function startTicketCheckout(input: {
 /** De stand van een bestelling, om na het betalen te weten of ze doorging. */
 export function fetchOrderStatus(orderId: string): Promise<{ id: string; status: string }> {
   return apiFetch(`/api/tickets/orders/${encodeURIComponent(orderId)}/status`);
+}
+
+// ── Inhoud, zoeken, media en mensen ─────────────────────────────────────────
+
+export function fetchCategory(locale: AppLocale, slug: string): Promise<AppCategory> {
+  return apiFetch<AppCategory>(appApi(`/categorie/${encodeURIComponent(slug)}`, { locale }));
+}
+
+export function fetchPage(locale: AppLocale, slug: string): Promise<AppPage> {
+  return apiFetch<AppPage>(appApi(`/paginas/${encodeURIComponent(slug)}`, { locale }));
+}
+
+export function search(locale: AppLocale, query: string): Promise<AppSearch> {
+  return apiFetch<AppSearch>(appApi('/zoeken', { locale, q: query }));
+}
+
+export function fetchMedia(locale: AppLocale): Promise<AppMedia> {
+  return apiFetch<AppMedia>(appApi('/media', { locale }));
+}
+
+export function fetchAlbum(locale: AppLocale, slug: string): Promise<AppAlbumDetail> {
+  return apiFetch<AppAlbumDetail>(appApi(`/media/${encodeURIComponent(slug)}`, { locale }));
+}
+
+export function fetchPraesidium(locale: AppLocale, year?: number): Promise<AppPraesidium> {
+  return apiFetch<AppPraesidium>(
+    appApi('/praesidium', { locale, jaar: year === undefined ? undefined : String(year) }),
+  );
 }

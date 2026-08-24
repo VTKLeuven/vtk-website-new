@@ -1,6 +1,13 @@
 import { useRouter } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
-import { ChevronRight, ExternalLink, TicketCheck } from 'lucide-react-native';
+import {
+  ChevronRight,
+  ExternalLink,
+  Images,
+  Search,
+  TicketCheck,
+  Users,
+} from 'lucide-react-native';
 import { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
@@ -19,9 +26,9 @@ import { COLORS, RADIUS, SPACING, TYPE } from '../../src/theme/tokens';
  * hier bewust geen vaste lijst in de app: wie in de admin een pagina publiceert,
  * hoort ze meteen in de app te zien zonder release.
  *
- * De pagina's zelf worden in fase 3 native gerenderd (Markdown, met de kop-index
- * en de downloads). Tot dan opent een tik de webpagina; dat is één scherm dat
- * verdwijnt, niet een architectuur.
+ * Bovenaan staan de vier bestemmingen die geen CMS-categorie zijn maar wel een
+ * eigen scherm hebben. Ze zijn er te weinig voor een eigen tab en te belangrijk
+ * om onderaan te verdwijnen.
  */
 export default function InfoScreen() {
   const router = useRouter();
@@ -45,24 +52,38 @@ export default function InfoScreen() {
 
   return (
     <>
-      <PageHead title="Info" subtitle="Alles wat VTK doet, per onderdeel" />
+      <PageHead
+        title="Info"
+        subtitle="Alles wat VTK doet, per onderdeel"
+        right={
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Zoeken"
+            onPress={() => router.push('/zoeken')}
+            hitSlop={10}
+          >
+            <Search color={COLORS.yellow} size={22} />
+          </Pressable>
+        }
+      />
       <ScrollView contentContainerStyle={styles.content} style={styles.root}>
         {stale ? <StaleNotice onRetry={() => void refresh()} /> : null}
 
-        {/* Tickets heeft geen eigen tab (zes is er een te veel), dus staat het
-            hier bovenaan naast de categorieën uit het CMS. */}
-        <Card style={styles.tab}>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Tickets"
-            onPress={() => router.push('/tickets')}
-            style={styles.tabHeader}
-          >
-            <TicketCheck color={COLORS.navy} size={20} />
-            <Text style={styles.tabLabel}>Tickets</Text>
-            <ChevronRight color={COLORS.muted} size={18} />
-          </Pressable>
-        </Card>
+        <Shortcut
+          icon={<TicketCheck color={COLORS.navy} size={20} />}
+          label="Tickets"
+          onPress={() => router.push('/tickets')}
+        />
+        <Shortcut
+          icon={<Images color={COLORS.navy} size={20} />}
+          label="Media"
+          onPress={() => router.push('/media')}
+        />
+        <Shortcut
+          icon={<Users color={COLORS.navy} size={20} />}
+          label="Praesidium"
+          onPress={() => router.push('/praesidium')}
+        />
 
         {bootstrap.tabs.map((tab) => (
           <TabRow
@@ -70,7 +91,8 @@ export default function InfoScreen() {
             tab={tab}
             expanded={open === tab.id}
             onToggle={() => setOpen(open === tab.id ? null : tab.id)}
-            onOpen={openPath}
+            onOpenCategory={() => router.push(`/categorie/${tab.slug}`)}
+            onOpenExternal={openPath}
           />
         ))}
 
@@ -84,17 +106,45 @@ export default function InfoScreen() {
   );
 }
 
+function Shortcut({
+  icon,
+  label,
+  onPress,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  onPress: () => void;
+}) {
+  return (
+    <Card style={styles.tab}>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={label}
+        onPress={onPress}
+        style={styles.tabHeader}
+      >
+        {icon}
+        <Text style={styles.tabLabel}>{label}</Text>
+        <ChevronRight color={COLORS.muted} size={18} />
+      </Pressable>
+    </Card>
+  );
+}
+
 function TabRow({
   tab,
   expanded,
   onToggle,
-  onOpen,
+  onOpenCategory,
+  onOpenExternal,
 }: {
   tab: AppNavTab;
   expanded: boolean;
   onToggle: () => void;
-  onOpen: (path: string) => void;
+  onOpenCategory: () => void;
+  onOpenExternal: (path: string) => void;
 }) {
+  const router = useRouter();
   // Een tab met een externe site (bv. Career) is gewoon een link; die klapt niet
   // uit, want er hangt niets van ons onder.
   const external = Boolean(tab.externalUrl);
@@ -107,9 +157,9 @@ function TabRow({
         accessibilityLabel={tab.label}
         accessibilityState={{ expanded: hasChildren ? expanded : undefined }}
         onPress={() => {
-          if (external) onOpen(tab.externalUrl as string);
+          if (external) onOpenExternal(tab.externalUrl as string);
           else if (hasChildren) onToggle();
-          else onOpen(`/${tab.slug}`);
+          else onOpenCategory();
         }}
         style={styles.tabHeader}
       >
@@ -127,12 +177,28 @@ function TabRow({
 
       {expanded && hasChildren ? (
         <View style={styles.children}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={`Alles onder ${tab.label}`}
+            onPress={onOpenCategory}
+            style={styles.child}
+          >
+            <Text style={styles.childLabel}>Overzicht</Text>
+            <ChevronRight color={COLORS.muted} size={15} />
+          </Pressable>
+
           {tab.children.map((child) => (
             <Pressable
               key={child.id}
               accessibilityRole="button"
               accessibilityLabel={child.label}
-              onPress={() => onOpen(child.href)}
+              onPress={() => {
+                // Een pagina onder deze categorie krijgt het native scherm; een
+                // menu-item wijst per definitie ergens anders heen.
+                const page = pageSlugFrom(child.href, tab.slug);
+                if (!child.external && page) router.push(`/pagina/${page}`);
+                else onOpenExternal(child.href);
+              }}
               style={styles.child}
             >
               <Text style={styles.childLabel}>{child.label}</Text>
@@ -143,6 +209,18 @@ function TabRow({
       ) : null}
     </Card>
   );
+}
+
+/**
+ * `/info/theokot` onder de tab `info` is de pagina `theokot`. Een pad dat daar
+ * niet aan voldoet (`/piano`, `/kalender`) is een menu-item naar iets anders en
+ * heeft hier geen contentpagina.
+ */
+function pageSlugFrom(href: string, tabSlug: string): string | null {
+  const prefix = `/${tabSlug}/`;
+  if (!href.startsWith(prefix)) return null;
+  const slug = href.slice(prefix.length);
+  return slug.includes('/') || slug === '' ? null : slug;
 }
 
 const styles = StyleSheet.create({

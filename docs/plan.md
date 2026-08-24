@@ -419,9 +419,26 @@ wrapper zou daar niets doen dan doorgeven.
 
 ### Fase 3 - Info: de inhoud van de site
 
-- [ ] `GET /api/app/v1/tabs/[slug]` en `/pages/[slug]` met Markdown en de kop-index
-- [ ] zoeken, praesidium, werkgroepen, POC's, bureau
-- [ ] media: albums, foto's, aftermovies, magazines
+- [x] `GET /api/app/v1/categorie/[slug]` en `/paginas/[slug]`, altijd Markdown
+- [x] `GET /api/app/v1/zoeken`, `/media`, `/media/[slug]`, `/praesidium`
+- [x] `Prose`: Markdown in de typografie van de site
+- [x] categorie-, pagina-, zoek-, media-, album- en praesidiumschermen
+- [ ] werkgroepen, POC's en bureau als eigen scherm (nu enkel via de site)
+- [ ] met de hand getest op een toestel
+
+**Twee dingen die afwijken van het plan.** De kop-index van een contentpagina
+wordt door de API meegestuurd maar door de app niet getoond: die rail is op de
+site een register in de marge, en op een telefoon is er geen marge. Ze zou een
+tweede lijst boven de tekst worden waar je doorheen moet scrollen. En de
+Markdown-renderer tekent afbeeldingen met `expo-image` in plaats van met de
+`react-native-fit-image` die `react-native-markdown-display` standaard gebruikt;
+dat pakket is uit 2018 en leunt op `Image.propTypes`, dat React Native niet meer
+heeft.
+
+| Datum | Commit | Wat |
+|---|---|---|
+| 2026-08-24 | `web: App-API: pagina's, categorieen, zoeken, media en praesidium` | Zes endpoints. `lib/app-api/pageContent.ts` zet oud tiptap-JSON om naar Markdown met dezelfde terugvalregels als `PageView`, met zeven tests erop. |
+| 2026-08-24 | `De inhoud van de site: pagina's, zoeken, media en praesidium` | Zes schermen, plus `Prose` voor Markdown. Aankondigingen, evenementbeschrijvingen en ticketbeschrijvingen worden nu ook echt gerenderd in plaats van als platte tekst. |
 
 ### Fase 4 - De rest, en push
 
