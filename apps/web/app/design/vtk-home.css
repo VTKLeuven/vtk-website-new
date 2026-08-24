@@ -340,17 +340,19 @@
   vertical-align: middle;
 }
 
-/* The events card sits on the dark hero scrim as "donker glas": a translucent
-   navy panel with blur and light text, so it reads as part of the hero instead
-   of a bright white cut-out that wins every contrast battle. Light-on-dark tones
+/* The events card sits on the dark hero scrim as a solid navy panel with a
+   yellow accent rail, subtle blur and light text, so it reads clearly over
+   busy photos without depending on what is behind it. Light-on-dark tones
    use --paper and --on-dark-muted. Scoped to .home-hero so the same hero-cal
    classes stay light on other surfaces (e.g. the sample page). */
 .vtk-design .home-hero .hero-cal {
-  background: rgba(9, 15, 32, 0.46);
-  border-color: rgba(255, 255, 255, 0.11);
-  box-shadow: none;
-  -webkit-backdrop-filter: blur(16px) saturate(1.05);
-  backdrop-filter: blur(16px) saturate(1.05);
+  background: rgba(9, 15, 32, 0.9);
+  border-color: rgba(255, 255, 255, 0.16);
+  -webkit-backdrop-filter: blur(8px) saturate(1.05);
+  backdrop-filter: blur(8px) saturate(1.05);
+  box-shadow:
+    0 26px 60px rgba(5, 8, 18, 0.5),
+    inset 3px 0 0 0 var(--yellow);
   color: rgba(255, 255, 255, 0.92);
 }
 
@@ -375,143 +377,7 @@
 }
 
 .vtk-design .home-hero .hero-day {
-  border-top-color: rgba(255, 255, 255, 0.14);
-}
-
-/* ==================================================================
-   TESTSCHAKELAAR: massief paneel (voorstel C)
-
-   Tijdelijk blok op branch `test/hero-massief-paneel`, hoort niet op main.
-   `HeroPanelSwitch` zet `data-hero-panel` op <html>; hieronder staat wat
-   dat met de eventkaart doet. Zonder attribuut verandert er niets, dus de
-   hero hierboven blijft de huidige site.
-
-   Voorstel C: de kaart is geen donker glas meer maar een dekkend navy
-   paneel. Het contrast met de foto hangt dan niet meer af van wat er
-   toevallig achter de kaart ligt, wat telt omdat het beheer de hero-foto
-   via /admin/home kan vervangen. "rail" zet er de gele accentrail bij die
-   het raster gebruikt voor een uitgelichte kaart, "massief" laat ze weg.
-   ================================================================== */
-
-:root[data-hero-panel="rail"] .vtk-design .home-hero .hero-cal,
-:root[data-hero-panel="massief"] .vtk-design .home-hero .hero-cal {
-  background: rgba(9, 15, 32, 0.9);
-  border-color: rgba(255, 255, 255, 0.16);
-  /* Minder blur dan bij glas: er is bijna niets meer om doorheen te kijken,
-     en de blur kost wel elke scroll rekenwerk. */
-  -webkit-backdrop-filter: blur(8px) saturate(1.05);
-  backdrop-filter: blur(8px) saturate(1.05);
-  box-shadow: 0 26px 60px rgba(5, 8, 18, 0.5);
-}
-
-:root[data-hero-panel="rail"] .vtk-design .home-hero .hero-cal {
-  box-shadow:
-    0 26px 60px rgba(5, 8, 18, 0.5),
-    inset 3px 0 0 0 var(--yellow);
-}
-
-/* Op een dekkend vlak verdwijnt een lijn van 14% wit bijna; op glas viel ze
-   nog op tegen de foto erachter. */
-:root[data-hero-panel="rail"] .vtk-design .home-hero .hero-day,
-:root[data-hero-panel="massief"] .vtk-design .home-hero .hero-day {
   border-top-color: rgba(255, 255, 255, 0.16);
-}
-
-/* De knop zelf. Zweeft rechtsonder, buiten de inhoud, en is bewust saai:
-   ze hoort bij het testen, niet bij de pagina. */
-.hero-panel-switch {
-  position: fixed;
-  right: 16px;
-  bottom: 16px;
-  z-index: 60;
-  display: flex;
-  flex-direction: column;
-  align-items: stretch;
-  gap: 8px;
-  width: max-content;
-  max-width: calc(100vw - 32px);
-  font-size: 13px;
-}
-
-.hero-panel-switch .hps-toggle {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  align-self: flex-end;
-  padding: 8px 14px;
-  border: 1px solid rgba(255, 255, 255, 0.18);
-  border-radius: 999px;
-  background: rgba(9, 15, 32, 0.92);
-  color: var(--paper);
-  font-size: 12.5px;
-  font-weight: 500;
-  box-shadow: 0 10px 30px rgba(5, 8, 18, 0.45);
-}
-
-.hero-panel-switch[data-open="true"] .hps-toggle-label {
-  color: var(--on-dark-muted);
-}
-
-.hero-panel-switch .hps-body {
-  padding: 14px 16px 16px;
-  border: 1px solid rgba(255, 255, 255, 0.18);
-  border-radius: 16px;
-  background: rgba(9, 15, 32, 0.94);
-  -webkit-backdrop-filter: blur(10px);
-  backdrop-filter: blur(10px);
-  box-shadow: 0 18px 44px rgba(5, 8, 18, 0.5);
-  color: var(--paper);
-}
-
-.hero-panel-switch .hps-title {
-  margin: 0 0 10px;
-  font-size: 13px;
-  font-weight: 600;
-  line-height: 1.3;
-}
-
-.hero-panel-switch .hps-title span {
-  display: block;
-  margin-top: 2px;
-  color: var(--on-dark-muted);
-  font-size: 11px;
-  font-weight: 400;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-}
-
-.hero-panel-switch .hps-options {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-}
-
-.hero-panel-switch .hps-option {
-  padding: 7px 12px;
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  border-radius: 999px;
-  background: transparent;
-  color: var(--paper);
-  font-size: 12.5px;
-  font-weight: 500;
-}
-
-.hero-panel-switch .hps-option:hover {
-  border-color: rgba(255, 255, 255, 0.45);
-}
-
-.hero-panel-switch .hps-option[aria-pressed="true"] {
-  background: var(--yellow);
-  border-color: var(--yellow);
-  color: var(--ink);
-}
-
-.hero-panel-switch .hps-hint {
-  margin: 10px 0 0;
-  max-width: 34ch;
-  color: var(--on-dark-muted);
-  font-size: 11.5px;
-  line-height: 1.4;
 }
 
 .vtk-design .quick {

@@ -18,8 +18,6 @@ import { audienceFilter, viewerAudiences } from "@/lib/calendar/audience";
 import { resolveFrontpage } from "@/lib/frontpage/resolve";
 import { frontpagePhoto } from "@/lib/frontpage/registry";
 import { Frontpage } from "@/components/editorial/frontpage";
-import { HeroPanelSwitch } from "@/components/site/HeroPanelSwitch";
-import { heroPanelBootScript } from "@/lib/heroPanel";
 import { AftermovieGrid, type AftermovieGridItem } from "./AftermovieGrid";
 import {
   dutchDayNameForDate,
@@ -326,10 +324,6 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
 
           Loopt er een campagne, dan neemt haar layout de hero over; de quick
           links eronder blijven in beide gevallen staan. Zie lib/frontpage.ts. */}
-      {/* Tijdelijk (branch test/hero-massief-paneel): zet de gekozen
-          uitvoering van de eventkaart voor de eerste verf, zodat je bij een
-          herlaadbeurt geen glas ziet omslaan naar navy. */}
-      <script dangerouslySetInnerHTML={{ __html: heroPanelBootScript }} />
       <div className="home-dark-zone" style={heroPhotoStyle}>
         <Frontpage
           id={frontpage.module.id}
@@ -773,11 +767,6 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
           )}
         </div>
       </section>
-
-      {/* Tijdelijk (branch test/hero-massief-paneel): knop rechtsonder om de
-          eventkaart in de hero te wisselen tussen glas, massief met gele rail
-          en massief zonder. Verwijderen samen met de rest van de test. */}
-      <HeroPanelSwitch />
     </div>
   );
 }
