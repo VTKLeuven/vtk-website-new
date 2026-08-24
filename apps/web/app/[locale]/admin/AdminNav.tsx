@@ -161,20 +161,104 @@ const icons: Record<string, ReactNode> = {
       <circle cx="12" cy="7" r="4" />
     </Svg>
   ),
-  // mailinglists: envelop
+  // mailinglists: envelop (Brevo nieuwsbrieven)
   mailinglists: (
     <Svg>
       <rect x="2" y="4" width="20" height="16" rx="2" />
       <path d="m2 7 10 6 10-6" />
     </Svg>
   ),
-  // groups: meerdere gebruikers
+  // groups: ereteken / lint van een praesidiumpost
   groups: (
     <Svg>
-      <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
-      <circle cx="9" cy="7" r="4" />
-      <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
-      <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+      <circle cx="12" cy="8" r="6" />
+      <path d="m15.5 13 2.5 9-6-3.5L6 22l2.5-9" />
+    </Svg>
+  ),
+  // mailGroups: groepsmailadressen (@vtk.be)
+  mailGroups: (
+    <Svg>
+      <circle cx="12" cy="12" r="4" />
+      <path d="M16 8v5a3 3 0 0 0 6 0v-1a10 10 0 1 0-4 8" />
+    </Svg>
+  ),
+  // kiesploeg: stembus voor verkiezingen van de nieuwe ploeg
+  kiesploeg: (
+    <Svg>
+      <path d="M4 8h16v12a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V8Z" />
+      <path d="M8 8V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v4" />
+      <path d="m9 14 2 2 4-4" />
+    </Svg>
+  ),
+  // vault: wachtwoordkluis / hangslot
+  vault: (
+    <Svg>
+      <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+      <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+    </Svg>
+  ),
+  // vaultAdmin: kluis met combinatiewiel
+  vaultAdmin: (
+    <Svg>
+      <rect x="3" y="3" width="18" height="18" rx="2" />
+      <circle cx="12" cy="12" r="4" />
+      <path d="m14.8 14.8-1.4-1.4" />
+      <path d="m9.2 9.2 1.4 1.4" />
+      <path d="m14.8 9.2-1.4 1.4" />
+      <path d="m9.2 14.8 1.4-1.4" />
+    </Svg>
+  ),
+  // media: fototoestel / fotoalbums & magazine
+  media: (
+    <Svg>
+      <path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z" />
+      <circle cx="12" cy="13" r="3" />
+    </Svg>
+  ),
+  // openingHours: geopende balie / winkelpui met luifel
+  openingHours: (
+    <Svg>
+      <path d="m2 7 4.41-4.41A2 2 0 0 1 7.83 2h8.34a2 2 0 0 1 1.42.59L22 7" />
+      <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8" />
+      <path d="M15 22v-4a2 2 0 0 0-2-2h-2a2 2 0 0 0-2 2v4" />
+      <path d="M2 7h20" />
+    </Svg>
+  ),
+  // linkPage: linktree / link-in-bio op mobiel
+  linkPage: (
+    <Svg>
+      <rect x="5" y="2" width="14" height="20" rx="3" />
+      <line x1="8" y1="7" x2="16" y2="7" />
+      <line x1="8" y1="11" x2="16" y2="11" />
+      <line x1="8" y1="15" x2="16" y2="15" />
+    </Svg>
+  ),
+  // header: sitenavigatiebalk bovenaan de website
+  header: (
+    <Svg>
+      <rect x="3" y="3" width="18" height="18" rx="2" />
+      <path d="M3 9h18" />
+      <path d="M7 6h2" />
+      <path d="M12 6h2" />
+    </Svg>
+  ),
+  // urenloopApp: download van de 24UL desktop app
+  urenloopApp: (
+    <Svg>
+      <rect x="2" y="3" width="20" height="14" rx="2" />
+      <path d="M8 21h8" />
+      <path d="M12 17v4" />
+      <path d="m9 10 3 3 3-3" />
+      <path d="M12 6v7" />
+    </Svg>
+  ),
+  // appPush: bel met meldingssignalen (pushberichten)
+  appPush: (
+    <Svg>
+      <path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9" />
+      <path d="M10.3 21a1.94 1.94 0 0 0 3.4 0" />
+      <path d="M4 2C2.8 3.7 2 5.7 2 8" />
+      <path d="M22 8c0-2.3-.8-4.3-2-6" />
     </Svg>
   ),
   // werkgroepen: gestapelde lagen (werkgroepen naast de posten)

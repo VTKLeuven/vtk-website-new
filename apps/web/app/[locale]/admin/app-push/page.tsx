@@ -51,42 +51,62 @@ export default async function AdminAppPush({
   ];
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       <div>
-        <h1 className="text-2xl font-semibold">{nl ? "Pushberichten" : "Push notifications"}</h1>
-        <p className="text-vtk-blue-muted mt-1 text-sm">
+        <h1 className="text-2xl font-semibold">{nl ? "App-pushberichten" : "App push notifications"}</h1>
+        <p className="mt-1 text-sm text-zinc-500">
           {nl
             ? "Een bericht op de telefoon van wie de app heeft. Dit kan niet teruggenomen worden."
             : "A message on the phone of everyone with the app. This cannot be undone."}
         </p>
       </div>
 
-      <Card>
-        <PushComposer locale={nl ? "nl" : "en"} audiences={audiences} deviceCount={devices} />
-      </Card>
+      <section className="space-y-3">
+        <div>
+          <h2 className="text-lg font-semibold">{nl ? "Bericht opstellen" : "Compose message"}</h2>
+          <p className="mt-1 text-sm text-zinc-500">
+            {nl
+              ? "Kies de doelgroep, stel het bericht op en controleer het voorbeeld voor verzenden."
+              : "Choose the target audience, compose the message and check the preview before sending."}
+          </p>
+        </div>
+        <Card className="p-5 sm:p-6">
+          <PushComposer locale={nl ? "nl" : "en"} audiences={audiences} deviceCount={devices} />
+        </Card>
+      </section>
 
-      <Card>
-        <h2 className="text-base font-semibold">
-          {nl ? "Wat er vanzelf vertrekt" : "What is sent automatically"}
-        </h2>
-        <ul className="text-vtk-blue-muted mt-2 list-disc space-y-1 pl-5 text-sm">
-          <li>
+      <section className="space-y-3">
+        <div>
+          <h2 className="text-lg font-semibold">
+            {nl ? "Wat er vanzelf vertrekt" : "What is sent automatically"}
+          </h2>
+          <p className="mt-1 text-sm text-zinc-500">
             {nl
-              ? "Je broodje ligt klaar, zodra de afhaal bij het Theokot opengaat."
-              : "Your sandwich is ready, as soon as Theokot pickup opens."}
-          </li>
-          <li>
-            {nl
-              ? "Een herinnering aan een shift, samen met de herinneringsmail."
-              : "A shift reminder, alongside the reminder e-mail."}
-          </li>
-        </ul>
-        <p className="text-vtk-blue-muted mt-3 text-sm">
-          {nl
-            ? "Die twee hoef je hier niet te sturen. Gebruik dit scherm enkel voor iets dat niet vanzelf gaat."
-            : "You do not need to send those here. Use this screen only for something that is not automatic."}
-        </p>
-      </Card>
+              ? "Onderstaande meldingen vertrekken al automatisch vanuit de site; die hoef je hier niet handmatig te versturen."
+              : "The notifications below are sent automatically by the site; you don't need to send them manually here."}
+          </p>
+        </div>
+        <Card className="p-5 sm:p-6">
+          <ul className="list-disc space-y-2 pl-5 text-sm text-zinc-600">
+            <li>
+              <span className="font-medium text-vtk-ink">
+                {nl ? "Broodje ligt klaar:" : "Sandwich is ready:"}
+              </span>{" "}
+              {nl
+                ? "Zodra de afhaal bij het Theokot opengaat."
+                : "As soon as Theokot pickup opens."}
+            </li>
+            <li>
+              <span className="font-medium text-vtk-ink">
+                {nl ? "Shift-herinnering:" : "Shift reminder:"}
+              </span>{" "}
+              {nl
+                ? "Samen met de herinneringsmail voor medewerkers."
+                : "Alongside the reminder e-mail for volunteers."}
+            </li>
+          </ul>
+        </Card>
+      </section>
     </div>
   );
 }
