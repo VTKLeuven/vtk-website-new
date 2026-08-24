@@ -49,6 +49,9 @@ export default function RootLayout() {
         >
           <Stack.Screen name="(tabs)" />
           <Stack.Screen name="evenement/[id]" />
+          <Stack.Screen name="tickets/index" />
+          <Stack.Screen name="tickets/[slug]" />
+          <Stack.Screen name="mijn-tickets" />
           <Stack.Screen name="inloggen" options={{ presentation: 'modal' }} />
           <Stack.Screen name="poort" options={{ presentation: 'modal' }} />
           <Stack.Screen name="instellingen" options={{ presentation: 'modal' }} />

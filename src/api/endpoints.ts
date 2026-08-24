@@ -4,12 +4,16 @@ import type {
   AppCalendarEventDetail,
   AppHome,
   AppLocale,
+  AppMyOrder,
+  AppProfile,
   AppTheokot,
   AppTheokotOrderInput,
+  AppTicketEvent,
+  AppTicketEventDetail,
 } from './contract';
 
 /**
- * De endpoints van fase 1. Eén regel per aanroep, zodat de schermen niets van
+ * De endpoints van de app-API. Eén regel per aanroep, zodat de schermen niets van
  * paden hoeven te weten en de versie op één plek staat (`appApi`).
  */
 
@@ -42,4 +46,53 @@ export function placeTheokotOrder(
 
 export function cancelTheokotOrder(orderId: string): Promise<{ ok: true }> {
   return apiFetch(appApi('/theokot/order'), { method: 'DELETE', body: { orderId } });
+}
+
+// ── Tickets ─────────────────────────────────────────────────────────────────
+
+export function fetchTicketEvents(locale: AppLocale): Promise<AppTicketEvent[]> {
+  return apiFetch<AppTicketEvent[]>(appApi('/tickets', { locale }));
+}
+
+export function fetchTicketEvent(locale: AppLocale, slug: string): Promise<AppTicketEventDetail> {
+  return apiFetch<AppTicketEventDetail>(
+    appApi(`/tickets/${encodeURIComponent(slug)}`, { locale }),
+  );
+}
+
+export function fetchMyTickets(locale: AppLocale): Promise<AppMyOrder[]> {
+  return apiFetch<AppMyOrder[]>(appApi('/mijn/tickets', { locale }));
+}
+
+export function fetchProfile(locale: AppLocale): Promise<AppProfile> {
+  return apiFetch<AppProfile>(appApi('/mijn/profiel', { locale }));
+}
+
+/**
+ * Afrekenen gaat naar de bestaande route van de webshop en niet naar `/app/v1`.
+ *
+ * Twee redenen. Een wrapper zou hier niets doen dan doorgeven; en die route zet
+ * het order-toegangscookie dat daarna nodig is om de status van de bestelling te
+ * mogen lezen. `fetch` in React Native deelt die cookie-opslag met de browser die
+ * de betaling opent, dus dat werkt vanzelf mee.
+ */
+export function startTicketCheckout(input: {
+  eventId: string;
+  buyerName: string;
+  buyerEmail: string;
+  locale: AppLocale;
+  termsAccepted: true;
+  items: {
+    ticketTypeId: string;
+    attendeeName: string;
+    attendeeEmail?: string;
+    answers: Record<string, string | boolean | string[]>;
+  }[];
+}): Promise<{ orderId: string; orderNumber: string; checkoutUrl: string }> {
+  return apiFetch('/api/tickets/checkout', { method: 'POST', body: input });
+}
+
+/** De stand van een bestelling, om na het betalen te weten of ze doorging. */
+export function fetchOrderStatus(orderId: string): Promise<{ id: string; status: string }> {
+  return apiFetch(`/api/tickets/orders/${encodeURIComponent(orderId)}/status`);
 }

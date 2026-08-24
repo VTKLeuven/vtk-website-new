@@ -402,3 +402,132 @@ export type AppHome = {
   pocs: AppPoc[];
   partners: AppPartner[];
 };
+
+// -----------------------------------------------------------------------------
+// Tickets
+// -----------------------------------------------------------------------------
+
+export type AppTicketQuestionType =
+  | "SHORT_TEXT"
+  | "LONG_TEXT"
+  | "SINGLE_CHOICE"
+  | "MULTIPLE_CHOICE"
+  | "BOOLEAN";
+
+export type AppTicketQuestion = {
+  id: string;
+  code: string;
+  label: string;
+  description: string;
+  type: AppTicketQuestionType;
+  required: boolean;
+  /** Enkel bij SINGLE_CHOICE en MULTIPLE_CHOICE. */
+  options: string[];
+};
+
+export type AppTicketType = {
+  id: string;
+  name: string;
+  description: string;
+  priceCents: number;
+  /** Wat er nu nog vrij is in de voorraadpot van dit type. */
+  available: number;
+  minPerOrder: number | null;
+  maxPerOrder: number | null;
+  /** Vragen die bij dit type horen, plus de vragen voor het hele event. */
+  questions: AppTicketQuestion[];
+};
+
+export type AppTicketEvent = {
+  id: string;
+  slug: string;
+  title: string;
+  location: string | null;
+  startsAt: string;
+  endsAt: string;
+  ownerGroupName: string;
+  /** Hoeveel types er te koop staan; genoeg voor de lijst. */
+  ticketTypeCount: number;
+  /** De laagste prijs die nu te koop staat, in cent. `null` bij geen enkel type. */
+  fromPriceCents: number | null;
+  /**
+   * Er staan enkel ledentickets open en je bent niet ingelogd. De app toont dan
+   * een loginknop in plaats van een lege lijst.
+   */
+  requiresLogin: boolean;
+};
+
+export type AppTicketEventDetail = AppTicketEvent & {
+  /** Markdown. */
+  description: string;
+  maxTicketsPerOrder: number;
+  currency: string;
+  contactEmail: string | null;
+  /** Pad naar de verkoopvoorwaarden op de site. */
+  termsUrl: string;
+  ticketTypes: AppTicketType[];
+};
+
+/** Eén ticket in "mijn tickets". */
+export type AppMyTicket = {
+  id: string;
+  publicId: string;
+  status: string;
+  attendeeName: string | null;
+  typeName: string;
+  /**
+   * De inhoud van de QR-code. De app tekent die zelf; er komt geen afbeelding
+   * over de lijn, want dat is een rondje meer voor iets dat het toestel in een
+   * oogwenk zelf tekent.
+   */
+  credential: string;
+  checkedInAt: string | null;
+  /** Absolute URL's; `null` wanneer die wallet niet ingesteld is op de server. */
+  pdfUrl: string;
+  walletAppleUrl: string | null;
+  walletGoogleUrl: string | null;
+};
+
+export type AppMyOrder = {
+  id: string;
+  orderNumber: string;
+  status: string;
+  totalCents: number;
+  event: {
+    slug: string;
+    title: string;
+    startsAt: string;
+    location: string | null;
+  };
+  tickets: AppMyTicket[];
+};
+
+// -----------------------------------------------------------------------------
+// Profiel
+// -----------------------------------------------------------------------------
+
+export type AppMyShift = {
+  id: string;
+  name: string;
+  location: string;
+  start: string;
+  end: string;
+  /** De post waarvoor de shift telt, of `null`. */
+  post: string | null;
+  reward: number;
+};
+
+export type AppProfile = {
+  name: string;
+  email: string;
+  rNumber: string | null;
+  avatarUrl: string | null;
+  /** De studierichtingen zoals ze bij de studiebevestiging opgegeven zijn. */
+  studyProgrammes: string[];
+  groups: AppViewerGroup[];
+  /** Shiften waarvoor je ingeschreven staat en die nog moeten komen. */
+  upcomingShifts: AppMyShift[];
+  /** Shiften die je dit academiejaar gedaan hebt en die nog niet uitbetaald zijn. */
+  unpaidShiftsThisYear: number;
+  totalShifts: number;
+};

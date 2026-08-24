@@ -399,8 +399,23 @@ lukken; kijk het na voor je erop bouwt.
 
 ### Fase 2 - Tickets en Profiel
 
-- [ ] tickets: lijst, detail, checkout via Mollie, mijn tickets met QR
-- [ ] profiel: gegevens, bestellingen, tickets, shiften
+- [x] `GET /api/app/v1/tickets` en `/tickets/[slug]`
+- [x] `GET /api/app/v1/mijn/tickets` en `/mijn/profiel`
+- [x] tickets: lijst, verkoopscherm met vragen, betalen via Mollie in de browser
+- [x] mijn tickets met een native getekende QR
+- [x] profiel: gegevens, shiften, doorstappen naar tickets en broodjes
+- [ ] met de hand getest op een toestel, inclusief een echte Mollie-testbetaling
+
+**Bewust op de site gebleven:** je gegevens wijzigen, verbonden apps en de
+privacygegevens. Dat zijn formulieren met eigen validatie en juridische gevolgen;
+die twee keer bouwen is twee keer kunnen mislopen. Afrekenen heeft ook geen eigen
+app-route: de app post naar het bestaande `/api/tickets/checkout`, want een
+wrapper zou daar niets doen dan doorgeven.
+
+| Datum | Commit | Wat |
+|---|---|---|
+| 2026-08-24 | `web: App-API: tickets, mijn tickets en profiel` | Vier endpoints bovenop de bestaande `queries.ts` van de webshop. Mijn tickets geeft het `credential`, niet een afbeelding. |
+| 2026-08-24 | `Tickets kopen, mijn tickets en het profiel` | Het verkoopscherm met alle vijf de vraagtypes, betalen in de browser met een statuscontrole achteraf, en de QR native getekend zodat hij ook zonder netwerk werkt. |
 
 ### Fase 3 - Info: de inhoud van de site
 

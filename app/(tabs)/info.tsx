@@ -1,5 +1,6 @@
+import { useRouter } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
-import { ChevronRight, ExternalLink } from 'lucide-react-native';
+import { ChevronRight, ExternalLink, TicketCheck } from 'lucide-react-native';
 import { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
@@ -23,6 +24,7 @@ import { COLORS, RADIUS, SPACING, TYPE } from '../../src/theme/tokens';
  * verdwijnt, niet een architectuur.
  */
 export default function InfoScreen() {
+  const router = useRouter();
   const { bootstrap, loading, stale, error, refresh } = useApp();
   const [open, setOpen] = useState<string | null>(null);
 
@@ -46,6 +48,21 @@ export default function InfoScreen() {
       <PageHead title="Info" subtitle="Alles wat VTK doet, per onderdeel" />
       <ScrollView contentContainerStyle={styles.content} style={styles.root}>
         {stale ? <StaleNotice onRetry={() => void refresh()} /> : null}
+
+        {/* Tickets heeft geen eigen tab (zes is er een te veel), dus staat het
+            hier bovenaan naast de categorieën uit het CMS. */}
+        <Card style={styles.tab}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Tickets"
+            onPress={() => router.push('/tickets')}
+            style={styles.tabHeader}
+          >
+            <TicketCheck color={COLORS.navy} size={20} />
+            <Text style={styles.tabLabel}>Tickets</Text>
+            <ChevronRight color={COLORS.muted} size={18} />
+          </Pressable>
+        </Card>
 
         {bootstrap.tabs.map((tab) => (
           <TabRow

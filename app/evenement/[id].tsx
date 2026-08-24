@@ -20,8 +20,9 @@ import { COLORS, SPACING, TYPE } from '../../src/theme/tokens';
  * toelaat, en ze doet hier het werk van de paginakop: er staat al een beeld, dus
  * er hoeft geen tweede donkere band boven.
  *
- * Tickets en inschrijven verwijzen naar de site. Dat is fase 2 werk; tot dan is
- * een knop die naar de echte pagina gaat eerlijker dan geen knop.
+ * Tickets openen het native verkoopscherm. Inschrijven gaat nog naar de site: een
+ * formulier met eigen validatie is fase 4 werk, en een knop naar de echte pagina
+ * is tot dan eerlijker dan geen knop.
  */
 export default function EventScreen() {
   const router = useRouter();
@@ -92,12 +93,7 @@ export default function EventScreen() {
         ) : null}
 
         {event.ticketSlug ? (
-          <Button
-            label="Tickets"
-            onPress={() =>
-              void WebBrowser.openBrowserAsync(`${baseUrl()}/tickets/${event.ticketSlug}`)
-            }
-          />
+          <Button label="Tickets" onPress={() => router.push(`/tickets/${event.ticketSlug}`)} />
         ) : null}
         {event.formSlug ? (
           <Button

@@ -1,7 +1,7 @@
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
-import { ChevronRight, Play } from 'lucide-react-native';
+import { ChevronRight, Play, TicketCheck } from 'lucide-react-native';
 import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -85,6 +85,19 @@ export default function HomeScreen() {
             </Card>
           </View>
         ) : null}
+
+        <View style={styles.paperBlock}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Tickets"
+            onPress={() => router.push('/tickets')}
+            style={({ pressed }) => [styles.shortcut, pressed && styles.shortcutPressed]}
+          >
+            <TicketCheck color={COLORS.navy} size={20} />
+            <Text style={styles.shortcutLabel}>Tickets</Text>
+            <ChevronRight color={COLORS.muted} size={18} />
+          </Pressable>
+        </View>
 
         {bootstrap?.announcement ? (
           <View style={styles.paperBlock}>
@@ -382,6 +395,19 @@ const styles = StyleSheet.create({
     padding: SPACING.sm,
   },
   partnerLogo: { width: '100%', height: '100%' },
+
+  shortcut: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.md,
+    backgroundColor: COLORS.surface,
+    borderRadius: RADIUS.md,
+    borderWidth: 1,
+    borderColor: COLORS.line,
+    padding: SPACING.lg,
+  },
+  shortcutPressed: { backgroundColor: COLORS.paper2 },
+  shortcutLabel: { ...TYPE.cardTitle, color: COLORS.ink, flex: 1 },
 
   kicker: { ...TYPE.kicker, color: COLORS.muted },
   cardTitle: { ...TYPE.cardTitle, color: COLORS.ink },
