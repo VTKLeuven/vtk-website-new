@@ -3,6 +3,18 @@ import { Stack } from 'expo-router';
 import { COLORS } from '../../../src/theme/tokens';
 
 /**
+ * **Meer is de bodem van deze stack**, en dat is de hele reden dat hij hier
+ * staat en niet als losse tab.
+ *
+ * Zonder dit lag het eraan waar je vandaan kwam: open je iets vanaf Home terwijl
+ * er nog een scherm van een vorige keer in de stack stond, dan kwam je met de
+ * terugknop op dát scherm uit in plaats van op Meer. `initialRouteName` zorgt dat
+ * React Navigation Meer eronder schuift wanneer je rechtstreeks naar een
+ * detailscherm navigeert, dus teruggaan komt altijd op Meer uit.
+ */
+export const unstable_settings = { initialRouteName: 'meer' };
+
+/**
  * De schermen die je vanuit een tab opent: een evenement, een pagina, een album,
  * de ticketverkoop, de scanner, je bonnetjes.
  *
@@ -17,6 +29,10 @@ import { COLORS } from '../../../src/theme/tokens';
  * Home én vanaf Kalender, de scanner vanaf Home én vanaf Tickets; met een stack
  * per tab zou elk van die schermen in twee mappen moeten staan.
  *
+ * Het scherm **Meer** hoort daar zelf bij: het is de bodem van de stack en
+ * tegelijk de tab. Dat is hoe een "Meer"-tab op iOS ook werkt, en het is wat
+ * teruggaan voorspelbaar maakt.
+ *
  * **Elk scherm hier heeft een terugknop**, en die zit in `PageHead`. De stack
  * draait met `headerShown: false`, dus er is geen systeemkop die er een tekent;
  * zonder die knop geraakte je op iOS nergens meer weg zodra je doorklikte.
@@ -29,6 +45,7 @@ export default function DetailLayout() {
         contentStyle: { backgroundColor: COLORS.paper },
       }}
     >
+      <Stack.Screen name="meer" />
       <Stack.Screen name="zoeken" />
       <Stack.Screen name="media" />
       <Stack.Screen name="album/[slug]" />

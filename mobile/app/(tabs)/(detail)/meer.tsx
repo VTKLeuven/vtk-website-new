@@ -18,13 +18,13 @@ import {
 import { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
-import { baseUrl } from '../../src/api/client';
-import type { AppNavTab } from '../../src/api/contract';
-import { PageHead } from '../../src/components/PageHead';
-import { Card, ErrorState, Loading, StaleNotice } from '../../src/components/ui';
-import { nativeRouteFor, pageSlugFor } from '../../src/nativeRoute';
-import { useApp } from '../../src/state/app';
-import { COLORS, RADIUS, SPACING, TYPE } from '../../src/theme/tokens';
+import { baseUrl } from '../../../src/api/client';
+import type { AppNavTab } from '../../../src/api/contract';
+import { PageHead } from '../../../src/components/PageHead';
+import { Card, ErrorState, Loading, StaleNotice } from '../../../src/components/ui';
+import { nativeRouteFor, pageSlugFor } from '../../../src/nativeRoute';
+import { useApp } from '../../../src/state/app';
+import { COLORS, RADIUS, SPACING, TYPE } from '../../../src/theme/tokens';
 
 /**
  * Meer: alles wat je opzoekt in plaats van doet.

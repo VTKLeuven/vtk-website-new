@@ -29,6 +29,12 @@ import { COLORS, FONTS } from '../../src/theme/tokens';
 export default function TabsLayout() {
   return (
     <Tabs
+      /**
+       * Teruggaan brengt je naar de tab waar je vandaan kwam, niet naar Home.
+       * De standaard (`firstRoute`) stuurt je altijd naar de eerste tab, en dat
+       * voelt als weggeslingerd worden.
+       */
+      backBehavior="history"
       screenOptions={{
         headerShown: false,
         tabBarActiveTintColor: COLORS.navy,
@@ -67,14 +73,16 @@ export default function TabsLayout() {
           tabBarIcon: ({ color, size }) => <Sandwich color={color} size={size} />,
         }}
       />
-      {/* De gedeelde stack met alle doorklikschermen. Hij hoort bij de
-          tabnavigator zodat de balk zichtbaar blijft, maar hij is zelf geen tab
-          en staat dus niet in de balk. */}
-      <Tabs.Screen name="(detail)" options={{ href: null }} />
+      {/* Meer is tegelijk een tab en de bodem van de stack met alle
+          doorklikschermen. Dat is met opzet: teruggaan uit een detailscherm komt
+          daardoor altijd op Meer uit, ongeacht vanwaar je het opende. Stond de
+          stack los van de tab, dan hing dat af van wat er toevallig nog in
+          stond. */}
       <Tabs.Screen
-        name="meer"
+        name="(detail)"
         options={{
           title: 'Meer',
+          href: '/meer',
           tabBarIcon: ({ color, size }) => <LayoutGrid color={color} size={size} />,
         }}
       />
