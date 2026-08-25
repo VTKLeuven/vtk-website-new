@@ -68,7 +68,7 @@ Developer-account, en dat is er nog niet.
 
 ### 4. De server instellen
 
-Open in de app **Profiel → Server** en vul je cloudflared-adres in. Zonder dat
+Open in de app **Meer → je naam → Server** en vul je cloudflared-adres in. Zonder dat
 praat de app met `https://dev.vtk.be`, en dan test je de productiegegevens in
 plaats van je eigen werk.
 
@@ -108,12 +108,31 @@ npx eas-cli@latest update --branch preview --message "wat je veranderd hebt"
 ```
 
 Dat is genoeg voor JavaScript en assets: die gaan over de lucht naar elk toestel
-dat de app al heeft. **Een nieuwe native dependency gaat er niet over**; dan is er
-een nieuwe build nodig:
+dat de app al heeft.
+
+**Een nieuwe native dependency gaat er niet over.** Dan is er een nieuwe build
+nodig, en die moet er zijn **voor** je publiceert:
 
 ```bash
 npx eas-cli@latest build --profile preview --platform android
 ```
+
+Dat "voor" is niet vrijblijvend. `runtimeVersion` staat op de fingerprint-policy,
+dus een update bereikt enkel builds met dezelfde native kant. Publiceer je zonder
+te bouwen, dan krijgt niemand iets; bouw je zonder te publiceren, dan zit de code
+enkel in die ene APK. Zie `mobile/docs/architecture.md` voor waarom dat beter is
+dan de `exposdk`-policy die hier ooit stond.
+
+De volgorde die klopt:
+
+1. `npx eas-cli@latest build --profile preview --platform android`
+2. de APK verspreiden (de link uit de build, of de QR)
+3. `npx eas-cli@latest update --branch preview --message "..."` voor alles wat
+   daarna nog aan de JavaScript verandert
+
+Wijzigde er niets aan de native kant, dan volstaat stap 3 alleen. Twijfel je?
+`npx eas-cli@latest fingerprint:generate --platform android` geeft de hash; is die
+gelijk aan die van de laatste build, dan volstaat een update.
 
 Let op de bekende valstrik: een OTA-update wordt op de ene start **gedownload** en
 op de volgende pas **toegepast**. De app moet dus twee keer dicht en open voor je

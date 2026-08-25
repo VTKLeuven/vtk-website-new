@@ -41,6 +41,13 @@ gaan niet met `eas update` over de lucht mee. Wie de scanner, "In agenda" of het
 bewaren van een foto wil testen, heeft een development build of een verse APK
 nodig, geen OTA-update.
 
+**Voeg je een native dependency toe, bouw dan voor je publiceert.**
+`runtimeVersion` staat op de fingerprint-policy, dus een update bereikt enkel
+builds met dezelfde native kant. Dat is met opzet: met de oude `exposdk`-policy
+kreeg élke SDK 54-build elke update aangeboden, ook eentje die een module
+importeert die er niet in zit, en dan gooit `requireNativeModule` op het scherm
+waar die import hangt. Zie `docs/architecture.md`.
+
 ## Regels
 
 1. **De server is de waarheid.** Elke regel die iets beslist (mag ik bestellen,

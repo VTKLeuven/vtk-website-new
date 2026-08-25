@@ -94,8 +94,8 @@ een nieuwe build nodig.
 
 De weblogin vraagt HTTPS, dus `http://localhost:3000` werkt niet vanaf een
 toestel. Draai vtk-website-new achter een cloudflared-tunnel en vul die URL in bij
-**Profiel -> Server**. Dat wisselen gooit de leescache weg, want die hoort bij één
-site.
+**Meer -> je naam -> Server**. Dat wisselen gooit de leescache weg, want die hoort
+bij één site.
 
 De server leidt zijn absolute URL's af uit de aanvraag zelf en niet uit
 `VTK_MAIN_URL`, precies zodat die tunnel vanzelf meewerkt.
@@ -103,10 +103,33 @@ De server leidt zijn absolute URL's af uit de aanvraag zelf en niet uit
 ## Uitrollen
 
 EAS internal distribution plus `eas update`, drie kanalen (`development`,
-`preview`, `production`), net als bij de scanner. `runtimeVersion` staat op
-`exposdk:54.0.0`: JS en assets gaan over de lucht, native modules niet. Voeg je
-een native dependency toe, dan is er een nieuwe build nodig en helpt een update
-niet.
+`preview`, `production`), net als bij de scanner. JS en assets gaan over de
+lucht, native modules niet.
+
+## `runtimeVersion`: fingerprint, en waarom niet `exposdk`
+
+`app.json` zet `runtimeVersion` op `{ "policy": "fingerprint" }`. EAS berekent
+dan een hash over alles wat de native kant bepaalt (de dependencies, de plugins,
+de config) en gebruikt die als versie. Een build en een update passen bij elkaar
+wanneer die hashes gelijk zijn.
+
+**Dit stond ooit op `exposdk:54.0.0`, en dat was stil kapot.** Die waarde is
+dezelfde voor élke SDK 54-build, of er nu `expo-camera` in zit of niet. EAS kon
+een oude APK dus niet onderscheiden van een nieuwe en bood elke update aan
+iedereen aan. Een update die `expo-calendar` importeert, belandde zo op een
+toestel zonder die module, en `requireNativeModule` gooit op het moment dat het
+scherm geladen wordt. Niet een knop die niets doet: een rood scherm op het
+evenementenscherm.
+
+De prijs is een build meer dan vroeger. Elke wijziging aan een native dependency,
+aan een plugin of aan de app-config geeft een nieuwe fingerprint, en dan bereikt
+een update de vorige builds niet meer. Dat is precies de bedoeling: liever een
+toestel dat niets krijgt dan een toestel dat crasht. Wat de fingerprint is, vraag
+je op met:
+
+```bash
+npx eas-cli@latest fingerprint:generate --platform android
+```
 
 Let op de bekende valstrik: **een OTA-update wordt op de ene start gedownload en
 op de volgende pas toegepast.** De app moet dus twee keer dicht en open voor je

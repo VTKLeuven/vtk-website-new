@@ -543,9 +543,18 @@ App:
 - [x] meldingenscherm met een schakelaar per soort bericht
 - [ ] met de hand getest op een toestel
 
-**Nieuwe build nodig.** `expo-camera` en `expo-calendar` zijn native; een
-`eas update` volstaat niet. Wie de scanner, "In agenda" of de fakbar-check-in wil
-proberen, heeft een verse APK of development build nodig.
+**Nieuwe build nodig, en de runtimeVersion mee.** `expo-camera` en
+`expo-calendar` zijn native; een `eas update` volstaat niet.
+
+Wat daarbij bovenkwam en erger was dan het bouwen zelf: `runtimeVersion` stond op
+`exposdk:54.0.0`, en dat is dezelfde waarde voor élke SDK 54-build. EAS kon een
+oude APK dus niet onderscheiden van een nieuwe en bood elke update aan iedereen
+aan; een toestel zonder `expo-calendar` kreeg JS die het importeert, en dat is
+geen knop die niets doet maar een rood scherm op het evenementenscherm. Dezelfde
+val lag al open onder de commit ervoor, die `expo-media-library` toevoegde.
+
+Staat nu op `{ "policy": "fingerprint" }`. Zie `docs/architecture.md` voor de
+prijs (een build per native wijziging) en waarom die het waard is.
 
 **Nagekeken tegen een draaiende server**, met een lokale beheerder: de pas
 opzoeken en afboeken (inclusief verlopen, vervalst, te veel, en bij jezelf), de

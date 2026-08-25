@@ -68,7 +68,9 @@
         "projectId": "2858ac35-d566-4e4d-8351-3c36bed26693"
       }
     },
-    "runtimeVersion": "exposdk:54.0.0",
+    "runtimeVersion": {
+      "policy": "fingerprint"
+    },
     "platforms": [
       "ios",
       "android"
