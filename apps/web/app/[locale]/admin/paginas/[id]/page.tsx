@@ -1,3 +1,4 @@
+import { headers } from "next/headers";
 import { notFound } from "next/navigation";
 import { prisma } from "@vtk/db";
 import { hasPermission } from "@vtk/auth";
@@ -24,6 +25,7 @@ export default async function AdminPageEditor({
   const locale: Locale = localeParam;
 
   const session = await requireAnyPermission(["pages.edit", "pages.editAll"]);
+  const host = (await headers()).get("host") ?? "vtk.be";
 
   const [page, roles] = await Promise.all([
     prisma.page.findUnique({
@@ -49,6 +51,7 @@ export default async function AdminPageEditor({
 
   return (
     <PageContentEditor
+      host={host}
       locale={locale}
       page={{
         id: page.id,

@@ -2,6 +2,7 @@
 
 import { useId, useState } from "react";
 import Link from "next/link";
+import { QrCode } from "lucide-react";
 import { Card, Input, Label } from "@vtk/ui";
 import { getDictionary, type Locale } from "@vtk/i18n";
 import { MarkdownEditor } from "@/components/editor/MarkdownEditor";
@@ -13,6 +14,7 @@ import { AssetList } from "../../inhoud/AssetList";
 import { FileUploader } from "../../inhoud/FileUploader";
 import type { AssetNode } from "../../inhoud/ContentManager";
 import { PageSettingsCard, type SettingsRole } from "./PageSettingsCard";
+import { PageQrModal } from "../PageQrModal";
 
 type EditorPage = {
   id: string;
@@ -35,6 +37,7 @@ type EditorPage = {
  * de site valt dan terug op NL.
  */
 export function PageContentEditor({
+  host,
   locale,
   page,
   initialNl,
@@ -46,6 +49,7 @@ export function PageContentEditor({
   canDelete,
   canPublish,
 }: {
+  host: string;
   locale: Locale;
   page: EditorPage;
   initialNl: string;
@@ -74,6 +78,7 @@ export function PageContentEditor({
   const [lang, setLang] = useState<"nl" | "en">("nl");
   const [contentNl, setContentNl] = useState(initialNl);
   const [contentEn, setContentEn] = useState(initialEn);
+  const [qrOpen, setQrOpen] = useState(false);
 
   return (
     <div className="space-y-5">
@@ -92,16 +97,26 @@ export function PageContentEditor({
             {page.published ? (nl ? "gepubliceerd" : "published") : nl ? "concept" : "draft"}
           </p>
         </div>
-        {page.published && (
-          <a
-            href={`${base}/p/${page.slug}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="rounded-full border border-vtk-blue/20 px-3 py-1.5 text-sm font-medium text-vtk-ink hover:bg-vtk-blue-soft/50"
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setQrOpen(true)}
+            className="inline-flex items-center gap-1.5 rounded-full border border-vtk-blue/20 px-3 py-1.5 text-sm font-medium text-vtk-ink hover:bg-vtk-blue-soft/50"
           >
-            {nl ? "Bekijk pagina" : "View page"}
-          </a>
-        )}
+            <QrCode size={16} aria-hidden="true" />
+            {nl ? "QR-code" : "QR code"}
+          </button>
+          {page.published && (
+            <a
+              href={`${base}/p/${page.slug}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="rounded-full border border-vtk-blue/20 px-3 py-1.5 text-sm font-medium text-vtk-ink hover:bg-vtk-blue-soft/50"
+            >
+              {nl ? "Bekijk pagina" : "View page"}
+            </a>
+          )}
+        </div>
       </div>
 
       {page.needsReview && (
@@ -231,6 +246,15 @@ export function PageContentEditor({
         initialNeedsYearlyEdit={page.needsYearlyEdit}
         initialRoleIds={page.editorRoleIds}
       />
+
+      {qrOpen && (
+        <PageQrModal
+          host={host}
+          nl={nl}
+          page={{ slug: page.slug, title: page.titleNl, published: page.published }}
+          onClose={() => setQrOpen(false)}
+        />
+      )}
     </div>
   );
 }

@@ -1,3 +1,4 @@
+import { headers } from "next/headers";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { Prisma } from "@prisma/client";
@@ -6,11 +7,10 @@ import { hasPermission } from "@vtk/auth";
 import type { Locale } from "@vtk/i18n";
 import { hasLocale } from "@/lib/locale";
 import { requireAnyPermission } from "@/lib/session";
-import { IconLink, RowActions } from "@/components/ui/IconButton";
-import { ExternalLinkIcon, PencilIcon } from "@/components/ui/icons";
 import { currentWorkingYear, workingYearStart } from "@/lib/workingYear";
 import { reviewFirstWindow } from "@/lib/reviewFirstPaging";
 import { PagesToolbar } from "./PagesToolbar";
+import { PageRowActions } from "./PageRowActions";
 
 const PAGE_SIZE = 25;
 
@@ -44,6 +44,7 @@ export default async function AdminPages({
 
   const session = await requireAnyPermission(["pages.edit", "pages.editAll"]);
   const canEditAll = hasPermission(session, "pages.editAll");
+  const host = (await headers()).get("host") ?? "vtk.be";
 
   const q = (sp.q ?? "").trim();
   const sortKey: SortKey = SORT_KEYS.includes(sp.sort as SortKey) ? (sp.sort as SortKey) : "review";
@@ -280,25 +281,17 @@ export default async function AdminPages({
                     )}
                   </td>
                   <td>
-                    <RowActions>
-                      {published && (
-                        <IconLink
-                          href={`${base}/p/${p.slug}`}
-                          target="_blank"
-                          label={nl ? "Bekijk pagina" : "View page"}
-                          srLabel={`${nl ? "Bekijk pagina" : "View page"}: ${title}`}
-                        >
-                          <ExternalLinkIcon />
-                        </IconLink>
-                      )}
-                      <IconLink
-                        href={`${base}/admin/paginas/${p.id}`}
-                        label={nl ? "Bewerken" : "Edit"}
-                        srLabel={`${nl ? "Bewerken" : "Edit"}: ${title}`}
-                      >
-                        <PencilIcon />
-                      </IconLink>
-                    </RowActions>
+                    <PageRowActions
+                      host={host}
+                      nl={nl}
+                      base={base}
+                      page={{
+                        id: p.id,
+                        slug: p.slug,
+                        title,
+                        published,
+                      }}
+                    />
                   </td>
                 </tr>
               );
