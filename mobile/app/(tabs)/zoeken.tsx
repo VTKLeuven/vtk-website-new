@@ -4,12 +4,12 @@ import { ExternalLink, Search } from 'lucide-react-native';
 import { useEffect, useState } from 'react';
 import { FlatList, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
-import { search } from '../../../src/api/endpoints';
-import type { AppSearchResult } from '../../../src/api/contract';
-import { PageHead } from '../../../src/components/PageHead';
-import { Empty, Loading } from '../../../src/components/ui';
-import { useApp } from '../../../src/state/app';
-import { COLORS, RADIUS, SPACING, TYPE } from '../../../src/theme/tokens';
+import { search } from '../../src/api/endpoints';
+import type { AppSearchResult } from '../../src/api/contract';
+import { PageHead } from '../../src/components/PageHead';
+import { Empty, Loading } from '../../src/components/ui';
+import { useApp } from '../../src/state/app';
+import { COLORS, RADIUS, SPACING, TYPE } from '../../src/theme/tokens';
 
 /** Wachttijd voor een getikte letter een zoekopdracht wordt. */
 const DEBOUNCE_MS = 350;

@@ -2,12 +2,12 @@ import { Image } from 'expo-image';
 import { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
-import { fetchWerkgroepen } from '../../../src/api/endpoints';
-import { messageFor, useResource } from '../../../src/api/useResource';
-import { PageHead } from '../../../src/components/PageHead';
-import { Card, Empty, ErrorState, Loading } from '../../../src/components/ui';
-import { useApp } from '../../../src/state/app';
-import { COLORS, RADIUS, SPACING, TYPE } from '../../../src/theme/tokens';
+import { fetchWerkgroepen } from '../../src/api/endpoints';
+import { messageFor, useResource } from '../../src/api/useResource';
+import { PageHead } from '../../src/components/PageHead';
+import { Card, Empty, ErrorState, Loading } from '../../src/components/ui';
+import { useApp } from '../../src/state/app';
+import { COLORS, RADIUS, SPACING, TYPE } from '../../src/theme/tokens';
 
 /**
  * De werkgroepen, per werkingsjaar.

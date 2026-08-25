@@ -4,13 +4,13 @@ import * as WebBrowser from 'expo-web-browser';
 import { Download } from 'lucide-react-native';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
-import { fetchPage } from '../../../../src/api/endpoints';
-import { messageFor, useResource } from '../../../../src/api/useResource';
-import { PageHead } from '../../../../src/components/PageHead';
-import { Prose } from '../../../../src/components/Prose';
-import { Button, Card, ErrorState, Loading } from '../../../../src/components/ui';
-import { useApp } from '../../../../src/state/app';
-import { COLORS, RADIUS, SPACING, TYPE } from '../../../../src/theme/tokens';
+import { fetchPage } from '../../../src/api/endpoints';
+import { messageFor, useResource } from '../../../src/api/useResource';
+import { PageHead } from '../../../src/components/PageHead';
+import { Prose } from '../../../src/components/Prose';
+import { Button, Card, ErrorState, Loading } from '../../../src/components/ui';
+import { useApp } from '../../../src/state/app';
+import { COLORS, RADIUS, SPACING, TYPE } from '../../../src/theme/tokens';
 
 /**
  * Een contentpagina uit het CMS.

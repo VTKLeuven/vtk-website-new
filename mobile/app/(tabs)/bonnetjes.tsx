@@ -2,14 +2,14 @@ import { useRouter } from 'expo-router';
 import { ArrowDownLeft, ArrowUpRight } from 'lucide-react-native';
 import { RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 
-import { fetchVouchers } from '../../../src/api/endpoints';
-import { messageFor, useResource } from '../../../src/api/useResource';
-import { PageHead } from '../../../src/components/PageHead';
-import { PassCode } from '../../../src/components/PassCode';
-import { Button, Card, ErrorState, Loading, StaleNotice } from '../../../src/components/ui';
-import { formatDate } from '../../../src/format';
-import { useApp } from '../../../src/state/app';
-import { COLORS, RADIUS, SPACING, TYPE } from '../../../src/theme/tokens';
+import { fetchVouchers } from '../../src/api/endpoints';
+import { messageFor, useResource } from '../../src/api/useResource';
+import { PageHead } from '../../src/components/PageHead';
+import { PassCode } from '../../src/components/PassCode';
+import { Button, Card, ErrorState, Loading, StaleNotice } from '../../src/components/ui';
+import { formatDate } from '../../src/format';
+import { useApp } from '../../src/state/app';
+import { COLORS, RADIUS, SPACING, TYPE } from '../../src/theme/tokens';
 
 /**
  * Bonnetjes: wat je verdiende met shiften en wat je ermee kan.

@@ -3,18 +3,18 @@ import { Bell } from 'lucide-react-native';
 import { useState } from 'react';
 import { Alert, Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
 
-import type { AppNotificationTopic } from '../../../src/api/contract';
+import type { AppNotificationTopic } from '../../src/api/contract';
 import {
   fetchNotificationSettings,
   setCategoryFollow,
   setNotificationTopic,
-} from '../../../src/api/endpoints';
-import { messageFor, useResource } from '../../../src/api/useResource';
-import { PageHead } from '../../../src/components/PageHead';
-import { Button, Card, ErrorState, Loading } from '../../../src/components/ui';
-import { disablePush, enablePush, hasBeenAsked, pushIsOn } from '../../../src/push';
-import { useApp } from '../../../src/state/app';
-import { COLORS, RADIUS, SPACING, TYPE } from '../../../src/theme/tokens';
+} from '../../src/api/endpoints';
+import { messageFor, useResource } from '../../src/api/useResource';
+import { PageHead } from '../../src/components/PageHead';
+import { Button, Card, ErrorState, Loading } from '../../src/components/ui';
+import { disablePush, enablePush, hasBeenAsked, pushIsOn } from '../../src/push';
+import { useApp } from '../../src/state/app';
+import { COLORS, RADIUS, SPACING, TYPE } from '../../src/theme/tokens';
 
 /**
  * Waarvoor je telefoon afgaat.

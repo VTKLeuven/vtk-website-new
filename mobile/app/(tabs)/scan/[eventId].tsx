@@ -3,17 +3,17 @@ import { CircleCheck, CircleX, TriangleAlert } from 'lucide-react-native';
 import { useCallback, useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 
-import { ApiError } from '../../../../src/api/client';
-import type { AppTicketScanResult } from '../../../../src/api/contract';
-import { fetchScanEvents, scanTicket } from '../../../../src/api/endpoints';
-import { useResource } from '../../../../src/api/useResource';
-import { PageHead } from '../../../../src/components/PageHead';
-import { QrScanner } from '../../../../src/components/QrScanner';
-import { Button, Card } from '../../../../src/components/ui';
-import { getPref, setPref } from '../../../../src/storage';
-import { scanKindOf } from '../../../../src/scanKind';
-import { useApp } from '../../../../src/state/app';
-import { COLORS, SPACING, TYPE } from '../../../../src/theme/tokens';
+import { ApiError } from '../../../src/api/client';
+import type { AppTicketScanResult } from '../../../src/api/contract';
+import { fetchScanEvents, scanTicket } from '../../../src/api/endpoints';
+import { useResource } from '../../../src/api/useResource';
+import { PageHead } from '../../../src/components/PageHead';
+import { QrScanner } from '../../../src/components/QrScanner';
+import { Button, Card } from '../../../src/components/ui';
+import { getPref, setPref } from '../../../src/storage';
+import { scanKindOf } from '../../../src/scanKind';
+import { useApp } from '../../../src/state/app';
+import { COLORS, SPACING, TYPE } from '../../../src/theme/tokens';
 
 /**
  * Tickets scannen aan de deur van één evenement.
