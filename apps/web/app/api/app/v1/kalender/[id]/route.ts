@@ -1,8 +1,11 @@
 import { pick } from "@vtk/i18n";
 
+import { prisma } from "@vtk/db";
+
 import { corsPreflight } from "@/lib/cors";
 import { loadCalendarEvent } from "@/lib/pageQueries";
 import { getDefaultEventImage } from "@/lib/defaultEventImage";
+import { getCurrentSession } from "@/lib/session";
 import { appLocaleFrom, type AppCalendarEventDetail } from "@/lib/app-api/contract";
 import { absoluteMediaUrl, absoluteUrl } from "@/lib/app-api/media";
 import { appErrorResponse, appJson, appNotFound } from "@/lib/app-api/respond";
@@ -18,6 +21,10 @@ export const dynamic = "force-dynamic";
  * openstaat: een knop die naar een gesloten verkoop leidt, is erger dan geen
  * knop. Die beoordeling gebeurt hier en niet in de app, zodat de app niet hoeft
  * te weten wat de statussen van een ticketevent betekenen.
+ *
+ * `interestedCount` is een teller en geen deelnemerslijst: er staan geen namen
+ * bij en er hangt geen plaats aan. Het is er om te zien of er volk komt, en dat
+ * is precies zoveel als een ster mag beloven.
  */
 export async function GET(request: Request, context: { params: Promise<{ id: string }> }) {
   try {
@@ -33,6 +40,16 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
     // `public/`), dus die gaat langs `absoluteUrl` en niet langs de media-helper.
     const imageUrl =
       absoluteMediaUrl(request, event.imageKey) ?? absoluteUrl(request, await getDefaultEventImage());
+
+    const session = await getCurrentSession();
+    const [interest, interestedCount] = await Promise.all([
+      session
+        ? prisma.calendarEventInterest.count({
+            where: { userId: session.user.id, eventId: event.id },
+          })
+        : Promise.resolve(0),
+      prisma.calendarEventInterest.count({ where: { eventId: event.id } }),
+    ]);
 
     const now = new Date();
     const formOpen =
@@ -60,6 +77,8 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
       url: event.url,
       ticketSlug: event.ticketEvent?.status === "PUBLISHED" ? event.ticketEvent.slug : null,
       formSlug: formOpen ? (event.form?.slug ?? null) : null,
+      interested: interest > 0,
+      interestedCount,
     };
 
     return appJson(request, payload);

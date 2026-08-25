@@ -78,8 +78,36 @@ dat zit een nieuw lid in een app die overal leeg blijft zonder te zeggen waarom.
 ### `GET /api/app/v1/bootstrap`
 
 Wat de app bij elke start ophaalt, in één ronde: `viewer` (of `null`), de
-headertabs uit het CMS, de aankondiging van dit moment, `minimumAppVersion` en
-`webBaseUrl`. Werkt zonder sessie; de app is publiek bruikbaar.
+headertabs uit het CMS, de aankondiging van dit moment, `minimumAppVersion`,
+`webBaseUrl` en `abilities`. Werkt zonder sessie; de app is publiek bruikbaar.
+
+`abilities` (`lib/app-api/abilities.ts`) zegt welke knoppen deze gebruiker mag
+zien: scannen, bonnetjes aanvaarden, de afhaalbalie. Dat is **netheid en geen
+beveiliging** (elke route controleert het daarna nog eens zelf); zonder dit zou de
+app knoppen tonen die bij de helft "geen toegang" antwoorden, en dat is erger dan
+een knop die er niet is.
+
+### `GET /api/app/v1/vandaag`
+
+Het beginscherm van de app. Bewust een eigen route naast `/home`: die laatste is
+de voorpagina van de site in gegevensvorm (fotohero, aftermovies, career,
+partners) en blijft staan zolang er toestellen op de oudere versie van de app
+zitten. `/vandaag` beantwoordt de twee vragen waarmee iemand zijn telefoon
+bovenhaalt: **wat is er open** en **wat wacht er op mij**.
+
+- `services`: Theokot, cursusdienst en 't ElixIr, elk herleid tot `openNow` plus
+  één regel `detail` ("tot 14:00", "opent 22:00", "do 12:00"). Het rekenwerk zit
+  in `lib/app-api/serviceStatus.ts`, **op de Brusselse klok** en niet op die van
+  de server: `isOpenAt` in `hoursUtils` gebruikt `Date#getHours()` en is dus stil
+  fout zodra de container niet op Europe/Brussels staat.
+- Een dag kan een bereik zijn (`12:00 - 14:00`) of één tijdstip (`22:00`). Dat
+  tweede is 't ElixIr: een fakbar opent om tien uur en sluit wanneer ze sluit.
+  `parseHoursRange` kent enkel het eerste, en daardoor stond de bar de hele week
+  als gesloten op het beginscherm tot dit erbij kwam.
+- `tasks`: wat er op deze gebruiker wacht, gesorteerd op dringendheid door de
+  server. De app tekent enkel; zou ze zelf beslissen wat dringend is, dan stond
+  die regel op twee plaatsen.
+- `vouchers`: het openstaande bonnetjessaldo, of `null` zonder login.
 
 ### `POST /api/app/v1/push/register` en `/push/unregister`
 
@@ -103,6 +131,98 @@ en de doelgroepfilter niet twee keer berekend worden.
 De kalender filtert op `end >= nu` en niet op `start`: anders verdwijnt een
 festival op zijn tweede dag. Zonder categorie geldt de doelgroepfilter; met een
 categorie niet, want wie om de eerstejaarskalender vraagt, wil ze zien.
+
+### `POST`/`DELETE /api/app/v1/kalender/[id]/interesse`
+
+De ster op een evenement: "ik ga hier waarschijnlijk naartoe". **Geen
+inschrijving**: er hangt geen plaats aan, geen betaling en geen deelnemerslijst.
+Wat ze wel doet is jouw eigen lijst maken (`?interesse=1` op de kalender) en de
+herinnering van de dag ervoor eraan hangen.
+
+Twee keer aanzetten is geen fout: een tik op een ster die al aan stond hoort niets
+te doen en zeker niet te falen op een trage verbinding waar de eerste tik al
+aankwam. Uitzetten controleert bewust niet of het evenement nog zichtbaar is; je
+moet je eigen ster altijd weg kunnen halen.
+
+`?interesse=1` negeert de doelgroepfilter, ook met opzet: wat jij ooit aanduidde
+hoort in jouw lijst te blijven staan, ook wanneer je studiejaar intussen
+verschoven is.
+
+### `GET`/`PATCH /api/app/v1/mijn/meldingen`
+
+Welke soorten bericht je wil, en welke kalendercategorieën je volgt. Die twee
+staan in één endpoint omdat ze in één scherm horen: "waarvoor gaat mijn telefoon
+af". Apart zetten zou betekenen dat je twee schermen moet bezoeken om te snappen
+waarom je iets kreeg.
+
+`PATCH` doet **één schakelaar per aanroep** en niet de hele set. Een scherm dat
+telkens alles terugstuurt, overschrijft wat er intussen op een ander toestel
+veranderde.
+
+Enkel afwijkingen staan in `AppNotificationPreference`; geen rij betekent de
+standaard uit `APP_NOTIFICATION_TOPICS` in het contract. Zo heeft een nieuw soort
+bericht vanzelf de juiste standaard voor iedereen die al bestond.
+
+### `GET /api/app/v1/mijn/bonnetjes` en `POST /api/app/v1/bonnetjes/{pas,inwisselen}`
+
+Bonnetjes verdien je met shiften en geef je uit aan een toog.
+
+**Het saldo is geen kolom.** Het is `Shift.reward` min `ShiftParticipant.rewardPaid`
+over alle voorbije shiften. Er bestond al een beheerscherm dat bonnetjes in geld
+uitbetaalt en een afhaalbalie die er twee afboekt voor een broodje; die schrijven
+allemaal in diezelfde kolom. Een tweede saldo ernaast zou betekenen dat de twee
+uit elkaar kunnen lopen, en dan is geen van beide nog te vertrouwen.
+`lib/app-api/vouchers.ts` voegt enkel de derde weg toe om ze uit te geven.
+
+- `/mijn/bonnetjes` geeft saldo, historiek en **de pas**: de QR die je aan een
+  balie toont. Die zit in dezelfde aanvraag als het saldo omdat ze samen op één
+  scherm staan; twee rondjes voel je aan een toog wel degelijk.
+- `/bonnetjes/pas` is de leeskant voor wie aanvaardt: wie is dit, hoeveel staat er
+  open, en (met `theokot.pickup`) de broodjesbestelling van vandaag.
+- `/bonnetjes/inwisselen` boekt af. Allebei achter het recht `shift.rewardRedeem`.
+
+**De pas gaat mee bij het afboeken, niet het `userId` uit de vorige stap.** Zonder
+dat zou wie dit recht heeft bij eender wie kunnen afboeken zonder dat die persoon
+erbij staat. De pas leeft twee minuten, dus hij dwingt af dat het echt om deze
+scan gaat. En je kan **niet bij jezelf** afboeken: wie mag aanvaarden heeft zelf
+ook bonnetjes, en zijn eigen pas scannen is de kortste weg naar een gratis pint
+zonder dat er iemand meekijkt.
+
+Opzoeken en afboeken zijn bewust twee stappen. Wie achter een toog scant, hoort
+de naam en het saldo te zien voor er iets afgaat.
+
+### `GET /api/app/v1/scan/events` en `POST /api/app/v1/scan/uitnodiging`
+
+De evenementen waarvoor je tickets mag scannen, en het inwisselen van een
+uitnodigings-QR.
+
+De lijst komt uit `listScannableTicketEvents()`, dezelfde als het keuzescherm van
+de webscanner: van twaalf uur na afloop tot een maand vooruit, met de
+standaardregel plus je grants. Een lege lijst is een geldig antwoord en geen
+fout.
+
+De uitnodiging is hetzelfde token en dezelfde schrijfweg (`grantScannerRole`) als
+`/scan/uitnodiging` op de site, waar diezelfde QR op uitkomt met de gewone camera
+van een telefoon. Eén soort code die overal werkt is makkelijker uit te leggen aan
+wie hem aan de deur moet tonen, en er is maar één plek waar een grant ontstaat.
+De app mag ook de volledige URL doorsturen; dat is wat een camera leest.
+
+**Scannen zelf loopt niet langs `/app/v1`.** De app post naar
+`/api/tickets/events/[eventId]/scan`, want die route draagt de hele beoordeling
+(geldig, al gescand, verkeerd evenement, terugbetaald) plus het scanlogboek.
+
+### `POST /api/app/v1/fakbar/checkin`
+
+Inchecken aan de bar met je telefoon in plaats van met je studentenkaart. Naast de
+kaartlezer hangt een QR met een ondertekende code (te vinden in
+/admin/fakscanner); de check-in zelf is dezelfde `registerCheckin` als de Pi
+gebruikt.
+
+**De eerlijke beperking**: die code hangt daar maanden en verloopt dus niet. Wie
+er een foto van neemt, heeft hem voorgoed. De tegenmaatregel zit niet in het token
+maar in de check-in: ze telt enkel wanneer 't ElixIr op dat moment ook **open
+gemeten** wordt (`readBarStatus`, niet stale), en nog steeds maar één keer per
+bardag. Zie `docs/design-decisions.md`.
 
 ### `GET /api/app/v1/theokot` en `POST`/`DELETE /api/app/v1/theokot/order`
 
@@ -222,18 +342,38 @@ De automatische berichten staan in `lib/app-api/notifications.ts`. **Wanneer een
 bericht gerechtvaardigd is, is een kringkeuze**; ze staat in
 `docs/design-decisions.md`, sectie "Wanneer de app een pushbericht stuurt".
 
-- **"Je broodje ligt klaar"** vertrekt uit
-  `POST /api/app/v1/push/maintenance` (worker, `APP_PUSH_MAINTENANCE_SECRET`).
-- **De shift-herinnering** vertrekt uit `processDueShiftReminders`, binnen
-  dezelfde claim als de mail. Twee wekkers voor één herinnering lopen vroeg of
-  laat uit elkaar.
-- **Met de hand** kan het via Admin -> Pushberichten, achter het recht
-  `app.push`. Elke verzending komt in het logboek met de tekst erbij.
+Vier vertrekken uit `POST /api/app/v1/push/maintenance` (worker,
+`APP_PUSH_MAINTENANCE_SECRET`):
 
-Beide automatische berichten claimen eerst en versturen dan: de markering gaat om
+| bericht | markering | wanneer |
+|---|---|---|
+| Je broodje ligt klaar | `TheokotOrder.pickupPushedAt` | de afhaal begint |
+| De broodjes staan open | `TheokotSession.orderOpenPushedAt` | het bestelvenster opent |
+| Nieuw in wat je volgt | `CalendarEvent.announcedPushAt` | een evenement bijkomt in een gevolgde categorie |
+| Herinnering aan wat je aanduidde | `CalendarEventInterest.remindedAt` | een dag voor het evenement |
+
+Daarnaast vertrekt **de shift-herinnering** uit `processDueShiftReminders`, binnen
+dezelfde claim als de mail; twee wekkers voor één herinnering lopen vroeg of laat
+uit elkaar. **Met de hand** kan het via Admin -> Pushberichten, achter het recht
+`app.push`; elke verzending komt in het logboek met de tekst erbij.
+
+Alle automatische berichten claimen eerst en versturen dan: de markering gaat om
 in een voorwaardelijke `updateMany`, en enkel wie die wint verstuurt. Een mislukte
 verzending zet de markering niet terug. Iemand twee keer wakker maken voor
 hetzelfde broodje is erger dan het één keer missen.
+
+Drie dingen die bij die vier horen en makkelijk vergeten worden:
+
+- **De claim valt vóór de voorkeurscontrole.** Zou hij erna vallen, dan blijft de
+  markering leeg voor wie dat soort bericht uitgezet heeft, en kondigt de volgende
+  beurt hetzelfde broodje alsnog aan zodra hij het weer aanzet.
+- **"Nieuw in wat je volgt" kijkt enkel naar wat de laatste 24 uur gepubliceerd
+  is.** Zonder die grens zou de eerste beurt na het uitrollen de volledige
+  kalendergeschiedenis aankondigen, want die evenementen dragen allemaal nog geen
+  markering.
+- **De doelgroepfilter geldt ook voor push.** Een eerstejaarsevent hoort niet op
+  de telefoon van iemand uit de master, ook niet wanneer die de categorie volgt.
+  Een pushbericht heeft geen `where` op een lezer, dus dat gebeurt expliciet.
 
 ### `GET /api/app/v1/piano` en `POST`/`DELETE /piano/reservatie`
 

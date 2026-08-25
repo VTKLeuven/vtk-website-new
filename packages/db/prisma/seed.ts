@@ -176,7 +176,8 @@ async function main() {
   // (GroupRole, kind DEFAULT = elk lid). De geseede rolset:
   //   - admin (alle rechten, systeemrol)                 -> IT + Groep 5
   //   - praesidium (calendar.create + photos.upload +    -> elke post
-  //       tickets.create + forms.create + users.search)
+  //       tickets.create + forms.create + users.search +
+  //       shift.rewardRedeem)
   //   - werkgroep, medewerker                            -> beschikbaar, nog niet toegekend
   //   - theokot (theokot.manage + theokot.pickup)        -> Theokot
   //   - één rol per post, met de postnaam                -> die post zelf
@@ -239,8 +240,8 @@ async function main() {
     "Praesidium",
     "Praesidium",
     1,
-    "Basisrol voor elk praesidiumlid: evenementen (incl. ticketevents) en formulieren voor de eigen groep aanmaken, foto's uploaden en gebruikers opzoeken.",
-    "Base role for every praesidium member: create events (incl. ticket events) and forms for the own group, upload photos and search users.",
+    "Basisrol voor elk praesidiumlid: evenementen (incl. ticketevents) en formulieren voor de eigen groep aanmaken, foto's uploaden, gebruikers opzoeken en bonnetjes aanvaarden aan de toog.",
+    "Base role for every praesidium member: create events (incl. ticket events) and forms for the own group, upload photos, search users and accept vouchers at the bar.",
   );
   await setRolePermissions(praesidiumRole.id, [
     "calendar.create",
@@ -248,6 +249,10 @@ async function main() {
     "tickets.create",
     "forms.create",
     "users.search",
+    // Bonnetjes aanvaarden aan de toog. Zit in de basisrol omdat elk praesidiumlid
+    // ooit achter een toog staat; IT kan het per post of per persoon afnemen in
+    // /admin/roles zonder iemand uit zijn post te halen.
+    "shift.rewardRedeem",
   ]);
   for (const g of GROUP_SEEDS) {
     await grantRoleToGroup(g.code, praesidiumRole.id, "DEFAULT");

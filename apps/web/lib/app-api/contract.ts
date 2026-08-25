@@ -150,6 +150,11 @@ export type AppBootstrap = {
    * tijdens het testen werkt vanzelf mee.
    */
   webBaseUrl: string;
+  /**
+   * Welke knoppen deze gebruiker mag zien. `null` voor wie niet ingelogd is; die
+   * mag sowieso niets van dit alles.
+   */
+  abilities: AppAbilities | null;
 };
 
 // -----------------------------------------------------------------------------
@@ -286,6 +291,14 @@ export type AppCalendarEvent = {
   groupName: string;
   groupSlug: string;
   categories: AppCalendarCategory[];
+  /**
+   * Heb jij dit aangeduid als "ik ga waarschijnlijk". Altijd `false` voor wie
+   * niet ingelogd is. Bewust geen inschrijving: er hangt geen plaats en geen
+   * deelnemerslijst aan, enkel jouw eigen lijst en de herinnering van die dag.
+   */
+  interested: boolean;
+  /** Er staan tickets voor te koop; de app kan dan meteen doorsturen. */
+  ticketSlug: string | null;
 };
 
 export type AppCalendarEventDetail = AppCalendarEvent & {
@@ -293,10 +306,13 @@ export type AppCalendarEventDetail = AppCalendarEvent & {
   description: string | null;
   /** Externe link bij het evenement, indien ingevuld. */
   url: string | null;
-  /** Slug van het ticketevent wanneer er tickets voor te koop staan. */
-  ticketSlug: string | null;
   /** Slug van het inschrijvingsformulier wanneer dat openstaat. */
   formSlug: string | null;
+  /**
+   * Hoeveel leden er interesse in aangeduid hebben. Geen deelnemersaantal en
+   * dus geen belofte: het staat er om te zien of er volk komt.
+   */
+  interestedCount: number;
 };
 
 export type AppCalendar = {
@@ -307,6 +323,8 @@ export type AppCalendar = {
    * iemand die zijn eigen evenement mist, weet waar het aan ligt.
    */
   filteredByAudience: boolean;
+  /** Slugs van de categorieën die jij volgt. Leeg voor wie niet ingelogd is. */
+  followedCategories: string[];
 };
 
 // -----------------------------------------------------------------------------
@@ -794,3 +812,270 @@ export type AppPianoErrorCode =
   | "BEYOND_HORIZON"
   | "WEEK_LIMIT"
   | "TAKEN";
+
+// -----------------------------------------------------------------------------
+// Vandaag: het beginscherm van de app
+// -----------------------------------------------------------------------------
+
+/**
+ * Eén dienst met haar toestand, al herleid tot wat er op één regel past.
+ *
+ * De site toont een volledig weekrooster naast elkaar; op een telefoon is de
+ * vraag bijna altijd "kan ik er nu heen". Vandaar `openNow` plus één regel
+ * `detail` ("tot 14:00", "morgen 12:00"), met het weekrooster erachter voor wie
+ * doorklikt. Het rekenwerk gebeurt hier en niet in de app: de openingsuren staan
+ * in wandkloktijd van Brussel, en een telefoon staat niet noodzakelijk op die
+ * tijdzone.
+ */
+export type AppServiceStatus = {
+  key: "theokot" | "cursusdienst" | "elixir";
+  name: string;
+  openNow: boolean;
+  /** Eén regel: hoe lang het nog open is, of wanneer het weer opengaat. */
+  detail: string;
+  /**
+   * De toestand is live gemeten in plaats van uit het rooster afgeleid. Enkel
+   * 't ElixIr heeft dat (de geluidsmeting), en enkel wanneer de meting vers is.
+   */
+  live: boolean;
+  /** De uren konden niet opgehaald worden (cursusdienst komt live van cudi). */
+  unavailable: boolean;
+  entries: AppOpeningHoursEntry[];
+  note: string;
+};
+
+/**
+ * Eén ding dat op jou wacht. De app tekent ze als kaarten onder "Voor jou", op
+ * volgorde zoals ze binnenkomen; de server sorteert, want die kent de
+ * dringendheid.
+ */
+export type AppTodayTask = {
+  kind:
+    | "gate"
+    | "theokot-pickup"
+    | "theokot-order"
+    | "ticket"
+    | "shift"
+    | "piano";
+  title: string;
+  detail: string | null;
+  /** Een route in de app (`/broodjes`), nooit een URL. */
+  path: string;
+  actionLabel: string | null;
+  /** Dringend genoeg voor de gele rail op de kaart. */
+  highlight: boolean;
+  /** Het moment waar dit om draait, ISO. `null` wanneer er geen uur bij hoort. */
+  at: string | null;
+};
+
+export type AppToday = {
+  /**
+   * De klok van de server. De app toont de datum hiermee en niet met die van het
+   * toestel: een telefoon die op de verkeerde dag staat, zou anders beweren dat
+   * het Theokot dicht is.
+   */
+  now: string;
+  /** Voornaam, of `null` voor wie niet ingelogd is. */
+  greetingName: string | null;
+  services: AppServiceStatus[];
+  barStatus: AppBarStatus | null;
+  tasks: AppTodayTask[];
+  /** Openstaande bonnetjes, of `null` voor wie niet ingelogd is. */
+  vouchers: number | null;
+  upcomingEvents: AppCalendarEvent[];
+  announcement: AppAnnouncement | null;
+  /** Er staat minstens één evenement klaar waarvoor jij tickets mag scannen. */
+  canScanTickets: boolean;
+  /** Je mag betalingen met bonnetjes aanvaarden (`shift.rewardRedeem`). */
+  canAcceptVouchers: boolean;
+};
+
+// -----------------------------------------------------------------------------
+// Meldingen
+// -----------------------------------------------------------------------------
+
+/**
+ * De soorten pushbericht die een lid apart kan uitzetten.
+ *
+ * `defaultOn` is de stand zonder rij in de databank; enkel afwijkingen worden
+ * bewaard. Zo hoeft er bij een nieuw soort bericht niets gemigreerd te worden.
+ *
+ * Wanneer een bericht gerechtvaardigd is, staat als kringkeuze in
+ * `docs/design-decisions.md`. De korte versie: enkel wanneer je iets moet dóén.
+ * `calendar.follow` is de bewuste uitzondering, want dat vraagt een lid zelf aan
+ * per categorie.
+ */
+export const APP_NOTIFICATION_TOPICS = [
+  { topic: "theokot.open", defaultOn: true },
+  { topic: "theokot.pickup", defaultOn: true },
+  { topic: "shift.reminder", defaultOn: true },
+  { topic: "calendar.follow", defaultOn: true },
+  { topic: "calendar.interest", defaultOn: true },
+] as const;
+
+export type AppNotificationTopic = (typeof APP_NOTIFICATION_TOPICS)[number]["topic"];
+
+export function isAppNotificationTopic(value: string): value is AppNotificationTopic {
+  return APP_NOTIFICATION_TOPICS.some((entry) => entry.topic === value);
+}
+
+/** De stand zonder opgeslagen voorkeur. */
+export function defaultNotificationEnabled(topic: AppNotificationTopic): boolean {
+  return APP_NOTIFICATION_TOPICS.find((entry) => entry.topic === topic)?.defaultOn ?? true;
+}
+
+export type AppNotificationSettings = {
+  topics: { topic: AppNotificationTopic; enabled: boolean }[];
+  /** Slugs van de kalendercategorieën die je volgt. */
+  followedCategories: string[];
+  /** Alle categorieën die je kan volgen, met hun naam in jouw taal. */
+  categories: AppCalendarCategory[];
+};
+
+// -----------------------------------------------------------------------------
+// Bonnetjes: verdiend met shiften, betaald aan een toog
+// -----------------------------------------------------------------------------
+
+/**
+ * Eén regel in je bonnetjeshistoriek. `earned` komt van een shift die voorbij
+ * is, `spent` van een balie die er afboekte. Het saldo is niet de som van deze
+ * lijst: uitbetalingen in geld door een beheerder staan er niet in, want die
+ * verhogen enkel `rewardPaid`.
+ */
+export type AppVoucherEntry = {
+  id: string;
+  kind: "earned" | "spent";
+  amount: number;
+  label: string;
+  at: string;
+};
+
+export type AppVouchers = {
+  /** Wat je nu kan uitgeven: `reward` min `rewardPaid` over al je shiften. */
+  balance: number;
+  /** Hoeveel je er dit academiejaar bij verdiend hebt. */
+  earnedThisYear: number;
+  history: AppVoucherEntry[];
+  /**
+   * De inhoud van de QR die je aan een balie toont. Kortlevend en ondertekend;
+   * de app haalt hem opnieuw op wanneer hij verlopen is.
+   */
+  pass: string;
+  passExpiresAt: string;
+};
+
+/**
+ * Wat de balie ziet nadat ze een pas gescand heeft, vóór er iets afgeboekt is.
+ * Twee stappen met opzet: wie afboekt, hoort eerst te zien van wie en hoeveel.
+ */
+export type AppPassHolder = {
+  userId: string;
+  name: string;
+  rNumber: string | null;
+  avatarUrl: string | null;
+  vouchers: number;
+  /** De broodjesbestelling van vandaag, of `null`. */
+  theokotOrder: {
+    orderId: string;
+    status: string;
+    totalCents: number;
+    lines: AppTheokotOrderLine[];
+    /** Nog niet opgehaald, en er zijn genoeg bonnetjes voor de vaste prijs. */
+    canRedeemVouchers: boolean;
+    /** Hoeveel bonnetjes een broodje kost aan de balie. */
+    voucherCost: number;
+  } | null;
+};
+
+export type AppVoucherRedeemInput = {
+  pass: string;
+  amount: number;
+  /** Waar het gebeurde; komt in het logboek terecht. */
+  place?: string;
+};
+
+export type AppVoucherRedeemResult = {
+  name: string;
+  amount: number;
+  /** Wat de student daarna nog overhoudt. */
+  remaining: number;
+};
+
+/** Waarom een afboeking geweigerd werd. */
+export type AppVoucherErrorCode =
+  | "PASS_INVALID"
+  | "PASS_EXPIRED"
+  | "NOT_ENOUGH"
+  | "CONFLICT"
+  | "SELF";
+
+// -----------------------------------------------------------------------------
+// Scannen: tickets, uitnodigingen en de fakbar
+// -----------------------------------------------------------------------------
+
+/** Een evenement waarvoor jij vandaag tickets mag scannen. */
+export type AppScanEvent = {
+  id: string;
+  title: string;
+  startsAt: string;
+  location: string | null;
+  checkedIn: number;
+  total: number;
+};
+
+export type AppTicketScanResult = {
+  result: "ACCEPTED" | "ALREADY_USED" | "WRONG_EVENT" | "INVALID" | "VOID" | "REFUNDED";
+  ticket?: {
+    publicId: string;
+    attendeeName: string;
+    typeName: string;
+    checkedInAt: string | null;
+  };
+  stats: { total: number; checkedIn: number };
+};
+
+/** Wat een gescande uitnodigings-QR oplevert: scanrechten op één evenement. */
+export type AppScannerInviteResult = {
+  eventId: string;
+  title: string;
+  /** Je had die rechten al; dan is er niets bijgekomen. */
+  alreadyHadAccess: boolean;
+};
+
+/**
+ * Een check-in aan de bar, gescand van de QR naast de kaartlezer in plaats van
+ * met een studentenkaart. Zelfde velden als wat het schermpje op de Pi krijgt.
+ */
+export type AppFakCheckin = {
+  counted: boolean;
+  name: string;
+  total: number;
+  points: number;
+  double: boolean;
+  freeBeer: boolean;
+  toNextBeer: number;
+  message: string | null;
+};
+
+/**
+ * `BAR_CLOSED` is de belangrijkste: een opgehangen QR kan gefotografeerd worden,
+ * dus een scan telt enkel wanneer 't ElixIr op dat moment ook echt open gemeten
+ * wordt. Zie `docs/design-decisions.md`.
+ */
+export type AppFakErrorCode = "BAR_CLOSED" | "INVALID_CODE" | "NO_RNUMBER";
+
+// -----------------------------------------------------------------------------
+// Wat de app zelf mag
+// -----------------------------------------------------------------------------
+
+/**
+ * De knoppen die enkel voor sommige mensen bestaan. De app vraagt dit één keer
+ * bij de start en verstopt wat er niet in staat; de server controleert het
+ * daarna nog eens bij elke aanroep. Dit is dus geen beveiliging maar netheid:
+ * een knop tonen die altijd "geen toegang" zegt, is een bug.
+ */
+export type AppAbilities = {
+  scanTickets: boolean;
+  acceptVouchers: boolean;
+  theokotPickup: boolean;
+};

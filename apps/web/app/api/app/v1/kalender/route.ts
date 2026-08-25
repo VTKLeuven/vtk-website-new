@@ -5,7 +5,9 @@ import { pick } from "@vtk/i18n";
 import { audienceFilter, viewerAudiences } from "@/lib/calendar/audience";
 import { listCalendarCategories } from "@/lib/calendar/categories";
 import { corsPreflight } from "@/lib/cors";
+import { getCurrentSession } from "@/lib/session";
 import { appLocaleFrom, type AppCalendar } from "@/lib/app-api/contract";
+import { followedCategorySlugs, interestedEventIds } from "@/lib/app-api/interest";
 import { absoluteMediaUrl } from "@/lib/app-api/media";
 import { appErrorResponse, appJson } from "@/lib/app-api/respond";
 
@@ -24,8 +26,14 @@ const MAX_EVENTS = 200;
  * hij komt uit `viewerAudiences()` + `audienceFilter()`; het is een standaard en
  * geen slot, dus `?audience=all` zet hem uit.
  *
- * Parameters: `van` en `tot` (ISO), `categorie` (meerdere mag), `audience=all`.
- * Zonder `van` vertrekt de lijst vanaf nu; dat is wat een app openen betekent.
+ * Parameters: `van` en `tot` (ISO), `categorie` (meerdere mag), `audience=all`,
+ * en `interesse=1` voor enkel wat je zelf aanduidde. Zonder `van` vertrekt de
+ * lijst vanaf nu; dat is wat een app openen betekent.
+ *
+ * `interesse=1` negeert de doelgroepfilter met opzet: wat jij ooit aanduidde,
+ * hoort in jouw lijst te blijven staan, ook wanneer je studiejaar intussen
+ * verschoven is. Anders verdwijnt er een evenement uit je eigen kalender zonder
+ * dat je er iets aan gedaan hebt.
  */
 export async function GET(request: Request) {
   try {
@@ -35,6 +43,8 @@ export async function GET(request: Request) {
     const to = parseDate(url.searchParams.get("tot"));
     const categories = url.searchParams.getAll("categorie").filter(Boolean);
     const showAll = url.searchParams.get("audience") === "all";
+    const onlyInterested = url.searchParams.get("interesse") === "1";
+    const session = await getCurrentSession();
 
     const where: Prisma.CalendarEventWhereInput = {
       visibility: "PUBLIC",
@@ -49,20 +59,42 @@ export async function GET(request: Request) {
       where.categories = { some: { category: { slug: { in: categories } } } };
     }
 
+    // Interesse hangt aan een account. Wie niet ingelogd is en toch om zijn
+    // eigen lijst vraagt, krijgt een lege lijst en geen fout: de app kan dat
+    // scherm tonen met een loginknop erin, en dat leest beter dan een 401.
+    if (onlyInterested && !session) {
+      return appJson(request, {
+        filteredByAudience: false,
+        followedCategories: [],
+        categories: (await listCalendarCategories()).map((category) => ({
+          slug: category.slug,
+          name: pick(category.nameNl, category.nameEn, locale) ?? category.nameNl,
+          colour: category.colour,
+          audience: category.audience,
+        })),
+        events: [],
+      } satisfies AppCalendar);
+    }
+
+    if (onlyInterested && session) {
+      where.interests = { some: { userId: session.user.id } };
+    }
+
     // Wie expliciet om een categorie vraagt, krijgt ze ook als het een
     // doelgroepcategorie is: die lijst ís dan de eerstejaarskalender.
-    const filteredByAudience = !showAll && categories.length === 0;
+    const filteredByAudience = !showAll && !onlyInterested && categories.length === 0;
     if (filteredByAudience) {
       Object.assign(where, audienceFilter(await viewerAudiences()));
     }
 
-    const [events, allCategories] = await Promise.all([
+    const [events, allCategories, followed] = await Promise.all([
       prisma.calendarEvent.findMany({
         where,
         orderBy: { start: "asc" },
         take: MAX_EVENTS,
         include: {
           group: { select: { slug: true, nameNl: true, nameEn: true } },
+          ticketEvent: { select: { slug: true, status: true } },
           categories: {
             select: {
               category: {
@@ -74,10 +106,17 @@ export async function GET(request: Request) {
         },
       }),
       listCalendarCategories(),
+      followedCategorySlugs(session?.user.id ?? null),
     ]);
+
+    const interested = await interestedEventIds(
+      session?.user.id ?? null,
+      events.map((event) => event.id),
+    );
 
     const payload: AppCalendar = {
       filteredByAudience,
+      followedCategories: followed,
       categories: allCategories.map((category) => ({
         slug: category.slug,
         name: pick(category.nameNl, category.nameEn, locale) ?? category.nameNl,
@@ -100,6 +139,8 @@ export async function GET(request: Request) {
           colour: category.colour,
           audience: category.audience,
         })),
+        interested: interested.has(event.id),
+        ticketSlug: event.ticketEvent?.status === "PUBLISHED" ? event.ticketEvent.slug : null,
       })),
     };
 

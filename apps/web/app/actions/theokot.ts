@@ -8,6 +8,7 @@ import {
   brusselsTimeOnDay,
   brusselsYMD,
   coerceItemLayout,
+  SANDWICH_VOUCHER_COST,
   TheokotValidationError,
   type OrderLineInput,
 } from "@/lib/theokot";
@@ -17,10 +18,15 @@ import { cancelOrder, placeOrder, TheokotOrderError } from "@/lib/theokot-orders
 import { syncMeetingsForSession, syncMeetingsOnDay } from "@/lib/meetings-server";
 import { resolveStudentCard } from "@/lib/student-card";
 import {
+  pickupByRNumber,
+  pickupForUser,
+  type PickupLookupResult,
+} from "@/lib/theokot-pickup";
+import { verifyPassToken } from "@/lib/app-api/tokens";
+import {
   allocateUserShiftReward,
   ShiftRewardConflictError,
 } from "@/lib/shift/rewards.server";
-import { outstandingShiftReward } from "@/lib/shift/rewards";
 import { withSerializableTransaction } from "@/lib/ticketing/transactions";
 import { saveError, saveOk, type SaveState } from "@/lib/saveState";
 import { logAudit } from "@/lib/audit";
@@ -691,105 +697,19 @@ export async function correctOrderStatusAction(
 // Afhaalbalie (theokot.pickup)
 // -----------------------------------------------------------------------------
 
-export type PickupLine = { nameNl: string; nameEn: string | null; quantity: number; unitPriceCents: number };
-export type PickupOrder = {
-  orderId: string;
-  status: TheokotOrderStatus;
-  totalCents: number;
-  lines: PickupLine[];
-  pickupStart: string;
-  pickupEnd: string;
-  voucherRedemption: { amount: number } | null;
-};
-export type PickupLookupResult =
-  | {
-      ok: true;
-      userName: string;
-      rNumber: string;
-      outstandingBonnetjes: number;
-      orders: PickupOrder[];
-    }
-  | { ok: false; error: string };
+// De opzoeking zelf staat in `lib/theokot-pickup.ts`: er zijn drie wegen naar
+// dezelfde vraag (r-nummer, studentenkaart, pas uit de app) en die hoort maar
+// één keer beantwoord te worden. Deze types worden doorgegeven zodat
+// `PickupCounter` ze uit dezelfde plek kan importeren als vroeger.
+export type {
+  PickupLine,
+  PickupOrder,
+  PickupLookupResult,
+} from "@/lib/theokot-pickup";
+
 export type VoucherRedemptionResult =
   | { ok: true; amount: number; remainingBonnetjes: number }
   | { ok: false; error: string };
-
-const SANDWICH_VOUCHER_COST = 2;
-
-/** Kernlogica: bestelling(en) van vandaag voor een r-nummer opzoeken. */
-async function pickupByRNumber(rNumberRaw: string): Promise<PickupLookupResult> {
-  const rNumber = rNumberRaw.trim().toLowerCase();
-  if (!rNumber) return { ok: false, error: "Geef een r-nummer in." };
-
-  const user = await prisma.user.findUnique({ where: { rNumber } });
-  if (!user) return { ok: false, error: `Geen gebruiker gevonden met r-nummer ${rNumber}.` };
-
-  const now = new Date();
-  const today = brusselsTimeOnDay(now, "00:00");
-  const tomorrow = new Date(today.getTime() + 86400000);
-
-  const [orders, shiftBalances] = await Promise.all([
-    prisma.theokotOrder.findMany({
-      where: {
-        userId: user.id,
-        status: { in: ["RESERVED", "PICKED_UP"] },
-        session: { date: { gte: today, lt: tomorrow } },
-      },
-      include: {
-        session: { select: { pickupStart: true, pickupEnd: true } },
-        voucherRedemption: { select: { amount: true } },
-        lines: {
-          include: { sessionItem: { select: { nameNl: true, nameEn: true } } },
-          orderBy: { sessionItem: { order: "asc" } },
-        },
-      },
-    }),
-    prisma.shiftParticipant.findMany({
-      where: { userId: user.id, shift: { endTime: { lt: now } } },
-      select: {
-        shiftId: true,
-        rewardPaid: true,
-        shift: { select: { reward: true } },
-      },
-    }),
-  ]);
-
-  if (orders.length === 0) {
-    return { ok: false, error: `${user.name} heeft geen bestelling voor vandaag.` };
-  }
-
-  const fmt = (d: Date) =>
-    new Intl.DateTimeFormat("nl-BE", { timeZone: "Europe/Brussels", hour: "2-digit", minute: "2-digit" }).format(d);
-
-  return {
-    ok: true,
-    userName: user.name,
-    rNumber,
-    outstandingBonnetjes: shiftBalances.reduce(
-      (total, balance) =>
-        total +
-        outstandingShiftReward({
-          reward: balance.shift.reward,
-          rewardPaid: balance.rewardPaid,
-        }),
-      0,
-    ),
-    orders: orders.map((o) => ({
-      orderId: o.id,
-      status: o.status,
-      totalCents: o.totalCents,
-      pickupStart: fmt(o.session.pickupStart),
-      pickupEnd: fmt(o.session.pickupEnd),
-      voucherRedemption: o.voucherRedemption,
-      lines: o.lines.map((l) => ({
-        nameNl: l.sessionItem.nameNl,
-        nameEn: l.sessionItem.nameEn,
-        quantity: l.quantity,
-        unitPriceCents: l.unitPriceCents,
-      })),
-    })),
-  };
-}
 
 /** Zoekt de bestelling(en) van vandaag voor een handmatig ingegeven r-nummer. */
 export async function lookupPickupByRNumberAction(rNumber: string): Promise<PickupLookupResult> {
@@ -808,6 +728,29 @@ export async function lookupPickupByCardAction(scanned: string): Promise<PickupL
   const resolved = await resolveStudentCard(scanned);
   if (!resolved.ok) return { ok: false, error: resolved.error };
   return pickupByRNumber(resolved.rNumber);
+}
+
+/**
+ * Zoekt de bestelling(en) op via de pas uit de VTK-app.
+ *
+ * De student toont één code voor alles wat hij aan een balie moet tonen; die
+ * code is kortlevend en ondertekend (zie `lib/app-api/tokens.ts`). Een verlopen
+ * pas krijgt bewust een andere zin dan een vervalste: aan de balie is dat het
+ * verschil tussen "laat nog eens zien" en "dit klopt niet".
+ */
+export async function lookupPickupByPassAction(pass: string): Promise<PickupLookupResult> {
+  await requirePermission("theokot.pickup");
+  const verified = verifyPassToken(pass);
+  if (!verified.ok) {
+    return {
+      ok: false,
+      error:
+        verified.reason === "PASS_EXPIRED"
+          ? "Deze code is verlopen. Laat de student ze opnieuw tonen."
+          : "Deze code hoort niet bij VTK.",
+    };
+  }
+  return pickupForUser(verified.userId);
 }
 
 /** Markeert een bestelling als opgehaald. Faalt als ze al opgehaald/geannuleerd is. */

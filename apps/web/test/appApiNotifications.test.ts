@@ -12,12 +12,14 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({
   findMany: vi.fn(),
   updateMany: vi.fn(),
+  prefFindMany: vi.fn(),
   sendPushToUsers: vi.fn(),
 }));
 
 vi.mock("@vtk/db", () => ({
   prisma: {
     theokotOrder: { findMany: mocks.findMany, updateMany: mocks.updateMany },
+    appNotificationPreference: { findMany: mocks.prefFindMany },
   },
 }));
 
@@ -31,6 +33,8 @@ describe("je broodje ligt klaar", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.sendPushToUsers.mockResolvedValue({ sent: 1, removed: 0, failed: 0 });
+    // Geen opgeslagen voorkeuren: iedereen staat op de standaard, en die is aan.
+    mocks.prefFindMany.mockResolvedValue([]);
   });
 
   it("stuurt niets wanneer er geen bestellingen wachten", async () => {
@@ -54,7 +58,7 @@ describe("je broodje ligt klaar", () => {
     });
     expect(mocks.sendPushToUsers).toHaveBeenCalledWith(
       ["user-1"],
-      expect.objectContaining({ path: "/bestellen" }),
+      expect.objectContaining({ path: "/broodjes" }),
     );
     expect(run).toEqual({ users: 1, devices: 1 });
   });
@@ -95,5 +99,41 @@ describe("je broodje ligt klaar", () => {
     expect(await sendTheokotPickupPush(NOW)).toEqual({ users: 2, devices: 3 });
     expect(mocks.sendPushToUsers).toHaveBeenCalledTimes(1);
     expect(mocks.sendPushToUsers.mock.calls[0][0]).toEqual(["user-1", "user-2"]);
+  });
+
+  /**
+   * De claim valt vóór de voorkeurscontrole, en dat is met opzet.
+   *
+   * Zou hij erna vallen, dan blijft `pickupPushedAt` leeg voor wie dit soort
+   * bericht uitgezet heeft, en kondigt de volgende beurt datzelfde broodje
+   * alsnog aan zodra hij het weer aanzet. Een bericht over een broodje van
+   * vanmiddag dat 's avonds binnenkomt, is erger dan geen bericht.
+   */
+  it("claimt ook voor wie dit soort bericht uitgezet heeft", async () => {
+    mocks.findMany.mockResolvedValue([
+      { id: "order-1", userId: "wil-niet" },
+      { id: "order-2", userId: "wil-wel" },
+    ]);
+    mocks.updateMany.mockResolvedValue({ count: 1 });
+    mocks.prefFindMany.mockResolvedValue([
+      { userId: "wil-niet", topic: "theokot.pickup", enabled: false },
+    ]);
+
+    const run = await sendTheokotPickupPush(NOW);
+
+    expect(mocks.updateMany).toHaveBeenCalledTimes(2);
+    expect(mocks.sendPushToUsers.mock.calls[0][0]).toEqual(["wil-wel"]);
+    expect(run.users).toBe(1);
+  });
+
+  it("stuurt niets wanneer niemand dit soort bericht wil", async () => {
+    mocks.findMany.mockResolvedValue([{ id: "order-1", userId: "wil-niet" }]);
+    mocks.updateMany.mockResolvedValue({ count: 1 });
+    mocks.prefFindMany.mockResolvedValue([
+      { userId: "wil-niet", topic: "theokot.pickup", enabled: false },
+    ]);
+
+    expect(await sendTheokotPickupPush(NOW)).toEqual({ users: 0, devices: 0 });
+    expect(mocks.sendPushToUsers).not.toHaveBeenCalled();
   });
 });

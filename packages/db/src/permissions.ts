@@ -65,6 +65,11 @@ export const PERMISSIONS = [
   // Shifts
   { code: "shift.edit", labelNl: "Shiften beheren", labelEn: "Manage shifts", category: "shift" },
   { code: "shift.reward", labelNl: "Shiftbonnetjes beheren", labelEn: "Manage shift vouchers", category: "shift" },
+  // Bonnetjes aanvaarden als betaling, met de app: de student toont zijn pas,
+  // een praesidiumlid scant en tikt een bedrag in. Bewust een eigen recht en
+  // geen "zit in een post": dit raakt geld aan, en het moet iemand afgenomen
+  // kunnen worden zonder hem uit zijn post te zetten.
+  { code: "shift.rewardRedeem", labelNl: "Bonnetjes aanvaarden als betaling (app)", labelEn: "Accept vouchers as payment (app)", category: "shift" },
   { code: "shift.ranking", labelNl: "Shiftranglijst bekijken", labelEn: "View shift rankings", category: "shift" },
 
   // Theokot (cafetaria / broodjesbar)

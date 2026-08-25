@@ -26,6 +26,7 @@ import {
   type AppLocale,
   type AppOpeningHours,
 } from "@/lib/app-api/contract";
+import { interestedEventIds } from "@/lib/app-api/interest";
 import { absoluteMediaUrl, absoluteUrl } from "@/lib/app-api/media";
 import { appErrorResponse, appJson } from "@/lib/app-api/respond";
 
@@ -54,6 +55,11 @@ type CareerSetting = {
  * dezelfde reden als op de site: de **doelgroepfilter** op de evenementen (een
  * eerstejaarsevent hoort niet bij iedereen op het scherm) en **jouw POC's**, die
  * per definitie persoonlijk zijn.
+ *
+ * **Deze route is de vorige vorm van het beginscherm.** De app opent intussen op
+ * `/vandaag`; dit blijft staan zolang er toestellen op de oudere versie zitten,
+ * want een geïnstalleerde app kan maanden achterlopen. Nieuwe velden komen er
+ * enkel bij wanneer het contract ze verplicht maakt.
  */
 export async function GET(request: Request) {
   try {
@@ -105,6 +111,7 @@ export async function GET(request: Request) {
       take: 6,
       include: {
         group: { select: { slug: true, nameNl: true, nameEn: true } },
+        ticketEvent: { select: { slug: true, status: true } },
         categories: {
           select: {
             category: {
@@ -141,6 +148,11 @@ export async function GET(request: Request) {
             include: { representatives: { orderBy: { order: "asc" }, include: { user: true } } },
           })
         : [];
+
+    const interested = await interestedEventIds(
+      session?.user.id ?? null,
+      upcomingEvents.map((event) => event.id),
+    );
 
     const career = map.get("home.career") as CareerSetting | undefined;
 
@@ -182,6 +194,8 @@ export async function GET(request: Request) {
           colour: category.colour,
           audience: category.audience,
         })),
+        interested: interested.has(event.id),
+        ticketSlug: event.ticketEvent?.status === "PUBLISHED" ? event.ticketEvent.slug : null,
       })),
 
       // Enkel echte embeds: een losse mp4 of een onherkenbare link hoort er niet

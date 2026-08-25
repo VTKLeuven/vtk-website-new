@@ -107,6 +107,15 @@ export function parseTheokotConfig(value: unknown): TheokotConfig {
 // -----------------------------------------------------------------------------
 
 /** Eurocent → "€2,60" (Belgische notatie met komma). */
+/**
+ * Wat een broodje aan de afhaalbalie kost in medewerkersbonnetjes.
+ *
+ * Staat hier en niet in de action, omdat er intussen twee wegen naar toe leiden:
+ * de balie op de site en de scanner in de app. Twee getallen die hetzelfde horen
+ * te zijn, zijn er één te veel.
+ */
+export const SANDWICH_VOUCHER_COST = 2;
+
 export function formatEuro(cents: number): string {
   return `€${(cents / 100).toFixed(2).replace('.', ',')}`;
 }

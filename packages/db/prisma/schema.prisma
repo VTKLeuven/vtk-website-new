@@ -500,13 +500,13 @@ model User {
   // Contact: `email` is de login-/universiteitsmail (via SSO). Persoonlijke
   // mail en de voorkeur voor communicatie komen erbij.
   personalEmail          String?
-  emailPreference        EmailPreference  @default(UNIVERSITY)
+  emailPreference        EmailPreference     @default(UNIVERSITY)
   // Het `@vtk.be`-account in Google Workspace. `googleUserId` is het immutable
   // id van Google: dat blijft kloppen wanneer iemand van naam of adres wisselt.
   // Op naam matchen doen we bewust nooit (naamgenoten, tussenvoegsels), dus dit
   // veld is de enige koppeling. Zie docs/design-decisions.md, "Google Workspace".
-  googleUserId           String?          @unique
-  googleEmail            String?          @unique
+  googleUserId           String?             @unique
+  googleEmail            String?             @unique
   googleLinkedAt         DateTime?
   // Wanneer het lid de verplichte koppeling uitstelde omdat het nog geen
   // @vtk.be-account heeft. Zonder deze ontsnapping sluit de gate iemand buiten
@@ -517,34 +517,34 @@ model User {
   // kiesploeg; zie lib/google/accountState.ts.
   googleAccountState     GoogleAccountState?
   // Opt-in mailinglijsten: enkel de aangeduide categorieën zitten in de array.
-  mailCategories         MailCategory[]   @default([])
+  mailCategories         MailCategory[]      @default([])
   // Herinneringen voor een shift waarvoor je jezelf inschreef. Bewust geen
   // `MailCategory`: dat zijn opt-in nieuwsbrieven, dit is transactioneel. Wel
   // uitzetbaar, want niet iedereen wil twee mails per shift.
-  shiftReminderDayBefore Boolean          @default(true)
-  shiftReminderSoon      Boolean          @default(true)
+  shiftReminderDayBefore Boolean             @default(true)
+  shiftReminderSoon      Boolean             @default(true)
   // Studie: meerdere studiejaren en richtingen mogelijk (iemand kan bv. deels in
   // 2de en deels in 3de bachelor zitten).
-  studyYears             StudyYear[]      @default([])
-  studyProgrammes        StudyProgramme[] @default([])
+  studyYears             StudyYear[]         @default([])
+  studyProgrammes        StudyProgramme[]    @default([])
   // Lid dat niet aan de faculteit Ingenieurswetenschappen studeert. Bewust geen
   // `StudyProgramme`-waarde: het is geen richting, en als enum-waarde zou het
   // overal opduiken waar richtingen opgelijst worden (o.a. de career-export).
-  notAtFaculty           Boolean          @default(false)
+  notAtFaculty           Boolean             @default(false)
   // Lid dat niet (meer) studeert: afgestudeerd of gestopt. Bewust los van
   // `notAtFaculty` (dat is "studeert wél, maar elders"): wie dit aanduidt valt
   // uit élke studiegerichte mailinglijst (zie lib/mailinglists.ts). Blijft een
   // aparte boolean om dezelfde reden als notAtFaculty.
-  notStudying            Boolean          @default(false)
+  notStudying            Boolean             @default(false)
   // Internationale of uitwisselingsstudent. Bewust een eigen veld en geen
   // afleiding uit `locale`: de sitetaal zegt welke taal je leest, niet of je een
   // exchange-student bent. Stuurt welke evenementen vanzelf in de kalender
   // opduiken (zie CalendarAudience).
-  internationalStudent   Boolean          @default(false)
+  internationalStudent   Boolean             @default(false)
   // Afgestudeerde van de faculteit. Bewust los van `notStudying`: die laatste
   // omvat ook wie stopte zonder af te studeren en is dus geen betrouwbare
   // alumni-indicator. Stuurt de expliciete alumni-doelgroep in de kalender.
-  alumni                 Boolean          @default(false)
+  alumni                 Boolean             @default(false)
   // Werkingsjaar waarin het lid zijn studieprofiel laatst bevestigde (2026 =
   // "26-27"). Loopt dat achter op het huidige werkingsjaar, dan is het profiel
   // verlopen: de bevestigingsgate vraagt het opnieuw en het lid valt zolang uit
@@ -580,7 +580,12 @@ model User {
   theokotVouchersProcessed  TheokotVoucherRedemption[] @relation("TheokotVoucherProcessedBy")
   theokotBans               TheokotBan[]
 
-  appPushDevices AppPushDevice[] @relation("AppPushDeviceUser")
+  appPushDevices          AppPushDevice[]             @relation("AppPushDeviceUser")
+  appNotificationPrefs    AppNotificationPreference[] @relation("AppNotificationPrefUser")
+  calendarInterests       CalendarEventInterest[]     @relation("CalendarInterestUser")
+  calendarCategoryFollows CalendarCategoryFollow[]    @relation("CalendarFollowUser")
+  shiftRewardRedemptions  ShiftRewardRedemption[]     @relation("ShiftRewardRedemptionUser")
+  shiftRewardsProcessed   ShiftRewardRedemption[]     @relation("ShiftRewardRedemptionProcessedBy")
 
   pianoReservations PianoReservation[]
 
@@ -811,8 +816,8 @@ model MailGroup {
 /// Activiteiten + post Groep 5". Dat g5 overal in zit, staat hier dus als
 /// zichtbare rij en niet als verstopte regel in de code.
 model MailGroupSource {
-  id          String  @id @default(cuid())
-  mailGroupId String
+  id              String     @id @default(cuid())
+  mailGroupId     String
   /// Precies één van de vier is ingevuld: een post/werkgroep, elke actieve
   /// groep van een soort, een hele kiesploeg, of één post binnen een kiesploeg.
   /// Bewust losse kolommen en geen polymorfe `type` + `id`: zo blijft de foreign
@@ -828,7 +833,7 @@ model MailGroupSource {
   kiesploegId     String?
   kiesploegPostId String?
   /// Enkel de verantwoordelijke (`role = LEAD`) i.p.v. elk lid.
-  onlyLead    Boolean @default(false)
+  onlyLead        Boolean    @default(false)
 
   mailGroup     MailGroup      @relation(fields: [mailGroupId], references: [id], onDelete: Cascade)
   group         Group?         @relation(fields: [groupId], references: [id], onDelete: Cascade)
@@ -856,15 +861,15 @@ model MailGroupSource {
 // Zie docs/design-decisions.md, "Google Workspace".
 
 model Kiesploeg {
-  id String @id @default(cuid())
+  id           String  @id @default(cuid())
   /// Korte code die in elk adres terugkomt, bv. "2027".
-  code String @unique
+  code         String  @unique
   /// Het werkingsjaar waarin ze aantreedt (2027 = "27-28"). Vanaf 15 juli van
   /// dat jaar worden haar leden volwaardig, op voorwaarde dat ze dan effectief
   /// in een post zitten.
-  workingYear Int
+  workingYear  Int
   /// De naam die VTK kiest, bv. "Kiesploeg Delta".
-  formalName String
+  formalName   String
   /// De naam die de ploeg zelf later kiest; mag lang leeg blijven. De adressen
   /// hangen aan de code en niet aan de naam, dus dit breekt niets.
   informalName String?
@@ -906,19 +911,19 @@ model KiesploegPost {
 }
 
 model KiesploegMember {
-  id          String         @id @default(cuid())
-  kiesploegId String
-  userId      String
+  id            String         @id @default(cuid())
+  kiesploegId   String
+  userId        String
   /// Leeg zolang de postverdeling nog niet gemaakt is: in het begin is enkel
   /// de g5 bekend.
-  postId      String?
-  role        MembershipRole @default(MEMBER)
+  postId        String?
+  role          MembershipRole @default(MEMBER)
   /// Override: dit lid mag nu al mailen vanaf zijn eigen adres (de
   /// marketingmensen). Wint van de afgeleide staat.
-  mailboxActive Boolean      @default(false)
+  mailboxActive Boolean        @default(false)
   /// Waar de mail naartoe gaat zolang de mailbox niet actief is.
-  forwardTo   String?
-  createdAt   DateTime       @default(now())
+  forwardTo     String?
+  createdAt     DateTime       @default(now())
 
   kiesploeg Kiesploeg      @relation(fields: [kiesploegId], references: [id], onDelete: Cascade)
   user      User           @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -1304,13 +1309,20 @@ model CalendarEvent {
   searchNl Unsupported("tsvector")?
   searchEn Unsupported("tsvector")?
 
+  /// Wanneer het bericht "er staat iets nieuws in een categorie die je volgt"
+  /// voor dit evenement verstuurd is. Wordt geclaimd voor er iets vertrekt, en
+  /// nooit teruggezet: bij twijfel liever geen bericht dan twee.
+  announcedPushAt DateTime? @db.Timestamptz(3)
+
   group       Group                   @relation(fields: [groupId], references: [id], onDelete: Cascade)
   createdBy   User?                   @relation("EventCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
   ticketEvent TicketEvent?
   form        Form?
   categories  CalendarEventCategory[]
+  interests   CalendarEventInterest[]
 
   @@index([start])
+  @@index([publishedAt, announcedPushAt])
   @@index([groupId])
   @@index([searchNl], type: Gin)
   @@index([searchEn], type: Gin)
@@ -1354,7 +1366,8 @@ model CalendarCategory {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  events CalendarEventCategory[]
+  events    CalendarEventCategory[]
+  followers CalendarCategoryFollow[]
 
   @@index([order])
 }
@@ -2208,6 +2221,9 @@ model TheokotSession {
   weeklySpecialLabelEn String?
   processedAt          DateTime? // wanneer no-shows verwerkt zijn (idempotentie)
   processingStartedAt  DateTime? // lease/claim voor een actieve no-show-worker
+  /// Wanneer het pushbericht "de bestelronde is open" voor deze dag vertrokken
+  /// is. Zelfde claim-dan-versturen-aanpak als `TheokotOrder.pickupPushedAt`.
+  orderOpenPushedAt    DateTime? @db.Timestamptz(3)
   createdById          String?
   createdAt            DateTime  @default(now())
   updatedAt            DateTime  @updatedAt
@@ -2217,6 +2233,7 @@ model TheokotSession {
 
   @@index([date])
   @@index([processedAt, isOpen, pickupEnd])
+  @@index([isOpen, orderOpenPushedAt, orderOpenAt])
 }
 
 /// Aanbod van één sessie (snapshot van een product op het moment van aanmaken).
@@ -2260,7 +2277,7 @@ model TheokotOrder {
   /// verstuurd is. Dezelfde claim-dan-versturen-aanpak als bij de
   /// shift-herinneringen: eerst de markering zetten in een voorwaardelijke
   /// update, dan pas versturen. Bij twijfel liever geen bericht dan twee.
-  pickupPushedAt    DateTime?                 @db.Timestamptz(3)
+  pickupPushedAt    DateTime?          @db.Timestamptz(3)
 
   session           TheokotSession            @relation(fields: [sessionId], references: [id], onDelete: Cascade)
   user              User                      @relation("TheokotOrderUser", fields: [userId], references: [id], onDelete: Cascade)
@@ -2730,9 +2747,9 @@ model UitleenEvent {
   group     Group? @relation(fields: [groupId], references: [id], onDelete: SetNull)
   createdBy User?  @relation("UitleenEventCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
 
-  reservations UitleenReservation[]
-  transport    UitleenTransportBooking[]
-  extraItems   UitleenEventExtraItem[]
+  reservations  UitleenReservation[]
+  transport     UitleenTransportBooking[]
+  extraItems    UitleenEventExtraItem[]
   groceryOrders CollectEnGoOrder[]
 
   @@index([startAt])
@@ -4644,4 +4661,100 @@ model AppPushDevice {
 enum AppPushPlatform {
   ios
   android
+}
+
+// -----------------------------------------------------------------------------
+// De VTK-app: interesse, meldingen en bonnetjes aan de toog
+//
+// Alles hieronder bestaat omdat een app iets kan wat een website niet kan: op
+// het juiste moment iets van zich laten horen, en aan een balie iets tonen dat
+// iemand anders scant. De regels zelf blijven staan waar ze al stonden; dit zijn
+// enkel de rijen die daarvoor nodig zijn.
+// -----------------------------------------------------------------------------
+
+/// "Ik ga hier waarschijnlijk naartoe."
+///
+/// Bewust geen inschrijving: er hangt geen plaats, geen betaling en geen
+/// deelnemerslijst aan. Het is een private markering waarmee een lid zijn eigen
+/// kalender maakt en waarop de herinnering van de dag zelf hangt. Wie echt moet
+/// inschrijven, doet dat via een formulier of een ticket.
+model CalendarEventInterest {
+  id      String @id @default(cuid())
+  userId  String
+  eventId String
+
+  createdAt  DateTime  @default(now()) @db.Timestamptz(3)
+  /// Wanneer de herinnering voor dit evenement vertrokken is. Zelfde
+  /// claim-dan-versturen-aanpak als bij de broodjes: eerst de markering in een
+  /// voorwaardelijke update, dan pas het bericht.
+  remindedAt DateTime? @db.Timestamptz(3)
+
+  user  User          @relation("CalendarInterestUser", fields: [userId], references: [id], onDelete: Cascade)
+  event CalendarEvent @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, eventId])
+  @@index([eventId])
+  @@index([remindedAt])
+}
+
+/// Een lid volgt een kalendercategorie en wil weten wanneer er iets bijkomt.
+///
+/// Dit is de enige plek waar de app iets stuurt dat geen "je moet nu iets doen"
+/// is (zie docs/design-decisions.md). Het mag, precies omdat het lid er zelf om
+/// gevraagd heeft, per categorie, en het met één tik weer uit kan.
+model CalendarCategoryFollow {
+  id         String @id @default(cuid())
+  userId     String
+  categoryId String
+
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+
+  user     User             @relation("CalendarFollowUser", fields: [userId], references: [id], onDelete: Cascade)
+  category CalendarCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, categoryId])
+  @@index([categoryId])
+}
+
+/// Aan- of uitgezette meldingssoort per lid.
+///
+/// Enkel afwijkingen staan hier: geen rij betekent de standaard uit
+/// `APP_NOTIFICATION_TOPICS`. Zo hoeft er bij een nieuw soort bericht niets
+/// gemigreerd te worden, en blijft de tabel klein.
+model AppNotificationPreference {
+  id      String  @id @default(cuid())
+  userId  String
+  /// Sleutel uit `APP_NOTIFICATION_TOPICS` in lib/app-api/contract.ts.
+  topic   String
+  enabled Boolean
+
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+
+  user User @relation("AppNotificationPrefUser", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, topic])
+}
+
+/// Eén betaling met openstaande shiftbonnetjes, buiten de Theokot-afhaalbalie om.
+///
+/// De afhaalbalie heeft haar eigen auditrij (`TheokotVoucherRedemption`) omdat
+/// die aan een bestelling hangt en altijd exact twee bonnetjes kost. Dit is de
+/// vrije variant: aan de toog van de fakbar tikt iemand een bedrag in. Het saldo
+/// zelf blijft `Shift.reward` min `ShiftParticipant.rewardPaid`; deze tabel is
+/// het logboek, niet de waarheid.
+model ShiftRewardRedemption {
+  id            String  @id @default(cuid())
+  userId        String
+  processedById String?
+  amount        Int
+  /// Waar het gebeurde, ingetikt door wie aanvaardt ("Fakbar", "Theokot").
+  place         String?
+
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+
+  user        User  @relation("ShiftRewardRedemptionUser", fields: [userId], references: [id], onDelete: Cascade)
+  processedBy User? @relation("ShiftRewardRedemptionProcessedBy", fields: [processedById], references: [id], onDelete: SetNull)
+
+  @@index([userId, createdAt])
+  @@index([createdAt])
 }

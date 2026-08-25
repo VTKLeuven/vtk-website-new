@@ -12,6 +12,7 @@ import {
   type AppNavTab,
   type AppViewer,
 } from "@/lib/app-api/contract";
+import { appAbilities } from "@/lib/app-api/abilities";
 import { absoluteMediaUrl, absoluteUrl, requestOrigin } from "@/lib/app-api/media";
 import { appErrorResponse, appJson } from "@/lib/app-api/respond";
 import { minimumAppVersion } from "@/lib/app-api/version";
@@ -33,10 +34,11 @@ export async function GET(request: Request) {
   try {
     const locale = appLocaleFrom(new URL(request.url).searchParams.get("locale"));
 
-    const [session, tabs, announcement] = await Promise.all([
+    const [session, tabs, announcement, abilities] = await Promise.all([
       getCurrentSession(),
       getVisibleHeaderTabsForNav(locale),
       getCurrentAnnouncement(),
+      appAbilities(),
     ]);
 
     const viewer: AppViewer | null = session
@@ -99,6 +101,7 @@ export async function GET(request: Request) {
         : null,
       minimumAppVersion: minimumAppVersion(),
       webBaseUrl: requestOrigin(request),
+      abilities,
     };
 
     return appJson(request, payload);

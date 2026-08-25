@@ -5,6 +5,7 @@ import { Button, Card, ConfirmDialog, Input, Label } from "@vtk/ui";
 import { formatEuro } from "@/lib/theokot";
 import {
   lookupPickupByCardAction,
+  lookupPickupByPassAction,
   lookupPickupByRNumberAction,
   markPickedUpAction,
   redeemEmployeeVouchersAction,
@@ -12,7 +13,10 @@ import {
   type PickupOrder,
 } from "@/app/actions/theokot";
 
-/** Afhaalbalie: r-nummer intikken of studentenkaart scannen, bestelling tonen, opgehaald markeren. */
+/** Waaraan een pas uit de VTK-app te herkennen is; zie `lib/app-api/tokens.ts`. */
+const PASS_PREFIX = "vtkpas1.";
+
+/** Afhaalbalie: r-nummer, studentenkaart of de pas uit de app; bestelling tonen, opgehaald markeren. */
 export function PickupCounter({ nl }: { nl: boolean }) {
   const [value, setValue] = useState("");
   const [result, setResult] = useState<PickupLookupResult | null>(null);
@@ -30,10 +34,15 @@ export function PickupCounter({ nl }: { nl: boolean }) {
     busyRef.current = true;
     startTransition(async () => {
       try {
-        // De scanner tikt "serial;cardAppId"; handmatige invoer is een r-nummer.
-        const res = cleaned.includes(";")
-          ? await lookupPickupByCardAction(cleaned)
-          : await lookupPickupByRNumberAction(cleaned);
+        // Drie soorten invoer op één veld, en ze zijn aan hun vorm te herkennen:
+        // de kaartlezer tikt "serial;cardAppId", een QR-lezer tikt de pas uit de
+        // app ("vtkpas1."), en wat overblijft is een met de hand ingetikt
+        // r-nummer. Eén veld en niet drie, want aan de balie is er één beweging.
+        const res = cleaned.startsWith(PASS_PREFIX)
+          ? await lookupPickupByPassAction(cleaned)
+          : cleaned.includes(";")
+            ? await lookupPickupByCardAction(cleaned)
+            : await lookupPickupByRNumberAction(cleaned);
         setResult(res);
         const eligibleOrder =
           res.ok && res.outstandingBonnetjes >= 2
@@ -114,7 +123,11 @@ export function PickupCounter({ nl }: { nl: boolean }) {
       <Card className="p-5">
         <form onSubmit={onSubmit} className="flex flex-wrap items-end gap-3">
           <div className="flex-1 min-w-[220px]">
-            <Label>{nl ? "R-nummer of scan studentenkaart" : "R-number or scan student card"}</Label>
+            <Label>
+              {nl
+                ? "R-nummer, studentenkaart of de code uit de app"
+                : "R-number, student card or the code from the app"}
+            </Label>
             <Input
               ref={inputRef}
               value={value}

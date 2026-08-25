@@ -61,6 +61,11 @@ export const MCP_PERMISSION_POLICY = {
   "shortlinks.manage": { reads: ["shortlinks"], creates: ["app_create:short_link"], blocked: ["enable, update or delete short links"] },
   "shift.edit": { reads: ["shifts"], creates: ["app_create:shift"], blocked: ["update shifts or enrol participants"] },
   "shift.reward": { reads: ["shifts"], creates: [], blocked: ["pay shift rewards"] },
+  // Bonnetjes afboeken is geld afboeken en is niet terug te draaien; dat is een
+  // operationeel neveneffect en geen `create`. MCP mag het onder geen beding.
+  // Ook geen leesrecht op `shifts`: dit recht gaat over één betaling aanvaarden
+  // aan een toog, niet over de shiftadministratie van de hele kring inkijken.
+  "shift.rewardRedeem": { reads: [], creates: [], blocked: ["redeem shift vouchers as payment"] },
   "shift.ranking": { reads: ["shift_ranking"], creates: [], blocked: [] },
   "theokot.manage": { reads: ["theokot"], creates: ["app_create:theokot_product", "app_create:theokot_session"], blocked: ["open sessions, ban users or alter orders"] },
   "theokot.pickup": { reads: ["theokot"], creates: [], blocked: ["mark orders picked up or redeem vouchers"] },

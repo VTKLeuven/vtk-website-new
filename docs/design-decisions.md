@@ -3911,20 +3911,44 @@ Wat er vandaag vanzelf vertrekt:
   voor no-shows loopt, en drie no-shows leveren een schorsing op. Bewust op het
   openen van de afhaal en niet 's ochtends: een bericht een uur te vroeg stuurt
   iemand naar een gesloten deur.
+- **"De broodjes staan open"**, wanneer een nieuwe bestelronde begint. Dit is het
+  enige bericht dat naar iedereen met de app gaat in plaats van naar een handvol
+  mensen die iets openstaan hebben, en dat verdient uitleg. Het haalt de drempel
+  omdat een gemiste ronde betekent dat je die dag geen lunch hebt, en omdat de
+  besteldeadline uren voor het eten ligt: wie het pas 's middags leest, is te
+  laat. De prijs is een bericht per verkoopdag; wie dat te veel vindt, zet het uit
+  onder Meer → Meldingen.
 - **Een herinnering aan een shift**, een dag en twee uur vooraf. Die vertrekt
   **samen met de bestaande herinneringsmail** en binnen dezelfde markering, niet
   als een tweede systeem. "De herinnering voor dit venster is afgehandeld" hoort
   één ding te betekenen; twee wekkers voor één herinnering lopen vroeg of laat
   uit elkaar.
+- **Een herinnering aan een evenement waar je een ster bij zette**, een dag
+  vooraf. Je hebt er zelf om gevraagd door het aan te duiden, en een dag vooraf is
+  het moment waarop je er nog iets aan kan doen: een ticket kopen, je avond
+  vrijhouden, met iemand afspreken. Een kwartier vooraf is een verwijt.
+- **"Nieuw in een categorie die je volgt."** Dit is de bewuste uitzondering op de
+  regel hierboven, want dit ís nieuws. Het mag omdat een lid er zelf om vraagt,
+  **per categorie**, en het met één tik weer uit kan. Iemand die "Cantus" volgt,
+  heeft gezegd dat hij dat wil weten; dat is iets anders dan een kring die
+  besluit dat iedereen het wil weten. Enkel wat de laatste 24 uur gepubliceerd is
+  telt mee, en de doelgroepfilter geldt ook hier.
 
 Wat er bewust **niet** vanzelf vertrekt, en waarom:
 
 - **Tickets die in verkoop gaan.** Verleidelijk, maar het is het duidelijkste
   voorbeeld van een bericht dat commercieel aanvoelt in plaats van behulpzaam.
   Wil een post dat toch voor één groot event, dan kan dat met de hand via
-  Admin → Pushberichten.
+  Admin → Pushberichten. Wie een evenement aanduidde, krijgt sowieso al zijn
+  herinnering.
 - **Een nieuwe aankondiging.** Die staat al als venster over de homepage en in de
   app op het hoofdscherm; een push erbovenop is hetzelfde bericht een tweede keer.
+
+**Elk soort bericht is per lid uit te zetten** (Meer → Meldingen). Enkel
+afwijkingen worden bewaard, dus een nieuw soort bericht heeft vanzelf de juiste
+standaard voor iedereen die al bestond. Dat scherm zegt er ook bij dat de
+toestemming van de telefoon een laag erboven is: staat die uit, dan komt er niets
+binnen, hoe de schakelaars ook staan.
 
 **Met de hand sturen kan, achter het recht `app.push`.** Dat scherm is klein
 gehouden met opzet: je kiest iedereen of één post, en de knop zegt naar hoeveel
@@ -3933,6 +3957,101 @@ fijner de knoppen, hoe makkelijker je de verkeerde indrukt. Elke verzending komt
 in het logboek met de tekst erbij.
 
 **Toestemming wordt in de app niet bij de eerste start gevraagd**, maar via een
-knop in Profiel met een zin erbij die zegt waarover het gaat. Een systeemvenster
-meteen na het installeren wordt weggeklikt, en op iOS is dat definitief: wie één
-keer weigert, moet daarna naar de systeeminstellingen van zijn telefoon.
+knop onder Meer → Meldingen met een zin erbij die zegt waarover het gaat. Een
+systeemvenster meteen na het installeren wordt weggeklikt, en op iOS is dat
+definitief: wie één keer weigert, moet daarna naar de systeeminstellingen van zijn
+telefoon.
+
+---
+
+## De ster op een evenement is geen inschrijving
+
+In de app staat bij elk evenement een ster: "ik ga hier waarschijnlijk naartoe".
+Ze doet drie dingen en niet meer: het evenement verschijnt in je eigen lijst
+(Kalender → Mijn lijst), je krijgt een dag vooraf een bericht, en de teller op de
+detailpagina gaat één omhoog.
+
+**Wat ze uitdrukkelijk niet doet is een plaats reserveren.** Dat onderscheid is
+geen semantiek: wie denkt dat hij ingeschreven is, koopt geen ticket en vult geen
+formulier in, en staat dan voor een uitverkochte zaal met een sterretje in zijn
+telefoon. Daarom staat de ster in de app naast de rij en niet als hoofdactie, en
+staat er onder een aangeduid evenement letterlijk "Dit is geen inschrijving en
+geen ticket".
+
+De teller (`interestedCount`) draagt **geen namen**. Hij is er om te zien of er
+volk komt, en dat is precies zoveel als een ster mag beloven; een deelnemerslijst
+zou hem tot een belofte maken die hij niet is.
+
+Een aangeduid evenement blijft in je lijst staan ook wanneer het buiten je
+doelgroep valt. Iemand die in september eerstejaarsactiviteiten aanduidde en in
+oktober zijn studiejaar bijwerkt, hoort ze niet zonder uitleg te zien verdwijnen.
+
+---
+
+## Bonnetjes betalen aan een toog
+
+Shiftbonnetjes bestonden al: één per begonnen uur, uit te betalen door een
+beheerder of aan de afhaalbalie op te gebruiken voor een broodje. Wat erbij komt
+is een derde weg: de student toont een QR in de app, een praesidiumlid scant hem
+en tikt een bedrag in.
+
+**Het heet "bonnetjes" en niet iets nieuws.** De admin, de mails en de
+afhaalbalie zeggen het al zo; er een tweede woord naast zetten (VTK-coins, punten)
+levert precies het soort discussie op waar aan een toog geen tijd voor is.
+
+**Het saldo blijft één getal op één plek**: `Shift.reward` min
+`ShiftParticipant.rewardPaid`. Er is geen aparte portefeuille, want dan zouden er
+twee saldo's zijn die uit elkaar kunnen lopen, en dan is geen van beide nog te
+vertrouwen. `ShiftRewardRedemption` is het logboek van deze derde weg, niet de
+waarheid; dat staat ook in de app onder de historiek, want een lijst die niet
+optelt naar het getal erboven is anders gewoon verwarrend.
+
+Drie regels die het misbruik afdekken dat er anders zou zijn:
+
+- **Aanvaarden zit achter een eigen recht** (`shift.rewardRedeem`), niet achter
+  "zit in een praesidiumpost". Dit raakt geld aan, en het moet iemand afgenomen
+  kunnen worden zonder hem uit zijn post te zetten. De seed geeft het aan de
+  basisrol `praesidium`, dus in de praktijk heeft elk praesidiumlid het meteen.
+- **Je kan niet bij jezelf afboeken.** Wie mag aanvaarden heeft zelf ook
+  bonnetjes; zijn eigen pas scannen is de kortste weg naar een gratis pint zonder
+  dat er iemand meekijkt.
+- **Opzoeken en afboeken zijn twee stappen.** Wie scant, ziet eerst de naam en het
+  saldo en tikt dan pas een aantal in. Eén gecombineerde beweging zou betekenen
+  dat je afboekt bij iemand die je nog niet herkend hebt.
+
+De pas zelf leeft twee minuten en vernieuwt zichzelf. Een QR die uren geldig
+blijft, staat na één keer tonen in een groepschat. De prijs is dat je hem niet
+offline kan tonen; aan een balie staat altijd iemand met netwerk. Een **ticket**
+is bewust het omgekeerde: dat wordt uit de leescache getekend en werkt zonder
+netwerk, want aan de ingang van een zaal is dat er vaak niet.
+
+---
+
+## Inchecken aan de fakbar met een opgehangen QR
+
+Naast de kaartlezer aan de bar hangt een QR. Wie hem met de app scant, krijgt
+dezelfde check-in als wie zijn studentenkaart voorlegt. De kaartlezer blijft: dit
+is een tweede weg voor wie zijn kaart niet op zak heeft, geen vervanging.
+
+**De beperking is echt en we lossen ze niet op in het token.** Die code hangt daar
+maanden en verloopt dus niet; wie er een foto van neemt, heeft hem voorgoed. Een
+rollende code zoals bij de scanner-uitnodiging kan niet, want daar hoort een
+scherm bij en de Pi heeft er een van twee regels van zestien tekens.
+
+Wat de code waardeloos maakt buiten de bar zijn drie grendels die er niet in
+zitten:
+
+1. **'t ElixIr moet op dat moment open gemeten worden.** De geluidsmeting die de
+   openingsstatus op de site voedt, is hier de poort; is ze verouderd of stil, dan
+   telt er niets. Dit is de grendel die er echt toe doet, want hij maakt de code
+   buiten de openingsuren nutteloos.
+2. **Eén keer per bardag**, precies zoals bij de kaartlezer. Dezelfde
+   `registerCheckin`, dus dat kan niet uit elkaar lopen.
+3. **Er moet een account met een r-nummer achter zitten.** De stand hangt aan het
+   r-nummer.
+
+Wie de code doorstuurt naar iemand die niet in de bar staat, geeft die persoon dus
+hoogstens één check-in op een avond dat de bar toch open is. Dat is aanvaardbaar
+voor een spaarkaart voor pinten; het zou dat niet zijn voor iets met geldwaarde,
+en daarom hangt betalen met bonnetjes aan een kortlevende pas en niet aan een
+opgehangen code.

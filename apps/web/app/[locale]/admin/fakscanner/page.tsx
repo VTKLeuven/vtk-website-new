@@ -3,6 +3,8 @@ import { notFound } from 'next/navigation';
 import { prisma } from '@vtk/db';
 import type { FakScanResult } from '@prisma/client';
 import { Card, Input, Label } from '@vtk/ui';
+import { CheckinQrPanel } from '@/components/fakscanner/CheckinQrPanel';
+import { createFakCheckinToken } from '@/lib/app-api/tokens';
 import { hasLocale } from '@/lib/locale';
 import { requireSession } from '@/lib/session';
 import { getDictionary, type Locale } from '@vtk/i18n';
@@ -155,6 +157,8 @@ export default async function FakscannerAdminPage({
           </Link>
         ))}
       </div>
+
+      <CheckinQrPanel nl={nl} code={createFakCheckinToken()} />
 
       {/* Ranglijst */}
       <section className="space-y-3 rounded-2xl border border-vtk-blue/12 bg-white p-5">
