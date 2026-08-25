@@ -25,16 +25,34 @@ import { useMemo } from 'react';
 /**
  * Welke schermen in welke tab bereikbaar zijn.
  *
- * Een tab draagt enkel wat je er ook echt kan openen; dat is geen zuinigheid maar
- * de bedoeling. Stond overal alles, dan zou je via Kalender in de foto's kunnen
- * belanden en daarna terugvegen naar de kalender, wat nergens op slaat.
+ * Een tab draagt wat je er ook echt kan openen, en **alles** wat je er kan openen.
+ * Dat tweede is waar het één keer op mislukte: de snelkoppeling naar de piano
+ * stond op Home terwijl enkel Meer dat scherm droeg, dus opende ze op Meer en
+ * zette teruggaan je daar af. `npm run routes:check` loopt nu elke tab af en
+ * eist die volledigheid.
+ *
+ * Het omgekeerde blijft ook waar: een tab draagt niet wat je er niet kan openen.
+ * Kalender heeft geen foto's, want er staat nergens in de kalender een knop
+ * ernaartoe.
  *
  * `[x]` is een parameter, zoals in de bestandsnamen van expo-router.
  */
 export const TAB_ROUTES = {
-  '(home)': ['evenement/[id]', 'bonnetjes', 'scannen', 'meldingen'],
-  kalender: ['evenement/[id]', 'meldingen'],
-  tickets: ['ticket/[slug]', 'scan/[eventId]', 'scannen', 'mijn-tickets'],
+  '(home)': [
+    'evenement/[id]',
+    'ticket/[slug]',
+    'mijn-tickets',
+    'bonnetjes',
+    'scannen',
+    'scan/[eventId]',
+    'meldingen',
+    'shiften',
+    'media',
+    'album/[slug]',
+    'piano',
+  ],
+  kalender: ['evenement/[id]', 'ticket/[slug]', 'mijn-tickets', 'meldingen'],
+  tickets: ['ticket/[slug]', 'mijn-tickets', 'scannen', 'scan/[eventId]'],
   broodjes: ['bestellen'],
   meer: [
     'zoeken',
@@ -49,9 +67,12 @@ export const TAB_ROUTES = {
     'bonnetjes',
     'meldingen',
     'scannen',
+    'scan/[eventId]',
     'categorie/[slug]',
     'pagina/[slug]',
     'evenement/[id]',
+    'ticket/[slug]',
+    'mijn-tickets',
   ],
 } as const;
 

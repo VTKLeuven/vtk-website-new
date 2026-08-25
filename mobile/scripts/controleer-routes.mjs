@@ -93,7 +93,65 @@ for (const bron of bronnen) {
 }
 
 /**
- * 3. De vertaaltabel van het CMS.
+ * 3. Blijft elke tab in zichzelf?
+ *
+ * Dit is de controle die er het meest toe doet, en de reden dat ze bestaat: een
+ * snelkoppeling op Home naar `/piano` kwam uit op `/meer/piano`, want Home droeg
+ * dat scherm niet. Teruggaan zette je dan op Meer af terwijl je van Home kwam.
+ *
+ * Dus: vanaf het tabscherm alle schermen aflopen die je in die tab kan openen, en
+ * eisen dat elk adres dat ze duwen ook in diezelfde tab bestaat. Een tab die naar
+ * een andere tab stuurt (`/tickets?tab=mijne`) of naar een modal (`/inloggen`) is
+ * geen fout: dat is bewust weg uit de tab.
+ *
+ * Wat dit **niet** ziet: een adres dat als data binnenkomt in plaats van in de
+ * code te staan, zoals het pad bij een taak op Home. Die stel je in
+ * `apps/web/app/api/app/v1/vandaag/route.ts` in, en ze horen in dezelfde lijst
+ * thuis.
+ */
+const navigatie = readFileSync(join(root, 'src/navigation.ts'), 'utf8');
+const kaart = {};
+{
+  const blok = navigatie.match(/export const TAB_ROUTES = \{([\s\S]*?)\n\} as const;/)[1];
+  for (const [, tab, lijst] of `${blok}\n`.matchAll(/^\s{2}'?([\w()-]+)'?:\s*([\s\S]*?),\n(?=\s{2}\S|$)/gm)) {
+    kaart[tab] = [...lijst.matchAll(/'([^']+)'/g)].map((m) => m[1]);
+  }
+}
+const indexSchermen = {};
+{
+  const blok = navigatie.match(/export const TAB_INDEX_SCREENS = \{([\s\S]*?)\n\} as const;/)[1];
+  for (const [, tab, naam] of `${blok}\n`.matchAll(/^\s{2}'?([\w()-]+)'?:\s*'([^']+)',/gm)) {
+    indexSchermen[tab] = naam;
+  }
+}
+
+/** Adressen die met opzet buiten de tab liggen: de tabs zelf en de modals. */
+const BUITEN = new Set(['/', '/kalender', '/tickets', '/broodjes', '/meer', '/inloggen', '/instellingen', '/poort']);
+
+/** De adressen die één scherm duwt, genormaliseerd. */
+function duwtNaar(scherm) {
+  const bestand = join(root, 'src/screens', `${scherm}.tsx`);
+  if (!existsSync(bestand)) return [];
+  return [...readFileSync(bestand, 'utf8').matchAll(ADRES)].map(([, a, b]) =>
+    (a ?? b).split('?')[0].replace(/\$\{[^}]*\}/g, '*').replace(/\/$/, ''),
+  );
+}
+
+for (const [tab, schermen] of Object.entries(kaart)) {
+  const heeft = new Set(schermen.map((s) => `/${s.replace(/\[\w+\]/g, '*')}`));
+  for (const scherm of [indexSchermen[tab], ...schermen]) {
+    for (const adres of duwtNaar(scherm)) {
+      if (BUITEN.has(adres) || heeft.has(adres)) continue;
+      fouten.push(
+        `${tab}: src/screens/${scherm}.tsx duwt naar ${adres}, maar die tab draagt dat scherm niet.` +
+          ` Zet het bij ${tab} in TAB_ROUTES, of het opent in een andere tab en teruggaan zet je daar af.`,
+      );
+    }
+  }
+}
+
+/**
+ * 4. De vertaaltabel van het CMS.
  *
  * `nativeRouteFor` geeft zijn adres als waarde terug in plaats van het ergens in
  * te tikken, dus de scan hierboven ziet die niet. Het is net de tabel die verkeerd

@@ -112,9 +112,15 @@ bekijken. Push is de bestaande uitzondering: die werkt in Expo Go niet.
     voor `back()`). De adressen in een scherm blijven gewoon `/piano`; welke tab
     ervoor komt, hoort een knop niet te weten.
   - Een nieuw scherm: bestand in `src/screens/`, regel bij in `TAB_ROUTES`,
-    `npm run routes`. `npm run routes:check` bewaakt allebei de kanten: dat de
-    bestanden gelijklopen met de kaart, en dat elk adres waar de app naartoe duwt
-    ook echt bestaat.
+    `npm run routes`. **In élke tab van waaruit je het kan openen**, niet enkel in
+    de meest voor de hand liggende: een snelkoppeling op Home naar een scherm dat
+    enkel Meer draagt, opent op Meer en zet je daar af bij het teruggaan. Dat is
+    precies wat er één keer misging.
+  - `npm run routes:check` bewaakt drie dingen: dat de bestanden gelijklopen met
+    de kaart, dat elk adres waar de app naartoe duwt ook bestaat, en dat elke tab
+    in zichzelf blijft. Wat het niet ziet, is een adres dat als data binnenkomt;
+    de paden bij de taken op Home staan in
+    `apps/web/app/api/app/v1/vandaag/route.ts` en horen in dezelfde lijst.
   - **Elk doorklikscherm krijgt een terugknop, en die zit in `PageHead`.** De
     stacks draaien met `headerShown: false`, dus er is geen systeemkop die er een
     tekent. Zonder die knop geraakte je op iOS nergens meer weg zodra je één keer
