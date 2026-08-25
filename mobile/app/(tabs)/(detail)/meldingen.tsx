@@ -55,6 +55,10 @@ const TOPICS: Record<AppNotificationTopic, { label: string; hint: string }> = {
     label: 'Herinnering aan wat je aanduidde',
     hint: 'Een dag voor een evenement waar je een ster bij zette.',
   },
+  'study.groupStart': {
+    label: 'De eerste van je blokgroep zit',
+    hint: 'Eén bericht per groep per dag, wanneer de eerste begint. Niet bij elke volgende.',
+  },
 };
 
 export default function MeldingenScreen() {

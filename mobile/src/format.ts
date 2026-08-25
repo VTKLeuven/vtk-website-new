@@ -85,3 +85,34 @@ export function formatDate(iso: string, locale: AppLocale): string {
     month: 'long',
   }).format(new Date(iso));
 }
+
+/**
+ * De lopende klok: `1:04:32`.
+ *
+ * Uren zonder voorloopnul, minuten en seconden met. Dat is hoe een stopwatch
+ * eruitziet, en het houdt de breedte stabiel genoeg om niet te dansen terwijl hij
+ * loopt.
+ */
+export function formatClock(seconds: number): string {
+  const safe = Math.max(0, Math.floor(seconds));
+  const hours = Math.floor(safe / 3600);
+  const minutes = Math.floor(safe / 60) % 60;
+  const rest = safe % 60;
+  const pad = (value: number) => String(value).padStart(2, '0');
+  return `${hours}:${pad(minutes)}:${pad(rest)}`;
+}
+
+/**
+ * Een duur om te lezen, niet om af te tellen: `4u 32`, `18 min`, `0 min`.
+ *
+ * Seconden staan er bewust niet in. In een ranglijst of een dagtotaal zeggen ze
+ * niets en maken ze de kolom onrustig; alleen de klok die nu loopt, telt per
+ * seconde.
+ */
+export function formatSpan(seconds: number): string {
+  const minutes = Math.max(0, Math.round(seconds / 60));
+  if (minutes < 60) return `${minutes} min`;
+  const hours = Math.floor(minutes / 60);
+  const rest = minutes % 60;
+  return rest === 0 ? `${hours}u` : `${hours}u ${String(rest).padStart(2, '0')}`;
+}

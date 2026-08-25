@@ -394,3 +394,49 @@ zijn. Bewust geen `Setting` met een beheerscherm: dit hoort bij een release van 
 server, en een verkeerd getikte waarde in een adminveld zet iedereen buiten.
 Verhoog het enkel wanneer een oudere app echt niet meer werkt, niet bij elke
 release. Niet gezet of onzinnig ingevuld betekent `1.0.0`, en dus niemand buiten.
+
+### `GET /api/app/v1/studeren`
+
+Het volledige studeerscherm in één antwoord: je lopende sessie, je dagtotaal, je
+week, je reeks, de vakken die je eerder intikte, en al je blokgroepen met hun
+leden. Bewust niet opgesplitst: het is één scherm, en twee aanvragen zouden
+betekenen dat de helft ervan ververst terwijl de andere helft achterloopt.
+
+De app haalt dit ook op terwijl er niets verandert, want de zaal moet leven. Bij
+een lopende sessie gebeurt dat via het levensteken hieronder; anders elke drie
+kwartier zolang het scherm openstaat.
+
+### `POST`/`PATCH`/`DELETE /api/app/v1/studeren/sessie`
+
+Gaan zitten, pauzeren of hervatten, opstaan. Alle drie geven het volledige
+overzicht terug, zodat de app na een tik niets extra hoeft op te halen.
+
+- `POST` met `{ subject?, subjectHidden? }` start. Loopt er al een sessie, dan
+  gebeurt er niets en krijg je die terug: twee keer op de knop hoort geen tweede
+  sessie te maken.
+- `PATCH` met `{ action: "pause" | "resume" | "heartbeat" }`. Het levensteken is
+  geen beleefdheid maar meting: blijft het weg, dan telt de server de sessie tot
+  het laatste moment waarop hij wist dat ze liep.
+- `DELETE` sluit af en geeft `{ finishedSeconds, subject, overview }`.
+
+Het rekenwerk staat in `lib/app-api/study.ts`; de regels erachter (pauzemarge,
+maximumduur, aan welke dag een sessie toebehoort) staan in
+`docs/design-decisions.md`.
+
+### `POST /api/app/v1/studeren/groepen` en `/groepen/deelnemen`
+
+Een groep maken (`{ name }`) of erbij komen met een code (`{ code }`). Allebei
+geven ze `{ groupId, overview }`. Een onbekende of verkeerd overgetikte code geeft
+`NOT_FOUND`; er wordt niet gegokt welk teken je bedoelde.
+
+Foutcodes: `NOT_FOUND`, `GROUP_FULL`, `TOO_MANY_GROUPS`, `INVALID_NAME`.
+
+### `PATCH`/`DELETE /api/app/v1/studeren/groepen/[id]`
+
+Hernoemen of het groepsdoel zetten (enkel wie de groep maakte, anders
+`NOT_OWNER`), en vertrekken. `DELETE` zonder parameters laat jezelf vertrekken;
+`?lid=<userId>` zet iemand anders eruit en kan enkel de eigenaar.
+
+### `PATCH /api/app/v1/studeren/doel`
+
+`{ dailyGoalMinutes }`. Bepaalt wat de reeks telt en wanneer een dag "gehaald" is.

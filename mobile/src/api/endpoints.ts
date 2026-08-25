@@ -1,30 +1,33 @@
 import { apiFetch, appApi } from './client';
 import type {
+  AppAlbumDetail,
   AppCalendar,
   AppCalendarEventDetail,
+  AppCategory,
+  AppFakCheckin,
+  AppGroups,
   AppLocale,
+  AppMedia,
   AppMyOrder,
+  AppNotificationSettings,
+  AppNotificationTopic,
+  AppPage,
+  AppPassHolder,
+  AppPiano,
+  AppPoc,
+  AppPraesidium,
   AppProfile,
+  AppScanEvent,
+  AppScannerInviteResult,
+  AppSearch,
+  AppShifts,
+  AppStudyAction,
+  AppStudyOverview,
+  AppStudyStopResult,
   AppTheokot,
   AppTheokotOrderInput,
   AppTicketEvent,
   AppTicketEventDetail,
-  AppAlbumDetail,
-  AppCategory,
-  AppMedia,
-  AppPage,
-  AppPraesidium,
-  AppSearch,
-  AppGroups,
-  AppPoc,
-  AppShifts,
-  AppPiano,
-  AppFakCheckin,
-  AppNotificationSettings,
-  AppNotificationTopic,
-  AppPassHolder,
-  AppScanEvent,
-  AppScannerInviteResult,
   AppTicketScanResult,
   AppToday,
   AppVoucherRedeemInput,
@@ -293,4 +296,70 @@ export function scanTicket(
 
 export function fakCheckin(code: string): Promise<AppFakCheckin> {
   return apiFetch<AppFakCheckin>(appApi('/fakbar/checkin'), { method: 'POST', body: { code } });
+}
+
+// ── Samen blokken ───────────────────────────────────────────────────────────
+
+export function fetchStudyOverview(): Promise<AppStudyOverview> {
+  return apiFetch<AppStudyOverview>(appApi('/studeren'));
+}
+
+export function startStudySession(input: {
+  subject?: string;
+  subjectHidden?: boolean;
+}): Promise<AppStudyOverview> {
+  return apiFetch(appApi('/studeren/sessie'), { method: 'POST', body: input });
+}
+
+/**
+ * Pauzeren, hervatten of enkel laten weten dat het scherm nog openstaat.
+ *
+ * De app stuurt dit ook wanneer er niets veranderde. Dat levensteken is niet
+ * beleefdheid maar meting: blijft het weg, dan telt de server de sessie tot het
+ * laatste moment waarop hij wist dat ze liep.
+ */
+export function updateStudySession(input: {
+  action: AppStudyAction;
+  subject?: string;
+  subjectHidden?: boolean;
+}): Promise<AppStudyOverview> {
+  return apiFetch(appApi('/studeren/sessie'), { method: 'PATCH', body: input });
+}
+
+export function stopStudySession(): Promise<AppStudyStopResult> {
+  return apiFetch(appApi('/studeren/sessie'), { method: 'DELETE' });
+}
+
+export function setStudyGoal(dailyGoalMinutes: number): Promise<AppStudyOverview> {
+  return apiFetch(appApi('/studeren/doel'), { method: 'PATCH', body: { dailyGoalMinutes } });
+}
+
+export function createStudyGroup(
+  name: string,
+): Promise<{ groupId: string; overview: AppStudyOverview }> {
+  return apiFetch(appApi('/studeren/groepen'), { method: 'POST', body: { name } });
+}
+
+export function joinStudyGroup(
+  code: string,
+): Promise<{ groupId: string; overview: AppStudyOverview }> {
+  return apiFetch(appApi('/studeren/groepen/deelnemen'), { method: 'POST', body: { code } });
+}
+
+export function updateStudyGroup(
+  groupId: string,
+  changes: { name?: string; weeklyGoalMinutes?: number | null },
+): Promise<AppStudyOverview> {
+  return apiFetch(appApi(`/studeren/groepen/${encodeURIComponent(groupId)}`), {
+    method: 'PATCH',
+    body: changes,
+  });
+}
+
+/** Zelf vertrekken, of als eigenaar iemand anders eruit zetten. */
+export function leaveStudyGroup(groupId: string, memberId?: string): Promise<AppStudyOverview> {
+  const path = appApi(`/studeren/groepen/${encodeURIComponent(groupId)}`);
+  return apiFetch(memberId ? `${path}?lid=${encodeURIComponent(memberId)}` : path, {
+    method: 'DELETE',
+  });
 }

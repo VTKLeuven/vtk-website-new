@@ -52,3 +52,39 @@ export const appTheokotOrderSchema = z.object({
 });
 
 export const appTheokotCancelSchema = z.object({ orderId: z.string().min(1).max(64) });
+
+// -----------------------------------------------------------------------------
+// Samen blokken
+// -----------------------------------------------------------------------------
+
+/**
+ * Het vak is vrij ingetikt en dus rommelig; dat is de bedoeling. Mensen blokken
+ * ook voor dingen die niet in de cursusdienst staan, en een keuzelijst zou hen
+ * dwingen te liegen. Enkel de lengte wordt begrensd.
+ */
+const studySubjectSchema = z.string().trim().max(60).optional();
+
+export const appStudyStartSchema = z.object({
+  subject: studySubjectSchema,
+  subjectHidden: z.boolean().optional(),
+});
+
+export const appStudyActionSchema = z.object({
+  action: z.enum(["pause", "resume", "heartbeat"]),
+  subject: studySubjectSchema,
+  subjectHidden: z.boolean().optional(),
+});
+
+export const appStudyGroupCreateSchema = z.object({ name: z.string().trim().min(2).max(40) });
+
+export const appStudyGroupJoinSchema = z.object({ code: z.string().trim().min(4).max(16) });
+
+export const appStudyGroupUpdateSchema = z.object({
+  name: z.string().trim().min(2).max(40).optional(),
+  /** `null` haalt het groepsdoel weg. */
+  weeklyGoalMinutes: z.number().int().min(60).max(100_000).nullable().optional(),
+});
+
+export const appStudyGoalSchema = z.object({
+  dailyGoalMinutes: z.number().int().min(15).max(1440),
+});

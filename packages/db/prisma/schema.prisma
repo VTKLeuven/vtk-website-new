@@ -586,6 +586,10 @@ model User {
   calendarCategoryFollows CalendarCategoryFollow[]    @relation("CalendarFollowUser")
   shiftRewardRedemptions  ShiftRewardRedemption[]     @relation("ShiftRewardRedemptionUser")
   shiftRewardsProcessed   ShiftRewardRedemption[]     @relation("ShiftRewardRedemptionProcessedBy")
+  studySessions           StudySession[]              @relation("StudySessionUser")
+  studyGroupsOwned        StudyGroup[]                @relation("StudyGroupOwner")
+  studyGroupMemberships   StudyGroupMember[]          @relation("StudyGroupMemberUser")
+  studyProfile            StudyProfile?               @relation("StudyProfileUser")
 
   pianoReservations PianoReservation[]
 
@@ -4757,4 +4761,113 @@ model ShiftRewardRedemption {
 
   @@index([userId, createdAt])
   @@index([createdAt])
+}
+
+// -----------------------------------------------------------------------------
+// Samen blokken: studietijd meten en naast die van je vrienden zetten
+// -----------------------------------------------------------------------------
+
+/// Eén keer gaan zitten studeren.
+///
+/// **De duur staat niet in één veld.** Een sessie loopt, pauzeert en loopt weer;
+/// wat telt is `endedAt - startedAt` min de pauzes, en pas bij het afsluiten
+/// wordt dat als `seconds` vastgelegd. Zolang ze loopt rekent de server het bij
+/// elke vraag opnieuw uit, want een lopende sessie heeft geen eindtijd om vanaf
+/// te rekenen.
+///
+/// `lastSeenAt` is het levensteken van de app. Het doet twee dingen: het bepaalt
+/// of iemand "nu aan het studeren" is in de zaal van zijn groep, en het is de
+/// bovengrens waarop een vergeten sessie afgekapt wordt. Zonder dat zou een
+/// telefoon die 's avonds leegloopt de volgende ochtend veertien uur studietijd
+/// opleveren.
+///
+/// Een lid hoort er hoogstens één open te hebben. Dat staat niet als
+/// databankregel (Postgres kan dat enkel met een partiële unieke index, en die
+/// kan Prisma niet uitdrukken); `startStudySession` sluit daarom eerst af wat nog
+/// openstond, in dezelfde transactie.
+model StudySession {
+  id            String  @id @default(cuid())
+  userId        String
+  /// Het vak, vrij ingetikt door het lid zelf. Geen lijst uit de cursusdienst:
+  /// mensen blokken ook voor dingen die daar niet in staan.
+  subject       String?
+  /// Verbergt het vak voor groepsgenoten. De tijd blijft wel meetellen.
+  subjectHidden Boolean @default(false)
+
+  startedAt     DateTime  @db.Timestamptz(3)
+  endedAt       DateTime? @db.Timestamptz(3)
+  /// Wanneer de huidige pauze begon; niet null betekent "nu gepauzeerd".
+  pausedAt      DateTime? @db.Timestamptz(3)
+  /// De som van de pauzes die al voorbij zijn, in seconden.
+  pausedSeconds Int       @default(0)
+  lastSeenAt    DateTime  @db.Timestamptz(3)
+  /// Netto seconden. Pas ingevuld bij het afsluiten.
+  seconds       Int?
+  /// `user` (zelf gestopt), `timeout` (levensteken bleef weg) of `cap` (over de
+  /// maximumduur). Staat er voor de uitleg aan het lid, niet voor statistiek.
+  endedReason   String?
+
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+
+  user User @relation("StudySessionUser", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, startedAt])
+  @@index([endedAt, lastSeenAt])
+}
+
+/// Een groep waarin vrienden hun studietijd naast elkaar zetten.
+///
+/// Er is bewust geen VTK-brede ranglijst: studietijd is persoonlijk, en een
+/// kringbrede lijst meet vooral wie geen leven heeft. Je totalen zijn zichtbaar
+/// voor wie in dezelfde groep zit en voor niemand anders; stap je eruit, dan ben
+/// je weg uit de lijst. Zie docs/design-decisions.md.
+model StudyGroup {
+  id                String    @id @default(cuid())
+  name              String
+  /// De code die je deelt. Hoofdletters en cijfers zonder de tekens die je
+  /// verkeerd overtikt, zie `lib/app-api/studyGroups.ts`.
+  code              String    @unique
+  ownerId           String?
+  /// Samen zoveel minuten per week halen. Null betekent: geen doel afgesproken.
+  weeklyGoalMinutes Int?
+  /// Wanneer voor deze groep laatst een "de eerste is begonnen"-bericht vertrok.
+  /// Claim-dan-versturen: acht leden die tegelijk starten geven niet acht
+  /// berichten, en één per dag is genoeg.
+  startPushAt       DateTime? @db.Timestamptz(3)
+
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+
+  owner   User?              @relation("StudyGroupOwner", fields: [ownerId], references: [id], onDelete: SetNull)
+  members StudyGroupMember[]
+}
+
+/// Wie in welke groep zit. `owner` mag hernoemen, het doel zetten en iemand
+/// verwijderen; verder is iedereen gelijk.
+model StudyGroupMember {
+  id      String @id @default(cuid())
+  groupId String
+  userId  String
+  role    String @default("member")
+
+  joinedAt DateTime @default(now()) @db.Timestamptz(3)
+
+  group StudyGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  user  User       @relation("StudyGroupMemberUser", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([groupId, userId])
+  @@index([userId])
+}
+
+/// Wat een lid voor zichzelf instelde. Bestaat pas zodra iemand iets wijzigt.
+model StudyProfile {
+  userId           String @id
+  /// Het dagdoel in minuten; de reeks telt de dagen waarop je dat haalde.
+  dailyGoalMinutes Int    @default(240)
+
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+
+  user User @relation("StudyProfileUser", fields: [userId], references: [id], onDelete: Cascade)
 }
