@@ -1,8 +1,7 @@
 # Wat de VTK-app aan deze site toevoegt
 
 Deze branch (`possible-app`) bevat alles wat er aan **vtk-website-new** bijgekomen
-is om de VTK-app te laten werken. De app zelf staat in een aparte repo,
-`~/vtk-app`; haar plan en voortgang staan in `~/vtk-app/docs/plan.md`.
+is om de VTK-app te laten werken. De app zelf staat in `mobile/`; haar plan en voortgang staan in `mobile/docs/plan.md`.
 
 Dit document is de **inventaris**: wat er bijkwam, wat er wijzigde, en wat er nog
 moet gebeuren voor dit naar productie kan. De werking van het contract zelf staat
@@ -91,7 +90,7 @@ absolute beeld-URL's. Zie `app-api.md` voor het waarom.
 
 | Bestand | Wat |
 |---|---|
-| `lib/app-api/contract.ts` | Alle types. **Wordt letterlijk gekopieerd** naar `~/vtk-app/src/api/contract.ts`; daarom geen enkele import, ook geen zod. |
+| `lib/app-api/contract.ts` | Alle types. **Wordt letterlijk gekopieerd** naar `mobile/src/api/contract.ts`; daarom geen enkele import, ook geen zod. |
 | `lib/app-api/schemas.ts` | De zod-schema's voor wat de app stuurt. Apart, zodat de app die bibliotheek niet meesleept. |
 | `lib/app-api/respond.ts` | `appJson`, `appError`, `appErrorResponse`, `readAppJson`. Eén foutvorm, één plek voor CORS. |
 | `lib/app-api/media.ts` | Absolute URL's, met de host **uit de aanvraag** en niet uit `VTK_MAIN_URL`. |

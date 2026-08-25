@@ -78,7 +78,7 @@ wat ze deed, wordt de logica testbaar zonder Next, en is de app per definitie ni
 soepeler dan de website. Dat laatste is belangrijk bij Theokot: bans, vensters en
 voorraad mogen niet twee implementaties krijgen.
 
-### A4. De app: `~/vtk-app`, een nieuwe repo
+### A4. De app: `mobile/`, een nieuwe repo
 
 Zelfde opzet als `vtk-scanner-app` (dat is de huisstijl voor Expo hier):
 
@@ -289,7 +289,7 @@ docs/app-api.md
 worden dunner; verder niets aan de bestaande pagina's, want die blijven dezelfde
 `lib/`-functies gebruiken.
 
-**Nieuwe repo `~/vtk-app`** met de structuur uit A4/A5, `app/(tabs)/` per tab en
+**Nieuwe repo `mobile/`** met de structuur uit A4/A5, `app/(tabs)/` per tab en
 `src/{api,auth,theme,components,features}/`.
 
 ---
@@ -301,7 +301,7 @@ Per fase, niet één keer op het einde:
 1. `npm run verify` in `vtk-website-new` (lockfile, typegen + tsc, eslint, de
    vitest-suites van `@vtk/web` en `@vtk/logistiek`). Verandert er een
    dependency, dan de lockfile **regenereren**, niet incrementeel bijwerken.
-2. `npm run type-check` en `npm run lint` in `~/vtk-app`.
+2. `npm run type-check` en `npm run lint` in `mobile/`.
 3. **Een contracttest**: een vitest die `apps/web/lib/app-api/contract.ts` en de
    kopie in de app-repo byte-voor-byte vergelijkt wanneer die repo naast deze
    staat, en anders overslaat. Dat is de enige goedkope bescherming tegen de

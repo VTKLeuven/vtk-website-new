@@ -1,10 +1,10 @@
 # De app-API (`/api/app/v1`)
 
-De JSON-API waar de **VTK-app** (Expo, iOS + Android, repo `~/vtk-app`) op draait.
+De JSON-API waar de **VTK-app** (Expo, iOS + Android, `mobile/` in deze repo) op draait.
 Dit document beschrijft het contract en de regels errond. Voor een inventaris van
 alles wat er voor de app aan deze site toegevoegd is (endpoints, migraties,
 rechten, wat er nog moet gebeuren), zie [`app-toevoegingen.md`](./app-toevoegingen.md).
-Het plan van de app zelf staat in `~/vtk-app/docs/plan.md`.
+Het plan van de app zelf staat in `mobile/docs/plan.md`.
 
 Niet te verwarren met de scanner: `vtk-scanner-app` praat met `/api/tickets/...`
 en staat hier los van.
@@ -46,7 +46,7 @@ zitten.
 
 | Bestand | Wat |
 |---|---|
-| `apps/web/lib/app-api/contract.ts` | Types en zod-schema's. **Geen server-imports**, want dit bestand wordt gekopieerd naar `~/vtk-app/src/api/contract.ts`. |
+| `apps/web/lib/app-api/contract.ts` | Types en zod-schema's. **Geen server-imports**, want dit bestand wordt gekopieerd naar `mobile/src/api/contract.ts`. |
 | `apps/web/lib/app-api/respond.ts` | `appJson`, `appError`, `appErrorResponse`, `readAppJson`. Eén plek voor de foutvorm en de CORS-headers. |
 | `apps/web/lib/app-api/media.ts` | `requestOrigin`, `absoluteMediaUrl`, `absoluteUrl`. |
 | `apps/web/lib/app-api/version.ts` | `minimumAppVersion()` en `compareVersions()`. |

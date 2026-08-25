@@ -1,5 +1,5 @@
 /**
- * Het contract tussen de site en de VTK-app (`~/vtk-app`).
+ * Het contract tussen de site en de VTK-app (`mobile/`).
  *
  * **Dit bestand wordt letterlijk gekopieerd naar `src/api/contract.ts` in de
  * app-repo.** Daarom staan er enkel types en pure helpers in: geen prisma, geen
