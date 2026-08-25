@@ -88,6 +88,26 @@ services:
     ports:
       - "127.0.0.1:3100:3000"
 
+  fakbar:
+    build:
+      context: ..
+      dockerfile: infra/docker/fakbar.Dockerfile
+    restart: unless-stopped
+    env_file:
+      - ../.env
+    depends_on:
+      web:
+        condition: service_started
+      postgres:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://${POSTGRES_USER:-vtk}:${POSTGRES_PASSWORD:-vtk}@postgres:5432/${POSTGRES_DB:-vtk}?schema=public
+      SESSION_COOKIE_DOMAIN: ${SESSION_COOKIE_DOMAIN:-.vtk.be}
+      VTK_MAIN_URL: ${VTK_MAIN_URL:-https://vtk.be}
+    ports:
+      - "127.0.0.1:3300:3000"
+
   # Vangnet voor de uitleen-betalingen: reconciliatie + verlopen checkouts,
   # zelfde curl-loop-patroon als de ticket-worker hieronder.
   logistiek-worker:

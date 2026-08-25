@@ -22,12 +22,12 @@
     "build": "dotenv -e ../../.env -- prisma generate"
   },
   "dependencies": {
-    "@prisma/client": "^6.3.0"
+    "@prisma/client": "^6.19.3"
   },
   "devDependencies": {
     "@vtk/tsconfig": "*",
     "dotenv-cli": "^7.4.2",
-    "prisma": "^6.3.0",
+    "prisma": "^6.19.3",
     "tsx": "^4.19.2",
     "typescript": "^5"
   },

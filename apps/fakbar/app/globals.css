@@ -1,0 +1,516 @@
+/* Fakbar Elixir — design system.
+   Structureel identiek aan apps/logistiek/app/globals.css.
+   Enige verschil: het palet is zwart-wit ("Elixir") in plaats van blauw-geel. */
+@import 'tailwindcss' source(none);
+@source "../app";
+@source "../components";
+@source "../lib";
+
+@theme {
+  --color-vtk-ink: #0a0a0a;
+  --color-vtk-navy: #111111;
+  --color-vtk-blue: #111111;
+  --color-vtk-blue-dark: #0a0a0a;
+  --color-vtk-blue-light: #333333;
+  --color-vtk-blue-soft: #f0f0f0;
+  --color-vtk-blue-muted: #777777;
+  --color-vtk-yellow: #ffffff;
+  --color-vtk-yellow-dark: #e0e0e0;
+  --color-vtk-paper: #f5f5f5;
+  --color-vtk-paper-2: #ebebeb;
+  --color-vtk-surface: #ffffff;
+  --color-vtk-body: #333333;
+  --color-vtk-muted: #777777;
+  --font-sans: var(--font-vtk-sans), ui-sans-serif, system-ui, sans-serif;
+}
+
+html,
+body {
+  height: 100%;
+  font-family: var(--font-vtk-sans), ui-sans-serif, system-ui, sans-serif;
+}
+
+:root {
+  --vtk-header-height: 73px;
+  --max: 1240px;
+  --ink: #0a0a0a;
+  --navy: #111111;
+  --paper: #f5f5f5;
+  --paper-2: #ebebeb;
+  --surface: #ffffff;
+  --line: rgba(10, 10, 10, 0.1);
+  --line-2: rgba(10, 10, 10, 0.18);
+  --yellow: #ffffff;
+  --yellow-dark: #e0e0e0;
+  --muted: #777777;
+  --body: #333333;
+  --on-dark-muted: #aaaaaa;
+  --success: #2f6f33;
+  --success-soft: #eef8ea;
+}
+
+/* ── Site Header ─────────────────────────────────────────────────────────── */
+
+.vtk-site-header {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  background: var(--navy);
+  color: var(--paper);
+  font-family: var(--font-vtk-sans), ui-sans-serif, system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+.vtk-site-header .nav-inner {
+  display: flex;
+  min-height: 72px;
+  max-width: var(--max);
+  align-items: center;
+  gap: clamp(18px, 3vw, 46px);
+  margin: 0 auto;
+  padding: 0 clamp(20px, 3vw, 36px);
+}
+
+.vtk-site-header .brand {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  color: var(--paper);
+  text-decoration: none;
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+}
+
+.vtk-site-header .nav-links-shell {
+  position: relative;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.vtk-site-header .nav-links {
+  display: flex;
+  width: 100%;
+  min-width: 0;
+  flex: none;
+  align-items: center;
+  gap: clamp(16px, 2vw, 30px);
+  overflow-x: auto;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+
+.vtk-site-header .nav-links::-webkit-scrollbar {
+  display: none;
+}
+
+.vtk-site-header .nav-links a {
+  color: rgba(250, 250, 247, 0.78);
+  font-size: 14px;
+  font-weight: 500;
+  text-decoration: none;
+  white-space: nowrap;
+  transition: color 160ms ease;
+}
+
+.vtk-site-header .nav-links a:hover {
+  color: #fff;
+}
+
+.vtk-site-header .nav-right {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 10px;
+  margin-left: auto;
+}
+
+.vtk-site-header .profile-menu-trigger,
+.vtk-site-header .nav-login {
+  display: inline-grid;
+  width: 38px;
+  min-width: 38px;
+  height: 38px;
+  place-items: center;
+  border: 1px solid rgba(250, 250, 247, 0.34);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.12);
+  color: var(--paper);
+  font-weight: 600;
+  text-decoration: none;
+  transition:
+    background 160ms ease,
+    border-color 160ms ease;
+}
+
+.vtk-site-header .profile-menu-trigger:hover,
+.vtk-site-header .nav-login:hover {
+  border-color: var(--paper);
+  background: rgba(255, 255, 255, 0.22);
+}
+
+.vtk-site-header .profile-menu-root {
+  position: relative;
+}
+
+.vtk-site-header .profile-menu {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  z-index: 60;
+  min-width: 180px;
+  margin-top: 8px;
+  padding: 6px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--surface);
+  box-shadow: 0 18px 42px rgba(10, 10, 10, 0.12);
+}
+
+.vtk-site-header .profile-menu-item {
+  display: block;
+  width: 100%;
+  padding: 9px 10px;
+  border-radius: 10px;
+  color: var(--ink);
+  font-size: 14px;
+  text-align: left;
+  text-decoration: none;
+}
+
+.vtk-site-header .profile-menu-item:hover,
+.vtk-site-header .profile-menu-item:focus-visible {
+  background: var(--paper-2);
+  outline: none;
+}
+
+@media (max-width: 720px) {
+  :root {
+    --vtk-header-height: 112px;
+  }
+
+  .vtk-site-header .nav-inner {
+    min-height: 64px;
+    flex-wrap: wrap;
+    gap: 14px;
+    padding-top: 12px;
+  }
+
+  .vtk-site-header .nav-links-shell {
+    order: 3;
+    width: 100%;
+    flex-basis: 100%;
+  }
+
+  .vtk-site-header .nav-links {
+    padding: 0 0 9px;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(250, 250, 247, 0.4) transparent;
+  }
+
+  .vtk-site-header .nav-links::-webkit-scrollbar {
+    display: block;
+    height: 3px;
+  }
+
+  .vtk-site-header .nav-links::-webkit-scrollbar-thumb {
+    border-radius: 2px;
+    background: rgba(250, 250, 247, 0.4);
+  }
+}
+
+/* ── Page Structure ──────────────────────────────────────────────────────── */
+
+.fakbar-page-head,
+.fakbar-footer {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  background: var(--navy);
+}
+
+.fakbar-page-head {
+  box-shadow: inset 0 -5px 0 var(--yellow);
+}
+
+.fakbar-page-head-inner,
+.fakbar-page-content {
+  width: 100%;
+  max-width: var(--max);
+  margin: 0 auto;
+  padding-inline: clamp(20px, 3vw, 36px);
+}
+
+.fakbar-page-head-inner {
+  padding-top: clamp(44px, 5vw, 68px);
+  padding-bottom: clamp(40px, 4.5vw, 56px);
+}
+
+.fakbar-page-content {
+  padding-top: clamp(28px, 4vw, 40px);
+  padding-bottom: clamp(64px, 8vw, 96px);
+}
+
+.fakbar-eyebrow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--on-dark-muted);
+  font-size: 13px;
+}
+
+.fakbar-page-head h1 {
+  max-width: 900px;
+  margin: 14px 0 0;
+  color: var(--paper);
+  font-size: clamp(32px, 4.4vw, 56px);
+  font-weight: 600;
+  letter-spacing: -0.03em;
+  line-height: 1.04;
+}
+
+.fakbar-page-intro {
+  max-width: 60ch;
+  margin: 18px 0 0;
+  color: var(--on-dark-muted);
+  font-size: 17px;
+  line-height: 1.6;
+}
+
+/* ── Service cards ───────────────────────────────────────────────────────── */
+
+.fakbar-service-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 18px;
+}
+
+.fakbar-service-card {
+  min-height: 240px;
+  padding: clamp(22px, 3vw, 28px);
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: var(--surface);
+  text-decoration: none;
+  transition:
+    transform 180ms ease,
+    border-color 180ms ease;
+}
+
+.fakbar-service-card:hover {
+  transform: translateY(-3px);
+  border-color: var(--line-2);
+}
+
+.fakbar-service-icon {
+  display: grid;
+  width: 48px;
+  height: 48px;
+  place-items: center;
+  border-radius: 14px;
+  background: var(--ink);
+  color: var(--surface);
+}
+
+/* ── Admin layout ────────────────────────────────────────────────────────── */
+
+.fakbar-admin-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 28px;
+  align-items: start;
+}
+
+@media (min-width: 860px) {
+  .fakbar-admin-layout {
+    grid-template-columns: 220px minmax(0, 1fr);
+    gap: 48px;
+  }
+
+  .fakbar-admin-layout > aside {
+    align-self: stretch;
+  }
+}
+
+/* ── Admin sidebar nav ───────────────────────────────────────────────────── */
+
+.fakbar-admin-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 18px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: var(--surface);
+}
+
+.fakbar-admin-nav a {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  color: var(--body);
+  font-size: 14px;
+  font-weight: 500;
+  text-decoration: none;
+  transition: background 140ms ease, color 140ms ease;
+}
+
+.fakbar-admin-nav a:hover {
+  background: var(--paper);
+  color: var(--ink);
+}
+
+.fakbar-admin-nav a[data-active='true'] {
+  background: var(--ink);
+  color: var(--surface);
+  font-weight: 600;
+}
+
+.fakbar-admin-nav-section {
+  padding: 8px 12px 4px;
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+/* ── Stat cards ──────────────────────────────────────────────────────────── */
+
+.fakbar-stat-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 16px;
+}
+
+.fakbar-stat-card {
+  padding: 20px 22px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--surface);
+}
+
+.fakbar-stat-label {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
+.fakbar-stat-value {
+  margin-top: 6px;
+  color: var(--ink);
+  font-size: 28px;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  line-height: 1;
+}
+
+.fakbar-stat-sub {
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+/* ── Tables / rows ───────────────────────────────────────────────────────── */
+
+.fakbar-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 14px 16px;
+  border: 1px solid var(--line-2);
+  border-radius: 14px;
+  background: var(--surface);
+  transition: border-color 150ms ease, box-shadow 150ms ease;
+}
+
+.fakbar-row:hover {
+  border-color: rgba(10, 10, 10, 0.3);
+  box-shadow: 0 8px 24px rgba(10, 10, 10, 0.06);
+}
+
+/* ── Section heading ─────────────────────────────────────────────────────── */
+
+.fakbar-section-head {
+  margin-bottom: 18px;
+}
+
+.fakbar-section-head h2 {
+  margin: 0;
+  color: var(--ink);
+  font-size: clamp(20px, 2.5vw, 26px);
+  font-weight: 600;
+  letter-spacing: -0.025em;
+}
+
+.fakbar-section-head p {
+  margin: 6px 0 0;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+/* ── Footer ──────────────────────────────────────────────────────────────── */
+
+.fakbar-footer {
+  border-top: 1px solid rgba(255, 255, 255, 0.11);
+}
+
+/* ── Forms ───────────────────────────────────────────────────────────────── */
+
+input,
+textarea,
+select {
+  transition:
+    border-color 150ms ease,
+    box-shadow 150ms ease;
+}
+
+button:not(:disabled),
+[role='button']:not([aria-disabled='true']) {
+  cursor: pointer;
+}
+
+button:disabled {
+  cursor: not-allowed;
+}
+
+input:focus,
+textarea:focus,
+select:focus {
+  outline: none;
+  border-color: var(--navy) !important;
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.22);
+}
+
+/* ── Responsive ──────────────────────────────────────────────────────────── */
+
+@media (max-width: 960px) {
+  .fakbar-service-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .fakbar-service-card {
+    min-height: 0;
+  }
+}
+
+@media print {
+  body > header,
+  body > footer,
+  nav[aria-label='Beheernavigatie'] {
+    display: none !important;
+  }
+
+  [data-print='hide'] {
+    display: none !important;
+  }
+
+  body {
+    background: #fff;
+  }
+}
