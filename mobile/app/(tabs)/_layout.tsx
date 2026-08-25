@@ -1,20 +1,30 @@
 import { Tabs } from 'expo-router';
-import { CalendarDays, House, Info, Sandwich, UserRound } from 'lucide-react-native';
+import { CalendarDays, House, LayoutGrid, Sandwich, Ticket } from 'lucide-react-native';
 
 import { COLORS, FONTS } from '../../src/theme/tokens';
 
 /**
  * De tabbalk: het enige wat deze app echt anders maakt dan de site.
  *
- * Vijf tabs, en dat is een keuze. **Bestellen** staat er apart in omdat het de
- * reden is dat de meeste studenten de app openen; het verstoppen onder Info zou
- * er twee tikken van maken. **Info** draagt de hele CMS-boom (de headertabs uit
- * het beheer), want zonder eigen tab moet die ergens ingeduwd worden waar niemand
- * hem zoekt.
+ * Vijf tabs, en elk daarvan is een van de redenen waarom er een app is:
  *
- * De balk zelf volgt de site: papieren grond, een dunne `--line` bovenrand, en
- * navy voor wat actief is. Geel blijft accent en wordt hier niet als vulling
- * gebruikt.
+ * - **Home** is vandaag: wat is er open, en wat wacht er op mij.
+ * - **Kalender** is wat er te doen is, met een ster om iets in je eigen lijst te
+ *   zetten en in de agenda van je telefoon.
+ * - **Tickets** is kopen én tonen, in twee segmenten. Ze staan samen omdat het in
+ *   het hoofd van wie ze opent één zaak is; ze uit elkaar trekken zou betekenen
+ *   dat je moet weten in welke van twee tabs je moet zijn voor je iets ziet.
+ * - **Broodjes** is bestellen én afhalen, om dezelfde reden.
+ * - **Meer** draagt de hele CMS-boom plus foto's, shiften, piano, de mensen en je
+ *   profiel. Alles wat je opzoekt in plaats van doet.
+ *
+ * Wat er bewust **niet** in staat: een aparte Profiel-tab. Die was een vijfde
+ * plaats waard toen de app vooral de site was; nu is het één rij bovenaan Meer.
+ * De scanknop en je bonnetjes staan bovenaan Home, want die wil je vanaf het
+ * eerste scherm kunnen bereiken zonder eerst ergens in te duiken.
+ *
+ * De balk volgt de site: papieren grond, een dunne `--line` bovenrand, navy voor
+ * wat actief is. Geel blijft accent en wordt hier niet als vulling gebruikt.
  */
 export default function TabsLayout() {
   return (
@@ -44,25 +54,28 @@ export default function TabsLayout() {
         }}
       />
       <Tabs.Screen
-        name="bestellen"
+        name="tickets"
         options={{
-          title: 'Bestellen',
-          tabBarIcon: ({ color, size }) => <Sandwich color={color} size={size} />,
+          title: 'Tickets',
+          tabBarIcon: ({ color, size }) => <Ticket color={color} size={size} />,
         }}
       />
       <Tabs.Screen
-        name="info"
-        options={{ title: 'Info', tabBarIcon: ({ color, size }) => <Info color={color} size={size} /> }}
+        name="broodjes"
+        options={{
+          title: 'Broodjes',
+          tabBarIcon: ({ color, size }) => <Sandwich color={color} size={size} />,
+        }}
       />
       {/* De gedeelde stack met alle doorklikschermen. Hij hoort bij de
           tabnavigator zodat de balk zichtbaar blijft, maar hij is zelf geen tab
           en staat dus niet in de balk. */}
       <Tabs.Screen name="(detail)" options={{ href: null }} />
       <Tabs.Screen
-        name="profiel"
+        name="meer"
         options={{
-          title: 'Profiel',
-          tabBarIcon: ({ color, size }) => <UserRound color={color} size={size} />,
+          title: 'Meer',
+          tabBarIcon: ({ color, size }) => <LayoutGrid color={color} size={size} />,
         }}
       />
     </Tabs>

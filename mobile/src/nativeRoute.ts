@@ -15,8 +15,8 @@
 /** Pad op de site -> route in de app. */
 const NATIVE_ROUTES: Record<string, string> = {
   '/kalender': '/kalender',
-  '/theokot': '/bestellen',
-  '/shop': '/bestellen',
+  '/theokot': '/broodjes',
+  '/shop': '/broodjes',
   '/shift': '/shiften',
   '/piano': '/piano',
   '/praesidium': '/praesidium',
@@ -27,6 +27,9 @@ const NATIVE_ROUTES: Record<string, string> = {
   // `/fotos` is op de site een omleiding naar `/media`; hier komt ze op hetzelfde
   // scherm uit, zodat een oud menu-item niet in een browser eindigt.
   '/fotos': '/media',
+  // De webscanner. Wie de app heeft, hoort niet in een browser te belanden voor
+  // iets waar hier een scherm voor bestaat.
+  '/scan': '/scannen',
 };
 
 /**

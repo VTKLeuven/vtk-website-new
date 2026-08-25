@@ -134,6 +134,12 @@ Expliciet, zodat het niet later alsnog binnensluipt:
   voor wie toevallig rechten heeft;
 - **geen scanner** (die app blijft apart; hoogstens een knop die `vtk-scanner://`
   opent voor wie mag scannen);
+  > **Bijgesteld in fase 6.** De app scant nu wél, en dat is een bewuste
+  > afwijking. Niet omdat de scanner-app tekortschoot, maar omdat de vraag een
+  > andere was: een shifter die één avond komt bijspringen, gaat geen tweede app
+  > installeren. `vtk-scanner-app` blijft wat ze is (offline manifest,
+  > schrijfwachtrij, donker scherm, aan een deur in een kelder); wat hier
+  > bijkwam is de lichte versie voor één avond met het netwerk dat er is.
 - **geen offline-wachtrij.** De scanner heeft SQLite en een flush-lus omdat een
   deur in een kelder staat. Hier volstaat een leescache op schijf: laatst
   opgehaalde inhoud tonen met een "niet vernieuwd"-melding. Iets bestellen of
@@ -489,3 +495,76 @@ het anders misloopt. Tickets die in verkoop gaan, halen die drempel bewust niet.
 |---|---|---|
 | 2026-08-24 | `web: Pushberichten die vanzelf vertrekken, en piano in de app-API` | Broodje-klaar en de shift-herinnering, het beheerscherm, en piano-reservaties uit de action naar `lib/`. Vijf tests op de claim-volgorde (975 in totaal). |
 | 2026-08-24 | `Piano` | Het pianoscherm: een dag is een rij tijdsloten, geel voor wat van jou is, met de naam erbij van wie een uur heeft. |
+
+### Fase 6 - De app wordt een app
+
+De aanleiding: de app was inhoudelijk compleet maar voelde als de site in een
+tabbalk. De hero, de aftermovies, career en de partners stonden vooraan, en wat
+je met een telefoon in je hand doet stond eronder. Deze fase draait dat om.
+
+**De onderbalk werd Home · Kalender · Tickets · Broodjes · Meer.** Elk van die
+vier eerste is een van de redenen waarom er een app is; Meer draagt de CMS-boom,
+de mensen, de piano, de foto's en je profiel. Profiel was een tab en is nu één rij
+bovenaan Meer: je opent het een paar keer per jaar, niet per dag. Tickets en
+Broodjes hebben elk twee segmenten (Kopen/Mijne, Bestellen/Afhalen), want wat je
+aan een balie toont hoort twee tikken ver te zijn.
+
+**Home werd "vandaag".** Een compacte donkere kop met de datum, dan de drie
+diensten met open of dicht en tot hoe laat, dan wat er op jou wacht, dan vier
+snelkoppelingen en wat er deze week te doen is. Aftermovies, career en partners
+zijn eruit; wie de site wil lezen, vindt alles onder Meer. `/api/app/v1/home`
+blijft wel bestaan voor toestellen die nog op de vorige versie zitten.
+
+Site:
+
+- [x] `GET /api/app/v1/vandaag`, met `lib/app-api/serviceStatus.ts` (Brusselse
+      klok, en een dag zonder sluitingsuur zoals de fakbar)
+- [x] `CalendarEventInterest` en `CalendarCategoryFollow` + de ster- en
+      volg-endpoints
+- [x] `AppNotificationPreference` + `GET`/`PATCH /api/app/v1/mijn/meldingen`
+- [x] `ShiftRewardRedemption` + recht `shift.rewardRedeem` + `/mijn/bonnetjes`,
+      `/bonnetjes/pas` en `/bonnetjes/inwisselen`
+- [x] `lib/app-api/tokens.ts`: de pas van een student en de code aan de fakbar
+- [x] `/scan/events` en `/scan/uitnodiging`; scannen zelf blijft op de bestaande
+      route van de webscanner
+- [x] `POST /api/app/v1/fakbar/checkin` + de QR in /admin/fakscanner
+- [x] `lib/theokot-pickup.ts` uit de action; de afhaalbalie herkent nu ook een pas
+- [x] drie pushberichten erbij (broodjes open, nieuw in een gevolgde categorie,
+      herinnering aan wat je aanduidde), alle vier achter een voorkeur
+- [x] `docs/app-api.md` en `docs/design-decisions.md` bijgewerkt
+
+App:
+
+- [x] de nieuwe onderbalk en het nieuwe Home
+- [x] terugknop in `PageHead` op elk doorklikscherm
+- [x] `expo-camera` (de scanner) en `expo-calendar` ("In agenda")
+- [x] ster, "Mijn lijst" en categorieën volgen in de kalender
+- [x] bonnetjes met de pas, en de scanner die vier soorten code herkent
+- [x] meldingenscherm met een schakelaar per soort bericht
+- [ ] met de hand getest op een toestel
+
+**Nieuwe build nodig.** `expo-camera` en `expo-calendar` zijn native; een
+`eas update` volstaat niet. Wie de scanner, "In agenda" of de fakbar-check-in wil
+proberen, heeft een verse APK of development build nodig.
+
+**Nagekeken tegen een draaiende server**, met een lokale beheerder: de pas
+opzoeken en afboeken (inclusief verlopen, vervalst, te veel, en bij jezelf), de
+fakbar-check-in met de bar open en dicht en twee keer op dezelfde bardag, de ster
+aan en uit en de lijst erachter, de meldingsvoorkeuren, en de vier pushberichten
+via `/push/maintenance` (claim gezet, tweede beurt doet niets).
+
+| Datum | Commit | Wat |
+|---|---|---|
+| 2026-08-25 | `web: De app-API voor een app in plaats van een site` | Vandaag-endpoint, interesse en gevolgde categorieën, meldingsvoorkeuren, bonnetjes aan de toog, de twee QR-tokens, scannen en de fakbar-check-in. Drie pushberichten erbij. |
+| 2026-08-25 | `De app wordt een app` | Nieuwe onderbalk, nieuw Home, terugknop overal, camera en agenda. |
+
+**Drie afwijkingen van het oorspronkelijke plan.**
+
+- **A7 zei "geen scanner".** De app scant nu wel. De reden staat bij A7 zelf: een
+  shifter die één avond komt bijspringen, installeert geen tweede app.
+  `vtk-scanner-app` blijft bestaan en blijft de zware versie.
+- **De aftermovies en de partners blijven op de site** en komen niet elders in de
+  app terug. Ze zijn er om een voorpagina te vullen, en dat doet Home niet meer.
+- **De fakbar-QR verloopt niet.** Dat is met opzet: hij hangt maanden aan een
+  muur. Wat hem buiten de bar waardeloos maakt, staat in
+  `docs/design-decisions.md` en zit niet in het token.

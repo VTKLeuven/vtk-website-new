@@ -1,9 +1,9 @@
 import { useRouter } from 'expo-router';
-import { CalendarDays, List } from 'lucide-react-native';
+import { Bell, CalendarDays, List, Star } from 'lucide-react-native';
 import { useMemo, useState } from 'react';
 import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 
-import { fetchCalendar } from '../../src/api/endpoints';
+import { fetchCalendar, setEventInterest } from '../../src/api/endpoints';
 import { messageFor, useResource } from '../../src/api/useResource';
 import { EventRow } from '../../src/components/EventRow';
 import { MonthView } from '../../src/components/MonthView';
@@ -19,6 +19,9 @@ type Weergave = 'lijst' | 'maand';
 
 const VIEW_KEY = 'kalender-weergave';
 
+/** De filterchip die enkel toont wat je zelf aanduidde. */
+const MINE = '__mijn__';
+
 /**
  * De kalender, in twee weergaven.
  *
@@ -33,6 +36,17 @@ const VIEW_KEY = 'kalender-weergave';
  * De twee halen ook andere gegevens op: de lijst vraagt alles vanaf nu, de
  * maandweergave precies het zichtbare rooster, inclusief het verleden. Anders zou
  * bladeren naar vorige maand een leeg rooster geven.
+ *
+ * **De ster is geen inschrijving.** Ze zet een evenement in jouw lijst (de chip
+ * "Mijn lijst") en hangt er de herinnering van de dag ervoor aan. Wat ze niet
+ * doet: een plaats reserveren, een ticket kopen of iemand laten weten dat je
+ * komt. Dat onderscheid is de reden dat ze naast de rij staat en niet de rij zelf
+ * is.
+ *
+ * Naast de ster staat een belknop in de kop: die opent de meldingen, waar je een
+ * categorie kan volgen. Interesse gaat over één evenement, een categorie volgen
+ * over alles wat er nog bij komt; die twee verwarren is de makkelijkste manier om
+ * te veel of te weinig berichten te krijgen.
  */
 export default function KalenderScreen() {
   const router = useRouter();
@@ -51,17 +65,30 @@ export default function KalenderScreen() {
   };
 
   const range = view === 'maand' ? gridRange(anchor) : null;
+  const mine = category === MINE;
 
   const resource = useResource(
     'kalender',
     () =>
       fetchCalendar(locale, {
-        categorie: category ?? undefined,
+        categorie: mine ? undefined : (category ?? undefined),
+        interesse: mine,
         van: range?.from,
         tot: range?.to,
       }),
     `${locale}:${category ?? ''}:${range ? `${range.from}-${range.to}` : 'nu'}`,
   );
+
+  /**
+   * De ster meteen omzetten en pas daarna verversen. Wachten op het rondje zou
+   * betekenen dat een tik op een trage verbinding een seconde lang niets lijkt te
+   * doen, en dan tikt iedereen twee keer.
+   */
+  const toggleInterest = (id: string, next: boolean) => {
+    void setEventInterest(id, next)
+      .catch(() => undefined)
+      .then(() => resource.refresh());
+  };
 
   const events = useMemo(() => resource.data?.events ?? [], [resource.data]);
 
@@ -84,8 +111,20 @@ export default function KalenderScreen() {
       <PageHead
         title="Kalender"
         subtitle="Alles wat er te doen is"
+        back={false}
         right={
-          <View style={styles.toggle}>
+          <View style={styles.headActions}>
+            {viewer ? (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Meldingen instellen"
+                onPress={() => router.push('/meldingen')}
+                hitSlop={10}
+              >
+                <Bell color={COLORS.yellow} size={20} />
+              </Pressable>
+            ) : null}
+            <View style={styles.toggle}>
             <Pressable
               accessibilityRole="button"
               accessibilityState={{ selected: view === 'lijst' }}
@@ -107,6 +146,7 @@ export default function KalenderScreen() {
                 size={17}
               />
             </Pressable>
+            </View>
           </View>
         }
       />
@@ -119,6 +159,14 @@ export default function KalenderScreen() {
           style={styles.chipBar}
         >
           <Chip label="Alles" active={category === null} onPress={() => setCategory(null)} />
+          {viewer ? (
+            <Chip
+              label="Mijn lijst"
+              icon={<Star color={mine ? COLORS.ink : COLORS.body} size={13} fill={mine ? COLORS.ink : 'transparent'} />}
+              active={mine}
+              onPress={() => setCategory(mine ? null : MINE)}
+            />
+          ) : null}
           {categories.map((item) => (
             <Chip
               key={item.slug}
@@ -170,6 +218,9 @@ export default function KalenderScreen() {
                       event={event}
                       locale={locale}
                       onPress={() => router.push(`/evenement/${event.id}`)}
+                      onToggleInterest={
+                        viewer ? (next) => toggleInterest(event.id, next) : undefined
+                      }
                     />
                   ))
                 )}
@@ -184,9 +235,11 @@ export default function KalenderScreen() {
           <Empty
             title="Niets gevonden"
             hint={
-              category
-                ? 'Er staat niets in deze categorie. Zet de filter op Alles om de rest te zien.'
-                : 'Er staat nog niets gepland.'
+              mine
+                ? 'Je hebt nog niets aangeduid. Tik het sterretje bij een evenement en het komt hier te staan.'
+                : category
+                  ? 'Er staat niets in deze categorie. Zet de filter op Alles om de rest te zien.'
+                  : 'Er staat nog niets gepland.'
             }
             action={category ? { label: 'Toon alles', onPress: () => setCategory(null) } : undefined}
           />
@@ -198,6 +251,7 @@ export default function KalenderScreen() {
                 event={event}
                 locale={locale}
                 onPress={() => router.push(`/evenement/${event.id}`)}
+                onToggleInterest={viewer ? (next) => toggleInterest(event.id, next) : undefined}
               />
             ))}
             {viewer && filteredByAudience ? (
@@ -217,10 +271,12 @@ function Chip({
   label,
   active,
   onPress,
+  icon,
 }: {
   label: string;
   active: boolean;
   onPress: () => void;
+  icon?: React.ReactNode;
 }) {
   return (
     <Pressable
@@ -230,6 +286,7 @@ function Chip({
       onPress={onPress}
       style={[styles.chip, active && styles.chipActive]}
     >
+      {icon}
       <Text style={[styles.chipLabel, active && styles.chipLabelActive]}>{label}</Text>
     </Pressable>
   );
@@ -241,6 +298,7 @@ const styles = StyleSheet.create({
 
   // De schakelaar staat in de donkere paginakop, dus de inactieve kant gebruikt
   // de gedempte kleur voor een donkere band.
+  headActions: { flexDirection: 'row', alignItems: 'center', gap: SPACING.md },
   toggle: {
     flexDirection: 'row',
     gap: 2,
@@ -259,6 +317,9 @@ const styles = StyleSheet.create({
   },
   chips: { paddingHorizontal: SPACING.lg, paddingVertical: SPACING.md, gap: SPACING.sm },
   chip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
     borderRadius: RADIUS.pill,
     borderWidth: 1,
     borderColor: COLORS.line2,

@@ -47,6 +47,19 @@
           "photosPermission": "VTK bewaart een foto uit een album in je fotobibliotheek.",
           "isAccessMediaLocationEnabled": false
         }
+      ],
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "VTK gebruikt je camera enkel om een QR-code te scannen: een ticket aan de deur, een uitnodiging om te mogen scannen, de code aan de fakbar of de pas van een student.",
+          "recordAudioAndroid": false
+        }
+      ],
+      [
+        "expo-calendar",
+        {
+          "calendarPermission": "VTK zet een evenement in je agenda wanneer je daarop tikt. Er wordt niets gelezen of gewijzigd zonder dat je het vraagt."
+        }
       ]
     ],
     "extra": {

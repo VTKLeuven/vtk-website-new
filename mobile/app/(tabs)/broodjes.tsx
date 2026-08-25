@@ -1,38 +1,51 @@
 import { Image } from 'expo-image';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { CircleAlert, Info } from 'lucide-react-native';
 import { useCallback, useMemo, useState } from 'react';
 import { Alert, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { ApiError } from '../../src/api/client';
-import type { AppLocale, AppTheokotSession } from '../../src/api/contract';
+import type { AppLocale, AppTheokot, AppTheokotSession } from '../../src/api/contract';
 import { cancelTheokotOrder, fetchTheokot, placeTheokotOrder } from '../../src/api/endpoints';
 import { messageFor, useResource } from '../../src/api/useResource';
 import { PageHead } from '../../src/components/PageHead';
+import { PassCode } from '../../src/components/PassCode';
+import { Segmented } from '../../src/components/Segmented';
 import { Stepper } from '../../src/components/Stepper';
 import { Button, Card, Empty, ErrorState, Loading, StaleNotice } from '../../src/components/ui';
 import { formatDate, formatDay, formatEuro, formatTimeRange } from '../../src/format';
 import { useApp } from '../../src/state/app';
 import { COLORS, RADIUS, SPACING, TYPE } from '../../src/theme/tokens';
+import { useTabParam } from '../../src/useTabParam';
+
+type Tab = 'bestellen' | 'afhalen';
 
 /**
- * Broodjes bestellen bij het Theokot.
+ * Broodjes: bestellen en afhalen.
  *
  * Alle regels staan op de server (`lib/theokot-orders.ts` in vtk-website-new): de
  * ban, het bestelvenster, hoeveel er per bestelling mag en wat er nog is. Dit
  * scherm rekent er wel mee, maar enkel om knoppen uit te schakelen; het beslist
  * niets. Is het hier soepeler dan op de server, dan is dat een bug in dit scherm
  * en geen reden om de server te versoepelen.
+ *
+ * **Afhalen is een eigen segment en geen kaartje onderaan de bestellijst.** Aan
+ * de balie sta je met een rij achter je; dan wil je twee tikken en een code op
+ * het scherm, niet scrollen door het aanbod van morgen. Dezelfde reden waarom
+ * tickets Kopen en Mijne heeft.
  */
-export default function BestellenScreen() {
+export default function BroodjesScreen() {
   const router = useRouter();
+  const params = useLocalSearchParams<{ tab?: string }>();
   const { locale, viewer, gate, refresh: refreshApp } = useApp();
   const resource = useResource('theokot', () => fetchTheokot(locale), locale);
+  const [tab, setTab] = useState<Tab>(params.tab === 'afhalen' ? 'afhalen' : 'bestellen');
+  useTabParam<Tab>(params.tab, ['bestellen', 'afhalen'], setTab);
 
   if (!viewer) {
     return (
       <>
-        <PageHead title="Bestellen" subtitle="Broodjes bij het Theokot" />
+        <PageHead title="Broodjes" subtitle="Bij het Theokot" back={false} />
         <ScrollView contentContainerStyle={styles.content} style={styles.root}>
           <Card>
             <Text style={styles.title}>Log eerst in</Text>
@@ -50,7 +63,7 @@ export default function BestellenScreen() {
   if (gate) {
     return (
       <>
-        <PageHead title="Bestellen" subtitle="Broodjes bij het Theokot" />
+        <PageHead title="Broodjes" subtitle="Bij het Theokot" back={false} />
         <ScrollView contentContainerStyle={styles.content} style={styles.root}>
           <Card featured>
             <Text style={styles.title}>
@@ -76,69 +89,188 @@ export default function BestellenScreen() {
     );
   }
 
-  const { sessions, ban, message, maxItemsPerOrder, maxWeeklySpecialPerOrder } = resource.data;
+  // Enkel wat er af te halen valt hoort in het tweede segment; de rest van de
+  // payload gaat ongewijzigd door naar `Ordering`.
+  const open = resource.data.sessions.filter((session) => session.order !== null);
 
   return (
     <>
-      <PageHead title="Bestellen" subtitle="Broodjes bij het Theokot" />
-      <ScrollView
-        contentContainerStyle={styles.content}
-        style={styles.root}
-        refreshControl={
-          <RefreshControl
-            refreshing={resource.refreshing}
-            onRefresh={() => void resource.refresh()}
-          />
-        }
-      >
-        {resource.stale ? <StaleNotice onRetry={() => void resource.refresh()} /> : null}
+      <PageHead title="Broodjes" subtitle="Bij het Theokot" back={false} />
 
-        {ban ? (
-          <Card featured>
-            <View style={styles.rowIcon}>
-              <CircleAlert color={COLORS.ink} size={18} />
-              <Text style={styles.title}>Tijdelijk geschorst</Text>
+      <Segmented
+        value={tab}
+        onChange={setTab}
+        options={[
+          { value: 'bestellen', label: 'Bestellen' },
+          { value: 'afhalen', label: 'Afhalen', badge: open.length },
+        ]}
+      />
+
+      {tab === 'afhalen' ? (
+        <Pickup sessions={open} locale={locale} onOrder={() => setTab('bestellen')} />
+      ) : (
+        <Ordering
+          data={resource.data}
+          stale={resource.stale}
+          refreshing={resource.refreshing}
+          onRefresh={() => void resource.refresh()}
+          locale={locale}
+          onChanged={() => {
+            void resource.refresh();
+            void refreshApp();
+          }}
+        />
+      )}
+    </>
+  );
+}
+
+/**
+ * Bestellen: het aanbod per verkoopdag.
+ *
+ * Een eigen component en geen tak in een ternary, om dezelfde reden als bij
+ * tickets: twee segmenten zijn twee schermen die toevallig één tab delen, en dat
+ * hoort ook zo te lezen.
+ */
+function Ordering({
+  data,
+  stale,
+  refreshing,
+  onRefresh,
+  locale,
+  onChanged,
+}: {
+  data: AppTheokot;
+  stale: boolean;
+  refreshing: boolean;
+  onRefresh: () => void;
+  locale: AppLocale;
+  onChanged: () => void;
+}) {
+  const { sessions, ban, message, maxItemsPerOrder, maxWeeklySpecialPerOrder } = data;
+
+  return (
+    <ScrollView
+      contentContainerStyle={styles.content}
+      style={styles.root}
+      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+    >
+      {stale ? <StaleNotice onRetry={onRefresh} /> : null}
+
+      {ban ? (
+        <Card featured>
+          <View style={styles.rowIcon}>
+            <CircleAlert color={COLORS.ink} size={18} />
+            <Text style={styles.title}>Tijdelijk geschorst</Text>
+          </View>
+          <Text style={styles.body}>
+            Je kan tot {formatDate(ban.until, locale)} niet bestellen, omdat er bestellingen niet
+            opgehaald zijn. Daarna gaat het vanzelf weer.
+          </Text>
+        </Card>
+      ) : null}
+
+      {message ? (
+        <Card>
+          <View style={styles.rowIcon}>
+            <Info color={COLORS.muted} size={16} />
+            <Text style={styles.kicker}>VAN HET THEOKOT</Text>
+          </View>
+          <Text style={styles.body}>{message}</Text>
+        </Card>
+      ) : null}
+
+      {sessions.length === 0 ? (
+        <Empty
+          title="Geen verkoopdagen open"
+          hint="Er staat nu niets klaar om te bestellen. Het Theokot zet de dagen meestal een paar dagen op voorhand open."
+        />
+      ) : null}
+
+      {sessions.map((session) => (
+        <SessionCard
+          key={session.id}
+          session={session}
+          locale={locale}
+          banned={Boolean(ban)}
+          maxItems={maxItemsPerOrder}
+          maxWeeklySpecial={maxWeeklySpecialPerOrder}
+          onChanged={onChanged}
+        />
+      ))}
+    </ScrollView>
+  );
+}
+
+/**
+ * Afhalen: je bestelling en de code die de balie scant.
+ *
+ * De code vervangt het intikken van je r-nummer. Aan de andere kant staat
+ * dezelfde afhaalbalie als op de site; die herkent een pas aan zijn vorm en zoekt
+ * er dezelfde bestelling mee op (`lib/theokot-pickup.ts`). Er is dus geen tweede
+ * afhaallogica, enkel een derde manier om herkend te worden.
+ *
+ * Wat je betaalt staat erbij, want dat is wat je aan de balie moet klaarleggen.
+ * Heb je genoeg bonnetjes staan, dan zegt de balie het zelf; dat hier beloven zou
+ * betekenen dat de app de regel nabouwt.
+ */
+function Pickup({
+  sessions,
+  locale,
+  onOrder,
+}: {
+  sessions: AppTheokotSession[];
+  locale: AppLocale;
+  onOrder: () => void;
+}) {
+  if (sessions.length === 0) {
+    return (
+      <ScrollView contentContainerStyle={styles.content} style={styles.root}>
+        <Empty
+          title="Niets af te halen"
+          hint="Zodra je iets besteld hebt, staat hier de code die de balie scant."
+          action={{ label: 'Naar het aanbod', onPress: onOrder }}
+        />
+      </ScrollView>
+    );
+  }
+
+  return (
+    <ScrollView contentContainerStyle={styles.content} style={styles.root}>
+      <PassCode caption="Laat dit scannen aan de afhaalbalie van het Theokot." />
+
+      {sessions.map((session) => {
+        const order = session.order;
+        if (!order) return null;
+        return (
+          <Card key={session.id}>
+            <Text style={styles.sessionDay}>{formatDay(session.date, locale)}</Text>
+            <Text style={styles.hint}>
+              Afhalen {formatTimeRange(session.pickupStart, session.pickupEnd, locale)}
+            </Text>
+            <View style={styles.order}>
+              {order.lines.map((line, index) => (
+                <View key={`${line.name}-${index}`} style={styles.orderLine}>
+                  <Text style={styles.orderQty}>{line.quantity}</Text>
+                  <Text style={styles.orderName}>{line.name}</Text>
+                  <Text style={styles.orderPrice}>
+                    {formatEuro(line.quantity * line.unitPriceCents)}
+                  </Text>
+                </View>
+              ))}
+              <View style={styles.orderTotal}>
+                <Text style={styles.title}>Te betalen</Text>
+                <Text style={styles.title}>{formatEuro(order.totalCents)}</Text>
+              </View>
             </View>
-            <Text style={styles.body}>
-              Je kan tot {formatDate(ban.until, locale)} niet bestellen, omdat er bestellingen niet
-              opgehaald zijn. Daarna gaat het vanzelf weer.
+            <Text style={styles.hint}>
+              Je betaalt bij het afhalen. Heb je genoeg bonnetjes staan, dan kan de balie die
+              gebruiken.
             </Text>
           </Card>
-        ) : null}
-
-        {message ? (
-          <Card>
-            <View style={styles.rowIcon}>
-              <Info color={COLORS.muted} size={16} />
-              <Text style={styles.kicker}>VAN HET THEOKOT</Text>
-            </View>
-            <Text style={styles.body}>{message}</Text>
-          </Card>
-        ) : null}
-
-        {sessions.length === 0 ? (
-          <Empty
-            title="Geen verkoopdagen open"
-            hint="Er staat nu niets klaar om te bestellen. Het Theokot zet de dagen meestal een paar dagen op voorhand open."
-          />
-        ) : null}
-
-        {sessions.map((session) => (
-          <SessionCard
-            key={session.id}
-            session={session}
-            locale={locale}
-            banned={Boolean(ban)}
-            maxItems={maxItemsPerOrder}
-            maxWeeklySpecial={maxWeeklySpecialPerOrder}
-            onChanged={() => {
-              void resource.refresh();
-              void refreshApp();
-            }}
-          />
-        ))}
-      </ScrollView>
-    </>
+        );
+      })}
+    </ScrollView>
   );
 }
 

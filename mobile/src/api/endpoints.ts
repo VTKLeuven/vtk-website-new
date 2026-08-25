@@ -2,7 +2,6 @@ import { apiFetch, appApi } from './client';
 import type {
   AppCalendar,
   AppCalendarEventDetail,
-  AppHome,
   AppLocale,
   AppMyOrder,
   AppProfile,
@@ -20,6 +19,17 @@ import type {
   AppPoc,
   AppShifts,
   AppPiano,
+  AppFakCheckin,
+  AppNotificationSettings,
+  AppNotificationTopic,
+  AppPassHolder,
+  AppScanEvent,
+  AppScannerInviteResult,
+  AppTicketScanResult,
+  AppToday,
+  AppVoucherRedeemInput,
+  AppVoucherRedeemResult,
+  AppVouchers,
 } from './contract';
 
 /**
@@ -27,17 +37,20 @@ import type {
  * paden hoeven te weten en de versie op één plek staat (`appApi`).
  */
 
-export function fetchHome(locale: AppLocale): Promise<AppHome> {
-  return apiFetch<AppHome>(appApi('/home', { locale }));
-}
-
 /**
  * De kalender. Zonder `van` vertrekt de lijst vanaf nu; de maandweergave geeft
  * het zichtbare rooster mee, want die toont ook het verleden.
  */
 export function fetchCalendar(
   locale: AppLocale,
-  options: { categorie?: string; audience?: 'all'; van?: string; tot?: string } = {},
+  options: {
+    categorie?: string;
+    audience?: 'all';
+    van?: string;
+    tot?: string;
+    /** Enkel wat je zelf met een ster aanduidde. */
+    interesse?: boolean;
+  } = {},
 ): Promise<AppCalendar> {
   return apiFetch<AppCalendar>(
     appApi('/kalender', {
@@ -46,6 +59,7 @@ export function fetchCalendar(
       audience: options.audience,
       van: options.van,
       tot: options.tot,
+      interesse: options.interesse ? '1' : undefined,
     }),
   );
 }
@@ -191,4 +205,92 @@ export function reservePianoSlot(startsAt: string): Promise<{ startsAt: string; 
 
 export function cancelPianoSlot(id: string): Promise<{ ok: true }> {
   return apiFetch(appApi('/piano/reservatie'), { method: 'DELETE', body: { id } });
+}
+
+// ── Vandaag ─────────────────────────────────────────────────────────────────
+
+/**
+ * Het beginscherm. Bewust een eigen endpoint en niet `/home`: die laatste is de
+ * voorpagina van de site in gegevensvorm en blijft bestaan voor toestellen die
+ * nog op de vorige versie van de app zitten.
+ */
+export function fetchToday(locale: AppLocale): Promise<AppToday> {
+  return apiFetch<AppToday>(appApi('/vandaag', { locale }));
+}
+
+// ── Interesse en gevolgde categorieën ───────────────────────────────────────
+
+export function setEventInterest(id: string, interested: boolean): Promise<{ interested: boolean }> {
+  return apiFetch(appApi(`/kalender/${encodeURIComponent(id)}/interesse`), {
+    method: interested ? 'POST' : 'DELETE',
+  });
+}
+
+export function fetchNotificationSettings(locale: AppLocale): Promise<AppNotificationSettings> {
+  return apiFetch<AppNotificationSettings>(appApi('/mijn/meldingen', { locale }));
+}
+
+type NotificationPatch = { topics: AppNotificationSettings['topics']; followedCategories: string[] };
+
+export function setNotificationTopic(
+  topic: AppNotificationTopic,
+  enabled: boolean,
+): Promise<NotificationPatch> {
+  return apiFetch(appApi('/mijn/meldingen'), { method: 'PATCH', body: { topic, enabled } });
+}
+
+export function setCategoryFollow(category: string, follow: boolean): Promise<NotificationPatch> {
+  return apiFetch(appApi('/mijn/meldingen'), { method: 'PATCH', body: { category, follow } });
+}
+
+// ── Bonnetjes ───────────────────────────────────────────────────────────────
+
+export function fetchVouchers(): Promise<AppVouchers> {
+  return apiFetch<AppVouchers>(appApi('/mijn/bonnetjes'));
+}
+
+/** Wie hoort bij deze pas, en hoeveel staat er open. Nog niets afgeboekt. */
+export function lookupPass(pass: string): Promise<AppPassHolder> {
+  return apiFetch<AppPassHolder>(appApi('/bonnetjes/pas'), { method: 'POST', body: { pass } });
+}
+
+export function redeemVouchers(input: AppVoucherRedeemInput): Promise<AppVoucherRedeemResult> {
+  return apiFetch(appApi('/bonnetjes/inwisselen'), { method: 'POST', body: input });
+}
+
+// ── Scannen ─────────────────────────────────────────────────────────────────
+
+export function fetchScanEvents(locale: AppLocale): Promise<AppScanEvent[]> {
+  return apiFetch<AppScanEvent[]>(appApi('/scan/events', { locale }));
+}
+
+export function redeemScannerInvite(code: string): Promise<AppScannerInviteResult> {
+  return apiFetch(appApi('/scan/uitnodiging'), { method: 'POST', body: { code } });
+}
+
+/**
+ * Een ticket scannen gaat naar de bestaande route van de webscanner en niet naar
+ * `/app/v1`. Dezelfde reden als bij afrekenen en bij inschrijven op een shift:
+ * die route draagt de hele beoordeling (geldig, al gescand, verkeerd evenement,
+ * terugbetaald) plus het scanlogboek, en een wrapper zou daar niets doen dan
+ * doorgeven of, erger, de helft vergeten.
+ *
+ * `clientScanId` maakt de aanroep idempotent: dezelfde id twee keer sturen geeft
+ * hetzelfde antwoord in plaats van een tweede scan. Dat is precies wat je wil
+ * wanneer het netwerk aan een deur wegvalt en de app opnieuw probeert.
+ */
+export function scanTicket(
+  eventId: string,
+  input: { credential: string; clientScanId: string; deviceId: string; clientScannedAt: string },
+): Promise<AppTicketScanResult> {
+  return apiFetch(`/api/tickets/events/${encodeURIComponent(eventId)}/scan`, {
+    method: 'POST',
+    body: input,
+  });
+}
+
+// ── Fakbar ──────────────────────────────────────────────────────────────────
+
+export function fakCheckin(code: string): Promise<AppFakCheckin> {
+  return apiFetch<AppFakCheckin>(appApi('/fakbar/checkin'), { method: 'POST', body: { code } });
 }

@@ -1,38 +1,50 @@
-import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
+import {
+  BookOpen,
+  ChevronRight,
+  Coins,
+  ExternalLink,
+  Images,
+  Music,
+  QrCode,
+  Wrench,
+} from 'lucide-react-native';
 import * as WebBrowser from 'expo-web-browser';
-import { ChevronRight, Play } from 'lucide-react-native';
 import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import type { AppOpeningHours } from '../../src/api/contract';
-import { fetchHome } from '../../src/api/endpoints';
+import { fetchToday, setEventInterest } from '../../src/api/endpoints';
 import { messageFor, useResource } from '../../src/api/useResource';
 import { EventRow } from '../../src/components/EventRow';
-import { Shortcuts } from '../../src/components/Shortcuts';
 import { Prose } from '../../src/components/Prose';
+import { ServiceList } from '../../src/components/ServiceList';
+import { TaskCard } from '../../src/components/TaskCard';
 import { Button, Card, ErrorState, Loading, StaleNotice } from '../../src/components/ui';
 import { useApp } from '../../src/state/app';
-import { COLORS, DARK_GLASS, FONTS, RADIUS, SPACING, TYPE } from '../../src/theme/tokens';
+import { COLORS, RADIUS, SPACING, TYPE } from '../../src/theme/tokens';
 
 /**
- * Home.
+ * Home: **vandaag**.
  *
- * Het enige scherm met een fotohero in plaats van de donkere paginakop; op de
- * site is de homepage ook de enige die dat mag. De ritmiek van de site komt
- * terug als stapel: hero, openingsuren op een navy band, evenementen op papier,
- * career weer navy, jouw POC's, partners.
+ * Dit scherm beantwoordt de twee vragen waarmee iemand de app opent: *wat is er
+ * open* en *wat wacht er op mij*. In die volgorde, allebei boven de vouw.
  *
- * De sectie **Jouw POC's** staat bewust helemaal onderaan en niet tussen twee
- * donkere banden. Ze verschijnt enkel voor een ingelogd lid met studierichtingen,
- * en zat ze ertussen, dan zouden die twee banden tegen elkaar botsen zodra ze
- * wegvalt. Dezelfde reden als op de site.
+ * De vorige versie was de voorpagina van de site: fotohero, aftermovies, career,
+ * partners, en jouw broodje ergens onderaan. Dat is een goede voorpagina en een
+ * slecht beginscherm; op een telefoon open je de app niet om te lezen wat VTK
+ * doet, maar om iets te doen. De hero is daarom een compacte donkere kop met de
+ * datum, en aftermovies, career en partners staan er niet meer in. Wie de site
+ * wil lezen, vindt alles onder Meer.
+ *
+ * Wat er wél bleef van het ontwerp van de site: de donkere kop met de gele
+ * onderlijn, de witte kaarten met dunne rand op papieren grond, de gele rail voor
+ * wat dringend is, en geel enkel als accent.
  */
 export default function HomeScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { locale, viewer, gate, bootstrap } = useApp();
-  const resource = useResource('home', () => fetchHome(locale), locale);
+  const { locale, viewer, gate, refresh: refreshApp } = useApp();
+  const resource = useResource('vandaag', () => fetchToday(locale), locale);
 
   if (resource.loading) return <Loading label="VTK openen" />;
   if (!resource.data) {
@@ -41,25 +53,65 @@ export default function HomeScreen() {
     );
   }
 
-  const home = resource.data;
-  const firstName = viewer?.name.split(' ')[0];
+  const today = resource.data;
+
+  /**
+   * De ster meteen omzetten en pas daarna verversen. Wachten op het rondje zou
+   * betekenen dat een tik op een trage verbinding een seconde lang niets lijkt te
+   * doen, en dan tikt iedereen twee keer.
+   */
+  const toggleInterest = (id: string, next: boolean) => {
+    void setEventInterest(id, next)
+      .catch(() => undefined)
+      .then(() => resource.refresh());
+  };
+
+  const dayLabel = new Intl.DateTimeFormat(locale === 'en' ? 'en-GB' : 'nl-BE', {
+    timeZone: 'Europe/Brussels',
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+  }).format(new Date(today.now));
 
   return (
     <View style={styles.root}>
-      {/* De hero staat buiten de scroll, net als `PageHead` op elk ander scherm.
-          Zat hij erbinnen, dan kon je hem naar beneden trekken en verscheen er
-          een lege strook boven de foto; dat gebeurt nergens anders in de app. */}
-      <View style={styles.hero}>
-        {home.heroPhotoUrl ? (
-          <Image source={{ uri: home.heroPhotoUrl }} style={styles.heroPhoto} contentFit="cover" />
-        ) : null}
-        <View style={styles.heroScrim} />
-        <View style={[styles.heroText, { paddingTop: insets.top + SPACING.lg }]}>
-          <Text style={styles.heroKicker}>VTK LEUVEN</Text>
-          <Text style={styles.heroTitle}>
-            {firstName ? `Dag ${firstName}, ` : ''}
-            <Text style={styles.heroAccent}>welkom</Text>
-          </Text>
+      {/* De donkere kop staat buiten de scroll, net als `PageHead` elders. Zat hij
+          erbinnen, dan kon je hem naar beneden trekken en verscheen er een lege
+          strook; dat gebeurt nergens anders in de app. */}
+      <View style={[styles.head, { paddingTop: insets.top + SPACING.lg }]}>
+        <View style={styles.headRow}>
+          <View style={styles.headText}>
+            <Text style={styles.kicker}>{dayLabel.toUpperCase()}</Text>
+            <Text style={styles.title}>
+              {today.greetingName ? `Dag ${today.greetingName}` : 'VTK Leuven'}
+            </Text>
+          </View>
+
+          {viewer ? (
+            <View style={styles.headActions}>
+              {today.canScanTickets || today.canAcceptVouchers ? (
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel="Een code scannen"
+                  onPress={() => router.push('/scannen')}
+                  hitSlop={10}
+                  style={({ pressed }) => [styles.headButton, pressed && styles.pressedDark]}
+                >
+                  <QrCode color={COLORS.yellow} size={20} />
+                </Pressable>
+              ) : null}
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={`Bonnetjes, ${today.vouchers ?? 0} openstaand`}
+                onPress={() => router.push('/bonnetjes')}
+                hitSlop={10}
+                style={({ pressed }) => [styles.coins, pressed && styles.pressedDark]}
+              >
+                <Coins color={COLORS.yellow} size={16} />
+                <Text style={styles.coinsValue}>{today.vouchers ?? 0}</Text>
+              </Pressable>
+            </View>
+          ) : null}
         </View>
       </View>
 
@@ -71,261 +123,168 @@ export default function HomeScreen() {
         refreshControl={
           <RefreshControl
             refreshing={resource.refreshing}
-            onRefresh={() => void resource.refresh()}
+            onRefresh={() => {
+              void resource.refresh();
+              void refreshApp();
+            }}
           />
         }
       >
-      <View style={styles.stack}>
-        {gate ? (
-          <View style={styles.paperBlock}>
-            <Card featured>
-              <Text style={styles.cardTitle}>
-                {gate === 'onboarding' ? 'Werk je profiel af' : 'Bevestig je studie'}
-              </Text>
-              <Text style={styles.cardBody}>
-                {gate === 'onboarding'
-                  ? 'Nog een paar gegevens en je account is klaar. Zonder dat blijven bestellen en tickets gesloten.'
-                  : 'Elk werkingsjaar geef je opnieuw op wat je studeert. Dat houdt de mailinglijsten en de cursusdienst kloppend.'}
-              </Text>
-              <Button
-                label="Nu doen"
-                onPress={() => router.push({ pathname: '/poort', params: { gate } })}
-              />
-            </Card>
-          </View>
+        {/* Openingsuren eerst. Het is de vraag die het vaakst gesteld wordt, en de
+            enige reden waarom sommigen de app überhaupt openen. */}
+        <Section title="Nu open">
+          <ServiceList services={today.services} />
+        </Section>
+
+        {today.tasks.length > 0 ? (
+          <Section title="Voor jou">
+            <View style={styles.stack}>
+              {today.tasks.map((task, index) => (
+                <TaskCard key={`${task.kind}-${task.at ?? index}`} task={task} />
+              ))}
+            </View>
+          </Section>
         ) : null}
 
-        <View style={styles.paperBlock}>
-          <Shortcuts />
-        </View>
+        <Section>
+          <Shortcuts
+            onOpen={(route) => router.push(route as never)}
+            onExternal={(url) => void WebBrowser.openBrowserAsync(url)}
+          />
+        </Section>
 
-        {bootstrap?.announcement ? (
-          <View style={styles.paperBlock}>
+        {today.announcement ? (
+          <Section>
             <Card>
-              <Text style={styles.kicker}>AANKONDIGING</Text>
-              <Text style={styles.cardTitle}>{bootstrap.announcement.title}</Text>
-              <Prose>{bootstrap.announcement.body}</Prose>
+              <Text style={styles.announceKicker}>AANKONDIGING</Text>
+              <Text style={styles.cardTitle}>{today.announcement.title}</Text>
+              <Prose>{today.announcement.body}</Prose>
+              {today.announcement.ctaUrl ? (
+                <Button
+                  label={today.announcement.ctaLabel ?? 'Meer weten'}
+                  variant="ghost"
+                  onPress={() =>
+                    void WebBrowser.openBrowserAsync(today.announcement!.ctaUrl as string)
+                  }
+                />
+              ) : null}
             </Card>
-          </View>
+          </Section>
         ) : null}
 
-        {/* Openingsuren: een navy band, zoals op de site meteen onder de hero. */}
-        <View style={styles.bandDark}>
-          <Text style={styles.bandTitleDark}>Openingsuren</Text>
-          <View style={styles.hoursRow}>
-            <HoursPanel hours={home.openingHours.theokot} />
-            <HoursPanel hours={home.openingHours.cursusdienst} />
-            <HoursPanel
-              hours={home.openingHours.elixir}
-              // De live geluidsstatus van 't ElixIr wint van het uurrooster, maar
-              // enkel als de meting vers is: een verouderde "open" is erger dan
-              // geen antwoord.
-              live={
-                home.barStatus && !home.barStatus.stale
-                  ? home.barStatus.isOpen
-                    ? 'Nu open'
-                    : 'Nu gesloten'
-                  : null
-              }
-            />
-          </View>
-        </View>
-
-        {home.upcomingEvents.length > 0 ? (
-          <View style={styles.bandTint}>
+        {today.upcomingEvents.length > 0 ? (
+          <View style={styles.band}>
             <View style={styles.bandHead}>
-              <Text style={styles.bandTitle}>Opkomende evenementen</Text>
+              <Text style={styles.sectionTitle}>Binnenkort</Text>
               <Pressable
                 accessibilityRole="button"
-                accessibilityLabel="Alle evenementen"
+                accessibilityLabel="Naar de kalender"
                 onPress={() => router.push('/kalender')}
                 style={styles.more}
               >
-                <Text style={styles.moreText}>alles</Text>
+                <Text style={styles.moreText}>kalender</Text>
                 <ChevronRight color={COLORS.muted} size={16} />
               </Pressable>
             </View>
-            <View style={styles.list}>
-              {home.upcomingEvents.map((event) => (
+            <View style={styles.stack}>
+              {today.upcomingEvents.map((event) => (
                 <EventRow
                   key={event.id}
                   event={event}
                   locale={locale}
                   onPress={() => router.push(`/evenement/${event.id}`)}
+                  onToggleInterest={
+                    viewer ? (next) => toggleInterest(event.id, next) : undefined
+                  }
                 />
               ))}
-            </View>
-          </View>
-        ) : null}
-
-        {home.aftermovies.length > 0 ? (
-          <View style={styles.bandDark}>
-            <Text style={styles.bandTitleDark}>Aftermovies</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.movies}>
-              {home.aftermovies.map((movie) => (
-                <Pressable
-                  key={movie.id}
-                  accessibilityRole="button"
-                  accessibilityLabel={`Bekijk ${movie.title}`}
-                  onPress={() => void WebBrowser.openBrowserAsync(movie.externalUrl)}
-                  style={styles.movie}
-                >
-                  {movie.posterUrl ? (
-                    <Image
-                      source={{ uri: movie.posterUrl }}
-                      style={styles.moviePoster}
-                      contentFit="cover"
-                    />
-                  ) : (
-                    <View style={[styles.moviePoster, styles.moviePosterEmpty]} />
-                  )}
-                  <View style={styles.moviePlay}>
-                    <Play color={COLORS.ink} size={16} fill={COLORS.ink} />
-                  </View>
-                  <Text style={styles.movieTitle} numberOfLines={2}>
-                    {movie.title}
-                  </Text>
-                </Pressable>
-              ))}
-            </ScrollView>
-          </View>
-        ) : null}
-
-        {home.career ? (
-          <View style={styles.bandDark}>
-            <Text style={styles.bandTitleDark}>{home.career.title}</Text>
-            <Text style={styles.bandBodyDark}>{home.career.body}</Text>
-            {home.career.ctaUrl ? (
-              <View style={styles.bandAction}>
-                <Button
-                  label={home.career.ctaLabel ?? 'Meer weten'}
-                  onDark
-                  onPress={() => void WebBrowser.openBrowserAsync(home.career!.ctaUrl as string)}
-                />
-              </View>
-            ) : null}
-          </View>
-        ) : null}
-
-        {home.pocs.length > 0 ? (
-          <View style={styles.bandTint}>
-            <View style={styles.bandHead}>
-              <Text style={styles.bandTitle}>Jouw POC{"'"}s</Text>
-              {/* Dezelfde "bekijk alles" als op de site: wie de POC van een
-                  andere richting zoekt, geraakt er anders nergens. */}
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel="Alle POC's"
-                onPress={() => router.push('/pocs')}
-                style={styles.more}
-              >
-                <Text style={styles.moreText}>alles</Text>
-                <ChevronRight color={COLORS.muted} size={16} />
-              </Pressable>
-            </View>
-            <View style={styles.list}>
-              {home.pocs.map((poc) => (
-                <Card key={poc.id}>
-                  <Text style={styles.cardTitle}>{poc.name}</Text>
-                  {poc.email ? <Text style={styles.hint}>{poc.email}</Text> : null}
-                  <View style={styles.people}>
-                    {poc.people.map((person, index) => (
-                      <View key={`${person.name}-${index}`} style={styles.person}>
-                        {person.avatarUrl ? (
-                          <Image
-                            source={{ uri: person.avatarUrl }}
-                            style={styles.avatar}
-                            contentFit="cover"
-                          />
-                        ) : (
-                          <View style={[styles.avatar, styles.avatarEmpty]} />
-                        )}
-                        <View style={styles.personText}>
-                          <Text style={styles.personName}>{person.name}</Text>
-                          {person.role ? <Text style={styles.hint}>{person.role}</Text> : null}
-                        </View>
-                      </View>
-                    ))}
-                  </View>
-                </Card>
-              ))}
-            </View>
-          </View>
-        ) : null}
-
-        {home.partners.length > 0 ? (
-          <View style={styles.paperBlock}>
-            <Text style={styles.bandTitle}>Hoofdpartners</Text>
-            <View style={styles.partners}>
-              {home.partners.map((partner) =>
-                partner.logoUrl ? (
-                  <Pressable
-                    key={partner.id}
-                    accessibilityRole={partner.url ? 'link' : 'image'}
-                    accessibilityLabel={partner.name}
-                    disabled={!partner.url}
-                    onPress={() => void WebBrowser.openBrowserAsync(partner.url as string)}
-                    style={styles.partner}
-                  >
-                    <Image
-                      source={{ uri: partner.logoUrl }}
-                      style={styles.partnerLogo}
-                      contentFit="contain"
-                    />
-                  </Pressable>
-                ) : null,
-              )}
             </View>
           </View>
         ) : null}
 
         {!viewer ? (
-          <View style={styles.paperBlock}>
+          <Section>
             <Card>
               <Text style={styles.cardTitle}>Log in met je VTK-account</Text>
               <Text style={styles.cardBody}>
-                Zonder inloggen kan je alles lezen. Bestellen, tickets en je profiel vragen een
-                account.
+                Zonder inloggen kan je alles lezen. Broodjes, tickets, je bonnetjes en je shiften
+                vragen een account; hetzelfde als op de site, KU Leuven-login inbegrepen.
               </Text>
               <Button label="Inloggen" onPress={() => router.push('/inloggen')} />
             </Card>
-          </View>
+          </Section>
         ) : null}
-      </View>
+
+        {viewer && !gate && today.tasks.length === 0 ? (
+          <Section>
+            <Text style={styles.quiet}>
+              Er wacht niets op je. Wat je bestelt of koopt, verschijnt hier vanzelf.
+            </Text>
+          </Section>
+        ) : null}
       </ScrollView>
     </View>
   );
 }
 
-/**
- * Eén dienst met zijn uren. Dag en uur staan als twee kolommen naast elkaar en
- * niet als "maandag 12:00-16:00" in één string: dat is de regel over gelabelde
- * kolommen uit CLAUDE.md, en met een rooster is ze meteen zichtbaar.
- */
-function HoursPanel({ hours, live }: { hours: AppOpeningHours; live?: string | null }) {
+function Section({ title, children }: { title?: string; children: React.ReactNode }) {
   return (
-    <View style={styles.hoursPanel}>
-      <Text style={styles.hoursName}>{hours.name}</Text>
+    <View style={styles.section}>
+      {title ? <Text style={styles.sectionTitle}>{title}</Text> : null}
+      {children}
+    </View>
+  );
+}
 
-      {hours.unavailable ? (
-        <Text style={styles.hoursMuted}>Uren niet beschikbaar</Text>
-      ) : (
-        <>
-          <Text style={live || hours.openNow ? styles.hoursOpen : styles.hoursMuted}>
-            {live ?? (hours.openNow ? 'Nu open' : 'Nu gesloten')}
+/**
+ * De vier dingen die geen eigen tab hebben maar wel vaak gebruikt worden, plus de
+ * twee die de app verlaten.
+ *
+ * Cursusdienst en tijdsloten draaien op Cudi en niet op deze site, dus die
+ * krijgen het pijltje naar buiten: je hoort te weten dat je in een browser
+ * terechtkomt voor je tikt, niet erna. Burgieclan idem.
+ */
+const CUDI = 'https://cudi.vtk.be';
+
+function Shortcuts({
+  onOpen,
+  onExternal,
+}: {
+  onOpen: (route: string) => void;
+  onExternal: (url: string) => void;
+}) {
+  const items = [
+    { key: 'shiften', label: 'Shiften', icon: <Wrench color={COLORS.navy} size={20} />, to: '/shiften' },
+    { key: 'media', label: "Foto's", icon: <Images color={COLORS.navy} size={20} />, to: '/media' },
+    { key: 'piano', label: 'Piano', icon: <Music color={COLORS.navy} size={20} />, to: '/piano' },
+    {
+      key: 'cursusdienst',
+      label: 'Cursusdienst',
+      icon: <BookOpen color={COLORS.navy} size={20} />,
+      to: `${CUDI}/vtk/shop`,
+      external: true,
+    },
+  ];
+
+  return (
+    <View style={styles.tiles}>
+      {items.map((item) => (
+        <Pressable
+          key={item.key}
+          accessibilityRole="button"
+          accessibilityLabel={item.external ? `${item.label}, opent cudi.vtk.be` : item.label}
+          onPress={() => (item.external ? onExternal(item.to) : onOpen(item.to))}
+          style={({ pressed }) => [styles.tile, pressed && styles.tilePressed]}
+        >
+          <View style={styles.tileTop}>
+            {item.icon}
+            {item.external ? <ExternalLink color={COLORS.muted} size={12} /> : null}
+          </View>
+          <Text style={styles.tileLabel} numberOfLines={1}>
+            {item.label}
           </Text>
-          {hours.entries.map((entry) => (
-            <View key={entry.day} style={styles.hoursLine}>
-              <Text style={styles.hoursDay} numberOfLines={1}>
-                {entry.day}
-              </Text>
-              <Text style={styles.hoursValue} numberOfLines={1}>
-                {entry.hours}
-              </Text>
-            </View>
-          ))}
-        </>
-      )}
+        </Pressable>
+      ))}
     </View>
   );
 }
@@ -335,86 +294,71 @@ const styles = StyleSheet.create({
   scroll: { flex: 1 },
   content: { paddingBottom: SPACING.xxl },
 
-  // Lager dan toen hij meescrolde: een vaste kop neemt zijn hoogte permanent in,
-  // en 240 punten hero op een telefoon laat weinig over voor de inhoud.
-  hero: { backgroundColor: COLORS.navy, minHeight: 180, justifyContent: 'flex-end' },
-  heroPhoto: { ...StyleSheet.absoluteFillObject },
-  // Het scrim van de site: het zwaarst waar de tekst staat.
-  heroScrim: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(14, 26, 54, 0.58)' },
-  heroText: { padding: SPACING.lg, gap: SPACING.sm },
-  heroKicker: { ...TYPE.kicker, color: COLORS.yellow },
-  heroTitle: { fontFamily: FONTS.bold, fontSize: 32, lineHeight: 38, color: COLORS.onDark },
-  heroAccent: { fontFamily: FONTS.serifItalic, color: COLORS.yellow, fontSize: 34 },
-
-  stack: { gap: 0 },
-  paperBlock: { padding: SPACING.lg, gap: SPACING.md },
-
-  bandDark: { backgroundColor: COLORS.navy, padding: SPACING.lg, gap: SPACING.md },
-  bandTint: { backgroundColor: COLORS.paper2, padding: SPACING.lg, gap: SPACING.md },
-  bandHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  bandTitle: { ...TYPE.sectionTitle, color: COLORS.ink },
-  bandTitleDark: { ...TYPE.sectionTitle, color: COLORS.onDark },
-  bandBodyDark: { ...TYPE.body, color: COLORS.onDarkMuted },
-  bandAction: { alignItems: 'flex-start' },
-  more: { flexDirection: 'row', alignItems: 'center', gap: 2 },
-  moreText: { ...TYPE.small, color: COLORS.muted },
-  list: { gap: SPACING.md },
-
-  // Op een donkere band zijn panelen dark glass, geen tweede blok navy.
-  hoursRow: { gap: SPACING.md },
-  hoursPanel: {
-    backgroundColor: DARK_GLASS.background,
-    borderWidth: 1,
-    borderColor: DARK_GLASS.border,
-    borderRadius: RADIUS.md,
-    padding: SPACING.lg,
-    gap: 2,
+  head: {
+    backgroundColor: COLORS.navy,
+    paddingHorizontal: SPACING.lg,
+    paddingBottom: SPACING.lg,
+    borderBottomWidth: 3,
+    borderBottomColor: COLORS.yellow,
   },
-  hoursName: { ...TYPE.cardTitle, color: COLORS.onDark, marginBottom: SPACING.xs },
-  hoursOpen: { ...TYPE.small, color: COLORS.yellow, marginBottom: SPACING.sm },
-  hoursMuted: { ...TYPE.small, color: COLORS.onDarkMuted, marginBottom: SPACING.sm },
-  hoursLine: { flexDirection: 'row', justifyContent: 'space-between', gap: SPACING.md },
-  hoursDay: { ...TYPE.small, color: COLORS.onDarkMuted, flex: 1 },
-  hoursValue: { ...TYPE.small, color: COLORS.onDark },
-
-  movies: { gap: SPACING.md, paddingRight: SPACING.lg },
-  movie: { width: 200, gap: SPACING.sm },
-  moviePoster: { width: 200, height: 112, borderRadius: RADIUS.sm, backgroundColor: COLORS.ink },
-  moviePosterEmpty: { borderWidth: 1, borderColor: DARK_GLASS.border },
-  moviePlay: {
-    position: 'absolute',
-    left: SPACING.sm,
-    top: SPACING.sm,
-    width: 30,
-    height: 30,
+  headRow: { flexDirection: 'row', alignItems: 'flex-end', gap: SPACING.md },
+  headText: { flex: 1, gap: SPACING.xs },
+  headActions: { flexDirection: 'row', alignItems: 'center', gap: SPACING.sm },
+  headButton: {
+    width: 38,
+    height: 38,
     borderRadius: RADIUS.pill,
-    backgroundColor: COLORS.yellow,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.18)',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  movieTitle: { ...TYPE.small, color: COLORS.onDark },
+  coins: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    height: 38,
+    paddingHorizontal: SPACING.md,
+    borderRadius: RADIUS.pill,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.18)',
+  },
+  coinsValue: { ...TYPE.body, fontFamily: TYPE.cardTitle.fontFamily, color: COLORS.onDark },
+  pressedDark: { opacity: 0.6 },
+  kicker: { ...TYPE.kicker, color: COLORS.yellow },
+  title: { ...TYPE.pageTitle, color: COLORS.onDark },
 
-  people: { gap: SPACING.md, marginTop: SPACING.sm },
-  person: { flexDirection: 'row', alignItems: 'center', gap: SPACING.md },
-  personText: { flex: 1 },
-  personName: { ...TYPE.body, color: COLORS.ink },
-  avatar: { width: 40, height: 40, borderRadius: RADIUS.pill, backgroundColor: COLORS.paper2 },
-  avatarEmpty: { borderWidth: 1, borderColor: COLORS.line },
+  section: { padding: SPACING.lg, paddingBottom: 0, gap: SPACING.md },
+  sectionTitle: { ...TYPE.sectionTitle, color: COLORS.ink },
+  stack: { gap: SPACING.sm },
 
-  partners: { flexDirection: 'row', flexWrap: 'wrap', gap: SPACING.md },
-  partner: {
-    width: '30%',
-    aspectRatio: 1.8,
+  band: {
+    marginTop: SPACING.lg,
+    backgroundColor: COLORS.paper2,
+    padding: SPACING.lg,
+    gap: SPACING.md,
+  },
+  bandHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  more: { flexDirection: 'row', alignItems: 'center', gap: 2 },
+  moreText: { ...TYPE.small, color: COLORS.muted },
+
+  tiles: { flexDirection: 'row', gap: SPACING.sm },
+  tile: {
+    flex: 1,
+    aspectRatio: 1,
     backgroundColor: COLORS.surface,
-    borderRadius: RADIUS.sm,
+    borderRadius: RADIUS.md,
     borderWidth: 1,
     borderColor: COLORS.line,
-    padding: SPACING.sm,
+    padding: SPACING.md,
+    justifyContent: 'space-between',
   },
-  partnerLogo: { width: '100%', height: '100%' },
+  tilePressed: { backgroundColor: COLORS.paper2 },
+  tileTop: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between' },
+  tileLabel: { ...TYPE.small, fontFamily: TYPE.cardTitle.fontFamily, color: COLORS.ink },
 
-  kicker: { ...TYPE.kicker, color: COLORS.muted },
+  announceKicker: { ...TYPE.kicker, color: COLORS.muted },
   cardTitle: { ...TYPE.cardTitle, color: COLORS.ink },
   cardBody: { ...TYPE.body, color: COLORS.body },
-  hint: { ...TYPE.small, color: COLORS.muted },
+  quiet: { ...TYPE.small, color: COLORS.muted },
 });

@@ -1,18 +1,21 @@
 import { Image } from 'expo-image';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
-import { ArrowLeft, CalendarDays, MapPin } from 'lucide-react-native';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ArrowLeft, CalendarDays, CalendarPlus, MapPin, Star, Users } from 'lucide-react-native';
+import { useState } from 'react';
+import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { baseUrl } from '../../../../src/api/client';
-import { fetchCalendarEvent } from '../../../../src/api/endpoints';
+import { fetchCalendarEvent, setEventInterest } from '../../../../src/api/endpoints';
 import { messageFor, useResource } from '../../../../src/api/useResource';
 import { Prose } from '../../../../src/components/Prose';
 import { Button, Card, ErrorState, Loading } from '../../../../src/components/ui';
+import { addEventToDeviceCalendar, addResultMessage } from '../../../../src/deviceCalendar';
 import { formatEventWhen } from '../../../../src/format';
+import { markdownToPlainText } from '../../../../src/markdown';
 import { useApp } from '../../../../src/state/app';
-import { COLORS, SPACING, TYPE } from '../../../../src/theme/tokens';
+import { COLORS, RADIUS, SPACING, TYPE } from '../../../../src/theme/tokens';
 
 /**
  * Eén evenement.
@@ -24,12 +27,24 @@ import { COLORS, SPACING, TYPE } from '../../../../src/theme/tokens';
  * Tickets openen het native verkoopscherm. Inschrijven gaat nog naar de site: een
  * formulier met eigen validatie is fase 4 werk, en een knop naar de echte pagina
  * is tot dan eerlijker dan geen knop.
+ *
+ * Twee knoppen die enkel een app kan hebben, en dus precies de reden dat dit
+ * scherm bestaat naast de website:
+ *
+ * - **De ster** zet dit in je eigen lijst en levert de herinnering een dag
+ *   vooraf. Het is geen inschrijving; de tekst eronder zegt dat ook, want een
+ *   sterretje dat aanvoelt als een plaats reserveren is een misverstand met
+ *   gevolgen.
+ * - **In agenda** schrijft de afspraak in de agenda van je telefoon, met plaats
+ *   en een herinnering. Dat is iets anders dan de ICS-feed op de site: die
+ *   abonneert je op álles, dit is dit ene ding.
  */
 export default function EventScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { locale } = useApp();
+  const { locale, viewer } = useApp();
   const { id } = useLocalSearchParams<{ id: string }>();
+  const [addingToCalendar, setAddingToCalendar] = useState(false);
 
   const resource = useResource(
     `evenement:${id}`,
@@ -45,6 +60,33 @@ export default function EventScreen() {
   }
 
   const event = resource.data;
+
+  const toggleInterest = () => {
+    void setEventInterest(event.id, !event.interested)
+      .catch(() => undefined)
+      .then(() => resource.refresh());
+  };
+
+  const addToCalendar = async () => {
+    setAddingToCalendar(true);
+    try {
+      const result = await addEventToDeviceCalendar({
+        title: event.title,
+        start: event.start,
+        end: event.end,
+        allDay: event.allDay,
+        location: event.location,
+        notes: event.description ? markdownToPlainText(event.description).slice(0, 600) : null,
+      });
+      if (result.ok) {
+        Alert.alert('In je agenda gezet', `De afspraak staat in ${result.calendarTitle}.`);
+      } else {
+        Alert.alert('Niet gelukt', addResultMessage(result));
+      }
+    } finally {
+      setAddingToCalendar(false);
+    }
+  };
 
   return (
     <ScrollView style={styles.root} contentContainerStyle={styles.content}>
@@ -84,6 +126,61 @@ export default function EventScreen() {
           ) : null}
         </Card>
 
+        <View style={styles.actions}>
+          {viewer ? (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityState={{ selected: event.interested }}
+              accessibilityLabel={
+                event.interested ? 'Uit mijn lijst halen' : 'In mijn lijst zetten'
+              }
+              onPress={toggleInterest}
+              style={({ pressed }) => [
+                styles.action,
+                event.interested && styles.actionActive,
+                pressed && styles.actionPressed,
+              ]}
+            >
+              <Star
+                color={event.interested ? COLORS.ink : COLORS.navy}
+                fill={event.interested ? COLORS.ink : 'transparent'}
+                size={18}
+              />
+              <Text style={styles.actionLabel}>
+                {event.interested ? 'In mijn lijst' : 'Ik ga misschien'}
+              </Text>
+            </Pressable>
+          ) : null}
+
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="In de agenda van mijn telefoon zetten"
+            disabled={addingToCalendar}
+            onPress={() => void addToCalendar()}
+            style={({ pressed }) => [styles.action, pressed && styles.actionPressed]}
+          >
+            <CalendarPlus color={COLORS.navy} size={18} />
+            <Text style={styles.actionLabel}>In agenda</Text>
+          </Pressable>
+        </View>
+
+        {viewer && event.interested ? (
+          <Text style={styles.note}>
+            Je krijgt een dag vooraf een bericht. Dit is geen inschrijving en geen ticket.
+          </Text>
+        ) : null}
+
+        {event.interestedCount > 0 ? (
+          <View style={styles.interestRow}>
+            <Users color={COLORS.muted} size={15} />
+            <Text style={styles.note}>
+              {event.interestedCount === 1
+                ? 'Eén lid duidde dit aan'
+                : `${event.interestedCount} leden duidden dit aan`}
+            </Text>
+          </View>
+        ) : null}
+
         {event.description ? (
           <Card>
             <Prose>{event.description}</Prose>
@@ -91,7 +188,7 @@ export default function EventScreen() {
         ) : null}
 
         {event.ticketSlug ? (
-          <Button label="Tickets" onPress={() => router.push(`/tickets/${event.ticketSlug}`)} />
+          <Button label="Tickets" onPress={() => router.push(`/ticket/${event.ticketSlug}`)} />
         ) : null}
         {event.formSlug ? (
           <Button
@@ -129,4 +226,24 @@ const styles = StyleSheet.create({
   body: { padding: SPACING.lg, gap: SPACING.md },
   fact: { flexDirection: 'row', alignItems: 'flex-start', gap: SPACING.md },
   factText: { ...TYPE.body, color: COLORS.ink, flex: 1 },
+
+  actions: { flexDirection: 'row', gap: SPACING.sm },
+  action: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: SPACING.sm,
+    minHeight: 46,
+    paddingHorizontal: SPACING.md,
+    borderRadius: RADIUS.pill,
+    borderWidth: 1,
+    borderColor: COLORS.line2,
+    backgroundColor: COLORS.surface,
+  },
+  actionActive: { backgroundColor: COLORS.yellow, borderColor: COLORS.yellow },
+  actionPressed: { opacity: 0.75 },
+  actionLabel: { ...TYPE.small, fontFamily: TYPE.cardTitle.fontFamily, color: COLORS.ink },
+  interestRow: { flexDirection: 'row', alignItems: 'center', gap: SPACING.sm },
+  note: { ...TYPE.small, color: COLORS.muted },
 });

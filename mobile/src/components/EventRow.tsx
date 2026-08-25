@@ -1,5 +1,5 @@
 import { Image } from 'expo-image';
-import { MapPin } from 'lucide-react-native';
+import { MapPin, Star } from 'lucide-react-native';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import type { AppCalendarEvent, AppLocale } from '../api/contract';
@@ -17,15 +17,24 @@ import { COLORS, RADIUS, SPACING, TYPE } from '../theme/tokens';
  * Categorie, plaats en tijd staan elk op hun eigen regel of in hun eigen kolom.
  * Ze samenpersen achter middots is precies wat CLAUDE.md verbiedt, en op een
  * telefoonbreedte wordt dat sowieso onleesbaar.
+ *
+ * **De ster is geen inschrijving.** Ze zet dit evenement in jouw lijst en hangt
+ * er de herinnering van die dag aan; er hangt geen plaats aan en niemand ziet wie
+ * ze aanduidde. Dat verschil moet zichtbaar blijven, anders staat er iemand voor
+ * een uitverkochte zaal met een sterretje in zijn telefoon. Vandaar dat ze een
+ * losse knop naast de rij is en niet de hoofdactie ervan.
  */
 export function EventRow({
   event,
   locale,
   onPress,
+  onToggleInterest,
 }: {
   event: AppCalendarEvent;
   locale: AppLocale;
   onPress: () => void;
+  /** Weglaten en de ster verdwijnt; zo blijft de rij bruikbaar zonder login. */
+  onToggleInterest?: (next: boolean) => void;
 }) {
   const category = event.categories[0];
 
@@ -73,6 +82,27 @@ export function EventRow({
           </View>
         ) : null}
       </View>
+
+      {onToggleInterest ? (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityState={{ selected: event.interested }}
+          accessibilityLabel={
+            event.interested
+              ? `${event.title} niet meer volgen`
+              : `${event.title} in mijn lijst zetten`
+          }
+          onPress={() => onToggleInterest(!event.interested)}
+          hitSlop={10}
+          style={({ pressed }) => [styles.star, pressed && styles.starPressed]}
+        >
+          <Star
+            color={event.interested ? COLORS.yellowDeep : COLORS.muted}
+            fill={event.interested ? COLORS.yellow : 'transparent'}
+            size={20}
+          />
+        </Pressable>
+      ) : null}
     </Pressable>
   );
 }
@@ -109,4 +139,6 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   chipText: { ...TYPE.small, fontSize: 11, color: COLORS.body },
+  star: { paddingLeft: SPACING.xs, alignSelf: 'flex-start', paddingTop: 2 },
+  starPressed: { opacity: 0.6 },
 });

@@ -1,23 +1,27 @@
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
-import { Bell, ChevronRight, Sandwich, TicketCheck, Wrench } from 'lucide-react-native';
+import { Bell, ChevronRight, Coins, Sandwich, TicketCheck, Wrench } from 'lucide-react-native';
 import { useEffect, useState } from 'react';
-import { Alert, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 
-import { baseUrl } from '../../src/api/client';
-import { fetchProfile } from '../../src/api/endpoints';
-import { useResource } from '../../src/api/useResource';
-import { signOut } from '../../src/auth/session';
-import { PageHead } from '../../src/components/PageHead';
-import { Button, Card, SectionTitle } from '../../src/components/ui';
-import { formatDay, formatTimeRange } from '../../src/format';
-import { disablePush, enablePush, hasBeenAsked, pushIsOn, refreshPushRegistration } from '../../src/push';
-import { useApp } from '../../src/state/app';
-import { COLORS, RADIUS, SPACING, TYPE } from '../../src/theme/tokens';
+import { baseUrl } from '../../../src/api/client';
+import { fetchProfile } from '../../../src/api/endpoints';
+import { useResource } from '../../../src/api/useResource';
+import { signOut } from '../../../src/auth/session';
+import { PageHead } from '../../../src/components/PageHead';
+import { Button, Card, SectionTitle } from '../../../src/components/ui';
+import { formatDay, formatTimeRange } from '../../../src/format';
+import { refreshPushRegistration } from '../../../src/push';
+import { useApp } from '../../../src/state/app';
+import { COLORS, RADIUS, SPACING, TYPE } from '../../../src/theme/tokens';
 
 /**
- * Profiel: wie je bent, waar je heen kan, en je shiften.
+ * Profiel: wie je bent, en je shiften.
+ *
+ * Het staat onder Meer en niet meer als eigen tab. Je opent je profiel een paar
+ * keer per jaar en niet een paar keer per dag; die plaats in de onderbalk is
+ * beter besteed aan iets wat je wél dagelijks doet.
  *
  * Wat hier níét in staat is even bewust als wat er wel in staat. Je gegevens
  * wijzigen, je privacygegevens opvragen en je verbonden apps beheren blijven op
@@ -114,20 +118,28 @@ export default function ProfielScreen() {
         <Row
           icon={<TicketCheck color={COLORS.navy} size={20} />}
           label="Mijn tickets"
-          onPress={() => router.push('/mijn-tickets')}
+          onPress={() => router.push('/tickets?tab=mijne')}
         />
         <Row
           icon={<Sandwich color={COLORS.navy} size={20} />}
           label="Mijn broodjes"
-          onPress={() => router.push('/bestellen')}
+          onPress={() => router.push('/broodjes?tab=afhalen')}
+        />
+        <Row
+          icon={<Coins color={COLORS.navy} size={20} />}
+          label="Mijn bonnetjes"
+          onPress={() => router.push('/bonnetjes')}
         />
         <Row
           icon={<Wrench color={COLORS.navy} size={20} />}
           label="Shiften"
           onPress={() => router.push('/shiften')}
         />
-
-        <PushCard />
+        <Row
+          icon={<Bell color={COLORS.navy} size={20} />}
+          label="Meldingen"
+          onPress={() => router.push('/meldingen')}
+        />
 
         {data && data.upcomingShifts.length > 0 ? (
           <>
@@ -209,69 +221,6 @@ export default function ProfielScreen() {
         />
       </ScrollView>
     </>
-  );
-}
-
-/**
- * De schakelaar voor pushberichten.
- *
- * De toestemming wordt hier gevraagd en niet bij de eerste start van de app. Een
- * systeemvenster dat meteen na het installeren verschijnt, wordt in de regel
- * weggeklikt, en op iOS is dat definitief: wie één keer weigert, moet daarna naar
- * de systeeminstellingen. Vandaar dat er een zin bij staat die zegt waarover het
- * gaat, voor het venster verschijnt.
- *
- * Er wordt vandaag nog niets verstuurd. Dat staat er ook bij; iemand die dit
- * aanzet en dan weken niets hoort, hoort te weten dat dat klopt.
- */
-function PushCard() {
-  const [on, setOn] = useState(pushIsOn);
-  const [busy, setBusy] = useState(false);
-
-  const toggle = async () => {
-    setBusy(true);
-    try {
-      if (on) {
-        await disablePush();
-        setOn(false);
-        return;
-      }
-      const ok = await enablePush();
-      setOn(ok);
-      if (!ok) {
-        Alert.alert(
-          'Pushberichten staan uit',
-          hasBeenAsked()
-            ? 'Je toestel laat geen berichten toe voor deze app. Dat kan je aanzetten in de instellingen van je telefoon.'
-            : 'Er kon geen toestemming opgehaald worden.',
-        );
-      }
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  return (
-    <Card>
-      <View style={styles.pushHead}>
-        <Bell color={COLORS.navy} size={20} />
-        <Text style={styles.title}>Pushberichten</Text>
-      </View>
-      <Text style={styles.body}>
-        {on
-          ? 'Je krijgt een bericht wanneer er iets is dat je moet weten: je broodje dat klaarligt, een shift die begint, tickets die opengaan.'
-          : 'Zet dit aan om een bericht te krijgen bij je broodje, je shiften en nieuwe tickets.'}
-      </Text>
-      <Text style={styles.hint}>
-        Er wordt op dit moment nog niets verstuurd; dit legt enkel vast dat je ze wil.
-      </Text>
-      <Button
-        label={on ? 'Uitzetten' : 'Aanzetten'}
-        variant="ghost"
-        busy={busy}
-        onPress={() => void toggle()}
-      />
-    </Card>
   );
 }
 
@@ -379,5 +328,4 @@ const styles = StyleSheet.create({
     paddingVertical: SPACING.xs,
   },
   groupName: { ...TYPE.body, color: COLORS.ink, flex: 1 },
-  pushHead: { flexDirection: 'row', alignItems: 'center', gap: SPACING.md },
 });

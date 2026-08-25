@@ -4,19 +4,22 @@ import { COLORS } from '../../../src/theme/tokens';
 
 /**
  * De schermen die je vanuit een tab opent: een evenement, een pagina, een album,
- * de ticketverkoop, de piano.
+ * de ticketverkoop, de scanner, je bonnetjes.
  *
  * Ze zitten **binnen** de tabbalk en niet erboven, zodat die zichtbaar blijft.
  * Stonden ze in de stack van de wortel, dan schoof elk gepusht scherm over de
  * balk heen en was je de navigatie kwijt zodra je één keer doorklikte.
  *
  * `(detail)` is een routegroep, dus de haakjes staan niet in het adres:
- * `app/(tabs)/(detail)/piano.tsx` blijft gewoon `/piano`. Dat is waarom deze
- * verhuizing geen enkele `router.push` in de app raakt.
+ * `app/(tabs)/(detail)/piano.tsx` blijft gewoon `/piano`.
  *
  * Het is één gedeelde stack en geen stack per tab. Een evenement open je vanaf
- * Home én vanaf Kalender, tickets vanaf Home én vanaf Info; met een stack per tab
- * zou elk van die schermen in twee mappen moeten staan.
+ * Home én vanaf Kalender, de scanner vanaf Home én vanaf Tickets; met een stack
+ * per tab zou elk van die schermen in twee mappen moeten staan.
+ *
+ * **Elk scherm hier heeft een terugknop**, en die zit in `PageHead`. De stack
+ * draait met `headerShown: false`, dus er is geen systeemkop die er een tekent;
+ * zonder die knop geraakte je op iOS nergens meer weg zodra je doorklikte.
  */
 export default function DetailLayout() {
   return (
@@ -34,12 +37,20 @@ export default function DetailLayout() {
       <Stack.Screen name="pocs" />
       <Stack.Screen name="piano" />
       <Stack.Screen name="shiften" />
-      <Stack.Screen name="mijn-tickets" />
-      <Stack.Screen name="tickets/index" />
-      <Stack.Screen name="tickets/[slug]" />
+      <Stack.Screen name="profiel" />
+      <Stack.Screen name="bonnetjes" />
+      <Stack.Screen name="meldingen" />
+      <Stack.Screen name="scannen" />
+      <Stack.Screen name="scan/[eventId]" />
+      <Stack.Screen name="ticket/[slug]" />
       <Stack.Screen name="categorie/[slug]" />
       <Stack.Screen name="pagina/[slug]" />
       <Stack.Screen name="evenement/[id]" />
+      {/* Twee oude adressen die blijven werken. Een geïnstalleerde app kan
+          maanden achterlopen, en een pushbericht van vorige week draagt nog
+          `/bestellen`; dat mag niet op een leeg scherm eindigen. */}
+      <Stack.Screen name="bestellen" />
+      <Stack.Screen name="mijn-tickets" />
     </Stack>
   );
 }
