@@ -165,6 +165,11 @@ function compositeRawImage(canvas: Buffer, image: RawImage, left: number, top: n
  * Bouwt een scanbare QR rechtstreeks als rasterbeeld. Er komt bewust nergens
  * SVG aan Sharp te pas: sommige Alpine/libvips-builds kunnen een SVG-buffer
  * niet decoderen en gaven daardoor in productie een 500.
+ *
+ * **Deze opmaak heeft een tweeling in de app**, in
+ * `mobile/src/components/vtkQrPaths.ts`. Die tekent hetzelfde in SVG omdat een
+ * ticket ook zonder netwerk te tonen moet zijn, en gebruikt exact de getallen
+ * hieronder. Wijzig je hier iets aan de vorm, wijzig het daar mee.
  */
 export async function createStyledVtkQrPng(content: string): Promise<Buffer> {
   if (!content || content.length > 512) throw new Error("INVALID_QR_CONTENT");

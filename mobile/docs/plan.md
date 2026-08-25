@@ -571,6 +571,7 @@ via `/push/maintenance` (claim gezet, tweede beurt doet niets).
 |---|---|---|
 | 2026-08-25 | `web: De app-API voor een app in plaats van een site` | Vandaag-endpoint, interesse en gevolgde categorieën, meldingsvoorkeuren, bonnetjes aan de toog, de twee QR-tokens, scannen en de fakbar-check-in. Drie pushberichten erbij. |
 | 2026-08-25 | `De app wordt een app` | Nieuwe onderbalk, nieuw Home, terugknop overal, camera en agenda. |
+| 2026-08-25 | `Tickets in de huisstijl` | VTK-QR in de app, Mijn tickets vooraan en standaard. |
 
 **Drie afwijkingen van het oorspronkelijke plan.**
 

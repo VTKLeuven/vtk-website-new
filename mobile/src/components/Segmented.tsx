@@ -3,8 +3,8 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { COLORS, RADIUS, SPACING, TYPE } from '../theme/tokens';
 
 /**
- * Twee of drie kanten van hetzelfde onderwerp: Kopen en Mijne, Bestellen en
- * Afhalen.
+ * Twee of drie kanten van hetzelfde onderwerp: Mijn tickets en Kopen, Bestellen
+ * en Afhalen.
  *
  * Bewust geen tweede tabbalk en geen aparte schermen. Wat je met een ticket doet
  * (kopen, tonen) is één zaak in het hoofd van wie het opent, en het onder twee

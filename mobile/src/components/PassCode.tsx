@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
-import QRCode from 'react-native-qrcode-svg';
 
 import { fetchVouchers } from '../api/endpoints';
 import { COLORS, RADIUS, SPACING, TYPE } from '../theme/tokens';
 import { Button } from './ui';
+import { VtkQr } from './VtkQr';
 
 /**
  * Jouw pas: één code voor alles wat je aan een balie toont.
@@ -68,7 +68,7 @@ export function PassCode({ caption }: { caption?: string }) {
     <View style={styles.wrap}>
       <View style={[styles.frame, { width: size + SPACING.lg * 2 }]}>
         {pass ? (
-          <QRCode value={pass} size={size} backgroundColor="#FFFFFF" color={COLORS.ink} />
+          <VtkQr value={pass} size={size} />
         ) : (
           <View style={[styles.placeholder, { width: size, height: size }]}>
             {busy ? (

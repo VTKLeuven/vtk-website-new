@@ -11,7 +11,6 @@ import {
   View,
   useWindowDimensions,
 } from 'react-native';
-import QRCode from 'react-native-qrcode-svg';
 
 import { baseUrl } from '../../src/api/client';
 import type { AppMyTicket } from '../../src/api/contract';
@@ -19,6 +18,7 @@ import { fetchMyTickets, fetchTicketEvents } from '../../src/api/endpoints';
 import { messageFor, useResource } from '../../src/api/useResource';
 import { PageHead } from '../../src/components/PageHead';
 import { Segmented } from '../../src/components/Segmented';
+import { VtkQr } from '../../src/components/VtkQr';
 import { Button, Card, Empty, ErrorState, Loading, StaleNotice } from '../../src/components/ui';
 import { formatDay, formatDayShort, formatEuro } from '../../src/format';
 import { useApp } from '../../src/state/app';
@@ -40,6 +40,11 @@ type Tab = 'kopen' | 'mijne';
  * tonen is, is geen ticket. Wat er in de leescache staat, volstaat om binnen te
  * geraken.
  *
+ * **Mijn tickets staat vooraan en is het standaardsegment.** Wie hier binnenkomt
+ * heeft meestal al een ticket en wil het tonen; kopen doe je een keer, tonen doe
+ * je aan elke deur. Wie niet ingelogd is, ziet wel de verkoop, want zijn eigen
+ * tickets zijn dan enkel een aanmeldscherm.
+ *
  * De scanknop staat er ook, maar enkel voor wie mag scannen. Zo hoeft een shifter
  * die komt bijspringen niets te installeren: hij scant de uitnodigings-QR die een
  * praesidiumlid toont en kan meteen aan de deur staan.
@@ -48,7 +53,10 @@ export default function TicketsScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{ tab?: string }>();
   const { locale, viewer, bootstrap } = useApp();
-  const [tab, setTab] = useState<Tab>(params.tab === 'mijne' ? 'mijne' : 'kopen');
+  const [tab, setTab] = useState<Tab>(() => {
+    if (params.tab === 'kopen' || params.tab === 'mijne') return params.tab;
+    return viewer ? 'mijne' : 'kopen';
+  });
   useTabParam<Tab>(params.tab, ['kopen', 'mijne'], setTab);
 
   const sales = useResource('tickets', () => fetchTicketEvents(locale), locale);
@@ -84,8 +92,8 @@ export default function TicketsScreen() {
         value={tab}
         onChange={setTab}
         options={[
+          { value: 'mijne', label: 'Mijn tickets', badge: ticketCount },
           { value: 'kopen', label: 'Kopen' },
-          { value: 'mijne', label: 'Mijne', badge: ticketCount },
         ]}
       />
 
@@ -169,7 +177,7 @@ function SalesList({
   );
 }
 
-// ── Mijne ───────────────────────────────────────────────────────────────────
+// ── Mijn tickets ────────────────────────────────────────────────────────────
 
 function MyTickets({
   resource,
@@ -257,7 +265,7 @@ function TicketCard({ ticket }: { ticket: AppMyTicket }) {
       ) : null}
 
       <View style={styles.qrWrap}>
-        <QRCode value={ticket.credential} size={size} backgroundColor="#FFFFFF" color={COLORS.ink} />
+        <VtkQr value={ticket.credential} size={size} />
       </View>
       <Text style={styles.code}>{ticket.publicId}</Text>
 
@@ -325,12 +333,7 @@ const styles = StyleSheet.create({
   body: { ...TYPE.body, color: COLORS.body },
   hint: { ...TYPE.small, color: COLORS.muted },
   usedRow: { flexDirection: 'row', alignItems: 'center', gap: SPACING.sm },
-  qrWrap: {
-    alignSelf: 'center',
-    backgroundColor: '#FFFFFF',
-    borderRadius: RADIUS.sm,
-    padding: SPACING.md,
-    marginVertical: SPACING.sm,
-  },
+  // De QR draagt zijn eigen navy kader, dus er hoeft geen tweede wit vlak omheen.
+  qrWrap: { alignSelf: 'center', marginVertical: SPACING.sm },
   code: { ...TYPE.small, color: COLORS.muted, textAlign: 'center', letterSpacing: 1 },
 });
