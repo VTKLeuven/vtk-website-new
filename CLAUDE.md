@@ -8,6 +8,10 @@
 - Vertaal technische / IT-termen niet krampachtig naar het Nederlands. Interne,
   technische surfaces (bv. de admin/IT-tab) mogen gewoon Engelse vakterminologie
   gebruiken (bv. "Throw uncaught error" i.p.v. "Onafgevangen fout gooien").
+- **EAS Update na elke app-wijziging.** Pas je iets aan aan de mobiele app (`mobile/`)
+  en push je naar `main`, publiceer dan ook altijd direct een EAS Update zodat
+  toestellen en Expo Go de wijzigingen ontvangen:
+  `cd mobile && npx eas update --branch preview --message "<korte beschrijving>"`.
 
 # UX-conventies
 

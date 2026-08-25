@@ -90,6 +90,11 @@ bekijken. Push is de bestaande uitzondering: die werkt in Expo Go niet.
 11. **Toon geen knop die "geen toegang" antwoordt.** `bootstrap.abilities` zegt
    wat deze gebruiker mag; verberg de rest. Dat is netheid en geen beveiliging,
    want elke route controleert het daarna nog eens zelf.
+12. **Publiceer altijd een EAS Update na het pushen naar main.** De CI-pipeline
+   van GitHub Actions deployt enkel de website; wijzigingen aan de mobiele app
+   moeten dus altijd via `npx eas update --branch preview --message "..."` naar het
+   preview-kanaal gepubliceerd worden zodat ze direct op toestellen en in Expo Go
+   verschijnen.
 
 ## Structuur
 

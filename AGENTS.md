@@ -16,6 +16,11 @@ De app heeft dus zijn eigen `node_modules` en zijn eigen lockfile. `npm install`
 in de wortel raakt hem niet aan; gebruik `npm run app:install`, `npm run app` en
 `npm run app:check`. De handleiding staat in **`docs/app-ontwikkelen.md`**.
 
+- **EAS Update na elke app-wijziging.** Pas je iets aan aan de mobiele app (`mobile/`)
+  en push je naar `main`, publiceer dan ook altijd direct een EAS Update zodat
+  testtoestellen en Expo Go de update direct ontvangen:
+  `cd mobile && npx eas update --branch preview --message "<korte beschrijving>"`.
+
 # Local setup: `make up && make db && make dev`
 
 The root `Makefile` is a thin layer over the npm scripts; `make help` lists
