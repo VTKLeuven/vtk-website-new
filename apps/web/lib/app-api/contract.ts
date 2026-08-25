@@ -632,6 +632,14 @@ export type AppPhoto = {
   /** Schermklare versie; de app toont die en haalt niet het origineel op. */
   url: string;
   thumbUrl: string;
+  /**
+   * Het origineel, om te bewaren. Bewust een apart veld en niet hetzelfde als
+   * `url`: wat je toont mag klein zijn, wat je bewaart hoort de volle resolutie
+   * te zijn. Dezelfde URL die de site achter zijn downloadknop hangt.
+   */
+  downloadUrl: string;
+  /** De bestandsnaam zoals ze bedoeld is; de app bewaart ze daaronder. */
+  filename: string;
 };
 
 export type AppAlbumDetail = AppAlbum & {

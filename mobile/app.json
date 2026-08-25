@@ -39,6 +39,14 @@
         {
           "color": "#FFD23F"
         }
+      ],
+      [
+        "expo-media-library",
+        {
+          "savePhotosPermission": "VTK bewaart een foto uit een album in je fotobibliotheek.",
+          "photosPermission": "VTK bewaart een foto uit een album in je fotobibliotheek.",
+          "isAccessMediaLocationEnabled": false
+        }
       ]
     ],
     "extra": {

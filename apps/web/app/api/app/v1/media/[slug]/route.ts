@@ -10,10 +10,12 @@ export const dynamic = "force-dynamic";
 /**
  * Eén fotoalbum met zijn foto's.
  *
- * Elke foto komt in twee maten: een thumbnail voor het raster en een
- * schermklare versie voor wie erop tikt. Het **origineel** zit er bewust niet
- * bij: dat zijn bestanden van tien megabyte en meer, en op mobiele data is dat
- * een galerij die niet laadt. Wie het origineel wil, downloadt het op de site.
+ * Elke foto komt in drie vormen: een thumbnail voor het raster, een schermklare
+ * versie voor wie erop tikt, en de URL van het **origineel** om te bewaren.
+ *
+ * Dat origineel wordt nooit zomaar getoond: het zijn bestanden van tien megabyte
+ * en meer, en een galerij die die allemaal inlaadt, laadt niet. Het wordt enkel
+ * opgehaald wanneer iemand op downloaden drukt.
  */
 export async function GET(request: Request, context: { params: Promise<{ slug: string }> }) {
   try {
@@ -33,6 +35,8 @@ export async function GET(request: Request, context: { params: Promise<{ slug: s
         id: photo.id,
         url: absoluteUrl(request, photo.previewUrl) as string,
         thumbUrl: absoluteUrl(request, photo.thumbnailUrl) as string,
+        downloadUrl: absoluteUrl(request, photo.downloadUrl) as string,
+        filename: photo.filename,
       })),
     };
 
