@@ -6,6 +6,12 @@ import { COLORS, FONTS } from '../../src/theme/tokens';
 /**
  * De tabbalk: het enige wat deze app echt anders maakt dan de site.
  *
+ * Elke tab hieronder is een map met een eigen stack erin, niet één scherm. Dat
+ * staat uitgelegd in `src/navigation.ts`; kort: terugvegen popt een stack, dus
+ * moet er onder elk scherm dat je opent het tabscherm liggen waar je vandaan
+ * kwam. Dit bestand is het enige onder `app/` dat met de hand geschreven is; de
+ * rest komt uit `npm run routes`.
+ *
  * Zes tabs, en elk daarvan is een van de redenen waarom er een app is:
  *
  * - **Home** is vandaag: wat is er open, en wat wacht er op mij.
@@ -34,6 +40,12 @@ import { COLORS, FONTS } from '../../src/theme/tokens';
 export default function TabsLayout() {
   return (
     <Tabs
+      /**
+       * Teruggaan brengt je naar de tab waar je vandaan kwam, niet naar Home.
+       * De standaard (`firstRoute`) stuurt je altijd naar de eerste tab, en dat
+       * voelt als weggeslingerd worden.
+       */
+      backBehavior="history"
       screenOptions={{
         headerShown: false,
         tabBarActiveTintColor: COLORS.navy,
@@ -48,7 +60,7 @@ export default function TabsLayout() {
       }}
     >
       <Tabs.Screen
-        name="index"
+        name="(home)"
         options={{ title: 'Home', tabBarIcon: ({ color, size }) => <House color={color} size={size} /> }}
       />
       <Tabs.Screen
@@ -79,10 +91,6 @@ export default function TabsLayout() {
           tabBarIcon: ({ color, size }) => <Sandwich color={color} size={size} />,
         }}
       />
-      {/* De gedeelde stack met alle doorklikschermen. Hij hoort bij de
-          tabnavigator zodat de balk zichtbaar blijft, maar hij is zelf geen tab
-          en staat dus niet in de balk. */}
-      <Tabs.Screen name="(detail)" options={{ href: null }} />
       <Tabs.Screen
         name="meer"
         options={{

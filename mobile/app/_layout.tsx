@@ -67,6 +67,10 @@ export default function RootLayout() {
           }}
         >
           <Stack.Screen name="(tabs)" />
+          {/* De adressen van voor elke tab zijn eigen stack kreeg. Ze verwijzen
+              enkel door, zodat een ouder pushbericht of een link van buitenaf
+              nog steeds op het juiste scherm uitkomt. Zie src/navigation.ts. */}
+          <Stack.Screen name="(oud)" />
           {/* Enkel deze drie liggen bewust óver de tabbalk: het zijn modals, en
               een modal die de navigatie eronder laat staan is geen modal. */}
           <Stack.Screen name="inloggen" options={{ presentation: 'modal' }} />

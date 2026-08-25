@@ -1,4 +1,3 @@
-import { useRouter } from 'expo-router';
 import {
   CalendarCheck,
   ChevronRight,
@@ -11,6 +10,7 @@ import {
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import type { AppTodayTask } from '../api/contract';
+import { useTabRouter } from '../navigation';
 import { COLORS, RADIUS, SPACING, TYPE } from '../theme/tokens';
 
 /**
@@ -35,18 +35,21 @@ const ICONS: Record<AppTodayTask['kind'], React.ComponentType<{ color: string; s
 };
 
 export function TaskCard({ task }: { task: AppTodayTask }) {
-  const router = useRouter();
+  const router = useTabRouter();
   const Icon = ICONS[task.kind] ?? CalendarCheck;
 
   /**
    * De server geeft een pad met soms een querystring (`/poort?gate=onboarding`).
    * `router.push` wil dat als twee stukken, anders belandt de query in het pad en
    * vindt de router niets.
+   *
+   * `useTabRouter` zet het daarna in de tab waar de kaart staat, zodat teruggaan
+   * je weer op die tab afzet. Zie src/navigation.ts.
    */
   const go = () => {
     const [pathname, query] = task.path.split('?');
     const params = Object.fromEntries(new URLSearchParams(query ?? ''));
-    router.push({ pathname: pathname as never, params });
+    router.push({ pathname, params });
   };
 
   return (

@@ -16,7 +16,7 @@
     "start": "npm run start --workspace=@vtk/web",
     "app": "npm start --prefix mobile",
     "app:install": "npm install --prefix mobile",
-    "app:check": "npm run type-check --prefix mobile && npm run lint --prefix mobile",
+    "app:check": "npm run type-check --prefix mobile && npm run lint --prefix mobile && npm run routes:check --prefix mobile",
     "lint": "npm run lint --workspace=@vtk/web",
     "db:generate": "npm run generate --workspace=@vtk/db",
     "db:push": "npm run push --workspace=@vtk/db",
