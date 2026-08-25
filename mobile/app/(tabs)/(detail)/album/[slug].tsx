@@ -64,7 +64,7 @@ export default function AlbumScreen() {
    * keuze gemaakt, en dan wijzen we op de deelknop in plaats van te zeuren.
    */
   const handle = async (kind: 'bewaren' | 'delen') => {
-    if (open === null || busy) return;
+    if (open === null || !open.downloadUrl || busy) return;
     setBusy(kind);
     try {
       const outcome: SaveOutcome =
@@ -152,43 +152,49 @@ export default function AlbumScreen() {
               <X color={COLORS.onDark} size={24} />
             </Pressable>
 
-            <View style={styles.viewerActions}>
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel="Deel deze foto"
-                accessibilityState={{ busy: busy === 'delen' }}
-                disabled={busy !== null}
-                onPress={() => void handle('delen')}
-                hitSlop={14}
-                style={styles.viewerButton}
-              >
-                {busy === 'delen' ? (
-                  <ActivityIndicator color={COLORS.onDark} size="small" />
-                ) : (
-                  <Share2 color={COLORS.onDark} size={22} />
-                )}
-              </Pressable>
+            {/* Een server van vóór deze functie stuurt geen `downloadUrl` mee.
+                Dan tonen we de knoppen niet, in plaats van ze te laten falen met
+                een melding waar niemand iets aan heeft. De app kan met een oudere
+                site praten; dat is het hele punt van de versie in het API-pad. */}
+            {open?.downloadUrl ? (
+              <View style={styles.viewerActions}>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel="Deel deze foto"
+                  accessibilityState={{ busy: busy === 'delen' }}
+                  disabled={busy !== null}
+                  onPress={() => void handle('delen')}
+                  hitSlop={14}
+                  style={styles.viewerButton}
+                >
+                  {busy === 'delen' ? (
+                    <ActivityIndicator color={COLORS.onDark} size="small" />
+                  ) : (
+                    <Share2 color={COLORS.onDark} size={22} />
+                  )}
+                </Pressable>
 
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel={justSaved ? 'Bewaard' : 'Bewaar deze foto'}
-                accessibilityState={{ busy: busy === 'bewaren' }}
-                disabled={busy !== null}
-                onPress={() => void handle('bewaren')}
-                hitSlop={14}
-                style={[styles.viewerButton, justSaved && styles.viewerButtonDone]}
-              >
-                {busy === 'bewaren' ? (
-                  <ActivityIndicator color={COLORS.onDark} size="small" />
-                ) : justSaved ? (
-                  // Het vinkje zit in de knop zelf en niet enkel in een melding:
-                  // zo zie je aan de knop dat deze foto al binnen is.
-                  <Check color={COLORS.ink} size={22} />
-                ) : (
-                  <Download color={COLORS.onDark} size={22} />
-                )}
-              </Pressable>
-            </View>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel={justSaved ? 'Bewaard' : 'Bewaar deze foto'}
+                  accessibilityState={{ busy: busy === 'bewaren' }}
+                  disabled={busy !== null}
+                  onPress={() => void handle('bewaren')}
+                  hitSlop={14}
+                  style={[styles.viewerButton, justSaved && styles.viewerButtonDone]}
+                >
+                  {busy === 'bewaren' ? (
+                    <ActivityIndicator color={COLORS.onDark} size="small" />
+                  ) : justSaved ? (
+                    // Het vinkje zit in de knop zelf en niet enkel in een
+                    // melding: zo zie je aan de knop dat deze foto binnen is.
+                    <Check color={COLORS.ink} size={22} />
+                  ) : (
+                    <Download color={COLORS.onDark} size={22} />
+                  )}
+                </Pressable>
+              </View>
+            ) : null}
           </View>
           {openIndex !== null ? (
             <Text style={[styles.counter, { bottom: insets.bottom + SPACING.xl }]}>
