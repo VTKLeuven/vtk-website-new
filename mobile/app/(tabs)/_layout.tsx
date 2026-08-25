@@ -1,5 +1,5 @@
 import { Tabs } from 'expo-router';
-import { CalendarDays, House, LayoutGrid, Sandwich, Ticket } from 'lucide-react-native';
+import { BookOpen, CalendarDays, House, LayoutGrid, Sandwich, Ticket } from 'lucide-react-native';
 
 import { COLORS, FONTS } from '../../src/theme/tokens';
 
@@ -12,11 +12,16 @@ import { COLORS, FONTS } from '../../src/theme/tokens';
  * kwam. Dit bestand is het enige onder `app/` dat met de hand geschreven is; de
  * rest komt uit `npm run routes`.
  *
- * Vijf tabs, en elk daarvan is een van de redenen waarom er een app is:
+ * Zes tabs, en elk daarvan is een van de redenen waarom er een app is:
  *
  * - **Home** is vandaag: wat is er open, en wat wacht er op mij.
  * - **Kalender** is wat er te doen is, met een ster om iets in je eigen lijst te
  *   zetten en in de agenda van je telefoon.
+ * - **Studeren** is samen blokken: wie van je vrienden er nu zit, en je eigen
+ *   teller. Het is de zesde tab en niet iets onder Meer, omdat je hem tijdens de
+ *   blok meerdere keren per dag opent; dat is precies het criterium waarmee de
+ *   andere vijf gekozen zijn. Zes is wel het maximum: bij zeven wordt een label
+ *   afgekapt en dan is de balk een raadspel.
  * - **Tickets** is kopen én tonen, in twee segmenten. Ze staan samen omdat het in
  *   het hoofd van wie ze opent één zaak is; ze uit elkaar trekken zou betekenen
  *   dat je moet weten in welke van twee tabs je moet zijn voor je iets ziet.
@@ -63,6 +68,13 @@ export default function TabsLayout() {
         options={{
           title: 'Kalender',
           tabBarIcon: ({ color, size }) => <CalendarDays color={color} size={size} />,
+        }}
+      />
+      <Tabs.Screen
+        name="studeren"
+        options={{
+          title: 'Studeren',
+          tabBarIcon: ({ color, size }) => <BookOpen color={color} size={size} />,
         }}
       />
       <Tabs.Screen

@@ -911,6 +911,7 @@ export const APP_NOTIFICATION_TOPICS = [
   { topic: "shift.reminder", defaultOn: true },
   { topic: "calendar.follow", defaultOn: true },
   { topic: "calendar.interest", defaultOn: true },
+  { topic: "study.groupStart", defaultOn: true },
 ] as const;
 
 export type AppNotificationTopic = (typeof APP_NOTIFICATION_TOPICS)[number]["topic"];
@@ -1079,3 +1080,112 @@ export type AppAbilities = {
   acceptVouchers: boolean;
   theokotPickup: boolean;
 };
+
+// -----------------------------------------------------------------------------
+// Samen blokken: studietijd meten en naast die van je vrienden zetten
+// -----------------------------------------------------------------------------
+
+/**
+ * De sessie die nu loopt.
+ *
+ * `seconds` is de stand op het moment van het antwoord; de app telt zelf verder
+ * zolang het scherm openstaat en meldt zich elke minuut opnieuw. Dat is met opzet
+ * zo verdeeld: de klok moet vloeiend lopen zonder elke seconde een aanvraag, maar
+ * de waarheid komt van de server, want die telt ook wanneer de app dicht is.
+ */
+export type AppStudySession = {
+  id: string;
+  subject: string | null;
+  /** Verbergt het vak voor groepsgenoten; de tijd blijft wel meetellen. */
+  subjectHidden: boolean;
+  startedAt: string;
+  /** Netto seconden tot nu, pauzes er al af. */
+  seconds: number;
+  paused: boolean;
+  pausedAt: string | null;
+  /** Waar de server afkapt, zodat de app het kan zeggen voor het gebeurt. */
+  maxSeconds: number;
+};
+
+/** Eén persoon in de zaal van een groep. */
+export type AppStudyMemberState = {
+  userId: string;
+  name: string;
+  avatarUrl: string | null;
+  /** Nu echt bezig: de app meldde zich net nog en staat niet op pauze. */
+  studying: boolean;
+  paused: boolean;
+  /** Het vak, of `null` wanneer het niet ingevuld of verborgen is. */
+  subject: string | null;
+  /** Seconden van de lopende sessie; `null` wanneer er geen loopt. */
+  liveSeconds: number | null;
+  startedAt: string | null;
+  weekSeconds: number;
+  todaySeconds: number;
+  isYou: boolean;
+};
+
+export type AppStudyGroup = {
+  id: string;
+  name: string;
+  /** De code om te delen. Iedereen in de groep mag ze zien en doorgeven. */
+  code: string;
+  memberCount: number;
+  liveCount: number;
+  isOwner: boolean;
+  /** Samen zoveel minuten per week halen. `null` betekent: niets afgesproken. */
+  weeklyGoalMinutes: number | null;
+  /** De som van de hele groep deze week, in seconden. */
+  weekSeconds: number;
+  /** Bezig eerst, daarna op tijd deze week. */
+  members: AppStudyMemberState[];
+};
+
+/** Eén dag in het weekstrookje. `date` is `yyyy-mm-dd` in Brusselse tijd. */
+export type AppStudyDay = {
+  date: string;
+  seconds: number;
+  goalMet: boolean;
+};
+
+export type AppStudyOverview = {
+  now: string;
+  session: AppStudySession | null;
+  todaySeconds: number;
+  weekSeconds: number;
+  /** Dagen op rij waarop je je dagdoel haalde. */
+  streak: number;
+  dailyGoalMinutes: number;
+  /** De laatste zeven dagen, oudste eerst. */
+  week: AppStudyDay[];
+  /** Wat je eerder als vak intikte, meest recent eerst. */
+  subjects: string[];
+  groups: AppStudyGroup[];
+};
+
+/** Wat het stoppen van een sessie oplevert: de uitkomst plus het verse overzicht. */
+export type AppStudyStopResult = {
+  finishedSeconds: number;
+  subject: string | null;
+  overview: AppStudyOverview;
+};
+
+/**
+ * Wat de app met een lopende sessie kan doen.
+ *
+ * `pause` en `resume` stuurt de app zelf wanneer ze naar de achtergrond gaat en
+ * weer terugkomt; `heartbeat` is het levensteken dat zegt dat het scherm nog
+ * openstaat. Blijft dat weg, dan telt de sessie tot het laatste teken van leven.
+ */
+export type AppStudyAction = "pause" | "resume" | "heartbeat";
+
+export const STUDY_GROUP_ERRORS = [
+  "NOT_FOUND",
+  "GROUP_FULL",
+  "TOO_MANY_GROUPS",
+  "INVALID_NAME",
+  "NOT_OWNER",
+  "NOT_A_MEMBER",
+] as const;
+
+export type AppStudyGroupErrorCode = (typeof STUDY_GROUP_ERRORS)[number];

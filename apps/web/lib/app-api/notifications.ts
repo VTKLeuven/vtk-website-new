@@ -5,6 +5,7 @@ import { prisma } from "@vtk/db";
 import { audiencesForStudyProfile } from "@/lib/calendar/audience";
 
 import { usersWantingTopic } from "./notificationPrefs";
+import { dayStart, isLive } from "./study";
 import { sendPushToUsers } from "./push";
 
 /**
@@ -337,4 +338,93 @@ async function withinAudience(
       ),
     )
     .map((user) => user.id);
+}
+
+/**
+ * "Lotte is begonnen met studeren."
+ *
+ * Eén bericht per groep per dag, en enkel wanneer de eerste gaat zitten. Acht
+ * leden die na elkaar beginnen zouden anders acht berichten geven, en dan zet
+ * iedereen het na één dag uit.
+ *
+ * Dezelfde claim-dan-versturen-aanpak als bij de broodjes: eerst de markering in
+ * een voorwaardelijke `updateMany`, dan pas het bericht. Twee toestellen die op
+ * hetzelfde moment starten, kunnen zo niet allebei aankondigen dat zij de eerste
+ * zijn. De markering wordt bewust **niet** teruggezet wanneer het versturen faalt:
+ * liever een bericht te weinig dan een groepschat vol.
+ */
+export async function sendStudyGroupStartPush(
+  userId: string,
+  now: Date = new Date(),
+): Promise<NotificationRun> {
+  const [me, memberships] = await Promise.all([
+    prisma.user.findUnique({ where: { id: userId }, select: { name: true } }),
+    prisma.studyGroupMember.findMany({
+      where: { userId },
+      select: {
+        group: {
+          select: {
+            id: true,
+            name: true,
+            startPushAt: true,
+            members: { select: { userId: true } },
+          },
+        },
+      },
+    }),
+  ]);
+  if (!me || memberships.length === 0) return { users: 0, devices: 0 };
+
+  const dayStarted = dayStart(now);
+  const firstName = me.name.split(" ")[0];
+  let users = 0;
+  let devices = 0;
+
+  for (const { group } of memberships) {
+    const others = group.members.map((member) => member.userId).filter((id) => id !== userId);
+    if (others.length === 0) continue;
+    if (group.startPushAt && group.startPushAt >= dayStarted) continue;
+
+    // Zit er al iemand anders, dan ben jij niet de eerste en is er niets aan te
+    // kondigen. `isLive` is dezelfde regel als in de zaal zelf: open, en de app
+    // meldde zich net nog.
+    const active = await prisma.studySession.findMany({
+      where: { userId: { in: others }, endedAt: null },
+      select: {
+        id: true,
+        userId: true,
+        subject: true,
+        subjectHidden: true,
+        startedAt: true,
+        endedAt: true,
+        pausedAt: true,
+        pausedSeconds: true,
+        lastSeenAt: true,
+        seconds: true,
+      },
+    });
+    if (active.some((session) => isLive(session, now))) continue;
+
+    const { count } = await prisma.studyGroup.updateMany({
+      where: {
+        id: group.id,
+        OR: [{ startPushAt: null }, { startPushAt: { lt: dayStarted } }],
+      },
+      data: { startPushAt: now },
+    });
+    if (count === 0) continue;
+
+    const wanting = await usersWantingTopic(others, "study.groupStart");
+    if (wanting.length === 0) continue;
+
+    const outcome = await sendPushToUsers(wanting, {
+      title: `${firstName} is begonnen met studeren`,
+      body: `In ${group.name}. Kom erbij.`,
+      path: "/studeren",
+    });
+    users += wanting.length;
+    devices += outcome.sent;
+  }
+
+  return { users, devices };
 }

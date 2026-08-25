@@ -132,9 +132,9 @@ bekijken. Push is de bestaande uitzondering: die werkt in Expo Go niet.
   achterlopen en een pushbericht van vorige week draagt nog het oude pad; dat mag
   niet op een leeg scherm eindigen. Ook deze worden gemaakt.
 - `app/(tabs)/_layout.tsx` is wél met de hand geschreven: **Home, Kalender,
-  Tickets, Broodjes, Meer**, met hun iconen. Tickets en Broodjes hebben elk twee
-  segmenten (Kopen/Mijne, Bestellen/Afhalen); zie `src/components/Segmented.tsx`
-  voor waarom dat geen tabs zijn.
+  Studeren, Tickets, Broodjes, Meer**, met hun iconen. Tickets en Broodjes hebben
+  elk twee segmenten (Kopen/Mijne, Bestellen/Afhalen); zie
+  `src/components/Segmented.tsx` voor waarom dat geen tabs zijn.
 - `app/_layout.tsx` draagt enkel nog de tabs plus drie modals (inloggen, de
   onboardingpoort, de serverinstelling). Die liggen bewust wél over de balk: een
   modal die de navigatie eronder laat staan, is geen modal.

@@ -4055,3 +4055,63 @@ hoogstens één check-in op een avond dat de bar toch open is. Dat is aanvaardba
 voor een spaarkaart voor pinten; het zou dat niet zijn voor iets met geldwaarde,
 en daarom hangt betalen met bonnetjes aan een kortlevende pas en niet aan een
 opgehangen code.
+
+## Samen blokken: studietijd meten onder vrienden
+
+De app kan je studietijd meten en die naast die van je vrienden zetten. Dat is
+geen ranglijst van VTK maar een blokgroep: je maakt er een, je deelt de code, en
+binnen die groep zie je van elkaar wie er nu zit.
+
+**Waarom de groep vooraan staat en niet je eigen cijfer.** Een ranglijst
+motiveert de eerste drie. Wat wél voor iedereen werkt is de reden waarom mensen
+naar de bib gaan terwijl ze thuis dezelfde stoel hebben: er zit iemand naast je.
+Het scherm opent daarom met wie er nu bezig is en hoelang al, met jouw plaats er
+leeg naast. De cijfers staan eronder, niet erboven.
+
+**Er is geen ranglijst per opleiding en geen VTK-brede lijst.** Studietijd is
+persoonlijk, en een kringbrede lijst meet vooral wie geen leven heeft. Niemand
+gaf zich daarvoor op. Je totalen zijn zichtbaar voor wie in dezelfde groep zit en
+voor niemand anders; stap je eruit, dan ben je weg uit die lijst. Het vak waaraan
+je werkt mag je bovendien per sessie verbergen: dan telt de tijd wel mee maar
+staat er niet bij waarvoor.
+
+**Weg uit de app is pauze.** Een teller die doorloopt terwijl je op iets anders
+zit, meet niets, en dan is de hele lijst een grap. Maar streng afkappen straft
+wie even iets moet opzoeken. Daarom pauzeert de sessie zodra de app naar de
+achtergrond gaat, en telt een pauze korter dan een minuut niet mee. Blijft het
+levensteken van de app helemaal weg, dan telt de sessie tot het laatste moment
+waarop de server wist dat ze liep; anders levert een telefoon die 's avonds
+leegloopt de volgende ochtend veertien uur op. Boven de acht uur netto wordt een
+sessie afgekapt.
+
+**Een sessie hoort bij de dag waarop ze begon.** Wie om half twaalf 's avonds
+begint en tot twee uur doorgaat, heeft dat op één avond gedaan. Die tijd over twee
+kalenderdagen splitsen zou een reeks breken die niemand gebroken heeft.
+
+**De code is de hele toegangscontrole.** Zes tekens, in een alfabet zonder de
+tekens die je verkeerd overtikt. Dit is een blokgroep onder vrienden en geen
+kluis; wie de code heeft, mag erbij. Wie de groep maakte, kan iemand er weer
+uitzetten, want een code die rondgaat belandt vroeg of laat bij iemand voor wie ze
+niet bedoeld was. Vertrekt de eigenaar zelf, dan gaat de groep naar wie er het
+langst in zit; vertrekt de laatste, dan verdwijnt de groep, want een lege groep
+met een rondslingerende code is niets dan een val.
+
+**Het groepsdoel is er om het coöperatief te maken.** Samen honderd uur halen is
+iets waar de laatste in de lijst ook aan meedoet, en dat is in een blokgroep
+meestal het punt. Zonder zo'n doel blijft er enkel een wedstrijd over, en die
+wint altijd dezelfde.
+
+**Er vertrekt één bericht per groep per dag**, wanneer de eerste gaat zitten. Niet
+bij elk van de acht: dan zet iedereen het na één dag uit. Zie ook "Wanneer de app
+een pushbericht stuurt" hierboven; dit bericht is een uitzondering op de regel dat
+push enkel voor "je moet nu iets doen" is, en het mag om dezelfde reden als het
+volgen van een kalendercategorie: je vroeg er zelf om, en één tik zet het uit.
+
+**De skyline is niet decoratie maar de meting zelf.** Elke tien minuten komt er
+een verdieping bij en gaan er ramen aan; zolang je sessie loopt staat er een kraan
+bovenop. In een groep is elk lid een gebouw, hoog naar wat het deze week zat, met
+licht achter de ramen bij wie nu bezig is. Dat is de enige plek in de app waar een
+beeld iets zegt dat een getal niet zegt: je ziet in één oogopslag of er iemand zit.
+De vormen komen uit het VTK-posterbeeld en blijven binnen de huisstijl (navy
+silhouetten, geel als enige accent), precies omdat een tekenfilmboom dat niet zou
+doen.
