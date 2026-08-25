@@ -35,3 +35,7 @@
 
 # Docker/infra artifacts not needed for the app build
 infra/immich/
+
+# De mobiele app (Expo). Die wordt door EAS gebouwd en niet in deze images; ze
+# meesturen maakt de buildcontext alleen groter.
+mobile/

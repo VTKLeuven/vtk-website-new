@@ -4,6 +4,18 @@
 This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` before writing any code. Heed deprecation notices.
 <!-- END:nextjs-agent-rules -->
 
+# De mobiele app staat in `mobile/`
+
+De VTK-app (Expo, iOS + Android) zit in deze repo maar **buiten de workspaces**:
+alles onder `apps/*` en `packages/*` wordt automatisch een npm-workspace, en de
+dependencies van React Native samenvoegen met die van de website zou de lockfile
+van de hele repo opnieuw laten oplossen. Dat is hier een bekende val (zie
+"Never hand-edit deps" verderop).
+
+De app heeft dus zijn eigen `node_modules` en zijn eigen lockfile. `npm install`
+in de wortel raakt hem niet aan; gebruik `npm run app:install`, `npm run app` en
+`npm run app:check`. De handleiding staat in **`docs/app-ontwikkelen.md`**.
+
 # Local setup: `make up && make db && make dev`
 
 The root `Makefile` is a thin layer over the npm scripts; `make help` lists

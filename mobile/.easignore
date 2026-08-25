@@ -1,0 +1,9 @@
+# Wat EAS niet mee hoeft te uploaden bij een build.
+#
+# De app zit in een submap van een grotere repo. EAS pakt bij een build het
+# project in; zonder dit bestand zou dat de hele website kunnen meenemen, en dat
+# is honderden megabytes die de build niet nodig heeft.
+node_modules/
+.expo/
+dist/
+docs/

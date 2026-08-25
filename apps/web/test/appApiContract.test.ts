@@ -48,21 +48,16 @@ describe('app-api contract', () => {
   });
 
   /**
-   * De app-repo staat naast deze repo op een ontwikkelmachine, maar niet in CI.
-   * Daar slaat deze test zichzelf over: hem laten falen zou de pipeline laten
-   * afhangen van een map die er niet hoort te zijn.
+   * De app staat sinds de verhuizing naar `mobile/` in dezelfde repo, dus deze
+   * test slaat niets meer over: hij faalt gewoon wanneer de kopie uit de pas
+   * loopt. Dat is precies de bedoeling; het was de zwakke plek van de vorige
+   * opzet, waar de vergelijking overgeslagen werd zodra de andere repo ontbrak
+   * (en dus altijd in CI).
    */
-  it('is byte-voor-byte gelijk aan de kopie in de app-repo', () => {
+  it('is byte-voor-byte gelijk aan de kopie in de app', () => {
     const original = new URL('../lib/app-api/contract.ts', import.meta.url).pathname;
-    const copy = `${process.env.HOME}/vtk-app/src/api/contract.ts`;
+    const copy = new URL('../../../mobile/src/api/contract.ts', import.meta.url).pathname;
 
-    let copied: string;
-    try {
-      copied = readFileSync(copy, 'utf8');
-    } catch {
-      return; // app-repo staat hier niet; niets te vergelijken
-    }
-
-    expect(copied).toBe(readFileSync(original, 'utf8'));
+    expect(readFileSync(copy, 'utf8')).toBe(readFileSync(original, 'utf8'));
   });
 });
