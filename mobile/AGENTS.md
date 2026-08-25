@@ -35,18 +35,28 @@ Lokaal testen vraagt HTTPS, want de weblogin doet KU Leuven-SSO. Draai
 vtk-website-new achter een cloudflared-tunnel en vul die URL in bij
 **Meer -> je naam -> Server**. Zie `docs/architecture.md`.
 
-**De camera, de agenda en de fotobibliotheek vragen een nieuwe build.**
-`expo-camera`, `expo-calendar` en `expo-media-library` zijn native modules; die
-gaan niet met `eas update` over de lucht mee. Wie de scanner, "In agenda" of het
-bewaren van een foto wil testen, heeft een development build of een verse APK
-nodig, geen OTA-update.
+**De camera, de agenda en de fotobibliotheek gaan niet mee met `eas update`.**
+`expo-camera`, `expo-calendar` en `expo-media-library` zijn native modules. In
+Expo Go zitten ze al ingebouwd, dus daar kan je de scanner, "In agenda" en het
+bewaren van een foto wel gewoon testen. Op een APK moet de module in de build
+zelf zitten; wie een oudere APK heeft, krijgt daar een rood scherm.
 
 **Voeg je een native dependency toe, bouw dan voor je publiceert.**
-`runtimeVersion` staat op de fingerprint-policy, dus een update bereikt enkel
-builds met dezelfde native kant. Dat is met opzet: met de oude `exposdk`-policy
-kreeg élke SDK 54-build elke update aangeboden, ook eentje die een module
-importeert die er niet in zit, en dan gooit `requireNativeModule` op het scherm
-waar die import hangt. Zie `docs/architecture.md`.
+`runtimeVersion` staat op `"exposdk:54.0.0"`, dezelfde waarde voor élke SDK
+54-build, dus een update wordt ook aangeboden aan een oudere APK die de module
+niet heeft; `requireNativeModule` gooit dan op het scherm waar die import hangt.
+Bouw eerst, verspreid de APK, en vraag om de vorige te vervangen.
+
+**Die policy staat er om Expo Go.** Er is geen Apple Developer-account en dus geen
+iOS-build; de enige weg naar een iPhone is Expo Go dat een gepubliceerde update
+opent, en Expo Go laadt enkel een `exposdk`-runtime. Zet dit niet op
+`{ "policy": "fingerprint" }` zonder eerst `docs/architecture.md` te lezen: dat is
+één keer gebeurd en legde de hele iOS-kant stil.
+
+**Voeg geen module toe die niet in Expo Go zit.** Alles wat we vandaag gebruiken
+zit erin (camera, agenda, fotobibliotheek, sqlite, bestanden, delen, webview,
+svg). Iets anders erbij betekent dat niemand de app nog op een iPhone kan
+bekijken. Push is de bestaande uitzondering: die werkt in Expo Go niet.
 
 ## Regels
 

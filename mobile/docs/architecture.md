@@ -106,30 +106,44 @@ EAS internal distribution plus `eas update`, drie kanalen (`development`,
 `preview`, `production`), net als bij de scanner. JS en assets gaan over de
 lucht, native modules niet.
 
-## `runtimeVersion`: fingerprint, en waarom niet `exposdk`
+## `runtimeVersion`: `exposdk`, en waarom niet fingerprint
 
-`app.json` zet `runtimeVersion` op `{ "policy": "fingerprint" }`. EAS berekent
-dan een hash over alles wat de native kant bepaalt (de dependencies, de plugins,
-de config) en gebruikt die als versie. Een build en een update passen bij elkaar
-wanneer die hashes gelijk zijn.
+`app.json` zet `runtimeVersion` op `"exposdk:54.0.0"`. Een update en een client
+horen bij elkaar wanneer die waarde gelijk is, en `exposdk:54.0.0` is de waarde
+van **Expo Go** voor SDK 54.
 
-**Dit stond ooit op `exposdk:54.0.0`, en dat was stil kapot.** Die waarde is
-dezelfde voor élke SDK 54-build, of er nu `expo-camera` in zit of niet. EAS kon
-een oude APK dus niet onderscheiden van een nieuwe en bood elke update aan
-iedereen aan. Een update die `expo-calendar` importeert, belandde zo op een
-toestel zonder die module, en `requireNativeModule` gooit op het moment dat het
-scherm geladen wordt. Niet een knop die niets doet: een rood scherm op het
-evenementenscherm.
+Dat is geen detail maar de hele iOS-kant. Er is geen Apple Developer-account, dus
+er bestaat geen iOS-build en die is er ook nooit geweest. De enige manier waarop
+deze app vandaag op een iPhone draait, is Expo Go dat een gepubliceerde update van
+het `preview`-kanaal opent, na inloggen met het `vtk-it`-account. **Expo Go laadt
+enkel een update met een `exposdk`-runtime**; een fingerprint-hash zegt die client
+niets, en zo'n update is er onzichtbaar.
 
-De prijs is een build meer dan vroeger. Elke wijziging aan een native dependency,
-aan een plugin of aan de app-config geeft een nieuwe fingerprint, en dan bereikt
-een update de vorige builds niet meer. Dat is precies de bedoeling: liever een
-toestel dat niets krijgt dan een toestel dat crasht. Wat de fingerprint is, vraag
-je op met:
+Dat kan enkel omdat elke native module die we gebruiken al in Expo Go zit: camera,
+agenda, fotobibliotheek, sqlite, bestanden, delen, webview, svg. Zolang dat zo
+blijft is Expo Go een volwaardige testomgeving; de uitzondering is push, want
+Expo Go verstuurt sinds SDK 53 geen pushberichten meer. Voeg je een module toe die
+niet in Expo Go zit, dan valt die weg weg, en dan is dit hele stuk aan herziening
+toe.
 
-```bash
-npx eas-cli@latest fingerprint:generate --platform android
-```
+**De prijs is echt.** Deze waarde is dezelfde voor élke SDK 54-build, dus EAS kan
+een oude APK niet van een nieuwe onderscheiden en biedt elke update aan iedereen
+aan. Krijgt een APK zonder `expo-camera` JavaScript dat `expo-camera` importeert,
+dan gooit `requireNativeModule` op het moment dat dat scherm laadt: een rood
+scherm, niet een knop die niets doet. Die val lag open toen `expo-media-library`
+en later `expo-calendar` erbij kwamen.
+
+Daarom hoort bij elke native wijziging een zin naar het bestuur: wie een oudere
+APK heeft, installeert de nieuwste. Dat werkt zolang de APK's intern verspreid
+worden en we iedereen kunnen bereiken.
+
+**Wanneer dit moet wijzigen.** Zodra er builds in de wereld staan die we niet meer
+kunnen vragen om te herinstalleren, dus bij TestFlight of de stores, is
+`{ "policy": "fingerprint" }` de juiste keuze: EAS berekent dan een hash over de
+native kant en een update bereikt enkel een build die ze aankan. Die hash vraag je
+op met `npx eas-cli@latest fingerprint:generate --platform android`. Op dat moment
+is er ook een Apple Developer-account en dus een echte iOS-build, en is Expo Go
+niet langer de enige weg naar een iPhone.
 
 Let op de bekende valstrik: **een OTA-update wordt op de ene start gedownload en
 op de volgende pas toegepast.** De app moet dus twee keer dicht en open voor je

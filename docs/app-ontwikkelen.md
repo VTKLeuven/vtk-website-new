@@ -111,32 +111,48 @@ Dat is genoeg voor JavaScript en assets: die gaan over de lucht naar elk toestel
 dat de app al heeft.
 
 **Een nieuwe native dependency gaat er niet over.** Dan is er een nieuwe build
-nodig, en die moet er zijn **voor** je publiceert:
+nodig:
 
 ```bash
 npx eas-cli@latest build --profile preview --platform android
 ```
 
-Dat "voor" is niet vrijblijvend. `runtimeVersion` staat op de fingerprint-policy,
-dus een update bereikt enkel builds met dezelfde native kant. Publiceer je zonder
-te bouwen, dan krijgt niemand iets; bouw je zonder te publiceren, dan zit de code
-enkel in die ene APK. Zie `mobile/docs/architecture.md` voor waarom dat beter is
-dan de `exposdk`-policy die hier ooit stond.
+`runtimeVersion` staat op `"exposdk:54.0.0"`, en die waarde is dezelfde voor élke
+SDK 54-build. Een update bereikt dus ook toestellen met een oudere APK, ook
+wanneer de JavaScript erin een module importeert die daar niet in zit; dat geeft
+een rood scherm op het moment dat zo'n scherm laadt. Bouw daarom eerst, verspreid
+de APK, en zeg erbij dat wie een oudere versie heeft moet herinstalleren. Zie
+`mobile/docs/architecture.md` voor waarom die policy hier toch de juiste is, en
+wanneer ze op fingerprint moet.
 
 De volgorde die klopt:
 
 1. `npx eas-cli@latest build --profile preview --platform android`
-2. de APK verspreiden (de link uit de build, of de QR)
+2. de APK verspreiden (de link uit de build, of de QR), met de vraag om de vorige
+   te vervangen
 3. `npx eas-cli@latest update --branch preview --message "..."` voor alles wat
    daarna nog aan de JavaScript verandert
 
-Wijzigde er niets aan de native kant, dan volstaat stap 3 alleen. Twijfel je?
-`npx eas-cli@latest fingerprint:generate --platform android` geeft de hash; is die
-gelijk aan die van de laatste build, dan volstaat een update.
+Wijzigde er niets aan de native kant, dan volstaat stap 3 alleen.
 
 Let op de bekende valstrik: een OTA-update wordt op de ene start **gedownload** en
 op de volgende pas **toegepast**. De app moet dus twee keer dicht en open voor je
 oordeelt over wat je ziet.
+
+## Op een iPhone
+
+Er is **geen Apple Developer-account**, dus EAS kan geen iOS-build maken en er is
+er ook nooit een geweest. De weg naar een iPhone loopt daarom via **Expo Go**:
+
+1. Expo Go installeren uit de App Store.
+2. Inloggen met het `vtk-it`-account.
+3. Het project `vtk-app` openen; Expo Go laadt de laatste update van het
+   `preview`-kanaal.
+
+Daarvoor is geen dev server nodig en er hoeft niets gebouwd te worden: een
+`eas update` volstaat, want Expo Go draait op `exposdk:54.0.0`. Wat er niet werkt
+is push, want Expo Go verstuurt sinds SDK 53 geen pushberichten meer; daarvoor
+heb je een echte build nodig.
 
 ## De kanalen
 

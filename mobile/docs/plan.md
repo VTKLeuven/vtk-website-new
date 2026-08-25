@@ -553,8 +553,13 @@ aan; een toestel zonder `expo-calendar` kreeg JS die het importeert, en dat is
 geen knop die niets doet maar een rood scherm op het evenementenscherm. Dezelfde
 val lag al open onder de commit ervoor, die `expo-media-library` toevoegde.
 
-Staat nu op `{ "policy": "fingerprint" }`. Zie `docs/architecture.md` voor de
-prijs (een build per native wijziging) en waarom die het waard is.
+Stond daarna even op `{ "policy": "fingerprint" }`, en dat bleek een slechtere
+ruil: Expo Go laadt enkel een `exposdk`-runtime, en Expo Go is de enige manier
+waarop deze app op een iPhone draait zolang er geen Apple Developer-account is.
+Die wijziging legde dus de hele iOS-kant stil. Staat terug op `"exposdk:54.0.0"`;
+de oude val wordt opgevangen door bij elke native wijziging te vragen de APK te
+vervangen. Zie `docs/architecture.md` voor wanneer fingerprint wel de juiste
+keuze wordt.
 
 **Nagekeken tegen een draaiende server**, met een lokale beheerder: de pas
 opzoeken en afboeken (inclusief verlopen, vervalst, te veel, en bij jezelf), de
