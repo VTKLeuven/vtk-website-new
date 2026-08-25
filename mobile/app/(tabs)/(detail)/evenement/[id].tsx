@@ -6,16 +6,16 @@ import { useState } from 'react';
 import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { baseUrl } from '../../../src/api/client';
-import { fetchCalendarEvent, setEventInterest } from '../../../src/api/endpoints';
-import { messageFor, useResource } from '../../../src/api/useResource';
-import { Prose } from '../../../src/components/Prose';
-import { Button, Card, ErrorState, Loading } from '../../../src/components/ui';
-import { addEventToDeviceCalendar, addResultMessage } from '../../../src/deviceCalendar';
-import { formatEventWhen } from '../../../src/format';
-import { markdownToPlainText } from '../../../src/markdown';
-import { useApp } from '../../../src/state/app';
-import { COLORS, RADIUS, SPACING, TYPE } from '../../../src/theme/tokens';
+import { baseUrl } from '../../../../src/api/client';
+import { fetchCalendarEvent, setEventInterest } from '../../../../src/api/endpoints';
+import { messageFor, useResource } from '../../../../src/api/useResource';
+import { Prose } from '../../../../src/components/Prose';
+import { Button, Card, ErrorState, Loading } from '../../../../src/components/ui';
+import { addEventToDeviceCalendar, addResultMessage } from '../../../../src/deviceCalendar';
+import { formatEventWhen } from '../../../../src/format';
+import { markdownToPlainText } from '../../../../src/markdown';
+import { useApp } from '../../../../src/state/app';
+import { COLORS, RADIUS, SPACING, TYPE } from '../../../../src/theme/tokens';
 
 /**
  * Eén evenement.

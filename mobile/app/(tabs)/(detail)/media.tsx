@@ -4,13 +4,13 @@ import * as WebBrowser from 'expo-web-browser';
 import { BookOpen, Play } from 'lucide-react-native';
 import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 
-import { fetchMedia } from '../../src/api/endpoints';
-import { messageFor, useResource } from '../../src/api/useResource';
-import { PageHead } from '../../src/components/PageHead';
-import { Card, Empty, ErrorState, Loading, SectionTitle, StaleNotice } from '../../src/components/ui';
-import { formatDate } from '../../src/format';
-import { useApp } from '../../src/state/app';
-import { COLORS, RADIUS, SPACING, TYPE } from '../../src/theme/tokens';
+import { fetchMedia } from '../../../src/api/endpoints';
+import { messageFor, useResource } from '../../../src/api/useResource';
+import { PageHead } from '../../../src/components/PageHead';
+import { Card, Empty, ErrorState, Loading, SectionTitle, StaleNotice } from '../../../src/components/ui';
+import { formatDate } from '../../../src/format';
+import { useApp } from '../../../src/state/app';
+import { COLORS, RADIUS, SPACING, TYPE } from '../../../src/theme/tokens';
 
 /**
  * Media: fotoalbums, aftermovies en de magazines.

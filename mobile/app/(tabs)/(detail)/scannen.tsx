@@ -3,24 +3,24 @@ import { Beer, Coins, ScanLine, TicketCheck } from 'lucide-react-native';
 import { useCallback, useState } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 
-import { ApiError } from '../../src/api/client';
-import type { AppPassHolder } from '../../src/api/contract';
+import { ApiError } from '../../../src/api/client';
+import type { AppPassHolder } from '../../../src/api/contract';
 import {
   fakCheckin,
   fetchScanEvents,
   lookupPass,
   redeemScannerInvite,
   redeemVouchers,
-} from '../../src/api/endpoints';
-import { messageFor, useResource } from '../../src/api/useResource';
-import { PageHead } from '../../src/components/PageHead';
-import { QrScanner } from '../../src/components/QrScanner';
-import { Stepper } from '../../src/components/Stepper';
-import { Button, Card, ErrorState, Loading } from '../../src/components/ui';
-import { formatDayShort, formatEuro } from '../../src/format';
-import { scanKindOf, UNKNOWN_SCAN_MESSAGE } from '../../src/scanKind';
-import { useApp } from '../../src/state/app';
-import { COLORS, RADIUS, SPACING, TYPE } from '../../src/theme/tokens';
+} from '../../../src/api/endpoints';
+import { messageFor, useResource } from '../../../src/api/useResource';
+import { PageHead } from '../../../src/components/PageHead';
+import { QrScanner } from '../../../src/components/QrScanner';
+import { Stepper } from '../../../src/components/Stepper';
+import { Button, Card, ErrorState, Loading } from '../../../src/components/ui';
+import { formatDayShort, formatEuro } from '../../../src/format';
+import { scanKindOf, UNKNOWN_SCAN_MESSAGE } from '../../../src/scanKind';
+import { useApp } from '../../../src/state/app';
+import { COLORS, RADIUS, SPACING, TYPE } from '../../../src/theme/tokens';
 
 type ScanResult =
   | { kind: 'busy' }

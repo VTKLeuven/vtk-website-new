@@ -5,16 +5,16 @@ import { Bell, ChevronRight, Coins, Sandwich, TicketCheck, Wrench } from 'lucide
 import { useEffect, useState } from 'react';
 import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 
-import { baseUrl } from '../../src/api/client';
-import { fetchProfile } from '../../src/api/endpoints';
-import { useResource } from '../../src/api/useResource';
-import { signOut } from '../../src/auth/session';
-import { PageHead } from '../../src/components/PageHead';
-import { Button, Card, SectionTitle } from '../../src/components/ui';
-import { formatDay, formatTimeRange } from '../../src/format';
-import { refreshPushRegistration } from '../../src/push';
-import { useApp } from '../../src/state/app';
-import { COLORS, RADIUS, SPACING, TYPE } from '../../src/theme/tokens';
+import { baseUrl } from '../../../src/api/client';
+import { fetchProfile } from '../../../src/api/endpoints';
+import { useResource } from '../../../src/api/useResource';
+import { signOut } from '../../../src/auth/session';
+import { PageHead } from '../../../src/components/PageHead';
+import { Button, Card, SectionTitle } from '../../../src/components/ui';
+import { formatDay, formatTimeRange } from '../../../src/format';
+import { refreshPushRegistration } from '../../../src/push';
+import { useApp } from '../../../src/state/app';
+import { COLORS, RADIUS, SPACING, TYPE } from '../../../src/theme/tokens';
 
 /**
  * Profiel: wie je bent, en je shiften.

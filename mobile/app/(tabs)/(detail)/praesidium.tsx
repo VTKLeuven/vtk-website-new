@@ -2,12 +2,12 @@ import { Image } from 'expo-image';
 import { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
-import { fetchPraesidium } from '../../src/api/endpoints';
-import { messageFor, useResource } from '../../src/api/useResource';
-import { PageHead } from '../../src/components/PageHead';
-import { Card, Empty, ErrorState, Loading } from '../../src/components/ui';
-import { useApp } from '../../src/state/app';
-import { COLORS, RADIUS, SPACING, TYPE } from '../../src/theme/tokens';
+import { fetchPraesidium } from '../../../src/api/endpoints';
+import { messageFor, useResource } from '../../../src/api/useResource';
+import { PageHead } from '../../../src/components/PageHead';
+import { Card, Empty, ErrorState, Loading } from '../../../src/components/ui';
+import { useApp } from '../../../src/state/app';
+import { COLORS, RADIUS, SPACING, TYPE } from '../../../src/theme/tokens';
 
 /** Hoeveel jaren los in de balk staan; de rest zit erachter. */
 const YEARS_IN_BAR = 5;

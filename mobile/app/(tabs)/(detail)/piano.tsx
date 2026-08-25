@@ -1,17 +1,17 @@
 import { useState } from 'react';
 import { Alert, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 
-import { ApiError } from '../../src/api/client';
-import type { AppPianoSlot } from '../../src/api/contract';
-import { cancelPianoSlot, fetchPiano, reservePianoSlot } from '../../src/api/endpoints';
-import { messageFor, useResource } from '../../src/api/useResource';
-import { PageHead } from '../../src/components/PageHead';
-import { Prose } from '../../src/components/Prose';
-import { Button, Card, Empty, ErrorState, Loading, StaleNotice } from '../../src/components/ui';
-import { formatDay, formatTime } from '../../src/format';
-import { useApp } from '../../src/state/app';
+import { ApiError } from '../../../src/api/client';
+import type { AppPianoSlot } from '../../../src/api/contract';
+import { cancelPianoSlot, fetchPiano, reservePianoSlot } from '../../../src/api/endpoints';
+import { messageFor, useResource } from '../../../src/api/useResource';
+import { PageHead } from '../../../src/components/PageHead';
+import { Prose } from '../../../src/components/Prose';
+import { Button, Card, Empty, ErrorState, Loading, StaleNotice } from '../../../src/components/ui';
+import { formatDay, formatTime } from '../../../src/format';
+import { useApp } from '../../../src/state/app';
 import { useRouter } from 'expo-router';
-import { COLORS, RADIUS, SPACING, TYPE } from '../../src/theme/tokens';
+import { COLORS, RADIUS, SPACING, TYPE } from '../../../src/theme/tokens';
 
 /**
  * De piano in het kasteel reserveren.

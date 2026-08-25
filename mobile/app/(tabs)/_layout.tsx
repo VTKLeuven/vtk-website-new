@@ -81,42 +81,11 @@ export default function TabsLayout() {
         }}
       />
 
-      {/* De doorklikschermen. Ze horen bij deze navigator maar staan niet in de
-          balk (`href: null`), en dat is de hele truc: samen met
-          `backBehavior="history"` brengt teruggaan je naar het scherm waar je
-          vandaan kwam, en niet naar een vaste plek.
-
-          Ze stonden eerst in een gedeelde stack. Een stack onthoudt wat eronder
-          ligt, en dat is precies wat hier in de weg zat: opende je iets vanaf
-          Home terwijl er nog een scherm van een vorige keer onder lag, dan kwam
-          je met terug op dát scherm uit. Een geschiedenis heeft dat probleem
-          niet. */}
-      {[
-        'zoeken',
-        'media',
-        'album/[slug]',
-        'praesidium',
-        'werkgroepen',
-        'pocs',
-        'piano',
-        'shiften',
-        'profiel',
-        'bonnetjes',
-        'meldingen',
-        'scannen',
-        'scan/[eventId]',
-        'ticket/[slug]',
-        'categorie/[slug]',
-        'pagina/[slug]',
-        'evenement/[id]',
-        // Twee oude adressen die blijven werken. Een geïnstalleerde app kan
-        // maanden achterlopen, en een pushbericht van vorige week draagt nog
-        // `/bestellen`; dat mag niet op een leeg scherm eindigen.
-        'bestellen',
-        'mijn-tickets',
-      ].map((name) => (
-        <Tabs.Screen key={name} name={name} options={{ href: null }} />
-      ))}
+      {/* De gedeelde stack met alle doorklikschermen. Hij hoort bij deze
+          navigator zodat de tabbalk zichtbaar blijft, maar hij is zelf geen tab.
+          Wat eronder ligt wordt opgeruimd zodra je er van buitenaf in navigeert;
+          zie `(detail)/_layout.tsx`. */}
+      <Tabs.Screen name="(detail)" options={{ href: null }} />
     </Tabs>
   );
 }
