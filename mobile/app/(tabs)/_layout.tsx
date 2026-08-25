@@ -6,6 +6,12 @@ import { COLORS, FONTS } from '../../src/theme/tokens';
 /**
  * De tabbalk: het enige wat deze app echt anders maakt dan de site.
  *
+ * Elke tab hieronder is een map met een eigen stack erin, niet één scherm. Dat
+ * staat uitgelegd in `src/navigation.ts`; kort: terugvegen popt een stack, dus
+ * moet er onder elk scherm dat je opent het tabscherm liggen waar je vandaan
+ * kwam. Dit bestand is het enige onder `app/` dat met de hand geschreven is; de
+ * rest komt uit `npm run routes`.
+ *
  * Vijf tabs, en elk daarvan is een van de redenen waarom er een app is:
  *
  * - **Home** is vandaag: wat is er open, en wat wacht er op mij.
@@ -49,7 +55,7 @@ export default function TabsLayout() {
       }}
     >
       <Tabs.Screen
-        name="index"
+        name="(home)"
         options={{ title: 'Home', tabBarIcon: ({ color, size }) => <House color={color} size={size} /> }}
       />
       <Tabs.Screen
@@ -80,12 +86,6 @@ export default function TabsLayout() {
           tabBarIcon: ({ color, size }) => <LayoutGrid color={color} size={size} />,
         }}
       />
-
-      {/* De gedeelde stack met alle doorklikschermen. Hij hoort bij deze
-          navigator zodat de tabbalk zichtbaar blijft, maar hij is zelf geen tab.
-          Wat eronder ligt wordt opgeruimd zodra je er van buitenaf in navigeert;
-          zie `(detail)/_layout.tsx`. */}
-      <Tabs.Screen name="(detail)" options={{ href: null }} />
     </Tabs>
   );
 }

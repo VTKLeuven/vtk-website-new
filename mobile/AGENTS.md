@@ -29,6 +29,8 @@ de site praat.
 npm start          # expo start (dev build, niet Expo Go: react-native-webview)
 npm run type-check # tsc --noEmit, moet 0 fouten geven
 npm run lint
+npm run routes     # schrijft app/(tabs)/** en app/(oud)/** uit src/navigation.ts
+npm run routes:check # loopt dat gelijk, en bestaat elk adres waar de app naartoe duwt
 ```
 
 Lokaal testen vraagt HTTPS, want de weblogin doet KU Leuven-SSO. Draai
@@ -91,25 +93,42 @@ bekijken. Push is de bestaande uitzondering: die werkt in Expo Go niet.
 
 ## Structuur
 
-- `app/` - enkel expo-router routes. De vijf tabs staan in
-  `app/(tabs)/_layout.tsx`: **Home, Kalender, Tickets, Broodjes, Meer**. Tickets
-  en Broodjes hebben elk twee segmenten (Kopen/Mijne, Bestellen/Afhalen); zie
-  `src/components/Segmented.tsx` voor waarom dat geen tabs zijn.
-- `app/(tabs)/(detail)/` - **alle doorklikschermen**, in één gedeelde stack die
-  binnen de tabnavigator zit. Daardoor blijft de tabbalk zichtbaar zodra je
-  ergens op tikt; stonden ze in de stack van de wortel, dan schoof elk scherm
-  over de balk heen. `(detail)` is een routegroep, dus de haakjes staan niet in
-  het adres: `(tabs)/(detail)/piano.tsx` is gewoon `/piano`. **Een nieuw
-  doorklikscherm hoort hier**, niet in `app/`.
-  - **Elk scherm hier krijgt een terugknop, en die zit in `PageHead`.** De stack
-    draait met `headerShown: false`, dus er is geen systeemkop die er een tekent.
-    Zonder die knop geraakte je op iOS nergens meer weg zodra je één keer
-    doorklikte (op Android redde de hardwareknop dat), en dat was letterlijk het
-    geval op het ticketscherm. `PageHead` toont hem enkel wanneer er iets is om
-    naar terug te keren, dus een tabscherm zet `back={false}`.
-  - `bestellen.tsx` en `mijn-tickets.tsx` zijn omleidingen naar hun nieuwe adres.
-    Een geïnstalleerde app kan maanden achterlopen en een pushbericht van vorige
-    week draagt nog het oude pad; dat mag niet op een leeg scherm eindigen.
+- `app/` - enkel expo-router routes, en die worden **gemaakt, niet getikt**:
+  `npm run routes` schrijft ze uit `TAB_ROUTES` in `src/navigation.ts`. De
+  schermen zelf staan in `src/screens/`.
+- **Elke tab is een eigen stack**, met het tabscherm onderaan:
+  `app/(tabs)/(home)/`, `kalender/`, `tickets/`, `broodjes/`, `meer/`. Dat is de
+  hele reden dat teruggaan werkt zoals het hoort, en het is één keer fout gegaan
+  in drie pogingen, dus: **terugvegen popt een stack, en poppen kan enkel als er
+  een scherm onder ligt.** Was er één gedeelde stack voor alle doorklikschermen,
+  dan lag daar het tabscherm van de tab waar je het láátst geweest was, en kwam je
+  vanuit Home op Meer uit. Was er geen stack, dan was er niets om te poppen en
+  deed de veeg niets. Een scherm dat vanuit twee tabs bereikbaar is, staat dus in
+  twee stacks maar bestaat één keer.
+  - Home is een routegroep (`(home)`), de rest niet. Zo blijft `/evenement/12`
+    letterlijk `/evenement/12` en breekt geen enkel bestaand adres, terwijl
+    dezelfde pagina onder Meer `/meer/evenement/12` wordt.
+  - **Gebruik `useTabRouter` uit `src/navigation.ts`, nooit `useRouter`** (behalve
+    voor `back()`). De adressen in een scherm blijven gewoon `/piano`; welke tab
+    ervoor komt, hoort een knop niet te weten.
+  - Een nieuw scherm: bestand in `src/screens/`, regel bij in `TAB_ROUTES`,
+    `npm run routes`. `npm run routes:check` bewaakt allebei de kanten: dat de
+    bestanden gelijklopen met de kaart, en dat elk adres waar de app naartoe duwt
+    ook echt bestaat.
+  - **Elk doorklikscherm krijgt een terugknop, en die zit in `PageHead`.** De
+    stacks draaien met `headerShown: false`, dus er is geen systeemkop die er een
+    tekent. Zonder die knop geraakte je op iOS nergens meer weg zodra je één keer
+    doorklikte (op Android redde de hardwareknop dat). `PageHead` toont hem enkel
+    wanneer er iets is om naar terug te keren, dus een tabscherm zet
+    `back={false}`.
+- `app/(oud)/` - de adressen van vóór die opsplitsing (`/piano`, `/shiften`,
+  `/media`, ...), die enkel doorverwijzen. Een geïnstalleerde app kan maanden
+  achterlopen en een pushbericht van vorige week draagt nog het oude pad; dat mag
+  niet op een leeg scherm eindigen. Ook deze worden gemaakt.
+- `app/(tabs)/_layout.tsx` is wél met de hand geschreven: **Home, Kalender,
+  Tickets, Broodjes, Meer**, met hun iconen. Tickets en Broodjes hebben elk twee
+  segmenten (Kopen/Mijne, Bestellen/Afhalen); zie `src/components/Segmented.tsx`
+  voor waarom dat geen tabs zijn.
 - `app/_layout.tsx` draagt enkel nog de tabs plus drie modals (inloggen, de
   onboardingpoort, de serverinstelling). Die liggen bewust wél over de balk: een
   modal die de navigatie eronder laat staan, is geen modal.
@@ -127,6 +146,10 @@ bekijken. Push is de bestaande uitzondering: die werkt in Expo Go niet.
   en op een telefoon is dat niet noodzakelijk Brussel. Hier draait alles op
   datumsleutels (`YYYY-MM-DD`) en op UTC-middag, zodat geen tijdzone en geen
   zomertijdsprong een dag kan verschuiven.
+- `src/navigation.ts` - de kaart van tabs en schermen, plus `useTabRouter`. De
+  enige plek waar staat welk scherm in welke tab hoort.
+- `src/screens/` - de schermen zelf. Een bestand hier is een gewone component; het
+  weet niet in welke tab het getekend wordt, en dat hoort ook niet.
 - `src/nativeRoute.ts` - vertaalt een pad uit het CMS naar een scherm in de app.
   Het CMS kent de app niet en zet "Piano reserveren" als link naar `/piano`;
   zonder deze tabel zou dat in een browser openen terwijl er een scherm voor
