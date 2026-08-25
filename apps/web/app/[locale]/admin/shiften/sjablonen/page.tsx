@@ -12,7 +12,7 @@ export default async function AdminShiftTemplates({ params }: { params: Promise<
   const { locale: localeParam } = await params;
   if (!hasLocale(localeParam)) notFound();
   const locale: Locale = localeParam;
-  await requirePermission('shift.edit');
+  const session = await requirePermission('shift.edit');
 
   const nl = locale === 'nl';
   const base = nl ? '' : '/en';
@@ -23,6 +23,11 @@ export default async function AdminShiftTemplates({ params }: { params: Promise<
     orderBy: { orderInPraesidium: 'asc' },
     select: { code: true },
   });
+
+  const userPostCodes = session.groups.filter((g) => g.type === 'PRAESIDIUM').map((g) => g.code);
+  const postOptions = session.user.isSuperAdmin
+    ? activeGroups.map((g) => g.code)
+    : activeGroups.map((g) => g.code).filter((code) => userPostCodes.includes(code));
 
   return (
     <div className="space-y-5">
@@ -41,7 +46,7 @@ export default async function AdminShiftTemplates({ params }: { params: Promise<
         locale={locale}
         templates={SHIFT_TEMPLATES}
         today={utcToLocalDateTime(new Date()).slice(0, 10)}
-        postOptions={activeGroups.map((g) => g.code)}
+        postOptions={postOptions}
       />
     </div>
   );

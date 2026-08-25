@@ -512,3 +512,9 @@ export const isUniqueViolation = (err: unknown): boolean => prismaErrorCode(err)
 
 /** True wanneer een Prisma-operatie een foreign-key-constraint schond (P2003). */
 export const isForeignKeyViolation = (err: unknown): boolean => prismaErrorCode(err) === 'P2003';
+
+export {
+  canManageShift,
+  isUserInShiftPost,
+  userShiftPostCodes,
+} from './authorization';

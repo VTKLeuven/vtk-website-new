@@ -7,6 +7,8 @@ import {
   isRecordNotFound,
   isForeignKeyViolation,
   ShiftValidationError,
+  canManageShift,
+  isUserInShiftPost,
 } from '@/lib/shift';
 import { authErrorResponse } from '@/lib/session';
 import { withCors, corsPreflight } from '@/lib/cors';
@@ -56,8 +58,9 @@ export async function GET() {
  * Requests zijn van de vorm /api/shift
  */
 async function postHandler(request: Request) {
+  let session;
   try {
-    await requirePermission('shift.edit');
+    session = await requirePermission('shift.edit');
   } catch (err) {
     return authErrorResponse(err);
   }
@@ -82,6 +85,13 @@ async function postHandler(request: Request) {
     throw err;
   }
 
+  if (!session.user.isSuperAdmin && !isUserInShiftPost(session, data.post)) {
+    return NextResponse.json(
+      { error: 'Validation failed', details: ['post must be one of your own praesidium posts'] },
+      { status: 403 }
+    );
+  }
+
   const shift = await createShift(data);
 
   return NextResponse.json(shift, { status: 201 });
@@ -93,8 +103,9 @@ async function postHandler(request: Request) {
  * Requests zijn van de vorm /api/shift?id=*****
  */
 async function deleteHandler(request: Request) {
+  let session;
   try {
-    await requirePermission('shift.edit');
+    session = await requirePermission('shift.edit');
   } catch (err) {
     return authErrorResponse(err);
   }
@@ -102,6 +113,15 @@ async function deleteHandler(request: Request) {
   const id = new URL(request.url).searchParams.get('id');
   if (!id) {
     return NextResponse.json({ error: 'id query parameter is required' }, { status: 400 });
+  }
+
+  const existing = await prisma.shift.findUnique({ where: { id } });
+  if (!existing) {
+    return NextResponse.json({ error: 'Shift not found' }, { status: 404 });
+  }
+
+  if (!canManageShift(session, existing)) {
+    return NextResponse.json({ error: 'FORBIDDEN' }, { status: 403 });
   }
 
   let deleted;
@@ -152,8 +172,9 @@ const isStringArray = (value: unknown): value is string[] =>
  *    worden bewust géén overlap-/vol-/verleden-regels gecontroleerd.
  */
 async function patchHandler(request: Request) {
+  let session;
   try {
-    await requirePermission('shift.edit');
+    session = await requirePermission('shift.edit');
   } catch (err) {
     return authErrorResponse(err);
   }
@@ -211,6 +232,19 @@ async function patchHandler(request: Request) {
   const existing = await prisma.shift.findUnique({ where: { id } });
   if (!existing) {
     return NextResponse.json({ error: 'Shift not found' }, { status: 404 });
+  }
+
+  if (!canManageShift(session, existing)) {
+    return NextResponse.json({ error: 'FORBIDDEN' }, { status: 403 });
+  }
+
+  if (!session.user.isSuperAdmin && patch.post !== undefined && patch.post !== existing.post) {
+    if (!isUserInShiftPost(session, patch.post)) {
+      return NextResponse.json(
+        { error: 'Validation failed', details: ['post must be one of your own praesidium posts'] },
+        { status: 403 }
+      );
+    }
   }
 
   if (hasFieldChanges) {

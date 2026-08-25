@@ -15,18 +15,29 @@ export function ShiftEditModal({
   locale,
   shift,
   postOptions,
+  userPostCodes = [],
+  isSuperAdmin = false,
   onClose,
   onSaved,
 }: {
   locale: Locale;
   shift: AdminShift | null;
   postOptions: string[];
+  userPostCodes?: string[];
+  isSuperAdmin?: boolean;
   onClose: () => void;
   onSaved: () => void;
 }) {
   const nl = locale === "nl";
   const showToast = useToast();
   const isEdit = shift !== null;
+
+  const selectablePosts = useMemo(() => {
+    if (isSuperAdmin) return postOptions;
+    return postOptions.filter((p) =>
+      userPostCodes.some((code) => code.toLowerCase() === p.toLowerCase()),
+    );
+  }, [isSuperAdmin, postOptions, userPostCodes]);
 
   const now = new Date();
   const [name, setName] = useState(shift?.name ?? "");
@@ -38,7 +49,9 @@ export function ShiftEditModal({
   const [description, setDescription] = useState(shift?.description ?? "");
   const [maxParticipants, setMaxParticipants] = useState(String(shift?.maxParticipants ?? 1));
   const [reward, setReward] = useState(String(shift?.reward ?? 0));
-  const [post, setPost] = useState(shift?.post ?? "");
+  const [post, setPost] = useState(
+    shift?.post ?? (isSuperAdmin ? "" : (selectablePosts[0] ?? "")),
+  );
   const [openToInternationals, setOpenToInternationals] = useState(
     shift?.openToInternationals ?? false,
   );
@@ -185,12 +198,17 @@ export function ShiftEditModal({
           <div>
             <Label>Post</Label>
             <Select value={post} onChange={(e) => setPost(e.target.value)}>
-              <option value="">{nl ? "Geen" : "None"}</option>
-              {postOptions.map((p) => (
+              {isSuperAdmin && <option value="">{nl ? "Geen" : "None"}</option>}
+              {selectablePosts.map((p) => (
                 <option key={p} value={p}>
                   {p}
                 </option>
               ))}
+              {shift?.post && !selectablePosts.includes(shift.post) && (
+                <option key={shift.post} value={shift.post}>
+                  {shift.post}
+                </option>
+              )}
             </Select>
           </div>
           <div>

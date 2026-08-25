@@ -17,12 +17,16 @@ export function ShiftManage({
   locale,
   shifts,
   postOptions,
+  userPostCodes = [],
+  isSuperAdmin = false,
   from,
   to,
 }: {
   locale: Locale;
   shifts: AdminShift[];
   postOptions: string[];
+  userPostCodes?: string[];
+  isSuperAdmin?: boolean;
   from: string;
   to: string;
 }) {
@@ -181,24 +185,30 @@ export function ShiftManage({
                 </td>
                 <td className="px-4 py-2 text-zinc-500">{s.reward}</td>
                 <td className="px-4 py-2 text-right">
-                  <RowActions>
-                    <IconButton
-                      label={nl ? "Bewerken" : "Edit"}
-                      srLabel={`${nl ? "Bewerken" : "Edit"}: ${s.name}`}
-                      onClick={() => setEditing(s)}
-                    >
-                      <PencilIcon />
-                    </IconButton>
-                    <IconButton
-                      label={nl ? "Verwijderen" : "Delete"}
-                      srLabel={`${nl ? "Verwijderen" : "Delete"}: ${s.name}`}
-                      tone="danger"
-                      disabled={busyId === s.id}
-                      onClick={() => setDeleting(s)}
-                    >
-                      <TrashIcon />
-                    </IconButton>
-                  </RowActions>
+                  {(isSuperAdmin ||
+                    (s.post !== null &&
+                      userPostCodes.some(
+                        (code) => code.toLowerCase() === s.post?.toLowerCase(),
+                      ))) && (
+                    <RowActions>
+                      <IconButton
+                        label={nl ? "Bewerken" : "Edit"}
+                        srLabel={`${nl ? "Bewerken" : "Edit"}: ${s.name}`}
+                        onClick={() => setEditing(s)}
+                      >
+                        <PencilIcon />
+                      </IconButton>
+                      <IconButton
+                        label={nl ? "Verwijderen" : "Delete"}
+                        srLabel={`${nl ? "Verwijderen" : "Delete"}: ${s.name}`}
+                        tone="danger"
+                        disabled={busyId === s.id}
+                        onClick={() => setDeleting(s)}
+                      >
+                        <TrashIcon />
+                      </IconButton>
+                    </RowActions>
+                  )}
                 </td>
               </tr>
             ))}
@@ -218,6 +228,8 @@ export function ShiftManage({
           locale={locale}
           shift={editing}
           postOptions={postOptions}
+          userPostCodes={userPostCodes}
+          isSuperAdmin={isSuperAdmin}
           onClose={() => {
             setCreating(false);
             setEditing(null);

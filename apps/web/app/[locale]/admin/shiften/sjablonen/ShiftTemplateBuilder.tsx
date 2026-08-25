@@ -166,38 +166,46 @@ async function describeFailure(resp: Response): Promise<string> {
   return data?.error ?? `HTTP ${resp.status}`;
 }
 
-function initialGlobals(template: ShiftTemplate, start: string): Globals {
+function initialGlobals(template: ShiftTemplate, start: string, postOptions?: string[]): Globals {
+  let defaultPost = template.defaults.post ?? '';
+  if (postOptions && postOptions.length > 0 && !postOptions.includes(defaultPost)) {
+    defaultPost = postOptions[0];
+  }
   return {
     eventName: template.defaults.eventName,
     start,
     location: template.defaults.location,
-    post: template.defaults.post ?? '',
+    post: defaultPost,
   };
 }
 
-function buildRows(template: ShiftTemplate, globals: Globals): Row[] {
-  return template.shifts.map((entry, index) => ({
-    uid: `${template.id}-${entry.key}-${index}`,
-    enabled: entry.enabled !== false,
-    name: composeName(globals.eventName, entry.name),
-    start: addMinutes(globals.start, entry.startOffsetMinutes),
-    end: addMinutes(globals.start, entry.startOffsetMinutes + entry.durationMinutes),
-    maxParticipants: String(entry.maxParticipants),
-    reward: String(entry.reward),
-    location: entry.location ?? globals.location,
-    // `post: null` in een sjabloon betekent "deze shift hoort bij geen post", en
-    // dat is iets anders dan het veld weglaten; enkel weglaten volgt het globale.
-    post: entry.post !== undefined ? (entry.post ?? '') : globals.post,
-    description: entry.description,
-    instructions: entry.instructions ?? '',
-    openToInternationals: entry.openToInternationals ?? false,
-    offsetMinutes: entry.startOffsetMinutes,
-    durationMinutes: entry.durationMinutes,
-    baseName: entry.name,
-    ownLocation: entry.location !== undefined,
-    ownPost: entry.post !== undefined,
-    touched: {},
-  }));
+function buildRows(template: ShiftTemplate, globals: Globals, postOptions?: string[]): Row[] {
+  return template.shifts.map((entry, index) => {
+    let post = entry.post !== undefined ? (entry.post ?? '') : globals.post;
+    if (postOptions && postOptions.length > 0 && !postOptions.includes(post)) {
+      post = globals.post;
+    }
+    return {
+      uid: `${template.id}-${entry.key}-${index}`,
+      enabled: entry.enabled !== false,
+      name: composeName(globals.eventName, entry.name),
+      start: addMinutes(globals.start, entry.startOffsetMinutes),
+      end: addMinutes(globals.start, entry.startOffsetMinutes + entry.durationMinutes),
+      maxParticipants: String(entry.maxParticipants),
+      reward: String(entry.reward),
+      location: entry.location ?? globals.location,
+      post,
+      description: entry.description,
+      instructions: entry.instructions ?? '',
+      openToInternationals: entry.openToInternationals ?? false,
+      offsetMinutes: entry.startOffsetMinutes,
+      durationMinutes: entry.durationMinutes,
+      baseName: entry.name,
+      ownLocation: entry.location !== undefined,
+      ownPost: entry.post !== undefined && (!postOptions || postOptions.includes(entry.post ?? '')),
+      touched: {},
+    };
+  });
 }
 
 /** Eén lege rij om zelf iets bij te zetten dat niet in het sjabloon zit. */
@@ -245,9 +253,11 @@ export function ShiftTemplateBuilder({
   const [templateId, setTemplateId] = useState(templates[0]?.id ?? '');
   const template = useMemo(() => templates.find((t) => t.id === templateId) ?? templates[0], [templates, templateId]);
 
-  const [globals, setGlobals] = useState<Globals>(() => initialGlobals(template, defaultStart(template, today)));
+  const [globals, setGlobals] = useState<Globals>(() =>
+    initialGlobals(template, defaultStart(template, today), postOptions),
+  );
   const [rows, setRows] = useState<Row[]>(() =>
-    buildRows(template, initialGlobals(template, defaultStart(template, today)))
+    buildRows(template, initialGlobals(template, defaultStart(template, today), postOptions), postOptions),
   );
   const [dirty, setDirty] = useState(false);
   const [pendingTemplate, setPendingTemplate] = useState<string | null>(null);
@@ -314,10 +324,10 @@ export function ShiftTemplateBuilder({
     // moment, inclusief de opbouwshiften die eromheen gerekend worden.
     const day = globals.start.slice(0, 10) || today;
     const start = defaultStart(next, day);
-    const nextGlobals = initialGlobals(next, start);
+    const nextGlobals = initialGlobals(next, start, postOptions);
     setTemplateId(id);
     setGlobals(nextGlobals);
-    setRows(buildRows(next, nextGlobals));
+    setRows(buildRows(next, nextGlobals, postOptions));
     setDirty(false);
     setFailure(null);
     setDoneUids([]);

@@ -181,6 +181,9 @@ export default async function AdminShifts({
     select: { code: true },
   });
   const postOptions = activeGroups.map((g) => g.code);
+  const userPostCodes = session.user.isSuperAdmin
+    ? postOptions
+    : session.groups.filter((g) => g.type === "PRAESIDIUM").map((g) => g.code);
 
   return (
     <div className="space-y-5">
@@ -192,6 +195,8 @@ export default async function AdminShifts({
         ranking={ranking}
         rewards={rewards}
         postOptions={postOptions}
+        userPostCodes={userPostCodes}
+        isSuperAdmin={session.user.isSuperAdmin}
         from={format(rangeStart, "yyyy-MM-dd")}
         to={format(rangeToDay, "yyyy-MM-dd")}
         year={selectedYear}

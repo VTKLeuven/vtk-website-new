@@ -42,6 +42,8 @@ export function ShiftAdmin({
   ranking,
   rewards,
   postOptions,
+  userPostCodes = [],
+  isSuperAdmin = false,
   from,
   to,
   year,
@@ -53,6 +55,8 @@ export function ShiftAdmin({
   ranking: RankingRow[];
   rewards: RewardRow[];
   postOptions: string[];
+  userPostCodes?: string[];
+  isSuperAdmin?: boolean;
   from: string;
   to: string;
   year: number;
@@ -87,7 +91,15 @@ export function ShiftAdmin({
       </div>
 
       {tab === "manage" && capabilities.canEdit && (
-        <ShiftManage locale={locale} shifts={shifts} postOptions={postOptions} from={from} to={to} />
+        <ShiftManage
+          locale={locale}
+          shifts={shifts}
+          postOptions={postOptions}
+          userPostCodes={userPostCodes}
+          isSuperAdmin={isSuperAdmin}
+          from={from}
+          to={to}
+        />
       )}
       {tab === "ranking" && capabilities.canRanking && (
         <ShiftRanking locale={locale} ranking={ranking} year={year} years={years} />
