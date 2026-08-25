@@ -47,7 +47,7 @@ export default function BroodjesScreen() {
   if (!viewer) {
     return (
       <>
-        <PageHead title="Broodjes" subtitle="Bij het Theokot" back={false} />
+        <PageHead title="Broodjes" subtitle="Bij het Theokot" />
         <ScrollView contentContainerStyle={styles.content} style={styles.root}>
           <Card>
             <Text style={styles.title}>Log eerst in</Text>
@@ -65,7 +65,7 @@ export default function BroodjesScreen() {
   if (gate) {
     return (
       <>
-        <PageHead title="Broodjes" subtitle="Bij het Theokot" back={false} />
+        <PageHead title="Broodjes" subtitle="Bij het Theokot" />
         <ScrollView contentContainerStyle={styles.content} style={styles.root}>
           <Card featured>
             <Text style={styles.title}>
@@ -97,7 +97,7 @@ export default function BroodjesScreen() {
 
   return (
     <>
-      <PageHead title="Broodjes" subtitle="Bij het Theokot" back={false} />
+      <PageHead title="Broodjes" subtitle="Bij het Theokot" />
 
       <Segmented
         value={tab}

@@ -5,8 +5,8 @@ import {
   Coins,
   ExternalLink,
   Images,
-  Music,
   QrCode,
+  Sandwich,
   Wrench,
 } from 'lucide-react-native';
 import * as WebBrowser from 'expo-web-browser';
@@ -257,7 +257,7 @@ function Shortcuts({
   const items = [
     { key: 'shiften', label: 'Shiften', icon: <Wrench color={COLORS.navy} size={20} />, to: '/shiften' },
     { key: 'media', label: "Foto's", icon: <Images color={COLORS.navy} size={20} />, to: '/media' },
-    { key: 'piano', label: 'Piano', icon: <Music color={COLORS.navy} size={20} />, to: '/piano' },
+    { key: 'broodjes', label: 'Broodjes', icon: <Sandwich color={COLORS.navy} size={20} />, to: '/broodjes' },
     {
       key: 'cursusdienst',
       label: 'Cursusdienst',

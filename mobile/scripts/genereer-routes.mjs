@@ -8,7 +8,7 @@
  * je dat pas op een toestel. `TAB_ROUTES` is de kaart; dit script maakt de
  * bestanden. Draaien: `npm run routes`.
  */
-import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -34,16 +34,16 @@ const TAB_INDEX_SCREENS = readMap('TAB_INDEX_SCREENS');
 const TITLES = {
   '(home)': 'Home',
   kalender: 'Kalender',
+  studeren: 'Studeren',
   tickets: 'Tickets',
-  broodjes: 'Broodjes',
   meer: 'Meer',
 };
 
 const NAMES = {
   '(home)': 'Home',
   kalender: 'Kalender',
+  studeren: 'Studeren',
   tickets: 'Tickets',
-  broodjes: 'Broodjes',
   meer: 'Meer',
 };
 
@@ -79,8 +79,10 @@ export default function ${NAMES[tab]}StackLayout() {
 
 // De tabbalk zelf (`app/(tabs)/_layout.tsx`) is met de hand geschreven: iconen en
 // titels zijn keuzes, geen afgeleide. Enkel de stacks eronder worden hier gemaakt.
-for (const tab of Object.keys(TAB_ROUTES)) {
-  rmSync(join(root, 'app/(tabs)', tab), { recursive: true, force: true });
+for (const entry of readdirSync(join(root, 'app/(tabs)'), { withFileTypes: true })) {
+  if (entry.isDirectory()) {
+    rmSync(join(root, 'app/(tabs)', entry.name), { recursive: true, force: true });
+  }
 }
 rmSync(join(root, 'app/(oud)'), { recursive: true, force: true });
 

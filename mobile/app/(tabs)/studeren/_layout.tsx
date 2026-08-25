@@ -5,14 +5,14 @@ import { Stack } from 'expo-router';
 import { COLORS } from '../../../src/theme/tokens';
 
 /**
- * De stack van de tab **undefined**.
+ * De stack van de tab **Studeren**.
  *
  * Elke tab heeft er een, en dat is niet uit netheid: **terugvegen popt een stack,
  * dus er moet een scherm onder liggen**. Dat scherm is de tab zelf. Alles wat je
  * hier opent komt erbovenop, en teruggaan komt daardoor altijd uit waar je
  * vandaan kwam. Zie src/navigation.ts voor het geheel.
  */
-export default function undefinedStackLayout() {
+export default function StuderenStackLayout() {
   return (
     <Stack
       screenOptions={{

@@ -97,7 +97,7 @@ bekijken. Push is de bestaande uitzondering: die werkt in Expo Go niet.
   `npm run routes` schrijft ze uit `TAB_ROUTES` in `src/navigation.ts`. De
   schermen zelf staan in `src/screens/`.
 - **Elke tab is een eigen stack**, met het tabscherm onderaan:
-  `app/(tabs)/(home)/`, `kalender/`, `tickets/`, `broodjes/`, `meer/`. Dat is de
+  `app/(tabs)/(home)/`, `kalender/`, `studeren/`, `tickets/`, `meer/`. Dat is de
   hele reden dat teruggaan werkt zoals het hoort, en het is één keer fout gegaan
   in drie pogingen, dus: **terugvegen popt een stack, en poppen kan enkel als er
   een scherm onder ligt.** Was er één gedeelde stack voor alle doorklikschermen,
@@ -132,9 +132,9 @@ bekijken. Push is de bestaande uitzondering: die werkt in Expo Go niet.
   achterlopen en een pushbericht van vorige week draagt nog het oude pad; dat mag
   niet op een leeg scherm eindigen. Ook deze worden gemaakt.
 - `app/(tabs)/_layout.tsx` is wél met de hand geschreven: **Home, Kalender,
-  Studeren, Tickets, Broodjes, Meer**, met hun iconen. Tickets en Broodjes hebben
-  elk twee segmenten (Kopen/Mijne, Bestellen/Afhalen); zie
-  `src/components/Segmented.tsx` voor waarom dat geen tabs zijn.
+  Studeren, Tickets, Meer**, met hun iconen. Tickets heeft twee segmenten (Kopen/Mijne); zie
+  `src/components/Segmented.tsx` voor waarom dat geen tabs zijn. Broodjes staat als
+  snelkoppeling op Home.
 - `app/_layout.tsx` draagt enkel nog de tabs plus drie modals (inloggen, de
   onboardingpoort, de serverinstelling). Die liggen bewust wél over de balk: een
   modal die de navigatie eronder laat staan, is geen modal.

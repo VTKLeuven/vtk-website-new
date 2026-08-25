@@ -39,7 +39,7 @@ function inhoud(dir) {
  * is minder omslachtig dan het lijkt: de bestanden zijn één regel lang en de
  * generator is de enige die ze schrijft.
  */
-const gemaakt = ['app/(tabs)/(home)', 'app/(tabs)/kalender', 'app/(tabs)/tickets', 'app/(tabs)/broodjes', 'app/(tabs)/meer', 'app/(oud)'];
+const gemaakt = ['app/(tabs)/(home)', 'app/(tabs)/kalender', 'app/(tabs)/studeren', 'app/(tabs)/tickets', 'app/(tabs)/meer', 'app/(oud)'];
 const voor = new Map(gemaakt.flatMap((d) => [...inhoud(join(root, d))]));
 execFileSync('node', [join(root, 'scripts/genereer-routes.mjs')], { stdio: 'pipe' });
 const na = new Map(gemaakt.flatMap((d) => [...inhoud(join(root, d))]));
@@ -126,7 +126,7 @@ const indexSchermen = {};
 }
 
 /** Adressen die met opzet buiten de tab liggen: de tabs zelf en de modals. */
-const BUITEN = new Set(['/', '/kalender', '/tickets', '/broodjes', '/meer', '/inloggen', '/instellingen', '/poort']);
+const BUITEN = new Set(['/', '/kalender', '/studeren', '/tickets', '/meer', '/inloggen', '/instellingen', '/poort']);
 
 /** De adressen die één scherm duwt, genormaliseerd. */
 function duwtNaar(scherm) {
