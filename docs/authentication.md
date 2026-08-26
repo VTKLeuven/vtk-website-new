@@ -268,8 +268,8 @@ Om te controleren welke attributen ICTS effectief vrijgeeft (bv. of
   better-auth aan `mapProfileToUser` doorgeeft, plus de afgeleide `email`/`rNumber`.
   Het loggen faalt dicht: een DB-fout mag een login nooit breken.
 - **Privacy**: die claims bevatten persoonsgegevens (naam, e-mail, r-nummer,
-  faculteit). Daarom staat het standaard uit, bewaren we enkel de laatste
-  `KUL_LOG_KEEP` (50) logins, en is er een "Clear logs"-knop.
+  faculteit). Daarom staat het standaard uit, bewaren we enkel logins van de
+  laatste `KUL_LOG_RETENTION_DAYS` (7) dagen, en is er een "Clear logs"-knop.
 - **Userinfo wordt altijd opgehaald**: better-auth zou standaard meteen de
   **ID-token**-claims gebruiken zodra die `sub` en `email` bevatten. Daardoor
   ontbraken attributen die ICTS enkel via userinfo vrijgeeft. Onze custom

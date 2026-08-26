@@ -9,8 +9,9 @@
  * omgeving, zodat je ze zonder redeploy aan/uit zet.
  *
  * Belangrijk: dit bevat persoonsgegevens (naam, e-mail, r-nummer, faculteit).
- * Daarom staat het standaard uit, bewaren we enkel de laatste `KUL_LOG_KEEP`
- * logins, en mag het loggen nooit een login breken (alles hieronder faalt dicht).
+ * Daarom staat het standaard uit, bewaren we enkel logins van de laatste
+ * `KUL_LOG_RETENTION_DAYS` (7) dagen, en mag het loggen nooit een login breken
+ * (alles hieronder faalt dicht).
  */
 import "server-only";
 import { prisma } from "@vtk/db";
@@ -19,8 +20,11 @@ import type { Prisma } from "@prisma/client";
 /** Setting-sleutel voor de debugtoggle. JSON-vorm: `{ enabled: boolean }`. */
 export const KUL_DEBUG_SETTING_KEY = "kul.debug";
 
-/** Hoeveel logins we bewaren; oudere rijen sneuvelen na elke nieuwe login. */
-export const KUL_LOG_KEEP = 50;
+/** Hoeveel dagen we bewaarde logins bijhouden; oudere rijen worden gesnoeid. */
+export const KUL_LOG_RETENTION_DAYS = 7;
+
+/** @deprecated Gebruik `KUL_LOG_RETENTION_DAYS`. */
+export const KUL_LOG_KEEP = KUL_LOG_RETENTION_DAYS;
 
 type KulDebugSetting = { enabled?: boolean };
 
@@ -46,7 +50,7 @@ export async function isKulDebugEnabled(): Promise<boolean> {
 
 /**
  * Bewaart de ruwe claims van één KU Leuven-login wanneer de toggle aanstaat, en
- * snoeit daarna tot de laatste `KUL_LOG_KEEP` rijen. `email` en `rNumber` komen
+ * snoeit daarna rijen ouder dan `KUL_LOG_RETENTION_DAYS` dagen. `email` en `rNumber` komen
  * van de aanroeper (kul.ts leidt ze al af) zodat de UI ze zonder de volledige
  * claims kan tonen. Gooit nooit: een mislukte log mag een login niet breken.
  */
@@ -65,24 +69,24 @@ export async function recordKulProfile(
       },
     });
 
-    // Snoei alles buiten de nieuwste N. Aparte query zodat een fout hier de login
+    // Snoei rijen ouder dan de bewaartermijn. Aparte query zodat een fout hier de login
     // (en de zonet bewaarde rij) niet raakt.
-    const stale = await prisma.kulAuthLog.findMany({
-      orderBy: { at: "desc" },
-      skip: KUL_LOG_KEEP,
-      select: { id: true },
+    const cutoff = new Date(Date.now() - KUL_LOG_RETENTION_DAYS * 86_400_000);
+    await prisma.kulAuthLog.deleteMany({
+      where: { at: { lt: cutoff } },
     });
-    if (stale.length > 0) {
-      await prisma.kulAuthLog.deleteMany({ where: { id: { in: stale.map((s) => s.id) } } });
-    }
   } catch {
     // Debuglogging mag de authenticatie nooit breken; bewust ingeslikt.
   }
 }
 
-/** De laatst bewaarde logins, nieuwste eerst, voor het overzicht in Admin -> IT. */
-export async function getKulAuthLogs(limit = KUL_LOG_KEEP): Promise<KulAuthLogEntry[]> {
-  const rows = await prisma.kulAuthLog.findMany({ orderBy: { at: "desc" }, take: limit });
+/** De bewaarde logins van de voorbije dagen, nieuwste eerst, voor het overzicht in Admin -> IT. */
+export async function getKulAuthLogs(days = KUL_LOG_RETENTION_DAYS): Promise<KulAuthLogEntry[]> {
+  const cutoff = new Date(Date.now() - days * 86_400_000);
+  const rows = await prisma.kulAuthLog.findMany({
+    where: { at: { gte: cutoff } },
+    orderBy: { at: "desc" },
+  });
   return rows.map((row) => ({
     id: row.id,
     at: row.at,
@@ -90,6 +94,15 @@ export async function getKulAuthLogs(limit = KUL_LOG_KEEP): Promise<KulAuthLogEn
     rNumber: row.rNumber,
     claims: (row.claims ?? {}) as Record<string, unknown>,
   }));
+}
+
+/** Snoeit bewaarde logins ouder dan de bewaartermijn. */
+export async function pruneKulAuthLogs(days = KUL_LOG_RETENTION_DAYS): Promise<number> {
+  const cutoff = new Date(Date.now() - days * 86_400_000);
+  const { count } = await prisma.kulAuthLog.deleteMany({
+    where: { at: { lt: cutoff } },
+  });
+  return count;
 }
 
 /** Wist alle bewaarde logins. De toggle zelf blijft ongewijzigd. */
