@@ -1,6 +1,6 @@
 'use client';
 
-import { useActionState } from 'react';
+import { useActionState, useState } from 'react';
 import { registerAction } from '@/app/actions/register';
 import { SAVE_IDLE, type SaveState } from '@/lib/saveState';
 
@@ -24,10 +24,10 @@ export function RegisterForm({
     password: string;
     passwordHint: string;
     passwordRepeat: string;
+    alumni: string;
     graduationYear: string;
     graduationYearHint: string;
     wasInVtk: string;
-    wasInVtkHint: string;
     mailOptIn: string;
     submit: string;
     sentTitle: string;
@@ -41,6 +41,7 @@ export function RegisterForm({
     registerAction,
     SAVE_IDLE,
   );
+  const [isAlumni, setIsAlumni] = useState(false);
 
   if (state.status === 'success') {
     return (
@@ -98,33 +99,45 @@ export function RegisterForm({
         </div>
       </div>
 
-      <div>
-        <label htmlFor="graduationYear">{labels.graduationYear}</label>
-        {/* `inputMode` en geen `type="number"`: een spinner op een jaartal is
-            onbruikbaar op een telefoon en scrollt per ongeluk mee. */}
-        <input
-          id="graduationYear"
-          name="graduationYear"
-          inputMode="numeric"
-          pattern="[0-9]{4}"
-          maxLength={4}
-          placeholder="2019"
-        />
-        <p className="vtk-auth-hint">{labels.graduationYearHint}</p>
-      </div>
-
-      <div>
-        <div className="vtk-auth-check">
-          <input id="wasInVtk" name="wasInVtk" type="checkbox" />
-          <label htmlFor="wasInVtk">{labels.wasInVtk}</label>
-        </div>
-        <p className="vtk-auth-hint">{labels.wasInVtkHint}</p>
-      </div>
-
       <div className="vtk-auth-check">
-        <input id="mailOptIn" name="mailOptIn" type="checkbox" />
-        <label htmlFor="mailOptIn">{labels.mailOptIn}</label>
+        <input
+          id="alumni"
+          name="alumni"
+          type="checkbox"
+          checked={isAlumni}
+          onChange={(e) => setIsAlumni(e.target.checked)}
+        />
+        <label htmlFor="alumni">{labels.alumni}</label>
       </div>
+
+      {isAlumni && (
+        <>
+          <div>
+            <label htmlFor="graduationYear">{labels.graduationYear}</label>
+            {/* `inputMode` en geen `type="number"`: een spinner op een jaartal is
+                onbruikbaar op een telefoon en scrollt per ongeluk mee. */}
+            <input
+              id="graduationYear"
+              name="graduationYear"
+              inputMode="numeric"
+              pattern="[0-9]{4}"
+              maxLength={4}
+              placeholder="2019"
+            />
+            <p className="vtk-auth-hint">{labels.graduationYearHint}</p>
+          </div>
+
+          <div className="vtk-auth-check">
+            <input id="wasInVtk" name="wasInVtk" type="checkbox" />
+            <label htmlFor="wasInVtk">{labels.wasInVtk}</label>
+          </div>
+
+          <div className="vtk-auth-check">
+            <input id="mailOptIn" name="mailOptIn" type="checkbox" />
+            <label htmlFor="mailOptIn">{labels.mailOptIn}</label>
+          </div>
+        </>
+      )}
 
       {state.status === 'error' && (
         <p className="vtk-auth-error">{labels.errors[state.code] ?? labels.errorFallback}</p>

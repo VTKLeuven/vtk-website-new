@@ -44,6 +44,7 @@ export type SelfSignupInput = {
   email: string;
   password: string;
   locale: Locale;
+  alumni?: boolean;
   /** Vult het alumni-profiel meteen in; het is de reden dat deze deur bestaat. */
   graduationYear?: number | null;
   wasInVtk?: boolean;
@@ -71,21 +72,17 @@ function hashToken(token: string): string {
   return createHash('sha256').update(token).digest('hex');
 }
 
-function newToken(): string {
-  return randomBytes(32).toString('base64url');
-}
-
 /**
- * Zet een verse token klaar en trekt de vorige van dezelfde soort in. Zonder dat
- * intrekken blijft een oude bevestigingslink uit een eerdere mail werken, en dan
- * is "opnieuw versturen" geen vervanging maar een tweede sleutel.
+ * Maakt een eenmalig token aan en verwijdert eventuele eerdere open tokens voor
+ * dezelfde gebruiker en hetzelfde doel. Geeft de platte tekst terug om in de
+ * mail te stoppen; in de database bewaren we alleen de SHA-256-hash.
  */
 async function issueToken(
   userId: string,
   kind: 'EMAIL_VERIFICATION' | 'PASSWORD_RESET',
   ttlMs: number,
 ): Promise<string> {
-  const token = newToken();
+  const token = randomBytes(32).toString('base64url');
   await prisma.$transaction([
     prisma.accountEmailToken.updateMany({
       where: { userId, kind, usedAt: null },
@@ -124,6 +121,7 @@ export async function registerSelfServiceAccount(
   }
 
   const passwordHash = await hashPassword(input.password);
+  const isAlumni = input.alumni ?? Boolean(input.graduationYear != null || input.wasInVtk || input.alumniMailOptIn);
 
   const user = await prisma.$transaction(async (tx) => {
     const created = await tx.user.create({
@@ -137,11 +135,11 @@ export async function registerSelfServiceAccount(
         selfRegisteredAt: new Date(),
         // De onboarding hoort er ook voor dit account bij: die vult adres,
         // voorkeuren en het alumni-profiel aan. `onboardedAt` blijft dus null.
-        alumni: true,
-        notStudying: true,
-        graduationYear: input.graduationYear ?? null,
-        wasInVtk: input.wasInVtk ?? false,
-        alumniMailOptIn: input.alumniMailOptIn ?? false,
+        alumni: isAlumni,
+        notStudying: isAlumni,
+        graduationYear: isAlumni ? (input.graduationYear ?? null) : null,
+        wasInVtk: isAlumni ? (input.wasInVtk ?? false) : false,
+        alumniMailOptIn: isAlumni ? (input.alumniMailOptIn ?? false) : false,
       },
     });
 

@@ -48,6 +48,7 @@ const registerSchema = z
     email: z.string().trim().toLowerCase().email(),
     password: z.string().min(1),
     passwordRepeat: z.string().min(1),
+    alumni: z.boolean().default(false),
     graduationYear: graduationYearField(),
     wasInVtk: z.boolean().default(false),
     mailOptIn: z.boolean().default(false),
@@ -70,6 +71,7 @@ export async function registerAction(
     email: formData.get("email") ?? "",
     password: formData.get("password") ?? "",
     passwordRepeat: formData.get("passwordRepeat") ?? "",
+    alumni: formData.get("alumni") === "on",
     graduationYear: formData.get("graduationYear") ?? "",
     wasInVtk: formData.get("wasInVtk") === "on",
     mailOptIn: formData.get("mailOptIn") === "on",
@@ -95,9 +97,10 @@ export async function registerAction(
       email: data.email,
       password: data.password,
       locale: locale === "en" ? "EN" : "NL",
-      graduationYear: data.graduationYear ? Number(data.graduationYear) : null,
-      wasInVtk: data.wasInVtk,
-      alumniMailOptIn: data.mailOptIn,
+      alumni: data.alumni,
+      graduationYear: data.alumni && data.graduationYear ? Number(data.graduationYear) : null,
+      wasInVtk: data.alumni ? data.wasInVtk : false,
+      alumniMailOptIn: data.alumni ? data.mailOptIn : false,
     });
   } catch (err) {
     if (err instanceof AuthError && err.code === "PASSWORD_TOO_SHORT") {

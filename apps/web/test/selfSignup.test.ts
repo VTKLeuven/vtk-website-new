@@ -104,6 +104,29 @@ describe("registerSelfServiceAccount", () => {
     expect(stored).not.toBe(result.token);
   });
 
+  it("maakt een niet-alumnus account aan wanneer alumni niet aangevinkt is", async () => {
+    userFindUnique.mockResolvedValue(null);
+    userCreate.mockResolvedValue({ id: "nieuw-extern" });
+
+    const result = await registerSelfServiceAccount({ ...input, alumni: false });
+
+    expect(userCreate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          email: "jan@example.com",
+          emailVerified: false,
+          alumni: false,
+          notStudying: false,
+          graduationYear: null,
+          wasInVtk: false,
+          alumniMailOptIn: false,
+          selfRegisteredAt: expect.any(Date),
+        }),
+      }),
+    );
+    expect(result.token).toEqual(expect.any(String));
+  });
+
   it("weigert een te kort wachtwoord", async () => {
     await expect(
       registerSelfServiceAccount({ ...input, password: "a".repeat(MIN_PASSWORD_LENGTH - 1) }),

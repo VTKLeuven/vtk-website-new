@@ -271,14 +271,14 @@ export default async function CalendarSegmentPage({ params }: { params: Params }
               ? "Laat leeg om anoniem in de lijst te staan."
               : "Leave empty to appear anonymously in the list.",
             guestYear: nl ? "Afstudeerjaar" : "Graduation year",
-            guestWasInVtk: nl ? "Ik heb ooit in VTK gezeten" : "I was part of VTK",
+            guestWasInVtk: nl ? "Ik heb ooit in VTK Praesidium gezeten" : "I was part of the VTK Praesidium",
             guestSubmit: nl ? "Ik kom" : "I am coming",
             guestUpdate: nl ? "Bijwerken" : "Update",
             guestRemove: nl ? "Toch niet" : "Never mind",
             guestDone: nl ? "Genoteerd. Tot dan." : "Noted. See you there.",
             errorNothing: nl
-              ? "Vul minstens je afstudeerjaar in of vink aan dat je in VTK zat."
-              : "Fill in at least your graduation year, or tick that you were in VTK.",
+              ? "Vul minstens je afstudeerjaar in of vink aan dat je in VTK Praesidium zat."
+              : "Fill in at least your graduation year, or tick that you were in the VTK Praesidium.",
             errorGeneric: nl
               ? "Er ging iets mis. Probeer het opnieuw."
               : "Something went wrong. Please try again.",
