@@ -56,12 +56,16 @@ export default async function OnboardingPage({
       mailCategories: true,
       shiftReminderDayBefore: true,
       shiftReminderSoon: true,
+      calendarOnlyMyAudiences: true,
       studyYears: true,
       studyProgrammes: true,
       notAtFaculty: true,
       notStudying: true,
       internationalStudent: true,
       alumni: true,
+      graduationYear: true,
+      wasInVtk: true,
+      alumniMailOptIn: true,
     },
   });
 

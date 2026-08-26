@@ -172,6 +172,13 @@ export function DefaultFrontpage({
                           .filter(Boolean)
                           .join(" · ")}
                       </small>
+                      {/* Enkel wanneer er al volk naartoe gaat; de drempel zit
+                          aan de serverkant, dus een laag getal komt hier niet. */}
+                      {event.interestedCount ? (
+                        <span className="hero-ev-going">
+                          {event.interestedCount} {nl ? "komen" : "going"}
+                        </span>
+                      ) : null}
                     </div>
                     {/* Own class: the global `.arrow` would glue a second arrow
                         on with ::after. */}

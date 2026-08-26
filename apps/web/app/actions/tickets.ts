@@ -72,6 +72,17 @@ function value(formData: FormData, key: string): string {
   return String(formData.get(key) ?? "").trim();
 }
 
+/**
+ * De doelgroep van een ticketsoort. Alles wat we niet herkennen wordt `PUBLIC`:
+ * een onbekende waarde mag nooit per ongeluk een strengere of net ruimere groep
+ * opleveren dan wat de beheerder koos.
+ */
+function ticketAudienceFrom(raw: string): "PUBLIC" | "MEMBERS" | "HONORARY" {
+  if (raw === "MEMBERS") return "MEMBERS";
+  if (raw === "HONORARY") return "HONORARY";
+  return "PUBLIC";
+}
+
 function optionalValue(formData: FormData, key: string): string | null {
   return value(formData, key) || null;
 }
@@ -702,7 +713,7 @@ export async function createTicketTypeAction(formData: FormData): Promise<void> 
         descriptionEn: limitedOptionalValue(formData, "descriptionEn", 5_000),
         unitPriceCents,
         currency: event.currency,
-        audience: value(formData, "audience") === "MEMBERS" ? "MEMBERS" : "PUBLIC",
+        audience: ticketAudienceFrom(value(formData, "audience")),
         color: ticketColorKey(formData.get("color")),
         salesStartAt,
         salesEndAt,

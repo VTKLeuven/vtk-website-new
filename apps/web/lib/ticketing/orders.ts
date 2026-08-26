@@ -142,6 +142,16 @@ export async function createTicketCheckout(
   const input = checkoutRequestSchema.parse(rawInput);
   const now = new Date();
   const [session, terms] = await Promise.all([getSession(await headers()), getTicketTerms()]);
+  // Erelidtickets staan bij niemand anders in de lijst (zie ticketing/queries.ts);
+  // deze controle is het slot erachter.
+  const isHonorary = session
+    ? ((
+        await prisma.user.findUnique({
+          where: { id: session.user.id },
+          select: { honoraryMember: true },
+        })
+      )?.honoraryMember ?? false)
+    : false;
 
   const event = await prisma.ticketEvent.findUnique({
     where: { id: input.eventId },
@@ -173,6 +183,11 @@ export async function createTicketCheckout(
     }
     if (type.audience === "MEMBERS" && !session) {
       throw new TicketCheckoutError("LOGIN_REQUIRED", item.ticketTypeId);
+    }
+    // Een erelidticket staat bij niemand anders in de lijst; wie het toch
+    // meestuurt, krijgt hetzelfde antwoord als bij een onbestaand type.
+    if (type.audience === "HONORARY" && !isHonorary) {
+      throw new TicketCheckoutError("INVALID_TICKET_TYPE", item.ticketTypeId);
     }
     if (type.unitPriceCents === 0 && !session) {
       throw new TicketCheckoutError("LOGIN_REQUIRED", item.ticketTypeId);

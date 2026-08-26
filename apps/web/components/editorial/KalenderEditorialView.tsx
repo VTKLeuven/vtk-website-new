@@ -27,8 +27,28 @@ type ApiEvent = {
       colour: string;
       audience: string | null;
     }>;
+    /**
+     * Hoeveel mensen aanduidden dat ze komen, of `null` zolang het er te weinig
+     * zijn. De drempel zit aan de serverkant (zie lib/calendar/interest.ts), dus
+     * een laag getal komt hier niet eens aan.
+     */
+    interestedCount: number | null;
   };
 };
+
+/**
+ * De eerste paar zinnen van een beschrijving, afgekapt op een woordgrens.
+ *
+ * Bewust geen `line-clamp` in CSS: die kapt het beeld af maar niet de tekst, dus
+ * blijft de rest in de DOM staan en leest een screenreader een halve pagina voor
+ * in een kaartje van drie regels.
+ */
+function previewSummary(text: string, max = 260): string {
+  if (text.length <= max) return text;
+  const cut = text.slice(0, max);
+  const lastSpace = cut.lastIndexOf(" ");
+  return `${(lastSpace > max * 0.6 ? cut.slice(0, lastSpace) : cut).trimEnd()}…`;
+}
 
 /** Sleutel per kalenderdag; gedeeld door het raster, de selectie en de dagpanelen. */
 function dayKey(date: Date): string {
@@ -49,11 +69,12 @@ export function KalenderEditorialView({
   locale,
   labels,
   categories,
-  feedUrl,
+  feedBaseUrl,
   lockedCategory,
   heading,
   parentCrumb,
   intro,
+  defaultOnlyMyAudiences = false,
 }: {
   locale: "nl" | "en";
   labels: {
@@ -79,8 +100,8 @@ export function KalenderEditorialView({
     views: { agenda: string; week: string; list: string };
   };
   categories: CalendarCategoryOption[];
-  /** Absolute URL van de ICS-feed die bij deze weergave hoort. */
-  feedUrl: string;
+  /** Absolute URL van de hoofdfeed; de abonneerdialoog stelt de selectie samen. */
+  feedBaseUrl: string;
   /**
    * Op een categoriepagina staat de filter vast op die categorie: de chips
    * verdwijnen dan, want er valt niets meer te kiezen.
@@ -92,6 +113,12 @@ export function KalenderEditorialView({
   parentCrumb?: { label: string; href: string };
   /** Introtekst onder de kop, bv. de beschrijving van een categorie. */
   intro?: React.ReactNode;
+  /**
+   * Beginstand van "Afstemmen op mijn profiel", uit de accountvoorkeur van het
+   * lid. Zonder dit stond het vinkje altijd uit en moest wie de voorkeur net
+   * aanzette hem hier opnieuw aanklikken.
+   */
+  defaultOnlyMyAudiences?: boolean;
 }) {
   const base = locale === "nl" ? "" : "/en";
   const now = new Date();
@@ -101,14 +128,20 @@ export function KalenderEditorialView({
   const [filter, setFilter] = useState<string>(lockedCategory ?? "all");
   const [view, setView] = useState<"agenda" | "week" | "list">("agenda");
   // Alles is standaard zichtbaar. Personalisatie is een bewuste keuze en houdt
-  // algemene events plus de doelgroepevents die bij het profiel horen over.
-  const [onlyMyAudiences, setOnlyMyAudiences] = useState(false);
+  // algemene events plus de doelgroepevents die bij het profiel horen over; de
+  // beginstand komt uit de accountvoorkeur van het lid.
+  const [onlyMyAudiences, setOnlyMyAudiences] = useState(defaultOnlyMyAudiences);
   // Enkel voor het smalle scherm: welke dag staat er open onder het raster. Op
   // een telefoon passen de eventpillen niet in een cel van 45 pixels, dus toont
   // het raster daar stippen en lees je de dag zelf hieronder.
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
   const [monthEvents, setMonthEvents] = useState<ApiEvent[]>([]);
   const [agendaEvents, setAgendaEvents] = useState<ApiEvent[]>([]);
+  // Het evenement waarvan de voorvertoning openstaat. Een klik in het raster
+  // opent eerst dit kaartje: in een cel past hoogstens een afgekapte titel, en
+  // meteen doorsturen naar een volledige pagina is een dure manier om te
+  // ontdekken dat je het verkeerde evenement aanklikte.
+  const [preview, setPreview] = useState<ApiEvent | null>(null);
 
   const year = cursor.getFullYear();
   const month = cursor.getMonth();
@@ -122,13 +155,6 @@ export function KalenderEditorialView({
   const themeCategories = categories.filter((c) => c.audience === null);
   const audienceOptions = categories.filter((c) => c.audience !== null);
   const selectedAudience = audienceOptions.some((c) => c.slug === filter);
-
-  const activeFeedUrl = useMemo(() => {
-    if (filter === "all") return feedUrl;
-    const url = new URL(feedUrl);
-    url.pathname = `/api/calendar/feed/c/${filter}.ics`;
-    return url.toString();
-  }, [feedUrl, filter]);
 
   const fetchForRange = useCallback(
     async (start: Date, end: Date) => {
@@ -174,6 +200,15 @@ export function KalenderEditorialView({
       cancelled = true;
     };
   }, [fetchForRange]);
+
+  useEffect(() => {
+    if (!preview) return;
+    function onKey(event: KeyboardEvent) {
+      if (event.key === "Escape") setPreview(null);
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [preview]);
 
   const eventsByDay = useMemo(() => {
     const m = new Map<string, ApiEvent[]>();
@@ -332,6 +367,15 @@ export function KalenderEditorialView({
     });
   }
 
+  /**
+   * Een chip die al aanstaat, zet de filter uit. Zonder dit is "alles" enkel te
+   * bereiken via de knop links, en dat is precies niet waar iemand kijkt die net
+   * op "Alumni" duwde en het weer weg wil.
+   */
+  function toggleFilter(slug: string) {
+    setFilter((current) => (current === slug ? "all" : slug));
+  }
+
   function shiftPeriod(delta: number) {
     if (view === "week") {
       const next = new Date(cursor);
@@ -344,6 +388,27 @@ export function KalenderEditorialView({
 
   function eventHref(e: ApiEvent) {
     return `${base}/kalender/${e.id}`;
+  }
+
+  /**
+   * Vangt de gewone klik op een evenement af en opent de voorvertoning. De
+   * `href` blijft staan: middenklik, ctrl-klik en "link openen in nieuw tabblad"
+   * horen gewoon naar de pagina te gaan, en een zoekmachine ziet nog altijd een
+   * echte link.
+   */
+  function openPreview(event: React.MouseEvent, item: ApiEvent) {
+    if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || event.button !== 0) {
+      return;
+    }
+    event.preventDefault();
+    setPreview(item);
+  }
+
+  /** "32 komen", of niets zolang de teller onder de drempel zit. */
+  function interestLine(e: ApiEvent): string | null {
+    const count = e.extendedProps.interestedCount;
+    if (!count) return null;
+    return locale === "nl" ? `${count} komen` : `${count} going`;
   }
 
   const showMonthGrid = view === "agenda";
@@ -360,8 +425,14 @@ export function KalenderEditorialView({
     const cat = e.extendedProps.categories.find((c) => c.audience === null) ?? null;
     const d = new Date(e.start);
     const dateLocale = locale === "nl" ? "nl-BE" : "en-GB";
+    const going = interestLine(e);
     return (
-      <a key={e.id} href={eventHref(e)} className="ag-row">
+      <a
+        key={e.id}
+        href={eventHref(e)}
+        className="ag-row"
+        onClick={(event) => openPreview(event, e)}
+      >
         <div className="ag-date">
           <b>{String(d.getDate()).padStart(2, "0")}</b>
           {d.toLocaleDateString(dateLocale, { month: "short" })} ·{" "}
@@ -382,6 +453,7 @@ export function KalenderEditorialView({
             {eventTime(e)}
             {e.location ? ` · ${e.location}` : ""}
           </small>
+          {going ? <span className="ev-going">{going}</span> : null}
         </div>
         <div className="ag-desc">{pickDesc(e) || pickGroup(e)}</div>
         <div
@@ -446,15 +518,96 @@ export function KalenderEditorialView({
       </ul>
 
       <CalendarSubscribe
-        feedUrl={activeFeedUrl}
+        feedBaseUrl={feedBaseUrl}
+        categories={categories}
+        selectedSlug={filter === "all" ? null : filter}
         locale={locale}
         labels={{ title: labels.subscribeTitle, sub: labels.subscribeSub }}
       />
     </aside>
   );
 
+  /**
+   * De voorvertoning. Toont wat een cel niet kwijt kan: de volledige titel, een
+   * samenvatting, waar en wanneer, en of er al volk komt. De knop eronder gaat
+   * pas naar de eventpagina, waar de tickets, het formulier en de
+   * aanwezigheidslijst staan.
+   */
+  const previewCard = preview ? (
+    <div
+      className="ev-preview-overlay"
+      role="dialog"
+      aria-modal="true"
+      aria-label={pickTitle(preview)}
+      onClick={() => setPreview(null)}
+    >
+      <div className="ev-preview" onClick={(event) => event.stopPropagation()}>
+        <button
+          type="button"
+          className="ev-preview-close"
+          onClick={() => setPreview(null)}
+          aria-label={locale === "nl" ? "Sluiten" : "Close"}
+        >
+          ×
+        </button>
+
+        <div className="ev-preview-tags">
+          {preview.extendedProps.categories.map((c) => (
+            <span
+              key={c.slug}
+              className={`ev-preview-tag${c.audience ? " audience" : ""}`}
+              style={{ "--cat": c.colour } as React.CSSProperties}
+            >
+              {categoryName(c)}
+            </span>
+          ))}
+        </div>
+
+        <h3>{pickTitle(preview)}</h3>
+
+        <dl className="ev-preview-meta">
+          <div>
+            <dt>{locale === "nl" ? "Wanneer" : "When"}</dt>
+            <dd>
+              {new Date(preview.start).toLocaleDateString(locale === "nl" ? "nl-BE" : "en-GB", {
+                weekday: "long",
+                day: "numeric",
+                month: "long",
+              })}
+              {" · "}
+              {eventTime(preview)}
+            </dd>
+          </div>
+          {preview.location ? (
+            <div>
+              <dt>{locale === "nl" ? "Waar" : "Where"}</dt>
+              <dd>{preview.location}</dd>
+            </div>
+          ) : null}
+          <div>
+            <dt>{locale === "nl" ? "Door" : "By"}</dt>
+            <dd>{pickGroup(preview)}</dd>
+          </div>
+        </dl>
+
+        {pickDesc(preview) ? (
+          <p className="ev-preview-desc">{previewSummary(pickDesc(preview))}</p>
+        ) : null}
+
+        {interestLine(preview) ? (
+          <p className="ev-preview-going">{interestLine(preview)}</p>
+        ) : null}
+
+        <a href={eventHref(preview)} className="btn btn-primary arrow ev-preview-go">
+          {locale === "nl" ? "Naar de evenementpagina" : "Go to the event page"}
+        </a>
+      </div>
+    </div>
+  ) : null;
+
   return (
     <>
+      {previewCard}
       <header className="page-head">
         <div>
           <div className="crumbs">
@@ -576,7 +729,8 @@ export function KalenderEditorialView({
                     key={c.slug}
                     type="button"
                     className={`filter${filter === c.slug ? " on" : ""}`}
-                    onClick={() => setFilter(c.slug)}
+                    aria-pressed={filter === c.slug}
+                    onClick={() => toggleFilter(c.slug)}
                   >
                     {categoryName(c)}
                   </button>
@@ -590,9 +744,10 @@ export function KalenderEditorialView({
                       key={c.slug}
                       type="button"
                       className={`filter audience-filter${filter === c.slug ? " on" : ""}`}
+                      aria-pressed={filter === c.slug}
                       style={{ "--cat": c.colour } as React.CSSProperties}
                       onClick={() => {
-                        setFilter(c.slug);
+                        toggleFilter(c.slug);
                         setOnlyMyAudiences(false);
                       }}
                     >
@@ -688,6 +843,7 @@ export function KalenderEditorialView({
                           href={eventHref(e)}
                           className={`ev-pill${cat ? " tinted" : ""}`}
                           style={cat ? ({ "--cat": cat.colour } as React.CSSProperties) : undefined}
+                          onClick={(event) => openPreview(event, e)}
                         >
                           {audiences.map((a) => (
                             <span
@@ -703,6 +859,9 @@ export function KalenderEditorialView({
                             {eventTime(e)}
                             {e.location ? ` · ${e.location}` : ""}
                           </span>
+                          {interestLine(e) ? (
+                            <span className="ev-going">{interestLine(e)}</span>
+                          ) : null}
                         </a>
                       );
                     })}
@@ -750,6 +909,7 @@ export function KalenderEditorialView({
                         <a
                           href={eventHref(e)}
                           style={cat ? ({ "--cat": cat.colour } as React.CSSProperties) : undefined}
+                          onClick={(event) => openPreview(event, e)}
                         >
                           <b>{pickTitle(e)}</b>
                           <span>
@@ -765,6 +925,9 @@ export function KalenderEditorialView({
                               {categoryName(a)}
                             </span>
                           ))}
+                          {interestLine(e) ? (
+                            <span className="ev-going">{interestLine(e)}</span>
+                          ) : null}
                         </a>
                       </li>
                     );
@@ -818,6 +981,7 @@ export function KalenderEditorialView({
                                 style={
                                   cat ? ({ "--cat": cat.colour } as React.CSSProperties) : undefined
                                 }
+                                onClick={(clicked) => openPreview(clicked, event)}
                               >
                                 <span className="week-event-time">{eventTime(event)}</span>
                                 <b>{pickTitle(event)}</b>
@@ -831,6 +995,9 @@ export function KalenderEditorialView({
                                     {categoryName(audience)}
                                   </span>
                                 ))}
+                                {interestLine(event) ? (
+                                  <span className="ev-going">{interestLine(event)}</span>
+                                ) : null}
                               </a>
                             );
                           })

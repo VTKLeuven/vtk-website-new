@@ -108,6 +108,11 @@ const NAV: NavEntry[] = [
   item('piano', '/piano', { perm: 'piano.manage' }),
   item('fakscanner', '/fakscanner', { perm: 'fakscanner.manage' }),
   item('mailinglists', '/mailinglijsten', { perm: 'mailinglists.export' }),
+  // Derde ding dat "mailinglijst" heet, en bewust naast de andere twee: dit is
+  // het adresboek per lichting voor alumni. Ze staan niet in de opt-in-lijsten
+  // hierboven, want die vragen een studiebevestiging van dit werkingsjaar en
+  // die geeft een afgestudeerde per definitie nooit meer.
+  item('alumni', '/alumni', { perm: 'alumni.manage' }),
   // Twee dingen die allebei "mailinglijst" heten, en bewust naast elkaar staan
   // zodat wie het ene zoekt het andere ziet: hierboven de opt-in nieuwsbrieven
   // naar studenten (export + Brevo), hier de eigen adressen van de kring
@@ -125,6 +130,9 @@ const NAV: NavEntry[] = [
     // onderliggende /admin/it/preview staat.
     item('itConfig', '/it', { superAdminOnly: true, exact: true }),
     item('authorizationPreview', '/it/preview', { superAdminOnly: true }),
+    // De onboarding en de jaarlijkse bevestiging zie je maar één keer; zonder
+    // deze pagina is er geen manier om te controleren of ze nog kloppen.
+    item('flowPreview', '/it/flows', { superAdminOnly: true }),
     item('kulSso', '/it/kul-sso', { superAdminOnly: true }),
     item('vaultAdmin', '/wachtwoorden/beheer', { perm: 'vault.manage' }),
     item('auditLog', '/it/logboek', { perm: 'audit.view' }),

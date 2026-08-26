@@ -1,7 +1,7 @@
 import { prisma } from "@vtk/db";
 import { pick } from "@vtk/i18n";
 
-import { audienceFilter, viewerAudiences } from "@/lib/calendar/audience";
+import { viewerAudienceFilter } from "@/lib/calendar/audience";
 import { corsPreflight } from "@/lib/cors";
 import { getCursusdienstHours } from "@/lib/cursusdienstHours";
 import { DEFAULT_EVENT_IMAGE_SETTING, BUILTIN_DEFAULT_EVENT_IMAGE } from "@/lib/defaultEventImage";
@@ -99,13 +99,12 @@ export async function GET(request: Request) {
     const map = new Map(settings.map((setting) => [setting.key, setting.value as unknown]));
 
     // Dezelfde doelgroepfilter als /kalender en als de site zelf.
-    const audiences = await viewerAudiences();
+    const audiences = await viewerAudienceFilter();
     const upcomingEvents = await prisma.calendarEvent.findMany({
       where: {
         start: { gte: now },
-        visibility: "PUBLIC",
         publishedAt: { not: null },
-        ...audienceFilter(audiences),
+        ...audiences,
       },
       orderBy: { start: "asc" },
       take: 6,

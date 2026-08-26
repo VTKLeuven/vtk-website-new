@@ -1,9 +1,8 @@
 import "server-only";
 
-import { Prisma, type CalendarAudience } from "@prisma/client";
+import { Prisma } from "@prisma/client";
 import { prisma } from "@vtk/db";
 import { pick, type Locale } from "@vtk/i18n";
-import { audienceFilter } from "@/lib/calendar/audience";
 import { eventDateLine } from "@/lib/pageMetadata";
 import {
   HEADLINE_OPTIONS,
@@ -35,9 +34,9 @@ import { listImmichGalleryAlbums } from "@/lib/immich-gallery";
  *    levert kandidaat-ids met hun rang en hun fragment.
  * 2. Prisma haalt daaruit de rijen op **met dezelfde where-regels als de rest
  *    van de site**: `publishedAt` voor pagina's én evenementen, en voor een
- *    evenement ook `visibility: "PUBLIC"` plus `audienceFilter()` uit
+ *    evenement ook het doelgroepfilter van de kijker uit
  *    `lib/calendar/audience.ts`, precies zoals `/api/calendar/events` en de
- *    ics-feeds die gebruiken.
+ *    ics-feeds dat doen.
  *
  * Die tweede stap in Prisma houden in plaats van de regels in SQL over te
  * schrijven is de hele reden voor de opsplitsing: een tweede, met de hand
@@ -131,16 +130,15 @@ async function eventCandidates(
       ? Prisma.sql`concat_ws(' ', e."location", coalesce(nullif(e."descriptionEn", ''), e."descriptionNl"))`
       : Prisma.sql`concat_ws(' ', e."location", e."descriptionNl")`;
 
-  // `visibility` staat hier al in de WHERE en niet pas in stap 2. Dat scheelt
-  // niet alleen werk: zo berekent Postgres ook geen fragment van een
-  // ledenexclusief evenement dat toch weggegooid wordt.
+  // De publicatiecheck staat hier al in de WHERE en niet pas in stap 2. Dat scheelt
+  // niet alleen werk: zo berekent Postgres ook geen fragment van een concept dat
+  // toch weggegooid wordt.
   return prisma.$queryRaw<Candidate[]>`
     SELECT e."id",
            ts_rank(${vector}, q.query) AS "rank",
            ts_headline(${config}::regconfig, ${body}, q.query, ${HEADLINE_OPTIONS}) AS headline
     FROM "CalendarEvent" e, ${tsQuery(query, config, prefix)} AS q(query)
-    WHERE e."visibility" = 'PUBLIC'
-      AND e."publishedAt" IS NOT NULL
+    WHERE e."publishedAt" IS NOT NULL
       AND ${vector} @@ q.query
     ORDER BY "rank" DESC
     LIMIT ${CANDIDATE_LIMIT}
@@ -254,16 +252,15 @@ async function pageResults(
 async function eventResults(
   candidates: CandidateMap,
   locale: Locale,
-  audiences: CalendarAudience[],
+  audienceWhere: Prisma.CalendarEventWhereInput,
 ): Promise<SearchResult[]> {
   if (candidates.size === 0) return [];
 
   const events = await prisma.calendarEvent.findMany({
     where: {
       id: { in: [...candidates.keys()] },
-      visibility: "PUBLIC",
       publishedAt: { not: null },
-      ...audienceFilter(audiences),
+      ...audienceWhere,
     },
     select: {
       id: true,
@@ -299,12 +296,15 @@ export type SearchInput = {
   query: string | null | undefined;
   locale: Locale;
   /**
-   * De doelgroepen van de kijker, uit `viewerAudiences()`. Bewust een parameter
-   * en geen sessielezing hierbinnen, zodat deze functie zonder request te testen
-   * valt: een test die de kalenderzichtbaarheid bewijst, moet de doelgroep zelf
-   * kunnen kiezen.
+   * Het doelgroepfilter van de kijker, uit `viewerAudienceFilter()`. Meestal een
+   * leeg object: elk gepubliceerd evenement is publiek, en enkel wie zijn
+   * kalender op /account toespitste krijgt hier een filter.
+   *
+   * Bewust een parameter en geen sessielezing hierbinnen, zodat deze functie
+   * zonder request te testen valt: een test die de kalenderzichtbaarheid
+   * bewijst, moet de doelgroep zelf kunnen kiezen.
    */
-  audiences: CalendarAudience[];
+  audienceWhere: Prisma.CalendarEventWhereInput;
   /**
    * Is de bezoeker ingelogd? Bepaalt of het uitleenmateriaal meezoekt. De
    * catalogus zit in de logistiek-app achter een login (zie
@@ -312,7 +312,7 @@ export type SearchInput = {
    * zetten zou die keuze langs de achterdeur ongedaan maken, en een
    * uitgelogde bezoeker zou toch op een loginscherm landen.
    *
-   * Net als `audiences` een parameter en geen sessielezing hierbinnen, zodat een
+   * Net als `audienceWhere` een parameter en geen sessielezing hierbinnen, zodat een
    * test kan bewijzen dat er niets lekt.
    */
   signedIn: boolean;
@@ -381,7 +381,7 @@ export async function searchSite(input: SearchInput): Promise<SearchOutcome> {
 
   const [pageRows, eventRows, materialRows] = await Promise.all([
     pageResults(byId(prefix === null ? pages : fallbackPages), input.locale),
-    eventResults(byId(prefix === null ? events : fallbackEvents), input.locale, input.audiences),
+    eventResults(byId(prefix === null ? events : fallbackEvents), input.locale, input.audienceWhere),
     materialResults(byId(prefix === null ? materials : fallbackMaterials)),
   ]);
 

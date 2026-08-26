@@ -1282,3 +1282,32 @@
     text-align: left;
   }
 }
+
+
+/* De interesse-teller op de homepage: op de donkere heroagenda en op de lichte
+   kaarten van "Aankomende evenementen". Enkel zichtbaar boven de drempel uit
+   lib/calendar/interest.ts. */
+.hero-ev-going {
+  display: inline-block;
+  margin-top: 4px;
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: var(--yellow);
+  color: var(--ink);
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.evcard-going {
+  display: inline-block;
+  align-self: flex-start;
+  margin-top: 8px;
+  padding: 2px 9px;
+  border-radius: 999px;
+  background: var(--yellow);
+  color: var(--ink);
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+}

@@ -47,6 +47,10 @@ export const MCP_PERMISSION_POLICY = {
   "werkgroepen.manage": { reads: ["groups"], creates: ["app_create:group(WERKGROEP)"], blocked: ["modify memberships or grants"] },
   "roles.manage": { reads: ["roles"], creates: ["app_create:role"], blocked: ["assign roles or permissions"] },
   "mailinglists.export": { reads: ["mailing_lists"], creates: [], blocked: ["send mail or change subscriptions"] },
+  // Het alumni-adresboek is een lijst met naam, e-mail en afstudeerjaar van
+  // mensen die geen account hebben en dus nooit zelf iets aanvinkten. Niets
+  // ervan gaat door dit endpoint, ook niet lezend.
+  "alumni.manage": { reads: [], creates: [], blocked: ["read or edit the alumni address book"] },
   "pocs.manage": { reads: ["pocs"], creates: ["app_create:poc"], blocked: ["add representatives, update or delete POCs"] },
   "partners.manage": { reads: ["partners"], creates: ["app_create:partner"], blocked: ["upload logos, update or delete partners"] },
   "home.edit": { reads: ["announcements", "editorial_settings"], creates: ["app_create:announcement"], blocked: ["activate announcements or overwrite homepage settings"] },

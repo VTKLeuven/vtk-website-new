@@ -216,7 +216,20 @@
     "loginRequiredKicker": "Inloggen vereist",
     "loginRequiredTitle": "Log in om deze pagina te bekijken",
     "loginRequiredBody": "Je moet ingelogd zijn voordat je de inhoud van deze pagina kan bekijken.",
-    "goHome": "Naar home"
+    "goHome": "Naar home",
+    "signInWithKulLong": "Inloggen met KU Leuven Authenticator",
+    "signInWithKulHint": "De gewone weg voor studenten: je logt in bij KU Leuven zelf.",
+    "noKulLead": "Geen KU Leuven student (meer):",
+    "noKulLink": "klik hier",
+    "emailPanelTitle": "Inloggen met e-mail en wachtwoord",
+    "emailPanelIntro": "Voor alumni en iedereen zonder werkende KU Leuven-login.",
+    "noAccountYet": "Nog geen account?",
+    "createAccount": "Account aanmaken",
+    "forgotPassword": "Wachtwoord vergeten?",
+    "unverified": "Je account bestaat al, maar je e-mailadres is nog niet bevestigd. Kijk je mailbox na of vraag hieronder een nieuwe bevestigingsmail.",
+    "resendVerification": "Bevestigingsmail opnieuw sturen",
+    "resendVerificationSent": "Verstuurd. Staat er niets in je inbox, kijk dan ook even in je spam.",
+    "back": "Terug"
   },
   "onboarding": {
     "kicker": "Welkom bij VTK",
@@ -309,7 +322,16 @@
       "URBANISM": "Urbanism Landscape and Planning",
       "MATHEMATICAL": "Wiskundige Ingenieurstechnieken",
       "MECHANICAL": "Werktuigkunde"
-    }
+    },
+    "graduationYear": "Afstudeerjaar",
+    "graduationYearHint": "Het jaar waarin je afstudeerde. Groepeert je bij je eigen lichting in de alumniwerking.",
+    "wasInVtk": "Ik heb ooit in VTK gezeten",
+    "wasInVtkHint": "Praesidium, werkgroep of medewerker; wanneer dan ook. Je kan dit tonen bij alumni-evenementen waar je naartoe komt.",
+    "alumniMailOptIn": "Hou me via mail op de hoogte van alumni-evenementen",
+    "alumniMailOptInHint": "Een paar mails per jaar over reünies en alumni-activiteiten. Staat los van de nieuwsbrieven hierboven, want die vallen weg zodra je niet meer studeert.",
+    "calendarHeading": "Kalender",
+    "calendarHint": "Standaard zie je alles wat VTK inplant, ook activiteiten voor een doelgroep waar je niet bij hoort. Een doelgroep is een label, geen slot.",
+    "calendarOnlyMyAudiences": "Toon enkel doelgroepactiviteiten die bij mijn profiel passen"
   },
   "admin": {
     "title": "Admin",
@@ -366,7 +388,9 @@
     "urenloopApp": "24UL App Download",
     "appPush": "App-pushberichten",
     "lesbezoeken": "Lesbezoeken",
-    "onderwijs": "Onderwijs"
+    "onderwijs": "Onderwijs",
+    "alumni": "Alumni",
+    "flowPreview": "Onboarding & bevestiging"
   },
   "confirmStudy": {
     "title": "Klopt je studie nog?",
@@ -783,6 +807,14 @@
     "lesbezoeken": {
       "title": "Lesbezoek aanvragen",
       "description": "Vraag een lesbezoek aan bij VTK Onderwijs: wij coördineren de aanvragen met de faculteit Ingenieurswetenschappen."
+    },
+    "register": {
+      "title": "Account aanmaken",
+      "description": "Maak een VTK-account met je eigen e-mailadres, ook zonder KU Leuven-login."
+    },
+    "passwordReset": {
+      "title": "Wachtwoord vergeten",
+      "description": "Stel een nieuw wachtwoord in voor je VTK-account."
     }
   },
   "contact": {
@@ -875,5 +907,56 @@
     "errors": {
       "fallback": "Er ging iets mis. Probeer het opnieuw."
     }
+  },
+  "register": {
+    "kicker": "Alumni & externen",
+    "title": "Account aanmaken",
+    "intro": "Studeer je niet (meer) aan de KU Leuven, dan maak je hier een account met je eigen e-mailadres. Daarmee kan je je inschrijven, tickets kopen en aanduiden dat je naar een evenement komt.",
+    "firstName": "Voornaam",
+    "lastName": "Achternaam",
+    "email": "E-mailadres",
+    "emailHint": "Hier komt de bevestigingsmail toe. Gebruik een adres dat je blijft lezen; je universiteitsmail valt na je afstuderen weg.",
+    "password": "Wachtwoord",
+    "passwordHint": "Minstens 10 tekens.",
+    "passwordRepeat": "Wachtwoord herhalen",
+    "graduationYear": "Afstudeerjaar",
+    "graduationYearHint": "Optioneel. Groepeert je bij je eigen lichting.",
+    "wasInVtk": "Ik heb ooit in VTK gezeten",
+    "wasInVtkHint": "Praesidium, werkgroep of medewerker; wanneer dan ook.",
+    "mailOptIn": "Hou me via mail op de hoogte van alumni-evenementen",
+    "submit": "Account aanmaken",
+    "sentTitle": "Kijk je mailbox na",
+    "sentBody": "Als dit e-mailadres nog geen account heeft, staat er nu een bevestigingsmail klaar. Klik op de link erin en je kan inloggen.",
+    "sentSpam": "Niets gekregen? Kijk ook even in je spam.",
+    "confirmTitle": "Account bevestigd",
+    "confirmBody": "Je e-mailadres is bevestigd. Je kan nu inloggen.",
+    "confirmFailedTitle": "Deze link werkt niet meer",
+    "confirmFailedBody": "De link is verlopen of al gebruikt. Is je account al bevestigd, log dan gewoon in; anders vraag je een nieuwe bevestigingsmail aan op het inlogscherm.",
+    "errorInvalid": "Niet aangemaakt: kijk de ingevulde velden na.",
+    "errorPasswordShort": "Niet aangemaakt: je wachtwoord moet minstens 10 tekens lang zijn.",
+    "errorPasswordMismatch": "Niet aangemaakt: de twee wachtwoorden zijn niet gelijk.",
+    "errorMailFailed": "Je account is aangemaakt, maar de bevestigingsmail kon niet verstuurd worden. Probeer op het inlogscherm een nieuwe mail aan te vragen."
+  },
+  "passwordReset": {
+    "kicker": "Wachtwoord",
+    "title": "Wachtwoord vergeten",
+    "intro": "Vul het e-mailadres van je account in. Heb je een wachtwoord op dit adres, dan sturen we je een link om een nieuw in te stellen.",
+    "kulNote": "Log je in met de KU Leuven Authenticator? Dan heb je hier geen wachtwoord en verandert dit niets; ga terug naar het inlogscherm.",
+    "email": "E-mailadres",
+    "submit": "Stuur me een link",
+    "sentTitle": "Kijk je mailbox na",
+    "sentBody": "Bestaat er een account met een wachtwoord op dit adres, dan staat de link nu klaar. Hij blijft één uur geldig.",
+    "newTitle": "Nieuw wachtwoord instellen",
+    "newIntro": "Kies een nieuw wachtwoord voor je account.",
+    "password": "Nieuw wachtwoord",
+    "passwordRepeat": "Herhaal het wachtwoord",
+    "newSubmit": "Wachtwoord opslaan",
+    "doneTitle": "Wachtwoord gewijzigd",
+    "doneBody": "Je kan nu inloggen met je nieuwe wachtwoord.",
+    "expiredTitle": "Deze link werkt niet meer",
+    "expiredBody": "De link is verlopen of al gebruikt. Vraag er hieronder een nieuwe aan.",
+    "errorInvalid": "Niet gelukt: kijk het ingevulde adres na.",
+    "errorPasswordShort": "Niet opgeslagen: je wachtwoord moet minstens 10 tekens lang zijn.",
+    "errorPasswordMismatch": "Niet opgeslagen: de twee wachtwoorden zijn niet gelijk."
   }
 }

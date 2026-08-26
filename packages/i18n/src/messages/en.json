@@ -216,7 +216,20 @@
     "loginRequiredKicker": "Login required",
     "loginRequiredTitle": "Please log in to view this page",
     "loginRequiredBody": "You must be logged in before you can view the content on this page.",
-    "goHome": "Go home"
+    "goHome": "Go home",
+    "signInWithKulLong": "Sign in with the KU Leuven Authenticator",
+    "signInWithKulHint": "The normal route for students: you sign in at KU Leuven itself.",
+    "noKulLead": "Not a KU Leuven student (any more):",
+    "noKulLink": "click here",
+    "emailPanelTitle": "Sign in with email and password",
+    "emailPanelIntro": "For alumni and anyone without a working KU Leuven login.",
+    "noAccountYet": "No account yet?",
+    "createAccount": "Create an account",
+    "forgotPassword": "Forgot your password?",
+    "unverified": "Your account already exists, but your email address has not been confirmed yet. Check your mailbox, or ask for a new confirmation email below.",
+    "resendVerification": "Send the confirmation email again",
+    "resendVerificationSent": "Sent. If nothing shows up in your inbox, check your spam folder too.",
+    "back": "Back"
   },
   "onboarding": {
     "kicker": "Welcome to VTK",
@@ -309,7 +322,16 @@
       "URBANISM": "Urbanism Landscape and Planning",
       "MATHEMATICAL": "Mathematical Engineering",
       "MECHANICAL": "Mechanical Engineering"
-    }
+    },
+    "graduationYear": "Graduation year",
+    "graduationYearHint": "The year you graduated. Groups you with your own year in the alumni network.",
+    "wasInVtk": "I was part of VTK",
+    "wasInVtkHint": "Praesidium, work group or helper; whenever that was. You can show this at alumni events you attend.",
+    "alumniMailOptIn": "Keep me posted about alumni events by email",
+    "alumniMailOptInHint": "A few emails a year about reunions and alumni activities. Separate from the newsletters above, which stop as soon as you are no longer studying.",
+    "calendarHeading": "Calendar",
+    "calendarHint": "By default you see everything VTK plans, including activities for an audience you are not part of. An audience is a label, not a lock.",
+    "calendarOnlyMyAudiences": "Only show target-audience activities that match my profile"
   },
   "admin": {
     "title": "Admin",
@@ -366,7 +388,9 @@
     "urenloopApp": "24UL App Download",
     "appPush": "App push notifications",
     "lesbezoeken": "Classroom visits",
-    "onderwijs": "Education"
+    "onderwijs": "Education",
+    "alumni": "Alumni",
+    "flowPreview": "Onboarding & confirmation"
   },
   "confirmStudy": {
     "title": "Are your studies still up to date?",
@@ -783,6 +807,14 @@
     "lesbezoeken": {
       "title": "Request a class visit",
       "description": "Request a class visit through VTK Education: we coordinate every request with the Faculty of Engineering Science."
+    },
+    "register": {
+      "title": "Create an account",
+      "description": "Create a VTK account with your own email address, also without a KU Leuven login."
+    },
+    "passwordReset": {
+      "title": "Forgot your password",
+      "description": "Set a new password for your VTK account."
     }
   },
   "contact": {
@@ -875,5 +907,56 @@
     "errors": {
       "fallback": "Something went wrong. Please try again."
     }
+  },
+  "register": {
+    "kicker": "Alumni & externals",
+    "title": "Create an account",
+    "intro": "If you are not (or no longer) a KU Leuven student, create an account here with your own email address. It lets you sign up for things, buy tickets and mark that you are coming to an event.",
+    "firstName": "First name",
+    "lastName": "Last name",
+    "email": "Email address",
+    "emailHint": "The confirmation email goes here. Use an address you keep reading; your university mail disappears after you graduate.",
+    "password": "Password",
+    "passwordHint": "At least 10 characters.",
+    "passwordRepeat": "Repeat password",
+    "graduationYear": "Graduation year",
+    "graduationYearHint": "Optional. Groups you with your own year.",
+    "wasInVtk": "I was part of VTK",
+    "wasInVtkHint": "Praesidium, work group or helper; whenever that was.",
+    "mailOptIn": "Keep me posted about alumni events by email",
+    "submit": "Create account",
+    "sentTitle": "Check your mailbox",
+    "sentBody": "If this email address does not have an account yet, a confirmation email is on its way. Follow the link in it and you can sign in.",
+    "sentSpam": "Nothing arrived? Check your spam folder too.",
+    "confirmTitle": "Account confirmed",
+    "confirmBody": "Your email address is confirmed. You can sign in now.",
+    "confirmFailedTitle": "This link no longer works",
+    "confirmFailedBody": "The link has expired or was already used. If your account is already confirmed just sign in; otherwise ask for a new confirmation email on the sign-in screen.",
+    "errorInvalid": "Not created: please check the fields you entered.",
+    "errorPasswordShort": "Not created: your password must be at least 10 characters long.",
+    "errorPasswordMismatch": "Not created: the two passwords do not match.",
+    "errorMailFailed": "Your account was created, but the confirmation email could not be sent. Try asking for a new one on the sign-in screen."
+  },
+  "passwordReset": {
+    "kicker": "Password",
+    "title": "Forgot your password",
+    "intro": "Enter the email address of your account. If you have a password on that address, we will send you a link to set a new one.",
+    "kulNote": "Do you sign in with the KU Leuven Authenticator? Then you have no password here and this changes nothing; go back to the sign-in screen.",
+    "email": "Email address",
+    "submit": "Send me a link",
+    "sentTitle": "Check your mailbox",
+    "sentBody": "If an account with a password exists on this address, the link is on its way. It stays valid for one hour.",
+    "newTitle": "Set a new password",
+    "newIntro": "Choose a new password for your account.",
+    "password": "New password",
+    "passwordRepeat": "Repeat the password",
+    "newSubmit": "Save password",
+    "doneTitle": "Password changed",
+    "doneBody": "You can now sign in with your new password.",
+    "expiredTitle": "This link no longer works",
+    "expiredBody": "The link has expired or was already used. Ask for a new one below.",
+    "errorInvalid": "Failed: please check the address you entered.",
+    "errorPasswordShort": "Not saved: your password must be at least 10 characters long.",
+    "errorPasswordMismatch": "Not saved: the two passwords do not match."
   }
 }

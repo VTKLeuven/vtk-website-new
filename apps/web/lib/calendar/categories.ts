@@ -19,13 +19,14 @@ export async function listCalendarCategories(): Promise<CalendarCategoryOption[]
 }
 
 /**
- * De feed-URL die bij een weergave hoort. Absoluut, want hij belandt in een
- * `webcal:`-link en in de `cid`-parameter van Google Calendar; een relatief pad
- * doet daar niets.
+ * De hoofdfeed zonder selectie. Absoluut, want hij belandt in een `webcal:`-link
+ * en in het klembord voor Google Calendar; een relatief pad doet daar niets.
+ *
+ * De abonneerdialoog hangt er zelf `c`- en `algemeen`-parameters aan (zie
+ * `feedScopeFromQuery`), dus er is maar één basis-URL nodig.
  */
-export function feedUrlFor(locale: Locale, categorySlug?: string): string {
-  const path = categorySlug ? `/api/calendar/feed/c/${categorySlug}.ics` : "/api/calendar/feed.ics";
-  return `${siteBaseUrl()}${path}${locale === "en" ? "?lang=en" : ""}`;
+export function feedBaseUrlFor(locale: Locale): string {
+  return `${siteBaseUrl()}/api/calendar/feed.ics${locale === "en" ? "?lang=en" : ""}`;
 }
 
 /** Labels van de kalenderweergave; gedeeld door /kalender en de categoriepagina's. */

@@ -168,6 +168,24 @@ const icons: Record<string, ReactNode> = {
       <path d="m2 7 10 6 10-6" />
     </Svg>
   ),
+  // flowPreview: formulier met een oog erop; de twee schermen die je maar één
+  // keer ziet, hier wel bekijkbaar
+  flowPreview: (
+    <Svg>
+      <path d="M4 3h10l4 4v6" />
+      <path d="M4 3v18h7" />
+      <path d="M14 3v4h4" />
+      <path d="M14.5 18.5c1-1.7 2.6-2.5 4-2.5s3 .8 4 2.5c-1 1.7-2.6 2.5-4 2.5s-3-.8-4-2.5Z" />
+      <circle cx="18.5" cy="18.5" r=".8" />
+    </Svg>
+  ),
+  // alumni: afstudeerhoed, het enige wat deze groep gemeen heeft
+  alumni: (
+    <Svg>
+      <path d="M12 4 2 9l10 5 10-5-10-5Z" />
+      <path d="M6 11.5V16c0 1.1 2.7 2.5 6 2.5s6-1.4 6-2.5v-4.5" />
+    </Svg>
+  ),
   // groups: ereteken / lint van een praesidiumpost
   groups: (
     <Svg>

@@ -39,6 +39,11 @@ export async function exportUserData(userId: string) {
       notStudying: true,
       internationalStudent: true,
       alumni: true,
+      graduationYear: true,
+      wasInVtk: true,
+      alumniMailOptIn: true,
+      honoraryMember: true,
+      calendarOnlyMyAudiences: true,
       studyConfirmedYear: true,
       createdAt: true,
       updatedAt: true,
@@ -315,6 +320,13 @@ export async function eraseUserData(userId: string) {
     // Om dezelfde reden: een persoonlijke feed-URL blijft anders werken en zou de
     // agenda van een gewist account aan de houder van de link blijven tonen.
     await tx.calendarFeedToken.deleteMany({ where: { userId } });
+    // Bevestigings- en herstellinks per mail: een openstaande link zou na het
+    // wissen nog altijd een wachtwoord op deze rij kunnen zetten.
+    await tx.accountEmailToken.deleteMany({ where: { userId } });
+    // "Ik kom naar dit evenement" hangt aan een persoon, en bij een
+    // alumni-evenement staat er mogelijk een naam van hem publiek op de site.
+    // Een tombstone hoort daar niet meer in te staan.
+    await tx.calendarEventInterest.deleteMany({ where: { userId } });
 
     await tx.doorAccessLog.updateMany({
       where: { userId },
@@ -412,6 +424,13 @@ export async function eraseUserData(userId: string) {
         notStudying: false,
         internationalStudent: false,
         alumni: false,
+        graduationYear: null,
+        wasInVtk: false,
+        alumniMailOptIn: false,
+        // Ook de eretitel: een tombstone hoort geen toegang meer te geven tot
+        // ticketsoorten die voor iedereen anders niet bestaan.
+        honoraryMember: false,
+        calendarOnlyMyAudiences: false,
         studyConfirmedYear: null,
       },
     });

@@ -59,7 +59,6 @@ const listEventsInput = z.object({
   from: isoMoment.optional(),
   to: isoMoment.optional(),
   publication: z.enum(["all", "published", "draft"]).default("all"),
-  visibility: z.enum(["all", "PUBLIC", "MEMBERS"]).default("all"),
   groupCode: z.string().trim().min(1).max(80).optional(),
   categorySlug: z.string().trim().min(1).max(60).optional(),
   order: z.enum(["asc", "desc"]).default("desc"),
@@ -77,7 +76,6 @@ export async function listCalendarEvents(raw: ListEventsInput) {
   if (input.to) where.start = { lte: new Date(input.to) };
   if (input.publication === "published") where.publishedAt = { not: null };
   if (input.publication === "draft") where.publishedAt = null;
-  if (input.visibility !== "all") where.visibility = input.visibility;
   if (input.groupCode) where.group = { code: input.groupCode };
   if (input.categorySlug) {
     where.categories = { some: { category: { slug: input.categorySlug } } };
@@ -98,7 +96,6 @@ export async function listCalendarEvents(raw: ListEventsInput) {
       start: true,
       end: true,
       allDay: true,
-      visibility: true,
       url: true,
       imageKey: true,
       publishedAt: true,
@@ -156,7 +153,6 @@ export async function getCalendarEvent(raw: { id: string }) {
       start: true,
       end: true,
       allDay: true,
-      visibility: true,
       url: true,
       imageKey: true,
       publishedAt: true,
@@ -505,7 +501,6 @@ const createEventInput = z.object({
   start: isoMoment,
   end: isoMoment,
   allDay: z.boolean().default(false),
-  visibility: z.enum(["PUBLIC", "MEMBERS"]).default("PUBLIC"),
   url: z.string().trim().max(2048).refine(isSafeEventUrl, "Ongeldige event-URL").optional().nullable(),
   categorySlugs: z.array(z.string().trim().min(1).max(60)).max(20).default([]),
   publish: z.boolean().default(false),
@@ -559,7 +554,6 @@ export async function createCalendarEvent(raw: CreateCalendarEventInput) {
       start,
       end,
       allDay: input.allDay,
-      visibility: input.visibility,
       url: nullIfEmpty(input.url),
       publishedAt: input.publish ? new Date() : null,
       createdById: null,
@@ -572,7 +566,6 @@ export async function createCalendarEvent(raw: CreateCalendarEventInput) {
       titleNl: true,
       start: true,
       end: true,
-      visibility: true,
       publishedAt: true,
       group: { select: { code: true, nameNl: true } },
       categories: { select: { category: { select: { slug: true, nameNl: true } } } },

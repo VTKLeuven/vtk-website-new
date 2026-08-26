@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
 import { staticMetadata } from "@/lib/pageMetadata";
 import { KalenderEditorialView } from "@/components/editorial/KalenderEditorialView";
-import { calendarLabels, feedUrlFor, listCalendarCategories } from "@/lib/calendar/categories";
+import { calendarLabels, feedBaseUrlFor, listCalendarCategories } from "@/lib/calendar/categories";
+import { viewerPrefersOwnAudiences } from "@/lib/calendar/audience";
 import { hasLocale } from "@/lib/locale";
 import type { Locale } from "@vtk/i18n";
 import { notFound } from "next/navigation";
@@ -28,7 +29,10 @@ export default async function KalenderPage({
   if (!hasLocale(localeParam)) notFound();
   const locale: Locale = localeParam;
 
-  const categories = await listCalendarCategories();
+  const [categories, prefersOwnAudiences] = await Promise.all([
+    listCalendarCategories(),
+    viewerPrefersOwnAudiences(),
+  ]);
 
   return (
     <div className="vtk-design">
@@ -36,7 +40,8 @@ export default async function KalenderPage({
         locale={locale}
         labels={calendarLabels(locale)}
         categories={categories}
-        feedUrl={feedUrlFor(locale)}
+        feedBaseUrl={feedBaseUrlFor(locale)}
+        defaultOnlyMyAudiences={prefersOwnAudiences}
       />
     </div>
   );

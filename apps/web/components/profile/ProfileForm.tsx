@@ -7,6 +7,7 @@ import { MAIL_CATEGORIES, R_NUMBER_PATTERN } from "@/lib/profile";
 import { CheckboxChip, StudyFieldset } from "./StudyFieldset";
 import { SaveForm } from "@/components/ui/SaveForm";
 import { saveProfileAction, type ProfileErrorCode } from "@/app/actions/onboarding";
+import type { SaveAction } from "@/lib/saveState";
 import { AvatarCropField } from "./AvatarCropField";
 
 function dateInputValue(date: Date | null): string {
@@ -21,12 +22,21 @@ function dateInputValue(date: Date | null): string {
  * {@link saveProfileAction} via {@link SaveForm}, dat de uitkomst als toast
  * toont. Pass `next` to redirect after saving (onboarding); omit it to stay on
  * the page (account), waar de toast de enige bevestiging is.
+ *
+ * `action` en `savedMessage` bestaan voor de voorvertoning onder Admin -> IT:
+ * daar draait hetzelfde formulier met een actie die niets bewaart, zodat een
+ * beheerder de onboarding kan bekijken en de knoppen kan indrukken zonder zijn
+ * eigen profiel te wijzigen. Een nagebouwde kopie zou vroeg of laat afwijken van
+ * wat een nieuw lid echt te zien krijgt, en dan is de voorvertoning erger dan
+ * niets.
  */
 export function ProfileForm({
   locale,
   user,
   next,
   submitLabel,
+  action = saveProfileAction,
+  savedMessage,
 }: {
   locale: Locale;
   user: Pick<
@@ -48,16 +58,24 @@ export function ProfileForm({
     | "mailCategories"
     | "shiftReminderDayBefore"
     | "shiftReminderSoon"
+    | "calendarOnlyMyAudiences"
     | "studyYears"
     | "studyProgrammes"
     | "notAtFaculty"
     | "notStudying"
     | "internationalStudent"
     | "alumni"
+    | "graduationYear"
+    | "wasInVtk"
+    | "alumniMailOptIn"
     | "rNumberFromKul"
   >;
   next?: string;
   submitLabel: string;
+  /** Overschrijft de opslaan-actie; enkel voor de voorvertoning in de admin. */
+  action?: SaveAction;
+  /** Overschrijft de succesmelding; hoort bij een afwijkende `action`. */
+  savedMessage?: string;
 }) {
   const t = getDictionary(locale).onboarding;
   const currentAvatar = publicUrl(user.avatarKey);
@@ -76,11 +94,11 @@ export function ProfileForm({
 
   return (
     <SaveForm
-      action={saveProfileAction}
+      action={action}
       className="space-y-8"
       submitLabel={submitLabel}
       savingLabel={common.saving}
-      savedMessage={t.saved}
+      savedMessage={savedMessage ?? t.saved}
       errorMessages={errorMessages}
       fallbackErrorMessage={common.saveError}
     >
@@ -253,6 +271,20 @@ export function ProfileForm({
             />
           </div>
         </div>
+        {/* Wat je te zien krijgt, niet wat je toegestuurd krijgt; daarom onderaan
+            deze groep en niet tussen de mailinglijsten. Standaard uit: elk
+            evenement is publiek en een doelgroep is een label, geen slot. */}
+        <div>
+          <span className="text-sm font-medium text-vtk-ink">{t.calendarHeading}</span>
+          <p className="text-xs text-[#5c667f]">{t.calendarHint}</p>
+          <CheckboxChip
+            name="calendarOnlyMyAudiences"
+            value="on"
+            defaultChecked={user.calendarOnlyMyAudiences}
+            label={t.calendarOnlyMyAudiences}
+            className="mt-2"
+          />
+        </div>
       </fieldset>
 
       {/* Studie: studiejaren + richtingen */}
@@ -266,6 +298,9 @@ export function ProfileForm({
           notStudying={user.notStudying}
           internationalStudent={user.internationalStudent}
           alumni={user.alumni}
+          graduationYear={user.graduationYear}
+          wasInVtk={user.wasInVtk}
+          alumniMailOptIn={user.alumniMailOptIn}
         />
       </fieldset>
 

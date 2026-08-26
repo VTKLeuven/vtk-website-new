@@ -32,7 +32,7 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
     const locale = appLocaleFrom(new URL(request.url).searchParams.get("locale"));
 
     const event = await loadCalendarEvent(id);
-    if (!event || event.visibility !== "PUBLIC") return appNotFound(request, "Evenement niet gevonden.");
+    if (!event) return appNotFound(request, "Evenement niet gevonden.");
 
     // Een evenement zonder eigen foto krijgt de standaardfoto uit /admin/home,
     // net als op de site; anders opent de helft van de lijst op een grijs vlak.

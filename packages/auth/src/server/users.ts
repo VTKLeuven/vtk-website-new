@@ -31,6 +31,12 @@ type UpdateUserInput = {
   avatarKey?: string | null;
   active?: boolean;
   isSuperAdmin?: boolean;
+  /**
+   * Erelid. Enkel door een beheerder te zetten, nooit door het lid zelf: het
+   * geeft toegang tot ticketsoorten die voor iedereen anders onzichtbaar zijn
+   * (zie `TicketAudience.HONORARY`).
+   */
+  honoraryMember?: boolean;
   rNumber?: string | null;
   password?: string;
 };
@@ -106,6 +112,7 @@ export async function updateUser(
     ...(input.avatarKey !== undefined ? { avatarKey: input.avatarKey } : {}),
     ...(input.active !== undefined ? { active: input.active } : {}),
     ...(input.isSuperAdmin !== undefined ? { isSuperAdmin: input.isSuperAdmin } : {}),
+    ...(input.honoraryMember !== undefined ? { honoraryMember: input.honoraryMember } : {}),
     ...(input.rNumber !== undefined ? { rNumber: input.rNumber?.trim() || null } : {}),
   };
   return prisma.$transaction(async (tx) => {

@@ -163,3 +163,252 @@
   filter: brightness(1.1);
   color: #fff;
 }
+
+
+/* -----------------------------------------------------------------------------
+   "Ik kom naar dit evenement"
+
+   Staat onder de infokaart en niet ernaast: het is een beslissing die je neemt
+   nadat je gelezen hebt waar het over gaat, niet ervoor.
+   -------------------------------------------------------------------------- */
+
+.vtk-interest {
+  grid-column: 1 / -1;
+  padding: 22px 24px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: var(--surface);
+}
+
+.vtk-interest-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px 16px;
+  margin-bottom: 14px;
+}
+
+.vtk-interest-head h2 {
+  margin: 0;
+  color: var(--ink);
+  font-size: 20px;
+  letter-spacing: -0.02em;
+}
+
+.vtk-interest-count {
+  padding: 4px 12px;
+  border-radius: 999px;
+  background: var(--yellow);
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.vtk-interest-form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.vtk-interest-intro,
+.vtk-interest-login {
+  margin: 0 0 14px;
+  color: var(--body);
+  font-size: 14px;
+  line-height: 1.55;
+}
+
+.vtk-interest-show {
+  margin: 0;
+  padding: 14px 16px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--paper-2);
+}
+
+.vtk-interest-show legend {
+  padding: 0 6px;
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.vtk-interest-show p {
+  margin: 0 0 10px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.vtk-interest-show label,
+.vtk-interest-check {
+  display: flex;
+  gap: 9px;
+  align-items: center;
+  margin-top: 7px;
+  color: var(--body);
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.vtk-interest-note {
+  margin-top: 12px !important;
+}
+
+.vtk-interest-fields {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: 1fr;
+}
+
+@media (min-width: 560px) {
+  .vtk-interest-fields {
+    grid-template-columns: 2fr 1fr;
+  }
+}
+
+.vtk-interest-fields label {
+  display: block;
+}
+
+.vtk-interest-fields span {
+  display: block;
+  margin-bottom: 5px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.vtk-interest-fields input {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--line-2);
+  border-radius: 12px;
+  background: var(--paper);
+  color: var(--ink);
+  font: inherit;
+}
+
+.vtk-interest-fields small {
+  display: block;
+  margin-top: 5px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.vtk-interest-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.vtk-interest-guest form + form {
+  margin-top: 12px;
+}
+
+.vtk-interest-error {
+  margin: 0;
+  color: #b42318;
+  font-size: 13px;
+}
+
+.vtk-interest-done {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+/* -----------------------------------------------------------------------------
+   De aanwezigheidslijst bij een alumni-evenement
+   -------------------------------------------------------------------------- */
+
+.vtk-attendees {
+  grid-column: 1 / -1;
+  padding: 22px 24px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: var(--surface);
+}
+
+.vtk-attendees-head h2 {
+  margin: 0;
+  color: var(--ink);
+  font-size: 20px;
+  letter-spacing: -0.02em;
+}
+
+.vtk-attendees-head p {
+  margin: 4px 0 16px;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+/* Een brede tabel in een horizontale scroller heeft een gepositioneerde wrapper
+   nodig; zie CLAUDE.md. */
+.vtk-attendees-scroll {
+  position: relative;
+  overflow-x: auto;
+}
+
+.vtk-attendees-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+.vtk-attendees-table th {
+  padding: 8px 12px 8px 0;
+  border-bottom: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-align: left;
+  text-transform: uppercase;
+}
+
+.vtk-attendees-table td {
+  padding: 10px 12px 10px 0;
+  border-bottom: 1px solid var(--line);
+  color: var(--body);
+}
+
+.vtk-attendees-anon {
+  color: var(--muted);
+  font-style: italic;
+}
+
+/* Op een telefoon worden de kolomkoppen labels per waarde, in plaats van te
+   verdwijnen; zie CLAUDE.md. */
+@media (max-width: 560px) {
+  .vtk-attendees-table thead {
+    display: none;
+  }
+
+  .vtk-attendees-table tr {
+    display: block;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .vtk-attendees-table td {
+    display: flex;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 3px 0;
+    border: 0;
+  }
+
+  .vtk-attendees-table td::before {
+    content: attr(data-label);
+    color: var(--muted);
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+}

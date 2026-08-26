@@ -23,7 +23,6 @@ const eventSchema = z.object({
   start: z.string().min(1),
   end: z.string().min(1),
   allDay: z.coerce.boolean().default(false),
-  visibility: z.enum(["PUBLIC", "MEMBERS"]).default("PUBLIC"),
   url: z.string().optional().nullable(),
 });
 
@@ -38,7 +37,6 @@ const EVENT_FIELD_LABELS: Record<string, string> = {
   start: "startmoment",
   end: "eindmoment",
   allDay: "hele dag",
-  visibility: "zichtbaarheid",
   url: "link",
   imageKey: "afbeelding",
   publishedAt: "publicatiestatus",
@@ -64,7 +62,6 @@ export async function saveEventAction(_prev: SaveState, formData: FormData): Pro
     start: formData.get("start"),
     end: formData.get("end"),
     allDay: formData.get("allDay") === "on",
-    visibility: formData.get("visibility") || "PUBLIC",
     url: formData.get("url") || null,
   });
   const image = readImageField(formData);
@@ -104,7 +101,6 @@ export async function saveEventAction(_prev: SaveState, formData: FormData): Pro
     start,
     end,
     allDay: input.allDay,
-    visibility: input.visibility,
     url: input.url,
     createdById: session.user.id,
   };

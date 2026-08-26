@@ -38,6 +38,10 @@ export const PERMISSIONS = [
 
   // Mailing lists
   { code: "mailinglists.export", labelNl: "Mailinglijsten exporteren", labelEn: "Export mailing lists", category: "users" },
+  // Alumni-adresboek. Bewust los van `mailinglists.export`: dat zijn de opt-in
+  // nieuwsbrieven naar studenten, dit is het adresboek per lichting dat de
+  // alumniwerking zelf bijhoudt, mét persoonsgegevens van mensen zonder account.
+  { code: "alumni.manage", labelNl: "Alumni-adresboek beheren", labelEn: "Manage the alumni address book", category: "users" },
 
   // POCs
   { code: "pocs.manage", labelNl: "POC's beheren", labelEn: "Manage POCs", category: "general" },

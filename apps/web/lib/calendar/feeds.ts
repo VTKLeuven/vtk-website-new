@@ -3,7 +3,7 @@ import "server-only";
 import { prisma } from "@vtk/db";
 import { pick, type Locale } from "@vtk/i18n";
 import { markdownToPlainText } from "@/lib/markdown";
-import { audienceFilter, audiencesForUser } from "./audience";
+import { audienceFilter, audienceFilterForUser } from "./audience";
 import { buildIcs, type IcsCalendar, type IcsEvent } from "./ics";
 
 /**
@@ -13,6 +13,17 @@ import { buildIcs, type IcsCalendar, type IcsEvent } from "./ics";
 export type FeedScope =
   | { kind: "all" }
   | { kind: "category"; slug: string }
+  /**
+   * Een zelfgekozen samenstelling: nul of meer categorieën, eventueel samen met
+   * de algemene evenementen (die zonder doelgroepcategorie).
+   *
+   * Bestaat omdat "enkel alumni" en "alles" allebei het verkeerde antwoord zijn
+   * voor een alumnus: hij wil de alumni-activiteiten én de fuiven en cantussen
+   * waar iedereen welkom is, maar niet de eerstejaarsdoop. Zonder deze scope zou
+   * hij zich op twee feeds moeten abonneren en in zijn agenda-app zelf moeten
+   * uitzoeken welke van de twee hij nu weer had.
+   */
+  | { kind: "mix"; slugs: string[]; includeGeneral: boolean }
   | { kind: "group"; slug: string }
   | { kind: "personal"; userId: string };
 
@@ -52,7 +63,6 @@ type EventRow = {
   start: Date;
   end: Date;
   allDay: boolean;
-  visibility: "PUBLIC" | "MEMBERS";
   updatedAt: Date;
   categories: { category: { nameNl: string; nameEn: string } }[];
 };
@@ -67,7 +77,6 @@ const eventSelect = {
   start: true,
   end: true,
   allDay: true,
-  visibility: true,
   updatedAt: true,
   categories: { select: { category: { select: { nameNl: true, nameEn: true } } } },
 } as const;
@@ -85,15 +94,15 @@ function toIcsEvent(event: EventRow, locale: Locale): IcsEvent {
     url: eventUrl(event.id, locale),
     categories: event.categories.map((c) => pick(c.category.nameNl, c.category.nameEn, locale)),
     updatedAt: event.updatedAt,
-    private: event.visibility === "MEMBERS",
   };
 }
 
 /**
- * Bouwt de kalender voor een scope, of `null` wanneer de categorie of post niet
- * bestaat; de route maakt daar een 404 van. Enkel die twee scopes kunnen
- * ontbreken, dus de overloads houden dat zichtbaar in het type: de routes die
- * niet kunnen falen hoeven geen null-check te faken.
+ * Bouwt de kalender voor een scope, of `null` wanneer een categorie of post uit
+ * de URL niet bestaat; de route maakt daar een 404 van. Enkel de scopes die een
+ * naam uit de URL opzoeken kunnen zo ontbreken, dus de overloads houden dat
+ * zichtbaar in het type: de routes die niet kunnen falen hoeven geen null-check
+ * te faken.
  *
  * De persoonlijke feed voegt naast de events ook de shiften toe waarvoor het lid
  * is ingeschreven.
@@ -122,7 +131,6 @@ export async function buildFeed(
       // Wie één doelgroep wil, gebruikt de categoriefeed van die doelgroep.
       const events = await prisma.calendarEvent.findMany({
         where: {
-          visibility: "PUBLIC",
           publishedAt: { not: null },
           ...window,
         },
@@ -146,7 +154,6 @@ export async function buildFeed(
       if (!category) return null;
       const events = await prisma.calendarEvent.findMany({
         where: {
-          visibility: "PUBLIC",
           publishedAt: { not: null },
           categories: { some: { category: { slug: scope.slug } } },
           ...window,
@@ -167,6 +174,54 @@ export async function buildFeed(
       );
     }
 
+    case "mix": {
+      // Een lege selectie zonder algemene events zou een lege kalender opleveren
+      // die er in een agenda-app uitziet als een kapot abonnement; dan is "alles"
+      // het eerlijkere antwoord.
+      if (scope.slugs.length === 0 && !scope.includeGeneral) {
+        return buildFeed({ kind: "all" }, locale, now);
+      }
+
+      const categories = await prisma.calendarCategory.findMany({
+        where: { slug: { in: scope.slugs } },
+        select: { slug: true, nameNl: true, nameEn: true },
+        orderBy: { order: "asc" },
+      });
+      // Eén onbekende slug betekent een verkeerd overgetikte URL; dan liever een
+      // 404 dan stilzwijgend een kalender met minder erin dan gevraagd.
+      if (categories.length !== new Set(scope.slugs).size) return null;
+
+      const events = await prisma.calendarEvent.findMany({
+        where: {
+          publishedAt: { not: null },
+          ...window,
+          OR: [
+            ...(scope.includeGeneral
+              ? [{ categories: { none: { category: { audience: { not: null } } } } }]
+              : []),
+            ...(scope.slugs.length > 0
+              ? [{ categories: { some: { category: { slug: { in: scope.slugs } } } } }]
+              : []),
+          ],
+        },
+        select: eventSelect,
+        orderBy: { start: "asc" },
+      });
+
+      const generalLabel = locale === "nl" ? "Algemeen" : "General";
+      const parts = [
+        ...(scope.includeGeneral ? [generalLabel] : []),
+        ...categories.map((c) => pick(c.nameNl, c.nameEn, locale)),
+      ];
+      return render(
+        { name: `VTK ${parts.join(" + ")}` },
+        events,
+        locale,
+        `${siteBaseUrl()}${locale === "en" ? "/en" : ""}/kalender`,
+        now,
+      );
+    }
+
     case "group": {
       const group = await prisma.group.findUnique({
         where: { slug: scope.slug },
@@ -175,7 +230,6 @@ export async function buildFeed(
       if (!group) return null;
       const events = await prisma.calendarEvent.findMany({
         where: {
-          visibility: "PUBLIC",
           publishedAt: { not: null },
           groupId: group.id,
           ...window,
@@ -194,15 +248,13 @@ export async function buildFeed(
     }
 
     case "personal": {
-      // Geen visibility-filter: dit is de enige feed die MEMBERS-events mag
-      // dragen. Events waarvoor het lid een ticket heeft, zitten hier dus
-      // sowieso al in; ze hoeven niet apart opgehaald te worden. De doelgroepen
-      // volgen wél het profiel: een eerstejaars krijgt zijn eerstejaarsevents in
-      // deze ene feed, zonder zich apart te moeten abonneren.
-      const audiences = await audiencesForUser(scope.userId);
+      // De persoonlijke feed onderscheidt zich van de publieke door de shiften
+      // eronder. De doelgroepen staan er standaard allemaal op; enkel wie op
+      // /account koos zijn kalender toe te spitsen, krijgt hier minder.
+      const audienceWhere = await audienceFilterForUser(scope.userId);
       const [events, shifts] = await Promise.all([
         prisma.calendarEvent.findMany({
-          where: { publishedAt: { not: null }, ...window, ...audienceFilter(audiences) },
+          where: { publishedAt: { not: null }, ...window, ...audienceWhere },
           select: eventSelect,
           orderBy: { start: "asc" },
         }),
@@ -272,7 +324,7 @@ export async function buildEventIcs(
   now = new Date(),
 ): Promise<{ body: string; slug: string } | null> {
   const event = await prisma.calendarEvent.findFirst({
-    where: { id, visibility: "PUBLIC", publishedAt: { not: null } },
+    where: { id, publishedAt: { not: null } },
     select: eventSelect,
   });
   if (!event) return null;

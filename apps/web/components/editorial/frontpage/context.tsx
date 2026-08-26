@@ -19,6 +19,13 @@ export type FrontpageEvent = {
   titleEn: string | null;
   location: string | null;
   group: { nameNl: string; nameEn: string };
+  /**
+   * Hoeveel mensen aanduidden dat ze komen, of `null` zolang het er te weinig
+   * zijn. De drempel zit in `lib/calendar/interest.ts`: onder een bepaald aantal
+   * leest een getal als "hier komt niemand" en houdt het precies de mensen weg
+   * die het had moeten overtuigen.
+   */
+  interestedCount: number | null;
 };
 
 export type FrontpagePartner = {

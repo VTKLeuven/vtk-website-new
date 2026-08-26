@@ -38,6 +38,7 @@ const userSchema = z.object({
   locale: z.enum(["NL", "EN"]).default("NL"),
   active: z.coerce.boolean().default(true),
   isSuperAdmin: z.coerce.boolean().default(false),
+  honoraryMember: z.coerce.boolean().default(false),
 });
 
 export async function saveUserAction(_prev: SaveState, formData: FormData): Promise<SaveState> {
@@ -53,6 +54,7 @@ export async function saveUserAction(_prev: SaveState, formData: FormData): Prom
     locale: formData.get("locale") || "NL",
     active: formData.get("active") === "on",
     isSuperAdmin: formData.get("isSuperAdmin") === "on",
+    honoraryMember: formData.get("honoraryMember") === "on",
   });
   if (!result.success) return saveError("INVALID_INPUT");
   const parsed = result.data;
@@ -73,6 +75,7 @@ export async function saveUserAction(_prev: SaveState, formData: FormData): Prom
           locale: true,
           active: true,
           isSuperAdmin: true,
+          honoraryMember: true,
           rNumber: true,
         },
       })
@@ -88,6 +91,7 @@ export async function saveUserAction(_prev: SaveState, formData: FormData): Prom
         locale: parsed.locale,
         active: parsed.active,
         isSuperAdmin: parsed.isSuperAdmin,
+        honoraryMember: parsed.honoraryMember,
         rNumber,
         password: parsed.password,
       });
@@ -126,6 +130,7 @@ export async function saveUserAction(_prev: SaveState, formData: FormData): Prom
             locale: "taal",
             active: "actief",
             isSuperAdmin: "superadmin",
+            honoraryMember: "erelid",
             rNumber: "r-nummer",
           },
         )

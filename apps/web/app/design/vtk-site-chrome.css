@@ -349,6 +349,176 @@
   cursor: not-allowed;
 }
 
+/* Op het inlogscherm is de KU Leuven-knop de primaire actie: donker, breed en
+   als eerste. `.vtk-auth-sso` blijft de lichte variant voor waar SSO een
+   alternatief is (het koppelscherm), dus die regels blijven staan. */
+.vtk-auth .vtk-auth-sso {
+  margin-top: 4px;
+  min-height: 52px;
+  border-color: var(--ink);
+  background: var(--ink);
+  color: var(--paper);
+  font-size: 15px;
+}
+
+.vtk-auth .vtk-auth-sso:hover:not(:disabled) {
+  background: var(--navy);
+}
+
+.vtk-auth-primary-hint {
+  margin: 10px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+  text-align: center;
+}
+
+/* De regel die het wachtwoordformulier openklikt. Klein en rustig: ze mag de
+   knop erboven niet beconcurreren. */
+.vtk-auth-alt {
+  margin: 22px 0 0;
+  padding-top: 18px;
+  border-top: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 13px;
+  text-align: center;
+}
+
+.vtk-auth-alt-link {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--ink);
+  font: inherit;
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+.vtk-auth-alt-link:hover {
+  color: var(--navy);
+}
+
+.vtk-auth-alt-link:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.vtk-auth-alt-panel {
+  margin-top: 22px;
+  padding-top: 22px;
+  border-top: 1px solid var(--line);
+}
+
+.vtk-auth-alt-title {
+  margin: 0;
+  color: var(--ink);
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.vtk-auth-alt-intro {
+  margin: 4px 0 18px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.vtk-auth-notice {
+  margin-top: 16px;
+  padding: 12px 14px;
+  border: 1px solid var(--line-2);
+  border-radius: 12px;
+  background: var(--paper-2);
+  color: var(--body);
+  font-size: 13px;
+}
+
+.vtk-auth-notice p {
+  margin: 0 0 8px;
+}
+
+.vtk-auth-notice-done {
+  margin: 0;
+  color: var(--muted);
+}
+
+.vtk-auth-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 16px;
+  justify-content: space-between;
+  margin: 18px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.vtk-auth-links a {
+  color: var(--ink);
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+/* Registratie en wachtwoordherstel gebruiken hetzelfde paneel, maar hebben meer
+   velden; voor- en achternaam passen naast elkaar zodra er plaats is. */
+.vtk-auth-panel-wide {
+  max-width: 560px;
+}
+
+.vtk-auth-row {
+  display: grid;
+  gap: 18px;
+  grid-template-columns: 1fr;
+}
+
+@media (min-width: 520px) {
+  .vtk-auth-row {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+.vtk-auth-intro {
+  margin: -12px 0 24px;
+  color: var(--body);
+  font-size: 14px;
+  line-height: 1.55;
+}
+
+.vtk-auth-hint {
+  margin: 6px 0 0;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.vtk-auth-check {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  color: var(--body);
+  font-size: 14px;
+}
+
+.vtk-auth-check input {
+  width: auto;
+  margin-top: 3px;
+}
+
+.vtk-auth-check label {
+  margin: 0;
+  color: inherit;
+  font-size: inherit;
+  font-weight: 500;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.vtk-auth-done {
+  margin: 0 0 18px;
+  color: var(--body);
+  font-size: 14px;
+  line-height: 1.55;
+}
+
 @media (max-width: 900px) {
   .vtk-site-footer-top {
     grid-template-columns: 1fr 1fr;

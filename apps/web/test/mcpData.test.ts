@@ -52,7 +52,6 @@ describe("MCP create-only datalaag", () => {
       titleNl: "Testevent",
       start: new Date("2026-09-01T18:00:00.000Z"),
       end: new Date("2026-09-01T20:00:00.000Z"),
-      visibility: "PUBLIC",
       publishedAt: null,
       group: { code: "CULTUUR", nameNl: "Cultuur" },
       categories: [{ category: { slug: "cultuur", nameNl: "Cultuur" } }],
@@ -86,7 +85,6 @@ describe("MCP create-only datalaag", () => {
       groupId: "group-1",
       publishedAt: null,
       createdById: null,
-      visibility: "PUBLIC",
       categories: { create: [{ categoryId: "cat-1" }] },
     });
     expect(result.created.id).toBe("event-1");
@@ -102,7 +100,6 @@ describe("MCP create-only datalaag", () => {
       titleNl: data.titleNl,
       start: data.start,
       end: data.end,
-      visibility: data.visibility,
       publishedAt: data.publishedAt,
       group: { code: "CULTUUR", nameNl: "Cultuur" },
       categories: [],

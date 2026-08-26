@@ -46,6 +46,33 @@ function ticketTypeRequiresLogin(type: { audience: string; priceCents: number })
   return type.audience === "MEMBERS" || type.priceCents === 0;
 }
 
+/**
+ * Een ticketsoort voor ereleden bestaat voor iedereen anders niet.
+ *
+ * Bewust wegfilteren en niet uitgrijzen: wat de kring aan haar ereleden geeft
+ * (gratis naar een cantus, bijvoorbeeld) hoort geen zichtbare uitzondering te
+ * zijn waar de rest van de site zich vragen bij stelt. Wie geen erelid is, ziet
+ * gewoon het gewone aanbod, en `createOrder` weigert zo'n type ook serverside.
+ */
+function ticketTypeIsHidden(type: { audience: string }, isHonorary: boolean): boolean {
+  return type.audience === "HONORARY" && !isHonorary;
+}
+
+/**
+ * Is de ingelogde bezoeker erelid? Een DB-lezing, want `SessionPayload` draagt
+ * permissies en rollen, geen ledenstatus, en dat uitbreiden zou elke
+ * sessielezing op de hele site duurder maken voor iets wat enkel de ticketshop
+ * nodig heeft.
+ */
+async function viewerIsHonorary(userId: string | undefined): Promise<boolean> {
+  if (!userId) return false;
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { honoraryMember: true },
+  });
+  return user?.honoraryMember ?? false;
+}
+
 function ticketTypeIsOnSale(
   type: { salesStart?: Date | string | null; salesEnd?: Date | string | null },
   now: Date
@@ -126,12 +153,14 @@ export async function listPublishedTicketEvents(locale: PublicLocale) {
     }),
     getSession(await headers()),
   ]);
+  const isHonorary = await viewerIsHonorary(session?.user.id);
   return events.map((event) => {
     const dto = publicEventDto(event, locale);
     const selectableTypes = dto.ticketTypes.filter(
       (type) =>
         ticketTypeIsOnSale(type, now) &&
-        type.available >= (type.minPerOrder ?? 1)
+        type.available >= (type.minPerOrder ?? 1) &&
+        !ticketTypeIsHidden(type, isHonorary)
     );
     const ticketTypes = selectableTypes.filter(
       (type) => Boolean(session) || !ticketTypeRequiresLogin(type)
@@ -155,8 +184,10 @@ export async function getPublishedTicketEventBySlug(slug: string, locale: Public
   if (!event || event.status !== "PUBLISHED") return null;
 
   const session = await getSession(await headers());
+  const isHonorary = await viewerIsHonorary(session?.user.id);
   const dto = publicEventDto(event, locale);
-  const ticketTypes = dto.ticketTypes.filter(
+  const visibleTypes = dto.ticketTypes.filter((type) => !ticketTypeIsHidden(type, isHonorary));
+  const ticketTypes = visibleTypes.filter(
     (type) => Boolean(session) || !ticketTypeRequiresLogin(type)
   );
   return {
@@ -165,7 +196,7 @@ export async function getPublishedTicketEventBySlug(slug: string, locale: Public
     requiresLogin:
       !session &&
       ticketTypes.length === 0 &&
-      dto.ticketTypes.some(ticketTypeRequiresLogin),
+      visibleTypes.some(ticketTypeRequiresLogin),
     viewer: session
       ? { id: session.user.id, name: session.user.name, email: session.user.email }
       : null,

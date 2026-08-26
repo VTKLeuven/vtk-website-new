@@ -18,7 +18,6 @@ type Event = {
   start?: Date | null;
   end?: Date | null;
   allDay?: boolean;
-  visibility?: "PUBLIC" | "MEMBERS";
   url?: string | null;
   imageKey?: string | null;
   publishedAt?: Date | null;
@@ -119,6 +118,7 @@ export function EventForm({
   const audienceCategories = categories.filter((c) => c.audience !== null);
   const themeCategories = categories.filter((c) => c.audience === null);
   const isDraft = Boolean(event.id) && !event.publishedAt;
+  const isPublished = Boolean(event.id) && Boolean(event.publishedAt);
   const secondarySubmits = [
     ...(!event.id || isDraft
       ? [
@@ -126,6 +126,26 @@ export function EventForm({
             name: "publication",
             value: "draft",
             label: nl ? "Opslaan als concept" : "Save as draft",
+          },
+        ]
+      : []),
+    // Een gepubliceerd evenement terug offline halen. Dezelfde knop en dezelfde
+    // waarde als hierboven, maar met een andere naam en een bevestiging: dit
+    // haalt iets weg dat bezoekers nu zien, en dat verdient een vraag.
+    ...(isPublished
+      ? [
+          {
+            name: "publication",
+            value: "draft",
+            label: nl ? "Terug naar concept" : "Back to draft",
+            confirm: {
+              title: nl ? "Terug naar concept?" : "Back to draft?",
+              description: nl
+                ? "Het evenement verdwijnt meteen van de kalender, de homepage, de agenda-feeds en de app. De inhoud, categorieën, tickets en het formulier blijven bewaard; publiceren zet alles in één klik terug online."
+                : "The event disappears at once from the calendar, the home page, the calendar feeds and the app. Its content, categories, tickets and form are kept; publishing puts everything back online in one click.",
+              confirmLabel: nl ? "Terug naar concept" : "Back to draft",
+              cancelLabel: nl ? "Annuleren" : "Cancel",
+            },
           },
         ]
       : []),
@@ -214,13 +234,6 @@ export function EventForm({
               <input type="checkbox" name="allDay" defaultChecked={event.allDay ?? false} />
               {locale === "nl" ? "Hele dag" : "All day"}
             </label>
-            <div>
-              <Label>Visibility</Label>
-              <Select name="visibility" defaultValue={event.visibility ?? "PUBLIC"}>
-                <option value="PUBLIC">Public</option>
-                <option value="MEMBERS">Members only</option>
-              </Select>
-            </div>
           </div>
           <div>
             <Label>URL</Label>

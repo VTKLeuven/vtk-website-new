@@ -1380,7 +1380,6 @@ async function main() {
         url: e.url,
         descriptionNl: e.descriptionNl,
         descriptionEn: e.descriptionEn,
-        visibility: "PUBLIC" as const,
         publishedAt: new Date(),
         groupId: group.id,
       },

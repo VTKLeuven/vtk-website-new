@@ -237,7 +237,7 @@ export function TicketTypeManager({
                         {locale === "en" && ticketType.nameEn ? ticketType.nameEn : ticketType.nameNl}
                       </p>
                       <p className="ticket-admin-row-meta">
-                        {formatMoney(ticketType.unitPriceCents, ticketType.currency, locale)} · {ticketType.inventoryPool.nameNl} · {ticketType.audience === "MEMBERS" ? (locale === "nl" ? "Leden" : "Members") : (locale === "nl" ? "Publiek" : "Public")}
+                        {formatMoney(ticketType.unitPriceCents, ticketType.currency, locale)} · {ticketType.inventoryPool.nameNl} · {ticketType.audience === "MEMBERS" ? (locale === "nl" ? "Leden" : "Members") : ticketType.audience === "HONORARY" ? (locale === "nl" ? "Ereleden" : "Honorary members") : (locale === "nl" ? "Publiek" : "Public")}
                       </p>
                       <p className="ticket-admin-row-meta ticket-admin-inline-meta">
                         <UsersRound aria-hidden="true" size={13} />
@@ -354,6 +354,10 @@ export function TicketTypeManager({
                     <select id="ticket-type-audience" name="audience" defaultValue="PUBLIC">
                       <option value="PUBLIC">{locale === "nl" ? "Publiek" : "Public"}</option>
                       <option value="MEMBERS">{locale === "nl" ? "Alleen leden" : "Members only"}</option>
+                      {/* Onzichtbaar voor iedereen behalve ereleden; niet
+                          uitgegrijsd maar echt weggefilterd, zodat de rest van
+                          de site die uitzondering niet ziet. */}
+                      <option value="HONORARY">{locale === "nl" ? "Alleen ereleden" : "Honorary members only"}</option>
                     </select>
                   </div>
                   <div className="ticket-admin-field" data-span="2">

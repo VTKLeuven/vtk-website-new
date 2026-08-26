@@ -2,6 +2,7 @@ import type { StudyProgramme, StudyYear } from "@prisma/client";
 import { cn } from "@vtk/ui";
 import { getDictionary, type Locale } from "@vtk/i18n";
 import { STUDY_YEARS, STUDY_PROGRAMMES } from "@/lib/profile";
+import { AlumniFieldset } from "./AlumniFieldset";
 
 /** Eén aanvinkbare optie in een multi-select groep (mailinglijsten, studie, ...). */
 export function CheckboxChip({
@@ -45,6 +46,9 @@ export function StudyFieldset({
   notStudying,
   internationalStudent,
   alumni,
+  graduationYear,
+  wasInVtk,
+  alumniMailOptIn,
 }: {
   locale: Locale;
   studyYears: StudyYear[];
@@ -53,6 +57,9 @@ export function StudyFieldset({
   notStudying: boolean;
   internationalStudent: boolean;
   alumni: boolean;
+  graduationYear: number | null;
+  wasInVtk: boolean;
+  alumniMailOptIn: boolean;
 }) {
   const t = getDictionary(locale).onboarding;
   const selectedYears = new Set(studyYears);
@@ -122,10 +129,26 @@ export function StudyFieldset({
         />
         <p className="mt-1 text-xs text-[#5c667f]">{t.internationalStudentHint}</p>
       </div>
-      <div>
-        <CheckboxChip name="alumni" value="on" defaultChecked={alumni} label={t.alumni} />
-        <p className="mt-1 text-xs text-[#5c667f]">{t.alumniHint}</p>
-      </div>
+      {/* Alumni krijgen drie vervolgvragen zodra ze zichzelf zo aanduiden:
+          welk jaar, of ze ooit in VTK zaten, en of ze mails willen. Die drie
+          sturen de alumni-mailinglijst en de aanwezigheidslijst bij een
+          alumni-evenement. */}
+      <AlumniFieldset
+        alumni={alumni}
+        graduationYear={graduationYear}
+        wasInVtk={wasInVtk}
+        alumniMailOptIn={alumniMailOptIn}
+        labels={{
+          alumni: t.alumni,
+          alumniHint: t.alumniHint,
+          graduationYear: t.graduationYear,
+          graduationYearHint: t.graduationYearHint,
+          wasInVtk: t.wasInVtk,
+          wasInVtkHint: t.wasInVtkHint,
+          mailOptIn: t.alumniMailOptIn,
+          mailOptInHint: t.alumniMailOptInHint,
+        }}
+      />
     </div>
   );
 }

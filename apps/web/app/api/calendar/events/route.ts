@@ -2,6 +2,7 @@ import type { Prisma } from "@prisma/client";
 import { NextResponse } from "next/server";
 import { prisma } from "@vtk/db";
 import { audienceFilter, viewerAudiences } from "@/lib/calendar/audience";
+import { publicInterestCounts } from "@/lib/calendar/interest";
 
 // Leest de sessie om de doelgroepen van de kijker te bepalen, dus per definitie
 // niet statisch te renderen.
@@ -18,7 +19,6 @@ export async function GET(request: Request) {
   const onlyMyAudiences = url.searchParams.get("audience") === "mine";
 
   const where: Prisma.CalendarEventWhereInput = {
-    visibility: "PUBLIC",
     publishedAt: { not: null },
   };
 
@@ -59,6 +59,10 @@ export async function GET(request: Request) {
     orderBy: { start: "asc" },
   });
 
+  // Enkel de tellers die de drempel halen komen terug; een laag getal verlaat de
+  // server dus niet eens. Zie lib/calendar/interest.ts.
+  const interested = await publicInterestCounts(events.map((e) => e.id));
+
   const payload = events.map((e) => ({
     id: e.id,
     title: e.titleNl,
@@ -76,6 +80,7 @@ export async function GET(request: Request) {
       descriptionNl: e.descriptionNl,
       descriptionEn: e.descriptionEn,
       categories: e.categories.map((c) => c.category),
+      interestedCount: interested.get(e.id) ?? null,
     },
   }));
 

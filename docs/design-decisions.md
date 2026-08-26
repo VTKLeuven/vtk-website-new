@@ -1312,8 +1312,8 @@ avond werk voor niets.
 VTK had een gedeelde Google Workspace-agenda. Die wordt **niet** gekoppeld: niet
 geïmporteerd, niet gespiegeld, niet gesynchroniseerd. De reden is dat
 `CalendarEvent` dingen draagt waar een Google-agenda geen plaats voor heeft: een
-Nederlandse én Engelse titel en beschrijving, `visibility` (publiek vs. enkel
-leden), `groupId` (dat bepaalt wie het event mag bewerken), een foto, en een 1:1-
+Nederlandse én Engelse titel en beschrijving, `publishedAt` (concept vs. online),
+`groupId` (dat bepaalt wie het event mag bewerken), een foto, en een 1:1-
 koppeling met `TicketEvent`. Zou Google de bron zijn, dan verlies je dat allemaal
 of moet je het in de eventbeschrijving proppen.
 
@@ -3612,6 +3612,28 @@ keuzes die niet uit de code volgen.
   twee plaatsen te bezetten en voor de derde te wachten. Half ingeschreven zijn is
   voor niemand bruikbaar.
 
+## De onboarding en de jaarlijkse bevestiging zijn te bekijken onder Admin → IT
+
+De twee gates uit `proxy.ts` zijn de enige schermen die een lid precies één keer
+ziet. Daardoor is er geen manier om te controleren of ze nog kloppen: je eigen
+account is al onboarded, en het werkingsjaar rolt maar één keer per jaar om. Wie
+het toch wou zien, moest een testaccount aanmaken of `onboardedAt` in de database
+op null zetten — en dat laatste is precies hoe je per ongeluk je eigen profiel
+wist.
+
+`/admin/it/flows` (superadmin) toont per gate wanneer hij afgaat, wat de eigen
+staat van de kijker is (`onboardedAt`, `studyConfirmedYear`, het huidige
+werkingsjaar en de eerstvolgende omslag op 15 juli), en het formulier zelf.
+
+Dat is bewust **het echte formulier**, met een opslaan-actie die niets bewaart
+(`previewNoopAction`). Een nagebouwde kopie zou vroeg of laat afwijken van wat een
+nieuw lid werkelijk ziet, en dan is de voorvertoning erger dan geen
+voorvertoning. `ProfileForm` heeft daarvoor een optionele `action`-prop; de
+studiebevestiging hergebruikt hetzelfde `StudyFieldset` met dezelfde
+`name`-attributen.
+
+---
+
 ## Adminlogboek: wie deed wat in het beheer
 
 Elke wijzigende beheerdersactie schrijft één regel in `AdminAuditLog`, te lezen op
@@ -3980,11 +4002,234 @@ geen ticket".
 
 De teller (`interestedCount`) draagt **geen namen**. Hij is er om te zien of er
 volk komt, en dat is precies zoveel als een ster mag beloven; een deelnemerslijst
-zou hem tot een belofte maken die hij niet is.
+zou hem tot een belofte maken die hij niet is. De enige uitzondering staat
+hieronder bij de alumniwerking, en die is expliciet opt-in per evenement.
 
 Een aangeduid evenement blijft in je lijst staan ook wanneer het buiten je
 doelgroep valt. Iemand die in september eerstejaarsactiviteiten aanduidde en in
 oktober zijn studiejaar bijwerkt, hoort ze niet zonder uitleg te zien verdwijnen.
+
+### Dezelfde ster staat sinds augustus 2026 ook op de website
+
+`/kalender/<id>` heeft een knop "Ik kom naar dit evenement" die in dezelfde
+`CalendarEventInterest`-tabel schrijft. Wie in de app op de ster tikt en op de
+site kijkt, krijgt dus geen twee verschillende antwoorden.
+
+**De teller verschijnt pas vanaf 30 geïnteresseerden** (`INTEREST_PUBLIC_THRESHOLD`
+in `lib/calendar/interest.ts`). Dat getal is een kringkeuze en geen technische
+grens: onder die drempel zegt een getal het verkeerde. "3 mensen komen" leest als
+"hier komt niemand" en houdt precies de mensen weg die je wou overtuigen; boven de
+drempel keert dat om en werkt het als aanmoediging. Een laag getal verlaat de
+server daarom niet eens: `publicInterestCounts()` geeft die rijen gewoon niet
+terug, zodat het ook niet per ongeluk ergens opduikt.
+
+De teller staat op vier plekken en overal met dezelfde drempel: de heroagenda en
+de kaarten op de homepage, het kalenderraster, de voorvertoning bij een klik, en
+de eventpagina zelf.
+
+---
+
+## Alumniwerking
+
+Alles hieronder bestaat voor één doel: meer alumni op onze evenementen krijgen.
+De rest volgt daaruit, en dat verklaart een paar keuzes die er los van elkaar
+raar uitzien.
+
+### Een tweede deur naast KU Leuven SSO
+
+Studenten registreren zichzelf door voor het eerst met KU Leuven SSO in te loggen
+(zie "Ledenregistratie & onboarding" hierboven). Een alumnus van 2004 kan dat
+niet: zijn KU Leuven-account bestaat niet meer. Zolang SSO de enige deur was, kon
+hij zich dus letterlijk nergens voor inschrijven.
+
+- `/registreren` maakt een account met **e-mail en wachtwoord**. De implementatie
+  staat in `packages/auth/src/server/selfSignup.ts`, bewust **niet** via
+  better-auths `signUpEmail`: die staat uit (`disableSignUp: true`) en aanzetten
+  zou `/api/auth/better/sign-up/email` openzetten voor iedereen, buiten elke
+  controle die wij doen.
+- **Het adres moet bevestigd worden.** `AccountEmailToken` draagt de eenmalige
+  link (enkel de hash bewaard, zoals bij `CalendarFeedToken`). `selfRegisteredAt`
+  is het veld dat zegt dat `emailVerified` hier iets betekent: voor een account
+  dat een beheerder aanmaakte of dat via SSO binnenkwam, betekent het niets, en
+  daarop gaan gaten zou elke bestaande admin buitensluiten.
+- **De inlogfout verklapt niets.** `checkLoginBlocked` geeft enkel `UNVERIFIED`
+  wanneer het wachtwoord klópte; anders is het gewoon `INVALID`. Hetzelfde geldt
+  voor het registratieformulier en voor "wachtwoord vergeten": een adres dat al
+  bezet is, levert exact hetzelfde scherm op als een geslaagde registratie.
+  Anders is dat formulier een manier om onze ledenlijst af te tasten.
+- **Zo'n account is een gewoon lid.** Geen aparte status, geen beperkte rechten.
+  Wat aan de faculteit hangt (ledenkorting) volgt uit de KU Leuven-attributen
+  (`firwStudent`, uit `eduPersonOrgUnitDN`), en die heeft dit account nu eenmaal
+  niet; dat is de bestaande regel en niet iets nieuws.
+- Er is ook een **wachtwoord-vergeten**-flow (`/wachtwoord-vergeten`), want zonder
+  SSO is er anders geen enkele weg terug. Enkel voor accounts die een wachtwoord
+  hébben: wie via KU Leuven binnenkomt, wordt daar expliciet naar het inlogscherm
+  teruggestuurd in plaats van een mail te krijgen die zijn probleem niet oplost.
+
+### Het inlogscherm is één knop, met een regeltje eronder
+
+Verreweg de meeste bezoekers zijn student. Twee even grote formulieren naast
+elkaar zetten betekent dat de helft van hen eerst een wachtwoord probeert te
+verzinnen dat niet bestaat. Dus: één grote knop "Inloggen met KU Leuven
+Authenticator", en daaronder in het klein "Geen KU Leuven student (meer): klik
+hier", dat het e-mailformulier openklapt met daarin de link naar registratie en
+naar wachtwoord vergeten. Staat SSO uit (geen env-vars), dan staat dat formulier
+gewoon open; er valt dan niets te verbergen.
+
+### Ereleden
+
+Een alumnus kan door een beheerder als **erelid** aangeduid worden
+(`User.honoraryMember`, op `/admin/gebruikers/<id>`; nooit door het lid zelf).
+Daarmee ziet hij ticketsoorten met `TicketAudience.HONORARY` — bijvoorbeeld
+gratis naar een cantus.
+
+Zo'n ticketsoort wordt voor iedereen anders **weggefilterd**, niet uitgegrijsd.
+Wat de kring aan haar ereleden geeft, hoort geen zichtbare uitzondering te zijn
+waar de rest van de site zich vragen bij stelt; wie geen erelid is, ziet gewoon
+het gewone aanbod. `createTicketCheckout` weigert zo'n type ook serverside, met
+dezelfde fout als bij een onbestaand type.
+
+### "Ik kom" zonder account, maar enkel bij een alumni-evenement
+
+Bij een evenement met de alumni-doelgroep kan iemand **zonder account** aanduiden
+dat hij komt (`CalendarEventGuestInterest`). Bij elk ander evenement kan dat niet:
+daar is interesse een ledenmarkering, en een anonieme rij zou de teller waardeloos
+maken.
+
+De prijs van die openheid is dat de bezoeker iets over zichzelf zegt: een
+afstudeerjaar, of dat hij in VTK zat, of allebei. **De naam is optioneel** — "iemand
+van 2004 die in VTK zat komt ook" is al genoeg om een andere alumnus over de
+streep te trekken. Een volledig lege rij wordt geweigerd, want die verhoogt enkel
+een teller zonder iemand iets te vertellen.
+
+Een cookie (alleen de hash bewaard) laat de bezoeker zijn keuze terugnemen en
+houdt dubbele klikken van hetzelfde toestel tegen. Dat is geen waterdichte
+fraudebescherming, en die bestaat ook niet zonder login; het is de bewuste ruil
+voor het wegnemen van de drempel.
+
+### De aanwezigheidslijst is publiek, en dat is het punt
+
+Op een alumni-evenement staat een tabel met wie er komt: naam, afstudeerjaar, en
+of die persoon ooit in VTK zat. **Alleen wie zelf een vakje aanvinkte staat erin**
+(`showName` / `showGraduationYear` / `showWasInVtk` op `CalendarEventInterest`,
+alle drie standaard uit). Wie enkel "ik kom" duidt, telt mee in het getal en
+verschijnt nergens.
+
+De lijst is publiek zichtbaar, ook voor wie niet ingelogd is. Dat is een bewuste
+kringkeuze: het domino-effect is de hele reden dat dit bestaat. Een alumnus
+beslist te komen wanneer hij ziet dat hij er iemand gaat kennen, en die
+overtuiging moet werken vóór hij een account maakt, niet erna.
+
+De drie vlaggen staan **per evenement** en niet op het profiel: "ik wil zichtbaar
+zijn op de reünie van mijn eigen lichting" is iets anders dan "ik wil altijd en
+overal met naam op de website staan".
+
+### Het adresboek staat naast de opt-in-nieuwsbrieven, niet erin
+
+De mailinglijsten uit `lib/mailinglists.ts` zijn studiegericht: ze eisen een
+studiebevestiging van het huidige werkingsjaar, en die geeft een afgestudeerde per
+definitie nooit meer. Een alumnus in die lijsten zetten zou dus betekenen dat je
+die regel voor iedereen sloopt.
+
+Daarom een eigen bron, met twee helften die pas bij de export samenkomen:
+
+- **`AlumniContact`** (`/admin/alumni`, permissie `alumni.manage`): namen die de
+  kring van reünies, oud-praesidia en inschrijvingslijsten overhoudt, zonder
+  account. Per lichting te beheren, met een plakvenster voor een geëxporteerde
+  lijst — zonder dat is vijfhonderd alumni invoeren een middag typen, en dan
+  gebeurt het niet.
+- **Site-accounts** met `alumni` én `alumniMailOptIn`. Dat vinkje staat in de
+  onboarding én in de jaarlijkse bevestiging, samen met het afstudeerjaar en "ik
+  heb ooit in VTK gezeten"; die drie verschijnen pas zodra iemand zichzelf als
+  alumnus aanduidt.
+
+Ze worden **op e-mailadres ontdubbeld en het account wint**. Een alumnus die later
+toch een account maakt, hoeft dus niet handmatig uit het adresboek gehaald te
+worden, en niemand krijgt dezelfde mail twee keer.
+
+**Uitschrijven is niet verwijderen.** Een uitgeschreven contact blijft in de tabel
+staan met een `unsubscribedAt`, precies zodat de volgende import van een oude
+lijst hem niet stilletjes weer toevoegt. Verwijderen is er voor een tikfout of een
+dubbele rij.
+
+In Brevo is dit **een eigen lijst met een eigen sync** (`lib/brevo/alumni.ts`,
+`Setting`-sleutel `brevo.alumniList`), bewust buiten `BREVO_LIST_KEYS`. Die
+lijsten worden elke nacht gereconcilieerd tegen `desiredListKeys()`, dat enkel
+naar `User`-rijen kijkt en per definitie geen enkele alumnus teruggeeft; zat de
+alumnilijst daarin, dan maakte de reconciliatie ze elke nacht leeg.
+
+---
+
+## Doelgroepen zijn een label, geen slot
+
+Een `CalendarCategory` met een `audience` (eerstejaars, internationaal,
+laatstejaars, alumni) zegt voor wie een evenement bedoeld is. Tot augustus 2026
+verborg de site zo'n evenement ook voor wie er niet bij hoorde: op de homepage, in
+de zoekresultaten en in de app zag een tweedejaars geen enkele alumni-activiteit.
+
+Dat is de omgekeerde wereld voor een kring die net wil dat mensen ontdekken wat er
+allemaal is. **Standaard staat nu alles overal.** Het filter blijft bestaan als
+persoonlijke voorkeur: `User.calendarOnlyMyAudiences` (op /account) houdt de
+algemene evenementen plus de eigen doelgroepen over, en geldt dan op de homepage,
+de kalender, de zoekresultaten, de app en de persoonlijke agendafeed. Gebruik
+`viewerAudienceFilter()` en niet `audienceFilter(await viewerAudiences())`: die
+laatste combinatie negeert de voorkeur.
+
+Op /kalender blijft de chip "Afstemmen op mijn profiel" bestaan om het per bezoek
+aan of uit te zetten; zijn beginstand komt uit die accountvoorkeur.
+
+### Er is geen ledenexclusief evenement meer
+
+`EventVisibility.MEMBERS` is verdwenen (migratie
+`20260826110000_drop_event_visibility`). VTK plant niets in wat niet op de
+publieke kalender mag staan; wat wél besloten is — een vergadering, een intern
+moment — staat sowieso nergens in `CalendarEvent`. De vlag leverde vooral een
+extra regel in elke query op en een keuzelijst in de admin die niemand ooit anders
+zette.
+
+Wie een evenement niet online wil, zet het op **concept** (`publishedAt = null`).
+Dat is sinds dezelfde release ook terug te draaien vanaf een gepubliceerd event
+("Terug naar concept", met bevestiging: het verdwijnt meteen van de kalender, de
+homepage, de feeds en de app, maar inhoud, categorieën, tickets en formulier
+blijven bewaard).
+
+---
+
+## Abonneren op de kalender: vier samenstellingen
+
+De abonneerknop wees vroeger naar de feed van de filterchip die toevallig aanstond
+— zonder dat ergens te zeggen. Dat is de soort stille koppeling waar iemand pas
+achter komt wanneer hij drie maanden later geen enkel evenement in zijn agenda
+ziet.
+
+Nu zegt de knop wat ze gaat doen ("Abonneren op de alumni-kalender") en zet een
+dialoog de vier zinvolle keuzes naast elkaar:
+
+1. **de hele kalender** — alles, alle doelgroepen inbegrepen;
+2. **algemene evenementen + één doelgroep** — het antwoord voor een alumnus: de
+   alumni-avonden én de fuiven waar iedereen welkom is, maar niet de
+   eerstejaarsdoop;
+3. **enkel die doelgroep of categorie**;
+4. **een eigen selectie** van categorieën.
+
+Dat gebeurt met **parameters op de bestaande feed-URL** (`?c=alumni&algemeen=1`)
+en niet met een nieuw pad per combinatie. Een agenda-abonnement is een URL die
+jaren in iemands telefoon blijft staan; hoe minder verschillende vormen daarvan
+rondzwerven, hoe minder er ooit stil kapotgaat. `/api/calendar/feed/c/<slug>.ics`
+blijft bestaan voor wie zich al abonneerde.
+
+Een filterchip die al aanstaat, zet zichzelf uit bij een tweede klik. Zonder dat
+is "alles" enkel bereikbaar via de knop links, en dat is precies niet waar iemand
+kijkt die net op "Alumni" duwde en het weer weg wil.
+
+### Klikken op een evenement opent eerst een kaartje
+
+In een cel van het maandraster past hoogstens een afgekapte titel. Meteen
+doorsturen naar een volledige pagina is dan een dure manier om te ontdekken dat je
+het verkeerde evenement aanklikte. Een klik opent daarom een voorvertoning met de
+volledige titel, een samenvatting, waar en wanneer, en de teller; de knop eronder
+gaat pas naar de eventpagina. De `href` blijft op het element staan, zodat
+middenklik, ctrl-klik en een zoekmachine nog altijd een echte link zien.
 
 ---
 

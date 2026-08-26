@@ -15,8 +15,7 @@ const mocks = vi.hoisted(() => ({
   requireSession: vi.fn(),
   calendarFindMany: vi.fn(),
   categoryFindMany: vi.fn(),
-  viewerAudiences: vi.fn(),
-  audienceFilter: vi.fn(),
+  viewerAudienceFilter: vi.fn(),
   loadOrderableSessions: vi.fn(),
 }));
 
@@ -33,8 +32,7 @@ vi.mock("@/lib/session", () => ({
 }));
 
 vi.mock("@/lib/calendar/audience", () => ({
-  viewerAudiences: mocks.viewerAudiences,
-  audienceFilter: mocks.audienceFilter,
+  viewerAudienceFilter: mocks.viewerAudienceFilter,
 }));
 
 vi.mock("@/lib/calendar/categories", () => ({
@@ -64,8 +62,9 @@ function appRequest(path: string, headers: Record<string, string> = {}) {
 describe("GET /api/app/v1/kalender", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mocks.viewerAudiences.mockResolvedValue([]);
-    mocks.audienceFilter.mockReturnValue({ OR: ["doelgroepfilter"] });
+    // Standaard filtert de voorkeur niets weg; enkel wie op /account koos zijn
+    // kalender toe te spitsen krijgt hier een where-fragment.
+    mocks.viewerAudienceFilter.mockResolvedValue({ OR: ["doelgroepfilter"] });
     mocks.categoryFindMany.mockResolvedValue([
       { slug: "cantus", nameNl: "Cantussen", nameEn: "Cantus", colour: "#123456", audience: null },
     ]);
@@ -114,21 +113,34 @@ describe("GET /api/app/v1/kalender", () => {
   });
 
   /**
-   * De doelgroepfilter is de reden dat een eerstejaarsevent niet bij iedereen op
-   * het scherm staat. Hij is een standaard en geen slot, dus `audience=all` zet
-   * hem uit; dat de app dat weet, staat in `filteredByAudience`.
+   * Het doelgroepfilter komt uit de accountvoorkeur van het lid en is standaard
+   * leeg: elk gepubliceerd evenement is publiek. Wie de voorkeur wél aanzette,
+   * kan hem per oproep uitzetten met `audience=all`; dat de app dat weet, staat
+   * in `filteredByAudience`.
    */
-  it("past de doelgroepfilter toe, tenzij er expliciet om alles gevraagd wordt", async () => {
+  it("past de voorkeursfilter toe, tenzij er expliciet om alles gevraagd wordt", async () => {
     const filtered = await (await calendarGet(appRequest("/api/app/v1/kalender"))).json();
     expect(filtered.filteredByAudience).toBe(true);
-    expect(mocks.audienceFilter).toHaveBeenCalledTimes(1);
+    expect(mocks.viewerAudienceFilter).toHaveBeenCalledTimes(1);
 
     vi.clearAllMocks();
     mocks.categoryFindMany.mockResolvedValue([]);
     mocks.calendarFindMany.mockResolvedValue([]);
     const all = await (await calendarGet(appRequest("/api/app/v1/kalender?audience=all"))).json();
     expect(all.filteredByAudience).toBe(false);
-    expect(mocks.audienceFilter).not.toHaveBeenCalled();
+    expect(mocks.viewerAudienceFilter).not.toHaveBeenCalled();
+  });
+
+  /**
+   * De vlag zegt of er effectief iets weggefilterd wordt, niet of we het
+   * geprobeerd hebben. Zonder dat onderscheid zet de app onder elke lijst dat er
+   * activiteiten voor andere doelgroepen ontbreken, terwijl er niets ontbreekt:
+   * doelgroepevents zijn standaard voor iedereen zichtbaar.
+   */
+  it("meldt geen filter wanneer de voorkeur uitstaat", async () => {
+    mocks.viewerAudienceFilter.mockResolvedValue({});
+    const body = await (await calendarGet(appRequest("/api/app/v1/kalender"))).json();
+    expect(body.filteredByAudience).toBe(false);
   });
 
   /**
@@ -151,7 +163,7 @@ describe("GET /api/app/v1/kalender", () => {
     expect(where.categories).toEqual({ some: { category: { slug: { in: ["cantus"] } } } });
     // Wie om één categorie vraagt, krijgt ze ook als het een doelgroepcategorie
     // is: die lijst is dan de eerstejaarskalender.
-    expect(mocks.audienceFilter).not.toHaveBeenCalled();
+    expect(mocks.viewerAudienceFilter).not.toHaveBeenCalled();
   });
 });
 

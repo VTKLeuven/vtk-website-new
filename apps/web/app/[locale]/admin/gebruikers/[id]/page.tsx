@@ -102,7 +102,7 @@ export default async function EditUserPage({
               <option value="EN">EN</option>
             </Select>
           </div>
-          <div className="md:col-span-2 flex items-center gap-4">
+          <div className="md:col-span-2 flex flex-wrap items-center gap-4">
             <label className="inline-flex items-center gap-2 text-sm">
               <input type="checkbox" name="active" defaultChecked={user.active} />
               Active
@@ -111,7 +111,19 @@ export default async function EditUserPage({
               <input type="checkbox" name="isSuperAdmin" defaultChecked={user.isSuperAdmin} />
               Superadmin
             </label>
+            {/* Erelid: geeft toegang tot ticketsoorten die voor iedereen anders
+                niet bestaan (bv. gratis naar een cantus). Enkel hier te zetten;
+                het lid ziet zijn eigen status nergens als een schakelaar. */}
+            <label className="inline-flex items-center gap-2 text-sm">
+              <input type="checkbox" name="honoraryMember" defaultChecked={user.honoraryMember} />
+              {locale === 'nl' ? 'Erelid' : 'Honorary member'}
+            </label>
           </div>
+          <p className="md:col-span-2 -mt-1 text-xs text-[#5c667f]">
+            {locale === 'nl'
+              ? 'Een erelid ziet ticketsoorten met doelgroep “Alleen ereleden”. Voor alle andere bezoekers bestaan die soorten niet: ze staan niet in de lijst en de kassa weigert ze.'
+              : 'An honorary member sees ticket types with the “Honorary members only” audience. For every other visitor those types do not exist: they are not listed, and checkout refuses them.'}
+          </p>
         </SaveForm>
       </Card>
 

@@ -718,6 +718,148 @@
   line-height: 1.45;
 }
 
+.vtk-design .subscribe-open {
+  width: 100%;
+  justify-content: space-between;
+  margin-top: 4px;
+}
+
+/* De abonneerdialoog. Vast in het scherm, want ze wordt geopend vanuit een
+   zijkolom die op een telefoon onderaan de pagina staat; een paneel dat daar
+   openklapt valt buiten beeld. */
+.vtk-design .subscribe-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: rgba(10, 15, 31, 0.45);
+}
+
+.vtk-design .subscribe-modal {
+  width: 100%;
+  max-width: 480px;
+  max-height: calc(100dvh - 40px);
+  overflow-y: auto;
+  padding: 22px;
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  background: var(--surface);
+  box-shadow: 0 24px 70px rgba(10, 15, 31, 0.22);
+}
+
+.vtk-design .subscribe-modal-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.vtk-design .subscribe-modal-head h3 {
+  margin: 0;
+  color: var(--ink);
+  font-size: 20px;
+  letter-spacing: -0.02em;
+}
+
+.vtk-design .subscribe-close {
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--paper);
+  color: var(--muted);
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.vtk-design .subscribe-close:hover {
+  color: var(--ink);
+}
+
+.vtk-design .subscribe-choices {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.vtk-design .subscribe-choices label {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--paper);
+  cursor: pointer;
+}
+
+.vtk-design .subscribe-choices label.on {
+  border-color: var(--ink);
+  background: var(--surface);
+  box-shadow: inset 3px 0 0 var(--yellow);
+}
+
+.vtk-design .subscribe-choices input {
+  margin-top: 3px;
+}
+
+.vtk-design .subscribe-choices b {
+  display: block;
+  color: var(--ink);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.vtk-design .subscribe-choices small {
+  display: block;
+  margin-top: 2px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.vtk-design .subscribe-custom {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--paper-2);
+}
+
+.vtk-design .subscribe-chip {
+  display: inline-flex;
+  gap: 7px;
+  align-items: center;
+  padding: 6px 11px;
+  border: 1px solid var(--line-2);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--body);
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.vtk-design .subscribe-chip:has(input:checked) {
+  border-color: var(--cat, var(--ink));
+  box-shadow: inset 0 0 0 1px var(--cat, var(--ink));
+  color: var(--ink);
+}
+
+.vtk-design .subscribe-modal .subscribe-actions {
+  margin-top: 18px;
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
+}
+
 .vtk-design .agenda-head {
   display: flex;
   justify-content: space-between;
@@ -1250,4 +1392,156 @@
 
 .vtk-design .view-switch button.on {
   border-color: var(--ink);
+}
+
+
+/* -----------------------------------------------------------------------------
+   Voorvertoning van een evenement
+
+   Klikken in het raster opent eerst dit kaartje. In een cel van 45 pixels past
+   hoogstens een afgekapte titel; meteen doorsturen naar een volledige pagina is
+   een dure manier om te ontdekken dat je het verkeerde evenement aanklikte.
+   -------------------------------------------------------------------------- */
+
+.vtk-design .ev-preview-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: rgba(10, 15, 31, 0.45);
+}
+
+.vtk-design .ev-preview {
+  position: relative;
+  width: 100%;
+  max-width: 460px;
+  max-height: calc(100dvh - 40px);
+  overflow-y: auto;
+  padding: 24px;
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  background: var(--surface);
+  box-shadow: 0 24px 70px rgba(10, 15, 31, 0.22);
+}
+
+.vtk-design .ev-preview-close {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  width: 32px;
+  height: 32px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--paper);
+  color: var(--muted);
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.vtk-design .ev-preview-close:hover {
+  color: var(--ink);
+}
+
+.vtk-design .ev-preview-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-right: 40px;
+}
+
+.vtk-design .ev-preview-tag {
+  padding: 3px 10px;
+  border: 1px solid var(--line-2);
+  border-radius: 999px;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.vtk-design .ev-preview-tag.audience {
+  border-color: var(--cat);
+  background: var(--cat);
+  color: #fff;
+}
+
+.vtk-design .ev-preview h3 {
+  margin: 12px 0 0;
+  color: var(--ink);
+  font-size: 24px;
+  line-height: 1.15;
+  letter-spacing: -0.02em;
+}
+
+.vtk-design .ev-preview-meta {
+  display: grid;
+  gap: 10px;
+  margin: 16px 0 0;
+  padding: 14px 0;
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+}
+
+.vtk-design .ev-preview-meta div {
+  display: flex;
+  gap: 16px;
+  justify-content: space-between;
+}
+
+.vtk-design .ev-preview-meta dt {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.vtk-design .ev-preview-meta dd {
+  margin: 0;
+  color: var(--ink);
+  font-size: 14px;
+  text-align: right;
+}
+
+.vtk-design .ev-preview-desc {
+  margin: 14px 0 0;
+  color: var(--body);
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.vtk-design .ev-preview-going {
+  display: inline-block;
+  margin: 14px 0 0;
+  padding: 4px 12px;
+  border-radius: 999px;
+  background: var(--yellow);
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.vtk-design .ev-preview-go {
+  width: 100%;
+  justify-content: space-between;
+  margin-top: 18px;
+}
+
+/* De teller in het raster, de lijst en de weekweergave. Klein en geel, zodat ze
+   opvalt zonder de titel te verdringen. */
+.vtk-design .ev-going {
+  display: inline-block;
+  margin-top: 4px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: var(--yellow);
+  color: var(--ink);
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
 }

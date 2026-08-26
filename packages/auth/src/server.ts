@@ -29,6 +29,18 @@ export { resolveClaims, type ResolveClaimsInput } from './server/claims';
 export { verifySignedOAuthQuery } from './server/oauthQuery';
 export { createUser, updateUser, setUserPassword, deleteUser } from './server/users';
 export {
+  MIN_PASSWORD_LENGTH,
+  registerSelfServiceAccount,
+  confirmEmailToken,
+  reissueEmailVerification,
+  createPasswordReset,
+  resetPasswordWithToken,
+  checkLoginBlocked,
+  type SelfSignupInput,
+  type SelfSignupResult,
+  type LoginBlock,
+} from './server/selfSignup';
+export {
   listSsoClients,
   getSsoClient,
   createSsoClient,

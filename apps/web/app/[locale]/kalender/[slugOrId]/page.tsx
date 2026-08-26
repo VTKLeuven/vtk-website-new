@@ -9,6 +9,16 @@ import { publicUrl } from "@/lib/storage";
 import { eventMetadata } from "@/lib/pageMetadata";
 import { loadCalendarCategory, loadCalendarEvent, loadDefaultEventImage } from "@/lib/pageQueries";
 import { buildMetadata } from "@/lib/seo";
+import { getCurrentSession } from "@/lib/session";
+import {
+  attendeeList,
+  interestLabel,
+  INTEREST_PUBLIC_THRESHOLD,
+  interestTotal,
+  viewerInterest,
+} from "@/lib/calendar/interest";
+import { EventInterestPanel } from "@/components/calendar/EventInterestPanel";
+import { AttendeeTable } from "@/components/calendar/AttendeeTable";
 import { CategoryCalendar } from "./CategoryCalendar";
 
 import "@/app/design/vtk-event.css";
@@ -61,7 +71,7 @@ export async function generateMetadata({ params }: { params: Params }): Promise<
   }
 
   const event = await loadCalendarEvent(slugOrId);
-  if (!event || event.visibility !== "PUBLIC") return {};
+  if (!event) return {};
 
   const image = publicUrl(event.imageKey) ?? (await loadDefaultEventImage());
   return eventMetadata(event, locale, `/kalender/${event.id}`, image);
@@ -85,7 +95,7 @@ export default async function CalendarSegmentPage({ params }: { params: Params }
 
   const event = await loadCalendarEvent(slugOrId);
 
-  if (!event || event.visibility !== "PUBLIC") notFound();
+  if (!event) notFound();
 
   const title = pick(event.titleNl, event.titleEn, locale);
   const description = pick(event.descriptionNl ?? "", event.descriptionEn ?? "", locale);
@@ -97,6 +107,23 @@ export default async function CalendarSegmentPage({ params }: { params: Params }
     .map((c) => c.category)
     .filter((c) => c.audience !== null);
   const themes = event.categories.map((c) => c.category).filter((c) => c.audience === null);
+
+  // "Ik kom naar dit evenement". De teller verschijnt pas vanaf een drempel; zie
+  // lib/calendar/interest.ts voor waarom een laag getal averechts werkt.
+  const isAlumniEvent = audiences.some((c) => c.audience === "ALUMNI");
+  const session = await getCurrentSession();
+  const [total, viewer, attendees] = await Promise.all([
+    interestTotal(event.id),
+    viewerInterest(event.id, session?.user.id ?? null),
+    // Enkel een alumni-evenement heeft een namenlijst; elders is interesse een
+    // private markering en zou een lijst een deelnemerslijst suggereren.
+    isAlumniEvent ? attendeeList(event.id) : Promise.resolve([]),
+  ]);
+  const countLine = interestLabel(
+    total >= INTEREST_PUBLIC_THRESHOLD ? total : null,
+    locale,
+  );
+  const nl = locale === "nl";
 
   return (
     <article className="vtk-page">
@@ -174,8 +201,6 @@ export default async function CalendarSegmentPage({ params }: { params: Params }
             <dd>{event.start.toLocaleString(locale === "nl" ? "nl-BE" : "en-GB", { timeZone: "Europe/Brussels" })}</dd>
             <dt>{locale === "nl" ? "Einde" : "End"}</dt>
             <dd>{event.end.toLocaleString(locale === "nl" ? "nl-BE" : "en-GB", { timeZone: "Europe/Brussels" })}</dd>
-            <dt>{locale === "nl" ? "Zichtbaarheid" : "Visibility"}</dt>
-            <dd>{locale === "nl" ? "Publiek" : "Public"}</dd>
           </dl>
           <div className="vtk-event-actions">
             <Link href={`${base}/kalender`} className="btn btn-ghost">
@@ -213,6 +238,58 @@ export default async function CalendarSegmentPage({ params }: { params: Params }
             ) : null}
           </div>
         </section>
+
+        <EventInterestPanel
+          eventId={event.id}
+          isAlumniEvent={isAlumniEvent}
+          signedIn={Boolean(session)}
+          viewer={viewer}
+          accountHref={`${base}/account`}
+          loginHref={`${base}/inloggen?next=${encodeURIComponent(`${base}/kalender/${event.id}`)}`}
+          labels={{
+            heading: nl ? "Kom je?" : "Are you coming?",
+            countLine,
+            join: nl ? "Ik kom naar dit evenement" : "I am coming to this event",
+            joined: nl ? "Je komt — bewaren" : "You are coming — save",
+            leave: nl ? "Toch niet" : "Never mind",
+            loginPrompt: nl
+              ? "Om aan te duiden dat je komt, log je even in."
+              : "To mark that you are coming, sign in first.",
+            loginCta: nl ? "Inloggen" : "Sign in",
+            showHeading: nl ? "Wat mag er in de lijst staan?" : "What may appear in the list?",
+            showHint: nl
+              ? "Alles staat standaard uit. Vink je niets aan, dan tel je gewoon mee in het aantal."
+              : "Everything is off by default. If you tick nothing you simply count towards the total.",
+            showName: nl ? "Mijn naam" : "My name",
+            showGraduationYear: nl ? "Mijn afstudeerjaar" : "My graduation year",
+            showWasInVtk: nl ? "Dat ik in VTK zat" : "That I was in VTK",
+            guestIntro: nl
+              ? "Geen account nodig. Zeg iets over jezelf, zodat andere alumni zien wie er komt; je naam is optioneel."
+              : "No account needed. Say something about yourself so other alumni can see who is coming; your name is optional.",
+            guestName: nl ? "Naam (optioneel)" : "Name (optional)",
+            guestNameHint: nl
+              ? "Laat leeg om anoniem in de lijst te staan."
+              : "Leave empty to appear anonymously in the list.",
+            guestYear: nl ? "Afstudeerjaar" : "Graduation year",
+            guestWasInVtk: nl ? "Ik heb ooit in VTK gezeten" : "I was part of VTK",
+            guestSubmit: nl ? "Ik kom" : "I am coming",
+            guestUpdate: nl ? "Bijwerken" : "Update",
+            guestRemove: nl ? "Toch niet" : "Never mind",
+            guestDone: nl ? "Genoteerd. Tot dan." : "Noted. See you there.",
+            errorNothing: nl
+              ? "Vul minstens je afstudeerjaar in of vink aan dat je in VTK zat."
+              : "Fill in at least your graduation year, or tick that you were in VTK.",
+            errorGeneric: nl
+              ? "Er ging iets mis. Probeer het opnieuw."
+              : "Something went wrong. Please try again.",
+            profileHint: nl
+              ? "Je naam, afstudeerjaar en VTK-verleden komen uit je profiel."
+              : "Your name, graduation year and VTK history come from your profile.",
+            profileLink: nl ? "Profiel bewerken" : "Edit profile",
+          }}
+        />
+
+        {isAlumniEvent ? <AttendeeTable rows={attendees} locale={locale} /> : null}
       </div>
     </article>
   );

@@ -2,7 +2,7 @@ import type { Prisma } from "@prisma/client";
 import { prisma } from "@vtk/db";
 import { pick } from "@vtk/i18n";
 
-import { audienceFilter, viewerAudiences } from "@/lib/calendar/audience";
+import { viewerAudienceFilter } from "@/lib/calendar/audience";
 import { listCalendarCategories } from "@/lib/calendar/categories";
 import { corsPreflight } from "@/lib/cors";
 import { getCurrentSession } from "@/lib/session";
@@ -20,11 +20,11 @@ const MAX_EVENTS = 200;
 /**
  * De kalender voor de app.
  *
- * Werkt zonder login, net als `/kalender` op de site. Wie wél ingelogd is, krijgt
- * de **doelgroepfilter** mee: een evenement dat enkel voor eerstejaars is, hoort
- * niet bij iedereen in de lijst te staan. Dat is dezelfde regel als op de site en
- * hij komt uit `viewerAudiences()` + `audienceFilter()`; het is een standaard en
- * geen slot, dus `?audience=all` zet hem uit.
+ * Werkt zonder login, net als `/kalender` op de site, en toont standaard **alles**:
+ * een doelgroep is een label, geen slot. Enkel wie op /account koos zijn kalender
+ * toe te spitsen (`calendarOnlyMyAudiences`) krijgt de doelgroepfilter mee, via
+ * `viewerAudienceFilter()`. `?audience=all` zet ook die voorkeur voor deze ene
+ * oproep uit.
  *
  * Parameters: `van` en `tot` (ISO), `categorie` (meerdere mag), `audience=all`,
  * en `interesse=1` voor enkel wat je zelf aanduidde. Zonder `van` vertrekt de
@@ -47,7 +47,6 @@ export async function GET(request: Request) {
     const session = await getCurrentSession();
 
     const where: Prisma.CalendarEventWhereInput = {
-      visibility: "PUBLIC",
       publishedAt: { not: null },
       // Een evenement dat bezig is, hoort er nog bij te staan; daarom `end` en
       // niet `start`. Zonder dat verdwijnt een festival op zijn tweede dag.
@@ -82,10 +81,16 @@ export async function GET(request: Request) {
 
     // Wie expliciet om een categorie vraagt, krijgt ze ook als het een
     // doelgroepcategorie is: die lijst ís dan de eerstejaarskalender.
-    const filteredByAudience = !showAll && !onlyInterested && categories.length === 0;
-    if (filteredByAudience) {
-      Object.assign(where, audienceFilter(await viewerAudiences()));
-    }
+    //
+    // `filteredByAudience` zegt of er effectief iets weggefilterd wórdt, niet of
+    // we het geprobeerd hebben. Sinds doelgroepevents standaard voor iedereen
+    // zichtbaar zijn, is het filter meestal leeg; zou de vlag dan toch true
+    // blijven, dan zet de app een regel onder de lijst die zegt dat er
+    // activiteiten ontbreken terwijl er niets ontbreekt.
+    const mayFilter = !showAll && !onlyInterested && categories.length === 0;
+    const audienceWhere = mayFilter ? await viewerAudienceFilter() : {};
+    const filteredByAudience = Object.keys(audienceWhere).length > 0;
+    if (filteredByAudience) Object.assign(where, audienceWhere);
 
     const [events, allCategories, followed] = await Promise.all([
       prisma.calendarEvent.findMany({

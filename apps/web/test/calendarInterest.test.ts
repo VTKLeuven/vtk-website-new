@@ -1,0 +1,72 @@
+import { describe, expect, it, vi, beforeEach } from "vitest";
+
+/**
+ * De drempel is de hele reden dat deze teller bestaat zoals ze bestaat: onder een
+ * bepaald aantal leest een getal als "hier komt niemand" en houdt het precies de
+ * mensen weg die het had moeten overtuigen. Een regressie hier is niet zichtbaar
+ * in de UI tot iemand meldt dat er "3 komen" op de homepage staat.
+ */
+const groupBy = vi.fn();
+const guestGroupBy = vi.fn();
+
+vi.mock("@vtk/db", () => ({
+  prisma: {
+    calendarEventInterest: { groupBy },
+    calendarEventGuestInterest: { groupBy: guestGroupBy },
+  },
+}));
+
+vi.mock("next/headers", () => ({ cookies: vi.fn() }));
+
+const { INTEREST_PUBLIC_THRESHOLD, interestLabel, publicInterestCounts } = await import(
+  "@/lib/calendar/interest"
+);
+
+describe("publicInterestCounts", () => {
+  beforeEach(() => {
+    groupBy.mockReset();
+    guestGroupBy.mockReset();
+  });
+
+  it("telt leden en gasten samen", async () => {
+    groupBy.mockResolvedValue([{ eventId: "ev-1", _count: { _all: 20 } }]);
+    guestGroupBy.mockResolvedValue([{ eventId: "ev-1", _count: { _all: 15 } }]);
+
+    const counts = await publicInterestCounts(["ev-1"]);
+    expect(counts.get("ev-1")).toBe(35);
+  });
+
+  it("laat een evenement onder de drempel volledig weg", async () => {
+    groupBy.mockResolvedValue([
+      { eventId: "laag", _count: { _all: INTEREST_PUBLIC_THRESHOLD - 1 } },
+      { eventId: "net-genoeg", _count: { _all: INTEREST_PUBLIC_THRESHOLD } },
+    ]);
+    guestGroupBy.mockResolvedValue([]);
+
+    const counts = await publicInterestCounts(["laag", "net-genoeg"]);
+    // Niet "0" en niet "null met een getal ernaast": de rij bestaat gewoon niet,
+    // zodat een laag aantal de server niet eens verlaat.
+    expect(counts.has("laag")).toBe(false);
+    expect(counts.get("net-genoeg")).toBe(INTEREST_PUBLIC_THRESHOLD);
+  });
+
+  it("doet geen enkele query voor een lege lijst", async () => {
+    const counts = await publicInterestCounts([]);
+    expect(counts.size).toBe(0);
+    expect(groupBy).not.toHaveBeenCalled();
+    expect(guestGroupBy).not.toHaveBeenCalled();
+  });
+});
+
+describe("interestLabel", () => {
+  it("zwijgt bij niets, nul of undefined", () => {
+    expect(interestLabel(null, "nl")).toBeNull();
+    expect(interestLabel(0, "nl")).toBeNull();
+    expect(interestLabel(undefined, "nl")).toBeNull();
+  });
+
+  it("schrijft het aantal uit in beide talen", () => {
+    expect(interestLabel(32, "nl")).toBe("32 komen");
+    expect(interestLabel(32, "en")).toBe("32 going");
+  });
+});
