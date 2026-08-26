@@ -1204,6 +1204,60 @@
   color: #fff;
 }
 
+/* De filter is meteen de legenda: het kleurpunt gebruikt exact dezelfde
+   databasekleur als de eventpillen in het raster. */
+.vtk-design .category-filter,
+.vtk-design .audience-filter {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  border-color: color-mix(in srgb, var(--cat) 48%, white);
+}
+
+.vtk-design .category-filter::before,
+.vtk-design .audience-filter::before {
+  content: "";
+  flex: 0 0 auto;
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--cat);
+}
+
+.vtk-design .category-filter:hover,
+.vtk-design .audience-filter:hover {
+  border-color: var(--cat);
+}
+
+.vtk-design .category-filter.on,
+.vtk-design .audience-filter.on {
+  background: var(--cat);
+  border-color: var(--cat);
+  color: #fff;
+}
+
+.vtk-design .category-filter.on::before,
+.vtk-design .audience-filter.on::before {
+  background: currentColor;
+}
+
+/* Alleen de knop leeft in de toolbar; alle uitleg staat in de dialoog nadat de
+   bezoeker bewust voor abonneren koos. */
+.vtk-design .toolbar-top .subscribe-compact {
+  flex: none;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.vtk-design .toolbar-top .subscribe-compact .subscribe-open {
+  width: auto;
+  min-height: 38px;
+  margin: 0;
+  padding-inline: 16px;
+  white-space: nowrap;
+}
+
 /* Weekweergave: zeven gelijkwaardige dagkolommen, met alle evenementen zichtbaar
    in plaats van de twee compacte pillen uit het maandraster. */
 .vtk-design .week-cal {
@@ -1543,105 +1597,6 @@
   font-weight: 600;
   white-space: nowrap;
 }
-
-
-/* -----------------------------------------------------------------------------
-   Legende + abonneren als band boven het raster
-
-   Zat hiervoor als kolom van 260 pixels rechts naast de kalender, en at daarmee
-   een vijfde van de breedte op. In een dagcel bleef dan geen ruimte over voor een
-   eventtitel: je las "Alumni-r..." en moest klikken om te weten wat er stond.
-   -------------------------------------------------------------------------- */
-
-.vtk-design .kal-top {
-  display: grid;
-  gap: 20px 32px;
-  grid-template-columns: minmax(0, 1fr);
-  padding: 20px 24px;
-  border: 1px solid var(--line);
-  border-radius: 18px;
-  background: var(--surface);
-}
-
-@media (min-width: 900px) {
-  .vtk-design .kal-top {
-    grid-template-columns: minmax(0, 1fr) minmax(260px, 340px);
-    align-items: start;
-  }
-}
-
-.vtk-design .kal-top-legend h3 {
-  margin: 0;
-  color: var(--ink);
-  font-size: 18px;
-  font-weight: 600;
-  letter-spacing: -0.01em;
-}
-
-.vtk-design .kal-top-legend .sub {
-  margin-bottom: 12px;
-  color: var(--muted);
-  font-family: var(--sans);
-  font-size: 13px;
-  letter-spacing: 0;
-  text-transform: none;
-}
-
-/* De legende ligt nu horizontaal: een handvol korte namen naast elkaar leest
-   sneller dan een kolom, en het houdt de band laag. */
-.vtk-design .kal-legend-list {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px 10px;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.vtk-design .kal-legend-list li {
-  display: inline-flex;
-  gap: 7px;
-  align-items: center;
-  padding: 5px 11px;
-  border: 1px solid var(--line-2);
-  border-radius: 999px;
-  color: var(--body);
-  font-size: 13px;
-}
-
-.vtk-design .kal-legend-list .sw {
-  width: 9px;
-  height: 9px;
-  border-radius: 999px;
-  background: var(--cat, var(--muted));
-}
-
-.vtk-design .kal-legend-list .count {
-  color: var(--muted);
-  font-family: var(--mono, var(--sans));
-  font-size: 12px;
-}
-
-.vtk-design .kal-legend-empty {
-  border-style: dashed;
-  color: var(--muted);
-}
-
-/* In de band staat het abonneerblok naast de legende in plaats van eronder, dus
-   de scheiding erboven hoort weg. */
-.vtk-design .kal-top .subscribe-box {
-  margin-top: 0;
-  padding-top: 0;
-  border-top: 0;
-}
-
-@media (max-width: 899px) {
-  .vtk-design .kal-top .subscribe-box {
-    padding-top: 18px;
-    border-top: 1px solid var(--line);
-  }
-}
-
 .vtk-design .subscribe-how {
   margin: 6px 0 12px;
   color: var(--muted);
@@ -1659,11 +1614,11 @@
   grid-template-columns: minmax(0, 1fr);
 }
 
-/* Twee knoppen onder elkaar in de voorvertoning: aanduiden dat je komt, en pas
-   daarna doorklikken. */
+/* Twee korte beslissingen naast elkaar. Zo krijgt "ik kom" niet meer gewicht
+   dan de eventpagina zelf en blijft de modal compact. */
 .vtk-design .ev-preview-actions {
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 8px;
   margin-top: 18px;
 }
@@ -1676,4 +1631,41 @@
 
 .vtk-design .ev-preview-actions .arrow {
   justify-content: space-between;
+}
+
+.vtk-design .ev-preview-actions .btn {
+  min-width: 0;
+  min-height: 42px;
+  padding-inline: 14px;
+  white-space: nowrap;
+}
+
+.vtk-design .ev-interest-hover {
+  display: none;
+}
+
+.vtk-design .ev-interest-going:not(:disabled):hover .ev-interest-default {
+  display: none;
+}
+
+.vtk-design .ev-interest-going:not(:disabled):hover .ev-interest-hover {
+  display: inline;
+}
+
+.vtk-design .ev-preview-interest-error {
+  grid-column: 1 / -1;
+  margin: 2px 0 0;
+  color: #a43b3b;
+  font-size: 12px;
+}
+
+@media (max-width: 520px) {
+  .vtk-design .ev-preview-actions {
+    grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+  }
+
+  .vtk-design .ev-preview-actions .btn {
+    padding-inline: 10px;
+    font-size: 12px;
+  }
 }

@@ -1,8 +1,10 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { usePathname } from "next/navigation";
 import { markdownToPlainText } from "@/lib/markdown";
 import { CalendarSubscribe } from "@/components/site/CalendarSubscribe";
+import { Markdown } from "@/components/ui/Markdown";
 import { setEventInterestAction } from "@/app/actions/eventInterest";
 import { monthGridCells, weekGridDays, isSameCalendarDay } from "./calendarGrid";
 
@@ -63,6 +65,8 @@ export type CalendarCategoryOption = {
   slug: string;
   nameNl: string;
   nameEn: string;
+  descriptionNl: string | null;
+  descriptionEn: string | null;
   colour: string;
   /** Niet-null = doelgroepcategorie: aparte filterchip en een label op het event. */
   audience: string | null;
@@ -73,10 +77,6 @@ export function KalenderEditorialView({
   labels,
   categories,
   feedBaseUrl,
-  activeCategory,
-  heading,
-  parentCrumb,
-  intro,
   defaultOnlyMyAudiences = false,
   signedIn = false,
 }: {
@@ -86,8 +86,6 @@ export function KalenderEditorialView({
     crumbsHere: string;
     metaEvents: string;
     weekLine: string;
-    legendTitle: string;
-    legendSub: string;
     agendaNext: string;
     agendaSub: string;
     subscribeTitle: string;
@@ -95,7 +93,6 @@ export function KalenderEditorialView({
     prevEvents: string;
     nextMonth: string;
     all: string;
-    uncategorised: string;
     audienceFilters: string;
     onlyMyAudiences: string;
     onlyMyAudiencesHint: string;
@@ -107,18 +104,6 @@ export function KalenderEditorialView({
   /** Absolute URL van de hoofdfeed; de abonneerdialoog stelt de selectie samen. */
   feedBaseUrl: string;
   /**
-   * De categorie waarop deze pagina staat (`/kalender/alumni`). Leeg op
-   * `/kalender` zelf. De chips blijven wél staan: ze zijn links naar de andere
-   * categoriepagina's, en de actieve wijst terug naar `/kalender`.
-   */
-  activeCategory?: string;
-  /** Vervangt "Kalender <jaar>." als paginatitel, bv. door de categorienaam. */
-  heading?: string;
-  /** Extra kruimel tussen Home en de huidige pagina, bv. terug naar /kalender. */
-  parentCrumb?: { label: string; href: string };
-  /** Introtekst onder de kop, bv. de beschrijving van een categorie. */
-  intro?: React.ReactNode;
-  /**
    * Beginstand van "Afstemmen op mijn profiel", uit de accountvoorkeur van het
    * lid. Zonder dit stond het vinkje altijd uit en moest wie de voorkeur net
    * aanzette hem hier opnieuw aanklikken.
@@ -128,13 +113,19 @@ export function KalenderEditorialView({
   signedIn?: boolean;
 }) {
   const base = locale === "nl" ? "" : "/en";
+  const pathname = usePathname();
   const now = new Date();
   const [cursor, setCursor] = useState(
     () => new Date(now.getFullYear(), now.getMonth(), now.getDate()),
   );
-  // Geen state: de gekozen categorie ís de route. `/kalender` toont alles,
-  // `/kalender/alumni` die ene doelgroep. Zie de chips onderaan de toolbar.
-  const filter = activeCategory ?? "all";
+  // De gekozen categorie blijft een deelbare route, maar wordt uit de huidige
+  // client-URL afgeleid. `history.pushState` wijzigt die URL zonder een nieuwe
+  // Server Component-render op te halen; Next.js 16 houdt `usePathname` daarbij
+  // zelf synchroon. Zo blijven terug/vooruit en een gekopieerde slug werken.
+  const filter = useMemo(() => {
+    const slug = pathname.split("/").filter(Boolean).at(-1);
+    return categories.some((category) => category.slug === slug) ? slug! : "all";
+  }, [categories, pathname]);
   const [view, setView] = useState<"agenda" | "week" | "list">("agenda");
   // Alles is standaard zichtbaar. Personalisatie is een bewuste keuze en houdt
   // algemene events plus de doelgroepevents die bij het profiel horen over; de
@@ -161,6 +152,12 @@ export function KalenderEditorialView({
     (c: { nameNl: string; nameEn: string }) => (locale === "nl" ? c.nameNl : c.nameEn),
     [locale],
   );
+  const selectedCategory = categories.find((category) => category.slug === filter) ?? null;
+  const selectedDescription = selectedCategory
+    ? locale === "nl"
+      ? selectedCategory.descriptionNl
+      : selectedCategory.descriptionEn
+    : null;
   const themeCategories = categories.filter((c) => c.audience === null);
   const audienceOptions = categories.filter((c) => c.audience !== null);
 
@@ -239,11 +236,6 @@ export function KalenderEditorialView({
   );
 
   /**
-   * De legende telt per categorie hoeveel events er deze maand in zitten. Een
-   * event met twee categorieën telt in beide; een event zonder categorie belandt
-   * in de restrij, die enkel verschijnt als ze niet leeg is.
-   */
-  /**
    * De evenementen van de maand zelf, chronologisch. `monthEvents` dekt het hele
    * raster van 42 cellen en bevat dus ook de uitlopers van de vorige en volgende
    * maand; die horen niet in een lijst met "Augustus 2026" erboven.
@@ -258,32 +250,6 @@ export function KalenderEditorialView({
         .sort((a, b) => +new Date(a.start) - +new Date(b.start)),
     [monthEvents, year, month],
   );
-
-  const legend = useMemo(() => {
-    const counts = new Map<string, number>();
-    let uncategorised = 0;
-    for (const e of monthEvents) {
-      if (e.extendedProps.categories.length === 0) {
-        uncategorised += 1;
-        continue;
-      }
-      for (const c of e.extendedProps.categories) {
-        counts.set(c.slug, (counts.get(c.slug) ?? 0) + 1);
-      }
-    }
-    const rows = categories
-      .filter((c) => (counts.get(c.slug) ?? 0) > 0)
-      .map((c) => ({
-        key: c.slug,
-        name: categoryName(c),
-        colour: c.colour,
-        count: counts.get(c.slug)!,
-      }));
-    if (uncategorised > 0) {
-      rows.push({ key: "__rest", name: labels.uncategorised, colour: "", count: uncategorised });
-    }
-    return rows;
-  }, [monthEvents, categories, categoryName, labels.uncategorised]);
 
   /**
    * De dag die op smal scherm opengeklapt staat. Bewust afgeleid in plaats van in
@@ -334,7 +300,7 @@ export function KalenderEditorialView({
   const weekLabel = `${weekFrom.toLocaleDateString(locale === "nl" ? "nl-BE" : "en-GB", {
     day: "numeric",
     month: "short",
-  })} – ${weekTo.toLocaleDateString(locale === "nl" ? "nl-BE" : "en-GB", {
+  })} - ${weekTo.toLocaleDateString(locale === "nl" ? "nl-BE" : "en-GB", {
     day: "numeric",
     month: "short",
     year: "numeric",
@@ -387,6 +353,25 @@ export function KalenderEditorialView({
 
   function eventHref(e: ApiEvent) {
     return `${base}/kalender/${e.id}`;
+  }
+
+  function filterHref(slug: string | null): string {
+    if (!slug || filter === slug) return `${base}/kalender`;
+    return `${base}/kalender/${slug}`;
+  }
+
+  /**
+   * Houdt de echte link als no-JavaScript- en nieuw-tabbladfallback, maar vangt
+   * een gewone klik client-side af. De API-fetch reageert daarna op `filter`;
+   * het kalenderframe, de gekozen maand en de scrollpositie blijven staan.
+   */
+  function switchFilter(event: React.MouseEvent<HTMLAnchorElement>, slug: string | null) {
+    if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || event.button !== 0) {
+      return;
+    }
+    event.preventDefault();
+    const href = filterHref(slug);
+    if (href !== pathname) window.history.pushState(null, "", href);
   }
 
   /**
@@ -538,49 +523,6 @@ export function KalenderEditorialView({
   );
 
   /**
-   * Legende plus abonneerblok, als één brede band boven het raster.
-   *
-   * Stond hiervoor als kolom van 260 pixels rechts naast de kalender. Dat kostte
-   * het raster een vijfde van de breedte, en in een dagcel van nog geen 130 pixels
-   * paste geen enkele eventtitel meer: je zag "Alumni-r..." en moest klikken om te
-   * weten wat er stond. De legende is een handvol regels die evengoed naast
-   * elkaar passen; de kalender is het scherm.
-   */
-  const topPanel = (
-    <section className="kal-top">
-      <div className="kal-top-legend">
-        <h3>{labels.legendTitle}</h3>
-        <div className="sub">{labels.legendSub}</div>
-        <ul className="kal-legend-list">
-          {legend.map((row) => (
-            <li key={row.key}>
-              <span
-                className="sw"
-                style={row.colour ? ({ "--cat": row.colour } as React.CSSProperties) : undefined}
-              />
-              {row.name}
-              <span className="count">{String(row.count).padStart(2, "0")}</span>
-            </li>
-          ))}
-          {legend.length === 0 ? (
-            <li className="kal-legend-empty">
-              {locale === "nl" ? "Geen evenementen deze maand." : "No events this month."}
-            </li>
-          ) : null}
-        </ul>
-      </div>
-
-      <CalendarSubscribe
-        feedBaseUrl={feedBaseUrl}
-        categories={categories}
-        selectedSlug={filter === "all" ? null : filter}
-        locale={locale}
-        labels={{ title: labels.subscribeTitle, sub: labels.subscribeSub }}
-      />
-    </section>
-  );
-
-  /**
    * De voorvertoning. Toont wat een cel niet kwijt kan: de volledige titel, een
    * samenvatting, waar en wanneer, en of er al volk komt. De knop eronder gaat
    * pas naar de eventpagina, waar de tickets, het formulier en de
@@ -664,7 +606,7 @@ export function KalenderEditorialView({
             onChanged={(next) => markInterest(preview.id, next)}
           />
           <a href={eventHref(preview)} className="btn btn-ghost arrow ev-preview-go">
-            {locale === "nl" ? "Naar de evenementpagina" : "Go to the event page"}
+            {locale === "nl" ? "Evenementpagina" : "Event page"}
           </a>
         </div>
       </div>
@@ -678,16 +620,21 @@ export function KalenderEditorialView({
         <div>
           <div className="crumbs">
             {labels.crumbsHome} ·{" "}
-            {parentCrumb ? (
+            {selectedCategory ? (
               <>
-                <a href={parentCrumb.href}>{parentCrumb.label}</a> ·{" "}
+                <a href={`${base}/kalender`} onClick={(event) => switchFilter(event, null)}>
+                  {locale === "nl" ? "Kalender" : "Calendar"}
+                </a>{" "}
+                ·{" "}
               </>
             ) : null}
-            <span style={{ color: "var(--ink)" }}>{labels.crumbsHere}</span>
+            <span style={{ color: "var(--ink)" }}>
+              {selectedCategory ? categoryName(selectedCategory) : labels.crumbsHere}
+            </span>
           </div>
           <h1>
-            {heading ? (
-              heading
+            {selectedCategory ? (
+              categoryName(selectedCategory)
             ) : (
               <>
                 {locale === "nl" ? "Kalender " : "Calendar "}
@@ -695,7 +642,11 @@ export function KalenderEditorialView({
               </>
             )}
           </h1>
-          {intro ? <div className="page-head-intro">{intro}</div> : null}
+          {selectedDescription ? (
+            <div className="page-head-intro prose-vtk">
+              <Markdown>{selectedDescription}</Markdown>
+            </div>
+          ) : null}
         </div>
         <div className="page-head-meta">
           <b>{periodCount}</b>{" "}
@@ -778,6 +729,14 @@ export function KalenderEditorialView({
                 {labels.views.list}
               </button>
             </div>
+            <CalendarSubscribe
+              compact
+              feedBaseUrl={feedBaseUrl}
+              categories={categories}
+              selectedSlug={filter === "all" ? null : filter}
+              locale={locale}
+              labels={{ title: labels.subscribeTitle, sub: labels.subscribeSub }}
+            />
           </div>
 
           {/* De chips zijn links, geen knoppen: een categorie heeft een eigen
@@ -791,6 +750,7 @@ export function KalenderEditorialView({
                 href={`${base}/kalender`}
                 className={`filter${filter === "all" ? " on" : ""}`}
                 aria-current={filter === "all" ? "page" : undefined}
+                onClick={(event) => switchFilter(event, null)}
               >
                 {labels.all}
               </a>
@@ -798,8 +758,10 @@ export function KalenderEditorialView({
                 <a
                   key={c.slug}
                   href={filter === c.slug ? `${base}/kalender` : `${base}/kalender/${c.slug}`}
-                  className={`filter${filter === c.slug ? " on" : ""}`}
+                  className={`filter category-filter${filter === c.slug ? " on" : ""}`}
                   aria-current={filter === c.slug ? "page" : undefined}
+                  style={{ "--cat": c.colour } as React.CSSProperties}
+                  onClick={(event) => switchFilter(event, c.slug)}
                 >
                   {categoryName(c)}
                 </a>
@@ -815,6 +777,7 @@ export function KalenderEditorialView({
                     className={`filter audience-filter${filter === c.slug ? " on" : ""}`}
                     aria-current={filter === c.slug ? "page" : undefined}
                     style={{ "--cat": c.colour } as React.CSSProperties}
+                    onClick={(event) => switchFilter(event, c.slug)}
                   >
                     {categoryName(c)}
                   </a>
@@ -838,7 +801,6 @@ export function KalenderEditorialView({
 
         {showMonthGrid && (
           <div className="kal-main">
-            {topPanel}
             <div className="cal">
               <div className="cal-header">
                 {(locale === "nl"
@@ -1005,7 +967,6 @@ export function KalenderEditorialView({
 
         {view === "week" && (
           <div className="kal-main week-main">
-            {topPanel}
             <div>
               <section
                 className="week-cal"
@@ -1095,11 +1056,9 @@ export function KalenderEditorialView({
           </section>
         )}
 
-        {/* Lijst: dezelfde maand als het raster, chronologisch. De legende en het
-            abonneerblok staan erboven, net als bij het raster. */}
+        {/* Lijst: dezelfde maand als het raster, chronologisch. */}
         {view === "list" && (
           <section className="agenda agenda-full" style={{ marginTop: 0 }}>
-            {topPanel}
             <div>
               <div className="agenda-head">
                 <h2>{monthLabel.charAt(0).toUpperCase() + monthLabel.slice(1)}</h2>
@@ -1151,6 +1110,7 @@ function PreviewInterestButton({
 }) {
   const nl = locale === "nl";
   const [pending, setPending] = useState(false);
+  const [error, setError] = useState(false);
   const going = event.extendedProps.interested;
 
   if (!signedIn) {
@@ -1162,42 +1122,59 @@ function PreviewInterestButton({
       >
         {isAlumniEvent
           ? nl
-            ? "Ik kom naar dit evenement"
-            : "I am coming to this event"
+            ? "Ik kom!"
+            : "I'm coming!"
           : nl
-            ? "Log in om aan te duiden dat je komt"
-            : "Sign in to say you are coming"}
+            ? "Log in"
+            : "Sign in"}
       </a>
     );
   }
 
   return (
-    <button
-      type="button"
-      className={going ? "btn btn-ghost ev-preview-go" : "btn btn-primary ev-preview-go"}
-      disabled={pending}
-      aria-pressed={going}
-      onClick={async () => {
-        setPending(true);
-        const next = !going;
-        try {
-          const form = new FormData();
-          form.set("eventId", event.id);
-          form.set("interested", next ? "on" : "off");
-          const state = await setEventInterestAction({ status: "idle" }, form);
-          if (state.status === "success") onChanged(next);
-        } finally {
-          setPending(false);
-        }
-      }}
-    >
-      {going
-        ? nl
-          ? "Je komt · toch niet"
-          : "You are coming · never mind"
-        : nl
-          ? "Ik kom naar dit evenement"
-          : "I am coming to this event"}
-    </button>
+    <>
+      <button
+        type="button"
+        className={going ? "btn btn-ghost ev-preview-go ev-interest-going" : "btn btn-primary ev-preview-go"}
+        disabled={pending}
+        aria-pressed={going}
+        aria-busy={pending}
+        onClick={async () => {
+          setPending(true);
+          setError(false);
+          const next = !going;
+          try {
+            const form = new FormData();
+            form.set("eventId", event.id);
+            form.set("interested", next ? "on" : "off");
+            const state = await setEventInterestAction({ status: "idle" }, form);
+            if (state.status === "success") onChanged(next);
+            else setError(true);
+          } catch {
+            setError(true);
+          } finally {
+            setPending(false);
+          }
+        }}
+      >
+        {pending ? (
+          nl ? "Bezig..." : "Working..."
+        ) : going ? (
+          <>
+            <span className="ev-interest-default">{nl ? "Je komt! :)" : "You're coming! :)"}</span>
+            <span className="ev-interest-hover">{nl ? "Toch niet :(" : "Not anymore :("}</span>
+          </>
+        ) : nl ? (
+          "Ik kom!"
+        ) : (
+          "I'm coming!"
+        )}
+      </button>
+      {error ? (
+        <p className="ev-preview-interest-error" role="alert">
+          {nl ? "Dat lukte niet. Probeer het opnieuw." : "That did not work. Please try again."}
+        </p>
+      ) : null}
+    </>
   );
 }

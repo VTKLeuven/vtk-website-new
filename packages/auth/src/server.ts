@@ -34,6 +34,7 @@ export {
   confirmEmailToken,
   reissueEmailVerification,
   createPasswordReset,
+  createPasswordSetupForUser,
   resetPasswordWithToken,
   passwordStatus,
   setOwnPassword,

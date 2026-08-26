@@ -269,6 +269,41 @@ export async function createPasswordReset(
 }
 
 /**
+ * Maakt vanuit een vertrouwde beheerflow een link waarmee een bestaande
+ * gebruiker voor het eerst een wachtwoord kan instellen.
+ *
+ * In tegenstelling tot `createPasswordReset` hoeft er nog geen credential-rij
+ * te bestaan: dat is net het probleem van een alumnus die enkel via KU Leuven
+ * inlogde. De bestemming moet wel een niet-KU-Leuven-adres zijn dat al op het
+ * profiel staat. Het webproject controleert en bewaart dat adres vóór deze
+ * functie wordt aangeroepen; deze tweede controle voorkomt dat een latere
+ * aanroeper per ongeluk toch naar de vervallen universiteitsmail stuurt.
+ */
+export async function createPasswordSetupForUser(
+  userId: string,
+): Promise<{ userId: string; token: string; name: string; locale: Locale; email: string } | null> {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: {
+      id: true,
+      name: true,
+      locale: true,
+      email: true,
+      personalEmail: true,
+      active: true,
+      deletedAt: true,
+    },
+  });
+  if (!user || !user.active || user.deletedAt) return null;
+
+  const email = normalizeEmail(user.personalEmail || user.email);
+  if (/@(?:[^@.]+\.)*kuleuven\.be$/i.test(email)) return null;
+
+  const token = await issueToken(user.id, 'PASSWORD_RESET', RESET_TTL_MS);
+  return { userId: user.id, token, name: user.name, locale: user.locale, email };
+}
+
+/**
  * Waar een herstelmail voor dit lid naartoe zou gaan, en of er al een wachtwoord
  * is. Voor het paneel op /account: iemand die zijn KU Leuven-account gaat
  * verliezen, moet vooraf kunnen zien of hij binnen geraakt zonder.

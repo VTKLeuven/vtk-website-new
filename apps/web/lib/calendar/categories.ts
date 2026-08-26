@@ -13,7 +13,15 @@ import { siteBaseUrl } from "./feeds";
 export async function listCalendarCategories(): Promise<CalendarCategoryOption[]> {
   return prisma.calendarCategory.findMany({
     where: { OR: [{ showOnCalendarPage: true }, { audience: { not: null } }] },
-    select: { slug: true, nameNl: true, nameEn: true, colour: true, audience: true },
+    select: {
+      slug: true,
+      nameNl: true,
+      nameEn: true,
+      descriptionNl: true,
+      descriptionEn: true,
+      colour: true,
+      audience: true,
+    },
     orderBy: [{ order: "asc" }, { nameNl: "asc" }],
   });
 }
@@ -37,8 +45,6 @@ export function calendarLabels(locale: Locale) {
     crumbsHere: nl ? "Kalender" : "Calendar",
     metaEvents: nl ? "Evenementen (deze maand)" : "Events (this month)",
     weekLine: nl ? "Raster" : "Grid",
-    legendTitle: nl ? "Legende" : "Legend",
-    legendSub: nl ? "Op basis van categorie" : "By category",
     agendaNext: nl ? "Eerstvolgend" : "Up next",
     agendaSub: nl ? "Komende 14 dagen" : "Next 14 days",
     emptyMonth: nl ? "Geen evenementen deze maand." : "No events this month.",
@@ -52,7 +58,6 @@ export function calendarLabels(locale: Locale) {
     prevEvents: nl ? "Vorige maand" : "Previous month",
     nextMonth: nl ? "Volgende maand" : "Next month",
     all: nl ? "Alle" : "All",
-    uncategorised: nl ? "Zonder categorie" : "Uncategorised",
     audienceFilters: nl ? "Doelgroepen" : "Target audiences",
     onlyMyAudiences: nl ? "Afstemmen op mijn profiel" : "Tailor to my profile",
     onlyMyAudiencesHint: nl

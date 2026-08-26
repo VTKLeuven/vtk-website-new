@@ -44,6 +44,7 @@ export function CalendarSubscribe({
   selectedSlug,
   locale,
   labels,
+  compact = false,
 }: {
   /**
    * Absolute URL van de hoofdfeed, zonder selectie (`https://vtk.be/api/calendar/feed.ics`,
@@ -57,6 +58,8 @@ export function CalendarSubscribe({
   selectedSlug: string | null;
   locale: "nl" | "en";
   labels: { title: string; sub: string };
+  /** In de kalenderwerkbalk volstaat één korte knop; de dialoog legt de rest uit. */
+  compact?: boolean;
 }) {
   const nl = locale === "nl";
   const [open, setOpen] = useState(false);
@@ -183,20 +186,26 @@ export function CalendarSubscribe({
   ];
 
   return (
-    <div className="subscribe-box">
-      <h3>{labels.title}</h3>
-      <div className="sub">{labels.sub}</div>
+    <div className={`subscribe-box${compact ? " subscribe-compact" : ""}`}>
+      {!compact ? (
+        <>
+          <h3>{labels.title}</h3>
+          <div className="sub">{labels.sub}</div>
+        </>
+      ) : null}
       {/* Zeggen waar het naartoe gaat vóór er iemand op duwt. "Abonneren" alleen
           laat in het midden of je een bestand krijgt, een mail, of iets in je
           agenda; dit is precies de onduidelijkheid die maakt dat mensen er niet
           op klikken. */}
-      <p className="subscribe-how">
-        {nl
-          ? "In je agenda-app, in Google Calendar, of via een abonnementslink."
-          : "In your calendar app, in Google Calendar, or through a subscription link."}
-      </p>
+      {!compact ? (
+        <p className="subscribe-how">
+          {nl
+            ? "In je agenda-app, in Google Calendar, of via een abonnementslink."
+            : "In your calendar app, in Google Calendar, or through a subscription link."}
+        </p>
+      ) : null}
       <button type="button" className="btn btn-primary arrow subscribe-open" onClick={() => setOpen(true)}>
-        {buttonLabel}
+        {compact ? labels.title : buttonLabel}
       </button>
 
       {open && (
@@ -284,8 +293,8 @@ export function CalendarSubscribe({
               >
                 {copied === "google"
                   ? nl
-                    ? "Link gekopieerd — plak in Google"
-                    : "Link copied — paste in Google"
+                    ? "Link gekopieerd. Plak hem in Google"
+                    : "Link copied. Paste it in Google"
                   : "Google Calendar"}
               </a>
               <button

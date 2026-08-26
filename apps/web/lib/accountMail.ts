@@ -96,3 +96,46 @@ export async function sendPasswordResetMail(input: {
         ].join("\n"),
   });
 }
+
+/**
+ * Toegangslink die een beheerder voor een alumnus verstuurt. Dezelfde veilige
+ * resetpagina, maar zonder te beweren dat de ontvanger de mail zelf aanvroeg.
+ */
+export async function sendAlumniPasswordSetupMail(input: {
+  to: string;
+  name: string;
+  token: string;
+  locale: Locale;
+}): Promise<boolean> {
+  const url = link("/wachtwoord-vergeten/nieuw", input.token, input.locale);
+  const nl = input.locale === "nl";
+  const firstName = input.name.split(" ")[0] || input.name;
+
+  return sendMail({
+    to: input.to,
+    subject: nl ? "Blijf toegang houden tot je VTK-account" : "Keep access to your VTK account",
+    text: nl
+      ? [
+          `Dag ${firstName}`,
+          "",
+          "Je VTK-account was gekoppeld aan je KU Leuven-login. Via de link hieronder kan je een wachtwoord instellen, zodat je ook na je afstuderen toegang houdt met je persoonlijke e-mailadres.",
+          "",
+          url,
+          "",
+          "De link blijft één uur geldig en werkt maar één keer. Verwachtte je deze mail niet, dan hoef je niets te doen.",
+          "",
+          "VTK",
+        ].join("\n")
+      : [
+          `Hi ${firstName}`,
+          "",
+          "Your VTK account was linked to your KU Leuven sign-in. Use the link below to set a password, so you can keep access after graduating with your personal email address.",
+          "",
+          url,
+          "",
+          "The link stays valid for one hour and works only once. If you did not expect this email, you do not need to do anything.",
+          "",
+          "VTK",
+        ].join("\n"),
+  });
+}

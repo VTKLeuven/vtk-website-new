@@ -28,8 +28,13 @@ vi.mock("@node-rs/argon2", () => ({
   verify: vi.fn(async (_hash: string, password: string) => password === "juist-wachtwoord"),
 }));
 
-const { registerSelfServiceAccount, checkLoginBlocked, resolveLoginEmail, MIN_PASSWORD_LENGTH } =
-  await import("@vtk/auth/server");
+const {
+  registerSelfServiceAccount,
+  createPasswordSetupForUser,
+  checkLoginBlocked,
+  resolveLoginEmail,
+  MIN_PASSWORD_LENGTH,
+} = await import("@vtk/auth/server");
 
 beforeEach(() => {
   userFindUnique.mockReset();
@@ -134,6 +139,43 @@ describe("registerSelfServiceAccount", () => {
       registerSelfServiceAccount({ ...input, password: "a".repeat(MIN_PASSWORD_LENGTH - 1) }),
     ).rejects.toThrow();
     expect(userFindUnique).not.toHaveBeenCalled();
+  });
+});
+
+describe("createPasswordSetupForUser", () => {
+  it("maakt ook zonder bestaand wachtwoord een token voor het persoonlijke adres", async () => {
+    userFindUnique.mockResolvedValue({
+      id: "alumnus",
+      name: "Jan Peeters",
+      locale: "NL",
+      email: "r0123456@kuleuven.be",
+      personalEmail: "jan@example.com",
+      active: true,
+      deletedAt: null,
+    });
+
+    const result = await createPasswordSetupForUser("alumnus");
+
+    expect(result).toMatchObject({ userId: "alumnus", email: "jan@example.com" });
+    expect(result?.token).toEqual(expect.any(String));
+    expect(tokenCreate).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ kind: "PASSWORD_RESET" }) }),
+    );
+  });
+
+  it("stuurt nooit een toegangslink naar een KU Leuven-adres", async () => {
+    userFindUnique.mockResolvedValue({
+      id: "alumnus",
+      name: "Jan Peeters",
+      locale: "NL",
+      email: "r0123456@student.kuleuven.be",
+      personalEmail: null,
+      active: true,
+      deletedAt: null,
+    });
+
+    expect(await createPasswordSetupForUser("alumnus")).toBeNull();
+    expect(tokenCreate).not.toHaveBeenCalled();
   });
 });
 

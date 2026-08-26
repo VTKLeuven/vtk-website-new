@@ -13,7 +13,6 @@ import {
 } from "@/lib/alumni";
 import { AlumniContactForm } from "./AlumniContactForm";
 import { AlumniImport } from "./AlumniImport";
-import { AlumniAccounts } from "./AlumniAccounts";
 import { AlumniTable } from "./AlumniTable";
 import { AlumniSyncButton } from "./SyncButton";
 
@@ -64,8 +63,8 @@ export default async function AdminAlumni({
         <h1 className="text-2xl font-semibold text-vtk-ink">{nl ? "Alumni" : "Alumni"}</h1>
         <p className="mt-1 max-w-3xl text-sm text-[#5c667f]">
           {nl
-            ? "Twee bronnen die bij een export samenkomen: het adresboek per lichting voor alumni zonder account, en de leden die op de site aanvinkten dat ze alumni-mails willen. Dubbele adressen vallen weg, en het account wint."
-            : "Two sources that come together on export: the address book by year for alumni without an account, and the members who ticked on the site that they want alumni mail. Duplicate addresses are dropped, and the account wins."}
+            ? "Alle alumni in één overzicht. Het label bij de naam toont of iemand zelf een account heeft of handmatig werd toegevoegd."
+            : "All alumni in one overview. The label next to the name shows whether someone has an account or was added manually."}
         </p>
       </div>
 
@@ -108,9 +107,7 @@ export default async function AdminAlumni({
         </div>
       </Card>
 
-      {/* Per lichting: het overzicht én de filter. Beide bronnen apart, zodat een
-          leeg jaar zichtbaar het verschil toont tussen "niemand" en "nog niet
-          ingevoerd". */}
+      {/* Per lichting: het overzicht en de filter over beide bronnen samen. */}
       <Card className="p-5">
         <h2 className="mb-3 font-medium text-vtk-ink">{nl ? "Per lichting" : "By year"}</h2>
         <div className="flex flex-wrap gap-2">
@@ -180,14 +177,15 @@ export default async function AdminAlumni({
         </form>
 
         <div className="space-y-2">
-          <h2 className="font-medium text-vtk-ink">
-            {nl ? "Adresboek (zonder account)" : "Address book (no account)"}
-          </h2>
-          <AlumniTable rows={contacts} locale={locale} />
-        </div>
-
-        <div className="mt-6">
-          <AlumniAccounts accounts={accounts} locale={locale} />
+          <div>
+            <h2 className="font-medium text-vtk-ink">{nl ? "Alumni" : "Alumni"}</h2>
+            <p className="mt-1 text-sm text-[#5c667f]">
+              {nl
+                ? "Accountgegevens komen uit het profiel. Handmatige rijen kan je hier bewerken."
+                : "Account details come from the profile. Manual rows can be edited here."}
+            </p>
+          </div>
+          <AlumniTable contacts={contacts} accounts={accounts} locale={locale} />
         </div>
       </div>
     </div>

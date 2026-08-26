@@ -1,5 +1,18 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
-import { parseAlumniPaste, toAlumniCsv, type AlumniRecipient } from "@/lib/alumni";
+import {
+  isKuLeuvenEmail,
+  parseAlumniPaste,
+  toAlumniCsv,
+  type AlumniRecipient,
+} from "@/lib/alumni";
+
+describe("isKuLeuvenEmail", () => {
+  it("herkent ook studentensubdomeinen, maar geen persoonlijke adressen", () => {
+    expect(isKuLeuvenEmail("r0123456@kuleuven.be")).toBe(true);
+    expect(isKuLeuvenEmail("r0123456@student.kuleuven.be")).toBe(true);
+    expect(isKuLeuvenEmail("jan@example.com")).toBe(false);
+  });
+});
 
 describe("parseAlumniPaste", () => {
   it("aanvaardt komma's, puntkomma's en tabs door elkaar", () => {
@@ -204,6 +217,7 @@ describe("listAlumniAccounts", () => {
         wasInVtk: true,
         alumniMailOptIn: true,
         active: true,
+        accounts: [],
       },
       {
         id: "u2",
@@ -215,14 +229,25 @@ describe("listAlumniAccounts", () => {
         wasInVtk: false,
         alumniMailOptIn: false,
         active: true,
+        accounts: [{ id: "credential:u2" }],
       },
     ]);
 
     const listAlumniAccounts = await load();
     const rows = await listAlumniAccounts({});
 
-    expect(rows[0]).toMatchObject({ email: "jan@example.com", optedIn: true });
-    expect(rows[1]).toMatchObject({ email: "r0999999@kuleuven.be", optedIn: false });
+    expect(rows[0]).toMatchObject({
+      email: "jan@example.com",
+      accessEmail: "jan@example.com",
+      optedIn: true,
+      hasPassword: false,
+    });
+    expect(rows[1]).toMatchObject({
+      email: "r0999999@kuleuven.be",
+      accessEmail: null,
+      optedIn: false,
+      hasPassword: true,
+    });
   });
 
   it("laat gewiste accounts eruit", async () => {

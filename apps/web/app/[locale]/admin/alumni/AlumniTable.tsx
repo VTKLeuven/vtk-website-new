@@ -1,11 +1,19 @@
 "use client";
 
-import { useState } from "react";
+import { useActionState, useEffect, useRef, useState } from "react";
 import { Card } from "@vtk/ui";
 import { DeleteIconButton } from "@/components/ui/DeleteIconButton";
 import { IconButton, RowActions } from "@/components/ui/IconButton";
 import { PencilIcon } from "@/components/ui/icons";
-import { deleteAlumniContactAction, toggleAlumniSubscriptionAction } from "@/app/actions/alumni";
+import { useToast } from "@/components/ui/toast";
+import {
+  deleteAlumniContactAction,
+  sendAlumniAccessLinkAction,
+  toggleAlumniAccountOptInAction,
+  toggleAlumniSubscriptionAction,
+} from "@/app/actions/alumni";
+import type { AlumniAccount } from "@/lib/alumni";
+import { SAVE_IDLE } from "@/lib/saveState";
 import { AlumniContactForm } from "./AlumniContactForm";
 
 export type AlumniRow = {
@@ -19,31 +27,56 @@ export type AlumniRow = {
   unsubscribedAt: Date | null;
 };
 
+type CombinedRow =
+  | { source: "contact"; name: string; year: number | null; contact: AlumniRow }
+  | { source: "account"; name: string; year: number | null; account: AlumniAccount };
+
 /**
- * Het adresboek zelf. Rij-acties zijn icoonknoppen (zie CLAUDE.md); bewerken
- * klapt hetzelfde formulier open dat ook "toevoegen" gebruikt, in plaats van
- * naar een aparte pagina te springen.
- *
- * De site-accounts staan hier bewust **niet** in: dit is de handmatige lijst.
- * Wat er samen naar Brevo en naar de CSV gaat, staat in de kop van de pagina.
+ * Alle alumni in één lijst. De bronbadge maakt het onderscheid zichtbaar zonder
+ * de beheerder eerst twee tabellen en twee verschillende verklaringen te laten
+ * doorzoeken. Rijacties blijven bronafhankelijk: handmatige contacten zijn hier
+ * bewerkbaar, accountgegevens beheert het lid zelf.
  */
 export function AlumniTable({
-  rows,
+  contacts,
+  accounts,
   locale,
 }: {
-  rows: AlumniRow[];
+  contacts: AlumniRow[];
+  accounts: AlumniAccount[];
   locale: "nl" | "en";
 }) {
   const nl = locale === "nl";
   const [editing, setEditing] = useState<string | null>(null);
+  const rows: CombinedRow[] = [
+    ...contacts.map(
+      (contact): CombinedRow => ({
+        source: "contact",
+        name: `${contact.firstName} ${contact.lastName}`,
+        year: contact.graduationYear,
+        contact,
+      }),
+    ),
+    ...accounts.map(
+      (account): CombinedRow => ({
+        source: "account",
+        name: account.name,
+        year: account.graduationYear,
+        account,
+      }),
+    ),
+  ].sort(
+    (a, b) =>
+      (b.year ?? 0) - (a.year ?? 0) || a.name.localeCompare(b.name, locale, { sensitivity: "base" }),
+  );
 
   if (rows.length === 0) {
     return (
       <Card className="p-5">
         <p className="text-sm text-[#5c667f]">
           {nl
-            ? "Nog geen alumni in het adresboek. Voeg er hierboven een toe, of plak een lijst."
-            : "No alumni in the address book yet. Add one above, or paste a list."}
+            ? "Nog geen alumni. Voeg er hierboven een toe, of plak een lijst."
+            : "No alumni yet. Add one above, or paste a list."}
         </p>
       </Card>
     );
@@ -51,8 +84,6 @@ export function AlumniTable({
 
   return (
     <div className="space-y-3">
-      {/* Een brede tabel in een horizontale scroller heeft een gepositioneerde
-          wrapper nodig; zie CLAUDE.md. */}
       <Card className="relative overflow-x-auto p-0">
         <table className="w-full text-sm">
           <thead>
@@ -61,54 +92,96 @@ export function AlumniTable({
               <th className="px-4 py-3 font-medium">{nl ? "E-mail" : "Email"}</th>
               <th className="px-4 py-3 font-medium">{nl ? "Lichting" : "Year"}</th>
               <th className="px-4 py-3 font-medium">{nl ? "In VTK" : "In VTK"}</th>
-              <th className="px-4 py-3 font-medium">{nl ? "Status" : "Status"}</th>
+              <th className="px-4 py-3 font-medium">{nl ? "Mailinglijst" : "Mailing list"}</th>
+              <th className="min-w-64 px-4 py-3 font-medium">{nl ? "Accounttoegang" : "Account access"}</th>
               <th className="px-4 py-3" />
             </tr>
           </thead>
           <tbody>
             {rows.map((row) => {
-              const name = `${row.firstName} ${row.lastName}`;
+              if (row.source === "account") {
+                const account = row.account;
+                return (
+                  <tr key={`account:${account.id}`} className="border-b border-vtk-blue/10 last:border-0">
+                    <td className="px-4 py-3 font-medium text-vtk-ink">
+                      {account.name}
+                      <SourceBadge source="account" locale={locale} />
+                      {!account.active ? (
+                        <span className="ml-2 rounded-md bg-zinc-100 px-2 py-0.5 text-xs font-normal text-zinc-600">
+                          {nl ? "Gedeactiveerd" : "Deactivated"}
+                        </span>
+                      ) : null}
+                    </td>
+                    <td className="px-4 py-3 text-[#34405e]">{account.email}</td>
+                    <td className="px-4 py-3 text-[#34405e]">{account.graduationYear ?? "-"}</td>
+                    <td className="px-4 py-3 text-[#34405e]">
+                      {account.wasInVtk ? (nl ? "Ja" : "Yes") : "-"}
+                    </td>
+                    <td className="px-4 py-3">
+                      <MailStatus enabled={account.optedIn} locale={locale} />
+                    </td>
+                    <td className="px-4 py-3">
+                      <AlumniAccessForm account={account} locale={locale} />
+                    </td>
+                    <td className="px-4 py-3 text-right">
+                      <form action={toggleAlumniAccountOptInAction}>
+                        <input type="hidden" name="id" value={account.id} />
+                        <button
+                          type="submit"
+                          className="whitespace-nowrap rounded-full border border-vtk-blue/15 px-3 py-1 text-xs text-vtk-ink transition-colors hover:bg-vtk-blue-soft/70 active:translate-y-px"
+                        >
+                          {account.optedIn
+                            ? nl
+                              ? "Uitschrijven"
+                              : "Unsubscribe"
+                            : nl
+                              ? "Inschrijven"
+                              : "Subscribe"}
+                        </button>
+                      </form>
+                    </td>
+                  </tr>
+                );
+              }
+
+              const contact = row.contact;
+              const name = `${contact.firstName} ${contact.lastName}`;
               return (
-                <tr key={row.id} className="border-b border-vtk-blue/10 last:border-0">
+                <tr key={`contact:${contact.id}`} className="border-b border-vtk-blue/10 last:border-0">
                   <td className="px-4 py-3 font-medium text-vtk-ink">
                     {name}
-                    {row.note ? (
-                      <span className="block text-xs font-normal text-[#5c667f]">{row.note}</span>
+                    <SourceBadge source="contact" locale={locale} />
+                    {contact.note ? (
+                      <span className="block text-xs font-normal text-[#5c667f]">{contact.note}</span>
                     ) : null}
                   </td>
-                  <td className="px-4 py-3 text-[#34405e]">{row.email}</td>
-                  <td className="px-4 py-3 text-[#34405e]">{row.graduationYear ?? "—"}</td>
-                  <td className="px-4 py-3 text-[#34405e]">{row.wasInVtk ? (nl ? "Ja" : "Yes") : "—"}</td>
+                  <td className="px-4 py-3 text-[#34405e]">{contact.email}</td>
+                  <td className="px-4 py-3 text-[#34405e]">{contact.graduationYear ?? "-"}</td>
+                  <td className="px-4 py-3 text-[#34405e]">
+                    {contact.wasInVtk ? (nl ? "Ja" : "Yes") : "-"}
+                  </td>
                   <td className="px-4 py-3">
-                    {row.unsubscribedAt ? (
-                      <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-xs text-zinc-600">
-                        {nl ? "Uitgeschreven" : "Unsubscribed"}
-                      </span>
-                    ) : (
-                      <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs text-emerald-800">
-                        {nl ? "Krijgt mails" : "Receives mail"}
-                      </span>
-                    )}
+                    <MailStatus enabled={!contact.unsubscribedAt} locale={locale} />
+                  </td>
+                  <td className="px-4 py-3 text-xs text-[#5c667f]">
+                    {nl ? "Geen account" : "No account"}
                   </td>
                   <td className="px-4 py-3">
                     <RowActions>
                       <IconButton
                         label={nl ? "Bewerken" : "Edit"}
                         srLabel={`${nl ? "Bewerken" : "Edit"}: ${name}`}
-                        onClick={() => setEditing(editing === row.id ? null : row.id)}
+                        onClick={() => setEditing(editing === contact.id ? null : contact.id)}
                       >
                         <PencilIcon />
                       </IconButton>
-                      {/* Uitschrijven is geen verwijderen: de rij blijft staan
-                          zodat de volgende import hem niet stilletjes weer
-                          toevoegt. Daarom een gewone knop en geen dialoog. */}
                       <form action={toggleAlumniSubscriptionAction}>
-                        <input type="hidden" name="id" value={row.id} />
+                        <input type="hidden" name="id" value={contact.id} />
                         <button
                           type="submit"
-                          className="rounded-full border border-vtk-blue/15 px-3 py-1 text-xs text-vtk-ink transition-colors hover:bg-vtk-blue-soft/70"
+                          className="whitespace-nowrap rounded-full border border-vtk-blue/15 px-3 py-1 text-xs text-vtk-ink transition-colors hover:bg-vtk-blue-soft/70 active:translate-y-px"
                         >
-                          {row.unsubscribedAt
+                          {contact.unsubscribedAt
                             ? nl
                               ? "Opnieuw inschrijven"
                               : "Resubscribe"
@@ -119,14 +192,14 @@ export function AlumniTable({
                       </form>
                       <DeleteIconButton
                         action={deleteAlumniContactAction}
-                        fields={{ id: row.id }}
+                        fields={{ id: contact.id }}
                         label={nl ? "Verwijderen" : "Delete"}
                         srLabel={`${nl ? "Verwijderen" : "Delete"}: ${name}`}
                         title={nl ? "Alumnus verwijderen?" : "Delete alumnus?"}
                         description={
                           nl
-                            ? `${name} (${row.email}) verdwijnt uit het adresboek en uit elke export. Wil je enkel dat hij geen mails meer krijgt, gebruik dan "Uitschrijven": dan blijft de rij staan en voegt een volgende import hem niet opnieuw toe.`
-                            : `${name} (${row.email}) disappears from the address book and from every export. If you only want to stop the mail, use "Unsubscribe": the row stays and a later import will not add them back.`
+                            ? `${name} (${contact.email}) verdwijnt uit de lijst en uit elke export. Gebruik "Uitschrijven" als alleen de mails moeten stoppen.`
+                            : `${name} (${contact.email}) disappears from the list and every export. Use "Unsubscribe" if only the emails should stop.`
                         }
                         confirmLabel={nl ? "Verwijderen" : "Delete"}
                         cancelLabel={nl ? "Annuleren" : "Cancel"}
@@ -142,17 +215,130 @@ export function AlumniTable({
       </Card>
 
       {editing
-        ? rows
-            .filter((row) => row.id === editing)
-            .map((row) => (
+        ? contacts
+            .filter((contact) => contact.id === editing)
+            .map((contact) => (
               <AlumniContactForm
-                key={row.id}
+                key={contact.id}
                 locale={locale}
-                contact={row}
+                contact={contact}
                 onSaved={() => setEditing(null)}
               />
             ))
         : null}
     </div>
+  );
+}
+
+function SourceBadge({
+  source,
+  locale,
+}: {
+  source: "account" | "contact";
+  locale: "nl" | "en";
+}) {
+  return (
+    <span className="ml-2 inline-flex rounded-md border border-vtk-blue/10 bg-vtk-blue-soft/55 px-2 py-0.5 text-[11px] font-normal text-[#43506d]">
+      {source === "account"
+        ? "Account"
+        : locale === "nl"
+          ? "Handmatig"
+          : "Manual"}
+    </span>
+  );
+}
+
+function MailStatus({ enabled, locale }: { enabled: boolean; locale: "nl" | "en" }) {
+  return enabled ? (
+    <span className="rounded-md bg-emerald-100 px-2 py-0.5 text-xs text-emerald-800">
+      {locale === "nl" ? "Krijgt mails" : "Receives mail"}
+    </span>
+  ) : (
+    <span className="rounded-md bg-zinc-100 px-2 py-0.5 text-xs text-zinc-600">
+      {locale === "nl" ? "Uitgeschreven" : "Unsubscribed"}
+    </span>
+  );
+}
+
+/** Verstuurt de eenmalige wachtwoordlink en houdt alle feedback in dezelfde rij. */
+function AlumniAccessForm({
+  account,
+  locale,
+}: {
+  account: AlumniAccount;
+  locale: "nl" | "en";
+}) {
+  const nl = locale === "nl";
+  const [state, formAction, pending] = useActionState(sendAlumniAccessLinkAction, SAVE_IDLE);
+  const handled = useRef<number | null>(null);
+  const showToast = useToast();
+
+  useEffect(() => {
+    if (state.status === "idle" || handled.current === state.nonce) return;
+    handled.current = state.nonce;
+    if (state.status === "success") {
+      showToast({
+        message: nl ? "Wachtwoordlink verstuurd" : "Password link sent",
+        variant: "success",
+      });
+      return;
+    }
+    const message =
+      state.code === "EMAIL_TAKEN"
+        ? nl
+          ? "Dit privéadres hoort al bij een ander account."
+          : "This private address already belongs to another account."
+        : state.code === "NO_PERSONAL_EMAIL"
+          ? nl
+            ? "Vul een niet-KU-Leuven-adres in."
+            : "Enter a non-KU-Leuven address."
+          : state.code === "MAIL_FAILED"
+            ? nl
+              ? "De mail kon niet worden verstuurd."
+              : "The email could not be sent."
+            : nl
+              ? "De toegangslink kon niet worden verstuurd."
+              : "The access link could not be sent.";
+    showToast({ message, variant: "error", duration: 0 });
+  }, [state, showToast, nl]);
+
+  return (
+    <form action={formAction} className="flex min-w-56 flex-col items-start gap-1.5">
+      <input type="hidden" name="id" value={account.id} />
+      {account.accessEmail ? (
+        <>
+          <input type="hidden" name="email" value={account.accessEmail} />
+          <span className="max-w-64 truncate text-xs text-[#5c667f]" title={account.accessEmail}>
+            {account.accessEmail}
+          </span>
+        </>
+      ) : (
+        <input
+          name="email"
+          type="email"
+          required
+          placeholder={nl ? "Privé-e-mailadres" : "Private email address"}
+          aria-label={nl ? `Privé-e-mailadres van ${account.name}` : `Private email address for ${account.name}`}
+          className="w-full rounded-lg border border-vtk-blue/15 bg-white px-2.5 py-1.5 text-xs text-vtk-ink outline-none transition-colors focus:border-vtk-blue"
+        />
+      )}
+      <button
+        type="submit"
+        disabled={pending || !account.active}
+        className="whitespace-nowrap rounded-full border border-vtk-blue/15 px-3 py-1 text-xs font-medium text-vtk-ink transition-colors hover:bg-vtk-blue-soft/70 active:translate-y-px disabled:cursor-not-allowed disabled:opacity-50"
+      >
+        {pending
+          ? nl
+            ? "Versturen..."
+            : "Sending..."
+          : account.hasPassword
+            ? nl
+              ? "Herstellink sturen"
+              : "Send reset link"
+            : nl
+              ? "Toegangslink sturen"
+              : "Send access link"}
+      </button>
+    </form>
   );
 }

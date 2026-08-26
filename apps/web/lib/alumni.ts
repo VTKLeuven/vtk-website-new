@@ -157,12 +157,21 @@ export function toAlumniCsv(recipients: AlumniRecipient[]): string {
 export type AlumniAccount = {
   id: string;
   name: string;
+  /** Adres dat voor gewone alumnimail gebruikt wordt. */
   email: string;
+  /** Niet-KU-Leuven-adres waar een beheerder veilig een toegangslink heen kan sturen. */
+  accessEmail: string | null;
   graduationYear: number | null;
   wasInVtk: boolean;
   optedIn: boolean;
   active: boolean;
+  hasPassword: boolean;
 };
+
+/** Universiteitsadressen verdwijnen na het afstuderen en zijn dus geen hersteladres. */
+export function isKuLeuvenEmail(email: string): boolean {
+  return /@(?:[^@.]+\.)*kuleuven\.be$/i.test(email.trim());
+}
 
 /**
  * De site-accounts met `alumni = true`.
@@ -201,6 +210,7 @@ export async function listAlumniAccounts(filter: {
       wasInVtk: true,
       alumniMailOptIn: true,
       active: true,
+      accounts: { where: { providerId: "credential" }, select: { id: true } },
     },
   });
 
@@ -209,10 +219,12 @@ export async function listAlumniAccounts(filter: {
     name: row.name,
     email:
       row.emailPreference === "PERSONAL" && row.personalEmail ? row.personalEmail : row.email,
+    accessEmail: row.personalEmail || (!isKuLeuvenEmail(row.email) ? row.email : null),
     graduationYear: row.graduationYear,
     wasInVtk: row.wasInVtk,
     optedIn: row.alumniMailOptIn,
     active: row.active,
+    hasPassword: row.accounts.length > 0,
   }));
 }
 
