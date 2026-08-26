@@ -73,10 +73,7 @@ export default async function LoginPage({
             Het wachtwoordformulier staat eronder achter een regel tekst; zie
             PasswordSignIn voor waarom. */}
         {kulEnabled && (
-          <>
-            <KulSignInButton nextParam={next} label={dict.auth.signInWithKulLong} />
-            <p className="vtk-auth-primary-hint">{dict.auth.signInWithKulHint}</p>
-          </>
+          <KulSignInButton nextParam={next} label={dict.auth.signInWithKulLong} />
         )}
 
         <PasswordSignIn
