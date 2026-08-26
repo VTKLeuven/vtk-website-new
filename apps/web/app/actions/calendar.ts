@@ -218,7 +218,6 @@ const categorySchema = z.object({
     .string()
     .trim()
     .regex(/^#[0-9a-fA-F]{6}$/),
-  order: z.coerce.number().int().min(0).max(999),
   showOnCalendarPage: z.coerce.boolean().default(false),
   // Bij elke doelgroepwaarde hoort code die bepaalt wie erbij hoort
   // (lib/calendar/audience.ts), dus dit is een gesloten lijst.
@@ -236,7 +235,6 @@ const CATEGORY_FIELD_LABELS: Record<string, string> = {
   descriptionNl: "beschrijving",
   descriptionEn: "Engelse beschrijving",
   colour: "kleur",
-  order: "volgorde",
   showOnCalendarPage: "tonen op de kalenderpagina",
   audience: "doelgroep",
 };
@@ -271,7 +269,6 @@ export async function saveCalendarCategoryAction(
     descriptionNl: formData.get("descriptionNl") || null,
     descriptionEn: formData.get("descriptionEn") || null,
     colour: formData.get("colour"),
-    order: formData.get("order") ?? 0,
     showOnCalendarPage: formData.get("showOnCalendarPage") === "on",
     kind: formData.get("kind"),
     audience: formData.get("audience") || null,
@@ -301,7 +298,13 @@ export async function saveCalendarCategoryAction(
       summary: existing ? describeChanges(existing, data, CATEGORY_FIELD_LABELS) : null,
     });
   } else {
-    const category = await prisma.calendarCategory.create({ data });
+    const last = await prisma.calendarCategory.findFirst({
+      orderBy: { order: "desc" },
+      select: { order: true },
+    });
+    const category = await prisma.calendarCategory.create({
+      data: { ...data, order: (last?.order ?? -1) + 1 },
+    });
     await logAudit({
       action: "create",
       entity: "calendarCategory",
@@ -312,6 +315,29 @@ export async function saveCalendarCategoryAction(
 
   revalidateCalendar();
   return saveOk();
+}
+
+export async function reorderCalendarCategoriesAction(ids: string[]): Promise<void> {
+  const session = await requireSession();
+  if (!session.user.isSuperAdmin && !hasPermission(session, "calendar.manageAll")) {
+    throw new Error("forbidden");
+  }
+
+  await prisma.$transaction(
+    ids.map((id, index) =>
+      prisma.calendarCategory.update({
+        where: { id },
+        data: { order: index },
+      })
+    )
+  );
+  await logAudit({
+    action: "reorder",
+    entity: "calendarCategory",
+    target: `${ids.length} kalendercategorieën`,
+    summary: "volgorde van kalendercategorieën gewijzigd",
+  });
+  revalidateCalendar();
 }
 
 /**

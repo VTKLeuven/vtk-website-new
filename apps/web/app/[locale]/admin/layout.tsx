@@ -119,9 +119,7 @@ const NAV: NavEntry[] = [
   // moeten zoeken. Het kluisbeheer zelf (posten koppelen, configuratie) staat wel
   // onder IT.
   item('vault', '/wachtwoorden', { anyPerm: ['vault.editOwn', 'vault.manage'] }),
-  item('dashboardTiles', '/dashboard-tiles', {
-    anyPerm: ['dashboard.manage', 'dashboard.manageOwn'],
-  }),
+  item('dashboardTiles', '/dashboard-tiles'),
   group('it', [
     // `exact`, anders licht Configuratie (/admin/it) ook op wanneer je op de
     // onderliggende /admin/it/preview staat.

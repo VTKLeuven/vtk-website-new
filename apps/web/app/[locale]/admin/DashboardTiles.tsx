@@ -235,7 +235,7 @@ export function DashboardTiles({
               </button>
               {manageHref && (
                 <Link href={manageHref} className="vtk-tile-btn">
-                  {locale === "nl" ? "Standaardtegels beheren" : "Manage default tiles"}
+                  {locale === "nl" ? "Dashboardtegels beheren" : "Manage dashboard tiles"}
                 </Link>
               )}
             </>

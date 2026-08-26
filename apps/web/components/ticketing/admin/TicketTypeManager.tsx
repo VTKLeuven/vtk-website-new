@@ -1,6 +1,10 @@
+"use client";
+
+import { useRef, useState, useTransition } from "react";
 import {
   archiveTicketTypeAction,
   createTicketTypeAction,
+  reorderTicketTypesAction,
   saveTicketTypeColorAction,
   updateInventoryPoolAction,
 } from "@/app/actions/tickets";
@@ -51,7 +55,37 @@ export function TicketTypeManager({
   locale: AdminLocale;
 }) {
   const activePools = pools.filter((pool) => pool.active);
-  const hasActiveTicketType = ticketTypes.some((ticketType) => ticketType.active);
+  const [prevTicketTypes, setPrevTicketTypes] = useState<TicketType[]>(ticketTypes);
+  const [items, setItems] = useState<TicketType[]>(ticketTypes);
+  const [, startTransition] = useTransition();
+
+  if (ticketTypes !== prevTicketTypes) {
+    setPrevTicketTypes(ticketTypes);
+    setItems(ticketTypes);
+  }
+
+  const hasActiveTicketType = items.some((ticketType) => ticketType.active);
+
+  const dragFrom = useRef<number | null>(null);
+  const [overIndex, setOverIndex] = useState<number | null>(null);
+
+  function onDrop(to: number) {
+    const from = dragFrom.current;
+    dragFrom.current = null;
+    setOverIndex(null);
+    if (from === null || from === to) return;
+    const next = [...items];
+    const [moved] = next.splice(from, 1);
+    next.splice(to, 0, moved);
+    setItems(next);
+    startTransition(async () => {
+      const fd = new FormData();
+      fd.set("eventId", eventId);
+      fd.set("locale", locale);
+      for (const t of next) fd.append("ids", t.id);
+      await reorderTicketTypesAction(fd);
+    });
+  }
 
   return (
     <>
@@ -159,28 +193,58 @@ export function TicketTypeManager({
             </span>
           </div>
         ) : null}
-        {ticketTypes.length > 0 ? (
+        {items.length > 0 ? (
           <ul className="ticket-admin-list">
-            {ticketTypes.map((ticketType) => (
-              <li key={ticketType.id}>
+            {items.map((ticketType, index) => (
+              <li
+                key={ticketType.id}
+                draggable
+                onDragStart={() => {
+                  dragFrom.current = index;
+                }}
+                onDragEnd={() => {
+                  dragFrom.current = null;
+                  setOverIndex(null);
+                }}
+                onDragOver={(e) => {
+                  e.preventDefault();
+                  if (overIndex !== index) setOverIndex(index);
+                }}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  onDrop(index);
+                }}
+                className={`transition-colors rounded-xl ${
+                  overIndex === index ? "bg-vtk-yellow/20" : ""
+                }`}
+              >
                 <div className="ticket-admin-row-head">
-                  <div>
-                    <p className="ticket-admin-row-title">
-                      <span
-                        className="ticket-admin-color-dot"
-                        style={{ background: `var(--ticket-color-${ticketColorKey(ticketType.color)})` }}
-                        aria-hidden="true"
-                      />
-                      {locale === "en" && ticketType.nameEn ? ticketType.nameEn : ticketType.nameNl}
-                    </p>
-                    <p className="ticket-admin-row-meta">
-                      {formatMoney(ticketType.unitPriceCents, ticketType.currency, locale)} · {ticketType.inventoryPool.nameNl} · {ticketType.audience === "MEMBERS" ? (locale === "nl" ? "Leden" : "Members") : (locale === "nl" ? "Publiek" : "Public")}
-                    </p>
-                    <p className="ticket-admin-row-meta ticket-admin-inline-meta">
-                      <UsersRound aria-hidden="true" size={13} />
-                      {ticketType._count?.orderItems ?? 0} {locale === "nl" ? "bestelde tickets" : "ordered tickets"}
-                      <span className="ticket-admin-code">{ticketType.code}</span>
-                    </p>
+                  <div className="flex items-start gap-2">
+                    <span
+                      className="cursor-grab active:cursor-grabbing text-zinc-400 hover:text-zinc-700 px-1 text-base select-none mt-0.5"
+                      title={locale === "nl" ? "Sleep om volgorde te wijzigen" : "Drag to reorder"}
+                      aria-hidden="true"
+                    >
+                      ⠿
+                    </span>
+                    <div>
+                      <p className="ticket-admin-row-title">
+                        <span
+                          className="ticket-admin-color-dot"
+                          style={{ background: `var(--ticket-color-${ticketColorKey(ticketType.color)})` }}
+                          aria-hidden="true"
+                        />
+                        {locale === "en" && ticketType.nameEn ? ticketType.nameEn : ticketType.nameNl}
+                      </p>
+                      <p className="ticket-admin-row-meta">
+                        {formatMoney(ticketType.unitPriceCents, ticketType.currency, locale)} · {ticketType.inventoryPool.nameNl} · {ticketType.audience === "MEMBERS" ? (locale === "nl" ? "Leden" : "Members") : (locale === "nl" ? "Publiek" : "Public")}
+                      </p>
+                      <p className="ticket-admin-row-meta ticket-admin-inline-meta">
+                        <UsersRound aria-hidden="true" size={13} />
+                        {ticketType._count?.orderItems ?? 0} {locale === "nl" ? "bestelde tickets" : "ordered tickets"}
+                        <span className="ticket-admin-code">{ticketType.code}</span>
+                      </p>
+                    </div>
                   </div>
                   {ticketType.active ? (
                     <form action={archiveTicketTypeAction}>
@@ -302,10 +366,6 @@ export function TicketTypeManager({
                   <div className="ticket-admin-field">
                     <label htmlFor="ticket-type-max">{locale === "nl" ? "Maximum per bestelling" : "Maximum per order"}</label>
                     <input id="ticket-type-max" name="maxPerOrder" type="number" min="1" defaultValue="8" required />
-                  </div>
-                  <div className="ticket-admin-field">
-                    <label htmlFor="ticket-type-sort">{locale === "nl" ? "Volgorde" : "Order"}</label>
-                    <input id="ticket-type-sort" name="sortOrder" type="number" defaultValue="0" />
                   </div>
                   <div className="ticket-admin-field">
                     <label htmlFor="ticket-type-sales-start">{locale === "nl" ? "Verkoop start" : "Sales start"}</label>

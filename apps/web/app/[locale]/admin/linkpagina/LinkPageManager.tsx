@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { ArrowDown, ArrowUp, ExternalLink, Plus, Share2, Trash2 } from "lucide-react";
 import { Card, Input, Label, Textarea } from "@vtk/ui";
 import type { Locale } from "@vtk/i18n";
@@ -133,6 +133,22 @@ export function LinkPageManager({
     }));
   };
 
+  const dragFrom = useRef<number | null>(null);
+  const [overIndex, setOverIndex] = useState<number | null>(null);
+
+  function onDropLink(to: number) {
+    const from = dragFrom.current;
+    dragFrom.current = null;
+    setOverIndex(null);
+    if (from === null || from === to) return;
+    setConfig((current) => {
+      const links = [...current.links];
+      const [moved] = links.splice(from, 1);
+      links.splice(to, 0, moved);
+      return { ...current, links };
+    });
+  }
+
   return (
     <div className="grid min-w-0 gap-8 xl:grid-cols-[minmax(0,1fr)_330px]">
       <SaveForm
@@ -238,8 +254,8 @@ export function LinkPageManager({
               <h2 className="font-semibold">{nl ? "Knoppen" : "Buttons"}</h2>
               <p className="mt-1 text-sm text-[#5c667f]">
                 {nl
-                  ? "De volgorde hieronder is ook de volgorde op de publieke pagina."
-                  : "The order below is also the order on the public page."}
+                  ? "De volgorde hieronder is ook de volgorde op de publieke pagina. Je kan knoppen slepen om ze te herordenen."
+                  : "The order below is also the order on the public page. You can drag buttons to reorder them."}
               </p>
             </div>
             <button
@@ -260,8 +276,38 @@ export function LinkPageManager({
           ) : (
             <div className="space-y-4">
               {config.links.map((link, index) => (
-                <div key={link.id} className="rounded-2xl border border-vtk-blue/10 bg-vtk-blue-soft/45 p-4">
-                  <div className="grid min-w-0 gap-4 lg:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)_auto] lg:items-end">
+                <div
+                  key={link.id}
+                  draggable
+                  onDragStart={() => {
+                    dragFrom.current = index;
+                  }}
+                  onDragEnd={() => {
+                    dragFrom.current = null;
+                    setOverIndex(null);
+                  }}
+                  onDragOver={(e) => {
+                    e.preventDefault();
+                    if (overIndex !== index) setOverIndex(index);
+                  }}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    onDropLink(index);
+                  }}
+                  className={`rounded-2xl border border-vtk-blue/10 bg-vtk-blue-soft/45 p-4 transition-colors ${
+                    overIndex === index ? "border-vtk-blue bg-vtk-yellow/20" : ""
+                  }`}
+                >
+                  <div className="grid min-w-0 gap-4 lg:grid-cols-[auto_minmax(0,0.8fr)_minmax(0,1.2fr)_auto] lg:items-end">
+                    <div className="hidden lg:flex items-center pb-2.5">
+                      <span
+                        className="cursor-grab active:cursor-grabbing text-zinc-400 hover:text-zinc-700 px-1 text-lg select-none"
+                        title={nl ? "Sleep om volgorde te wijzigen" : "Drag to reorder"}
+                        aria-hidden="true"
+                      >
+                        ⠿
+                      </span>
+                    </div>
                     <div>
                       <Label htmlFor={`link-title-${link.id}`}>{nl ? "Knoptekst" : "Button label"}</Label>
                       <Input

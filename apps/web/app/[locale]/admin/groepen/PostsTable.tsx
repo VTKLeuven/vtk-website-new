@@ -1,9 +1,9 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState, useTransition } from "react";
 import { Input, Label, Textarea } from "@vtk/ui";
 import { SaveForm } from "@/components/ui/SaveForm";
-import { saveGroupAction, setGroupRoleAction } from "@/app/actions/users-groups";
+import { saveGroupAction, reorderGroupsAction, setGroupRoleAction } from "@/app/actions/users-groups";
 import { AddMemberForm } from "./AddMemberForm";
 import { RemoveMemberButton } from "./RemoveMemberButton";
 import {
@@ -73,13 +73,38 @@ export function PostsTable({
   saveLabels: SaveLabels;
 }) {
   const nl = locale === "nl";
+  const [prevPosts, setPrevPosts] = useState(posts);
+  const [items, setItems] = useState<PostRow[]>(posts);
   const [createOpen, setCreateOpen] = useState(false);
-  const { query, setQuery, sort, toggleSort, filtered, isOpen, toggleRow } = useTableControls(posts, {
+  const [, startTransition] = useTransition();
+
+  if (posts !== prevPosts) {
+    setPrevPosts(posts);
+    setItems(posts);
+  }
+
+  const { query, setQuery, sort, toggleSort, filtered, isOpen, toggleRow } = useTableControls(items, {
     searchOf: (r) => r.searchText,
     nameOf: (r) => r.name,
     countOf: (r) => r.memberCount,
     locale,
   });
+
+  const dragFrom = useRef<number | null>(null);
+  const [overIndex, setOverIndex] = useState<number | null>(null);
+  const isReorderable = !query && !sort;
+
+  function onDrop(to: number) {
+    const from = dragFrom.current;
+    dragFrom.current = null;
+    setOverIndex(null);
+    if (from === null || from === to) return;
+    const next = [...items];
+    const [moved] = next.splice(from, 1);
+    next.splice(to, 0, moved);
+    setItems(next);
+    startTransition(() => void reorderGroupsAction(next.map((p) => p.id)));
+  }
 
   return (
     <div className="space-y-4">
@@ -88,7 +113,7 @@ export function PostsTable({
         <SearchBar
           value={query}
           onChange={setQuery}
-          placeholder={nl ? "Zoek op naam, rol of lid" : "Search by name, role or member"}
+          placeholder={nl ? "Zoek op naam, code, beschrijving of lid" : "Search by name, code, description or member"}
           ariaLabel={nl ? "Posten zoeken" : "Search posts"}
         />
         <button type="button" className="vtk-tile-btn vtk-tile-btn-primary" onClick={() => setCreateOpen(true)}>
@@ -113,6 +138,7 @@ export function PostsTable({
         <table>
           <thead>
             <tr>
+              <th className="w-8" aria-hidden />
               <SortHeader label={nl ? "Post" : "Post"} active={sort?.key === "name" ? sort.dir : null} onClick={() => toggleSort("name")} />
               <SortHeader
                 label={nl ? "Leden" : "Members"}
@@ -124,10 +150,29 @@ export function PostsTable({
             </tr>
           </thead>
           <tbody>
-            {filtered.map((post) => (
+            {filtered.map((post, index) => (
               <PostRowView
                 key={post.id}
                 post={post}
+                isReorderable={isReorderable}
+                isOver={overIndex === index}
+                onDragStart={() => {
+                  dragFrom.current = index;
+                }}
+                onDragEnd={() => {
+                  dragFrom.current = null;
+                  setOverIndex(null);
+                }}
+                onDragOver={(e) => {
+                  if (!isReorderable) return;
+                  e.preventDefault();
+                  if (overIndex !== index) setOverIndex(index);
+                }}
+                onDrop={(e) => {
+                  if (!isReorderable) return;
+                  e.preventDefault();
+                  onDrop(index);
+                }}
                 isOpen={isOpen(post.id)}
                 onToggle={() => toggleRow(post.id)}
                 nl={nl}
@@ -152,14 +197,16 @@ export function PostsTable({
         <Modal title={nl ? "Nieuwe post" : "New post"} onClose={() => setCreateOpen(false)}>
           <SaveForm
             action={saveGroupAction}
-            className="grid grid-cols-1 gap-3 md:grid-cols-6 [&>button]:md:col-span-6 [&>button]:justify-self-start"
+            className="grid grid-cols-1 gap-3 md:grid-cols-2 [&>button]:md:col-span-2 [&>button]:justify-self-start"
             {...saveLabels}
             onSuccess={() => setCreateOpen(false)}
           >
-            <div className="md:col-span-3"><Label>{nl ? "Naam (NL)" : "Name (NL)"}</Label><Input name="nameNl" required /></div>
-            <div className="md:col-span-3"><Label>{nl ? "Naam (EN)" : "Name (EN)"}</Label><Input name="nameEn" required /></div>
-            <div className="md:col-span-4"><Label>{nl ? "Code" : "Code"}</Label><Input name="code" placeholder={nl ? "auto" : "auto"} /></div>
-            <div className="md:col-span-2"><Label>{nl ? "Volgorde" : "Order"}</Label><Input name="orderInPraesidium" type="number" defaultValue={0} /></div>
+            <input type="hidden" name="type" value="PRAESIDIUM" />
+            <div><Label>{nl ? "Naam (NL)" : "Name (NL)"}</Label><Input name="nameNl" required /></div>
+            <div><Label>{nl ? "Naam (EN)" : "Name (EN)"}</Label><Input name="nameEn" required /></div>
+            <div className="md:col-span-2"><Label>{nl ? "Beschrijving (NL)" : "Description (NL)"}</Label><Textarea name="descriptionNl" /></div>
+            <div className="md:col-span-2"><Label>{nl ? "Beschrijving (EN)" : "Description (EN)"}</Label><Textarea name="descriptionEn" /></div>
+            <div className="md:col-span-2"><Label>{nl ? "Code" : "Code"}</Label><Input name="code" placeholder={nl ? "auto" : "auto"} /></div>
             <input type="hidden" name="active" value="on" />
           </SaveForm>
         </Modal>
@@ -170,6 +217,12 @@ export function PostsTable({
 
 function PostRowView({
   post,
+  isReorderable,
+  isOver,
+  onDragStart,
+  onDragEnd,
+  onDragOver,
+  onDrop,
   isOpen,
   onToggle,
   nl,
@@ -180,6 +233,12 @@ function PostRowView({
   saveLabels,
 }: {
   post: PostRow;
+  isReorderable: boolean;
+  isOver: boolean;
+  onDragStart: () => void;
+  onDragEnd: () => void;
+  onDragOver: (e: React.DragEvent) => void;
+  onDrop: (e: React.DragEvent) => void;
   isOpen: boolean;
   onToggle: () => void;
   nl: boolean;
@@ -197,6 +256,11 @@ function PostRowView({
         tabIndex={0}
         aria-expanded={isOpen}
         aria-controls={detailId}
+        draggable={isReorderable}
+        onDragStart={onDragStart}
+        onDragEnd={onDragEnd}
+        onDragOver={onDragOver}
+        onDrop={onDrop}
         onClick={onToggle}
         onKeyDown={(e) => {
           if (e.key === "Enter" || e.key === " ") {
@@ -204,8 +268,21 @@ function PostRowView({
             onToggle();
           }
         }}
-        className={"cursor-pointer" + (post.active ? "" : " opacity-70")}
+        className={`cursor-pointer transition-colors ${
+          isOver ? "border-vtk-blue bg-vtk-yellow/20" : ""
+        } ${post.active ? "" : " opacity-70"}`}
       >
+        <td className="w-8 text-center text-zinc-400" onClick={(e) => isReorderable && e.stopPropagation()}>
+          {isReorderable && (
+            <span
+              className="cursor-grab active:cursor-grabbing hover:text-vtk-ink text-base select-none px-1"
+              title={nl ? "Sleep om volgorde te wijzigen" : "Drag to reorder"}
+              aria-hidden="true"
+            >
+              ⠿
+            </span>
+          )}
+        </td>
         <td>
           <div className="flex items-start gap-2">
             <Chevron open={isOpen} />
@@ -228,7 +305,7 @@ function PostRowView({
       </tr>
       {isOpen && (
         <tr id={detailId}>
-          <td colSpan={3} className="bg-vtk-blue-soft/20">
+          <td colSpan={4} className="bg-vtk-blue-soft/20">
             <PostDetail
               post={post}
               nl={nl}
@@ -383,16 +460,15 @@ function PostDetail({
         <div className="space-y-4 p-4">
           <SaveForm
             action={saveGroupAction}
-            className="grid grid-cols-1 gap-3 md:grid-cols-5 [&>button]:md:col-span-5 [&>button]:justify-self-start"
+            className="grid grid-cols-1 gap-3 md:grid-cols-2 [&>button]:md:col-span-2 [&>button]:justify-self-start"
             {...saveLabels}
           >
             <input type="hidden" name="id" value={post.id} />
-            <div className="md:col-span-2"><Label>{nl ? "Naam (NL)" : "Name (NL)"}</Label><Input name="nameNl" defaultValue={post.nameNl} required /></div>
-            <div className="md:col-span-2"><Label>{nl ? "Naam (EN)" : "Name (EN)"}</Label><Input name="nameEn" defaultValue={post.nameEn} required /></div>
-            <div><Label>{nl ? "Volgorde" : "Order"}</Label><Input name="orderInPraesidium" type="number" defaultValue={post.orderInPraesidium} /></div>
-            <div className="md:col-span-5"><Label>{nl ? "Beschrijving (NL)" : "Description (NL)"}</Label><Textarea name="descriptionNl" defaultValue={post.descriptionNl} rows={2} /></div>
-            <div className="md:col-span-5"><Label>{nl ? "Beschrijving (EN)" : "Description (EN)"}</Label><Textarea name="descriptionEn" defaultValue={post.descriptionEn} rows={2} /></div>
-            <label className="md:col-span-5 inline-flex items-center gap-2 text-sm text-vtk-ink">
+            <div><Label>{nl ? "Naam (NL)" : "Name (NL)"}</Label><Input name="nameNl" defaultValue={post.nameNl} required /></div>
+            <div><Label>{nl ? "Naam (EN)" : "Name (EN)"}</Label><Input name="nameEn" defaultValue={post.nameEn} required /></div>
+            <div className="md:col-span-2"><Label>{nl ? "Beschrijving (NL)" : "Description (NL)"}</Label><Textarea name="descriptionNl" defaultValue={post.descriptionNl} rows={2} /></div>
+            <div className="md:col-span-2"><Label>{nl ? "Beschrijving (EN)" : "Description (EN)"}</Label><Textarea name="descriptionEn" defaultValue={post.descriptionEn} rows={2} /></div>
+            <label className="md:col-span-2 inline-flex items-center gap-2 text-sm text-vtk-ink">
               <input type="checkbox" name="active" defaultChecked={post.active} className="size-4 rounded border-zinc-400" />
               {nl
                 ? "Actief (een inactieve post verdwijnt uit de shift-keuzes; de historiek blijft)"

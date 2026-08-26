@@ -451,14 +451,13 @@ const GROUP_FIELD_LABELS: Record<string, string> = {
   nameEn: "Engelse naam",
   descriptionNl: "beschrijving",
   descriptionEn: "Engelse beschrijving",
-  orderInPraesidium: "volgorde",
   active: "actief",
 };
 
 /**
  * Post aanmaken of bewerken. De `code` en `slug` staan enkel bij het aanmaken
  * vast (shiften en de sessie verwijzen naar `code`); bij bewerken wijzigen enkel
- * naam, beschrijving, volgorde en actief-status. Een post uitzetten (active=false)
+ * naam, beschrijving en actief-status. Een post uitzetten (active=false)
  * haalt ze uit de nieuwe-shift-keuzes maar behoudt de historiek.
  */
 export async function saveGroupAction(_prev: SaveState, formData: FormData): Promise<SaveState> {
@@ -470,7 +469,6 @@ export async function saveGroupAction(_prev: SaveState, formData: FormData): Pro
     nameEn: formData.get("nameEn"),
     descriptionNl: (formData.get("descriptionNl") as string) || null,
     descriptionEn: (formData.get("descriptionEn") as string) || null,
-    orderInPraesidium: formData.get("orderInPraesidium") || 0,
     active: formData.get("active") === "on",
   });
   if (!result.success) return saveError("INVALID_INPUT");
@@ -481,7 +479,6 @@ export async function saveGroupAction(_prev: SaveState, formData: FormData): Pro
     nameEn: parsed.nameEn,
     descriptionNl: parsed.descriptionNl,
     descriptionEn: parsed.descriptionEn,
-    orderInPraesidium: parsed.orderInPraesidium,
     active: parsed.active,
   };
 
@@ -500,7 +497,20 @@ export async function saveGroupAction(_prev: SaveState, formData: FormData): Pro
       const code = codeify(parsed.code || parsed.nameNl);
       const slug = slugify(parsed.nameNl);
       if (!code || !slug) return saveError("INVALID_INPUT");
-      const created = await prisma.group.create({ data: { ...data, code, slug } });
+      const last = await prisma.group.findFirst({
+        where: { type: "PRAESIDIUM" },
+        orderBy: { orderInPraesidium: "desc" },
+        select: { orderInPraesidium: true },
+      });
+      const created = await prisma.group.create({
+        data: {
+          ...data,
+          code,
+          slug,
+          type: "PRAESIDIUM",
+          orderInPraesidium: (last?.orderInPraesidium ?? -1) + 1,
+        },
+      });
       await logAudit({
         action: "create",
         entity: "post",
@@ -518,6 +528,26 @@ export async function saveGroupAction(_prev: SaveState, formData: FormData): Pro
   revalidatePath("/admin/groepen");
   revalidatePath("/praesidium");
   return saveOk();
+}
+
+export async function reorderGroupsAction(ids: string[]): Promise<void> {
+  await requirePermission("groups.manage");
+  await prisma.$transaction(
+    ids.map((id, index) =>
+      prisma.group.update({
+        where: { id },
+        data: { orderInPraesidium: index },
+      })
+    )
+  );
+  await logAudit({
+    action: "reorder",
+    entity: "post",
+    target: `${ids.length} posten`,
+    summary: "volgorde van posten gewijzigd",
+  });
+  revalidatePath("/admin/groepen");
+  revalidatePath("/praesidium");
 }
 
 /**
@@ -587,12 +617,11 @@ const werkgroepSchema = z.object({
   code: z.string().trim().optional(),
   nameNl: z.string().trim().min(1),
   nameEn: z.string().trim().min(1),
-  orderInPraesidium: z.coerce.number().int().default(0),
   active: z.coerce.boolean().default(true),
 });
 
 /**
- * Werkgroep aanmaken of haar basisinstellingen (naam, volgorde, actief) bewerken.
+ * Werkgroep aanmaken of haar basisinstellingen (naam, actief) bewerken.
  * De infotekst + website lopen apart via {@link saveWerkgroepInfoAction} zodat
  * ook gewone leden die mogen aanpassen. Enkel werkgroepen.manage (of superadmin).
  */
@@ -603,7 +632,6 @@ export async function saveWerkgroepAction(_prev: SaveState, formData: FormData):
     code: (formData.get("code") as string) || undefined,
     nameNl: formData.get("nameNl"),
     nameEn: formData.get("nameEn"),
-    orderInPraesidium: formData.get("orderInPraesidium") || 0,
     active: formData.get("active") === "on",
   });
   if (!result.success) return saveError("INVALID_INPUT");
@@ -612,7 +640,6 @@ export async function saveWerkgroepAction(_prev: SaveState, formData: FormData):
   const data = {
     nameNl: parsed.nameNl,
     nameEn: parsed.nameEn,
-    orderInPraesidium: parsed.orderInPraesidium,
     active: parsed.active,
   };
 
@@ -631,8 +658,19 @@ export async function saveWerkgroepAction(_prev: SaveState, formData: FormData):
       const code = codeify(parsed.code || parsed.nameNl);
       const slug = slugify(parsed.nameNl);
       if (!code || !slug) return saveError("INVALID_INPUT");
+      const last = await prisma.group.findFirst({
+        where: { type: "WERKGROEP" },
+        orderBy: { orderInPraesidium: "desc" },
+        select: { orderInPraesidium: true },
+      });
       const created = await prisma.group.create({
-        data: { ...data, code, slug, type: "WERKGROEP" },
+        data: {
+          ...data,
+          code,
+          slug,
+          type: "WERKGROEP",
+          orderInPraesidium: (last?.orderInPraesidium ?? -1) + 1,
+        },
       });
       await logAudit({
         action: "create",
@@ -651,6 +689,26 @@ export async function saveWerkgroepAction(_prev: SaveState, formData: FormData):
   revalidatePath("/admin/werkgroepen");
   revalidatePath("/werkgroepen");
   return saveOk();
+}
+
+export async function reorderWerkgroepenAction(ids: string[]): Promise<void> {
+  await requirePermission("werkgroepen.manage");
+  await prisma.$transaction(
+    ids.map((id, index) =>
+      prisma.group.update({
+        where: { id },
+        data: { orderInPraesidium: index },
+      })
+    )
+  );
+  await logAudit({
+    action: "reorder",
+    entity: "werkgroep",
+    target: `${ids.length} werkgroepen`,
+    summary: "volgorde van werkgroepen gewijzigd",
+  });
+  revalidatePath("/admin/werkgroepen");
+  revalidatePath("/werkgroepen");
 }
 
 const werkgroepInfoSchema = z.object({
