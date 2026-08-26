@@ -297,8 +297,34 @@ export type AppCalendarEvent = {
    * deelnemerslijst aan, enkel jouw eigen lijst en de herinnering van die dag.
    */
   interested: boolean;
+  /**
+   * Hoeveel mensen aanduidden dat ze komen, of `null` zolang het er te weinig
+   * zijn. De drempel zit aan de serverkant (`INTEREST_PUBLIC_THRESHOLD`), dus een
+   * laag getal komt hier niet eens aan: onder die grens leest een getal als "hier
+   * komt niemand" en houdt het precies de mensen weg die het had moeten
+   * overtuigen.
+   *
+   * Bewust `null` en niet `0` voor "te weinig": een oudere app-versie die dit
+   * veld nog niet kent, valt met `null` vanzelf in de "toon niets"-tak, terwijl
+   * `0` een echt nulaantal zou suggereren.
+   */
+  interestedCount: number | null;
   /** Er staan tickets voor te koop; de app kan dan meteen doorsturen. */
   ticketSlug: string | null;
+};
+
+/**
+ * Eén rij in de aanwezigheidslijst van een alumni-evenement.
+ *
+ * Enkel wie zelf aanvinkte zichtbaar te willen zijn. `name` is `null` wanneer
+ * iemand wel zijn afstudeerjaar of VTK-verleden toont maar niet zijn naam; dat is
+ * een geldige keuze en geen ontbrekend gegeven.
+ */
+export type AppEventAttendee = {
+  key: string;
+  name: string | null;
+  graduationYear: number | null;
+  wasInVtk: boolean;
 };
 
 export type AppCalendarEventDetail = AppCalendarEvent & {
@@ -309,10 +335,16 @@ export type AppCalendarEventDetail = AppCalendarEvent & {
   /** Slug van het inschrijvingsformulier wanneer dat openstaat. */
   formSlug: string | null;
   /**
-   * Hoeveel leden er interesse in aangeduid hebben. Geen deelnemersaantal en
-   * dus geen belofte: het staat er om te zien of er volk komt.
+   * Draagt dit evenement de alumni-doelgroep? Alleen dan bestaat er een publieke
+   * aanwezigheidslijst; elders is interesse een private markering.
    */
-  interestedCount: number;
+  isAlumniEvent: boolean;
+  /**
+   * De publieke aanwezigheidslijst. Leeg bij elk niet-alumni-evenement, en ook
+   * bij een alumni-evenement waar niemand zichtbaar wou zijn. Het aantal
+   * hieronder telt iedereen, ook wie niet in deze lijst staat.
+   */
+  attendees: AppEventAttendee[];
 };
 
 export type AppCalendar = {

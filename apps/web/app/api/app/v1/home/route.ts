@@ -2,6 +2,7 @@ import { prisma } from "@vtk/db";
 import { pick } from "@vtk/i18n";
 
 import { viewerAudienceFilter } from "@/lib/calendar/audience";
+import { publicInterestCounts } from "@/lib/calendar/interest";
 import { corsPreflight } from "@/lib/cors";
 import { getCursusdienstHours } from "@/lib/cursusdienstHours";
 import { DEFAULT_EVENT_IMAGE_SETTING, BUILTIN_DEFAULT_EVENT_IMAGE } from "@/lib/defaultEventImage";
@@ -148,10 +149,11 @@ export async function GET(request: Request) {
           })
         : [];
 
-    const interested = await interestedEventIds(
-      session?.user.id ?? null,
-      upcomingEvents.map((event) => event.id),
-    );
+    const [interested, publicCounts] = await Promise.all([
+      interestedEventIds(session?.user.id ?? null, upcomingEvents.map((event) => event.id)),
+      // Enkel de tellers die de drempel halen; zelfde regel als op de site.
+      publicInterestCounts(upcomingEvents.map((event) => event.id)),
+    ]);
 
     const career = map.get("home.career") as CareerSetting | undefined;
 
@@ -194,6 +196,7 @@ export async function GET(request: Request) {
           audience: category.audience,
         })),
         interested: interested.has(event.id),
+        interestedCount: publicCounts.get(event.id) ?? null,
         ticketSlug: event.ticketEvent?.status === "PUBLISHED" ? event.ticketEvent.slug : null,
       })),
 

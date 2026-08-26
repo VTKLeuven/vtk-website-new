@@ -3,6 +3,7 @@ import { prisma } from "@vtk/db";
 import { pick } from "@vtk/i18n";
 
 import { viewerAudienceFilter } from "@/lib/calendar/audience";
+import { publicInterestCounts } from "@/lib/calendar/interest";
 import { listCalendarCategories } from "@/lib/calendar/categories";
 import { corsPreflight } from "@/lib/cors";
 import { getCurrentSession } from "@/lib/session";
@@ -114,10 +115,12 @@ export async function GET(request: Request) {
       followedCategorySlugs(session?.user.id ?? null),
     ]);
 
-    const interested = await interestedEventIds(
-      session?.user.id ?? null,
-      events.map((event) => event.id),
-    );
+    const [interested, publicCounts] = await Promise.all([
+      interestedEventIds(session?.user.id ?? null, events.map((event) => event.id)),
+      // Enkel de tellers die de drempel halen; zelfde regel als op de site, zodat
+      // de app en de website hetzelfde getal tonen.
+      publicInterestCounts(events.map((event) => event.id)),
+    ]);
 
     const payload: AppCalendar = {
       filteredByAudience,
@@ -145,6 +148,7 @@ export async function GET(request: Request) {
           audience: category.audience,
         })),
         interested: interested.has(event.id),
+        interestedCount: publicCounts.get(event.id) ?? null,
         ticketSlug: event.ticketEvent?.status === "PUBLISHED" ? event.ticketEvent.slug : null,
       })),
     };

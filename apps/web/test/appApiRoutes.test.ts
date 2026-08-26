@@ -16,6 +16,9 @@ const mocks = vi.hoisted(() => ({
   calendarFindMany: vi.fn(),
   categoryFindMany: vi.fn(),
   viewerAudienceFilter: vi.fn(),
+  interestGroupBy: vi.fn(),
+  guestInterestGroupBy: vi.fn(),
+  interestFindMany: vi.fn(),
   loadOrderableSessions: vi.fn(),
 }));
 
@@ -23,6 +26,10 @@ vi.mock("@vtk/db", () => ({
   prisma: {
     calendarEvent: { findMany: mocks.calendarFindMany },
     calendarCategory: { findMany: mocks.categoryFindMany },
+    // De teller telt leden én gasten samen; `publicInterestCounts` draait hier
+    // echt, zodat de drempel meegetest wordt in plaats van weggemockt.
+    calendarEventInterest: { groupBy: mocks.interestGroupBy, findMany: mocks.interestFindMany },
+    calendarEventGuestInterest: { groupBy: mocks.guestInterestGroupBy },
   },
 }));
 
@@ -65,6 +72,9 @@ describe("GET /api/app/v1/kalender", () => {
     // Standaard filtert de voorkeur niets weg; enkel wie op /account koos zijn
     // kalender toe te spitsen krijgt hier een where-fragment.
     mocks.viewerAudienceFilter.mockResolvedValue({ OR: ["doelgroepfilter"] });
+    mocks.interestGroupBy.mockResolvedValue([]);
+    mocks.guestInterestGroupBy.mockResolvedValue([]);
+    mocks.interestFindMany.mockResolvedValue([]);
     mocks.categoryFindMany.mockResolvedValue([
       { slug: "cantus", nameNl: "Cantussen", nameEn: "Cantus", colour: "#123456", audience: null },
     ]);
@@ -141,6 +151,24 @@ describe("GET /api/app/v1/kalender", () => {
     mocks.viewerAudienceFilter.mockResolvedValue({});
     const body = await (await calendarGet(appRequest("/api/app/v1/kalender"))).json();
     expect(body.filteredByAudience).toBe(false);
+  });
+
+  /**
+   * De teller is dezelfde als op de site, inclusief de drempel: anders geven de
+   * app en de website een ander antwoord op dezelfde vraag.
+   */
+  it("stuurt de teller pas mee vanaf de drempel, leden en gasten samen", async () => {
+    mocks.interestGroupBy.mockResolvedValue([{ eventId: "ev-1", _count: { _all: 20 } }]);
+    mocks.guestInterestGroupBy.mockResolvedValue([{ eventId: "ev-1", _count: { _all: 15 } }]);
+    const veel = await (await calendarGet(appRequest("/api/app/v1/kalender"))).json();
+    expect(veel.events[0].interestedCount).toBe(35);
+
+    mocks.interestGroupBy.mockResolvedValue([{ eventId: "ev-1", _count: { _all: 3 } }]);
+    mocks.guestInterestGroupBy.mockResolvedValue([]);
+    const weinig = await (await calendarGet(appRequest("/api/app/v1/kalender"))).json();
+    // `null` en niet `0`: een oudere app-versie valt daarmee vanzelf in de
+    // "toon niets"-tak in plaats van een echt nulaantal te suggereren.
+    expect(weinig.events[0].interestedCount).toBeNull();
   });
 
   /**

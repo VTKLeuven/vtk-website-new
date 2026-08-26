@@ -4,6 +4,7 @@ import { pick } from "@vtk/i18n";
 
 import { getCurrentAnnouncement, announcementFits } from "@/lib/announcements";
 import { viewerAudienceFilter } from "@/lib/calendar/audience";
+import { publicInterestCounts } from "@/lib/calendar/interest";
 import { corsPreflight } from "@/lib/cors";
 import { getCursusdienstHours } from "@/lib/cursusdienstHours";
 import { BUILTIN_DEFAULT_EVENT_IMAGE, DEFAULT_EVENT_IMAGE_SETTING } from "@/lib/defaultEventImage";
@@ -102,10 +103,11 @@ export async function GET(request: Request) {
         (map.get(DEFAULT_EVENT_IMAGE_SETTING) as { imageKey?: string | null } | undefined)?.imageKey,
       ) ?? BUILTIN_DEFAULT_EVENT_IMAGE;
 
-    const interested = await interestedEventIds(
-      session?.user.id ?? null,
-      upcoming.map((event) => event.id),
-    );
+    const [interested, publicCounts] = await Promise.all([
+      interestedEventIds(session?.user.id ?? null, upcoming.map((event) => event.id)),
+      // Enkel de tellers die de drempel halen; zelfde regel als op de site.
+      publicInterestCounts(upcoming.map((event) => event.id)),
+    ]);
 
     const upcomingEvents: AppCalendarEvent[] = upcoming.map((event) => ({
       id: event.id,
@@ -125,6 +127,7 @@ export async function GET(request: Request) {
         audience: category.audience,
       })),
       interested: interested.has(event.id),
+      interestedCount: publicCounts.get(event.id) ?? null,
       ticketSlug: event.ticketEvent?.status === "PUBLISHED" ? event.ticketEvent.slug : null,
     }));
 

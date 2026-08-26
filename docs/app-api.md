@@ -148,6 +148,29 @@ moet je eigen ster altijd weg kunnen halen.
 hoort in jouw lijst te blijven staan, ook wanneer je studiejaar intussen
 verschoven is.
 
+#### De teller en de aanwezigheidslijst
+
+`interestedCount` staat sinds augustus 2026 op **elke** kalenderrij en niet enkel
+op de detailpagina, want de site toont hem ook in het raster en op de homepage.
+Drie regels erbij, alle drie aan de serverkant zodat app en website nooit een
+ander antwoord geven op dezelfde vraag:
+
+- Hij telt **leden én gasten** (`CalendarEventGuestInterest`, de weg waarlangs een
+  alumnus zonder account kan aanduiden dat hij komt).
+- Hij verschijnt pas vanaf `INTEREST_PUBLIC_THRESHOLD` uit
+  `lib/calendar/interest.ts`; daaronder is de waarde `null`. Bewust `null` en
+  geen `0`: een app-versie die het veld nog niet kent, valt daarmee vanzelf in de
+  "toon niets"-tak, terwijl `0` een echt nulaantal zou suggereren.
+- `attendees` op de detailrespons is de publieke aanwezigheidslijst, en staat
+  **enkel** bij een alumni-evenement (`isAlumniEvent`). Er staat alleen in wie op
+  de site zelf aanvinkte zichtbaar te willen zijn; wie dat niet deed, telt mee in
+  het getal en verschijnt nergens.
+
+`filteredByAudience` zegt of er effectief iets weggefilterd **wordt**, niet of we
+het geprobeerd hebben. Sinds doelgroepevents standaard voor iedereen zichtbaar
+zijn, is dat filter meestal leeg; zou de vlag toch true blijven, dan zet de app
+een regel onder de lijst dat er activiteiten ontbreken terwijl er niets ontbreekt.
+
 ### `GET`/`PATCH /api/app/v1/mijn/meldingen`
 
 Welke soorten bericht je wil, en welke kalendercategorieën je volgt. Die twee

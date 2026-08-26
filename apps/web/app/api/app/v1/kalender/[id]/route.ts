@@ -7,6 +7,11 @@ import { loadCalendarEvent } from "@/lib/pageQueries";
 import { getDefaultEventImage } from "@/lib/defaultEventImage";
 import { getCurrentSession } from "@/lib/session";
 import { appLocaleFrom, type AppCalendarEventDetail } from "@/lib/app-api/contract";
+import {
+  attendeeList,
+  INTEREST_PUBLIC_THRESHOLD,
+  interestTotal,
+} from "@/lib/calendar/interest";
 import { absoluteMediaUrl, absoluteUrl } from "@/lib/app-api/media";
 import { appErrorResponse, appJson, appNotFound } from "@/lib/app-api/respond";
 
@@ -22,9 +27,14 @@ export const dynamic = "force-dynamic";
  * knop. Die beoordeling gebeurt hier en niet in de app, zodat de app niet hoeft
  * te weten wat de statussen van een ticketevent betekenen.
  *
- * `interestedCount` is een teller en geen deelnemerslijst: er staan geen namen
- * bij en er hangt geen plaats aan. Het is er om te zien of er volk komt, en dat
- * is precies zoveel als een ster mag beloven.
+ * `interestedCount` is een teller en geen deelnemerslijst: er hangt geen plaats
+ * aan. Het is er om te zien of er volk komt, en dat is precies zoveel als een
+ * ster mag beloven. Hij verschijnt pas boven een drempel (zie
+ * `lib/calendar/interest.ts`), zodat de app en de site hetzelfde tonen.
+ *
+ * De enige plek met namen is `attendees`, en enkel bij een alumni-evenement:
+ * daar kan iemand zelf aanvinken dat hij zichtbaar wil zijn. Wie dat niet doet,
+ * telt mee in het getal en staat nergens in de lijst.
  */
 export async function GET(request: Request, context: { params: Promise<{ id: string }> }) {
   try {
@@ -41,14 +51,20 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
     const imageUrl =
       absoluteMediaUrl(request, event.imageKey) ?? absoluteUrl(request, await getDefaultEventImage());
 
+    // De alumni-doelgroep bepaalt of er een aanwezigheidslijst bestaat.
+    const isAlumniEvent = event.categories.some(({ category }) => category.audience === "ALUMNI");
+
     const session = await getCurrentSession();
-    const [interest, interestedCount] = await Promise.all([
+    const [interest, total, attendees] = await Promise.all([
       session
         ? prisma.calendarEventInterest.count({
             where: { userId: session.user.id, eventId: event.id },
           })
         : Promise.resolve(0),
-      prisma.calendarEventInterest.count({ where: { eventId: event.id } }),
+      // Leden én gasten, zoals op de site: anders geven de app en de website een
+      // ander antwoord op dezelfde vraag.
+      interestTotal(event.id),
+      isAlumniEvent ? attendeeList(event.id) : Promise.resolve([]),
     ]);
 
     const now = new Date();
@@ -78,7 +94,9 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
       ticketSlug: event.ticketEvent?.status === "PUBLISHED" ? event.ticketEvent.slug : null,
       formSlug: formOpen ? (event.form?.slug ?? null) : null,
       interested: interest > 0,
-      interestedCount,
+      interestedCount: total >= INTEREST_PUBLIC_THRESHOLD ? total : null,
+      isAlumniEvent,
+      attendees,
     };
 
     return appJson(request, payload);
