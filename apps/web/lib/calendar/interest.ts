@@ -286,3 +286,192 @@ export function interestLabel(count: number | null | undefined, locale: Locale):
   if (!count) return null;
   return locale === "nl" ? `${count} komen` : `${count} going`;
 }
+
+export type AdminAttendeeRow = {
+  id: string;
+  kind: "member" | "guest";
+  userId: string | null;
+  name: string;
+  email: string | null;
+  rNumber: string | null;
+  isAlumni: boolean;
+  firwStudent: boolean;
+  profileGraduationYear: number | null;
+  profileWasInVtk: boolean;
+  alumniMailOptIn: boolean;
+  displayName: string | null;
+  graduationYear: number | null;
+  effectiveGraduationYear: number | null;
+  wasInVtk: boolean;
+  effectiveWasInVtk: boolean;
+  showName: boolean;
+  showGraduationYear: boolean;
+  showWasInVtk: boolean;
+  createdAt: Date;
+};
+
+/**
+ * Volledige lijst van iedereen die interesse heeft aangeduid voor de beheerder.
+ * Bevat zowel accounts (met profiel- en event-specifieke alumnigegevens) als anonieme gasten.
+ */
+export async function adminAttendeeList(eventId: string): Promise<AdminAttendeeRow[]> {
+  const [members, guests] = await Promise.all([
+    prisma.calendarEventInterest.findMany({
+      where: { eventId },
+      include: {
+        user: {
+          select: {
+            id: true,
+            name: true,
+            firstName: true,
+            lastName: true,
+            email: true,
+            rNumber: true,
+            alumni: true,
+            firwStudent: true,
+            graduationYear: true,
+            wasInVtk: true,
+            alumniMailOptIn: true,
+          },
+        },
+      },
+      orderBy: { createdAt: "asc" },
+    }),
+    prisma.calendarEventGuestInterest.findMany({
+      where: { eventId },
+      orderBy: { createdAt: "asc" },
+    }),
+  ]);
+
+  const rows: AdminAttendeeRow[] = [
+    ...members.map((row) => {
+      const u = row.user;
+      const fullName =
+        u.firstName && u.lastName ? `${u.firstName} ${u.lastName}` : u.name || u.email;
+      return {
+        id: row.id,
+        kind: "member" as const,
+        userId: u.id,
+        name: fullName,
+        email: u.email,
+        rNumber: u.rNumber,
+        isAlumni: u.alumni,
+        firwStudent: u.firwStudent,
+        profileGraduationYear: u.graduationYear,
+        profileWasInVtk: u.wasInVtk,
+        alumniMailOptIn: u.alumniMailOptIn,
+        displayName: row.displayName,
+        graduationYear: row.graduationYear,
+        effectiveGraduationYear: row.graduationYear ?? u.graduationYear,
+        wasInVtk: row.wasInVtk,
+        effectiveWasInVtk: row.wasInVtk || u.wasInVtk,
+        showName: row.showName,
+        showGraduationYear: row.showGraduationYear,
+        showWasInVtk: row.showWasInVtk,
+        createdAt: row.createdAt,
+      };
+    }),
+    ...guests.map((row) => ({
+      id: row.id,
+      kind: "guest" as const,
+      userId: null,
+      name: row.displayName ?? "Gast zonder account",
+      email: null,
+      rNumber: null,
+      isAlumni: false,
+      firwStudent: false,
+      profileGraduationYear: null,
+      profileWasInVtk: false,
+      alumniMailOptIn: false,
+      displayName: row.displayName,
+      graduationYear: row.graduationYear,
+      effectiveGraduationYear: row.graduationYear,
+      wasInVtk: row.wasInVtk,
+      effectiveWasInVtk: row.wasInVtk,
+      showName: row.showName,
+      showGraduationYear: row.showGraduationYear,
+      showWasInVtk: row.showWasInVtk,
+      createdAt: row.createdAt,
+    })),
+  ];
+
+  return rows.sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
+}
+
+/**
+ * Genereert een CSV-bestand van de geïnteresseerdenlijst voor de beheerder.
+ */
+export function attendeesToCsv(rows: AdminAttendeeRow[], locale: Locale): string {
+  const nl = locale === "nl";
+  const headers = [
+    nl ? "Type" : "Type",
+    nl ? "Naam" : "Name",
+    nl ? "E-mail" : "Email",
+    nl ? "KU Leuven r-nummer" : "Student number",
+    nl ? "Alumnus" : "Alumnus",
+    nl ? "Alumni-mailinglijst" : "Alumni mailing list",
+    nl ? "Aangeduid op" : "Marked at",
+    nl ? "Weergavenaam (evenement)" : "Display name (event)",
+    nl ? "Afstudeerjaar" : "Graduation year",
+    nl ? "In VTK Praesidium" : "In VTK Praesidium",
+    nl ? "Publiek zichtbaar" : "Publicly visible",
+  ];
+
+  const csvRows = rows.map((row) => {
+    const typeLabel =
+      row.kind === "member"
+        ? nl
+          ? "Account"
+          : "Account"
+        : nl
+          ? "Gast"
+          : "Guest";
+    const isAlumniStr = row.isAlumni ? (nl ? "Ja" : "Yes") : nl ? "Nee" : "No";
+    const mailOptInStr = row.alumniMailOptIn ? (nl ? "Ja" : "Yes") : nl ? "Nee" : "No";
+    const wasInVtkStr = row.effectiveWasInVtk ? (nl ? "Ja" : "Yes") : nl ? "Nee" : "No";
+    const visibleParts: string[] = [];
+    if (row.showName) visibleParts.push(nl ? "naam" : "name");
+    if (row.showGraduationYear) visibleParts.push(nl ? "afstudeerjaar" : "graduation year");
+    if (row.showWasInVtk) visibleParts.push(nl ? "VTK-verleden" : "praesidium past");
+    const visibilityStr =
+      visibleParts.length > 0
+        ? nl
+          ? `Ja (${visibleParts.join(", ")})`
+          : `Yes (${visibleParts.join(", ")})`
+        : nl
+          ? "Nee (anoniem)"
+          : "No (anonymous)";
+
+    return [
+      typeLabel,
+      row.name,
+      row.email ?? "",
+      row.rNumber ?? "",
+      row.kind === "member" ? isAlumniStr : "",
+      row.kind === "member" ? mailOptInStr : "",
+      row.createdAt.toISOString(),
+      row.displayName ?? "",
+      row.effectiveGraduationYear ?? "",
+      wasInVtkStr,
+      visibilityStr,
+    ];
+  });
+
+  const lines = [
+    headers.map(csvCell).join(","),
+    ...csvRows.map((row) => row.map(csvCell).join(",")),
+  ];
+  return `\uFEFF${lines.join("\r\n")}\r\n`;
+}
+
+function csvCell(value: string | number | boolean | Date | null | undefined): string {
+  if (value == null) return "";
+  let cell = value instanceof Date ? value.toISOString() : String(value);
+  if (/^[\t\r ]*[=+\-@]/.test(cell) || /^[\t\r]/.test(cell)) {
+    cell = `'${cell}`;
+  }
+  if (/[",\r\n]/.test(cell)) {
+    return `"${cell.replaceAll('"', '""')}"`;
+  }
+  return cell;
+}

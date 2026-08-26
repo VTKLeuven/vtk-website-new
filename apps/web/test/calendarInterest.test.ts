@@ -23,6 +23,8 @@ vi.mock("next/headers", () => ({ cookies: vi.fn() }));
 const {
   INTEREST_PUBLIC_THRESHOLD,
   attendeeList,
+  adminAttendeeList,
+  attendeesToCsv,
   interestLabel,
   publicInterestCounts,
   viewerInterests,
@@ -168,3 +170,120 @@ describe("interestLabel", () => {
     expect(interestLabel(32, "en")).toBe("32 going");
   });
 });
+
+describe("adminAttendeeList en CSV export", () => {
+  beforeEach(() => {
+    memberFindMany.mockReset();
+    guestFindMany.mockReset();
+  });
+
+  it("geeft alle geïnteresseerden (leden en gasten) terug voor de beheerder", async () => {
+    const t1 = new Date("2026-08-20T10:00:00Z");
+    const t2 = new Date("2026-08-21T12:00:00Z");
+
+    memberFindMany.mockResolvedValue([
+      {
+        id: "mem-1",
+        displayName: "Jeroen Peeters",
+        graduationYear: 2020,
+        wasInVtk: true,
+        showName: false,
+        showGraduationYear: false,
+        showWasInVtk: false,
+        createdAt: t1,
+        user: {
+          id: "usr-1",
+          name: "Jeroen Peeters",
+          firstName: "Jeroen",
+          lastName: "Peeters",
+          email: "jeroen@example.com",
+          rNumber: "r0123456",
+          alumni: true,
+          firwStudent: false,
+          graduationYear: 2019,
+          wasInVtk: false,
+          alumniMailOptIn: true,
+        },
+      },
+    ]);
+
+    guestFindMany.mockResolvedValue([
+      {
+        id: "gst-1",
+        displayName: "Gast Bezoeker",
+        graduationYear: 2010,
+        wasInVtk: false,
+        showName: true,
+        showGraduationYear: true,
+        showWasInVtk: false,
+        createdAt: t2,
+      },
+    ]);
+
+    const result = await adminAttendeeList("event-xyz");
+    expect(result).toHaveLength(2);
+    expect(result[0]).toMatchObject({
+      id: "mem-1",
+      kind: "member",
+      userId: "usr-1",
+      name: "Jeroen Peeters",
+      email: "jeroen@example.com",
+      rNumber: "r0123456",
+      isAlumni: true,
+      graduationYear: 2020,
+      effectiveGraduationYear: 2020,
+      wasInVtk: true,
+      effectiveWasInVtk: true,
+      showName: false,
+      createdAt: t1,
+    });
+    expect(result[1]).toMatchObject({
+      id: "gst-1",
+      kind: "guest",
+      userId: null,
+      name: "Gast Bezoeker",
+      email: null,
+      rNumber: null,
+      isAlumni: false,
+      graduationYear: 2010,
+      effectiveGraduationYear: 2010,
+      wasInVtk: false,
+      effectiveWasInVtk: false,
+      showName: true,
+      createdAt: t2,
+    });
+  });
+
+  it("genereert een geldige CSV string met headers", () => {
+    const rows = [
+      {
+        id: "mem-1",
+        kind: "member" as const,
+        userId: "usr-1",
+        name: "Jeroen Peeters",
+        email: "jeroen@example.com",
+        rNumber: "r0123456",
+        isAlumni: true,
+        firwStudent: false,
+        profileGraduationYear: 2019,
+        profileWasInVtk: false,
+        alumniMailOptIn: true,
+        displayName: null,
+        graduationYear: 2020,
+        effectiveGraduationYear: 2020,
+        wasInVtk: true,
+        effectiveWasInVtk: true,
+        showName: true,
+        showGraduationYear: true,
+        showWasInVtk: false,
+        createdAt: new Date("2026-08-20T10:00:00Z"),
+      },
+    ];
+
+    const csv = attendeesToCsv(rows, "nl");
+    expect(csv).toContain("Type,Naam,E-mail,KU Leuven r-nummer");
+    expect(csv).toContain("Account,Jeroen Peeters,jeroen@example.com,r0123456");
+    expect(csv).toContain("Ja (naam, afstudeerjaar)");
+  });
+});
+

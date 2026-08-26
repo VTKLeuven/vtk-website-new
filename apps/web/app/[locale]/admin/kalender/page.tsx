@@ -116,7 +116,17 @@ export default async function AdminCalendar({
                   </span>
                 </td>
                 <td className="px-4 py-2 text-right tabular-nums text-zinc-600">
-                  {e._count.interests + e._count.guestInterests}
+                  {e._count.interests + e._count.guestInterests > 0 ? (
+                    <Link
+                      href={`${base}/admin/kalender/${e.id}#geinteresseerden`}
+                      className="font-medium text-vtk-ink underline hover:text-vtk-blue"
+                      title={nl ? "Bekijk geïnteresseerden" : "View interested attendees"}
+                    >
+                      {e._count.interests + e._count.guestInterests}
+                    </Link>
+                  ) : (
+                    0
+                  )}
                 </td>
                 <td className="px-4 py-2 tabular-nums text-zinc-500">{dateFmt.format(e.start)}</td>
                 <td className="px-4 py-2 tabular-nums text-zinc-500">{dateFmt.format(e.end)}</td>

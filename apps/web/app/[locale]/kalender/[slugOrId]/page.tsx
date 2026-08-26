@@ -176,16 +176,20 @@ export default async function CalendarSegmentPage({ params }: { params: Params }
       </header>
 
       <div className="vtk-event-layout">
-        <figure className="vtk-event-photo">
-          <Image
-            src={imageSrc}
-            alt=""
-            fill
-            sizes="(max-width: 960px) 100vw, 58vw"
-            className="vtk-event-photo-img"
-            priority
-          />
-        </figure>
+        <div className="vtk-event-media-col">
+          <figure className="vtk-event-photo">
+            <Image
+              src={imageSrc}
+              alt=""
+              fill
+              sizes="(max-width: 960px) 100vw, 58vw"
+              className="vtk-event-photo-img"
+              priority
+            />
+          </figure>
+
+          {isAlumniEvent ? <AttendeeTable rows={attendees} locale={locale} /> : null}
+        </div>
 
         <section className="vtk-panel vtk-event-info">
           <h2>{locale === "nl" ? "Over dit event" : "About this event"}</h2>
@@ -261,9 +265,6 @@ export default async function CalendarSegmentPage({ params }: { params: Params }
                   : "Something went wrong. Please try again.",
               }}
             />
-            <Link href={`${base}/kalender`} className="btn btn-ghost">
-              ← {locale === "nl" ? "Terug naar kalender" : "Back to calendar"}
-            </Link>
             {/* Losse download, geen abonnement: dit is één event, dat verandert
                 zelden nog na publicatie. Wie alles wil volgen, abonneert zich op
                 de feed vanaf /kalender. */}
@@ -296,10 +297,11 @@ export default async function CalendarSegmentPage({ params }: { params: Params }
                 {locale === "nl" ? "Externe eventlink" : "External event link"}
               </a>
             ) : null}
+            <Link href={`${base}/kalender`} className="btn btn-ghost vtk-event-back-btn">
+              ← {locale === "nl" ? "Terug naar kalender" : "Back to calendar"}
+            </Link>
           </div>
         </section>
-
-        {isAlumniEvent ? <AttendeeTable rows={attendees} locale={locale} /> : null}
       </div>
     </article>
   );
