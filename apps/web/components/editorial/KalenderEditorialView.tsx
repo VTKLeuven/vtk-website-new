@@ -7,7 +7,12 @@ import { CalendarSubscribe } from "@/components/site/CalendarSubscribe";
 import { Markdown } from "@/components/ui/Markdown";
 import { EventInterest } from "@/components/calendar/EventInterest";
 import type { ViewerInterest } from "@/lib/calendar/interest";
-import { monthGridCells, weekGridDays, isSameCalendarDay } from "./calendarGrid";
+import {
+  monthGridCells,
+  rollingSixWeeksGridCells,
+  weekGridDays,
+  isSameCalendarDay,
+} from "./calendarGrid";
 
 type ApiEvent = {
   id: string;
@@ -121,6 +126,10 @@ export function KalenderEditorialView({
   const [cursor, setCursor] = useState(
     () => new Date(now.getFullYear(), now.getMonth(), now.getDate()),
   );
+  // Bij het openen van de kalender toont het raster de komende 6 weken (1 week
+  // terug, huidige week, 4 weken vooruit). Zodra de gebruiker begint te bladeren
+  // of van weergave wisselt, schakelt het raster over naar de klassieke maandweergave.
+  const [isRolling, setIsRolling] = useState(true);
   // De gekozen categorie blijft een deelbare route, maar wordt uit de huidige
   // client-URL afgeleid. `history.pushState` wijzigt die URL zonder een nieuwe
   // Server Component-render op te halen; Next.js 16 houdt `usePathname` daarbij
@@ -148,7 +157,10 @@ export function KalenderEditorialView({
 
   const year = cursor.getFullYear();
   const month = cursor.getMonth();
-  const cells = useMemo(() => monthGridCells(year, month), [year, month]);
+  const cells = useMemo(
+    () => (isRolling ? rollingSixWeeksGridCells(cursor) : monthGridCells(year, month)),
+    [isRolling, cursor, year, month],
+  );
   const weekDays = useMemo(() => weekGridDays(cursor), [cursor]);
 
   const categoryName = useCallback(
@@ -345,6 +357,9 @@ export function KalenderEditorialView({
   }
 
   function shiftPeriod(delta: number) {
+    if (isRolling) {
+      setIsRolling(false);
+    }
     if (view === "week") {
       const next = new Date(cursor);
       next.setDate(next.getDate() + delta * 7);
@@ -448,7 +463,12 @@ export function KalenderEditorialView({
   }
 
   const showMonthGrid = view === "agenda";
-  const periodCount = view === "week" ? weekEvents.length : monthOnlyEvents.length;
+  const periodCount =
+    view === "week"
+      ? weekEvents.length
+      : isRolling
+        ? monthEvents.length
+        : monthOnlyEvents.length;
 
   /**
    * Eén rij in een evenementenlijst. Gedeeld door de "eerstvolgend"-lijst onder
@@ -713,7 +733,11 @@ export function KalenderEditorialView({
             ? locale === "nl"
               ? "Evenementen (deze week)"
               : "Events (this week)"
-            : labels.metaEvents}
+            : isRolling
+              ? locale === "nl"
+                ? "Evenementen (komende weken)"
+                : "Events (upcoming weeks)"
+              : labels.metaEvents}
         </div>
       </header>
 
@@ -775,7 +799,10 @@ export function KalenderEditorialView({
                 type="button"
                 className={view === "week" ? "on" : ""}
                 aria-pressed={view === "week"}
-                onClick={() => setView("week")}
+                onClick={() => {
+                  setIsRolling(false);
+                  setView("week");
+                }}
               >
                 {labels.views.week}
               </button>
@@ -783,7 +810,10 @@ export function KalenderEditorialView({
                 type="button"
                 className={view === "list" ? "on" : ""}
                 aria-pressed={view === "list"}
-                onClick={() => setView("list")}
+                onClick={() => {
+                  setIsRolling(false);
+                  setView("list");
+                }}
               >
                 {labels.views.list}
               </button>
