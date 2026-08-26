@@ -64,7 +64,9 @@ export function DefaultFrontpage({
   const formatTime = (d: Date) =>
     d.toLocaleTimeString(nl ? "nl-BE" : "en-GB", { hour: "2-digit", minute: "2-digit" });
 
-  const eventGroups = upcomingEvents.slice(0, 5).reduce<
+  const heroEvents = upcomingEvents.slice(0, 4);
+
+  const eventGroups = heroEvents.reduce<
     Array<{ key: string; date: Date; events: FrontpageProps["upcomingEvents"] }>
   >((acc, event) => {
     const date = new Date(event.start);
@@ -123,9 +125,9 @@ export function DefaultFrontpage({
           <div>
             <h3>{nl ? "Aankomende events" : "Upcoming events"}</h3>
             <div className="sub">
-              {upcomingEvents[0]
-                ? `${dayKey(new Date(upcomingEvents[0].start))} → ${dayKey(
-                    new Date(upcomingEvents[Math.min(upcomingEvents.length - 1, 4)].start),
+              {heroEvents[0]
+                ? `${dayKey(new Date(heroEvents[0].start))} → ${dayKey(
+                    new Date(heroEvents[heroEvents.length - 1].start),
                   )}`
                 : nl
                   ? "Geen geplande events"
