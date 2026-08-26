@@ -86,6 +86,46 @@ export const LESBEZOEK_AUDIENCES = [
 ] as const;
 
 /**
+ * Parseert een doelgroepinvoer (enkele string, komma-gescheiden reeks of array)
+ * naar een nette lijst van afzonderlijke doelgroepnamen.
+ */
+export function parseAudienceList(raw: unknown): string[] {
+  if (!raw) return [];
+  if (Array.isArray(raw)) {
+    return Array.from(new Set(raw.map((item) => toSingleLine(item)).filter(Boolean)));
+  }
+  if (typeof raw !== "string") return [];
+  const text = toSingleLine(raw);
+  if (!text) return [];
+
+  const found: string[] = [];
+  let remaining = text;
+
+  // Sorteer bekende doelgroepen op lengte van lang naar kort om deelmatches te voorkomen
+  const sortedKnown = [...LESBEZOEK_BACHELORS, ...LESBEZOEK_MASTERS].sort(
+    (a, b) => b.length - a.length,
+  );
+
+  for (const known of sortedKnown) {
+    if (remaining.includes(known)) {
+      found.push(known);
+      remaining = remaining.replace(known, "").trim();
+    }
+  }
+
+  // Voeg eventuele overgebleven delen toe (opgesplitst op komma's)
+  if (remaining) {
+    const extra = remaining
+      .split(/,\s*/)
+      .map((s) => s.replace(/^,\s*|,\s*$/g, "").trim())
+      .filter((s) => s.length > 0 && !found.includes(s));
+    found.push(...extra);
+  }
+
+  return found.length > 0 ? found : [text];
+}
+
+/**
  * De taal waarin de professor standaard aangeschreven wordt.
  *
  * De vuistregel uit de handleiding: masters zijn Engelstalig, bachelors niet.
@@ -266,7 +306,7 @@ export const LESBEZOEK_LIMITS = {
   phone: 40,
   subject: 150,
   course: 150,
-  audience: 150,
+  audience: 500,
   organisation: 120,
   /**
    * De toelichting gaat letterlijk naar de professor. Twee duizend tekens is
@@ -354,6 +394,7 @@ export type RawLesbezoekInput = {
   subject?: unknown;
   teacherNote?: unknown;
   audience?: unknown;
+  audiences?: unknown;
   audienceOther?: unknown;
   course?: unknown;
   teacherEmail?: unknown;
@@ -451,9 +492,33 @@ export function parseLesbezoekRequest(
     return { status: "error", code: "TEACHER_NOTE_TOO_LONG" };
   }
 
-  // De keuzelijst met een "Anders"-veld ernaast: het vrije veld wint zodra het
-  // ingevuld is, want dat is wat de aanvrager als laatste typte.
-  const audience = toSingleLine(raw.audienceOther) || toSingleLine(raw.audience);
+  // Doelgroepen: ondersteunt zowel een enkele doelgroep, meerdere doelgroepen
+  // (als array of komma-gescheiden reeks), als een optioneel vrij veld.
+  const rawAudienceItems: string[] = [];
+  if (Array.isArray(raw.audience)) {
+    rawAudienceItems.push(...raw.audience.map((i: unknown) => toSingleLine(i)).filter(Boolean));
+  } else if (typeof raw.audience === "string") {
+    rawAudienceItems.push(...parseAudienceList(raw.audience));
+  }
+
+  if (Array.isArray(raw.audiences)) {
+    rawAudienceItems.push(...raw.audiences.map((i: unknown) => toSingleLine(i)).filter(Boolean));
+  } else if (typeof raw.audiences === "string") {
+    rawAudienceItems.push(...parseAudienceList(raw.audiences));
+  }
+
+  if (raw.audienceOther) {
+    const otherText = toSingleLine(raw.audienceOther);
+    if (otherText && otherText !== "__other__") {
+      rawAudienceItems.push(otherText);
+    }
+  }
+
+  const uniqueAudiences = Array.from(
+    new Set(rawAudienceItems.filter((item) => item && item !== "__other__")),
+  );
+  const audience = uniqueAudiences.join(", ");
+
   if (audience === "") return { status: "error", code: "AUDIENCE_REQUIRED" };
   if (audience.length > LESBEZOEK_LIMITS.audience) {
     return { status: "error", code: "AUDIENCE_TOO_LONG" };

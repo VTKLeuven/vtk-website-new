@@ -122,10 +122,15 @@ export function LesbezoekFormModal({
             <AudienceCombobox
               id="lb-audience"
               name="audience"
+              nl={nl}
               defaultValue={visit?.audience ?? ""}
               maxLength={LESBEZOEK_LIMITS.audience}
               required
-              placeholder={nl ? "Kies of typ een doelgroep…" : "Choose or type a target group…"}
+              placeholder={
+                nl
+                  ? "Kies of typ één of meerdere doelgroepen…"
+                  : "Choose or type one or more target audiences…"
+              }
             />
           </div>
           <div>

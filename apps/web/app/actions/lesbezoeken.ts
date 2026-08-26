@@ -87,6 +87,9 @@ export async function requestLesbezoekAction(
   const time = toSingleLine(formData.get("time"));
   const startsAt = date && time ? toInstant(date, time) : null;
 
+  const rawAudiences = formData.getAll("audience");
+  const audience = rawAudiences.length > 1 ? rawAudiences : formData.get("audience");
+
   const parsed = parseLesbezoekRequest(
     {
       organisationId: formData.get("organisationId"),
@@ -96,7 +99,8 @@ export async function requestLesbezoekAction(
       requesterPhone: formData.get("requesterPhone"),
       subject: formData.get("subject"),
       teacherNote: formData.get("teacherNote"),
-      audience: formData.get("audience"),
+      audience,
+      audiences: formData.getAll("audiences"),
       audienceOther: formData.get("audienceOther"),
       course: formData.get("course"),
       teacherEmail: formData.get("teacherEmail"),
@@ -216,13 +220,21 @@ export async function saveLesbezoekAction(
   const explicitEnd = endTime ? toInstant(date, endTime) : null;
   const endsAt = explicitEnd && explicitEnd > startsAt ? explicitEnd : visitEnd(startsAt, longVisit);
 
-  const teacherEmail = toSingleLine(formData.get("teacherEmail"));
+   const teacherEmail = toSingleLine(formData.get("teacherEmail"));
+  const rawAudiences = formData
+    .getAll("audience")
+    .map(toSingleLine)
+    .filter((v) => v && v !== "__other__");
+  const audience = (
+    rawAudiences.length > 0 ? rawAudiences.join(", ") : toSingleLine(formData.get("audience"))
+  ).slice(0, LESBEZOEK_LIMITS.audience);
+
   const data = {
     organisationId,
     startsAt,
     endsAt,
     longVisit,
-    audience: toSingleLine(formData.get("audience")).slice(0, LESBEZOEK_LIMITS.audience),
+    audience,
     course: toSingleLine(formData.get("course")).slice(0, LESBEZOEK_LIMITS.course),
     subject: toSingleLine(formData.get("subject")).slice(0, LESBEZOEK_LIMITS.subject),
     teacherNote: toMessageText(formData.get("teacherNote")).slice(0, LESBEZOEK_LIMITS.teacherNote),

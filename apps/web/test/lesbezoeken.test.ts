@@ -9,6 +9,7 @@ import {
   matchPeculiarities,
   nextOrganisationColour,
   organisationKey,
+  parseAudienceList,
   parseDateTimeFields,
   parseLesbezoekRequest,
   teacherNameFromEmail,
@@ -129,14 +130,35 @@ describe("parseLesbezoekRequest", () => {
     expect(result).toEqual({ status: "error", code: "TEACHER_EMAIL_INVALID" });
   });
 
-  it("laat het vrije doelgroepveld voorgaan op de keuzelijst", () => {
+  it("voegt meerdere gekozen doelgroepen samen", () => {
     const result = parseLesbezoekRequest(
-      validInput({ audience: "3e Bach, Architectuur", audienceOther: "2e Ma, BME" }),
+      validInput({
+        audience: [
+          "1e Bach, Algemene richting, Groep A",
+          "2e Bach, Algemene richting, Groep B",
+          "Master in Computer Science",
+        ],
+      }),
       { startsAt: START, now: NOW },
     );
     expect(result.status).toBe("ok");
     if (result.status !== "ok") return;
-    expect(result.request.audience).toBe("2e Ma, BME");
+    expect(result.request.audience).toBe(
+      "1e Bach, Algemene richting, Groep A, 2e Bach, Algemene richting, Groep B, Master in Computer Science",
+    );
+  });
+
+  it("combineert keuzelijst-doelgroepen met een eigen vrije doelgroep", () => {
+    const result = parseLesbezoekRequest(
+      validInput({
+        audience: ["3e Bach, Computerwetenschappen"],
+        audienceOther: "Master in AI",
+      }),
+      { startsAt: START, now: NOW },
+    );
+    expect(result.status).toBe("ok");
+    if (result.status !== "ok") return;
+    expect(result.request.audience).toBe("3e Bach, Computerwetenschappen, Master in AI");
   });
 
   it("houdt de regeleindes in de toelichting, want die gaat zo naar de docent", () => {
@@ -147,6 +169,46 @@ describe("parseLesbezoekRequest", () => {
     expect(result.status).toBe("ok");
     if (result.status !== "ok") return;
     expect(result.request.teacherNote).toBe("Geachte professor,\n\nWij zouden graag…");
+  });
+});
+
+describe("parseAudienceList", () => {
+  it("splitst bekende bachelors en masters correct uit", () => {
+    const parsed = parseAudienceList(
+      "1e Bach, Algemene richting, Groep A, 2e Bach, Architectuur, Master in Biomedical Engineering",
+    );
+    expect(parsed).toEqual([
+      "1e Bach, Algemene richting, Groep A",
+      "2e Bach, Architectuur",
+      "Master in Biomedical Engineering",
+    ]);
+  });
+
+  it("behoudt een enkele doelgroep met komma's in de naam", () => {
+    const parsed = parseAudienceList("1e Bach, Algemene richting, Groep A");
+    expect(parsed).toEqual(["1e Bach, Algemene richting, Groep A"]);
+  });
+
+  it("ondersteunt array-invoer", () => {
+    const parsed = parseAudienceList([
+      "3e Bach, Computerwetenschappen",
+      "Master in Artificial Intelligence",
+    ]);
+    expect(parsed).toEqual([
+      "3e Bach, Computerwetenschappen",
+      "Master in Artificial Intelligence",
+    ]);
+  });
+
+  it("haalt vrije tekstinvoer op", () => {
+    const parsed = parseAudienceList("Doctoraatsstudenten, Onderzoekers");
+    expect(parsed).toEqual(["Doctoraatsstudenten", "Onderzoekers"]);
+  });
+
+  it("geeft een lege lijst bij lege invoer", () => {
+    expect(parseAudienceList("")).toEqual([]);
+    expect(parseAudienceList(null)).toEqual([]);
+    expect(parseAudienceList(undefined)).toEqual([]);
   });
 });
 

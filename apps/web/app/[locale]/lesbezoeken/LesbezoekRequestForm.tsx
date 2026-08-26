@@ -4,13 +4,9 @@ import { useCallback, useState } from "react";
 import { Input, Label, Select, Textarea } from "@vtk/ui";
 import { SaveForm } from "@/components/ui/SaveForm";
 import { requestLesbezoekAction } from "@/app/actions/lesbezoeken";
-import {
-  LESBEZOEK_BACHELORS,
-  LESBEZOEK_LIMITS,
-  LESBEZOEK_MASTERS,
-  LESBEZOEK_MIN_LEAD_DAYS,
-} from "@/lib/lesbezoeken";
+import { LESBEZOEK_LIMITS, LESBEZOEK_MIN_LEAD_DAYS } from "@/lib/lesbezoeken";
 import { lesbezoekRequestErrors } from "@/lib/lesbezoekenMessages";
+import { AudienceCombobox } from "@/app/[locale]/admin/lesbezoeken/AudienceCombobox";
 
 /**
  * Het publieke aanvraagformulier, de opvolger van de Google Form.
@@ -75,7 +71,6 @@ export function LesbezoekRequestForm({
   organisations: { id: string; name: string }[];
 }) {
   const [organisation, setOrganisation] = useState("");
-  const [audience, setAudience] = useState("");
   const [sent, setSent] = useState(false);
 
   // Niet alles leegmaken na een geslaagde aanvraag: wie voor drie doelgroepen
@@ -223,43 +218,18 @@ export function LesbezoekRequestForm({
 
           <div className="lb-field">
             <Label htmlFor="lb-audience">{copy.audienceLabel} *</Label>
-            <Select
+            <AudienceCombobox
               id="lb-audience"
               name="audience"
-              value={audience}
-              onChange={(event) => setAudience(event.target.value)}
-              required={audience !== OTHER}
-            >
-              <option value="">—</option>
-              <optgroup label="Bachelors">
-                {LESBEZOEK_BACHELORS.map((value) => (
-                  <option key={value} value={value}>
-                    {value}
-                  </option>
-                ))}
-              </optgroup>
-              <optgroup label="Masters">
-                {LESBEZOEK_MASTERS.map((value) => (
-                  <option key={value} value={value}>
-                    {value}
-                  </option>
-                ))}
-              </optgroup>
-              <option value={OTHER}>{copy.audienceOtherOption}</option>
-            </Select>
+              nl={nl}
+              placeholder={
+                nl
+                  ? "Kies of typ één of meerdere doelgroepen…"
+                  : "Choose or type one or more target audiences…"
+              }
+              required
+            />
           </div>
-
-          {audience === OTHER && (
-            <div className="lb-field">
-              <Label htmlFor="lb-audience-other">{copy.audienceOtherLabel} *</Label>
-              <Input
-                id="lb-audience-other"
-                name="audienceOther"
-                maxLength={LESBEZOEK_LIMITS.audience}
-                required
-              />
-            </div>
-          )}
 
           <div className="lb-field">
             <Label htmlFor="lb-course">{copy.courseLabel} *</Label>
