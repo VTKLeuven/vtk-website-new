@@ -1632,14 +1632,12 @@
   text-align: left;
 }
 
-.vtk-design .ev-preview-actions .ev-preview-go {
+.vtk-design .ev-preview-actions .ev-preview-go,
+.vtk-design .ev-preview-actions .arrow {
   width: 100%;
   justify-content: center;
+  gap: 6px;
   margin-top: 0;
-}
-
-.vtk-design .ev-preview-actions .arrow {
-  justify-content: space-between;
 }
 
 .vtk-design .ev-preview-actions .btn {

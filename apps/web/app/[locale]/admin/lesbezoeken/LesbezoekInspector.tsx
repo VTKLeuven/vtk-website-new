@@ -391,7 +391,22 @@ function Warnings({ nl, visit }: { nl: boolean; visit: VisitView }) {
           key={peculiarity.id}
           className="flex items-start gap-2.5 rounded-xl border border-amber-200 bg-amber-50/90 p-3 text-xs text-amber-900 leading-relaxed"
         >
-          <span className="mt-0.5 shrink-0 text-amber-600 font-bold">⚠️</span>
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="14"
+            height="14"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            className="mt-0.5 shrink-0 text-amber-600"
+          >
+            <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z" />
+            <line x1="12" y1="9" x2="12" y2="13" />
+            <line x1="12" y1="17" x2="12.01" y2="17" />
+          </svg>
           <span>
             <strong>{peculiarity.subject}:</strong> {peculiarity.note}
           </span>
@@ -399,7 +414,22 @@ function Warnings({ nl, visit }: { nl: boolean; visit: VisitView }) {
       ))}
       {visit.clashes.length > 0 && (
         <div className="flex items-start gap-2.5 rounded-xl border border-amber-200 bg-amber-50/90 p-3 text-xs text-amber-900 leading-relaxed">
-          <span className="mt-0.5 shrink-0 text-amber-600 font-bold">⚠️</span>
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="14"
+            height="14"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            className="mt-0.5 shrink-0 text-amber-600"
+          >
+            <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z" />
+            <line x1="12" y1="9" x2="12" y2="13" />
+            <line x1="12" y1="17" x2="12.01" y2="17" />
+          </svg>
           <span>
             <strong>{nl ? "Dezelfde docent, zelfde dag:" : "Same lecturer, same day:"}</strong>{" "}
             {visit.clashes
@@ -410,7 +440,22 @@ function Warnings({ nl, visit }: { nl: boolean; visit: VisitView }) {
       )}
       {visit.organisationNote && (
         <div className="flex items-start gap-2.5 rounded-xl border border-vtk-blue/15 bg-vtk-blue-soft/50 p-3 text-xs text-vtk-ink leading-relaxed">
-          <span className="mt-0.5 shrink-0 font-bold">ℹ️</span>
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="14"
+            height="14"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            className="mt-0.5 shrink-0 text-vtk-ink"
+          >
+            <circle cx="12" cy="12" r="10" />
+            <line x1="12" y1="16" x2="12" y2="12" />
+            <line x1="12" y1="8" x2="12.01" y2="8" />
+          </svg>
           <span>
             <strong>{visit.organisationName}:</strong> {visit.organisationNote}
           </span>
@@ -441,8 +486,21 @@ function ScheduledMailBanner({
         >
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div className="flex items-center gap-2">
-              <span className="flex h-6 w-6 items-center justify-center rounded-full bg-indigo-600 text-white text-xs font-bold shadow-xs">
-                🕒
+              <span className="flex h-6 w-6 items-center justify-center rounded-full bg-indigo-600 text-white shadow-xs">
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="13"
+                  height="13"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <circle cx="12" cy="12" r="10" />
+                  <polyline points="12 6 12 12 16 14" />
+                </svg>
               </span>
               <div>
                 <h4 className="text-xs font-bold uppercase tracking-wider text-indigo-900">
@@ -547,7 +605,7 @@ function TimelineSteps({ nl, visit }: { nl: boolean; visit: VisitView }) {
       time: visit.professorMailedAt
         ? fmt.format(new Date(visit.professorMailedAt))
         : scheduledProfMail
-          ? `🕒 ${nl ? "Gepland" : "Scheduled"}: ${scheduledProfMail.sendAtShort}`
+          ? `${nl ? "Gepland" : "Scheduled"}: ${scheduledProfMail.sendAtShort}`
           : null,
       scheduled: Boolean(!visit.professorMailedAt && scheduledProfMail),
     },
@@ -557,7 +615,7 @@ function TimelineSteps({ nl, visit }: { nl: boolean; visit: VisitView }) {
       time: visit.professorNudgedAt
         ? fmt.format(new Date(visit.professorNudgedAt))
         : scheduledNudgeMail
-          ? `🕒 ${nl ? "Gepland" : "Scheduled"}: ${scheduledNudgeMail.sendAtShort}`
+          ? `${nl ? "Gepland" : "Scheduled"}: ${scheduledNudgeMail.sendAtShort}`
           : null,
       optional: true,
       scheduled: Boolean(!visit.professorNudgedAt && scheduledNudgeMail),
@@ -568,7 +626,7 @@ function TimelineSteps({ nl, visit }: { nl: boolean; visit: VisitView }) {
       time: visit.requesterNotifiedAt
         ? fmt.format(new Date(visit.requesterNotifiedAt))
         : scheduledReqMail
-          ? `🕒 ${nl ? "Gepland" : "Scheduled"}: ${scheduledReqMail.sendAtShort}`
+          ? `${nl ? "Gepland" : "Scheduled"}: ${scheduledReqMail.sendAtShort}`
           : null,
       scheduled: Boolean(!visit.requesterNotifiedAt && scheduledReqMail),
     },
@@ -601,7 +659,38 @@ function TimelineSteps({ nl, visit }: { nl: boolean; visit: VisitView }) {
                       : "bg-zinc-200 text-zinc-500 font-normal"
                 }`}
               >
-                {step.done ? "✓" : step.scheduled ? "🕒" : idx + 1}
+                {step.done ? (
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    width="9"
+                    height="9"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="3.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <polyline points="20 6 9 17 4 12" />
+                  </svg>
+                ) : step.scheduled ? (
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    width="9"
+                    height="9"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="3"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <circle cx="12" cy="12" r="10" />
+                    <polyline points="12 6 12 12 16 14" />
+                  </svg>
+                ) : (
+                  idx + 1
+                )}
               </span>
               <span className="truncate">{step.label}</span>
             </div>
@@ -806,7 +895,20 @@ function MailComposer({
                   : "text-[#5c667f] hover:text-vtk-ink"
               }`}
             >
-              <span>🕒</span>
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="12"
+                height="12"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <circle cx="12" cy="12" r="10" />
+                <polyline points="12 6 12 12 16 14" />
+              </svg>
               <span>{nl ? "Inplannen (Aanbevolen)" : "Schedule (Recommended)"}</span>
             </button>
             <button
@@ -818,7 +920,19 @@ function MailComposer({
                   : "text-[#5c667f] hover:text-vtk-ink"
               }`}
             >
-              <span>⚡</span>
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="12"
+                height="12"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
+              </svg>
               <span>{nl ? "Direct versturen" : "Send immediately"}</span>
             </button>
           </div>
@@ -889,11 +1003,29 @@ function MailComposer({
             )}
           </div>
         ) : (
-          <p className="text-xs text-amber-800 bg-amber-50/80 border border-amber-200 p-2.5 rounded-xl">
-            {nl
-              ? "⚠️ De mail wordt meteen bij het klikken verstuurd naar de ontvanger."
-              : "⚠️ The email will be delivered immediately upon clicking send."}
-          </p>
+          <div className="flex items-center gap-2 text-xs text-amber-900 bg-amber-50/80 border border-amber-200 p-2.5 rounded-xl">
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className="shrink-0 text-amber-600"
+            >
+              <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z" />
+              <line x1="12" y1="9" x2="12" y2="13" />
+              <line x1="12" y1="17" x2="12.01" y2="17" />
+            </svg>
+            <span>
+              {nl
+                ? "De mail wordt meteen bij het klikken verstuurd naar de ontvanger."
+                : "The email will be delivered immediately upon clicking send."}
+            </span>
+          </div>
         )}
       </div>
 

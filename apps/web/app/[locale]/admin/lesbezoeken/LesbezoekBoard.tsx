@@ -275,8 +275,22 @@ function Queue({
                   {meta[nl ? "nl" : "en"]}
                 </span>
                 {visit.scheduledMails && visit.scheduledMails.length > 0 && (
-                  <span className="lb-badge" data-tone="sent">
-                    🕒 {nl ? `Mail gepland: ${visit.scheduledMails[0]!.sendAtShort}` : `Mail scheduled: ${visit.scheduledMails[0]!.sendAtShort}`}
+                  <span className="lb-badge flex items-center gap-1" data-tone="sent">
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      width="11"
+                      height="11"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2.5"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
+                      <circle cx="12" cy="12" r="10" />
+                      <polyline points="12 6 12 12 16 14" />
+                    </svg>
+                    {nl ? `Mail gepland: ${visit.scheduledMails[0]!.sendAtShort}` : `Mail scheduled: ${visit.scheduledMails[0]!.sendAtShort}`}
                   </span>
                 )}
                 {visit.clashes.length > 0 && (
