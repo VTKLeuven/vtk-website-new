@@ -34,7 +34,7 @@ export function LesbezoekBoard({
   signature,
 }: {
   nl: boolean;
-  mode: "queue" | "calendar";
+  mode: "queue" | "approved" | "calendar";
   canManage: boolean;
   visits: VisitView[];
   organisations: OrganisationView[];
@@ -46,13 +46,16 @@ export function LesbezoekBoard({
   const [creating, setCreating] = useState(false);
   const [query, setQuery] = useState("");
   const [organisation, setOrganisation] = useState("");
-  // De werklijst begint bij wat nog openstaat; de kalender toont standaard alles,
-  // want daar is de vraag "wat staat er gepland", niet "wat moet ik nog doen".
-  const [status, setStatus] = useState<string>(mode === "queue" ? "OPEN" : "");
+  // De werklijst begint bij wat nog openstaat; de goedgekeurd-tab toont enkel goedgekeurd;
+  // de kalender toont standaard alles.
+  const [status, setStatus] = useState<string>(
+    mode === "approved" ? "APPROVED" : mode === "queue" ? "OPEN" : "",
+  );
 
   const filtered = useMemo(() => {
     const needle = query.trim().toLowerCase();
     return visits.filter((visit) => {
+      if (mode === "approved" && visit.status !== "APPROVED") return false;
       if (organisation && visit.organisationId !== organisation) return false;
       if (status === "OPEN" && !isOpenStatus(visit.status)) return false;
       if (status && status !== "OPEN" && visit.status !== status) return false;
@@ -67,7 +70,7 @@ export function LesbezoekBoard({
         visit.requesterEmail ?? "",
       ].some((value) => value.toLowerCase().includes(needle));
     });
-  }, [visits, query, organisation, status]);
+  }, [visits, query, organisation, status, mode]);
 
   const selected = selectedId ? (visits.find((visit) => visit.id === selectedId) ?? null) : null;
 
@@ -98,21 +101,23 @@ export function LesbezoekBoard({
             ))}
           </Select>
         </div>
-        <div className="w-48">
-          <Select
-            value={status}
-            onChange={(event) => setStatus(event.target.value)}
-            aria-label={nl ? "Status" : "Status"}
-          >
-            <option value="">{nl ? "Alle statussen" : "All statuses"}</option>
-            <option value="OPEN">{nl ? "Openstaand" : "Open"}</option>
-            {LESBEZOEK_STATUSES.map((value) => (
-              <option key={value} value={value}>
-                {LESBEZOEK_STATUS_META[value][nl ? "nl" : "en"]}
-              </option>
-            ))}
-          </Select>
-        </div>
+        {mode !== "approved" && (
+          <div className="w-48">
+            <Select
+              value={status}
+              onChange={(event) => setStatus(event.target.value)}
+              aria-label={nl ? "Status" : "Status"}
+            >
+              <option value="">{nl ? "Alle statussen" : "All statuses"}</option>
+              <option value="OPEN">{nl ? "Openstaand" : "Open"}</option>
+              {LESBEZOEK_STATUSES.map((value) => (
+                <option key={value} value={value}>
+                  {LESBEZOEK_STATUS_META[value][nl ? "nl" : "en"]}
+                </option>
+              ))}
+            </Select>
+          </div>
+        )}
         {canManage && (
           <Button type="button" size="sm" onClick={() => setCreating(true)}>
             {nl ? "Nieuw lesbezoek" : "New classroom visit"}
@@ -128,7 +133,19 @@ export function LesbezoekBoard({
           onSelect={(visit) => setSelectedId(visit.id)}
         />
       ) : (
-        <Queue nl={nl} visits={filtered} selectedId={selectedId} onSelect={setSelectedId} />
+        <Queue
+          nl={nl}
+          visits={filtered}
+          selectedId={selectedId}
+          onSelect={setSelectedId}
+          emptyText={
+            mode === "approved"
+              ? nl
+                ? "Geen goedgekeurde lesbezoeken gevonden."
+                : "No approved classroom visits found."
+              : undefined
+          }
+        />
       )}
 
       {selected && (
@@ -167,18 +184,21 @@ function Queue({
   visits,
   selectedId,
   onSelect,
+  emptyText,
 }: {
   nl: boolean;
   visits: VisitView[];
   selectedId: string | null;
   onSelect: (id: string) => void;
+  emptyText?: string;
 }) {
   if (visits.length === 0) {
     return (
       <p className="rounded-2xl border border-dashed border-vtk-blue/20 p-6 text-center text-sm text-[#5c667f]">
-        {nl
-          ? "Geen aanvragen die aan deze filters voldoen."
-          : "No requests match these filters."}
+        {emptyText ??
+          (nl
+            ? "Geen aanvragen die aan deze filters voldoen."
+            : "No requests match these filters.")}
       </p>
     );
   }

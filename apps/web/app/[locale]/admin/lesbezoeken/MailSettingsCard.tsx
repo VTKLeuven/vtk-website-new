@@ -1,40 +1,21 @@
 "use client";
 
-import { Card, Input, Label, Textarea } from "@vtk/ui";
+import { useState } from "react";
+import { Button, Card, Input, Label, Select, Textarea } from "@vtk/ui";
 import { SaveForm } from "@/components/ui/SaveForm";
 import {
   saveLesbezoekSettingsAction,
   saveLesbezoekTemplatesAction,
 } from "@/app/actions/lesbezoeken";
 import {
-  DEFAULT_LESBEZOEK_TEMPLATES,
+  DEFAULT_LESBEZOEK_TEMPLATE_ITEMS,
   LESBEZOEK_PLACEHOLDERS,
-  LESBEZOEK_TEMPLATE_KEYS,
   type LesbezoekConfig,
-  type LesbezoekTemplateKey,
+  type LesbezoekTemplateCategory,
+  type LesbezoekTemplateItem,
   type LesbezoekTemplates,
 } from "@/lib/lesbezoekenMail";
 import { lesbezoekAdminErrors } from "@/lib/lesbezoekenMessages";
-
-/**
- * De ondertekening onder elke mail, de mailbox die een seintje krijgt, en de acht
- * sjablonen.
- *
- * De sjablonen zijn bewerkbaar omdat ze dat vroeger ook waren: het waren Word-
- * documenten in een gedeelde map, met bovenaan "pas gerust dingen aan". Wie de
- * lesbezoeken doet mag de aanhef wijzigen zonder een deploy af te wachten.
- */
-
-const TEMPLATE_LABELS: Record<LesbezoekTemplateKey, { nl: string; en: string }> = {
-  professorShortNl: { nl: "Docent · kort bezoek · NL", en: "Lecturer · short visit · NL" },
-  professorLongNl: { nl: "Docent · lang bezoek · NL", en: "Lecturer · long visit · NL" },
-  professorShortEn: { nl: "Docent · kort bezoek · EN", en: "Lecturer · short visit · EN" },
-  professorLongEn: { nl: "Docent · lang bezoek · EN", en: "Lecturer · long visit · EN" },
-  professorNudgeNl: { nl: "Herinnering docent · NL", en: "Reminder lecturer · NL" },
-  professorNudgeEn: { nl: "Herinnering docent · EN", en: "Reminder lecturer · EN" },
-  requesterApproved: { nl: "Aanvrager · goedgekeurd", en: "Requester · approved" },
-  requesterDeclined: { nl: "Aanvrager · niet doorgegaan", en: "Requester · did not happen" },
-};
 
 export function MailSettingsCard({
   nl,
@@ -48,8 +29,69 @@ export function MailSettingsCard({
   templates: LesbezoekTemplates;
 }) {
   const errors = lesbezoekAdminErrors(nl);
+  const [items, setItems] = useState<LesbezoekTemplateItem[]>(() => {
+    return templates.items && templates.items.length > 0
+      ? templates.items
+      : DEFAULT_LESBEZOEK_TEMPLATE_ITEMS;
+  });
 
   if (!canManage) return null;
+
+  const handleUpdateItem = (
+    id: string,
+    field: keyof LesbezoekTemplateItem,
+    value: unknown,
+  ) => {
+    setItems((prev) =>
+      prev.map((item) => (item.id === id ? { ...item, [field]: value } : item)),
+    );
+  };
+
+  const handleDeleteItem = (id: string) => {
+    setItems((prev) => prev.filter((item) => item.id !== id));
+  };
+
+  const handleAddNew = () => {
+    const id = `custom_${Date.now().toString(36)}`;
+    const newItem: LesbezoekTemplateItem = {
+      id,
+      name: nl ? "Nieuw mailsjabloon" : "New email template",
+      subject: nl ? "Betreft: {vak} op {datum}" : "Regarding: {vak} on {datum}",
+      body: nl
+        ? [
+            "Beste {contactpersoon},",
+            "",
+            "Hierbij informeren wij u over het lesbezoek voor {organisatie} tijdens {vak} op {datum} om {uur}.",
+            "",
+            "Met vriendelijke groeten,",
+            "{ondertekening}",
+          ].join("\n")
+        : [
+            "Dear {contactpersoon},",
+            "",
+            "We are writing regarding the classroom visit for {organisatie} during {vak} on {datum} at {uur}.",
+            "",
+            "Sincerely,",
+            "{ondertekening}",
+          ].join("\n"),
+      category: "other",
+      lang: "nl",
+      isDefault: false,
+    };
+    setItems((prev) => [...prev, newItem]);
+  };
+
+  const handleResetDefaults = () => {
+    if (
+      window.confirm(
+        nl
+          ? "Weet je zeker dat je alle standaardsjablonen wilt herstellen naar de oorspronkelijke tekst?"
+          : "Are you sure you want to reset all standard templates to their default text?",
+      )
+    ) {
+      setItems(DEFAULT_LESBEZOEK_TEMPLATE_ITEMS);
+    }
+  };
 
   return (
     <>
@@ -93,19 +135,42 @@ export function MailSettingsCard({
       </Card>
 
       <Card className="p-5">
-        <h2 className="mb-1 text-lg font-semibold">{nl ? "Mailsjablonen" : "Email templates"}</h2>
-        <p className="mb-2 text-sm text-[#5c667f]">
-          {nl
-            ? "Wat er klaarstaat wanneer je in een aanvraag op mailen klikt. Je leest de mail daar altijd nog na voor ze vertrekt."
-            : "What is prepared when you compose an email on a request. You always read it over there before it goes out."}
-        </p>
-        <p className="mb-4 text-sm text-[#5c667f]">
-          {nl ? "Beschikbare velden: " : "Available fields: "}
-          {LESBEZOEK_PLACEHOLDERS.map((name) => `{${name}}`).join(" ")}.{" "}
-          {nl
-            ? "Een veld leegmaken zet dat sjabloon terug op de standaardtekst."
-            : "Clearing a field resets that template to its default text."}
-        </p>
+        <div className="flex flex-wrap items-center justify-between gap-3 mb-2">
+          <div>
+            <h2 className="text-lg font-semibold">{nl ? "Mailsjablonen" : "Email templates"}</h2>
+            <p className="text-sm text-[#5c667f]">
+              {nl
+                ? "Beheer de sjablonen die klaarstaan wanneer je een mail verstuurt. Je kan namen aanpassen, nieuwe sjablonen toevoegen of overbodige verwijderen."
+                : "Manage the email templates used when composing messages. You can edit names, add new templates, or remove unneeded ones."}
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={handleAddNew}
+            >
+              + {nl ? "Nieuw sjabloon" : "New template"}
+            </Button>
+          </div>
+        </div>
+
+        <div className="mb-4 rounded-xl border border-vtk-blue/10 bg-vtk-blue-soft/30 p-3 text-xs text-[#5c667f]">
+          <span className="font-semibold text-vtk-ink">
+            {nl ? "Beschikbare variabelen: " : "Available variables: "}
+          </span>
+          <div className="mt-1 flex flex-wrap gap-1">
+            {LESBEZOEK_PLACEHOLDERS.map((name) => (
+              <code
+                key={name}
+                className="rounded-md bg-white border border-vtk-blue/15 px-1.5 py-0.5 font-mono text-[11px] text-vtk-ink"
+              >
+                {`{${name}}`}
+              </code>
+            ))}
+          </div>
+        </div>
 
         <SaveForm
           action={saveLesbezoekTemplatesAction}
@@ -115,40 +180,160 @@ export function MailSettingsCard({
           errorMessages={errors}
           fallbackErrorMessage={nl ? "Niet opgeslagen." : "Not saved."}
           resetOnSuccess={false}
-          className="space-y-3"
+          className="space-y-4"
         >
-          {LESBEZOEK_TEMPLATE_KEYS.map((key) => (
-            <details key={key} className="rounded-2xl border border-vtk-blue/15 p-4">
-              <summary className="cursor-pointer text-sm font-semibold text-vtk-ink">
-                {TEMPLATE_LABELS[key][nl ? "nl" : "en"]}
-                {templates[key].body === DEFAULT_LESBEZOEK_TEMPLATES[key].body ? (
-                  <span className="ml-2 text-xs font-normal text-[#5c667f]">
-                    {nl ? "standaardtekst" : "default text"}
-                  </span>
-                ) : null}
-              </summary>
-              <div className="mt-3 space-y-3">
-                <div>
-                  <Label htmlFor={`tpl-subject-${key}`}>{nl ? "Onderwerp" : "Subject"}</Label>
-                  <Input
-                    id={`tpl-subject-${key}`}
-                    name={`${key}.subject`}
-                    defaultValue={templates[key].subject}
-                  />
+          <input
+            type="hidden"
+            name="templatesJson"
+            value={JSON.stringify(items)}
+          />
+
+          <div className="space-y-3">
+            {items.map((item, index) => (
+              <details
+                key={item.id}
+                open={index === 0}
+                className="group rounded-2xl border border-vtk-blue/15 bg-white p-4 transition-all"
+              >
+                <summary className="flex cursor-pointer list-none items-center justify-between gap-3 text-sm font-semibold text-vtk-ink select-none">
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-vtk-blue/10 text-xs font-semibold text-vtk-ink group-open:rotate-90 transition-transform">
+                      ›
+                    </span>
+                    <span className="truncate font-medium">{item.name || (nl ? "Naamloos sjabloon" : "Untitled template")}</span>
+                    {item.lang && (
+                      <span className="rounded-full border border-vtk-blue/15 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-[#5c667f]">
+                        {item.lang}
+                      </span>
+                    )}
+                    {item.category && item.category !== "other" && (
+                      <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-[10px] font-medium text-zinc-600">
+                        {item.category === "professor"
+                          ? nl
+                            ? "Docent"
+                            : "Lecturer"
+                          : item.category === "nudge"
+                            ? nl
+                              ? "Herinnering"
+                              : "Reminder"
+                            : nl
+                              ? "Aanvrager"
+                              : "Requester"}
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="flex items-center gap-2 shrink-0">
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        handleDeleteItem(item.id);
+                      }}
+                      className="rounded-lg p-1 text-zinc-400 hover:bg-rose-50 hover:text-rose-600 transition-colors"
+                      title={nl ? "Sjabloon verwijderen" : "Delete template"}
+                    >
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        width="15"
+                        height="15"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      >
+                        <path d="M3 6h18" />
+                        <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" />
+                        <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />
+                      </svg>
+                    </button>
+                  </div>
+                </summary>
+
+                <div className="mt-4 space-y-3 pt-3 border-t border-vtk-blue/10">
+                  <div className="grid gap-3 sm:grid-cols-3">
+                    <div className="sm:col-span-2">
+                      <Label htmlFor={`tpl-name-${item.id}`}>
+                        {nl ? "Naam van sjabloon" : "Template name"}
+                      </Label>
+                      <Input
+                        id={`tpl-name-${item.id}`}
+                        value={item.name}
+                        onChange={(e) => handleUpdateItem(item.id, "name", e.target.value)}
+                        placeholder={nl ? "bv. Docent · uitnodiging" : "e.g. Lecturer · invitation"}
+                        required
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor={`tpl-cat-${item.id}`}>
+                        {nl ? "Bestemming" : "Target"}
+                      </Label>
+                      <Select
+                        id={`tpl-cat-${item.id}`}
+                        value={item.category ?? "other"}
+                        onChange={(e) =>
+                          handleUpdateItem(
+                            item.id,
+                            "category",
+                            e.target.value as LesbezoekTemplateCategory,
+                          )
+                        }
+                      >
+                        <option value="professor">{nl ? "Docent (aanvraag)" : "Lecturer (request)"}</option>
+                        <option value="nudge">{nl ? "Docent (herinnering)" : "Lecturer (reminder)"}</option>
+                        <option value="requester">{nl ? "Aanvrager" : "Requester"}</option>
+                        <option value="other">{nl ? "Algemeen / Overig" : "General / Other"}</option>
+                      </Select>
+                    </div>
+                  </div>
+
+                  <div className="grid gap-3 sm:grid-cols-4">
+                    <div className="sm:col-span-3">
+                      <Label htmlFor={`tpl-subject-${item.id}`}>{nl ? "Onderwerp" : "Subject"}</Label>
+                      <Input
+                        id={`tpl-subject-${item.id}`}
+                        value={item.subject}
+                        onChange={(e) => handleUpdateItem(item.id, "subject", e.target.value)}
+                        required
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor={`tpl-lang-${item.id}`}>{nl ? "Taal" : "Language"}</Label>
+                      <Select
+                        id={`tpl-lang-${item.id}`}
+                        value={item.lang ?? "nl"}
+                        onChange={(e) => handleUpdateItem(item.id, "lang", e.target.value as "nl" | "en")}
+                      >
+                        <option value="nl">Nederlands</option>
+                        <option value="en">English</option>
+                      </Select>
+                    </div>
+                  </div>
+
+                  <div>
+                    <Label htmlFor={`tpl-body-${item.id}`}>{nl ? "Bericht" : "Message"}</Label>
+                    <Textarea
+                      id={`tpl-body-${item.id}`}
+                      rows={10}
+                      value={item.body}
+                      onChange={(e) => handleUpdateItem(item.id, "body", e.target.value)}
+                      className="font-mono text-[13px] leading-relaxed"
+                      required
+                    />
+                  </div>
                 </div>
-                <div>
-                  <Label htmlFor={`tpl-body-${key}`}>{nl ? "Bericht" : "Message"}</Label>
-                  <Textarea
-                    id={`tpl-body-${key}`}
-                    name={`${key}.body`}
-                    rows={12}
-                    defaultValue={templates[key].body}
-                    className="font-mono text-[13px]"
-                  />
-                </div>
-              </div>
-            </details>
-          ))}
+              </details>
+            ))}
+          </div>
+
+          <div className="flex items-center justify-between pt-2">
+            <Button type="button" variant="ghost" size="sm" onClick={handleResetDefaults}>
+              {nl ? "Standaardsjablonen herstellen" : "Reset standard templates"}
+            </Button>
+          </div>
         </SaveForm>
       </Card>
     </>

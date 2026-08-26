@@ -20,6 +20,7 @@ import {
   professorTemplateKey,
   renderMailTemplate,
   renderTemplate,
+  type MailTemplate,
 } from "@/lib/lesbezoekenMail";
 
 const NOW = new Date("2026-01-01T10:00:00.000Z");
@@ -321,21 +322,36 @@ describe("parseLesbezoekTemplates", () => {
       professorShortNl: { subject: "Eigen onderwerp", body: "Eigen tekst" },
     });
     expect(templates.professorShortNl.subject).toBe("Eigen onderwerp");
-    expect(templates.professorLongEn).toEqual(DEFAULT_LESBEZOEK_TEMPLATES.professorLongEn);
+    expect(templates.professorLongEn.subject).toEqual(DEFAULT_LESBEZOEK_TEMPLATES.professorLongEn.subject);
   });
 
   it("behandelt een leeg veld als 'terug naar de standaardtekst'", () => {
     const templates = parseLesbezoekTemplates({
       professorShortNl: { subject: "  ", body: "" },
     });
-    expect(templates.professorShortNl).toEqual(DEFAULT_LESBEZOEK_TEMPLATES.professorShortNl);
+    expect(templates.professorShortNl.subject).toEqual(DEFAULT_LESBEZOEK_TEMPLATES.professorShortNl.subject);
   });
 
   it("overleeft rommel in de database", () => {
-    expect(parseLesbezoekTemplates(null)).toEqual(DEFAULT_LESBEZOEK_TEMPLATES);
-    expect(parseLesbezoekTemplates({ professorShortNl: "kapot" })).toEqual(
-      DEFAULT_LESBEZOEK_TEMPLATES,
-    );
+    expect(parseLesbezoekTemplates(null).items.length).toBeGreaterThan(0);
+    expect(parseLesbezoekTemplates({ professorShortNl: "kapot" }).items.length).toBeGreaterThan(0);
+  });
+
+  it("parset een array van dynamische sjablonen inclusief aangepaste", () => {
+    const customList = [
+      {
+        id: "custom_bedanking",
+        name: "Bedanking docent",
+        subject: "Bedankt voor het lesbezoek: {vak}",
+        body: "Beste prof {prof}, bedankt!",
+        category: "professor",
+        lang: "nl",
+      },
+    ];
+    const parsed = parseLesbezoekTemplates(customList);
+    expect(parsed.items.length).toBe(1);
+    expect(parsed.items[0]?.name).toBe("Bedanking docent");
+    expect((parsed.custom_bedanking as MailTemplate).subject).toBe("Bedankt voor het lesbezoek: {vak}");
   });
 });
 

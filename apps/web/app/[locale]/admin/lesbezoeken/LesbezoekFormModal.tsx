@@ -4,8 +4,9 @@ import { Input, Label, Select, Textarea } from "@vtk/ui";
 import { Modal } from "@/app/[locale]/admin/admin-table";
 import { SaveForm } from "@/components/ui/SaveForm";
 import { saveLesbezoekAction } from "@/app/actions/lesbezoeken";
-import { LESBEZOEK_AUDIENCES, LESBEZOEK_LIMITS } from "@/lib/lesbezoeken";
+import { LESBEZOEK_LIMITS } from "@/lib/lesbezoeken";
 import { lesbezoekAdminErrors } from "@/lib/lesbezoekenMessages";
+import { AudienceCombobox } from "./AudienceCombobox";
 import type { OrganisationView, VisitView } from "./types";
 
 /**
@@ -35,7 +36,6 @@ export function LesbezoekFormModal({
   onClose: () => void;
 }) {
   const errors = lesbezoekAdminErrors(nl);
-  const listId = "lb-audiences";
 
   return (
     <Modal
@@ -63,12 +63,6 @@ export function LesbezoekFormModal({
         className="space-y-4"
       >
         {visit && <input type="hidden" name="id" value={visit.id} />}
-
-        <datalist id={listId}>
-          {LESBEZOEK_AUDIENCES.map((audience) => (
-            <option key={audience} value={audience} />
-          ))}
-        </datalist>
 
         <div>
           <Label htmlFor="lb-organisation">{nl ? "Organisatie" : "Organisation"}</Label>
@@ -125,13 +119,13 @@ export function LesbezoekFormModal({
         <div className="grid gap-4 sm:grid-cols-2">
           <div>
             <Label htmlFor="lb-audience">{nl ? "Doelgroep" : "Target group"}</Label>
-            <Input
+            <AudienceCombobox
               id="lb-audience"
               name="audience"
-              list={listId}
               defaultValue={visit?.audience ?? ""}
               maxLength={LESBEZOEK_LIMITS.audience}
               required
+              placeholder={nl ? "Kies of typ een doelgroep…" : "Choose or type a target group…"}
             />
           </div>
           <div>

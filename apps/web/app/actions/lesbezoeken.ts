@@ -30,8 +30,7 @@ import {
 } from "@/lib/lesbezoeken-server";
 import {
   LESBEZOEK_TEMPLATE_KEYS,
-  type LesbezoekTemplates,
-  type MailTemplate,
+  type LesbezoekTemplateItem,
 } from "@/lib/lesbezoekenMail";
 
 /**
@@ -590,9 +589,8 @@ export async function saveLesbezoekSettingsAction(
 }
 
 /**
- * Bewaart de mailsjablonen. Een leeg veld betekent "terug naar de standaardtekst":
- * `parseLesbezoekTemplates` vult die aan bij het lezen, dus wissen is hier het
- * herstelknopje.
+ * Bewaart de mailsjablonen. Ondersteunt zowel dynamische sjablonen (toevoegen,
+ * hernoemen, verwijderen) via JSON als de klassieke formuliervelden.
  */
 export async function saveLesbezoekTemplatesAction(
   _prev: SaveState,
@@ -600,17 +598,59 @@ export async function saveLesbezoekTemplatesAction(
 ): Promise<SaveState> {
   await requirePermission("lesbezoeken.manage");
 
-  const value: Partial<Record<string, MailTemplate>> = {};
-  for (const key of LESBEZOEK_TEMPLATE_KEYS) {
-    const subject = toSingleLine(formData.get(`${key}.subject`));
-    const body = toMessageText(formData.get(`${key}.body`));
-    if (subject || body) value[key] = { subject, body };
+  const json = formData.get("templatesJson");
+  const itemsToSave: LesbezoekTemplateItem[] = [];
+
+  if (typeof json === "string" && json.trim()) {
+    try {
+      const parsed = JSON.parse(json);
+      if (Array.isArray(parsed)) {
+        for (const raw of parsed) {
+          if (!raw || typeof raw !== "object") continue;
+          const id = toSingleLine(raw.id) || `custom_${Math.random().toString(36).slice(2, 8)}`;
+          const name = toSingleLine(raw.name) || "Sjabloon";
+          const subject = toSingleLine(raw.subject);
+          const body = toMessageText(raw.body);
+          const category =
+            raw.category === "professor" || raw.category === "nudge" || raw.category === "requester"
+              ? raw.category
+              : "other";
+          const lang = raw.lang === "en" ? "en" : "nl";
+          const isDefault = Boolean(raw.isDefault);
+
+          itemsToSave.push({
+            id,
+            name,
+            subject,
+            body,
+            category,
+            lang,
+            isDefault,
+          });
+        }
+      }
+    } catch {
+      return saveError("INVALID_INPUT");
+    }
+  } else {
+    for (const key of LESBEZOEK_TEMPLATE_KEYS) {
+      const subject = toSingleLine(formData.get(`${key}.subject`));
+      const body = toMessageText(formData.get(`${key}.body`));
+      const name = toSingleLine(formData.get(`${key}.name`));
+      itemsToSave.push({
+        id: key,
+        name: name || key,
+        subject,
+        body,
+        isDefault: true,
+      });
+    }
   }
 
   await prisma.setting.upsert({
     where: { key: LESBEZOEK_MAIL_KEY },
-    create: { key: LESBEZOEK_MAIL_KEY, value: value as LesbezoekTemplates },
-    update: { value: value as LesbezoekTemplates },
+    create: { key: LESBEZOEK_MAIL_KEY, value: itemsToSave },
+    update: { value: itemsToSave },
   });
 
   await logAudit({ action: "update", entity: "lesbezoekSettings", target: "Mailsjablonen" });

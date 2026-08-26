@@ -43,7 +43,7 @@ export function visitEnd(start: Date, longVisit: boolean): Date {
  * masters en al de rest gaan via het vrije veld, precies zoals de "Anders"-optie
  * in het formulier.
  */
-export const LESBEZOEK_AUDIENCES = [
+export const LESBEZOEK_BACHELORS = [
   "1e Bach, Algemene richting, Groep A",
   "1e Bach, Algemene richting, Groep B",
   "1e Bach, Architectuur",
@@ -62,6 +62,27 @@ export const LESBEZOEK_AUDIENCES = [
   "3e Bach, Werktuigkunde",
   "3e Bach, nevenrichting Architectuur & Omgeving",
   "3e Bach, nevenrichting Bedrijfsbeheer",
+] as const;
+
+export const LESBEZOEK_MASTERS = [
+  "Master Architectural Engineering",
+  "Master Artificial Intelligence",
+  "Master Biomedical Engineering",
+  "Master Chemical Engineering",
+  "Master Civil Engineering",
+  "Master Computer Science",
+  "Master Electrical Engineering",
+  "Master Energy Engineering",
+  "Master Materials Engineering",
+  "Master Mathematical Engineering",
+  "Master Mechanical Engineering",
+  "Master Mobility & Supply Chain Engineering",
+  "Master Nanoscience, Nanotechnology and Nanoengineering",
+] as const;
+
+export const LESBEZOEK_AUDIENCES = [
+  ...LESBEZOEK_BACHELORS,
+  ...LESBEZOEK_MASTERS,
 ] as const;
 
 /**

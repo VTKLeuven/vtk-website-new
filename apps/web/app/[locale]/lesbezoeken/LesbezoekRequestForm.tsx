@@ -5,8 +5,9 @@ import { Input, Label, Select, Textarea } from "@vtk/ui";
 import { SaveForm } from "@/components/ui/SaveForm";
 import { requestLesbezoekAction } from "@/app/actions/lesbezoeken";
 import {
-  LESBEZOEK_AUDIENCES,
+  LESBEZOEK_BACHELORS,
   LESBEZOEK_LIMITS,
+  LESBEZOEK_MASTERS,
   LESBEZOEK_MIN_LEAD_DAYS,
 } from "@/lib/lesbezoeken";
 import { lesbezoekRequestErrors } from "@/lib/lesbezoekenMessages";
@@ -230,11 +231,20 @@ export function LesbezoekRequestForm({
               required={audience !== OTHER}
             >
               <option value="">—</option>
-              {LESBEZOEK_AUDIENCES.map((value) => (
-                <option key={value} value={value}>
-                  {value}
-                </option>
-              ))}
+              <optgroup label="Bachelors">
+                {LESBEZOEK_BACHELORS.map((value) => (
+                  <option key={value} value={value}>
+                    {value}
+                  </option>
+                ))}
+              </optgroup>
+              <optgroup label="Masters">
+                {LESBEZOEK_MASTERS.map((value) => (
+                  <option key={value} value={value}>
+                    {value}
+                  </option>
+                ))}
+              </optgroup>
               <option value={OTHER}>{copy.audienceOtherOption}</option>
             </Select>
           </div>

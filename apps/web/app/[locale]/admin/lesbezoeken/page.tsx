@@ -41,11 +41,12 @@ import "@/app/design/vtk-lesbezoeken.css";
  * docs/design-decisions.md ("Lesbezoeken").
  */
 
-const TABS = ["aanvragen", "kalender", "instellingen"] as const;
+const TABS = ["aanvragen", "goedgekeurd", "kalender", "instellingen"] as const;
 type Tab = (typeof TABS)[number];
 
 const TAB_LABELS: Record<Tab, { nl: string; en: string }> = {
   aanvragen: { nl: "Aanvragen", en: "Requests" },
+  goedgekeurd: { nl: "Goedgekeurd", en: "Approved" },
   kalender: { nl: "Kalender", en: "Calendar" },
   instellingen: { nl: "Organisaties & mails", en: "Organisations & mail" },
 };
@@ -228,6 +229,7 @@ export default async function AdminLesbezoekenPage({
   });
 
   const openCount = visits.filter((visit) => OPEN_STATUSES.includes(visit.status)).length;
+  const approvedCount = visits.filter((visit) => visit.status === "APPROVED").length;
   const years = workingYearTabs(
     yearRows.map((row) => {
       const { year: y, month } = brusselsYMD(row.startsAt);
@@ -267,6 +269,7 @@ export default async function AdminLesbezoekenPage({
           >
             {TAB_LABELS[value][nl ? "nl" : "en"]}
             {value === "aanvragen" && openCount > 0 ? ` (${openCount})` : ""}
+            {value === "goedgekeurd" && approvedCount > 0 ? ` (${approvedCount})` : ""}
           </Link>
         ))}
       </nav>
@@ -300,7 +303,7 @@ export default async function AdminLesbezoekenPage({
         <Card className="p-5">
           <LesbezoekBoard
             nl={nl}
-            mode={tab === "kalender" ? "calendar" : "queue"}
+            mode={tab === "kalender" ? "calendar" : tab === "goedgekeurd" ? "approved" : "queue"}
             canManage={canManage}
             visits={visits}
             organisations={organisations.filter(

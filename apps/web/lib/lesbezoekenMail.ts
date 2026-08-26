@@ -51,8 +51,31 @@ export const LESBEZOEK_TEMPLATE_KEYS = [
 
 export type LesbezoekTemplateKey = (typeof LESBEZOEK_TEMPLATE_KEYS)[number];
 
-export type MailTemplate = { subject: string; body: string };
-export type LesbezoekTemplates = Record<LesbezoekTemplateKey, MailTemplate>;
+export type LesbezoekTemplateCategory = "professor" | "nudge" | "requester" | "other";
+
+export type LesbezoekTemplateItem = {
+  id: string;
+  name: string;
+  subject: string;
+  body: string;
+  category?: LesbezoekTemplateCategory;
+  lang?: "nl" | "en";
+  isDefault?: boolean;
+};
+
+export type MailTemplate = {
+  name?: string;
+  subject: string;
+  body: string;
+  category?: LesbezoekTemplateCategory;
+  lang?: "nl" | "en";
+  isDefault?: boolean;
+};
+
+export type LesbezoekTemplates = Record<LesbezoekTemplateKey, MailTemplate> & {
+  items: LesbezoekTemplateItem[];
+  [key: string]: MailTemplate | LesbezoekTemplateItem[] | undefined;
+};
 
 /**
  * De placeholders die een sjabloon kent. Wordt ook op het scherm getoond, zodat
@@ -90,8 +113,12 @@ export function renderTemplate(text: string, vars: TemplateVars): string {
 
 export function renderMailTemplate(template: MailTemplate, vars: TemplateVars): MailTemplate {
   return {
+    name: template.name,
     subject: renderTemplate(template.subject, vars).replace(/\s+/g, " ").trim(),
     body: renderTemplate(template.body, vars),
+    category: template.category,
+    lang: template.lang,
+    isDefault: template.isDefault,
   };
 }
 
@@ -157,14 +184,27 @@ export function nudgeTemplateKey(locale: "nl" | "en"): LesbezoekTemplateKey {
 
 const SIGNATURE = "{ondertekening}";
 
+export const DEFAULT_LESBEZOEK_TEMPLATE_NAMES: Record<LesbezoekTemplateKey, { nl: string; en: string }> = {
+  professorShortNl: { nl: "Docent · kort bezoek · NL", en: "Lecturer · short visit · NL" },
+  professorLongNl: { nl: "Docent · lang bezoek · NL", en: "Lecturer · long visit · NL" },
+  professorShortEn: { nl: "Docent · kort bezoek · EN", en: "Lecturer · short visit · EN" },
+  professorLongEn: { nl: "Docent · lang bezoek · EN", en: "Lecturer · long visit · EN" },
+  professorNudgeNl: { nl: "Herinnering docent · NL", en: "Reminder lecturer · NL" },
+  professorNudgeEn: { nl: "Herinnering docent · EN", en: "Reminder lecturer · EN" },
+  requesterApproved: { nl: "Aanvrager · goedgekeurd", en: "Requester · approved" },
+  requesterDeclined: { nl: "Aanvrager · niet doorgegaan", en: "Requester · did not happen" },
+};
+
 /**
- * De teksten zoals ze in de map "Template mails" stonden, met de
- * `<<Veld>>`-merge-velden vervangen door onze placeholders. Bewust zo dicht
- * mogelijk bij het origineel: professoren kennen deze mail ondertussen, en een
- * herschreven aanhef is een verandering die niemand vroeg.
+ * De basisteksten van de standaardsjablonen.
  */
-export const DEFAULT_LESBEZOEK_TEMPLATES: LesbezoekTemplates = {
-  professorShortNl: {
+export const DEFAULT_LESBEZOEK_TEMPLATE_ITEMS: LesbezoekTemplateItem[] = [
+  {
+    id: "professorShortNl",
+    name: "Docent · kort bezoek · NL",
+    category: "professor",
+    lang: "nl",
+    isDefault: true,
     subject: "Aanvraag kort lesbezoek: {vak} op {datum}",
     body: [
       "Geachte professor {prof},",
@@ -180,7 +220,12 @@ export const DEFAULT_LESBEZOEK_TEMPLATES: LesbezoekTemplates = {
       SIGNATURE,
     ].join("\n"),
   },
-  professorLongNl: {
+  {
+    id: "professorLongNl",
+    name: "Docent · lang bezoek · NL",
+    category: "professor",
+    lang: "nl",
+    isDefault: true,
     subject: "Aanvraag lesbezoek: {vak} op {datum}",
     body: [
       "Geachte professor {prof},",
@@ -196,7 +241,12 @@ export const DEFAULT_LESBEZOEK_TEMPLATES: LesbezoekTemplates = {
       SIGNATURE,
     ].join("\n"),
   },
-  professorShortEn: {
+  {
+    id: "professorShortEn",
+    name: "Docent · kort bezoek · EN",
+    category: "professor",
+    lang: "en",
+    isDefault: true,
     subject: "Request for a short class visit: {vak} on {datum}",
     body: [
       "Dear Professor {prof},",
@@ -212,7 +262,12 @@ export const DEFAULT_LESBEZOEK_TEMPLATES: LesbezoekTemplates = {
       SIGNATURE,
     ].join("\n"),
   },
-  professorLongEn: {
+  {
+    id: "professorLongEn",
+    name: "Docent · lang bezoek · EN",
+    category: "professor",
+    lang: "en",
+    isDefault: true,
     subject: "Request for a class visit: {vak} on {datum}",
     body: [
       "Dear Professor {prof},",
@@ -230,7 +285,12 @@ export const DEFAULT_LESBEZOEK_TEMPLATES: LesbezoekTemplates = {
       SIGNATURE,
     ].join("\n"),
   },
-  professorNudgeNl: {
+  {
+    id: "professorNudgeNl",
+    name: "Herinnering docent · NL",
+    category: "nudge",
+    lang: "nl",
+    isDefault: true,
     subject: "Opvolging aanvraag lesbezoek: {vak} op {datum}",
     body: [
       "Geachte professor {prof},",
@@ -242,7 +302,12 @@ export const DEFAULT_LESBEZOEK_TEMPLATES: LesbezoekTemplates = {
       SIGNATURE,
     ].join("\n"),
   },
-  professorNudgeEn: {
+  {
+    id: "professorNudgeEn",
+    name: "Herinnering docent · EN",
+    category: "nudge",
+    lang: "en",
+    isDefault: true,
     subject: "Follow-up on the class visit request: {vak} on {datum}",
     body: [
       "Dear Professor {prof},",
@@ -254,7 +319,12 @@ export const DEFAULT_LESBEZOEK_TEMPLATES: LesbezoekTemplates = {
       SIGNATURE,
     ].join("\n"),
   },
-  requesterApproved: {
+  {
+    id: "requesterApproved",
+    name: "Aanvrager · goedgekeurd",
+    category: "requester",
+    lang: "nl",
+    isDefault: true,
     subject: "Lesbezoek goedgekeurd: {vak} op {datum}",
     body: [
       "Beste {contactpersoon},",
@@ -268,7 +338,12 @@ export const DEFAULT_LESBEZOEK_TEMPLATES: LesbezoekTemplates = {
       SIGNATURE,
     ].join("\n"),
   },
-  requesterDeclined: {
+  {
+    id: "requesterDeclined",
+    name: "Aanvrager · niet doorgegaan",
+    category: "requester",
+    lang: "nl",
+    isDefault: true,
     subject: "Lesbezoek niet doorgegaan: {vak} op {datum}",
     body: [
       "Beste {contactpersoon},",
@@ -284,30 +359,140 @@ export const DEFAULT_LESBEZOEK_TEMPLATES: LesbezoekTemplates = {
       SIGNATURE,
     ].join("\n"),
   },
+];
+
+const DEFAULT_MAP = DEFAULT_LESBEZOEK_TEMPLATE_ITEMS.reduce(
+  (acc, item) => {
+    acc[item.id as LesbezoekTemplateKey] = {
+      name: item.name,
+      subject: item.subject,
+      body: item.body,
+      category: item.category,
+      lang: item.lang,
+      isDefault: item.isDefault,
+    };
+    return acc;
+  },
+  {} as Record<LesbezoekTemplateKey, MailTemplate>,
+);
+
+export const DEFAULT_LESBEZOEK_TEMPLATES: LesbezoekTemplates = {
+  items: DEFAULT_LESBEZOEK_TEMPLATE_ITEMS,
+  ...DEFAULT_MAP,
 };
 
 /**
  * Leest wat er in `Setting` staat en vult aan met de standaardteksten. Een
- * sjabloon dat leeg of stuk in de database staat, valt terug op de tekst
- * hierboven in plaats van een lege mail te maken.
+ * sjabloon dat leeg of stuk in de database staat, valt terug op de standaardtekst.
+ * Ondersteunt zowel de nieuwe lijststructuur als de legacy dictionary-structuur.
  */
 export function parseLesbezoekTemplates(value: unknown): LesbezoekTemplates {
-  const stored = (value ?? {}) as Record<string, unknown>;
-  const result = {} as LesbezoekTemplates;
+  const result: LesbezoekTemplates = {
+    ...DEFAULT_MAP,
+    items: [],
+  };
 
-  for (const key of LESBEZOEK_TEMPLATE_KEYS) {
-    const fallback = DEFAULT_LESBEZOEK_TEMPLATES[key];
-    const entry = stored[key];
-    if (!entry || typeof entry !== "object") {
-      result[key] = fallback;
-      continue;
+  // 1. Array-structuur (nieuw)
+  const isObject = value !== null && typeof value === "object";
+  const objectItems = isObject && "items" in value && Array.isArray((value as { items: unknown }).items)
+    ? (value as { items: unknown[] }).items
+    : null;
+
+  if (Array.isArray(value) || objectItems !== null) {
+    const rawList: unknown[] = Array.isArray(value) ? value : (objectItems ?? []);
+    const items: LesbezoekTemplateItem[] = [];
+
+    for (const raw of rawList) {
+      if (!raw || typeof raw !== "object") continue;
+      const entry = raw as Partial<LesbezoekTemplateItem>;
+      const id = String(entry.id || "").trim();
+      if (!id) continue;
+
+      const fallback = DEFAULT_MAP[id as LesbezoekTemplateKey];
+      const name = typeof entry.name === "string" && entry.name.trim() ? entry.name.trim() : fallback?.name ?? id;
+      const subject =
+        typeof entry.subject === "string" && entry.subject.trim()
+          ? entry.subject
+          : fallback?.subject ?? "";
+      const body =
+        typeof entry.body === "string" && entry.body.trim()
+          ? entry.body
+          : fallback?.body ?? "";
+
+      const item: LesbezoekTemplateItem = {
+        id,
+        name,
+        subject,
+        body,
+        category: entry.category ?? fallback?.category ?? "other",
+        lang: entry.lang ?? fallback?.lang ?? "nl",
+        isDefault: Boolean(entry.isDefault || fallback),
+      };
+
+      items.push(item);
+      result[id] = item;
     }
-    const { subject, body } = entry as Partial<MailTemplate>;
-    result[key] = {
-      subject: typeof subject === "string" && subject.trim() ? subject : fallback.subject,
-      body: typeof body === "string" && body.trim() ? body : fallback.body,
-    };
+
+    // Zorg dat ontbrekende standaardsjablonen als fallback aanwezig blijven op het result object
+    for (const def of DEFAULT_LESBEZOEK_TEMPLATE_ITEMS) {
+      if (!result[def.id]) {
+        result[def.id] = def;
+      }
+    }
+
+    result.items = items.length > 0 ? items : DEFAULT_LESBEZOEK_TEMPLATE_ITEMS;
+    return result;
   }
 
+  // 2. Object / Record-structuur (legacy)
+  const stored = (value ?? {}) as Record<string, unknown>;
+  const items: LesbezoekTemplateItem[] = [];
+
+  for (const def of DEFAULT_LESBEZOEK_TEMPLATE_ITEMS) {
+    const entry = stored[def.id];
+    let subject = def.subject;
+    let body = def.body;
+    let name = def.name;
+
+    if (entry && typeof entry === "object") {
+      const p = entry as Partial<MailTemplate>;
+      if (typeof p.subject === "string" && p.subject.trim()) subject = p.subject;
+      if (typeof p.body === "string" && p.body.trim()) body = p.body;
+      if (typeof p.name === "string" && p.name.trim()) name = p.name.trim();
+    }
+
+    const item: LesbezoekTemplateItem = {
+      id: def.id,
+      name,
+      subject,
+      body,
+      category: def.category,
+      lang: def.lang,
+      isDefault: true,
+    };
+    items.push(item);
+    result[def.id] = item;
+  }
+
+  // Eventuele extra custom keys uit legacy store
+  for (const [key, entry] of Object.entries(stored)) {
+    if ((LESBEZOEK_TEMPLATE_KEYS as readonly string[]).includes(key) || !entry || typeof entry !== "object") {
+      continue;
+    }
+    const p = entry as Partial<MailTemplate>;
+    const item: LesbezoekTemplateItem = {
+      id: key,
+      name: (typeof p.name === "string" && p.name.trim()) || key,
+      subject: typeof p.subject === "string" ? p.subject : "",
+      body: typeof p.body === "string" ? p.body : "",
+      category: p.category ?? "other",
+      lang: p.lang ?? "nl",
+      isDefault: false,
+    };
+    items.push(item);
+    result[key] = item;
+  }
+
+  result.items = items;
   return result;
 }
