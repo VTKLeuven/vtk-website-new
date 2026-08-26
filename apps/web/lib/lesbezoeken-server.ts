@@ -150,3 +150,98 @@ export async function notifyNewLesbezoek(visit: {
     Sentry.captureException(err);
   }
 }
+
+// -----------------------------------------------------------------------------
+// Ingeplande mails (uitgesteld verzenden)
+// -----------------------------------------------------------------------------
+
+/**
+ * Verwerkt alle ingeplande lesbezoekenmails waarvan het verzendmoment verstreken is.
+ *
+ * Claimt eerst via updateMany, verstuurt vervolgens de mail en werkt het lesbezoek bij.
+ */
+export async function processDueLesbezoekScheduledMails(
+  now: Date = new Date(),
+): Promise<{ sent: number; failed: number }> {
+  try {
+    const due = await prisma.lesbezoekScheduledMail.findMany({
+      where: {
+        sendAt: { lte: now },
+        sentAt: null,
+        failedAt: null,
+      },
+      include: {
+        lesbezoek: {
+          select: {
+            id: true,
+            status: true,
+            organisation: { select: { name: true } },
+            course: true,
+          },
+        },
+      },
+      orderBy: { sendAt: "asc" },
+    });
+
+    if (due.length === 0) return { sent: 0, failed: 0 };
+
+    let sent = 0;
+    let failed = 0;
+
+    for (const item of due) {
+      // Claimen zodat gelijktijdige runs (bv. interval + page load) niet dubbel mailen
+      const claimed = await prisma.lesbezoekScheduledMail.updateMany({
+        where: { id: item.id, sentAt: null, failedAt: null },
+        data: { sentAt: now },
+      });
+      if (claimed.count === 0) continue;
+
+      const delivered = await sendLesbezoekMail({
+        to: item.to,
+        cc: item.cc ?? undefined,
+        subject: item.subject,
+        text: item.body,
+      });
+
+      if (delivered) {
+        // Lesbezoek status en datumstempels bijwerken
+        const updateData: {
+          professorMailedAt?: Date;
+          professorNudgedAt?: Date;
+          requesterNotifiedAt?: Date;
+          status?: "ASKED";
+        } = {};
+
+        if (item.kind === "professor") {
+          updateData.professorMailedAt = now;
+          if (item.lesbezoek.status === "PENDING") {
+            updateData.status = "ASKED";
+          }
+        } else if (item.kind === "nudge") {
+          updateData.professorNudgedAt = now;
+        } else if (item.kind === "requester") {
+          updateData.requesterNotifiedAt = now;
+        }
+
+        await prisma.lesbezoek.update({
+          where: { id: item.lesbezoekId },
+          data: updateData,
+        });
+
+        sent += 1;
+      } else {
+        await prisma.lesbezoekScheduledMail.update({
+          where: { id: item.id },
+          data: { sentAt: null, failedAt: now, failedReason: "Versturen via mailserver mislukt" },
+        });
+        failed += 1;
+      }
+    }
+
+    return { sent, failed };
+  } catch (err) {
+    console.error("[lesbezoeken] fout bij verwerken van geplande mails:", err);
+    Sentry.captureException(err);
+    return { sent: 0, failed: 0 };
+  }
+}

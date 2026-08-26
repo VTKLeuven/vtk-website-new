@@ -274,6 +274,11 @@ function Queue({
                 <span className="lb-badge" data-tone={meta.tone}>
                   {meta[nl ? "nl" : "en"]}
                 </span>
+                {visit.scheduledMails && visit.scheduledMails.length > 0 && (
+                  <span className="lb-badge" data-tone="sent">
+                    🕒 {nl ? `Mail gepland: ${visit.scheduledMails[0]!.sendAtShort}` : `Mail scheduled: ${visit.scheduledMails[0]!.sendAtShort}`}
+                  </span>
+                )}
                 {visit.clashes.length > 0 && (
                   <span className="lb-badge" data-tone="waiting">
                     {nl ? "Mogelijk dubbel" : "Possible duplicate"}

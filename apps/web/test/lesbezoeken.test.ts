@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
+  formatScheduleMoment,
+  formatScheduleShort,
+  getSchedulePresets,
   isOpenStatus,
   isProcessedStatus,
   LESBEZOEK_COLOURS,
@@ -485,5 +488,73 @@ describe("buildLesbezoekIcs", () => {
     // agenda met een zekerheid die ze niet heeft.
     expect(ics).not.toContain("BEGIN:VEVENT");
     expect(ics).toContain("BEGIN:VCALENDAR");
+  });
+});
+
+describe("getSchedulePresets en planningshelpers", () => {
+  it("berekent morgen 08:00 en 09:00 op een gewone weekdag (woensdag)", () => {
+    // 2026-08-26 is een woensdag
+    const wednesday = new Date("2026-08-26T21:00:00.000Z");
+    const presets = getSchedulePresets(wednesday);
+
+    expect(presets.length).toBe(2);
+    expect(presets[0]?.id).toBe("tomorrow_0800");
+    expect(presets[0]?.dateStr).toBe("2026-08-27");
+    expect(presets[0]?.timeStr).toBe("08:00");
+    expect(presets[1]?.id).toBe("tomorrow_0900");
+    expect(presets[1]?.dateStr).toBe("2026-08-27");
+    expect(presets[1]?.timeStr).toBe("09:00");
+  });
+
+  it("voegt op vrijdag een 'volgende werkdag' optie toe voor maandag", () => {
+    // 2026-08-28 is een vrijdag
+    const friday = new Date("2026-08-28T22:30:00.000Z");
+    const presets = getSchedulePresets(friday);
+
+    expect(presets.length).toBe(3);
+    expect(presets[0]?.id).toBe("tomorrow_0800"); // zaterdag
+    expect(presets[1]?.id).toBe("tomorrow_0900");
+    expect(presets[2]?.id).toBe("next_workday_0800");
+    expect(presets[2]?.dateStr).toBe("2026-08-31"); // maandag
+    expect(presets[2]?.timeStr).toBe("08:00");
+    expect(presets[2]?.labelNl).toContain("Volgende werkdag");
+  });
+
+  it("voegt op zaterdag een 'volgende werkdag' optie toe voor maandag", () => {
+    // 2026-08-29 is een zaterdag
+    const saturday = new Date("2026-08-29T14:00:00.000Z");
+    const presets = getSchedulePresets(saturday);
+
+    expect(presets.length).toBe(3);
+    expect(presets[0]?.id).toBe("tomorrow_0800"); // zondag
+    expect(presets[2]?.id).toBe("next_workday_0800");
+    expect(presets[2]?.dateStr).toBe("2026-08-31"); // maandag
+  });
+
+  it("geeft op zondag morgen als maandag", () => {
+    // 2026-08-30 is een zondag
+    const sunday = new Date("2026-08-30T14:00:00.000Z");
+    const presets = getSchedulePresets(sunday);
+
+    expect(presets.length).toBe(2);
+    expect(presets[0]?.id).toBe("tomorrow_0800");
+    expect(presets[0]?.dateStr).toBe("2026-08-31"); // maandag
+  });
+
+  it("formatteert een gepland moment netjes in Brussel-tijd", () => {
+    const moment = new Date("2026-08-27T06:00:00.000Z"); // 08:00 CEST (Brussel)
+    const nl = formatScheduleMoment(moment, "nl");
+    const en = formatScheduleMoment(moment, "en");
+
+    expect(nl).toContain("donderdag 27 augustus");
+    expect(nl).toContain("08:00");
+    expect(en).toContain("Thursday 27 August");
+    expect(en).toContain("08:00");
+  });
+
+  it("formatteert een korte weergave voor badges", () => {
+    const moment = new Date("2026-08-27T06:00:00.000Z"); // 08:00 CEST
+    const shortNl = formatScheduleShort(moment, "nl");
+    expect(shortNl).toContain("08:00");
   });
 });

@@ -54,8 +54,16 @@ export async function register(): Promise<void> {
             `[theokot] no-show-verwerking: ${result.noShows} bestelling(en) over ${result.sessions} sessie(s) gemarkeerd.`
           );
         }
+
+        const { processDueLesbezoekScheduledMails } = await import('./lib/lesbezoeken-server');
+        const lesbezoekResult = await processDueLesbezoekScheduledMails(new Date());
+        if (lesbezoekResult.sent > 0) {
+          console.info(
+            `[lesbezoeken] ${lesbezoekResult.sent} geplande mail(s) succesvol verzonden.`
+          );
+        }
       } catch (err) {
-        console.error('[theokot] no-show-verwerking mislukt:', err);
+        console.error('[background-runner] periodieke verwerking mislukt:', err);
       } finally {
         globalThis.__theokotNoShowRunning = false;
       }

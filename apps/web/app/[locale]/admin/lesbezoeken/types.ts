@@ -57,6 +57,22 @@ export type VisitView = {
    */
   mailDate: { nl: string; en: string };
   mailTime: string;
+
+  /** Openstaande ingeplande mails voor dit lesbezoek. */
+  scheduledMails: ScheduledMailView[];
+};
+
+export type ScheduledMailView = {
+  id: string;
+  kind: "professor" | "nudge" | "requester";
+  to: string;
+  cc: string | null;
+  subject: string;
+  body: string;
+  sendAt: string;
+  sendAtFormatted: string;
+  sendAtShort: string;
+  createdAt: string;
 };
 
 export type OrganisationView = {

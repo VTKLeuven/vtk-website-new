@@ -8,6 +8,8 @@ import { requireAnyPermission } from "@/lib/session";
 import { brusselsMinutesOfDay, brusselsYMD, ymdKey } from "@/lib/brussels";
 import {
   defaultTeacherLocale,
+  formatScheduleMoment,
+  formatScheduleShort,
   isOpenStatus,
   isProcessedStatus,
   matchPeculiarities,
@@ -16,6 +18,7 @@ import {
   formatMailMoment,
   getLesbezoekConfig,
   getLesbezoekTemplates,
+  processDueLesbezoekScheduledMails,
 } from "@/lib/lesbezoeken-server";
 import {
   currentWorkingYear,
@@ -83,6 +86,11 @@ export default async function AdminLesbezoekenPage({
   const from = workingYearStart(year);
   const to = workingYearStart(year + 1);
 
+  // Verwerk eventueel vervallen geplande mails direct bij paginalaad
+  await processDueLesbezoekScheduledMails().catch((err) => {
+    console.error("[lesbezoeken] fout bij verwerken van geplande mails bij paginalaad:", err);
+  });
+
   const [visitRows, organisationRows, peculiarityRows, config, templates, yearRows] =
     await Promise.all([
       prisma.lesbezoek.findMany({
@@ -111,6 +119,20 @@ export default async function AdminLesbezoekenPage({
           createdAt: true,
           organisation: { select: { id: true, name: true, colour: true, note: true } },
           reviewedBy: { select: { name: true } },
+          scheduledMails: {
+            where: { sentAt: null, failedAt: null },
+            orderBy: { sendAt: "asc" },
+            select: {
+              id: true,
+              kind: true,
+              to: true,
+              cc: true,
+              subject: true,
+              body: true,
+              sendAt: true,
+              createdAt: true,
+            },
+          },
         },
       }),
       prisma.lesbezoekOrganisation.findMany({
@@ -227,6 +249,18 @@ export default async function AdminLesbezoekenPage({
         en: formatMailMoment(row.startsAt, "en").date,
       },
       mailTime: formatMailMoment(row.startsAt, "nl").time,
+      scheduledMails: row.scheduledMails.map((m) => ({
+        id: m.id,
+        kind: m.kind as "professor" | "nudge" | "requester",
+        to: m.to,
+        cc: m.cc,
+        subject: m.subject,
+        body: m.body,
+        sendAt: m.sendAt.toISOString(),
+        sendAtFormatted: formatScheduleMoment(m.sendAt, nl ? "nl" : "en"),
+        sendAtShort: formatScheduleShort(m.sendAt, nl ? "nl" : "en"),
+        createdAt: m.createdAt.toISOString(),
+      })),
     };
   });
 

@@ -12,6 +12,13 @@
  */
 
 import { toSingleLine, toMessageText, isValidEmail } from "@/lib/contactForm";
+import {
+  brusselsWallClock,
+  brusselsYMD,
+  isoWeekday,
+  shiftYMD,
+  ymdKey,
+} from "@/lib/brussels";
 
 // -----------------------------------------------------------------------------
 // Duur en doelgroepen
@@ -613,4 +620,130 @@ export function organisationKey(name: string): string {
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, " ")
     .trim();
+}
+
+// -----------------------------------------------------------------------------
+// Planning en uitgesteld verzenden van mails
+// -----------------------------------------------------------------------------
+
+export type SchedulePreset = {
+  id: "tomorrow_0800" | "tomorrow_0900" | "next_workday_0800";
+  labelNl: string;
+  labelEn: string;
+  dateStr: string;
+  timeStr: string;
+  instant: Date;
+};
+
+/**
+ * Berekent logische presets voor het inplannen van mails (bv. morgen 08:00, morgen 09:00,
+ * volgende werkdag 08:00). Handig om professoren niet 's avonds laat of in het weekend
+ * te mailen.
+ */
+export function getSchedulePresets(now: Date = new Date()): SchedulePreset[] {
+  const currentYmd = brusselsYMD(now);
+  const tomorrowYmd = shiftYMD(currentYmd, 1);
+  const weekday = isoWeekday(currentYmd);
+
+  // Volgende werkdag:
+  // Vrijdag (5) -> Maandag (+3)
+  // Zaterdag (6) -> Maandag (+2)
+  // Zondag (7) -> Maandag (+1)
+  // Maandag t.e.m. Donderdag -> Morgen (+1)
+  const workdayDelta = weekday === 5 ? 3 : weekday === 6 ? 2 : weekday === 7 ? 1 : 1;
+  const nextWorkdayYmd = shiftYMD(currentYmd, workdayDelta);
+
+  const tomorrow8 = brusselsWallClock(tomorrowYmd.year, tomorrowYmd.month, tomorrowYmd.day, "08:00");
+  const tomorrow9 = brusselsWallClock(tomorrowYmd.year, tomorrowYmd.month, tomorrowYmd.day, "09:00");
+  const nextWorkday8 = brusselsWallClock(nextWorkdayYmd.year, nextWorkdayYmd.month, nextWorkdayYmd.day, "08:00");
+
+  const fmtDateNl = new Intl.DateTimeFormat("nl-BE", {
+    timeZone: "Europe/Brussels",
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+  });
+  const fmtDateEn = new Intl.DateTimeFormat("en-GB", {
+    timeZone: "Europe/Brussels",
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+  });
+
+  const tomorrowNl = fmtDateNl.format(tomorrow8);
+  const tomorrowEn = fmtDateEn.format(tomorrow8);
+  const workdayNl = fmtDateNl.format(nextWorkday8);
+  const workdayEn = fmtDateEn.format(nextWorkday8);
+
+  const presets: SchedulePreset[] = [
+    {
+      id: "tomorrow_0800",
+      labelNl: `Morgen om 08:00 (${tomorrowNl})`,
+      labelEn: `Tomorrow at 08:00 (${tomorrowEn})`,
+      dateStr: ymdKey(tomorrowYmd),
+      timeStr: "08:00",
+      instant: tomorrow8,
+    },
+    {
+      id: "tomorrow_0900",
+      labelNl: `Morgen om 09:00 (${tomorrowNl})`,
+      labelEn: `Tomorrow at 09:00 (${tomorrowEn})`,
+      dateStr: ymdKey(tomorrowYmd),
+      timeStr: "09:00",
+      instant: tomorrow9,
+    },
+  ];
+
+  if (workdayDelta > 1) {
+    presets.push({
+      id: "next_workday_0800",
+      labelNl: `Volgende werkdag om 08:00 (${workdayNl})`,
+      labelEn: `Next workday at 08:00 (${workdayEn})`,
+      dateStr: ymdKey(nextWorkdayYmd),
+      timeStr: "08:00",
+      instant: nextWorkday8,
+    });
+  }
+
+  return presets;
+}
+
+/** Formatteert een gepland moment in Brussel-tijd (bv. "donderdag 27 augustus om 08:00"). */
+export function formatScheduleMoment(
+  instant: Date,
+  locale: "nl" | "en",
+): string {
+  const dateFmt = new Intl.DateTimeFormat(locale === "nl" ? "nl-BE" : "en-GB", {
+    timeZone: "Europe/Brussels",
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+  });
+  const timeFmt = new Intl.DateTimeFormat(locale === "nl" ? "nl-BE" : "en-GB", {
+    timeZone: "Europe/Brussels",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+  const date = dateFmt.format(instant);
+  const time = timeFmt.format(instant);
+  return locale === "nl" ? `${date} om ${time}` : `${date} at ${time}`;
+}
+
+/** Korte weergave van een gepland moment voor overzichten en badges (bv. "do 27 aug · 08:00"). */
+export function formatScheduleShort(
+  instant: Date,
+  locale: "nl" | "en",
+): string {
+  const dateFmt = new Intl.DateTimeFormat(locale === "nl" ? "nl-BE" : "en-GB", {
+    timeZone: "Europe/Brussels",
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+  });
+  const timeFmt = new Intl.DateTimeFormat(locale === "nl" ? "nl-BE" : "en-GB", {
+    timeZone: "Europe/Brussels",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+  return `${dateFmt.format(instant)} · ${timeFmt.format(instant)}`;
 }

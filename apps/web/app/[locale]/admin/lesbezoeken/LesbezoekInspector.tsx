@@ -6,13 +6,18 @@ import { Modal } from "@/app/[locale]/admin/admin-table";
 import { SaveForm } from "@/components/ui/SaveForm";
 import { DeleteButton } from "@/components/ui/DeleteIconButton";
 import {
+  cancelLesbezoekScheduledMailAction,
   deleteLesbezoekAction,
   reviewLesbezoekAction,
+  scheduleLesbezoekMailAction,
   sendLesbezoekMailAction,
+  sendNowLesbezoekScheduledMailAction,
 } from "@/app/actions/lesbezoeken";
 import {
+  getSchedulePresets,
   LESBEZOEK_STATUSES,
   LESBEZOEK_STATUS_META,
+  type SchedulePreset,
 } from "@/lib/lesbezoeken";
 import {
   DEFAULT_LESBEZOEK_TEMPLATE_ITEMS,
@@ -157,6 +162,9 @@ export function LesbezoekInspector({
 
         {/* Waarschuwingen bovenaan */}
         <Warnings nl={nl} visit={visit} />
+
+        {/* Eventuele geplande mails */}
+        <ScheduledMailBanner nl={nl} visit={visit} canManage={canManage} />
 
         {activeTab === "details" ? (
           <div className="space-y-4">
@@ -412,6 +420,106 @@ function Warnings({ nl, visit }: { nl: boolean; visit: VisitView }) {
   );
 }
 
+/** Visuele weergave van ingeplande mails met actieknoppen voor annuleren of direct verzenden. */
+function ScheduledMailBanner({
+  nl,
+  visit,
+  canManage,
+}: {
+  nl: boolean;
+  visit: VisitView;
+  canManage: boolean;
+}) {
+  if (!visit.scheduledMails || visit.scheduledMails.length === 0) return null;
+
+  return (
+    <div className="space-y-2.5">
+      {visit.scheduledMails.map((mail) => (
+        <div
+          key={mail.id}
+          className="rounded-2xl border border-indigo-200 bg-indigo-50/90 p-4 shadow-xs space-y-2.5"
+        >
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <span className="flex h-6 w-6 items-center justify-center rounded-full bg-indigo-600 text-white text-xs font-bold shadow-xs">
+                🕒
+              </span>
+              <div>
+                <h4 className="text-xs font-bold uppercase tracking-wider text-indigo-900">
+                  {nl ? "Mail ingepland voor verzending" : "Email scheduled for delivery"}
+                </h4>
+                <p className="text-xs text-indigo-700">
+                  {nl ? "Verzending gepland op: " : "Scheduled for: "}
+                  <strong className="font-semibold text-indigo-950">{mail.sendAtFormatted}</strong>
+                </p>
+              </div>
+            </div>
+            <span className="rounded-full bg-indigo-100 px-2.5 py-0.5 text-xs font-semibold text-indigo-800 border border-indigo-200">
+              {mail.kind === "professor"
+                ? nl
+                  ? "Vraag aan docent"
+                  : "Ask lecturer"
+                : mail.kind === "nudge"
+                  ? nl
+                    ? "Herinnering"
+                    : "Reminder"
+                  : nl
+                    ? "Terugkoppeling aanvrager"
+                    : "Reply requester"}
+            </span>
+          </div>
+
+          <div className="rounded-xl border border-indigo-100 bg-white/90 p-3 text-xs space-y-1 text-zinc-800">
+            <div>
+              <span className="font-semibold text-[#5c667f]">{nl ? "Ontvanger: " : "Recipient: "}</span>
+              <span className="font-mono text-zinc-900">{mail.to}</span>
+              {mail.cc && <span className="text-[#5c667f]"> (CC: {mail.cc})</span>}
+            </div>
+            <div>
+              <span className="font-semibold text-[#5c667f]">{nl ? "Onderwerp: " : "Subject: "}</span>
+              <span className="font-medium text-zinc-900">{mail.subject}</span>
+            </div>
+            <details className="mt-2 text-xs">
+              <summary className="cursor-pointer font-medium text-indigo-700 hover:text-indigo-900">
+                {nl ? "Voorvertoning van bericht tonen" : "Show message preview"}
+              </summary>
+              <p className="mt-1.5 whitespace-pre-wrap font-mono text-[12px] text-zinc-700 bg-zinc-50 p-2.5 rounded-lg border border-zinc-200/60 leading-relaxed max-h-40 overflow-y-auto">
+                {mail.body}
+              </p>
+            </details>
+          </div>
+
+          {canManage && (
+            <div className="flex flex-wrap items-center justify-end gap-2 pt-1">
+              <form action={cancelLesbezoekScheduledMailAction}>
+                <input type="hidden" name="id" value={mail.id} />
+                <Button
+                  type="submit"
+                  variant="ghost"
+                  size="sm"
+                  className="text-red-700 hover:bg-red-50 hover:text-red-800 text-xs"
+                >
+                  {nl ? "Planning annuleren" : "Cancel schedule"}
+                </Button>
+              </form>
+              <form action={sendNowLesbezoekScheduledMailAction}>
+                <input type="hidden" name="id" value={mail.id} />
+                <Button
+                  type="submit"
+                  size="sm"
+                  className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs"
+                >
+                  {nl ? "Nu direct verzenden" : "Send immediately now"}
+                </Button>
+              </form>
+            </div>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
+
 /** Visuele tijdlijn met duidelijke stappen. */
 function TimelineSteps({ nl, visit }: { nl: boolean; visit: VisitView }) {
   const fmt = new Intl.DateTimeFormat(nl ? "nl-BE" : "en-GB", {
@@ -422,27 +530,47 @@ function TimelineSteps({ nl, visit }: { nl: boolean; visit: VisitView }) {
     minute: "2-digit",
   });
 
+  const scheduledProfMail = visit.scheduledMails?.find((m) => m.kind === "professor");
+  const scheduledNudgeMail = visit.scheduledMails?.find((m) => m.kind === "nudge");
+  const scheduledReqMail = visit.scheduledMails?.find((m) => m.kind === "requester");
+
   const steps = [
     {
       label: nl ? "Aangevraagd" : "Requested",
       done: true,
       time: visit.createdAt ? fmt.format(new Date(visit.createdAt)) : null,
+      scheduled: false,
     },
     {
       label: nl ? "Vraag naar docent" : "Asked lecturer",
       done: Boolean(visit.professorMailedAt),
-      time: visit.professorMailedAt ? fmt.format(new Date(visit.professorMailedAt)) : null,
+      time: visit.professorMailedAt
+        ? fmt.format(new Date(visit.professorMailedAt))
+        : scheduledProfMail
+          ? `🕒 ${nl ? "Gepland" : "Scheduled"}: ${scheduledProfMail.sendAtShort}`
+          : null,
+      scheduled: Boolean(!visit.professorMailedAt && scheduledProfMail),
     },
     {
       label: nl ? "Herinnering" : "Reminder",
       done: Boolean(visit.professorNudgedAt),
-      time: visit.professorNudgedAt ? fmt.format(new Date(visit.professorNudgedAt)) : null,
+      time: visit.professorNudgedAt
+        ? fmt.format(new Date(visit.professorNudgedAt))
+        : scheduledNudgeMail
+          ? `🕒 ${nl ? "Gepland" : "Scheduled"}: ${scheduledNudgeMail.sendAtShort}`
+          : null,
       optional: true,
+      scheduled: Boolean(!visit.professorNudgedAt && scheduledNudgeMail),
     },
     {
       label: nl ? "Aanvrager verwittigd" : "Requester notified",
       done: Boolean(visit.requesterNotifiedAt),
-      time: visit.requesterNotifiedAt ? fmt.format(new Date(visit.requesterNotifiedAt)) : null,
+      time: visit.requesterNotifiedAt
+        ? fmt.format(new Date(visit.requesterNotifiedAt))
+        : scheduledReqMail
+          ? `🕒 ${nl ? "Gepland" : "Scheduled"}: ${scheduledReqMail.sendAtShort}`
+          : null,
+      scheduled: Boolean(!visit.requesterNotifiedAt && scheduledReqMail),
     },
   ];
 
@@ -458,7 +586,9 @@ function TimelineSteps({ nl, visit }: { nl: boolean; visit: VisitView }) {
             className={`rounded-xl border p-2.5 transition-all ${
               step.done
                 ? "border-emerald-200 bg-emerald-50/70 text-emerald-950"
-                : "border-zinc-200/70 bg-zinc-50/50 text-zinc-500"
+                : step.scheduled
+                  ? "border-indigo-300 bg-indigo-50/80 text-indigo-950"
+                  : "border-zinc-200/70 bg-zinc-50/50 text-zinc-500"
             }`}
           >
             <div className="flex items-center gap-1.5 text-xs font-semibold">
@@ -466,10 +596,12 @@ function TimelineSteps({ nl, visit }: { nl: boolean; visit: VisitView }) {
                 className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-[10px] ${
                   step.done
                     ? "bg-emerald-600 text-white"
-                    : "bg-zinc-200 text-zinc-500 font-normal"
+                    : step.scheduled
+                      ? "bg-indigo-600 text-white"
+                      : "bg-zinc-200 text-zinc-500 font-normal"
                 }`}
               >
-                {step.done ? "✓" : idx + 1}
+                {step.done ? "✓" : step.scheduled ? "🕒" : idx + 1}
               </span>
               <span className="truncate">{step.label}</span>
             </div>
@@ -491,7 +623,7 @@ function TimelineSteps({ nl, visit }: { nl: boolean; visit: VisitView }) {
   );
 }
 
-/** De mailopsteller met sjabloonselectie en live voorvertoning. */
+/** De mailopsteller met sjabloonselectie, uitgesteld verzenden/plannen en live voorvertoning. */
 function MailComposer({
   nl,
   visit,
@@ -566,15 +698,35 @@ function MailComposer({
         ? "requester"
         : "professor";
 
+  // Planningsmodus: "scheduled" vs "instant"
+  const presets = useMemo(() => getSchedulePresets(new Date()), []);
+  const [sendMode, setSendMode] = useState<"scheduled" | "instant">("scheduled");
+  const [selectedPresetId, setSelectedPresetId] = useState<string>(presets[0]?.id ?? "tomorrow_0800");
+
+  const [customDate, setCustomDate] = useState<string>(() => presets[0]?.dateStr ?? "");
+  const [customTime, setCustomTime] = useState<string>(() => presets[0]?.timeStr ?? "08:00");
+
+  const activeSendDate = selectedPresetId === "custom"
+    ? customDate
+    : (presets.find((p) => p.id === selectedPresetId)?.dateStr ?? customDate);
+  const activeSendTime = selectedPresetId === "custom"
+    ? customTime
+    : (presets.find((p) => p.id === selectedPresetId)?.timeStr ?? customTime);
+
+  const activePreset = presets.find((p) => p.id === selectedPresetId);
+  const activeMomentLabel = activePreset
+    ? (nl ? activePreset.labelNl : activePreset.labelEn)
+    : `${activeSendDate} ${activeSendTime}`;
+
   return (
     <section className="rounded-2xl border border-vtk-blue/15 bg-white p-4 shadow-xs space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-vtk-blue/10 pb-3">
         <div>
-          <h3 className="font-semibold text-vtk-ink">{nl ? "Mail opstellen" : "Compose email"}</h3>
+          <h3 className="font-semibold text-vtk-ink">{nl ? "Mail opstellen & Plannen" : "Compose & Schedule email"}</h3>
           <p className="text-xs text-[#5c667f]">
             {nl
-              ? "Kies een sjabloon en pas de tekst naar wens aan voor je verstuurt."
-              : "Pick a template and edit the text as needed before sending."}
+              ? "Kies een sjabloon, pas de tekst aan en kies wanneer de mail verzonden moet worden."
+              : "Pick a template, edit the text and choose when the email should be sent."}
           </p>
         </div>
         <Button type="button" variant="ghost" size="sm" onClick={onBack}>
@@ -638,36 +790,177 @@ function MailComposer({
         </div>
       </div>
 
+      {/* Verzendtijdstip / Planningsopties */}
+      <div className="rounded-2xl border border-vtk-blue/15 bg-zinc-50/70 p-4 space-y-3">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <Label className="text-xs font-bold uppercase tracking-wider text-[#5c667f] mb-0">
+            {nl ? "Verzendtijdstip" : "Sending time"}
+          </Label>
+          <div className="inline-flex rounded-full border border-vtk-blue/15 bg-white p-0.5">
+            <button
+              type="button"
+              onClick={() => setSendMode("scheduled")}
+              className={`rounded-full px-3 py-1 text-xs font-semibold transition-all flex items-center gap-1.5 ${
+                sendMode === "scheduled"
+                  ? "bg-indigo-600 text-white shadow-xs"
+                  : "text-[#5c667f] hover:text-vtk-ink"
+              }`}
+            >
+              <span>🕒</span>
+              <span>{nl ? "Inplannen (Aanbevolen)" : "Schedule (Recommended)"}</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setSendMode("instant")}
+              className={`rounded-full px-3 py-1 text-xs font-semibold transition-all flex items-center gap-1.5 ${
+                sendMode === "instant"
+                  ? "bg-vtk-ink text-white shadow-xs"
+                  : "text-[#5c667f] hover:text-vtk-ink"
+              }`}
+            >
+              <span>⚡</span>
+              <span>{nl ? "Direct versturen" : "Send immediately"}</span>
+            </button>
+          </div>
+        </div>
+
+        {sendMode === "scheduled" ? (
+          <div className="space-y-3 pt-1">
+            <p className="text-xs text-[#5c667f]">
+              {nl
+                ? "Mails naar professoren worden bij voorkeur tijdens kantooruren verzonden. Kies een preset of stel zelf een moment in."
+                : "Emails to lecturers are preferably sent during working hours. Choose a preset or specify a custom time."}
+            </p>
+
+            <div className="flex flex-wrap gap-2">
+              {presets.map((p) => {
+                const active = selectedPresetId === p.id;
+                return (
+                  <button
+                    key={p.id}
+                    type="button"
+                    onClick={() => setSelectedPresetId(p.id)}
+                    className={`rounded-full border px-3.5 py-1.5 text-xs font-medium transition-all ${
+                      active
+                        ? "border-indigo-600 bg-indigo-50 text-indigo-900 font-semibold shadow-xs"
+                        : "border-zinc-200 bg-white text-zinc-700 hover:border-zinc-300"
+                    }`}
+                  >
+                    {nl ? p.labelNl : p.labelEn}
+                  </button>
+                );
+              })}
+              <button
+                type="button"
+                onClick={() => setSelectedPresetId("custom")}
+                className={`rounded-full border px-3.5 py-1.5 text-xs font-medium transition-all ${
+                  selectedPresetId === "custom"
+                    ? "border-indigo-600 bg-indigo-50 text-indigo-900 font-semibold shadow-xs"
+                    : "border-zinc-200 bg-white text-zinc-700 hover:border-zinc-300"
+                }`}
+              >
+                {nl ? "Aangepast moment…" : "Custom time…"}
+              </button>
+            </div>
+
+            {selectedPresetId === "custom" && (
+              <div className="grid gap-3 pt-1 sm:grid-cols-2 rounded-xl border border-indigo-100 bg-white p-3">
+                <div>
+                  <Label htmlFor={`send-date-${visit.id}`}>{nl ? "Verzenddatum" : "Send date"}</Label>
+                  <Input
+                    id={`send-date-${visit.id}`}
+                    type="date"
+                    value={customDate}
+                    onChange={(e) => setCustomDate(e.target.value)}
+                    required
+                  />
+                </div>
+                <div>
+                  <Label htmlFor={`send-time-${visit.id}`}>{nl ? "Verzenduurtijd (Brussel-tijd)" : "Send time"}</Label>
+                  <Input
+                    id={`send-time-${visit.id}`}
+                    type="time"
+                    value={customTime}
+                    onChange={(e) => setCustomTime(e.target.value)}
+                    required
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+        ) : (
+          <p className="text-xs text-amber-800 bg-amber-50/80 border border-amber-200 p-2.5 rounded-xl">
+            {nl
+              ? "⚠️ De mail wordt meteen bij het klikken verstuurd naar de ontvanger."
+              : "⚠️ The email will be delivered immediately upon clicking send."}
+          </p>
+        )}
+      </div>
+
       {recipient ? (
-        <SaveForm
-          key={`${selectedId}-${lang}`}
-          action={sendLesbezoekMailAction}
-          submitLabel={nl ? `Versturen naar ${recipient}` : `Send to ${recipient}`}
-          savingLabel={nl ? "Versturen…" : "Sending…"}
-          savedMessage={nl ? "Mail verstuurd." : "Email sent."}
-          errorMessages={errors}
-          fallbackErrorMessage={nl ? "Niet verstuurd." : "Not sent."}
-          resetOnSuccess={false}
-          className="space-y-3"
-        >
-          <input type="hidden" name="id" value={visit.id} />
-          <input type="hidden" name="kind" value={kind} />
-          <div>
-            <Label htmlFor={`subject-${visit.id}`}>{nl ? "Onderwerp" : "Subject"}</Label>
-            <Input id={`subject-${visit.id}`} name="subject" defaultValue={rendered.subject} required />
-          </div>
-          <div>
-            <Label htmlFor={`body-${visit.id}`}>{nl ? "Bericht" : "Message"}</Label>
-            <Textarea
-              id={`body-${visit.id}`}
-              name="body"
-              rows={11}
-              defaultValue={rendered.body}
-              className="font-mono text-[13px] leading-relaxed"
-              required
-            />
-          </div>
-        </SaveForm>
+        sendMode === "scheduled" ? (
+          <SaveForm
+            key={`${selectedId}-${lang}-scheduled-${selectedPresetId}-${activeSendDate}-${activeSendTime}`}
+            action={scheduleLesbezoekMailAction}
+            submitLabel={nl ? `Inplannen voor ${activeMomentLabel}` : `Schedule for ${activeMomentLabel}`}
+            savingLabel={nl ? "Inplannen…" : "Scheduling…"}
+            savedMessage={nl ? "Mail ingepland." : "Email scheduled."}
+            errorMessages={errors}
+            fallbackErrorMessage={nl ? "Niet ingepland." : "Not scheduled."}
+            resetOnSuccess={false}
+            className="space-y-3"
+          >
+            <input type="hidden" name="id" value={visit.id} />
+            <input type="hidden" name="kind" value={kind} />
+            <input type="hidden" name="sendAtDate" value={activeSendDate} />
+            <input type="hidden" name="sendAtTime" value={activeSendTime} />
+            <div>
+              <Label htmlFor={`subject-${visit.id}`}>{nl ? "Onderwerp" : "Subject"}</Label>
+              <Input id={`subject-${visit.id}`} name="subject" defaultValue={rendered.subject} required />
+            </div>
+            <div>
+              <Label htmlFor={`body-${visit.id}`}>{nl ? "Bericht" : "Message"}</Label>
+              <Textarea
+                id={`body-${visit.id}`}
+                name="body"
+                rows={11}
+                defaultValue={rendered.body}
+                className="font-mono text-[13px] leading-relaxed"
+                required
+              />
+            </div>
+          </SaveForm>
+        ) : (
+          <SaveForm
+            key={`${selectedId}-${lang}-instant`}
+            action={sendLesbezoekMailAction}
+            submitLabel={nl ? `Direct versturen naar ${recipient}` : `Send immediately to ${recipient}`}
+            savingLabel={nl ? "Versturen…" : "Sending…"}
+            savedMessage={nl ? "Mail verstuurd." : "Email sent."}
+            errorMessages={errors}
+            fallbackErrorMessage={nl ? "Niet verstuurd." : "Not sent."}
+            resetOnSuccess={false}
+            className="space-y-3"
+          >
+            <input type="hidden" name="id" value={visit.id} />
+            <input type="hidden" name="kind" value={kind} />
+            <div>
+              <Label htmlFor={`subject-${visit.id}`}>{nl ? "Onderwerp" : "Subject"}</Label>
+              <Input id={`subject-${visit.id}`} name="subject" defaultValue={rendered.subject} required />
+            </div>
+            <div>
+              <Label htmlFor={`body-${visit.id}`}>{nl ? "Bericht" : "Message"}</Label>
+              <Textarea
+                id={`body-${visit.id}`}
+                name="body"
+                rows={11}
+                defaultValue={rendered.body}
+                className="font-mono text-[13px] leading-relaxed"
+                required
+              />
+            </div>
+          </SaveForm>
+        )
       ) : (
         <p className="rounded-xl border border-dashed border-amber-300 bg-amber-50 p-4 text-center text-sm text-amber-800">
           {nl

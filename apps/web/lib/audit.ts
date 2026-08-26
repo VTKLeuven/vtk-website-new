@@ -104,6 +104,7 @@ export const AUDIT_ENTITIES = {
   lesbezoek: { nl: "Lesbezoek", en: "Classroom visit", group: "lesbezoeken" },
   lesbezoekOrganisation: { nl: "Lesbezoekorganisatie", en: "Classroom-visit organisation", group: "lesbezoeken" },
   lesbezoekPeculiarity: { nl: "Bijzonderheid lesbezoeken", en: "Classroom-visit note", group: "lesbezoeken" },
+  lesbezoekScheduledMail: { nl: "Geplande lesbezoekmail", en: "Scheduled classroom-visit email", group: "lesbezoeken" },
   lesbezoekSettings: { nl: "Lesbezoekeninstelling", en: "Classroom-visit setting", group: "lesbezoeken" },
   piano: { nl: "Piano", en: "Piano", group: "piano" },
   pianoReservation: { nl: "Pianoreservatie", en: "Piano reservation", group: "piano" },

@@ -688,6 +688,7 @@ model User {
 
   createdLesbezoeken  Lesbezoek[] @relation("LesbezoekCreatedBy")
   reviewedLesbezoeken Lesbezoek[] @relation("LesbezoekReviewedBy")
+  createdLesbezoekScheduledMails LesbezoekScheduledMail[] @relation("LesbezoekScheduledMailCreatedBy")
 
   @@index([deletedAt])
 }
@@ -4662,11 +4663,43 @@ model Lesbezoek {
   reviewedBy   User?                 @relation("LesbezoekReviewedBy", fields: [reviewedById], references: [id], onDelete: SetNull)
   createdBy    User?                 @relation("LesbezoekCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
 
+  scheduledMails LesbezoekScheduledMail[]
+
   @@index([startsAt])
   @@index([status, startsAt])
   @@index([organisationId, startsAt])
   /// Voedt de dubbelaanvraag-waarschuwing: dezelfde professor op dezelfde dag.
   @@index([teacherEmail, startsAt])
+}
+
+/// Een ingeplande mail rond een lesbezoek (bv. vraag naar een docent die pas
+/// de volgende ochtend tijdens kantooruren verstuurd mag worden).
+model LesbezoekScheduledMail {
+  id          String   @id @default(cuid())
+  lesbezoekId String
+  kind        String
+  to          String
+  cc          String?
+  subject     String
+  body        String
+
+  /// Wanneer de mail volgens planning verstuurd moet worden.
+  sendAt       DateTime  @db.Timestamptz(3)
+  /// Wanneer de mail daadwerkelijk verstuurd werd (null = nog in wachtrij).
+  sentAt       DateTime? @db.Timestamptz(3)
+  /// Foutregistratie indien versturen mislukte.
+  failedAt     DateTime? @db.Timestamptz(3)
+  failedReason String?
+
+  createdById String?
+  createdAt   DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt   DateTime @updatedAt @db.Timestamptz(3)
+
+  lesbezoek Lesbezoek @relation(fields: [lesbezoekId], references: [id], onDelete: Cascade)
+  createdBy User?     @relation("LesbezoekScheduledMailCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@index([sendAt, sentAt])
+  @@index([lesbezoekId])
 }
 
 /// Wat je van een professor, een vak of een faculteit moet weten vóór je een

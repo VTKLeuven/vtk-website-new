@@ -417,13 +417,18 @@ export async function sendLesbezoekMailAction(
   if (!delivered) return saveError("MAIL_FAILED");
 
   const rule = MAIL_KINDS[kind];
-  await prisma.lesbezoek.update({
-    where: { id },
-    data: {
-      [rule.stamp]: new Date(),
-      ...(rule.status ? { status: rule.status } : {}),
-    },
-  });
+  await prisma.$transaction([
+    prisma.lesbezoek.update({
+      where: { id },
+      data: {
+        [rule.stamp]: new Date(),
+        ...(rule.status ? { status: rule.status } : {}),
+      },
+    }),
+    prisma.lesbezoekScheduledMail.deleteMany({
+      where: { lesbezoekId: id, sentAt: null },
+    }),
+  ]);
 
   await logAudit({
     action: "send",
@@ -435,6 +440,193 @@ export async function sendLesbezoekMailAction(
 
   revalidateLesbezoeken();
   return saveOk();
+}
+
+/**
+ * Plant een mail in voor een lesbezoek op een toekomstig tijdstip (Brussel-tijd).
+ */
+export async function scheduleLesbezoekMailAction(
+  _prev: SaveState,
+  formData: FormData,
+): Promise<SaveState> {
+  const session = await requirePermission("lesbezoeken.manage");
+
+  const id = toSingleLine(formData.get("id"));
+  const kind = toSingleLine(formData.get("kind"));
+  const subject = toSingleLine(formData.get("subject"));
+  const body = toMessageText(formData.get("body"));
+  const sendAtDate = toSingleLine(formData.get("sendAtDate"));
+  const sendAtTime = toSingleLine(formData.get("sendAtTime"));
+
+  if (!id || !isMailKind(kind)) return saveError("INVALID_INPUT");
+  if (!subject || !body) return saveError("MAIL_EMPTY");
+  if (!sendAtDate || !sendAtTime) return saveError("SCHEDULE_TIME_INVALID");
+
+  const sendAt = toInstant(sendAtDate, sendAtTime);
+  if (!sendAt) return saveError("SCHEDULE_TIME_INVALID");
+
+  // Moet in de toekomst liggen (met kleine speling van 30s)
+  if (sendAt.getTime() <= Date.now() + 30_000) {
+    return saveError("SCHEDULE_TIME_PAST");
+  }
+
+  const visit = await prisma.lesbezoek.findUnique({
+    where: { id },
+    select: {
+      teacherEmail: true,
+      requesterEmail: true,
+      course: true,
+      organisation: { select: { name: true, contactEmail: true } },
+    },
+  });
+  if (!visit) return saveError("NOT_FOUND");
+
+  const to = kind === "requester" ? visit.requesterEmail : visit.teacherEmail;
+  if (!to) return saveError("NO_RECIPIENT");
+  const cc = kind === "requester" ? (visit.organisation.contactEmail ?? null) : null;
+
+  // Vervang eventuele eerdere openstaande geplande mail voor dit lesbezoek
+  await prisma.lesbezoekScheduledMail.deleteMany({
+    where: { lesbezoekId: id, sentAt: null },
+  });
+
+  const created = await prisma.lesbezoekScheduledMail.create({
+    data: {
+      lesbezoekId: id,
+      kind,
+      to,
+      cc,
+      subject,
+      body,
+      sendAt,
+      createdById: session.user.id,
+    },
+    select: { id: true },
+  });
+
+  await logAudit({
+    action: "create",
+    entity: "lesbezoekScheduledMail",
+    entityId: created.id,
+    target: `${visit.organisation.name} — ${visit.course}`,
+    summary: `mail naar ${to} ingepland voor ${sendAtDate} om ${sendAtTime}`,
+  });
+
+  revalidateLesbezoeken();
+  return saveOk();
+}
+
+/**
+ * Annuleert een ingeplande mail voordat deze verstuurd is.
+ */
+export async function cancelLesbezoekScheduledMailAction(
+  formData: FormData,
+): Promise<void> {
+  await requirePermission("lesbezoeken.manage");
+
+  const id = toSingleLine(formData.get("id"));
+  const lesbezoekId = toSingleLine(formData.get("lesbezoekId"));
+
+  if (id) {
+    const before = await prisma.lesbezoekScheduledMail.findUnique({
+      where: { id },
+      select: {
+        to: true,
+        lesbezoek: { select: { organisation: { select: { name: true } }, course: true } },
+      },
+    });
+    if (before) {
+      await prisma.lesbezoekScheduledMail.delete({ where: { id } });
+      await logAudit({
+        action: "delete",
+        entity: "lesbezoekScheduledMail",
+        entityId: id,
+        target: `${before.lesbezoek.organisation.name} — ${before.lesbezoek.course}`,
+        summary: `planning geannuleerd voor ${before.to}`,
+      });
+    }
+  } else if (lesbezoekId) {
+    await prisma.lesbezoekScheduledMail.deleteMany({
+      where: { lesbezoekId, sentAt: null },
+    });
+  }
+
+  revalidateLesbezoeken();
+}
+
+/**
+ * Verstuurt een ingeplande mail onmiddellijk in plaats van te wachten op het geplande tijdstip.
+ */
+export async function sendNowLesbezoekScheduledMailAction(
+  formData: FormData,
+): Promise<void> {
+  await requirePermission("lesbezoeken.manage");
+
+  const id = toSingleLine(formData.get("id"));
+  if (!id) return;
+
+  const item = await prisma.lesbezoekScheduledMail.findUnique({
+    where: { id },
+    include: {
+      lesbezoek: {
+        select: {
+          id: true,
+          status: true,
+          organisation: { select: { name: true } },
+          course: true,
+        },
+      },
+    },
+  });
+  if (!item || item.sentAt) return;
+
+  const delivered = await sendLesbezoekMail({
+    to: item.to,
+    cc: item.cc ?? undefined,
+    subject: item.subject,
+    text: item.body,
+  });
+
+  if (delivered) {
+    const now = new Date();
+    await prisma.lesbezoekScheduledMail.update({
+      where: { id },
+      data: { sentAt: now },
+    });
+
+    const updateData: {
+      professorMailedAt?: Date;
+      professorNudgedAt?: Date;
+      requesterNotifiedAt?: Date;
+      status?: "ASKED";
+    } = {};
+
+    if (item.kind === "professor") {
+      updateData.professorMailedAt = now;
+      if (item.lesbezoek.status === "PENDING") {
+        updateData.status = "ASKED";
+      }
+    } else if (item.kind === "nudge") {
+      updateData.professorNudgedAt = now;
+    } else if (item.kind === "requester") {
+      updateData.requesterNotifiedAt = now;
+    }
+
+    await prisma.lesbezoek.update({
+      where: { id: item.lesbezoekId },
+      data: updateData,
+    });
+
+    await logAudit({
+      action: "send",
+      entity: "lesbezoekScheduledMail",
+      entityId: id,
+      target: `${item.lesbezoek.organisation.name} — ${item.lesbezoek.course}`,
+      summary: `direct verzonden naar ${item.to}`,
+    });
+  }
+
+  revalidateLesbezoeken();
 }
 
 // -----------------------------------------------------------------------------
