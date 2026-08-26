@@ -127,13 +127,29 @@ export const LESBEZOEK_STATUS_META: Record<
   ASKED: { nl: "Bij de prof", en: "With the professor", tone: "sent" },
   APPROVED: { nl: "Goedgekeurd", en: "Approved", tone: "ok" },
   DECLINED: { nl: "Afgewezen door de prof", en: "Declined by the professor", tone: "no" },
-  REJECTED: { nl: "Niet doorgestuurd", en: "Not forwarded", tone: "no" },
+  REJECTED: { nl: "Afgewezen door ons", en: "Declined by us", tone: "no" },
   CANCELLED: { nl: "Ingetrokken", en: "Withdrawn", tone: "no" },
 };
 
-/** Welke statussen tellen als "hier moet nog iets mee gebeuren". */
+/** Statussen die als "hier moet nog iets mee gebeuren" tellen (actie vereist). */
+export const OPEN_STATUSES: readonly LesbezoekStatusCode[] = ["PENDING", "ASKED"] as const;
+
+/** Statussen die als "afgehandeld / verwerkt" tellen. */
+export const PROCESSED_STATUSES: readonly LesbezoekStatusCode[] = [
+  "APPROVED",
+  "DECLINED",
+  "REJECTED",
+  "CANCELLED",
+] as const;
+
+/** Welke statussen tellen als openstaand (Nieuw & Bij de prof). */
 export function isOpenStatus(status: LesbezoekStatusCode): boolean {
-  return status === "PENDING" || status === "ASKED";
+  return (OPEN_STATUSES as readonly string[]).includes(status);
+}
+
+/** Welke statussen tellen als verwerkt / afgehandeld. */
+export function isProcessedStatus(status: LesbezoekStatusCode): boolean {
+  return (PROCESSED_STATUSES as readonly string[]).includes(status);
 }
 
 // -----------------------------------------------------------------------------

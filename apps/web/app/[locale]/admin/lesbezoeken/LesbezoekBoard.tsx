@@ -7,6 +7,9 @@ import {
   LESBEZOEK_STATUSES,
   LESBEZOEK_STATUS_META,
   isOpenStatus,
+  isProcessedStatus,
+  OPEN_STATUSES,
+  PROCESSED_STATUSES,
 } from "@/lib/lesbezoeken";
 import type { LesbezoekTemplates } from "@/lib/lesbezoekenMail";
 import { LesbezoekCalendar } from "./LesbezoekCalendar";
@@ -15,14 +18,17 @@ import { LesbezoekInspector } from "./LesbezoekInspector";
 import type { OrganisationView, VisitView } from "./types";
 
 /**
- * De twee weergaven van dezelfde bezoeken: de werklijst (wat moet er nog
- * gebeuren) en de kalender (wanneer staat wat gepland). Ze delen de filters en
- * hetzelfde detailpaneel, zodat je vanuit beide kanten dezelfde handelingen doet.
- *
- * De werklijst is de standaard en de kalender niet, omgekeerd aan de app die dit
- * vervangt. Die had enkel een kalender, en daardoor was "welke aanvraag ligt hier
- * al een week te wachten?" precies de vraag die je er niet aan kon stellen.
+ * De weergaven van dezelfde bezoeken:
+ * - queue: "Aanvragen" met openstaande items die actie vereisen (standaard Nieuw & Bij de prof).
+ * - processed: "Verwerkt" met reeds afgehandelde items (Goedgekeurd, Afgewezen, Ingetrokken).
+ * - calendar: "Kalender" met chronologisch geplande bezoeken.
  */
+
+function defaultStatusForMode(m: "queue" | "processed" | "calendar"): string {
+  if (m === "queue") return "OPEN";
+  if (m === "processed") return "PROCESSED";
+  return "";
+}
 
 export function LesbezoekBoard({
   nl,
@@ -34,7 +40,7 @@ export function LesbezoekBoard({
   signature,
 }: {
   nl: boolean;
-  mode: "queue" | "approved" | "calendar";
+  mode: "queue" | "processed" | "calendar";
   canManage: boolean;
   visits: VisitView[];
   organisations: OrganisationView[];
@@ -46,19 +52,28 @@ export function LesbezoekBoard({
   const [creating, setCreating] = useState(false);
   const [query, setQuery] = useState("");
   const [organisation, setOrganisation] = useState("");
-  // De werklijst begint bij wat nog openstaat; de goedgekeurd-tab toont enkel goedgekeurd;
-  // de kalender toont standaard alles.
-  const [status, setStatus] = useState<string>(
-    mode === "approved" ? "APPROVED" : mode === "queue" ? "OPEN" : "",
-  );
+
+  const [prevMode, setPrevMode] = useState(mode);
+  const [status, setStatus] = useState<string>(() => defaultStatusForMode(mode));
+
+  if (prevMode !== mode) {
+    setPrevMode(mode);
+    setStatus(defaultStatusForMode(mode));
+  }
 
   const filtered = useMemo(() => {
     const needle = query.trim().toLowerCase();
     return visits.filter((visit) => {
-      if (mode === "approved" && visit.status !== "APPROVED") return false;
       if (organisation && visit.organisationId !== organisation) return false;
-      if (status === "OPEN" && !isOpenStatus(visit.status)) return false;
-      if (status && status !== "OPEN" && visit.status !== status) return false;
+
+      if (status === "OPEN") {
+        if (!isOpenStatus(visit.status)) return false;
+      } else if (status === "PROCESSED") {
+        if (!isProcessedStatus(visit.status)) return false;
+      } else if (status && status !== "ALL") {
+        if (visit.status !== status) return false;
+      }
+
       if (!needle) return true;
       return [
         visit.organisationName,
@@ -70,7 +85,7 @@ export function LesbezoekBoard({
         visit.requesterEmail ?? "",
       ].some((value) => value.toLowerCase().includes(needle));
     });
-  }, [visits, query, organisation, status, mode]);
+  }, [visits, query, organisation, status]);
 
   const selected = selectedId ? (visits.find((visit) => visit.id === selectedId) ?? null) : null;
 
@@ -101,23 +116,50 @@ export function LesbezoekBoard({
             ))}
           </Select>
         </div>
-        {mode !== "approved" && (
-          <div className="w-48">
-            <Select
-              value={status}
-              onChange={(event) => setStatus(event.target.value)}
-              aria-label={nl ? "Status" : "Status"}
-            >
-              <option value="">{nl ? "Alle statussen" : "All statuses"}</option>
-              <option value="OPEN">{nl ? "Openstaand" : "Open"}</option>
-              {LESBEZOEK_STATUSES.map((value) => (
-                <option key={value} value={value}>
-                  {LESBEZOEK_STATUS_META[value][nl ? "nl" : "en"]}
+        <div className="w-56">
+          <Select
+            value={status}
+            onChange={(event) => setStatus(event.target.value)}
+            aria-label={nl ? "Status" : "Status"}
+          >
+            {mode === "queue" && (
+              <>
+                <option value="OPEN">
+                  {nl ? "Openstaand (Nieuw & Bij de prof)" : "Open (New & With professor)"}
                 </option>
-              ))}
-            </Select>
-          </div>
-        )}
+                {OPEN_STATUSES.map((code) => (
+                  <option key={code} value={code}>
+                    {LESBEZOEK_STATUS_META[code][nl ? "nl" : "en"]}
+                  </option>
+                ))}
+                <option value="ALL">{nl ? "Alle statussen" : "All statuses"}</option>
+              </>
+            )}
+            {mode === "processed" && (
+              <>
+                <option value="PROCESSED">{nl ? "Alle verwerkt" : "All processed"}</option>
+                {PROCESSED_STATUSES.map((code) => (
+                  <option key={code} value={code}>
+                    {LESBEZOEK_STATUS_META[code][nl ? "nl" : "en"]}
+                  </option>
+                ))}
+                <option value="ALL">{nl ? "Alle statussen" : "All statuses"}</option>
+              </>
+            )}
+            {mode === "calendar" && (
+              <>
+                <option value="">{nl ? "Alle statussen" : "All statuses"}</option>
+                <option value="OPEN">{nl ? "Openstaand" : "Open"}</option>
+                <option value="PROCESSED">{nl ? "Verwerkt" : "Processed"}</option>
+                {LESBEZOEK_STATUSES.map((code) => (
+                  <option key={code} value={code}>
+                    {LESBEZOEK_STATUS_META[code][nl ? "nl" : "en"]}
+                  </option>
+                ))}
+              </>
+            )}
+          </Select>
+        </div>
         {canManage && (
           <Button type="button" size="sm" onClick={() => setCreating(true)}>
             {nl ? "Nieuw lesbezoek" : "New classroom visit"}
@@ -139,11 +181,13 @@ export function LesbezoekBoard({
           selectedId={selectedId}
           onSelect={setSelectedId}
           emptyText={
-            mode === "approved"
+            mode === "processed"
               ? nl
-                ? "Geen goedgekeurde lesbezoeken gevonden."
-                : "No approved classroom visits found."
-              : undefined
+                ? "Geen verwerkte lesbezoeken gevonden."
+                : "No processed classroom visits found."
+              : nl
+                ? "Geen openstaande lesbezoeken die actie vereisen."
+                : "No open classroom visits requiring action."
           }
         />
       )}

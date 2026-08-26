@@ -1,7 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
+  isOpenStatus,
+  isProcessedStatus,
   LESBEZOEK_COLOURS,
   LESBEZOEK_MIN_LEAD_DAYS,
+  LESBEZOEK_STATUS_META,
   defaultTeacherLocale,
   matchPeculiarities,
   nextOrganisationColour,
@@ -262,6 +265,31 @@ describe("nextOrganisationColour", () => {
   it("begint opnieuw wanneer het palet op is", () => {
     const colour = nextOrganisationColour([...LESBEZOEK_COLOURS]);
     expect(LESBEZOEK_COLOURS).toContain(colour);
+  });
+});
+
+describe("statussen en categorisering", () => {
+  it("herkent openstaande statussen (Nieuw en Bij de prof)", () => {
+    expect(isOpenStatus("PENDING")).toBe(true);
+    expect(isOpenStatus("ASKED")).toBe(true);
+    expect(isOpenStatus("APPROVED")).toBe(false);
+    expect(isOpenStatus("DECLINED")).toBe(false);
+    expect(isOpenStatus("REJECTED")).toBe(false);
+    expect(isOpenStatus("CANCELLED")).toBe(false);
+  });
+
+  it("herkent verwerkte statussen", () => {
+    expect(isProcessedStatus("APPROVED")).toBe(true);
+    expect(isProcessedStatus("DECLINED")).toBe(true);
+    expect(isProcessedStatus("REJECTED")).toBe(true);
+    expect(isProcessedStatus("CANCELLED")).toBe(true);
+    expect(isProcessedStatus("PENDING")).toBe(false);
+    expect(isProcessedStatus("ASKED")).toBe(false);
+  });
+
+  it("bevat het correcte label voor REJECTED (Afgewezen door ons)", () => {
+    expect(LESBEZOEK_STATUS_META.REJECTED.nl).toBe("Afgewezen door ons");
+    expect(LESBEZOEK_STATUS_META.REJECTED.en).toBe("Declined by us");
   });
 });
 

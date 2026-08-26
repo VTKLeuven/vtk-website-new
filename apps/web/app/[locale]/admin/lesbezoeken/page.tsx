@@ -8,8 +8,9 @@ import { requireAnyPermission } from "@/lib/session";
 import { brusselsMinutesOfDay, brusselsYMD, ymdKey } from "@/lib/brussels";
 import {
   defaultTeacherLocale,
+  isOpenStatus,
+  isProcessedStatus,
   matchPeculiarities,
-  type LesbezoekStatusCode,
 } from "@/lib/lesbezoeken";
 import {
   formatMailMoment,
@@ -41,18 +42,15 @@ import "@/app/design/vtk-lesbezoeken.css";
  * docs/design-decisions.md ("Lesbezoeken").
  */
 
-const TABS = ["aanvragen", "goedgekeurd", "kalender", "instellingen"] as const;
+const TABS = ["aanvragen", "verwerkt", "kalender", "instellingen"] as const;
 type Tab = (typeof TABS)[number];
 
 const TAB_LABELS: Record<Tab, { nl: string; en: string }> = {
   aanvragen: { nl: "Aanvragen", en: "Requests" },
-  goedgekeurd: { nl: "Goedgekeurd", en: "Approved" },
+  verwerkt: { nl: "Verwerkt", en: "Processed" },
   kalender: { nl: "Kalender", en: "Calendar" },
   instellingen: { nl: "Organisaties & mails", en: "Organisations & mail" },
 };
-
-/** Statussen die als "hier moet nog iets mee gebeuren" tellen, voor de teller. */
-const OPEN_STATUSES: LesbezoekStatusCode[] = ["PENDING", "ASKED"];
 
 export default async function AdminLesbezoekenPage({
   params,
@@ -72,7 +70,11 @@ export default async function AdminLesbezoekenPage({
     session.user.isSuperAdmin || session.permissions.includes("lesbezoeken.manage");
 
   const { tab: tabParam, jaar } = await searchParams;
-  const tab: Tab = (TABS as readonly string[]).includes(tabParam ?? "") ? (tabParam as Tab) : "aanvragen";
+  const normalizedTab =
+    tabParam === "goedgekeurd" || tabParam === "processed" ? "verwerkt" : tabParam;
+  const tab: Tab = (TABS as readonly string[]).includes(normalizedTab ?? "")
+    ? (normalizedTab as Tab)
+    : "aanvragen";
   const year = parseWorkingYear(jaar);
 
   // Het venster van één werkingsjaar (15 juli tot 15 juli). Alle bezoeken van dat
@@ -228,8 +230,8 @@ export default async function AdminLesbezoekenPage({
     };
   });
 
-  const openCount = visits.filter((visit) => OPEN_STATUSES.includes(visit.status)).length;
-  const approvedCount = visits.filter((visit) => visit.status === "APPROVED").length;
+  const openCount = visits.filter((visit) => isOpenStatus(visit.status)).length;
+  const processedCount = visits.filter((visit) => isProcessedStatus(visit.status)).length;
   const years = workingYearTabs(
     yearRows.map((row) => {
       const { year: y, month } = brusselsYMD(row.startsAt);
@@ -269,7 +271,7 @@ export default async function AdminLesbezoekenPage({
           >
             {TAB_LABELS[value][nl ? "nl" : "en"]}
             {value === "aanvragen" && openCount > 0 ? ` (${openCount})` : ""}
-            {value === "goedgekeurd" && approvedCount > 0 ? ` (${approvedCount})` : ""}
+            {value === "verwerkt" && processedCount > 0 ? ` (${processedCount})` : ""}
           </Link>
         ))}
       </nav>
@@ -303,7 +305,7 @@ export default async function AdminLesbezoekenPage({
         <Card className="p-5">
           <LesbezoekBoard
             nl={nl}
-            mode={tab === "kalender" ? "calendar" : tab === "goedgekeurd" ? "approved" : "queue"}
+            mode={tab === "kalender" ? "calendar" : tab === "verwerkt" ? "processed" : "queue"}
             canManage={canManage}
             visits={visits}
             organisations={organisations.filter(
