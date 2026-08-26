@@ -13,15 +13,13 @@ import {
   deleteUserAction,
   removeMembershipAction,
   saveUserAction,
+  sendUserAccessLinkAction,
 } from '@/app/actions/users-groups';
 import { assignUserRoleAction, removeUserRoleAction } from '@/app/actions/roles';
 import { currentWorkingYear, formatWorkingYear } from '@/lib/workingYear';
+import { isKuLeuvenEmail } from '@/lib/accountAccess';
 
-export default async function EditUserPage({
-  params,
-}: {
-  params: Promise<{ locale: string; id: string }>;
-}) {
+export default async function EditUserPage({ params }: { params: Promise<{ locale: string; id: string }> }) {
   const { locale: localeParam, id } = await params;
   if (!hasLocale(localeParam)) notFound();
   const locale: Locale = localeParam;
@@ -37,12 +35,11 @@ export default async function EditUserPage({
       include: {
         memberships: { include: { group: true } },
         roles: { where: { year }, include: { role: true } },
+        accounts: { where: { providerId: 'credential' }, select: { id: true } },
       },
     }),
     prisma.group.findMany({ orderBy: { orderInPraesidium: 'asc' } }),
-    canManageRoles
-      ? prisma.role.findMany({ orderBy: [{ order: 'asc' }, { nameNl: 'asc' }] })
-      : Promise.resolve([]),
+    canManageRoles ? prisma.role.findMany({ orderBy: [{ order: 'asc' }, { nameNl: 'asc' }] }) : Promise.resolve([]),
   ]);
   if (!user) notFound();
 
@@ -53,6 +50,27 @@ export default async function EditUserPage({
   // Leden van voor de eerste onboarding hebben nog geen aparte voor-/achternaam;
   // dan tonen we een split van de weergavenaam als startwaarde.
   const parts = nameParts(user);
+  const accessEmail = user.personalEmail || (!isKuLeuvenEmail(user.email) ? user.email : '');
+  const hasPassword = user.accounts.length > 0;
+  const accessErrors = {
+    ...userErrorMessages(locale),
+    NO_PERSONAL_EMAIL:
+      locale === 'nl'
+        ? 'Vul een geldig privéadres in dat niet van KU Leuven is.'
+        : 'Enter a valid private address that is not managed by KU Leuven.',
+    ACCOUNT_NOT_FOUND:
+      locale === 'nl'
+        ? 'Dit account is niet actief of bestaat niet meer.'
+        : 'This account is inactive or no longer exists.',
+    FORBIDDEN:
+      locale === 'nl'
+        ? 'Alleen een superadmin kan een toegangslink voor een superadmin sturen.'
+        : 'Only a super admin can send an access link for another super admin.',
+    MAIL_FAILED:
+      locale === 'nl'
+        ? 'Het privéadres is bewaard, maar de mail kon niet worden verstuurd.'
+        : 'The private address was saved, but the email could not be sent.',
+  };
 
   return (
     <div className="space-y-6">
@@ -90,9 +108,7 @@ export default async function EditUserPage({
               name="password"
               type="text"
               minLength={8}
-              placeholder={
-                locale === 'nl' ? 'Leeg laten om niet te wijzigen' : 'Leave blank to keep'
-              }
+              placeholder={locale === 'nl' ? 'Leeg laten om niet te wijzigen' : 'Leave blank to keep'}
             />
           </div>
           <div>
@@ -128,9 +144,52 @@ export default async function EditUserPage({
       </Card>
 
       <Card className="p-5 space-y-4">
-        <h2 className="font-semibold">
-          {locale === 'nl' ? 'Post lidmaatschappen' : 'Post Memberships'}
-        </h2>
+        <div>
+          <h2 className="font-semibold">{locale === 'nl' ? 'Toegang na KU Leuven' : 'Access after KU Leuven'}</h2>
+          <p className="mt-1 max-w-2xl text-sm leading-6 text-[#5c667f]">
+            {locale === 'nl'
+              ? 'Vul een privéadres in en stuur een eenmalige veilige link. Daarmee kan de gebruiker een wachtwoord instellen of herstellen en ook zonder KU Leuven-account blijven inloggen.'
+              : 'Enter a private address and send a one-time secure link. The user can set or reset a password and keep signing in without a KU Leuven account.'}
+          </p>
+        </div>
+        <SaveForm
+          action={sendUserAccessLinkAction}
+          className="grid max-w-2xl grid-cols-1 gap-3 md:grid-cols-[minmax(0,1fr)_auto] md:items-end"
+          submitLabel={
+            hasPassword
+              ? locale === 'nl'
+                ? 'Herstellink sturen'
+                : 'Send reset link'
+              : locale === 'nl'
+                ? 'Toegangslink sturen'
+                : 'Send access link'
+          }
+          savingLabel={locale === 'nl' ? 'Versturen...' : 'Sending...'}
+          savedMessage={locale === 'nl' ? 'Veilige link verstuurd' : 'Secure link sent'}
+          errorMessages={accessErrors}
+          fallbackErrorMessage={
+            locale === 'nl' ? 'De veilige link kon niet worden verstuurd.' : 'The secure link could not be sent.'
+          }
+          resetOnSuccess={false}
+          submitDisabled={!user.active}
+        >
+          <input type="hidden" name="id" value={user.id} />
+          <div>
+            <Label>{locale === 'nl' ? 'Privé-e-mailadres' : 'Private email address'}</Label>
+            <Input name="email" type="email" defaultValue={accessEmail} placeholder="naam@example.com" required />
+          </div>
+        </SaveForm>
+        {!user.active ? (
+          <p className="text-xs text-[#5c667f]">
+            {locale === 'nl'
+              ? 'Activeer dit account eerst om een toegangslink te sturen.'
+              : 'Activate this account before sending an access link.'}
+          </p>
+        ) : null}
+      </Card>
+
+      <Card className="p-5 space-y-4">
+        <h2 className="font-semibold">{locale === 'nl' ? 'Post lidmaatschappen' : 'Post Memberships'}</h2>
         <ul className="divide-y divide-zinc-200">
           {user.memberships.map((m) => (
             <li key={m.id} className="py-2 flex items-center justify-between gap-3">
@@ -164,10 +223,7 @@ export default async function EditUserPage({
             </li>
           )}
         </ul>
-        <form
-          action={addMembershipAction}
-          className="grid grid-cols-1 md:grid-cols-6 gap-3 items-end"
-        >
+        <form action={addMembershipAction} className="grid grid-cols-1 md:grid-cols-6 gap-3 items-end">
           <input type="hidden" name="userId" value={user.id} />
           <div className="md:col-span-2">
             <Label>Group</Label>
@@ -218,9 +274,7 @@ export default async function EditUserPage({
             {user.roles.map((ur) => (
               <li key={ur.roleId} className="py-2 flex items-center justify-between gap-3">
                 <span className="text-sm">
-                  <span className="font-medium">
-                    {locale === 'nl' ? ur.role.nameNl : ur.role.nameEn}
-                  </span>
+                  <span className="font-medium">{locale === 'nl' ? ur.role.nameNl : ur.role.nameEn}</span>
                   {' · '}
                   <code className="text-xs text-[#5c667f]">{ur.role.code}</code>
                 </span>

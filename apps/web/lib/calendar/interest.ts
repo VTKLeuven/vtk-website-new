@@ -18,13 +18,11 @@ import type { Locale } from "@vtk/i18n";
  * Twee wegen naar binnen, met opzet ongelijk:
  *
  * - **Ingelogd** kan overal. Eén account telt één keer, en niemand ziet wie het
- *   aanduidde tenzij hij dat bij een alumni-evenement zelf aanvinkt.
- * - **Zonder account** kan enkel bij een **alumni-evenement**, en enkel door
- *   iets over jezelf te zeggen (afstudeerjaar, of dat je in VTK zat, of allebei;
- *   de naam mag je weglaten). Een afgestudeerde van 2004 heeft geen KU Leuven-
- *   login meer, en die groep is net wie we willen bereiken. De prijs is dat die
- *   teller niet waterdicht is; een cookie houdt dubbele klikken van hetzelfde
- *   toestel tegen, meer niet.
+ *   aanduidde tenzij hij bij een alumni-evenement per veld toestemming geeft.
+ * - **Zonder account** kan enkel bij een **alumni-evenement**. Ook daar zijn de
+ *   extra gegevens en hun zichtbaarheid optioneel. Een cookie houdt dubbele
+ *   klikken van hetzelfde toestel tegen; zonder login is de teller dus bewust
+ *   niet volledig waterdicht.
  */
 
 /**
@@ -77,9 +75,7 @@ export async function ensureGuestDeviceHash(): Promise<string> {
  * haalt. Een evenement dat er niet in zit, toont geen teller; de oproeper hoeft
  * de drempel dus niet zelf te kennen.
  */
-export async function publicInterestCounts(
-  eventIds: string[],
-): Promise<Map<string, number>> {
+export async function publicInterestCounts(eventIds: string[]): Promise<Map<string, number>> {
   const counts = new Map<string, number>();
   if (eventIds.length === 0) return counts;
 
@@ -129,7 +125,9 @@ export type AttendeeRow = {
   /** `null` = deze persoon toont zijn naam niet. */
   name: string | null;
   graduationYear: number | null;
+  /** De waarde blijft boolean voor de app; deze vlag onderscheidt "nee" van verborgen. */
   wasInVtk: boolean;
+  showWasInVtk: boolean;
 };
 
 /**
@@ -149,21 +147,29 @@ export async function attendeeList(eventId: string): Promise<AttendeeRow[]> {
       },
       select: {
         id: true,
+        displayName: true,
+        graduationYear: true,
+        wasInVtk: true,
         showName: true,
         showGraduationYear: true,
         showWasInVtk: true,
         createdAt: true,
-        user: { select: { name: true, graduationYear: true, wasInVtk: true } },
       },
       orderBy: { createdAt: "asc" },
     }),
     prisma.calendarEventGuestInterest.findMany({
-      where: { eventId },
+      where: {
+        eventId,
+        OR: [{ showName: true }, { showGraduationYear: true }, { showWasInVtk: true }],
+      },
       select: {
         id: true,
         displayName: true,
         graduationYear: true,
         wasInVtk: true,
+        showName: true,
+        showGraduationYear: true,
+        showWasInVtk: true,
         createdAt: true,
       },
       orderBy: { createdAt: "asc" },
@@ -173,63 +179,106 @@ export async function attendeeList(eventId: string): Promise<AttendeeRow[]> {
   const rows: Array<AttendeeRow & { at: Date }> = [
     ...members.map((row) => ({
       key: `m-${row.id}`,
-      name: row.showName ? row.user.name : null,
-      graduationYear: row.showGraduationYear ? row.user.graduationYear : null,
-      wasInVtk: row.showWasInVtk ? row.user.wasInVtk : false,
+      name: row.showName ? row.displayName : null,
+      graduationYear: row.showGraduationYear ? row.graduationYear : null,
+      wasInVtk: row.wasInVtk,
+      showWasInVtk: row.showWasInVtk,
       at: row.createdAt,
     })),
     ...guests.map((row) => ({
       key: `g-${row.id}`,
-      name: row.displayName,
-      graduationYear: row.graduationYear,
+      name: row.showName ? row.displayName : null,
+      graduationYear: row.showGraduationYear ? row.graduationYear : null,
       wasInVtk: row.wasInVtk,
+      showWasInVtk: row.showWasInVtk,
       at: row.createdAt,
     })),
   ];
 
-  // Wie enkel "ik zat niet in VTK en zeg verder niets" achterliet, levert een
-  // lege rij op; die hoort er niet in te staan.
+  // Een rij zonder gedeeld veld hoort niet in de publieke lijst. "Niet in VTK"
+  // is wel betekenisvolle informatie wanneer die keuze expliciet gedeeld werd.
   return rows
-    .filter((row) => row.name !== null || row.graduationYear !== null || row.wasInVtk)
+    .filter((row) => row.name !== null || row.graduationYear !== null || row.showWasInVtk)
     .sort((a, b) => a.at.getTime() - b.at.getTime())
     .map((row) => ({
       key: row.key,
       name: row.name,
       graduationYear: row.graduationYear,
       wasInVtk: row.wasInVtk,
+      showWasInVtk: row.showWasInVtk,
     }));
 }
 
 /** Wat de bezoeker zelf al aanduidde bij dit evenement. */
+export type AlumniAttendanceDetails = {
+  displayName: string | null;
+  graduationYear: number | null;
+  wasInVtk: boolean;
+  showName: boolean;
+  showGraduationYear: boolean;
+  showWasInVtk: boolean;
+};
+
 export type ViewerInterest =
   | { kind: "none" }
-  | {
-      kind: "member";
-      showName: boolean;
-      showGraduationYear: boolean;
-      showWasInVtk: boolean;
+  | ({ kind: "member" } & AlumniAttendanceDetails)
+  | ({ kind: "guest" } & AlumniAttendanceDetails);
+
+/**
+ * De eigen keuzes voor een set evenementen. Dit is de batchvariant voor de
+ * kalender-API, zodat een maand niet één query per modal nodig heeft.
+ */
+export async function viewerInterests(
+  eventIds: string[],
+  userId: string | null,
+): Promise<Map<string, ViewerInterest>> {
+  const result = new Map<string, ViewerInterest>();
+  if (eventIds.length === 0) return result;
+
+  if (userId) {
+    const rows = await prisma.calendarEventInterest.findMany({
+      where: { userId, eventId: { in: eventIds } },
+      select: {
+        eventId: true,
+        displayName: true,
+        graduationYear: true,
+        wasInVtk: true,
+        showName: true,
+        showGraduationYear: true,
+        showWasInVtk: true,
+      },
+    });
+    for (const { eventId, ...details } of rows) {
+      result.set(eventId, { kind: "member", ...details });
     }
-  | { kind: "guest"; displayName: string | null; graduationYear: number | null; wasInVtk: boolean };
+    return result;
+  }
+
+  const deviceHash = await readGuestDeviceHash();
+  if (!deviceHash) return result;
+  const rows = await prisma.calendarEventGuestInterest.findMany({
+    where: { deviceHash, eventId: { in: eventIds } },
+    select: {
+      eventId: true,
+      displayName: true,
+      graduationYear: true,
+      wasInVtk: true,
+      showName: true,
+      showGraduationYear: true,
+      showWasInVtk: true,
+    },
+  });
+  for (const { eventId, ...details } of rows) {
+    result.set(eventId, { kind: "guest", ...details });
+  }
+  return result;
+}
 
 export async function viewerInterest(
   eventId: string,
   userId: string | null,
 ): Promise<ViewerInterest> {
-  if (userId) {
-    const row = await prisma.calendarEventInterest.findUnique({
-      where: { userId_eventId: { userId, eventId } },
-      select: { showName: true, showGraduationYear: true, showWasInVtk: true },
-    });
-    return row ? { kind: "member", ...row } : { kind: "none" };
-  }
-
-  const deviceHash = await readGuestDeviceHash();
-  if (!deviceHash) return { kind: "none" };
-  const row = await prisma.calendarEventGuestInterest.findUnique({
-    where: { eventId_deviceHash: { eventId, deviceHash } },
-    select: { displayName: true, graduationYear: true, wasInVtk: true },
-  });
-  return row ? { kind: "guest", ...row } : { kind: "none" };
+  return (await viewerInterests([eventId], userId)).get(eventId) ?? { kind: "none" };
 }
 
 /** "32 komen" / "32 going", of `null` onder de drempel. */

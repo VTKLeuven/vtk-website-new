@@ -12,13 +12,7 @@ import type { AttendeeRow } from "@/lib/calendar/interest";
  * wordt dat een woordsalade. Onder de smalle grens worden de kolomkoppen labels
  * per waarde (zie vtk-event.css).
  */
-export function AttendeeTable({
-  rows,
-  locale,
-}: {
-  rows: AttendeeRow[];
-  locale: "nl" | "en";
-}) {
+export function AttendeeTable({ rows, locale }: { rows: AttendeeRow[]; locale: "nl" | "en" }) {
   const nl = locale === "nl";
   if (rows.length === 0) return null;
 
@@ -49,11 +43,17 @@ export function AttendeeTable({
                 <td data-label={nl ? "Naam" : "Name"}>
                   {row.name ?? <span className="vtk-attendees-anon">{anonymous}</span>}
                 </td>
-                <td data-label={nl ? "Afgestudeerd" : "Graduated"}>
-                  {row.graduationYear ?? "—"}
-                </td>
+                <td data-label={nl ? "Afgestudeerd" : "Graduated"}>{row.graduationYear ?? "-"}</td>
                 <td data-label={nl ? "In VTK gezeten" : "Was in VTK"}>
-                  {row.wasInVtk ? (nl ? "Ja" : "Yes") : "—"}
+                  {row.showWasInVtk
+                    ? row.wasInVtk
+                      ? nl
+                        ? "Ja"
+                        : "Yes"
+                      : nl
+                        ? "Nee"
+                        : "No"
+                    : "-"}
                 </td>
               </tr>
             ))}

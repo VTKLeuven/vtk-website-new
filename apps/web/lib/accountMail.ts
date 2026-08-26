@@ -101,7 +101,7 @@ export async function sendPasswordResetMail(input: {
  * Toegangslink die een beheerder voor een alumnus verstuurt. Dezelfde veilige
  * resetpagina, maar zonder te beweren dat de ontvanger de mail zelf aanvroeg.
  */
-export async function sendAlumniPasswordSetupMail(input: {
+export async function sendManagedPasswordSetupMail(input: {
   to: string;
   name: string;
   token: string;

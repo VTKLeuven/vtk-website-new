@@ -159,19 +159,11 @@ export type AlumniAccount = {
   name: string;
   /** Adres dat voor gewone alumnimail gebruikt wordt. */
   email: string;
-  /** Niet-KU-Leuven-adres waar een beheerder veilig een toegangslink heen kan sturen. */
-  accessEmail: string | null;
   graduationYear: number | null;
   wasInVtk: boolean;
   optedIn: boolean;
   active: boolean;
-  hasPassword: boolean;
 };
-
-/** Universiteitsadressen verdwijnen na het afstuderen en zijn dus geen hersteladres. */
-export function isKuLeuvenEmail(email: string): boolean {
-  return /@(?:[^@.]+\.)*kuleuven\.be$/i.test(email.trim());
-}
 
 /**
  * De site-accounts met `alumni = true`.
@@ -210,21 +202,17 @@ export async function listAlumniAccounts(filter: {
       wasInVtk: true,
       alumniMailOptIn: true,
       active: true,
-      accounts: { where: { providerId: "credential" }, select: { id: true } },
     },
   });
 
   return rows.map((row) => ({
     id: row.id,
     name: row.name,
-    email:
-      row.emailPreference === "PERSONAL" && row.personalEmail ? row.personalEmail : row.email,
-    accessEmail: row.personalEmail || (!isKuLeuvenEmail(row.email) ? row.email : null),
+    email: row.emailPreference === "PERSONAL" && row.personalEmail ? row.personalEmail : row.email,
     graduationYear: row.graduationYear,
     wasInVtk: row.wasInVtk,
     optedIn: row.alumniMailOptIn,
     active: row.active,
-    hasPassword: row.accounts.length > 0,
   }));
 }
 
@@ -264,10 +252,7 @@ export async function alumniYears(): Promise<AlumniYearRow[]> {
 }
 
 /** Het adresboek zelf (dus zonder de accounts), voor de beheertabel. */
-export async function listAlumniContacts(filter: {
-  year?: number | null;
-  query?: string;
-}): Promise<
+export async function listAlumniContacts(filter: { year?: number | null; query?: string }): Promise<
   Array<{
     id: string;
     firstName: string;

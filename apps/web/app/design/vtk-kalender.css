@@ -1216,7 +1216,7 @@
 
 .vtk-design .category-filter::before,
 .vtk-design .audience-filter::before {
-  content: "";
+  content: '';
   flex: 0 0 auto;
   width: 8px;
   height: 8px;
@@ -1446,7 +1446,6 @@
   border-color: var(--ink);
 }
 
-
 /* -----------------------------------------------------------------------------
    Voorvertoning van een evenement
 
@@ -1623,6 +1622,16 @@
   margin-top: 18px;
 }
 
+.vtk-design .ev-preview.has-interest {
+  max-width: 680px;
+}
+
+.vtk-design .ev-preview-actions .vtk-interest-expand,
+.vtk-design .ev-preview-actions .vtk-interest-toggle-error {
+  grid-column: 1 / -1;
+  text-align: left;
+}
+
 .vtk-design .ev-preview-actions .ev-preview-go {
   width: 100%;
   justify-content: center;
@@ -1638,25 +1647,6 @@
   min-height: 42px;
   padding-inline: 14px;
   white-space: nowrap;
-}
-
-.vtk-design .ev-interest-hover {
-  display: none;
-}
-
-.vtk-design .ev-interest-going:not(:disabled):hover .ev-interest-default {
-  display: none;
-}
-
-.vtk-design .ev-interest-going:not(:disabled):hover .ev-interest-hover {
-  display: inline;
-}
-
-.vtk-design .ev-preview-interest-error {
-  grid-column: 1 / -1;
-  margin: 2px 0 0;
-  color: #a43b3b;
-  font-size: 12px;
 }
 
 @media (max-width: 520px) {

@@ -2,9 +2,8 @@ import type { Prisma } from "@prisma/client";
 import { NextResponse } from "next/server";
 import { prisma } from "@vtk/db";
 import { audienceFilter, viewerAudiences } from "@/lib/calendar/audience";
-import { publicInterestCounts } from "@/lib/calendar/interest";
+import { publicInterestCounts, viewerInterests } from "@/lib/calendar/interest";
 import { getCurrentSession } from "@/lib/session";
-import { interestedEventIds } from "@/lib/app-api/interest";
 
 // Leest de sessie om de doelgroepen van de kijker te bepalen, dus per definitie
 // niet statisch te renderen.
@@ -64,13 +63,17 @@ export async function GET(request: Request) {
   // Enkel de tellers die de drempel halen komen terug; een laag getal verlaat de
   // server dus niet eens. Zie lib/calendar/interest.ts.
   //
-  // `interested` per event erbij, zodat de voorvertoning in de kalender meteen de
-  // juiste stand van de knop toont in plaats van "ik kom" aan te bieden aan
-  // iemand die het al aanduidde.
+  // De eigen keuze en per-event alumnigegevens gaan mee, zodat de modal niet
+  // alleen de juiste ster toont maar ook meteen het alumniblok kan invullen.
+  // `viewerInterests` geeft uitsluitend de rij van de huidige sessie of het
+  // huidige gastcookie terug.
   const session = await getCurrentSession();
   const [counts, mine] = await Promise.all([
     publicInterestCounts(events.map((e) => e.id)),
-    interestedEventIds(session?.user.id ?? null, events.map((e) => e.id)),
+    viewerInterests(
+      events.map((e) => e.id),
+      session?.user.id ?? null,
+    ),
   ]);
 
   const payload = events.map((e) => ({
@@ -91,6 +94,7 @@ export async function GET(request: Request) {
       descriptionEn: e.descriptionEn,
       categories: e.categories.map((c) => c.category),
       interestedCount: counts.get(e.id) ?? null,
+      viewerInterest: mine.get(e.id) ?? { kind: "none" },
       interested: mine.has(e.id),
     },
   }));

@@ -9,6 +9,7 @@ import type { Locale } from "@vtk/i18n";
 import { notFound } from "next/navigation";
 
 import "@/app/design/vtk-base.css";
+import "@/app/design/vtk-event.css";
 import "@/app/design/vtk-kalender.css";
 
 export async function generateMetadata({
@@ -21,11 +22,7 @@ export async function generateMetadata({
   return staticMetadata("kalender", "/kalender", locale);
 }
 
-export default async function KalenderPage({
-  params,
-}: {
-  params: Promise<{ locale: string }>;
-}) {
+export default async function KalenderPage({ params }: { params: Promise<{ locale: string }> }) {
   const { locale: localeParam } = await params;
   if (!hasLocale(localeParam)) notFound();
   const locale: Locale = localeParam;

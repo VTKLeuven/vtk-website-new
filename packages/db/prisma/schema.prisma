@@ -4755,12 +4755,15 @@ model CalendarEventInterest {
   userId  String
   eventId String
 
-  /// Wat dit lid publiek wil tonen in de aanwezigheidslijst van een
-  /// alumni-evenement. Alles staat standaard uit: interesse blijft dus wat het
-  /// altijd was (een private markering en één streepje in de teller), tenzij
-  /// het lid er expliciet voor kiest zichtbaar te zijn. De drie vlaggen zijn
-  /// los van elkaar, want "afgestudeerd in 2019, zat in VTK" zonder naam is een
-  /// geldige keuze.
+  /// Alumni-informatie voor dit ene evenement. Ze wordt bewust niet uit het
+  /// profiel gelezen: iemand kan per activiteit een andere naam gebruiken en
+  /// kiest hier ook per veld wat andere bezoekers mogen zien.
+  displayName    String?
+  graduationYear Int?
+  wasInVtk       Boolean @default(false)
+
+  /// Wat dit lid publiek wil tonen in de aanwezigheidslijst. Alles staat
+  /// standaard uit, zodat "ik kom" ook volledig anoniem kan blijven.
   showName           Boolean @default(false)
   showGraduationYear Boolean @default(false)
   showWasInVtk       Boolean @default(false)
@@ -4788,10 +4791,9 @@ model CalendarEventInterest {
 /// deze weg bewust níét: daar is interesse een ledenmarkering en zou een
 /// anonieme rij de teller waardeloos maken.
 ///
-/// De prijs van die openheid is dat de bezoeker iets over zichzelf zegt: een
-/// afstudeerjaar, of dat hij in VTK zat, of allebei. De naam is optioneel, want
-/// "iemand van 2004 die in VTK zat komt ook" is al genoeg om een andere alumnus
-/// over de streep te trekken.
+/// Naam, afstudeerjaar en VTK-verleden blijven optioneel. De bezoeker kan dus
+/// ook alleen de teller verhogen, en beslist per veld of het in de publieke
+/// aanwezigheidslijst verschijnt.
 model CalendarEventGuestInterest {
   id      String @id @default(cuid())
   eventId String
@@ -4803,11 +4805,15 @@ model CalendarEventGuestInterest {
   /// waterdichte fraudebescherming; die bestaat niet zonder login.
   deviceHash String
 
-  /// Wat er in de aanwezigheidslijst mag staan. `displayName` is optioneel;
-  /// minstens één van de drie moet iets zeggen, anders is het een lege rij.
+  /// Zelf ingevulde informatie voor dit ene evenement.
   displayName    String?
   graduationYear Int?
   wasInVtk       Boolean @default(false)
+
+  /// Wat er in de publieke aanwezigheidslijst mag staan.
+  showName           Boolean @default(false)
+  showGraduationYear Boolean @default(false)
+  showWasInVtk       Boolean @default(false)
 
   createdAt DateTime @default(now()) @db.Timestamptz(3)
 

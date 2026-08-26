@@ -6,10 +6,7 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@vtk/db";
-import {
-  createUser,
-  updateUser,
-} from "@vtk/auth/server";
+import { createPasswordSetupForUser, createUser, updateUser } from "@vtk/auth/server";
 import { hasPermission, fullName, splitFullName } from "@vtk/auth";
 import { requirePermission, requireSession } from "@/lib/session";
 import { saveError, saveOk, type SaveState } from "@/lib/saveState";
@@ -17,6 +14,8 @@ import { currentWorkingYear } from "@/lib/workingYear";
 import { eraseUserData } from "@/lib/privacy/account";
 import { describeChanges, logAudit } from "@/lib/audit";
 import { pushMailGroupsForGroup } from "@/lib/google/sync";
+import { isKuLeuvenEmail } from "@/lib/accountAccess";
+import { sendManagedPasswordSetupMail } from "@/lib/accountMail";
 
 /** `P2002` op een bepaald veld: de unieke constraint die Prisma noemt. */
 function isUniqueViolation(err: unknown, field: string): boolean {
@@ -141,6 +140,101 @@ export async function saveUserAction(_prev: SaveState, formData: FormData): Prom
   if (parsed.id) revalidatePath(`/admin/gebruikers/${parsed.id}`);
   // Geen redirect: het formulier staat op de lijstpagina (nieuw) of op de
   // detailpagina (bewerken); in beide gevallen blijf je waar je bent.
+  return saveOk();
+}
+
+export type UserAccessErrorCode =
+  | "INVALID_INPUT"
+  | "EMAIL_TAKEN"
+  | "NO_PERSONAL_EMAIL"
+  | "ACCOUNT_NOT_FOUND"
+  | "FORBIDDEN"
+  | "MAIL_FAILED";
+
+/**
+ * Bewaart een privéadres en stuurt een eenmalige wachtwoordlink vanuit
+ * Admin > Ledenbeheer > Gebruikers. De actie is even streng als een publiek
+ * eindpunt: ze controleert de beheerrechten opnieuw, beschermt superadmins en
+ * weigert KU Leuven-adressen en adressen van andere accounts.
+ */
+export async function sendUserAccessLinkAction(
+  _prev: SaveState,
+  formData: FormData,
+): Promise<SaveState> {
+  const session = await requirePermission("users.edit");
+  const parsed = z
+    .object({ id: z.string().min(1), email: z.string().trim().toLowerCase().email() })
+    .safeParse({ id: formData.get("id") ?? "", email: formData.get("email") ?? "" });
+  if (!parsed.success) return saveError("INVALID_INPUT" satisfies UserAccessErrorCode);
+  if (isKuLeuvenEmail(parsed.data.email)) {
+    return saveError("NO_PERSONAL_EMAIL" satisfies UserAccessErrorCode);
+  }
+
+  const user = await prisma.user.findFirst({
+    where: { id: parsed.data.id, deletedAt: null },
+    select: {
+      id: true,
+      name: true,
+      email: true,
+      personalEmail: true,
+      emailPreference: true,
+      active: true,
+      isSuperAdmin: true,
+    },
+  });
+  if (!user || !user.active) {
+    return saveError("ACCOUNT_NOT_FOUND" satisfies UserAccessErrorCode);
+  }
+  if (user.isSuperAdmin && !session.user.isSuperAdmin) {
+    return saveError("FORBIDDEN" satisfies UserAccessErrorCode);
+  }
+
+  const collision = await prisma.user.findFirst({
+    where: {
+      id: { not: user.id },
+      deletedAt: null,
+      OR: [
+        { email: { equals: parsed.data.email, mode: "insensitive" } },
+        { personalEmail: { equals: parsed.data.email, mode: "insensitive" } },
+      ],
+    },
+    select: { id: true },
+  });
+  if (collision) return saveError("EMAIL_TAKEN" satisfies UserAccessErrorCode);
+
+  const changedEmail = user.personalEmail !== parsed.data.email;
+  const changedPreference = user.emailPreference !== "PERSONAL";
+  if (changedEmail || changedPreference) {
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { personalEmail: parsed.data.email, emailPreference: "PERSONAL" },
+    });
+  }
+
+  const reset = await createPasswordSetupForUser(user.id);
+  if (!reset) return saveError("ACCOUNT_NOT_FOUND" satisfies UserAccessErrorCode);
+  const sent = await sendManagedPasswordSetupMail({
+    to: reset.email,
+    name: reset.name,
+    token: reset.token,
+    locale: reset.locale === "EN" ? "en" : "nl",
+  });
+  if (!sent) {
+    revalidatePath(`/admin/gebruikers/${user.id}`);
+    return saveError("MAIL_FAILED" satisfies UserAccessErrorCode);
+  }
+
+  await logAudit({
+    action: "update",
+    entity: "user",
+    entityId: user.id,
+    target: user.name,
+    summary: changedEmail
+      ? "privéadres bewaard en wachtwoordlink verstuurd"
+      : "wachtwoordlink verstuurd naar privéadres",
+  });
+  revalidatePath("/admin/gebruikers");
+  revalidatePath(`/admin/gebruikers/${user.id}`);
   return saveOk();
 }
 
@@ -285,11 +379,16 @@ export async function removeMembershipAction(formData: FormData): Promise<void> 
 }
 
 // Bulk CSV import. Columns: email,name,password,groupCode,role,year,rNumber
-export async function bulkImportUsersAction(formData: FormData): Promise<{ ok: boolean; added: number; errors: string[] }> {
+export async function bulkImportUsersAction(
+  formData: FormData,
+): Promise<{ ok: boolean; added: number; errors: string[] }> {
   await requirePermission("users.bulkImport");
   const session = await requireSession();
   const csv = (formData.get("csv") as string) || "";
-  const lines = csv.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+  const lines = csv
+    .split(/\r?\n/)
+    .map((l) => l.trim())
+    .filter(Boolean);
   const errors: string[] = [];
   let added = 0;
 
@@ -349,8 +448,7 @@ export async function bulkImportUsersAction(formData: FormData): Promise<{ ok: b
           // Leeg jaar in de CSV valt terug op het huidige werkingsjaar.
           const membershipYear = yearStr ? Number(yearStr) : currentWorkingYear();
           const membershipRole = (role?.toUpperCase() === "LEAD" ? "LEAD" : "MEMBER") as
-            | "LEAD"
-            | "MEMBER";
+            "LEAD" | "MEMBER";
           await prisma.groupMembership.upsert({
             where: {
               userId_groupId_year: {
@@ -542,8 +640,8 @@ export async function reorderGroupsAction(ids: string[]): Promise<void> {
       prisma.group.update({
         where: { id },
         data: { orderInPraesidium: index },
-      })
-    )
+      }),
+    ),
   );
   await logAudit({
     action: "reorder",
@@ -577,9 +675,7 @@ async function logGroupRoleChange(
     entity,
     entityId: groupId,
     target: group?.nameNl ?? groupId,
-    summary: `rol ${role?.nameNl ?? roleId} ${
-      enabled ? "toegekend aan" : "afgenomen van"
-    } ${who}`,
+    summary: `rol ${role?.nameNl ?? roleId} ${enabled ? "toegekend aan" : "afgenomen van"} ${who}`,
   });
 }
 
@@ -630,7 +726,10 @@ const werkgroepSchema = z.object({
  * De infotekst + website lopen apart via {@link saveWerkgroepInfoAction} zodat
  * ook gewone leden die mogen aanpassen. Enkel werkgroepen.manage (of superadmin).
  */
-export async function saveWerkgroepAction(_prev: SaveState, formData: FormData): Promise<SaveState> {
+export async function saveWerkgroepAction(
+  _prev: SaveState,
+  formData: FormData,
+): Promise<SaveState> {
   await requirePermission("werkgroepen.manage");
   const result = werkgroepSchema.safeParse({
     id: (formData.get("id") as string) || undefined,
@@ -703,8 +802,8 @@ export async function reorderWerkgroepenAction(ids: string[]): Promise<void> {
       prisma.group.update({
         where: { id },
         data: { orderInPraesidium: index },
-      })
-    )
+      }),
+    ),
   );
   await logAudit({
     action: "reorder",
@@ -728,10 +827,15 @@ const werkgroepInfoSchema = z.object({
  * lid van BEST kan dus enkel de tekst van BEST wijzigen, niet die van een andere
  * werkgroep.
  */
-export async function saveWerkgroepInfoAction(_prev: SaveState, formData: FormData): Promise<SaveState> {
+export async function saveWerkgroepInfoAction(
+  _prev: SaveState,
+  formData: FormData,
+): Promise<SaveState> {
   const session = await requireSession();
   const id = String(formData.get("id") ?? "");
-  const group = id ? await prisma.group.findUnique({ where: { id }, select: { type: true } }) : null;
+  const group = id
+    ? await prisma.group.findUnique({ where: { id }, select: { type: true } })
+    : null;
   if (!group || group.type !== "WERKGROEP") return saveError("INVALID_INPUT");
 
   const isMember = session.groups.some((g) => g.id === id);

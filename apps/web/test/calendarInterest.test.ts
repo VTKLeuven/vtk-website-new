@@ -8,24 +8,32 @@ import { describe, expect, it, vi, beforeEach } from "vitest";
  */
 const groupBy = vi.fn();
 const guestGroupBy = vi.fn();
+const memberFindMany = vi.fn();
+const guestFindMany = vi.fn();
 
 vi.mock("@vtk/db", () => ({
   prisma: {
-    calendarEventInterest: { groupBy },
-    calendarEventGuestInterest: { groupBy: guestGroupBy },
+    calendarEventInterest: { groupBy, findMany: memberFindMany },
+    calendarEventGuestInterest: { groupBy: guestGroupBy, findMany: guestFindMany },
   },
 }));
 
 vi.mock("next/headers", () => ({ cookies: vi.fn() }));
 
-const { INTEREST_PUBLIC_THRESHOLD, interestLabel, publicInterestCounts } = await import(
-  "@/lib/calendar/interest"
-);
+const {
+  INTEREST_PUBLIC_THRESHOLD,
+  attendeeList,
+  interestLabel,
+  publicInterestCounts,
+  viewerInterests,
+} = await import("@/lib/calendar/interest");
 
 describe("publicInterestCounts", () => {
   beforeEach(() => {
     groupBy.mockReset();
     guestGroupBy.mockReset();
+    memberFindMany.mockReset();
+    guestFindMany.mockReset();
   });
 
   it("telt leden en gasten samen", async () => {
@@ -55,6 +63,96 @@ describe("publicInterestCounts", () => {
     expect(counts.size).toBe(0);
     expect(groupBy).not.toHaveBeenCalled();
     expect(guestGroupBy).not.toHaveBeenCalled();
+  });
+});
+
+describe("alumni-aanwezigheid per evenement", () => {
+  beforeEach(() => {
+    memberFindMany.mockReset();
+    guestFindMany.mockReset();
+  });
+
+  it("leest de zelf ingevulde eventgegevens en niet het accountprofiel", async () => {
+    memberFindMany.mockResolvedValue([
+      {
+        id: "member-interest",
+        displayName: "Naam voor de reünie",
+        graduationYear: 2007,
+        wasInVtk: false,
+        showName: true,
+        showGraduationYear: true,
+        showWasInVtk: true,
+        createdAt: new Date("2026-01-01T10:00:00Z"),
+      },
+    ]);
+    guestFindMany.mockResolvedValue([]);
+
+    await expect(attendeeList("event-1")).resolves.toEqual([
+      {
+        key: "m-member-interest",
+        name: "Naam voor de reünie",
+        graduationYear: 2007,
+        wasInVtk: false,
+        showWasInVtk: true,
+      },
+    ]);
+    expect(memberFindMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        select: expect.not.objectContaining({ user: expect.anything() }),
+      }),
+    );
+  });
+
+  it("houdt niet-aangevinkte gastgegevens uit de publieke lijst", async () => {
+    memberFindMany.mockResolvedValue([]);
+    guestFindMany.mockResolvedValue([
+      {
+        id: "guest-interest",
+        displayName: "Privénaam",
+        graduationYear: 2014,
+        wasInVtk: true,
+        showName: false,
+        showGraduationYear: true,
+        showWasInVtk: false,
+        createdAt: new Date("2026-01-01T10:00:00Z"),
+      },
+    ]);
+
+    await expect(attendeeList("event-1")).resolves.toEqual([
+      {
+        key: "g-guest-interest",
+        name: null,
+        graduationYear: 2014,
+        wasInVtk: true,
+        showWasInVtk: false,
+      },
+    ]);
+  });
+
+  it("levert de eigen alumnigegevens in één batch aan de kalendermodal", async () => {
+    memberFindMany.mockResolvedValue([
+      {
+        eventId: "event-2",
+        displayName: "J. Peeters",
+        graduationYear: 2004,
+        wasInVtk: true,
+        showName: true,
+        showGraduationYear: false,
+        showWasInVtk: true,
+      },
+    ]);
+
+    const rows = await viewerInterests(["event-1", "event-2"], "user-1");
+    expect(rows.get("event-1")).toBeUndefined();
+    expect(rows.get("event-2")).toEqual({
+      kind: "member",
+      displayName: "J. Peeters",
+      graduationYear: 2004,
+      wasInVtk: true,
+      showName: true,
+      showGraduationYear: false,
+      showWasInVtk: true,
+    });
   });
 });
 

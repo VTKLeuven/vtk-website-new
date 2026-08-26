@@ -5,6 +5,7 @@ import { viewerPrefersOwnAudiences } from "@/lib/calendar/audience";
 import { getCurrentSession } from "@/lib/session";
 
 import "@/app/design/vtk-base.css";
+import "@/app/design/vtk-event.css";
 import "@/app/design/vtk-kalender.css";
 
 /**
@@ -12,11 +13,7 @@ import "@/app/design/vtk-kalender.css";
  * doelgroep: zelfde raster, zelfde legende, maar met een eigen titel, eigen
  * introtekst en vooral een eigen abonneerlink.
  */
-export async function CategoryCalendar({
-  locale,
-}: {
-  locale: Locale;
-}) {
+export async function CategoryCalendar({ locale }: { locale: Locale }) {
   const [categories, prefersOwnAudiences, session] = await Promise.all([
     listCalendarCategories(),
     viewerPrefersOwnAudiences(),

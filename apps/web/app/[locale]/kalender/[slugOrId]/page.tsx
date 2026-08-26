@@ -32,7 +32,8 @@ function audienceLabel(audience: string | null, locale: Locale): string {
   const nl = locale === "nl";
   if (audience === "FIRST_YEARS") return nl ? "Voor eerstejaars" : "For first years";
   if (audience === "LAST_YEARS") return nl ? "Voor laatstejaars" : "For last years";
-  if (audience === "INTERNATIONALS") return nl ? "Voor internationals" : "For international students";
+  if (audience === "INTERNATIONALS")
+    return nl ? "Voor internationals" : "For international students";
   if (audience === "ALUMNI") return nl ? "Voor alumni" : "For alumni";
   return nl ? "Voor een specifieke doelgroep" : "For a specific audience";
 }
@@ -48,8 +49,16 @@ function formatDateRange(start: Date, end: Date, locale: Locale, allDay: boolean
   });
   if (allDay) return `${day} · ${locale === "nl" ? "hele dag" : "all day"}`;
 
-  const startTime = start.toLocaleTimeString(dateLocale, { timeZone: "Europe/Brussels", hour: "2-digit", minute: "2-digit" });
-  const endTime = end.toLocaleTimeString(dateLocale, { timeZone: "Europe/Brussels", hour: "2-digit", minute: "2-digit" });
+  const startTime = start.toLocaleTimeString(dateLocale, {
+    timeZone: "Europe/Brussels",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+  const endTime = end.toLocaleTimeString(dateLocale, {
+    timeZone: "Europe/Brussels",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
   return `${day} · ${startTime} - ${endTime}`;
 }
 
@@ -103,9 +112,7 @@ export default async function CalendarSegmentPage({ params }: { params: Params }
   const imageSrc = publicUrl(event.imageKey) ?? (await loadDefaultEventImage());
   // Doelgroepen krijgen een eigen, opvallend label: wie hier toevallig belandt
   // moet meteen zien dat het evenement voor eerstejaars of internationals is.
-  const audiences = event.categories
-    .map((c) => c.category)
-    .filter((c) => c.audience !== null);
+  const audiences = event.categories.map((c) => c.category).filter((c) => c.audience !== null);
   const themes = event.categories.map((c) => c.category).filter((c) => c.audience === null);
 
   // "Ik kom naar dit evenement". De teller verschijnt pas vanaf een drempel; zie
@@ -119,10 +126,7 @@ export default async function CalendarSegmentPage({ params }: { params: Params }
     // private markering en zou een lijst een deelnemerslijst suggereren.
     isAlumniEvent ? attendeeList(event.id) : Promise.resolve([]),
   ]);
-  const countLine = interestLabel(
-    total >= INTEREST_PUBLIC_THRESHOLD ? total : null,
-    locale,
-  );
+  const countLine = interestLabel(total >= INTEREST_PUBLIC_THRESHOLD ? total : null, locale);
   const nl = locale === "nl";
 
   return (
@@ -136,7 +140,9 @@ export default async function CalendarSegmentPage({ params }: { params: Params }
             · {groupName}
           </div>
           <h1 className="vtk-page-title">{title}</h1>
-          <p className="vtk-page-subtitle">{formatDateRange(event.start, event.end, locale, event.allDay)}</p>
+          <p className="vtk-page-subtitle">
+            {formatDateRange(event.start, event.end, locale, event.allDay)}
+          </p>
           {audiences.length > 0 || themes.length > 0 ? (
             <div className="vtk-event-tags">
               {audiences.map((c) => (
@@ -182,9 +188,7 @@ export default async function CalendarSegmentPage({ params }: { params: Params }
         </figure>
 
         <section className="vtk-panel vtk-event-info">
-          <h2>
-            {locale === "nl" ? "Over dit event" : "About this event"}
-          </h2>
+          <h2>{locale === "nl" ? "Over dit event" : "About this event"}</h2>
           {description ? (
             <div className="prose-vtk vtk-event-description">
               <Markdown>{description}</Markdown>
@@ -198,9 +202,17 @@ export default async function CalendarSegmentPage({ params }: { params: Params }
           )}
           <dl className="spec">
             <dt>{locale === "nl" ? "Start" : "Start"}</dt>
-            <dd>{event.start.toLocaleString(locale === "nl" ? "nl-BE" : "en-GB", { timeZone: "Europe/Brussels" })}</dd>
+            <dd>
+              {event.start.toLocaleString(locale === "nl" ? "nl-BE" : "en-GB", {
+                timeZone: "Europe/Brussels",
+              })}
+            </dd>
             <dt>{locale === "nl" ? "Einde" : "End"}</dt>
-            <dd>{event.end.toLocaleString(locale === "nl" ? "nl-BE" : "en-GB", { timeZone: "Europe/Brussels" })}</dd>
+            <dd>
+              {event.end.toLocaleString(locale === "nl" ? "nl-BE" : "en-GB", {
+                timeZone: "Europe/Brussels",
+              })}
+            </dd>
           </dl>
           <div className="vtk-event-actions">
             {/* "Ik kom" hoort bij "Tickets kopen" en "Zet in mijn agenda": het is
@@ -212,53 +224,41 @@ export default async function CalendarSegmentPage({ params }: { params: Params }
               isAlumniEvent={isAlumniEvent}
               signedIn={Boolean(session)}
               viewer={viewer}
-              accountHref={`${base}/account`}
               loginHref={`${base}/inloggen?next=${encodeURIComponent(`${base}/kalender/${event.id}`)}`}
               labels={{
-                join: nl ? "Ik kom naar dit evenement" : "I am coming to this event",
-                joined: nl ? "Je komt" : "You are coming",
-                leave: nl ? "Toch niet" : "Never mind",
+                interested: nl ? "Geïnteresseerd" : "Interested",
+                removeInterest: nl ? "Niet meer geïnteresseerd" : "Remove interest",
                 saving: nl ? "Bezig..." : "Working...",
                 countLine,
                 loginCta: nl
-                  ? "Log in om aan te duiden dat je komt"
-                  : "Sign in to say you are coming",
-                showHeading: nl
-                  ? "Wat mag er in de lijst staan?"
-                  : "What may appear in the list?",
-                showHint: nl
-                  ? "Alles staat standaard uit. Vink je niets aan, dan tel je gewoon mee in het aantal."
-                  : "Everything is off by default. If you tick nothing you simply count towards the total.",
-                showName: nl ? "Mijn naam" : "My name",
-                showGraduationYear: nl ? "Mijn afstudeerjaar" : "My graduation year",
-                showWasInVtk: nl ? "Dat ik in VTK Praesidium zat" : "That I was in the VTK Praesidium",
-                showSave: nl ? "Bewaren" : "Save",
-                showToggle: nl ? "Zichtbaarheid" : "Visibility",
-                guestIntro: nl
-                  ? "Geen account nodig. Zeg iets over jezelf, zodat andere alumni zien wie er komt; je naam is optioneel."
-                  : "No account needed. Say something about yourself so other alumni can see who is coming; your name is optional.",
-                guestName: nl ? "Naam (optioneel)" : "Name (optional)",
-                guestNameHint: nl
-                  ? "Laat leeg om anoniem in de lijst te staan."
-                  : "Leave empty to appear anonymously in the list.",
-                guestYear: nl ? "Afstudeerjaar" : "Graduation year",
-                guestWasInVtk: nl
-                  ? "Ik heb ooit in VTK Praesidium gezeten"
-                  : "I was part of the VTK Praesidium",
-                guestSubmit: nl ? "Ik kom" : "I am coming",
-                guestUpdate: nl ? "Bijwerken" : "Update",
-                guestRemove: nl ? "Toch niet" : "Never mind",
-                guestDone: nl ? "Genoteerd. Tot dan." : "Noted. See you there.",
-                errorNothing: nl
-                  ? "Vul minstens je afstudeerjaar in of vink aan dat je in VTK Praesidium zat."
-                  : "Fill in at least your graduation year, or tick that you were in the VTK Praesidium.",
+                  ? "Log in om je interesse aan te duiden"
+                  : "Sign in to mark your interest",
+                detailsHeading: nl
+                  ? "Wat mogen anderen zien bij ‘Wie er komt’?"
+                  : "What may others see under ‘Who is coming’?",
+                detailsHint: nl
+                  ? "Zo zien anderen wie er komt, en help je dus mede alumni te overtuigen om te komen door ze te laten weten dat ze mensen zullen herkennen!"
+                  : "This shows others who is coming and helps convince fellow alumni by letting them know they will recognise people there.",
+                name: nl ? "Naam (optioneel)" : "Name (optional)",
+                namePlaceholder: nl ? "Jouw naam" : "Your name",
+                showName: nl ? "Toon mijn naam" : "Show my name",
+                graduationYear: nl ? "Afstudeerjaar (optioneel)" : "Graduation year (optional)",
+                showGraduationYear: nl ? "Toon mijn afstudeerjaar" : "Show my graduation year",
+                wasInVtk: nl ? "Ik zat in VTK Praesidium" : "I was in the VTK Praesidium",
+                showWasInVtk: nl
+                  ? "Toon mijn antwoord over VTK Praesidium"
+                  : "Show my answer about the VTK Praesidium",
+                perEventHint: nl
+                  ? "Deze gegevens gelden alleen voor dit evenement en komen niet uit je profiel. Alleen aangevinkte informatie wordt publiek getoond."
+                  : "These details apply only to this event and do not come from your profile. Only selected information is shown publicly.",
+                saveDetails: nl ? "Bewaren" : "Save",
+                detailsSaved: nl ? "Opgeslagen." : "Saved.",
+                errorVisibleValue: nl
+                  ? "Vul eerst de naam of het afstudeerjaar in dat je zichtbaar wilt maken."
+                  : "First enter the name or graduation year you want to make visible.",
                 errorGeneric: nl
                   ? "Er ging iets mis. Probeer het opnieuw."
                   : "Something went wrong. Please try again.",
-                profileHint: nl
-                  ? "Je naam, afstudeerjaar en VTK-verleden komen uit je profiel."
-                  : "Your name, graduation year and VTK history come from your profile.",
-                profileLink: nl ? "Profiel bewerken" : "Edit profile",
               }}
             />
             <Link href={`${base}/kalender`} className="btn btn-ghost">
@@ -280,7 +280,9 @@ export default async function CalendarSegmentPage({ params }: { params: Params }
             (!event.form.closesAt || event.form.closesAt > new Date()) ? (
               <Link
                 href={`${base}/formulieren/${event.form.slug}`}
-                className={event.ticketEvent?.status === "PUBLISHED" ? "btn btn-ghost" : "btn btn-primary"}
+                className={
+                  event.ticketEvent?.status === "PUBLISHED" ? "btn btn-ghost" : "btn btn-primary"
+                }
               >
                 {locale === "nl" ? "Inschrijven" : "Sign up"}
               </Link>

@@ -4,26 +4,17 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@vtk/db";
-import { createPasswordSetupForUser } from "@vtk/auth/server";
 import { requirePermission } from "@/lib/session";
 import { logAudit } from "@/lib/audit";
 import { saveError, saveOk, type SaveState } from "@/lib/saveState";
-import { isKuLeuvenEmail, parseAlumniPaste } from "@/lib/alumni";
+import { parseAlumniPaste } from "@/lib/alumni";
 import { brevoEnabled } from "@/lib/brevo/client";
 import { syncAlumniToBrevo } from "@/lib/brevo/alumni";
-import { sendAlumniPasswordSetupMail } from "@/lib/accountMail";
 
 /** Beheer van het alumni-adresboek: toevoegen, bijwerken, uitschrijven, verwijderen. */
 
 export type AlumniErrorCode =
-  | "INVALID_INPUT"
-  | "EMAIL_TAKEN"
-  | "LINKED_TO_ACCOUNT"
-  | "NOTHING_IMPORTED"
-  | "BREVO_DISABLED"
-  | "NO_PERSONAL_EMAIL"
-  | "ACCOUNT_NOT_FOUND"
-  | "MAIL_FAILED";
+  "INVALID_INPUT" | "EMAIL_TAKEN" | "LINKED_TO_ACCOUNT" | "NOTHING_IMPORTED" | "BREVO_DISABLED";
 
 const MIN_GRADUATION_YEAR = 1920;
 
@@ -236,90 +227,6 @@ export async function toggleAlumniAccountOptInAction(formData: FormData): Promis
 }
 
 /**
- * Stuurt een alumnus een eenmalige link om een wachtwoord in te stellen.
- *
- * Deze actie is bewust strenger dan het publieke "wachtwoord vergeten": de
- * beheerder kiest een concreet account, het account moet alumnus zijn en de mail
- * mag nooit naar KU Leuven gaan. Als er nog geen persoonlijk adres opgeslagen
- * is, bewaart dezelfde handeling het ingevoerde adres als voorkeursadres. Zo kan
- * iemand die zijn universiteitsaccount al kwijt is alsnog in één stap geholpen
- * worden.
- */
-export async function sendAlumniAccessLinkAction(
-  _prev: SaveState,
-  formData: FormData,
-): Promise<SaveState> {
-  await requirePermission("alumni.manage");
-  const parsed = z
-    .object({ id: z.string().min(1), email: z.string().trim().toLowerCase().email() })
-    .safeParse({ id: formData.get("id") ?? "", email: formData.get("email") ?? "" });
-  if (!parsed.success) return saveError("INVALID_INPUT" satisfies AlumniErrorCode);
-  if (isKuLeuvenEmail(parsed.data.email)) {
-    return saveError("NO_PERSONAL_EMAIL" satisfies AlumniErrorCode);
-  }
-
-  const user = await prisma.user.findFirst({
-    where: { id: parsed.data.id, alumni: true, deletedAt: null },
-    select: {
-      id: true,
-      name: true,
-      email: true,
-      personalEmail: true,
-      active: true,
-    },
-  });
-  if (!user || !user.active) return saveError("ACCOUNT_NOT_FOUND" satisfies AlumniErrorCode);
-
-  // Een persoonlijk adres dat al aan een ander account hangt, zou na het
-  // instellen van het wachtwoord een dubbelzinnige login opleveren.
-  const collision = await prisma.user.findFirst({
-    where: {
-      id: { not: user.id },
-      deletedAt: null,
-      OR: [
-        { email: { equals: parsed.data.email, mode: "insensitive" } },
-        { personalEmail: { equals: parsed.data.email, mode: "insensitive" } },
-      ],
-    },
-    select: { id: true },
-  });
-  if (collision) return saveError("EMAIL_TAKEN" satisfies AlumniErrorCode);
-
-  const changedEmail = user.personalEmail !== parsed.data.email && user.email !== parsed.data.email;
-  if (changedEmail) {
-    await prisma.user.update({
-      where: { id: user.id },
-      data: { personalEmail: parsed.data.email, emailPreference: "PERSONAL" },
-    });
-  }
-
-  const reset = await createPasswordSetupForUser(user.id);
-  if (!reset) return saveError("NO_PERSONAL_EMAIL" satisfies AlumniErrorCode);
-  const sent = await sendAlumniPasswordSetupMail({
-    to: reset.email,
-    name: reset.name,
-    token: reset.token,
-    locale: reset.locale === "EN" ? "en" : "nl",
-  });
-  if (!sent) {
-    if (changedEmail) refresh();
-    return saveError("MAIL_FAILED" satisfies AlumniErrorCode);
-  }
-
-  await logAudit({
-    action: "update",
-    entity: "user",
-    entityId: user.id,
-    target: user.name,
-    summary: changedEmail
-      ? "persoonlijk adres bewaard en wachtwoordlink verstuurd"
-      : "wachtwoordlink verstuurd naar persoonlijk adres",
-  });
-  refresh();
-  return saveOk();
-}
-
-/**
  * Een geplakte lijst invoeren.
  *
  * Zonder dit is een adresboek van vijfhonderd alumni een middag typen, en dan
@@ -328,10 +235,7 @@ export async function sendAlumniAccessLinkAction(
  * te krijgen. Een uitgeschreven contact blijft uitgeschreven; een import mag die
  * keuze niet terugdraaien.
  */
-export async function importAlumniAction(
-  _prev: SaveState,
-  formData: FormData,
-): Promise<SaveState> {
+export async function importAlumniAction(_prev: SaveState, formData: FormData): Promise<SaveState> {
   const session = await requirePermission("alumni.manage");
   const text = String(formData.get("paste") ?? "");
   const { rows, invalid } = parseAlumniPaste(text);
@@ -399,12 +303,13 @@ export async function importAlumniAction(
     action: "create",
     entity: "alumniContact",
     target: `${rows.length} alumni`,
-    summary: [
-      linked > 0 ? `${linked} gekoppeld aan een bestaand account` : null,
-      invalid.length > 0 ? `${invalid.length} regel(s) overgeslagen` : null,
-    ]
-      .filter(Boolean)
-      .join(", ") || undefined,
+    summary:
+      [
+        linked > 0 ? `${linked} gekoppeld aan een bestaand account` : null,
+        invalid.length > 0 ? `${invalid.length} regel(s) overgeslagen` : null,
+      ]
+        .filter(Boolean)
+        .join(", ") || undefined,
   });
 
   refresh();

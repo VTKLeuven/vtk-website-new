@@ -164,7 +164,6 @@
   color: #fff;
 }
 
-
 /* -----------------------------------------------------------------------------
    "Ik kom naar dit evenement"
 
@@ -178,13 +177,69 @@
   display: contents;
 }
 
+.vtk-interest-toggle {
+  display: inline-flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.vtk-interest-star {
+  display: inline-flex;
+  flex: 0 0 auto;
+}
+
+.vtk-interest-star svg {
+  width: 17px;
+  height: 17px;
+  fill: transparent;
+  transition:
+    fill 140ms ease,
+    transform 140ms ease;
+}
+
+.vtk-interest-toggle.is-active .vtk-interest-star svg {
+  fill: currentColor;
+}
+
+.vtk-interest-toggle:active .vtk-interest-star svg {
+  transform: scale(0.92);
+}
+
+.ev-interest-hover {
+  display: none;
+}
+
+.vtk-interest-toggle.is-active:not(:disabled):hover .ev-interest-default {
+  display: none;
+}
+
+.vtk-interest-toggle.is-active:not(:disabled):hover .ev-interest-hover {
+  display: inline;
+}
+
 .vtk-interest-expand {
   flex: 1 0 100%;
+  order: 20;
   margin-top: 4px;
   padding: 18px 20px;
   border: 1px solid var(--line);
   border-radius: 16px;
   background: var(--paper-2);
+}
+
+.vtk-interest-copy h3 {
+  margin: 0;
+  color: var(--ink);
+  font-size: 16px;
+  letter-spacing: -0.01em;
+}
+
+.vtk-interest-copy p {
+  max-width: 68ch;
+  margin: 5px 0 16px;
+  color: var(--body);
+  font-size: 13px;
+  line-height: 1.55;
 }
 
 .vtk-interest-pill {
@@ -197,34 +252,6 @@
   font-weight: 600;
 }
 
-.vtk-interest-intro {
-  margin: 0 0 14px;
-  color: var(--body);
-  font-size: 14px;
-  line-height: 1.55;
-}
-
-.vtk-interest-show {
-  margin: 0 0 14px;
-  padding: 0;
-  border: 0;
-}
-
-.vtk-interest-show legend {
-  padding: 0;
-  color: var(--ink);
-  font-size: 14px;
-  font-weight: 600;
-}
-
-.vtk-interest-show p {
-  margin: 0 0 10px;
-  color: var(--muted);
-  font-size: 12px;
-  line-height: 1.45;
-}
-
-.vtk-interest-show label,
 .vtk-interest-check {
   display: flex;
   gap: 9px;
@@ -235,27 +262,19 @@
   cursor: pointer;
 }
 
-.vtk-interest-note {
-  margin-top: 12px !important;
-}
-
 .vtk-interest-fields {
   display: grid;
   gap: 14px;
   grid-template-columns: 1fr;
 }
 
-@media (min-width: 560px) {
+@media (min-width: 640px) {
   .vtk-interest-fields {
-    grid-template-columns: 2fr 1fr;
+    grid-template-columns: minmax(0, 1.5fr) minmax(150px, 0.75fr);
   }
 }
 
-.vtk-interest-fields label {
-  display: block;
-}
-
-.vtk-interest-fields span {
+.vtk-interest-field > label:first-child:not(.vtk-interest-check) {
   display: block;
   margin-bottom: 5px;
   color: var(--muted);
@@ -265,7 +284,7 @@
   text-transform: uppercase;
 }
 
-.vtk-interest-fields input {
+.vtk-interest-field > input:not([type='checkbox']) {
   width: 100%;
   padding: 10px 12px;
   border: 1px solid var(--line-2);
@@ -275,39 +294,56 @@
   font: inherit;
 }
 
-.vtk-interest-fields small {
-  display: block;
-  margin-top: 5px;
+.vtk-interest-check input[type='checkbox'] {
+  flex: 0 0 auto;
+  width: 16px;
+  height: 16px;
+  accent-color: var(--ink);
+}
+
+.vtk-interest-praesidium {
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--paper);
+}
+
+@media (min-width: 640px) {
+  .vtk-interest-praesidium {
+    grid-column: 1 / -1;
+  }
+}
+
+.vtk-interest-answer {
+  margin-top: 0;
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.vtk-interest-note {
+  margin: 12px 0 0;
   color: var(--muted);
   font-size: 12px;
+  line-height: 1.5;
 }
 
-.vtk-interest-buttons {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-}
-
-.vtk-interest-expand form + form {
-  margin-top: 12px;
-}
-
-.vtk-interest-expand .vtk-interest-fields {
-  margin-bottom: 12px;
-}
-
-.vtk-interest-expand .vtk-interest-buttons {
+.vtk-interest-details-form > .btn {
   margin-top: 14px;
 }
 
 .vtk-interest-error {
-  margin: 0;
+  margin: 10px 0 0;
   color: #b42318;
   font-size: 13px;
 }
 
+.vtk-interest-toggle-error {
+  flex: 1 0 100%;
+  order: 19;
+}
+
 .vtk-interest-done {
-  margin: 0;
+  margin: 10px 0 0;
   color: var(--muted);
   font-size: 13px;
 }

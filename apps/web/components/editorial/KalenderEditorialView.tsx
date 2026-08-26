@@ -5,7 +5,8 @@ import { usePathname } from "next/navigation";
 import { markdownToPlainText } from "@/lib/markdown";
 import { CalendarSubscribe } from "@/components/site/CalendarSubscribe";
 import { Markdown } from "@/components/ui/Markdown";
-import { setEventInterestAction } from "@/app/actions/eventInterest";
+import { EventInterest } from "@/components/calendar/EventInterest";
+import type { ViewerInterest } from "@/lib/calendar/interest";
 import { monthGridCells, weekGridDays, isSameCalendarDay } from "./calendarGrid";
 
 type ApiEvent = {
@@ -36,7 +37,9 @@ type ApiEvent = {
      * een laag getal komt hier niet eens aan.
      */
     interestedCount: number | null;
-    /** Heb jij dit aangeduid. Altijd `false` voor wie niet ingelogd is. */
+    /** De eigen per-eventkeuzes, ook voor een alumnus met alleen een gastcookie. */
+    viewerInterest: ViewerInterest;
+    /** Heb jij dit aangeduid, afgeleid van `viewerInterest`. */
     interested: boolean;
   };
 };
@@ -396,7 +399,8 @@ export function KalenderEditorialView({
    * nog eens duwt. De teller schuift mee, maar enkel wanneer hij al zichtbaar was:
    * de drempel is een serverbeslissing, en die mogen we hier niet nabootsen.
    */
-  function markInterest(eventId: string, next: boolean) {
+  function markInterest(eventId: string, nextViewer: ViewerInterest) {
+    const next = nextViewer.kind !== "none";
     const apply = (list: ApiEvent[]) =>
       list.map((item) =>
         item.id === eventId
@@ -405,9 +409,11 @@ export function KalenderEditorialView({
               extendedProps: {
                 ...item.extendedProps,
                 interested: next,
+                viewerInterest: nextViewer,
                 interestedCount:
-                  item.extendedProps.interestedCount === null
-                    ? null
+                  item.extendedProps.interestedCount === null ||
+                  item.extendedProps.interested === next
+                    ? item.extendedProps.interestedCount
                     : Math.max(0, item.extendedProps.interestedCount + (next ? 1 : -1)),
               },
             }
@@ -422,9 +428,11 @@ export function KalenderEditorialView({
             extendedProps: {
               ...current.extendedProps,
               interested: next,
+              viewerInterest: nextViewer,
               interestedCount:
-                current.extendedProps.interestedCount === null
-                  ? null
+                current.extendedProps.interestedCount === null ||
+                current.extendedProps.interested === next
+                  ? current.extendedProps.interestedCount
                   : Math.max(0, current.extendedProps.interestedCount + (next ? 1 : -1)),
             },
           }
@@ -536,7 +544,15 @@ export function KalenderEditorialView({
       aria-label={pickTitle(preview)}
       onClick={() => setPreview(null)}
     >
-      <div className="ev-preview" onClick={(event) => event.stopPropagation()}>
+      <div
+        className={`ev-preview${
+          preview.extendedProps.viewerInterest.kind !== "none" &&
+          preview.extendedProps.categories.some((category) => category.audience === "ALUMNI")
+            ? " has-interest"
+            : ""
+        }`}
+        onClick={(event) => event.stopPropagation()}
+      >
         <button
           type="button"
           className="ev-preview-close"
@@ -589,21 +605,64 @@ export function KalenderEditorialView({
           <p className="ev-preview-desc">{previewSummary(pickDesc(preview))}</p>
         ) : null}
 
-        {interestLine(preview) ? (
-          <p className="ev-preview-going">{interestLine(preview)}</p>
-        ) : null}
+        {interestLine(preview) ? <p className="ev-preview-going">{interestLine(preview)}</p> : null}
 
         {/* Aanduiden dat je komt hoort hier al te kunnen: wie in de kalender op
             een evenement klikt, heeft precies dan de vraag "ga ik?" in zijn
             hoofd, en hem daarvoor eerst naar een tweede pagina sturen kost de
             helft van de klikken. */}
         <div className="ev-preview-actions">
-          <PreviewInterestButton
-            event={preview}
+          <EventInterest
+            eventId={preview.id}
+            isAlumniEvent={preview.extendedProps.categories.some(
+              (category) => category.audience === "ALUMNI",
+            )}
             signedIn={signedIn}
-            locale={locale}
-            base={base}
-            onChanged={(next) => markInterest(preview.id, next)}
+            viewer={preview.extendedProps.viewerInterest}
+            loginHref={`${base}/inloggen?next=${encodeURIComponent(eventHref(preview))}`}
+            labels={{
+              interested: locale === "nl" ? "Geïnteresseerd" : "Interested",
+              removeInterest: locale === "nl" ? "Niet meer geïnteresseerd" : "Remove interest",
+              saving: locale === "nl" ? "Bezig..." : "Working...",
+              countLine: null,
+              loginCta: locale === "nl" ? "Log in" : "Sign in",
+              detailsHeading:
+                locale === "nl"
+                  ? "Wat mogen anderen zien bij ‘Wie er komt’?"
+                  : "What may others see under ‘Who is coming’?",
+              detailsHint:
+                locale === "nl"
+                  ? "Zo zien anderen wie er komt, en help je dus mede alumni te overtuigen om te komen door ze te laten weten dat ze mensen zullen herkennen!"
+                  : "This shows others who is coming and helps convince fellow alumni by letting them know they will recognise people there.",
+              name: locale === "nl" ? "Naam (optioneel)" : "Name (optional)",
+              namePlaceholder: locale === "nl" ? "Jouw naam" : "Your name",
+              showName: locale === "nl" ? "Toon mijn naam" : "Show my name",
+              graduationYear:
+                locale === "nl" ? "Afstudeerjaar (optioneel)" : "Graduation year (optional)",
+              showGraduationYear:
+                locale === "nl" ? "Toon mijn afstudeerjaar" : "Show my graduation year",
+              wasInVtk:
+                locale === "nl" ? "Ik zat in VTK Praesidium" : "I was in the VTK Praesidium",
+              showWasInVtk:
+                locale === "nl"
+                  ? "Toon mijn antwoord over VTK Praesidium"
+                  : "Show my answer about the VTK Praesidium",
+              perEventHint:
+                locale === "nl"
+                  ? "Deze gegevens gelden alleen voor dit evenement en komen niet uit je profiel. Alleen aangevinkte informatie wordt publiek getoond."
+                  : "These details apply only to this event and do not come from your profile. Only selected information is shown publicly.",
+              saveDetails: locale === "nl" ? "Bewaren" : "Save",
+              detailsSaved: locale === "nl" ? "Opgeslagen." : "Saved.",
+              errorVisibleValue:
+                locale === "nl"
+                  ? "Vul eerst de naam of het afstudeerjaar in dat je zichtbaar wilt maken."
+                  : "First enter the name or graduation year you want to make visible.",
+              errorGeneric:
+                locale === "nl"
+                  ? "Dat lukte niet. Probeer het opnieuw."
+                  : "That did not work. Please try again.",
+            }}
+            onChanged={(viewer) => markInterest(preview.id, viewer)}
           />
           <a href={eventHref(preview)} className="btn btn-ghost arrow ev-preview-go">
             {locale === "nl" ? "Evenementpagina" : "Event page"}
@@ -1083,98 +1142,6 @@ export function KalenderEditorialView({
           </section>
         )}
       </div>
-    </>
-  );
-}
-
-/**
- * "Ik kom naar dit evenement", in de voorvertoning.
- *
- * Enkel voor wie ingelogd is. Een bezoeker zonder account kan het bij een
- * alumni-evenement ook aanduiden, maar dat vraagt een afstudeerjaar of zijn
- * VTK-verleden; dat formulier hoort op de eventpagina en niet in een kaartje
- * van tien regels.
- */
-function PreviewInterestButton({
-  event,
-  signedIn,
-  locale,
-  base,
-  onChanged,
-}: {
-  event: ApiEvent;
-  signedIn: boolean;
-  locale: "nl" | "en";
-  base: string;
-  onChanged: (next: boolean) => void;
-}) {
-  const nl = locale === "nl";
-  const [pending, setPending] = useState(false);
-  const [error, setError] = useState(false);
-  const going = event.extendedProps.interested;
-
-  if (!signedIn) {
-    const isAlumniEvent = event.extendedProps.categories.some((c) => c.audience === "ALUMNI");
-    return (
-      <a
-        href={`${base}/kalender/${event.id}`}
-        className="btn btn-primary arrow ev-preview-go"
-      >
-        {isAlumniEvent
-          ? nl
-            ? "Ik kom!"
-            : "I'm coming!"
-          : nl
-            ? "Log in"
-            : "Sign in"}
-      </a>
-    );
-  }
-
-  return (
-    <>
-      <button
-        type="button"
-        className={going ? "btn btn-ghost ev-preview-go ev-interest-going" : "btn btn-primary ev-preview-go"}
-        disabled={pending}
-        aria-pressed={going}
-        aria-busy={pending}
-        onClick={async () => {
-          setPending(true);
-          setError(false);
-          const next = !going;
-          try {
-            const form = new FormData();
-            form.set("eventId", event.id);
-            form.set("interested", next ? "on" : "off");
-            const state = await setEventInterestAction({ status: "idle" }, form);
-            if (state.status === "success") onChanged(next);
-            else setError(true);
-          } catch {
-            setError(true);
-          } finally {
-            setPending(false);
-          }
-        }}
-      >
-        {pending ? (
-          nl ? "Bezig..." : "Working..."
-        ) : going ? (
-          <>
-            <span className="ev-interest-default">{nl ? "Je komt! :)" : "You're coming! :)"}</span>
-            <span className="ev-interest-hover">{nl ? "Toch niet :(" : "Not anymore :("}</span>
-          </>
-        ) : nl ? (
-          "Ik kom!"
-        ) : (
-          "I'm coming!"
-        )}
-      </button>
-      {error ? (
-        <p className="ev-preview-interest-error" role="alert">
-          {nl ? "Dat lukte niet. Probeer het opnieuw." : "That did not work. Please try again."}
-        </p>
-      ) : null}
     </>
   );
 }

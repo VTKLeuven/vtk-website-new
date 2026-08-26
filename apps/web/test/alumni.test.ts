@@ -1,10 +1,6 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
-import {
-  isKuLeuvenEmail,
-  parseAlumniPaste,
-  toAlumniCsv,
-  type AlumniRecipient,
-} from "@/lib/alumni";
+import { parseAlumniPaste, toAlumniCsv, type AlumniRecipient } from "@/lib/alumni";
+import { isKuLeuvenEmail } from "@/lib/accountAccess";
 
 describe("isKuLeuvenEmail", () => {
   it("herkent ook studentensubdomeinen, maar geen persoonlijke adressen", () => {
@@ -186,7 +182,6 @@ describe("listAlumniRecipients", () => {
   });
 });
 
-
 /**
  * Het adresboek en de accounts zijn twee bronnen voor dezelfde lijst. Een
  * alumnus die toevallig een account heeft, hoort dus **niet** als tweede rij in
@@ -217,7 +212,6 @@ describe("listAlumniAccounts", () => {
         wasInVtk: true,
         alumniMailOptIn: true,
         active: true,
-        accounts: [],
       },
       {
         id: "u2",
@@ -229,7 +223,6 @@ describe("listAlumniAccounts", () => {
         wasInVtk: false,
         alumniMailOptIn: false,
         active: true,
-        accounts: [{ id: "credential:u2" }],
       },
     ]);
 
@@ -238,15 +231,11 @@ describe("listAlumniAccounts", () => {
 
     expect(rows[0]).toMatchObject({
       email: "jan@example.com",
-      accessEmail: "jan@example.com",
       optedIn: true,
-      hasPassword: false,
     });
     expect(rows[1]).toMatchObject({
       email: "r0999999@kuleuven.be",
-      accessEmail: null,
       optedIn: false,
-      hasPassword: true,
     });
   });
 

@@ -20,17 +20,59 @@ import { saveError, saveOk, type SaveState } from "@/lib/saveState";
  */
 
 export type InterestErrorCode =
-  | "INVALID_INPUT"
-  | "NOT_FOUND"
-  | "LOGIN_REQUIRED"
-  | "NOTHING_TO_SHOW";
+  "INVALID_INPUT" | "NOT_FOUND" | "LOGIN_REQUIRED" | "MISSING_VISIBLE_VALUE";
 
-const displaySchema = z.object({
+const yearField = z
+  .string()
+  .trim()
+  .refine((v) => {
+    if (v === "") return true;
+    if (!/^\d{4}$/.test(v)) return false;
+    const year = Number(v);
+    return year >= 1920 && year <= new Date().getFullYear() + 1;
+  })
+  .default("");
+
+const attendanceSchema = z.object({
   eventId: z.string().min(1),
+  displayName: z.string().trim().max(80).default(""),
+  graduationYear: yearField,
+  wasInVtk: z.boolean().default(false),
   showName: z.boolean().default(false),
   showGraduationYear: z.boolean().default(false),
   showWasInVtk: z.boolean().default(false),
 });
+
+type AttendanceInput = z.infer<typeof attendanceSchema>;
+
+function attendanceData(input: AttendanceInput) {
+  return {
+    displayName: input.displayName || null,
+    graduationYear: input.graduationYear ? Number(input.graduationYear) : null,
+    wasInVtk: input.wasInVtk,
+    showName: input.showName,
+    showGraduationYear: input.showGraduationYear,
+    showWasInVtk: input.showWasInVtk,
+  };
+}
+
+function missesVisibleValue(input: AttendanceInput): boolean {
+  return (
+    (input.showName && !input.displayName) || (input.showGraduationYear && !input.graduationYear)
+  );
+}
+
+function parseAttendance(formData: FormData) {
+  return attendanceSchema.safeParse({
+    eventId: formData.get("eventId") ?? "",
+    displayName: formData.get("displayName") ?? "",
+    graduationYear: formData.get("graduationYear") ?? "",
+    wasInVtk: formData.get("wasInVtk") === "on",
+    showName: formData.get("showName") === "on",
+    showGraduationYear: formData.get("showGraduationYear") === "on",
+    showWasInVtk: formData.get("showWasInVtk") === "on",
+  });
+}
 
 /**
  * Zet interesse aan (met de zichtbaarheidskeuzes) of uit. `interested` staat in
@@ -44,15 +86,10 @@ export async function setEventInterestAction(
   const session = await getCurrentSession();
   if (!session) return saveError("LOGIN_REQUIRED" satisfies InterestErrorCode);
 
-  const parsed = displaySchema.safeParse({
-    eventId: formData.get("eventId") ?? "",
-    showName: formData.get("showName") === "on",
-    showGraduationYear: formData.get("showGraduationYear") === "on",
-    showWasInVtk: formData.get("showWasInVtk") === "on",
-  });
+  const parsed = parseAttendance(formData);
   if (!parsed.success) return saveError("INVALID_INPUT" satisfies InterestErrorCode);
 
-  const { eventId, ...display } = parsed.data;
+  const { eventId } = parsed.data;
   const interested = formData.get("interested") !== "off";
 
   if (!interested) {
@@ -69,64 +106,55 @@ export async function setEventInterestAction(
     return saveError("NOT_FOUND" satisfies InterestErrorCode);
   }
 
+  const isAlumniEvent = await eventIsForAlumni(eventId);
+  if (isAlumniEvent && missesVisibleValue(parsed.data)) {
+    return saveError("MISSING_VISIBLE_VALUE" satisfies InterestErrorCode);
+  }
+
+  const data = isAlumniEvent
+    ? attendanceData(parsed.data)
+    : {
+        displayName: null,
+        graduationYear: null,
+        wasInVtk: false,
+        showName: false,
+        showGraduationYear: false,
+        showWasInVtk: false,
+      };
+
   await prisma.calendarEventInterest.upsert({
     where: { userId_eventId: { userId: session.user.id, eventId } },
-    update: display,
-    create: { userId: session.user.id, eventId, ...display },
+    update: data,
+    create: { userId: session.user.id, eventId, ...data },
   });
 
   revalidatePath(`/kalender/${eventId}`);
   return saveOk();
 }
 
-const guestSchema = z.object({
-  eventId: z.string().min(1),
-  displayName: z.string().trim().max(80).default(""),
-  graduationYear: z
-    .string()
-    .trim()
-    .refine((v) => {
-      if (v === "") return true;
-      if (!/^\d{4}$/.test(v)) return false;
-      const year = Number(v);
-      return year >= 1920 && year <= new Date().getFullYear() + 1;
-    })
-    .default(""),
-  wasInVtk: z.boolean().default(false),
-});
-
 /**
- * Hetzelfde, maar door iemand zonder account. Enkel bij een alumni-evenement, en
- * enkel wanneer er iets in te vullen valt: een lege rij zou de teller verhogen
- * zonder dat iemand weet wie er komt, en dan is het niet meer dan een klikknop.
+ * Hetzelfde, maar door iemand zonder account. Enkel bij een alumni-evenement.
+ * De extra informatie blijft optioneel: ook een volledig anonieme interesse is
+ * geldig en verhoogt alleen de teller.
  */
 export async function setGuestInterestAction(
   _prev: SaveState,
   formData: FormData,
 ): Promise<SaveState> {
-  const parsed = guestSchema.safeParse({
-    eventId: formData.get("eventId") ?? "",
-    displayName: formData.get("displayName") ?? "",
-    graduationYear: formData.get("graduationYear") ?? "",
-    wasInVtk: formData.get("wasInVtk") === "on",
-  });
+  const parsed = parseAttendance(formData);
   if (!parsed.success) return saveError("INVALID_INPUT" satisfies InterestErrorCode);
 
-  const { eventId, displayName, graduationYear, wasInVtk } = parsed.data;
+  const { eventId } = parsed.data;
 
   if (!(await eventIsVisible(eventId)) || !(await eventIsForAlumni(eventId))) {
     return saveError("NOT_FOUND" satisfies InterestErrorCode);
   }
-  if (!displayName && !graduationYear && !wasInVtk) {
-    return saveError("NOTHING_TO_SHOW" satisfies InterestErrorCode);
+  if (missesVisibleValue(parsed.data)) {
+    return saveError("MISSING_VISIBLE_VALUE" satisfies InterestErrorCode);
   }
 
   const deviceHash = await ensureGuestDeviceHash();
-  const data = {
-    displayName: displayName || null,
-    graduationYear: graduationYear ? Number(graduationYear) : null,
-    wasInVtk,
-  };
+  const data = attendanceData(parsed.data);
   await prisma.calendarEventGuestInterest.upsert({
     where: { eventId_deviceHash: { eventId, deviceHash } },
     update: data,
