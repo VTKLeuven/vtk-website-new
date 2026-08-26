@@ -33,12 +33,12 @@ is not the same right as putting it on the site.
 
 New on `Page`:
 
-| Field                         | Meaning                                                                                                                                                                                     |
-| ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Field | Meaning |
+| --- | --- |
 | `contentMdNl` / `contentMdEn` | Markdown, the source of truth. `null` = page never saved in the new editor (legacy). Empty string = deliberately empty. `contentMdEn = null` = no English version, public falls back to NL. |
-| `needsYearlyEdit`             | "Jaarlijks nakijken": page holds info that changes every working year (names, phone numbers, ...).                                                                                          |
-| `contentEditedAt`             | Last time the CONTENT was saved via the editor. `updatedAt` is useless for this: it also moves on drag-reorder and metadata saves.                                                          |
-| `editorRoles`                 | Relation to `PageEditorRole` (`@@id([pageId, roleId])`, multiple roles per page).                                                                                                           |
+| `needsYearlyEdit` | "Jaarlijks nakijken": page holds info that changes every working year (names, phone numbers, ...). |
+| `contentEditedAt` | Last time the CONTENT was saved via the editor. `updatedAt` is useless for this: it also moves on drag-reorder and metadata saves. |
+| `editorRoles` | Relation to `PageEditorRole` (`@@id([pageId, roleId])`, multiple roles per page). |
 
 `contentJsonNl/En` (legacy tiptap JSON) still exist. Render precedence per
 language: markdown wins as soon as it is non-null; JSON only renders for pages
@@ -164,13 +164,13 @@ role list). Content editing, bijlagen and delete are gone from here; a prominent
 
 Pure functions, because the risky logic here is decision logic, not glue:
 
-- `test/reviewFirstPaging.test.ts` — the two-block paging window, checked
+- `test/reviewFirstPaging.test.ts`: the two-block paging window, checked
   against a reference implementation of the old "fetch all and slice" ordering
   over every combination of review/rest counts and page boundaries.
-- `test/pageAccess.test.ts` — `canEditPageContent`, plus `losesOwnPageAccess`
+- `test/pageAccess.test.ts`: `canEditPageContent`, plus `losesOwnPageAccess`
   proven to fire **exactly** when the server would refuse. If those two ever
   disagree, a member gets an error page instead of the warning dialog.
-- `test/pagePublish.test.ts` — `canPublishPages`, and the tri-state
+- `test/pagePublish.test.ts`: `canPublishPages`, and the tri-state
   `published` rule (on / off / absent = don't touch).
 
 ## Gotchas worth keeping in mind
@@ -206,7 +206,7 @@ Pure functions, because the risky logic here is decision logic, not glue:
 - **`pages.publish` is granted to no role yet.** Until it is assigned, only
   `pages.manage` holders and superadmins can publish.
 
-## Infopagina's — wie schrijft wat, en het jaarlijkse nakijken
+## Infopagina's: wie schrijft wat, en het jaarlijkse nakijken
 
 Infopagina's (`Page`) worden door de werkgroepen/posten zelf onderhouden, niet door
 één centrale beheerder. De keuzes:
@@ -288,5 +288,3 @@ Infopagina's (`Page`) worden door de werkgroepen/posten zelf onderhouden, niet d
 - **Twee geldige URL's.** Elke gepubliceerde pagina is bereikbaar op
   `/p/<slug>`; hangt ze onder een headercategorie, dan ook op
   `/<categorie-slug>/<slug>`. Beide blijven werken.
-
----

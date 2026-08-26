@@ -21,7 +21,7 @@ VTK must complete the controller-side decisions and evidence listed under
 
 ## Findings and repository fixes
 
-### 1. Privacy statement did not match actual processing — high
+### 1. Privacy statement did not match actual processing: high
 
 **Found:** `packages/db/prisma/schema.prisma` stores profile address and birth
 date, personal email, study profile, memberships, mailing choices, tickets,
@@ -39,7 +39,7 @@ primarily described login name/email and technical session data.
   logistics request forms.
 - Added `docs/privacy-processors.md` as the maintainable processor inventory.
 
-### 2. Browser Sentry monitoring and replay loaded without consent — high
+### 2. Browser Sentry monitoring and replay loaded without consent: high
 
 **Found:** Sentry browser tracing and session replay initialized whenever a DSN
 was configured. Session replay can be particularly intrusive even when an SDK
@@ -60,7 +60,7 @@ masks common fields.
 instrumentation runs before React hydration. Withdrawal therefore stops a
 running browser SDK immediately after reload.
 
-### 3. Biometric face search lacked a safe default and full notice — critical
+### 3. Biometric face search lacked a safe default and full notice: critical
 
 **Found:** album face search sends a selfie to Immich face recognition and
 compares a biometric embedding with the album index. The UI had a consent
@@ -82,7 +82,7 @@ feature and there was no repository gate requiring a DPIA/approval.
 for everybody appearing in existing album photos. The feature must remain off
 until VTK completes the actions below.
 
-### 4. No self-service access/export or erasure — high
+### 4. No self-service access/export or erasure: high
 
 **Found:** members could edit a profile but could not download their data or
 request account erasure. Admin deletion risked either incomplete deletion or
@@ -102,7 +102,7 @@ loss of transaction integrity.
 - Exports deliberately exclude password hashes, OAuth credentials, session
   tokens, ticket access tokens and provider secrets.
 
-### 5. Stated retention was not technically enforced — high
+### 5. Stated retention was not technically enforced: high
 
 **Found:** sessions had expiries but historical logs, webhook payloads, outbox
 payloads and request fingerprints had no general cleanup routine.
@@ -121,7 +121,7 @@ payloads and request fingerprints had no general cleanup routine.
 Financial transaction rows are intentionally excluded from automatic deletion;
 their period must follow VTK’s approved Belgian accounting/legal schedule.
 
-### 6. Non-consensual bulk mailing export — high
+### 6. Non-consensual bulk mailing export: high
 
 **Found:** `ALLE_STUDENTEN` exported every current student even when no mailing
 category was selected.
@@ -131,7 +131,7 @@ opt-in categories. Necessary operational messages should be sent by the
 relevant order/reservation/member workflow and not through a marketing-list
 bypass.
 
-### 7. Data minimisation in onboarding — medium
+### 7. Data minimisation in onboarding: medium
 
 **Found:** street, house number, postcode, city, birth date and personal email
 were mandatory even though the code did not establish that every member needed
@@ -141,7 +141,7 @@ them.
 stored as `null`, and the form explains which details are optional and links to
 the privacy statement.
 
-### 8. Third-party media before user action — medium
+### 8. Third-party media before user action: medium
 
 **Found:** a default YouTube thumbnail contacted `i.ytimg.com` before the
 visitor played the video.
@@ -152,7 +152,7 @@ the image server-side, so the visitor's IP never reaches Google; editors can
 still configure their own poster. YouTube/Vimeo is contacted only after
 deliberate playback. The cookie policy explains this boundary.
 
-### 9. Profile action trusted a caller-supplied user ID — security/privacy
+### 9. Profile action trusted a caller-supplied user ID: security/privacy
 
 **Found:** the locale update action accepted a `userId` parameter from its
 caller rather than resolving the authenticated subject itself.
@@ -229,8 +229,8 @@ completed truthfully in source code:
 
 - [General Data Protection Regulation (EU) 2016/679](https://eur-lex.europa.eu/eli/reg/2016/679/oj)
 - [EU Artificial Intelligence Act 2024/1689](https://eur-lex.europa.eu/eli/reg/2024/1689/oj)
-- [Belgian Data Protection Authority — cookies](https://dataprotectionauthority.be/professioneel/thema-s/cookies)
-- [Belgian Data Protection Authority — facial recognition](https://dataprotectionauthority.be/burger/thema-s/recht-op-afbeelding/gezichtsherkenning-en-recht-op-afbeelding)
+- [Belgian Data Protection Authority: cookies](https://dataprotectionauthority.be/professioneel/thema-s/cookies)
+- [Belgian Data Protection Authority: facial recognition](https://dataprotectionauthority.be/burger/thema-s/recht-op-afbeelding/gezichtsherkenning-en-recht-op-afbeelding)
 
 ## Limitations
 

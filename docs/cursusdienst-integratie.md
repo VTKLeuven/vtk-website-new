@@ -1,4 +1,4 @@
-# Cursusdienst (cudi.vtk.be) ↔ VTK-website integratie
+# Cursusdienst (cudi.vtk.be) <-> VTK-website integratie
 
 Dit document beschrijft **hoe** de koppeling tussen de VTK-main site (`apps/web`,
 vtk.be) en het cursusdienst-platform (`cudi.vtk.be`, aparte repo
@@ -10,8 +10,8 @@ cudi-kant `docs/DESIGN_DECISIONS.md`.
 Er zijn twee losse koppelingen:
 
 | Koppeling | Richting | Standaard aan? |
-|-----------|----------|----------------|
-| **Openingsuren** tonen op de homepage | cudi → main (pull) | Ja (met fallback) |
+| --- | --- | --- |
+| **Openingsuren** tonen op de homepage | cudi -> main (pull) | Ja (met fallback) |
 | **Shiften** aanmaken op cudi, inschrijven op de main site | twee-weg | **Nee, opt-in via secret** |
 
 > De twee apps hebben elk een eigen database en deployment. Ze praten enkel via
@@ -31,9 +31,9 @@ De homepage en `/aanbod` tonen de cursusdienst-openingsuren live van cudi.
   expliciet een gesloten week. Op zaterdag en zondag kiest het al de volgende
   week; de website toont alleen maandag tot en met vrijdag.
 - **Consument:** `apps/web/lib/cursusdienstHours.ts`. Fallback in drie trappen:
-  live fetch → laatst gecachte waarde voor exact dezelfde gekozen week
+  live fetch -> laatst gecachte waarde voor exact dezelfde gekozen week
   (DB-`Setting` `cursusdienst.weekHoursCache`)
-  → melding "De cursusdienst openingsuren zijn momenteel niet beschikbaar".
+  -> melding "De cursusdienst openingsuren zijn momenteel niet beschikbaar".
 
 **Opzet:** niets verplicht. Optioneel kan je de cudi-URL overriden met
 `CURSUSDIENST_ORIGIN` (zie tabel onderaan). Dit staat standaard aan.
@@ -68,7 +68,7 @@ flowchart LR
     H --> E
 ```
 
-**a) Shift-definities: cudi → main.** Bij elke shift-mutatie op cudi (aanmaken,
+**a) Shift-definities (cudi -> main):** Bij elke shift-mutatie op cudi (aanmaken,
 wijzigen, verwijderen, en cascade-deletes via een verwijderde openingsuur-instance)
 duwt cudi de **volledige set komende shiften** naar de main site
 (`reconcileShiftsToMainSite` in `lib/main-site-shift-sync.ts`). De main site
@@ -78,16 +78,16 @@ shiften blijven staan voor ranking/reward/history.
 
 Veld-mapping (in `apps/web/lib/cudiShiftMirror.ts`, de centrale plek):
 - `sourceSystem = "cudi"`, `sourceId = <cudi-shift-id>` (idempotente sleutel);
-- `reward` = **1 bonnetje per begonnen uur** = `⌈(eindtijd − starttijd) / 1u⌉`
-  (1u00 → 1, 1u30 → 2, 2u00 → 2, 2u01 → 3);
+- `reward` = **1 bonnetje per begonnen uur** = `ceil((eindtijd - starttijd) / 1u)`
+  (1u00 -> 1, 1u30 -> 2, 2u00 -> 2, 2u01 -> 3);
 - `post = "Cursusdienst"` (zo verschijnen ze als aparte post in de ranking);
 - `maxParticipants = maxShifters`.
 
-**b) Inschrijven: native op de main site.** Gespiegelde shiften zijn gewone
+**b) Inschrijven (native op de main site):** Gespiegelde shiften zijn gewone
 `Shift`-rijen, dus ze verschijnen op `/shift` en lopen door de bestaande inschrijf-,
 overlap-, ranking- en reward-logica. Geen aparte UI.
 
-**c) Roster terug: main → cudi (blokkerend).** Schrijft een lid zich in/uit voor
+**c) Roster terug (main -> cudi, blokkerend):** Schrijft een lid zich in/uit voor
 een cursusdienst-shift, dan pusht de main site dat naar
 `POST https://cudi.vtk.be/api/integrations/main/registrations`. **Blokkerend:**
 lukt de cudi-call niet, dan draait de main site de native inschrijving terug en
@@ -95,12 +95,12 @@ krijgt het lid een foutmelding, zodat beide rosters strikt consistent blijven. D
 capaciteit wordt op de main site afgedwongen; cudi is een tweede gate + de roster
 voor de verantwoordelijken.
 
-**d) Identiteit.** Beide `User`-modellen hebben `rNumber @unique` (het KUL-nummer).
+**d) Identiteit:** Beide `User`-modellen hebben `rNumber @unique` (het KUL-nummer).
 De main site stuurt het r-nummer (+ e-mail/naam) mee; cudi lost dat op naar zijn
 `User`, en **provisioneert er stil één** als die nog niet bestaat (onbruikbaar
 wachtwoord; dat lid logt nooit rechtstreeks op cudi in).
 
-**e) Vangnet.** `POST https://vtk.be/api/integrations/cudi/sync-registrations`
+**e) Vangnet:** `POST https://vtk.be/api/integrations/cudi/sync-registrations`
 (voor een cron) duwt de volledige roster-set en zet zeldzame gemiste pushes gelijk.
 
 ### 2.2 Belangrijk om te weten
@@ -125,7 +125,7 @@ cudi spiegelt niets, het main-endpoint weigert alles (401), er bestaan dus geen
 
 ## 3. Opzet (activeren)
 
-### Stap 1 — Migratie op de main site
+### Stap 1: Migratie op de main site
 
 De brug voegt `sourceSystem` + `sourceId` toe aan `Shift`
 (migratie `packages/db/prisma/migrations/20260721120000_shift_source_origin`).
@@ -140,7 +140,7 @@ npm run migrate -w @vtk/db
 Veilig op bestaande data: twee nullable kolommen + een unieke index op
 `(sourceSystem, sourceId)` (NULLs botsen niet).
 
-### Stap 2 — Gedeeld secret genereren
+### Stap 2: Gedeeld secret genereren
 
 ```bash
 openssl rand -base64 32
@@ -148,7 +148,7 @@ openssl rand -base64 32
 
 Dezelfde waarde gebruik je aan **beide** kanten.
 
-### Stap 3 — Environment variabelen
+### Stap 3: Environment variabelen
 
 **Main site** (root `.env` van deze repo):
 
@@ -166,7 +166,7 @@ MAIN_SITE_ORIGIN="https://vtk.be"
 MAIN_SITE_ASSOCIATION_SLUG="vtk"   # optioneel; default vtk. Enkel deze kring spiegelt
 ```
 
-### Stap 4 — (optioneel) reconcile-cron
+### Stap 4: (optioneel) reconcile-cron
 
 Laat een cron/uptime-pinger periodiek (bv. elke 5 min) het vangnet triggeren:
 
@@ -175,13 +175,13 @@ curl -X POST https://vtk.be/api/integrations/cudi/sync-registrations \
      -H "Authorization: Bearer $CUDI_SYNC_SECRET"
 ```
 
-### Stap 5 — Cudi's student-shiftpagina uitzetten
+### Stap 5: Cudi's student-shiftpagina uitzetten
 
 Zodra inschrijven enkel nog op de main site mag: zet per kring in de cudi-admin de
 shift-toggle uit (`settings.useShifts`). De admin-authoring van de shiften en de
 brug-API's blijven werken; enkel de student-inschrijfpagina op cudi verdwijnt.
 
-> Doe stap 5 pas nadat stap 1–3 live en getest zijn, anders kan er even nergens
+> Doe stap 5 pas nadat stap 1 tot 3 live en getest zijn, anders kan er even nergens
 > ingeschreven worden.
 
 ---
@@ -191,10 +191,10 @@ brug-API's blijven werken; enkel de student-inschrijfpagina op cudi verdwijnt.
 Beide apps draaien standaard op poort **3000**, dus geef er één een andere poort:
 
 ```bash
-# terminal A — main site (deze repo)
+# terminal A: main site (deze repo)
 npm run dev -w @vtk/web                 # http://localhost:3000
 
-# terminal B — cudi
+# terminal B: cudi
 PORT=3001 npm run dev                    # http://localhost:3001
 ```
 
@@ -211,11 +211,11 @@ MAIN_SITE_ORIGIN="http://localhost:3000"
 ```
 
 Rooktest:
-1. Maak op cudi een cursusdienst-shift aan (Admin → Slots).
+1. Maak op cudi een cursusdienst-shift aan (Admin -> Slots).
 2. Ze verschijnt op de main site onder `/shift`.
-3. Schrijf je op de main site in → controleer dat de registratie op cudi opduikt
+3. Schrijf je op de main site in -> controleer dat de registratie op cudi opduikt
    (roster van de shift).
-4. Schrijf je weer uit → registratie verdwijnt op cudi.
+4. Schrijf je weer uit -> registratie verdwijnt op cudi.
 
 ---
 
@@ -224,7 +224,7 @@ Rooktest:
 ### Endpoints
 
 | Endpoint | Kant | Auth | Doel |
-|----------|------|------|------|
+| --- | --- | --- | --- |
 | `GET /api/opening-hours?association=vtk` | cudi | geen (publiek) | Wekelijkse openingsuren |
 | `POST /api/integrations/cudi/shifts` | main | `Bearer CUDI_SYNC_SECRET` | Shift-definities spiegelen (upsert + prune) |
 | `POST /api/integrations/main/registrations` | cudi | `Bearer MAIN_SITE_SHIFT_SYNC_SECRET` | Roster schrijven (`register`/`unregister`/`reconcile`) |
@@ -233,17 +233,17 @@ Rooktest:
 ### Environment variabelen
 
 | Variabele | Kant | Default | Doel |
-|-----------|------|---------|------|
-| `CUDI_SYNC_SECRET` | main | — | Gedeeld secret; verifieert inkomende shift-mirror en autoriseert uitgaande roster-push. Leeg = brug uit |
+| --- | --- | --- | --- |
+| `CUDI_SYNC_SECRET` | main | (geen) | Gedeeld secret; verifieert inkomende shift-mirror en autoriseert uitgaande roster-push. Leeg = brug uit |
 | `CURSUSDIENST_ORIGIN` | main | `https://cudi.vtk.be` | Basis-URL van cudi (openingsuren-pull + roster-push) |
-| `MAIN_SITE_SHIFT_SYNC_SECRET` | cudi | — | Zelfde gedeelde secret; autoriseert uitgaande shift-mirror en verifieert inkomende roster-writes. Leeg = brug uit |
+| `MAIN_SITE_SHIFT_SYNC_SECRET` | cudi | (geen) | Zelfde gedeelde secret; autoriseert uitgaande shift-mirror en verifieert inkomende roster-writes. Leeg = brug uit |
 | `MAIN_SITE_ORIGIN` | cudi | `https://vtk.be` | Basis-URL van de main site (shift-mirror) |
 | `MAIN_SITE_ASSOCIATION_SLUG` | cudi | `vtk` | Welke kring naar de main site spiegelt |
 
 ### Belangrijke bestanden
 
 | Bestand | Kant | Rol |
-|---------|------|-----|
+| --- | --- | --- |
 | `apps/web/lib/cudiShiftMirror.ts` | main | Reward-regel + post-label + veld-mapping (centrale beslissingsplek) |
 | `apps/web/lib/cudiRegistrationSync.ts` | main | Roster-push + reconcile |
 | `apps/web/app/api/shift/register/route.ts` | main | Native inschrijven + blokkerende cudi-push |
@@ -256,7 +256,7 @@ Rooktest:
 ## 6. Troubleshooting
 
 | Symptoom | Waarschijnlijke oorzaak |
-|----------|-------------------------|
+| --- | --- |
 | Cudi-shiften verschijnen niet op de main site | Secret ontbreekt of mismatcht (401), verkeerde `MAIN_SITE_ORIGIN`, of `MAIN_SITE_ASSOCIATION_SLUG` ≠ `vtk`. Check de cudi-logs op `[shift-sync]`. |
 | Inschrijven faalt met "Could not sync with cursusdienst" | cudi onbereikbaar, secret-mismatch (401), of de shift bestaat niet (meer) op cudi (stale mirror; wacht op de volgende reconcile of triggert stap 4). |
 | Cudi-roster loopt achter | Gemiste per-actie-push; trigger de reconcile (stap 4). |

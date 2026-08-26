@@ -15,7 +15,7 @@ acties in `apps/web/app/actions/theokot.ts`).
 
 ---
 
-## Hoofdnavigatie — Info, Theokot en Shiften
+## Hoofdnavigatie: Info, Theokot en Shiften
 
 De tabs in de header komen uit de `HeaderTab`-tabel; `HEADER_TABS` in
 `packages/db/src/groups.ts` is de seed én de fallback wanneer die tabel leeg is.
@@ -128,7 +128,7 @@ de URL dezelfde blijft.
 
 ---
 
-## Theokot — broodjes-reservatiesysteem
+## Theokot: broodjes-reservatiesysteem
 
 Theokot is de cafetaria/broodjesbar van VTK. Studenten reserveren vooraf broodjes,
 halen ze af aan de balie en betalen daar. Post **Theokot** beheert het systeem.
@@ -202,7 +202,7 @@ halen ze af aan de balie en betalen daar. Post **Theokot** beheert het systeem.
   hoeft niet wekelijks te wijzigen.
 - Eén bestelling per persoon per sessie (DB-uniek). **Annuleren = verwijderen** van de
   bestelling (geeft voorraad + het uniek-slot vrij, zodat opnieuw bestellen kan vóór
-  de deadline). Er wordt dus geen annulatie-historiek bijgehouden — enkel no-shows.
+  de deadline). Er wordt dus geen annulatie-historiek bijgehouden: enkel no-shows.
 
 ### Afhalen
 
@@ -220,8 +220,7 @@ halen ze af aan de balie en betalen daar. Post **Theokot** beheert het systeem.
 - **Kaartscanner**: de scanner werkt als toetsenbord en tikt `serial;cardAppId` + Enter.
   Eén invoerveld verwerkt beide: bevat de invoer een `;` dan gaat ze naar de KU Leuven
   `idverification`-API (`lib/kul-card.ts`) die een r-nummer teruggeeft; anders wordt de
-  invoer als r-nummer behandeld. Credentials (`KUL_CARD_*`) staan los van de OIDC-login —
-  zie README.
+  invoer als r-nummer behandeld. Credentials (`KUL_CARD_*`) staan los van de OIDC-login (zie README).
 - **Afhaaluren** (default **12:00–16:00**, per dag aanpasbaar) zijn NIET dezelfde als de
   **openingsuren van Theokot** op de startpagina (default ma–vr **10:30–18:00**). De
   r-nummerpagina werkt ook vóór 12:00.
@@ -230,8 +229,8 @@ halen ze af aan de balie en betalen daar. Post **Theokot** beheert het systeem.
 
 - Een bestelling telt pas als **no-show** vanaf **15 min na sluitingstijd**
   (`noShowGraceMinutes`). Verwerking gebeurt door een **ingebouwde scheduler**
-  (`apps/web/instrumentation.ts`) die periodiek `processDueNoShows` draait — geen
-  externe cron. Idempotent via `TheokotSession.processedAt`.
+  (`apps/web/instrumentation.ts`) die periodiek `processDueNoShows` draait (geen
+  externe cron). Idempotent via `TheokotSession.processedAt`.
 - Bij een no-show krijgt de student een **waarschuwingsmail** (`lib/mail.ts`,
   nodemailer/SMTP; logt enkel wanneer SMTP niet geconfigureerd is).
 - Na **X** no-shows (`noShowThreshold`) volgt een **ban** van **Y** dagen
@@ -258,15 +257,15 @@ halen ze af aan de balie en betalen daar. Post **Theokot** beheert het systeem.
 
 ### Permissies
 
-- `theokot.manage` — sessies/aanbod, config, bericht, bans, historiek.
-- `openingHours.manageOwn` — openingsurenkaart van de eigen post; daarnaast wordt
+- `theokot.manage`: sessies/aanbod, config, bericht, bans, historiek.
+- `openingHours.manageOwn`: openingsurenkaart van de eigen post; daarnaast wordt
   de exacte post (THEOKOT, CURSUSDIENST of FAKBAR) server-side gecontroleerd.
-- `theokot.pickup` — afhaalbalie + turf-lijst.
+- `theokot.pickup`: afhaalbalie + turf-lijst.
 - Beide worden in de seed toegekend aan groep **THEOKOT**.
 
 ---
 
-## Grocomeet en VTK Bureau — broodjes voor een vergadering
+## Grocomeet en VTK Bureau: broodjes voor een vergadering
 
 Twee terugkerende vergaderingen waar vooraf een broodje en een drankje voor besteld
 wordt. Ze staan in de code als één model (`Meeting`, met `kind`), want de werking is
@@ -535,7 +534,7 @@ vooraf; er vertrekt **geen mail**, dus de vice verwittigt die leden zelf.
 
 ### Permissies & navigatie
 
-- `piano.manage` — vensters, sluitingsdagen, instellingen, infotekst en het
+- `piano.manage`: vensters, sluitingsdagen, instellingen, infotekst en het
   schrappen van andermans reservatie. Hoort bij de vice.
 - De pagina hangt als menu-item onder de **Info**-tab (`HeaderTabLink` naar
   `/piano`), zoals ze op de oude site onder "Aanbod" stond. Het is een eigen route
@@ -553,14 +552,14 @@ en `apps/web/lib/door-*.ts`; Pi-kant: `infra/door/`.
 
 ### Drie aparte rechten (bewust gescheiden)
 
-- **`door.open`** — mag de deur openen met zijn studentenkaart. Dit ken je toe aan
+- **`door.open`**: mag de deur openen met zijn studentenkaart. Dit ken je toe aan
   rollen in `/admin/roles`, zodat "wie geraakt binnen" gewoon werkingsjaar-gescoped
   meeloopt met de rollen/posten (reset dus mee op 15 juli, zoals alle rechten).
-- **`door.remoteOpen`** — toont de "deur openen"-knop op het admin-dashboard.
+- **`door.remoteOpen`**: toont de "deur openen"-knop op het admin-dashboard.
   **Bewust los van `door.open`:** wie met zijn kaart binnen mag, hoeft daarom nog
   niet de deur voor anderen te kunnen openen vanop afstand. Dit is de kleinere,
   bewustere groep (bv. praesidium/onthaal).
-- **`door.manage`** — de `/admin/deur`-tab: tijdelijke toegang geven, de
+- **`door.manage`**: de `/admin/deur`-tab: tijdelijke toegang geven, de
   gebruiksstatistiek en de log bekijken.
 
 ### Tijdelijke toegang los van de rollen
@@ -3618,7 +3617,7 @@ De twee gates uit `proxy.ts` zijn de enige schermen die een lid precies één ke
 ziet. Daardoor is er geen manier om te controleren of ze nog kloppen: je eigen
 account is al onboarded, en het werkingsjaar rolt maar één keer per jaar om. Wie
 het toch wou zien, moest een testaccount aanmaken of `onboardedAt` in de database
-op null zetten — en dat laatste is precies hoe je per ongeluk je eigen profiel
+op null zetten, en dat laatste is precies hoe je per ongeluk je eigen profiel
 wist.
 
 `/admin/it/flows` (superadmin) toont per gate wanneer hij afgaat, wat de eigen
@@ -4105,7 +4104,7 @@ gewoon open; er valt dan niets te verbergen.
 
 Een alumnus kan door een beheerder als **erelid** aangeduid worden
 (`User.honoraryMember`, op `/admin/gebruikers/<id>`; nooit door het lid zelf).
-Daarmee ziet hij ticketsoorten met `TicketAudience.HONORARY` — bijvoorbeeld
+Daarmee ziet hij ticketsoorten met `TicketAudience.HONORARY`, bijvoorbeeld
 gratis naar een cantus.
 
 Zo'n ticketsoort wordt voor iedereen anders **weggefilterd**, niet uitgegrijsd.
@@ -4122,7 +4121,7 @@ daar is interesse een ledenmarkering, en een anonieme rij zou de teller waardelo
 maken.
 
 De prijs van die openheid is dat de bezoeker iets over zichzelf zegt: een
-afstudeerjaar, of dat hij in VTK zat, of allebei. **De naam is optioneel** — "iemand
+afstudeerjaar, of dat hij in VTK zat, of allebei. **De naam is optioneel**: "iemand
 van 2004 die in VTK zat komt ook" is al genoeg om een andere alumnus over de
 streep te trekken. Een volledig lege rij wordt geweigerd, want die verhoogt enkel
 een teller zonder iemand iets te vertellen.
@@ -4161,7 +4160,7 @@ Daarom een eigen bron, met twee helften die pas bij de export samenkomen:
 - **`AlumniContact`** (`/admin/alumni`, permissie `alumni.manage`): namen die de
   kring van reünies, oud-praesidia en inschrijvingslijsten overhoudt, zonder
   account. Per lichting te beheren, met een plakvenster voor een geëxporteerde
-  lijst — zonder dat is vijfhonderd alumni invoeren een middag typen, en dan
+  lijst; zonder dat is vijfhonderd alumni invoeren een middag typen, en dan
   gebeurt het niet.
 - **Site-accounts** met `alumni` én `alumniMailOptIn`. Dat vinkje staat in de
   onboarding én in de jaarlijkse bevestiging, samen met het afstudeerjaar en "ik
@@ -4215,8 +4214,8 @@ aan of uit te zetten; zijn beginstand komt uit die accountvoorkeur.
 
 `EventVisibility.MEMBERS` is verdwenen (migratie
 `20260826110000_drop_event_visibility`). VTK plant niets in wat niet op de
-publieke kalender mag staan; wat wél besloten is — een vergadering, een intern
-moment — staat sowieso nergens in `CalendarEvent`. De vlag leverde vooral een
+publieke kalender mag staan; wat wél besloten is (een vergadering, een intern
+moment) staat sowieso nergens in `CalendarEvent`. De vlag leverde vooral een
 extra regel in elke query op en een keuzelijst in de admin die niemand ooit anders
 zette.
 
@@ -4231,15 +4230,15 @@ blijven bewaard).
 ## Abonneren op de kalender: vier samenstellingen
 
 De abonneerknop wees vroeger naar de feed van de filterchip die toevallig aanstond
-— zonder dat ergens te zeggen. Dat is de soort stille koppeling waar iemand pas
+(zonder dat ergens te zeggen). Dat is de soort stille koppeling waar iemand pas
 achter komt wanneer hij drie maanden later geen enkel evenement in zijn agenda
 ziet.
 
 Nu zegt de knop wat ze gaat doen ("Abonneren op de alumni-kalender") en zet een
 dialoog de vier zinvolle keuzes naast elkaar:
 
-1. **de hele kalender** — alles, alle doelgroepen inbegrepen;
-2. **algemene evenementen + één doelgroep** — het antwoord voor een alumnus: de
+1. **de hele kalender**: alles, alle doelgroepen inbegrepen;
+2. **algemene evenementen + één doelgroep**: het antwoord voor een alumnus: de
    alumni-avonden én de fuiven waar iedereen welkom is, maar niet de
    eerstejaarsdoop;
 3. **enkel die doelgroep of categorie**;

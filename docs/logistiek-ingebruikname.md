@@ -90,7 +90,7 @@ invult en het heeft geen relay-rechten nodig.
 
 ### `/beheer/materiaal`
 
-- **Schap en rek per item.** De klaarzetlijst en het printblad tonen "—" zolang
+- **Schap en rek per item.** De klaarzetlijst en het printblad tonen "-" zolang
   dat leeg is, en dat is net waarvoor ze bedoeld zijn.
 - **Volume in liter**, minstens voor het grote spul (tafels, frigo's, boxen).
   Anders zegt het evenementscherm enkel "van 40 stuks is het volume niet
