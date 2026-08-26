@@ -3,6 +3,8 @@ import { NextResponse } from "next/server";
 import { prisma } from "@vtk/db";
 import { audienceFilter, viewerAudiences } from "@/lib/calendar/audience";
 import { publicInterestCounts } from "@/lib/calendar/interest";
+import { getCurrentSession } from "@/lib/session";
+import { interestedEventIds } from "@/lib/app-api/interest";
 
 // Leest de sessie om de doelgroepen van de kijker te bepalen, dus per definitie
 // niet statisch te renderen.
@@ -61,7 +63,15 @@ export async function GET(request: Request) {
 
   // Enkel de tellers die de drempel halen komen terug; een laag getal verlaat de
   // server dus niet eens. Zie lib/calendar/interest.ts.
-  const interested = await publicInterestCounts(events.map((e) => e.id));
+  //
+  // `interested` per event erbij, zodat de voorvertoning in de kalender meteen de
+  // juiste stand van de knop toont in plaats van "ik kom" aan te bieden aan
+  // iemand die het al aanduidde.
+  const session = await getCurrentSession();
+  const [counts, mine] = await Promise.all([
+    publicInterestCounts(events.map((e) => e.id)),
+    interestedEventIds(session?.user.id ?? null, events.map((e) => e.id)),
+  ]);
 
   const payload = events.map((e) => ({
     id: e.id,
@@ -80,7 +90,8 @@ export async function GET(request: Request) {
       descriptionNl: e.descriptionNl,
       descriptionEn: e.descriptionEn,
       categories: e.categories.map((c) => c.category),
-      interestedCount: interested.get(e.id) ?? null,
+      interestedCount: counts.get(e.id) ?? null,
+      interested: mine.has(e.id),
     },
   }));
 

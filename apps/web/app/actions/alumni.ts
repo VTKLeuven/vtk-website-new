@@ -16,6 +16,7 @@ import { syncAlumniToBrevo } from "@/lib/brevo/alumni";
 export type AlumniErrorCode =
   | "INVALID_INPUT"
   | "EMAIL_TAKEN"
+  | "LINKED_TO_ACCOUNT"
   | "NOTHING_IMPORTED"
   | "BREVO_DISABLED";
 
@@ -70,6 +71,45 @@ export async function saveAlumniContactAction(
     wasInVtk: parsed.data.wasInVtk,
     note: parsed.data.note || null,
   };
+
+  // Heeft dit adres al een account, dan is een adresboekrij de verkeerde vorm:
+  // die persoon houdt zijn eigen profiel bij, en twee rijen betekent vroeg of
+  // laat twee mails. We zetten hem dan als alumnus in de mailinglijst en vullen
+  // enkel aan wat nog leeg stond; wat hij zelf invulde blijft van hem.
+  if (!parsed.data.id) {
+    const account = await prisma.user.findFirst({
+      where: {
+        deletedAt: null,
+        OR: [{ email: data.email }, { personalEmail: data.email }],
+      },
+      select: { id: true, name: true, graduationYear: true, wasInVtk: true },
+    });
+    if (account) {
+      await prisma.user.update({
+        where: { id: account.id },
+        data: {
+          alumni: true,
+          alumniMailOptIn: true,
+          ...(account.graduationYear === null && data.graduationYear
+            ? { graduationYear: data.graduationYear }
+            : {}),
+          ...(!account.wasInVtk && data.wasInVtk ? { wasInVtk: true } : {}),
+        },
+      });
+      await logAudit({
+        action: "update",
+        entity: "user",
+        entityId: account.id,
+        target: account.name,
+        summary: "als alumnus in de mailinglijst gezet vanuit het adresboek",
+      });
+      refresh();
+      return saveError(
+        "LINKED_TO_ACCOUNT",
+        `${account.name} heeft al een account op dit adres. Die is nu als alumnus in de mailinglijst gezet; er is geen tweede rij in het adresboek gemaakt.`,
+      );
+    }
+  }
 
   try {
     if (parsed.data.id) {
@@ -156,6 +196,41 @@ export async function toggleAlumniSubscriptionAction(formData: FormData): Promis
 }
 
 /**
+ * Een account in of uit de alumni-mailinglijst zetten.
+ *
+ * Raakt bewust enkel `alumniMailOptIn` (en `alumni`, want zonder dat hoort hij
+ * hier niet). Naam, afstudeerjaar en VTK-verleden blijven van het lid zelf: die
+ * staan in zijn profiel en hij kan ze daar wijzigen.
+ */
+export async function toggleAlumniAccountOptInAction(formData: FormData): Promise<void> {
+  await requirePermission("alumni.manage");
+  const id = String(formData.get("id") ?? "");
+  if (!id) return;
+
+  const user = await prisma.user.findUnique({
+    where: { id },
+    select: { name: true, alumniMailOptIn: true },
+  });
+  if (!user) return;
+
+  await prisma.user.update({
+    where: { id },
+    data: { alumni: true, alumniMailOptIn: !user.alumniMailOptIn },
+  });
+
+  await logAudit({
+    action: "update",
+    entity: "user",
+    entityId: id,
+    target: user.name,
+    summary: user.alumniMailOptIn
+      ? "uit de alumni-mailinglijst gehaald"
+      : "in de alumni-mailinglijst gezet",
+  });
+  refresh();
+}
+
+/**
  * Een geplakte lijst invoeren.
  *
  * Zonder dit is een adresboek van vijfhonderd alumni een middag typen, en dan
@@ -181,7 +256,37 @@ export async function importAlumniAction(
     );
   }
 
+  // Adressen die al een account hebben, worden geen adresboekrij maar een
+  // opt-in op dat account: twee rijen voor dezelfde persoon betekent vroeg of
+  // laat twee mails.
+  const accounts = await prisma.user.findMany({
+    where: {
+      deletedAt: null,
+      OR: [
+        { email: { in: rows.map((row) => row.email) } },
+        { personalEmail: { in: rows.map((row) => row.email) } },
+      ],
+    },
+    select: { id: true, email: true, personalEmail: true },
+  });
+  const accountByEmail = new Map<string, string>();
+  for (const account of accounts) {
+    accountByEmail.set(account.email.toLowerCase(), account.id);
+    if (account.personalEmail) accountByEmail.set(account.personalEmail.toLowerCase(), account.id);
+  }
+
+  let linked = 0;
   for (const row of rows) {
+    const accountId = accountByEmail.get(row.email);
+    if (accountId) {
+      await prisma.user.update({
+        where: { id: accountId },
+        data: { alumni: true, alumniMailOptIn: true },
+      });
+      linked += 1;
+      continue;
+    }
+
     await prisma.alumniContact.upsert({
       where: { email: row.email },
       update: {
@@ -205,18 +310,30 @@ export async function importAlumniAction(
     action: "create",
     entity: "alumniContact",
     target: `${rows.length} alumni`,
-    summary: invalid.length > 0 ? `${invalid.length} regel(s) overgeslagen` : undefined,
+    summary: [
+      linked > 0 ? `${linked} gekoppeld aan een bestaand account` : null,
+      invalid.length > 0 ? `${invalid.length} regel(s) overgeslagen` : null,
+    ]
+      .filter(Boolean)
+      .join(", ") || undefined,
   });
 
   refresh();
   // De uitkomst hoort in de toast te staan: "3 toegevoegd, 1 overgeslagen" is
   // wat de beheerder wil weten, en dat kan de client niet zelf afleiden.
-  return invalid.length > 0
-    ? saveError(
-        "PARTIAL_IMPORT",
-        `${rows.length} ingevoerd, ${invalid.length} overgeslagen (eerste fout op regel ${invalid[0]!.line}).`,
-      )
-    : saveOk();
+  if (invalid.length === 0 && linked === 0) return saveOk();
+  return saveError(
+    "PARTIAL_IMPORT",
+    [
+      `${rows.length - linked} in het adresboek gezet`,
+      linked > 0 ? `${linked} gekoppeld aan een bestaand account` : null,
+      invalid.length > 0
+        ? `${invalid.length} overgeslagen (eerste fout op regel ${invalid[0]!.line})`
+        : null,
+    ]
+      .filter(Boolean)
+      .join(", ") + ".",
+  );
 }
 
 /** Handmatige duw naar Brevo, zoals de knop bij de gewone mailinglijsten. */

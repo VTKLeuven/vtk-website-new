@@ -186,6 +186,15 @@ export function CalendarSubscribe({
     <div className="subscribe-box">
       <h3>{labels.title}</h3>
       <div className="sub">{labels.sub}</div>
+      {/* Zeggen waar het naartoe gaat vóór er iemand op duwt. "Abonneren" alleen
+          laat in het midden of je een bestand krijgt, een mail, of iets in je
+          agenda; dit is precies de onduidelijkheid die maakt dat mensen er niet
+          op klikken. */}
+      <p className="subscribe-how">
+        {nl
+          ? "In je agenda-app, in Google Calendar, of via een abonnementslink."
+          : "In your calendar app, in Google Calendar, or through a subscription link."}
+      </p>
       <button type="button" className="btn btn-primary arrow subscribe-open" onClick={() => setOpen(true)}>
         {buttonLabel}
       </button>
@@ -255,6 +264,12 @@ export function CalendarSubscribe({
                 ))}
               </div>
             )}
+
+            <p className="subscribe-how subscribe-how-modal">
+              {nl
+                ? "Kies hieronder hoe je hem toevoegt. Je agenda haalt de kalender daarna zelf op, dus nieuwe evenementen komen er vanzelf bij."
+                : "Choose below how to add it. Your calendar fetches it from then on, so new events appear on their own."}
+            </p>
 
             <div className="subscribe-actions">
               <a className="btn btn-ghost arrow" href={webcalUrl}>

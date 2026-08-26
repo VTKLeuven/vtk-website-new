@@ -5,9 +5,15 @@ import { type Locale } from "@vtk/i18n";
 import { hasLocale } from "@/lib/locale";
 import { requirePermission } from "@/lib/session";
 import { brevoEnabled } from "@/lib/brevo/client";
-import { alumniYears, listAlumniContacts, listAlumniRecipients } from "@/lib/alumni";
+import {
+  alumniYears,
+  listAlumniAccounts,
+  listAlumniContacts,
+  listAlumniRecipients,
+} from "@/lib/alumni";
 import { AlumniContactForm } from "./AlumniContactForm";
 import { AlumniImport } from "./AlumniImport";
+import { AlumniAccounts } from "./AlumniAccounts";
 import { AlumniTable } from "./AlumniTable";
 import { AlumniSyncButton } from "./SyncButton";
 
@@ -41,9 +47,10 @@ export default async function AdminAlumni({
   const query = (Array.isArray(sp.q) ? sp.q[0] : sp.q) ?? "";
   const year = yearParam && /^\d{4}$/.test(yearParam) ? Number(yearParam) : null;
 
-  const [years, contacts, recipients] = await Promise.all([
+  const [years, contacts, accounts, recipients] = await Promise.all([
     alumniYears(),
     listAlumniContacts({ year, query }),
+    listAlumniAccounts({ year, query }),
     listAlumniRecipients({ year }),
   ]);
 
@@ -57,8 +64,8 @@ export default async function AdminAlumni({
         <h1 className="text-2xl font-semibold text-vtk-ink">{nl ? "Alumni" : "Alumni"}</h1>
         <p className="mt-1 max-w-3xl text-sm text-[#5c667f]">
           {nl
-            ? "Het adresboek per lichting, voor alumni zonder account. Bij een export komen daar de site-accounts bij die zelf aanvinkten dat ze alumni-mails willen; dubbele adressen vallen weg."
-            : "The address book by year, for alumni without an account. An export adds the site accounts that ticked they want alumni mail; duplicate addresses are dropped."}
+            ? "Twee bronnen die bij een export samenkomen: het adresboek per lichting voor alumni zonder account, en de leden die op de site aanvinkten dat ze alumni-mails willen. Dubbele adressen vallen weg, en het account wint."
+            : "Two sources that come together on export: the address book by year for alumni without an account, and the members who ticked on the site that they want alumni mail. Duplicate addresses are dropped, and the account wins."}
         </p>
       </div>
 
@@ -172,7 +179,16 @@ export default async function AdminAlumni({
           </button>
         </form>
 
-        <AlumniTable rows={contacts} locale={locale} />
+        <div className="space-y-2">
+          <h2 className="font-medium text-vtk-ink">
+            {nl ? "Adresboek (zonder account)" : "Address book (no account)"}
+          </h2>
+          <AlumniTable rows={contacts} locale={locale} />
+        </div>
+
+        <div className="mt-6">
+          <AlumniAccounts accounts={accounts} locale={locale} />
+        </div>
       </div>
     </div>
   );

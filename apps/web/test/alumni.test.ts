@@ -172,3 +172,67 @@ describe("listAlumniRecipients", () => {
     expect(rows.map((r) => r.graduationYear)).toEqual([2011, 2004]);
   });
 });
+
+
+/**
+ * Het adresboek en de accounts zijn twee bronnen voor dezelfde lijst. Een
+ * alumnus die toevallig een account heeft, hoort dus **niet** als tweede rij in
+ * het adresboek te belanden: dat is precies hoe iemand elke mailing dubbel krijgt.
+ */
+describe("listAlumniAccounts", () => {
+  const findMany = vi.fn();
+
+  beforeEach(() => {
+    vi.resetModules();
+    findMany.mockReset();
+  });
+
+  async function load() {
+    vi.doMock("@vtk/db", () => ({ prisma: { user: { findMany } } }));
+    return (await import("@/lib/alumni")).listAlumniAccounts;
+  }
+
+  it("gebruikt het voorkeursadres, want een universiteitsmail sterft af", async () => {
+    findMany.mockResolvedValue([
+      {
+        id: "u1",
+        name: "Jan Peeters",
+        email: "r0123456@kuleuven.be",
+        personalEmail: "jan@example.com",
+        emailPreference: "PERSONAL",
+        graduationYear: 2004,
+        wasInVtk: true,
+        alumniMailOptIn: true,
+        active: true,
+      },
+      {
+        id: "u2",
+        name: "An Janssens",
+        email: "r0999999@kuleuven.be",
+        personalEmail: null,
+        emailPreference: "UNIVERSITY",
+        graduationYear: 2011,
+        wasInVtk: false,
+        alumniMailOptIn: false,
+        active: true,
+      },
+    ]);
+
+    const listAlumniAccounts = await load();
+    const rows = await listAlumniAccounts({});
+
+    expect(rows[0]).toMatchObject({ email: "jan@example.com", optedIn: true });
+    expect(rows[1]).toMatchObject({ email: "r0999999@kuleuven.be", optedIn: false });
+  });
+
+  it("laat gewiste accounts eruit", async () => {
+    findMany.mockResolvedValue([]);
+    const listAlumniAccounts = await load();
+    await listAlumniAccounts({});
+    expect(findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ alumni: true, deletedAt: null }),
+      }),
+    );
+  });
+});

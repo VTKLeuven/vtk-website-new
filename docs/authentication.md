@@ -151,6 +151,31 @@ KU Leuven-login meer. `packages/auth/src/server/selfSignup.ts` is de tweede deur
 - **Wachtwoord vergeten** (`/wachtwoord-vergeten`) werkt enkel voor accounts die
   een wachtwoord hébben. Een geslaagde reset zet `emailVerified` mee op true: wie
   zijn wachtwoord kan herstellen, bewijst daarmee dat het adres van hem is.
+
+### Migratiepad: van KU Leuven naar een wachtwoord
+
+Een KU Leuven-account verdwijnt een tijd na het afstuderen. Zonder wachtwoord is
+er dan geen enkele manier meer om binnen te geraken, en een herstelmail zou naar
+een dode mailbox gaan. Drie stukken vangen dat op:
+
+- **`setOwnPassword(userId, password)`** zet (of vervangt) de `credential`-rij
+  voor een ingelogd lid. Het paneel staat op `/account` en dringt aan zodra
+  iemand zichzelf als alumnus of als niet-meer-studerend aanduidde en nog geen
+  wachtwoord heeft. `passwordStatus(userId)` levert wat dat paneel toont.
+- **`createPasswordReset` stuurt naar `personalEmail`** wanneer dat ingevuld is,
+  en zoekt ook op dat adres. Naar de universiteitsmail sturen is een link die
+  niemand meer leest.
+- **`resolveLoginEmail(email)`** vertaalt een ingetikt persoonlijk adres naar het
+  login-adres (`User.email`), en `loginAction` gebruikt dat vóór
+  `checkLoginBlocked` en `signInEmail`. Zonder die vertaling is het geheel een
+  val: je herstelt je wachtwoord via je persoonlijke adres en geraakt er daarna
+  niet mee binnen. Enkel wanneer dat adres **één** account aanwijst; botst het
+  met een login-adres of met een tweede profiel, dan blijft het ingetikte adres
+  staan en faalt de login gewoon. Raden doen we hier niet.
+
+`User.email` blijft dus de identiteit en verandert nergens. Dat is met opzet: hem
+laten wijzigen raakt de account-linking met KU Leuven en de unieke index, voor een
+probleem dat met een tweede login-adres al opgelost is.
 - De mails staan in `apps/web/lib/accountMail.ts`: platte tekst met één link, want
   ze moeten door een spamfilter en op een oude telefoon leesbaar zijn.
 

@@ -236,20 +236,89 @@ export async function createPasswordReset(
   email: string,
 ): Promise<{ userId: string; token: string; name: string; locale: Locale; email: string } | null> {
   const normalized = normalizeEmail(email);
-  const user = await prisma.user.findUnique({
-    where: { email: normalized },
+  // Zoeken op allebei de adressen: een afgestudeerde kent zijn KU Leuven-adres
+  // vaak niet meer uit het hoofd en tikt het adres in waar hij zijn mail leest.
+  const user = await prisma.user.findFirst({
+    where: {
+      deletedAt: null,
+      OR: [{ email: normalized }, { personalEmail: normalized }],
+    },
     select: {
       id: true,
       name: true,
       locale: true,
       active: true,
+      email: true,
+      personalEmail: true,
       accounts: { where: { providerId: 'credential' }, select: { id: true } },
     },
   });
   if (!user || !user.active || user.accounts.length === 0) return null;
 
   const token = await issueToken(user.id, 'PASSWORD_RESET', RESET_TTL_MS);
-  return { userId: user.id, token, name: user.name, locale: user.locale, email: normalized };
+  return {
+    userId: user.id,
+    token,
+    name: user.name,
+    locale: user.locale,
+    // Naar het persoonlijke adres wanneer dat er is. Dit is precies het geval
+    // waarin het universiteitsadres niet meer werkt: wie afstudeert, verliest die
+    // mailbox, en een herstelmail daarheen sturen is een link die niemand leest.
+    email: user.personalEmail || user.email,
+  };
+}
+
+/**
+ * Waar een herstelmail voor dit lid naartoe zou gaan, en of er al een wachtwoord
+ * is. Voor het paneel op /account: iemand die zijn KU Leuven-account gaat
+ * verliezen, moet vooraf kunnen zien of hij binnen geraakt zonder.
+ */
+export async function passwordStatus(
+  userId: string,
+): Promise<{ hasPassword: boolean; resetEmail: string; usesPersonalEmail: boolean }> {
+  const user = await prisma.user.findUniqueOrThrow({
+    where: { id: userId },
+    select: {
+      email: true,
+      personalEmail: true,
+      accounts: { where: { providerId: 'credential' }, select: { id: true } },
+    },
+  });
+  return {
+    hasPassword: user.accounts.length > 0,
+    resetEmail: user.personalEmail || user.email,
+    usesPersonalEmail: Boolean(user.personalEmail),
+  };
+}
+
+/**
+ * Zelf een wachtwoord instellen op een account dat er nog geen heeft, of het
+ * bestaande vervangen.
+ *
+ * Dit is het migratiepad voor wie via KU Leuven binnenkomt. Dat account
+ * verdwijnt een tijd na het afstuderen, en dan is er geen enkele manier meer om
+ * in te loggen; een wachtwoord vooraf instellen is het verschil tussen een
+ * alumnus die blijft meedoen en een die buiten staat.
+ *
+ * Bewust géén huidig wachtwoord vereist: verreweg de meesten hebben er nog geen,
+ * en wie er wel een heeft, zit hier achter een geldige sessie. Wil je het
+ * strenger, dan hoort dat bij een "gevoelige actie"-herauthenticatie die de site
+ * nergens anders heeft.
+ */
+export async function setOwnPassword(userId: string, password: string): Promise<void> {
+  assertPasswordStrongEnough(password);
+  const passwordHash = await hashPassword(password);
+  await prisma.account.upsert({
+    where: { id: `credential:${userId}` },
+    update: { password: passwordHash },
+    create: {
+      id: `credential:${userId}`,
+      accountId: userId,
+      providerId: 'credential',
+      userId,
+      password: passwordHash,
+    },
+  });
 }
 
 /** Zet een nieuw wachtwoord met een herstellink. `false` = link ongeldig of verlopen. */
@@ -281,6 +350,36 @@ export async function resetPasswordWithToken(
     prisma.user.update({ where: { id: row.userId }, data: { emailVerified: true } }),
   ]);
   return true;
+}
+
+/**
+ * Het login-adres dat bij een ingetikt adres hoort.
+ *
+ * `User.email` is de identiteit (bij een SSO-lid het KU Leuven-adres). Wie
+ * afgestudeerd is, kent dat adres vaak niet meer uit het hoofd en tikt het adres
+ * in waar hij zijn mail leest. Zonder deze vertaling zou hij een wachtwoord
+ * kunnen herstellen via zijn persoonlijke adres en er daarna alsnog niet mee
+ * binnen geraken; dat is precies de val die dit migratiepad moest wegnemen.
+ *
+ * Enkel wanneer het persoonlijke adres **één** account aanwijst. Botst het met
+ * een login-adres of met een tweede profiel, dan blijft het ingetikte adres
+ * staan en faalt de login als een gewone foute login. Raden doen we hier niet.
+ */
+export async function resolveLoginEmail(email: string): Promise<string> {
+  const normalized = normalizeEmail(email);
+
+  const direct = await prisma.user.findUnique({
+    where: { email: normalized },
+    select: { id: true },
+  });
+  if (direct) return normalized;
+
+  const matches = await prisma.user.findMany({
+    where: { personalEmail: normalized, deletedAt: null },
+    select: { email: true },
+    take: 2,
+  });
+  return matches.length === 1 ? matches[0]!.email : normalized;
 }
 
 /**

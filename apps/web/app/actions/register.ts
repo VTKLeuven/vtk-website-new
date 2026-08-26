@@ -1,5 +1,6 @@
 "use server";
 
+import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { AuthError } from "@vtk/auth";
 import {
@@ -8,8 +9,10 @@ import {
   registerSelfServiceAccount,
   reissueEmailVerification,
   resetPasswordWithToken,
+  setOwnPassword,
 } from "@vtk/auth/server";
 import { normalizeLocale } from "@/lib/locale";
+import { requireSession } from "@/lib/session";
 import { sendPasswordResetMail, sendVerificationMail } from "@/lib/accountMail";
 import { saveError, saveOk, type SaveState } from "@/lib/saveState";
 
@@ -215,5 +218,44 @@ export async function setNewPasswordAction(
   }
   if (!ok) return saveError("TOKEN_INVALID" satisfies PasswordResetErrorCode);
 
+  return saveOk();
+}
+
+
+/**
+ * Zelf een wachtwoord instellen op je eigen account.
+ *
+ * Het migratiepad voor wie via KU Leuven binnenkomt: dat account verdwijnt een
+ * tijd na het afstuderen, en dan is er geen enkele manier meer om in te loggen.
+ * Zie het paneel op /account.
+ */
+export async function setOwnPasswordAction(
+  _prev: SaveState,
+  formData: FormData,
+): Promise<SaveState> {
+  const session = await requireSession();
+
+  const password = String(formData.get("password") ?? "");
+  const passwordRepeat = String(formData.get("passwordRepeat") ?? "");
+  if (!password || !passwordRepeat) {
+    return saveError("INVALID_INPUT" satisfies PasswordResetErrorCode);
+  }
+  if (password !== passwordRepeat) {
+    return saveError("PASSWORD_MISMATCH" satisfies PasswordResetErrorCode);
+  }
+  if (password.length < MIN_PASSWORD_LENGTH) {
+    return saveError("PASSWORD_TOO_SHORT" satisfies PasswordResetErrorCode);
+  }
+
+  try {
+    await setOwnPassword(session.user.id, password);
+  } catch (err) {
+    if (err instanceof AuthError && err.code === "PASSWORD_TOO_SHORT") {
+      return saveError("PASSWORD_TOO_SHORT" satisfies PasswordResetErrorCode);
+    }
+    throw err;
+  }
+
+  revalidatePath("/account");
   return saveOk();
 }

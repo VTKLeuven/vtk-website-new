@@ -172,32 +172,24 @@
    nadat je gelezen hebt waar het over gaat, niet ervoor.
    -------------------------------------------------------------------------- */
 
-.vtk-interest {
-  grid-column: 1 / -1;
-  padding: 22px 24px;
+/* De knop staat in de knoppenrij zelf; het formulier eronder krijgt de volle
+   breedte van die rij (flex-wrap doet de rest). */
+.vtk-interest-inline {
+  display: contents;
+}
+
+.vtk-interest-expand {
+  flex: 1 0 100%;
+  margin-top: 4px;
+  padding: 18px 20px;
   border: 1px solid var(--line);
-  border-radius: 18px;
-  background: var(--surface);
+  border-radius: 16px;
+  background: var(--paper-2);
 }
 
-.vtk-interest-head {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 10px 16px;
-  margin-bottom: 14px;
-}
-
-.vtk-interest-head h2 {
-  margin: 0;
-  color: var(--ink);
-  font-size: 20px;
-  letter-spacing: -0.02em;
-}
-
-.vtk-interest-count {
-  padding: 4px 12px;
+.vtk-interest-pill {
+  align-self: center;
+  padding: 5px 12px;
   border-radius: 999px;
   background: var(--yellow);
   color: var(--ink);
@@ -205,14 +197,7 @@
   font-weight: 600;
 }
 
-.vtk-interest-form {
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-}
-
-.vtk-interest-intro,
-.vtk-interest-login {
+.vtk-interest-intro {
   margin: 0 0 14px;
   color: var(--body);
   font-size: 14px;
@@ -220,17 +205,15 @@
 }
 
 .vtk-interest-show {
-  margin: 0;
-  padding: 14px 16px;
-  border: 1px solid var(--line);
-  border-radius: 14px;
-  background: var(--paper-2);
+  margin: 0 0 14px;
+  padding: 0;
+  border: 0;
 }
 
 .vtk-interest-show legend {
-  padding: 0 6px;
+  padding: 0;
   color: var(--ink);
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 600;
 }
 
@@ -305,8 +288,16 @@
   gap: 10px;
 }
 
-.vtk-interest-guest form + form {
+.vtk-interest-expand form + form {
   margin-top: 12px;
+}
+
+.vtk-interest-expand .vtk-interest-fields {
+  margin-bottom: 12px;
+}
+
+.vtk-interest-expand .vtk-interest-buttons {
+  margin-top: 14px;
 }
 
 .vtk-interest-error {

@@ -7,6 +7,7 @@ import { describe, expect, it, vi, beforeEach } from "vitest";
  * formulier onze ledenlijst of komt iemand binnen op een adres dat niet van hem is.
  */
 const userFindUnique = vi.fn();
+const userFindMany = vi.fn();
 const userCreate = vi.fn();
 const accountCreate = vi.fn();
 const transaction = vi.fn();
@@ -15,7 +16,7 @@ const tokenCreate = vi.fn();
 
 vi.mock("@vtk/db", () => ({
   prisma: {
-    user: { findUnique: userFindUnique, create: userCreate },
+    user: { findUnique: userFindUnique, findMany: userFindMany, create: userCreate },
     account: { create: accountCreate },
     accountEmailToken: { updateMany: tokenUpdateMany, create: tokenCreate },
     $transaction: transaction,
@@ -27,12 +28,13 @@ vi.mock("@node-rs/argon2", () => ({
   verify: vi.fn(async (_hash: string, password: string) => password === "juist-wachtwoord"),
 }));
 
-const { registerSelfServiceAccount, checkLoginBlocked, MIN_PASSWORD_LENGTH } = await import(
-  "@vtk/auth/server"
-);
+const { registerSelfServiceAccount, checkLoginBlocked, resolveLoginEmail, MIN_PASSWORD_LENGTH } =
+  await import("@vtk/auth/server");
 
 beforeEach(() => {
   userFindUnique.mockReset();
+  userFindMany.mockReset();
+  userFindMany.mockResolvedValue([]);
   userCreate.mockReset();
   accountCreate.mockReset();
   tokenUpdateMany.mockReset();
@@ -173,5 +175,33 @@ describe("checkLoginBlocked", () => {
     // Verkeerd wachtwoord: gewoon INVALID, anders verklapt dit scherm welke
     // adressen een account hebben.
     expect(await checkLoginBlocked("nieuw@example.com", "fout")).toBe("INVALID");
+  });
+});
+
+
+/**
+ * Het migratiepad voor wie via KU Leuven binnenkomt: dat adres verdwijnt na het
+ * afstuderen. Wie zijn persoonlijke adres intikt, hoort binnen te geraken;
+ * anders herstelt hij een wachtwoord via een adres waarmee hij niet kan inloggen.
+ */
+describe("resolveLoginEmail", () => {
+  it("laat een bestaand login-adres ongemoeid", async () => {
+    userFindUnique.mockResolvedValue({ id: "u1" });
+    expect(await resolveLoginEmail("R0123456@KULEUVEN.be")).toBe("r0123456@kuleuven.be");
+    expect(userFindMany).not.toHaveBeenCalled();
+  });
+
+  it("vertaalt een persoonlijk adres naar het login-adres", async () => {
+    userFindUnique.mockResolvedValue(null);
+    userFindMany.mockResolvedValue([{ email: "r0123456@kuleuven.be" }]);
+    expect(await resolveLoginEmail("jan@example.com")).toBe("r0123456@kuleuven.be");
+  });
+
+  it("raadt niet wanneer twee profielen hetzelfde persoonlijke adres dragen", async () => {
+    userFindUnique.mockResolvedValue(null);
+    userFindMany.mockResolvedValue([{ email: "a@kuleuven.be" }, { email: "b@kuleuven.be" }]);
+    // Het ingetikte adres blijft staan; de login faalt dan als een gewone
+    // foute login in plaats van iemand in het verkeerde account te zetten.
+    expect(await resolveLoginEmail("gedeeld@example.com")).toBe("gedeeld@example.com");
   });
 });

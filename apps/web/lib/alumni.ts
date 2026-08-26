@@ -147,6 +147,75 @@ export function toAlumniCsv(recipients: AlumniRecipient[]): string {
   return `﻿${lines.join("\r\n")}\r\n`;
 }
 
+/**
+ * Een alumnus met een account op de site, zoals de beheertabel hem toont.
+ *
+ * Staat naast `AlumniContact` en niet erin: dit is een echte gebruiker met een
+ * profiel dat hij zelf bijhoudt. De beheerder kan hier één ding aan wijzigen, en
+ * dat is of hij in de mailinglijst zit; naam en afstudeerjaar blijven van het lid.
+ */
+export type AlumniAccount = {
+  id: string;
+  name: string;
+  email: string;
+  graduationYear: number | null;
+  wasInVtk: boolean;
+  optedIn: boolean;
+  active: boolean;
+};
+
+/**
+ * De site-accounts met `alumni = true`.
+ *
+ * Ze staan bewust ook in het beheerscherm, en niet enkel in de export. Een
+ * beheerder die op een reünie hoort "zet mij ook op die lijst" moet dat kunnen
+ * doen zonder te weten of die persoon toevallig een account heeft; zonder deze
+ * lijst zou hij een tweede rij in het adresboek aanmaken en dubbel mailen.
+ */
+export async function listAlumniAccounts(filter: {
+  year?: number | null;
+  query?: string;
+}): Promise<AlumniAccount[]> {
+  const where: Prisma.UserWhereInput = { alumni: true, deletedAt: null };
+  if (filter.year) where.graduationYear = filter.year;
+  const query = filter.query?.trim();
+  if (query) {
+    where.OR = [
+      { name: { contains: query, mode: "insensitive" } },
+      { email: { contains: query, mode: "insensitive" } },
+      { personalEmail: { contains: query, mode: "insensitive" } },
+    ];
+  }
+
+  const rows = await prisma.user.findMany({
+    where,
+    orderBy: [{ graduationYear: "desc" }, { lastName: "asc" }, { name: "asc" }],
+    take: 500,
+    select: {
+      id: true,
+      name: true,
+      email: true,
+      personalEmail: true,
+      emailPreference: true,
+      graduationYear: true,
+      wasInVtk: true,
+      alumniMailOptIn: true,
+      active: true,
+    },
+  });
+
+  return rows.map((row) => ({
+    id: row.id,
+    name: row.name,
+    email:
+      row.emailPreference === "PERSONAL" && row.personalEmail ? row.personalEmail : row.email,
+    graduationYear: row.graduationYear,
+    wasInVtk: row.wasInVtk,
+    optedIn: row.alumniMailOptIn,
+    active: row.active,
+  }));
+}
+
 export type AlumniYearRow = { year: number | null; contacts: number; accounts: number };
 
 /**

@@ -3,6 +3,7 @@ import { KalenderEditorialView } from "@/components/editorial/KalenderEditorialV
 import { Markdown } from "@/components/ui/Markdown";
 import { calendarLabels, feedBaseUrlFor, listCalendarCategories } from "@/lib/calendar/categories";
 import { viewerPrefersOwnAudiences } from "@/lib/calendar/audience";
+import { getCurrentSession } from "@/lib/session";
 import type { CalendarCategory } from "@/lib/pageQueries";
 
 import "@/app/design/vtk-base.css";
@@ -21,9 +22,10 @@ export async function CategoryCalendar({
   locale: Locale;
 }) {
   const base = locale === "nl" ? "" : "/en";
-  const [categories, prefersOwnAudiences] = await Promise.all([
+  const [categories, prefersOwnAudiences, session] = await Promise.all([
     listCalendarCategories(),
     viewerPrefersOwnAudiences(),
+    getCurrentSession(),
   ]);
   const name = pick(category.nameNl, category.nameEn, locale);
   const description = pick(category.descriptionNl ?? "", category.descriptionEn ?? "", locale);
@@ -38,7 +40,8 @@ export async function CategoryCalendar({
         categories={categories}
         feedBaseUrl={feedBaseUrlFor(locale)}
         defaultOnlyMyAudiences={prefersOwnAudiences}
-        lockedCategory={category.slug}
+        signedIn={Boolean(session)}
+        activeCategory={category.slug}
         heading={name}
         parentCrumb={{ label: locale === "nl" ? "Kalender" : "Calendar", href: `${base}/kalender` }}
         intro={

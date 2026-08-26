@@ -3,6 +3,7 @@ import { staticMetadata } from "@/lib/pageMetadata";
 import { KalenderEditorialView } from "@/components/editorial/KalenderEditorialView";
 import { calendarLabels, feedBaseUrlFor, listCalendarCategories } from "@/lib/calendar/categories";
 import { viewerPrefersOwnAudiences } from "@/lib/calendar/audience";
+import { getCurrentSession } from "@/lib/session";
 import { hasLocale } from "@/lib/locale";
 import type { Locale } from "@vtk/i18n";
 import { notFound } from "next/navigation";
@@ -29,9 +30,10 @@ export default async function KalenderPage({
   if (!hasLocale(localeParam)) notFound();
   const locale: Locale = localeParam;
 
-  const [categories, prefersOwnAudiences] = await Promise.all([
+  const [categories, prefersOwnAudiences, session] = await Promise.all([
     listCalendarCategories(),
     viewerPrefersOwnAudiences(),
+    getCurrentSession(),
   ]);
 
   return (
@@ -42,6 +44,7 @@ export default async function KalenderPage({
         categories={categories}
         feedBaseUrl={feedBaseUrlFor(locale)}
         defaultOnlyMyAudiences={prefersOwnAudiences}
+        signedIn={Boolean(session)}
       />
     </div>
   );

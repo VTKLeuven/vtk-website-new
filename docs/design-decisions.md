@@ -4066,6 +4066,31 @@ hij zich dus letterlijk nergens voor inschrijven.
   hébben: wie via KU Leuven binnenkomt, wordt daar expliciet naar het inlogscherm
   teruggestuurd in plaats van een mail te krijgen die zijn probleem niet oplost.
 
+### Van KU Leuven naar een wachtwoord: het migratiepad
+
+Wie via KU Leuven binnenkomt heeft hier geen wachtwoord, en dat is prima zolang
+die login werkt. Maar een KU Leuven-account verdwijnt een tijd na het afstuderen,
+en op dat moment is er geen enkele manier meer om binnen te geraken: geen
+wachtwoord om mee in te loggen, en een herstelmail zou naar een mailbox gaan die
+niet meer bestaat. Dat is precies de groep die we op onze evenementen willen.
+
+Drie stukken, samen het pad:
+
+- **`/account` heeft een paneel "Inloggen zonder KU Leuven"** waar een lid zelf
+  een wachtwoord zet (`setOwnPassword`). Het toont ook waarmee je inlogt en waar
+  een herstelmail heen zou gaan. Bewust géén huidig wachtwoord vereist: verreweg
+  de meesten hebben er nog geen, en wie er wel een heeft zit achter een geldige
+  sessie.
+- **Het paneel dringt aan wanneer het nodig wordt.** Wie zichzelf als alumnus of
+  als niet-meer-studerend aanduidde en nog geen wachtwoord heeft, krijgt het met
+  een gele accentrail en opengeklapt; de rest ziet een gewone kaart.
+- **De herstelmail gaat naar het persoonlijke adres** wanneer dat ingevuld is, en
+  je kan **met dat adres ook inloggen** (`resolveLoginEmail`). Zonder dat laatste
+  is het een val: je herstelt een wachtwoord via je persoonlijke adres en geraakt
+  er vervolgens niet mee binnen, want `User.email` blijft het KU Leuven-adres.
+  Enkel wanneer het persoonlijke adres precies één account aanwijst; botst het,
+  dan faalt de login als een gewone foute login. Raden doen we hier niet.
+
 ### Het inlogscherm is één knop, met een regeltje eronder
 
 Verreweg de meeste bezoekers zijn student. Twee even grote formulieren naast
@@ -4147,6 +4172,14 @@ Ze worden **op e-mailadres ontdubbeld en het account wint**. Een alumnus die lat
 toch een account maakt, hoeft dus niet handmatig uit het adresboek gehaald te
 worden, en niemand krijgt dezelfde mail twee keer.
 
+**Beide bronnen staan ook in het beheerscherm**, niet enkel in de export. Een
+beheerder die op een reünie hoort "zet mij ook op die lijst" moet dat kunnen doen
+zonder te weten of die persoon toevallig een account heeft. Voer je iemand in wiens
+adres al bij een account hoort, dan maken we géén tweede rij maar zetten we dat
+account als alumnus in de mailinglijst; de plakimport doet hetzelfde. Aan zo'n
+account valt hier maar één ding te wijzigen, en dat is of hij mails krijgt: naam,
+afstudeerjaar en VTK-verleden blijven van het lid en staan in zijn eigen profiel.
+
 **Uitschrijven is niet verwijderen.** Een uitgeschreven contact blijft in de tabel
 staan met een `unsubscribedAt`, precies zodat de volgende import van een oude
 lijst hem niet stilletjes weer toevoegt. Verwijderen is er voor een tikfout of een
@@ -4218,9 +4251,29 @@ jaren in iemands telefoon blijft staan; hoe minder verschillende vormen daarvan
 rondzwerven, hoe minder er ooit stil kapotgaat. `/api/calendar/feed/c/<slug>.ics`
 blijft bestaan voor wie zich al abonneerde.
 
-Een filterchip die al aanstaat, zet zichzelf uit bij een tweede klik. Zonder dat
-is "alles" enkel bereikbaar via de knop links, en dat is precies niet waar iemand
-kijkt die net op "Alumni" duwde en het weer weg wil.
+De dialoog zegt er ook bij dat het via je agenda-app, Google Calendar of een
+abonnementslink gaat. "Abonneren" alleen laat in het midden of je een bestand
+krijgt, een mail, of iets in je agenda, en dat is precies de onduidelijkheid die
+maakt dat mensen er niet op klikken.
+
+### De filterchips zijn links, geen knoppen
+
+Elke categorie heeft een eigen pagina (`/kalender/alumni`), en die hoort in de
+adresbalk te staan: dan is ze deelbaar, staat ze in de geschiedenis, en ziet
+iemand die op "Alumni" duwt meteen **dat** er een alumnikalender bestaat. De chip
+die al aanstaat wijst terug naar `/kalender` en zet zichzelf dus uit.
+
+Gevolg: de gekozen categorie is geen clientstate meer maar de route zelf, en de
+chips blijven ook op een categoriepagina staan (ze verdwenen daar vroeger, zodat
+je van `/kalender/alumni` niet naar `/kalender/sport` kon zonder terug te gaan).
+
+### Legende en abonneren staan boven het raster
+
+Ze stonden als kolom van 260 pixels rechts naast de kalender en aten daarmee een
+vijfde van de breedte op. In een dagcel bleef dan geen ruimte over voor een
+eventtitel: je las "Alumni-r..." en moest klikken om te weten wat er stond. De
+legende is een handvol korte namen die evengoed naast elkaar passen; de kalender
+is het scherm.
 
 ### Klikken op een evenement opent eerst een kaartje
 
@@ -4230,6 +4283,20 @@ het verkeerde evenement aanklikte. Een klik opent daarom een voorvertoning met d
 volledige titel, een samenvatting, waar en wanneer, en de teller; de knop eronder
 gaat pas naar de eventpagina. De `href` blijft op het element staan, zodat
 middenklik, ctrl-klik en een zoekmachine nog altijd een echte link zien.
+
+In dat kaartje staat ook **"ik kom naar dit evenement"**. Wie in de kalender op
+iets klikt, heeft precies dán de vraag "ga ik?" in zijn hoofd; hem daarvoor eerst
+naar een tweede pagina sturen kost de helft van de klikken. Een bezoeker zonder
+account krijgt er een link naar de eventpagina: het gastformulier vraagt een
+afstudeerjaar of een VTK-verleden, en dat hoort niet in een kaartje van tien
+regels.
+
+Op de eventpagina zelf staat dezelfde knop **in de knoppenrij** naast "Tickets
+kopen" en "Zet in mijn agenda". Het is dezelfde soort beslissing over dit
+evenement; een eigen box eronder maakte er een tweede, zwaarder ogende sectie van
+die je pas zag na de beschrijving. Wat er méér nodig is (de
+zichtbaarheidsvakjes, of het gastformulier) klapt open over de volle breedte van
+die rij.
 
 ---
 

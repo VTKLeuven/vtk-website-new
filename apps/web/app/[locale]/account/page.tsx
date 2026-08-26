@@ -6,12 +6,14 @@ import { prisma } from '@vtk/db';
 import { Card, Label, Input, Select, Button } from '@vtk/ui';
 import { hasLocale } from '@/lib/locale';
 import { requireSession } from '@/lib/session';
+import { passwordStatus } from '@vtk/auth/server';
 import { getDictionary, pick } from '@vtk/i18n';
 import { hasPermission } from '@vtk/auth';
 import { formatEuro } from '@/lib/theokot';
 import { meetingKindLabel, meetingPath } from '@/lib/meetings';
 import { updateProfileAction, logoutAction } from '@/app/actions/auth';
 import { ProfileForm } from '@/components/profile/ProfileForm';
+import { PasswordPanel } from '@/components/profile/PasswordPanel';
 import { SaveForm } from '@/components/ui/SaveForm';
 import { deleteMyAccountAction } from '@/app/actions/privacy';
 import { listTicketsForCurrentUser } from '@/lib/ticketing/queries';
@@ -53,6 +55,7 @@ export default async function AccountPage({ params }: { params: Promise<{ locale
     calendarFeedTokens,
     meetingReservations,
     memberships,
+    password,
   ] = await Promise.all([
     // Volledig profiel voor het bewerkbare gegevensformulier (kotadres, mails, ...).
     prisma.user.findUniqueOrThrow({
@@ -149,6 +152,8 @@ export default async function AccountPage({ params }: { params: Promise<{ locale
       include: { group: { select: { nameNl: true, nameEn: true, code: true, type: true } } },
       orderBy: [{ year: 'desc' }, { group: { orderInPraesidium: 'asc' } }],
     }),
+    // Heeft dit lid een wachtwoord, en waar zou een herstelmail heen gaan?
+    passwordStatus(session.user.id),
   ]);
 
   const workingYear = currentWorkingYear(now);
@@ -435,6 +440,18 @@ export default async function AccountPage({ params }: { params: Promise<{ locale
                 </div>
               </SaveForm>
             </Card>
+
+            {/* Het migratiepad voor wie via KU Leuven inlogt: dat account
+                verdwijnt na het afstuderen. Staat boven het profielformulier,
+                want daar vult iemand net zijn persoonlijke adres in. */}
+            <PasswordPanel
+              locale={locale}
+              hasPassword={password.hasPassword}
+              resetEmail={password.resetEmail}
+              usesPersonalEmail={password.usesPersonalEmail}
+              loginEmail={session.user.email}
+              urgent={!password.hasPassword && (profile.alumni || profile.notStudying)}
+            />
 
             <Card className="p-6">
               <h3 className="mb-4 text-lg font-semibold text-vtk-ink">{nl ? 'Profiel' : 'Profile'}</h3>
