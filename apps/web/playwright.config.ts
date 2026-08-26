@@ -14,7 +14,7 @@ export default defineConfig({
   },
   webServer: process.env.CI
     ? {
-        command: "npm run dev -- --hostname 127.0.0.1 --port 3013",
+        command: "npm run start -- --hostname 127.0.0.1 --port 3013",
         url: "http://127.0.0.1:3013/tickets/toegang",
         reuseExistingServer: false,
         timeout: 120_000,

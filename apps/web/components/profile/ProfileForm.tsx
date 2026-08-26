@@ -37,6 +37,7 @@ export function ProfileForm({
   submitLabel,
   action = saveProfileAction,
   savedMessage,
+  showCalendarPreference = true,
 }: {
   locale: Locale;
   user: Pick<
@@ -76,6 +77,8 @@ export function ProfileForm({
   action?: SaveAction;
   /** Overschrijft de succesmelding; hoort bij een afwijkende `action`. */
   savedMessage?: string;
+  /** Toont de kalender-doelgroepvoorkeur. Standaard aan (op /account); uit tijdens onboarding. */
+  showCalendarPreference?: boolean;
 }) {
   const t = getDictionary(locale).onboarding;
   const currentAvatar = publicUrl(user.avatarKey);
@@ -274,17 +277,19 @@ export function ProfileForm({
         {/* Wat je te zien krijgt, niet wat je toegestuurd krijgt; daarom onderaan
             deze groep en niet tussen de mailinglijsten. Standaard uit: elk
             evenement is publiek en een doelgroep is een label, geen slot. */}
-        <div>
-          <span className="text-sm font-medium text-vtk-ink">{t.calendarHeading}</span>
-          <p className="text-xs text-[#5c667f]">{t.calendarHint}</p>
-          <CheckboxChip
-            name="calendarOnlyMyAudiences"
-            value="on"
-            defaultChecked={user.calendarOnlyMyAudiences}
-            label={t.calendarOnlyMyAudiences}
-            className="mt-2"
-          />
-        </div>
+        {showCalendarPreference && (
+          <div>
+            <span className="text-sm font-medium text-vtk-ink">{t.calendarHeading}</span>
+            <p className="text-xs text-[#5c667f]">{t.calendarHint}</p>
+            <CheckboxChip
+              name="calendarOnlyMyAudiences"
+              value="on"
+              defaultChecked={user.calendarOnlyMyAudiences}
+              label={t.calendarOnlyMyAudiences}
+              className="mt-2"
+            />
+          </div>
+        )}
       </fieldset>
 
       {/* Studie: studiejaren + richtingen */}

@@ -180,6 +180,7 @@ export default async function AdminFlowPreview({
           submitLabel={dict.onboarding.submit}
           action={previewNoopAction}
           savedMessage={previewSaved}
+          showCalendarPreference={false}
         />
       </FlowPreview>
 

@@ -274,7 +274,7 @@
     "programmesLabel": "Richtingen",
     "programmesHint": "Duid alle richtingen aan die op jou van toepassing zijn.",
     "notAtFaculty": "Ik studeer niet aan de faculteit",
-    "notAtFacultyHint": "Duid dit aan als je geen ingenieursopleiding aan de faculteit volgt. Je krijgt dan geen Career-mails, want die zijn op faculteitsstudenten gericht.",
+    "notAtFacultyHint": "Duid dit aan als je geen ingenieursopleiding aan de faculteit volgt.",
     "internationalStudent": "Ik ben een internationale of uitwisselingsstudent",
     "internationalStudentHint": "Duid dit aan als je via een uitwisseling of als internationale student aan de faculteit zit. Evenementen voor internationals verschijnen dan vanzelf in je kalender.",
     "alumni": "Ik ben alumnus van de faculteit",
