@@ -4474,3 +4474,92 @@ beeld iets zegt dat een getal niet zegt: je ziet in één oogopslag of er iemand
 De vormen komen uit het VTK-posterbeeld en blijven binnen de huisstijl (navy
 silhouetten, geel als enige accent), precies omdat een tekenfilmboom dat niet zou
 doen.
+
+## Rekeningen (de opvolger van billsheet)
+
+Een lid koopt iets voor VTK; die kost moet terug bij het lid geraken en bij de
+boekhouder. Dat liep tot 2026 via **billsheet**, een aparte Next.js-app op
+Supabase met een eigen ledenlijst, een eigen login en een eigen postenlijst.
+Alles daarvan zit nu in `/admin/rekeningen`. De werkende keuzes:
+
+**De boekhouder wil één vast blad, dus dat blad blijft.** `blad.pdf` staat onder
+`apps/web/public/rekeningen/`, en `lib/rekeningen/report.ts` vult het in op exact
+dezelfde coördinaten als billsheet, met dezelfde bestandsnaam
+(`26-27_Fakbar_Doopcantus_Bierbestelling_248.9.pdf`). De bladen van vóór en na de
+overstap liggen bij de boekhouder in dezelfde map; ze moeten er dus hetzelfde
+uitzien. Een mooiere, zelfgetekende PDF was hier de verkeerde verbetering.
+
+**Het bonnetje kan gedraaid worden voor het vertrekt.** Een kassaticket komt van
+een telefoon en ligt vaak op zijn kant. Het voorbeeldvenster genereert bij elke
+draai gewoon een nieuw blad; wat je ziet is exact wat je downloadt of doorstuurt.
+Billsheet had dit ook, en het is geen luxe: zonder dat krijgt de boekhouder een
+liggende bon.
+
+**Vier statussen, afgeleid uit drie datums.** `paidAt` (terugbetaald), `sentAt`
+(blad vertrokken naar de boekhouder), `bookedAt` (boekhouder bevestigde). Daar
+volgen "terug te betalen → door te sturen → in te boeken → afgehandeld" uit. Er is
+bewust géén statuskolom in de database: die kan afwijken van de datums, en dan
+weet niemand meer welke van de twee klopt. De statustabs bovenaan het overzicht
+zijn dus gewoon vier `where`-fragmenten.
+
+**Een rekening met de VTK-kaart staat meteen op "terugbetaald".** Er is niets
+terug te betalen: het geld ging nooit uit de zak van het lid. Zo blijft de lijst
+"terug te betalen" precies het bedrag dat nog ergens naartoe moet, wat de vraag is
+die Groep 5 elke week stelt. Billsheet deed hetzelfde (`paid: values.paymentMethod
+=== "vtk"`), en het is de reden dat het cijfer bovenaan bruikbaar is.
+
+**Terugbetaald, doorgestuurd of ingeboekt = niet meer aanpasbaar.** Het bedrag op
+het blad moet gelijk blijven aan wat er uitbetaald en geboekt is. Wie het toch moet
+rechtzetten, haalt eerst het vinkje weg; dat kan enkel Groep 5. Nieuw tegenover
+billsheet is dat de **indiener zelf** zijn rekening mag corrigeren zolang er niets
+van dat alles gebeurd is: een tikfout in het bedrag was anders een berichtje naar
+Groep 5.
+
+**"Doorgestuurd" is geen vinkje.** Het wordt gezet door de mail effectief te
+versturen, niet door te beweren dat je dat deed. Zonder mailserver weigert de
+actie dus in plaats van een blad af te vinken dat nooit vertrok (zie de
+waarschuwing bovenaan `@vtk/mail`); je kan het blad dan downloaden en zelf mailen.
+
+**Het IBAN staat bij de rekening, niet bij het lid.** Billsheet bewaarde het op
+het profiel. Dat betekent een permanent rekeningnummer in de ledentabel van
+iedereen die ooit iets voorschoot, terwijl het maar voor één ding dient. Het
+formulier vult het in vanuit je vorige rekening, dus je merkt het verschil niet;
+verdwijnt die rekening ooit, dan verdwijnt het nummer mee.
+
+**De postnaam wordt vastgeklikt bij het indienen.** `Expense.postLabel` is een
+kopie van de naam zoals de post op dat moment heette, naast de gewone
+`groupId`-relatie. Die naam staat op het blad bij de boekhouder; hernoemt de post
+later, dan mag zijn map niet ineens twee namen bevatten voor hetzelfde jaar.
+
+**Er is geen gebruikersbeheer meer.** Billsheet had een eigen `profiles`-tabel met
+`admin`, `allowed_posts`, naam, post en IBAN, plus registratie op `@vtk.be` en een
+wachtwoordreset. Dat is nu de gewone toegangscontrole van de site: posten,
+rollen en KU Leuven SSO. `expenses.submit` zit in de rol `praesidium` (dus elke
+post), `expenses.manage` in de rol `admin` (dus IT en Groep 5), en
+`expenses.managePost` is er voor een postverantwoordelijke die de rekeningen van
+zijn eigen post wil opvolgen.
+
+**Wat billsheet fout deed en hier niet meer kan.** `requireAdmin` liet een
+post-beheerder door voor `setPaid`, `setBooked`, `updateBill` én `deleteBill`
+zónder ooit te toetsen of de rekening bij zijn post hoorde; enkel de *lijst* werd
+in de browser gefilterd. Wie een id kende, kon met één POST elke rekening van de
+hele kring op betaald zetten. Elke check zit nu serverkant en op de rekening zelf
+(`lib/rekeningen/server.ts`).
+
+**Bonnetjes gaan niet door `/api/media`.** Die route vraagt niets en vertrouwt
+erop dat storage-keys onraadbaar zijn: prima voor een partnerlogo, fout voor een
+kassabon met een naam, een bedrag en soms een rekeningnummer. Ze staan onder
+`bonnetjes/` en gaan enkel via `/api/admin/rekeningen/[id]/bon`, die de rekening
+opzoekt en de toegang erop toetst. De uploadroute hercodeert elke foto naar JPEG,
+wat meteen de EXIF (inclusief GPS) weggooit die een telefoon in een bonfoto stopt.
+
+**Zoeken gebeurt in de database, niet in de browser.** Billsheet haalde álle
+rekeningen op en filterde ze met Fuse.js; dat is tolerant voor tikfouten en werkt
+tot het niet meer werkt. Hier staan de filters in de URL en de selectie in
+`?sel=`, zodat een gefilterde lijst en een geopende rekening deelbare links zijn,
+de terugknop werkt, en de lijst met tienduizend rijen overweg kan.
+
+**De opslagmeter is gebleven, de limiet niet.** Billsheet toonde het
+Supabase-verbruik met een waarschuwing bij 80% van 1 GB, want daarboven werd het
+hele project geblokkeerd. De objectopslag van de site heeft dat quotum niet, dus
+het cijfer staat er nog als informatie en niet meer als alarm.

@@ -333,6 +333,15 @@ const icons: Record<string, ReactNode> = {
       <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
     </Svg>
   ),
+  // expenses: bonnetje met een euroteken (rekeningen en terugbetalingen)
+  expenses: (
+    <Svg>
+      <path d="M6 2h9l4 4v14.5l-2.5-1.5-2.5 1.5-2.5-1.5L9 20.5 6.5 19 6 19.3Z" />
+      <path d="M15 2v4h4" />
+      <path d="M14 10.5a2.5 2.5 0 0 0-4 2v1a2.5 2.5 0 0 0 4 2" />
+      <path d="M9 12.2h3.6" />
+    </Svg>
+  ),
   // shift: shiften -> klok
   shift: (
     <Svg>

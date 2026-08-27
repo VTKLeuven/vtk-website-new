@@ -219,6 +219,7 @@ table whose rows expand into per-category editors, with create/import in modals.
 | `/admin/lesbezoeken` | `lesbezoeken.view` (beheren vraagt `lesbezoeken.manage`) | Werklijst, kalender (maand/week/dag) en de vaste gegevens (organisaties, bijzonderheden per docent, mailsjablonen). Aanvragen komen binnen via het publieke `/lesbezoeken`, dat geen login vraagt. Alleen `.view` betekent meekijken zonder knoppen. Zie `docs/design-decisions.md` ("Lesbezoeken"). |
 | `/admin/deur` (door access) | `door.manage` | Usage stats (1/7/30 d), temporary access grants (`DoorAccessGrant`, user typeahead + window), and the full access log (`DoorAccessLog`, incl. denied/unknown scans). |
 | `/admin/it/logboek` (admin audit log) | `audit.view` | Every changing admin action in one table (`AdminAuditLog`, written by `logAudit` in `apps/web/lib/audit.ts`), with filters on person, section, kind of action and date, plus a search over subject and detail. Kept for 30 days. Sits under the IT group but is a plain permission, not superadmin-only, so it can be handed to a role. Rationale and what is *not* logged: `docs/design-decisions.md` ("Adminlogboek"). |
+| `/admin/rekeningen` (rekeningen / het oude billsheet) | `expenses.submit` (indienen + eigen lijst), `expenses.managePost` (eigen post), `expenses.manage` (alles) | Werkbank per werkingsjaar: statustabs (terug te betalen / door te sturen / in te boeken / afgehandeld) als afgeleide van `paidAt`/`sentAt`/`bookedAt`, filters in de URL, en de geopende rekening in `?sel=` met het bonnetje ernaast. Terugbetalen, inboeken, doorsturen en de instellingen zitten enkel in `expenses.manage`. Toegang wordt per rekening getoetst in `lib/rekeningen/server.ts`, niet per scherm. Zie `docs/design-decisions.md` ("Rekeningen"). |
 | `/admin/fakscanner` (bar check-ins) | `fakscanner.manage` | Per working year (`?jaar=`): the points ranking (`FakTally`, 30 per page via `?rang=`), the settings (double-count window, points per free beer, bar-day rollover) and the log of **failed** scans only (`FakScanLog`). Rows are keyed on r-number, so people without a VTK account appear too, by r-number rather than name. |
 
 User pickers everywhere use the server-side typeahead `GET /api/users/search` (capped results), not
@@ -323,3 +324,24 @@ een **SSO-clientpermissie** uit het andere systeem (`SsoClientPermission`, zie
 `docs/sso.md`), toegekend per post of per rol in `/admin/sso/[clientId]`. Beide
 in de registry zetten zou twee dingen met dezelfde naam geven die elkaar niets
 aangaan; dan lijkt de toegang geregeld terwijl niemand binnen raakt.
+
+## Rekeningen
+
+De rekeningen (`docs/design-decisions.md`, "Rekeningen") voegen drie permissies
+toe:
+
+- `expenses.submit` — een rekening indienen en je eigen lijst zien. Zit in de
+  geseede rol `praesidium`, dus elk praesidiumlid kan een bonnetje kwijt zonder
+  dat IT er eerst iets voor moet uitdelen. Bewust wél een recht en niet "iedereen
+  die inlogt": aan een rekening hangt een terugbetaling.
+- `expenses.managePost` — de rekeningen van de eigen post(en) opvolgen,
+  corrigeren en verwijderen zolang er niets verwerkt is. De post-scope komt uit
+  `session.groups` van het huidige werkingsjaar; er is dus geen `allowed_posts`
+  meer zoals in billsheet.
+- `expenses.manage` — alles: alle posten, terugbetalen, inboeken, doorsturen naar
+  de boekhouder en de instellingen. Zit in de systeemrol `admin`, en die wordt
+  toegekend aan IT en Groep 5.
+
+Terugbetalen en inboeken zitten bewust **niet** in `expenses.managePost`: dat is
+geld en boekhouding, en een postverantwoordelijke die zijn eigen uitgaven op
+"betaald" kan zetten is precies het gat dat billsheet had.

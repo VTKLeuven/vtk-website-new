@@ -126,6 +126,17 @@ export const PERMISSIONS = [
   { code: "googleAccounts.manage", labelNl: "Google-accounts aanmaken en beheren", labelEn: "Create and manage Google accounts", category: "google" },
   { code: "kiesploeg.manage", labelNl: "Kiesploeg beheren (posten, leden, adressen)", labelEn: "Manage the kiesploeg (posts, members, addresses)", category: "google" },
 
+  // Rekeningen (uitgaven indienen, terugbetalen en doorsturen naar de boekhouding).
+  // Indienen is bewust een eigen recht en niet "iedereen die inlogt": aan een
+  // rekening hangt een terugbetaling, dus hoort ze van iemand met een post te
+  // komen. De rol `praesidium` draagt het, dus elk praesidiumlid kan indienen.
+  { code: "expenses.submit", labelNl: "Rekeningen indienen", labelEn: "Submit expenses", category: "expenses" },
+  // De postverantwoordelijke die de rekeningen van zijn eigen post opvolgt en
+  // corrigeert. Terugbetalen, inboeken en doorsturen zitten er bewust niet in:
+  // dat is geld en boekhouding, en dat is `expenses.manage`.
+  { code: "expenses.managePost", labelNl: "Rekeningen van de eigen post beheren", labelEn: "Manage own post's expenses", category: "expenses" },
+  { code: "expenses.manage", labelNl: "Alle rekeningen beheren (terugbetalen, inboeken, doorsturen)", labelEn: "Manage all expenses (reimburse, book, forward)", category: "expenses" },
+
   // Adminlogboek (wie deed wat in de admin)
   { code: "audit.view", labelNl: "Adminlogboek bekijken", labelEn: "View the admin audit log", category: "it" },
   { code: "urenloopApp.manage", labelNl: "24UL-app: downloadlijst beheren", labelEn: "24UL app: manage the download list", category: "it" },

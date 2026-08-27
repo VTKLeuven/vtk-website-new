@@ -686,6 +686,11 @@ model User {
 
   kiesploegMemberships KiesploegMember[]
 
+  // Rekeningen (billsheet): ingediend, terugbetaald, ingeboekt.
+  expensesSubmitted Expense[] @relation("ExpenseSubmittedBy")
+  expensesPaid      Expense[] @relation("ExpensePaidBy")
+  expensesBooked    Expense[] @relation("ExpenseBookedBy")
+
   createdLesbezoeken  Lesbezoek[] @relation("LesbezoekCreatedBy")
   reviewedLesbezoeken Lesbezoek[] @relation("LesbezoekReviewedBy")
   createdLesbezoekScheduledMails LesbezoekScheduledMail[] @relation("LesbezoekScheduledMailCreatedBy")
@@ -732,6 +737,7 @@ model Group {
   uitleenTemplates    UitleenRequestTemplate[]
   uitleenEventsGroup  UitleenEvent[]
   mailGroupSources    MailGroupSource[]
+  expenses            Expense[]
 }
 
 model GroupMembership {
@@ -5074,4 +5080,90 @@ model StudyProfile {
   updatedAt DateTime @updatedAt @db.Timestamptz(3)
 
   user User @relation("StudyProfileUser", fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// -----------------------------------------------------------------------------
+// Rekeningen (het oude billsheet)
+//
+// Een lid koopt iets voor VTK, met de kaart van de kring of met zijn eigen, en
+// dient het bonnetje hier in. De boekhouder wil dat als PDF op één vast blad, dus
+// blijft `blad.pdf` het sjabloon en plakken we het bonnetje eronder; zie
+// `lib/rekeningen/report.ts`.
+// -----------------------------------------------------------------------------
+
+/// Waarmee er betaald werd. VTK_CARD heeft geen terugbetaling nodig (het geld
+/// ging nooit uit de zak van het lid), PERSONAL wel: dan is `iban` verplicht.
+enum ExpensePaymentMethod {
+  VTK_CARD
+  PERSONAL
+}
+
+model Expense {
+  id String @id @default(cuid())
+
+  /// Werkingsjaar waarin de uitgave viel (2026 = "26-27"), afgeleid uit
+  /// `spentOn` met dezelfde 15-juli-grens als de rest van de site. Bewust
+  /// opgeslagen en niet berekend: de boekhouding sluit een jaar af, en dan mag
+  /// een rekening niet van jaar veranderen omdat iemand haar datum corrigeert
+  /// nadat het jaar om is.
+  workingYear Int
+
+  /// De post die de kost draagt. `SetNull` en niet `Cascade`: een gedeactiveerde
+  /// of verwijderde post mag de boekhouding niet meenemen.
+  groupId String?
+  /// Naam van de post op het moment van indienen. Staat zo op het blad dat naar
+  /// de boekhouder gaat, en blijft dus staan ook als de post later hernoemt.
+  postLabel String
+
+  submittedById String?
+  /// Wie het betaalde. Standaard de indiener, maar iemand mag het bonnetje van
+  /// een medelid indienen, en dan hoort diens naam op het blad.
+  payerName     String
+
+  activity    String
+  description String
+  /// Datum van de uitgave (de datum op het bonnetje), niet van het indienen.
+  spentOn     DateTime @db.Date
+  amountCents Int
+
+  paymentMethod ExpensePaymentMethod
+  /// Enkel bij PERSONAL. Nergens anders bewaard: het staat niet op de User, want
+  /// dan draagt de ledentabel een permanent rekeningnummer van iedereen die ooit
+  /// iets voorschoot. Het formulier vult het in vanuit je vorige rekening.
+  iban          String?
+
+  /// Het bonnetje in object storage. Onder `bonnetjes/`, en enkel te lezen via
+  /// de afgeschermde route: `/api/media` is publiek, en dit zijn financiële
+  /// stukken met namen en rekeningnummers erop.
+  receiptKey  String
+  receiptName String
+  receiptMime String
+  receiptSize Int
+
+  /// Terugbetaald aan het lid. Bij VTK_CARD staat dit meteen gevuld: er valt
+  /// niets terug te betalen, en zo blijft "openstaand" precies de lijst waar
+  /// nog geld naartoe moet.
+  paidAt   DateTime? @db.Timestamptz(3)
+  paidById String?
+  /// Bevestigd door de boekhouder dat ze in de boeken staat.
+  bookedAt   DateTime? @db.Timestamptz(3)
+  bookedById String?
+  /// Wanneer het blad naar de boekhouding vertrok, en naar welk adres.
+  sentAt DateTime? @db.Timestamptz(3)
+  sentTo String?
+
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+
+  group       Group? @relation(fields: [groupId], references: [id], onDelete: SetNull)
+  submittedBy User?  @relation("ExpenseSubmittedBy", fields: [submittedById], references: [id], onDelete: SetNull)
+  paidBy      User?  @relation("ExpensePaidBy", fields: [paidById], references: [id], onDelete: SetNull)
+  bookedBy    User?  @relation("ExpenseBookedBy", fields: [bookedById], references: [id], onDelete: SetNull)
+
+  @@index([workingYear])
+  @@index([groupId])
+  @@index([submittedById])
+  @@index([spentOn])
+  @@index([paidAt])
+  @@index([createdAt])
 }

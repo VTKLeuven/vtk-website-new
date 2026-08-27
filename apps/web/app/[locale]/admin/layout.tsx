@@ -92,6 +92,11 @@ const NAV: NavEntry[] = [
   // /admin/albums beheerde een tweede, lokale albumopslag die nergens meer
   // getoond werd.
   item('media', '/media', { anyPerm: ['media.manage', 'photos.manageAlbums'] }),
+  // Rekeningen (het oude billsheet). Indienen mag elk praesidiumlid, dus de tab
+  // hangt niet enkel aan de beheerpermissies; zelfde redenering als bij Logistiek.
+  item('expenses', '/rekeningen', {
+    anyPerm: ['expenses.submit', 'expenses.managePost', 'expenses.manage'],
+  }),
   item('shift', '/shiften', { anyPerm: ['shift.edit', 'shift.reward', 'shift.ranking'] }),
   item('theokot', '/theokot', { anyPerm: ['theokot.manage', 'theokot.pickup'] }),
   item('grocomeet', '/grocomeet', { perm: 'grocomeet.manage' }),
