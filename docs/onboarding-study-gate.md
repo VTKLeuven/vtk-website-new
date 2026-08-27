@@ -1,7 +1,7 @@
 # Onboarding- en studiebevestiging-gate
 
 Deze notitie legt uit waar de gate zit die een ingelogd lid dwingt om (1) zijn
-profiel af te werken (onboarding) en (2) per werkingsjaar zijn studie te
+profiel af te werken (onboarding) en (2) per academiejaar zijn studie te
 bevestigen, waarom die in `proxy.ts` leeft en niet in een layout, en wat de
 kost/nadelen van de huidige aanpak zijn. Ze is bewust eerlijk over de zwakke
 plekken: de huidige oplossing werkt, maar is niet de eindvorm.
@@ -11,8 +11,10 @@ plekken: de huidige oplossing werkt, maar is niet de eindvorm.
 Een ingelogd lid wordt omgeleid zolang een van deze twee gaten open staat:
 
 1. **Onboarding:** `onboardedAt` is `null` -> omleiden naar `/onboarding`.
-2. **Studiebevestiging:** `studyConfirmedYear !== currentWorkingYear()` -> omleiden
-   naar `/studie-bevestigen`.
+2. **Studiebevestiging:** `studyConfirmedYear !== currentStudyYear()` -> omleiden
+   naar `/studie-bevestigen`. Let op de functie: dit is het **academiejaar**
+   (cutover 27 september), niet het werkingsjaar (15 juli). Zie
+   `docs/design-decisions.md`.
 
 Op de doelpagina zelf grijpt de gate niet in (anders krijg je een lus). Anonieme
 bezoekers raken de gate nooit: geen sessie, geen redirect.
@@ -115,8 +117,8 @@ tegen de DB gecheckt te worden. Denkrichtingen voor een herwerking:
   op de better-auth-sessie zetten, zodat de proxy ze uit de cookie leest zonder
   DB-hit. Vergt invalidatie wanneer het lid onboardt/bevestigt.
 - **Event-driven i.p.v. per-request:** enkel (her)evalueren op de momenten die
-  ertoe doen (login, jaarwissel op 15 juli, na het invullen van het formulier),
-  en de rest van de tijd niets doen.
+  ertoe doen (login, jaarwissel op 15 juli en 27 september, na het invullen van
+  het formulier), en de rest van de tijd niets doen.
 
 Tot dan: de huidige proxy-gate werkt en is correct; dit is bewust "goed genoeg
 voor nu", niet de eindvorm.

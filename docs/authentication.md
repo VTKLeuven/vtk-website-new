@@ -440,7 +440,8 @@ Admin-CRUD op accounts, allemaal achter de `users.edit`-permissie
 ## Onboarding & studiebevestiging
 
 Een nieuw (SSO-)lid landt met `onboardedAt = null` en moet eerst zijn profiel
-invullen; daarna moet het elk werkingsjaar zijn studie herbevestigen. Beide zijn
+invullen; daarna moet het elk academiejaar zijn studie herbevestigen (die
+bevestiging vervalt op 27 september, niet op 15 juli zoals het werkingsjaar). Beide zijn
 blokkerende gates op de **netwerkgrens** (`apps/web/proxy.ts`), niet in een
 layout. Het r-nummer-veld wordt voorgevuld uit de KU Leuven-claim (zie boven).
 Volledige uitleg: `docs/onboarding-study-gate.md` en de sectie

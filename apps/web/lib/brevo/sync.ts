@@ -2,7 +2,7 @@ import "server-only";
 
 import { Prisma } from "@prisma/client";
 import { prisma } from "@vtk/db";
-import { currentWorkingYear } from "@vtk/auth";
+import { currentStudyYear } from "@vtk/auth";
 import {
   BREVO_LIST_KEYS,
   alternateEmail,
@@ -77,7 +77,7 @@ export async function syncUserToBrevo(userId: string): Promise<SyncOutcome> {
     if (!user) return { ok: false, error: "user not found" };
 
     const { lists } = await getBrevoListMap();
-    const desired = new Set(desiredListKeys(user, currentWorkingYear()));
+    const desired = new Set(desiredListKeys(user, currentStudyYear()));
     const email = preferredEmail(user);
     const alt = alternateEmail(user);
 
@@ -116,12 +116,12 @@ export type ReconcileOutcome =
 export async function reconcileMailingLists(): Promise<ReconcileOutcome> {
   if (!brevoEnabled()) return { skipped: true };
   const { lists } = await getBrevoListMap();
-  const workingYear = currentWorkingYear();
+  const studyYear = currentStudyYear();
 
   // Enkel geschikte leden komen uit de DB; de rest hoort in geen lijst en wordt
   // hieronder weggeprund waar Brevo ze nog kent.
   const users = await prisma.user.findMany({
-    where: { active: true, studyConfirmedYear: workingYear, notStudying: false },
+    where: { active: true, studyConfirmedYear: studyYear, notStudying: false },
     select: USER_SELECT,
   });
 
@@ -129,7 +129,7 @@ export async function reconcileMailingLists(): Promise<ReconcileOutcome> {
   const desiredByList = new Map<string, Map<string, ImportContact>>();
   for (const key of BREVO_LIST_KEYS) desiredByList.set(key, new Map());
   for (const user of users) {
-    const keys = desiredListKeys(user, workingYear);
+    const keys = desiredListKeys(user, studyYear);
     if (keys.length === 0) continue;
     const email = normalizeEmail(preferredEmail(user));
     const contact: ImportContact = { email, ext_id: user.id, attributes: contactAttributes(user) };

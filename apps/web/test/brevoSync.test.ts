@@ -15,7 +15,7 @@ import { STUDY_PROGRAMMES, STUDY_YEARS } from "@/lib/profile";
 
 const YEAR = 2026;
 
-/** Een geschikt lid: actief, dit werkingsjaar bevestigd, studeert nog. */
+/** Een geschikt lid: actief, dit academiejaar bevestigd, studeert nog. */
 function user(overrides: Partial<SyncUserData> = {}): SyncUserData {
   return {
     name: "Jan Peeters",

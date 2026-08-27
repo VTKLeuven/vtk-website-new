@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { prisma } from '@vtk/db';
 import { resolveClaims } from '@vtk/auth/server';
-import { currentWorkingYear } from '@vtk/auth';
+import { currentStudyYear, currentWorkingYear } from '@vtk/auth';
 
 /**
  * De resolver tegen een echte database: hier zit het risico dat de unit tests
@@ -37,7 +37,7 @@ describe.sequential('claim resolution', () => {
         studyProgrammes: ['COMPUTER_SCIENCE'],
         studyYears: ['MASTER_1'],
         notAtFaculty: false,
-        studyConfirmedYear: currentWorkingYear(),
+        studyConfirmedYear: currentStudyYear(),
       },
     });
 

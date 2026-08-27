@@ -3,7 +3,7 @@ import { prisma } from "@vtk/db";
 import { getDictionary, type Locale } from "@vtk/i18n";
 import { hasLocale } from "@/lib/locale";
 import { requireSession } from "@/lib/session";
-import { currentWorkingYear, formatWorkingYear } from "@/lib/workingYear";
+import { currentStudyYear, formatWorkingYear, studyYearStart } from "@/lib/workingYear";
 import { previewNoopAction } from "@/app/actions/flowPreview";
 import { ProfileForm } from "@/components/profile/ProfileForm";
 import { StudyFieldset } from "@/components/profile/StudyFieldset";
@@ -27,7 +27,7 @@ import { FlowPreview } from "./FlowPreview";
  * erger dan geen voorvertoning.
  *
  * De regels erboven zijn geen documentatie maar afgeleide waarden: het huidige
- * werkingsjaar, de eerstvolgende omslag, en de eigen staat van de kijker.
+ * academiejaar, de eerstvolgende omslag, en de eigen staat van de kijker.
  */
 export default async function AdminFlowPreview({
   params,
@@ -80,16 +80,15 @@ export default async function AdminFlowPreview({
   });
 
   const dict = getDictionary(locale);
-  const year = currentWorkingYear();
+  const year = currentStudyYear();
 
-  // De eerstvolgende 15 juli: dat is het moment waarop iedereen tegelijk de
+  // De eerstvolgende 27 september: dat is het moment waarop iedereen tegelijk de
   // bevestigingsgate voor zijn neus krijgt.
-  const now = new Date();
-  const rolloverYear = now < new Date(now.getFullYear(), 6, 15) ? now.getFullYear() : now.getFullYear() + 1;
-  const rollover = new Date(rolloverYear, 6, 15).toLocaleDateString(nl ? "nl-BE" : "en-GB", {
+  const rollover = studyYearStart(year + 1).toLocaleDateString(nl ? "nl-BE" : "en-GB", {
     day: "numeric",
     month: "long",
     year: "numeric",
+    timeZone: "Europe/Brussels",
   });
 
   const dateOrNever = (value: Date | null) =>
@@ -188,8 +187,8 @@ export default async function AdminFlowPreview({
         title={nl ? "Jaarlijkse studiebevestiging" : "Yearly study confirmation"}
         when={
           nl
-            ? "Verschijnt na de onboarding, zodra het werkingsjaar omslaat en het lid zijn studie nog niet opnieuw bevestigde."
-            : "Appears after onboarding, once the working year rolls over and the member has not reconfirmed their studies."
+            ? "Verschijnt na de onboarding, zodra het academiejaar omslaat en het lid zijn studie nog niet opnieuw bevestigde."
+            : "Appears after onboarding, once the academic year rolls over and the member has not reconfirmed their studies."
         }
         openLabel={nl ? "Toon het formulier" : "Show the form"}
         closeLabel={nl ? "Verberg het formulier" : "Hide the form"}
@@ -199,13 +198,13 @@ export default async function AdminFlowPreview({
             <ul className="mt-2 list-disc space-y-1 pl-4">
               <li>
                 {nl
-                  ? `Zodra User.studyConfirmedYear achterloopt op het huidige werkingsjaar (${formatWorkingYear(year)}).`
-                  : `As soon as User.studyConfirmedYear lags behind the current working year (${formatWorkingYear(year)}).`}
+                  ? `Zodra User.studyConfirmedYear achterloopt op het huidige academiejaar (${formatWorkingYear(year)}).`
+                  : `As soon as User.studyConfirmedYear lags behind the current academic year (${formatWorkingYear(year)}).`}
               </li>
               <li>
                 {nl
-                  ? `Het werkingsjaar rolt om op 15 juli; de eerstvolgende omslag is ${rollover}. Dan krijgt iedereen dit scherm tegelijk.`
-                  : `The working year rolls over on 15 July; the next one is ${rollover}. Everyone gets this screen at the same moment.`}
+                  ? `Het academiejaar rolt om op 27 september, niet op 15 juli zoals het werkingsjaar: in juli loopt het academiejaar nog. De eerstvolgende omslag is ${rollover}; dan krijgt iedereen dit scherm tegelijk.`
+                  : `The academic year rolls over on 27 September, not on 15 July like the working year: in July the academic year is still running. The next rollover is ${rollover}; everyone gets this screen at the same moment.`}
               </li>
               <li>
                 {nl
@@ -235,7 +234,7 @@ export default async function AdminFlowPreview({
                 </dd>
               </div>
               <div className="flex justify-between gap-4">
-                <dt>{nl ? "Huidig werkingsjaar" : "Current working year"}</dt>
+                <dt>{nl ? "Huidig academiejaar" : "Current academic year"}</dt>
                 <dd className="text-right">{formatWorkingYear(year)}</dd>
               </div>
               <div className="flex justify-between gap-4">

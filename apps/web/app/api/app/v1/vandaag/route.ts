@@ -1,4 +1,4 @@
-import { currentWorkingYear } from "@vtk/auth";
+import { currentStudyYear } from "@vtk/auth";
 import { prisma } from "@vtk/db";
 import { pick } from "@vtk/i18n";
 
@@ -225,11 +225,11 @@ async function tasksFor(
       highlight: true,
       at: null,
     });
-  } else if (user.studyConfirmedYear !== currentWorkingYear()) {
+  } else if (user.studyConfirmedYear !== currentStudyYear()) {
     tasks.push({
       kind: "gate",
       title: "Bevestig je studie",
-      detail: "Elk werkingsjaar geef je opnieuw op wat je studeert.",
+      detail: "Elk academiejaar geef je opnieuw op wat je studeert.",
       path: "/poort?gate=studie-bevestigen",
       actionLabel: "Nu doen",
       highlight: true,

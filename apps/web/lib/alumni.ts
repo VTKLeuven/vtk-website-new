@@ -8,7 +8,7 @@ import { nameParts } from "@vtk/auth";
  * Het alumni-adresboek.
  *
  * De opt-in-mailinglijsten (`lib/mailinglists.ts`) zijn studiegericht: ze vragen
- * een studiebevestiging van dit werkingsjaar, en die geeft een afgestudeerde per
+ * een studiebevestiging van dit academiejaar, en die geeft een afgestudeerde per
  * definitie nooit meer. Voor alumni is er dus een tweede bron nodig, en die
  * bestaat uit twee helften die bij de export samenkomen:
  *

@@ -580,11 +580,16 @@ model User {
   // definitie vertrouwd; enkel bij een zelfgemaakt account houdt een
   // onbevestigd adres de login tegen (zie `loginAction`).
   selfRegisteredAt       DateTime?           @db.Timestamptz(3)
-  // Werkingsjaar waarin het lid zijn studieprofiel laatst bevestigde (2026 =
-  // "26-27"). Loopt dat achter op het huidige werkingsjaar, dan is het profiel
+  // Academiejaar waarin het lid zijn studieprofiel laatst bevestigde (2026 =
+  // "26-27"). Loopt dat achter op het huidige academiejaar, dan is het profiel
   // verlopen: de bevestigingsgate vraagt het opnieuw en het lid valt zolang uit
   // de mailinglijsten. Zo blijft "actief student" een jaarlijks vers signaal
   // zonder koppeling met de cursusdienst.
+  //
+  // Dit is bewust NIET het werkingsjaar: dat kantelt op 15 juli, terwijl het
+  // academiejaar tot eind september loopt. De bevestiging vervalt daarom op
+  // 27 september (`currentStudyYear()` in @vtk/auth), anders duidt iedereen in
+  // juli nog het jaar aan dat net gedaan is.
   studyConfirmedYear     Int?
 
   sessions  Session[]

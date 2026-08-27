@@ -6,7 +6,7 @@ import { Card, Button } from "@vtk/ui";
 import { getDictionary, type Locale } from "@vtk/i18n";
 import { hasLocale } from "@/lib/locale";
 import { requireSession } from "@/lib/session";
-import { currentWorkingYear, formatWorkingYear } from "@/lib/workingYear";
+import { currentStudyYear, formatWorkingYear } from "@/lib/workingYear";
 import { logoutAction } from "@/app/actions/auth";
 import { confirmStudyAction } from "@/app/actions/onboarding";
 import { StudyFieldset } from "@/components/profile/StudyFieldset";
@@ -22,8 +22,9 @@ export async function generateMetadata({
 }
 
 /**
- * Jaarlijkse bevestiging van het studieprofiel. De gate in `[locale]/layout.tsx`
- * stuurt hierheen zodra `studyConfirmedYear` achterloopt op het werkingsjaar.
+ * Jaarlijkse bevestiging van het studieprofiel. De gate in `proxy.ts` stuurt
+ * hierheen zodra `studyConfirmedYear` achterloopt op het academiejaar (de
+ * cutover ligt op 27 september, zie `lib/workingYear.ts`).
  *
  * De vorige keuze staat voorgevuld, zodat bevestigen één klik is voor wie niets
  * wijzigt; dat is het verschil tussen een lid dat bevestigt en een lid dat
@@ -42,7 +43,7 @@ export default async function ConfirmStudyPage({
   const session = await requireSession(
     `/inloggen?next=${locale === "en" ? "/en" : ""}/studie-bevestigen`
   );
-  const year = currentWorkingYear();
+  const year = currentStudyYear();
   // Al bevestigd (of nog niet door de onboarding): niets te doen hier.
   if (!session.user.onboarded) redirect(locale === "en" ? "/en/onboarding" : "/onboarding");
   if (session.user.studyConfirmedYear === year) redirect(home);

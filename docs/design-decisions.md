@@ -791,18 +791,44 @@ SSO. Concrete implementatie: hook in `packages/auth/src/auth.ts`, gate in
   gaf ongewild een jaarlijks signaal over wie nog actief studeerde. Nu cudi een
   aparte site is (en we die bewust **niet** koppelen), viel dat signaal weg.
 - **De oplossing:** niet de koppeling herbouwen, maar de _jaarlijkse herdeclaratie_.
-  `User.studyConfirmedYear` houdt bij in welk werkingsjaar het lid zijn studie
-  laatst bevestigde. Loopt dat achter op `currentWorkingYear()` (rollover op
-  15 juli, zie `lib/workingYear.ts`), dan is het profiel verlopen.
+  `User.studyConfirmedYear` houdt bij in welk academiejaar het lid zijn studie
+  laatst bevestigde. Loopt dat achter op `currentStudyYear()` (rollover op
+  27 september, zie `lib/workingYear.ts`), dan is het profiel verlopen.
+- **De bevestiging vervalt op 27 september, niet op 15 juli.** Dat is bewust een
+  andere dag dan de rest van de site: het werkingsjaar kantelt op 15 juli, maar
+  het academiejaar loopt door tot eind september. Wie in juli gevraagd wordt "wat
+  studeer je?" antwoordt met het jaar dat net gedaan is (in juli 2026 dus 25-26),
+  en dan staat het hele werkingsjaar lang het verkeerde studiejaar in de
+  mailinglijsten en in de career-mappen. Op 27 september is het nieuwe
+  academiejaar effectief begonnen: de tweedezittijd is voorbij, wie heroriënteert
+  weet het, en de eerste lesweek is bezig. Dan pas is "wat studeer je?" een vraag
+  met een juist antwoord.
+- **Gevolg: twee jaargrenzen naast elkaar.** `currentWorkingYear()` (15 juli,
+  posten en rollen) en `currentStudyYear()` (27 september, enkel de
+  studiebevestiging) staan samen in `packages/auth/src/lib/workingYear.ts`, zodat
+  het verschil op één plek zichtbaar is. Alles wat aan `studyConfirmedYear` hangt
+  gebruikt het studiejaar; dat is de gate, het bevestigingsscherm, én de
+  geschiktheid voor de mailinglijsten. Zouden die uit elkaar lopen, dan valt
+  iedereen tussen 15 juli en 27 september uit elke lijst zonder dat er iets
+  gebeurd is.
+- Het studiejaar is bewust **niet geklemd** op `FIRST_WORKING_YEAR` zoals het
+  werkingsjaar (die klem bestaat omdat er geen roldata is van vóór 26-27). Met
+  die klem zou de gate in de zomer van 2026 alsnog in juli vallen.
+- **Eenmalige correctie bij de invoering (augustus 2026):** wie sinds 15 juli
+  2026 al bevestigd had, stond op 2026 terwijl het antwoord in de praktijk over
+  25-26 ging. De migratie `20260827160000_studiebevestiging_27_september` zet die
+  stempels op 2025. Zo valt de eerste bevestiging onder de nieuwe regel op
+  27 september 2026; tot dan is niemand gegate en blijven de mailinglijsten
+  intact.
 - Een verlopen profiel wordt **blokkerend** afgedwongen door een tweede gate in
-  `app/[locale]/layout.tsx`, na de onboarding-gate: het lid gaat naar
+  `apps/web/proxy.ts`, na de onboarding-gate: het lid gaat naar
   `/studie-bevestigen` voor het de site verder kan gebruiken.
 - **Bewust geen reset van de data** (in tegenstelling tot het oude systeem): de
   vorige keuze blijft staan en wordt voorgevuld, zodat bevestigen één klik is.
   Dat verschil bepaalt of leden bevestigen of afhaken.
 - **Waarom dit sterker is dan de oude cudi-truc:** inloggen gaat via KU Leuven
   SSO. Een afgestudeerde wiens KUL-account uit staat, geraakt niet meer binnen en
-  kan dus nooit bevestigen. "Bevestigd dit werkingsjaar" betekent daardoor in de
+  kan dus nooit bevestigen. "Bevestigd dit academiejaar" betekent daardoor in de
   praktijk: heeft een werkend KUL-account **én** verklaart zelf nog te studeren.
 - `saveProfileAction` (onboarding + `/account`) stempelt `studyConfirmedYear` ook,
   want wie dat formulier invult declareert daarmee net zijn studie.
@@ -816,10 +842,10 @@ SSO. Concrete implementatie: hook in `packages/auth/src/auth.ts`, gate in
   universiteitsmail.
 - Enkel **actieve** leden komen in een export: een gedeactiveerd account hoort
   geen mails meer te krijgen.
-- Enkel leden die hun studie **dit werkingsjaar bevestigd** hebben (zie de
-  jaarlijkse studiebevestiging hierboven) zitten in een lijst; dat geldt voor
-  **alle** lijsten, ook "Alle studenten". Afgestudeerden vallen er zo vanzelf
-  uit, zonder manuele opkuis.
+- Enkel leden die hun studie **dit academiejaar bevestigd** hebben (zie de
+  jaarlijkse studiebevestiging hierboven; die vervalt op 27 september, niet op
+  15 juli) zitten in een lijst; dat geldt voor **alle** lijsten, ook "Alle
+  studenten". Afgestudeerden vallen er zo vanzelf uit, zonder manuele opkuis.
 - Enkel leden die **nog studeren**: wie bij de bevestiging "ik studeer niet
   (meer)" (`notStudying`) aanduidde, bevestigt zijn profiel wél en passeert dus
   de gate, maar hoort in **geen enkele** studiegerichte lijst. Zonder deze extra
@@ -3670,7 +3696,7 @@ wist.
 
 `/admin/it/flows` (superadmin) toont per gate wanneer hij afgaat, wat de eigen
 staat van de kijker is (`onboardedAt`, `studyConfirmedYear`, het huidige
-werkingsjaar en de eerstvolgende omslag op 15 juli), en het formulier zelf.
+academiejaar en de eerstvolgende omslag op 27 september), en het formulier zelf.
 
 Dat is bewust **het echte formulier**, met een opslaan-actie die niets bewaart
 (`previewNoopAction`). Een nagebouwde kopie zou vroeg of laat afwijken van wat een
@@ -4199,7 +4225,7 @@ overal met naam op de website staan".
 ### Het adresboek staat naast de opt-in-nieuwsbrieven, niet erin
 
 De mailinglijsten uit `lib/mailinglists.ts` zijn studiegericht: ze eisen een
-studiebevestiging van het huidige werkingsjaar, en die geeft een afgestudeerde per
+studiebevestiging van het huidige academiejaar, en die geeft een afgestudeerde per
 definitie nooit meer. Een alumnus in die lijsten zetten zou dus betekenen dat je
 die regel voor iedereen sloopt.
 

@@ -10,7 +10,7 @@ import { prisma } from "@vtk/db";
 import { newStorageKey, putObject, deleteObject } from "@vtk/storage";
 import { requireSession } from "@/lib/session";
 import { saveError, saveOk, type SaveState } from "@/lib/saveState";
-import { currentWorkingYear } from "@/lib/workingYear";
+import { currentStudyYear } from "@/lib/workingYear";
 import { fullName } from "@vtk/auth";
 import {
   MAIL_CATEGORIES,
@@ -264,8 +264,8 @@ export async function saveProfileAction(
         calendarOnlyMyAudiences: data.calendarOnlyMyAudiences,
         ...studyUpdate(data),
         // Wie dit formulier invult, declareert daarmee zijn studie voor dit
-        // werkingsjaar; de bevestigingsgate hoeft er dan niet meer op te vallen.
-        studyConfirmedYear: currentWorkingYear(),
+        // academiejaar; de bevestigingsgate hoeft er dan niet meer op te vallen.
+        studyConfirmedYear: currentStudyYear(),
         ...(newAvatarKey ? { avatarKey: newAvatarKey } : {}),
         // Stamp completion only once; account edits keep the original timestamp.
         ...(wasOnboarded ? {} : { onboardedAt: new Date() }),
@@ -312,10 +312,9 @@ export async function saveProfileAction(
 const confirmStudySchema = z.object(studySchema);
 
 /**
- * Jaarlijkse bevestiging van het studieprofiel (zie de gate in
- * `app/[locale]/layout.tsx`). Zet `studyConfirmedYear` op het huidige
- * werkingsjaar, waardoor het lid weer als actief student telt en dus opnieuw in
- * de mailinglijsten komt.
+ * Jaarlijkse bevestiging van het studieprofiel (zie de gate in `proxy.ts`). Zet
+ * `studyConfirmedYear` op het huidige academiejaar, waardoor het lid weer als
+ * actief student telt en dus opnieuw in de mailinglijsten komt.
  *
  * Bewust géén aparte "bevestigd zonder wijziging"-flow: het formulier post altijd
  * de volledige studiekeuze, of ze nu gewijzigd is of niet.
@@ -329,7 +328,7 @@ export async function confirmStudyAction(formData: FormData): Promise<void> {
     where: { id: session.user.id },
     data: {
       ...studyUpdate(parsed.data),
-      studyConfirmedYear: currentWorkingYear(),
+      studyConfirmedYear: currentStudyYear(),
     },
   });
 
