@@ -19,7 +19,13 @@ export async function generateMetadata({ params }: { params: Params }): Promise<
   return contentPageMetadata(page, locale, pagePath({ slug: page.slug, headerTabSlug: tab.slug }));
 }
 
-export default async function HeaderPage({ params }: { params: Params }) {
+export default async function HeaderPage({
+  params,
+  searchParams,
+}: {
+  params: Params;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
   const { locale: localeParam, headerSlug, pageSlug } = await params;
   if (!hasLocale(localeParam)) notFound();
   const locale: Locale = localeParam;
@@ -38,6 +44,8 @@ export default async function HeaderPage({ params }: { params: Params }) {
       locale={locale}
       downloadsLabel={dict.pages.downloads}
       onThisPageLabel={dict.pages.onThisPage}
+      searchParams={searchParams}
+      pagePath={`${locale === "en" ? "/en" : ""}/${tab.slug}/${page.slug}`}
     />
   );
 }

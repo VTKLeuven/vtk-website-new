@@ -25,7 +25,13 @@ export async function generateMetadata({ params }: { params: Params }): Promise<
   );
 }
 
-export default async function UnlistedPage({ params }: { params: Params }) {
+export default async function UnlistedPage({
+  params,
+  searchParams,
+}: {
+  params: Params;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
   const { locale: localeParam, slug } = await params;
   if (!hasLocale(localeParam)) notFound();
   const locale: Locale = localeParam;
@@ -43,6 +49,8 @@ export default async function UnlistedPage({ params }: { params: Params }) {
       locale={locale}
       downloadsLabel={dict.pages.downloads}
       onThisPageLabel={dict.pages.onThisPage}
+      searchParams={searchParams}
+      pagePath={`${locale === "en" ? "/en" : ""}/p/${page.slug}`}
     />
   );
 }

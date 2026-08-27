@@ -19,6 +19,9 @@ export const loadPageBySlug = cache(async (slug: string) =>
     include: {
       assets: { orderBy: { order: "asc" } },
       headerTab: true,
+      // Enkel de slug: het formulier zelf wordt met al zijn velden geladen via
+      // `loadPublicForm`, en dan alleen wanneer de pagina er echt een heeft.
+      form: { select: { slug: true } },
     },
   }),
 );

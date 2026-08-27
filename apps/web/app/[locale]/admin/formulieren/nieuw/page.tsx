@@ -6,6 +6,7 @@ import { ArrowLeft, ClipboardPlus } from "lucide-react";
 import { hasLocale } from "@/lib/locale";
 import { requireSession } from "@/lib/session";
 import { canSessionCreateFormForGroup } from "@/lib/forms/authorization";
+import { linkablePages } from "@/lib/forms/pageLink";
 import { FormCreateForm } from "@/components/forms/admin/FormCreateForm";
 import { formBase, formatDate, type AdminLocale } from "@/components/forms/admin/format";
 
@@ -72,6 +73,8 @@ export default async function NewFormPage({ params }: { params: Promise<{ locale
     take: 200,
   });
 
+  const pages = await linkablePages(session, locale, null);
+
   const calendarEvents = calendarRows.map((event) => ({
     id: event.id,
     groupId: event.groupId,
@@ -106,7 +109,12 @@ export default async function NewFormPage({ params }: { params: Promise<{ locale
             </div>
           </div>
         </div>
-        <FormCreateForm locale={locale} groups={groups} calendarEvents={calendarEvents} />
+        <FormCreateForm
+          locale={locale}
+          groups={groups}
+          calendarEvents={calendarEvents}
+          pages={pages}
+        />
       </section>
     </div>
   );

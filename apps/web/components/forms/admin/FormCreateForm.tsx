@@ -9,6 +9,7 @@ import type { AdminLocale } from "./format";
 
 type GroupOption = { id: string; name: string };
 type CalendarOption = { id: string; label: string; groupId: string };
+type PageOption = { id: string; label: string };
 
 /**
  * Aanmaken vraagt bewust weinig: titel, eigenaar en doelpubliek. De rest (open-
@@ -19,10 +20,12 @@ export function FormCreateForm({
   locale,
   groups,
   calendarEvents,
+  pages,
 }: {
   locale: AdminLocale;
   groups: GroupOption[];
   calendarEvents: CalendarOption[];
+  pages: PageOption[];
 }) {
   const nl = locale === "nl";
   const [title, setTitle] = useState("");
@@ -56,6 +59,13 @@ export function FormCreateForm({
         INVALID_CALENDAREVENTID: nl
           ? "Dat evenement hoort niet bij de gekozen post."
           : "That event does not belong to the selected post.",
+        INVALID_PAGEID: nl ? "Die pagina bestaat niet meer." : "That page no longer exists.",
+        PAGE_FORBIDDEN: nl
+          ? "Je mag die pagina niet bewerken, dus je kan er ook geen form op zetten."
+          : "You cannot edit that page, so you cannot put a form on it either.",
+        PAGE_TAKEN: nl
+          ? "Op die pagina staat al een andere form."
+          : "That page already carries another form.",
       }}
     >
       <input type="hidden" name="locale" value={locale} />
@@ -132,6 +142,28 @@ export function FormCreateForm({
             ]}
           />
         </div>
+
+        {pages.length > 0 ? (
+          <div className="ticket-admin-field" data-span="2">
+            <label htmlFor="form-page">
+              {nl ? "Staat op een pagina (optioneel)" : "Shown on a page (optional)"}
+            </label>
+            <ThemedSelect
+              id="form-page"
+              name="pageId"
+              defaultValue=""
+              options={[
+                { value: "", label: nl ? "Geen pagina" : "No page" },
+                ...pages.map((page) => ({ value: page.id, label: page.label })),
+              ]}
+            />
+            <span className="ticket-admin-help">
+              {nl
+                ? "De form verschijnt dan als paneel in die pagina, onderaan of op de plaats van de markering [[formulier]] in de tekst. Ze houdt hoe dan ook haar eigen adres."
+                : "The form then shows up as a panel in that page, at the bottom or where the [[formulier]] marker sits in the text. It keeps its own address either way."}
+            </span>
+          </div>
+        ) : null}
 
         {eventsForGroup.length > 0 ? (
           <div className="ticket-admin-field" data-span="2">

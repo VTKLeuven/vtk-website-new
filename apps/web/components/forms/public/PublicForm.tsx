@@ -69,6 +69,7 @@ export function PublicForm({
   initialFiles,
   entryId,
   allowDrafts,
+  successHref,
   consent,
   privacyUrl,
   canTest,
@@ -86,6 +87,12 @@ export function PublicForm({
   initialFiles: Record<string, UploadedFile[]>;
   entryId: string | null;
   allowDrafts: boolean;
+  /**
+   * Waar de bezoeker na het versturen terechtkomt. Op zijn eigen pagina is dat
+   * de bedanktroute; staat het formulier in een contentpagina, dan blijft hij op
+   * die pagina staan, want daar was hij naartoe gekomen.
+   */
+  successHref: string;
   consent: { required: boolean; text: string } | null;
   privacyUrl: string;
   canTest: boolean;
@@ -244,7 +251,12 @@ export function PublicForm({
       if (result.waitlisted) flags.set("wachtlijst", "1");
       const query = flags.toString();
       trackFormSubmitted({ slug });
-      const target = `${nl ? "" : "/en"}/formulieren/${slug}/bedankt${query ? `?${query}` : ""}`;
+      // De bestemming kan zelf al een query of een anker dragen (het paneel in
+      // een contentpagina wijst naar `...?formulier=verstuurd#formulier`).
+      const [path, anchor] = successHref.split("#");
+      const target = `${path}${query ? `${path.includes("?") ? "&" : "?"}${query}` : ""}${
+        anchor ? `#${anchor}` : ""
+      }`;
       router.push(target);
     });
   }

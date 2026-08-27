@@ -82,3 +82,49 @@ export function outlineFromTiptap(doc: unknown): OutlineItem[] {
   walk(doc as TiptapNode);
   return items;
 }
+
+/** Een anker op de pagina en waar het in het document staat (in pixels). */
+export type Anchor = { id: string; top: number };
+
+/**
+ * Welk anker "gelezen" is bij deze scrollpositie.
+ *
+ * De gewone regel is: het laatste anker dat de leesregel voorbij is. Onderaan
+ * loopt die regel stuk, want de laatste kopjes staan in het laatste scherm en
+ * halen de leesregel nooit meer; er is geen scrollruimte meer onder ze. Zonder
+ * correctie sprong de rail van het laatste bereikbare kopje meteen naar het
+ * allerlaatste en lichtten de kopjes ertussen nooit op.
+ *
+ * Die onbereikbare staart verdeelt daarom de laatste centimeters scroll onder
+ * elkaar: scroll je het laatste stuk uit, dan loopt de rail er nog netjes
+ * doorheen. Is er helemaal geen ruimte meer over, dan wint het laatste kopje,
+ * zodat een sprong vanuit de rail naar het slot toch oplicht.
+ */
+export function activeAnchor(
+  anchors: readonly Anchor[],
+  view: { scrolled: number; maxScroll: number; readingLine: number },
+): string | null {
+  if (anchors.length === 0) return null;
+
+  // De scrollpositie waarop elk anker de leesregel haalt.
+  const marks = anchors.map((anchor) => ({
+    id: anchor.id,
+    at: anchor.top - view.readingLine,
+  }));
+
+  // De ankers staan in documentvolgorde, dus de onbereikbare zijn een staart.
+  let tailStart = marks.length;
+  while (tailStart > 0 && marks[tailStart - 1].at > view.maxScroll) tailStart -= 1;
+
+  const tail = marks.slice(tailStart);
+  if (tail.length > 0) {
+    const from = tailStart > 0 ? marks[tailStart - 1].at : 0;
+    const step = Math.max(0, (view.maxScroll - from) / tail.length);
+    tail.forEach((mark, index) => {
+      mark.at = from + step * (index + 1);
+    });
+  }
+
+  const passed = marks.filter((mark) => view.scrolled >= mark.at);
+  return passed.length > 0 ? passed[passed.length - 1].id : marks[0].id;
+}

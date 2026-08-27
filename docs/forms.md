@@ -40,7 +40,7 @@ Alles in `packages/db/prisma/schema.prisma`, sectie "Formulieren".
 
 | Model | Wat het is |
 | --- | --- |
-| `Form` | Het formulier zelf: slug, NL/EN-titels en intro, status, doelpubliek, open- en sluitmoment, `maxEntries`, bevestigingsmail, meldingen, toestemming, `retentionDays`, optionele `calendarEventId`. |
+| `Form` | Het formulier zelf: slug, NL/EN-titels en intro, status, doelpubliek, open- en sluitmoment, `maxEntries`, bevestigingsmail, meldingen, toestemming, `retentionDays`, optionele `calendarEventId` en `pageId`. |
 | `FormSection` | Optionele groepering met volgorde; voedt de voortgangsbalk en draagt haar standaardvervolg (`nextSectionId`, `endsForm`). |
 | `FormField` | Type, **stabiele `code`**, volgorde, labels, `required`, typespecifieke `config` (Json), `archivedAt` voor soft delete. |
 | `FormFieldOption` | Keuzeopties als rijen (niet als JSON), met `quotaLimit`/`quotaUsed`/`version`, een eigen wachtlijst en een eigen sprong. |
@@ -76,6 +76,11 @@ Dit is de reden dat verschillende keuzes eruitzien zoals ze eruitzien:
   afleiden van stabiele codes. Puur, dus gedeeld met de client.
 - `visibility.ts`: welke velden zichtbaar zijn, plus kringdetectie voor de
   editor. Ook puur en gedeeld.
+- `surface.ts`: alles wat nodig is om het formulier te tonen (velden,
+  voorinvulling, of invullen kan). Gedeeld door de eigen pagina en het paneel in
+  een contentpagina, zodat die twee nooit iets anders zeggen.
+- `pageLink.ts`: de koppeling met een contentpagina vanaf beide kanten; wie wat
+  mag kiezen, en de cache van de pagina verversen.
 - `branching.ts`: welke secties het antwoordenpatroon aandoet, de stappen die
   daaruit volgen, en de kringdetectie voor sprongen. Ook puur en gedeeld.
 - `validation.ts`: de serverside waarheid bij het indienen.
@@ -95,6 +100,10 @@ Dit is de reden dat verschillende keuzes eruitzien zoals ze eruitzien:
 - `[slug]/page.tsx`: het formulier
 - `[slug]/bedankt/page.tsx`: de bevestiging
 
+Daarnaast rendert `components/site/PageView.tsx` het paneel op een contentpagina
+(`/<categorie>/<pagina>` en `/p/<pagina>`); de markering en het anker staan in
+`lib/pageForm.ts`.
+
 ### Routes - admin (`apps/web/app/[locale]/admin/formulieren/`)
 - `page.tsx`, `nieuw/page.tsx`
 - `[formId]/{page,instellingen,velden,inzendingen,toegang}`
@@ -110,13 +119,18 @@ Dit is de reden dat verschillende keuzes eruitzien zoals ze eruitzien:
 - `FormFieldInput.tsx` + `FormFieldBlock.tsx`: **de** veldrenderer, gedeeld
   door het publieke formulier en de preview in de editor
 - `public/PublicForm.tsx`, `public/FormFileField.tsx`
+- `public/FormBody.tsx`: de melding waarom invullen niet kan, of de velden zelf,
+  plus de statusregels; gedeeld door beide weergaven
+- `public/PageFormPanel.tsx`: het paneel zoals het in een contentpagina staat
 - `admin/FieldEditor.tsx` + `admin/FieldSettings.tsx`: de veldeditor
 - `admin/SectionManager.tsx`, `admin/MailingPanel.tsx`, `admin/EntryTools.tsx`,
   `admin/SharePanel.tsx`, `admin/EntryReviewForm.tsx`
 
 ### Styling
 - `apps/web/app/design/vtk-forms.css`: het formulier zoals de bezoeker het ziet
-  (gedeeld met de preview)
+  (gedeeld met de preview), plus het paneel op een contentpagina
+  (`.vtk-page-form`). De gele knop in de rail staat bij de rest van de rail in
+  `vtk-base.css` (`.vtk-rail-form`).
 - `apps/web/app/design/vtk-form-admin.css`: enkel wat eigen is aan de admin. De
   panelen, tabellen en velden komen uit `vtk-ticket-admin.css`; vandaar
   `ticket-admin` op de root van de formulierenschermen.
@@ -152,6 +166,39 @@ wachtrij**: anders staat alles op `SENT` terwijl er nooit iets vertrok.
 - `runPrivacyRetention` ruimt inzendingen op van formulieren met een
   `retentionDays`. Leeg is de standaard en betekent: niets opruimen.
 - `requireConsent` zet een verplicht vinkje met een link naar het privacybeleid.
+
+## Het formulier op een contentpagina
+
+`Form.pageId` hangt een formulier aan een CMS-pagina; het verschijnt daar als
+paneel in de tekst. Uniek in beide richtingen: een pagina draagt hoogstens een
+formulier, en een formulier staat op hoogstens een pagina.
+
+- **Waar het paneel komt, staat in de tekst zelf.** De redacteur zet de
+  markering `[[formulier]]` op een eigen regel in de markdown; `lib/pageForm.ts`
+  splitst de inhoud daarop en `PageView` rendert tekst, paneel, tekst. Staat de
+  markering er niet, dan komt het paneel onderaan. Zonder gekoppeld formulier
+  wordt ze uit de tekst gehaald in plaats van als tekst gerenderd.
+- **De rail zegt het.** Het formulier krijgt geen gewone regel in "Op deze
+  pagina" maar een gele knop met de deadline eronder, op de plaats waar het
+  paneel in de tekst staat. Is het dicht, vol of al ingediend, dan wordt die knop
+  grijs; een gele "inschrijven"-knop op een gesloten formulier is een leugen.
+- **Een formulier houdt zijn eigen adres.** `/formulieren/<slug>` blijft
+  bestaan; de pagina is een tweede plek waar het staat, geen verhuizing.
+- **Een concept of een gearchiveerd formulier laat het paneel weg**, in plaats
+  van de hele pagina te weigeren. Wie het formulier beheert, ziet het concept wel,
+  met dezelfde voorbeeldmelding als op de eigen pagina.
+- **Na het versturen blijf je op de pagina staan.** `PublicForm` krijgt een
+  `successHref`; het paneel wijst naar `?formulier=verstuurd#formulier` en toont
+  daar de bedanking. Doorsturen naar `/formulieren/<slug>/bedankt` zou de bezoeker
+  weghalen van waar hij naartoe kwam.
+- **Koppelen kan vanaf beide kanten**: bij de instellingen van een formulier
+  kies je de pagina, en op `/admin/paginas/<id>` staat een kaart waar je een
+  bestaand formulier kiest of er meteen een nieuw voor aanmaakt. In beide
+  richtingen geldt dezelfde regel: koppelen is de pagina bewerken, dus je hebt de
+  bewerkrechten van die pagina nodig plus `MANAGE_FORM` op het formulier.
+- **De MCP-server kan dit niet.** `form` in `lib/mcp/create.ts` is `.strict()` en
+  kent geen `pageId`: een agent kan dus geen formulier op een pagina laten
+  verschijnen.
 
 ## Springen tussen secties
 
@@ -209,4 +256,6 @@ In beide gevallen komt de inzending binnen met `waitlisted = true` en claimt ze
 `npm run test --workspace=@vtk/web`, in het bijzonder:
 `formsSchema`, `formsVisibility`, `formsBranching`, `formsValidation`,
 `formsExport`, `formsMail`, `formsPdf`, `formsTranslation` en
-`formsAuthorization`.
+`formsAuthorization`. Voor het paneel op een contentpagina: `pageForm` (waar het
+in de tekst komt) en `pageOutline` (waar het in de rail komt, en hoe de rail
+meeloopt met het scrollen).

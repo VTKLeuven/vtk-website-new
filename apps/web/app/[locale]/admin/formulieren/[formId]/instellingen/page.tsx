@@ -3,6 +3,8 @@ import { prisma } from "@vtk/db";
 import { Settings2 } from "lucide-react";
 import { hasLocale } from "@/lib/locale";
 import { requireFormCapability } from "@/lib/forms/authorization";
+import { linkablePages } from "@/lib/forms/pageLink";
+import { hasFormMarker } from "@/lib/pageForm";
 import {
   FormSettingsForm,
   type FormSettingsValues,
@@ -17,7 +19,7 @@ export default async function FormSettingsPage({
   const { locale: localeParam, formId } = await params;
   if (!hasLocale(localeParam)) notFound();
   const locale: AdminLocale = localeParam;
-  const { form } = await requireFormCapability(formId, "MANAGE_FORM");
+  const { session, form } = await requireFormCapability(formId, "MANAGE_FORM");
 
   // Evenementen van de eigenaarspost waar nog geen formulier aan hangt, plus het
   // eventueel al gekoppelde evenement zelf (anders verdwijnt het uit de lijst).
@@ -40,6 +42,17 @@ export default async function FormSettingsPage({
     orderBy: { start: "asc" },
     take: 200,
   });
+
+  const pages = await linkablePages(session, locale, form.pageId);
+
+  // Staat de markering in de tekst van de gekoppelde pagina? Bepaalt of de hulp
+  // bij het veld zegt waar de form komt of hoe je dat kiest.
+  const linkedPage = form.pageId
+    ? await prisma.page.findUnique({
+        where: { id: form.pageId },
+        select: { contentMdNl: true },
+      })
+    : null;
 
   const values: FormSettingsValues = {
     id: form.id,
@@ -78,6 +91,8 @@ export default async function FormSettingsPage({
     retentionDays: form.retentionDays,
     calendarEventId: form.calendarEventId,
     hasCalendarEvent: Boolean(form.calendarEventId),
+    pageId: form.pageId,
+    pageHasMarker: hasFormMarker(linkedPage?.contentMdNl ?? ""),
   };
 
   const calendarEvents = calendarRows.map((event) => ({
@@ -105,7 +120,12 @@ export default async function FormSettingsPage({
             </div>
           </div>
         </div>
-        <FormSettingsForm locale={locale} values={values} calendarEvents={calendarEvents} />
+        <FormSettingsForm
+          locale={locale}
+          values={values}
+          calendarEvents={calendarEvents}
+          pages={pages}
+        />
       </section>
     </div>
   );

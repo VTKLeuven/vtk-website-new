@@ -1284,6 +1284,8 @@ model Page {
   createdBy   User?            @relation("PageCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
   assets      PageAsset[]
   editorRoles PageEditorRole[]
+  /// Het formulier dat in deze pagina staat, als er een gekoppeld is.
+  form        Form?
 
   @@index([headerTabId])
   @@index([searchNl], type: Gin)
@@ -4051,6 +4053,12 @@ model Form {
   /// Optionele koppeling aan een kalenderevenement: het formulier verschijnt dan
   /// bij dat evenement en de bevestigingsmail kan er een .ics bij steken.
   calendarEventId String? @unique
+  /// Optionele koppeling aan een contentpagina: het formulier staat dan als
+  /// paneel in de tekst van die pagina, op de plaats van de markering
+  /// `[[formulier]]` en anders onderaan. Uniek, want een pagina heeft hoogstens
+  /// een formulier: twee panelen in dezelfde tekstkolom lezen als een fout, en
+  /// de markering zou niet meer weten welke van de twee ze aanwijst.
+  pageId          String? @unique
   ownerGroupId    String
   createdById     String?
 
@@ -4123,6 +4131,7 @@ model Form {
   updatedAt   DateTime  @updatedAt @db.Timestamptz(3)
 
   calendarEvent CalendarEvent? @relation(fields: [calendarEventId], references: [id], onDelete: SetNull)
+  page          Page?          @relation(fields: [pageId], references: [id], onDelete: SetNull)
   ownerGroup    Group          @relation("FormOwnerGroup", fields: [ownerGroupId], references: [id], onDelete: Restrict)
   createdBy     User?          @relation("FormCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
 

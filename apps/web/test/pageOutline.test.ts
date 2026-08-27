@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  activeAnchor,
   headingId,
   headingText,
   outlineFromMarkdown,
@@ -59,5 +60,61 @@ describe('kopjes van een contentpagina', () => {
   it('vlakt geneste React-children af tot platte tekst', () => {
     const children = ['Bonnetjes ', { props: { children: ['en ', 'ruilen'] } }];
     expect(headingText(children)).toBe('Bonnetjes en ruilen');
+  });
+});
+
+describe('welk kopje de rail markeert bij het scrollen', () => {
+  // De maten van /p/sport met een formulierpaneel erin: het paneel duwt de
+  // laatste drie kopjes in het laatste scherm, waar ze de leesregel nooit meer
+  // halen.
+  const anchors = [
+    { id: 'sectie-wat-doet-sport-voor-jullie', top: 295 },
+    { id: 'sectie-interne-competitie', top: 443 },
+    { id: 'formulier', top: 645 },
+    { id: 'sectie-24-urenloop', top: 1625 },
+    { id: 'sectie-svdm', top: 1745 },
+    { id: 'sectie-wanneer-precies', top: 1861 },
+    { id: 'sectie-ideetjes', top: 1949 },
+  ];
+  const view = (scrolled: number) => ({ scrolled, maxScroll: 1606, readingLine: 120 });
+
+  it('markeert het eerste kopje zolang je nog niets voorbij bent', () => {
+    expect(activeAnchor(anchors, view(0))).toBe('sectie-wat-doet-sport-voor-jullie');
+  });
+
+  it('markeert het formulier terwijl je erin staat', () => {
+    expect(activeAnchor(anchors, view(600))).toBe('formulier');
+  });
+
+  it('slaat de kopjes na het formulier niet over', () => {
+    // Dit ging fout: onderaan sprong de rail van het formulier meteen naar het
+    // laatste kopje, omdat de drie ertussen de leesregel nooit halen.
+    const walked = [1505, 1540, 1575, 1606].map((y) => activeAnchor(anchors, view(y)));
+    expect(walked).toEqual([
+      'sectie-24-urenloop',
+      'sectie-svdm',
+      'sectie-wanneer-precies',
+      'sectie-ideetjes',
+    ]);
+  });
+
+  it('markeert het laatste kopje wanneer je helemaal beneden staat', () => {
+    expect(activeAnchor(anchors, view(1606))).toBe('sectie-ideetjes');
+  });
+
+  it('markeert het laatste kopje ook wanneer er geen scrollruimte meer over is', () => {
+    // Een korte pagina die helemaal in beeld past: springen vanuit de rail moet
+    // dan nog altijd oplichten.
+    const short = [
+      { id: 'sectie-een', top: 300 },
+      { id: 'sectie-twee', top: 500 },
+    ];
+    expect(activeAnchor(short, { scrolled: 0, maxScroll: 0, readingLine: 120 })).toBe(
+      'sectie-twee'
+    );
+  });
+
+  it('geeft null zonder ankers', () => {
+    expect(activeAnchor([], view(0))).toBeNull();
   });
 });

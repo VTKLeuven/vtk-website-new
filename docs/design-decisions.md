@@ -3587,6 +3587,54 @@ keuzes die niet uit de code volgen.
   geen "bedankt voor je inzending"-mail: hij heeft niets ingevuld en zou zich
   afvragen wat er gebeurd is. Het formulier hoeft daarvoor ook niet open te staan.
 
+### Een formulier op een contentpagina
+
+Een formulier kan als paneel in een gewone CMS-pagina staan. Dat is de reden om
+onze eigen formulieren te gebruiken in plaats van een Google Form: het hoort
+eruit te zien alsof het bij de pagina hoort, niet alsof het eraan geplakt is.
+
+- **Een uitgelicht paneel, geen band en geen kale sectie.** Het formulier staat
+  in de tekstkolom als witte kaart met de gele accentrail: hetzelfde materiaal
+  dat de huisstijl al voor een uitgelichte kaart gebruikt. Vier richtingen zijn
+  bekeken. Een kale inline-sectie zonder kader las te veel als een gewone alinea
+  en werd bij het scrollen gemist. Een volle navy band viel op maar kan enkel
+  ónder de tekst staan (een band van rand tot rand kan niet tussen twee
+  alinea's) en overheerste een korte pagina. Een inzet onderaan met een
+  actiepaneel in de rail zette het formulier te ver van de tekst waar het bij
+  hoort. De kaart valt op zonder de pagina over te nemen, en past even goed op
+  een korte als op een lange pagina.
+- **De redacteur bepaalt waar het staat, in de tekst zelf.** De markering
+  `[[formulier]]` op een eigen regel in de markdown zegt waar het paneel komt;
+  staat ze er niet, dan komt het onderaan. Bewust geen keuzelijst met drie
+  posities in een ander paneel: de tekst weet het beste waar de inschrijving
+  hoort, en een markering die je ziet staan is duidelijker dan een instelling
+  die je moet gaan zoeken.
+- **De rail schreeuwt dat er iets in te vullen valt.** In "Op deze pagina" krijgt
+  het formulier geen gewone regel tussen de tussentitels, maar een gele knop met
+  de titel en de deadline, op de plaats waar het paneel in de tekst staat. Iemand
+  die de pagina opent om in te schrijven, mag daar niet naar moeten zoeken. Staat
+  het formulier dicht, vol of heb je al ingediend, dan wordt die knop grijs: een
+  gele "schrijf je in"-knop op een gesloten formulier is een leugen.
+- **Eén formulier per pagina.** Twee panelen in dezelfde tekstkolom lezen als een
+  fout, en de markering zou niet meer weten welke van de twee ze aanwijst.
+- **Een formulier verhuist niet, het staat er ook.** `/formulieren/<slug>` blijft
+  gewoon werken. De affiche met de QR-code, de link in een mail en de lijst op
+  `/formulieren` mogen niet breken omdat iemand het formulier ergens ook op een
+  pagina zet.
+- **Na het versturen blijf je op de pagina staan.** De bedanking komt in het
+  paneel zelf. Doorsturen naar de bedanktpagina van het formulier haalt de
+  bezoeker weg van de pagina waar hij naartoe kwam, en dat is precies het
+  "aangeplakt"-gevoel dat we wilden vermijden.
+- **Een concept laat het paneel weg, het weigert de pagina niet.** De tekst
+  eromheen hoort er gewoon te staan. Wie het formulier beheert, ziet het concept
+  wel, met de voorbeeldmelding erbij.
+- **Koppelen is de pagina bewerken.** Vanaf beide kanten (bij de instellingen van
+  het formulier, en op de pagina zelf) geldt dezelfde regel: je hebt de
+  bewerkrechten van die pagina nodig én het beheer van dat formulier. Anders kan
+  iemand met paginarechten het concept van een andere post online zetten, of kan
+  een formulierbeheerder zijn inschrijving op een willekeurige pagina laten
+  verschijnen.
+
 ### Springen en wachtlijsten (aanvulling op de formulierenmodule)
 
 - **Springen kan enkel wanneer de secties stap voor stap komen.** Naar een
