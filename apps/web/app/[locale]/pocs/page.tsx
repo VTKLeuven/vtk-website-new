@@ -9,8 +9,6 @@ import { hasLocale } from "@/lib/locale";
 import { publicUrl } from "@/lib/storage";
 import { currentWorkingYear, formatWorkingYear, splitYearBar } from "@/lib/workingYear";
 
-import "@/app/design/vtk-home.css";
-
 /** Aantal jaren dat los in de jaarbalk staat; de rest zit achter "Archief". */
 const YEARS_IN_BAR = 5;
 
@@ -24,11 +22,6 @@ export async function generateMetadata({
   return staticMetadata("pocs", "/pocs", locale);
 }
 
-/**
- * Alle POC's, per werkingsjaar. Bewust dezelfde kaarten als de POC-band op de
- * homepage (`.poc-grid` / `.poccard` in vtk-home.css): een lid dat daar zijn
- * eigen POC ziet en hier doorklikt, hoort hetzelfde beeld te krijgen.
- */
 export default async function PocsPage({
   params,
   searchParams,
@@ -74,7 +67,17 @@ export default async function PocsPage({
   });
 
   // POC's zonder vertegenwoordigers in dit werkingsjaar worden verborgen
-  const pocs = allPocs.filter((poc) => poc.representatives.length > 0);
+  const withMembers = allPocs
+    .filter((poc) => poc.representatives.length > 0)
+    .sort((a, b) =>
+      pick(a.nameNl, a.nameEn, locale).localeCompare(
+        pick(b.nameNl, b.nameEn, locale),
+        locale
+      )
+    );
+
+  const repCount = (n: number) =>
+    n === 1 ? t.repCountOne : t.repCount.replace("{count}", String(n));
 
   return (
     <div className="vtk-page">
@@ -125,49 +128,71 @@ export default async function PocsPage({
         </div>
       </div>
 
-      <div className="vtk-page-shell">
-        {pocs.length === 0 ? (
-          <p className="text-[#5c667f]">{t.noRepresentatives}</p>
-        ) : (
-          <div className="vtk-design">
-            <div className="poc-grid" data-groups="1">
-              {pocs.map((poc) => (
-                <div className="poccard" key={poc.id}>
-                  <div className="poccard-head">
-                    <h3>{pick(poc.nameNl, poc.nameEn ?? poc.nameNl, locale)}</h3>
-                    {poc.email ? (
-                      <a className="poc-mail" href={`mailto:${poc.email}`}>
-                        {poc.email}
-                      </a>
-                    ) : null}
+      {withMembers.length === 0 ? (
+        <div className="vtk-page-shell">
+          <p className="vtk-muted">{t.noRepresentatives}</p>
+        </div>
+      ) : (
+        <section className="vtk-wall">
+          <div className="vtk-wall-inner">
+            {/* Quick jump navigatie naar de verschillende POC's */}
+            <nav className="vtk-wall-jump" aria-label={t.pocs}>
+              <span className="vtk-wall-jump-label">{t.pocs}</span>
+              {withMembers.map((poc) => (
+                <a key={poc.id} href={`#poc-${poc.slug}`}>
+                  {pick(poc.nameNl, poc.nameEn, locale)}
+                </a>
+              ))}
+            </nav>
+
+            {withMembers.map((poc) => {
+              const sorted = [...poc.representatives].sort((a, b) => {
+                if (a.order !== b.order) return a.order - b.order;
+                return a.user.name.localeCompare(b.user.name, locale);
+              });
+              return (
+                <div key={poc.id} id={`poc-${poc.slug}`} className="vtk-wall-row">
+                  <div className="vtk-wall-label">
+                    <div className="vtk-wall-label-inner">
+                      <h2>{pick(poc.nameNl, poc.nameEn, locale)}</h2>
+                      <p>{repCount(sorted.length)}</p>
+                      {poc.email ? (
+                        <a className="vtk-wall-email" href={`mailto:${poc.email}`}>
+                          {poc.email}
+                        </a>
+                      ) : null}
+                    </div>
                   </div>
-                  <ul className="poc-people">
-                    {poc.representatives.map((rep) => {
-                      const avatar = publicUrl(rep.user.avatarKey);
+                  <ul className="vtk-wall-faces">
+                    {sorted.map((rep) => {
+                      const src = publicUrl(rep.user.avatarKey);
                       return (
-                        <li key={rep.id}>
-                          <span className="poc-face">
-                            {avatar ? (
-                              // .poc-face is 64x64 (vtk-home.css); die maat meegeven
-                              // scheelt het verschil met de volledige profielfoto.
-                              <Image src={avatar} alt="" width={64} height={64} />
+                        <li key={rep.id} className="vtk-roster-cell">
+                          <div className={"vtk-roster-photo" + (src ? "" : " is-blank")}>
+                            {src ? (
+                              <Image
+                                src={src}
+                                alt={rep.user.name}
+                                width={192}
+                                height={192}
+                              />
                             ) : (
-                              <span className="poc-initial" aria-hidden="true">
+                              <div className="vtk-roster-initial" aria-hidden>
                                 {rep.user.name.slice(0, 1).toUpperCase()}
-                              </span>
+                              </div>
                             )}
-                          </span>
-                          <span className="poc-name">{rep.user.name}</span>
+                          </div>
+                          <div className="vtk-roster-name">{rep.user.name}</div>
                         </li>
                       );
                     })}
                   </ul>
                 </div>
-              ))}
-            </div>
+              );
+            })}
           </div>
-        )}
-      </div>
+        </section>
+      )}
     </div>
   );
 }

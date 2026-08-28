@@ -90,7 +90,10 @@
     "year": "Jaar",
     "archiveTo": "Archief tot {year}",
     "empty": "Nog geen POC's toegevoegd.",
-    "noRepresentatives": "Nog geen vertegenwoordigers voor dit werkingsjaar."
+    "noRepresentatives": "Nog geen vertegenwoordigers voor dit werkingsjaar.",
+    "pocs": "POC's",
+    "repCount": "{count} vertegenwoordigers",
+    "repCountOne": "1 vertegenwoordiger"
   },
   "photos": {
     "title": "Fotogalerij",

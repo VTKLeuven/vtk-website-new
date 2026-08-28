@@ -90,7 +90,10 @@
     "year": "Year",
     "archiveTo": "Archive back to {year}",
     "empty": "No POCs yet.",
-    "noRepresentatives": "No representatives for this working year yet."
+    "noRepresentatives": "No representatives for this working year yet.",
+    "pocs": "POCs",
+    "repCount": "{count} representatives",
+    "repCountOne": "1 representative"
   },
   "photos": {
     "title": "Photo gallery",
