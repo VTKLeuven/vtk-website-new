@@ -12,7 +12,15 @@ type SearchUser = { id: string; name: string; email: string; rNumber: string | n
  * voegt de gekozen persoon toe met een optionele rol (NL/EN) via
  * {@link addPocRepresentativeAction}. De picker maakt zichzelf leeg na elke submit.
  */
-export function AddRepresentativeForm({ pocId, locale }: { pocId: string; locale: "nl" | "en" }) {
+export function AddRepresentativeForm({
+  pocId,
+  year,
+  locale,
+}: {
+  pocId: string;
+  year?: number;
+  locale: "nl" | "en";
+}) {
   const nl = locale === "nl";
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<SearchUser[]>([]);
@@ -56,6 +64,7 @@ export function AddRepresentativeForm({ pocId, locale }: { pocId: string; locale
     >
       <input type="hidden" name="pocId" value={pocId} />
       <input type="hidden" name="userId" value={selected?.id ?? ""} />
+      {year !== undefined && <input type="hidden" name="year" value={year} />}
 
       <div className="relative min-w-[220px] flex-1">
         <label className="mb-1 block text-xs font-medium text-[#5c667f]">{nl ? "Persoon zoeken" : "Search person"}</label>

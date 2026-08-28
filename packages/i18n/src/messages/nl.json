@@ -85,8 +85,12 @@
     "noMembers": "Nog geen leden voor dit werkingsjaar."
   },
   "pocs": {
+    "kicker": "VTK · POC's",
     "title": "POC's",
-    "empty": "Nog geen POC's toegevoegd."
+    "year": "Jaar",
+    "archiveTo": "Archief tot {year}",
+    "empty": "Nog geen POC's toegevoegd.",
+    "noRepresentatives": "Nog geen vertegenwoordigers voor dit werkingsjaar."
   },
   "photos": {
     "title": "Fotogalerij",

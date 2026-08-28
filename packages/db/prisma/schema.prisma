@@ -2056,6 +2056,7 @@ model PocRepresentative {
   id     String  @id @default(cuid())
   pocId  String
   userId String
+  year   Int
   roleNl String?
   roleEn String?
   order  Int     @default(0)
@@ -2063,7 +2064,9 @@ model PocRepresentative {
   poc  Poc  @relation(fields: [pocId], references: [id], onDelete: Cascade)
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  @@unique([pocId, userId])
+  @@unique([pocId, userId, year])
+  @@index([pocId])
+  @@index([year])
 }
 
 // -----------------------------------------------------------------------------

@@ -9,6 +9,7 @@ import { saveError, saveOk, type SaveState } from "@/lib/saveState";
 import { describeChanges, logAudit } from "@/lib/audit";
 import { STUDY_PROGRAMMES } from "@/lib/profile";
 import { deleteObject } from "@vtk/storage";
+import { currentWorkingYear } from "@/lib/workingYear";
 
 /** `P2002` op een bepaald veld: de unieke constraint die Prisma noemt. */
 function isUniqueViolation(err: unknown, field: string): boolean {
@@ -121,20 +122,24 @@ export async function deletePocAction(formData: FormData): Promise<void> {
 const repSchema = z.object({
   pocId: z.string(),
   userId: z.string(),
+  year: z.coerce.number().int().optional(),
   order: z.coerce.number().int().default(0),
 });
 
 export async function addPocRepresentativeAction(formData: FormData): Promise<void> {
   await requirePermission("pocs.manage");
+  const rawYear = formData.get("year");
   const parsed = repSchema.parse({
     pocId: formData.get("pocId"),
     userId: formData.get("userId"),
+    year: rawYear ? Number(rawYear) : undefined,
     order: formData.get("order") || 0,
   });
+  const year = parsed.year ?? currentWorkingYear();
   await prisma.pocRepresentative.upsert({
-    where: { pocId_userId: { pocId: parsed.pocId, userId: parsed.userId } },
+    where: { pocId_userId_year: { pocId: parsed.pocId, userId: parsed.userId, year } },
     update: { order: parsed.order },
-    create: parsed,
+    create: { pocId: parsed.pocId, userId: parsed.userId, year, order: parsed.order },
   });
   const [poc, user] = await Promise.all([
     prisma.poc.findUnique({ where: { id: parsed.pocId }, select: { nameNl: true } }),

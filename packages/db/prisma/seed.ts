@@ -915,9 +915,9 @@ async function main() {
       const user = prototypeUserByEmail.get(rep.email);
       if (!user) continue;
       await prisma.pocRepresentative.upsert({
-        where: { pocId_userId: { pocId: row.id, userId: user.id } },
+        where: { pocId_userId_year: { pocId: row.id, userId: user.id, year: 2026 } },
         update: {},
-        create: { pocId: row.id, userId: user.id, order: rep.order },
+        create: { pocId: row.id, userId: user.id, year: 2026, order: rep.order },
       });
     }
   }

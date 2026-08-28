@@ -19,6 +19,7 @@ import { interestLabel, publicInterestCounts } from "@/lib/calendar/interest";
 import { resolveFrontpage } from "@/lib/frontpage/resolve";
 import { frontpagePhoto } from "@/lib/frontpage/registry";
 import { Frontpage } from "@/components/editorial/frontpage";
+import { currentWorkingYear } from "@/lib/workingYear";
 import { AftermovieGrid, type AftermovieGridItem } from "./AftermovieGrid";
 import {
   dutchDayNameForDate,
@@ -179,7 +180,11 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
           where: { studyProgrammes: { hasSome: myProgrammes } },
           orderBy: { order: "asc" },
           include: {
-            representatives: { orderBy: { order: "asc" }, include: { user: true } },
+            representatives: {
+              where: { year: currentWorkingYear(), user: { deletedAt: null } },
+              orderBy: { order: "asc" },
+              include: { user: true },
+            },
           },
         })
       : [];

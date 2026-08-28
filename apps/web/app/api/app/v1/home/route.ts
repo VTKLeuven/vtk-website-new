@@ -20,6 +20,7 @@ import {
 import { getCurrentSession } from "@/lib/session";
 import { publicUrl } from "@/lib/storage";
 import { videoEmbed } from "@/lib/videoEmbed";
+import { currentWorkingYear } from "@/lib/workingYear";
 import { entryForDate, isClosedHours, isOpenAt } from "@/components/editorial/hoursUtils";
 import {
   appLocaleFrom,
@@ -145,7 +146,13 @@ export async function GET(request: Request) {
         ? await prisma.poc.findMany({
             where: { studyProgrammes: { hasSome: programmes } },
             orderBy: { order: "asc" },
-            include: { representatives: { orderBy: { order: "asc" }, include: { user: true } } },
+            include: {
+              representatives: {
+                where: { year: currentWorkingYear(), user: { deletedAt: null } },
+                orderBy: { order: "asc" },
+                include: { user: true },
+              },
+            },
           })
         : [];
 

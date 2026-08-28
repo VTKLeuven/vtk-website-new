@@ -85,8 +85,12 @@
     "noMembers": "No members for this working year yet."
   },
   "pocs": {
+    "kicker": "VTK · POCs",
     "title": "POCs",
-    "empty": "No POCs yet."
+    "year": "Year",
+    "archiveTo": "Archive back to {year}",
+    "empty": "No POCs yet.",
+    "noRepresentatives": "No representatives for this working year yet."
   },
   "photos": {
     "title": "Photo gallery",

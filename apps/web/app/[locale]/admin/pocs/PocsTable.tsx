@@ -88,12 +88,16 @@ export type SaveLabels = {
 
 export function PocsTable({
   pocs,
+  year,
+  yearLabel,
   locale,
   saveLabels,
   createLabels,
   programmeOptions,
 }: {
   pocs: PocRow[];
+  year?: number;
+  yearLabel?: string;
   locale: "nl" | "en";
   saveLabels: SaveLabels;
   createLabels: SaveLabels;
@@ -189,6 +193,7 @@ export function PocsTable({
                 }}
                 isOpen={isOpen(poc.id)}
                 onToggle={() => toggleRow(poc.id)}
+                year={year}
                 nl={nl}
                 locale={locale}
                 saveLabels={saveLabels}
@@ -229,6 +234,7 @@ export function PocsTable({
 
 function PocRowView({
   poc,
+  year,
   isReorderable,
   isOver,
   onDragStart,
@@ -243,6 +249,7 @@ function PocRowView({
   programmeOptions,
 }: {
   poc: PocRow;
+  year?: number;
   isReorderable: boolean;
   isOver: boolean;
   onDragStart: () => void;
@@ -310,6 +317,7 @@ function PocRowView({
           <td colSpan={4} className="bg-vtk-blue-soft/20">
             <PocDetail
               poc={poc}
+              year={year}
               nl={nl}
               locale={locale}
               saveLabels={saveLabels}
@@ -324,12 +332,14 @@ function PocRowView({
 
 function PocDetail({
   poc,
+  year,
   nl,
   locale,
   saveLabels,
   programmeOptions,
 }: {
   poc: PocRow;
+  year?: number;
   nl: boolean;
   locale: "nl" | "en";
   saveLabels: SaveLabels;
@@ -380,7 +390,7 @@ function PocDetail({
               ) : (
                 <p className="text-sm text-[#5c667f]">{nl ? "Nog geen vertegenwoordigers." : "No representatives yet."}</p>
               )}
-              <AddRepresentativeForm pocId={poc.id} locale={locale} />
+              <AddRepresentativeForm pocId={poc.id} year={year} locale={locale} />
             </div>
           ) : poc.reps.length > 0 ? (
             <ul className="flex flex-wrap gap-2">
