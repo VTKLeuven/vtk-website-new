@@ -25,6 +25,7 @@
     "db:admin": "dotenv -e .env -- tsx scripts/create-local-admin.ts",
     "fixtures:export": "dotenv -e .env -- tsx scripts/export-fixtures.ts",
     "import:praesidium": "dotenv -e .env -- tsx scripts/import-praesidium-history.ts",
+    "import:pocs": "dotenv -e .env -- tsx scripts/import-poc-history.ts",
     "import:pages": "dotenv -e .env -- tsx scripts/import-pages.ts",
     "probe:elixir": "dotenv -e .env -- tsx --conditions=react-server scripts/elixir-probe.ts"
   },
