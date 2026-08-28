@@ -22,6 +22,10 @@ export async function generateMetadata({
   return staticMetadata("pocs", "/pocs", locale);
 }
 
+function displayPocName(name: string): string {
+  return name.replace(/^POC\s+/i, "").trim();
+}
+
 export default async function PocsPage({
   params,
   searchParams,
@@ -69,15 +73,11 @@ export default async function PocsPage({
   // POC's zonder vertegenwoordigers in dit werkingsjaar worden verborgen
   const withMembers = allPocs
     .filter((poc) => poc.representatives.length > 0)
-    .sort((a, b) =>
-      pick(a.nameNl, a.nameEn, locale).localeCompare(
-        pick(b.nameNl, b.nameEn, locale),
-        locale
-      )
-    );
-
-  const repCount = (n: number) =>
-    n === 1 ? t.repCountOne : t.repCount.replace("{count}", String(n));
+    .sort((a, b) => {
+      const nameA = displayPocName(pick(a.nameNl, a.nameEn, locale));
+      const nameB = displayPocName(pick(b.nameNl, b.nameEn, locale));
+      return nameA.localeCompare(nameB, locale);
+    });
 
   return (
     <div className="vtk-page">
@@ -138,11 +138,14 @@ export default async function PocsPage({
             {/* Quick jump navigatie naar de verschillende POC's */}
             <nav className="vtk-wall-jump" aria-label={t.pocs}>
               <span className="vtk-wall-jump-label">{t.pocs}</span>
-              {withMembers.map((poc) => (
-                <a key={poc.id} href={`#poc-${poc.slug}`}>
-                  {pick(poc.nameNl, poc.nameEn, locale)}
-                </a>
-              ))}
+              {withMembers.map((poc) => {
+                const name = displayPocName(pick(poc.nameNl, poc.nameEn, locale));
+                return (
+                  <a key={poc.id} href={`#poc-${poc.slug}`}>
+                    {name}
+                  </a>
+                );
+              })}
             </nav>
 
             {withMembers.map((poc) => {
@@ -150,12 +153,12 @@ export default async function PocsPage({
                 if (a.order !== b.order) return a.order - b.order;
                 return a.user.name.localeCompare(b.user.name, locale);
               });
+              const name = displayPocName(pick(poc.nameNl, poc.nameEn, locale));
               return (
                 <div key={poc.id} id={`poc-${poc.slug}`} className="vtk-wall-row">
                   <div className="vtk-wall-label">
                     <div className="vtk-wall-label-inner">
-                      <h2>{pick(poc.nameNl, poc.nameEn, locale)}</h2>
-                      <p>{repCount(sorted.length)}</p>
+                      <h2>{name}</h2>
                       {poc.email ? (
                         <a className="vtk-wall-email" href={`mailto:${poc.email}`}>
                           {poc.email}

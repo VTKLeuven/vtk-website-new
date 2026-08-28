@@ -1117,7 +1117,7 @@
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
-  margin-bottom: 10px;
+  margin-bottom: clamp(24px, 3.5vw, 36px);
 }
 
 .vtk-wall-jump-label {
@@ -1148,19 +1148,19 @@
   color: var(--ink);
 }
 
-/* Eén post per rij: de naam links in de marge, de gezichten rechts. */
+/* Eén post/POC per rij: de naam links in de marge, de gezichten rechts. */
 .vtk-wall-row {
   display: grid;
-  grid-template-columns: 158px minmax(0, 1fr);
-  gap: 28px;
-  padding: 28px 0;
+  grid-template-columns: 168px minmax(0, 1fr);
+  gap: clamp(24px, 3.5vw, 40px);
+  padding: clamp(32px, 4vw, 48px) 0;
   border-top: 1px solid var(--line-2);
   /* Zelfde marge als `.prose-vtk :is(h2, h3)`: de sticky sitekop. */
   scroll-margin-top: 96px;
 }
 
 .vtk-wall-row:first-of-type {
-  padding-top: 6px;
+  padding-top: 18px;
   border-top: 0;
 }
 
@@ -1216,8 +1216,8 @@
 @media (max-width: 820px) {
   .vtk-wall-row {
     grid-template-columns: minmax(0, 1fr);
-    gap: 14px;
-    padding: 22px 0;
+    gap: 16px;
+    padding: 24px 0;
   }
 
   /* Zonder tweede kolom is er geen marge om in mee te lopen. De telling schuift
