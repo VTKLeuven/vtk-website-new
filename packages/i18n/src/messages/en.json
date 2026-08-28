@@ -394,11 +394,11 @@
     "flowPreview": "Onboarding modals",
     "communicatie": "Communication",
     "dashboardOverview": "Overview",
+    "overig": "Other",
     "pinned": "Pinned",
     "allTabs": "All",
     "pinTab": "Pin",
     "unpinTab": "Unpin",
-    "pinnedEmpty": "Pin the tabs you use often; they show up here at the top.",
     "pinError": "Could not pin this tab. Please try again."
   },
   "confirmStudy": {

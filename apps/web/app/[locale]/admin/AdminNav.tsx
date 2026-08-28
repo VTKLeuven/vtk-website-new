@@ -13,7 +13,6 @@ export type PinLabels = {
   all: string;
   pin: string;
   unpin: string;
-  empty: string;
   error: string;
 };
 
@@ -521,6 +520,14 @@ const icons: Record<string, ReactNode> = {
       <path d="M3 21h18" />
       <path d="M6 21V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v17" />
       <path d="M14 12h.01" />
+    </Svg>
+  ),
+  // overig: overige modules voor IT en G5
+  overig: (
+    <Svg>
+      <circle cx="12" cy="12" r="1.5" fill="currentColor" />
+      <circle cx="19" cy="12" r="1.5" fill="currentColor" />
+      <circle cx="5" cy="12" r="1.5" fill="currentColor" />
     </Svg>
   ),
 };

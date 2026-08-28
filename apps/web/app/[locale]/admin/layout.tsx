@@ -7,7 +7,7 @@ import { getDictionary, type Locale } from '@vtk/i18n';
 import { canAccessAnyTicketEvent } from '@/lib/ticketing/authorization';
 import { canAccessAnyForm } from '@/lib/forms/authorization';
 import { isExternalUrl } from '@/lib/href';
-import { NAV, type NavGuard, type NavLeaf } from '@/lib/admin-nav';
+import { getAdminNav, type NavGuard, type NavLeaf } from '@/lib/admin-nav';
 import { AdminNav, type NavItem, type NavNode } from './AdminNav';
 
 import '@/app/design/vtk-admin.css';
@@ -79,10 +79,21 @@ export default async function AdminLayout({
     exact: leaf.exact,
   });
 
-  // Bouw de zichtbare nav. De volgorde staat vast in NAV (lib/admin-nav.ts), ook
-  // binnen een groep; er wordt hier niet meer gesorteerd. Zie de uitleg daar.
+  // Is de huidige gebruiker lid van IT of Groep 5 (of superadmin)?
+  // Enkel voor IT en G5 worden Fakscanner en Theokot onder een tabje "Overig" gegroepeerd.
+  const isItOrG5 =
+    session.user.isSuperAdmin ||
+    session.groups.some(
+      (g) =>
+        ['IT', 'GROEP5', 'G5'].includes(g.code.toUpperCase()) ||
+        ['it', 'groep-5', 'g5'].includes(g.slug.toLowerCase())
+    );
+
+  // Bouw de zichtbare nav. De volgorde staat vast in admin-nav.ts, ook
+  // binnen een groep; er wordt hier niet meer gesorteerd.
   const nodes: NavNode[] = [];
-  for (const entry of NAV) {
+  const nav = getAdminNav({ isItOrG5 });
+  for (const entry of nav) {
     if ('group' in entry) {
       const items = entry.items.filter(canSee).map(toItem);
       // Een groep waarvan je maar één item mag zien, is een klik om niets: toon
@@ -120,7 +131,6 @@ export default async function AdminLayout({
               all: adminDict.allTabs,
               pin: adminDict.pinTab,
               unpin: adminDict.unpinTab,
-              empty: adminDict.pinnedEmpty,
               error: adminDict.pinError,
             }}
           />

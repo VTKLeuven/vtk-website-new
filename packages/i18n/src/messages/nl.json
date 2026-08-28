@@ -394,11 +394,11 @@
     "flowPreview": "Onboarding-modals",
     "communicatie": "Communicatie",
     "dashboardOverview": "Overzicht",
+    "overig": "Overig",
     "pinned": "Vastgepind",
     "allTabs": "Alles",
     "pinTab": "Vastpinnen",
     "unpinTab": "Losmaken",
-    "pinnedEmpty": "Pin de tabs die je vaak gebruikt met het speldje; ze komen dan hier bovenaan.",
     "pinError": "Vastpinnen is niet gelukt. Probeer het opnieuw."
   },
   "confirmStudy": {

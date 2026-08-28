@@ -16,9 +16,10 @@
 // label gesorteerd). De regel is nu: eerst de domeinen, dan de modules die één
 // post beheert, en IT achteraan.
 //
-// Een module die één post dagelijks gebruikt (Theokot, Piano, Fakscanner,
-// Grocomeet) blijft bewust een los item. In een groep gestopt moeten net de
-// mensen die er het meest inzitten er elke keer naar zoeken.
+// Een module die één post dagelijks gebruikt (Theokot, Fakscanner, Grocomeet)
+// blijft voor die post bewust een los item. Voor IT en Groep 5 (die alle rechten
+// hebben en anders een overvolle balk zien) worden Fakscanner en Theokot
+// gebundeld onder "Overig".
 // -----------------------------------------------------------------------------
 
 export type NavGuard = {
@@ -52,108 +53,126 @@ export function logisticsModuleUrl(): string {
   return process.env.NODE_ENV === 'development' ? 'http://localhost:3100' : 'https://logistiek.dev.vtk.be';
 }
 
-export const NAV: NavEntry[] = [
-  // Het dashboard is een groep omdat de tegels erop door elke post aangepast
-  // kunnen worden; dat scherm hoort bij het dashboard, niet bij IT.
-  group('dashboard', [
-    item('dashboardOverview', '', { exact: true }),
-    item('dashboardTiles', '/dashboard-tiles'),
-  ]),
-  // Alles wat een bezoeker op de site ziet, plus de twee dingen die je daar
-  // publiceert zonder dat er per se een evenement aan hangt: formulieren en
-  // shiften.
-  group('website', [
-    item('home', '/home', { perm: 'home.edit' }),
-    item('frontpage', '/frontpage', { perm: 'home.edit' }),
-    item('openingHours', '/openingsuren', { perm: 'openingHours.manageOwn' }),
-    item('announcements', '/aankondigingen', { perm: 'home.edit' }),
-    item('linkPage', '/linkpagina', { perm: 'home.edit' }),
-    item('header', '/header', { perm: 'pages.manage' }),
-    item('pages', '/paginas', { anyPerm: ['pages.edit', 'pages.editAll'] }),
-    item('partners', '/partners', { perm: 'partners.manage' }),
-    item('shortlinks', '/links', { perm: 'shortlinks.manage' }),
-    item('forms', '/formulieren', { forms: true }),
-    item('shift', '/shiften', { anyPerm: ['shift.edit', 'shift.reward', 'shift.ranking'] }),
-  ]),
-  // Eén evenement is één ding voor wie het organiseert: je plant het in en je
-  // verkoopt er tickets voor.
-  group('evenementen', [
-    item('calendar', '/kalender', { perm: 'calendar.create' }),
-    item('tickets', '/tickets', { ticketing: true }),
-  ]),
-  group('ledenbeheer', [
-    item('users', '/gebruikers', { perm: 'users.view' }),
-    item('groups', '/groepen', { perm: 'groups.manage' }),
-    item('werkgroepen', '/werkgroepen', { werkgroep: true }),
-    item('roles', '/roles', { perm: 'roles.manage' }),
-    // Alumni is een adresboek per lichting, geen opt-in mailinglijst: een
-    // afgestudeerde geeft per definitie nooit meer een studiebevestiging van
-    // dit werkingsjaar. Daarom hier en niet bij Communicatie.
-    item('alumni', '/alumni', { perm: 'alumni.manage' }),
-    item('kiesploeg', '/kiesploeg', { perm: 'kiesploeg.manage' }),
-  ]),
-  // Alles wat de kring naar buiten stuurt, en het beeld dat ze publiceert.
-  group('communicatie', [
-    // Twee dingen die allebei "mailinglijst" heten en bewust naast elkaar
-    // staan zodat wie het ene zoekt het andere ziet: de opt-in nieuwsbrieven
-    // naar studenten (export + Brevo), en de eigen adressen van de kring
-    // (activiteiten@vtk.be) die de posten van dit werkingsjaar volgen.
-    item('mailinglists', '/mailinglijsten', { perm: 'mailinglists.export' }),
-    item('mailGroups', '/groepsadressen', { perm: 'mailgroups.manage' }),
-    item('appPush', '/app-push', { perm: 'app.push' }),
-    // Fotoalbums hebben één ingang: /admin/media. Daar staat de Immich-galerij,
-    // en dat is de enige bron die de publieke mediapagina leest.
-    item('media', '/media', { anyPerm: ['media.manage', 'photos.manageAlbums'] }),
-  ]),
-  // Wat VTK Onderwijs beheert hangt samen: de POC's zijn de studenten die de
-  // opleiding vertegenwoordigen, het bureau is hun vergadering, en de
-  // lesbezoeken lopen via dezelfde post.
-  group('onderwijs', [
-    item('pocs', '/pocs', { perm: 'pocs.manage' }),
-    item('bureau', '/bureau', { perm: 'bureau.manage' }),
-    item('lesbezoeken', '/lesbezoeken', {
-      anyPerm: ['lesbezoeken.view', 'lesbezoeken.manage'],
-    }),
-  ]),
+export type AdminNavOptions = {
+  /** Enkel voor IT en Groep 5: zet Fakscanner en Theokot in een groep "Overig". */
+  isItOrG5?: boolean;
+};
 
-  // ---------------------------------------------------------------------------
-  // Losse modules: elk van één post, of van iedereen. Geen groep eromheen, zie
-  // de uitleg bovenaan. Onderling alfabetisch.
-  // ---------------------------------------------------------------------------
-  item('fakscanner', '/fakscanner', { perm: 'fakscanner.manage' }),
-  item('grocomeet', '/grocomeet', { perm: 'grocomeet.manage' }),
-  // Iedereen die kan inloggen kan een materiaal- of vervoeraanvraag indienen.
-  // Daarom staat de ingang niet achter de beheerpermissie van de post.
-  item('logistics', logisticsModuleUrl()),
-  item('piano', '/piano', { perm: 'piano.manage' }),
-  // Rekeningen (het oude billsheet). Indienen mag elk praesidiumlid, dus de tab
-  // hangt niet enkel aan de beheerpermissies; zelfde redenering als Logistiek.
-  item('expenses', '/rekeningen', {
-    anyPerm: ['expenses.submit', 'expenses.managePost', 'expenses.manage'],
-  }),
-  item('theokot', '/theokot', { anyPerm: ['theokot.manage', 'theokot.pickup'] }),
-  // Wachtwoorden staat los van de IT-groep: een postverantwoordelijke beheert de
-  // wachtwoorden van zijn eigen post en hoort daarvoor niet in een IT-map te
-  // moeten zoeken. Het kluisbeheer zelf (posten koppelen, configuratie) staat wel
-  // onder IT.
-  item('vault', '/wachtwoorden', { anyPerm: ['vault.editOwn', 'vault.manage'] }),
+export function getAdminNav({ isItOrG5 = false }: AdminNavOptions = {}): NavEntry[] {
+  const fakscannerItem = item('fakscanner', '/fakscanner', { perm: 'fakscanner.manage' });
+  const theokotItem = item('theokot', '/theokot', { anyPerm: ['theokot.manage', 'theokot.pickup'] });
 
-  group('it', [
-    // `exact`, anders licht Configuratie (/admin/it) ook op wanneer je op de
-    // onderliggende /admin/it/preview staat.
-    item('itConfig', '/it', { superAdminOnly: true, exact: true }),
-    item('vaultAdmin', '/wachtwoorden/beheer', { perm: 'vault.manage' }),
-    item('auditLog', '/it/logboek', { perm: 'audit.view' }),
-    item('door', '/deur', { perm: 'door.manage' }),
-    item('sso', '/sso', { perm: 'oauth.client.edit' }),
-    item('kulSso', '/it/kul-sso', { superAdminOnly: true }),
-    item('authorizationPreview', '/it/preview', { superAdminOnly: true }),
-    // De onboarding en de jaarlijkse bevestiging zie je maar één keer; zonder
-    // deze pagina is er geen manier om te controleren of ze nog kloppen.
-    item('flowPreview', '/it/flows', { superAdminOnly: true }),
-    item('urenloopApp', '/it/24ul-app', { perm: 'urenloopApp.manage' }),
-  ]),
-];
+  const looseOrOverig: NavEntry[] = isItOrG5
+    ? [
+        item('grocomeet', '/grocomeet', { perm: 'grocomeet.manage' }),
+        item('logistics', logisticsModuleUrl()),
+        item('expenses', '/rekeningen', {
+          anyPerm: ['expenses.submit', 'expenses.managePost', 'expenses.manage'],
+        }),
+        item('vault', '/wachtwoorden', { anyPerm: ['vault.editOwn', 'vault.manage'] }),
+        group('overig', [fakscannerItem, theokotItem]),
+      ]
+    : [
+        fakscannerItem,
+        item('grocomeet', '/grocomeet', { perm: 'grocomeet.manage' }),
+        item('logistics', logisticsModuleUrl()),
+        item('expenses', '/rekeningen', {
+          anyPerm: ['expenses.submit', 'expenses.managePost', 'expenses.manage'],
+        }),
+        theokotItem,
+        item('vault', '/wachtwoorden', { anyPerm: ['vault.editOwn', 'vault.manage'] }),
+      ];
+
+  return [
+    // Het dashboard is een groep omdat de tegels erop door elke post aangepast
+    // kunnen worden; dat scherm hoort bij het dashboard, niet bij IT.
+    group('dashboard', [
+      item('dashboardOverview', '', { exact: true }),
+      item('dashboardTiles', '/dashboard-tiles'),
+    ]),
+    // Alles wat een bezoeker op de site ziet, plus de dingen die je daar
+    // publiceert zonder dat er per se een evenement aan hangt (formulieren,
+    // shiften en piano).
+    group('website', [
+      item('home', '/home', { perm: 'home.edit' }),
+      item('frontpage', '/frontpage', { perm: 'home.edit' }),
+      item('openingHours', '/openingsuren', { perm: 'openingHours.manageOwn' }),
+      item('announcements', '/aankondigingen', { perm: 'home.edit' }),
+      item('linkPage', '/linkpagina', { perm: 'home.edit' }),
+      item('header', '/header', { perm: 'pages.manage' }),
+      item('pages', '/paginas', { anyPerm: ['pages.edit', 'pages.editAll'] }),
+      item('partners', '/partners', { perm: 'partners.manage' }),
+      item('shortlinks', '/links', { perm: 'shortlinks.manage' }),
+      item('forms', '/formulieren', { forms: true }),
+      item('shift', '/shiften', { anyPerm: ['shift.edit', 'shift.reward', 'shift.ranking'] }),
+      item('piano', '/piano', { perm: 'piano.manage' }),
+    ]),
+    // Eén evenement is één ding voor wie het organiseert: je plant het in en je
+    // verkoopt er tickets voor.
+    group('evenementen', [
+      item('calendar', '/kalender', { perm: 'calendar.create' }),
+      item('tickets', '/tickets', { ticketing: true }),
+    ]),
+    group('ledenbeheer', [
+      item('users', '/gebruikers', { perm: 'users.view' }),
+      item('groups', '/groepen', { perm: 'groups.manage' }),
+      item('werkgroepen', '/werkgroepen', { werkgroep: true }),
+      item('roles', '/roles', { perm: 'roles.manage' }),
+      // Alumni is een adresboek per lichting, geen opt-in mailinglijst: een
+      // afgestudeerde geeft per definitie nooit meer een studiebevestiging van
+      // dit werkingsjaar. Daarom hier en niet bij Communicatie.
+      item('alumni', '/alumni', { perm: 'alumni.manage' }),
+      item('kiesploeg', '/kiesploeg', { perm: 'kiesploeg.manage' }),
+    ]),
+    // Alles wat de kring naar buiten stuurt, en het beeld dat ze publiceert.
+    group('communicatie', [
+      // Twee dingen die allebei "mailinglijst" heten en bewust naast elkaar
+      // staan zodat wie het ene zoekt het andere ziet: de opt-in nieuwsbrieven
+      // naar studenten (export + Brevo), en de eigen adressen van de kring
+      // (activiteiten@vtk.be) die de posten van dit werkingsjaar volgen.
+      item('mailinglists', '/mailinglijsten', { perm: 'mailinglists.export' }),
+      item('mailGroups', '/groepsadressen', { perm: 'mailgroups.manage' }),
+      item('appPush', '/app-push', { perm: 'app.push' }),
+      // Fotoalbums hebben één ingang: /admin/media. Daar staat de Immich-galerij,
+      // en dat is de enige bron die de publieke mediapagina leest.
+      item('media', '/media', { anyPerm: ['media.manage', 'photos.manageAlbums'] }),
+    ]),
+    // Wat VTK Onderwijs beheert hangt samen: de POC's zijn de studenten die de
+    // opleiding vertegenwoordigen, het bureau is hun vergadering, en de
+    // lesbezoeken lopen via dezelfde post.
+    group('onderwijs', [
+      item('pocs', '/pocs', { perm: 'pocs.manage' }),
+      item('bureau', '/bureau', { perm: 'bureau.manage' }),
+      item('lesbezoeken', '/lesbezoeken', {
+        anyPerm: ['lesbezoeken.view', 'lesbezoeken.manage'],
+      }),
+    ]),
+
+    // ---------------------------------------------------------------------------
+    // Losse modules: elk van één post, of van iedereen. Onderling alfabetisch.
+    // Voor IT en G5 worden Fakscanner en Theokot in de overig-groep geplaatst.
+    // ---------------------------------------------------------------------------
+    ...looseOrOverig,
+
+    group('it', [
+      // `exact`, anders licht Configuratie (/admin/it) ook op wanneer je op de
+      // onderliggende /admin/it/preview staat.
+      item('itConfig', '/it', { superAdminOnly: true, exact: true }),
+      item('vaultAdmin', '/wachtwoorden/beheer', { perm: 'vault.manage' }),
+      item('auditLog', '/it/logboek', { perm: 'audit.view' }),
+      item('door', '/deur', { perm: 'door.manage' }),
+      item('sso', '/sso', { perm: 'oauth.client.edit' }),
+      item('kulSso', '/it/kul-sso', { superAdminOnly: true }),
+      item('authorizationPreview', '/it/preview', { superAdminOnly: true }),
+      // De onboarding en de jaarlijkse bevestiging zie je maar één keer; zonder
+      // deze pagina is er geen manier om te controleren of ze nog kloppen.
+      item('flowPreview', '/it/flows', { superAdminOnly: true }),
+      item('urenloopApp', '/it/24ul-app', { perm: 'urenloopApp.manage' }),
+    ]),
+  ];
+}
+
+export const NAV: NavEntry[] = getAdminNav();
 
 /**
  * Elke tab-key die bestaat. De pin-action toetst hieraan, zodat er geen

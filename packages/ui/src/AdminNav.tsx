@@ -35,8 +35,6 @@ export type AdminNavPins = {
     pin: string;
     /** Tooltip op het speldje van een vastgepinde tab. */
     unpin: string;
-    /** Uitleg onder de lege vastgepind-sectie. */
-    empty: string;
   };
 };
 
@@ -260,23 +258,20 @@ function PinnedSection({
   // Een pin op een tab die je niet (meer) mag zien, slaan we over in plaats van
   // ze te verwijderen: rechten kunnen volgend werkingsjaar terugkomen.
   const items = state.keys.map((key) => byKey.get(key)).filter((item): item is AdminNavItem => !!item);
+  if (items.length === 0) return null;
 
   return (
     <div className="vtk-admin-nav-pinned">
       <p className="vtk-admin-nav-section">{pins.labels.section}</p>
-      {items.length === 0 ? (
-        <p className="vtk-admin-nav-pinned-empty">{pins.labels.empty}</p>
-      ) : (
-        items.map((item) => (
-          <NavLink
-            key={item.key}
-            item={item}
-            active={isActive(pathname, item)}
-            icons={icons}
-            pin={{ pins, state }}
-          />
-        ))
-      )}
+      {items.map((item) => (
+        <NavLink
+          key={item.key}
+          item={item}
+          active={isActive(pathname, item)}
+          icons={icons}
+          pin={{ pins, state }}
+        />
+      ))}
       <p className="vtk-admin-nav-section vtk-admin-nav-section-all">{pins.labels.all}</p>
     </div>
   );

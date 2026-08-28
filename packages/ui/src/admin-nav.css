@@ -138,15 +138,6 @@
   border-top: 1px solid var(--line);
 }
 
-.vtk-admin-nav-pinned-empty {
-  margin: 0 0 2px;
-  padding: 2px 11px 6px;
-  color: var(--muted);
-  font-size: 12px;
-  line-height: 1.35;
-  white-space: normal;
-}
-
 .vtk-admin-nav-pin {
   appearance: none;
   flex: none;
