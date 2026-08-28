@@ -1152,15 +1152,15 @@
 .vtk-wall-row {
   display: grid;
   grid-template-columns: 168px minmax(0, 1fr);
-  gap: clamp(24px, 3.5vw, 40px);
-  padding: clamp(32px, 4vw, 48px) 0;
+  gap: clamp(22px, 2.5vw, 32px);
+  padding: clamp(28px, 3vw, 36px) 0;
   border-top: 1px solid var(--line-2);
   /* Zelfde marge als `.prose-vtk :is(h2, h3)`: de sticky sitekop. */
   scroll-margin-top: 96px;
 }
 
 .vtk-wall-row:first-of-type {
-  padding-top: 18px;
+  padding-top: 12px;
   border-top: 0;
 }
 
