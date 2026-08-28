@@ -72,7 +72,25 @@
   }
 }
 
+/* De rij draagt de achtergrond, niet de link: het speldje staat ernaast (een
+   knop in een <a> is ongeldige HTML) en moet mee oplichten. */
+.vtk-admin-nav-row {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  border-radius: 999px;
+  min-width: 0;
+}
+
+.vtk-admin-nav-row:hover,
+.vtk-admin-nav-row:focus-within,
+.vtk-admin-nav-row.is-active {
+  background: var(--paper-2);
+}
+
 .vtk-admin-nav a {
+  flex: 1;
+  min-width: 0;
   padding: 9px 11px;
   border-radius: 999px;
   color: rgba(10, 15, 31, 0.72);
@@ -82,15 +100,93 @@
   font-weight: 500;
 }
 
+.vtk-admin-nav a span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.vtk-admin-nav-row:hover a,
 .vtk-admin-nav a:hover {
-  background: var(--paper-2);
   color: var(--ink);
 }
 
 .vtk-admin-nav a.is-active {
-  background: var(--paper-2);
   color: var(--ink);
   font-weight: 600;
+}
+
+/* Vastgepinde tabs, bovenaan de lijst. */
+.vtk-admin-nav-pinned {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.vtk-admin-nav-section {
+  margin: 2px 0 4px;
+  padding: 0 11px;
+  color: var(--muted);
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.vtk-admin-nav-section-all {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
+}
+
+.vtk-admin-nav-pinned-empty {
+  margin: 0 0 2px;
+  padding: 2px 11px 6px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.35;
+  white-space: normal;
+}
+
+.vtk-admin-nav-pin {
+  appearance: none;
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  margin-right: 4px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  /* Onzichtbaar tot je de rij aanraakt: veertien speldjes naast elkaar zijn
+     ruis. Een vastgepinde tab toont het speldje wel altijd, anders is er geen
+     manier om te zien dat je hem kan losmaken. */
+  opacity: 0;
+}
+
+.vtk-admin-nav-row:hover .vtk-admin-nav-pin,
+.vtk-admin-nav-pin:focus-visible,
+.vtk-admin-nav-pin.is-pinned {
+  opacity: 1;
+}
+
+.vtk-admin-nav-pin:hover {
+  background: rgba(14, 26, 54, 0.09);
+  color: var(--ink);
+}
+
+.vtk-admin-nav-pin.is-pinned {
+  color: var(--accent-2, #edbd22);
+}
+
+/* Zonder hover (touch) is een speldje dat pas bij hoveren verschijnt niet te
+   vinden; toon ze daar altijd. */
+@media (hover: none) {
+  .vtk-admin-nav-pin {
+    opacity: 1;
+  }
 }
 
 .vtk-admin-nav-group {

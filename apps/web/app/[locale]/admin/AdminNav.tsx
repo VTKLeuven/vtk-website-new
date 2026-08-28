@@ -2,12 +2,63 @@
 
 import { AdminNav as SharedAdminNav, type AdminNavItem, type AdminNavNode } from '@vtk/ui';
 import type { ReactNode } from 'react';
+import { toggleAdminNavPinAction } from '@/app/actions/admin-nav';
+import { useToast } from '@/components/ui/toast';
 
 export type NavItem = AdminNavItem;
 export type NavNode = AdminNavNode;
 
-export function AdminNav({ title, nodes }: { title: string; nodes: NavNode[] }) {
-  return <SharedAdminNav title={title} nodes={nodes} icons={icons} />;
+export type PinLabels = {
+  section: string;
+  all: string;
+  pin: string;
+  unpin: string;
+  empty: string;
+  error: string;
+};
+
+export function AdminNav({
+  title,
+  nodes,
+  pinnedKeys,
+  pinLabels,
+}: {
+  title: string;
+  nodes: NavNode[];
+  pinnedKeys: string[];
+  pinLabels: PinLabels;
+}) {
+  const showToast = useToast();
+  const { error, ...labels } = pinLabels;
+
+  return (
+    <SharedAdminNav
+      title={title}
+      nodes={nodes}
+      icons={icons}
+      pins={{
+        keys: pinnedKeys,
+        labels,
+        // Het speldje meldt zijn succes door de tab zichtbaar te verplaatsen;
+        // enkel een mislukking heeft een toast nodig (zie CLAUDE.md).
+        // Gooien is het sein aan de nav om de pin terug te zetten; de melding
+        // is hier al getoond.
+        onToggle: async (key, pinned) => {
+          let result;
+          try {
+            result = await toggleAdminNavPinAction(key, pinned);
+          } catch (cause) {
+            showToast({ message: error, variant: 'error', duration: 0 });
+            throw cause;
+          }
+          if (result.status === 'error') {
+            showToast({ message: error, variant: 'error', duration: 0 });
+            throw new Error(`admin nav pin failed: ${result.code}`);
+          }
+        },
+      }}
+    />
+  );
 }
 
 function Svg({ children }: { children: ReactNode }) {
@@ -38,6 +89,23 @@ const icons: Record<string, ReactNode> = {
       <path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20" />
       <circle cx="12" cy="9" r="2" />
       <path d="M9.5 15a2.5 2.5 0 0 1 5 0" />
+    </Svg>
+  ),
+  // dashboardOverview: de landingspagina zelf, binnen de dashboardgroep
+  dashboardOverview: (
+    <Svg>
+      <rect x="3" y="3" width="7" height="9" rx="1" />
+      <rect x="14" y="3" width="7" height="5" rx="1" />
+      <rect x="14" y="12" width="7" height="9" rx="1" />
+      <rect x="3" y="16" width="7" height="5" rx="1" />
+    </Svg>
+  ),
+  // communicatie: megafoon; alles wat de kring naar buiten stuurt
+  communicatie: (
+    <Svg>
+      <path d="M3 11v2a1 1 0 0 0 1 1h2l4 4V6L6 10H4a1 1 0 0 0-1 1Z" />
+      <path d="M14 8a4 4 0 0 1 0 8" />
+      <path d="M17 5a8 8 0 0 1 0 14" />
     </Svg>
   ),
   // dashboard: overzichtstegels (landing page)

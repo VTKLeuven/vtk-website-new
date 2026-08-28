@@ -391,7 +391,15 @@
     "lesbezoeken": "Lesbezoeken",
     "onderwijs": "Onderwijs",
     "alumni": "Alumni",
-    "flowPreview": "Onboarding & bevestiging"
+    "flowPreview": "Onboarding-modals",
+    "communicatie": "Communicatie",
+    "dashboardOverview": "Overzicht",
+    "pinned": "Vastgepind",
+    "allTabs": "Alles",
+    "pinTab": "Vastpinnen",
+    "unpinTab": "Losmaken",
+    "pinnedEmpty": "Pin de tabs die je vaak gebruikt met het speldje; ze komen dan hier bovenaan.",
+    "pinError": "Vastpinnen is niet gelukt. Probeer het opnieuw."
   },
   "confirmStudy": {
     "title": "Klopt je studie nog?",

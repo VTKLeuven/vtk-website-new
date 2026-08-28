@@ -607,6 +607,7 @@ model User {
   createdEvents        CalendarEvent[]         @relation("EventCreatedBy")
   dashboardTiles       DashboardTile[]
   dashboardTilePrefs   UserDashboardTilePref[]
+  adminNavPins         UserAdminNavPin[]
   participatingShifts  ShiftParticipant[]
   createdShortLinks    ShortLink[]             @relation("ShortLinkCreatedBy")
   alumniContacts       AlumniContact[]         @relation("AlumniContactCreatedBy")
@@ -2140,6 +2141,21 @@ model UserDashboardTilePref {
   tile DashboardTile @relation(fields: [tileId], references: [id], onDelete: Cascade)
 
   @@id([userId, tileId])
+  @@index([userId])
+}
+
+// Vastgepinde admin-tabs per gebruiker. Gekeyd op de nav-`key` uit
+// lib/admin-nav.ts en niet op het pad: een tab die later verhuist houdt zo zijn
+// pin. Een pin op een tab die de gebruiker niet (meer) mag zien, rendert
+// gewoon niet; de rij mag blijven staan tot hij het recht terugkrijgt.
+model UserAdminNavPin {
+  userId String
+  key    String
+  order  Int    @default(0)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([userId, key])
   @@index([userId])
 }
 

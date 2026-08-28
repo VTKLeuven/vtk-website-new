@@ -391,7 +391,15 @@
     "lesbezoeken": "Classroom visits",
     "onderwijs": "Education",
     "alumni": "Alumni",
-    "flowPreview": "Onboarding & confirmation"
+    "flowPreview": "Onboarding modals",
+    "communicatie": "Communication",
+    "dashboardOverview": "Overview",
+    "pinned": "Pinned",
+    "allTabs": "All",
+    "pinTab": "Pin",
+    "unpinTab": "Unpin",
+    "pinnedEmpty": "Pin the tabs you use often; they show up here at the top.",
+    "pinError": "Could not pin this tab. Please try again."
   },
   "confirmStudy": {
     "title": "Are your studies still up to date?",

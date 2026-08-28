@@ -4664,3 +4664,75 @@ de terugknop werkt, en de lijst met tienduizend rijen overweg kan.
 Supabase-verbruik met een waarschuwing bij 80% van 1 GB, want daarboven werd het
 hele project geblokkeerd. De objectopslag van de site heeft dat quotum niet, dus
 het cijfer staat er nog als informatie en niet meer als alarm.
+
+## Admin-navigatie: domeinen, losse modules en vastgepinde tabs
+
+De zijbalk van `/admin` telde tweeëntwintig rijen voor wie alles mag zien (IT en
+Groep 5), en dat is de ingeklapte stand: volledig open waren het er negenveertig.
+Zeventien van die tweeëntwintig waren losse items zonder groep, vijf waren
+groepen, en alles stond door elkaar alfabetisch. Het probleem was niet de lengte
+maar de ontbrekende regel: je kon niet voorspellen waar iets stond.
+
+**De volgorde staat nu vast in `apps/web/lib/admin-nav.ts` en er wordt niet meer
+gesorteerd.** Ook niet binnen een groep. Alfabetisch sorteren zette een map met
+tien schermen (IT) tussen twee losse tools, en omdat er op het *vertaalde* label
+gesorteerd werd, kreeg dezelfde persoon een andere zijbalk zodra hij naar Engels
+wisselde. Een vaste volgorde lost allebei op en laat toe om de vijf schermen die
+samen de homepagina beschrijven ook naast elkaar te zetten.
+
+**Een module die één post dagelijks gebruikt, blijft een los item.** Dit is de
+belangrijkste uitzondering op "alles in een domein". Theokot, Piano, Fakscanner
+en Grocomeet in een groep "Diensten" stoppen betekent dat net de mensen die er
+het meest inzitten er elke keer naar moeten zoeken; de winst van een kortere
+lijst gaat dan naar de mensen die die tab toch nooit openen. Rekeningen,
+Wachtwoorden en Logistiek staan om dezelfde reden los: die gebruikt iedereen
+rechtstreeks. Gevolg: zeven domeinen plus zeven losse modules, veertien rijen.
+
+**Een groep met een vage naam is erger dan geen groep.** Er stond even een groep
+"Werking" met Rekeningen, Wachtwoorden en Logistiek erin. Die is geschrapt: je
+wist niet wat erin zat tot je hem opendeed, en dan is een groep enkel een extra
+klik.
+
+**Waar de twijfelgevallen terechtkwamen, en waarom.**
+
+- *Forms en Shiften* staan bij Website, niet bij Evenementen. Ze hangen niet
+  altijd aan een evenement; een formulier of een shift kan evengoed op zichzelf
+  staan.
+- *Media* staat bij Communicatie, samen met de mailinglijsten, de groepsadressen
+  en de app-pushberichten. Dat is wat de kring naar buiten brengt.
+  *App-pushberichten* stond onder IT, maar wie een pushbericht stuurt doet
+  communicatie, geen systeembeheer.
+- *Dashboard* is een groep met Overzicht en Dashboardtegels. Die tegels kan elke
+  post aanpassen, dus ze horen bij het dashboard en niet bij IT.
+- *Alumni* staat bij Ledenbeheer en niet bij Communicatie: het is een adresboek
+  per lichting, geen opt-in lijst. Een afgestudeerde geeft per definitie nooit
+  meer een studiebevestiging van dit werkingsjaar. Zie ook de drie dingen die
+  "mailinglijst" heten, hierboven.
+- *Wachtwoorden* blijft los van IT, om dezelfde reden als vroeger: een
+  postverantwoordelijke beheert de wachtwoorden van zijn eigen post en hoort
+  daarvoor niet in een IT-map te moeten kijken. Het kluisbeheer zelf staat er wel
+  onder.
+
+**Een groep waarvan je maar één item mag zien, rendert als los item.** Anders
+betaalt de meerderheid, die drie tabs ziet, een klik voor een indeling die enkel
+IT en Groep 5 nodig hebben.
+
+### Vastgepinde tabs
+
+Elke gebruiker kan tabs vastpinnen (`UserAdminNavPin`), en die staan dan bovenaan
+onder "Vastgepind", met de volledige lijst er standaard open onder. IT en Groep 5
+hebben een ander dagelijks lijstje dan de rest, en dit is het enige deel van de
+indeling dat dat verschil erkent. Hetzelfde idee als de dashboardtegels, die ook
+al per gebruiker te schikken zijn.
+
+- **Er wordt op de tab-key gepind, niet op het pad.** Verhuist een scherm later
+  naar een ander pad, dan blijft de pin staan.
+- **Een pin op een tab die je niet meer mag zien, blijft bewaard.** Hij rendert
+  gewoon niet. Rechten zijn werkingsjaar-gescoped; wie zijn post volgend jaar
+  terugkrijgt, krijgt ook zijn pin terug.
+- **Het verplaatsen van de tab is de bevestiging, dus geen toast bij succes.**
+  Enkel als het opslaan mislukt komt er een rode toast en springt de pin terug.
+  Dat is de uitzondering op de regel dat opslaan altijd zijn uitkomst meldt: hier
+  is de uitkomst zichtbaar in de zijbalk zelf.
+- **De volledige lijst staat er open onder, niet ingeklapt.** Anders vallen
+  nieuwe tabs niet meer op bij wie enkel nog naar zijn pins kijkt.
