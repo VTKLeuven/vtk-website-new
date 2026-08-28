@@ -17,7 +17,7 @@ import {
   getSchedulePresets,
   LESBEZOEK_STATUSES,
   LESBEZOEK_STATUS_META,
-  type SchedulePreset,
+  nudgeCountdownLabel,
 } from "@/lib/lesbezoeken";
 import {
   DEFAULT_LESBEZOEK_TEMPLATE_ITEMS,
@@ -162,6 +162,10 @@ export function LesbezoekInspector({
 
         {/* Waarschuwingen bovenaan */}
         <Warnings nl={nl} visit={visit} />
+
+        {visit.needsNudge && canManage && (
+          <NudgeBanner nl={nl} visit={visit} onCompose={() => setActiveTab("mail")} />
+        )}
 
         {/* Eventuele geplande mails */}
         <ScheduledMailBanner nl={nl} visit={visit} canManage={canManage} />
@@ -465,6 +469,59 @@ function Warnings({ nl, visit }: { nl: boolean; visit: VisitView }) {
   );
 }
 
+/**
+ * "Het lesbezoek komt dichterbij, tijd voor een herinnering."
+ *
+ * De vraag ligt bij de docent, hij antwoordde nog niet, en het moment nadert.
+ * Dat is precies het punt waarop het in de Sheet misliep: niemand ziet dat een
+ * rij al drie weken op oranje staat tot het bezoek voorbij is. De knop springt
+ * meteen naar de mailopsteller, waar het herinneringssjabloon al klaarstaat.
+ */
+function NudgeBanner({
+  nl,
+  visit,
+  onCompose,
+}: {
+  nl: boolean;
+  visit: VisitView;
+  onCompose: () => void;
+}) {
+  return (
+    <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-amber-300 bg-amber-50 p-4">
+      <div className="flex items-start gap-2.5 text-sm leading-relaxed text-amber-900">
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          width="16"
+          height="16"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          className="mt-0.5 shrink-0 text-amber-600"
+        >
+          <path d="M10.268 21a2 2 0 0 0 3.464 0" />
+          <path d="M3.262 15.326A1 1 0 0 0 4 17h16a1 1 0 0 0 .74-1.673C19.41 13.956 18 12.499 18 8A6 6 0 0 0 6 8c0 4.499-1.411 5.956-2.738 7.326" />
+        </svg>
+        <span>
+          <strong>
+            {nl
+              ? "Het lesbezoek komt dichterbij, tijd voor een herinnering."
+              : "The class visit is coming up, time for a reminder."}
+          </strong>{" "}
+          {nl
+            ? `Het bezoek is ${nudgeCountdownLabel(visit.daysUntil, true)} en de docent antwoordde nog niet.`
+            : `The visit is ${nudgeCountdownLabel(visit.daysUntil, false)} and the lecturer has not replied yet.`}
+        </span>
+      </div>
+      <Button type="button" size="sm" onClick={onCompose}>
+        {nl ? "Herinnering opstellen" : "Compose reminder"}
+      </Button>
+    </div>
+  );
+}
+
 /** Visuele weergave van ingeplande mails met actieknoppen voor annuleren of direct verzenden. */
 function ScheduledMailBanner({
   nl,
@@ -533,6 +590,13 @@ function ScheduledMailBanner({
               <span className="font-mono text-zinc-900">{mail.to}</span>
               {mail.cc && <span className="text-[#5c667f]"> (CC: {mail.cc})</span>}
             </div>
+            {mail.bundledCount > 1 && (
+              <div className="text-[#5c667f]">
+                {nl
+                  ? `Deze ene mail gaat over ${mail.bundledCount} lesbezoeken. Annuleren of nu versturen doet dat voor alle ${mail.bundledCount}.`
+                  : `This single email covers ${mail.bundledCount} class visits. Cancelling or sending now applies to all ${mail.bundledCount}.`}
+              </div>
+            )}
             <div>
               <span className="font-semibold text-[#5c667f]">{nl ? "Onderwerp: " : "Subject: "}</span>
               <span className="font-medium text-zinc-900">{mail.subject}</span>

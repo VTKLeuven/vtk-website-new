@@ -456,6 +456,81 @@ Een organisatie verdwijnt niet, ze gaat op niet-actief: verwijderen kan enkel zo
 geen enkel bezoek aan hangt, want de kalender van vorig jaar mag niet halveren omdat
 iemand opruimt.
 
+### Een merge mag, maar niemand verstuurt ongelezen
+
+"Alle aanvragen tegelijk insturen" is een echte vraag: een jobbeurs dient twintig
+lesbezoeken na elkaar in en die één voor één openen is werk zonder inhoud. Het
+bulkvenster (aanvinken in de werklijst, dan "Naar de docenten…") stelt daarom in één
+beurt alle mails op, maar het stelt ze **op het scherm** op: elke mail staat er als een
+eigen blok, met haar ontvanger, haar sjabloon en een uitklapbaar tekstveld, en met een
+vinkje om ze uit de reeks te laten. Pas de knop onderaan verstuurt of plant.
+
+Dat is precies één stap trager dan de mailmerge die dit vervangt, en dat is de bedoeling
+(zie hierboven): die stuurde rij per rij zonder dat iemand de tekst nog zag, en een fout
+in het sjabloon vertrok dan honderd keer. Wat de merge wél wegneemt is het opzoekwerk:
+het juiste sjabloon per aanvraag (kort of lang, NL of EN), het invullen, en het
+klikken tussen twintig panelen.
+
+- **Ligt de vraag al bij de docent, dan wordt het de herinnering.** Dezelfde knop
+  bedient dus het insturen van nieuwe aanvragen én het porren van de reeks die blijft
+  liggen; per mail staat er in het venster of het een "Vraag" of een "Herinnering" is.
+- **Inplannen is de standaard, ook hier.** Twintig mails die om elf uur 's avonds
+  tegelijk bij professoren binnenvallen, zijn erger dan één.
+- Een aangevinkt bezoek dat niet meer bij de docent ligt, valt uit de merge, met een
+  regel bovenaan die zegt hoeveel en waarom. Stil weglaten zou betekenen dat je denkt
+  dat er twintig mails vertrokken terwijl het er zeventien waren.
+
+### Eén aanvrager krijgt één mail, geen twintig
+
+Wie twintig lesbezoeken aanvraagt, kreeg twintig losse terugkoppelingen. Elk daarvan
+klopte, maar samen vertelden ze niet wat een mens wil weten: wat gaat er door, wat ligt
+er nog bij een professor, en wat niet. "Terugkoppeling bundelen…" maakt van de selectie
+**één mail per aanvrager**, met het overzicht gegroepeerd per uitkomst
+(`buildRequesterDigest`): goedgekeurd, nog in behandeling, niet doorgegaan, met de reden
+onder het bezoek waar ze over gaat.
+
+- **Gegroepeerd per organisatie én per aanvragersadres.** Enkel op het adres groeperen
+  zou de lesbezoeken van twee organisaties door elkaar in dezelfde mail zetten wanneer
+  dezelfde persoon voor allebei aanvraagt.
+- De koppen in die mail zijn niet de statusnamen uit het beheer. "Afgewezen door ons" is
+  een interne term; de aanvrager leest liever wat er met zijn aanvraag gebeurde dan wie
+  het besliste.
+- `{vak}`, `{datum}` en `{uur}` blijven leeg in een bundelsjabloon. Eén datum uit twintig
+  in de onderwerpregel zetten is erger dan er geen zetten.
+- In de database is dat één rij (`LesbezoekScheduledMail.bundledIds`), maar het versturen
+  zet `requesterNotifiedAt` op **elk** bezoek van de bundel. Anders dook de rest morgen
+  gewoon opnieuw in de bundel op.
+
+### Een geplande mail naar de docent en een naar de aanvrager sluiten elkaar niet uit
+
+Er staat hoogstens één openstaande geplande mail per bezoek **per kant**: een tweede
+vraag aan dezelfde professor vervangt de eerste, maar een terugkoppeling naar de
+aanvrager laat de vraag die morgenvroeg naar de professor moet gewoon staan. Zonder dat
+onderscheid haalde het bundelen van een terugkoppeling stilletjes de merge weg die je
+vijf minuten eerder had ingepland.
+
+### De herinnering kondigt zichzelf aan
+
+De vraag ligt bij de professor, hij antwoordde niet, en het bezoek nadert: dat is het
+moment waarop de oude Sheet het liet afweten. Niemand ziet dat een rij al drie weken op
+oranje staat tot het bezoek voorbij is. De werklijst zegt het nu zelf, vanaf drie dagen
+voor het bezoek: een balk bovenaan ("tijd voor een herinnering"), een badge op de rij met
+hoeveel dagen er nog zijn, een filter "Herinnering nodig", en in het paneel een knop die
+meteen de herinneringsmail opstelt.
+
+- **Afgeleid, geen kolom.** `needsNudgeReminder` rekent het per keer uit uit status,
+  datum en of er al gepord of iets ingepland is. Er is dus geen tweede toestand die kan
+  verlopen, en de drempel mag veranderen zonder dat er iets herberekend moet worden.
+- **De drempel staat in de instellingen** (`nudgeLeadDays`, standaard 3): hoe lang je een
+  professor laat zwijgen voor je nog eens port, is een afweging van wie de lesbezoeken
+  doet, en die verschilt per jaar.
+- **Enkel bij "Bij de prof".** Bij "Nieuw" is het probleem een ander (de vraag vertrok
+  nog niet eens) en bij een verwerkte status valt er niets meer te porren. Een bezoek dat
+  al bezig of voorbij is, valt weg: een herinnering is dan geen hulp meer maar ruis.
+- **Het blijft in het scherm.** Geen mail naar de lesbezoekenmailbox: wie dit werk doet,
+  opent dat scherm toch, en een dagelijkse herinneringsmail over herinneringen wordt
+  weggeklikt.
+
 ### De werklijst is de standaard, niet de kalender
 
 De app die dit vervangt had enkel een kalender. Daardoor was "welke aanvraag ligt hier al

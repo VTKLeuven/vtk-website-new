@@ -200,6 +200,82 @@ export function isProcessedStatus(status: LesbezoekStatusCode): boolean {
 }
 
 // -----------------------------------------------------------------------------
+// De herinnering aan de professor
+// -----------------------------------------------------------------------------
+
+/**
+ * Hoeveel dagen voor het lesbezoek het scherm begint te roepen dat er een
+ * herinnering naar de professor mag.
+ *
+ * Drie dagen is de standaard en geen wet: het staat in de instellingen, want hoe
+ * lang je een professor laat zwijgen voor je nog eens port, is een afweging van
+ * wie de lesbezoeken doet. Onder de nul zakken heeft geen zin (dan is het bezoek
+ * al voorbij), en meer dan een maand vooruit roepen maakt de melding waardeloos.
+ */
+export const LESBEZOEK_NUDGE_LEAD_DAYS = 3;
+export const LESBEZOEK_NUDGE_LEAD_MIN = 1;
+export const LESBEZOEK_NUDGE_LEAD_MAX = 30;
+
+/** Houdt een ingevoerd aantal dagen binnen de grenzen; niet-getallen -> standaard. */
+export function clampNudgeLeadDays(value: unknown): number {
+  const days = typeof value === "number" ? value : Number(value);
+  if (!Number.isFinite(days)) return LESBEZOEK_NUDGE_LEAD_DAYS;
+  return Math.min(LESBEZOEK_NUDGE_LEAD_MAX, Math.max(LESBEZOEK_NUDGE_LEAD_MIN, Math.round(days)));
+}
+
+export type NudgeCheck = {
+  status: LesbezoekStatusCode;
+  startsAt: Date;
+  /** Wanneer er al gepord werd; daarna zwijgt de melding. */
+  professorNudgedAt: Date | null;
+  /** Staat er al een herinnering ingepland, dan is er niets meer te doen. */
+  nudgeScheduled?: boolean;
+};
+
+/**
+ * Is het tijd om de professor te herinneren aan deze vraag?
+ *
+ * Enkel bij `ASKED`: de vraag ligt bij hem, hij antwoordde nog niet, en het
+ * moment komt dichterbij. Bij `PENDING` is het probleem een ander (de vraag
+ * vertrok nog niet eens) en bij een verwerkte status is er niets meer te porren.
+ *
+ * Dit is bewust een afgeleide en geen kolom: er is geen tweede plek nodig die
+ * kan verlopen, en de drempel mag veranderen zonder dat er iets herberekend
+ * moet worden.
+ */
+export function needsNudgeReminder(
+  visit: NudgeCheck,
+  options: { now?: Date; leadDays?: number } = {},
+): boolean {
+  if (visit.status !== "ASKED") return false;
+  if (visit.professorNudgedAt) return false;
+  if (visit.nudgeScheduled) return false;
+
+  const now = options.now ?? new Date();
+  const leadDays = clampNudgeLeadDays(options.leadDays ?? LESBEZOEK_NUDGE_LEAD_DAYS);
+  const remaining = visit.startsAt.getTime() - now.getTime();
+  // Een bezoek dat al bezig of voorbij is, valt hier weg: dan is een herinnering
+  // geen hulp meer maar ruis in de lijst.
+  if (remaining <= 0) return false;
+  return remaining <= leadDays * 86_400_000;
+}
+
+/**
+ * Hoeveel hele dagen er nog tussen zitten, voor de tekst van de melding.
+ * Rondt naar boven af: een bezoek over 30 uur is "over 2 dagen", niet "over 1".
+ */
+export function daysUntil(startsAt: Date, now: Date = new Date()): number {
+  return Math.ceil((startsAt.getTime() - now.getTime()) / 86_400_000);
+}
+
+/** "vandaag" / "morgen" / "over 3 dagen", voor het badge en de banner. */
+export function nudgeCountdownLabel(days: number, nl: boolean): string {
+  if (days <= 0) return nl ? "vandaag" : "today";
+  if (days === 1) return nl ? "morgen" : "tomorrow";
+  return nl ? `over ${days} dagen` : `in ${days} days`;
+}
+
+// -----------------------------------------------------------------------------
 // De professor
 // -----------------------------------------------------------------------------
 

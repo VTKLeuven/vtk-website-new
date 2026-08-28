@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
+  clampNudgeLeadDays,
+  daysUntil,
   formatScheduleMoment,
   formatScheduleShort,
   getSchedulePresets,
@@ -7,9 +9,11 @@ import {
   isProcessedStatus,
   LESBEZOEK_COLOURS,
   LESBEZOEK_MIN_LEAD_DAYS,
+  LESBEZOEK_NUDGE_LEAD_DAYS,
   LESBEZOEK_STATUS_META,
   defaultTeacherLocale,
   matchPeculiarities,
+  needsNudgeReminder,
   nextOrganisationColour,
   organisationKey,
   parseAudienceList,
@@ -21,12 +25,15 @@ import {
 } from "@/lib/lesbezoeken";
 import { buildLesbezoekIcs } from "@/lib/lesbezoekenIcs";
 import {
+  buildRequesterDigest,
   DEFAULT_LESBEZOEK_TEMPLATES,
+  digestMailVars,
   mailVarsFor,
   parseLesbezoekTemplates,
   professorTemplateKey,
   renderMailTemplate,
   renderTemplate,
+  type DigestVisitFacts,
   type MailTemplate,
 } from "@/lib/lesbezoekenMail";
 
@@ -556,5 +563,169 @@ describe("getSchedulePresets en planningshelpers", () => {
     const moment = new Date("2026-08-27T06:00:00.000Z"); // 08:00 CEST
     const shortNl = formatScheduleShort(moment, "nl");
     expect(shortNl).toContain("08:00");
+  });
+});
+
+// -----------------------------------------------------------------------------
+// De herinnering aan de professor
+// -----------------------------------------------------------------------------
+
+describe("needsNudgeReminder", () => {
+  const now = new Date("2026-09-01T09:00:00.000Z");
+
+  /** Een bezoek dat over twee dagen doorgaat en bij de professor ligt. */
+  function asked(overrides: Partial<Parameters<typeof needsNudgeReminder>[0]> = {}) {
+    return {
+      status: "ASKED" as const,
+      startsAt: new Date("2026-09-03T09:00:00.000Z"),
+      professorNudgedAt: null,
+      ...overrides,
+    };
+  }
+
+  it("roept om een herinnering wanneer het bezoek binnen de drempel valt", () => {
+    expect(needsNudgeReminder(asked(), { now })).toBe(true);
+  });
+
+  it("zwijgt zolang het bezoek nog ver weg is", () => {
+    const far = asked({ startsAt: new Date("2026-10-01T09:00:00.000Z") });
+    expect(needsNudgeReminder(far, { now })).toBe(false);
+  });
+
+  it("zwijgt wanneer er al gepord werd", () => {
+    const nudged = asked({ professorNudgedAt: new Date("2026-08-31T09:00:00.000Z") });
+    expect(needsNudgeReminder(nudged, { now })).toBe(false);
+  });
+
+  it("zwijgt wanneer er al een herinnering ingepland staat", () => {
+    expect(needsNudgeReminder(asked({ nudgeScheduled: true }), { now })).toBe(false);
+  });
+
+  it("zwijgt bij elke status behalve 'bij de prof'", () => {
+    for (const status of ["PENDING", "APPROVED", "DECLINED", "REJECTED", "CANCELLED"] as const) {
+      expect(needsNudgeReminder(asked({ status }), { now })).toBe(false);
+    }
+  });
+
+  it("zwijgt over een bezoek dat al voorbij is", () => {
+    const past = asked({ startsAt: new Date("2026-08-30T09:00:00.000Z") });
+    expect(needsNudgeReminder(past, { now })).toBe(false);
+  });
+
+  it("volgt de ingestelde drempel", () => {
+    const week = asked({ startsAt: new Date("2026-09-06T09:00:00.000Z") });
+    expect(needsNudgeReminder(week, { now })).toBe(false);
+    expect(needsNudgeReminder(week, { now, leadDays: 7 })).toBe(true);
+  });
+
+  it("houdt een onzinnige drempel binnen de grenzen", () => {
+    expect(clampNudgeLeadDays("3")).toBe(3);
+    expect(clampNudgeLeadDays(0)).toBe(1);
+    expect(clampNudgeLeadDays(999)).toBe(30);
+    expect(clampNudgeLeadDays("tien")).toBe(LESBEZOEK_NUDGE_LEAD_DAYS);
+  });
+
+  it("rondt de resterende dagen naar boven af", () => {
+    // Dertig uur is "over 2 dagen"; naar beneden afronden zou "morgen" zeggen
+    // over iets dat pas overmorgen doorgaat.
+    expect(daysUntil(new Date("2026-09-02T15:00:00.000Z"), now)).toBe(2);
+    expect(daysUntil(new Date("2026-09-01T15:00:00.000Z"), now)).toBe(1);
+  });
+});
+
+// -----------------------------------------------------------------------------
+// De gebundelde terugkoppeling
+// -----------------------------------------------------------------------------
+
+describe("buildRequesterDigest", () => {
+  function visit(overrides: Partial<DigestVisitFacts> = {}): DigestVisitFacts {
+    return {
+      status: "APPROVED",
+      course: "H06U1a Artificiële intelligentie",
+      audience: "3e Bach, Computerwetenschappen",
+      mailDate: { nl: "maandag 1 maart 2026", en: "Monday 1 March 2026" },
+      mailTime: "11:30",
+      reviewNote: null,
+      ...overrides,
+    };
+  }
+
+  it("groepeert per uitkomst, met goedgekeurd bovenaan", () => {
+    const text = buildRequesterDigest([
+      visit({ status: "DECLINED", course: "Thermodynamica", reviewNote: "de prof wil het niet" }),
+      visit({ status: "APPROVED" }),
+      visit({ status: "ASKED", course: "Chemie" }),
+    ]);
+
+    const lines = text.split("\n");
+    expect(lines[0]).toBe("Goedgekeurd:");
+    expect(text.indexOf("Goedgekeurd:")).toBeLessThan(text.indexOf("Nog in behandeling"));
+    expect(text.indexOf("Nog in behandeling")).toBeLessThan(text.indexOf("Niet doorgegaan"));
+  });
+
+  it("zet de reden onder het bezoek waar ze over gaat", () => {
+    const text = buildRequesterDigest([
+      visit({ status: "DECLINED", reviewNote: "de prof geeft dit semester geen ruimte" }),
+    ]);
+    const lines = text.split("\n");
+    expect(lines[1]?.startsWith("- ")).toBe(true);
+    expect(lines[2]).toBe("  de prof geeft dit semester geen ruimte");
+  });
+
+  it("laat een groep zonder bezoeken helemaal weg", () => {
+    const text = buildRequesterDigest([visit({ status: "APPROVED" })]);
+    expect(text).not.toContain("Ingetrokken");
+    expect(text).not.toContain("Niet doorgestuurd");
+  });
+
+  it("schrijft de Engelse variant met het Engelse datumformaat", () => {
+    const text = buildRequesterDigest([visit()], "en");
+    expect(text).toContain("Approved:");
+    expect(text).toContain("Monday 1 March 2026 at 11:30");
+  });
+
+  it("levert de placeholders voor het bundelsjabloon", () => {
+    const vars = digestMailVars(
+      {
+        organisationName: "Existenz",
+        requesterName: "Jan Peeters",
+        visits: [visit(), visit({ status: "ASKED" })],
+      },
+      "nl",
+      "VTK Onderwijs",
+    );
+
+    expect(vars.aantal).toBe("2");
+    expect(vars.contactpersoon).toBe("Jan Peeters");
+    expect(vars.overzicht).toContain("Goedgekeurd:");
+    // Eén datum uit twintig in de onderwerpregel zetten is erger dan geen.
+    expect(vars.datum).toBe("");
+    expect(vars.vak).toBe("");
+  });
+
+  it("spreekt de organisatie aan wanneer er geen naam bekend is", () => {
+    const vars = digestMailVars(
+      { organisationName: "Existenz", requesterName: null, visits: [visit()] },
+      "nl",
+      "VTK Onderwijs",
+    );
+    expect(vars.contactpersoon).toBe("Existenz");
+  });
+
+  it("vult het standaardsjabloon in tot een leesbare mail", () => {
+    const template = DEFAULT_LESBEZOEK_TEMPLATES.requesterDigest;
+    const rendered = renderMailTemplate(
+      template,
+      digestMailVars(
+        { organisationName: "Existenz", requesterName: "Jan", visits: [visit(), visit()] },
+        "nl",
+        "VTK Onderwijs",
+      ),
+    );
+
+    expect(rendered.subject).toBe("Overzicht van jullie lesbezoeken (2)");
+    expect(rendered.body).toContain("Beste Jan,");
+    expect(rendered.body).toContain("Goedgekeurd:");
+    expect(rendered.body).not.toContain("{overzicht}");
   });
 });

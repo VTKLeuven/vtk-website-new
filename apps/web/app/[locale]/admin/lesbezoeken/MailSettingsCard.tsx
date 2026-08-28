@@ -15,6 +15,10 @@ import {
   type LesbezoekTemplateItem,
   type LesbezoekTemplates,
 } from "@/lib/lesbezoekenMail";
+import {
+  LESBEZOEK_NUDGE_LEAD_MAX,
+  LESBEZOEK_NUDGE_LEAD_MIN,
+} from "@/lib/lesbezoeken";
 import { lesbezoekAdminErrors } from "@/lib/lesbezoekenMessages";
 
 export function MailSettingsCard({
@@ -129,6 +133,28 @@ export function MailSettingsCard({
               {nl
                 ? "Krijgt een seintje bij elke nieuwe aanvraag, en is het antwoordadres van elke mail die hier vertrekt."
                 : "Gets a heads-up on every new request, and is the reply-to on every email sent from here."}
+            </p>
+          </div>
+          <div>
+            <Label htmlFor="lb-nudge-days">
+              {nl
+                ? "Herinnering aankondigen vanaf (dagen voor het bezoek)"
+                : "Announce the reminder from (days before the visit)"}
+            </Label>
+            <Input
+              id="lb-nudge-days"
+              name="nudgeLeadDays"
+              type="number"
+              min={LESBEZOEK_NUDGE_LEAD_MIN}
+              max={LESBEZOEK_NUDGE_LEAD_MAX}
+              step={1}
+              defaultValue={config.nudgeLeadDays}
+              className="max-w-28"
+            />
+            <p className="lb-help">
+              {nl
+                ? "Zoveel dagen voor het bezoek roept de werklijst dat de docent nog niet antwoordde. Wie eerder wil porren, zet het hoger."
+                : "This many days before the visit, the work list flags that the lecturer has not replied. Set it higher to nudge sooner."}
             </p>
           </div>
         </SaveForm>

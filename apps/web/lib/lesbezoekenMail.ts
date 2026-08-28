@@ -16,6 +16,8 @@
  * dezelfde fout.
  */
 
+import { LESBEZOEK_NUDGE_LEAD_DAYS, type LesbezoekStatusCode } from "@/lib/lesbezoeken";
+
 /**
  * Instellingen van de werking, beheerd in /admin/lesbezoeken.
  *
@@ -30,11 +32,17 @@
 export type LesbezoekConfig = {
   signature: string;
   notifyEmail: string;
+  /**
+   * Hoeveel dagen voor het bezoek de werklijst roept dat de professor een
+   * herinnering mag. Zie `LESBEZOEK_NUDGE_LEAD_DAYS` in `lib/lesbezoeken.ts`.
+   */
+  nudgeLeadDays: number;
 };
 
 export const DEFAULT_LESBEZOEK_CONFIG: LesbezoekConfig = {
   signature: "VTK Onderwijs\nlesbezoeken@vtk.be",
   notifyEmail: "lesbezoeken@vtk.be",
+  nudgeLeadDays: LESBEZOEK_NUDGE_LEAD_DAYS,
 };
 
 /** De sleutels van de sjablonen. Union, zodat een typo een compile-error is. */
@@ -47,6 +55,7 @@ export const LESBEZOEK_TEMPLATE_KEYS = [
   "professorNudgeEn",
   "requesterApproved",
   "requesterDeclined",
+  "requesterDigest",
 ] as const;
 
 export type LesbezoekTemplateKey = (typeof LESBEZOEK_TEMPLATE_KEYS)[number];
@@ -92,6 +101,8 @@ export const LESBEZOEK_PLACEHOLDERS = [
   "uur",
   "toelichting",
   "reden",
+  "overzicht",
+  "aantal",
   "ondertekening",
 ] as const;
 
@@ -182,6 +193,122 @@ export function nudgeTemplateKey(locale: "nl" | "en"): LesbezoekTemplateKey {
   return locale === "en" ? "professorNudgeEn" : "professorNudgeNl";
 }
 
+/** Het sjabloon dat een gebundelde terugkoppeling standaard gebruikt. */
+export const REQUESTER_DIGEST_TEMPLATE_KEY: LesbezoekTemplateKey = "requesterDigest";
+
+// -----------------------------------------------------------------------------
+// De gebundelde terugkoppeling
+// -----------------------------------------------------------------------------
+
+/**
+ * De koppen boven elke groep in `{overzicht}`.
+ *
+ * Bewust niet dezelfde labels als in het beheer: "Afgewezen door ons" is een
+ * interne term, en de aanvrager leest liever wat er met zijn aanvraag gebeurde
+ * dan wie het besliste. De volgorde is die van de lijst hieronder: eerst wat
+ * doorgaat, dan wat nog loopt, dan wat niet doorgaat.
+ */
+export const DIGEST_GROUP_LABELS: Record<LesbezoekStatusCode, { nl: string; en: string }> = {
+  APPROVED: { nl: "Goedgekeurd", en: "Approved" },
+  ASKED: { nl: "Nog in behandeling bij de professor", en: "Still with the lecturer" },
+  PENDING: { nl: "Nog na te kijken door VTK Onderwijs", en: "Still to be reviewed by VTK Education" },
+  DECLINED: { nl: "Niet doorgegaan: de professor gaat niet akkoord", en: "Not going ahead: the lecturer declined" },
+  REJECTED: { nl: "Niet doorgestuurd", en: "Not forwarded" },
+  CANCELLED: { nl: "Ingetrokken", en: "Withdrawn" },
+};
+
+/** De volgorde waarin de groepen in de mail staan. */
+const DIGEST_ORDER: readonly LesbezoekStatusCode[] = [
+  "APPROVED",
+  "ASKED",
+  "PENDING",
+  "DECLINED",
+  "REJECTED",
+  "CANCELLED",
+];
+
+/** Wat er per lesbezoek in het overzicht komt. Al geformatteerd, zoals hierboven. */
+export type DigestVisitFacts = {
+  status: LesbezoekStatusCode;
+  course: string;
+  audience: string;
+  mailDate: { nl: string; en: string };
+  mailTime: string;
+  reviewNote: string | null;
+};
+
+/**
+ * De tekst achter `{overzicht}`: één regel per lesbezoek, gegroepeerd per
+ * uitkomst.
+ *
+ * Dit is waarom de bundel bestaat. Een organisatie die twintig lesbezoeken
+ * aanvraagt, kreeg vroeger twintig losse mails, en die vertellen elk apart niet
+ * wat het geheel doet. Hier staat in één blok wat doorgaat, wat nog loopt en wat
+ * niet doorgaat; de reden bij een geweigerd bezoek staat eronder, want zonder die
+ * reden is "niet doorgegaan" enkel een mededeling.
+ */
+export function buildRequesterDigest(
+  visits: readonly DigestVisitFacts[],
+  locale: "nl" | "en" = "nl",
+): string {
+  const nl = locale === "nl";
+  const blocks: string[] = [];
+
+  for (const status of DIGEST_ORDER) {
+    const inGroup = visits.filter((visit) => visit.status === status);
+    if (inGroup.length === 0) continue;
+
+    const lines = [`${DIGEST_GROUP_LABELS[status][locale]}:`];
+    for (const visit of inGroup) {
+      const when = nl
+        ? `${visit.mailDate.nl} om ${visit.mailTime}`
+        : `${visit.mailDate.en} at ${visit.mailTime}`;
+      lines.push(`- ${visit.course} (${visit.audience}) ${nl ? "op" : "on"} ${when}`);
+      const note = visit.reviewNote?.trim();
+      // De reden hoort onder het bezoek waar ze over gaat, ingesprongen: op één
+      // regel erachter loopt ze in de volgende aanvraag over.
+      if (note) lines.push(`  ${note.replace(/\n+/g, " ")}`);
+    }
+    blocks.push(lines.join("\n"));
+  }
+
+  return blocks.join("\n\n");
+}
+
+/**
+ * De placeholderwaarden voor een gebundelde mail.
+ *
+ * `{vak}`, `{datum}` en `{uur}` slaan hier op niets: de mail gaat over meerdere
+ * bezoeken tegelijk. Ze blijven daarom leeg in plaats van het eerste bezoek te
+ * kiezen, want een onderwerpregel die één van de twintig data noemt, is erger
+ * dan een die er geen noemt.
+ */
+export function digestMailVars(
+  input: {
+    organisationName: string;
+    requesterName: string | null;
+    visits: readonly DigestVisitFacts[];
+  },
+  locale: "nl" | "en",
+  signature: string,
+): TemplateVars {
+  return {
+    organisatie: input.organisationName,
+    contactpersoon: input.requesterName?.trim() || input.organisationName,
+    overzicht: buildRequesterDigest(input.visits, locale),
+    aantal: String(input.visits.length),
+    ondertekening: signature,
+    prof: "",
+    onderwerp: "",
+    vak: "",
+    doelgroep: "",
+    datum: "",
+    uur: "",
+    toelichting: "",
+    reden: "",
+  };
+}
+
 const SIGNATURE = "{ondertekening}";
 
 export const DEFAULT_LESBEZOEK_TEMPLATE_NAMES: Record<LesbezoekTemplateKey, { nl: string; en: string }> = {
@@ -193,6 +320,7 @@ export const DEFAULT_LESBEZOEK_TEMPLATE_NAMES: Record<LesbezoekTemplateKey, { nl
   professorNudgeEn: { nl: "Herinnering docent · EN", en: "Reminder lecturer · EN" },
   requesterApproved: { nl: "Aanvrager · goedgekeurd", en: "Requester · approved" },
   requesterDeclined: { nl: "Aanvrager · niet doorgegaan", en: "Requester · did not happen" },
+  requesterDigest: { nl: "Aanvrager · overzicht (bundel)", en: "Requester · overview (bundle)" },
 };
 
 /**
@@ -333,6 +461,26 @@ export const DEFAULT_LESBEZOEK_TEMPLATE_ITEMS: LesbezoekTemplateItem[] = [
       "{reden}",
       "",
       "Er wordt uiteraard verwacht dat iemand van jullie organisatie aanwezig is. Ga op het voorziene moment het lokaal binnen, zo weet de lesgever dat jullie er zijn.",
+      "",
+      "Met vriendelijke groeten,",
+      SIGNATURE,
+    ].join("\n"),
+  },
+  {
+    id: "requesterDigest",
+    name: "Aanvrager · overzicht (bundel)",
+    category: "requester",
+    lang: "nl",
+    isDefault: true,
+    subject: "Overzicht van jullie lesbezoeken ({aantal})",
+    body: [
+      "Beste {contactpersoon},",
+      "",
+      "Hierbij een overzicht van de lesbezoeken die {organisatie} aanvroeg.",
+      "",
+      "{overzicht}",
+      "",
+      "Bij een goedgekeurd lesbezoek wordt verwacht dat iemand van jullie organisatie aanwezig is. Ga op het voorziene moment het lokaal binnen, zo weet de lesgever dat jullie er zijn.",
       "",
       "Met vriendelijke groeten,",
       SIGNATURE,

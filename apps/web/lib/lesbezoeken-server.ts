@@ -3,6 +3,7 @@ import "server-only";
 import * as Sentry from "@sentry/nextjs";
 import { prisma } from "@vtk/db";
 import { sendMail } from "@vtk/mail";
+import { clampNudgeLeadDays } from "@/lib/lesbezoeken";
 import {
   DEFAULT_LESBEZOEK_CONFIG,
   DEFAULT_LESBEZOEK_TEMPLATES,
@@ -52,6 +53,10 @@ export async function getLesbezoekConfig(): Promise<LesbezoekConfig> {
       typeof value.notifyEmail === "string" && value.notifyEmail.trim()
         ? value.notifyEmail.trim()
         : DEFAULT_LESBEZOEK_CONFIG.notifyEmail,
+    nudgeLeadDays:
+      value.nudgeLeadDays === undefined || value.nudgeLeadDays === null
+        ? DEFAULT_LESBEZOEK_CONFIG.nudgeLeadDays
+        : clampNudgeLeadDays(value.nudgeLeadDays),
   };
 }
 
@@ -156,6 +161,51 @@ export async function notifyNewLesbezoek(visit: {
 // -----------------------------------------------------------------------------
 
 /**
+ * Zet de stempels die bij een verstuurde geplande mail horen, op elk lesbezoek
+ * dat ze dekt.
+ *
+ * Een gebundelde terugkoppeling staat als één rij in de database maar gaat over
+ * meerdere bezoeken (`bundledIds`); zonder deze lus zou alleen het eerste bezoek
+ * als "aanvrager verwittigd" gelden en zouden de negentien andere morgen weer in
+ * de bundel opduiken.
+ */
+export async function applyScheduledMailStamps(
+  mail: { kind: string; lesbezoekId: string; bundledIds: string[] },
+  now: Date,
+): Promise<void> {
+  const ids = Array.from(new Set([mail.lesbezoekId, ...mail.bundledIds]));
+
+  if (mail.kind === "professor") {
+    await prisma.lesbezoek.updateMany({
+      where: { id: { in: ids } },
+      data: { professorMailedAt: now },
+    });
+    // De status volgt alleen wanneer er nog niets beslist was: een bezoek dat
+    // intussen ingetrokken of afgewezen werd, mag niet terug naar "bij de prof".
+    await prisma.lesbezoek.updateMany({
+      where: { id: { in: ids }, status: "PENDING" },
+      data: { status: "ASKED" },
+    });
+    return;
+  }
+
+  if (mail.kind === "nudge") {
+    await prisma.lesbezoek.updateMany({
+      where: { id: { in: ids } },
+      data: { professorNudgedAt: now },
+    });
+    return;
+  }
+
+  if (mail.kind === "requester") {
+    await prisma.lesbezoek.updateMany({
+      where: { id: { in: ids } },
+      data: { requesterNotifiedAt: now },
+    });
+  }
+}
+
+/**
  * Verwerkt alle ingeplande lesbezoekenmails waarvan het verzendmoment verstreken is.
  *
  * Claimt eerst via updateMany, verstuurt vervolgens de mail en werkt het lesbezoek bij.
@@ -169,16 +219,6 @@ export async function processDueLesbezoekScheduledMails(
         sendAt: { lte: now },
         sentAt: null,
         failedAt: null,
-      },
-      include: {
-        lesbezoek: {
-          select: {
-            id: true,
-            status: true,
-            organisation: { select: { name: true } },
-            course: true,
-          },
-        },
       },
       orderBy: { sendAt: "asc" },
     });
@@ -204,30 +244,7 @@ export async function processDueLesbezoekScheduledMails(
       });
 
       if (delivered) {
-        // Lesbezoek status en datumstempels bijwerken
-        const updateData: {
-          professorMailedAt?: Date;
-          professorNudgedAt?: Date;
-          requesterNotifiedAt?: Date;
-          status?: "ASKED";
-        } = {};
-
-        if (item.kind === "professor") {
-          updateData.professorMailedAt = now;
-          if (item.lesbezoek.status === "PENDING") {
-            updateData.status = "ASKED";
-          }
-        } else if (item.kind === "nudge") {
-          updateData.professorNudgedAt = now;
-        } else if (item.kind === "requester") {
-          updateData.requesterNotifiedAt = now;
-        }
-
-        await prisma.lesbezoek.update({
-          where: { id: item.lesbezoekId },
-          data: updateData,
-        });
-
+        await applyScheduledMailStamps(item, now);
         sent += 1;
       } else {
         await prisma.lesbezoekScheduledMail.update({

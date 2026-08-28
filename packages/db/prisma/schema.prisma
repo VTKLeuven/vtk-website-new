@@ -4703,6 +4703,13 @@ model LesbezoekScheduledMail {
   subject     String
   body        String
 
+  /// De overige lesbezoeken die in dezelfde gebundelde mail zitten. Een
+  /// terugkoppeling naar een aanvrager met twintig bezoeken is één mail, maar ze
+  /// moet wel twintig keer `requesterNotifiedAt` zetten. `lesbezoekId` blijft de
+  /// eerste van de reeks, zodat de cascade en de weergave in het paneel werken;
+  /// wie de mail bij een bezoek zoekt, kijkt dus naar beide velden.
+  bundledIds String[] @default([])
+
   /// Wanneer de mail volgens planning verstuurd moet worden.
   sendAt       DateTime  @db.Timestamptz(3)
   /// Wanneer de mail daadwerkelijk verstuurd werd (null = nog in wachtrij).
