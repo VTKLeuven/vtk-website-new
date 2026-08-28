@@ -1673,10 +1673,11 @@ homepage valt terug op de standaard) en in het beheer als onbekend gemeld.
   (weggooien zou bestaande tekst vernietigen), maar worden nergens meer getoond
   of bewerkt.
 - **`/pocs` gebruikt dezelfde kaarten als de homepage-band** (`.poc-grid` /
-  `.poccard` uit `vtk-home.css`) maar toont ze in maximaal 2 kolommen en per
-  werkingsjaar (met een jaarbalk en archief identiek aan `/praesidium`). Wie
-  zijn eigen POC op de homepage ziet en doorklikt, krijgt hetzelfde herkenbare
-  beeld en kan ook vorige jaren raadplegen.
+  `.poccard` uit `vtk-home.css`) in 1 kolom en per werkingsjaar (met een
+  jaarbalk en archief identiek aan `/praesidium`). POC's zonder vertegenwoordigers
+  in het geselecteerde jaar worden verborgen. Wie zijn eigen POC op de homepage
+  ziet en doorklikt, krijgt hetzelfde herkenbare beeld en kan ook vorige jaren
+  raadplegen.
 - **Lege staat = sectie verbergen.** Zonder sessie, zonder richtingen, of zonder
   een matchende POC met vertegenwoordigers valt de hele sectie weg. Bewuste keuze
   boven "toon dan alle POC's" of een uitnodigingsbanner: de sectie is enkel

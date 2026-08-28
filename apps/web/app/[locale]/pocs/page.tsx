@@ -62,7 +62,7 @@ export default async function PocsPage({
   const { bar: barYears, archive: archiveYears } = splitYearBar(allYears, year, YEARS_IN_BAR);
   const oldestArchived = archiveYears.at(-1);
 
-  const pocs = await prisma.poc.findMany({
+  const allPocs = await prisma.poc.findMany({
     orderBy: { order: "asc" },
     include: {
       representatives: {
@@ -72,6 +72,9 @@ export default async function PocsPage({
       },
     },
   });
+
+  // POC's zonder vertegenwoordigers in dit werkingsjaar worden verborgen
+  const pocs = allPocs.filter((poc) => poc.representatives.length > 0);
 
   return (
     <div className="vtk-page">
@@ -124,10 +127,10 @@ export default async function PocsPage({
 
       <div className="vtk-page-shell">
         {pocs.length === 0 ? (
-          <p className="text-[#5c667f]">{t.empty}</p>
+          <p className="text-[#5c667f]">{t.noRepresentatives}</p>
         ) : (
           <div className="vtk-design">
-            <div className="poc-grid" data-groups={Math.min(pocs.length, 2)}>
+            <div className="poc-grid" data-groups="1">
               {pocs.map((poc) => (
                 <div className="poccard" key={poc.id}>
                   <div className="poccard-head">
@@ -138,31 +141,27 @@ export default async function PocsPage({
                       </a>
                     ) : null}
                   </div>
-                  {poc.representatives.length === 0 ? (
-                    <p className="text-sm text-[#5c667f]">{t.noRepresentatives}</p>
-                  ) : (
-                    <ul className="poc-people">
-                      {poc.representatives.map((rep) => {
-                        const avatar = publicUrl(rep.user.avatarKey);
-                        return (
-                          <li key={rep.id}>
-                            <span className="poc-face">
-                              {avatar ? (
-                                // .poc-face is 64x64 (vtk-home.css); die maat meegeven
-                                // scheelt het verschil met de volledige profielfoto.
-                                <Image src={avatar} alt="" width={64} height={64} />
-                              ) : (
-                                <span className="poc-initial" aria-hidden="true">
-                                  {rep.user.name.slice(0, 1).toUpperCase()}
-                                </span>
-                              )}
-                            </span>
-                            <span className="poc-name">{rep.user.name}</span>
-                          </li>
-                        );
-                      })}
-                    </ul>
-                  )}
+                  <ul className="poc-people">
+                    {poc.representatives.map((rep) => {
+                      const avatar = publicUrl(rep.user.avatarKey);
+                      return (
+                        <li key={rep.id}>
+                          <span className="poc-face">
+                            {avatar ? (
+                              // .poc-face is 64x64 (vtk-home.css); die maat meegeven
+                              // scheelt het verschil met de volledige profielfoto.
+                              <Image src={avatar} alt="" width={64} height={64} />
+                            ) : (
+                              <span className="poc-initial" aria-hidden="true">
+                                {rep.user.name.slice(0, 1).toUpperCase()}
+                              </span>
+                            )}
+                          </span>
+                          <span className="poc-name">{rep.user.name}</span>
+                        </li>
+                      );
+                    })}
+                  </ul>
                 </div>
               ))}
             </div>
