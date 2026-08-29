@@ -1,7 +1,6 @@
 import type { Metadata } from 'next';
 import { redirect } from 'next/navigation';
 import { getSession, canManageFakbar } from '@/lib/session';
-import { ToastProvider } from '@/components/ui/toast';
 import { FakbarAdminNav } from './admin-nav';
 
 export const metadata: Metadata = {
@@ -35,7 +34,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   }
 
   return (
-    <ToastProvider>
+    <>
       <div className="fakbar-page-head" data-print="hide">
         <div className="fakbar-page-head-inner !pb-8 !pt-11">
           <p className="fakbar-eyebrow">Beheer &rsquo;t ElixIr</p>
@@ -51,6 +50,6 @@ export default async function AdminLayout({ children }: { children: React.ReactN
           <main className="min-w-0">{children}</main>
         </div>
       </div>
-    </ToastProvider>
+    </>
   );
 }

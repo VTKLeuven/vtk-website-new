@@ -61,7 +61,7 @@ export function TakedownDialog({
         onClick={() => setOpen(true)}
         title="Deze foto laten verwijderen"
       >
-        <ElixirIcon name="trash" className="h-4 w-4" />
+        <ElixirIcon name="flag" className="h-4 w-4" />
         <span className="sr-only">Deze foto laten verwijderen</span>
       </button>
 

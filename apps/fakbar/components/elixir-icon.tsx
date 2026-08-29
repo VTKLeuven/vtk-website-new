@@ -37,7 +37,8 @@ type IconName =
   | 'camera'
   | 'upload'
   | 'close'
-  | 'retry';
+  | 'retry'
+  | 'flag';
 
 export function ElixirIcon({ name, className, ...props }: SVGProps<SVGSVGElement> & { name: IconName }) {
   const paths: Record<IconName, ReactNode> = {
@@ -181,6 +182,7 @@ export function ElixirIcon({ name, className, ...props }: SVGProps<SVGSVGElement
       </>
     ),
     close: <path d="m6 6 12 12M18 6 6 18" />,
+    flag: <path d="M5 21V4m0 0 6.5 1.8a4 4 0 0 0 2.6-.2L19 3.5v10l-4.9 2.1a4 4 0 0 1-2.6.2L5 14" />,
     retry: (
       <>
         <path d="M20 12a8 8 0 1 1-2.34-5.66" />

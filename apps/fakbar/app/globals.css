@@ -2401,3 +2401,12 @@ select:focus {
     content: none;
   }
 }
+
+.fakbar-error-digest {
+  padding: 2px 7px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--paper-2);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.85em;
+}
