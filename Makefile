@@ -86,6 +86,10 @@ dev:
 logistiek:
 	npm run dev --workspace=@vtk/logistiek
 
+## fakbar: start the fakbar app (http://localhost:3300)
+fakbar:
+	npm run dev --workspace=@vtk/fakbar
+
 ## generate: regenerate the Prisma client after a schema change
 generate:
 	npm run db:generate

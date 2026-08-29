@@ -634,6 +634,8 @@ model User {
   studyGroupMemberships   StudyGroupMember[]          @relation("StudyGroupMemberUser")
   studyProfile            StudyProfile?               @relation("StudyProfileUser")
 
+  fakbarEvenings          FakbarEvening[]             @relation("FakbarHoofdtapper")
+
   pianoReservations PianoReservation[]
 
   uitleenReservations     UitleenReservation[]      @relation("UitleenReservationUser")
@@ -5197,4 +5199,201 @@ model Expense {
   @@index([spentOn])
   @@index([paidAt])
   @@index([createdAt])
+}
+
+// -----------------------------------------------------------------------------
+// Fakbar App
+// -----------------------------------------------------------------------------
+
+enum FakbarItemCategory {
+  VAT
+  BIER_WIJN
+  FRISDRANK
+  STERK
+}
+
+model FakbarItem {
+  id         String             @id @default(cuid())
+  name       String
+  category   FakbarItemCategory
+  salesPrice Int                // In cents (theoretical income per unit)
+
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+
+  consumptions FakbarConsumption[]
+  stockCounts  FakbarStockCount[]
+  specials     FakbarEveningSpecial[]
+}
+
+enum FakbarWeekStatus {
+  OPEN
+  CLOSED
+}
+
+model FakbarWeek {
+  id         String           @id @default(cuid())
+  weekNumber Int
+  year       Int
+  startDate  DateTime         @db.Date
+  endDate    DateTime         @db.Date
+  status     FakbarWeekStatus @default(OPEN)
+
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+
+  evenings    FakbarEvening[]
+  stockCounts FakbarStockCount[]
+
+  @@unique([year, weekNumber])
+}
+
+model FakbarEvening {
+  id                 String   @id @default(cuid())
+  weekId             String
+  date               DateTime @db.Date
+  dayOfWeek          String   // Zondag, Maandag, etc.
+  hoofdtapperId      String?
+  specialeActiviteit String?
+  bancontactRevenue  Int      @default(0) // In cents
+  cashToSafe         Int      @default(0) // "Naar kluis" in cents
+
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+
+  week        FakbarWeek               @relation(fields: [weekId], references: [id], onDelete: Cascade)
+  hoofdtapper User?                    @relation("FakbarHoofdtapper", fields: [hoofdtapperId], references: [id], onDelete: SetNull)
+  cashCount   FakbarCashRegisterCount?
+  consumption FakbarConsumption[]
+  rental      FakbarRental?
+  specials    FakbarEveningSpecial[]
+
+  @@index([date])
+}
+
+model FakbarCashRegisterCount {
+  eveningId String @id
+
+  // All amounts are counts (how many pieces)
+  cnt_0_05          Int @default(0)
+  cnt_0_10          Int @default(0)
+  cnt_0_20          Int @default(0)
+  cnt_0_50          Int @default(0)
+  cnt_1_00          Int @default(0)
+  cnt_2_00          Int @default(0)
+  cnt_5_00          Int @default(0)
+  cnt_10_00         Int @default(0)
+  cnt_20_00         Int @default(0)
+  cnt_50_00         Int @default(0)
+  cnt_100_00        Int @default(0)
+  
+  cnt_elixirbon         Int @default(0)
+  cnt_guidogids         Int @default(0)
+  cnt_medewerkersbon    Int @default(0)
+
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+
+  evening FakbarEvening @relation(fields: [eveningId], references: [id], onDelete: Cascade)
+}
+
+enum FakbarConsumptionCategory {
+  TAPPERSDRANK
+  VERJAARDAGEN
+  ZAKPINTJES
+  MISLUKTE_PINTEN
+  KLANTENKAART
+  SUCCESPINTEN
+  VERKOOP
+}
+
+model FakbarConsumption {
+  id        String                    @id @default(cuid())
+  eveningId String
+  itemId    String
+  category  FakbarConsumptionCategory
+  quantity  Int
+
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+
+  evening FakbarEvening @relation(fields: [eveningId], references: [id], onDelete: Cascade)
+  item    FakbarItem    @relation(fields: [itemId], references: [id], onDelete: Cascade)
+
+  @@index([eveningId])
+}
+
+model FakbarStockCount {
+  id           String @id @default(cuid())
+  weekId       String
+  itemId       String
+  beginOpslag  Int    @default(0)
+  levering     Int    @default(0)
+  naarPost     Int    @default(0)
+  naarFrigo    Int    @default(0)
+  eindOpslag   Int    @default(0)
+  beginTelling Int    @default(0)
+  eindTelling  Int    @default(0)
+
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+
+  week FakbarWeek @relation(fields: [weekId], references: [id], onDelete: Cascade)
+  item FakbarItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
+
+  @@unique([weekId, itemId])
+}
+
+/// Wat er één avond extra is: een drank die er anders niet staat, of een actie
+/// aan de toog ("2+1 gratis Stella").
+///
+/// **Dit is iets anders dan `FakbarEvening.specialeActiviteit`.** Dat veld zegt
+/// *wat* die avond is (een cantus, een TD, een verhuur); dit zegt wat er die
+/// avond aan de toog anders is. Een gewone donderdag kan een actie hebben zonder
+/// dat er een activiteit is, en een cantus kan er drie hebben.
+enum FakbarSpecialKind {
+  /// Een drank die er die avond bij is en niet op de vaste kaart staat.
+  DRANK
+  /// Een actie of korting op wat er al staat.
+  ACTIE
+}
+
+model FakbarEveningSpecial {
+  id        String            @id @default(cuid())
+  eveningId String
+  kind      FakbarSpecialKind
+
+  /// Wat er op het bord komt: "2+1 gratis Stella", "Cocktail van de maand".
+  title     String
+  /// Optionele toelichting, bv. de voorwaarden van de actie.
+  note      String?
+
+  /// Het artikel waar de actie over gaat, wanneer het er één is. Null voor een
+  /// actie over de hele toog of een drank die niet op de kaart staat. Bewust
+  /// `SetNull` en geen `Cascade`: gaat het artikel van de kaart, dan blijft de
+  /// actie in de historiek staan met haar eigen titel.
+  itemId    String?
+  /// De prijs die die avond geldt, in cent. Null betekent: de gewone prijs, of
+  /// niet van toepassing (bij een actie zoals 2+1).
+  price     Int?
+
+  /// Volgorde op het bord en op de site.
+  sortOrder Int               @default(0)
+
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+
+  evening FakbarEvening @relation(fields: [eveningId], references: [id], onDelete: Cascade)
+  item    FakbarItem?   @relation(fields: [itemId], references: [id], onDelete: SetNull)
+
+  @@index([eveningId])
+}
+
+model FakbarRental {
+  eveningId       String @id
+  rentalFee       Int    @default(25000) // Default 250 EUR in cents
+  expectedRevenue Int    @default(0) // In cents
+  effectiveProfit Int    @default(0) // In cents
+  
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+
+  evening FakbarEvening @relation(fields: [eveningId], references: [id], onDelete: Cascade)
 }

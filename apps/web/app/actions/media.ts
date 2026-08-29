@@ -19,10 +19,26 @@ import {
   setImmichAlbumCover,
   uploadImmichAsset,
 } from "@/lib/immich-gallery";
+import { fakbarGallery, fakbarUploadEnabled, setFakbarUploadEnabled } from "@/lib/fakbar-gallery";
 
 const MAX_PDF_BYTES = 40 * 1024 * 1024;
 const MAX_IMAGE_BYTES = 45 * 1024 * 1024;
 const IMMICH_ADMIN_DEVICE_ID = "vtk-web-admin";
+
+/**
+ * Naar welke fotogalerij een upload gaat. Standaard die van vtk.be; "fakbar"
+ * kan alleen wanneer de schakelaar in /admin/media aanstaat (zie
+ * lib/fakbar-gallery.ts). De keuze wordt hier server-side hertoetst en niet op
+ * het formulier vertrouwd: een uitgezette schakelaar moet ook standhouden als
+ * iemand het verborgen veld zelf meestuurt.
+ */
+type GalleryTarget = "main" | "fakbar";
+
+async function readGalleryTarget(formData: FormData): Promise<GalleryTarget | null> {
+  const raw = formData.get("gallery");
+  if (raw !== "fakbar") return "main";
+  return (await fakbarUploadEnabled()) ? "fakbar" : null;
+}
 
 function slugifyId(value: string): string {
   const slug = value
@@ -201,14 +217,22 @@ export async function createImmichAlbumAction(
   const title = readField(formData, "title");
   const description = readField(formData, "description", 1000);
   if (!title) return { ok: false, error: "missing_title" };
+  const target = await readGalleryTarget(formData);
+  if (!target) return { ok: false, error: "fakbar_upload_disabled" };
   try {
-    const album = await createImmichGalleryAlbum({ title, description });
+    const album =
+      target === "fakbar"
+        ? await fakbarGallery.createAlbum({ title, description })
+        : await createImmichGalleryAlbum({ title, description });
     await logAudit({
       action: "create",
       entity: "photoAlbum",
       entityId: album.id,
       target: title,
-      summary: "fotoalbum aangemaakt in Immich",
+      summary:
+        target === "fakbar"
+          ? "fotoalbum aangemaakt in Immich voor de fakbargalerij"
+          : "fotoalbum aangemaakt in Immich",
     });
     return { ok: true, albumId: album.id };
   } catch (error) {
@@ -272,9 +296,42 @@ export async function setImmichAlbumCoverAction(
   }
 }
 
-export async function finalizeImmichAlbumAction(): Promise<void> {
+export async function finalizeImmichAlbumAction(formData?: FormData): Promise<void> {
   await requirePermission("media.manage");
+  // Ververst de momentopname van de galerij waarin net geüpload is. De andere
+  // met rust laten scheelt een volledige Immich-uitlezing per upload.
+  if (formData?.get("gallery") === "fakbar") {
+    await fakbarGallery.refreshSnapshot();
+    return;
+  }
   await refreshImmichGallerySnapshot();
   revalidatePath("/media");
   revalidatePath("/en/media");
+}
+
+/**
+ * De schakelaar die het uploaden naar de fakbargalerij vrijgeeft. Staat
+ * standaard uit; zie lib/fakbar-gallery.ts voor waarom.
+ */
+export async function setFakbarUploadEnabledAction(
+  _prev: SaveState,
+  formData: FormData
+): Promise<SaveState> {
+  await requirePermission("media.manage");
+  const enabled = formData.get("enabled") === "true";
+  await setFakbarUploadEnabled(enabled);
+  await logAudit({
+    action: "update",
+    entity: "media",
+    entityId: "media.fakbarUpload",
+    target: "fakbar-upload",
+    summary: enabled
+      ? "uploaden naar de fakbargalerij aangezet"
+      : "uploaden naar de fakbargalerij uitgezet",
+  });
+  revalidatePath("/admin/media");
+  revalidatePath("/en/admin/media");
+  // De web-variant van saveOk draagt geen eigen melding; het formulier zegt
+  // zelf wat de nieuwe stand is.
+  return saveOk();
 }

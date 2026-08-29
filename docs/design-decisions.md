@@ -4739,3 +4739,44 @@ al per gebruiker te schikken zijn.
   is de uitkomst zichtbaar in de zijbalk zelf.
 - **De volledige lijst staat er open onder, niet ingeklapt.** Anders vallen
   nieuwe tabs niet meer op bij wie enkel nog naar zijn pins kijkt.
+
+---
+
+## Twee fotogalerijen: vtk.be en 't ElixIr
+
+De fakbar heeft een **eigen fotogalerij** op haar eigen app, los van die op
+vtk.be, en dat is een kringkeuze en geen technische.
+
+**Waarom.** VTK wil op de hoofdsite enkel kwalitatief, geselecteerd werk: de
+fotogalerij daar is een visitekaartje dat ook door bedrijven, ouders en nieuwe
+studenten bekeken wordt. De fakbar wil na elke avond gewoon alles kunnen posten,
+ook wat minder scherp of minder flatteus is; voor wie er die avond bij was, is
+dat net de waarde. Dat zijn twee verschillende redacties met twee verschillende
+latten, en die passen niet in één galerij met een vinkje per album: één
+verkeerde klik zet dan een rommelige barnacht op de voorpagina van de kring.
+
+**Hoe het gescheiden blijft.** Eén Immich-installatie, één API-sleutel, maar per
+galerij een eigen **merker** in de albumbeschrijving: `[gallery]` voor vtk.be,
+`[fakbar]` voor 't ElixIr. Een album hoort bij de galerij waarvan het de merker
+draagt **en bij die alleen**: draagt het er twee, dan verschijnt het nergens en
+zet /admin/fotos het als "staat nergens" in beeld. Die wederzijdse uitsluiting
+is het hele punt; zonder haar zou één album met beide merkers alsnog op de
+hoofdsite belanden. De merker komt bij het uploaden altijd uit de client en
+nooit uit het formulier, dus een upload vanuit de fakbar-app kan per constructie
+niet in de galerij van vtk.be terechtkomen.
+
+**Uploaden vanaf de hoofdsite staat standaard uit.** Wie in /admin/media werkt
+heeft soms toch de foto's van de fakbar in handen, dus er is een bestemmingskeuze
+per album. Die verschijnt pas nadat iemand met `media.manage` de schakelaar
+aanzet (`Setting["media.fakbarUpload"]`). Standaard uit, omdat een keuze die er
+altijd staat er ooit eentje is die verkeerd gaat, en dan is precies het
+onderscheid weg waar dit hele verhaal om draait. De schakelaar geldt voor het
+hele team en niet per gebruiker: het is een afspraak, geen voorkeur.
+
+**Wat er bewust niet is.** De fakbargalerij heeft geen gezichtszoeker. Die op
+vtk.be draait op een aparte Immich-databank en is gebouwd voor het geselecteerde
+archief; hem hier bijzetten zou betekenen dat je jezelf kan terugvinden op elke
+avond die iemand ooit gepost heeft, en dat is een ander gesprek dan een galerij.
+
+De implementatie staat in `packages/gallery` (gedeeld), `apps/fakbar/lib/gallery.ts`
+en `apps/web/lib/fakbar-gallery.ts`.
