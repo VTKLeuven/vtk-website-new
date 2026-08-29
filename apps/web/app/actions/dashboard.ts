@@ -2,28 +2,24 @@
 
 import { revalidatePath } from "next/cache";
 import { prisma } from "@vtk/db";
-import { isTileImageKey } from "@/lib/dashboard-tiles";
+import { isTileImageKey, normalizeUrl } from "@/lib/dashboard-tiles";
 import { canManageSharedDashboardTile } from "@/lib/dashboard-authorization";
 import { requireSession } from "@/lib/session";
 import { describeChanges, logAudit } from "@/lib/audit";
 
 function revalidateDashboard(): void {
   revalidatePath("/admin");
+  revalidatePath("/nl/admin");
   revalidatePath("/en/admin");
+  revalidatePath("/[locale]/admin", "page");
 }
 
 function revalidateManager(): void {
   revalidatePath("/admin/dashboard-tiles");
+  revalidatePath("/nl/admin/dashboard-tiles");
   revalidatePath("/en/admin/dashboard-tiles");
+  revalidatePath("/[locale]/admin/dashboard-tiles", "page");
   revalidateDashboard();
-}
-
-/** Prepend https:// when the user omits a scheme, otherwise leave untouched. */
-function normalizeUrl(raw: string): string {
-  const s = raw.trim();
-  if (!s) return s;
-  if (/^[a-z][a-z0-9+.-]*:\/\//i.test(s)) return s;
-  return `https://${s}`;
 }
 
 /**

@@ -5,7 +5,7 @@ import { ConfirmDialog } from "@vtk/ui";
 import { IconButton } from "@/components/ui/IconButton";
 import { PencilIcon, TrashIcon } from "@/components/ui/icons";
 import { TileVisualPicker } from "@/components/admin/TileVisualPicker";
-import { TILE_COLORS, TileChip } from "@/lib/dashboard-tiles";
+import { TILE_COLORS, TileChip, normalizeUrl } from "@/lib/dashboard-tiles";
 import {
   deleteDefaultTileAction,
   reorderDefaultTilesAction,
@@ -127,6 +127,11 @@ export function DefaultTilesManager({
   }
 
   function remove(tile: SimpleTile) {
+    setOwnTiles((cur) => cur.filter((t) => t.id !== tile.id));
+    setPubTiles((cur) => cur.filter((t) => t.id !== tile.id));
+    setGrpSections((cur) =>
+      cur.map((g) => ({ ...g, tiles: g.tiles.filter((t) => t.id !== tile.id) }))
+    );
     startTransition(async () => {
       await deleteDefaultTileAction(tile.id);
       setRemoving(null);
@@ -135,25 +140,25 @@ export function DefaultTilesManager({
 
   function handleReorderPersonal(next: SimpleTile[]) {
     setOwnTiles(next);
-    startTransition(() =>
-      void reorderDefaultTilesAction({ scope: "USER", ids: next.map((x) => x.id) })
-    );
+    startTransition(async () => {
+      await reorderDefaultTilesAction({ scope: "USER", ids: next.map((x) => x.id) });
+    });
   }
 
   function handleReorderGlobal(next: SimpleTile[]) {
     setPubTiles(next);
-    startTransition(() =>
-      void reorderDefaultTilesAction({ scope: "GLOBAL", ids: next.map((x) => x.id) })
-    );
+    startTransition(async () => {
+      await reorderDefaultTilesAction({ scope: "GLOBAL", ids: next.map((x) => x.id) });
+    });
   }
 
   function handleReorderGroup(groupId: string, next: SimpleTile[]) {
     setGrpSections((cur) =>
       cur.map((g) => (g.id === groupId ? { ...g, tiles: next } : g))
     );
-    startTransition(() =>
-      void reorderDefaultTilesAction({ scope: "GROUP", groupId, ids: next.map((x) => x.id) })
-    );
+    startTransition(async () => {
+      await reorderDefaultTilesAction({ scope: "GROUP", groupId, ids: next.map((x) => x.id) });
+    });
   }
 
   return (
@@ -248,14 +253,64 @@ export function DefaultTilesManager({
           pending={pending}
           onClose={() => setEditor(null)}
           onSubmit={(data) => {
-            startTransition(() =>
-              saveDefaultTileAction({
+            const cleanUrl = normalizeUrl(data.url);
+            const cleanLabel = data.label.trim();
+            if (editor.tile) {
+              const id = editor.tile.id;
+              const updated: SimpleTile = {
+                ...editor.tile,
+                label: cleanLabel,
+                url: cleanUrl,
+                icon: data.icon || "link",
+                color: data.color || "navy",
+                imageKey: data.imageKey,
+              };
+              if (editor.scope === "USER") {
+                setOwnTiles((cur) => cur.map((t) => (t.id === id ? updated : t)));
+              } else if (editor.scope === "GLOBAL") {
+                setPubTiles((cur) => cur.map((t) => (t.id === id ? updated : t)));
+              } else if (editor.scope === "GROUP") {
+                const groupId = editor.groupId;
+                setGrpSections((cur) =>
+                  cur.map((g) =>
+                    g.id === groupId
+                      ? { ...g, tiles: g.tiles.map((t) => (t.id === id ? updated : t)) }
+                      : g
+                  )
+                );
+              }
+            } else {
+              const tempId = `temp:${Date.now()}`;
+              const created: SimpleTile = {
+                id: tempId,
+                label: cleanLabel,
+                url: cleanUrl,
+                icon: data.icon || "link",
+                color: data.color || "navy",
+                imageKey: data.imageKey,
+                order: 999,
+              };
+              if (editor.scope === "USER") {
+                setOwnTiles((cur) => [...cur, created]);
+              } else if (editor.scope === "GLOBAL") {
+                setPubTiles((cur) => [...cur, created]);
+              } else if (editor.scope === "GROUP") {
+                const groupId = editor.groupId;
+                setGrpSections((cur) =>
+                  cur.map((g) =>
+                    g.id === groupId ? { ...g, tiles: [...g.tiles, created] } : g
+                  )
+                );
+              }
+            }
+            startTransition(async () => {
+              await saveDefaultTileAction({
                 id: editor.tile?.id,
                 scope: editor.scope,
                 groupId: editor.groupId,
                 ...data,
-              })
-            );
+              });
+            });
             setEditor(null);
           }}
         />

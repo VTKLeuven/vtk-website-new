@@ -713,6 +713,14 @@ export function isTileImageKey(key: string): boolean {
   return key.startsWith(TILE_IMAGE_PREFIX);
 }
 
+/** Prepend https:// when the user omits a scheme, otherwise leave untouched. */
+export function normalizeUrl(raw: string): string {
+  const s = raw.trim();
+  if (!s) return s;
+  if (/^[a-z][a-z0-9+.-]*:/i.test(s)) return s;
+  return `https://${s}`;
+}
+
 /**
  * Same-origin media-URL. `publicUrl` uit `lib/storage` doet hetzelfde, maar dat
  * bestand her-exporteert heel `@vtk/storage` (aws-sdk, node) en hoort dus niet
