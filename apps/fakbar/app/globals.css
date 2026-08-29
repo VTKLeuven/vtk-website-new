@@ -2374,3 +2374,30 @@ select:focus {
     justify-content: center;
   }
 }
+
+/* Uitgeklapt uploadveld onder een albumrij. */
+.fakbar-album-upload-row > td {
+  padding: 0;
+  background: var(--paper-2);
+}
+
+.fakbar-album-upload {
+  padding: 18px 20px 22px;
+  border-top: 1px solid var(--line);
+  box-shadow: inset 3px 0 0 var(--yellow);
+}
+
+.fakbar-album-upload h4 {
+  margin-bottom: 14px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+/* In de gestapelde weergave op smalle schermen heeft de rij geen kolommen meer;
+   het label van de lege cel hoort dan ook niet te verschijnen. */
+@media (max-width: 720px) {
+  .fakbar-album-upload-row > td::before {
+    content: none;
+  }
+}

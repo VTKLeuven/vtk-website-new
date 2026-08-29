@@ -21,6 +21,21 @@ const nextConfig: NextConfig = {
   turbopack: {
     root: monorepoRoot,
   },
+  experimental: {
+    /**
+     * Zonder dit weigert Next elke server action met een body boven 1 MiB, en
+     * dat is elke foto. De actie kwam daardoor nooit aan bod: je kreeg "Body
+     * exceeded 1 MB limit" in de serverlog terwijl het album al aangemaakt was,
+     * dus bleef er een leeg album staan.
+     *
+     * Iets ruimer dan de 100 MB die `uploadAssetAction` zelf toelaat, zodat de
+     * vriendelijke melding van de actie ("te groot") afgaat en niet de harde
+     * weigering van Next; de multipart-envelop eromheen telt namelijk mee.
+     */
+    serverActions: {
+      bodySizeLimit: "110mb",
+    },
+  },
 };
 
 export default nextConfig;

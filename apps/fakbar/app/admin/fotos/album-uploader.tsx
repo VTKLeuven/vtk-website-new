@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useState, useTransition } from 'react';
+import { useId, useRef, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button, Input, Label } from '@vtk/ui';
 import { useToast } from '@/components/ui/toast';
@@ -18,15 +18,22 @@ const ERRORS: Record<string, string> = {
 };
 
 /**
- * Album aanmaken en de foto's erin uploaden.
+ * Foto's uploaden: naar een nieuw album, of naar een album dat er al staat.
  *
  * Bestand per bestand, met de voortgang erbij: een avond fotograferen levert
  * makkelijk tweehonderd bestanden op, en één grote request daarvoor loopt op de
  * bodylimiet stuk zonder dat je weet hoever hij geraakt was. Mislukt er één,
  * dan gaat de rest gewoon door en zegt de melding achteraf hoeveel er niet
  * gelukt zijn.
+ *
+ * **Waarom er ook een modus voor een bestaand album is.** Een album werd
+ * aangemaakt vóór de eerste upload, dus liep er iets mis met de bestanden, dan
+ * bleef er een leeg album achter waar je niets meer mee kon; het enige antwoord
+ * was het in Immich zelf oplossen. Nu vul je het gewoon aan. Het is bovendien
+ * de gewone gang van zaken: na een avond komen er later nog foto's van iemand
+ * anders bij.
  */
-export function AlbumUploader() {
+export function AlbumUploader({ album }: { album?: { id: string; title: string } }) {
   const [files, setFiles] = useState<File[]>([]);
   const [coverIndex, setCoverIndex] = useState(0);
   const [progress, setProgress] = useState<Progress | null>(null);
@@ -34,12 +41,25 @@ export function AlbumUploader() {
   const showToast = useToast();
   const router = useRouter();
   const [, startTransition] = useTransition();
+  const fieldId = useId();
+
+  // Naar een bestaand album uploaden verandert de cover niet: die is ooit
+  // gekozen en hoort niet te verspringen omdat er foto's bijkomen.
+  const isExisting = Boolean(album);
 
   function selectFiles(list: FileList | null) {
     const next = list ? Array.from(list) : [];
     setFiles(next);
     const firstImage = next.findIndex((file) => file.type.startsWith('image/'));
     setCoverIndex(firstImage >= 0 ? firstImage : 0);
+  }
+
+  function reset(form: HTMLFormElement) {
+    setProgress(null);
+    setFiles([]);
+    setCoverIndex(0);
+    form.reset();
+    if (inputRef.current) inputRef.current.value = '';
   }
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
@@ -51,14 +71,18 @@ export function AlbumUploader() {
       return;
     }
 
-    const created = await createAlbumAction(new FormData(form));
-    if (!created.ok || !created.albumId) {
-      showToast({
-        message: ERRORS[created.error ?? ''] ?? 'Het album kon niet aangemaakt worden.',
-        variant: 'error',
-        duration: 0,
-      });
-      return;
+    let albumId = album?.id;
+    if (!albumId) {
+      const created = await createAlbumAction(new FormData(form));
+      if (!created.ok || !created.albumId) {
+        showToast({
+          message: ERRORS[created.error ?? ''] ?? 'Het album kon niet aangemaakt worden.',
+          variant: 'error',
+          duration: 0,
+        });
+        return;
+      }
+      albumId = created.albumId;
     }
 
     let done = 0;
@@ -68,13 +92,15 @@ export function AlbumUploader() {
 
     for (const file of files) {
       const data = new FormData();
-      data.append('albumId', created.albumId);
+      data.append('albumId', albumId);
       data.append('file', file);
       try {
         const result = await uploadAssetAction(data);
         assetIds.push(result.ok && result.assetId ? result.assetId : null);
         if (!result.ok) failed += 1;
       } catch {
+        // Een afgewezen request (te grote body, netwerk weg) gooit hier; die
+        // telt als mislukt en mag de rest van de reeks niet stilleggen.
         assetIds.push(null);
         failed += 1;
       }
@@ -84,37 +110,29 @@ export function AlbumUploader() {
 
     // De gekozen cover in Immich zelf zetten, zodat de keuze ook daar klopt.
     // Is die foto niet geraakt, dan valt hij terug op de eerste die wel lukte.
-    const coverAssetId = assetIds[coverIndex] ?? assetIds.find((id) => id !== null) ?? null;
     let coverFailed = false;
-    if (coverAssetId) {
-      const coverData = new FormData();
-      coverData.append('albumId', created.albumId);
-      coverData.append('assetId', coverAssetId);
-      try {
-        const coverResult = await setAlbumCoverAction(coverData);
-        coverFailed = !coverResult.ok;
-      } catch {
-        coverFailed = true;
+    if (!isExisting) {
+      const coverAssetId = assetIds[coverIndex] ?? assetIds.find((id) => id !== null) ?? null;
+      if (coverAssetId) {
+        const coverData = new FormData();
+        coverData.append('albumId', albumId);
+        coverData.append('assetId', coverAssetId);
+        try {
+          const coverResult = await setAlbumCoverAction(coverData);
+          coverFailed = !coverResult.ok;
+        } catch {
+          coverFailed = true;
+        }
       }
     }
 
     await finalizeAlbumAction();
-
-    setProgress(null);
-    setFiles([]);
-    setCoverIndex(0);
-    form.reset();
-    if (inputRef.current) inputRef.current.value = '';
+    reset(form);
 
     const uploaded = done - failed;
-    const base =
-      failed === 0
-        ? `Album aangemaakt met ${uploaded} ${uploaded === 1 ? 'foto' : "foto's"}.`
-        : `Album aangemaakt; ${uploaded} van de ${done} gelukt, ${failed} mislukt.`;
-
     showToast({
-      message: coverFailed ? `${base} De cover kon niet ingesteld worden.` : base,
-      variant: failed === 0 ? 'success' : 'warning',
+      message: buildMessage({ isExisting, uploaded, done, failed, coverFailed, title: album?.title }),
+      variant: failed === 0 ? 'success' : uploaded === 0 ? 'error' : 'warning',
       duration: failed === 0 ? 4000 : 0,
     });
     startTransition(() => router.refresh());
@@ -124,22 +142,24 @@ export function AlbumUploader() {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
-      <div className="grid gap-4 sm:grid-cols-2">
-        <div>
-          <Label htmlFor="album-title">Albumtitel</Label>
-          <Input id="album-title" name="title" required maxLength={200} placeholder="Cantus 12 maart" />
+      {isExisting ? null : (
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div>
+            <Label htmlFor={`${fieldId}-title`}>Albumtitel</Label>
+            <Input id={`${fieldId}-title`} name="title" required maxLength={200} placeholder="Cantus 12 maart" />
+          </div>
+          <div>
+            <Label htmlFor={`${fieldId}-description`}>Beschrijving (optioneel)</Label>
+            <Input id={`${fieldId}-description`} name="description" maxLength={1000} />
+          </div>
         </div>
-        <div>
-          <Label htmlFor="album-description">Beschrijving (optioneel)</Label>
-          <Input id="album-description" name="description" maxLength={1000} />
-        </div>
-      </div>
+      )}
 
       <div>
-        <Label htmlFor="album-files">Foto&rsquo;s</Label>
+        <Label htmlFor={`${fieldId}-files`}>Foto&rsquo;s</Label>
         <input
           ref={inputRef}
-          id="album-files"
+          id={`${fieldId}-files`}
           type="file"
           accept="image/*,video/*"
           multiple
@@ -153,7 +173,7 @@ export function AlbumUploader() {
         </p>
       </div>
 
-      {files.length > 0 ? (
+      {files.length > 0 && !isExisting ? (
         <div>
           <Label>Coverfoto</Label>
           <p className="mb-1.5 text-xs text-[var(--muted)]">
@@ -189,11 +209,20 @@ export function AlbumUploader() {
         </div>
       ) : null}
 
+      {files.length > 0 && isExisting ? (
+        <p className="text-sm text-[var(--muted)]">
+          {files.length} {files.length === 1 ? 'bestand' : 'bestanden'} klaar om toe te voegen. De cover van het
+          album blijft zoals ze is.
+        </p>
+      ) : null}
+
       <div className="flex flex-wrap items-center gap-3">
         <Button type="submit" disabled={busy}>
           {busy
             ? `${progress.done}/${progress.total}${progress.failed ? ` (${progress.failed} mislukt)` : ''}`
-            : 'Album aanmaken en uploaden'}
+            : isExisting
+              ? "Foto's toevoegen"
+              : 'Album aanmaken en uploaden'}
         </Button>
         {busy ? (
           <p className="text-sm text-[var(--muted)]" role="status">
@@ -203,4 +232,42 @@ export function AlbumUploader() {
       </div>
     </form>
   );
+}
+
+/**
+ * Wat er achteraf in de toast staat. Het geval dat er echt toe doet is
+ * `uploaded === 0` bij een nieuw album: dan staat er een leeg album, en dat moet
+ * de melding zeggen in plaats van "album aangemaakt" alsof het gelukt is.
+ */
+function buildMessage({
+  isExisting,
+  uploaded,
+  done,
+  failed,
+  coverFailed,
+  title,
+}: {
+  isExisting: boolean;
+  uploaded: number;
+  done: number;
+  failed: number;
+  coverFailed: boolean;
+  title?: string;
+}): string {
+  const photos = (count: number) => `${count} ${count === 1 ? 'foto' : "foto's"}`;
+
+  if (isExisting) {
+    if (uploaded === 0) return `Er is niets toegevoegd aan ${title ?? 'het album'}; alle ${done} mislukt.`;
+    if (failed === 0) return `${photos(uploaded)} toegevoegd aan ${title ?? 'het album'}.`;
+    return `${photos(uploaded)} toegevoegd aan ${title ?? 'het album'}, ${failed} mislukt.`;
+  }
+
+  if (uploaded === 0) {
+    return `Het album is aangemaakt maar leeg gebleven: alle ${done} uploads mislukten. Voeg de foto's hieronder toe bij het album, of verwijder het in Immich.`;
+  }
+  const base =
+    failed === 0
+      ? `Album aangemaakt met ${photos(uploaded)}.`
+      : `Album aangemaakt; ${uploaded} van de ${done} gelukt, ${failed} mislukt.`;
+  return coverFailed ? `${base} De cover kon niet ingesteld worden.` : base;
 }

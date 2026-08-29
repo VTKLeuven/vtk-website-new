@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { galleryMarker, immichWebUrl } from '@vtk/gallery';
 import { AlbumUploader } from './album-uploader';
+import { AlbumTable } from './album-table';
 import { ElixirIcon } from '@/components/elixir-icon';
 import { fakbarGallery } from '@/lib/gallery';
 
@@ -100,44 +101,16 @@ export default async function AdminFotosPage() {
             </p>
           </div>
         ) : (
-          <div className="fakbar-table-wrap">
-            <table className="fakbar-table fakbar-table-stack">
-              <thead>
-                <tr>
-                  <th>Album</th>
-                  <th>Datum</th>
-                  <th className="num">Foto&rsquo;s</th>
-                  <th>
-                    <span className="sr-only">Bekijken</span>
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {albums.map((album) => (
-                  <tr key={album.id}>
-                    <td data-label="Album">
-                      <span className="font-medium text-[var(--ink)]">{album.title}</span>
-                      {album.description ? (
-                        <span className="mt-0.5 block text-xs text-[var(--muted)]">{album.description}</span>
-                      ) : null}
-                    </td>
-                    <td data-label="Datum">{formatAlbumDate(album.date) ?? 'geen datum'}</td>
-                    <td className="num tabular-nums" data-label="Foto's">
-                      {album.photoCount}
-                    </td>
-                    <td data-label="">
-                      <Link
-                        href={`/fotos/${album.slug}`}
-                        className="text-sm font-medium text-[var(--ink)] underline underline-offset-2"
-                      >
-                        Bekijken
-                      </Link>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <AlbumTable
+            albums={albums.map((album) => ({
+              id: album.id,
+              slug: album.slug,
+              title: album.title,
+              description: album.description,
+              date: formatAlbumDate(album.date),
+              photoCount: album.photoCount,
+            }))}
+          />
         )}
       </section>
     </div>
