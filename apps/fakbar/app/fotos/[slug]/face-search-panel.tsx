@@ -503,7 +503,7 @@ export function FaceSearchPanel({ albumSlug, configured }: { albumSlug: string; 
               {matches.length} {matches.length === 1 ? 'foto' : "foto's"}
             </span>
           </div>
-          <AlbumViewer photos={matches} />
+          <AlbumViewer photos={matches} albumSlug={albumSlug} />
         </div>
       ) : null}
     </section>

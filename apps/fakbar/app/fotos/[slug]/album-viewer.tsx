@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ElixirIcon } from '@/components/elixir-icon';
+import { TakedownDialog } from './takedown-dialog';
 
 type Photo = {
   id: string;
@@ -21,7 +22,7 @@ type Photo = {
  * De afbeeldingen komen van de Immich-proxy op een eigen host, al op maat
  * geschaald; daarom gewone `<img>`-tags en geen `next/image`.
  */
-export function AlbumViewer({ photos }: { photos: Photo[] }) {
+export function AlbumViewer({ photos, albumSlug }: { photos: Photo[]; albumSlug: string }) {
   const [index, setIndex] = useState<number | null>(null);
   const pointerStartX = useRef<number | null>(null);
   const active = index === null ? null : photos[index];
@@ -119,6 +120,13 @@ export function AlbumViewer({ photos }: { photos: Photo[] }) {
               >
                 <ElixirIcon name="arrow" className="h-[1.05rem] w-[1.05rem] rotate-90" />
               </a>
+              {/* Remount per foto: zo staat het formulier leeg wanneer je doorbladert. */}
+              <TakedownDialog
+                key={active.id}
+                albumSlug={albumSlug}
+                assetId={active.id}
+                photoTitle={active.title}
+              />
               <button
                 type="button"
                 className="fakbar-lightbox-button"

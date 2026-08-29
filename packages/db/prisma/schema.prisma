@@ -635,6 +635,7 @@ model User {
   studyProfile            StudyProfile?               @relation("StudyProfileUser")
 
   fakbarEvenings          FakbarEvening[]             @relation("FakbarHoofdtapper")
+  photoTakedownsHandled   PhotoTakedownRequest[]     @relation("PhotoTakedownHandler")
 
   pianoReservations PianoReservation[]
 
@@ -5396,4 +5397,80 @@ model FakbarRental {
   updatedAt DateTime @updatedAt @db.Timestamptz(3)
 
   evening FakbarEvening @relation(fields: [eveningId], references: [id], onDelete: Cascade)
+}
+
+/// Welke galerij een verwijderverzoek betreft. Eén tabel voor beide, net zoals
+/// het één Immich-installatie is; de scheiding zit in dit veld en in de query.
+enum PhotoTakedownGallery {
+  MAIN
+  FAKBAR
+}
+
+enum PhotoTakedownReason {
+  /// De melder staat zelf op de foto.
+  ON_PHOTO
+  /// Auteursrecht of een andere claim op het beeld zelf.
+  COPYRIGHT
+  OTHER
+}
+
+enum PhotoTakedownStatus {
+  /// Nog te behandelen.
+  NEW
+  /// Ingewilligd; de foto is uit de galerij gehaald.
+  DELETED
+  /// Bewust niet ingewilligd, met een notitie waarom.
+  KEPT
+}
+
+/// Een vraag van iemand om een foto uit een galerij te halen.
+///
+/// Dit is de bezwaar- en verwijderroute uit `docs/compliance-audit-2026-07-18.md`
+/// (art. 17 en 21 AVG), en tegelijk de gewone portretrecht-knop: wie op een
+/// fakbarfoto staat wil die soms weg, los van alle regelgeving.
+///
+/// **De rij is de waarheid, de mail is een seintje.** Er wordt eerst hier
+/// geschreven en pas daarna gemaild, zodat een hikkende mailserver geen verzoek
+/// laat verdwijnen; `mailDelivered` maakt in het beheer zichtbaar wat nooit
+/// vertrokken is.
+model PhotoTakedownRequest {
+  id      String               @id @default(cuid())
+  gallery PhotoTakedownGallery
+
+  /// Waar de foto stond. De slug is de publieke sleutel van het album, het
+  /// asset-id dat van Immich.
+  albumSlug String
+  assetId   String
+
+  /// Momentopnames, want na afhandeling bestaat de foto niet meer. Zonder deze
+  /// twee toont de historiek een verzoek over een asset-id dat nergens meer
+  /// naar verwijst.
+  albumTitle    String
+  photoFilename String
+
+  reporterName  String
+  reporterEmail String
+  reason        PhotoTakedownReason
+  /// Vrije toelichting van de melder.
+  message       String?
+
+  status        PhotoTakedownStatus @default(NEW)
+  handledById   String?
+  handledAt     DateTime?           @db.Timestamptz(3)
+  /// Waarom het verzoek zo afgehandeld is. Verplicht wanneer de foto blijft.
+  handlingNote  String?
+
+  /// Is de meldingsmail naar de post vertrokken? Onwaar betekent dat het
+  /// verzoek enkel hier staat en dat niemand er een seintje van kreeg.
+  mailDelivered Boolean @default(false)
+
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+
+  /// De beheerder die het afhandelde. `SetNull`: verlaat die persoon de kring,
+  /// dan blijft de afhandeling zelf bestaan.
+  handledBy User? @relation("PhotoTakedownHandler", fields: [handledById], references: [id], onDelete: SetNull)
+
+  @@index([gallery, status])
+  @@index([assetId])
 }

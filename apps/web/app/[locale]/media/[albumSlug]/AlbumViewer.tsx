@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { trackPhotoDownload } from "@/lib/analytics-client";
+import { TakedownDialog, type TakedownLabels } from "./TakedownDialog";
 
 type Photo = {
   id: string;
@@ -21,7 +22,7 @@ type Labels = {
   next: string;
   downloadPhoto: string;
   photoCounter: string;
-};
+} & TakedownLabels;
 
 function DownloadIcon() {
   return (
@@ -39,7 +40,20 @@ function CloseIcon() {
   );
 }
 
-export function AlbumViewer({ photos, labels }: { photos: Photo[]; labels: Labels }) {
+export function AlbumViewer({
+  photos,
+  labels,
+  albumSlug,
+}: {
+  photos: Photo[];
+  labels: Labels;
+  /**
+   * Zonder slug valt niet te zeggen over welk album een verzoek gaat, dus dan
+   * verschijnt de meldknop niet. Optioneel, zodat een viewer zonder album
+   * (bijvoorbeeld een losse reeks) blijft werken.
+   */
+  albumSlug?: string;
+}) {
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
   const pointerStartX = useRef<number | null>(null);
   const activePhoto = lightboxIndex === null ? null : photos[lightboxIndex];
@@ -141,6 +155,17 @@ export function AlbumViewer({ photos, labels }: { photos: Photo[]; labels: Label
               >
                 <DownloadIcon />
               </a>
+              {albumSlug ? (
+                <TakedownDialog
+                  /* Remount per foto: zo staat het formulier leeg wanneer je
+                     doorbladert, zonder een effect dat state reset. */
+                  key={activePhoto.id}
+                  albumSlug={albumSlug}
+                  assetId={activePhoto.id}
+                  photoTitle={activePhoto.title}
+                  labels={labels}
+                />
+              ) : null}
               <button
                 type="button"
                 className="vtk-immich-icon-button"

@@ -136,6 +136,10 @@ export function getAdminNav({ isItOrG5 = false }: AdminNavOptions = {}): NavEntr
       // Fotoalbums hebben één ingang: /admin/media. Daar staat de Immich-galerij,
       // en dat is de enige bron die de publieke mediapagina leest.
       item('media', '/media', { anyPerm: ['media.manage', 'photos.manageAlbums'] }),
+      // Verzoeken om een foto uit de galerij te halen. Naast Media, want dat is
+      // waar de albums beheerd worden; alleen `media.manage`, want dit is de
+      // enige tab die foto's echt weggooit.
+      item('takedowns', '/media/verwijderverzoeken', { perm: 'media.manage' }),
     ]),
     // Wat VTK Onderwijs beheert hangt samen: de POC's zijn de studenten die de
     // opleiding vertegenwoordigen, het bureau is hun vergadering, en de

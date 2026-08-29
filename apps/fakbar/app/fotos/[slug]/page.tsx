@@ -83,7 +83,7 @@ export default async function AlbumPage({ params }: { params: Promise<{ slug: st
             {faceSearch.enabled ? (
               <FaceSearchPanel albumSlug={slug} configured={faceSearch.configured} />
             ) : null}
-            <AlbumViewer photos={album.photos} />
+            <AlbumViewer photos={album.photos} albumSlug={album.slug} />
           </>
         )}
       </div>

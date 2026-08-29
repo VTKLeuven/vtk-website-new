@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { trackFaceSearch } from "@/lib/analytics-client";
 import { AlbumViewer } from "./AlbumViewer";
+import type { TakedownLabels } from "./TakedownDialog";
 
 type Photo = {
   id: string;
@@ -26,7 +27,7 @@ type FaceSearchResult = {
   }>;
 };
 
-type Labels = {
+type Labels = TakedownLabels & {
   findMyPhotos: string;
   faceSearchIntro: string;
   search: string;
@@ -577,14 +578,12 @@ export function FaceSearchPanel({
             </span>
           </div>
           <AlbumViewer
+            albumSlug={albumSlug}
             photos={matches}
             labels={{
-              openPhoto: labels.openPhoto,
-              close: labels.close,
+              ...labels,
               previous: labels.previousPhoto,
               next: labels.nextPhoto,
-              downloadPhoto: labels.downloadPhoto,
-              photoCounter: labels.photoCounter,
             }}
           />
         </div>

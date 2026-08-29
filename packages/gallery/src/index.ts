@@ -43,4 +43,23 @@ export {
 
 export { downloadFilenameFromResponse, sanitizeFilename, slugify } from './format';
 
+export {
+  TAKEDOWN_LIMITS,
+  TAKEDOWN_RATE_LIMIT,
+  TAKEDOWN_REASONS,
+  TakedownRateLimiter,
+  isTakedownReason,
+  isValidTakedownEmail,
+  parseTakedownSubmission,
+  takedownClientKey,
+  takedownMailBody,
+  takedownReasonLabel,
+  withinTakedownWindow,
+  type RawTakedownInput,
+  type TakedownErrorCode,
+  type TakedownParseResult,
+  type TakedownReason,
+  type TakedownSubmission,
+} from './takedown';
+
 export { createGalleryClient, type GalleryClient } from './client';

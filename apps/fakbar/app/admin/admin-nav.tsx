@@ -17,6 +17,7 @@ const nodes: AdminNavNode[] = [
   { type: 'item', item: { key: 'weeks', href: '/admin/weekoverzicht', label: 'Weekoverzicht' } },
   { type: 'item', item: { key: 'stats', href: '/admin/statistieken', label: 'Statistieken' } },
   { type: 'item', item: { key: 'photos', href: '/admin/fotos', label: "Foto's" } },
+  { type: 'item', item: { key: 'takedowns', href: '/admin/verwijderverzoeken', label: 'Verwijderverzoeken' } },
   {
     type: 'group',
     key: 'config',

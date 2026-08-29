@@ -66,6 +66,7 @@ export async function runPrivacyRetention(now = new Date()) {
     positiveDays("PRIVACY_FINGERPRINT_DAYS", 30),
     now,
   );
+  const takedownCutoff = before(positiveDays("PRIVACY_TAKEDOWN_DAYS", 365), now);
 
   const results = await prisma.$transaction([
     prisma.session.deleteMany({ where: { expiresAt: { lt: now } } }),
@@ -115,6 +116,18 @@ export async function runPrivacyRetention(now = new Date()) {
       },
       data: { requestFingerprint: null },
     }),
+    // Verwijderverzoeken worden geanonimiseerd, niet verwijderd: dat een foto
+    // op verzoek weggehaald is, moet navolgbaar blijven, maar wie het vroeg
+    // hoeft daarvoor niet jaren bewaard te blijven. Enkel afgehandelde
+    // verzoeken; een openstaand verzoek zonder afzender is onbehandelbaar.
+    prisma.photoTakedownRequest.updateMany({
+      where: {
+        handledAt: { lt: takedownCutoff },
+        status: { in: ["DELETED", "KEPT"] },
+        reporterEmail: { not: "" },
+      },
+      data: { reporterName: "", reporterEmail: "", message: null },
+    }),
   ]);
 
   const formEntries = await purgeExpiredFormEntries(now);
@@ -125,6 +138,7 @@ export async function runPrivacyRetention(now = new Date()) {
       accessLogDays: positiveDays("PRIVACY_ACCESS_LOG_DAYS", 365),
       rawPayloadDays: positiveDays("PRIVACY_RAW_PAYLOAD_DAYS", 90),
       fingerprintDays: positiveDays("PRIVACY_FINGERPRINT_DAYS", 30),
+      takedownDays: positiveDays("PRIVACY_TAKEDOWN_DAYS", 365),
     },
     affected: {
       formEntries,
@@ -139,6 +153,7 @@ export async function runPrivacyRetention(now = new Date()) {
       formOutboxPayloads: results[8].count,
       formEntryFingerprints: results[9].count,
       orderFingerprints: results[10].count,
+      takedownRequests: results[11].count,
     },
   };
 }
