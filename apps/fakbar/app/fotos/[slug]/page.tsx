@@ -4,7 +4,9 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { ElixirIcon } from '@/components/elixir-icon';
 import { AlbumViewer } from './album-viewer';
+import { FaceSearchPanel } from './face-search-panel';
 import { fakbarGallery } from '@/lib/gallery';
+import { fakbarFaceSearch } from '@/lib/face-search';
 
 export const dynamic = 'force-dynamic';
 
@@ -48,6 +50,9 @@ export default async function AlbumPage({ params }: { params: Promise<{ slug: st
   if (!album) notFound();
 
   const date = formatAlbumDate(album.date);
+  // Staat de vlag uit, dan wordt het paneel niet gerenderd en bestaat de knop
+  // dus ook niet; de route weigert los daarvan nog eens.
+  const faceSearch = fakbarFaceSearch.publicConfig();
 
   return (
     <>
@@ -74,7 +79,12 @@ export default async function AlbumPage({ params }: { params: Promise<{ slug: st
             <p>Er staan nog geen foto&rsquo;s in dit album.</p>
           </div>
         ) : (
-          <AlbumViewer photos={album.photos} />
+          <>
+            {faceSearch.enabled ? (
+              <FaceSearchPanel albumSlug={slug} configured={faceSearch.configured} />
+            ) : null}
+            <AlbumViewer photos={album.photos} />
+          </>
         )}
       </div>
     </>

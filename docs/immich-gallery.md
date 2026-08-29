@@ -13,7 +13,9 @@ server-side Immich API and renders images through Immich Public Proxy URLs.
 - `/media`: public album overview inside the VTK website layout.
 - `/media/[albumSlug]`: responsive photo grid, lightbox and per-photo download.
 - Face search per album: visitors can upload a profile photo or take a selfie
-  to find likely matches in that album.
+  to find likely matches in that album. Available on both galleries, each behind
+  its own flag that is off by default; see
+  [Face search runs per gallery](#face-search-runs-per-gallery).
 - NL/EN text through the existing i18n dictionaries.
 - Server-side API key handling. The Immich API key is never sent to the browser.
 
@@ -51,6 +53,9 @@ GALLERY_DATABASE_NAME="<immich-db-name>"
 GALLERY_DATABASE_USER="<immich-db-user>"
 GALLERY_DATABASE_PASSWORD="<immich-db-password>"
 GALLERY_FACE_SEARCH_ENABLED="true"
+GALLERY_FAKBAR_FACE_SEARCH_ENABLED="false"
+GALLERY_FACE_SEARCH_DEVICE_ID="vtk-gallery-face-search"
+GALLERY_FAKBAR_FACE_SEARCH_DEVICE_ID="vtk-fakbar-face-search"
 GALLERY_FACE_SEARCH_MAX_UPLOAD_BYTES="8388608"
 GALLERY_FACE_SEARCH_TIMEOUT_SECONDS="240"
 GALLERY_FACE_SEARCH_MIN_FACE_AREA_RATIO="0.008"
@@ -174,6 +179,61 @@ dumps. These are intentionally excluded or external:
 
 Only static website assets that belong to the website, such as
 `apps/web/public/VTK.png` and `apps/web/public/default-event.jpg`, are tracked.
+
+## Face search runs per gallery
+
+The engine lives in `packages/gallery/src/face-search.ts` and both apps use it:
+`apps/web/lib/immich-face-search.ts` is a thin facade over it for vtk.be, and
+`apps/fakbar/lib/face-search.ts` is the ElixIr one. There is one implementation,
+not two copies.
+
+Three things are deliberately **not** shared.
+
+**The on/off flag.** `GALLERY_FACE_SEARCH_ENABLED` covers vtk.be and
+`GALLERY_FAKBAR_FACE_SEARCH_ENABLED` covers the fakbar. Both default to off and
+both must read exactly `true`; `1`, `yes` and `TRUE` do not count. A face
+template is biometric data and therefore an Article 9 special category, and the
+2026-07-18 compliance audit requires an approved DPIA, a lawful Article 9
+condition, notice to the people indexed in the albums and a working objection
+route **per processing activity**. vtk.be and the fakbar are a different
+audience and a different set of albums, so enabling one must never quietly open
+the other.
+
+**The device id.** `GALLERY_FACE_SEARCH_DEVICE_ID` and
+`GALLERY_FAKBAR_FACE_SEARCH_DEVICE_ID` name the temporary selfie in Immich.
+Cleaning up stale uploads deletes everything carrying that device id older than
+the TTL, so a shared value would let one gallery wipe the other's selfie out
+from under a running search. Keep them different.
+
+**The albums.** Every query filters on `album_asset."albumId"`, and the album id
+comes from that gallery's own client. A `[fakbar]` album is therefore not
+searchable from vtk.be and a `[gallery]` album is not searchable from the fakbar
+app, the same boundary the markers draw for browsing. `apps/web/test/faceSearchSeparation.test.ts`
+guards the flag and device-id halves of this; the album half follows from the
+client that resolves the slug.
+
+What **is** shared: the Immich database connection and the tuning
+(`GALLERY_FACE_MATCH_MAX_DISTANCE`, the timeouts, the face-area ratios). It is
+one Immich install and one model, so those would only drift if split.
+
+### Before switching either flag on
+
+The audit lists this as a critical finding and the deployment checklist says to
+keep it off until the biometric checklist is formally approved. Enabling it is a
+controller decision, not a deployment detail:
+
+1. Complete and approve a DPIA for that gallery.
+2. Establish a valid Article 9 condition. Consent from the person searching
+   covers their own selfie; it does not cover the templates of everyone already
+   indexed in the album photos.
+3. Inform the people whose faces are indexed and give them a working objection
+   and deletion route.
+4. Restrict Immich access, and verify deletion from active data *and* backups.
+5. Test consent withdrawal, and document the AI Act role and human oversight.
+
+Existing album embeddings need a separate documented decision. Note that Immich
+detects faces and stores embeddings on its own schedule, independently of these
+flags: turning face search off stops the search feature, not the detection.
 
 ## Troubleshooting
 

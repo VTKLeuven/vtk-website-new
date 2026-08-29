@@ -110,6 +110,14 @@ services:
       # localhost-URL uit de root-.env over en vindt ze Immich niet; ze zou dan
       # stil een lege galerij tonen in plaats van te falen.
       GALLERY_IMMICH_API_URL: http://immich-server:2283/api
+      # Gezichtszoeken leest de albumindex rechtstreeks uit de Immich-databank,
+      # net als de web-service hierboven. Binnen het netwerk heet die host
+      # immich-database; de localhost-waarde uit de root-.env klopt hier niet.
+      GALLERY_DATABASE_HOST: immich-database
+      # Standaard uit, en apart van GALLERY_FACE_SEARCH_ENABLED van de
+      # hoofdsite: biometrische verwerking hoort per galerij afzonderlijk
+      # goedgekeurd te worden. Zie docs/immich-gallery.md.
+      GALLERY_FAKBAR_FACE_SEARCH_ENABLED: ${GALLERY_FAKBAR_FACE_SEARCH_ENABLED:-false}
     ports:
       - "127.0.0.1:3300:3000"
 

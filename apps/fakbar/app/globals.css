@@ -1901,3 +1901,251 @@ select:focus {
 .fakbar-chart-table summary:hover {
   color: var(--ink);
 }
+
+/* ── Gezichtszoeken in een album ─────────────────────────────────────────── */
+
+/* Het paneel staat boven het raster en moet zich als een kaart gedragen, niet
+   als een tweede pagina: één rand, geen genest kaartje per onderdeel. */
+.fakbar-face-panel {
+  margin-bottom: 28px;
+  padding: clamp(18px, 2.6vw, 26px);
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: var(--surface);
+  box-shadow: inset 3px 0 0 var(--yellow);
+}
+
+.fakbar-face-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.fakbar-face-header h2 {
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.fakbar-face-header p {
+  margin-top: 6px;
+  max-width: 62ch;
+  font-size: 0.875rem;
+  line-height: 1.6;
+  color: var(--muted);
+}
+
+.fakbar-face-form {
+  margin-top: 22px;
+  display: grid;
+  gap: 18px;
+}
+
+.fakbar-visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+.fakbar-face-picker {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 18px;
+}
+
+.fakbar-face-preview {
+  position: relative;
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 96px;
+  height: 96px;
+  border: 1px dashed var(--line-2);
+  border-radius: 16px;
+  background: var(--paper-2);
+  color: var(--muted);
+}
+
+.fakbar-face-preview.has-image {
+  border-style: solid;
+}
+
+.fakbar-face-preview img {
+  width: 100%;
+  height: 100%;
+  border-radius: 15px;
+  object-fit: cover;
+}
+
+.fakbar-face-preview-clear {
+  position: absolute;
+  top: -8px;
+  right: -8px;
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border: 1px solid var(--line-2);
+  border-radius: 999px;
+  background: var(--surface-2);
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.fakbar-face-preview-clear:hover {
+  border-color: var(--yellow);
+  color: var(--yellow);
+}
+
+.fakbar-face-picker-body {
+  display: grid;
+  gap: 12px;
+  min-width: 220px;
+  flex: 1 1 260px;
+}
+
+.fakbar-face-picker-body h3 {
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--muted);
+}
+
+.fakbar-face-picker-body p {
+  margin-top: 4px;
+  font-size: 0.875rem;
+  color: var(--body);
+  overflow-wrap: anywhere;
+}
+
+.fakbar-face-picker-actions,
+.fakbar-face-camera-actions,
+.fakbar-face-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.fakbar-face-camera {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--paper-2);
+}
+
+.fakbar-face-camera p {
+  font-size: 0.875rem;
+  line-height: 1.6;
+  color: var(--muted);
+}
+
+.fakbar-face-camera-frame {
+  overflow: hidden;
+  border-radius: 14px;
+  background: var(--navy);
+}
+
+.fakbar-face-camera-frame video {
+  display: block;
+  width: 100%;
+  max-height: 340px;
+  object-fit: cover;
+  /* Een spiegelbeeld: wie in de camera kijkt verwacht zichzelf zoals in een
+     spiegel, niet omgekeerd. */
+  transform: scaleX(-1);
+}
+
+.fakbar-face-consent {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 14px 16px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--paper-2);
+  font-size: 0.85rem;
+  line-height: 1.6;
+  color: var(--body);
+  cursor: pointer;
+}
+
+.fakbar-face-consent input {
+  flex: none;
+  margin-top: 2px;
+  width: 17px;
+  height: 17px;
+  accent-color: var(--yellow);
+}
+
+.fakbar-face-message {
+  margin-top: 18px;
+  padding: 12px 16px;
+  border: 1px solid var(--line);
+  border-radius: 13px;
+  background: var(--paper-2);
+  font-size: 0.875rem;
+  line-height: 1.6;
+  color: var(--body);
+}
+
+.fakbar-face-message[data-tone='ok'] {
+  border-color: rgba(34, 203, 232, 0.4);
+  color: var(--yellow);
+}
+
+.fakbar-face-message[data-tone='error'] {
+  border-color: rgba(217, 89, 38, 0.45);
+  color: #f0a184;
+}
+
+.fakbar-face-results {
+  margin-top: 24px;
+  padding-top: 22px;
+  border-top: 1px solid var(--line);
+}
+
+.fakbar-face-results-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.fakbar-face-results-head h3 {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.fakbar-face-results-head span {
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+@media (max-width: 560px) {
+  .fakbar-face-header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  /* Op een telefoon staan de knoppen onder elkaar; twee halve knoppen naast
+     elkaar knippen hun label af. */
+  .fakbar-face-picker-actions .fakbar-btn,
+  .fakbar-face-actions .fakbar-btn {
+    flex: 1 1 100%;
+    justify-content: center;
+  }
+}

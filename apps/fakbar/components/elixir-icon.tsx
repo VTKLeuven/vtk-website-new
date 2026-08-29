@@ -33,7 +33,11 @@ type IconName =
   | 'edit'
   | 'lock'
   | 'chevron'
-  | 'bars';
+  | 'bars'
+  | 'camera'
+  | 'upload'
+  | 'close'
+  | 'retry';
 
 export function ElixirIcon({ name, className, ...props }: SVGProps<SVGSVGElement> & { name: IconName }) {
   const paths: Record<IconName, ReactNode> = {
@@ -164,6 +168,25 @@ export function ElixirIcon({ name, className, ...props }: SVGProps<SVGSVGElement
     ),
     chevron: <path d="m6 9 6 6 6-6" />,
     bars: <path d="M4 7h16M4 12h16M4 17h16" />,
+    camera: (
+      <>
+        <path d="M9 7 10.4 5h3.2L15 7h3a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2h3Z" />
+        <path d="M12 16a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z" />
+      </>
+    ),
+    upload: (
+      <>
+        <path d="M12 16V4m0 0 4 4m-4-4-4 4" />
+        <path d="M5 20h14" />
+      </>
+    ),
+    close: <path d="m6 6 12 12M18 6 6 18" />,
+    retry: (
+      <>
+        <path d="M20 12a8 8 0 1 1-2.34-5.66" />
+        <path d="M20 4v5h-5" />
+      </>
+    ),
   };
 
   return (

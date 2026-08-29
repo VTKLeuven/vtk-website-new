@@ -10,11 +10,23 @@ export {
   GALLERY_IDS,
   galleryLabel,
   galleryMarker,
+  faceSearchConfig,
   foreignMarkers,
   immichConfig,
   immichWebUrl,
+  type FaceSearchConfig,
   type GalleryId,
 } from './config';
+
+export {
+  FaceSearchError,
+  createFaceSearchClient,
+  faceSearchStatus,
+  type FaceSearchClient,
+  type FaceSearchMatch,
+  type FaceSearchStatus,
+  type PublicFaceSearchJob,
+} from './face-search';
 
 export {
   GalleryError,
