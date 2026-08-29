@@ -95,6 +95,13 @@ services:
     restart: unless-stopped
     env_file:
       - ../.env
+      # Dezelfde twee bestanden als de web-service hierboven, en om dezelfde
+      # reden: GALLERY_DATABASE_NAME, _USER en _PASSWORD staan daar en nergens
+      # anders. Zonder deze regels kent deze app enkel de host, en dan meldt
+      # het gezichtszoeken zich "niet geconfigureerd" ook al staat de vlag aan.
+      - path: ./immich/.env.example
+      - path: ./immich/.env
+        required: false
     depends_on:
       web:
         condition: service_started

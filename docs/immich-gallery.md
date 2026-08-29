@@ -216,6 +216,16 @@ What **is** shared: the Immich database connection and the tuning
 (`GALLERY_FACE_MATCH_MAX_DISTANCE`, the timeouts, the face-area ratios). It is
 one Immich install and one model, so those would only drift if split.
 
+### The fakbar app needs the Immich database credentials too
+
+`GALLERY_DATABASE_NAME`, `_USER` and `_PASSWORD` live in `infra/immich/.env.example`,
+not in the root `.env`. The web service loads that file through `env_file`; the
+fakbar service must load the same two entries or it only ever learns the host.
+The failure is quiet in the wrong way: the flag reads `true`, but
+`isDatabaseConfigured` is false, so the panel renders as "not configured" and
+the route answers 503 `face_search_db_missing`. Both services are wired for this
+in `infra/docker-compose.yml`; keep them in step.
+
 ### Before switching either flag on
 
 The audit lists this as a critical finding and the deployment checklist says to
