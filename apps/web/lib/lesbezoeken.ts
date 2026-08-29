@@ -12,6 +12,13 @@
  */
 
 import { toSingleLine, toMessageText, isValidEmail } from "@/lib/contactForm";
+import {
+  brusselsWallClock,
+  brusselsYMD,
+  isoWeekday,
+  shiftYMD,
+  ymdKey,
+} from "@/lib/brussels";
 
 // -----------------------------------------------------------------------------
 // Duur en doelgroepen
@@ -43,7 +50,7 @@ export function visitEnd(start: Date, longVisit: boolean): Date {
  * masters en al de rest gaan via het vrije veld, precies zoals de "Anders"-optie
  * in het formulier.
  */
-export const LESBEZOEK_AUDIENCES = [
+export const LESBEZOEK_BACHELORS = [
   "1e Bach, Algemene richting, Groep A",
   "1e Bach, Algemene richting, Groep B",
   "1e Bach, Architectuur",
@@ -63,6 +70,67 @@ export const LESBEZOEK_AUDIENCES = [
   "3e Bach, nevenrichting Architectuur & Omgeving",
   "3e Bach, nevenrichting Bedrijfsbeheer",
 ] as const;
+
+export const LESBEZOEK_MASTERS = [
+  "Master Architectural Engineering",
+  "Master Artificial Intelligence",
+  "Master Biomedical Engineering",
+  "Master Chemical Engineering",
+  "Master Civil Engineering",
+  "Master Computer Science",
+  "Master Electrical Engineering",
+  "Master Energy Engineering",
+  "Master Materials Engineering",
+  "Master Mathematical Engineering",
+  "Master Mechanical Engineering",
+  "Master Mobility & Supply Chain Engineering",
+  "Master Nanoscience, Nanotechnology and Nanoengineering",
+] as const;
+
+export const LESBEZOEK_AUDIENCES = [
+  ...LESBEZOEK_BACHELORS,
+  ...LESBEZOEK_MASTERS,
+] as const;
+
+/**
+ * Parseert een doelgroepinvoer (enkele string, komma-gescheiden reeks of array)
+ * naar een nette lijst van afzonderlijke doelgroepnamen.
+ */
+export function parseAudienceList(raw: unknown): string[] {
+  if (!raw) return [];
+  if (Array.isArray(raw)) {
+    return Array.from(new Set(raw.map((item) => toSingleLine(item)).filter(Boolean)));
+  }
+  if (typeof raw !== "string") return [];
+  const text = toSingleLine(raw);
+  if (!text) return [];
+
+  const found: string[] = [];
+  let remaining = text;
+
+  // Sorteer bekende doelgroepen op lengte van lang naar kort om deelmatches te voorkomen
+  const sortedKnown = [...LESBEZOEK_BACHELORS, ...LESBEZOEK_MASTERS].sort(
+    (a, b) => b.length - a.length,
+  );
+
+  for (const known of sortedKnown) {
+    if (remaining.includes(known)) {
+      found.push(known);
+      remaining = remaining.replace(known, "").trim();
+    }
+  }
+
+  // Voeg eventuele overgebleven delen toe (opgesplitst op komma's)
+  if (remaining) {
+    const extra = remaining
+      .split(/,\s*/)
+      .map((s) => s.replace(/^,\s*|,\s*$/g, "").trim())
+      .filter((s) => s.length > 0 && !found.includes(s));
+    found.push(...extra);
+  }
+
+  return found.length > 0 ? found : [text];
+}
 
 /**
  * De taal waarin de professor standaard aangeschreven wordt.
@@ -106,13 +174,105 @@ export const LESBEZOEK_STATUS_META: Record<
   ASKED: { nl: "Bij de prof", en: "With the professor", tone: "sent" },
   APPROVED: { nl: "Goedgekeurd", en: "Approved", tone: "ok" },
   DECLINED: { nl: "Afgewezen door de prof", en: "Declined by the professor", tone: "no" },
-  REJECTED: { nl: "Niet doorgestuurd", en: "Not forwarded", tone: "no" },
+  REJECTED: { nl: "Afgewezen door ons", en: "Declined by us", tone: "no" },
   CANCELLED: { nl: "Ingetrokken", en: "Withdrawn", tone: "no" },
 };
 
-/** Welke statussen tellen als "hier moet nog iets mee gebeuren". */
+/** Statussen die als "hier moet nog iets mee gebeuren" tellen (actie vereist). */
+export const OPEN_STATUSES: readonly LesbezoekStatusCode[] = ["PENDING", "ASKED"] as const;
+
+/** Statussen die als "afgehandeld / verwerkt" tellen. */
+export const PROCESSED_STATUSES: readonly LesbezoekStatusCode[] = [
+  "APPROVED",
+  "DECLINED",
+  "REJECTED",
+  "CANCELLED",
+] as const;
+
+/** Welke statussen tellen als openstaand (Nieuw & Bij de prof). */
 export function isOpenStatus(status: LesbezoekStatusCode): boolean {
-  return status === "PENDING" || status === "ASKED";
+  return (OPEN_STATUSES as readonly string[]).includes(status);
+}
+
+/** Welke statussen tellen als verwerkt / afgehandeld. */
+export function isProcessedStatus(status: LesbezoekStatusCode): boolean {
+  return (PROCESSED_STATUSES as readonly string[]).includes(status);
+}
+
+// -----------------------------------------------------------------------------
+// De herinnering aan de professor
+// -----------------------------------------------------------------------------
+
+/**
+ * Hoeveel dagen voor het lesbezoek het scherm begint te roepen dat er een
+ * herinnering naar de professor mag.
+ *
+ * Drie dagen is de standaard en geen wet: het staat in de instellingen, want hoe
+ * lang je een professor laat zwijgen voor je nog eens port, is een afweging van
+ * wie de lesbezoeken doet. Onder de nul zakken heeft geen zin (dan is het bezoek
+ * al voorbij), en meer dan een maand vooruit roepen maakt de melding waardeloos.
+ */
+export const LESBEZOEK_NUDGE_LEAD_DAYS = 3;
+export const LESBEZOEK_NUDGE_LEAD_MIN = 1;
+export const LESBEZOEK_NUDGE_LEAD_MAX = 30;
+
+/** Houdt een ingevoerd aantal dagen binnen de grenzen; niet-getallen -> standaard. */
+export function clampNudgeLeadDays(value: unknown): number {
+  const days = typeof value === "number" ? value : Number(value);
+  if (!Number.isFinite(days)) return LESBEZOEK_NUDGE_LEAD_DAYS;
+  return Math.min(LESBEZOEK_NUDGE_LEAD_MAX, Math.max(LESBEZOEK_NUDGE_LEAD_MIN, Math.round(days)));
+}
+
+export type NudgeCheck = {
+  status: LesbezoekStatusCode;
+  startsAt: Date;
+  /** Wanneer er al gepord werd; daarna zwijgt de melding. */
+  professorNudgedAt: Date | null;
+  /** Staat er al een herinnering ingepland, dan is er niets meer te doen. */
+  nudgeScheduled?: boolean;
+};
+
+/**
+ * Is het tijd om de professor te herinneren aan deze vraag?
+ *
+ * Enkel bij `ASKED`: de vraag ligt bij hem, hij antwoordde nog niet, en het
+ * moment komt dichterbij. Bij `PENDING` is het probleem een ander (de vraag
+ * vertrok nog niet eens) en bij een verwerkte status is er niets meer te porren.
+ *
+ * Dit is bewust een afgeleide en geen kolom: er is geen tweede plek nodig die
+ * kan verlopen, en de drempel mag veranderen zonder dat er iets herberekend
+ * moet worden.
+ */
+export function needsNudgeReminder(
+  visit: NudgeCheck,
+  options: { now?: Date; leadDays?: number } = {},
+): boolean {
+  if (visit.status !== "ASKED") return false;
+  if (visit.professorNudgedAt) return false;
+  if (visit.nudgeScheduled) return false;
+
+  const now = options.now ?? new Date();
+  const leadDays = clampNudgeLeadDays(options.leadDays ?? LESBEZOEK_NUDGE_LEAD_DAYS);
+  const remaining = visit.startsAt.getTime() - now.getTime();
+  // Een bezoek dat al bezig of voorbij is, valt hier weg: dan is een herinnering
+  // geen hulp meer maar ruis in de lijst.
+  if (remaining <= 0) return false;
+  return remaining <= leadDays * 86_400_000;
+}
+
+/**
+ * Hoeveel hele dagen er nog tussen zitten, voor de tekst van de melding.
+ * Rondt naar boven af: een bezoek over 30 uur is "over 2 dagen", niet "over 1".
+ */
+export function daysUntil(startsAt: Date, now: Date = new Date()): number {
+  return Math.ceil((startsAt.getTime() - now.getTime()) / 86_400_000);
+}
+
+/** "vandaag" / "morgen" / "over 3 dagen", voor het badge en de banner. */
+export function nudgeCountdownLabel(days: number, nl: boolean): string {
+  if (days <= 0) return nl ? "vandaag" : "today";
+  if (days === 1) return nl ? "morgen" : "tomorrow";
+  return nl ? `over ${days} dagen` : `in ${days} days`;
 }
 
 // -----------------------------------------------------------------------------
@@ -229,7 +389,7 @@ export const LESBEZOEK_LIMITS = {
   phone: 40,
   subject: 150,
   course: 150,
-  audience: 150,
+  audience: 500,
   organisation: 120,
   /**
    * De toelichting gaat letterlijk naar de professor. Twee duizend tekens is
@@ -317,6 +477,7 @@ export type RawLesbezoekInput = {
   subject?: unknown;
   teacherNote?: unknown;
   audience?: unknown;
+  audiences?: unknown;
   audienceOther?: unknown;
   course?: unknown;
   teacherEmail?: unknown;
@@ -414,9 +575,33 @@ export function parseLesbezoekRequest(
     return { status: "error", code: "TEACHER_NOTE_TOO_LONG" };
   }
 
-  // De keuzelijst met een "Anders"-veld ernaast: het vrije veld wint zodra het
-  // ingevuld is, want dat is wat de aanvrager als laatste typte.
-  const audience = toSingleLine(raw.audienceOther) || toSingleLine(raw.audience);
+  // Doelgroepen: ondersteunt zowel een enkele doelgroep, meerdere doelgroepen
+  // (als array of komma-gescheiden reeks), als een optioneel vrij veld.
+  const rawAudienceItems: string[] = [];
+  if (Array.isArray(raw.audience)) {
+    rawAudienceItems.push(...raw.audience.map((i: unknown) => toSingleLine(i)).filter(Boolean));
+  } else if (typeof raw.audience === "string") {
+    rawAudienceItems.push(...parseAudienceList(raw.audience));
+  }
+
+  if (Array.isArray(raw.audiences)) {
+    rawAudienceItems.push(...raw.audiences.map((i: unknown) => toSingleLine(i)).filter(Boolean));
+  } else if (typeof raw.audiences === "string") {
+    rawAudienceItems.push(...parseAudienceList(raw.audiences));
+  }
+
+  if (raw.audienceOther) {
+    const otherText = toSingleLine(raw.audienceOther);
+    if (otherText && otherText !== "__other__") {
+      rawAudienceItems.push(otherText);
+    }
+  }
+
+  const uniqueAudiences = Array.from(
+    new Set(rawAudienceItems.filter((item) => item && item !== "__other__")),
+  );
+  const audience = uniqueAudiences.join(", ");
+
   if (audience === "") return { status: "error", code: "AUDIENCE_REQUIRED" };
   if (audience.length > LESBEZOEK_LIMITS.audience) {
     return { status: "error", code: "AUDIENCE_TOO_LONG" };
@@ -511,4 +696,130 @@ export function organisationKey(name: string): string {
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, " ")
     .trim();
+}
+
+// -----------------------------------------------------------------------------
+// Planning en uitgesteld verzenden van mails
+// -----------------------------------------------------------------------------
+
+export type SchedulePreset = {
+  id: "tomorrow_0800" | "tomorrow_0900" | "next_workday_0800";
+  labelNl: string;
+  labelEn: string;
+  dateStr: string;
+  timeStr: string;
+  instant: Date;
+};
+
+/**
+ * Berekent logische presets voor het inplannen van mails (bv. morgen 08:00, morgen 09:00,
+ * volgende werkdag 08:00). Handig om professoren niet 's avonds laat of in het weekend
+ * te mailen.
+ */
+export function getSchedulePresets(now: Date = new Date()): SchedulePreset[] {
+  const currentYmd = brusselsYMD(now);
+  const tomorrowYmd = shiftYMD(currentYmd, 1);
+  const weekday = isoWeekday(currentYmd);
+
+  // Volgende werkdag:
+  // Vrijdag (5) -> Maandag (+3)
+  // Zaterdag (6) -> Maandag (+2)
+  // Zondag (7) -> Maandag (+1)
+  // Maandag t.e.m. Donderdag -> Morgen (+1)
+  const workdayDelta = weekday === 5 ? 3 : weekday === 6 ? 2 : weekday === 7 ? 1 : 1;
+  const nextWorkdayYmd = shiftYMD(currentYmd, workdayDelta);
+
+  const tomorrow8 = brusselsWallClock(tomorrowYmd.year, tomorrowYmd.month, tomorrowYmd.day, "08:00");
+  const tomorrow9 = brusselsWallClock(tomorrowYmd.year, tomorrowYmd.month, tomorrowYmd.day, "09:00");
+  const nextWorkday8 = brusselsWallClock(nextWorkdayYmd.year, nextWorkdayYmd.month, nextWorkdayYmd.day, "08:00");
+
+  const fmtDateNl = new Intl.DateTimeFormat("nl-BE", {
+    timeZone: "Europe/Brussels",
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+  });
+  const fmtDateEn = new Intl.DateTimeFormat("en-GB", {
+    timeZone: "Europe/Brussels",
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+  });
+
+  const tomorrowNl = fmtDateNl.format(tomorrow8);
+  const tomorrowEn = fmtDateEn.format(tomorrow8);
+  const workdayNl = fmtDateNl.format(nextWorkday8);
+  const workdayEn = fmtDateEn.format(nextWorkday8);
+
+  const presets: SchedulePreset[] = [
+    {
+      id: "tomorrow_0800",
+      labelNl: `Morgen om 08:00 (${tomorrowNl})`,
+      labelEn: `Tomorrow at 08:00 (${tomorrowEn})`,
+      dateStr: ymdKey(tomorrowYmd),
+      timeStr: "08:00",
+      instant: tomorrow8,
+    },
+    {
+      id: "tomorrow_0900",
+      labelNl: `Morgen om 09:00 (${tomorrowNl})`,
+      labelEn: `Tomorrow at 09:00 (${tomorrowEn})`,
+      dateStr: ymdKey(tomorrowYmd),
+      timeStr: "09:00",
+      instant: tomorrow9,
+    },
+  ];
+
+  if (workdayDelta > 1) {
+    presets.push({
+      id: "next_workday_0800",
+      labelNl: `Volgende werkdag om 08:00 (${workdayNl})`,
+      labelEn: `Next workday at 08:00 (${workdayEn})`,
+      dateStr: ymdKey(nextWorkdayYmd),
+      timeStr: "08:00",
+      instant: nextWorkday8,
+    });
+  }
+
+  return presets;
+}
+
+/** Formatteert een gepland moment in Brussel-tijd (bv. "donderdag 27 augustus om 08:00"). */
+export function formatScheduleMoment(
+  instant: Date,
+  locale: "nl" | "en",
+): string {
+  const dateFmt = new Intl.DateTimeFormat(locale === "nl" ? "nl-BE" : "en-GB", {
+    timeZone: "Europe/Brussels",
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+  });
+  const timeFmt = new Intl.DateTimeFormat(locale === "nl" ? "nl-BE" : "en-GB", {
+    timeZone: "Europe/Brussels",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+  const date = dateFmt.format(instant);
+  const time = timeFmt.format(instant);
+  return locale === "nl" ? `${date} om ${time}` : `${date} at ${time}`;
+}
+
+/** Korte weergave van een gepland moment voor overzichten en badges (bv. "do 27 aug · 08:00"). */
+export function formatScheduleShort(
+  instant: Date,
+  locale: "nl" | "en",
+): string {
+  const dateFmt = new Intl.DateTimeFormat(locale === "nl" ? "nl-BE" : "en-GB", {
+    timeZone: "Europe/Brussels",
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+  });
+  const timeFmt = new Intl.DateTimeFormat(locale === "nl" ? "nl-BE" : "en-GB", {
+    timeZone: "Europe/Brussels",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+  return `${dateFmt.format(instant)} · ${timeFmt.format(instant)}`;
 }

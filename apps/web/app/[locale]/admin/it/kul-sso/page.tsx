@@ -4,7 +4,7 @@ import {
   isKulEnabled,
   isKulDebugEnabled,
   getKulAuthLogs,
-  KUL_LOG_KEEP,
+  KUL_LOG_RETENTION_DAYS,
 } from "@vtk/auth/server";
 import { hasLocale } from "@/lib/locale";
 import { requireSession } from "@/lib/session";
@@ -52,7 +52,7 @@ export default async function KulSsoAdminPage({
             the faculty / employee type comes through. The login explicitly fetches KU
             Leuven&apos;s userinfo endpoint and merges those attributes with the ID-token
             claims. Captured claims contain personal data, so this is off by default and only
-            the last {KUL_LOG_KEEP} logins are kept.
+            logins from the last {KUL_LOG_RETENTION_DAYS} days are kept.
           </p>
         </div>
 
@@ -66,7 +66,9 @@ export default async function KulSsoAdminPage({
           <div>
             <h2 className="text-lg font-semibold">Captured logins</h2>
             <p className="text-xs text-zinc-500">
-              Last {kulLogs.length} of max {KUL_LOG_KEEP} logins stored.
+              {kulLogs.length === 1
+                ? `1 login captured in the last ${KUL_LOG_RETENTION_DAYS} days.`
+                : `${kulLogs.length} logins captured in the last ${KUL_LOG_RETENTION_DAYS} days.`}
             </p>
           </div>
           {kulLogs.length > 0 && (

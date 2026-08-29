@@ -1179,10 +1179,8 @@
   gap: 18px;
 }
 
-/* Eén POC: 60% breed, links uitgelijnd zoals alle andere secties. Een halve
-   kaart liet te veel van de band leeg; centreren brak de linkermarge. */
 .vtk-design .poc-grid[data-groups="1"] {
-  grid-template-columns: minmax(0, 60%);
+  grid-template-columns: minmax(0, 1fr);
 }
 
 .vtk-design .poc-grid[data-groups="2"] {

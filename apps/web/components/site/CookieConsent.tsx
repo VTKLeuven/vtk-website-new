@@ -86,27 +86,31 @@ export function CookieConsent() {
       <section className="vtk-cookie-consent" role="dialog" aria-modal="true" aria-labelledby="vtk-cookie-title">
         <div className="vtk-cookie-consent-copy">
           <h2 id="vtk-cookie-title">{labels.title}</h2>
-          <p>{labels.body}</p>
-          <a href={`${base}/cookies`}>{labels.privacy}</a>
+          <p>
+            {labels.body}{" "}
+            <a href={`${base}/cookies`}>{labels.privacy}</a>
+          </p>
         </div>
-        <label className="vtk-cookie-consent-option">
-          <input
-            type="checkbox"
-            checked={draft === "analytics"}
-            onChange={(event) => setDraft(event.target.checked ? "analytics" : "essential")}
-          />
-          <span>{labels.analytics}</span>
-        </label>
-        <div className="vtk-cookie-consent-actions">
-          <button type="button" className="vtk-cookie-secondary" onClick={() => save("essential")}>
-            {labels.reject}
-          </button>
-          <button type="button" className="vtk-cookie-secondary" onClick={() => save(draft)}>
-            {labels.save}
-          </button>
-          <button type="button" className="vtk-cookie-primary" onClick={() => save("analytics")}>
-            {labels.accept}
-          </button>
+        <div className="vtk-cookie-consent-controls">
+          <label className="vtk-cookie-consent-option">
+            <input
+              type="checkbox"
+              checked={draft === "analytics"}
+              onChange={(event) => setDraft(event.target.checked ? "analytics" : "essential")}
+            />
+            <span>{labels.analytics}</span>
+          </label>
+          <div className="vtk-cookie-consent-actions">
+            <button type="button" className="vtk-cookie-secondary" onClick={() => save("essential")}>
+              {labels.reject}
+            </button>
+            <button type="button" className="vtk-cookie-secondary" onClick={() => save(draft)}>
+              {labels.save}
+            </button>
+            <button type="button" className="vtk-cookie-primary" onClick={() => save("analytics")}>
+              {labels.accept}
+            </button>
+          </div>
         </div>
       </section>
     </div>

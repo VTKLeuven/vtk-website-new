@@ -2,12 +2,62 @@
 
 import { AdminNav as SharedAdminNav, type AdminNavItem, type AdminNavNode } from '@vtk/ui';
 import type { ReactNode } from 'react';
+import { toggleAdminNavPinAction } from '@/app/actions/admin-nav';
+import { useToast } from '@/components/ui/toast';
 
 export type NavItem = AdminNavItem;
 export type NavNode = AdminNavNode;
 
-export function AdminNav({ title, nodes }: { title: string; nodes: NavNode[] }) {
-  return <SharedAdminNav title={title} nodes={nodes} icons={icons} />;
+export type PinLabels = {
+  section: string;
+  all: string;
+  pin: string;
+  unpin: string;
+  error: string;
+};
+
+export function AdminNav({
+  title,
+  nodes,
+  pinnedKeys,
+  pinLabels,
+}: {
+  title: string;
+  nodes: NavNode[];
+  pinnedKeys: string[];
+  pinLabels: PinLabels;
+}) {
+  const showToast = useToast();
+  const { error, ...labels } = pinLabels;
+
+  return (
+    <SharedAdminNav
+      title={title}
+      nodes={nodes}
+      icons={icons}
+      pins={{
+        keys: pinnedKeys,
+        labels,
+        // Het speldje meldt zijn succes door de tab zichtbaar te verplaatsen;
+        // enkel een mislukking heeft een toast nodig (zie CLAUDE.md).
+        // Gooien is het sein aan de nav om de pin terug te zetten; de melding
+        // is hier al getoond.
+        onToggle: async (key, pinned) => {
+          let result;
+          try {
+            result = await toggleAdminNavPinAction(key, pinned);
+          } catch (cause) {
+            showToast({ message: error, variant: 'error', duration: 0 });
+            throw cause;
+          }
+          if (result.status === 'error') {
+            showToast({ message: error, variant: 'error', duration: 0 });
+            throw new Error(`admin nav pin failed: ${result.code}`);
+          }
+        },
+      }}
+    />
+  );
 }
 
 function Svg({ children }: { children: ReactNode }) {
@@ -38,6 +88,23 @@ const icons: Record<string, ReactNode> = {
       <path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20" />
       <circle cx="12" cy="9" r="2" />
       <path d="M9.5 15a2.5 2.5 0 0 1 5 0" />
+    </Svg>
+  ),
+  // dashboardOverview: de landingspagina zelf, binnen de dashboardgroep
+  dashboardOverview: (
+    <Svg>
+      <rect x="3" y="3" width="7" height="9" rx="1" />
+      <rect x="14" y="3" width="7" height="5" rx="1" />
+      <rect x="14" y="12" width="7" height="9" rx="1" />
+      <rect x="3" y="16" width="7" height="5" rx="1" />
+    </Svg>
+  ),
+  // communicatie: megafoon; alles wat de kring naar buiten stuurt
+  communicatie: (
+    <Svg>
+      <path d="M3 11v2a1 1 0 0 0 1 1h2l4 4V6L6 10H4a1 1 0 0 0-1 1Z" />
+      <path d="M14 8a4 4 0 0 1 0 8" />
+      <path d="M17 5a8 8 0 0 1 0 14" />
     </Svg>
   ),
   // dashboard: overzichtstegels (landing page)
@@ -166,6 +233,24 @@ const icons: Record<string, ReactNode> = {
     <Svg>
       <rect x="2" y="4" width="20" height="16" rx="2" />
       <path d="m2 7 10 6 10-6" />
+    </Svg>
+  ),
+  // flowPreview: formulier met een oog erop; de twee schermen die je maar één
+  // keer ziet, hier wel bekijkbaar
+  flowPreview: (
+    <Svg>
+      <path d="M4 3h10l4 4v6" />
+      <path d="M4 3v18h7" />
+      <path d="M14 3v4h4" />
+      <path d="M14.5 18.5c1-1.7 2.6-2.5 4-2.5s3 .8 4 2.5c-1 1.7-2.6 2.5-4 2.5s-3-.8-4-2.5Z" />
+      <circle cx="18.5" cy="18.5" r=".8" />
+    </Svg>
+  ),
+  // alumni: afstudeerhoed, het enige wat deze groep gemeen heeft
+  alumni: (
+    <Svg>
+      <path d="M12 4 2 9l10 5 10-5-10-5Z" />
+      <path d="M6 11.5V16c0 1.1 2.7 2.5 6 2.5s6-1.4 6-2.5v-4.5" />
     </Svg>
   ),
   // groups: ereteken / lint van een praesidiumpost
@@ -315,6 +400,15 @@ const icons: Record<string, ReactNode> = {
       <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
     </Svg>
   ),
+  // expenses: bonnetje met een euroteken (rekeningen en terugbetalingen)
+  expenses: (
+    <Svg>
+      <path d="M6 2h9l4 4v14.5l-2.5-1.5-2.5 1.5-2.5-1.5L9 20.5 6.5 19 6 19.3Z" />
+      <path d="M15 2v4h4" />
+      <path d="M14 10.5a2.5 2.5 0 0 0-4 2v1a2.5 2.5 0 0 0 4 2" />
+      <path d="M9 12.2h3.6" />
+    </Svg>
+  ),
   // shift: shiften -> klok
   shift: (
     <Svg>
@@ -426,6 +520,14 @@ const icons: Record<string, ReactNode> = {
       <path d="M3 21h18" />
       <path d="M6 21V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v17" />
       <path d="M14 12h.01" />
+    </Svg>
+  ),
+  // overig: overige modules voor IT en G5
+  overig: (
+    <Svg>
+      <circle cx="12" cy="12" r="1.5" fill="currentColor" />
+      <circle cx="19" cy="12" r="1.5" fill="currentColor" />
+      <circle cx="5" cy="12" r="1.5" fill="currentColor" />
     </Svg>
   ),
 };

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState, useTransition } from "react";
 import { Input, Label, Textarea } from "@vtk/ui";
 import { SaveForm } from "@/components/ui/SaveForm";
 import { DeleteButton, DeleteIconButton } from "@/components/ui/DeleteIconButton";
@@ -9,6 +9,7 @@ import {
   deleteRoleAction,
   setRolePermissionAction,
   removeUserRoleAction,
+  reorderRolesAction,
 } from "@/app/actions/roles";
 import { setGroupRoleAction } from "@/app/actions/users-groups";
 import { AddRoleMemberForm } from "./AddRoleMemberForm";
@@ -95,13 +96,38 @@ export function RolesTable({
   saveLabels: SaveLabels;
 }) {
   const nl = locale === "nl";
+  const [prevRoles, setPrevRoles] = useState(roles);
+  const [items, setItems] = useState<RoleRow[]>(roles);
   const [createOpen, setCreateOpen] = useState(false);
-  const { query, setQuery, sort, toggleSort, filtered, isOpen, toggleRow } = useTableControls(roles, {
+  const [, startTransition] = useTransition();
+
+  if (roles !== prevRoles) {
+    setPrevRoles(roles);
+    setItems(roles);
+  }
+
+  const { query, setQuery, sort, toggleSort, filtered, isOpen, toggleRow } = useTableControls(items, {
     searchOf: (r) => r.searchText,
     nameOf: (r) => r.name,
     countOf: (r) => r.holderCount,
     locale,
   });
+
+  const dragFrom = useRef<number | null>(null);
+  const [overIndex, setOverIndex] = useState<number | null>(null);
+  const isReorderable = can.manageRoles && !query && !sort;
+
+  function onDrop(to: number) {
+    const from = dragFrom.current;
+    dragFrom.current = null;
+    setOverIndex(null);
+    if (from === null || from === to) return;
+    const next = [...items];
+    const [moved] = next.splice(from, 1);
+    next.splice(to, 0, moved);
+    setItems(next);
+    startTransition(() => void reorderRolesAction(next.map((r) => r.id)));
+  }
 
   return (
     <div className="space-y-4">
@@ -124,6 +150,7 @@ export function RolesTable({
         <table>
           <thead>
             <tr>
+              <th className="w-8" aria-hidden />
               <SortHeader label={nl ? "Rol" : "Role"} active={sort?.key === "name" ? sort.dir : null} onClick={() => toggleSort("name")} />
               <SortHeader
                 label={nl ? "Personen" : "People"}
@@ -135,10 +162,29 @@ export function RolesTable({
             </tr>
           </thead>
           <tbody>
-            {filtered.map((role) => (
+            {filtered.map((role, index) => (
               <RoleRowView
                 key={role.id}
                 role={role}
+                isReorderable={isReorderable}
+                isOver={overIndex === index}
+                onDragStart={() => {
+                  dragFrom.current = index;
+                }}
+                onDragEnd={() => {
+                  dragFrom.current = null;
+                  setOverIndex(null);
+                }}
+                onDragOver={(e) => {
+                  if (!isReorderable) return;
+                  e.preventDefault();
+                  if (overIndex !== index) setOverIndex(index);
+                }}
+                onDrop={(e) => {
+                  if (!isReorderable) return;
+                  e.preventDefault();
+                  onDrop(index);
+                }}
                 isOpen={isOpen(role.id)}
                 onToggle={() => toggleRow(role.id)}
                 nl={nl}
@@ -172,11 +218,10 @@ export function RolesTable({
           >
             <div className="md:col-span-3"><Label>{nl ? "Naam (NL)" : "Name (NL)"}</Label><Input name="nameNl" required /></div>
             <div className="md:col-span-3"><Label>{nl ? "Naam (EN)" : "Name (EN)"}</Label><Input name="nameEn" required /></div>
-            <div className="md:col-span-4"><Label>{nl ? "Code" : "Code"}</Label><Input name="code" placeholder={nl ? "auto" : "auto"} /></div>
-            <div className="md:col-span-2"><Label>{nl ? "Volgorde" : "Order"}</Label><Input name="order" type="number" defaultValue={0} /></div>
+            <div className="md:col-span-6"><Label>{nl ? "Code" : "Code"}</Label><Input name="code" placeholder={nl ? "auto" : "auto"} /></div>
             <div className="md:col-span-3"><Label>{nl ? "Beschrijving (NL)" : "Description (NL)"}</Label><Input name="descriptionNl" /></div>
             <div className="md:col-span-3"><Label>{nl ? "Beschrijving (EN)" : "Description (EN)"}</Label><Input name="descriptionEn" /></div>
-            <div className="md:col-span-2"><Label>{nl ? "Kleur (optioneel)" : "Color (optional)"}</Label><Input name="color" placeholder="#FFD23F" /></div>
+            <div className="md:col-span-3"><Label>{nl ? "Kleur (optioneel)" : "Color (optional)"}</Label><Input name="color" placeholder="#FFD23F" /></div>
           </SaveForm>
         </Modal>
       )}
@@ -186,6 +231,12 @@ export function RolesTable({
 
 function RoleRowView({
   role,
+  isReorderable,
+  isOver,
+  onDragStart,
+  onDragEnd,
+  onDragOver,
+  onDrop,
   isOpen,
   onToggle,
   nl,
@@ -199,6 +250,12 @@ function RoleRowView({
   saveLabels,
 }: {
   role: RoleRow;
+  isReorderable: boolean;
+  isOver: boolean;
+  onDragStart: () => void;
+  onDragEnd: () => void;
+  onDragOver: (e: React.DragEvent) => void;
+  onDrop: (e: React.DragEvent) => void;
   isOpen: boolean;
   onToggle: () => void;
   nl: boolean;
@@ -219,6 +276,11 @@ function RoleRowView({
         tabIndex={0}
         aria-expanded={isOpen}
         aria-controls={detailId}
+        draggable={isReorderable}
+        onDragStart={onDragStart}
+        onDragEnd={onDragEnd}
+        onDragOver={onDragOver}
+        onDrop={onDrop}
         onClick={onToggle}
         onKeyDown={(e) => {
           if (e.key === "Enter" || e.key === " ") {
@@ -226,8 +288,19 @@ function RoleRowView({
             onToggle();
           }
         }}
-        className="cursor-pointer"
+        className={`cursor-pointer transition-colors ${isOver ? "border-vtk-blue bg-vtk-yellow/20" : ""}`}
       >
+        <td className="w-8 text-center text-zinc-400" onClick={(e) => isReorderable && e.stopPropagation()}>
+          {isReorderable && (
+            <span
+              className="cursor-grab active:cursor-grabbing hover:text-vtk-ink text-base select-none px-1"
+              title={nl ? "Sleep om volgorde te wijzigen" : "Drag to reorder"}
+              aria-hidden="true"
+            >
+              ⠿
+            </span>
+          )}
+        </td>
         <td>
           <div className="flex items-start gap-2">
             <Chevron open={isOpen} />
@@ -253,7 +326,7 @@ function RoleRowView({
       </tr>
       {isOpen && (
         <tr id={detailId}>
-          <td colSpan={3} className="bg-vtk-blue-soft/20">
+          <td colSpan={4} className="bg-vtk-blue-soft/20">
             <RoleDetail
               role={role}
               nl={nl}
@@ -450,11 +523,11 @@ function RoleDetail({
         {(editing) =>
           editing ? (
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-              {permsByCategory.map(([cat, perms]) => (
+              {permsByCategory.map(([cat, perms]: [string, Perm[]]) => (
                 <div key={cat}>
                   <h5 className="mb-1 text-[11px] font-semibold uppercase text-zinc-500">{cat}</h5>
                   <ul className="space-y-1 text-sm">
-                    {perms.map((p) => {
+                    {perms.map((p: Perm) => {
                       const on = enabledPerms.has(p.id);
                       return (
                         <li key={p.id}>
@@ -506,11 +579,11 @@ function RoleDetail({
                     : "Rights inside applications that sign in with a VTK account. A permission marked “access” decides whether someone gets in at all; the rest decide what they may do."}
                 </p>
                 <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-                  {clientPermsByApp.map(([clientName, perms]) => (
+                  {clientPermsByApp.map(([clientName, perms]: [string, ClientPerm[]]) => (
                     <div key={clientName}>
                       <h5 className="mb-1 text-[11px] font-semibold uppercase text-zinc-500">{clientName}</h5>
                       <ul className="space-y-1 text-sm">
-                        {perms.map((p) => (
+                        {perms.map((p: ClientPerm) => (
                           <li key={p.id}>
                             <ClientPermToggle
                               nl={nl}

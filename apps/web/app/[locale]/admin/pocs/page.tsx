@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { prisma } from "@vtk/db";
 import { notFound } from "next/navigation";
 import { hasLocale } from "@/lib/locale";
@@ -6,26 +7,47 @@ import { getDictionary, type Locale } from "@vtk/i18n";
 import { publicUrl } from "@/lib/storage";
 import { saveErrorMessages } from "@/lib/saveMessages";
 import { STUDY_PROGRAMMES } from "@/lib/profile";
+import { formatWorkingYear, parseWorkingYear, workingYearTabs } from "@/lib/workingYear";
 import { PocsTable, type PocRow } from "./PocsTable";
 
 export default async function AdminPocs({
   params,
+  searchParams,
 }: {
   params: Promise<{ locale: string }>;
+  searchParams: Promise<{ jaar?: string }>;
 }) {
   const { locale: localeParam } = await params;
+  const { jaar } = await searchParams;
   if (!hasLocale(localeParam)) notFound();
   const locale: Locale = localeParam;
   const nl = locale === "nl";
+  const base = nl ? "" : "/en";
   await requirePermission("pocs.manage");
   const dict = getDictionary(locale);
 
-  // Enkel de POC's + hun vertegenwoordigers; de user-picker zoekt server-side
-  // (/api/users/search), dus we laden de volledige gebruikerslijst niet meer.
-  const pocs = await prisma.poc.findMany({
-    orderBy: { order: "asc" },
-    include: { representatives: { orderBy: { order: "asc" }, include: { user: true } } },
-  });
+  const year = parseWorkingYear(jaar);
+
+  // Enkel de POC's + hun vertegenwoordigers van het geselecteerde werkingsjaar;
+  // de user-picker zoekt server-side (/api/users/search).
+  const [pocs, distinctYears] = await Promise.all([
+    prisma.poc.findMany({
+      orderBy: { order: "asc" },
+      include: {
+        representatives: {
+          where: { year },
+          orderBy: { order: "asc" },
+          include: { user: true },
+        },
+      },
+    }),
+    prisma.pocRepresentative.findMany({
+      distinct: ["year"],
+      select: { year: true },
+    }),
+  ]);
+
+  const tabs = workingYearTabs(distinctYears.map((r) => r.year));
 
   const pocRows: PocRow[] = pocs.map((poc) => {
     const reps = poc.representatives.map((r) => ({
@@ -82,13 +104,36 @@ export default async function AdminPocs({
         <h1 className="text-2xl font-semibold">{nl ? "POC's" : "POCs"}</h1>
         <p className="mt-1 text-sm text-[#5c667f]">
           {nl
-            ? "Aanspreekpunten per studierichting. Klik een POC open om de vertegenwoordigers te beheren."
-            : "Points of contact per study track. Open a POC to manage its representatives."}
+            ? "Aanspreekpunten per studierichting. Klik een POC open om de vertegenwoordigers te beheren. Vertegenwoordigers gelden per werkingsjaar."
+            : "Points of contact per study track. Open a POC to manage its representatives. Representatives apply per working year."}
         </p>
+      </div>
+
+      {/* Werkingsjaar-tabjes */}
+      <div className="flex flex-wrap gap-2">
+        {tabs.map((y) => {
+          const active = y === year;
+          return (
+            <Link
+              key={y}
+              href={`${base}/admin/pocs?jaar=${y}`}
+              className={
+                "rounded-full border px-4 py-1.5 text-sm font-medium transition " +
+                (active
+                  ? "border-vtk-ink bg-vtk-ink text-white"
+                  : "border-vtk-blue/20 bg-white text-vtk-ink hover:bg-vtk-blue-soft/50")
+              }
+            >
+              {formatWorkingYear(y)}
+            </Link>
+          );
+        })}
       </div>
 
       <PocsTable
         pocs={pocRows}
+        year={year}
+        yearLabel={formatWorkingYear(year)}
         locale={nl ? "nl" : "en"}
         saveLabels={saveLabels}
         createLabels={createLabels}

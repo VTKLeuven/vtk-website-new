@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useId, useRef, useState, useTransition, type ReactNode } from 'react';
 
 import './admin-nav.css';
 
@@ -16,10 +16,33 @@ export type AdminNavItem = {
 export type AdminNavNode =
   { type: 'item'; item: AdminNavItem } | { type: 'group'; key: string; label: string; items: AdminNavItem[] };
 
+/**
+ * Vastpinnen is optioneel: geef `pins` mee en elke tab krijgt een speldje,
+ * waarmee de gebruiker zijn eigen tabs bovenaan zet. Zonder deze prop rendert
+ * de nav precies zoals voorheen (Logistiek gebruikt hem zo).
+ */
+export type AdminNavPins = {
+  /** Vastgepinde keys, in de volgorde waarin ze bovenaan komen. */
+  keys: string[];
+  /** Slaat de wijziging op. Mag gooien; de nav zet de pin dan terug. */
+  onToggle: (key: string, pinned: boolean) => Promise<void>;
+  labels: {
+    /** Kopje boven de vastgepinde tabs. */
+    section: string;
+    /** Kopje boven de volledige lijst eronder. */
+    all: string;
+    /** Tooltip op het speldje van een tab die nog niet vastgepind is. */
+    pin: string;
+    /** Tooltip op het speldje van een vastgepinde tab. */
+    unpin: string;
+  };
+};
+
 export type AdminNavProps = {
   title: string;
   nodes: AdminNavNode[];
   icons?: Record<string, ReactNode>;
+  pins?: AdminNavPins;
 };
 
 const TOP_GAP = 96;
@@ -109,7 +132,12 @@ function activeLabel(nodes: AdminNavNode[], pathname: string, fallback: string):
   return fallback;
 }
 
-export function AdminNav({ title, nodes, icons = {} }: AdminNavProps) {
+/** Alle tabs die de gebruiker mag zien, plat, om een pin op te kunnen zoeken. */
+function flatten(nodes: AdminNavNode[]): AdminNavItem[] {
+  return nodes.flatMap((node) => (node.type === 'item' ? [node.item] : node.items));
+}
+
+export function AdminNav({ title, nodes, icons = {}, pins }: AdminNavProps) {
   const pathname = usePathname();
   const stickyRef = useSmartSticky<HTMLDivElement>();
   const panelId = useId();
@@ -121,6 +149,11 @@ export function AdminNav({ title, nodes, icons = {} }: AdminNavProps) {
     setPreviousPath(pathname);
     if (open) setOpen(false);
   }
+
+  const pinState = usePins(pins);
+  // Eén context voor elke rij, zodat de rijen zelf niets over de prop hoeven te
+  // weten: null betekent gewoon "geen speldjes".
+  const pinCtx: PinCtx | null = pins && pinState ? { pins, state: pinState } : null;
 
   return (
     <div className="vtk-admin-nav-sticky" ref={stickyRef}>
@@ -136,11 +169,26 @@ export function AdminNav({ title, nodes, icons = {} }: AdminNavProps) {
         <Chevron open={open} />
       </button>
       <nav id={panelId} className={`vtk-admin-nav${open ? ' is-open' : ''}`} aria-label={title}>
+        {pinCtx && (
+          <PinnedSection nodes={nodes} pathname={pathname} icons={icons} pins={pinCtx.pins} state={pinCtx.state} />
+        )}
         {nodes.map((node) =>
           node.type === 'item' ? (
-            <NavLink key={node.item.key} item={node.item} active={isActive(pathname, node.item)} icons={icons} />
+            <NavLink
+              key={node.item.key}
+              item={node.item}
+              active={isActive(pathname, node.item)}
+              icons={icons}
+              pin={pinCtx}
+            />
           ) : (
-            <NavGroup key={node.key} group={node} pathname={pathname} icons={icons} />
+            <NavGroup
+              key={node.key}
+              group={node}
+              pathname={pathname}
+              icons={icons}
+              pin={pinCtx}
+            />
           )
         )}
       </nav>
@@ -148,26 +196,140 @@ export function AdminNav({ title, nodes, icons = {} }: AdminNavProps) {
   );
 }
 
+type PinState = {
+  keys: string[];
+  toggle: (key: string) => void;
+};
+
+type PinCtx = { pins: AdminNavPins; state: PinState };
+
+/**
+ * Houdt de pins lokaal bij zodat een klik meteen zichtbaar is; de server volgt
+ * erachteraan. Mislukt de action, dan springt de pin terug. De melding komt van
+ * de app: die gooit vanuit `onToggle`, en dat gooien is hier het sein.
+ */
+function usePins(pins: AdminNavPins | undefined): PinState | null {
+  const serverKeys = pins?.keys;
+  const [keys, setKeys] = useState<string[]>(serverKeys ?? []);
+  const [, startTransition] = useTransition();
+
+  // De layout hervalideert na het opslaan; neem die waarheid dan weer over.
+  const serialized = (serverKeys ?? []).join(' ');
+  const [previous, setPrevious] = useState(serialized);
+  if (serialized !== previous) {
+    setPrevious(serialized);
+    setKeys(serverKeys ?? []);
+  }
+
+  if (!pins) return null;
+
+  const toggle = (key: string) => {
+    const wasPinned = keys.includes(key);
+    const next = wasPinned ? keys.filter((k) => k !== key) : [...keys, key];
+    setKeys(next);
+    startTransition(async () => {
+      try {
+        await pins.onToggle(key, !wasPinned);
+      } catch {
+        // De app heeft de fout al gemeld; hier zetten we enkel de pin terug,
+        // zodat de zijbalk niet iets toont wat niet bewaard is.
+        setKeys(keys);
+      }
+    });
+  };
+
+  return { keys, toggle };
+}
+
+function PinnedSection({
+  nodes,
+  pathname,
+  icons,
+  pins,
+  state,
+}: {
+  nodes: AdminNavNode[];
+  pathname: string;
+  icons: Record<string, ReactNode>;
+  pins: AdminNavPins;
+  state: PinState;
+}) {
+  const byKey = new Map(flatten(nodes).map((item) => [item.key, item]));
+  // Een pin op een tab die je niet (meer) mag zien, slaan we over in plaats van
+  // ze te verwijderen: rechten kunnen volgend werkingsjaar terugkomen.
+  const items = state.keys.map((key) => byKey.get(key)).filter((item): item is AdminNavItem => !!item);
+  if (items.length === 0) return null;
+
+  return (
+    <div className="vtk-admin-nav-pinned">
+      <p className="vtk-admin-nav-section">{pins.labels.section}</p>
+      {items.map((item) => (
+        <NavLink
+          key={item.key}
+          item={item}
+          active={isActive(pathname, item)}
+          icons={icons}
+          pin={{ pins, state }}
+        />
+      ))}
+      <p className="vtk-admin-nav-section vtk-admin-nav-section-all">{pins.labels.all}</p>
+    </div>
+  );
+}
+
+function PinButton({ item, pins, state }: { item: AdminNavItem; pins: AdminNavPins; state: PinState }) {
+  const pinned = state.keys.includes(item.key);
+  const label = pinned ? pins.labels.unpin : pins.labels.pin;
+  return (
+    <button
+      type="button"
+      className={`vtk-admin-nav-pin${pinned ? ' is-pinned' : ''}`}
+      title={label}
+      aria-label={`${label}: ${item.label}`}
+      aria-pressed={pinned}
+      onClick={(event) => {
+        // De rij eromheen is een link; een klik op het speldje mag niet
+        // navigeren.
+        event.preventDefault();
+        event.stopPropagation();
+        state.toggle(item.key);
+      }}
+    >
+      <PinIcon filled={pinned} />
+    </button>
+  );
+}
+
+/**
+ * Eén rij. Het speldje staat naast de link en niet erin: een knop binnen een
+ * `<a>` is ongeldige HTML en de browser haalt hem er dan uit. De rij draagt
+ * daarom de hover- en actief-achtergrond, niet de link zelf.
+ */
 function NavLink({
   item,
   active,
   icons,
   sub,
+  pin,
 }: {
   item: AdminNavItem;
   active: boolean;
   icons: Record<string, ReactNode>;
   sub?: boolean;
+  pin?: PinCtx | null;
 }) {
   return (
-    <Link
-      href={item.href}
-      aria-current={active ? 'page' : undefined}
-      className={`inline-flex items-center gap-2${sub ? ' vtk-admin-nav-sublink' : ''}${active ? ' is-active' : ''}`}
-    >
-      {icons[item.key] ?? icons.groups}
-      <span>{item.label}</span>
-    </Link>
+    <div className={`vtk-admin-nav-row${active ? ' is-active' : ''}`}>
+      <Link
+        href={item.href}
+        aria-current={active ? 'page' : undefined}
+        className={`inline-flex items-center gap-2${sub ? ' vtk-admin-nav-sublink' : ''}${active ? ' is-active' : ''}`}
+      >
+        {icons[item.key] ?? icons.groups}
+        <span>{item.label}</span>
+      </Link>
+      {pin && <PinButton item={item} pins={pin.pins} state={pin.state} />}
+    </div>
   );
 }
 
@@ -175,10 +337,12 @@ function NavGroup({
   group,
   pathname,
   icons,
+  pin,
 }: {
   group: Extract<AdminNavNode, { type: 'group' }>;
   pathname: string;
   icons: Record<string, ReactNode>;
+  pin?: PinCtx | null;
 }) {
   const containsActive = group.items.some((item) => isActive(pathname, item));
   const [open, setOpen] = useState(containsActive);
@@ -203,10 +367,39 @@ function NavGroup({
       </button>
       <div className={`vtk-admin-nav-sub${open ? ' is-open' : ''}`}>
         {group.items.map((item) => (
-          <NavLink key={item.key} item={item} active={isActive(pathname, item)} icons={icons} sub />
+          <NavLink
+            key={item.key}
+            item={item}
+            active={isActive(pathname, item)}
+            icons={icons}
+            sub
+            pin={pin}
+          />
         ))}
       </div>
     </div>
+  );
+}
+
+/** Gevuld wanneer de tab vastgepind is, zodat de toestand in het icoon zit en
+ *  niet enkel in de tooltip. */
+function PinIcon({ filled }: { filled: boolean }) {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width="14"
+      height="14"
+      viewBox="0 0 24 24"
+      fill={filled ? 'currentColor' : 'none'}
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
+      <path d="M12 17v5" />
+      <path d="M9 10.5V4h6v6.5l2.5 3.5h-11L9 10.5Z" />
+    </svg>
   );
 }
 

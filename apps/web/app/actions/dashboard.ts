@@ -2,28 +2,24 @@
 
 import { revalidatePath } from "next/cache";
 import { prisma } from "@vtk/db";
-import { isTileImageKey } from "@/lib/dashboard-tiles";
+import { isTileImageKey, normalizeUrl } from "@/lib/dashboard-tiles";
 import { canManageSharedDashboardTile } from "@/lib/dashboard-authorization";
 import { requireSession } from "@/lib/session";
 import { describeChanges, logAudit } from "@/lib/audit";
 
 function revalidateDashboard(): void {
   revalidatePath("/admin");
+  revalidatePath("/nl/admin");
   revalidatePath("/en/admin");
+  revalidatePath("/[locale]/admin", "page");
 }
 
 function revalidateManager(): void {
   revalidatePath("/admin/dashboard-tiles");
+  revalidatePath("/nl/admin/dashboard-tiles");
   revalidatePath("/en/admin/dashboard-tiles");
+  revalidatePath("/[locale]/admin/dashboard-tiles", "page");
   revalidateDashboard();
-}
-
-/** Prepend https:// when the user omits a scheme, otherwise leave untouched. */
-function normalizeUrl(raw: string): string {
-  const s = raw.trim();
-  if (!s) return s;
-  if (/^[a-z][a-z0-9+.-]*:\/\//i.test(s)) return s;
-  return `https://${s}`;
 }
 
 /**
@@ -111,10 +107,10 @@ export async function addPersonalTileAction(input: TileInput): Promise<void> {
       imageKey: cleanImageKey(input.imageKey),
       scope: "USER",
       userId,
-      order: (max._max.order ?? 999) + 1,
+      order: (max._max.order ?? -1) + 1,
     },
   });
-  revalidateDashboard();
+  revalidateManager();
 }
 
 export async function updatePersonalTileAction(input: TileInput & { id: string }): Promise<void> {
@@ -137,7 +133,7 @@ export async function updatePersonalTileAction(input: TileInput & { id: string }
       imageKey: cleanImageKey(input.imageKey),
     },
   });
-  revalidateDashboard();
+  revalidateManager();
 }
 
 export async function deletePersonalTileAction(id: string): Promise<void> {
@@ -145,7 +141,7 @@ export async function deletePersonalTileAction(id: string): Promise<void> {
   await prisma.dashboardTile.deleteMany({
     where: { id, userId: session.user.id, scope: "USER" },
   });
-  revalidateDashboard();
+  revalidateManager();
 }
 
 export async function overrideSharedTileAction(input: TileInput & { tileId: string }): Promise<void> {
@@ -207,9 +203,9 @@ export async function resetLayoutAction(): Promise<void> {
 
 export type DefaultTileInput = TileInput & {
   id?: string;
-  scope: "GLOBAL" | "GROUP";
+  scope: "GLOBAL" | "GROUP" | "USER";
   groupId?: string | null;
-  order: number;
+  order?: number;
 };
 
 export async function saveDefaultTileAction(input: DefaultTileInput): Promise<void> {
@@ -217,6 +213,16 @@ export async function saveDefaultTileAction(input: DefaultTileInput): Promise<vo
   const label = input.label.trim();
   const url = normalizeUrl(input.url);
   if (!label || !url) return;
+
+  if (input.scope === "USER") {
+    if (input.id) {
+      await updatePersonalTileAction({ ...input, id: input.id });
+    } else {
+      await addPersonalTileAction(input);
+    }
+    return;
+  }
+
   const groupId = input.scope === "GROUP" ? input.groupId || null : null;
   if (input.scope === "GROUP" && !groupId) return;
   const target = { scope: input.scope, groupId };
@@ -228,7 +234,6 @@ export async function saveDefaultTileAction(input: DefaultTileInput): Promise<vo
     icon: input.icon || "link",
     color: input.color || "navy",
     imageKey: cleanImageKey(input.imageKey),
-    order: Number.isFinite(input.order) ? input.order : 0,
     scope: input.scope,
     groupId,
   };
@@ -252,13 +257,19 @@ export async function saveDefaultTileAction(input: DefaultTileInput): Promise<vo
         icon: "icoon",
         color: "kleur",
         imageKey: "afbeelding",
-        order: "volgorde",
         scope: "bereik",
         groupId: "post",
       }),
     });
   } else {
-    const created = await prisma.dashboardTile.create({ data });
+    const last = await prisma.dashboardTile.findFirst({
+      where: { scope: input.scope, groupId },
+      orderBy: { order: "desc" },
+      select: { order: true },
+    });
+    const created = await prisma.dashboardTile.create({
+      data: { ...data, order: (last?.order ?? -1) + 1 },
+    });
     await logAudit({
       action: "create",
       entity: "dashboardTile",
@@ -271,10 +282,60 @@ export async function saveDefaultTileAction(input: DefaultTileInput): Promise<vo
   revalidateManager();
 }
 
+export async function reorderDefaultTilesAction(input: {
+  scope: "GLOBAL" | "GROUP" | "USER";
+  groupId?: string | null;
+  ids: string[];
+}): Promise<void> {
+  const session = await requireSession();
+  const { scope, ids } = input;
+  const groupId = scope === "GROUP" ? input.groupId || null : null;
+
+  if (scope === "USER") {
+    await prisma.$transaction(
+      ids.map((id, index) =>
+        prisma.dashboardTile.updateMany({
+          where: { id, userId: session.user.id, scope: "USER" },
+          data: { order: index },
+        })
+      )
+    );
+  } else {
+    const target = { scope, groupId };
+    if (!canManageSharedDashboardTile(session, target)) throw new Error("FORBIDDEN");
+
+    await prisma.$transaction(
+      ids.map((id, index) =>
+        prisma.dashboardTile.update({
+          where: { id },
+          data: { order: index },
+        })
+      )
+    );
+    await logAudit({
+      action: "reorder",
+      entity: "dashboardTile",
+      target: `${ids.length} dashboardtegels`,
+      summary:
+        scope === "GLOBAL"
+          ? "volgorde van globale dashboardtegels gewijzigd"
+          : "volgorde van post-dashboardtegels gewijzigd",
+    });
+  }
+  revalidateManager();
+}
+
 export async function deleteDefaultTileAction(id: string): Promise<void> {
   const session = await requireSession();
   const tile = await prisma.dashboardTile.findUnique({ where: { id } });
-  if (!tile || !canManageSharedDashboardTile(session, tile)) {
+  if (!tile) return;
+  if (tile.scope === "USER") {
+    if (tile.userId !== session.user.id) throw new Error("FORBIDDEN");
+    await prisma.dashboardTile.delete({ where: { id } });
+    revalidateManager();
+    return;
+  }
+  if (!canManageSharedDashboardTile(session, tile)) {
     throw new Error("FORBIDDEN");
   }
   const { count } = await prisma.dashboardTile.deleteMany({

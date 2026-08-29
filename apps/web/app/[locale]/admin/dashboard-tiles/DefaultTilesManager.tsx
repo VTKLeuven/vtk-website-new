@@ -1,13 +1,14 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useRef, useState, useTransition } from "react";
 import { ConfirmDialog } from "@vtk/ui";
 import { IconButton } from "@/components/ui/IconButton";
 import { PencilIcon, TrashIcon } from "@/components/ui/icons";
 import { TileVisualPicker } from "@/components/admin/TileVisualPicker";
-import { TILE_COLORS, TileChip } from "@/lib/dashboard-tiles";
+import { TILE_COLORS, TileChip, normalizeUrl } from "@/lib/dashboard-tiles";
 import {
   deleteDefaultTileAction,
+  reorderDefaultTilesAction,
   saveDefaultTileAction,
 } from "@/app/actions/dashboard";
 
@@ -27,6 +28,8 @@ export type GroupSection = { id: string; name: string; tiles: SimpleTile[] };
 
 const T = {
   nl: {
+    personal: "Van jou",
+    personalHint: "Alleen jij ziet deze snelkoppelingen op jouw dashboard.",
     global: "Voor iedereen",
     globalHint:
       "Iedereen die inlogt ziet deze tegels, onder de kop \"Voor iedereen\" op het dashboard.",
@@ -38,18 +41,20 @@ const T = {
     remove: "Verwijderen",
     removeTile: "Tegel verwijderen?",
     removeConfirm: (label: string) =>
-      `"${label}" verdwijnt van het dashboard van iedereen die de tegel ziet. Dit kan niet ongedaan gemaakt worden.`,
+      `"${label}" verdwijnt van het dashboard. Dit kan niet ongedaan gemaakt worden.`,
     label: "Naam",
     url: "URL",
     color: "Kleur",
-    order: "Volgorde",
     save: "Opslaan",
     cancel: "Annuleren",
     newTile: "Nieuwe tegel",
     editTile: "Tegel bewerken",
     none: "Nog geen tegels.",
+    dragHint: "Sleep om de volgorde te wijzigen",
   },
   en: {
+    personal: "Yours",
+    personalHint: "Only you see these shortcuts on your dashboard.",
     global: "For everyone",
     globalHint:
       'Everyone who signs in sees these tiles, under the "For everyone" heading on the dashboard.',
@@ -61,20 +66,21 @@ const T = {
     remove: "Remove",
     removeTile: "Remove tile?",
     removeConfirm: (label: string) =>
-      `"${label}" will disappear from the dashboard of everyone who sees it. This cannot be undone.`,
+      `"${label}" will disappear from the dashboard. This cannot be undone.`,
     label: "Name",
     url: "URL",
     color: "Color",
-    order: "Order",
     save: "Save",
     cancel: "Cancel",
     newTile: "New tile",
     editTile: "Edit tile",
     none: "No tiles yet.",
+    dragHint: "Drag to reorder",
   },
 } as const;
 
 type EditorState =
+  | { scope: "USER"; groupId: null; tile: SimpleTile | null }
   | { scope: "GLOBAL"; groupId: null; tile: SimpleTile | null }
   | { scope: "GROUP"; groupId: string; tile: SimpleTile | null }
   | null;
@@ -83,12 +89,14 @@ export function DefaultTilesManager({
   locale,
   canManageGlobal,
   canManageGroups,
+  personalTiles,
   globalTiles,
   groups,
 }: {
   locale: Loc;
   canManageGlobal: boolean;
   canManageGroups: boolean;
+  personalTiles: SimpleTile[];
   globalTiles: SimpleTile[];
   groups: GroupSection[];
 }) {
@@ -97,15 +105,89 @@ export function DefaultTilesManager({
   const [removing, setRemoving] = useState<SimpleTile | null>(null);
   const [pending, startTransition] = useTransition();
 
+  const [prevPersonalTiles, setPrevPersonalTiles] = useState<SimpleTile[]>(personalTiles);
+  const [ownTiles, setOwnTiles] = useState<SimpleTile[]>(personalTiles);
+  if (personalTiles !== prevPersonalTiles) {
+    setPrevPersonalTiles(personalTiles);
+    setOwnTiles(personalTiles);
+  }
+
+  const [prevGlobalTiles, setPrevGlobalTiles] = useState<SimpleTile[]>(globalTiles);
+  const [pubTiles, setPubTiles] = useState<SimpleTile[]>(globalTiles);
+  if (globalTiles !== prevGlobalTiles) {
+    setPrevGlobalTiles(globalTiles);
+    setPubTiles(globalTiles);
+  }
+
+  const [prevGroups, setPrevGroups] = useState<GroupSection[]>(groups);
+  const [grpSections, setGrpSections] = useState<GroupSection[]>(groups);
+  if (groups !== prevGroups) {
+    setPrevGroups(groups);
+    setGrpSections(groups);
+  }
+
   function remove(tile: SimpleTile) {
+    setOwnTiles((cur) => cur.filter((t) => t.id !== tile.id));
+    setPubTiles((cur) => cur.filter((t) => t.id !== tile.id));
+    setGrpSections((cur) =>
+      cur.map((g) => ({ ...g, tiles: g.tiles.filter((t) => t.id !== tile.id) }))
+    );
     startTransition(async () => {
       await deleteDefaultTileAction(tile.id);
       setRemoving(null);
     });
   }
 
+  function handleReorderPersonal(next: SimpleTile[]) {
+    setOwnTiles(next);
+    startTransition(async () => {
+      await reorderDefaultTilesAction({ scope: "USER", ids: next.map((x) => x.id) });
+    });
+  }
+
+  function handleReorderGlobal(next: SimpleTile[]) {
+    setPubTiles(next);
+    startTransition(async () => {
+      await reorderDefaultTilesAction({ scope: "GLOBAL", ids: next.map((x) => x.id) });
+    });
+  }
+
+  function handleReorderGroup(groupId: string, next: SimpleTile[]) {
+    setGrpSections((cur) =>
+      cur.map((g) => (g.id === groupId ? { ...g, tiles: next } : g))
+    );
+    startTransition(async () => {
+      await reorderDefaultTilesAction({ scope: "GROUP", groupId, ids: next.map((x) => x.id) });
+    });
+  }
+
   return (
     <div className="space-y-6">
+      {/* 1. Eigen tegels (Van jou) */}
+      <section className="vtk-tiles-section">
+        <div className="vtk-tiles-section-head">
+          <div>
+            <h2 className="font-semibold">{t.personal}</h2>
+            <p className="text-sm text-zinc-500">{t.personalHint}</p>
+          </div>
+          <button
+            type="button"
+            className="vtk-tile-btn vtk-tile-btn-primary"
+            onClick={() => setEditor({ scope: "USER", groupId: null, tile: null })}
+          >
+            + {t.addTile}
+          </button>
+        </div>
+        <TileList
+          tiles={ownTiles}
+          t={t}
+          onEdit={(tile) => setEditor({ scope: "USER", groupId: null, tile })}
+          onRemove={setRemoving}
+          onReorder={handleReorderPersonal}
+        />
+      </section>
+
+      {/* 2. Voor iedereen */}
       {canManageGlobal ? (
         <section className="vtk-tiles-section">
           <div className="vtk-tiles-section-head">
@@ -122,20 +204,22 @@ export function DefaultTilesManager({
             </button>
           </div>
           <TileList
-            tiles={globalTiles}
+            tiles={pubTiles}
             t={t}
             onEdit={(tile) => setEditor({ scope: "GLOBAL", groupId: null, tile })}
             onRemove={setRemoving}
+            onReorder={handleReorderGlobal}
           />
         </section>
       ) : null}
 
+      {/* 3. Per post of werkgroep */}
       {canManageGroups ? (
         <section className="vtk-tiles-section">
           <h2 className="font-semibold">{t.groups}</h2>
           <p className="text-sm text-zinc-500">{t.groupHint}</p>
           <div className="space-y-4 mt-3">
-            {groups.map((g) => (
+            {grpSections.map((g) => (
               <div key={g.id} className="vtk-tiles-group">
                 <div className="vtk-tiles-section-head">
                   <h3 className="font-semibold text-sm">{g.name}</h3>
@@ -154,6 +238,7 @@ export function DefaultTilesManager({
                     setEditor({ scope: "GROUP", groupId: g.id, tile })
                   }
                   onRemove={setRemoving}
+                  onReorder={(next) => handleReorderGroup(g.id, next)}
                 />
               </div>
             ))}
@@ -168,14 +253,64 @@ export function DefaultTilesManager({
           pending={pending}
           onClose={() => setEditor(null)}
           onSubmit={(data) => {
-            startTransition(() =>
-              saveDefaultTileAction({
+            const cleanUrl = normalizeUrl(data.url);
+            const cleanLabel = data.label.trim();
+            if (editor.tile) {
+              const id = editor.tile.id;
+              const updated: SimpleTile = {
+                ...editor.tile,
+                label: cleanLabel,
+                url: cleanUrl,
+                icon: data.icon || "link",
+                color: data.color || "navy",
+                imageKey: data.imageKey,
+              };
+              if (editor.scope === "USER") {
+                setOwnTiles((cur) => cur.map((t) => (t.id === id ? updated : t)));
+              } else if (editor.scope === "GLOBAL") {
+                setPubTiles((cur) => cur.map((t) => (t.id === id ? updated : t)));
+              } else if (editor.scope === "GROUP") {
+                const groupId = editor.groupId;
+                setGrpSections((cur) =>
+                  cur.map((g) =>
+                    g.id === groupId
+                      ? { ...g, tiles: g.tiles.map((t) => (t.id === id ? updated : t)) }
+                      : g
+                  )
+                );
+              }
+            } else {
+              const tempId = `temp:${Date.now()}`;
+              const created: SimpleTile = {
+                id: tempId,
+                label: cleanLabel,
+                url: cleanUrl,
+                icon: data.icon || "link",
+                color: data.color || "navy",
+                imageKey: data.imageKey,
+                order: 999,
+              };
+              if (editor.scope === "USER") {
+                setOwnTiles((cur) => [...cur, created]);
+              } else if (editor.scope === "GLOBAL") {
+                setPubTiles((cur) => [...cur, created]);
+              } else if (editor.scope === "GROUP") {
+                const groupId = editor.groupId;
+                setGrpSections((cur) =>
+                  cur.map((g) =>
+                    g.id === groupId ? { ...g, tiles: [...g.tiles, created] } : g
+                  )
+                );
+              }
+            }
+            startTransition(async () => {
+              await saveDefaultTileAction({
                 id: editor.tile?.id,
                 scope: editor.scope,
                 groupId: editor.groupId,
                 ...data,
-              })
-            );
+              });
+            });
             setEditor(null);
           }}
         />
@@ -200,18 +335,63 @@ function TileList({
   t,
   onEdit,
   onRemove,
+  onReorder,
 }: {
   tiles: SimpleTile[];
   t: (typeof T)[Loc];
   onEdit: (tile: SimpleTile) => void;
   onRemove: (tile: SimpleTile) => void;
+  onReorder: (next: SimpleTile[]) => void;
 }) {
+  const dragFrom = useRef<number | null>(null);
+  const [overIndex, setOverIndex] = useState<number | null>(null);
+
   if (tiles.length === 0) return <p className="vtk-tiles-empty">{t.none}</p>;
+
+  function onDrop(to: number) {
+    const from = dragFrom.current;
+    dragFrom.current = null;
+    setOverIndex(null);
+    if (from === null || from === to) return;
+    const next = [...tiles];
+    const [moved] = next.splice(from, 1);
+    next.splice(to, 0, moved);
+    onReorder(next);
+  }
+
   return (
     <ul className="vtk-tiles-rows">
-      {tiles.map((tile) => {
+      {tiles.map((tile, index) => {
         return (
-          <li key={tile.id} className="vtk-tiles-row">
+          <li
+            key={tile.id}
+            className={`vtk-tiles-row transition-colors ${
+              overIndex === index ? "bg-vtk-yellow/20 border-vtk-blue" : ""
+            }`}
+            draggable
+            onDragStart={() => {
+              dragFrom.current = index;
+            }}
+            onDragEnd={() => {
+              dragFrom.current = null;
+              setOverIndex(null);
+            }}
+            onDragOver={(e) => {
+              e.preventDefault();
+              if (overIndex !== index) setOverIndex(index);
+            }}
+            onDrop={(e) => {
+              e.preventDefault();
+              onDrop(index);
+            }}
+          >
+            <span
+              className="cursor-grab active:cursor-grabbing text-zinc-400 hover:text-zinc-700 px-1 text-base select-none"
+              title={t.dragHint}
+              aria-hidden="true"
+            >
+              ⠿
+            </span>
             <TileChip
               icon={tile.icon}
               imageKey={tile.imageKey}
@@ -260,7 +440,6 @@ function DefaultTileEditor({
     icon: string;
     color: string;
     imageKey: string | null;
-    order: number;
   }) => void;
 }) {
   const t = T[locale];
@@ -270,7 +449,6 @@ function DefaultTileEditor({
   const [icon, setIcon] = useState(tile?.icon ?? "link");
   const [color, setColor] = useState(tile?.color ?? "navy");
   const [imageKey, setImageKey] = useState<string | null>(tile?.imageKey ?? null);
-  const [order, setOrder] = useState(String(tile?.order ?? 0));
 
   return (
     <div className="vtk-tile-modal-backdrop" onClick={onClose}>
@@ -289,10 +467,6 @@ function DefaultTileEditor({
         <label className="vtk-tile-field">
           <span>{t.url}</span>
           <input value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://…" />
-        </label>
-        <label className="vtk-tile-field">
-          <span>{t.order}</span>
-          <input type="number" value={order} onChange={(e) => setOrder(e.target.value)} />
         </label>
 
         <TileVisualPicker
@@ -332,7 +506,7 @@ function DefaultTileEditor({
             className="vtk-tile-btn vtk-tile-btn-primary"
             disabled={pending || !label.trim() || !url.trim()}
             onClick={() =>
-              onSubmit({ label, url, icon, color, imageKey, order: parseInt(order, 10) || 0 })
+              onSubmit({ label, url, icon, color, imageKey })
             }
           >
             {t.save}

@@ -19,8 +19,10 @@ Verwante docs, die hier niet herhaald worden:
 
 Er zijn twee manieren om binnen te geraken, allebei via [better-auth](https://better-auth.com):
 
-1. **Wachtwoord** (`credential`-account, argon2-hash). Enkel voor accounts die een
-   admin heeft aangemaakt; self-service registratie staat uit.
+1. **Wachtwoord** (`credential`-account, argon2-hash). Voor accounts die een admin
+   aanmaakte, én sinds augustus 2026 voor wie zichzelf registreert op
+   `/registreren` (zie "Zelfregistratie" hieronder). Better-auths eigen
+   `signUpEmail` blijft uit; wij maken die rijen zelf aan.
 2. **KU Leuven SSO** (OpenID Connect, Authorization Code Flow + PKCE). Het lid
    logt in bij KU Leuven; een onbekend KU Leuven-account mag zichzelf
    aanmaken en belandt dan in de onboarding.
@@ -82,9 +84,11 @@ Belangrijke keuzes:
 - **`basePath: "/api/auth/better"`.** Alle better-auth-routes leven onder
   `/api/auth/better/*`. De callback-URL voor OIDC wordt hieruit afgeleid (zie
   KU Leuven-sectie). `nextCookies()` moet **als laatste** plugin staan.
-- **`disableSignUp: true`.** Er is geen publieke wachtwoord-registratie.
-  Wachtwoord-accounts maakt een admin aan (`createUser`); KU Leuven-accounts
-  mogen zichzelf provisionen via SSO (zie hieronder).
+- **`disableSignUp: true`.** Het better-auth-endpoint
+  `/api/auth/better/sign-up/email` blijft dicht. Wachtwoord-accounts komen er via
+  `createUser` (admin) of `registerSelfServiceAccount` (`/registreren`); allebei
+  maken ze de `User`- en `Account`-rijen zelf aan, achter onze eigen controles.
+  KU Leuven-accounts mogen zichzelf provisionen via SSO (zie hieronder).
 - **Cross-subdomain cookies.** In productie is de cookie `vtk.*` en geldt ze
   voor `BETTER_AUTH_COOKIE_DOMAIN` (`.vtk.be`), met `useSecureCookies`. Zo kan
   `logistiek.vtk.be` diezelfde cookie meesturen en remote laten valideren.
@@ -112,11 +116,75 @@ Belangrijke keuzes:
   (zie Gebruikersbeheer).
 - **Login-flow** (`apps/web/app/actions/auth.ts`, `loginAction`):
   1. valideert e-mail/wachtwoord (zod);
-  2. checkt `user.active` vooraf (nette "INVALID" i.p.v. een error boundary);
+  2. `checkLoginBlocked(email, password)` -> `INVALID` (onbekend of gedeactiveerd),
+     `UNVERIFIED` (zelfgemaakt account met onbevestigd adres, en het wachtwoord
+     klopte) of `NONE`;
   3. `signInEmail(headers, {...})` -> better-auth zet de cookie;
   4. redirect naar `next` (enkel interne paden).
   Foute credentials en inactieve accounts geven allebei `INVALID` (geen
   user-enumeratie).
+
+## Zelfregistratie met e-mail en wachtwoord (`/registreren`)
+
+De site draait op KU Leuven SSO, maar een alumnus van 2004 heeft geen werkende
+KU Leuven-login meer. `packages/auth/src/server/selfSignup.ts` is de tweede deur.
+
+- **`registerSelfServiceAccount`** maakt dezelfde twee rijen als `createUser`
+  (`User` + `Account { providerId: "credential" }`), met `selfRegisteredAt`
+  gestempeld, `emailVerified: false`, `onboardedAt: null` (de onboarding-gate
+  vraagt daarna het profiel) en `alumni: true` als startwaarde.
+- **Bestaat het adres al, dan gebeurt er niets** en komt er ook geen mail. De
+  functie geeft `token: null` terug en het scherm toont exact hetzelfde als bij
+  een geslaagde registratie: anders is dit formulier een manier om te achterhalen
+  wie hier een account heeft.
+- **`AccountEmailToken`** draagt de bevestigings- en herstellinks. Enkel de
+  sha256-hash gaat de database in (zelfde redenering als `CalendarFeedToken`), een
+  nieuwe token trekt de vorige van dezelfde soort in, en de vervaltijden zijn
+  zeven dagen (bevestiging) en één uur (herstel).
+  Bewust een **eigen tabel** naast better-auths `Verification`: die tabel is van
+  de plugin, die er zelf in schrijft en opruimt.
+- **`checkLoginBlocked`** (aangeroepen door `loginAction`) is de poort. Ze geeft
+  `UNVERIFIED` enkel wanneer het wachtwoord klópte; verkeerde credentials en een
+  gedeactiveerd account geven allebei `INVALID`. `emailVerified` telt **alleen**
+  wanneer `selfRegisteredAt` gezet is: een account van een admin of via SSO is per
+  definitie vertrouwd, en daarop gaan gaten zou elke bestaande admin buitensluiten.
+- **Wachtwoord vergeten** (`/wachtwoord-vergeten`) werkt enkel voor accounts die
+  een wachtwoord hébben. Een geslaagde reset zet `emailVerified` mee op true: wie
+  zijn wachtwoord kan herstellen, bewijst daarmee dat het adres van hem is.
+
+### Migratiepad: van KU Leuven naar een wachtwoord
+
+Een KU Leuven-account verdwijnt een tijd na het afstuderen. Zonder wachtwoord is
+er dan geen enkele manier meer om binnen te geraken, en een herstelmail zou naar
+een dode mailbox gaan. Drie stukken vangen dat op:
+
+- **`setOwnPassword(userId, password)`** zet (of vervangt) de `credential`-rij
+  voor een ingelogd lid. Het paneel staat op `/account` en dringt aan zodra
+  iemand zichzelf als alumnus of als niet-meer-studerend aanduidde en nog geen
+  wachtwoord heeft. `passwordStatus(userId)` levert wat dat paneel toont.
+- **`createPasswordReset` stuurt naar `personalEmail`** wanneer dat ingevuld is,
+  en zoekt ook op dat adres. Naar de universiteitsmail sturen is een link die
+  niemand meer leest.
+- **`resolveLoginEmail(email)`** vertaalt een ingetikt persoonlijk adres naar het
+  login-adres (`User.email`), en `loginAction` gebruikt dat vóór
+  `checkLoginBlocked` en `signInEmail`. Zonder die vertaling is het geheel een
+  val: je herstelt je wachtwoord via je persoonlijke adres en geraakt er daarna
+  niet mee binnen. Enkel wanneer dat adres **één** account aanwijst; botst het
+  met een login-adres of met een tweede profiel, dan blijft het ingetikte adres
+  staan en faalt de login gewoon. Raden doen we hier niet.
+
+`User.email` blijft dus de identiteit en verandert nergens. Dat is met opzet: hem
+laten wijzigen raakt de account-linking met KU Leuven en de unieke index, voor een
+probleem dat met een tweede login-adres al opgelost is.
+- De mails staan in `apps/web/lib/accountMail.ts`: platte tekst met één link, want
+  ze moeten door een spamfilter en op een oude telefoon leesbaar zijn.
+
+### Het inlogscherm
+
+Eén grote knop voor KU Leuven, en daaronder in het klein "Geen KU Leuven student
+(meer): klik hier" dat het e-mailformulier openklapt (`PasswordSignIn`), met
+daarin de links naar registratie en wachtwoordherstel. Staat SSO uit (geen
+env-vars), dan staat dat formulier open: er valt dan niets te verbergen.
 
 ## KU Leuven SSO (OpenID Connect)
 
@@ -200,8 +268,8 @@ Om te controleren welke attributen ICTS effectief vrijgeeft (bv. of
   better-auth aan `mapProfileToUser` doorgeeft, plus de afgeleide `email`/`rNumber`.
   Het loggen faalt dicht: een DB-fout mag een login nooit breken.
 - **Privacy**: die claims bevatten persoonsgegevens (naam, e-mail, r-nummer,
-  faculteit). Daarom staat het standaard uit, bewaren we enkel de laatste
-  `KUL_LOG_KEEP` (50) logins, en is er een "Clear logs"-knop.
+  faculteit). Daarom staat het standaard uit, bewaren we enkel logins van de
+  laatste `KUL_LOG_RETENTION_DAYS` (7) dagen, en is er een "Clear logs"-knop.
 - **Userinfo wordt altijd opgehaald**: better-auth zou standaard meteen de
   **ID-token**-claims gebruiken zodra die `sub` en `email` bevatten. Daardoor
   ontbraken attributen die ICTS enkel via userinfo vrijgeeft. Onze custom
@@ -372,7 +440,8 @@ Admin-CRUD op accounts, allemaal achter de `users.edit`-permissie
 ## Onboarding & studiebevestiging
 
 Een nieuw (SSO-)lid landt met `onboardedAt = null` en moet eerst zijn profiel
-invullen; daarna moet het elk werkingsjaar zijn studie herbevestigen. Beide zijn
+invullen; daarna moet het elk academiejaar zijn studie herbevestigen (die
+bevestiging vervalt op 27 september, niet op 15 juli zoals het werkingsjaar). Beide zijn
 blokkerende gates op de **netwerkgrens** (`apps/web/proxy.ts`), niet in een
 layout. Het r-nummer-veld wordt voorgevuld uit de KU Leuven-claim (zie boven).
 Volledige uitleg: `docs/onboarding-study-gate.md` en de sectie

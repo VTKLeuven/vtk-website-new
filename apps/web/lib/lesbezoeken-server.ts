@@ -3,6 +3,7 @@ import "server-only";
 import * as Sentry from "@sentry/nextjs";
 import { prisma } from "@vtk/db";
 import { sendMail } from "@vtk/mail";
+import { clampNudgeLeadDays } from "@/lib/lesbezoeken";
 import {
   DEFAULT_LESBEZOEK_CONFIG,
   DEFAULT_LESBEZOEK_TEMPLATES,
@@ -52,6 +53,10 @@ export async function getLesbezoekConfig(): Promise<LesbezoekConfig> {
       typeof value.notifyEmail === "string" && value.notifyEmail.trim()
         ? value.notifyEmail.trim()
         : DEFAULT_LESBEZOEK_CONFIG.notifyEmail,
+    nudgeLeadDays:
+      value.nudgeLeadDays === undefined || value.nudgeLeadDays === null
+        ? DEFAULT_LESBEZOEK_CONFIG.nudgeLeadDays
+        : clampNudgeLeadDays(value.nudgeLeadDays),
   };
 }
 
@@ -148,5 +153,112 @@ export async function notifyNewLesbezoek(visit: {
   } catch (err) {
     console.error("[lesbezoeken] kon melding van nieuwe aanvraag niet versturen", err);
     Sentry.captureException(err);
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Ingeplande mails (uitgesteld verzenden)
+// -----------------------------------------------------------------------------
+
+/**
+ * Zet de stempels die bij een verstuurde geplande mail horen, op elk lesbezoek
+ * dat ze dekt.
+ *
+ * Een gebundelde terugkoppeling staat als één rij in de database maar gaat over
+ * meerdere bezoeken (`bundledIds`); zonder deze lus zou alleen het eerste bezoek
+ * als "aanvrager verwittigd" gelden en zouden de negentien andere morgen weer in
+ * de bundel opduiken.
+ */
+export async function applyScheduledMailStamps(
+  mail: { kind: string; lesbezoekId: string; bundledIds: string[] },
+  now: Date,
+): Promise<void> {
+  const ids = Array.from(new Set([mail.lesbezoekId, ...mail.bundledIds]));
+
+  if (mail.kind === "professor") {
+    await prisma.lesbezoek.updateMany({
+      where: { id: { in: ids } },
+      data: { professorMailedAt: now },
+    });
+    // De status volgt alleen wanneer er nog niets beslist was: een bezoek dat
+    // intussen ingetrokken of afgewezen werd, mag niet terug naar "bij de prof".
+    await prisma.lesbezoek.updateMany({
+      where: { id: { in: ids }, status: "PENDING" },
+      data: { status: "ASKED" },
+    });
+    return;
+  }
+
+  if (mail.kind === "nudge") {
+    await prisma.lesbezoek.updateMany({
+      where: { id: { in: ids } },
+      data: { professorNudgedAt: now },
+    });
+    return;
+  }
+
+  if (mail.kind === "requester") {
+    await prisma.lesbezoek.updateMany({
+      where: { id: { in: ids } },
+      data: { requesterNotifiedAt: now },
+    });
+  }
+}
+
+/**
+ * Verwerkt alle ingeplande lesbezoekenmails waarvan het verzendmoment verstreken is.
+ *
+ * Claimt eerst via updateMany, verstuurt vervolgens de mail en werkt het lesbezoek bij.
+ */
+export async function processDueLesbezoekScheduledMails(
+  now: Date = new Date(),
+): Promise<{ sent: number; failed: number }> {
+  try {
+    const due = await prisma.lesbezoekScheduledMail.findMany({
+      where: {
+        sendAt: { lte: now },
+        sentAt: null,
+        failedAt: null,
+      },
+      orderBy: { sendAt: "asc" },
+    });
+
+    if (due.length === 0) return { sent: 0, failed: 0 };
+
+    let sent = 0;
+    let failed = 0;
+
+    for (const item of due) {
+      // Claimen zodat gelijktijdige runs (bv. interval + page load) niet dubbel mailen
+      const claimed = await prisma.lesbezoekScheduledMail.updateMany({
+        where: { id: item.id, sentAt: null, failedAt: null },
+        data: { sentAt: now },
+      });
+      if (claimed.count === 0) continue;
+
+      const delivered = await sendLesbezoekMail({
+        to: item.to,
+        cc: item.cc ?? undefined,
+        subject: item.subject,
+        text: item.body,
+      });
+
+      if (delivered) {
+        await applyScheduledMailStamps(item, now);
+        sent += 1;
+      } else {
+        await prisma.lesbezoekScheduledMail.update({
+          where: { id: item.id },
+          data: { sentAt: null, failedAt: now, failedReason: "Versturen via mailserver mislukt" },
+        });
+        failed += 1;
+      }
+    }
+
+    return { sent, failed };
+  } catch (err) {
+    console.error("[lesbezoeken] fout bij verwerken van geplande mails:", err);
+    Sentry.captureException(err);
+    return { sent: 0, failed: 0 };
   }
 }

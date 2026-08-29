@@ -1,4 +1,4 @@
-# Roles, posts & permissions — developer guide
+# Roles, posts & permissions: developer guide
 
 How access control works in this codebase, and how to work with it. This is the living
 reference; the step-by-step build history lives in `docs/roles-and-permissions.md` (archived).
@@ -7,37 +7,37 @@ Product/working decisions are in `docs/design-decisions.md`; UX + writing house 
 
 ## The model in one paragraph
 
-A **permission** is an atomic capability with a string code (`users.view`, `theokot.pickup`, …).
+A **permission** is an atomic capability with a string code (`users.view`, `theokot.pickup`, ...).
 Permissions are never assigned to people directly. A **role** bundles permissions and is
 GUI-created. People get a role either **directly** (a `UserRole`) or **via a post** (a `Group` that
 grants roles to its members). A user's **effective permissions** for the current working year are
 the union of the permissions of all their roles, direct and post-granted, plus *everything* if
 they are a super admin.
 
-```
-permission ──many──< role >──many── user            (direct: UserRole)
-                       │
-                       └──many── post (Group) ──many── user   (via GroupMembership + GroupRole)
+```text
+permission <--many--> role <--many--> user            (direct: UserRole)
+                       |
+                       +--many--> post (Group) <--many--> user   (via GroupMembership + GroupRole)
 ```
 
 Two words for the same thing: **"Post"** is the product word (the UI says "Posten"); **`Group`** is
-the code/model word. They are the werkgroepen (IT, Cursusdienst, Theokot, …).
+the code/model word. They are the werkgroepen (IT, Cursusdienst, Theokot, ...).
 
 ## Data model
 
 Prisma schema: `packages/db/prisma/schema.prisma`.
 
 | Model | What it is |
-|-------|-----------|
+| --- | --- |
 | `Permission` | Atomic capability. `code` (unique), `labelNl/En`, `category`. Mirror of the code registry (see below). |
 | `Role` | A GUI-created bundle. `code` (unique slug), `nameNl/En`, `descriptionNl/En?`, `color?`, `order`, `system` (GUI cannot delete a system role). |
-| `RolePermission` | role ↔ permission. `@@id([roleId, permissionId])`. |
+| `RolePermission` | role <-> permission. `@@id([roleId, permissionId])`. |
 | `UserRole` | **Direct** role assignment, **per working year**. `@@id([userId, roleId, year])`. |
 | `GroupRole` | A post grants a role. `kind` is `DEFAULT` (every member) or `LEADER` (only the lead). `@@id([groupId, roleId, kind])`. |
 | `Group` (post) | `code` (unique **String**), `slug`, names, `orderInPraesidium`, `active`. Grants roles via `roleGrants`. |
 | `GroupMembership` | Membership of a post, **per working year**. `role` is `MEMBER` or `LEAD`. `@@unique([userId, groupId, year])`. |
 | `User` | Holds `isSuperAdmin` (a boolean, never resets) plus direct `roles` and `memberships`. |
-| `PageEditorRole` | page ↔ role: which roles may edit a page's **content**. `@@id([pageId, roleId])`. See "Page editing" below. |
+| `PageEditorRole` | page <-> role: which roles may edit a page's **content**. `@@id([pageId, roleId])`. See "Page editing" below. |
 
 Notes:
 - `Group.code` is a plain `String` (not an enum), so posts are fully GUI-managed
@@ -51,19 +51,19 @@ Notes:
 `packages/auth/src/server/session.ts` (`getSession`) builds the session for `year =
 currentWorkingYear()`:
 
-1. **Direct roles** — `user.roles` for this `year` → add each role's permission codes.
-2. **Post-granted roles** — for each `GroupMembership` this `year`, add the post's `GroupRole`s:
-   `DEFAULT` for every member, `LEADER` only when `membership.role === 'LEAD'` → add those roles'
+1. **Direct roles**: `user.roles` for this `year` -> add each role's permission codes.
+2. **Post-granted roles**: for each `GroupMembership` this `year`, add the post's `GroupRole`s:
+   `DEFAULT` for every member, `LEADER` only when `membership.role === 'LEAD'` -> add those roles'
    permission codes.
-3. **Super admin** — `user.isSuperAdmin` short-circuits every check to "allowed".
+3. **Super admin**: `user.isSuperAdmin` short-circuits every check to "allowed".
 
 `SessionPayload.permissions` is a `string[]`; the *type safety* is on the check functions' inputs
-(below), not on this array. The session also carries `roleIds: string[]` — the ids of every role
-the user holds this working year (direct + post-granted, same resolution as the permissions) — for
+(below), not on this array. The session also carries `roleIds: string[]` (the ids of every role
+the user holds this working year, direct + post-granted, same resolution as the permissions) for
 checks that hang on a *specific* role, such as page editing.
 
 Because `UserRole` and `GroupMembership` are keyed by working year and the resolver only counts the
-current year, **assignments reset by themselves at the 15 July cutover** — there is no cron job. The
+current year, **assignments reset by themselves at the 15 July cutover** (there is no cron job). The
 only thing that survives the cutover is `User.isSuperAdmin`.
 
 ### Working year
@@ -89,15 +89,15 @@ const canEdit = session.user.isSuperAdmin || session.permissions.includes("users
 **Anywhere with a session in hand** (`@vtk/auth`):
 ```ts
 import { hasPermission, isMemberOfGroup } from "@vtk/auth";
-if (hasPermission(session, "roles.manage")) { … }
-if (isMemberOfGroup(session, "LOGISTIEK")) { … }   // takes a group CODE, not a permission
+if (hasPermission(session, "roles.manage")) { ... }
+if (isMemberOfGroup(session, "LOGISTIEK")) { ... }   // takes a group CODE, not a permission
 ```
 
-**API routes** — guard explicitly and return `authErrorResponse(err)` on the thrown auth errors;
+**API routes**: guard explicitly and return `authErrorResponse(err)` on the thrown auth errors;
 see `apps/web/app/api/users/search/route.ts` for the pattern (it requires `users.search`, or super
 admin).
 
-**Server actions** must re-check (`await requirePermission(...)`) — never trust the client. Expected
+**Server actions** must re-check (`await requirePermission(...)`): never trust the client. Expected
 input errors are *returned* as `saveError(code)`, not thrown (see `CLAUDE.md`).
 
 ### Page editing (permission + page role)
@@ -141,7 +141,7 @@ plain `pages.edit` users reach, so the permission alone is no longer a sufficien
 `deletePageAction` checks page access too. Otherwise anyone holding `pages.delete` could wipe any
 werkgroep's page by posting its id.
 
-**Publishing is its own permission: `pages.publish` (or `pages.manage`)** — see `canPublishPages` in
+**Publishing is its own permission: `pages.publish` (or `pages.manage`)**: see `canPublishPages` in
 `apps/web/lib/pageAccess.ts`. Writing a page is not the same right as putting it on the site, so
 plain `pages.edit`/`pages.editAll` cannot publish. The checkbox lives in the editor's settings card
 and only renders for holders.
@@ -155,7 +155,7 @@ grants publishing by definition.
 
 ## Adding a permission (code) vs. a role (GUI)
 
-**A new permission is a code change** — permissions are the fixed vocabulary of the app:
+**A new permission is a code change** (permissions are the fixed vocabulary of the app):
 1. Add one line to the registry `packages/db/src/permissions.ts`
    (`{ code, labelNl, labelEn, category }`).
 2. Run `npm run sync -w @vtk/db` to mirror it into the `Permission` table (safe while the dev
@@ -171,17 +171,17 @@ defaults), which used to mean a new permission never reached the DB on dev.vtk.b
 the `Permission` row did not, and the screen stayed shut. `sync.ts` closes that gap. It runs on every
 container start, right after `prisma migrate deploy`, and touches **only** data that code owns:
 
-- `Permission` — creates missing codes, updates labels/category when they drift from the registry.
-- the `admin` system role's grants — a new permission is linked immediately, since that role bundles
+- `Permission`: creates missing codes, updates labels/category when they drift from the registry.
+- the `admin` system role's grants: a new permission is linked immediately, since that role bundles
   everything by definition. It does not create the role if it is absent.
 
 It creates **no users, roles or groups**; those are GUI actions on a live environment. Posts,
 werkgroepen and header tabs that exist in the seed but not in the DB are only *reported*, never
 written back, because deleting one via the GUI is a legitimate choice.
 
-- `npm run sync -w @vtk/db` — apply.
-- `npm run sync:check -w @vtk/db` — dry run; prints what would change and writes nothing.
-- `npx tsx packages/db/prisma/sync.ts --prune` — also delete `Permission` rows no longer in the
+- `npm run sync -w @vtk/db`: apply.
+- `npm run sync:check -w @vtk/db`: dry run; prints what would change and writes nothing.
+- `npx tsx packages/db/prisma/sync.ts --prune`: also delete `Permission` rows no longer in the
   registry (cascades to their role grants). Not part of the automatic run: dropping a permission is
   destructive, so a removed code is reported as a warning and cleaned up deliberately.
 
@@ -190,14 +190,14 @@ queryable in SQL). It is exposed to client bundles without pulling in Prisma via
 `@vtk/db/permissions` subpath export. `@vtk/auth` re-exports `type Permission` (the union),
 `PERMISSIONS`, `isPermission()`, and `permissionCodes()`.
 
-**A new role is a GUI action** — create it in `/admin/roles`, tick its permissions, and assign it to
+**A new role is a GUI action**: create it in `/admin/roles`, tick its permissions, and assign it to
 people or have a post grant it. No code change. (System roles like `admin` are seeded and cannot be
 deleted from the GUI.)
 
 ## Admin surfaces
 
 Left-nav config is a single declarative tree in `apps/web/app/[locale]/admin/layout.tsx` using
-`item(...)` / `group(...)` helpers — **source order = display order**, and each entry carries its own
+`item(...)` / `group(...)` helpers: **source order = display order**, and each entry carries its own
 permission guard. The people screens sit in a collapsible **"Ledenbeheer"** group (client
 `AdminNav.tsx`, with active-link highlighting).
 
@@ -207,18 +207,19 @@ The four Ledenbeheer screens share one pattern built on
 table whose rows expand into per-category editors, with create/import in modals.
 
 | Screen | Gate | Notes |
-|--------|------|-------|
+| --- | --- | --- |
 | `/admin/roles` (`RolesTable`) | `roles.manage` | Row = role + effective holder count. Expands to: direct holders, posts that grant it (edit needs `groups.manage`), permissions. |
 | `/admin/groepen` (`PostsTable`) | `groups.manage` | Per working-year tabs. Row = post + member count. Expands to: members, roles this post grants (DEFAULT/LEADER), post settings (incl. `active`). Posts are deactivated, never hard-deleted. Filtered to `Group.type = PRAESIDIUM`. |
 | `/admin/werkgroepen` (`WerkgroepenTable`) | `werkgroepen.manage` **or** werkgroep member | Werkgroepen = `Group` with `type = WERKGROEP`. Managers see all and manage members/roles/settings like posts; a plain member sees only their own werkgroep(s) and may edit just the info text + website (`saveWerkgroepInfoAction`, scoped to their own membership). Public page: `/werkgroepen`. |
-| `/admin/gebruikers` | `users.view` (edit needs `users.edit`) | **Server-driven** table (URL `?q&sort&dir&page`, `count` + `findMany` with `take`/`skip`, no memberships join) — built to scale to tens of thousands of users. Editing opens `/admin/gebruikers/[id]`. |
+| `/admin/gebruikers` | `users.view` (edit needs `users.edit`) | **Server-driven** table (URL `?q&sort&dir&page`, `count` + `findMany` with `take`/`skip`, no memberships join), built to scale to tens of thousands of users. Editing opens `/admin/gebruikers/[id]`. |
 | `/admin/pocs` (`PocsTable`) | `pocs.manage` | Row = POC + representative count. Expands to representatives (added via the `/api/users/search` typeahead) and POC settings. |
-| `/admin/paginas` (server-rendered table) | `pages.edit` or `pages.editAll` | Lists only the pages the user may edit (role match; editAll/superadmin sees all). Search + sort + pagination run in the DB (25/page); search spans every page the user may edit. Yearly-review pages not yet edited this working year float to the top with a yellow cue. Row → full-page markdown editor (`/admin/paginas/[id]`). "Nieuwe pagina" (title + slug) creates a draft and redirects to its editor. |
+| `/admin/paginas` (server-rendered table) | `pages.edit` or `pages.editAll` | Lists only the pages the user may edit (role match; editAll/superadmin sees all). Search + sort + pagination run in the DB (25/page); search spans every page the user may edit. Yearly-review pages not yet edited this working year float to the top with a yellow cue. Row -> full-page markdown editor (`/admin/paginas/[id]`). "Nieuwe pagina" (title + slug) creates a draft and redirects to its editor. |
 | `/admin/paginas/[id]` (`PageContentEditor`) | `canEditPageContent` | Markdown content (NL/EN) + attachments, plus a settings card for the page's slug, editor roles and yearly flag (same check, not `pages.manage`), and Delete (`pages.delete` **and** `canEditPageContent`). |
 | `/admin/inhoud` (`ContentManager`) | `pages.manage` | Structure only: header categories, which page hangs where, titles, slug, publish, excerpts, editor roles + yearly flag. The tree lists only pages that hang under a category. "Pagina toevoegen" links an **existing** page (search via `/api/admin/pages/search`, `pages.manage`); creating, content, attachments and delete all live in `/admin/paginas`. |
 | `/admin/lesbezoeken` | `lesbezoeken.view` (beheren vraagt `lesbezoeken.manage`) | Werklijst, kalender (maand/week/dag) en de vaste gegevens (organisaties, bijzonderheden per docent, mailsjablonen). Aanvragen komen binnen via het publieke `/lesbezoeken`, dat geen login vraagt. Alleen `.view` betekent meekijken zonder knoppen. Zie `docs/design-decisions.md` ("Lesbezoeken"). |
 | `/admin/deur` (door access) | `door.manage` | Usage stats (1/7/30 d), temporary access grants (`DoorAccessGrant`, user typeahead + window), and the full access log (`DoorAccessLog`, incl. denied/unknown scans). |
 | `/admin/it/logboek` (admin audit log) | `audit.view` | Every changing admin action in one table (`AdminAuditLog`, written by `logAudit` in `apps/web/lib/audit.ts`), with filters on person, section, kind of action and date, plus a search over subject and detail. Kept for 30 days. Sits under the IT group but is a plain permission, not superadmin-only, so it can be handed to a role. Rationale and what is *not* logged: `docs/design-decisions.md` ("Adminlogboek"). |
+| `/admin/rekeningen` (rekeningen / het oude billsheet) | `expenses.submit` (indienen + eigen lijst), `expenses.managePost` (eigen post), `expenses.manage` (alles) | Werkbank per werkingsjaar: statustabs (terug te betalen / door te sturen / in te boeken / afgehandeld) als afgeleide van `paidAt`/`sentAt`/`bookedAt`, filters in de URL, en de geopende rekening in `?sel=` met het bonnetje ernaast. Terugbetalen, inboeken, doorsturen en de instellingen zitten enkel in `expenses.manage`. Toegang wordt per rekening getoetst in `lib/rekeningen/server.ts`, niet per scherm. Zie `docs/design-decisions.md` ("Rekeningen"). |
 | `/admin/fakscanner` (bar check-ins) | `fakscanner.manage` | Per working year (`?jaar=`): the points ranking (`FakTally`, 30 per page via `?rang=`), the settings (double-count window, points per free beer, bar-day rollover) and the log of **failed** scans only (`FakScanLog`). Rows are keyed on r-number, so people without a VTK account appear too, by r-number rather than name. |
 
 User pickers everywhere use the server-side typeahead `GET /api/users/search` (capped results), not
@@ -230,7 +231,7 @@ praesidium (a werkgroep- or medewerker-role, say) must be given `users.search` e
 
 The **door** family is separate from the admin screens above: `door.open` (open the door with a
 student card, assigned to roles), `door.remoteOpen` (adds the open-door button to the `/admin`
-dashboard — deliberately *not* implied by `door.open`), and `door.manage` (the tab above). The
+dashboard: deliberately *not* implied by `door.open`), and `door.manage` (the tab above). The
 device endpoints `POST /api/door/scan` + `/api/door/logs` are for the Raspberry Pi and authenticate
 on a shared Bearer secret (`getDoorConfig`), not a session; see `docs/design-decisions.md`
 ("Deurtoegang") and `infra/door/`.
@@ -247,12 +248,12 @@ the DB, unlike the door secret); see `docs/design-decisions.md` ("Fakscanner") a
 `packages/db/prisma/seed.ts` seeds the role set and wires posts to them (all grants `DEFAULT`, so
 every member of the post gets the role):
 
-| Role | Permissions | Granted to (post → DEFAULT) |
-|------|-------------|-----------------------------|
+| Role | Permissions | Granted to (post -> DEFAULT) |
+| --- | --- | --- |
 | `admin` (system) | all | IT, Groep 5 |
 | `praesidium` | `calendar.create`, `photos.upload`, `tickets.create`, `forms.create`, `users.search` | every post |
-| `werkgroep` | none (fill in the GUI) | — |
-| `medewerker` | none (fill in the GUI) | — |
+| `werkgroep` | none (fill in the GUI) | - |
+| `medewerker` | none (fill in the GUI) | - |
 | `theokot` | `theokot.manage`, `theokot.pickup` | Theokot |
 | `grocomeet-deelnemer` | `grocomeet.reserve` | **LEADER** of every post, plus Groep 5 (DEFAULT) |
 | `grocomeet-beheer` | `grocomeet.manage`, `grocomeet.reserve` | Groep 5 |
@@ -265,7 +266,7 @@ it as `DEFAULT` because all five of them attend. Whoever holds it sees the "Broo
 in the profile menu; that entry is gated on the permission, not on a hard-coded "is lead of a
 praesidium post" check, so the board can add someone (a co-responsible) without a code change.
 
-The per-post roles (`post-it`, `post-cursusdienst`, …) are empty containers so you can hang
+The per-post roles (`post-it`, `post-cursusdienst`, ...) are empty containers so you can hang
 post-specific permissions off each werkgroep over time. `werkgroep`/`medewerker` are seeded as
 available roles but not auto-assigned to any post. Your seeded admin account is a member of IT
 (which grants `admin`), so it can see every admin screen.
@@ -276,16 +277,16 @@ available roles but not auto-assigned to any post. Your seeded admin account is 
   `prisma generate` / `prisma migrate dev` fail with `EPERM` while it runs. Stop the dev server
   before migrating and restart it after (the node process caches the old generated client).
 - **Migrate:** `npm run migrate -w @vtk/db -- --name <name>`. Check
-  `npx dotenv -e ../../.env -- npx prisma migrate status` first (read-only). An enum→string column
-  change needs a hand-written `USING ::text` cast — Prisma won't generate it.
-- **Seed:** `npm run seed -w @vtk/db` — idempotent upserts; safe while the dev server is up.
-- **Config sync:** `npm run sync -w @vtk/db` (or `sync:check` for a dry run) — mirrors the
+  `npx dotenv -e ../../.env -- npx prisma migrate status` first (read-only). An enum->string column
+  change needs a hand-written `USING ::text` cast (Prisma won't generate it).
+- **Seed:** `npm run seed -w @vtk/db`: idempotent upserts; safe while the dev server is up.
+- **Config sync:** `npm run sync -w @vtk/db` (or `sync:check` for a dry run): mirrors the
   permission registry into the DB without touching admin-managed content. Runs automatically on
   every deploy.
 - **Typecheck (no server needed):** `cd apps/web && npx tsc --noEmit`;
   `cd packages/auth && npx tsc --noEmit -p tsconfig.json`.
 - **Route health without auth:**
-  `curl -s -o /dev/null -w "%{http_code}" http://localhost:3000/nl/admin/roles` → `307` (login
+  `curl -s -o /dev/null -w "%{http_code}" http://localhost:3000/nl/admin/roles` -> `307` (login
   redirect). A `500` is a runtime error; the first hit may compile on demand, so allow a long
   timeout.
 - Do **not** switch dev off `next dev --webpack`, and do **not** re-export Prisma client types from
@@ -324,3 +325,23 @@ een **SSO-clientpermissie** uit het andere systeem (`SsoClientPermission`, zie
 in de registry zetten zou twee dingen met dezelfde naam geven die elkaar niets
 aangaan; dan lijkt de toegang geregeld terwijl niemand binnen raakt.
 
+## Rekeningen
+
+De rekeningen (`docs/design-decisions.md`, "Rekeningen") voegen drie permissies
+toe:
+
+- `expenses.submit` — een rekening indienen en je eigen lijst zien. Zit in de
+  geseede rol `praesidium`, dus elk praesidiumlid kan een bonnetje kwijt zonder
+  dat IT er eerst iets voor moet uitdelen. Bewust wél een recht en niet "iedereen
+  die inlogt": aan een rekening hangt een terugbetaling.
+- `expenses.managePost` — de rekeningen van de eigen post(en) opvolgen,
+  corrigeren en verwijderen zolang er niets verwerkt is. De post-scope komt uit
+  `session.groups` van het huidige werkingsjaar; er is dus geen `allowed_posts`
+  meer zoals in billsheet.
+- `expenses.manage` — alles: alle posten, terugbetalen, inboeken, doorsturen naar
+  de boekhouder en de instellingen. Zit in de systeemrol `admin`, en die wordt
+  toegekend aan IT en Groep 5.
+
+Terugbetalen en inboeken zitten bewust **niet** in `expenses.managePost`: dat is
+geld en boekhouding, en een postverantwoordelijke die zijn eigen uitgaven op
+"betaald" kan zetten is precies het gat dat billsheet had.

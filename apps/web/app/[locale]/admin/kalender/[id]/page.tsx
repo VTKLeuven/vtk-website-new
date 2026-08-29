@@ -5,7 +5,9 @@ import { requireSession } from "@/lib/session";
 import { hasPermission } from "@vtk/auth";
 import type { Locale } from "@vtk/i18n";
 import { canCreateTicketEventForGroup } from "@/lib/ticketing/authorization";
+import { adminAttendeeList } from "@/lib/calendar/interest";
 import { EventForm } from "../EventForm";
+import { EventInterestsPanel } from "../EventInterestsPanel";
 import { EventTicketsPanel } from "../EventTicketsPanel";
 
 export default async function EditEventPage({
@@ -39,10 +41,15 @@ export default async function EditEventPage({
         where: { id: { in: session.groups.map((g) => g.id) } },
         orderBy: { orderInPraesidium: "asc" },
       });
-  const categories = await prisma.calendarCategory.findMany({
-    select: { id: true, nameNl: true, nameEn: true, colour: true, audience: true },
-    orderBy: [{ order: "asc" }, { nameNl: "asc" }],
-  });
+  const [categories, interests] = await Promise.all([
+    prisma.calendarCategory.findMany({
+      select: { id: true, nameNl: true, nameEn: true, colour: true, audience: true },
+      orderBy: [{ order: "asc" }, { nameNl: "asc" }],
+    }),
+    adminAttendeeList(event.id),
+  ]);
+
+  const base = locale === "nl" ? "" : "/en";
 
   return (
     <div className="space-y-4">
@@ -55,6 +62,12 @@ export default async function EditEventPage({
         categories={categories}
         locale={locale}
         canManageCategories={canAll}
+      />
+      <EventInterestsPanel
+        eventId={event.id}
+        rows={interests}
+        locale={locale}
+        base={base}
       />
       <EventTicketsPanel
         eventId={event.id}

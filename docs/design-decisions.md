@@ -15,7 +15,7 @@ acties in `apps/web/app/actions/theokot.ts`).
 
 ---
 
-## Hoofdnavigatie — Info, Theokot en Shiften
+## Hoofdnavigatie: Info, Theokot en Shiften
 
 De tabs in de header komen uit de `HeaderTab`-tabel; `HEADER_TABS` in
 `packages/db/src/groups.ts` is de seed én de fallback wanneer die tabel leeg is.
@@ -128,7 +128,7 @@ de URL dezelfde blijft.
 
 ---
 
-## Theokot — broodjes-reservatiesysteem
+## Theokot: broodjes-reservatiesysteem
 
 Theokot is de cafetaria/broodjesbar van VTK. Studenten reserveren vooraf broodjes,
 halen ze af aan de balie en betalen daar. Post **Theokot** beheert het systeem.
@@ -202,7 +202,7 @@ halen ze af aan de balie en betalen daar. Post **Theokot** beheert het systeem.
   hoeft niet wekelijks te wijzigen.
 - Eén bestelling per persoon per sessie (DB-uniek). **Annuleren = verwijderen** van de
   bestelling (geeft voorraad + het uniek-slot vrij, zodat opnieuw bestellen kan vóór
-  de deadline). Er wordt dus geen annulatie-historiek bijgehouden — enkel no-shows.
+  de deadline). Er wordt dus geen annulatie-historiek bijgehouden: enkel no-shows.
 
 ### Afhalen
 
@@ -220,8 +220,7 @@ halen ze af aan de balie en betalen daar. Post **Theokot** beheert het systeem.
 - **Kaartscanner**: de scanner werkt als toetsenbord en tikt `serial;cardAppId` + Enter.
   Eén invoerveld verwerkt beide: bevat de invoer een `;` dan gaat ze naar de KU Leuven
   `idverification`-API (`lib/kul-card.ts`) die een r-nummer teruggeeft; anders wordt de
-  invoer als r-nummer behandeld. Credentials (`KUL_CARD_*`) staan los van de OIDC-login —
-  zie README.
+  invoer als r-nummer behandeld. Credentials (`KUL_CARD_*`) staan los van de OIDC-login (zie README).
 - **Afhaaluren** (default **12:00–16:00**, per dag aanpasbaar) zijn NIET dezelfde als de
   **openingsuren van Theokot** op de startpagina (default ma–vr **10:30–18:00**). De
   r-nummerpagina werkt ook vóór 12:00.
@@ -230,8 +229,8 @@ halen ze af aan de balie en betalen daar. Post **Theokot** beheert het systeem.
 
 - Een bestelling telt pas als **no-show** vanaf **15 min na sluitingstijd**
   (`noShowGraceMinutes`). Verwerking gebeurt door een **ingebouwde scheduler**
-  (`apps/web/instrumentation.ts`) die periodiek `processDueNoShows` draait — geen
-  externe cron. Idempotent via `TheokotSession.processedAt`.
+  (`apps/web/instrumentation.ts`) die periodiek `processDueNoShows` draait (geen
+  externe cron). Idempotent via `TheokotSession.processedAt`.
 - Bij een no-show krijgt de student een **waarschuwingsmail** (`lib/mail.ts`,
   nodemailer/SMTP; logt enkel wanneer SMTP niet geconfigureerd is).
 - Na **X** no-shows (`noShowThreshold`) volgt een **ban** van **Y** dagen
@@ -258,15 +257,15 @@ halen ze af aan de balie en betalen daar. Post **Theokot** beheert het systeem.
 
 ### Permissies
 
-- `theokot.manage` — sessies/aanbod, config, bericht, bans, historiek.
-- `openingHours.manageOwn` — openingsurenkaart van de eigen post; daarnaast wordt
+- `theokot.manage`: sessies/aanbod, config, bericht, bans, historiek.
+- `openingHours.manageOwn`: openingsurenkaart van de eigen post; daarnaast wordt
   de exacte post (THEOKOT, CURSUSDIENST of FAKBAR) server-side gecontroleerd.
-- `theokot.pickup` — afhaalbalie + turf-lijst.
+- `theokot.pickup`: afhaalbalie + turf-lijst.
 - Beide worden in de seed toegekend aan groep **THEOKOT**.
 
 ---
 
-## Grocomeet en VTK Bureau — broodjes voor een vergadering
+## Grocomeet en VTK Bureau: broodjes voor een vergadering
 
 Twee terugkerende vergaderingen waar vooraf een broodje en een drankje voor besteld
 wordt. Ze staan in de code als één model (`Meeting`, met `kind`), want de werking is
@@ -457,6 +456,81 @@ Een organisatie verdwijnt niet, ze gaat op niet-actief: verwijderen kan enkel zo
 geen enkel bezoek aan hangt, want de kalender van vorig jaar mag niet halveren omdat
 iemand opruimt.
 
+### Een merge mag, maar niemand verstuurt ongelezen
+
+"Alle aanvragen tegelijk insturen" is een echte vraag: een jobbeurs dient twintig
+lesbezoeken na elkaar in en die één voor één openen is werk zonder inhoud. Het
+bulkvenster (aanvinken in de werklijst, dan "Naar de docenten…") stelt daarom in één
+beurt alle mails op, maar het stelt ze **op het scherm** op: elke mail staat er als een
+eigen blok, met haar ontvanger, haar sjabloon en een uitklapbaar tekstveld, en met een
+vinkje om ze uit de reeks te laten. Pas de knop onderaan verstuurt of plant.
+
+Dat is precies één stap trager dan de mailmerge die dit vervangt, en dat is de bedoeling
+(zie hierboven): die stuurde rij per rij zonder dat iemand de tekst nog zag, en een fout
+in het sjabloon vertrok dan honderd keer. Wat de merge wél wegneemt is het opzoekwerk:
+het juiste sjabloon per aanvraag (kort of lang, NL of EN), het invullen, en het
+klikken tussen twintig panelen.
+
+- **Ligt de vraag al bij de docent, dan wordt het de herinnering.** Dezelfde knop
+  bedient dus het insturen van nieuwe aanvragen én het porren van de reeks die blijft
+  liggen; per mail staat er in het venster of het een "Vraag" of een "Herinnering" is.
+- **Inplannen is de standaard, ook hier.** Twintig mails die om elf uur 's avonds
+  tegelijk bij professoren binnenvallen, zijn erger dan één.
+- Een aangevinkt bezoek dat niet meer bij de docent ligt, valt uit de merge, met een
+  regel bovenaan die zegt hoeveel en waarom. Stil weglaten zou betekenen dat je denkt
+  dat er twintig mails vertrokken terwijl het er zeventien waren.
+
+### Eén aanvrager krijgt één mail, geen twintig
+
+Wie twintig lesbezoeken aanvraagt, kreeg twintig losse terugkoppelingen. Elk daarvan
+klopte, maar samen vertelden ze niet wat een mens wil weten: wat gaat er door, wat ligt
+er nog bij een professor, en wat niet. "Terugkoppeling bundelen…" maakt van de selectie
+**één mail per aanvrager**, met het overzicht gegroepeerd per uitkomst
+(`buildRequesterDigest`): goedgekeurd, nog in behandeling, niet doorgegaan, met de reden
+onder het bezoek waar ze over gaat.
+
+- **Gegroepeerd per organisatie én per aanvragersadres.** Enkel op het adres groeperen
+  zou de lesbezoeken van twee organisaties door elkaar in dezelfde mail zetten wanneer
+  dezelfde persoon voor allebei aanvraagt.
+- De koppen in die mail zijn niet de statusnamen uit het beheer. "Afgewezen door ons" is
+  een interne term; de aanvrager leest liever wat er met zijn aanvraag gebeurde dan wie
+  het besliste.
+- `{vak}`, `{datum}` en `{uur}` blijven leeg in een bundelsjabloon. Eén datum uit twintig
+  in de onderwerpregel zetten is erger dan er geen zetten.
+- In de database is dat één rij (`LesbezoekScheduledMail.bundledIds`), maar het versturen
+  zet `requesterNotifiedAt` op **elk** bezoek van de bundel. Anders dook de rest morgen
+  gewoon opnieuw in de bundel op.
+
+### Een geplande mail naar de docent en een naar de aanvrager sluiten elkaar niet uit
+
+Er staat hoogstens één openstaande geplande mail per bezoek **per kant**: een tweede
+vraag aan dezelfde professor vervangt de eerste, maar een terugkoppeling naar de
+aanvrager laat de vraag die morgenvroeg naar de professor moet gewoon staan. Zonder dat
+onderscheid haalde het bundelen van een terugkoppeling stilletjes de merge weg die je
+vijf minuten eerder had ingepland.
+
+### De herinnering kondigt zichzelf aan
+
+De vraag ligt bij de professor, hij antwoordde niet, en het bezoek nadert: dat is het
+moment waarop de oude Sheet het liet afweten. Niemand ziet dat een rij al drie weken op
+oranje staat tot het bezoek voorbij is. De werklijst zegt het nu zelf, vanaf drie dagen
+voor het bezoek: een balk bovenaan ("tijd voor een herinnering"), een badge op de rij met
+hoeveel dagen er nog zijn, een filter "Herinnering nodig", en in het paneel een knop die
+meteen de herinneringsmail opstelt.
+
+- **Afgeleid, geen kolom.** `needsNudgeReminder` rekent het per keer uit uit status,
+  datum en of er al gepord of iets ingepland is. Er is dus geen tweede toestand die kan
+  verlopen, en de drempel mag veranderen zonder dat er iets herberekend moet worden.
+- **De drempel staat in de instellingen** (`nudgeLeadDays`, standaard 3): hoe lang je een
+  professor laat zwijgen voor je nog eens port, is een afweging van wie de lesbezoeken
+  doet, en die verschilt per jaar.
+- **Enkel bij "Bij de prof".** Bij "Nieuw" is het probleem een ander (de vraag vertrok
+  nog niet eens) en bij een verwerkte status valt er niets meer te porren. Een bezoek dat
+  al bezig of voorbij is, valt weg: een herinnering is dan geen hulp meer maar ruis.
+- **Het blijft in het scherm.** Geen mail naar de lesbezoekenmailbox: wie dit werk doet,
+  opent dat scherm toch, en een dagelijkse herinneringsmail over herinneringen wordt
+  weggeklikt.
+
 ### De werklijst is de standaard, niet de kalender
 
 De app die dit vervangt had enkel een kalender. Daardoor was "welke aanvraag ligt hier al
@@ -535,7 +609,7 @@ vooraf; er vertrekt **geen mail**, dus de vice verwittigt die leden zelf.
 
 ### Permissies & navigatie
 
-- `piano.manage` — vensters, sluitingsdagen, instellingen, infotekst en het
+- `piano.manage`: vensters, sluitingsdagen, instellingen, infotekst en het
   schrappen van andermans reservatie. Hoort bij de vice.
 - De pagina hangt als menu-item onder de **Info**-tab (`HeaderTabLink` naar
   `/piano`), zoals ze op de oude site onder "Aanbod" stond. Het is een eigen route
@@ -553,14 +627,14 @@ en `apps/web/lib/door-*.ts`; Pi-kant: `infra/door/`.
 
 ### Drie aparte rechten (bewust gescheiden)
 
-- **`door.open`** — mag de deur openen met zijn studentenkaart. Dit ken je toe aan
+- **`door.open`**: mag de deur openen met zijn studentenkaart. Dit ken je toe aan
   rollen in `/admin/roles`, zodat "wie geraakt binnen" gewoon werkingsjaar-gescoped
   meeloopt met de rollen/posten (reset dus mee op 15 juli, zoals alle rechten).
-- **`door.remoteOpen`** — toont de "deur openen"-knop op het admin-dashboard.
+- **`door.remoteOpen`**: toont de "deur openen"-knop op het admin-dashboard.
   **Bewust los van `door.open`:** wie met zijn kaart binnen mag, hoeft daarom nog
   niet de deur voor anderen te kunnen openen vanop afstand. Dit is de kleinere,
   bewustere groep (bv. praesidium/onthaal).
-- **`door.manage`** — de `/admin/deur`-tab: tijdelijke toegang geven, de
+- **`door.manage`**: de `/admin/deur`-tab: tijdelijke toegang geven, de
   gebruiksstatistiek en de log bekijken.
 
 ### Tijdelijke toegang los van de rollen
@@ -792,18 +866,44 @@ SSO. Concrete implementatie: hook in `packages/auth/src/auth.ts`, gate in
   gaf ongewild een jaarlijks signaal over wie nog actief studeerde. Nu cudi een
   aparte site is (en we die bewust **niet** koppelen), viel dat signaal weg.
 - **De oplossing:** niet de koppeling herbouwen, maar de _jaarlijkse herdeclaratie_.
-  `User.studyConfirmedYear` houdt bij in welk werkingsjaar het lid zijn studie
-  laatst bevestigde. Loopt dat achter op `currentWorkingYear()` (rollover op
-  15 juli, zie `lib/workingYear.ts`), dan is het profiel verlopen.
+  `User.studyConfirmedYear` houdt bij in welk academiejaar het lid zijn studie
+  laatst bevestigde. Loopt dat achter op `currentStudyYear()` (rollover op
+  27 september, zie `lib/workingYear.ts`), dan is het profiel verlopen.
+- **De bevestiging vervalt op 27 september, niet op 15 juli.** Dat is bewust een
+  andere dag dan de rest van de site: het werkingsjaar kantelt op 15 juli, maar
+  het academiejaar loopt door tot eind september. Wie in juli gevraagd wordt "wat
+  studeer je?" antwoordt met het jaar dat net gedaan is (in juli 2026 dus 25-26),
+  en dan staat het hele werkingsjaar lang het verkeerde studiejaar in de
+  mailinglijsten en in de career-mappen. Op 27 september is het nieuwe
+  academiejaar effectief begonnen: de tweedezittijd is voorbij, wie heroriënteert
+  weet het, en de eerste lesweek is bezig. Dan pas is "wat studeer je?" een vraag
+  met een juist antwoord.
+- **Gevolg: twee jaargrenzen naast elkaar.** `currentWorkingYear()` (15 juli,
+  posten en rollen) en `currentStudyYear()` (27 september, enkel de
+  studiebevestiging) staan samen in `packages/auth/src/lib/workingYear.ts`, zodat
+  het verschil op één plek zichtbaar is. Alles wat aan `studyConfirmedYear` hangt
+  gebruikt het studiejaar; dat is de gate, het bevestigingsscherm, én de
+  geschiktheid voor de mailinglijsten. Zouden die uit elkaar lopen, dan valt
+  iedereen tussen 15 juli en 27 september uit elke lijst zonder dat er iets
+  gebeurd is.
+- Het studiejaar is bewust **niet geklemd** op `FIRST_WORKING_YEAR` zoals het
+  werkingsjaar (die klem bestaat omdat er geen roldata is van vóór 26-27). Met
+  die klem zou de gate in de zomer van 2026 alsnog in juli vallen.
+- **Eenmalige correctie bij de invoering (augustus 2026):** wie sinds 15 juli
+  2026 al bevestigd had, stond op 2026 terwijl het antwoord in de praktijk over
+  25-26 ging. De migratie `20260827160000_studiebevestiging_27_september` zet die
+  stempels op 2025. Zo valt de eerste bevestiging onder de nieuwe regel op
+  27 september 2026; tot dan is niemand gegate en blijven de mailinglijsten
+  intact.
 - Een verlopen profiel wordt **blokkerend** afgedwongen door een tweede gate in
-  `app/[locale]/layout.tsx`, na de onboarding-gate: het lid gaat naar
+  `apps/web/proxy.ts`, na de onboarding-gate: het lid gaat naar
   `/studie-bevestigen` voor het de site verder kan gebruiken.
 - **Bewust geen reset van de data** (in tegenstelling tot het oude systeem): de
   vorige keuze blijft staan en wordt voorgevuld, zodat bevestigen één klik is.
   Dat verschil bepaalt of leden bevestigen of afhaken.
 - **Waarom dit sterker is dan de oude cudi-truc:** inloggen gaat via KU Leuven
   SSO. Een afgestudeerde wiens KUL-account uit staat, geraakt niet meer binnen en
-  kan dus nooit bevestigen. "Bevestigd dit werkingsjaar" betekent daardoor in de
+  kan dus nooit bevestigen. "Bevestigd dit academiejaar" betekent daardoor in de
   praktijk: heeft een werkend KUL-account **én** verklaart zelf nog te studeren.
 - `saveProfileAction` (onboarding + `/account`) stempelt `studyConfirmedYear` ook,
   want wie dat formulier invult declareert daarmee net zijn studie.
@@ -817,10 +917,10 @@ SSO. Concrete implementatie: hook in `packages/auth/src/auth.ts`, gate in
   universiteitsmail.
 - Enkel **actieve** leden komen in een export: een gedeactiveerd account hoort
   geen mails meer te krijgen.
-- Enkel leden die hun studie **dit werkingsjaar bevestigd** hebben (zie de
-  jaarlijkse studiebevestiging hierboven) zitten in een lijst; dat geldt voor
-  **alle** lijsten, ook "Alle studenten". Afgestudeerden vallen er zo vanzelf
-  uit, zonder manuele opkuis.
+- Enkel leden die hun studie **dit academiejaar bevestigd** hebben (zie de
+  jaarlijkse studiebevestiging hierboven; die vervalt op 27 september, niet op
+  15 juli) zitten in een lijst; dat geldt voor **alle** lijsten, ook "Alle
+  studenten". Afgestudeerden vallen er zo vanzelf uit, zonder manuele opkuis.
 - Enkel leden die **nog studeren**: wie bij de bevestiging "ik studeer niet
   (meer)" (`notStudying`) aanduidde, bevestigt zijn profiel wél en passeert dus
   de gate, maar hoort in **geen enkele** studiegerichte lijst. Zonder deze extra
@@ -1312,8 +1412,8 @@ avond werk voor niets.
 VTK had een gedeelde Google Workspace-agenda. Die wordt **niet** gekoppeld: niet
 geïmporteerd, niet gespiegeld, niet gesynchroniseerd. De reden is dat
 `CalendarEvent` dingen draagt waar een Google-agenda geen plaats voor heeft: een
-Nederlandse én Engelse titel en beschrijving, `visibility` (publiek vs. enkel
-leden), `groupId` (dat bepaalt wie het event mag bewerken), een foto, en een 1:1-
+Nederlandse én Engelse titel en beschrijving, `publishedAt` (concept vs. online),
+`groupId` (dat bepaalt wie het event mag bewerken), een foto, en een 1:1-
 koppeling met `TicketEvent`. Zou Google de bron zijn, dan verlies je dat allemaal
 of moet je het in de eventbeschrijving proppen.
 
@@ -1572,9 +1672,12 @@ homepage valt terug op de standaard) en in het beheer als onbekend gemeld.
   `Poc.description*` en `PocRepresentative.role*` bestaan nog in de database
   (weggooien zou bestaande tekst vernietigen), maar worden nergens meer getoond
   of bewerkt.
-- **`/pocs` gebruikt dezelfde kaarten als de homepage-band** (`.poc-grid` /
-  `.poccard` uit `vtk-home.css`): wie zijn eigen POC op de homepage ziet en
-  doorklikt, hoort hetzelfde beeld te krijgen.
+- **`/pocs` gebruikt hetzelfde wall-roster design als `/praesidium`** (`.vtk-wall`,
+  `.vtk-wall-row`, `.vtk-wall-faces` uit `vtk-base.css`), aangevuld met het e-mailadres
+  van de POC in het zijlabel (`.vtk-wall-email`). Bovenaan staat een quick-jump navigatie
+  naar de verschillende richtingen. POC's zonder vertegenwoordigers in het
+  geselecteerde jaar worden verborgen. Wie zijn eigen POC op de homepage ziet en
+  doorklikt, kan zo het volledige overzicht en eerdere jaargangen raadplegen.
 - **Lege staat = sectie verbergen.** Zonder sessie, zonder richtingen, of zonder
   een matchende POC met vertegenwoordigers valt de hele sectie weg. Bewuste keuze
   boven "toon dan alle POC's" of een uitnodigingsbanner: de sectie is enkel
@@ -3588,6 +3691,54 @@ keuzes die niet uit de code volgen.
   geen "bedankt voor je inzending"-mail: hij heeft niets ingevuld en zou zich
   afvragen wat er gebeurd is. Het formulier hoeft daarvoor ook niet open te staan.
 
+### Een formulier op een contentpagina
+
+Een formulier kan als paneel in een gewone CMS-pagina staan. Dat is de reden om
+onze eigen formulieren te gebruiken in plaats van een Google Form: het hoort
+eruit te zien alsof het bij de pagina hoort, niet alsof het eraan geplakt is.
+
+- **Een uitgelicht paneel, geen band en geen kale sectie.** Het formulier staat
+  in de tekstkolom als witte kaart met de gele accentrail: hetzelfde materiaal
+  dat de huisstijl al voor een uitgelichte kaart gebruikt. Vier richtingen zijn
+  bekeken. Een kale inline-sectie zonder kader las te veel als een gewone alinea
+  en werd bij het scrollen gemist. Een volle navy band viel op maar kan enkel
+  ónder de tekst staan (een band van rand tot rand kan niet tussen twee
+  alinea's) en overheerste een korte pagina. Een inzet onderaan met een
+  actiepaneel in de rail zette het formulier te ver van de tekst waar het bij
+  hoort. De kaart valt op zonder de pagina over te nemen, en past even goed op
+  een korte als op een lange pagina.
+- **De redacteur bepaalt waar het staat, in de tekst zelf.** De markering
+  `[[formulier]]` op een eigen regel in de markdown zegt waar het paneel komt;
+  staat ze er niet, dan komt het onderaan. Bewust geen keuzelijst met drie
+  posities in een ander paneel: de tekst weet het beste waar de inschrijving
+  hoort, en een markering die je ziet staan is duidelijker dan een instelling
+  die je moet gaan zoeken.
+- **De rail schreeuwt dat er iets in te vullen valt.** In "Op deze pagina" krijgt
+  het formulier geen gewone regel tussen de tussentitels, maar een gele knop met
+  de titel en de deadline, op de plaats waar het paneel in de tekst staat. Iemand
+  die de pagina opent om in te schrijven, mag daar niet naar moeten zoeken. Staat
+  het formulier dicht, vol of heb je al ingediend, dan wordt die knop grijs: een
+  gele "schrijf je in"-knop op een gesloten formulier is een leugen.
+- **Eén formulier per pagina.** Twee panelen in dezelfde tekstkolom lezen als een
+  fout, en de markering zou niet meer weten welke van de twee ze aanwijst.
+- **Een formulier verhuist niet, het staat er ook.** `/formulieren/<slug>` blijft
+  gewoon werken. De affiche met de QR-code, de link in een mail en de lijst op
+  `/formulieren` mogen niet breken omdat iemand het formulier ergens ook op een
+  pagina zet.
+- **Na het versturen blijf je op de pagina staan.** De bedanking komt in het
+  paneel zelf. Doorsturen naar de bedanktpagina van het formulier haalt de
+  bezoeker weg van de pagina waar hij naartoe kwam, en dat is precies het
+  "aangeplakt"-gevoel dat we wilden vermijden.
+- **Een concept laat het paneel weg, het weigert de pagina niet.** De tekst
+  eromheen hoort er gewoon te staan. Wie het formulier beheert, ziet het concept
+  wel, met de voorbeeldmelding erbij.
+- **Koppelen is de pagina bewerken.** Vanaf beide kanten (bij de instellingen van
+  het formulier, en op de pagina zelf) geldt dezelfde regel: je hebt de
+  bewerkrechten van die pagina nodig én het beheer van dat formulier. Anders kan
+  iemand met paginarechten het concept van een andere post online zetten, of kan
+  een formulierbeheerder zijn inschrijving op een willekeurige pagina laten
+  verschijnen.
+
 ### Springen en wachtlijsten (aanvulling op de formulierenmodule)
 
 - **Springen kan enkel wanneer de secties stap voor stap komen.** Naar een
@@ -3611,6 +3762,28 @@ keuzes die niet uit de code volgen.
   aanduidt waarvan de tweede vol zit, komt volledig op de wachtlijst in plaats van
   twee plaatsen te bezetten en voor de derde te wachten. Half ingeschreven zijn is
   voor niemand bruikbaar.
+
+## De onboarding en de jaarlijkse bevestiging zijn te bekijken onder Admin → IT
+
+De twee gates uit `proxy.ts` zijn de enige schermen die een lid precies één keer
+ziet. Daardoor is er geen manier om te controleren of ze nog kloppen: je eigen
+account is al onboarded, en het werkingsjaar rolt maar één keer per jaar om. Wie
+het toch wou zien, moest een testaccount aanmaken of `onboardedAt` in de database
+op null zetten, en dat laatste is precies hoe je per ongeluk je eigen profiel
+wist.
+
+`/admin/it/flows` (superadmin) toont per gate wanneer hij afgaat, wat de eigen
+staat van de kijker is (`onboardedAt`, `studyConfirmedYear`, het huidige
+academiejaar en de eerstvolgende omslag op 27 september), en het formulier zelf.
+
+Dat is bewust **het echte formulier**, met een opslaan-actie die niets bewaart
+(`previewNoopAction`). Een nagebouwde kopie zou vroeg of laat afwijken van wat een
+nieuw lid werkelijk ziet, en dan is de voorvertoning erger dan geen
+voorvertoning. `ProfileForm` heeft daarvoor een optionele `action`-prop; de
+studiebevestiging hergebruikt hetzelfde `StudyFieldset` met dezelfde
+`name`-attributen.
+
+---
 
 ## Adminlogboek: wie deed wat in het beheer
 
@@ -3980,11 +4153,301 @@ geen ticket".
 
 De teller (`interestedCount`) draagt **geen namen**. Hij is er om te zien of er
 volk komt, en dat is precies zoveel als een ster mag beloven; een deelnemerslijst
-zou hem tot een belofte maken die hij niet is.
+zou hem tot een belofte maken die hij niet is. De enige uitzondering staat
+hieronder bij de alumniwerking, en die is expliciet opt-in per evenement.
 
 Een aangeduid evenement blijft in je lijst staan ook wanneer het buiten je
 doelgroep valt. Iemand die in september eerstejaarsactiviteiten aanduidde en in
 oktober zijn studiejaar bijwerkt, hoort ze niet zonder uitleg te zien verdwijnen.
+
+### Dezelfde ster staat sinds augustus 2026 ook op de website
+
+`/kalender/<id>` heeft een knop "Ik kom naar dit evenement" die in dezelfde
+`CalendarEventInterest`-tabel schrijft. Wie in de app op de ster tikt en op de
+site kijkt, krijgt dus geen twee verschillende antwoorden.
+
+**De teller verschijnt pas vanaf 30 geïnteresseerden** (`INTEREST_PUBLIC_THRESHOLD`
+in `lib/calendar/interest.ts`). Dat getal is een kringkeuze en geen technische
+grens: onder die drempel zegt een getal het verkeerde. "3 mensen komen" leest als
+"hier komt niemand" en houdt precies de mensen weg die je wou overtuigen; boven de
+drempel keert dat om en werkt het als aanmoediging. Een laag getal verlaat de
+server daarom niet eens: `publicInterestCounts()` geeft die rijen gewoon niet
+terug, zodat het ook niet per ongeluk ergens opduikt.
+
+De teller staat op vier plekken en overal met dezelfde drempel: de heroagenda en
+de kaarten op de homepage, het kalenderraster, de voorvertoning bij een klik, en
+de eventpagina zelf.
+
+---
+
+## Alumniwerking
+
+Alles hieronder bestaat voor één doel: meer alumni op onze evenementen krijgen.
+De rest volgt daaruit, en dat verklaart een paar keuzes die er los van elkaar
+raar uitzien.
+
+### Een tweede deur naast KU Leuven SSO
+
+Studenten registreren zichzelf door voor het eerst met KU Leuven SSO in te loggen
+(zie "Ledenregistratie & onboarding" hierboven). Een alumnus van 2004 kan dat
+niet: zijn KU Leuven-account bestaat niet meer. Zolang SSO de enige deur was, kon
+hij zich dus letterlijk nergens voor inschrijven.
+
+- `/registreren` maakt een account met **e-mail en wachtwoord**. De implementatie
+  staat in `packages/auth/src/server/selfSignup.ts`, bewust **niet** via
+  better-auths `signUpEmail`: die staat uit (`disableSignUp: true`) en aanzetten
+  zou `/api/auth/better/sign-up/email` openzetten voor iedereen, buiten elke
+  controle die wij doen.
+- **Het adres moet bevestigd worden.** `AccountEmailToken` draagt de eenmalige
+  link (enkel de hash bewaard, zoals bij `CalendarFeedToken`). `selfRegisteredAt`
+  is het veld dat zegt dat `emailVerified` hier iets betekent: voor een account
+  dat een beheerder aanmaakte of dat via SSO binnenkwam, betekent het niets, en
+  daarop gaan gaten zou elke bestaande admin buitensluiten.
+- **De inlogfout verklapt niets.** `checkLoginBlocked` geeft enkel `UNVERIFIED`
+  wanneer het wachtwoord klópte; anders is het gewoon `INVALID`. Hetzelfde geldt
+  voor het registratieformulier en voor "wachtwoord vergeten": een adres dat al
+  bezet is, levert exact hetzelfde scherm op als een geslaagde registratie.
+  Anders is dat formulier een manier om onze ledenlijst af te tasten.
+- **Zo'n account is een gewoon lid.** Geen aparte status, geen beperkte rechten.
+  Wat aan de faculteit hangt (ledenkorting) volgt uit de KU Leuven-attributen
+  (`firwStudent`, uit `eduPersonOrgUnitDN`), en die heeft dit account nu eenmaal
+  niet; dat is de bestaande regel en niet iets nieuws.
+- Er is ook een **wachtwoord-vergeten**-flow (`/wachtwoord-vergeten`), want zonder
+  SSO is er anders geen enkele weg terug. Enkel voor accounts die een wachtwoord
+  hébben: wie via KU Leuven binnenkomt, wordt daar expliciet naar het inlogscherm
+  teruggestuurd in plaats van een mail te krijgen die zijn probleem niet oplost.
+
+### Van KU Leuven naar een wachtwoord: het migratiepad
+
+Wie via KU Leuven binnenkomt heeft hier geen wachtwoord, en dat is prima zolang
+die login werkt. Maar een KU Leuven-account verdwijnt een tijd na het afstuderen,
+en op dat moment is er geen enkele manier meer om binnen te geraken: geen
+wachtwoord om mee in te loggen, en een herstelmail zou naar een mailbox gaan die
+niet meer bestaat. Dat is precies de groep die we op onze evenementen willen.
+
+Drie stukken, samen het pad:
+
+- **`/account` heeft een paneel "Inloggen zonder KU Leuven"** waar een lid zelf
+  een wachtwoord zet (`setOwnPassword`). Het toont ook waarmee je inlogt en waar
+  een herstelmail heen zou gaan. Bewust géén huidig wachtwoord vereist: verreweg
+  de meesten hebben er nog geen, en wie er wel een heeft zit achter een geldige
+  sessie.
+- **Het paneel dringt aan wanneer het nodig wordt.** Wie zichzelf als alumnus of
+  als niet-meer-studerend aanduidde en nog geen wachtwoord heeft, krijgt het met
+  een gele accentrail en opengeklapt; de rest ziet een gewone kaart.
+- **De herstelmail gaat naar het persoonlijke adres** wanneer dat ingevuld is, en
+  je kan **met dat adres ook inloggen** (`resolveLoginEmail`). Zonder dat laatste
+  is het een val: je herstelt een wachtwoord via je persoonlijke adres en geraakt
+  er vervolgens niet mee binnen, want `User.email` blijft het KU Leuven-adres.
+  Enkel wanneer het persoonlijke adres precies één account aanwijst; botst het,
+  dan faalt de login als een gewone foute login. Raden doen we hier niet.
+
+### Het inlogscherm is één knop, met een regeltje eronder
+
+Verreweg de meeste bezoekers zijn student. Twee even grote formulieren naast
+elkaar zetten betekent dat de helft van hen eerst een wachtwoord probeert te
+verzinnen dat niet bestaat. Dus: één grote knop "Inloggen met KU Leuven
+Authenticator", en daaronder in het klein "Geen KU Leuven student (meer): klik
+hier", dat het e-mailformulier openklapt met daarin de link naar registratie en
+naar wachtwoord vergeten. Staat SSO uit (geen env-vars), dan staat dat formulier
+gewoon open; er valt dan niets te verbergen.
+
+### Ereleden
+
+Een alumnus kan door een beheerder als **erelid** aangeduid worden
+(`User.honoraryMember`, op `/admin/gebruikers/<id>`; nooit door het lid zelf).
+Daarmee ziet hij ticketsoorten met `TicketAudience.HONORARY`, bijvoorbeeld
+gratis naar een cantus.
+
+Zo'n ticketsoort wordt voor iedereen anders **weggefilterd**, niet uitgegrijsd.
+Wat de kring aan haar ereleden geeft, hoort geen zichtbare uitzondering te zijn
+waar de rest van de site zich vragen bij stelt; wie geen erelid is, ziet gewoon
+het gewone aanbod. `createTicketCheckout` weigert zo'n type ook serverside, met
+dezelfde fout als bij een onbestaand type.
+
+### "Ik kom" zonder account, maar enkel bij een alumni-evenement
+
+Bij een evenement met de alumni-doelgroep kan iemand **zonder account** aanduiden
+dat hij komt (`CalendarEventGuestInterest`). Bij elk ander evenement kan dat niet:
+daar is interesse een ledenmarkering, en een anonieme rij zou de teller waardeloos
+maken.
+
+De prijs van die openheid is dat de bezoeker iets over zichzelf zegt: een
+afstudeerjaar, of dat hij in VTK zat, of allebei. **De naam is optioneel**: "iemand
+van 2004 die in VTK zat komt ook" is al genoeg om een andere alumnus over de
+streep te trekken. Een volledig lege rij wordt geweigerd, want die verhoogt enkel
+een teller zonder iemand iets te vertellen.
+
+Een cookie (alleen de hash bewaard) laat de bezoeker zijn keuze terugnemen en
+houdt dubbele klikken van hetzelfde toestel tegen. Dat is geen waterdichte
+fraudebescherming, en die bestaat ook niet zonder login; het is de bewuste ruil
+voor het wegnemen van de drempel.
+
+### De aanwezigheidslijst is publiek, en dat is het punt
+
+Op een alumni-evenement staat een tabel met wie er komt: naam, afstudeerjaar, en
+of die persoon ooit in VTK zat. **Alleen wie zelf een vakje aanvinkte staat erin**
+(`showName` / `showGraduationYear` / `showWasInVtk` op `CalendarEventInterest`,
+alle drie standaard uit). Wie enkel "ik kom" duidt, telt mee in het getal en
+verschijnt nergens.
+
+De lijst is publiek zichtbaar, ook voor wie niet ingelogd is. Dat is een bewuste
+kringkeuze: het domino-effect is de hele reden dat dit bestaat. Een alumnus
+beslist te komen wanneer hij ziet dat hij er iemand gaat kennen, en die
+overtuiging moet werken vóór hij een account maakt, niet erna.
+
+De drie vlaggen staan **per evenement** en niet op het profiel: "ik wil zichtbaar
+zijn op de reünie van mijn eigen lichting" is iets anders dan "ik wil altijd en
+overal met naam op de website staan".
+
+### Het adresboek staat naast de opt-in-nieuwsbrieven, niet erin
+
+De mailinglijsten uit `lib/mailinglists.ts` zijn studiegericht: ze eisen een
+studiebevestiging van het huidige academiejaar, en die geeft een afgestudeerde per
+definitie nooit meer. Een alumnus in die lijsten zetten zou dus betekenen dat je
+die regel voor iedereen sloopt.
+
+Daarom een eigen bron, met twee helften die pas bij de export samenkomen:
+
+- **`AlumniContact`** (`/admin/alumni`, permissie `alumni.manage`): namen die de
+  kring van reünies, oud-praesidia en inschrijvingslijsten overhoudt, zonder
+  account. Per lichting te beheren, met een plakvenster voor een geëxporteerde
+  lijst; zonder dat is vijfhonderd alumni invoeren een middag typen, en dan
+  gebeurt het niet.
+- **Site-accounts** met `alumni` én `alumniMailOptIn`. Dat vinkje staat in de
+  onboarding én in de jaarlijkse bevestiging, samen met het afstudeerjaar en "ik
+  heb ooit in VTK gezeten"; die drie verschijnen pas zodra iemand zichzelf als
+  alumnus aanduidt.
+
+Ze worden **op e-mailadres ontdubbeld en het account wint**. Een alumnus die later
+toch een account maakt, hoeft dus niet handmatig uit het adresboek gehaald te
+worden, en niemand krijgt dezelfde mail twee keer.
+
+**Beide bronnen staan ook in het beheerscherm**, niet enkel in de export. Een
+beheerder die op een reünie hoort "zet mij ook op die lijst" moet dat kunnen doen
+zonder te weten of die persoon toevallig een account heeft. Voer je iemand in wiens
+adres al bij een account hoort, dan maken we géén tweede rij maar zetten we dat
+account als alumnus in de mailinglijst; de plakimport doet hetzelfde. Aan zo'n
+account valt hier maar één ding te wijzigen, en dat is of hij mails krijgt: naam,
+afstudeerjaar en VTK-verleden blijven van het lid en staan in zijn eigen profiel.
+
+**Uitschrijven is niet verwijderen.** Een uitgeschreven contact blijft in de tabel
+staan met een `unsubscribedAt`, precies zodat de volgende import van een oude
+lijst hem niet stilletjes weer toevoegt. Verwijderen is er voor een tikfout of een
+dubbele rij.
+
+In Brevo is dit **een eigen lijst met een eigen sync** (`lib/brevo/alumni.ts`,
+`Setting`-sleutel `brevo.alumniList`), bewust buiten `BREVO_LIST_KEYS`. Die
+lijsten worden elke nacht gereconcilieerd tegen `desiredListKeys()`, dat enkel
+naar `User`-rijen kijkt en per definitie geen enkele alumnus teruggeeft; zat de
+alumnilijst daarin, dan maakte de reconciliatie ze elke nacht leeg.
+
+---
+
+## Doelgroepen zijn een label, geen slot
+
+Een `CalendarCategory` met een `audience` (eerstejaars, internationaal,
+laatstejaars, alumni) zegt voor wie een evenement bedoeld is. Tot augustus 2026
+verborg de site zo'n evenement ook voor wie er niet bij hoorde: op de homepage, in
+de zoekresultaten en in de app zag een tweedejaars geen enkele alumni-activiteit.
+
+Dat is de omgekeerde wereld voor een kring die net wil dat mensen ontdekken wat er
+allemaal is. **Standaard staat nu alles overal.** Het filter blijft bestaan als
+persoonlijke voorkeur: `User.calendarOnlyMyAudiences` (op /account) houdt de
+algemene evenementen plus de eigen doelgroepen over, en geldt dan op de homepage,
+de kalender, de zoekresultaten, de app en de persoonlijke agendafeed. Gebruik
+`viewerAudienceFilter()` en niet `audienceFilter(await viewerAudiences())`: die
+laatste combinatie negeert de voorkeur.
+
+Op /kalender blijft de chip "Afstemmen op mijn profiel" bestaan om het per bezoek
+aan of uit te zetten; zijn beginstand komt uit die accountvoorkeur.
+
+### Er is geen ledenexclusief evenement meer
+
+`EventVisibility.MEMBERS` is verdwenen (migratie
+`20260826110000_drop_event_visibility`). VTK plant niets in wat niet op de
+publieke kalender mag staan; wat wél besloten is (een vergadering, een intern
+moment) staat sowieso nergens in `CalendarEvent`. De vlag leverde vooral een
+extra regel in elke query op en een keuzelijst in de admin die niemand ooit anders
+zette.
+
+Wie een evenement niet online wil, zet het op **concept** (`publishedAt = null`).
+Dat is sinds dezelfde release ook terug te draaien vanaf een gepubliceerd event
+("Terug naar concept", met bevestiging: het verdwijnt meteen van de kalender, de
+homepage, de feeds en de app, maar inhoud, categorieën, tickets en formulier
+blijven bewaard).
+
+---
+
+## Abonneren op de kalender: vier samenstellingen
+
+De abonneerknop wees vroeger naar de feed van de filterchip die toevallig aanstond
+(zonder dat ergens te zeggen). Dat is de soort stille koppeling waar iemand pas
+achter komt wanneer hij drie maanden later geen enkel evenement in zijn agenda
+ziet.
+
+Nu zegt de knop wat ze gaat doen ("Abonneren op de alumni-kalender") en zet een
+dialoog de vier zinvolle keuzes naast elkaar:
+
+1. **de hele kalender**: alles, alle doelgroepen inbegrepen;
+2. **algemene evenementen + één doelgroep**: het antwoord voor een alumnus: de
+   alumni-avonden én de fuiven waar iedereen welkom is, maar niet de
+   eerstejaarsdoop;
+3. **enkel die doelgroep of categorie**;
+4. **een eigen selectie** van categorieën.
+
+Dat gebeurt met **parameters op de bestaande feed-URL** (`?c=alumni&algemeen=1`)
+en niet met een nieuw pad per combinatie. Een agenda-abonnement is een URL die
+jaren in iemands telefoon blijft staan; hoe minder verschillende vormen daarvan
+rondzwerven, hoe minder er ooit stil kapotgaat. `/api/calendar/feed/c/<slug>.ics`
+blijft bestaan voor wie zich al abonneerde.
+
+De dialoog zegt er ook bij dat het via je agenda-app, Google Calendar of een
+abonnementslink gaat. "Abonneren" alleen laat in het midden of je een bestand
+krijgt, een mail, of iets in je agenda, en dat is precies de onduidelijkheid die
+maakt dat mensen er niet op klikken.
+
+### De filterchips zijn links, geen knoppen
+
+Elke categorie heeft een eigen pagina (`/kalender/alumni`), en die hoort in de
+adresbalk te staan: dan is ze deelbaar, staat ze in de geschiedenis, en ziet
+iemand die op "Alumni" duwt meteen **dat** er een alumnikalender bestaat. De chip
+die al aanstaat wijst terug naar `/kalender` en zet zichzelf dus uit.
+
+Gevolg: de gekozen categorie is geen clientstate meer maar de route zelf, en de
+chips blijven ook op een categoriepagina staan (ze verdwenen daar vroeger, zodat
+je van `/kalender/alumni` niet naar `/kalender/sport` kon zonder terug te gaan).
+
+### Legende en abonneren staan boven het raster
+
+Ze stonden als kolom van 260 pixels rechts naast de kalender en aten daarmee een
+vijfde van de breedte op. In een dagcel bleef dan geen ruimte over voor een
+eventtitel: je las "Alumni-r..." en moest klikken om te weten wat er stond. De
+legende is een handvol korte namen die evengoed naast elkaar passen; de kalender
+is het scherm.
+
+### Klikken op een evenement opent eerst een kaartje
+
+In een cel van het maandraster past hoogstens een afgekapte titel. Meteen
+doorsturen naar een volledige pagina is dan een dure manier om te ontdekken dat je
+het verkeerde evenement aanklikte. Een klik opent daarom een voorvertoning met de
+volledige titel, een samenvatting, waar en wanneer, en de teller; de knop eronder
+gaat pas naar de eventpagina. De `href` blijft op het element staan, zodat
+middenklik, ctrl-klik en een zoekmachine nog altijd een echte link zien.
+
+In dat kaartje staat ook **"ik kom naar dit evenement"**. Wie in de kalender op
+iets klikt, heeft precies dán de vraag "ga ik?" in zijn hoofd; hem daarvoor eerst
+naar een tweede pagina sturen kost de helft van de klikken. Een bezoeker zonder
+account krijgt er een link naar de eventpagina: het gastformulier vraagt een
+afstudeerjaar of een VTK-verleden, en dat hoort niet in een kaartje van tien
+regels.
+
+Op de eventpagina zelf staat dezelfde knop **in de knoppenrij** naast "Tickets
+kopen" en "Zet in mijn agenda". Het is dezelfde soort beslissing over dit
+evenement; een eigen box eronder maakte er een tweede, zwaarder ogende sectie van
+die je pas zag na de beschrijving. Wat er méér nodig is (de
+zichtbaarheidsvakjes, of het gastformulier) klapt open over de volle breedte van
+die rij.
 
 ---
 
@@ -4115,6 +4578,167 @@ beeld iets zegt dat een getal niet zegt: je ziet in één oogopslag of er iemand
 De vormen komen uit het VTK-posterbeeld en blijven binnen de huisstijl (navy
 silhouetten, geel als enige accent), precies omdat een tekenfilmboom dat niet zou
 doen.
+
+## Rekeningen (de opvolger van billsheet)
+
+Een lid koopt iets voor VTK; die kost moet terug bij het lid geraken en bij de
+boekhouder. Dat liep tot 2026 via **billsheet**, een aparte Next.js-app op
+Supabase met een eigen ledenlijst, een eigen login en een eigen postenlijst.
+Alles daarvan zit nu in `/admin/rekeningen`. De werkende keuzes:
+
+**De boekhouder wil één vast blad, dus dat blad blijft.** `blad.pdf` staat onder
+`apps/web/public/rekeningen/`, en `lib/rekeningen/report.ts` vult het in op exact
+dezelfde coördinaten als billsheet, met dezelfde bestandsnaam
+(`26-27_Fakbar_Doopcantus_Bierbestelling_248.9.pdf`). De bladen van vóór en na de
+overstap liggen bij de boekhouder in dezelfde map; ze moeten er dus hetzelfde
+uitzien. Een mooiere, zelfgetekende PDF was hier de verkeerde verbetering.
+
+**Het bonnetje kan gedraaid worden voor het vertrekt.** Een kassaticket komt van
+een telefoon en ligt vaak op zijn kant. Het voorbeeldvenster genereert bij elke
+draai gewoon een nieuw blad; wat je ziet is exact wat je downloadt of doorstuurt.
+Billsheet had dit ook, en het is geen luxe: zonder dat krijgt de boekhouder een
+liggende bon.
+
+**Vier statussen, afgeleid uit drie datums.** `paidAt` (terugbetaald), `sentAt`
+(blad vertrokken naar de boekhouder), `bookedAt` (boekhouder bevestigde). Daar
+volgen "terug te betalen → door te sturen → in te boeken → afgehandeld" uit. Er is
+bewust géén statuskolom in de database: die kan afwijken van de datums, en dan
+weet niemand meer welke van de twee klopt. De statustabs bovenaan het overzicht
+zijn dus gewoon vier `where`-fragmenten.
+
+**Een rekening met de VTK-kaart staat meteen op "terugbetaald".** Er is niets
+terug te betalen: het geld ging nooit uit de zak van het lid. Zo blijft de lijst
+"terug te betalen" precies het bedrag dat nog ergens naartoe moet, wat de vraag is
+die Groep 5 elke week stelt. Billsheet deed hetzelfde (`paid: values.paymentMethod
+=== "vtk"`), en het is de reden dat het cijfer bovenaan bruikbaar is.
+
+**Terugbetaald, doorgestuurd of ingeboekt = niet meer aanpasbaar.** Het bedrag op
+het blad moet gelijk blijven aan wat er uitbetaald en geboekt is. Wie het toch moet
+rechtzetten, haalt eerst het vinkje weg; dat kan enkel Groep 5. Nieuw tegenover
+billsheet is dat de **indiener zelf** zijn rekening mag corrigeren zolang er niets
+van dat alles gebeurd is: een tikfout in het bedrag was anders een berichtje naar
+Groep 5.
+
+**"Doorgestuurd" is geen vinkje.** Het wordt gezet door de mail effectief te
+versturen, niet door te beweren dat je dat deed. Zonder mailserver weigert de
+actie dus in plaats van een blad af te vinken dat nooit vertrok (zie de
+waarschuwing bovenaan `@vtk/mail`); je kan het blad dan downloaden en zelf mailen.
+
+**Het IBAN staat bij de rekening, niet bij het lid.** Billsheet bewaarde het op
+het profiel. Dat betekent een permanent rekeningnummer in de ledentabel van
+iedereen die ooit iets voorschoot, terwijl het maar voor één ding dient. Het
+formulier vult het in vanuit je vorige rekening, dus je merkt het verschil niet;
+verdwijnt die rekening ooit, dan verdwijnt het nummer mee.
+
+**De postnaam wordt vastgeklikt bij het indienen.** `Expense.postLabel` is een
+kopie van de naam zoals de post op dat moment heette, naast de gewone
+`groupId`-relatie. Die naam staat op het blad bij de boekhouder; hernoemt de post
+later, dan mag zijn map niet ineens twee namen bevatten voor hetzelfde jaar.
+
+**Er is geen gebruikersbeheer meer.** Billsheet had een eigen `profiles`-tabel met
+`admin`, `allowed_posts`, naam, post en IBAN, plus registratie op `@vtk.be` en een
+wachtwoordreset. Dat is nu de gewone toegangscontrole van de site: posten,
+rollen en KU Leuven SSO. `expenses.submit` zit in de rol `praesidium` (dus elke
+post), `expenses.manage` in de rol `admin` (dus IT en Groep 5), en
+`expenses.managePost` is er voor een postverantwoordelijke die de rekeningen van
+zijn eigen post wil opvolgen.
+
+**Wat billsheet fout deed en hier niet meer kan.** `requireAdmin` liet een
+post-beheerder door voor `setPaid`, `setBooked`, `updateBill` én `deleteBill`
+zónder ooit te toetsen of de rekening bij zijn post hoorde; enkel de *lijst* werd
+in de browser gefilterd. Wie een id kende, kon met één POST elke rekening van de
+hele kring op betaald zetten. Elke check zit nu serverkant en op de rekening zelf
+(`lib/rekeningen/server.ts`).
+
+**Bonnetjes gaan niet door `/api/media`.** Die route vraagt niets en vertrouwt
+erop dat storage-keys onraadbaar zijn: prima voor een partnerlogo, fout voor een
+kassabon met een naam, een bedrag en soms een rekeningnummer. Ze staan onder
+`bonnetjes/` en gaan enkel via `/api/admin/rekeningen/[id]/bon`, die de rekening
+opzoekt en de toegang erop toetst. De uploadroute hercodeert elke foto naar JPEG,
+wat meteen de EXIF (inclusief GPS) weggooit die een telefoon in een bonfoto stopt.
+
+**Zoeken gebeurt in de database, niet in de browser.** Billsheet haalde álle
+rekeningen op en filterde ze met Fuse.js; dat is tolerant voor tikfouten en werkt
+tot het niet meer werkt. Hier staan de filters in de URL en de selectie in
+`?sel=`, zodat een gefilterde lijst en een geopende rekening deelbare links zijn,
+de terugknop werkt, en de lijst met tienduizend rijen overweg kan.
+
+**De opslagmeter is gebleven, de limiet niet.** Billsheet toonde het
+Supabase-verbruik met een waarschuwing bij 80% van 1 GB, want daarboven werd het
+hele project geblokkeerd. De objectopslag van de site heeft dat quotum niet, dus
+het cijfer staat er nog als informatie en niet meer als alarm.
+
+## Admin-navigatie: domeinen, losse modules en vastgepinde tabs
+
+De zijbalk van `/admin` telde tweeëntwintig rijen voor wie alles mag zien (IT en
+Groep 5), en dat is de ingeklapte stand: volledig open waren het er negenveertig.
+Zeventien van die tweeëntwintig waren losse items zonder groep, vijf waren
+groepen, en alles stond door elkaar alfabetisch. Het probleem was niet de lengte
+maar de ontbrekende regel: je kon niet voorspellen waar iets stond.
+
+**De volgorde staat nu vast in `apps/web/lib/admin-nav.ts` en er wordt niet meer
+gesorteerd.** Ook niet binnen een groep. Alfabetisch sorteren zette een map met
+tien schermen (IT) tussen twee losse tools, en omdat er op het *vertaalde* label
+gesorteerd werd, kreeg dezelfde persoon een andere zijbalk zodra hij naar Engels
+wisselde. Een vaste volgorde lost allebei op en laat toe om de vijf schermen die
+samen de homepagina beschrijven ook naast elkaar te zetten.
+
+**Een module die één post dagelijks gebruikt, blijft een los item.** Dit is de
+belangrijkste uitzondering op "alles in een domein". Theokot, Piano, Fakscanner
+en Grocomeet in een groep "Diensten" stoppen betekent dat net de mensen die er
+het meest inzitten er elke keer naar moeten zoeken; de winst van een kortere
+lijst gaat dan naar de mensen die die tab toch nooit openen. Rekeningen,
+Wachtwoorden en Logistiek staan om dezelfde reden los: die gebruikt iedereen
+rechtstreeks. Gevolg: zeven domeinen plus zeven losse modules, veertien rijen.
+
+**Een groep met een vage naam is erger dan geen groep.** Er stond even een groep
+"Werking" met Rekeningen, Wachtwoorden en Logistiek erin. Die is geschrapt: je
+wist niet wat erin zat tot je hem opendeed, en dan is een groep enkel een extra
+klik.
+
+**Waar de twijfelgevallen terechtkwamen, en waarom.**
+
+- *Forms en Shiften* staan bij Website, niet bij Evenementen. Ze hangen niet
+  altijd aan een evenement; een formulier of een shift kan evengoed op zichzelf
+  staan.
+- *Media* staat bij Communicatie, samen met de mailinglijsten, de groepsadressen
+  en de app-pushberichten. Dat is wat de kring naar buiten brengt.
+  *App-pushberichten* stond onder IT, maar wie een pushbericht stuurt doet
+  communicatie, geen systeembeheer.
+- *Dashboard* is een groep met Overzicht en Dashboardtegels. Die tegels kan elke
+  post aanpassen, dus ze horen bij het dashboard en niet bij IT.
+- *Alumni* staat bij Ledenbeheer en niet bij Communicatie: het is een adresboek
+  per lichting, geen opt-in lijst. Een afgestudeerde geeft per definitie nooit
+  meer een studiebevestiging van dit werkingsjaar. Zie ook de drie dingen die
+  "mailinglijst" heten, hierboven.
+- *Wachtwoorden* blijft los van IT, om dezelfde reden als vroeger: een
+  postverantwoordelijke beheert de wachtwoorden van zijn eigen post en hoort
+  daarvoor niet in een IT-map te moeten kijken. Het kluisbeheer zelf staat er wel
+  onder.
+
+**Een groep waarvan je maar één item mag zien, rendert als los item.** Anders
+betaalt de meerderheid, die drie tabs ziet, een klik voor een indeling die enkel
+IT en Groep 5 nodig hebben.
+
+### Vastgepinde tabs
+
+Elke gebruiker kan tabs vastpinnen (`UserAdminNavPin`), en die staan dan bovenaan
+onder "Vastgepind", met de volledige lijst er standaard open onder. IT en Groep 5
+hebben een ander dagelijks lijstje dan de rest, en dit is het enige deel van de
+indeling dat dat verschil erkent. Hetzelfde idee als de dashboardtegels, die ook
+al per gebruiker te schikken zijn.
+
+- **Er wordt op de tab-key gepind, niet op het pad.** Verhuist een scherm later
+  naar een ander pad, dan blijft de pin staan.
+- **Een pin op een tab die je niet meer mag zien, blijft bewaard.** Hij rendert
+  gewoon niet. Rechten zijn werkingsjaar-gescoped; wie zijn post volgend jaar
+  terugkrijgt, krijgt ook zijn pin terug.
+- **Het verplaatsen van de tab is de bevestiging, dus geen toast bij succes.**
+  Enkel als het opslaan mislukt komt er een rode toast en springt de pin terug.
+  Dat is de uitzondering op de regel dat opslaan altijd zijn uitkomst meldt: hier
+  is de uitkomst zichtbaar in de zijbalk zelf.
+- **De volledige lijst staat er open onder, niet ingeklapt.** Anders vallen
+  nieuwe tabs niet meer op bij wie enkel nog naar zijn pins kijkt.
 
 ---
 

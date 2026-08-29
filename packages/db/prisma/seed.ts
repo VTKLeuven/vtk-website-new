@@ -177,7 +177,7 @@ async function main() {
   //   - admin (alle rechten, systeemrol)                 -> IT + Groep 5
   //   - praesidium (calendar.create + photos.upload +    -> elke post
   //       tickets.create + forms.create + users.search +
-  //       shift.rewardRedeem)
+  //       shift.rewardRedeem + expenses.submit)
   //   - werkgroep, medewerker                            -> beschikbaar, nog niet toegekend
   //   - theokot (theokot.manage + theokot.pickup)        -> Theokot
   //   - één rol per post, met de postnaam                -> die post zelf
@@ -253,6 +253,10 @@ async function main() {
     // ooit achter een toog staat; IT kan het per post of per persoon afnemen in
     // /admin/roles zonder iemand uit zijn post te halen.
     "shift.rewardRedeem",
+    // Een rekening indienen. Zit in de basisrol omdat elk praesidiumlid ooit iets
+    // voorschiet; beheren (terugbetalen, inboeken, doorsturen) blijft bij de rol
+    // admin, dus bij IT en Groep 5.
+    "expenses.submit",
   ]);
   for (const g of GROUP_SEEDS) {
     await grantRoleToGroup(g.code, praesidiumRole.id, "DEFAULT");
@@ -911,9 +915,9 @@ async function main() {
       const user = prototypeUserByEmail.get(rep.email);
       if (!user) continue;
       await prisma.pocRepresentative.upsert({
-        where: { pocId_userId: { pocId: row.id, userId: user.id } },
+        where: { pocId_userId_year: { pocId: row.id, userId: user.id, year: 2026 } },
         update: {},
-        create: { pocId: row.id, userId: user.id, order: rep.order },
+        create: { pocId: row.id, userId: user.id, year: 2026, order: rep.order },
       });
     }
   }
@@ -1380,7 +1384,6 @@ async function main() {
         url: e.url,
         descriptionNl: e.descriptionNl,
         descriptionEn: e.descriptionEn,
-        visibility: "PUBLIC" as const,
         publishedAt: new Date(),
         groupId: group.id,
       },

@@ -5,8 +5,10 @@ import { redirect, unstable_rethrow } from "next/navigation";
 import { prisma } from "@vtk/db";
 import type { Prisma } from "@prisma/client";
 import { z } from "zod";
+import type { SessionPayload } from "@vtk/auth";
 import { requireSession } from "@/lib/session";
 import { canCreateFormForGroup, requireFormCapability } from "@/lib/forms/authorization";
+import { checkPageForForm, refreshFormPage } from "@/lib/forms/pageLink";
 import { logFormAudit } from "@/lib/forms/audit";
 import { slugify } from "@/lib/ticketing/slug";
 import { localDateTimeToUtc } from "@/lib/ticketing/time";
@@ -36,6 +38,8 @@ const EXPECTED_ERRORS = new Set([
   "USER_NOT_FOUND",
   "LAST_MANAGER",
   "GRANT_NOT_FOUND",
+  "PAGE_FORBIDDEN",
+  "PAGE_TAKEN",
 ]);
 
 type Outcome<T> = { ok: true; value: T } | { ok: false; state: SaveState };
@@ -172,6 +176,21 @@ async function readCalendarEventId(
 }
 
 /**
+ * De pagina waarin dit formulier komt te staan. Leeg betekent: op geen enkele
+ * pagina, enkel op zijn eigen adres.
+ */
+async function readPageId(
+  formData: FormData,
+  session: SessionPayload,
+  formId: string | null
+): Promise<string | null> {
+  const pageId = limitedOptional(formData, "pageId", 60);
+  if (!pageId) return null;
+  await checkPageForForm(session, pageId, formId);
+  return pageId;
+}
+
+/**
  * Titel van het formulier voor in het adminlogboek. Het formulier heeft ook zijn
  * eigen auditlog (FormAuditLog); dit is de regel die in het overzicht van álle
  * admin-acties belandt.
@@ -207,6 +226,7 @@ export async function createFormAction(
     const titleEn = limitedOptional(formData, "titleEn", 200);
     const slug = await uniqueSlug(value(formData, "slug") || titleNl, titleNl);
     const calendarEventId = await readCalendarEventId(formData, ownerGroupId);
+    const pageId = await readPageId(formData, session, null);
 
     const form = await prisma.$transaction(async (tx) => {
       const created = await tx.form.create({
@@ -216,6 +236,7 @@ export async function createFormAction(
           titleEn,
           ownerGroupId,
           calendarEventId,
+          pageId,
           createdById: session.user.id,
           audience: audienceSchema.parse(value(formData, "audience") || "PUBLIC"),
         },
@@ -301,6 +322,7 @@ export async function saveFormSettingsAction(
 
     const slug = await uniqueSlug(value(formData, "slug") || titleNl, titleNl, form.slug);
     const calendarEventId = await readCalendarEventId(formData, form.ownerGroupId);
+    const pageId = await readPageId(formData, session, form.id);
 
     const data: Prisma.FormUpdateInput = {
       slug,
@@ -338,6 +360,7 @@ export async function saveFormSettingsAction(
       consentTextEn: limitedOptional(formData, "consentTextEn", 1_000),
       retentionDays: boundedInteger(formData, "retentionDays", 1, 3_650),
       calendarEvent: calendarEventId ? { connect: { id: calendarEventId } } : { disconnect: true },
+      page: pageId ? { connect: { id: pageId } } : { disconnect: true },
       // Eén keer gepubliceerd blijft `publishedAt` staan; het is het moment
       // waarop het formulier voor het eerst online kwam, geen statusvlag.
       publishedAt: status === "PUBLISHED" && !form.publishedAt ? new Date() : undefined,
@@ -366,6 +389,10 @@ export async function saveFormSettingsAction(
 
     refreshForm(locale, formId, slug);
     if (form.slug !== slug) refreshForm(locale, formId, form.slug);
+    // Beide kanten: de pagina waar het formulier vandaan komt en die waar het
+    // naartoe gaat. Enkel de nieuwe verversen laat het paneel op de oude staan.
+    await refreshFormPage(form.pageId);
+    if (form.pageId !== pageId) await refreshFormPage(pageId);
   });
 
   return outcome.ok ? saveOk() : outcome.state;
@@ -430,6 +457,7 @@ export async function setFormStatusAction(
     });
 
     refreshForm(locale, formId, form.slug);
+    await refreshFormPage(form.pageId);
   });
 
   return outcome.ok ? saveOk() : outcome.state;
@@ -461,6 +489,8 @@ export async function deleteFormAction(formData: FormData): Promise<void> {
 
   console.info(`[forms] formulier ${form.slug} (${formId}) verwijderd door ${session.user.email}`);
   refreshForm(locale, formId, form.slug);
+  // De pagina waarop het stond, houdt anders een paneel over dat er niet meer is.
+  await refreshFormPage(form.pageId);
   redirect(localePath(locale, "/admin/formulieren"));
 }
 

@@ -66,3 +66,6 @@ infra/immich/seed/photos
 infra/immich/seed/state.json
 
 .vscode
+.agents
+.claude
+skills-lock.json

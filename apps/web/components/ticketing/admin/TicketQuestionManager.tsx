@@ -1,9 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState, useTransition } from "react";
 import {
   archiveTicketQuestionAction,
   createTicketQuestionAction,
+  reorderTicketQuestionsAction,
 } from "@/app/actions/tickets";
 import { Archive, ListChecks, Plus } from "lucide-react";
 import type { AdminLocale } from "./format";
@@ -77,6 +78,35 @@ export function TicketQuestionManager({
   const [kind, setKind] = useState<AnswerKind>("TEXT");
   const [longText, setLongText] = useState(false);
   const [multiple, setMultiple] = useState(false);
+  const [prevQuestions, setPrevQuestions] = useState<Question[]>(questions);
+  const [items, setItems] = useState<Question[]>(questions);
+  const [, startTransition] = useTransition();
+
+  if (questions !== prevQuestions) {
+    setPrevQuestions(questions);
+    setItems(questions);
+  }
+
+  const dragFrom = useRef<number | null>(null);
+  const [overIndex, setOverIndex] = useState<number | null>(null);
+
+  function onDrop(to: number) {
+    const from = dragFrom.current;
+    dragFrom.current = null;
+    setOverIndex(null);
+    if (from === null || from === to) return;
+    const next = [...items];
+    const [moved] = next.splice(from, 1);
+    next.splice(to, 0, moved);
+    setItems(next);
+    startTransition(async () => {
+      const fd = new FormData();
+      fd.set("eventId", eventId);
+      fd.set("locale", locale);
+      for (const q of next) fd.append("ids", q.id);
+      await reorderTicketQuestionsAction(fd);
+    });
+  }
 
   return (
     <section className="ticket-admin-section">
@@ -88,21 +118,51 @@ export function TicketQuestionManager({
           </div>
         </div>
       </div>
-      {questions.length === 0 ? (
+      {items.length === 0 ? (
         <p className="ticket-admin-empty">{nl ? "Nog geen vragen." : "No questions yet."}</p>
       ) : (
         <ul className="ticket-admin-list">
-          {questions.map((question) => (
-            <li key={question.id}>
+          {items.map((question, index) => (
+            <li
+              key={question.id}
+              draggable
+              onDragStart={() => {
+                dragFrom.current = index;
+              }}
+              onDragEnd={() => {
+                dragFrom.current = null;
+                setOverIndex(null);
+              }}
+              onDragOver={(e) => {
+                e.preventDefault();
+                if (overIndex !== index) setOverIndex(index);
+              }}
+              onDrop={(e) => {
+                e.preventDefault();
+                onDrop(index);
+              }}
+              className={`transition-colors rounded-xl ${
+                overIndex === index ? "bg-vtk-yellow/20" : ""
+              }`}
+            >
               <div className="ticket-admin-row-head">
-                <div>
-                  <p className="ticket-admin-row-title">
-                    {locale === "en" && question.labelEn ? question.labelEn : question.labelNl}
-                  </p>
-                  <p className="ticket-admin-row-meta">
-                    {question.type.replaceAll("_", " ").toLowerCase()} · {question.required ? (nl ? "Verplicht" : "Required") : (nl ? "Optioneel" : "Optional")} · {question.ticketType ? question.ticketType.nameNl : (nl ? "Alle tickettypes" : "All ticket types")}
-                  </p>
-                  <p className="ticket-admin-row-meta ticket-admin-code">{question.code}</p>
+                <div className="flex items-start gap-2">
+                  <span
+                    className="cursor-grab active:cursor-grabbing text-zinc-400 hover:text-zinc-700 px-1 text-base select-none mt-0.5"
+                    title={nl ? "Sleep om volgorde te wijzigen" : "Drag to reorder"}
+                    aria-hidden="true"
+                  >
+                    ⠿
+                  </span>
+                  <div>
+                    <p className="ticket-admin-row-title">
+                      {locale === "en" && question.labelEn ? question.labelEn : question.labelNl}
+                    </p>
+                    <p className="ticket-admin-row-meta">
+                      {question.type.replaceAll("_", " ").toLowerCase()} · {question.required ? (nl ? "Verplicht" : "Required") : (nl ? "Optioneel" : "Optional")} · {question.ticketType ? question.ticketType.nameNl : (nl ? "Alle tickettypes" : "All ticket types")}
+                    </p>
+                    <p className="ticket-admin-row-meta ticket-admin-code">{question.code}</p>
+                  </div>
                 </div>
                 {question.active ? (
                   <form action={archiveTicketQuestionAction}>
@@ -243,10 +303,6 @@ export function TicketQuestionManager({
                     </option>
                   ))}
                 </select>
-              </div>
-              <div className="ticket-admin-field">
-                <label htmlFor="question-sort">{nl ? "Volgorde" : "Order"}</label>
-                <input id="question-sort" name="sortOrder" type="number" defaultValue="0" />
               </div>
               <div className="ticket-admin-field" data-span="2">
                 <label htmlFor="question-description-nl">

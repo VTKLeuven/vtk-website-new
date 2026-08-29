@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { prisma } from "@vtk/db";
 import { searchSite } from "@/lib/search-server";
+import { audienceFilter } from "@/lib/calendar/audience";
 
 /**
  * Zoeken tegen een echte database.
@@ -50,7 +51,6 @@ describe.sequential("zoeken", () => {
     compoundPage: randomUUID(),
     publicEvent: randomUUID(),
     draftEvent: randomUUID(),
-    membersEvent: randomUUID(),
     audienceEvent: randomUUID(),
     material: randomUUID(),
     inactiveMaterial: randomUUID(),
@@ -92,7 +92,6 @@ describe.sequential("zoeken", () => {
   async function makeEvent(
     id: string,
     titleNl: string,
-    visibility: "PUBLIC" | "MEMBERS",
     categoryIds: string[] = [],
     published = true,
   ) {
@@ -103,7 +102,6 @@ describe.sequential("zoeken", () => {
         descriptionNl: `Een avond rond de ${TERM}.`,
         start,
         end,
-        visibility,
         publishedAt: published ? new Date() : null,
         groupId: ids.group,
         categories: { create: categoryIds.map((categoryId) => ({ categoryId })) },
@@ -153,10 +151,9 @@ describe.sequential("zoeken", () => {
     await makePage(ids.loosePage, slugs.loosePage, `Los: ${TERM}`, true);
     await makePage(ids.compoundPage, slugs.compoundPage, `Samenstelling: ${COMPOUND}`, true);
 
-    await makeEvent(ids.publicEvent, `Publiek: ${TERM}`, "PUBLIC");
-    await makeEvent(ids.draftEvent, `Conceptactiviteit: ${TERM}`, "PUBLIC", [], false);
-    await makeEvent(ids.membersEvent, `Intern: ${TERM}`, "MEMBERS");
-    await makeEvent(ids.audienceEvent, `Eerstejaars: ${TERM}`, "PUBLIC", [ids.firstYearCat]);
+    await makeEvent(ids.publicEvent, `Publiek: ${TERM}`);
+    await makeEvent(ids.draftEvent, `Conceptactiviteit: ${TERM}`, [], false);
+    await makeEvent(ids.audienceEvent, `Eerstejaars: ${TERM}`, [ids.firstYearCat]);
 
     await prisma.uitleenItem.createMany({
       data: [
@@ -182,7 +179,7 @@ describe.sequential("zoeken", () => {
     });
     await prisma.calendarEvent.deleteMany({
       where: {
-        id: { in: [ids.publicEvent, ids.draftEvent, ids.membersEvent, ids.audienceEvent] },
+        id: { in: [ids.publicEvent, ids.draftEvent, ids.audienceEvent] },
       },
     });
     await prisma.calendarCategory.delete({ where: { id: ids.firstYearCat } });
@@ -195,12 +192,12 @@ describe.sequential("zoeken", () => {
 
   /** De testset zoals een niet-ingelogde bezoeker ze ziet. */
   async function visitorSearch(query: string, locale: "nl" | "en" = "nl") {
-    return searchSite({ query, locale, audiences: [], signedIn: false });
+    return searchSite({ query, locale, audienceWhere: {}, signedIn: false });
   }
 
   /** Dezelfde zoekopdracht, maar dan als ingelogd lid. */
   async function memberSearch(query: string, locale: "nl" | "en" = "nl") {
-    return searchSite({ query, locale, audiences: [], signedIn: true });
+    return searchSite({ query, locale, audienceWhere: {}, signedIn: true });
   }
 
   it("vult de zoekvector bij het aanmaken, zonder dat er iets opnieuw opgeslagen wordt", async () => {
@@ -228,31 +225,40 @@ describe.sequential("zoeken", () => {
     expect(alleTekst).not.toContain("Concept");
   });
 
-  it("laat een ledenexclusief evenement niet terugkomen", async () => {
-    const { results } = await visitorSearch(TERM);
-    expect(results.map((r) => r.id)).not.toContain(ids.membersEvent);
-  });
-
   it("laat een concept-evenement nergens opduiken", async () => {
     const { results } = await visitorSearch(TERM);
     expect(results.map((r) => r.id)).not.toContain(ids.draftEvent);
     expect(results.map((r) => r.title).join(" ")).not.toContain("Conceptactiviteit");
   });
 
-  it("houdt een doelgroepevenement weg bij wie niet tot die doelgroep hoort", async () => {
+  it("toont een doelgroepevenement standaard aan iedereen", async () => {
+    // Een doelgroep is een label, geen slot: elk gepubliceerd evenement is
+    // publiek en hoort dus vindbaar te zijn, ook voor wie er niet bij hoort.
     const anoniem = await visitorSearch(TERM);
-    expect(anoniem.results.map((r) => r.id)).not.toContain(ids.audienceEvent);
+    expect(anoniem.results.map((r) => r.id)).toContain(ids.audienceEvent);
+  });
+
+  it("respecteert de persoonlijke doelgroepfilter wanneer die aanstaat", async () => {
+    // Wie op /account koos zijn kalender toe te spitsen, krijgt hier hetzelfde
+    // where-fragment mee als de kalender en de homepage.
+    const anders = await searchSite({
+      query: TERM,
+      locale: "nl",
+      audienceWhere: audienceFilter([]),
+      signedIn: false,
+    });
+    expect(anders.results.map((r) => r.id)).not.toContain(ids.audienceEvent);
 
     const eerstejaars = await searchSite({
       query: TERM,
       locale: "nl",
-      audiences: ["FIRST_YEARS"],
+      audienceWhere: audienceFilter(["FIRST_YEARS"]),
       signedIn: false,
     });
     expect(eerstejaars.results.map((r) => r.id)).toContain(ids.audienceEvent);
     // De rest van de regels blijft ook voor een eerstejaars gelden.
     expect(eerstejaars.results.map((r) => r.id)).not.toContain(ids.draftPage);
-    expect(eerstejaars.results.map((r) => r.id)).not.toContain(ids.membersEvent);
+    expect(eerstejaars.results.map((r) => r.id)).not.toContain(ids.draftEvent);
   });
 
   it("linkt naar de canonieke vorm van een pagina", async () => {
@@ -302,9 +308,9 @@ describe.sequential("zoeken", () => {
       `"${TERM}"`,
       `${TERM} `.repeat(200),
     ]) {
-      const uitkomst = await searchSite({ query, locale: "nl", audiences: [], signedIn: false });
+      const uitkomst = await searchSite({ query, locale: "nl", audienceWhere: {}, signedIn: false });
       expect(uitkomst.results.map((r) => r.id)).not.toContain(ids.draftPage);
-      expect(uitkomst.results.map((r) => r.id)).not.toContain(ids.membersEvent);
+      expect(uitkomst.results.map((r) => r.id)).not.toContain(ids.draftEvent);
     }
 
     // De tabel staat er nog: de zoekterm ging als parameter mee, niet als SQL.
@@ -347,11 +353,11 @@ describe.sequential("zoeken", () => {
 
   it("houdt de zichtbaarheidsregels ook in die tweede poging aan", async () => {
     // De tweede poging is een tweede query; als daar de where-regels ontbreken,
-    // lekt er een concept-pagina of een ledenevenement doorheen.
+    // lekt er een concept-pagina of een concept-evenement doorheen.
     const half = TERM.slice(0, 8);
     const { results } = await visitorSearch(half);
     expect(results.map((r) => r.id)).not.toContain(ids.draftPage);
-    expect(results.map((r) => r.id)).not.toContain(ids.membersEvent);
+    expect(results.map((r) => r.id)).not.toContain(ids.draftEvent);
   });
 
   it("toont een adres maar één keer", async () => {

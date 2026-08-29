@@ -1,9 +1,10 @@
-import { currentWorkingYear } from "@vtk/auth";
+import { currentStudyYear } from "@vtk/auth";
 import { prisma } from "@vtk/db";
 import { pick } from "@vtk/i18n";
 
 import { getCurrentAnnouncement, announcementFits } from "@/lib/announcements";
-import { audienceFilter, viewerAudiences } from "@/lib/calendar/audience";
+import { viewerAudienceFilter } from "@/lib/calendar/audience";
+import { publicInterestCounts } from "@/lib/calendar/interest";
 import { corsPreflight } from "@/lib/cors";
 import { getCursusdienstHours } from "@/lib/cursusdienstHours";
 import { BUILTIN_DEFAULT_EVENT_IMAGE, DEFAULT_EVENT_IMAGE_SETTING } from "@/lib/defaultEventImage";
@@ -74,13 +75,12 @@ export async function GET(request: Request) {
 
     // Dezelfde doelgroepfilter als op de site en als /kalender: geen
     // eerstejaarsevent op het scherm van wie het daar niet zou zien.
-    const audiences = await viewerAudiences();
+    const audiences = await viewerAudienceFilter();
     const upcoming = await prisma.calendarEvent.findMany({
       where: {
         start: { gte: now },
-        visibility: "PUBLIC",
         publishedAt: { not: null },
-        ...audienceFilter(audiences),
+        ...audiences,
       },
       orderBy: { start: "asc" },
       take: 5,
@@ -103,10 +103,11 @@ export async function GET(request: Request) {
         (map.get(DEFAULT_EVENT_IMAGE_SETTING) as { imageKey?: string | null } | undefined)?.imageKey,
       ) ?? BUILTIN_DEFAULT_EVENT_IMAGE;
 
-    const interested = await interestedEventIds(
-      session?.user.id ?? null,
-      upcoming.map((event) => event.id),
-    );
+    const [interested, publicCounts] = await Promise.all([
+      interestedEventIds(session?.user.id ?? null, upcoming.map((event) => event.id)),
+      // Enkel de tellers die de drempel halen; zelfde regel als op de site.
+      publicInterestCounts(upcoming.map((event) => event.id)),
+    ]);
 
     const upcomingEvents: AppCalendarEvent[] = upcoming.map((event) => ({
       id: event.id,
@@ -126,6 +127,7 @@ export async function GET(request: Request) {
         audience: category.audience,
       })),
       interested: interested.has(event.id),
+      interestedCount: publicCounts.get(event.id) ?? null,
       ticketSlug: event.ticketEvent?.status === "PUBLISHED" ? event.ticketEvent.slug : null,
     }));
 
@@ -223,11 +225,11 @@ async function tasksFor(
       highlight: true,
       at: null,
     });
-  } else if (user.studyConfirmedYear !== currentWorkingYear()) {
+  } else if (user.studyConfirmedYear !== currentStudyYear()) {
     tasks.push({
       kind: "gate",
       title: "Bevestig je studie",
-      detail: "Elk werkingsjaar geef je opnieuw op wat je studeert.",
+      detail: "Elk academiejaar geef je opnieuw op wat je studeert.",
       path: "/poort?gate=studie-bevestigen",
       actionLabel: "Nu doen",
       highlight: true,

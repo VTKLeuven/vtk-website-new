@@ -1,4 +1,4 @@
-# Integrated ticketing — architecture & file map
+# Integrated ticketing: architecture & file map
 
 Event-scoped ticket sales for the main web app (`apps/web`): create a ticketed
 event, sell tickets to the public, take payment via **Mollie**, issue signed
@@ -8,29 +8,29 @@ setup (env, webhook, SMTP).
 
 ## End-to-end flow
 
-1. **Create/publish** — a group LEAD with `tickets.create` (or a superadmin)
+1. **Create/publish**: a group LEAD with `tickets.create` (or a superadmin)
    creates an event at `/admin/tickets/new`, adds ≥1 active ticket type with a
    price, then flips status to `PUBLISHED`. Creation auto-grants the creator an
    `OWNER` grant + the owner group's leads a `MANAGER` grant, and seeds a default
    inventory pool (`GENERAL`) and gate (`MAIN`).
-2. **Buy** — a buyer picks tickets at `/tickets/<slug>` → `POST /api/tickets/checkout`
+2. **Buy**: a buyer picks tickets at `/tickets/<slug>` -> `POST /api/tickets/checkout`
    reserves inventory, creates a `TicketOrder` (`PENDING_PAYMENT`) + `TicketPayment`,
    asks the payment gateway for a checkout URL, and redirects there.
    Zero-cost tickets skip the gateway (provider `free`) but require a logged-in
    account.
-3. **Pay** — Mollie hosted checkout. On completion Mollie calls the webhook,
-   which re-fetches the payment and calls `fulfillPaidOrder` → tickets issued,
+3. **Pay**: Mollie hosted checkout. On completion Mollie calls the webhook,
+   which re-fetches the payment and calls `fulfillPaidOrder` -> tickets issued,
    confirmation mail enqueued in the same transaction.
-4. **Mail** — the confirmation carries the tickets themselves: one PDF with every
+4. **Mail**: the confirmation carries the tickets themselves: one PDF with every
    valid ticket of the order, one Apple Wallet pass per ticket, and a Google
    Wallet save button per ticket (Google passes can only be links). The link to
    the ticket page stays the primary route; the attachments are the fallback at
    the door. See `docs/design-decisions.md` for the limits and the failure mode.
-5. **Ticket** — buyer finds paid orders in the "Mijn VTK" section at
+5. **Ticket**: buyer finds paid orders in the "Mijn VTK" section at
    `/account#mijn-vtk-tickets` and opens an order at
    `/tickets/bestelling/<orderId>`; each ticket renders a QR from a signed,
    PII-free credential.
-6. **Scan** — an operator with `SCAN` capability opens `/scan/<eventId>` on a
+6. **Scan**: an operator with `SCAN` capability opens `/scan/<eventId>` on a
    phone, scans the QR, and the server validates + marks it used (with duplicate
    detection and reversal).
 
@@ -38,8 +38,8 @@ setup (env, webhook, SMTP).
 
 All providers implement one interface; the rest of the system is
 provider-agnostic and keys off the `provider` string stored on each row
-(`TicketPayment.provider`, `TicketRefund.provider`, `TicketPaymentWebhook.provider`
-— a plain `String`, so adding/switching a provider needs **no DB migration**).
+(`TicketPayment.provider`, `TicketRefund.provider`, `TicketPaymentWebhook.provider`,
+which is a plain `String`, so adding/switching a provider needs **no DB migration**).
 
 | Concern | Location |
 | --- | --- |
@@ -67,25 +67,25 @@ provider-agnostic and keys off the `provider` string stored on each row
 - Webhook URL is derived from `TICKETING_PUBLIC_URL` and auto-omitted for
   localhost (Mollie rejects non-public URLs); reconciliation is the fallback.
 - Refunds are nested under a payment, so `getRefundStatus` takes
-  `{ refundId, paymentId }` (not just a refund id like a top-level Stripe refund).
+  `{ refundId, paymentId }` (not just a refund id like a top-level refund).
 - Definitive (non-retryable) errors = any Mollie 4xx except 429.
 
 ## File map
 
-### Routes — public (`apps/web/app/[locale]/...`)
-- `tickets/page.tsx` — public shop list (`/tickets`)
-- `tickets/[slug]/page.tsx` — event + purchase page
-- `account/page.tsx` — personal ticket overview in the "Mijn VTK" section
-- `tickets/bestelling/[orderId]` — order + QR
+### Routes: public (`apps/web/app/[locale]/...`)
+- `tickets/page.tsx`: public shop list (`/tickets`)
+- `tickets/[slug]/page.tsx`: event + purchase page
+- `account/page.tsx`: personal ticket overview in the "Mijn VTK" section
+- `tickets/bestelling/[orderId]`: order + QR
 
-### Routes — admin (`apps/web/app/[locale]/admin/tickets/...`)
-- `page.tsx` — event list / management
-- `new/page.tsx` — create event
-- `[eventId]/{instellingen,toegang,deelnemers,bestellingen}` — settings (ticket
+### Routes: admin (`apps/web/app/[locale]/admin/tickets/...`)
+- `page.tsx`: event list / management
+- `new/page.tsx`: create event
+- `[eventId]/{instellingen,toegang,deelnemers,bestellingen}`: settings (ticket
   types), access/grants, attendees, orders
 
-### Routes — scanner
-- `apps/web/app/(scanner)/scan/[eventId]/page.tsx` — camera scanner (no locale
+### Routes: scanner
+- `apps/web/app/(scanner)/scan/[eventId]/page.tsx`: camera scanner (no locale
   prefix). Requires session + `SCAN` capability. Needs HTTPS or localhost for
   camera access.
 
@@ -211,18 +211,18 @@ De scanner is installeerbaar als aparte app ("VTK Scanner"), zodat er geen
 browserbalk over het camerabeeld staat en de deurploeg met één tik start. Drie
 stukken horen bij elkaar:
 
-- `app/manifest.ts` — `id`/`scope`/`start_url` op `/scan`. Die `scope` doet meer
+- `app/manifest.ts`: `id`/`scope`/`start_url` op `/scan`. Die `scope` doet meer
   dan het lijkt: buiten `/scan` is de pagina niet installeerbaar, dus de browser
   biedt dit nooit aan op de publieke site. Eén manifest op de conventionele plek
   volstaat daardoor; een tweede op een geneste route werkt trouwens niet, want de
   bestandsconventie wint van `metadata.manifest` in een geneste layout.
-- `public/sw.js` — een smalle service worker. Nodig omdat Chrome zonder
+- `public/sw.js`: een smalle service worker. Nodig omdat Chrome zonder
   geregistreerde worker met fetch-handler nooit `beforeinstallprompt` vuurt, én
   omdat de scanner anders offline niet eens opstart. Cachet enkel `/scan*` en de
   gehashte build-assets; API-antwoorden nooit (een hergebruikt scan-antwoord zou
   iemand een tweede keer binnenlaten). Registratie gebeurt enkel in productie:
   in dev zou hij hot-reloadchunks vasthouden.
-- `components/ticketing/scanner/InstallButton.tsx` — vangt `beforeinstallprompt`
+- `components/ticketing/scanner/InstallButton.tsx`: vangt `beforeinstallprompt`
   op (Android/Chrome) of toont de Deel-instructie (iOS/Safari, waar dat event
   niet bestaat), en verdwijnt zodra de app in `display-mode: standalone` draait.
 
@@ -256,18 +256,18 @@ webscanner blijft staan als webweg en als vangnet.
   vindt dan offline geen enkele kaart meer.
 
 ### API (`apps/web/app/api/tickets/...`)
-- `checkout/route.ts` — start an order + checkout
-- `mollie/webhook/route.ts` — Mollie payment/refund callback
-- `mock/complete/route.ts` — dev-only instant "payment complete"
-- `maintenance/route.ts` — reconciliation + outbox flush (Bearer `TICKETING_MAINTENANCE_SECRET`)
-- `scanner/events/route.ts` — de evenementen waarvoor je scanrechten hebt, voor de native app
-- `events/[eventId]/scanners` — scanners van dit event opvragen (`GET`), toevoegen
+- `checkout/route.ts`: start an order + checkout
+- `mollie/webhook/route.ts`: Mollie payment/refund callback
+- `mock/complete/route.ts`: dev-only instant "payment complete"
+- `maintenance/route.ts`: reconciliation + outbox flush (Bearer `TICKETING_MAINTENANCE_SECRET`)
+- `scanner/events/route.ts`: de evenementen waarvoor je scanrechten hebt, voor de native app
+- `events/[eventId]/scanners`: scanners van dit event opvragen (`GET`), toevoegen
   (`POST {userId}`) of weghalen (`POST {grantId}`); enkel `MANAGE_SCANNERS`, en
   enkel de rol `SCANNER`, zodat deze weg nooit een OWNER kan degraderen
-- `events/[eventId]/users/search` — iemand zoeken op naam, e-mail of r-nummer om
+- `events/[eventId]/users/search`: iemand zoeken op naam, e-mail of r-nummer om
   als scanner toe te voegen; gescoped op de capability van het event en niet op de
   globale `users.search`-permissie
-- `events/[eventId]/scanners/invite` — een verse uitnodigings-QR (`MANAGE_SCANNERS`).
+- `events/[eventId]/scanners/invite`: een verse uitnodigings-QR (`MANAGE_SCANNERS`).
   Het token (`vtks1.<base64url(eventId)>.<base36 vervaltijd>.<hmac>`, zie
   `lib/ticketing/crypto.ts`) leeft 30 seconden en het paneel ververst om de 20;
   daardoor is een doorgestuurde screenshot dood. De landingspagina is
@@ -275,37 +275,37 @@ webscanner blijft staan als webweg en als vangnet.
   toekent en doorverwijst naar `/scan/<eventId>` of naar de app
   (`vtk-scanner://scan/<eventId>`)
 - `events/[eventId]/scan`, `.../scan/batch`, `.../scan/card`, `.../scan/reverse`,
-  `.../scanner/bootstrap` — scanning (`scan/batch` leegt de offline wachtrij,
+  `.../scanner/bootstrap`: scanning (`scan/batch` leegt de offline wachtrij,
   `scan/card` checkt in met een studentenkaart)
 - `events/[eventId]/{stats,exports/*}`, `orders/[orderId]/{status,access}`,
-  `[ticketId]/pdf` — supporting endpoints
+  `[ticketId]/pdf`: supporting endpoints
 
 ### Domain logic (`apps/web/lib/ticketing/`)
-- `orders.ts` — `createTicketCheckout`, `fulfillPaidOrder`, `expirePendingOrder`,
+- `orders.ts`: `createTicketCheckout`, `fulfillPaidOrder`, `expirePendingOrder`,
   `releaseExpiredOrders` (order lifecycle + gateway orchestration)
-- `inventory.ts` — capacity reservation (race-safe)
-- `refunds.ts` — `requestTicketRefund`, `completeTicketRefund`, `failTicketRefund`
-- `reconciliation.ts` — polls PENDING payments/refunds against the provider
-- `scanner.ts` — scan authorization + validation
-- `authorization.ts` — capability checks (`canCreateTicketEventForGroup`, `requireTicketEventCapability`)
-- `config.ts` — env-driven config (provider, base URL, secrets, reservation window)
-- `crypto.ts` — signed ticket credentials + order access tokens
-- `ticketColors.ts` — het palet per tickettype (key, geen hex)
-- `cardHash.ts` — het hashformaat van de studentenkaart in het offline-manifest;
+- `inventory.ts`: capacity reservation (race-safe)
+- `refunds.ts`: `requestTicketRefund`, `completeTicketRefund`, `failTicketRefund`
+- `reconciliation.ts`: polls PENDING payments/refunds against the provider
+- `scanner.ts`: scan authorization + validation
+- `authorization.ts`: capability checks (`canCreateTicketEventForGroup`, `requireTicketEventCapability`)
+- `config.ts`: env-driven config (provider, base URL, secrets, reservation window)
+- `crypto.ts`: signed ticket credentials + order access tokens
+- `ticketColors.ts`: het palet per tickettype (key, geen hex)
+- `cardHash.ts`: het hashformaat van de studentenkaart in het offline-manifest;
   draait bewust aan beide kanten
-- `mail.ts`, `outbox.ts` — durable confirmation-mail queue
-- `mailBundle.ts` — the ticket PDF and the Apple Wallet passes that ride along
+- `mail.ts`, `outbox.ts`: durable confirmation-mail queue
+- `mailBundle.ts`: the ticket PDF and the Apple Wallet passes that ride along
   with that mail, plus the Google Wallet save links (best effort: a failing
   generator or provider never blocks the confirmation itself)
-- `money.ts`, `time.ts`, `pdf.ts`, `csv.ts`, `http.ts`, `access.ts`, `queries.ts` — helpers
+- `money.ts`, `time.ts`, `pdf.ts`, `csv.ts`, `http.ts`, `access.ts`, `queries.ts`: helpers
 
 ### Components (`apps/web/components/ticketing/`)
-- `public/TicketShop.tsx` — buyer checkout UI (quantity steppers, attendee form)
-- `public/TicketPass.tsx` — renders the QR from the ticket credential
+- `public/TicketShop.tsx`: buyer checkout UI (quantity steppers, attendee form)
+- `public/TicketPass.tsx`: renders the QR from the ticket credential
 - `public/OrderStatus.tsx`, `TicketEventCard.tsx`, `AccessExchange.tsx`
 - `admin/TicketEventForm.tsx`, `TicketTypeManager.tsx`, `TicketQuestionManager.tsx`,
   `RefundOrderForm.tsx`, `EventAdminNav.tsx`, `StatusBadge.tsx`, `AdminMetric.tsx`
-- `scanner/ScannerApp.tsx` — `@zxing/browser` camera scanner (rear camera)
+- `scanner/ScannerApp.tsx`: `@zxing/browser` camera scanner (rear camera)
 
 ### Styling
 - `apps/web/app/design/vtk-tickets.css`
@@ -315,15 +315,15 @@ webscanner blijft staan als webweg en als vangnet.
 - Groups + per-group `MembershipRole` (`MEMBER` | `LEAD`) in
   `packages/db/prisma/schema.prisma`; fine-grained codes in
   `packages/db/src/permissions.ts`.
-- `tickets.create` — create ticket events for own group (granted to `IT` and
-  `GROEP5` by the seed). `tickets.manageAll` — global ticket admin (explicit).
+- `tickets.create`: create ticket events for own group (granted to `IT` and
+  `GROEP5` by the seed). `tickets.manageAll`: global ticket admin (explicit).
 - Per-event capabilities via grants: `OWNER`/`MANAGER` grants include `SCAN`.
   Superadmins bypass all checks.
 - `SCANNER` draagt **enkel `SCAN`**, bewust zonder `VIEW_EVENT`: die capability
   bewaakt `admin/tickets/[eventId]/layout.tsx`, en wie aan de deur staat hoort niet
   in het beheer. Om dezelfde reden telt scannen niet mee in
   `canAccessAnyTicketEvent()`, dat de Tickets-tab in de adminnavigatie bepaalt.
-- `MANAGE_SCANNERS` — smaller than `MANAGE_ACCESS`: scanners toevoegen en
+- `MANAGE_SCANNERS`: smaller than `MANAGE_ACCESS`: scanners toevoegen en
   weghalen, en niets anders. `OWNER` en `MANAGER` dragen ze, zodat de leads van
   de organiserende post een deurploeg kunnen samenstellen zonder het
   eigenaarschap of de financiële rollen te kunnen verzetten.
@@ -348,7 +348,7 @@ groeit anders uit elkaar; `apps/web/test/authorization.test.ts` legt ze vast.
 - **Seed users** (`packages/db/prisma/seed.ts`): committee accounts
   `<group>@vtk.prototype` (e.g. `it@vtk.prototype`, an IT LEAD) with password
   `prototype` (override via `SEED_PROTOTYPE_PASSWORD`). No student account is
-  seeded — create one via `/admin/gebruikers` or a small script (a user with no
+  seeded: create one via `/admin/gebruikers` or a small script (a user with no
   group membership = a plain student).
 - **Mock provider** (default, offline): `TICKETING_PAYMENT_PROVIDER=mock`,
   `TICKETING_PUBLIC_URL=http://localhost:3000`. Payment "completes" instantly via
@@ -361,10 +361,10 @@ groeit anders uit elkaar; `apps/web/test/authorization.test.ts` legt ze vast.
   README *Mollie hosted checkout* section for the full walkthrough.
 - **Camera/scanner** needs HTTPS or `localhost`; a phone on a LAN IP is refused,
   so use the tunnel URL for `/scan/<eventId>` on mobile.
-- Dev server runs `next dev --webpack` (never Turbopack — see `AGENTS.md`).
+- Dev server runs `next dev --webpack` (never Turbopack: see `AGENTS.md`).
 
 ## Tests
 - Unit: `npm run test --workspace=@vtk/web` (`apps/web/test/*.test.ts`)
 - Integration (needs an isolated Postgres, not the seeded dev DB):
-  `apps/web/test/integration/ticketing-db.integration.ts` — includes the Mollie
+  `apps/web/test/integration/ticketing-db.integration.ts`: includes the Mollie
   webhook fulfil + dedup test (mocks `fetch` to Mollie).

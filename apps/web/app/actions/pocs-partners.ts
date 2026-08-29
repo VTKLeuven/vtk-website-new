@@ -9,6 +9,7 @@ import { saveError, saveOk, type SaveState } from "@/lib/saveState";
 import { describeChanges, logAudit } from "@/lib/audit";
 import { STUDY_PROGRAMMES } from "@/lib/profile";
 import { deleteObject } from "@vtk/storage";
+import { currentWorkingYear } from "@/lib/workingYear";
 
 /** `P2002` op een bepaald veld: de unieke constraint die Prisma noemt. */
 function isUniqueViolation(err: unknown, field: string): boolean {
@@ -28,7 +29,6 @@ const pocSchema = z.object({
   nameEn: z.string().optional().nullable(),
   // Eén adres voor de hele POC; leeg mag, een half ingevuld adres niet.
   email: z.string().email().optional().nullable(),
-  order: z.coerce.number().int().default(0),
   // De aangevinkte richtingen. Onbekende waarden weren we hier: het formulier
   // stuurt enkel `StudyProgramme`-codes, dus iets anders is geknoei.
   studyProgrammes: z.array(z.enum(STUDY_PROGRAMMES)).default([]),
@@ -42,7 +42,6 @@ export async function savePocAction(_prev: SaveState, formData: FormData): Promi
     nameNl: formData.get("nameNl"),
     nameEn: formData.get("nameEn") || null,
     email: formData.get("email") || null,
-    order: formData.get("order") || 0,
     studyProgrammes: formData.getAll("studyProgrammes"),
   });
   if (!parsed.success) return saveError("INVALID_INPUT");
@@ -62,13 +61,15 @@ export async function savePocAction(_prev: SaveState, formData: FormData): Promi
               nameNl: "naam",
               nameEn: "Engelse naam",
               email: "e-mailadres",
-              order: "volgorde",
               studyProgrammes: "richtingen",
             })
           : null,
       });
     } else {
-      const created = await prisma.poc.create({ data: parsed.data });
+      const last = await prisma.poc.findFirst({ orderBy: { order: "desc" }, select: { order: true } });
+      const created = await prisma.poc.create({
+        data: { ...parsed.data, order: (last?.order ?? -1) + 1 },
+      });
       await logAudit({
         action: "create",
         entity: "poc",
@@ -89,6 +90,22 @@ export async function savePocAction(_prev: SaveState, formData: FormData): Promi
   return saveOk();
 }
 
+export async function reorderPocsAction(ids: string[]): Promise<void> {
+  await requirePermission("pocs.manage");
+  await prisma.$transaction(
+    ids.map((id, index) => prisma.poc.update({ where: { id }, data: { order: index } })),
+  );
+  await logAudit({
+    action: "reorder",
+    entity: "poc",
+    target: `${ids.length} POC's`,
+    summary: "volgorde van POC's gewijzigd",
+  });
+  revalidatePath("/pocs");
+  revalidatePath("/admin/pocs");
+  revalidatePath("/", "layout");
+}
+
 export async function deletePocAction(formData: FormData): Promise<void> {
   await requirePermission("pocs.manage");
   const id = formData.get("id") as string;
@@ -105,20 +122,24 @@ export async function deletePocAction(formData: FormData): Promise<void> {
 const repSchema = z.object({
   pocId: z.string(),
   userId: z.string(),
+  year: z.coerce.number().int().optional(),
   order: z.coerce.number().int().default(0),
 });
 
 export async function addPocRepresentativeAction(formData: FormData): Promise<void> {
   await requirePermission("pocs.manage");
+  const rawYear = formData.get("year");
   const parsed = repSchema.parse({
     pocId: formData.get("pocId"),
     userId: formData.get("userId"),
+    year: rawYear ? Number(rawYear) : undefined,
     order: formData.get("order") || 0,
   });
+  const year = parsed.year ?? currentWorkingYear();
   await prisma.pocRepresentative.upsert({
-    where: { pocId_userId: { pocId: parsed.pocId, userId: parsed.userId } },
+    where: { pocId_userId_year: { pocId: parsed.pocId, userId: parsed.userId, year } },
     update: { order: parsed.order },
-    create: parsed,
+    create: { pocId: parsed.pocId, userId: parsed.userId, year, order: parsed.order },
   });
   const [poc, user] = await Promise.all([
     prisma.poc.findUnique({ where: { id: parsed.pocId }, select: { nameNl: true } }),

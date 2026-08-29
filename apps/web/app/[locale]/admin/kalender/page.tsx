@@ -39,7 +39,10 @@ export default async function AdminCalendar({
 
   const events = await prisma.calendarEvent.findMany({
     where: { ...scope, ...period },
-    include: { group: true },
+    include: {
+      group: true,
+      _count: { select: { interests: true, guestInterests: true } },
+    },
     // Aankomend: eerstvolgende bovenaan. Verleden: recentste bovenaan.
     orderBy: { start: showPast ? "desc" : "asc" },
     take: 100,
@@ -89,6 +92,7 @@ export default async function AdminCalendar({
               <th className="px-4 py-2">{nl ? "Titel" : "Title"}</th>
               <th className="px-4 py-2">{nl ? "Groep" : "Group"}</th>
               <th className="px-4 py-2">Status</th>
+              <th className="px-4 py-2 text-right">{nl ? "Geïnteresseerd" : "Interested"}</th>
               <th className="px-4 py-2">Start</th>
               <th className="px-4 py-2">{nl ? "Einde" : "End"}</th>
               <th className="px-4 py-2"></th>
@@ -108,14 +112,21 @@ export default async function AdminCalendar({
                         : "border border-vtk-blue/15 text-vtk-blue-muted",
                     ].join(" ")}
                   >
-                    {e.publishedAt
-                      ? nl
-                        ? "Gepubliceerd"
-                        : "Published"
-                      : nl
-                        ? "Concept"
-                        : "Draft"}
+                    {e.publishedAt ? (nl ? "Gepubliceerd" : "Published") : nl ? "Concept" : "Draft"}
                   </span>
+                </td>
+                <td className="px-4 py-2 text-right tabular-nums text-zinc-600">
+                  {e._count.interests + e._count.guestInterests > 0 ? (
+                    <Link
+                      href={`${base}/admin/kalender/${e.id}#geinteresseerden`}
+                      className="font-medium text-vtk-ink underline hover:text-vtk-blue"
+                      title={nl ? "Bekijk geïnteresseerden" : "View interested attendees"}
+                    >
+                      {e._count.interests + e._count.guestInterests}
+                    </Link>
+                  ) : (
+                    0
+                  )}
                 </td>
                 <td className="px-4 py-2 tabular-nums text-zinc-500">{dateFmt.format(e.start)}</td>
                 <td className="px-4 py-2 tabular-nums text-zinc-500">{dateFmt.format(e.end)}</td>
@@ -126,7 +137,7 @@ export default async function AdminCalendar({
             ))}
             {events.length === 0 && (
               <tr>
-                <td colSpan={6} className="px-4 py-8 text-center text-zinc-500">
+                <td colSpan={7} className="px-4 py-8 text-center text-zinc-500">
                   {showPast
                     ? nl
                       ? "Geen evenementen in het verleden"

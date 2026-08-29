@@ -69,11 +69,13 @@
   padding: 24px 32px 96px;
 }
 
-/* Maandraster met de legende ernaast. */
+/* Legende en abonneren staan als band bovenaan; het raster krijgt de volle
+   breedte. Stonden ze rechts, dan hield een dagcel geen 130 pixels over en paste
+   er geen enkele eventtitel meer in. */
 .vtk-design .kal-main {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 260px;
-  gap: 32px;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 24px;
   align-items: start;
 }
 
@@ -400,10 +402,6 @@
   .vtk-design .agenda {
     grid-template-columns: 1fr;
   }
-  /* Te smal voor raster + legende naast elkaar. */
-  .vtk-design .kal-main {
-    grid-template-columns: 1fr;
-  }
   .vtk-design .ag-row {
     grid-template-columns: 72px 1fr;
     grid-template-rows: auto auto auto;
@@ -716,6 +714,148 @@
   color: var(--muted);
   font-size: 12px;
   line-height: 1.45;
+}
+
+.vtk-design .subscribe-open {
+  width: 100%;
+  justify-content: space-between;
+  margin-top: 4px;
+}
+
+/* De abonneerdialoog. Vast in het scherm, want ze wordt geopend vanuit een
+   zijkolom die op een telefoon onderaan de pagina staat; een paneel dat daar
+   openklapt valt buiten beeld. */
+.vtk-design .subscribe-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: rgba(10, 15, 31, 0.45);
+}
+
+.vtk-design .subscribe-modal {
+  width: 100%;
+  max-width: 480px;
+  max-height: calc(100dvh - 40px);
+  overflow-y: auto;
+  padding: 22px;
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  background: var(--surface);
+  box-shadow: 0 24px 70px rgba(10, 15, 31, 0.22);
+}
+
+.vtk-design .subscribe-modal-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.vtk-design .subscribe-modal-head h3 {
+  margin: 0;
+  color: var(--ink);
+  font-size: 20px;
+  letter-spacing: -0.02em;
+}
+
+.vtk-design .subscribe-close {
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--paper);
+  color: var(--muted);
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.vtk-design .subscribe-close:hover {
+  color: var(--ink);
+}
+
+.vtk-design .subscribe-choices {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.vtk-design .subscribe-choices label {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--paper);
+  cursor: pointer;
+}
+
+.vtk-design .subscribe-choices label.on {
+  border-color: var(--ink);
+  background: var(--surface);
+  box-shadow: inset 3px 0 0 var(--yellow);
+}
+
+.vtk-design .subscribe-choices input {
+  margin-top: 3px;
+}
+
+.vtk-design .subscribe-choices b {
+  display: block;
+  color: var(--ink);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.vtk-design .subscribe-choices small {
+  display: block;
+  margin-top: 2px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.vtk-design .subscribe-custom {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--paper-2);
+}
+
+.vtk-design .subscribe-chip {
+  display: inline-flex;
+  gap: 7px;
+  align-items: center;
+  padding: 6px 11px;
+  border: 1px solid var(--line-2);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--body);
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.vtk-design .subscribe-chip:has(input:checked) {
+  border-color: var(--cat, var(--ink));
+  box-shadow: inset 0 0 0 1px var(--cat, var(--ink));
+  color: var(--ink);
+}
+
+.vtk-design .subscribe-modal .subscribe-actions {
+  margin-top: 18px;
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
 }
 
 .vtk-design .agenda-head {
@@ -1064,6 +1204,60 @@
   color: #fff;
 }
 
+/* De filter is meteen de legenda: het kleurpunt gebruikt exact dezelfde
+   databasekleur als de eventpillen in het raster. */
+.vtk-design .category-filter,
+.vtk-design .audience-filter {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  border-color: color-mix(in srgb, var(--cat) 48%, white);
+}
+
+.vtk-design .category-filter::before,
+.vtk-design .audience-filter::before {
+  content: '';
+  flex: 0 0 auto;
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--cat);
+}
+
+.vtk-design .category-filter:hover,
+.vtk-design .audience-filter:hover {
+  border-color: var(--cat);
+}
+
+.vtk-design .category-filter.on,
+.vtk-design .audience-filter.on {
+  background: var(--cat);
+  border-color: var(--cat);
+  color: #fff;
+}
+
+.vtk-design .category-filter.on::before,
+.vtk-design .audience-filter.on::before {
+  background: currentColor;
+}
+
+/* Alleen de knop leeft in de toolbar; alle uitleg staat in de dialoog nadat de
+   bezoeker bewust voor abonneren koos. */
+.vtk-design .toolbar-top .subscribe-compact {
+  flex: none;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.vtk-design .toolbar-top .subscribe-compact .subscribe-open {
+  width: auto;
+  min-height: 38px;
+  margin: 0;
+  padding-inline: 16px;
+  white-space: nowrap;
+}
+
 /* Weekweergave: zeven gelijkwaardige dagkolommen, met alle evenementen zichtbaar
    in plaats van de twee compacte pillen uit het maandraster. */
 .vtk-design .week-cal {
@@ -1250,4 +1444,216 @@
 
 .vtk-design .view-switch button.on {
   border-color: var(--ink);
+}
+
+/* -----------------------------------------------------------------------------
+   Voorvertoning van een evenement
+
+   Klikken in het raster opent eerst dit kaartje. In een cel van 45 pixels past
+   hoogstens een afgekapte titel; meteen doorsturen naar een volledige pagina is
+   een dure manier om te ontdekken dat je het verkeerde evenement aanklikte.
+   -------------------------------------------------------------------------- */
+
+.vtk-design .ev-preview-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: rgba(10, 15, 31, 0.45);
+}
+
+.vtk-design .ev-preview {
+  position: relative;
+  width: 100%;
+  max-width: 460px;
+  max-height: calc(100dvh - 40px);
+  overflow-y: auto;
+  padding: 24px;
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  background: var(--surface);
+  box-shadow: 0 24px 70px rgba(10, 15, 31, 0.22);
+}
+
+.vtk-design .ev-preview-close {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  width: 32px;
+  height: 32px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--paper);
+  color: var(--muted);
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.vtk-design .ev-preview-close:hover {
+  color: var(--ink);
+}
+
+.vtk-design .ev-preview-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-right: 40px;
+}
+
+.vtk-design .ev-preview-tag {
+  padding: 3px 10px;
+  border: 1px solid var(--line-2);
+  border-radius: 999px;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.vtk-design .ev-preview-tag.audience {
+  border-color: var(--cat);
+  background: var(--cat);
+  color: #fff;
+}
+
+.vtk-design .ev-preview h3 {
+  margin: 12px 0 0;
+  color: var(--ink);
+  font-size: 24px;
+  line-height: 1.15;
+  letter-spacing: -0.02em;
+}
+
+.vtk-design .ev-preview-meta {
+  display: grid;
+  gap: 10px;
+  margin: 16px 0 0;
+  padding: 14px 0;
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+}
+
+.vtk-design .ev-preview-meta div {
+  display: flex;
+  gap: 16px;
+  justify-content: space-between;
+}
+
+.vtk-design .ev-preview-meta dt {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.vtk-design .ev-preview-meta dd {
+  margin: 0;
+  color: var(--ink);
+  font-size: 14px;
+  text-align: right;
+}
+
+.vtk-design .ev-preview-desc {
+  margin: 14px 0 0;
+  color: var(--body);
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.vtk-design .ev-preview-going {
+  display: inline-block;
+  margin: 14px 0 0;
+  padding: 4px 12px;
+  border-radius: 999px;
+  background: var(--yellow);
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.vtk-design .ev-preview-go {
+  width: 100%;
+  justify-content: space-between;
+  margin-top: 18px;
+}
+
+/* De teller in het raster, de lijst en de weekweergave. Klein en geel, zodat ze
+   opvalt zonder de titel te verdringen. */
+.vtk-design .ev-going {
+  display: inline-block;
+  margin-top: 4px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: var(--yellow);
+  color: var(--ink);
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.vtk-design .subscribe-how {
+  margin: 6px 0 12px;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.vtk-design .subscribe-how-modal {
+  margin: 16px 0 0;
+}
+
+/* De lijstweergave gebruikt dezelfde band bovenaan, dus die mag niet meer in
+   twee kolommen staan. */
+.vtk-design .agenda-full {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+/* Twee korte beslissingen naast elkaar. Zo krijgt "ik kom" niet meer gewicht
+   dan de eventpagina zelf en blijft de modal compact. */
+.vtk-design .ev-preview-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 18px;
+}
+
+.vtk-design .ev-preview.has-interest {
+  max-width: 680px;
+}
+
+.vtk-design .ev-preview-actions .vtk-interest-expand,
+.vtk-design .ev-preview-actions .vtk-interest-toggle-error {
+  grid-column: 1 / -1;
+  text-align: left;
+}
+
+.vtk-design .ev-preview-actions .ev-preview-go,
+.vtk-design .ev-preview-actions .arrow {
+  width: 100%;
+  justify-content: center;
+  gap: 6px;
+  margin-top: 0;
+}
+
+.vtk-design .ev-preview-actions .btn {
+  min-width: 0;
+  min-height: 42px;
+  padding-inline: 14px;
+  white-space: nowrap;
+}
+
+@media (max-width: 520px) {
+  .vtk-design .ev-preview-actions {
+    grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+  }
+
+  .vtk-design .ev-preview-actions .btn {
+    padding-inline: 10px;
+    font-size: 12px;
+  }
 }

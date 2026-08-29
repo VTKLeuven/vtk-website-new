@@ -19,6 +19,53 @@ export function audiencesForStudyProfile(
 }
 
 /**
+ * Het doelgroepfilter voor wie nu kijkt.
+ *
+ * **Standaard filtert dit niets weg.** Alle evenementen zijn publiek, en een
+ * doelgroep is een label ("dit is voor eerstejaars"), geen slot: een tweedejaars
+ * mag gerust zien dat er een alumni-avond is, en de homepage van een kring hoort
+ * te tonen wat er allemaal gebeurt.
+ *
+ * Wie zijn kalender wél wil toespitsen, zet `calendarOnlyMyAudiences` aan op
+ * /account. Pas dan blijven de algemene evenementen plus zijn eigen doelgroepen
+ * over, overal waar deze helper gebruikt wordt: homepage, kalender, zoeken, de
+ * app en de persoonlijke agendafeed.
+ *
+ * Gebruik dit en niet `audienceFilter(await viewerAudiences())`: die combinatie
+ * negeert de voorkeur en verbergt dus dingen die iedereen hoort te zien.
+ */
+export const viewerAudienceFilter = cache(
+  async (): Promise<Prisma.CalendarEventWhereInput> => {
+    const session = await getCurrentSession();
+    if (!session) return {};
+    const user = await prisma.user.findUnique({
+      where: { id: session.user.id },
+      select: {
+        calendarOnlyMyAudiences: true,
+        studyYears: true,
+        internationalStudent: true,
+        alumni: true,
+      },
+    });
+    if (!user?.calendarOnlyMyAudiences) return {};
+    return audienceFilter(
+      audiencesForStudyProfile(user.studyYears, user.internationalStudent, user.alumni),
+    );
+  },
+);
+
+/** Staat de persoonlijke doelgroepfilter aan? Voor de standaardstand van de chip. */
+export const viewerPrefersOwnAudiences = cache(async (): Promise<boolean> => {
+  const session = await getCurrentSession();
+  if (!session) return false;
+  const user = await prisma.user.findUnique({
+    where: { id: session.user.id },
+    select: { calendarOnlyMyAudiences: true },
+  });
+  return user?.calendarOnlyMyAudiences ?? false;
+});
+
+/**
  * De doelgroepen waar het ingelogde lid bij hoort.
  *
  * Bewust een DB-lezing en geen sessieveld: `SessionPayload` draagt permissies en
@@ -48,6 +95,29 @@ export async function audiencesForUser(userId: string): Promise<CalendarAudience
   if (!user) return [];
 
   return audiencesForStudyProfile(user.studyYears, user.internationalStudent, user.alumni);
+}
+
+/**
+ * Hetzelfde als {@link viewerAudienceFilter}, maar voor een expliciete gebruiker.
+ * De persoonlijke agenda-feed heeft geen sessie: die authenticeert met een token
+ * in de URL.
+ */
+export async function audienceFilterForUser(
+  userId: string,
+): Promise<Prisma.CalendarEventWhereInput> {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: {
+      calendarOnlyMyAudiences: true,
+      studyYears: true,
+      internationalStudent: true,
+      alumni: true,
+    },
+  });
+  if (!user?.calendarOnlyMyAudiences) return {};
+  return audienceFilter(
+    audiencesForStudyProfile(user.studyYears, user.internationalStudent, user.alumni),
+  );
 }
 
 /**

@@ -14,10 +14,12 @@ import { readBarStatus } from "@/lib/elixir/status";
 import { publicUrl } from "@/lib/storage";
 import { BUILTIN_DEFAULT_EVENT_IMAGE, DEFAULT_EVENT_IMAGE_SETTING } from "@/lib/defaultEventImage";
 import { PartnerLogo } from "@/components/site/PartnerLogo";
-import { audienceFilter, viewerAudiences } from "@/lib/calendar/audience";
+import { viewerAudienceFilter } from "@/lib/calendar/audience";
+import { interestLabel, publicInterestCounts } from "@/lib/calendar/interest";
 import { resolveFrontpage } from "@/lib/frontpage/resolve";
 import { frontpagePhoto } from "@/lib/frontpage/registry";
 import { Frontpage } from "@/components/editorial/frontpage";
+import { currentWorkingYear } from "@/lib/workingYear";
 import { AftermovieGrid, type AftermovieGridItem } from "./AftermovieGrid";
 import {
   dutchDayNameForDate,
@@ -94,15 +96,14 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
         },
       },
     }),
-    // Dezelfde doelgroepfilter als /kalender: een eerstejaarsevent hoort niet bij
-    // iedereen op de homepage te staan terwijl het uit de kalender gefilterd is.
-    viewerAudiences().then((audiences) =>
+    // Dezelfde doelgroepregel als /kalender: standaard staat alles erop, en enkel
+    // wie op /account koos zijn kalender toe te spitsen krijgt hier minder.
+    viewerAudienceFilter().then((audiences) =>
       prisma.calendarEvent.findMany({
         where: {
           start: { gte: now },
-          visibility: "PUBLIC",
           publishedAt: { not: null },
-          ...audienceFilter(audiences),
+          ...audiences,
         },
         orderBy: { start: "asc" },
         take: 8,
@@ -153,6 +154,11 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
   // rooster gewoon mee (zie `.ev-grid`), zonder lege plaatsen op te vullen.
   const eventCards = upcomingEvents.slice(0, 6);
 
+  // "32 komen" bij een evenement waar al volk naartoe gaat. Enkel boven de
+  // drempel; zie lib/calendar/interest.ts voor waarom een laag getal averechts
+  // werkt. Eén lezing voor de hero én de kaarten hieronder.
+  const interested = await publicInterestCounts(upcomingEvents.map((event) => event.id));
+
   // POC's van jouw richtingen. Zonder sessie of zonder richtingen valt de hele
   // sectie weg: een lijst van alle POC's is hier niet wat gevraagd wordt.
   //
@@ -174,7 +180,11 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
           where: { studyProgrammes: { hasSome: myProgrammes } },
           orderBy: { order: "asc" },
           include: {
-            representatives: { orderBy: { order: "asc" }, include: { user: true } },
+            representatives: {
+              where: { year: currentWorkingYear(), user: { deletedAt: null } },
+              orderBy: { order: "asc" },
+              include: { user: true },
+            },
           },
         })
       : [];
@@ -331,7 +341,10 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
           locale={locale}
           base={base}
           now={now}
-          upcomingEvents={upcomingEvents}
+          upcomingEvents={upcomingEvents.map((event) => ({
+            ...event,
+            interestedCount: interested.get(event.id) ?? null,
+          }))}
           partners={partners}
         />
 
@@ -599,6 +612,11 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
                         .filter(Boolean)
                         .join(" · ")}
                     </p>
+                    {interestLabel(interested.get(event.id), locale) ? (
+                      <span className="evcard-going">
+                        {interestLabel(interested.get(event.id), locale)}
+                      </span>
+                    ) : null}
                   </div>
                 </Link>
               );

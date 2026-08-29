@@ -250,6 +250,7 @@ function Chip({
   selected: boolean;
   onSelect: (visit: VisitView) => void;
 }) {
+  const hasScheduled = visit.scheduledMails && visit.scheduledMails.length > 0;
   return (
     <button
       type="button"
@@ -258,10 +259,27 @@ function Chip({
       aria-current={selected}
       style={{ ["--org" as string]: visit.organisationColour }}
       onClick={() => onSelect(visit)}
-      title={`${visit.time} ${visit.organisationName} — ${visit.course}`}
+      title={`${visit.time} ${visit.organisationName} — ${visit.course}${hasScheduled ? ` (${visit.scheduledMails[0]!.sendAtShort})` : ""}`}
     >
       <span>
         <strong>{visit.time}</strong>
+        {hasScheduled && (
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="10"
+            height="10"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            className="inline-block mr-1 align-[-1px]"
+          >
+            <circle cx="12" cy="12" r="10" />
+            <polyline points="12 6 12 12 16 14" />
+          </svg>
+        )}
         {visit.organisationName}
       </span>
       <span className="opacity-70">{visit.audience}</span>

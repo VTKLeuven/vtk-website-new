@@ -1,4 +1,4 @@
-import { viewerAudiences } from "@/lib/calendar/audience";
+import { viewerAudienceFilter } from "@/lib/calendar/audience";
 import { corsPreflight } from "@/lib/cors";
 import { isExternalResult, type SnippetPart } from "@/lib/search";
 import { searchSite } from "@/lib/search-server";
@@ -29,12 +29,15 @@ export async function GET(request: Request) {
     const url = new URL(request.url);
     const locale = appLocaleFrom(url.searchParams.get("locale"));
 
-    const [session, audiences] = await Promise.all([getCurrentSession(), viewerAudiences()]);
+    const [session, audienceWhere] = await Promise.all([
+      getCurrentSession(),
+      viewerAudienceFilter(),
+    ]);
 
     const outcome = await searchSite({
       query: url.searchParams.get("q"),
       locale,
-      audiences,
+      audienceWhere,
       signedIn: Boolean(session),
     });
 

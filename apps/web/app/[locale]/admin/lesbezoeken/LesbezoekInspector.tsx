@@ -6,44 +6,51 @@ import { Modal } from "@/app/[locale]/admin/admin-table";
 import { SaveForm } from "@/components/ui/SaveForm";
 import { DeleteButton } from "@/components/ui/DeleteIconButton";
 import {
+  cancelLesbezoekScheduledMailAction,
   deleteLesbezoekAction,
   reviewLesbezoekAction,
+  scheduleLesbezoekMailAction,
   sendLesbezoekMailAction,
+  sendNowLesbezoekScheduledMailAction,
 } from "@/app/actions/lesbezoeken";
 import {
+  getSchedulePresets,
   LESBEZOEK_STATUSES,
   LESBEZOEK_STATUS_META,
-  type LesbezoekStatusCode,
+  nudgeCountdownLabel,
 } from "@/lib/lesbezoeken";
 import {
+  DEFAULT_LESBEZOEK_TEMPLATE_ITEMS,
   mailVarsFor,
   nudgeTemplateKey,
   professorTemplateKey,
   renderMailTemplate,
+  type LesbezoekTemplateItem,
   type LesbezoekTemplates,
 } from "@/lib/lesbezoekenMail";
 import { lesbezoekAdminErrors } from "@/lib/lesbezoekenMessages";
 import type { VisitView } from "./types";
 
 /**
- * Het detailpaneel van één lesbezoek: alles wat je nodig hebt om te beslissen, en
- * de twee dingen die op die beslissing volgen (de status bijwerken en een mail
- * versturen).
- *
- * De waarschuwingen staan bovenaan en niet onderaan. Dat is het hele punt van dit
- * scherm: in de oude werkwijze stonden de bijzonderheden van een professor, de
- * dubbele aanvragen en de reputatie van een organisatie in drie andere tabbladen,
- * en wie ze vergat te openen mailde een professor die nooit lesbezoeken toelaat.
+ * Het detailpaneel van één lesbezoek: overzichtelijk ingedeeld in tabbladen voor
+ * details/beoordeling en mailen, zodat het scherm rustig blijft en je direct ziet
+ * wat de status is.
  */
 
-type MailKind = "professor" | "nudge" | "requester";
+type InspectorTab = "details" | "mail";
 
-/** Welke mail er bij deze status het meest voor de hand ligt. */
-function suggestedKind(status: LesbezoekStatusCode): MailKind {
-  if (status === "PENDING") return "professor";
-  if (status === "ASKED") return "nudge";
-  // Beslist: dan is de aanvrager aan de beurt.
-  return "requester";
+/** Welk sjabloon-id bij deze status standaard hoort. */
+function suggestedTemplateId(visit: VisitView, lang: "nl" | "en"): string {
+  if (visit.status === "PENDING") {
+    return professorTemplateKey(visit.longVisit, lang);
+  }
+  if (visit.status === "ASKED") {
+    return nudgeTemplateKey(lang);
+  }
+  if (visit.status === "APPROVED") {
+    return "requesterApproved";
+  }
+  return "requesterDeclined";
 }
 
 export function LesbezoekInspector({
@@ -65,6 +72,12 @@ export function LesbezoekInspector({
 }) {
   const errors = lesbezoekAdminErrors(nl);
   const meta = LESBEZOEK_STATUS_META[visit.status];
+  const [activeTab, setActiveTab] = useState<InspectorTab>("details");
+
+  const templateItems =
+    templates.items && templates.items.length > 0
+      ? templates.items
+      : DEFAULT_LESBEZOEK_TEMPLATE_ITEMS;
 
   return (
     <Modal
@@ -72,144 +85,290 @@ export function LesbezoekInspector({
       onClose={onClose}
       size="lg"
     >
-      <div className="space-y-5">
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="lb-badge" data-tone={meta.tone}>
-            {meta[nl ? "nl" : "en"]}
-          </span>
-          <span className="text-sm text-[#5c667f]">
-            {visit.mailDate[nl ? "nl" : "en"]} · {visit.mailTime}
-          </span>
-          {visit.longVisit && (
-            <span className="rounded-full border border-vtk-blue/15 px-2 py-0.5 text-xs font-semibold text-[#5c667f]">
-              {nl ? "Langer dan 5 min" : "Longer than 5 min"}
+      <div className="space-y-4">
+        {/* Header meta badges */}
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-vtk-blue/10 pb-3">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="lb-badge" data-tone={meta.tone}>
+              {meta[nl ? "nl" : "en"]}
             </span>
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-zinc-100 px-3 py-1 text-xs font-medium text-zinc-700">
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="13"
+                height="13"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className="text-[#5c667f]"
+              >
+                <circle cx="12" cy="12" r="10" />
+                <polyline points="12 6 12 12 16 14" />
+              </svg>
+              {visit.mailDate[nl ? "nl" : "en"]} · {visit.mailTime}
+            </span>
+            {visit.longVisit && (
+              <span className="rounded-full border border-amber-300 bg-amber-50 px-2.5 py-0.5 text-xs font-semibold text-amber-800">
+                {nl ? "Langer dan 5 min" : "Longer than 5 min"}
+              </span>
+            )}
+          </div>
+
+          {/* Tab Selector */}
+          {canManage && (
+            <div className="inline-flex rounded-full border border-vtk-blue/15 bg-zinc-50 p-1">
+              <button
+                type="button"
+                onClick={() => setActiveTab("details")}
+                className={`rounded-full px-3.5 py-1 text-xs font-semibold transition-all ${
+                  activeTab === "details"
+                    ? "bg-white text-vtk-ink shadow-xs"
+                    : "text-[#5c667f] hover:text-vtk-ink"
+                }`}
+              >
+                {nl ? "Overzicht & Status" : "Overview & Status"}
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveTab("mail")}
+                className={`rounded-full px-3.5 py-1 text-xs font-semibold transition-all flex items-center gap-1.5 ${
+                  activeTab === "mail"
+                    ? "bg-vtk-ink text-white shadow-xs"
+                    : "text-[#5c667f] hover:text-vtk-ink"
+                }`}
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="12"
+                  height="12"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <rect width="20" height="16" x="2" y="4" rx="2" />
+                  <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7" />
+                </svg>
+                {nl ? "Mail versturen" : "Send email"}
+              </button>
+            </div>
           )}
         </div>
 
+        {/* Waarschuwingen bovenaan */}
         <Warnings nl={nl} visit={visit} />
 
-        <dl className="lb-def">
-          <dt>{nl ? "Doelgroep" : "Target group"}</dt>
-          <dd>{visit.audience}</dd>
-          <dt>{nl ? "Vak" : "Course"}</dt>
-          <dd>{visit.course}</dd>
-          <dt>{nl ? "Onderwerp" : "Subject"}</dt>
-          <dd>{visit.subject}</dd>
-          <dt>{nl ? "Docent" : "Lecturer"}</dt>
-          <dd>
-            {visit.teacherName ? `${visit.teacherName} · ` : ""}
-            <a className="underline underline-offset-2" href={`mailto:${visit.teacherEmail}`}>
-              {visit.teacherEmail}
-            </a>
-          </dd>
-          <dt>{nl ? "Aanvrager" : "Requester"}</dt>
-          <dd>
-            {visit.requesterName ?? "—"}
-            {visit.requesterEmail ? (
-              <>
-                {" · "}
-                <a className="underline underline-offset-2" href={`mailto:${visit.requesterEmail}`}>
-                  {visit.requesterEmail}
-                </a>
-              </>
-            ) : null}
-            {visit.requesterPhone ? ` · ${visit.requesterPhone}` : ""}
-          </dd>
-        </dl>
+        {visit.needsNudge && canManage && (
+          <NudgeBanner nl={nl} visit={visit} onCompose={() => setActiveTab("mail")} />
+        )}
 
-        <div>
-          {/* Een `<Label>` zonder veld eronder is geen label maar een kopje; een
-              screenreader kondigt het anders aan als het bijschrift van een
-              invulveld dat er niet is. */}
-          <p className="mb-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-[#5c667f]">
-            {nl ? "Toelichting voor de docent" : "Note for the lecturer"}
-          </p>
-          <p className="lb-quote">{visit.teacherNote}</p>
-        </div>
+        {/* Eventuele geplande mails */}
+        <ScheduledMailBanner nl={nl} visit={visit} canManage={canManage} />
 
-        <Timeline nl={nl} visit={visit} />
+        {activeTab === "details" ? (
+          <div className="space-y-4">
+            {/* Gegevens overzicht in 2 kolommen */}
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="rounded-2xl border border-vtk-blue/12 bg-white p-4 shadow-xs">
+                <h4 className="mb-2.5 text-xs font-bold uppercase tracking-wider text-[#5c667f]">
+                  {nl ? "Les & Doelgroep" : "Class & Audience"}
+                </h4>
+                <dl className="space-y-2 text-sm">
+                  <div>
+                    <dt className="text-xs text-[#5c667f]">{nl ? "Vak" : "Course"}</dt>
+                    <dd className="font-semibold text-vtk-ink">{visit.course}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-xs text-[#5c667f]">{nl ? "Onderwerp" : "Subject"}</dt>
+                    <dd className="text-zinc-800">{visit.subject}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-xs text-[#5c667f]">{nl ? "Doelgroep" : "Target group"}</dt>
+                    <dd className="mt-0.5">
+                      <span className="inline-block rounded-md bg-vtk-blue-soft/80 px-2 py-0.5 text-xs font-medium text-vtk-ink border border-vtk-blue/15">
+                        {visit.audience}
+                      </span>
+                    </dd>
+                  </div>
+                </dl>
+              </div>
 
-        {canManage && (
-          <>
-            <section className="rounded-2xl border border-vtk-blue/15 p-4">
-              <h3 className="mb-1 font-semibold text-vtk-ink">
-                {nl ? "Antwoord verwerken" : "Record the outcome"}
-              </h3>
-              <p className="mb-3 text-sm text-[#5c667f]">
-                {nl
-                  ? "De docent antwoordt per mail; zet hier wat hij zei. Bij een weigering is de reden verplicht: die gaat mee in de terugkoppeling naar de aanvrager."
-                  : "The lecturer replies by email; record their answer here. A reason is required when declining: it goes into the reply to the requester."}
-              </p>
-              <SaveForm
-                action={reviewLesbezoekAction}
-                submitLabel={nl ? "Status bijwerken" : "Update status"}
-                savingLabel={nl ? "Bezig…" : "Saving…"}
-                savedMessage={nl ? "Status bijgewerkt." : "Status updated."}
-                errorMessages={errors}
-                fallbackErrorMessage={nl ? "Niet opgeslagen." : "Not saved."}
-                resetOnSuccess={false}
-                className="space-y-3"
-              >
-                <input type="hidden" name="id" value={visit.id} />
-                <div>
-                  <Label htmlFor={`status-${visit.id}`}>{nl ? "Status" : "Status"}</Label>
-                  <Select id={`status-${visit.id}`} name="status" defaultValue={visit.status}>
-                    {LESBEZOEK_STATUSES.map((status) => (
-                      <option key={status} value={status}>
-                        {LESBEZOEK_STATUS_META[status][nl ? "nl" : "en"]}
-                      </option>
-                    ))}
-                  </Select>
-                </div>
-                <div>
-                  <Label htmlFor={`reason-${visit.id}`}>
-                    {nl ? "Reden of opmerking" : "Reason or remark"}
-                  </Label>
-                  <Textarea
-                    id={`reason-${visit.id}`}
-                    name="reviewNote"
-                    rows={3}
-                    defaultValue={visit.reviewNote ?? ""}
-                    placeholder={
-                      nl
-                        ? "de docent laat dit semester geen lesbezoeken toe"
-                        : "the lecturer does not allow class visits this semester"
-                    }
-                  />
-                </div>
-              </SaveForm>
-            </section>
-
-            <MailComposer
-              nl={nl}
-              visit={visit}
-              templates={templates}
-              signature={signature}
-              errors={errors}
-            />
-
-            <div className="flex items-center justify-between gap-3 border-t border-vtk-blue/10 pt-3">
-              <Button type="button" variant="ghost" size="sm" onClick={onEdit}>
-                {nl ? "Gegevens bewerken" : "Edit details"}
-              </Button>
-              <DeleteButton
-                action={deleteLesbezoekAction}
-                fields={{ id: visit.id }}
-                title={nl ? "Lesbezoek verwijderen?" : "Delete classroom visit?"}
-                description={
-                  nl
-                    ? "De aanvraag verdwijnt volledig, ook uit de kalender en het overzicht per organisatie. Wil je ze enkel afwijzen, gebruik dan hierboven de status: dan blijft ze bewaard met de reden erbij."
-                    : "The request disappears completely, including from the calendar and the per-organisation overview. To decline it instead, use the status above: it then stays on file with the reason."
-                }
-                confirmLabel={nl ? "Verwijderen" : "Delete"}
-                cancelLabel={nl ? "Annuleren" : "Cancel"}
-                successMessage={nl ? "Lesbezoek verwijderd." : "Classroom visit deleted."}
-              >
-                {nl ? "Lesbezoek verwijderen" : "Delete classroom visit"}
-              </DeleteButton>
+              <div className="rounded-2xl border border-vtk-blue/12 bg-white p-4 shadow-xs">
+                <h4 className="mb-2.5 text-xs font-bold uppercase tracking-wider text-[#5c667f]">
+                  {nl ? "Contactpersonen" : "Contacts"}
+                </h4>
+                <dl className="space-y-2.5 text-sm">
+                  <div>
+                    <dt className="text-xs text-[#5c667f]">{nl ? "Docent" : "Lecturer"}</dt>
+                    <dd className="font-medium text-vtk-ink">
+                      {visit.teacherName ? `${visit.teacherName} · ` : ""}
+                      <a
+                        className="text-vtk-ink underline underline-offset-2 hover:text-vtk-blue"
+                        href={`mailto:${visit.teacherEmail}`}
+                      >
+                        {visit.teacherEmail}
+                      </a>
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="text-xs text-[#5c667f]">{nl ? "Aanvrager" : "Requester"}</dt>
+                    <dd className="text-zinc-800">
+                      {visit.requesterName ?? "—"}
+                      {visit.requesterEmail && (
+                        <>
+                          {" · "}
+                          <a
+                            className="text-vtk-ink underline underline-offset-2 hover:text-vtk-blue"
+                            href={`mailto:${visit.requesterEmail}`}
+                          >
+                            {visit.requesterEmail}
+                          </a>
+                        </>
+                      )}
+                      {visit.requesterPhone && (
+                        <span className="text-[#5c667f]">{` · ${visit.requesterPhone}`}</span>
+                      )}
+                    </dd>
+                  </div>
+                </dl>
+              </div>
             </div>
-          </>
+
+            {/* Toelichting voor de docent */}
+            <div className="rounded-2xl border border-vtk-blue/12 bg-zinc-50/60 p-4">
+              <div className="mb-1.5 flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-[#5c667f]">
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="13"
+                  height="13"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+                </svg>
+                <span>{nl ? "Toelichting voor de docent" : "Note for the lecturer"}</span>
+              </div>
+              <p className="whitespace-pre-wrap rounded-xl border border-zinc-200/80 bg-white p-3 text-sm leading-relaxed text-zinc-800">
+                {visit.teacherNote}
+              </p>
+            </div>
+
+            {/* Visuele tijdlijn */}
+            <TimelineSteps nl={nl} visit={visit} />
+
+            {/* Antwoord verwerken */}
+            {canManage && (
+              <section className="rounded-2xl border border-vtk-blue/15 bg-white p-4 shadow-xs">
+                <div className="mb-3">
+                  <h3 className="font-semibold text-vtk-ink">
+                    {nl ? "Antwoord verwerken & Status bijwerken" : "Record outcome & update status"}
+                  </h3>
+                  <p className="text-xs text-[#5c667f]">
+                    {nl
+                      ? "Zet hier het antwoord van de docent. Bij een weigering is de reden verplicht: die gaat mee naar de aanvrager."
+                      : "Record the lecturer's response. A reason is required when declining: it goes into the reply to the requester."}
+                  </p>
+                </div>
+                <SaveForm
+                  action={reviewLesbezoekAction}
+                  submitLabel={nl ? "Status opslaan" : "Save status"}
+                  savingLabel={nl ? "Bezig…" : "Saving…"}
+                  savedMessage={nl ? "Status bijgewerkt." : "Status updated."}
+                  errorMessages={errors}
+                  fallbackErrorMessage={nl ? "Niet opgeslagen." : "Not saved."}
+                  resetOnSuccess={false}
+                  className="space-y-3"
+                >
+                  <input type="hidden" name="id" value={visit.id} />
+                  <div className="grid gap-3 sm:grid-cols-3">
+                    <div>
+                      <Label htmlFor={`status-${visit.id}`}>{nl ? "Status" : "Status"}</Label>
+                      <Select id={`status-${visit.id}`} name="status" defaultValue={visit.status}>
+                        {LESBEZOEK_STATUSES.map((status) => (
+                          <option key={status} value={status}>
+                            {LESBEZOEK_STATUS_META[status][nl ? "nl" : "en"]}
+                          </option>
+                        ))}
+                      </Select>
+                    </div>
+                    <div className="sm:col-span-2">
+                      <Label htmlFor={`reason-${visit.id}`}>
+                        {nl ? "Reden of toelichting bij besluit" : "Reason or remark"}
+                      </Label>
+                      <Textarea
+                        id={`reason-${visit.id}`}
+                        name="reviewNote"
+                        rows={2}
+                        defaultValue={visit.reviewNote ?? ""}
+                        placeholder={
+                          nl
+                            ? "bv. de docent laat dit semester geen lesbezoeken toe"
+                            : "e.g. the lecturer does not allow class visits this semester"
+                        }
+                      />
+                    </div>
+                  </div>
+                </SaveForm>
+              </section>
+            )}
+
+            {/* Acties onderaan */}
+            <div className="flex flex-wrap items-center justify-between gap-3 border-t border-vtk-blue/10 pt-3">
+              <div className="flex items-center gap-2">
+                <Button type="button" variant="ghost" size="sm" onClick={onEdit}>
+                  {nl ? "Gegevens bewerken" : "Edit details"}
+                </Button>
+                {canManage && (
+                  <DeleteButton
+                    action={deleteLesbezoekAction}
+                    fields={{ id: visit.id }}
+                    title={nl ? "Lesbezoek verwijderen?" : "Delete classroom visit?"}
+                    description={
+                      nl
+                        ? "De aanvraag verdwijnt volledig uit de kalender en het overzicht. Wil je ze enkel afwijzen, gebruik dan de status: dan blijft ze bewaard met de reden erbij."
+                        : "The request disappears completely. To decline it instead, use the status above: it stays on file with the reason."
+                    }
+                    confirmLabel={nl ? "Verwijderen" : "Delete"}
+                    cancelLabel={nl ? "Annuleren" : "Cancel"}
+                    successMessage={nl ? "Lesbezoek verwijderd." : "Classroom visit deleted."}
+                  >
+                    {nl ? "Verwijderen" : "Delete"}
+                  </DeleteButton>
+                )}
+              </div>
+
+              {canManage && (
+                <Button
+                  type="button"
+                  size="sm"
+                  onClick={() => setActiveTab("mail")}
+                  className="gap-1.5"
+                >
+                  <span>{nl ? "Mail opstellen" : "Compose email"}</span>
+                  <span aria-hidden="true">→</span>
+                </Button>
+              )}
+            </div>
+          </div>
+        ) : (
+          /* Mail Tab */
+          <MailComposer
+            nl={nl}
+            visit={visit}
+            templates={templateItems}
+            signature={signature}
+            errors={errors}
+            onBack={() => setActiveTab("details")}
+          />
         )}
       </div>
     </Modal>
@@ -217,9 +376,8 @@ export function LesbezoekInspector({
 }
 
 /**
- * Wat je moet weten vóór je iets doorstuurt: de bijzonderheden van deze professor
- * of dit vak, andere aanvragen bij dezelfde docent op dezelfde dag, en de notitie
- * bij de organisatie.
+ * Waarschuwingen: bijzonderheden van professor/vak, botsingen op dezelfde dag,
+ * notitie bij de organisatie.
  */
 function Warnings({ nl, visit }: { nl: boolean; visit: VisitView }) {
   if (
@@ -233,35 +391,259 @@ function Warnings({ nl, visit }: { nl: boolean; visit: VisitView }) {
   return (
     <div className="space-y-2">
       {visit.peculiarities.map((peculiarity) => (
-        <p key={peculiarity.id} className="lb-warn">
+        <div
+          key={peculiarity.id}
+          className="flex items-start gap-2.5 rounded-xl border border-amber-200 bg-amber-50/90 p-3 text-xs text-amber-900 leading-relaxed"
+        >
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="14"
+            height="14"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            className="mt-0.5 shrink-0 text-amber-600"
+          >
+            <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z" />
+            <line x1="12" y1="9" x2="12" y2="13" />
+            <line x1="12" y1="17" x2="12.01" y2="17" />
+          </svg>
           <span>
             <strong>{peculiarity.subject}:</strong> {peculiarity.note}
           </span>
-        </p>
+        </div>
       ))}
       {visit.clashes.length > 0 && (
-        <p className="lb-warn">
+        <div className="flex items-start gap-2.5 rounded-xl border border-amber-200 bg-amber-50/90 p-3 text-xs text-amber-900 leading-relaxed">
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="14"
+            height="14"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            className="mt-0.5 shrink-0 text-amber-600"
+          >
+            <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z" />
+            <line x1="12" y1="9" x2="12" y2="13" />
+            <line x1="12" y1="17" x2="12.01" y2="17" />
+          </svg>
           <span>
             <strong>{nl ? "Dezelfde docent, zelfde dag:" : "Same lecturer, same day:"}</strong>{" "}
             {visit.clashes
               .map((clash) => `${clash.organisation} (${clash.course}, ${clash.time})`)
               .join(" · ")}
           </span>
-        </p>
+        </div>
       )}
       {visit.organisationNote && (
-        <p className="lb-warn">
+        <div className="flex items-start gap-2.5 rounded-xl border border-vtk-blue/15 bg-vtk-blue-soft/50 p-3 text-xs text-vtk-ink leading-relaxed">
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="14"
+            height="14"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            className="mt-0.5 shrink-0 text-vtk-ink"
+          >
+            <circle cx="12" cy="12" r="10" />
+            <line x1="12" y1="16" x2="12" y2="12" />
+            <line x1="12" y1="8" x2="12.01" y2="8" />
+          </svg>
           <span>
             <strong>{visit.organisationName}:</strong> {visit.organisationNote}
           </span>
-        </p>
+        </div>
       )}
     </div>
   );
 }
 
-/** Wat er al gebeurd is. Vervangt de hulpkolommen "por mail gestuurd?" en "laten weten?". */
-function Timeline({ nl, visit }: { nl: boolean; visit: VisitView }) {
+/**
+ * "Het lesbezoek komt dichterbij, tijd voor een herinnering."
+ *
+ * De vraag ligt bij de docent, hij antwoordde nog niet, en het moment nadert.
+ * Dat is precies het punt waarop het in de Sheet misliep: niemand ziet dat een
+ * rij al drie weken op oranje staat tot het bezoek voorbij is. De knop springt
+ * meteen naar de mailopsteller, waar het herinneringssjabloon al klaarstaat.
+ */
+function NudgeBanner({
+  nl,
+  visit,
+  onCompose,
+}: {
+  nl: boolean;
+  visit: VisitView;
+  onCompose: () => void;
+}) {
+  return (
+    <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-amber-300 bg-amber-50 p-4">
+      <div className="flex items-start gap-2.5 text-sm leading-relaxed text-amber-900">
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          width="16"
+          height="16"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          className="mt-0.5 shrink-0 text-amber-600"
+        >
+          <path d="M10.268 21a2 2 0 0 0 3.464 0" />
+          <path d="M3.262 15.326A1 1 0 0 0 4 17h16a1 1 0 0 0 .74-1.673C19.41 13.956 18 12.499 18 8A6 6 0 0 0 6 8c0 4.499-1.411 5.956-2.738 7.326" />
+        </svg>
+        <span>
+          <strong>
+            {nl
+              ? "Het lesbezoek komt dichterbij, tijd voor een herinnering."
+              : "The class visit is coming up, time for a reminder."}
+          </strong>{" "}
+          {nl
+            ? `Het bezoek is ${nudgeCountdownLabel(visit.daysUntil, true)} en de docent antwoordde nog niet.`
+            : `The visit is ${nudgeCountdownLabel(visit.daysUntil, false)} and the lecturer has not replied yet.`}
+        </span>
+      </div>
+      <Button type="button" size="sm" onClick={onCompose}>
+        {nl ? "Herinnering opstellen" : "Compose reminder"}
+      </Button>
+    </div>
+  );
+}
+
+/** Visuele weergave van ingeplande mails met actieknoppen voor annuleren of direct verzenden. */
+function ScheduledMailBanner({
+  nl,
+  visit,
+  canManage,
+}: {
+  nl: boolean;
+  visit: VisitView;
+  canManage: boolean;
+}) {
+  if (!visit.scheduledMails || visit.scheduledMails.length === 0) return null;
+
+  return (
+    <div className="space-y-2.5">
+      {visit.scheduledMails.map((mail) => (
+        <div
+          key={mail.id}
+          className="rounded-2xl border border-indigo-200 bg-indigo-50/90 p-4 shadow-xs space-y-2.5"
+        >
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <span className="flex h-6 w-6 items-center justify-center rounded-full bg-indigo-600 text-white shadow-xs">
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="13"
+                  height="13"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <circle cx="12" cy="12" r="10" />
+                  <polyline points="12 6 12 12 16 14" />
+                </svg>
+              </span>
+              <div>
+                <h4 className="text-xs font-bold uppercase tracking-wider text-indigo-900">
+                  {nl ? "Mail ingepland voor verzending" : "Email scheduled for delivery"}
+                </h4>
+                <p className="text-xs text-indigo-700">
+                  {nl ? "Verzending gepland op: " : "Scheduled for: "}
+                  <strong className="font-semibold text-indigo-950">{mail.sendAtFormatted}</strong>
+                </p>
+              </div>
+            </div>
+            <span className="rounded-full bg-indigo-100 px-2.5 py-0.5 text-xs font-semibold text-indigo-800 border border-indigo-200">
+              {mail.kind === "professor"
+                ? nl
+                  ? "Vraag aan docent"
+                  : "Ask lecturer"
+                : mail.kind === "nudge"
+                  ? nl
+                    ? "Herinnering"
+                    : "Reminder"
+                  : nl
+                    ? "Terugkoppeling aanvrager"
+                    : "Reply requester"}
+            </span>
+          </div>
+
+          <div className="rounded-xl border border-indigo-100 bg-white/90 p-3 text-xs space-y-1 text-zinc-800">
+            <div>
+              <span className="font-semibold text-[#5c667f]">{nl ? "Ontvanger: " : "Recipient: "}</span>
+              <span className="font-mono text-zinc-900">{mail.to}</span>
+              {mail.cc && <span className="text-[#5c667f]"> (CC: {mail.cc})</span>}
+            </div>
+            {mail.bundledCount > 1 && (
+              <div className="text-[#5c667f]">
+                {nl
+                  ? `Deze ene mail gaat over ${mail.bundledCount} lesbezoeken. Annuleren of nu versturen doet dat voor alle ${mail.bundledCount}.`
+                  : `This single email covers ${mail.bundledCount} class visits. Cancelling or sending now applies to all ${mail.bundledCount}.`}
+              </div>
+            )}
+            <div>
+              <span className="font-semibold text-[#5c667f]">{nl ? "Onderwerp: " : "Subject: "}</span>
+              <span className="font-medium text-zinc-900">{mail.subject}</span>
+            </div>
+            <details className="mt-2 text-xs">
+              <summary className="cursor-pointer font-medium text-indigo-700 hover:text-indigo-900">
+                {nl ? "Voorvertoning van bericht tonen" : "Show message preview"}
+              </summary>
+              <p className="mt-1.5 whitespace-pre-wrap font-mono text-[12px] text-zinc-700 bg-zinc-50 p-2.5 rounded-lg border border-zinc-200/60 leading-relaxed max-h-40 overflow-y-auto">
+                {mail.body}
+              </p>
+            </details>
+          </div>
+
+          {canManage && (
+            <div className="flex flex-wrap items-center justify-end gap-2 pt-1">
+              <form action={cancelLesbezoekScheduledMailAction}>
+                <input type="hidden" name="id" value={mail.id} />
+                <Button
+                  type="submit"
+                  variant="ghost"
+                  size="sm"
+                  className="text-red-700 hover:bg-red-50 hover:text-red-800 text-xs"
+                >
+                  {nl ? "Planning annuleren" : "Cancel schedule"}
+                </Button>
+              </form>
+              <form action={sendNowLesbezoekScheduledMailAction}>
+                <input type="hidden" name="id" value={mail.id} />
+                <Button
+                  type="submit"
+                  size="sm"
+                  className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs"
+                >
+                  {nl ? "Nu direct verzenden" : "Send immediately now"}
+                </Button>
+              </form>
+            </div>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/** Visuele tijdlijn met duidelijke stappen. */
+function TimelineSteps({ nl, visit }: { nl: boolean; visit: VisitView }) {
   const fmt = new Intl.DateTimeFormat(nl ? "nl-BE" : "en-GB", {
     timeZone: "Europe/Brussels",
     day: "numeric",
@@ -269,72 +651,179 @@ function Timeline({ nl, visit }: { nl: boolean; visit: VisitView }) {
     hour: "2-digit",
     minute: "2-digit",
   });
-  const rows: [string, string | null][] = [
-    [nl ? "Aangevraagd" : "Requested", visit.createdAt],
-    [nl ? "Vraag naar de docent" : "Asked the lecturer", visit.professorMailedAt],
-    [nl ? "Herinnering gestuurd" : "Reminder sent", visit.professorNudgedAt],
-    [nl ? "Aanvrager verwittigd" : "Requester informed", visit.requesterNotifiedAt],
+
+  const scheduledProfMail = visit.scheduledMails?.find((m) => m.kind === "professor");
+  const scheduledNudgeMail = visit.scheduledMails?.find((m) => m.kind === "nudge");
+  const scheduledReqMail = visit.scheduledMails?.find((m) => m.kind === "requester");
+
+  const steps = [
+    {
+      label: nl ? "Aangevraagd" : "Requested",
+      done: true,
+      time: visit.createdAt ? fmt.format(new Date(visit.createdAt)) : null,
+      scheduled: false,
+    },
+    {
+      label: nl ? "Vraag naar docent" : "Asked lecturer",
+      done: Boolean(visit.professorMailedAt),
+      time: visit.professorMailedAt
+        ? fmt.format(new Date(visit.professorMailedAt))
+        : scheduledProfMail
+          ? `${nl ? "Gepland" : "Scheduled"}: ${scheduledProfMail.sendAtShort}`
+          : null,
+      scheduled: Boolean(!visit.professorMailedAt && scheduledProfMail),
+    },
+    {
+      label: nl ? "Herinnering" : "Reminder",
+      done: Boolean(visit.professorNudgedAt),
+      time: visit.professorNudgedAt
+        ? fmt.format(new Date(visit.professorNudgedAt))
+        : scheduledNudgeMail
+          ? `${nl ? "Gepland" : "Scheduled"}: ${scheduledNudgeMail.sendAtShort}`
+          : null,
+      optional: true,
+      scheduled: Boolean(!visit.professorNudgedAt && scheduledNudgeMail),
+    },
+    {
+      label: nl ? "Aanvrager verwittigd" : "Requester notified",
+      done: Boolean(visit.requesterNotifiedAt),
+      time: visit.requesterNotifiedAt
+        ? fmt.format(new Date(visit.requesterNotifiedAt))
+        : scheduledReqMail
+          ? `${nl ? "Gepland" : "Scheduled"}: ${scheduledReqMail.sendAtShort}`
+          : null,
+      scheduled: Boolean(!visit.requesterNotifiedAt && scheduledReqMail),
+    },
   ];
 
   return (
-    <dl className="lb-def">
-      {rows.map(([label, value]) => (
-        <div key={label} className="contents">
-          <dt>{label}</dt>
-          <dd className={value ? "" : "text-[#5c667f]"}>
-            {value ? fmt.format(new Date(value)) : nl ? "nog niet" : "not yet"}
-          </dd>
-        </div>
-      ))}
+    <div className="rounded-2xl border border-vtk-blue/12 bg-white p-4 shadow-xs">
+      <h4 className="mb-3 text-xs font-bold uppercase tracking-wider text-[#5c667f]">
+        {nl ? "Statusverloop & Tijdlijn" : "Timeline & Progress"}
+      </h4>
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+        {steps.map((step, idx) => (
+          <div
+            key={idx}
+            className={`rounded-xl border p-2.5 transition-all ${
+              step.done
+                ? "border-emerald-200 bg-emerald-50/70 text-emerald-950"
+                : step.scheduled
+                  ? "border-indigo-300 bg-indigo-50/80 text-indigo-950"
+                  : "border-zinc-200/70 bg-zinc-50/50 text-zinc-500"
+            }`}
+          >
+            <div className="flex items-center gap-1.5 text-xs font-semibold">
+              <span
+                className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-[10px] ${
+                  step.done
+                    ? "bg-emerald-600 text-white"
+                    : step.scheduled
+                      ? "bg-indigo-600 text-white"
+                      : "bg-zinc-200 text-zinc-500 font-normal"
+                }`}
+              >
+                {step.done ? (
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    width="9"
+                    height="9"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="3.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <polyline points="20 6 9 17 4 12" />
+                  </svg>
+                ) : step.scheduled ? (
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    width="9"
+                    height="9"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="3"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <circle cx="12" cy="12" r="10" />
+                    <polyline points="12 6 12 12 16 14" />
+                  </svg>
+                ) : (
+                  idx + 1
+                )}
+              </span>
+              <span className="truncate">{step.label}</span>
+            </div>
+            <div className="mt-1 text-[11px] text-[#5c667f] truncate">
+              {step.time ?? (nl ? "nog niet" : "not yet")}
+            </div>
+          </div>
+        ))}
+      </div>
+
       {visit.reviewedBy && (
-        <>
-          <dt>{nl ? "Verwerkt door" : "Handled by"}</dt>
-          <dd>
-            {visit.reviewedBy}
-            {visit.reviewedAt ? ` · ${fmt.format(new Date(visit.reviewedAt))}` : ""}
-          </dd>
-        </>
+        <div className="mt-2.5 text-right text-xs text-[#5c667f]">
+          {nl ? "Verwerkt door" : "Handled by"}:{" "}
+          <strong className="text-vtk-ink">{visit.reviewedBy}</strong>
+          {visit.reviewedAt ? ` (${fmt.format(new Date(visit.reviewedAt))})` : ""}
+        </div>
       )}
-    </dl>
+    </div>
   );
 }
 
-/**
- * De mailopsteller: het sjabloon wordt ingevuld en in een bewerkbaar veld gezet,
- * zodat wie verstuurt hem eerst leest.
- *
- * Dat is bewust een stap trager dan de mailmerge die dit vervangt. Die stuurde
- * een rij tegelijk naar een professor zonder dat iemand de tekst nog zag, en een
- * fout in het sjabloon vertrok dan honderd keer.
- */
+/** De mailopsteller met sjabloonselectie, uitgesteld verzenden/plannen en live voorvertoning. */
 function MailComposer({
   nl,
   visit,
   templates,
   signature,
   errors,
+  onBack,
 }: {
   nl: boolean;
   visit: VisitView;
-  templates: LesbezoekTemplates;
+  templates: LesbezoekTemplateItem[];
   signature: string;
   errors: Record<string, string>;
+  onBack: () => void;
 }) {
-  const suggested = suggestedKind(visit.status);
-  const [kind, setKind] = useState<MailKind>(suggested);
   const [lang, setLang] = useState<"nl" | "en">(visit.teacherLocale);
+  const defaultId = useMemo(
+    () => suggestedTemplateId(visit, lang),
+    [visit, lang],
+  );
 
-  // De keuze volgt de status zodra die verandert. Zonder dit blijft het paneel na
-  // een goedkeuring op "herinnering aan de docent" staan, want de beginwaarde van
-  // `useState` loopt maar één keer en het detailpaneel blijft ondertussen open.
-  // Een eigen keuze blijft wel staan tot de status opnieuw wijzigt.
-  const [suggestedFor, setSuggestedFor] = useState<LesbezoekStatusCode>(visit.status);
-  if (suggestedFor !== visit.status) {
-    setSuggestedFor(visit.status);
-    setKind(suggested);
-  }
+  const [selectedId, setSelectedId] = useState<string>(() => {
+    const exists = templates.some((t) => t.id === defaultId);
+    return exists ? defaultId : templates[0]?.id ?? "professorShortNl";
+  });
 
-  const template = useMemo(() => {
+  const selectedTemplate = useMemo(() => {
+    return (
+      templates.find((t) => t.id === selectedId) ??
+      templates[0] ?? {
+        id: "default",
+        name: "Sjabloon",
+        subject: "",
+        body: "",
+        category: "professor",
+        lang: "nl",
+      }
+    );
+  }, [templates, selectedId]);
+
+  // Afleiden wie de ontvanger is op basis van de sjablooncategorie
+  const isRequester =
+    selectedTemplate.category === "requester" ||
+    selectedId.toLowerCase().includes("requester");
+  const recipient = isRequester ? visit.requesterEmail : visit.teacherEmail;
+
+  const rendered = useMemo(() => {
     const vars = mailVarsFor(
       {
         teacherName: visit.teacherName,
@@ -348,104 +837,334 @@ function MailComposer({
         mailDate: visit.mailDate,
         mailTime: visit.mailTime,
       },
-      kind === "requester" ? "nl" : lang,
+      lang,
       signature,
     );
 
-    const key =
-      kind === "professor"
-        ? professorTemplateKey(visit.longVisit, lang)
-        : kind === "nudge"
-          ? nudgeTemplateKey(lang)
-          : visit.status === "APPROVED"
-            ? "requesterApproved"
-            : "requesterDeclined";
+    return renderMailTemplate(selectedTemplate, vars);
+  }, [selectedTemplate, lang, signature, visit]);
 
-    return renderMailTemplate(templates[key], vars);
-  }, [kind, lang, signature, templates, visit]);
+  const kind =
+    selectedTemplate.category === "nudge" || selectedId.toLowerCase().includes("nudge")
+      ? "nudge"
+      : isRequester
+        ? "requester"
+        : "professor";
 
-  const recipient = kind === "requester" ? visit.requesterEmail : visit.teacherEmail;
+  // Planningsmodus: "scheduled" vs "instant"
+  const presets = useMemo(() => getSchedulePresets(new Date()), []);
+  const [sendMode, setSendMode] = useState<"scheduled" | "instant">("scheduled");
+  const [selectedPresetId, setSelectedPresetId] = useState<string>(presets[0]?.id ?? "tomorrow_0800");
+
+  const [customDate, setCustomDate] = useState<string>(() => presets[0]?.dateStr ?? "");
+  const [customTime, setCustomTime] = useState<string>(() => presets[0]?.timeStr ?? "08:00");
+
+  const activeSendDate = selectedPresetId === "custom"
+    ? customDate
+    : (presets.find((p) => p.id === selectedPresetId)?.dateStr ?? customDate);
+  const activeSendTime = selectedPresetId === "custom"
+    ? customTime
+    : (presets.find((p) => p.id === selectedPresetId)?.timeStr ?? customTime);
+
+  const activePreset = presets.find((p) => p.id === selectedPresetId);
+  const activeMomentLabel = activePreset
+    ? (nl ? activePreset.labelNl : activePreset.labelEn)
+    : `${activeSendDate} ${activeSendTime}`;
 
   return (
-    <section className="rounded-2xl border border-vtk-blue/15 p-4">
-      <h3 className="mb-1 font-semibold text-vtk-ink">{nl ? "Mail versturen" : "Send an email"}</h3>
-      <p className="mb-3 text-sm text-[#5c667f]">
-        {nl
-          ? "Het sjabloon staat ingevuld klaar. Lees hem na en pas aan waar nodig; wat hier staat is wat er vertrekt."
-          : "The template is filled in for you. Read it over and adjust where needed; what you see here is what goes out."}
-      </p>
+    <section className="rounded-2xl border border-vtk-blue/15 bg-white p-4 shadow-xs space-y-4">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-vtk-blue/10 pb-3">
+        <div>
+          <h3 className="font-semibold text-vtk-ink">{nl ? "Mail opstellen & Plannen" : "Compose & Schedule email"}</h3>
+          <p className="text-xs text-[#5c667f]">
+            {nl
+              ? "Kies een sjabloon, pas de tekst aan en kies wanneer de mail verzonden moet worden."
+              : "Pick a template, edit the text and choose when the email should be sent."}
+          </p>
+        </div>
+        <Button type="button" variant="ghost" size="sm" onClick={onBack}>
+          ← {nl ? "Terug naar overzicht" : "Back to overview"}
+        </Button>
+      </div>
 
-      <div className="mb-3 flex flex-wrap gap-3">
-        <div className="min-w-[12rem] flex-1">
-          <Label htmlFor={`kind-${visit.id}`}>{nl ? "Welke mail" : "Which email"}</Label>
+      <div className="grid gap-3 sm:grid-cols-3">
+        <div className="sm:col-span-2">
+          <Label htmlFor={`tpl-picker-${visit.id}`}>{nl ? "Kies sjabloon" : "Choose template"}</Label>
           <Select
-            id={`kind-${visit.id}`}
-            value={kind}
-            onChange={(event) => setKind(event.target.value as MailKind)}
+            id={`tpl-picker-${visit.id}`}
+            value={selectedId}
+            onChange={(e) => setSelectedId(e.target.value)}
           >
-            <option value="professor">
-              {nl ? "Vraag aan de docent" : "Request to the lecturer"}
-            </option>
-            <option value="nudge">{nl ? "Herinnering aan de docent" : "Reminder to the lecturer"}</option>
-            <option value="requester">
-              {nl ? "Terugkoppeling naar de aanvrager" : "Reply to the requester"}
-            </option>
+            {templates.map((t) => (
+              <option key={t.id} value={t.id}>
+                {t.name}
+              </option>
+            ))}
           </Select>
         </div>
-        {kind !== "requester" && (
-          <div className="w-40">
-            <Label htmlFor={`lang-${visit.id}`}>{nl ? "Taal" : "Language"}</Label>
-            <Select
-              id={`lang-${visit.id}`}
-              value={lang}
-              onChange={(event) => setLang(event.target.value as "nl" | "en")}
+        <div>
+          <Label htmlFor={`lang-picker-${visit.id}`}>{nl ? "Taal / Datumformaat" : "Language"}</Label>
+          <Select
+            id={`lang-picker-${visit.id}`}
+            value={lang}
+            onChange={(e) => setLang(e.target.value as "nl" | "en")}
+          >
+            <option value="nl">Nederlands</option>
+            <option value="en">English</option>
+          </Select>
+        </div>
+      </div>
+
+      <div className="rounded-xl border border-vtk-blue/10 bg-zinc-50 p-3 text-xs flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <span className="font-semibold text-[#5c667f]">{nl ? "Ontvanger: " : "Recipient: "}</span>
+          <span className="font-mono font-medium text-vtk-ink">
+            {recipient || (nl ? "(geen e-mailadres beschikbaar)" : "(no email available)")}
+          </span>
+          {isRequester && visit.organisationNote && (
+            <span className="text-[#5c667f]"> · {nl ? "CC organisatie" : "CC organisation"}</span>
+          )}
+        </div>
+        <div className="text-[#5c667f]">
+          {nl ? "Type actie: " : "Action: "}
+          <span className="font-semibold text-vtk-ink">
+            {kind === "professor"
+              ? nl
+                ? "Vraag aan docent"
+                : "Ask lecturer"
+              : kind === "nudge"
+                ? nl
+                  ? "Herinnering"
+                  : "Reminder"
+                : nl
+                  ? "Terugkoppeling aanvrager"
+                  : "Reply requester"}
+          </span>
+        </div>
+      </div>
+
+      {/* Verzendtijdstip / Planningsopties */}
+      <div className="rounded-2xl border border-vtk-blue/15 bg-zinc-50/70 p-4 space-y-3">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <Label className="text-xs font-bold uppercase tracking-wider text-[#5c667f] mb-0">
+            {nl ? "Verzendtijdstip" : "Sending time"}
+          </Label>
+          <div className="inline-flex rounded-full border border-vtk-blue/15 bg-white p-0.5">
+            <button
+              type="button"
+              onClick={() => setSendMode("scheduled")}
+              className={`rounded-full px-3 py-1 text-xs font-semibold transition-all flex items-center gap-1.5 ${
+                sendMode === "scheduled"
+                  ? "bg-indigo-600 text-white shadow-xs"
+                  : "text-[#5c667f] hover:text-vtk-ink"
+              }`}
             >
-              <option value="nl">Nederlands</option>
-              <option value="en">English</option>
-            </Select>
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="12"
+                height="12"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <circle cx="12" cy="12" r="10" />
+                <polyline points="12 6 12 12 16 14" />
+              </svg>
+              <span>{nl ? "Inplannen (Aanbevolen)" : "Schedule (Recommended)"}</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setSendMode("instant")}
+              className={`rounded-full px-3 py-1 text-xs font-semibold transition-all flex items-center gap-1.5 ${
+                sendMode === "instant"
+                  ? "bg-vtk-ink text-white shadow-xs"
+                  : "text-[#5c667f] hover:text-vtk-ink"
+              }`}
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="12"
+                height="12"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
+              </svg>
+              <span>{nl ? "Direct versturen" : "Send immediately"}</span>
+            </button>
+          </div>
+        </div>
+
+        {sendMode === "scheduled" ? (
+          <div className="space-y-3 pt-1">
+            <p className="text-xs text-[#5c667f]">
+              {nl
+                ? "Mails naar professoren worden bij voorkeur tijdens kantooruren verzonden. Kies een preset of stel zelf een moment in."
+                : "Emails to lecturers are preferably sent during working hours. Choose a preset or specify a custom time."}
+            </p>
+
+            <div className="flex flex-wrap gap-2">
+              {presets.map((p) => {
+                const active = selectedPresetId === p.id;
+                return (
+                  <button
+                    key={p.id}
+                    type="button"
+                    onClick={() => setSelectedPresetId(p.id)}
+                    className={`rounded-full border px-3.5 py-1.5 text-xs font-medium transition-all ${
+                      active
+                        ? "border-indigo-600 bg-indigo-50 text-indigo-900 font-semibold shadow-xs"
+                        : "border-zinc-200 bg-white text-zinc-700 hover:border-zinc-300"
+                    }`}
+                  >
+                    {nl ? p.labelNl : p.labelEn}
+                  </button>
+                );
+              })}
+              <button
+                type="button"
+                onClick={() => setSelectedPresetId("custom")}
+                className={`rounded-full border px-3.5 py-1.5 text-xs font-medium transition-all ${
+                  selectedPresetId === "custom"
+                    ? "border-indigo-600 bg-indigo-50 text-indigo-900 font-semibold shadow-xs"
+                    : "border-zinc-200 bg-white text-zinc-700 hover:border-zinc-300"
+                }`}
+              >
+                {nl ? "Aangepast moment…" : "Custom time…"}
+              </button>
+            </div>
+
+            {selectedPresetId === "custom" && (
+              <div className="grid gap-3 pt-1 sm:grid-cols-2 rounded-xl border border-indigo-100 bg-white p-3">
+                <div>
+                  <Label htmlFor={`send-date-${visit.id}`}>{nl ? "Verzenddatum" : "Send date"}</Label>
+                  <Input
+                    id={`send-date-${visit.id}`}
+                    type="date"
+                    value={customDate}
+                    onChange={(e) => setCustomDate(e.target.value)}
+                    required
+                  />
+                </div>
+                <div>
+                  <Label htmlFor={`send-time-${visit.id}`}>{nl ? "Verzenduurtijd (Brussel-tijd)" : "Send time"}</Label>
+                  <Input
+                    id={`send-time-${visit.id}`}
+                    type="time"
+                    value={customTime}
+                    onChange={(e) => setCustomTime(e.target.value)}
+                    required
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className="flex items-center gap-2 text-xs text-amber-900 bg-amber-50/80 border border-amber-200 p-2.5 rounded-xl">
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className="shrink-0 text-amber-600"
+            >
+              <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z" />
+              <line x1="12" y1="9" x2="12" y2="13" />
+              <line x1="12" y1="17" x2="12.01" y2="17" />
+            </svg>
+            <span>
+              {nl
+                ? "De mail wordt meteen bij het klikken verstuurd naar de ontvanger."
+                : "The email will be delivered immediately upon clicking send."}
+            </span>
           </div>
         )}
       </div>
 
       {recipient ? (
-        <SaveForm
-          // De sleutel dwingt een verse render van de niet-gecontroleerde velden
-          // wanneer je van sjabloon of taal wisselt; anders blijft de vorige tekst
-          // staan en verstuur je de Engelse mail met de Nederlandse aanhef.
-          key={`${kind}-${lang}`}
-          action={sendLesbezoekMailAction}
-          submitLabel={nl ? `Versturen naar ${recipient}` : `Send to ${recipient}`}
-          savingLabel={nl ? "Versturen…" : "Sending…"}
-          savedMessage={nl ? "Mail verstuurd." : "Email sent."}
-          errorMessages={errors}
-          fallbackErrorMessage={nl ? "Niet verstuurd." : "Not sent."}
-          resetOnSuccess={false}
-          className="space-y-3"
-        >
-          <input type="hidden" name="id" value={visit.id} />
-          <input type="hidden" name="kind" value={kind} />
-          <div>
-            <Label htmlFor={`subject-${visit.id}`}>{nl ? "Onderwerp" : "Subject"}</Label>
-            <Input id={`subject-${visit.id}`} name="subject" defaultValue={template.subject} />
-          </div>
-          <div>
-            <Label htmlFor={`body-${visit.id}`}>{nl ? "Bericht" : "Message"}</Label>
-            <Textarea
-              id={`body-${visit.id}`}
-              name="body"
-              rows={12}
-              defaultValue={template.body}
-              className="font-mono text-[13px]"
-            />
-          </div>
-        </SaveForm>
+        sendMode === "scheduled" ? (
+          <SaveForm
+            key={`${selectedId}-${lang}-scheduled-${selectedPresetId}-${activeSendDate}-${activeSendTime}`}
+            action={scheduleLesbezoekMailAction}
+            submitLabel={nl ? `Inplannen voor ${activeMomentLabel}` : `Schedule for ${activeMomentLabel}`}
+            savingLabel={nl ? "Inplannen…" : "Scheduling…"}
+            savedMessage={nl ? "Mail ingepland." : "Email scheduled."}
+            errorMessages={errors}
+            fallbackErrorMessage={nl ? "Niet ingepland." : "Not scheduled."}
+            resetOnSuccess={false}
+            className="space-y-3"
+          >
+            <input type="hidden" name="id" value={visit.id} />
+            <input type="hidden" name="kind" value={kind} />
+            <input type="hidden" name="sendAtDate" value={activeSendDate} />
+            <input type="hidden" name="sendAtTime" value={activeSendTime} />
+            <div>
+              <Label htmlFor={`subject-${visit.id}`}>{nl ? "Onderwerp" : "Subject"}</Label>
+              <Input id={`subject-${visit.id}`} name="subject" defaultValue={rendered.subject} required />
+            </div>
+            <div>
+              <Label htmlFor={`body-${visit.id}`}>{nl ? "Bericht" : "Message"}</Label>
+              <Textarea
+                id={`body-${visit.id}`}
+                name="body"
+                rows={11}
+                defaultValue={rendered.body}
+                className="font-mono text-[13px] leading-relaxed"
+                required
+              />
+            </div>
+          </SaveForm>
+        ) : (
+          <SaveForm
+            key={`${selectedId}-${lang}-instant`}
+            action={sendLesbezoekMailAction}
+            submitLabel={nl ? `Direct versturen naar ${recipient}` : `Send immediately to ${recipient}`}
+            savingLabel={nl ? "Versturen…" : "Sending…"}
+            savedMessage={nl ? "Mail verstuurd." : "Email sent."}
+            errorMessages={errors}
+            fallbackErrorMessage={nl ? "Niet verstuurd." : "Not sent."}
+            resetOnSuccess={false}
+            className="space-y-3"
+          >
+            <input type="hidden" name="id" value={visit.id} />
+            <input type="hidden" name="kind" value={kind} />
+            <div>
+              <Label htmlFor={`subject-${visit.id}`}>{nl ? "Onderwerp" : "Subject"}</Label>
+              <Input id={`subject-${visit.id}`} name="subject" defaultValue={rendered.subject} required />
+            </div>
+            <div>
+              <Label htmlFor={`body-${visit.id}`}>{nl ? "Bericht" : "Message"}</Label>
+              <Textarea
+                id={`body-${visit.id}`}
+                name="body"
+                rows={11}
+                defaultValue={rendered.body}
+                className="font-mono text-[13px] leading-relaxed"
+                required
+              />
+            </div>
+          </SaveForm>
+        )
       ) : (
-        <p className="text-sm text-[#5c667f]">
+        <p className="rounded-xl border border-dashed border-amber-300 bg-amber-50 p-4 text-center text-sm text-amber-800">
           {nl
-            ? "Er staat geen adres van de aanvrager bij deze aanvraag, dus er valt niets terug te koppelen."
-            : "This request has no requester address, so there is nobody to reply to."}
+            ? "Er staat geen e-mailadres bij deze aanvraag voor deze ontvanger, dus er kan geen mail worden verstuurd."
+            : "No email address is available for this recipient, so no email can be sent."}
         </p>
       )}
     </section>
   );
 }
+

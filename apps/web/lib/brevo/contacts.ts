@@ -51,13 +51,13 @@ export type SyncUserData = {
 };
 
 /**
- * Basis-geschiktheid: enkel actieve leden die hun studie dit werkingsjaar
+ * Basis-geschiktheid: enkel actieve leden die hun studie dit academiejaar
  * bevestigden en nog studeren. Faalt dit, dan hoort het lid in géén enkele lijst
  * en wordt het overal uit verwijderd. Spiegelt de eerste drie filters van
  * `listWhere()`.
  */
-export function isEligible(user: SyncUserData, workingYear: number): boolean {
-  return user.active && user.studyConfirmedYear === workingYear && !user.notStudying;
+export function isEligible(user: SyncUserData, studyYear: number): boolean {
+  return user.active && user.studyConfirmedYear === studyYear && !user.notStudying;
 }
 
 /**
@@ -65,8 +65,8 @@ export function isEligible(user: SyncUserData, workingYear: number): boolean {
  * categorieën enkel wie ze aanvinkte; Career bovendien enkel faculteitsstudenten
  * (`notAtFaculty === false`), net als in `listWhere("CAREER")`.
  */
-export function desiredListKeys(user: SyncUserData, workingYear: number): BrevoListKey[] {
-  if (!isEligible(user, workingYear)) return [];
+export function desiredListKeys(user: SyncUserData, studyYear: number): BrevoListKey[] {
+  if (!isEligible(user, studyYear)) return [];
   const keys: BrevoListKey[] = [ALL_STUDENTS_KEY];
   for (const category of user.mailCategories) {
     if (category === "CAREER" && user.notAtFaculty) continue;

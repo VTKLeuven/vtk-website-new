@@ -10,7 +10,7 @@ import { prisma } from "@vtk/db";
 import { newStorageKey, putObject, deleteObject } from "@vtk/storage";
 import { requireSession } from "@/lib/session";
 import { saveError, saveOk, type SaveState } from "@/lib/saveState";
-import { currentWorkingYear } from "@/lib/workingYear";
+import { currentStudyYear } from "@/lib/workingYear";
 import { fullName } from "@vtk/auth";
 import {
   MAIL_CATEGORIES,
@@ -36,6 +36,22 @@ const studySchema = {
   notStudying: z.boolean().default(false),
   internationalStudent: z.boolean().default(false),
   alumni: z.boolean().default(false),
+  // Het afstudeerjaar komt als tekst binnen en mag leeg blijven. De ondergrens
+  // is het stichtingsjaar van VTK; de bovengrens loopt mee, want wie in juni
+  // afstudeert vult dat in september als "vorig jaar" in en wie zijn laatste
+  // examen nog moet doen denkt al aan volgend jaar.
+  graduationYear: z
+    .string()
+    .trim()
+    .refine((v) => {
+      if (v === "") return true;
+      if (!/^\d{4}$/.test(v)) return false;
+      const year = Number(v);
+      return year >= 1920 && year <= new Date().getFullYear() + 1;
+    })
+    .default(""),
+  wasInVtk: z.boolean().default(false),
+  alumniMailOptIn: z.boolean().default(false),
 };
 
 /**
@@ -58,6 +74,42 @@ function studyFields(formData: FormData) {
     notStudying: formData.get("notStudying") === "on",
     internationalStudent: formData.get("internationalStudent") === "on",
     alumni: formData.get("alumni") === "on",
+    graduationYear: String(formData.get("graduationYear") ?? ""),
+    wasInVtk: formData.get("wasInVtk") === "on",
+    alumniMailOptIn: formData.get("alumniMailOptIn") === "on",
+  };
+}
+
+/**
+ * De studievelden in de vorm waarin Prisma ze wil. Gedeeld door het
+ * profielformulier en de jaarlijkse bevestiging, zodat een nieuw veld niet in
+ * één van de twee vergeten wordt.
+ *
+ * De alumni-vervolgvelden worden gewist zodra "ik ben alumnus" uitgaat: het
+ * formulier toont ze dan niet meer, dus laten staan zou betekenen dat een
+ * afstudeerjaar blijft hangen bij iemand die zegt geen alumnus te zijn.
+ */
+function studyUpdate(data: {
+  studyYears: readonly (typeof STUDY_YEARS)[number][];
+  studyProgrammes: readonly (typeof STUDY_PROGRAMMES)[number][];
+  notAtFaculty: boolean;
+  notStudying: boolean;
+  internationalStudent: boolean;
+  alumni: boolean;
+  graduationYear: string;
+  wasInVtk: boolean;
+  alumniMailOptIn: boolean;
+}) {
+  return {
+    studyYears: { set: [...data.studyYears] },
+    studyProgrammes: { set: [...data.studyProgrammes] },
+    notAtFaculty: data.notAtFaculty,
+    notStudying: data.notStudying,
+    internationalStudent: data.internationalStudent,
+    alumni: data.alumni,
+    graduationYear: data.alumni && data.graduationYear ? Number(data.graduationYear) : null,
+    wasInVtk: data.alumni ? data.wasInVtk : false,
+    alumniMailOptIn: data.alumni ? data.alumniMailOptIn : false,
   };
 }
 
@@ -91,6 +143,7 @@ const profileSchema = z.object({
   mailCategories: z.array(z.enum(MAIL_CATEGORIES)).default([]),
   shiftReminderDayBefore: z.boolean(),
   shiftReminderSoon: z.boolean(),
+  calendarOnlyMyAudiences: z.boolean().default(false),
   ...studySchema,
 });
 
@@ -154,6 +207,7 @@ export async function saveProfileAction(
     mailCategories: formData.getAll("mailCategories"),
     shiftReminderDayBefore: formData.get("shiftReminderDayBefore") !== null,
     shiftReminderSoon: formData.get("shiftReminderSoon") !== null,
+    calendarOnlyMyAudiences: formData.get("calendarOnlyMyAudiences") === "on",
     ...studyFields(formData),
   });
 
@@ -207,15 +261,11 @@ export async function saveProfileAction(
         mailCategories: { set: data.mailCategories },
         shiftReminderDayBefore: data.shiftReminderDayBefore,
         shiftReminderSoon: data.shiftReminderSoon,
-        studyYears: { set: data.studyYears },
-        studyProgrammes: { set: data.studyProgrammes },
-        notAtFaculty: data.notAtFaculty,
-        notStudying: data.notStudying,
-        internationalStudent: data.internationalStudent,
-        alumni: data.alumni,
+        calendarOnlyMyAudiences: data.calendarOnlyMyAudiences,
+        ...studyUpdate(data),
         // Wie dit formulier invult, declareert daarmee zijn studie voor dit
-        // werkingsjaar; de bevestigingsgate hoeft er dan niet meer op te vallen.
-        studyConfirmedYear: currentWorkingYear(),
+        // academiejaar; de bevestigingsgate hoeft er dan niet meer op te vallen.
+        studyConfirmedYear: currentStudyYear(),
         ...(newAvatarKey ? { avatarKey: newAvatarKey } : {}),
         // Stamp completion only once; account edits keep the original timestamp.
         ...(wasOnboarded ? {} : { onboardedAt: new Date() }),
@@ -262,10 +312,9 @@ export async function saveProfileAction(
 const confirmStudySchema = z.object(studySchema);
 
 /**
- * Jaarlijkse bevestiging van het studieprofiel (zie de gate in
- * `app/[locale]/layout.tsx`). Zet `studyConfirmedYear` op het huidige
- * werkingsjaar, waardoor het lid weer als actief student telt en dus opnieuw in
- * de mailinglijsten komt.
+ * Jaarlijkse bevestiging van het studieprofiel (zie de gate in `proxy.ts`). Zet
+ * `studyConfirmedYear` op het huidige academiejaar, waardoor het lid weer als
+ * actief student telt en dus opnieuw in de mailinglijsten komt.
  *
  * Bewust géén aparte "bevestigd zonder wijziging"-flow: het formulier post altijd
  * de volledige studiekeuze, of ze nu gewijzigd is of niet.
@@ -278,13 +327,8 @@ export async function confirmStudyAction(formData: FormData): Promise<void> {
   await prisma.user.update({
     where: { id: session.user.id },
     data: {
-      studyYears: { set: parsed.data.studyYears },
-      studyProgrammes: { set: parsed.data.studyProgrammes },
-      notAtFaculty: parsed.data.notAtFaculty,
-      notStudying: parsed.data.notStudying,
-      internationalStudent: parsed.data.internationalStudent,
-      alumni: parsed.data.alumni,
-      studyConfirmedYear: currentWorkingYear(),
+      ...studyUpdate(parsed.data),
+      studyConfirmedYear: currentStudyYear(),
     },
   });
 

@@ -38,7 +38,7 @@ export function CategoryForm({
   return (
     <SaveForm
       action={saveCalendarCategoryAction}
-      className="grid grid-cols-1 items-end gap-3 md:grid-cols-[1fr_1fr_1fr_auto_5rem_10rem_auto] [&>button]:justify-self-start"
+      className="grid grid-cols-1 items-end gap-3 md:grid-cols-[1fr_1fr_1fr_auto_10rem_auto] [&>button]:justify-self-start"
       submitLabel={
         category
           ? nl
@@ -104,10 +104,6 @@ export function CategoryForm({
           defaultValue={category?.colour ?? "#5C667F"}
           className="h-10 w-14 cursor-pointer rounded-lg border border-vtk-blue/15 bg-white p-1"
         />
-      </div>
-      <div>
-        <Label>{nl ? "Volgorde" : "Order"}</Label>
-        <Input name="order" type="number" min={0} max={999} defaultValue={category?.order ?? 0} />
       </div>
       {kind === "audience" ? (
         <div>

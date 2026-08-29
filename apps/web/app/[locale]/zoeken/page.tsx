@@ -5,7 +5,7 @@ import { notFound } from "next/navigation";
 import { getDictionary, type Locale } from "@vtk/i18n";
 import { SiteSearchForm } from "@/components/site/SiteSearchForm";
 import { TrackEmptySearch } from "./TrackEmptySearch";
-import { viewerAudiences } from "@/lib/calendar/audience";
+import { viewerAudienceFilter } from "@/lib/calendar/audience";
 import { hasLocale } from "@/lib/locale";
 import { OUTBOUND_EVENT, outboundHost, umamiEvent } from "@/lib/analytics";
 import { RESULT_LIMIT, isExternalResult, type SearchResult } from "@/lib/search";
@@ -77,11 +77,14 @@ export default async function SearchPage({ params, searchParams }: PageProps) {
   // `searchSite` zelf, zodat het invoerveld en de query dezelfde tekst zien.
   const raw = Array.isArray(q) ? q[0] : q;
 
-  const [audiences, session] = await Promise.all([viewerAudiences(), getCurrentSession()]);
+  const [audienceWhere, session] = await Promise.all([
+    viewerAudienceFilter(),
+    getCurrentSession(),
+  ]);
   const { query, searched, results } = await searchSite({
     query: raw,
     locale,
-    audiences,
+    audienceWhere,
     // Materiaal uit de uitleendienst enkel voor wie ingelogd is; de catalogus
     // zelf zit ook achter een login.
     signedIn: session !== null,

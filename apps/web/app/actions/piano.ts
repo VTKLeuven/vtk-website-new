@@ -215,7 +215,6 @@ export async function savePianoWindowAction(
     startDate,
     endDate,
     active: formData.get("active") === "on",
-    order: parseIntField(formData.get("order"), 0),
   };
 
   const id = formData.get("id");
@@ -229,7 +228,13 @@ export async function savePianoWindowAction(
       summary: describeWindow(data),
     });
   } else {
-    const created = await prisma.pianoWindow.create({ data });
+    const last = await prisma.pianoWindow.findFirst({
+      orderBy: { order: "desc" },
+      select: { order: true },
+    });
+    const created = await prisma.pianoWindow.create({
+      data: { ...data, order: (last?.order ?? -1) + 1 },
+    });
     await logAudit({
       action: "create",
       entity: "piano",
@@ -241,6 +246,25 @@ export async function savePianoWindowAction(
 
   revalidatePiano();
   return saveOk();
+}
+
+export async function reorderPianoWindowsAction(ids: string[]): Promise<void> {
+  await requirePermission("piano.manage");
+  await prisma.$transaction(
+    ids.map((id, index) =>
+      prisma.pianoWindow.update({
+        where: { id },
+        data: { order: index },
+      })
+    )
+  );
+  await logAudit({
+    action: "reorder",
+    entity: "piano",
+    target: `${ids.length} pianovensters`,
+    summary: "volgorde van pianovensters gewijzigd",
+  });
+  revalidatePiano();
 }
 
 export async function deletePianoWindowAction(formData: FormData): Promise<void> {

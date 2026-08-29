@@ -1,0 +1,15 @@
+-- De jaarlijkse studiebevestiging kantelt voortaan op 27 september (het
+-- academiejaar) in plaats van op 15 juli (het werkingsjaar). Zie
+-- `currentStudyYear()` in packages/auth/src/lib/workingYear.ts.
+--
+-- Enkel data, geen schemawijziging. Wie sinds 15 juli 2026 bevestigde, kreeg
+-- 2026 gestempeld terwijl in de praktijk het studiejaar van 25-26 aangeduid
+-- werd: het academiejaar 25-26 liep toen nog. Die stempel hoort dus bij 25-26,
+-- en zo krijgt iedereen op 27 september 2026 de bevestiging opnieuw, op het
+-- moment dat het antwoord wel klopt.
+--
+-- Tot die datum blijft `currentStudyYear()` 2025 teruggeven, dus deze update
+-- gate niemand en houdt ze de mailinglijsten intact. 2026 is het eerste
+-- getrackte jaar (FIRST_WORKING_YEAR), dus er kan geen oudere, terechte
+-- bevestiging van 26-27 bestaan die we hiermee zouden terugdraaien.
+UPDATE "User" SET "studyConfirmedYear" = 2025 WHERE "studyConfirmedYear" = 2026;

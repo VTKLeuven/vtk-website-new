@@ -548,6 +548,40 @@
   text-align: left;
   padding: 0;
   font: inherit;
+}
+
+/* Met een selectievakje erbij: rail, vakje, en dan pas de knop die opent. Het
+   vakje staat buiten die knop, want een checkbox in een button is geen geldige
+   HTML en een klik erop zou dan ook het paneel openen. */
+.lb-item[data-select] {
+  grid-template-columns: 4px auto minmax(0, 1fr);
+  gap: 0 10px;
+}
+
+.lb-item-check {
+  display: flex;
+  align-items: center;
+  padding-left: 4px;
+  cursor: pointer;
+}
+
+.lb-item-check input {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--navy);
+  cursor: pointer;
+}
+
+.lb-item-open {
+  display: block;
+  min-width: 0;
+  border: 0;
+  background: none;
+  padding: 0;
+  margin: 0;
+  font: inherit;
+  color: inherit;
+  text-align: left;
   cursor: pointer;
   appearance: none;
 }

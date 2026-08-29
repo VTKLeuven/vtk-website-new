@@ -1,5 +1,6 @@
 import { prisma } from "@vtk/db";
 import { pick } from "@vtk/i18n";
+import { currentWorkingYear, parseWorkingYear } from "@/lib/workingYear";
 
 import { corsPreflight } from "@/lib/cors";
 import { appLocaleFrom, type AppPoc } from "@/lib/app-api/contract";
@@ -21,11 +22,20 @@ export const dynamic = "force-dynamic";
  */
 export async function GET(request: Request) {
   try {
-    const locale = appLocaleFrom(new URL(request.url).searchParams.get("locale"));
+    const url = new URL(request.url);
+    const locale = appLocaleFrom(url.searchParams.get("locale"));
+    const yearParam = url.searchParams.get("jaar");
+    const year = yearParam ? parseWorkingYear(yearParam) : currentWorkingYear();
 
     const pocs = await prisma.poc.findMany({
       orderBy: { order: "asc" },
-      include: { representatives: { orderBy: { order: "asc" }, include: { user: true } } },
+      include: {
+        representatives: {
+          where: { year, user: { deletedAt: null } },
+          orderBy: { order: "asc" },
+          include: { user: true },
+        },
+      },
     });
 
     const payload: AppPoc[] = pocs

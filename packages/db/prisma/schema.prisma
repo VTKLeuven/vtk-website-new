@@ -56,11 +56,6 @@ enum PageAssetKind {
   DOWNLOAD
 }
 
-enum EventVisibility {
-  PUBLIC
-  MEMBERS
-}
-
 enum DashboardTileScope {
   GLOBAL
   GROUP
@@ -79,6 +74,11 @@ enum TicketEventStatus {
 enum TicketAudience {
   PUBLIC
   MEMBERS
+  /// Enkel voor ereleden (`User.honoraryMember`). Zo'n ticketsoort is voor
+  /// iedereen anders onzichtbaar: ze staat niet in de lijst, en de checkout
+  /// weigert ze. Bedoeld voor wat de kring aan ereleden geeft (bv. gratis
+  /// naar een cantus) zonder dat de rest van de site die uitzondering ziet.
+  HONORARY
 }
 
 enum TicketQuestionType {
@@ -536,6 +536,14 @@ model User {
   // uit élke studiegerichte mailinglijst (zie lib/mailinglists.ts). Blijft een
   // aparte boolean om dezelfde reden als notAtFaculty.
   notStudying            Boolean             @default(false)
+  // Verbergt doelgroepevents die niet bij het profiel passen.
+  //
+  // Standaard **uit**: alles is publiek en een eerstejaars mag gerust zien dat er
+  // een alumni-avond is. Wie zijn kalender wil toespitsen (en op de homepage geen
+  // doopactiviteiten wil zien) zet dit aan op /account; dan gelden de doelgroepen
+  // uit `audiencesForStudyProfile` als filter op de homepage, de kalender, de
+  // zoekresultaten, de app en de persoonlijke agendafeed.
+  calendarOnlyMyAudiences Boolean            @default(false)
   // Internationale of uitwisselingsstudent. Bewust een eigen veld en geen
   // afleiding uit `locale`: de sitetaal zegt welke taal je leest, niet of je een
   // exchange-student bent. Stuurt welke evenementen vanzelf in de kalender
@@ -545,11 +553,43 @@ model User {
   // omvat ook wie stopte zonder af te studeren en is dus geen betrouwbare
   // alumni-indicator. Stuurt de expliciete alumni-doelgroep in de kalender.
   alumni                 Boolean             @default(false)
-  // Werkingsjaar waarin het lid zijn studieprofiel laatst bevestigde (2026 =
-  // "26-27"). Loopt dat achter op het huidige werkingsjaar, dan is het profiel
+  // Het jaar waarin het lid afstudeerde. Enkel zinvol bij `alumni`, maar bewust
+  // geen aparte tabel: het is één getal dat bij de persoon hoort. Wordt getoond
+  // in de aanwezigheidslijst van een alumni-evenement wanneer het lid dat zelf
+  // aanvinkt, en groepeert de alumni-mailinglijsten per lichting.
+  graduationYear         Int?
+  // "Ik heb ooit in VTK gezeten" (praesidium, werkgroep, medewerker). Bewust
+  // zelf verklaard en niet afgeleid uit `GroupMembership`: de historiek in de
+  // database begint pas bij de website, terwijl een alumnus van 2004 evengoed
+  // in VTK zat.
+  wasInVtk               Boolean             @default(false)
+  // Wil per mail op de hoogte blijven van alumni-evenementen. Bewust geen
+  // `MailCategory`: die lijsten zijn studiegericht en vallen weg zodra iemand
+  // zijn studie niet meer bevestigt, wat voor een alumnus altijd het geval is.
+  alumniMailOptIn        Boolean             @default(false)
+  // Erelid. Enkel door een beheerder te zetten (zie `users.edit`), nooit door
+  // het lid zelf. Geeft toegang tot ticketsoorten met `TicketAudience.HONORARY`,
+  // die voor iedereen anders onzichtbaar blijven.
+  honoraryMember         Boolean             @default(false)
+  // Wanneer dit account zichzelf met e-mail en wachtwoord aanmaakte (de weg voor
+  // wie geen KU Leuven-login (meer) heeft). Bewust een datum en geen boolean:
+  // het beheer wil kunnen zien wanneer zo'n account binnenkwam.
+  //
+  // Het is ook de enige plek waar `emailVerified` echt iets betekent. Een
+  // account dat een beheerder aanmaakte of dat via SSO binnenkwam is per
+  // definitie vertrouwd; enkel bij een zelfgemaakt account houdt een
+  // onbevestigd adres de login tegen (zie `loginAction`).
+  selfRegisteredAt       DateTime?           @db.Timestamptz(3)
+  // Academiejaar waarin het lid zijn studieprofiel laatst bevestigde (2026 =
+  // "26-27"). Loopt dat achter op het huidige academiejaar, dan is het profiel
   // verlopen: de bevestigingsgate vraagt het opnieuw en het lid valt zolang uit
   // de mailinglijsten. Zo blijft "actief student" een jaarlijks vers signaal
   // zonder koppeling met de cursusdienst.
+  //
+  // Dit is bewust NIET het werkingsjaar: dat kantelt op 15 juli, terwijl het
+  // academiejaar tot eind september loopt. De bevestiging vervalt daarom op
+  // 27 september (`currentStudyYear()` in @vtk/auth), anders duidt iedereen in
+  // juli nog het jaar aan dat net gedaan is.
   studyConfirmedYear     Int?
 
   sessions  Session[]
@@ -567,8 +607,11 @@ model User {
   createdEvents        CalendarEvent[]         @relation("EventCreatedBy")
   dashboardTiles       DashboardTile[]
   dashboardTilePrefs   UserDashboardTilePref[]
+  adminNavPins         UserAdminNavPin[]
   participatingShifts  ShiftParticipant[]
   createdShortLinks    ShortLink[]             @relation("ShortLinkCreatedBy")
+  alumniContacts       AlumniContact[]         @relation("AlumniContactCreatedBy")
+  accountEmailTokens   AccountEmailToken[]     @relation("AccountEmailTokenUser")
 
   meetingsCreated           Meeting[]                  @relation("MeetingCreatedBy")
   meetingReservations       MeetingReservation[]       @relation("MeetingReservationUser")
@@ -651,8 +694,14 @@ model User {
 
   kiesploegMemberships KiesploegMember[]
 
+  // Rekeningen (billsheet): ingediend, terugbetaald, ingeboekt.
+  expensesSubmitted Expense[] @relation("ExpenseSubmittedBy")
+  expensesPaid      Expense[] @relation("ExpensePaidBy")
+  expensesBooked    Expense[] @relation("ExpenseBookedBy")
+
   createdLesbezoeken  Lesbezoek[] @relation("LesbezoekCreatedBy")
   reviewedLesbezoeken Lesbezoek[] @relation("LesbezoekReviewedBy")
+  createdLesbezoekScheduledMails LesbezoekScheduledMail[] @relation("LesbezoekScheduledMailCreatedBy")
 
   @@index([deletedAt])
 }
@@ -696,6 +745,7 @@ model Group {
   uitleenTemplates    UitleenRequestTemplate[]
   uitleenEventsGroup  UitleenEvent[]
   mailGroupSources    MailGroupSource[]
+  expenses            Expense[]
 }
 
 model GroupMembership {
@@ -1248,6 +1298,8 @@ model Page {
   createdBy   User?            @relation("PageCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
   assets      PageAsset[]
   editorRoles PageEditorRole[]
+  /// Het formulier dat in deze pagina staat, als er een gekoppeld is.
+  form        Form?
 
   @@index([headerTabId])
   @@index([searchNl], type: Gin)
@@ -1299,7 +1351,6 @@ model CalendarEvent {
   start         DateTime
   end           DateTime
   allDay        Boolean         @default(false)
-  visibility    EventVisibility @default(PUBLIC)
   url           String?
   imageKey      String?
   groupId       String
@@ -1320,12 +1371,13 @@ model CalendarEvent {
   /// nooit teruggezet: bij twijfel liever geen bericht dan twee.
   announcedPushAt DateTime? @db.Timestamptz(3)
 
-  group       Group                   @relation(fields: [groupId], references: [id], onDelete: Cascade)
-  createdBy   User?                   @relation("EventCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
-  ticketEvent TicketEvent?
-  form        Form?
-  categories  CalendarEventCategory[]
-  interests   CalendarEventInterest[]
+  group          Group                        @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  createdBy      User?                        @relation("EventCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  ticketEvent    TicketEvent?
+  form           Form?
+  categories     CalendarEventCategory[]
+  interests      CalendarEventInterest[]
+  guestInterests CalendarEventGuestInterest[]
 
   @@index([start])
   @@index([publishedAt, announcedPushAt])
@@ -2006,6 +2058,7 @@ model PocRepresentative {
   id     String  @id @default(cuid())
   pocId  String
   userId String
+  year   Int
   roleNl String?
   roleEn String?
   order  Int     @default(0)
@@ -2013,7 +2066,9 @@ model PocRepresentative {
   poc  Poc  @relation(fields: [pocId], references: [id], onDelete: Cascade)
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  @@unique([pocId, userId])
+  @@unique([pocId, userId, year])
+  @@index([pocId])
+  @@index([year])
 }
 
 // -----------------------------------------------------------------------------
@@ -2091,6 +2146,21 @@ model UserDashboardTilePref {
   tile DashboardTile @relation(fields: [tileId], references: [id], onDelete: Cascade)
 
   @@id([userId, tileId])
+  @@index([userId])
+}
+
+// Vastgepinde admin-tabs per gebruiker. Gekeyd op de nav-`key` uit
+// lib/admin-nav.ts en niet op het pad: een tab die later verhuist houdt zo zijn
+// pin. Een pin op een tab die de gebruiker niet (meer) mag zien, rendert
+// gewoon niet; de rij mag blijven staan tot hij het recht terugkrijgt.
+model UserAdminNavPin {
+  userId String
+  key    String
+  order  Int    @default(0)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([userId, key])
   @@index([userId])
 }
 
@@ -3607,7 +3677,7 @@ model FakScanLog {
 // login met de ruwe claims die better-auth aan `mapProfileToUser` doorgeeft,
 // zodat een superadmin kan zien welke attributen ICTS effectief vrijgeeft (bv. of
 // KULeuvenEmployeeType/faculteit binnenkomt). Bevat persoonsgegevens, staat
-// daarom standaard uit en wordt tot de laatste N rijen gesnoeid.
+// daarom standaard uit en wordt na 7 dagen gesnoeid.
 model KulAuthLog {
   id      String   @id @default(cuid())
   at      DateTime @default(now())
@@ -3693,6 +3763,37 @@ model Account {
 
   @@index([userId])
   @@map("account")
+}
+
+/// Eenmalige link die per mail vertrekt: een nieuw account bevestigen of een
+/// vergeten wachtwoord opnieuw zetten.
+///
+/// Bewust naast better-auths eigen `Verification`-tabel en niet erin. Die tabel
+/// is van de plugin: better-auth schrijft en ruimt er zelf in op, en meeliften
+/// betekent dat een toekomstige plugin-update onze tokens kan opruimen of van
+/// vorm veranderen. Dit is één tabel met één eigenaar.
+///
+/// Enkel de hash wordt bewaard, zoals bij `CalendarFeedToken`: wie de database
+/// leest mag geen werkende link kunnen samenstellen.
+model AccountEmailToken {
+  id     String                @id @default(cuid())
+  userId String
+  kind   AccountEmailTokenKind
+
+  tokenHash String    @unique
+  expiresAt DateTime  @db.Timestamptz(3)
+  usedAt    DateTime? @db.Timestamptz(3)
+  createdAt DateTime  @default(now()) @db.Timestamptz(3)
+
+  user User @relation("AccountEmailTokenUser", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, kind])
+  @@index([expiresAt])
+}
+
+enum AccountEmailTokenKind {
+  EMAIL_VERIFICATION
+  PASSWORD_RESET
 }
 
 model Verification {
@@ -3984,6 +4085,12 @@ model Form {
   /// Optionele koppeling aan een kalenderevenement: het formulier verschijnt dan
   /// bij dat evenement en de bevestigingsmail kan er een .ics bij steken.
   calendarEventId String? @unique
+  /// Optionele koppeling aan een contentpagina: het formulier staat dan als
+  /// paneel in de tekst van die pagina, op de plaats van de markering
+  /// `[[formulier]]` en anders onderaan. Uniek, want een pagina heeft hoogstens
+  /// een formulier: twee panelen in dezelfde tekstkolom lezen als een fout, en
+  /// de markering zou niet meer weten welke van de twee ze aanwijst.
+  pageId          String? @unique
   ownerGroupId    String
   createdById     String?
 
@@ -4056,6 +4163,7 @@ model Form {
   updatedAt   DateTime  @updatedAt @db.Timestamptz(3)
 
   calendarEvent CalendarEvent? @relation(fields: [calendarEventId], references: [id], onDelete: SetNull)
+  page          Page?          @relation(fields: [pageId], references: [id], onDelete: SetNull)
   ownerGroup    Group          @relation("FormOwnerGroup", fields: [ownerGroupId], references: [id], onDelete: Restrict)
   createdBy     User?          @relation("FormCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
 
@@ -4596,11 +4704,50 @@ model Lesbezoek {
   reviewedBy   User?                 @relation("LesbezoekReviewedBy", fields: [reviewedById], references: [id], onDelete: SetNull)
   createdBy    User?                 @relation("LesbezoekCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
 
+  scheduledMails LesbezoekScheduledMail[]
+
   @@index([startsAt])
   @@index([status, startsAt])
   @@index([organisationId, startsAt])
   /// Voedt de dubbelaanvraag-waarschuwing: dezelfde professor op dezelfde dag.
   @@index([teacherEmail, startsAt])
+}
+
+/// Een ingeplande mail rond een lesbezoek (bv. vraag naar een docent die pas
+/// de volgende ochtend tijdens kantooruren verstuurd mag worden).
+model LesbezoekScheduledMail {
+  id          String   @id @default(cuid())
+  lesbezoekId String
+  kind        String
+  to          String
+  cc          String?
+  subject     String
+  body        String
+
+  /// De overige lesbezoeken die in dezelfde gebundelde mail zitten. Een
+  /// terugkoppeling naar een aanvrager met twintig bezoeken is één mail, maar ze
+  /// moet wel twintig keer `requesterNotifiedAt` zetten. `lesbezoekId` blijft de
+  /// eerste van de reeks, zodat de cascade en de weergave in het paneel werken;
+  /// wie de mail bij een bezoek zoekt, kijkt dus naar beide velden.
+  bundledIds String[] @default([])
+
+  /// Wanneer de mail volgens planning verstuurd moet worden.
+  sendAt       DateTime  @db.Timestamptz(3)
+  /// Wanneer de mail daadwerkelijk verstuurd werd (null = nog in wachtrij).
+  sentAt       DateTime? @db.Timestamptz(3)
+  /// Foutregistratie indien versturen mislukte.
+  failedAt     DateTime? @db.Timestamptz(3)
+  failedReason String?
+
+  createdById String?
+  createdAt   DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt   DateTime @updatedAt @db.Timestamptz(3)
+
+  lesbezoek Lesbezoek @relation(fields: [lesbezoekId], references: [id], onDelete: Cascade)
+  createdBy User?     @relation("LesbezoekScheduledMailCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@index([sendAt, sentAt])
+  @@index([lesbezoekId])
 }
 
 /// Wat je van een professor, een vak of een faculteit moet weten vóór je een
@@ -4689,6 +4836,19 @@ model CalendarEventInterest {
   userId  String
   eventId String
 
+  /// Alumni-informatie voor dit ene evenement. Ze wordt bewust niet uit het
+  /// profiel gelezen: iemand kan per activiteit een andere naam gebruiken en
+  /// kiest hier ook per veld wat andere bezoekers mogen zien.
+  displayName    String?
+  graduationYear Int?
+  wasInVtk       Boolean @default(false)
+
+  /// Wat dit lid publiek wil tonen in de aanwezigheidslijst. Alles staat
+  /// standaard uit, zodat "ik kom" ook volledig anoniem kan blijven.
+  showName           Boolean @default(false)
+  showGraduationYear Boolean @default(false)
+  showWasInVtk       Boolean @default(false)
+
   createdAt  DateTime  @default(now()) @db.Timestamptz(3)
   /// Wanneer de herinnering voor dit evenement vertrokken is. Zelfde
   /// claim-dan-versturen-aanpak als bij de broodjes: eerst de markering in een
@@ -4701,6 +4861,87 @@ model CalendarEventInterest {
   @@unique([userId, eventId])
   @@index([eventId])
   @@index([remindedAt])
+}
+
+/// "Ik kom naar dit alumni-evenement", aangeduid door iemand zonder account.
+///
+/// Bestaat enkel voor **alumni-evenementen**. Een afgestudeerde van 2004 heeft
+/// geen KU Leuven-login meer en vaak ook geen zin om er een account bij te
+/// maken; hem dwingen te registreren voor hij mag zeggen dat hij komt, is
+/// precies de drempel die we willen weghalen. Voor gewone evenementen bestaat
+/// deze weg bewust níét: daar is interesse een ledenmarkering en zou een
+/// anonieme rij de teller waardeloos maken.
+///
+/// Naam, afstudeerjaar en VTK-verleden blijven optioneel. De bezoeker kan dus
+/// ook alleen de teller verhogen, en beslist per veld of het in de publieke
+/// aanwezigheidslijst verschijnt.
+model CalendarEventGuestInterest {
+  id      String @id @default(cuid())
+  eventId String
+
+  /// Hash van een cookie dat de bezoeker bij zijn eerste aanmelding krijgt.
+  /// Daarmee kan hij zijn keuze terugnemen en telt hetzelfde toestel niet twee
+  /// keer. Bewust enkel de hash: het cookie is een geheim dat we niet hoeven te
+  /// bewaren, en zo staat er geen bruikbare identifier in de tabel. Dit is geen
+  /// waterdichte fraudebescherming; die bestaat niet zonder login.
+  deviceHash String
+
+  /// Zelf ingevulde informatie voor dit ene evenement.
+  displayName    String?
+  graduationYear Int?
+  wasInVtk       Boolean @default(false)
+
+  /// Wat er in de publieke aanwezigheidslijst mag staan.
+  showName           Boolean @default(false)
+  showGraduationYear Boolean @default(false)
+  showWasInVtk       Boolean @default(false)
+
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+
+  event CalendarEvent @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  @@unique([eventId, deviceHash])
+  @@index([eventId])
+}
+
+/// Een alumnus in de mailinglijst, zonder dat er een account aan hangt.
+///
+/// De opt-in-mailinglijsten (`MailCategory`) vallen weg zodra iemand zijn studie
+/// niet meer bevestigt; voor een afgestudeerde is dat per definitie altijd. Deze
+/// tabel is daarom geen variant op die lijsten maar een eigen adresboek: namen
+/// die de kring van reünies, oud-praesidia en inschrijvingslijsten overhoudt,
+/// per lichting bijgehouden.
+///
+/// Site-accounts met `alumni = true` staan hier **niet** in. Die worden bij de
+/// export samengevoegd en op e-mailadres ontdubbeld (zie lib/alumni.ts), zodat
+/// niemand dezelfde mail twee keer krijgt en een alumnus die later toch een
+/// account maakt niet handmatig verwijderd hoeft te worden.
+model AlumniContact {
+  id String @id @default(cuid())
+
+  firstName String
+  lastName  String
+  /// Uniek en lowercase bewaard: het e-mailadres is de sleutel waarop de export
+  /// ontdubbelt tegen de site-accounts.
+  email     String @unique
+
+  graduationYear Int?
+  wasInVtk       Boolean @default(false)
+  note           String?
+
+  /// Uitgeschreven. Blijft bewust in de tabel staan: verwijderen zou betekenen
+  /// dat de volgende import van een oude lijst hem stilletjes weer toevoegt.
+  /// Valt uit elke export en uit de Brevo-sync.
+  unsubscribedAt DateTime? @db.Timestamptz(3)
+
+  createdById String?
+  createdBy   User?   @relation("AlumniContactCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+
+  @@index([graduationYear])
+  @@index([lastName, firstName])
 }
 
 /// Een lid volgt een kalendercategorie en wil weten wanneer er iets bijkomt.
@@ -4872,6 +5113,92 @@ model StudyProfile {
   updatedAt DateTime @updatedAt @db.Timestamptz(3)
 
   user User @relation("StudyProfileUser", fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// -----------------------------------------------------------------------------
+// Rekeningen (het oude billsheet)
+//
+// Een lid koopt iets voor VTK, met de kaart van de kring of met zijn eigen, en
+// dient het bonnetje hier in. De boekhouder wil dat als PDF op één vast blad, dus
+// blijft `blad.pdf` het sjabloon en plakken we het bonnetje eronder; zie
+// `lib/rekeningen/report.ts`.
+// -----------------------------------------------------------------------------
+
+/// Waarmee er betaald werd. VTK_CARD heeft geen terugbetaling nodig (het geld
+/// ging nooit uit de zak van het lid), PERSONAL wel: dan is `iban` verplicht.
+enum ExpensePaymentMethod {
+  VTK_CARD
+  PERSONAL
+}
+
+model Expense {
+  id String @id @default(cuid())
+
+  /// Werkingsjaar waarin de uitgave viel (2026 = "26-27"), afgeleid uit
+  /// `spentOn` met dezelfde 15-juli-grens als de rest van de site. Bewust
+  /// opgeslagen en niet berekend: de boekhouding sluit een jaar af, en dan mag
+  /// een rekening niet van jaar veranderen omdat iemand haar datum corrigeert
+  /// nadat het jaar om is.
+  workingYear Int
+
+  /// De post die de kost draagt. `SetNull` en niet `Cascade`: een gedeactiveerde
+  /// of verwijderde post mag de boekhouding niet meenemen.
+  groupId String?
+  /// Naam van de post op het moment van indienen. Staat zo op het blad dat naar
+  /// de boekhouder gaat, en blijft dus staan ook als de post later hernoemt.
+  postLabel String
+
+  submittedById String?
+  /// Wie het betaalde. Standaard de indiener, maar iemand mag het bonnetje van
+  /// een medelid indienen, en dan hoort diens naam op het blad.
+  payerName     String
+
+  activity    String
+  description String
+  /// Datum van de uitgave (de datum op het bonnetje), niet van het indienen.
+  spentOn     DateTime @db.Date
+  amountCents Int
+
+  paymentMethod ExpensePaymentMethod
+  /// Enkel bij PERSONAL. Nergens anders bewaard: het staat niet op de User, want
+  /// dan draagt de ledentabel een permanent rekeningnummer van iedereen die ooit
+  /// iets voorschoot. Het formulier vult het in vanuit je vorige rekening.
+  iban          String?
+
+  /// Het bonnetje in object storage. Onder `bonnetjes/`, en enkel te lezen via
+  /// de afgeschermde route: `/api/media` is publiek, en dit zijn financiële
+  /// stukken met namen en rekeningnummers erop.
+  receiptKey  String
+  receiptName String
+  receiptMime String
+  receiptSize Int
+
+  /// Terugbetaald aan het lid. Bij VTK_CARD staat dit meteen gevuld: er valt
+  /// niets terug te betalen, en zo blijft "openstaand" precies de lijst waar
+  /// nog geld naartoe moet.
+  paidAt   DateTime? @db.Timestamptz(3)
+  paidById String?
+  /// Bevestigd door de boekhouder dat ze in de boeken staat.
+  bookedAt   DateTime? @db.Timestamptz(3)
+  bookedById String?
+  /// Wanneer het blad naar de boekhouding vertrok, en naar welk adres.
+  sentAt DateTime? @db.Timestamptz(3)
+  sentTo String?
+
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+
+  group       Group? @relation(fields: [groupId], references: [id], onDelete: SetNull)
+  submittedBy User?  @relation("ExpenseSubmittedBy", fields: [submittedById], references: [id], onDelete: SetNull)
+  paidBy      User?  @relation("ExpensePaidBy", fields: [paidById], references: [id], onDelete: SetNull)
+  bookedBy    User?  @relation("ExpenseBookedBy", fields: [bookedById], references: [id], onDelete: SetNull)
+
+  @@index([workingYear])
+  @@index([groupId])
+  @@index([submittedById])
+  @@index([spentOn])
+  @@index([paidAt])
+  @@index([createdAt])
 }
 
 // -----------------------------------------------------------------------------

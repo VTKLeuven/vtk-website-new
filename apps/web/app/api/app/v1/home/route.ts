@@ -1,7 +1,8 @@
 import { prisma } from "@vtk/db";
 import { pick } from "@vtk/i18n";
 
-import { audienceFilter, viewerAudiences } from "@/lib/calendar/audience";
+import { viewerAudienceFilter } from "@/lib/calendar/audience";
+import { publicInterestCounts } from "@/lib/calendar/interest";
 import { corsPreflight } from "@/lib/cors";
 import { getCursusdienstHours } from "@/lib/cursusdienstHours";
 import { DEFAULT_EVENT_IMAGE_SETTING, BUILTIN_DEFAULT_EVENT_IMAGE } from "@/lib/defaultEventImage";
@@ -19,6 +20,7 @@ import {
 import { getCurrentSession } from "@/lib/session";
 import { publicUrl } from "@/lib/storage";
 import { videoEmbed } from "@/lib/videoEmbed";
+import { currentWorkingYear } from "@/lib/workingYear";
 import { entryForDate, isClosedHours, isOpenAt } from "@/components/editorial/hoursUtils";
 import {
   appLocaleFrom,
@@ -99,13 +101,12 @@ export async function GET(request: Request) {
     const map = new Map(settings.map((setting) => [setting.key, setting.value as unknown]));
 
     // Dezelfde doelgroepfilter als /kalender en als de site zelf.
-    const audiences = await viewerAudiences();
+    const audiences = await viewerAudienceFilter();
     const upcomingEvents = await prisma.calendarEvent.findMany({
       where: {
         start: { gte: now },
-        visibility: "PUBLIC",
         publishedAt: { not: null },
-        ...audienceFilter(audiences),
+        ...audiences,
       },
       orderBy: { start: "asc" },
       take: 6,
@@ -145,14 +146,21 @@ export async function GET(request: Request) {
         ? await prisma.poc.findMany({
             where: { studyProgrammes: { hasSome: programmes } },
             orderBy: { order: "asc" },
-            include: { representatives: { orderBy: { order: "asc" }, include: { user: true } } },
+            include: {
+              representatives: {
+                where: { year: currentWorkingYear(), user: { deletedAt: null } },
+                orderBy: { order: "asc" },
+                include: { user: true },
+              },
+            },
           })
         : [];
 
-    const interested = await interestedEventIds(
-      session?.user.id ?? null,
-      upcomingEvents.map((event) => event.id),
-    );
+    const [interested, publicCounts] = await Promise.all([
+      interestedEventIds(session?.user.id ?? null, upcomingEvents.map((event) => event.id)),
+      // Enkel de tellers die de drempel halen; zelfde regel als op de site.
+      publicInterestCounts(upcomingEvents.map((event) => event.id)),
+    ]);
 
     const career = map.get("home.career") as CareerSetting | undefined;
 
@@ -195,6 +203,7 @@ export async function GET(request: Request) {
           audience: category.audience,
         })),
         interested: interested.has(event.id),
+        interestedCount: publicCounts.get(event.id) ?? null,
         ticketSlug: event.ticketEvent?.status === "PUBLISHED" ? event.ticketEvent.slug : null,
       })),
 

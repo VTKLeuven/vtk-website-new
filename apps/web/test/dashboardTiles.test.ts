@@ -6,6 +6,7 @@ import {
   groupTilesBySource,
   isTileImageKey,
   mergeTiles,
+  normalizeUrl,
 } from '@/lib/dashboard-tiles';
 import {
   canManageAnySharedDashboardTile,
@@ -216,5 +217,22 @@ describe('de pictogrammenset', () => {
   it('deelt elk pictogram in bij een bestaande categorie', () => {
     const cats = new Set(TILE_ICON_CATEGORIES.map((c) => c.key));
     for (const icon of TILE_ICONS) expect(cats.has(icon.cat)).toBe(true);
+  });
+});
+
+describe('normalizeUrl', () => {
+  it('voegt https:// toe als er geen schema aanwezig is', () => {
+    expect(normalizeUrl('example.com')).toBe('https://example.com');
+    expect(normalizeUrl('example.com/path?foo=bar')).toBe('https://example.com/path?foo=bar');
+  });
+
+  it('laat URLs met een protocol ongewijzigd', () => {
+    expect(normalizeUrl('http://localhost:3000')).toBe('http://localhost:3000');
+    expect(normalizeUrl('https://vtk.be/admin')).toBe('https://vtk.be/admin');
+    expect(normalizeUrl('mailto:it@vtk.be')).toBe('mailto:it@vtk.be');
+  });
+
+  it('trimt spaties rond de URL', () => {
+    expect(normalizeUrl('  google.com  ')).toBe('https://google.com');
   });
 });

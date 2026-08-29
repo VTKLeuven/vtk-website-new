@@ -7,22 +7,33 @@ import {
   LESBEZOEK_STATUSES,
   LESBEZOEK_STATUS_META,
   isOpenStatus,
+  isProcessedStatus,
+  nudgeCountdownLabel,
+  OPEN_STATUSES,
+  PROCESSED_STATUSES,
 } from "@/lib/lesbezoeken";
-import type { LesbezoekTemplates } from "@/lib/lesbezoekenMail";
+import {
+  DEFAULT_LESBEZOEK_TEMPLATE_ITEMS,
+  type LesbezoekTemplates,
+} from "@/lib/lesbezoekenMail";
+import { BulkMailModal, type BulkMode } from "./BulkMailModal";
 import { LesbezoekCalendar } from "./LesbezoekCalendar";
 import { LesbezoekFormModal } from "./LesbezoekFormModal";
 import { LesbezoekInspector } from "./LesbezoekInspector";
 import type { OrganisationView, VisitView } from "./types";
 
 /**
- * De twee weergaven van dezelfde bezoeken: de werklijst (wat moet er nog
- * gebeuren) en de kalender (wanneer staat wat gepland). Ze delen de filters en
- * hetzelfde detailpaneel, zodat je vanuit beide kanten dezelfde handelingen doet.
- *
- * De werklijst is de standaard en de kalender niet, omgekeerd aan de app die dit
- * vervangt. Die had enkel een kalender, en daardoor was "welke aanvraag ligt hier
- * al een week te wachten?" precies de vraag die je er niet aan kon stellen.
+ * De weergaven van dezelfde bezoeken:
+ * - queue: "Aanvragen" met openstaande items die actie vereisen (standaard Nieuw & Bij de prof).
+ * - processed: "Verwerkt" met reeds afgehandelde items (Goedgekeurd, Afgewezen, Ingetrokken).
+ * - calendar: "Kalender" met chronologisch geplande bezoeken.
  */
+
+function defaultStatusForMode(m: "queue" | "processed" | "calendar"): string {
+  if (m === "queue") return "OPEN";
+  if (m === "processed") return "PROCESSED";
+  return "";
+}
 
 export function LesbezoekBoard({
   nl,
@@ -32,30 +43,52 @@ export function LesbezoekBoard({
   organisations,
   templates,
   signature,
+  nudgeLeadDays,
 }: {
   nl: boolean;
-  mode: "queue" | "calendar";
+  mode: "queue" | "processed" | "calendar";
   canManage: boolean;
   visits: VisitView[];
   organisations: OrganisationView[];
   templates: LesbezoekTemplates;
   signature: string;
+  /** Hoeveel dagen op voorhand de werklijst om een herinnering vraagt. */
+  nudgeLeadDays: number;
 }) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [editing, setEditing] = useState<VisitView | null>(null);
   const [creating, setCreating] = useState(false);
   const [query, setQuery] = useState("");
   const [organisation, setOrganisation] = useState("");
-  // De werklijst begint bij wat nog openstaat; de kalender toont standaard alles,
-  // want daar is de vraag "wat staat er gepland", niet "wat moet ik nog doen".
-  const [status, setStatus] = useState<string>(mode === "queue" ? "OPEN" : "");
+  // De aangevinkte aanvragen voor een merge. Bewust ids en geen objecten: na een
+  // revalidatie zijn de VisitViews nieuwe objecten en zou een selectie op
+  // identiteit stilletjes leeglopen.
+  const [checked, setChecked] = useState<Set<string>>(() => new Set());
+  const [bulkMode, setBulkMode] = useState<BulkMode | null>(null);
+
+  const [prevMode, setPrevMode] = useState(mode);
+  const [status, setStatus] = useState<string>(() => defaultStatusForMode(mode));
+
+  if (prevMode !== mode) {
+    setPrevMode(mode);
+    setStatus(defaultStatusForMode(mode));
+  }
 
   const filtered = useMemo(() => {
     const needle = query.trim().toLowerCase();
     return visits.filter((visit) => {
       if (organisation && visit.organisationId !== organisation) return false;
-      if (status === "OPEN" && !isOpenStatus(visit.status)) return false;
-      if (status && status !== "OPEN" && visit.status !== status) return false;
+
+      if (status === "OPEN") {
+        if (!isOpenStatus(visit.status)) return false;
+      } else if (status === "NUDGE") {
+        if (!visit.needsNudge) return false;
+      } else if (status === "PROCESSED") {
+        if (!isProcessedStatus(visit.status)) return false;
+      } else if (status && status !== "ALL") {
+        if (visit.status !== status) return false;
+      }
+
       if (!needle) return true;
       return [
         visit.organisationName,
@@ -70,6 +103,25 @@ export function LesbezoekBoard({
   }, [visits, query, organisation, status]);
 
   const selected = selectedId ? (visits.find((visit) => visit.id === selectedId) ?? null) : null;
+
+  const templateItems =
+    templates.items && templates.items.length > 0
+      ? templates.items
+      : DEFAULT_LESBEZOEK_TEMPLATE_ITEMS;
+
+  // Enkel wat in beeld staat, telt mee: aanvinken en dan filteren mag de merge
+  // niet vullen met bezoeken die je niet meer ziet.
+  const checkedVisits = filtered.filter((visit) => checked.has(visit.id));
+  const nudgeCount = visits.filter((visit) => visit.needsNudge).length;
+
+  const toggle = (id: string) => {
+    setChecked((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
 
   return (
     <div className="space-y-4">
@@ -98,19 +150,53 @@ export function LesbezoekBoard({
             ))}
           </Select>
         </div>
-        <div className="w-48">
+        <div className="w-56">
           <Select
             value={status}
             onChange={(event) => setStatus(event.target.value)}
             aria-label={nl ? "Status" : "Status"}
           >
-            <option value="">{nl ? "Alle statussen" : "All statuses"}</option>
-            <option value="OPEN">{nl ? "Openstaand" : "Open"}</option>
-            {LESBEZOEK_STATUSES.map((value) => (
-              <option key={value} value={value}>
-                {LESBEZOEK_STATUS_META[value][nl ? "nl" : "en"]}
-              </option>
-            ))}
+            {mode === "queue" && (
+              <>
+                <option value="OPEN">
+                  {nl ? "Openstaand (Nieuw & Bij de prof)" : "Open (New & With professor)"}
+                </option>
+                <option value="NUDGE">
+                  {nl
+                    ? `Herinnering nodig${nudgeCount > 0 ? ` (${nudgeCount})` : ""}`
+                    : `Reminder due${nudgeCount > 0 ? ` (${nudgeCount})` : ""}`}
+                </option>
+                {OPEN_STATUSES.map((code) => (
+                  <option key={code} value={code}>
+                    {LESBEZOEK_STATUS_META[code][nl ? "nl" : "en"]}
+                  </option>
+                ))}
+                <option value="ALL">{nl ? "Alle statussen" : "All statuses"}</option>
+              </>
+            )}
+            {mode === "processed" && (
+              <>
+                <option value="PROCESSED">{nl ? "Alle verwerkt" : "All processed"}</option>
+                {PROCESSED_STATUSES.map((code) => (
+                  <option key={code} value={code}>
+                    {LESBEZOEK_STATUS_META[code][nl ? "nl" : "en"]}
+                  </option>
+                ))}
+                <option value="ALL">{nl ? "Alle statussen" : "All statuses"}</option>
+              </>
+            )}
+            {mode === "calendar" && (
+              <>
+                <option value="">{nl ? "Alle statussen" : "All statuses"}</option>
+                <option value="OPEN">{nl ? "Openstaand" : "Open"}</option>
+                <option value="PROCESSED">{nl ? "Verwerkt" : "Processed"}</option>
+                {LESBEZOEK_STATUSES.map((code) => (
+                  <option key={code} value={code}>
+                    {LESBEZOEK_STATUS_META[code][nl ? "nl" : "en"]}
+                  </option>
+                ))}
+              </>
+            )}
           </Select>
         </div>
         {canManage && (
@@ -120,6 +206,21 @@ export function LesbezoekBoard({
         )}
       </div>
 
+      {canManage && mode !== "calendar" && (
+        <SelectionBar
+          nl={nl}
+          total={filtered.length}
+          checkedVisits={checkedVisits}
+          nudgeCount={nudgeCount}
+          nudgeLeadDays={nudgeLeadDays}
+          showNudgeHint={mode === "queue" && status !== "NUDGE"}
+          onSelectAll={() => setChecked(new Set(filtered.map((visit) => visit.id)))}
+          onClear={() => setChecked(new Set())}
+          onBulk={setBulkMode}
+          onShowNudges={() => setStatus("NUDGE")}
+        />
+      )}
+
       {mode === "calendar" ? (
         <LesbezoekCalendar
           nl={nl}
@@ -128,7 +229,23 @@ export function LesbezoekBoard({
           onSelect={(visit) => setSelectedId(visit.id)}
         />
       ) : (
-        <Queue nl={nl} visits={filtered} selectedId={selectedId} onSelect={setSelectedId} />
+        <Queue
+          nl={nl}
+          visits={filtered}
+          selectedId={selectedId}
+          onSelect={setSelectedId}
+          checked={canManage ? checked : null}
+          onToggle={toggle}
+          emptyText={
+            mode === "processed"
+              ? nl
+                ? "Geen verwerkte lesbezoeken gevonden."
+                : "No processed classroom visits found."
+              : nl
+                ? "Geen openstaande lesbezoeken die actie vereisen."
+                : "No open classroom visits requiring action."
+          }
+        />
       )}
 
       {selected && (
@@ -143,6 +260,18 @@ export function LesbezoekBoard({
             setEditing(selected);
             setSelectedId(null);
           }}
+        />
+      )}
+
+      {bulkMode && (
+        <BulkMailModal
+          nl={nl}
+          mode={bulkMode}
+          visits={checkedVisits}
+          templates={templateItems}
+          signature={signature}
+          onClose={() => setBulkMode(null)}
+          onSent={() => setChecked(new Set())}
         />
       )}
 
@@ -161,24 +290,105 @@ export function LesbezoekBoard({
   );
 }
 
+/**
+ * De balk boven de werklijst: wat er aangevinkt staat en wat je ermee kan doen.
+ *
+ * Staat er niets aangevinkt, dan toont ze enkel de herinneringen die wachten.
+ * Dat is de plek waar dat hoort: het is geen filter die je moet gaan zoeken maar
+ * een mededeling over werk dat blijft liggen.
+ */
+function SelectionBar({
+  nl,
+  total,
+  checkedVisits,
+  nudgeCount,
+  nudgeLeadDays,
+  showNudgeHint,
+  onSelectAll,
+  onClear,
+  onBulk,
+  onShowNudges,
+}: {
+  nl: boolean;
+  total: number;
+  checkedVisits: VisitView[];
+  nudgeCount: number;
+  nudgeLeadDays: number;
+  showNudgeHint: boolean;
+  onSelectAll: () => void;
+  onClear: () => void;
+  onBulk: (mode: BulkMode) => void;
+  onShowNudges: () => void;
+}) {
+  const count = checkedVisits.length;
+
+  if (count === 0) {
+    if (!showNudgeHint || nudgeCount === 0) return null;
+    return (
+      <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-amber-200 bg-amber-50/90 px-4 py-2.5 text-sm text-amber-900">
+        <span>
+          {nl
+            ? `${nudgeCount} lesbezoek${nudgeCount === 1 ? "" : "en"} komt dichterbij (binnen ${nudgeLeadDays} dagen) terwijl de docent nog niet antwoordde. Tijd voor een herinnering.`
+            : `${nudgeCount} class visit${nudgeCount === 1 ? " is" : "s are"} coming up (within ${nudgeLeadDays} days) while the lecturer has not replied. Time for a reminder.`}
+        </span>
+        <Button type="button" variant="ghost" size="sm" onClick={onShowNudges}>
+          {nl ? "Toon ze" : "Show them"}
+        </Button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-vtk-ink/20 bg-vtk-blue-soft/50 px-4 py-2.5">
+      <span className="text-sm font-semibold text-vtk-ink">
+        {nl ? `${count} van ${total} aangevinkt` : `${count} of ${total} ticked`}
+      </span>
+      <Button type="button" size="sm" onClick={() => onBulk("professor")}>
+        {nl ? "Naar de docenten…" : "Send to lecturers…"}
+      </Button>
+      <Button type="button" variant="secondary" size="sm" onClick={() => onBulk("requester")}>
+        {nl ? "Terugkoppeling bundelen…" : "Bundle the replies…"}
+      </Button>
+      <div className="ml-auto flex items-center gap-2">
+        {count < total && (
+          <Button type="button" variant="ghost" size="sm" onClick={onSelectAll}>
+            {nl ? "Alles in beeld" : "All in view"}
+          </Button>
+        )}
+        <Button type="button" variant="ghost" size="sm" onClick={onClear}>
+          {nl ? "Selectie wissen" : "Clear selection"}
+        </Button>
+      </div>
+    </div>
+  );
+}
+
 /** De werklijst: één regel per aanvraag, chronologisch. */
 function Queue({
   nl,
   visits,
   selectedId,
   onSelect,
+  checked,
+  onToggle,
+  emptyText,
 }: {
   nl: boolean;
   visits: VisitView[];
   selectedId: string | null;
   onSelect: (id: string) => void;
+  /** `null` wanneer je enkel mag kijken; dan is er niets aan te vinken. */
+  checked: Set<string> | null;
+  onToggle: (id: string) => void;
+  emptyText?: string;
 }) {
   if (visits.length === 0) {
     return (
       <p className="rounded-2xl border border-dashed border-vtk-blue/20 p-6 text-center text-sm text-[#5c667f]">
-        {nl
-          ? "Geen aanvragen die aan deze filters voldoen."
-          : "No requests match these filters."}
+        {emptyText ??
+          (nl
+            ? "Geen aanvragen die aan deze filters voldoen."
+            : "No requests match these filters.")}
       </p>
     );
   }
@@ -195,43 +405,84 @@ function Queue({
       {visits.map((visit) => {
         const meta = LESBEZOEK_STATUS_META[visit.status];
         return (
-          <button
+          <div
             key={visit.id}
-            type="button"
             className="lb-item"
+            data-select={checked ? "" : undefined}
             aria-current={visit.id === selectedId}
             style={{ ["--org" as string]: visit.organisationColour }}
-            onClick={() => onSelect(visit.id)}
           >
             <span className="lb-item-rail" aria-hidden="true" />
-            <span className="lb-item-body">
-              <span className="lb-item-top">
-                <span className="lb-item-title">{visit.organisationName}</span>
-                <span className="lb-badge" data-tone={meta.tone}>
-                  {meta[nl ? "nl" : "en"]}
+            {checked && (
+              <label className="lb-item-check">
+                <input
+                  type="checkbox"
+                  checked={checked.has(visit.id)}
+                  onChange={() => onToggle(visit.id)}
+                  aria-label={
+                    nl
+                      ? `Selecteren: ${visit.organisationName}, ${visit.course}`
+                      : `Select: ${visit.organisationName}, ${visit.course}`
+                  }
+                />
+              </label>
+            )}
+            <button type="button" className="lb-item-open" onClick={() => onSelect(visit.id)}>
+              <span className="lb-item-body">
+                <span className="lb-item-top">
+                  <span className="lb-item-title">{visit.organisationName}</span>
+                  <span className="lb-badge" data-tone={meta.tone}>
+                    {meta[nl ? "nl" : "en"]}
+                  </span>
+                  {visit.scheduledMails && visit.scheduledMails.length > 0 && (
+                    <span className="lb-badge flex items-center gap-1" data-tone="sent">
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        width="11"
+                        height="11"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2.5"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      >
+                        <circle cx="12" cy="12" r="10" />
+                        <polyline points="12 6 12 12 16 14" />
+                      </svg>
+                      {nl ? `Mail gepland: ${visit.scheduledMails[0]!.sendAtShort}` : `Mail scheduled: ${visit.scheduledMails[0]!.sendAtShort}`}
+                    </span>
+                  )}
+                  {visit.needsNudge && (
+                    <span className="lb-badge" data-tone="waiting">
+                      {nl
+                        ? `Tijd voor een herinnering · ${nudgeCountdownLabel(visit.daysUntil, true)}`
+                        : `Time for a reminder · ${nudgeCountdownLabel(visit.daysUntil, false)}`}
+                    </span>
+                  )}
+                  {visit.clashes.length > 0 && (
+                    <span className="lb-badge" data-tone="waiting">
+                      {nl ? "Mogelijk dubbel" : "Possible duplicate"}
+                    </span>
+                  )}
+                  {visit.peculiarities.length > 0 && (
+                    <span className="lb-badge" data-tone="waiting">
+                      {nl ? "Let op deze docent" : "Note on this lecturer"}
+                    </span>
+                  )}
                 </span>
-                {visit.clashes.length > 0 && (
-                  <span className="lb-badge" data-tone="waiting">
-                    {nl ? "Mogelijk dubbel" : "Possible duplicate"}
-                  </span>
-                )}
-                {visit.peculiarities.length > 0 && (
-                  <span className="lb-badge" data-tone="waiting">
-                    {nl ? "Let op deze docent" : "Note on this lecturer"}
-                  </span>
-                )}
+                <span className="lb-item-meta">
+                  {/* De datum staat hier als tekst en niet in een aparte kolom: op een
+                      telefoon is een tabel met zes kolommen onleesbaar. */}
+                  {dateFmt.format(new Date(`${visit.day}T12:00:00`))} · {visit.time} ·{" "}
+                  {visit.course} · {visit.audience}
+                </span>
+                <span className="lb-item-meta">
+                  {nl ? "Docent" : "Lecturer"}: {visit.teacherName ?? visit.teacherEmail}
+                </span>
               </span>
-              <span className="lb-item-meta">
-                {/* De datum staat hier als tekst en niet in een aparte kolom: op een
-                    telefoon is een tabel met zes kolommen onleesbaar. */}
-                {dateFmt.format(new Date(`${visit.day}T12:00:00`))} · {visit.time} ·{" "}
-                {visit.course} · {visit.audience}
-              </span>
-              <span className="lb-item-meta">
-                {nl ? "Docent" : "Lecturer"}: {visit.teacherName ?? visit.teacherEmail}
-              </span>
-            </span>
-          </button>
+            </button>
+          </div>
         );
       })}
     </div>

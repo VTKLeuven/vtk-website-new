@@ -7,135 +7,10 @@ import { getDictionary, type Locale } from '@vtk/i18n';
 import { canAccessAnyTicketEvent } from '@/lib/ticketing/authorization';
 import { canAccessAnyForm } from '@/lib/forms/authorization';
 import { isExternalUrl } from '@/lib/href';
+import { getAdminNav, type NavGuard, type NavLeaf } from '@/lib/admin-nav';
 import { AdminNav, type NavItem, type NavNode } from './AdminNav';
 
 import '@/app/design/vtk-admin.css';
-
-// -----------------------------------------------------------------------------
-// Admin-navigatie. Op het scherm staat alles alfabetisch (dashboard bovenaan);
-// deze lijst bepaalt dus enkel wat er is en wat bij elkaar hoort.
-//
-//   Item toevoegen     -> voeg een `item(...)`-regel toe.
-//   Groep toevoegen    -> voeg een `group("<key>", [ item(...), ... ])`-blok toe.
-//
-// `key` heeft een label nodig in de i18n-dictionaries (`admin.<key>`, in
-// packages/i18n) en mag een icoon hebben in AdminNav.tsx. Zichtbaarheid regel je
-// met de derde parameter: `{ perm }`, `{ anyPerm }`, of `{ superAdminOnly: true }`
-// (weglaten = altijd zichtbaar). Een groep valt vanzelf weg als de gebruiker geen
-// enkel sub-item mag zien.
-// -----------------------------------------------------------------------------
-
-type NavGuard = {
-  perm?: string;
-  anyPerm?: string[];
-  superAdminOnly?: boolean;
-  /** Ticketing-tab: zichtbaar bij een eigen event-grant of een globale ticket-permissie. */
-  ticketing?: boolean;
-  /** Formulieren-tab: zichtbaar bij een eigen formulier-grant of een globale formulier-permissie. */
-  forms?: boolean;
-  /** Werkgroepen-tab: zichtbaar voor beheerders (werkgroepen.manage) en voor leden
-   *  van een werkgroep (die zien enkel hun eigen werkgroep, enkel de infotekst). */
-  werkgroep?: boolean;
-  /** Enkel bij exacte padmatch actief markeren (voor de dashboard-landing op /admin). */
-  exact?: boolean;
-};
-type NavLeaf = { key: string; href: string } & NavGuard;
-type NavEntry = NavLeaf | { group: string; items: NavLeaf[] };
-
-const item = (key: string, href: string, guard: NavGuard = {}): NavLeaf => ({
-  key,
-  href,
-  ...guard,
-});
-const group = (key: string, items: NavLeaf[]) => ({ group: key, items });
-
-function logisticsModuleUrl(): string {
-  const configured = process.env.LOGISTIEK_PUBLIC_URL?.trim();
-  if (configured) return configured.replace(/\/+$/, '');
-  return process.env.NODE_ENV === 'development' ? 'http://localhost:3100' : 'https://logistiek.dev.vtk.be';
-}
-
-const NAV: NavEntry[] = [
-  item('dashboard', '', { exact: true }),
-  // Iedereen die kan inloggen kan een materiaal- of vervoeraanvraag indienen.
-  // Daarom staat de ingang niet achter de beheerpermissie van de post.
-  item('logistics', logisticsModuleUrl()),
-  group('ledenbeheer', [
-    item('users', '/gebruikers', { perm: 'users.view' }),
-    item('groups', '/groepen', { perm: 'groups.manage' }),
-    item('werkgroepen', '/werkgroepen', { werkgroep: true }),
-    item('roles', '/roles', { perm: 'roles.manage' }),
-  ]),
-  group('website', [
-    item('home', '/home', { perm: 'home.edit' }),
-    item('openingHours', '/openingsuren', { perm: 'openingHours.manageOwn' }),
-    item('frontpage', '/frontpage', { perm: 'home.edit' }),
-    item('announcements', '/aankondigingen', { perm: 'home.edit' }),
-    item('linkPage', '/linkpagina', { perm: 'home.edit' }),
-    item('header', '/header', { perm: 'pages.manage' }),
-    item('pages', '/paginas', { anyPerm: ['pages.edit', 'pages.editAll'] }),
-    item('partners', '/partners', { perm: 'partners.manage' }),
-  ]),
-  // Verkorte links zijn geen website-inhoud: ze leven op hun eigen domein
-  // (on.vtk.be) en verwijzen naar eender waar. Daarom geen onderdeel van de
-  // websitegroep, maar een eigen item.
-  item('shortlinks', '/links', { perm: 'shortlinks.manage' }),
-  // Eén evenement is één ding voor wie het organiseert: je plant het in en je
-  // verkoopt er tickets voor. Die twee schermen hoorden daarom onder één tab.
-  group('evenementen', [
-    item('calendar', '/kalender', { perm: 'calendar.create' }),
-    item('tickets', '/tickets', { ticketing: true }),
-  ]),
-  item('forms', '/formulieren', { forms: true }),
-  // Fotoalbums hebben één ingang: /admin/media. Daar staat de Immich-galerij,
-  // en dat is de enige bron die de publieke mediapagina leest. De oude
-  // /admin/albums beheerde een tweede, lokale albumopslag die nergens meer
-  // getoond werd.
-  item('media', '/media', { anyPerm: ['media.manage', 'photos.manageAlbums'] }),
-  item('shift', '/shiften', { anyPerm: ['shift.edit', 'shift.reward', 'shift.ranking'] }),
-  item('theokot', '/theokot', { anyPerm: ['theokot.manage', 'theokot.pickup'] }),
-  item('grocomeet', '/grocomeet', { perm: 'grocomeet.manage' }),
-  // Wat VTK Onderwijs beheert hangt samen: de POC's zijn de studenten die de
-  // opleiding vertegenwoordigen, het bureau is hun vergadering, en de
-  // lesbezoeken lopen via dezelfde post.
-  group('onderwijs', [
-    item('pocs', '/pocs', { perm: 'pocs.manage' }),
-    item('bureau', '/bureau', { perm: 'bureau.manage' }),
-    item('lesbezoeken', '/lesbezoeken', {
-      anyPerm: ['lesbezoeken.view', 'lesbezoeken.manage'],
-    }),
-  ]),
-  item('piano', '/piano', { perm: 'piano.manage' }),
-  item('fakscanner', '/fakscanner', { perm: 'fakscanner.manage' }),
-  item('mailinglists', '/mailinglijsten', { perm: 'mailinglists.export' }),
-  // Twee dingen die allebei "mailinglijst" heten, en bewust naast elkaar staan
-  // zodat wie het ene zoekt het andere ziet: hierboven de opt-in nieuwsbrieven
-  // naar studenten (export + Brevo), hier de eigen adressen van de kring
-  // (activiteiten@vtk.be) die de posten van dit werkingsjaar volgen.
-  item('mailGroups', '/groepsadressen', { perm: 'mailgroups.manage' }),
-  item('kiesploeg', '/kiesploeg', { perm: 'kiesploeg.manage' }),
-  // Wachtwoorden staat los van de IT-groep: een postverantwoordelijke beheert de
-  // wachtwoorden van zijn eigen post en hoort daarvoor niet in een IT-map te
-  // moeten zoeken. Het kluisbeheer zelf (posten koppelen, configuratie) staat wel
-  // onder IT.
-  item('vault', '/wachtwoorden', { anyPerm: ['vault.editOwn', 'vault.manage'] }),
-  item('dashboardTiles', '/dashboard-tiles', {
-    anyPerm: ['dashboard.manage', 'dashboard.manageOwn'],
-  }),
-  group('it', [
-    // `exact`, anders licht Configuratie (/admin/it) ook op wanneer je op de
-    // onderliggende /admin/it/preview staat.
-    item('itConfig', '/it', { superAdminOnly: true, exact: true }),
-    item('authorizationPreview', '/it/preview', { superAdminOnly: true }),
-    item('kulSso', '/it/kul-sso', { superAdminOnly: true }),
-    item('vaultAdmin', '/wachtwoorden/beheer', { perm: 'vault.manage' }),
-    item('auditLog', '/it/logboek', { perm: 'audit.view' }),
-    item('urenloopApp', '/it/24ul-app', { perm: 'urenloopApp.manage' }),
-    item('appPush', '/app-push', { perm: 'app.push' }),
-    item('door', '/deur', { perm: 'door.manage' }),
-    item('sso', '/sso', { perm: 'oauth.client.edit' }),
-  ]),
-];
 
 type DictAdmin = ReturnType<typeof getDictionary>['admin'];
 
@@ -204,22 +79,28 @@ export default async function AdminLayout({
     exact: leaf.exact,
   });
 
-  // Bouw de zichtbare nav. De volgorde in NAV hierboven bepaalt enkel nog welke
-  // items bij elkaar staan; op het scherm staat alles alfabetisch, met het
-  // dashboard vastgepind bovenaan. Zoeken in een lijst van vijftien tabs gaat zo
-  // sneller dan onthouden waar iemand ze ooit gezet heeft. Gevolg: nl en en
-  // hebben een andere volgorde, want er wordt op het vertaalde label gesorteerd.
-  const collator = new Intl.Collator(locale === 'nl' ? 'nl-BE' : 'en-GB', {
-    sensitivity: 'base',
-  });
-  const byLabel = (a: { label: string }, b: { label: string }) =>
-    collator.compare(a.label, b.label);
+  // Is de huidige gebruiker lid van IT of Groep 5 (of superadmin)?
+  // Enkel voor IT en G5 worden Fakscanner en Theokot onder een tabje "Overig" gegroepeerd.
+  const isItOrG5 =
+    session.user.isSuperAdmin ||
+    session.groups.some(
+      (g) =>
+        ['IT', 'GROEP5', 'G5'].includes(g.code.toUpperCase()) ||
+        ['it', 'groep-5', 'g5'].includes(g.slug.toLowerCase())
+    );
 
+  // Bouw de zichtbare nav. De volgorde staat vast in admin-nav.ts, ook
+  // binnen een groep; er wordt hier niet meer gesorteerd.
   const nodes: NavNode[] = [];
-  for (const entry of NAV) {
+  const nav = getAdminNav({ isItOrG5 });
+  for (const entry of nav) {
     if ('group' in entry) {
-      const items = entry.items.filter(canSee).map(toItem).sort(byLabel);
-      if (items.length > 0) {
+      const items = entry.items.filter(canSee).map(toItem);
+      // Een groep waarvan je maar één item mag zien, is een klik om niets: toon
+      // dat item dan gewoon als los item.
+      if (items.length === 1) {
+        nodes.push({ type: 'item', item: items[0] });
+      } else if (items.length > 1) {
         nodes.push({ type: 'group', key: entry.group, label: adminDict[entry.group], items });
       }
     } else if (canSee(entry)) {
@@ -227,13 +108,12 @@ export default async function AdminLayout({
     }
   }
 
-  const isDashboard = (node: NavNode) => node.type === 'item' && node.item.key === 'dashboard';
-  nodes.sort((a, b) => {
-    if (isDashboard(a) !== isDashboard(b)) return isDashboard(a) ? -1 : 1;
-    return collator.compare(
-      a.type === 'group' ? a.label : a.item.label,
-      b.type === 'group' ? b.label : b.item.label,
-    );
+  // Vastgepinde tabs van deze gebruiker. Keys die hij niet (meer) mag zien
+  // blijven staan in de databank maar renderen niet; zie AdminNav.
+  const pins = await prisma.userAdminNavPin.findMany({
+    where: { userId: session.user.id },
+    orderBy: { order: 'asc' },
+    select: { key: true },
   });
 
   return (
@@ -242,7 +122,18 @@ export default async function AdminLayout({
         {/* Sticky/scrollgedrag staat in AdminNav (useSmartSticky) plus het
             860px-breekpunt in vtk-admin.css (niet Tailwinds md:, dat 768px is). */}
         <aside>
-          <AdminNav title={dict.admin.title} nodes={nodes} />
+          <AdminNav
+            title={dict.admin.title}
+            nodes={nodes}
+            pinnedKeys={pins.map((p) => p.key)}
+            pinLabels={{
+              section: adminDict.pinned,
+              all: adminDict.allTabs,
+              pin: adminDict.pinTab,
+              unpin: adminDict.unpinTab,
+              error: adminDict.pinError,
+            }}
+          />
         </aside>
         <section className="vtk-admin-main">{children}</section>
       </div>

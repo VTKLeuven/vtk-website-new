@@ -44,6 +44,12 @@ export type MailInput = {
    */
   replyTo?: string;
   messageId?: string;
+  /**
+   * Bijlagen. Bewust enkel een buffer met een naam en een type: een pad of een
+   * URL meegeven zou nodemailer laten lezen van schijf of van het net, en de
+   * enige aanroeper (het rekeningenblad) heeft de bytes al in de hand.
+   */
+  attachments?: Array<{ filename: string; content: Buffer; contentType?: string }>;
 };
 
 const FROM = process.env.MAIL_FROM || 'Theokot VTK <theokot@vtk.be>';
@@ -96,7 +102,7 @@ export async function sendMail(
   const host = process.env.SMTP_HOST;
   if (!host) {
     console.info(
-      `[mail] SMTP niet geconfigureerd; mail niet verstuurd.\n  from: ${from}\n  to: ${input.to}${ccLabel ? `\n  cc: ${ccLabel}` : ''}${input.replyTo ? `\n  reply-to: ${input.replyTo}` : ''}\n  subject: ${input.subject}\n  ${input.text.replace(/\n/g, '\n  ')}`,
+      `[mail] SMTP niet geconfigureerd; mail niet verstuurd.\n  from: ${from}\n  to: ${input.to}${ccLabel ? `\n  cc: ${ccLabel}` : ''}${input.replyTo ? `\n  reply-to: ${input.replyTo}` : ''}\n  subject: ${input.subject}${input.attachments?.length ? `\n  bijlagen: ${input.attachments.map((a) => a.filename).join(', ')}` : ''}\n  ${input.text.replace(/\n/g, '\n  ')}`,
     );
     // Lokaal is loggen de bedoeling; dat mag niet als mislukking tellen.
     return true;
@@ -143,6 +149,7 @@ export async function sendMail(
       html: input.html,
       replyTo: input.replyTo,
       messageId: input.messageId,
+      attachments: input.attachments,
     });
     return true;
   } catch (err) {

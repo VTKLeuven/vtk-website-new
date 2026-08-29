@@ -10,6 +10,7 @@ import { brusselsWallClockMinutes } from "@/lib/brussels";
 import { logAudit } from "@/lib/audit";
 import { saveError, saveOk, type SaveState } from "@/lib/saveState";
 import {
+  clampNudgeLeadDays,
   LESBEZOEK_COLOURS,
   LESBEZOEK_LIMITS,
   LESBEZOEK_RATE_LIMIT,
@@ -23,6 +24,7 @@ import {
   type LesbezoekStatusCode,
 } from "@/lib/lesbezoeken";
 import {
+  applyScheduledMailStamps,
   LESBEZOEK_CONFIG_KEY,
   LESBEZOEK_MAIL_KEY,
   notifyNewLesbezoek,
@@ -30,8 +32,7 @@ import {
 } from "@/lib/lesbezoeken-server";
 import {
   LESBEZOEK_TEMPLATE_KEYS,
-  type LesbezoekTemplates,
-  type MailTemplate,
+  type LesbezoekTemplateItem,
 } from "@/lib/lesbezoekenMail";
 
 /**
@@ -88,6 +89,9 @@ export async function requestLesbezoekAction(
   const time = toSingleLine(formData.get("time"));
   const startsAt = date && time ? toInstant(date, time) : null;
 
+  const rawAudiences = formData.getAll("audience");
+  const audience = rawAudiences.length > 1 ? rawAudiences : formData.get("audience");
+
   const parsed = parseLesbezoekRequest(
     {
       organisationId: formData.get("organisationId"),
@@ -97,7 +101,8 @@ export async function requestLesbezoekAction(
       requesterPhone: formData.get("requesterPhone"),
       subject: formData.get("subject"),
       teacherNote: formData.get("teacherNote"),
-      audience: formData.get("audience"),
+      audience,
+      audiences: formData.getAll("audiences"),
       audienceOther: formData.get("audienceOther"),
       course: formData.get("course"),
       teacherEmail: formData.get("teacherEmail"),
@@ -217,13 +222,21 @@ export async function saveLesbezoekAction(
   const explicitEnd = endTime ? toInstant(date, endTime) : null;
   const endsAt = explicitEnd && explicitEnd > startsAt ? explicitEnd : visitEnd(startsAt, longVisit);
 
-  const teacherEmail = toSingleLine(formData.get("teacherEmail"));
+   const teacherEmail = toSingleLine(formData.get("teacherEmail"));
+  const rawAudiences = formData
+    .getAll("audience")
+    .map(toSingleLine)
+    .filter((v) => v && v !== "__other__");
+  const audience = (
+    rawAudiences.length > 0 ? rawAudiences.join(", ") : toSingleLine(formData.get("audience"))
+  ).slice(0, LESBEZOEK_LIMITS.audience);
+
   const data = {
     organisationId,
     startsAt,
     endsAt,
     longVisit,
-    audience: toSingleLine(formData.get("audience")).slice(0, LESBEZOEK_LIMITS.audience),
+    audience,
     course: toSingleLine(formData.get("course")).slice(0, LESBEZOEK_LIMITS.course),
     subject: toSingleLine(formData.get("subject")).slice(0, LESBEZOEK_LIMITS.subject),
     teacherNote: toMessageText(formData.get("teacherNote")).slice(0, LESBEZOEK_LIMITS.teacherNote),
@@ -346,17 +359,59 @@ export async function deleteLesbezoekAction(formData: FormData): Promise<void> {
 /** Welke mail er vertrekt, en wat dat met de aanvraag doet. */
 const MAIL_KINDS = {
   /** De vraag naar de professor. Zet de aanvraag op "bij de prof". */
-  professor: { status: "ASKED" as LesbezoekStatusCode, stamp: "professorMailedAt" as const },
+  professor: {
+    status: "ASKED" as LesbezoekStatusCode,
+    stamp: "professorMailedAt" as const,
+    side: "teacher" as const,
+  },
   /** Een herinnering aan diezelfde professor; de status verandert niet. */
-  nudge: { status: null, stamp: "professorNudgedAt" as const },
+  nudge: { status: null, stamp: "professorNudgedAt" as const, side: "teacher" as const },
   /** De terugkoppeling naar de aanvrager; de status verandert niet. */
-  requester: { status: null, stamp: "requesterNotifiedAt" as const },
+  requester: {
+    status: null,
+    stamp: "requesterNotifiedAt" as const,
+    side: "requester" as const,
+  },
 } as const;
 
 type MailKind = keyof typeof MAIL_KINDS;
 
+/**
+ * Naar wie een mail vertrekt. Twee mails naar dezelfde kant sluiten elkaar uit
+ * (je stuurt geen vraag en een herinnering samen), twee mails naar verschillende
+ * kanten niet.
+ */
+type MailSide = (typeof MAIL_KINDS)[MailKind]["side"];
+
 function isMailKind(value: string): value is MailKind {
   return value in MAIL_KINDS;
+}
+
+/**
+ * De openstaande geplande mails die over deze lesbezoeken gaan.
+ *
+ * Kijkt naar allebei de velden: een gebundelde terugkoppeling staat als één rij
+ * onder het eerste bezoek, met de rest in `bundledIds`. Zoek je enkel op
+ * `lesbezoekId`, dan blijft die bundel staan wanneer je voor bezoek nummer zeven
+ * iets anders inplant, en vertrekken er straks twee mails over hetzelfde.
+ *
+ * `side` beperkt de opkuis tot de mails naar dezelfde ontvanger. Zonder die
+ * beperking haalde het inplannen van een terugkoppeling naar de aanvrager de
+ * vraag weg die morgenvroeg naar de professor moest: twee verschillende mails
+ * naar twee verschillende mensen, waarvan er één stil verdween.
+ */
+function openScheduledFor(ids: readonly string[], side?: MailSide) {
+  const kinds = side
+    ? Object.entries(MAIL_KINDS)
+        .filter(([, rule]) => rule.side === side)
+        .map(([kind]) => kind)
+    : null;
+
+  return {
+    sentAt: null,
+    ...(kinds ? { kind: { in: kinds } } : {}),
+    OR: [{ lesbezoekId: { in: [...ids] } }, { bundledIds: { hasSome: [...ids] } }],
+  };
 }
 
 /**
@@ -406,13 +461,18 @@ export async function sendLesbezoekMailAction(
   if (!delivered) return saveError("MAIL_FAILED");
 
   const rule = MAIL_KINDS[kind];
-  await prisma.lesbezoek.update({
-    where: { id },
-    data: {
-      [rule.stamp]: new Date(),
-      ...(rule.status ? { status: rule.status } : {}),
-    },
-  });
+  await prisma.$transaction([
+    prisma.lesbezoek.update({
+      where: { id },
+      data: {
+        [rule.stamp]: new Date(),
+        ...(rule.status ? { status: rule.status } : {}),
+      },
+    }),
+    prisma.lesbezoekScheduledMail.deleteMany({
+      where: openScheduledFor([id], MAIL_KINDS[kind].side),
+    }),
+  ]);
 
   await logAudit({
     action: "send",
@@ -423,6 +483,390 @@ export async function sendLesbezoekMailAction(
   });
 
   revalidateLesbezoeken();
+  return saveOk();
+}
+
+/**
+ * Plant een mail in voor een lesbezoek op een toekomstig tijdstip (Brussel-tijd).
+ */
+export async function scheduleLesbezoekMailAction(
+  _prev: SaveState,
+  formData: FormData,
+): Promise<SaveState> {
+  const session = await requirePermission("lesbezoeken.manage");
+
+  const id = toSingleLine(formData.get("id"));
+  const kind = toSingleLine(formData.get("kind"));
+  const subject = toSingleLine(formData.get("subject"));
+  const body = toMessageText(formData.get("body"));
+  const sendAtDate = toSingleLine(formData.get("sendAtDate"));
+  const sendAtTime = toSingleLine(formData.get("sendAtTime"));
+
+  if (!id || !isMailKind(kind)) return saveError("INVALID_INPUT");
+  if (!subject || !body) return saveError("MAIL_EMPTY");
+  if (!sendAtDate || !sendAtTime) return saveError("SCHEDULE_TIME_INVALID");
+
+  const sendAt = toInstant(sendAtDate, sendAtTime);
+  if (!sendAt) return saveError("SCHEDULE_TIME_INVALID");
+
+  // Moet in de toekomst liggen (met kleine speling van 30s)
+  if (sendAt.getTime() <= Date.now() + 30_000) {
+    return saveError("SCHEDULE_TIME_PAST");
+  }
+
+  const visit = await prisma.lesbezoek.findUnique({
+    where: { id },
+    select: {
+      teacherEmail: true,
+      requesterEmail: true,
+      course: true,
+      organisation: { select: { name: true, contactEmail: true } },
+    },
+  });
+  if (!visit) return saveError("NOT_FOUND");
+
+  const to = kind === "requester" ? visit.requesterEmail : visit.teacherEmail;
+  if (!to) return saveError("NO_RECIPIENT");
+  const cc = kind === "requester" ? (visit.organisation.contactEmail ?? null) : null;
+
+  // Vervang een eerdere openstaande mail naar dezelfde kant; een geplande vraag
+  // aan de docent blijft staan wanneer je een terugkoppeling inplant.
+  await prisma.lesbezoekScheduledMail.deleteMany({
+    where: openScheduledFor([id], MAIL_KINDS[kind].side),
+  });
+
+  const created = await prisma.lesbezoekScheduledMail.create({
+    data: {
+      lesbezoekId: id,
+      kind,
+      to,
+      cc,
+      subject,
+      body,
+      sendAt,
+      createdById: session.user.id,
+    },
+    select: { id: true },
+  });
+
+  await logAudit({
+    action: "create",
+    entity: "lesbezoekScheduledMail",
+    entityId: created.id,
+    target: `${visit.organisation.name} — ${visit.course}`,
+    summary: `mail naar ${to} ingepland voor ${sendAtDate} om ${sendAtTime}`,
+  });
+
+  revalidateLesbezoeken();
+  return saveOk();
+}
+
+/**
+ * Annuleert een ingeplande mail voordat deze verstuurd is.
+ */
+export async function cancelLesbezoekScheduledMailAction(
+  formData: FormData,
+): Promise<void> {
+  await requirePermission("lesbezoeken.manage");
+
+  const id = toSingleLine(formData.get("id"));
+  const lesbezoekId = toSingleLine(formData.get("lesbezoekId"));
+
+  if (id) {
+    const before = await prisma.lesbezoekScheduledMail.findUnique({
+      where: { id },
+      select: {
+        to: true,
+        lesbezoek: { select: { organisation: { select: { name: true } }, course: true } },
+      },
+    });
+    if (before) {
+      await prisma.lesbezoekScheduledMail.delete({ where: { id } });
+      await logAudit({
+        action: "delete",
+        entity: "lesbezoekScheduledMail",
+        entityId: id,
+        target: `${before.lesbezoek.organisation.name} — ${before.lesbezoek.course}`,
+        summary: `planning geannuleerd voor ${before.to}`,
+      });
+    }
+  } else if (lesbezoekId) {
+    await prisma.lesbezoekScheduledMail.deleteMany({ where: openScheduledFor([lesbezoekId]) });
+  }
+
+  revalidateLesbezoeken();
+}
+
+/**
+ * Verstuurt een ingeplande mail onmiddellijk in plaats van te wachten op het geplande tijdstip.
+ */
+export async function sendNowLesbezoekScheduledMailAction(
+  formData: FormData,
+): Promise<void> {
+  await requirePermission("lesbezoeken.manage");
+
+  const id = toSingleLine(formData.get("id"));
+  if (!id) return;
+
+  const item = await prisma.lesbezoekScheduledMail.findUnique({
+    where: { id },
+    include: {
+      lesbezoek: {
+        select: {
+          id: true,
+          status: true,
+          organisation: { select: { name: true } },
+          course: true,
+        },
+      },
+    },
+  });
+  if (!item || item.sentAt) return;
+
+  const delivered = await sendLesbezoekMail({
+    to: item.to,
+    cc: item.cc ?? undefined,
+    subject: item.subject,
+    text: item.body,
+  });
+
+  if (delivered) {
+    const now = new Date();
+    await prisma.lesbezoekScheduledMail.update({
+      where: { id },
+      data: { sentAt: now },
+    });
+    await applyScheduledMailStamps(item, now);
+
+    await logAudit({
+      action: "send",
+      entity: "lesbezoekScheduledMail",
+      entityId: id,
+      target: `${item.lesbezoek.organisation.name} — ${item.lesbezoek.course}`,
+      summary: `direct verzonden naar ${item.to}`,
+    });
+  }
+
+  revalidateLesbezoeken();
+}
+
+// -----------------------------------------------------------------------------
+// Beheer: meerdere mails in één beurt
+// -----------------------------------------------------------------------------
+
+/**
+ * Hoeveel mails er in één beurt mogen. Ruim boven een normale voormiddag werk
+ * (een jobbeurs met twintig lesbezoeken), en laag genoeg dat een verkeerde
+ * selectie niet de halve faculteit aanschrijft.
+ */
+const BULK_MAIL_MAX = 100;
+
+type BulkMailItem = {
+  ids: string[];
+  kind: MailKind;
+  subject: string;
+  body: string;
+};
+
+/** Leest de payload van het bulkscherm; `null` zodra er iets niet klopt. */
+function parseBulkItems(raw: unknown): BulkMailItem[] | null {
+  if (!Array.isArray(raw)) return null;
+  const items: BulkMailItem[] = [];
+
+  for (const entry of raw) {
+    if (!entry || typeof entry !== "object") return null;
+    const row = entry as Record<string, unknown>;
+
+    const ids = Array.isArray(row.ids)
+      ? Array.from(new Set(row.ids.map(toSingleLine).filter(Boolean)))
+      : [];
+    const kind = toSingleLine(row.kind);
+    const subject = toSingleLine(row.subject);
+    const body = toMessageText(row.body);
+
+    if (ids.length === 0 || !isMailKind(kind)) return null;
+    // Een vraag of een herinnering gaat over één les bij één professor; enkel de
+    // terugkoppeling naar de aanvrager bundelt meerdere bezoeken in één mail.
+    if (kind !== "requester" && ids.length > 1) return null;
+    if (!subject || !body) return null;
+
+    items.push({ ids, kind, subject, body });
+  }
+
+  return items;
+}
+
+/**
+ * Verstuurt of plant meerdere lesbezoekenmails in één beurt.
+ *
+ * Dit is de mailmerge die de Word-sjablonen vervingen, met het verschil dat de
+ * teksten hier al door het scherm gegaan zijn: elke mail staat afzonderlijk
+ * bewerkbaar in het bulkvenster en komt van daar terug. De server vult dus niets
+ * meer in, hij verstuurt wat een mens zag staan (zie docs/design-decisions.md,
+ * "Er zit altijd een mens tussen de sjabloon en de verzendknop").
+ *
+ * Een item met meerdere `ids` is de gebundelde terugkoppeling: één mail naar één
+ * aanvrager over al zijn lesbezoeken. Die adressen moeten gelijk zijn, anders
+ * belandt de ene organisatie in de mail van de andere.
+ */
+export async function sendBulkLesbezoekMailsAction(
+  _prev: SaveState,
+  formData: FormData,
+): Promise<SaveState> {
+  const session = await requirePermission("lesbezoeken.manage");
+
+  const raw = formData.get("payload");
+  if (typeof raw !== "string" || !raw.trim()) return saveError("INVALID_INPUT");
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return saveError("INVALID_INPUT");
+  }
+
+  const payload = (parsed ?? {}) as Record<string, unknown>;
+  const mode = toSingleLine(payload.mode) === "instant" ? "instant" : "scheduled";
+  const items = parseBulkItems(payload.items);
+  if (!items) return saveError("INVALID_INPUT");
+  if (items.length === 0) return saveError("BULK_EMPTY");
+  if (items.length > BULK_MAIL_MAX) return saveError("BULK_TOO_MANY");
+
+  let sendAt: Date | null = null;
+  if (mode === "scheduled") {
+    const sendAtDate = toSingleLine(payload.sendAtDate);
+    const sendAtTime = toSingleLine(payload.sendAtTime);
+    if (!sendAtDate || !sendAtTime) return saveError("SCHEDULE_TIME_INVALID");
+    sendAt = toInstant(sendAtDate, sendAtTime);
+    if (!sendAt) return saveError("SCHEDULE_TIME_INVALID");
+    if (sendAt.getTime() <= Date.now() + 30_000) return saveError("SCHEDULE_TIME_PAST");
+  }
+
+  const allIds = Array.from(new Set(items.flatMap((item) => item.ids)));
+  const visits = await prisma.lesbezoek.findMany({
+    where: { id: { in: allIds } },
+    select: {
+      id: true,
+      course: true,
+      teacherEmail: true,
+      requesterEmail: true,
+      organisation: { select: { name: true, contactEmail: true } },
+    },
+  });
+  if (visits.length !== allIds.length) return saveError("NOT_FOUND");
+  const byId = new Map(visits.map((visit) => [visit.id, visit]));
+
+  // Eerst alles nakijken, dan pas versturen: half verstuurde selecties zijn met
+  // de hand niet meer recht te zetten, en een ontbrekend adres is te zien vóór
+  // de eerste mail vertrekt.
+  type Ready = BulkMailItem & { to: string; cc: string | null; target: string };
+  const ready: Ready[] = [];
+
+  for (const item of items) {
+    const rows = item.ids.map((id) => byId.get(id)!);
+    const first = rows[0]!;
+    const to = item.kind === "requester" ? first.requesterEmail : first.teacherEmail;
+    if (!to) return saveError("NO_RECIPIENT");
+
+    const sameRecipient = rows.every((row) => {
+      const address = item.kind === "requester" ? row.requesterEmail : row.teacherEmail;
+      return (address ?? "").toLowerCase() === to.toLowerCase();
+    });
+    if (!sameRecipient) return saveError("BULK_MIXED_RECIPIENT");
+
+    ready.push({
+      ...item,
+      to,
+      cc: item.kind === "requester" ? first.organisation.contactEmail : null,
+      target:
+        rows.length === 1
+          ? `${first.organisation.name} — ${first.course}`
+          : `${first.organisation.name} — ${rows.length} lesbezoeken`,
+    });
+  }
+
+  if (sendAt) {
+    for (const item of ready) {
+      await prisma.lesbezoekScheduledMail.deleteMany({
+        where: openScheduledFor(item.ids, MAIL_KINDS[item.kind].side),
+      });
+      const [primary, ...rest] = item.ids;
+      await prisma.lesbezoekScheduledMail.create({
+        data: {
+          lesbezoekId: primary!,
+          bundledIds: rest,
+          kind: item.kind,
+          to: item.to,
+          cc: item.cc,
+          subject: item.subject,
+          body: item.body,
+          sendAt,
+          createdById: session.user.id,
+        },
+        select: { id: true },
+      });
+    }
+
+    await logAudit({
+      action: "create",
+      entity: "lesbezoekScheduledMail",
+      target: `${ready.length} mail(s)`,
+      summary: `in bulk ingepland voor ${sendAt.toISOString()}`,
+    });
+    revalidateLesbezoeken();
+    return saveOk();
+  }
+
+  const now = new Date();
+  let failed = 0;
+
+  for (const item of ready) {
+    const delivered = await sendLesbezoekMail({
+      to: item.to,
+      cc: item.cc ?? undefined,
+      subject: item.subject,
+      text: item.body,
+    });
+
+    if (!delivered) {
+      failed += 1;
+      continue;
+    }
+
+    const [primary, ...rest] = item.ids;
+    await applyScheduledMailStamps(
+      { kind: item.kind, lesbezoekId: primary!, bundledIds: rest },
+      now,
+    );
+    await prisma.lesbezoekScheduledMail.deleteMany({
+      where: openScheduledFor(item.ids, MAIL_KINDS[item.kind].side),
+    });
+
+    await logAudit({
+      action: "send",
+      entity: "lesbezoek",
+      entityId: primary!,
+      target: item.target,
+      summary: `mail naar ${item.to} (bulk)`,
+    });
+  }
+
+  revalidateLesbezoeken();
+
+  if (failed === ready.length) return saveError("MAIL_FAILED");
+  if (failed > 0) {
+    // Wat wél vertrok is gestempeld, dus een tweede poging op de rest maakt geen
+    // dubbels; het aantal staat erbij zodat duidelijk is hoeveel er nog te doen is.
+    // `BULK_PARTIAL` staat bewust niet in `errorMessages`: een vertaling voor die
+    // code zou deze zin met de aantallen erin overschrijven.
+    const done = ready.length - failed;
+    return saveError(
+      "BULK_PARTIAL",
+      toSingleLine(payload.locale) === "en"
+        ? `${done} of ${ready.length} emails went out; ${failed} did not. The failed ones are still marked as not sent.`
+        : `${done} van de ${ready.length} mails zijn vertrokken; ${failed} niet. Die staan nog als niet verstuurd in de lijst.`,
+    );
+  }
   return saveOk();
 }
 
@@ -577,7 +1021,11 @@ export async function saveLesbezoekSettingsAction(
   const notifyEmail = toSingleLine(formData.get("notifyEmail"));
   if (!notifyEmail) return saveError("INVALID_INPUT");
 
-  const value = { signature, notifyEmail };
+  // Buiten de grenzen invullen is geen fout maar een vergissing; klemmen is hier
+  // vriendelijker dan een rode toast over een getal dat niemand bewust koos.
+  const nudgeLeadDays = clampNudgeLeadDays(toSingleLine(formData.get("nudgeLeadDays")));
+
+  const value = { signature, notifyEmail, nudgeLeadDays };
   await prisma.setting.upsert({
     where: { key: LESBEZOEK_CONFIG_KEY },
     create: { key: LESBEZOEK_CONFIG_KEY, value },
@@ -590,9 +1038,8 @@ export async function saveLesbezoekSettingsAction(
 }
 
 /**
- * Bewaart de mailsjablonen. Een leeg veld betekent "terug naar de standaardtekst":
- * `parseLesbezoekTemplates` vult die aan bij het lezen, dus wissen is hier het
- * herstelknopje.
+ * Bewaart de mailsjablonen. Ondersteunt zowel dynamische sjablonen (toevoegen,
+ * hernoemen, verwijderen) via JSON als de klassieke formuliervelden.
  */
 export async function saveLesbezoekTemplatesAction(
   _prev: SaveState,
@@ -600,17 +1047,59 @@ export async function saveLesbezoekTemplatesAction(
 ): Promise<SaveState> {
   await requirePermission("lesbezoeken.manage");
 
-  const value: Partial<Record<string, MailTemplate>> = {};
-  for (const key of LESBEZOEK_TEMPLATE_KEYS) {
-    const subject = toSingleLine(formData.get(`${key}.subject`));
-    const body = toMessageText(formData.get(`${key}.body`));
-    if (subject || body) value[key] = { subject, body };
+  const json = formData.get("templatesJson");
+  const itemsToSave: LesbezoekTemplateItem[] = [];
+
+  if (typeof json === "string" && json.trim()) {
+    try {
+      const parsed = JSON.parse(json);
+      if (Array.isArray(parsed)) {
+        for (const raw of parsed) {
+          if (!raw || typeof raw !== "object") continue;
+          const id = toSingleLine(raw.id) || `custom_${Math.random().toString(36).slice(2, 8)}`;
+          const name = toSingleLine(raw.name) || "Sjabloon";
+          const subject = toSingleLine(raw.subject);
+          const body = toMessageText(raw.body);
+          const category =
+            raw.category === "professor" || raw.category === "nudge" || raw.category === "requester"
+              ? raw.category
+              : "other";
+          const lang = raw.lang === "en" ? "en" : "nl";
+          const isDefault = Boolean(raw.isDefault);
+
+          itemsToSave.push({
+            id,
+            name,
+            subject,
+            body,
+            category,
+            lang,
+            isDefault,
+          });
+        }
+      }
+    } catch {
+      return saveError("INVALID_INPUT");
+    }
+  } else {
+    for (const key of LESBEZOEK_TEMPLATE_KEYS) {
+      const subject = toSingleLine(formData.get(`${key}.subject`));
+      const body = toMessageText(formData.get(`${key}.body`));
+      const name = toSingleLine(formData.get(`${key}.name`));
+      itemsToSave.push({
+        id: key,
+        name: name || key,
+        subject,
+        body,
+        isDefault: true,
+      });
+    }
   }
 
   await prisma.setting.upsert({
     where: { key: LESBEZOEK_MAIL_KEY },
-    create: { key: LESBEZOEK_MAIL_KEY, value: value as LesbezoekTemplates },
-    update: { value: value as LesbezoekTemplates },
+    create: { key: LESBEZOEK_MAIL_KEY, value: itemsToSave },
+    update: { value: itemsToSave },
   });
 
   await logAudit({ action: "update", entity: "lesbezoekSettings", target: "Mailsjablonen" });

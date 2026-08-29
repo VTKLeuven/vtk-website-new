@@ -13,19 +13,28 @@ import { siteBaseUrl } from "./feeds";
 export async function listCalendarCategories(): Promise<CalendarCategoryOption[]> {
   return prisma.calendarCategory.findMany({
     where: { OR: [{ showOnCalendarPage: true }, { audience: { not: null } }] },
-    select: { slug: true, nameNl: true, nameEn: true, colour: true, audience: true },
+    select: {
+      slug: true,
+      nameNl: true,
+      nameEn: true,
+      descriptionNl: true,
+      descriptionEn: true,
+      colour: true,
+      audience: true,
+    },
     orderBy: [{ order: "asc" }, { nameNl: "asc" }],
   });
 }
 
 /**
- * De feed-URL die bij een weergave hoort. Absoluut, want hij belandt in een
- * `webcal:`-link en in de `cid`-parameter van Google Calendar; een relatief pad
- * doet daar niets.
+ * De hoofdfeed zonder selectie. Absoluut, want hij belandt in een `webcal:`-link
+ * en in het klembord voor Google Calendar; een relatief pad doet daar niets.
+ *
+ * De abonneerdialoog hangt er zelf `c`- en `algemeen`-parameters aan (zie
+ * `feedScopeFromQuery`), dus er is maar één basis-URL nodig.
  */
-export function feedUrlFor(locale: Locale, categorySlug?: string): string {
-  const path = categorySlug ? `/api/calendar/feed/c/${categorySlug}.ics` : "/api/calendar/feed.ics";
-  return `${siteBaseUrl()}${path}${locale === "en" ? "?lang=en" : ""}`;
+export function feedBaseUrlFor(locale: Locale): string {
+  return `${siteBaseUrl()}/api/calendar/feed.ics${locale === "en" ? "?lang=en" : ""}`;
 }
 
 /** Labels van de kalenderweergave; gedeeld door /kalender en de categoriepagina's. */
@@ -36,8 +45,6 @@ export function calendarLabels(locale: Locale) {
     crumbsHere: nl ? "Kalender" : "Calendar",
     metaEvents: nl ? "Evenementen (deze maand)" : "Events (this month)",
     weekLine: nl ? "Raster" : "Grid",
-    legendTitle: nl ? "Legende" : "Legend",
-    legendSub: nl ? "Op basis van categorie" : "By category",
     agendaNext: nl ? "Eerstvolgend" : "Up next",
     agendaSub: nl ? "Komende 14 dagen" : "Next 14 days",
     emptyMonth: nl ? "Geen evenementen deze maand." : "No events this month.",
@@ -51,7 +58,6 @@ export function calendarLabels(locale: Locale) {
     prevEvents: nl ? "Vorige maand" : "Previous month",
     nextMonth: nl ? "Volgende maand" : "Next month",
     all: nl ? "Alle" : "All",
-    uncategorised: nl ? "Zonder categorie" : "Uncategorised",
     audienceFilters: nl ? "Doelgroepen" : "Target audiences",
     onlyMyAudiences: nl ? "Afstemmen op mijn profiel" : "Tailor to my profile",
     onlyMyAudiencesHint: nl

@@ -56,12 +56,16 @@ export default async function OnboardingPage({
       mailCategories: true,
       shiftReminderDayBefore: true,
       shiftReminderSoon: true,
+      calendarOnlyMyAudiences: true,
       studyYears: true,
       studyProgrammes: true,
       notAtFaculty: true,
       notStudying: true,
       internationalStudent: true,
       alumni: true,
+      graduationYear: true,
+      wasInVtk: true,
+      alumniMailOptIn: true,
     },
   });
 
@@ -76,7 +80,13 @@ export default async function OnboardingPage({
       </div>
 
       <Card className="p-6">
-        <ProfileForm locale={locale} user={user} next={home} submitLabel={t.submit} />
+        <ProfileForm
+          locale={locale}
+          user={user}
+          next={home}
+          submitLabel={t.submit}
+          showCalendarPreference={false}
+        />
       </Card>
 
       <form action={logoutAction}>

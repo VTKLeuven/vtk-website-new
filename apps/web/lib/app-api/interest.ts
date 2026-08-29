@@ -2,7 +2,6 @@ import "server-only";
 
 import { prisma } from "@vtk/db";
 
-import { audienceFilter, viewerAudiences } from "@/lib/calendar/audience";
 
 /**
  * Interesse in een evenement, en gevolgde categorieën.
@@ -24,16 +23,17 @@ import { audienceFilter, viewerAudiences } from "@/lib/calendar/audience";
  * ster een manier zijn om te achterhalen welke id's bestaan.
  */
 
-/** Of dit evenement zichtbaar is voor wie nu kijkt. */
+/**
+ * Of dit evenement bestaat en online staat.
+ *
+ * Bewust géén doelgroepcontrole: elk gepubliceerd evenement is publiek, en de
+ * doelgroepfilter is een persoonlijke weergavevoorkeur. Wie de filter aanzette en
+ * toch op een alumni-evenement belandt (via een link, of via de kalender van die
+ * doelgroep) hoort gewoon te kunnen zeggen dat hij komt.
+ */
 export async function eventIsVisible(eventId: string): Promise<boolean> {
-  const audiences = await viewerAudiences();
   const count = await prisma.calendarEvent.count({
-    where: {
-      id: eventId,
-      visibility: "PUBLIC",
-      publishedAt: { not: null },
-      ...audienceFilter(audiences),
-    },
+    where: { id: eventId, publishedAt: { not: null } },
   });
   return count > 0;
 }

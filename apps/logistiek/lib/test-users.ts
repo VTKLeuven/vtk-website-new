@@ -1,6 +1,6 @@
 import 'server-only';
 import { prisma } from '@vtk/db';
-import { currentWorkingYear, type SessionPayload } from '@vtk/auth';
+import { currentStudyYear, type SessionPayload } from '@vtk/auth';
 
 /**
  * Test-login voor de uitleendienst. Op een testomgeving (dev.vtk.be, lokaal) is
@@ -168,7 +168,7 @@ export async function ensureTestUser(key: TestUserKey): Promise<void> {
       active: true,
       isSuperAdmin: p.isSuperAdmin,
       onboardedAt: new Date(),
-      studyConfirmedYear: currentWorkingYear(),
+      studyConfirmedYear: currentStudyYear(),
     },
   });
 }
@@ -202,7 +202,7 @@ export async function buildTestSession(key: TestUserKey): Promise<SessionPayload
       locale: 'NL',
       isSuperAdmin: p.isSuperAdmin,
       onboarded: true,
-      studyConfirmedYear: currentWorkingYear(),
+      studyConfirmedYear: currentStudyYear(),
       // Testgebruikers van de uitleendienst raken de Google-koppeling niet aan;
       // "gekoppeld" houdt de koppelgate uit de weg.
       googleLinked: true,

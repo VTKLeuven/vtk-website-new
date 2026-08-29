@@ -71,7 +71,7 @@ altijd `Cache-Control: no-store`.
 
 | Status | JSON `error` | Betekenis |
 |---|---|---|
-| `200` | — | De Pi heeft de open-opdracht aanvaard. |
+| `200` | None | De Pi heeft de open-opdracht aanvaard. |
 | `401` | `unauthorized` | Token ontbreekt, is ongeldig, ingetrokken of vervallen. |
 | `403` | `forbidden` | Gebruiker is inactief of heeft `door.remoteOpen` niet meer. |
 | `429` | `rate_limited` | Hetzelfde token werd minder dan vijf seconden geleden gebruikt. |

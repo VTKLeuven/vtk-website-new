@@ -1,11 +1,16 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState, useTransition } from "react";
 import { Input, Label } from "@vtk/ui";
 import { SaveForm } from "@/components/ui/SaveForm";
 import { DeleteButton, DeleteIconButton } from "@/components/ui/DeleteIconButton";
 import { CheckboxChip } from "@/components/profile/StudyFieldset";
-import { savePocAction, deletePocAction, removePocRepresentativeAction } from "@/app/actions/pocs-partners";
+import {
+  savePocAction,
+  deletePocAction,
+  removePocRepresentativeAction,
+  reorderPocsAction,
+} from "@/app/actions/pocs-partners";
 import { AddRepresentativeForm } from "./AddRepresentativeForm";
 import { Avatar, Chevron, Modal, Panel, SearchBar, SortHeader, useTableControls } from "../admin-table";
 
@@ -83,33 +88,63 @@ export type SaveLabels = {
 
 export function PocsTable({
   pocs,
+  year,
+  yearLabel,
   locale,
   saveLabels,
   createLabels,
   programmeOptions,
 }: {
   pocs: PocRow[];
+  year?: number;
+  yearLabel?: string;
   locale: "nl" | "en";
   saveLabels: SaveLabels;
   createLabels: SaveLabels;
   programmeOptions: ProgrammeOption[];
 }) {
   const nl = locale === "nl";
+  const [prevPocs, setPrevPocs] = useState(pocs);
+  const [items, setItems] = useState<PocRow[]>(pocs);
   const [createOpen, setCreateOpen] = useState(false);
-  const { query, setQuery, sort, toggleSort, filtered, isOpen, toggleRow } = useTableControls(pocs, {
+  const [, startTransition] = useTransition();
+
+  if (pocs !== prevPocs) {
+    setPrevPocs(pocs);
+    setItems(pocs);
+  }
+
+  const { query, setQuery, sort, toggleSort, filtered, isOpen, toggleRow } = useTableControls(items, {
     searchOf: (r) => r.searchText,
     nameOf: (r) => r.name,
     countOf: (r) => r.reps.length,
     locale,
   });
 
+  const dragFrom = useRef<number | null>(null);
+  const [overIndex, setOverIndex] = useState<number | null>(null);
+  const isReorderable = !query && !sort;
+
+  function onDrop(to: number) {
+    const from = dragFrom.current;
+    dragFrom.current = null;
+    setOverIndex(null);
+    if (from === null || from === to) return;
+    const next = [...items];
+    const [moved] = next.splice(from, 1);
+    next.splice(to, 0, moved);
+    setItems(next);
+    startTransition(() => void reorderPocsAction(next.map((p) => p.id)));
+  }
+
   return (
     <div className="space-y-4">
+      {/* Toolbar: zoeken + nieuwe POC */}
       <div className="flex flex-wrap items-center gap-3">
         <SearchBar
           value={query}
           onChange={setQuery}
-          placeholder={nl ? "Zoek op naam, richting of vertegenwoordiger" : "Search by name, track or representative"}
+          placeholder={nl ? "Zoek op naam, e-mail of opleiding" : "Search by name, email or programme"}
           ariaLabel={nl ? "POC's zoeken" : "Search POCs"}
         />
         <button type="button" className="vtk-tile-btn vtk-tile-btn-primary" onClick={() => setCreateOpen(true)}>
@@ -121,9 +156,10 @@ export function PocsTable({
         <table>
           <thead>
             <tr>
-              <SortHeader label={nl ? "POC" : "POC"} active={sort?.key === "name" ? sort.dir : null} onClick={() => toggleSort("name")} />
+              <th className="w-8" aria-hidden />
+              <SortHeader label="POC" active={sort?.key === "name" ? sort.dir : null} onClick={() => toggleSort("name")} />
               <SortHeader
-                label={nl ? "Vertegenwoordigers" : "Representatives"}
+                label={nl ? "Studentenvertegenwoordigers" : "Student reps"}
                 active={sort?.key === "count" ? sort.dir : null}
                 onClick={() => toggleSort("count")}
                 align="right"
@@ -132,12 +168,32 @@ export function PocsTable({
             </tr>
           </thead>
           <tbody>
-            {filtered.map((poc) => (
+            {filtered.map((poc, index) => (
               <PocRowView
                 key={poc.id}
                 poc={poc}
+                isReorderable={isReorderable}
+                isOver={overIndex === index}
+                onDragStart={() => {
+                  dragFrom.current = index;
+                }}
+                onDragEnd={() => {
+                  dragFrom.current = null;
+                  setOverIndex(null);
+                }}
+                onDragOver={(e) => {
+                  if (!isReorderable) return;
+                  e.preventDefault();
+                  if (overIndex !== index) setOverIndex(index);
+                }}
+                onDrop={(e) => {
+                  if (!isReorderable) return;
+                  e.preventDefault();
+                  onDrop(index);
+                }}
                 isOpen={isOpen(poc.id)}
                 onToggle={() => toggleRow(poc.id)}
+                year={year}
                 nl={nl}
                 locale={locale}
                 saveLabels={saveLabels}
@@ -162,14 +218,10 @@ export function PocsTable({
             {...createLabels}
             onSuccess={() => setCreateOpen(false)}
           >
-            <div><Label>Slug</Label><Input name="slug" required placeholder="computerwetenschappen" /></div>
-            <div><Label>{nl ? "Volgorde" : "Order"}</Label><Input name="order" type="number" defaultValue={pocs.length} /></div>
             <div><Label>{nl ? "Naam (NL)" : "Name (NL)"}</Label><Input name="nameNl" required /></div>
-            <div><Label>{nl ? "Naam (EN)" : "Name (EN)"}</Label><Input name="nameEn" /></div>
-            <div className="md:col-span-2">
-              <Label>{nl ? "E-mailadres van de POC" : "POC email address"}</Label>
-              <Input name="email" type="email" placeholder="wtk-poc@vtk.be" autoComplete="off" />
-            </div>
+            <div><Label>{nl ? "Naam (EN)" : "Name (EN)"}</Label><Input name="nameEn" required /></div>
+            <div><Label>{nl ? "E-mail (optioneel)" : "Email (optional)"}</Label><Input name="email" type="email" placeholder="poc-…@vtk.be" /></div>
+            <div><Label>{nl ? "Code" : "Code"}</Label><Input name="code" placeholder={nl ? "auto" : "auto"} /></div>
             <div className="md:col-span-2">
               <ProgrammesField options={programmeOptions} selected={[]} nl={nl} />
             </div>
@@ -182,6 +234,13 @@ export function PocsTable({
 
 function PocRowView({
   poc,
+  year,
+  isReorderable,
+  isOver,
+  onDragStart,
+  onDragEnd,
+  onDragOver,
+  onDrop,
   isOpen,
   onToggle,
   nl,
@@ -190,6 +249,13 @@ function PocRowView({
   programmeOptions,
 }: {
   poc: PocRow;
+  year?: number;
+  isReorderable: boolean;
+  isOver: boolean;
+  onDragStart: () => void;
+  onDragEnd: () => void;
+  onDragOver: (e: React.DragEvent) => void;
+  onDrop: (e: React.DragEvent) => void;
   isOpen: boolean;
   onToggle: () => void;
   nl: boolean;
@@ -205,6 +271,11 @@ function PocRowView({
         tabIndex={0}
         aria-expanded={isOpen}
         aria-controls={detailId}
+        draggable={isReorderable}
+        onDragStart={onDragStart}
+        onDragEnd={onDragEnd}
+        onDragOver={onDragOver}
+        onDrop={onDrop}
         onClick={onToggle}
         onKeyDown={(e) => {
           if (e.key === "Enter" || e.key === " ") {
@@ -212,8 +283,21 @@ function PocRowView({
             onToggle();
           }
         }}
-        className="cursor-pointer"
+        className={`cursor-pointer transition-colors ${
+          isOver ? "border-vtk-blue bg-vtk-yellow/20" : ""
+        }`}
       >
+        <td className="w-8 text-center text-zinc-400" onClick={(e) => isReorderable && e.stopPropagation()}>
+          {isReorderable && (
+            <span
+              className="cursor-grab active:cursor-grabbing hover:text-vtk-ink text-base select-none px-1"
+              title={nl ? "Sleep om volgorde te wijzigen" : "Drag to reorder"}
+              aria-hidden="true"
+            >
+              ⠿
+            </span>
+          )}
+        </td>
         <td>
           <div className="flex items-start gap-2">
             <Chevron open={isOpen} />
@@ -230,9 +314,10 @@ function PocRowView({
       </tr>
       {isOpen && (
         <tr id={detailId}>
-          <td colSpan={3} className="bg-vtk-blue-soft/20">
+          <td colSpan={4} className="bg-vtk-blue-soft/20">
             <PocDetail
               poc={poc}
+              year={year}
               nl={nl}
               locale={locale}
               saveLabels={saveLabels}
@@ -247,12 +332,14 @@ function PocRowView({
 
 function PocDetail({
   poc,
+  year,
   nl,
   locale,
   saveLabels,
   programmeOptions,
 }: {
   poc: PocRow;
+  year?: number;
   nl: boolean;
   locale: "nl" | "en";
   saveLabels: SaveLabels;
@@ -303,7 +390,7 @@ function PocDetail({
               ) : (
                 <p className="text-sm text-[#5c667f]">{nl ? "Nog geen vertegenwoordigers." : "No representatives yet."}</p>
               )}
-              <AddRepresentativeForm pocId={poc.id} locale={locale} />
+              <AddRepresentativeForm pocId={poc.id} year={year} locale={locale} />
             </div>
           ) : poc.reps.length > 0 ? (
             <ul className="flex flex-wrap gap-2">
@@ -334,8 +421,7 @@ function PocDetail({
             <input type="hidden" name="id" value={poc.id} />
             <div className="md:col-span-3"><Label>{nl ? "Naam (NL)" : "Name (NL)"}</Label><Input name="nameNl" defaultValue={poc.nameNl} required /></div>
             <div className="md:col-span-3"><Label>{nl ? "Naam (EN)" : "Name (EN)"}</Label><Input name="nameEn" defaultValue={poc.nameEn} /></div>
-            <div className="md:col-span-3"><Label>Slug</Label><Input name="slug" defaultValue={poc.slug} required /></div>
-            <div className="md:col-span-3"><Label>{nl ? "Volgorde" : "Order"}</Label><Input name="order" type="number" defaultValue={poc.order} /></div>
+            <div className="md:col-span-6"><Label>Slug</Label><Input name="slug" defaultValue={poc.slug} required /></div>
             <div className="md:col-span-6">
               <Label>{nl ? "E-mailadres van de POC" : "POC email address"}</Label>
               <Input name="email" type="email" defaultValue={poc.email} placeholder="wtk-poc@vtk.be" autoComplete="off" />

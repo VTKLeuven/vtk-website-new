@@ -72,6 +72,17 @@ function value(formData: FormData, key: string): string {
   return String(formData.get(key) ?? "").trim();
 }
 
+/**
+ * De doelgroep van een ticketsoort. Alles wat we niet herkennen wordt `PUBLIC`:
+ * een onbekende waarde mag nooit per ongeluk een strengere of net ruimere groep
+ * opleveren dan wat de beheerder koos.
+ */
+function ticketAudienceFrom(raw: string): "PUBLIC" | "MEMBERS" | "HONORARY" {
+  if (raw === "MEMBERS") return "MEMBERS";
+  if (raw === "HONORARY") return "HONORARY";
+  return "PUBLIC";
+}
+
 function optionalValue(formData: FormData, key: string): string | null {
   return value(formData, key) || null;
 }
@@ -702,13 +713,20 @@ export async function createTicketTypeAction(formData: FormData): Promise<void> 
         descriptionEn: limitedOptionalValue(formData, "descriptionEn", 5_000),
         unitPriceCents,
         currency: event.currency,
-        audience: value(formData, "audience") === "MEMBERS" ? "MEMBERS" : "PUBLIC",
+        audience: ticketAudienceFrom(value(formData, "audience")),
         color: ticketColorKey(formData.get("color")),
         salesStartAt,
         salesEndAt,
         minPerOrder,
         maxPerOrder,
-        sortOrder: integerValue(formData, "sortOrder", 0),
+        sortOrder:
+          integerValue(formData, "sortOrder", -1) >= 0
+            ? integerValue(formData, "sortOrder", 0)
+            : ((await tx.ticketType.findFirst({
+                where: { eventId },
+                orderBy: { sortOrder: "desc" },
+                select: { sortOrder: true },
+              }))?.sortOrder ?? -1) + 1,
       },
     });
     await tx.ticketAuditLog.create({
@@ -727,6 +745,29 @@ export async function createTicketTypeAction(formData: FormData): Promise<void> 
     entityId: eventId,
     target: `${event.titleNl}: ${nameNl}`,
     summary: `${(unitPriceCents / 100).toFixed(2)} euro per ticket`,
+  });
+  refreshTicketEvent(locale, eventId);
+}
+
+export async function reorderTicketTypesAction(formData: FormData): Promise<void> {
+  const eventId = value(formData, "eventId");
+  const locale = localeSchema.parse(value(formData, "locale") || "nl");
+  await requireTicketEventCapability(eventId, "MANAGE_INVENTORY");
+  const ids = formData.getAll("ids").map(String);
+  await prisma.$transaction(
+    ids.map((id, index) =>
+      prisma.ticketType.update({
+        where: { id },
+        data: { sortOrder: index },
+      })
+    )
+  );
+  await logAudit({
+    action: "reorder",
+    entity: "ticketType",
+    entityId: eventId,
+    target: `${await ticketEventTitle(eventId)}`,
+    summary: "volgorde van tickettypes gewijzigd",
   });
   refreshTicketEvent(locale, eventId);
 }
@@ -902,7 +943,14 @@ export async function createTicketQuestionAction(formData: FormData): Promise<vo
       type,
       required: formData.get("required") === "on" || formData.get("required") === "true",
       options: options.length ? options : undefined,
-      sortOrder: integerValue(formData, "sortOrder", 0),
+      sortOrder:
+        integerValue(formData, "sortOrder", -1) >= 0
+          ? integerValue(formData, "sortOrder", 0)
+          : ((await prisma.ticketQuestion.findFirst({
+              where: { eventId },
+              orderBy: { sortOrder: "desc" },
+              select: { sortOrder: true },
+            }))?.sortOrder ?? -1) + 1,
     },
   });
   await prisma.ticketAuditLog.create({
@@ -919,6 +967,29 @@ export async function createTicketQuestionAction(formData: FormData): Promise<vo
     entity: "ticketQuestion",
     entityId: eventId,
     target: `${await ticketEventTitle(eventId)}: ${labelNl}`,
+  });
+  refreshTicketEvent(locale, eventId);
+}
+
+export async function reorderTicketQuestionsAction(formData: FormData): Promise<void> {
+  const eventId = value(formData, "eventId");
+  const locale = localeSchema.parse(value(formData, "locale") || "nl");
+  await requireTicketEventCapability(eventId, "MANAGE_EVENT");
+  const ids = formData.getAll("ids").map(String);
+  await prisma.$transaction(
+    ids.map((id, index) =>
+      prisma.ticketQuestion.update({
+        where: { id },
+        data: { sortOrder: index },
+      })
+    )
+  );
+  await logAudit({
+    action: "reorder",
+    entity: "ticketQuestion",
+    entityId: eventId,
+    target: `${await ticketEventTitle(eventId)}`,
+    summary: "volgorde van deelnemersvragen gewijzigd",
   });
   refreshTicketEvent(locale, eventId);
 }

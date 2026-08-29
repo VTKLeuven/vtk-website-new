@@ -286,8 +286,20 @@ the design language into the application instead of copying mockup content.
 - Content pages (`PageView`): dark head with a breadcrumb to the category, then
   the text column with an optional rail beside it holding the page outline (H2
   and H3, anchors from `lib/pageOutline.ts`) and the downloads. The rail only
-  appears when there are at least two headings or a download, sticks on desktop,
-  and moves above the text on narrow screens.
+  appears when there are at least two headings, a download, or a linked form; it
+  sticks on desktop and moves above the text on narrow screens.
+  - A page can carry one form (`Form.pageId`), rendered as a `.vtk-page-form`
+    panel in the text column: a `--surface` card with the yellow accent rail,
+    the same treatment as any featured card. It sits where the editor put the
+    `[[formulier]]` marker in the markdown, and at the bottom otherwise. Do not
+    give it a navy band or a photo header; the panel belongs to the text, not
+    beside it. See `docs/design-decisions.md` for the three directions that were
+    reviewed and rejected.
+  - In that rail the form is **not** another muted outline row but a yellow
+    button (`.vtk-rail-form`) carrying the title and the deadline, breaking the
+    hairline at the position the panel has in the text. It goes grey
+    (`data-state="closed"`) once the form is closed, full or already submitted.
+    Someone who opened the page to sign up should not have to hunt for it.
   - The rail is a register in the margin, not a card: a hairline guide down the
     left, muted links with air between them, an uppercase ink label leading the
     list, and a 2px yellow marker on the heading you are reading. `PageOutline`

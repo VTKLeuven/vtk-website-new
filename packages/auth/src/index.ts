@@ -10,7 +10,7 @@ import type { Permission } from './lib/permissions';
 
 export { splitFullName, fullName, nameParts, type NameParts } from './lib/names';
 export { PERMISSIONS, isPermission, permissionCodes, type Permission } from './lib/permissions';
-export { currentWorkingYear, FIRST_WORKING_YEAR } from './lib/workingYear';
+export { currentWorkingYear, currentStudyYear, studyYearStart, FIRST_WORKING_YEAR } from './lib/workingYear';
 export {
   SCOPES,
   SCOPE_CODES,
@@ -69,8 +69,8 @@ export type AuthUser = {
   /** `false` until the member completes the onboarding profile. */
   onboarded: boolean;
   /**
-   * Werkingsjaar waarin het studieprofiel laatst bevestigd werd, of `null`.
-   * Bewust de ruwe waarde en geen `studyConfirmed`-boolean: welk werkingsjaar
+   * Academiejaar waarin het studieprofiel laatst bevestigd werd, of `null`.
+   * Bewust de ruwe waarde en geen `studyConfirmed`-boolean: welk academiejaar
    * "nu" is, hangt af van de cutover-logica in de app (`lib/workingYear.ts`),
    * die hier niet thuishoort.
    */

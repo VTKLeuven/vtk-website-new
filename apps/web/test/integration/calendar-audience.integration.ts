@@ -114,7 +114,6 @@ describe.sequential("kalender-doelgroepen", () => {
           start,
           end,
           groupId: ids.group,
-          visibility: "PUBLIC",
           publishedAt: new Date(),
           categories: { create: categoryIds.map((categoryId) => ({ categoryId })) },
         },

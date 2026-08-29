@@ -190,7 +190,6 @@ export async function sendCalendarFollowPush(now: Date = new Date()): Promise<No
   const events = await prisma.calendarEvent.findMany({
     where: {
       announcedPushAt: null,
-      visibility: "PUBLIC",
       publishedAt: { not: null, gte: new Date(now.getTime() - ANNOUNCE_WINDOW_MS) },
       start: { gte: now },
       categories: { some: { category: { followers: { some: {} } } } },
@@ -269,7 +268,6 @@ export async function sendInterestReminderPush(now: Date = new Date()): Promise<
       remindedAt: null,
       event: {
         start: { gte: now, lte: new Date(now.getTime() + INTEREST_REMINDER_MS) },
-        visibility: "PUBLIC",
         publishedAt: { not: null },
       },
     },

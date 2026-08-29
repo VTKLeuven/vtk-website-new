@@ -7,7 +7,7 @@ import type { Locale } from "@vtk/i18n";
 import { publicUrl } from "@/lib/storage";
 import { readFieldValues } from "@/lib/frontpage/fields";
 import { frontpagePhoto, getFrontpageModule } from "@/lib/frontpage/registry";
-import { audienceFilter, viewerAudiences } from "@/lib/calendar/audience";
+import { viewerAudienceFilter } from "@/lib/calendar/audience";
 import { Frontpage } from "@/components/editorial/frontpage";
 
 // Outside `app/[locale]/` on purpose, so the site header, the footer and the
@@ -52,13 +52,12 @@ export default async function FrontpagePreview({
   const now = new Date();
   const [row, upcomingEvents, partners] = await Promise.all([
     prisma.frontpage.findUnique({ where: { layout } }),
-    viewerAudiences().then((audiences) =>
+    viewerAudienceFilter().then((audiences) =>
       prisma.calendarEvent.findMany({
         where: {
           start: { gte: now },
-          visibility: "PUBLIC",
           publishedAt: { not: null },
-          ...audienceFilter(audiences),
+          ...audiences,
         },
         orderBy: { start: "asc" },
         take: 8,
@@ -87,7 +86,15 @@ export default async function FrontpagePreview({
           locale={locale}
           base={base}
           now={now}
-          upcomingEvents={upcomingEvents}
+          upcomingEvents={upcomingEvents.map((event) => ({
+            id: event.id,
+            start: event.start,
+            titleNl: event.titleNl,
+            titleEn: event.titleEn,
+            location: event.location,
+            group: { nameNl: event.group.nameNl, nameEn: event.group.nameEn },
+            interestedCount: null,
+          }))}
           partners={partners}
         />
       </div>

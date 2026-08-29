@@ -9,6 +9,16 @@ import { publicUrl } from "@/lib/storage";
 import { eventMetadata } from "@/lib/pageMetadata";
 import { loadCalendarCategory, loadCalendarEvent, loadDefaultEventImage } from "@/lib/pageQueries";
 import { buildMetadata } from "@/lib/seo";
+import { getCurrentSession } from "@/lib/session";
+import {
+  attendeeList,
+  interestLabel,
+  INTEREST_PUBLIC_THRESHOLD,
+  interestTotal,
+  viewerInterest,
+} from "@/lib/calendar/interest";
+import { EventInterest } from "@/components/calendar/EventInterest";
+import { AttendeeTable } from "@/components/calendar/AttendeeTable";
 import { CategoryCalendar } from "./CategoryCalendar";
 
 import "@/app/design/vtk-event.css";
@@ -22,7 +32,8 @@ function audienceLabel(audience: string | null, locale: Locale): string {
   const nl = locale === "nl";
   if (audience === "FIRST_YEARS") return nl ? "Voor eerstejaars" : "For first years";
   if (audience === "LAST_YEARS") return nl ? "Voor laatstejaars" : "For last years";
-  if (audience === "INTERNATIONALS") return nl ? "Voor internationals" : "For international students";
+  if (audience === "INTERNATIONALS")
+    return nl ? "Voor internationals" : "For international students";
   if (audience === "ALUMNI") return nl ? "Voor alumni" : "For alumni";
   return nl ? "Voor een specifieke doelgroep" : "For a specific audience";
 }
@@ -38,8 +49,16 @@ function formatDateRange(start: Date, end: Date, locale: Locale, allDay: boolean
   });
   if (allDay) return `${day} · ${locale === "nl" ? "hele dag" : "all day"}`;
 
-  const startTime = start.toLocaleTimeString(dateLocale, { timeZone: "Europe/Brussels", hour: "2-digit", minute: "2-digit" });
-  const endTime = end.toLocaleTimeString(dateLocale, { timeZone: "Europe/Brussels", hour: "2-digit", minute: "2-digit" });
+  const startTime = start.toLocaleTimeString(dateLocale, {
+    timeZone: "Europe/Brussels",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+  const endTime = end.toLocaleTimeString(dateLocale, {
+    timeZone: "Europe/Brussels",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
   return `${day} · ${startTime} - ${endTime}`;
 }
 
@@ -61,7 +80,7 @@ export async function generateMetadata({ params }: { params: Params }): Promise<
   }
 
   const event = await loadCalendarEvent(slugOrId);
-  if (!event || event.visibility !== "PUBLIC") return {};
+  if (!event) return {};
 
   const image = publicUrl(event.imageKey) ?? (await loadDefaultEventImage());
   return eventMetadata(event, locale, `/kalender/${event.id}`, image);
@@ -81,11 +100,11 @@ export default async function CalendarSegmentPage({ params }: { params: Params }
   const base = locale === "nl" ? "" : "/en";
 
   const category = await loadCalendarCategory(slugOrId);
-  if (category) return <CategoryCalendar category={category} locale={locale} />;
+  if (category) return <CategoryCalendar locale={locale} />;
 
   const event = await loadCalendarEvent(slugOrId);
 
-  if (!event || event.visibility !== "PUBLIC") notFound();
+  if (!event) notFound();
 
   const title = pick(event.titleNl, event.titleEn, locale);
   const description = pick(event.descriptionNl ?? "", event.descriptionEn ?? "", locale);
@@ -93,10 +112,22 @@ export default async function CalendarSegmentPage({ params }: { params: Params }
   const imageSrc = publicUrl(event.imageKey) ?? (await loadDefaultEventImage());
   // Doelgroepen krijgen een eigen, opvallend label: wie hier toevallig belandt
   // moet meteen zien dat het evenement voor eerstejaars of internationals is.
-  const audiences = event.categories
-    .map((c) => c.category)
-    .filter((c) => c.audience !== null);
+  const audiences = event.categories.map((c) => c.category).filter((c) => c.audience !== null);
   const themes = event.categories.map((c) => c.category).filter((c) => c.audience === null);
+
+  // "Ik kom naar dit evenement". De teller verschijnt pas vanaf een drempel; zie
+  // lib/calendar/interest.ts voor waarom een laag getal averechts werkt.
+  const isAlumniEvent = audiences.some((c) => c.audience === "ALUMNI");
+  const session = await getCurrentSession();
+  const [total, viewer, attendees] = await Promise.all([
+    interestTotal(event.id),
+    viewerInterest(event.id, session?.user.id ?? null),
+    // Enkel een alumni-evenement heeft een namenlijst; elders is interesse een
+    // private markering en zou een lijst een deelnemerslijst suggereren.
+    isAlumniEvent ? attendeeList(event.id) : Promise.resolve([]),
+  ]);
+  const countLine = interestLabel(total >= INTEREST_PUBLIC_THRESHOLD ? total : null, locale);
+  const nl = locale === "nl";
 
   return (
     <article className="vtk-page">
@@ -109,7 +140,9 @@ export default async function CalendarSegmentPage({ params }: { params: Params }
             · {groupName}
           </div>
           <h1 className="vtk-page-title">{title}</h1>
-          <p className="vtk-page-subtitle">{formatDateRange(event.start, event.end, locale, event.allDay)}</p>
+          <p className="vtk-page-subtitle">
+            {formatDateRange(event.start, event.end, locale, event.allDay)}
+          </p>
           {audiences.length > 0 || themes.length > 0 ? (
             <div className="vtk-event-tags">
               {audiences.map((c) => (
@@ -143,21 +176,23 @@ export default async function CalendarSegmentPage({ params }: { params: Params }
       </header>
 
       <div className="vtk-event-layout">
-        <figure className="vtk-event-photo">
-          <Image
-            src={imageSrc}
-            alt=""
-            fill
-            sizes="(max-width: 960px) 100vw, 58vw"
-            className="vtk-event-photo-img"
-            priority
-          />
-        </figure>
+        <div className="vtk-event-media-col">
+          <figure className="vtk-event-photo">
+            <Image
+              src={imageSrc}
+              alt=""
+              fill
+              sizes="(max-width: 960px) 100vw, 58vw"
+              className="vtk-event-photo-img"
+              priority
+            />
+          </figure>
+
+          {isAlumniEvent ? <AttendeeTable rows={attendees} locale={locale} /> : null}
+        </div>
 
         <section className="vtk-panel vtk-event-info">
-          <h2>
-            {locale === "nl" ? "Over dit event" : "About this event"}
-          </h2>
+          <h2>{locale === "nl" ? "Over dit event" : "About this event"}</h2>
           {description ? (
             <div className="prose-vtk vtk-event-description">
               <Markdown>{description}</Markdown>
@@ -171,16 +206,65 @@ export default async function CalendarSegmentPage({ params }: { params: Params }
           )}
           <dl className="spec">
             <dt>{locale === "nl" ? "Start" : "Start"}</dt>
-            <dd>{event.start.toLocaleString(locale === "nl" ? "nl-BE" : "en-GB", { timeZone: "Europe/Brussels" })}</dd>
+            <dd>
+              {event.start.toLocaleString(locale === "nl" ? "nl-BE" : "en-GB", {
+                timeZone: "Europe/Brussels",
+              })}
+            </dd>
             <dt>{locale === "nl" ? "Einde" : "End"}</dt>
-            <dd>{event.end.toLocaleString(locale === "nl" ? "nl-BE" : "en-GB", { timeZone: "Europe/Brussels" })}</dd>
-            <dt>{locale === "nl" ? "Zichtbaarheid" : "Visibility"}</dt>
-            <dd>{locale === "nl" ? "Publiek" : "Public"}</dd>
+            <dd>
+              {event.end.toLocaleString(locale === "nl" ? "nl-BE" : "en-GB", {
+                timeZone: "Europe/Brussels",
+              })}
+            </dd>
           </dl>
           <div className="vtk-event-actions">
-            <Link href={`${base}/kalender`} className="btn btn-ghost">
-              ← {locale === "nl" ? "Terug naar kalender" : "Back to calendar"}
-            </Link>
+            {/* "Ik kom" hoort bij "Tickets kopen" en "Zet in mijn agenda": het is
+                dezelfde soort beslissing over dit evenement. Wat er méér nodig is
+                (de zichtbaarheidsvakjes, of het gastformulier bij een
+                alumni-evenement) klapt eronder open over de volle breedte. */}
+            <EventInterest
+              eventId={event.id}
+              isAlumniEvent={isAlumniEvent}
+              signedIn={Boolean(session)}
+              viewer={viewer}
+              loginHref={`${base}/inloggen?next=${encodeURIComponent(`${base}/kalender/${event.id}`)}`}
+              labels={{
+                interested: nl ? "Geïnteresseerd" : "Interested",
+                removeInterest: nl ? "Niet meer geïnteresseerd" : "Remove interest",
+                saving: nl ? "Bezig..." : "Working...",
+                countLine,
+                loginCta: nl
+                  ? "Log in om je interesse aan te duiden"
+                  : "Sign in to mark your interest",
+                detailsHeading: nl
+                  ? "Wat mogen anderen zien bij ‘Wie er komt’?"
+                  : "What may others see under ‘Who is coming’?",
+                detailsHint: nl
+                  ? "Zo zien anderen wie er komt, en help je dus mede alumni te overtuigen om te komen door ze te laten weten dat ze mensen zullen herkennen!"
+                  : "This shows others who is coming and helps convince fellow alumni by letting them know they will recognise people there.",
+                name: nl ? "Naam (optioneel)" : "Name (optional)",
+                namePlaceholder: nl ? "Jouw naam" : "Your name",
+                showName: nl ? "Toon mijn naam" : "Show my name",
+                graduationYear: nl ? "Afstudeerjaar (optioneel)" : "Graduation year (optional)",
+                showGraduationYear: nl ? "Toon mijn afstudeerjaar" : "Show my graduation year",
+                wasInVtk: nl ? "Ik zat in VTK Praesidium" : "I was in the VTK Praesidium",
+                showWasInVtk: nl
+                  ? "Toon mijn antwoord over VTK Praesidium"
+                  : "Show my answer about the VTK Praesidium",
+                perEventHint: nl
+                  ? "Deze gegevens gelden alleen voor dit evenement en komen niet uit je profiel. Alleen aangevinkte informatie wordt publiek getoond."
+                  : "These details apply only to this event and do not come from your profile. Only selected information is shown publicly.",
+                saveDetails: nl ? "Bewaren" : "Save",
+                detailsSaved: nl ? "Opgeslagen." : "Saved.",
+                errorVisibleValue: nl
+                  ? "Vul eerst de naam of het afstudeerjaar in dat je zichtbaar wilt maken."
+                  : "First enter the name or graduation year you want to make visible.",
+                errorGeneric: nl
+                  ? "Er ging iets mis. Probeer het opnieuw."
+                  : "Something went wrong. Please try again.",
+              }}
+            />
             {/* Losse download, geen abonnement: dit is één event, dat verandert
                 zelden nog na publicatie. Wie alles wil volgen, abonneert zich op
                 de feed vanaf /kalender. */}
@@ -197,7 +281,9 @@ export default async function CalendarSegmentPage({ params }: { params: Params }
             (!event.form.closesAt || event.form.closesAt > new Date()) ? (
               <Link
                 href={`${base}/formulieren/${event.form.slug}`}
-                className={event.ticketEvent?.status === "PUBLISHED" ? "btn btn-ghost" : "btn btn-primary"}
+                className={
+                  event.ticketEvent?.status === "PUBLISHED" ? "btn btn-ghost" : "btn btn-primary"
+                }
               >
                 {locale === "nl" ? "Inschrijven" : "Sign up"}
               </Link>
@@ -211,6 +297,9 @@ export default async function CalendarSegmentPage({ params }: { params: Params }
                 {locale === "nl" ? "Externe eventlink" : "External event link"}
               </a>
             ) : null}
+            <Link href={`${base}/kalender`} className="btn btn-ghost vtk-event-back-btn">
+              ← {locale === "nl" ? "Terug naar kalender" : "Back to calendar"}
+            </Link>
           </div>
         </section>
       </div>

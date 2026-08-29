@@ -5,15 +5,31 @@ import {
   useActionState,
   useEffect,
   useRef,
+  useState,
   type FormEvent,
   type ReactNode,
 } from "react";
-import { Button } from "@vtk/ui";
+import { Button, ConfirmDialog } from "@vtk/ui";
 import { useToast } from "@/components/ui/toast";
 import { FormBusyProvider, useFormBusy } from "@/components/ui/formBusy";
 import { SAVE_IDLE, type SaveAction } from "@/lib/saveState";
 
-type SecondarySubmit = { name: string; value: string; label: string };
+type SecondarySubmit = {
+  name: string;
+  value: string;
+  label: string;
+  /**
+   * Vraagt eerst een bevestiging. Voor een knop die iets doet wat de bezoeker
+   * van de site meteen merkt (een evenement offline halen), maar die niet als
+   * "verwijderen" gelabeld staat en dus niet vanzelf argwaan wekt.
+   */
+  confirm?: {
+    title: string;
+    description: string;
+    confirmLabel: string;
+    cancelLabel: string;
+  };
+};
 
 /**
  * Formulier dat de uitkomst van zijn opslaan-actie als toast meldt: groen bij
@@ -75,6 +91,24 @@ export function SaveForm({
       ? secondarySubmit
       : [secondarySubmit]
     : [];
+  // Welke secundaire knop op een bevestiging staat te wachten. De knop zelf mag
+  // het formulier dan niet verzenden; dat gebeurt pas in de dialoog.
+  const [confirming, setConfirming] = useState<SecondarySubmit | null>(null);
+
+  /**
+   * Verstuurt het formulier alsof er op `submit` geklikt was. Nodig omdat de
+   * bevestigingsdialoog buiten het formulier staat: `requestSubmit` met een
+   * submitter uit de dialoog kan niet, dus zetten we de name/value zelf in de
+   * FormData.
+   */
+  function submitWith(submit: SecondarySubmit) {
+    const form = formRef.current;
+    if (!form) return;
+    const data = new FormData(form);
+    data.set(submit.name, submit.value);
+    setConfirming(null);
+    startTransition(() => formAction(data));
+  }
 
   /**
    * Zelf verzenden in plaats van `<form action={formAction}>`.
@@ -141,18 +175,32 @@ export function SaveForm({
         {secondarySubmits.map((submit) => (
           // `name`/`value` op de knop: die waarde komt enkel mee wanneer je op
           // déze knop klikt, zodat de action ziet welke van de twee je gebruikte.
+          // Staat er een bevestiging op, dan is het een gewone knop en gaat de
+          // waarde pas mee wanneer de dialoog bevestigd wordt.
           <Button
             key={`${submit.name}:${submit.value}`}
-            type="submit"
+            type={submit.confirm ? "button" : "submit"}
             variant="secondary"
-            name={submit.name}
-            value={submit.value}
+            {...(submit.confirm ? {} : { name: submit.name, value: submit.value })}
+            onClick={submit.confirm ? () => setConfirming(submit) : undefined}
             disabled={pending || submitDisabled || busy}
           >
             {submit.label}
           </Button>
         ))}
       </div>
+      {confirming?.confirm ? (
+        <ConfirmDialog
+          open
+          title={confirming.confirm.title}
+          description={confirming.confirm.description}
+          confirmLabel={confirming.confirm.confirmLabel}
+          cancelLabel={confirming.confirm.cancelLabel}
+          pending={pending}
+          onConfirm={() => submitWith(confirming)}
+          onCancel={() => setConfirming(null)}
+        />
+      ) : null}
     </form>
   );
 }

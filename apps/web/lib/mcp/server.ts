@@ -114,7 +114,6 @@ const listEventsSchema = schema<ListEventsInput>({
     from: { type: "string", format: "date-time", description: "Inclusieve ondergrens; events die hierna eindigen." },
     to: { type: "string", format: "date-time", description: "Inclusieve bovengrens; events die hiervoor starten." },
     publication: { type: "string", enum: ["all", "published", "draft"], default: "all" },
-    visibility: { type: "string", enum: ["all", "PUBLIC", "MEMBERS"], default: "all" },
     groupCode: { type: "string", minLength: 1, maxLength: 80 },
     categorySlug: { type: "string", minLength: 1, maxLength: 60 },
     order: { type: "string", enum: ["asc", "desc"], default: "desc" },
@@ -183,7 +182,6 @@ const createEventSchema = schema<CreateCalendarEventInput>({
     start: { type: "string", format: "date-time", description: "ISO 8601 met tijdzone-offset." },
     end: { type: "string", format: "date-time", description: "ISO 8601 met tijdzone-offset." },
     allDay: { type: "boolean", default: false },
-    visibility: { type: "string", enum: ["PUBLIC", "MEMBERS"], default: "PUBLIC" },
     url: {
       ...nullableText(2048),
       description: "Een absolute http(s)-URL of een intern pad dat met / begint.",

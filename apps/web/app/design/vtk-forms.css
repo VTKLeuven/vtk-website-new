@@ -386,6 +386,105 @@
   gap: 24px;
 }
 
+/* Het formulier als paneel in een contentpagina --------------------------------
+ *
+ * Een witte kaart met de gele accentrail: hetzelfde materiaal dat de huisstijl
+ * al voor een uitgelichte kaart gebruikt (zie de Styling Guidelines). Het staat
+ * in de leesvolgorde van de tekst en tegelijk duidelijk apart, zodat het niet
+ * als een alinea leest maar ook niet als een banner die er los overheen ligt.
+ */
+
+.vtk-page-form {
+  display: grid;
+  gap: 18px;
+  padding: clamp(20px, 3vw, 26px);
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  background: var(--surface);
+  box-shadow:
+    inset 3px 0 0 var(--yellow),
+    0 1px 2px rgba(14, 26, 54, 0.04);
+  /* Zelfde marge als de kopjes: de rail springt hiernaartoe en de sticky
+     sitekop mag de titel niet afdekken. */
+  scroll-margin-top: 96px;
+}
+
+.vtk-page-form-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 6px 16px;
+}
+
+.vtk-page-form-head h2 {
+  margin: 0;
+  font-size: clamp(19px, 2.2vw, 22px);
+  font-weight: 600;
+  letter-spacing: -0.015em;
+  color: var(--ink);
+  text-wrap: balance;
+}
+
+.vtk-page-form-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.vtk-page-form-status::before {
+  content: '';
+  flex: none;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--yellow);
+}
+
+.vtk-page-form-body {
+  display: grid;
+  gap: 18px;
+}
+
+/* Het formulier vult de kaart; de eigen maximumbreedte is er voor zijn eigen
+   pagina, waar er geen kaart omheen staat. */
+.vtk-page-form-body .vtk-form {
+  max-width: none;
+}
+
+/* De inleiding van het formulier staat hier tussen de paginatekst en de velden;
+   de marges van de eerste en laatste alinea zouden dubbel tellen bovenop de
+   gap. */
+.vtk-page-form-body > .prose-vtk > :first-child {
+  margin-top: 0;
+}
+
+.vtk-page-form-body > .prose-vtk > :last-child {
+  margin-bottom: 0;
+}
+
+/* Een melding binnen de kaart heeft de rand van de kaart al; een tweede kader
+   eromheen maakt er een kaart in een kaart van. */
+.vtk-page-form-body .vtk-form-notice {
+  padding: 0 0 0 14px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: inset 3px 0 0 var(--yellow);
+}
+
+.vtk-page-form-body .vtk-form-notice[data-tone='blocked'],
+.vtk-page-form-body .vtk-form-notice[data-tone='preview'],
+.vtk-page-form-body .vtk-form-notice[data-tone='warning'],
+.vtk-page-form-body .vtk-form-notice[data-tone='done'] {
+  box-shadow: inset 3px 0 0 var(--yellow);
+}
+
 .vtk-form-section {
   display: grid;
   gap: 18px;

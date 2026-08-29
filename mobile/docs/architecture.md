@@ -40,7 +40,7 @@ cookies niet en is de app na het inloggen nog steeds uitgelogd.
 ## De twee poorten
 
 `proxy.ts` op de website stuurt een lid zonder afgewerkt profiel naar
-`/onboarding`, en een lid dat zijn studie dit werkingsjaar nog niet bevestigde
+`/onboarding`, en een lid dat zijn studie dit academiejaar nog niet bevestigde
 naar `/studie-bevestigen`. **Die gate staat op pagina's en niet op `/api`.** De
 app-API ziet er dus niets van, en zonder tegenmaatregel zou een nieuw lid in een
 app zitten waar overal "niet toegelaten" staat zonder uitleg.

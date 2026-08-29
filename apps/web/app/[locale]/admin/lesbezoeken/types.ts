@@ -57,6 +57,33 @@ export type VisitView = {
    */
   mailDate: { nl: string; en: string };
   mailTime: string;
+
+  /** Openstaande ingeplande mails voor dit lesbezoek, gebundelde inbegrepen. */
+  scheduledMails: ScheduledMailView[];
+
+  /**
+   * Staat de vraag bij de professor terwijl het bezoek dichterbij komt? Op de
+   * server berekend, want de drempel staat in de instellingen en de "nu" van een
+   * laptop mag niet bepalen of er een melding staat.
+   */
+  needsNudge: boolean;
+  /** Hele dagen tot het bezoek; 0 is vandaag, negatief is voorbij. */
+  daysUntil: number;
+};
+
+export type ScheduledMailView = {
+  id: string;
+  kind: "professor" | "nudge" | "requester";
+  to: string;
+  cc: string | null;
+  /** Hoeveel lesbezoeken deze ene mail dekt; 1 bij een gewone mail. */
+  bundledCount: number;
+  subject: string;
+  body: string;
+  sendAt: string;
+  sendAtFormatted: string;
+  sendAtShort: string;
+  createdAt: string;
 };
 
 export type OrganisationView = {

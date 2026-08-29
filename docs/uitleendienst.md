@@ -1,4 +1,4 @@
-# Uitleendienst (logistiek.vtk.be) — architectuur & file map
+# Uitleendienst (logistiek.vtk.be): architectuur & file map
 
 De uitleendienst van VTK Logistiek in `apps/logistiek`: leden vragen per
 **evenement** materiaal, vervoer (kar/auto/bakfiets) en flesserke aan; het team
@@ -9,16 +9,16 @@ zelf doet staat in `docs/logistiek-ingebruikname.md`.
 
 ## End-to-end flow
 
-1. **Aanvragen** — een ingelogd vtk.be-lid (sessie gedeeld via het
+1. **Aanvragen**: een ingelogd vtk.be-lid (sessie gedeeld via het
    `.vtk.be`-cookie, remote geverifieerd via `@vtk/auth/remote`) vraagt aan per
    evenement: naam, locatie, startuur, verwachte opkomst, contact, levering. Het
    **aanvragertype wordt automatisch uit de login afgeleid** (praesidiumlid in een
-   post → INTERN namens die post; anders EXTERN met de eigen naam), server-side
+   post -> INTERN namens die post; anders EXTERN met de eigen naam), server-side
    afgedwongen. Materiaal, vervoer (voertuigkeuze) en flesserke (aparte tab, enkel
    praesidium) zijn elk een eigen aanvraag/flow. Status `REQUESTED`;
    prijzen/waarborgen gesnapshot. Een lid mag zijn aanvraag bewerken zolang ze
    `REQUESTED` is.
-2. **Beslissen** — het team (`logistiek.manage`) keurt goed of wijst af in
+2. **Beslissen**: het team (`logistiek.manage`) keurt goed of wijst af in
    `/beheer/aanvragen` (tabs per aanvragertype, last-minute badge) en
    `/beheer/vervoer`. Bij goedkeuring kiest het team `ONLINE`/`OFFLINE`. De
    **harde voorraadcheck** loopt in een Serializable-transactie: materiaal =
@@ -26,17 +26,17 @@ zelf doet staat in `docs/logistiek-ingebruikname.md`.
    quantity min status-gebaseerd gereserveerd; vervoer = geen twee `APPROVED`
    ritten van hetzelfde voertuig op hetzelfde moment. Het team mag een `APPROVED`
    aanvraag bewerken; de save hercheckt dan de voorraad in dezelfde tx.
-3. **Vervoer** — tarief per voertuig (team-configureerbaar: gratis/per uur/per
+3. **Vervoer**: tarief per voertuig (team-configureerbaar: gratis/per uur/per
    km/vast). Chauffeur is optioneel bij goedkeuring en wordt later toegewezen; de
    keuzelijst is de post Logistiek plus de zelf toegevoegde chauffeurs (zie
    "Chauffeurs" hieronder).
    Prijs is `null` tot ze gekend is (per km: bij afronden voert het team de
    kilometers in). Het team kan het voertuig wisselen (re-snapshot + herberekening).
-4. **Betalen** — enkel de huurprijs gaat online (Mollie/mock); de waarborg blijft
+4. **Betalen**: enkel de huurprijs gaat online (Mollie/mock); de waarborg blijft
    cash bij afhaling. `OFFLINE` markeert het team aan de balie.
-5. **Afhalen/terugbrengen** — `PICKED_UP` → `RETURNED`. Bij flesserke voert het
+5. **Afhalen/terugbrengen**: `PICKED_UP` -> `RETURNED`. Bij flesserke voert het
    team per lijn het teruggekeerde (gesloten) aantal in; het verbruik
-   (`quantity − returned`) wordt in dezelfde tx van de flesserke-voorraad
+   (`quantity - returned`) wordt in dezelfde tx van de flesserke-voorraad
    afgeboekt. Daarna "waarborg terug".
 
 ## Datamodel (packages/db/prisma/schema.prisma)
@@ -47,7 +47,7 @@ zelf doet staat in `docs/logistiek-ingebruikname.md`.
 | `UitleenEvent` | Optionele koepel boven materiaal-, flesserke- en vervoeraanvragen van hetzelfde evenement (A8). `onDelete: SetNull`: verwijderen is loskoppelen. |
 | `UitleenRequestTemplate` / `...Line` | Vaste set materiaal die het aanvraagformulier invult (M17). Beheerd door Logistiek; aanmaken gebeurt vanaf een bestaande aanvraag. |
 | `UitleenItemUnit` | Eén fysiek exemplaar met een eigen staat, optioneel per item. Bestaan er exemplaren, dan is `item.quantity` de telling van de bruikbare (actief en niet KAPOT), bijgehouden door `syncItemQuantityFromUnits`. |
-| `UitleenReservation` + `UitleenReservationLine` | Aanvraag met event-context + `requesterType` (+ `groupId`/`requesterName`), dagbereik, snapshots. Statusmachine `REQUESTED → APPROVED/REJECTED/CANCELLED → PICKED_UP → RETURNED`. Per lijn: `note` (M15) en `preparedAt`/`preparedById` (klaarzetten, A7). `pickupPart`/`returnPart` zijn een afspraak tussen mensen: de voorraad rekent op hele dagen. |
+| `UitleenReservation` + `UitleenReservationLine` | Aanvraag met event-context + `requesterType` (+ `groupId`/`requesterName`), dagbereik, snapshots. Statusmachine `REQUESTED -> APPROVED/REJECTED/CANCELLED -> PICKED_UP -> RETURNED`. Per lijn: `note` (M15) en `preparedAt`/`preparedById` (klaarzetten, A7). `pickupPart`/`returnPart` zijn een afspraak tussen mensen: de voorraad rekent op hele dagen. |
 | `UitleenVehicle` | Voertuig (kar/auto/bakfiets); `pricingMode` (FREE/PER_HOUR/PER_KM/FLAT) + `rateCents`, team-configureerbaar. |
 | `UitleenTransportBooking` | Rit met voertuig, tijdvenster, chauffeur, tarief-snapshot, `kilometers`/`priceCents` (nullable). |
 | `UitleenDriver` | Chauffeur die het team zelf toevoegt (uniek per `userId`, met notitie en `addedById`). Niet werkingsjaar-gescoped; verwijderen laat toegewezen ritten staan. |
@@ -58,27 +58,27 @@ zelf doet staat in `docs/logistiek-ingebruikname.md`.
 ## Toegang & zichtbaarheid
 
 - **Leden**: elk ingelogd vtk.be-lid (`requireSession`) voor materiaal en vervoer;
-  het aanvragertype wordt automatisch afgeleid (`deriveMemberRequester`). De
-  **flesserke-tab** is zichtbaar en bruikbaar voor wie tot de interne werking
-  behoort: een post, een werkgroep of een jaarwerking
-  (`session.groups.length > 0`), server-side afgedwongen. Werkgroepen horen daar
-  dus uitdrukkelijk bij; de teksten zeiden ooit "enkel praesidium" en dat is
-  hersteld, want werkgroepen concludeerden daaruit dat het niets voor hen was.
-  Ziet een werkgrooplid de tab toch niet, dan hangt zijn account dit werkingsjaar
-  aan geen enkele groep: dat is ledenbeheer op vtk.be (`/admin/werkgroepen`), niet
-  de uitleendienst.
+   the request type is automatically derived (`deriveMemberRequester`). De
+   **flesserke-tab** is zichtbaar en bruikbaar voor wie tot de interne werking
+   behoort: een post, een werkgroep of een jaarwerking
+   (`session.groups.length > 0`), server-side afgedwongen. Werkgroepen horen daar
+   dus uitdrukkelijk bij; de teksten zeiden ooit "enkel praesidium" en dat is
+   hersteld, want werkgroepen concludeerden daaruit dat het niets voor hen was.
+   Ziet een werkgroeplid de tab toch niet, dan hangt zijn account dit werkingsjaar
+   aan geen enkele groep: dat is ledenbeheer op vtk.be (`/admin/werkgroepen`), niet
+   de uitleendienst.
 - **Beheer**: `hasPermission(session, "logistiek.manage")` (`requireManage`). Rol
-  `logistiek` (seed) hangt aan de post `LOGISTIEK` (DEFAULT).
+   `logistiek` (seed) hangt aan de post `LOGISTIEK` (DEFAULT).
 - **Chauffeurs**: geen permissie, maar data. De keuzelijst (`driverOptions()` in
-  `lib/uitleen-server.ts`) is de unie van de leden van de post `LOGISTIEK` in het
-  huidige werkingsjaar en de rijen in `UitleenDriver`, die het team beheert in
-  `/beheer/chauffeurs`. Een toegevoegde chauffeur krijgt daardoor géén
-  `logistiek.manage`: die ziet enkel `/ritten` ("Mijn ritten"), gefilterd op
-  `driverId = session.user.id` (`tripsForDriver`). `approveTransportAction` en
-  `assignDriverAction` herchecken `isDriver()`, want een toewijzing is meteen
-  leestoegang tot die rit.
+   `lib/uitleen-server.ts`) is de unie van de leden van de post `LOGISTIEK` in het
+   huidige werkingsjaar en de rijen in `UitleenDriver`, die het team beheert in
+   `/beheer/chauffeurs`. Een toegevoegde chauffeur krijgt daardoor géén
+   `logistiek.manage`: die ziet enkel `/ritten` ("Mijn ritten"), gefilterd op
+   `driverId = session.user.id` (`tripsForDriver`). `approveTransportAction` en
+   `assignDriverAction` herchecken `isDriver()`, want een toewijzing is meteen
+   leestoegang tot die rit.
 - Server actions herchecken altijd; verwachte fouten komen terug (SaveState/
-  ActionResult), nooit als throw.
+   ActionResult), nooit als throw.
 
 ## Betalingen: @vtk/payments
 
@@ -173,7 +173,7 @@ de same-origin `publicUrl`.
 `npm run import:inventaris -w @vtk/logistiek -- "<pad>/Inventaris Loods.xlsx"`
 (optioneel `--materiaal-only` / `--flesserke-only`). Idempotent (upsert op
 naam+categorie), deletet nooit, telt created/updated/skipped. Niet-numerieke
-hoeveelheden → aantal 1 + tekst in de beschrijving. Gereserveerd/Beschikbaar uit
+hoeveelheden -> aantal 1 + tekst in de beschrijving. Gereserveerd/Beschikbaar uit
 de sheet worden genegeerd (live berekend).
 
 ## Collect&Go-import
@@ -183,7 +183,7 @@ bevestigingsmail bevat alle producten, aantallen en prijzen en een
 reservatienummer; die overtypen in `/beheer/flesserke` was een half uur per
 bestelling en leverde dubbele items op.
 
-1. **Binnenkomen.** `collectengo-worker` POST naar
+1. **Binnenkomen**: `collectengo-worker` POST naar
    `app/api/uitleen/collectengo/route.ts` (zelfde bearer-secret als de
    maintenance-route). Die roept `pollCollectEnGoMailbox()` aan: ongelezen mails
    **van de Collect&Go-afzender** worden geparsed, bewaard en als gelezen
@@ -202,7 +202,7 @@ bestelling en leverde dubbele items op.
    gesplitst in merk, naam en inhoud en vergeleken met de catalogus; een eerdere
    keuze (`CollectEnGoProductMatch`) wint altijd. Dezelfde naam met een andere
    inhoud is een voorstel, geen match: 2 L hoort niet bij het item van 1,5 L.
-4. **Importeren.** `/beheer/collectengo/[id]` toont de lijnen per categorie met
+4. **Importeren**: `/beheer/collectengo/[id]` toont de lijnen per categorie met
    bestemming, aantal en vervaldatum (de mail bevat geen houdbaarheidsdatums).
    `importCollectEnGoOrderAction` maakt in één transactie per lijn een
    `UitleenFlesserkeBatch` (met `syncFlesserkeItemTotals`), onthoudt de keuze en
@@ -220,5 +220,3 @@ bestelling en leverde dubbele items op.
 4. Collect&Go zonder mailbox: plak de mail uit
    `apps/logistiek/test/fixtures/collectengo-mail.txt` op `/beheer/collectengo`.
    Met een echte mailbox: `npm run collectengo:poll -w @vtk/logistiek`.
-- Server actions zonder browser aansturen: zie de memory
-  `uitleendienst-module` voor de RSC-action-truc.

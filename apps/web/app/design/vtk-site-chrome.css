@@ -125,111 +125,126 @@
 .vtk-cookie-consent-positioner {
   position: fixed;
   inset-inline: 0;
-  bottom: clamp(16px, 3vw, 32px);
+  bottom: clamp(12px, 2.5vw, 24px);
   z-index: 1000;
   display: flex;
-  justify-content: flex-end;
+  justify-content: center;
   width: 100%;
-  padding-inline: clamp(16px, 3vw, 32px);
+  padding-inline: clamp(16px, 3vw, 36px);
   box-sizing: border-box;
   pointer-events: none;
 }
 
 .vtk-cookie-consent {
+  width: min(100%, var(--max));
   display: grid;
-  width: min(560px, 100%);
-  gap: 16px;
-  padding: 22px;
+  grid-template-columns: minmax(0, 1.35fr) minmax(360px, auto);
+  align-items: center;
+  gap: clamp(16px, 2.5vw, 36px);
+  padding: clamp(14px, 1.6vw, 18px) clamp(18px, 2vw, 24px);
   border: 1px solid rgba(255, 255, 255, 0.16);
   border-radius: 18px;
-  background: var(--navy);
+  background: rgba(11, 23, 54, 0.97);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
   color: var(--paper);
-  box-shadow: 0 24px 70px rgba(10, 15, 31, 0.3);
+  box-shadow: 0 20px 60px rgba(10, 15, 31, 0.45);
   font-family: var(--sans);
   pointer-events: auto;
 }
 
-/* Match the homepage hero grid exactly so the cookie panel shares both edges
-   with the upcoming-events card instead of floating a few pixels beside it. */
-@media (min-width: 981px) {
-  body:has(.home-hero) .vtk-cookie-consent-positioner {
-    max-width: var(--max);
-    margin-inline: auto;
-    padding-inline: clamp(20px, 3vw, 36px);
-    display: grid;
-    grid-template-columns: minmax(0, 1.2fr) minmax(340px, 1fr);
-    gap: clamp(36px, 5vw, 64px);
-  }
-
-  body:has(.home-hero) .vtk-cookie-consent {
-    grid-column: 2;
-    width: 100%;
-  }
+.vtk-cookie-consent-copy h2 {
+  margin: 0 0 4px;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--paper);
 }
 
-.vtk-cookie-consent h2 {
-  margin: 0 0 8px;
-  font-size: 20px;
-}
-
-.vtk-cookie-consent p {
-  margin: 0 0 8px;
+.vtk-cookie-consent-copy p {
+  margin: 0;
   color: var(--on-dark-muted);
-  font-size: 14px;
-  line-height: 1.55;
+  font-size: 13px;
+  line-height: 1.5;
 }
 
-.vtk-cookie-consent a {
+.vtk-cookie-consent-copy a {
   color: var(--paper);
   font-size: 13px;
   text-decoration: underline;
+  white-space: nowrap;
+}
+
+.vtk-cookie-consent-controls {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 10px;
 }
 
 .vtk-cookie-consent-option {
   display: flex;
-  align-items: flex-start;
-  gap: 10px;
-  color: var(--paper);
-  font-size: 14px;
-  line-height: 1.4;
+  align-items: center;
+  gap: 8px;
+  color: var(--on-dark-muted);
+  font-size: 12.5px;
+  line-height: 1.35;
   cursor: pointer;
+  user-select: none;
+}
+
+.vtk-cookie-consent-option:hover {
+  color: var(--paper);
 }
 
 .vtk-cookie-consent-option input {
-  width: 16px;
-  height: 16px;
-  margin-top: 3px;
+  width: 15px;
+  height: 15px;
+  margin: 0;
   accent-color: var(--yellow);
   cursor: pointer;
+  flex-shrink: 0;
 }
 
 .vtk-cookie-consent-actions {
   display: flex;
   flex-wrap: wrap;
   justify-content: flex-end;
+  align-items: center;
   gap: 8px;
 }
 
 .vtk-cookie-consent-actions button {
-  min-height: 40px;
-  padding: 8px 14px;
+  min-height: 38px;
+  padding: 6px 14px;
   border-radius: 999px;
   font: inherit;
   font-size: 13px;
   font-weight: 600;
   cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
 }
 
 .vtk-cookie-secondary {
-  border: 1px solid rgba(255, 255, 255, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.25);
   background: transparent;
   color: var(--paper);
+}
+
+.vtk-cookie-secondary:hover {
+  border-color: rgba(255, 255, 255, 0.5);
+  background: rgba(255, 255, 255, 0.08);
 }
 
 .vtk-cookie-primary {
   border: 1px solid var(--yellow);
   background: var(--yellow);
   color: var(--navy);
+}
+
+.vtk-cookie-primary:hover {
+  background: #ffe066;
+  border-color: #ffe066;
 }
 
 .vtk-auth {
@@ -349,6 +364,191 @@
   cursor: not-allowed;
 }
 
+/* Op het inlogscherm is de KU Leuven-knop de primaire actie: donker, breed en
+   als eerste. `.vtk-auth-sso` blijft de lichte variant voor waar SSO een
+   alternatief is (het koppelscherm), dus die regels blijven staan. */
+.vtk-auth .vtk-auth-sso {
+  margin-top: 4px;
+  min-height: 52px;
+  border-color: var(--ink);
+  background: var(--ink);
+  color: var(--paper);
+  font-size: 15px;
+}
+
+.vtk-auth .vtk-auth-sso:hover:not(:disabled) {
+  background: var(--navy);
+}
+
+.vtk-auth-primary-hint {
+  margin: 10px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+  text-align: center;
+}
+
+/* De regel die het wachtwoordformulier openklikt. Klein en rustig: ze mag de
+   knop erboven niet beconcurreren. */
+.vtk-auth-alt {
+  margin: 22px 0 0;
+  padding-top: 18px;
+  border-top: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 13px;
+  text-align: center;
+}
+
+.vtk-auth-alt-link {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--ink);
+  font: inherit;
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+.vtk-auth-alt-link:hover {
+  color: var(--navy);
+}
+
+.vtk-auth-alt-link:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.vtk-auth-alt-panel {
+  margin-top: 22px;
+  padding-top: 22px;
+  border-top: 1px solid var(--line);
+}
+
+.vtk-auth-alt-title {
+  margin: 0;
+  color: var(--ink);
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.vtk-auth-alt-intro {
+  margin: 4px 0 18px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.vtk-auth-notice {
+  margin-top: 16px;
+  padding: 12px 14px;
+  border: 1px solid var(--line-2);
+  border-radius: 12px;
+  background: var(--paper-2);
+  color: var(--body);
+  font-size: 13px;
+}
+
+.vtk-auth-notice p {
+  margin: 0 0 8px;
+}
+
+.vtk-auth-notice-done {
+  margin: 0;
+  color: var(--muted);
+}
+
+.vtk-auth-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 16px;
+  justify-content: space-between;
+  margin: 18px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.vtk-auth-links a {
+  color: var(--ink);
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+/* Registratie en wachtwoordherstel gebruiken hetzelfde paneel, maar hebben meer
+   velden; voor- en achternaam passen naast elkaar zodra er plaats is. */
+.vtk-auth-panel-wide {
+  max-width: 560px;
+}
+
+.vtk-auth-row {
+  display: grid;
+  gap: 18px;
+  grid-template-columns: 1fr;
+}
+
+@media (min-width: 520px) {
+  .vtk-auth-row {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+.vtk-auth-intro {
+  margin: -12px 0 24px;
+  color: var(--body);
+  font-size: 14px;
+  line-height: 1.55;
+}
+
+.vtk-auth-hint {
+  margin: 6px 0 0;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.vtk-auth-check {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  color: var(--body);
+  font-size: 14px;
+}
+
+.vtk-auth-check input {
+  width: auto;
+  margin-top: 3px;
+}
+
+.vtk-auth-check label {
+  margin: 0;
+  color: inherit;
+  font-size: inherit;
+  font-weight: 500;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.vtk-auth-done {
+  margin: 0 0 18px;
+  color: var(--body);
+  font-size: 14px;
+  line-height: 1.55;
+}
+
+@media (max-width: 980px) {
+  .vtk-cookie-consent {
+    grid-template-columns: 1fr;
+    gap: 14px;
+  }
+
+  .vtk-cookie-consent-controls {
+    align-items: flex-start;
+  }
+
+  .vtk-cookie-consent-actions {
+    justify-content: flex-start;
+  }
+}
+
 @media (max-width: 900px) {
   .vtk-site-footer-top {
     grid-template-columns: 1fr 1fr;
@@ -365,6 +565,7 @@
   }
 
   .vtk-cookie-consent-actions {
+    width: 100%;
     align-items: stretch;
     flex-direction: column;
   }

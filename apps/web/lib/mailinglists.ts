@@ -5,7 +5,7 @@ import { prisma } from "@vtk/db";
 import { nameParts } from "@vtk/auth";
 import { getDictionary, type Locale } from "@vtk/i18n";
 import { MAIL_CATEGORIES, STUDY_PROGRAMMES } from "@/lib/profile";
-import { currentWorkingYear } from "@/lib/workingYear";
+import { currentStudyYear } from "@/lib/workingYear";
 
 /**
  * Mailinglijst-exports voor de admin.
@@ -60,9 +60,8 @@ export type Recipient = {
  *
  * Vier filters gelden voor **elke** lijst:
  * - enkel **actieve** leden: gedeactiveerde accounts horen geen mails te krijgen;
- * - enkel leden die hun studie **dit werkingsjaar bevestigd** hebben, zodat
- *   afgestudeerden vanzelf uit de lijsten vallen (zie de gate in
- *   `app/[locale]/layout.tsx`);
+ * - enkel leden die hun studie **dit academiejaar bevestigd** hebben, zodat
+ *   afgestudeerden vanzelf uit de lijsten vallen (zie de gate in `proxy.ts`);
  * - enkel leden die **nog studeren**: wie bij de bevestiging "ik studeer niet
  *   (meer)" aanduidde bevestigt zijn profiel wel (en passeert dus de gate), maar
  *   hoort in geen enkele studiegerichte lijst;
@@ -74,7 +73,7 @@ export type Recipient = {
 export function listWhere(id: MailingListId): Prisma.UserWhereInput {
   return {
     active: true,
-    studyConfirmedYear: currentWorkingYear(),
+    studyConfirmedYear: currentStudyYear(),
     notStudying: false,
     ...(id === ALL_STUDENTS ? {} : { mailCategories: { has: id } }),
     // Career is op faculteitsstudenten gericht: wie aangaf niet aan de

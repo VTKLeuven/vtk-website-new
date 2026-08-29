@@ -70,7 +70,7 @@ Alle vier beslist op 22 augustus 2026; de motivatie staat in
 | B1 | **C&G-bestellingen importeren via e-mail?** | De feedback stelt voor om een mailadres aan te maken waar Colruyt-bevestigingen naartoe gaan, zodat een ordernummer ingeven op de site de bestelling automatisch importeert. Dit vereist een mailbox-integratie (IMAP/webhook) en heeft security-implicaties. Alternatief: handmatige CSV/copy-paste import. |
 | B2 | **Mogen posten en werkgroepen zelf sjablonen aanmaken?** | Ronde 1 beperkte sjablonen tot `logistiek.manage`. De feedback vraagt nu of posten/werkgroepen hun eigen sjablonen mogen beheren. |
 | B3 | **Hoe zichtbaar zijn evenementen voor externen?** | Externen hoeven "hoort dit bij een evenement?" en de sjabloonselectie niet te zien/krijgen, en mogen niet zien welke evenementen er allemaal zijn. Hoe strikt afschermen? |
-| B4 | **Chauffeurskleuren in het weekoverzicht — vast of instelbaar?** | De feedback wil dat elke chauffeur een kleur krijgt in het weekoverzicht, zoals op de Litus. Vaste kleuren of instelbaar? |
+| B4 | **Chauffeurskleuren in het weekoverzicht: vast of instelbaar?** | De feedback wil dat elke chauffeur een kleur krijgt in het weekoverzicht, zoals op de Litus. Vaste kleuren of instelbaar? |
 
 ---
 
@@ -283,7 +283,7 @@ Alles hier is klein, zichtbaar en zonder (of met een minimale) migratie.
 
 ---
 
-# Fase 3: materiaal — opmerkingen, deelgoedkeuring, sjablonen
+# Fase 3: materiaal: opmerkingen, deelgoedkeuring, sjablonen
 
 ### ✅ M1. Logi-opmerking per materiaalitem
 **P1 · code · 🗄️**
@@ -417,7 +417,7 @@ Alles hier is klein, zichtbaar en zonder (of met een minimale) migratie.
 
 ---
 
-# Fase 4: vervoer — terminologie, goedkeuring, weekoverzicht
+# Fase 4: vervoer: terminologie, goedkeuring, weekoverzicht
 
 ### ✅ T1. Terminologie: "transport" in plaats van "vervoer"
 **P1 · code**
@@ -500,8 +500,8 @@ Alles hier is klein, zichtbaar en zonder (of met een minimale) migratie.
      toegewezen chauffeur.
   4. Afgeronde ritten ook tonen (eventueel in een lichtere kleur).
   5. Klik op een rit opent een **popup-venster** (modal/dialog) waar je de
-     rit kan aanpassen, goedkeuren, chauffeur wijzigen — zonder weg te
-     navigeren.
+     rit kan aanpassen, goedkeuren, chauffeur wijzigen (zonder weg te
+     navigeren).
   6. De transportverantwoordelijke werkt primair vanuit dit overzicht.
 - **Klaar wanneer:** het weekoverzicht lijkt op de Litus met moment → voertuig.
 
@@ -638,7 +638,7 @@ Alles hier is klein, zichtbaar en zonder (of met een minimale) migratie.
 
 ---
 
-# Fase 6: evenementen — post-overzicht, materiaallijst, C&G
+# Fase 6: evenementen: post-overzicht, materiaallijst, C&G
 
 ### ✅ E1. Aanvrager kan eigen evenement zien en beheren
 **P1 · code**

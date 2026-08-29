@@ -2,6 +2,8 @@ import type { Prisma } from "@prisma/client";
 import { NextResponse } from "next/server";
 import { prisma } from "@vtk/db";
 import { audienceFilter, viewerAudiences } from "@/lib/calendar/audience";
+import { publicInterestCounts, viewerInterests } from "@/lib/calendar/interest";
+import { getCurrentSession } from "@/lib/session";
 
 // Leest de sessie om de doelgroepen van de kijker te bepalen, dus per definitie
 // niet statisch te renderen.
@@ -18,7 +20,6 @@ export async function GET(request: Request) {
   const onlyMyAudiences = url.searchParams.get("audience") === "mine";
 
   const where: Prisma.CalendarEventWhereInput = {
-    visibility: "PUBLIC",
     publishedAt: { not: null },
   };
 
@@ -59,6 +60,22 @@ export async function GET(request: Request) {
     orderBy: { start: "asc" },
   });
 
+  // Enkel de tellers die de drempel halen komen terug; een laag getal verlaat de
+  // server dus niet eens. Zie lib/calendar/interest.ts.
+  //
+  // De eigen keuze en per-event alumnigegevens gaan mee, zodat de modal niet
+  // alleen de juiste ster toont maar ook meteen het alumniblok kan invullen.
+  // `viewerInterests` geeft uitsluitend de rij van de huidige sessie of het
+  // huidige gastcookie terug.
+  const session = await getCurrentSession();
+  const [counts, mine] = await Promise.all([
+    publicInterestCounts(events.map((e) => e.id)),
+    viewerInterests(
+      events.map((e) => e.id),
+      session?.user.id ?? null,
+    ),
+  ]);
+
   const payload = events.map((e) => ({
     id: e.id,
     title: e.titleNl,
@@ -76,6 +93,9 @@ export async function GET(request: Request) {
       descriptionNl: e.descriptionNl,
       descriptionEn: e.descriptionEn,
       categories: e.categories.map((c) => c.category),
+      interestedCount: counts.get(e.id) ?? null,
+      viewerInterest: mine.get(e.id) ?? { kind: "none" },
+      interested: mine.has(e.id),
     },
   }));
 

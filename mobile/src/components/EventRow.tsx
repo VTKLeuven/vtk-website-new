@@ -23,6 +23,11 @@ import { COLORS, RADIUS, SPACING, TYPE } from '../theme/tokens';
  * ze aanduidde. Dat verschil moet zichtbaar blijven, anders staat er iemand voor
  * een uitverkochte zaal met een sterretje in zijn telefoon. Vandaar dat ze een
  * losse knop naast de rij is en niet de hoofdactie ervan.
+ *
+ * `interestedCount` verschijnt enkel wanneer de server een getal meestuurt. Die
+ * beslist over de drempel (zie `lib/calendar/interest.ts` op de site), zodat de
+ * app en de website hetzelfde tonen en een lage teller nergens opduikt. Een
+ * oudere serverversie stuurt het veld niet mee; dan blijft het weg.
  */
 export function EventRow({
   event,
@@ -71,16 +76,27 @@ export function EventRow({
             </Text>
           </View>
         ) : null}
-        {category ? (
-          <View
-            style={[
-              styles.chip,
-              category.colour ? { borderColor: category.colour } : null,
-            ]}
-          >
-            <Text style={styles.chipText}>{category.name}</Text>
-          </View>
-        ) : null}
+        <View style={styles.tags}>
+          {category ? (
+            <View
+              style={[
+                styles.chip,
+                category.colour ? { borderColor: category.colour } : null,
+              ]}
+            >
+              <Text style={styles.chipText}>{category.name}</Text>
+            </View>
+          ) : null}
+          {event.interestedCount ? (
+            <View style={styles.going}>
+              <Text style={styles.goingText}>
+                {locale === 'en'
+                  ? `${event.interestedCount} going`
+                  : `${event.interestedCount} komen`}
+              </Text>
+            </View>
+          ) : null}
+        </View>
       </View>
 
       {onToggleInterest ? (
@@ -129,6 +145,7 @@ const styles = StyleSheet.create({
   group: { ...TYPE.small, color: COLORS.muted },
   locationRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   location: { ...TYPE.small, color: COLORS.muted, flex: 1 },
+  tags: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 4, marginTop: 2 },
   chip: {
     alignSelf: 'flex-start',
     borderWidth: 1,
@@ -136,9 +153,16 @@ const styles = StyleSheet.create({
     borderRadius: RADIUS.pill,
     paddingHorizontal: SPACING.sm,
     paddingVertical: 2,
-    marginTop: 2,
   },
   chipText: { ...TYPE.small, fontSize: 11, color: COLORS.body },
+  going: {
+    alignSelf: 'flex-start',
+    borderRadius: RADIUS.pill,
+    backgroundColor: COLORS.yellow,
+    paddingHorizontal: SPACING.sm,
+    paddingVertical: 2,
+  },
+  goingText: { ...TYPE.small, fontSize: 11, color: COLORS.ink },
   star: { paddingLeft: SPACING.xs, alignSelf: 'flex-start', paddingTop: 2 },
   starPressed: { opacity: 0.6 },
 });

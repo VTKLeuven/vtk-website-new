@@ -82,6 +82,13 @@ export function lesbezoekAdminErrors(nl: boolean): Record<string, string> {
         MAIL_EMPTY: "Niet verstuurd: de mail heeft een onderwerp en een tekst nodig.",
         MAIL_FAILED: "De mail is niet vertrokken. Probeer het opnieuw of verwittig IT.",
         NO_RECIPIENT: "Niet verstuurd: er staat geen adres bij deze aanvraag.",
+        SCHEDULE_TIME_INVALID: "Niet ingepland: kies een geldige datum en een geldig tijdstip.",
+        SCHEDULE_TIME_PAST: "Niet ingepland: kies een tijdstip in de toekomst.",
+        SCHEDULED_MAIL_NOT_FOUND: "Niet gevonden: deze geplande mail bestaat niet meer.",
+        BULK_EMPTY: "Niet verstuurd: er staat geen enkele mail aangevinkt.",
+        BULK_TOO_MANY: "Niet verstuurd: dit zijn er te veel in één beurt. Doe het in kleinere groepen.",
+        BULK_MIXED_RECIPIENT:
+          "Niet verstuurd: er zitten verschillende ontvangers in één gebundelde mail. Bundel enkel bezoeken van dezelfde aanvrager.",
       }
     : {
         ...lesbezoekRequestErrors(false),
@@ -93,5 +100,12 @@ export function lesbezoekAdminErrors(nl: boolean): Record<string, string> {
         MAIL_EMPTY: "Not sent: the email needs a subject and a body.",
         MAIL_FAILED: "The email did not go out. Try again or let IT know.",
         NO_RECIPIENT: "Not sent: there is no address on this request.",
+        SCHEDULE_TIME_INVALID: "Not scheduled: pick a valid date and time.",
+        SCHEDULE_TIME_PAST: "Not scheduled: pick a time in the future.",
+        SCHEDULED_MAIL_NOT_FOUND: "Not found: this scheduled email no longer exists.",
+        BULK_EMPTY: "Not sent: no email is ticked.",
+        BULK_TOO_MANY: "Not sent: too many in one go. Do it in smaller batches.",
+        BULK_MIXED_RECIPIENT:
+          "Not sent: one bundled email has several recipients. Only bundle visits from the same requester.",
       };
 }

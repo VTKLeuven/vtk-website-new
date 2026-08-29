@@ -273,7 +273,7 @@ export async function adminRead(principal: McpPrincipal, raw: McpAdminReadInput)
         take, skip, orderBy: { start: "desc" },
         select: {
           id: true, titleNl: true, titleEn: true, descriptionNl: true, descriptionEn: true,
-          location: true, start: true, end: true, allDay: true, visibility: true, url: true,
+          location: true, start: true, end: true, allDay: true, url: true,
           publishedAt: true, createdAt: true, updatedAt: true,
           group: { select: { code: true, nameNl: true } },
           categories: { select: { category: { select: { slug: true, nameNl: true, colour: true } } } },

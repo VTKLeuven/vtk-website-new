@@ -1,4 +1,5 @@
 import { normalizeLocale, type Locale } from "@/lib/locale";
+import type { FeedScope } from "./feeds";
 
 /**
  * Agenda-clients hangen graag een `.ics` aan de URL, en sommige tonen de feed
@@ -38,4 +39,24 @@ export function icsResponse(
   }
 
   return new Response(body, { headers });
+}
+
+/**
+ * De scope van de hoofdfeed, uit de query.
+ *
+ * - niets: alles, zoals altijd;
+ * - `?c=alumni`: enkel die categorie;
+ * - `?c=alumni&algemeen=1`: de algemene evenementen plus die categorie;
+ * - `?c=sport&c=cultuur`: die twee categorieën samen.
+ *
+ * De parameters zitten bewust in de bestaande feed-URL en niet in een nieuw pad.
+ * Een agenda-abonnement is een URL die jaren in iemands telefoon blijft staan;
+ * hoe minder verschillende vormen daarvan rondzwerven, hoe minder er ooit stil
+ * kapotgaat. `/feed/c/<slug>.ics` blijft bestaan voor wie zich al abonneerde.
+ */
+export function feedScopeFromQuery(url: URL): FeedScope {
+  const slugs = [...new Set(url.searchParams.getAll("c").map(stripIcsSuffix).filter(Boolean))];
+  const includeGeneral = url.searchParams.get("algemeen") === "1";
+  if (slugs.length === 0 && !includeGeneral) return { kind: "all" };
+  return { kind: "mix", slugs, includeGeneral };
 }

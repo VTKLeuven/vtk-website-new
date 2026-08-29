@@ -9,11 +9,18 @@ import { MarkdownEditor } from "@/components/editor/MarkdownEditor";
 import { SaveForm } from "@/components/ui/SaveForm";
 import { StorageImageField } from "@/components/admin/StorageImageField";
 import { savePageContentAction, savePageImageAction } from "@/app/actions/pages";
+import { hasFormMarker } from "@/lib/pageForm";
 import { saveErrorMessages } from "@/lib/saveMessages";
 import { AssetList } from "../../inhoud/AssetList";
 import { FileUploader } from "../../inhoud/FileUploader";
 import type { AssetNode } from "../../inhoud/ContentManager";
 import { PageSettingsCard, type SettingsRole } from "./PageSettingsCard";
+import {
+  PageFormCard,
+  type LinkedForm,
+  type PageFormGroup,
+  type PageFormOption,
+} from "./PageFormCard";
 import { PageQrModal } from "../PageQrModal";
 
 type EditorPage = {
@@ -29,6 +36,8 @@ type EditorPage = {
   needsReview: boolean;
   editorRoleIds: string[];
   assets: AssetNode[];
+  /** Het formulier dat op deze pagina staat, als er een gekoppeld is. */
+  form: LinkedForm | null;
 };
 
 /**
@@ -48,6 +57,8 @@ export function PageContentEditor({
   canEditAll,
   canDelete,
   canPublish,
+  linkableForms,
+  formGroups,
 }: {
   host: string;
   locale: Locale;
@@ -60,6 +71,10 @@ export function PageContentEditor({
   canEditAll: boolean;
   canDelete: boolean;
   canPublish: boolean;
+  /** Formulieren die deze gebruiker beheert en die nog nergens anders staan. */
+  linkableForms: PageFormOption[];
+  /** Posten waarvoor deze gebruiker een formulier mag aanmaken. */
+  formGroups: PageFormGroup[];
 }) {
   const nl = locale === "nl";
   const dict = getDictionary(locale);
@@ -230,6 +245,19 @@ export function PageContentEditor({
         <AssetList locale={locale} pageId={page.id} assets={page.assets} />
         <FileUploader pageId={page.id} locale={locale} />
       </Card>
+
+      <PageFormCard
+        locale={locale}
+        pageId={page.id}
+        pageTitle={page.titleNl}
+        linked={page.form}
+        forms={linkableForms}
+        groups={formGroups}
+        // De markering leest mee met wat er nu in de editor staat, niet met wat
+        // er bij het laden opgeslagen was: anders zegt de kaart nog "onderaan"
+        // terwijl je de markering net typte.
+        hasMarker={hasFormMarker(contentNl) || hasFormMarker(contentEn)}
+      />
 
       <PageSettingsCard
         locale={locale}

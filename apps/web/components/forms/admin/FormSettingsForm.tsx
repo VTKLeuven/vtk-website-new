@@ -45,24 +45,31 @@ export type FormSettingsValues = {
   retentionDays: number | null;
   calendarEventId: string | null;
   hasCalendarEvent: boolean;
+  pageId: string | null;
+  /** Waar het paneel op de pagina komt, om de markering te kunnen uitleggen. */
+  pageHasMarker: boolean;
 };
 
 type CalendarOption = { id: string; label: string };
+type PageOption = { id: string; label: string };
 
 export function FormSettingsForm({
   locale,
   values,
   calendarEvents,
+  pages,
 }: {
   locale: AdminLocale;
   values: FormSettingsValues;
   calendarEvents: CalendarOption[];
+  pages: PageOption[];
 }) {
   const nl = locale === "nl";
   const [localeMode, setLocaleMode] = useState(values.localeMode);
   const [confirmationEnabled, setConfirmationEnabled] = useState(values.confirmationEnabled);
   const [requireConsent, setRequireConsent] = useState(values.requireConsent);
   const [notifyMode, setNotifyMode] = useState(values.notifyMode);
+  const [pageId, setPageId] = useState(values.pageId ?? "");
 
   const showEnglish = localeMode !== "NL_ONLY";
   const showDutch = localeMode !== "EN_ONLY";
@@ -106,6 +113,13 @@ export function FormSettingsForm({
         INVALID_CALENDAREVENTID: nl
           ? "Dat evenement hoort niet bij de eigenaarspost van deze form."
           : "That event does not belong to this form's owning post.",
+        INVALID_PAGEID: nl ? "Die pagina bestaat niet meer." : "That page no longer exists.",
+        PAGE_FORBIDDEN: nl
+          ? "Je mag die pagina niet bewerken, dus je kan er ook geen form op zetten."
+          : "You cannot edit that page, so you cannot put a form on it either.",
+        PAGE_TAKEN: nl
+          ? "Op die pagina staat al een andere form."
+          : "That page already carries another form.",
       }}
     >
       <input type="hidden" name="locale" value={locale} />
@@ -718,6 +732,42 @@ export function FormSettingsForm({
           </span>
         </div>
       </fieldset>
+
+      {pages.length > 0 || values.pageId ? (
+        <fieldset className="form-admin-fieldset">
+          <legend>{nl ? "Op een pagina" : "On a page"}</legend>
+          <div className="ticket-admin-field">
+            <label htmlFor="settings-page">
+              {nl ? "Staat op deze pagina" : "Shown on this page"}
+            </label>
+            <ThemedSelect
+              id="settings-page"
+              name="pageId"
+              value={pageId}
+              onChange={setPageId}
+              options={[
+                { value: "", label: nl ? "Geen pagina" : "No page" },
+                ...pages.map((page) => ({ value: page.id, label: page.label })),
+              ]}
+            />
+            <span className="ticket-admin-help">
+              {pageId
+                ? nl
+                  ? values.pageHasMarker
+                    ? "De form staat op de plaats van de markering [[formulier]] in de tekst van die pagina."
+                    : "De form komt onderaan die pagina. Zet [[formulier]] op een eigen regel in de tekst om ze ergens anders te laten verschijnen."
+                  : values.pageHasMarker
+                    ? "The form sits where the [[formulier]] marker is in that page's text."
+                    : "The form goes to the bottom of that page. Put [[formulier]] on its own line in the text to place it somewhere else."
+                : nl
+                  ? "Je kan enkel pagina's kiezen die je zelf mag bewerken. De form houdt hoe dan ook haar eigen adres."
+                  : "You can only pick pages you may edit yourself. The form keeps its own address either way."}
+            </span>
+          </div>
+        </fieldset>
+      ) : (
+        <input type="hidden" name="pageId" value={values.pageId ?? ""} />
+      )}
 
       {calendarEvents.length > 0 || values.calendarEventId ? (
         <fieldset className="form-admin-fieldset">

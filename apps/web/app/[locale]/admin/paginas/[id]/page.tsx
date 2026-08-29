@@ -6,6 +6,8 @@ import type { Locale } from "@vtk/i18n";
 import { hasLocale } from "@/lib/locale";
 import { requireAnyPermission } from "@/lib/session";
 import { canEditPageContent, canPublishPages, needsYearlyReview } from "@/lib/pageAccess";
+import { canSessionCreateFormForGroup } from "@/lib/forms/authorization";
+import { linkableForms } from "@/lib/forms/pageLink";
 import { tiptapToMarkdown } from "@/lib/tiptap-to-markdown";
 import { publicUrl } from "@/lib/storage";
 import { PageContentEditor } from "./PageContentEditor";
@@ -34,12 +36,44 @@ export default async function AdminPageEditor({
         headerTab: true,
         assets: { orderBy: { order: "asc" } },
         editorRoles: { select: { roleId: true } },
+        form: {
+          select: {
+            id: true,
+            slug: true,
+            titleNl: true,
+            titleEn: true,
+            status: true,
+            _count: { select: { entries: true } },
+          },
+        },
       },
     }),
     prisma.role.findMany({ orderBy: [{ order: "asc" }, { nameNl: "asc" }] }),
   ]);
   if (!page) notFound();
   if (!canEditPageContent(session, page)) throw new Error("FORBIDDEN");
+
+  // Wat deze gebruiker aan deze pagina kan hangen: formulieren die hij beheert
+  // en die nog nergens anders staan, plus de posten waarvoor hij er een mag
+  // aanmaken. Beide leeg? Dan zegt de kaart dat, in plaats van twee lege
+  // keuzelijsten te tonen.
+  const [forms, fieldCount, groupRows] = await Promise.all([
+    page.form ? Promise.resolve([]) : linkableForms(locale, null),
+    page.form
+      ? prisma.formField.count({ where: { formId: page.form.id, archivedAt: null } })
+      : Promise.resolve(0),
+    page.form
+      ? Promise.resolve([])
+      : prisma.group.findMany({
+          where: { active: true },
+          select: { id: true, nameNl: true, nameEn: true },
+          orderBy: { orderInPraesidium: "asc" },
+        }),
+  ]);
+
+  const formGroups = groupRows
+    .filter((group) => canSessionCreateFormForGroup(session, group.id))
+    .map((group) => ({ id: group.id, name: locale === "en" ? group.nameEn : group.nameNl }));
 
   // Markdown is de bron van waarheid. Bestaat die nog niet, dan vullen we de
   // editor met een automatische conversie van het legacy tiptap-JSON; wie
@@ -66,6 +100,17 @@ export default async function AdminPageEditor({
         needsYearlyEdit: page.needsYearlyEdit,
         needsReview: needsYearlyReview(page),
         editorRoleIds: page.editorRoles.map((r) => r.roleId),
+        form: page.form
+          ? {
+              id: page.form.id,
+              slug: page.form.slug,
+              title:
+                locale === "en" && page.form.titleEn ? page.form.titleEn : page.form.titleNl,
+              status: page.form.status,
+              fieldCount,
+              entryCount: page.form._count.entries,
+            }
+          : null,
         assets: page.assets.map((a) => ({
           id: a.id,
           labelNl: a.labelNl,
@@ -82,6 +127,8 @@ export default async function AdminPageEditor({
       canEditAll={session.user.isSuperAdmin || hasPermission(session, "pages.editAll")}
       canDelete={hasPermission(session, "pages.delete")}
       canPublish={canPublishPages(session)}
+      linkableForms={forms.map((form) => ({ id: form.id, label: form.label }))}
+      formGroups={formGroups}
     />
   );
 }

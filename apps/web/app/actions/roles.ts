@@ -38,7 +38,6 @@ const roleSchema = z.object({
   descriptionNl: z.string().trim().optional().nullable(),
   descriptionEn: z.string().trim().optional().nullable(),
   color: z.string().trim().optional().nullable(),
-  order: z.coerce.number().int().default(0),
 });
 
 export async function saveRoleAction(_prev: SaveState, formData: FormData): Promise<SaveState> {
@@ -51,7 +50,6 @@ export async function saveRoleAction(_prev: SaveState, formData: FormData): Prom
     descriptionNl: (formData.get("descriptionNl") as string) || null,
     descriptionEn: (formData.get("descriptionEn") as string) || null,
     color: (formData.get("color") as string) || null,
-    order: formData.get("order") || 0,
   });
   if (!result.success) return saveError("INVALID_INPUT");
   const parsed = result.data;
@@ -65,7 +63,6 @@ export async function saveRoleAction(_prev: SaveState, formData: FormData): Prom
     descriptionNl: parsed.descriptionNl,
     descriptionEn: parsed.descriptionEn,
     color: parsed.color,
-    order: parsed.order,
   };
 
   try {
@@ -89,11 +86,13 @@ export async function saveRoleAction(_prev: SaveState, formData: FormData): Prom
           descriptionNl: "beschrijving",
           descriptionEn: "Engelse beschrijving",
           color: "kleur",
-          order: "volgorde",
         }),
       });
     } else {
-      const created = await prisma.role.create({ data: { ...data, code } });
+      const last = await prisma.role.findFirst({ orderBy: { order: "desc" }, select: { order: true } });
+      const created = await prisma.role.create({
+        data: { ...data, code, order: (last?.order ?? -1) + 1 },
+      });
       await logAudit({
         action: "create",
         entity: "role",
@@ -109,6 +108,25 @@ export async function saveRoleAction(_prev: SaveState, formData: FormData): Prom
 
   revalidatePath("/admin/roles");
   return saveOk();
+}
+
+export async function reorderRolesAction(ids: string[]): Promise<void> {
+  await requirePermission("roles.manage");
+  await prisma.$transaction(
+    ids.map((id, index) =>
+      prisma.role.update({
+        where: { id },
+        data: { order: index },
+      })
+    )
+  );
+  await logAudit({
+    action: "reorder",
+    entity: "role",
+    target: `${ids.length} rollen`,
+    summary: "volgorde van rollen gewijzigd",
+  });
+  revalidatePath("/admin/roles");
 }
 
 export async function deleteRoleAction(formData: FormData): Promise<void> {

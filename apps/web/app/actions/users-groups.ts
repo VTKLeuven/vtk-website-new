@@ -6,10 +6,7 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@vtk/db";
-import {
-  createUser,
-  updateUser,
-} from "@vtk/auth/server";
+import { createPasswordSetupForUser, createUser, updateUser } from "@vtk/auth/server";
 import { hasPermission, fullName, splitFullName } from "@vtk/auth";
 import { requirePermission, requireSession } from "@/lib/session";
 import { saveError, saveOk, type SaveState } from "@/lib/saveState";
@@ -17,6 +14,8 @@ import { currentWorkingYear } from "@/lib/workingYear";
 import { eraseUserData } from "@/lib/privacy/account";
 import { describeChanges, logAudit } from "@/lib/audit";
 import { pushMailGroupsForGroup } from "@/lib/google/sync";
+import { isKuLeuvenEmail } from "@/lib/accountAccess";
+import { sendManagedPasswordSetupMail } from "@/lib/accountMail";
 
 /** `P2002` op een bepaald veld: de unieke constraint die Prisma noemt. */
 function isUniqueViolation(err: unknown, field: string): boolean {
@@ -38,6 +37,7 @@ const userSchema = z.object({
   locale: z.enum(["NL", "EN"]).default("NL"),
   active: z.coerce.boolean().default(true),
   isSuperAdmin: z.coerce.boolean().default(false),
+  honoraryMember: z.coerce.boolean().default(false),
 });
 
 export async function saveUserAction(_prev: SaveState, formData: FormData): Promise<SaveState> {
@@ -53,6 +53,7 @@ export async function saveUserAction(_prev: SaveState, formData: FormData): Prom
     locale: formData.get("locale") || "NL",
     active: formData.get("active") === "on",
     isSuperAdmin: formData.get("isSuperAdmin") === "on",
+    honoraryMember: formData.get("honoraryMember") === "on",
   });
   if (!result.success) return saveError("INVALID_INPUT");
   const parsed = result.data;
@@ -73,6 +74,7 @@ export async function saveUserAction(_prev: SaveState, formData: FormData): Prom
           locale: true,
           active: true,
           isSuperAdmin: true,
+          honoraryMember: true,
           rNumber: true,
         },
       })
@@ -88,6 +90,7 @@ export async function saveUserAction(_prev: SaveState, formData: FormData): Prom
         locale: parsed.locale,
         active: parsed.active,
         isSuperAdmin: parsed.isSuperAdmin,
+        honoraryMember: parsed.honoraryMember,
         rNumber,
         password: parsed.password,
       });
@@ -126,6 +129,7 @@ export async function saveUserAction(_prev: SaveState, formData: FormData): Prom
             locale: "taal",
             active: "actief",
             isSuperAdmin: "superadmin",
+            honoraryMember: "erelid",
             rNumber: "r-nummer",
           },
         )
@@ -136,6 +140,101 @@ export async function saveUserAction(_prev: SaveState, formData: FormData): Prom
   if (parsed.id) revalidatePath(`/admin/gebruikers/${parsed.id}`);
   // Geen redirect: het formulier staat op de lijstpagina (nieuw) of op de
   // detailpagina (bewerken); in beide gevallen blijf je waar je bent.
+  return saveOk();
+}
+
+export type UserAccessErrorCode =
+  | "INVALID_INPUT"
+  | "EMAIL_TAKEN"
+  | "NO_PERSONAL_EMAIL"
+  | "ACCOUNT_NOT_FOUND"
+  | "FORBIDDEN"
+  | "MAIL_FAILED";
+
+/**
+ * Bewaart een privéadres en stuurt een eenmalige wachtwoordlink vanuit
+ * Admin > Ledenbeheer > Gebruikers. De actie is even streng als een publiek
+ * eindpunt: ze controleert de beheerrechten opnieuw, beschermt superadmins en
+ * weigert KU Leuven-adressen en adressen van andere accounts.
+ */
+export async function sendUserAccessLinkAction(
+  _prev: SaveState,
+  formData: FormData,
+): Promise<SaveState> {
+  const session = await requirePermission("users.edit");
+  const parsed = z
+    .object({ id: z.string().min(1), email: z.string().trim().toLowerCase().email() })
+    .safeParse({ id: formData.get("id") ?? "", email: formData.get("email") ?? "" });
+  if (!parsed.success) return saveError("INVALID_INPUT" satisfies UserAccessErrorCode);
+  if (isKuLeuvenEmail(parsed.data.email)) {
+    return saveError("NO_PERSONAL_EMAIL" satisfies UserAccessErrorCode);
+  }
+
+  const user = await prisma.user.findFirst({
+    where: { id: parsed.data.id, deletedAt: null },
+    select: {
+      id: true,
+      name: true,
+      email: true,
+      personalEmail: true,
+      emailPreference: true,
+      active: true,
+      isSuperAdmin: true,
+    },
+  });
+  if (!user || !user.active) {
+    return saveError("ACCOUNT_NOT_FOUND" satisfies UserAccessErrorCode);
+  }
+  if (user.isSuperAdmin && !session.user.isSuperAdmin) {
+    return saveError("FORBIDDEN" satisfies UserAccessErrorCode);
+  }
+
+  const collision = await prisma.user.findFirst({
+    where: {
+      id: { not: user.id },
+      deletedAt: null,
+      OR: [
+        { email: { equals: parsed.data.email, mode: "insensitive" } },
+        { personalEmail: { equals: parsed.data.email, mode: "insensitive" } },
+      ],
+    },
+    select: { id: true },
+  });
+  if (collision) return saveError("EMAIL_TAKEN" satisfies UserAccessErrorCode);
+
+  const changedEmail = user.personalEmail !== parsed.data.email;
+  const changedPreference = user.emailPreference !== "PERSONAL";
+  if (changedEmail || changedPreference) {
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { personalEmail: parsed.data.email, emailPreference: "PERSONAL" },
+    });
+  }
+
+  const reset = await createPasswordSetupForUser(user.id);
+  if (!reset) return saveError("ACCOUNT_NOT_FOUND" satisfies UserAccessErrorCode);
+  const sent = await sendManagedPasswordSetupMail({
+    to: reset.email,
+    name: reset.name,
+    token: reset.token,
+    locale: reset.locale === "EN" ? "en" : "nl",
+  });
+  if (!sent) {
+    revalidatePath(`/admin/gebruikers/${user.id}`);
+    return saveError("MAIL_FAILED" satisfies UserAccessErrorCode);
+  }
+
+  await logAudit({
+    action: "update",
+    entity: "user",
+    entityId: user.id,
+    target: user.name,
+    summary: changedEmail
+      ? "privéadres bewaard en wachtwoordlink verstuurd"
+      : "wachtwoordlink verstuurd naar privéadres",
+  });
+  revalidatePath("/admin/gebruikers");
+  revalidatePath(`/admin/gebruikers/${user.id}`);
   return saveOk();
 }
 
@@ -280,11 +379,16 @@ export async function removeMembershipAction(formData: FormData): Promise<void> 
 }
 
 // Bulk CSV import. Columns: email,name,password,groupCode,role,year,rNumber
-export async function bulkImportUsersAction(formData: FormData): Promise<{ ok: boolean; added: number; errors: string[] }> {
+export async function bulkImportUsersAction(
+  formData: FormData,
+): Promise<{ ok: boolean; added: number; errors: string[] }> {
   await requirePermission("users.bulkImport");
   const session = await requireSession();
   const csv = (formData.get("csv") as string) || "";
-  const lines = csv.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+  const lines = csv
+    .split(/\r?\n/)
+    .map((l) => l.trim())
+    .filter(Boolean);
   const errors: string[] = [];
   let added = 0;
 
@@ -344,8 +448,7 @@ export async function bulkImportUsersAction(formData: FormData): Promise<{ ok: b
           // Leeg jaar in de CSV valt terug op het huidige werkingsjaar.
           const membershipYear = yearStr ? Number(yearStr) : currentWorkingYear();
           const membershipRole = (role?.toUpperCase() === "LEAD" ? "LEAD" : "MEMBER") as
-            | "LEAD"
-            | "MEMBER";
+            "LEAD" | "MEMBER";
           await prisma.groupMembership.upsert({
             where: {
               userId_groupId_year: {
@@ -451,14 +554,13 @@ const GROUP_FIELD_LABELS: Record<string, string> = {
   nameEn: "Engelse naam",
   descriptionNl: "beschrijving",
   descriptionEn: "Engelse beschrijving",
-  orderInPraesidium: "volgorde",
   active: "actief",
 };
 
 /**
  * Post aanmaken of bewerken. De `code` en `slug` staan enkel bij het aanmaken
  * vast (shiften en de sessie verwijzen naar `code`); bij bewerken wijzigen enkel
- * naam, beschrijving, volgorde en actief-status. Een post uitzetten (active=false)
+ * naam, beschrijving en actief-status. Een post uitzetten (active=false)
  * haalt ze uit de nieuwe-shift-keuzes maar behoudt de historiek.
  */
 export async function saveGroupAction(_prev: SaveState, formData: FormData): Promise<SaveState> {
@@ -470,7 +572,6 @@ export async function saveGroupAction(_prev: SaveState, formData: FormData): Pro
     nameEn: formData.get("nameEn"),
     descriptionNl: (formData.get("descriptionNl") as string) || null,
     descriptionEn: (formData.get("descriptionEn") as string) || null,
-    orderInPraesidium: formData.get("orderInPraesidium") || 0,
     active: formData.get("active") === "on",
   });
   if (!result.success) return saveError("INVALID_INPUT");
@@ -481,7 +582,6 @@ export async function saveGroupAction(_prev: SaveState, formData: FormData): Pro
     nameEn: parsed.nameEn,
     descriptionNl: parsed.descriptionNl,
     descriptionEn: parsed.descriptionEn,
-    orderInPraesidium: parsed.orderInPraesidium,
     active: parsed.active,
   };
 
@@ -500,7 +600,20 @@ export async function saveGroupAction(_prev: SaveState, formData: FormData): Pro
       const code = codeify(parsed.code || parsed.nameNl);
       const slug = slugify(parsed.nameNl);
       if (!code || !slug) return saveError("INVALID_INPUT");
-      const created = await prisma.group.create({ data: { ...data, code, slug } });
+      const last = await prisma.group.findFirst({
+        where: { type: "PRAESIDIUM" },
+        orderBy: { orderInPraesidium: "desc" },
+        select: { orderInPraesidium: true },
+      });
+      const created = await prisma.group.create({
+        data: {
+          ...data,
+          code,
+          slug,
+          type: "PRAESIDIUM",
+          orderInPraesidium: (last?.orderInPraesidium ?? -1) + 1,
+        },
+      });
       await logAudit({
         action: "create",
         entity: "post",
@@ -518,6 +631,26 @@ export async function saveGroupAction(_prev: SaveState, formData: FormData): Pro
   revalidatePath("/admin/groepen");
   revalidatePath("/praesidium");
   return saveOk();
+}
+
+export async function reorderGroupsAction(ids: string[]): Promise<void> {
+  await requirePermission("groups.manage");
+  await prisma.$transaction(
+    ids.map((id, index) =>
+      prisma.group.update({
+        where: { id },
+        data: { orderInPraesidium: index },
+      }),
+    ),
+  );
+  await logAudit({
+    action: "reorder",
+    entity: "post",
+    target: `${ids.length} posten`,
+    summary: "volgorde van posten gewijzigd",
+  });
+  revalidatePath("/admin/groepen");
+  revalidatePath("/praesidium");
 }
 
 /**
@@ -542,9 +675,7 @@ async function logGroupRoleChange(
     entity,
     entityId: groupId,
     target: group?.nameNl ?? groupId,
-    summary: `rol ${role?.nameNl ?? roleId} ${
-      enabled ? "toegekend aan" : "afgenomen van"
-    } ${who}`,
+    summary: `rol ${role?.nameNl ?? roleId} ${enabled ? "toegekend aan" : "afgenomen van"} ${who}`,
   });
 }
 
@@ -587,23 +718,24 @@ const werkgroepSchema = z.object({
   code: z.string().trim().optional(),
   nameNl: z.string().trim().min(1),
   nameEn: z.string().trim().min(1),
-  orderInPraesidium: z.coerce.number().int().default(0),
   active: z.coerce.boolean().default(true),
 });
 
 /**
- * Werkgroep aanmaken of haar basisinstellingen (naam, volgorde, actief) bewerken.
+ * Werkgroep aanmaken of haar basisinstellingen (naam, actief) bewerken.
  * De infotekst + website lopen apart via {@link saveWerkgroepInfoAction} zodat
  * ook gewone leden die mogen aanpassen. Enkel werkgroepen.manage (of superadmin).
  */
-export async function saveWerkgroepAction(_prev: SaveState, formData: FormData): Promise<SaveState> {
+export async function saveWerkgroepAction(
+  _prev: SaveState,
+  formData: FormData,
+): Promise<SaveState> {
   await requirePermission("werkgroepen.manage");
   const result = werkgroepSchema.safeParse({
     id: (formData.get("id") as string) || undefined,
     code: (formData.get("code") as string) || undefined,
     nameNl: formData.get("nameNl"),
     nameEn: formData.get("nameEn"),
-    orderInPraesidium: formData.get("orderInPraesidium") || 0,
     active: formData.get("active") === "on",
   });
   if (!result.success) return saveError("INVALID_INPUT");
@@ -612,7 +744,6 @@ export async function saveWerkgroepAction(_prev: SaveState, formData: FormData):
   const data = {
     nameNl: parsed.nameNl,
     nameEn: parsed.nameEn,
-    orderInPraesidium: parsed.orderInPraesidium,
     active: parsed.active,
   };
 
@@ -631,8 +762,19 @@ export async function saveWerkgroepAction(_prev: SaveState, formData: FormData):
       const code = codeify(parsed.code || parsed.nameNl);
       const slug = slugify(parsed.nameNl);
       if (!code || !slug) return saveError("INVALID_INPUT");
+      const last = await prisma.group.findFirst({
+        where: { type: "WERKGROEP" },
+        orderBy: { orderInPraesidium: "desc" },
+        select: { orderInPraesidium: true },
+      });
       const created = await prisma.group.create({
-        data: { ...data, code, slug, type: "WERKGROEP" },
+        data: {
+          ...data,
+          code,
+          slug,
+          type: "WERKGROEP",
+          orderInPraesidium: (last?.orderInPraesidium ?? -1) + 1,
+        },
       });
       await logAudit({
         action: "create",
@@ -653,6 +795,26 @@ export async function saveWerkgroepAction(_prev: SaveState, formData: FormData):
   return saveOk();
 }
 
+export async function reorderWerkgroepenAction(ids: string[]): Promise<void> {
+  await requirePermission("werkgroepen.manage");
+  await prisma.$transaction(
+    ids.map((id, index) =>
+      prisma.group.update({
+        where: { id },
+        data: { orderInPraesidium: index },
+      }),
+    ),
+  );
+  await logAudit({
+    action: "reorder",
+    entity: "werkgroep",
+    target: `${ids.length} werkgroepen`,
+    summary: "volgorde van werkgroepen gewijzigd",
+  });
+  revalidatePath("/admin/werkgroepen");
+  revalidatePath("/werkgroepen");
+}
+
 const werkgroepInfoSchema = z.object({
   descriptionNl: z.string().trim().optional().nullable(),
   descriptionEn: z.string().trim().optional().nullable(),
@@ -665,10 +827,15 @@ const werkgroepInfoSchema = z.object({
  * lid van BEST kan dus enkel de tekst van BEST wijzigen, niet die van een andere
  * werkgroep.
  */
-export async function saveWerkgroepInfoAction(_prev: SaveState, formData: FormData): Promise<SaveState> {
+export async function saveWerkgroepInfoAction(
+  _prev: SaveState,
+  formData: FormData,
+): Promise<SaveState> {
   const session = await requireSession();
   const id = String(formData.get("id") ?? "");
-  const group = id ? await prisma.group.findUnique({ where: { id }, select: { type: true } }) : null;
+  const group = id
+    ? await prisma.group.findUnique({ where: { id }, select: { type: true } })
+    : null;
   if (!group || group.type !== "WERKGROEP") return saveError("INVALID_INPUT");
 
   const isMember = session.groups.some((g) => g.id === id);

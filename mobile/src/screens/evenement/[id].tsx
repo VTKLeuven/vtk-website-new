@@ -40,6 +40,12 @@ import { COLORS, RADIUS, SPACING, TYPE } from '../../theme/tokens';
  * - **In agenda** schrijft de afspraak in de agenda van je telefoon, met plaats
  *   en een herinnering. Dat is iets anders dan de ICS-feed op de site: die
  *   abonneert je op álles, dit is dit ene ding.
+ *
+ * Bij een **alumni-evenement** staat er onderaan wie er komt. Die lijst bevat
+ * enkel wie op de site zelf aanvinkte zichtbaar te willen zijn; wie dat niet deed
+ * telt mee in het getal en staat er niet in. Aanduiden dat je komt zonder account
+ * kan enkel op de site: in de app ben je per definitie ingelogd, en dan is de
+ * ster de juiste knop.
  */
 export default function EventScreen() {
   const router = useTabRouter();
@@ -172,13 +178,15 @@ export default function EventScreen() {
           </Text>
         ) : null}
 
-        {event.interestedCount > 0 ? (
+        {/* De server beslist over de drempel en stuurt hieronder niets mee zolang
+            die niet gehaald is; zo tonen de app en de site hetzelfde getal. */}
+        {event.interestedCount ? (
           <View style={styles.interestRow}>
-            <Users color={COLORS.muted} size={15} />
-            <Text style={styles.note}>
-              {event.interestedCount === 1
-                ? 'Eén lid duidde dit aan'
-                : `${event.interestedCount} leden duidden dit aan`}
+            <Users color={COLORS.ink} size={15} />
+            <Text style={styles.goingText}>
+              {locale === 'en'
+                ? `${event.interestedCount} going`
+                : `${event.interestedCount} komen`}
             </Text>
           </View>
         ) : null}
@@ -186,6 +194,36 @@ export default function EventScreen() {
         {event.description ? (
           <Card>
             <Prose>{event.description}</Prose>
+          </Card>
+        ) : null}
+
+        {event.isAlumniEvent && event.attendees.length > 0 ? (
+          <Card>
+            <Text style={styles.attendeesTitle}>
+              {locale === 'en' ? 'Who is coming' : 'Wie er komt'}
+            </Text>
+            <Text style={styles.note}>
+              {locale === 'en'
+                ? 'Only those who chose to be visible. The counter above counts everyone.'
+                : 'Alleen wie zelf aangaf zichtbaar te willen zijn. De teller hierboven telt iedereen.'}
+            </Text>
+            <View style={styles.attendees}>
+              {event.attendees.map((attendee) => (
+                <View key={attendee.key} style={styles.attendee}>
+                  <Text style={[styles.attendeeName, !attendee.name && styles.attendeeAnon]}>
+                    {attendee.name ?? (locale === 'en' ? 'Anonymous' : 'Anoniem')}
+                  </Text>
+                  <Text style={styles.attendeeMeta}>
+                    {[
+                      attendee.graduationYear ? String(attendee.graduationYear) : null,
+                      attendee.wasInVtk ? 'VTK' : null,
+                    ]
+                      .filter(Boolean)
+                      .join(' · ') || '—'}
+                  </Text>
+                </View>
+              ))}
+            </View>
           </Card>
         ) : null}
 
@@ -248,4 +286,21 @@ const styles = StyleSheet.create({
   actionLabel: { ...TYPE.small, fontFamily: TYPE.cardTitle.fontFamily, color: COLORS.ink },
   interestRow: { flexDirection: 'row', alignItems: 'center', gap: SPACING.sm },
   note: { ...TYPE.small, color: COLORS.muted },
+  goingText: { ...TYPE.small, fontFamily: TYPE.cardTitle.fontFamily, color: COLORS.ink },
+  attendeesTitle: { ...TYPE.cardTitle, color: COLORS.ink, marginBottom: 2 },
+  attendees: { marginTop: SPACING.sm },
+  // Naam links, de rest rechts: twee gelabelde kolommen in plaats van één regel
+  // met middots, precies zoals de tabel op de site (zie CLAUDE.md).
+  attendee: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: SPACING.md,
+    paddingVertical: SPACING.xs,
+    borderTopWidth: 1,
+    borderTopColor: COLORS.line,
+  },
+  attendeeName: { ...TYPE.body, color: COLORS.ink, flex: 1 },
+  attendeeAnon: { color: COLORS.muted, fontStyle: 'italic' },
+  attendeeMeta: { ...TYPE.small, color: COLORS.muted },
 });

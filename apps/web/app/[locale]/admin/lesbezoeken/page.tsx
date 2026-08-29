@@ -7,14 +7,20 @@ import { hasLocale } from "@/lib/locale";
 import { requireAnyPermission } from "@/lib/session";
 import { brusselsMinutesOfDay, brusselsYMD, ymdKey } from "@/lib/brussels";
 import {
+  daysUntil,
   defaultTeacherLocale,
+  formatScheduleMoment,
+  formatScheduleShort,
+  isOpenStatus,
+  isProcessedStatus,
   matchPeculiarities,
-  type LesbezoekStatusCode,
+  needsNudgeReminder,
 } from "@/lib/lesbezoeken";
 import {
   formatMailMoment,
   getLesbezoekConfig,
   getLesbezoekTemplates,
+  processDueLesbezoekScheduledMails,
 } from "@/lib/lesbezoeken-server";
 import {
   currentWorkingYear,
@@ -27,7 +33,12 @@ import { LesbezoekBoard } from "./LesbezoekBoard";
 import { OrganisationsCard } from "./OrganisationsCard";
 import { PeculiaritiesCard } from "./PeculiaritiesCard";
 import { MailSettingsCard } from "./MailSettingsCard";
-import type { OrganisationView, PeculiarityView, VisitView } from "./types";
+import type {
+  OrganisationView,
+  PeculiarityView,
+  ScheduledMailView,
+  VisitView,
+} from "./types";
 
 import "@/app/design/vtk-lesbezoeken.css";
 
@@ -41,17 +52,15 @@ import "@/app/design/vtk-lesbezoeken.css";
  * docs/design-decisions.md ("Lesbezoeken").
  */
 
-const TABS = ["aanvragen", "kalender", "instellingen"] as const;
+const TABS = ["aanvragen", "verwerkt", "kalender", "instellingen"] as const;
 type Tab = (typeof TABS)[number];
 
 const TAB_LABELS: Record<Tab, { nl: string; en: string }> = {
   aanvragen: { nl: "Aanvragen", en: "Requests" },
+  verwerkt: { nl: "Verwerkt", en: "Processed" },
   kalender: { nl: "Kalender", en: "Calendar" },
   instellingen: { nl: "Organisaties & mails", en: "Organisations & mail" },
 };
-
-/** Statussen die als "hier moet nog iets mee gebeuren" tellen, voor de teller. */
-const OPEN_STATUSES: LesbezoekStatusCode[] = ["PENDING", "ASKED"];
 
 export default async function AdminLesbezoekenPage({
   params,
@@ -71,7 +80,11 @@ export default async function AdminLesbezoekenPage({
     session.user.isSuperAdmin || session.permissions.includes("lesbezoeken.manage");
 
   const { tab: tabParam, jaar } = await searchParams;
-  const tab: Tab = (TABS as readonly string[]).includes(tabParam ?? "") ? (tabParam as Tab) : "aanvragen";
+  const normalizedTab =
+    tabParam === "goedgekeurd" || tabParam === "processed" ? "verwerkt" : tabParam;
+  const tab: Tab = (TABS as readonly string[]).includes(normalizedTab ?? "")
+    ? (normalizedTab as Tab)
+    : "aanvragen";
   const year = parseWorkingYear(jaar);
 
   // Het venster van één werkingsjaar (15 juli tot 15 juli). Alle bezoeken van dat
@@ -80,57 +93,93 @@ export default async function AdminLesbezoekenPage({
   const from = workingYearStart(year);
   const to = workingYearStart(year + 1);
 
-  const [visitRows, organisationRows, peculiarityRows, config, templates, yearRows] =
-    await Promise.all([
-      prisma.lesbezoek.findMany({
-        where: { startsAt: { gte: from, lt: to } },
-        orderBy: { startsAt: "asc" },
-        select: {
-          id: true,
-          startsAt: true,
-          endsAt: true,
-          longVisit: true,
-          audience: true,
-          course: true,
-          subject: true,
-          teacherNote: true,
-          teacherEmail: true,
-          teacherName: true,
-          requesterName: true,
-          requesterEmail: true,
-          requesterPhone: true,
-          status: true,
-          reviewNote: true,
-          reviewedAt: true,
-          professorMailedAt: true,
-          professorNudgedAt: true,
-          requesterNotifiedAt: true,
-          createdAt: true,
-          organisation: { select: { id: true, name: true, colour: true, note: true } },
-          reviewedBy: { select: { name: true } },
-        },
-      }),
-      prisma.lesbezoekOrganisation.findMany({
-        orderBy: { name: "asc" },
-        select: {
-          id: true,
-          name: true,
-          colour: true,
-          contactEmail: true,
-          note: true,
-          active: true,
-          _count: { select: { visits: true } },
-        },
-      }),
-      prisma.lesbezoekPeculiarity.findMany({ orderBy: { subject: "asc" } }),
-      getLesbezoekConfig(),
-      getLesbezoekTemplates(),
-      prisma.lesbezoek.findMany({
-        distinct: ["startsAt"],
-        select: { startsAt: true },
-        orderBy: { startsAt: "asc" },
-      }),
-    ]);
+  // Verwerk eventueel vervallen geplande mails direct bij paginalaad
+  await processDueLesbezoekScheduledMails().catch((err) => {
+    console.error("[lesbezoeken] fout bij verwerken van geplande mails bij paginalaad:", err);
+  });
+
+  const [
+    visitRows,
+    scheduledMailRows,
+    organisationRows,
+    peculiarityRows,
+    config,
+    templates,
+    yearRows,
+  ] = await Promise.all([
+    prisma.lesbezoek.findMany({
+      where: { startsAt: { gte: from, lt: to } },
+      orderBy: { startsAt: "asc" },
+      select: {
+        id: true,
+        startsAt: true,
+        endsAt: true,
+        longVisit: true,
+        audience: true,
+        course: true,
+        subject: true,
+        teacherNote: true,
+        teacherEmail: true,
+        teacherName: true,
+        requesterName: true,
+        requesterEmail: true,
+        requesterPhone: true,
+        status: true,
+        reviewNote: true,
+        reviewedAt: true,
+        professorMailedAt: true,
+        professorNudgedAt: true,
+        requesterNotifiedAt: true,
+        createdAt: true,
+        organisation: { select: { id: true, name: true, colour: true, note: true } },
+        reviewedBy: { select: { name: true } },
+      },
+    }),
+    // De geplande mails apart: een gebundelde terugkoppeling staat als één rij
+    // onder haar eerste bezoek, met de rest in `bundledIds`. Genest opvragen
+    // zou ze dus enkel bij dat eerste bezoek tonen, en bij de negentien andere
+    // lijkt er dan niets ingepland te staan.
+    prisma.lesbezoekScheduledMail.findMany({
+      where: {
+        sentAt: null,
+        failedAt: null,
+        lesbezoek: { startsAt: { gte: from, lt: to } },
+      },
+      orderBy: { sendAt: "asc" },
+      select: {
+        id: true,
+        lesbezoekId: true,
+        bundledIds: true,
+        kind: true,
+        to: true,
+        cc: true,
+        subject: true,
+        body: true,
+        sendAt: true,
+        createdAt: true,
+      },
+    }),
+    prisma.lesbezoekOrganisation.findMany({
+      orderBy: { name: "asc" },
+      select: {
+        id: true,
+        name: true,
+        colour: true,
+        contactEmail: true,
+        note: true,
+        active: true,
+        _count: { select: { visits: true } },
+      },
+    }),
+    prisma.lesbezoekPeculiarity.findMany({ orderBy: { subject: "asc" } }),
+    getLesbezoekConfig(),
+    getLesbezoekTemplates(),
+    prisma.lesbezoek.findMany({
+      distinct: ["startsAt"],
+      select: { startsAt: true },
+      orderBy: { startsAt: "asc" },
+    }),
+  ]);
 
   const peculiarities: PeculiarityView[] = peculiarityRows.map((row) => ({
     id: row.id,
@@ -168,11 +217,38 @@ export default async function AdminLesbezoekenPage({
     minute: "2-digit",
   });
 
+  // Elke geplande mail bij elk bezoek dat ze dekt, dus ook bij de bezoeken die
+  // enkel via `bundledIds` in de bundel zitten.
+  const scheduledByVisit = new Map<string, ScheduledMailView[]>();
+  for (const mail of scheduledMailRows) {
+    const view: ScheduledMailView = {
+      id: mail.id,
+      kind: mail.kind as "professor" | "nudge" | "requester",
+      to: mail.to,
+      cc: mail.cc,
+      bundledCount: 1 + mail.bundledIds.length,
+      subject: mail.subject,
+      body: mail.body,
+      sendAt: mail.sendAt.toISOString(),
+      sendAtFormatted: formatScheduleMoment(mail.sendAt, nl ? "nl" : "en"),
+      sendAtShort: formatScheduleShort(mail.sendAt, nl ? "nl" : "en"),
+      createdAt: mail.createdAt.toISOString(),
+    };
+    for (const visitId of [mail.lesbezoekId, ...mail.bundledIds]) {
+      const bucket = scheduledByVisit.get(visitId);
+      if (bucket) bucket.push(view);
+      else scheduledByVisit.set(visitId, [view]);
+    }
+  }
+
+  const now = new Date();
+
   const visits: VisitView[] = visitRows.map((row) => {
     const day = ymdKey(brusselsYMD(row.startsAt));
     const minutes = brusselsMinutesOfDay(row.startsAt);
     const endMinutes = brusselsMinutesOfDay(row.endsAt);
     const clashKey = `${row.teacherEmail.toLowerCase()}|${day}`;
+    const scheduledMails = scheduledByVisit.get(row.id) ?? [];
 
     return {
       id: row.id,
@@ -224,10 +300,22 @@ export default async function AdminLesbezoekenPage({
         en: formatMailMoment(row.startsAt, "en").date,
       },
       mailTime: formatMailMoment(row.startsAt, "nl").time,
+      scheduledMails,
+      needsNudge: needsNudgeReminder(
+        {
+          status: row.status,
+          startsAt: row.startsAt,
+          professorNudgedAt: row.professorNudgedAt,
+          nudgeScheduled: scheduledMails.some((mail) => mail.kind === "nudge"),
+        },
+        { now, leadDays: config.nudgeLeadDays },
+      ),
+      daysUntil: daysUntil(row.startsAt, now),
     };
   });
 
-  const openCount = visits.filter((visit) => OPEN_STATUSES.includes(visit.status)).length;
+  const openCount = visits.filter((visit) => isOpenStatus(visit.status)).length;
+  const processedCount = visits.filter((visit) => isProcessedStatus(visit.status)).length;
   const years = workingYearTabs(
     yearRows.map((row) => {
       const { year: y, month } = brusselsYMD(row.startsAt);
@@ -267,6 +355,7 @@ export default async function AdminLesbezoekenPage({
           >
             {TAB_LABELS[value][nl ? "nl" : "en"]}
             {value === "aanvragen" && openCount > 0 ? ` (${openCount})` : ""}
+            {value === "verwerkt" && processedCount > 0 ? ` (${processedCount})` : ""}
           </Link>
         ))}
       </nav>
@@ -300,7 +389,7 @@ export default async function AdminLesbezoekenPage({
         <Card className="p-5">
           <LesbezoekBoard
             nl={nl}
-            mode={tab === "kalender" ? "calendar" : "queue"}
+            mode={tab === "kalender" ? "calendar" : tab === "verwerkt" ? "processed" : "queue"}
             canManage={canManage}
             visits={visits}
             organisations={organisations.filter(
@@ -308,6 +397,7 @@ export default async function AdminLesbezoekenPage({
             )}
             templates={templates}
             signature={config.signature}
+            nudgeLeadDays={config.nudgeLeadDays}
           />
         </Card>
       )}

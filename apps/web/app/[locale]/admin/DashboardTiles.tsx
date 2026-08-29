@@ -8,6 +8,7 @@ import {
   TILE_COLORS,
   TileChip,
   groupTilesBySource,
+  normalizeUrl,
   type EffectiveTile,
   type TileSection,
 } from "@/lib/dashboard-tiles";
@@ -133,6 +134,11 @@ export function DashboardTiles({
   const signature = tiles
     .map((x) => `${x.key}:${x.order}:${x.hidden}:${x.label}:${x.icon}:${x.color}:${x.imageKey}:${x.url}`)
     .join("|");
+  const [prevSignature, setPrevSignature] = useState(signature);
+  if (signature !== prevSignature) {
+    setPrevSignature(signature);
+    setList(tiles);
+  }
   useEffect(() => {
     if (!dragging.current) setList(tiles);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -168,7 +174,9 @@ export function DashboardTiles({
   }, [sections]);
 
   function persistLayout(next: EffectiveTile[]) {
-    startTransition(() => saveDashboardLayoutAction(buildLayout(next)));
+    startTransition(async () => {
+      await saveDashboardLayoutAction(buildLayout(next));
+    });
   }
 
   // --- drag & drop reordering (edit mode only) ---
@@ -201,11 +209,16 @@ export function DashboardTiles({
   }
 
   function removeTile(tile: EffectiveTile) {
-    startTransition(() => deletePersonalTileAction(tile.tileId));
+    setList((cur) => cur.filter((x) => x.key !== tile.key));
+    startTransition(async () => {
+      await deletePersonalTileAction(tile.tileId);
+    });
   }
 
   function resetTile(tile: EffectiveTile) {
-    startTransition(() => resetSharedTileAction(tile.tileId));
+    startTransition(async () => {
+      await resetSharedTileAction(tile.tileId);
+    });
   }
 
   function resetLayout() {
@@ -235,7 +248,7 @@ export function DashboardTiles({
               </button>
               {manageHref && (
                 <Link href={manageHref} className="vtk-tile-btn">
-                  {locale === "nl" ? "Standaardtegels beheren" : "Manage default tiles"}
+                  {locale === "nl" ? "Dashboardtegels beheren" : "Manage dashboard tiles"}
                 </Link>
               )}
             </>
@@ -361,15 +374,67 @@ export function DashboardTiles({
           pending={pending}
           onClose={() => setEditor(null)}
           onSubmit={(data) => {
-            startTransition(() => {
-              if (editor.mode === "add") {
-                addPersonalTileAction(data);
-              } else if (editor.tile.source === "personal") {
-                updatePersonalTileAction({ ...data, id: editor.tile.tileId });
-              } else {
-                overrideSharedTileAction({ ...data, tileId: editor.tile.tileId });
-              }
-            });
+            const cleanUrl = normalizeUrl(data.url);
+            const cleanLabel = data.label.trim();
+            if (editor.mode === "add") {
+              const tempId = `temp:${Date.now()}`;
+              const optimisticTile: EffectiveTile = {
+                key: `personal:${tempId}`,
+                tileId: tempId,
+                source: "personal",
+                label: cleanLabel,
+                url: cleanUrl,
+                icon: data.icon || "link",
+                color: data.color || "navy",
+                imageKey: data.imageKey,
+                order: list.length,
+                hidden: false,
+                overridden: false,
+              };
+              setList((cur) => [...cur, optimisticTile]);
+              startTransition(async () => {
+                await addPersonalTileAction(data);
+              });
+            } else if (editor.tile.source === "personal") {
+              const tileId = editor.tile.tileId;
+              setList((cur) =>
+                cur.map((t) =>
+                  t.key === editor.tile.key
+                    ? {
+                        ...t,
+                        label: cleanLabel,
+                        url: cleanUrl,
+                        icon: data.icon || "link",
+                        color: data.color || "navy",
+                        imageKey: data.imageKey,
+                      }
+                    : t
+                )
+              );
+              startTransition(async () => {
+                await updatePersonalTileAction({ ...data, id: tileId });
+              });
+            } else {
+              const tileId = editor.tile.tileId;
+              setList((cur) =>
+                cur.map((t) =>
+                  t.key === editor.tile.key
+                    ? {
+                        ...t,
+                        label: cleanLabel,
+                        url: cleanUrl,
+                        icon: data.icon || "link",
+                        color: data.color || "navy",
+                        imageKey: data.imageKey,
+                        overridden: true,
+                      }
+                    : t
+                )
+              );
+              startTransition(async () => {
+                await overrideSharedTileAction({ ...data, tileId });
+              });
+            }
             setEditor(null);
           }}
         />

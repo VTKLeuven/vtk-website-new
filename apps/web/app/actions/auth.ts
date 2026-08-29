@@ -5,7 +5,7 @@ import { revalidatePath } from 'next/cache';
 import { headers } from 'next/headers';
 import { z } from 'zod';
 import { prisma } from '@vtk/db';
-import { signInEmail, signOut } from '@vtk/auth/server';
+import { checkLoginBlocked, resolveLoginEmail, signInEmail, signOut } from '@vtk/auth/server';
 import { saveError, saveOk, type SaveState } from '@/lib/saveState';
 import { requireSession } from '@/lib/session';
 
@@ -19,7 +19,7 @@ const loginSchema = z.object({
 /**
  * `redirectTo` wordt gezet in plaats van te redirecten wanneer de bestemming
  * geen pagina is maar het OAuth-authorize-endpoint; de client navigeert er dan
- * zelf hard naartoe. Zie `hardRedirect` in LoginForm.
+ * zelf hard naartoe. Zie `hardRedirect` in PasswordSignIn.
  */
 export type LoginState = { error?: string; redirectTo?: string } | undefined;
 
@@ -36,17 +36,20 @@ export async function loginAction(_prev: LoginState, formData: FormData): Promis
     return { error: 'Invalid input' };
   }
 
-  const user = await prisma.user.findUnique({
-    where: { email: parsed.data.email },
-    select: { active: true },
-  });
-  if (!user?.active) {
-    return { error: 'INVALID' };
-  }
+  // Een afgestudeerde kent zijn KU Leuven-adres vaak niet meer en tikt het adres
+  // in waar hij zijn mail leest; dat vertalen we naar het login-adres.
+  const email = await resolveLoginEmail(parsed.data.email);
+
+  // Foute credentials en een gedeactiveerd account geven allebei 'INVALID'; het
+  // formulier mag niet verklappen welke adressen een account hebben. De enige
+  // uitzondering is een zelfgemaakt account dat zijn mailadres nog niet
+  // bevestigde: dat krijgt 'UNVERIFIED', maar pas nadat het wachtwoord klopte.
+  const blocked = await checkLoginBlocked(email, parsed.data.password);
+  if (blocked !== 'NONE') return { error: blocked };
 
   try {
     await signInEmail(await headers(), {
-      email: parsed.data.email,
+      email,
       password: parsed.data.password,
     });
   } catch {
