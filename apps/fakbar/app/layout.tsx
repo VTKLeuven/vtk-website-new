@@ -7,14 +7,14 @@ import { SiteFooter } from '@/components/site-footer';
 const inter = Inter({ subsets: ['latin'], variable: '--font-vtk-sans', display: 'swap' });
 
 export const metadata: Metadata = {
-  title: { default: "'t ElixIr", template: "%s · 't ElixIr" },
-  description: "De gezelligste fakbar van Leuven. Drankkaart, foto's, verhuur en meer.",
+  title: { default: "'t ElixIr · de fakbar van VTK Leuven", template: "%s · 't ElixIr" },
+  description: "De faculteitsbar van Ingenieurswetenschappen in Leuven: openingsuren, drankkaart en verhuur.",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="nl" className={inter.variable}>
-      <body className="flex min-h-full flex-col bg-[--paper] text-[--ink] antialiased">
+      <body className="vtk-fakbar-dark flex min-h-full flex-col bg-[var(--paper)] text-[var(--ink)] antialiased">
         <SiteHeader />
         <div className="flex flex-1 flex-col">{children}</div>
         <SiteFooter />

@@ -1,85 +1,83 @@
 import type { Metadata } from 'next';
+import Link from 'next/link';
 import { prisma } from '@vtk/db';
+import { StockForm } from './stock-form';
+import { CATEGORY_ORDER, CATEGORY_LABELS } from '@/lib/fakbar-format';
+import { formatWeekRange } from '@/lib/fakbar-week';
 
 export const metadata: Metadata = { title: 'Stocktelling' };
 
-export default async function StocktellingPage() {
-  const items = await prisma.fakbarItem.findMany({
-    orderBy: [{ category: 'asc' }, { name: 'asc' }],
-  });
+export default async function StocktellingPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ week?: string }>;
+}) {
+  const { week: weekId } = await searchParams;
 
-  const currentWeek = await prisma.fakbarWeek.findFirst({
-    where: { status: 'OPEN' },
-    orderBy: [{ year: 'desc' }, { weekNumber: 'desc' }],
-    include: {
-      stockCounts: { include: { item: true } },
-    },
-  });
+  const week = weekId
+    ? await prisma.fakbarWeek.findUnique({
+        where: { id: weekId },
+        include: { stockCounts: { include: { item: true } } },
+      })
+    : await prisma.fakbarWeek.findFirst({
+        where: { status: 'OPEN' },
+        orderBy: [{ year: 'desc' }, { weekNumber: 'desc' }],
+        include: { stockCounts: { include: { item: true } } },
+      });
 
-  const CATEGORIES: Record<string, string> = {
-    VAT: "Bieren van 't Vat",
-    BIER_WIJN: 'Bieren op Fles & Wijn',
-    FRISDRANK: 'Frisdranken',
-    STERK: 'Sterke Drank',
-  };
+  if (!week) {
+    return (
+      <div className="space-y-6">
+        <div className="fakbar-section-head">
+          <h2>Stocktelling</h2>
+        </div>
+        <div className="fakbar-empty">
+          <h3>Geen open week</h3>
+          <p>Maak eerst een week aan op het overzicht; de tellingsrijen komen er dan per artikel bij.</p>
+          <Link href="/admin" className="fakbar-btn fakbar-btn-primary mt-2">
+            Naar het overzicht
+          </Link>
+        </div>
+      </div>
+    );
+  }
 
-  const grouped = Object.entries(CATEGORIES).map(([key, label]) => ({
-    key,
-    label,
-    items: items.filter((i) => i.category === key),
-  }));
+  // Artikelen die na het aanmaken van de week op de kaart gezet zijn, hebben
+  // nog geen tellingsrij. Die melden we in plaats van ze stil weg te laten.
+  const itemCount = await prisma.fakbarItem.count();
+  const missing = itemCount - week.stockCounts.length;
+
+  const groups = CATEGORY_ORDER.map((category) => ({
+    key: category,
+    label: CATEGORY_LABELS[category],
+    counts: week.stockCounts
+      .filter((count) => count.item.category === category)
+      .sort((a, b) => a.item.name.localeCompare(b.item.name, 'nl-BE')),
+  })).filter((group) => group.counts.length > 0);
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
       <div className="fakbar-section-head">
-        <h2>Stocktelling</h2>
+        <h2>
+          Stocktelling week {week.weekNumber} van {week.year}
+        </h2>
         <p>
-          {currentWeek
-            ? `Week ${currentWeek.weekNumber} — ${currentWeek.year}`
-            : 'Geen open week gevonden.'}
+          {formatWeekRange(week.startDate, week.endDate)}
+          {week.status === 'CLOSED' ? '. Deze week is afgesloten en kan niet meer gewijzigd worden.' : '.'}{' '}
+          De opslag en de toog worden apart geteld: wat er in het magazijn staat, en wat er in de frigo en aan de toog
+          staat.
         </p>
       </div>
 
-      {!currentWeek ? (
-        <p className="text-[--muted] text-sm">Maak eerst een week aan via het dashboard.</p>
-      ) : (
-        grouped.map(({ key, label, items }) => {
-          if (items.length === 0) return null;
-          return (
-            <section key={key}>
-              <p className="mb-3 text-sm font-semibold uppercase tracking-wider text-[--muted]">{label}</p>
-              <div className="overflow-hidden rounded-[18px] border border-[--line] bg-[--surface]">
-                {/* Header row */}
-                <div className="grid grid-cols-[1fr_80px_80px_80px_80px] gap-4 border-b border-[--line] px-5 py-3 text-xs font-bold uppercase tracking-wider text-[--muted]">
-                  <span>Artikel</span>
-                  <span className="text-right">Begin</span>
-                  <span className="text-right">Levering</span>
-                  <span className="text-right">Eind</span>
-                  <span className="text-right">Delta</span>
-                </div>
-                {items.map((item, idx) => {
-                  const count = currentWeek.stockCounts.find((s) => s.itemId === item.id);
-                  const delta = count ? count.eindTelling - count.beginTelling : 0;
-                  return (
-                    <div
-                      key={item.id}
-                      className={`grid grid-cols-[1fr_80px_80px_80px_80px] gap-4 items-center px-5 py-3 ${idx < items.length - 1 ? 'border-b border-[--line]' : ''}`}
-                    >
-                      <span className="font-medium text-[--ink]">{item.name}</span>
-                      <span className="text-right text-sm text-[--muted]">{count?.beginTelling ?? '—'}</span>
-                      <span className="text-right text-sm text-[--muted]">{count?.levering ?? '—'}</span>
-                      <span className="text-right text-sm text-[--muted]">{count?.eindTelling ?? '—'}</span>
-                      <span className={`text-right text-sm font-semibold ${delta < 0 ? 'text-red-600' : delta > 0 ? 'text-green-600' : 'text-[--muted]'}`}>
-                        {count ? (delta >= 0 ? `+${delta}` : delta) : '—'}
-                      </span>
-                    </div>
-                  );
-                })}
-              </div>
-            </section>
-          );
-        })
-      )}
+      {missing > 0 ? (
+        <p className="rounded-xl border border-[var(--line-2)] bg-[var(--paper-2)] px-4 py-3 text-sm text-[var(--body)]">
+          {missing === 1 ? 'Eén artikel staat' : `${missing} artikelen staan`} wel op de drankkaart maar niet in deze
+          telling; {missing === 1 ? 'het is' : 'ze zijn'} na het aanmaken van de week toegevoegd. Vanaf de volgende
+          week {missing === 1 ? 'staat het' : 'staan ze'} er automatisch bij.
+        </p>
+      ) : null}
+
+      <StockForm weekId={week.id} readOnly={week.status === 'CLOSED'} groups={groups} />
     </div>
   );
 }

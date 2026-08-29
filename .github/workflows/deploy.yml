@@ -82,8 +82,10 @@ jobs:
         run: |
           npm exec --workspace=@vtk/web -- next typegen
           npm exec --workspace=@vtk/logistiek -- next typegen
+          npm exec --workspace=@vtk/fakbar -- next typegen
           npx tsc --noEmit -p apps/web/tsconfig.build.json
           npx tsc --noEmit -p apps/logistiek/tsconfig.build.json
+          npx tsc --noEmit -p apps/fakbar/tsconfig.build.json
           npm run lint --workspace=@vtk/web
 
       - name: Apply migrations and run database integration tests
@@ -134,6 +136,7 @@ jobs:
         run: |
           npm run build --workspace=@vtk/web
           npm run build --workspace=@vtk/logistiek
+          npm run build --workspace=@vtk/fakbar
 
       - name: Resolve Playwright version
         id: playwright

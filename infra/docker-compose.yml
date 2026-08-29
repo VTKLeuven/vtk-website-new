@@ -105,6 +105,11 @@ services:
       DATABASE_URL: postgresql://${POSTGRES_USER:-vtk}:${POSTGRES_PASSWORD:-vtk}@postgres:5432/${POSTGRES_DB:-vtk}?schema=public
       SESSION_COOKIE_DOMAIN: ${SESSION_COOKIE_DOMAIN:-.vtk.be}
       VTK_MAIN_URL: ${VTK_MAIN_URL:-https://vtk.be}
+      # De fakbargalerij praat met dezelfde Immich als de website, maar van
+      # binnen het compose-netwerk. Zonder deze regel neemt de app de
+      # localhost-URL uit de root-.env over en vindt ze Immich niet; ze zou dan
+      # stil een lege galerij tonen in plaats van te falen.
+      GALLERY_IMMICH_API_URL: http://immich-server:2283/api
     ports:
       - "127.0.0.1:3300:3000"
 

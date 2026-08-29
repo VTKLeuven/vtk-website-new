@@ -28,7 +28,7 @@ const nextConfig: NextConfig = {
     tsconfigPath: process.env.NODE_ENV === "production" ? "tsconfig.build.json" : "tsconfig.json",
   },
   allowedDevOrigins: ["192.168.9.206", "192.168.9.226", "127.0.0.1", "*.trycloudflare.com"],
-  transpilePackages: ["@vtk/ui", "@vtk/auth", "@vtk/db", "@vtk/i18n", "@vtk/mail", "@vtk/storage", "@vtk/payments"],
+  transpilePackages: ["@vtk/gallery", "@vtk/ui", "@vtk/auth", "@vtk/db", "@vtk/i18n", "@vtk/mail", "@vtk/storage", "@vtk/payments"],
   // Keep heavy, native, or generated server-only packages OUT of the
   // bundler module graph. Without this, the bundler tries to fully
   // resolve the generated Prisma client (which is huge) across every

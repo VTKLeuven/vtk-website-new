@@ -14,6 +14,8 @@ import {
   type GalleryAlbumSummary,
 } from "@/lib/immich-gallery";
 import { deleteMagazineAction, savePromoVideosAction } from "@/app/actions/media";
+import { fakbarUploadEnabled } from "@/lib/fakbar-gallery";
+import { FakbarUploadToggle } from "./FakbarUploadToggle";
 import { MagazineUploadForm } from "./MagazineUploadForm";
 import { ImmichAlbumUploader } from "./ImmichAlbumUploader";
 import { MagazineStats, parsePeriod } from "./MagazineStats";
@@ -50,6 +52,8 @@ export default async function AdminMedia({
     }
   }
   const immichUrl = immichWebUrl();
+  // Staat standaard uit; zie lib/fakbar-gallery.ts.
+  const fakbarEnabled = await fakbarUploadEnabled();
 
   const videoRows = [...videos, null, null, null];
 
@@ -195,7 +199,8 @@ export default async function AdminMedia({
             </>
           ) : null}
         </p>
-        <ImmichAlbumUploader locale={locale} />
+        <FakbarUploadToggle locale={locale} enabled={fakbarEnabled} />
+        <ImmichAlbumUploader locale={locale} fakbarEnabled={fakbarEnabled} />
 
         <h3 className="mt-6 mb-2 text-sm font-semibold">
           {nl ? "Staat nu op de mediapagina" : "Currently on the media page"} ({galleryAlbums.length})

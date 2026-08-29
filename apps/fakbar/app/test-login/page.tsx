@@ -1,44 +1,64 @@
+import type { Metadata } from 'next';
 import { cookies } from 'next/headers';
-import { redirect } from 'next/navigation';
-import { ensureTestUser, isTestUserKey, TEST_USER_COOKIE } from '@/lib/test-users';
+import { notFound, redirect } from 'next/navigation';
+import {
+  ensureTestUser,
+  isTestUserKey,
+  testLoginEnabled,
+  testPersonaLanding,
+  testPersonas,
+  TEST_USER_COOKIE,
+} from '@/lib/test-users';
 
+export const metadata: Metadata = { title: 'Test-login', robots: { index: false, follow: false } };
+
+/**
+ * De test-picker voor lokale dev. Staat de vlag uit, dan bestaat deze route
+ * niet: hij mag niet als lege pagina blijven staan op een omgeving waar hij
+ * niets doet.
+ *
+ * De lijst komt uit `testPersonas()`, zodat een extra testgebruiker één regel
+ * in `lib/test-users.ts` is en niet ook nog een knop hier.
+ */
 export default async function TestLoginPage() {
+  if (!testLoginEnabled()) notFound();
+
   return (
-    <main className="min-h-screen bg-black text-white flex items-center justify-center p-8">
-      <div className="max-w-sm w-full">
-        <h1 className="text-2xl font-bold mb-2">Test Login</h1>
-        <p className="text-sm text-gray-400 mb-6">Enkel beschikbaar in lokale dev.</p>
-        <div className="flex flex-col gap-3">
-          <form action={loginAsFakbar}>
-            <button type="submit" className="w-full px-4 py-3 bg-white text-black font-semibold rounded-lg hover:bg-gray-200 transition text-left">
-              🍺 Alice — Fakbar lid (beheer)
-            </button>
-          </form>
-          <form action={loginAsIT}>
-            <button type="submit" className="w-full px-4 py-3 bg-white/10 text-white font-semibold rounded-lg hover:bg-white/20 transition text-left">
-              🔧 Bob — IT superadmin
-            </button>
-          </form>
+    <>
+      <div className="fakbar-page-head">
+        <div className="fakbar-page-head-inner">
+          <p className="fakbar-eyebrow">Lokale dev</p>
+          <h1>Test-login</h1>
+          <p className="fakbar-page-intro">
+            Enkel beschikbaar wanneer <code>FAKBAR_TEST_LOGIN=true</code> staat. Op productie is dit weg en verloopt
+            het inloggen via de KU Leuven-login op vtk.be.
+          </p>
         </div>
       </div>
-    </main>
+
+      <div className="fakbar-page-content">
+        <div className="grid max-w-2xl gap-3">
+          {testPersonas().map((persona) => (
+            <form key={persona.key} action={loginAs}>
+              <input type="hidden" name="key" value={persona.key} />
+              <button type="submit" className="fakbar-test-login-option">
+                <span className="name">{persona.name}</span>
+                <span className="description">{persona.description}</span>
+              </button>
+            </form>
+          ))}
+        </div>
+      </div>
+    </>
   );
 }
 
-async function loginAs(key: string) {
+async function loginAs(formData: FormData) {
   'use server';
-  if (!isTestUserKey(key)) return;
+  if (!testLoginEnabled()) return;
+  const key = formData.get('key');
+  if (typeof key !== 'string' || !isTestUserKey(key)) return;
   await ensureTestUser(key);
   (await cookies()).set(TEST_USER_COOKIE, key, { path: '/', maxAge: 60 * 60 * 24 });
-  redirect('/admin');
-}
-
-async function loginAsFakbar() {
-  'use server';
-  await loginAs('fakbar');
-}
-
-async function loginAsIT() {
-  'use server';
-  await loginAs('it');
+  redirect(testPersonaLanding(key));
 }

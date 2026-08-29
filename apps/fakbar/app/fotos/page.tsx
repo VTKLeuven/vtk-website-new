@@ -1,49 +1,115 @@
-export const metadata = {
+import type { Metadata } from 'next';
+import Link from 'next/link';
+import { ElixirIcon } from '@/components/elixir-icon';
+import { fakbarGallery } from '@/lib/gallery';
+import { getSession, canManageFakbar } from '@/lib/session';
+
+export const metadata: Metadata = {
   title: "Foto's",
-  description: "Sfeerbeelden en foto's van 't ElixIr feestjes.",
+  description: "De fotogalerij van 't ElixIr: alle avonden, cantussen en TD's in de fakbar.",
 };
 
-const ALBUMS = [
-  { title: 'Opening Party 2026', date: 'Februari 2026', count: "48 foto's" },
-  { title: 'St. Barbara Cantus & Naspel', date: 'December 2025', count: "112 foto's" },
-  { title: 'KoeLixir Themed Night', date: 'November 2025', count: "84 foto's" },
-  { title: 'OZA Bar night', date: 'Oktober 2025', count: "65 foto's" },
-  { title: 'VTK Openingsfeest', date: 'September 2025', count: "140 foto's" },
-];
+export const dynamic = 'force-dynamic';
 
-export default function FotosPage() {
+function formatAlbumDate(value: string | null): string | null {
+  if (!value) return null;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+  return new Intl.DateTimeFormat('nl-BE', { day: 'numeric', month: 'long', year: 'numeric' }).format(date);
+}
+
+export default async function FotosPage() {
+  // Immich mag onbereikbaar zijn zonder dat de pagina stukloopt; dat gebeurt in
+  // de praktijk, want de proxy draait in een aparte container.
+  const [result, session] = await Promise.all([
+    fakbarGallery.listAlbums().catch(() => null),
+    getSession(),
+  ]);
+  const albums = result?.albums ?? [];
+  const failed = result === null;
+  const canManage = session ? canManageFakbar(session) : false;
+
   return (
     <>
       <div className="fakbar-page-head">
         <div className="fakbar-page-head-inner">
-          <p className="fakbar-eyebrow"><span>📸</span><span>'t ElixIr</span></p>
-          <h1>Feestfoto's</h1>
-          <p className="fakbar-page-intro">Herbeleef de beste avonden in 't ElixIr.</p>
+          <p className="fakbar-eyebrow">&rsquo;t ElixIr</p>
+          <h1>Foto&rsquo;s</h1>
+          <p className="fakbar-page-intro">
+            Alles wat er in de fakbar gebeurt, zoals het gebeurd is. Deze galerij staat los van de fotopagina van
+            vtk.be: daar staat het geselecteerde werk, hier staat de avond zelf.
+          </p>
         </div>
       </div>
 
       <div className="fakbar-page-content">
-        <div className="grid gap-5 sm:grid-cols-2 md:grid-cols-3">
-          {ALBUMS.map((album, i) => (
-            <div
-              key={i}
-              className="group overflow-hidden rounded-[18px] border border-[--line] bg-[--surface] transition hover:border-[--line-2] hover:-translate-y-1"
-            >
-              <div className="flex h-44 items-center justify-center bg-[--paper-2] text-[--muted] transition group-hover:text-[--body]">
-                <svg className="h-12 w-12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                </svg>
-              </div>
-              <div className="p-4">
-                <h3 className="font-semibold text-[--ink]">{album.title}</h3>
-                <div className="mt-1 flex justify-between text-xs text-[--muted]">
-                  <span>{album.date}</span>
-                  <span>{album.count}</span>
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
+        {canManage ? (
+          <div className="mb-7 flex flex-wrap items-center gap-3">
+            <Link href="/admin/fotos" className="fakbar-btn fakbar-btn-ghost">
+              <ElixirIcon name="plus" className="h-4 w-4" />
+              Album toevoegen
+            </Link>
+          </div>
+        ) : null}
+
+        {failed ? (
+          <div className="fakbar-empty">
+            <h3>De galerij is even niet bereikbaar</h3>
+            <p>
+              De fotoserver antwoordt op dit moment niet. Probeer het straks opnieuw; de albums zelf zijn niet weg.
+            </p>
+          </div>
+        ) : albums.length === 0 ? (
+          <div className="fakbar-empty">
+            <h3>Nog geen albums</h3>
+            <p>
+              Er staan nog geen fotoalbums in de galerij van &rsquo;t ElixIr. Na de volgende avond staat hier het
+              eerste.
+            </p>
+          </div>
+        ) : (
+          <ul className="fakbar-album-grid">
+            {albums.map((album) => {
+              const date = formatAlbumDate(album.date);
+              return (
+                <li key={album.id}>
+                  <Link href={`/fotos/${album.slug}`} className="fakbar-album-card">
+                    <div className="fakbar-album-cover">
+                      {album.coverPhoto ? (
+                        // De duimnagel komt al op maat van de Immich-proxy, op een
+                        // host die de Next-optimizer niet kent; daarom een gewone
+                        // <img> en geen next/image.
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={album.coverPhoto.thumbnailUrl} alt="" loading="lazy" />
+                      ) : (
+                        <span className="fakbar-album-cover-empty" aria-hidden>
+                          <ElixirIcon name="photo" className="h-7 w-7" />
+                        </span>
+                      )}
+                    </div>
+                    <div className="fakbar-album-body">
+                      <h2>{album.title}</h2>
+                      <p className="fakbar-album-meta">
+                        {[date, `${album.photoCount} ${album.photoCount === 1 ? 'foto' : "foto's"}`]
+                          .filter(Boolean)
+                          .join(' · ')}
+                      </p>
+                      {album.description ? <p className="fakbar-album-desc">{album.description}</p> : null}
+                    </div>
+                  </Link>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+
+        <p className="mt-10 text-sm leading-relaxed text-[var(--muted)]">
+          Sta je op een foto die je liever niet online ziet? Mail{' '}
+          <a className="font-medium text-[var(--ink)] underline underline-offset-2" href="mailto:fakbar@vtk.be">
+            fakbar@vtk.be
+          </a>{' '}
+          en we halen ze weg.
+        </p>
       </div>
     </>
   );

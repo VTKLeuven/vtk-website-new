@@ -13,8 +13,20 @@ import {
 
 type Progress = { total: number; done: number; errors: number };
 
-export function ImmichAlbumUploader({ locale }: { locale: "nl" | "en" }) {
+export function ImmichAlbumUploader({
+  locale,
+  fakbarEnabled = false,
+}: {
+  locale: "nl" | "en";
+  /**
+   * Of de fakbargalerij als bestemming gekozen mag worden. Staat standaard uit;
+   * de schakelaar staat op deze pagina en de server hertoetst hem sowieso (zie
+   * lib/fakbar-gallery.ts).
+   */
+  fakbarEnabled?: boolean;
+}) {
   const nl = locale === "nl";
+  const [gallery, setGallery] = useState<"main" | "fakbar">("main");
   const [files, setFiles] = useState<File[]>([]);
   const [coverIndex, setCoverIndex] = useState(0);
   const [progress, setProgress] = useState<Progress | null>(null);
@@ -39,6 +51,9 @@ export function ImmichAlbumUploader({ locale }: { locale: "nl" | "en" }) {
 
     const form = event.currentTarget;
     const data = new FormData(form);
+    // De bestemming komt uit de state, niet uit een veld dat ook zonder de
+    // schakelaar meegestuurd zou kunnen worden.
+    data.set("gallery", fakbarEnabled ? gallery : "main");
     if (files.length === 0) {
       setError(nl ? "Kies eerst foto's om te uploaden." : "Pick photos to upload first.");
       return;
@@ -51,9 +66,13 @@ export function ImmichAlbumUploader({ locale }: { locale: "nl" | "en" }) {
           ? nl
             ? "Geef het album een titel."
             : "Give the album a title."
-          : nl
-            ? "Immich is niet bereikbaar. Probeer later opnieuw."
-            : "Immich is unreachable. Try again later."
+          : created.error === "fakbar_upload_disabled"
+            ? nl
+              ? "Uploaden naar de fakbargalerij staat uit. Zet het hierboven aan."
+              : "Uploading to the fakbar gallery is switched off. Enable it above."
+            : nl
+              ? "Immich is niet bereikbaar. Probeer later opnieuw."
+              : "Immich is unreachable. Try again later."
       );
       return;
     }
@@ -65,6 +84,7 @@ export function ImmichAlbumUploader({ locale }: { locale: "nl" | "en" }) {
     for (const file of files) {
       const uploadData = new FormData();
       uploadData.append("albumId", created.albumId);
+      uploadData.append("gallery", data.get("gallery") as string);
       uploadData.append("file", file);
       try {
         const result = await uploadImmichAlbumAssetAction(uploadData);
@@ -94,7 +114,9 @@ export function ImmichAlbumUploader({ locale }: { locale: "nl" | "en" }) {
       }
     }
 
-    await finalizeImmichAlbumAction();
+    const finalizeData = new FormData();
+    finalizeData.set("gallery", data.get("gallery") as string);
+    await finalizeImmichAlbumAction(finalizeData);
     setProgress(null);
     setFiles([]);
     setCoverIndex(0);
@@ -125,6 +147,36 @@ export function ImmichAlbumUploader({ locale }: { locale: "nl" | "en" }) {
         <Label>{nl ? "Beschrijving (optioneel)" : "Description (optional)"}</Label>
         <Input name="description" maxLength={1000} />
       </div>
+      {fakbarEnabled ? (
+        <div className="md:col-span-2">
+          <Label>{nl ? "Naar welke galerij" : "Which gallery"}</Label>
+          <div className="flex flex-wrap gap-4 text-sm">
+            <label className="flex items-center gap-2">
+              <input
+                type="radio"
+                name="galleryChoice"
+                checked={gallery === "main"}
+                onChange={() => setGallery("main")}
+              />
+              <span>{nl ? "Fotogalerij van vtk.be" : "vtk.be photo gallery"}</span>
+            </label>
+            <label className="flex items-center gap-2">
+              <input
+                type="radio"
+                name="galleryChoice"
+                checked={gallery === "fakbar"}
+                onChange={() => setGallery("fakbar")}
+              />
+              <span>{nl ? "Fotogalerij van 't ElixIr" : "'t ElixIr photo gallery"}</span>
+            </label>
+          </div>
+          <p className="mt-1 text-xs text-zinc-500">
+            {nl
+              ? "Een album staat in één van de twee, nooit in allebei."
+              : "An album lives in one of the two, never in both."}
+          </p>
+        </div>
+      ) : null}
       <div className="md:col-span-2">
         <Label>{nl ? "Foto's" : "Photos"}</Label>
         <FileField

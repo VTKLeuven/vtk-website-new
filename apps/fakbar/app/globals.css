@@ -1,26 +1,40 @@
-/* Fakbar Elixir — design system.
-   Structureel identiek aan apps/logistiek/app/globals.css.
-   Enige verschil: het palet is zwart-wit ("Elixir") in plaats van blauw-geel. */
+/* Fakbar 't ElixIr — design system.
+   Structureel identiek aan apps/logistiek/app/globals.css: dezelfde tokens,
+   dezelfde `@source`-lock, dezelfde admin-layout. Enige verschil is het palet.
+
+   **Donker, want het logo is dat ook.** Het merk van 't ElixIr is een wit-op-
+   zwarte maansikkel; een licht, luchtig papierpalet zoals op vtk.be zet dat
+   logo op een achtergrond waar het niet thuishoort. De basis is daarom
+   houtskool in plaats van papier: donkere vlakken dragen de inhoud, en het
+   accent is het cyaan van de muurschildering in de fakbar zelf (gesampled uit
+   public/elixir-wall.jpg: #03c7e9, iets opgetild voor leesbaarheid op donker).
+
+   De tokennamen blijven die van de andere apps, ook waar ze nu iets anders
+   betekenen: `--paper` is hier de donkere paginagrond en `--ink` de lichte
+   tekst erop. Hernoem ze niet lokaal; @vtk/ui rekent op deze namen (`--yellow`
+   is de accentslot van zijn secundaire knop). Hertune enkel de waarden. */
 @import 'tailwindcss' source(none);
 @source "../app";
 @source "../components";
 @source "../lib";
+@source "../../../packages/ui/src";
 
 @theme {
-  --color-vtk-ink: #0a0a0a;
-  --color-vtk-navy: #111111;
-  --color-vtk-blue: #111111;
-  --color-vtk-blue-dark: #0a0a0a;
-  --color-vtk-blue-light: #333333;
-  --color-vtk-blue-soft: #f0f0f0;
-  --color-vtk-blue-muted: #777777;
-  --color-vtk-yellow: #ffffff;
-  --color-vtk-yellow-dark: #e0e0e0;
-  --color-vtk-paper: #f5f5f5;
-  --color-vtk-paper-2: #ebebeb;
-  --color-vtk-surface: #ffffff;
-  --color-vtk-body: #333333;
-  --color-vtk-muted: #777777;
+  /* Tekst en randen op de donkere grond. */
+  --color-vtk-ink: #f2f5f8;
+  --color-vtk-navy: #05070a;
+  --color-vtk-blue: #1a2029;
+  --color-vtk-blue-dark: #05070a;
+  --color-vtk-blue-light: #2c343f;
+  --color-vtk-blue-soft: #1a2029;
+  --color-vtk-blue-muted: #8d99a8;
+  --color-vtk-yellow: #22cbe8;
+  --color-vtk-yellow-dark: #0ea5c4;
+  --color-vtk-paper: #0b0e13;
+  --color-vtk-paper-2: #11161e;
+  --color-vtk-surface: #171d26;
+  --color-vtk-body: #c2cad4;
+  --color-vtk-muted: #8d99a8;
   --font-sans: var(--font-vtk-sans), ui-sans-serif, system-ui, sans-serif;
 }
 
@@ -31,25 +45,38 @@ body {
 }
 
 :root {
-  --vtk-header-height: 73px;
+  --vtk-header-height: 72px;
   --max: 1240px;
-  --ink: #0a0a0a;
-  --navy: #111111;
-  --paper: #f5f5f5;
-  --paper-2: #ebebeb;
-  --surface: #ffffff;
-  --line: rgba(10, 10, 10, 0.1);
-  --line-2: rgba(10, 10, 10, 0.18);
-  --yellow: #ffffff;
-  --yellow-dark: #e0e0e0;
-  --muted: #777777;
-  --body: #333333;
-  --on-dark-muted: #aaaaaa;
-  --success: #2f6f33;
-  --success-soft: #eef8ea;
+  /* `--ink` is de tekstkleur, niet de donkerste kleur: op een donker palet is
+     dat licht. `--paper` blijft de paginagrond. */
+  --ink: #f2f5f8;
+  --navy: #05070a;
+  /* Vier stappen die echt van elkaar verschillen. Ze stonden eerder met twee
+     op dezelfde waarde, en dan is een tabelkop op een kaart geen kop meer en
+     een badge geen badge. Van donker naar licht:
+       --paper     de paginagrond
+       --paper-2   ingesloten vlak op een kaart (tabelkop, badge, code)
+       --surface   de kaart zelf
+       --surface-2 opgetild vlak (hover, actief item) */
+  --paper: #0b0e13;
+  --paper-2: #11161e;
+  --surface: #171d26;
+  --surface-2: #212a36;
+  --line: rgba(255, 255, 255, 0.09);
+  --line-2: rgba(255, 255, 255, 0.17);
+  --yellow: #22cbe8;
+  --yellow-dark: #0ea5c4;
+  --muted: #8d99a8;
+  --body: #c2cad4;
+  --on-dark-muted: #8d99a8;
+  --success: #4ade80;
+  --success-soft: rgba(74, 222, 128, 0.12);
+  --danger: #f87171;
 }
 
-/* ── Site Header ─────────────────────────────────────────────────────────── */
+/* ── Site header ─────────────────────────────────────────────────────────────
+   Sticky, donker, lichte links; op de homepagina start hij transparant over de
+   fotohero en wordt hij vast zodra je eronder scrolt (SiteHeaderShell). */
 
 .vtk-site-header {
   position: sticky;
@@ -58,8 +85,16 @@ body {
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
   background: var(--navy);
   color: var(--paper);
-  font-family: var(--font-vtk-sans), ui-sans-serif, system-ui, sans-serif;
+  transition:
+    background 220ms ease,
+    border-color 220ms ease;
   -webkit-font-smoothing: antialiased;
+}
+
+/* Over de hero: geen eigen vlak, de foto is de achtergrond. */
+.vtk-site-header[data-transparent='true'] {
+  background: transparent;
+  border-bottom-color: transparent;
 }
 
 .vtk-site-header .nav-inner {
@@ -78,35 +113,18 @@ body {
   align-items: center;
   color: var(--paper);
   text-decoration: none;
-  font-size: 18px;
-  font-weight: 700;
-  letter-spacing: -0.03em;
-}
-
-.vtk-site-header .nav-links-shell {
-  position: relative;
-  min-width: 0;
-  flex: 1 1 auto;
 }
 
 .vtk-site-header .nav-links {
   display: flex;
-  width: 100%;
-  min-width: 0;
-  flex: none;
   align-items: center;
   gap: clamp(16px, 2vw, 30px);
-  overflow-x: auto;
-  scrollbar-width: none;
-  -webkit-overflow-scrolling: touch;
-}
-
-.vtk-site-header .nav-links::-webkit-scrollbar {
-  display: none;
 }
 
 .vtk-site-header .nav-links a {
-  color: rgba(250, 250, 247, 0.78);
+  position: relative;
+  padding: 4px 0;
+  color: rgba(244, 246, 248, 0.76);
   font-size: 14px;
   font-weight: 500;
   text-decoration: none;
@@ -114,8 +132,20 @@ body {
   transition: color 160ms ease;
 }
 
-.vtk-site-header .nav-links a:hover {
+.vtk-site-header .nav-links a:hover,
+.vtk-site-header .nav-links a[aria-current='page'] {
   color: #fff;
+}
+
+.vtk-site-header .nav-links a[aria-current='page']::after {
+  content: '';
+  position: absolute;
+  right: 0;
+  bottom: -2px;
+  left: 0;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--yellow);
 }
 
 .vtk-site-header .nav-right {
@@ -127,16 +157,18 @@ body {
 }
 
 .vtk-site-header .profile-menu-trigger,
-.vtk-site-header .nav-login {
+.vtk-site-header .nav-login,
+.vtk-site-header .nav-menu-button {
   display: inline-grid;
   width: 38px;
   min-width: 38px;
   height: 38px;
   place-items: center;
-  border: 1px solid rgba(250, 250, 247, 0.34);
+  border: 1px solid rgba(244, 246, 248, 0.34);
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.12);
   color: var(--paper);
+  font-size: 14px;
   font-weight: 600;
   text-decoration: none;
   transition:
@@ -145,9 +177,14 @@ body {
 }
 
 .vtk-site-header .profile-menu-trigger:hover,
-.vtk-site-header .nav-login:hover {
+.vtk-site-header .nav-login:hover,
+.vtk-site-header .nav-menu-button:hover {
   border-color: var(--paper);
   background: rgba(255, 255, 255, 0.22);
+}
+
+.vtk-site-header .nav-menu-button {
+  display: none;
 }
 
 .vtk-site-header .profile-menu-root {
@@ -159,21 +196,34 @@ body {
   top: 100%;
   right: 0;
   z-index: 60;
-  min-width: 180px;
+  min-width: 190px;
   margin-top: 8px;
   padding: 6px;
   border: 1px solid var(--line);
   border-radius: 14px;
   background: var(--surface);
-  box-shadow: 0 18px 42px rgba(10, 10, 10, 0.12);
+  box-shadow: 0 18px 42px rgba(0, 0, 0, 0.6);
+}
+
+.vtk-site-header .profile-menu-name {
+  display: block;
+  padding: 8px 10px 6px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
 }
 
 .vtk-site-header .profile-menu-item {
   display: block;
   width: 100%;
   padding: 9px 10px;
+  border: 0;
   border-radius: 10px;
+  background: transparent;
   color: var(--ink);
+  font-family: inherit;
   font-size: 14px;
   text-align: left;
   text-decoration: none;
@@ -185,42 +235,215 @@ body {
   outline: none;
 }
 
-@media (max-width: 720px) {
-  :root {
-    --vtk-header-height: 112px;
-  }
+/* Onder 760px verdwijnen de tabs achter één menuknop die een paneel onder de
+   header opent. Bewust geen horizontale scroller: die verbergt navigatie en
+   leest als een fout (zie CLAUDE.md). */
+.vtk-site-header .nav-panel {
+  display: none;
+}
 
-  .vtk-site-header .nav-inner {
-    min-height: 64px;
-    flex-wrap: wrap;
-    gap: 14px;
-    padding-top: 12px;
-  }
-
-  .vtk-site-header .nav-links-shell {
-    order: 3;
-    width: 100%;
-    flex-basis: 100%;
-  }
-
+@media (max-width: 760px) {
   .vtk-site-header .nav-links {
-    padding: 0 0 9px;
-    scrollbar-width: thin;
-    scrollbar-color: rgba(250, 250, 247, 0.4) transparent;
+    display: none;
   }
 
-  .vtk-site-header .nav-links::-webkit-scrollbar {
+  .vtk-site-header .nav-menu-button {
+    display: inline-grid;
+  }
+
+  .vtk-site-header .nav-panel.is-open {
     display: block;
-    height: 3px;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+    background: var(--navy);
   }
 
-  .vtk-site-header .nav-links::-webkit-scrollbar-thumb {
-    border-radius: 2px;
-    background: rgba(250, 250, 247, 0.4);
+  .vtk-site-header .nav-panel-inner {
+    display: flex;
+    max-width: var(--max);
+    flex-direction: column;
+    margin: 0 auto;
+    padding: 8px clamp(20px, 3vw, 36px) 16px;
+  }
+
+  .vtk-site-header .nav-panel a {
+    padding: 12px 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    color: rgba(244, 246, 248, 0.86);
+    font-size: 15px;
+    font-weight: 500;
+    text-decoration: none;
+  }
+
+  .vtk-site-header .nav-panel a:last-child {
+    border-bottom: 0;
+  }
+
+  .vtk-site-header .nav-panel a[aria-current='page'] {
+    color: var(--yellow);
   }
 }
 
-/* ── Page Structure ──────────────────────────────────────────────────────── */
+/* ── Fotohero (enkel de homepagina) ──────────────────────────────────────────
+   Volle breedte, de muurschildering onder een inkt-scrim die linksonder het
+   zwaarst is: daar staat de kop. De header staat er transparant bovenop, dus de
+   scrim loopt ook bovenaan even donker door. */
+
+.fakbar-hero {
+  position: relative;
+  isolation: isolate;
+  display: flex;
+  min-height: clamp(520px, 78vh, 760px);
+  align-items: flex-end;
+  /* Trekt de hero onder de sticky header door. */
+  margin-top: calc(-1 * var(--vtk-header-height));
+  padding-top: var(--vtk-header-height);
+  background: var(--navy);
+  overflow: hidden;
+}
+
+.fakbar-hero-photo {
+  position: absolute;
+  inset: 0;
+  z-index: -2;
+  object-fit: cover;
+  object-position: 62% 34%;
+  /* De foto komt uit een rokerige zaal onder blacklight; wat contrast en
+     verzadiging zetten het cyaan van de muur terug aan zonder dat het
+     neonachtig wordt. */
+  filter: contrast(1.1) saturate(1.16) brightness(0.94);
+}
+
+.fakbar-hero::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  /* Drie lagen. Het verticale verloop tilt de onderkant op zodat de knoppen
+     staan; de radiaal linksonder maakt een rustig vlak voor de kop, want daar
+     staat in de foto zelf ook de muurschildering met dezelfde naam en die twee
+     door elkaar leest als ruis; de horizontale houdt de rechterhelft open zodat
+     de schildering zichtbaar blijft. */
+  background:
+    linear-gradient(
+      to top,
+      rgba(6, 9, 14, 0.95) 0%,
+      rgba(6, 9, 14, 0.7) 30%,
+      rgba(6, 9, 14, 0.24) 60%,
+      rgba(6, 9, 14, 0.55) 100%
+    ),
+    radial-gradient(95% 110% at 6% 82%, rgba(6, 9, 14, 0.92) 0%, rgba(6, 9, 14, 0.35) 45%, rgba(6, 9, 14, 0) 70%),
+    linear-gradient(to right, rgba(6, 9, 14, 0.6) 0%, rgba(6, 9, 14, 0.12) 45%, rgba(6, 9, 14, 0) 70%);
+}
+
+/* Vignet: houdt de randen rustig zodat de crop niet als een uitsnede leest. */
+.fakbar-hero::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  box-shadow: inset 0 0 clamp(80px, 12vw, 190px) rgba(6, 9, 14, 0.75);
+}
+
+.fakbar-hero-inner {
+  width: 100%;
+  max-width: var(--max);
+  margin: 0 auto;
+  padding: clamp(48px, 7vw, 92px) clamp(20px, 3vw, 36px) clamp(44px, 6vw, 76px);
+}
+
+.fakbar-hero h1 {
+  max-width: 14ch;
+  margin: 16px 0 0;
+  color: #fff;
+  font-size: clamp(46px, 8vw, 96px);
+  font-weight: 600;
+  letter-spacing: -0.045em;
+  line-height: 0.95;
+  text-shadow: 0 2px 30px rgba(6, 9, 14, 0.55);
+}
+
+.fakbar-hero-lead {
+  max-width: 52ch;
+  margin: 20px 0 0;
+  color: rgba(255, 255, 255, 0.82);
+  font-size: clamp(16px, 1.5vw, 19px);
+  line-height: 1.6;
+}
+
+.fakbar-hero-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 32px;
+}
+
+/* ── Knoppen ─────────────────────────────────────────────────────────────── */
+
+.fakbar-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 13px 24px;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  font-size: 14px;
+  font-weight: 600;
+  text-decoration: none;
+  white-space: nowrap;
+  transition:
+    background 160ms ease,
+    border-color 160ms ease,
+    transform 160ms ease;
+}
+
+.fakbar-btn:hover {
+  transform: translateY(-1px);
+}
+
+.fakbar-btn-primary {
+  background: var(--ink);
+  color: var(--paper);
+}
+
+.fakbar-btn-primary:hover {
+  background: #fff;
+}
+
+.fakbar-btn-ghost {
+  border-color: var(--line-2);
+  background: var(--surface);
+  color: var(--ink);
+}
+
+.fakbar-btn-ghost:hover {
+  border-color: var(--line-2);
+  background: var(--surface-2);
+}
+
+/* De primaire knop is op dit palet al licht-op-donker; op een foto krijgt hij
+   enkel wat meer dekking zodat hij niet in het beeld wegzakt. */
+.fakbar-on-dark .fakbar-btn-primary {
+  background: #fff;
+  color: #05070a;
+}
+
+.fakbar-on-dark .fakbar-btn-primary:hover {
+  background: rgba(255, 255, 255, 0.88);
+}
+
+.fakbar-on-dark .fakbar-btn-ghost {
+  border-color: rgba(255, 255, 255, 0.36);
+  background: transparent;
+  color: #fff;
+}
+
+.fakbar-on-dark .fakbar-btn-ghost:hover {
+  border-color: #fff;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+/* ── Paginakop (elke pagina buiten de homepagina) ────────────────────────── */
 
 .fakbar-page-head,
 .fakbar-footer {
@@ -231,7 +454,7 @@ body {
 }
 
 .fakbar-page-head {
-  box-shadow: inset 0 -5px 0 var(--yellow);
+  box-shadow: inset 0 -3px 0 var(--yellow);
 }
 
 .fakbar-page-head-inner,
@@ -255,30 +478,112 @@ body {
 .fakbar-eyebrow {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 9px;
   color: var(--on-dark-muted);
-  font-size: 13px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+
+.fakbar-eyebrow::before {
+  content: '';
+  width: 18px;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--yellow);
 }
 
 .fakbar-page-head h1 {
   max-width: 900px;
   margin: 14px 0 0;
-  color: var(--paper);
-  font-size: clamp(32px, 4.4vw, 56px);
+  color: #fff;
+  font-size: clamp(32px, 4.4vw, 52px);
   font-weight: 600;
-  letter-spacing: -0.03em;
+  letter-spacing: -0.035em;
   line-height: 1.04;
 }
 
 .fakbar-page-intro {
   max-width: 60ch;
-  margin: 18px 0 0;
+  margin: 16px 0 0;
   color: var(--on-dark-muted);
   font-size: 17px;
   line-height: 1.6;
 }
 
-/* ── Service cards ───────────────────────────────────────────────────────── */
+.fakbar-breadcrumb {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  margin-bottom: 4px;
+  color: var(--on-dark-muted);
+  font-size: 13px;
+  text-decoration: none;
+}
+
+.fakbar-breadcrumb:hover {
+  color: #fff;
+}
+
+/* ── Openingsurenband ────────────────────────────────────────────────────── */
+
+.fakbar-band {
+  background: var(--paper-2);
+  border-block: 1px solid var(--line);
+}
+
+.fakbar-hours {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 1px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--line);
+}
+
+.fakbar-hours > div {
+  padding: 16px 18px;
+  background: var(--surface);
+}
+
+.fakbar-hours[data-open-day] {
+  --unused: 0;
+}
+
+/* Vandaag: het accent draagt de rij, niet een omgekeerd vlak. Op een donker
+   palet is "de rij lichter maken" juist het tegenovergestelde van nadruk. */
+.fakbar-hours .is-today {
+  background: var(--surface-2);
+  box-shadow: inset 3px 0 0 var(--yellow);
+}
+
+.fakbar-hours .is-today dt {
+  color: var(--yellow);
+}
+
+.fakbar-hours .is-today dd {
+  color: var(--ink);
+}
+
+.fakbar-hours dt {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.fakbar-hours dd {
+  margin: 6px 0 0;
+  color: var(--ink);
+  font-size: 15px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Kaarten ─────────────────────────────────────────────────────────────── */
 
 .fakbar-service-grid {
   display: grid;
@@ -287,7 +592,9 @@ body {
 }
 
 .fakbar-service-card {
-  min-height: 240px;
+  display: flex;
+  min-height: 210px;
+  flex-direction: column;
   padding: clamp(22px, 3vw, 28px);
   border: 1px solid var(--line);
   border-radius: 18px;
@@ -295,22 +602,108 @@ body {
   text-decoration: none;
   transition:
     transform 180ms ease,
-    border-color 180ms ease;
+    border-color 180ms ease,
+    box-shadow 180ms ease;
 }
 
 .fakbar-service-card:hover {
   transform: translateY(-3px);
   border-color: var(--line-2);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
 }
 
 .fakbar-service-icon {
   display: grid;
-  width: 48px;
-  height: 48px;
+  width: 44px;
+  height: 44px;
   place-items: center;
-  border-radius: 14px;
-  background: var(--ink);
-  color: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 13px;
+  background: rgba(34, 203, 232, 0.12);
+  color: var(--yellow);
+}
+
+.fakbar-card {
+  padding: clamp(20px, 3vw, 28px);
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: var(--surface);
+}
+
+/* Uitgelichte kaart: een accentrail links, geen donker vlak in een licht
+   raster (zie CLAUDE.md). */
+.fakbar-card-accent {
+  box-shadow: inset 3px 0 0 var(--yellow);
+}
+
+/* ── Drankkaart ──────────────────────────────────────────────────────────── */
+
+.fakbar-menu-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 28px;
+}
+
+.fakbar-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 15px;
+  border: 1px solid var(--line-2);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 500;
+  text-decoration: none;
+  transition:
+    border-color 150ms ease,
+    background 150ms ease;
+}
+
+.fakbar-chip:hover {
+  border-color: var(--ink);
+  background: var(--paper-2);
+}
+
+.fakbar-menu-list {
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: var(--surface);
+}
+
+.fakbar-menu-row {
+  display: flex;
+  align-items: baseline;
+  gap: 14px;
+  padding: 14px 22px;
+  border-bottom: 1px solid var(--line);
+}
+
+.fakbar-menu-row:last-child {
+  border-bottom: 0;
+}
+
+.fakbar-menu-row .name {
+  color: var(--ink);
+  font-weight: 500;
+}
+
+/* Stippellijn tussen naam en prijs: leest als een kaart, niet als een tabel
+   met een gat erin. */
+.fakbar-menu-row .leader {
+  flex: 1;
+  min-width: 20px;
+  border-bottom: 1px dotted var(--line-2);
+  translate: 0 -3px;
+}
+
+.fakbar-menu-row .price {
+  color: var(--ink);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
 }
 
 /* ── Admin layout ────────────────────────────────────────────────────────── */
@@ -333,61 +726,16 @@ body {
   }
 }
 
-/* ── Admin sidebar nav ───────────────────────────────────────────────────── */
-
-.fakbar-admin-nav {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  padding: 18px;
-  border: 1px solid var(--line);
-  border-radius: 18px;
-  background: var(--surface);
-}
-
-.fakbar-admin-nav a {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 10px 12px;
-  border-radius: 10px;
-  color: var(--body);
-  font-size: 14px;
-  font-weight: 500;
-  text-decoration: none;
-  transition: background 140ms ease, color 140ms ease;
-}
-
-.fakbar-admin-nav a:hover {
-  background: var(--paper);
-  color: var(--ink);
-}
-
-.fakbar-admin-nav a[data-active='true'] {
-  background: var(--ink);
-  color: var(--surface);
-  font-weight: 600;
-}
-
-.fakbar-admin-nav-section {
-  padding: 8px 12px 4px;
-  color: var(--muted);
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-
-/* ── Stat cards ──────────────────────────────────────────────────────────── */
+/* ── Statistiekkaarten ───────────────────────────────────────────────────── */
 
 .fakbar-stat-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-  gap: 16px;
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  gap: 14px;
 }
 
 .fakbar-stat-card {
-  padding: 20px 22px;
+  padding: 18px 20px;
   border: 1px solid var(--line);
   border-radius: 16px;
   background: var(--surface);
@@ -404,37 +752,148 @@ body {
 .fakbar-stat-value {
   margin-top: 6px;
   color: var(--ink);
-  font-size: 28px;
+  font-size: 27px;
   font-weight: 700;
   letter-spacing: -0.03em;
   line-height: 1;
+  font-variant-numeric: tabular-nums;
 }
 
 .fakbar-stat-sub {
-  margin-top: 4px;
+  margin-top: 5px;
   color: var(--muted);
   font-size: 12px;
 }
 
-/* ── Tables / rows ───────────────────────────────────────────────────────── */
+.fakbar-stat-value[data-tone='positive'] {
+  color: var(--success);
+}
+
+.fakbar-stat-value[data-tone='negative'] {
+  color: var(--danger);
+}
+
+/* ── Rijen & tabellen ────────────────────────────────────────────────────── */
 
 .fakbar-row {
   display: flex;
   align-items: center;
   gap: 16px;
   padding: 14px 16px;
-  border: 1px solid var(--line-2);
+  border: 1px solid var(--line);
   border-radius: 14px;
   background: var(--surface);
-  transition: border-color 150ms ease, box-shadow 150ms ease;
+  text-decoration: none;
+  transition:
+    border-color 150ms ease,
+    box-shadow 150ms ease;
 }
 
-.fakbar-row:hover {
-  border-color: rgba(10, 10, 10, 0.3);
-  box-shadow: 0 8px 24px rgba(10, 10, 10, 0.06);
+a.fakbar-row:hover {
+  border-color: var(--line-2);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
 }
 
-/* ── Section heading ─────────────────────────────────────────────────────── */
+.fakbar-table-wrap {
+  /* position: relative is geen detail. `sr-only` is absoluut gepositioneerd;
+     zonder een gepositioneerde voorouder ankert die op de pagina en zoomt een
+     telefoon de hele pagina uit om dat ene onzichtbare pixel te tonen. Dat
+     kostte ooit een namiddag op /admin/tickets (zie CLAUDE.md). */
+  position: relative;
+  overflow-x: auto;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: var(--surface);
+}
+
+.fakbar-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+.fakbar-table th {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--line);
+  background: var(--paper-2);
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-align: left;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.fakbar-table td {
+  padding: 11px 16px;
+  border-bottom: 1px solid var(--line);
+  color: var(--body);
+  vertical-align: middle;
+}
+
+.fakbar-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.fakbar-table tbody tr:hover td {
+  background: var(--surface-2);
+}
+
+.fakbar-table .num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.fakbar-table .num input {
+  width: 82px;
+  text-align: right;
+}
+
+/* Onder 640px worden de kolomkoppen labels per waarde: de kop bovenaan is dan
+   weg en "112" zonder label zegt niets (zie CLAUDE.md). */
+@media (max-width: 640px) {
+  .fakbar-table-stack thead {
+    display: none;
+  }
+
+  .fakbar-table-stack tbody tr {
+    display: block;
+    padding: 12px 14px;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .fakbar-table-stack tbody tr:last-child {
+    border-bottom: 0;
+  }
+
+  .fakbar-table-stack tbody td {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 5px 0;
+    border: 0;
+    text-align: left;
+  }
+
+  .fakbar-table-stack tbody td::before {
+    content: attr(data-label);
+    color: var(--muted);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+
+  .fakbar-table-stack tbody td:first-child {
+    padding-bottom: 8px;
+    color: var(--ink);
+    font-weight: 600;
+  }
+}
+
+/* ── Sectiekop ───────────────────────────────────────────────────────────── */
 
 .fakbar-section-head {
   margin-bottom: 18px;
@@ -443,24 +902,97 @@ body {
 .fakbar-section-head h2 {
   margin: 0;
   color: var(--ink);
-  font-size: clamp(20px, 2.5vw, 26px);
+  font-size: clamp(19px, 2.3vw, 24px);
   font-weight: 600;
   letter-spacing: -0.025em;
 }
 
 .fakbar-section-head p {
   margin: 6px 0 0;
+  max-width: 70ch;
   color: var(--muted);
   font-size: 14px;
+  line-height: 1.55;
+}
+
+/* ── Badges ──────────────────────────────────────────────────────────────── */
+
+.fakbar-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: var(--paper-2);
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.fakbar-badge[data-tone='open'] {
+  background: rgba(34, 203, 232, 0.16);
+  color: #7fe3f5;
+}
+
+.fakbar-badge[data-tone='closed'] {
+  background: var(--paper-2);
+  color: var(--muted);
+}
+
+.fakbar-badge[data-tone='warn'] {
+  background: rgba(248, 113, 113, 0.14);
+  color: var(--danger);
+}
+
+/* ── Lege toestand ───────────────────────────────────────────────────────── */
+
+.fakbar-empty {
+  display: grid;
+  place-items: center;
+  gap: 10px;
+  padding: clamp(36px, 6vw, 60px) 24px;
+  border: 1px dashed var(--line-2);
+  border-radius: 18px;
+  background: var(--surface);
+  text-align: center;
+}
+
+.fakbar-empty h3 {
+  margin: 0;
+  color: var(--ink);
+  font-size: 17px;
+  font-weight: 600;
+}
+
+.fakbar-empty p {
+  margin: 0;
+  max-width: 46ch;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.55;
 }
 
 /* ── Footer ──────────────────────────────────────────────────────────────── */
 
 .fakbar-footer {
   border-top: 1px solid rgba(255, 255, 255, 0.11);
+  color: var(--on-dark-muted);
 }
 
-/* ── Forms ───────────────────────────────────────────────────────────────── */
+.fakbar-footer a {
+  color: rgba(244, 246, 248, 0.72);
+  text-decoration: none;
+  transition: color 150ms ease;
+}
+
+.fakbar-footer a:hover {
+  color: #fff;
+}
+
+/* ── Formulieren ─────────────────────────────────────────────────────────── */
 
 input,
 textarea,
@@ -475,6 +1007,16 @@ button:not(:disabled),
   cursor: pointer;
 }
 
+/* Een `<fieldset>` krimpt niet onder zijn inhoud: de browser geeft hem
+   `min-width: min-content`, en dat is geen gewone breedte die een
+   `overflow-x` erbinnen nog kan opvangen. Eén brede tabel erin (het
+   tappersblad heeft negen kolommen) duwde daardoor niet de tabel maar het hele
+   veldenblok breder dan de kolom, en dan schuift de héle pagina horizontaal in
+   plaats van enkel die tabel. */
+fieldset {
+  min-width: 0;
+}
+
 button:disabled {
   cursor: not-allowed;
 }
@@ -483,11 +1025,11 @@ input:focus,
 textarea:focus,
 select:focus {
   outline: none;
-  border-color: var(--navy) !important;
-  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.22);
+  border-color: var(--yellow-dark) !important;
+  box-shadow: 0 0 0 3px rgba(34, 203, 232, 0.2);
 }
 
-/* ── Responsive ──────────────────────────────────────────────────────────── */
+/* ── Responsief ──────────────────────────────────────────────────────────── */
 
 @media (max-width: 960px) {
   .fakbar-service-grid {
@@ -502,7 +1044,7 @@ select:focus {
 @media print {
   body > header,
   body > footer,
-  nav[aria-label='Beheernavigatie'] {
+  .vtk-admin-nav-sticky {
     display: none !important;
   }
 
@@ -510,7 +1052,852 @@ select:focus {
     display: none !important;
   }
 
+  /* Papier is wit. Het hele scherm-palet omkeren voor de printer, anders komt
+     er een zwarte pagina uit de printer van de penningmeester. */
+  :root {
+    --ink: #0a0d12;
+    --paper: #ffffff;
+    --paper-2: #f1f4f7;
+    --surface: #ffffff;
+    --surface-2: #f1f4f7;
+    --line: rgba(10, 13, 18, 0.18);
+    --line-2: rgba(10, 13, 18, 0.3);
+    --muted: #4a5563;
+    --body: #1d232c;
+  }
+
   body {
     background: #fff;
+    color: #0a0d12;
   }
+}
+
+/* ── Fotogalerij ─────────────────────────────────────────────────────────────
+   Eigen galerij van de fakbar; zie lib/gallery.ts voor waarom die los staat
+   van die op vtk.be. */
+
+.fakbar-album-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(260px, 100%), 1fr));
+  gap: 18px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.fakbar-album-card {
+  display: flex;
+  height: 100%;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: var(--surface);
+  text-decoration: none;
+  transition:
+    transform 180ms ease,
+    border-color 180ms ease,
+    box-shadow 180ms ease;
+}
+
+.fakbar-album-card:hover {
+  transform: translateY(-3px);
+  border-color: var(--line-2);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
+}
+
+.fakbar-album-cover {
+  position: relative;
+  aspect-ratio: 4 / 3;
+  overflow: hidden;
+  background: var(--paper-2);
+}
+
+.fakbar-album-cover img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 320ms ease;
+}
+
+.fakbar-album-card:hover .fakbar-album-cover img {
+  transform: scale(1.03);
+}
+
+/* Album zonder cover: hetzelfde streeppatroon als een werking zonder foto op
+   de hoofdsite, zodat een ontbrekende afbeelding zichtbaar blijft. */
+.fakbar-album-cover-empty {
+  display: grid;
+  width: 100%;
+  height: 100%;
+  place-items: center;
+  color: var(--muted);
+  background: repeating-linear-gradient(
+    135deg,
+    var(--paper-2) 0 10px,
+    var(--paper) 10px 20px
+  );
+}
+
+.fakbar-album-body {
+  padding: 16px 18px 18px;
+}
+
+.fakbar-album-body h2 {
+  margin: 0;
+  color: var(--ink);
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.fakbar-album-meta {
+  margin: 5px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+
+.fakbar-album-desc {
+  display: -webkit-box;
+  overflow: hidden;
+  margin: 8px 0 0;
+  color: var(--body);
+  font-size: 13px;
+  line-height: 1.5;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+/* ── Fotoraster ──────────────────────────────────────────────────────────── */
+
+.fakbar-photo-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(210px, 100%), 1fr));
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.fakbar-photo-tile {
+  position: relative;
+  overflow: hidden;
+  border-radius: 12px;
+  background: var(--paper-2);
+}
+
+.fakbar-photo-button {
+  display: block;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: none;
+}
+
+.fakbar-photo-button img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 320ms ease;
+}
+
+.fakbar-photo-tile:hover .fakbar-photo-button img {
+  transform: scale(1.04);
+}
+
+/* De downloadknop verschijnt op hover, maar blijft altijd bereikbaar met het
+   toetsenbord: enkel op `:hover` tonen maakt hem onbruikbaar zonder muis. */
+.fakbar-photo-download {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  display: grid;
+  width: 32px;
+  height: 32px;
+  place-items: center;
+  border-radius: 999px;
+  background: rgba(6, 9, 14, 0.62);
+  color: #fff;
+  opacity: 0;
+  transition: opacity 160ms ease, background 160ms ease;
+}
+
+.fakbar-photo-tile:hover .fakbar-photo-download,
+.fakbar-photo-download:focus-visible {
+  opacity: 1;
+}
+
+.fakbar-photo-download:hover {
+  background: rgba(6, 9, 14, 0.85);
+}
+
+@media (hover: none) {
+  .fakbar-photo-download {
+    opacity: 1;
+  }
+}
+
+/* ── Lightbox ────────────────────────────────────────────────────────────── */
+
+.fakbar-lightbox {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  padding: 64px 12px 24px;
+  background: rgba(6, 9, 14, 0.94);
+}
+
+.fakbar-lightbox-bar {
+  position: absolute;
+  top: 0;
+  right: 0;
+  left: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 18px;
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+
+.fakbar-lightbox-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.fakbar-lightbox-button {
+  display: grid;
+  width: 36px;
+  height: 36px;
+  place-items: center;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+  transition: background 160ms ease, border-color 160ms ease;
+}
+
+.fakbar-lightbox-button:hover {
+  border-color: rgba(255, 255, 255, 0.5);
+  background: rgba(255, 255, 255, 0.18);
+}
+
+.fakbar-lightbox-image {
+  max-width: 100%;
+  max-height: calc(100vh - 100px);
+  margin: 0 auto;
+  border-radius: 8px;
+  object-fit: contain;
+}
+
+.fakbar-lightbox-nav {
+  padding: 12px 14px;
+  border: 0;
+  background: none;
+  color: rgba(255, 255, 255, 0.62);
+  font-size: 36px;
+  line-height: 1;
+  transition: color 160ms ease;
+}
+
+.fakbar-lightbox-nav:hover {
+  color: #fff;
+}
+
+@media (max-width: 640px) {
+  .fakbar-lightbox {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  /* Op een telefoon veeg je; twee pijlen die de foto verkleinen helpen niet. */
+  .fakbar-lightbox-nav {
+    display: none;
+  }
+}
+
+/* ── @vtk/ui op een donker palet ─────────────────────────────────────────────
+   De gedeelde componenten zijn geschreven voor het lichte palet van vtk.be en
+   de uitleendienst: `Input`, `Textarea` en `Select` zetten `bg-white`, en
+   `ConfirmDialog` doet hetzelfde. Met lichte tekst erop levert dat wit-op-wit.
+
+   Dat hoort hier gecorrigeerd te worden en niet in het pakket zelf: de andere
+   twee apps zijn licht, en een donkere variant in @vtk/ui zou daar niets doen
+   behalve de kans creëren dat iemand ze per ongeluk aanzet. Zodra een derde
+   app donker wordt, is het tijd om er een echt thema van te maken. */
+
+.vtk-fakbar-dark input:not([type='radio']):not([type='checkbox']):not([type='file']),
+.vtk-fakbar-dark textarea,
+.vtk-fakbar-dark select {
+  border-color: var(--line-2);
+  background: var(--paper);
+  color: var(--ink);
+}
+
+.vtk-fakbar-dark input::placeholder,
+.vtk-fakbar-dark textarea::placeholder {
+  color: var(--muted);
+}
+
+/* De pijl van een <select> is een SVG in de browserstijl en blijft anders zwart
+   op zwart. */
+.vtk-fakbar-dark select {
+  color-scheme: dark;
+}
+
+/* Radio's, checkboxen en de bestandskiezer volgen het systeemthema; zonder dit
+   tekent de browser ze licht op een donkere kaart. */
+.vtk-fakbar-dark input[type='radio'],
+.vtk-fakbar-dark input[type='checkbox'],
+.vtk-fakbar-dark input[type='file'],
+.vtk-fakbar-dark input[type='date'],
+.vtk-fakbar-dark input[type='number'] {
+  color-scheme: dark;
+  accent-color: var(--yellow);
+}
+
+/* ConfirmDialog: `bg-white` met `text-vtk-ink` erop. */
+.vtk-fakbar-dark [role='dialog'] > div,
+[role='dialog'] > div.bg-white {
+  border-color: var(--line-2) !important;
+  background: var(--surface) !important;
+  color: var(--ink);
+}
+
+.vtk-fakbar-dark [role='dialog'] h2 {
+  color: var(--ink);
+}
+
+/* De secundaire knop van @vtk/ui is `bg-vtk-yellow text-vtk-ink`. Op dit palet
+   is `--color-vtk-ink` licht, dus cyaan-op-licht: onleesbaar. De accentknop
+   hoort donkere tekst te dragen. */
+.vtk-fakbar-dark .bg-vtk-yellow {
+  color: #05070a;
+}
+
+/* De randen van @vtk/ui hangen aan `--color-vtk-blue` op 12-15% dekking. Die
+   kleur is hier bijna zo donker als de achtergrond, dus die randen verdwenen;
+   ze horen aan de lijn-tokens te hangen. */
+.vtk-fakbar-dark [class*='border-vtk-blue'] {
+  border-color: var(--line);
+}
+
+/* ── AdminNav op een donker palet ────────────────────────────────────────────
+   admin-nav.css zet zijn zijbalk hard op `rgba(255,255,255,.56)` en zijn links
+   op `rgba(10,15,31,.72)`: geen tokens, dus een licht paneel met bijna zwarte
+   tekst midden in het donkere beheer. Hier rechtgezet, om dezelfde reden als
+   hierboven: de twee andere apps zijn licht en het pakket hoort niet één app
+   te dienen. */
+
+.vtk-fakbar-dark .vtk-admin-nav,
+.vtk-fakbar-dark .vtk-admin-nav-toggle {
+  border-color: var(--line);
+  background: var(--surface);
+}
+
+.vtk-fakbar-dark .vtk-admin-nav a,
+.vtk-fakbar-dark .vtk-admin-nav-group-toggle {
+  color: var(--body);
+}
+
+.vtk-fakbar-dark .vtk-admin-nav a:hover,
+.vtk-fakbar-dark .vtk-admin-nav-group-toggle:hover {
+  background: var(--surface-2);
+  color: var(--ink);
+}
+
+/* Het actieve onderdeel draagt het accent, net als de dag van vandaag in de
+   openingsurenband en een open week in het weekoverzicht. */
+.vtk-fakbar-dark .vtk-admin-nav a.is-active {
+  background: rgba(34, 203, 232, 0.14);
+  color: var(--yellow);
+}
+
+.vtk-fakbar-dark .vtk-admin-nav-group-toggle.has-active {
+  color: var(--ink);
+}
+
+/* ── Toasts ──────────────────────────────────────────────────────────────── */
+
+.vtk-toast {
+  border-color: var(--line-2);
+  background: var(--surface-2);
+  color: var(--ink);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.55);
+}
+
+.vtk-toast-success {
+  border-color: rgba(74, 222, 128, 0.4);
+  background: rgba(74, 222, 128, 0.12);
+  color: #bbf7d0;
+}
+
+.vtk-toast-error {
+  border-color: rgba(248, 113, 113, 0.4);
+  background: rgba(248, 113, 113, 0.12);
+  color: #fecaca;
+}
+
+.vtk-toast-warning {
+  border-color: rgba(250, 204, 21, 0.4);
+  background: rgba(250, 204, 21, 0.12);
+  color: #fef08a;
+}
+
+.vtk-toast-info {
+  border-color: rgba(34, 203, 232, 0.4);
+  background: rgba(34, 203, 232, 0.12);
+  color: #a5eefa;
+}
+
+/* ── Test-login ──────────────────────────────────────────────────────────── */
+
+.fakbar-test-login-option {
+  display: flex;
+  width: 100%;
+  flex-direction: column;
+  gap: 4px;
+  padding: 16px 20px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--surface);
+  text-align: left;
+  transition:
+    border-color 150ms ease,
+    background 150ms ease;
+}
+
+.fakbar-test-login-option:hover {
+  border-color: var(--line-2);
+  background: var(--surface-2);
+}
+
+.fakbar-test-login-option .name {
+  color: var(--ink);
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.fakbar-test-login-option .description {
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+/* ── Specials ────────────────────────────────────────────────────────────────
+   Wat er één avond anders is aan de toog. Publiek een bord, in het beheer een
+   rij velden per special. */
+
+.fakbar-special-list {
+  display: grid;
+  gap: 2px;
+  margin: 18px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.fakbar-special-list li {
+  display: flex;
+  align-items: baseline;
+  gap: 14px;
+  padding: 12px 0;
+  border-top: 1px solid var(--line);
+}
+
+.fakbar-special-list li:first-child {
+  border-top: 0;
+  padding-top: 4px;
+}
+
+.fakbar-special-list .fakbar-badge {
+  flex: none;
+  /* Uitlijnen met de eerste regel tekst ernaast in plaats van met de basislijn
+     van het hele blok, anders hangt het label los boven een special met een
+     toelichting eronder. */
+  transform: translateY(1px);
+}
+
+.fakbar-special-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.fakbar-special-body .title {
+  margin: 0;
+  color: var(--ink);
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.fakbar-special-body .note {
+  margin: 3px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.fakbar-special-price {
+  flex: none;
+  margin: 0;
+  color: var(--ink);
+  font-size: 15px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.fakbar-special-price s {
+  display: block;
+  margin-top: 2px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+@media (max-width: 560px) {
+  .fakbar-special-list li {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .fakbar-special-body {
+    flex-basis: 100%;
+    order: 2;
+  }
+
+  .fakbar-special-price {
+    order: 1;
+    margin-left: auto;
+  }
+}
+
+/* ── Specials in het beheer ──────────────────────────────────────────────── */
+
+.fakbar-special-row {
+  padding: 14px 16px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--paper-2);
+}
+
+.fakbar-special-grid {
+  display: grid;
+  grid-template-columns: 150px minmax(0, 1.4fr) minmax(0, 1fr) 130px 36px;
+  gap: 12px;
+  align-items: end;
+}
+
+/* De toelichting loopt over de volle breedte onder de rest, behalve de
+   verwijderknop die rechts van de eerste rij blijft staan. */
+.fakbar-special-note {
+  grid-column: 1 / 5;
+}
+
+.fakbar-special-remove {
+  display: grid;
+  width: 36px;
+  height: 36px;
+  place-items: center;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--muted);
+  transition:
+    border-color 150ms ease,
+    background 150ms ease,
+    color 150ms ease;
+}
+
+.fakbar-special-remove:hover {
+  border-color: var(--line-2);
+  background: var(--surface-2);
+  color: var(--ink);
+}
+
+@media (max-width: 900px) {
+  .fakbar-special-grid {
+    grid-template-columns: minmax(0, 1fr) 36px;
+  }
+
+  .fakbar-special-grid > div {
+    grid-column: 1;
+  }
+
+  .fakbar-special-note {
+    grid-column: 1;
+  }
+
+  .fakbar-special-remove {
+    grid-row: 1;
+    grid-column: 2;
+  }
+}
+
+/* ── Grafieken ───────────────────────────────────────────────────────────────
+   De reekskleuren staan in charts.tsx en zijn tegen deze achtergrond door de
+   validator gehaald; hier staat enkel de opmaak eromheen. Assen en raster zijn
+   bewust terughoudend: de staven horen het beeld te dragen. */
+
+.fakbar-chart-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.fakbar-chip[aria-current='true'] {
+  border-color: var(--yellow-dark);
+  background: rgba(34, 203, 232, 0.14);
+  color: var(--yellow);
+}
+
+.fakbar-chart {
+  display: block;
+}
+
+.fakbar-chart-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin: 0 0 14px;
+  padding: 0;
+  list-style: none;
+}
+
+.fakbar-chart-legend li {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.fakbar-chart-legend span {
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+}
+
+.fakbar-chart-plot {
+  position: relative;
+  height: 240px;
+  /* Ruimte links voor de asbedragen. Die stonden eerder rechts *in* het vlak,
+     met een achtergrondje om de rasterlijn te onderbreken; dan botsen ze op de
+     laatste staaf, en dat is net de week waar je naar kijkt. */
+  padding-left: 76px;
+}
+
+.fakbar-chart-plot svg {
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+.fakbar-chart-plot svg [role='button'] {
+  cursor: pointer;
+  outline: none;
+}
+
+.fakbar-chart-plot svg [role='button']:focus-visible {
+  outline: 2px solid var(--yellow);
+  outline-offset: -2px;
+}
+
+.fakbar-chart-grid {
+  position: absolute;
+  inset: 0 0 0 76px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  pointer-events: none;
+}
+
+.fakbar-chart-grid > div {
+  position: relative;
+  border-top: 1px solid var(--line);
+}
+
+.fakbar-chart-grid span {
+  position: absolute;
+  top: -8px;
+  right: 100%;
+  padding-right: 10px;
+  color: var(--muted);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* De laatste rasterlijn is de nullijn en mag iets steviger staan. */
+.fakbar-chart-grid > div:last-child {
+  border-top-color: var(--line-2);
+}
+
+.fakbar-chart-tooltip {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  /* De tooltip hangt boven de grafiek, dus hij moet de kaartrand kunnen
+     overlappen zonder afgesneden te worden. */
+  margin-left: 76px;
+  z-index: 5;
+  min-width: 190px;
+  padding: 10px 12px;
+  border: 1px solid var(--line-2);
+  border-radius: 12px;
+  background: var(--surface-2);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.55);
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+
+.fakbar-chart-tooltip p {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin: 0;
+  color: var(--body);
+  font-size: 13px;
+}
+
+.fakbar-chart-tooltip p span {
+  width: 9px;
+  height: 9px;
+  border-radius: 2px;
+}
+
+.fakbar-chart-tooltip strong {
+  margin-left: auto;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+
+.fakbar-chart-tooltip .head {
+  margin-bottom: 6px;
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.fakbar-chart-tooltip .total {
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px solid var(--line);
+}
+
+.fakbar-chart-tooltip .sub {
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.fakbar-chart-axis {
+  display: flex;
+  margin: 10px 0 0;
+  padding: 0 0 0 76px;
+  list-style: none;
+}
+
+.fakbar-chart-axis li {
+  flex: 1;
+  color: var(--muted);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+
+.fakbar-chart-empty {
+  margin: 0;
+  padding: 28px 16px;
+  border: 1px dashed var(--line-2);
+  border-radius: 14px;
+  color: var(--muted);
+  font-size: 14px;
+  text-align: center;
+}
+
+/* ── Gerangschikte balken ────────────────────────────────────────────────── */
+
+.fakbar-bars {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.fakbar-bars li {
+  display: grid;
+  grid-template-columns: minmax(90px, 150px) minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  border-radius: 8px;
+  outline: none;
+}
+
+.fakbar-bars li:focus-visible {
+  outline: 2px solid var(--yellow);
+  outline-offset: 3px;
+}
+
+.fakbar-bars .label {
+  overflow: hidden;
+  color: var(--body);
+  font-size: 13px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fakbar-bars .track {
+  height: 20px;
+  border-radius: 5px;
+  background: var(--paper-2);
+}
+
+.fakbar-bars .fill {
+  display: block;
+  height: 100%;
+  /* Afgeronde uiteinden aan de kant van de waarde; de basis blijft vlak tegen
+     de nullijn zodat korte balken niet langer lijken dan ze zijn. */
+  border-radius: 0 5px 5px 0;
+  transition:
+    width 260ms ease,
+    opacity 160ms ease;
+}
+
+.fakbar-bars .value {
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+@media (max-width: 560px) {
+  .fakbar-bars li {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .fakbar-bars .track {
+    grid-column: 1 / 3;
+  }
+}
+
+/* ── Tabelweergave onder een grafiek ─────────────────────────────────────── */
+
+.fakbar-chart-table {
+  margin-top: 18px;
+}
+
+.fakbar-chart-table summary {
+  display: inline-block;
+  color: var(--muted);
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.fakbar-chart-table summary:hover {
+  color: var(--ink);
 }

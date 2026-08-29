@@ -1,61 +1,96 @@
+import type { Metadata } from 'next';
 import { prisma } from '@vtk/db';
-import { ensureDefaultFakbarItems } from '@/app/actions/fakbar';
+import { ElixirIcon } from '@/components/elixir-icon';
+import { SpecialsBoard } from '@/components/specials-board';
+import { CATEGORY_ORDER, CATEGORY_LABELS, CATEGORY_ICONS, formatEuro } from '@/lib/fakbar-format';
+import { getSpecialsBoard } from '@/lib/specials';
 
-export const metadata = {
+export const metadata: Metadata = {
   title: 'Drankkaart',
-  description: "Het volledige aanbod dranken en prijzen van 't ElixIr.",
+  description: "Het volledige drankaanbod en de prijzen van 't ElixIr.",
 };
 
-const CATEGORIES = [
-  { key: 'VAT', title: "Bieren van 't Vat", icon: '🍺' },
-  { key: 'BIER_WIJN', title: 'Bieren op Fles & Wijn', icon: '🍾' },
-  { key: 'FRISDRANK', title: 'Frisdranken', icon: '🥤' },
-  { key: 'STERK', title: 'Sterke Drank', icon: '🥃' },
-];
+export const revalidate = 300;
 
 export default async function DrankkaartPage() {
-  await ensureDefaultFakbarItems();
-  const items = await prisma.fakbarItem.findMany({
-    orderBy: [{ category: 'asc' }, { name: 'asc' }],
-  });
+  // Bewust geen seed-aanroep hier. Dit is een publieke pagina: die hoort te
+  // lezen en niet te schrijven, zeker niet bij elke GET van een bezoeker. De
+  // standaardkaart aanmaken doe je vanuit /admin/instellingen.
+  const [items, board] = await Promise.all([
+    prisma.fakbarItem.findMany({ orderBy: [{ name: 'asc' }] }),
+    getSpecialsBoard(),
+  ]);
+
+  const groups = CATEGORY_ORDER.map((key) => ({
+    key,
+    label: CATEGORY_LABELS[key],
+    icon: CATEGORY_ICONS[key],
+    items: items.filter((item) => item.category === key),
+  })).filter((group) => group.items.length > 0);
 
   return (
     <>
       <div className="fakbar-page-head">
         <div className="fakbar-page-head-inner">
-          <p className="fakbar-eyebrow"><span>🍺</span><span>'t ElixIr</span></p>
+          <p className="fakbar-eyebrow">&rsquo;t ElixIr</p>
           <h1>Drankkaart</h1>
-          <p className="fakbar-page-intro">Alle prijzen zijn in Euro (€). Geniet maar drink met mate!</p>
+          <p className="fakbar-page-intro">
+            Alle prijzen in euro, zoals ze aan de toog hangen. Wijzigen we iets, dan staat het hier meteen mee.
+          </p>
         </div>
       </div>
 
       <div className="fakbar-page-content">
-        <div className="grid gap-8">
-          {CATEGORIES.map((cat) => {
-            const categoryItems = items.filter((i) => i.category === cat.key);
-            if (categoryItems.length === 0) return null;
-            return (
-              <section key={cat.key}>
-                <div className="fakbar-section-head">
-                  <h2>{cat.icon} {cat.title}</h2>
-                </div>
-                <div className="rounded-[18px] border border-[--line] bg-[--surface] overflow-hidden">
-                  {categoryItems.map((item, idx) => (
-                    <div
-                      key={item.id}
-                      className={`flex items-center justify-between px-6 py-4 ${idx < categoryItems.length - 1 ? 'border-b border-[--line]' : ''}`}
-                    >
-                      <span className="font-medium text-[--ink]">{item.name}</span>
-                      <span className="font-semibold tabular-nums text-[--ink]">
-                        €{(item.salesPrice / 100).toFixed(2)}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              </section>
-            );
-          })}
-        </div>
+        {board ? (
+          <div className="mb-9">
+            <SpecialsBoard board={board} />
+          </div>
+        ) : null}
+
+        {groups.length === 0 ? (
+          <div className="fakbar-empty">
+            <h3>Nog geen drankkaart</h3>
+            <p>
+              Er staan nog geen artikelen in. De fakbar vult de kaart aan vanuit het beheer; kom straks nog eens
+              terug.
+            </p>
+          </div>
+        ) : (
+          <>
+            <nav className="fakbar-menu-nav" aria-label="Naar een categorie">
+              {groups.map((group) => (
+                <a key={group.key} href={`#${group.key.toLowerCase()}`} className="fakbar-chip">
+                  <ElixirIcon name={group.icon} className="h-4 w-4 text-[var(--muted)]" />
+                  {group.label}
+                </a>
+              ))}
+            </nav>
+
+            <div className="grid gap-10">
+              {groups.map((group) => (
+                <section key={group.key} id={group.key.toLowerCase()} className="scroll-mt-24">
+                  <div className="fakbar-section-head">
+                    <h2 className="flex items-center gap-2.5">
+                      <ElixirIcon name={group.icon} className="h-5 w-5 text-[var(--muted)]" />
+                      {group.label}
+                    </h2>
+                  </div>
+                  <div className="fakbar-menu-list">
+                    {group.items.map((item) => (
+                      <div key={item.id} className="fakbar-menu-row">
+                        <span className="name">{item.name}</span>
+                        <span className="leader" aria-hidden />
+                        <span className="price">{formatEuro(item.salesPrice)}</span>
+                      </div>
+                    ))}
+                  </div>
+                </section>
+              ))}
+            </div>
+          </>
+        )}
+
+        <p className="mt-10 text-sm text-[var(--muted)]">Geniet, maar drink met mate.</p>
       </div>
     </>
   );

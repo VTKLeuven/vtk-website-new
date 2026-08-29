@@ -4896,6 +4896,7 @@ model FakbarItem {
 
   consumptions FakbarConsumption[]
   stockCounts  FakbarStockCount[]
+  specials     FakbarEveningSpecial[]
 }
 
 enum FakbarWeekStatus {
@@ -4938,6 +4939,7 @@ model FakbarEvening {
   cashCount   FakbarCashRegisterCount?
   consumption FakbarConsumption[]
   rental      FakbarRental?
+  specials    FakbarEveningSpecial[]
 
   @@index([date])
 }
@@ -5011,6 +5013,51 @@ model FakbarStockCount {
   item FakbarItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
 
   @@unique([weekId, itemId])
+}
+
+/// Wat er één avond extra is: een drank die er anders niet staat, of een actie
+/// aan de toog ("2+1 gratis Stella").
+///
+/// **Dit is iets anders dan `FakbarEvening.specialeActiviteit`.** Dat veld zegt
+/// *wat* die avond is (een cantus, een TD, een verhuur); dit zegt wat er die
+/// avond aan de toog anders is. Een gewone donderdag kan een actie hebben zonder
+/// dat er een activiteit is, en een cantus kan er drie hebben.
+enum FakbarSpecialKind {
+  /// Een drank die er die avond bij is en niet op de vaste kaart staat.
+  DRANK
+  /// Een actie of korting op wat er al staat.
+  ACTIE
+}
+
+model FakbarEveningSpecial {
+  id        String            @id @default(cuid())
+  eveningId String
+  kind      FakbarSpecialKind
+
+  /// Wat er op het bord komt: "2+1 gratis Stella", "Cocktail van de maand".
+  title     String
+  /// Optionele toelichting, bv. de voorwaarden van de actie.
+  note      String?
+
+  /// Het artikel waar de actie over gaat, wanneer het er één is. Null voor een
+  /// actie over de hele toog of een drank die niet op de kaart staat. Bewust
+  /// `SetNull` en geen `Cascade`: gaat het artikel van de kaart, dan blijft de
+  /// actie in de historiek staan met haar eigen titel.
+  itemId    String?
+  /// De prijs die die avond geldt, in cent. Null betekent: de gewone prijs, of
+  /// niet van toepassing (bij een actie zoals 2+1).
+  price     Int?
+
+  /// Volgorde op het bord en op de site.
+  sortOrder Int               @default(0)
+
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+
+  evening FakbarEvening @relation(fields: [eveningId], references: [id], onDelete: Cascade)
+  item    FakbarItem?   @relation(fields: [itemId], references: [id], onDelete: SetNull)
+
+  @@index([eveningId])
 }
 
 model FakbarRental {

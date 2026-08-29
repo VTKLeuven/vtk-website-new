@@ -20,6 +20,7 @@
     "@types/pg": "^8.20.0",
     "@vtk/auth": "*",
     "@vtk/db": "*",
+    "@vtk/gallery": "*",
     "@vtk/i18n": "*",
     "@vtk/mail": "*",
     "@vtk/payments": "*",

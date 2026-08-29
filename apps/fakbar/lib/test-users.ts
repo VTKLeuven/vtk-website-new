@@ -15,33 +15,71 @@ export function testLoginEnabled(): boolean {
 }
 
 export const TEST_USER_COOKIE = 'fakbar-test-user';
-export type TestUserKey = 'fakbar' | 'it';
-export const TEST_USER_KEYS: TestUserKey[] = ['fakbar', 'it'];
+export type TestUserKey = 'student' | 'fakbar' | 'it';
+export const TEST_USER_KEYS: TestUserKey[] = ['student', 'fakbar', 'it'];
 
 type TestPersona = {
   key: TestUserKey;
   name: string;
+  /** Korte omschrijving voor de knop op /test-login. */
+  description: string;
   isSuperAdmin: boolean;
   groups: { code: string; role: 'MEMBER' | 'LEAD' }[];
   permissions: string[];
 };
 
+/**
+ * De volgorde hieronder is de volgorde op /test-login, en ze loopt van weinig
+ * naar veel rechten. `student` staat vooraan omdat dat de gewone bezoeker is:
+ * verreweg de meeste mensen die op deze site komen zijn geen fakbarlid, en dat
+ * is precies het geval dat je bij het bouwen het snelst vergeet te bekijken.
+ */
 const PERSONAS: Record<TestUserKey, TestPersona> = {
+  student: {
+    key: 'student',
+    name: 'Sien (test student)',
+    description: 'Gewoon lid, geen post. Ziet de site zoals een bezoeker die ingelogd is.',
+    isSuperAdmin: false,
+    // Geen enkele post: geen Beheer-tab, en /admin geeft "Geen toegang" in
+    // plaats van een redirect naar de login (die is er immers al).
+    groups: [],
+    permissions: [],
+  },
   fakbar: {
     key: 'fakbar',
     name: 'Alice (test fakbar)',
+    description: 'Lid van de post Fakbar. Mag alles beheren.',
     isSuperAdmin: false,
     groups: [{ code: 'FAKBAR', role: 'LEAD' }],
     permissions: [],
   },
   it: {
     key: 'it',
-    name: 'Bob (test IT superadmin)',
+    name: 'Bob (test IT)',
+    description: 'Superadmin. Mag alles, ook zonder bij de post Fakbar te zitten.',
     isSuperAdmin: true,
     groups: [{ code: 'IT', role: 'LEAD' }],
     permissions: [],
   },
 };
+
+/** De persona's voor de keuzelijst op /test-login. */
+export function testPersonas(): { key: TestUserKey; name: string; description: string }[] {
+  return TEST_USER_KEYS.map((key) => {
+    const persona = PERSONAS[key];
+    return { key, name: persona.name, description: persona.description };
+  });
+}
+
+/**
+ * Waar je na het inloggen belandt. Wie niets te beheren heeft, hoort niet op een
+ * scherm te landen dat "Geen toegang" zegt; die begint gewoon op de homepagina.
+ */
+export function testPersonaLanding(key: TestUserKey): string {
+  const persona = PERSONAS[key];
+  const manages = persona.isSuperAdmin || persona.groups.some((group) => group.code === 'FAKBAR');
+  return manages ? '/admin' : '/';
+}
 
 export function isTestUserKey(value: string | undefined | null): value is TestUserKey {
   return value != null && (TEST_USER_KEYS as string[]).includes(value);

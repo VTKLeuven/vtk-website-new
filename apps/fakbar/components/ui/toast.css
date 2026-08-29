@@ -1,0 +1,84 @@
+.vtk-toast-viewport {
+  position: fixed;
+  /* Val onder de header; --vtk-header-height wordt door de site gezet (fallback
+     als de variabele ontbreekt). z-index net onder de header (50) zodat een
+     eventuele overlap achter de header tuckt i.p.v. erover. */
+  top: calc(var(--vtk-header-height, 0px) + 16px);
+  right: 16px;
+  z-index: 40;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: min(360px, calc(100vw - 32px));
+  /* Laat kliks door de lege ruimte gaan; de toasts zelf vangen ze wel op. */
+  pointer-events: none;
+}
+
+.vtk-toast {
+  pointer-events: auto;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: #fff;
+  color: var(--ink);
+  box-shadow: 0 8px 24px rgba(10, 15, 31, 0.12);
+  font-size: 14px;
+  line-height: 1.45;
+  animation: vtk-toast-in 160ms ease-out;
+}
+
+@keyframes vtk-toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.vtk-toast-message {
+  flex: 1;
+}
+
+.vtk-toast-close {
+  flex: none;
+  padding: 0 2px;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  opacity: 0.6;
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.vtk-toast-close:hover {
+  opacity: 1;
+}
+
+.vtk-toast-success {
+  border-color: #b8dec1;
+  background: #eef8ea;
+  color: #2f6f33;
+}
+
+.vtk-toast-error {
+  border-color: #f0c6bd;
+  background: #fff0ed;
+  color: #9d2f1f;
+}
+
+.vtk-toast-warning {
+  border-color: #f0d76d;
+  background: #fff7cf;
+}
+
+.vtk-toast-info {
+  border-color: #c9d5ff;
+  background: #eef2ff;
+}
