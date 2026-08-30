@@ -5,12 +5,21 @@ import {
   Coins,
   ExternalLink,
   Images,
+  MapPin,
   QrCode,
   Sandwich,
   Wrench,
 } from 'lucide-react-native';
 import * as WebBrowser from 'expo-web-browser';
-import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
+import {
+  Pressable,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  Text,
+  useWindowDimensions,
+  View,
+} from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { fetchToday, setEventInterest } from '../api/endpoints';
@@ -238,14 +247,31 @@ function Section({ title, children }: { title?: string; children: React.ReactNod
 }
 
 /**
- * De vier dingen die geen eigen tab hebben maar wel vaak gebruikt worden, plus de
- * twee die de app verlaten.
+ * De dingen die geen eigen tab hebben maar wel vaak gebruikt worden, plus die
+ * de app verlaten.
  *
  * Cursusdienst en tijdsloten draaien op Cudi en niet op deze site, dus die
  * krijgen het pijltje naar buiten: je hoort te weten dat je in een browser
  * terechtkomt voor je tikt, niet erna. Burgieclan idem.
+ *
+ * **Waarom deze rij schuift en de rest van de app niet.** De styleguide wijst
+ * horizontale scrollers af waar ze navigatie verbergen (elf tabs in de
+ * siteheader, vijftien in het beheer). Hier is het omgekeerde waar: er zijn er
+ * vijf en er staan er ruim vier in beeld, dus je ziet wat er is en dat er meer
+ * is. Vijf tegels naast elkaar persen zou van "Cursusdienst" een afgekapt woord
+ * maken, en de rij naar twee regels laten breken kost een halve schermhoogte op
+ * het scherm dat juist snel moet zijn.
  */
 const CUDI = 'https://cudi.vtk.be';
+
+/**
+ * Hoeveel tegels er in beeld staan.
+ *
+ * Bewust géén rond getal: bij precies vier valt de vijfde exact buiten beeld en
+ * ziet niemand dat er nog iets is, dus schuift ook niemand. De rest van een
+ * tegel die over de rand steekt is het enige wat dat verklapt.
+ */
+const TILES_IN_VIEW = 4.35;
 
 function Shortcuts({
   onOpen,
@@ -254,9 +280,15 @@ function Shortcuts({
   onOpen: (route: string) => void;
   onExternal: (url: string) => void;
 }) {
+  const { width } = useWindowDimensions();
+  // De rij loopt van rand tot rand, dus enkel de binnenmarges van de sectie gaan
+  // eraf; het overschot is de tegel die half buiten beeld hangt.
+  const size = (width - SPACING.lg * 2 - SPACING.sm * (TILES_IN_VIEW - 1)) / TILES_IN_VIEW;
+
   const items = [
     { key: 'shiften', label: 'Shiften', icon: <Wrench color={COLORS.navy} size={20} />, to: '/shiften' },
     { key: 'media', label: "Foto's", icon: <Images color={COLORS.navy} size={20} />, to: '/media' },
+    { key: 'lokalen', label: 'Lokalen', icon: <MapPin color={COLORS.navy} size={20} />, to: '/lokalen' },
     { key: 'broodjes', label: 'Broodjes', icon: <Sandwich color={COLORS.navy} size={20} />, to: '/broodjes' },
     {
       key: 'cursusdienst',
@@ -268,14 +300,22 @@ function Shortcuts({
   ];
 
   return (
-    <View style={styles.tiles}>
+    <ScrollView
+      horizontal
+      showsHorizontalScrollIndicator={false}
+      // De sectie geeft zijn eigen marge door aan de inhoud, zodat de eerste
+      // tegel uitlijnt met de rest van het scherm terwijl de rij zelf tot de
+      // rand loopt en de laatste tegel er netjes onder schuift.
+      style={styles.tilesBleed}
+      contentContainerStyle={styles.tiles}
+    >
       {items.map((item) => (
         <Pressable
           key={item.key}
           accessibilityRole="button"
           accessibilityLabel={item.external ? `${item.label}, opent cudi.vtk.be` : item.label}
           onPress={() => (item.external ? onExternal(item.to) : onOpen(item.to))}
-          style={({ pressed }) => [styles.tile, pressed && styles.tilePressed]}
+          style={({ pressed }) => [styles.tile, { width: size }, pressed && styles.tilePressed]}
         >
           <View style={styles.tileTop}>
             {item.icon}
@@ -286,7 +326,7 @@ function Shortcuts({
           </Text>
         </Pressable>
       ))}
-    </View>
+    </ScrollView>
   );
 }
 
@@ -343,9 +383,11 @@ const styles = StyleSheet.create({
   more: { flexDirection: 'row', alignItems: 'center', gap: 2 },
   moreText: { ...TYPE.small, color: COLORS.muted },
 
-  tiles: { flexDirection: 'row', gap: SPACING.sm },
+  // `marginHorizontal` duwt de scroller tot de schermrand, `paddingHorizontal`
+  // zet de tegels weer op de lijn van de rest van het scherm.
+  tilesBleed: { marginHorizontal: -SPACING.lg },
+  tiles: { flexDirection: 'row', gap: SPACING.sm, paddingHorizontal: SPACING.lg },
   tile: {
-    flex: 1,
     aspectRatio: 1,
     backgroundColor: COLORS.surface,
     borderRadius: RADIUS.md,

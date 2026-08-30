@@ -1221,3 +1221,54 @@ export const STUDY_GROUP_ERRORS = [
 ] as const;
 
 export type AppStudyGroupErrorCode = (typeof STUDY_GROUP_ERRORS)[number];
+
+/**
+ * Een lokaal in de lokalenzoeker.
+ *
+ * `label` is wat de app groot toont en waar mensen op zoeken: de korte code van
+ * het gebouw plus het lokaalnummer, zoals het in een uurrooster staat
+ * ("200K 00.06"). De app bouwt die string niet zelf op; de server is ook hier
+ * de waarheid.
+ */
+export type AppRoom = {
+  id: string;
+  label: string;
+  code: string | null;
+  name: string;
+  category: string;
+  /** 0 is de gelijkvloers. Null wanneer het lokaalnummer geen verdieping noemt. */
+  floor: number | null;
+  buildingId: string;
+  buildingName: string;
+  buildingShortCode: string | null;
+  kulagUrl: string;
+};
+
+export type AppBuilding = {
+  id: string;
+  /** Het gebouwnummer van de KU Leuven, bv. "490-13". */
+  kulagId: string;
+  shortCode: string | null;
+  name: string;
+  address: string;
+  city: string;
+  lat: number | null;
+  lng: number | null;
+  /** De contour als [[lat, lng], ...]; leeg voor een terrein zonder voetafdruk. */
+  outline: [number, number][];
+  photoUrl: string | null;
+  kulagUrl: string;
+  plans: { title: string; url: string }[];
+  rooms: AppRoom[];
+};
+
+export type AppRooms = {
+  buildings: AppBuilding[];
+  /** Enkel gevuld bij een zoekopdracht; anders leeg. */
+  results: AppRoom[];
+  /**
+   * KULag screent enkel op toegankelijkheid, dus niet elk lokaal staat erin. De
+   * app zegt dat en verwijst door in plaats van te doen alsof het niet bestaat.
+   */
+  sourceUrl: string;
+};
