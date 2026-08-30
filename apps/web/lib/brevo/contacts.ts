@@ -46,18 +46,24 @@ export type SyncUserData = {
   notAtFaculty: boolean;
   studyConfirmedYear: number | null;
   mailCategories: MailCategory[];
+  mailUnsubscribedAt: Date | null;
   studyYears: StudyYear[];
   studyProgrammes: StudyProgramme[];
 };
 
 /**
  * Basis-geschiktheid: enkel actieve leden die hun studie dit academiejaar
- * bevestigden en nog studeren. Faalt dit, dan hoort het lid in géén enkele lijst
- * en wordt het overal uit verwijderd. Spiegelt de eerste drie filters van
- * `listWhere()`.
+ * bevestigden, nog studeren en zich niet via een mail uitschreven. Faalt dit,
+ * dan hoort het lid in géén enkele lijst en wordt het overal uit verwijderd.
+ * Spiegelt de eerste vier filters van `listWhere()`.
  */
 export function isEligible(user: SyncUserData, studyYear: number): boolean {
-  return user.active && user.studyConfirmedYear === studyYear && !user.notStudying;
+  return (
+    user.active &&
+    user.studyConfirmedYear === studyYear &&
+    !user.notStudying &&
+    user.mailUnsubscribedAt === null
+  );
 }
 
 /**
@@ -73,6 +79,42 @@ export function desiredListKeys(user: SyncUserData, studyYear: number): BrevoLis
     keys.push(category);
   }
   return keys;
+}
+
+/**
+ * Wat een uitschrijving in Brevo betekent voor de site.
+ *
+ * `global` is "geen enkele VTK-lijstmail meer". Twee dingen leiden daartoe: de
+ * blacklist op het contact (de uitschrijflink onderaan elke campagne), en een
+ * uitschrijving voor de lijst "Alle studenten". Die tweede heeft op de site geen
+ * eigen vinkje; wie ze uitzet, zegt hetzelfde als wie zich blacklist.
+ *
+ * `categories` zijn de losse opt-ins die het lid uitzette. Die vinken we af in
+ * `mailCategories`, zodat de site en Brevo hetzelfde zeggen en het lid het op
+ * /account terugziet.
+ */
+export type BrevoUnsubscribe = { global: boolean; categories: MailCategory[] };
+
+/**
+ * Leest de uitschrijfstatus van een Brevo-contact terug naar sitebegrippen.
+ *
+ * Bewust **enkel** op expliciete uitschrijfvelden: dat een adres niet (meer) in
+ * een lijst zit, telt hier niet mee. De import bij Brevo verloopt asynchroon, dus
+ * een adres dat we net toevoegden kan een tel later nog ontbreken; die afwezigheid
+ * als "uitgeschreven" lezen zou een lid uitschrijven omdat we het net inschreven.
+ */
+export function readUnsubscribe(
+  contact: { emailBlacklisted: boolean; listUnsubscribed: number[] },
+  keyByListId: Map<number, BrevoListKey>,
+): BrevoUnsubscribe {
+  if (contact.emailBlacklisted) return { global: true, categories: [] };
+
+  const keys = contact.listUnsubscribed
+    .map((id) => keyByListId.get(id))
+    .filter((key): key is BrevoListKey => key !== undefined);
+
+  if (keys.includes(ALL_STUDENTS_KEY)) return { global: true, categories: [] };
+  return { global: false, categories: keys.filter((k) => k !== ALL_STUDENTS_KEY) as MailCategory[] };
 }
 
 type EmailFields = Pick<SyncUserData, "email" | "personalEmail" | "emailPreference">;

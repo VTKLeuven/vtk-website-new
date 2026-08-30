@@ -994,6 +994,65 @@ bijgewerkt. De Brevo-sync (`apps/web/lib/brevo/`) haalt de tussenpersoon weg.
   aangemaakt bij de eerste geslaagde sync (knop, cron of profielwijziging), niet
   bij het deployen; er wordt dus niets in Brevo gezet zolang de key/IP niet werkt.
 
+### Uitschrijven komt uit Brevo terug (de koppeling is tweerichting)
+
+De sync hierboven was aanvankelijk eenrichting: de site duwde, Brevo ontving. Wie
+op de uitschrijflink onderaan een campagne klikte, kreeg van Brevo inderdaad geen
+mail meer, maar de site wist dat niet. Die persoon bleef in het beheer als
+ingeschreven staan, bleef meegeteld bij de aantallen en kwam nog altijd in de
+CSV/ZIP-download. Wie die download ooit ergens anders importeerde, mailde iemand
+die net "stop" gezegd had. Sinds augustus 2026 leest de sync uitschrijvingen
+terug (`apps/web/lib/brevo/unsubscribe.ts`).
+
+- **Enkel uitschrijvingen komen terug, geen inschrijvingen.** De site blijft de
+  plek waar iemand zich abonneert; daar staat de opt-in en daar hangt de
+  toestemming aan vast. Brevo is enkel de plek waar iemand kan afhaken. Een
+  contact dat in Brevo van de blacklist gehaald wordt, verandert op de site dus
+  niets.
+- **Twee signalen, twee betekenissen.** Brevo geeft per contact `emailBlacklisted`
+  (geen enkele campagne meer) en `listUnsubscribed` (de lijsten waarvoor het
+  contact zich apart uitschreef). Een blacklist zet `User.mailUnsubscribedAt`;
+  een uitschrijving voor één categorielijst vinkt precies die `MailCategory` af.
+  Uitschrijven voor "Alle studenten" telt als een blacklist: daar is op de site
+  geen vinkje voor, dus het kan niets anders betekenen.
+- **Afwezigheid is géén signaal.** Dat een adres niet (meer) in een lijst zit,
+  lezen we bewust niet als een uitschrijving. De bulk-import bij Brevo verloopt
+  asynchroon, dus een contact dat we net toevoegden kan een tel later nog
+  ontbreken; die afwezigheid meetellen zou iemand uitschrijven omdát we hem
+  inschreven.
+- **`mailUnsubscribedAt` blokkeert álles, ook de alumnilijst.** Brevo kent maar
+  één blacklist per contact, en de student- en alumnilijsten delen dat contact.
+  "Stop" tegen de ene is dus ook "stop" tegen de andere; alles anders doen zou
+  betekenen dat we blijven mailen naar iemand die op de knop drukte. `listWhere()`,
+  `desiredListKeys()` en `listAlumniRecipients()` filteren er alle drie op.
+- **De opt-ins blijven staan.** Een uitschrijving wist `mailCategories` of
+  `alumniMailOptIn` niet. Schrijft het lid zich later opnieuw in, dan krijgt het
+  zijn eigen keuzes terug in plaats van een leeg formulier.
+- **Alleen het lid zelf kan terug, en dan gaat het in één keer.** Op /account
+  verschijnt in dat geval een vinkje "ik wil weer mails ontvangen"
+  (`mailResubscribe`). Dat wist `mailUnsubscribedAt` én haalt de uitschrijving in
+  Brevo weg voor we opnieuw inschrijven, want een adres opnieuw in een lijst
+  zetten heft de blacklist niet op. Een beheerder heeft die knop niet: de
+  alumnitabel toont zo'n account als "zelf uitgeschreven" met een zin erbij in
+  plaats van een knop die niets doet.
+- **Eerst lezen, dan schrijven.** Beide sporen halen de uitschrijvingen op voor ze
+  iets duwen: de reconciliatie leest élke lijst uit voor ze berekent wie waar
+  hoort, en de real-time push haalt eerst het contact op. Andersom zou een
+  profielopslag ("ik pas mijn adres aan") iemand stil terugzetten in de lijsten
+  die hij net verlaten had, en zou de nachtelijke import de uitschrijving van die
+  ochtend overschrijven.
+- **Val om te kennen: een lijst-uitschrijving is niet te wissen via een veld.**
+  Brevo heeft geen `listUnsubscribed` in de update-API. Wat wel werkt, is het
+  contact van de lijst **loskoppelen** (`unlinkListIds`): die uitschrijving hangt
+  aan het lidmaatschap, niet aan het contact. Daarom doet `clearUnsubscribe` een
+  unlink van alle beheerde lijsten plus `emailBlacklisted: false`, en zet de
+  gewone sync het contact daarna opnieuw in de lijsten waar het in hoort.
+- **Matchen gebeurt op `ext_id`, dan pas op adres.** De sync stuurt `user.id` als
+  `ext_id` mee, en dat blijft kloppen wanneer een lid van adres wisselt. Het adres
+  is de terugval voor contacten die ooit anders binnenkwamen, hoofdletterongevoelig
+  vergeleken: Brevo bewaart alles lowercase, een zelf ingevulde persoonlijke mail
+  niet per se.
+
 ### Posten (groepen) & werkingsjaren
 
 - Een **post** = een `Group`. In de admin heet dit voortaan **"Posten"** (niet
@@ -4341,6 +4400,12 @@ In Brevo is dit **een eigen lijst met een eigen sync** (`lib/brevo/alumni.ts`,
 lijsten worden elke nacht gereconcilieerd tegen `desiredListKeys()`, dat enkel
 naar `User`-rijen kijkt en per definitie geen enkele alumnus teruggeeft; zat de
 alumnilijst daarin, dan maakte de reconciliatie ze elke nacht leeg.
+
+Die eigen sync draait wél mee in dezelfde nachtelijke cron-route, want ze haalt
+ook de uitschrijvingen uit Brevo op (zie "Uitschrijven komt uit Brevo terug").
+Zonder dat zou een alumnus die op de uitschrijflink klikt pas uit de lijst vallen
+wanneer iemand toevallig op de sync-knop in het beheer drukt, en tot dan in elke
+export blijven staan.
 
 ---
 

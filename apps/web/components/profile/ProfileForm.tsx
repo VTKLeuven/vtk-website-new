@@ -57,6 +57,7 @@ export function ProfileForm({
     | "personalEmail"
     | "emailPreference"
     | "mailCategories"
+    | "mailUnsubscribedAt"
     | "shiftReminderDayBefore"
     | "shiftReminderSoon"
     | "calendarOnlyMyAudiences"
@@ -86,6 +87,9 @@ export function ProfileForm({
   // die splitsen we als startwaarde zodat ze ze meteen kunnen corrigeren.
   const { firstName, lastName } = nameParts(user);
   const selectedCategories = new Set(user.mailCategories);
+  // Wie op de uitschrijflink in een mail klikte, staat uit élke lijst; de
+  // vinkjes hieronder doen dan niets tot hij hier weer opt-in geeft.
+  const unsubscribed = user.mailUnsubscribedAt !== null;
 
   const common = getDictionary(locale).common;
   const errorMessages: Record<ProfileErrorCode, string> = {
@@ -241,6 +245,22 @@ export function ProfileForm({
         <div>
           <span className="text-sm font-medium text-vtk-ink">{t.mailHeading}</span>
           <p className="text-xs text-[#5c667f]">{t.mailIntro}</p>
+          {/* Een uitschrijving via de mail komt uit Brevo terug (zie
+              lib/brevo/unsubscribe.ts). Zonder deze uitleg staan de vinkjes
+              hieronder aan terwijl er niets vertrekt, en dat leest als een bug. */}
+          {unsubscribed && (
+            <div className="mt-3 rounded-2xl border border-vtk-blue/15 bg-vtk-surface p-4 shadow-[inset_3px_0_0_var(--yellow)]">
+              <p className="text-sm font-medium text-vtk-ink">{t.mailUnsubscribedHeading}</p>
+              <p className="mt-1 text-xs text-[#5c667f]">{t.mailUnsubscribedHint}</p>
+              <CheckboxChip
+                name="mailResubscribe"
+                value="on"
+                defaultChecked={false}
+                label={t.mailResubscribe}
+                className="mt-3"
+              />
+            </div>
+          )}
           <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4">
             {MAIL_CATEGORIES.map((cat) => (
               <CheckboxChip

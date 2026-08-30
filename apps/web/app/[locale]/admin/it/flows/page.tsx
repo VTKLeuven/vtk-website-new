@@ -62,6 +62,7 @@ export default async function AdminFlowPreview({
       personalEmail: true,
       emailPreference: true,
       mailCategories: true,
+      mailUnsubscribedAt: true,
       shiftReminderDayBefore: true,
       shiftReminderSoon: true,
       calendarOnlyMyAudiences: true,

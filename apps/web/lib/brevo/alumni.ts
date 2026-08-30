@@ -5,17 +5,20 @@ import { prisma } from "@vtk/db";
 import { listAlumniRecipients } from "@/lib/alumni";
 import {
   brevoEnabled,
+  clearUnsubscribe,
   createContactAttribute,
   createFolder,
   createList,
   findFolderByName,
   findListByName,
+  getContact,
   getContactAttributeNames,
   importContactsToList,
-  listContactEmails,
+  listContacts,
   removeContactsFromList,
 } from "./client";
 import { emailsToRemove } from "./contacts";
+import { pullAlumniUnsubscribes } from "./unsubscribe";
 
 /**
  * De alumni-lijst in Brevo.
@@ -77,7 +80,7 @@ export async function ensureAlumniList(force = false): Promise<number> {
 
 export type AlumniSyncResult =
   | { skipped: "disabled" }
-  | { imported: number; removed: number };
+  | { imported: number; removed: number; unsubscribed: number };
 
 /**
  * Duwt het volledige adresboek naar Brevo en haalt eruit wie er niet meer in
@@ -86,11 +89,18 @@ export type AlumniSyncResult =
  * Volledig en niet incrementeel: de lijst is klein genoeg om in één keer te
  * doen, en een incrementele sync die één keer een verwijdering mist, blijft die
  * fout voor altijd meedragen.
+ *
+ * Eerst lezen, dan schrijven, net als bij de studentenlijsten: wie op de
+ * uitschrijflink klikte, staat als `unsubscribedAt` (adresboek) of met de opt-in
+ * af (account) in de DB voor we het adresboek opnieuw naar Brevo duwen. Anders
+ * zou de import van vanavond de uitschrijving van vanmorgen overschrijven.
  */
 export async function syncAlumniToBrevo(): Promise<AlumniSyncResult> {
   if (!brevoEnabled()) return { skipped: "disabled" };
 
   const listId = await ensureAlumniList();
+  const current = await listContacts(listId);
+  const unsubscribed = await pullAlumniUnsubscribes(current, listId);
   const recipients = await listAlumniRecipients();
 
   if (recipients.length > 0) {
@@ -111,14 +121,32 @@ export async function syncAlumniToBrevo(): Promise<AlumniSyncResult> {
     );
   }
 
-  const current = await listContactEmails(listId);
   const stale = emailsToRemove(
-    current,
+    current.map((c) => c.email),
     recipients.map((r) => r.email),
   );
   if (stale.length > 0) await removeContactsFromList(listId, stale);
 
-  return { imported: recipients.length, removed: stale.length };
+  return { imported: recipients.length, removed: stale.length, unsubscribed };
+}
+
+/**
+ * Draait een uitschrijving in Brevo terug voor één alumnusadres, nadat een
+ * beheerder (of het lid zelf) het weer inschreef. Best-effort en na de response:
+ * lukt het niet, dan staat de site alvast juist en blijft Brevo achter, wat de
+ * volgende sync niet oplost. Zie `clearUnsubscribe` voor waarom loskoppelen de
+ * enige manier is om een lijst-uitschrijving te wissen.
+ */
+export async function resubscribeAlumnusInBrevo(email: string): Promise<void> {
+  if (!brevoEnabled()) return;
+  try {
+    const listId = await ensureAlumniList();
+    const contact = await getContact(email);
+    const stuck = contact?.listUnsubscribed.includes(listId) ? [listId] : [];
+    await clearUnsubscribe(email, stuck);
+  } catch {
+    /* best-effort */
+  }
 }
 
 export { SETTING_KEY as BREVO_ALUMNI_SETTING_KEY, LIST_NAME as BREVO_ALUMNI_LIST_NAME };

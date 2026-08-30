@@ -8,7 +8,9 @@ import {
   isEligible,
   preferredEmail,
   programmeAttr,
+  readUnsubscribe,
   yearAttr,
+  type BrevoListKey,
   type SyncUserData,
 } from "@/lib/brevo/contacts";
 import { STUDY_PROGRAMMES, STUDY_YEARS } from "@/lib/profile";
@@ -29,6 +31,7 @@ function user(overrides: Partial<SyncUserData> = {}): SyncUserData {
     notAtFaculty: false,
     studyConfirmedYear: YEAR,
     mailCategories: [],
+    mailUnsubscribedAt: null,
     studyYears: [],
     studyProgrammes: [],
     ...overrides,
@@ -45,6 +48,60 @@ describe("isEligible", () => {
     expect(isEligible(user({ notStudying: true }), YEAR)).toBe(false);
     expect(isEligible(user({ studyConfirmedYear: YEAR - 1 }), YEAR)).toBe(false);
     expect(isEligible(user({ studyConfirmedYear: null }), YEAR)).toBe(false);
+  });
+
+  it("rejects a member who unsubscribed through an email, like listWhere", () => {
+    expect(isEligible(user({ mailUnsubscribedAt: new Date() }), YEAR)).toBe(false);
+    // Ook met categorieën aangevinkt: de uitschrijving gaat voor.
+    expect(
+      desiredListKeys(
+        user({ mailUnsubscribedAt: new Date(), mailCategories: ["FEEST"] }),
+        YEAR,
+      ),
+    ).toEqual([]);
+  });
+});
+
+describe("readUnsubscribe", () => {
+  /** Lijst-ID's zoals `getBrevoListMap()` ze teruggeeft. */
+  const keyByListId = new Map<number, BrevoListKey>([
+    [181, ALL_STUDENTS_KEY],
+    [182, "FEEST"],
+    [183, "CAREER"],
+  ]);
+
+  it("reads nothing from a contact that did not unsubscribe", () => {
+    expect(readUnsubscribe({ emailBlacklisted: false, listUnsubscribed: [] }, keyByListId)).toEqual({
+      global: false,
+      categories: [],
+    });
+  });
+
+  it("treats a blacklisted contact as unsubscribed from everything", () => {
+    expect(readUnsubscribe({ emailBlacklisted: true, listUnsubscribed: [] }, keyByListId)).toEqual({
+      global: true,
+      categories: [],
+    });
+  });
+
+  it("treats leaving 'alle studenten' as leaving everything: there is no opt-in for it", () => {
+    expect(
+      readUnsubscribe({ emailBlacklisted: false, listUnsubscribed: [181, 182] }, keyByListId),
+    ).toEqual({ global: true, categories: [] });
+  });
+
+  it("maps a per-list unsubscribe onto the matching categories", () => {
+    expect(
+      readUnsubscribe({ emailBlacklisted: false, listUnsubscribed: [182, 183] }, keyByListId),
+    ).toEqual({ global: false, categories: ["FEEST", "CAREER"] });
+  });
+
+  it("ignores lists the site does not manage", () => {
+    // Brevo bevat ook handmatige lijsten (jobfair, oude jaargangen); een
+    // uitschrijving daar zegt niets over de opt-ins van de site.
+    expect(
+      readUnsubscribe({ emailBlacklisted: false, listUnsubscribed: [999] }, keyByListId),
+    ).toEqual({ global: false, categories: [] });
   });
 });
 

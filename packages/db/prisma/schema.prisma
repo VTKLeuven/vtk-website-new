@@ -518,6 +518,18 @@ model User {
   googleAccountState     GoogleAccountState?
   // Opt-in mailinglijsten: enkel de aangeduide categorieën zitten in de array.
   mailCategories         MailCategory[]      @default([])
+  // Wanneer het lid zich via een mail zelf uitschreef (de uitschrijflink in
+  // Brevo). Bewust een datum en geen boolean: het beheer wil kunnen zien wanneer
+  // die keuze viel, en het is een keuze van het lid die we niet stil mogen
+  // overschrijven.
+  //
+  // Dit blokkeert **elke** lijstmail (de studiegerichte categorieën én de
+  // alumnilijst), want Brevo kent maar één uitschrijving per contact: wie op
+  // "unsubscribe" klikt, zegt dat tegen VTK als geheel. Alleen het lid zelf zet
+  // dit terug, via de opt-in op /account; een import of een profielopslag mag
+  // het nooit wissen. `mailCategories` blijft bewust staan, zodat een lid dat
+  // zich opnieuw inschrijft zijn oude voorkeuren terugkrijgt.
+  mailUnsubscribedAt     DateTime?           @db.Timestamptz(3)
   // Herinneringen voor een shift waarvoor je jezelf inschreef. Bewust geen
   // `MailCategory`: dat zijn opt-in nieuwsbrieven, dit is transactioneel. Wel
   // uitzetbaar, want niet iedereen wil twee mails per shift.

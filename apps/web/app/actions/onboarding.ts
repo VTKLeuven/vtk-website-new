@@ -141,6 +141,10 @@ const profileSchema = z.object({
     .default(""),
   emailPreference: z.enum(EMAIL_PREFERENCES),
   mailCategories: z.array(z.enum(MAIL_CATEGORIES)).default([]),
+  // Enkel zichtbaar voor wie zich via een mail uitschreef: het lid vraagt
+  // expliciet om weer mails te krijgen. Dit is de énige weg terug, zowel op de
+  // site als in Brevo (zie lib/brevo/sync.ts).
+  mailResubscribe: z.boolean().default(false),
   shiftReminderDayBefore: z.boolean(),
   shiftReminderSoon: z.boolean(),
   calendarOnlyMyAudiences: z.boolean().default(false),
@@ -205,6 +209,7 @@ export async function saveProfileAction(
     personalEmail: formData.get("personalEmail") ?? "",
     emailPreference: formData.get("emailPreference") ?? "UNIVERSITY",
     mailCategories: formData.getAll("mailCategories"),
+    mailResubscribe: formData.get("mailResubscribe") === "on",
     shiftReminderDayBefore: formData.get("shiftReminderDayBefore") !== null,
     shiftReminderSoon: formData.get("shiftReminderSoon") !== null,
     calendarOnlyMyAudiences: formData.get("calendarOnlyMyAudiences") === "on",
@@ -237,9 +242,12 @@ export async function saveProfileAction(
   // zelfs een gemanipuleerde submit laat het r-nummer dan ongemoeid.
   const existing = await prisma.user.findUnique({
     where: { id: session.user.id },
-    select: { rNumberFromKul: true },
+    select: { rNumberFromKul: true, mailUnsubscribedAt: true },
   });
   const rNumberLocked = existing?.rNumberFromKul ?? false;
+  // Alleen een lid dat écht uitgeschreven stond, schrijft zich opnieuw in; zo
+  // blijft een gewone profielopslag een gewone push naar Brevo.
+  const resubscribe = existing?.mailUnsubscribedAt != null && data.mailResubscribe;
 
   try {
     await prisma.user.update({
@@ -259,6 +267,7 @@ export async function saveProfileAction(
         personalEmail: data.personalEmail || null,
         emailPreference: data.emailPreference,
         mailCategories: { set: data.mailCategories },
+        ...(resubscribe ? { mailUnsubscribedAt: null } : {}),
         shiftReminderDayBefore: data.shiftReminderDayBefore,
         shiftReminderSoon: data.shiftReminderSoon,
         calendarOnlyMyAudiences: data.calendarOnlyMyAudiences,
@@ -299,7 +308,7 @@ export async function saveProfileAction(
   // Voorkeuren en studie kunnen net gewijzigd zijn: duw het lid naar Brevo zodat
   // de mailinglijsten meteen kloppen. Best-effort na de response (blokkeert het
   // opslaan niet); de dagelijkse reconciliatie is het vangnet als dit faalt.
-  after(() => syncUserToBrevo(session.user.id));
+  after(() => syncUserToBrevo(session.user.id, { resubscribe }));
 
   // Buiten elke try/catch: redirect() werkt via een throw en mag niet als
   // "onverwachte fout" opgevangen worden.

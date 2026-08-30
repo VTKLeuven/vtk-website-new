@@ -177,20 +177,98 @@ export async function removeContactsFromList(listId: number, emails: string[]): 
   }
 }
 
-/** Alle e-mailadressen die momenteel in een lijst zitten (gepagineerd). */
-export async function listContactEmails(listId: number): Promise<string[]> {
-  const emails: string[] = [];
+/**
+ * Eén contact zoals Brevo het teruggeeft. De twee uitschrijfvelden zijn de enige
+ * informatie die de site niet zelf geschreven heeft:
+ *
+ * - `emailBlacklisted`: het contact klikte op de uitschrijflink (of werd
+ *   handmatig geblokkeerd) en krijgt **geen enkele** campagne meer;
+ * - `listUnsubscribed`: de lijsten waarvoor het contact zich apart uitschreef.
+ *   Dat is niet hetzelfde als "zit niet in de lijst": het contact blijft in de
+ *   lijst staan, maar Brevo slaat het over.
+ */
+export type BrevoContact = {
+  email: string;
+  extId: string | null;
+  emailBlacklisted: boolean;
+  listUnsubscribed: number[];
+};
+
+type RawContact = {
+  email?: string;
+  emailBlacklisted?: boolean;
+  listUnsubscribed?: number[];
+  attributes?: { EXT_ID?: unknown };
+};
+
+function toContact(raw: RawContact): BrevoContact | null {
+  if (!raw.email) return null;
+  const extId = raw.attributes?.EXT_ID;
+  return {
+    email: raw.email,
+    extId: typeof extId === "string" && extId ? extId : null,
+    emailBlacklisted: raw.emailBlacklisted === true,
+    listUnsubscribed: Array.isArray(raw.listUnsubscribed) ? raw.listUnsubscribed : [],
+  };
+}
+
+/** Alle contacten die momenteel in een lijst zitten (gepagineerd), met hun uitschrijfstatus. */
+export async function listContacts(listId: number): Promise<BrevoContact[]> {
+  const contacts: BrevoContact[] = [];
   const limit = 500;
   for (let offset = 0; ; offset += limit) {
-    const page = await brevoFetch<{ contacts?: { email?: string }[] }>(
+    const page = await brevoFetch<{ contacts?: RawContact[] }>(
       `/contacts/lists/${listId}/contacts`,
       { query: { limit, offset } },
     );
-    const contacts = page.contacts ?? [];
-    for (const c of contacts) if (c.email) emails.push(c.email);
-    if (contacts.length < limit) break;
+    const raw = page.contacts ?? [];
+    for (const c of raw) {
+      const contact = toContact(c);
+      if (contact) contacts.push(contact);
+    }
+    if (raw.length < limit) break;
   }
-  return emails;
+  return contacts;
+}
+
+/** Eén contact op adres; `null` wanneer Brevo het niet kent (404). */
+export async function getContact(email: string): Promise<BrevoContact | null> {
+  try {
+    const raw = await brevoFetch<RawContact>(`/contacts/${encodeURIComponent(email)}`);
+    return toContact({ ...raw, email: raw.email ?? email });
+  } catch (err) {
+    if (err instanceof BrevoError && err.status === 404) return null;
+    throw err;
+  }
+}
+
+/**
+ * Draait een uitschrijving in Brevo terug, nadat het lid zich op de site opnieuw
+ * inschreef. Een uitschrijving kan op twee manieren vastzitten: de blacklist op
+ * het contact, en een uitschrijving per lijst (`listUnsubscribed`).
+ *
+ * Die tweede is niet rechtstreeks te wissen; Brevo heeft er geen veld voor. Wat
+ * wél werkt, is het contact van die lijst **loskoppelen**: de uitschrijving hangt
+ * aan het lidmaatschap, niet aan het contact. De gewone sync zet het daarna
+ * opnieuw in de lijsten waar het volgens de site in hoort. Geef dus enkel de
+ * lijsten mee waarvoor het contact écht uitgeschreven staat; de rest loskoppelen
+ * is nodeloos heen en weer.
+ *
+ * Twee losse calls, en de blacklist eerst: die kan niet stuklopen op
+ * lijstlidmaatschap en is het zwaarste deel van de uitschrijving. Faalt de unlink
+ * daarna, dan is het lid alvast weer bereikbaar.
+ */
+export async function clearUnsubscribe(email: string, listIds: number[] = []): Promise<void> {
+  await brevoFetch(`/contacts/${encodeURIComponent(email)}`, {
+    method: "PUT",
+    body: { emailBlacklisted: false },
+  });
+  if (listIds.length > 0) {
+    await brevoFetch(`/contacts/${encodeURIComponent(email)}`, {
+      method: "PUT",
+      body: { unlinkListIds: listIds },
+    });
+  }
 }
 
 export type ImportContact = {

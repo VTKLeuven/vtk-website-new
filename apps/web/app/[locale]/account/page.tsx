@@ -77,6 +77,7 @@ export default async function AccountPage({ params }: { params: Promise<{ locale
         personalEmail: true,
         emailPreference: true,
         mailCategories: true,
+        mailUnsubscribedAt: true,
         shiftReminderDayBefore: true,
         shiftReminderSoon: true,
         calendarOnlyMyAudiences: true,
