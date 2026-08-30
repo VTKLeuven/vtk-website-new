@@ -11,6 +11,7 @@ import { Stack, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import * as SplashScreen from 'expo-splash-screen';
 import { useEffect } from 'react';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { AppProvider } from '../src/state/app';
@@ -56,28 +57,33 @@ export default function RootLayout() {
   if (!fontsLoaded) return null;
 
   return (
-    <SafeAreaProvider>
-      <AppProvider>
-        {/* De schermkop is navy, dus de statusbalk staat licht. */}
-        <StatusBar style="light" />
-        <Stack
-          screenOptions={{
-            headerShown: false,
-            contentStyle: { backgroundColor: COLORS.paper },
-          }}
-        >
-          <Stack.Screen name="(tabs)" />
-          {/* De adressen van voor elke tab zijn eigen stack kreeg. Ze verwijzen
-              enkel door, zodat een ouder pushbericht of een link van buitenaf
-              nog steeds op het juiste scherm uitkomt. Zie src/navigation.ts. */}
-          <Stack.Screen name="(oud)" />
-          {/* Enkel deze drie liggen bewust óver de tabbalk: het zijn modals, en
-              een modal die de navigatie eronder laat staan is geen modal. */}
-          <Stack.Screen name="inloggen" options={{ presentation: 'modal' }} />
-          <Stack.Screen name="poort" options={{ presentation: 'modal' }} />
-          <Stack.Screen name="instellingen" options={{ presentation: 'modal' }} />
-        </Stack>
-      </AppProvider>
-    </SafeAreaProvider>
+    // De wortel voor gebaren. Knijpen in de fotoviewer werkt niet zonder; die
+    // viewer zet er zelf nog een binnen zijn modal, want een modal is een eigen
+    // native venster en bereikt deze niet.
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <SafeAreaProvider>
+        <AppProvider>
+          {/* De schermkop is navy, dus de statusbalk staat licht. */}
+          <StatusBar style="light" />
+          <Stack
+            screenOptions={{
+              headerShown: false,
+              contentStyle: { backgroundColor: COLORS.paper },
+            }}
+          >
+            <Stack.Screen name="(tabs)" />
+            {/* De adressen van voor elke tab zijn eigen stack kreeg. Ze verwijzen
+                enkel door, zodat een ouder pushbericht of een link van buitenaf
+                nog steeds op het juiste scherm uitkomt. Zie src/navigation.ts. */}
+            <Stack.Screen name="(oud)" />
+            {/* Enkel deze drie liggen bewust óver de tabbalk: het zijn modals, en
+                een modal die de navigatie eronder laat staan is geen modal. */}
+            <Stack.Screen name="inloggen" options={{ presentation: 'modal' }} />
+            <Stack.Screen name="poort" options={{ presentation: 'modal' }} />
+            <Stack.Screen name="instellingen" options={{ presentation: 'modal' }} />
+          </Stack>
+        </AppProvider>
+      </SafeAreaProvider>
+    </GestureHandlerRootView>
   );
 }

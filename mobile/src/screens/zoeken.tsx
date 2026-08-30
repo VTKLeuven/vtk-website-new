@@ -1,12 +1,13 @@
 
 import * as WebBrowser from 'expo-web-browser';
-import { ExternalLink, Search } from 'lucide-react-native';
+import { ExternalLink } from 'lucide-react-native';
 import { useEffect, useState } from 'react';
-import { FlatList, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { search } from '../api/endpoints';
 import type { AppSearchResult } from '../api/contract';
 import { PageHead } from '../components/PageHead';
+import { SearchField } from '../components/SearchField';
 import { Empty, Loading } from '../components/ui';
 import { useApp } from '../state/app';
 import { useTabRouter } from '../navigation';
@@ -82,20 +83,13 @@ export default function ZoekenScreen() {
     <>
       <PageHead title="Zoeken" subtitle="Pagina's, activiteiten en albums" />
 
-      <View style={styles.searchBar}>
-        <Search color={COLORS.muted} size={18} />
-        <TextInput
-          value={query}
-          onChangeText={setQuery}
-          placeholder="Waar zoek je naar?"
-          placeholderTextColor={COLORS.muted}
-          style={styles.input}
-          autoFocus
-          autoCorrect={false}
-          accessibilityLabel="Zoekterm"
-          returnKeyType="search"
-        />
-      </View>
+      <SearchField
+        value={query}
+        onChange={setQuery}
+        placeholder="Waar zoek je naar?"
+        label="Zoekterm"
+        autoFocus
+      />
 
       {busy && results.length === 0 ? <Loading label="Zoeken" /> : null}
 
@@ -138,19 +132,6 @@ export default function ZoekenScreen() {
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: COLORS.paper },
-  searchBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: SPACING.md,
-    margin: SPACING.lg,
-    marginBottom: 0,
-    paddingHorizontal: SPACING.lg,
-    backgroundColor: COLORS.surface,
-    borderRadius: RADIUS.pill,
-    borderWidth: 1,
-    borderColor: COLORS.line2,
-  },
-  input: { ...TYPE.body, color: COLORS.ink, flex: 1, paddingVertical: SPACING.md },
   list: { padding: SPACING.lg, gap: SPACING.md, paddingBottom: SPACING.xxl },
   row: {
     flexDirection: 'row',

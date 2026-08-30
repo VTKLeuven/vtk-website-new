@@ -1,28 +1,26 @@
 import { Image } from 'expo-image';
 import { useLocalSearchParams } from 'expo-router';
-import { Check, Download, Share2, X } from 'lucide-react-native';
-import { useState } from 'react';
+import { Check, Download, Share2 } from 'lucide-react-native';
+import { useCallback, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
   FlatList,
-  Modal,
   Pressable,
   StyleSheet,
-  Text,
   View,
   useWindowDimensions,
 } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { fetchAlbum } from '../../api/endpoints';
 import { messageFor, useResource } from '../../api/useResource';
 import { PageHead } from '../../components/PageHead';
+import { PhotoViewer } from '../../components/PhotoViewer';
 import { Empty, ErrorState, Loading } from '../../components/ui';
 import { formatDate } from '../../format';
 import { savePhotoToLibrary, sharePhoto, type SaveOutcome } from '../../savePhoto';
 import { useApp } from '../../state/app';
-import { COLORS, SPACING, TYPE } from '../../theme/tokens';
+import { COLORS, SPACING } from '../../theme/tokens';
 
 /** Kolommen in het raster. Drie is wat op een telefoon nog herkenbaar blijft. */
 const COLUMNS = 3;
@@ -30,9 +28,10 @@ const COLUMNS = 3;
 /**
  * Eén fotoalbum.
  *
- * Het raster toont thumbnails; tikken opent de schermklare versie. Het origineel
- * wordt enkel opgehaald wanneer iemand het bewaart of deelt: dat zijn bestanden
- * van tien megabyte en meer, en een album dat die allemaal inlaadt, laadt niet.
+ * Het raster toont thumbnails; tikken opent de viewer, waarin je veegt en knijpt
+ * (zie `components/PhotoViewer.tsx`). Het origineel wordt enkel opgehaald wanneer
+ * iemand het bewaart of deelt: dat zijn bestanden van tien megabyte en meer, en
+ * een album dat die allemaal inlaadt, laadt niet.
  */
 export default function AlbumScreen() {
   const { locale } = useApp();
@@ -43,9 +42,14 @@ export default function AlbumScreen() {
   // Kort vinkje na het bewaren. Een melding wegklikken voor elke foto die je
   // bewaart, is meer werk dan het bewaren zelf.
   const [justSaved, setJustSaved] = useState(false);
-  const insets = useSafeAreaInsets();
 
   const resource = useResource(`album:${slug}`, () => fetchAlbum(locale, slug), `${locale}:${slug}`);
+
+  // Blader je door, dan hoort het vinkje bij de vorige foto en niet bij deze.
+  const changeIndex = useCallback((next: number) => {
+    setOpenIndex(next);
+    setJustSaved(false);
+  }, []);
 
   if (resource.loading) return <Loading label="Album ophalen" />;
   if (!resource.data) {
@@ -55,6 +59,7 @@ export default function AlbumScreen() {
   }
 
   const album = resource.data;
+  const open = openIndex === null ? null : album.photos[openIndex];
 
   /**
    * Bewaren of delen van de foto die openstaat.
@@ -64,7 +69,7 @@ export default function AlbumScreen() {
    * keuze gemaakt, en dan wijzen we op de deelknop in plaats van te zeuren.
    */
   const handle = async (kind: 'bewaren' | 'delen') => {
-    if (open === null || !open.downloadUrl || busy) return;
+    if (!open || !open.downloadUrl || busy) return;
     setBusy(kind);
     try {
       const outcome: SaveOutcome =
@@ -90,7 +95,6 @@ export default function AlbumScreen() {
 
   const gap = 2;
   const size = (width - gap * (COLUMNS - 1)) / COLUMNS;
-  const open = openIndex === null ? null : album.photos[openIndex];
 
   return (
     <>
@@ -114,7 +118,7 @@ export default function AlbumScreen() {
           <Pressable
             accessibilityRole="imagebutton"
             accessibilityLabel={`Foto ${index + 1} van ${album.photoCount}`}
-            onPress={() => setOpenIndex(index)}
+            onPress={() => changeIndex(index)}
           >
             <Image
               source={{ uri: item.thumbUrl }}
@@ -123,6 +127,7 @@ export default function AlbumScreen() {
               // Een grijs vlak in plaats van niets terwijl de foto binnenkomt;
               // zonder dat springt het hele raster bij elk beeld.
               transition={150}
+              recyclingKey={item.id}
             />
           </Pressable>
         )}
@@ -131,78 +136,57 @@ export default function AlbumScreen() {
         }
       />
 
-      <Modal
-        visible={open !== null}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setOpenIndex(null)}
-      >
-        <View style={styles.viewer}>
-          {open ? (
-            <Image source={{ uri: open.url }} style={styles.full} contentFit="contain" />
-          ) : null}
-          <View style={[styles.viewerBar, { top: insets.top + SPACING.md }]}>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="Sluiten"
-              onPress={() => setOpenIndex(null)}
-              hitSlop={14}
-              style={styles.viewerButton}
-            >
-              <X color={COLORS.onDark} size={24} />
-            </Pressable>
+      <PhotoViewer
+        photos={album.photos}
+        index={openIndex}
+        onIndexChange={changeIndex}
+        onClose={() => setOpenIndex(null)}
+        actions={
+          /* Een server van vóór deze functie stuurt geen `downloadUrl` mee. Dan
+             tonen we de knoppen niet, in plaats van ze te laten falen met een
+             melding waar niemand iets aan heeft. De app kan met een oudere site
+             praten; dat is het hele punt van de versie in het API-pad. */
+          open?.downloadUrl ? (
+            <View style={styles.actions}>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Deel deze foto"
+                accessibilityState={{ busy: busy === 'delen' }}
+                disabled={busy !== null}
+                onPress={() => void handle('delen')}
+                hitSlop={14}
+                style={styles.button}
+              >
+                {busy === 'delen' ? (
+                  <ActivityIndicator color={COLORS.onDark} size="small" />
+                ) : (
+                  <Share2 color={COLORS.onDark} size={22} />
+                )}
+              </Pressable>
 
-            {/* Een server van vóór deze functie stuurt geen `downloadUrl` mee.
-                Dan tonen we de knoppen niet, in plaats van ze te laten falen met
-                een melding waar niemand iets aan heeft. De app kan met een oudere
-                site praten; dat is het hele punt van de versie in het API-pad. */}
-            {open?.downloadUrl ? (
-              <View style={styles.viewerActions}>
-                <Pressable
-                  accessibilityRole="button"
-                  accessibilityLabel="Deel deze foto"
-                  accessibilityState={{ busy: busy === 'delen' }}
-                  disabled={busy !== null}
-                  onPress={() => void handle('delen')}
-                  hitSlop={14}
-                  style={styles.viewerButton}
-                >
-                  {busy === 'delen' ? (
-                    <ActivityIndicator color={COLORS.onDark} size="small" />
-                  ) : (
-                    <Share2 color={COLORS.onDark} size={22} />
-                  )}
-                </Pressable>
-
-                <Pressable
-                  accessibilityRole="button"
-                  accessibilityLabel={justSaved ? 'Bewaard' : 'Bewaar deze foto'}
-                  accessibilityState={{ busy: busy === 'bewaren' }}
-                  disabled={busy !== null}
-                  onPress={() => void handle('bewaren')}
-                  hitSlop={14}
-                  style={[styles.viewerButton, justSaved && styles.viewerButtonDone]}
-                >
-                  {busy === 'bewaren' ? (
-                    <ActivityIndicator color={COLORS.onDark} size="small" />
-                  ) : justSaved ? (
-                    // Het vinkje zit in de knop zelf en niet enkel in een
-                    // melding: zo zie je aan de knop dat deze foto binnen is.
-                    <Check color={COLORS.ink} size={22} />
-                  ) : (
-                    <Download color={COLORS.onDark} size={22} />
-                  )}
-                </Pressable>
-              </View>
-            ) : null}
-          </View>
-          {openIndex !== null ? (
-            <Text style={[styles.counter, { bottom: insets.bottom + SPACING.xl }]}>
-              {openIndex + 1} van {album.photos.length}
-            </Text>
-          ) : null}
-        </View>
-      </Modal>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={justSaved ? 'Bewaard' : 'Bewaar deze foto'}
+                accessibilityState={{ busy: busy === 'bewaren' }}
+                disabled={busy !== null}
+                onPress={() => void handle('bewaren')}
+                hitSlop={14}
+                style={[styles.button, justSaved && styles.buttonDone]}
+              >
+                {busy === 'bewaren' ? (
+                  <ActivityIndicator color={COLORS.onDark} size="small" />
+                ) : justSaved ? (
+                  // Het vinkje zit in de knop zelf en niet enkel in een melding:
+                  // zo zie je aan de knop dat deze foto binnen is.
+                  <Check color={COLORS.ink} size={22} />
+                ) : (
+                  <Download color={COLORS.onDark} size={22} />
+                )}
+              </Pressable>
+            </View>
+          ) : null
+        }
+      />
     </>
   );
 }
@@ -210,28 +194,14 @@ export default function AlbumScreen() {
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: COLORS.paper },
   grid: { paddingBottom: SPACING.xxl },
-  // De viewer is bewust bijna zwart en niet navy: een foto beoordeel je niet
-  // tegen een gekleurde achtergrond.
-  viewer: { flex: 1, backgroundColor: 'rgba(0,0,0,0.94)', justifyContent: 'center' },
-  full: { width: '100%', height: '80%' },
-  viewerBar: {
-    position: 'absolute',
-    left: SPACING.lg,
-    right: SPACING.lg,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  viewerActions: { flexDirection: 'row', gap: SPACING.sm },
-  viewerButton: {
+  actions: { flexDirection: 'row', gap: SPACING.sm },
+  button: {
     width: 40,
     height: 40,
     borderRadius: 20,
     alignItems: 'center',
     justifyContent: 'center',
-    // Een lichte vulling, zodat de icoontjes ook op een lichte foto leesbaar zijn.
     backgroundColor: 'rgba(0,0,0,0.45)',
   },
-  viewerButtonDone: { backgroundColor: COLORS.yellow },
-  counter: { ...TYPE.small, color: COLORS.onDarkMuted, alignSelf: 'center', position: 'absolute' },
+  buttonDone: { backgroundColor: COLORS.yellow },
 });

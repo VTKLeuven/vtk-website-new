@@ -1,25 +1,34 @@
-import { Image } from 'expo-image';
-
 import * as WebBrowser from 'expo-web-browser';
-import { BookOpen, Play } from 'lucide-react-native';
-import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { BookOpen, ChevronRight, Play } from 'lucide-react-native';
+import { FlatList, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { fetchMedia } from '../api/endpoints';
 import { messageFor, useResource } from '../api/useResource';
+import { AlbumCard } from '../components/AlbumCard';
 import { PageHead } from '../components/PageHead';
 import { Card, Empty, ErrorState, Loading, SectionTitle, StaleNotice } from '../components/ui';
-import { formatDate } from '../format';
 import { useApp } from '../state/app';
 import { useTabRouter } from '../navigation';
 import { COLORS, RADIUS, SPACING, TYPE } from '../theme/tokens';
 
+/** Hoeveel albums er in de rij "Recent" passen voor je doorklikt. */
+const RECENT = 8;
+
+/** Hoe breed één tegel in die rij is. Smal genoeg dat de volgende meekijkt. */
+const TILE = 150;
+
 /**
  * Media: fotoalbums, aftermovies en de magazines.
  *
- * De albums staan als raster van twee, want dat is wat je van een fotoalbum wil
- * zien. Aantal foto's en datum staan eronder als gewone regels; het aantal is
- * hier wél nuttig, want het is het verschil tussen een album van tien en een van
- * duizend foto's, en dat bepaalt of je er nu aan begint.
+ * **Dit scherm toont niet alle albums meer.** Dat deed het wel, als raster in een
+ * `ScrollView`, en dat hield op te werken toen het archief van de oude site erbij
+ * kwam: tweehonderd covers die allemaal tegelijk monteren, in een muur zonder
+ * ordening waarin niemand een bepaald album terugvindt. Erger nog, Aftermovies en
+ * Magazines stonden eronder en waren daarmee in de praktijk onbereikbaar.
+ *
+ * Nu staat hier een rij met de nieuwste albums en een weg naar de rest; alle drie
+ * de secties passen weer op één scherm. Zoeken en filteren gebeurt in
+ * `albums.tsx`.
  */
 export default function MediaScreen() {
   const router = useTabRouter();
@@ -34,6 +43,7 @@ export default function MediaScreen() {
   }
 
   const { albums, aftermovies, publications } = resource.data;
+  const recent = albums.slice(0, RECENT);
 
   return (
     <>
@@ -50,39 +60,36 @@ export default function MediaScreen() {
       >
         {resource.stale ? <StaleNotice onRetry={() => void resource.refresh()} /> : null}
 
-        <SectionTitle>Fotoalbums</SectionTitle>
+        <View style={styles.sectionRow}>
+          <SectionTitle>Recente albums</SectionTitle>
+          {albums.length > recent.length ? (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={`Alle ${albums.length} albums`}
+              onPress={() => router.push('/albums')}
+              hitSlop={10}
+              style={({ pressed }) => [styles.all, pressed && styles.pressed]}
+            >
+              <Text style={styles.allLabel}>Alle {albums.length}</Text>
+              <ChevronRight color={COLORS.muted} size={16} />
+            </Pressable>
+          ) : null}
+        </View>
+
         {albums.length === 0 ? (
           <Empty
             title="Geen albums"
             hint="Er staan nu geen albums online. Ze komen uit Immich en verschijnen hier zodra ze publiek gezet zijn."
           />
         ) : (
-          <View style={styles.grid}>
-            {albums.map((album) => (
-              <Pressable
-                key={album.slug}
-                accessibilityRole="button"
-                accessibilityLabel={album.title}
-                onPress={() => router.push(`/album/${album.slug}`)}
-                style={({ pressed }) => [styles.album, pressed && styles.pressed]}
-              >
-                {album.coverUrl ? (
-                  <Image source={{ uri: album.coverUrl }} style={styles.cover} contentFit="cover" />
-                ) : (
-                  <View style={[styles.cover, styles.coverEmpty]} />
-                )}
-                <Text style={styles.albumTitle} numberOfLines={2}>
-                  {album.title}
-                </Text>
-                <Text style={styles.hint}>
-                  {album.photoCount} foto{album.photoCount === 1 ? '' : "'s"}
-                </Text>
-                {album.date ? (
-                  <Text style={styles.hint}>{formatDate(album.date, locale)}</Text>
-                ) : null}
-              </Pressable>
-            ))}
-          </View>
+          <FlatList
+            data={recent}
+            keyExtractor={(album) => album.slug}
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.strip}
+            renderItem={({ item }) => <AlbumCard album={item} style={styles.tile} />}
+          />
         )}
 
         {aftermovies.length > 0 ? (
@@ -144,11 +151,13 @@ export default function MediaScreen() {
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: COLORS.paper },
   content: { padding: SPACING.lg, gap: SPACING.md, paddingBottom: SPACING.xxl },
-  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: SPACING.md },
-  album: { width: '47%', gap: 2 },
-  cover: { width: '100%', aspectRatio: 1, borderRadius: RADIUS.sm, backgroundColor: COLORS.paper2 },
-  coverEmpty: { borderWidth: 1, borderColor: COLORS.line },
-  albumTitle: { ...TYPE.body, fontFamily: TYPE.cardTitle.fontFamily, color: COLORS.ink, marginTop: SPACING.xs },
+  sectionRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  all: { flexDirection: 'row', alignItems: 'center', gap: SPACING.xs },
+  allLabel: { ...TYPE.small, color: COLORS.muted },
+  // De rij loopt tot buiten de padding van de pagina, zodat de laatste tegel
+  // niet halverwege afgesneden lijkt maar duidelijk doorloopt.
+  strip: { gap: SPACING.md, paddingRight: SPACING.lg },
+  tile: { width: TILE },
   pressed: { opacity: 0.8 },
   stack: { gap: SPACING.sm },
   row: {
