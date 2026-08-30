@@ -225,9 +225,15 @@ Onder de kaart de resultaten als rijen: `200K 00.06` groot, `Aula` eronder,
   gebouw in `--yellow`. Geen schaduw, geen gradient.
 - De paden zijn wat de kaart leesbaar maakt: zonder hen zijn het zeventien vormen
   die zweven, met hen is het een campus.
-- Labels: de korte code (`200K`) in het zwaartepunt, en pas vanaf een zoomniveau
-  ook de volledige naam. Bij uitzoomen valt het label weg in plaats van te
-  overlappen.
+- Labels: de korte code (`200K`) in het zwaartepunt. **Veertien codes passen niet
+  op een campus van 350 punten breed**; 200M, 200S en 200L vielen over elkaar.
+  Een gebouw draagt zijn label daarom pas wanneer het breed genoeg in beeld staat
+  (`LABEL_AT_WIDTH`), en de kleine komen erbij naarmate je inzoomt. Het gekozen
+  gebouw houdt zijn label altijd, want dat is waar je naar zoekt. De tekengrootte
+  deelt door de zoom, zodat een label op het scherm even groot blijft.
+- De zoom komt met `useAnimatedReaction` naar de JS-kant, en enkel bij een stap
+  van meer dan 0,3: elke frame een `setState` doen zou de hele kaart opnieuw
+  laten renderen tijdens het knijpen, precies wanneer het vloeiend moet blijven.
 - Pannen en zoomen met `react-native-gesture-handler` en `react-native-reanimated`
   (beide aanwezig): een `Animated.View` met een transform rond de vaste SVG, niet
   de `viewBox` per frame herberekenen.
@@ -283,9 +289,12 @@ ios:      maps://?daddr=<lat>,<lng>&dirflg=w
 android:  geo:<lat>,<lng>?q=<lat>,<lng>(<naam>)
 ```
 
-De 5 bushaltes uit OSM ("Heverlee Celestijnenlaan", "Heverlee Campus Arenberg")
-zijn een goed vertrekpunt zolang er nog geen eigen positie is: een route vanaf de
-halte waar je uitstapt, is bruikbaar zonder één toestemmingsvraag.
+De 5 bushaltes uit OSM zijn een goed vertrekpunt zolang er nog geen eigen positie
+is: een route vanaf de halte waar je uitstapt is bruikbaar zonder één
+toestemmingsvraag. **Neem daarvoor niet zomaar de eerste uit de lijst**; OSM geeft
+beide richtingen van dezelfde halte terug en de volgorde is toeval. `arrivalStop`
+kiest de halte die het dichtst bij het midden van het padennet ligt, en dat komt
+op "Heverlee Campus Arenberg" uit.
 
 **Waar sta ik zelf** vraagt `expo-location`. Dat is een Expo-module en dus
 vermoedelijk in Expo Go beschikbaar, **maar test dat eerst op een iPhone**. Is
@@ -333,14 +342,25 @@ zodra er een deur dichtgaat.
 lijst die "200K 00.06, Aula, Auditoria K, gelijkvloers" zegt is op zichzelf al
 bruikbaar; zo staat er iets op een toestel voor de kaart af is.
 
-**Fase 2, de kaart en de route.** `CampusMap.tsx` met de drie lagen, projectie,
-pannen en zoomen, het gebouw in geel, en de eigen wandelroute over de
-OSM-graaf. Dit is het stuk waar de feature zijn naam aan verdient. Meet hier de
-omwegfactor per gebouwpaar; 200G naar 200N zegt dat de graaf nog niet klopt.
+**Fase 2, de kaart en de route. Staat er.** `mobile/src/components/CampusMap.tsx`
+met de drie lagen, `campus/geo.ts` voor de projectie en `campus/route.ts` voor
+Dijkstra. Pannen, knijpen en dubbeltikken om terug te zetten. Het endpoint stuurt
+de OSM-ondergrond mee (`AppCampusMap`), zodat de route offline berekend wordt.
+Gemeten op het echte antwoord: **vijf routes in 4 ms**, dus de bewering dat dit
+zonder netwerk kan is geen schatting.
+
+Wat daar nog open staat:
+
+- **De omweg naar 200G is x1,74.** Ergens mist een verbinding in de graaf. Dit
+  hoort gemeten te worden over alle gebouwparen, niet per geval bekeken.
+- **De kaart is nog niet op een toestel gezien.** Er is geen simulator op deze
+  machine, dus de projectie, de laagvolgorde en de labelregel zijn geverifieerd
+  door de echte modules in Node te draaien en de SVG te renderen. Gebaren en het
+  gedrag van `react-native-svg` zelf zijn dus nog ongetest.
 
 **Fase 3, de verrijking.** `expo-location` (na controle in Expo Go) voor de eigen
-positie en dus een route vanaf waar je staat, en `/lokalen` op de site met
-dezelfde gegevens.
+positie en dus een route vanaf waar je staat in plaats van vanaf de halte, en
+`/lokalen` op de site met dezelfde gegevens.
 
 **Fase 4, binnen.** De PDF-pijplijn, met de terugval hierboven.
 
