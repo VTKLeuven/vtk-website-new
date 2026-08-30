@@ -9,15 +9,34 @@ volgorde het gebouwd wordt.
 
 ## Wat er al is
 
+Er zijn **twee bronnen**, en ze doen bewust niet hetzelfde.
+
 `scripts/scrape-kulag.ts` haalt de KU Leuven Access Guide en de KU Leuven
 kaart-API leeg en schrijft `scripts/kulag-gebouwen.json`. Vandaag staat daar
 Celestijnenlaan 200 in: 20 gebouwen en 154 lokalen.
 
+`scripts/scrape-osm.ts` haalt OpenStreetMap op via Overpass en schrijft
+`scripts/osm-campus.json`: **987 knopen en 1105 bogen wandelnetwerk**, 58
+ingangen, 5 bushaltes en 66 gebouwcontouren als context (Alma, IMEC, het
+kasteel). 57 kB.
+
 ```
 npx tsx scripts/scrape-kulag.ts                    # Celestijnenlaan 200
-npx tsx scripts/scrape-kulag.ts --address "Celestijnenlaan"
 npx tsx scripts/scrape-kulag.ts --campus 30 --all  # heel Arenberg (109 gebouwen)
+npx tsx scripts/scrape-osm.ts                      # wandelnetwerk en ingangen
+npm run import:lokalen                             # KULag-JSON naar de databank
 ```
+
+**KU Leuven heeft de gebouwen en de lokalen; OSM heeft de paden ertussen.** Dat
+is de hele taakverdeling. KU Leuven publiceert geen wandelnetwerk, en zonder dat
+netwerk is "breng me erheen" niet meer dan een speld op een kaart. OSM tagt een
+universiteitsgebouw met `ref` = het gebouwnummer van KU Leuven, dus de twee
+bronnen koppelen op dezelfde sleutel als `kulag_id` (12 van de 17 exact; de rest
+op naam of op overlappende geometrie).
+
+De OSM-gegevens zijn ODbL. **"© OpenStreetMap contributors" hoort zichtbaar bij
+elke kaart die hiermee getekend wordt**; dat is geen nette gewoonte maar de
+licentie.
 
 Per gebouw: gebouwnummer (`490-13`), naam, **korte code** (`200K`), adres, foto,
 de contour als lat/lng-veelhoek, het zwaartepunt daarvan, en de
@@ -37,6 +56,14 @@ hoeft uit te zoeken:
 - **De zoekfunctie van KULag zelf is de sitebrede KU Leuven-zoek**, geen
   lokalenindex. `/json/buildings` negeert elke zoekparameter stil en geeft altijd
   alles terug. Zoeken doen we dus zelf, op onze eigen kopie.
+- **Overpass weigert een verzoek zonder herkenbare User-Agent met een 406** en
+  zegt er niet bij waarom. `fetch` in Node stuurt er geen, `curl` wel, dus dit
+  werkt in je terminal en faalt in je script.
+- **Neem enkel de grootste samenhangende component van het wandelnetwerk.** Een
+  los stukje fietspad aan de rand van de bbox is geen route maar wel een val: het
+  dichtstbijzijnde knooppunt bij een gebouw kan erin liggen, en dan vindt de
+  zoektocht niets. `service` moet mee in de weg-selectie, anders valt het netwerk
+  bij de parkings uiteen.
 
 ### Wat de bron niet dekt
 
@@ -63,10 +90,21 @@ omzeilen en levert bovendien een kaart die niet in de vormtaal van de site staat
 
 Daaruit volgt de vorm van de kaart, en dat is de kernkeuze van deze feature:
 
-> **We tekenen de campuskaart zelf met `react-native-svg`, uit de contouren die we
-> gescrapet hebben.** Geen tegels, geen API-sleutel, geen native module. Wat we
-> hebben zijn echte gebouwvoetafdrukken in lat/lng; die Mercator-projecteren naar
-> een `viewBox` geeft een correcte plattegrond van Celestijnenlaan 200.
+> **We tekenen de campuskaart zelf met `react-native-svg`, uit de vectoren van
+> OSM en KU Leuven.** Geen tegels, geen API-sleutel, geen native module. Wat we
+> hebben zijn echte gebouwvoetafdrukken en een echt padennet in lat/lng; die
+> Mercator-projecteren naar een `viewBox` geeft een correcte plattegrond van
+> Celestijnenlaan 200.
+
+**Dit is ook waarom we geen OSM-rastertegels gebruiken.** De verleiding is groot
+(een tegel is maar een afbeelding, en `expo-image` kan die tonen), maar de
+gebruiksvoorwaarden van `tile.openstreetmap.org` staan app-gebruik op schaal niet
+toe; daar een app op richten is de tegelserver van een vrijwilligersproject
+gebruiken als eigen CDN. De alternatieven zijn een provider met een sleutel
+(MapTiler, Thunderforest) of zelf tegels hosten, en allebei kosten ze meer dan ze
+hier opleveren. De vectoren die we al hebben tekenen kost niets, werkt offline,
+en levert een kaart in de vormtaal van de site in plaats van de wereldkaart van
+iemand anders.
 
 Dat is niet de goedkope oplossing die we nemen omdat het moet: het is de betere.
 Een Google-basemap met veertig irrelevante labels erop staat haaks op de
@@ -181,8 +219,12 @@ Onder de kaart de resultaten als rijen: `200K 00.06` groot, `Aula` eronder,
 
 - Web Mercator van lat/lng naar de `viewBox`, één keer berekend uit de bounding
   box van alle contouren en daarna een constante.
-- Gebouwen als `<Path>` in `--surface` met een `--line`-rand; het gezochte gebouw
-  in `--yellow`. Geen schaduw, geen gradient.
+- Drie lagen, van onder naar boven: de **paden** uit OSM als dunne `--line`-lijnen,
+  de **contextgebouwen** uit OSM in `--paper-2` zonder label, en onze eigen
+  **gebouwen** als `<Path>` in `--surface` met een `--line`-rand. Het gezochte
+  gebouw in `--yellow`. Geen schaduw, geen gradient.
+- De paden zijn wat de kaart leesbaar maakt: zonder hen zijn het zeventien vormen
+  die zweven, met hen is het een campus.
 - Labels: de korte code (`200K`) in het zwaartepunt, en pas vanaf een zoomniveau
   ook de volledige naam. Bij uitzoomen valt het label weg in plaats van te
   overlappen.
@@ -202,21 +244,54 @@ code en het adres, de lokalen gegroepeerd per verdieping, en twee knoppen:
 
 ### Breng me erheen
 
-`Linking.openURL` naar de kaart-app van het toestel, met het zwaartepunt en de
-naam van het gebouw. Native, geen module, en het geeft de gebruiker de navigatie
-die hij al kent (inclusief stem, verkeer en te voet).
+Met het OSM-wandelnetwerk erbij is dit geen doorverwijzing meer maar een echte
+route, en die tekenen we zelf.
+
+De graaf is 987 knopen en 1105 bogen, ongeveer 40 kB. Dijkstra daarover kost
+niets op een telefoon, dus de route wordt lokaal berekend: **geen routeerdienst,
+geen sleutel, geen netwerk**. Dat laatste is hier niet academisch; wie in de
+kelder van 200C staat te zoeken waar hij moet zijn, heeft precies daar geen
+ontvangst.
+
+Gemeten op de echte graaf, van zwaartepunt tot zwaartepunt:
+
+| van | naar | route | hemelsbreed |
+| --- | --- | --- | --- |
+| QDV | 200K | 453 m | 359 m |
+| 200B | De Moete | 278 m | 148 m |
+| 200S | Chem&Tech | 387 m | - |
+
+De route eindigt aan een **ingang** en niet in het zwaartepunt van het gebouw:
+OSM heeft er 58 in deze bbox, waarvan 11 als hoofdingang getagd. Bij 200K ligt de
+dichtstbijzijnde op 16 m van het zwaartepunt, dus dat scheelt in de praktijk de
+laatste ronde om het gebouw.
+
+Twee dingen om eerlijk over te zijn:
+
+- **Niet elke route is al goed.** 200G naar 200N komt op 648 m voor 281 m
+  hemelsbreed. Dat is een omweg van 2,3 en te veel; ergens ontbreekt een
+  verbinding of hangt het gebouw aan de verkeerde kant van het net. De graaf
+  heeft dus nog afstelwerk nodig, en dat hoort in fase 2 gemeten te worden en
+  niet geloofd.
+- **Het net stopt aan de rand van de bbox.** Voor "ik zit thuis en moet naar
+  200K" blijft de kaart-app van het toestel de betere weg; die kent de bus en het
+  verkeer. Hou daarom `Linking.openURL` als tweede knop naast de eigen route:
+  de onze is voor op de campus, die van het toestel om er te geraken.
 
 ```
 ios:      maps://?daddr=<lat>,<lng>&dirflg=w
 android:  geo:<lat>,<lng>?q=<lat>,<lng>(<naam>)
 ```
 
-"Waar sta ik zelf" op onze eigen kaart tekenen vraagt `expo-location`. Dat is een
-Expo-module en dus vermoedelijk in Expo Go beschikbaar, **maar controleer dat
-eerst op een iPhone voor je het inbouwt**; is het er niet, dan valt de hele
-iOS-kant stil en dat is de fout die `mobile/AGENTS.md` beschrijft. Zonder
-`expo-location` werkt alles hierboven gewoon; het is een verrijking, geen
-voorwaarde. Zet het daarom in fase 3, niet in fase 1.
+De 5 bushaltes uit OSM ("Heverlee Celestijnenlaan", "Heverlee Campus Arenberg")
+zijn een goed vertrekpunt zolang er nog geen eigen positie is: een route vanaf de
+halte waar je uitstapt, is bruikbaar zonder één toestemmingsvraag.
+
+**Waar sta ik zelf** vraagt `expo-location`. Dat is een Expo-module en dus
+vermoedelijk in Expo Go beschikbaar, **maar test dat eerst op een iPhone**. Is
+het er niet, dan valt de hele iOS-kant stil, en dat is precies de fout die
+`mobile/AGENTS.md` beschrijft. Zonder `expo-location` werkt al de rest gewoon;
+het is een verrijking, geen voorwaarde, en het hoort daarom in fase 3.
 
 ### Binnen in het gebouw
 
@@ -252,17 +327,20 @@ zodra er een deur dichtgaat.
 
 ## Volgorde
 
-**Fase 1, de kern.** Prisma-model, importscript vanaf `kulag-gebouwen.json`,
-`/api/app/v1/lokalen` met zoeken, en het zoekscherm met een resultatenlijst en
-het gebouwdetail. Nog geen kaart: een lijst die "200K 00.06, gelijkvloers,
-Auditoria K, Celestijnenlaan 200k" zegt, is op zichzelf al bruikbaar. Zo staat er
-iets op een toestel voor de kaart af is.
+**Fase 1, de kern. Staat er.** Prisma-model (`Building`, `Room`), importscript
+(`npm run import:lokalen`), `/api/app/v1/lokalen` met zoeken, het zoekscherm
+`mobile/src/screens/lokalen.tsx`, en de tegel op home. Zonder kaart nog, want een
+lijst die "200K 00.06, Aula, Auditoria K, gelijkvloers" zegt is op zichzelf al
+bruikbaar; zo staat er iets op een toestel voor de kaart af is.
 
-**Fase 2, de kaart.** `CampusMap.tsx`, projectie, pan en zoom, het gebouw in geel,
-"Breng me erheen". Dit is het stuk waar de feature zijn naam aan verdient.
+**Fase 2, de kaart en de route.** `CampusMap.tsx` met de drie lagen, projectie,
+pannen en zoomen, het gebouw in geel, en de eigen wandelroute over de
+OSM-graaf. Dit is het stuk waar de feature zijn naam aan verdient. Meet hier de
+omwegfactor per gebouwpaar; 200G naar 200N zegt dat de graaf nog niet klopt.
 
 **Fase 3, de verrijking.** `expo-location` (na controle in Expo Go) voor de eigen
-positie, en `/lokalen` op de site met dezelfde gegevens.
+positie en dus een route vanaf waar je staat, en `/lokalen` op de site met
+dezelfde gegevens.
 
 **Fase 4, binnen.** De PDF-pijplijn, met de terugval hierboven.
 
