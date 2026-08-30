@@ -313,35 +313,53 @@ modules".
 
 ### Binnen in het gebouw
 
-Dit is het onzekere stuk en het hoort daarom achteraan.
+**Dit gaat met deze bron niet lukken, en dat is gemeten.**
 
-De toegankelijkheidsplannen van KULag zijn vector-PDF's uit AutoCAD, één pagina
-met de verdiepingen naast elkaar. Goed nieuws: `pdftotext -bbox` haalt er de
-lokaalnummers **met coördinaten** uit; op het plan van Quadrivium staan `100`,
-`110`, `180` als losse tekstelementen op de juiste plek. Slecht nieuws: de tekst
-is geroteerd en gefragmenteerd, en de verdiepingen zitten als blokken op één
-pagina die je eerst moet segmenteren.
+Alle 20 gebouwen op Celestijnenlaan 200 hebben een "Toegankelijkheidsplan" op
+KULag; 18 ervan hebben er precies één (Akoestiek en NanoCentre hebben er geen,
+en het eerste plan van 200D is een stuk bij dat geen enkele lezer opent). Het
+zijn vector-PDF's uit AutoCAD, één pagina van 842 x 1701 punten, gedraaid, elk
+met zijn eigen gebouwnummer als titel. Ze zijn dus wel degelijk per gebouw
+getekend.
 
-Aanpak, server-side in `scripts/`, niet in de app:
+Maar het zijn **geen verdiepingsplattegronden, het zijn toegankelijkheidsroutes**.
+Onze 154 lokalen tegen de tekst op hun eigen plan gelegd:
 
-1. Per gebouw de PDF omzetten naar één afbeelding per verdieping (`pdftoppm`, of
-   naar SVG met `pdf2svg` als de bestandsgrootte meevalt).
-2. Uit `pdftotext -bbox` de labels halen, per verdiepingsblok groeperen, en
-   `00.100` koppelen aan het label `100` in het blok van verdieping 00.
-3. Het resultaat opslaan als `Room.planX` / `Room.planY` plus een
-   `FloorPlan`-record met de afbeelding en de afmetingen.
+| rubriek | staat op het plan | staat er niet op |
+| --- | --- | --- |
+| Inkom en balie | 19 | 7 |
+| Aula (auditorium) | **0** | 17 |
+| Les- en vergaderlokaal | **0** | 77 |
+| Sanitair, lift, overige | 0 | 8 |
 
-In de app is het dan een `expo-image` met een `<Circle>` van `react-native-svg`
-erop, in dezelfde pan/zoom-schil als de campuskaart.
+Enkel de inkomhallen staan erop. Geen enkele aula, geen enkel leslokaal. Dat past
+ook bij wat KULag is: een gids die toont hoe je van de straat tot aan een
+toegankelijke ingang geraakt, niet een lokalenregister.
 
-**Val terug op het eenvoudige wanneer stap 2 tegenvalt**: toon de plattegrond
-zonder speld, met de verdieping en het lokaalnummer erboven. Dat is nog altijd
-sneller dan wat een student vandaag doet. Handmatig een handvol lokalen pinnen
-(de aula's, de fakbar, het kringlokaal) is dan de tussenstap, geen mislukking.
+**Corrigeert een eerdere lezing in dit document.** Er stond hier dat
+`pdftotext -bbox` de lokaalnummers met coördinaten oplevert, met `100`, `110` en
+`180` op het plan van Quadrivium als bewijs. Dat klopte niet: die reeks loopt van
+`088` tot `119`, staat op 19 van de 20 plannen en is de legende van het
+tekeningblad. Wie daarop verder bouwt, pint honderd lokalen op de plek van een
+symbolenlijst.
 
-Een echte binnennavigatie ("links, dan de trap op") bouwen we niet. Daar is een
-looproutegraaf per verdieping voor nodig die niemand onderhoudt, en die vervalt
-zodra er een deur dichtgaat.
+Wat er dus nodig is voor een plattegrond binnen:
+
+- **Een andere bron.** De technische dienst van KU Leuven heeft de echte
+  verdiepingsplannen; die staan niet publiek. Dat is een vraag aan een mens, geen
+  scrape.
+- **Of zelf tekenen.** Voor de handvol lokalen die er echt toe doen (de aula's van
+  200K/L/M/N, Aula A tot D in 200C, het kringlokaal) is een eigen schets per
+  verdieping haalbaar en meteen beter dan een CAD-plan met tweehonderd
+  symbolen erop.
+
+Tot dan is het eerlijke alternatief klein: toon de verdieping en het
+lokaalnummer, en link naar het plan op KULag voor wie de ingang zoekt. Dat is de
+enige vraag die dat plan wél beantwoordt.
+
+Een echte binnennavigatie ("links, dan de trap op") bouwen we sowieso niet. Daar
+is een looproutegraaf per verdieping voor nodig die niemand onderhoudt, en die
+vervalt zodra er een deur dichtgaat.
 
 ## Volgorde
 
@@ -425,7 +443,10 @@ update dus ook aangeboden en loopt dan tegen `requireNativeModule` aan. Zie
   terug op de halte en er staat wat er aan de hand is. Geen van beide is iets dat
   opnieuw proberen oplost, dus staat er geen "probeer opnieuw".
 
-**Fase 4, binnen.** De PDF-pijplijn, met de terugval hierboven.
+**Fase 4, binnen. Vervalt in deze vorm.** De toegankelijkheidsplannen van KULag
+labelen enkel de inkomhallen en geen enkele aula of leslokaal; zie hierboven. Wat
+overblijft is de verdieping en het lokaalnummer tonen, en de echte plannen bij de
+technische dienst gaan vragen.
 
 Uitbreiden naar heel Arenberg is geen fase maar een vlag: `--campus 30 --all`
 geeft 109 gebouwen. Doe dat pas wanneer fase 2 staat, anders debug je een kaart
