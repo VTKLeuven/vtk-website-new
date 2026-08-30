@@ -13,6 +13,10 @@
  *   - `Permission`: de registry is canoniek en niet GUI-bewerkbaar.
  *   - de rechten van de systeemrol `admin`: die bundelt per definitie alles, dus
  *     een nieuwe permissie moet er meteen aan hangen.
+ *   - `Building` en `Room`: de gebouwen en lokalen van de KU Leuven komen uit
+ *     `fixtures/gebouwen.json`, geschreven door `scripts/scrape-kulag.ts`. Ze
+ *     zijn niet GUI-beheerd, en zonder deze sync maakt een deploy wel de
+ *     tabellen aan maar blijven ze leeg; de lokalenzoeker toont dan niets.
  *
  * Ze maakt GEEN gebruikers, rollen of posten aan: dat gebeurt live via de GUI.
  * Wat GUI-beheerd is (posten, header tabs, settings) wordt enkel gerapporteerd
@@ -23,6 +27,10 @@
  *   --prune     verwijder Permission-rijen die niet meer in de registry staan
  *               (cascade: hun RolePermission-toewijzingen gaan mee)
  */
+import { readFile } from "node:fs/promises";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
+
 import { PrismaClient } from "@prisma/client";
 import { GROUP_SEEDS, WERKGROEP_SEEDS, HEADER_TABS } from "../src/groups";
 import { PERMISSIONS } from "../src/permissions";
@@ -148,11 +156,115 @@ async function reportGuiManagedDrift() {
   }
 }
 
+type FixtureRoom = {
+  id: string;
+  code: string | null;
+  name: string;
+  category: string;
+  url: string;
+};
+
+type FixtureBuilding = {
+  id: string;
+  name: string;
+  shortCode: string | null;
+  address: string;
+  zipcode: string;
+  city: string;
+  lat: number | null;
+  lng: number | null;
+  outline: [number, number][];
+  photoUrl: string | null;
+  kulagUrl: string;
+  plans: { title: string; url: string }[];
+  rooms: FixtureRoom[];
+};
+
+/** "00.06" wordt 0, "01.100" wordt 1. Null wanneer het nummer die vorm niet heeft. */
+function floorOf(code: string | null): number | null {
+  if (!code) return null;
+  const match = /^(\d+)\./.exec(code);
+  return match ? Number.parseInt(match[1], 10) : null;
+}
+
+/**
+ * De gebouwen en lokalen uit de fixture.
+ *
+ * **Create-or-update op de natuurlijke sleutel, nooit deleten.** `Building.notes`
+ * en `Room.aliases` worden door VTK ingevuld en staan niet in de fixture; die
+ * mogen door een herimport niet verdwijnen. Een lokaal dat KULag niet meer
+ * vermeldt blijft dus staan, en dat is de veilige kant: een verdwenen rij zou
+ * stil een zoekresultaat wegnemen.
+ */
+async function syncBuildings() {
+  const path = join(dirname(fileURLToPath(import.meta.url)), "fixtures", "gebouwen.json");
+
+  let buildings: FixtureBuilding[];
+  try {
+    buildings = (JSON.parse(await readFile(path, "utf8")) as { buildings: FixtureBuilding[] })
+      .buildings;
+  } catch {
+    warn("fixtures/gebouwen.json ontbreekt of is onleesbaar; gebouwen niet gesynct.");
+    return;
+  }
+
+  let created = 0;
+  let rooms = 0;
+  for (const item of buildings) {
+    const fields = {
+      shortCode: item.shortCode,
+      name: item.name,
+      address: item.address,
+      zipcode: item.zipcode,
+      city: item.city,
+      lat: item.lat,
+      lng: item.lng,
+      outline: item.outline,
+      photoUrl: item.photoUrl,
+      kulagUrl: item.kulagUrl,
+      plans: item.plans,
+    };
+
+    if (dryRun) {
+      const existing = await prisma.building.findUnique({ where: { kulagId: item.id } });
+      if (!existing) created += 1;
+      rooms += item.rooms.length;
+      continue;
+    }
+
+    const building = await prisma.building.upsert({
+      where: { kulagId: item.id },
+      create: { kulagId: item.id, ...fields },
+      update: fields,
+    });
+
+    for (const room of item.rooms) {
+      const roomFields = {
+        buildingId: building.id,
+        code: room.code,
+        name: room.name,
+        category: room.category,
+        floor: floorOf(room.code),
+        kulagUrl: room.url,
+      };
+      await prisma.room.upsert({
+        where: { kulagId: room.id },
+        create: { kulagId: room.id, ...roomFields },
+        update: roomFields,
+      });
+      rooms += 1;
+    }
+  }
+
+  note(`gebouwen gesynct: ${buildings.length} gebouwen, ${rooms} lokalen${created ? ` (${created} nieuw)` : ""}`);
+}
+
 async function main() {
   if (dryRun) console.log("Dry run: er wordt niets geschreven.\n");
 
   await syncPermissions();
   await syncAdminRolePermissions();
+  await syncBuildings();
   await reportGuiManagedDrift();
 
   console.log("");

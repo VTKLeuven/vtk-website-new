@@ -12,7 +12,7 @@ volgorde het gebouwd wordt.
 Er zijn **twee bronnen**, en ze doen bewust niet hetzelfde.
 
 `scripts/scrape-kulag.ts` haalt de KU Leuven Access Guide en de KU Leuven
-kaart-API leeg en schrijft `scripts/kulag-gebouwen.json`. Vandaag staat daar
+kaart-API leeg en schrijft `packages/db/prisma/fixtures/gebouwen.json`. Vandaag staat daar
 Celestijnenlaan 200 in: 20 gebouwen en 154 lokalen.
 
 `scripts/scrape-osm.ts` haalt OpenStreetMap op via Overpass en schrijft
@@ -24,7 +24,7 @@ kasteel). 57 kB.
 npx tsx scripts/scrape-kulag.ts                    # Celestijnenlaan 200
 npx tsx scripts/scrape-kulag.ts --campus 30 --all  # heel Arenberg (109 gebouwen)
 npx tsx scripts/scrape-osm.ts                      # wandelnetwerk en ingangen
-npm run import:lokalen                             # KULag-JSON naar de databank
+npm run db:sync                                    # fixture naar de databank
 ```
 
 **KU Leuven heeft de gebouwen en de lokalen; OSM heeft de paden ertussen.** Dat
@@ -116,15 +116,24 @@ in de app, en `Skyline.tsx` bewijst dat dit patroon hier al eens gewerkt heeft.
 
 ### De server is de waarheid
 
-De gescrapete JSON is een **bron voor een seed**, niet het bestand dat de app
-inleest. Redenen: regel 1 van de app (de server beslist), de app krijgt zo de
-bestaande leescache van `useResource` gratis, de website kan dezelfde gegevens
-tonen, en VTK moet kunnen bijsturen waar KULag te kort komt (het kringlokaal, de
-fakbar, de naam die iedereen gebruikt in plaats van de officiële).
+De gescrapete JSON is een **fixture**, niet het bestand dat de app inleest.
+Redenen: regel 1 van de app (de server beslist), de app krijgt zo de bestaande
+leescache van `useResource` gratis, en VTK moet kunnen bijsturen waar KULag te
+kort komt (het kringlokaal, de fakbar, de naam die iedereen gebruikt in plaats
+van de officiële).
+
+Ze staat in `packages/db/prisma/fixtures/` en niet in `scripts/`, en dat is geen
+smaakkwestie: **de runtime-image kopieert `packages/` en niet `scripts/`.** Een
+importscript in `scripts/` draait dus wel op een laptop en nooit op de server.
+`prisma/sync.ts` laadt haar bij elke start in, naast de permissieregistry, want
+het is hetzelfde soort data: de code is er de bron van en de GUI beheert ze niet.
+Zonder die stap maakt een deploy wel de tabellen aan maar blijven ze leeg, en
+toont de lokalenzoeker een lege lijst. Dat is precies wat er de eerste keer
+gebeurde.
 
 ```
-scripts/kulag-gebouwen.json          bron, in git, herbruikbaar via de scraper
-  -> packages/db  Building / Room     met een import-script, create-or-update
+packages/db/prisma/fixtures/         bron, in git, herbruikbaar via de scraper
+  -> packages/db  Building / Room     via prisma/sync.ts, create-or-update
     -> apps/web  /api/app/v1/lokalen  zoeken, gebouwen, OSM-ondergrond
       -> mobile   src/screens/lokalen zoekscherm, kaart, route
 ```
@@ -336,8 +345,8 @@ zodra er een deur dichtgaat.
 
 ## Volgorde
 
-**Fase 1, de kern. Staat er.** Prisma-model (`Building`, `Room`), importscript
-(`npm run import:lokalen`), `/api/app/v1/lokalen` met zoeken, het zoekscherm
+**Fase 1, de kern. Staat er.** Prisma-model (`Building`, `Room`), import
+(in `prisma/sync.ts`), `/api/app/v1/lokalen` met zoeken, het zoekscherm
 `mobile/src/screens/lokalen.tsx`, en de tegel op home. Zonder kaart nog, want een
 lijst die "200K 00.06, Aula, Auditoria K, gelijkvloers" zegt is op zichzelf al
 bruikbaar; zo staat er iets op een toestel voor de kaart af is.

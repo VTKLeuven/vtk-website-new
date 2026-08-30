@@ -14,7 +14,7 @@
  *   npx tsx scripts/scrape-kulag.ts                       # standaard: Celestijnenlaan 200
  *   npx tsx scripts/scrape-kulag.ts --address "Celestijnenlaan"
  *   npx tsx scripts/scrape-kulag.ts --campus 30 --all     # heel Arenberg
- *   npx tsx scripts/scrape-kulag.ts --out scripts/kulag.json
+ *   npx tsx scripts/scrape-kulag.ts --out elders.json
  */
 
 import { writeFile } from "node:fs/promises";
@@ -279,7 +279,7 @@ function parseArgs(argv: string[]) {
     campus: Number(get("--campus") ?? ARENBERG),
     address: get("--address") ?? "Celestijnenlaan 200",
     all: argv.includes("--all"),
-    out: get("--out") ?? "scripts/kulag-gebouwen.json",
+    out: get("--out") ?? "packages/db/prisma/fixtures/gebouwen.json",
   };
 }
 
