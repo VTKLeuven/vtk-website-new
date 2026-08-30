@@ -48,6 +48,7 @@ export const TAB_ROUTES = {
     'meldingen',
     'shiften',
     'media',
+    'albums',
     'album/[slug]',
     'piano',
     'broodjes',
@@ -59,6 +60,7 @@ export const TAB_ROUTES = {
   meer: [
     'zoeken',
     'media',
+    'albums',
     'album/[slug]',
     'praesidium',
     'werkgroepen',
