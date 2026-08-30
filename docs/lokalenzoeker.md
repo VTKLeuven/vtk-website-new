@@ -125,9 +125,8 @@ fakbar, de naam die iedereen gebruikt in plaats van de officiële).
 ```
 scripts/kulag-gebouwen.json          bron, in git, herbruikbaar via de scraper
   -> packages/db  Building / Room     met een import-script, create-or-update
-    -> apps/web  /api/app/v1/lokalen  zoeken + detail
-      -> mobile   src/screens/lokalen zoekscherm, kaart, plattegrond
-      -> apps/web /lokalen            dezelfde gegevens op de site
+    -> apps/web  /api/app/v1/lokalen  zoeken, gebouwen, OSM-ondergrond
+      -> mobile   src/screens/lokalen zoekscherm, kaart, route
 ```
 
 ### Datamodel
@@ -392,8 +391,12 @@ meter of vier bij elkaar liggen maar geen boog delen, en sla ways met `bridge`,
 `tunnel` of `layer` over, anders knoop je een brug aan de weg eronder vast.
 
 **Fase 3, de eigen positie. Staat er.** `expo-location`, met de route die vertrekt
-waar je staat in plaats van bij de halte. Wat er van fase 3 nog rest is
-`/lokalen` op de site met dezelfde gegevens.
+waar je staat in plaats van bij de halte.
+
+**De lokalenzoeker komt bewust niet op de website.** Dit is een scherm dat je
+onderweg opent, met een telefoon in je hand, om te weten waar je naartoe moet;
+achter een bureau zoekt niemand een lokaal op. Het endpoint blijft wel gewoon de
+app-API, dus mocht de site hem ooit toch nodig hebben, dan ligt de bron er al.
 
 ⚠️ **Er moet een nieuwe APK gebouwd en verspreid worden voor deze wijziging
 gepubliceerd wordt.** `expo-location` is een native module. In Expo Go zit ze
