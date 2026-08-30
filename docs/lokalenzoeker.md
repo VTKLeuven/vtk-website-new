@@ -296,11 +296,12 @@ beide richtingen van dezelfde halte terug en de volgorde is toeval. `arrivalStop
 kiest de halte die het dichtst bij het midden van het padennet ligt, en dat komt
 op "Heverlee Campus Arenberg" uit.
 
-**Waar sta ik zelf** vraagt `expo-location`. Dat is een Expo-module en dus
-vermoedelijk in Expo Go beschikbaar, **maar test dat eerst op een iPhone**. Is
-het er niet, dan valt de hele iOS-kant stil, en dat is precies de fout die
-`mobile/AGENTS.md` beschrijft. Zonder `expo-location` werkt al de rest gewoon;
-het is een verrijking, geen voorwaarde, en het hoort daarom in fase 3.
+**Waar sta ik zelf** vraagt `expo-location`, en dat mag: Expo Go bevat de hele
+Expo SDK, dus elke `expo-*`-module werkt er. Wat er níét in zit is een
+derdepartijbibliotheek met eigen native code, en dat is precies waarom
+`react-native-maps` afvalt en `expo-location` niet. Dat onderscheid is de regel
+achter "voeg geen module toe die niet in Expo Go zit"; het is niet "geen native
+modules".
 
 ### Binnen in het gebouw
 
@@ -390,9 +391,27 @@ achter dit probleem. Wie die wil dichtnaaien: verbind knopen die dichter dan een
 meter of vier bij elkaar liggen maar geen boog delen, en sla ways met `bridge`,
 `tunnel` of `layer` over, anders knoop je een brug aan de weg eronder vast.
 
-**Fase 3, de verrijking.** `expo-location` (na controle in Expo Go) voor de eigen
-positie en dus een route vanaf waar je staat in plaats van vanaf de halte, en
+**Fase 3, de eigen positie. Staat er.** `expo-location`, met de route die vertrekt
+waar je staat in plaats van bij de halte. Wat er van fase 3 nog rest is
 `/lokalen` op de site met dezelfde gegevens.
+
+⚠️ **Er moet een nieuwe APK gebouwd en verspreid worden voor deze wijziging
+gepubliceerd wordt.** `expo-location` is een native module. In Expo Go zit ze
+ingebouwd, dus daar werkt ze meteen; op een APK moet ze in de build zelf zitten,
+en `runtimeVersion` is voor élke SDK 54-build dezelfde. Een oudere APK krijgt deze
+update dus ook aangeboden en loopt dan tegen `requireNativeModule` aan. Zie
+`mobile/AGENTS.md`.
+
+- **De toestemming wordt pas gevraagd wanneer erom gevraagd wordt**, achter de
+  knop "Vanaf hier". Een scherm dat bij het openen naar je locatie hengelt krijgt
+  "niet toestaan" en daarna nooit meer een tweede kans.
+- **Buiten 900 meter van de campus tekenen we geen route.** Het padennet stopt aan
+  de rand van de bbox, en een lijn die van buiten het beeld komt is geen route
+  maar een leugen. Wie daar staat krijgt te zien hoe ver hij is en de knop naar de
+  kaart-app van zijn toestel, die de bus en het verkeer wel kent.
+- Geweigerd, of geen positie te krijgen (binnen, in een kelder): de route valt
+  terug op de halte en er staat wat er aan de hand is. Geen van beide is iets dat
+  opnieuw proberen oplost, dus staat er geen "probeer opnieuw".
 
 **Fase 4, binnen.** De PDF-pijplijn, met de terugval hierboven.
 

@@ -46,6 +46,7 @@ export function CampusMap({
   campus,
   selectedId,
   routePoints,
+  here,
   onSelect,
   height = 260,
 }: {
@@ -54,6 +55,8 @@ export function CampusMap({
   selectedId: string | null;
   /** De berekende wandelroute; leeg wanneer er geen doel is. */
   routePoints: LatLng[];
+  /** Waar de gebruiker staat, wanneer hij dat gedeeld heeft. */
+  here: LatLng | null;
   onSelect: (buildingId: string) => void;
   height?: number;
 }) {
@@ -229,14 +232,18 @@ export function CampusMap({
 
             {routePoints.length > 1 ? (
               <>
-                <Circle
-                  cx={projection.project(routePoints[0]).x}
-                  cy={projection.project(routePoints[0]).y}
-                  r={7}
-                  fill={COLORS.surface}
-                  stroke={COLORS.line2}
-                  strokeWidth={2}
-                />
+                {/* Sta je er zelf, dan draagt de blauwe stip het vertrek en is
+                    een tweede wit bolletje ernaast enkel verwarrend. */}
+                {here ? null : (
+                  <Circle
+                    cx={projection.project(routePoints[0]).x}
+                    cy={projection.project(routePoints[0]).y}
+                    r={7}
+                    fill={COLORS.surface}
+                    stroke={COLORS.line2}
+                    strokeWidth={2}
+                  />
+                )}
                 <Circle
                   cx={projection.project(routePoints[routePoints.length - 1]).x}
                   cy={projection.project(routePoints[routePoints.length - 1]).y}
@@ -244,6 +251,26 @@ export function CampusMap({
                   fill={COLORS.yellow}
                   stroke={COLORS.ink}
                   strokeWidth={1.8}
+                />
+              </>
+            ) : null}
+
+            {here ? (
+              <>
+                <Circle
+                  cx={projection.project(here).x}
+                  cy={projection.project(here).y}
+                  r={14}
+                  fill={COLORS.navy}
+                  opacity={0.16}
+                />
+                <Circle
+                  cx={projection.project(here).x}
+                  cy={projection.project(here).y}
+                  r={6}
+                  fill={COLORS.navy}
+                  stroke={COLORS.surface}
+                  strokeWidth={2.4}
                 />
               </>
             ) : null}

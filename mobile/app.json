@@ -60,6 +60,15 @@
         {
           "calendarPermission": "VTK zet een evenement in je agenda wanneer je daarop tikt. Er wordt niets gelezen of gewijzigd zonder dat je het vraagt."
         }
+      ],
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "VTK gebruikt je locatie enkel om de wandelroute naar een lokaal vanaf je eigen positie te tekenen. Er wordt niets bewaard of doorgestuurd.",
+          "locationWhenInUsePermission": "VTK gebruikt je locatie enkel om de wandelroute naar een lokaal vanaf je eigen positie te tekenen. Er wordt niets bewaard of doorgestuurd.",
+          "isAndroidBackgroundLocationEnabled": false,
+          "isAndroidForegroundServiceEnabled": false
+        }
       ]
     ],
     "extra": {
