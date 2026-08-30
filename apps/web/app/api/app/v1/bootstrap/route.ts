@@ -1,4 +1,4 @@
-import { currentStudyYear } from "@vtk/auth";
+import { needsStudyConfirmation } from "@vtk/auth";
 import { pick } from "@vtk/i18n";
 
 import { getCurrentAnnouncement, announcementFits } from "@/lib/announcements";
@@ -63,7 +63,7 @@ export async function GET(request: Request) {
           // de studie bevestigen. Anders stuurt de app iemand naar het tweede
           // scherm terwijl de website hem op het eerste zou houden.
           needsStudyConfirmation:
-            session.user.onboarded && session.user.studyConfirmedYear !== currentStudyYear(),
+            session.user.onboarded && needsStudyConfirmation(session.user),
         }
       : null;
 

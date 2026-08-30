@@ -203,6 +203,7 @@ export async function buildTestSession(key: TestUserKey): Promise<SessionPayload
       isSuperAdmin: p.isSuperAdmin,
       onboarded: true,
       studyConfirmedYear: currentStudyYear(),
+      isStudent: true,
       // Testgebruikers van de uitleendienst raken de Google-koppeling niet aan;
       // "gekoppeld" houdt de koppelgate uit de weg.
       googleLinked: true,

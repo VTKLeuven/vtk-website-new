@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { needsStudyConfirmation } from "@vtk/auth";
 import { currentStudyYear, currentWorkingYear, splitYearBar, studyYearStart } from "@/lib/workingYear";
 
 describe("currentStudyYear", () => {
@@ -33,6 +34,17 @@ describe("currentStudyYear", () => {
 describe("studyYearStart", () => {
   it("geeft 27 september van dat jaar", () => {
     expect(studyYearStart(2026).toISOString()).toBe("2026-09-27T00:00:00.000Z");
+  });
+});
+
+describe("needsStudyConfirmation", () => {
+  const now = new Date("2027-10-01T12:00:00Z");
+
+  it("vraagt alleen studenten met een verouderde bevestiging", () => {
+    expect(needsStudyConfirmation({ isStudent: true, studyConfirmedYear: 2026 }, now)).toBe(true);
+    expect(needsStudyConfirmation({ isStudent: true, studyConfirmedYear: 2027 }, now)).toBe(false);
+    expect(needsStudyConfirmation({ isStudent: false, studyConfirmedYear: null }, now)).toBe(false);
+    expect(needsStudyConfirmation({ isStudent: false, studyConfirmedYear: 2026 }, now)).toBe(false);
   });
 });
 

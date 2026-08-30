@@ -7,6 +7,7 @@ import { getDictionary, type Locale } from "@vtk/i18n";
 import { hasLocale } from "@/lib/locale";
 import { requireSession } from "@/lib/session";
 import { currentStudyYear, formatWorkingYear } from "@/lib/workingYear";
+import { needsStudyConfirmation } from "@vtk/auth";
 import { logoutAction } from "@/app/actions/auth";
 import { confirmStudyAction } from "@/app/actions/onboarding";
 import { StudyFieldset } from "@/components/profile/StudyFieldset";
@@ -46,15 +47,17 @@ export default async function ConfirmStudyPage({
   const year = currentStudyYear();
   // Al bevestigd (of nog niet door de onboarding): niets te doen hier.
   if (!session.user.onboarded) redirect(locale === "en" ? "/en/onboarding" : "/onboarding");
-  if (session.user.studyConfirmedYear === year) redirect(home);
+  if (!needsStudyConfirmation(session.user)) redirect(home);
 
   const user = await prisma.user.findUniqueOrThrow({
     where: { id: session.user.id },
     select: {
       studyYears: true,
       studyProgrammes: true,
+      isStudent: true,
       notAtFaculty: true,
       notStudying: true,
+      academicStaffRole: true,
       internationalStudent: true,
       alumni: true,
       graduationYear: true,
@@ -80,8 +83,10 @@ export default async function ConfirmStudyPage({
             locale={locale}
             studyYears={user.studyYears}
             studyProgrammes={user.studyProgrammes}
+            isStudent={user.isStudent}
             notAtFaculty={user.notAtFaculty}
             notStudying={user.notStudying}
+            academicStaffRole={user.academicStaffRole}
             internationalStudent={user.internationalStudent}
             alumni={user.alumni}
             graduationYear={user.graduationYear}

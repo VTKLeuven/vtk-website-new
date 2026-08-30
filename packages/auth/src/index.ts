@@ -10,7 +10,13 @@ import type { Permission } from './lib/permissions';
 
 export { splitFullName, fullName, nameParts, type NameParts } from './lib/names';
 export { PERMISSIONS, isPermission, permissionCodes, type Permission } from './lib/permissions';
-export { currentWorkingYear, currentStudyYear, studyYearStart, FIRST_WORKING_YEAR } from './lib/workingYear';
+export {
+  currentWorkingYear,
+  currentStudyYear,
+  needsStudyConfirmation,
+  studyYearStart,
+  FIRST_WORKING_YEAR,
+} from './lib/workingYear';
 export {
   SCOPES,
   SCOPE_CODES,
@@ -75,6 +81,8 @@ export type AuthUser = {
    * die hier niet thuishoort.
    */
   studyConfirmedYear: number | null;
+  /** Alleen deze status opent de jaarlijkse studiebevestigingsgate. */
+  isStudent: boolean;
   /**
    * Heeft dit lid zijn `@vtk.be`-account gekoppeld? Praesidium- en
    * werkgroepleden moeten dat; de gate in `apps/web/proxy.ts` gebruikt dit

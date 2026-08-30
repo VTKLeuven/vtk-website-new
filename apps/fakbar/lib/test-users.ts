@@ -130,6 +130,7 @@ export async function buildTestSession(key: TestUserKey): Promise<SessionPayload
       isSuperAdmin: p.isSuperAdmin,
       onboarded: true,
       studyConfirmedYear: currentWorkingYear(),
+      isStudent: true,
       googleLinked: true,
       googleLinkDeferredAt: null,
     },

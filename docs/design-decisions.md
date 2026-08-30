@@ -787,7 +787,7 @@ ontbreken.
 
 Studenten **registreren zichzelf** door voor het eerst in te loggen met KU Leuven
 SSO. Concrete implementatie: hook in `packages/auth/src/auth.ts`, gate in
-`apps/web/app/[locale]/layout.tsx` + `apps/web/proxy.ts`, formulier in
+`apps/web/proxy.ts`, formulier in
 `apps/web/components/profile/ProfileForm.tsx`, actie in
 `apps/web/app/actions/onboarding.ts`, velden in het `User`-model.
 
@@ -817,6 +817,11 @@ SSO. Concrete implementatie: hook in `packages/auth/src/auth.ts`, gate in
   of persoonlijke mail) de **voorkeur** krijgt voor communicatie. De
   universiteitsmail is de SSO-/login-mail (`User.email`) en wordt niet apart
   gevraagd, enkel getoond.
+- Bij een zelfgemaakt **e-mail/wachtwoordaccount** is `User.email` al het
+  persoonlijke loginadres. Daar blijft het r-nummer expliciet optioneel en toont
+  het formulier geen veld met het misleidende label universiteitsmail, geen
+  tweede persoonlijke mail en geen communicatiekeuze. Het loginadres wordt als
+  persoonlijke voorkeur opgeslagen.
 - **Voor- en achternaam staan apart** (`User.firstName`/`lastName`) omdat de
   mailinglijst-exports die als aparte kolommen nodig hebben. `User.name` blijft
   de weergavenaam en wordt eruit samengesteld; enkel bij leden die de onboarding
@@ -832,6 +837,16 @@ SSO. Concrete implementatie: hook in `packages/auth/src/auth.ts`, gate in
 
 ### Studie (richtingen & studiejaren)
 
+- Het blok begint met vier combineerbare profielstatussen: **Student**
+  (`User.isStudent`), **Alumnus** (`User.alumni`), **Academisch Personeel**
+  (`User.academicStaffRole != null`) en **Ik studeer niet**
+  (`User.notStudying`). Student en "ik studeer niet" sluiten elkaar uit; andere
+  combinaties zijn bewust mogelijk, bijvoorbeeld een alumnus die professor is.
+- Alleen bij Student verschijnen studiejaar, richting, "niet aan de faculteit"
+  en internationale/uitwisselingsstudent. Gaat Student uit, dan worden die
+  studentvelden gewist. Bij Alumnus verschijnen afstudeerjaar, VTK-verleden en
+  de alumni-mailopt-in. Bij Academisch Personeel is een subtype verplicht:
+  professor, assistent, administratief medewerker of overig academisch personeel.
 - Een lid kan **meerdere richtingen** aanduiden (`StudyProgramme`-enum,
   `User.studyProgrammes` array) en ook **meerdere studiejaren** (`StudyYear`-enum,
   `User.studyYears` array): 1ste/2de/3de bachelor of 1ste/2de master. Meerdere
@@ -850,14 +865,10 @@ SSO. Concrete implementatie: hook in `packages/auth/src/auth.ts`, gate in
   opgelijst worden (o.a. de mappen in de career-ZIP). Wie dit aanduidt valt uit
   **alle** career-lijsten, ook de algemene; de andere categorieën blijven gewoon
   werken.
-- **"Ik studeer niet (meer)"** (`User.notStudying`) is er voor afgestudeerden of
-  gestopte leden. Bewust **los van `notAtFaculty`**: dat betekent "studeert wél,
-  maar elders"; dit betekent "studeert niet". Ook bewust **geen `StudyYear`**:
-  het is geen jaar, en als enum-waarde zou het overal opduiken waar jaren
-  opgelijst worden (o.a. de per-jaar-mappen in de career-ZIP). Het lid blijft
-  lid, maar valt uit **élke** studiegerichte mailinglijst (zie hieronder). Beide
-  vlaggen zijn onafhankelijk; wie niet (meer) studeert hoeft geen richting of
-  jaar meer aan te duiden.
+- **"Ik studeer niet"** (`User.notStudying`) is een profielstatus voor wie geen
+  student, alumnus of academisch personeelslid is. Ze staat niet langer als
+  pseudo-studiejaar tussen de jaren. Het lid blijft gewoon lid, maar krijgt geen
+  studentvelden, jaarlijkse studiebevestiging of studiegerichte mailinglijsten.
 
 ### Jaarlijkse studiebevestiging ("wie is nog actief student?")
 
@@ -866,9 +877,11 @@ SSO. Concrete implementatie: hook in `packages/auth/src/auth.ts`, gate in
   gaf ongewild een jaarlijks signaal over wie nog actief studeerde. Nu cudi een
   aparte site is (en we die bewust **niet** koppelen), viel dat signaal weg.
 - **De oplossing:** niet de koppeling herbouwen, maar de _jaarlijkse herdeclaratie_.
-  `User.studyConfirmedYear` houdt bij in welk academiejaar het lid zijn studie
-  laatst bevestigde. Loopt dat achter op `currentStudyYear()` (rollover op
-  27 september, zie `lib/workingYear.ts`), dan is het profiel verlopen.
+  `User.isStudent` zegt expliciet wie student is; alleen voor die accounts houdt
+  `User.studyConfirmedYear` bij in welk academiejaar het lid zijn studie laatst
+  bevestigde. Loopt dat achter op `currentStudyYear()` (rollover op 27 september,
+  zie `lib/workingYear.ts`), dan is het studentenprofiel verlopen. De gedeelde
+  helper `needsStudyConfirmation()` bewaakt die regel in web en mobiele app.
 - **De bevestiging vervalt op 27 september, niet op 15 juli.** Dat is bewust een
   andere dag dan de rest van de site: het werkingsjaar kantelt op 15 juli, maar
   het academiejaar loopt door tot eind september. Wie in juli gevraagd wordt "wat
@@ -895,18 +908,17 @@ SSO. Concrete implementatie: hook in `packages/auth/src/auth.ts`, gate in
   stempels op 2025. Zo valt de eerste bevestiging onder de nieuwe regel op
   27 september 2026; tot dan is niemand gegate en blijven de mailinglijsten
   intact.
-- Een verlopen profiel wordt **blokkerend** afgedwongen door een tweede gate in
+- Een verlopen studentenprofiel wordt **blokkerend** afgedwongen door een tweede gate in
   `apps/web/proxy.ts`, na de onboarding-gate: het lid gaat naar
   `/studie-bevestigen` voor het de site verder kan gebruiken.
 - **Bewust geen reset van de data** (in tegenstelling tot het oude systeem): de
   vorige keuze blijft staan en wordt voorgevuld, zodat bevestigen één klik is.
   Dat verschil bepaalt of leden bevestigen of afhaken.
-- **Waarom dit sterker is dan de oude cudi-truc:** inloggen gaat via KU Leuven
-  SSO. Een afgestudeerde wiens KUL-account uit staat, geraakt niet meer binnen en
-  kan dus nooit bevestigen. "Bevestigd dit academiejaar" betekent daardoor in de
-  praktijk: heeft een werkend KUL-account **én** verklaart zelf nog te studeren.
-- `saveProfileAction` (onboarding + `/account`) stempelt `studyConfirmedYear` ook,
-  want wie dat formulier invult declareert daarmee net zijn studie.
+- De expliciete status voorkomt dat alumni, academisch personeel en andere
+  niet-studenten door het ontbreken van een recente jaarstempel toch naar het
+  bevestigingsscherm gestuurd worden.
+- `saveProfileAction` (onboarding + `/account`) stempelt `studyConfirmedYear`
+  alleen bij Student; voor elke andere status wordt die stempel leeggemaakt.
 
 ### Mailinglijsten (admin-export)
 
@@ -917,14 +929,11 @@ SSO. Concrete implementatie: hook in `packages/auth/src/auth.ts`, gate in
   universiteitsmail.
 - Enkel **actieve** leden komen in een export: een gedeactiveerd account hoort
   geen mails meer te krijgen.
-- Enkel leden die hun studie **dit academiejaar bevestigd** hebben (zie de
+- Enkel leden met de status **Student** die hun studie **dit academiejaar bevestigd** hebben (zie de
   jaarlijkse studiebevestiging hierboven; die vervalt op 27 september, niet op
   15 juli) zitten in een lijst; dat geldt voor **alle** lijsten, ook "Alle
-  studenten". Afgestudeerden vallen er zo vanzelf uit, zonder manuele opkuis.
-- Enkel leden die **nog studeren**: wie bij de bevestiging "ik studeer niet
-  (meer)" (`notStudying`) aanduidde, bevestigt zijn profiel wél en passeert dus
-  de gate, maar hoort in **geen enkele** studiegerichte lijst. Zonder deze extra
-  filter zou zo'n lid via de bevestiging net terug in de lijsten belanden.
+  studenten". Andere statussen vallen er meteen uit, zonder op een verlopen
+  jaarstempel te moeten wachten.
 - **"Alle studenten"** is een synthetische lijst: iedereen, zonder opt-in. Ze is
   bewust **geen `MailCategory`** en heeft dus geen checkbox bij "Mijn account",
   want dit is de lijst om sowieso iedereen te kunnen bereiken.
@@ -960,8 +969,8 @@ bijgewerkt. De Brevo-sync (`apps/web/lib/brevo/`) haalt de tussenpersoon weg.
   admin-tab.
 - **De site is de enige bron van waarheid.** De reconciliatie doet upsert **én
   prune**: wie een categorie afvinkt, van richting verandert, afstudeert
-  (`studyConfirmedYear` verloopt), gedeactiveerd wordt of "ik studeer niet meer"
-  aanduidt, verdwijnt vanzelf uit de betrokken lijsten. Daarom zijn het **verse,
+  (`studyConfirmedYear` verloopt), de status Student uitzet of gedeactiveerd
+  wordt, verdwijnt vanzelf uit de betrokken lijsten. Daarom zijn het **verse,
   door de site aangemaakte** Brevo-lijsten (folder "VTK Website"), niet bestaande
   lijsten waar ook handmatig toegevoegde contacten in kunnen zitten die een prune
   zou wissen.
@@ -993,6 +1002,65 @@ bijgewerkt. De Brevo-sync (`apps/web/lib/brevo/`) haalt de tussenpersoon weg.
   opnieuw probeert en óók faalt. De folder/lijsten/attributen worden pas
   aangemaakt bij de eerste geslaagde sync (knop, cron of profielwijziging), niet
   bij het deployen; er wordt dus niets in Brevo gezet zolang de key/IP niet werkt.
+
+### Uitschrijven komt uit Brevo terug (de koppeling is tweerichting)
+
+De sync hierboven was aanvankelijk eenrichting: de site duwde, Brevo ontving. Wie
+op de uitschrijflink onderaan een campagne klikte, kreeg van Brevo inderdaad geen
+mail meer, maar de site wist dat niet. Die persoon bleef in het beheer als
+ingeschreven staan, bleef meegeteld bij de aantallen en kwam nog altijd in de
+CSV/ZIP-download. Wie die download ooit ergens anders importeerde, mailde iemand
+die net "stop" gezegd had. Sinds augustus 2026 leest de sync uitschrijvingen
+terug (`apps/web/lib/brevo/unsubscribe.ts`).
+
+- **Enkel uitschrijvingen komen terug, geen inschrijvingen.** De site blijft de
+  plek waar iemand zich abonneert; daar staat de opt-in en daar hangt de
+  toestemming aan vast. Brevo is enkel de plek waar iemand kan afhaken. Een
+  contact dat in Brevo van de blacklist gehaald wordt, verandert op de site dus
+  niets.
+- **Twee signalen, twee betekenissen.** Brevo geeft per contact `emailBlacklisted`
+  (geen enkele campagne meer) en `listUnsubscribed` (de lijsten waarvoor het
+  contact zich apart uitschreef). Een blacklist zet `User.mailUnsubscribedAt`;
+  een uitschrijving voor één categorielijst vinkt precies die `MailCategory` af.
+  Uitschrijven voor "Alle studenten" telt als een blacklist: daar is op de site
+  geen vinkje voor, dus het kan niets anders betekenen.
+- **Afwezigheid is géén signaal.** Dat een adres niet (meer) in een lijst zit,
+  lezen we bewust niet als een uitschrijving. De bulk-import bij Brevo verloopt
+  asynchroon, dus een contact dat we net toevoegden kan een tel later nog
+  ontbreken; die afwezigheid meetellen zou iemand uitschrijven omdát we hem
+  inschreven.
+- **`mailUnsubscribedAt` blokkeert álles, ook de alumnilijst.** Brevo kent maar
+  één blacklist per contact, en de student- en alumnilijsten delen dat contact.
+  "Stop" tegen de ene is dus ook "stop" tegen de andere; alles anders doen zou
+  betekenen dat we blijven mailen naar iemand die op de knop drukte. `listWhere()`,
+  `desiredListKeys()` en `listAlumniRecipients()` filteren er alle drie op.
+- **De opt-ins blijven staan.** Een uitschrijving wist `mailCategories` of
+  `alumniMailOptIn` niet. Schrijft het lid zich later opnieuw in, dan krijgt het
+  zijn eigen keuzes terug in plaats van een leeg formulier.
+- **Alleen het lid zelf kan terug, en dan gaat het in één keer.** Op /account
+  verschijnt in dat geval een vinkje "ik wil weer mails ontvangen"
+  (`mailResubscribe`). Dat wist `mailUnsubscribedAt` én haalt de uitschrijving in
+  Brevo weg voor we opnieuw inschrijven, want een adres opnieuw in een lijst
+  zetten heft de blacklist niet op. Een beheerder heeft die knop niet: de
+  alumnitabel toont zo'n account als "zelf uitgeschreven" met een zin erbij in
+  plaats van een knop die niets doet.
+- **Eerst lezen, dan schrijven.** Beide sporen halen de uitschrijvingen op voor ze
+  iets duwen: de reconciliatie leest élke lijst uit voor ze berekent wie waar
+  hoort, en de real-time push haalt eerst het contact op. Andersom zou een
+  profielopslag ("ik pas mijn adres aan") iemand stil terugzetten in de lijsten
+  die hij net verlaten had, en zou de nachtelijke import de uitschrijving van die
+  ochtend overschrijven.
+- **Val om te kennen: een lijst-uitschrijving is niet te wissen via een veld.**
+  Brevo heeft geen `listUnsubscribed` in de update-API. Wat wel werkt, is het
+  contact van de lijst **loskoppelen** (`unlinkListIds`): die uitschrijving hangt
+  aan het lidmaatschap, niet aan het contact. Daarom doet `clearUnsubscribe` een
+  unlink van alle beheerde lijsten plus `emailBlacklisted: false`, en zet de
+  gewone sync het contact daarna opnieuw in de lijsten waar het in hoort.
+- **Matchen gebeurt op `ext_id`, dan pas op adres.** De sync stuurt `user.id` als
+  `ext_id` mee, en dat blijft kloppen wanneer een lid van adres wisselt. Het adres
+  is de terugval voor contacten die ooit anders binnenkwamen, hoofdletterongevoelig
+  vergeleken: Brevo bewaart alles lowercase, een zelf ingevulde persoonlijke mail
+  niet per se.
 
 ### Posten (groepen) & werkingsjaren
 
@@ -3773,7 +3841,7 @@ op null zetten, en dat laatste is precies hoe je per ongeluk je eigen profiel
 wist.
 
 `/admin/it/flows` (superadmin) toont per gate wanneer hij afgaat, wat de eigen
-staat van de kijker is (`onboardedAt`, `studyConfirmedYear`, het huidige
+staat van de kijker is (`onboardedAt`, `isStudent`, `studyConfirmedYear`, het huidige
 academiejaar en de eerstvolgende omslag op 27 september), en het formulier zelf.
 
 Dat is bewust **het echte formulier**, met een opslaan-actie die niets bewaart
@@ -4303,9 +4371,8 @@ overal met naam op de website staan".
 ### Het adresboek staat naast de opt-in-nieuwsbrieven, niet erin
 
 De mailinglijsten uit `lib/mailinglists.ts` zijn studiegericht: ze eisen een
-studiebevestiging van het huidige academiejaar, en die geeft een afgestudeerde per
-definitie nooit meer. Een alumnus in die lijsten zetten zou dus betekenen dat je
-die regel voor iedereen sloopt.
+de expliciete status Student plus een studiebevestiging van het huidige
+academiejaar. Een alumnus zonder studentstatus valt daar dus per definitie uit.
 
 Daarom een eigen bron, met twee helften die pas bij de export samenkomen:
 
@@ -4341,6 +4408,12 @@ In Brevo is dit **een eigen lijst met een eigen sync** (`lib/brevo/alumni.ts`,
 lijsten worden elke nacht gereconcilieerd tegen `desiredListKeys()`, dat enkel
 naar `User`-rijen kijkt en per definitie geen enkele alumnus teruggeeft; zat de
 alumnilijst daarin, dan maakte de reconciliatie ze elke nacht leeg.
+
+Die eigen sync draait wél mee in dezelfde nachtelijke cron-route, want ze haalt
+ook de uitschrijvingen uit Brevo op (zie "Uitschrijven komt uit Brevo terug").
+Zonder dat zou een alumnus die op de uitschrijflink klikt pas uit de lijst vallen
+wanneer iemand toevallig op de sync-knop in het beheer drukt, en tot dan in elke
+export blijven staan.
 
 ---
 

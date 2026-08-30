@@ -11,9 +11,11 @@ plekken: de huidige oplossing werkt, maar is niet de eindvorm.
 Een ingelogd lid wordt omgeleid zolang een van deze twee gaten open staat:
 
 1. **Onboarding:** `onboardedAt` is `null` -> omleiden naar `/onboarding`.
-2. **Studiebevestiging:** `studyConfirmedYear !== currentStudyYear()` -> omleiden
-   naar `/studie-bevestigen`. Let op de functie: dit is het **academiejaar**
-   (cutover 27 september), niet het werkingsjaar (15 juli). Zie
+2. **Studiebevestiging:** alleen wanneer `isStudent` waar is én
+   `studyConfirmedYear !== currentStudyYear()` -> omleiden naar
+   `/studie-bevestigen`. Alumni, academisch personeel en andere niet-studenten
+   krijgen deze jaarlijkse gate niet. Dit is het **academiejaar** (cutover
+   27 september), niet het werkingsjaar (15 juli). Zie
    `docs/design-decisions.md`.
 
 Op de doelpagina zelf grijpt de gate niet in (anders krijg je een lus). Anonieme
@@ -86,7 +88,7 @@ De proxy en de RSC-render delen **geen** React request-cache. De proxy roept
 `getSession` aan voor de gate, en daarna roepen de pagina en/of de `Header`
 `getSession` (via `requireSession`) nog eens aan tijdens de render. Resultaat:
 **~16-20 SQL-statements per geauthenticeerde navigatie**, terwijl de gate maar
-**twee velden** nodig heeft (`onboardedAt`, `studyConfirmedYear`). De volledige
+**drie velden** nodig heeft (`onboardedAt`, `isStudent`, `studyConfirmedYear`). De volledige
 rol-/permissie-machinerie is pure verspilling voor een gate-check.
 
 Voor het verkeersvolume van deze site valt dit niet om, maar het is
@@ -111,9 +113,9 @@ studiestatus veranderen zelden, dus ze horen niet bij elke navigatie opnieuw
 tegen de DB gecheckt te worden. Denkrichtingen voor een herwerking:
 
 - **Lichte gate-query:** een `getGateStatus()` die enkel de sessie valideert en
-  `onboardedAt` + `studyConfirmedYear` selecteert (~2-3 lichte queries, geen
+  `onboardedAt` + `isStudent` + `studyConfirmedYear` selecteert (~2-3 lichte queries, geen
   joins). Snelste verbetering met de kleinste impact.
-- **Status in de sessie/cookie:** `onboarded` en `studyConfirmedYear` als velden
+- **Status in de sessie/cookie:** `onboarded`, `isStudent` en `studyConfirmedYear` als velden
   op de better-auth-sessie zetten, zodat de proxy ze uit de cookie leest zonder
   DB-hit. Vergt invalidatie wanneer het lid onboardt/bevestigt.
 - **Event-driven i.p.v. per-request:** enkel (her)evalueren op de momenten die

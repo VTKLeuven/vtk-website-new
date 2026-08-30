@@ -17,8 +17,8 @@ function dateInputValue(date: Date | null): string {
 
 /**
  * Onboarding / account profile form. Renders the kot address, birth date,
- * contact emails + communication preference + opt-in mailing lists, the study
- * years and programmes, and an optional profile picture. Posts to
+ * contact email(s) waar relevant + opt-in mailing lists, de profielstatussen en
+ * hun conditionele studie-/alumnivelden, en een optionele profielfoto. Posts to
  * {@link saveProfileAction} via {@link SaveForm}, dat de uitkomst als toast
  * toont. Pass `next` to redirect after saving (onboarding); omit it to stay on
  * the page (account), waar de toast de enige bevestiging is.
@@ -43,6 +43,7 @@ export function ProfileForm({
   user: Pick<
     User,
     | "email"
+    | "selfRegisteredAt"
     | "name"
     | "firstName"
     | "lastName"
@@ -57,13 +58,16 @@ export function ProfileForm({
     | "personalEmail"
     | "emailPreference"
     | "mailCategories"
+    | "mailUnsubscribedAt"
     | "shiftReminderDayBefore"
     | "shiftReminderSoon"
     | "calendarOnlyMyAudiences"
     | "studyYears"
     | "studyProgrammes"
+    | "isStudent"
     | "notAtFaculty"
     | "notStudying"
+    | "academicStaffRole"
     | "internationalStudent"
     | "alumni"
     | "graduationYear"
@@ -86,6 +90,10 @@ export function ProfileForm({
   // die splitsen we als startwaarde zodat ze ze meteen kunnen corrigeren.
   const { firstName, lastName } = nameParts(user);
   const selectedCategories = new Set(user.mailCategories);
+  // Wie op de uitschrijflink in een mail klikte, staat uit élke lijst; de
+  // vinkjes hieronder doen dan niets tot hij hier weer opt-in geeft.
+  const unsubscribed = user.mailUnsubscribedAt !== null;
+  const selfRegistered = user.selfRegisteredAt !== null;
 
   const common = getDictionary(locale).common;
   const errorMessages: Record<ProfileErrorCode, string> = {
@@ -108,7 +116,7 @@ export function ProfileForm({
       {next ? <input type="hidden" name="next" value={next} /> : null}
 
       <p className="rounded-xl border border-vtk-blue/12 bg-vtk-blue-soft/40 p-4 text-sm leading-6 text-[#34405e]">
-        {t.privacyNotice}{" "}
+        {selfRegistered ? t.privacyNoticeSelfRegistered : t.privacyNotice}{" "}
         <a
           href={`${locale === "en" ? "/en" : ""}/privacy`}
           className="font-medium text-vtk-ink underline"
@@ -149,7 +157,9 @@ export function ProfileForm({
                   pattern={R_NUMBER_PATTERN}
                   title={t.rNumberHint}
                 />
-                <p className="mt-1 text-xs text-[#5c667f]">{t.rNumberHint}</p>
+                <p className="mt-1 text-xs text-[#5c667f]">
+                  {selfRegistered ? t.rNumberOptionalHint : t.rNumberHint}
+                </p>
               </>
             )}
           </div>
@@ -197,50 +207,81 @@ export function ProfileForm({
       {/* Contact & voorkeur */}
       <fieldset className="space-y-4">
         <legend className="text-lg font-semibold text-vtk-ink">{t.contactHeading}</legend>
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <div>
-            <Label htmlFor="universityEmail">{t.universityEmail}</Label>
-            <Input id="universityEmail" defaultValue={user.email} disabled />
-            <p className="mt-1 text-xs text-[#5c667f]">{t.universityEmailHint}</p>
+        {selfRegistered ? (
+          <div className="sm:max-w-md">
+            <Label htmlFor="accountEmail">{t.accountEmail}</Label>
+            <Input id="accountEmail" defaultValue={user.email} disabled />
+            <p className="mt-1 text-xs text-[#5c667f]">{t.accountEmailHint}</p>
+            {/* Een persoonlijk loginadres heeft geen tweede universiteitsadres
+                en dus ook geen zinvolle communicatiekeuze. Bestaande optionele
+                data blijft wel behouden wanneer het profiel wordt opgeslagen. */}
+            <input type="hidden" name="personalEmail" value={user.personalEmail ?? ""} />
+            <input type="hidden" name="emailPreference" value="PERSONAL" />
           </div>
-          <div>
-            <Label htmlFor="personalEmail">{t.personalEmail}</Label>
-            <Input
-              id="personalEmail"
-              name="personalEmail"
-              type="email"
-              defaultValue={user.personalEmail ?? ""}
-            />
-          </div>
-        </div>
-        <div>
-          <span className="text-sm font-medium text-vtk-ink">{t.preferenceHeading}</span>
-          <p className="text-xs text-[#5c667f]">{t.preferenceHint}</p>
-          <div className="mt-2 flex flex-wrap gap-4">
-            <label className="inline-flex items-center gap-2 text-sm">
-              <input
-                type="radio"
-                name="emailPreference"
-                value="UNIVERSITY"
-                defaultChecked={user.emailPreference !== "PERSONAL"}
-              />
-              {t.preferenceUniversity}
-            </label>
-            <label className="inline-flex items-center gap-2 text-sm">
-              <input
-                type="radio"
-                name="emailPreference"
-                value="PERSONAL"
-                defaultChecked={user.emailPreference === "PERSONAL"}
-              />
-              {t.preferencePersonal}
-            </label>
-          </div>
-        </div>
+        ) : (
+          <>
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div>
+                <Label htmlFor="universityEmail">{t.universityEmail}</Label>
+                <Input id="universityEmail" defaultValue={user.email} disabled />
+                <p className="mt-1 text-xs text-[#5c667f]">{t.universityEmailHint}</p>
+              </div>
+              <div>
+                <Label htmlFor="personalEmail">{t.personalEmail}</Label>
+                <Input
+                  id="personalEmail"
+                  name="personalEmail"
+                  type="email"
+                  defaultValue={user.personalEmail ?? ""}
+                />
+              </div>
+            </div>
+            <div>
+              <span className="text-sm font-medium text-vtk-ink">{t.preferenceHeading}</span>
+              <p className="text-xs text-[#5c667f]">{t.preferenceHint}</p>
+              <div className="mt-2 flex flex-wrap gap-4">
+                <label className="inline-flex items-center gap-2 text-sm">
+                  <input
+                    type="radio"
+                    name="emailPreference"
+                    value="UNIVERSITY"
+                    defaultChecked={user.emailPreference !== "PERSONAL"}
+                  />
+                  {t.preferenceUniversity}
+                </label>
+                <label className="inline-flex items-center gap-2 text-sm">
+                  <input
+                    type="radio"
+                    name="emailPreference"
+                    value="PERSONAL"
+                    defaultChecked={user.emailPreference === "PERSONAL"}
+                  />
+                  {t.preferencePersonal}
+                </label>
+              </div>
+            </div>
+          </>
+        )}
         {/* Mailinglijsten (opt-in) horen bij de contactgegevens. */}
         <div>
           <span className="text-sm font-medium text-vtk-ink">{t.mailHeading}</span>
           <p className="text-xs text-[#5c667f]">{t.mailIntro}</p>
+          {/* Een uitschrijving via de mail komt uit Brevo terug (zie
+              lib/brevo/unsubscribe.ts). Zonder deze uitleg staan de vinkjes
+              hieronder aan terwijl er niets vertrekt, en dat leest als een bug. */}
+          {unsubscribed && (
+            <div className="mt-3 rounded-2xl border border-vtk-blue/15 bg-vtk-surface p-4 shadow-[inset_3px_0_0_var(--yellow)]">
+              <p className="text-sm font-medium text-vtk-ink">{t.mailUnsubscribedHeading}</p>
+              <p className="mt-1 text-xs text-[#5c667f]">{t.mailUnsubscribedHint}</p>
+              <CheckboxChip
+                name="mailResubscribe"
+                value="on"
+                defaultChecked={false}
+                label={t.mailResubscribe}
+                className="mt-3"
+              />
+            </div>
+          )}
           <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4">
             {MAIL_CATEGORIES.map((cat) => (
               <CheckboxChip
@@ -299,8 +340,10 @@ export function ProfileForm({
           locale={locale}
           studyYears={user.studyYears}
           studyProgrammes={user.studyProgrammes}
+          isStudent={user.isStudent}
           notAtFaculty={user.notAtFaculty}
           notStudying={user.notStudying}
+          academicStaffRole={user.academicStaffRole}
           internationalStudent={user.internationalStudent}
           alumni={user.alumni}
           graduationYear={user.graduationYear}

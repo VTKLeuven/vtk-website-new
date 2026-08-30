@@ -4,6 +4,7 @@ import { getDictionary, type Locale } from "@vtk/i18n";
 import { hasLocale } from "@/lib/locale";
 import { requireSession } from "@/lib/session";
 import { currentStudyYear, formatWorkingYear, studyYearStart } from "@/lib/workingYear";
+import { needsStudyConfirmation } from "@vtk/auth";
 import { previewNoopAction } from "@/app/actions/flowPreview";
 import { ProfileForm } from "@/components/profile/ProfileForm";
 import { StudyFieldset } from "@/components/profile/StudyFieldset";
@@ -47,6 +48,7 @@ export default async function AdminFlowPreview({
     where: { id: session.user.id },
     select: {
       email: true,
+      selfRegisteredAt: true,
       name: true,
       firstName: true,
       lastName: true,
@@ -62,13 +64,16 @@ export default async function AdminFlowPreview({
       personalEmail: true,
       emailPreference: true,
       mailCategories: true,
+      mailUnsubscribedAt: true,
       shiftReminderDayBefore: true,
       shiftReminderSoon: true,
       calendarOnlyMyAudiences: true,
       studyYears: true,
       studyProgrammes: true,
+      isStudent: true,
       notAtFaculty: true,
       notStudying: true,
+      academicStaffRole: true,
       internationalStudent: true,
       alumni: true,
       graduationYear: true,
@@ -149,8 +154,8 @@ export default async function AdminFlowPreview({
               </li>
               <li>
                 {nl
-                  ? "Invullen stempelt onboardedAt én studyConfirmedYear; de tweede gate hieronder valt daarmee meteen weg."
-                  : "Submitting stamps onboardedAt and studyConfirmedYear; the second gate below therefore falls away at once."}
+                  ? "Invullen stempelt onboardedAt en, enkel voor de status Student, studyConfirmedYear."
+                  : "Submitting stamps onboardedAt and, only for the Student status, studyConfirmedYear."}
               </li>
             </ul>
           </>
@@ -198,13 +203,13 @@ export default async function AdminFlowPreview({
             <ul className="mt-2 list-disc space-y-1 pl-4">
               <li>
                 {nl
-                  ? `Zodra User.studyConfirmedYear achterloopt op het huidige academiejaar (${formatWorkingYear(year)}).`
-                  : `As soon as User.studyConfirmedYear lags behind the current academic year (${formatWorkingYear(year)}).`}
+                  ? `Enkel met de status Student, zodra User.studyConfirmedYear achterloopt op het huidige academiejaar (${formatWorkingYear(year)}).`
+                  : `Only with the Student status, as soon as User.studyConfirmedYear lags behind the current academic year (${formatWorkingYear(year)}).`}
               </li>
               <li>
                 {nl
-                  ? `Het academiejaar rolt om op 27 september, niet op 15 juli zoals het werkingsjaar: in juli loopt het academiejaar nog. De eerstvolgende omslag is ${rollover}; dan krijgt iedereen dit scherm tegelijk.`
-                  : `The academic year rolls over on 27 September, not on 15 July like the working year: in July the academic year is still running. The next rollover is ${rollover}; everyone gets this screen at the same moment.`}
+                  ? `Het academiejaar rolt om op 27 september, niet op 15 juli zoals het werkingsjaar: in juli loopt het academiejaar nog. De eerstvolgende omslag is ${rollover}; dan krijgen alle studenten dit scherm.`
+                  : `The academic year rolls over on 27 September, not on 15 July like the working year: in July the academic year is still running. The next rollover is ${rollover}; all students then get this screen.`}
               </li>
               <li>
                 {nl
@@ -213,8 +218,8 @@ export default async function AdminFlowPreview({
               </li>
               <li>
                 {nl
-                  ? "Wie hier niet bevestigt, valt uit elke studiegerichte mailinglijst; wie “ik studeer niet (meer)” aanduidt ook."
-                  : "Anyone who does not confirm falls out of every study-related mailing list; so does anyone ticking “I am no longer studying”."}
+                  ? "Wie hier niet bevestigt, valt uit elke studiegerichte mailinglijst. Alumni, personeel en andere niet-studenten krijgen deze gate niet."
+                  : "Anyone who does not confirm falls out of every study-related mailing list. Alumni, staff and other non-students do not get this gate."}
               </li>
             </ul>
           </>
@@ -223,6 +228,10 @@ export default async function AdminFlowPreview({
           <>
             <p className="font-medium text-vtk-ink">{nl ? "Jouw account" : "Your account"}</p>
             <dl className="mt-2 space-y-1">
+              <div className="flex justify-between gap-4">
+                <dt>isStudent</dt>
+                <dd className="text-right">{user.isStudent ? (nl ? "ja" : "yes") : nl ? "nee" : "no"}</dd>
+              </div>
               <div className="flex justify-between gap-4">
                 <dt>studyConfirmedYear</dt>
                 <dd className="text-right">
@@ -240,7 +249,7 @@ export default async function AdminFlowPreview({
               <div className="flex justify-between gap-4">
                 <dt>{nl ? "Gate actief" : "Gate active"}</dt>
                 <dd className="text-right">
-                  {user.studyConfirmedYear === year ? (nl ? "nee" : "no") : nl ? "ja" : "yes"}
+                  {needsStudyConfirmation(user) ? (nl ? "ja" : "yes") : nl ? "nee" : "no"}
                 </dd>
               </div>
             </dl>
@@ -263,8 +272,10 @@ export default async function AdminFlowPreview({
             locale={locale}
             studyYears={user.studyYears}
             studyProgrammes={user.studyProgrammes}
+            isStudent={user.isStudent}
             notAtFaculty={user.notAtFaculty}
             notStudying={user.notStudying}
+            academicStaffRole={user.academicStaffRole}
             internationalStudent={user.internationalStudent}
             alumni={user.alumni}
             graduationYear={user.graduationYear}

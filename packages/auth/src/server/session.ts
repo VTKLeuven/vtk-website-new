@@ -108,6 +108,7 @@ export async function getSession(headers: Headers): Promise<SessionPayload | nul
       isSuperAdmin: user.isSuperAdmin,
       onboarded: user.onboardedAt !== null,
       studyConfirmedYear: user.studyConfirmedYear,
+      isStudent: user.isStudent,
       googleLinked: user.googleUserId !== null,
       googleLinkDeferredAt: user.googleLinkDeferredAt?.toISOString() ?? null,
     },

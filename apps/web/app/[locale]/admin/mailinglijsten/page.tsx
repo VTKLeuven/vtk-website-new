@@ -38,9 +38,12 @@ export default async function AdminMailingLists({
   const nl = locale === "nl";
   const syncOn = brevoEnabled();
 
-  const counts = await Promise.all(
-    MAILING_LISTS.map((id) => prisma.user.count({ where: listWhere(id) }))
-  );
+  const [counts, unsubscribed] = await Promise.all([
+    Promise.all(MAILING_LISTS.map((id) => prisma.user.count({ where: listWhere(id) }))),
+    // Uitschrijvingen komen uit Brevo terug (lib/brevo/unsubscribe.ts). Ze zijn
+    // hier zichtbaar omdat de aantallen hierboven anders onverklaard dalen.
+    prisma.user.count({ where: { mailUnsubscribedAt: { not: null }, deletedAt: null } }),
+  ]);
 
   const label = (id: MailingListId) =>
     id === ALL_STUDENTS ? t.allStudents : categories[id];
@@ -82,6 +85,15 @@ export default async function AdminMailingLists({
             />
           ) : null}
         </div>
+
+        {unsubscribed > 0 ? (
+          <div className="mt-4 border-t border-vtk-blue/10 pt-4">
+            <p className="text-sm font-medium text-vtk-ink">
+              {unsubscribed} {unsubscribed === 1 ? t.member : t.members} · {t.unsubscribedTitle}
+            </p>
+            <p className="mt-1 max-w-2xl text-sm text-[#5c667f]">{t.unsubscribedHint}</p>
+          </div>
+        ) : null}
       </Card>
 
       <Card className="p-5">

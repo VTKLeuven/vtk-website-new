@@ -17,23 +17,29 @@ import {
   EMAIL_PREFERENCES,
   STUDY_YEARS,
   STUDY_PROGRAMMES,
+  ACADEMIC_STAFF_ROLES,
   R_NUMBER_REGEX,
 } from "@/lib/profile";
 import { syncUserToBrevo } from "@/lib/brevo/sync";
 
 /**
  * De studievelden, gedeeld door het volledige profielformulier en de jaarlijkse
- * bevestigingspagina (zie {@link confirmStudyAction}). Alles is optioneel: de
- * registratie mag er niet op blokkeren.
+ * bevestigingspagina (zie {@link confirmStudyAction}). Minstens één profielstatus
+ * is nodig; studiejaar en richting blijven optioneel voor studenten.
  *
  * Meerdere jaren mogen, want een lid kan bv. deels in 2de en deels in 3de
  * bachelor zitten.
  */
-const studySchema = {
+const studyFieldsSchema = {
+  isStudent: z.boolean().default(false),
   studyYears: z.array(z.enum(STUDY_YEARS)).default([]),
   studyProgrammes: z.array(z.enum(STUDY_PROGRAMMES)).default([]),
   notAtFaculty: z.boolean().default(false),
   notStudying: z.boolean().default(false),
+  academicStaff: z.boolean().default(false),
+  academicStaffRole: z
+    .union([z.enum(ACADEMIC_STAFF_ROLES), z.literal("")])
+    .default(""),
   internationalStudent: z.boolean().default(false),
   alumni: z.boolean().default(false),
   // Het afstudeerjaar komt als tekst binnen en mag leeg blijven. De ondergrens
@@ -54,6 +60,24 @@ const studySchema = {
   alumniMailOptIn: z.boolean().default(false),
 };
 
+const studyObjectSchema = z.object(studyFieldsSchema);
+type StudyInput = z.infer<typeof studyObjectSchema>;
+
+/** De combinatieregels die zowel onboarding als jaarlijkse bevestiging afdwingen. */
+function validateStudy(data: StudyInput, ctx: z.RefinementCtx): void {
+  if (!data.isStudent && !data.alumni && !data.academicStaff && !data.notStudying) {
+    ctx.addIssue({ code: "custom", message: "SELECT_STATUS" });
+  }
+  if (data.isStudent && data.notStudying) {
+    ctx.addIssue({ code: "custom", message: "CONFLICTING_STATUS" });
+  }
+  if (data.academicStaff && !data.academicStaffRole) {
+    ctx.addIssue({ code: "custom", path: ["academicStaffRole"], message: "ACADEMIC_ROLE_REQUIRED" });
+  }
+}
+
+const studySchema = studyObjectSchema.superRefine(validateStudy);
+
 /**
  * De `next`-waarde uit een formulier, of `null`. Enkel paden op deze site:
  * `//evil.com` is voor een browser een protocol-relatieve URL, dus die moet er
@@ -67,11 +91,14 @@ function safeNext(formData: FormData): string | null {
 /** De studievelden uit een FormData halen, in de vorm die {@link studySchema} verwacht. */
 function studyFields(formData: FormData) {
   return {
+    isStudent: formData.get("isStudent") === "on",
     studyYears: formData.getAll("studyYears"),
     studyProgrammes: formData.getAll("studyProgrammes"),
     // Niet-aangevinkte checkbox zit niet in de FormData.
     notAtFaculty: formData.get("notAtFaculty") === "on",
     notStudying: formData.get("notStudying") === "on",
+    academicStaff: formData.get("academicStaff") === "on",
+    academicStaffRole: String(formData.get("academicStaffRole") ?? ""),
     internationalStudent: formData.get("internationalStudent") === "on",
     alumni: formData.get("alumni") === "on",
     graduationYear: String(formData.get("graduationYear") ?? ""),
@@ -89,23 +116,16 @@ function studyFields(formData: FormData) {
  * formulier toont ze dan niet meer, dus laten staan zou betekenen dat een
  * afstudeerjaar blijft hangen bij iemand die zegt geen alumnus te zijn.
  */
-function studyUpdate(data: {
-  studyYears: readonly (typeof STUDY_YEARS)[number][];
-  studyProgrammes: readonly (typeof STUDY_PROGRAMMES)[number][];
-  notAtFaculty: boolean;
-  notStudying: boolean;
-  internationalStudent: boolean;
-  alumni: boolean;
-  graduationYear: string;
-  wasInVtk: boolean;
-  alumniMailOptIn: boolean;
-}) {
+function studyUpdate(data: StudyInput) {
   return {
-    studyYears: { set: [...data.studyYears] },
-    studyProgrammes: { set: [...data.studyProgrammes] },
-    notAtFaculty: data.notAtFaculty,
+    isStudent: data.isStudent,
+    studyYears: { set: data.isStudent ? [...data.studyYears] : [] },
+    studyProgrammes: { set: data.isStudent ? [...data.studyProgrammes] : [] },
+    notAtFaculty: data.isStudent ? data.notAtFaculty : false,
     notStudying: data.notStudying,
-    internationalStudent: data.internationalStudent,
+    academicStaffRole:
+      data.academicStaff && data.academicStaffRole ? data.academicStaffRole : null,
+    internationalStudent: data.isStudent ? data.internationalStudent : false,
     alumni: data.alumni,
     graduationYear: data.alumni && data.graduationYear ? Number(data.graduationYear) : null,
     wasInVtk: data.alumni ? data.wasInVtk : false,
@@ -141,11 +161,15 @@ const profileSchema = z.object({
     .default(""),
   emailPreference: z.enum(EMAIL_PREFERENCES),
   mailCategories: z.array(z.enum(MAIL_CATEGORIES)).default([]),
+  // Enkel zichtbaar voor wie zich via een mail uitschreef: het lid vraagt
+  // expliciet om weer mails te krijgen. Dit is de énige weg terug, zowel op de
+  // site als in Brevo (zie lib/brevo/sync.ts).
+  mailResubscribe: z.boolean().default(false),
   shiftReminderDayBefore: z.boolean(),
   shiftReminderSoon: z.boolean(),
   calendarOnlyMyAudiences: z.boolean().default(false),
-  ...studySchema,
-});
+  ...studyFieldsSchema,
+}).superRefine(validateStudy);
 
 const MAX_AVATAR_BYTES = 8 * 1024 * 1024; // 8 MiB before re-encode
 
@@ -205,6 +229,7 @@ export async function saveProfileAction(
     personalEmail: formData.get("personalEmail") ?? "",
     emailPreference: formData.get("emailPreference") ?? "UNIVERSITY",
     mailCategories: formData.getAll("mailCategories"),
+    mailResubscribe: formData.get("mailResubscribe") === "on",
     shiftReminderDayBefore: formData.get("shiftReminderDayBefore") !== null,
     shiftReminderSoon: formData.get("shiftReminderSoon") !== null,
     calendarOnlyMyAudiences: formData.get("calendarOnlyMyAudiences") === "on",
@@ -237,9 +262,12 @@ export async function saveProfileAction(
   // zelfs een gemanipuleerde submit laat het r-nummer dan ongemoeid.
   const existing = await prisma.user.findUnique({
     where: { id: session.user.id },
-    select: { rNumberFromKul: true },
+    select: { rNumberFromKul: true, mailUnsubscribedAt: true },
   });
   const rNumberLocked = existing?.rNumberFromKul ?? false;
+  // Alleen een lid dat écht uitgeschreven stond, schrijft zich opnieuw in; zo
+  // blijft een gewone profielopslag een gewone push naar Brevo.
+  const resubscribe = existing?.mailUnsubscribedAt != null && data.mailResubscribe;
 
   try {
     await prisma.user.update({
@@ -259,13 +287,14 @@ export async function saveProfileAction(
         personalEmail: data.personalEmail || null,
         emailPreference: data.emailPreference,
         mailCategories: { set: data.mailCategories },
+        ...(resubscribe ? { mailUnsubscribedAt: null } : {}),
         shiftReminderDayBefore: data.shiftReminderDayBefore,
         shiftReminderSoon: data.shiftReminderSoon,
         calendarOnlyMyAudiences: data.calendarOnlyMyAudiences,
         ...studyUpdate(data),
         // Wie dit formulier invult, declareert daarmee zijn studie voor dit
         // academiejaar; de bevestigingsgate hoeft er dan niet meer op te vallen.
-        studyConfirmedYear: currentStudyYear(),
+        studyConfirmedYear: data.isStudent ? currentStudyYear() : null,
         ...(newAvatarKey ? { avatarKey: newAvatarKey } : {}),
         // Stamp completion only once; account edits keep the original timestamp.
         ...(wasOnboarded ? {} : { onboardedAt: new Date() }),
@@ -299,7 +328,7 @@ export async function saveProfileAction(
   // Voorkeuren en studie kunnen net gewijzigd zijn: duw het lid naar Brevo zodat
   // de mailinglijsten meteen kloppen. Best-effort na de response (blokkeert het
   // opslaan niet); de dagelijkse reconciliatie is het vangnet als dit faalt.
-  after(() => syncUserToBrevo(session.user.id));
+  after(() => syncUserToBrevo(session.user.id, { resubscribe }));
 
   // Buiten elke try/catch: redirect() werkt via een throw en mag niet als
   // "onverwachte fout" opgevangen worden.
@@ -309,7 +338,7 @@ export async function saveProfileAction(
   return saveOk();
 }
 
-const confirmStudySchema = z.object(studySchema);
+const confirmStudySchema = studySchema;
 
 /**
  * Jaarlijkse bevestiging van het studieprofiel (zie de gate in `proxy.ts`). Zet
@@ -321,6 +350,9 @@ const confirmStudySchema = z.object(studySchema);
  */
 export async function confirmStudyAction(formData: FormData): Promise<void> {
   const session = await requireSession();
+  // De actie is rechtstreeks aanroepbaar. Een niet-student hoort deze aparte
+  // mutatieroute evenmin te gebruiken als de pagina of proxygate.
+  if (!session.user.isStudent) redirect(safeNext(formData) ?? "/");
   const parsed = confirmStudySchema.safeParse(studyFields(formData));
   if (!parsed.success) throw new Error("INVALID_PROFILE");
 
@@ -328,7 +360,7 @@ export async function confirmStudyAction(formData: FormData): Promise<void> {
     where: { id: session.user.id },
     data: {
       ...studyUpdate(parsed.data),
-      studyConfirmedYear: currentStudyYear(),
+      studyConfirmedYear: parsed.data.isStudent ? currentStudyYear() : null,
     },
   });
 

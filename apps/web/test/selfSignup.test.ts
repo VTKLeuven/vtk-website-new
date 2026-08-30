@@ -89,6 +89,8 @@ describe("registerSelfServiceAccount", () => {
         data: expect.objectContaining({
           email: "jan@example.com",
           emailVerified: false,
+          emailPreference: "PERSONAL",
+          isStudent: false,
           alumni: true,
           graduationYear: 2004,
           selfRegisteredAt: expect.any(Date),
@@ -122,8 +124,10 @@ describe("registerSelfServiceAccount", () => {
         data: expect.objectContaining({
           email: "jan@example.com",
           emailVerified: false,
+          emailPreference: "PERSONAL",
+          isStudent: false,
           alumni: false,
-          notStudying: false,
+          notStudying: true,
           graduationYear: null,
           wasInVtk: false,
           alumniMailOptIn: false,

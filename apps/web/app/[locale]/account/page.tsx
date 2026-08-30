@@ -62,6 +62,7 @@ export default async function AccountPage({ params }: { params: Promise<{ locale
       where: { id: session.user.id },
       select: {
         email: true,
+        selfRegisteredAt: true,
         name: true,
         firstName: true,
         lastName: true,
@@ -77,13 +78,16 @@ export default async function AccountPage({ params }: { params: Promise<{ locale
         personalEmail: true,
         emailPreference: true,
         mailCategories: true,
+        mailUnsubscribedAt: true,
         shiftReminderDayBefore: true,
         shiftReminderSoon: true,
         calendarOnlyMyAudiences: true,
         studyYears: true,
         studyProgrammes: true,
+        isStudent: true,
         notAtFaculty: true,
         notStudying: true,
+        academicStaffRole: true,
         internationalStudent: true,
         alumni: true,
         graduationYear: true,
@@ -450,7 +454,7 @@ export default async function AccountPage({ params }: { params: Promise<{ locale
               resetEmail={password.resetEmail}
               usesPersonalEmail={password.usesPersonalEmail}
               loginEmail={session.user.email}
-              urgent={!password.hasPassword && (profile.alumni || profile.notStudying)}
+              urgent={!password.hasPassword && !profile.isStudent}
             />
 
             <Card className="p-6">

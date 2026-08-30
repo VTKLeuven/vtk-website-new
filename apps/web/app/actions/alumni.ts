@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { after } from "next/server";
 import { z } from "zod";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@vtk/db";
@@ -9,7 +10,7 @@ import { logAudit } from "@/lib/audit";
 import { saveError, saveOk, type SaveState } from "@/lib/saveState";
 import { parseAlumniPaste } from "@/lib/alumni";
 import { brevoEnabled } from "@/lib/brevo/client";
-import { syncAlumniToBrevo } from "@/lib/brevo/alumni";
+import { resubscribeAlumnusInBrevo, syncAlumniToBrevo } from "@/lib/brevo/alumni";
 
 /** Beheer van het alumni-adresboek: toevoegen, bijwerken, uitschrijven, verwijderen. */
 
@@ -172,7 +173,7 @@ export async function toggleAlumniSubscriptionAction(formData: FormData): Promis
 
   const existing = await prisma.alumniContact.findUnique({
     where: { id },
-    select: { unsubscribedAt: true, firstName: true, lastName: true },
+    select: { unsubscribedAt: true, firstName: true, lastName: true, email: true },
   });
   if (!existing) return;
 
@@ -180,6 +181,11 @@ export async function toggleAlumniSubscriptionAction(formData: FormData): Promis
     where: { id },
     data: { unsubscribedAt: existing.unsubscribedAt ? null : new Date() },
   });
+
+  // Opnieuw inschrijven moet ook in Brevo doorgaan: klikte dit adres ooit op de
+  // uitschrijflink, dan blijft het daar geblokkeerd en verandert opnieuw
+  // toevoegen aan de lijst daar niets aan. Best-effort en na de response.
+  if (existing.unsubscribedAt) after(() => resubscribeAlumnusInBrevo(existing.email));
 
   await logAudit({
     action: "update",
@@ -205,7 +211,14 @@ export async function toggleAlumniAccountOptInAction(formData: FormData): Promis
 
   const user = await prisma.user.findUnique({
     where: { id },
-    select: { name: true, alumniMailOptIn: true },
+    select: {
+      name: true,
+      alumniMailOptIn: true,
+      mailUnsubscribedAt: true,
+      email: true,
+      personalEmail: true,
+      emailPreference: true,
+    },
   });
   if (!user) return;
 
@@ -213,6 +226,15 @@ export async function toggleAlumniAccountOptInAction(formData: FormData): Promis
     where: { id },
     data: { alumni: true, alumniMailOptIn: !user.alumniMailOptIn },
   });
+
+  // Schreef het lid zichzelf via een mail uit, dan blijft dat gelden: die keuze
+  // is van hem en staat los van deze opt-in. De tabel toont dat ook zo, dus deze
+  // knop hoort daar niet te staan; komt hij er toch langs, dan raken we Brevo niet.
+  if (!user.alumniMailOptIn && user.mailUnsubscribedAt === null) {
+    const email =
+      user.emailPreference === "PERSONAL" && user.personalEmail ? user.personalEmail : user.email;
+    after(() => resubscribeAlumnusInBrevo(email));
+  }
 
   await logAudit({
     action: "update",

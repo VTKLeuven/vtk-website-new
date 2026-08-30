@@ -1,4 +1,4 @@
-import { currentStudyYear } from "@vtk/auth";
+import { needsStudyConfirmation } from "@vtk/auth";
 import { prisma } from "@vtk/db";
 import { pick } from "@vtk/i18n";
 
@@ -207,7 +207,7 @@ export async function GET(request: Request) {
  */
 async function tasksFor(
   userId: string,
-  user: { onboarded: boolean; studyConfirmedYear: number | null },
+  user: { onboarded: boolean; isStudent: boolean; studyConfirmedYear: number | null },
   now: Date,
   horizon: Date,
 ): Promise<AppTodayTask[]> {
@@ -225,7 +225,7 @@ async function tasksFor(
       highlight: true,
       at: null,
     });
-  } else if (user.studyConfirmedYear !== currentStudyYear()) {
+  } else if (needsStudyConfirmation(user)) {
     tasks.push({
       kind: "gate",
       title: "Bevestig je studie",

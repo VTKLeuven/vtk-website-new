@@ -196,8 +196,9 @@ export async function adminRead(principal: McpPrincipal, raw: McpAdminReadInput)
           id: true, name: true, firstName: true, lastName: true, email: true,
           rNumber: true, locale: true, active: true, isSuperAdmin: true,
           firwStudent: true, personalEmail: true, emailPreference: true,
-          studyYears: true, studyProgrammes: true, notAtFaculty: true,
-          notStudying: true, internationalStudent: true, alumni: true, studyConfirmedYear: true,
+          studyYears: true, studyProgrammes: true, isStudent: true, notAtFaculty: true,
+          notStudying: true, academicStaffRole: true, internationalStudent: true,
+          alumni: true, studyConfirmedYear: true,
           createdAt: true, updatedAt: true,
           memberships: {
             orderBy: { year: "desc" },

@@ -451,6 +451,15 @@ enum GoogleAccountState {
   FULL
 }
 
+/// Functie van een lid dat zichzelf als academisch personeel aanduidt. `null`
+/// op User betekent dat die status niet van toepassing is.
+enum AcademicStaffRole {
+  PROFESSOR
+  ASSISTANT
+  ADMINISTRATIVE
+  OTHER
+}
+
 model User {
   id                   String    @id @default(cuid())
   // `name` blijft de weergavenaam (en het veld dat better-auth zelf zet bij een
@@ -517,7 +526,19 @@ model User {
   // kiesploeg; zie lib/google/accountState.ts.
   googleAccountState      GoogleAccountState?
   // Opt-in mailinglijsten: enkel de aangeduide categorieën zitten in de array.
-  mailCategories          MailCategory[]      @default([])
+  mailCategories         MailCategory[]      @default([])
+  // Wanneer het lid zich via een mail zelf uitschreef (de uitschrijflink in
+  // Brevo). Bewust een datum en geen boolean: het beheer wil kunnen zien wanneer
+  // die keuze viel, en het is een keuze van het lid die we niet stil mogen
+  // overschrijven.
+  //
+  // Dit blokkeert **elke** lijstmail (de studiegerichte categorieën én de
+  // alumnilijst), want Brevo kent maar één uitschrijving per contact: wie op
+  // "unsubscribe" klikt, zegt dat tegen VTK als geheel. Alleen het lid zelf zet
+  // dit terug, via de opt-in op /account; een import of een profielopslag mag
+  // het nooit wissen. `mailCategories` blijft bewust staan, zodat een lid dat
+  // zich opnieuw inschrijft zijn oude voorkeuren terugkrijgt.
+  mailUnsubscribedAt     DateTime?           @db.Timestamptz(3)
   // Herinneringen voor een shift waarvoor je jezelf inschreef. Bewust geen
   // `MailCategory`: dat zijn opt-in nieuwsbrieven, dit is transactioneel. Wel
   // uitzetbaar, want niet iedereen wil twee mails per shift.
@@ -525,17 +546,23 @@ model User {
   shiftReminderSoon       Boolean             @default(true)
   // Studie: meerdere studiejaren en richtingen mogelijk (iemand kan bv. deels in
   // 2de en deels in 3de bachelor zitten).
-  studyYears              StudyYear[]         @default([])
-  studyProgrammes         StudyProgramme[]    @default([])
+  // Expliciete studentstatus. Vroeger betekende "niet notStudying" impliciet
+  // student, waardoor alumni en personeel elk academiejaar onterecht door de
+  // studiebevestigingsgate gingen. Staat los van `alumni`: iemand kan beide zijn.
+  isStudent              Boolean             @default(true)
+  studyYears             StudyYear[]         @default([])
+  studyProgrammes        StudyProgramme[]    @default([])
   // Lid dat niet aan de faculteit Ingenieurswetenschappen studeert. Bewust geen
   // `StudyProgramme`-waarde: het is geen richting, en als enum-waarde zou het
   // overal opduiken waar richtingen opgelijst worden (o.a. de career-export).
-  notAtFaculty            Boolean             @default(false)
-  // Lid dat niet (meer) studeert: afgestudeerd of gestopt. Bewust los van
-  // `notAtFaculty` (dat is "studeert wél, maar elders"): wie dit aanduidt valt
-  // uit élke studiegerichte mailinglijst (zie lib/mailinglists.ts). Blijft een
-  // aparte boolean om dezelfde reden als notAtFaculty.
-  notStudying             Boolean             @default(false)
+  notAtFaculty           Boolean             @default(false)
+  // Expliciete status "ik studeer niet" voor wie geen student, alumnus of
+  // academisch personeelslid is. Bewust los van `notAtFaculty` (dat is
+  // "studeert wél, maar elders").
+  notStudying            Boolean             @default(false)
+  // Subtype voor wie "academisch personeel" aanvinkt. De status zelf wordt uit
+  // een niet-null waarde afgeleid, zodat checkbox en subtype niet uiteenlopen.
+  academicStaffRole      AcademicStaffRole?
   // Verbergt doelgroepevents die niet bij het profiel passen.
   //
   // Standaard **uit**: alles is publiek en een eerstejaars mag gerust zien dat er
@@ -579,12 +606,11 @@ model User {
   // account dat een beheerder aanmaakte of dat via SSO binnenkwam is per
   // definitie vertrouwd; enkel bij een zelfgemaakt account houdt een
   // onbevestigd adres de login tegen (zie `loginAction`).
-  selfRegisteredAt        DateTime?           @db.Timestamptz(3)
-  // Academiejaar waarin het lid zijn studieprofiel laatst bevestigde (2026 =
-  // "26-27"). Loopt dat achter op het huidige academiejaar, dan is het profiel
-  // verlopen: de bevestigingsgate vraagt het opnieuw en het lid valt zolang uit
-  // de mailinglijsten. Zo blijft "actief student" een jaarlijks vers signaal
-  // zonder koppeling met de cursusdienst.
+  selfRegisteredAt       DateTime?           @db.Timestamptz(3)
+  // Academiejaar waarin een lid met `isStudent` zijn studieprofiel laatst
+  // bevestigde (2026 = "26-27"). Loopt dat achter op het huidige academiejaar,
+  // dan is het profiel verlopen: de bevestigingsgate vraagt het opnieuw en het
+  // lid valt zolang uit de mailinglijsten. Andere statussen negeren deze stempel.
   //
   // Dit is bewust NIET het werkingsjaar: dat kantelt op 15 juli, terwijl het
   // academiejaar tot eind september loopt. De bevestiging vervalt daarom op

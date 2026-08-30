@@ -53,6 +53,10 @@ export async function listAlumniRecipients(
         alumniMailOptIn: true,
         active: true,
         deletedAt: null,
+        // Wie zich via een mail uitschreef, valt uit élke lijst, ook deze: Brevo
+        // kent maar één uitschrijving per contact, dus "stop" tegen de
+        // studentenmails is ook "stop" tegen de alumnimails.
+        mailUnsubscribedAt: null,
         ...(year ? { graduationYear: year } : {}),
       },
       select: {
@@ -162,6 +166,13 @@ export type AlumniAccount = {
   graduationYear: number | null;
   wasInVtk: boolean;
   optedIn: boolean;
+  /**
+   * Het lid schreef zichzelf uit via de link in een VTK-mail. Dan krijgt het
+   * niets meer, wat de opt-in hierboven ook zegt, en kan enkel het lid zelf dat
+   * terugzetten (op /account). Bewust een apart veld: een beheerder die dit niet
+   * ziet, denkt dat de knop hiernaast iets doet.
+   */
+  selfUnsubscribed: boolean;
   active: boolean;
 };
 
@@ -201,6 +212,7 @@ export async function listAlumniAccounts(filter: {
       graduationYear: true,
       wasInVtk: true,
       alumniMailOptIn: true,
+      mailUnsubscribedAt: true,
       active: true,
     },
   });
@@ -212,6 +224,7 @@ export async function listAlumniAccounts(filter: {
     graduationYear: row.graduationYear,
     wasInVtk: row.wasInVtk,
     optedIn: row.alumniMailOptIn,
+    selfUnsubscribed: row.mailUnsubscribedAt !== null,
     active: row.active,
   }));
 }

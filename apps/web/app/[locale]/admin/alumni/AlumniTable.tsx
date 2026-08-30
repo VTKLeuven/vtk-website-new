@@ -114,9 +114,25 @@ export function AlumniTable({
                       {account.wasInVtk ? (nl ? "Ja" : "Yes") : "-"}
                     </td>
                     <td className="px-4 py-3">
-                      <MailStatus enabled={account.optedIn} locale={locale} />
+                      {account.selfUnsubscribed ? (
+                        <span className="rounded-md bg-zinc-100 px-2 py-0.5 text-xs text-zinc-600">
+                          {nl ? "Zelf uitgeschreven" : "Unsubscribed themselves"}
+                        </span>
+                      ) : (
+                        <MailStatus enabled={account.optedIn} locale={locale} />
+                      )}
                     </td>
                     <td className="px-4 py-3 text-right">
+                      {/* Wie zichzelf via de mail uitschreef, krijgt niets meer,
+                          wat de opt-in ook zegt. Een knop tonen die daar niets
+                          aan verandert is erger dan geen knop. */}
+                      {account.selfUnsubscribed ? (
+                        <span className="text-xs text-[#5c667f]">
+                          {nl
+                            ? "Schreef zich uit via een VTK-mail. Alleen het lid zelf kan dat terugzetten, op zijn accountpagina."
+                            : "Unsubscribed through a VTK email. Only the member can undo that, on their account page."}
+                        </span>
+                      ) : (
                       <form action={toggleAlumniAccountOptInAction}>
                         <input type="hidden" name="id" value={account.id} />
                         <button
@@ -132,6 +148,7 @@ export function AlumniTable({
                               : "Subscribe"}
                         </button>
                       </form>
+                      )}
                     </td>
                   </tr>
                 );
