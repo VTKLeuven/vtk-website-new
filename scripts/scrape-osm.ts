@@ -17,7 +17,7 @@
  *
  * Gebruik:
  *   npx tsx scripts/scrape-osm.ts
- *   npx tsx scripts/scrape-osm.ts --bbox 50.86,4.67,50.87,4.69 --out scripts/osm.json
+ *   npx tsx scripts/scrape-osm.ts --bbox 50.86,4.67,50.87,4.69
  */
 
 import { writeFile } from "node:fs/promises";
@@ -161,7 +161,9 @@ function parseArgs(argv: string[]) {
   if (bbox.length !== 4 || bbox.some(Number.isNaN)) {
     throw new Error("--bbox verwacht zuid,west,noord,oost");
   }
-  return { bbox, out: get("--out") ?? "scripts/osm-campus.json" };
+  // Naast de app-API, want de app haalt hem daar op en Next bundelt een JSON
+  // die geïmporteerd wordt. In `scripts/` zou hij niet mee gedeployd worden.
+  return { bbox, out: get("--out") ?? "apps/web/lib/campus/osm-campus.json" };
 }
 
 async function main() {

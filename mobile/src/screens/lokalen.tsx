@@ -4,8 +4,11 @@ import { useMemo, useState } from 'react';
 import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { fetchRooms } from '../api/endpoints';
-import type { AppRoom } from '../api/contract';
+import type { AppBuilding, AppCampusMap, AppRoom } from '../api/contract';
 import { messageFor, useResource } from '../api/useResource';
+import { metres, type LatLng } from '../campus/geo';
+import { nearestNode, prepare, shortestPath } from '../campus/route';
+import { CampusMap } from '../components/CampusMap';
 import { PageHead } from '../components/PageHead';
 import { SearchField } from '../components/SearchField';
 import { Empty, ErrorState, Loading, StaleNotice } from '../components/ui';
@@ -21,12 +24,63 @@ import { COLORS, RADIUS, SPACING, TYPE } from '../theme/tokens';
  * lokaal zoekt. Filteren gebeurt daarom lokaal, met dezelfde normalisatie als op
  * de server, zodat "200K 00.06", "200k0006" en "aula k" hetzelfde vinden.
  *
- * De kaart komt onder het zoekveld in fase 2; zie `docs/lokalenzoeker.md`.
+ * De kaart eronder is `CampusMap`; de route wordt hier berekend en niet daar,
+ * zodat de kaart puur tekent en dit scherm de toestand houdt.
  */
+
+/** Verder dan dit hoort een ingang niet bij een gebouw. */
+const ENTRANCE_RADIUS = 90;
 
 /** Kleine letters, punten en spaties weg. Zelfde regel als in de API. */
 function normalise(value: string): string {
   return value.toLowerCase().replace(/[\s._-]/g, '');
+}
+
+/**
+ * De ingang die het dichtst bij het gebouw ligt.
+ *
+ * Een route naar het zwaartepunt zet je middenin het gebouw af en laat je de
+ * laatste ronde zelf zoeken. OSM heeft de deuren, dus die gebruiken we. Staat er
+ * geen ingang in de buurt, dan valt de route terug op het zwaartepunt.
+ */
+function entranceFor(building: AppBuilding, campus: AppCampusMap): LatLng | null {
+  if (building.lat === null || building.lng === null) return null;
+  const centre: LatLng = [building.lat, building.lng];
+
+  let best: LatLng | null = null;
+  let bestDistance = ENTRANCE_RADIUS;
+  for (const entrance of campus.entrances) {
+    const here: LatLng = [entrance.lat, entrance.lng];
+    const distance = metres(here, centre);
+    if (distance < bestDistance) {
+      bestDistance = distance;
+      best = here;
+    }
+  }
+  return best ?? centre;
+}
+
+/**
+ * De halte waar de campus begint.
+ *
+ * OSM geeft er vijf terug, waaronder beide richtingen van dezelfde halte, en de
+ * eerste uit die lijst is geen keuze maar toeval. Genomen wordt de halte die het
+ * dichtst bij het midden van de campus ligt: dat is stabiel, en het is waar de
+ * meeste mensen uitstappen. Zodra `expo-location` erin zit (fase 3) vervangt de
+ * eigen positie dit hele stuk.
+ */
+function arrivalStop(campus: AppCampusMap): { lat: number; lng: number; name: string | null } | null {
+  if (campus.busStops.length === 0) return null;
+
+  const nodes = campus.walk.nodes;
+  const centre: LatLng = [
+    nodes.reduce((sum, node) => sum + node[0], 0) / nodes.length,
+    nodes.reduce((sum, node) => sum + node[1], 0) / nodes.length,
+  ];
+
+  return campus.busStops.reduce((best, stop) =>
+    metres([stop.lat, stop.lng], centre) < metres([best.lat, best.lng], centre) ? stop : best,
+  );
 }
 
 function floorLabel(floor: number | null): string | null {
@@ -36,6 +90,7 @@ function floorLabel(floor: number | null): string | null {
 
 export default function LokalenScreen() {
   const [query, setQuery] = useState('');
+  const [picked, setPicked] = useState<string | null>(null);
   const resource = useResource('lokalen', () => fetchRooms());
   const data = resource.data;
 
@@ -58,6 +113,48 @@ export default function LokalenScreen() {
       .sort((a, b) => a.score - b.score || a.room.label.localeCompare(b.room.label, 'nl'))
       .map((entry) => entry.room);
   }, [rooms, query]);
+
+  /**
+   * Waar de kaart naartoe wijst.
+   *
+   * Een zoekopdracht die op één gebouw uitkomt is net zo goed een keuze als
+   * erop tikken; wachten op een extra tik laat iemand raden dat er nog iets te
+   * zien is. Tikken wint wel van zoeken, want dat is de meest recente keuze.
+   */
+  const focus = useMemo(() => {
+    if (picked) return picked;
+    const ids = new Set(results.map((room) => room.buildingId));
+    return ids.size === 1 ? [...ids][0] : null;
+  }, [picked, results]);
+
+  const graph = useMemo(
+    () => (data ? prepare(data.campus.walk) : null),
+    [data],
+  );
+
+  /**
+   * De route naar het gekozen gebouw.
+   *
+   * Vertrek is voorlopig de bushalte: bruikbaar zonder één toestemmingsvraag, en
+   * het is waar de meeste mensen de campus binnenkomen. Zodra `expo-location`
+   * erin zit (fase 3) wordt dat de eigen positie.
+   */
+  const route = useMemo(() => {
+    if (!data || !graph) return null;
+    const building = data.buildings.find((entry) => entry.id === focus);
+    if (!building || building.lat === null || building.lng === null) return null;
+
+    const start = arrivalStop(data.campus);
+    if (!start) return null;
+
+    const target = entranceFor(building, data.campus) ?? [building.lat, building.lng];
+    const path = shortestPath(
+      graph,
+      nearestNode(graph, [start.lat, start.lng]),
+      nearestNode(graph, target),
+    );
+    return path ? { ...path, from: start.name, building } : null;
+  }, [data, graph, focus]);
 
   if (resource.loading) {
     return (
@@ -85,10 +182,29 @@ export default function LokalenScreen() {
       <View style={styles.search}>
         <SearchField
           value={query}
-          onChange={setQuery}
+          onChange={(next) => {
+            setQuery(next);
+            // Opnieuw beginnen te typen laat de keuze los; anders blijft de
+            // kaart een gebouw tonen dat niet meer in de lijst staat.
+            setPicked(null);
+          }}
           placeholder="200K 00.06, aula, Franklin"
           label="Zoek een lokaal of gebouw"
         />
+
+        <CampusMap
+          buildings={data.buildings}
+          campus={data.campus}
+          selectedId={focus}
+          routePoints={route?.points ?? []}
+          onSelect={(id) => setPicked((current) => (current === id ? null : id))}
+        />
+
+        <Text style={styles.legend}>
+          {route
+            ? `${route.building.name}${route.building.shortCode ? ` (${route.building.shortCode})` : ''} · ${Math.round(route.metres)} m te voet vanaf ${route.from ?? 'de halte'}`
+            : 'Tik een gebouw aan of zoek een lokaal; de route wordt hier berekend.'}
+        </Text>
       </View>
 
       <FlatList
@@ -141,7 +257,8 @@ function RoomRow({ room }: { room: AppRoom }) {
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: COLORS.paper },
-  search: { padding: SPACING.lg, paddingBottom: SPACING.sm },
+  search: { padding: SPACING.lg, paddingBottom: SPACING.sm, gap: SPACING.md },
+  legend: { ...TYPE.small, color: COLORS.muted },
   list: { paddingHorizontal: SPACING.lg, paddingBottom: SPACING.xxl, gap: SPACING.sm },
 
   row: {

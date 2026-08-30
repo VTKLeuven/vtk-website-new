@@ -1,6 +1,7 @@
 import type { Prisma } from "@prisma/client";
 import { prisma } from "@vtk/db";
 
+import { campusMap } from "@/lib/campus/map";
 import { corsPreflight } from "@/lib/cors";
 import type { AppBuilding, AppRoom, AppRooms } from "@/lib/app-api/contract";
 import { appErrorResponse, appJson } from "@/lib/app-api/respond";
@@ -70,6 +71,7 @@ export async function GET(request: Request) {
       buildings: payload,
       results: query ? search(payload, query) : [],
       sourceUrl: KULAG,
+      campus: campusMap(new Set(payload.map((building) => building.kulagId))),
     };
 
     return appJson(request, body);

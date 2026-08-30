@@ -1262,6 +1262,35 @@ export type AppBuilding = {
   rooms: AppRoom[];
 };
 
+
+/**
+ * De ondergrond van de campuskaart, uit OpenStreetMap.
+ *
+ * KU Leuven publiceert de gebouwen maar niet de paden ertussen; dat netwerk komt
+ * hier vandaan en is wat "breng me erheen" een echte route maakt. De app rekent
+ * de route zelf uit over deze graaf, dus dit gaat één keer mee en werkt daarna
+ * zonder netwerk.
+ *
+ * **ODbL: "© OpenStreetMap contributors" hoort zichtbaar bij elke kaart die
+ * hiermee getekend wordt.** Dat is de licentie, niet een nette gewoonte.
+ */
+export type AppCampusMap = {
+  attribution: string;
+  /**
+   * Het wandelnetwerk. `nodes` zijn [lat, lng]-paren, `edges` verwijst met
+   * indexen in `nodes`. Enkel de grootste samenhangende component: een los
+   * stukje pad is geen route maar wel een val, want het dichtstbijzijnde
+   * knooppunt bij een gebouw kan erin liggen.
+   */
+  walk: { nodes: [number, number][]; edges: [number, number][] };
+  /** Hier eindigt een route, niet in het zwaartepunt van het gebouw. */
+  entrances: { lat: number; lng: number; main: boolean }[];
+  /** Bruikbaar vertrekpunt zolang de app de eigen positie niet kent. */
+  busStops: { lat: number; lng: number; name: string | null }[];
+  /** Gebouwen die KULag niet kent (Alma, IMEC), als context op de kaart. */
+  context: [number, number][][];
+};
+
 export type AppRooms = {
   buildings: AppBuilding[];
   /** Enkel gevuld bij een zoekopdracht; anders leeg. */
@@ -1271,4 +1300,6 @@ export type AppRooms = {
    * app zegt dat en verwijst door in plaats van te doen alsof het niet bestaat.
    */
   sourceUrl: string;
+  /** De ondergrond van de kaart. */
+  campus: AppCampusMap;
 };
