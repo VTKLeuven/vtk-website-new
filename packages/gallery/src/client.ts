@@ -67,22 +67,28 @@ export function createGalleryClient({
 
   async function listAlbumAssets(albumId: string, { size = 1000 } = {}): Promise<ImmichAsset[]> {
     const assets: ImmichAsset[] = [];
-    const seenPages = new Set<string>();
-    let page: number | string | null = 1;
+    const seenPages = new Set<number>();
+    let page: number | null = 1;
 
     while (page) {
-      const pageKey = String(page);
-      if (seenPages.has(pageKey)) {
+      if (seenPages.has(page)) {
         throw new GalleryError(502, 'Immich album asset pagination loop detected.', 'immich_pagination_loop');
       }
-      seenPages.add(pageKey);
+      seenPages.add(page);
 
       const result: ImmichSearchResponse = await immichJson<ImmichSearchResponse>('/search/metadata', {
         method: 'POST',
         body: { albumIds: [albumId], page, size },
       });
       assets.push(...(result?.assets?.items || []));
-      page = result?.assets?.nextPage || null;
+
+      // Immich geeft `nextPage` terug als string ("2"), terwijl /search/metadata
+      // `page` als getal valideert en die string weigert met HTTP 400. Geef je
+      // ze ongewijzigd door, dan faalt elk album met meer dan `size` foto's op
+      // zijn tweede pagina. Dat viel lang niet op, want tot de import van het
+      // oude archief had geen enkel album er zoveel.
+      const next = Number(result?.assets?.nextPage);
+      page = Number.isInteger(next) && next > 0 ? next : null;
     }
 
     return assets;
@@ -216,12 +222,14 @@ export function createGalleryClient({
     const allMarkers = [ownMarker, ...otherMarkers];
 
     const summaries = await immichJson<ImmichAlbumSummary[]>('/albums');
-    const details = await Promise.all((summaries || []).map((album) => getFullAlbum(album.id)));
 
     const ambiguous: AmbiguousAlbum[] = [];
-    const mine: ImmichAlbumSummary[] = [];
+    const wanted: ImmichAlbumSummary[] = [];
 
-    for (const album of details) {
+    // De merker staat al in de albumlijst, dus we filteren voor we de foto's
+    // ophalen. Anders haalt elke galerij ook de volledige inhoud binnen van de
+    // albums van de andere, om ze daarna weg te gooien.
+    for (const album of summaries || []) {
       const description = String(album.description || '');
       // Een lege merker zou elk album opeisen; dat mag nooit, want dan slorpt
       // deze galerij ook die van de andere op.
@@ -237,8 +245,25 @@ export function createGalleryClient({
         });
         continue;
       }
-      mine.push(album);
+      wanted.push(album);
     }
+
+    const settled = await Promise.allSettled(wanted.map((album) => getFullAlbum(album.id)));
+    const mine: ImmichAlbumSummary[] = [];
+
+    settled.forEach((result, index) => {
+      if (result.status === 'fulfilled') {
+        mine.push(result.value);
+        return;
+      }
+      // Eén album dat niet laadt mag de galerij niet leegmaken. Dit liep via
+      // Promise.all, en toen één album op een paginatiefout viel verdween de
+      // volledige lijst van de site in plaats van dat ene album.
+      console.warn(
+        `[gallery:${id}] album ${wanted[index]?.albumName || wanted[index]?.id} overgeslagen:`,
+        result.reason,
+      );
+    });
 
     mine.sort((left, right) => dateValue(right.startDate) - dateValue(left.startDate));
 
@@ -247,7 +272,17 @@ export function createGalleryClient({
 
     for (const album of mine) {
       const publicDescription = stripMarkers(album.description || '', allMarkers);
-      const sharedLink = await ensureAlbumSharedLink(album, publicDescription);
+
+      // Om dezelfde reden als hierboven: een album zonder werkende gedeelde
+      // link heeft geen foto-URL's en valt weg, maar neemt de rest niet mee.
+      let sharedLink: ImmichSharedLink;
+      try {
+        sharedLink = await ensureAlbumSharedLink(album, publicDescription);
+      } catch (error) {
+        console.warn(`[gallery:${id}] geen gedeelde link voor ${album.albumName || album.id}:`, error);
+        continue;
+      }
+
       const slug = allocateSlug(album.albumName || 'album');
       albums.push(
         mapAlbumDetail({
