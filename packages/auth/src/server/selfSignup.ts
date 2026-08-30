@@ -133,10 +133,16 @@ export async function registerSelfServiceAccount(
         locale: input.locale,
         emailVerified: false,
         selfRegisteredAt: new Date(),
+        // Dit is een persoonlijk loginadres; er is geen universiteitsadres om
+        // mee te vergelijken en de onboarding vraagt dus geen mailvoorkeur.
+        emailPreference: 'PERSONAL',
+        isStudent: false,
         // De onboarding hoort er ook voor dit account bij: die vult adres,
         // voorkeuren en het alumni-profiel aan. `onboardedAt` blijft dus null.
         alumni: isAlumni,
-        notStudying: isAlumni,
+        // Een alumnus heeft zijn eigen status. Voor andere externe accounts is
+        // "ik studeer niet" de veilige voorselectie; onboarding kan dit wijzigen.
+        notStudying: !isAlumni,
         graduationYear: isAlumni ? (input.graduationYear ?? null) : null,
         wasInVtk: isAlumni ? (input.wasInVtk ?? false) : false,
         alumniMailOptIn: isAlumni ? (input.alumniMailOptIn ?? false) : false,

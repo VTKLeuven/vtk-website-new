@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from 'next/server';
-import { AUTH_BASE_PATH, currentStudyYear } from '@vtk/auth';
+import { AUTH_BASE_PATH, needsStudyConfirmation } from '@vtk/auth';
 import { googleLinkGateEnabled } from '@/lib/google/config';
 import { getSession } from '@vtk/auth/server';
 import {
@@ -109,7 +109,7 @@ async function gateRedirect(request: NextRequest, internalPath: string): Promise
   //    de mailinglijsten beperkt tot wie effectief nog studeert). Bewust het
   //    studiejaar (27 september) en niet het werkingsjaar (15 juli): in juli
   //    loopt het academiejaar nog en duidt iedereen zijn oude jaar aan.
-  if (session.user.studyConfirmedYear !== currentStudyYear()) {
+  if (needsStudyConfirmation(session.user)) {
     if (segment !== 'studie-bevestigen') {
       return NextResponse.redirect(new URL(`${enPrefix}/studie-bevestigen`, request.url));
     }

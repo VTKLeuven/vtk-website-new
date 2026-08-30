@@ -51,7 +51,7 @@ const USER_SELECT = {
   personalEmail: true,
   emailPreference: true,
   active: true,
-  notStudying: true,
+  isStudent: true,
   notAtFaculty: true,
   studyConfirmedYear: true,
   mailCategories: true,
@@ -204,8 +204,8 @@ export async function reconcileMailingLists(): Promise<ReconcileOutcome> {
   const users = await prisma.user.findMany({
     where: {
       active: true,
+      isStudent: true,
       studyConfirmedYear: studyYear,
-      notStudying: false,
       mailUnsubscribedAt: null,
     },
     select: USER_SELECT,

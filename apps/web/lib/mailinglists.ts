@@ -62,9 +62,9 @@ export type Recipient = {
  * - enkel **actieve** leden: gedeactiveerde accounts horen geen mails te krijgen;
  * - enkel leden die hun studie **dit academiejaar bevestigd** hebben, zodat
  *   afgestudeerden vanzelf uit de lijsten vallen (zie de gate in `proxy.ts`);
- * - enkel leden die **nog studeren**: wie bij de bevestiging "ik studeer niet
- *   (meer)" aanduidde bevestigt zijn profiel wel (en passeert dus de gate), maar
- *   hoort in geen enkele studiegerichte lijst;
+ * - enkel leden met de expliciete status **Student**; alumni, academisch
+ *   personeel en andere niet-studenten krijgen geen jaarlijkse bevestigingsgate
+ *   en horen ook niet in een studiegerichte lijst;
  * - enkel leden die zich **niet via een mail uitschreven**: die uitschrijving
  *   komt uit Brevo terug (zie lib/brevo/unsubscribe.ts) en moet ook hier gelden,
  *   anders zet de export iemand weer op een lijst die net "stop" zei;
@@ -76,8 +76,8 @@ export type Recipient = {
 export function listWhere(id: MailingListId): Prisma.UserWhereInput {
   return {
     active: true,
+    isStudent: true,
     studyConfirmedYear: currentStudyYear(),
-    notStudying: false,
     mailUnsubscribedAt: null,
     ...(id === ALL_STUDENTS ? {} : { mailCategories: { has: id } }),
     // Career is op faculteitsstudenten gericht: wie aangaf niet aan de

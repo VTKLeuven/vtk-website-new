@@ -73,6 +73,21 @@ export function currentStudyYear(date: Date = new Date()): number {
 }
 
 /**
+ * Of een account nu door de jaarlijkse studiebevestiging moet.
+ *
+ * De expliciete studentstatus is essentieel: een oude of ontbrekende
+ * `studyConfirmedYear` zegt niets over alumni, academisch personeel of andere
+ * niet-studenten. Deze helper houdt de website en mobiele app bij dezelfde
+ * poortregel.
+ */
+export function needsStudyConfirmation(
+  user: { isStudent: boolean; studyConfirmedYear: number | null },
+  date: Date = new Date(),
+): boolean {
+  return user.isStudent && user.studyConfirmedYear !== currentStudyYear(date);
+}
+
+/**
  * Startmoment van een studiejaar: 27 september van dat jaar (Brussel-tijd, hier
  * benaderd als middernacht UTC; het uur doet er niet toe voor het tonen van "de
  * eerstvolgende omslag"). De tegenhanger voor het werkingsjaar staat in

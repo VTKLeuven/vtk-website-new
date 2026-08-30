@@ -28,6 +28,7 @@ function previewSession(overrides: Partial<SessionPayload> = {}): SessionPayload
       isSuperAdmin: false,
       onboarded: true,
       studyConfirmedYear: 2026,
+      isStudent: true,
       googleLinked: true,
       googleLinkDeferredAt: null,
     },

@@ -27,7 +27,7 @@ function user(overrides: Partial<SyncUserData> = {}): SyncUserData {
     personalEmail: null,
     emailPreference: "UNIVERSITY",
     active: true,
-    notStudying: false,
+    isStudent: true,
     notAtFaculty: false,
     studyConfirmedYear: YEAR,
     mailCategories: [],
@@ -43,9 +43,9 @@ describe("isEligible", () => {
     expect(isEligible(user(), YEAR)).toBe(true);
   });
 
-  it("rejects inactive, not-studying, or stale confirmations", () => {
+  it("rejects inactive, non-student, or stale confirmations", () => {
     expect(isEligible(user({ active: false }), YEAR)).toBe(false);
-    expect(isEligible(user({ notStudying: true }), YEAR)).toBe(false);
+    expect(isEligible(user({ isStudent: false }), YEAR)).toBe(false);
     expect(isEligible(user({ studyConfirmedYear: YEAR - 1 }), YEAR)).toBe(false);
     expect(isEligible(user({ studyConfirmedYear: null }), YEAR)).toBe(false);
   });

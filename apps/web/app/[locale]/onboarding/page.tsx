@@ -39,6 +39,7 @@ export default async function OnboardingPage({
     where: { id: session.user.id },
     select: {
       email: true,
+      selfRegisteredAt: true,
       name: true,
       firstName: true,
       lastName: true,
@@ -60,8 +61,10 @@ export default async function OnboardingPage({
       calendarOnlyMyAudiences: true,
       studyYears: true,
       studyProgrammes: true,
+      isStudent: true,
       notAtFaculty: true,
       notStudying: true,
+      academicStaffRole: true,
       internationalStudent: true,
       alumni: true,
       graduationYear: true,

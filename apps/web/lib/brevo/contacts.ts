@@ -42,7 +42,7 @@ export type SyncUserData = {
   personalEmail: string | null;
   emailPreference: "UNIVERSITY" | "PERSONAL";
   active: boolean;
-  notStudying: boolean;
+  isStudent: boolean;
   notAtFaculty: boolean;
   studyConfirmedYear: number | null;
   mailCategories: MailCategory[];
@@ -53,15 +53,15 @@ export type SyncUserData = {
 
 /**
  * Basis-geschiktheid: enkel actieve leden die hun studie dit academiejaar
- * bevestigden, nog studeren en zich niet via een mail uitschreven. Faalt dit,
+ * bevestigden, de status Student hebben en zich niet via een mail uitschreven. Faalt dit,
  * dan hoort het lid in géén enkele lijst en wordt het overal uit verwijderd.
  * Spiegelt de eerste vier filters van `listWhere()`.
  */
 export function isEligible(user: SyncUserData, studyYear: number): boolean {
   return (
     user.active &&
+    user.isStudent &&
     user.studyConfirmedYear === studyYear &&
-    !user.notStudying &&
     user.mailUnsubscribedAt === null
   );
 }

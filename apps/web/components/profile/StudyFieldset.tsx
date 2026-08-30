@@ -1,49 +1,22 @@
-import type { StudyProgramme, StudyYear } from "@prisma/client";
-import { cn } from "@vtk/ui";
+import type { AcademicStaffRole, StudyProgramme, StudyYear } from "@prisma/client";
 import { getDictionary, type Locale } from "@vtk/i18n";
 import { STUDY_YEARS, STUDY_PROGRAMMES } from "@/lib/profile";
-import { AlumniFieldset } from "./AlumniFieldset";
-
-/** Eén aanvinkbare optie in een multi-select groep (mailinglijsten, studie, ...). */
-export function CheckboxChip({
-  name,
-  value,
-  defaultChecked,
-  label,
-  className,
-}: {
-  name: string;
-  value: string;
-  defaultChecked: boolean;
-  label: string;
-  className?: string;
-}) {
-  return (
-    <label
-      className={cn(
-        "inline-flex items-center gap-2 rounded-xl border border-vtk-blue/12 bg-vtk-blue-soft/30 px-3 py-2 text-sm",
-        className
-      )}
-    >
-      <input type="checkbox" name={name} value={value} defaultChecked={defaultChecked} className="shrink-0" />
-      <span className="min-w-0 break-words">{label}</span>
-    </label>
-  );
-}
+import { StudyStatusFields } from "./StudyStatusFields";
 
 /**
- * Studiejaren + richtingen + "ik studeer niet aan de faculteit".
+ * Expliciete profielstatussen met hun conditionele vervolgvragen.
  *
- * Gedeeld door het volledige profielformulier ({@link ProfileForm}) en de
- * jaarlijkse bevestigingspagina, zodat beide dezelfde velden en dezelfde
- * `name`-attributen gebruiken en niet uit elkaar kunnen groeien.
+ * De labels worden server-side opgezocht en als kleine prop doorgegeven, zodat
+ * de volledige i18n-dictionary niet in de clientbundel terechtkomt.
  */
 export function StudyFieldset({
   locale,
   studyYears,
   studyProgrammes,
+  isStudent,
   notAtFaculty,
   notStudying,
+  academicStaffRole,
   internationalStudent,
   alumni,
   graduationYear,
@@ -53,8 +26,10 @@ export function StudyFieldset({
   locale: Locale;
   studyYears: StudyYear[];
   studyProgrammes: StudyProgramme[];
+  isStudent: boolean;
   notAtFaculty: boolean;
   notStudying: boolean;
+  academicStaffRole: AcademicStaffRole | null;
   internationalStudent: boolean;
   alumni: boolean;
   graduationYear: number | null;
@@ -62,93 +37,52 @@ export function StudyFieldset({
   alumniMailOptIn: boolean;
 }) {
   const t = getDictionary(locale).onboarding;
-  const selectedYears = new Set(studyYears);
-  const selectedProgrammes = new Set(studyProgrammes);
 
   return (
-    <div className="space-y-4">
-      <div>
-        <span className="text-sm font-medium text-vtk-ink">{t.studyYearLabel}</span>
-        <p className="text-xs text-[#5c667f]">{t.studyYearHint}</p>
-        <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-5">
-          {STUDY_YEARS.map((year) => (
-            <CheckboxChip
-              key={year}
-              name="studyYears"
-              value={year}
-              defaultChecked={selectedYears.has(year)}
-              label={t.years[year]}
-            />
-          ))}
-        </div>
-        {/* Wie niet (meer) studeert heeft geen studiejaar; aparte optie onder de
-            jaren, want ze valt uit élke studiegerichte mailinglijst. */}
-        <CheckboxChip
-          name="notStudying"
-          value="on"
-          defaultChecked={notStudying}
-          label={t.notStudying}
-          className="mt-2"
-        />
-        <p className="mt-1 text-xs text-[#5c667f]">{t.notStudyingHint}</p>
-      </div>
-      <div>
-        <span className="text-sm font-medium text-vtk-ink">{t.programmesLabel}</span>
-        <p className="text-xs text-[#5c667f]">{t.programmesHint}</p>
-        <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2">
-          {STUDY_PROGRAMMES.map((programme) => (
-            <CheckboxChip
-              key={programme}
-              name="studyProgrammes"
-              value={programme}
-              defaultChecked={selectedProgrammes.has(programme)}
-              label={t.programmes[programme]}
-            />
-          ))}
-          {/* Geen richting maar een uitzondering, dus over de volle breedte
-              onderaan; wie dit aanduidt valt uit de career-lijsten. */}
-          <CheckboxChip
-            name="notAtFaculty"
-            value="on"
-            defaultChecked={notAtFaculty}
-            label={t.notAtFaculty}
-            className="sm:col-span-2"
-          />
-        </div>
-        <p className="mt-2 text-xs text-[#5c667f]">{t.notAtFacultyHint}</p>
-      </div>
-      {/* Geen richting en geen studiejaar, maar wel studie-context: het bepaalt
-          welke evenementen vanzelf in je kalender opduiken. Bewust een eigen veld
-          en geen afleiding uit de sitetaal. */}
-      <div>
-        <CheckboxChip
-          name="internationalStudent"
-          value="on"
-          defaultChecked={internationalStudent}
-          label={t.internationalStudent}
-        />
-        <p className="mt-1 text-xs text-[#5c667f]">{t.internationalStudentHint}</p>
-      </div>
-      {/* Alumni krijgen drie vervolgvragen zodra ze zichzelf zo aanduiden:
-          welk jaar, of ze ooit in VTK zaten, en of ze mails willen. Die drie
-          sturen de alumni-mailinglijst en de aanwezigheidslijst bij een
-          alumni-evenement. */}
-      <AlumniFieldset
-        alumni={alumni}
-        graduationYear={graduationYear}
-        wasInVtk={wasInVtk}
-        alumniMailOptIn={alumniMailOptIn}
-        labels={{
-          alumni: t.alumni,
-          alumniHint: t.alumniHint,
-          graduationYear: t.graduationYear,
-          graduationYearHint: t.graduationYearHint,
-          wasInVtk: t.wasInVtk,
-          wasInVtkHint: t.wasInVtkHint,
-          mailOptIn: t.alumniMailOptIn,
-          mailOptInHint: t.alumniMailOptInHint,
-        }}
-      />
-    </div>
+    <StudyStatusFields
+      studyYears={studyYears}
+      studyProgrammes={studyProgrammes}
+      isStudent={isStudent}
+      notAtFaculty={notAtFaculty}
+      notStudying={notStudying}
+      internationalStudent={internationalStudent}
+      alumni={alumni}
+      graduationYear={graduationYear}
+      wasInVtk={wasInVtk}
+      alumniMailOptIn={alumniMailOptIn}
+      academicStaffRole={academicStaffRole}
+      studyYearOptions={STUDY_YEARS}
+      programmeOptions={STUDY_PROGRAMMES}
+      labels={{
+        statusLabel: t.statusLabel,
+        statusHint: t.statusHint,
+        statusStudent: t.statusStudent,
+        statusAlumnus: t.statusAlumnus,
+        statusAcademicStaff: t.statusAcademicStaff,
+        statusNotStudying: t.statusNotStudying,
+        studyYearLabel: t.studyYearLabel,
+        studyYearHint: t.studyYearHint,
+        programmesLabel: t.programmesLabel,
+        programmesHint: t.programmesHint,
+        notAtFaculty: t.notAtFaculty,
+        notAtFacultyHint: t.notAtFacultyHint,
+        internationalStudent: t.internationalStudent,
+        internationalStudentHint: t.internationalStudentHint,
+        alumniDetailsHint: t.alumniHint,
+        graduationYear: t.graduationYear,
+        graduationYearHint: t.graduationYearHint,
+        wasInVtk: t.wasInVtk,
+        wasInVtkHint: t.wasInVtkHint,
+        alumniMailOptIn: t.alumniMailOptIn,
+        alumniMailOptInHint: t.alumniMailOptInHint,
+        academicStaffRoleLabel: t.academicStaffRoleLabel,
+        academicStaffRoleHint: t.academicStaffRoleHint,
+        years: t.years,
+        programmes: t.programmes,
+        academicStaffRoles: t.academicStaffRoles,
+      }}
+    />
   );
 }
+
+export { CheckboxChip } from "./CheckboxChip";
