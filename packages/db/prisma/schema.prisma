@@ -5500,3 +5500,82 @@ model PhotoTakedownRequest {
   @@index([gallery, status])
   @@index([assetId])
 }
+
+/// Een gebouw van de KU Leuven, voor de lokalenzoeker in de app.
+///
+/// De gegevens komen uit de KU Leuven Access Guide en de KU Leuven kaart;
+/// `scripts/scrape-kulag.ts` haalt ze op en `scripts/import-kulag.ts` zet ze
+/// hier. De import is create-or-update op `kulagId`, zodat een herimport de
+/// velden die VTK zelf invulde niet weggooit. Zie `docs/lokalenzoeker.md`.
+model Building {
+  id        String  @id @default(cuid())
+  /// Het gebouwnummer van de KU Leuven, bv. "490-13". De natuurlijke sleutel.
+  kulagId   String  @unique
+  /// De korte code waarmee studenten het gebouw aanduiden, bv. "200K". Samen
+  /// met het lokaalnummer is dit hoe een lokaal in een uurrooster staat
+  /// ("200K 00.06"), en dus waar mensen op zoeken.
+  shortCode String?
+  name      String
+  address   String
+  zipcode   String
+  city      String
+
+  /// Zwaartepunt van `outline`. De lat/lng op de KULag-pagina zelf is voor elk
+  /// gebouw dezelfde (het middelpunt van de kaart) en dus onbruikbaar.
+  lat     Float?
+  lng     Float?
+  /// De contour als [[lat, lng], ...]. Leeg voor de terreinen, die geen
+  /// voetafdruk hebben; die horen niet op de kaart.
+  outline Json   @default("[]")
+
+  photoUrl String?
+  kulagUrl String
+  /// De toegankelijkheidsplannen als [{ title, url }].
+  plans    Json    @default("[]")
+
+  /// Door VTK toegevoegd. Blijft staan bij een herimport.
+  notes String?
+
+  rooms Room[]
+
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+
+  @@index([shortCode])
+}
+
+/// Een lokaal in een gebouw.
+///
+/// KULag is een toegankelijkheidsgids en geen lokalenregister: enkel gescreende
+/// lokalen staan erin. Dat dekt in de praktijk de aula's en leslokalen, maar
+/// niet elk bureau of labo. De app zegt dat ook, en verwijst wie niets vindt
+/// door naar KULag zelf.
+model Room {
+  id         String  @id @default(cuid())
+  /// Het KULag-id van het lokaal, bv. "490-13-000006". De natuurlijke sleutel.
+  kulagId    String  @unique
+  buildingId String
+  /// Het lokaalnummer zoals het aan de deur hangt, bv. "00.06".
+  code       String?
+  /// De omschrijving zonder het nummer, bv. "Aula Rosalind Franklin".
+  name       String
+  /// De rubriek van KULag, bv. "Aula (auditorium)" of "Les- en vergaderlokaal".
+  category   String
+  /// Afgeleid uit `code`: "00.06" wordt 0, "01.01" wordt 1. Null wanneer het
+  /// nummer die vorm niet heeft.
+  floor      Int?
+  kulagUrl   String
+
+  /// Namen die mensen echt gebruiken en die niet in KULag staan ("Aula K",
+  /// "de grote aula"). Dit is wat de zoekfunctie bruikbaar maakt; niemand zoekt
+  /// op een KULag-id. Wordt door VTK ingevuld en overleeft een herimport.
+  aliases String[] @default([])
+
+  building Building @relation(fields: [buildingId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+
+  @@index([buildingId])
+  @@index([code])
+}

@@ -1,0 +1,2606 @@
+{
+  "scrapedAt": "2026-08-30T08:55:26.837Z",
+  "source": "KU Leuven Access Guide (KULag) + KU Leuven maps",
+  "campus": 30,
+  "addressFilter": "Celestijnenlaan 200",
+  "buildings": [
+    {
+      "id": "490-13",
+      "name": "Auditoria K",
+      "shortCode": "200K",
+      "address": "Celestijnenlaan 200k",
+      "zipcode": "3001",
+      "city": "Heverlee",
+      "lat": 50.86394317058504,
+      "lng": 4.679720805535584,
+      "outline": [
+        [
+          50.8640692,
+          4.6794568
+        ],
+        [
+          50.8639647,
+          4.6795159
+        ],
+        [
+          50.863958,
+          4.6794859
+        ],
+        [
+          50.8639375,
+          4.6794974
+        ],
+        [
+          50.8639199,
+          4.6795072
+        ],
+        [
+          50.8639272,
+          4.67954
+        ],
+        [
+          50.8638451,
+          4.6795858
+        ],
+        [
+          50.8638381,
+          4.6795543
+        ],
+        [
+          50.8638186,
+          4.6795652
+        ],
+        [
+          50.8638007,
+          4.6795756
+        ],
+        [
+          50.863808,
+          4.6796075
+        ],
+        [
+          50.8637403,
+          4.6796465
+        ],
+        [
+          50.8637683,
+          4.6797685
+        ],
+        [
+          50.8638197,
+          4.6799919
+        ],
+        [
+          50.8638532,
+          4.6799726
+        ],
+        [
+          50.8639408,
+          4.6799221
+        ],
+        [
+          50.864148,
+          4.6798029
+        ],
+        [
+          50.8641018,
+          4.6796013
+        ]
+      ],
+      "photoUrl": "https://res.cloudinary.com/td-applicatiebeheer-ku-leuven/image/upload/w_800/v1597609713/kulag_dev/BuildingPhotoId-a3d5a140-1928-4d91-bcbd-c3e00f0874c6.jpg",
+      "kulagUrl": "https://www.kuleuven.be/kulag/nl/gebouw/490-13/onderwijs",
+      "plans": [
+        {
+          "title": "Toegankelijkheidsplan 490-13",
+          "url": "https://www.kuleuven.be/kulag/media/original/15095f5b-1994-4546-8793-8d09896bf90d.pdf"
+        }
+      ],
+      "rooms": [
+        {
+          "id": "490-13-000021",
+          "code": "00.21",
+          "name": "Inkomhal",
+          "category": "Inkom en balie",
+          "url": "https://www.kuleuven.be/kulag/nl/lokaal/490-13-000021/onderwijs"
+        },
+        {
+          "id": "490-13-000023",
+          "code": "00.23",
+          "name": "Inkomhal",
+          "category": "Inkom en balie",
+          "url": "https://www.kuleuven.be/kulag/nl/lokaal/490-13-000023/onderwijs"
+        },
+        {
+          "id": "490-13-000006",
+          "code": "00.06",
+          "name": "Aula",
+          "category": "Aula (auditorium)",
+          "url": "https://www.kuleuven.be/kulag/nl/lokaal/490-13-000006/onderwijs"
+        },
+        {
+          "id": "490-13-000007",
+          "code": "00.07",
+          "name": "Aula",
+          "category": "Aula (auditorium)",
+          "url": "https://www.kuleuven.be/kulag/nl/lokaal/490-13-000007/onderwijs"
+        },
+        {
+          "id": "490-13-000005",
+          "code": null,
+          "name": "Aangepast toilet 00.05",
+          "category": "Sanitair",
+          "url": "https://www.kuleuven.be/kulag/nl/lokaal/490-13-000005/onderwijs"
+        }
+      ]
+    },
+    {
+      "id": "490-14",
+      "name": "Auditoria L",
+      "shortCode": "200L",
+      "address": "Celestijnenlaan 200l",
+      "zipcode": "3001",
+      "city": "Heverlee",
+      "lat": 50.86336778004811,
+      "lng": 4.679489734251847,
+      "outline": [
+        [
+          50.8632431,
+          4.6797446
+        ],
+        [
+          50.8633139,
+          4.6797041
+        ],
+        [
+          50.8633188,
+          4.6797256
+        ],
+        [
+          50.8633402,
+          4.6797133
+        ],
+        [
+          50.863358,
+          4.6797031
+        ],
+        [
+          50.8633532,
+          4.679682
+        ],
+        [
+          50.8634673,
+          4.6796167
+        ],
+        [
+          50.8634717,
+          4.6796362
+        ],
+        [
+          50.8634902,
+          4.6796256
+        ],
+        [
+          50.8635079,
+          4.6796155
+        ],
+        [
+          50.8635035,
+          4.6795963
+        ],
+        [
+          50.8635707,
+          4.6795579
+        ],
+        [
+          50.8634959,
+          4.6792301
+        ],
+        [
+          50.8633732,
+          4.6793003
+        ],
+        [
+          50.8631685,
+          4.6794174
+        ],
+        [
+          50.863214,
+          4.6796167
+        ]
+      ],
+      "photoUrl": "https://res.cloudinary.com/td-applicatiebeheer-ku-leuven/image/upload/w_800/v1597609743/kulag_dev/BuildingPhotoId-d3e04979-e384-4a7a-b819-fc5aa18c650e.jpg",
+      "kulagUrl": "https://www.kuleuven.be/kulag/nl/gebouw/490-14/onderwijs",
+      "plans": [
+        {
+          "title": "Toegankelijkheidsplan 490-14",
+          "url": "https://www.kuleuven.be/kulag/media/original/c31e0116-6d08-420f-b5ca-babd38b0ad81.pdf"
+        }
+      ],
+      "rooms": [
+        {
+          "id": "490-14-000021",
+          "code": "00.21",
+          "name": "Inkomhal",
+          "category": "Inkom en balie",
+          "url": "https://www.kuleuven.be/kulag/nl/lokaal/490-14-000021/onderwijs"
+        },
+        {
+          "id": "490-14-000023",
+          "code": "00.23",
+          "name": "Inkomhal",
+          "category": "Inkom en balie",
+          "url": "https://www.kuleuven.be/kulag/nl/lokaal/490-14-000023/onderwijs"
+        },
+        {
+          "id": "490-14-000006",
+          "code": "00.06",
+          "name": "Aula",
+          "category": "Aula (auditorium)",
+          "url": "https://www.kuleuven.be/kulag/nl/lokaal/490-14-000006/onderwijs"
+        },
+        {
+          "id": "490-14-000007",
+          "code": "00.07",
+          "name": "Aula",
+          "category": "Aula (auditorium)",
+          "url": "https://www.kuleuven.be/kulag/nl/lokaal/490-14-000007/onderwijs"
+        },
+        {
+          "id": "490-14-000010",
+          "code": "00.10",
+          "name": "Gebedsruimte",
+          "category": "Socioculturele en logistieke ruimte",
+          "url": "https://www.kuleuven.be/kulag/nl/lokaal/490-14-000010/onderwijs"
+        },
+        {
+          "id": "490-14-000005",
+          "code": null,
+          "name": "Aangepast toilet 00.05",
+          "category": "Sanitair",
+          "url": "https://www.kuleuven.be/kulag/nl/lokaal/490-14-000005/onderwijs"
+        }
+      ]
+    },
+    {
+      "id": "490-15",
+      "name": "Auditoria M",
+      "shortCode": "200M",
+      "address": "Celestijnenlaan 200m",
+      "zipcode": "3001",
+      "city": "Heverlee",
+      "lat": 50.86315355395839,
+      "lng": 4.678978912895042,
+      "outline": [
+        [
+          50.8629542,
+          4.6789089
+        ],
+        [
+          50.8629854,
+          4.6790456
+        ],
+        [
+          50.8630307,
+          4.6792441
+        ],
+        [
+          50.8630981,
+          4.6792055
+        ],
+        [
+          50.863293,
+          4.6790939
+        ],
+        [
+          50.8633138,
+          4.679082
+        ],
+        [
+          50.8633609,
+          4.679055
+        ],
+        [
+          50.863316,
+          4.678858
+        ],
+        [
+          50.8632845,
+          4.6787199
+        ],
+        [
+          50.8632167,
+          4.6787587
+        ],
+        [
+          50.8632117,
+          4.6787369
+        ],
+        [
+          50.8632073,
+          4.6787394
+        ],
+        [
+          50.8631908,
+          4.6787488
+        ],
+        [
+          50.8631724,
+          4.6787594
+        ],
+        [
+          50.8631774,
+          4.6787812
+        ],
+        [
+          50.863065,
+          4.6788455
+        ],
+        [
+          50.86306,
+          4.6788236
+        ],
+        [
+          50.8630399,
+          4.6788351
+        ],
+        [
+          50.8630204,
+          4.6788463
+        ],
+        [
+          50.8630254,
+          4.6788682
+        ]
+      ],
+      "photoUrl": "https://res.cloudinary.com/td-applicatiebeheer-ku-leuven/image/upload/w_800/v1597609761/kulag_dev/BuildingPhotoId-af2e76e1-4c95-4fa1-ad51-2e3f3e122cbd.jpg",
+      "kulagUrl": "https://www.kuleuven.be/kulag/nl/gebouw/490-15/onderwijs",
+      "plans": [
+        {
+          "title": "Toegankelijkheidsplan 490-15",
+          "url": "https://www.kuleuven.be/kulag/media/original/eaeeaf13-9d60-40d6-853e-4aa12812a636.pdf"
+        }
+      ],
+      "rooms": [
+        {
+          "id": "490-15-000021",
+          "code": "00.21",
+          "name": "Inkomhal",
+          "category": "Inkom en balie",
+          "url": "https://www.kuleuven.be/kulag/nl/lokaal/490-15-000021/onderwijs"
+        },
+        {
+          "id": "490-15-000023",
+          "code": "00.23",
+          "name": "Inkomhal",
+          "category": "Inkom en balie",
+          "url": "https://www.kuleuven.be/kulag/nl/lokaal/490-15-000023/onderwijs"
+        },
+        {
+          "id": "490-15-000006",
+          "code": "00.06",
+          "name": "Aula",
+          "category": "Aula (auditorium)",
+          "url": "https://www.kuleuven.be/kulag/nl/lokaal/490-15-000006/onderwijs"
+        },
+        {
+          "id": "490-15-000007",
+          "code": "00.07",
+          "name": "Aula",
+          "category": "Aula (auditorium)",
+          "url": "https://www.kuleuven.be/kulag/nl/lokaal/490-15-000007/onderwijs"
+        },
+        {
+          "id": "490-15-000005",
+          "code": null,
+          "name": "Aangepast toilet 00.05",
+          "category": "Sanitair",
+          "url": "https://www.kuleuven.be/kulag/nl/lokaal/490-15-000005/onderwijs"
+        }
+      ]
+    },
+    {
+      "id": "490-16",
+      "name": "Auditoria N",
+      "shortCode": "200N",
+      "address": "Celestijnenlaan 200n",
+      "zipcode": "3001",
+      "city": "Heverlee",
+      "lat": 50.86325364184242,
+      "lng": 4.678221750696247,
+      "outline": [
+        [
+          50.8632871,
+          4.6780389
+        ],
+        [
+          50.8631595,
+          4.6781109
+        ],
+        [
+          50.863194,
+          4.6782645
+        ],
+        [
+          50.8632282,
+          4.6782452
+        ],
+        [
+          50.8632695,
+          4.678429
+        ],
+        [
+          50.8633526,
+          4.6783821
+        ],
+        [
+          50.8633277,
+          4.6782714
+        ],
+        [
+          50.8633515,
+          4.6782579
+        ],
+        [
+          50.8633429,
+          4.6782198
+        ],
+        [
+          50.8633344,
+          4.678182
+        ],
+        [
+          50.8633209,
+          4.6781896
+        ]
+      ],
+      "photoUrl": "https://res.cloudinary.com/td-applicatiebeheer-ku-leuven/image/upload/w_800/v1597624375/kulag_dev/BuildingPhotoId-094ca12d-1d8b-42a3-80b9-1a4a0bcbe109.jpg",
+      "kulagUrl": "https://www.kuleuven.be/kulag/nl/gebouw/490-16/onderwijs",
+      "plans": [
+        {
+          "title": "Toegankelijkheidsplan 490-16",
+          "url": "https://www.kuleuven.be/kulag/media/original/92dc5bdb-e746-49ff-9843-3a05ab6c78c4.pdf"
+        }
+      ],
+      "rooms": [
+        {
+          "id": "490-16-000006",
+          "code": "00.06",
+          "name": "Inkomhal",
+          "category": "Inkom en balie",
+          "url": "https://www.kuleuven.be/kulag/nl/lokaal/490-16-000006/onderwijs"
+        },
+        {
+          "id": "490-16-000004",
+          "code": "00.04",
+          "name": "Aula",
+          "category": "Aula (auditorium)",
+          "url": "https://www.kuleuven.be/kulag/nl/lokaal/490-16-000004/onderwijs"
+        },
+        {
+          "id": "490-16-000001",
+          "code": "00.01",
+          "name": "Aula",
+          "category": "Les- en vergaderlokaal",
+          "url": "https://www.kuleuven.be/kulag/nl/lokaal/490-16-000001/onderwijs"
+        }
+      ]
+    },
+    {
+      "id": "490-12",
+      "name": "Computerwetenschappen",
+      "shortCode": "200A",
+      "address": "Celestijnenlaan 200a",
+      "zipcode": "3001",
+      "city": "Heverlee",
+      "lat": 50.864153561583315,
+      "lng": 4.678806283669827,
+      "outline": [
+        [
+          50.8641011,
+          4.6781694
+        ],
+        [
+          50.864081,
+          4.6781811
+        ],
+        [
+          50.8640143,
+          4.6782203
+        ],
+        [
+          50.8639376,
+          4.6782649
+        ],
+        [
+          50.8640382,
+          4.6786987
+        ],
+        [
+          50.8640259,
+          4.6787058
+        ],
+        [
+          50.8640197,
+          4.6786788
+        ],
+        [
+          50.8639984,
+          4.6786912
+        ],
+        [
+          50.8640273,
+          4.6788163
+        ],
+        [
+          50.8640509,
+          4.6788025
+        ],
+        [
+          50.8640673,
+          4.6788732
+        ],
+        [
+          50.8640776,
+          4.6788672
+        ],
+        [
+          50.8640922,
+          4.6788587
+        ],
+        [
+          50.8641965,
+          4.679308
+        ],
+        [
+          50.8641601,
+          4.6793292
+        ],
+        [
+          50.8642039,
+          4.6795179
+        ],
+        [
+          50.8642848,
+          4.6794706
+        ],
+        [
+          50.8642747,
+          4.6794273
+        ],
+        [
+          50.8643224,
+          4.6793983
+        ],
+        [
+          50.8642923,
+          4.6792524
+        ],
+        [
+          50.8642984,
+          4.6792488
+        ],
+        [
+          50.8643016,
+          4.6792626
+        ],
+        [
+          50.8643088,
+          4.6792584
+        ],
+        [
+          50.8643185,
+          4.6792527
+        ],
+        [
+          50.8643119,
+          4.6792245
+        ],
+        [
+          50.8643259,
+          4.6792163
+        ],
+        [
+          50.8643297,
+          4.6792323
+        ],
+        [
+          50.8643521,
+          4.6792191
+        ],
+        [
+          50.8642439,
+          4.6787574
+        ],
+        [
+          50.8642622,
+          4.6787467
+        ],
+        [
+          50.8642444,
+          4.678671
+        ],
+        [
+          50.8642256,
+          4.6785901
+        ],
+        [
+          50.8642019,
+          4.6786039
+        ]
+      ],
+      "photoUrl": "https://res.cloudinary.com/td-applicatiebeheer-ku-leuven/image/upload/w_800/v1597610121/kulag_dev/BuildingPhotoId-6547249d-459b-45dc-979b-c6ac0a728e98.jpg",
+      "kulagUrl": "https://www.kuleuven.be/kulag/nl/gebouw/490-12/onderwijs",
+      "plans": [
+        {
+          "title": "Toegankelijkheidsplan 490-12",
+          "url": "https://www.kuleuven.be/kulag/media/original/5fb08cca-7a7e-41eb-9f4e-b6c0f212260a.pdf"
+        }
+      ],
+      "rooms": [
+        {
+          "id": "490-12-000191",
+          "code": "00.191",
+          "name": "Foyer Computerwetenschappen",
+          "category": "Inkom en balie",
+          "url": "https://www.kuleuven.be/kulag/nl/lokaal/490-12-000191/onderwijs"
+        },
+        {
+          "id": "490-12-000002",
+          "code": "00.02",
+          "name": "Balie balie",
+          "category": "Inkom en balie",
+          "url": "https://www.kuleuven.be/kulag/nl/lokaal/490-12-000002/onderwijs"
+        },
+        {
+          "id": "490-12-000225",
+          "code": "00.225",
+          "name": "Auditorium Erik Duval",
+          "category": "Aula (auditorium)",
+          "url": "https://www.kuleuven.be/kulag/nl/lokaal/490-12-000225/onderwijs"
+        },
+        {
+          "id": "490-12-000124",
+          "code": "00.124",
+          "name": "Computerleslokaal (ex. 00.140)",
+          "category": "Les- en vergaderlokaal",
+          "url": "https://www.kuleuven.be/kulag/nl/lokaal/490-12-000124/onderwijs"
+        },
+        {
+          "id": "490-12-000144",
+          "code": "00.144",
+          "name": "Seminarielokaal",
+          "category": "Les- en vergaderlokaal",
+          "url": "https://www.kuleuven.be/kulag/nl/lokaal/490-12-000144/onderwijs"
+        },
+        {
+          "id": "490-12-000025",
+          "code": "00.25",
+          "name": "SOL Z softwareontwerplabo (ex. 00.49)",
+          "category": "Les- en vergaderlokaal",
+          "url": "https://www.kuleuven.be/kulag/nl/lokaal/490-12-000025/onderwijs"
+        },
+        {
+          "id": "490-12-000026",
+          "code": "00.26",
+          "name": "SOL N softwareontwerplabo (ex. 00.53)",
+          "category": "Les- en vergaderlokaal",
+          "url": "https://www.kuleuven.be/kulag/nl/lokaal/490-12-000026/onderwijs"
+        },
+        {
+          "id": "490-12-010143",
+          "code": "01.143",
+          "name": "Practicumruimte computer",
+          "category": "Les- en vergaderlokaal",
+          "url": "https://www.kuleuven.be/kulag/nl/lokaal/490-12-010143/onderwijs"
+        },
+        {
+          "id": "490-12-030112",
+          "code": "03.112",
+          "name": "Vergaderlokaal",
+          "category": "Les- en vergaderlokaal",
+          "url": "https://www.kuleuven.be/kulag/nl/lokaal/490-12-030112/onderwijs"
+        },
+        {
+          "id": "490-12-000178",
+          "code": null,
+          "name": "Aangepast toilet 00.178",
+          "category": "Sanitair",
+          "url": "https://www.kuleuven.be/kulag/nl/lokaal/490-12-000178/onderwijs"
+        },
+        {
+          "id": "490-12-030179",
+          "code": null,
+          "name": "Aangepast toilet 03.179",
+          "category": "Sanitair",
+          "url": "https://www.kuleuven.be/kulag/nl/lokaal/490-12-030179/onderwijs"
+        },
+        {
+          "id": "490-12-000099",
+          "code": null,
+          "name": "Lift 00.99",
+          "category": "Lift en helling",
+          "url": "https://www.kuleuven.be/kulag/nl/lokaal/490-12-000099/onderwijs"
+        },
+        {
+          "id": "490-12-000194",
+          "code": "00.194",
+          "name": "Hellend vlak in/aan inkomhal",
+          "category": "Lift en helling",
+          "url": "https://www.kuleuven.be/kulag/nl/lokaal/490-12-000194/onderwijs"
+        },
+        {
+          "id": "490-12-000195",
+          "code": "00.195",
+          "name": "Hellend vlak in/aan gang",
+          "category": "Lift en helling",
+          "url": "https://www.kuleuven.be/kulag/nl/lokaal/490-12-000195/onderwijs"
+        }
+      ]
+    },
+    {
+      "id": "490-18",
+      "name": "De Moete",
+      "shortCode": "DEM",
+      "address": "Celestijnenlaan 200p",
+      "zipcode": "3001",
+      "city": "Heverlee",
+      "lat": 50.86432972320506,
+      "lng": 4.679875829840335,
+      "outline": [
+        [
+          50.8644426,
+          4.6797035
+        ],
+        [
+          50.8644841,
+          4.6798935
+        ],
+        [
+          50.864216,
+          4.6800477
+        ],
+        [
+          50.8641727,
+          4.6798587
+        ]
+      ],
+      "photoUrl": "https://res.cloudinary.com/td-applicatiebeheer-ku-leuven/image/upload/w_800/v1597610039/kulag_dev/BuildingPhotoId-d066453b-13ff-4e83-abc0-042ce82b0ce7.jpg",
+      "kulagUrl": "https://www.kuleuven.be/kulag/nl/gebouw/490-18/onderwijs",
+      "plans": [
+        {
+          "title": "Toegankelijkheidsplan 490-18",
+          "url": "https://www.kuleuven.be/kulag/media/original/bab71e03-84e3-418f-8bdf-35f4b7d0f195.pdf"
+        }
+      ],
+      "rooms": [
+        {
+          "id": "490-18-000022",
+          "code": "00.22",
+          "name": "Inkomhal",
+          "category": "Inkom en balie",
+          "url": "https://www.kuleuven.be/kulag/nl/lokaal/490-18-000022/onderwijs"
+        },
+        {
+          "id": "490-18-000001",
+          "code": "00.01",
+          "name": "Cafetaria",
+          "category": "Socioculturele en logistieke ruimte",
+          "url": "https://www.kuleuven.be/kulag/nl/lokaal/490-18-000001/onderwijs"
+        },
+        {
+          "id": "490-18-000028",
+          "code": "00.28",
+          "name": "Cafetaria",
+          "category": "Socioculturele en logistieke ruimte",
+          "url": "https://www.kuleuven.be/kulag/nl/lokaal/490-18-000028/onderwijs"
+        },
+        {
+          "id": "490-18-000025",
+          "code": null,
+          "name": "Aangepast toilet 00.25",
+          "category": "Sanitair",
+          "url": "https://www.kuleuven.be/kulag/nl/lokaal/490-18-000025/onderwijs"
+        }
+      ]
+    },
+    {
+      "id": "493-12",
+      "name": "Geo-instituut",
+      "shortCode": "200E",
+      "address": "Celestijnenlaan 200e",
+      "zipcode": "3001",
+      "city": "Heverlee",
+      "lat": 50.86370809435222,
+      "lng": 4.67573036071154,
+      "outline": [
+        [
+          50.8641113,
+          4.6752616
+        ],
+        [
+          50.8641762,
+          4.6756919
+        ],
+        [
+          50.8641194,
+          4.6757337
+        ],
+        [
+          50.8641052,
+          4.6756747
+        ],
+        [
+          50.8640812,
+          4.6756878
+        ],
+        [
+          50.8640931,
+          4.6757443
+        ],
+        [
+          50.8633261,
+          4.6761912
+        ],
+        [
+          50.8632314,
+          4.6757751
+        ],
+        [
+          50.863997,
+          4.6753244
+        ],
+        [
+          50.8640233,
+          4.6754401
+        ],
+        [
+          50.8640396,
+          4.67543
+        ],
+        [
+          50.8640143,
+          4.6753146
+        ]
+      ],
+      "photoUrl": "https://res.cloudinary.com/td-applicatiebeheer-ku-leuven/image/upload/w_800/v1597610417/kulag_dev/BuildingPhotoId-77c5d8d9-a335-4990-8449-bd9b87cf85a4.jpg",
+      "kulagUrl": "https://www.kuleuven.be/kulag/nl/gebouw/493-12/onderwijs",
+      "plans": [
+        {
+          "title": "Toegankelijkheidsplan 493-12",
+          "url": "https://www.kuleuven.be/kulag/media/original/450aa98c-4be6-4be8-b67b-0dedb1150c37.pdf"
+        }
+      ],
+      "rooms": [
+        {
+          "id": "493-12-000298",
+          "code": "00.298",
+          "name": "Inkomhal",
+          "category": "Inkom en balie",
+          "url": "https://www.kuleuven.be/kulag/nl/lokaal/493-12-000298/onderwijs"
+        },
+        {
+          "id": "493-12-010257",
+          "code": "01.257",
+          "name": "Balie onthaal",
+          "category": "Inkom en balie",
+          "url": "https://www.kuleuven.be/kulag/nl/lokaal/493-12-010257/onderwijs"
+        },
+        {
+          "id": "493-12-010207",
+          "code": "01.207",
+          "name": "Leslokaal",
+          "category": "Les- en vergaderlokaal",
+          "url": "https://www.kuleuven.be/kulag/nl/lokaal/493-12-010207/onderwijs"
+        },
+        {
+          "id": "493-12-010209",
+          "code": "01.209",
+          "name": "Leslokaal",
+          "category": "Les- en vergaderlokaal",
+          "url": "https://www.kuleuven.be/kulag/nl/lokaal/493-12-010209/onderwijs"
+        },
+        {
+          "id": "493-12-010212",
+          "code": "01.212",
+          "name": "Leslokaal",
+          "category": "Les- en vergaderlokaal",
+          "url": "https://www.kuleuven.be/kulag/nl/lokaal/493-12-010212/onderwijs"
+        },
+        {
+          "id": "493-12-010216",
+          "code": "01.216",
+          "name": "Microscopielokaal",
+          "category": "Les- en vergaderlokaal",
+          "url": "https://www.kuleuven.be/kulag/nl/lokaal/493-12-010216/onderwijs"
+        },
+        {
+          "id": "493-12-010217",
+          "code": "01.217",
+          "name": "Oefenlokaal",
+          "category": "Les- en vergaderlokaal",
+          "url": "https://www.kuleuven.be/kulag/nl/lokaal/493-12-010217/onderwijs"
+        },
+        {
+          "id": "493-12-010220",
+          "code": "01.220",
+          "name": "Kaartenkamer",
+          "category": "Les- en vergaderlokaal",
+          "url": "https://www.kuleuven.be/kulag/nl/lokaal/493-12-010220/onderwijs"
+        },
+        {
+          "id": "493-12-010262",
+          "code": "01.262",
+          "name": "Vergaderlokaal",
+          "category": "Les- en vergaderlokaal",
+          "url": "https://www.kuleuven.be/kulag/nl/lokaal/493-12-010262/onderwijs"
+        },
+        {
+          "id": "493-12-010263",
+          "code": "01.263",
+          "name": "Vergaderlokaal",
+          "category": "Les- en vergaderlokaal",
+          "url": "https://www.kuleuven.be/kulag/nl/lokaal/493-12-010263/onderwijs"
+        },
+        {
+          "id": "493-12-010267",
+          "code": "01.267",
+          "name": "Vergaderlokaal",
+          "category": "Les- en vergaderlokaal",
+          "url": "https://www.kuleuven.be/kulag/nl/lokaal/493-12-010267/onderwijs"
+        },
+        {
+          "id": "493-12-010298",
+          "code": "01.298",
+          "name": "Gang met eland",
+          "category": "Socioculturele en logistieke ruimte",
+          "url": "https://www.kuleuven.be/kulag/nl/lokaal/493-12-010298/onderwijs"
+        },
+        {
+          "id": "493-12-010300",
+          "code": "01.300",
+          "name": "Leerruimte studenten",
+          "category": "Kringlokaal",
+          "url": "https://www.kuleuven.be/kulag/nl/lokaal/493-12-010300/onderwijs"
+        },
+        {
+          "id": "493-12-000268",
+          "code": null,
+          "name": "Aangepast toilet 00.268",
+          "category": "Sanitair",
+          "url": "https://www.kuleuven.be/kulag/nl/lokaal/493-12-000268/onderwijs"
+        },
+        {
+          "id": "493-12-010268",
+          "code": null,
+          "name": "Aangepast toilet 01.268",
+          "category": "Sanitair",
+          "url": "https://www.kuleuven.be/kulag/nl/lokaal/493-12-010268/onderwijs"
+        },
+        {
+          "id": "493-12-000290",
+          "code": null,
+          "name": "Lift 00.290",
+          "category": "Lift en helling",
+          "url": "https://www.kuleuven.be/kulag/nl/lokaal/493-12-000290/onderwijs"
+        }
+      ]
+    },
+    {
+      "id": "490-19",
+      "name": "Impuls",
+      "shortCode": "200I",
+      "address": "Celestijnenlaan 200i",
+      "zipcode": "3001",
+      "city": "Heverlee",
+      "lat": 50.86398034501018,
+      "lng": 4.6779104965264695,
+      "outline": [
+        [
+          50.8640842,
+          4.6781752
+        ],
+        [
+          50.863956,
+          4.6776046
+        ],
+        [
+          50.8638848,
+          4.6776413
+        ],
+        [
+          50.864013,
+          4.6782187
+        ]
+      ],
+      "photoUrl": "https://res.cloudinary.com/td-applicatiebeheer-ku-leuven/image/upload/w_800/v1597610175/kulag_dev/BuildingPhotoId-d795b250-00f5-4dc2-8009-3b0bab122c99.jpg",
+      "kulagUrl": "https://www.kuleuven.be/kulag/nl/gebouw/490-19/onderwijs",
+      "plans": [
+        {
+          "title": "toegankelijkheidsplan",
+          "url": "https://www.kuleuven.be/kulag/media/original/753963c8-93aa-46b1-9583-e0cefd009bc7.pdf"
+        },
+        {
+          "title": "Toegankelijkheidsplan 490-19",
+          "url": "https://www.kuleuven.be/kulag/media/original/605c5f81-2448-4541-b452-e10c7cd6ebee.pdf"
+        }
+      ],
+      "rooms": [
+        {
+          "id": "490-19-000090",
+          "code": "00.90",
+          "name": "Gang",
+          "category": "Inkom en balie",
+          "url": "https://www.kuleuven.be/kulag/nl/lokaal/490-19-000090/onderwijs"
+        },
+        {
+          "id": "490-19-010003",
+          "code": "01.03",
+          "name": "Praktijk",
+          "category": "Les- en vergaderlokaal",
+          "url": "https://www.kuleuven.be/kulag/nl/lokaal/490-19-010003/onderwijs"
+        }
+      ]
+    },
+    {
+      "id": "493-21",
+      "name": "Instituut Natuurkunde navorsing",
+      "shortCode": "200D",
+      "address": "Celestijnenlaan 200d",
+      "zipcode": "3001",
+      "city": "Heverlee",
+      "lat": 50.86276864288348,
+      "lng": 4.677140700986865,
+      "outline": [
+        [
+          50.8631046,
+          4.6772197
+        ],
+        [
+          50.8630308,
+          4.6772612
+        ],
+        [
+          50.8630201,
+          4.6772134
+        ],
+        [
+          50.862938,
+          4.6772595
+        ],
+        [
+          50.8629953,
+          4.677515
+        ],
+        [
+          50.8628496,
+          4.6775969
+        ],
+        [
+          50.8627929,
+          4.6773436
+        ],
+        [
+          50.8627145,
+          4.6773877
+        ],
+        [
+          50.8627371,
+          4.6774885
+        ],
+        [
+          50.8624403,
+          4.6776554
+        ],
+        [
+          50.8623908,
+          4.6774345
+        ],
+        [
+          50.8624518,
+          4.6774002
+        ],
+        [
+          50.8624164,
+          4.677242
+        ],
+        [
+          50.8624948,
+          4.6771979
+        ],
+        [
+          50.8624465,
+          4.6769824
+        ],
+        [
+          50.8631704,
+          4.6765753
+        ],
+        [
+          50.8632188,
+          4.6767916
+        ],
+        [
+          50.8628291,
+          4.6770107
+        ],
+        [
+          50.8628464,
+          4.677088
+        ],
+        [
+          50.862894,
+          4.6770612
+        ],
+        [
+          50.8629123,
+          4.6771427
+        ],
+        [
+          50.8630678,
+          4.6770553
+        ]
+      ],
+      "photoUrl": "https://res.cloudinary.com/td-applicatiebeheer-ku-leuven/image/upload/w_800/v1597609904/kulag_dev/BuildingPhotoId-a607421d-722a-4724-9e9a-11bc397fd181.jpg",
+      "kulagUrl": "https://www.kuleuven.be/kulag/nl/gebouw/493-21/onderwijs",
+      "plans": [
+        {
+          "title": "toegankelijkheidsplan",
+          "url": "https://www.kuleuven.be/kulag/media/original/493-21-toegankelijkheidsplan-052017.pdf"
+        },
+        {
+          "title": "Toegankelijkheidsplan 493-21",
+          "url": "https://www.kuleuven.be/kulag/media/original/c6dcc461-89a4-4037-a970-9d9143606911.pdf"
+        }
+      ],
+      "rooms": [
+        {
+          "id": "493-21-000001",
+          "code": "00.01",
+          "name": "Hal - wachtruimte",
+          "category": "Inkom en balie",
+          "url": "https://www.kuleuven.be/kulag/nl/lokaal/493-21-000001/onderwijs"
+        },
+        {
+          "id": "493-21-050011",
+          "code": "05.11",
+          "name": "Aula",
+          "category": "Aula (auditorium)",
+          "url": "https://www.kuleuven.be/kulag/nl/lokaal/493-21-050011/onderwijs"
+        },
+        {
+          "id": "493-21-050034",
+          "code": "05.34",
+          "name": "Leslokaal",
+          "category": "Les- en vergaderlokaal",
+          "url": "https://www.kuleuven.be/kulag/nl/lokaal/493-21-050034/onderwijs"
+        },
+        {
+          "id": "493-21-060032",
+          "code": "06.32",
+          "name": "Leslokaal",
+          "category": "Les- en vergaderlokaal",
+          "url": "https://www.kuleuven.be/kulag/nl/lokaal/493-21-060032/onderwijs"
+        },
+        {
+          "id": "493-21-060034",
+          "code": "06.34",
+          "name": "Leslokaal",
+          "category": "Les- en vergaderlokaal",
+          "url": "https://www.kuleuven.be/kulag/nl/lokaal/493-21-060034/onderwijs"
+        },
+        {
+          "id": "493-21-000022",
+          "code": null,
+          "name": "Aangepast toilet 00.22",
+          "category": "Sanitair",
+          "url": "https://www.kuleuven.be/kulag/nl/lokaal/493-21-000022/onderwijs"
+        },
+        {
+          "id": "493-21-000101",
+          "code": null,
+          "name": "Lift 00.101",
+          "category": "Lift en helling",
+          "url": "https://www.kuleuven.be/kulag/nl/lokaal/493-21-000101/onderwijs"
+        },
+        {
+          "id": "493-21-000103",
+          "code": null,
+          "name": "Lift 00.103",
+          "category": "Lift en helling",
+          "url": "https://www.kuleuven.be/kulag/nl/lokaal/493-21-000103/onderwijs"
+        }
+      ]
+    },
+    {
+      "id": "490-11",
+      "name": "Instituut voor Wiskunde",
+      "shortCode": "200B",
+      "address": "Celestijnenlaan 200b",
+      "zipcode": "3001",
+      "city": "Heverlee",
+      "lat": 50.86370430184132,
+      "lng": 4.678016537364415,
+      "outline": [
+        [
+          50.863564,
+          4.6780893
+        ],
+        [
+          50.8635945,
+          4.6780717
+        ],
+        [
+          50.8636178,
+          4.6780581
+        ],
+        [
+          50.8636399,
+          4.6780453
+        ],
+        [
+          50.8636551,
+          4.6780367
+        ],
+        [
+          50.8636319,
+          4.6779341
+        ],
+        [
+          50.8639483,
+          4.6777543
+        ],
+        [
+          50.8640069,
+          4.6780134
+        ],
+        [
+          50.8636894,
+          4.6781938
+        ],
+        [
+          50.8636724,
+          4.6781188
+        ],
+        [
+          50.8636592,
+          4.6781263
+        ],
+        [
+          50.8636354,
+          4.67814
+        ],
+        [
+          50.8636137,
+          4.6781525
+        ],
+        [
+          50.8635818,
+          4.678171
+        ],
+        [
+          50.8635942,
+          4.6782247
+        ],
+        [
+          50.8634735,
+          4.6782946
+        ],
+        [
+          50.8633914,
+          4.6779391
+        ],
+        [
+          50.8635131,
+          4.6778686
+        ]
+      ],
+      "photoUrl": "https://res.cloudinary.com/td-applicatiebeheer-ku-leuven/image/upload/w_800/v1597610104/kulag_dev/BuildingPhotoId-e089affd-8d3a-48f1-bbe8-1a440fd7cf70.jpg",
+      "kulagUrl": "https://www.kuleuven.be/kulag/nl/gebouw/490-11/onderwijs",
+      "plans": [
+        {
+          "title": "Toegankelijkheidsplan 490-11",
+          "url": "https://www.kuleuven.be/kulag/media/original/74fa844f-478d-48fb-8ace-1bd58e735766.pdf"
+        }
+      ],
+      "rooms": [
+        {
+          "id": "490-11-000001",
+          "code": "00.01",
+          "name": "Inkomhal",
+          "category": "Inkom en balie",
+          "url": "https://www.kuleuven.be/kulag/nl/lokaal/490-11-000001/onderwijs"
+        },
+        {
+          "id": "490-11-020005",
+          "code": "02.05",
+          "name": "Balie secretariaat",
+          "category": "Inkom en balie",
+          "url": "https://www.kuleuven.be/kulag/nl/lokaal/490-11-020005/onderwijs"
+        },
+        {
+          "id": "490-11-000005",
+          "code": "00.05",
+          "name": "Leslokaal",
+          "category": "Les- en vergaderlokaal",
+          "url": "https://www.kuleuven.be/kulag/nl/lokaal/490-11-000005/onderwijs"
+        },
+        {
+          "id": "490-11-000007",
+          "code": "00.07",
+          "name": "Leslokaal in groepsopstelling",
+          "category": "Les- en vergaderlokaal",
+          "url": "https://www.kuleuven.be/kulag/nl/lokaal/490-11-000007/onderwijs"
+        },
+        {
+          "id": "490-11-000016",
+          "code": "00.16",
+          "name": "Leslokaal",
+          "category": "Les- en vergaderlokaal",
+          "url": "https://www.kuleuven.be/kulag/nl/lokaal/490-11-000016/onderwijs"
+        },
+        {
+          "id": "490-11-000018",
+          "code": "00.18",
+          "name": "Leslokaal",
+          "category": "Les- en vergaderlokaal",
+          "url": "https://www.kuleuven.be/kulag/nl/lokaal/490-11-000018/onderwijs"
+        },
+        {
+          "id": "490-11-010005",
+          "code": "01.05",
+          "name": "Leslokaal",
+          "category": "Les- en vergaderlokaal",
+          "url": "https://www.kuleuven.be/kulag/nl/lokaal/490-11-010005/onderwijs"
+        },
+        {
+          "id": "490-11-010007",
+          "code": "01.07",
+          "name": "Leslokaal",
+          "category": "Les- en vergaderlokaal",
+          "url": "https://www.kuleuven.be/kulag/nl/lokaal/490-11-010007/onderwijs"
+        },
+        {
+          "id": "490-11-010014",
+          "code": "01.14",
+          "name": "Leslokaal",
+          "category": "Les- en vergaderlokaal",
+          "url": "https://www.kuleuven.be/kulag/nl/lokaal/490-11-010014/onderwijs"
+        },
+        {
+          "id": "490-11-010016",
+          "code": "01.16",
+          "name": "Leslokaal",
+          "category": "Les- en vergaderlokaal",
+          "url": "https://www.kuleuven.be/kulag/nl/lokaal/490-11-010016/onderwijs"
+        },
+        {
+          "id": "490-11-010018",
+          "code": "01.18",
+          "name": "Leslokaal",
+          "category": "Les- en vergaderlokaal",
+          "url": "https://www.kuleuven.be/kulag/nl/lokaal/490-11-010018/onderwijs"
+        },
+        {
+          "id": "490-11-020014",
+          "code": "02.14",
+          "name": "Leslokaal",
+          "category": "Les- en vergaderlokaal",
+          "url": "https://www.kuleuven.be/kulag/nl/lokaal/490-11-020014/onderwijs"
+        },
+        {
+          "id": "490-11-020016",
+          "code": "02.16",
+          "name": "Leslokaal",
+          "category": "Les- en vergaderlokaal",
+          "url": "https://www.kuleuven.be/kulag/nl/lokaal/490-11-020016/onderwijs"
+        },
+        {
+          "id": "490-11-000025",
+          "code": null,
+          "name": "Aangepast toilet 00.25",
+          "category": "Sanitair",
+          "url": "https://www.kuleuven.be/kulag/nl/lokaal/490-11-000025/onderwijs"
+        },
+        {
+          "id": "490-11-010010",
+          "code": null,
+          "name": "Aangepast toilet 01.10",
+          "category": "Sanitair",
+          "url": "https://www.kuleuven.be/kulag/nl/lokaal/490-11-010010/onderwijs"
+        },
+        {
+          "id": "490-11-000026",
+          "code": null,
+          "name": "Lift 00.26",
+          "category": "Lift en helling",
+          "url": "https://www.kuleuven.be/kulag/nl/lokaal/490-11-000026/onderwijs"
+        }
+      ]
+    },
+    {
+      "id": "493-11",
+      "name": "Kandidatuur Natuurkunde",
+      "shortCode": "200C",
+      "address": "Celestijnenlaan 200c",
+      "zipcode": "3001",
+      "city": "Heverlee",
+      "lat": 50.86386136494676,
+      "lng": 4.676634065679972,
+      "outline": [
+        [
+          50.8640384,
+          4.6771378
+        ],
+        [
+          50.8638946,
+          4.6772209
+        ],
+        [
+          50.8638706,
+          4.6771167
+        ],
+        [
+          50.8638483,
+          4.6771296
+        ],
+        [
+          50.863779,
+          4.6768286
+        ],
+        [
+          50.8637362,
+          4.6768533
+        ],
+        [
+          50.8636942,
+          4.6768774
+        ],
+        [
+          50.8637316,
+          4.6770413
+        ],
+        [
+          50.863616,
+          4.6771075
+        ],
+        [
+          50.863474,
+          4.6764855
+        ],
+        [
+          50.8635313,
+          4.6764527
+        ],
+        [
+          50.8635838,
+          4.6764223
+        ],
+        [
+          50.8635882,
+          4.6764198
+        ],
+        [
+          50.8636714,
+          4.6767881
+        ],
+        [
+          50.8637789,
+          4.6767271
+        ],
+        [
+          50.8636478,
+          4.6761469
+        ],
+        [
+          50.8637843,
+          4.6760663
+        ],
+        [
+          50.8639522,
+          4.6759645
+        ],
+        [
+          50.8639522,
+          4.6759645
+        ],
+        [
+          50.8641997,
+          4.6770451
+        ]
+      ],
+      "photoUrl": "https://res.cloudinary.com/td-applicatiebeheer-ku-leuven/image/upload/w_800/v1597610330/kulag_dev/BuildingPhotoId-86262412-2d66-48c2-96ea-9e7ae3730e3c.jpg",
+      "kulagUrl": "https://www.kuleuven.be/kulag/nl/gebouw/493-11/onderwijs",
+      "plans": [
+        {
+          "title": "Toegankelijkheidsplan-493-11",
+          "url": "https://www.kuleuven.be/kulag/media/original/01b07e0c-200e-4aa3-ac05-f26d6fa27f1b.pdf"
+        }
+      ],
+      "rooms": [
+        {
+          "id": "493-11-000101",
+          "code": "00.101",
+          "name": "Inkomhal",
+          "category": "Inkom en balie",
+          "url": "https://www.kuleuven.be/kulag/nl/lokaal/493-11-000101/onderwijs"
+        },
+        {
+          "id": "493-11-000110",
+          "code": "00.110",
+          "name": "Hoofdinkomhal",
+          "category": "Inkom en balie",
+          "url": "https://www.kuleuven.be/kulag/nl/lokaal/493-11-000110/onderwijs"
+        },
+        {
+          "id": "493-11-010005",
+          "code": "01.05",
+          "name": "Aula C",
+          "category": "Aula (auditorium)",
+          "url": "https://www.kuleuven.be/kulag/nl/lokaal/493-11-010005/onderwijs"
+        },
+        {
+          "id": "493-11-010006",
+          "code": "01.06",
+          "name": "Aula D",
+          "category": "Aula (auditorium)",
+          "url": "https://www.kuleuven.be/kulag/nl/lokaal/493-11-010006/onderwijs"
+        },
+        {
+          "id": "493-11-010017",
+          "code": "01.17",
+          "name": "Aula B",
+          "category": "Aula (auditorium)",
+          "url": "https://www.kuleuven.be/kulag/nl/lokaal/493-11-010017/onderwijs"
+        },
+        {
+          "id": "493-11-010027",
+          "code": "01.27",
+          "name": "Aula A",
+          "category": "Aula (auditorium)",
+          "url": "https://www.kuleuven.be/kulag/nl/lokaal/493-11-010027/onderwijs"
+        },
+        {
+          "id": "493-11-000001",
+          "code": "00.01",
+          "name": "ICTS pc-klas A (21pc)",
+          "category": "Les- en vergaderlokaal",
+          "url": "https://www.kuleuven.be/kulag/nl/lokaal/493-11-000001/onderwijs"
+        },
+        {
+          "id": "493-11-000003",
+          "code": "00.03",
+          "name": "ICTS pc-klas B",
+          "category": "Les- en vergaderlokaal",
+          "url": "https://www.kuleuven.be/kulag/nl/lokaal/493-11-000003/onderwijs"
+        },
+        {
+          "id": "493-11-000004",
+          "code": "00.04",
+          "name": "ICTS pc-klas C (21pc)",
+          "category": "Les- en vergaderlokaal",
+          "url": "https://www.kuleuven.be/kulag/nl/lokaal/493-11-000004/onderwijs"
+        },
+        {
+          "id": "493-11-000011",
+          "code": "00.11",
+          "name": "Practicum Natuurkunde",
+          "category": "Les- en vergaderlokaal",
+          "url": "https://www.kuleuven.be/kulag/nl/lokaal/493-11-000011/onderwijs"
+        },
+        {
+          "id": "493-11-010001",
+          "code": "01.01",
+          "name": "ICTS pc-klas D",
+          "category": "Les- en vergaderlokaal",
+          "url": "https://www.kuleuven.be/kulag/nl/lokaal/493-11-010001/onderwijs"
+        },
+        {
+          "id": "493-11-010003",
+          "code": "01.03",
+          "name": "ICTS pc-klas E",
+          "category": "Les- en vergaderlokaal",
+          "url": "https://www.kuleuven.be/kulag/nl/lokaal/493-11-010003/onderwijs"
+        },
+        {
+          "id": "493-11-010008",
+          "code": "01.08",
+          "name": "Leslokaal 01H",
+          "category": "Les- en vergaderlokaal",
+          "url": "https://www.kuleuven.be/kulag/nl/lokaal/493-11-010008/onderwijs"
+        },
+        {
+          "id": "493-11-010009",
+          "code": "01.09",
+          "name": "Leslokaal 01J",
+          "category": "Les- en vergaderlokaal",
+          "url": "https://www.kuleuven.be/kulag/nl/lokaal/493-11-010009/onderwijs"
+        },
+        {
+          "id": "493-11-010010",
+          "code": "01.10",
+          "name": "Leslokaal 01K",
+          "category": "Les- en vergaderlokaal",
+          "url": "https://www.kuleuven.be/kulag/nl/lokaal/493-11-010010/onderwijs"
+        },
+        {
+          "id": "493-11-000022",
+          "code": null,
+          "name": "Aangepast toilet 00.22",
+          "category": "Sanitair",
+          "url": "https://www.kuleuven.be/kulag/nl/lokaal/493-11-000022/onderwijs"
+        },
+        {
+          "id": "493-11-000099",
+          "code": null,
+          "name": "Lift 00.99",
+          "category": "Lift en helling",
+          "url": "https://www.kuleuven.be/kulag/nl/lokaal/493-11-000099/onderwijs"
+        }
+      ]
+    },
+    {
+      "id": "492-11",
+      "name": "Kandidatuur Scheikunde",
+      "shortCode": "200G",
+      "address": "Celestijnenlaan 200g",
+      "zipcode": "3001",
+      "city": "Heverlee",
+      "lat": 50.862397819169686,
+      "lng": 4.674453299762682,
+      "outline": [
+        [
+          50.8622382,
+          4.6747983
+        ],
+        [
+          50.8620855,
+          4.6741238
+        ],
+        [
+          50.8621368,
+          4.6740947
+        ],
+        [
+          50.8621011,
+          4.6739371
+        ],
+        [
+          50.8625837,
+          4.6736629
+        ],
+        [
+          50.8626469,
+          4.6739419
+        ],
+        [
+          50.862589,
+          4.6739747
+        ],
+        [
+          50.8625733,
+          4.673905
+        ],
+        [
+          50.8624509,
+          4.6739746
+        ],
+        [
+          50.8624626,
+          4.6740266
+        ],
+        [
+          50.8623758,
+          4.674076
+        ],
+        [
+          50.8623641,
+          4.6740241
+        ],
+        [
+          50.8622247,
+          4.6741033
+        ],
+        [
+          50.8622442,
+          4.6741896
+        ],
+        [
+          50.8623659,
+          4.6747178
+        ],
+        [
+          50.8624875,
+          4.6746475
+        ],
+        [
+          50.8626384,
+          4.6745603
+        ],
+        [
+          50.8627321,
+          4.6749672
+        ],
+        [
+          50.8626526,
+          4.6750132
+        ],
+        [
+          50.8624538,
+          4.6751289
+        ],
+        [
+          50.8623702,
+          4.6751767
+        ],
+        [
+          50.8622878,
+          4.6747741
+        ]
+      ],
+      "photoUrl": "https://res.cloudinary.com/td-applicatiebeheer-ku-leuven/image/upload/w_800/v1743771077/kulag_dev/BuildingPhotoId-47445324-aae1-419e-a857-7561f3cdb35a.jpg",
+      "kulagUrl": "https://www.kuleuven.be/kulag/nl/gebouw/492-11/onderwijs",
+      "plans": [
+        {
+          "title": "Toegankelijkheidsplan-492-11",
+          "url": "https://www.kuleuven.be/kulag/media/original/f45fb5be-9b13-4c01-b47b-5c6cf592bd74.pdf"
+        }
+      ],
+      "rooms": [
+        {
+          "id": "492-11-000076",
+          "code": "00.76",
+          "name": "Inkomhal",
+          "category": "Inkom en balie",
+          "url": "https://www.kuleuven.be/kulag/nl/lokaal/492-11-000076/onderwijs"
+        },
+        {
+          "id": "492-11-000080",
+          "code": "00.80",
+          "name": "Inkomhal",
+          "category": "Inkom en balie",
+          "url": "https://www.kuleuven.be/kulag/nl/lokaal/492-11-000080/onderwijs"
+        },
+        {
+          "id": "492-11-000098",
+          "code": "00.98",
+          "name": "Inkomhal",
+          "category": "Inkom en balie",
+          "url": "https://www.kuleuven.be/kulag/nl/lokaal/492-11-000098/onderwijs"
+        },
+        {
+          "id": "492-11-000001",
+          "code": "00.01",
+          "name": "Aula",
+          "category": "Aula (auditorium)",
+          "url": "https://www.kuleuven.be/kulag/nl/lokaal/492-11-000001/onderwijs"
+        },
+        {
+          "id": "492-11-000006",
+          "code": "00.06",
+          "name": "Aula",
+          "category": "Aula (auditorium)",
+          "url": "https://www.kuleuven.be/kulag/nl/lokaal/492-11-000006/onderwijs"
+        },
+        {
+          "id": "492-11-000010",
+          "code": "00.10",
+          "name": "Leslokaal",
+          "category": "Les- en vergaderlokaal",
+          "url": "https://www.kuleuven.be/kulag/nl/lokaal/492-11-000010/onderwijs"
+        },
+        {
+          "id": "492-11-000014",
+          "code": "00.14",
+          "name": "Leslokaal",
+          "category": "Les- en vergaderlokaal",
+          "url": "https://www.kuleuven.be/kulag/nl/lokaal/492-11-000014/onderwijs"
+        },
+        {
+          "id": "492-11-000059",
+          "code": "00.59",
+          "name": "Leslokaal",
+          "category": "Les- en vergaderlokaal",
+          "url": "https://www.kuleuven.be/kulag/nl/lokaal/492-11-000059/onderwijs"
+        },
+        {
+          "id": "492-11-000063",
+          "code": "00.63",
+          "name": "Leslokaal",
+          "category": "Les- en vergaderlokaal",
+          "url": "https://www.kuleuven.be/kulag/nl/lokaal/492-11-000063/onderwijs"
+        },
+        {
+          "id": "492-11-010025",
+          "code": "01.25",
+          "name": "Didactisch labo",
+          "category": "Les- en vergaderlokaal",
+          "url": "https://www.kuleuven.be/kulag/nl/lokaal/492-11-010025/onderwijs"
+        },
+        {
+          "id": "492-11-010035",
+          "code": "01.35",
+          "name": "Practicumruimte",
+          "category": "Les- en vergaderlokaal",
+          "url": "https://www.kuleuven.be/kulag/nl/lokaal/492-11-010035/onderwijs"
+        },
+        {
+          "id": "492-11-010073",
+          "code": "01.73",
+          "name": "Leslokaal",
+          "category": "Les- en vergaderlokaal",
+          "url": "https://www.kuleuven.be/kulag/nl/lokaal/492-11-010073/onderwijs"
+        },
+        {
+          "id": "492-11-020025",
+          "code": "02.25",
+          "name": "Practicumruimte",
+          "category": "Les- en vergaderlokaal",
+          "url": "https://www.kuleuven.be/kulag/nl/lokaal/492-11-020025/onderwijs"
+        },
+        {
+          "id": "492-11-020035",
+          "code": "02.35",
+          "name": "Practicumruimte",
+          "category": "Les- en vergaderlokaal",
+          "url": "https://www.kuleuven.be/kulag/nl/lokaal/492-11-020035/onderwijs"
+        },
+        {
+          "id": "492-11-030025",
+          "code": "03.25",
+          "name": "Practicumruimte",
+          "category": "Les- en vergaderlokaal",
+          "url": "https://www.kuleuven.be/kulag/nl/lokaal/492-11-030025/onderwijs"
+        },
+        {
+          "id": "492-11-030035",
+          "code": "03.35",
+          "name": "Didactisch labo",
+          "category": "Les- en vergaderlokaal",
+          "url": "https://www.kuleuven.be/kulag/nl/lokaal/492-11-030035/onderwijs"
+        },
+        {
+          "id": "492-11-040025",
+          "code": "04.25",
+          "name": "Practicumruimte",
+          "category": "Les- en vergaderlokaal",
+          "url": "https://www.kuleuven.be/kulag/nl/lokaal/492-11-040025/onderwijs"
+        },
+        {
+          "id": "492-11-040035",
+          "code": "04.35",
+          "name": "Practicumruimte",
+          "category": "Les- en vergaderlokaal",
+          "url": "https://www.kuleuven.be/kulag/nl/lokaal/492-11-040035/onderwijs"
+        },
+        {
+          "id": "492-11-000003",
+          "code": null,
+          "name": "Aangepast toilet 00.03",
+          "category": "Sanitair",
+          "url": "https://www.kuleuven.be/kulag/nl/lokaal/492-11-000003/onderwijs"
+        },
+        {
+          "id": "492-11-000095",
+          "code": null,
+          "name": "Lift 00.95",
+          "category": "Lift en helling",
+          "url": "https://www.kuleuven.be/kulag/nl/lokaal/492-11-000095/onderwijs"
+        }
+      ]
+    },
+    {
+      "id": "493-31",
+      "name": "Laboratorium voor Akoestiek",
+      "shortCode": null,
+      "address": "Celestijnenlaan 200d",
+      "zipcode": "3001",
+      "city": "Heverlee",
+      "lat": 50.86259980788772,
+      "lng": 4.67664220753707,
+      "outline": [
+        [
+          50.8628162,
+          4.6766505
+        ],
+        [
+          50.8625202,
+          4.6768177
+        ],
+        [
+          50.8624896,
+          4.6766818
+        ],
+        [
+          50.8624671,
+          4.6766945
+        ],
+        [
+          50.8624302,
+          4.6765307
+        ],
+        [
+          50.8625057,
+          4.676488
+        ],
+        [
+          50.8625182,
+          4.6765436
+        ],
+        [
+          50.862607,
+          4.6764934
+        ],
+        [
+          50.8626385,
+          4.6766332
+        ],
+        [
+          50.8627927,
+          4.676546
+        ]
+      ],
+      "photoUrl": null,
+      "kulagUrl": "https://www.kuleuven.be/kulag/nl/gebouw/493-31/onderwijs",
+      "plans": [],
+      "rooms": [
+        {
+          "id": "493-31-000020",
+          "code": "00.20",
+          "name": "Gang",
+          "category": "Inkom en balie",
+          "url": "https://www.kuleuven.be/kulag/nl/lokaal/493-31-000020/onderwijs"
+        },
+        {
+          "id": "493-31-000022",
+          "code": null,
+          "name": "Lift 00.22",
+          "category": "Lift en helling",
+          "url": "https://www.kuleuven.be/kulag/nl/lokaal/493-31-000022/onderwijs"
+        }
+      ]
+    },
+    {
+      "id": "492-31",
+      "name": "Leuven Chem Tech",
+      "shortCode": null,
+      "address": "Celestijnenlaan 200f",
+      "zipcode": "3001",
+      "city": "Heverlee",
+      "lat": 50.8636832120271,
+      "lng": 4.674847981654843,
+      "outline": [
+        [
+          50.8640479,
+          4.6750219
+        ],
+        [
+          50.8639371,
+          4.6750921
+        ],
+        [
+          50.8639218,
+          4.67503
+        ],
+        [
+          50.8639971,
+          4.6749844
+        ],
+        [
+          50.8639852,
+          4.6749321
+        ],
+        [
+          50.8633821,
+          4.675287
+        ],
+        [
+          50.8632688,
+          4.6748101
+        ],
+        [
+          50.8639716,
+          4.6744084
+        ],
+        [
+          50.8639912,
+          4.674401
+        ],
+        [
+          50.8640648,
+          4.6748905
+        ],
+        [
+          50.8640191,
+          4.6749119
+        ]
+      ],
+      "photoUrl": "https://res.cloudinary.com/td-applicatiebeheer-ku-leuven/image/upload/w_800/v1764886840/kulag_dev/BuildingPhotoId-7cac5e84-5780-4345-aaec-b7fac8916538.jpg",
+      "kulagUrl": "https://www.kuleuven.be/kulag/nl/gebouw/492-31/onderwijs",
+      "plans": [
+        {
+          "title": "Toegankelijkheidsplan-492-31.pdf",
+          "url": "https://www.kuleuven.be/kulag/media/original/d40d2dbe-68fe-470e-90ec-f4a1e00d36ba.pdf"
+        }
+      ],
+      "rooms": [
+        {
+          "id": "492-31-000188",
+          "code": "00.188",
+          "name": "Inkomhal",
+          "category": "Inkom en balie",
+          "url": "https://www.kuleuven.be/kulag/nl/lokaal/492-31-000188/onderwijs"
+        },
+        {
+          "id": "492-31-000127",
+          "code": null,
+          "name": "Aangepast toilet 00.127",
+          "category": "Sanitair",
+          "url": "https://www.kuleuven.be/kulag/nl/lokaal/492-31-000127/onderwijs"
+        },
+        {
+          "id": "492-31-000192",
+          "code": null,
+          "name": "Lift 00.192",
+          "category": "Lift en helling",
+          "url": "https://www.kuleuven.be/kulag/nl/lokaal/492-31-000192/onderwijs"
+        }
+      ]
+    },
+    {
+      "id": "492-41",
+      "name": "Leuven NanoCentre",
+      "shortCode": null,
+      "address": "Celestijnenlaan 200J",
+      "zipcode": "3001",
+      "city": "Heverlee",
+      "lat": 50.86363766940472,
+      "lng": 4.673796304700775,
+      "outline": [
+        [
+          50.863894,
+          4.6744507
+        ],
+        [
+          50.8639169,
+          4.6744411
+        ],
+        [
+          50.8639716,
+          4.6744084
+        ],
+        [
+          50.8636666,
+          4.6730927
+        ],
+        [
+          50.8635339,
+          4.6731676
+        ],
+        [
+          50.8633219,
+          4.6732873
+        ],
+        [
+          50.8635825,
+          4.6744457
+        ],
+        [
+          50.8638186,
+          4.6743124
+        ],
+        [
+          50.8638299,
+          4.6743622
+        ],
+        [
+          50.863855,
+          4.6744731
+        ]
+      ],
+      "photoUrl": "https://res.cloudinary.com/td-applicatiebeheer-ku-leuven/image/upload/w_800/v1597626197/kulag_dev/BuildingPhotoId-ec288820-6134-4b57-947b-b09cc0b53fb4.jpg",
+      "kulagUrl": "https://www.kuleuven.be/kulag/nl/gebouw/492-41/onderwijs",
+      "plans": [],
+      "rooms": [
+        {
+          "id": "492-41-000394",
+          "code": "00.394",
+          "name": "Inkomhal",
+          "category": "Inkom en balie",
+          "url": "https://www.kuleuven.be/kulag/nl/lokaal/492-41-000394/onderwijs"
+        },
+        {
+          "id": "492-41-000527",
+          "code": null,
+          "name": "Aangepast toilet 00.527",
+          "category": "Sanitair",
+          "url": "https://www.kuleuven.be/kulag/nl/lokaal/492-41-000527/onderwijs"
+        },
+        {
+          "id": "492-41-000596",
+          "code": null,
+          "name": "Lift 00.596",
+          "category": "Lift en helling",
+          "url": "https://www.kuleuven.be/kulag/nl/lokaal/492-41-000596/onderwijs"
+        }
+      ]
+    },
+    {
+      "id": "492-51",
+      "name": "Quadrivium",
+      "shortCode": "QDV",
+      "address": "Celestijnenlaan 200",
+      "zipcode": "3001",
+      "city": "Heverlee",
+      "lat": 50.86279685154103,
+      "lng": 4.6749397785585565,
+      "outline": [
+        [
+          50.8627294,
+          4.6749918
+        ],
+        [
+          50.8627651,
+          4.6751377
+        ],
+        [
+          50.8626768,
+          4.6754031
+        ],
+        [
+          50.8628756,
+          4.6757482
+        ],
+        [
+          50.8630622,
+          4.6755712
+        ],
+        [
+          50.8627025,
+          4.6740122
+        ],
+        [
+          50.8625312,
+          4.6741144
+        ],
+        [
+          50.8626301,
+          4.6745742
+        ],
+        [
+          50.8626435,
+          4.6745698
+        ],
+        [
+          50.8627172,
+          4.6748901
+        ],
+        [
+          50.8627074,
+          4.6748962
+        ]
+      ],
+      "photoUrl": "https://res.cloudinary.com/td-applicatiebeheer-ku-leuven/image/upload/w_800/v1639602884/kulag_dev/BuildingPhotoId-ac7132ec-8dd9-42ff-aaea-37c7671db43b.jpg",
+      "kulagUrl": "https://www.kuleuven.be/kulag/nl/gebouw/492-51/onderwijs",
+      "plans": [
+        {
+          "title": "Toegankelijkheidsplan-492-51",
+          "url": "https://www.kuleuven.be/kulag/media/original/50c7e887-2c5f-41cd-8f5b-1e3c9c1c47c1.pdf"
+        }
+      ],
+      "rooms": [
+        {
+          "id": "492-51-000091",
+          "code": "00.91",
+          "name": "Inkomruimte",
+          "category": "Inkom en balie",
+          "url": "https://www.kuleuven.be/kulag/nl/lokaal/492-51-000091/onderwijs"
+        },
+        {
+          "id": "492-51-010001",
+          "code": "01.01",
+          "name": "Aula Rosalind Franklin",
+          "category": "Aula (auditorium)",
+          "url": "https://www.kuleuven.be/kulag/nl/lokaal/492-51-010001/onderwijs"
+        },
+        {
+          "id": "492-51-000100",
+          "code": "00.100",
+          "name": "Seminarielokaal",
+          "category": "Les- en vergaderlokaal",
+          "url": "https://www.kuleuven.be/kulag/nl/lokaal/492-51-000100/onderwijs"
+        },
+        {
+          "id": "492-51-000110",
+          "code": "00.110",
+          "name": "Seminarielokaal",
+          "category": "Les- en vergaderlokaal",
+          "url": "https://www.kuleuven.be/kulag/nl/lokaal/492-51-000110/onderwijs"
+        },
+        {
+          "id": "492-51-010100",
+          "code": "01.100",
+          "name": "Collaboratieve ruimte ASTRONOMIA",
+          "category": "Les- en vergaderlokaal",
+          "url": "https://www.kuleuven.be/kulag/nl/lokaal/492-51-010100/onderwijs"
+        },
+        {
+          "id": "492-51-010110",
+          "code": "01.110",
+          "name": "Collaboratieve ruimte Musica",
+          "category": "Les- en vergaderlokaal",
+          "url": "https://www.kuleuven.be/kulag/nl/lokaal/492-51-010110/onderwijs"
+        },
+        {
+          "id": "492-51-010180",
+          "code": "01.180",
+          "name": "Collaboratieve ruimte Geometrica",
+          "category": "Les- en vergaderlokaal",
+          "url": "https://www.kuleuven.be/kulag/nl/lokaal/492-51-010180/onderwijs"
+        },
+        {
+          "id": "492-51-020100",
+          "code": "02.100",
+          "name": "Collaboratieve ruimte Arithmetica",
+          "category": "Les- en vergaderlokaal",
+          "url": "https://www.kuleuven.be/kulag/nl/lokaal/492-51-020100/onderwijs"
+        },
+        {
+          "id": "492-51-020125",
+          "code": "02.125",
+          "name": "Seminarielokaal",
+          "category": "Les- en vergaderlokaal",
+          "url": "https://www.kuleuven.be/kulag/nl/lokaal/492-51-020125/onderwijs"
+        },
+        {
+          "id": "492-51-020135",
+          "code": "02.135",
+          "name": "Polyvalent lokaal",
+          "category": "Les- en vergaderlokaal",
+          "url": "https://www.kuleuven.be/kulag/nl/lokaal/492-51-020135/onderwijs"
+        },
+        {
+          "id": "492-51-020140",
+          "code": "02.140",
+          "name": "Practicum Biochemie",
+          "category": "Les- en vergaderlokaal",
+          "url": "https://www.kuleuven.be/kulag/nl/lokaal/492-51-020140/onderwijs"
+        },
+        {
+          "id": "492-51-020180",
+          "code": "02.180",
+          "name": "Practicum Kunststoffen",
+          "category": "Les- en vergaderlokaal",
+          "url": "https://www.kuleuven.be/kulag/nl/lokaal/492-51-020180/onderwijs"
+        },
+        {
+          "id": "492-51-030120",
+          "code": "03.120",
+          "name": "Seminarielokaal",
+          "category": "Les- en vergaderlokaal",
+          "url": "https://www.kuleuven.be/kulag/nl/lokaal/492-51-030120/onderwijs"
+        },
+        {
+          "id": "492-51-030140",
+          "code": "03.140",
+          "name": "Seminarielokaal",
+          "category": "Les- en vergaderlokaal",
+          "url": "https://www.kuleuven.be/kulag/nl/lokaal/492-51-030140/onderwijs"
+        },
+        {
+          "id": "492-51-030160",
+          "code": "03.160",
+          "name": "Seminarielokaal",
+          "category": "Les- en vergaderlokaal",
+          "url": "https://www.kuleuven.be/kulag/nl/lokaal/492-51-030160/onderwijs"
+        },
+        {
+          "id": "492-51-030180",
+          "code": "03.180",
+          "name": "Seminarielokaal",
+          "category": "Les- en vergaderlokaal",
+          "url": "https://www.kuleuven.be/kulag/nl/lokaal/492-51-030180/onderwijs"
+        },
+        {
+          "id": "492-51-000010",
+          "code": "00.10",
+          "name": "Eetzaal Alma Quadrivium",
+          "category": "Socioculturele en logistieke ruimte",
+          "url": "https://www.kuleuven.be/kulag/nl/lokaal/492-51-000010/onderwijs"
+        },
+        {
+          "id": "492-51-000127",
+          "code": null,
+          "name": "Aangepast toilet 00.127",
+          "category": "Sanitair",
+          "url": "https://www.kuleuven.be/kulag/nl/lokaal/492-51-000127/onderwijs"
+        },
+        {
+          "id": "492-51-000060",
+          "code": null,
+          "name": "Aangepast toilet 00.60",
+          "category": "Sanitair",
+          "url": "https://www.kuleuven.be/kulag/nl/lokaal/492-51-000060/onderwijs"
+        },
+        {
+          "id": "492-51-010127",
+          "code": null,
+          "name": "Aangepast toilet 01.127",
+          "category": "Sanitair",
+          "url": "https://www.kuleuven.be/kulag/nl/lokaal/492-51-010127/onderwijs"
+        },
+        {
+          "id": "492-51-020151",
+          "code": null,
+          "name": "Aangepast toilet 02.151",
+          "category": "Sanitair",
+          "url": "https://www.kuleuven.be/kulag/nl/lokaal/492-51-020151/onderwijs"
+        },
+        {
+          "id": "492-51-000199",
+          "code": null,
+          "name": "Lift 00.199",
+          "category": "Lift en helling",
+          "url": "https://www.kuleuven.be/kulag/nl/lokaal/492-51-000199/onderwijs"
+        },
+        {
+          "id": "492-51-010087",
+          "code": null,
+          "name": "Plateaulift in/aan 01.87",
+          "category": "Lift en helling",
+          "url": "https://www.kuleuven.be/kulag/nl/lokaal/492-51-010087/onderwijs"
+        }
+      ]
+    },
+    {
+      "id": "490-17",
+      "name": "Seminarielokalen",
+      "shortCode": "200S",
+      "address": "Celestijnenlaan 200s",
+      "zipcode": "3001",
+      "city": "Heverlee",
+      "lat": 50.86321694282697,
+      "lng": 4.6792602846072056,
+      "outline": [
+        [
+          50.8633221,
+          4.6792471
+        ],
+        [
+          50.8633369,
+          4.6793175
+        ],
+        [
+          50.8631685,
+          4.6794174
+        ],
+        [
+          50.8631489,
+          4.6794286
+        ],
+        [
+          50.8630979,
+          4.6792054
+        ],
+        [
+          50.8632897,
+          4.6790954
+        ],
+        [
+          50.8633085,
+          4.6791852
+        ],
+        [
+          50.863312,
+          4.6791843
+        ],
+        [
+          50.8633157,
+          4.6791839
+        ],
+        [
+          50.8633191,
+          4.6791845
+        ],
+        [
+          50.8633213,
+          4.6791852
+        ],
+        [
+          50.8633234,
+          4.6791862
+        ],
+        [
+          50.8633258,
+          4.6791882
+        ],
+        [
+          50.8633275,
+          4.6791898
+        ],
+        [
+          50.8633299,
+          4.6791932
+        ],
+        [
+          50.8633316,
+          4.6791963
+        ],
+        [
+          50.8633332,
+          4.6792
+        ],
+        [
+          50.8633341,
+          4.6792029
+        ],
+        [
+          50.8633347,
+          4.6792061
+        ],
+        [
+          50.8633353,
+          4.67921
+        ],
+        [
+          50.8633357,
+          4.6792154
+        ],
+        [
+          50.8633358,
+          4.6792192
+        ],
+        [
+          50.8633357,
+          4.6792223
+        ],
+        [
+          50.8633353,
+          4.6792262
+        ],
+        [
+          50.8633345,
+          4.6792296
+        ],
+        [
+          50.8633326,
+          4.6792346
+        ],
+        [
+          50.8633306,
+          4.6792383
+        ],
+        [
+          50.8633283,
+          4.6792416
+        ],
+        [
+          50.8633263,
+          4.6792435
+        ],
+        [
+          50.8633248,
+          4.6792451
+        ]
+      ],
+      "photoUrl": "https://res.cloudinary.com/td-applicatiebeheer-ku-leuven/image/upload/w_800/v1597610482/kulag_dev/BuildingPhotoId-39658223-bc4c-4c12-a9d7-9de3e7edd9ea.jpg",
+      "kulagUrl": "https://www.kuleuven.be/kulag/nl/gebouw/490-17/onderwijs",
+      "plans": [
+        {
+          "title": "Toegankelijkheidsplan 490-17",
+          "url": "https://www.kuleuven.be/kulag/media/original/21f3e2f6-b000-49fd-a942-4b1621f59951.pdf"
+        }
+      ],
+      "rooms": [
+        {
+          "id": "490-17-000002",
+          "code": "00.02",
+          "name": "Inkomhal 200S",
+          "category": "Inkom en balie",
+          "url": "https://www.kuleuven.be/kulag/nl/lokaal/490-17-000002/onderwijs"
+        },
+        {
+          "id": "490-17-000003",
+          "code": "00.03",
+          "name": "Leslokaal",
+          "category": "Les- en vergaderlokaal",
+          "url": "https://www.kuleuven.be/kulag/nl/lokaal/490-17-000003/onderwijs"
+        },
+        {
+          "id": "490-17-000004",
+          "code": "00.04",
+          "name": "Leslokaal",
+          "category": "Les- en vergaderlokaal",
+          "url": "https://www.kuleuven.be/kulag/nl/lokaal/490-17-000004/onderwijs"
+        },
+        {
+          "id": "490-17-000005",
+          "code": "00.05",
+          "name": "Leslokaal",
+          "category": "Les- en vergaderlokaal",
+          "url": "https://www.kuleuven.be/kulag/nl/lokaal/490-17-000005/onderwijs"
+        },
+        {
+          "id": "490-17-010003",
+          "code": "01.03",
+          "name": "Leslokaal",
+          "category": "Les- en vergaderlokaal",
+          "url": "https://www.kuleuven.be/kulag/nl/lokaal/490-17-010003/onderwijs"
+        },
+        {
+          "id": "490-17-010004",
+          "code": "01.04",
+          "name": "Leslokaal",
+          "category": "Les- en vergaderlokaal",
+          "url": "https://www.kuleuven.be/kulag/nl/lokaal/490-17-010004/onderwijs"
+        },
+        {
+          "id": "490-17-010005",
+          "code": "01.05",
+          "name": "Leslokaal",
+          "category": "Les- en vergaderlokaal",
+          "url": "https://www.kuleuven.be/kulag/nl/lokaal/490-17-010005/onderwijs"
+        }
+      ]
+    },
+    {
+      "id": "490-90",
+      "name": "Terrein Auditoria",
+      "shortCode": null,
+      "address": "Celestijnenlaan 200",
+      "zipcode": "3001",
+      "city": "Heverlee",
+      "lat": null,
+      "lng": null,
+      "outline": [],
+      "photoUrl": "https://res.cloudinary.com/td-applicatiebeheer-ku-leuven/image/upload/w_800/v1597624068/kulag_dev/BuildingPhotoId-475e0e81-4471-4de7-a928-ba7dcd2af577.jpg",
+      "kulagUrl": "https://www.kuleuven.be/kulag/nl/gebouw/490-90/onderwijs",
+      "plans": [
+        {
+          "title": "Toegankelijkheidsplan-490-90",
+          "url": "https://www.kuleuven.be/kulag/media/original/15367667-16da-48b4-a371-3be2b13de4a8.pdf"
+        }
+      ],
+      "rooms": []
+    },
+    {
+      "id": "493-30",
+      "name": "Terrein Natuurkunde",
+      "shortCode": null,
+      "address": "Celestijnenlaan 200",
+      "zipcode": "3001",
+      "city": "Heverlee",
+      "lat": null,
+      "lng": null,
+      "outline": [],
+      "photoUrl": "https://res.cloudinary.com/td-applicatiebeheer-ku-leuven/image/upload/w_800/v1597624045/kulag_dev/BuildingPhotoId-b326b95f-07f5-4740-a874-d5558087b2d0.jpg",
+      "kulagUrl": "https://www.kuleuven.be/kulag/nl/gebouw/493-30/onderwijs",
+      "plans": [
+        {
+          "title": "Toegankelijkheidsplan-493-30",
+          "url": "https://www.kuleuven.be/kulag/media/original/ec253770-02d2-4626-9e00-e66b94b5de3a.pdf"
+        }
+      ],
+      "rooms": []
+    },
+    {
+      "id": "492-90",
+      "name": "Terrein Scheikunde",
+      "shortCode": null,
+      "address": "Celestijnenlaan 200",
+      "zipcode": "3001",
+      "city": "Heverlee",
+      "lat": null,
+      "lng": null,
+      "outline": [],
+      "photoUrl": null,
+      "kulagUrl": "https://www.kuleuven.be/kulag/nl/gebouw/492-90/onderwijs",
+      "plans": [
+        {
+          "title": "Toegankelijkheidsplan-492-90",
+          "url": "https://www.kuleuven.be/kulag/media/original/20c640e2-3443-4617-8138-3bfcd54ef924.pdf"
+        }
+      ],
+      "rooms": []
+    }
+  ]
+}

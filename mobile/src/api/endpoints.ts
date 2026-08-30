@@ -17,6 +17,7 @@ import type {
   AppPoc,
   AppPraesidium,
   AppProfile,
+  AppRooms,
   AppScanEvent,
   AppScannerInviteResult,
   AppSearch,
@@ -362,4 +363,18 @@ export function leaveStudyGroup(groupId: string, memberId?: string): Promise<App
   return apiFetch(memberId ? `${path}?lid=${encodeURIComponent(memberId)}` : path, {
     method: 'DELETE',
   });
+}
+
+// ── Lokalen ─────────────────────────────────────────────────────────────────
+
+/**
+ * De lokalenzoeker.
+ *
+ * Zonder `query` komen alle gebouwen mee met hun contour; dat is wat de kaart
+ * nodig heeft en het is klein genoeg om in één keer te cachen. Met `query` komen
+ * de treffers erbij in `results`. Het zoeken zelf gebeurt op de server: die
+ * beslist wat "200k0006" betekent, niet de app.
+ */
+export function fetchRooms(query?: string): Promise<AppRooms> {
+  return apiFetch<AppRooms>(appApi('/lokalen', { q: query?.trim() || undefined }));
 }

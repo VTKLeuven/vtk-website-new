@@ -39,6 +39,7 @@ import { useMemo } from 'react';
  */
 export const TAB_ROUTES = {
   '(home)': [
+    'lokalen',
     'evenement/[id]',
     'ticket/[slug]',
     'mijn-tickets',
@@ -55,10 +56,11 @@ export const TAB_ROUTES = {
     'bestellen',
   ],
   kalender: ['evenement/[id]', 'ticket/[slug]', 'mijn-tickets', 'meldingen'],
-  studeren: ['studiegroep/[id]', 'studiegroep/nieuw'],
+  studeren: ['studiegroep/[id]', 'studiegroep/nieuw', 'lokalen'],
   tickets: ['ticket/[slug]', 'mijn-tickets', 'scannen', 'scan/[eventId]'],
   meer: [
     'zoeken',
+    'lokalen',
     'media',
     'albums',
     'album/[slug]',
