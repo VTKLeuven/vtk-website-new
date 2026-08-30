@@ -489,53 +489,53 @@ model User {
 
   // Onboarding-profiel (ingevuld bij de eerste KUL SSO-login). Zolang
   // onboardedAt null is, wordt het lid naar de onboarding-flow gestuurd.
-  onboardedAt            DateTime?
+  onboardedAt             DateTime?
   // Kotadres
-  street                 String?
-  houseNumber            String?
-  bus                    String? // busnummer, optioneel
-  postalCode             String?
-  city                   String?
-  birthDate              DateTime?
+  street                  String?
+  houseNumber             String?
+  bus                     String? // busnummer, optioneel
+  postalCode              String?
+  city                    String?
+  birthDate               DateTime?
   // Contact: `email` is de login-/universiteitsmail (via SSO). Persoonlijke
   // mail en de voorkeur voor communicatie komen erbij.
-  personalEmail          String?
-  emailPreference        EmailPreference     @default(UNIVERSITY)
+  personalEmail           String?
+  emailPreference         EmailPreference     @default(UNIVERSITY)
   // Het `@vtk.be`-account in Google Workspace. `googleUserId` is het immutable
   // id van Google: dat blijft kloppen wanneer iemand van naam of adres wisselt.
   // Op naam matchen doen we bewust nooit (naamgenoten, tussenvoegsels), dus dit
   // veld is de enige koppeling. Zie docs/design-decisions.md, "Google Workspace".
-  googleUserId           String?             @unique
-  googleEmail            String?             @unique
-  googleLinkedAt         DateTime?
+  googleUserId            String?             @unique
+  googleEmail             String?             @unique
+  googleLinkedAt          DateTime?
   // Wanneer het lid de verplichte koppeling uitstelde omdat het nog geen
   // @vtk.be-account heeft. Zonder deze ontsnapping sluit de gate iemand buiten
   // die niets kan doen aan wat de gate vraagt; de gate komt gewoon terug.
-  googleLinkDeferredAt   DateTime?
+  googleLinkDeferredAt    DateTime?
   // Laatst toegepaste staat van het Google-account, zodat de sync niet elke
   // ronde dezelfde OU-verhuizing opnieuw doet. Afgeleid uit de posten en de
   // kiesploeg; zie lib/google/accountState.ts.
-  googleAccountState     GoogleAccountState?
+  googleAccountState      GoogleAccountState?
   // Opt-in mailinglijsten: enkel de aangeduide categorieën zitten in de array.
-  mailCategories         MailCategory[]      @default([])
+  mailCategories          MailCategory[]      @default([])
   // Herinneringen voor een shift waarvoor je jezelf inschreef. Bewust geen
   // `MailCategory`: dat zijn opt-in nieuwsbrieven, dit is transactioneel. Wel
   // uitzetbaar, want niet iedereen wil twee mails per shift.
-  shiftReminderDayBefore Boolean             @default(true)
-  shiftReminderSoon      Boolean             @default(true)
+  shiftReminderDayBefore  Boolean             @default(true)
+  shiftReminderSoon       Boolean             @default(true)
   // Studie: meerdere studiejaren en richtingen mogelijk (iemand kan bv. deels in
   // 2de en deels in 3de bachelor zitten).
-  studyYears             StudyYear[]         @default([])
-  studyProgrammes        StudyProgramme[]    @default([])
+  studyYears              StudyYear[]         @default([])
+  studyProgrammes         StudyProgramme[]    @default([])
   // Lid dat niet aan de faculteit Ingenieurswetenschappen studeert. Bewust geen
   // `StudyProgramme`-waarde: het is geen richting, en als enum-waarde zou het
   // overal opduiken waar richtingen opgelijst worden (o.a. de career-export).
-  notAtFaculty           Boolean             @default(false)
+  notAtFaculty            Boolean             @default(false)
   // Lid dat niet (meer) studeert: afgestudeerd of gestopt. Bewust los van
   // `notAtFaculty` (dat is "studeert wél, maar elders"): wie dit aanduidt valt
   // uit élke studiegerichte mailinglijst (zie lib/mailinglists.ts). Blijft een
   // aparte boolean om dezelfde reden als notAtFaculty.
-  notStudying            Boolean             @default(false)
+  notStudying             Boolean             @default(false)
   // Verbergt doelgroepevents die niet bij het profiel passen.
   //
   // Standaard **uit**: alles is publiek en een eerstejaars mag gerust zien dat er
@@ -543,34 +543,34 @@ model User {
   // doopactiviteiten wil zien) zet dit aan op /account; dan gelden de doelgroepen
   // uit `audiencesForStudyProfile` als filter op de homepage, de kalender, de
   // zoekresultaten, de app en de persoonlijke agendafeed.
-  calendarOnlyMyAudiences Boolean            @default(false)
+  calendarOnlyMyAudiences Boolean             @default(false)
   // Internationale of uitwisselingsstudent. Bewust een eigen veld en geen
   // afleiding uit `locale`: de sitetaal zegt welke taal je leest, niet of je een
   // exchange-student bent. Stuurt welke evenementen vanzelf in de kalender
   // opduiken (zie CalendarAudience).
-  internationalStudent   Boolean             @default(false)
+  internationalStudent    Boolean             @default(false)
   // Afgestudeerde van de faculteit. Bewust los van `notStudying`: die laatste
   // omvat ook wie stopte zonder af te studeren en is dus geen betrouwbare
   // alumni-indicator. Stuurt de expliciete alumni-doelgroep in de kalender.
-  alumni                 Boolean             @default(false)
+  alumni                  Boolean             @default(false)
   // Het jaar waarin het lid afstudeerde. Enkel zinvol bij `alumni`, maar bewust
   // geen aparte tabel: het is één getal dat bij de persoon hoort. Wordt getoond
   // in de aanwezigheidslijst van een alumni-evenement wanneer het lid dat zelf
   // aanvinkt, en groepeert de alumni-mailinglijsten per lichting.
-  graduationYear         Int?
+  graduationYear          Int?
   // "Ik heb ooit in VTK gezeten" (praesidium, werkgroep, medewerker). Bewust
   // zelf verklaard en niet afgeleid uit `GroupMembership`: de historiek in de
   // database begint pas bij de website, terwijl een alumnus van 2004 evengoed
   // in VTK zat.
-  wasInVtk               Boolean             @default(false)
+  wasInVtk                Boolean             @default(false)
   // Wil per mail op de hoogte blijven van alumni-evenementen. Bewust geen
   // `MailCategory`: die lijsten zijn studiegericht en vallen weg zodra iemand
   // zijn studie niet meer bevestigt, wat voor een alumnus altijd het geval is.
-  alumniMailOptIn        Boolean             @default(false)
+  alumniMailOptIn         Boolean             @default(false)
   // Erelid. Enkel door een beheerder te zetten (zie `users.edit`), nooit door
   // het lid zelf. Geeft toegang tot ticketsoorten met `TicketAudience.HONORARY`,
   // die voor iedereen anders onzichtbaar blijven.
-  honoraryMember         Boolean             @default(false)
+  honoraryMember          Boolean             @default(false)
   // Wanneer dit account zichzelf met e-mail en wachtwoord aanmaakte (de weg voor
   // wie geen KU Leuven-login (meer) heeft). Bewust een datum en geen boolean:
   // het beheer wil kunnen zien wanneer zo'n account binnenkwam.
@@ -579,7 +579,7 @@ model User {
   // account dat een beheerder aanmaakte of dat via SSO binnenkwam is per
   // definitie vertrouwd; enkel bij een zelfgemaakt account houdt een
   // onbevestigd adres de login tegen (zie `loginAction`).
-  selfRegisteredAt       DateTime?           @db.Timestamptz(3)
+  selfRegisteredAt        DateTime?           @db.Timestamptz(3)
   // Academiejaar waarin het lid zijn studieprofiel laatst bevestigde (2026 =
   // "26-27"). Loopt dat achter op het huidige academiejaar, dan is het profiel
   // verlopen: de bevestigingsgate vraagt het opnieuw en het lid valt zolang uit
@@ -590,7 +590,7 @@ model User {
   // academiejaar tot eind september loopt. De bevestiging vervalt daarom op
   // 27 september (`currentStudyYear()` in @vtk/auth), anders duidt iedereen in
   // juli nog het jaar aan dat net gedaan is.
-  studyConfirmedYear     Int?
+  studyConfirmedYear      Int?
 
   sessions  Session[]
   accounts  Account[]
@@ -634,8 +634,8 @@ model User {
   studyGroupMemberships   StudyGroupMember[]          @relation("StudyGroupMemberUser")
   studyProfile            StudyProfile?               @relation("StudyProfileUser")
 
-  fakbarEvenings          FakbarEvening[]             @relation("FakbarHoofdtapper")
-  photoTakedownsHandled   PhotoTakedownRequest[]     @relation("PhotoTakedownHandler")
+  fakbarEvenings        FakbarEvening[]        @relation("FakbarHoofdtapper")
+  photoTakedownsHandled PhotoTakedownRequest[] @relation("PhotoTakedownHandler")
 
   pianoReservations PianoReservation[]
 
@@ -700,8 +700,8 @@ model User {
   expensesPaid      Expense[] @relation("ExpensePaidBy")
   expensesBooked    Expense[] @relation("ExpenseBookedBy")
 
-  createdLesbezoeken  Lesbezoek[] @relation("LesbezoekCreatedBy")
-  reviewedLesbezoeken Lesbezoek[] @relation("LesbezoekReviewedBy")
+  createdLesbezoeken             Lesbezoek[]              @relation("LesbezoekCreatedBy")
+  reviewedLesbezoeken            Lesbezoek[]              @relation("LesbezoekReviewedBy")
   createdLesbezoekScheduledMails LesbezoekScheduledMail[] @relation("LesbezoekScheduledMailCreatedBy")
 
   @@index([deletedAt])
@@ -1343,7 +1343,7 @@ model PageAsset {
 // -----------------------------------------------------------------------------
 
 model CalendarEvent {
-  id            String          @id @default(cuid())
+  id            String    @id @default(cuid())
   titleNl       String
   titleEn       String?
   descriptionNl String?
@@ -1351,16 +1351,16 @@ model CalendarEvent {
   location      String?
   start         DateTime
   end           DateTime
-  allDay        Boolean         @default(false)
+  allDay        Boolean   @default(false)
   url           String?
   imageKey      String?
   groupId       String
   createdById   String?
   // NULL = concept. Een concept blijft wel zichtbaar en bewerkbaar in de admin,
   // maar verschijnt nergens op de publieke site of in een agenda-feed.
-  publishedAt   DateTime?       @db.Timestamptz(3)
-  createdAt     DateTime        @default(now())
-  updatedAt     DateTime        @updatedAt
+  publishedAt   DateTime? @db.Timestamptz(3)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
 
   // Zie de gelijknamige velden op `Page`: door een trigger onderhouden
   // zoekvectoren, enkel via ruwe SQL bevraagd.
@@ -4717,7 +4717,7 @@ model Lesbezoek {
 /// Een ingeplande mail rond een lesbezoek (bv. vraag naar een docent die pas
 /// de volgende ochtend tijdens kantooruren verstuurd mag worden).
 model LesbezoekScheduledMail {
-  id          String   @id @default(cuid())
+  id          String  @id @default(cuid())
   lesbezoekId String
   kind        String
   to          String
@@ -5144,7 +5144,7 @@ model Expense {
 
   /// De post die de kost draagt. `SetNull` en niet `Cascade`: een gedeactiveerde
   /// of verwijderde post mag de boekhouding niet meenemen.
-  groupId String?
+  groupId   String?
   /// Naam van de post op het moment van indienen. Staat zo op het blad dat naar
   /// de boekhouder gaat, en blijft dus staan ook als de post later hernoemt.
   postLabel String
@@ -5177,14 +5177,14 @@ model Expense {
   /// Terugbetaald aan het lid. Bij VTK_CARD staat dit meteen gevuld: er valt
   /// niets terug te betalen, en zo blijft "openstaand" precies de lijst waar
   /// nog geld naartoe moet.
-  paidAt   DateTime? @db.Timestamptz(3)
-  paidById String?
+  paidAt     DateTime? @db.Timestamptz(3)
+  paidById   String?
   /// Bevestigd door de boekhouder dat ze in de boeken staat.
   bookedAt   DateTime? @db.Timestamptz(3)
   bookedById String?
   /// Wanneer het blad naar de boekhouding vertrok, en naar welk adres.
-  sentAt DateTime? @db.Timestamptz(3)
-  sentTo String?
+  sentAt     DateTime? @db.Timestamptz(3)
+  sentTo     String?
 
   createdAt DateTime @default(now()) @db.Timestamptz(3)
   updatedAt DateTime @updatedAt @db.Timestamptz(3)
@@ -5217,7 +5217,7 @@ model FakbarItem {
   id         String             @id @default(cuid())
   name       String
   category   FakbarItemCategory
-  salesPrice Int                // In cents (theoretical income per unit)
+  salesPrice Int // In cents (theoretical income per unit)
 
   createdAt DateTime @default(now()) @db.Timestamptz(3)
   updatedAt DateTime @updatedAt @db.Timestamptz(3)
@@ -5253,7 +5253,7 @@ model FakbarEvening {
   id                 String   @id @default(cuid())
   weekId             String
   date               DateTime @db.Date
-  dayOfWeek          String   // Zondag, Maandag, etc.
+  dayOfWeek          String // Zondag, Maandag, etc.
   hoofdtapperId      String?
   specialeActiviteit String?
   bancontactRevenue  Int      @default(0) // In cents
@@ -5276,21 +5276,21 @@ model FakbarCashRegisterCount {
   eveningId String @id
 
   // All amounts are counts (how many pieces)
-  cnt_0_05          Int @default(0)
-  cnt_0_10          Int @default(0)
-  cnt_0_20          Int @default(0)
-  cnt_0_50          Int @default(0)
-  cnt_1_00          Int @default(0)
-  cnt_2_00          Int @default(0)
-  cnt_5_00          Int @default(0)
-  cnt_10_00         Int @default(0)
-  cnt_20_00         Int @default(0)
-  cnt_50_00         Int @default(0)
-  cnt_100_00        Int @default(0)
-  
-  cnt_elixirbon         Int @default(0)
-  cnt_guidogids         Int @default(0)
-  cnt_medewerkersbon    Int @default(0)
+  cnt_0_05   Int @default(0)
+  cnt_0_10   Int @default(0)
+  cnt_0_20   Int @default(0)
+  cnt_0_50   Int @default(0)
+  cnt_1_00   Int @default(0)
+  cnt_2_00   Int @default(0)
+  cnt_5_00   Int @default(0)
+  cnt_10_00  Int @default(0)
+  cnt_20_00  Int @default(0)
+  cnt_50_00  Int @default(0)
+  cnt_100_00 Int @default(0)
+
+  cnt_elixirbon      Int @default(0)
+  cnt_guidogids      Int @default(0)
+  cnt_medewerkersbon Int @default(0)
 
   updatedAt DateTime @updatedAt @db.Timestamptz(3)
 
@@ -5363,21 +5363,21 @@ model FakbarEveningSpecial {
   kind      FakbarSpecialKind
 
   /// Wat er op het bord komt: "2+1 gratis Stella", "Cocktail van de maand".
-  title     String
+  title String
   /// Optionele toelichting, bv. de voorwaarden van de actie.
-  note      String?
+  note  String?
 
   /// Het artikel waar de actie over gaat, wanneer het er één is. Null voor een
   /// actie over de hele toog of een drank die niet op de kaart staat. Bewust
   /// `SetNull` en geen `Cascade`: gaat het artikel van de kaart, dan blijft de
   /// actie in de historiek staan met haar eigen titel.
-  itemId    String?
+  itemId String?
   /// De prijs die die avond geldt, in cent. Null betekent: de gewone prijs, of
   /// niet van toepassing (bij een actie zoals 2+1).
-  price     Int?
+  price  Int?
 
   /// Volgorde op het bord en op de site.
-  sortOrder Int               @default(0)
+  sortOrder Int @default(0)
 
   createdAt DateTime @default(now()) @db.Timestamptz(3)
   updatedAt DateTime @updatedAt @db.Timestamptz(3)
@@ -5393,7 +5393,7 @@ model FakbarRental {
   rentalFee       Int    @default(25000) // Default 250 EUR in cents
   expectedRevenue Int    @default(0) // In cents
   effectiveProfit Int    @default(0) // In cents
-  
+
   updatedAt DateTime @updatedAt @db.Timestamptz(3)
 
   evening FakbarEvening @relation(fields: [eveningId], references: [id], onDelete: Cascade)
@@ -5454,11 +5454,11 @@ model PhotoTakedownRequest {
   /// Vrije toelichting van de melder.
   message       String?
 
-  status        PhotoTakedownStatus @default(NEW)
-  handledById   String?
-  handledAt     DateTime?           @db.Timestamptz(3)
+  status       PhotoTakedownStatus @default(NEW)
+  handledById  String?
+  handledAt    DateTime?           @db.Timestamptz(3)
   /// Waarom het verzoek zo afgehandeld is. Verplicht wanneer de foto blijft.
-  handlingNote  String?
+  handlingNote String?
 
   /// Is de meldingsmail naar de post vertrokken? Onwaar betekent dat het
   /// verzoek enkel hier staat en dat niemand er een seintje van kreeg.
@@ -5473,4 +5473,83 @@ model PhotoTakedownRequest {
 
   @@index([gallery, status])
   @@index([assetId])
+}
+
+/// Een gebouw van de KU Leuven, voor de lokalenzoeker in de app.
+///
+/// De gegevens komen uit de KU Leuven Access Guide en de KU Leuven kaart;
+/// `scripts/scrape-kulag.ts` haalt ze op en `scripts/import-kulag.ts` zet ze
+/// hier. De import is create-or-update op `kulagId`, zodat een herimport de
+/// velden die VTK zelf invulde niet weggooit. Zie `docs/lokalenzoeker.md`.
+model Building {
+  id        String  @id @default(cuid())
+  /// Het gebouwnummer van de KU Leuven, bv. "490-13". De natuurlijke sleutel.
+  kulagId   String  @unique
+  /// De korte code waarmee studenten het gebouw aanduiden, bv. "200K". Samen
+  /// met het lokaalnummer is dit hoe een lokaal in een uurrooster staat
+  /// ("200K 00.06"), en dus waar mensen op zoeken.
+  shortCode String?
+  name      String
+  address   String
+  zipcode   String
+  city      String
+
+  /// Zwaartepunt van `outline`. De lat/lng op de KULag-pagina zelf is voor elk
+  /// gebouw dezelfde (het middelpunt van de kaart) en dus onbruikbaar.
+  lat     Float?
+  lng     Float?
+  /// De contour als [[lat, lng], ...]. Leeg voor de terreinen, die geen
+  /// voetafdruk hebben; die horen niet op de kaart.
+  outline Json   @default("[]")
+
+  photoUrl String?
+  kulagUrl String
+  /// De toegankelijkheidsplannen als [{ title, url }].
+  plans    Json    @default("[]")
+
+  /// Door VTK toegevoegd. Blijft staan bij een herimport.
+  notes String?
+
+  rooms Room[]
+
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+
+  @@index([shortCode])
+}
+
+/// Een lokaal in een gebouw.
+///
+/// KULag is een toegankelijkheidsgids en geen lokalenregister: enkel gescreende
+/// lokalen staan erin. Dat dekt in de praktijk de aula's en leslokalen, maar
+/// niet elk bureau of labo. De app zegt dat ook, en verwijst wie niets vindt
+/// door naar KULag zelf.
+model Room {
+  id         String  @id @default(cuid())
+  /// Het KULag-id van het lokaal, bv. "490-13-000006". De natuurlijke sleutel.
+  kulagId    String  @unique
+  buildingId String
+  /// Het lokaalnummer zoals het aan de deur hangt, bv. "00.06".
+  code       String?
+  /// De omschrijving zonder het nummer, bv. "Aula Rosalind Franklin".
+  name       String
+  /// De rubriek van KULag, bv. "Aula (auditorium)" of "Les- en vergaderlokaal".
+  category   String
+  /// Afgeleid uit `code`: "00.06" wordt 0, "01.01" wordt 1. Null wanneer het
+  /// nummer die vorm niet heeft.
+  floor      Int?
+  kulagUrl   String
+
+  /// Namen die mensen echt gebruiken en die niet in KULag staan ("Aula K",
+  /// "de grote aula"). Dit is wat de zoekfunctie bruikbaar maakt; niemand zoekt
+  /// op een KULag-id. Wordt door VTK ingevuld en overleeft een herimport.
+  aliases String[] @default([])
+
+  building Building @relation(fields: [buildingId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+
+  @@index([buildingId])
+  @@index([code])
 }
