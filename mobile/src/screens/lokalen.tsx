@@ -7,7 +7,7 @@ import { fetchRooms } from '../api/endpoints';
 import type { AppBuilding, AppCampusMap, AppRoom } from '../api/contract';
 import { messageFor, useResource } from '../api/useResource';
 import { metres, type LatLng } from '../campus/geo';
-import { nearestNode, prepare, shortestPath } from '../campus/route';
+import { nearestNode, prepare, shortestPathToAny } from '../campus/route';
 import { CampusMap } from '../components/CampusMap';
 import { PageHead } from '../components/PageHead';
 import { SearchField } from '../components/SearchField';
@@ -28,36 +28,25 @@ import { COLORS, RADIUS, SPACING, TYPE } from '../theme/tokens';
  * zodat de kaart puur tekent en dit scherm de toestand houdt.
  */
 
-/** Verder dan dit hoort een ingang niet bij een gebouw. */
-const ENTRANCE_RADIUS = 90;
-
 /** Kleine letters, punten en spaties weg. Zelfde regel als in de API. */
 function normalise(value: string): string {
   return value.toLowerCase().replace(/[\s._-]/g, '');
 }
 
 /**
- * De ingang die het dichtst bij het gebouw ligt.
+ * De deuren van een gebouw, of het zwaartepunt wanneer OSM er geen kent.
  *
- * Een route naar het zwaartepunt zet je middenin het gebouw af en laat je de
- * laatste ronde zelf zoeken. OSM heeft de deuren, dus die gebruiken we. Staat er
- * geen ingang in de buurt, dan valt de route terug op het zwaartepunt.
+ * Welke deur de juiste is, beslist de route en niet de afstand tot het midden:
+ * bij een lang gebouw ligt elke deur ver van het zwaartepunt, en de dichtstbije
+ * kan aan de verkeerde kant liggen. `shortestPathToAny` kiest de beste in één
+ * zoektocht. De koppeling deur-gebouw komt van de server en is exclusief.
  */
-function entranceFor(building: AppBuilding, campus: AppCampusMap): LatLng | null {
-  if (building.lat === null || building.lng === null) return null;
-  const centre: LatLng = [building.lat, building.lng];
-
-  let best: LatLng | null = null;
-  let bestDistance = ENTRANCE_RADIUS;
-  for (const entrance of campus.entrances) {
-    const here: LatLng = [entrance.lat, entrance.lng];
-    const distance = metres(here, centre);
-    if (distance < bestDistance) {
-      bestDistance = distance;
-      best = here;
-    }
-  }
-  return best ?? centre;
+function doorsFor(building: AppBuilding, campus: AppCampusMap): LatLng[] {
+  const doors = campus.entrances
+    .filter((entrance) => entrance.buildingId === building.id)
+    .map((entrance) => [entrance.lat, entrance.lng] as LatLng);
+  if (doors.length > 0) return doors;
+  return building.lat !== null && building.lng !== null ? [[building.lat, building.lng]] : [];
 }
 
 /**
@@ -65,9 +54,9 @@ function entranceFor(building: AppBuilding, campus: AppCampusMap): LatLng | null
  *
  * OSM geeft er vijf terug, waaronder beide richtingen van dezelfde halte, en de
  * eerste uit die lijst is geen keuze maar toeval. Genomen wordt de halte die het
- * dichtst bij het midden van de campus ligt: dat is stabiel, en het is waar de
- * meeste mensen uitstappen. Zodra `expo-location` erin zit (fase 3) vervangt de
- * eigen positie dit hele stuk.
+ * dichtst bij het midden van het padennet ligt: dat is stabiel, en het is waar
+ * de meeste mensen uitstappen. Zodra `expo-location` erin zit (fase 3) vervangt
+ * de eigen positie dit hele stuk.
  */
 function arrivalStop(campus: AppCampusMap): { lat: number; lng: number; name: string | null } | null {
   if (campus.busStops.length === 0) return null;
@@ -147,11 +136,13 @@ export default function LokalenScreen() {
     const start = arrivalStop(data.campus);
     if (!start) return null;
 
-    const target = entranceFor(building, data.campus) ?? [building.lat, building.lng];
-    const path = shortestPath(
+    const doors = doorsFor(building, data.campus);
+    if (doors.length === 0) return null;
+
+    const path = shortestPathToAny(
       graph,
       nearestNode(graph, [start.lat, start.lng]),
-      nearestNode(graph, target),
+      doors.map((door) => nearestNode(graph, door)),
     );
     return path ? { ...path, from: start.name, building } : null;
   }, [data, graph, focus]);

@@ -349,14 +349,46 @@ de OSM-ondergrond mee (`AppCampusMap`), zodat de route offline berekend wordt.
 Gemeten op het echte antwoord: **vijf routes in 4 ms**, dus de bewering dat dit
 zonder netwerk kan is geen schatting.
 
-Wat daar nog open staat:
+**De kaart is nog niet op een toestel gezien.** Er is geen simulator op deze
+machine, dus de projectie, de laagvolgorde en de labelregel zijn geverifieerd
+door de echte modules in Node te draaien en de SVG te renderen. Gebaren en het
+gedrag van `react-native-svg` zelf zijn dus nog ongetest.
 
-- **De omweg naar 200G is x1,74.** Ergens mist een verbinding in de graaf. Dit
-  hoort gemeten te worden over alle gebouwparen, niet per geval bekeken.
-- **De kaart is nog niet op een toestel gezien.** Er is geen simulator op deze
-  machine, dus de projectie, de laagvolgorde en de labelregel zijn geverifieerd
-  door de echte modules in Node te draaien en de SVG te renderen. Gebaren en het
-  gedrag van `react-native-svg` zelf zijn dus nog ongetest.
+### De omweg was niet OSM, maar wij
+
+De eerste meting gaf een mediane omweg van x1,43 en een uitschieter van **x9,07**:
+200G naar Quadrivium was 508 meter voor 56 meter hemelsbreed. De verleiding is
+dan om OSM de schuld te geven en gaten in het padennet te gaan dichten. Meten gaf
+een ander antwoord; er zaten twee fouten in onze eigen code.
+
+- **Een deur werd gekozen op afstand tot het zwaartepunt.** Bij een lang gebouw
+  ligt elke deur ver van het midden, en de dichtstbijzijnde kan aan de verkeerde
+  kant staan. Welke deur de juiste is, hangt af van waar je vandaan komt, dus dat
+  hoort de route te beslissen. `shortestPathToAny` doet dat in één zoektocht:
+  Dijkstra bezoekt de knopen toch al op volgorde van afstand, dus de eerste deur
+  die afgehandeld wordt is de beste.
+- **Deuren werden door twee gebouwen tegelijk geclaimd.** Quadrivium en 200G
+  staan tegen elkaar, en met "elke deur binnen 25 meter" nam 200G er van
+  Quadrivium over. De koppeling deur-gebouw gebeurt nu op de server en is
+  exclusief: een deur hoort bij het gebouw waar ze het dichtst tegenaan ligt, en
+  bij precies één.
+
+| | ervoor | erna |
+| --- | --- | --- |
+| mediane omweg | x1,43 | **x1,10** |
+| slechtste | x9,07 | **x2,01** |
+| paren boven x1,6 | 50 van 132 | **6 van 132** |
+
+De zes die overblijven zitten tussen x1,6 en x2,0, en dat is gewoon wat het kost
+om rond een gebouw te lopen. 132 paren doorrekenen duurt 35 ms.
+
+**De les is de volgorde: eerst meten over alle paren, dan pas de bron
+verdenken.** Er zijn wel degelijk tien plekken waar twee paden elkaar tot op vier
+meter raken zonder een knoop te delen, goed voor omwegen tot 340 meter tussen die
+knopen. Ze liggen allemaal langs de Celestijnenlaan en ze zaten geen van alle
+achter dit probleem. Wie die wil dichtnaaien: verbind knopen die dichter dan een
+meter of vier bij elkaar liggen maar geen boog delen, en sla ways met `bridge`,
+`tunnel` of `layer` over, anders knoop je een brug aan de weg eronder vast.
 
 **Fase 3, de verrijking.** `expo-location` (na controle in Expo Go) voor de eigen
 positie en dus een route vanaf waar je staat in plaats van vanaf de halte, en

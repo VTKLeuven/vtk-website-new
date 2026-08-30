@@ -74,12 +74,33 @@ export type Route = {
  * milliseconde, ook wanneer het netwerk ooit heel Arenberg beslaat.
  */
 export function shortestPath(graph: RoutableGraph, from: number, to: number): Route | null {
+  return shortestPathToAny(graph, from, [to]);
+}
+
+/**
+ * De kortste route naar het dichtstbijzijnde doel uit een verzameling.
+ *
+ * **Waarom dit bestaat.** Een gebouw heeft meerdere deuren, en welke de juiste
+ * is hangt af van waar je vandaan komt: 200G heeft er vijf, en de deur die het
+ * dichtst bij het midden van het gebouw ligt gaf vanuit Quadrivium een route van
+ * 508 meter voor 56 meter hemelsbreed. Dijkstra bezoekt de knopen toch al in
+ * volgorde van afstand, dus stoppen bij de eerste deur die afgehandeld wordt
+ * geeft de beste deur in één zoektocht in plaats van vijf.
+ */
+export function shortestPathToAny(
+  graph: RoutableGraph,
+  from: number,
+  targets: number[],
+): Route | null {
+  if (targets.length === 0) return null;
+  const wanted = new Set(targets);
   const count = graph.nodes.length;
   const distance = new Float64Array(count).fill(Infinity);
   const previous = new Int32Array(count).fill(-1);
   const settled = new Uint8Array(count);
 
   distance[from] = 0;
+  let reached = -1;
   const heap = new MinHeap();
   heap.push(from, 0);
 
@@ -87,7 +108,10 @@ export function shortestPath(graph: RoutableGraph, from: number, to: number): Ro
     const current = heap.pop();
     if (current === -1 || settled[current]) continue;
     settled[current] = 1;
-    if (current === to) break;
+    if (wanted.has(current)) {
+      reached = current;
+      break;
+    }
 
     for (const edge of graph.neighbours[current]) {
       const next = distance[current] + edge.cost;
@@ -99,14 +123,14 @@ export function shortestPath(graph: RoutableGraph, from: number, to: number): Ro
     }
   }
 
-  if (!Number.isFinite(distance[to])) return null;
+  if (reached === -1) return null;
 
   const points: LatLng[] = [];
-  for (let node = to; node !== -1; node = previous[node]) {
+  for (let node = reached; node !== -1; node = previous[node]) {
     points.push(graph.nodes[node]);
     if (node === from) break;
   }
-  return { points: points.reverse(), metres: distance[to] };
+  return { points: points.reverse(), metres: distance[reached] };
 }
 
 /** Een minimum-hoop op twee parallelle arrays. */

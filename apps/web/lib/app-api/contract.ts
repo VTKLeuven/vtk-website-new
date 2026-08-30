@@ -1283,8 +1283,12 @@ export type AppCampusMap = {
    * knooppunt bij een gebouw kan erin liggen.
    */
   walk: { nodes: [number, number][]; edges: [number, number][] };
-  /** Hier eindigt een route, niet in het zwaartepunt van het gebouw. */
-  entrances: { lat: number; lng: number; main: boolean }[];
+  /**
+   * Hier eindigt een route, niet in het zwaartepunt van het gebouw. `buildingId`
+   * is exclusief: staan twee gebouwen tegen elkaar, dan hoort een deur bij het
+   * gebouw waar ze het dichtst tegenaan ligt en niet bij allebei.
+   */
+  entrances: { lat: number; lng: number; main: boolean; buildingId: string | null }[];
   /** Bruikbaar vertrekpunt zolang de app de eigen positie niet kent. */
   busStops: { lat: number; lng: number; name: string | null }[];
   /** Gebouwen die KULag niet kent (Alma, IMEC), als context op de kaart. */

@@ -71,7 +71,10 @@ export async function GET(request: Request) {
       buildings: payload,
       results: query ? search(payload, query) : [],
       sourceUrl: KULAG,
-      campus: campusMap(new Set(payload.map((building) => building.kulagId))),
+      campus: campusMap(
+        new Set(payload.map((building) => building.kulagId)),
+        payload.map((building) => ({ id: building.id, outline: building.outline })),
+      ),
     };
 
     return appJson(request, body);
