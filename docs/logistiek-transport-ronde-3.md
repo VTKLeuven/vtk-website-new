@@ -44,10 +44,10 @@ Fase 3 is die tool, in onze eigen app en op onze eigen data.
 | 1 | Semesterstart | S1–S3 | ✅ af |
 | 2 | Kleur en arcering | K1 | ✅ af |
 | 3 | De planning wordt een agenda-app | P1–P5 | ✅ af |
-| 4 | Meldingsmail per aanvraagsoort | M1 | ⬜ |
-| 5 | Privé-agendafeed van transport | A1 | ⬜ |
-| 6 | Logistiek-evenement bij een website-evenement | E1 | ⬜ |
-| 7 | Beschikbaarheid en bijrijders | V1–V3 | ⬜ |
+| 4 | Meldingsmail per aanvraagsoort | M1 | ✅ af |
+| 5 | Privé-agendafeed van transport | A1 | ✅ af |
+| 6 | Logistiek-evenement bij een website-evenement | E1 | ✅ af |
+| 7 | Beschikbaarheid en bijrijders | V1–V3 | ✅ af |
 
 Alles wordt op **390px breed** nagekeken, niet alleen op desktop. Tijdens ronde 1
 en 2 is dat tot twee keer toe blijven liggen.
@@ -200,7 +200,7 @@ en van de mobiele weergave.
 
 # Fase 4: meldingsmail per aanvraagsoort
 
-### M1. Mail naar het juiste adres bij een nieuwe aanvraag
+### ✅ M1. Mail naar het juiste adres bij een nieuwe aanvraag
 **P1 · code · 📝**
 
 - **Raakt:** `lib/uitleen-mail.ts`, `app/actions/uitleen.ts`,
@@ -218,7 +218,7 @@ en van de mobiele weergave.
 
 # Fase 5: privé-agendafeed van transport
 
-### A1. De planning als agenda-abonnement
+### ✅ A1. De planning als agenda-abonnement
 **P2 · code · 🗄️**
 
 - **Raakt:** `lib/calendar/ics.ts` (nieuw, kopie), `app/api/kalender/[token]/`,
@@ -237,7 +237,7 @@ en van de mobiele weergave.
 
 # Fase 6: logistiek-evenement bij een website-evenement
 
-### E1. Vinkje "Logistiek nodig" op een kalenderevenement
+### ✅ E1. Vinkje "Logistiek nodig" op een kalenderevenement
 **P2 · code · 🗄️ 📝**
 
 - **Raakt:** `apps/web/app/actions/calendar.ts`,
@@ -256,7 +256,7 @@ en van de mobiele weergave.
 
 # Fase 7: beschikbaarheid en bijrijders
 
-### V1. Chauffeurs geven hun beschikbaarheid door
+### ✅ V1. Chauffeurs geven hun beschikbaarheid door
 **P2 · code · 🗄️ 📝**
 
 - **Doen:** `UitleenDriverAvailability` (vensters, geen rooster), een
@@ -267,7 +267,7 @@ en van de mobiele weergave.
 - **Acties horen in `app/actions/uitleen.ts`**, niet in `beheer.ts`: een chauffeur
   heeft geen `logistiek.manage`.
 
-### V2. Bijrijders met naam en nummer, ook achteraf
+### ✅ V2. Bijrijders met naam en nummer, ook achteraf
 **P2 · code · 🗄️**
 
 - **Nu:** `helpersNote` (vrije tekst) en één `helpersPhone`. Twee bijrijders met
@@ -277,13 +277,41 @@ en van de mobiele weergave.
   post of werkgroep. De ritmail en "Mijn ritten" tonen ze met `tel:`-links, want
   daarvoor dient het nummer.
 
-### V3. Documentatie bijwerken
+### ✅ V3. Documentatie bijwerken
 **P2 · docs**
 
 - `docs/uitleendienst.md`: de nieuwe modellen, de feed, de meldingen, de file map.
 - `docs/logistiek-ingebruikname.md`: wat het team zelf invult (kleuren, patronen,
   mailadressen per soort, de externen-schakelaar, de abonnementen).
-- Dit bestand: alles afvinken met de commit-hashes.
+- Dit bestand: alles afgevinkt.
+
+---
+
+# Nog manueel na te kijken
+
+Wat er tijdens de bouw niet doorgeklikt kon worden, of wat enkel met testdata
+werkte. Hier begin je bij het testen.
+
+1. **De mails vertrekken echt.** Alles is lokaal in de log nagekeken (inhoud,
+   ontvangers, en dat een mislukte verzending de aanvraag niet doet falen), maar
+   er is nooit iets vertrokken: lokaal draait er geen mailserver. Zie punt 1 van
+   `docs/logistiek-ingebruikname.md`.
+2. **De agendafeed in een echte agenda-app.** De feed is met `curl` nagekeken
+   (headers, inhoud, `.ics`-suffix, 404 na intrekken), niet in Google Agenda of
+   Apple Agenda.
+3. **Volledig scherm op een echt toestel.** In de testbrowser viel de planning
+   terug op het vaste paneel omdat een gescripte klik geen echte gebruikersactie
+   is. Beide vormen werken, maar welke je krijgt hangt van de browser af; kijk
+   zeker eens op iOS.
+4. **Slepen met een echte muis en op een echt touchscreen.** Verplaatsen, rekken
+   en intekenen zijn met gesimuleerde pointer-events nagekeken. Op touch staat
+   slepen bewust uit; controleer dat scrollen daar gewoon scrollt.
+5. **Een collega van dezelfde post die een bijrijder toevoegt.** De autorisatie
+   hergebruikt `vanBookingForMember` (dezelfde regel die al bepaalt wie een rit
+   van zijn post mag zien), maar de test-persona's hebben één lid per post, dus
+   dat pad is niet doorgeklikt.
+6. **Alles op een gsm, met echte vingers.** De schermen zijn op 390px nagekeken
+   in een browser.
 
 ---
 
