@@ -93,10 +93,13 @@ def log(message):
 _gpio_lock = threading.Lock()  # zodat scan en remote-open elkaar niet overlappen
 GPIO = None
 
-if not DEBUG:
+def _init_gpio():
+    global GPIO, DEBUG
+    if DEBUG:
+        return
     try:
-        import RPi.GPIO as GPIO  # type: ignore
-
+        if GPIO is None:
+            import RPi.GPIO as GPIO  # type: ignore
         GPIO.setmode(GPIO.BOARD)
         GPIO.setwarnings(False)
         GPIO.setup(GPIO_PORT, GPIO.OUT)
@@ -105,6 +108,9 @@ if not DEBUG:
         log(f"GPIO niet beschikbaar ({exc}); val terug op DEBUG-modus.")
         DEBUG = True
         GPIO = None
+
+
+_init_gpio()
 
 
 def open_door(seconds=None, source="card"):
@@ -117,10 +123,13 @@ def open_door(seconds=None, source="card"):
             return True
         for attempt in range(3):
             try:
+                GPIO.setmode(GPIO.BOARD)
+                GPIO.setup(GPIO_PORT, GPIO.OUT)
+                log(f"Relais AAN (pin {GPIO_PORT}, {duration:.0f}s, bron: {source})")
                 GPIO.output(GPIO_PORT, GPIO.HIGH)
                 time.sleep(duration)
                 GPIO.output(GPIO_PORT, GPIO.LOW)
-                log(f"Deur geopend ({source}, {duration:.0f}s)")
+                log("Relais UIT (deur vergrendeld)")
                 return True
             except Exception as exc:  # noqa: BLE001
                 log(f"Deur openen mislukt (poging {attempt + 1}/3): {exc}")
