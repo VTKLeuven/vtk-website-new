@@ -16,6 +16,8 @@ type IconName =
   | 'hide'
   | 'show'
   | 'external'
+  | 'expand'
+  | 'collapse'
   | 'chevron';
 
 export function LogisticsIcon({ name, className, ...props }: SVGProps<SVGSVGElement> & { name: IconName }) {
@@ -105,6 +107,24 @@ export function LogisticsIcon({ name, className, ...props }: SVGProps<SVGSVGElem
       </>
     ),
     chevron: <path d="m7 10 5 5 5-5" />,
+    // Vier hoeken die naar buiten wijzen: volledig scherm openen.
+    expand: (
+      <>
+        <path d="M9 4H4v5" />
+        <path d="M4 4l6 6" />
+        <path d="M15 20h5v-5" />
+        <path d="M20 20l-6-6" />
+      </>
+    ),
+    // Dezelfde vier hoeken, naar binnen: volledig scherm sluiten.
+    collapse: (
+      <>
+        <path d="M4 9h5V4" />
+        <path d="M3 3l6 6" />
+        <path d="M20 15h-5v5" />
+        <path d="M21 21l-6-6" />
+      </>
+    ),
     external: (
       <>
         <path d="M14 4h6v6" />

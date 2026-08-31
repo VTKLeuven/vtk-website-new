@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import type { DriverColorOverrides } from '@/lib/driver-colors';
@@ -14,7 +14,16 @@ import { LogisticsIcon } from '@/components/logistics-icon';
 import { MonthGrid } from './month-grid';
 import { TimeGrid } from './time-grid';
 import { vehicleIcon } from './trip-block';
-import type { CalendarVehicle, TripBlock } from './types';
+import {
+  HOUR_PX_DEFAULT,
+  HOUR_PX_MAX,
+  HOUR_PX_MIN,
+  HOUR_PX_STEP,
+  ZOOM_STORAGE_KEY,
+  clampHourPx,
+  type CalendarVehicle,
+  type TripBlock,
+} from './types';
 
 /**
  * De transportplanning: dag, week of maand, met de navigatie erboven.
@@ -62,6 +71,7 @@ export function TransportCalendar({
   const router = useRouter();
   const pathname = usePathname();
   const params = useSearchParams();
+  const shell = useRef<HTMLDivElement>(null);
 
   // De nu-lijn pas na de eerste render: de server kent het uur van de bezoeker
   // niet, en een lijn die er bij de hydratie anders uitziet, is een hydratiefout.
@@ -87,6 +97,109 @@ export function TransportCalendar({
     [params, pathname]
   );
 
+  /**
+   * Zoom: hoe hoog één uur is.
+   *
+   * In een effect en niet als beginwaarde, om dezelfde reden als de nu-lijn: op
+   * de server bestaat `localStorage` niet, en een andere eerste render dan de
+   * server geeft een hydratiefout. Lezen én schrijven in een try/catch, want in
+   * een privévenster gooit de accessor zelf.
+   */
+  const [hourPx, setHourPx] = useState(HOUR_PX_DEFAULT);
+  useEffect(() => {
+    try {
+      const saved = window.localStorage.getItem(ZOOM_STORAGE_KEY);
+      if (saved !== null) setHourPx(clampHourPx(Number(saved)));
+    } catch {
+      /* privévenster: dan gewoon de standaardhoogte */
+    }
+  }, []);
+
+  const zoomTo = useCallback((next: number) => {
+    const value = clampHourPx(next);
+    setHourPx(value);
+    try {
+      window.localStorage.setItem(ZOOM_STORAGE_KEY, String(value));
+    } catch {
+      /* niet kunnen onthouden is geen reden om niet te zoomen */
+    }
+  }, []);
+
+  // Ctrl/⌘ + scrollen zoomt, zoals in een tekenprogramma. Zonder die modifier
+  // blijft scrollen gewoon scrollen: de kalender is hoger dan het scherm, en een
+  // pagina die onder je muis wegspringt is erger dan geen zoom.
+  //
+  // Niet via `onWheel` op het element: React hangt dat passief op, en een
+  // passieve listener mag `preventDefault()` niet doen, waardoor de browser
+  // eroverheen zijn eigen paginazoom doet.
+  useEffect(() => {
+    const node = shell.current;
+    if (!node) return;
+    function onWheel(event: WheelEvent) {
+      if (!event.ctrlKey && !event.metaKey) return;
+      event.preventDefault();
+      setHourPx((current) => {
+        const value = clampHourPx(current - Math.sign(event.deltaY) * HOUR_PX_STEP);
+        try {
+          window.localStorage.setItem(ZOOM_STORAGE_KEY, String(value));
+        } catch {
+          /* zie zoomTo */
+        }
+        return value;
+      });
+    }
+    node.addEventListener('wheel', onWheel, { passive: false });
+    return () => node.removeEventListener('wheel', onWheel);
+  }, []);
+
+  /**
+   * Volledig scherm.
+   *
+   * `requestFullscreen()` bestaat niet op een `div` in Safari op iOS; daar (en
+   * overal waar de API weigert) valt het terug op een vast paneel over de pagina.
+   * Dat is niet hetzelfde, maar het doet wat het team vraagt: de hele week zonder
+   * de rest van het scherm eromheen.
+   */
+  const [fullscreen, setFullscreen] = useState<false | 'native' | 'fallback'>(false);
+
+  useEffect(() => {
+    function onChange() {
+      // Sluiten via de Escape-toets of de systeemknop laat de API los zonder ons
+      // te vragen; zonder deze luisteraar blijft de knop "sluiten" beweren.
+      if (!document.fullscreenElement) setFullscreen((current) => (current === 'native' ? false : current));
+    }
+    document.addEventListener('fullscreenchange', onChange);
+    return () => document.removeEventListener('fullscreenchange', onChange);
+  }, []);
+
+  // In de terugvalvorm vangt de browser Escape niet af, dus doen we het zelf.
+  useEffect(() => {
+    if (fullscreen !== 'fallback') return;
+    function onKey(event: KeyboardEvent) {
+      if (event.key === 'Escape') setFullscreen(false);
+    }
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [fullscreen]);
+
+  const toggleFullscreen = useCallback(async () => {
+    const node = shell.current;
+    if (!node) return;
+    if (fullscreen) {
+      if (fullscreen === 'native' && document.fullscreenElement) {
+        await document.exitFullscreen().catch(() => undefined);
+      }
+      setFullscreen(false);
+      return;
+    }
+    try {
+      await node.requestFullscreen();
+      setFullscreen('native');
+    } catch {
+      setFullscreen('fallback');
+    }
+  }, [fullscreen]);
+
   const openDay = useCallback(
     (dayIso: string) => {
       router.push(hrefFor({ weergave: 'dag', datum: dayIso.slice(0, 10) }));
@@ -94,9 +207,12 @@ export function TransportCalendar({
     [hrefFor, router]
   );
 
+  const iconButton =
+    'grid h-8 w-8 place-items-center rounded-full border border-vtk-navy/15 text-vtk-navy transition hover:border-vtk-navy/40 disabled:opacity-40';
+
   return (
-    <div className="grid gap-3">
-      <div className="flex flex-wrap items-center gap-2">
+    <div ref={shell} className="transport-calendar grid gap-3" data-fullscreen={fullscreen || undefined}>
+      <div className="transport-calendar-toolbar flex flex-wrap items-center gap-2">
         {/* Weergavekeuze. Segmenten en geen keuzelijst: het zijn er drie, en je
             wisselt er de hele tijd tussen. */}
         <div
@@ -121,6 +237,55 @@ export function TransportCalendar({
         </div>
 
         {toolbarExtra}
+
+        {/* Zoom en volledig scherm helemaal rechts: het zijn kijkinstellingen en
+            geen acties op de planning. In de maandweergave is de uurhoogte
+            betekenisloos, dus daar staat de zoom er niet. */}
+        <div className="ml-auto flex items-center gap-1.5">
+          {view === 'maand' ? null : (
+            <>
+              <button
+                type="button"
+                onClick={() => zoomTo(hourPx - HOUR_PX_STEP)}
+                disabled={hourPx <= HOUR_PX_MIN}
+                title="Uitzoomen (of Ctrl/⌘ + scrollen)"
+                className={iconButton}
+              >
+                <span aria-hidden className="text-base leading-none">−</span>
+                <span className="sr-only">Uitzoomen</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => zoomTo(hourPx + HOUR_PX_STEP)}
+                disabled={hourPx >= HOUR_PX_MAX}
+                title="Inzoomen (of Ctrl/⌘ + scrollen)"
+                className={iconButton}
+              >
+                <span aria-hidden className="text-base leading-none">+</span>
+                <span className="sr-only">Inzoomen</span>
+              </button>
+            </>
+          )}
+          <button
+            type="button"
+            onClick={toggleFullscreen}
+            title={fullscreen ? 'Volledig scherm sluiten (Esc)' : 'Volledig scherm'}
+            aria-pressed={Boolean(fullscreen)}
+            className={
+              fullscreen
+                ? 'grid h-8 w-8 place-items-center rounded-full border border-vtk-navy bg-vtk-navy text-white transition'
+                : iconButton
+            }
+          >
+            <LogisticsIcon
+              name={fullscreen ? 'collapse' : 'expand'}
+              className="h-4 w-4"
+            />
+            <span className="sr-only">
+              {fullscreen ? 'Volledig scherm sluiten' : 'Volledig scherm'}
+            </span>
+          </button>
+        </div>
       </div>
 
       {view === 'maand' ? (
@@ -147,6 +312,7 @@ export function TransportCalendar({
           emptyLabel={emptyLabel}
           showDriver={showDriver}
           driverColors={driverColors}
+          hourPx={hourPx}
           now={now}
         />
       )}
