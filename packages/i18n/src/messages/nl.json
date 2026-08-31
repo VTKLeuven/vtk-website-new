@@ -268,8 +268,8 @@
     "kicker": "Welkom bij VTK",
     "title": "Vervolledig je profiel",
     "intro": "Nog even dit invullen en je bent helemaal geregistreerd. Je kan deze gegevens later altijd aanpassen bij je account.",
-    "privacyNotice": "We gebruiken je naam en universiteitsmail voor je lidmaatschap en toegang. Studentennummer, adres, geboortedatum, persoonlijke mail, studiegegevens en foto zijn optioneel en worden enkel gebruikt voor de functies die je kiest. Vul dus alleen in wat nodig is.",
-    "privacyNoticeSelfRegistered": "We gebruiken je naam en login-e-mailadres voor je lidmaatschap en toegang. Studentennummer, adres, geboortedatum, studiegegevens en foto zijn optioneel en worden enkel gebruikt voor de functies die je kiest. Vul dus alleen in wat nodig is.",
+    "privacyNotice": "We gebruiken je naam, universiteitsmail en adresgegevens voor je lidmaatschap en administratie. Studentennummer, geboortedatum, persoonlijke mail, studiegegevens en foto worden enkel gebruikt voor de functies die je kiest.",
+    "privacyNoticeSelfRegistered": "We gebruiken je naam, login-e-mailadres en adresgegevens voor je lidmaatschap en administratie. Studentennummer, geboortedatum, studiegegevens en foto worden enkel gebruikt voor de functies die je kiest.",
     "privacyLink": "Lees hoe VTK je gegevens gebruikt.",
     "identityHeading": "Naam & studentennummer",
     "firstName": "Voornaam",
@@ -278,7 +278,11 @@
     "rNumberHint": "Formaat: r gevolgd door 7 cijfers, bv. r0123456.",
     "rNumberOptionalHint": "Optioneel. Formaat: r gevolgd door 7 cijfers, bv. r0123456.",
     "rNumberFromKul": "Dit r-nummer komt van je KU Leuven-account en kan je niet aanpassen.",
-    "addressHeading": "Kotadres",
+    "addressHeading": "Adressen",
+    "noKot": "Ik heb geen kot",
+    "kotAddressHeading": "Kotadres",
+    "homeAddressHeading": "Thuisadres",
+    "homeAddressHint": "Je thuisadres is altijd verplicht.",
     "street": "Straatnaam",
     "houseNumber": "Huisnummer",
     "bus": "Bus",
@@ -458,8 +462,16 @@
   },
   "confirmStudy": {
     "title": "Klopt je studie nog?",
-    "intro": "Bij de start van een nieuw academiejaar vragen we je even te bevestigen wat je studeert. Zo blijven onze mailinglijsten kloppen en krijg je enkel mails die voor jou relevant zijn.",
-    "unchangedHint": "Niets veranderd? Klik gewoon op bevestigen.",
+    "intro": "Bij de start van een nieuw academiejaar vragen we je even je studie en adressen te bevestigen. Zo blijven onze gegevens en mailinglijsten kloppen.",
+    "addressesHeading": "Kloppen je adressen nog?",
+    "addressesQuestion": "Controleer je kot- en thuisadres. Je kan ze hier meteen aanpassen.",
+    "addressesYes": "Ja, deze adressen kloppen",
+    "addressesNo": "Nee, ik wil ze aanpassen",
+    "addressesIncomplete": "Je profiel bevat nog niet alle verplichte adresgegevens. Vul de ontbrekende gegevens hieronder aan.",
+    "noKot": "Geen kot",
+    "kotAddress": "Kotadres",
+    "homeAddress": "Thuisadres",
+    "unchangedHint": "Niets veranderd? Bevestig je studie en adressen.",
     "submit": "Bevestigen"
   },
   "mailinglists": {
@@ -523,7 +535,7 @@
     "kicker": "VTK · KU Leuven",
     "title": "Privacyverklaring",
     "lead": "Deze verklaring legt uit welke persoonsgegevens VTK verwerkt op de publieke website, in het ledenportaal, bij tickets en reservaties, in de logistieke tools en bij optionele gezichtsherkenning.",
-    "updated": "Laatst bijgewerkt op 18 juli 2026.",
+    "updated": "Laatst bijgewerkt op 31 augustus 2026.",
     "sections": [
       {
         "heading": "Wie is verantwoordelijk?",
@@ -531,7 +543,7 @@
       },
       {
         "heading": "Welke gegevens verwerken we?",
-        "body": "Afhankelijk van de functies die je gebruikt verwerken we:\n• account- en lidmaatschapsgegevens: naam, KU Leuven-mail, taal, r-nummer, rollen en sessiegegevens\n• optionele profielgegevens: adres, geboortedatum, persoonlijke mail, mailvoorkeuren, studieprofiel en profielfoto\n• bestellingen en activiteiten: ticketkoper en deelnemers, antwoorden, betalingen en terugbetalingen, broodjes, shiften, materiaal- en camionettereservaties en bijbehorende nota's\n• toegangs- en beveiligingsgegevens: kaartnummer/naam, deurgebeurtenissen, IP-adres, browser en technische logs\n• fotoalbums: een selfie en biometrische gezichtstemplate, maar alleen als je daarvoor uitdrukkelijk toestemming geeft"
+        "body": "Afhankelijk van de functies die je gebruikt verwerken we:\n• account- en lidmaatschapsgegevens: naam, KU Leuven-mail, taal, r-nummer, rollen en sessiegegevens\n• profielgegevens: kot- en thuisadres, geboortedatum, persoonlijke mail, mailvoorkeuren, studieprofiel en profielfoto\n• bestellingen en activiteiten: ticketkoper en deelnemers, antwoorden, betalingen en terugbetalingen, broodjes, shiften, materiaal- en camionettereservaties en bijbehorende nota's\n• toegangs- en beveiligingsgegevens: kaartnummer/naam, deurgebeurtenissen, IP-adres, browser en technische logs\n• fotoalbums: een selfie en biometrische gezichtstemplate, maar alleen als je daarvoor uitdrukkelijk toestemming geeft"
       },
       {
         "heading": "Doelen en rechtsgronden",

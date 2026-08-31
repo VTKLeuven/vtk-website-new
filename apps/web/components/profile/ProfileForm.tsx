@@ -9,6 +9,7 @@ import { SaveForm } from "@/components/ui/SaveForm";
 import { saveProfileAction, type ProfileErrorCode } from "@/app/actions/onboarding";
 import type { SaveAction } from "@/lib/saveState";
 import { AvatarCropField } from "./AvatarCropField";
+import { AddressFields } from "./AddressFields";
 
 function dateInputValue(date: Date | null): string {
   if (!date) return "";
@@ -16,9 +17,10 @@ function dateInputValue(date: Date | null): string {
 }
 
 /**
- * Onboarding / account profile form. Renders the kot address, birth date,
- * contact email(s) waar relevant + opt-in mailing lists, de profielstatussen en
- * hun conditionele studie-/alumnivelden, en een optionele profielfoto. Posts to
+ * Onboarding / account profile form. Renders the room and home address, birth
+ * date, contact email(s) waar relevant + opt-in mailing lists, de
+ * profielstatussen en hun conditionele studie-/alumnivelden, en een optionele
+ * profielfoto. Posts to
  * {@link saveProfileAction} via {@link SaveForm}, dat de uitkomst als toast
  * toont. Pass `next` to redirect after saving (onboarding); omit it to stay on
  * the page (account), waar de toast de enige bevestiging is.
@@ -49,11 +51,17 @@ export function ProfileForm({
     | "lastName"
     | "rNumber"
     | "avatarKey"
+    | "noKot"
     | "street"
     | "houseNumber"
     | "bus"
     | "postalCode"
     | "city"
+    | "homeStreet"
+    | "homeHouseNumber"
+    | "homeBus"
+    | "homePostalCode"
+    | "homeCity"
     | "birthDate"
     | "personalEmail"
     | "emailPreference"
@@ -164,35 +172,6 @@ export function ProfileForm({
             )}
           </div>
         </div>
-      </fieldset>
-
-      {/* Kotadres */}
-      <fieldset className="space-y-4">
-        <legend className="text-lg font-semibold text-vtk-ink">{t.addressHeading}</legend>
-        <div className="grid grid-cols-1 items-end gap-4 sm:grid-cols-6">
-          <div className="sm:col-span-3">
-            <Label htmlFor="street">{t.street}</Label>
-            <Input id="street" name="street" defaultValue={user.street ?? ""} />
-          </div>
-          <div className="sm:col-span-1">
-            <Label htmlFor="houseNumber">{t.houseNumber}</Label>
-            <Input id="houseNumber" name="houseNumber" defaultValue={user.houseNumber ?? ""} />
-          </div>
-          <div className="sm:col-span-2">
-            <Label htmlFor="bus" className="whitespace-nowrap">
-              {t.bus} <span className="text-xs text-[#5c667f]">({t.busHint})</span>
-            </Label>
-            <Input id="bus" name="bus" defaultValue={user.bus ?? ""} />
-          </div>
-          <div className="sm:col-span-2">
-            <Label htmlFor="postalCode">{t.postalCode}</Label>
-            <Input id="postalCode" name="postalCode" defaultValue={user.postalCode ?? ""} />
-          </div>
-          <div className="sm:col-span-4">
-            <Label htmlFor="city">{t.city}</Label>
-            <Input id="city" name="city" defaultValue={user.city ?? ""} />
-          </div>
-        </div>
         <div className="sm:max-w-xs">
           <Label htmlFor="birthDate">{t.birthDate}</Label>
           <Input
@@ -202,6 +181,26 @@ export function ProfileForm({
             defaultValue={dateInputValue(user.birthDate)}
           />
         </div>
+      </fieldset>
+
+      {/* Kot- en thuisadres */}
+      <fieldset className="space-y-4">
+        <legend className="text-lg font-semibold text-vtk-ink">{t.addressHeading}</legend>
+        <AddressFields
+          values={user}
+          labels={{
+            noKot: t.noKot,
+            kotAddressHeading: t.kotAddressHeading,
+            homeAddressHeading: t.homeAddressHeading,
+            homeAddressHint: t.homeAddressHint,
+            street: t.street,
+            houseNumber: t.houseNumber,
+            bus: t.bus,
+            busHint: t.busHint,
+            postalCode: t.postalCode,
+            city: t.city,
+          }}
+        />
       </fieldset>
 
       {/* Contact & voorkeur */}

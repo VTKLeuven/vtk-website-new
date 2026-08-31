@@ -11,6 +11,8 @@ import { needsStudyConfirmation } from "@vtk/auth";
 import { logoutAction } from "@/app/actions/auth";
 import { confirmStudyAction } from "@/app/actions/onboarding";
 import { StudyFieldset } from "@/components/profile/StudyFieldset";
+import { AddressConfirmation } from "@/components/profile/AddressConfirmation";
+import { hasCompleteAddresses } from "@/lib/profile-address";
 
 export async function generateMetadata({
   params,
@@ -63,10 +65,23 @@ export default async function ConfirmStudyPage({
       graduationYear: true,
       wasInVtk: true,
       alumniMailOptIn: true,
+      noKot: true,
+      street: true,
+      houseNumber: true,
+      bus: true,
+      postalCode: true,
+      city: true,
+      homeStreet: true,
+      homeHouseNumber: true,
+      homeBus: true,
+      homePostalCode: true,
+      homeCity: true,
     },
   });
 
-  const t = getDictionary(locale).confirmStudy;
+  const dict = getDictionary(locale);
+  const t = dict.confirmStudy;
+  const addressT = dict.onboarding;
 
   return (
     <div className="vtk-page vtk-page-shell vtk-page-narrow space-y-6">
@@ -92,6 +107,32 @@ export default async function ConfirmStudyPage({
             graduationYear={user.graduationYear}
             wasInVtk={user.wasInVtk}
             alumniMailOptIn={user.alumniMailOptIn}
+          />
+          <AddressConfirmation
+            values={user}
+            complete={hasCompleteAddresses(user)}
+            addressLabels={{
+              noKot: addressT.noKot,
+              kotAddressHeading: addressT.kotAddressHeading,
+              homeAddressHeading: addressT.homeAddressHeading,
+              homeAddressHint: addressT.homeAddressHint,
+              street: addressT.street,
+              houseNumber: addressT.houseNumber,
+              bus: addressT.bus,
+              busHint: addressT.busHint,
+              postalCode: addressT.postalCode,
+              city: addressT.city,
+            }}
+            labels={{
+              heading: t.addressesHeading,
+              question: t.addressesQuestion,
+              yes: t.addressesYes,
+              no: t.addressesNo,
+              incomplete: t.addressesIncomplete,
+              noKot: t.noKot,
+              kotAddress: t.kotAddress,
+              homeAddress: t.homeAddress,
+            }}
           />
           <div className="flex flex-wrap items-center gap-3">
             <Button type="submit">{t.submit}</Button>

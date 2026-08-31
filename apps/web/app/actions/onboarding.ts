@@ -21,6 +21,12 @@ import {
   R_NUMBER_REGEX,
 } from "@/lib/profile";
 import { syncUserToBrevo } from "@/lib/brevo/sync";
+import {
+  addressFieldsFromForm,
+  addressFieldsFromUser,
+  addressSchema,
+  addressUpdate,
+} from "@/lib/profile-address";
 
 /**
  * De studievelden, gedeeld door het volledige profielformulier en de jaarlijkse
@@ -133,43 +139,41 @@ function studyUpdate(data: StudyInput) {
   };
 }
 
-const profileSchema = z.object({
-  firstName: z.string().trim().min(1),
-  lastName: z.string().trim().min(1),
-  // Optioneel, maar wanneer ingevuld moet het een geldig r-nummer zijn.
-  rNumber: z
-    .string()
-    .trim()
-    .toLowerCase()
-    .refine((v) => v === "" || R_NUMBER_REGEX.test(v), { message: "INVALID_RNUMBER" })
-    .default(""),
-  street: z.string().trim().max(120).default(""),
-  houseNumber: z.string().trim().max(20).default(""),
-  bus: z.string().trim().max(20).optional().default(""),
-  postalCode: z.string().trim().max(12).default(""),
-  city: z.string().trim().max(120).default(""),
-  birthDate: z
-    .string()
-    .trim()
-    .refine((value) => value === "" || !Number.isNaN(Date.parse(value)))
-    .default(""),
-  personalEmail: z
-    .string()
-    .trim()
-    .toLowerCase()
-    .refine((value) => value === "" || z.string().email().safeParse(value).success)
-    .default(""),
-  emailPreference: z.enum(EMAIL_PREFERENCES),
-  mailCategories: z.array(z.enum(MAIL_CATEGORIES)).default([]),
-  // Enkel zichtbaar voor wie zich via een mail uitschreef: het lid vraagt
-  // expliciet om weer mails te krijgen. Dit is de énige weg terug, zowel op de
-  // site als in Brevo (zie lib/brevo/sync.ts).
-  mailResubscribe: z.boolean().default(false),
-  shiftReminderDayBefore: z.boolean(),
-  shiftReminderSoon: z.boolean(),
-  calendarOnlyMyAudiences: z.boolean().default(false),
-  ...studyFieldsSchema,
-}).superRefine(validateStudy);
+const profileSchema = z
+  .object({
+    firstName: z.string().trim().min(1),
+    lastName: z.string().trim().min(1),
+    // Optioneel, maar wanneer ingevuld moet het een geldig r-nummer zijn.
+    rNumber: z
+      .string()
+      .trim()
+      .toLowerCase()
+      .refine((v) => v === "" || R_NUMBER_REGEX.test(v), { message: "INVALID_RNUMBER" })
+      .default(""),
+    birthDate: z
+      .string()
+      .trim()
+      .refine((value) => value === "" || !Number.isNaN(Date.parse(value)))
+      .default(""),
+    personalEmail: z
+      .string()
+      .trim()
+      .toLowerCase()
+      .refine((value) => value === "" || z.string().email().safeParse(value).success)
+      .default(""),
+    emailPreference: z.enum(EMAIL_PREFERENCES),
+    mailCategories: z.array(z.enum(MAIL_CATEGORIES)).default([]),
+    // Enkel zichtbaar voor wie zich via een mail uitschreef: het lid vraagt
+    // expliciet om weer mails te krijgen. Dit is de énige weg terug, zowel op de
+    // site als in Brevo (zie lib/brevo/sync.ts).
+    mailResubscribe: z.boolean().default(false),
+    shiftReminderDayBefore: z.boolean(),
+    shiftReminderSoon: z.boolean(),
+    calendarOnlyMyAudiences: z.boolean().default(false),
+    ...studyFieldsSchema,
+  })
+  .superRefine(validateStudy)
+  .and(addressSchema);
 
 const MAX_AVATAR_BYTES = 8 * 1024 * 1024; // 8 MiB before re-encode
 
@@ -220,11 +224,7 @@ export async function saveProfileAction(
     firstName: formData.get("firstName") ?? "",
     lastName: formData.get("lastName") ?? "",
     rNumber: formData.get("rNumber") ?? "",
-    street: formData.get("street") ?? "",
-    houseNumber: formData.get("houseNumber") ?? "",
-    bus: formData.get("bus") ?? "",
-    postalCode: formData.get("postalCode") ?? "",
-    city: formData.get("city") ?? "",
+    ...addressFieldsFromForm(formData),
     birthDate: formData.get("birthDate") ?? "",
     personalEmail: formData.get("personalEmail") ?? "",
     emailPreference: formData.get("emailPreference") ?? "UNIVERSITY",
@@ -278,11 +278,7 @@ export async function saveProfileAction(
         // De weergavenaam blijft afgeleid van voor- + achternaam.
         name: fullName(data.firstName, data.lastName),
         ...(rNumberLocked ? {} : { rNumber: data.rNumber ? data.rNumber : null }),
-        street: data.street || null,
-        houseNumber: data.houseNumber || null,
-        bus: data.bus ? data.bus : null,
-        postalCode: data.postalCode || null,
-        city: data.city || null,
+        ...addressUpdate(data),
         birthDate: data.birthDate ? new Date(data.birthDate) : null,
         personalEmail: data.personalEmail || null,
         emailPreference: data.emailPreference,
@@ -338,29 +334,55 @@ export async function saveProfileAction(
   return saveOk();
 }
 
-const confirmStudySchema = studySchema;
-
 /**
- * Jaarlijkse bevestiging van het studieprofiel (zie de gate in `proxy.ts`). Zet
- * `studyConfirmedYear` op het huidige academiejaar, waardoor het lid weer als
- * actief student telt en dus opnieuw in de mailinglijsten komt.
+ * Jaarlijkse bevestiging van het studieprofiel en de adressen (zie de gate in
+ * `proxy.ts`). Zet `studyConfirmedYear` op het huidige academiejaar, waardoor
+ * het lid weer als actief student telt en dus opnieuw in de mailinglijsten komt.
  *
- * Bewust géén aparte "bevestigd zonder wijziging"-flow: het formulier post altijd
- * de volledige studiekeuze, of ze nu gewijzigd is of niet.
+ * De volledige studiekeuze wordt altijd gepost. Voor de adressen kiest het lid
+ * expliciet tussen de bestaande waarden bevestigen en aangepaste waarden posten.
  */
 export async function confirmStudyAction(formData: FormData): Promise<void> {
   const session = await requireSession();
   // De actie is rechtstreeks aanroepbaar. Een niet-student hoort deze aparte
   // mutatieroute evenmin te gebruiken als de pagina of proxygate.
   if (!session.user.isStudent) redirect(safeNext(formData) ?? "/");
-  const parsed = confirmStudySchema.safeParse(studyFields(formData));
-  if (!parsed.success) throw new Error("INVALID_PROFILE");
+  const parsedStudy = studySchema.safeParse(studyFields(formData));
+  if (!parsedStudy.success) throw new Error("INVALID_PROFILE");
+
+  // Bij "de adressen kloppen" vertrouwen we geen verborgen clientwaarden: lees
+  // de huidige rij opnieuw. Een oud, onvolledig profiel kan zo evenmin via een
+  // handgemaakte POST als correct bevestigd worden.
+  const addressCandidate =
+    formData.get("addressesCorrect") === "yes"
+      ? addressFieldsFromUser(
+          await prisma.user.findUniqueOrThrow({
+            where: { id: session.user.id },
+            select: {
+              noKot: true,
+              street: true,
+              houseNumber: true,
+              bus: true,
+              postalCode: true,
+              city: true,
+              homeStreet: true,
+              homeHouseNumber: true,
+              homeBus: true,
+              homePostalCode: true,
+              homeCity: true,
+            },
+          }),
+        )
+      : addressFieldsFromForm(formData);
+  const parsedAddress = addressSchema.safeParse(addressCandidate);
+  if (!parsedAddress.success) throw new Error("INVALID_PROFILE");
 
   await prisma.user.update({
     where: { id: session.user.id },
     data: {
-      ...studyUpdate(parsed.data),
-      studyConfirmedYear: parsed.data.isStudent ? currentStudyYear() : null,
+      ...studyUpdate(parsedStudy.data),
+      ...addressUpdate(parsedAddress.data),
+      studyConfirmedYear: parsedStudy.data.isStudent ? currentStudyYear() : null,
     },
   });
 

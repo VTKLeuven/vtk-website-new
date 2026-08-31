@@ -499,12 +499,22 @@ model User {
   // Onboarding-profiel (ingevuld bij de eerste KUL SSO-login). Zolang
   // onboardedAt null is, wordt het lid naar de onboarding-flow gestuurd.
   onboardedAt            DateTime?
-  // Kotadres
+  // Kotadres. `noKot` is expliciet: lege velden alleen kunnen niet onderscheiden
+  // of iemand geen kot heeft of het adres nog niet invulde.
+  noKot                  Boolean   @default(false)
   street                 String?
   houseNumber            String?
   bus                    String? // busnummer, optioneel
   postalCode             String?
   city                   String?
+  // Thuisadres is functioneel verplicht in onboarding en studiebevestiging.
+  // De kolommen blijven nullable zodat bestaande leden pas bij hun volgende
+  // bevestiging een echt adres moeten opgeven, zonder verzonnen migratiedata.
+  homeStreet             String?
+  homeHouseNumber        String?
+  homeBus                String? // busnummer, optioneel
+  homePostalCode         String?
+  homeCity               String?
   birthDate              DateTime?
   // Contact: `email` is de login-/universiteitsmail (via SSO). Persoonlijke
   // mail en de voorkeur voor communicatie komen erbij.

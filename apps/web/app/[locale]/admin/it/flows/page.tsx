@@ -8,6 +8,8 @@ import { needsStudyConfirmation } from "@vtk/auth";
 import { previewNoopAction } from "@/app/actions/flowPreview";
 import { ProfileForm } from "@/components/profile/ProfileForm";
 import { StudyFieldset } from "@/components/profile/StudyFieldset";
+import { AddressConfirmation } from "@/components/profile/AddressConfirmation";
+import { hasCompleteAddresses } from "@/lib/profile-address";
 import { SaveForm } from "@/components/ui/SaveForm";
 import { FlowPreview } from "./FlowPreview";
 
@@ -55,11 +57,17 @@ export default async function AdminFlowPreview({
       rNumber: true,
       rNumberFromKul: true,
       avatarKey: true,
+      noKot: true,
       street: true,
       houseNumber: true,
       bus: true,
       postalCode: true,
       city: true,
+      homeStreet: true,
+      homeHouseNumber: true,
+      homeBus: true,
+      homePostalCode: true,
+      homeCity: true,
       birthDate: true,
       personalEmail: true,
       emailPreference: true,
@@ -213,8 +221,8 @@ export default async function AdminFlowPreview({
               </li>
               <li>
                 {nl
-                  ? "De vorige keuze staat voorgevuld: bevestigen is één klik voor wie niets wijzigt."
-                  : "The previous choice is prefilled: confirming is a single click for anyone who changes nothing."}
+                  ? "De vorige studiegegevens en adressen staan voorgevuld: bevestigen blijft snel voor wie niets wijzigt."
+                  : "The previous study details and addresses are prefilled, so confirming stays quick when nothing changed."}
               </li>
               <li>
                 {nl
@@ -281,6 +289,32 @@ export default async function AdminFlowPreview({
             graduationYear={user.graduationYear}
             wasInVtk={user.wasInVtk}
             alumniMailOptIn={user.alumniMailOptIn}
+          />
+          <AddressConfirmation
+            values={user}
+            complete={hasCompleteAddresses(user)}
+            addressLabels={{
+              noKot: dict.onboarding.noKot,
+              kotAddressHeading: dict.onboarding.kotAddressHeading,
+              homeAddressHeading: dict.onboarding.homeAddressHeading,
+              homeAddressHint: dict.onboarding.homeAddressHint,
+              street: dict.onboarding.street,
+              houseNumber: dict.onboarding.houseNumber,
+              bus: dict.onboarding.bus,
+              busHint: dict.onboarding.busHint,
+              postalCode: dict.onboarding.postalCode,
+              city: dict.onboarding.city,
+            }}
+            labels={{
+              heading: dict.confirmStudy.addressesHeading,
+              question: dict.confirmStudy.addressesQuestion,
+              yes: dict.confirmStudy.addressesYes,
+              no: dict.confirmStudy.addressesNo,
+              incomplete: dict.confirmStudy.addressesIncomplete,
+              noKot: dict.confirmStudy.noKot,
+              kotAddress: dict.confirmStudy.kotAddress,
+              homeAddress: dict.confirmStudy.homeAddress,
+            }}
           />
           <span className="text-xs text-[#5c667f]">{dict.confirmStudy.unchangedHint}</span>
         </SaveForm>

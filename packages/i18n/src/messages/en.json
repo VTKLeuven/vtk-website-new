@@ -268,8 +268,8 @@
     "kicker": "Welcome to VTK",
     "title": "Complete your profile",
     "intro": "Just a few things to fill in and your registration is done. You can always change these later in your account.",
-    "privacyNotice": "We use your name and university email for membership and access. Student number, address, date of birth, personal email, study details and photo are optional and only used for features you choose. Only provide what is needed.",
-    "privacyNoticeSelfRegistered": "We use your name and login email address for membership and access. Student number, address, date of birth, study details and photo are optional and only used for features you choose. Only provide what is needed.",
+    "privacyNotice": "We use your name, university email and address details for your membership and administration. Student number, date of birth, personal email, study details and photo are only used for features you choose.",
+    "privacyNoticeSelfRegistered": "We use your name, login email address and address details for your membership and administration. Student number, date of birth, study details and photo are only used for features you choose.",
     "privacyLink": "Read how VTK uses your data.",
     "identityHeading": "Name & student number",
     "firstName": "First name",
@@ -278,7 +278,11 @@
     "rNumberHint": "Format: r followed by 7 digits, e.g. r0123456.",
     "rNumberOptionalHint": "Optional. Format: r followed by 7 digits, e.g. r0123456.",
     "rNumberFromKul": "This student number comes from your KU Leuven account and cannot be changed.",
-    "addressHeading": "Room address",
+    "addressHeading": "Addresses",
+    "noKot": "I do not have a student room",
+    "kotAddressHeading": "Student room address",
+    "homeAddressHeading": "Home address",
+    "homeAddressHint": "Your home address is always required.",
     "street": "Street",
     "houseNumber": "House number",
     "bus": "Box",
@@ -458,8 +462,16 @@
   },
   "confirmStudy": {
     "title": "Are your studies still up to date?",
-    "intro": "At the start of every academic year we ask you to confirm what you are studying. That keeps our mailing lists accurate, so you only get emails that are relevant to you.",
-    "unchangedHint": "Nothing changed? Just click confirm.",
+    "intro": "At the start of every academic year we ask you to confirm your studies and addresses. This keeps our records and mailing lists accurate.",
+    "addressesHeading": "Are your addresses still correct?",
+    "addressesQuestion": "Check your student room and home address. You can update them here right away.",
+    "addressesYes": "Yes, these addresses are correct",
+    "addressesNo": "No, I want to update them",
+    "addressesIncomplete": "Your profile does not yet contain all required address details. Fill in the missing details below.",
+    "noKot": "No student room",
+    "kotAddress": "Student room address",
+    "homeAddress": "Home address",
+    "unchangedHint": "Nothing changed? Confirm your studies and addresses.",
     "submit": "Confirm"
   },
   "mailinglists": {
@@ -523,7 +535,7 @@
     "kicker": "VTK · KU Leuven",
     "title": "Privacy statement",
     "lead": "This statement explains which personal data VTK processes on the public website, in the member portal, for tickets and reservations, in logistics tools and for optional face recognition.",
-    "updated": "Last updated on 18 July 2026.",
+    "updated": "Last updated on 31 August 2026.",
     "sections": [
       {
         "heading": "Who is responsible?",
@@ -531,7 +543,7 @@
       },
       {
         "heading": "Which data do we process?",
-        "body": "Depending on the features you use, we process:\n• account and membership data: name, KU Leuven email, language, r-number, roles and session data\n• optional profile data: address, date of birth, personal email, email preferences, study profile and profile picture\n• orders and activities: ticket buyer and attendees, answers, payments and refunds, sandwiches, shifts, equipment and van reservations and related notes\n• access and security data: card number/name, door events, IP address, browser and technical logs\n• photo albums: a selfie and biometric face template, but only when you explicitly consent"
+        "body": "Depending on the features you use, we process:\n• account and membership data: name, KU Leuven email, language, r-number, roles and session data\n• profile data: student room and home address, date of birth, personal email, email preferences, study profile and profile picture\n• orders and activities: ticket buyer and attendees, answers, payments and refunds, sandwiches, shifts, equipment and van reservations and related notes\n• access and security data: card number/name, door events, IP address, browser and technical logs\n• photo albums: a selfie and biometric face template, but only when you explicitly consent"
       },
       {
         "heading": "Purposes and legal bases",
