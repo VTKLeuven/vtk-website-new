@@ -23,6 +23,7 @@ import {
   transportRange,
   type TransportBooking,
 } from '@/lib/uitleen-server';
+import { describeFilters, filtersToQuery, parseTransportFilters } from '@/lib/transport-filters';
 import { TransportPlanner, type PlannerTrip } from './planner';
 import type { TripBlock } from '@/components/transport-calendar/types';
 
@@ -72,19 +73,29 @@ function periodTitle(view: CalendarView, anchor: Date): string {
 export default async function VervoerWeekPage({
   searchParams,
 }: {
-  searchParams: Promise<{ weergave?: string; datum?: string; week?: string }>;
+  searchParams: Promise<{
+    weergave?: string;
+    datum?: string;
+    week?: string;
+    voertuig?: string;
+    chauffeur?: string;
+    status?: string;
+    aanvrager?: string;
+  }>;
 }) {
   await requireManage();
-  const { weergave, datum, week } = await searchParams;
+  const query = await searchParams;
+  const { weergave, datum, week } = query;
 
   const view = parseCalendarView(weergave);
+  const filters = parseTransportFilters(query);
   // `?week=` is de oude parameter van het weekoverzicht; links en bladwijzers uit
   // die tijd blijven werken in plaats van op deze week uit te komen.
   const anchor = (datum && parseDateOnly(datum)) || (week && parseDateOnly(week)) || todayDateOnly();
   const { days, from, to } = calendarRange(view, anchor);
 
   const [bookings, vehicles, drivers, driverColors] = await Promise.all([
-    transportRange(from, to),
+    transportRange(from, to, filters),
     activeVehicles(),
     driverOptions(),
     driverColorOverrides(),
@@ -92,8 +103,13 @@ export default async function VervoerWeekPage({
 
   const conflicts = conflictingIds(bookings);
 
+  // De filters blijven staan wanneer je van week naar week bladert: ze horen bij
+  // waar je naar kijkt, niet bij wanneer.
+  const filterQuery = new URLSearchParams(filtersToQuery(filters)).toString();
   const hrefFor = (target: Date) =>
-    `/beheer/vervoer/week?weergave=${view}&datum=${toDateInputValue(target)}`;
+    `/beheer/vervoer/week?weergave=${view}&datum=${toDateInputValue(target)}${
+      filterQuery ? `&${filterQuery}` : ''
+    }`;
 
   const blocks: TripBlock[] = bookings.map((booking) => ({
     id: booking.id,
@@ -223,6 +239,11 @@ export default async function VervoerWeekPage({
           trips={trips}
           drivers={drivers}
           driverColors={driverColors}
+          filters={filters}
+          hiddenNote={describeFilters(filters, {
+            vehicles: new Map(vehicles.map((vehicle) => [vehicle.id, vehicle.nameNl])),
+            drivers: new Map(drivers.map((driver) => [driver.id, driver.name])),
+          })}
           vehicleOptions={vehicles
             .filter((vehicle) => vehicle.active)
             .map((vehicle) => ({

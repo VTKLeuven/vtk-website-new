@@ -9,6 +9,8 @@ import {
 import type { CalendarVehicle, TripBlock } from '@/components/transport-calendar/types';
 import type { CalendarView } from '@/lib/calendar-range';
 import type { DriverColorOverrides } from '@/lib/driver-colors';
+import { TransportFilterBar } from '@/components/transport-calendar/filters';
+import type { TransportFilters } from '@/lib/transport-filters';
 import { TransportControls } from '../transport-controls';
 import { TransportDecisionForms, type DecisionLeg } from '../transport-decision-forms';
 import type { DriverOption } from '@/lib/uitleen-server';
@@ -61,6 +63,8 @@ export function TransportPlanner({
   drivers,
   vehicleOptions,
   driverColors,
+  filters,
+  hiddenNote,
   nav,
 }: {
   view: CalendarView;
@@ -72,6 +76,9 @@ export function TransportPlanner({
   drivers: DriverOption[];
   vehicleOptions: Array<{ id: string; name: string; needsVanDriver: boolean }>;
   driverColors?: DriverColorOverrides;
+  filters: TransportFilters;
+  /** Wat er door de filters niet getoond wordt, in woorden. */
+  hiddenNote: string[];
   nav: {
     previousHref: string;
     nextHref: string;
@@ -104,14 +111,33 @@ export function TransportPlanner({
         selectedId={openId}
         onSelect={setOpenId}
         emptyLabel={
-          view === 'dag'
-            ? 'Geen ritten op deze dag.'
+          (view === 'dag'
+            ? 'Geen ritten op deze dag'
             : view === 'maand'
-              ? 'Geen ritten deze maand.'
-              : 'Geen ritten deze week.'
+              ? 'Geen ritten deze maand'
+              : 'Geen ritten deze week') +
+          (hiddenNote.length > 0 ? ` met deze filters (${hiddenNote.join('; ')}).` : '.')
         }
-        toolbarExtra={<CalendarNav {...nav} />}
+        toolbarExtra={
+          <>
+            <CalendarNav {...nav} />
+            <TransportFilterBar
+              filters={filters}
+              vehicles={vehicles.map((vehicle) => ({ id: vehicle.id, name: vehicle.name }))}
+              drivers={drivers.map((driver) => ({ id: driver.id, name: driver.name }))}
+              driverColors={driverColors}
+            />
+          </>
+        }
       >
+        {/* Wat er niet staat, zodat een gefilterde week niet als een lege week
+            leest. Dezelfde regel als op /beheer/kalender. */}
+        {hiddenNote.length > 0 ? (
+          <p className="text-xs font-medium text-vtk-navy">
+            Gefilterd: {hiddenNote.join('; ')}.
+          </p>
+        ) : null}
+
         <p className="text-xs text-vtk-muted">
           De vulkleur is de chauffeur, de arcering is het voertuig; een rit zonder chauffeur is geel
           met een rode streepjesrand. Kleuren stel je in bij Chauffeurs, arceringen bij

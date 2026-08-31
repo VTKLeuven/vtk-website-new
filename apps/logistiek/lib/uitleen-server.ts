@@ -4,6 +4,7 @@ import { prisma } from '@vtk/db';
 import type { Prisma, UitleenTransportBookingStatus } from '@prisma/client';
 import { currentWorkingYear } from '@vtk/auth';
 import { DEFAULT_LAST_MINUTE_DAYS, STOCK_CONSUMING_STATUSES } from './uitleen';
+import { NO_DRIVER, type TransportFilters } from './transport-filters';
 
 export type CatalogItem = {
   id: string;
@@ -1013,6 +1014,33 @@ const OCCUPYING_STATUSES: UitleenTransportBookingStatus[] = ['REQUESTED', 'APPRO
  */
 const PLANNING_STATUSES: UitleenTransportBookingStatus[] = [...OCCUPYING_STATUSES, 'COMPLETED'];
 
+/**
+ * De filters van de planning als `where` (P3).
+ *
+ * De chauffeursfilter kan "nog geen chauffeur" bevatten; die en de gekozen
+ * personen samen zijn een OF en geen EN, want "de ritten van Arthur plus wat nog
+ * niemand heeft" is precies de vraag waarmee je een weekend indeelt.
+ */
+function transportFilterWhere(
+  filters: TransportFilters | undefined
+): Prisma.UitleenTransportBookingWhereInput {
+  if (!filters) return {};
+  const named = filters.driverIds.filter((id) => id !== NO_DRIVER);
+  const wantsNone = filters.driverIds.includes(NO_DRIVER);
+  return {
+    ...(filters.vehicleIds.length > 0 ? { vehicleId: { in: filters.vehicleIds } } : {}),
+    ...(filters.requesterTypes.length > 0 ? { requesterType: { in: filters.requesterTypes } } : {}),
+    ...(filters.driverIds.length > 0
+      ? {
+          OR: [
+            ...(named.length > 0 ? [{ driverId: { in: named } }] : []),
+            ...(wantsNone ? [{ driverId: null }] : []),
+          ],
+        }
+      : {}),
+  };
+}
+
 const transportWindowWhere = (
   from: Date,
   to: Date,
@@ -1029,9 +1057,19 @@ const transportWindowWhere = (
  * Meer velden dan het oude raster nodig had: sinds er vanuit dit scherm beslist
  * en aangepast wordt, moet het venster dezelfde gegevens hebben als de lijst.
  */
-export async function transportRange(from: Date, to: Date) {
+export async function transportRange(from: Date, to: Date, filters?: TransportFilters) {
   return prisma.uitleenTransportBooking.findMany({
-    where: transportWindowWhere(from, to, PLANNING_STATUSES),
+    where: {
+      ...transportWindowWhere(
+        from,
+        to,
+        // Een statusfilter vervangt de standaardlijst, maar mag er niets aan
+        // toevoegen: afgewezen en geannuleerde ritten horen niet op een planning,
+        // en die uitzondering hoort niet via de URL te openen.
+        filters && filters.statuses.length > 0 ? filters.statuses : PLANNING_STATUSES
+      ),
+      ...transportFilterWhere(filters),
+    },
     select: {
       id: true,
       vehicleId: true,
