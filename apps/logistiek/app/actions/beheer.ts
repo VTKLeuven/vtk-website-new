@@ -2,7 +2,7 @@
 
 import { revalidatePath } from 'next/cache';
 import { prisma } from '@vtk/db';
-import type { Prisma } from '@prisma/client';
+import type { Prisma, UitleenRequesterType } from '@prisma/client';
 import { currentWorkingYear } from '@vtk/auth';
 import { requireManage } from '@/lib/session';
 import { writeAudit } from '@/lib/audit';
@@ -2021,6 +2021,94 @@ export async function rejectTransportAction(_prev: SaveState, formData: FormData
 
   revalidateBeheer();
   return saveOk();
+}
+
+/**
+ * Een rit aanmaken vanuit de planning (P4).
+ *
+ * Meteen `APPROVED` en niet `REQUESTED`: het team vraagt niets aan zichzelf. Een
+ * rit die de transportverantwoordelijke zelf inplant, is beslist op het moment
+ * dat hij ze intekent; ze daarna nog eens laten goedkeuren zou een lege stap
+ * zijn die vroeg of laat blijft openstaan.
+ *
+ * Daarom loopt de botsingscontrole hier wél meteen (een goedgekeurde rit houdt
+ * het voertuig bezet), terwijl een aanvraag van een lid nog mag botsen; zie
+ * "Conflicten: aanvragen mag, goedkeuren niet".
+ *
+ * De rit komt op naam van de aanvrager die het team kiest, of op die van het
+ * teamlid zelf wanneer er geen gekozen wordt. Wie eronder staat, bepaalt wie ze
+ * bij "Mijn aanvragen" ziet.
+ */
+export async function adminCreateTransportAction(
+  input: TransportFormInput & {
+    groupId?: string | null;
+    requesterType?: UitleenRequesterType;
+    requesterName?: string | null;
+    userId?: string | null;
+    eventId?: string | null;
+    driverId?: string | null;
+  }
+): Promise<ActionResult> {
+  const session = await requireManage();
+
+  const ownerId = input.userId?.trim() || session.user.id;
+  const built = await buildTransportBookings(input, {
+    userId: ownerId,
+    eventId: input.eventId?.trim() || null,
+    requesterType: input.requesterType ?? 'INTERN',
+    groupId: input.groupId?.trim() || null,
+    requesterName: input.requesterName?.trim() || null,
+  });
+  if (!built.ok) return { ok: false, error: built.error };
+
+  // Een chauffeur toewijzen mag enkel aan iemand uit de chauffeurslijst; dat is
+  // meteen leestoegang tot die rit, dus dezelfde hercheck als bij het goedkeuren.
+  const driverId = input.driverId?.trim() || null;
+  if (driverId && !(await isDriver(driverId))) {
+    return { ok: false, error: 'Deze persoon staat niet in de chauffeurslijst.' };
+  }
+
+  const outcome = await runSerializable(async (tx) => {
+    for (const booking of built.bookings) {
+      const clash = await overlappingBooking(
+        tx,
+        booking.vehicleId,
+        booking.startAt as Date,
+        booking.endAt as Date,
+        []
+      );
+      if (clash) return { error: 'OVERLAP' as const, detail: bookingLabel(clash) };
+    }
+    const created = await tx.uitleenTransportBooking.createManyAndReturn({
+      data: built.bookings.map((booking) => ({
+        ...booking,
+        status: 'APPROVED' as const,
+        driverId,
+        decidedAt: new Date(),
+        decidedById: session.user.id,
+      })),
+      select: { id: true },
+    });
+    for (const row of created) {
+      await writeAudit(tx, { transportBookingId: row.id }, {
+        kind: 'STATUS_CHANGED',
+        toStatus: 'APPROVED',
+        note: 'ingepland door Logistiek',
+        actorId: session.user.id,
+      });
+    }
+    return { error: null, ids: created.map((row) => row.id) };
+  });
+
+  if (outcome.error === 'OVERLAP') {
+    return { ok: false, error: `Botst met ${outcome.detail}. Kies een ander moment.` };
+  }
+
+  revalidateBeheer();
+  return {
+    ok: true,
+    message: built.roundTrip || built.vehicleCount > 1 ? 'Ritten ingepland.' : 'Rit ingepland.',
+  };
 }
 
 /**

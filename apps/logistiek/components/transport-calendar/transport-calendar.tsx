@@ -50,6 +50,8 @@ export function TransportCalendar({
   emptyLabel,
   showDriver = true,
   toolbarExtra,
+  onMoveBlock,
+  onCreateRange,
   children,
 }: {
   view: CalendarView;
@@ -65,6 +67,10 @@ export function TransportCalendar({
   showDriver?: boolean;
   /** Extra knoppen in de werkbalk (filters, "nieuwe rit", ...). */
   toolbarExtra?: React.ReactNode;
+  /** Een rit verslepen of rekken; enkel in dag- en weekweergave (P4). */
+  onMoveBlock?: (blockId: string, startAt: Date, endAt: Date) => void;
+  /** Slepen op lege ruimte: een nieuwe rit op dat moment. */
+  onCreateRange?: (startAt: Date, endAt: Date) => void;
   /** Wat onder de kalender komt: de legende staat er al, dit komt erna. */
   children?: React.ReactNode;
 }) {
@@ -314,6 +320,8 @@ export function TransportCalendar({
           driverColors={driverColors}
           hourPx={hourPx}
           now={now}
+          onMoveBlock={onMoveBlock}
+          onCreateRange={onCreateRange}
         />
       )}
 

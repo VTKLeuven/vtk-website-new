@@ -9,6 +9,7 @@ import {
   parseDateOnly,
   requesterLabel,
   toDateInputValue,
+  toDatetimeLocalValue,
   todayDateOnly,
 } from '@/lib/uitleen';
 import {
@@ -21,6 +22,7 @@ import {
 import {
   activeVehicles,
   driverColorOverrides,
+  activeGroups,
   driverOptions,
   transportAuditLogsByBooking,
   transportRange,
@@ -97,11 +99,14 @@ export default async function VervoerWeekPage({
   const anchor = (datum && parseDateOnly(datum)) || (week && parseDateOnly(week)) || todayDateOnly();
   const { days, from, to } = calendarRange(view, anchor);
 
-  const [bookings, vehicles, drivers, driverColors] = await Promise.all([
+  const [bookings, vehicles, drivers, driverColors, groups] = await Promise.all([
     transportRange(from, to, filters),
     activeVehicles(),
     driverOptions(),
     driverColorOverrides(),
+    // Voor wie het team zelf een rit inplant. Alle posten en werkgroepen, niet
+    // enkel die van het teamlid: Logistiek rijdt voor de hele kring.
+    activeGroups(),
   ]);
 
   const conflicts = conflictingIds(bookings);
@@ -161,8 +166,8 @@ export default async function VervoerWeekPage({
       startAt: booking.startAt.toISOString(),
       endAt: booking.endAt.toISOString(),
       edit: {
-        startAt: toDatetimeLocal(booking.startAt),
-        endAt: toDatetimeLocal(booking.endAt),
+        startAt: toDatetimeLocalValue(booking.startAt),
+        endAt: toDatetimeLocalValue(booking.endAt),
         purpose: booking.purpose,
         cargoNote: booking.cargoNote ?? '',
         pickupAddress: booking.pickupAddress ?? '',
@@ -191,8 +196,8 @@ export default async function VervoerWeekPage({
         .sort((a, b) => a.startAt.getTime() - b.startAt.getTime())
         .map((leg) => ({
           id: leg.id,
-          startAt: toDatetimeLocal(leg.startAt),
-          endAt: toDatetimeLocal(leg.endAt),
+          startAt: toDatetimeLocalValue(leg.startAt),
+          endAt: toDatetimeLocalValue(leg.endAt),
           label:
             legs.length > 1
               ? [
@@ -280,6 +285,7 @@ export default async function VervoerWeekPage({
               name: vehicle.nameNl,
               needsVanDriver: vehicle.needsVanDriver,
             }))}
+          groups={groups.map((group) => ({ id: group.id, name: group.nameNl }))}
           nav={{
             previousHref: hrefFor(shiftAnchor(view, anchor, -1)),
             nextHref: hrefFor(shiftAnchor(view, anchor, 1)),
@@ -293,18 +299,3 @@ export default async function VervoerWeekPage({
   );
 }
 
-/** "YYYY-MM-DDTHH:mm" in Belgische tijd, voor de datetime-local-velden. */
-function toDatetimeLocal(date: Date): string {
-  const parts = new Intl.DateTimeFormat('en-CA', {
-    timeZone: 'Europe/Brussels',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false,
-  }).formatToParts(date);
-  const get = (type: string) => parts.find((part) => part.type === type)?.value ?? '';
-  const hour = get('hour') === '24' ? '00' : get('hour');
-  return `${get('year')}-${get('month')}-${get('day')}T${hour}:${get('minute')}`;
-}

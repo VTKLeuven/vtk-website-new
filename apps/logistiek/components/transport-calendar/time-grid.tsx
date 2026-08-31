@@ -1,9 +1,9 @@
 'use client';
 
-import { useMemo, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import type { DriverColorOverrides } from '@/lib/driver-colors';
-import { minutesOfDay, placeForDay, type Placed } from '@/lib/week-lanes';
-import { BlockContent, blockLabel, blockLook } from './trip-block';
+import { minutesOfDay, placeForDay, startOfBrusselsDay, type Placed } from '@/lib/week-lanes';
+import { BlockContent, blockLabel, blockLook, formatTime } from './trip-block';
 import { HOUR_PX_DEFAULT, type CalendarVehicle, type TripBlock } from './types';
 
 /**
@@ -51,6 +51,37 @@ const dayKeyFormatter = new Intl.DateTimeFormat('en-CA', {
  */
 const DAY_MIN_WIDTH = '9.5rem';
 
+/**
+ * De stap waarop slepen vastklikt. Hetzelfde kwartier als de server aanvaardt
+ * (`isOnQuarterHour`): kon je fijner slepen, dan bouwde je een rit die bij het
+ * opslaan geweigerd wordt.
+ */
+const SNAP_MINUTES = 15;
+
+/** Hoeveel pixels aan de onderrand van een blok het einduur verslepen in plaats van het blok. */
+const RESIZE_GRIP_PX = 8;
+
+/**
+ * Hoeveel je moet bewegen voor een klik een sleep wordt. Zonder deze drempel
+ * verschuift elke aanklik de rit een kwartier, want een muisklik beweegt altijd
+ * een paar pixels.
+ */
+const DRAG_THRESHOLD_PX = 4;
+
+/** Minuten sinds middernacht omzetten naar een moment op deze Belgische dag. */
+function momentOn(day: Date, minutes: number): Date {
+  return new Date(startOfBrusselsDay(day) + minutes * 60_000);
+}
+
+function snap(minutes: number): number {
+  return Math.round(minutes / SNAP_MINUTES) * SNAP_MINUTES;
+}
+
+type DragState =
+  | { kind: 'move'; blockId: string; dayIndex: number; from: number; to: number; grabOffset: number }
+  | { kind: 'resize'; blockId: string; dayIndex: number; from: number; to: number }
+  | { kind: 'create'; dayIndex: number; from: number; to: number };
+
 export function TimeGrid({
   days,
   vehicles,
@@ -62,6 +93,8 @@ export function TimeGrid({
   driverColors,
   hourPx = HOUR_PX_DEFAULT,
   now,
+  onMoveBlock,
+  onCreateRange,
 }: {
   /** De dagen, als ISO-strings van UTC-middernacht (date-only). */
   days: string[];
@@ -78,6 +111,13 @@ export function TimeGrid({
   hourPx?: number;
   /** Nu-lijn; weglaten laat ze weg (bv. in een test of een afdruk). */
   now?: Date;
+  /**
+   * Een rit verslepen of aan de onderrand rekken (P4). Weglaten maakt de
+   * kalender onbeweeglijk, wat het publieke overzicht ook is.
+   */
+  onMoveBlock?: (blockId: string, startAt: Date, endAt: Date) => void;
+  /** Slepen op lege ruimte: een nieuwe rit op dat moment. */
+  onCreateRange?: (startAt: Date, endAt: Date) => void;
 }) {
   const parsedDays = useMemo(() => days.map((day) => new Date(day)), [days]);
   const vehicleById = useMemo(
@@ -106,6 +146,150 @@ export function TimeGrid({
       lastHour: Math.min(24, Math.max(latest, earliest + 1)),
     };
   }, [placedPerDay]);
+
+  /**
+   * Wat er op dit moment versleept wordt.
+   *
+   * Enkel met een muis: op een touchscreen is verticaal vegen scrollen, en een
+   * kalender die daarbij ritten verschuift, is onbruikbaar. Daar doet de
+   * inspector het werk, met exacte uren in plaats van een gok.
+   */
+  const [drag, setDrag] = useState<DragState | null>(null);
+  const dragRef = useRef<DragState | null>(null);
+  const columns_ = useRef<Array<HTMLDivElement | null>>([]);
+  /** Is er al voorbij de drempel bewogen? Zolang niet, is dit een klik. */
+  const moved = useRef(false);
+  const grabbedAtY = useRef(0);
+  /**
+   * De rit die net versleept is. Het loslaten van een sleep is óók een klik, en
+   * die mag het paneel niet openen bovenop de week waarin je aan het schuiven
+   * was. Per id en niet als vlag, want een vlag die pas bij de volgende
+   * pointerdown gewist wordt, slikt ook de eerstvolgende klik op een rit die
+   * helemaal niet versleepbaar is.
+   */
+  const justDraggedId = useRef<string | null>(null);
+
+  /** Het uur onder de muis in deze dagkolom, in minuten sinds middernacht. */
+  const minutesAt = useCallback(
+    (dayIndex: number, clientY: number): number => {
+      const node = columns_.current[dayIndex];
+      if (!node) return firstHour * 60;
+      const rect = node.getBoundingClientRect();
+      const ratio = (clientY - rect.top) / Math.max(1, rect.height);
+      const total = (lastHour - firstHour) * 60;
+      return firstHour * 60 + Math.min(total, Math.max(0, ratio * total));
+    },
+    [firstHour, lastHour]
+  );
+
+  /**
+   * Het slepen zelf hangt aan het venster en niet aan het blok: je muis verlaat
+   * het blok zodra je begint te bewegen, en dan zou de sleep meteen stoppen.
+   *
+   * De luisteraars worden meteen bij het indrukken opgehangen en niet in een
+   * effect. Een effect loopt pas ná de render die op `setDrag` volgt, en alles
+   * wat je in die tussentijd beweegt, is weg; bij een snelle sleep sprong de rit
+   * daardoor naar het verkeerde uur.
+   */
+  const stopDrag = useRef<(() => void) | null>(null);
+  useEffect(() => () => stopDrag.current?.(), []);
+
+  const listen = useCallback(() => {
+    function onMove(event: PointerEvent) {
+      const current = dragRef.current;
+      if (!current) return;
+      // Een muisklik beweegt altijd een paar pixels; zonder drempel verschuift
+      // elke aanklik de rit een kwartier.
+      if (!moved.current) {
+        if (Math.abs(event.clientY - grabbedAtY.current) < DRAG_THRESHOLD_PX) return;
+        moved.current = true;
+      }
+      const minutes = snap(minutesAt(current.dayIndex, event.clientY));
+      if (current.kind === 'resize') {
+        dragRef.current = { ...current, to: Math.max(current.from + SNAP_MINUTES, minutes) };
+      } else if (current.kind === 'create') {
+        dragRef.current = { ...current, to: minutes };
+      } else {
+        const length = current.to - current.from;
+        const from = Math.max(0, minutes - current.grabOffset);
+        dragRef.current = { ...current, from, to: from + length };
+      }
+      setDrag(dragRef.current);
+    }
+
+    function onUp() {
+      detach();
+      const current = dragRef.current;
+      dragRef.current = null;
+      setDrag(null);
+      if (!current || !moved.current) return;
+      if (current.kind !== 'create') justDraggedId.current = current.blockId;
+      const day = parsedDays[current.dayIndex];
+      const from = Math.min(current.from, current.to);
+      const to = Math.max(current.from, current.to);
+      if (to - from < SNAP_MINUTES) return;
+      if (current.kind === 'create') {
+        onCreateRange?.(momentOn(day, from), momentOn(day, to));
+      } else {
+        onMoveBlock?.(current.blockId, momentOn(day, from), momentOn(day, to));
+      }
+    }
+
+    function detach() {
+      window.removeEventListener('pointermove', onMove);
+      window.removeEventListener('pointerup', onUp);
+      window.removeEventListener('pointercancel', onUp);
+      stopDrag.current = null;
+    }
+
+    window.addEventListener('pointermove', onMove);
+    window.addEventListener('pointerup', onUp);
+    window.addEventListener('pointercancel', onUp);
+    stopDrag.current = detach;
+  }, [minutesAt, onCreateRange, onMoveBlock, parsedDays]);
+
+  function beginBlockDrag(
+    event: React.PointerEvent,
+    block: Placed<TripBlock>,
+    dayIndex: number,
+    kind: 'move' | 'resize'
+  ) {
+    if (!onMoveBlock || event.pointerType !== 'mouse' || event.button !== 0) return;
+    // Een rit die over de dagrand loopt, versleep je niet vanuit deze dag: het
+    // stuk dat je ziet is niet de hele rit, en verschuiven zou het andere stuk
+    // laten verspringen zonder dat je het ziet.
+    if (block.continuesBefore || block.continuesAfter) return;
+    event.stopPropagation();
+    moved.current = false;
+    grabbedAtY.current = event.clientY;
+    const at = snap(minutesAt(dayIndex, event.clientY));
+    const next: DragState =
+      kind === 'resize'
+        ? { kind, blockId: block.id, dayIndex, from: block.from, to: block.to }
+        : {
+            kind,
+            blockId: block.id,
+            dayIndex,
+            from: block.from,
+            to: block.to,
+            grabOffset: at - block.from,
+          };
+    dragRef.current = next;
+    setDrag(next);
+    listen();
+  }
+
+  function beginCreate(event: React.PointerEvent, dayIndex: number) {
+    if (!onCreateRange || event.pointerType !== 'mouse' || event.button !== 0) return;
+    if (event.target !== event.currentTarget) return;
+    moved.current = false;
+    grabbedAtY.current = event.clientY;
+    const at = snap(minutesAt(dayIndex, event.clientY));
+    const next: DragState = { kind: 'create', dayIndex, from: at, to: at + 60 };
+    dragRef.current = next;
+    setDrag(next);
+    listen();
+  }
 
   const hours = Array.from({ length: lastHour - firstHour }, (_, index) => firstHour + index);
   const height = hours.length * hourPx;
@@ -168,7 +352,13 @@ export function TimeGrid({
             return (
               <div
                 key={days[dayIndex]}
-                className={`relative rounded-[10px] ${isToday ? 'bg-vtk-yellow/10' : 'bg-vtk-paper/70'}`}
+                ref={(node) => {
+                  columns_.current[dayIndex] = node;
+                }}
+                onPointerDown={(event) => beginCreate(event, dayIndex)}
+                className={`relative rounded-[10px] ${isToday ? 'bg-vtk-yellow/10' : 'bg-vtk-paper/70'} ${
+                  onCreateRange ? 'cursor-copy' : ''
+                }`}
                 style={{ height }}
               >
                 {/* Uurlijnen, zodat je een blok op de klok kan leggen. */}
@@ -192,6 +382,27 @@ export function TimeGrid({
                   />
                 ) : null}
 
+                {/* Het blok dat je nu tekent of versleept, als schaduw op zijn
+                    nieuwe plek. Zonder dit zie je pas na het loslaten waar de rit
+                    terechtkomt, en dan is het al gebeurd. */}
+                {drag && drag.dayIndex === dayIndex && moved.current ? (
+                  <div
+                    aria-hidden
+                    className="pointer-events-none absolute inset-x-0 z-20 rounded-[8px] border-2 border-dashed border-vtk-navy bg-vtk-navy/10 px-1.5 py-1 text-[11px] font-semibold tabular-nums text-vtk-navy"
+                    style={{
+                      top: ((Math.min(drag.from, drag.to) - firstHour * 60) / 60) * hourPx,
+                      height: Math.max(
+                        18,
+                        (Math.abs(drag.to - drag.from) / 60) * hourPx - 2
+                      ),
+                    }}
+                  >
+                    {formatTime(momentOn(day, Math.min(drag.from, drag.to)))}
+                    {'-'}
+                    {formatTime(momentOn(day, Math.max(drag.from, drag.to)))}
+                  </div>
+                ) : null}
+
                 {placedPerDay[dayIndex].map((block) => (
                   <TimeBlock
                     key={`${block.id}-${days[dayIndex]}`}
@@ -203,6 +414,14 @@ export function TimeGrid({
                     selected={selectedId === block.id}
                     showDriver={showDriver}
                     driverColors={driverColors}
+                    draggable={Boolean(onMoveBlock)}
+                    dimmed={drag?.kind !== 'create' && drag?.blockId === block.id && moved.current}
+                    onDragStart={(event, kind) => beginBlockDrag(event, block, dayIndex, kind)}
+                    justDragged={() => {
+                      if (justDraggedId.current !== block.id) return false;
+                      justDraggedId.current = null;
+                      return true;
+                    }}
                   />
                 ))}
               </div>
@@ -223,6 +442,10 @@ function TimeBlock({
   selected,
   showDriver,
   driverColors,
+  draggable,
+  dimmed,
+  onDragStart,
+  justDragged,
 }: {
   block: Placed<TripBlock>;
   vehicle: CalendarVehicle | null;
@@ -232,6 +455,12 @@ function TimeBlock({
   selected: boolean;
   showDriver: boolean;
   driverColors?: DriverColorOverrides;
+  draggable?: boolean;
+  /** Dit blok wordt op dit moment versleept; de schaduw toont waar het heen gaat. */
+  dimmed?: boolean;
+  onDragStart?: (event: React.PointerEvent, kind: 'move' | 'resize') => void;
+  /** Is er net gesleept? Dan is deze klik het loslaten en geen selectie. */
+  justDragged?: () => boolean;
 }) {
   const top = ((block.from - firstHour * 60) / 60) * hourPx;
   const rawHeight = ((block.to - block.from) / 60) * hourPx;
@@ -245,6 +474,7 @@ function TimeBlock({
     height: Math.max(24, rawHeight - 2),
     left: `${block.lane * laneWidth}%`,
     width: `${laneWidth}%`,
+    opacity: dimmed ? 0.4 : look.style.opacity,
   };
 
   // Staat dit blok naast een ander, dan is er geen plaats voor een heel bereik.
@@ -280,16 +510,41 @@ function TimeBlock({
     );
   }
 
+  // Enkel een rit die volledig op deze dag valt, is te verslepen: van een rit
+  // die over middernacht loopt zie je hier maar de helft.
+  const movable = draggable && !block.continuesBefore && !block.continuesAfter;
+
   return (
     <button
       type="button"
-      onClick={() => onSelect(block.id)}
-      className={`absolute transition hover:brightness-95 ${look.className}`}
+      // `onSelect` en niet openen wanneer je net gesleept hebt: het loslaten van
+      // een sleep is óók een klik, en dan sprong het paneel open bovenop de week
+      // waarin je aan het schuiven was.
+      onClick={(event) => {
+        if (justDragged?.()) {
+          event.preventDefault();
+          return;
+        }
+        onSelect(block.id);
+      }}
+      onPointerDown={movable ? (event) => onDragStart?.(event, 'move') : undefined}
+      className={`absolute transition hover:brightness-95 ${movable ? 'cursor-grab' : ''} ${look.className}`}
       style={style}
       title={label}
       aria-label={label}
     >
       {content}
+      {/* De greep aan de onderrand rekt het einduur op. Een eigen strookje en
+          niet de rand van het blok zelf: die randen liggen bij overlap tegen
+          elkaar, en dan pak je de verkeerde rit vast. */}
+      {movable ? (
+        <span
+          aria-hidden
+          onPointerDown={(event) => onDragStart?.(event, 'resize')}
+          className="absolute inset-x-0 bottom-0 cursor-ns-resize"
+          style={{ height: RESIZE_GRIP_PX }}
+        />
+      ) : null}
     </button>
   );
 }

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useCallback, useState, useTransition } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import {
@@ -20,6 +20,10 @@ import type { UitleenAuditEntry, DriverOption } from '@/lib/uitleen-server';
 import { TransportControls } from '../transport-controls';
 import { TransportDecisionForms, type DecisionLeg } from '../transport-decision-forms';
 import { TripEditForm, type TripEditValues } from './trip-edit-form';
+import { NewTripForm, type NewTripValues } from './new-trip-form';
+import { adminEditTransportAction } from '@/app/actions/beheer';
+import { useToast } from '@/components/ui/toast';
+import { toDatetimeLocalValue } from '@/lib/uitleen';
 import type {
   UitleenPricingMode,
   UitleenRequesterType,
@@ -89,6 +93,7 @@ export function TransportPlanner({
   trips,
   drivers,
   vehicleOptions,
+  groups,
   driverColors,
   filters,
   hiddenNote,
@@ -102,6 +107,8 @@ export function TransportPlanner({
   trips: PlannerTrip[];
   drivers: DriverOption[];
   vehicleOptions: Array<{ id: string; name: string; needsVanDriver: boolean }>;
+  /** Posten en werkgroepen waarvoor het team zelf een rit kan inplannen. */
+  groups: Array<{ id: string; name: string }>;
   driverColors?: DriverColorOverrides;
   filters: TransportFilters;
   /** Wat er door de filters niet getoond wordt, in woorden. */
@@ -115,8 +122,59 @@ export function TransportPlanner({
   };
 }) {
   const router = useRouter();
+  const showToast = useToast();
+  const [, startTransition] = useTransition();
   const [openId, setOpenId] = useState<string | null>(null);
+  /** De rit die je aan het intekenen bent, met de uren die je sleepte. */
+  const [draft, setDraft] = useState<NewTripValues | null>(null);
   const trip = trips.find((entry) => entry.id === openId) ?? null;
+
+  /**
+   * Een rit verslepen of rekken in de kalender.
+   *
+   * Dezelfde actie als het formulier in het paneel, met dezelfde
+   * overlapcontrole: slepen is een snellere manier om uren te wijzigen, geen
+   * tweede manier met andere regels. Botst het, dan zegt de melding waarmee, en
+   * zet het herladen de rit terug waar ze stond.
+   */
+  const moveBlock = useCallback(
+    (blockId: string, startAt: Date, endAt: Date) => {
+      const target = trips.find((entry) => entry.id === blockId);
+      if (!target) return;
+      startTransition(async () => {
+        const result = await adminEditTransportAction(blockId, {
+          ...target.edit,
+          startAt: toDatetimeLocalValue(startAt),
+          endAt: toDatetimeLocalValue(endAt),
+        });
+        if (result.ok) {
+          showToast({ message: result.message ?? 'Rit verplaatst.', variant: 'success' });
+        } else {
+          showToast({ message: result.error, variant: 'error', duration: 0 });
+        }
+        router.refresh();
+      });
+    },
+    [router, showToast, trips]
+  );
+
+  const createRange = useCallback(
+    (startAt: Date, endAt: Date) => {
+      setOpenId(null);
+      setDraft({
+        startAt: toDatetimeLocalValue(startAt),
+        endAt: toDatetimeLocalValue(endAt),
+        vehicleId: vehicleOptions[0]?.id ?? '',
+        groupId: '',
+        driverId: '',
+        purpose: '',
+        cargoNote: '',
+        pickupAddress: '',
+        destination: '',
+      });
+    },
+    [vehicleOptions]
+  );
 
   return (
     <>
@@ -128,7 +186,12 @@ export function TransportPlanner({
         blocks={blocks}
         driverColors={driverColors}
         selectedId={openId}
-        onSelect={setOpenId}
+        onSelect={(id) => {
+          setDraft(null);
+          setOpenId(id);
+        }}
+        onMoveBlock={moveBlock}
+        onCreateRange={createRange}
         emptyLabel={
           (view === 'dag'
             ? 'Geen ritten op deze dag'
@@ -146,6 +209,20 @@ export function TransportPlanner({
               drivers={drivers.map((driver) => ({ id: driver.id, name: driver.name }))}
               driverColors={driverColors}
             />
+            {/* Ook als knop en niet enkel als sleep: op een touchscreen is
+                verticaal vegen scrollen, dus daar valt er niets in te tekenen. */}
+            <button
+              type="button"
+              onClick={() => {
+                const start = new Date();
+                start.setMinutes(0, 0, 0);
+                start.setHours(start.getHours() + 1);
+                createRange(start, new Date(start.getTime() + 60 * 60 * 1000));
+              }}
+              className="rounded-full border border-vtk-navy bg-vtk-navy px-3 py-1.5 text-sm font-semibold text-white transition hover:bg-vtk-ink"
+            >
+              Nieuwe rit
+            </button>
           </>
         }
       >
@@ -162,6 +239,26 @@ export function TransportPlanner({
           goedgekeurde ritten met hetzelfde voertuig op hetzelfde moment. Klik een rit aan om ze te
           beslissen of aan te passen.
         </p>
+
+        {draft ? (
+          <TripInspector
+            title="Nieuwe rit"
+            subtitle="Wordt meteen ingepland; Logistiek vraagt niets aan zichzelf."
+            onClose={() => setDraft(null)}
+          >
+            <NewTripForm
+              initial={draft}
+              vehicles={vehicleOptions}
+              groups={groups}
+              drivers={drivers}
+              onDone={() => {
+                setDraft(null);
+                router.refresh();
+              }}
+              onCancel={() => setDraft(null)}
+            />
+          </TripInspector>
+        ) : null}
 
         {trip ? (
           <TripInspector

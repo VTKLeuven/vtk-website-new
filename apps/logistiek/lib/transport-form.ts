@@ -25,6 +25,8 @@ export type TransportFormInput = {
   startAt: string; // datetime-local, Belgische wall-clock
   endAt: string;
   purpose: string;
+  /** Wat er mee moet ("20 bierbakken en 4 tafels"). */
+  cargoNote?: string;
   pickupAddress: string;
   destination: string;
   note: string;
@@ -153,6 +155,7 @@ export async function buildTransportBookings(
     ...(owner.groupId !== undefined ? { groupId: owner.groupId } : {}),
     ...(owner.requesterName !== undefined ? { requesterName: owner.requesterName } : {}),
     purpose: purpose.slice(0, MAX_NOTE_LENGTH),
+    cargoNote: input.cargoNote?.trim().slice(0, MAX_NOTE_LENGTH) || null,
     eventName: input.eventName?.trim().slice(0, 300) || null,
     pickupAddress: input.pickupAddress.trim().slice(0, 300) || null,
     destination: input.destination.trim().slice(0, 300) || null,
