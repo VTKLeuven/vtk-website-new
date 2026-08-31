@@ -41,9 +41,9 @@ Fase 3 is die tool, in onze eigen app en op onze eigen data.
 | Fase | Inhoud | Taken | Status |
 | --- | --- | --- | --- |
 | 0 | Werkplan vastleggen | dit bestand | ✅ af |
-| 1 | Semesterstart | S1–S3 | ⬜ |
-| 2 | Kleur en arcering | K1 | ⬜ |
-| 3 | De planning wordt een agenda-app | P1–P5 | ⬜ |
+| 1 | Semesterstart | S1–S3 | ✅ af |
+| 2 | Kleur en arcering | K1 | ✅ af |
+| 3 | De planning wordt een agenda-app | P1–P5 | ✅ af |
 | 4 | Meldingsmail per aanvraagsoort | M1 | ⬜ |
 | 5 | Privé-agendafeed van transport | A1 | ⬜ |
 | 6 | Logistiek-evenement bij een website-evenement | E1 | ⬜ |
@@ -56,7 +56,7 @@ en 2 is dat tot twee keer toe blijven liggen.
 
 # Fase 1: semesterstart
 
-### S1. Externen kunnen nog niets aanvragen
+### ✅ S1. Externen kunnen nog niets aanvragen
 **P1 · code**
 
 - **Raakt:** `lib/uitleen-server.ts`, `lib/session.ts`, `app/actions/uitleen.ts`,
@@ -76,7 +76,7 @@ en 2 is dat tot twee keer toe blijven liggen.
   kan indienen, ook niet door de server action rechtstreeks aan te roepen, en het
   team dat met één schakelaar kan openzetten.
 
-### S2. Geen waarborg voor posten en werkgroepen
+### ✅ S2. Geen waarborg voor posten en werkgroepen
 **P1 · code · klein · 📝**
 
 - **Raakt:** `app/materiaal/reservation-form.tsx`, `app/materiaal/[id]/page.tsx`.
@@ -88,7 +88,7 @@ en 2 is dat tot twee keer toe blijven liggen.
 - **Klaar wanneer:** een praesidiumlid nergens een waarborgbedrag ziet, een
   externe wel.
 
-### S3. Kalender opent de rit zelf
+### ✅ S3. Kalender opent de rit zelf
 **P1 · code · klein**
 
 - **Raakt:** `app/beheer/kalender/page.tsx`, `app/beheer/vervoer/page.tsx`,
@@ -103,7 +103,7 @@ en 2 is dat tot twee keer toe blijven liggen.
 
 # Fase 2: kleur en arcering
 
-### K1. Kleur per chauffeur, arcering per voertuig
+### ✅ K1. Kleur per chauffeur, arcering per voertuig
 **P1 · code · 🗄️ 📝**
 
 - **Raakt:** `packages/db/prisma/schema.prisma`, `lib/driver-colors.ts`,
@@ -132,7 +132,7 @@ Nieuwe map `apps/logistiek/components/transport-calendar/`. Het tijdrooster word
 gedeeld met het publieke `/vervoer/bezetting`, zodat dat mee profiteert van zoom
 en van de mobiele weergave.
 
-### P1. Dag-, week- en maandweergave
+### ✅ P1. Dag-, week- en maandweergave
 **P1 · code · groter**
 
 - **Raakt:** `components/transport-calendar/`, `lib/month-lanes.ts` (nieuw),
@@ -140,31 +140,38 @@ en van de mobiele weergave.
 - **Doen:** weergave en datum in de URL (`?weergave=dag|week|maand&datum=…`),
   `‹ › vandaag`, en een maandrooster waarin een rit over meerdere dagen één balk
   is. Dag en week hergebruiken `placeForDay` uit `lib/week-lanes.ts` ongewijzigd.
-- **Mobiel:** week staat onder ~700px op drie dagen, dag is één kolom, maand
-  toont bolletjes in plaats van tekst.
+- **Mobiel, anders opgelost dan gepland:** het plan was de week onder ~700px op
+  drie dagen te zetten. Het is een horizontale scroller geworden met een
+  vastgeplakte urenkolom: dan veeg je van dag naar dag zonder dat de app moet
+  raden hoeveel dagen er passen, en de klok blijft staan. Wie één dag wil, neemt
+  de dagweergave; die is op een telefoon sowieso de bruikbare.
 - **Klaar wanneer:** je van maand naar dag kan en terug zonder de context te
   verliezen, ook op een gsm.
 
-### P2. Zoom en volledig scherm
+### ✅ P2. Zoom en volledig scherm
 **P2 · code**
 
-- **Doen:** de vaste `HOUR_PX = 42` wordt de CSS-variabele `--hour-px` (24–96px),
-  met knoppen, ctrl/⌘+scroll en pinch; onthouden in `localStorage` (in een
-  try/catch, want privémodus gooit). Volledig scherm via `requestFullscreen()`
-  met een `position: fixed`-fallback voor iOS Safari.
+- **Doen:** de vaste `HOUR_PX = 42` wordt een prop van 24 tot 108 pixels per uur,
+  met knoppen en met ctrl/⌘+scroll; onthouden in `localStorage` (in een try/catch,
+  want privémodus gooit). Volledig scherm via `requestFullscreen()` met een
+  `position: fixed`-fallback voor iOS Safari.
+- **Geen pinch-zoom.** Dat is op een telefoon de gebaar voor de paginazoom van de
+  browser; die overnemen breekt iets dat mensen al kennen. De knoppen werken daar
+  even goed. Google Agenda doet het op het web ook niet.
 - **Klaar wanneer:** een drukke week op één scherm past, en een rustige week
   leesbaar groot staat.
 
-### P3. Filters
+### ✅ P3. Filters
 **P2 · code**
 
 - **Doen:** voertuig, chauffeur (met "geen chauffeur"), status, aanvragertype, en
-  schakelaars voor evenementen en beschikbaarheid. URL-parameters plus geheugen,
+  een schakelaar voor de evenementenstrook. (De schakelaar voor de
+  beschikbaarheid komt bij V1, samen met de gegevens die ze toont.) URL-parameters plus geheugen,
   hetzelfde stramien als `app/beheer/kalender/kalender-filters.tsx`. Onder de balk
   staat wát er verborgen is, zodat een lege week niet als "niets gepland" leest.
 - **Mobiel:** de balk klapt samen tot één knop `Filters (3)`.
 
-### P4. Rit openen, aanpassen en aanmaken
+### ✅ P4. Rit openen, aanpassen en aanmaken
 **P1 · code · groter · 🗄️**
 
 - **Doen:**
@@ -182,7 +189,7 @@ en van de mobiele weergave.
 - **Klaar wanneer:** de transportverantwoordelijke een week kan plannen zonder
   het scherm te verlaten, en per ongeluk niets meer kan afronden.
 
-### P5. Evenementen in de planning
+### ✅ P5. Evenementen in de planning
 **P2 · code**
 
 - **Doen:** de logistiek-evenementen die het venster raken staan als balken boven
