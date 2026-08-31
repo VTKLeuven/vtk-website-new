@@ -89,8 +89,8 @@ export function LinkInspector({
             label={nl ? "Foto op de categoriepagina" : "Photo on the category page"}
             helpText={
               nl
-                ? "Deze foto verschijnt op de kaart van dit item. Zonder foto toont de kaart een gestreept patroon."
-                : "This photo appears on this item's card. Without one, the card shows a striped pattern."
+                ? "Deze foto verschijnt op de kaart van dit item. Zonder foto toont de kaart het technische patroon uit de huisstijl."
+                : "This photo appears on this item's card. Without one, the card shows the technical brand pattern."
             }
             srContext={nl ? link.labelNl : link.labelEn}
           />

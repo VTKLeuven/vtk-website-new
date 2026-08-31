@@ -28,8 +28,8 @@ export type CategoryTile = {
   excerptEn: string | null;
   /**
    * Storage-key van de foto op de kaart. Zowel pagina's als vaste routes en
-   * externe links kunnen er een hebben; zonder foto verschijnt het gestreepte
-   * placeholder-patroon.
+   * externe links kunnen er een hebben; zonder foto verschijnt het technische
+   * patroon uit de huisstijl.
    */
   imageKey: string | null;
 };

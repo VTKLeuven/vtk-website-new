@@ -151,8 +151,8 @@ export function PageInspector({
             label={nl ? "Foto op de categoriepagina" : "Photo on the category page"}
             helpText={
               nl
-                ? "Deze foto verschijnt op de kaart van deze pagina. Zonder foto toont de kaart een gestreept patroon."
-                : "This photo appears on this page's card. Without one, the card shows a striped pattern."
+                ? "Deze foto verschijnt op de kaart van deze pagina. Zonder foto toont de kaart het technische patroon uit de huisstijl."
+                : "This photo appears on this page's card. Without one, the card shows the technical brand pattern."
             }
             srContext={page.titleNl}
           />

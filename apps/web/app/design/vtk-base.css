@@ -841,8 +841,8 @@
    foto als vierkant links en de tekst rechts. Bewust geen `.vtk-card-grid` met
    een fotokop erboven: een categorie telt makkelijk tien items, en in een lijst
    valt een pagina zonder foto ook nauwelijks op. Menu-items (piano,
-   uitleendienst) horen hier tussen en hebben nooit een foto; hun thumbnail
-   blijft het gestreepte patroon. */
+   uitleendienst) horen hier tussen en hebben niet altijd een foto; hun thumbnail
+   valt dan terug op het technische patroon uit de huisstijl. */
 .vtk-tile-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(min(420px, 100%), 1fr));
@@ -890,7 +890,7 @@
   min-height: 128px;
   overflow: hidden;
   border-right: 1px solid var(--line);
-  background: repeating-linear-gradient(-45deg, var(--paper-2) 0 8px, var(--paper) 8px 16px);
+  background: var(--paper-2) url("/technisch-pattern-light.png") center / cover no-repeat;
 }
 
 .vtk-tile-media img {
@@ -899,7 +899,7 @@
 
 /* Lichte navy scrim, zoals op de fotokoppen van de aanbod-kaarten. Zwakker dan
    daar: op een thumbnail van 148px maakt een zware scrim de foto enkel modderig.
-   Zonder foto blijft het patroon onaangeroerd. */
+   Zonder foto blijft het technische patroon onaangeroerd. */
 .vtk-tile-media.has-photo::after {
   content: "";
   position: absolute;
