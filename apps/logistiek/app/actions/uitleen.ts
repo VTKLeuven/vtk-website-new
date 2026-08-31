@@ -2,10 +2,15 @@
 
 import { revalidatePath } from 'next/cache';
 import { prisma } from '@vtk/db';
-import { externalRequestsBlocked, requireSession } from '@/lib/session';
+import { canManage, externalRequestsBlocked, requireSession } from '@/lib/session';
 import { getLocale } from '@/lib/i18n';
-import { isEmailish, isOnQuarterHour, parseDateOnly, todayDateOnly } from '@/lib/uitleen';
-import { availabilityForRange, getLogistiekSettings, isDriver } from '@/lib/uitleen-server';
+import { isEmailish, isOnQuarterHour, MAX_HELPERS, parseDateOnly, todayDateOnly } from '@/lib/uitleen';
+import {
+  availabilityForRange,
+  getLogistiekSettings,
+  isDriver,
+  vanBookingForMember,
+} from '@/lib/uitleen-server';
 import {
   buildReservationData,
   parseBrusselsDateTime,
@@ -670,6 +675,22 @@ export async function createVanBookingAction(input: TransportFormInput & {
     select: { id: true },
   });
 
+  // Bijrijders per boeking (V2). `createMany` kan geen geneste rijen schrijven,
+  // en heen en terug krijgen dezelfde rijen: daarna leiden ze hun eigen leven,
+  // want op de terugrit kan iemand anders meerijden.
+  if (built.helpers.length > 0) {
+    await prisma.uitleenTransportHelper.createMany({
+      data: created.flatMap((booking) =>
+        built.helpers.map((helper) => ({
+          transportBookingId: booking.id,
+          name: helper.name,
+          phone: helper.phone,
+          addedById: session.user.id,
+        }))
+      ),
+    });
+  }
+
   // Eén melding per aanvraag en niet per boeking: heen en terug (of twee
   // voertuigen) zijn samen één vraag, en de mail toont ze allebei.
   if (created[0]) await notifyTeamNewRequest('transport', created[0].id);
@@ -1030,4 +1051,98 @@ export async function removeAvailabilityAction(id: string): Promise<ActionResult
   revalidatePath('/ritten/beschikbaarheid');
   revalidatePath('/beheer/vervoer/week');
   return { ok: true, message: 'Venster weggehaald.' };
+}
+
+// ---------------------------------------------------------------------------
+// Bijrijders (V2)
+// ---------------------------------------------------------------------------
+
+/**
+ * Wie er mag rommelen aan de bijrijders van een rit.
+ *
+ * De aanvrager, én een collega van dezelfde post of werkgroep. Dat tweede is de
+ * hele reden dat dit bestaat: iemand van Sport vraagt de rit aan, en de twee die
+ * effectief meerijden zijn pas de dag voordien bekend, vaak bij iemand anders.
+ * `vanBookingForMember` bepaalt al wie de rit mag zíén; dit is dezelfde regel,
+ * maar dan om te schrijven.
+ *
+ * Het team kan het ook, via `logistiek.manage`: de chauffeur belt hen wanneer er
+ * onderweg iets verandert.
+ */
+async function canEditHelpers(
+  session: SessionLike & { user: { id: string } },
+  bookingId: string,
+  isTeam: boolean
+): Promise<boolean> {
+  if (isTeam) return true;
+  const booking = await vanBookingForMember(
+    bookingId,
+    session.user.id,
+    session.groups.map((group) => group.id)
+  );
+  return booking !== null;
+}
+
+export async function addTripHelperAction(
+  bookingId: string,
+  input: { name: string; phone?: string }
+): Promise<ActionResult> {
+  const session = await requireSession();
+
+  const name = input.name.trim();
+  if (!name) return { ok: false, error: 'Vul de naam van de bijrijder in.' };
+
+  if (!(await canEditHelpers(session, bookingId, canManage(session)))) {
+    return { ok: false, error: 'Je kan deze rit niet aanpassen.' };
+  }
+
+  const booking = await prisma.uitleenTransportBooking.findUnique({
+    where: { id: bookingId },
+    select: { status: true, _count: { select: { helpers: true } } },
+  });
+  if (!booking) return { ok: false, error: 'Rit niet gevonden.' };
+  // Een gereden of afgewezen rit is geschiedenis; wie er toen meereed, verandert
+  // achteraf niet meer.
+  if (booking.status !== 'REQUESTED' && booking.status !== 'APPROVED') {
+    return { ok: false, error: 'Deze rit is afgerond of geannuleerd.' };
+  }
+  if (booking._count.helpers >= MAX_HELPERS) {
+    return { ok: false, error: `Er passen er maximaal ${MAX_HELPERS} op een rit.` };
+  }
+
+  await prisma.uitleenTransportHelper.create({
+    data: {
+      transportBookingId: bookingId,
+      name: name.slice(0, 120),
+      phone: input.phone?.trim().slice(0, 60) || null,
+      addedById: session.user.id,
+    },
+  });
+
+  revalidateMember();
+  revalidatePath('/ritten');
+  revalidatePath('/beheer/vervoer');
+  revalidatePath('/beheer/vervoer/week');
+  return { ok: true, message: 'Bijrijder toegevoegd.' };
+}
+
+export async function removeTripHelperAction(helperId: string): Promise<ActionResult> {
+  const session = await requireSession();
+
+  const helper = await prisma.uitleenTransportHelper.findUnique({
+    where: { id: helperId },
+    select: { transportBookingId: true },
+  });
+  if (!helper) return { ok: false, error: 'Deze bijrijder staat er niet (meer).' };
+  if (!(await canEditHelpers(session, helper.transportBookingId, canManage(session)))) {
+    return { ok: false, error: 'Je kan deze rit niet aanpassen.' };
+  }
+
+  await prisma.uitleenTransportHelper.delete({ where: { id: helperId } });
+
+  revalidateMember();
+  revalidatePath('/ritten');
+  revalidatePath('/beheer/vervoer');
+  revalidatePath('/beheer/vervoer/week');
+  return { ok: true, message: 'Bijrijder weggehaald.' };
 }

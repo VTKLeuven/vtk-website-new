@@ -184,6 +184,7 @@ export default async function VervoerWeekPage({
       contactPhone: booking.contactPhone,
       pickupAddress: booking.pickupAddress,
       destination: booking.destination,
+      helpers: booking.helpers,
       helpersNote: booking.helpersNote,
       helpersPhone: booking.helpersPhone,
       memberNote: booking.memberNote,

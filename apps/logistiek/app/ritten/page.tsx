@@ -76,6 +76,19 @@ function TripCard({ trip, locale, past }: { trip: DriverTrip; locale: LogistiekL
             <dd className="font-medium text-vtk-ink">{trip.eventName}</dd>
           </div>
         ) : null}
+        {trip.helpers.length > 0 ? (
+          <div className="sm:col-span-2">
+            <dt className="text-vtk-muted">{en ? 'Passengers' : 'Bijrijders'}</dt>
+            <dd className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-1 font-medium text-vtk-ink">
+              {trip.helpers.map((helper) => (
+                <span key={helper.id} className="inline-flex items-center gap-1.5">
+                  {helper.name}
+                  {helper.phone ? <PhoneLink number={helper.phone} /> : null}
+                </span>
+              ))}
+            </dd>
+          </div>
+        ) : null}
         {trip.helpersNote || trip.helpersPhone ? (
           <div className="sm:col-span-2">
             <dt className="text-vtk-muted">{en ? 'Helpers' : 'Bijrijders'}</dt>

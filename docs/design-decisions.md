@@ -2745,6 +2745,34 @@ enkel `EXTERN` betaalt.
   formulier: wie bij geen enkele groep hoort, vraagt extern aan en ziet de
   waarborg wel.
 
+### Bijrijders zijn rijen met een nummer, en mogen achteraf
+
+Een rit droeg `helpersNote` (vrije tekst) plus één `helpersPhone`. Twee bijrijders
+met elk hun gsm pasten daar niet in, en de chauffeur belde dan de aanvrager om het
+tweede nummer te vragen. Sinds V2 is het een tabel: één rij per persoon, met een
+naam en een optioneel nummer.
+
+- **Achteraf toevoegen mag, en niet alleen door de aanvrager.** Dat is de hele
+  reden dat dit bestaat: iemand van Sport vraagt de rit aan, en wie er effectief
+  meerijdt is pas de dag voordien bekend, vaak bij iemand anders van dezelfde
+  post. Wie de rit mag zien (`vanBookingForMember`: de aanvrager of een collega
+  van dezelfde post of werkgroep), mag de bijrijders wijzigen. Het team ook,
+  want de chauffeur belt hén wanneer er onderweg iets verandert.
+- **Het nummer mag leeg.** Soms weet je wel wie meegaat en nog niet zijn gsm.
+  Half ingevuld is beter dan niets ingevuld: de chauffeur weet dan tenminste op
+  wie hij staat te wachten.
+- **Ze hangen aan de boeking en niet aan de tripgroep.** Heen en terug kunnen
+  andere bijrijders hebben, en dat is net het geval waarin je het wil weten. Bij
+  het aanvragen krijgen beide helften dezelfde rijen; daarna leiden ze hun eigen
+  leven.
+- **De oude velden blijven staan.** De migratie maakt van wat er stond één
+  bijrijder, ook wanneer die tekst "twee helpers van onze werkgroep" is: dat is
+  informatie die de chauffeur onderweg gebruikt, en ze weggooien zou ze
+  verliezen. De kolommen blijven leesbaar voor bestaande ritten; nieuwe
+  bijrijders komen enkel nog in de tabel.
+- **Een gereden of afgewezen rit staat op slot.** Wie er toen meereed, verandert
+  achteraf niet meer.
+
 ### Beschikbaarheid is een hint, geen belofte en geen rooster
 
 Chauffeurs geven op `/ritten/beschikbaarheid` in wanneer ze kunnen rijden; het

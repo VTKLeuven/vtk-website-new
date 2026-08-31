@@ -19,6 +19,7 @@ import type { DriverColorOverrides } from '@/lib/driver-colors';
 import type { TransportFilters } from '@/lib/transport-filters';
 import { AuditTimeline } from '@/components/audit-timeline';
 import { PhoneLink } from '@/components/phone-link';
+import { TripHelpers } from '@/components/trip-helpers';
 import { VanStatusBadge } from '@/components/status-badge';
 import type { UitleenAuditEntry, DriverOption } from '@/lib/uitleen-server';
 import { TransportControls } from '../transport-controls';
@@ -64,6 +65,7 @@ export type PlannerTrip = {
   contactPhone: string | null;
   pickupAddress: string | null;
   destination: string | null;
+  helpers: Array<{ id: string; name: string; phone: string | null }>;
   helpersNote: string | null;
   helpersPhone: string | null;
   memberNote: string | null;
@@ -365,15 +367,9 @@ export function TransportPlanner({
                     </dd>
                   </div>
                 ) : null}
-                {trip.helpersNote ? (
-                  <div>
-                    <dt>Bijrijders</dt>
-                    <dd>{trip.helpersNote}</dd>
-                  </div>
-                ) : null}
                 {trip.helpersPhone ? (
                   <div>
-                    <dt>Bijrijder bellen</dt>
+                    <dt>Bijrijder bellen (oud veld)</dt>
                     <dd>
                       <PhoneLink number={trip.helpersPhone} />
                     </dd>
@@ -418,6 +414,16 @@ export function TransportPlanner({
                   </div>
                 ) : null}
               </dl>
+
+              {/* V2: wie er meerijdt, met een nummer per persoon. Ook hier te
+                  wijzigen: de chauffeur belt het team wanneer er onderweg iets
+                  verandert. */}
+              <TripHelpers
+                bookingId={trip.id}
+                helpers={trip.helpers}
+                legacyNote={trip.helpersNote}
+                canEdit={trip.status === 'REQUESTED' || trip.status === 'APPROVED'}
+              />
 
               <section>
                 <h3 className="text-sm font-semibold text-vtk-ink">Rit aanpassen</h3>

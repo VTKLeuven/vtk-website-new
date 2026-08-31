@@ -427,6 +427,7 @@ async function transportSummary(id: string): Promise<{ title: string; text: stri
       user: { select: { name: true } },
       group: { select: { nameNl: true } },
       vehicle: { select: { nameNl: true } },
+      helpers: { orderBy: { createdAt: 'asc' }, select: { name: true, phone: true } },
     },
   });
   if (!booking) return null;
@@ -453,6 +454,11 @@ async function transportSummary(id: string): Promise<{ title: string; text: stri
         )
         .join('\n'),
       booking.cargoNote ? `Lading: ${booking.cargoNote}` : null,
+      booking.helpers.length > 0
+        ? `Bijrijders: ${booking.helpers
+            .map((helper) => `${helper.name}${helper.phone ? ` (${helper.phone})` : ''}`)
+            .join(', ')}`
+        : null,
       [booking.pickupAddress, booking.destination].some(Boolean)
         ? `Van: ${booking.pickupAddress ?? 'niet ingevuld'}\nNaar: ${booking.destination ?? 'niet ingevuld'}`
         : null,

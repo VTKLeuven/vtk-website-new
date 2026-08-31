@@ -7,6 +7,7 @@ import type { UitleenPricingMode } from '@prisma/client';
 import { createVanBookingAction } from '@/app/actions/uitleen';
 import { formatDateTime, formatEuro, formatPriceCents, transportPriceCents } from '@/lib/uitleen';
 import { useFormDraft } from '@/lib/use-form-draft';
+import { MAX_HELPERS } from '@/lib/uitleen';
 import { EventPicker, type SelectableEvent } from '@/components/event-picker';
 import { QuarterDateTime } from '@/components/quarter-datetime';
 import {
@@ -51,8 +52,14 @@ export function VanRequestForm({
   const [eventName, setEventName] = useState('');
   const [pickupAddress, setPickupAddress] = useState('');
   const [destination, setDestination] = useState('');
-  const [helpersNote, setHelpersNote] = useState('');
-  const [helpersPhone, setHelpersPhone] = useState('');
+  // Eén lege rij om mee te beginnen: een knop "voeg een bijrijder toe" boven een
+  // leeg blok laat mensen denken dat het verplicht is om er eerst een te maken.
+  const [helpers, setHelpers] = useState<Array<{ name: string; phone: string }>>([
+    { name: '', phone: '' },
+  ]);
+  function setHelper(index: number, value: { name: string; phone: string }) {
+    setHelpers((current) => current.map((entry, i) => (i === index ? value : entry)));
+  }
   const [contactPhone, setContactPhone] = useState('');
   const [notifyEmail, setNotifyEmail] = useState('');
   const [roundTrip, setRoundTrip] = useState(false);
@@ -91,8 +98,7 @@ export function VanRequestForm({
       eventName,
       pickupAddress,
       destination,
-      helpersNote,
-      helpersPhone,
+      helpers,
       contactPhone,
       notifyEmail,
       roundTrip,
@@ -108,8 +114,7 @@ export function VanRequestForm({
       eventName,
       pickupAddress,
       destination,
-      helpersNote,
-      helpersPhone,
+      helpers,
       contactPhone,
       notifyEmail,
       roundTrip,
@@ -135,8 +140,9 @@ export function VanRequestForm({
     setEventName(saved.eventName);
     setPickupAddress(saved.pickupAddress);
     setDestination(saved.destination);
-    setHelpersNote(saved.helpersNote);
-    setHelpersPhone(saved.helpersPhone);
+    // Een ouder concept (van vóór V2) draagt geen `helpers`; dan blijft de ene
+    // lege rij staan in plaats van de lijst leeg te maken.
+    if (Array.isArray(saved.helpers)) setHelpers(saved.helpers);
     setContactPhone(saved.contactPhone);
     setNotifyEmail(saved.notifyEmail);
     setRoundTrip(saved.roundTrip);
@@ -241,8 +247,7 @@ export function VanRequestForm({
         eventName,
         pickupAddress,
         destination,
-        helpersNote,
-        helpersPhone,
+        helpers,
         contactPhone,
         notifyEmail,
         groupId: groupId || null,
@@ -493,30 +498,49 @@ export function VanRequestForm({
           <span className="font-medium text-vtk-ink">{en ? 'Destination (optional)' : 'Bestemming (optioneel)'}</span>
           <input type="text" value={destination} onChange={(e) => setDestination(e.target.value)} className={inputClass} />
         </label>
-        <label className="grid gap-1 text-sm">
-          <span className="font-medium text-vtk-ink">
+        {/* V2: één rij per bijrijder, met een eigen nummer. Twee bijrijders met
+            elk hun gsm pasten niet in de twee losse velden die hier stonden, en
+            de chauffeur belde dan de aanvrager om het tweede nummer te vragen.
+            Ze mogen ook later nog: bij de rit staat dezelfde lijst. */}
+        <fieldset className="grid gap-2 text-sm sm:col-span-2">
+          <legend className="font-medium text-vtk-ink">
             {en ? 'Co-drivers you provide (optional)' : 'Bijrijders die je voorziet (optioneel)'}
-          </span>
-          <input
-            type="text"
-            value={helpersNote}
-            onChange={(e) => setHelpersNote(e.target.value)}
-            placeholder={en ? 'E.g. two helpers from our team' : 'Bv. twee helpers van onze werkgroep'}
-            className={inputClass}
-          />
-        </label>
-        <label className="grid gap-1 text-sm">
-          <span className="font-medium text-vtk-ink">
-            {en ? 'Co-driver phone (optional)' : 'Telefoon bijrijder (optioneel)'}
-          </span>
-          <input
-            type="tel"
-            value={helpersPhone}
-            onChange={(e) => setHelpersPhone(e.target.value)}
-            placeholder="+32 4.."
-            className={inputClass}
-          />
-        </label>
+          </legend>
+          <p className="text-xs text-vtk-muted">
+            {en
+              ? 'You can add or change them later, on the trip itself; a colleague from your post can too.'
+              : 'Je kan ze later nog toevoegen of wijzigen bij de rit zelf; een collega van je post kan dat ook.'}
+          </p>
+          {helpers.map((helper, index) => (
+            <div key={index} className="grid gap-2 sm:grid-cols-2">
+              <input
+                type="text"
+                value={helper.name}
+                onChange={(e) => setHelper(index, { ...helper, name: e.target.value })}
+                placeholder={en ? `Name ${index + 1}` : `Naam ${index + 1}`}
+                aria-label={en ? `Co-driver ${index + 1}: name` : `Bijrijder ${index + 1}: naam`}
+                className={inputClass}
+              />
+              <input
+                type="tel"
+                value={helper.phone}
+                onChange={(e) => setHelper(index, { ...helper, phone: e.target.value })}
+                placeholder="+32 4.."
+                aria-label={en ? `Co-driver ${index + 1}: phone` : `Bijrijder ${index + 1}: telefoon`}
+                className={inputClass}
+              />
+            </div>
+          ))}
+          {helpers.length < MAX_HELPERS ? (
+            <button
+              type="button"
+              onClick={() => setHelpers([...helpers, { name: '', phone: '' }])}
+              className="justify-self-start text-sm font-semibold text-vtk-navy underline decoration-vtk-yellow underline-offset-4"
+            >
+              {en ? '+ Another co-driver' : '+ Nog een bijrijder'}
+            </button>
+          ) : null}
+        </fieldset>
         <label className="grid gap-1 text-sm sm:col-span-2">
           <span className="font-medium text-vtk-ink">
             {en ? 'Your phone number' : 'Jouw telefoonnummer'}

@@ -21,6 +21,16 @@ export type NotifyKind = (typeof NOTIFY_KINDS)[number];
 
 export type LogistiekNotifyEmails = Record<NotifyKind, string[]>;
 
+/**
+ * Hoeveel bijrijders er op een rit passen (V2). Een grens tegen tikfouten en
+ * tegen een formulier dat oneindig groeit, geen beleid: in de kar passen er twee
+ * naast de chauffeur, en wie er meer meeneemt, schrijft dat in de nota.
+ *
+ * Hier en niet in `lib/transport-form.ts`: dat bestand is `server-only`, en het
+ * aanvraagformulier is een client-component. Zie de comment bij `NOTIFY_KINDS`.
+ */
+export const MAX_HELPERS = 4;
+
 export function formatEuro(cents: number): string {
   const euros = Math.floor(Math.abs(cents) / 100);
   const rest = Math.abs(cents) % 100;

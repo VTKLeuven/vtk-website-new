@@ -21,6 +21,7 @@ import {
   type AdminTransportBooking,
 } from '@/lib/uitleen-server';
 import { ScrollToRit } from '@/components/scroll-to-rit';
+import { TripHelpers } from '@/components/trip-helpers';
 import { BookingRow } from './booking-row';
 import { TransportControls } from './transport-controls';
 import { TransportDecisionForms } from './transport-decision-forms';
@@ -179,9 +180,20 @@ export default async function BeheerVervoerPage({
     if (booking.contactPhone) {
       lines.push(['Aanvrager bellen', <PhoneLink key="contact" number={booking.contactPhone} />]);
     }
-    if (booking.helpersNote) lines.push(['Bijrijders', booking.helpersNote]);
+    // V2: bijrijders staan als eigen rijen, met een nummer per persoon. De oude
+    // vrije tekst blijft leesbaar zolang ze op een rit staat.
+    lines.push([
+      'Bijrijders',
+      <TripHelpers
+        key="helpers"
+        bookingId={booking.id}
+        helpers={booking.helpers}
+        legacyNote={booking.helpersNote}
+        canEdit={booking.status === 'REQUESTED' || booking.status === 'APPROVED'}
+      />,
+    ]);
     if (booking.helpersPhone) {
-      lines.push(['Bijrijder bellen', <PhoneLink key="helpers" number={booking.helpersPhone} />]);
+      lines.push(['Bijrijder bellen', <PhoneLink key="helpersphone" number={booking.helpersPhone} />]);
     }
     if (booking.memberNote) lines.push(['Nota van het lid', booking.memberNote]);
     if (booking.adminNote) lines.push(['Nota van Logistiek', booking.adminNote]);

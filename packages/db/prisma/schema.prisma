@@ -681,6 +681,7 @@ model User {
   uitleenDriver           UitleenDriver?            @relation("UitleenDriverUser")
   uitleenFeedTokens       UitleenFeedToken[]        @relation("UitleenFeedTokenUser")
   uitleenAvailability     UitleenDriverAvailability[] @relation("UitleenDriverAvailabilityUser")
+  uitleenHelpersAdded     UitleenTransportHelper[]  @relation("UitleenTransportHelperAddedBy")
   uitleenDriversAdded     UitleenDriver[]           @relation("UitleenDriverAddedBy")
   uitleenAuditLogs        UitleenAuditLog[]         @relation("UitleenAuditActor")
 
@@ -3269,8 +3270,11 @@ model UitleenTransportBooking {
   cargoNote     String?
   pickupAddress String?
   destination   String?
-  helpersNote   String? // bijrijders die de aanvrager zelf voorziet
-  helpersPhone  String? // nummer van de bijrijder, voor de chauffeur onderweg
+  /// Vrije tekst over de bijrijders, van vóór V2. Blijft staan voor de historiek
+  /// van bestaande ritten; nieuwe bijrijders komen in `UitleenTransportHelper`,
+  /// waar er meer dan één met elk zijn eigen nummer in past.
+  helpersNote   String?
+  helpersPhone  String?
   contactPhone  String? // nummer van de aanvrager zelf, zoals UitleenReservation dat heeft
 
   // Heen- en terugrit horen bij elkaar maar zijn twee boekingen: de kar is
@@ -3322,6 +3326,7 @@ model UitleenTransportBooking {
 
   payments  UitleenPayment[]
   auditLogs UitleenAuditLog[]
+  helpers   UitleenTransportHelper[]
 
   @@index([userId])
   @@index([status, startAt])
@@ -3375,6 +3380,36 @@ model UitleenFeedToken {
   user User @relation("UitleenFeedTokenUser", fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId, revokedAt])
+}
+
+/// Iemand die meerijdt op een rit: een naam en een nummer.
+///
+/// Verving `helpersNote` + `helpersPhone` op de rit zelf (V2). Die twee velden
+/// droegen één vrije tekst en één nummer, en twee bijrijders met elk hun eigen
+/// gsm pasten daar niet in; de chauffeur belde dan de aanvrager om het nummer
+/// van de tweede te vragen.
+///
+/// Hangt aan de **boeking** en niet aan de tripgroep: heen en terug kunnen
+/// andere bijrijders hebben, en dat is precies het geval waarin je het wil weten.
+/// Bij het aanvragen van een heen-en-terugrit krijgen beide helften dezelfde
+/// rijen; daarna leiden ze hun eigen leven.
+model UitleenTransportHelper {
+  id                 String @id @default(cuid())
+  transportBookingId String
+
+  name  String
+  /// Optioneel: soms weet de aanvrager enkel wie er meegaat, nog niet zijn nummer.
+  phone String?
+
+  /// Wie deze bijrijder toevoegde. Kan de aanvrager zijn, een collega van
+  /// dezelfde post, of iemand van het team.
+  addedById String?
+  createdAt DateTime @default(now())
+
+  booking UitleenTransportBooking @relation(fields: [transportBookingId], references: [id], onDelete: Cascade)
+  addedBy User?                   @relation("UitleenTransportHelperAddedBy", fields: [addedById], references: [id], onDelete: SetNull)
+
+  @@index([transportBookingId])
 }
 
 /// Spiegel van TicketPayment (zonder refunds): provider is een vrije string

@@ -688,6 +688,7 @@ export async function vanBookingForMember(id: string, userId: string, groupIds: 
       driver: { select: { name: true } },
       vehicle: { select: { nameNl: true, nameEn: true } },
       user: { select: { id: true, name: true } },
+      helpers: { orderBy: { createdAt: 'asc' }, select: { id: true, name: true, phone: true } },
     },
   });
 }
@@ -1009,6 +1010,7 @@ export async function adminVanBookings() {
       // De materiaalaanvraag waarvan dit de levering is, zodat de chauffeur ziet
       // wat er mee moet en het team van hieruit naar die aanvraag kan.
       reservation: { select: { id: true, eventName: true } },
+      helpers: { orderBy: { createdAt: 'asc' }, select: { id: true, name: true, phone: true } },
     },
     take: 200,
   });
@@ -1157,6 +1159,7 @@ export async function transportRange(from: Date, to: Date, filters?: TransportFi
       destination: true,
       helpersNote: true,
       helpersPhone: true,
+      helpers: { orderBy: { createdAt: 'asc' as const }, select: { id: true, name: true, phone: true } },
       memberNote: true,
       adminNote: true,
       notifyEmail: true,
@@ -1571,6 +1574,9 @@ export async function tripsForDriver(driverId: string) {
       user: { select: { name: true, email: true } },
       vehicle: { select: { nameNl: true, nameEn: true } },
       group: { select: { nameNl: true, nameEn: true } },
+      // V2: wie er meerijdt en op welk nummer. Dat is precies wat een chauffeur
+      // onderweg nodig heeft.
+      helpers: { orderBy: { createdAt: 'asc' }, select: { id: true, name: true, phone: true } },
     },
   });
 }

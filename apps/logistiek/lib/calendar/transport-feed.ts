@@ -66,6 +66,7 @@ export async function buildTransportFeed(
       contactPhone: true,
       helpersNote: true,
       helpersPhone: true,
+      helpers: { orderBy: { createdAt: 'asc' as const }, select: { name: true, phone: true } },
       requesterType: true,
       requesterName: true,
       user: { select: { name: true } },
@@ -89,6 +90,11 @@ export async function buildTransportFeed(
       booking.cargoNote ? `Lading: ${booking.cargoNote}` : null,
       `Aanvrager: ${requesterLabel(booking)} (${booking.user.name})`,
       booking.contactPhone ? `Aanvrager bellen: ${booking.contactPhone}` : null,
+      booking.helpers.length > 0
+        ? `Bijrijders: ${booking.helpers
+            .map((helper) => `${helper.name}${helper.phone ? ` (${helper.phone})` : ''}`)
+            .join(', ')}`
+        : null,
       booking.helpersNote ? `Bijrijders: ${booking.helpersNote}` : null,
       booking.helpersPhone ? `Bijrijder bellen: ${booking.helpersPhone}` : null,
       booking.driver ? `Chauffeur: ${booking.driver.name}` : 'Nog geen chauffeur',
