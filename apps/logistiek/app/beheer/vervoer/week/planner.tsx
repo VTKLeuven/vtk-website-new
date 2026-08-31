@@ -3,23 +3,28 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import {
-  TransportWeekGrid,
-  type WeekBlock,
-  type WeekVehicle,
-} from '@/components/transport-week-grid';
+  CalendarNav,
+  TransportCalendar,
+} from '@/components/transport-calendar/transport-calendar';
+import type { CalendarVehicle, TripBlock } from '@/components/transport-calendar/types';
+import type { CalendarView } from '@/lib/calendar-range';
+import type { DriverColorOverrides } from '@/lib/driver-colors';
 import { TransportControls } from '../transport-controls';
 import { TransportDecisionForms, type DecisionLeg } from '../transport-decision-forms';
-import type { DriverColorOverrides } from '@/lib/driver-colors';
 import type { DriverOption } from '@/lib/uitleen-server';
 import type { UitleenPricingMode, UitleenRequesterType } from '@prisma/client';
 
 /**
- * De transportplanning waarop de verantwoordelijke werkt (T7).
+ * De transportplanning waarop de verantwoordelijke werkt (T7, P1).
  *
  * Klikken op een rit opent een venster met de feiten en de knoppen die erbij
- * horen: goedkeuren of afwijzen zolang ze te beslissen is, daarna de chauffeur,
- * het voertuig en het afronden. Zonder dat venster was elke ingreep een
- * navigatie naar de lijst, zoeken, terugkeren, en het overzicht kwijt.
+ * horen: goedkeuren of afwijzen zolang ze te beslissen is, daarna de chauffeur en
+ * het voertuig. Zonder dat venster was elke ingreep een navigatie naar de lijst,
+ * zoeken, terugkeren, en het overzicht kwijt.
+ *
+ * De weergave (dag, week, maand) en de datum staan in de URL; dit component
+ * bewaart enkel welke rit openstaat, want dat is geen plek in de kalender maar
+ * een venster erboven.
  */
 export type PlannerTrip = {
   id: string;
@@ -46,7 +51,9 @@ export type PlannerTrip = {
   sameDayBookings: string[];
 };
 
-export function TransportWeekPlanner({
+export function TransportPlanner({
+  view,
+  anchor,
   days,
   vehicles,
   blocks,
@@ -54,15 +61,24 @@ export function TransportWeekPlanner({
   drivers,
   vehicleOptions,
   driverColors,
+  nav,
 }: {
+  view: CalendarView;
+  anchor: string;
   days: string[];
-  vehicles: WeekVehicle[];
-  blocks: WeekBlock[];
+  vehicles: CalendarVehicle[];
+  blocks: TripBlock[];
   trips: PlannerTrip[];
   drivers: DriverOption[];
   vehicleOptions: Array<{ id: string; name: string; needsVanDriver: boolean }>;
-  /** Kleuren die het team zelf zette (K1). */
   driverColors?: DriverColorOverrides;
+  nav: {
+    previousHref: string;
+    nextHref: string;
+    todayHref: string;
+    isToday: boolean;
+    label: string;
+  };
 }) {
   const [openId, setOpenId] = useState<string | null>(null);
   const trip = trips.find((entry) => entry.id === openId) ?? null;
@@ -78,14 +94,32 @@ export function TransportWeekPlanner({
 
   return (
     <>
-      <TransportWeekGrid
+      <TransportCalendar
+        view={view}
+        anchor={anchor}
         days={days}
         vehicles={vehicles}
         blocks={blocks}
-        onSelect={setOpenId}
-        emptyLabel="Geen ritten deze week."
         driverColors={driverColors}
-      />
+        selectedId={openId}
+        onSelect={setOpenId}
+        emptyLabel={
+          view === 'dag'
+            ? 'Geen ritten op deze dag.'
+            : view === 'maand'
+              ? 'Geen ritten deze maand.'
+              : 'Geen ritten deze week.'
+        }
+        toolbarExtra={<CalendarNav {...nav} />}
+      >
+        <p className="text-xs text-vtk-muted">
+          De vulkleur is de chauffeur, de arcering is het voertuig; een rit zonder chauffeur is geel
+          met een rode streepjesrand. Kleuren stel je in bij Chauffeurs, arceringen bij
+          Instellingen. Gestreept = nog te beslissen, doorzichtig = afgerond, volle rode rand = twee
+          goedgekeurde ritten met hetzelfde voertuig op hetzelfde moment. Klik een rit aan om ze te
+          beslissen of aan te passen.
+        </p>
+      </TransportCalendar>
 
       {trip ? (
         <div
@@ -174,7 +208,10 @@ export function TransportWeekPlanner({
             </div>
 
             <p className="mt-4 text-xs text-vtk-muted">
-              <Link href="/beheer/vervoer" className="underline underline-offset-2">
+              <Link
+                href={`/beheer/vervoer?rit=${trip.id}`}
+                className="underline underline-offset-2"
+              >
                 Alles over deze rit in de lijst
               </Link>
             </p>

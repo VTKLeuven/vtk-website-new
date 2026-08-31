@@ -1,7 +1,8 @@
 import Link from 'next/link';
 import type { Metadata } from 'next';
 import { PageShell } from '@/components/page-shell';
-import { TransportWeekGrid, type WeekBlock } from '@/components/transport-week-grid';
+import { PublicWeek } from './public-week';
+import type { TripBlock } from '@/components/transport-calendar/types';
 import { getLocale } from '@/lib/i18n';
 import { getSession } from '@/lib/session';
 import {
@@ -67,7 +68,7 @@ export default async function VervoerBezettingPage({
   const previousHref = `/vervoer/bezetting?week=${toDateInputValue(new Date(monday.getTime() - 7 * DAY_MS))}`;
   const nextHref = `/vervoer/bezetting?week=${toDateInputValue(nextMonday)}`;
 
-  const blocks: WeekBlock[] =
+  const blocks: TripBlock[] =
     memberBookings?.map((booking) => ({
       id: booking.id,
       vehicleId: booking.vehicleId,
@@ -159,7 +160,7 @@ export default async function VervoerBezettingPage({
         </p>
       ) : (
         <div className="mt-5 grid gap-5">
-          <TransportWeekGrid
+          <PublicWeek
             days={days}
             vehicles={vehicles.map((vehicle) => ({
               id: vehicle.id,

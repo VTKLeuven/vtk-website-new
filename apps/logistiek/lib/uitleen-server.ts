@@ -1,7 +1,7 @@
 import 'server-only';
 
 import { prisma } from '@vtk/db';
-import type { Prisma } from '@prisma/client';
+import type { Prisma, UitleenTransportBookingStatus } from '@prisma/client';
 import { currentWorkingYear } from '@vtk/auth';
 import { DEFAULT_LAST_MINUTE_DAYS, STOCK_CONSUMING_STATUSES } from './uitleen';
 
@@ -996,11 +996,29 @@ export type AdminTransportBooking = Awaited<ReturnType<typeof adminVanBookings>>
  * `REQUESTED` komt mee, want het weekraster dient net om te zien waar een
  * nieuwe aanvraag nog past; het beheer toont ze in een lichtere stijl.
  */
+/**
+ * Statussen die op een bezettingsoverzicht horen: wat het voertuig bezet houdt.
+ * Afgewezen en geannuleerd vallen weg, want die ritten gaan niet door.
+ */
+const OCCUPYING_STATUSES: UitleenTransportBookingStatus[] = ['REQUESTED', 'APPROVED'];
+
+/**
+ * Wat de transportplanning toont: hetzelfde, plus de afgeronde ritten.
+ *
+ * Die laatste horen erbij omdat de planning ook naar gisteren kijkt ("wie heeft
+ * die rit gedaan?"), en omdat de kalender ze al lichter tekende terwijl de query
+ * ze nooit meebracht: de legende beloofde "doorzichtig = afgerond" en er stond
+ * nooit iets doorzichtigs. Op het publieke overzicht blijven ze weg: daar is de
+ * vraag "wanneer is de kar vrij", en een gereden rit maakt niets bezet.
+ */
+const PLANNING_STATUSES: UitleenTransportBookingStatus[] = [...OCCUPYING_STATUSES, 'COMPLETED'];
+
 const transportWindowWhere = (
   from: Date,
-  to: Date
+  to: Date,
+  statuses: UitleenTransportBookingStatus[] = OCCUPYING_STATUSES
 ): Prisma.UitleenTransportBookingWhereInput => ({
-  status: { in: ['REQUESTED', 'APPROVED'] },
+  status: { in: statuses },
   startAt: { lt: to },
   endAt: { gt: from },
 });
@@ -1011,9 +1029,9 @@ const transportWindowWhere = (
  * Meer velden dan het oude raster nodig had: sinds er vanuit dit scherm beslist
  * en aangepast wordt, moet het venster dezelfde gegevens hebben als de lijst.
  */
-export async function transportWeek(from: Date, to: Date) {
+export async function transportRange(from: Date, to: Date) {
   return prisma.uitleenTransportBooking.findMany({
-    where: transportWindowWhere(from, to),
+    where: transportWindowWhere(from, to, PLANNING_STATUSES),
     select: {
       id: true,
       vehicleId: true,
@@ -1041,12 +1059,12 @@ export async function transportWeek(from: Date, to: Date) {
   });
 }
 
-export type TransportWeekBooking = Awaited<ReturnType<typeof transportWeek>>[number];
+export type TransportBooking = Awaited<ReturnType<typeof transportRange>>[number];
 
 /**
  * Zelfde venster, maar enkel wanneer welk voertuig bezet is: geen namen, doelen,
  * adressen of chauffeurs. Bewust een eigen `select` en geen filter over
- * `transportWeek`: een projectie achteraf laat vroeg of laat een veld door
+ * `transportRange`: een projectie achteraf laat vroeg of laat een veld door
  * wanneer iemand hierboven een relatie toevoegt. Voor het publieke overzicht
  * (zie docs/logistiek-feedback-plan.md, V13).
  */

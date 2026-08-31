@@ -56,8 +56,13 @@ function brusselsOffsetMs(at: Date): number {
  *
  * Twee passages, want de eerste gok kan net aan de andere kant van een
  * zomeruurwissel vallen.
+ *
+ * Geëxporteerd omdat `lib/month-lanes.ts` dezelfde dagrand moet gebruiken: twee
+ * eigen berekeningen zouden dag- en maandweergave op verschillende momenten
+ * laten knippen, en dan staat dezelfde rit in de ene weergave op zaterdag en in
+ * de andere op zondag.
  */
-function startOfBrusselsDay(dayAsUtcMidnight: Date): number {
+export function startOfBrusselsDay(dayAsUtcMidnight: Date): number {
   const target = dayAsUtcMidnight.getTime();
   const first = target - brusselsOffsetMs(new Date(target));
   return target - brusselsOffsetMs(new Date(first));

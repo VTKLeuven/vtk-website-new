@@ -1,22 +1,30 @@
 import Link from 'next/link';
 import { requireManage } from '@/lib/session';
 import {
+  formatDateOnly,
   formatDateRange,
   isoWeekNumber,
   parseDateOnly,
   requesterLabel,
-  startOfWeek,
   toDateInputValue,
+  todayDateOnly,
 } from '@/lib/uitleen';
+import {
+  calendarRange,
+  isCurrentPeriod,
+  parseCalendarView,
+  shiftAnchor,
+  type CalendarView,
+} from '@/lib/calendar-range';
 import {
   activeVehicles,
   driverColorOverrides,
   driverOptions,
-  transportWeek,
-  type TransportWeekBooking,
+  transportRange,
+  type TransportBooking,
 } from '@/lib/uitleen-server';
-import { TransportWeekPlanner, type PlannerTrip } from './week-planner';
-import type { WeekBlock } from '@/components/transport-week-grid';
+import { TransportPlanner, type PlannerTrip } from './planner';
+import type { TripBlock } from '@/components/transport-calendar/types';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -26,12 +34,18 @@ const timeFormatter = new Intl.DateTimeFormat('nl-BE', {
   minute: '2-digit',
 });
 
+const monthFormatter = new Intl.DateTimeFormat('nl-BE', {
+  timeZone: 'UTC',
+  month: 'long',
+  year: 'numeric',
+});
+
 /**
  * Goedgekeurde ritten van hetzelfde voertuig die elkaar overlappen. Dat hoort
  * niet te kunnen (de goedkeuring checkt het), maar een voertuigwissel of een
  * handmatige ingreep kan het alsnog veroorzaken, en dan wil je het zien.
  */
-function conflictingIds(bookings: TransportWeekBooking[]): Set<string> {
+function conflictingIds(bookings: TransportBooking[]): Set<string> {
   const conflicts = new Set<string>();
   const approved = bookings.filter((booking) => booking.status === 'APPROVED');
   for (let i = 0; i < approved.length; i++) {
@@ -48,34 +62,40 @@ function conflictingIds(bookings: TransportWeekBooking[]): Set<string> {
   return conflicts;
 }
 
+/** De kop boven de kalender: "Week 36", "september 2026" of de dag zelf. */
+function periodTitle(view: CalendarView, anchor: Date): string {
+  if (view === 'dag') return formatDateOnly(anchor);
+  if (view === 'maand') return monthFormatter.format(anchor);
+  return `Week ${isoWeekNumber(anchor)}`;
+}
+
 export default async function VervoerWeekPage({
   searchParams,
 }: {
-  searchParams: Promise<{ week?: string }>;
+  searchParams: Promise<{ weergave?: string; datum?: string; week?: string }>;
 }) {
   await requireManage();
-  const { week } = await searchParams;
+  const { weergave, datum, week } = await searchParams;
 
-  const monday = startOfWeek((week && parseDateOnly(week)) || new Date());
-  const nextMonday = new Date(monday.getTime() + 7 * DAY_MS);
-  const days = Array.from({ length: 7 }, (_, index) =>
-    new Date(monday.getTime() + index * DAY_MS).toISOString()
-  );
+  const view = parseCalendarView(weergave);
+  // `?week=` is de oude parameter van het weekoverzicht; links en bladwijzers uit
+  // die tijd blijven werken in plaats van op deze week uit te komen.
+  const anchor = (datum && parseDateOnly(datum)) || (week && parseDateOnly(week)) || todayDateOnly();
+  const { days, from, to } = calendarRange(view, anchor);
 
   const [bookings, vehicles, drivers, driverColors] = await Promise.all([
-    transportWeek(monday, nextMonday),
+    transportRange(from, to),
     activeVehicles(),
     driverOptions(),
     driverColorOverrides(),
   ]);
 
   const conflicts = conflictingIds(bookings);
-  const thisWeek = startOfWeek(new Date());
 
-  const previousHref = `/beheer/vervoer/week?week=${toDateInputValue(new Date(monday.getTime() - 7 * DAY_MS))}`;
-  const nextHref = `/beheer/vervoer/week?week=${toDateInputValue(nextMonday)}`;
+  const hrefFor = (target: Date) =>
+    `/beheer/vervoer/week?weergave=${view}&datum=${toDateInputValue(target)}`;
 
-  const blocks: WeekBlock[] = bookings.map((booking) => ({
+  const blocks: TripBlock[] = bookings.map((booking) => ({
     id: booking.id,
     vehicleId: booking.vehicleId,
     startAt: booking.startAt.toISOString(),
@@ -161,39 +181,18 @@ export default async function VervoerWeekPage({
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h2 className="text-lg font-semibold tracking-tight text-vtk-ink">
-            Week {isoWeekNumber(monday)}
+            {periodTitle(view, anchor)}
           </h2>
           <p className="text-sm text-vtk-muted">
-            {formatDateRange(monday, new Date(nextMonday.getTime() - DAY_MS))}
+            {view === 'dag'
+              ? `${bookings.length} ${bookings.length === 1 ? 'rit' : 'ritten'}`
+              : formatDateRange(days[0], new Date(to.getTime() - DAY_MS))}
           </p>
         </div>
-        <nav className="flex flex-wrap items-center gap-2 text-sm" aria-label="Week kiezen">
-          <Link
-            href={previousHref}
-            className="rounded-full border border-vtk-navy/15 px-3 py-1.5 font-medium text-vtk-ink transition hover:border-vtk-navy/40"
-          >
-            ← Vorige
-          </Link>
-          <Link
-            href="/beheer/vervoer/week"
-            aria-current={monday.getTime() === thisWeek.getTime() ? 'true' : undefined}
-            className={
-              monday.getTime() === thisWeek.getTime()
-                ? 'rounded-full border border-vtk-navy bg-vtk-navy px-3 py-1.5 font-semibold text-white'
-                : 'rounded-full border border-vtk-navy/15 px-3 py-1.5 font-medium text-vtk-ink transition hover:border-vtk-navy/40'
-            }
-          >
-            Deze week
-          </Link>
-          <Link
-            href={nextHref}
-            className="rounded-full border border-vtk-navy/15 px-3 py-1.5 font-medium text-vtk-ink transition hover:border-vtk-navy/40"
-          >
-            Volgende →
-          </Link>
+        <div className="flex flex-wrap items-center gap-3 text-sm">
           <Link
             href="/beheer/vervoer"
-            className="ml-2 font-semibold text-vtk-navy underline decoration-vtk-yellow underline-offset-4"
+            className="font-semibold text-vtk-navy underline decoration-vtk-yellow underline-offset-4"
           >
             Lijst
           </Link>
@@ -203,41 +202,42 @@ export default async function VervoerWeekPage({
           >
             Publieke bezetting
           </Link>
-        </nav>
+        </div>
       </div>
 
       {vehicles.length === 0 ? (
         <p className="text-sm text-vtk-muted">Er staan nog geen voertuigen in de instellingen.</p>
       ) : (
-        <>
-          <TransportWeekPlanner
-            days={days}
-            vehicles={vehicles.map((vehicle) => ({
-              id: vehicle.id,
-              name: vehicle.nameNl,
-              code: vehicle.code,
-              pattern: vehicle.pattern,
-              needsDriver: vehicle.needsDriver,
-            }))}
-            blocks={blocks}
-            trips={trips}
-            drivers={drivers}
-            driverColors={driverColors}
-            vehicleOptions={vehicles.map((vehicle) => ({
+        <TransportPlanner
+          view={view}
+          anchor={anchor.toISOString()}
+          days={days.map((day) => day.toISOString())}
+          vehicles={vehicles.map((vehicle) => ({
+            id: vehicle.id,
+            name: vehicle.nameNl,
+            code: vehicle.code,
+            pattern: vehicle.pattern,
+            needsDriver: vehicle.needsDriver,
+          }))}
+          blocks={blocks}
+          trips={trips}
+          drivers={drivers}
+          driverColors={driverColors}
+          vehicleOptions={vehicles
+            .filter((vehicle) => vehicle.active)
+            .map((vehicle) => ({
               id: vehicle.id,
               name: vehicle.nameNl,
               needsVanDriver: vehicle.needsVanDriver,
             }))}
-          />
-
-          <p className="text-xs text-vtk-muted">
-            De vulkleur is de chauffeur, de arcering is het voertuig; een rit zonder chauffeur is
-            geel met een rode streepjesrand. Kleuren stel je in bij Chauffeurs, arceringen bij
-            Instellingen. Gestreept = nog te beslissen, doorzichtig = afgerond, volle rode rand =
-            twee goedgekeurde ritten met hetzelfde voertuig op hetzelfde moment. Klik een rit aan
-            om ze te beslissen of aan te passen.
-          </p>
-        </>
+          nav={{
+            previousHref: hrefFor(shiftAnchor(view, anchor, -1)),
+            nextHref: hrefFor(shiftAnchor(view, anchor, 1)),
+            todayHref: hrefFor(todayDateOnly()),
+            isToday: isCurrentPeriod(view, anchor),
+            label: view,
+          }}
+        />
       )}
     </div>
   );
