@@ -111,11 +111,42 @@ export function PageInspector({
           </div>
         </div>
 
-        <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
-          <label className="inline-flex items-center gap-2 text-sm">
-            <input type="checkbox" name="visibleInHeader" defaultChecked={page.visibleInHeader} />
-            {nl ? "Tonen in overzicht" : "Show in overview"}
+        <div className="grid gap-3 sm:grid-cols-2">
+          <label className="flex items-start gap-2 text-sm">
+            <input
+              type="checkbox"
+              name="visibleOnCategoryPage"
+              defaultChecked={page.visibleOnCategoryPage}
+              className="mt-0.5"
+            />
+            <span>
+              <span className="font-medium text-vtk-ink">
+                {nl ? "Tonen op categoriepagina" : "Show on category page"}
+              </span>
+              <span className="block text-xs text-[#5c667f]">
+                {nl ? "Als kaart op de overzichtspagina." : "As a card on the category overview."}
+              </span>
+            </span>
           </label>
+          <label className="flex items-start gap-2 text-sm">
+            <input
+              type="checkbox"
+              name="visibleInHeader"
+              defaultChecked={page.visibleInHeader}
+              className="mt-0.5"
+            />
+            <span>
+              <span className="font-medium text-vtk-ink">
+                {nl ? "Tonen in dropdown" : "Show in dropdown"}
+              </span>
+              <span className="block text-xs text-[#5c667f]">
+                {nl ? "In het menu bij hover over de categorie." : "In the menu when hovering over the category."}
+              </span>
+            </span>
+          </label>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
           <label className="inline-flex items-center gap-2 text-sm">
             <input type="checkbox" name="published" defaultChecked={page.published} />
             {nl ? "Gepubliceerd" : "Published"}
@@ -149,6 +180,9 @@ export function PageInspector({
             defaultKey={page.imageKey}
             locale={locale}
             label={nl ? "Foto op de categoriepagina" : "Photo on the category page"}
+            fallbackUrl="/technisch-pattern-light.png"
+            fallbackPosition="left"
+            emptyHint={nl ? "Technisch patroon" : "Technical pattern"}
             helpText={
               nl
                 ? "Deze foto verschijnt op de kaart van deze pagina. Zonder foto toont de kaart het technische patroon uit de huisstijl."

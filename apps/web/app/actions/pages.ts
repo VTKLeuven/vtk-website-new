@@ -60,7 +60,8 @@ function isUniqueViolation(err: unknown, field: string): boolean {
 const PAGE_FIELD_LABELS: Record<string, string> = {
   slug: 'slug',
   headerTabId: 'categorie',
-  visibleInHeader: 'zichtbaar in het menu',
+  visibleInHeader: 'zichtbaar in de dropdown',
+  visibleOnCategoryPage: 'zichtbaar op de categoriepagina',
   titleNl: 'titel',
   titleEn: 'Engelse titel',
   excerptNl: 'samenvatting',
@@ -81,6 +82,7 @@ const saveSchema = z.object({
   slug: z.string().min(1).regex(SLUG_REGEX),
   headerTabId: z.string().optional().nullable(),
   visibleInHeader: z.coerce.boolean().optional().default(true),
+  visibleOnCategoryPage: z.coerce.boolean().optional().default(true),
   titleNl: z.string().min(1),
   titleEn: z.string().optional().nullable(),
   excerptNl: z.string().optional().nullable(),
@@ -118,6 +120,7 @@ export async function savePageAction(_prev: SaveState, formData: FormData): Prom
     slug: formData.get('slug'),
     headerTabId: formData.get('headerTabId') || null,
     visibleInHeader: formData.get('visibleInHeader') === 'on',
+    visibleOnCategoryPage: formData.get('visibleOnCategoryPage') === 'on',
     titleNl: formData.get('titleNl'),
     titleEn: formData.get('titleEn') || null,
     excerptNl: formData.get('excerptNl') || null,
@@ -140,6 +143,7 @@ export async function savePageAction(_prev: SaveState, formData: FormData): Prom
       slug: true,
       headerTabId: true,
       visibleInHeader: true,
+      visibleOnCategoryPage: true,
       titleNl: true,
       titleEn: true,
       excerptNl: true,
@@ -162,6 +166,7 @@ export async function savePageAction(_prev: SaveState, formData: FormData): Prom
         slug: data.slug,
         headerTabId: data.headerTabId || null,
         visibleInHeader: data.visibleInHeader,
+        visibleOnCategoryPage: data.visibleOnCategoryPage,
         titleNl: data.titleNl,
         titleEn: data.titleEn,
         excerptNl: data.excerptNl,
@@ -433,6 +438,65 @@ export async function savePageContentAction(
     ),
   });
 
+  revalidatePath('/', 'layout');
+  return saveOk();
+}
+
+/**
+ * De foto op de categoriekaart opslaan vanuit de gewone pagina-editor.
+ *
+ * Dit is bewust een aparte actie naast de markdown-save: een upload mag niet
+ * pas bewaard worden wanneer iemand daarna toevallig ook de volledige inhoud
+ * opslaat. Dezelfde paginatoegang geldt als voor de inhoud; /admin/header kan
+ * hetzelfde veld daarnaast blijven beheren met `pages.manage`.
+ */
+export async function savePageImageAction(
+  _prev: SaveState,
+  formData: FormData
+): Promise<SaveState> {
+  const session = await requireSession();
+  const id = formData.get('id');
+  if (typeof id !== 'string' || !id) {
+    return saveError('INVALID_INPUT' satisfies ContentErrorCode);
+  }
+
+  const image = readImageField(formData);
+  if (image.kind === 'invalid') {
+    return saveError('INVALID_INPUT' satisfies ContentErrorCode);
+  }
+
+  const page = await prisma.page.findUnique({
+    where: { id },
+    select: {
+      titleNl: true,
+      imageKey: true,
+      editorRoles: { select: { roleId: true } },
+    },
+  });
+  if (!page) return saveError('INVALID_INPUT' satisfies ContentErrorCode);
+  if (!canEditPageContent(session, page)) throw new Error('FORBIDDEN');
+
+  const imageKey = resolveImageKey(image, page.imageKey);
+  if (imageKey === page.imageKey) return saveOk();
+
+  await prisma.page.update({
+    where: { id },
+    data: { imageKey },
+  });
+
+  await logAudit({
+    action: 'update',
+    entity: 'page',
+    entityId: id,
+    target: page.titleNl,
+    summary: imageKey
+      ? page.imageKey
+        ? 'foto op de categoriepagina vervangen'
+        : 'foto op de categoriepagina toegevoegd'
+      : 'foto op de categoriepagina verwijderd',
+  });
+
+  if (page.imageKey) await deleteStoredObjects([page.imageKey]);
   revalidatePath('/', 'layout');
   return saveOk();
 }

@@ -243,6 +243,7 @@ export async function adminRead(principal: McpPrincipal, raw: McpAdminReadInput)
         select: {
           id: true, slug: true, titleNl: true, titleEn: true, contentMdNl: true,
           contentMdEn: true, excerptNl: true, excerptEn: true, visibleInHeader: true,
+          visibleOnCategoryPage: true,
           ctaLabelNl: true, ctaLabelEn: true, ctaUrl: true, needsYearlyEdit: true,
           contentEditedAt: true, publishedAt: true, order: true, createdAt: true, updatedAt: true,
           headerTab: { select: { code: true, slug: true, labelNl: true, labelEn: true } },

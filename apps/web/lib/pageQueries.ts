@@ -31,18 +31,17 @@ export const loadHeaderTab = cache(async (slug: string) =>
   prisma.headerTab.findUnique({ where: { slug } }),
 );
 
-/** Dezelfde categorie mét de gepubliceerde pagina's eronder, voor het overzicht. */
+/** Dezelfde categorie mét de gepubliceerde kaarten voor de categoriepagina. */
 export const loadHeaderTabWithPages = cache(async (slug: string) =>
   prisma.headerTab.findUnique({
     where: { slug },
     include: {
       pages: {
-        where: { visibleInHeader: true, publishedAt: { not: null } },
+        where: { visibleOnCategoryPage: true, publishedAt: { not: null } },
         orderBy: [{ order: "asc" }, { titleNl: "asc" }],
       },
-      // De categoriepagina toont dezelfde items als het uitklapmenu in de
-      // header, dus ook de menu-items die naar een app of een andere site
-      // wijzen (piano, uitleendienst, de cudi-webshop).
+      // Ook vaste menu-items die naar een app of een andere site wijzen horen
+      // als kaart op de categoriepagina (piano, uitleendienst, cudi-webshop).
       links: { orderBy: { order: "asc" } },
     },
   }),

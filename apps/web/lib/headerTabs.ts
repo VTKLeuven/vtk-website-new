@@ -50,8 +50,8 @@ export async function getVisibleHeaderTabsForNav(locale: Locale = "nl"): Promise
     },
     orderBy: { order: "asc" },
     include: {
-      // Dezelfde selectie als de categoriepagina toont, zodat het menu en die
-      // pagina niet uit elkaar lopen.
+      // Alleen pagina's die expliciet in de hover-dropdown horen. De
+      // categoriepagina heeft sinds augustus 2026 haar eigen zichtbaarheid.
       pages: {
         where: { visibleInHeader: true, publishedAt: { not: null } },
         orderBy: [{ order: "asc" }, { titleNl: "asc" }],

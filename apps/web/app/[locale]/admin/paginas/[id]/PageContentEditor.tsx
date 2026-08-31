@@ -13,6 +13,7 @@ import { saveErrorMessages } from "@/lib/saveMessages";
 import { AssetList } from "../../inhoud/AssetList";
 import { FileUploader } from "../../inhoud/FileUploader";
 import type { AssetNode } from "../../inhoud/ContentManager";
+import { PageCategoryImageCard } from "./PageCategoryImageCard";
 import { PageSettingsCard, type SettingsRole } from "./PageSettingsCard";
 import {
   PageFormCard,
@@ -27,6 +28,7 @@ type EditorPage = {
   slug: string;
   titleNl: string;
   titleEn: string | null;
+  imageKey: string | null;
   category: { slug: string; label: string } | null;
   published: boolean;
   needsYearlyEdit: boolean;
@@ -193,6 +195,13 @@ export function PageContentEditor({
           </div>
         </SaveForm>
       </Card>
+
+      <PageCategoryImageCard
+        locale={locale}
+        pageId={page.id}
+        pageTitle={page.titleNl}
+        imageKey={page.imageKey}
+      />
 
       <Card className="p-5">
         <h2 className="mb-3 text-sm font-semibold text-vtk-ink">

@@ -1083,7 +1083,8 @@ async function main() {
   ];
 
   // CMS-pagina's zijn admin-beheerd: titel, inhoud, categorie (headerTabId),
-  // zichtbaarheid in de header en volgorde worden in /admin/inhoud bewerkt. Enkel
+  // zichtbaarheid in dropdown/categoriepagina en volgorde worden in
+  // /admin/inhoud bewerkt. Enkel
   // ontbrekende pagina's aanmaken en bestaande NIET overschrijven, zodat een
   // handmatige reseed die aanpassingen (bv. verplaatst, verborgen of herschikt)
   // niet terugdraait naar de defaults.
@@ -1096,6 +1097,7 @@ async function main() {
     headerCode: string | null;
     slug: string;
     visibleInHeader: boolean;
+    visibleOnCategoryPage: boolean;
     titleNl: string;
     titleEn: string | null;
     excerptNl: string | null;
@@ -1124,6 +1126,7 @@ async function main() {
         headerCode: p.headerTabCode ?? null,
         slug: p.slug,
         visibleInHeader: p.visibleInHeader,
+        visibleOnCategoryPage: p.visibleOnCategoryPage ?? p.visibleInHeader,
         titleNl: p.titleNl,
         titleEn: p.titleEn ?? null,
         excerptNl: null,
@@ -1143,6 +1146,7 @@ async function main() {
         headerCode: page.headerCode,
         slug: page.slug,
         visibleInHeader: true,
+        visibleOnCategoryPage: true,
         titleNl: page.titleNl,
         titleEn: page.titleEn,
         excerptNl: page.excerptNl,
@@ -1175,6 +1179,7 @@ async function main() {
         slug: page.slug,
         headerTabId,
         visibleInHeader: page.visibleInHeader,
+        visibleOnCategoryPage: page.visibleOnCategoryPage,
         titleNl: page.titleNl,
         titleEn: page.titleEn,
         excerptNl: page.excerptNl,

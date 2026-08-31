@@ -87,6 +87,9 @@ export function LinkInspector({
             defaultKey={link.imageKey}
             locale={locale}
             label={nl ? "Foto op de categoriepagina" : "Photo on the category page"}
+            fallbackUrl="/technisch-pattern-light.png"
+            fallbackPosition="left"
+            emptyHint={nl ? "Technisch patroon" : "Technical pattern"}
             helpText={
               nl
                 ? "Deze foto verschijnt op de kaart van dit item. Zonder foto toont de kaart het technische patroon uit de huisstijl."

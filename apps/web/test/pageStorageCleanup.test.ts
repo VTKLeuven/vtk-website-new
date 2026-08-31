@@ -35,7 +35,12 @@ vi.mock("@/lib/pageAccess", () => ({
   canPublishPages: vi.fn(),
 }));
 
-import { deletePageAction, deletePageAssetAction, savePageAction } from "@/app/actions/pages";
+import {
+  deletePageAction,
+  deletePageAssetAction,
+  savePageAction,
+  savePageImageAction,
+} from "@/app/actions/pages";
 import { SAVE_IDLE } from "@/lib/saveState";
 
 /**
@@ -155,6 +160,7 @@ describe("kaartfoto beheren vanuit Header", () => {
       slug: "sportdag",
       headerTabId: "tab_1",
       visibleInHeader: true,
+      visibleOnCategoryPage: true,
       titleNl: "Sportdag",
       titleEn: "Sports day",
       excerptNl: null,
@@ -174,6 +180,7 @@ describe("kaartfoto beheren vanuit Header", () => {
     form.set("slug", "sportdag");
     form.set("headerTabId", "tab_1");
     form.set("visibleInHeader", "on");
+    form.set("visibleOnCategoryPage", "on");
     form.set("titleNl", "Sportdag");
     form.set("titleEn", "Sports day");
     form.set("published", "on");
@@ -187,9 +194,80 @@ describe("kaartfoto beheren vanuit Header", () => {
     expect(mocks.pageUpdate).toHaveBeenCalledWith(
       expect.objectContaining({
         where: { id: "page_1" },
-        data: expect.objectContaining({ imageKey: "images/nieuw.jpg" }),
+        data: expect.objectContaining({
+          imageKey: "images/nieuw.jpg",
+          visibleInHeader: true,
+          visibleOnCategoryPage: true,
+        }),
       }),
     );
     expect(mocks.deleteObject).toHaveBeenCalledWith("images/oud.jpg");
+  });
+
+  it("kan de kaart tonen terwijl de pagina uit de hover-dropdown blijft", async () => {
+    const form = new FormData();
+    form.set("id", "page_1");
+    form.set("slug", "sportdag");
+    form.set("headerTabId", "tab_1");
+    form.set("visibleOnCategoryPage", "on");
+    form.set("titleNl", "Sportdag");
+    form.set("titleEn", "Sports day");
+    form.set("published", "on");
+    form.set("order", "0");
+
+    const result = await savePageAction(SAVE_IDLE, form);
+
+    expect(result.status).toBe("success");
+    expect(mocks.pageUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          visibleInHeader: false,
+          visibleOnCategoryPage: true,
+        }),
+      }),
+    );
+  });
+});
+
+describe("kaartfoto beheren vanuit Pagina's", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mocks.requireSession.mockResolvedValue({
+      user: { isSuperAdmin: true },
+      permissions: [],
+      roleIds: [],
+    });
+    mocks.canEditPageContent.mockReturnValue(true);
+    mocks.pageFindUnique.mockResolvedValue({
+      titleNl: "Sportdag",
+      imageKey: "images/oud.jpg",
+      editorRoles: [],
+    });
+  });
+
+  it("bewaart dezelfde categoriekaartfoto en ruimt de vorige upload op", async () => {
+    const form = new FormData();
+    form.set("id", "page_1");
+    form.set("imageKey", "images/nieuw.jpg");
+
+    const result = await savePageImageAction(SAVE_IDLE, form);
+
+    expect(result.status).toBe("success");
+    expect(mocks.pageUpdate).toHaveBeenCalledWith({
+      where: { id: "page_1" },
+      data: { imageKey: "images/nieuw.jpg" },
+    });
+    expect(mocks.deleteObject).toHaveBeenCalledWith("images/oud.jpg");
+  });
+
+  it("weigert de foto te wijzigen zonder toegang tot deze pagina", async () => {
+    mocks.canEditPageContent.mockReturnValue(false);
+    const form = new FormData();
+    form.set("id", "page_1");
+    form.set("imageKey", "images/nieuw.jpg");
+
+    await expect(savePageImageAction(SAVE_IDLE, form)).rejects.toThrow("FORBIDDEN");
+    expect(mocks.pageUpdate).not.toHaveBeenCalled();
+    expect(mocks.deleteObject).not.toHaveBeenCalled();
   });
 });

@@ -33,6 +33,7 @@ export function StorageImageField({
   name = "imageKey",
   label,
   fallbackUrl,
+  fallbackPosition = "center",
   emptyHint,
   helpText,
   srContext,
@@ -45,6 +46,8 @@ export function StorageImageField({
   label?: string;
   /** De foto die verschijnt zolang er geen upload is, bv. `/aanbod/theokot.jpg`. */
   fallbackUrl?: string;
+  /** Uitsnede van de standaardfoto in de preview. */
+  fallbackPosition?: "center" | "left";
   emptyHint?: string;
   helpText?: string;
   /** Waarover dit veld gaat ("Cursusdienst"), voor de screenreader-labels. */
@@ -126,7 +129,11 @@ export function StorageImageField({
                 alt=""
                 fill
                 sizes="160px"
-                className={`object-cover ${showingFallback ? "opacity-60" : ""}`}
+                className={`object-cover ${
+                  showingFallback
+                    ? `${fallbackPosition === "left" ? "object-left" : "object-center"} opacity-60`
+                    : ""
+                }`}
               />
               {showingFallback && (
                 <span className="absolute bottom-1 left-1 rounded-md bg-white/85 px-1.5 py-0.5 text-[11px] font-medium text-[#5c667f]">

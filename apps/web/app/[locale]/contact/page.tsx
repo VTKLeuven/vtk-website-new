@@ -35,7 +35,7 @@ const loadContactTab = cache(async () =>
     where: { code: "CONTACT" },
     include: {
       pages: {
-        where: { visibleInHeader: true, publishedAt: { not: null } },
+        where: { visibleOnCategoryPage: true, publishedAt: { not: null } },
         orderBy: [{ order: "asc" }, { titleNl: "asc" }],
       },
     },

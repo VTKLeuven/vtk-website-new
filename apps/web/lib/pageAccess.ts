@@ -9,8 +9,9 @@ import { currentWorkingYear, workingYearStart } from "@/lib/workingYear";
  *   werkingsjaar draagt (PageEditorRole);
  * - een pagina zonder rollen is vergrendeld voor gewone pages.edit-houders.
  *
- * Dit gaat enkel over de inhoud (de editor onder /admin/paginas). Structuur en
- * metadata (slug, categorie, rollen, publicatie) vallen onder `pages.manage`.
+ * Dit gaat over de editor onder /admin/paginas: inhoud, slug, bewerkrollen en
+ * de bijbehorende categoriekaartfoto. De navigatiestructuur en haar zichtbaarheid
+ * vallen onder `pages.manage`; publiceren heeft een eigen expliciete check.
  */
 export function canEditPageContent(
   session: SessionPayload,

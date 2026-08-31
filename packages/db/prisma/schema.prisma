@@ -1294,12 +1294,15 @@ model Frontpage {
 }
 
 model Page {
-  id              String    @id @default(cuid())
-  slug            String    @unique
-  headerTabId     String?
-  visibleInHeader Boolean   @default(true)
-  titleNl         String
-  titleEn         String?
+  id                    String    @id @default(cuid())
+  slug                  String    @unique
+  headerTabId           String?
+  // Onafhankelijke navigatiekeuzes: een pagina kan als kaart op /<categorie>
+  // staan zonder de hover-dropdown in de siteheader langer te maken.
+  visibleInHeader       Boolean   @default(true)
+  visibleOnCategoryPage Boolean   @default(true)
+  titleNl               String
+  titleEn               String?
   // Legacy tiptap-documenten. Markdown (contentMdNl/En) is de bron van waarheid;
   // deze JSON wordt enkel nog gerenderd zolang de pagina niet één keer in de
   // markdown-editor opgeslagen is.
@@ -1310,9 +1313,9 @@ model Page {
   excerptNl       String?
   excerptEn       String?
   // Foto op de kaart van deze pagina op de categoriepagina (`/info`, ...),
-  // uploadbaar in /admin/header. Zelfde soort veld als `HeaderTabLink.imageKey`:
-  // een storage-key, geen URL. Zonder foto toont de kaart het gestreepte
-  // placeholder-patroon.
+  // uploadbaar in /admin/header en /admin/paginas. Zelfde soort veld als
+  // `HeaderTabLink.imageKey`: een storage-key, geen URL. Zonder foto toont de
+  // kaart het technische patroon uit de huisstijl.
   imageKey        String?
   // Optionele knop naast de titel, dezelfde velden als op HeaderTab. Voor een
   // pagina die een aparte app beschrijft (Uitleendienst -> logistiek, Shiften ->

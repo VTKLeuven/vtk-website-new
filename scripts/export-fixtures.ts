@@ -181,6 +181,7 @@ async function main() {
           slug: page.slug,
           headerTabCode: page.headerTab?.code ?? null,
           visibleInHeader: page.visibleInHeader,
+          visibleOnCategoryPage: page.visibleOnCategoryPage,
           titleNl: page.titleNl,
           titleEn: page.titleEn,
           ctaLabelNl: page.ctaLabelNl,

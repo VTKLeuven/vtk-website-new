@@ -13,9 +13,9 @@ export const dynamic = "force-dynamic";
 /**
  * Eén categorie uit de hoofdnavigatie, met de pagina's eronder.
  *
- * Dezelfde selectie als het uitklapmenu in de header en als de categoriepagina
- * op de site (`loadHeaderTabWithPages`): zichtbaar in de header én gepubliceerd.
- * Wat vindbaar is en wat in het menu staat, hoort niet uiteen te lopen.
+ * Dezelfde selectie als de categoriepagina op de site
+ * (`loadHeaderTabWithPages`): zichtbaar op die pagina én gepubliceerd. De
+ * hover-dropdown heeft bewust een afzonderlijke zichtbaarheidskeuze.
  *
  * De menu-items (`links`) horen erbij: dat zijn de bestemmingen op een andere
  * site of in een andere app (piano, uitleendienst, de cudi-webshop), en die

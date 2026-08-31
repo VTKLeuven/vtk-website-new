@@ -124,7 +124,10 @@ export type PageFixture = {
   slug: string;
   /** Natural key of the category. Absent = a page that sits under /p/<slug>. */
   headerTabCode?: string | null;
+  /** Show this page in the category's hover dropdown in the site header. */
   visibleInHeader: boolean;
+  /** Absent in older fixtures: then it follows visibleInHeader for compatibility. */
+  visibleOnCategoryPage?: boolean;
   titleNl: string;
   titleEn?: string | null;
   ctaLabelNl?: string | null;

@@ -33,6 +33,7 @@ export type PageNode = {
   slug: string;
   headerTabId: string | null;
   visibleInHeader: boolean;
+  visibleOnCategoryPage: boolean;
   titleNl: string;
   titleEn: string | null;
   excerptNl: string | null;

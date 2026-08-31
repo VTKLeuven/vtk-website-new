@@ -55,6 +55,8 @@ const pageSchema = z.object({
   /** Headertab-referentie: code of slug (bv. "AANBOD" of "info"). Null = los. */
   headerTab: z.string().nullable().optional(),
   visibleInHeader: z.boolean().default(true),
+  /** Oudere reviewexports hebben dit nog niet; volg dan de dropdownkeuze. */
+  visibleOnCategoryPage: z.boolean().optional(),
   /** True: publishedAt = importmoment. False: onzichtbaar concept. */
   published: z.boolean().default(true),
   needsYearlyEdit: z.boolean().default(false),
@@ -272,6 +274,7 @@ async function main() {
             slug: page.slug,
             headerTabId,
             visibleInHeader: page.visibleInHeader,
+            visibleOnCategoryPage: page.visibleOnCategoryPage ?? page.visibleInHeader,
             titleNl: page.titleNl,
             titleEn: page.titleEn ?? null,
             excerptNl: page.excerptNl ?? null,
