@@ -55,6 +55,8 @@ export type HeaderTabFixture = {
   externalUrl?: string | null;
   introNl?: string | null;
   introEn?: string | null;
+  homeBodyNl?: string | null;
+  homeBodyEn?: string | null;
   ctaLabelNl?: string | null;
   ctaLabelEn?: string | null;
   ctaUrl?: string | null;

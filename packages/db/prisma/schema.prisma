@@ -1140,6 +1140,12 @@ model HeaderTab {
   // gestreepte placeholder-patroon of de statische default in HomeEditorial.
   imageKey String?
 
+  // Tekstje onder de titel op diezelfde aanbod-kaart ("Wat we doen"),
+  // bewerkbaar via /admin/home. Leeg = de algemene standaardzin uit
+  // lib/aanbodCards.ts.
+  homeBodyNl String?
+  homeBodyEn String?
+
   // Externe bestemming voor deze tab. Staat die ingevuld, dan linkt de header
   // rechtstreeks naar die site (in een nieuw tabblad) in plaats van naar de
   // categoriepagina /<slug>. Bv. Career -> career.vtk.be.

@@ -9,8 +9,16 @@ import { saveError, saveOk, type SaveState } from "@/lib/saveState";
 import { DEFAULT_EVENT_IMAGE_SETTING } from "@/lib/defaultEventImage";
 import { logAudit } from "@/lib/audit";
 
-/** Foto op één kaart in de homepage-sectie "Wat we doen". */
-export async function saveHomepageCardImageAction(
+/** Tekstveld uit het formulier: leeg betekent "terug naar de standaardzin". */
+function readOptionalText(formData: FormData, name: string): string | null {
+  const raw = formData.get(name);
+  if (typeof raw !== "string") return null;
+  const value = raw.trim();
+  return value === "" ? null : value;
+}
+
+/** Foto en tekstje op één kaart in de homepage-sectie "Wat we doen". */
+export async function saveHomepageCardAction(
   _prev: SaveState,
   formData: FormData,
 ): Promise<SaveState> {
@@ -24,24 +32,38 @@ export async function saveHomepageCardImageAction(
 
   const existing = await prisma.headerTab.findUnique({
     where: { id },
-    select: { imageKey: true, labelNl: true },
+    select: { imageKey: true, labelNl: true, homeBodyNl: true, homeBodyEn: true },
   });
   if (!existing) return saveError("INVALID_INPUT");
 
   const imageKey = resolveImageKey(image, existing.imageKey);
+  const homeBodyNl = readOptionalText(formData, "homeBodyNl");
+  const homeBodyEn = readOptionalText(formData, "homeBodyEn");
 
   await prisma.headerTab.update({
     where: { id },
-    data: { imageKey },
+    data: { imageKey, homeBodyNl, homeBodyEn },
   });
 
-  if (imageKey !== existing.imageKey) {
+  const photoChanged = imageKey !== existing.imageKey;
+  const textChanged =
+    homeBodyNl !== existing.homeBodyNl || homeBodyEn !== existing.homeBodyEn;
+
+  if (photoChanged || textChanged) {
+    const changes = [
+      photoChanged ? (imageKey ? "foto vervangen" : "foto verwijderd") : null,
+      textChanged
+        ? homeBodyNl || homeBodyEn
+          ? "tekst aangepast"
+          : "tekst teruggezet op de standaardzin"
+        : null,
+    ].filter((part): part is string => part !== null);
     await logAudit({
       action: "update",
       entity: "home",
       entityId: id,
       target: `Wat we doen: ${existing.labelNl}`,
-      summary: imageKey ? "foto van de kaart vervangen" : "foto van de kaart verwijderd",
+      summary: changes.join(", "),
     });
   }
 

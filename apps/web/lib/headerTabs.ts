@@ -20,6 +20,12 @@ export type NavHeaderTab = {
   /** Storage-key van de foto op de homepage-aanbodkaart (via /admin/home). */
   imageKey: string | null;
   /**
+   * Tekstje onder de titel op die aanbodkaart (via /admin/home). Leeg = de
+   * standaardzin uit lib/aanbodCards.ts.
+   */
+  homeBodyNl: string | null;
+  homeBodyEn: string | null;
+  /**
    * Externe site voor deze tab (bv. career.vtk.be). Is die gezet, dan gaat de
    * headerknop daar rechtstreeks naartoe in plaats van naar /<slug>.
    */
@@ -82,6 +88,8 @@ export async function getVisibleHeaderTabsForNav(locale: Locale = "nl"): Promise
         labelNl: tab.labelNl,
         labelEn: tab.labelEn,
         imageKey: tab.imageKey,
+        homeBodyNl: tab.homeBodyNl,
+        homeBodyEn: tab.homeBodyEn,
         externalUrl: tab.externalUrl,
         children: children.map(({ id, labelNl, labelEn, href, external }) => ({
           id,
@@ -100,6 +108,8 @@ export async function getVisibleHeaderTabsForNav(locale: Locale = "nl"): Promise
     labelNl: t.labelNl,
     labelEn: t.labelEn,
     imageKey: null,
+    homeBodyNl: null,
+    homeBodyEn: null,
     externalUrl: t.externalUrl ?? null,
     children: (t.links ?? []).map((link) => ({
       id: `${t.code}-${link.url}`,

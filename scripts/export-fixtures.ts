@@ -150,6 +150,8 @@ async function main() {
           externalUrl: tab.externalUrl,
           introNl: tab.introNl,
           introEn: tab.introEn,
+          homeBodyNl: tab.homeBodyNl,
+          homeBodyEn: tab.homeBodyEn,
           ctaLabelNl: tab.ctaLabelNl,
           ctaLabelEn: tab.ctaLabelEn,
           ctaUrl: tab.ctaUrl,

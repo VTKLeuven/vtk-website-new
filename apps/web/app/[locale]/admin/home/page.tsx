@@ -6,12 +6,16 @@ import { requirePermission } from "@/lib/session";
 import { getDictionary, type Locale } from "@vtk/i18n";
 import { Card, Input, Label, Select, Textarea } from "@vtk/ui";
 import { StorageImageField } from "@/components/admin/StorageImageField";
-import { AANBOD_PHOTOS } from "@/lib/aanbodPhotos";
+import {
+  AANBOD_DEFAULT_BODY_EN,
+  AANBOD_DEFAULT_BODY_NL,
+  AANBOD_PHOTOS,
+} from "@/lib/aanbodCards";
 import { SaveForm } from "@/components/ui/SaveForm";
 import { BUILTIN_DEFAULT_EVENT_IMAGE, DEFAULT_EVENT_IMAGE_SETTING } from "@/lib/defaultEventImage";
 import {
   saveDefaultEventImageAction,
-  saveHomepageCardImageAction,
+  saveHomepageCardAction,
   saveCareerAction,
   saveAftermoviesAction,
 } from "@/app/actions/home";
@@ -92,6 +96,8 @@ export default async function AdminHome({
         labelNl: true,
         labelEn: true,
         imageKey: true,
+        homeBodyNl: true,
+        homeBodyEn: true,
       },
     }),
   ]);
@@ -111,8 +117,8 @@ export default async function AdminHome({
         <h2 className="mb-1 font-semibold">{locale === "nl" ? "Wat we doen" : "What we do"}</h2>
         <p className="mb-5 text-sm text-[#5c667f]">
           {locale === "nl"
-            ? "Beheer de foto op elke categoriekaart. De eerste zes zichtbare categorieën verschijnen op de homepage; hun volgorde beheer je onder Inhoud."
-            : "Manage the photo on each category card. The first six visible categories appear on the homepage; manage their order under Content."}
+            ? "Beheer de foto en het tekstje op elke categoriekaart. De eerste zes zichtbare categorieën verschijnen op de homepage; hun volgorde beheer je onder Inhoud."
+            : "Manage the photo and the text on each category card. The first six visible categories appear on the homepage; manage their order under Content."}
         </p>
 
         {homepageCards.length > 0 ? (
@@ -120,7 +126,7 @@ export default async function AdminHome({
             {homepageCards.map((tab) => (
               <SaveForm
                 key={tab.id}
-                action={saveHomepageCardImageAction}
+                action={saveHomepageCardAction}
                 className="space-y-4 rounded-xl border border-vtk-blue/10 p-4"
                 submitLabel={dict.admin.save}
                 savingLabel={dict.common.saving}
@@ -150,6 +156,35 @@ export default async function AdminHome({
                         : "This card has no default photo: without an upload it shows the striped pattern."
                   }
                 />
+                <div className="space-y-1">
+                  <Label htmlFor={`homeBodyNl-${tab.id}`}>
+                    {locale === "nl" ? "Tekst (NL)" : "Text (NL)"}
+                  </Label>
+                  <Textarea
+                    id={`homeBodyNl-${tab.id}`}
+                    name="homeBodyNl"
+                    defaultValue={tab.homeBodyNl ?? ""}
+                    placeholder={AANBOD_DEFAULT_BODY_NL}
+                    rows={2}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label htmlFor={`homeBodyEn-${tab.id}`}>
+                    {locale === "nl" ? "Tekst (EN)" : "Text (EN)"}
+                  </Label>
+                  <Textarea
+                    id={`homeBodyEn-${tab.id}`}
+                    name="homeBodyEn"
+                    defaultValue={tab.homeBodyEn ?? ""}
+                    placeholder={tab.homeBodyNl?.trim() || AANBOD_DEFAULT_BODY_EN}
+                    rows={2}
+                  />
+                  <p className="text-xs text-[#5c667f]">
+                    {locale === "nl"
+                      ? "Laat leeg om de standaardzin te tonen; vul je enkel Nederlands in, dan staat die zin ook op de Engelse site."
+                      : "Leave empty to show the default sentence; with only Dutch filled in, that text also appears on the English site."}
+                  </p>
+                </div>
               </SaveForm>
             ))}
           </div>

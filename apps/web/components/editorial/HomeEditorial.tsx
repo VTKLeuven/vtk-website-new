@@ -4,7 +4,7 @@ import type { CSSProperties } from "react";
 import { prisma } from "@vtk/db";
 import { pick, type Locale } from "@vtk/i18n";
 import { getVisibleHeaderTabsForNav } from "@/lib/headerTabs";
-import { AANBOD_PHOTOS } from "@/lib/aanbodPhotos";
+import { AANBOD_PHOTOS, aanbodCardBody } from "@/lib/aanbodCards";
 import { getMediaContent } from "@/lib/media-content";
 import { videoEmbed } from "@/lib/videoEmbed";
 import { getCurrentSession } from "@/lib/session";
@@ -320,8 +320,7 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
           labelEn: tab.labelEn,
           titleNl: tab.labelNl,
           titleEn: tab.labelEn,
-          bodyNl: "Ontdek pagina's, activiteiten en praktische info van deze werking.",
-          bodyEn: "Discover pages, activities and practical information from this work group.",
+          ...aanbodCardBody(tab.homeBodyNl, tab.homeBodyEn),
           href: `${base}/${tab.slug}`,
           photo: publicUrl(tab.imageKey) ?? AANBOD_PHOTOS[tab.slug],
         }))
