@@ -16,6 +16,7 @@ import { isExternalUrl } from "@/lib/href";
 import { ExternalLinkIcon, LinkIcon, TrashIcon } from "@/components/ui/icons";
 import { TabInspector } from "./TabInspector";
 import { PageInspector } from "./PageInspector";
+import { LinkInspector } from "./LinkInspector";
 import { AddPagePicker } from "./AddPagePicker";
 import { AddHeaderTabPicker } from "./AddHeaderTabPicker";
 
@@ -36,6 +37,7 @@ export type PageNode = {
   titleEn: string | null;
   excerptNl: string | null;
   excerptEn: string | null;
+  imageKey: string | null;
   ctaLabelNl: string | null;
   ctaLabelEn: string | null;
   ctaUrl: string | null;
@@ -51,6 +53,7 @@ export type TabLinkNode = {
   labelNl: string;
   labelEn: string;
   url: string;
+  imageKey: string | null;
   order: number;
 };
 
@@ -83,6 +86,7 @@ type Selection =
   | { kind: "none" }
   | { kind: "tab"; id: string }
   | { kind: "page"; id: string }
+  | { kind: "link"; id: string }
   | { kind: "new-tab" };
 
 /** Sleepbron: een categorie, een pagina of een vaste link. */
@@ -124,6 +128,7 @@ export function ContentManager({
   const [addingDirectTab, setAddingDirectTab] = useState(false);
 
   const allPages = useMemo(() => tabs.flatMap((t) => t.pages), [tabs]);
+  const allLinks = useMemo(() => tabs.flatMap((t) => t.links), [tabs]);
 
   const select = useCallback(
     (next: Selection) => {
@@ -140,6 +145,8 @@ export function ContentManager({
   const selectedTab = selection.kind === "tab" ? tabs.find((t) => t.id === selection.id) : undefined;
   const selectedPage =
     selection.kind === "page" ? allPages.find((p) => p.id === selection.id) : undefined;
+  const selectedLink =
+    selection.kind === "link" ? allLinks.find((link) => link.id === selection.id) : undefined;
 
   // ---- Slepen ---------------------------------------------------------------
 
@@ -273,6 +280,7 @@ export function ContentManager({
   }
 
   function LinkRow({ link, tabId }: { link: TabLinkNode; tabId: string }) {
+    const active = selection.kind === "link" && selection.id === link.id;
     const isExt = isExternalUrl(link.url);
     const [confirming, setConfirming] = useState(false);
     const label = nl ? link.labelNl : link.labelEn;
@@ -299,7 +307,8 @@ export function ContentManager({
           onDropOnItem(link.id, tabId);
         }}
         className={[
-          "group flex w-full items-center gap-2 rounded-xl border border-transparent py-1.5 pl-8 pr-3 text-left text-sm transition-colors hover:bg-vtk-blue-soft/30 cursor-grab active:cursor-grabbing",
+          "group flex w-full items-center gap-2 rounded-xl border py-1.5 pl-8 pr-3 text-left text-sm transition-colors cursor-grab active:cursor-grabbing",
+          active ? "border-vtk-ink bg-vtk-blue-soft/70" : "border-transparent hover:bg-vtk-blue-soft/30",
           dropTarget === link.id ? "ring-2 ring-vtk-yellow" : "",
         ].join(" ")}
       >
@@ -311,7 +320,7 @@ export function ContentManager({
         </span>
         <button
           type="button"
-          onClick={() => select({ kind: "tab", id: tabId })}
+          onClick={() => select({ kind: "link", id: link.id })}
           className="min-w-0 flex-1 truncate text-left text-vtk-ink hover:underline"
         >
           {label}
@@ -341,6 +350,7 @@ export function ContentManager({
             startTransition(async () => {
               await deleteHeaderTabLinkAction(link.id);
               setConfirming(false);
+              if (active) close();
             });
           }}
           onCancel={() => setConfirming(false)}
@@ -439,8 +449,8 @@ export function ContentManager({
           <h1 className="text-2xl font-semibold">{nl ? "Header" : "Header"}</h1>
           <p className="mt-1 text-sm text-[#5c667f]">
             {nl
-              ? "Beheer de categorieën en menu-items in de navigatiebalk. Sleep om de volgorde te wijzigen of een pagina naar een andere categorie te verplaatsen. De inhoud zelf bewerk je onder Pagina's."
-              : "Manage the categories and menu items in the main navigation. Drag to reorder or move a page to another category. The content itself is edited under Pages."}
+              ? "Beheer de categorieën, menu-items en hun foto's op de categoriepagina. Sleep om de volgorde te wijzigen of een item naar een andere categorie te verplaatsen. De inhoud zelf bewerk je onder Pagina's."
+              : "Manage the categories, menu items and their photos on the category page. Drag to reorder or move an item to another category. The content itself is edited under Pages."}
           </p>
         </div>
         {!usingDefaults && (
@@ -476,8 +486,8 @@ export function ContentManager({
           {selection.kind === "none" && (
             <Card className="grid min-h-[320px] place-items-center p-8 text-center text-sm text-[#5c667f]">
               {nl
-                ? "Kies links een categorie of pagina om ze te bewerken."
-                : "Pick a category or page on the left to edit it."}
+                ? "Kies links een categorie, pagina of link om ze te bewerken."
+                : "Pick a category, page or link on the left to edit it."}
             </Card>
           )}
 
@@ -496,6 +506,14 @@ export function ContentManager({
               tabs={tabs}
               roles={roles}
               canDelete={canDeletePages}
+              onClose={close}
+            />
+          )}
+          {selectedLink && (
+            <LinkInspector
+              key={selectedLink.id}
+              locale={locale}
+              link={selectedLink}
               onClose={close}
             />
           )}

@@ -5,6 +5,7 @@ const mocks = vi.hoisted(() => ({
   requireSession: vi.fn(),
   canEditPageContent: vi.fn(),
   pageFindUnique: vi.fn(),
+  pageUpdate: vi.fn(),
   pageDelete: vi.fn(),
   assetFindUnique: vi.fn(),
   assetDelete: vi.fn(),
@@ -17,7 +18,7 @@ vi.mock("next/navigation", () => ({ redirect: vi.fn() }));
 vi.mock("@vtk/db", () => ({
   HEADER_TABS: [],
   prisma: {
-    page: { findUnique: mocks.pageFindUnique, delete: mocks.pageDelete },
+    page: { findUnique: mocks.pageFindUnique, update: mocks.pageUpdate, delete: mocks.pageDelete },
     pageAsset: { findUnique: mocks.assetFindUnique, delete: mocks.assetDelete },
   },
 }));
@@ -34,7 +35,7 @@ vi.mock("@/lib/pageAccess", () => ({
   canPublishPages: vi.fn(),
 }));
 
-import { deletePageAction, deletePageAssetAction } from "@/app/actions/pages";
+import { deletePageAction, deletePageAssetAction, savePageAction } from "@/app/actions/pages";
 import { SAVE_IDLE } from "@/lib/saveState";
 
 /**
@@ -143,5 +144,52 @@ describe("opruimen van storage bij verwijderen", () => {
     await expect(deletePageAction(SAVE_IDLE, form)).resolves.toMatchObject({
       status: "success",
     });
+  });
+});
+
+describe("kaartfoto beheren vanuit Header", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mocks.pageFindUnique.mockResolvedValue({
+      publishedAt: new Date("2026-01-01T00:00:00Z"),
+      slug: "sportdag",
+      headerTabId: "tab_1",
+      visibleInHeader: true,
+      titleNl: "Sportdag",
+      titleEn: "Sports day",
+      excerptNl: null,
+      excerptEn: null,
+      imageKey: "images/oud.jpg",
+      ctaLabelNl: null,
+      ctaLabelEn: null,
+      ctaUrl: null,
+      needsYearlyEdit: false,
+      order: 0,
+    });
+  });
+
+  it("vervangt via de structuuractie de bestaande foto en ruimt de oude op", async () => {
+    const form = new FormData();
+    form.set("id", "page_1");
+    form.set("slug", "sportdag");
+    form.set("headerTabId", "tab_1");
+    form.set("visibleInHeader", "on");
+    form.set("titleNl", "Sportdag");
+    form.set("titleEn", "Sports day");
+    form.set("published", "on");
+    form.set("order", "0");
+    form.set("imageKey", "images/nieuw.jpg");
+
+    const result = await savePageAction(SAVE_IDLE, form);
+
+    expect(result.status).toBe("success");
+    expect(mocks.requirePermission).toHaveBeenCalledWith("pages.manage");
+    expect(mocks.pageUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: "page_1" },
+        data: expect.objectContaining({ imageKey: "images/nieuw.jpg" }),
+      }),
+    );
+    expect(mocks.deleteObject).toHaveBeenCalledWith("images/oud.jpg");
   });
 });

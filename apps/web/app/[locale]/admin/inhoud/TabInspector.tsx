@@ -276,17 +276,22 @@ export function InspectorHead({
 
 
 /**
- * Extra menu-items van een categorie. Rijen posten als `link-<i>-{labelNl,labelEn,url}`
- * plus een `linkCount`; de action vervangt de volledige lijst in die volgorde.
+ * Extra menu-items van een categorie. Rijen posten als
+ * `link-<i>-{id,labelNl,labelEn,url}` plus een `linkCount`; de action vervangt
+ * de volledige lijst in die volgorde en gebruikt het id om de kaartfoto te
+ * behouden. De foto zelf wordt in de eigen link-inspector bewerkt.
  */
 function MenuLinkRows({
   nl,
   initial,
 }: {
   nl: boolean;
-  initial: Array<{ labelNl: string; labelEn: string; url: string }>;
+  initial: Array<{ id: string; labelNl: string; labelEn: string; url: string }>;
 }) {
-  const [rows, setRows] = useState(initial);
+  type Row = { id: string | null; labelNl: string; labelEn: string; url: string };
+  const [rows, setRows] = useState<Row[]>(() =>
+    initial.map((row) => ({ id: row.id, labelNl: row.labelNl, labelEn: row.labelEn, url: row.url })),
+  );
 
   function update(index: number, patch: Partial<{ labelNl: string; labelEn: string; url: string }>) {
     setRows((current) => current.map((row, i) => (i === index ? { ...row, ...patch } : row)));
@@ -307,7 +312,7 @@ function MenuLinkRows({
     if (!found) return;
     setRows((current) => [
       ...current,
-      { labelNl: found.labelNl, labelEn: found.labelEn, url: found.path },
+      { id: null, labelNl: found.labelNl, labelEn: found.labelEn, url: found.path },
     ]);
   }
 
@@ -315,7 +320,8 @@ function MenuLinkRows({
     <div className="space-y-2">
       <input type="hidden" name="linkCount" value={rows.length} />
       {rows.map((row, index) => (
-        <div key={index} className="grid gap-2 sm:grid-cols-[1fr_1fr_1.4fr_auto] sm:items-center">
+        <div key={row.id ?? `new-${index}`} className="grid gap-2 sm:grid-cols-[1fr_1fr_1.4fr_auto] sm:items-center">
+          <input type="hidden" name={`link-${index}-id`} value={row.id ?? ""} />
           <Input
             name={`link-${index}-labelNl`}
             value={row.labelNl}
@@ -374,7 +380,12 @@ function MenuLinkRows({
           type="button"
           variant="ghost"
           size="sm"
-          onClick={() => setRows((current) => [...current, { labelNl: "", labelEn: "", url: "" }])}
+          onClick={() =>
+            setRows((current) => [
+              ...current,
+              { id: null, labelNl: "", labelEn: "", url: "" },
+            ])
+          }
         >
           + {nl ? "Item toevoegen" : "Add item"}
         </Button>

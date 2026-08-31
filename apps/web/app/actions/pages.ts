@@ -65,6 +65,7 @@ const PAGE_FIELD_LABELS: Record<string, string> = {
   titleEn: 'Engelse titel',
   excerptNl: 'samenvatting',
   excerptEn: 'Engelse samenvatting',
+  imageKey: 'foto op de categoriepagina',
   ctaLabelNl: 'knoptekst',
   ctaLabelEn: 'Engelse knoptekst',
   ctaUrl: 'knoplink',
@@ -110,6 +111,8 @@ const saveSchema = z.object({
  */
 export async function savePageAction(_prev: SaveState, formData: FormData): Promise<SaveState> {
   await requirePermission('pages.manage');
+  const image = readImageField(formData);
+  if (image.kind === 'invalid') return saveError('INVALID_INPUT' satisfies ContentErrorCode);
   const parsed = saveSchema.safeParse({
     id: formData.get('id'),
     slug: formData.get('slug'),
@@ -141,6 +144,7 @@ export async function savePageAction(_prev: SaveState, formData: FormData): Prom
       titleEn: true,
       excerptNl: true,
       excerptEn: true,
+      imageKey: true,
       ctaLabelNl: true,
       ctaLabelEn: true,
       ctaUrl: true,
@@ -149,6 +153,7 @@ export async function savePageAction(_prev: SaveState, formData: FormData): Prom
     },
   });
   if (!existing) return saveError('INVALID_INPUT' satisfies ContentErrorCode);
+  const imageKey = resolveImageKey(image, existing.imageKey);
 
   try {
     await prisma.page.update({
@@ -161,6 +166,7 @@ export async function savePageAction(_prev: SaveState, formData: FormData): Prom
         titleEn: data.titleEn,
         excerptNl: data.excerptNl,
         excerptEn: data.excerptEn,
+        imageKey,
         ctaLabelNl: data.ctaLabelNl || null,
         ctaLabelEn: data.ctaLabelEn || null,
         ctaUrl: data.ctaUrl || null,
@@ -196,10 +202,15 @@ export async function savePageAction(_prev: SaveState, formData: FormData): Prom
         ctaLabelNl: data.ctaLabelNl || null,
         ctaLabelEn: data.ctaLabelEn || null,
         ctaUrl: data.ctaUrl || null,
+        imageKey,
       },
       PAGE_FIELD_LABELS,
     ),
   });
+
+  if (existing.imageKey && existing.imageKey !== imageKey) {
+    await deleteStoredObjects([existing.imageKey]);
+  }
 
   revalidatePath('/', 'layout');
   return saveOk();
@@ -622,55 +633,6 @@ export async function savePageSettingsAction(
   return saveOk();
 }
 
-/**
- * De foto van deze pagina: ze verschijnt als thumbnail op haar kaart op de
- * categoriepagina (`/info`, ...). Staat bewust apart van de inhoud en van de
- * instellingen: een foto vervangen is één handeling en hoort de markdown niet
- * mee op te slaan.
- *
- * Rechten volgen de inhoud (`canEditPageContent`), niet `pages.manage`: wie de
- * tekst van een pagina schrijft, kiest ook de foto erbij.
- */
-export async function savePageImageAction(
-  _prev: SaveState,
-  formData: FormData
-): Promise<SaveState> {
-  const session = await requireSession();
-  const id = formData.get('id');
-  const image = readImageField(formData);
-
-  if (typeof id !== 'string' || !id || image.kind === 'invalid') {
-    return saveError('INVALID_INPUT' satisfies ContentErrorCode);
-  }
-
-  const page = await prisma.page.findUnique({
-    where: { id },
-    select: { titleNl: true, imageKey: true, editorRoles: { select: { roleId: true } } },
-  });
-  if (!page) return saveError('INVALID_INPUT' satisfies ContentErrorCode);
-  if (!canEditPageContent(session, page)) throw new Error('FORBIDDEN');
-
-  const imageKey = resolveImageKey(image, page.imageKey);
-
-  await prisma.page.update({ where: { id }, data: { imageKey } });
-
-  if (imageKey !== page.imageKey) {
-    await logAudit({
-      action: 'update',
-      entity: 'page',
-      entityId: id,
-      target: page.titleNl,
-      summary: imageKey ? 'foto van de pagina vervangen' : 'foto van de pagina verwijderd',
-    });
-  }
-
-  // De vervangen foto uit storage halen.
-  if (page.imageKey && page.imageKey !== imageKey) await deleteStoredObjects([page.imageKey]);
-
-  revalidatePath('/', 'layout');
-  return saveOk();
-}
-
 // ---- Bijlagen ---------------------------------------------------------------
 
 /**
@@ -851,18 +813,29 @@ export async function saveHeaderTabAction(
   // Extra menu-items komen als geïndexeerde velden binnen; de lijst in het
   // formulier is de volledige waarheid, dus ze wordt in haar geheel vervangen.
   const linkCount = Math.min(Number(formData.get('linkCount')) || 0, 20);
-  const links: Array<{ labelNl: string; labelEn: string; url: string; order: number }> = [];
+  const links: Array<{
+    id: string | null;
+    labelNl: string;
+    labelEn: string;
+    url: string;
+    order: number;
+  }> = [];
   for (let i = 0; i < linkCount; i += 1) {
+    const id = String(formData.get(`link-${i}-id`) ?? '').trim() || null;
     const labelNl = String(formData.get(`link-${i}-labelNl`) ?? '').trim();
     const labelEn = String(formData.get(`link-${i}-labelEn`) ?? '').trim();
     const url = String(formData.get(`link-${i}-url`) ?? '').trim();
     if (!labelNl || !url) continue;
     if (!isEditableDestination(url)) return saveError('INVALID_URL' satisfies ContentErrorCode);
+    if (id && links.some((link) => link.id === id)) {
+      return saveError('INVALID_INPUT' satisfies ContentErrorCode);
+    }
     // Twee items naar dezelfde URL kunnen niet (unieke index) en zeggen ook niets.
     if (links.some((link) => link.url === url)) continue;
-    links.push({ labelNl, labelEn: labelEn || labelNl, url, order: links.length });
+    links.push({ id, labelNl, labelEn: labelEn || labelNl, url, order: links.length });
   }
 
+  let removedLinkImageKeys: string[] = [];
   try {
     if (p.id) {
       // `code` bewust niet bijwerkbaar: het is de sleutel waarop de seed upsert
@@ -870,12 +843,42 @@ export async function saveHeaderTabAction(
       const tabId = p.id;
       const before = await prisma.headerTab.findUnique({
         where: { id: tabId },
-        include: { links: { select: { labelNl: true, url: true }, orderBy: { order: 'asc' } } },
+        include: {
+          links: {
+            select: { id: true, labelNl: true, url: true, imageKey: true },
+            orderBy: { order: 'asc' },
+          },
+        },
       });
+      if (!before) return saveError('INVALID_INPUT' satisfies ContentErrorCode);
+      const existingLinks = new Map(before.links.map((link) => [link.id, link]));
+      if (links.some((link) => link.id && !existingLinks.has(link.id))) {
+        return saveError('INVALID_INPUT' satisfies ContentErrorCode);
+      }
+      const keptImageKeys = new Set(
+        links
+          .map((link) => (link.id ? existingLinks.get(link.id)?.imageKey : null))
+          .filter((key): key is string => Boolean(key)),
+      );
+      removedLinkImageKeys = before.links
+        .map((link) => link.imageKey)
+        .filter((key): key is string => key !== null && !keptImageKeys.has(key));
       await prisma.$transaction([
         prisma.headerTab.update({ where: { id: tabId }, data }),
         prisma.headerTabLink.deleteMany({ where: { tabId } }),
-        ...links.map((link) => prisma.headerTabLink.create({ data: { ...link, tabId } })),
+        ...links.map((link) =>
+          prisma.headerTabLink.create({
+            data: {
+              id: link.id ?? undefined,
+              tabId,
+              labelNl: link.labelNl,
+              labelEn: link.labelEn,
+              url: link.url,
+              order: link.order,
+              imageKey: link.id ? (existingLinks.get(link.id)?.imageKey ?? null) : null,
+            },
+          }),
+        ),
       ]);
       await logAudit({
         action: 'update',
@@ -900,7 +903,13 @@ export async function saveHeaderTabAction(
       });
       if (links.length > 0) {
         await prisma.headerTabLink.createMany({
-          data: links.map((link) => ({ ...link, tabId: created.id })),
+          data: links.map((link) => ({
+            tabId: created.id,
+            labelNl: link.labelNl,
+            labelEn: link.labelEn,
+            url: link.url,
+            order: link.order,
+          })),
         });
       }
       await logAudit({
@@ -917,6 +926,7 @@ export async function saveHeaderTabAction(
     throw err;
   }
 
+  await deleteStoredObjects(removedLinkImageKeys);
   revalidatePath('/', 'layout');
   return saveOk();
 }
@@ -932,10 +942,18 @@ export async function deleteHeaderTabAction(
   // onder "Niet gekoppeld" te staan.
   const existing = await prisma.headerTab.findUnique({
     where: { id },
-    select: { imageKey: true, labelNl: true, _count: { select: { pages: true } } },
+    select: {
+      imageKey: true,
+      labelNl: true,
+      links: { select: { imageKey: true } },
+      _count: { select: { pages: true } },
+    },
   });
   await prisma.headerTab.delete({ where: { id } });
-  await deleteStoredObjects([existing?.imageKey]);
+  await deleteStoredObjects([
+    existing?.imageKey,
+    ...(existing?.links.map((link) => link.imageKey) ?? []),
+  ]);
   await logAudit({
     action: 'delete',
     entity: 'headerTab',
@@ -1061,6 +1079,80 @@ export async function addHeaderTabLinkAction(
   return saveOk();
 }
 
+const headerLinkSchema = z.object({
+  id: z.string().min(1),
+  labelNl: z.string().trim().min(1),
+  labelEn: z.string().trim().min(1),
+  url: z.string().trim().refine(isEditableDestination, { message: 'INVALID_URL' }),
+});
+
+/** Metadata en kaartfoto van één vaste route of externe link. */
+export async function saveHeaderTabLinkAction(
+  _prev: SaveState,
+  formData: FormData
+): Promise<SaveState> {
+  await requireAnyPermission(['pages.manage', 'header.manage']);
+  const image = readImageField(formData);
+  if (image.kind === 'invalid') return saveError('INVALID_INPUT' satisfies ContentErrorCode);
+
+  const parsed = headerLinkSchema.safeParse({
+    id: formData.get('id'),
+    labelNl: formData.get('labelNl'),
+    labelEn: formData.get('labelEn'),
+    url: formData.get('url'),
+  });
+  if (!parsed.success) return saveError(parseErrorCode(parsed.error));
+  const data = parsed.data;
+
+  const existing = await prisma.headerTabLink.findUnique({
+    where: { id: data.id },
+    include: { tab: { select: { labelNl: true } } },
+  });
+  if (!existing) return saveError('INVALID_INPUT' satisfies ContentErrorCode);
+  const imageKey = resolveImageKey(image, existing.imageKey);
+
+  try {
+    await prisma.headerTabLink.update({
+      where: { id: data.id },
+      data: {
+        labelNl: data.labelNl,
+        labelEn: data.labelEn,
+        url: data.url,
+        imageKey,
+      },
+    });
+  } catch (err) {
+    if (isUniqueViolation(err, 'tabId') || isUniqueViolation(err, 'url')) {
+      return saveError('INVALID_INPUT' satisfies ContentErrorCode);
+    }
+    throw err;
+  }
+
+  await logAudit({
+    action: 'update',
+    entity: 'headerTab',
+    entityId: existing.tabId,
+    target: existing.tab.labelNl,
+    summary: describeChanges(
+      existing,
+      { ...data, imageKey },
+      {
+        labelNl: 'label van menu-item',
+        labelEn: 'Engels label van menu-item',
+        url: 'link van menu-item',
+        imageKey: 'foto van menu-item',
+      },
+    ),
+  });
+
+  if (existing.imageKey && existing.imageKey !== imageKey) {
+    await deleteStoredObjects([existing.imageKey]);
+  }
+
+  revalidatePath('/', 'layout');
+  return saveOk();
+}
+
 /**
  * Verwijdert een menu-item (vaste route of externe link) uit een categorie.
  */
@@ -1073,6 +1165,7 @@ export async function deleteHeaderTabLinkAction(linkId: string): Promise<SaveSta
   if (!link) return saveError('INVALID_INPUT' satisfies ContentErrorCode);
 
   await prisma.headerTabLink.delete({ where: { id: linkId } });
+  await deleteStoredObjects([link.imageKey]);
 
   await logAudit({
     action: 'update',
@@ -1252,4 +1345,3 @@ export async function addHeaderTabDirectAction(input: {
   revalidatePath('/', 'layout');
   return saveOk();
 }
-

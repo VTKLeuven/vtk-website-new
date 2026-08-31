@@ -14,8 +14,8 @@ import {
 /**
  * Beheer van de navigatiestructuur en headercategorieën: welke categorieën in
  * de header staan, taalafhankelijke zichtbaarheid (NL/EN), welke pagina's en
- * vaste links daaronder hangen, en de metadata van die pagina's. De inhoud en
- * de bijlagen horen in /admin/paginas.
+ * vaste links daaronder hangen, en de metadata en categoriekaartfoto's van die
+ * items. De inhoud en de bijlagen horen in /admin/paginas.
  */
 export default async function AdminHeaderPage({
   params,
@@ -49,6 +49,7 @@ export default async function AdminHeaderPage({
         titleEn: true,
         excerptNl: true,
         excerptEn: true,
+        imageKey: true,
         ctaLabelNl: true,
         ctaLabelEn: true,
         ctaUrl: true,
@@ -76,6 +77,7 @@ export default async function AdminHeaderPage({
     titleEn: p.titleEn,
     excerptNl: p.excerptNl,
     excerptEn: p.excerptEn,
+    imageKey: p.imageKey,
     ctaLabelNl: p.ctaLabelNl,
     ctaLabelEn: p.ctaLabelEn,
     ctaUrl: p.ctaUrl,
@@ -100,6 +102,7 @@ export default async function AdminHeaderPage({
       labelNl: link.labelNl,
       labelEn: link.labelEn,
       url: link.url,
+      imageKey: link.imageKey,
       order: link.order,
     })),
     introNl: t.introNl,

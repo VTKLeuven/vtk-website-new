@@ -16,7 +16,13 @@ const page = (
   ...extra,
 });
 
-const link = (id: string, url: string) => ({ id, labelNl: id, labelEn: id, url });
+const link = (id: string, url: string, imageKey: string | null = null) => ({
+  id,
+  labelNl: id,
+  labelEn: id,
+  url,
+  imageKey,
+});
 
 describe('categoryTiles', () => {
   it('toont de menu-items en pagina’s volgens hun gecombineerde volgorde', () => {
@@ -67,17 +73,15 @@ describe('categoryTiles', () => {
     expect(tiles[1].excerptNl).toBeNull();
   });
 
-  it('geeft een menu-item geen foto', () => {
-    // Een menu-item is geen pagina en heeft dus geen `imageKey` om te tonen; de
-    // kaart valt terug op het gestreepte patroon i.p.v. de foto van de vorige.
+  it('geeft ook een vaste route of externe link haar eigen foto', () => {
     const tiles = categoryTiles({
       slug: 'info',
       pages: [page('p1', 'shiften', { imageKey: 'pages/shiften.jpg' })],
-      links: [link('l1', '/piano')],
+      links: [link('l1', '/piano', 'images/piano.jpg')],
     });
 
     expect(tiles[0].imageKey).toBe('pages/shiften.jpg');
-    expect(tiles[1].imageKey).toBeNull();
+    expect(tiles[1].imageKey).toBe('images/piano.jpg');
   });
 
   it('valt terug op de Nederlandse titel wanneer een pagina geen Engelse heeft', () => {

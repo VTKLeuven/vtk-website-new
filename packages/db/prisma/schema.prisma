@@ -1186,6 +1186,10 @@ model HeaderTabLink {
   labelEn String
   url     String
   order   Int    @default(0)
+  // Foto op de kaart van dit item op de categoriepagina. Geldt zowel voor een
+  // vaste route (/praesidium) als voor een externe link. Beheer via
+  // /admin/header, net als Page.imageKey.
+  imageKey String?
 
   tab HeaderTab @relation(fields: [tabId], references: [id], onDelete: Cascade)
 
@@ -1306,10 +1310,9 @@ model Page {
   excerptNl       String?
   excerptEn       String?
   // Foto op de kaart van deze pagina op de categoriepagina (`/info`, ...),
-  // uploadbaar in de pagina-editor. Zelfde soort veld als `HeaderTab.imageKey`:
+  // uploadbaar in /admin/header. Zelfde soort veld als `HeaderTabLink.imageKey`:
   // een storage-key, geen URL. Zonder foto toont de kaart het gestreepte
-  // placeholder-patroon; menu-items (`HeaderTabLink`) hebben geen pagina en dus
-  // nooit een foto.
+  // placeholder-patroon.
   imageKey        String?
   // Optionele knop naast de titel, dezelfde velden als op HeaderTab. Voor een
   // pagina die een aparte app beschrijft (Uitleendienst -> logistiek, Shiften ->

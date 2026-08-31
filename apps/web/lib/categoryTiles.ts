@@ -27,9 +27,9 @@ export type CategoryTile = {
   excerptNl: string | null;
   excerptEn: string | null;
   /**
-   * Storage-key van de foto op de kaart. Enkel pagina's kunnen er een hebben:
-   * een menu-item is geen pagina en heeft dus niets om een foto aan te hangen.
-   * Zonder foto toont de kaart het gestreepte placeholder-patroon.
+   * Storage-key van de foto op de kaart. Zowel pagina's als vaste routes en
+   * externe links kunnen er een hebben; zonder foto verschijnt het gestreepte
+   * placeholder-patroon.
    */
   imageKey: string | null;
 };
@@ -50,6 +50,7 @@ type TileLink = {
   labelNl: string;
   labelEn: string;
   url: string;
+  imageKey: string | null;
   order?: number;
 };
 
@@ -78,7 +79,7 @@ export function categoryTiles(tab: {
       external: isExternalUrl(link.url),
       excerptNl: null,
       excerptEn: null,
-      imageKey: null,
+      imageKey: link.imageKey,
       order: link.order ?? 0,
     })),
   ];

@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Button, Card, ConfirmDialog, Input, Label, Select, Textarea } from "@vtk/ui";
 import { getDictionary, type Locale } from "@vtk/i18n";
 import { SaveForm } from "@/components/ui/SaveForm";
+import { StorageImageField } from "@/components/admin/StorageImageField";
 import { SlugField } from "@/components/ui/SlugField";
 import { useToast } from "@/components/ui/toast";
 import { SAVE_IDLE } from "@/lib/saveState";
@@ -141,6 +142,20 @@ export function PageInspector({
             </Label>
             <Textarea id={`${uid}-excerptEn`} name="excerptEn" rows={2} defaultValue={page.excerptEn ?? ""} />
           </div>
+        </div>
+
+        <div className="border-t border-vtk-blue/10 pt-5">
+          <StorageImageField
+            defaultKey={page.imageKey}
+            locale={locale}
+            label={nl ? "Foto op de categoriepagina" : "Photo on the category page"}
+            helpText={
+              nl
+                ? "Deze foto verschijnt op de kaart van deze pagina. Zonder foto toont de kaart een gestreept patroon."
+                : "This photo appears on this page's card. Without one, the card shows a striped pattern."
+            }
+            srContext={page.titleNl}
+          />
         </div>
 
         <div className="grid grid-cols-1 gap-4 border-t border-vtk-blue/10 pt-5 sm:grid-cols-3">

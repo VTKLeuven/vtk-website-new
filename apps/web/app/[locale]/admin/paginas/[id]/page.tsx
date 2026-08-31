@@ -95,7 +95,6 @@ export default async function AdminPageEditor({
         category: page.headerTab
           ? { slug: page.headerTab.slug, label: locale === "nl" ? page.headerTab.labelNl : page.headerTab.labelEn }
           : null,
-        imageKey: page.imageKey,
         published: page.publishedAt !== null,
         needsYearlyEdit: page.needsYearlyEdit,
         needsReview: needsYearlyReview(page),

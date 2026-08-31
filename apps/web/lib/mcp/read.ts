@@ -258,7 +258,16 @@ export async function adminRead(principal: McpPrincipal, raw: McpAdminReadInput)
         take, skip, orderBy: { order: "asc" },
         include: { links: { orderBy: { order: "asc" } }, pages: { orderBy: { order: "asc" }, select: { id: true, slug: true, titleNl: true, titleEn: true, publishedAt: true } } },
       });
-      return page(items.map(({ imageKey, ...item }) => ({ ...item, hasImage: Boolean(imageKey) })), input);
+      return page(items.map(({ imageKey, links, ...item }) => ({
+        ...item,
+        hasImage: Boolean(imageKey),
+        // Storage keys zijn interne implementatiedetails. Geef, net als voor
+        // de categorie zelf, enkel aan of het menu-item een kaartfoto heeft.
+        links: links.map(({ imageKey: linkImageKey, ...link }) => ({
+          ...link,
+          hasImage: Boolean(linkImageKey),
+        })),
+      })), input);
     }
     case "announcements": {
       const items = await prisma.announcement.findMany({
