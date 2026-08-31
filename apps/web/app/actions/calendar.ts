@@ -69,6 +69,8 @@ export async function saveEventAction(_prev: SaveState, formData: FormData): Pro
   const input = parsed.data;
   const categoryIds = formData.getAll("categoryIds").map(String).filter(Boolean);
   const saveAsDraft = formData.get("publication") === "draft";
+  // E1: hangt er een logistiek-evenement aan dit evenement?
+  const needsLogistics = formData.get("needsLogistics") === "on";
 
   let start: Date;
   let end: Date;
@@ -144,6 +146,19 @@ export async function saveEventAction(_prev: SaveState, formData: FormData): Pro
         endsAt: end,
       },
     });
+    // Hetzelfde duwtje als bij het ticketevent hierboven, om dezelfde reden: het
+    // logistiek-evenement draagt een kopie van naam, locatie en uren, en zonder
+    // deze update blijft daar de oude datum staan tot iemand er toevallig ook
+    // eens opslaat (E1).
+    await syncUitleenEvent(input.id, {
+      needsLogistics,
+      name: input.titleNl,
+      location: input.location ?? null,
+      start,
+      end,
+      groupId: input.groupId,
+      createdById: session.user.id,
+    });
     await logAudit({
       action: "update",
       entity: "calendarEvent",
@@ -170,6 +185,15 @@ export async function saveEventAction(_prev: SaveState, formData: FormData): Pro
       },
       select: { id: true },
     });
+    await syncUitleenEvent(created.id, {
+      needsLogistics,
+      name: input.titleNl,
+      location: input.location ?? null,
+      start,
+      end,
+      groupId: input.groupId,
+      createdById: session.user.id,
+    });
     await logAudit({
       action: "create",
       entity: "calendarEvent",
@@ -194,6 +218,79 @@ export async function saveEventAction(_prev: SaveState, formData: FormData): Pro
     redirect(`/admin/tickets/new?calendarEvent=${created.id}`);
   }
   redirect("/admin/kalender");
+}
+
+/**
+ * Het logistiek-evenement dat bij dit kalenderevenement hoort (E1).
+ *
+ * `docs/design-decisions.md` zegt dat een logistiek-evenement niet vanzelf
+ * ontstaat: anders krijgt elke uitlening van twee tafels er een en wordt het
+ * evenementscherm een tweede aanvraaglijst. Een aangevinkt **kalender**evenement
+ * is de uitzondering: dat is geen aanvraag maar een gecureerde activiteit van de
+ * kring, en het vinkje houdt de beslissing bij een mens.
+ *
+ * Drie regels:
+ *
+ * - **Aanvinken maakt er een**, met naam, locatie en uren van hier.
+ * - **Bestaat er al een, dan volgt die mee.** Precies zoals de `ticketEvent`-duw
+ *   hierboven: zonder dit blijft daar de oude datum staan tot iemand er
+ *   toevallig ook eens opslaat, en dat verschil merkt niemand tot het materiaal
+ *   op de verkeerde dag klaarstaat.
+ * - **Uitvinken koppelt niets los.** Er kunnen al aanvragen aan hangen, en die
+ *   losmaken zou werk weggooien dat hier niet zichtbaar is. Het formulier zegt
+ *   dat erbij.
+ *
+ * Faalt dit, dan faalt het opslaan van het evenement niet: het kalenderevenement
+ * is het echte werk en de koppeling is een gemak.
+ */
+async function syncUitleenEvent(
+  calendarEventId: string,
+  input: {
+    needsLogistics: boolean;
+    name: string;
+    location: string | null;
+    start: Date;
+    end: Date;
+    groupId: string;
+    createdById: string;
+  },
+): Promise<void> {
+  try {
+    const existing = await prisma.uitleenEvent.findUnique({
+      where: { calendarEventId },
+      select: { id: true },
+    });
+
+    if (existing) {
+      await prisma.uitleenEvent.update({
+        where: { id: existing.id },
+        data: {
+          name: input.name.slice(0, 200),
+          location: input.location?.slice(0, 300) || null,
+          startAt: input.start,
+          startTimeKnown: true,
+          endAt: input.end,
+        },
+      });
+      return;
+    }
+    if (!input.needsLogistics) return;
+
+    await prisma.uitleenEvent.create({
+      data: {
+        calendarEventId,
+        name: input.name.slice(0, 200),
+        location: input.location?.slice(0, 300) || null,
+        startAt: input.start,
+        startTimeKnown: true,
+        endAt: input.end,
+        groupId: input.groupId,
+        createdById: input.createdById,
+      },
+    });
+  } catch (err) {
+    console.error("[calendar] logistiek-evenement synchroniseren mislukt:", err);
+  }
 }
 
 const categorySchema = z.object({

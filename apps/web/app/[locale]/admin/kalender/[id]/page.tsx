@@ -25,6 +25,9 @@ export default async function EditEventPage({
     where: { id },
     include: {
       categories: { select: { categoryId: true } },
+      // E1: staat er een logistiek-evenement aan dit evenement? Dat bepaalt of
+      // het vinkje "Logistiek nodig" aanstaat.
+      uitleenEvent: { select: { id: true } },
       ticketEvent: {
         select: { id: true, slug: true, status: true, _count: { select: { tickets: true } } },
       },
@@ -57,7 +60,11 @@ export default async function EditEventPage({
         {locale === "nl" ? "Evenement bewerken" : "Edit event"}
       </h1>
       <EventForm
-        event={{ ...event, categoryIds: event.categories.map((c) => c.categoryId) }}
+        event={{
+          ...event,
+          categoryIds: event.categories.map((c) => c.categoryId),
+          hasUitleenEvent: event.uitleenEvent !== null,
+        }}
         groups={groups}
         categories={categories}
         locale={locale}

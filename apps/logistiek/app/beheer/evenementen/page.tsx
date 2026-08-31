@@ -14,7 +14,11 @@ import {
   toBrusselsTimeValue,
 } from '@/lib/uitleen';
 import { adminEvents, eventLoad, type AdminEvent } from '@/lib/uitleen-server';
+import { LogisticsIcon } from '@/components/logistics-icon';
 import { EventEditor } from './event-editor';
+
+/** De hoofdsite, om terug te linken naar het kalenderevenement (E1). */
+const MAIN_URL = process.env.VTK_MAIN_URL || 'https://vtk.be';
 
 /**
  * Alles van één evenement naast elkaar: materiaal, flesserke, vervoer en de
@@ -71,6 +75,19 @@ function EventCard({ event }: { event: AdminEvent }) {
               <span className="rounded-full bg-vtk-paper-2 px-2.5 py-0.5 text-xs font-semibold text-vtk-navy">
                 {event.group.nameNl}
               </span>
+            ) : null}
+            {/* E1: dit evenement komt van de kalender op vtk.be. Naam, locatie en
+                uren volgen dáár mee, dus wie ze hier aanpast, ziet ze bij de
+                volgende bewerking daar weer overschreven worden. */}
+            {event.calendarEventId ? (
+              <a
+                href={`${MAIN_URL}/admin/kalender/${event.calendarEventId}`}
+                className="inline-flex items-center gap-1 rounded-full bg-vtk-yellow/25 px-2.5 py-0.5 text-xs font-semibold text-vtk-ink underline decoration-vtk-navy/30 underline-offset-2"
+                title="Dit evenement komt van de kalender op vtk.be; naam, locatie en uren volgen daar mee."
+              >
+                van vtk.be
+                <LogisticsIcon name="external" className="h-3 w-3" />
+              </a>
             ) : null}
           </h3>
         </div>

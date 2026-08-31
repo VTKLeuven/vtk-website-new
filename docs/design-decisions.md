@@ -2295,6 +2295,21 @@ was: "is voor dit evenement alles aangevraagd?".
   naam, en dat is vervelender dan geen groepering.
 - **De losse overzichten blijven.** `/beheer/aanvragen` en `/beheer/vervoer` zijn
   waar je beslist; het evenementscherm komt erbij en vervangt niets.
+- **Eén uitzondering: een aangevinkt kalenderevenement** (E1, ronde 3). Op
+  `/admin/kalender` staat een vinkje "Logistiek nodig", standaard aan bij een
+  nieuw evenement. Dat botst niet met de regel hierboven: die gaat over
+  aanvragen, en een kalenderevenement is geen aanvraag maar een gecureerde
+  activiteit van de kring. Het vinkje houdt de beslissing bovendien bij een mens;
+  wie het uitlaat, krijgt aan de logistiekkant niets.
+  - **Naam, locatie en uren volgen mee** bij elke wijziging op vtk.be, precies
+    zoals het gekoppelde ticketevent dat al deed. Zonder die duw blijft hier de
+    oude datum staan tot iemand er toevallig ook eens opslaat, en dat verschil
+    merkt niemand tot het materiaal op de verkeerde dag klaarstaat.
+  - **Het vinkje weghalen koppelt niets los.** Er kunnen al aanvragen aan hangen,
+    en die losmaken zou werk weggooien dat op dat scherm niet zichtbaar is; het
+    formulier zegt dat erbij.
+  - **Mislukt de koppeling, dan mislukt het opslaan niet.** Het kalenderevenement
+    is het echte werk; de koppeling is een gemak.
 
 ### Sjablonen maakt Logistiek, niet de posten
 

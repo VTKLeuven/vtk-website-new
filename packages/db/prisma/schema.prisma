@@ -1403,6 +1403,9 @@ model CalendarEvent {
   createdBy      User?                        @relation("EventCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
   ticketEvent    TicketEvent?
   form           Form?
+  /// Het logistiek-evenement dat bij dit kalenderevenement hoort (E1). Ontstaat
+  /// enkel wanneer iemand in de admin "Logistiek nodig" aanvinkt.
+  uitleenEvent   UitleenEvent?
   categories     CalendarEventCategory[]
   interests      CalendarEventInterest[]
   guestInterests CalendarEventGuestInterest[]
@@ -2818,6 +2821,15 @@ model UitleenEvent {
   location String?
   startAt  DateTime? @db.Timestamptz(3)
 
+  /// Het kalenderevenement op vtk.be waar dit uit ontstaan is (E1).
+  ///
+  /// Bewust nullable en uniek: de meeste logistiek-evenementen ontstaan hier, en
+  /// eentje dat uit de site komt hoort er precies één te hebben. Naam, locatie en
+  /// uren volgen dat evenement zolang iemand ze daar aanpast; verdwijnt het
+  /// evenement, dan blijft dit staan (`SetNull`), want de aanvragen eronder zijn
+  /// het echte werk.
+  calendarEventId String? @unique
+
   /// Is het uur van `startAt` echt ingevuld, of staat er enkel een dag?
   ///
   /// Bij het aanmaken is het uur vaak nog niet gekend ("ergens die zaterdag"),
@@ -2848,8 +2860,9 @@ model UitleenEvent {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  group     Group? @relation(fields: [groupId], references: [id], onDelete: SetNull)
-  createdBy User?  @relation("UitleenEventCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  group         Group?         @relation(fields: [groupId], references: [id], onDelete: SetNull)
+  createdBy     User?          @relation("UitleenEventCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  calendarEvent CalendarEvent? @relation(fields: [calendarEventId], references: [id], onDelete: SetNull)
 
   reservations  UitleenReservation[]
   transport     UitleenTransportBooking[]
