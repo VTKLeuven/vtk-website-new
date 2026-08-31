@@ -2,7 +2,7 @@ import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import { LoginGate } from '@/components/login-gate';
 import { PageShell } from '@/components/page-shell';
-import { canManage, getSession } from '@/lib/session';
+import { canManage, getSession, requestsAsExternal } from '@/lib/session';
 import { getLocale } from '@/lib/i18n';
 import { formatEuro, ITEM_CONDITION_LABELS } from '@/lib/uitleen';
 import { frequentlyRequestedWith, itemDetail, itemTeamDetails } from '@/lib/uitleen-server';
@@ -26,6 +26,10 @@ export default async function ItemDetailPage({ params }: { params: Promise<{ id:
     canManage(session) ? itemTeamDetails(item.id) : Promise.resolve(null),
   ]);
   const photos = [...(item.photoKey ? [item.photoKey] : []), ...item.photos.map((photo) => photo.key)];
+  // Wie namens een post of werkgroep aanvraagt, betaalt geen waarborg. Dit
+  // scherm kent de aanvraag nog niet, dus het volgt dezelfde regel als het
+  // formulier: bij geen enkele groep hoort een externe aanvraag.
+  const chargedHere = requestsAsExternal(session);
 
   return (
     <PageShell
@@ -121,12 +125,17 @@ export default async function ItemDetailPage({ params }: { params: Promise<{ id:
               <dt className="text-vtk-muted">{en ? 'In stock' : 'In voorraad'}</dt>
               <dd className="font-medium text-vtk-ink">{item.quantity}</dd>
             </div>
-            <div className="flex justify-between gap-4">
-              <dt className="text-vtk-muted">{en ? 'Deposit' : 'Waarborg'}</dt>
-              <dd className="font-medium text-vtk-ink">
-                {item.depositCents > 0 ? formatEuro(item.depositCents) : en ? 'None' : 'Geen'}
-              </dd>
-            </div>
+            {/* R4/S2: enkel een externe betaalt waarborg; voor een post of
+                werkgroep zou hier een bedrag staan dat nooit gevraagd wordt.
+                Zie `chargesRequester` in lib/uitleen.ts. */}
+            {chargedHere ? (
+              <div className="flex justify-between gap-4">
+                <dt className="text-vtk-muted">{en ? 'Deposit' : 'Waarborg'}</dt>
+                <dd className="font-medium text-vtk-ink">
+                  {item.depositCents > 0 ? formatEuro(item.depositCents) : en ? 'None' : 'Geen'}
+                </dd>
+              </div>
+            ) : null}
           </dl>
           {team ? (
             <div className="mt-4 rounded-[14px] border border-dashed border-vtk-navy/25 bg-vtk-paper/60 p-4">

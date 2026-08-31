@@ -2679,6 +2679,15 @@ enkel `EXTERN` betaalt.
 - **Los van `showRentPrices`.** Die instelling gaat over de dagprijzen in de
   catalogus (mag een lid zien wat een beamer kost?) en niet over een concrete
   aanvraag. De twee combineren, de ene vervangt de andere niet.
+- **Ook al vóór het indienen** (S2, ronde 3). De regel gold aanvankelijk enkel op
+  een bestaande aanvraag; het aanvraagformulier zelf toonde de waarborg per item,
+  in het totaal en in de betaalnota eronder, aan iedereen. Een post zag dus een
+  bedrag terwijl hij koos, en pas erna nooit meer. Het formulier kent zijn
+  aanvragertype (het leidt het af uit de gekozen groep, zoals de server dat bij
+  het indienen opnieuw doet), dus het volgt nu dezelfde regel. Op de
+  itemdetailpagina, waar er nog geen aanvraag is, geldt de regel van het
+  formulier: wie bij geen enkele groep hoort, vraagt extern aan en ziet de
+  waarborg wel.
 
 ### De uitleendienst gaat in fases open, en externen zijn de laatste
 
