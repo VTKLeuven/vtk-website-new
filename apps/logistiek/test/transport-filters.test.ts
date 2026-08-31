@@ -56,6 +56,36 @@ describe('countActiveFilters', () => {
     expect(hasActiveFilters(filters)).toBe(true);
     expect(hasActiveFilters(EMPTY_FILTERS)).toBe(false);
   });
+
+  it('telt de verborgen evenementenstrook mee', () => {
+    const filters = parseTransportFilters({ evenementen: '0' });
+    expect(filters.showEvents).toBe(false);
+    expect(countActiveFilters(filters)).toBe(1);
+  });
+});
+
+describe('showEvents', () => {
+  it('staat standaard aan', () => {
+    expect(parseTransportFilters({}).showEvents).toBe(true);
+    // Enkel een expliciete `0` zet ze uit; een tikfout in de URL mag de
+    // evenementen niet stil laten verdwijnen.
+    expect(parseTransportFilters({ evenementen: 'nee' }).showEvents).toBe(true);
+    expect(parseTransportFilters({ evenementen: '1' }).showEvents).toBe(true);
+  });
+
+  it('komt enkel in de URL wanneer ze uitstaat', () => {
+    expect(filtersToQuery(EMPTY_FILTERS)).toEqual({});
+    expect(filtersToQuery({ ...EMPTY_FILTERS, showEvents: false })).toEqual({ evenementen: '0' });
+  });
+
+  it('staat in de zin over wat er verborgen is', () => {
+    expect(
+      describeFilters({ ...EMPTY_FILTERS, showEvents: false }, {
+        vehicles: new Map(),
+        drivers: new Map(),
+      })
+    ).toEqual(['evenementen verborgen']);
+  });
 });
 
 describe('describeFilters', () => {

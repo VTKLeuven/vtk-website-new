@@ -1015,6 +1015,46 @@ const OCCUPYING_STATUSES: UitleenTransportBookingStatus[] = ['REQUESTED', 'APPRO
 const PLANNING_STATUSES: UitleenTransportBookingStatus[] = [...OCCUPYING_STATUSES, 'COMPLETED'];
 
 /**
+ * De evenementen die dit venster raken, voor de balken boven de transportplanning
+ * (P5).
+ *
+ * Enkel evenementen met een startmoment: een evenement zonder datum heeft geen
+ * plek op een kalender, en het bovenaan of onderaan plakken zou beweren dat het
+ * ergens valt.
+ *
+ * Een evenement zonder einde duurt tot het einde van zijn startdag; anders werd
+ * het een balk van nul breed, en dat is precies het evenement waarvan het team
+ * het uur nog niet ingevuld heeft.
+ */
+export async function eventsInRange(from: Date, to: Date) {
+  const events = await prisma.uitleenEvent.findMany({
+    where: {
+      startAt: { not: null, lt: to },
+      OR: [{ endAt: null }, { endAt: { gt: from } }],
+    },
+    select: {
+      id: true,
+      name: true,
+      location: true,
+      startAt: true,
+      startTimeKnown: true,
+      endAt: true,
+      note: true,
+      group: { select: { nameNl: true } },
+      _count: { select: { reservations: true, transport: true } },
+    },
+    orderBy: { startAt: 'asc' },
+  });
+  // Het einde per evenement afronden gebeurt hier en niet in de query: Prisma
+  // kan geen `endAt ?? einde van de startdag` in een `where` zetten, dus een
+  // meerdaags evenement dat vóór dit venster begon en geen einde heeft, filteren
+  // we er alsnog uit.
+  return events.filter((event) => (event.endAt ?? event.startAt!) >= from || event.startAt! >= from);
+}
+
+export type PlanningEvent = Awaited<ReturnType<typeof eventsInRange>>[number];
+
+/**
  * De filters van de planning als `where` (P3).
  *
  * De chauffeursfilter kan "nog geen chauffeur" bevatten; die en de gekozen

@@ -21,6 +21,8 @@ import { TransportControls } from '../transport-controls';
 import { TransportDecisionForms, type DecisionLeg } from '../transport-decision-forms';
 import { TripEditForm, type TripEditValues } from './trip-edit-form';
 import { NewTripForm, type NewTripValues } from './new-trip-form';
+import { EventEditForm, type PlannerEvent } from './event-edit-form';
+import type { CalendarEventBar } from '@/components/transport-calendar/event-bars';
 import { adminEditTransportAction } from '@/app/actions/beheer';
 import { useToast } from '@/components/ui/toast';
 import { toDatetimeLocalValue } from '@/lib/uitleen';
@@ -94,6 +96,7 @@ export function TransportPlanner({
   drivers,
   vehicleOptions,
   groups,
+  events,
   driverColors,
   filters,
   hiddenNote,
@@ -109,6 +112,8 @@ export function TransportPlanner({
   vehicleOptions: Array<{ id: string; name: string; needsVanDriver: boolean }>;
   /** Posten en werkgroepen waarvoor het team zelf een rit kan inplannen. */
   groups: Array<{ id: string; name: string }>;
+  /** De evenementen boven het rooster, met wat het paneel nodig heeft (P5). */
+  events: PlannerEvent[];
   driverColors?: DriverColorOverrides;
   filters: TransportFilters;
   /** Wat er door de filters niet getoond wordt, in woorden. */
@@ -127,7 +132,23 @@ export function TransportPlanner({
   const [openId, setOpenId] = useState<string | null>(null);
   /** De rit die je aan het intekenen bent, met de uren die je sleepte. */
   const [draft, setDraft] = useState<NewTripValues | null>(null);
+  const [openEventId, setOpenEventId] = useState<string | null>(null);
   const trip = trips.find((entry) => entry.id === openId) ?? null;
+  const openEvent = events.find((entry) => entry.id === openEventId) ?? null;
+
+  const eventBars: CalendarEventBar[] | undefined = filters.showEvents
+    ? events.map((event) => ({
+        id: event.id,
+        name: event.name,
+        location: event.location,
+        startAt: event.startAt,
+        endAt: event.endAt,
+        timeKnown: event.timeKnown,
+        groupName: event.groupName,
+        requestCount: event.requestCount,
+        tripCount: event.tripCount,
+      }))
+    : undefined;
 
   /**
    * Een rit verslepen of rekken in de kalender.
@@ -188,7 +209,15 @@ export function TransportPlanner({
         selectedId={openId}
         onSelect={(id) => {
           setDraft(null);
+          setOpenEventId(null);
           setOpenId(id);
+        }}
+        events={eventBars}
+        selectedEventId={openEventId}
+        onSelectEvent={(id) => {
+          setDraft(null);
+          setOpenId(null);
+          setOpenEventId(id);
         }}
         onMoveBlock={moveBlock}
         onCreateRange={createRange}
@@ -239,6 +268,29 @@ export function TransportPlanner({
           goedgekeurde ritten met hetzelfde voertuig op hetzelfde moment. Klik een rit aan om ze te
           beslissen of aan te passen.
         </p>
+
+        {openEvent ? (
+          <TripInspector
+            title={openEvent.name}
+            subtitle={
+              openEvent.groupName ? `Evenement · ${openEvent.groupName}` : 'Evenement'
+            }
+            onClose={() => setOpenEventId(null)}
+            footer={
+              <>
+                <Link
+                  href={`/beheer/evenementen#${openEvent.id}`}
+                  className="font-semibold text-vtk-navy underline decoration-vtk-yellow underline-offset-4"
+                >
+                  Alles van dit evenement
+                </Link>
+                : materiaal, flesserke, transport en de boodschappen naast elkaar.
+              </>
+            }
+          >
+            <EventEditForm event={openEvent} onSaved={() => setOpenEventId(null)} />
+          </TripInspector>
+        ) : null}
 
         {draft ? (
           <TripInspector

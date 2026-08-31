@@ -8,6 +8,8 @@ import {
   isoWeekNumber,
   parseDateOnly,
   requesterLabel,
+  toBrusselsDateValue,
+  toBrusselsTimeValue,
   toDateInputValue,
   toDatetimeLocalValue,
   todayDateOnly,
@@ -24,11 +26,13 @@ import {
   driverColorOverrides,
   activeGroups,
   driverOptions,
+  eventsInRange,
   transportAuditLogsByBooking,
   transportRange,
   type TransportBooking,
 } from '@/lib/uitleen-server';
 import { describeFilters, filtersToQuery, parseTransportFilters } from '@/lib/transport-filters';
+import { startOfBrusselsDay } from '@/lib/week-lanes';
 import { TransportPlanner, type PlannerTrip } from './planner';
 import type { TripBlock } from '@/components/transport-calendar/types';
 
@@ -68,6 +72,22 @@ function conflictingIds(bookings: TransportBooking[]): Set<string> {
   return conflicts;
 }
 
+/**
+ * 23:59 van dezelfde Belgische dag, voor een evenement zonder eindmoment.
+ *
+ * Via `startOfBrusselsDay` van de vólgende dag en niet via "plus 24 uur": op de
+ * dag van een uurwissel duurt een dag 23 of 25 uur, en dan zou de balk een uur
+ * te vroeg of te laat eindigen.
+ */
+function endOfDay(moment: Date): Date {
+  const parsed = parseDateOnly(toBrusselsDateValue(moment));
+  // Kan niet falen (de datum komt uit een `Date`), maar een terugval is
+  // goedkoper dan een pagina die omvalt op een tijdzonerand.
+  if (!parsed) return moment;
+  const nextDay = new Date(parsed.getTime() + DAY_MS);
+  return new Date(startOfBrusselsDay(nextDay) - 60_000);
+}
+
 /** De kop boven de kalender: "Week 36", "september 2026" of de dag zelf. */
 function periodTitle(view: CalendarView, anchor: Date): string {
   if (view === 'dag') return formatDateOnly(anchor);
@@ -99,7 +119,7 @@ export default async function VervoerWeekPage({
   const anchor = (datum && parseDateOnly(datum)) || (week && parseDateOnly(week)) || todayDateOnly();
   const { days, from, to } = calendarRange(view, anchor);
 
-  const [bookings, vehicles, drivers, driverColors, groups] = await Promise.all([
+  const [bookings, vehicles, drivers, driverColors, groups, events] = await Promise.all([
     transportRange(from, to, filters),
     activeVehicles(),
     driverOptions(),
@@ -107,6 +127,8 @@ export default async function VervoerWeekPage({
     // Voor wie het team zelf een rit inplant. Alle posten en werkgroepen, niet
     // enkel die van het teamlid: Logistiek rijdt voor de hele kring.
     activeGroups(),
+    // De evenementen die dit venster raken, voor de strook erboven (P5).
+    filters.showEvents ? eventsInRange(from, to) : Promise.resolve([]),
   ]);
 
   const conflicts = conflictingIds(bookings);
@@ -286,6 +308,31 @@ export default async function VervoerWeekPage({
               needsVanDriver: vehicle.needsVanDriver,
             }))}
           groups={groups.map((group) => ({ id: group.id, name: group.nameNl }))}
+          events={events.map((event) => {
+            const startAt = event.startAt as Date;
+            // Een evenement zonder einde duurt tot het einde van zijn startdag;
+            // een balk van nul breed zou onzichtbaar zijn, en dat is net het
+            // evenement waarvan het uur nog niet ingevuld is.
+            const endAt = event.endAt ?? endOfDay(startAt);
+            return {
+              id: event.id,
+              name: event.name,
+              location: event.location,
+              startAt: startAt.toISOString(),
+              endAt: endAt.toISOString(),
+              timeKnown: event.startTimeKnown,
+              groupName: event.group?.nameNl ?? null,
+              requestCount: event._count.reservations,
+              tripCount: event._count.transport,
+              form: {
+                startDate: toBrusselsDateValue(startAt),
+                startTime: event.startTimeKnown ? toBrusselsTimeValue(startAt) : '',
+                endDate: event.endAt ? toBrusselsDateValue(event.endAt) : '',
+                endTime: event.endAt ? toBrusselsTimeValue(event.endAt) : '',
+                note: event.note ?? '',
+              },
+            };
+          })}
           nav={{
             previousHref: hrefFor(shiftAnchor(view, anchor, -1)),
             nextHref: hrefFor(shiftAnchor(view, anchor, 1)),

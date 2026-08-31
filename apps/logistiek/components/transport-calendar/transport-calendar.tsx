@@ -11,8 +11,9 @@ import {
   type CalendarView,
 } from '@/lib/calendar-range';
 import { LogisticsIcon } from '@/components/logistics-icon';
+import { EventBars, type CalendarEventBar } from './event-bars';
 import { MonthGrid } from './month-grid';
-import { TimeGrid } from './time-grid';
+import { TimeGrid, timeGridColumns } from './time-grid';
 import { vehicleIcon } from './trip-block';
 import {
   HOUR_PX_DEFAULT,
@@ -52,6 +53,9 @@ export function TransportCalendar({
   toolbarExtra,
   onMoveBlock,
   onCreateRange,
+  events,
+  onSelectEvent,
+  selectedEventId,
   children,
 }: {
   view: CalendarView;
@@ -71,6 +75,14 @@ export function TransportCalendar({
   onMoveBlock?: (blockId: string, startAt: Date, endAt: Date) => void;
   /** Slepen op lege ruimte: een nieuwe rit op dat moment. */
   onCreateRange?: (startAt: Date, endAt: Date) => void;
+  /**
+   * De evenementen als strook boven het rooster (P5). Leeg of weggelaten laat de
+   * strook weg; in de maandweergave staan de ritten al als balken en zou een
+   * tweede rij balken erboven niet te onderscheiden zijn.
+   */
+  events?: CalendarEventBar[];
+  onSelectEvent?: (eventId: string) => void;
+  selectedEventId?: string | null;
   /** Wat onder de kalender komt: de legende staat er al, dit komt erna. */
   children?: React.ReactNode;
 }) {
@@ -322,6 +334,17 @@ export function TransportCalendar({
           now={now}
           onMoveBlock={onMoveBlock}
           onCreateRange={onCreateRange}
+          above={
+            events && events.length > 0 ? (
+              <EventBars
+                days={days}
+                events={events}
+                onSelect={onSelectEvent}
+                selectedId={selectedEventId}
+                columns={timeGridColumns(days.length)}
+              />
+            ) : undefined
+          }
         />
       )}
 

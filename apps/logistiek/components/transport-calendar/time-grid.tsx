@@ -52,6 +52,17 @@ const dayKeyFormatter = new Intl.DateTimeFormat('en-CA', {
 const DAY_MIN_WIDTH = '9.5rem';
 
 /**
+ * Het kolommenraster van de kalender: de urenkolom plus één kolom per dag.
+ *
+ * Geëxporteerd omdat de evenementenstrook erboven exact moet uitlijnen met de
+ * dagkolommen eronder; een tweede raster met dezelfde bedoeling schuift bij de
+ * eerste wijziging een halve kolom op.
+ */
+export function timeGridColumns(dayCount: number): string {
+  return `3.25rem repeat(${dayCount}, minmax(${DAY_MIN_WIDTH}, 1fr))`;
+}
+
+/**
  * De stap waarop slepen vastklikt. Hetzelfde kwartier als de server aanvaardt
  * (`isOnQuarterHour`): kon je fijner slepen, dan bouwde je een rit die bij het
  * opslaan geweigerd wordt.
@@ -95,6 +106,7 @@ export function TimeGrid({
   now,
   onMoveBlock,
   onCreateRange,
+  above,
 }: {
   /** De dagen, als ISO-strings van UTC-middernacht (date-only). */
   days: string[];
@@ -118,6 +130,11 @@ export function TimeGrid({
   onMoveBlock?: (blockId: string, startAt: Date, endAt: Date) => void;
   /** Slepen op lege ruimte: een nieuwe rit op dat moment. */
   onCreateRange?: (startAt: Date, endAt: Date) => void;
+  /**
+   * Wat er boven de dagkoppen komt (de evenementenstrook, P5). Binnen dezelfde
+   * scroller, zodat het meeschuift met de dagen eronder.
+   */
+  above?: ReactNode;
 }) {
   const parsedDays = useMemo(() => days.map((day) => new Date(day)), [days]);
   const vehicleById = useMemo(
@@ -293,12 +310,16 @@ export function TimeGrid({
 
   const hours = Array.from({ length: lastHour - firstHour }, (_, index) => firstHour + index);
   const height = hours.length * hourPx;
-  const columns = `3.25rem repeat(${parsedDays.length}, minmax(${DAY_MIN_WIDTH}, 1fr))`;
+  const columns = timeGridColumns(parsedDays.length);
 
   const todayKey = now ? dayKeyFormatter.format(now) : null;
   const nowMinutes = now ? minutesOfDay(now) : 0;
 
-  if (blocks.length === 0) {
+  // Helemaal leeg is één zin genoeg. Staan er wel evenementen (de strook
+  // erboven), dan blijft het rooster staan: dan zie je dat er die week iets
+  // gepland is waarvoor nog geen rit bestaat, en dat is precies het gat dat je
+  // wil zien.
+  if (blocks.length === 0 && !above) {
     return <p className="text-sm text-vtk-muted">{emptyLabel}</p>;
   }
 
@@ -308,6 +329,12 @@ export function TimeGrid({
     // telefoon het hele scherm uitzoomt om dat ene onzichtbare pixel te tonen.
     <div className="relative overflow-x-auto">
       <div className="rounded-[16px] border border-vtk-navy/10 bg-vtk-surface p-2">
+        {above}
+
+        {blocks.length === 0 ? (
+          <p className="px-1 pb-1 text-sm text-vtk-muted">{emptyLabel}</p>
+        ) : null}
+
         {/* Kop: de dagen. Meescrollend met de kolommen eronder, want ze staan in
             dezelfde scroller. */}
         <div className="grid gap-1 pb-1.5" style={{ gridTemplateColumns: columns }}>

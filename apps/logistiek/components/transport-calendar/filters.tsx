@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { driverColorVar, type DriverColorOverrides } from '@/lib/driver-colors';
 import {
+  EMPTY_FILTERS,
   NO_DRIVER,
   REQUESTER_TYPES,
   REQUESTER_TYPE_FILTER_LABELS,
@@ -161,6 +162,18 @@ export function TransportFilterBar({
         selected={filters.requesterTypes}
         onToggle={(id) => toggle('requesterTypes', id)}
       />
+      {/* Geen groep pillen maar een vinkje: dit is aan of uit, en één pil
+          "Evenementen" die aanstaat betekent iets anders dan één pil in een
+          groep waar er meer zijn. */}
+      <label className="flex items-center gap-2 text-sm text-vtk-ink">
+        <input
+          type="checkbox"
+          checked={filters.showEvents}
+          onChange={(event) => apply({ ...filters, showEvents: event.target.checked })}
+          className="h-4 w-4 accent-vtk-navy"
+        />
+        Evenementen boven de kalender
+      </label>
     </>
   );
 
@@ -191,9 +204,7 @@ export function TransportFilterBar({
           <div className="mt-4 flex items-center justify-between gap-3 border-t border-vtk-navy/10 pt-3">
             <button
               type="button"
-              onClick={() =>
-                apply({ vehicleIds: [], driverIds: [], statuses: [], requesterTypes: [] })
-              }
+              onClick={() => apply(EMPTY_FILTERS)}
               disabled={active === 0}
               className="text-sm font-semibold text-vtk-navy underline decoration-vtk-yellow underline-offset-4 disabled:text-vtk-muted disabled:no-underline"
             >

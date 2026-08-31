@@ -48,6 +48,12 @@ export type TransportFilters = {
   statuses: TripStatus[];
   /** Leeg = alle aanvragertypes. */
   requesterTypes: RequesterType[];
+  /**
+   * Staat de evenementenstrook boven het rooster (P5)? Standaard aan: het
+   * evenement is de context waarbinnen de ritten rijden, en die wegnemen maakt
+   * van de planning weer een lijst losse ritten.
+   */
+  showEvents: boolean;
 };
 
 export const EMPTY_FILTERS: TransportFilters = {
@@ -55,6 +61,7 @@ export const EMPTY_FILTERS: TransportFilters = {
   driverIds: [],
   statuses: [],
   requesterTypes: [],
+  showEvents: true,
 };
 
 /** Komma-gescheiden lijst uit de query, zonder lege stukken. */
@@ -70,8 +77,12 @@ export function parseTransportFilters(query: {
   chauffeur?: string;
   status?: string;
   aanvrager?: string;
+  evenementen?: string;
 }): TransportFilters {
   return {
+    // Enkel een expliciete `0` zet de strook uit; alles anders (ook een
+    // ontbrekende parameter) laat ze staan.
+    showEvents: query.evenementen !== '0',
     vehicleIds: parseList(query.voertuig),
     driverIds: parseList(query.chauffeur),
     statuses: parseList(query.status).filter((value): value is TripStatus =>
@@ -90,6 +101,7 @@ export function filtersToQuery(filters: TransportFilters): Record<string, string
   if (filters.driverIds.length > 0) query.chauffeur = filters.driverIds.join(',');
   if (filters.statuses.length > 0) query.status = filters.statuses.join(',');
   if (filters.requesterTypes.length > 0) query.aanvrager = filters.requesterTypes.join(',');
+  if (!filters.showEvents) query.evenementen = '0';
   return query;
 }
 
@@ -99,7 +111,8 @@ export function countActiveFilters(filters: TransportFilters): number {
     (filters.vehicleIds.length > 0 ? 1 : 0) +
     (filters.driverIds.length > 0 ? 1 : 0) +
     (filters.statuses.length > 0 ? 1 : 0) +
-    (filters.requesterTypes.length > 0 ? 1 : 0)
+    (filters.requesterTypes.length > 0 ? 1 : 0) +
+    (filters.showEvents ? 0 : 1)
   );
 }
 
@@ -139,5 +152,6 @@ export function describeFilters(
       `enkel ${filters.requesterTypes.map((t) => REQUESTER_TYPE_FILTER_LABELS[t].toLowerCase()).join(', ')}`
     );
   }
+  if (!filters.showEvents) parts.push('evenementen verborgen');
   return parts;
 }
