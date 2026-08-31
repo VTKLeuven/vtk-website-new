@@ -1127,6 +1127,11 @@ export type DriverOption = {
   source: DriverSource;
   /** Mag met de kar rijden, de bestelwagen; zie `UitleenDriver.canDriveVan`. */
   canDriveVan: boolean;
+  /**
+   * Kleur die het team zelf koos, of `null` voor de kleur uit zijn id
+   * (`driverColorIndex` in lib/driver-colors.ts).
+   */
+  colorIndex: number | null;
 };
 
 /** Leden van de post Logistiek dit werkingsjaar. */
@@ -1143,6 +1148,21 @@ async function logistiekTeamMembers() {
 }
 
 /**
+ * De kleuren die het team zelf zette, op gebruikers-id (K1).
+ *
+ * Apart van {@link driverOptions}, want het publieke bezettingsoverzicht toont
+ * wel de kleuren maar mag de chauffeurslijst zelf niet ophalen: dat zou namen
+ * meebrengen die daar niet horen.
+ */
+export async function driverColorOverrides(): Promise<Record<string, number>> {
+  const rows = await prisma.uitleenDriver.findMany({
+    where: { colorIndex: { not: null } },
+    select: { userId: true, colorIndex: true },
+  });
+  return Object.fromEntries(rows.map((row) => [row.userId, row.colorIndex as number]));
+}
+
+/**
  * Iedereen die als chauffeur gekozen kan worden: de post Logistiek van dit
  * werkingsjaar plus de handmatig toegevoegde chauffeurs. Zit iemand in allebei,
  * dan telt de post (die kost geen beheerwerk en verdwijnt vanzelf op 15 juli).
@@ -1152,22 +1172,24 @@ export async function driverOptions(): Promise<DriverOption[]> {
     logistiekTeamMembers(),
     prisma.uitleenDriver.findMany({
       where: { user: { active: true, deletedAt: null } },
-      select: { canDriveVan: true, user: { select: { id: true, name: true } } },
+      select: { canDriveVan: true, colorIndex: true, user: { select: { id: true, name: true } } },
     }),
   ]);
 
   // Een postlid kan óók een rij hier hebben: die wordt aangemaakt zodra iemand de
-  // karvlag zet. De bron blijft dan POST (die verdwijnt vanzelf op 15 juli), maar
-  // de vlag komt uit de rij.
-  const vanFlag = new Map(extra.map((row) => [row.user.id, row.canDriveVan]));
+  // karvlag of de kleur zet. De bron blijft dan POST (die verdwijnt vanzelf op
+  // 15 juli), maar de vlag en de kleur komen uit de rij.
+  const rowByUser = new Map(extra.map((row) => [row.user.id, row]));
 
   const byId = new Map<string, DriverOption>();
   for (const member of team) {
+    const row = rowByUser.get(member.id);
     byId.set(member.id, {
       id: member.id,
       name: member.name,
       source: 'POST',
-      canDriveVan: vanFlag.get(member.id) ?? false,
+      canDriveVan: row?.canDriveVan ?? false,
+      colorIndex: row?.colorIndex ?? null,
     });
   }
   for (const row of extra) {
@@ -1177,6 +1199,7 @@ export async function driverOptions(): Promise<DriverOption[]> {
       name: row.user.name,
       source: 'EXTRA',
       canDriveVan: row.canDriveVan,
+      colorIndex: row.colorIndex,
     });
   }
 
@@ -1209,6 +1232,7 @@ export async function driverPool(): Promise<DriverPoolEntry[]> {
         id: true,
         note: true,
         canDriveVan: true,
+        colorIndex: true,
         user: { select: { id: true, name: true, email: true, active: true } },
       },
     }),
@@ -1252,6 +1276,7 @@ export async function driverPool(): Promise<DriverPoolEntry[]> {
       driverRowId: null,
       note: row?.note ?? null,
       canDriveVan: row?.canDriveVan ?? false,
+      colorIndex: row?.colorIndex ?? null,
       inactive: false,
     });
   }
@@ -1264,6 +1289,7 @@ export async function driverPool(): Promise<DriverPoolEntry[]> {
       driverRowId: row.id,
       note: row.note,
       canDriveVan: row.canDriveVan,
+      colorIndex: row.colorIndex,
       inactive: !row.user.active,
     });
   }

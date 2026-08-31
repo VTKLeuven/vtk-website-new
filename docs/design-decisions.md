@@ -2082,7 +2082,8 @@ Wat daarbij vastligt:
   kalender. Zo blijft de kolombreedte voor de dag, en niet voor drie voertuigen
   waarvan er meestal twee leegstaan.
 - **De kleur blijft van de chauffeur** (zie B4), niet van het voertuig. Wie rijdt
-  is de vraag bij het plannen; wat er rijdt lees je aan het icoon.
+  is de vraag bij het plannen; wat er rijdt lees je aan het icoon **en sinds K1
+  aan de arcering** (hieronder).
 - **Overlappende ritten komen naast elkaar, ook over voertuigen heen.** Anders
   verbergt de auto de kar op precies het moment waarop je wil zien dat er twee
   dingen tegelijk rijden. De breedte wordt per groep elkaar rakende ritten
@@ -2097,6 +2098,46 @@ Wat daarbij vastligt:
   kreeg dan een einduur vóór zijn beginuur (een blok met negatieve hoogte) en een
   rit van 00:30 belandde op de dag ervoor. `lib/week-lanes.ts` rekent de dagrand
   daarom om, en `test/week-lanes.test.ts` houdt dat vast.
+
+### Een rit leest op twee assen: kleur is wie, arcering is wat
+
+Ronde 3 vroeg om "kleurcodering of arcering om voertuigen te onderscheiden",
+terwijl de kleur al van de chauffeur was. Beide op de kleur zetten kan niet, dus
+ze staan naast elkaar op twee assen die je tegelijk kan lezen.
+
+- **De vulkleur is de chauffeur.** Dat blijft de eerste vraag bij het plannen, en
+  het is de as die het langst bestaat (B4).
+- **De arcering is het voertuig** (`UitleenVehicle.pattern`: schuine strepen,
+  verticale strepen, stippen, ruitjes, of niets). Het icoon in het blok zegt
+  hetzelfde, maar een icoon van twaalf pixels lees je pas van dichtbij; een
+  patroon herken je over een hele week heen. De patronen zijn licht gehouden
+  (alfa rond 0.13): het is een tweede laag informatie, geen tweede kleur, en de
+  tekst in het blok moet leesbaar blijven.
+- **Geen chauffeur schreeuwt het luidst.** Dat is de enige toestand op deze
+  kalender die nog werk is, dus ze krijgt de gele accentkleur plus een rode
+  **streepjes**rand. Streepjes en niet vol, want een volle rode rand betekent al
+  iets anders: twee goedgekeurde ritten met hetzelfde voertuig op hetzelfde
+  moment.
+- **Behalve waar de aanvrager zelf rijdt.** Een bakfiets zonder chauffeur is geen
+  openstaande taak (`needsDriver`, T13); daar staat "rijdt zelf" in grijs in
+  plaats van "geen chauffeur" in het rood. Anders staat er elke week een taak op
+  het scherm die niemand ooit kan afvinken.
+- **Instelbaar, met de hash als standaard.** `driverColorIndex` leidt de kleur af
+  uit de id van de chauffeur, en dat blijft de standaard: het doel is
+  onderscheiden wie welke rit doet, niet dat Jonas geel wil. Maar twee chauffeurs
+  die toevallig op bijna dezelfde tint uitkomen, moet het team kunnen
+  rechtzetten, en dat hoort geen deploy te vragen. `UitleenDriver.colorIndex`
+  overschrijft de hash; `null` is de hash. Een waarde die buiten het palet valt
+  (een handmatige update, een ooit verkleind palet) valt terug op de hash in
+  plaats van een token te vragen dat niet bestaat, want een blok zonder vulling
+  ziet eruit als een blok zonder chauffeur.
+- **Acht bolletjes, geen kleurkiezer.** De tinten staan als tokens in
+  `apps/logistiek/app/globals.css` en zijn gekozen om naast elkaar te
+  onderscheiden én donkere tekst leesbaar te houden. Een vrije kleurkiezer zet
+  daar binnen de maand een donkerblauw en een knalgeel tussen.
+- **Een postlid krijgt pas een `UitleenDriver`-rij zodra iemand er iets aan
+  instelt**, net zoals bij `canDriveVan`. De rij is de plek voor wat het team
+  handmatig bijhoudt; het lidmaatschap zelf blijft uit de post komen.
 
 ### Karchauffeurs: één vlag, geen aparte soort
 

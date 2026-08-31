@@ -13,6 +13,7 @@ import {
 } from '@/lib/uitleen';
 import {
   activeVehicles,
+  driverColorOverrides,
   transportWeekForMembers,
   transportWeekPublic,
 } from '@/lib/uitleen-server';
@@ -53,10 +54,13 @@ export default async function VervoerBezettingPage({
 
   // Twee aparte projecties in plaats van één met een vlag: zo kan er geen veld
   // uit de ledenversie in de publieke versie belanden.
-  const [memberBookings, publicBookings, vehicles] = await Promise.all([
+  const [memberBookings, publicBookings, vehicles, driverColors] = await Promise.all([
     session ? transportWeekForMembers(monday, nextMonday) : Promise.resolve(null),
     session ? Promise.resolve(null) : transportWeekPublic(monday, nextMonday),
     activeVehicles(),
+    // Enkel zinvol voor wie de chauffeurs ook te zien krijgt; zonder login staat
+    // er geen naam en dus ook geen kleur per persoon.
+    session ? driverColorOverrides() : Promise.resolve({}),
   ]);
 
   const thisWeek = startOfWeek(new Date());
@@ -161,20 +165,23 @@ export default async function VervoerBezettingPage({
               id: vehicle.id,
               name: en ? vehicle.nameEn : vehicle.nameNl,
               code: vehicle.code,
+              pattern: vehicle.pattern,
+              needsDriver: vehicle.needsDriver,
             }))}
             blocks={blocks}
             emptyLabel={en ? 'Nothing booked this week.' : 'Niets geboekt deze week.'}
             showDriver={Boolean(session)}
+            driverColors={driverColors}
           />
 
           <p className="text-xs text-vtk-muted">
             {session
               ? en
-                ? 'Every driver has their own colour; a trip without a driver is yellow, and the vehicle is in the block with its icon. Striped means requested but not decided yet, so that slot may still become free.'
-                : 'Elke chauffeur heeft zijn eigen kleur; een rit zonder chauffeur is geel, en het voertuig staat met zijn icoon in het blok. Gestreept is aangevraagd maar nog niet beslist, dus dat moment kan nog vrijkomen.'
+                ? 'The fill colour is the driver, the hatching is the vehicle; a trip without a driver is yellow with a red dashed border. Diagonal stripes mean requested but not decided yet, so that slot may still become free.'
+                : 'De vulkleur is de chauffeur, de arcering is het voertuig; een rit zonder chauffeur is geel met een rode streepjesrand. Schuine strepen betekenen aangevraagd maar nog niet beslist, dus dat moment kan nog vrijkomen.'
               : en
-                ? 'Striped means requested but not yet decided; the vehicle may still become free.'
-                : 'Gestreept is aangevraagd maar nog niet beslist; dat moment kan dus nog vrijkomen.'}
+                ? 'The hatching tells the vehicles apart. Striped means requested but not yet decided; the vehicle may still become free.'
+                : 'De arcering onderscheidt de voertuigen. Gestreept is aangevraagd maar nog niet beslist; dat moment kan dus nog vrijkomen.'}
           </p>
         </div>
       )}

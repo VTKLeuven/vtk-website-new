@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, type ReactNode } from 'react';
-import { driverColorVar } from '@/lib/driver-colors';
+import { driverColorVar, vehiclePatternClass, type DriverColorOverrides } from '@/lib/driver-colors';
 import { placeForDay, type Placed } from '@/lib/week-lanes';
 import { LogisticsIcon } from '@/components/logistics-icon';
 
@@ -40,6 +40,14 @@ export type WeekVehicle = {
   name: string;
   /** `kar`, `auto`, `bakfiets`, ...: bepaalt welk icoon in het blok staat. */
   code: string;
+  /** Arcering van dit voertuig (K1); null of `none` = geen. */
+  pattern?: string | null;
+  /**
+   * Rijdt Logistiek dit voertuig? De bakfiets neemt de aanvrager zelf mee, dus
+   * daar is "nog geen chauffeur" geen openstaande taak maar de normale gang van
+   * zaken (T13). Weggelaten = wel, zoals het veld in de databank.
+   */
+  needsDriver?: boolean;
 };
 
 /** Hoogte van één uur. Genoeg voor de vier regels van een rit van een uur. */
@@ -78,6 +86,7 @@ export function TransportWeekGrid({
   onSelect,
   emptyLabel,
   showDriver = true,
+  driverColors,
 }: {
   /** De dagen van de week, als ISO-strings van UTC-middernacht. */
   days: string[];
@@ -88,6 +97,8 @@ export function TransportWeekGrid({
   emptyLabel: string;
   /** Uit op het publieke overzicht zonder login: daar is er geen chauffeur om te tonen. */
   showDriver?: boolean;
+  /** Kleuren die het team zelf zette (K1); de rest volgt uit de id. */
+  driverColors?: DriverColorOverrides;
 }) {
   const parsedDays = useMemo(() => days.map((day) => new Date(day)), [days]);
   const vehicleById = useMemo(
@@ -184,6 +195,7 @@ export function TransportWeekGrid({
                     firstHour={firstHour}
                     onSelect={onSelect}
                     showDriver={showDriver}
+                    driverColors={driverColors}
                   />
                 ))}
               </div>
@@ -192,11 +204,18 @@ export function TransportWeekGrid({
         </div>
       </div>
 
-      {/* Welk icoon hoort bij welk voertuig. Het staat in elk blok, dus zonder
-          deze regel moet je raden wat het karretje voorstelt. */}
+      {/* Welk icoon en welke arcering horen bij welk voertuig (K1). Allebei
+          staan ze in het blok, dus zonder deze regel moet je raden wat het
+          karretje voorstelt en waarom het gestreept is. */}
       <ul className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-vtk-muted">
         {vehicles.map((vehicle) => (
           <li key={vehicle.id} className="flex items-center gap-1.5">
+            <span
+              aria-hidden
+              className={`h-3.5 w-3.5 shrink-0 rounded-[3px] border border-vtk-navy/20 bg-vtk-paper ${vehiclePatternClass(
+                vehicle.pattern
+              )}`}
+            />
             <LogisticsIcon name={vehicleIcon(vehicle.code)} className="h-3.5 w-3.5 shrink-0" />
             {vehicle.name}
           </li>
@@ -212,12 +231,14 @@ function BlockView({
   firstHour,
   onSelect,
   showDriver,
+  driverColors,
 }: {
   block: Placed<WeekBlock>;
   vehicle: WeekVehicle | null;
   firstHour: number;
   onSelect?: (blockId: string) => void;
   showDriver: boolean;
+  driverColors?: DriverColorOverrides;
 }) {
   const top = ((block.from - firstHour * 60) / 60) * HOUR_PX;
   const rawHeight = ((block.to - block.from) / 60) * HOUR_PX;
@@ -225,6 +246,9 @@ function BlockView({
 
   const requested = block.status === 'REQUESTED';
   const done = block.status === 'COMPLETED';
+  // Enkel waar Logistiek zelf rijdt is "geen chauffeur" nog werk; het publieke
+  // overzicht toont geen chauffeurs, dus daar valt er niets te markeren.
+  const noDriver = showDriver && !block.driver && (vehicle?.needsDriver ?? true);
   const style: React.CSSProperties = {
     top: Math.max(0, top),
     // Minimaal 24px: een kwartierrit moet aanklikbaar blijven.
@@ -232,8 +256,9 @@ function BlockView({
     left: `${block.lane * laneWidth}%`,
     width: `${laneWidth}%`,
     // `backgroundColor` en niet de `background`-shorthand: die laatste wist het
-    // streeppatroon van `.week-block-requested` weer uit.
-    backgroundColor: block.conflict ? undefined : driverColorVar(block.driver?.id),
+    // streeppatroon van `.week-block-requested` en de arcering van het voertuig
+    // weer uit.
+    backgroundColor: block.conflict ? undefined : driverColorVar(block.driver?.id, driverColors),
   };
 
   // Staat dit blok naast een ander, dan is er geen plaats voor een heel bereik.
@@ -259,8 +284,12 @@ function BlockView({
       {showDriver ? (
         block.driver ? (
           <span className="block truncate font-medium">{block.driver.name}</span>
+        ) : noDriver ? (
+          <span className="block truncate font-semibold text-red-700">geen chauffeur</span>
         ) : (
-          <span className="block truncate font-semibold">geen chauffeur</span>
+          // De aanvrager rijdt zelf (bakfiets): dat is geen ontbrekende
+          // chauffeur, dus het staat er gewoon en niet in het rood.
+          <span className="block truncate text-vtk-muted">rijdt zelf</span>
         )
       ) : null}
     </>
@@ -268,7 +297,17 @@ function BlockView({
 
   const className = [
     'absolute overflow-hidden rounded-[8px] px-1.5 py-1 text-left text-[11px] leading-tight text-vtk-ink',
-    block.conflict ? 'border-2 border-red-500 bg-red-50 text-red-900' : 'border border-vtk-navy/15',
+    block.conflict
+      ? 'border-2 border-red-500 bg-red-50 text-red-900'
+      : noDriver
+        ? // Geen chauffeur is het enige wat hier nog werk is (K1): gele vulling
+          // plus een rode streepjesrand, zodat ze opvalt tussen de toegewezen
+          // ritten. Gestreept en niet vol, anders lijkt ze op een conflict.
+          'border-2 trip-no-driver'
+        : 'border border-vtk-navy/15',
+    // De arcering van het voertuig (K1); bij een conflict niet, want dan is de
+    // rode vulling het enige wat je moet zien.
+    block.conflict ? '' : vehiclePatternClass(vehicle?.pattern),
     // Nog te beslissen: gestreept, zodat je ziet dat dit moment nog kan
     // vrijkomen (T8). Afgerond: lichter, want het is geschiedenis.
     requested ? 'week-block-requested' : '',

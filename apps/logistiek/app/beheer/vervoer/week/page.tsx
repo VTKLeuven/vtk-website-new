@@ -10,6 +10,7 @@ import {
 } from '@/lib/uitleen';
 import {
   activeVehicles,
+  driverColorOverrides,
   driverOptions,
   transportWeek,
   type TransportWeekBooking,
@@ -61,10 +62,11 @@ export default async function VervoerWeekPage({
     new Date(monday.getTime() + index * DAY_MS).toISOString()
   );
 
-  const [bookings, vehicles, drivers] = await Promise.all([
+  const [bookings, vehicles, drivers, driverColors] = await Promise.all([
     transportWeek(monday, nextMonday),
     activeVehicles(),
     driverOptions(),
+    driverColorOverrides(),
   ]);
 
   const conflicts = conflictingIds(bookings);
@@ -214,10 +216,13 @@ export default async function VervoerWeekPage({
               id: vehicle.id,
               name: vehicle.nameNl,
               code: vehicle.code,
+              pattern: vehicle.pattern,
+              needsDriver: vehicle.needsDriver,
             }))}
             blocks={blocks}
             trips={trips}
             drivers={drivers}
+            driverColors={driverColors}
             vehicleOptions={vehicles.map((vehicle) => ({
               id: vehicle.id,
               name: vehicle.nameNl,
@@ -226,10 +231,11 @@ export default async function VervoerWeekPage({
           />
 
           <p className="text-xs text-vtk-muted">
-            Elke chauffeur heeft zijn eigen kleur; een rit zonder chauffeur is geel. Het voertuig
-            staat met zijn icoon in het blok. Gestreept = nog te beslissen, doorzichtig = afgerond,
-            rood = twee goedgekeurde ritten met hetzelfde voertuig op hetzelfde moment. Klik een
-            rit aan om ze te beslissen of aan te passen.
+            De vulkleur is de chauffeur, de arcering is het voertuig; een rit zonder chauffeur is
+            geel met een rode streepjesrand. Kleuren stel je in bij Chauffeurs, arceringen bij
+            Instellingen. Gestreept = nog te beslissen, doorzichtig = afgerond, volle rode rand =
+            twee goedgekeurde ritten met hetzelfde voertuig op hetzelfde moment. Klik een rit aan
+            om ze te beslissen of aan te passen.
           </p>
         </>
       )}

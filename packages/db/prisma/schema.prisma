@@ -3125,6 +3125,16 @@ model UitleenVehicle {
   /// `code == "bakfiets"`, om dezelfde reden als bij `needsVanDriver`.
   needsDriver    Boolean            @default(true)
 
+  /// Arcering van dit voertuig in de transportplanning: `diagonal`, `vertical`,
+  /// `dots`, `grid` of `none`. Een streeppatroon en geen kleur, want de kleur is
+  /// al bezet door de chauffeur (zie `UitleenDriver.colorIndex`): zo lees je in
+  /// één blok wie rijdt én waarmee, in plaats van te moeten kiezen.
+  ///
+  /// Een vrije string en geen enum: de patronen zijn CSS-klassen, en er eentje
+  /// bij zetten hoort geen migratie te vragen. `null` = geen arcering, wat de
+  /// toestand is van elk voertuig tot iemand er een kiest.
+  pattern        String?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -3151,6 +3161,20 @@ model UitleenDriver {
   // uit. Leden van de post Logistiek hebben pas een rij hier zodra iemand deze
   // vlag zet; tot dan gelden ze als autochauffeur.
   canDriveVan Boolean @default(false)
+
+  /// De kleur van deze chauffeur in de transportplanning, 1 tot 8
+  /// (`--driver-1` .. `--driver-8` in app/globals.css).
+  ///
+  /// `null` = de kleur die uit zijn id volgt (`driverColorIndex` in
+  /// lib/driver-colors.ts). Die hash blijft de standaard: het doel is
+  /// onderscheiden wie welke rit doet, niet dat Jonas geel wil. Maar twee
+  /// chauffeurs die toevallig op bijna dezelfde tint uitkomen, of iemand die
+  /// altijd al "de blauwe" was, moet het team kunnen rechtzetten zonder dat
+  /// daar een deploy aan te pas komt.
+  ///
+  /// Een lid van de post Logistiek zonder rij in deze tabel krijgt er een zodra
+  /// iemand zijn kleur zet, net zoals `canDriveVan` dat al doet.
+  colorIndex  Int?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

@@ -6,6 +6,7 @@ import type { Prisma } from '@prisma/client';
 import { currentWorkingYear } from '@vtk/auth';
 import { requireManage } from '@/lib/session';
 import { writeAudit } from '@/lib/audit';
+import { isDriverColorIndex, isVehiclePattern } from '@/lib/driver-colors';
 import { saveError, saveOk, type SaveState } from '@/lib/saveState';
 import {
   describeReservationChanges,
@@ -2412,6 +2413,44 @@ export async function setDriverVanAction(
 }
 
 /**
+ * De kleur van een chauffeur in de transportplanning (K1).
+ *
+ * `null` zet hem terug op de kleur die uit zijn id volgt; dat is de standaard en
+ * niet "geen kleur", want een blok zonder vulling is niet te onderscheiden van
+ * een blok zonder chauffeur.
+ *
+ * Upsert, zoals `setDriverVanAction`: een lid van de post Logistiek heeft pas een
+ * rij zodra iemand er iets aan instelt.
+ */
+export async function setDriverColorAction(
+  userId: string,
+  colorIndex: number | null
+): Promise<ActionResult> {
+  await requireManage();
+
+  if (colorIndex !== null && !isDriverColorIndex(colorIndex)) {
+    return { ok: false, error: 'Die kleur bestaat niet.' };
+  }
+
+  const user = await prisma.user.findFirst({
+    where: { id: userId, deletedAt: null },
+    select: { id: true },
+  });
+  if (!user) return { ok: false, error: 'Dit lid bestaat niet (meer) op vtk.be.' };
+
+  await prisma.uitleenDriver.upsert({
+    where: { userId },
+    update: { colorIndex },
+    create: { userId, colorIndex },
+  });
+
+  revalidateBeheer();
+  // Ook het publieke bezettingsoverzicht draagt deze kleuren.
+  revalidatePath('/vervoer/bezetting');
+  return { ok: true, message: colorIndex === null ? 'Terug op de standaardkleur.' : 'Kleur opgeslagen.' };
+}
+
+/**
  * Chauffeur uit de pool halen. Ritten die al aan deze persoon toegewezen zijn
  * blijven bewust staan: de rit is gereden of gepland, en de naam wissen zou de
  * historiek en de planning stukmaken. Wel verdwijnt de keuze voor nieuwe ritten,
@@ -2446,6 +2485,7 @@ export async function saveVehicleAction(_prev: SaveState, formData: FormData): P
     ? (modeRaw as PricingMode)
     : 'FREE';
   const rateCents = parseEuroToCents(formData.get('rate'));
+  const patternRaw = String(formData.get('pattern') ?? '').trim();
   if (!nameNl) return saveError('NAME_REQUIRED');
   if (rateCents === null) return saveError('AMOUNT_INVALID');
 
@@ -2457,6 +2497,10 @@ export async function saveVehicleAction(_prev: SaveState, formData: FormData): P
     rateCents: pricingMode === 'FREE' ? 0 : rateCents,
     needsVanDriver: String(formData.get('needsVanDriver') ?? '') === 'on',
     needsDriver: String(formData.get('needsDriver') ?? '') === 'on',
+    // "Geen arcering" bewaren we als null en niet als de string 'none': in de
+    // databank is dat dezelfde toestand, en twee schrijfwijzen voor hetzelfde
+    // lopen vroeg of laat uiteen in een query.
+    pattern: isVehiclePattern(patternRaw) && patternRaw !== 'none' ? patternRaw : null,
   };
   if (id) {
     await prisma.uitleenVehicle.update({ where: { id }, data });
@@ -2472,6 +2516,8 @@ export async function saveVehicleAction(_prev: SaveState, formData: FormData): P
   }
 
   revalidateBeheer();
+  // De arcering staat ook op het publieke bezettingsoverzicht.
+  revalidatePath('/vervoer/bezetting');
   return saveOk();
 }
 

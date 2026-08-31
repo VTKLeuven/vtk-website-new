@@ -9,6 +9,7 @@ import {
 } from '@/components/transport-week-grid';
 import { TransportControls } from '../transport-controls';
 import { TransportDecisionForms, type DecisionLeg } from '../transport-decision-forms';
+import type { DriverColorOverrides } from '@/lib/driver-colors';
 import type { DriverOption } from '@/lib/uitleen-server';
 import type { UitleenPricingMode, UitleenRequesterType } from '@prisma/client';
 
@@ -52,6 +53,7 @@ export function TransportWeekPlanner({
   trips,
   drivers,
   vehicleOptions,
+  driverColors,
 }: {
   days: string[];
   vehicles: WeekVehicle[];
@@ -59,6 +61,8 @@ export function TransportWeekPlanner({
   trips: PlannerTrip[];
   drivers: DriverOption[];
   vehicleOptions: Array<{ id: string; name: string; needsVanDriver: boolean }>;
+  /** Kleuren die het team zelf zette (K1). */
+  driverColors?: DriverColorOverrides;
 }) {
   const [openId, setOpenId] = useState<string | null>(null);
   const trip = trips.find((entry) => entry.id === openId) ?? null;
@@ -80,6 +84,7 @@ export function TransportWeekPlanner({
         blocks={blocks}
         onSelect={setOpenId}
         emptyLabel="Geen ritten deze week."
+        driverColors={driverColors}
       />
 
       {trip ? (

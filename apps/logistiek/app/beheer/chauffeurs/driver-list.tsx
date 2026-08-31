@@ -1,7 +1,15 @@
 'use client';
 
+import { useTransition } from 'react';
 import Link from 'next/link';
-import { removeDriverAction, saveDriverNoteAction, setDriverVanAction } from '@/app/actions/beheer';
+import {
+  removeDriverAction,
+  saveDriverNoteAction,
+  setDriverColorAction,
+  setDriverVanAction,
+} from '@/app/actions/beheer';
+import { DRIVER_COLOR_COUNT, driverColorIndex, driverColorVar } from '@/lib/driver-colors';
+import { useToast } from '@/components/ui/toast';
 import { ConfirmActionButton } from '@/components/ui/confirm-action-button';
 import { LogisticsIcon } from '@/components/logistics-icon';
 import { SaveForm } from '@/components/ui/save-form';
@@ -29,6 +37,91 @@ function removeDescription(entry: DriverPoolEntry): string {
     return `${base} De ${entry.upcomingTrips} ritten die al toegewezen zijn, blijven staan; ${entry.name} blijft ze ook zien. Wil je die ritten aan iemand anders geven, wijs ze dan eerst een andere chauffeur toe.`;
   }
   return `${base} De historiek van gereden ritten blijft bewaard.`;
+}
+
+/**
+ * De kleur van deze chauffeur in de transportplanning (K1).
+ *
+ * Acht bolletjes en geen kleurkiezer: de tinten komen uit `app/globals.css` en
+ * zijn gekozen om naast elkaar te onderscheiden en donkere tekst leesbaar te
+ * houden. Een vrije kleurkiezer zou daar binnen een maand een donkerblauw en een
+ * knalgeel tussen zetten.
+ *
+ * De negende knop zet hem terug op de kleur die uit zijn id volgt. Die
+ * standaardkleur staat er als bolletje bij, want "standaard" is hier een kleur
+ * en geen leegte.
+ */
+function DriverColorPicker({ entry }: { entry: DriverPoolEntry }) {
+  const showToast = useToast();
+  const [pending, startTransition] = useTransition();
+  const active = entry.colorIndex;
+  const fallback = driverColorIndex(entry.id);
+
+  function choose(colorIndex: number | null) {
+    startTransition(async () => {
+      const result = await setDriverColorAction(entry.id, colorIndex);
+      if (result.ok) {
+        showToast({ message: result.message ?? 'Opgeslagen.', variant: 'success' });
+      } else {
+        showToast({ message: result.error, variant: 'error', duration: 0 });
+      }
+    });
+  }
+
+  return (
+    <div className="mt-2">
+      <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-vtk-muted">
+        Kleur in de planning
+      </p>
+      <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+        {Array.from({ length: DRIVER_COLOR_COUNT }, (_, index) => index + 1).map((index) => (
+          <button
+            key={index}
+            type="button"
+            disabled={pending}
+            onClick={() => choose(index)}
+            aria-pressed={active === index}
+            title={`Kleur ${index}`}
+            className={`h-6 w-6 rounded-full border transition disabled:opacity-50 ${
+              active === index
+                ? 'border-vtk-navy ring-2 ring-vtk-navy/40'
+                : 'border-vtk-navy/20 hover:border-vtk-navy/50'
+            }`}
+            style={{ backgroundColor: `var(--driver-${index})` }}
+          >
+            <span className="sr-only">
+              Kleur {index} voor {entry.name}
+            </span>
+          </button>
+        ))}
+        <button
+          type="button"
+          disabled={pending || active === null}
+          onClick={() => choose(null)}
+          aria-pressed={active === null}
+          title="Terug op de standaardkleur"
+          className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium transition disabled:opacity-50 ${
+            active === null
+              ? 'border-vtk-navy bg-vtk-navy/5 text-vtk-ink'
+              : 'border-vtk-navy/20 text-vtk-muted hover:border-vtk-navy/50'
+          }`}
+        >
+          <span
+            aria-hidden
+            className="h-3 w-3 rounded-full border border-vtk-navy/20"
+            style={{ backgroundColor: driverColorVar(entry.id) }}
+          />
+          Standaard
+          <span className="sr-only">kleur voor {entry.name}</span>
+        </button>
+      </div>
+      {active !== null && active === fallback ? (
+        <p className="mt-1 text-xs text-vtk-muted">
+          Dit is toevallig ook de standaardkleur van {entry.name}.
+        </p>
+      ) : null}
+    </div>
+  );
 }
 
 function DriverRow({ entry }: { entry: DriverPoolEntry }) {
@@ -68,6 +161,7 @@ function DriverRow({ entry }: { entry: DriverPoolEntry }) {
             </div>
           </dl>
           {entry.note ? <p className="mt-1 text-sm text-vtk-body">{entry.note}</p> : null}
+          <DriverColorPicker entry={entry} />
         </div>
 
         {/* De karvlag staat naast de naam en niet in de notitie: de keuzelijst
