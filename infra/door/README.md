@@ -66,6 +66,7 @@ tests en oudere opstellingen.
 | `DOOR_LISTEN_HOST` | `0.0.0.0` | Bind-adres van de remote-open listener (mag de Tailscale-IP zijn). |
 | `DOOR_LISTEN_PORT` | `8080` | Poort van de listener. |
 | `DOOR_INPUT_DEVICE` | *(leeg)* | Stabiel `/dev/input/by-id/*-event-kbd`-pad van de USB-kaartlezer. Zonder waarde leest de scanner stdin (debug/legacy). |
+| `DOOR_KEYBOARD_LAYOUT` | `be` | Toetsenbordindeling van de scanner (`be` voor Belgisch AZERTY van SpringCard, of `us`). |
 | `DOOR_INPUT_RETRY_SECONDS` | `3` | Wachttijd voordat een losgekoppelde kaartlezer opnieuw geopend wordt. |
 | `DOOR_GPIO_PORT` | `7` | BOARD-pin van de lock. |
 | `DOOR_UNLOCK_SECONDS` | `5` | Hoelang de lock open blijft (de server kan dit per open overschrijven). |

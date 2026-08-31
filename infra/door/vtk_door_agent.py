@@ -44,6 +44,7 @@ DEVICE_SECRET = os.environ.get("DOOR_DEVICE_SECRET", "")
 LISTEN_HOST = os.environ.get("DOOR_LISTEN_HOST", "0.0.0.0")
 LISTEN_PORT = int(os.environ.get("DOOR_LISTEN_PORT", "8080"))
 INPUT_DEVICE = os.environ.get("DOOR_INPUT_DEVICE", "").strip()
+KEYBOARD_LAYOUT = os.environ.get("DOOR_KEYBOARD_LAYOUT", "be").strip().lower()
 INPUT_RETRY_SECONDS = float(os.environ.get("DOOR_INPUT_RETRY_SECONDS", "3"))
 
 GPIO_PORT = int(os.environ.get("DOOR_GPIO_PORT", "7"))
@@ -314,75 +315,120 @@ def scan_stdin():
     log("stdin is gesloten; kaartscan-worker stopt (remote-open blijft actief).")
 
 
+# Toetsenbordindelingen voor USB-kaartlezers.
+# SpringCard-lezers (KU Leuven) emuleren standaard Belgisch AZERTY (LAYOUT_BE).
+LAYOUT_BE = {
+    "KEY_GRAVE": ("²", "³"),
+    "KEY_1": ("&", "1"),
+    "KEY_2": ("é", "2"),
+    "KEY_3": ('"', "3"),
+    "KEY_4": ("'", "4"),
+    "KEY_5": ("(", "5"),
+    "KEY_6": ("§", "6"),
+    "KEY_7": ("è", "7"),
+    "KEY_8": ("!", "8"),
+    "KEY_9": ("ç", "9"),
+    "KEY_0": ("à", "0"),
+    "KEY_MINUS": (")", "°"),
+    "KEY_EQUAL": ("-", "_"),
+    "KEY_Q": ("a", "A"),
+    "KEY_W": ("z", "Z"),
+    "KEY_E": ("e", "E"),
+    "KEY_R": ("r", "R"),
+    "KEY_T": ("t", "T"),
+    "KEY_Y": ("y", "Y"),
+    "KEY_U": ("u", "U"),
+    "KEY_I": ("i", "I"),
+    "KEY_O": ("o", "O"),
+    "KEY_P": ("p", "P"),
+    "KEY_LEFTBRACE": ("^", "¨"),
+    "KEY_RIGHTBRACE": ("$", "*"),
+    "KEY_A": ("q", "Q"),
+    "KEY_S": ("s", "S"),
+    "KEY_D": ("d", "D"),
+    "KEY_F": ("f", "F"),
+    "KEY_G": ("g", "G"),
+    "KEY_H": ("h", "H"),
+    "KEY_J": ("j", "J"),
+    "KEY_K": ("k", "K"),
+    "KEY_L": ("l", "L"),
+    "KEY_SEMICOLON": ("m", "M"),
+    "KEY_APOSTROPHE": ("ù", "%"),
+    "KEY_BACKSLASH": ("µ", "£"),
+    "KEY_102ND": ("<", ">"),
+    "KEY_Z": ("w", "W"),
+    "KEY_X": ("x", "X"),
+    "KEY_C": ("c", "C"),
+    "KEY_V": ("v", "V"),
+    "KEY_B": ("b", "B"),
+    "KEY_N": ("n", "N"),
+    "KEY_M": (",", "?"),
+    "KEY_COMMA": (";", "."),
+    "KEY_DOT": (":", "/"),
+    "KEY_SLASH": ("=", "+"),
+    "KEY_SPACE": (" ", " "),
+}
+
+LAYOUT_US = {
+    "KEY_GRAVE": ("`", "~"),
+    "KEY_1": ("1", "!"),
+    "KEY_2": ("2", "@"),
+    "KEY_3": ("3", "#"),
+    "KEY_4": ("4", "$"),
+    "KEY_5": ("5", "%"),
+    "KEY_6": ("6", "^"),
+    "KEY_7": ("7", "&"),
+    "KEY_8": ("8", "*"),
+    "KEY_9": ("9", "("),
+    "KEY_0": ("0", ")"),
+    "KEY_MINUS": ("-", "_"),
+    "KEY_EQUAL": ("=", "+"),
+    "KEY_LEFTBRACE": ("[", "{"),
+    "KEY_RIGHTBRACE": ("]", "}"),
+    "KEY_SEMICOLON": (";", ":"),
+    "KEY_APOSTROPHE": ("'", '"'),
+    "KEY_BACKSLASH": ("\\", "|"),
+    "KEY_102ND": ("\\", "|"),
+    "KEY_COMMA": (",", "<"),
+    "KEY_DOT": (".", ">"),
+    "KEY_SLASH": ("/", "?"),
+    "KEY_SPACE": (" ", " "),
+}
+for _letter in "abcdefghijklmnopqrstuvwxyz":
+    LAYOUT_US.setdefault(f"KEY_{_letter.upper()}", (_letter, _letter.upper()))
+
+LAYOUTS = {"be": LAYOUT_BE, "us": LAYOUT_US}
+
+
+def _key_name(ecodes, code):
+    name = ecodes.KEY.get(code, f"({code})")
+    return name[0] if isinstance(name, list) else name
+
+
+def _decode_key(table, key_name, shift):
+    if key_name.startswith("KEY_KP") and len(key_name) == 7 and key_name[6].isdigit():
+        return key_name[6]
+    if key_name == "KEY_KPDOT":
+        return "."
+    if key_name == "KEY_KPMINUS":
+        return "-"
+    if key_name == "KEY_KPPLUS":
+        return "+"
+    if key_name == "KEY_KPSLASH":
+        return "/"
+    if key_name == "KEY_KPASTERISK":
+        return "*"
+    pair = table.get(key_name)
+    if pair:
+        return pair[1] if shift else pair[0]
+    return ""
+
+
 def scan_input_device():
     """Leest een USB-keyboardscanner rechtstreeks via Linux evdev."""
     from evdev import InputDevice, ecodes  # type: ignore
 
-    keymap = {
-        ecodes.KEY_0: "0",
-        ecodes.KEY_1: "1",
-        ecodes.KEY_2: "2",
-        ecodes.KEY_3: "3",
-        ecodes.KEY_4: "4",
-        ecodes.KEY_5: "5",
-        ecodes.KEY_6: "6",
-        ecodes.KEY_7: "7",
-        ecodes.KEY_8: "8",
-        ecodes.KEY_9: "9",
-        ecodes.KEY_MINUS: "-",
-        ecodes.KEY_EQUAL: "=",
-        ecodes.KEY_LEFTBRACE: "[",
-        ecodes.KEY_RIGHTBRACE: "]",
-        ecodes.KEY_BACKSLASH: "\\",
-        ecodes.KEY_SEMICOLON: ";",
-        ecodes.KEY_APOSTROPHE: "'",
-        ecodes.KEY_GRAVE: "`",
-        ecodes.KEY_COMMA: ",",
-        ecodes.KEY_DOT: ".",
-        ecodes.KEY_SLASH: "/",
-        ecodes.KEY_SPACE: " ",
-        ecodes.KEY_KP0: "0",
-        ecodes.KEY_KP1: "1",
-        ecodes.KEY_KP2: "2",
-        ecodes.KEY_KP3: "3",
-        ecodes.KEY_KP4: "4",
-        ecodes.KEY_KP5: "5",
-        ecodes.KEY_KP6: "6",
-        ecodes.KEY_KP7: "7",
-        ecodes.KEY_KP8: "8",
-        ecodes.KEY_KP9: "9",
-        ecodes.KEY_KPDOT: ".",
-        ecodes.KEY_KPMINUS: "-",
-        ecodes.KEY_KPPLUS: "+",
-        ecodes.KEY_KPSLASH: "/",
-        ecodes.KEY_KPASTERISK: "*",
-    }
-    for letter in "abcdefghijklmnopqrstuvwxyz":
-        keymap[getattr(ecodes, f"KEY_{letter.upper()}")] = letter
-
-    shifted = {
-        "1": "!",
-        "2": "@",
-        "3": "#",
-        "4": "$",
-        "5": "%",
-        "6": "^",
-        "7": "&",
-        "8": "*",
-        "9": "(",
-        "0": ")",
-        "-": "_",
-        "=": "+",
-        "[": "{",
-        "]": "}",
-        "\\": "|",
-        ";": ":",
-        "'": '"',
-        "`": "~",
-        ",": "<",
-        ".": ">",
-        "/": "?",
-    }
+    layout_table = LAYOUTS.get(KEYBOARD_LAYOUT, LAYOUT_BE)
     enter_keys = {ecodes.KEY_ENTER, ecodes.KEY_KPENTER}
     shift_keys = {ecodes.KEY_LEFTSHIFT, ecodes.KEY_RIGHTSHIFT}
 
@@ -392,7 +438,7 @@ def scan_input_device():
             device = InputDevice(INPUT_DEVICE)
             # Geen EVIOCGRAB: tijdens de migratie moet de oude door.py dezelfde
             # keyboardscanner parallel kunnen blijven ontvangen.
-            log(f"Kaartlezer verbonden: {INPUT_DEVICE} ({device.name})")
+            log(f"Kaartlezer verbonden: {INPUT_DEVICE} ({device.name}) [layout={KEYBOARD_LAYOUT}]")
             buffer = []
             shift_down = set()
 
@@ -421,10 +467,9 @@ def scan_input_device():
                         buffer.pop()
                     continue
 
-                char = keymap.get(event.code)
+                kname = _key_name(ecodes, event.code)
+                char = _decode_key(layout_table, kname, bool(shift_down))
                 if char:
-                    if shift_down:
-                        char = shifted.get(char, char.upper())
                     buffer.append(char)
         except OSError as exc:
             log(
