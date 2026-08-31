@@ -4,7 +4,9 @@ import { PhoneLink } from '@/components/phone-link';
 import { copy, getLocale } from '@/lib/i18n';
 import { getSession } from '@/lib/session';
 import { formatDateTime } from '@/lib/uitleen';
-import { isDriver, tripsForDriver, type DriverTrip } from '@/lib/uitleen-server';
+import { feedTokensForUser, isDriver, tripsForDriver, type DriverTrip } from '@/lib/uitleen-server';
+import { FeedTokens } from '@/components/feed-tokens';
+import { ToastProvider } from '@/components/ui/toast';
 import type { LogistiekLocale } from '@/lib/i18n-shared';
 
 function TripCard({ trip, locale, past }: { trip: DriverTrip; locale: LogistiekLocale; past: boolean }) {
@@ -121,7 +123,11 @@ export default async function RittenPage() {
   }
   const en = locale === 'en';
 
-  const [trips, driver] = await Promise.all([tripsForDriver(session.user.id), isDriver(session.user.id)]);
+  const [trips, driver, feedTokens] = await Promise.all([
+    tripsForDriver(session.user.id),
+    isDriver(session.user.id),
+    feedTokensForUser(session.user.id),
+  ]);
 
   // Grens tussen komend en voorbij: het einde van de rit, niet de start. Een rit
   // die vandaag bezig is, hoort nog bovenaan te staan.
@@ -184,6 +190,27 @@ export default async function RittenPage() {
               ))}
             </ul>
           </section>
+        ) : null}
+
+        {/* Je ritten in je eigen agenda (A1). Enkel voor wie chauffeur is; de
+            ledenkant heeft geen ToastProvider (die staat enkel rond /beheer),
+            dus die komt hier rond dit ene blok. */}
+        {driver ? (
+          <ToastProvider>
+            <FeedTokens
+              canTeam={false}
+              canDriver
+              tokens={feedTokens
+                .filter((token) => token.scope === 'DRIVER')
+                .map((token) => ({
+                  id: token.id,
+                  label: token.label,
+                  scope: token.scope,
+                  createdAt: token.createdAt.toISOString(),
+                  lastUsedAt: token.lastUsedAt?.toISOString() ?? null,
+                }))}
+            />
+          </ToastProvider>
         ) : null}
       </div>
     </PageShell>

@@ -1280,6 +1280,18 @@ async function logistiekTeamMembers() {
 }
 
 /**
+ * De agenda-abonnementen van deze persoon (A1). Ingetrokken abonnementen vallen
+ * weg: die staan er enkel nog om te beletten dat een token hergebruikt wordt.
+ */
+export async function feedTokensForUser(userId: string) {
+  return prisma.uitleenFeedToken.findMany({
+    where: { userId, revokedAt: null },
+    select: { id: true, label: true, scope: true, createdAt: true, lastUsedAt: true },
+    orderBy: { createdAt: 'asc' },
+  });
+}
+
+/**
  * De kleuren die het team zelf zette, op gebruikers-id (K1).
  *
  * Apart van {@link driverOptions}, want het publieke bezettingsoverzicht toont

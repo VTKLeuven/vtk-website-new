@@ -679,6 +679,7 @@ model User {
   uitleenTransportDone    UitleenTransportBooking[] @relation("UitleenTransportCompletedBy")
   collectEnGoImported     CollectEnGoOrder[]        @relation("CollectEnGoImportedBy")
   uitleenDriver           UitleenDriver?            @relation("UitleenDriverUser")
+  uitleenFeedTokens       UitleenFeedToken[]        @relation("UitleenFeedTokenUser")
   uitleenDriversAdded     UitleenDriver[]           @relation("UitleenDriverAddedBy")
   uitleenAuditLogs        UitleenAuditLog[]         @relation("UitleenAuditActor")
 
@@ -3286,6 +3287,47 @@ model UitleenTransportBooking {
   // "Mijn ritten" voor een chauffeur, en de rittentelling per chauffeur in het
   // chauffeursbeheer.
   @@index([driverId, startAt])
+}
+
+/// Waar een agendafeed van de uitleendienst over gaat.
+enum UitleenFeedScope {
+  /// De hele transportplanning: elke rit, met chauffeur, aanvrager en adressen.
+  /// Enkel voor wie `logistiek.manage` heeft op het moment van aanmaken.
+  TEAM
+  /// Enkel de ritten die aan deze persoon toegewezen zijn ("Mijn ritten").
+  DRIVER
+}
+
+/// Een abonneerbare agendafeed op de transportplanning.
+///
+/// Gemodelleerd op `CalendarFeedToken` van de hoofdsite, met dezelfde reden: een
+/// agenda-client stuurt geen cookies mee, dus het geheim zit in de URL zelf. Die
+/// URL komt in agenda-instellingen, back-ups en soms in server-logs terecht;
+/// daarom een token van 256 bits, een `no-store`-antwoord en een `noindex`.
+///
+/// Een eigen tabel en niet die van de hoofdsite: die feed gaat over de publieke
+/// kalender van de kring en heeft geen scope, terwijl deze de adressen en
+/// telefoonnummers van ritten draagt. Twee soorten geheim in één tabel betekent
+/// dat één fout in een query beide lekt.
+model UitleenFeedToken {
+  id     String           @id @default(cuid())
+  userId String
+  /// Waar de eigenaar deze feed voor gebruikt ("mijn gsm", "de logikot-agenda").
+  label  String
+  scope  UitleenFeedScope @default(TEAM)
+
+  /// sha256 van het token; het token zelf staat nergens. Een random token van
+  /// 256 bits heeft geen salt nodig.
+  tokenHash  String    @unique
+  lastUsedAt DateTime? @db.Timestamptz(3)
+  revokedAt  DateTime? @db.Timestamptz(3)
+
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+
+  user User @relation("UitleenFeedTokenUser", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, revokedAt])
 }
 
 /// Spiegel van TicketPayment (zonder refunds): provider is een vrije string

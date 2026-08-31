@@ -2730,6 +2730,36 @@ enkel `EXTERN` betaalt.
   formulier: wie bij geen enkele groep hoort, vraagt extern aan en ziet de
   waarborg wel.
 
+### De transportplanning is abonneerbaar, en die link is een geheim
+
+Het team plant in deze app, maar leeft in zijn eigen agenda. Zonder feed staat een
+rit op twee plekken, of op één plek die niemand open heeft. `/api/kalender/<token>`
+geeft de planning als `.ics`.
+
+- **Het geheim zit in de URL**, want een agenda-client stuurt geen cookies mee.
+  Dat is dezelfde afweging als bij de persoonlijke feed op vtk.be, met één
+  verschil: die is een lijst publieke evenementen, en deze draagt namen, adressen
+  en telefoonnummers. Vandaar 256 bits, `Cache-Control: private, no-store`,
+  `X-Robots-Tag: noindex`, en een scherm dat zegt dat je de link niet doorgeeft.
+- **De URL bestaat één keer.** Enkel de sha256 gaat de databank in; ook het team
+  kan een bestaande link niet meer opvragen. Wie ze kwijt is, maakt een nieuwe en
+  trekt de oude in.
+- **Twee soorten**: `TEAM` (de hele planning, vraagt `logistiek.manage`) en
+  `DRIVER` (enkel je eigen ritten, vraagt dat je in de chauffeurslijst staat).
+  Die tweede is een eigen query en geen filter op de eerste: een filter achteraf
+  laat vroeg of laat een rit door zodra iemand aan de select boven raakt.
+- **Intrekken, niet verwijderen.** Zo blijft zichtbaar dat er een abonnement was,
+  en wordt een token nooit hergebruikt. Een ingetrokken of onbekend token geeft
+  **404 en geen 403**: wie een token probeert, hoort niet te leren dat het ooit
+  bestaan heeft.
+- **Een eigen tabel naast `CalendarFeedToken`.** Twee soorten geheim in één tabel
+  betekent dat één fout in één query beide lekt.
+- **De ics-generator is een kopie**, geen gedeeld pakket. Hoisten is netter, maar
+  een nieuw workspace-pakket dwingt een volledige lockfile-regeneratie af
+  (AGENTS.md) en die laat `better-auth` doorfloaten naar een versie waarop
+  `packages/auth` niet meer typecheckt. De generator is klein,
+  afhankelijkheidsvrij en getest; de kopie kost minder dan die val.
+
 ### Een nieuwe aanvraag mailt het team, per soort een ander adres
 
 Tot ronde 3 gingen alle mails van de uitleendienst naar de **aanvrager**, en enkel
