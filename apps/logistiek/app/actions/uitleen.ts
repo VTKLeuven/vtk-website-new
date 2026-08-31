@@ -16,7 +16,7 @@ import { buildTransportBookings, type TransportFormInput } from '@/lib/transport
 import { expireOpenPayments, logistiekBaseUrl, paymentGateway } from '@/lib/payments';
 import { runSerializable } from '@/lib/tx';
 import { writeAudit } from '@/lib/audit';
-import { notifyReservation, notifyTransport } from '@/lib/uitleen-mail';
+import { notifyReservation, notifyTeamNewRequest, notifyTransport } from '@/lib/uitleen-mail';
 
 export type ActionResult = { ok: true; message?: string } | { ok: false; error: string };
 // `ReservationFormInput` NIET her-exporteren vanuit dit `'use server'`-bestand:
@@ -147,14 +147,19 @@ export async function createReservationAction(input: ReservationFormInput): Prom
   if (!built.ok) return built;
 
   const eventId = await resolveEventId(session, input, built.scalars.groupId);
-  await prisma.uitleenReservation.create({
+  const created = await prisma.uitleenReservation.create({
     data: {
       userId: session.user.id,
       ...built.scalars,
       eventId,
       lines: { create: built.lineCreates },
     },
+    select: { id: true },
   });
+
+  // Ná de write en zonder de aanvraag te kunnen doen falen (M1); wie een fout
+  // ziet omdat de mailserver plat ligt, dient opnieuw in en dan staan er twee.
+  await notifyTeamNewRequest('materiaal', created.id);
 
   revalidateMember();
   return { ok: true, message: 'Aanvraag ingediend. Je vindt de status bij Mijn aanvragen.' };
@@ -270,14 +275,17 @@ export async function createFlesserkeReservationAction(input: ReservationFormInp
   if (!built.ok) return built;
 
   const eventId = await resolveEventId(session, input, built.scalars.groupId);
-  await prisma.uitleenReservation.create({
+  const created = await prisma.uitleenReservation.create({
     data: {
       userId: session.user.id,
       ...built.scalars,
       eventId,
       flesserkeLines: { create: built.flesserkeLineCreates },
     },
+    select: { id: true },
   });
+
+  await notifyTeamNewRequest('flesserke', created.id);
 
   revalidateFlesserke();
   return { ok: true, message: 'Flesserke-aanvraag ingediend. Je krijgt bericht zodra Logistiek beslist.' };
@@ -657,7 +665,14 @@ export async function createVanBookingAction(input: TransportFormInput & {
   });
   if (!built.ok) return { ok: false, error: built.error };
 
-  await prisma.uitleenTransportBooking.createMany({ data: built.bookings });
+  const created = await prisma.uitleenTransportBooking.createManyAndReturn({
+    data: built.bookings,
+    select: { id: true },
+  });
+
+  // Eén melding per aanvraag en niet per boeking: heen en terug (of twee
+  // voertuigen) zijn samen één vraag, en de mail toont ze allebei.
+  if (created[0]) await notifyTeamNewRequest('transport', created[0].id);
 
   revalidateMember();
   const what =

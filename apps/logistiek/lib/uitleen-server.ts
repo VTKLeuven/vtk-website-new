@@ -3,7 +3,13 @@ import 'server-only';
 import { prisma } from '@vtk/db';
 import type { Prisma, UitleenTransportBookingStatus } from '@prisma/client';
 import { currentWorkingYear } from '@vtk/auth';
-import { DEFAULT_LAST_MINUTE_DAYS, STOCK_CONSUMING_STATUSES } from './uitleen';
+import {
+  DEFAULT_LAST_MINUTE_DAYS,
+  NOTIFY_KINDS,
+  STOCK_CONSUMING_STATUSES,
+  type LogistiekNotifyEmails,
+  type NotifyKind,
+} from './uitleen';
 import { NO_DRIVER, type TransportFilters } from './transport-filters';
 
 export type CatalogItem = {
@@ -571,6 +577,18 @@ export type LogistiekSettings = {
   showRentPrices: boolean;
   lastMinuteDays: number;
   /**
+   * Naar welke adressen er een melding gaat bij een nieuwe aanvraag, per soort.
+   *
+   * Per soort en niet één adres voor alles: materiaal, flesserke en transport
+   * hebben elk een andere verantwoordelijke, en één gedeelde mailbox betekent dat
+   * iedereen alles leest tot niemand nog iets leest.
+   *
+   * Een lege lijst betekent **geen mail**. Dat is een echte keuze (niet elke
+   * soort hoeft een melding), maar wel eentje die het instellingenscherm hardop
+   * zegt: stil niets versturen is precies de bug die deze instelling oplost.
+   */
+  notifyEmails: LogistiekNotifyEmails;
+  /**
    * Mag iemand die bij geen enkele groep hoort een aanvraag indienen?
    *
    * Standaard **uit**. De app is in het semester 2026-2027 in gebruik genomen bij
@@ -594,12 +612,21 @@ export async function getLogistiekSettings(): Promise<LogistiekSettings> {
     showRentPrices?: boolean;
     lastMinuteDays?: number;
     externalRequestsOpen?: boolean;
+    notifyEmails?: Partial<Record<NotifyKind, unknown>>;
   } | null;
   const days = Number(value?.lastMinuteDays);
   return {
     showRentPrices: Boolean(value?.showRentPrices),
     lastMinuteDays: Number.isFinite(days) && days > 0 ? Math.floor(days) : DEFAULT_LAST_MINUTE_DAYS,
     externalRequestsOpen: Boolean(value?.externalRequestsOpen),
+    notifyEmails: Object.fromEntries(
+      NOTIFY_KINDS.map((kind) => {
+        const stored = value?.notifyEmails?.[kind];
+        // Een instelling, geen invoer: wat er onzin in staat, wordt een lege
+        // lijst in plaats van de pagina te doen falen.
+        return [kind, Array.isArray(stored) ? stored.filter((entry) => typeof entry === 'string') : []];
+      })
+    ) as LogistiekNotifyEmails,
   };
 }
 

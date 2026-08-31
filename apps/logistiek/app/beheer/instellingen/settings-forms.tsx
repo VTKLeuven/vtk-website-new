@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import type { UitleenVehicle } from '@prisma/client';
+import { NOTIFY_KINDS, type LogistiekNotifyEmails, type NotifyKind } from '@/lib/uitleen';
 import { saveLogistiekSettingsAction, saveVehicleAction, setVehicleActiveAction } from '@/app/actions/beheer';
 import {
   VEHICLE_PATTERNS,
@@ -225,16 +226,36 @@ export function VehicleSettings({ vehicles }: { vehicles: UitleenVehicle[] }) {
 
 const GENERAL_ERRORS = {
   LAST_MINUTE_INVALID: 'De last-minute-termijn moet een aantal dagen tussen 1 en 90 zijn.',
+  NOTIFY_EMAIL_INVALID:
+    'Een van de meldingsadressen ziet er niet uit als een adres. Splits meerdere adressen met een komma.',
+};
+
+/** Wat er per soort in de melding staat, zodat je weet wie je waarvoor aanschrijft. */
+const NOTIFY_LABELS: Record<NotifyKind, { title: string; hint: string }> = {
+  materiaal: {
+    title: 'Materiaal',
+    hint: 'Krijgt een mail zodra iemand materiaal aanvraagt.',
+  },
+  flesserke: {
+    title: 'Flesserke',
+    hint: 'Krijgt een mail zodra iemand flesserke aanvraagt.',
+  },
+  transport: {
+    title: 'Transport',
+    hint: 'Krijgt een mail zodra iemand een rit aanvraagt.',
+  },
 };
 
 export function GeneralSettings({
   showRentPrices,
   lastMinuteDays,
   externalRequestsOpen,
+  notifyEmails,
 }: {
   showRentPrices: boolean;
   lastMinuteDays: number;
   externalRequestsOpen: boolean;
+  notifyEmails: LogistiekNotifyEmails;
 }) {
   return (
     <section className="rounded-[18px] border border-vtk-navy/10 bg-vtk-surface p-6">
@@ -287,6 +308,39 @@ export function GeneralSettings({
           de catalogus en de voertuigen wel bekijken, maar niets indienen; hij krijgt in de plaats van
           het formulier het mailadres van Logistiek te zien. Posten en werkgroepen merken er niets van.
         </p>
+
+        {/* M1: wie er gewaarschuwd wordt bij een nieuwe aanvraag. Per soort, want
+            materiaal, flesserke en transport hebben elk een andere
+            verantwoordelijke; één gedeelde mailbox betekent dat iedereen alles
+            leest tot niemand nog iets leest. */}
+        <div className="mt-4 grid gap-3 border-t border-vtk-navy/10 pt-4">
+          <p className="text-sm font-semibold text-vtk-ink">Melding bij een nieuwe aanvraag</p>
+          {NOTIFY_KINDS.map((kind) => (
+            <label key={kind} className="grid gap-1 text-xs font-medium text-vtk-muted">
+              {NOTIFY_LABELS[kind].title}
+              <input
+                type="text"
+                name={`notify-${kind}`}
+                defaultValue={notifyEmails[kind].join(', ')}
+                placeholder="logistiek@vtk.be, iemand@vtk.be"
+                className={inputClass}
+              />
+              <span className="font-normal">
+                {NOTIFY_LABELS[kind].hint}{' '}
+                {notifyEmails[kind].length === 0 ? (
+                  <span className="font-semibold text-red-700">
+                    Nu leeg: er vertrekt geen enkele melding voor deze soort.
+                  </span>
+                ) : null}
+              </span>
+            </label>
+          ))}
+          <p className="text-xs text-vtk-muted">
+            Meerdere adressen mogen, gescheiden door een komma. De mail draagt een samenvatting van
+            de aanvraag plus de link ernaartoe; hij vertrekt pas nádat de aanvraag opgeslagen is, en
+            een mailserver die er niet is, houdt de aanvraag nooit tegen.
+          </p>
+        </div>
       </SaveForm>
     </section>
   );

@@ -2730,6 +2730,31 @@ enkel `EXTERN` betaalt.
   formulier: wie bij geen enkele groep hoort, vraagt extern aan en ziet de
   waarborg wel.
 
+### Een nieuwe aanvraag mailt het team, per soort een ander adres
+
+Tot ronde 3 gingen alle mails van de uitleendienst naar de **aanvrager**, en enkel
+bij een beslissing. Dat er iets binnengekomen was, moest het team zelf gaan
+kijken; in de praktijk deed het dat om de paar dagen, en een last-minute aanvraag
+lag dan al twee dagen stil.
+
+- **Per soort een eigen lijst adressen** (materiaal, flesserke, transport), in te
+  vullen op /beheer/instellingen. Materiaal, flesserke en transport hebben elk een
+  andere verantwoordelijke; één gedeelde mailbox betekent dat iedereen alles
+  leest tot niemand nog iets leest.
+- **Enkel bij het indienen.** Elke wijziging melden zou dezelfde mailbox vullen
+  tot ze even hard genegeerd wordt als voordien. De aanvrager krijgt wél bericht
+  bij elke beslissing; dat is de andere richting en die regels staan hierboven.
+- **Een lege lijst betekent geen mail, en het scherm zegt dat.** Dat is een
+  legitieme keuze (niet elke soort hoeft een melding), maar stil niets versturen
+  is precies de bug die deze instelling oplost, dus staat er een rode zin bij een
+  soort waarvan het adres leeg is.
+- **Dezelfde drie regels als de andere mails**: ná de write, nooit erin; falen
+  mag de aanvraag niet doen falen (een lid dat "er ging iets mis" ziet omdat de
+  mailserver plat ligt, dient opnieuw in en dan staan er twee); en één mail per
+  aanvraag, ook wanneer die uit twee boekingen bestaat (heen en terug).
+- **Naar één adres met de rest in kopie**, niet drie losse berichten: drie mails
+  naar dezelfde mailbox lezen als drie aanvragen.
+
 ### De uitleendienst gaat in fases open, en externen zijn de laatste
 
 Vanaf het semester 2026-2027 werkt Logistiek écht met de app, maar niet met

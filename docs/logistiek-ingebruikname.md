@@ -80,13 +80,23 @@ invult en het heeft geen relay-rechten nodig.
 
 - Last-minute-termijn (staat op 7 dagen; beslissing B5).
 - Huurprijzen tonen ja/nee.
-- Per voertuig: naam NL/EN, tariefmodus en tarief, en het vinkje "vraagt een
-  chauffeur die met de kar mag rijden".
+- Per voertuig: naam NL/EN, tariefmodus en tarief, het vinkje "vraagt een
+  chauffeur die met de kar mag rijden", en sinds ronde 3 de **arcering** waarmee
+  dat voertuig in de transportplanning getekend wordt. Geef elk voertuig een ander
+  patroon; staat overal hetzelfde, dan zegt het niets.
+- **De meldingsadressen per soort** (materiaal, flesserke, transport). Staat een
+  soort leeg, dan vertrekt er bij een nieuwe aanvraag van die soort géén mail en
+  moet iemand het scherm blijven checken. Het scherm zegt dat er in het rood bij.
+- **De schakelaar "externen mogen aanvragen indienen"** staat uit. Zet ze pas aan
+  wanneer het team de externe aanvragen ook effectief in de app wil opvolgen.
 
 ### `/beheer/chauffeurs`
 
 - Wie chauffeur is, en per chauffeur of die met de kar mag rijden. Zonder dat
   laatste kan het goedkeuringsscherm van een karrit geen onderscheid maken.
+- Sinds ronde 3 ook de **kleur** waarmee die chauffeur in de transportplanning
+  verschijnt. Er staat standaard al een kleur (afgeleid uit zijn id); bijstellen
+  hoeft enkel wanneer twee mensen toevallig op bijna dezelfde tint uitkomen.
 
 ### `/beheer/materiaal`
 

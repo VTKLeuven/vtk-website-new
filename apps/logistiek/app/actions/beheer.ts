@@ -12,7 +12,9 @@ import {
   describeReservationChanges,
   formatDateTime,
   isOnQuarterHour,
+  NOTIFY_KINDS,
   parseDateOnly,
+  parseNotifyEmails,
   rangesOverlap,
   transportPriceCents,
 } from '@/lib/uitleen';
@@ -2761,7 +2763,18 @@ export async function saveLogistiekSettingsAction(_prev: SaveState, formData: Fo
   if (!Number.isFinite(lastMinuteDays) || lastMinuteDays < 1 || lastMinuteDays > 90) {
     return saveError('LAST_MINUTE_INVALID');
   }
-  const value = { showRentPrices, lastMinuteDays, externalRequestsOpen };
+  // Per soort een lijst adressen (M1). Komma-gescheiden in het formulier, want
+  // dat is hoe het meelezende adres op een aanvraag er ook uitziet; dezelfde
+  // parser, dus dezelfde regels over wat een adres is.
+  const notifyEmails: Record<string, string[]> = {};
+  for (const kind of NOTIFY_KINDS) {
+    const raw = String(formData.get(`notify-${kind}`) ?? '');
+    const parsed = parseNotifyEmails(raw);
+    if (parsed === null) return saveError('NOTIFY_EMAIL_INVALID');
+    notifyEmails[kind] = parsed;
+  }
+
+  const value = { showRentPrices, lastMinuteDays, externalRequestsOpen, notifyEmails };
   await prisma.setting.upsert({
     where: { key: LOGISTIEK_SETTINGS_KEY },
     update: { value },

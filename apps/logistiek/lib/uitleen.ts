@@ -7,6 +7,20 @@ import type {
 } from '@prisma/client';
 import type { LogistiekLocale } from './i18n-shared';
 
+/**
+ * De soorten aanvragen die elk hun eigen meldingsadres(sen) hebben (M1).
+ *
+ * Hier en niet in `lib/uitleen-server.ts`: het instellingenscherm is een
+ * client-component, en dat bestand draagt `import 'server-only'`. Een constante
+ * daaruit importeren laat de hele pagina omvallen met "You're importing a module
+ * that depends on server-only". Zie dezelfde comment bij `kalender-kinds.ts`.
+ */
+export const NOTIFY_KINDS = ['materiaal', 'flesserke', 'transport'] as const;
+
+export type NotifyKind = (typeof NOTIFY_KINDS)[number];
+
+export type LogistiekNotifyEmails = Record<NotifyKind, string[]>;
+
 export function formatEuro(cents: number): string {
   const euros = Math.floor(Math.abs(cents) / 100);
   const rest = Math.abs(cents) % 100;
