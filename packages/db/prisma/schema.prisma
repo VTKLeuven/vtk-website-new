@@ -3212,6 +3212,13 @@ model UitleenTransportBooking {
   /// zelf aanvraagt heeft geen aanvraag om aan te hangen.
   reservationId String?
   purpose       String // waarvoor de rit dient
+  /// Wat er mee moet: "20 bierbakken en 4 tafels", "de geluidsinstallatie".
+  ///
+  /// Los van `purpose` (waarvóór de rit dient) en van de materiaalaanvraag: een
+  /// rit die geen levering is, heeft geen aanvraag met een inhoudslijst, en de
+  /// chauffeur wil weten of hij de kar of de auto moet nemen. Stond tot ronde 3
+  /// nergens; het team schreef het in de vrije nota of belde erover.
+  cargoNote     String?
   pickupAddress String?
   destination   String?
   helpersNote   String? // bijrijders die de aanvrager zelf voorziet

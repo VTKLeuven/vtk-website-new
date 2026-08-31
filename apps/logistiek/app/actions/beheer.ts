@@ -2023,6 +2023,140 @@ export async function rejectTransportAction(_prev: SaveState, formData: FormData
   return saveOk();
 }
 
+/**
+ * Een rit aanpassen vanuit de planning (P4).
+ *
+ * Dit is de tegenhanger van `editVanBookingAction` (het lid past zijn eigen rit
+ * aan) voor het team: die van het lid haalt een goedgekeurde rit terug naar
+ * REQUESTED omdat er dan opnieuw beslist moet worden, terwijl het team het hier
+ * juist zélf beslist. De status blijft dus staan, en de overlapcontrole gebeurt
+ * meteen, in dezelfde Serializable-transactie als bij het goedkeuren.
+ *
+ * Wat je hier niet doet: goedkeuren, afwijzen, afronden of een chauffeur
+ * toewijzen. Die hebben elk hun eigen actie met hun eigen regels; dit gaat over
+ * de feiten van de rit.
+ */
+export async function adminEditTransportAction(
+  bookingId: string,
+  input: {
+    startAt: string;
+    endAt: string;
+    purpose: string;
+    cargoNote: string;
+    pickupAddress: string;
+    destination: string;
+    adminNote: string;
+  }
+): Promise<ActionResult> {
+  const session = await requireManage();
+
+  const purpose = input.purpose.trim();
+  if (!purpose) return { ok: false, error: 'Beschrijf waarvoor de rit dient.' };
+
+  const startAt = parseBrusselsDateTime(input.startAt);
+  const endAt = parseBrusselsDateTime(input.endAt);
+  if (!startAt || !endAt) return { ok: false, error: 'Vul een geldig begin- en einduur in.' };
+  if (endAt <= startAt) return { ok: false, error: 'Het einduur ligt voor het beginuur.' };
+  if (!isOnQuarterHour(startAt) || !isOnQuarterHour(endAt)) {
+    return { ok: false, error: 'Kies uren op het kwartier (bv. 14:00, 14:15).' };
+  }
+
+  const outcome = await runSerializable(async (tx) => {
+    const existing = await tx.uitleenTransportBooking.findUnique({
+      where: { id: bookingId },
+      select: {
+        id: true,
+        status: true,
+        vehicleId: true,
+        startAt: true,
+        endAt: true,
+        purpose: true,
+        cargoNote: true,
+        pickupAddress: true,
+        destination: true,
+        adminNote: true,
+        pricingMode: true,
+        rateCents: true,
+      },
+    });
+    if (!existing) return { error: 'NOT_FOUND' as const };
+    // Een gereden rit is geschiedenis; die uren aanpassen zou de historiek en de
+    // afgerekende kilometers laten liegen.
+    if (existing.status !== 'REQUESTED' && existing.status !== 'APPROVED') {
+      return { error: 'LOCKED' as const };
+    }
+
+    // Enkel een goedgekeurde rit houdt een voertuig bezet; een aanvraag mag nog
+    // botsen (zie "Conflicten: aanvragen mag, goedkeuren niet").
+    if (existing.status === 'APPROVED') {
+      const clash = await overlappingBooking(tx, existing.vehicleId, startAt, endAt, [bookingId]);
+      if (clash) return { error: 'OVERLAP' as const, detail: bookingLabel(clash) };
+    }
+
+    const changes: string[] = [];
+    const moved =
+      startAt.getTime() !== existing.startAt.getTime() || endAt.getTime() !== existing.endAt.getTime();
+    if (moved) {
+      changes.push(
+        `Uren: ${formatDateTime(existing.startAt)} tot ${formatDateTime(existing.endAt)} werd ${formatDateTime(startAt)} tot ${formatDateTime(endAt)}`
+      );
+    }
+    const field = (label: string, before: string | null, after: string | null) => {
+      if ((before ?? '') === (after ?? '')) return;
+      changes.push(`${label}: ${before?.trim() || 'leeg'} → ${after?.trim() || 'leeg'}`);
+    };
+    field('Waarvoor', existing.purpose, purpose);
+    field('Lading', existing.cargoNote, input.cargoNote.trim() || null);
+    field('Laadadres', existing.pickupAddress, input.pickupAddress.trim() || null);
+    field('Bestemming', existing.destination, input.destination.trim() || null);
+    field('Nota van Logistiek', existing.adminNote, input.adminNote.trim() || null);
+    if (changes.length === 0) return { error: 'NO_CHANGES' as const };
+
+    await tx.uitleenTransportBooking.update({
+      where: { id: bookingId },
+      data: {
+        startAt,
+        endAt,
+        purpose: purpose.slice(0, 1000),
+        cargoNote: input.cargoNote.trim().slice(0, 1000) || null,
+        pickupAddress: input.pickupAddress.trim().slice(0, 300) || null,
+        destination: input.destination.trim().slice(0, 300) || null,
+        adminNote: input.adminNote.trim().slice(0, 1000) || null,
+        // De prijs volgt de uren bij een per-uur-tarief; bij per km blijft ze
+        // null tot het afronden.
+        priceCents: transportPriceCents({
+          pricingMode: existing.pricingMode,
+          rateCents: existing.rateCents,
+          startAt,
+          endAt,
+        }),
+      },
+    });
+    await writeAudit(tx, { transportBookingId: bookingId }, {
+      kind: 'EDITED',
+      note: changes.join('; '),
+      actorId: session.user.id,
+    });
+    return { error: null, changes };
+  });
+
+  if (outcome.error === 'NOT_FOUND') return { ok: false, error: 'Deze rit bestaat niet meer.' };
+  if (outcome.error === 'LOCKED') {
+    return { ok: false, error: 'Deze rit is afgerond of geannuleerd; daar kan niets meer aan.' };
+  }
+  if (outcome.error === 'OVERLAP') {
+    return { ok: false, error: `Botst met ${outcome.detail}. Kies een ander moment.` };
+  }
+  if (outcome.error === 'NO_CHANGES') return { ok: true, message: 'Niets gewijzigd.' };
+
+  // Ná de transactie, zoals elke mail hier: anders vertrekt er bericht over een
+  // wijziging die door een rollback nooit gebeurd is.
+  await notifyTransport([bookingId], 'EDITED', outcome.changes?.join('\n'));
+
+  revalidateBeheer();
+  return { ok: true, message: 'Rit aangepast.' };
+}
+
 /** Chauffeur toewijzen of wijzigen; kan op elk moment voor de rit afgerond is. */
 export async function assignDriverAction(bookingId: string, driverId: string): Promise<ActionResult> {
   const session = await requireManage();

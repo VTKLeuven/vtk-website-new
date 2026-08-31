@@ -1,8 +1,10 @@
 import Link from 'next/link';
 import { requireManage } from '@/lib/session';
 import {
+  chargesRequester,
   formatDateOnly,
   formatDateRange,
+  formatPriceCents,
   isoWeekNumber,
   parseDateOnly,
   requesterLabel,
@@ -20,6 +22,7 @@ import {
   activeVehicles,
   driverColorOverrides,
   driverOptions,
+  transportAuditLogsByBooking,
   transportRange,
   type TransportBooking,
 } from '@/lib/uitleen-server';
@@ -102,6 +105,9 @@ export default async function VervoerWeekPage({
   ]);
 
   const conflicts = conflictingIds(bookings);
+  // De historiek van de getoonde ritten in één query; ze staat ingeklapt in het
+  // paneel, maar wordt hier server-side gerenderd, zoals op /beheer/vervoer.
+  const history = await transportAuditLogsByBooking(bookings.map((booking) => booking.id));
 
   // De filters blijven staan wanneer je van week naar week bladert: ze horen bij
   // waar je naar kijkt, niet bij wanneer.
@@ -138,16 +144,34 @@ export default async function VervoerWeekPage({
     return {
       id: booking.id,
       purpose: booking.purpose,
+      cargoNote: booking.cargoNote,
       eventName: booking.eventName,
+      eventId: booking.eventId,
+      reservationId: booking.reservationId,
       requesterLabel: requesterLabel(booking),
       userName: booking.user.name,
       contactPhone: booking.contactPhone,
       pickupAddress: booking.pickupAddress,
       destination: booking.destination,
+      helpersNote: booking.helpersNote,
+      helpersPhone: booking.helpersPhone,
+      memberNote: booking.memberNote,
+      adminNote: booking.adminNote,
+      notifyEmail: booking.notifyEmail,
       startAt: booking.startAt.toISOString(),
       endAt: booking.endAt.toISOString(),
+      edit: {
+        startAt: toDatetimeLocal(booking.startAt),
+        endAt: toDatetimeLocal(booking.endAt),
+        purpose: booking.purpose,
+        cargoNote: booking.cargoNote ?? '',
+        pickupAddress: booking.pickupAddress ?? '',
+        destination: booking.destination ?? '',
+        adminNote: booking.adminNote ?? '',
+      },
       status: booking.status,
       vehicleId: booking.vehicleId,
+      vehicleName: booking.vehicle.nameNl,
       driverId: booking.driverId,
       driver:
         booking.driver && booking.driverId
@@ -155,9 +179,14 @@ export default async function VervoerWeekPage({
           : null,
       pricingMode: booking.pricingMode,
       requesterType: booking.requesterType,
+      // R4: enkel een externe betaalt, dus enkel daar zegt een bedrag iets.
+      priceLabel: chargesRequester(booking.requesterType)
+        ? formatPriceCents(booking.priceCents)
+        : null,
       needsDriver: vehicle?.needsDriver ?? true,
       needsVanDriver: vehicle?.needsVanDriver ?? false,
       paid: booking.paidOfflineAt !== null,
+      history: history.get(booking.id) ?? [],
       legs: legs
         .sort((a, b) => a.startAt.getTime() - b.startAt.getTime())
         .map((leg) => ({

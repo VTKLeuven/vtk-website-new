@@ -1,56 +1,83 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import {
   CalendarNav,
   TransportCalendar,
 } from '@/components/transport-calendar/transport-calendar';
+import { TransportFilterBar } from '@/components/transport-calendar/filters';
+import { TripInspector } from '@/components/transport-calendar/trip-inspector';
 import type { CalendarVehicle, TripBlock } from '@/components/transport-calendar/types';
 import type { CalendarView } from '@/lib/calendar-range';
 import type { DriverColorOverrides } from '@/lib/driver-colors';
-import { TransportFilterBar } from '@/components/transport-calendar/filters';
 import type { TransportFilters } from '@/lib/transport-filters';
+import { AuditTimeline } from '@/components/audit-timeline';
+import { PhoneLink } from '@/components/phone-link';
+import { VanStatusBadge } from '@/components/status-badge';
+import type { UitleenAuditEntry, DriverOption } from '@/lib/uitleen-server';
 import { TransportControls } from '../transport-controls';
 import { TransportDecisionForms, type DecisionLeg } from '../transport-decision-forms';
-import type { DriverOption } from '@/lib/uitleen-server';
-import type { UitleenPricingMode, UitleenRequesterType } from '@prisma/client';
+import { TripEditForm, type TripEditValues } from './trip-edit-form';
+import type {
+  UitleenPricingMode,
+  UitleenRequesterType,
+  UitleenTransportBookingStatus,
+} from '@prisma/client';
 
 /**
- * De transportplanning waarop de verantwoordelijke werkt (T7, P1).
+ * De transportplanning waarop de verantwoordelijke werkt (T7, P1, P4).
  *
- * Klikken op een rit opent een venster met de feiten en de knoppen die erbij
- * horen: goedkeuren of afwijzen zolang ze te beslissen is, daarna de chauffeur en
- * het voertuig. Zonder dat venster was elke ingreep een navigatie naar de lijst,
- * zoeken, terugkeren, en het overzicht kwijt.
+ * Een rit aanklikken opent een paneel naast de kalender met **alles** over die
+ * rit, en met de knoppen die erbij horen: beslissen zolang ze te beslissen is,
+ * daarna de uren, de lading en de nota's aanpassen, en de chauffeur en het
+ * voertuig kiezen.
  *
- * De weergave (dag, week, maand) en de datum staan in de URL; dit component
- * bewaart enkel welke rit openstaat, want dat is geen plek in de kalender maar
- * een venster erboven.
+ * Twee dingen die daar bewust níét staan:
+ *
+ * - **"Rit afronden".** Je klikt hier de hele dag ritten aan om te schuiven; een
+ *   knop die de rit definitief afsluit, is dan één misklik van je verwijderd.
+ *   Afronden hoort bij `/beheer/vervoer`, waar je er bewust naartoe gaat.
+ * - **Verwijderen.** Een rit gaat niet weg, ze wordt afgewezen of geannuleerd,
+ *   en dat blijft in de historiek staan.
  */
 export type PlannerTrip = {
   id: string;
   purpose: string;
+  cargoNote: string | null;
   eventName: string | null;
+  eventId: string | null;
+  reservationId: string | null;
   requesterLabel: string;
   userName: string;
   contactPhone: string | null;
   pickupAddress: string | null;
   destination: string | null;
+  helpersNote: string | null;
+  helpersPhone: string | null;
+  memberNote: string | null;
+  adminNote: string | null;
+  notifyEmail: string | null;
   startAt: string;
   endAt: string;
-  status: string;
+  /** Begin en einde als datetime-local-waarden, voor het bewerkformulier. */
+  edit: TripEditValues;
+  status: UitleenTransportBookingStatus;
   vehicleId: string;
+  vehicleName: string;
   driverId: string | null;
   driver: { id: string; name: string } | null;
   pricingMode: UitleenPricingMode;
   requesterType: UitleenRequesterType;
+  priceLabel: string | null;
   needsDriver: boolean;
   needsVanDriver: boolean;
   paid: boolean;
   /** De ritten van dezelfde aanvraag, voor het goedkeurformulier. */
   legs: DecisionLeg[];
   sameDayBookings: string[];
+  history: UitleenAuditEntry[];
 };
 
 export function TransportPlanner({
@@ -87,17 +114,9 @@ export function TransportPlanner({
     label: string;
   };
 }) {
+  const router = useRouter();
   const [openId, setOpenId] = useState<string | null>(null);
   const trip = trips.find((entry) => entry.id === openId) ?? null;
-
-  useEffect(() => {
-    if (!openId) return;
-    function onKey(event: KeyboardEvent) {
-      if (event.key === 'Escape') setOpenId(null);
-    }
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [openId]);
 
   return (
     <>
@@ -133,9 +152,7 @@ export function TransportPlanner({
         {/* Wat er niet staat, zodat een gefilterde week niet als een lege week
             leest. Dezelfde regel als op /beheer/kalender. */}
         {hiddenNote.length > 0 ? (
-          <p className="text-xs font-medium text-vtk-navy">
-            Gefilterd: {hiddenNote.join('; ')}.
-          </p>
+          <p className="text-xs font-medium text-vtk-navy">Gefilterd: {hiddenNote.join('; ')}.</p>
         ) : null}
 
         <p className="text-xs text-vtk-muted">
@@ -145,105 +162,151 @@ export function TransportPlanner({
           goedgekeurde ritten met hetzelfde voertuig op hetzelfde moment. Klik een rit aan om ze te
           beslissen of aan te passen.
         </p>
-      </TransportCalendar>
 
-      {trip ? (
-        <div
-          className="fixed inset-0 z-[60] flex items-start justify-center overflow-y-auto bg-vtk-ink/40 p-4"
-          role="dialog"
-          aria-modal="true"
-          aria-label={`Rit: ${trip.eventName ?? trip.purpose}`}
-          onClick={() => setOpenId(null)}
-        >
-          <div
-            className="my-8 w-full max-w-xl rounded-[18px] border border-vtk-navy/15 bg-vtk-surface p-6 shadow-lg"
-            onClick={(event) => event.stopPropagation()}
+        {trip ? (
+          <TripInspector
+            title={trip.eventName?.trim() || trip.purpose}
+            subtitle={
+              <>
+                {trip.requesterLabel} · {trip.userName}
+              </>
+            }
+            onClose={() => setOpenId(null)}
+            footer={
+              <>
+                <Link
+                  href={`/beheer/vervoer?rit=${trip.id}`}
+                  className="font-semibold text-vtk-navy underline decoration-vtk-yellow underline-offset-4"
+                >
+                  Deze rit in de lijst
+                </Link>
+                : daar rond je ze af, draai je een beslissing terug en markeer je een betaling.
+              </>
+            }
           >
-            <div className="flex flex-wrap items-start justify-between gap-3">
-              <div className="min-w-0">
-                <h2 className="text-lg font-semibold tracking-tight text-vtk-ink">
-                  {trip.eventName ?? trip.purpose}
-                </h2>
-                <p className="text-sm text-vtk-muted">
-                  {trip.requesterLabel} · {trip.userName}
-                </p>
+            <div className="grid gap-5">
+              <div className="flex flex-wrap items-center gap-2">
+                <VanStatusBadge status={trip.status} />
+                <span className="rounded-full bg-vtk-paper-2 px-2.5 py-0.5 text-xs font-semibold text-vtk-navy">
+                  {trip.vehicleName}
+                </span>
+                {trip.priceLabel ? (
+                  <span className="text-xs text-vtk-muted">
+                    {trip.priceLabel} · {trip.paid ? 'betaald' : 'nog niet betaald'}
+                  </span>
+                ) : null}
               </div>
-              <button
-                type="button"
-                onClick={() => setOpenId(null)}
-                className="rounded-full border border-vtk-navy/15 px-3 py-1 text-sm font-medium text-vtk-ink transition hover:border-vtk-navy/40"
-              >
-                Sluiten
-              </button>
+
+              {/* De feiten die niet in het formulier staan omdat het lid ze
+                  invulde en het team ze niet hoort te overschrijven. */}
+              <dl className="logistics-fact-grid">
+                {trip.contactPhone ? (
+                  <div>
+                    <dt>Aanvrager bellen</dt>
+                    <dd>
+                      <PhoneLink number={trip.contactPhone} />
+                    </dd>
+                  </div>
+                ) : null}
+                {trip.helpersNote ? (
+                  <div>
+                    <dt>Bijrijders</dt>
+                    <dd>{trip.helpersNote}</dd>
+                  </div>
+                ) : null}
+                {trip.helpersPhone ? (
+                  <div>
+                    <dt>Bijrijder bellen</dt>
+                    <dd>
+                      <PhoneLink number={trip.helpersPhone} />
+                    </dd>
+                  </div>
+                ) : null}
+                {trip.memberNote ? (
+                  <div>
+                    <dt>Nota van het lid</dt>
+                    <dd>{trip.memberNote}</dd>
+                  </div>
+                ) : null}
+                {trip.notifyEmail ? (
+                  <div>
+                    <dt>Mail ook naar</dt>
+                    <dd className="break-all">{trip.notifyEmail}</dd>
+                  </div>
+                ) : null}
+                {trip.reservationId ? (
+                  <div>
+                    <dt>Levering voor</dt>
+                    <dd>
+                      <Link
+                        href={`/beheer/aanvragen/${trip.reservationId}`}
+                        className="underline underline-offset-2"
+                      >
+                        de materiaalaanvraag
+                      </Link>
+                    </dd>
+                  </div>
+                ) : null}
+                {trip.eventId ? (
+                  <div>
+                    <dt>Evenement</dt>
+                    <dd>
+                      <Link
+                        href={`/beheer/evenementen#${trip.eventId}`}
+                        className="underline underline-offset-2"
+                      >
+                        {trip.eventName?.trim() || 'evenement'}
+                      </Link>
+                    </dd>
+                  </div>
+                ) : null}
+              </dl>
+
+              <section>
+                <h3 className="text-sm font-semibold text-vtk-ink">Rit aanpassen</h3>
+                <div className="mt-2">
+                  <TripEditForm
+                    bookingId={trip.id}
+                    initial={trip.edit}
+                    locked={trip.status !== 'REQUESTED' && trip.status !== 'APPROVED'}
+                    onSaved={() => router.refresh()}
+                  />
+                </div>
+              </section>
+
+              <section>
+                {trip.status === 'REQUESTED' ? (
+                  <TransportDecisionForms
+                    bookingId={trip.id}
+                    legs={trip.legs}
+                    drivers={drivers}
+                    pricingIsPerKm={trip.pricingMode === 'PER_KM'}
+                    requesterType={trip.requesterType}
+                    needsDriver={trip.needsDriver}
+                    needsVanDriver={trip.needsVanDriver}
+                    sameDayBookings={trip.sameDayBookings}
+                  />
+                ) : (
+                  <TransportControls
+                    bookingId={trip.id}
+                    vehicleId={trip.vehicleId}
+                    driverId={trip.driverId}
+                    driver={trip.driver}
+                    pricingMode={trip.pricingMode}
+                    paid={trip.paid}
+                    requesterType={trip.requesterType}
+                    drivers={drivers}
+                    vehicles={vehicleOptions}
+                    showComplete={false}
+                  />
+                )}
+              </section>
+
+              {trip.history.length > 0 ? <AuditTimeline entries={trip.history} /> : null}
             </div>
-
-            <dl className="logistics-fact-grid mt-4">
-              <div>
-                <dt>Waarvoor</dt>
-                <dd>{trip.purpose}</dd>
-              </div>
-              {trip.pickupAddress ? (
-                <div>
-                  <dt>Laadadres</dt>
-                  <dd>{trip.pickupAddress}</dd>
-                </div>
-              ) : null}
-              {trip.destination ? (
-                <div>
-                  <dt>Bestemming</dt>
-                  <dd>{trip.destination}</dd>
-                </div>
-              ) : null}
-              {trip.contactPhone ? (
-                <div>
-                  <dt>Aanvrager bellen</dt>
-                  <dd>
-                    <a href={`tel:${trip.contactPhone}`} className="underline underline-offset-2">
-                      {trip.contactPhone}
-                    </a>
-                  </dd>
-                </div>
-              ) : null}
-            </dl>
-
-            <div className="mt-5">
-              {trip.status === 'REQUESTED' ? (
-                <TransportDecisionForms
-                  bookingId={trip.id}
-                  legs={trip.legs}
-                  drivers={drivers}
-                  pricingIsPerKm={trip.pricingMode === 'PER_KM'}
-                  requesterType={trip.requesterType}
-                  needsDriver={trip.needsDriver}
-                  needsVanDriver={trip.needsVanDriver}
-                  sameDayBookings={trip.sameDayBookings}
-                />
-              ) : (
-                <TransportControls
-                  bookingId={trip.id}
-                  vehicleId={trip.vehicleId}
-                  driverId={trip.driverId}
-                  driver={trip.driver}
-                  pricingMode={trip.pricingMode}
-                  paid={trip.paid}
-                  requesterType={trip.requesterType}
-                  drivers={drivers}
-                  vehicles={vehicleOptions}
-                />
-              )}
-            </div>
-
-            <p className="mt-4 text-xs text-vtk-muted">
-              <Link
-                href={`/beheer/vervoer?rit=${trip.id}`}
-                className="underline underline-offset-2"
-              >
-                Alles over deze rit in de lijst
-              </Link>
-            </p>
-          </div>
-        </div>
-      ) : null}
+          </TripInspector>
+        ) : null}
+      </TransportCalendar>
     </>
   );
 }

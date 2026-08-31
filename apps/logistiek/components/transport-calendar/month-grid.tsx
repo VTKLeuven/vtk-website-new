@@ -158,10 +158,7 @@ export function MonthGrid({
                             }`}
                           >
                             {day.getUTCDate()}
-                            <span className="sr-only">
-                              {' '}
-                              — open deze dag in de dagweergave
-                            </span>
+                            <span className="sr-only">: open deze dag in de dagweergave</span>
                           </button>
                         ) : (
                           <span

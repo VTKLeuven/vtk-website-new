@@ -28,6 +28,7 @@ export function TransportControls({
   requesterType,
   drivers,
   vehicles,
+  showComplete = true,
 }: {
   bookingId: string;
   vehicleId: string;
@@ -39,6 +40,13 @@ export function TransportControls({
   requesterType: UitleenRequesterType;
   drivers: DriverOption[];
   vehicles: Array<{ id: string; name: string; needsVanDriver: boolean }>;
+  /**
+   * Staat "Rit afronden" hier? Niet in de transportplanning (P4): daar klik je de
+   * hele dag ritten aan om te schuiven en chauffeurs toe te wijzen, en dan is een
+   * knop die de rit definitief afsluit één misklik van je verwijderd. Afronden
+   * hoort bij de lijst, waar je er bewust naartoe gaat.
+   */
+  showComplete?: boolean;
 }) {
   const router = useRouter();
   const showToast = useToast();
@@ -96,7 +104,7 @@ export function TransportControls({
       </div>
 
       <div className="flex flex-wrap items-end gap-3">
-        {pricingMode === 'PER_KM' ? (
+        {showComplete && pricingMode === 'PER_KM' ? (
           <label className="grid gap-1 text-sm">
             <span className="text-vtk-muted">Gereden km</span>
             <input
@@ -108,14 +116,16 @@ export function TransportControls({
             />
           </label>
         ) : null}
-        <Button
-          type="button"
-          size="sm"
-          disabled={pending || (pricingMode === 'PER_KM' && kilometers.trim() === '')}
-          onClick={() => run(() => completeTransportAction(bookingId, kilometers))}
-        >
-          Rit afronden
-        </Button>
+        {showComplete ? (
+          <Button
+            type="button"
+            size="sm"
+            disabled={pending || (pricingMode === 'PER_KM' && kilometers.trim() === '')}
+            onClick={() => run(() => completeTransportAction(bookingId, kilometers))}
+          >
+            Rit afronden
+          </Button>
+        ) : null}
         {/* Een post of werkgroep betaalt niets (R4), dus "betaald" heeft daar
             geen betekenis; de knop zou enkel een betaling in de historiek
             zetten die nooit gebeurd is. */}
