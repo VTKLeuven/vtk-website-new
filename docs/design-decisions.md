@@ -2680,6 +2680,28 @@ enkel `EXTERN` betaalt.
   catalogus (mag een lid zien wat een beamer kost?) en niet over een concrete
   aanvraag. De twee combineren, de ene vervangt de andere niet.
 
+### De uitleendienst gaat in fases open, en externen zijn de laatste
+
+Vanaf het semester 2026-2027 werkt Logistiek écht met de app, maar niet met
+iedereen tegelijk. De transportkant is het scherpst (het team plant er zijn week
+mee); materiaal, flesserke en evenementen lopen bij de posten en de werkgroepen
+naast hun bestaande Excels. Een externe student kan voorlopig niets indienen.
+
+- **Eén schakelaar, geen deploy** (`externalRequestsOpen` in
+  `logistiek.settings`, op /beheer/instellingen). Het team beslist wanneer het
+  opengaat, en dat moment valt niet samen met een release.
+- **Kijken mag, indienen niet.** De catalogus, de tarieven en het
+  bezettingsoverzicht blijven zichtbaar; in de plaats van de indienknop staat het
+  mailadres van Logistiek. Een externe die een leeg scherm krijgt, mailt niet en
+  komt ook niet terug wanneer het wél opengaat.
+- **De poort staat in de server action** (`externalGate` in
+  `app/actions/uitleen.ts`), niet enkel in het formulier. De knop verbergen houdt
+  niemand tegen die de actie rechtstreeks aanroept, en het is precies deze poort
+  die bepaalt of er een aanvraag binnenkomt waar niemand naar kijkt.
+- **Posten en werkgroepen merken er niets van.** De regel hangt aan "hoort dit
+  werkingsjaar bij geen enkele groep", dezelfde regel die het aanvragertype
+  bepaalt (`requestsAsExternal`). Eén begrip, niet twee die uit elkaar groeien.
+
 ### Feedbackronde 2 (augustus 2026): vier keuzes vooraf
 
 De tweede feedbackronde (werkplan: `docs/logistiek-feedback-ronde-2.md`) begon

@@ -1,6 +1,7 @@
+import { ExternClosed } from '@/components/extern-closed';
 import { LoginGate } from '@/components/login-gate';
 import { PageShell } from '@/components/page-shell';
-import { getSession, requestsAsExternal } from '@/lib/session';
+import { externalRequestsBlocked, getSession, requestsAsExternal } from '@/lib/session';
 import {
   getCatalog,
   getLogistiekSettings,
@@ -32,6 +33,8 @@ export default async function MateriaalPage() {
     external ? Promise.resolve([]) : requestTemplates(),
     external ? Promise.resolve([]) : selectableEvents(session.groups.map((g) => g.id)),
   ]);
+  // S1: rondkijken in de catalogus mag, indienen nog niet.
+  const blocked = externalRequestsBlocked(session, settings);
 
   return (
     <PageShell
@@ -61,6 +64,7 @@ export default async function MateriaalPage() {
           userId={session.user.id}
           templates={templates}
           events={external ? undefined : eventOptions(events, locale)}
+          blocked={blocked ? <ExternClosed locale={locale} /> : undefined}
         />
       )}
     </PageShell>

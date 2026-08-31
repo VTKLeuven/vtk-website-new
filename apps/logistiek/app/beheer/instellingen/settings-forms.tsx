@@ -182,9 +182,11 @@ const GENERAL_ERRORS = {
 export function GeneralSettings({
   showRentPrices,
   lastMinuteDays,
+  externalRequestsOpen,
 }: {
   showRentPrices: boolean;
   lastMinuteDays: number;
+  externalRequestsOpen: boolean;
 }) {
   return (
     <section className="rounded-[18px] border border-vtk-navy/10 bg-vtk-surface p-6">
@@ -221,6 +223,21 @@ export function GeneralSettings({
           Aanvragen die binnen deze termijn afgehaald worden, krijgen de badge &quot;last minute&quot; in de
           aanvragenlijst. Het lid ziet de waarschuwing al bij het invullen, dus dit is ook wat je belooft:
           korter dan dit mag je weigeren.
+        </p>
+
+        <label className="mt-2 flex items-center gap-2 text-sm text-vtk-ink">
+          <input
+            type="checkbox"
+            name="externalRequestsOpen"
+            defaultChecked={externalRequestsOpen}
+            className="h-4 w-4"
+          />
+          Externen mogen aanvragen indienen
+        </label>
+        <p className="text-xs text-vtk-muted">
+          Staat dit uit, dan kan iemand die dit werkingsjaar bij geen enkele post of werkgroep hoort
+          de catalogus en de voertuigen wel bekijken, maar niets indienen; hij krijgt in de plaats van
+          het formulier het mailadres van Logistiek te zien. Posten en werkgroepen merken er niets van.
         </p>
       </SaveForm>
     </section>

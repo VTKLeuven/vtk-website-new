@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState, useTransition } from 'react';
+import { useCallback, useEffect, useMemo, useState, useTransition, type ReactNode } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Button } from '@vtk/ui';
@@ -70,6 +70,7 @@ export function ReservationForm({
   draftKey,
   templates = [],
   events,
+  blocked,
 }: {
   catalog: CatalogCategory[];
   groups: RequesterOption[];
@@ -99,6 +100,15 @@ export function ReservationForm({
   templates?: RequestTemplate[];
   /** Evenementen om deze aanvraag onder te hangen (A8). */
   events?: SelectableEvent[];
+  /**
+   * Staat indienen dicht (S1: externen kunnen nog niets aanvragen), dan komt
+   * deze uitleg in de plaats van de indienknop en verdwijnt die knop.
+   *
+   * De catalogus zelf blijft staan: die is het halve antwoord op "wat heeft
+   * Logistiek?", en die wegnemen laat iemand met een lege pagina achter in
+   * plaats van met een mailadres.
+   */
+  blocked?: ReactNode;
 }) {
   const en = locale === 'en';
   const [event, setEvent] = useState<EventReservationValues>(initial.event);
@@ -1092,15 +1102,22 @@ export function ReservationForm({
               </p>
             ) : null}
 
-            <Button
-              type="button"
-              size="lg"
-              className="mt-5 w-full"
-              onClick={submit}
-              disabled={pending}
-            >
-              {pending ? submittingLabel : submitLabel}
-            </Button>
+            {/* Indienen staat dicht (S1). De knop verdwijnt in plaats van
+                uitgeschakeld te staan: een grijze knop laat je zoeken naar wat
+                je nog moet invullen, terwijl er niets in te vullen valt. */}
+            {blocked ? (
+              <div className="mt-5">{blocked}</div>
+            ) : (
+              <Button
+                type="button"
+                size="lg"
+                className="mt-5 w-full"
+                onClick={submit}
+                disabled={pending}
+              >
+                {pending ? submittingLabel : submitLabel}
+              </Button>
+            )}
             {onCancel ? (
               <Button
                 type="button"

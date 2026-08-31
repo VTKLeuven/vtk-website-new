@@ -2,9 +2,10 @@
 
 import { revalidatePath } from 'next/cache';
 import { prisma } from '@vtk/db';
-import { requireSession } from '@/lib/session';
+import { externalRequestsBlocked, requireSession } from '@/lib/session';
+import { getLocale } from '@/lib/i18n';
 import { isEmailish, isOnQuarterHour, parseDateOnly, todayDateOnly } from '@/lib/uitleen';
-import { availabilityForRange } from '@/lib/uitleen-server';
+import { availabilityForRange, getLogistiekSettings } from '@/lib/uitleen-server';
 import {
   buildReservationData,
   parseBrusselsDateTime,
@@ -31,6 +32,31 @@ function revalidateMember() {
 }
 
 type SessionLike = { user: { id: string; name: string }; groups: Array<{ id: string }> };
+
+/**
+ * De poort voor externen (S1): zolang `externalRequestsOpen` uitstaat, kan wie
+ * bij geen enkele groep hoort niets indienen of wijzigen.
+ *
+ * Server-side en niet enkel in het formulier: de knop verbergen houdt niemand
+ * tegen die de actie rechtstreeks aanroept, en het is precies deze poort die
+ * bepaalt of Logistiek een aanvraag mist.
+ *
+ * Geeft de fout terug in plaats van te gooien: dit is een verwachte toestand,
+ * geen serverfout, en de formulieren tonen `error` letterlijk aan het lid.
+ * `createFlesserkeReservationAction` heeft dit niet nodig: die weigert een lid
+ * zonder groep sowieso al.
+ */
+async function externalGate(session: SessionLike): Promise<ActionResult | null> {
+  const settings = await getLogistiekSettings();
+  if (!externalRequestsBlocked(session, settings)) return null;
+  const en = (await getLocale()) === 'en';
+  return {
+    ok: false,
+    error: en
+      ? 'Requests from outside VTK are not open yet. Mail logistiek@vtk.be and Logistics will help you.'
+      : 'Aanvragen van buiten VTK staan nog niet open. Mail logistiek@vtk.be, dan helpt Logistiek je verder.',
+  };
+}
 
 /**
  * Leidt het aanvragertype automatisch af uit de gekozen groep in de login. Een
@@ -111,6 +137,8 @@ async function resolveEventId(
 
 export async function createReservationAction(input: ReservationFormInput): Promise<ActionResult> {
   const session = await requireSession();
+  const blocked = await externalGate(session);
+  if (blocked) return blocked;
   const requester = await deriveMemberRequester(session, input.groupId ?? undefined);
   const built = await buildReservationData(
     { ...input, ...requester, flesserkeLines: [] },
@@ -138,6 +166,8 @@ export async function editReservationAction(
   input: ReservationFormInput
 ): Promise<ActionResult> {
   const session = await requireSession();
+  const blocked = await externalGate(session);
+  if (blocked) return blocked;
 
   const requester = await deriveMemberRequester(session, input.groupId ?? undefined);
   const built = await buildReservationData(
@@ -610,6 +640,8 @@ export async function createVanBookingAction(input: TransportFormInput & {
   groupId?: string | null;
 }): Promise<ActionResult> {
   const session = await requireSession();
+  const blocked = await externalGate(session);
+  if (blocked) return blocked;
 
   // Zoals bij een materiaalaanvraag: de rit hangt aan de post waarvoor ze dient.
   // Dat stond hier niet, waardoor elke rit van een lid als "Interne post" zonder
@@ -660,6 +692,8 @@ export async function editVanBookingAction(
   }
 ): Promise<ActionResult> {
   const session = await requireSession();
+  const blocked = await externalGate(session);
+  if (blocked) return blocked;
 
   const purpose = input.purpose.trim();
   if (!purpose) return { ok: false, error: 'Beschrijf waarvoor je het voertuig nodig hebt.' };

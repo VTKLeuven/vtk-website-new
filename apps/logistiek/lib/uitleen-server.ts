@@ -566,24 +566,39 @@ export async function adminVehicles() {
 
 const LOGISTIEK_SETTINGS_KEY = 'logistiek.settings';
 
-export type LogistiekSettings = { showRentPrices: boolean; lastMinuteDays: number };
+export type LogistiekSettings = {
+  showRentPrices: boolean;
+  lastMinuteDays: number;
+  /**
+   * Mag iemand die bij geen enkele groep hoort een aanvraag indienen?
+   *
+   * Standaard **uit**. De app is in het semester 2026-2027 in gebruik genomen bij
+   * de posten en de werkgroepen, terwijl de externe aanvragen nog per mail lopen;
+   * zonder deze schakelaar zou een externe student intussen wel kunnen indienen
+   * in een systeem waar niemand naar kijkt. Een instelling en geen env-variabele,
+   * want het is het team dat beslist wanneer het opengaat, niet een deploy.
+   */
+  externalRequestsOpen: boolean;
+};
 
 /**
  * Kringinstellingen, als één JSON-blob in `Setting`. Defaults: huurprijzen
- * verbergen en zeven dagen last minute. Een ontbrekende of onzinnige waarde valt
- * terug op de default in plaats van de pagina te doen falen; dit is een
- * instelling, geen invoer.
+ * verbergen, zeven dagen last minute, en externen nog niet open. Een ontbrekende
+ * of onzinnige waarde valt terug op de default in plaats van de pagina te doen
+ * falen; dit is een instelling, geen invoer.
  */
 export async function getLogistiekSettings(): Promise<LogistiekSettings> {
   const row = await prisma.setting.findUnique({ where: { key: LOGISTIEK_SETTINGS_KEY } });
   const value = (row?.value ?? null) as {
     showRentPrices?: boolean;
     lastMinuteDays?: number;
+    externalRequestsOpen?: boolean;
   } | null;
   const days = Number(value?.lastMinuteDays);
   return {
     showRentPrices: Boolean(value?.showRentPrices),
     lastMinuteDays: Number.isFinite(days) && days > 0 ? Math.floor(days) : DEFAULT_LAST_MINUTE_DAYS,
+    externalRequestsOpen: Boolean(value?.externalRequestsOpen),
   };
 }
 

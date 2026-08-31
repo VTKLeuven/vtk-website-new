@@ -12,6 +12,7 @@ export default async function BeheerInstellingenPage() {
       <GeneralSettings
         showRentPrices={settings.showRentPrices}
         lastMinuteDays={settings.lastMinuteDays}
+        externalRequestsOpen={settings.externalRequestsOpen}
       />
     </div>
   );

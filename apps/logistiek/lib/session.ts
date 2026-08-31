@@ -30,6 +30,25 @@ export function requestsAsExternal(session: { groups: Array<unknown> }): boolean
   return session.groups.length === 0;
 }
 
+/**
+ * Mag deze persoon nu iets indienen?
+ *
+ * De uitleendienst is in het semester 2026-2027 in gebruik genomen bij de posten
+ * en de werkgroepen; externe aanvragen lopen zolang nog per mail. Zonder deze
+ * poort zou een externe student intussen indienen in een systeem waar niemand
+ * naar kijkt, en dan staat zijn materiaal er niet.
+ *
+ * Kijken blijft wel toegestaan: de catalogus en de voertuigen zijn geen geheim,
+ * en wie ziet wát er is, weet waarvoor hij mailt. `externalRequestsOpen` op
+ * /beheer/instellingen zet het open.
+ */
+export function externalRequestsBlocked(
+  session: { groups: Array<unknown> },
+  settings: { externalRequestsOpen: boolean }
+): boolean {
+  return requestsAsExternal(session) && !settings.externalRequestsOpen;
+}
+
 /** Elk ingelogd vtk.be-lid mag de uitleendienst gebruiken. */
 export async function requireSession(): Promise<SessionPayload> {
   const session = await getSession();

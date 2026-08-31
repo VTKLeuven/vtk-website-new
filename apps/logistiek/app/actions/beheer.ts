@@ -2487,21 +2487,26 @@ const LOGISTIEK_SETTINGS_KEY = 'logistiek.settings';
 export async function saveLogistiekSettingsAction(_prev: SaveState, formData: FormData): Promise<SaveState> {
   await requireManage();
   const showRentPrices = String(formData.get('showRentPrices') ?? '') === 'on';
+  const externalRequestsOpen = String(formData.get('externalRequestsOpen') ?? '') === 'on';
   const lastMinuteDays = Number.parseInt(String(formData.get('lastMinuteDays') ?? ''), 10);
   // Een bovengrens omdat "last minute" anders alles wordt en de badge niets meer zegt.
   if (!Number.isFinite(lastMinuteDays) || lastMinuteDays < 1 || lastMinuteDays > 90) {
     return saveError('LAST_MINUTE_INVALID');
   }
-  const value = { showRentPrices, lastMinuteDays };
+  const value = { showRentPrices, lastMinuteDays, externalRequestsOpen };
   await prisma.setting.upsert({
     where: { key: LOGISTIEK_SETTINGS_KEY },
     update: { value },
     create: { key: LOGISTIEK_SETTINGS_KEY, value },
   });
   revalidateBeheer();
-  // Ook de ledenkant: de waarschuwing bij het aanvragen komt uit dezelfde instelling.
+  // Ook de ledenkant: de waarschuwing bij het aanvragen komt uit dezelfde
+  // instelling, en `externalRequestsOpen` bepaalt of daar überhaupt een formulier
+  // staat. De hub hoort erbij, want die zegt het als eerste.
+  revalidatePath('/');
   revalidatePath('/materiaal');
   revalidatePath('/flesserke');
+  revalidatePath('/vervoer');
   return saveOk();
 }
 

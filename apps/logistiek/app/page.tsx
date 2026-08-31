@@ -1,10 +1,11 @@
 import Link from 'next/link';
+import { ExternClosed } from '@/components/extern-closed';
 import { LoginGate } from '@/components/login-gate';
 import { LogisticsIcon } from '@/components/logistics-icon';
-import { getSession } from '@/lib/session';
+import { externalRequestsBlocked, getSession } from '@/lib/session';
 import { copy, getLocale } from '@/lib/i18n';
 import { getPublicCopy } from '@/lib/public-copy';
-import { driverStatus, showsMyTrips } from '@/lib/uitleen-server';
+import { driverStatus, getLogistiekSettings, showsMyTrips } from '@/lib/uitleen-server';
 
 function CtaCard({
   href,
@@ -47,7 +48,14 @@ export default async function LogistiekHome() {
     return <LoginGate />;
   }
   const en = locale === 'en';
-  const [content, driver] = await Promise.all([getPublicCopy(locale), driverStatus(session.user.id)]);
+  const [content, driver, settings] = await Promise.all([
+    getPublicCopy(locale),
+    driverStatus(session.user.id),
+    getLogistiekSettings(),
+  ]);
+  // S1: het zegt het hier al, zodat niemand eerst een formulier invult om pas
+  // bij de indienknop te ontdekken dat het nog dicht staat.
+  const blocked = externalRequestsBlocked(session, settings);
 
   return (
     <main className="flex-1">
@@ -63,6 +71,8 @@ export default async function LogistiekHome() {
       </header>
 
       <div className="logistics-page-content logistics-home-content">
+        {blocked ? <ExternClosed locale={locale} /> : null}
+
         <section aria-labelledby="logistics-options-title">
           <div className="logistics-section-head">
             <h2 id="logistics-options-title">{en ? 'What would you like to do?' : 'Wat wil je doen?'}</h2>
