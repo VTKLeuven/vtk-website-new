@@ -54,6 +54,12 @@ export type TransportFilters = {
    * van de planning weer een lijst losse ritten.
    */
   showEvents: boolean;
+  /**
+   * Staat de beschikbaarheid van de chauffeurs als band achter het rooster (V1)?
+   * Standaard **uit**: ze is nuttig op het moment dat je chauffeurs toewijst, en
+   * de rest van de tijd een extra laag kleur over de week.
+   */
+  showAvailability: boolean;
 };
 
 export const EMPTY_FILTERS: TransportFilters = {
@@ -62,6 +68,7 @@ export const EMPTY_FILTERS: TransportFilters = {
   statuses: [],
   requesterTypes: [],
   showEvents: true,
+  showAvailability: false,
 };
 
 /** Komma-gescheiden lijst uit de query, zonder lege stukken. */
@@ -78,8 +85,10 @@ export function parseTransportFilters(query: {
   status?: string;
   aanvrager?: string;
   evenementen?: string;
+  beschikbaar?: string;
 }): TransportFilters {
   return {
+    showAvailability: query.beschikbaar === '1',
     // Enkel een expliciete `0` zet de strook uit; alles anders (ook een
     // ontbrekende parameter) laat ze staan.
     showEvents: query.evenementen !== '0',
@@ -102,6 +111,7 @@ export function filtersToQuery(filters: TransportFilters): Record<string, string
   if (filters.statuses.length > 0) query.status = filters.statuses.join(',');
   if (filters.requesterTypes.length > 0) query.aanvrager = filters.requesterTypes.join(',');
   if (!filters.showEvents) query.evenementen = '0';
+  if (filters.showAvailability) query.beschikbaar = '1';
   return query;
 }
 
@@ -112,7 +122,8 @@ export function countActiveFilters(filters: TransportFilters): number {
     (filters.driverIds.length > 0 ? 1 : 0) +
     (filters.statuses.length > 0 ? 1 : 0) +
     (filters.requesterTypes.length > 0 ? 1 : 0) +
-    (filters.showEvents ? 0 : 1)
+    (filters.showEvents ? 0 : 1) +
+    (filters.showAvailability ? 1 : 0)
   );
 }
 
@@ -153,5 +164,6 @@ export function describeFilters(
     );
   }
   if (!filters.showEvents) parts.push('evenementen verborgen');
+  if (filters.showAvailability) parts.push('beschikbaarheid van de chauffeurs zichtbaar');
   return parts;
 }

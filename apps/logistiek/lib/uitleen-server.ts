@@ -1280,6 +1280,61 @@ async function logistiekTeamMembers() {
 }
 
 /**
+ * De beschikbaarheidsvensters die dit tijdvenster raken (V1), met de naam van de
+ * chauffeur erbij voor de band in de planning.
+ */
+export async function availabilityInRange(from: Date, to: Date) {
+  return prisma.uitleenDriverAvailability.findMany({
+    where: { startAt: { lt: to }, endAt: { gt: from } },
+    select: {
+      id: true,
+      userId: true,
+      startAt: true,
+      endAt: true,
+      note: true,
+      user: { select: { name: true } },
+    },
+    orderBy: { startAt: 'asc' },
+  });
+}
+
+/** De vensters van één chauffeur, vanaf vandaag: wat hij zelf beheert. */
+export async function availabilityForDriver(userId: string, now = new Date()) {
+  // Vensters die al voorbij zijn, blijven in de databank staan (ze zeggen
+  // achteraf wie er die dag kon), maar horen niet in de lijst waar je dingen
+  // weghaalt: die gaat over wat je nog belooft.
+  return prisma.uitleenDriverAvailability.findMany({
+    where: { userId, endAt: { gte: now } },
+    select: { id: true, startAt: true, endAt: true, note: true },
+    orderBy: { startAt: 'asc' },
+  });
+}
+
+/**
+ * Kan deze chauffeur op dit moment rijden, volgens wat hij zelf ingaf?
+ *
+ * `null` wanneer hij helemaal geen vensters ingaf: dan weet de app het niet, en
+ * "niet beschikbaar" beweren zou een waarschuwing geven bij elke chauffeur die
+ * dit scherm nog nooit geopend heeft.
+ */
+export async function driverIsAvailable(
+  userId: string,
+  startAt: Date,
+  endAt: Date
+): Promise<boolean | null> {
+  const any = await prisma.uitleenDriverAvailability.findFirst({
+    where: { userId },
+    select: { id: true },
+  });
+  if (!any) return null;
+  const covering = await prisma.uitleenDriverAvailability.findFirst({
+    where: { userId, startAt: { lte: startAt }, endAt: { gte: endAt } },
+    select: { id: true },
+  });
+  return covering !== null;
+}
+
+/**
  * De agenda-abonnementen van deze persoon (A1). Ingetrokken abonnementen vallen
  * weg: die staan er enkel nog om te beletten dat een token hergebruikt wordt.
  */

@@ -2745,6 +2745,33 @@ enkel `EXTERN` betaalt.
   formulier: wie bij geen enkele groep hoort, vraagt extern aan en ziet de
   waarborg wel.
 
+### Beschikbaarheid is een hint, geen belofte en geen rooster
+
+Chauffeurs geven op `/ritten/beschikbaarheid` in wanneer ze kunnen rijden; het
+team ziet dat als lichte band achter de transportplanning.
+
+- **Vensters en geen herhalend rooster.** Een chauffeur weet "die zaterdag kan
+  ik" en niet "elke tweede week van 9 tot 12". Een rooster zou hem dwingen iets
+  vast te leggen dat elke week anders is, en het team zou erop plannen.
+- **Iemand toewijzen buiten zijn venster mag**, met een waarschuwing in de
+  bevestiging. De app kent zijn agenda niet, hij wel, en een blokkade zou de
+  planning stilleggen op het moment dat er nog snel iemand gebeld moet worden.
+- **Niets ingeven betekent "niet gekend" en niet "kan niet".** Wie dit scherm
+  nooit opende, krijgt geen waarschuwing; anders zou elke chauffeur er een
+  krijgen en zou niemand ze nog lezen.
+- **Aansluitende vensters vloeien samen.** 12:00-14:00 plus 14:00-18:00 wordt
+  één band van 12 tot 18: twee banden naast elkaar zien eruit als een gaatje dat
+  er niet is.
+- **De band staat standaard uit** in de planning. Ze is nuttig op het moment dat
+  je chauffeurs toewijst, en de rest van de tijd een extra laag kleur over de
+  week.
+- **De chauffeur beheert ze zelf**, ook het team niet voor hem: de acties staan
+  in `app/actions/uitleen.ts` en niet in `beheer.ts`, want een chauffeur heeft
+  geen `logistiek.manage`.
+- **Vensters in het verleden blijven staan.** Die zeggen achteraf wie er die dag
+  kon, en dat is precies de vraag bij "waarom deed altijd dezelfde persoon de
+  nachtritten".
+
 ### De transportplanning is abonneerbaar, en die link is een geheim
 
 Het team plant in deze app, maar leeft in zijn eigen agenda. Zonder feed staat een

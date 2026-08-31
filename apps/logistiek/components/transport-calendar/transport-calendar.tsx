@@ -22,6 +22,7 @@ import {
   HOUR_PX_STEP,
   ZOOM_STORAGE_KEY,
   clampHourPx,
+  type AvailabilityBand,
   type CalendarVehicle,
   type TripBlock,
 } from './types';
@@ -56,6 +57,7 @@ export function TransportCalendar({
   events,
   onSelectEvent,
   selectedEventId,
+  bands,
   children,
 }: {
   view: CalendarView;
@@ -83,6 +85,8 @@ export function TransportCalendar({
   events?: CalendarEventBar[];
   onSelectEvent?: (eventId: string) => void;
   selectedEventId?: string | null;
+  /** Beschikbaarheid van de chauffeurs als lichte band achter het rooster (V1). */
+  bands?: AvailabilityBand[];
   /** Wat onder de kalender komt: de legende staat er al, dit komt erna. */
   children?: React.ReactNode;
 }) {
@@ -334,6 +338,7 @@ export function TransportCalendar({
           now={now}
           onMoveBlock={onMoveBlock}
           onCreateRange={onCreateRange}
+          bands={bands}
           above={
             events && events.length > 0 ? (
               <EventBars

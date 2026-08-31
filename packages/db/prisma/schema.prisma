@@ -680,6 +680,7 @@ model User {
   collectEnGoImported     CollectEnGoOrder[]        @relation("CollectEnGoImportedBy")
   uitleenDriver           UitleenDriver?            @relation("UitleenDriverUser")
   uitleenFeedTokens       UitleenFeedToken[]        @relation("UitleenFeedTokenUser")
+  uitleenAvailability     UitleenDriverAvailability[] @relation("UitleenDriverAvailabilityUser")
   uitleenDriversAdded     UitleenDriver[]           @relation("UitleenDriverAddedBy")
   uitleenAuditLogs        UitleenAuditLog[]         @relation("UitleenAuditActor")
 
@@ -3195,6 +3196,39 @@ model UitleenDriver {
 
   user    User  @relation("UitleenDriverUser", fields: [userId], references: [id], onDelete: Cascade)
   addedBy User? @relation("UitleenDriverAddedBy", fields: [addedById], references: [id], onDelete: SetNull)
+}
+
+/// Wanneer een chauffeur kan rijden.
+///
+/// Vensters en geen rooster: een chauffeur weet "zaterdagvoormiddag kan ik" en
+/// niet "elke tweede week van 9 tot 12". Een herhalend rooster zou hem dwingen
+/// iets vast te leggen dat elke week anders is, en het team zou erop plannen.
+///
+/// Het is een **hulpmiddel en geen belofte**: iemand toewijzen buiten zijn
+/// venster geeft een waarschuwing en geen blokkade. De app kent zijn agenda niet,
+/// hij wel, en een blokkade zou de planning stilleggen op het moment dat er nog
+/// snel iemand gebeld moet worden.
+///
+/// Niet werkingsjaar-gescoped en niet opgekuist: een venster in het verleden
+/// zegt achteraf wie er die dag kon, en dat is precies de vraag bij "waarom deed
+/// altijd dezelfde persoon de nachtritten".
+model UitleenDriverAvailability {
+  id     String @id @default(cuid())
+  userId String
+
+  startAt DateTime @db.Timestamptz(3)
+  endAt   DateTime @db.Timestamptz(3)
+
+  /// Vrije nota van de chauffeur zelf ("enkel met de auto", "tot 16u zeker").
+  note String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation("UitleenDriverAvailabilityUser", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, startAt])
+  @@index([startAt, endAt])
 }
 
 /// Heen of terug binnen één heen-en-terugaanvraag (`tripGroupId`).

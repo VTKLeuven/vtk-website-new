@@ -59,3 +59,21 @@ export function clampHourPx(value: number): number {
 
 /** Waar de zoom van deze persoon blijft staan. Per browser, zoals de catalogusweergave. */
 export const ZOOM_STORAGE_KEY = 'logistiek.transportplanning.zoom';
+
+/**
+ * Een venster waarin een chauffeur kan rijden (V1), als lichte band achter het
+ * rooster.
+ *
+ * Achter en niet tussen de ritten: het is context en geen afspraak. Een band die
+ * er even zwaar uitziet als een rit, laat je twee keer kijken om te zien wat er
+ * effectief gepland is.
+ */
+export type AvailabilityBand = {
+  id: string;
+  driverId: string;
+  driverName: string;
+  /** ISO-strings, zoals alles wat naar een client-component reist. */
+  startAt: string;
+  endAt: string;
+  note: string | null;
+};

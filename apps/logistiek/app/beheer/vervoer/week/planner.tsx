@@ -9,7 +9,11 @@ import {
 } from '@/components/transport-calendar/transport-calendar';
 import { TransportFilterBar } from '@/components/transport-calendar/filters';
 import { TripInspector } from '@/components/transport-calendar/trip-inspector';
-import type { CalendarVehicle, TripBlock } from '@/components/transport-calendar/types';
+import type {
+  AvailabilityBand,
+  CalendarVehicle,
+  TripBlock,
+} from '@/components/transport-calendar/types';
 import type { CalendarView } from '@/lib/calendar-range';
 import type { DriverColorOverrides } from '@/lib/driver-colors';
 import type { TransportFilters } from '@/lib/transport-filters';
@@ -97,6 +101,7 @@ export function TransportPlanner({
   vehicleOptions,
   groups,
   events,
+  availability,
   driverColors,
   filters,
   hiddenNote,
@@ -114,6 +119,8 @@ export function TransportPlanner({
   groups: Array<{ id: string; name: string }>;
   /** De evenementen boven het rooster, met wat het paneel nodig heeft (P5). */
   events: PlannerEvent[];
+  /** Wanneer de chauffeurs kunnen rijden (V1); leeg wanneer de filter uitstaat. */
+  availability: AvailabilityBand[];
   driverColors?: DriverColorOverrides;
   filters: TransportFilters;
   /** Wat er door de filters niet getoond wordt, in woorden. */
@@ -213,6 +220,7 @@ export function TransportPlanner({
           setOpenId(id);
         }}
         events={eventBars}
+        bands={filters.showAvailability ? availability : undefined}
         selectedEventId={openEventId}
         onSelectEvent={(id) => {
           setDraft(null);

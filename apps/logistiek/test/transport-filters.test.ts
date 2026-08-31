@@ -64,6 +64,27 @@ describe('countActiveFilters', () => {
   });
 });
 
+describe('showAvailability', () => {
+  it('staat standaard uit en komt enkel in de URL wanneer ze aanstaat', () => {
+    // Omgekeerd aan showEvents: de band is nuttig terwijl je chauffeurs toewijst
+    // en de rest van de tijd een extra laag kleur.
+    expect(parseTransportFilters({}).showAvailability).toBe(false);
+    expect(parseTransportFilters({ beschikbaar: '1' }).showAvailability).toBe(true);
+    expect(filtersToQuery(EMPTY_FILTERS).beschikbaar).toBeUndefined();
+    expect(filtersToQuery({ ...EMPTY_FILTERS, showAvailability: true })).toEqual({
+      beschikbaar: '1',
+    });
+  });
+
+  it('telt mee als filter en staat in de zin', () => {
+    const filters = parseTransportFilters({ beschikbaar: '1' });
+    expect(countActiveFilters(filters)).toBe(1);
+    expect(describeFilters(filters, { vehicles: new Map(), drivers: new Map() })).toEqual([
+      'beschikbaarheid van de chauffeurs zichtbaar',
+    ]);
+  });
+});
+
 describe('showEvents', () => {
   it('staat standaard aan', () => {
     expect(parseTransportFilters({}).showEvents).toBe(true);

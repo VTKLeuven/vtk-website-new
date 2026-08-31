@@ -28,6 +28,7 @@ import { notifyReservation, notifyTransport } from '@/lib/uitleen-mail';
 import {
   consumeFlesserkeStock,
   flesserkeReserved,
+  driverIsAvailable,
   isDriver,
   reservedQuantities,
   reservationConflicts,
@@ -2281,7 +2282,19 @@ export async function assignDriverAction(bookingId: string, driverId: string): P
   });
 
   revalidateBeheer();
-  return { ok: true, message: driverId ? 'Chauffeur toegewezen.' : 'Chauffeur verwijderd.' };
+  if (!driverId) return { ok: true, message: 'Chauffeur verwijderd.' };
+
+  // Een waarschuwing en geen blokkade (V1): de app kent de agenda van deze
+  // chauffeur niet, hij wel. Wie niets ingaf, krijgt er ook geen; `null` betekent
+  // "niet gekend" en niet "kan niet".
+  const available = await driverIsAvailable(driverId, booking.startAt, booking.endAt);
+  return {
+    ok: true,
+    message:
+      available === false
+        ? `Chauffeur toegewezen. Let op: ${driver?.name ?? 'deze chauffeur'} gaf niet op dat hij op dat moment kan rijden.`
+        : 'Chauffeur toegewezen.',
+  };
 }
 
 /** Voertuig wisselen: tarief opnieuw snapshotten en de prijs herberekenen. */

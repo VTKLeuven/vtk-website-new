@@ -1,10 +1,15 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import type { DriverColorOverrides } from '@/lib/driver-colors';
+import { driverColorVar, type DriverColorOverrides } from '@/lib/driver-colors';
 import { minutesOfDay, placeForDay, startOfBrusselsDay, type Placed } from '@/lib/week-lanes';
 import { BlockContent, blockLabel, blockLook, formatTime } from './trip-block';
-import { HOUR_PX_DEFAULT, type CalendarVehicle, type TripBlock } from './types';
+import {
+  HOUR_PX_DEFAULT,
+  type AvailabilityBand,
+  type CalendarVehicle,
+  type TripBlock,
+} from './types';
 
 /**
  * De dag- en weekweergave: de uren verticaal, de dagen naast elkaar, en elke rit
@@ -107,6 +112,7 @@ export function TimeGrid({
   onMoveBlock,
   onCreateRange,
   above,
+  bands,
 }: {
   /** De dagen, als ISO-strings van UTC-middernacht (date-only). */
   days: string[];
@@ -135,6 +141,8 @@ export function TimeGrid({
    * scroller, zodat het meeschuift met de dagen eronder.
    */
   above?: ReactNode;
+  /** Beschikbaarheidsvensters als lichte band achter het rooster (V1). */
+  bands?: AvailabilityBand[];
 }) {
   const parsedDays = useMemo(() => days.map((day) => new Date(day)), [days]);
   const vehicleById = useMemo(
@@ -145,6 +153,13 @@ export function TimeGrid({
   const placedPerDay = useMemo(
     () => parsedDays.map((day) => placeForDay(blocks, day)),
     [blocks, parsedDays]
+  );
+
+  // Dezelfde dagknip als de ritten, zodat een venster van 22:00 tot 02:00 ook op
+  // twee dagen staat en niet op één met een negatieve hoogte.
+  const bandsPerDay = useMemo(
+    () => parsedDays.map((day) => (bands ? placeForDay(bands, day) : [])),
+    [bands, parsedDays]
   );
 
   // Enkel de uren tonen waarin er iets gebeurt, met 07:00-23:00 als bodem: een
@@ -395,6 +410,23 @@ export function TimeGrid({
                     className="absolute inset-x-0 border-t border-vtk-navy/10"
                     style={{ top: index * hourPx }}
                     aria-hidden
+                  />
+                ))}
+
+                {/* De beschikbaarheid van de chauffeurs (V1), helemaal onderaan
+                    de stapel: het is context waarbinnen je plant, geen afspraak
+                    die met een rit kan concurreren om je aandacht. */}
+                {bandsPerDay[dayIndex].map((band) => (
+                  <span
+                    key={`${band.id}-${days[dayIndex]}`}
+                    aria-hidden
+                    title={`${band.driverName} kan rijden${band.note ? `: ${band.note}` : ''}`}
+                    className="pointer-events-none absolute inset-x-0 rounded-[6px] opacity-30"
+                    style={{
+                      top: ((band.from - firstHour * 60) / 60) * hourPx,
+                      height: Math.max(4, ((band.to - band.from) / 60) * hourPx),
+                      backgroundColor: driverColorVar(band.driverId, driverColors),
+                    }}
                   />
                 ))}
 

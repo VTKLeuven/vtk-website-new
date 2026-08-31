@@ -25,6 +25,7 @@ import {
   activeVehicles,
   driverColorOverrides,
   activeGroups,
+  availabilityInRange,
   driverOptions,
   eventsInRange,
   transportAuditLogsByBooking,
@@ -119,7 +120,8 @@ export default async function VervoerWeekPage({
   const anchor = (datum && parseDateOnly(datum)) || (week && parseDateOnly(week)) || todayDateOnly();
   const { days, from, to } = calendarRange(view, anchor);
 
-  const [bookings, vehicles, drivers, driverColors, groups, events] = await Promise.all([
+  const [bookings, vehicles, drivers, driverColors, groups, events, availability] =
+    await Promise.all([
     transportRange(from, to, filters),
     activeVehicles(),
     driverOptions(),
@@ -129,6 +131,8 @@ export default async function VervoerWeekPage({
     activeGroups(),
     // De evenementen die dit venster raken, voor de strook erboven (P5).
     filters.showEvents ? eventsInRange(from, to) : Promise.resolve([]),
+    // Enkel ophalen wanneer de band ook getoond wordt (V1).
+    filters.showAvailability ? availabilityInRange(from, to) : Promise.resolve([]),
   ]);
 
   const conflicts = conflictingIds(bookings);
@@ -308,6 +312,14 @@ export default async function VervoerWeekPage({
               needsVanDriver: vehicle.needsVanDriver,
             }))}
           groups={groups.map((group) => ({ id: group.id, name: group.nameNl }))}
+          availability={availability.map((window) => ({
+            id: window.id,
+            driverId: window.userId,
+            driverName: window.user.name,
+            startAt: window.startAt.toISOString(),
+            endAt: window.endAt.toISOString(),
+            note: window.note,
+          }))}
           events={events.map((event) => {
             const startAt = event.startAt as Date;
             // Een evenement zonder einde duurt tot het einde van zijn startdag;

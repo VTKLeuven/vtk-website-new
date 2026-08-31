@@ -174,6 +174,21 @@ export function TransportFilterBar({
         />
         Evenementen boven de kalender
       </label>
+      <label className="flex items-start gap-2 text-sm text-vtk-ink">
+        <input
+          type="checkbox"
+          checked={filters.showAvailability}
+          onChange={(event) => apply({ ...filters, showAvailability: event.target.checked })}
+          className="mt-0.5 h-4 w-4 accent-vtk-navy"
+        />
+        <span>
+          Beschikbaarheid van de chauffeurs
+          <span className="mt-0.5 block text-xs font-normal text-vtk-muted">
+            Als lichte band achter het rooster, in de kleur van de chauffeur. Wie niets ingaf,
+            staat er niet: dat betekent niet dat hij niet kan.
+          </span>
+        </span>
+      </label>
     </>
   );
 

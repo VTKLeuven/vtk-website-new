@@ -5,7 +5,7 @@ import { prisma } from '@vtk/db';
 import { externalRequestsBlocked, requireSession } from '@/lib/session';
 import { getLocale } from '@/lib/i18n';
 import { isEmailish, isOnQuarterHour, parseDateOnly, todayDateOnly } from '@/lib/uitleen';
-import { availabilityForRange, getLogistiekSettings } from '@/lib/uitleen-server';
+import { availabilityForRange, getLogistiekSettings, isDriver } from '@/lib/uitleen-server';
 import {
   buildReservationData,
   parseBrusselsDateTime,
@@ -952,4 +952,82 @@ export async function startPaymentAction(
     });
     return { ok: false, error: 'De betaalprovider is niet bereikbaar. Probeer straks opnieuw.' };
   }
+}
+
+// ---------------------------------------------------------------------------
+// Beschikbaarheid van chauffeurs (V1)
+// ---------------------------------------------------------------------------
+
+/**
+ * Een venster waarin je kan rijden toevoegen.
+ *
+ * Hier en niet in `app/actions/beheer.ts`: een chauffeur heeft geen
+ * `logistiek.manage` (zie `UitleenDriver` in de schema-comment), en zijn eigen
+ * beschikbaarheid ingeven is precies wat hij zonder beheerrechten moet kunnen.
+ * Dezelfde `isDriver()`-hercheck als `approveTransportAction` gebruikt.
+ *
+ * Overlappende vensters worden samengevoegd: twee keer "zaterdagvoormiddag"
+ * intekenen hoort geen twee banden op te leveren die je apart moet weghalen.
+ */
+export async function addAvailabilityAction(input: {
+  startAt: string;
+  endAt: string;
+  note?: string;
+}): Promise<ActionResult> {
+  const session = await requireSession();
+  if (!(await isDriver(session.user.id))) {
+    return { ok: false, error: 'Je staat niet in de chauffeurslijst.' };
+  }
+
+  const startAt = parseBrusselsDateTime(input.startAt);
+  const endAt = parseBrusselsDateTime(input.endAt);
+  if (!startAt || !endAt) return { ok: false, error: 'Kies een begin- en eindmoment.' };
+  if (endAt <= startAt) return { ok: false, error: 'Het einde ligt voor het begin.' };
+  if (!isOnQuarterHour(startAt) || !isOnQuarterHour(endAt)) {
+    return { ok: false, error: 'Kies uren op het kwartier (bv. 14:00, 14:15).' };
+  }
+
+  const note = (input.note ?? '').trim().slice(0, 300) || null;
+
+  await runSerializable(async (tx) => {
+    // Alles wat dit venster raakt, gaat erin op. `lte`/`gte` en niet `lt`/`gt`:
+    // twee vensters die op elkaar aansluiten (12:00-14:00 en 14:00-18:00) zijn
+    // één blok van 12 tot 18, en als twee banden naast elkaar zien ze eruit als
+    // een gaatje dat er niet is.
+    const touching = await tx.uitleenDriverAvailability.findMany({
+      where: { userId: session.user.id, startAt: { lte: endAt }, endAt: { gte: startAt } },
+      select: { id: true, startAt: true, endAt: true, note: true },
+    });
+    const from = touching.reduce((earliest, row) => (row.startAt < earliest ? row.startAt : earliest), startAt);
+    const to = touching.reduce((latest, row) => (row.endAt > latest ? row.endAt : latest), endAt);
+    // De nota van het nieuwe venster wint; die van de oude blijft staan wanneer
+    // het nieuwe er geen heeft, zodat "enkel met de auto" niet stil verdwijnt.
+    const keptNote = note ?? touching.find((row) => row.note)?.note ?? null;
+
+    if (touching.length > 0) {
+      await tx.uitleenDriverAvailability.deleteMany({
+        where: { id: { in: touching.map((row) => row.id) } },
+      });
+    }
+    await tx.uitleenDriverAvailability.create({
+      data: { userId: session.user.id, startAt: from, endAt: to, note: keptNote },
+    });
+  });
+
+  revalidatePath('/ritten/beschikbaarheid');
+  revalidatePath('/beheer/vervoer/week');
+  return { ok: true, message: 'Beschikbaarheid opgeslagen.' };
+}
+
+/** Een venster weghalen. Enkel je eigen; het team beheert dit niet voor je. */
+export async function removeAvailabilityAction(id: string): Promise<ActionResult> {
+  const session = await requireSession();
+  const deleted = await prisma.uitleenDriverAvailability.deleteMany({
+    where: { id, userId: session.user.id },
+  });
+  if (deleted.count === 0) return { ok: false, error: 'Dit venster bestaat niet (meer).' };
+
+  revalidatePath('/ritten/beschikbaarheid');
+  revalidatePath('/beheer/vervoer/week');
+  return { ok: true, message: 'Venster weggehaald.' };
 }
