@@ -108,6 +108,10 @@ export default async function BeschikbaarheidPage({
               /beheer), dus die komt hier rond dit ene blok. */}
           <ToastProvider>
             <AvailabilityEditor
+              weekLabel={`${en ? 'Week' : 'Week'} ${isoWeekNumber(monday)}`}
+              previousHref={hrefFor(new Date(monday.getTime() - 7 * DAY_MS))}
+              nextHref={hrefFor(new Date(monday.getTime() + 7 * DAY_MS))}
+              backHref="/ritten"
               days={days}
               driverId={session.user.id}
               driverName={session.user.name}

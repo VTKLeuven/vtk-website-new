@@ -49,12 +49,21 @@ export function AvailabilityEditor({
   windows,
   driverId,
   driverName,
+  weekLabel,
+  previousHref,
+  nextHref,
+  backHref,
 }: {
   /** De week, als ISO-strings van UTC-middernacht. */
   days: string[];
   windows: AvailabilityWindow[];
   driverId: string;
   driverName: string;
+  /** Wat de telefoonweergave in haar balk zet; die heeft geen paginakop. */
+  weekLabel: string;
+  previousHref: string;
+  nextHref: string;
+  backHref: string;
 }) {
   const showToast = useToast();
   const [pending, startTransition] = useTransition();
@@ -239,7 +248,16 @@ export function AvailabilityEditor({
     // samen duwden ze het raster van het scherm. Slepen in het tijdrooster van
     // het brede scherm is muis-only en kan daar ook niet anders: verticaal vegen
     // is scrollen. Zie `availability-paint.tsx`.
-    return <AvailabilityPaint days={days} windows={shown} />;
+    return (
+      <AvailabilityPaint
+        days={days}
+        windows={shown}
+        weekLabel={weekLabel}
+        previousHref={previousHref}
+        nextHref={nextHref}
+        backHref={backHref}
+      />
+    );
   }
 
   return (

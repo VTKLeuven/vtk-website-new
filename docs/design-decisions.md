@@ -2337,15 +2337,19 @@ op iets dat aanstond, dan wis je.
 - **Het vakje onder je vinger komt van `elementFromPoint`**, niet van de
   gebeurtenis: bij een veeg vangt de browser de pointer, dus `event.target`
   blijft de hele veeg lang het vakje waar je begon.
-- **Op een telefoon staat er niets anders op dat scherm.** De velden om een uur
-  in te tikken en de lijst om een venster weg te halen stonden er eerst onder,
-  maar allebei doen ze wat het raster al doet, en samen duwden ze het raster van
-  het scherm. Ze blijven wel op een breed scherm staan.
-- **Het raster meet zijn hoogte tot de onderrand van het venster** en de uren
-  delen wat er is. Daarvoor krijgt de paginakop een `compact`-stand: kleinere
-  titel, geen inleiding, minder ruimte onderaan, en de weeknavigatie op één rij.
-  Die zestig pixels waren precies het verschil tussen "past op één scherm" en
-  "je moet toch scrollen", en scrollen is hier wat niet kan: je vinger tekent.
+- **Op een telefoon is het een eigen volledig scherm.** De velden om een uur in
+  te tikken en de lijst om een venster weg te halen stonden er eerst onder, maar
+  allebei doen ze wat het raster al doet. En zelfs zonder die twee bleef het
+  krap: de sitekop, de donkere paginakop en de weeknavigatie namen samen ruim
+  driehonderd pixels, en dan blijft er voor achttien rijen te weinig over. Het
+  raster puilde uit zijn kaart en de voetregel viel over de vakjes. Nu vult dit
+  scherm de hele telefoon, met een smalle balk erboven waarin de week staat en
+  waarmee je terug gaat. Op een breed scherm blijven het tijdrooster, de velden
+  en de lijst gewoon staan.
+- **De rijen delen wat er overblijft, zonder ondergrens, in een doos die
+  afsnijdt.** Met een ondergrens puilde het raster eruit zodra het niet paste;
+  liever een rij van twintig pixels dan een scherm dat lekt. Klap je de nacht
+  open, dan worden de rijen kleiner in plaats van dat er iets buiten valt.
 
 ### De knop naar de beschikbaarheid staat in de donkere paginakop
 
