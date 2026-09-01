@@ -380,6 +380,252 @@
   border-top-color: rgba(255, 255, 255, 0.16);
 }
 
+/* ---------------------------------------------------------------------------
+   Weekoverzicht in de hero: de tweede agenda, te kiezen in /admin/frontpage.
+
+   Bewust géén kaart. De leesbaarheid komt van `.hero-week-wash`, een breed
+   verloop zonder rand dat naar buiten toe volledig oplost; dat is dezelfde
+   techniek als de scrim linksboven, alleen nu ook rechts, waar de foto net het
+   lichtst is (lucht en bomen). Een paneel met een eigen vulling loste het
+   contrast ook op, maar dan staat er weer een tweede scherm naast de titel.
+
+   De vormen zijn rond en de scheidingen lossen op: een raster met rails van 3px
+   en hoofdletter-mono stond hoekiger dan de rest van de site. De categoriekleur
+   zit in een ronde stip (`--cat`), dezelfde kleurcode als op /kalender.
+   --------------------------------------------------------------------------- */
+.vtk-design .home-hero .hero-week {
+  position: relative;
+}
+
+.vtk-design .home-hero .hero-week-wash {
+  position: absolute;
+  z-index: -1;
+  inset: -52px -64px -44px -52px;
+  border-radius: 44px;
+  background: radial-gradient(
+    102% 78% at 58% 50%,
+    rgba(5, 9, 22, 0.9) 0%,
+    rgba(5, 9, 22, 0.76) 40%,
+    rgba(5, 9, 22, 0.36) 70%,
+    rgba(5, 9, 22, 0) 100%
+  );
+  pointer-events: none;
+}
+
+.vtk-design .home-hero .hero-week-head {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+  margin-bottom: 14px;
+}
+
+.vtk-design .home-hero .hero-week-head h3 {
+  margin: 0;
+  color: var(--paper);
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.vtk-design .home-hero .hero-week-head .range {
+  color: var(--on-dark-muted);
+  font-size: 12.5px;
+}
+
+.vtk-design .home-hero .hero-week-head .all {
+  margin-left: auto;
+  color: #fff;
+  font-size: 12.5px;
+  white-space: nowrap;
+  text-decoration: underline;
+  text-underline-offset: 4px;
+  text-decoration-color: rgba(255, 255, 255, 0.4);
+}
+
+.vtk-design .home-hero .hero-week-head .all:hover {
+  text-decoration-color: #fff;
+}
+
+.vtk-design .home-hero .hero-week-day {
+  display: grid;
+  grid-template-columns: 52px minmax(0, 1fr);
+  gap: 16px;
+  padding: 12px 0;
+  align-items: start;
+}
+
+/* Een scheiding die naar rechts oplost. Als achtergrond en niet als `border-top`,
+   want een rand kan niet verlopen en een harde lijn is precies wat hier weg
+   moest. */
+.vtk-design .home-hero .hero-week-day + .hero-week-day {
+  background-image: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0.18),
+    rgba(255, 255, 255, 0.03) 78%,
+    transparent
+  );
+  background-size: 100% 1px;
+  background-repeat: no-repeat;
+  background-position: top left;
+}
+
+/* Een dag zonder events hoeft geen volle rij hoog te zijn; zo blijft de vorm van
+   de week zichtbaar zonder dat de lege dagen de drukke wegduwen. */
+.vtk-design .home-hero .hero-week-day.empty {
+  padding: 8px 0;
+  align-items: baseline;
+}
+
+.vtk-design .home-hero .hero-week-label {
+  display: flex;
+  align-items: baseline;
+  gap: 7px;
+  padding-top: 1px;
+}
+
+.vtk-design .home-hero .hero-week-label .num {
+  color: #fff;
+  font-size: 19px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1.15;
+}
+
+.vtk-design .home-hero .hero-week-label .dow {
+  color: var(--on-dark-muted);
+  font-size: 12.5px;
+}
+
+/* Vandaag als geel pilletje. Rond en niet vierkant: de kalender gebruikt daar
+   een blokje, maar in de hero staat het naast ronde stippen en ronde knoppen. */
+.vtk-design .home-hero .hero-week-day.today .num {
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: var(--yellow);
+  color: var(--ink);
+  font-size: 17px;
+}
+
+.vtk-design .home-hero .hero-week-day.empty .num {
+  color: rgba(255, 255, 255, 0.55);
+  font-size: 16px;
+  font-weight: 500;
+}
+
+.vtk-design .home-hero .hero-week-evs {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+
+.vtk-design .home-hero .hero-week-ev {
+  display: grid;
+  grid-template-columns: 8px minmax(0, 1fr) auto auto;
+  gap: 10px;
+  align-items: baseline;
+}
+
+.vtk-design .home-hero .hero-week-ev .dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--cat, var(--yellow));
+  transform: translateY(4px);
+}
+
+.vtk-design .home-hero .hero-week-ev .body {
+  display: block;
+  min-width: 0;
+  color: inherit;
+}
+
+.vtk-design .home-hero .hero-week-ev .title {
+  display: block;
+  color: var(--paper);
+  font-size: 14.5px;
+  font-weight: 500;
+  line-height: 1.35;
+}
+
+.vtk-design .home-hero .hero-week-ev .body:hover .title {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.vtk-design .home-hero .hero-week-ev .body small {
+  display: block;
+  margin-top: 2px;
+  color: var(--on-dark-muted);
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.vtk-design .home-hero .hero-week-ev .time {
+  color: var(--on-dark-muted);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* De ster van "ik kom". Leeg is niet aangeduid, gevuld en geel is aangeduid; het
+   verschil zit in het icoon zelf en niet enkel in de tooltip. */
+.vtk-design .home-hero .hero-week-star {
+  display: inline-grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  margin: -4px -4px 0 0;
+  border-radius: 999px;
+  color: rgba(255, 255, 255, 0.55);
+  transition:
+    color 140ms ease,
+    background-color 140ms ease;
+}
+
+.vtk-design .home-hero .hero-week-star:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+}
+
+.vtk-design .home-hero .hero-week-star[aria-pressed="true"] {
+  color: var(--yellow);
+}
+
+.vtk-design .home-hero .hero-week-star[data-pending] {
+  opacity: 0.6;
+}
+
+.vtk-design .home-hero .hero-week-star:focus-visible {
+  outline: 2px solid var(--yellow);
+  outline-offset: 2px;
+}
+
+.vtk-design .home-hero .hero-week-none {
+  color: rgba(255, 255, 255, 0.45);
+  font-size: 12.5px;
+}
+
+.vtk-design .home-hero .hero-week-more {
+  color: var(--on-dark-muted);
+  font-size: 12.5px;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  text-decoration-color: rgba(255, 255, 255, 0.3);
+}
+
+.vtk-design .home-hero .hero-week-more:hover {
+  color: #fff;
+}
+
+.vtk-design .home-hero .hero-week-empty {
+  margin: 0;
+  max-width: 44ch;
+  color: var(--on-dark-muted);
+  font-size: 14px;
+}
+
 .vtk-design .quick {
   max-width: var(--max);
   margin: 0 auto;
@@ -1502,6 +1748,14 @@
   .vtk-design .home-hero > aside {
     order: 3;
     margin: clamp(32px, 5vw, 44px) clamp(20px, 3vw, 36px) clamp(56px, 7vw, 72px);
+  }
+
+  /* De aside heeft hier een zijmarge; de wash loopt tot precies aan de
+     schermrand door en toont dus nergens een rand. `html` klipt de overflow, dus
+     een paar pixels ernaast geeft nooit een horizontale scrollbalk. */
+  .vtk-design .home-hero .hero-week-wash {
+    inset: -30px calc(-1 * clamp(20px, 3vw, 36px)) -34px;
+    border-radius: 34px;
   }
 
   .vtk-design .aanbod,

@@ -84,6 +84,15 @@ export async function saveFrontpageAction(
     if (def.type === "url" && !isEditableDestination(trimmed)) {
       return saveError("INVALID_URL");
     }
+    // Een keuze die niet in de registry staat, komt niet uit dit formulier. Ze
+    // weigeren in plaats van bewaren: anders staat er een waarde in de database
+    // waar geen enkele component een tak voor heeft.
+    if (def.type === "choice") {
+      const options = def.options ?? [];
+      if (!options.some((option) => option.value === trimmed)) return saveError("INVALID_INPUT");
+      values[name] = trimmed;
+      continue;
+    }
     if (def.type === "datetime") {
       const moment = parseMoment(trimmed);
       if (!moment) return saveError("INVALID_INPUT");

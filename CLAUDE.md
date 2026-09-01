@@ -174,7 +174,13 @@ the design language into the application instead of copying mockup content.
   gradients, decorative blobs, nested cards, or oversized explanatory text.
 - Hero (homepage): a full-bleed photo under a navy scrim (heaviest top-left,
   behind the headline) carries light copy, a yellow italic-serif accent, and the
-  dark-glass events card. The dark zone (`.home-dark-zone`) stretches the photo
+  agenda beside it. That agenda is either the week overview (`.hero-week`, the
+  default) or the older list of upcoming events (`.hero-cal`); an editor picks
+  which in /admin/frontpage. The week overview deliberately has **no panel**: it
+  reads on a wide, borderless gradient in the scrim (`.hero-week-wash`) that
+  dissolves outward, because the photo is at its lightest exactly there. Do not
+  put a card back around it, and see `docs/design-decisions.md` for the rules
+  behind the days it shows. The dark zone (`.home-dark-zone`) stretches the photo
   through the quick-links row, which sits on it as a dark glass panel; the zone
   ends on a crisp seam: a short bottom-anchored vignette settles the photo edge
   and the openingsuren band starts right below it. Both a paper gap and a long

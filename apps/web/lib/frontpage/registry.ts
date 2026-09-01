@@ -46,6 +46,22 @@ export const BUILTIN_HOME_HERO_IMAGE = "/hero-arenberg.jpg";
 /** The id of the fallback: shown whenever no other front page is live. */
 export const DEFAULT_FRONTPAGE_ID = "default";
 
+/**
+ * De twee agenda's die naast de titel kunnen staan.
+ *
+ * Het weekoverzicht staat eerst en is daarmee de terugval: het is de vorm die de
+ * kring koos. De lijst blijft bestaan omdat ze in een rustige periode soms beter
+ * uitkomt, en omdat een nieuwe hero die je niet kan terugdraaien geen keuze is.
+ * Zie apps/web/lib/calendar/heroWeek.ts en docs/design-decisions.md.
+ */
+export const HOME_AGENDA_WEEK = "week";
+export const HOME_AGENDA_LIST = "list";
+
+export const HOME_AGENDA_OPTIONS = [
+  { value: HOME_AGENDA_WEEK, labelNl: "Weekoverzicht", labelEn: "Week overview" },
+  { value: HOME_AGENDA_LIST, labelNl: "Lijst met eerstvolgende events", labelEn: "List of upcoming events" },
+] as const;
+
 export const FRONTPAGE_MODULES: FrontpageModule[] = [
   {
     id: DEFAULT_FRONTPAGE_ID,
@@ -63,6 +79,16 @@ export const FRONTPAGE_MODULES: FrontpageModule[] = [
         helpNl: "Breed en donker werkt het best; er komt een navy waas overheen.",
         helpEn: "Wide and dark works best; a navy scrim covers it.",
         fallbackUrl: BUILTIN_HOME_HERO_IMAGE,
+      },
+      agenda: {
+        type: "choice",
+        labelNl: "Agenda naast de titel",
+        labelEn: "Agenda beside the headline",
+        helpNl:
+          "Weekoverzicht: de komende zes dagen (zaterdag valt weg), met een ster om aan te duiden dat je komt. Lijst: de vier eerstvolgende evenementen onder elkaar.",
+        helpEn:
+          "Week overview: the next six days (Saturday is skipped), with a star to mark that you are coming. List: the next four events below one another.",
+        options: HOME_AGENDA_OPTIONS,
       },
       eyebrowNl: { type: "text", labelNl: "Bovenschrift (NL)", labelEn: "Eyebrow (NL)" },
       eyebrowEn: { type: "text", labelNl: "Bovenschrift (EN)", labelEn: "Eyebrow (EN)" },

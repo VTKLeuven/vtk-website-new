@@ -17,6 +17,9 @@ export default async function NewEventPage({
   const locale: Locale = localeParam;
   const session = await requireSession();
   const canAll = session.user.isSuperAdmin || hasPermission(session, "calendar.manageAll");
+  // Het weekoverzicht op de homepage staat los van het beheer van het evenement
+  // zelf; zie packages/db/src/permissions.ts.
+  const canHeroWeek = session.user.isSuperAdmin || hasPermission(session, "calendar.heroWeek");
   if (!canAll && !hasPermission(session, "calendar.create")) {
     return <p>{locale === "nl" ? "Geen toegang." : "No access."}</p>;
   }
@@ -51,6 +54,7 @@ export default async function NewEventPage({
         locale={locale}
         canCreateTickets={canCreateTickets}
         canManageCategories={canAll}
+        canHeroWeek={canHeroWeek}
       />
     </div>
   );

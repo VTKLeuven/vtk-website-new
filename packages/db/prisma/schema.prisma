@@ -1427,6 +1427,11 @@ model CalendarEvent {
   /// nooit teruggezet: bij twijfel liever geen bericht dan twee.
   announcedPushAt DateTime? @db.Timestamptz(3)
 
+  /// Voorrang of uitsluiting in het weekoverzicht op de homepage. Zie
+  /// `HeroWeekPlacement` en apps/web/lib/calendar/heroWeek.ts; enkel te zetten
+  /// met de permissie `calendar.heroWeek`.
+  heroWeek HeroWeekPlacement @default(AUTO)
+
   group          Group                        @relation(fields: [groupId], references: [id], onDelete: Cascade)
   createdBy      User?                        @relation("EventCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
   ticketEvent    TicketEvent?
@@ -1443,6 +1448,24 @@ model CalendarEvent {
   @@index([groupId])
   @@index([searchNl], type: Gin)
   @@index([searchEn], type: Gin)
+}
+
+/// Wat dit evenement doet in het weekoverzicht van de hero op de homepage.
+///
+/// Het overzicht kiest normaal zelf: het toont de dagen van het rollende venster
+/// en kapt af op drie events per dag en tien in totaal. Deze twee uitzonderingen
+/// bestaan omdat die keuze soms fout uitpakt. `PINNED` zet een evenement vooraan
+/// op zijn dag en beschermt het tegen die kap; `HIDDEN` houdt het volledig uit
+/// het overzicht, bijvoorbeeld een interne vergadering die wel in de kalender
+/// hoort maar niet op de homepage.
+///
+/// Dit raakt **alleen** de homepage. Een verborgen evenement blijft gewoon in de
+/// kalender, in de feeds en in de app staan; dit is geen zichtbaarheidsregel en
+/// dus ook geen vervanging van een concept.
+enum HeroWeekPlacement {
+  AUTO
+  PINNED
+  HIDDEN
 }
 
 // Doelgroep waar een categorie voor staat. Een categorie zonder `audience` is een

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { Locale } from "@vtk/i18n";
 import type { FieldValues } from "@/lib/frontpage/fields";
+import type { HeroWeekPlacement } from "@/lib/calendar/heroWeek";
 
 /**
  * What every front page component receives.
@@ -15,6 +16,8 @@ import type { FieldValues } from "@/lib/frontpage/fields";
 export type FrontpageEvent = {
   id: string;
   start: Date;
+  /** Een heledagevenement toont "hele dag" in plaats van een uur. */
+  allDay: boolean;
   titleNl: string;
   titleEn: string | null;
   location: string | null;
@@ -26,6 +29,18 @@ export type FrontpageEvent = {
    * die het had moeten overtuigen.
    */
   interestedCount: number | null;
+  /**
+   * De kleur van de eerste categorie, voor de stip in het weekoverzicht. Zo
+   * draagt een evenement op de homepage dezelfde kleurcode als in de kalender.
+   */
+  categoryColour: string | null;
+  /** Voorrang of uitsluiting in het weekoverzicht; zie lib/calendar/heroWeek.ts. */
+  heroWeek: HeroWeekPlacement;
+  /**
+   * Of de bezoeker zelf al aanduidde dat hij komt. Zonder aanmelding altijd
+   * `false`: de ster vraagt dan eerst om aan te melden.
+   */
+  viewerInterested: boolean;
 };
 
 export type FrontpagePartner = {
@@ -41,6 +56,15 @@ export type FrontpageProps = {
   base: string;
   now: Date;
   upcomingEvents: FrontpageEvent[];
+  /**
+   * Dezelfde evenementen, maar vanaf het begin van gisteren, voor het
+   * weekoverzicht. Apart van `upcomingEvents` omdat dat overal elders "wat er
+   * nog komt" betekent, en een front page die een lijst toont geen evenement van
+   * gisteren hoort te tonen. Zie lib/calendar/heroWeek.ts.
+   */
+  weekEvents: FrontpageEvent[];
+  /** Of er iemand aangemeld is. De ster van het weekoverzicht hangt eraan. */
+  signedIn: boolean;
   partners: FrontpagePartner[];
 };
 

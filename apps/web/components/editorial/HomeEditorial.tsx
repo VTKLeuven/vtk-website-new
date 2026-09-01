@@ -15,7 +15,12 @@ import { publicUrl } from "@/lib/storage";
 import { BUILTIN_DEFAULT_EVENT_IMAGE, DEFAULT_EVENT_IMAGE_SETTING } from "@/lib/defaultEventImage";
 import { PartnerLogo } from "@/components/site/PartnerLogo";
 import { viewerAudienceFilter } from "@/lib/calendar/audience";
-import { interestLabel, publicInterestCounts } from "@/lib/calendar/interest";
+import { interestLabel, publicInterestCounts, viewerInterests } from "@/lib/calendar/interest";
+import {
+  FRONTPAGE_EVENT_INCLUDE,
+  frontpageEventsSince,
+  toFrontpageEvents,
+} from "@/lib/frontpage/events";
 import { resolveFrontpage } from "@/lib/frontpage/resolve";
 import { frontpagePhoto } from "@/lib/frontpage/registry";
 import { Frontpage } from "@/components/editorial/frontpage";
@@ -74,7 +79,7 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
 
   const [
     settings,
-    upcomingEvents,
+    calendarEvents,
     tabs,
     partners,
     media,
@@ -98,16 +103,23 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
     }),
     // Dezelfde doelgroepregel als /kalender: standaard staat alles erop, en enkel
     // wie op /account koos zijn kalender toe te spitsen krijgt hier minder.
+    //
+    // Vanaf gisteren en niet vanaf nu: het weekoverzicht in de hero laat de dag
+    // van gisteren staan zolang daar iets was (zie lib/calendar/heroWeek.ts).
+    // Alles wat de rest van deze pagina toont, filtert daar zelf weer uit. De
+    // limiet ligt hoger dan de zes van het rooster hieronder, omdat het venster
+    // van zes dagen er meer kan bevatten en de terugval de eerstvolgende vier
+    // moet kunnen vinden, ook als die pas over een maand zijn.
     viewerAudienceFilter().then((audiences) =>
       prisma.calendarEvent.findMany({
         where: {
-          start: { gte: now },
+          start: { gte: frontpageEventsSince(now) },
           publishedAt: { not: null },
           ...audiences,
         },
         orderBy: { start: "asc" },
-        take: 8,
-        include: { group: true },
+        take: 40,
+        include: FRONTPAGE_EVENT_INCLUDE,
       }),
     ),
     getVisibleHeaderTabsForNav(locale),
@@ -150,6 +162,10 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
     })
     .slice(0, 6);
 
+  // Wat er nog komt. De hero mag een dag terugkijken, de rest van de pagina niet:
+  // een evenement van gisteren in "Aankomende evenementen" is gewoon fout.
+  const upcomingEvents = calendarEvents.filter((event) => event.start >= now);
+
   // Opkomende evenementen: 2 rijen van 3. Zijn er minder, dan krimpt het
   // rooster gewoon mee (zie `.ev-grid`), zonder lege plaatsen op te vullen.
   const eventCards = upcomingEvents.slice(0, 6);
@@ -157,7 +173,14 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
   // "32 komen" bij een evenement waar al volk naartoe gaat. Enkel boven de
   // drempel; zie lib/calendar/interest.ts voor waarom een laag getal averechts
   // werkt. Eén lezing voor de hero én de kaarten hieronder.
-  const interested = await publicInterestCounts(upcomingEvents.map((event) => event.id));
+  const eventIds = calendarEvents.map((event) => event.id);
+  const [interested, viewerInterestMap] = await Promise.all([
+    publicInterestCounts(eventIds),
+    // Wat de bezoeker zelf al aanduidde, voor de ster in het weekoverzicht.
+    // Zonder sessie blijft dit leeg en is de ster een link naar het aanmelden.
+    viewerInterests(eventIds, session?.user.id ?? null),
+  ]);
+  const viewerInterestIds = new Set(viewerInterestMap.keys());
 
   // POC's van jouw richtingen. Zonder sessie of zonder richtingen valt de hele
   // sectie weg: een lijst van alle POC's is hier niet wat gevraagd wordt.
@@ -340,10 +363,9 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
           locale={locale}
           base={base}
           now={now}
-          upcomingEvents={upcomingEvents.map((event) => ({
-            ...event,
-            interestedCount: interested.get(event.id) ?? null,
-          }))}
+          upcomingEvents={toFrontpageEvents(upcomingEvents, interested, viewerInterestIds)}
+          weekEvents={toFrontpageEvents(calendarEvents, interested, viewerInterestIds)}
+          signedIn={session !== null}
           partners={partners}
         />
 

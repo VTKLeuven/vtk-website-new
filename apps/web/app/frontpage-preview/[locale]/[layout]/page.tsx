@@ -8,6 +8,13 @@ import { publicUrl } from "@/lib/storage";
 import { readFieldValues } from "@/lib/frontpage/fields";
 import { frontpagePhoto, getFrontpageModule } from "@/lib/frontpage/registry";
 import { viewerAudienceFilter } from "@/lib/calendar/audience";
+import { publicInterestCounts, viewerInterests } from "@/lib/calendar/interest";
+import {
+  FRONTPAGE_EVENT_INCLUDE,
+  frontpageEventsSince,
+  toFrontpageEvents,
+} from "@/lib/frontpage/events";
+import { ToastProvider } from "@/components/ui/toast";
 import { Frontpage } from "@/components/editorial/frontpage";
 
 // Outside `app/[locale]/` on purpose, so the site header, the footer and the
@@ -43,25 +50,28 @@ export default async function FrontpagePreview({
   // Redirect to the login rather than throwing, the same as the admin layout
   // does: a session that expires while the front page screen is open would
   // otherwise turn every preview frame into a bare 404.
-  await requireSession(`${base}/inloggen?next=${base}/admin/frontpage`);
+  const session = await requireSession(`${base}/inloggen?next=${base}/admin/frontpage`);
   await requirePermission("home.edit");
 
   const layoutModule = getFrontpageModule(layout);
   if (!layoutModule) notFound();
 
   const now = new Date();
-  const [row, upcomingEvents, partners] = await Promise.all([
+  // Dezelfde lezing als de homepage, tot en met het venster dat een dag
+  // terugkijkt: een voorbeeld dat andere evenementen toont dan de echte pagina,
+  // is geen voorbeeld. Zie lib/frontpage/events.ts.
+  const [row, calendarEvents, partners] = await Promise.all([
     prisma.frontpage.findUnique({ where: { layout } }),
     viewerAudienceFilter().then((audiences) =>
       prisma.calendarEvent.findMany({
         where: {
-          start: { gte: now },
+          start: { gte: frontpageEventsSince(now) },
           publishedAt: { not: null },
           ...audiences,
         },
         orderBy: { start: "asc" },
-        take: 8,
-        include: { group: true },
+        take: 40,
+        include: FRONTPAGE_EVENT_INCLUDE,
       }),
     ),
     prisma.partner.findMany({
@@ -71,6 +81,14 @@ export default async function FrontpagePreview({
     }),
   ]);
 
+  const eventIds = calendarEvents.map((event) => event.id);
+  const [interested, viewerInterestMap] = await Promise.all([
+    publicInterestCounts(eventIds),
+    viewerInterests(eventIds, session.user.id),
+  ]);
+  const viewerInterestIds = new Set(viewerInterestMap.keys());
+  const upcomingEvents = calendarEvents.filter((event) => event.start >= now);
+
   const values = readFieldValues(row?.values, layoutModule.fields);
   const heroPhoto = frontpagePhoto(layoutModule, publicUrl(values.photo));
   const style = { "--home-hero-photo": `url("${heroPhoto}")` } as CSSProperties;
@@ -78,26 +96,26 @@ export default async function FrontpagePreview({
   return (
     <div className="vtk-design">
       {/* No quick-links row and no site header: the preview is about the front
-          page itself, and the surrounding chrome would only shrink it. */}
-      <div className="home-dark-zone" style={style}>
-        <Frontpage
-          id={layoutModule.id}
-          values={values}
-          locale={locale}
-          base={base}
-          now={now}
-          upcomingEvents={upcomingEvents.map((event) => ({
-            id: event.id,
-            start: event.start,
-            titleNl: event.titleNl,
-            titleEn: event.titleEn,
-            location: event.location,
-            group: { nameNl: event.group.nameNl, nameEn: event.group.nameEn },
-            interestedCount: null,
-          }))}
-          partners={partners}
-        />
-      </div>
+          page itself, and the surrounding chrome would only shrink it.
+
+          De ToastProvider staat hier apart: deze route valt buiten `[locale]`,
+          en de ster van het weekoverzicht meldt via een toast wanneer de server
+          weigert. Zonder provider gooit die hook en gaat het voorbeeld stuk. */}
+      <ToastProvider>
+        <div className="home-dark-zone" style={style}>
+          <Frontpage
+            id={layoutModule.id}
+            values={values}
+            locale={locale}
+            base={base}
+            now={now}
+            upcomingEvents={toFrontpageEvents(upcomingEvents, interested, viewerInterestIds)}
+            weekEvents={toFrontpageEvents(calendarEvents, interested, viewerInterestIds)}
+            signedIn
+            partners={partners}
+          />
+        </div>
+      </ToastProvider>
     </div>
   );
 }

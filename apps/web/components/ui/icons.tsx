@@ -1,13 +1,13 @@
 import type { ReactNode } from "react";
 
 /** Gedeelde icoonset voor rij-acties. Zelfde lijnstijl als de admin-navigatie. */
-function Icon({ children }: { children: ReactNode }) {
+function Icon({ children, fill = "none" }: { children: ReactNode; fill?: string }) {
   return (
     <svg
       width="16"
       height="16"
       viewBox="0 0 24 24"
-      fill="none"
+      fill={fill}
       stroke="currentColor"
       strokeWidth="2"
       strokeLinecap="round"
@@ -76,9 +76,14 @@ export function LinkIcon() {
   );
 }
 
-export function StarIcon() {
+/**
+ * De ster van "ik kom". Gevuld betekent aangeduid, leeg betekent niet
+ * aangeduid: dat onderscheid moet in het icoon zelf zitten en niet enkel in een
+ * tooltip, want in het weekoverzicht staan er zes onder elkaar.
+ */
+export function StarIcon({ filled = false }: { filled?: boolean } = {}) {
   return (
-    <Icon>
+    <Icon fill={filled ? "currentColor" : "none"}>
       <path d="m12 3 2.9 5.9 6.5.9-4.7 4.6 1.1 6.5L12 17.8 6.2 20.9l1.1-6.5L2.6 9.8l6.5-.9Z" />
     </Icon>
   );

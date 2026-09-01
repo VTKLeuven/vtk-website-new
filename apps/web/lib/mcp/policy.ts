@@ -33,6 +33,7 @@ export const MCP_PERMISSION_POLICY = {
   "header.manage": { reads: ["navigation"], creates: ["app_create:header_tab", "app_create:header_link"], blocked: ["update, reorder or delete navigation"] },
   "calendar.create": { reads: ["calendar"], creates: ["app_create:calendar_event", "calendar_create_event"], blocked: ["update or delete events"] },
   "calendar.manageAll": { reads: ["calendar"], creates: ["app_create:calendar_event", "app_create:calendar_category", "calendar_create_event", "calendar_create_category"], blocked: ["update, publish or delete events"] },
+  "calendar.heroWeek": { reads: ["calendar"], creates: [], blocked: ["pin or hide events in the homepage week overview"] },
   "tickets.create": { reads: ["tickets"], creates: ["app_create:ticket_event", "app_create:ticket_type", "app_create:ticket_question", "app_create:ticket_gate"], blocked: ["publish, sell, scan or refund tickets"] },
   "tickets.manageAll": { reads: ["tickets", "ticket_orders"], creates: ["app_create:ticket_event", "app_create:ticket_type", "app_create:ticket_question", "app_create:ticket_gate"], blocked: ["publish, sell, scan, resend or refund tickets"] },
   "forms.create": { reads: ["forms"], creates: ["app_create:form", "app_create:form_section", "app_create:form_field"], blocked: ["publish forms or submit entries"] },

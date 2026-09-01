@@ -14,6 +14,11 @@ export const PERMISSIONS = [
   // Calendar
   { code: "calendar.create", labelNl: "Evenementen aanmaken voor eigen groep", labelEn: "Create events for own group", category: "calendar" },
   { code: "calendar.manageAll", labelNl: "Alle evenementen beheren", labelEn: "Manage all events", category: "calendar" },
+  // Los van manageAll: dit gaat niet over het evenement zelf maar over de
+  // homepage. Wie het weekoverzicht in de hero samenstelt, is niet noodzakelijk
+  // wie evenementen mag bewerken, en omgekeerd hoort een post die zijn eigen
+  // events beheert niet zomaar over de homepage te beslissen.
+  { code: "calendar.heroWeek", labelNl: "Evenementen uitlichten of weglaten in het weekoverzicht", labelEn: "Highlight or hide events in the week overview", category: "calendar" },
 
   // Tickets
   { code: "tickets.create", labelNl: "Ticketevents aanmaken voor eigen groep", labelEn: "Create ticket events for own group", category: "tickets" },

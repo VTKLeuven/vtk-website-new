@@ -24,6 +24,7 @@ const eventSchema = z.object({
   end: z.string().min(1),
   allDay: z.coerce.boolean().default(false),
   url: z.string().optional().nullable(),
+  heroWeek: z.enum(["AUTO", "PINNED", "HIDDEN"]).default("AUTO"),
 });
 
 /** Velden die in het logboek bij naam genoemd worden bij een bewerking. */
@@ -40,6 +41,7 @@ const EVENT_FIELD_LABELS: Record<string, string> = {
   url: "link",
   imageKey: "afbeelding",
   publishedAt: "publicatiestatus",
+  heroWeek: "weekoverzicht op de homepage",
 };
 
 async function assertCanManageEvent(userGroups: string[], groupId: string, superOrAll: boolean) {
@@ -63,6 +65,7 @@ export async function saveEventAction(_prev: SaveState, formData: FormData): Pro
     end: formData.get("end"),
     allDay: formData.get("allDay") === "on",
     url: formData.get("url") || null,
+    heroWeek: formData.get("heroWeek") || "AUTO",
   });
   const image = readImageField(formData);
   if (!parsed.success || image.kind === "invalid") return saveError("INVALID_INPUT");
@@ -90,6 +93,11 @@ export async function saveEventAction(_prev: SaveState, formData: FormData): Pro
   if (!superOrAll && !hasPermission(session, "calendar.create")) {
     throw new Error("forbidden");
   }
+  // Het weekoverzicht op de homepage is een eigen permissie: wie ze niet heeft,
+  // ziet het veld niet staan en kan het ook niet meesturen. Bij een bestaand
+  // evenement blijft dan gewoon staan wat er stond, in plaats van stil terug te
+  // vallen op "automatisch".
+  const canHeroWeek = session.user.isSuperAdmin || hasPermission(session, "calendar.heroWeek");
   const userGroupIds = session.groups.map((g) => g.id);
   await assertCanManageEvent(userGroupIds, input.groupId, superOrAll);
 
@@ -105,6 +113,7 @@ export async function saveEventAction(_prev: SaveState, formData: FormData): Pro
     allDay: input.allDay,
     url: input.url,
     createdById: session.user.id,
+    ...(canHeroWeek ? { heroWeek: input.heroWeek } : {}),
   };
 
   // De categorieën komen als losse checkbox-waarden binnen; alles wegdoen en

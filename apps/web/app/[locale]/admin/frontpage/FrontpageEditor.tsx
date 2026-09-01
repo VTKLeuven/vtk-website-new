@@ -1,6 +1,6 @@
 "use client";
 
-import { Card, Input, Label, Textarea } from "@vtk/ui";
+import { Card, Input, Label, Select, Textarea } from "@vtk/ui";
 import { getDictionary, type Locale } from "@vtk/i18n";
 import { SaveForm } from "@/components/ui/SaveForm";
 import { StorageImageField } from "@/components/admin/StorageImageField";
@@ -127,6 +127,23 @@ function Field({
           fallbackUrl={def.fallbackUrl}
           emptyHint={nl ? "Meegeleverde foto" : "Bundled photo"}
         />
+      </div>
+    );
+  }
+
+  if (def.type === "choice") {
+    const options = def.options ?? [];
+    return (
+      <div>
+        <Label htmlFor={id}>{label}</Label>
+        <Select id={id} name={inputName} defaultValue={value || options[0]?.value}>
+          {options.map((option) => (
+            <option key={option.value} value={option.value}>
+              {nl ? option.labelNl : option.labelEn}
+            </option>
+          ))}
+        </Select>
+        {help ? <p className="mt-1 text-xs text-[#5c667f]">{help}</p> : null}
       </div>
     );
   }

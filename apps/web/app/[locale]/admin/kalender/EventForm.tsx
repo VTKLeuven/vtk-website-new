@@ -24,6 +24,8 @@ type Event = {
   categoryIds?: string[];
   /** Hangt er al een logistiek-evenement aan? Zie `UitleenEvent.calendarEventId`. */
   hasUitleenEvent?: boolean;
+  /** Voorrang of uitsluiting in het weekoverzicht op de homepage. */
+  heroWeek?: "AUTO" | "PINNED" | "HIDDEN";
 };
 
 type Group = { id: string; nameNl: string; nameEn: string };
@@ -100,6 +102,7 @@ export function EventForm({
   locale,
   canCreateTickets = false,
   canManageCategories = false,
+  canHeroWeek = false,
 }: {
   event: Event;
   groups: Group[];
@@ -113,6 +116,11 @@ export function EventForm({
   canCreateTickets?: boolean;
   /** Geeft bij een lege keuzelijst een rechtstreekse link naar categoriebeheer. */
   canManageCategories?: boolean;
+  /**
+   * Toont de keuze voor het weekoverzicht op de homepage (`calendar.heroWeek`).
+   * Zonder die permissie staat het veld er niet, en negeert de action het ook.
+   */
+  canHeroWeek?: boolean;
 }) {
   const nl = locale === "nl";
   const base = nl ? "" : "/en";
@@ -268,6 +276,23 @@ export function EventForm({
             <Label>URL</Label>
             <Input name="url" defaultValue={event.url ?? ""} placeholder="https://..." />
           </div>
+          {canHeroWeek ? (
+            <div>
+              <Label htmlFor="heroWeek">
+                {nl ? "Weekoverzicht op de homepage" : "Week overview on the home page"}
+              </Label>
+              <Select id="heroWeek" name="heroWeek" defaultValue={event.heroWeek ?? "AUTO"}>
+                <option value="AUTO">{nl ? "Automatisch" : "Automatic"}</option>
+                <option value="PINNED">{nl ? "Voorrang geven" : "Give priority"}</option>
+                <option value="HIDDEN">{nl ? "Niet tonen" : "Do not show"}</option>
+              </Select>
+              <p className="mt-1 text-xs text-vtk-muted">
+                {nl
+                  ? "Het overzicht toont hoogstens drie evenementen per dag en tien in totaal. Voorrang zet dit evenement vooraan op zijn dag; niet tonen houdt het van de homepage zonder het uit de kalender te halen."
+                  : "The overview shows at most three events per day and ten in total. Priority puts this event first on its day; do not show keeps it off the home page without removing it from the calendar."}
+              </p>
+            </div>
+          ) : null}
           <div className="md:col-span-2">
             <EventImageField defaultKey={event.imageKey} locale={locale} />
           </div>

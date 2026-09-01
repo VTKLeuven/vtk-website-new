@@ -16,7 +16,14 @@
  * field creeping into the schema.
  */
 
-export type FieldType = "text" | "textarea" | "image" | "datetime" | "url";
+export type FieldType = "text" | "textarea" | "image" | "datetime" | "url" | "choice";
+
+/** Eén optie van een keuzeveld. De waarde is wat er in de database komt. */
+export type FieldOption = {
+  value: string;
+  labelNl: string;
+  labelEn: string;
+};
 
 export type FieldDef = {
   type: FieldType;
@@ -34,6 +41,13 @@ export type FieldDef = {
    * about the current state.
    */
   fallbackUrl?: string;
+  /**
+   * Keuzevelden: de mogelijke waarden. De eerste is de terugval, zowel wanneer
+   * er nog niets gekozen is als wanneer er een waarde in de database staat die
+   * hier niet meer bestaat; zo blijft een verwijderde optie een keuze zonder
+   * gevolgen in plaats van een lege hero.
+   */
+  options?: readonly FieldOption[];
 };
 
 export type FieldSchema = Record<string, FieldDef>;
@@ -58,6 +72,20 @@ export function readFieldValues(raw: unknown, schema: FieldSchema): FieldValues 
     if (typeof value === "string" && value.trim() !== "") out[name] = value;
   }
   return out;
+}
+
+/**
+ * De gekozen waarde van een keuzeveld, of de eerste optie.
+ *
+ * Nooit `undefined`: een component die een keuze uitleest wil een tak kunnen
+ * kiezen, niet eerst nog eens beslissen wat "niets gekozen" betekent.
+ */
+export function choiceValue(values: FieldValues, name: string, def: FieldDef): string {
+  const options = def.options ?? [];
+  const fallback = options[0]?.value ?? "";
+  const stored = values[name];
+  if (!stored) return fallback;
+  return options.some((option) => option.value === stored) ? stored : fallback;
 }
 
 /** Picks the field for the current language from an `<name>Nl` / `<name>En` pair. */

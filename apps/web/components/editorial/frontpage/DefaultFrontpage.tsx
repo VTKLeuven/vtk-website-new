@@ -1,10 +1,22 @@
 import Link from "next/link";
 import { pick } from "@vtk/i18n";
-import { pickField } from "@/lib/frontpage/fields";
+import { choiceValue, pickField } from "@/lib/frontpage/fields";
+import {
+  DEFAULT_FRONTPAGE_ID,
+  HOME_AGENDA_WEEK,
+  getFrontpageModule,
+} from "@/lib/frontpage/registry";
+import { HeroWeek } from "./HeroWeek";
 import { Cta, ctaFrom, type FrontpageProps } from "./context";
 
 /**
- * The regular front page: copy on the left, the agenda card on the right.
+ * The regular front page: copy on the left, the agenda on the right.
+ *
+ * Welke agenda dat is, kiest een redacteur in /admin/frontpage: het
+ * weekoverzicht (de komende zes dagen, met een ster per evenement) of de oude
+ * lijst met de vier eerstvolgende events. Beide blijven bestaan omdat een
+ * weekoverzicht in een rustige periode leger oogt dan een lijst, en omdat een
+ * nieuwe hero die je niet kan terugzetten geen keuze is.
  *
  * Every text is a field with the wording we have always shipped as its fallback,
  * so an untouched database looks exactly like before and an admin can still
@@ -21,8 +33,14 @@ export function DefaultFrontpage({
   base,
   now,
   upcomingEvents,
+  weekEvents,
+  signedIn,
 }: FrontpageProps) {
   const nl = locale === "nl";
+  // De registry is de bron van de opties; zo blijft "wat staat er als er nog
+  // niets gekozen is" op één plaats staan.
+  const agendaField = getFrontpageModule(DEFAULT_FRONTPAGE_ID)?.fields.agenda;
+  const agenda = agendaField ? choiceValue(values, "agenda", agendaField) : HOME_AGENDA_WEEK;
 
   const eyebrow = pickField(values, "eyebrow", locale) ?? "Vlaamse Technische Kring · KU Leuven";
   const title = pickField(values, "title", locale) ?? (nl ? "De thuis voor" : "The home for");
@@ -65,6 +83,15 @@ export function DefaultFrontpage({
     d.toLocaleTimeString(nl ? "nl-BE" : "en-GB", { hour: "2-digit", minute: "2-digit" });
 
   const heroEvents = upcomingEvents.slice(0, 4);
+
+  // "Binnenkort", en in het Engels letterlijk "This week": dus de zeven dagen na
+  // nu en niet alles wat de homepage inlas. Dat laatste stond er ooit wel, maar
+  // enkel omdat de lezing op acht rijen stopte; nu leest ze er veertig en zou er
+  // "37 events" staan bij een teller die "binnenkort" belooft.
+  const weekAhead = now.getTime() + 7 * 24 * 60 * 60 * 1000;
+  const eventsThisWeek = upcomingEvents.filter(
+    (event) => event.start.getTime() < weekAhead,
+  ).length;
 
   const eventGroups = heroEvents.reduce<
     Array<{ key: string; date: Date; events: FrontpageProps["upcomingEvents"] }>
@@ -110,7 +137,7 @@ export function DefaultFrontpage({
           <div className="meta">
             <div className="k">{nl ? "Binnenkort" : "This week"}</div>
             <div className="v">
-              {upcomingEvents.length} {nl ? "events" : "events"}
+              {eventsThisWeek} {nl ? "events" : "events"}
             </div>
           </div>
           <div className="meta">
@@ -120,6 +147,15 @@ export function DefaultFrontpage({
         </div>
       </div>
 
+      {agenda === HOME_AGENDA_WEEK ? (
+        <HeroWeek
+          events={weekEvents}
+          now={now}
+          locale={locale}
+          base={base}
+          signedIn={signedIn}
+        />
+      ) : (
       <aside className="hero-cal">
         <div className="hero-cal-head">
           <div>
@@ -194,6 +230,7 @@ export function DefaultFrontpage({
           )}
         </div>
       </aside>
+      )}
     </section>
   );
 }

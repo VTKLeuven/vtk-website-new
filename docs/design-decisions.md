@@ -4771,6 +4771,94 @@ telefoon.
 
 ---
 
+## Het weekoverzicht in de hero
+
+De homepage toont naast de titel een agenda. Dat was een lijst met de vier
+eerstvolgende evenementen; het is nu standaard een **weekoverzicht**: de komende
+dagen onder elkaar, met de dag in de marge en de evenementen ernaast. De keuze
+tussen beide staat in Admin → Website → Frontpage (veld "Agenda naast de
+titel"), zodat een periode waarin er weinig te doen is niet vastzit aan een
+rooster dat vooral leeg is.
+
+De regels staan in `apps/web/lib/calendar/heroWeek.ts` en zijn los getest
+(`apps/web/test/heroWeek.test.ts`).
+
+### Zaterdag valt weg
+
+VTK organiseert nooit iets op zaterdag, dus een zaterdagrij is een lege rij. Ze
+wordt overgeslagen bij het tellen van de zes dagen: het venster loopt gewoon door
+tot de volgende dag. Staat er tóch iets op een zaterdag, dan valt het uit het
+overzicht; het blijft wel in de kalender, in de feeds en in de app staan. Wie op
+een zaterdag langskomt, ziet het venster vanaf zondag.
+
+### Zes dagen, rollend, met gisteren erbij als daar iets was
+
+Een vaste week (maandag tot zondag) staat op vrijdagavond zo goed als leeg,
+terwijl er dan net het meest te beleven valt. Daarom rolt het venster mee:
+
+- Stond er **gisteren** iets, dan begint het overzicht gisteren en loopt het nog
+  vier dagen vooruit. Anders verdwijnt een cantus van gisteren om middernacht van
+  de homepage, terwijl de halve kring er de dag erna nog over praat.
+- Stond er gisteren niets, dan begint het vandaag en kijkt het een dag verder.
+
+Het zijn altijd zes dagen, zodat de hoogte van het blok niet per dag verspringt.
+
+### Onder de vier evenementen wordt het een lijst
+
+Zes dagen met twee dingen erin leest als een kring waar niets gebeurt. Zitten er
+minder dan vier evenementen in het venster, dan toont de hero in de plaats de
+**vier eerstvolgende evenementen**, ook al zijn die pas over drie weken. Precies
+vier telt als genoeg om het venster te vullen.
+
+De terugval kijkt niet terug: gisteren hoort bij "deze week", niet bij "wat er
+nog komt".
+
+### Hoogstens drie per dag en tien in totaal
+
+De hero staat naast de titel en mag niet met de drukte meegroeien tot een tweede
+scherm. Een dag met meer toont er drie plus "nog n die dag", met een link naar de
+kalender. Het totaal stopt op tien; de kap valt dan op de verste dagen, want die
+zijn het minst dringend.
+
+### Uitlichten en weglaten is een eigen recht
+
+`calendar.heroWeek` (Admin → Kalender, veld "Weekoverzicht op de homepage") laat
+toe om een evenement **voorrang** te geven op zijn dag of het **weg te laten** uit
+het overzicht. Bewust los van `calendar.manageAll`: dit gaat niet over het
+evenement maar over de homepage, en een post die haar eigen evenementen beheert,
+beslist daarmee nog niet wat er op de voorpagina staat.
+
+- **Voorrang** zet het vooraan op zijn dag en beschermt het tegen de kap van drie.
+- **Niet tonen** houdt het van de homepage, niet uit de kalender. Het is dus geen
+  zichtbaarheidsregel en geen vervanging van een concept; een interne vergadering
+  hoort in de kalender maar niet in de hero.
+
+### De ster staat in het overzicht zelf
+
+Elk evenement draagt de ster van "ik kom", dezelfde als op de eventpagina en in
+de app, in dezelfde tabel. Zonder aanmelding is het een link naar het
+aanmeldscherm in plaats van een knop die pas na het klikken vertelt dat het niet
+gaat. Het blijft wat het overal is: geen inschrijving (zie "De ster op een
+evenement is geen inschrijving").
+
+De alumnivelden (naam, afstudeerjaar) horen hier niet: daar is in de hero geen
+plaats voor, en ze zijn nergens verplicht om te kunnen aanduiden dat je komt.
+
+### Waarom er geen paneel onder staat
+
+De rechterkant van de hero is net de plek waar de foto het lichtst is (lucht en
+bomen), dus witte tekst valt er weg. Een kaart met een eigen vulling loste dat op
+maar zette een tweede scherm naast de titel. Het overzicht draagt daarom een
+breed, randloos verloop in de scrim (`.hero-week-wash`) dat naar buiten toe
+volledig oplost: dezelfde techniek als de scrim linksboven, alleen nu ook rechts.
+
+Drie alternatieven zijn bekeken en afgevallen: een zachte glasplaat onder de hele
+week (het veiligst bij eender welke foto, maar het is weer een paneel), een blok
+per dag (het dichtst bij kaartjes) en een tijdlijn met bolletjes (het mooist,
+maar het verst van de rest van de site). De wash veronderstelt wel dat de
+herofoto donker genoeg is; wordt er ooit een felle zomerfoto ingesteld, dan is de
+glasplaat de terugval.
+
 ## De ster op een evenement is geen inschrijving
 
 In de app staat bij elk evenement een ster: "ik ga hier waarschijnlijk naartoe".
