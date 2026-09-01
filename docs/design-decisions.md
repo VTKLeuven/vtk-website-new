@@ -5248,7 +5248,17 @@ rechtstreeks. Gevolg: zeven domeinen plus zeven losse modules, veertien rijen.
 **Een groep met een vage naam is erger dan geen groep.** Er stond even een groep
 "Werking" met Rekeningen, Wachtwoorden en Logistiek erin. Die is geschrapt: je
 wist niet wat erin zat tot je hem opendeed, en dan is een groep enkel een extra
-klik.
+klik. Later stond er om dezelfde reden een "Overig" die Fakscanner en Theokot
+samennam, maar enkel voor IT en Groep 5. Ook die is weg, en met haar het idee dat
+de zijbalk per post anders is: welke tabs je ziet hangt van je rechten af, niet
+van je post, en hetzelfde onderdeel hoort voor iedereen op dezelfde plaats te
+staan. Fakscanner staat dus gewoon los.
+
+**Een module met meerdere schermen wordt een eigen categorie, geen verzamelmap.**
+Theokot is er sinds de verhuur twee (Broodjes en Verhuur, later ook de
+uitleendienst) en staat daarom als categorie naast Onderwijs en Communicatie. Dat
+is iets anders dan "Overig": de naam zegt wat erin zit, en wie maar één van de
+twee mag zien, krijgt dat ene item vanzelf als los item terug.
 
 **Waar de twijfelgevallen terechtkwamen, en waarom.**
 
@@ -5271,8 +5281,15 @@ klik.
   onder.
 
 **Een groep waarvan je maar één item mag zien, rendert als los item.** Anders
-betaalt de meerderheid, die drie tabs ziet, een klik voor een indeling die enkel
-IT en Groep 5 nodig hebben.
+betaalt iemand met één zichtbare tab een klik voor een indeling die enkel nut
+heeft wanneer je er meerdere ziet.
+
+**De zijbalk markeert de tab met het langste passende pad.** Ze markeerde eerst
+elke tab waarvan het pad een prefix was van de huidige URL, en dan lichtte
+`/admin/theokot/verhuur` ook Broodjes op. `exact` erop zetten helpt niet: die
+bovenliggende tab heeft zelf onderliggende schermen die hem wél moeten laten
+oplichten (`/admin/theokot/afhalen`). Sinds `AdminNav` de langste match kiest,
+klopt het ook voor Wachtwoorden en Media, waar hetzelfde stil misging.
 
 ### Vastgepinde tabs
 

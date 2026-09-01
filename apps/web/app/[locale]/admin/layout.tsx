@@ -79,20 +79,12 @@ export default async function AdminLayout({
     exact: leaf.exact,
   });
 
-  // Is de huidige gebruiker lid van IT of Groep 5 (of superadmin)?
-  // Enkel voor IT en G5 worden Fakscanner en Theokot onder een tabje "Overig" gegroepeerd.
-  const isItOrG5 =
-    session.user.isSuperAdmin ||
-    session.groups.some(
-      (g) =>
-        ['IT', 'GROEP5', 'G5'].includes(g.code.toUpperCase()) ||
-        ['it', 'groep-5', 'g5'].includes(g.slug.toLowerCase())
-    );
-
   // Bouw de zichtbare nav. De volgorde staat vast in admin-nav.ts, ook
-  // binnen een groep; er wordt hier niet meer gesorteerd.
+  // binnen een groep; er wordt hier niet meer gesorteerd. Iedereen krijgt
+  // dezelfde balk: welke tabs je ziet hangt enkel van je rechten af, niet van
+  // je post.
   const nodes: NavNode[] = [];
-  const nav = getAdminNav({ isItOrG5 });
+  const nav = getAdminNav();
   for (const entry of nav) {
     if ('group' in entry) {
       const items = entry.items.filter(canSee).map(toItem);

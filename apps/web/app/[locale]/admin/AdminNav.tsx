@@ -540,12 +540,4 @@ const icons: Record<string, ReactNode> = {
       <path d="M14 12h.01" />
     </Svg>
   ),
-  // overig: overige modules voor IT en G5
-  overig: (
-    <Svg>
-      <circle cx="12" cy="12" r="1.5" fill="currentColor" />
-      <circle cx="19" cy="12" r="1.5" fill="currentColor" />
-      <circle cx="5" cy="12" r="1.5" fill="currentColor" />
-    </Svg>
-  ),
 };

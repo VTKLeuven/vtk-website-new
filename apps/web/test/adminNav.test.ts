@@ -16,11 +16,9 @@ describe("admin nav structure", () => {
     for (const leaf of allLeaves) expect(ADMIN_NAV_KEYS.has(leaf.key)).toBe(true);
   });
 
-  it("has no group that is really a single item in either nav mode", () => {
-    for (const nav of [getAdminNav({ isItOrG5: false }), getAdminNav({ isItOrG5: true })]) {
-      for (const entry of nav) {
-        if ("group" in entry) expect(entry.items.length).toBeGreaterThan(1);
-      }
+  it("has no group that is really a single item", () => {
+    for (const entry of getAdminNav()) {
+      if ("group" in entry) expect(entry.items.length).toBeGreaterThan(1);
     }
   });
 
@@ -29,11 +27,9 @@ describe("admin nav structure", () => {
   // in de browser.
   it.each(["nl", "en"] as const)("has a %s label for every key, group included", (locale) => {
     const admin = getDictionary(locale).admin as Record<string, string | undefined>;
-    for (const nav of [getAdminNav({ isItOrG5: false }), getAdminNav({ isItOrG5: true })]) {
-      for (const entry of nav) {
-        if ("group" in entry) expect(admin[entry.group], `group ${entry.group}`).toBeTruthy();
-        for (const leaf of leaves(entry)) expect(admin[leaf.key], `tab ${leaf.key}`).toBeTruthy();
-      }
+    for (const entry of getAdminNav()) {
+      if ("group" in entry) expect(admin[entry.group], `group ${entry.group}`).toBeTruthy();
+      for (const leaf of leaves(entry)) expect(admin[leaf.key], `tab ${leaf.key}`).toBeTruthy();
     }
   });
 
@@ -49,31 +45,23 @@ describe("admin nav structure", () => {
     expect(websiteGroup?.items.map((i) => i.key)).toContain("piano");
   });
 
-  it("leaves post-specific daily modules loose for normal posts, but groups fakscanner and theokot under overig for IT and G5", () => {
-    const normalNav = getAdminNav({ isItOrG5: false });
-    const normalLoose = normalNav.filter((entry): entry is NavLeaf => !("group" in entry)).map((leaf) => leaf.key);
-    expect(normalLoose).toContain("fakscanner");
-    expect(normalLoose).toContain("grocomeet");
+  it("gives everyone the same bar: loose modules loose, Theokot as its own category", () => {
+    // Er was ooit een groep "Overig" die Fakscanner en Theokot enkel voor IT en
+    // Groep 5 samennam. Dat is weg: welke tabs je ziet hangt van je rechten af,
+    // niet van je post.
+    const nav = getAdminNav();
+    const loose = nav.filter((entry): entry is NavLeaf => !("group" in entry)).map((leaf) => leaf.key);
+    expect(loose).toContain("fakscanner");
+    expect(loose).toContain("grocomeet");
 
-    // Theokot is er twee (broodjes en verhuur) en staat daarom als eigen groep,
-    // ook voor een gewone post.
-    const theokotGroup = normalNav.find(
+    expect(nav.some((entry) => "group" in entry && entry.group === "overig")).toBe(false);
+
+    // Theokot is er twee (broodjes en verhuur, later ook de uitleendienst) en
+    // staat daarom als eigen categorie, naast Onderwijs en Communicatie.
+    const theokotGroup = nav.find(
       (e): e is Extract<NavEntry, { group: string }> => "group" in e && e.group === "theokot",
     );
     expect(theokotGroup?.items.map((i) => i.key)).toEqual(["theokotBroodjes", "theokotVerhuur"]);
-
-    const itG5Nav = getAdminNav({ isItOrG5: true });
-    const itG5Loose = itG5Nav.filter((entry): entry is NavLeaf => !("group" in entry)).map((leaf) => leaf.key);
-    expect(itG5Loose).not.toContain("fakscanner");
-    expect(itG5Loose).not.toContain("theokotBroodjes");
-    expect(itG5Loose).toContain("grocomeet");
-
-    const overigGroup = itG5Nav.find((e): e is Extract<NavEntry, { group: string }> => "group" in e && e.group === "overig");
-    expect(overigGroup?.items.map((i) => i.key)).toEqual([
-      "fakscanner",
-      "theokotBroodjes",
-      "theokotVerhuur",
-    ]);
   });
 
   it("routes every internal tab to a path below /admin", () => {

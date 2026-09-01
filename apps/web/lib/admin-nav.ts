@@ -16,11 +16,14 @@
 // label gesorteerd). De regel is nu: eerst de domeinen, dan de modules die één
 // post beheert, en IT achteraan.
 //
-// Een module die één post dagelijks gebruikt (Fakscanner, Grocomeet) blijft voor
-// die post bewust een los item. Theokot is er twee (broodjes en verhuur, later
-// ook de uitleendienst) en staat daarom als eigen groep. Voor IT en Groep 5 (die
-// alle rechten hebben en anders een overvolle balk zien) worden Fakscanner en de
-// Theokot-tabs gebundeld onder "Overig".
+// Een module die één post dagelijks gebruikt (Fakscanner, Grocomeet) blijft
+// bewust een los item. Theokot is er twee (broodjes en verhuur, later ook de
+// uitleendienst) en staat daarom als eigen groep, naast Onderwijs en
+// Communicatie. Iedereen ziet dezelfde balk: er was ooit een groep "Overig" die
+// Fakscanner en Theokot enkel voor IT en Groep 5 samennam, maar dan stond
+// hetzelfde onderdeel voor de ene post ergens anders dan voor de andere, en was
+// het voor precies de mensen die het meest in het beheer zitten een klik verder
+// weg.
 // -----------------------------------------------------------------------------
 
 export type NavGuard = {
@@ -54,44 +57,26 @@ export function logisticsModuleUrl(): string {
   return process.env.NODE_ENV === 'development' ? 'http://localhost:3100' : 'https://logistiek.dev.vtk.be';
 }
 
-export type AdminNavOptions = {
-  /** Enkel voor IT en Groep 5: zet Fakscanner en Theokot in een groep "Overig". */
-  isItOrG5?: boolean;
-};
-
-export function getAdminNav({ isItOrG5 = false }: AdminNavOptions = {}): NavEntry[] {
-  const fakscannerItem = item('fakscanner', '/fakscanner', { perm: 'fakscanner.manage' });
-  // Theokot doet twee dingen die weinig met elkaar te maken hebben: broodjes
-  // verkopen en de zaal verhuren. Later komt de uitleendienst erbij. Daarom een
-  // groep en geen los item; wie maar één van de twee mag zien, krijgt dat ene
-  // item vanzelf terug als losse tab (zie de layout).
-  const theokotItems = [
-    item('theokotBroodjes', '/theokot', { anyPerm: ['theokot.manage', 'theokot.pickup'] }),
-    item('theokotVerhuur', '/theokot/verhuur', {
-      anyPerm: ['theokot.rentals.view', 'theokot.rentals.manage'],
+export function getAdminNav(): NavEntry[] {
+  const loose: NavEntry[] = [
+    item('fakscanner', '/fakscanner', { perm: 'fakscanner.manage' }),
+    item('grocomeet', '/grocomeet', { perm: 'grocomeet.manage' }),
+    item('logistics', logisticsModuleUrl()),
+    item('expenses', '/rekeningen', {
+      anyPerm: ['expenses.submit', 'expenses.managePost', 'expenses.manage'],
     }),
+    // Theokot doet twee dingen die weinig met elkaar te maken hebben: broodjes
+    // verkopen en de zaal verhuren. Later komt de uitleendienst erbij. Daarom
+    // een groep en geen los item; wie maar één van de twee mag zien, krijgt dat
+    // ene item vanzelf terug als losse tab (zie de layout).
+    group('theokot', [
+      item('theokotBroodjes', '/theokot', { anyPerm: ['theokot.manage', 'theokot.pickup'] }),
+      item('theokotVerhuur', '/theokot/verhuur', {
+        anyPerm: ['theokot.rentals.view', 'theokot.rentals.manage'],
+      }),
+    ]),
+    item('vault', '/wachtwoorden', { anyPerm: ['vault.editOwn', 'vault.manage'] }),
   ];
-
-  const looseOrOverig: NavEntry[] = isItOrG5
-    ? [
-        item('grocomeet', '/grocomeet', { perm: 'grocomeet.manage' }),
-        item('logistics', logisticsModuleUrl()),
-        item('expenses', '/rekeningen', {
-          anyPerm: ['expenses.submit', 'expenses.managePost', 'expenses.manage'],
-        }),
-        item('vault', '/wachtwoorden', { anyPerm: ['vault.editOwn', 'vault.manage'] }),
-        group('overig', [fakscannerItem, ...theokotItems]),
-      ]
-    : [
-        fakscannerItem,
-        item('grocomeet', '/grocomeet', { perm: 'grocomeet.manage' }),
-        item('logistics', logisticsModuleUrl()),
-        item('expenses', '/rekeningen', {
-          anyPerm: ['expenses.submit', 'expenses.managePost', 'expenses.manage'],
-        }),
-        group('theokot', theokotItems),
-        item('vault', '/wachtwoorden', { anyPerm: ['vault.editOwn', 'vault.manage'] }),
-      ];
 
   return [
     // Het dashboard is een groep omdat de tegels erop door elke post aangepast
@@ -163,10 +148,10 @@ export function getAdminNav({ isItOrG5 = false }: AdminNavOptions = {}): NavEntr
     ]),
 
     // ---------------------------------------------------------------------------
-    // Losse modules: elk van één post, of van iedereen. Onderling alfabetisch.
-    // Voor IT en G5 worden Fakscanner en Theokot in de overig-groep geplaatst.
+    // Losse modules: elk van één post, of van iedereen. Onderling alfabetisch,
+    // met Theokot als groep omdat het er twee zijn.
     // ---------------------------------------------------------------------------
-    ...looseOrOverig,
+    ...loose,
 
     group('it', [
       // `exact`, anders licht Configuratie (/admin/it) ook op wanneer je op de
