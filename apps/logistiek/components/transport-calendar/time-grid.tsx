@@ -114,6 +114,13 @@ function snap(minutes: number): number {
   return Math.round(minutes / SNAP_MINUTES) * SNAP_MINUTES;
 }
 
+/** Minuten sinds middernacht als "08:30", voor het opschrift in een band. */
+function minutesLabel(minutes: number): string {
+  const hours = Math.floor(minutes / 60);
+  const rest = Math.round(minutes % 60);
+  return `${String(hours).padStart(2, '0')}:${String(rest).padStart(2, '0')}`;
+}
+
 /** De verticale padding van een element; gaat van de bruikbare hoogte af. */
 function paddingOf(node: HTMLElement): number {
   const style = getComputedStyle(node);
@@ -142,6 +149,7 @@ export function TimeGrid({
   onCreateRange,
   above,
   bands,
+  bandsProminent = false,
 }: {
   /** De dagen, als ISO-strings van UTC-middernacht (date-only). */
   days: string[];
@@ -179,8 +187,18 @@ export function TimeGrid({
    * scroller, zodat het meeschuift met de dagen eronder.
    */
   above?: ReactNode;
-  /** Beschikbaarheidsvensters als lichte band achter het rooster (V1). */
+  /** Beschikbaarheidsvensters als band achter het rooster (V1). */
   bands?: AvailabilityBand[];
+  /**
+   * De banden op de voorgrond in plaats van als context erachter.
+   *
+   * In de planning zijn ze bewust vaag: het is de achtergrond waarbinnen je
+   * plant, en ze mogen niet met de ritten concurreren om je aandacht. Op je eigen
+   * beschikbaarheidsscherm staan er helemaal geen ritten en zijn die banden het
+   * enige wat er te zien is; vaag betekent daar "ik zie niet goed wat ik net
+   * aangeduid heb".
+   */
+  bandsProminent?: boolean;
 }) {
   const parsedDays = useMemo(() => days.map((day) => new Date(day)), [days]);
   const vehicleById = useMemo(
@@ -441,15 +459,31 @@ export function TimeGrid({
     // raster; dat liet een telefoon het hele scherm uitzoomen om dat ene
     // onzichtbare pixel te tonen.
     <div className="tg-pane relative rounded-[16px] border border-vtk-navy/10 bg-vtk-surface">
-      <div ref={scroller} className="tg-scroller relative h-full overflow-auto p-2">
+      {/* Geen `padding-top` op de scroller. Een `sticky top-0`-kop plakt aan de
+          bovenrand van het scrollvenster, niet onder de padding: die acht pixels
+          bleven dus onbedekt, en daar schoven de ritten doorheen boven de
+          dagnamen. Dat is wat er "los" uitzag. De lucht bovenaan zit nu in de
+          kop zelf, die meeschuift en alles eronder afdekt. */}
+      <div ref={scroller} className="tg-scroller relative h-full overflow-auto px-2 pb-2">
         {/* De kop plakt bovenaan de scroller: de dagen en de evenementenstrook
             blijven staan terwijl je door de uren scrolt. Eén `sticky` blok en
             niet twee, want twee sticky elementen met een eigen `top` schuiven
-            over elkaar zodra de strook van hoogte verandert. */}
-        <div ref={head} className="tg-head sticky top-0 z-30 bg-vtk-surface pb-1.5">
+            over elkaar zodra de strook van hoogte verandert.
+
+            De hairline eronder is niet decoratief: zonder rand loopt wit vlak
+            over in wit vlak en lijkt de rij dagnamen boven het rooster te
+            zweven in plaats van erop te staan. */}
+        <div
+          ref={head}
+          className="tg-head sticky top-0 z-30 border-b border-vtk-navy/10 bg-vtk-surface pb-1.5 pt-2"
+        >
           {above}
 
-          {blocks.length === 0 ? (
+          {/* Ook de banden tellen mee voor "leeg": op het
+              beschikbaarheidsscherm staan er nooit ritten, en dan bleef er
+              "sleep hieronder in de week" staan boven een week die al vol
+              stond. */}
+          {blocks.length === 0 && (bands?.length ?? 0) === 0 ? (
             <p className="px-1 pb-1 text-sm text-vtk-muted">{emptyLabel}</p>
           ) : null}
 
@@ -477,7 +511,10 @@ export function TimeGrid({
         <div className="grid gap-1" style={{ gridTemplateColumns: columns }}>
           {/* De urenkolom, vastgeplakt links: scrol je horizontaal door de week,
               dan blijft de klok staan waar ze hoort. */}
-          <div className="sticky left-0 z-20 bg-vtk-surface" style={{ height }}>
+          <div
+            className="sticky left-0 z-20 border-r border-vtk-navy/10 bg-vtk-surface"
+            style={{ height }}
+          >
             <div className="relative h-full">
               {hours.map((hour, index) => (
                 <span
@@ -523,19 +560,33 @@ export function TimeGrid({
                 {/* De beschikbaarheid van de chauffeurs (V1), helemaal onderaan
                     de stapel: het is context waarbinnen je plant, geen afspraak
                     die met een rit kan concurreren om je aandacht. */}
-                {bandsPerDay[dayIndex].map((band) => (
-                  <span
-                    key={`${band.id}-${days[dayIndex]}`}
-                    aria-hidden
-                    title={`${band.driverName} kan rijden${band.note ? `: ${band.note}` : ''}`}
-                    className="pointer-events-none absolute inset-x-0 rounded-[6px] opacity-30"
-                    style={{
-                      top: ((band.from - firstHour * 60) / 60) * hourPx,
-                      height: Math.max(4, ((band.to - band.from) / 60) * hourPx),
-                      backgroundColor: driverColorVar(band.driverId, driverColors),
-                    }}
-                  />
-                ))}
+                {bandsPerDay[dayIndex].map((band) => {
+                  const height = Math.max(4, ((band.to - band.from) / 60) * hourPx);
+                  return (
+                    <span
+                      key={`${band.id}-${days[dayIndex]}`}
+                      aria-hidden
+                      title={`${band.driverName} kan rijden${band.note ? `: ${band.note}` : ''}`}
+                      className={`pointer-events-none absolute inset-x-0 overflow-hidden rounded-[6px] ${
+                        bandsProminent
+                          ? 'border border-vtk-navy/30 px-1.5 py-0.5 text-[11px] font-semibold text-vtk-ink shadow-sm'
+                          : 'opacity-30'
+                      }`}
+                      style={{
+                        top: ((band.from - firstHour * 60) / 60) * hourPx,
+                        height,
+                        backgroundColor: driverColorVar(band.driverId, driverColors),
+                      }}
+                    >
+                      {/* Het uur in de band zelf, zodra ze hoog genoeg is: op je
+                          eigen scherm wil je zien wát je aangeduid hebt, niet
+                          enkel dát er iets staat. */}
+                      {bandsProminent && height >= 26
+                        ? `${minutesLabel(band.from)} - ${minutesLabel(band.to)}`
+                        : null}
+                    </span>
+                  );
+                })}
 
                 {/* Waar we nu staan. Enkel op vandaag, en enkel wanneer dat uur
                     ook getekend wordt: buiten het venster zou de lijn tegen de

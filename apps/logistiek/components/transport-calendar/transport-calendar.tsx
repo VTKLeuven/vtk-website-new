@@ -12,6 +12,7 @@ import {
 } from '@/lib/calendar-range';
 import { LogisticsIcon } from '@/components/logistics-icon';
 import { EventBars, type CalendarEventBar } from './event-bars';
+import { MobileCalendar } from './mobile-calendar';
 import { MonthGrid } from './month-grid';
 import { TimeGrid, timeGridColumns } from './time-grid';
 import { vehicleIcon } from './trip-block';
@@ -60,6 +61,7 @@ export function TransportCalendar({
   onSelectEvent,
   selectedEventId,
   bands,
+  nav,
   children,
 }: {
   view: CalendarView;
@@ -89,6 +91,12 @@ export function TransportCalendar({
   selectedEventId?: string | null;
   /** Beschikbaarheid van de chauffeurs als lichte band achter het rooster (V1). */
   bands?: AvailabilityBand[];
+  /**
+   * Waar vorige, volgende en vandaag naartoe gaan. De pagina zet dezelfde
+   * knoppen naast de titel (`CalendarNav`); de telefoonweergave in volledig
+   * scherm heeft ze nodig omdat daar geen paginakop meer staat.
+   */
+  nav?: { previousHref: string; nextHref: string; todayHref: string };
   /** Wat onder de kalender komt: de legende staat er al, dit komt erna. */
   children?: React.ReactNode;
 }) {
@@ -320,6 +328,23 @@ export function TransportCalendar({
    */
   const [fullscreen, setFullscreen] = useState<false | 'native' | 'fallback'>(false);
 
+  /**
+   * Smal scherm? Bepaalt of volledig scherm de telefoonweergave krijgt.
+   *
+   * Via `matchMedia` en niet via een CSS-klasse, want het gaat hier niet om hoe
+   * iets eruitziet maar om wélke component er rendert; dat kan CSS niet. In een
+   * effect, want op de server bestaat `window` niet en een andere eerste render
+   * dan de server is een hydratiefout.
+   */
+  const [narrow, setNarrow] = useState(false);
+  useEffect(() => {
+    const query = window.matchMedia('(max-width: 700px)');
+    const apply = () => setNarrow(query.matches);
+    apply();
+    query.addEventListener('change', apply);
+    return () => query.removeEventListener('change', apply);
+  }, []);
+
   useEffect(() => {
     function onChange() {
       // Sluiten via de Escape-toets of de systeemknop laat de API los zonder ons
@@ -372,6 +397,49 @@ export function TransportCalendar({
 
   const iconButton =
     'grid h-8 w-8 place-items-center rounded-full border border-vtk-navy/15 text-vtk-navy transition hover:border-vtk-navy/40 disabled:opacity-40';
+
+  /**
+   * Op een telefoon krijgt volledig scherm een eigen weergave (één dag over de
+   * volle breedte) in plaats van de weekweergave die kleiner gezet is. Zie
+   * `MobileCalendar` voor het waarom.
+   *
+   * Ze staat bínnen dezelfde shell: bij echte fullscreen is alles wat erbuiten
+   * gerenderd wordt onzichtbaar, en het detailpaneel (`children`) hoort erbij.
+   * De maandweergave houdt haar raster; daar is één dag geen antwoord op "hoe
+   * ziet de maand eruit".
+   */
+  const phoneFullscreen = Boolean(fullscreen) && narrow && view !== 'maand';
+
+  if (phoneFullscreen) {
+    return (
+      <div
+        ref={shell}
+        className="transport-calendar"
+        data-fullscreen={fullscreen || undefined}
+        data-phone="true"
+      >
+        <MobileCalendar
+          days={days}
+          vehicles={vehicles}
+          blocks={blocks}
+          events={events}
+          bands={bands}
+          driverColors={driverColors}
+          showDriver={showDriver}
+          selectedId={selectedId}
+          onSelect={onSelect}
+          onSelectEvent={onSelectEvent}
+          onClose={toggleFullscreen}
+          onCreate={onCreateRange}
+          onPrevRange={nav ? () => router.push(nav.previousHref) : undefined}
+          onNextRange={nav ? () => router.push(nav.nextHref) : undefined}
+          onToday={nav ? () => router.push(nav.todayHref) : undefined}
+          now={now}
+        />
+        {children}
+      </div>
+    );
+  }
 
   return (
     <div ref={shell} className="transport-calendar grid gap-3" data-fullscreen={fullscreen || undefined}>

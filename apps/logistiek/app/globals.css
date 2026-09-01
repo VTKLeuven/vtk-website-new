@@ -231,6 +231,214 @@ body {
   }
 }
 
+/* De telefoonweergave in volledig scherm.
+
+   Een eigen weergave en niet de weekweergave die kleiner gezet is: zeven
+   kolommen in 340 pixels werd tweeënhalve dag naast elkaar, met ritten van 112px
+   waarin een naam drie letters is. Dit is één dag over de volle breedte, met de
+   week als knoppenstrip erboven; zie components/transport-calendar/mobile-calendar.tsx. */
+.mob-cal {
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+  display: flex;
+  flex-direction: column;
+  /* `dvh` en niet `vh`: met de adresbalk van een telefoon erbij is `vh` te hoog
+     en valt de onderste balk onder het scherm. */
+  height: 100dvh;
+  background: var(--paper);
+}
+
+.mob-cal-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 0 0 auto;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--line);
+  background: var(--surface);
+}
+
+.mob-cal-days {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 4px;
+  flex: 0 0 auto;
+  padding: 8px 8px 10px;
+  border-bottom: 1px solid var(--line);
+  background: var(--surface);
+}
+
+.mob-cal-day {
+  display: grid;
+  justify-items: center;
+  gap: 2px;
+  /* 44px hoog: een dag aantikken met een duim moet lukken zonder mikken. */
+  min-height: 44px;
+  padding: 4px 0 6px;
+  border-radius: 12px;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.1;
+}
+
+.mob-cal-day-name {
+  text-transform: capitalize;
+}
+
+.mob-cal-day-number {
+  color: var(--ink);
+  font-size: 15px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.mob-cal-day.is-today .mob-cal-day-number {
+  color: var(--navy);
+}
+
+.mob-cal-day.is-active {
+  background: var(--navy);
+}
+
+.mob-cal-day.is-active,
+.mob-cal-day.is-active .mob-cal-day-number {
+  color: var(--paper);
+}
+
+/* Een stip zegt dat er die dag iets staat. Dat is de vraag waarmee je op een
+   telefoon naar de planning gaat: waar zit het druk. */
+.mob-cal-day-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 999px;
+  background: transparent;
+}
+
+.mob-cal-day-dot.is-on {
+  background: var(--yellow);
+}
+
+.mob-cal-events {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  flex: 0 0 auto;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--line);
+  background: var(--paper-2);
+}
+
+.mob-cal-event {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+  min-height: 32px;
+  padding: 4px 10px;
+  border: 1px solid rgb(14 26 54 / 0.2);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--navy);
+  font-size: 12px;
+}
+
+/* De doos die verticaal scrolt. `pan-y` laat het vegen naar boven en beneden
+   native (en dus vloeiend) en geeft enkel de horizontale beweging aan ons, voor
+   het wisselen van dag. */
+.mob-cal-body {
+  flex: 1 1 0%;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  touch-action: pan-y;
+  background: var(--surface);
+}
+
+.mob-cal-grid {
+  position: relative;
+  padding: 8px 10px 24px 0;
+}
+
+.mob-cal-gutter {
+  position: absolute;
+  top: 8px;
+  left: 0;
+  bottom: 0;
+}
+
+.mob-cal-hour {
+  position: absolute;
+  right: 8px;
+  transform: translateY(-50%);
+  color: var(--muted);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* 00:00 hangt op de bovenrand; half omhoog schuiven zou het label afsnijden. */
+.mob-cal-hour:first-child {
+  transform: none;
+}
+
+.mob-cal-day-col {
+  position: relative;
+  height: 100%;
+}
+
+.mob-cal-line {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: rgb(14 26 54 / 0.07);
+}
+
+.mob-cal-band {
+  position: absolute;
+  left: 0;
+  right: 0;
+  border-radius: 6px;
+  opacity: 0.3;
+  pointer-events: none;
+}
+
+/* De inhoud bovenaan en niet gecentreerd. Op een breed scherm is een blok een
+   paar regels hoog en staat het midden goed; op een telefoon is een rit van
+   zeven uur een halve schermhoogte, en dan hangt de tekst in het niets. */
+.mob-cal-block {
+  position: absolute;
+  /* Expliciet `column`: de blokken dragen de klassen van het brede scherm mee
+     (`flex flex-col`), maar gewone CSS wint hier van een Tailwind-utility uit
+     een `@layer`, en dan zet dit `display: flex` alles op één regel. */
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: flex-start;
+  overflow: hidden;
+  padding: 5px 8px;
+  text-align: left;
+}
+
+.mob-cal-now {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: #d64545;
+}
+
+.mob-cal-hint {
+  flex: 0 0 auto;
+  padding: 8px 12px calc(8px + env(safe-area-inset-bottom));
+  border-top: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--muted);
+  font-size: 11px;
+  text-align: center;
+}
+
 /* Volledig scherm.
 
    Twee vormen, want `requestFullscreen()` bestaat niet op een `div` in Safari op

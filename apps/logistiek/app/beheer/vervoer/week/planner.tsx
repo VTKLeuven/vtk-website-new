@@ -212,6 +212,7 @@ export function TransportPlanner({
         view={view}
         anchor={anchor}
         days={days}
+        nav={nav}
         vehicles={vehicles}
         blocks={blocks}
         driverColors={driverColors}

@@ -92,16 +92,24 @@ describe('zoomByWheel', () => {
     // Dit is waar het over ging: de eerste versie deed 1,25x per gebeurtenis, en
     // een trackpad vuurt er dertig per gebaar. Eén stapje mag dus maar een paar
     // procent zijn, anders slaat één veeg tegen het maximum aan.
-    expect(zoomByWheel(1, -8)).toBeLessThan(1.03);
+    expect(zoomByWheel(1, -8)).toBeLessThan(1.05);
   });
 
-  it('blijft vloeiend over een heel gebaar', () => {
-    // Dertig kleine stapjes samen horen een merkbare maar beheersbare zoom te
-    // geven, niet het hele bereik.
+  it('blijft vloeiend over een heel gebaar, en niet traag', () => {
+    // De twee klachten waar de snelheid tussenin ligt: dertig kleine stapjes
+    // horen een merkbare zoom te geven (niet "er gebeurt niets") maar niet het
+    // hele bereik (niet "hij slaat door").
     let zoom = ZOOM_MIN;
     for (let step = 0; step < 30; step += 1) zoom = zoomByWheel(zoom, -8);
-    expect(zoom).toBeGreaterThan(1.2);
-    expect(zoom).toBeLessThan(2.5);
+    expect(zoom).toBeGreaterThan(1.7);
+    expect(zoom).toBeLessThan(3);
+  });
+
+  it('doet met een muiswiel een vijfde per klik', () => {
+    // Een muisklik is ongeveer 100px. Van helemaal uit tot helemaal in kost dat
+    // een klik of twaalf, en dat is een handbeweging en geen karwei.
+    expect(zoomByWheel(1, -100)).toBeGreaterThan(1.15);
+    expect(zoomByWheel(1, -100)).toBeLessThan(1.25);
   });
 
   it('vlakt één enorme gebeurtenis af', () => {

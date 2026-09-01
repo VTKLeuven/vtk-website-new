@@ -165,8 +165,10 @@ de same-origin `publicUrl`.
   dag-, week- en maandweergave, zoom, volledig scherm, filters, en een paneel
   waarin je een rit opent, aanpast of aanmaakt; dat paneel is op een breed
   scherm een kaartje naast het blok waar je op klikte. De kalendercomponenten staan in
-  `components/transport-calendar/` (`time-grid`, `month-grid`, `event-bars`,
-  `trip-block`, `trip-inspector`, `filters`, `transport-calendar`); de
+  `components/transport-calendar/` (`time-grid`, `month-grid`, `mobile-calendar`,
+  `event-bars`, `trip-block`, `trip-inspector`, `filters`, `transport-calendar`);
+  op een telefoon geeft volledig scherm een eigen dagweergave
+  (`mobile-calendar`) in plaats van de week in het klein; de
   berekeningen zijn puur en getest (`lib/week-lanes.ts`, `lib/month-lanes.ts`,
   `lib/calendar-range.ts`, `lib/transport-filters.ts`, `lib/driver-colors.ts`).
   Het tijdrooster is gedeeld met het publieke `/vervoer/bezetting`. De zoom is

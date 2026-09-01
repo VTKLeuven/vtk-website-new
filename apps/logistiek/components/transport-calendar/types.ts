@@ -102,8 +102,13 @@ export function hourPxFor(fitHourPx: number, zoom: number): number {
  * "glitchte". Nu telt de afstand, dus een muiswiel met grote stappen en een
  * trackpad met kleine stapjes komen op ongeveer hetzelfde uit, en een gebaar
  * loopt vloeiend in plaats van in sprongen.
+ *
+ * De waarde is het midden tussen twee klachten. Eerst was het 1,25 per
+ * gebeurtenis en dat was onbestuurbaar; op 0,0015 per pixel was het te traag.
+ * Hier is één muisklik ongeveer een vijfde erbij, en één trackpadgebaar
+ * ongeveer een verdubbeling.
  */
-export const ZOOM_WHEEL_PER_PX = 0.0015;
+export const ZOOM_WHEEL_PER_PX = 0.003;
 
 /**
  * Bovengrens op wat één gebeurtenis mag doen.

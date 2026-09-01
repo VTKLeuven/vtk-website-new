@@ -2183,7 +2183,9 @@ Wat daarbij vastligt:
   veeg sloeg meteen tegen het maximum aan. Nu schaalt de zoom met de gescrolde
   pixels (`zoomByWheel`), met een grens per gebeurtenis omdat een muis er soms
   240 in één keer meldt. `deltaMode` wordt omgerekend, anders zoomt Firefox
-  honderd keer trager dan Chrome.
+  honderd keer trager dan Chrome. De snelheid zelf is het midden tussen twee
+  klachten (te wild, daarna te traag): één muisklik is ongeveer een vijfde erbij,
+  één trackpadgebaar ongeveer een verdubbeling.
 - **De scrollcorrectie staat in een layout-effect, niet in een
   `requestAnimationFrame`.** Dat laatste loopt niet gegarandeerd ná de commit,
   dus klemde de browser de nieuwe scrollpositie soms nog op de oude, kleinere
@@ -2260,6 +2262,80 @@ daarbij ook een gele vulling met een omranding, en dat is weggehaald: opengeklap
 zijn en in beeld staan is de bevestiging al. De markering bleef daarna staan tot
 je herlaadde, en de gele tint in die lijst betekent al iets anders, namelijk dat
 er nog geen chauffeur is.
+
+### Op een telefoon is volledig scherm een eigen weergave, geen kleinere week
+
+Klik je op een telefoon op "volledig scherm", dan verschijnt er niet de
+weekweergave in het klein, maar een **dagweergave over de volle breedte**
+(`components/transport-calendar/mobile-calendar.tsx`).
+
+De week kleiner zetten is geprobeerd en werkte niet: zeven kolommen in 340 pixels
+werd tweeënhalve dag naast elkaar, met blokken van 112px waarin "Career Fair"
+drie letters is, en je moest horizontaal scrollen om te weten of er zaterdag iets
+stond. Elke agenda-app op een telefoon toont één dag, en om die reden.
+
+Wat daarbij vastligt:
+
+- **De keuze valt in JavaScript (`matchMedia`), niet in CSS.** Het gaat niet om
+  hoe iets eruitziet maar om wélke component er rendert, en dat kan CSS niet. In
+  een effect, want op de server bestaat `window` niet en een andere eerste render
+  dan de server is een hydratiefout.
+- **De week staat als zeven knoppen bovenaan**, met een stip op de dagen waar
+  iets staat. Dat is de vraag waarmee je op een telefoon naar de planning gaat:
+  waar zit het druk.
+- **Vegen wisselt van dag, knijpen maakt de uren hoger.** `touch-action: pan-y`
+  op het rooster houdt verticaal scrollen native (en dus vloeiend) en geeft enkel
+  de horizontale beweging aan ons; een veeg telt pas als hij duidelijk
+  horizontaal is, anders springt de dag weg bij elke schuine scroll.
+- **Slepen om een rit te verplaatsen of aan te maken zit er niet in.** Op een
+  touchscreen is elke sleep ook een scroll, en een rit die per ongeluk twee uur
+  opschuift merk je pas als de chauffeur belt. Aantikken opent de rit; de
+  plusknop maakt er een op het eerstvolgende hele uur.
+- **De maandweergave houdt haar raster.** Eén dag is geen antwoord op "hoe ziet
+  de maand eruit".
+- **Ze rendert bínnen dezelfde container als de gewone kalender.** Bij echte
+  fullscreen is alles wat daarbuiten staat onzichtbaar, en het detailpaneel hoort
+  erbij; dat verschijnt hier als bottom sheet.
+
+### De dagkop plakt, en dekt af wat eronder doorschuift
+
+De rij met de dagnamen en de evenementenstrook is `sticky` binnen de scroller.
+Twee dingen lieten dat er los uitzien, en allebei zijn ze weg:
+
+- **De scroller had `padding-top`.** Een `sticky top-0`-kop plakt aan de
+  bovenrand van het scrollvenster, niet onder de padding. Die acht pixels bleven
+  dus onbedekt, en daar schoven de ritten doorheen bóven de dagnamen. De lucht
+  bovenaan zit nu in de kop zelf, die meeschuift en alles eronder afdekt.
+- **Er stond geen rand onder.** Wit vlak liep over in wit vlak, en dan lijkt de
+  rij dagnamen boven het rooster te zweven in plaats van erop te staan. Een
+  hairline onder de kop en rechts van de urenkolom maakt van allebei een
+  zichtbare rand in plaats van een toevalligheid.
+
+### Beschikbaarheid tekenen werkt als een Let's Meet
+
+Sleep een venster in de week en het staat er meteen; sleep er nog eens over en
+het gaat weer weg. Geen tweede handeling, geen knop, geen nota.
+
+Het was eerst slepen om twee velden in te vullen en dan op "Toevoegen" klikken.
+Dat leek zorgvuldig (je kon er nog een nota bij zetten) maar het waren drie
+handelingen voor één venster, en de nota bleef in de praktijk leeg.
+
+- **Wat de toets bepaalt is het beginpunt van de sleep**, niet de hele overlap.
+  Sleep je van halverwege je zaterdagvenster naar de avond, dan is dat "dit stuk
+  mag weg" en niet "voeg er nog een uur aan toe". Het beginpunt is waar je de
+  knop indrukte.
+- **Optimistisch, via `useOptimistic`.** De acties doen `revalidatePath`, dus de
+  echte lijst komt vanzelf terug en React draait de optimistische versie precies
+  dan terug. Met eigen state moet je die twee zelf uit elkaar houden, en dan
+  blijft er bij een fout een venster staan dat er niet is.
+- **De velden en de lijst blijven staan.** Op een telefoon is verticaal vegen
+  scrollen, en dan valt er niets in te tekenen; de lijst is waar je met een
+  bevestiging wist voor wie liever niet met een gebaar werkt.
+- **Op je eigen scherm staan de banden op de voorgrond**, met het uur erin. In de
+  planning zijn ze bewust vaag, want daar zijn ze de achtergrond waarbinnen je
+  plant. Op je eigen scherm staan er helemaal geen ritten en zijn ze het enige
+  wat er te zien is; vaag betekende daar "ik zie niet goed wat ik net aangeduid
+  heb".
 
 ### Karchauffeurs: één vlag, geen aparte soort
 
