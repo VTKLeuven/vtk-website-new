@@ -109,9 +109,9 @@ export const FRONTPAGE_MODULES: FrontpageModule[] = [
         labelNl: "Maximum bij een rustige week",
         labelEn: "Maximum in a quiet week",
         helpNl:
-          "Hoeveel eerstvolgende evenementen er maximaal verschijnen wanneer het weekoverzicht minder dan vier evenementen bevat. Acht vult de beschikbare ruimte tot aan de feitenlijn.",
+          "Hoeveel eerstvolgende evenementen er maximaal verschijnen wanneer het weekoverzicht minder dan vier evenementen bevat. Zeven vult de beschikbare ruimte tot aan de feitenlijn met dezelfde ademruimte als het weekoverzicht.",
         helpEn:
-          "The maximum number of upcoming events shown when the week overview contains fewer than four events. Eight fills the available space down to the facts divider.",
+          "The maximum number of upcoming events shown when the week overview contains fewer than four events. Seven fills the available space down to the facts divider with the same spacing as the week overview.",
         min: HERO_WEEK_NEXT_LIMIT_MIN,
         max: HERO_WEEK_NEXT_LIMIT_MAX,
         step: 1,

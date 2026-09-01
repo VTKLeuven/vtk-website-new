@@ -99,7 +99,7 @@ export function HeroWeek({
 
   return (
     <aside
-      className={`hero-week hero-week-${mode}`}
+      className="hero-week"
       style={{ "--hero-week-dim": dim / 100 } as React.CSSProperties}
     >
       {/* Het verloop dat de tekst draagt. Puur decoratief: het staat achter de

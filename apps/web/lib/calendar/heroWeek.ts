@@ -44,12 +44,13 @@ export const HERO_WEEK_MIN_FOR_WINDOW = 4;
 
 /**
  * De rustige-weeklijst vult de ruimte naast de herotekst tot aan de feitenlijn.
- * Acht compacte rijen passen daar op desktop; meer zou de lijn voorbij lopen.
+ * Zeven rijen met de gewone ademruimte passen daar op desktop; meer zou de lijn
+ * voorbij lopen.
  * Een redacteur kan het aantal verlagen in Admin → Website → Frontpage.
  */
-export const HERO_WEEK_NEXT_LIMIT_DEFAULT = 8;
+export const HERO_WEEK_NEXT_LIMIT_DEFAULT = 7;
 export const HERO_WEEK_NEXT_LIMIT_MIN = HERO_WEEK_MIN_FOR_WINDOW;
-export const HERO_WEEK_NEXT_LIMIT_MAX = 8;
+export const HERO_WEEK_NEXT_LIMIT_MAX = 7;
 
 /** Zie de gelijknamige enum in schema.prisma. */
 export type HeroWeekPlacement = "AUTO" | "PINNED" | "HIDDEN";

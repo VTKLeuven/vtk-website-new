@@ -496,23 +496,6 @@
   align-items: baseline;
 }
 
-/* De rustige-weekvariant mag de beschikbare kolom tot aan de feitenlijn vullen.
-   Acht gewone weekrijen zouden daar net voorbij lopen; in deze lijst zijn lege
-   dagen er niet en krijgen de rijen daarom minder verticale marge. Titel en
-   context blijven elk op één regel, zodat één lang lokaal of een lange
-   eventnaam de feitenlijn niet alsnog naar beneden kruist. De volledige tekst
-   blijft op de eventpagina staan waar de rij naartoe linkt. */
-.vtk-design .home-hero .hero-week-next .hero-week-day {
-  padding: 6px 0;
-}
-
-.vtk-design .home-hero .hero-week-next .hero-week-ev .title,
-.vtk-design .home-hero .hero-week-next .hero-week-ev .body small {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
 .vtk-design .home-hero .hero-week-label {
   display: flex;
   align-items: baseline;
@@ -567,7 +550,10 @@
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background: var(--cat, var(--yellow));
+  /* De felle kalenderkleuren worden op de donkere herofoto snel neon. Meng ze
+     hier met het blauwgrijs van de secundaire tekst: de categorie blijft
+     herkenbaar, maar de stippen lezen rustiger en minder speels. */
+  background: color-mix(in srgb, var(--cat, var(--yellow)) 48%, #9da7ba);
   transform: translateY(4px);
 }
 

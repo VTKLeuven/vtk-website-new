@@ -180,7 +180,6 @@ describe("selectHeroWeek", () => {
       "vijf",
       "zes",
       "zeven",
-      "acht",
     ]);
   });
 
